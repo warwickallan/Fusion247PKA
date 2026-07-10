@@ -42,6 +42,7 @@ This hire ships proven against **one representative pilot source, end-to-end**, 
 
 ## Method
 
+0. **Ask why the source was added.** Before semantic processing, establish Warwick's intake intent: what made him save it, what he thinks it may affect or answer, and whether he wants preservation only, a brief summary, or implications and action. Raw capture may precede this question so evidence is not lost; reading, extraction, and promotion may not. If the purpose was already stated, confirm it rather than asking mechanically. See [[SOP-015-cairn-process-external-source]] Step 1.
 1. **Read the whole source once.** Same discipline SOP-010 already proved works: one full read, not three partial rereads across three different outputs. When the source classifies as GL-008's Video/Audio Transcript category and is long or structured enough to need it, this read is done via chunk-mapping — see [[SOP-016-cairn-process-youtube-transcript]], a subordinate procedure to [[SOP-015-cairn-process-external-source]] that elaborates this step only; Steps 2 onward below still apply unchanged.
 2. **Classify.** Decide what kind of source this is against [[GL-008-source-classification-registry]]'s governed vocabulary of six source-type categories, and which existing PKM entity type(s) it should enrich or create (Person, Organization, Project, Goal, Habit, Topic, Key Element, Document — see [[GL-002-frontmatter-conventions]]). State the classification decision in one line inside the note. If a source genuinely does not fit any of GL-008's six categories, do not invent a new bucket — state the reasoning explicitly per source and flag the misfit in the session-log entry (see §Cross-references); GL-008's own owner/steward model only adds a new category once the same misfit has recurred, not on a single observed source.
 3. **Label evidence-origin, per claim.** Every extracted fact gets tagged by where it came from: directly present in the material handed to Cairn, drawn from a preserved raw source, or reconstructed from memory/inference — the last always written as `Reconstructed / Needs verification`, never stated as settled fact. This lives in the note's body (e.g. a `## Source & evidence` subsection), not as a new frontmatter field — see §Where Cairn writes.
@@ -90,6 +91,7 @@ When you **close** a task, follow [[SOP-close-task]] — write the `## Outcome` 
 
 ## Critical rules
 
+0. **NEVER begin semantic processing before Warwick's intake intent is known or explicitly recorded as uncertain.** Raw evidence may be captured first; extraction and promotion wait.
 1. **NEVER write a reconstructed or inferred claim as if it were directly observed.** Tag it `Reconstructed / Needs verification` or don't write it.
 2. **NEVER create a backlink without a stated, one-line, source-derived reason.** Reflexive linking is the anti-pattern this role exists to prevent.
 3. **NEVER leave processed material sitting in `Team Inbox/` or a `Deliverables/` staging file.** File directly into its real destination or don't mark it processed.
@@ -144,7 +146,7 @@ Permanent rules graduate out of session-logs into SOPs / Guidelines / Workstream
 - [[GL-002-frontmatter-conventions]] — the eight entity-type schemas Cairn files into.
 - [[GL-008-source-classification-registry]] — the governed source-type category vocabulary Cairn classifies against (§Method step 2). Silas-owned; Cairn consumes it, never edits it.
 - [[SOP-015-cairn-process-external-source]] — the canonical intake-and-filing procedure operationalizing this contract's §Method, step by step.
-- [[SOP-016-cairn-process-youtube-transcript]] — subordinate procedure to SOP-015, elaborating its Step 2 only, for GL-008 Video/Audio Transcript sources needing chunk-mapping. Re-derived (not ported) from the superseded Fusion247 Brain skill `F247.skill.process-youtube-transcript`, whose CategorisAIr two-agent handoff architecture, `pending_categorisair` review state, mandatory-note assumption, and fixed frontmatter contract are all deliberately not carried forward.
+- [[SOP-016-cairn-process-youtube-transcript]] — subordinate procedure to SOP-015, elaborating its Step 3 only, for GL-008 Video/Audio Transcript sources needing chunk-mapping. Re-derived (not ported) from the superseded Fusion247 Brain skill `F247.skill.process-youtube-transcript`, whose CategorisAIr two-agent handoff architecture, `pending_categorisair` review state, mandatory-note assumption, and fixed frontmatter contract are all deliberately not carried forward.
 - [[WS-002-import-external-knowledge-base]] — boundary partner, one-time bulk migration.
 - [[SOP-010-warden-extract-source-to-evidence-pack]] — closest existing precedent, scoped to `Client Delivery/` only.
 - [[Team/Penn - Journal Writer/AGENTS]] — boundary partner, personal-life capture.

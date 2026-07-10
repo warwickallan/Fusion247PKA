@@ -8,11 +8,11 @@ assignee: silas
 priority: 2
 status: open
 blocked_reason: null
-blocked_by: null
+blocked_by: tsk-2026-07-10-008
 
 # Time
 created: 2026-07-10T23:10:00Z
-updated: 2026-07-11T04:40:00Z
+updated: 2026-07-11T05:00:00Z
 due: null
 
 # Provenance
@@ -62,7 +62,7 @@ awaits the user's sign-off on a direction before any implementer touches anythin
 
 Cairn (Knowledge Intake Specialist, `Team/Cairn - Knowledge Intake Specialist/AGENTS.md`,
 canonical process [[SOP-015-cairn-process-external-source]]) ran its first real pilot filing a
-YouTube transcript's knowledge into `PKM/My Life/Topics/ai-tooling.md`. SOP-015 Step 9 requires
+YouTube transcript's knowledge into `PKM/My Life/Topics/ai-tooling.md`. SOP-015 Step 10 requires
 addressing raw-source provenance honestly, and Cairn's pilot did exactly that — it surfaced this
 line explicitly, in the note body and in its own session log:
 
@@ -71,7 +71,7 @@ line explicitly, in the note body and in its own session log:
 > `Client Delivery/` only)."
 
 A follow-on pass, SOP-016 (`[[SOP-016-cairn-process-youtube-transcript]]`), hit the identical gap
-again and again deliberately declined to paper over it — it defers entirely to SOP-015 Step 9's
+again and again deliberately declined to paper over it — it defers entirely to SOP-015 Step 10's
 honest-flagging behavior rather than assuming a store exists.
 
 **This is a real, named, twice-recurring gap, not a one-off pilot footnote.** Warden's
@@ -104,6 +104,11 @@ external material processed via SOP-015/SOP-016, and the future TubeAIR/ICOR-cou
 adapters that will feed it). Cairn is now the decided owner of Knowledge Intake and Synthesis;
 this task no longer treats ownership as open. What remains undecided is the source-store location
 and its capture semantics. It is **not**:
+
+- The user-specific knowledge-valuation layer. Raw retention answers "what evidence do we keep?";
+  [[tsk-2026-07-10-008-design-warwick-knowledge-value-profile]] answers "what changes Warwick's
+  understanding, decisions, capabilities, actions, or future options?" Task 007 must not close
+  until that shared valuation design confirms the boundary between capture and promotion.
 
 - A redesign of `Team Inbox/`, `PKM/Journal/`, or `PKM/Images/` — Penn's existing personal-capture
   paths already have their own retention homes and are untouched by this proposal.
@@ -285,7 +290,7 @@ Whichever option the user approves, TubeAIR's eventual design (still entirely un
 starts on it from this task) must satisfy this hard requirement, stated by the user directly:
 **TubeAIR writes the raw transcript, plus every available piece of source metadata (video title,
 channel, URL if known, capture timestamp), into the canonical location decided here — before
-handing off to Cairn/SOP-015 for processing.** Once that lands, SOP-015 Step 9's provenance
+handing off to Cairn/SOP-015 for processing.** Once that lands, SOP-015 Step 10's provenance
 write-up changes from "citation only, thinner than a preserved raw copy" (today's honest but weak
 answer) to "wikilink to the stored raw copy plus its `INDEX.md` row" (a verifiable answer). This
 is the one piece of this proposal that is not optional or up for a design trade — it is the
@@ -320,9 +325,11 @@ reason the gap needed resolving now rather than whenever TubeAIR eventually gets
   approves a direction (A, B, C, or a fourth option none of these anticipated) or asks for more
   exploration before deciding.
 - Once a direction is approved, a follow-up implementation task is created (new folder, `INDEX.md`
-  register, SOP-015 Step 9 rewrite, and — separately, only once TubeAIR is actually scoped for a
+  register, SOP-015 Step 10 rewrite, and — separately, only once TubeAIR is actually scoped for a
   build — TubeAIR's own design inheriting the preserve-before-handoff constraint stated above).
   This task itself closes as "direction decided" without doing any of that build.
+- [[tsk-2026-07-10-008-design-warwick-knowledge-value-profile]] defines the shared valuation layer
+  and confirms that raw-source retention remains evidence capture, never automatic promotion.
 
 ## Updates
 - 2026-07-10 23:10 (silas) — created, per Larry's routing of the gap Cairn's SOP-015 pilot and
@@ -334,6 +341,9 @@ reason the gap needed resolving now rather than whenever TubeAIR eventually gets
   supersession semantics, added stable-ID/hash guidance, and narrowed the remaining decision to
   the final location choice (`PKM/Sources (Immutable)/` vs top-level `Sources (Immutable)/`).
   No folder or register implemented; the proposal still awaits user approval.
+- 2026-07-11 00:45 (larry) - paused closure after Warwick's knowledge-valuation realignment.
+  Raw-source retention is necessary but does not determine personal value. Added dependency on
+  [[tsk-2026-07-10-008-design-warwick-knowledge-value-profile]] before this proposal can close.
 
 ## Outcome
 _(filled when status flips to done — see SOP-close-task)_
