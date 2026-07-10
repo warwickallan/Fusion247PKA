@@ -1,6 +1,6 @@
 # Team - Agent Index
 
-Routing table for the twelve specialists in the **v3.0.0 all-in-one** bundle — six base specialists plus six preinstalled from the App Developer Pack (Felix, Vex, Vera) and the Designer Pack (Iris, Charta, Pixel). Larry reads this on every request to decide who handles what.
+Routing table for the team. Twelve specialists ship in the **v3.0.0 all-in-one** bundle — six base specialists plus six preinstalled from the App Developer Pack (Felix, Vex, Vera) and the Designer Pack (Iris, Charta, Pixel). Additional specialists are hired via Nolan per [[SOP-001-how-to-add-a-new-specialist]] and added below. Larry reads this on every request to decide who handles what.
 
 | Specialist | Role | Folder | Routes to them when |
 |---|---|---|---|
@@ -16,6 +16,7 @@ Routing table for the twelve specialists in the **v3.0.0 all-in-one** bundle —
 | Iris | Design System Architect | [[Team/Iris - Design System Architect/AGENTS]] | Author or extend the design system / brand SSOT. Owns [[GL-003-design-system]]; default owner of [[SOP-006-author-a-design-system]] and [[SOP-007-audit-content-for-design-system-compliance]]. *(Designer Pack)* |
 | Charta | Infographic Designer | [[Team/Charta - Infographic Designer/AGENTS]] | Build an infographic, slide, diagram, or structured visual deliverable (HTML/CSS layout). Default owner of [[SOP-008-build-an-infographic]]. *(Designer Pack)* |
 | Pixel | Visual Specialist | [[Team/Pixel - Visual Specialist/AGENTS]] | Generate or stylize an image; routes the connection half to Mack when local image-gen is unavailable. Default owner of [[SOP-009-generate-a-styled-image]]. *(Designer Pack)* |
+| Warden | Delivery Manager | [[Team/Warden - Delivery Manager/AGENTS]] | Business/client-delivery project governance — scope/PRD intake, work-package breakdown, risk/issue/change/decision register entries, outbound-communication verification, engagement handover/closure. Writes under the `Client Delivery/` root, structurally separate from `PKM/My Life/Projects` (personal, stays with Penn/the user). Hired 2026-07-10; see `[[2026-07-10-project-implementation-specialist-hire-research]]`. |
 
 ## Bootstrap rule
 
