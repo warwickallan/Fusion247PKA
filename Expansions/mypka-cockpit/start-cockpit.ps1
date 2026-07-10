@@ -131,7 +131,13 @@ function Get-PortableNode {
   $answer = Read-Host "Download and set this up now? (y/n)"
   if ($answer -notmatch '^(y|yes)$') { return $null }
 
-  $nodeVersion = "20.18.1"
+  # Pinned to a Node 22.x release, not 20.x: better-sqlite3's published
+  # Windows prebuilt binaries dropped ABI 115 (Node 20.x) support, so a
+  # portable Node 20 forces a from-source compile that needs a working
+  # Python + build toolchain - exactly what this fallback exists to avoid.
+  # Verified working end-to-end (install, native build, web build, server
+  # start) on a real locked-down Windows machine with this version.
+  $nodeVersion = "22.23.1"
   $zipUrl = "https://nodejs.org/dist/v$nodeVersion/node-v$nodeVersion-win-x64.zip"
   $zipPath = Join-Path $env:TEMP "node-portable-$nodeVersion.zip"
   try {
