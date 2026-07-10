@@ -30,6 +30,11 @@ id_rsa
 *.db-shm
 *.sqlite
 *.sqlite3
+# ...except: ship a prebuilt root mypka.db as a no-Python fallback, so a
+# machine with no working Python/PyYAML can still run the Cockpit via
+# `git pull` alone (see start-cockpit.ps1/.sh). It stays regenerable/
+# overwritable by scripts/regen-mypka-db.py wherever Python IS available.
+!/mypka.db
 
 # --- Dependencies & build artifacts ---
 node_modules/
