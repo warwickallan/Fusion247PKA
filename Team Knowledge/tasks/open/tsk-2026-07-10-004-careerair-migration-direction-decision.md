@@ -5,7 +5,7 @@ title: "Direction decision: CareerAIR migration scope (hire vs. retain-external 
 
 # Ownership & priority
 assignee: unassigned
-priority: 3
+priority: 4
 status: open
 blocked_reason: null
 blocked_by: null
@@ -88,6 +88,7 @@ This hinges on information only the user has: how often does career-document wor
 
 - 2026-07-10 23:46 (pax) — created, per tsk-2026-07-10-001 decision 14 disposition of Migration Coverage Matrix follow-up #4. Cross-refs: 5/7 populated (sops, workstreams, guidelines, deliverables; my_life confirmed genuinely empty — no `career.md` Key Element exists yet to link; session_logs and journal_entries empty — no existing entries cover this).
 - 2026-07-11 00:15 (larry) — added the explicit recommended direction (relayed from external QA review) atop Pax's three options: CareerAIR stays an active Fusion247 capability, intended for later migration as a bounded specialist, this task scoped to a design brief + capability mapping only. Still gated — no implementation without a separate approval on the brief itself.
+- 2026-07-11 01:35 (larry) — deprioritized (3 → 4, low) per explicit user instruction: left open, not actively worked, while #1 (Knowledge Intake and Synthesis) proceeds first.
 
 ## Outcome
 _(filled when status flips to done — see SOP-close-task)_
