@@ -46,7 +46,7 @@ Adapted from GL-006's source-tier precedence doctrine — items that touch what 
 - **Overdue items** — open register items whose `target_resolution_date` has passed, and Work Packages whose `target_date` has passed and aren't `done`. (myPKA has no discrete `action` entity — see SOP-010's note on this; overdue "actions" are read off these two fields.)
 - **Questions to ask** — `evidence_type: unresolved-discussion` items, and any open item with no `owner` set.
 - **Suggested meeting order** — sequence the agenda by the ranking in step 3, not by whichever item happens to be freshest.
-- **Who owns what** — split owned-internally vs. owned-by-the-client, pulled straight from each item's `owner` field; unowned items are listed as **unowned**, not silently assigned.
+- **Who owns what** — split owned-internally vs. owned-by-the-client: start from each item's `owner` field (a Person slug), then check whether that slug appears in the Engagement's `client_contacts` or `linked_stakeholders`, or whether the Person's own `company` matches the Engagement's `client_org` — if either holds, list as client-side; otherwise, list as internal. This is a best-effort cross-reference, not a guaranteed read: those Engagement fields are optional, and today's schema has no way to distinguish an internal team member from a third-party/subcontractor owner at all (see GL-006's §"Known gaps"). Unowned items are listed as **unowned**; an owner whose side can't be determined from the data above is listed as **side unknown** — never guessed.
 
 ### 5. QA checklist (Meeting Prep-specific)
 

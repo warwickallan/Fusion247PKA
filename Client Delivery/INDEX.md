@@ -12,6 +12,7 @@ Each engagement gets its own subfolder under `Client Delivery/<engagement-slug>/
 
 - **Project Control** — the Project PRD and Implementation Plan for the engagement. Intent and boundaries, not a task list.
 - **Sources (Immutable)** — raw inputs (transcripts, client documents, emails) as captured. Never edited after capture; processed artifacts elsewhere cite back to these with source/date/confidence.
+- **Evidence Packs** — one reusable, per-source distillation (structured summary, speaker/topic index, key extracts, linked Register Items) produced by [[SOP-010-warden-extract-source-to-evidence-pack]]. Lives in its own folder, not inside Sources (Immutable) — unlike a raw capture it is documented-mutable (a reread pass appends to it), and nesting it under an "Immutable" folder was a naming hazard. See GL-006.
 - **Work Packages** — the Work Package Catalogue. Each work package is independently referenceable, with a named owner and a defined done-state.
 - **Risk-Issue-Change-Decision Register** — one combined, reviewed register for the engagement. Dated reconciliation entries whenever new source material lands. This is the source of truth for engagement state — never a dashboard or board view.
 - **Reporting-QA-Comms** — status reporting and the Write-and-Verification Log for every outbound client artifact (what was sent, when, to whom, confirmed landed).

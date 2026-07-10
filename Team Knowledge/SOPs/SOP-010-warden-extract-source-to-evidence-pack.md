@@ -3,7 +3,7 @@
 - **Default owner:** Warden
 - **Reusable by any agent.** Any specialist processing a captured source under `Client Delivery/` follows this procedure — it is not exclusive to Warden, only usually run by him.
 - **Triggered by:** a new raw source lands in `Sources (Immutable)/` and hasn't been extracted yet, or an existing Register Item's `reread_flag` (`recommended`/`mandatory`) fires and the source needs a further pass.
-- **Output:** (a) new or updated Register Items in `Risk-Issue-Change-Decision Register/`; (b) one Evidence Pack per source in `Sources (Immutable)/Evidence Packs/`.
+- **Output:** (a) new or updated Register Items in `Risk-Issue-Change-Decision Register/`; (b) one Evidence Pack per source in `Evidence Packs/`.
 - **References:** [[GL-006-client-delivery-frontmatter-conventions]] (source-tier doctrine; `evidence_type` / `confidence` / `reread_flag`), [[GL-001-file-naming-conventions]], `Team Knowledge/Templates/register-item.md`.
 
 ## Purpose
@@ -87,9 +87,9 @@ Add a one-line dated entry to the Engagement note's `## Status update` ("source 
 
 ## Evidence Pack shape
 
-**Location:** `Client Delivery/<engagement-slug>/Sources (Immutable)/Evidence Packs/<source-slug>-evidence-pack.md`
+**Location:** `Client Delivery/<engagement-slug>/Evidence Packs/<source-slug>-evidence-pack.md`
 
-**Tier reasoning (why here, and why this isn't itself tier 3):** the Evidence Pack is not raw evidence — it's a processed distillation of a read of raw evidence, so per GL-006's source-tier precedence doctrine it is properly **tier 4 (structured project knowledge)**, the same tier as the Register Items it links to, not tier 3. It lives physically next to its source, inside `Sources (Immutable)/`, for the same reason GL-006 already tolerates one processed artifact there — the document-register `INDEX.md` — living alongside raw captures: 1:1 discoverability with what it describes matters more here than folder purity. To keep the raw/processed distinction legible despite that proximity, it sits in a named subfolder, `Evidence Packs/`, never loose among the raw captures themselves. And unlike a raw capture, the pack is **not immutable in the same sense** — a reread pass appends a new dated section to the pack's own `## Reread log` rather than silently rewriting the prior read, the same append-only discipline GL-006 already requires of a Register Item's `## Reconciliation log`.
+**Tier reasoning (why this isn't tier 3, and why it lives in its own folder, not inside `Sources (Immutable)/`):** the Evidence Pack is not raw evidence — it's a processed distillation of a read of raw evidence, so per GL-006's source-tier precedence doctrine it is properly **tier 4 (structured project knowledge)**, the same tier as the Register Items it links to, not tier 3. Earlier drafts of this SOP nested it inside `Sources (Immutable)/Evidence Packs/` for 1:1 proximity to the source it describes. A pre-merge QA pass flagged that as a real naming/tooling hazard: unlike a raw capture, the pack is **not immutable** — a reread pass appends a new dated section to the pack's own `## Reread log` rather than silently rewriting the prior read, the same append-only discipline GL-006 already requires of a Register Item's `## Reconciliation log` — and nesting a documented-mutable file under a folder explicitly named "Immutable" risks a future validation script (or a careless agent) treating it as immutable-by-name and refusing to update it, or a human skimming the folder wrongly assuming everything inside is raw and unedited. GL-006 now defines the Evidence Pack's home as its own top-level `Evidence Packs/` folder, a sibling to `Sources (Immutable)/` — see GL-006's folder map, which is the canonical source for this location decision. 1:1 discoverability with the source it describes is unaffected: the pack's own `## Source metadata` wikilinks back to the raw file and its `Sources (Immutable)/INDEX.md` row.
 
 **No frontmatter.** Plain structured markdown, same shape as the Work Package Catalogue and Comms Plan — a rollup/synthesis document, not an individually foreign-keyed entity. Register Items link back to the *source* via `source_ref`, not to the pack; the pack is a reading aid, not a new thing other entities point at.
 
@@ -107,7 +107,7 @@ Add a one-line dated entry to the Engagement note's `## Status update` ("source 
 
 ## Worked example
 
-Source: `2026-04-02-ptw-workshop-transcript.vtt` lands in `Client Delivery/bellrock-npl-implementation/Sources (Immutable)/`. Warden indexes it (tier 3) in that folder's `INDEX.md`, reads it once, extracts eleven items — three `risk`, two `issue`, four `change`, two `decision` — writing `bellrock-npl-implementation-reg-014` through `-024`. One item (permit-expiry notification ownership) is `evidence_type: assumption`, `confidence: low`, `reread_flag: recommended` because attribution of who owns notification config is disputed between two speakers. Warden builds `Sources (Immutable)/Evidence Packs/2026-04-02-ptw-workshop-evidence-pack.md`, logs the pass in the Engagement's `## Status update`, and writes a session log. SOP-011 through SOP-014 later read the pack; none reopen the VTT except a targeted check on the disputed-attribution item.
+Source: `2026-04-02-ptw-workshop-transcript.vtt` lands in `Client Delivery/bellrock-npl-implementation/Sources (Immutable)/`. Warden indexes it (tier 3) in that folder's `INDEX.md`, reads it once, extracts eleven items — three `risk`, two `issue`, four `change`, two `decision` — writing `bellrock-npl-implementation-reg-014` through `-024`. One item (permit-expiry notification ownership) is `evidence_type: assumption`, `confidence: low`, `reread_flag: recommended` because attribution of who owns notification config is disputed between two speakers. Warden builds `Evidence Packs/2026-04-02-ptw-workshop-evidence-pack.md`, logs the pass in the Engagement's `## Status update`, and writes a session log. SOP-011 through SOP-014 later read the pack; none reopen the VTT except a targeted check on the disputed-attribution item.
 
 ## Common mistakes to avoid
 
@@ -115,6 +115,6 @@ Source: `2026-04-02-ptw-workshop-transcript.vtt` lands in `Client Delivery/bellr
 - Skipping anchor capture during the first read — without anchors, a later "targeted reread" is really a full reread in disguise.
 - Marking `evidence_type: agreed-decision` because the discussion trended toward agreement, without an explicit sign-off statement in the source.
 - Drafting Register Items before finishing the full read — produces partial, uncorroborated extraction.
-- Filing the Evidence Pack loose in `Sources (Immutable)/` instead of in `Evidence Packs/` — blurs the raw/processed distinction the tier reasoning above depends on.
+- Filing the Evidence Pack inside `Sources (Immutable)/` instead of the dedicated top-level `Evidence Packs/` folder — reintroduces the immutable-folder naming hazard GL-006's relocation exists to avoid.
 - Not logging the pass in the Engagement's `## Status update` or a session log — leaves the extraction discoverable only inside the pack itself, which is the project-local-logging failure this SOP exists partly to prevent (Warden's Critical rule 8).
 - Inventing an `action` kind or a new `reread_flag` trigger not on GL-006's list — route real gaps to Silas via Larry instead.
