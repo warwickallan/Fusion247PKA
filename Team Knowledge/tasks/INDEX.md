@@ -13,11 +13,14 @@ _Last rebuilt: 2026-07-10T19:15:00Z_
 ## Open (0)
 _(none yet — see [[SOP-create-task]] to add one)_
 
-## In progress (1)
+## In progress (2)
 - [[tsk-2026-07-10-001-fold-fusion247-brain-doctrine-into-warden]] — assignee: warden — claimed 2026-07-10
+- [[tsk-2026-07-10-002-fusion247-brain-migration-coverage-matrix]] — assignee: pax — claimed 2026-07-10
+  - parent: [[tsk-2026-07-10-001-fold-fusion247-brain-doctrine-into-warden]]
 
 ## By assignee
 - warden: 0 open, 1 in-progress (0 blocked)
+- pax: 0 open, 1 in-progress (0 blocked)
 
 ## Recently closed (last 7 days)
 _(none)_
