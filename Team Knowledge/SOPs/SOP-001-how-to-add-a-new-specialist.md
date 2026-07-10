@@ -63,7 +63,7 @@ The principle is host-agnostic: a thin pointer to the wiki contract, never a cop
 | Host | Shim path | Frontmatter convention | Detect host activation by |
 |---|---|---|---|
 | Claude Code | `.claude/agents/<slug>.md` | YAML: `name`, `description`, `tools` | presence of `CLAUDE.md` at root |
-| Codex CLI | `.codex/agents/<slug>.md` (if supported by active version) — otherwise add a one-line specialist roster note in `AGENTS.md.codex` | per Codex spec at hire time | presence of `AGENTS.md.codex` at root |
+| Codex CLI | `.codex/agents/<slug>.toml` (project-scoped; only loads in "trusted" projects) | TOML, not Markdown+frontmatter. Required fields: `name`, `description`, `developer_instructions`. Optional: `model`, sandbox policy, MCP servers — omit unless there's a real reason to set them | presence of `.codex/` (or an activated Codex session) at root |
 | Gemini CLI | per Gemini spec (e.g. `.gemini/extensions/<slug>/`) | per Gemini spec | presence of `GEMINI.md` at root |
 | Cursor | n/a — Cursor lacks per-specialist parallel dispatch in the standard product. Add a one-line note in `.cursor/rules/main.md` | n/a | presence of `.cursor/rules/main.md` |
 | Chat-only LLM | n/a — single context, hat-switching only | n/a | tool-specific pointer file absent |
