@@ -111,10 +111,120 @@ if (Test-DbCore $DbPath) {
   }
 }
 
+# --- 2.5 resolve node/npm (system PATH first; portable no-admin fallback) ----
+# Same shape as the Python fallback above: if Node.js isn't on PATH at all
+# (common on locked-down machines), offer a fully local, no-installer, no-admin
+# portable Node.js instead of just failing. Nothing touches PATH, the registry,
+# or Program Files; deleting the folder removes it completely.
+function Get-PortableNode {
+  $embedRoot = Join-Path $CockpitDir ".node-portable"
+  $existing = Get-ChildItem -Path $embedRoot -Filter "node.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+  if ($existing) { return $existing.DirectoryName }
+
+  Write-Host ""
+  Write-Host "Node.js was not found on this machine, and you may not have admin rights"
+  Write-Host "to install it system-wide. I can download the official portable"
+  Write-Host "(no-installer) Node.js build into this folder only:"
+  Write-Host "  $embedRoot"
+  Write-Host "Nothing is installed system-wide, no admin rights are needed, and you"
+  Write-Host "can delete that folder any time to remove it completely."
+  $answer = Read-Host "Download and set this up now? (y/n)"
+  if ($answer -notmatch '^(y|yes)$') { return $null }
+
+  # Pinned to a Node 22.x release, not 20.x: better-sqlite3's published
+  # Windows prebuilt binaries dropped ABI 115 (Node 20.x) support, so a
+  # portable Node 20 forces a from-source compile that needs a working
+  # Python + build toolchain - exactly what this fallback exists to avoid.
+  # Verified working end-to-end (install, native build, web build, server
+  # start) on a real locked-down Windows machine with this version.
+  $nodeVersion = "22.23.1"
+  $zipUrl = "https://nodejs.org/dist/v$nodeVersion/node-v$nodeVersion-win-x64.zip"
+  $zipPath = Join-Path $env:TEMP "node-portable-$nodeVersion.zip"
+  try {
+    Write-Host "Downloading Node.js v$nodeVersion (portable, about 30MB)..."
+    Invoke-WebRequest -Uri $zipUrl -OutFile $zipPath -UseBasicParsing
+    New-Item -ItemType Directory -Force -Path $embedRoot | Out-Null
+    Expand-Archive -Path $zipPath -DestinationPath $embedRoot -Force
+    Remove-Item $zipPath -Force -ErrorAction SilentlyContinue
+    $found = Get-ChildItem -Path $embedRoot -Filter "node.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($found) {
+      Write-Host "Portable Node.js ready at $($found.DirectoryName) (no admin rights used)."
+      return $found.DirectoryName
+    }
+  } catch {
+    Write-Host "Could not set up portable Node.js automatically: $($_.Exception.Message)"
+  }
+  return $null
+}
+
+$NodeDir = $null
+if (-not (Get-Command node -ErrorAction SilentlyContinue) -or -not (Get-Command npm -ErrorAction SilentlyContinue)) {
+  $NodeDir = Get-PortableNode
+  if (-not $NodeDir) {
+    Write-Host ""
+    Write-Host "  Cannot continue: Node.js v20+ is required to run the Cockpit."
+    Write-Host ""
+    Write-Host "  None of these need admin/IT approval - each installs for your own"
+    Write-Host "  user account only, or needs no install at all:"
+    Write-Host "      * winget install --scope user OpenJS.NodeJS.LTS"
+    Write-Host "      * or the no-install 'Windows Binary (.zip)' at"
+    Write-Host "        https://nodejs.org/en/download - unzip it anywhere, then"
+    Write-Host "        re-run me and answer 'y' when I offer to use a portable Node"
+    Write-Host ""
+    Read-Host "Press Enter to close"
+    exit 1
+  }
+}
+$Node = if ($NodeDir) { Join-Path $NodeDir "node.exe" } else { "node" }
+$Npm  = if ($NodeDir) { Join-Path $NodeDir "npm.cmd" } else { "npm" }
+if ($NodeDir) {
+  # Prepend to THIS PROCESS's PATH only - nothing persists after this window
+  # closes, no user/system PATH or registry touched. Needed because npm
+  # spawns subprocesses (node-gyp/prebuild-install for native modules, esbuild's
+  # install script, tsc, vite) that look up a bare "node" on PATH themselves;
+  # pointing $Node/$Npm at the portable exe directly isn't enough for those.
+  $env:PATH = "$NodeDir;$env:PATH"
+}
+
+# --- pass the system proxy through to node/npm, if one is configured --------
+# Corporate networks often route HTTPS through a proxy that native Windows
+# tools (Invoke-WebRequest, git) pick up automatically from Windows' own
+# settings, but Node/npm do NOT unless HTTP_PROXY/HTTPS_PROXY are explicitly
+# set. Left unset, a native module's prebuilt-binary fetch (e.g.
+# better-sqlite3 via prebuild-install) can silently fail as a network error
+# that gets misreported as "no prebuilt binary found", then falls through to
+# a from-source compile that needs a working Python + build toolchain neither
+# of which should be required on a normal end-user machine.
+if (-not $env:HTTPS_PROXY -and -not $env:HTTP_PROXY) {
+  try {
+    $proxySettings = Get-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings" -ErrorAction Stop
+    if ($proxySettings.ProxyEnable -eq 1 -and $proxySettings.ProxyServer) {
+      $proxyUrl = $proxySettings.ProxyServer
+      if ($proxyUrl -notmatch '^https?://') { $proxyUrl = "http://$proxyUrl" }
+      Write-Host "Detected a system proxy ($proxyUrl) - passing it to npm/node so they can reach the internet too."
+      $env:HTTP_PROXY = $proxyUrl
+      $env:HTTPS_PROXY = $proxyUrl
+    }
+  } catch { }
+}
+
 # --- 3. first-run install + build (skipped on later launches) ----------------
-if (-not (Test-Path "node_modules"))     { Write-Host "Installing server deps..."; npm install --no-audit --no-fund }
-if (-not (Test-Path "web\node_modules")) { Write-Host "Installing web deps...";    npm --prefix web install --no-audit --no-fund }
-if (-not (Test-Path "web\dist"))         { Write-Host "Building the web app...";   npm --prefix web run build }
+# Check for a definite marker of a COMPLETE install/build, not just folder
+# existence - an install that failed partway (e.g. a native module build
+# error) still leaves the folder behind, which would otherwise make every
+# future launch silently skip re-running it forever.
+if (-not (Test-Path "node_modules\express\package.json")) {
+  Write-Host "Installing server deps..."
+  & "$Npm" install --no-audit --no-fund
+}
+if (-not (Test-Path "web\node_modules\.bin\tsc.cmd")) {
+  Write-Host "Installing web deps..."
+  & "$Npm" --prefix web install --no-audit --no-fund
+}
+if (-not (Test-Path "web\dist\index.html")) {
+  Write-Host "Building the web app..."
+  & "$Npm" --prefix web run build
+}
 
 # --- 4. free the port (NO lsof on Windows) -----------------------------------
 # Preferred: Get-NetTCPConnection (Win8+/Server2012+). Fallback: parse netstat.
@@ -149,4 +259,4 @@ $env:NODE_ENV = "production"
 $env:PORT = $Port
 $env:WORKBENCH_WRITE_ENABLED = "1"
 $env:PLAN_WRITE_ENABLED = "1"
-node server\server.js
+& "$Node" server\server.js

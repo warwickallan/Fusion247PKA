@@ -4,6 +4,7 @@ __MACOSX/
 *.swp
 .obsidian/workspace*
 .obsidian/cache
+.vscode/
 
 # --- Secrets (NEVER commit) ---
 # Excludes .env at any depth (e.g. Expansions/<slug>/.env). Keys-only
@@ -43,6 +44,9 @@ build/
 .next/
 .cache/
 *.tsbuildinfo
+# Portable Node.js the Windows launcher may bootstrap on machines with no
+# admin rights and no Node on PATH (start-cockpit.ps1) - local, removable cache:
+.node-portable/
 
 # --- Logs & runtime state ---
 *.log
