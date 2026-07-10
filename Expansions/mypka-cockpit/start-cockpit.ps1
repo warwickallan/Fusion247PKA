@@ -181,9 +181,22 @@ if ($NodeDir) {
 }
 
 # --- 3. first-run install + build (skipped on later launches) ----------------
-if (-not (Test-Path "node_modules"))     { Write-Host "Installing server deps..."; & "$Npm" install --no-audit --no-fund }
-if (-not (Test-Path "web\node_modules")) { Write-Host "Installing web deps...";    & "$Npm" --prefix web install --no-audit --no-fund }
-if (-not (Test-Path "web\dist"))         { Write-Host "Building the web app...";   & "$Npm" --prefix web run build }
+# Check for a definite marker of a COMPLETE install/build, not just folder
+# existence - an install that failed partway (e.g. a native module build
+# error) still leaves the folder behind, which would otherwise make every
+# future launch silently skip re-running it forever.
+if (-not (Test-Path "node_modules\express\package.json")) {
+  Write-Host "Installing server deps..."
+  & "$Npm" install --no-audit --no-fund
+}
+if (-not (Test-Path "web\node_modules\.bin\tsc.cmd")) {
+  Write-Host "Installing web deps..."
+  & "$Npm" --prefix web install --no-audit --no-fund
+}
+if (-not (Test-Path "web\dist\index.html")) {
+  Write-Host "Building the web app..."
+  & "$Npm" --prefix web run build
+}
 
 # --- 4. free the port (NO lsof on Windows) -----------------------------------
 # Preferred: Get-NetTCPConnection (Win8+/Server2012+). Fallback: parse netstat.
