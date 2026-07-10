@@ -111,10 +111,71 @@ if (Test-DbCore $DbPath) {
   }
 }
 
+# --- 2.5 resolve node/npm (system PATH first; portable no-admin fallback) ----
+# Same shape as the Python fallback above: if Node.js isn't on PATH at all
+# (common on locked-down machines), offer a fully local, no-installer, no-admin
+# portable Node.js instead of just failing. Nothing touches PATH, the registry,
+# or Program Files; deleting the folder removes it completely.
+function Get-PortableNode {
+  $embedRoot = Join-Path $CockpitDir ".node-portable"
+  $existing = Get-ChildItem -Path $embedRoot -Filter "node.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+  if ($existing) { return $existing.DirectoryName }
+
+  Write-Host ""
+  Write-Host "Node.js was not found on this machine, and you may not have admin rights"
+  Write-Host "to install it system-wide. I can download the official portable"
+  Write-Host "(no-installer) Node.js build into this folder only:"
+  Write-Host "  $embedRoot"
+  Write-Host "Nothing is installed system-wide, no admin rights are needed, and you"
+  Write-Host "can delete that folder any time to remove it completely."
+  $answer = Read-Host "Download and set this up now? (y/n)"
+  if ($answer -notmatch '^(y|yes)$') { return $null }
+
+  $nodeVersion = "20.18.1"
+  $zipUrl = "https://nodejs.org/dist/v$nodeVersion/node-v$nodeVersion-win-x64.zip"
+  $zipPath = Join-Path $env:TEMP "node-portable-$nodeVersion.zip"
+  try {
+    Write-Host "Downloading Node.js v$nodeVersion (portable, about 30MB)..."
+    Invoke-WebRequest -Uri $zipUrl -OutFile $zipPath -UseBasicParsing
+    New-Item -ItemType Directory -Force -Path $embedRoot | Out-Null
+    Expand-Archive -Path $zipPath -DestinationPath $embedRoot -Force
+    Remove-Item $zipPath -Force -ErrorAction SilentlyContinue
+    $found = Get-ChildItem -Path $embedRoot -Filter "node.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($found) {
+      Write-Host "Portable Node.js ready at $($found.DirectoryName) (no admin rights used)."
+      return $found.DirectoryName
+    }
+  } catch {
+    Write-Host "Could not set up portable Node.js automatically: $($_.Exception.Message)"
+  }
+  return $null
+}
+
+$NodeDir = $null
+if (-not (Get-Command node -ErrorAction SilentlyContinue) -or -not (Get-Command npm -ErrorAction SilentlyContinue)) {
+  $NodeDir = Get-PortableNode
+  if (-not $NodeDir) {
+    Write-Host ""
+    Write-Host "  Cannot continue: Node.js v20+ is required to run the Cockpit."
+    Write-Host ""
+    Write-Host "  None of these need admin/IT approval - each installs for your own"
+    Write-Host "  user account only, or needs no install at all:"
+    Write-Host "      * winget install --scope user OpenJS.NodeJS.LTS"
+    Write-Host "      * or the no-install 'Windows Binary (.zip)' at"
+    Write-Host "        https://nodejs.org/en/download - unzip it anywhere, then"
+    Write-Host "        re-run me and answer 'y' when I offer to use a portable Node"
+    Write-Host ""
+    Read-Host "Press Enter to close"
+    exit 1
+  }
+}
+$Node = if ($NodeDir) { Join-Path $NodeDir "node.exe" } else { "node" }
+$Npm  = if ($NodeDir) { Join-Path $NodeDir "npm.cmd" } else { "npm" }
+
 # --- 3. first-run install + build (skipped on later launches) ----------------
-if (-not (Test-Path "node_modules"))     { Write-Host "Installing server deps..."; npm install --no-audit --no-fund }
-if (-not (Test-Path "web\node_modules")) { Write-Host "Installing web deps...";    npm --prefix web install --no-audit --no-fund }
-if (-not (Test-Path "web\dist"))         { Write-Host "Building the web app...";   npm --prefix web run build }
+if (-not (Test-Path "node_modules"))     { Write-Host "Installing server deps..."; & "$Npm" install --no-audit --no-fund }
+if (-not (Test-Path "web\node_modules")) { Write-Host "Installing web deps...";    & "$Npm" --prefix web install --no-audit --no-fund }
+if (-not (Test-Path "web\dist"))         { Write-Host "Building the web app...";   & "$Npm" --prefix web run build }
 
 # --- 4. free the port (NO lsof on Windows) -----------------------------------
 # Preferred: Get-NetTCPConnection (Win8+/Server2012+). Fallback: parse netstat.
@@ -149,4 +210,4 @@ $env:NODE_ENV = "production"
 $env:PORT = $Port
 $env:WORKBENCH_WRITE_ENABLED = "1"
 $env:PLAN_WRITE_ENABLED = "1"
-node server\server.js
+& "$Node" server\server.js
