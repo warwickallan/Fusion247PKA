@@ -42,7 +42,7 @@ This hire ships proven against **one representative pilot source, end-to-end**, 
 
 ## Method
 
-1. **Read the whole source once.** Same discipline SOP-010 already proved works: one full read, not three partial rereads across three different outputs.
+1. **Read the whole source once.** Same discipline SOP-010 already proved works: one full read, not three partial rereads across three different outputs. When the source classifies as GL-008's Video/Audio Transcript category and is long or structured enough to need it, this read is done via chunk-mapping — see [[SOP-016-cairn-process-youtube-transcript]], a subordinate procedure to [[SOP-015-cairn-process-external-source]] that elaborates this step only; Steps 2 onward below still apply unchanged.
 2. **Classify.** Decide what kind of source this is against [[GL-008-source-classification-registry]]'s governed vocabulary of six source-type categories, and which existing PKM entity type(s) it should enrich or create (Person, Organization, Project, Goal, Habit, Topic, Key Element, Document — see [[GL-002-frontmatter-conventions]]). State the classification decision in one line inside the note. If a source genuinely does not fit any of GL-008's six categories, do not invent a new bucket — state the reasoning explicitly per source and flag the misfit in the session-log entry (see §Cross-references); GL-008's own owner/steward model only adds a new category once the same misfit has recurred, not on a single observed source.
 3. **Label evidence-origin, per claim.** Every extracted fact gets tagged by where it came from: directly present in the material handed to Cairn, drawn from a preserved raw source, or reconstructed from memory/inference — the last always written as `Reconstructed / Needs verification`, never stated as settled fact. This lives in the note's body (e.g. a `## Source & evidence` subsection), not as a new frontmatter field — see §Where Cairn writes.
 4. **Test every backlink.** Before creating a `[[wikilink]]`, state the one-line, source-derived reason the target note is actually enriched by it. No stated reason, no link. This applies to both new links and links inherited from a template.
@@ -143,6 +143,8 @@ Permanent rules graduate out of session-logs into SOPs / Guidelines / Workstream
 - [[GL-001-file-naming-conventions]] — slug, date, filename rules.
 - [[GL-002-frontmatter-conventions]] — the eight entity-type schemas Cairn files into.
 - [[GL-008-source-classification-registry]] — the governed source-type category vocabulary Cairn classifies against (§Method step 2). Silas-owned; Cairn consumes it, never edits it.
+- [[SOP-015-cairn-process-external-source]] — the canonical intake-and-filing procedure operationalizing this contract's §Method, step by step.
+- [[SOP-016-cairn-process-youtube-transcript]] — subordinate procedure to SOP-015, elaborating its Step 2 only, for GL-008 Video/Audio Transcript sources needing chunk-mapping. Re-derived (not ported) from the superseded Fusion247 Brain skill `F247.skill.process-youtube-transcript`, whose CategorisAIr two-agent handoff architecture, `pending_categorisair` review state, mandatory-note assumption, and fixed frontmatter contract are all deliberately not carried forward.
 - [[WS-002-import-external-knowledge-base]] — boundary partner, one-time bulk migration.
 - [[SOP-010-warden-extract-source-to-evidence-pack]] — closest existing precedent, scoped to `Client Delivery/` only.
 - [[Team/Penn - Journal Writer/AGENTS]] — boundary partner, personal-life capture.

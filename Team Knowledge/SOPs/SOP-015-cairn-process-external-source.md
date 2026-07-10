@@ -4,7 +4,7 @@
 - **Reusable by any agent.** Any specialist who occasionally files an already-acquired external source into `PKM/` follows this procedure — it is not exclusive to Cairn, only usually run by Cairn.
 - **Triggered by:** a source the user or team has already acquired (an article, PDF, transcript, pasted chat excerpt, course note, email) is handed to Cairn directly, or a `Team Inbox/` item is general external material rather than the user's own first-person life narrative (see [[Team/Cairn - Knowledge Intake Specialist/AGENTS]] §Boundary vs Penn).
 - **Output:** (a) one classification decision, stated in one line, for the source; (b) a filed or updated `PKM/` entity note (or notes) carrying evidence-origin labels on non-obvious claims and a justified reason for each new backlink; (c) a session-log entry recording the intake.
-- **References:** [[GL-008-source-classification-registry]] (the six-category classification vocabulary), [[GL-002-frontmatter-conventions]] (the eight entity-type schemas this SOP files into), [[GL-001-file-naming-conventions]] (slug rules), [[Team Knowledge/Templates/INDEX]] (starter templates), [[Team/Cairn - Knowledge Intake Specialist/AGENTS]] (the contract this SOP operationalizes).
+- **References:** [[GL-008-source-classification-registry]] (the six-category classification vocabulary), [[GL-002-frontmatter-conventions]] (the eight entity-type schemas this SOP files into), [[GL-001-file-naming-conventions]] (slug rules), [[Team Knowledge/Templates/INDEX]] (starter templates), [[Team/Cairn - Knowledge Intake Specialist/AGENTS]] (the contract this SOP operationalizes), [[SOP-016-cairn-process-youtube-transcript]] (subordinate procedure elaborating Step 2 below for long/structured GL-008 Video/Audio Transcript sources — chunk mapping, not a replacement for Steps 3-10).
 
 ## Purpose
 
@@ -25,6 +25,8 @@ Before reading, confirm you have the complete material — not a partial paste, 
 ### 2. Read the whole source once, before writing anything
 
 One full pass, start to finish. Resist drafting notes mid-read. As you read, mentally (or in scratch notes) track: what kind of material is this, which named entities recur with substance (not just name-dropped once), and which claims are stated plainly versus implied/interpreted.
+
+For a source that is (or is about to be classified as, in Step 3) GL-008's **Video/Audio Transcript** category and is long or structured enough that a single undifferentiated read would lose track of theme, sequence, or verification-needed claims, run [[SOP-016-cairn-process-youtube-transcript]] for this step instead of an unstructured read — it produces a theme-chunked, anchored chunk map that Steps 3-10 below run against unchanged. Short, clean transcripts can skip it and use this step as-is.
 
 ### 3. Classify against GL-008
 
