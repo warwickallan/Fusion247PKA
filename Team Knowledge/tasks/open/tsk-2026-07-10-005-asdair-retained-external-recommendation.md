@@ -1,7 +1,7 @@
 ---
 # Identity
 id: tsk-2026-07-10-005
-title: "Recommendation: formally treat AsdAIr as retained-external / personal-workflow-outside-myPKA"
+title: "Recommendation: AsdAIr automation stays retained-external; project knowledge may enter PKM/My Life/Projects"
 
 # Ownership & priority
 assignee: unassigned
@@ -12,7 +12,7 @@ blocked_by: null
 
 # Time
 created: 2026-07-10T23:47:00Z
-updated: 2026-07-10T23:47:00Z
+updated: 2026-07-11T00:15:00Z
 due: null
 
 # Provenance
@@ -36,43 +36,51 @@ linked_deliverables:
 tags: [tier-1-proposal, recommendation, fusion247-brain, asdair, awaiting-approval]
 ---
 
-# Recommendation: formally treat AsdAIr as retained-external / personal-workflow-outside-myPKA
+# Recommendation: AsdAIr automation stays retained-external; project knowledge may enter PKM/My Life/Projects
 
 ## What this is
 
-This is a **Tier-1 recommendation, not a ruling**, per [[WS-004-team-retro-and-self-improvement-loop]] §"Tier 1." Even though the Migration Coverage Matrix already leans toward this outcome (per [[tsk-2026-07-10-001-fold-fusion247-brain-doctrine-into-warden]] decision 14's summary), the user's explicit instruction was that this still routes through the **same Tier-1 human gate as the other three follow-up items** — it is not a call Pax or Larry makes unilaterally just because the direction looks clear. Nothing is implemented here; this task exists so the recommendation has a durable, reviewable record and an explicit approval point.
+This is a **Tier-1 recommendation, not a ruling**, per [[WS-004-team-retro-and-self-improvement-loop]] §"Tier 1." Nothing is implemented here; this task exists so the recommendation has a durable, reviewable record and an explicit approval point — even though the direction below is already fairly clear, it still routes through the same human gate as the other three follow-up items, per explicit user instruction.
 
-**Important sourcing caveat, stated plainly:** the Migration Coverage Matrix deliverable (`Deliverables/2026-07-10-fusion247-brain-migration-coverage-matrix.md`, row 37) was **not present on disk** when this task was written — only [[tsk-2026-07-10-001-fold-fusion247-brain-doctrine-into-warden]] decision 14's one-line summary of the disposition was available (*"AsdAIr — Tier-1 proposal recommending an explicit retained-external decision. Not implemented as a final ruling yet, even though the recommended outcome is already directionally clear from the coverage matrix, still routes through the same human gate as the others."*). Pax does not have direct visibility into what AsdAIr actually does, functionally, beyond its name and its grouping alongside the other personal-workflow items (CareerAIR) rather than the business-governance items (which fed into Warden). This task is written from that limited visibility and should be treated accordingly — it is a lighter-weight recommendation than [[tsk-2026-07-10-003-categorisair-equivalent-design-proposal]] or [[tsk-2026-07-10-004-careerair-migration-direction-decision]] precisely because the underlying source material could not be read directly. **This is flagged as an open question in the creating session's report back to Larry — the matrix file this task and its three siblings cite does not currently exist at the path referenced.**
+**Sourcing note:** this task was originally written by Pax without direct access to the Migration Coverage Matrix (it lived on a not-yet-merged branch at the time). Larry has since read the matrix directly and revised this task below with the actual row-37 content and a more precise recommendation relayed via external QA review. The original thinner version is preserved in the Updates log for the record.
+
+## What AsdAIr actually is (Migration Coverage Matrix row 37)
+
+AsdAIr / the Asda household-shopping project: a decisions log, order history, a weekly-list workflow, and Claude-in-Chrome basket-build browser automation. It is **primarily a household workflow/application** — order history and browser automation — **not merely a knowledge specialist** the way CategorisAIr or VerifiAIr are. That distinction matters for the recommendation below: "AsdAIr" is not one thing to accept-or-reject wholesale, it bundles a runtime/automation layer and a knowledge layer that don't need the same disposition.
 
 ## The recommendation
 
-Formally log AsdAIr as **retained-as-external / personal-workflow-outside-myPKA** — i.e., the user continues using it in whatever form it currently exists in, and myPKA does not absorb it as a specialist, Workstream, or SOP. Reasoning, to the extent it can be reasoned about from the available context:
+**Split the disposition by layer, rather than a single blanket retained-external call:**
 
-- The parent task's naming pattern groups AsdAIr with CareerAIR (both personal-workflow-shaped tools from the Fusion247 Brain ecosystem) rather than with the business/client-delivery items that fed into Warden's build. This suggests AsdAIr, like CareerAIR, serves a narrow personal use-case rather than a recurring team-wide need.
-- The parent task states the coverage matrix "already leans this way" — i.e., whatever row 37's actual analysis contains, its own conclusion pointed toward retained-external, and Pax has no basis to second-guess that conclusion without being able to read it directly.
-- Formally recording the decision (rather than letting it sit ambiguous) closes off AsdAIr from recurring as an unresolved open item on a future Team Retro per [[WS-004-team-retro-and-self-improvement-loop]] §"Edge cases" ("same proposal recurs across multiple retros, never approved... stays in the backlog").
+- **The operational application and browser automation** (the Claude-in-Chrome basket-build flow, the live order-execution mechanics) — **stays external, not migrated into myPKA at this stage.** This is a runtime/automation concern, not a knowledge-management one; nothing in myPKA's current architecture (a markdown-first PKM, not an app-automation platform) is the right home for it.
+- **The project's knowledge — decisions, status, order history as a record (not as live automation)** — **myPKA may hold this**, most likely as a `PKM/My Life/Projects/` entry (personal, recurring, per the existing GL-002 Project schema) rather than a new specialist or Workstream. This keeps the *knowledge* (what was decided, what's the current state, what was ordered when) inside the user's own knowledge graph even while the *automation* stays wherever it already runs.
+- **Future path, noted not built:** once a Cockpit exists, AsdAIr could be exposed there as a linked external project/app rather than an in-Brain specialist — a view onto the automation, not the automation itself moving inside myPKA. Not proposed for building now; noted so the door isn't closed by this decision.
+
+Reasoning: unlike CareerAIR (row 36 — an active drafting/knowledge capability with three working SOPs, a plausible future in-myPKA specialist), AsdAIr's core value is the automation runtime, which nothing in myPKA is built to host. Treating "AsdAIr" as all-or-nothing would either (a) wrongly exclude the household project from the user's own knowledge graph, or (b) wrongly imply myPKA should someday run browser automation, which is a different kind of build than anything else in this buildout.
 
 ## What this recommendation is explicitly not
 
-- Not a claim about what AsdAIr functionally does — Pax could not verify this directly (see sourcing caveat above).
-- Not a final decision. The user approves or declines this recommendation; if declined, the next step is for the user (or Larry, briefed by the user) to state what AsdAIr's actual disposition should be instead, and a follow-up task captures that.
+- Not a claim that AsdAIr's automation should ever move into myPKA — the recommendation is that it explicitly should not, at least not now.
+- Not a final decision on whether a `PKM/My Life/Projects/` entry gets created — that's a small, low-risk follow-up once this direction is approved, not bundled into this recommendation itself.
 
 ## Context one click away
 
 - Governing loop: [[WS-004-team-retro-and-self-improvement-loop]]
 - Parent task: [[tsk-2026-07-10-001-fold-fusion247-brain-doctrine-into-warden]]
+- Schema, if a `PKM/My Life/Projects/` entry is approved: [[GL-002-frontmatter-conventions]] §"Projects"
 - Working artifacts:
-  - [[2026-07-10-fusion247-brain-migration-coverage-matrix]] *(referenced but not directly readable at time of writing — see sourcing caveat above)*
+  - [[2026-07-10-fusion247-brain-migration-coverage-matrix]] (row 37 — now read directly, see above)
 
 ## Success criteria
 
-- The user approves or declines the retained-external recommendation.
-- If approved: this task closes with the disposition recorded as durable, so AsdAIr does not resurface as an ambiguous open item in a future retro.
+- The user approves, amends, or declines the split-disposition recommendation above.
+- If approved: this task closes with the disposition recorded as durable (automation stays external; knowledge may get a `PKM/My Life/Projects/` entry as a small separate follow-up), so AsdAIr does not resurface as an ambiguous open item in a future retro.
 - If declined: a follow-up task captures whatever direction the user actually wants instead.
 
 ## Updates
 
 - 2026-07-10 23:47 (pax) — created, per tsk-2026-07-10-001 decision 14 disposition of Migration Coverage Matrix follow-up #5. Cross-refs: 2/7 populated (workstreams, deliverables). All other slots (sops, guidelines, my_life, session_logs, journal_entries) walked and confirmed genuinely empty — no existing SOP, Guideline, My Life entry, session log, or journal entry covers AsdAIr specifically, and the source matrix row itself was not readable this session (flagged above and in report to Larry).
+- 2026-07-11 00:15 (larry) — read matrix row 37 directly (now accessible) and substantially revised the recommendation per external QA review: split disposition by layer rather than a blanket call — the operational app/browser-automation stays external; the project's knowledge (decisions, status, order history as record) may get a `PKM/My Life/Projects/` entry; a future Cockpit could expose AsdAIr as a linked external app without moving the automation inside myPKA. Still gated for approval, not implemented.
 
 ## Outcome
 _(filled when status flips to done — see SOP-close-task)_
