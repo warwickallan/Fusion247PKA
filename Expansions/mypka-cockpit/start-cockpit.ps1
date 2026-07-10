@@ -180,6 +180,28 @@ if ($NodeDir) {
   $env:PATH = "$NodeDir;$env:PATH"
 }
 
+# --- pass the system proxy through to node/npm, if one is configured --------
+# Corporate networks often route HTTPS through a proxy that native Windows
+# tools (Invoke-WebRequest, git) pick up automatically from Windows' own
+# settings, but Node/npm do NOT unless HTTP_PROXY/HTTPS_PROXY are explicitly
+# set. Left unset, a native module's prebuilt-binary fetch (e.g.
+# better-sqlite3 via prebuild-install) can silently fail as a network error
+# that gets misreported as "no prebuilt binary found", then falls through to
+# a from-source compile that needs a working Python + build toolchain neither
+# of which should be required on a normal end-user machine.
+if (-not $env:HTTPS_PROXY -and -not $env:HTTP_PROXY) {
+  try {
+    $proxySettings = Get-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings" -ErrorAction Stop
+    if ($proxySettings.ProxyEnable -eq 1 -and $proxySettings.ProxyServer) {
+      $proxyUrl = $proxySettings.ProxyServer
+      if ($proxyUrl -notmatch '^https?://') { $proxyUrl = "http://$proxyUrl" }
+      Write-Host "Detected a system proxy ($proxyUrl) - passing it to npm/node so they can reach the internet too."
+      $env:HTTP_PROXY = $proxyUrl
+      $env:HTTPS_PROXY = $proxyUrl
+    }
+  } catch { }
+}
+
 # --- 3. first-run install + build (skipped on later launches) ----------------
 # Check for a definite marker of a COMPLETE install/build, not just folder
 # existence - an install that failed partway (e.g. a native module build
