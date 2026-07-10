@@ -1,6 +1,6 @@
 @echo off
-REM start-cockpit.bat — double-click wrapper for start-cockpit.ps1 (Windows).
-REM Generated locally from launcher/templates/windows.bat.txt — review before use.
+REM start-cockpit.bat - double-click wrapper for start-cockpit.ps1 (Windows).
+REM Generated locally from launcher/templates/windows.bat.txt - review before use.
 REM -ExecutionPolicy Bypass is scoped to this process only; nothing system-wide.
 cd /d "%~dp0"
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0start-cockpit.ps1"

@@ -1,5 +1,5 @@
-# start-cockpit.ps1 — myPKA Cockpit launcher (Windows). Generated locally from
-# launcher/templates/windows.ps1.txt — review before use.
+# start-cockpit.ps1 - myPKA Cockpit launcher (Windows). Generated locally from
+# launcher/templates/windows.ps1.txt - review before use.
 $ErrorActionPreference = "Stop"
 
 # --- config (the LLM fills these in for THIS machine) ------------------------
@@ -11,7 +11,7 @@ $CockpitDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $CockpitDir
 
 # Resolve the scaffold-root mypka.db the server will open (three levels up in the
-# standard layout; honor MYPKA_ROOT for a non-standard one — the server reads it too).
+# standard layout; honor MYPKA_ROOT for a non-standard one - the server reads it too).
 if ($env:MYPKA_ROOT) {
   $DbPath = Join-Path $env:MYPKA_ROOT "mypka.db"
 } else {
@@ -57,19 +57,19 @@ except sqlite3.Error:
 # launcher must GUARANTEE a DB with the core schema before starting node. Check
 # first (fast path: a normal start never rebuilds); only create when missing/coreless.
 if (Test-DbCore $DbPath) {
-  # FAST PATH — the DB is already here. Refresh from markdown if Python+PyYAML
+  # FAST PATH - the DB is already here. Refresh from markdown if Python+PyYAML
   # are available (non-destructive); otherwise just serve the existing DB.
   if ($Python) {
-    Write-Host "Refreshing mypka.db from your markdown (non-destructive)…"
-    try { & cmd /c "$Python `"scripts\regen-mypka-db.py`"" } catch { Write-Host "  (regen failed — using existing mypka.db)" }
+    Write-Host "Refreshing mypka.db from your markdown (non-destructive)..."
+    try { & cmd /c "$Python `"scripts\regen-mypka-db.py`"" } catch { Write-Host "  (regen failed - using existing mypka.db)" }
   } else {
-    Write-Host "Python 3 + PyYAML not found — skipping DB refresh (existing mypka.db will serve)."
+    Write-Host "Python 3 + PyYAML not found - skipping DB refresh (existing mypka.db will serve)."
     Write-Host "  To enable refreshes: install Python 3, then  pip install --user pyyaml"
   }
 } else {
-  # FIRST-RUN PATH — no usable DB yet. Build it (core schema + every cockpit
+  # FIRST-RUN PATH - no usable DB yet. Build it (core schema + every cockpit
   # module) via the idempotent installer, which auto-bootstraps the base DB.
-  Write-Host "No mypka.db yet — creating it (core schema + all cockpit modules)…"
+  Write-Host "No mypka.db yet - creating it (core schema + all cockpit modules)..."
   if (-not $Python) {
     Write-Host ""
     Write-Host "  Cannot create mypka.db: Python 3 with the PyYAML package is required"
@@ -93,9 +93,9 @@ if (Test-DbCore $DbPath) {
 }
 
 # --- 3. first-run install + build (skipped on later launches) ----------------
-if (-not (Test-Path "node_modules"))     { Write-Host "Installing server deps…"; npm install --no-audit --no-fund }
-if (-not (Test-Path "web\node_modules")) { Write-Host "Installing web deps…";    npm --prefix web install --no-audit --no-fund }
-if (-not (Test-Path "web\dist"))         { Write-Host "Building the web app…";   npm --prefix web run build }
+if (-not (Test-Path "node_modules"))     { Write-Host "Installing server deps..."; npm install --no-audit --no-fund }
+if (-not (Test-Path "web\node_modules")) { Write-Host "Installing web deps...";    npm --prefix web install --no-audit --no-fund }
+if (-not (Test-Path "web\dist"))         { Write-Host "Building the web app...";   npm --prefix web run build }
 
 # --- 4. free the port (NO lsof on Windows) -----------------------------------
 # Preferred: Get-NetTCPConnection (Win8+/Server2012+). Fallback: parse netstat.
@@ -103,7 +103,7 @@ try {
   $owners = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction Stop |
             Select-Object -ExpandProperty OwningProcess -Unique
   foreach ($procId in $owners) {
-    Write-Host "Port $Port busy — stopping PID $procId…"
+    Write-Host "Port $Port busy - stopping PID $procId..."
     Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue
   }
 } catch {
@@ -111,7 +111,7 @@ try {
   foreach ($line in $lines) {
     $procId = ($line -split "\s+")[-1]
     if ($procId -match '^\d+$') {
-      Write-Host "Port $Port busy — stopping PID $procId…"
+      Write-Host "Port $Port busy - stopping PID $procId..."
       taskkill /PID $procId /F 2>$null | Out-Null
     }
   }
