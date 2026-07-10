@@ -27,7 +27,21 @@ When the team learns something durable across sessions, Larry appends it to a "C
 
 ### Cross-session learnings
 
-(empty on day one - Larry fills this as the team operates)
+- **Windows App Execution Aliases can shadow a real install.** If `python`,
+  `node`, or similar keeps reporting "not found" right after a fresh
+  installer run, check Settings → Apps → Advanced app settings → App
+  execution aliases before assuming the install failed — a stub alias for
+  that exe name may still be toggled On and taking priority on PATH.
+- **VS Code (and similar parent processes) snapshot PATH at launch.** A new
+  terminal tab inside an already-running VS Code instance does not see PATH
+  changes made after VS Code itself started. Restart the app, not just the
+  terminal, after installing something that updates user/system PATH.
+- **Native Node modules ship prebuilt binaries only for specific Node ABI
+  ranges.** `better-sqlite3` dropped Windows prebuilts for Node 20.x (ABI
+  115); a pinned/portable Node below a module's supported range silently
+  falls through to a from-source compile that then fails on an unrelated
+  missing-toolchain error. See
+  [[2026-07-10-18-41_larry_windows-cockpit-launcher-fix]].
 
 ## Active session log
 
