@@ -25,10 +25,16 @@ function Test-Python {
 }
 $Python = $null
 foreach ($cand in @("python", "py")) {
-  if (Get-Command $cand -ErrorAction SilentlyContinue) {
-    $probe = if ($cand -eq "py") { "py -3" } else { $cand }
-    if (Test-Python $cand) { $Python = $probe; break }
-  }
+  if (-not (Get-Command $cand -ErrorAction SilentlyContinue)) { continue }
+  $probe = if ($cand -eq "py") { "py -3" } else { $cand }
+  if (Test-Python $cand) { $Python = $probe; break }
+  # Python is present but PyYAML is missing. That is a small, per-user pip
+  # install - no admin/IT approval needed - so just do it rather than making
+  # the user re-run the launcher after installing it themselves.
+  Write-Host "Found $cand but the PyYAML package is missing - installing it"
+  Write-Host "  (pip install --user pyyaml; no admin rights required)..."
+  try { & cmd /c "$probe -m pip install --user --quiet pyyaml" 2>$null | Out-Null } catch { }
+  if (Test-Python $cand) { $Python = $probe; break }
 }
 
 # --- helper: does mypka.db exist AND carry the core `journal` table? ----------
@@ -71,12 +77,25 @@ if (Test-DbCore $DbPath) {
   # module) via the idempotent installer, which auto-bootstraps the base DB.
   Write-Host "No mypka.db yet - creating it (core schema + all cockpit modules)..."
   if (-not $Python) {
+    $ScaffoldRoot = Split-Path $DbPath -Parent
     Write-Host ""
-    Write-Host "  Cannot create mypka.db: Python 3 with the PyYAML package is required"
-    Write-Host "  to read your markdown the first time. Install them, then re-run me:"
+    Write-Host "  Cannot create mypka.db: a working Python 3 install (with the PyYAML"
+    Write-Host "  package) is required to read your markdown the first time."
     Write-Host ""
-    Write-Host "      * Python 3:  https://www.python.org/downloads/  (check 'Add to PATH')"
-    Write-Host "      * PyYAML:    pip install --user pyyaml"
+    Write-Host "  None of these need admin/IT approval - each installs for your own"
+    Write-Host "  user account only:"
+    Write-Host "      * winget install --scope user Python.Python.3.12"
+    Write-Host "      * or the installer at https://www.python.org/downloads/ -"
+    Write-Host "        leave 'Install launcher for all users' UNCHECKED"
+    Write-Host "      * or the Microsoft Store 'Python 3.12' app, if Store is allowed"
+    Write-Host "  Then:  pip install --user pyyaml"
+    Write-Host ""
+    Write-Host "  On a locked-down machine where none of that is possible: get the"
+    Write-Host "  mypka.db file from another machine where this myPKA has already run"
+    Write-Host "  (it's just a derived cache, safe to copy - never committed to git)"
+    Write-Host "  and drop it at:"
+    Write-Host "      $ScaffoldRoot\mypka.db"
+    Write-Host "  The cockpit will then serve it read-only with no Python needed at all."
     Write-Host ""
     Write-Host "  (Once mypka.db exists, future launches do NOT need Python.)"
     Read-Host "Press Enter to close"
