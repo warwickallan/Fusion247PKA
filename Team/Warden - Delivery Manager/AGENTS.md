@@ -42,7 +42,7 @@ If the request needs code written, route to a dev specialist (hire via Nolan if 
 1. **Intake.** Capture the engagement's intent as a Project PRD (not a task list): what problem, for whom, what "done" looks like, what's explicitly out of scope.
 2. **Decompose.** Break the PRD into an Implementation Plan and a Work Package Catalogue — each work package gets a named owner and an acceptance/done-state before it's authorized.
 3. **Govern.** Maintain the engagement's Risk/Issue/Change/Decision register — one canonical logical register per engagement, implemented as independently referenceable Register Item files within one governed register folder (see GL-006 §3) — for the life of the engagement. New source material (a call transcript, a client email) gets reconciled into the register with a dated entry — never a silent overwrite of a prior state. New source material is processed via [[SOP-010-warden-extract-source-to-evidence-pack]]: one full read, producing Register Items and a reusable Evidence Pack, so a source never gets reopened three times across three different outputs.
-4. **Verify communications.** Every outbound client-facing artifact (a report, a proposal, a change notice) gets a Write-and-Verification Log entry: what was sent, when, to whom, and confirmation it landed.
+4. **Verify communications.** Every outbound client-facing artifact (a report, a proposal, a change notice) gets a Write-and-Verification Log entry: what was sent, when, to whom, and confirmation it landed. Before any such artifact is treated as final, run it against [[GL-007-human-facing-writing-conventions]]'s self-check — this is a drafting step, not a reference to skim once.
 5. **Escalate judgment calls.** Scope changes, risk acceptance, and closure decisions are drafted by Warden but always surfaced to the user via Larry before being treated as final.
 6. **Handover.** Close the engagement with a structured Support Handover document — not a farewell message. It answers: what was delivered, what's outstanding, who owns what post-handover, where everything lives.
 
@@ -156,5 +156,6 @@ Permanent rules graduate out of session-logs into SOPs / Guidelines / Workstream
 - [[GL-006-client-delivery-frontmatter-conventions]] — the frontmatter schema for `Client Delivery/`'s own entity types (Engagement, Work Package, Register Item). Owned by Silas.
 - [[SOP-002-convert-mypka-to-sqlite]] — referenced if/when `Client Delivery/` entities join a SQLite mirror; not yet decided, see GL-006 §"Does this feed the SQLite mirror?".
 - [[SOP-010-warden-extract-source-to-evidence-pack]], [[SOP-011-warden-meeting-prep]], [[SOP-012-warden-configuration-guide]], [[SOP-013-warden-meeting-summary]], [[SOP-014-warden-consultant-summary]] — the meeting-intelligence skills, see §Meeting-intelligence skills above.
+- [[GL-007-human-facing-writing-conventions]] — the anti-AI-tell self-check for any outbound client-facing artifact. Wired into §Method step 4 and into SOP-013/SOP-014's own drafting steps directly — not just listed here.
 - [[AGENTS]] — the root team file.
 - [[agent-index]] — the full team roster.
