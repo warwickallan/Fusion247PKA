@@ -46,6 +46,10 @@ Reopen the anchored section of the source only when, for the *specific claim you
 
 Never write **"the team agreed,"** **"no blockers were identified,"** **"the solution meets requirements,"** or **"the workshop confirmed"** unless the specific underlying Register Item is `evidence_type: agreed-decision` (for "agreed"/"confirmed") or a Register Item actually states the claim being made. Absence of a recorded blocker in the register is not the same claim as "no blockers exist" — write **"no blockers recorded in the register as of [date]"**, not a blanket assertion about the world.
 
+### 4a. Before treating the draft as final
+
+This note may be recorded under `Reporting-QA-Comms/Customer_Comms/` — i.e. it can be client-facing. Run [[GL-007-human-facing-writing-conventions]]'s five-point self-check against the actual draft before finalizing, same as any other outbound artifact per Warden's contract §Method step 4. This is a drafting step, not optional polish.
+
 ### 5. QA checklist (Meeting Summary-specific)
 
 - Every "agreed"/"confirmed"/"approved" in the draft has a specific `evidence_type: agreed-decision` Register Item behind it — check each instance individually, not just the obvious one.

@@ -53,6 +53,7 @@ State it in the header, plainly, as a rule and not a suggestion: **"Internal onl
 - Any interpretation touching commercial or contractual exposure has been checked against tier-1 material, not asserted from meeting evidence alone.
 - Escalation items read as recommendations surfaced to the user, not decisions already taken.
 - The document header states internal-only status.
+- If this document is ever approved for external circulation, run [[GL-007-human-facing-writing-conventions]]'s self-check against it first — it does not get a pass just because it started internal-only.
 
 ### 7. Save
 
