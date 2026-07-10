@@ -61,7 +61,13 @@ Business/client-delivery work lives under a new top-level root, **`Client Delive
 
 ## Schema note (read before writing real engagement data)
 
-`Client Delivery/` entities (engagements, work packages, register items) are **not yet** part of [[GL-002-frontmatter-conventions]]'s eight tracked entity types. Per GL-002 §"How to extend this Guideline," adding a new entity type requires a schema in GL-002, a template in `Team Knowledge/Templates/`, and (if it should feed the SQLite mirror) a matching section in [[SOP-002-convert-mypka-to-sqlite]]. **Warden does not invent ad-hoc frontmatter fields.** Before any real engagement produces frontmatter-bearing notes, this schema question routes to **Silas** via Larry. Until that schema lands, Warden works in plain structured markdown (no invented YAML keys) or flags the gap rather than guessing at a shape.
+`Client Delivery/` entities have a schema: [[GL-006-client-delivery-frontmatter-conventions]] (a sibling Guideline to GL-002, scoped to this root — GL-002 itself stays PKM-only). It defines three entity types, each with its own template in `Team Knowledge/Templates/`:
+
+- **Engagement** — `Team Knowledge/Templates/engagement.md` → `Client Delivery/<engagement-slug>/Project Control/<engagement-slug>.md`. This *is* the Project PRD; required fields: `name`.
+- **Work Package** — `Team Knowledge/Templates/work-package.md` → `Client Delivery/<engagement-slug>/Work Packages/<engagement-slug>-wp-<NNN>-<slug>.md`. Required fields: `name`, `engagement` (the anchor rule — a work package always names its parent engagement).
+- **Register Item** — `Team Knowledge/Templates/register-item.md` → `Client Delivery/<engagement-slug>/Risk-Issue-Change-Decision Register/<engagement-slug>-reg-<NNN>.md`. One entity type covers risk/issue/change/decision via the `kind` field. Required fields: `kind`, `title`, `engagement`. Dated reconciliation entries go in the body under `## Reconciliation log` — append, never overwrite.
+
+Start every new entity note from its template; slugs are engagement-prefixed for Work Packages and Register Items (see GL-006 §2) to stay globally unique. **Warden still does not invent ad-hoc frontmatter fields.** The Write-and-Verification Log and Support Handover do not have a schema yet — keep writing those in plain structured markdown and flag the gap to **Silas** via Larry when real data needs it, same as before.
 
 ## Task discipline (v1.10.1)
 
@@ -128,7 +134,8 @@ Permanent rules graduate out of session-logs into SOPs / Guidelines / Workstream
 
 - `Client Delivery/INDEX.md` — the hub for Warden's own root.
 - [[GL-001-file-naming-conventions]] — slug, date, filename rules.
-- [[GL-002-frontmatter-conventions]] — entity frontmatter schema; Silas owns extending it to cover `Client Delivery/` entities.
-- [[SOP-002-convert-mypka-to-sqlite]] — referenced if/when `Client Delivery/` entities join the SQLite mirror.
+- [[GL-002-frontmatter-conventions]] — the PKM entity frontmatter schema; GL-006 inherits its mechanical rules (§§2-4).
+- [[GL-006-client-delivery-frontmatter-conventions]] — the frontmatter schema for `Client Delivery/`'s own entity types (Engagement, Work Package, Register Item). Owned by Silas.
+- [[SOP-002-convert-mypka-to-sqlite]] — referenced if/when `Client Delivery/` entities join a SQLite mirror; not yet decided, see GL-006 §"Does this feed the SQLite mirror?".
 - [[AGENTS]] — the root team file.
 - [[agent-index]] — the full team roster.

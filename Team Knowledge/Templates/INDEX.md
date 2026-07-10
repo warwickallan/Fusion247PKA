@@ -27,13 +27,23 @@ Then open the new file and edit. The Properties tab in mypka-interface will popu
 | [[Templates/key-element]] | Key Element | `PKM/My Life/Key Elements/<slug>.md` |
 | [[Templates/document]] | Document | `PKM/Documents/<slug>.md` |
 
+### Client Delivery templates
+
+Structurally separate from the eight PKM templates above — these back `Client Delivery/`, Warden's business/client-delivery root, per [[GL-006-client-delivery-frontmatter-conventions]] rather than GL-002.
+
+| Template | Entity | Goes under |
+|---|---|---|
+| [[Templates/engagement]] | Engagement | `Client Delivery/<engagement-slug>/Project Control/<engagement-slug>.md` |
+| [[Templates/work-package]] | Work Package | `Client Delivery/<engagement-slug>/Work Packages/<engagement-slug>-wp-<NNN>-<slug>.md` |
+| [[Templates/register-item]] | Register Item (risk/issue/change/decision) | `Client Delivery/<engagement-slug>/Risk-Issue-Change-Decision Register/<engagement-slug>-reg-<NNN>.md` |
+
 ## Rules these templates follow
 
-- Frontmatter field names match the SQLite column names in [[SOP-002-convert-mypka-to-sqlite]]. Do not rename them.
-- Required fields are marked in [[GL-002-frontmatter-conventions]]. Everything else is optional - delete the lines you do not need.
+- Frontmatter field names match the SQLite column names in [[SOP-002-convert-mypka-to-sqlite]] for the eight PKM templates. The three Client Delivery templates are not (yet) part of the SQLite mirror — see [[GL-006-client-delivery-frontmatter-conventions]] §"Does this feed the SQLite mirror?".
+- Required fields are marked in [[GL-002-frontmatter-conventions]] (PKM templates) or [[GL-006-client-delivery-frontmatter-conventions]] (Client Delivery templates). Everything else is optional - delete the lines you do not need.
 - Body H2 headings are suggestions, not contracts. Add or remove sections as your note evolves. The Properties tab does not care what is in the body.
-- Foreign-key fields (e.g. `company`, `key_element`, `linked_*`) store the **slug** of the target file, not the title. Per [[GL-002-frontmatter-conventions]] rule 4.
+- Foreign-key fields (e.g. `company`, `key_element`, `engagement`, `linked_*`) store the **slug** of the target file, not the title. Per [[GL-002-frontmatter-conventions]] rule 4 (inherited by GL-006 for Client Delivery entities).
 
 ## When in doubt
 
-Read [[GL-002-frontmatter-conventions]]. If a field you need is not there, edit the Guideline first, then come back and use it.
+Read [[GL-002-frontmatter-conventions]] for PKM entities, or [[GL-006-client-delivery-frontmatter-conventions]] for `Client Delivery/` entities. If a field you need is not there, edit the matching Guideline first, then come back and use it.

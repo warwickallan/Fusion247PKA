@@ -19,7 +19,7 @@ Each engagement gets its own subfolder under `Client Delivery/<engagement-slug>/
 
 ## Schema status (read before writing real engagement data)
 
-`Client Delivery/` entities (engagements, work packages, register items) are not yet part of [[GL-002-frontmatter-conventions]]'s eight tracked entity types. Before real engagement data is written with frontmatter, this needs a schema pass with **Silas** (new entity type per GL-002 §"How to extend this Guideline") — see Warden's contract §Schema note. Until then, Warden works in plain structured markdown rather than inventing ad-hoc YAML keys.
+`Client Delivery/` entities have a schema: [[GL-006-client-delivery-frontmatter-conventions]], a sibling Guideline to [[GL-002-frontmatter-conventions]] scoped to this root (GL-002 itself stays PKM-only). It defines three entity types — Engagement (the Project PRD, one file per engagement under `Project Control/`), Work Package (one file per authorized unit of scope under `Work Packages/`), and Register Item (one file per risk/issue/change/decision, distinguished by a `kind` field, under the Register folder) — each with a starter template in `Team Knowledge/Templates/`. Work Package and Register Item slugs are engagement-prefixed (`<engagement-slug>-wp-NNN-...`, `<engagement-slug>-reg-NNN`) to stay globally unique across engagements. The Write-and-Verification Log and Support Handover do not have a schema yet — keep those in plain structured markdown until a real one is needed, then flag it to Silas via Larry.
 
 ## SSOT applies here too
 
@@ -29,5 +29,6 @@ If a fact about an engagement shows up in two places, the register or the PRD is
 
 - [[Team/Warden - Delivery Manager/AGENTS]] — the specialist who owns this root.
 - [[GL-001-file-naming-conventions]] — slug, date, filename rules.
-- [[GL-002-frontmatter-conventions]] — entity frontmatter schema; extension pending for this root's entity types.
+- [[GL-002-frontmatter-conventions]] — PKM entity frontmatter schema; GL-006 inherits its mechanical rules (§§2-4).
+- [[GL-006-client-delivery-frontmatter-conventions]] — the frontmatter schema for this root's own entity types (Engagement, Work Package, Register Item).
 - [[PKM/INDEX]] — the user's personal knowledge, kept structurally separate from this root.
