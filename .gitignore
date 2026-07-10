@@ -4,6 +4,7 @@ __MACOSX/
 *.swp
 .obsidian/workspace*
 .obsidian/cache
+.vscode/
 
 # --- Secrets (NEVER commit) ---
 # Excludes .env at any depth (e.g. Expansions/<slug>/.env). Keys-only
