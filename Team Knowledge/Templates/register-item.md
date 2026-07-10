@@ -11,6 +11,9 @@ target_resolution_date:
 resolved_date:
 linked_work_packages:
 source_ref:
+evidence_type:
+confidence:
+reread_flag: not-required
 tags:
   - uat
 ---

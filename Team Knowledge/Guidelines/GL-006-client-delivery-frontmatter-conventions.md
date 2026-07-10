@@ -32,27 +32,62 @@ Unlike the eight PKM entity types (each living flat in one folder, e.g. all Peop
 
 An Engagement note is the Project PRD. A Work Package note is one unit of authorized scope. A Register Item note is one risk, issue, change, or decision. Never combine two engagements, two work packages, or two register entries into one file. The "combined register" in Warden's contract means **risk, issue, change, and decision share one entity type** (via the `kind` field, see below) and one reviewed folder per engagement — not that entries share one file. Each item gets its own file so it is independently linkable, frontmatter-queryable, and safe to update without clobbering its siblings.
 
+## Source-tier precedence doctrine
+
+`Client Delivery/` mixes artifacts that were never meant to carry equal weight — a signed SOW and a Warden-generated status report both describe "the engagement," but only one of them can obligate anything. When two artifacts disagree about the same fact, this is the order that resolves it: higher tier wins, and the disagreement gets recorded, never silently overwritten.
+
+| Tier | Category | Answers | Typical home in `Client Delivery/` |
+|---|---|---|---|
+| 1 | Contractual authority | What are we actually obligated to do? | Contract, SOW, schedules, approved change requests — captured under `Sources (Immutable)/` |
+| 2 | Approved baseline | What did we agree to build or deliver? | Signed-off requirements or solution design — captured under `Sources (Immutable)/`, reflected in the Engagement note's `## Definition of done` / `## Out of scope` |
+| 3 | Project evidence | What actually happened? | Transcripts, emails, meeting notes — captured under `Sources (Immutable)/` |
+| 4 | Structured project knowledge | What did we extract and decide from that evidence? | Register Items, Work Packages, Engagement frontmatter and body |
+| 5 | Generated outputs | What did we report, based on the above? | Status reports, summaries, client-facing artifacts — `Reporting-QA-Comms/` |
+
+**Why this order, not some other:** each tier is derived from the one above it, never the reverse. A generated output (tier 5) restates structured knowledge (tier 4); structured knowledge is extracted from evidence (tier 3); evidence proves what happened against a baseline (tier 2); the baseline only has force because a contract obligates it (tier 1). Derivation only flows downward. A report can never overrule a register item. A register item can never overrule what a transcript actually shows. No volume of project evidence overrides what the contract says is owed — a disputed contractual obligation only moves via a tier-1 artifact (an approved change request), never a tier-3 or tier-4 one.
+
+**When tiers conflict:** the higher tier (lower number) governs the fact. The lower-tier artifact is not silently edited to match it — the conflict itself is recorded. For a Register Item, that means a dated `## Reconciliation log` entry naming the discrepancy and which tier resolved it. For an Engagement note, that means a dated line in `## Status update`. Never quietly overwrite a prior structured-knowledge state to make it agree with a newer source; the discrepancy is itself information Warden's philosophy #3 ("provenance discipline") requires be kept, not erased.
+
+**This doctrine governs `source_ref`, and is distinct from `evidence_type` / `confidence` below.** A Register Item's `source_ref` points at a piece of evidence; that evidence's tier is implied by what kind of document it is (a contract vs. a transcript, both under `Sources (Immutable)/`). Tier says which artifact wins when two disagree. `evidence_type` and `confidence` (see the Register Item schema) say how much to trust a single extraction on its own, independent of tier. A tier-3 transcript can still produce a `high`-confidence, `direct-statement` register item; a tier-1 contract clause can still be extracted with `low` confidence if the clause itself is ambiguous.
+
 ## Folder map
 
 ```
 Client Delivery/
 └── <engagement-slug>/
     ├── Project Control/
-    │   └── <engagement-slug>.md                          -> Engagement entity (the Project PRD)
+    │   └── <engagement-slug>.md                          -> Engagement entity (the Project PRD, business case, and benefits log all fold into this note's body)
     │   └── <engagement-slug>-implementation-plan.md       -> plain markdown, no frontmatter (see note below)
-    ├── Sources (Immutable)/                                -> raw captures, no frontmatter, never edited post-capture
+    ├── Sources (Immutable)/
+    │   ├── INDEX.md                                        -> per-engagement document register (see below)
+    │   └── <captured files>                                -> raw captures, no frontmatter, never edited post-capture
     ├── Work Packages/
     │   ├── <engagement-slug>-work-package-catalogue.md    -> plain markdown rollup, no frontmatter (see note below)
     │   └── <engagement-slug>-wp-<NNN>-<slug>.md           -> Work Package entity, one per file
     ├── Risk-Issue-Change-Decision Register/
     │   └── <engagement-slug>-reg-<NNN>.md                 -> Register Item entity, one per file
-    ├── Reporting-QA-Comms/                                 -> Write-and-Verification Log; schema not yet defined (see below)
+    ├── Reporting-QA-Comms/
+    │   ├── <engagement-slug>-comms-plan.md                 -> Comms Plan, plain markdown, no frontmatter (see below)
+    │   └── <verification log entries>                      -> Write-and-Verification Log; schema not yet defined (see below)
     └── Handover-Closure/                                   -> Support Handover; schema not yet defined (see below)
 ```
 
-**Implementation Plan and Work Package Catalogue stay plain structured markdown, no frontmatter, for now.** Both are narrative/rollup documents (a sequenced approach; a table of links to Work Packages) rather than individually-referenceable entities — nothing else needs to foreign-key *into* them. If that changes (e.g. the user wants to query implementation-plan phases structurally), route back to Silas to add a schema here, same as any other extension.
+**Implementation Plan, Work Package Catalogue, Comms Plan, and the Sources index all stay plain structured markdown, no frontmatter, for now.** Each is a narrative/rollup document (a sequenced approach; a table of links to Work Packages; who needs which update on what cadence; a table of captured sources) rather than an individually-referenceable entity — nothing else needs to foreign-key *into* any one of them as a whole. The Sources index specifically is a table: title, capture date, source tier (per the precedence doctrine above), one-line description, wikilink to the file — maintained by whoever captures the source. If any of these needs to become queryable on its own (e.g. the user wants to query implementation-plan phases structurally), route back to Silas to add a schema here, same as any other extension.
 
 **Write-and-Verification Log and Support Handover are out of scope for this pass.** The task that produced this Guideline covered engagement, work package, and register item only. When Warden's work produces real Write-and-Verification Log entries or a real Handover document, that is a follow-up schema request to Silas — do not invent fields for them in the meantime; keep writing plain markdown per Warden's contract until they land here.
+
+## Where the six Project Control artifacts live
+
+A QA pass over an earlier architecture proposal for this domain flagged six artifacts that needed an explicit home once the "Project Control" folder they used to live under got reorganised without re-homing them: business case, project brief, comms plan, benefits log, stakeholder register, document register. None of these get a new entity type — each has a home in the schema that already exists, made explicit here so it stops being implicit:
+
+| Artifact | Home | Why not a new entity type |
+|---|---|---|
+| Business case | Engagement note, body section `## Business case` | One fact (why this engagement is worth doing) about one Engagement — a body section, not a separate file to keep in sync. |
+| Project brief | Engagement note body — `## Problem & intent`, `## Who this is for`, `## Definition of done`, `## Out of scope`, collectively | The Engagement note already **is** the Project PRD (see the schema below); a project brief is the same document under a different name. These four sections already say what a brief says. |
+| Comms plan | `Reporting-QA-Comms/<engagement-slug>-comms-plan.md`, plain markdown, no frontmatter | Same shape as the Implementation Plan and Work Package Catalogue — narrative/rollup, nothing foreign-keys into it. `Reporting-QA-Comms/` was already the intended home per `Client Delivery/INDEX.md`; this Guideline now says so explicitly. |
+| Benefits log | Engagement note, body section `## Benefits realization` | Deliberately lightweight — a dated log of benefit-against-baseline entries, same append-only shape as a Register Item's `## Reconciliation log`. Not a structured field, not a new entity. |
+| Stakeholder register | Engagement note, new optional field `linked_stakeholders` (list of objects, see the schema below); narrative content stays in the existing `## Stakeholders` body section | `client_contacts` is a flat list of Person slugs and cannot carry role, influence, or cadence — the actual content of a stakeholder register. A structured field is proportionate; a whole new entity type (one file per stakeholder per engagement) is not. |
+| Document register | `Sources (Immutable)/` plus the new per-engagement `INDEX.md` (see the folder map above) | Every source already lands in one immutable, engagement-scoped folder. A table (title, date, tier, description, wikilink) is the register. A real Document entity type — its own frontmatter, its own SQLite table — would only earn its cost once `Client Delivery/` needs to query documents structurally across engagements. Not yet; see §Future extension candidates. |
 
 ## Entity schemas
 
@@ -67,6 +102,11 @@ engagement_id: BRK-NPL-001                 # optional, client/business-facing co
 client_org: bellrock-npl                   # optional, slug of an Organization in PKM/CRM/Organizations
 client_contacts:                           # optional, slugs of People in PKM/CRM/People
   - jane-doe
+linked_stakeholders:                       # optional - list of objects, the stakeholder register (see notes)
+  - person: jane-doe                       # required per entry - slug of a Person in PKM/CRM/People
+    role: Client Sponsor                   # free text - their role on this engagement
+    influence: high                        # high | medium | low
+    cadence: weekly                        # ad-hoc | weekly | biweekly | monthly | milestone-only
 status: active                             # scoping | active | paused | closing | closed | archived
 engagement_type: fixed-price               # fixed-price | time-and-materials | retainer | internal | other
 start_date: 2026-02-01
@@ -81,9 +121,10 @@ tags:
 Notes:
 - `name` is the only required field, consistent with GL-002 rule 5's "require only what makes the note identifiable."
 - `client_org` and `client_contacts` are the one deliberate bridge back into `PKM/CRM/`: the client's organization and the people involved are still part of the user's contact graph, even though the engagement itself is governed outside `PKM/`. They store slugs per GL-002 rule 4, resolving into `PKM/CRM/Organizations/` and `PKM/CRM/People/` respectively.
+- **`linked_stakeholders` is the stakeholder register, structured.** It is a list of objects, not a flat slug list — the one deliberate departure from GL-002 rule 4's "list of slugs" shape, made in this Guideline because a stakeholder register needs more than an identity pointer to do its job. Each entry's `person` key still stores a slug per rule 4; `role`, `influence`, and `cadence` are per-entry attributes with no meaning outside their entry, so they nest under it rather than becoming parallel top-level lists that would need index-matching to stay aligned (a `linked_stakeholder_roles[0]` matching `linked_stakeholders[0]` shape is exactly the fragility this avoids). `client_contacts` stays as-is for the simple case (someone you deal with but aren't formally tracking); `linked_stakeholders` is for people actually part of the governed register. A person can appear in both. The existing `## Stakeholders` body section stays for narrative (their stake in the outcome, relationship notes) — the frontmatter field is the queryable register, the body section is the story.
 - `status` values follow a PRINCE2-flavoured engagement lifecycle, distinct from the Project `status` enum in GL-002 (which is personal-project-shaped).
 - `owner` is the internal person accountable for the engagement (an account/delivery lead) — a slug of a Person, not a title string.
-- Body section conventions: `## Problem & intent`, `## Who this is for`, `## Definition of done`, `## Out of scope`, `## Stakeholders`, `## Status update`.
+- Body section conventions: `## Problem & intent`, `## Who this is for`, `## Definition of done`, `## Out of scope`, `## Business case`, `## Stakeholders`, `## Benefits realization`, `## Status update`. `## Business case` is the investment rationale (why this is worth doing, what it costs to not do it) — new in this pass, folding the "business case" and "project brief" artifacts into the Engagement note per §"Where the six Project Control artifacts live" above. `## Benefits realization` is a dated, append-only log of benefit-against-baseline entries, same shape as a Register Item's `## Reconciliation log` — deliberately lightweight, not a structured field.
 
 ### Work Package - `Client Delivery/<engagement-slug>/Work Packages/<engagement-slug>-wp-<NNN>-<slug>.md`
 
@@ -132,6 +173,9 @@ resolved_date:
 linked_work_packages:                      # optional, slugs of Work Packages this affects
   - bellrock-npl-implementation-wp-001-mobilisation
 source_ref:                                # optional, wikilink or path to the immutable source this was extracted from
+evidence_type:                             # optional - direct-statement | demonstrated | agreed-decision | suggested-option | assumption | inference | unresolved-discussion
+confidence:                                # optional - high | medium | low (named band with a documented reason, not a percentage - see notes)
+reread_flag: not-required                  # optional - not-required | recommended | mandatory (default not-required if omitted)
 tags:
   - uat
 ---
@@ -142,9 +186,29 @@ Notes:
 - `status` is intentionally a superset spanning all four kinds. A given kind will only use the values that make sense for it in practice (a `decision` typically moves `open -> accepted` or `open -> rejected`; a `risk` typically moves `open -> monitoring -> closed`) — the schema does not enforce a per-kind subset, Warden does by convention.
 - `severity` applies to `risk` and `issue`; leave blank for `change` and `decision` where it doesn't map cleanly.
 - `source_ref` is the provenance pointer — per Warden's "provenance discipline" philosophy, when a register item is extracted from a raw source (a transcript, a client email) captured under `Sources (Immutable)/`, `source_ref` links back to it. Never edit the source; reconcile the register item's own fields and body instead.
+- **`evidence_type` classifies how this item was established from its source** — how it was said, not how important it is. `direct-statement` — someone stated it plainly. `demonstrated` — observed in action, not just stated (a system behaviour, a missed deadline). `agreed-decision` — explicit sign-off from someone with authority to decide. `suggested-option` — raised as a possibility, not committed to. `assumption` — filled in because no source said otherwise; flagging it as such stops it reading as fact. `inference` — someone connected dots the source did not state directly. `unresolved-discussion` — the source shows disagreement or an open thread with no resolution reached. Leave blank if the item predates this field or the distinction adds no value.
+- **`confidence` is a named band with a documented reason, never a manufactured percentage.** `high` — direct or demonstrated evidence, a single clear source, no contradiction elsewhere. `medium` — evidence is real but indirect (an inference, a single unconfirmed statement, or a source with some ambiguity). `low` — an assumption, a disputed point, a single verbal mention with no corroboration, or evidence that contradicts another source. The band is the queryable flag; write the *reason* for it in `## Description` or `## Reconciliation log` — reasoning is prose, per the frontmatter/body split this whole schema follows.
+- **`reread_flag` tells a reviewer whether the original source needs another pass before this item can be trusted as-is.** `not-required` (the default) — nothing about this item calls its extraction into question. `recommended` — worth a second look when time allows. `mandatory` — do not treat this item as settled until the source has been reread. Set `recommended` or `mandatory`, and note which trigger applied in `## Reconciliation log`, when any of the following hold:
+  - `confidence: low`.
+  - Attribution is disputed (who said or agreed this is contested).
+  - The source shows contradictory discussion (two people, or the same person at two points, said different things).
+  - `evidence_type: inference` — anything inferred rather than stated deserves a check before it is treated as settled.
+  - The item, or any output built from it, intends to state something was **"agreed"** — agreement is a strong claim and needs direct confirmation in the source before it is asserted as fact.
+  - A possible conflict with a tier-1 (Contractual authority) artifact per §"Source-tier precedence doctrine" above — this always warrants at least `recommended`, and `mandatory` if the item's resolution depends on which side is right.
 - **The "dated reconciliation entries" Warden's contract requires live in the body, under `## Reconciliation log`, not as separate files.** Each time new source material touches this item, append a dated line (`- 2026-04-02 — new transcript reviewed, downgraded severity to low`) rather than overwriting prior state. This is how "one register, reviewed, not written-once" (Warden's core philosophy #2) is realized structurally: the register *is* the folder of these items, and each item's own reconciliation log is its review history.
 - `linked_work_packages` stores slugs per GL-002 rule 4.
 - Body section conventions: `## Description`, `## Impact`, `## Reconciliation log`, `## Resolution`.
+
+## Future extension candidates (not built this pass)
+
+Noted for a future schema pass, not built now — each would need real data from a second engagement before it earns its own entity type, per this buildout's own sequencing decision (don't over-fit the schema to one engagement):
+
+- **Meeting Metadata** — structured attendee/date/type fields for meetings, distinct from the raw transcript captured under `Sources (Immutable)/`.
+- **Deliverables** — a queryable entity distinct from Work Packages, if "what we owe the client" ever needs tracking separately from "what work produces it."
+- **Requirements** — structured, individually-referenceable requirements, if the Engagement note's `## Definition of done` prose ever needs to become a queryable list.
+- **Dependencies** — cross-engagement or cross-work-package dependency tracking beyond the free-text `## Dependencies` section already on Work Package.
+
+Route any of these back to Silas via Larry when real data makes the case for them. Do not schema them speculatively.
 
 ## How to extend this Guideline
 
@@ -175,4 +239,5 @@ If the rules change, update this file. Do not duplicate the change into Warden's
 
 ### Version history
 
+- **v1.1** - Enrichment pass, re-deriving principles surfaced by a QA review of the user's prior Fusion247 Brain system (not copied — re-derived in myPKA's own voice and schema shape). Added **§"Source-tier precedence doctrine"**: five tiers (Contractual authority > Approved baseline > Project evidence > Structured project knowledge > Generated outputs), which artifact wins when two disagree, and how the disagreement gets recorded (never silently overwritten). Added optional **`evidence_type`**, **`confidence`**, and **`reread_flag`** fields to Register Item, with documented enum meanings and reread-flag trigger conditions. Added **§"Where the six Project Control artifacts live"**, closing a gap a prior architecture proposal had left open (business case, project brief, comms plan, benefits log, stakeholder register, document register all now have an explicit home): business case and benefits log become new Engagement body sections (`## Business case`, `## Benefits realization`); project brief confirmed as already covered by the Engagement note's existing sections; comms plan confirmed to live in `Reporting-QA-Comms/` as plain markdown; stakeholder register becomes a new optional `linked_stakeholders` field on Engagement (list of objects — person/role/influence/cadence — the one deliberate departure from the flat-slug-list convention, scoped to this Guideline only); document register resolved as `Sources (Immutable)/` plus a new per-engagement `INDEX.md`, not a new entity type. Added **§"Future extension candidates"** (Meeting Metadata, Deliverables, Requirements, Dependencies) as documented-but-not-built. All changes additive and backward-compatible; no existing field renamed or removed. SQLite mirror question and Write-and-Verification Log / Support Handover schemas remain deferred, untouched by this pass.
 - **v1.0** - Initial schema pass. Defined Engagement, Work Package, and Register Item (combined risk/issue/change/decision via a `kind` field). Created as a sibling Guideline to GL-002 rather than an extension of it, because `Client Delivery/` is a structurally separate root from `PKM/` by explicit user design. Write-and-Verification Log and Support Handover explicitly deferred - not yet schema'd. SQLite mirror question explicitly deferred to a future decision, not defaulted into SOP-002.

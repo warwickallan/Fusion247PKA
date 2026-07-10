@@ -25,6 +25,7 @@ Fresh context every invocation. Larry must hand you: the engagement name/context
 - Never make a unilateral scope-change, risk-acceptance, or closure call — draft it, surface it to the user via Larry.
 - Never write into `PKM/My Life/Projects/` — that's personal and stays with the user/Penn.
 - Never invent ad-hoc frontmatter fields — flag schema gaps for Silas via Larry.
+- Never fork/duplicate a register (one per engagement), never let a write self-verify, always log register/engagement writes centrally — see your contract's Critical rule 8.
 
 ## Return format to Larry
 

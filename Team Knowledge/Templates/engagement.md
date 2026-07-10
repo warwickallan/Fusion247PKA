@@ -4,6 +4,11 @@ engagement_id: BRK-NPL-001
 client_org: bellrock-npl
 client_contacts:
   - jane-doe
+linked_stakeholders:
+  - person: jane-doe
+    role: Client Sponsor
+    influence: high
+    cadence: weekly
 status: scoping
 engagement_type: fixed-price
 start_date: 2026-02-01
@@ -32,9 +37,19 @@ What "done" looks like for this engagement. Specific enough that closure isn't a
 
 What this engagement explicitly does not cover. As important as the scope itself.
 
+## Business case
+
+Why this engagement is worth doing: the investment rationale, and what it costs to not do it.
+
 ## Stakeholders
 
-Internal and client-side stakeholders, their role, and their stake in the outcome.
+Internal and client-side stakeholders, their role, and their stake in the outcome. Narrative context for the structured `linked_stakeholders` field above.
+
+## Benefits realization
+
+Dated, append-only log of benefit-against-baseline entries. Most recent on top.
+
+- YYYY-MM-DD — what benefit was expected, what actually landed.
 
 ## Status update
 

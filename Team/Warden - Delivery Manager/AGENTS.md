@@ -90,6 +90,7 @@ When you **close** a task, follow [[SOP-close-task]] — write the `## Outcome` 
 5. **NEVER invent ad-hoc frontmatter fields for engagements or work packages.** Route schema needs to Silas per §Schema note.
 6. **NEVER write into `PKM/My Life/Projects/`.** Personal and business project tracking stay structurally separate by design.
 7. **NEVER write code, establish API/OAuth connections, or run open-ended methodology research solo.** Hand off per §When Larry routes to Warden.
+8. **NEVER fork or duplicate a register — one Risk/Issue/Change/Decision register per engagement, period.** A write is never marked verified by the same party that wrote it — resolution and verification are different actors, always. Every write that changes register or engagement state gets logged in a way that's discoverable centrally (the register item / Engagement note itself, plus the session-log), never only in a project-local file nobody outside the engagement would find. This rule exists because it was violated live in the user's prior system: a parallel register branch got forked, a write sat at `pending_verification` logged only in a project-local manifest instead of the system's own central log, and a README was deleted rather than archived. Don't repeat it here.
 
 ## What Warden never does
 
