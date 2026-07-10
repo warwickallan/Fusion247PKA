@@ -13,8 +13,10 @@ Filename pattern: `GL-NNN-<title>.md`.
 | GL-003 | [[GL-003-design-system]] | Design-system / visual-identity SSOT — color, type, spacing, voice tokens that Iris authors and Charta/Pixel/Vera read from. *(Designer Pack — preinstalled in v3.0.0)* |
 | GL-004 | [[GL-004-task-resource-linking]] | One-way Task → Resource linking rule, seven-array task frontmatter contract, `linked_deliverables` slug format, archive-on-close cascade. Read by [[SOP-create-task]], [[SOP-claim-task]], [[SOP-close-task]]. |
 | GL-005 | [[GL-005-llm-agnostic-portable-core]] | The portable-core boundary: harness-agnostic core (`PKM/`, `Team Knowledge/`, the body of every `Team/*/AGENTS.md`) vs the per-harness adapter layer (`.claude/`, future `.codex/`, `.cursor/`). No harness names, host tool names, slash-command-only triggers, or hardcoded models in the core. Enforced by the `agnosticism-audit` in `validation-script.sh`. |
+| GL-006 | [[GL-006-client-delivery-frontmatter-conventions]] | YAML frontmatter field schemas for `Client Delivery/`'s entity types (Engagement, Work Package, Register Item) — Warden's business/client-delivery root, structurally separate from `PKM/`. Sibling to GL-002, inherits its mechanical rules (§§2-4) rather than duplicating them. Not (yet) part of the SQLite mirror in [[SOP-002-convert-mypka-to-sqlite]]. |
+| GL-007 | [[GL-007-human-facing-writing-conventions]] | Anti-AI-tell discipline for human-facing external prose (cover letters, client comms, reports) — current cited 2026 research on what reads as AI-written, a five-point self-check, and the hard rule that this Guideline must be wikilinked and re-read at the point of drafting, not just written once. Does not govern internal session-log/task register, which has its own existing no-em-dash convention. |
 
-*Reserved:* none. Next free Guideline slot is GL-006.
+*Reserved:* none. Next free Guideline slot is GL-008.
 
 ## When to write a new Guideline
 
