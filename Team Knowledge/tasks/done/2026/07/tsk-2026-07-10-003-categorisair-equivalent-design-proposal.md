@@ -6,13 +6,13 @@ title: "Design proposal: myPKA Knowledge Intake and Synthesis capability (matrix
 # Ownership & priority
 assignee: unassigned
 priority: 3
-status: open
+status: done
 blocked_reason: null
 blocked_by: null
 
 # Time
 created: 2026-07-10T23:45:00Z
-updated: 2026-07-11T02:45:00Z
+updated: 2026-07-11T04:45:00Z
 due: null
 
 # Provenance
@@ -187,6 +187,16 @@ This also resolved a useful extra: the doc's own "CRUD boundary" section states 
 - 2026-07-11 02:10 (pax) — Added "## Source material and retrieval map" per explicit user instruction, before any implementation. Citation only — no source content copied. Confirmed via `Glob` against the Fusion247 Brain export (`/workspace/fusion247brain/Fusion247 Brain/`) that all named TubeAIR/ICOR/source-classification-registry/categorisair/update-fusion paths exist as given; cross-checked `F247.agent.categorisair`'s Drive object ID against the F247 Drive Object Registry snapshot (confirmed, exact row match). Could not confirm the exact home of the backlink-justification/root-clutter-prevention rule inside `F247.agent.categorisair.docx` itself — binary `.docx`, no content-extraction tool available this pass; cited the two closest textual matches found in the plaintext registry (ROUTE-002, ROUTE-008) instead and flagged the gap openly rather than guessing.
 - 2026-07-11 02:20 (larry) — Resolved Pax's flagged gap: extracted `F247.agent.categorisair.docx` directly (have a docx-content script, Pax doesn't). Both rules are stated explicitly in the source, not inferred — backlink justification in its dated "Latest backlink rule — 2026-07-02" section, root-clutter prevention as the agent's core "Problem It Solves" framing plus its Inbox Archive Rule mechanism. Updated the retrieval-map row and note with the real quotes and citation. Also surfaced a useful bonus: the doc's own CRUD boundary ("Create/Read/Update/suggest-Delete") is directly relevant precedent for framing the new specialist's authority boundary.
 - 2026-07-11 02:45 (larry) — Per explicit user instruction, added `F247.skill.process-youtube-transcript` (a user-supplied upload, not a Drive-sourced file — confirmed absent from the F247 Drive Object Registry despite its own header's claim) to `## Source material and retrieval map`, and added `## Reconciliation` recording disposition **partially absorbed** against Cairn's completed pilot. Dispatched Cairn to re-derive the transcript-chunking mechanics into a new subordinate procedure, [[SOP-016-cairn-process-youtube-transcript]] (committed `da0d08b`) — single-read chunk mapping, timestamp anchors, transcript-noise/normalization flags, chunk-map coverage checking, metadata validation, sequential slicing, without porting the old CategorisAIr handoff packet, `pending_categorisair` state, mandatory-one-note assumption, or fixed frontmatter contract. Dispatched Silas to route the raw-source-retention gap (surfaced a second time by this reconciliation) as a proper Tier-1 design proposal: [[tsk-2026-07-10-007-raw-source-retention-design-proposal]] (committed `34187b9`), Option A recommended. Added SOP-015/SOP-016 to `linked_sops`. **Task remains open, not closed** — per explicit user instruction ("do not close tsk-003 yet... close tsk-003 only after its useful mechanics and remaining gaps have explicit dispositions"). Both conditions are now met (mechanics → SOP-016, gap → tsk-007), so this task is ready for the user's close-or-hold call, not closed unilaterally.
+- 2026-07-11 04:45 (larry) — done: external QA corrections applied, useful transcript mechanics are in [[SOP-016-cairn-process-youtube-transcript]], the remaining raw-source-retention design gap is captured in [[tsk-2026-07-10-007-raw-source-retention-design-proposal]], and this task is closed as direction decided / implementation completed for the Cairn v1 scope.
 
 ## Outcome
-_(filled when status flips to done — see SOP-close-task)_
+
+What shipped: the widened Knowledge Intake and Synthesis capability was approved as a dedicated specialist path, Cairn was hired and piloted end-to-end, [[GL-008-source-classification-registry]] was created as the governed source-type vocabulary, [[SOP-015-cairn-process-external-source]] became the canonical intake process, and [[SOP-016-cairn-process-youtube-transcript]] absorbed the useful transcript-chunking mechanics from `F247.skill.process-youtube-transcript` without carrying forward the old CategorisAIr handoff queue, pending-review state, mandatory-note assumption, or fixed frontmatter contract.
+
+Where it lives: [[Team/Cairn - Knowledge Intake Specialist/AGENTS]], [[GL-008-source-classification-registry]], [[SOP-015-cairn-process-external-source]], [[SOP-016-cairn-process-youtube-transcript]], and the pilot enrichment in [[ai-tooling]].
+
+Follow-ups: [[tsk-2026-07-10-007-raw-source-retention-design-proposal]] remains open as a standalone design decision before TubeAIR or any general-PKM raw-source store is implemented. [[tsk-2026-07-10-004-careerair-migration-direction-decision]], [[tsk-2026-07-10-005-asdair-retained-external-recommendation]], and [[tsk-2026-07-10-006-verifiair-content-integrity-qa-gap-proposal]] remain separate open matrix follow-ups.
+
+Lessons: no new journal entry written in this close; the durable lesson was routed into [[tsk-2026-07-10-007-raw-source-retention-design-proposal]] instead.
+
+Archived deliverables: archive deferred for `2026-07-10-fusion247-brain-migration-coverage-matrix` because it is still referenced by open or in-progress tasks, including [[tsk-2026-07-10-001-fold-fusion247-brain-doctrine-into-warden]], [[tsk-2026-07-10-004-careerair-migration-direction-decision]], [[tsk-2026-07-10-005-asdair-retained-external-recommendation]], and [[tsk-2026-07-10-006-verifiair-content-integrity-qa-gap-proposal]].

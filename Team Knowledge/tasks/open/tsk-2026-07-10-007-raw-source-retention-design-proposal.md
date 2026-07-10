@@ -12,7 +12,7 @@ blocked_by: null
 
 # Time
 created: 2026-07-10T23:10:00Z
-updated: 2026-07-10T23:10:00Z
+updated: 2026-07-11T04:40:00Z
 due: null
 
 # Provenance
@@ -101,8 +101,9 @@ whether.
 
 This proposal is scoped to **raw external-source retention for Cairn's domain** (already-acquired
 external material processed via SOP-015/SOP-016, and the future TubeAIR/ICOR-course-note capture
-adapters that will feed it — see [[tsk-2026-07-10-003-categorisair-equivalent-design-proposal]]
-for the still-open question of who owns that ongoing intake capability). It is **not**:
+adapters that will feed it). Cairn is now the decided owner of Knowledge Intake and Synthesis;
+this task no longer treats ownership as open. What remains undecided is the source-store location
+and its capture semantics. It is **not**:
 
 - A redesign of `Team Inbox/`, `PKM/Journal/`, or `PKM/Images/` — Penn's existing personal-capture
   paths already have their own retention homes and are untouched by this proposal.
@@ -226,12 +227,57 @@ fields, now baked into a folder name instead. It also loses the natural
 already has, for no functional gain the `INDEX.md` register (Option A) doesn't already provide as
 a queryable column.
 
+## Required capture semantics, whichever location is approved
+
+The location choice is not enough on its own. Any approved source store must also define these
+capture-time rules before implementation:
+
+- **Stable source identifier.** The `INDEX.md` row should record a stable ID where one exists
+  (for YouTube, the video ID; for a web page, canonical URL if known; for a file upload, original
+  filename plus capture timestamp). Where practical, also record a content hash so later duplicate
+  checks are not based on title similarity alone.
+- **Exact duplicate handling.** If a newly captured file has the same stable ID and same hash as an
+  existing row, do not create a second raw file. Add the new acquisition event to the existing
+  `INDEX.md` row or its notes column, preserving the fact that it arrived again without duplicating
+  the immutable original.
+- **Recapture/version handling.** If the same stable ID arrives again with different content
+  (different hash, changed transcript, corrected export, or added metadata), capture it as a new
+  immutable file. Record `supersedes: <prior source slug>` or equivalent in the `INDEX.md` row,
+  not in ad-hoc frontmatter on the raw file.
+- **Incomplete or wrong captures.** Never edit the original capture in place. If a transcript was
+  truncated, metadata was wrong, or the file was otherwise bad, mark the `INDEX.md` row as
+  incomplete/superseded with a short reason, then capture the corrected source as a new file.
+- **Duplicate-of and supersedes columns.** The register should include enough columns to express
+  `duplicate_of`, `supersedes`, and `superseded_by` relationships without requiring raw files to
+  carry frontmatter.
+- **Destination links stay many-to-one.** Multiple destination notes can point back to the same
+  raw source row. A recapture or correction does not force every destination note to change
+  immediately; update destination provenance only when the corrected capture materially changes
+  what the note says.
+
+## Remaining location choice for approval
+
+The design is now narrowed to one pattern - a date-nested immutable source store with an `INDEX.md`
+register - but two viable locations:
+
+- **Option A1: `PKM/Sources (Immutable)/YYYY/MM/`.** This keeps the store inside the personal PKM
+  root, close to the entity notes Cairn usually enriches.
+- **Option A2: `Sources (Immutable)/YYYY/MM/` at repo root.** This keeps historical evidence
+  structurally separate from living `PKM/` knowledge and lets the same source layer support future
+  `Team Knowledge/` or research outputs. `Client Delivery/` contractual sources remain separate
+  inside each engagement either way.
+
+Silas's original recommendation was A1. The external QA review argues for A2. This task now needs
+the user's explicit location choice before any folder, register, template, or SOP-015 rewrite is
+implemented.
+
 ## Recommendation
 
-**Option A** — a single PKM-wide, date-nested `PKM/Sources (Immutable)/YYYY/MM/` root with a
-GL-006-style `INDEX.md` register. This is a recommendation, not a unilateral decision — the user
-signs off on a direction (A, B, C, or a fourth shape none of these anticipated) before anyone
-builds anything.
+**Approve the pattern, then choose A1 or A2.** The recommended pattern is still a single
+date-nested immutable source store with a GL-006-style `INDEX.md` register, no frontmatter on raw
+files, stable IDs/hashes where available, and explicit duplicate/recapture/supersession semantics.
+The remaining decision is the location: `PKM/Sources (Immutable)/` or top-level
+`Sources (Immutable)/`.
 
 ## The explicit constraint TubeAIR's design must satisfy, once this is decided
 
@@ -255,11 +301,6 @@ reason the gap needed resolving now rather than whenever TubeAIR eventually gets
   WS-002's scope (one-time whole-export migration) is different enough from Cairn's ongoing
   ad hoc intake that forcing the same mechanism onto both without checking real usage first would
   be scope creep, not a resolved question.
-- **Who owns the ongoing "Knowledge Intake and Synthesis" capability this raw-source store feeds
-  into (Cairn as-is, a widened role, or something else)?** Explicitly out of scope here — that is
-  [[tsk-2026-07-10-003-categorisair-equivalent-design-proposal]]'s own open decision, not
-  reopened or pre-empted by this task.
-
 ## Context one click away
 
 - Procedure (the gap surfaced here): [[SOP-015-cairn-process-external-source]],
@@ -288,6 +329,11 @@ reason the gap needed resolving now rather than whenever TubeAIR eventually gets
   SOP-016 both surfaced on real work. Cross-refs: 6/7 populated (sops, workstreams, guidelines,
   my_life, session_logs, journal_entries genuinely empty — no specialist has a journal entry yet;
   deliverables genuinely empty — the proposal lives entirely in this task body).
+- 2026-07-11 04:40 (silas) — revised per external QA review of PR #6: acknowledged Cairn as the
+  decided owner of Knowledge Intake and Synthesis, added required duplicate/recapture/correction/
+  supersession semantics, added stable-ID/hash guidance, and narrowed the remaining decision to
+  the final location choice (`PKM/Sources (Immutable)/` vs top-level `Sources (Immutable)/`).
+  No folder or register implemented; the proposal still awaits user approval.
 
 ## Outcome
 _(filled when status flips to done — see SOP-close-task)_
