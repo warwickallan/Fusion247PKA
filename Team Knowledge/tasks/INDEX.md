@@ -2,22 +2,22 @@
 
 _Auto-generated. Do not edit by hand. Run `SOP-rebuild-task-index` to regenerate._
 
-_Last rebuilt: (never — first generation will fill this)_
+_Last rebuilt: 2026-07-10T19:15:00Z_
 
 ## Summary
 - Open: 0
-- In progress: 0 (0 blocked)
+- In progress: 1 (0 blocked)
 - Done (this month): 0
 - Cancelled (this month): 0
 
 ## Open (0)
 _(none yet — see [[SOP-create-task]] to add one)_
 
-## In progress (0)
-_(none)_
+## In progress (1)
+- [[tsk-2026-07-10-001-fold-fusion247-brain-doctrine-into-warden]] — assignee: warden — claimed 2026-07-10
 
 ## By assignee
-_(populated on first rebuild)_
+- warden: 0 open, 1 in-progress (0 blocked)
 
 ## Recently closed (last 7 days)
 _(none)_
