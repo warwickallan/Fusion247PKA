@@ -22,8 +22,9 @@ Filename pattern: `SOP-NNN-<title>.md`. See [[GL-001-file-naming-conventions]] f
 | SOP-012 | [[SOP-012-warden-configuration-guide]] | Warden | Implementation & Configuration Guide from `change`/`decision` Register Items and linked Work Packages. |
 | SOP-013 | [[SOP-013-warden-meeting-summary]] | Warden | Factual Meeting Summary from an Evidence Pack, targeted rereads only, anti-embellishment writing rule. |
 | SOP-014 | [[SOP-014-warden-consultant-summary]] | Warden | Delivery/commercial interpretation, fact visibly separated from interpretation. Internal-only unless the user approves external circulation. |
+| SOP-015 | [[SOP-015-cairn-process-external-source]] | Cairn | One canonical intake procedure — classify against GL-008, label evidence-origin per claim, test every backlink, file directly into `PKM/`. Self-authored, same pattern as Warden's SOP-010. |
 
-*Reserved (genuinely open for future agents):* SOP-015 onward. SOP-003–009 were claimed by the v3.0.0 all-in-one bundle (App Developer Pack → 003–005, Designer Pack → 006–009); SOP-010–014 claimed by Warden's meeting-intelligence buildout (2026-07-10). Do not back-fill below SOP-015 without coordinating across the team.
+*Reserved (genuinely open for future agents):* SOP-016 onward. SOP-003–009 were claimed by the v3.0.0 all-in-one bundle (App Developer Pack → 003–005, Designer Pack → 006–009); SOP-010–014 claimed by Warden's meeting-intelligence buildout (2026-07-10); SOP-015 claimed by Cairn's own pilot-processing buildout (2026-07-11). Do not back-fill below SOP-016 without coordinating across the team.
 
 ## How to add a new SOP
 
