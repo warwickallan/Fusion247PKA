@@ -171,6 +171,14 @@ if (-not (Get-Command node -ErrorAction SilentlyContinue) -or -not (Get-Command 
 }
 $Node = if ($NodeDir) { Join-Path $NodeDir "node.exe" } else { "node" }
 $Npm  = if ($NodeDir) { Join-Path $NodeDir "npm.cmd" } else { "npm" }
+if ($NodeDir) {
+  # Prepend to THIS PROCESS's PATH only - nothing persists after this window
+  # closes, no user/system PATH or registry touched. Needed because npm
+  # spawns subprocesses (node-gyp/prebuild-install for native modules, esbuild's
+  # install script, tsc, vite) that look up a bare "node" on PATH themselves;
+  # pointing $Node/$Npm at the portable exe directly isn't enough for those.
+  $env:PATH = "$NodeDir;$env:PATH"
+}
 
 # --- 3. first-run install + build (skipped on later launches) ----------------
 if (-not (Test-Path "node_modules"))     { Write-Host "Installing server deps..."; & "$Npm" install --no-audit --no-fund }
