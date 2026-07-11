@@ -6,13 +6,13 @@ title: "Design the shared Warwick Knowledge Value Profile and current-context vi
 # Ownership & priority
 assignee: silas
 priority: 2
-status: open
+status: done
 blocked_reason: null
 blocked_by: null
 
 # Time
 created: 2026-07-10T23:45:16Z
-updated: 2026-07-11T02:05:00Z
+updated: 2026-07-11T02:45:00Z
 due: null
 
 # Provenance
@@ -92,6 +92,18 @@ This task is architecture and acceptance criteria, not permission to infer a per
 - 2026-07-11 01:30 (larry) - public/private boundary added via [[GL-009-public-private-knowledge-boundary]]. Personal profile evidence stays local/private while this public PR carries the architecture and process contract.
 - 2026-07-11 01:45 (silas/larry) - architecture proposal drafted at [[2026-07-11-warwick-knowledge-value-profile-proposal]]. Status remains open pending Warwick review and approval of the profile shape.
 - 2026-07-11 02:05 (silas/larry) - Warwick approved the proposal with a two-stage signal rule: short-term signals expire after 14 days by default; recurring or explicitly requested signals become longer-term candidates before stable-fact approval. Implemented [[GL-010-warwick-knowledge-value-profile]], updated SOP-015, SOP-016, WS-001, Penn/Cairn/Larry contracts, and created ignored private/local skeleton files under `PKM/My Life/Current Context/`.
+- 2026-07-11 02:45 (silas/larry) - acceptance pass completed before closure:
+  - Duplicate/generic source: GL-010 defines `Retain source only` and `Discard where policy permits`; SOP-015 Step 3a requires one disposition before filing and says no-promotion is valid.
+  - Useful idea: GL-010 retrieval rule and SOP-015 Step 9 route durable knowledge into existing destination notes, with Topic/Project/Goal/Habit hooks rather than new arbitrary entity types.
+  - Later retrieval: GL-010 requires destination backlinks, task frontmatter arrays, active My Life links, the profile, or `Useful Retrieval Hooks`; later task work can load the profile and linked entities instead of vault-wide search.
 
 ## Outcome
-_(filled when status flips to done - see SOP-close-task)_
+What shipped: Warwick's Knowledge Value Profile is now an implemented public mechanism with private/local evidence surfaces. [[GL-010-warwick-knowledge-value-profile]] defines the profile structure, stewardship, 14-day short-term signal expiry, longer-term candidate promotion path, seven dispositions, and retrieval rule. SOP-015 now requires Cairn to load the profile and assign a disposition before filing. SOP-016 feeds transcript chunk maps into that valuation step. WS-001 lets Penn propose short-term and longer-term profile signals without silently promoting them to stable facts. Penn, Cairn, and Larry contracts and host shims were updated. The private/local skeleton files exist under ignored `PKM/My Life/Current Context/`.
+
+Where it lives: [[GL-010-warwick-knowledge-value-profile]], [[2026-07-11-warwick-knowledge-value-profile-proposal]], [[SOP-015-cairn-process-external-source]], [[SOP-016-cairn-process-youtube-transcript]], [[WS-001-daily-journaling]], `PKM/My Life/Current Context/warwick-knowledge-value-profile.md`, and `PKM/My Life/Current Context/about-warwick.md`.
+
+Follow-ups: none for Task 008. Future work may populate the private/local profile with Warwick-approved stable facts and current signals during normal journaling/intake.
+
+Archived deliverables: deferred. [[2026-07-11-warwick-knowledge-value-profile-proposal]] remains active in `Deliverables/` while PR #6 is open because it is still useful review context.
+
+- 2026-07-11 02:45 (silas/larry) - done: acceptance pass completed and Knowledge Value Profile task closed.

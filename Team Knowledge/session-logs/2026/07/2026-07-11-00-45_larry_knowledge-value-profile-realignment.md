@@ -71,3 +71,7 @@ Warwick approved the About Warwick / Current Context name, the `PKM/My Life/Curr
 ## Raw-source retention decision
 
 After the valuation layer was defined, Larry routed Task 007 back to Silas. The canonical general intake source store is now top-level `Sources (Immutable)/`, governed by [[GL-011-immutable-source-retention]]. The tracked register stays public; raw payload files are ignored by default while the repository remains public. SOP-015 and SOP-016 now require adapter-acquired sources, including future TubeAIR transcripts, to be retained before Cairn processes them.
+
+## Task 008 closure
+
+Silas ran the lightweight acceptance pass Warwick requested before closure. Duplicate/generic sources are covered by `Retain source only` and `Discard where policy permits`; useful ideas route into existing Topics/Projects through SOP-015; later retrieval is covered by GL-010's required hooks rather than vault-wide search. Task 008 is now closed as done.
