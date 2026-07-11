@@ -27,7 +27,7 @@ _Last rebuilt: 2026-07-11T02:30:00Z_
 
 ## By assignee
 - warden: 0 open, 1 in-progress (0 blocked)
-- silas: 2 open, 0 in-progress (0 blocked)
+- silas: 1 open, 0 in-progress (0 blocked)
 - unassigned: 3 open, 0 in-progress (0 blocked)
 - pax: 0 open, 0 in-progress (0 blocked)
 
