@@ -4,15 +4,15 @@ id: tsk-2026-07-10-006
 title: "Proposal: close the content-integrity QA gap (fabricated-reference detection, unlogged-change detection, content-level drift, safe corrective boundaries) — VerifiAIr equivalent"
 
 # Ownership & priority
-assignee: unassigned
+assignee: larry
 priority: 3
-status: open
+status: done
 blocked_reason: null
 blocked_by: null
 
 # Time
 created: 2026-07-10T23:48:00Z
-updated: 2026-07-11T02:20:00Z
+updated: 2026-07-11T05:00:00Z
 due: null
 
 # Provenance
@@ -22,19 +22,22 @@ parent: tsk-2026-07-10-001
 
 # Cross-references — REQUIRED, even if empty array. Seven slots. The act of filling these is the whole point.
 # See [[GL-004-task-resource-linking]] for the one-way rule (task→resource, never the reverse) and slug formats.
-linked_sops: []
+linked_sops:
+  - SOP-017-content-integrity-audit
 linked_workstreams:
   - WS-004-team-retro-and-self-improvement-loop
 linked_guidelines:
   - GL-007-human-facing-writing-conventions
 linked_my_life: []
-linked_session_logs: []
-linked_journal_entries: []
+linked_session_logs:
+  - 2026-07-11-05-00_larry_content-integrity-qa-implementation
+linked_journal_entries:
+  - 2026-07-11-content-integrity-qa-three-way-split
 linked_deliverables:
   - 2026-07-10-fusion247-brain-migration-coverage-matrix
 
 # Tagging
-tags: [tier-1-proposal, design-proposal, fusion247-brain, verifiair, content-integrity, awaiting-approval, revised]
+tags: [tier-1-proposal, design-proposal, fusion247-brain, verifiair, content-integrity, approved, implemented]
 ---
 
 # Proposal: close the content-integrity QA gap (fabricated-reference detection, unlogged-change detection, content-level drift, safe corrective boundaries) — VerifiAIr equivalent
@@ -130,6 +133,16 @@ These two incidents are exactly what motivated `F247.skill.update-qa-claude`'s l
 - 2026-07-10 23:59 (pax) — **revision pass, superseding the sourcing-caveat framing above.** The Migration Coverage Matrix (`Deliverables/2026-07-10-fusion247-brain-migration-coverage-matrix.md`) was not on disk when this task was originally written; the task worked from a summary. Larry has since pulled the real matrix content; this task is now sourced directly from it. An external QA review of the full matrix instructed that the original scope (row 15 only: fabricated-reference + unlogged-change detection) was missing two dimensions from row 12 (VerifiAIr's original R/U/suggest-D-never-autonomous-D scope): content-level drift, and safe corrective boundaries across the Brain. Reworked: `## The gap` section now covers both rows and all four dimensions explicitly; all three options expanded to address all four (Option A now includes content-drift detection and an explicit safe-corrective-boundary rule for Larry's Duty 2; Option C's fit is now split — weak for content-checking, a reasonable philosophical model for the boundary-discipline dimension specifically); the lean is now a three-way split instead of two, explicitly placing content-drift (paired with fabrication) and the safe-corrective-boundary rule (recommended as a low-cost, do-now change to Larry's Duty 2 independent of the other three). Cross-refs re-walked: added `GL-007-human-facing-writing-conventions` to `linked_guidelines` in frontmatter (it was already referenced in the body's `## Context one click away` section but had been left out of the frontmatter array in the original version — a genuine gap in the original walk, now resolved). Still a Tier-1 proposal, still nothing implemented, still the user's call which option (if any).
 - 2026-07-11 02:20 (pax) — Added "## Source material and retrieval map" per explicit user instruction, before any implementation. Citation only. Confirmed `F247.agent.verifiair`'s Drive object ID against the F247 Drive Object Registry snapshot (row 17, exact match). Confirmed `F247.skill.update-qa-claude` has no live document in this export — only the pre-Rev2 archived snapshot — but flagged that F247.master.index's own Document Register still lists it as "Active draft" with a Google Doc ID, implying a live Drive copy exists outside this export. Could not determine which of the four QA review docs describes the fabricated-reference incident versus the unlogged-change incident — all four are binary `.docx` with no content-extraction tool available this pass; listed all four as candidates with paths and flagged the attribution as unresolved rather than guessing, citing the closest actually-verified match (tsk-001 decision 7, a different artifact) instead.
 - 2026-07-11 02:30 (larry) — Resolved Pax's flagged attribution gap: neither incident was in the four QA review docs Pax examined — both are documented directly in the Session Log itself (already extracted to plain text this session), which Pax's docx-only search couldn't reach since it's a different document. Found and cited both: the BCC/Bristol fictional-example-leaked-as-real fabrication (with a second, later live instance in a README folder-schema example), and two separate unlogged-build incidents (the ~55-folder Bellrock template scaffold, and the Asda/AsdAIr build). Confirmed both directly motivated `F247.skill.update-qa-claude`'s five new mandatory checks per the Session Log's own account, not by inference. Added Session Log as a properly-cited row (real Drive object ID, confirmed against the registry) and rewrote the note as resolved.
+- 2026-07-11 05:00 (larry) — User approved Pax's hybrid lean directly (all three of: unlogged-change → Larry automatic; safe-corrective-boundary → Larry's Duty 2, now; fabrication + content-drift → new on-demand SOP-017, Pax-owned, Vera cited as boundary-discipline precedent only), with an explicit sequencing instruction: build after PR #6 merges cleanly, on a fresh branch, not inside it. PR #6 merged to `main` at `26d7dfe` first; this work then restarted the designated branch from `main` and built directly on it — decision and implementation landed in the same pass, so no separate follow-up "build" task was created.
 
 ## Outcome
-_(filled when status flips to done — see SOP-close-task)_
+
+What shipped: the full three-way split approved by the user. (1) Larry's Librarian pass (`Team/Larry - Orchestrator/AGENTS.md` Duty 2) gained a fifth automatic check — unlogged canonical-file changes — alongside the existing four structural checks. (2) An explicit safe-corrective-boundary rule was written into the same Duty 2 text: R/U for unambiguous structural fixes, suggest-only for anything touching a fact's substance, never autonomous Delete or autonomous rewrite — modeled on VerifiAIr's own R/U/suggest-D-never-autonomous-D scope and Vera's "never fixes, only finds" philosophy (Vera cited as precedent, not made owner, per the user's explicit instruction). (3) A new on-demand [[SOP-017-content-integrity-audit]] was created, default-owned by Pax, pairing fabricated-reference detection and content-level drift detection — report-only, severity-classified, never auto-fixes. (4) A new `## Content-Integrity Audit Triggers` section was added to root `AGENTS.md`, LLM-agnostic, with an optional periodic close-session nudge mirroring WS-004's Tier-2 retro nudge so on-demand doesn't silently become never. `Team Knowledge/SOPs/INDEX.md`, Larry's routing cheatsheet, and Pax's own contract were all updated to reflect SOP-017.
+
+Where it lives: [[2026-07-11-05-00_larry_content-integrity-qa-implementation]] (session log, full change list). Built on the restarted `claude/agent-count-kdved6` branch (fast-forwarded from `main` at `26d7dfe` first).
+
+Follow-ups: none — decision and build landed together. First real invocation of SOP-017 (an actual audit run) is a natural future trigger but not a tracked task; it fires on-demand per its own trigger contract.
+
+Lessons: [[2026-07-11-content-integrity-qa-three-way-split]] (journal) — the general pattern of sorting a multi-dimension QA gap by structural-cheap vs. substantive-expensive rather than picking one owner for the whole gap.
+
+Archived deliverables: `2026-07-10-fusion247-brain-migration-coverage-matrix` — archive deferred. Still referenced by three other open/in-progress tasks ([[tsk-2026-07-10-001-fold-fusion247-brain-doctrine-into-warden]], [[tsk-2026-07-10-004-careerair-migration-direction-decision]], [[tsk-2026-07-10-005-asdair-retained-external-recommendation]]). Will archive with whichever of those closes last.

@@ -203,6 +203,24 @@ Rules:
 
 Set-in-stone install patterns discovered during real installs graduate from session-logs into WS-003 itself.
 
+## Content-Integrity Audit Triggers (LLM-agnostic)
+
+Any LLM working in this myPKA MUST honor these natural-language triggers and run [[Team Knowledge/SOPs/SOP-017-content-integrity-audit]]. The SOP contains the canonical procedure (fabricated-reference detection, content-level drift detection, severity-classified report, never-auto-fix). This section is the trigger contract; SOP-017 is the executor. Unlogged-change detection is a **different, lighter** check that already runs automatically at every session close per Larry's Duty 2 — it does not need a trigger.
+
+Trigger phrases → action:
+
+| User says (or implies) | Action |
+|---|---|
+| "audit the wiki for fabricated references" / "check my citations" / "did we invent any sources" | Run [[SOP-017-content-integrity-audit]] |
+| "check for content drift" / "is anything stale or contradicting itself" / "has this note fallen out of sync with its source" | Run SOP-017 |
+| "run a content-integrity audit" / "do a Brain QA pass" | Run SOP-017 |
+| (close-session routine, ~periodically, optional) | Larry MAY nudge: "It's been a while since the last content-integrity audit — want me to run one?" On-demand remains the default trigger; the nudge is only an offer, mirroring [[WS-004-team-retro-and-self-improvement-loop]]'s Tier-2 retro nudge. |
+
+Rules:
+
+- **On-demand by default.** SOP-017 does the heavier verification work (checking a claim against an external source, checking content against whatever it should still match) — this is deliberately not automatic at every session close, unlike the four structural checks Larry's Librarian pass already runs.
+- **Report-only.** SOP-017 never auto-corrects. It finds, classifies severity, and recommends; the user decides what gets fixed and by whom.
+
 ## Frontmatter discipline
 
 When you (or any specialist you delegate to) create a new note in any of these eight entity folders:
@@ -229,7 +247,7 @@ A one-shot migration helper for users with pre-v1.3.0 notes lives at `Team Knowl
 Larry holds three duties:
 
 1. **Orchestrator** - receives every user request, applies the 6-step delegation protocol (Understand, Clarify, Match, Brief, Execute, Synthesize), routes to the right specialist.
-2. **Librarian** - at session close, scans for SSOT violations, broken `[[wikilinks]]`, orphaned files, and missing `INDEX.md` entries. Fixes structural drift on his own. Flags content drift for the user.
+2. **Librarian** - at session close, scans for SSOT violations, broken `[[wikilinks]]`, orphaned files, missing `INDEX.md` entries, and unlogged canonical-file changes. Fixes structural drift on his own, under an explicit safe-corrective boundary (R/U, suggest-D, never-autonomous-D — see `Team/Larry - Orchestrator/AGENTS.md` Duty 2). Flags content drift for the user, and points to [[SOP-017-content-integrity-audit]] for the heavier on-demand fabricated-reference/content-drift audit.
 3. **Session-Log Author** - at session close, writes `Team Knowledge/session-logs/YYYY/MM/YYYY-MM-DD-<slug>.md`. The log cross-links earlier logs via `[[wikilinks]]`, captures user realignments as persistent team memory, and lists insights, decisions, and deltas vs the prior plan.
 
 See [[Team/Larry - Orchestrator/AGENTS]] for the full Librarian and Session-Log Author protocols.
