@@ -221,6 +221,25 @@ Rules:
 - **On-demand by default.** SOP-017 does the heavier verification work (checking a claim against an external source, checking content against whatever it should still match) — this is deliberately not automatic at every session close, unlike the four structural checks Larry's Librarian pass already runs.
 - **Report-only.** SOP-017 never auto-corrects. It finds, classifies severity, and recommends; the user decides what gets fixed and by whom.
 
+## Independent Change QA Triggers (LLM-agnostic)
+
+Any LLM working in this myPKA MUST honor these natural-language triggers and run [[Team Knowledge/SOPs/SOP-018-independent-change-qa]]. This is a **different job** from [[SOP-017-content-integrity-audit]]: SOP-017 checks whether a claim is fabricated or content has drifted; SOP-018 checks whether a build or change actually did what it was requested and claimed to do — the independent-change-QA layer the migration closure audit found missing from Fusion247PKA. This section is the trigger contract; SOP-018 is the executor. Do not route these phrases to SOP-017 alone.
+
+Trigger phrases → action:
+
+| User says (or implies) | Action |
+|---|---|
+| "/update QA" | Run [[SOP-018-independent-change-qa]] |
+| "QA the recent Brain changes" | Run SOP-018 |
+| "check this PR before merge" | Run SOP-018 |
+| "independently verify what changed" | Run SOP-018 |
+| "compare what was requested with what was actually built" | Run SOP-018 |
+
+Rules:
+
+- **Same-model review is not independent review, and the report must say so.** SOP-018 is a skill, not a permanent agent — any agent can run it, and it is genuinely useful even when the reviewer is the same model/session that authored the change under review. But that combination must be labeled plainly in the report: "Same-model review — not independently verified." A material migration or build claim is only treated as verified once a genuinely separate reviewer (a different model, runtime, or session — Warwick himself, or an external instance) has actually reviewed it.
+- **A clean task board is not completeness evidence.** Neither is a closed-task count, nor a same-model reviewer finding nothing wrong from memory. Source-grounded acceptance evidence is required for any migration/build-completion claim.
+
 ## Frontmatter discipline
 
 When you (or any specialist you delegate to) create a new note in any of these eight entity folders:

@@ -4,7 +4,7 @@
 - **Default owner:** Pax
 - **Reusable by any agent.** This is a skill, not 1:1 ownership. Any specialist who wants to verify a deliverable's claims, or the user's own notes, against reality can run this procedure. Larry routes to Pax by default because the two checks below — fabricated-reference detection and content-level drift detection — are both cross-source-verification work, which is Pax's standing remit.
 - **Triggered by:** "audit the wiki for fabricated references", "check my citations", "check for content drift", "is anything stale or contradicting itself", "run a content-integrity audit", "do a Brain QA pass", a Librarian-pass content-drift flag the user asks to be actually resolved, close-session's optional periodic nudge (see root `AGENTS.md` §Content-Integrity Audit Triggers). On-demand is the default; nothing in this SOP fires on its own.
-- **References:** [[Team Knowledge/tasks/done/2026/07/tsk-2026-07-10-006-verifiair-content-integrity-qa-gap-proposal]] (the approved design decision this SOP implements), [[Team/Larry - Orchestrator/AGENTS]] Duty 2 (the automatic, lighter unlogged-change check this SOP does *not* duplicate), [[Team/Vera - QA Specialist/AGENTS]] (cited precedent for the boundary discipline below — evidence over opinion, never fixes, only finds), [[GL-007-human-facing-writing-conventions]] (the "a rule that's never re-read is no rule" discipline this SOP's on-demand-by-default nature has to guard against via the periodic nudge), [[GL-009-public-private-knowledge-boundary]] (governs the privacy gate below — this SOP may be asked to audit private PKM material, and its own output is subject to the same public/private rule as the material it audits).
+- **References:** [[Team Knowledge/tasks/done/2026/07/tsk-2026-07-10-006-verifiair-content-integrity-qa-gap-proposal]] (the approved design decision this SOP implements), [[Team/Larry - Orchestrator/AGENTS]] Duty 2 (the automatic, lighter unlogged-change check this SOP does *not* duplicate), [[Team/Vera - QA Specialist/AGENTS]] (cited precedent for the boundary discipline below — evidence over opinion, never fixes, only finds), [[GL-007-human-facing-writing-conventions]] (the "a rule that's never re-read is no rule" discipline this SOP's on-demand-by-default nature has to guard against via the periodic nudge), [[GL-009-public-private-knowledge-boundary]] (governs the privacy gate below — this SOP may be asked to audit private PKM material, and its own output is subject to the same public/private rule as the material it audits). **For "did the build match the claim" questions — was a change actually delivered as requested, not just whether its content is internally consistent — see [[SOP-018-independent-change-qa]] instead; the two are paired, separate skills, never merged.**
 - **Privacy (added 2026-07-11, blocking fix per external QA review):** an audit whose scope touches any private/local root (per GL-009) must never write its findings to a tracked location or describe them in a public session log. See §Privacy gate before running Step 5 or Step 7. Auditing a private source carefully and then publishing a report explaining what it said is not protection — it's the same leak GL-009/GL-011 exist to prevent, one step removed.
 
 ## Purpose
@@ -79,15 +79,17 @@ A file can carry multiple findings; its overall severity is its highest single f
 
 ### Step 5 — Write the audit report
 
-Destination depends on the Step 0 classification:
+Destination depends on the Step 0 classification. Filename includes a time and scope segment (`HH-MM-<scope>`, added 2026-07-11) — a bare date collides and silently overwrites evidence whenever two audits run the same day, which is routine once this SOP is used more than once per session:
 
-- **Public-only scope:** `Deliverables/YYYY-MM-DD-content-integrity-audit.md` — tracked, as before.
-- **Private or mixed scope:** `PKM/My Life/Current Context/audits/YYYY-MM-DD-content-integrity-audit.md` — inside the same folder GL-009/GL-010 already keep local-only and gitignored (`PKM/My Life/Current Context/`), never committed. Because this destination never leaves the local machine, the report may quote and detail the private material in full — the privacy protection is the file's location, not a redacted version of its content.
+- **Public-only scope:** `Deliverables/YYYY-MM-DD-HH-MM-<scope>-content-integrity-audit.md` — tracked, as before.
+- **Private or mixed scope:** `PKM/My Life/Current Context/audits/YYYY-MM-DD-HH-MM-<scope>-content-integrity-audit.md` — inside the same folder GL-009/GL-010 already keep local-only and gitignored (`PKM/My Life/Current Context/`), never committed. Because this destination never leaves the local machine, the report may quote and detail the private material in full — the privacy protection is the file's location, not a redacted version of its content.
+
+`<scope>` is a short kebab-case label for what was audited (e.g. `hermes-pilot`, `wanderloots-intake`) — enough to tell two same-day reports apart at a glance, not a full description.
 
 Structure (same shape regardless of destination):
 
 ```markdown
-# Content-Integrity Audit — YYYY-MM-DD
+# Content-Integrity Audit — YYYY-MM-DD HH:MM — <scope>
 
 ## Scope
 - <files/folders/date-range audited>
