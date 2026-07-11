@@ -12,7 +12,7 @@ blocked_by: null
 
 # Time
 created: 2026-07-10T23:45:16Z
-updated: 2026-07-10T23:45:16Z
+updated: 2026-07-11T00:30:00Z
 due: null
 
 # Provenance
@@ -31,6 +31,7 @@ linked_guidelines:
   - GL-002-frontmatter-conventions
   - GL-004-task-resource-linking
   - GL-008-source-classification-registry
+  - GL-009-public-private-knowledge-boundary
 linked_my_life:
   - ai-tooling
 linked_session_logs:
@@ -64,7 +65,7 @@ This task is architecture and acceptance criteria, not permission to infer a per
 
 - Procedures: [[SOP-015-cairn-process-external-source]], [[SOP-016-cairn-process-youtube-transcript]], [[SOP-create-task]]
 - Workstream: [[WS-001-daily-journaling]]
-- Guidelines: [[GL-002-frontmatter-conventions]], [[GL-004-task-resource-linking]], [[GL-008-source-classification-registry]]
+- Guidelines: [[GL-002-frontmatter-conventions]], [[GL-004-task-resource-linking]], [[GL-008-source-classification-registry]], [[GL-009-public-private-knowledge-boundary]]
 - Current example Topic: [[ai-tooling]]
 - Birthed in: [[2026-07-11-00-45_larry_knowledge-value-profile-realignment]]
 - Related dependency: [[tsk-2026-07-10-007-raw-source-retention-design-proposal]]
@@ -80,10 +81,13 @@ This task is architecture and acceptance criteria, not permission to infer a per
 - Token-cost controls use staged triage and reserve novelty/contradiction analysis for candidates that pass cheap relevance checks.
 - The proposal states the exact changes needed in SOP-015, SOP-016, WS-001, specialist contracts, and any new GL-009 guideline or profile note, without duplicating SSOT facts.
 - Warwick reviews and approves the profile shape before any journal-derived inference becomes canonical.
+- The design respects [[GL-009-public-private-knowledge-boundary]]: public architecture may describe the profile mechanism, while personal evidence remains local/private unless explicitly approved for publication.
 
 ## Updates
 
 - 2026-07-11 00:45 (larry) - created from Warwick's knowledge-valuation realignment. Cross-refs: 5/7 populated; no specialist journal priors or deliverables exist yet.
+- 2026-07-11 01:15 (cairn/larry) - intake gate refined from multiple prompts to one lightweight free-text question. The canonical signals are `why added` and `suspected effect`; both are optional and may remain uncertain.
+- 2026-07-11 01:30 (larry) - public/private boundary added via [[GL-009-public-private-knowledge-boundary]]. Personal profile evidence stays local/private while this public PR carries the architecture and process contract.
 
 ## Outcome
 _(filled when status flips to done - see SOP-close-task)_

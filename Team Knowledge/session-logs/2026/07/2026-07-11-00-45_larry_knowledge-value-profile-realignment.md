@@ -11,6 +11,7 @@ linked_workstreams:
 linked_guidelines:
   - GL-002-frontmatter-conventions
   - GL-008-source-classification-registry
+  - GL-009-public-private-knowledge-boundary
 ---
 
 # Knowledge value must be judged through Warwick's purpose and current context
@@ -58,3 +59,7 @@ Warwick asked the team to stop treating transcript processing as a content-only 
 - [[tsk-2026-07-10-007-raw-source-retention-design-proposal]]
 - [[SOP-015-cairn-process-external-source]]
 - [[WS-001-daily-journaling]]
+
+## Public/private boundary update
+
+Warwick confirmed that the repository may remain public during testing, but personal current-context material should be maintained without being published by default. Larry added [[GL-009-public-private-knowledge-boundary]] and `.gitignore` entries for the local/private PKM surfaces. The public record keeps the architecture decision; detailed personal evidence remains in local/private context unless Warwick explicitly approves exact publication.

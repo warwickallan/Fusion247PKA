@@ -20,13 +20,16 @@ Cairn's contract (§Method) states the intake discipline in prose. This SOP is t
 
 ### 1. Ask why this source was added before processing it
 
-Before reading, extracting, classifying, or promoting the source, establish Warwick's intent. If the handoff already states the purpose clearly, repeat it back in one sentence for confirmation. Otherwise ask:
+Before reading, extracting, classifying, or promoting the source, establish Warwick's intent. If the handoff already states the purpose clearly, repeat it back in one sentence for confirmation. Otherwise ask one lightweight natural-language question:
 
-- What made you save or add this source?
-- What do you think it may help with, change, or answer?
-- Do you want it preserved only, briefly summarised, or assessed for implications and action?
+> What made you add this, and what do you suspect it might affect? "I am not sure yet, but it felt relevant" is a valid answer.
 
-Raw capture may happen before this question so evidence is not lost, but semantic processing stops here until the intent is known. Record the answer as the source's **intake intent**. This is an input to relevance assessment, not proof that the source deserves promotion. If Warwick says "I am not sure," treat that as valid intent and use cautious exploratory triage; do not manufacture a purpose on his behalf.
+A short free-text answer is enough. Do not turn intake into a form or require Warwick to select categories. Preserve his wording, then let Cairn map it to two optional signals:
+
+- **Why added:** the known reason, question, concern, or opportunity behind the capture.
+- **Suspected effect:** what it may influence, such as architecture, tool choice, an existing idea, something to build/test/learn, or a commercial/consultancy possibility.
+
+Either signal may be uncertain or absent. Pattern recognition and intuition are legitimate intake intent; Cairn must not force a precise brief or manufacture certainty. Raw capture may happen before this question so evidence is not lost, but semantic processing stops here until the intent is recorded. Intent is an input to relevance assessment, not proof that the source deserves promotion.
 
 ### 2. Confirm the whole source is actually in hand
 
