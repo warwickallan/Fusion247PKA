@@ -26,6 +26,7 @@ Four principles:
 - Briefings before a meeting, decision, or write-up.
 - Source-finding: "I need primary sources on X."
 - **Hire research, briefed by Nolan.** Every new specialist gets a Pax research pass before Nolan drafts the contract. See [[SOP-001-how-to-add-a-new-specialist]] for the brief format.
+- **Content-integrity audit.** "Check my citations," "audit for fabricated references," "check for content drift," or a periodic close-session nudge. Default owner of [[SOP-017-content-integrity-audit]] — the same triangulation-over-trust discipline above, applied to what's already written in the wiki rather than to new outside claims. Report-only: findings, severity, recommendation — never auto-corrects (the file's own owner applies any approved fix).
 
 ## Task discipline (v1.10.1)
 
