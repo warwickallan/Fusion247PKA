@@ -41,6 +41,28 @@ One full pass, start to finish. Resist drafting notes mid-read. As you read, men
 
 For a source that is (or is about to be classified as, in Step 4) GL-008's **Video/Audio Transcript** category and is long or structured enough that a single undifferentiated read would lose track of theme, sequence, or verification-needed claims, run [[SOP-016-cairn-process-youtube-transcript]] for this step instead of an unstructured read — it produces a theme-chunked, anchored chunk map that Steps 4-11 below run against unchanged. Short, clean transcripts can skip it and use this step as-is.
 
+### 3a. Load the Knowledge Value Profile and assign a disposition
+
+Before choosing destination notes, load [[GL-010-warwick-knowledge-value-profile]] and, where present, the private/local `PKM/My Life/Current Context/warwick-knowledge-value-profile.md` profile and `PKM/My Life/Current Context/about-warwick.md` view. If the private/local files are absent, continue with the public GL-010 mechanism and active structured context; do not invent profile facts.
+
+Evaluate the source against three inputs:
+
+- Warwick's intake intent from Step 1.
+- The Knowledge Value Profile's confirmed stable facts, active structured context, recent signals, and longer-term candidates.
+- The source's novelty, contradiction risk, evidence quality, actionability, and processing cost.
+
+Assign exactly one disposition before filing:
+
+- **Promote**
+- **Enrich**
+- **Experiment**
+- **Verify**
+- **Surface for Warwick**
+- **Retain source only**
+- **Discard where policy permits**
+
+No promotion is a valid successful outcome. If the disposition is not Promote or Enrich, do not force a destination note. Record the disposition and reason in the session log. If the profile materially affected the disposition, state which profile layer did so without copying private personal evidence into public Team Knowledge.
+
 ### 4. Classify against GL-008
 
 Decide which of GL-008's six governed categories (Article/Written Source, Document/Report, Video/Audio Transcript, Course/Lesson Note, Chat/Conversation Excerpt, Email/Correspondence) the source is, and note GL-008's "typically maps to" guidance for that category. State the classification decision in one line — this line goes into the destination note's body (see Step 9). If the source genuinely fits none of the six, do not invent a bucket: state your reasoning per-source anyway (what it actually is) and flag the misfit in the session-log entry (Step 11). A single misfit is not grounds to extend GL-008 — that requires a second, independent recurrence per GL-008's own recurrence gate; Cairn flags, Silas decides.
@@ -79,6 +101,8 @@ State, per source, whether the raw material itself is preserved anywhere, and if
 
 Write a session-log entry per Cairn's contract §Session-Log Discipline: the intake intent from Step 1, what was classified (and why), where it landed or why nothing was promoted, every evidence-origin label applied, every backlink justification given, any classification misfit flagged for GL-008, and the raw-source provenance call from Step 10.
 
+Additional logging requirement: record the Step 3a disposition and any profile/context influence. If private/local profile evidence affected the decision, summarize the mechanism and link only where publication is allowed by [[GL-009-public-private-knowledge-boundary]].
+
 ## Worked example
 
 A pasted YouTube transcript about an AI agent tool arrives, handed directly to Cairn (not via an adapter). Full read once. Classified as **Video/Audio Transcript** per GL-008 — the source is a transcript of a published video. The transcript substantively discusses one tool at length (comparing it to a competitor) but only name-checks its maker's co-founder and a hosting sponsor in passing. Candidate entities: the tool itself (no matching GL-002 entity type — folded into the relevant Topic as narrative, not a new note); the maker company (mentioned as context, not enough standalone material to earn a CRM Organization note — the user has no relationship with it); the co-founder (quoted several times but the video is about the tool, not a profile of him — same call, no Person note); the sponsor (a passing ad mention, no note, no link). Result: one existing Topic note enriched, zero new entity notes, every claim about the tool's features labeled as directly present in the transcript, the narrator's comparative/marketing claims flagged as unverified assertions rather than restated as settled fact, and the video's own self-referenced channel name cited as the provenance line since no separate raw-transcript store exists for general PKM.
@@ -86,6 +110,7 @@ A pasted YouTube transcript about an AI agent tool arrives, handed directly to C
 ## Common mistakes to avoid
 
 - Starting semantic processing before asking why Warwick added the source, or assuming that the topic alone reveals his intent.
+- Filing before assigning one of GL-010's seven dispositions.
 - Rereading the source across multiple output passes instead of one full read before writing anything.
 - Classifying against a bucket that isn't one of GL-008's six, or silently inventing a seventh category instead of flagging the misfit.
 - Creating a new entity note for every named person/organization/tool a source mentions, rather than testing each one against "does this earn a note" (Step 6) — reflexive note-creation is the same anti-pattern as reflexive linking.

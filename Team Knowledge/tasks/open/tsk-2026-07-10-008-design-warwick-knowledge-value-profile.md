@@ -12,7 +12,7 @@ blocked_by: null
 
 # Time
 created: 2026-07-10T23:45:16Z
-updated: 2026-07-11T00:30:00Z
+updated: 2026-07-11T02:05:00Z
 due: null
 
 # Provenance
@@ -32,6 +32,7 @@ linked_guidelines:
   - GL-004-task-resource-linking
   - GL-008-source-classification-registry
   - GL-009-public-private-knowledge-boundary
+  - GL-010-warwick-knowledge-value-profile
 linked_my_life:
   - ai-tooling
 linked_session_logs:
@@ -66,7 +67,7 @@ This task is architecture and acceptance criteria, not permission to infer a per
 
 - Procedures: [[SOP-015-cairn-process-external-source]], [[SOP-016-cairn-process-youtube-transcript]], [[SOP-create-task]]
 - Workstream: [[WS-001-daily-journaling]]
-- Guidelines: [[GL-002-frontmatter-conventions]], [[GL-004-task-resource-linking]], [[GL-008-source-classification-registry]], [[GL-009-public-private-knowledge-boundary]]
+- Guidelines: [[GL-002-frontmatter-conventions]], [[GL-004-task-resource-linking]], [[GL-008-source-classification-registry]], [[GL-009-public-private-knowledge-boundary]], [[GL-010-warwick-knowledge-value-profile]]
 - Current example Topic: [[ai-tooling]]
 - Birthed in: [[2026-07-11-00-45_larry_knowledge-value-profile-realignment]]
 - Related dependency: [[tsk-2026-07-10-007-raw-source-retention-design-proposal]]
@@ -90,6 +91,7 @@ This task is architecture and acceptance criteria, not permission to infer a per
 - 2026-07-11 01:15 (cairn/larry) - intake gate refined from multiple prompts to one lightweight free-text question. The canonical signals are `why added` and `suspected effect`; both are optional and may remain uncertain.
 - 2026-07-11 01:30 (larry) - public/private boundary added via [[GL-009-public-private-knowledge-boundary]]. Personal profile evidence stays local/private while this public PR carries the architecture and process contract.
 - 2026-07-11 01:45 (silas/larry) - architecture proposal drafted at [[2026-07-11-warwick-knowledge-value-profile-proposal]]. Status remains open pending Warwick review and approval of the profile shape.
+- 2026-07-11 02:05 (silas/larry) - Warwick approved the proposal with a two-stage signal rule: short-term signals expire after 14 days by default; recurring or explicitly requested signals become longer-term candidates before stable-fact approval. Implemented [[GL-010-warwick-knowledge-value-profile]], updated SOP-015, SOP-016, WS-001, Penn/Cairn/Larry contracts, and created ignored private/local skeleton files under `PKM/My Life/Current Context/`.
 
 ## Outcome
 _(filled when status flips to done - see SOP-close-task)_

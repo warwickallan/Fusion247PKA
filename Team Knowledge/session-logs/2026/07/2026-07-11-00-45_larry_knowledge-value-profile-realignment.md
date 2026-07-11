@@ -63,3 +63,7 @@ Warwick asked the team to stop treating transcript processing as a content-only 
 ## Public/private boundary update
 
 Warwick confirmed that the repository may remain public during testing, but personal current-context material should be maintained without being published by default. Larry added [[GL-009-public-private-knowledge-boundary]] and `.gitignore` entries for the local/private PKM surfaces. The public record keeps the architecture decision; detailed personal evidence remains in local/private context unless Warwick explicitly approves exact publication.
+
+## Knowledge Value Profile approval
+
+Warwick approved the About Warwick / Current Context name, the `PKM/My Life/Current Context/` private/local location, and creating [[GL-010-warwick-knowledge-value-profile]] before editing the SOPs. He amended the expiry rule: short-term signals default to 14 days, while repeated signals or explicitly requested tracking move into a longer-term candidate stage before becoming confirmed stable facts.

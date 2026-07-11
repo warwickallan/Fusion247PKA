@@ -56,9 +56,19 @@ Time-bounded observations drawn from recent Journal entries.
 Rules:
 
 - each signal must cite its source journal entry
-- default expiry is 14 days unless Warwick confirms it as stable
+- default short-term expiry is 14 days
 - each signal is labelled `observed`, `inferred`, or `awaiting_confirmation`
 - agents may use `observed` signals for lightweight context, but may not treat `inferred` signals as fact
+
+### 3b. Longer-term candidates
+
+Signals can persist beyond the 14-day short-term window only through a second-stage mechanism:
+
+- recurrence across multiple short-term windows
+- Warwick explicitly asks the team to track the aim, goal, interest, preference, or constraint
+- Warwick confirms the signal as stable profile knowledge
+
+Until confirmed, longer-term candidates remain candidates, not stable facts.
 
 ### 4. AI inferences awaiting confirmation
 
@@ -188,7 +198,7 @@ Acceptance test: after a source is promoted, a later relevant task should find i
 
 ### GL-010 or GL-002
 
-Recommended: create **GL-010 - Warwick Knowledge Value Profile** instead of extending GL-002 immediately. Reason: the profile is a private/local operating component, not one of the eight PKM entity schemas yet. GL-010 can define the structure without forcing SQLite/frontmatter migration work before the shape is proven.
+Approved: create **GL-010 - Warwick Knowledge Value Profile** instead of extending GL-002 immediately. Reason: the profile is a private/local operating component, not one of the eight PKM entity schemas yet. GL-010 can define the structure without forcing SQLite/frontmatter migration work before the shape is proven.
 
 If later promoted into formal PKM schema, Silas can extend GL-002 and the templates.
 
@@ -242,7 +252,7 @@ Add orchestration rule:
 
 ## Open approval questions
 
-1. Is the human-facing name **About Warwick / Current Context** acceptable, or should it be one of those only?
-2. Should recent journal signals expire after 14 days by default?
-3. Should the first implementation live under `PKM/My Life/Current Context/` as proposed?
-4. Should GL-010 be created before editing SOP-015/SOP-016/WS-001?
+1. **Approved:** use **About Warwick / Current Context**.
+2. **Approved with amendment:** short-term signals expire after 14 days by default; recurring or explicitly requested signals enter a longer-term candidate stage before Warwick confirms them as stable.
+3. **Approved:** first implementation lives under `PKM/My Life/Current Context/`.
+4. **Approved:** create GL-010 before editing SOP-015/SOP-016/WS-001.

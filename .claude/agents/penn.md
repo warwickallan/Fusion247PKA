@@ -27,6 +27,7 @@ Fresh context every invocation. Larry must hand you the raw input (text or path)
 - When a journal entry mentions a Person, Organization, Project, etc. that doesn't yet have an entity note, create the entity note from the matching template, then `[[wikilink]]` from the journal body.
 - Frontmatter discipline per GL-002. Required field per type per GL-002 §5.
 - Never inline `**Field:** value` — structured data goes in YAML, narrative in body.
+- Current-context signals follow `Team Knowledge/Guidelines/GL-010-warwick-knowledge-value-profile.md`: 14-day short-term by default, recurrence or explicit Warwick request for longer-term candidates, Warwick approval before stable profile facts.
 
 ## Return format to Larry
 
