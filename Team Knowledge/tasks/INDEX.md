@@ -2,15 +2,18 @@
 
 _Auto-generated. Do not edit by hand. Run `SOP-rebuild-task-index` to regenerate._
 
-_Last rebuilt: 2026-07-11T05:40:00Z_
+_Last rebuilt: 2026-07-11T07:05:00Z_
 
 ## Summary
-- Open: 2
+- Open: 3
 - In progress: 0 (0 blocked)
 - Done (this month): 6
 - Cancelled (this month): 0
 
-## Open (2)
+## Open (3)
+
+### Priority 2 — high
+- [[tsk-2026-07-11-001-absorb-independent-change-qa-doctrine]] — Absorb legacy independent-change QA doctrine (SOP-018) and close T009/T013 through evidence — assignee: larry — created 2026-07-11
 
 ### Priority 4 — low
 - [[tsk-2026-07-10-004-careerair-migration-direction-decision]] — Direction decision: CareerAIR migration scope — assignee: unassigned — created 2026-07-10 — deprioritized 2026-07-11
@@ -20,9 +23,9 @@ _Last rebuilt: 2026-07-11T05:40:00Z_
 _none_
 
 ## By assignee
+- larry: 1 open, 0 in-progress (0 blocked)
 - warden: 0 open, 0 in-progress (0 blocked)
 - silas: 0 open, 0 in-progress (0 blocked)
-- larry: 0 open, 0 in-progress (0 blocked)
 - pax: 0 open, 0 in-progress (0 blocked)
 - unassigned: 2 open, 0 in-progress (0 blocked)
 
