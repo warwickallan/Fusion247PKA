@@ -14,7 +14,7 @@ blocked_by: null
 
 # Time
 created: 2026-07-11T22:00:00Z
-updated: 2026-07-11T22:00:00Z
+updated: 2026-07-11T22:30:00Z
 due: null
 
 # Provenance
@@ -36,6 +36,7 @@ linked_session_logs:
 linked_journal_entries: []
 linked_deliverables:
   - 2026-07-11-migration-closure-audit
+  - 2026-07-11-independent-change-qa-doctrine-absorption
 
 # Tagging
 tags: [migration-closure, fusion247-brain, warwick-decision-required, roadmap]
@@ -49,8 +50,9 @@ tags: [migration-closure, fusion247-brain, warwick-decision-required, roadmap]
 - Guideline: [[GL-011-immutable-source-retention]], [[GL-006-client-delivery-frontmatter-conventions]]
 - Working artifacts:
   - [[2026-07-11-migration-closure-audit]] — the audit this task exists to keep active and track to eventual closure
+  - [[2026-07-11-independent-change-qa-doctrine-absorption]] — doctrine-absorption matrix; kept active (not archived with `tsk-2026-07-11-001`'s other closed deliverables) specifically because this task tracks its row-#37 `open-follow-up-gap` (the session-log `model`/`runtime` metadata decision) to eventual resolution
 - Birthed in: [[2026-07-11-06-00_larry_migration-closure-audit]]
-- Parent: [[tsk-2026-07-11-001-absorb-independent-change-qa-doctrine]] — closed with T009/T013 resolved; this task is its minimal successor, created specifically so `2026-07-11-migration-closure-audit.md` stays an active, referenced deliverable rather than being archived on that task's close.
+- Parent: [[tsk-2026-07-11-001-absorb-independent-change-qa-doctrine]] (done, `Team Knowledge/tasks/done/2026/07/`) — closed with T009/T013 resolved; this task is its minimal successor, created specifically so `2026-07-11-migration-closure-audit.md` stays an active, referenced deliverable rather than being archived on that task's close.
 
 ## What this is
 
@@ -70,7 +72,7 @@ This task does not attempt to resolve any of the items below. It exists to hold 
 - F247-T025 — does myPKA's own template model already satisfy the "golden-master release pattern" intent?
 - F247-T029 — does `build.icor.md`/Addendum A/B's provenance need a Git-side record?
 - Whether `lessons` (and possibly `dependency`) should be added to `GL-006`'s Register Item `kind` enum.
-- **New, surfaced by `tsk-2026-07-11-001`'s closure (deferred, not implemented, per that task's own round-4 correction):** whether session-log frontmatter needs a `model`/`runtime` field distinct from the existing `agent_id` (specialist-persona) field, so metadata can eventually name the actual underlying model/runtime that processed a source — currently invisible because every specialist in this repo shares one underlying model. See `Deliverables/2026-07-11-independent-change-qa-doctrine-absorption.md` row #37 (`open-follow-up-gap`). This is a schema decision for Silas (frontmatter owner) and Warwick, not something to implement unilaterally.
+- **New, surfaced by [[tsk-2026-07-11-001-absorb-independent-change-qa-doctrine]]'s closure (deferred, not implemented, per that task's own round-4 correction):** whether session-log frontmatter needs a `model`/`runtime` field distinct from the existing `agent_id` (specialist-persona) field, so metadata can eventually name the actual underlying model/runtime that processed a source — currently invisible because every specialist in this repo shares one underlying model. See [[2026-07-11-independent-change-qa-doctrine-absorption]] row #37 (`open-follow-up-gap`). This is a schema decision for Silas (frontmatter owner) and Warwick, not something to implement unilaterally.
 
 **Explicitly not blockers (roadmap or external-input-blocked, tracked for completeness only, not chased here):**
 CareerAIR (`tsk-2026-07-10-004`), AsdAIr (`tsk-2026-07-10-005`), TubeAIR capture adapter, ICOR course-note adapter + business-domain naming, ClickUp/Withings/calendar connectors, raw ChatGPT export + WS-002 import (blocked on Warwick exporting the material).
@@ -85,6 +87,7 @@ This task has no single "done" state by design — it's a tracking placeholder, 
 ## Updates
 
 - 2026-07-11 22:00 (larry) — created, per Fable's explicit closure remedial on `tsk-2026-07-11-001`/PR #9: "preserve `2026-07-11-migration-closure-audit.md` as an active deliverable... one minimal successor migration-closure task referencing the audit and remaining blockers, including the deferred model/runtime metadata decision." No decisions resolved yet; this is the placeholder itself.
+- 2026-07-11 22:30 (larry) — Fable's final mechanical-correction pass caught that this task was tracking the doctrine-absorption matrix's row-#37 gap by prose citation only, without actually listing the matrix in `linked_deliverables` — the file was staying unarchived only because a grep-based sharing check happened to catch the literal-path citation, not because this task genuinely owned it. Added `2026-07-11-independent-change-qa-doctrine-absorption` to `linked_deliverables` and the `Context one click away` body mirror as a deliberate, owned reference. No other content changed.
 
 ## Outcome
 _(filled when status flips to done — see SOP-close-task)_

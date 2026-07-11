@@ -1,7 +1,7 @@
 # Independent Change QA — Doctrine Absorption Matrix
 
 - **Date:** 2026-07-11 (amended same day, rounds 3-4, after external QA review by Fable — see §Amendments below)
-- **Author:** Pax, for [[Team Knowledge/tasks/open/tsk-2026-07-11-001-absorb-independent-change-qa-doctrine]]
+- **Author:** Pax, for [[tsk-2026-07-11-001-absorb-independent-change-qa-doctrine]] (task closed, now at `Team Knowledge/tasks/done/2026/07/`)
 - **Purpose:** For every durable rule found in Fusion247 Brain's `/update QA` doctrine (and the adjacent VerifiAIr, decision-log, agent/skill-boundary, and worked-example QA-review sources), record what it was, where it came from, whether Fusion247PKA already has an equivalent, and what to do about it. This is the evidence base for [[SOP-018-independent-change-qa]] — nothing below is copied into that SOP verbatim; every row was re-derived in myPKA's own voice.
 
 ## Sources read in full

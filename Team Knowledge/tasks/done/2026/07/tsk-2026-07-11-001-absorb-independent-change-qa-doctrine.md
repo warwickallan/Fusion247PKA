@@ -14,7 +14,7 @@ blocked_by: null
 
 # Time
 created: 2026-07-11T07:00:00Z
-updated: 2026-07-11T22:00:00Z
+updated: 2026-07-11T22:30:00Z
 due: null
 
 # Provenance
@@ -60,7 +60,7 @@ linked_deliverables:
   - 2026-07-11-10-10-t013-wanderloots-independent-change-qa
 
 # Tagging
-tags: [tier-1-proposal, qa, sop-018, t009, t013, fusion247-brain, awaiting-independent-review]
+tags: [tier-1-proposal, qa, sop-018, t009, t013, fusion247-brain]
 ---
 
 # Absorb legacy independent-change QA doctrine (SOP-018) and close T009/T013 through evidence
@@ -248,6 +248,7 @@ T009 and T013 are **not** marked resolved merely because the SOP was created, a 
 
 - 2026-07-11 22:00 (larry) — **Fifth Fable review, run against pushed head SHA `6622a0ade5c54fbd0ca4929dae5085cb061aebc3`, returned Pass with minor closure remedials** — the first genuinely independent confirmation this task has received, and the gate its own two-stage closure rule (Step 7) required. Explicit reviewer statement: no further SOP-018 redesign or source-analysis round is required. Recorded in full in `## Independent review record` above. Closure remedials completed: SHA pointer fixed, body mirror synced, review record added, external-review addenda added to all four T009/T013 reports (historical same-model verdicts preserved, not deleted), migration-closure audit updated so T009/T013 show evidence-backed `verified-absorbed` closure, `tsk-2026-07-11-002-migration-closure-audit-remaining-blockers` created as the minimal successor task so the audit stays an active deliverable. Sharing check run against all seven `linked_deliverables`: the audit and (incidentally, via a literal-path citation in the successor task) the doctrine-absorption matrix are both still referenced by the new open successor task and are not archived this close; the other five (T013 intake report, all four T009/T013 QA reports) archive cleanly. **T009 and T013 are closed. This task is closed.** The migration-closure audit itself remains open, tracked by its successor task.
 - 2026-07-11 22:00 (larry) — done: T009/T013 resolved via genuine independent (Fable) confirmation at head SHA `6622a0ade5c54fbd0ca4929dae5085cb061aebc3`; SOP-018 built and stable; migration-closure audit preserved active via `tsk-2026-07-11-002`.
+- 2026-07-11 22:30 (larry) — **Sixth Fable pass: final mechanical correction only, no reopening.** Approved the implementation at head SHA `6622a0ade5c54fbd0ca4929dae5085cb061aebc3`, flagged 5 closure-record inconsistencies introduced by the prior closure commit itself: (1) all four archived T009/T013 reports still cited this task's stale `tasks/open/` path in their `## External review addendum`/evidence-trail lines — fixed to basename wikilinks; (2) both independent-change-qa reports carried present-tense "remains open pending independent confirmation" lines in their `## Approval requirement`/`## Recommendation` sections, written before the addendum was added and never updated to match — annotated `[Superseded]` in place, historical verdict text left untouched; (3) the migration-closure audit's T009/T013 evidence citations pointed at the reports' pre-archive paths — switched to basename wikilinks; (4) this task's `awaiting-independent-review` tag was stale now that review has concluded — removed (no `independently-reviewed` tag exists anywhere else in the task tree, so none was substituted); (5) `tsk-2026-07-11-002`'s `linked_deliverables` only listed the audit itself even though its own body deliberately cites the doctrine-absorption matrix for the row-#37 tracking — added the matrix as a genuine, deliberate `linked_deliverables` entry rather than relying on an incidental grep hit to keep it unarchived. No indexed field (status/priority/assignee) changed by any of this, so the task index was not rebuilt. T009, T013, and this task remain closed; no verdict, finding, or substantive content was reopened or altered.
 
 ## Outcome
 
