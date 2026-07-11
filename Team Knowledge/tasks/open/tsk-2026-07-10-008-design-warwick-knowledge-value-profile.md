@@ -37,7 +37,8 @@ linked_my_life:
 linked_session_logs:
   - 2026-07-11-00-45_larry_knowledge-value-profile-realignment
 linked_journal_entries: []
-linked_deliverables: []
+linked_deliverables:
+  - 2026-07-11-warwick-knowledge-value-profile-proposal
 
 # Tagging
 tags: [architecture, knowledge-valuation, current-context, about-me, cairn, penn, retrieval]
@@ -88,6 +89,7 @@ This task is architecture and acceptance criteria, not permission to infer a per
 - 2026-07-11 00:45 (larry) - created from Warwick's knowledge-valuation realignment. Cross-refs: 5/7 populated; no specialist journal priors or deliverables exist yet.
 - 2026-07-11 01:15 (cairn/larry) - intake gate refined from multiple prompts to one lightweight free-text question. The canonical signals are `why added` and `suspected effect`; both are optional and may remain uncertain.
 - 2026-07-11 01:30 (larry) - public/private boundary added via [[GL-009-public-private-knowledge-boundary]]. Personal profile evidence stays local/private while this public PR carries the architecture and process contract.
+- 2026-07-11 01:45 (silas/larry) - architecture proposal drafted at [[2026-07-11-warwick-knowledge-value-profile-proposal]]. Status remains open pending Warwick review and approval of the profile shape.
 
 ## Outcome
 _(filled when status flips to done - see SOP-close-task)_
