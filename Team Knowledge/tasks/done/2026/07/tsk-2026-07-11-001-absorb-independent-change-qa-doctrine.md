@@ -8,13 +8,13 @@ assignee: larry
 priority: 2
 
 # Status (mirrors folder location)
-status: open
+status: done
 blocked_reason: null
 blocked_by: null
 
 # Time
 created: 2026-07-11T07:00:00Z
-updated: 2026-07-11T19:45:00Z
+updated: 2026-07-11T22:00:00Z
 due: null
 
 # Provenance
@@ -48,6 +48,7 @@ linked_session_logs:
   - 2026-07-11-19-00_pax_sop-018-round-3-fable-corrections
   - 2026-07-11-20-15_cairn_ai-tooling-fable-qa-fixes
   - 2026-07-11-21-00_pax_fable-round-4-three-fixes
+  - 2026-07-11-22-00_larry_tsk-001-closure
 linked_journal_entries: []
 linked_deliverables:
   - 2026-07-11-migration-closure-audit
@@ -78,11 +79,25 @@ tags: [tier-1-proposal, qa, sop-018, t009, t013, fusion247-brain, awaiting-indep
   - [[2026-07-11-10-10-t013-wanderloots-independent-change-qa]] — T013 SOP-018 pass
   - [[2026-07-11-migration-closure-audit]] — the PR #8 audit this task follows from
 - Birthed in: [[2026-07-11-05-00_larry_content-integrity-qa-implementation]], [[2026-07-11-06-00_larry_migration-closure-audit]]
-- Touched by: [[2026-07-11-04-30_cairn_hermes-transcript-pilot]], [[2026-07-11-08-00_cairn_wanderloots-transcript-pilot]], [[2026-07-11-10-20_pax_t009-t013-independent-qa-passes]], [[2026-07-11-19-00_pax_sop-018-round-3-fable-corrections]]
+- Touched by: [[2026-07-11-04-30_cairn_hermes-transcript-pilot]], [[2026-07-11-08-00_cairn_wanderloots-transcript-pilot]], [[2026-07-11-10-20_pax_t009-t013-independent-qa-passes]], [[2026-07-11-19-00_pax_sop-018-round-3-fable-corrections]], [[2026-07-11-20-15_cairn_ai-tooling-fable-qa-fixes]], [[2026-07-11-21-00_pax_fable-round-4-three-fixes]]
+- Closed in: [[2026-07-11-22-00_larry_tsk-001-closure]]
 
 ## What this is
 
-**Current state, 2026-07-11 21:20 (superseding the "build plan, not yet the build" framing below):** the plan below was written and approved as plan-only on 2026-07-11 07:00-07:30. It has since been fully implemented, corrected across four external-review rounds, and pushed to PR #9 (current head SHA `c2e2b96f1b223edf1a7a935638a632d95677eae5`, see the `## Updates` log for the full history). The section immediately below is preserved as the **original plan-at-creation record**, not the current implementation state — read the `## Updates` log for what has actually happened. This task remains **open**: T009, T013, this task, and the migration-closure audit are all still pending genuinely independent (non-Larry, non-Pax, non-Cairn) review before any of them close.
+**Current state, 2026-07-11 22:00 (superseding the "build plan, not yet the build" framing below):** the plan below was written and approved as plan-only on 2026-07-11 07:00-07:30. It has since been fully implemented, corrected across four external-review rounds, and independently reviewed and passed at head SHA `6622a0ade5c54fbd0ca4929dae5085cb061aebc3` — see **§Independent review record** and the `## Updates` log for the full history. The section immediately below is preserved as the **original plan-at-creation record**, not the current implementation state.
+
+## Independent review record
+
+This is the genuinely independent confirmation the two-stage closure rule (Step 7 below) required before T009/T013 and this task could close. Recorded exactly as supplied, not paraphrased:
+
+- **Reviewer:** Fable (external ChatGPT-based reviewer; not part of this session/model — genuine independence, unlike every same-model pass recorded elsewhere in this task).
+- **Reviewed head SHA:** `6622a0ade5c54fbd0ca4929dae5085cb061aebc3`.
+- **Review date:** 2026-07-11 (same day, following four same-model correction rounds run against three prior SHAs — `215e01e...`, `6d14fae...`, `e0ff628...`).
+- **Verdict:** **Pass with minor closure remedials.**
+- **Explicit scope statement from the reviewer:** "No further SOP-018 redesign or source-analysis round is required."
+- **Closure remedials required (this same commit addresses all of them):** correct this task's current-state SHA pointer; synchronise the `Context one click away`/`Touched by` body mirror with frontmatter; record this review's metadata and verdict exactly as supplied; add external-review addenda to the T009/T013 reports without deleting their historical same-model verdicts; update the migration-closure audit so T009/T013 show evidence-backed closure; preserve `2026-07-11-migration-closure-audit.md` as an active deliverable via a minimal successor task; run the normal claim/close-task procedure.
+
+This is the first and only entry in this task's history recorded by a genuinely independent, non-author reviewer. Every other verdict recorded in `## Updates` above this point is same-model (Larry/Pax/Cairn) and is explicitly not this gate.
 
 **Original framing, preserved as history:** ~~This is a build plan, not yet the build.~~ Per Warwick's explicit instruction, this task captured the plan and scope for PR #9 so he could check it before any of it was executed. At the time this section was written, nothing described below had been built yet except the two verifications noted in §Pre-work already done.
 
@@ -231,5 +246,24 @@ T009 and T013 are **not** marked resolved merely because the SOP was created, a 
   7. **Cross-file consistency re-run** across `ai-tooling.md`, `Sources (Immutable)/INDEX.md`, both T009 reports, both T013 reports, the doctrine matrix, `SOP-018`, this task file, the round-3/round-4 session logs, and the PR description — spot-checked directly via grep for each of the six specific claims this review flagged, not taken on any dispatched agent's summary alone. All six confirmed accurate as of this entry.
   Two dispatches this round (Cairn for items 1+4, Pax for items 2+6), both verified against actual file diffs before being accepted, matching the discipline established in rounds 2-3. **T009, T013, this task, and the migration-closure audit remain open/unresolved** — none are closed by this fourth same-model correction round. Returning PR #9 with a new head SHA for a fifth Fable/Warwick pass.
 
+- 2026-07-11 22:00 (larry) — **Fifth Fable review, run against pushed head SHA `6622a0ade5c54fbd0ca4929dae5085cb061aebc3`, returned Pass with minor closure remedials** — the first genuinely independent confirmation this task has received, and the gate its own two-stage closure rule (Step 7) required. Explicit reviewer statement: no further SOP-018 redesign or source-analysis round is required. Recorded in full in `## Independent review record` above. Closure remedials completed: SHA pointer fixed, body mirror synced, review record added, external-review addenda added to all four T009/T013 reports (historical same-model verdicts preserved, not deleted), migration-closure audit updated so T009/T013 show evidence-backed `verified-absorbed` closure, `tsk-2026-07-11-002-migration-closure-audit-remaining-blockers` created as the minimal successor task so the audit stays an active deliverable. Sharing check run against all seven `linked_deliverables`: the audit and (incidentally, via a literal-path citation in the successor task) the doctrine-absorption matrix are both still referenced by the new open successor task and are not archived this close; the other five (T013 intake report, all four T009/T013 QA reports) archive cleanly. **T009 and T013 are closed. This task is closed.** The migration-closure audit itself remains open, tracked by its successor task.
+- 2026-07-11 22:00 (larry) — done: T009/T013 resolved via genuine independent (Fable) confirmation at head SHA `6622a0ade5c54fbd0ca4929dae5085cb061aebc3`; SOP-018 built and stable; migration-closure audit preserved active via `tsk-2026-07-11-002`.
+
 ## Outcome
-_(filled when status flips to done — see SOP-close-task)_
+
+**What shipped:** `SOP-018-independent-change-qa.md` — Fusion247 Brain's `/update QA` skill re-derived for myPKA as a portable, model-agnostic skill (not a new agent), cross-linked to but never merged with `SOP-017-content-integrity-audit`. A 38-row doctrine-absorption matrix backing it (`Deliverables/2026-07-11-independent-change-qa-doctrine-absorption.md`). T009 (Hermes pilot QA) and T013 (a genuine second source-to-WIKI test, the Wanderloots transcript) both run end-to-end — content-integrity check, independent-change check, register capture per GL-011 — corrected across four same-model self-correction rounds (each round triggered by an external Fable review catching something the same-model pass missed: a verdict-rule violation, a factually wrong provenance claim, a stale finding, a doctrine-completeness gap, a body-mirror/task-hygiene gap), then confirmed by a fifth, genuinely independent Fable review at head SHA `6622a0ade5c54fbd0ca4929dae5085cb061aebc3` — **Pass with minor closure remedials**.
+
+**Where it lives:** PR #9 (`claude/agent-count-kdved6`), head SHA `6622a0ade5c54fbd0ca4929dae5085cb061aebc3` at the point of independent confirmation; this closure commit is the final one on that branch. Session logs: [[2026-07-11-05-00_larry_content-integrity-qa-implementation]], [[2026-07-11-08-00_cairn_wanderloots-transcript-pilot]], [[2026-07-11-10-20_pax_t009-t013-independent-qa-passes]], [[2026-07-11-19-00_pax_sop-018-round-3-fable-corrections]], [[2026-07-11-20-15_cairn_ai-tooling-fable-qa-fixes]], [[2026-07-11-21-00_pax_fable-round-4-three-fixes]], [[2026-07-11-22-00_larry_tsk-001-closure]].
+
+**Follow-ups:** [[tsk-2026-07-11-002-migration-closure-audit-remaining-blockers]] — the minimal successor task that keeps `2026-07-11-migration-closure-audit.md` active and tracks its remaining confirmed blockers, Warwick-decision items, and the new row-#37 session-log `model`/`runtime` metadata gap this task's own closure surfaced. Not this task's job to resolve — a deliberate, explicit follow-up, not a dropped thread.
+
+**Lessons:** the four same-model self-correction rounds this task went through, each one catching a genuinely different class of error (a verdict-rule violation, a factual mis-framing, a stale finding, a body/task-hygiene gap) even after the prior round's own corrections, is itself the single clearest demonstration this whole engagement could have produced of *why* independent QA is a distinct, necessary gate — not a formality. No separate journal entry written; this observation is preserved here and in `## Independent review record` above rather than duplicated.
+
+**Archived deliverables:**
+- `2026-07-11-08-00-t013-wanderloots-intake-disposition` → archived to `Deliverables/_archive/2026/07/`.
+- `2026-07-11-09-10-t009-hermes-content-integrity-audit` → archived to `Deliverables/_archive/2026/07/`.
+- `2026-07-11-09-30-t009-hermes-independent-change-qa` → archived to `Deliverables/_archive/2026/07/`.
+- `2026-07-11-09-50-t013-wanderloots-content-integrity-audit` → archived to `Deliverables/_archive/2026/07/`.
+- `2026-07-11-10-10-t013-wanderloots-independent-change-qa` → archived to `Deliverables/_archive/2026/07/`.
+- `2026-07-11-migration-closure-audit` → **archive deferred**, still referenced by [[tsk-2026-07-11-002-migration-closure-audit-remaining-blockers]] (by design — this is the whole reason that task exists).
+- `2026-07-11-independent-change-qa-doctrine-absorption` → **archive deferred**, still referenced (a literal-path citation, not an owned `linked_deliverables` entry) by [[tsk-2026-07-11-002-migration-closure-audit-remaining-blockers]]'s body text explaining the row-#37 gap; the next task that closes without still needing that citation can archive it then.
