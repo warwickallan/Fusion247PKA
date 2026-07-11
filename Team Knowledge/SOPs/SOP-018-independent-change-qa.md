@@ -1,6 +1,6 @@
 # SOP: Independent Change QA
 
-- **Status:** Active (since 2026-07-11)
+- **Status:** Active (since 2026-07-11; amended 2026-07-11, round 3, per external QA (Fable) corrections — see [[Deliverables/2026-07-11-independent-change-qa-doctrine-absorption]] rows #28-#38 for the specific additions this amendment implements).
 - **Default owner:** Pax, when Larry scopes the request. **This SOP does not create a new specialist.** It is a skill — the portable successor to Fusion247 Brain's old `/update QA` skill — not a permanent agent, and any specialist can run it when they need to independently verify what was claimed vs. what was actually built.
 - **Reusable by any agent.** Larry scopes the request (the review window, the control set in scope, who authored the change under review); Pax is the default evidence/methodology owner because this is the same triangulation-over-trust discipline as his other work, applied to "did the build match the claim" instead of "is this claim true." Any agent can invoke this procedure directly when they need to check their own or another agent's work before it's treated as settled.
 - **Triggered by:** "QA the recent changes," "independently verify what changed," "check this before I merge/accept it," "compare what was requested with what was actually built," "did the build match the claim," a migration or build PR that's about to be treated as complete, a task closure that depends on evidence rather than a clean task board.
@@ -21,6 +21,7 @@ This SOP is Fusion247PKA's re-derivation of Fusion247 Brain's `F247.skill.update
 - **Does not run a multi-role adversarial panel review.** That's the separate Critical Panel Review skill. This SOP may recommend invoking it for a high-risk artefact before a final ship decision, but never inlines its reviewer-panel logic.
 - **Does not auto-fix, delete, archive, change schema, or rewrite a boundary.** Report-only by default. No destructive or structural-boundary action without Warwick's explicit approval — see §Step 8.
 - **Does not make product decisions for Warwick.** It surfaces evidence, severity, and a verdict. Warwick decides what happens next.
+- **Does not adjudicate client-delivery/handover sign-off evidentiary standards.** Whether recorded verbal concurrence (linked to meeting/transcript evidence) counts as adequate handover sign-off is Warden/`Client Delivery/`/[[GL-006-client-delivery-frontmatter-conventions]] territory, out of this SOP's scope — see the doctrine-absorption matrix row #32 for why that rule is flagged there rather than absorbed here.
 
 ## Reviewer independence — stated honestly
 
@@ -49,6 +50,7 @@ Record explicitly, before checking anything:
 - **What was requested** — the exact ask, in the requester's own words or the task file's stated brief.
 - **What the author claims changed** — the author's own summary of what they did.
 - **What the actual artefact is** — the specific files, diff, or git range the claim maps to. Do not accept "the recent work" as a scope; resolve it to concrete paths or a commit range before proceeding.
+- **Fallback when no explicit range is given.** If the scope is handed to you as something like "check the recent changes," with no explicit commit/file range, do not treat that as license to guess. Resolve it in this order, re-derived from Fusion247 Brain's original "recently modified documents" rule in myPKA's own git-native vocabulary: (1) default to the span since the most recent completed QA/session boundary for this scope, where one exists (a prior SOP-017/SOP-018 report, a closed task, or an explicit close-session entry); (2) if no such boundary exists, default to a 48-hour git-log window ending now; (3) resolve the actual window using git history (`git log`), the task file's own `## Updates` entries, and session logs — not memory of what was worked on; (4) state any uncertainty or inaccessible source explicitly (a truncated git history, a task file that can't be found, a session log gap) rather than assuming the window is complete. This is a narrower, on-demand, single-change instance of the same discipline — it does not replace Larry's Duty 2 blanket sweep (see [[Team/Larry - Orchestrator/AGENTS]] Duty 2), which runs automatically over the whole repo every session close regardless of scope.
 - **The relevant control set for this change** — the specific files a change of this kind should touch or be reflected in (the affected contract, the SOP/Guideline it implements, the task file, the relevant `INDEX.md`, recent session-log entries). Read that control set, not the whole repository by habit. If the change is large enough that the control set is unclear, ask rather than guessing.
 - **Any blocked tool or inaccessible source.** If a connector, file, or evidence source is unavailable this pass, declare it immediately and by name in the report (see Step 9). Never silently treat an unreachable source as if it had passed.
 
@@ -86,12 +88,16 @@ Check the literal output (from Step 5) and the three-way comparison (from Step 2
 - **Acceptance criteria.** Does the actual artefact meet what was asked, not just what was claimed?
 - **Source/provenance.** Does every load-bearing claim in the change trace to a real, checkable source?
 - **Register/task/session hygiene.** Is the change reflected in the task file, the relevant `INDEX.md`, and a session-log entry, the way it should be?
+- **Project-local write/session logs are audit ledgers, not instructions.** A project-local write log, changelog, or session-log-style ledger is permitted and expected as an audit trail — but check it hasn't drifted into stating rules a reader would follow instead of consulting the canonical SOP/Guideline/contract. A log entry that reads like a standing instruction, rather than a record of what happened, is a boundary-drift finding, not acceptable audit hygiene.
 - **Links/references.** Do wikilinks and cross-references the change touched still resolve? (Delegates to Larry's Duty 2 / SOP-017 mechanics — this checklist line flags the question for the reviewed change, it does not reimplement link-resolution.)
 - **Fabricated projects/clients/folders/documents.** Does every named entity in the change actually exist? (Delegates to [[SOP-017-content-integrity-audit]] for the actual fabricated-reference check — flag it here, run it there.)
 - **Stale or contradictory instructions.** Did the change leave behind an instruction, note, or reference that no longer matches current reality?
 - **Duplicate active source-of-truth files.** Did the change create a second file claiming the same authority as an existing one?
-- **Schema/ontology/folder-purpose drift.** Did the change alter what a folder or field is *for* without recording that decision anywhere?
+- **Duplicate instruction stores.** Does a project-local README, project-map, or similar document restate or duplicate ontology/governance rules that already live in root `AGENTS.md` or a Guideline, without explicit approval and a recorded reason? Per the SSOT Golden Rule (root `AGENTS.md` Hard Rule 1), a second copy of a governing rule is a finding even where the two copies currently agree — the duplication itself is the defect, distinct from the row above (which asks whether two documents both claim to be *the* source of truth for the same fact).
+- **Candidate lifecycle hygiene.** Are temporary, rejected, or superseded artefacts clearly labelled and excluded from active routing, with current indexes pointing only to the accepted source of truth? Distinct from the duplicate-source-of-truth check above — this asks whether an artefact that should no longer be routable is still being routed to.
+- **Schema/ontology/folder-purpose drift — treat as a high-priority review target.** Did the change alter what a folder or field is *for* without recording that decision anywhere? Ontology, schema, scaffold, and folder-purpose changes get elevated review priority over ordinary content edits, and any such change must be confirmed as logged at the myPKA-wide level (root `AGENTS.md`, the relevant Guideline, a decision-carrying session log, or an equivalent repo-wide record) — not only inside a project-local artefact. A schema change recorded only inside one project's own files, with no repo-wide trace, is itself a finding.
 - **Agent/skill/SOP/guideline/template boundary drift.** Did the change bury a procedure inside a contract, or a shared rule inside a single specialist's file, where it should live in a separate SOP/Guideline instead?
+- **Semantic-coverage check for rewrites/migrations/compressions/replacements.** Every durable predecessor rule or section must be recorded as preserved, relocated, superseded, or intentionally omitted with recorded approval. No silent governance/context loss. A tidy-looking, structurally clean rewrite that quietly drops governance context is a real, distinct failure mode from the structural-damage check below.
 - **Structural damage after edits.** Are headings and numbering sequential? Are there sentence fragments stranded beside a heading? Have changelog blocks stacked up inside a control file instead of living in the session log? Are tables intact, with no rows merged or split across cell boundaries? Any duplicated blocks left over from a splice?
 
 ### Step 7 — Classify severity
@@ -156,6 +162,11 @@ Independence level: Same-model review — not independently verified. / Genuinel
 ## Verdict
 Pass / Pass with observations / Pass with remedials / Fail.
 
+## Approval requirement
+- Warwick approval required: Yes / No
+- Reason:
+- Decision or action being requested:
+
 ## Evidence trail
 For every material finding: source title, git path or Drive ID, the [[GL-011-immutable-source-retention]] register entry if one exists, hash where available, exact access method, any access limitation, timestamp anchor.
 
@@ -182,3 +193,4 @@ Write `Team Knowledge/session-logs/YYYY/MM/YYYY-MM-DD-HH-MM_<agent>_independent-
 - **Rendering any Pass variant while a Critical or Major finding is still open.**
 - **Auto-fixing a finding.** Report, classify, recommend. Warwick decides; the file's own owner applies any approved fix.
 - **Skipping the reviewer-independence declaration entirely.** Every report states it, even when the answer is "same-model."
+- **Treating "recent changes" as a scope you can guess at.** Use the Step 1 fallback (recent QA/session boundary → 48-hour git-log window → git history/task/session-log resolution → declared uncertainty) rather than assuming you already know what "recent" covers.

@@ -58,6 +58,14 @@ None.
 
 **Fail pending independent confirmation** (changed from the prior wording, "Fail pending remedials"). No Critical findings. Of the two Major findings originally raised, both are now recorded as **Resolved-during-this-review**: the Hermes provenance finding (register row exists, durable, hash-identified) and the `ai-tooling.md` §5/§6 stale-citation finding (direct `grep` this pass confirms line 50 already reads §6; the earlier claim that it was "still unresolved" was this reviewer's own error, corrected above). **Zero Major findings remain open in this specific report as of this correction.** Per this SOP's own Step 8, that removes the rule-based bar to a Pass variant — but this reviewer (Pax, same session as the author and as the report under review) is deliberately **not** rendering a Pass verdict on that basis alone. Two same-model corrections have now been applied in succession to this same report within one session, which is itself a reason for caution rather than confidence: a same-model reviewer re-checking its own work is not the independence T009 actually requires. The verdict therefore stays at **Fail**, but the reason has changed — it is no longer "an unresolved finding blocks Pass," it is "no genuinely independent party has yet confirmed that these two corrections are actually correct and complete." T009 cannot be treated as closed until a genuinely independent reviewer (Fable/Warwick, non-Larry, non-Pax, non-Cairn) confirms this corrected report against the pushed head SHA.
 
+## Approval requirement
+
+*(Section added 2026-07-11, round 3, per SOP-018's template amendment — see SOP-018 Step 9.)*
+
+- Warwick approval required: No.
+- Reason: Both Major findings are recorded as Resolved-during-this-review (the Hermes GL-011 registration gap is closed; the stale SOP-015 citation was already fixed). No open policy question or destructive/boundary-changing action requires Warwick's sign-off.
+- Decision or action being requested: None at this time. T009 remains open pending the genuinely independent (non-Pax/non-Cairn/non-Larry) confirmation this report's Verdict calls for; no action is requested of Warwick beyond that awareness.
+
 ## Evidence trail
 
 - **Session log (claimed):** `Team Knowledge/session-logs/2026/07/2026-07-11-04-30_cairn_hermes-transcript-pilot.md` — git path, read in full this pass.
