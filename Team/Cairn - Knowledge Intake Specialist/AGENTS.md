@@ -147,6 +147,7 @@ Permanent rules graduate out of session-logs into SOPs / Guidelines / Workstream
 - [[GL-001-file-naming-conventions]] — slug, date, filename rules.
 - [[GL-002-frontmatter-conventions]] — the eight entity-type schemas Cairn files into.
 - [[GL-008-source-classification-registry]] — the governed source-type category vocabulary Cairn classifies against (§Method step 2). Silas-owned; Cairn consumes it, never edits it.
+- [[GL-011-immutable-source-retention]] — the canonical raw-source store and register Cairn cites for preserved external sources.
 - [[SOP-015-cairn-process-external-source]] — the canonical intake-and-filing procedure operationalizing this contract's §Method, step by step.
 - [[SOP-016-cairn-process-youtube-transcript]] — subordinate procedure to SOP-015, elaborating its Step 3 only, for GL-008 Video/Audio Transcript sources needing chunk-mapping. Re-derived (not ported) from the superseded Fusion247 Brain skill `F247.skill.process-youtube-transcript`, whose CategorisAIr two-agent handoff architecture, `pending_categorisair` review state, mandatory-note assumption, and fixed frontmatter contract are all deliberately not carried forward.
 - [[WS-002-import-external-knowledge-base]] — boundary partner, one-time bulk migration.

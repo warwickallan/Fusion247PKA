@@ -67,3 +67,7 @@ Warwick confirmed that the repository may remain public during testing, but pers
 ## Knowledge Value Profile approval
 
 Warwick approved the About Warwick / Current Context name, the `PKM/My Life/Current Context/` private/local location, and creating [[GL-010-warwick-knowledge-value-profile]] before editing the SOPs. He amended the expiry rule: short-term signals default to 14 days, while repeated signals or explicitly requested tracking move into a longer-term candidate stage before becoming confirmed stable facts.
+
+## Raw-source retention decision
+
+After the valuation layer was defined, Larry routed Task 007 back to Silas. The canonical general intake source store is now top-level `Sources (Immutable)/`, governed by [[GL-011-immutable-source-retention]]. The tracked register stays public; raw payload files are ignored by default while the repository remains public. SOP-015 and SOP-016 now require adapter-acquired sources, including future TubeAIR transcripts, to be retained before Cairn processes them.

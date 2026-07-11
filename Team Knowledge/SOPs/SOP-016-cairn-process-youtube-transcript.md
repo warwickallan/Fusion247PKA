@@ -76,9 +76,11 @@ For a transcript long enough that a single continuous read risks losing chunk-ma
 
 This SOP's output is the chunk map. SOP-015 continues from its own Step 3a, assigning a disposition from the completed chunk map, then Step 4 records the formal GL-008 classification through Step 11 (logging). From this point onward, SOP-015 reads the chunk map by default and opens the raw transcript only for the targeted verification case described in sections 2 and 4. This SOP makes no filing decision, creates no note, and does not decide which entities earn a note - that is SOP-015 Step 6's "does this earn a note" test, run exactly as SOP-015 already defines it. A long transcript can legitimately close with `Retain source only` or `Discard where policy permits`.
 
-## A note on raw-source retention (open gap, not resolved here)
+## Raw-source retention
 
-General PKM transcript intake currently has no equivalent of Warden's `Sources (Immutable)/` - there is no standing mechanism that preserves the raw transcript text itself once processing is done. This SOP does not assume one exists, invent one, or treat a chunk map as a substitute for raw-source preservation (a chunk map is a derived working artifact, not the source). Until this is resolved, SOP-016 defers entirely to [[SOP-015-cairn-process-external-source]] Step 10's existing honest-flagging behavior: state plainly, per source, what provenance the note actually relies on (title, apparent channel, capture date, metadata per section 5 above) and that it is not equivalent to a preserved raw copy. Closing this gap is a design task routed separately to Silas, not something this SOP resolves.
+General PKM transcript intake preserves raw payloads through [[GL-011-immutable-source-retention]]'s top-level `Sources (Immutable)/` store. A chunk map is still a derived working artifact, not the source. SOP-016 records transcript metadata during the read so SOP-015 Step 10 can cite the register row and local payload path when one exists, or explain why no payload was retained.
+
+For TubeAIR and future transcript adapters, the transcript payload and available metadata must be written to `Sources (Immutable)/` before handoff to Cairn. If an adapter handoff lacks the retained payload, stop and route the acquisition failure back to Larry/Mack rather than processing from transient scratchpad.
 
 ## Worked example
 

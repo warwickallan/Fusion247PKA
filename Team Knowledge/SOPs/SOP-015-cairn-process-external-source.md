@@ -95,7 +95,11 @@ Write or update the destination note under its real `PKM/` entity folder. If cre
 
 ### 10. Address raw-source provenance honestly
 
-State, per source, whether the raw material itself is preserved anywhere, and if not, what the note relies on for provenance instead (title, author/channel, acquisition date, URL if known). Do not fabricate a URL or citation detail that isn't actually in the material handed to you. If the acquisition channel is identifiable from the source's own self-references (a transcript that names its own channel or publication), cite that as directly-present evidence, not reconstruction. If general PKM intake genuinely has no raw-evidence retention mechanism (unlike Warden's `Sources (Immutable)/`, which is scoped to `Client Delivery/` only), say so plainly in the note and in the session log rather than silently treating a citation line as equivalent to raw-source preservation — that's a real gap, not a solved one, until Silas rules on it.
+State, per source, whether the raw material itself is preserved in [[GL-011-immutable-source-retention]]'s `Sources (Immutable)/` store. If it is preserved, cite the `Sources (Immutable)/INDEX.md` `source_id` and local file path. If it is not preserved, state what the note relies on instead (title, author/channel, acquisition date, URL if known) and why no raw payload was retained.
+
+Do not fabricate a URL or citation detail that isn't actually in the material handed to you. If the acquisition channel is identifiable from the source's own self-references (a transcript that names its own channel or publication), cite that as directly-present evidence, not reconstruction.
+
+If the source came through TubeAIR or another acquisition adapter, the raw payload must already be in `Sources (Immutable)/` before semantic processing. If it is missing, stop and route the acquisition failure back to Larry/Mack rather than processing from a transient scratchpad.
 
 ### 11. Log the intake
 
@@ -118,4 +122,4 @@ A pasted YouTube transcript about an AI agent tool arrives, handed directly to C
 - Restating a source's own unverified or marketing claim as settled fact instead of labeling it as a claim the source makes, with its truth value unaddressed.
 - Creating a backlink because a template ships it as an example, without checking it actually earns its place in this specific note.
 - Leaving the processed source sitting in `Team Inbox/` or a `Deliverables/` staging file instead of filing directly.
-- Treating a citation line (title, channel, date) as equivalent to raw-source retention without saying so explicitly — if there's no preserved raw copy, say that plainly rather than implying otherwise.
+- Treating a citation line (title, channel, date) as equivalent to raw-source retention. Preserved raw evidence means a `Sources (Immutable)/INDEX.md` row plus local payload per [[GL-011-immutable-source-retention]].

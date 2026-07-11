@@ -62,3 +62,11 @@ tmp/
 PKM/Journal/
 PKM/My Life/Current Context/
 PKM/My Life/About Warwick/
+
+# --- Local immutable external-source payloads ---
+# Keep the register and rules public, but do not publish captured transcripts,
+# PDFs, uploads, or other raw external-source payloads from the public repo.
+/Sources (Immutable)/**
+!/Sources (Immutable)/
+!/Sources (Immutable)/INDEX.md
+!/Sources (Immutable)/README.md

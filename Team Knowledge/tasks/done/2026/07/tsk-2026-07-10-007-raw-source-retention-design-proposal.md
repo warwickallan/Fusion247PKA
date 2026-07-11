@@ -6,13 +6,13 @@ title: "Design proposal: canonical raw-source retention location for general PKM
 # Ownership & priority
 assignee: silas
 priority: 2
-status: open
+status: done
 blocked_reason: null
-blocked_by: tsk-2026-07-10-008
+blocked_by: null
 
 # Time
 created: 2026-07-10T23:10:00Z
-updated: 2026-07-11T05:00:00Z
+updated: 2026-07-11T02:30:00Z
 due: null
 
 # Provenance
@@ -34,6 +34,7 @@ linked_guidelines:
   - GL-002-frontmatter-conventions
   - GL-006-client-delivery-frontmatter-conventions
   - GL-008-source-classification-registry
+  - GL-011-immutable-source-retention
 linked_my_life:
   - ai-tooling
 linked_session_logs:
@@ -345,5 +346,28 @@ reason the gap needed resolving now rather than whenever TubeAIR eventually gets
   Raw-source retention is necessary but does not determine personal value. Added dependency on
   [[tsk-2026-07-10-008-design-warwick-knowledge-value-profile]] before this proposal can close.
 
+- 2026-07-11 02:30 (silas/larry) - implemented the top-level `Sources (Immutable)/` pattern via
+  [[GL-011-immutable-source-retention]], tracked public register files, `.gitignore` protection
+  for raw payloads, and SOP-015/SOP-016 provenance updates. Chose top-level A2 because raw
+  evidence is not living PKM knowledge and may support PKM, Team Knowledge, research outputs, or
+  future adapters.
+
 ## Outcome
-_(filled when status flips to done — see SOP-close-task)_
+
+What shipped: the raw-source retention gap is closed for general PKM/team intake. The canonical
+location is the top-level `Sources (Immutable)/` store with a tracked `INDEX.md` register and
+local/ignored payload files under `YYYY/MM/`. [[GL-011-immutable-source-retention]] defines the
+register fields, duplicate handling, recapture/supersession behavior, adapter rule, and SQLite
+deferment. SOP-015 and SOP-016 now cite GL-011 instead of treating raw retention as unresolved.
+
+Where it lives: [[GL-011-immutable-source-retention]], `Sources (Immutable)/INDEX.md`,
+`Sources (Immutable)/README.md`, [[SOP-015-cairn-process-external-source]], and
+[[SOP-016-cairn-process-youtube-transcript]].
+
+Follow-ups: TubeAIR must preserve payload and metadata to `Sources (Immutable)/` before Cairn
+handoff. SQLite/source analytics and WS-002 raw export retention remain separate future decisions.
+
+Archived deliverables: none.
+
+- 2026-07-11 02:30 (silas/larry) - done: top-level immutable source store implemented and SOP
+  provenance rules updated.

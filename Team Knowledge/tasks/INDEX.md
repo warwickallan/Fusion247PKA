@@ -2,18 +2,17 @@
 
 _Auto-generated. Do not edit by hand. Run `SOP-rebuild-task-index` to regenerate._
 
-_Last rebuilt: 2026-07-11T05:05:00Z_
+_Last rebuilt: 2026-07-11T02:30:00Z_
 
 ## Summary
-- Open: 5
+- Open: 4
 - In progress: 1 (0 blocked)
-- Done (this month): 2
+- Done (this month): 3
 - Cancelled (this month): 0
 
-## Open (5)
+## Open (4)
 
 ### Priority 2 — high
-- [[tsk-2026-07-10-007-raw-source-retention-design-proposal]] — Design proposal: canonical raw-source retention location for general PKM intake (TubeAIR precondition) — assignee: silas — created 2026-07-10
 - [[tsk-2026-07-10-008-design-warwick-knowledge-value-profile]] — Design the shared Warwick Knowledge Value Profile and current-context view — assignee: silas — created 2026-07-10
 
 ### Priority 3 — normal
@@ -33,5 +32,6 @@ _Last rebuilt: 2026-07-11T05:05:00Z_
 - pax: 0 open, 0 in-progress (0 blocked)
 
 ## Recently closed (last 7 days)
+- 2026-07-11 [[tsk-2026-07-10-007-raw-source-retention-design-proposal]] — done — silas
 - 2026-07-11 [[tsk-2026-07-10-003-categorisair-equivalent-design-proposal]] — done — larry
 - 2026-07-10 [[tsk-2026-07-10-002-fusion247-brain-migration-coverage-matrix]] — done — larry
