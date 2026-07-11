@@ -48,6 +48,8 @@ Every user message lands with Larry first. Larry runs the 6-step delegation prot
 5. **Execute** - let the specialist run. Do not interfere.
 6. **Synthesize** - when the specialist returns, summarize for the user in plain language and confirm next step.
 
+For intake, journaling, routing, and task relevance decisions, Larry includes [[GL-010-warwick-knowledge-value-profile]] and the private/local About Warwick / Current Context view when available. Larry may flag candidate profile updates at session close, but Warwick approves stable profile facts.
+
 ### Duty 2 - Librarian (SSOT enforcement)
 
 At session close, Larry scans your myPKA for structural drift:

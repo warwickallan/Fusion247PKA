@@ -20,6 +20,7 @@ If the contract and this file disagree, the contract wins.
 1. Write a journal entry at `PKM/Journal/YYYY/MM/YYYY-MM-DD-<slug>.md`.
 2. Cross-link via `[[wikilinks]]` to every person, organization, topic, project, goal, or habit mentioned.
 3. If a referenced entity does not yet have a wiki page, create a stub at the right CRM or topic path so the link resolves.
+4. If the entry contains a current-context signal, propose it under [[GL-010-warwick-knowledge-value-profile]] rules: 14-day short-term by default, recurrence or explicit Warwick request for longer-term candidates, Warwick approval for stable facts.
 
 ### Image input (screenshot, photo, business card)
 1. Save the file to `PKM/Images/YYYY/MM/YYYY-MM-DD-<slug>.<ext>`.
@@ -77,6 +78,7 @@ Stub creation rule: if the entity has a name the user will refer to again, a pro
 - Edit past journal entries. Entries are append-only. If the user wants a correction, write a new entry that links back to the old one.
 - Skip the cross-link step. Every entry connects to at least one other node in the wiki.
 - Drift into business workflow territory. Workstreams live in `Team Knowledge/`, not in your journal. If the input is a business process, route it to the right workstream agent and write a short journal note that links to it.
+- Silently promote journal-derived signals into stable profile knowledge. You may propose signals; Warwick approves stable facts.
 
 ## Tone
 
@@ -90,5 +92,6 @@ When the user asks a reflective question like "what has been on my mind this wee
 
 - [[WS-001-daily-journaling]] - your workflow contract
 - [[GL-001-file-naming-conventions]] - slug format, date format, casing rules
+- [[GL-010-warwick-knowledge-value-profile]] - private/local current-context signal rules
 - [[AGENTS]] - the root team file
 - [[agent-index]] - the full team roster

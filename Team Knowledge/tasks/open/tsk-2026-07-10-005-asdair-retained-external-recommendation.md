@@ -5,7 +5,7 @@ title: "Recommendation: AsdAIr automation stays retained-external; project knowl
 
 # Ownership & priority
 assignee: unassigned
-priority: 3
+priority: 4
 status: open
 blocked_reason: null
 blocked_by: null
@@ -81,6 +81,7 @@ Reasoning: unlike CareerAIR (row 36 — an active drafting/knowledge capability 
 
 - 2026-07-10 23:47 (pax) — created, per tsk-2026-07-10-001 decision 14 disposition of Migration Coverage Matrix follow-up #5. Cross-refs: 2/7 populated (workstreams, deliverables). All other slots (sops, guidelines, my_life, session_logs, journal_entries) walked and confirmed genuinely empty — no existing SOP, Guideline, My Life entry, session log, or journal entry covers AsdAIr specifically, and the source matrix row itself was not readable this session (flagged above and in report to Larry).
 - 2026-07-11 00:15 (larry) — read matrix row 37 directly (now accessible) and substantially revised the recommendation per external QA review: split disposition by layer rather than a blanket call — the operational app/browser-automation stays external; the project's knowledge (decisions, status, order history as record) may get a `PKM/My Life/Projects/` entry; a future Cockpit could expose AsdAIr as a linked external app without moving the automation inside myPKA. Still gated for approval, not implemented.
+- 2026-07-11 01:35 (larry) — deprioritized (3 → 4, low) per explicit user instruction: left open, not actively worked, while #1 (Knowledge Intake and Synthesis) proceeds first.
 
 ## Outcome
 _(filled when status flips to done — see SOP-close-task)_

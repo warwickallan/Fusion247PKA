@@ -53,3 +53,20 @@ build/
 logs/
 tmp/
 *.pid
+
+# --- Private/local Warwick context while this repository is public ---
+# Keep personal journal and current-context material local during the
+# myPKA/Fusion247Brain merge and testing phase. Public architecture docs may
+# describe the mechanism, but personal evidence belongs in the local/private
+# PKM layer unless Warwick explicitly approves publication for that change.
+PKM/Journal/
+PKM/My Life/Current Context/
+PKM/My Life/About Warwick/
+
+# --- Local immutable external-source payloads ---
+# Keep the register and rules public, but do not publish captured transcripts,
+# PDFs, uploads, or other raw external-source payloads from the public repo.
+/Sources (Immutable)/**
+!/Sources (Immutable)/
+!/Sources (Immutable)/INDEX.md
+!/Sources (Immutable)/README.md

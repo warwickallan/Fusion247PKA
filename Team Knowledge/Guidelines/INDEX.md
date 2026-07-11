@@ -15,8 +15,12 @@ Filename pattern: `GL-NNN-<title>.md`.
 | GL-005 | [[GL-005-llm-agnostic-portable-core]] | The portable-core boundary: harness-agnostic core (`PKM/`, `Team Knowledge/`, the body of every `Team/*/AGENTS.md`) vs the per-harness adapter layer (`.claude/`, future `.codex/`, `.cursor/`). No harness names, host tool names, slash-command-only triggers, or hardcoded models in the core. Enforced by the `agnosticism-audit` in `validation-script.sh`. |
 | GL-006 | [[GL-006-client-delivery-frontmatter-conventions]] | YAML frontmatter field schemas for `Client Delivery/`'s entity types (Engagement, Work Package, Register Item) — Warden's business/client-delivery root, structurally separate from `PKM/`. Sibling to GL-002, inherits its mechanical rules (§§2-4) rather than duplicating them. Not (yet) part of the SQLite mirror in [[SOP-002-convert-mypka-to-sqlite]]. |
 | GL-007 | [[GL-007-human-facing-writing-conventions]] | Anti-AI-tell discipline for human-facing external prose (cover letters, client comms, reports) — current cited 2026 research on what reads as AI-written, a five-point self-check, and the hard rule that this Guideline must be wikilinked and re-read at the point of drafting, not just written once. Does not govern internal session-log/task register, which has its own existing no-em-dash convention. |
+| GL-008 | [[GL-008-source-classification-registry]] | The small, governed vocabulary of source-type categories (Article/Written Source, Document/Report, Video/Audio Transcript, Course/Lesson Note, Chat/Conversation Excerpt, Email/Correspondence) Cairn classifies already-acquired external material against, mapped to GL-002's eight entity types. Silas-owned/stewarded, Cairn-consumed; creates no new entity type or frontmatter field. |
+| GL-009 | [[GL-009-public-private-knowledge-boundary]] | Public/private boundary for keeping Team Knowledge architecture publishable while local/private PKM context remains out of public commit history unless Warwick explicitly approves exact publication. |
+| GL-010 | [[GL-010-warwick-knowledge-value-profile]] | Structure, stewardship, expiry, promotion, intake valuation, and retrieval rules for Warwick's private/local Knowledge Value Profile and About Warwick / Current Context view. |
+| GL-011 | [[GL-011-immutable-source-retention]] | Top-level immutable raw-source store and register semantics for general PKM/team intake, including duplicate, recapture, supersession, adapter, and public/private payload rules. |
 
-*Reserved:* none. Next free Guideline slot is GL-008.
+*Reserved:* none. Next free Guideline slot is GL-012.
 
 ## When to write a new Guideline
 

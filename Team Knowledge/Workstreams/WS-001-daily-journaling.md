@@ -2,7 +2,7 @@
 
 - **Type:** Workstream — a multi-agent composition. The agents below collaborate to deliver the outcome. New Workstreams emerge when patterns repeat across session-logs; this one ships pre-canonicalized because daily journaling is a day-1 flow.
 - **Owners:** Penn (capture and writing), Larry (routing and Librarian pass)
-- **References:** [[SOP-001-how-to-add-a-new-specialist]], [[GL-001-file-naming-conventions]], [[Team/Penn - Journal Writer/AGENTS]], [[Team/Larry - Orchestrator/AGENTS]]
+- **References:** [[SOP-001-how-to-add-a-new-specialist]], [[GL-001-file-naming-conventions]], [[GL-010-warwick-knowledge-value-profile]], [[Team/Penn - Journal Writer/AGENTS]], [[Team/Larry - Orchestrator/AGENTS]]
 - **Trigger:** any user input that contains a thought, observation, encounter, screenshot, photo, or voice note.
 - **Version:** 1.1.0 (2026-06-03) — Step 4 routing now enforces the My Life doctrine: every Goal anchors to exactly one Key Element, names a single carrier (Project OR Habit), passes the filter test, and Topics graduate into Key Elements rather than deepening forever. See the dated note at the foot of this file.
 
@@ -84,6 +84,21 @@ Before stubbing or linking anything in `PKM/My Life/`, run the doctrine checks. 
 
 These checks are proposals at capture time. Penn stubs the doctrine-correct shape and flags any anchor/carrier ambiguity to Larry rather than guessing.
 
+### Step 4c - Knowledge Value Profile signal proposals
+
+After writing the journal entry and any entity links, Penn may propose signals for [[GL-010-warwick-knowledge-value-profile]]. This is a proposal layer, not silent profile rewriting.
+
+Signal rules:
+
+- Short-term signals default to a 14-day expiry.
+- Each signal must link to the journal entry or source that produced it.
+- Each signal is labelled `observed`, `inferred`, or `awaiting_confirmation`.
+- Repeated short-term signals may be proposed as longer-term candidates.
+- Warwick can explicitly ask the team to track an aim, goal, interest, preference, or constraint as a longer-term candidate.
+- Only Warwick can promote a signal into confirmed stable profile knowledge.
+
+Penn records proposed signals in the private/local `PKM/My Life/Current Context/warwick-knowledge-value-profile.md` file when it exists. If it does not exist, Penn flags the proposal to Larry rather than creating public personal context.
+
 ### Step 5 - Larry's Librarian pass at session close
 
 At session close, Larry scans the new Journal entry, the new image (if any), and any newly created CRM or My Life stubs:
@@ -98,6 +113,7 @@ At session close, Larry scans the new Journal entry, the new image (if any), and
 - Does not write business workflows. Those are handled by future specialists hired through Nolan via [[SOP-001-how-to-add-a-new-specialist]].
 - Does not produce research reports. Pax handles that.
 - Does not edit the user's existing CRM entries. Penn appends, never overwrites, unless the user asks.
+- Does not silently promote journal-derived signals into stable profile knowledge. See [[GL-010-warwick-knowledge-value-profile]].
 
 ## Naming and image rules
 
