@@ -8,13 +8,13 @@ assignee: warden
 priority: 2
 
 # Status (mirrors folder location)
-status: in-progress
+status: done
 blocked_reason: null
 blocked_by: null
 
 # Time
 created: 2026-07-10T19:15:00Z
-updated: 2026-07-11T05:15:00Z
+updated: 2026-07-11T05:35:00Z
 due: null
 
 # Provenance
@@ -41,7 +41,8 @@ linked_session_logs:
   - 2026-07-10-23-10_silas_warden-pr4-qa-pass
   - 2026-07-11-03-10_silas_source-classification-registry
   - 2026-07-11-05-00_larry_content-integrity-qa-implementation
-linked_journal_entries: []
+linked_journal_entries:
+  - 2026-07-11-close-on-literal-criteria-not-accumulated-scope
 linked_deliverables:
   - 2026-07-10-project-implementation-specialist-hire-research
 
@@ -144,3 +145,16 @@ Durable decisions made on this build, in order. Append, never rewrite history �
 - 2026-07-11 03:10 (silas) — priors loaded: none listed in `linked_journal_entries`. Drafted `Team Knowledge/Guidelines/GL-008-source-classification-registry.md` (see decision 18) — the governed source-type category registry Cairn's own contract deferred at hire time. Confirmed GL-008 as the live slot against `Team Knowledge/Guidelines/INDEX.md` directly rather than trusting Cairn's hire-time estimate. Read `F247.template.source-classification-registry.docx` directly for structural precedent, re-derived rather than copied. Six categories, Silas-owned/Cairn-consumed governance model with a two-occurrence recurrence gate, explicit no-new-entity-type/no-new-field statement, and explicit `Client Delivery/` boundary. Updated `Team Knowledge/Guidelines/INDEX.md` (new row, next-free-slot bump to GL-009), `Team/Cairn - Knowledge Intake Specialist/AGENTS.md` (§Method step 2, §Cross-references open-dependency note, §References), and both host shims (`.claude/agents/cairn.md`, `.codex/agents/cairn.toml`).
 20. **2026-07-11 — #1 (Knowledge Intake and Synthesis / Cairn) fully validated end-to-end, closing the "bounded v1" scope the user specified.** Cairn authored its own pilot-processing procedure, `SOP-015-cairn-process-external-source.md` (ten steps, structurally modeled on `SOP-010`, adding two things neither the contract nor GL-008 had specified: an explicit "does this earn a note" test extending backlink-justification discipline up to note-creation itself, and an explicit raw-source-provenance step), then ran it for real against a genuine pilot source — the same Hermes/AI-agent-tooling YouTube transcript the original Fusion247 Brain used for its own first CategorisAIr pilot. Result: correctly classified (Video/Audio Transcript per GL-008), enriched an existing Topic note (`PKM/My Life/Topics/ai-tooling.md`, also backfilling its pre-mandate-era missing frontmatter while already editing it) rather than reflexively creating five new entity notes for five passing mentions (Hermes, Nous Research, Jeffrey Carnell, "OpenClaw," Hostinger — all five reasoned through and explicitly rejected as note-worthy, with reasoning stated in the note itself), evidence-labeled every claim (including inventing an on-the-fly sub-distinction for "directly present but the source's own claim is unverified" that neither the contract nor SOP-015 anticipated), zero backlinks created since none earned their place, and two transcription-quality ambiguities (garbled auto-caption renderings of "Nous Research" and "OpenClaw") flagged and normalized transparently rather than silently guessed. **One real, unresolved gap surfaced, not silently patched:** general PKM intake has no equivalent of Warden's `Sources (Immutable)/` immutable-evidence folder — Cairn used a citation line as thinner-than-ideal provenance for v1 and flagged this explicitly to Silas via Larry as a real design question for a future pass, not a solved problem. This closes the "research brief → role and name → contract → runtime shims → canonical source-classification registry → minimum SOP → pilot validation" sequence the user specified in full. Adapter wiring (TubeAIR, ICOR notes) and the raw-source-provenance question remain explicitly open, deliberately not built this pass.
 - 2026-07-11 05:15 (larry) — Brought this log current after a session gap (see decisions 19-20): retroactively recorded `GL-009`/`GL-010`/`GL-011`/`Sources (Immutable)/`/`tsk-007`/`tsk-008`, which landed via PR #6 without an entry here — an unlogged-canonical-change gap, ironic given decision 20's subject. Approved and implemented Task 006 (content-integrity QA) in the same pass: Larry's automatic unlogged-change check + safe-corrective-boundary rule, plus new on-demand `SOP-017-content-integrity-audit` (Pax-owned). Built on the restarted `claude/agent-count-kdved6` branch, opened as PR #7 (not yet merged). `tsk-2026-07-10-006` closed. Cross-refs updated: added `SOP-017`, `GL-009`, `GL-010`, `GL-011`, and this session's log to frontmatter. Re-assessed this task's own `## Success criteria` against current state — all four are met (see next line); flagging the closure question to the user rather than closing unilaterally, since this task's actual scope grew well past its literal title to become the whole Fusion247-Brain-fold umbrella log, and CareerAIR (`tsk-004`)/AsdAIr (`tsk-005`) — both spawned under that umbrella — remain open.
+- 2026-07-11 05:35 (larry) — done: user confirmed closure. Verified all three substantive success criteria are met (GL-006 doctrine, Warden's never-fork-a-register rule, the four meeting-intelligence SOPs — all shipped in earlier sessions, unchanged since). Sub-tasks `tsk-004`/`tsk-005` (both `parent: tsk-2026-07-10-001`, both still `open`) continue independently per the user's explicit choice — not closed, not holding this parent open. Deliverable sharing check: `2026-07-10-project-implementation-specialist-hire-research` referenced only by this task — archived below.
+
+## Outcome
+
+What shipped: the full Fusion247 Brain doctrine-fold buildout this task tracked across two sessions and 20 logged decisions. Warden (Delivery Manager) hired and built out — `GL-006-client-delivery-frontmatter-conventions` (now v1.4: source-tier precedence, evidence/confidence/reread-flag fields, all six Fable-flagged artifact homes, hybrid Archive semantics), the never-fork-a-register/writer-never-self-verifies hard rule, and the five meeting-intelligence SOPs (`SOP-010`–`SOP-014`). Cairn (Knowledge Intake Specialist) hired and piloted end-to-end — `GL-008-source-classification-registry`, `SOP-015`/`SOP-016`, a real filed pilot source. `GL-009` (public/private knowledge boundary), `GL-010` (Warwick Knowledge Value Profile), and `GL-011` (immutable source retention, closing Cairn's own flagged raw-source-provenance gap) landed via the same PR #6. Task 006 (content-integrity QA — unlogged-change detection + safe-corrective boundaries in Larry's automatic pass, `SOP-017` for fabricated-reference/content-drift on-demand) approved and implemented on a fresh branch (PR #7) after PR #6 merged cleanly. Six original Migration Coverage Matrix follow-ups all dispositioned: #1 (Cairn) done, #2 (GL-007) done, #3 (GL-006 clarification) done, #4 (CareerAIR) and #5 (AsdAIr) continue as independent open tasks, #6 (this task's own Task 006) done.
+
+Where it lives: PR #4 (`d59871c`), PR #5 (`c47d659`), PR #6 (`26d7dfe`) — all merged to `main`. PR #7 (content-integrity QA) open at time of this close. Full decision-by-decision record in the `## Decisions log` section above (20 entries) and the `## Updates` section (this task's own body — the running record the user explicitly asked for at the start).
+
+Follow-ups: [[tsk-2026-07-10-004-careerair-migration-direction-decision]] and [[tsk-2026-07-10-005-asdair-retained-external-recommendation]] — both continue independently, no longer nested under this closed parent. Adapter wiring for Cairn (TubeAIR, ICOR notes) remains explicitly deferred, not tracked as a task yet.
+
+Lessons: [[2026-07-11-close-on-literal-criteria-not-accumulated-scope]] (journal) — a task closes on its own written success criteria, not on how much accumulated inside it.
+
+Archived deliverables: `2026-07-10-project-implementation-specialist-hire-research` → archived to `Deliverables/_archive/2026/07/2026-07-10-project-implementation-specialist-hire-research`.
