@@ -2,7 +2,7 @@
 agent_id: pax
 session_id: sop-018-round-3-fable-corrections-2026-07-11
 timestamp: 2026-07-11T19:00:00Z
-type: end-of-session
+type: close-session
 linked_sops: [SOP-018-independent-change-qa, SOP-017-content-integrity-audit, SOP-015-cairn-process-external-source, SOP-016-cairn-process-youtube-transcript]
 linked_workstreams: []
 linked_guidelines: [GL-011-immutable-source-retention, GL-009-public-private-knowledge-boundary, GL-002-frontmatter-conventions, GL-006-client-delivery-frontmatter-conventions]

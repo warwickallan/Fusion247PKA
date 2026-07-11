@@ -14,7 +14,7 @@ blocked_by: null
 
 # Time
 created: 2026-07-11T07:00:00Z
-updated: 2026-07-11T07:30:00Z
+updated: 2026-07-11T19:45:00Z
 due: null
 
 # Provenance
@@ -28,6 +28,7 @@ linked_sops:
   - SOP-015-cairn-process-external-source
   - SOP-016-cairn-process-youtube-transcript
   - SOP-017-content-integrity-audit
+  - SOP-018-independent-change-qa
   - SOP-007-audit-content-for-design-system-compliance
 linked_workstreams:
   - WS-004-team-retro-and-self-improvement-loop
@@ -36,23 +37,53 @@ linked_guidelines:
   - GL-009-public-private-knowledge-boundary
   - GL-010-warwick-knowledge-value-profile
   - GL-011-immutable-source-retention
-linked_my_life: []
+linked_my_life:
+  - ai-tooling
 linked_session_logs:
   - 2026-07-11-05-00_larry_content-integrity-qa-implementation
   - 2026-07-11-06-00_larry_migration-closure-audit
+  - 2026-07-11-04-30_cairn_hermes-transcript-pilot
+  - 2026-07-11-08-00_cairn_wanderloots-transcript-pilot
+  - 2026-07-11-10-20_pax_t009-t013-independent-qa-passes
+  - 2026-07-11-19-00_pax_sop-018-round-3-fable-corrections
+  - 2026-07-11-20-15_cairn_ai-tooling-fable-qa-fixes
 linked_journal_entries: []
 linked_deliverables:
   - 2026-07-11-migration-closure-audit
+  - 2026-07-11-independent-change-qa-doctrine-absorption
+  - 2026-07-11-08-00-t013-wanderloots-intake-disposition
+  - 2026-07-11-09-10-t009-hermes-content-integrity-audit
+  - 2026-07-11-09-30-t009-hermes-independent-change-qa
+  - 2026-07-11-09-50-t013-wanderloots-content-integrity-audit
+  - 2026-07-11-10-10-t013-wanderloots-independent-change-qa
 
 # Tagging
-tags: [tier-1-proposal, qa, sop-018, t009, t013, fusion247-brain, awaiting-approval]
+tags: [tier-1-proposal, qa, sop-018, t009, t013, fusion247-brain, awaiting-independent-review]
 ---
 
 # Absorb legacy independent-change QA doctrine (SOP-018) and close T009/T013 through evidence
 
+## Context one click away
+
+- Procedure: [[SOP-018-independent-change-qa]], [[SOP-017-content-integrity-audit]], [[SOP-015-cairn-process-external-source]], [[SOP-016-cairn-process-youtube-transcript]]
+- Guideline: [[GL-011-immutable-source-retention]], [[GL-010-warwick-knowledge-value-profile]], [[GL-009-public-private-knowledge-boundary]], [[GL-008-source-classification-registry]]
+- My Life context: [[ai-tooling]]
+- Working artifacts:
+  - [[2026-07-11-independent-change-qa-doctrine-absorption]] — doctrine-absorption matrix
+  - [[2026-07-11-08-00-t013-wanderloots-intake-disposition]] — T013 Cairn intake
+  - [[2026-07-11-09-10-t009-hermes-content-integrity-audit]] — T009 SOP-017 pass
+  - [[2026-07-11-09-30-t009-hermes-independent-change-qa]] — T009 SOP-018 pass
+  - [[2026-07-11-09-50-t013-wanderloots-content-integrity-audit]] — T013 SOP-017 pass
+  - [[2026-07-11-10-10-t013-wanderloots-independent-change-qa]] — T013 SOP-018 pass
+  - [[2026-07-11-migration-closure-audit]] — the PR #8 audit this task follows from
+- Birthed in: [[2026-07-11-05-00_larry_content-integrity-qa-implementation]], [[2026-07-11-06-00_larry_migration-closure-audit]]
+- Touched by: [[2026-07-11-04-30_cairn_hermes-transcript-pilot]], [[2026-07-11-08-00_cairn_wanderloots-transcript-pilot]], [[2026-07-11-10-20_pax_t009-t013-independent-qa-passes]], [[2026-07-11-19-00_pax_sop-018-round-3-fable-corrections]]
+
 ## What this is
 
-**This is a build plan, not yet the build.** Per Warwick's explicit instruction, this task captures the plan and scope for PR #9 so he can check it before any of it is executed. Nothing described below has been built yet except the two verifications noted in §Pre-work already done.
+**Current state, 2026-07-11 19:45 (superseding the "build plan, not yet the build" framing below):** the plan below was written and approved as plan-only on 2026-07-11 07:00-07:30. It has since been fully implemented, corrected across three external-review rounds, and pushed to PR #9 (current head SHA `e0ff628bc92edb2c762df0ebaf4aa1401b97a32c`, see the `## Updates` log for the full history). The section immediately below is preserved as the **original plan-at-creation record**, not the current implementation state — read the `## Updates` log for what has actually happened. This task remains **open**: T009, T013, this task, and the migration-closure audit are all still pending genuinely independent (non-Larry, non-Pax, non-Cairn) review before any of them close.
+
+**Original framing, preserved as history:** ~~This is a build plan, not yet the build.~~ Per Warwick's explicit instruction, this task captured the plan and scope for PR #9 so he could check it before any of it was executed. At the time this section was written, nothing described below had been built yet except the two verifications noted in §Pre-work already done.
 
 The migration closure audit (`Deliverables/2026-07-11-migration-closure-audit.md`) found that Fusion247 Brain had three QA layers, and Fusion247PKA has only cleanly re-expressed two of them:
 
