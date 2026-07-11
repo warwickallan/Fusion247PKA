@@ -30,6 +30,16 @@ The same underlying pattern shows up in both pilots independently: **each Cairn 
 - Did not touch the migration closure audit, did not mark T009/T013 closed anywhere, did not edit `tsk-2026-07-11-001`'s status or move it to `done/`, did not touch `Client Delivery/` or anything on the task's exclusion list.
 - No hashing/compute tool was available in my toolset this session — the two register `sha256` values cited in the T009/T013 reports were read and cited as recorded, never independently recomputed. Declared explicitly in each report rather than silently treated as verified.
 
+## Addendum (2026-07-11, added after external QA review by Fable, second round)
+
+The verdicts recorded in this log's numbered items above are now stale and should not be relied on as current:
+
+- **Item 2** (T009 independent-change report) recorded verdict "Pass with remedials." That was a direct violation of SOP-018's own Step 8 (never Pass while a Major finding is open) — two Majors were open at the time. The report has since been corrected twice in place: the Hermes-provenance finding was re-framed (it was never an imminent-loss risk; the real gap was a GL-011 porting gap, now closed by retroactively registering the source), and the `ai-tooling.md` citation finding was re-checked and found already fixed (this reviewer's own first correction attempt wrongly re-asserted it was still open; caught and fixed again). The report's verdict now reads **Fail pending independent confirmation** — not Pass, and not the original Fail-for-different-reasons either. See the report itself for the full reconciliation.
+- **Item 4** (T013 independent-change report) recorded verdict "Pass with remedials," same Step-8 violation (one Major open — the register `status: active` vs. GL-011 "malformed" wording ambiguity). That finding was correctly left open (it is a genuine Warwick/Silas policy call, not something to self-resolve), so the report's verdict is now **Fail pending remedials** — correctly, since a real Major finding is still open there.
+- Items 1 and 3 (the two SOP-017 content-integrity reports) are unaffected — SOP-017 has no Pass/Fail verdict mechanism, so no correction was needed there. Item 3's duplicate-count figure ("roughly fifteen" vs. the now-precisely-parsed 11) and item 3's undisclosed "zealcasting"→"zettelkasting" normalization were independently corrected by Cairn in the linked T013 intake report, not in this SOP-017 report itself.
+
+None of this changes what's recorded in "Files touched" below — no new files were created for this addendum, only in-place corrections to existing reports plus this log entry. T009 and T013 both remain open, un-closed, pending the same genuinely independent (non-Larry, non-Pax, non-Cairn) review this log's original body already called for.
+
 ## Files touched
 
 - `Deliverables/2026-07-11-09-10-t009-hermes-content-integrity-audit.md` — new.
