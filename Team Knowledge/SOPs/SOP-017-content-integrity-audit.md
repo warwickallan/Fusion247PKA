@@ -79,15 +79,17 @@ A file can carry multiple findings; its overall severity is its highest single f
 
 ### Step 5 — Write the audit report
 
-Destination depends on the Step 0 classification:
+Destination depends on the Step 0 classification. Filename includes a time and scope segment (`HH-MM-<scope>`, added 2026-07-11) — a bare date collides and silently overwrites evidence whenever two audits run the same day, which is routine once this SOP is used more than once per session:
 
-- **Public-only scope:** `Deliverables/YYYY-MM-DD-content-integrity-audit.md` — tracked, as before.
-- **Private or mixed scope:** `PKM/My Life/Current Context/audits/YYYY-MM-DD-content-integrity-audit.md` — inside the same folder GL-009/GL-010 already keep local-only and gitignored (`PKM/My Life/Current Context/`), never committed. Because this destination never leaves the local machine, the report may quote and detail the private material in full — the privacy protection is the file's location, not a redacted version of its content.
+- **Public-only scope:** `Deliverables/YYYY-MM-DD-HH-MM-<scope>-content-integrity-audit.md` — tracked, as before.
+- **Private or mixed scope:** `PKM/My Life/Current Context/audits/YYYY-MM-DD-HH-MM-<scope>-content-integrity-audit.md` — inside the same folder GL-009/GL-010 already keep local-only and gitignored (`PKM/My Life/Current Context/`), never committed. Because this destination never leaves the local machine, the report may quote and detail the private material in full — the privacy protection is the file's location, not a redacted version of its content.
+
+`<scope>` is a short kebab-case label for what was audited (e.g. `hermes-pilot`, `wanderloots-intake`) — enough to tell two same-day reports apart at a glance, not a full description.
 
 Structure (same shape regardless of destination):
 
 ```markdown
-# Content-Integrity Audit — YYYY-MM-DD
+# Content-Integrity Audit — YYYY-MM-DD HH:MM — <scope>
 
 ## Scope
 - <files/folders/date-range audited>
