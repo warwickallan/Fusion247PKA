@@ -47,7 +47,7 @@ tags:
 - Specific competitive claims — "fastest growing project on GitHub," "took first place in OpenRouter token usage, surpassing OpenClaw," and "no security incidents to date" versus the competitor's "numerous CVEs" in its skill marketplace. *Directly present source assertions whose truth is unverified.* Do not relabel these as reconstructed if repeated later; keep the distinction clear by writing "the video asserts this" unless Pax independently verifies the claims.
 - **Evidence caveat (my own observation, not sourced from the transcript's factual content):** the video explicitly states it is sponsored by **Hostinger** ("the sponsor of this video," recommended as the hosting/VPS provider for installing Hermes). A sponsored video reviewing a tool favorably is a real conflict-of-interest signal worth holding onto when weighing the comparative claims above.
 
-**Entities considered and *not* created, with reasoning (per SOP-015 §5):**
+**Entities considered and *not* created, with reasoning (per SOP-015 §6, "does this earn a note" test):**
 
 - **Hermes (the tool):** no new note — none of GL-002's eight entity types fit a software product. Folded into this Topic as narrative instead.
 - **Nous Research (maker company):** no new Organization note. `PKM/CRM/Organizations/` is scoped to organizations the user actually interacts with; this is a company learned about secondhand via one video, not a vendor/employer/partner relationship.
