@@ -8,13 +8,13 @@ assignee: silas
 priority: 1
 
 # Status (mirrors folder location)
-status: in-progress
+status: done
 blocked_reason: null
 blocked_by: null
 
 # Time
 created: 2026-07-12T19:30:00Z
-updated: 2026-07-12T20:00:00Z
+updated: 2026-07-12T22:00:00Z
 due: null
 
 # Provenance
@@ -105,5 +105,16 @@ Build one synthetic Engagement under `Client Delivery/` with:
 - 2026-07-12 19:30 (larry) — created, per Warwick's explicit authorization scoped to GitHub issue #16 only. Dispatching to Silas with instruction to read GL-006 and Warden's SOPs directly rather than relying on this task's summary.
 - 2026-07-12 20:00 (larry) — Silas delivered the synthetic engagement (`Client Delivery/meridian-pos-modernisation/`). Verified directly, not on Silas's summary alone: read the Engagement note, the write-and-verification demo item (reg-002), the Action-mapping demo (reg-004), the Milestone-workaround demo (wp-003), and the Sources index in full; confirmed GL-006/SOP-002/Cockpit untouched via `git status`; re-ran the zero-real-data grep myself across every created file (one legitimate hit found — meta-commentary in the session log naming the real engagement's approved code, `NPL`, in a methodology comparison, not client data — left as-is per GL-006 v1.5's own naming-convention ruling that the code itself is not sensitive). Quality is genuinely high: every workaround is concretely demonstrated with specific evidence, not asserted abstractly, and every hard boundary (no GL-006 edit, no ad-hoc frontmatter keys, no SQLite/Cockpit touch, no real NPL data, no issue #17 decision) was respected, including one place (reg-002) where Silas started to add an ad-hoc `created_by`/`reviewed_by` field, caught itself against its own no-invented-keys rule and this task's boundary, and backed out — documenting the attempt in prose instead. Committed; PR being opened against issue #16 next.
 
+- 2026-07-12 22:00 (larry) — done: PR #18 merged (merge commit `6797b1d35245530d33c29ec3f6615fdbd6093eac`) following Warwick's explicit merge authorization ("I approve Grok's review as my sign off"). Verified directly before and after merge: PR #18's head SHA (`cab9a028e54880a1869218ec2577b610b273e6bf`) confirmed unchanged from what the review cited, `mergeable_state: clean`, 24 files, no drift; issue #16 confirmed auto-closed (`state_reason: completed`); issue #17 confirmed still open, untouched, unauthorized.
+
 ## Outcome
-_(filled when status flips to done — see SOP-close-task)_
+
+What shipped: the synthetic Client Delivery engagement (`Client Delivery/meridian-pos-modernisation/`) validating GL-006's schema and Warden's SOPs against a worked example — merged via PR #18. Concrete findings on Actions, Milestones, Open Questions, Configuration Changes, and the write-and-verification gap are now in the repo, ready for issue #17 to weigh. This resolves the confirmed merge blocker `tsk-2026-07-11-002` tracked since 2026-07-11.
+
+Where it lives: merge commit [[6797b1d35245530d33c29ec3f6615fdbd6093eac]] on `main`. Session log: [[2026-07-12-19-30_silas_synthetic-client-delivery-engagement-proof]]. GitHub issue #16 (closed). ClickUp task `869e3mw1z`.
+
+Follow-ups: issue #17 (schema decision) — remains open, unauthorized, explicitly not started by this task. Depends on Warwick's separate explicit authorization.
+
+Lessons: none requiring a new journal entry — the review-authorization pattern (unverified chat claim + Warwick's own explicit words as the actual authorization) is a one-off worth remembering in context, not a durable process change.
+
+Archived deliverables: `2026-07-12-client-delivery-operational-schema-evaluation` — archive still deferred; still referenced by `tsk-2026-07-11-002`'s `linked_deliverables`.

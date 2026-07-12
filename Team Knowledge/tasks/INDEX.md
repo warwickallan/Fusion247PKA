@@ -2,19 +2,18 @@
 
 _Auto-generated. Do not edit by hand. Run `SOP-rebuild-task-index` to regenerate._
 
-_Last rebuilt: 2026-07-12T13:30:00Z_
+_Last rebuilt: 2026-07-12T22:00:00Z_
 
 ## Summary
 - Open: 3
 - In progress: 0 (0 blocked)
-- Done (this month): 8
+- Done (this month): 9
 - Cancelled (this month): 0
 
 ## Open (3)
 
 ### Priority 3 — normal
 - [[tsk-2026-07-11-002-migration-closure-audit-remaining-blockers]] — Track migration-closure-audit's remaining blockers and Warwick decisions — assignee: larry — created 2026-07-11
-  - parent: [[tsk-2026-07-11-001-absorb-independent-change-qa-doctrine]] (done)
 
 ### Priority 4 — low
 - [[tsk-2026-07-10-004-careerair-migration-direction-decision]] — Direction decision: CareerAIR migration scope — assignee: unassigned — created 2026-07-10 — deprioritized 2026-07-11
@@ -31,6 +30,7 @@ _none_
 - unassigned: 2 open, 0 in-progress (0 blocked)
 
 ## Recently closed (last 7 days)
+- 2026-07-12 [[tsk-2026-07-12-002-synthetic-client-delivery-engagement-proof]] — done — larry
 - 2026-07-12 [[tsk-2026-07-12-001-evaluate-client-delivery-operational-schema-gap]] — done — larry
 - 2026-07-11 [[tsk-2026-07-11-001-absorb-independent-change-qa-doctrine]] — done — larry
 - 2026-07-11 [[tsk-2026-07-10-001-fold-fusion247-brain-doctrine-into-warden]] — done — larry

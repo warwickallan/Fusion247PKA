@@ -14,7 +14,7 @@ blocked_by: null
 
 # Time
 created: 2026-07-11T22:00:00Z
-updated: 2026-07-12T14:30:00Z
+updated: 2026-07-12T22:00:00Z
 due: null
 
 # Provenance
@@ -66,8 +66,8 @@ This task does not attempt to resolve any of the items below. It exists to hold 
 
 **Confirmed merge blockers:**
 - Final Drive read-only/historical handover disposition — never decided.
-- One real or synthetic `Client Delivery/` engagement to validate GL-006/Warden's schema (the B9 Phase 3 / GL-F247-001 validation gate).
-- Implementation Plan Phase 5's acceptance-criterion-4 failure — substantially the same underlying gap as the item above.
+- ~~One real or synthetic `Client Delivery/` engagement to validate GL-006/Warden's schema (the B9 Phase 3 / GL-F247-001 validation gate).~~ **Resolved 2026-07-12** — [[tsk-2026-07-12-002-synthetic-client-delivery-engagement-proof]] built and merged the synthetic engagement (PR #18, merge commit `6797b1d35245530d33c29ec3f6615fdbd6093eac`). See that task's `## Outcome` for full detail.
+- Implementation Plan Phase 5's acceptance-criterion-4 failure — substantially the same underlying gap as the item above, **very likely also satisfied by the same proof**, but not independently re-checked against that specific acceptance criterion's exact wording — confirm before striking this one through too.
 
 **Warwick decisions required (not yet blockers, not yet roadmap):**
 - F247-T024 — does Warden need a formal engagement-intake SOP?
@@ -75,7 +75,7 @@ This task does not attempt to resolve any of the items below. It exists to hold 
 - F247-T029 — does `build.icor.md`/Addendum A/B's provenance need a Git-side record?
 - Whether `lessons` (and possibly `dependency`) should be added to `GL-006`'s Register Item `kind` enum.
 - **New, surfaced by [[tsk-2026-07-11-001-absorb-independent-change-qa-doctrine]]'s closure (deferred, not implemented, per that task's own round-4 correction):** whether session-log frontmatter needs a `model`/`runtime` field distinct from the existing `agent_id` (specialist-persona) field, so metadata can eventually name the actual underlying model/runtime that processed a source — currently invisible because every specialist in this repo shares one underlying model. See [[2026-07-11-independent-change-qa-doctrine-absorption]] row #37 (`open-follow-up-gap`). This is a schema decision for Silas (frontmatter owner) and Warwick, not something to implement unilaterally.
-- **New, per [[2026-07-12-client-delivery-operational-schema-evaluation]] (IDEA-003 evaluation, `tsk-2026-07-12-001`):** whether to authorize a scoped Register Item write-and-verification metadata addition (`created_by`/`review_status`/`reviewed_by`/`reviewed_date`, or a standalone entity) — the evaluation's recommended smallest-useful-next-proof, closing GL-006's own already-documented "Known gaps" #1. Depends on the same synthetic/real engagement gate this task already tracks above. Not yet authorized; not built.
+- **New, per [[2026-07-12-client-delivery-operational-schema-evaluation]] (IDEA-003 evaluation, `tsk-2026-07-12-001`):** whether to authorize a scoped Register Item write-and-verification metadata addition (`created_by`/`review_status`/`reviewed_by`/`reviewed_date`, or a standalone entity) — the evaluation's recommended smallest-useful-next-proof, closing GL-006's own already-documented "Known gaps" #1. Its precondition (a synthetic/real engagement to test against) is now satisfied — see the resolved item above — but the decision itself remains tracked separately as GitHub issue #17, **not yet authorized**.
 
 **Explicitly not blockers (roadmap or external-input-blocked, tracked for completeness only, not chased here):**
 CareerAIR (`tsk-2026-07-10-004`), AsdAIr (`tsk-2026-07-10-005`), TubeAIR capture adapter, ICOR course-note adapter + business-domain naming, ClickUp/Withings/calendar connectors, raw ChatGPT export + WS-002 import (blocked on Warwick exporting the material).
@@ -100,6 +100,8 @@ This task has no single "done" state by design — it's a tracking placeholder, 
 
 - 2026-07-12 13:30 (larry) — PR #10 merged (`6390e903e7b44958a7398c85615933a6bb549218`); [[tsk-2026-07-12-001-evaluate-client-delivery-operational-schema-gap]] closed done. No change to this task's own tracked blockers/decisions above — the synthetic/redacted `Client Delivery/` engagement remains the confirmed merge blocker and the required precondition for the evaluation's recommended write-and-verification proof; neither is authorized or started.
 - 2026-07-12 14:30 (larry) — Fusion delivery now also tracked visually in ClickUp (Workspace → Team Space → Folder `IDEA-003 — Client Delivery operating layer` → List `WP1 — Schema and synthetic validation`). This task's two open blockers are mirrored there as ClickUp tasks: the synthetic/redacted engagement proof (https://app.clickup.com/t/869e3mw1z, status `to do`, not authorized) and the later schema-acceptance decision (https://app.clickup.com/t/869e3mw29, status `to do`, blocked on the proof above). ClickUp is operational/visual tracking only — this task file remains the durable decision record; GitHub's merged state and this file win if the two ever disagree.
+
+- 2026-07-12 22:00 (larry) — **A confirmed merge blocker is resolved.** PR #18 (synthetic Client Delivery engagement, [[tsk-2026-07-12-002-synthetic-client-delivery-engagement-proof]]) merged following Warwick's explicit authorization. The "one real or synthetic engagement" blocker above is struck through. This task stays open — the Drive handover disposition and several Warwick decisions remain, and the schema-acceptance decision the new proof enables (GitHub issue #17) is tracked separately and still unauthorized.
 
 ## Outcome
 _(filled when status flips to done — see SOP-close-task)_
