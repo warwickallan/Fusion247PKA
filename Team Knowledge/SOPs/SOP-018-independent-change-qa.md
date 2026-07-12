@@ -1,6 +1,6 @@
 # SOP: Independent Change QA
 
-- **Status:** Active (since 2026-07-11; amended 2026-07-11, round 3, per external QA (Fable) corrections — see [[Deliverables/2026-07-11-independent-change-qa-doctrine-absorption]] rows #28-#38 for the specific additions this amendment implements).
+- **Status:** Active (since 2026-07-11; amended 2026-07-11, round 3, per external QA (Fable) corrections — see [[Deliverables/2026-07-11-independent-change-qa-doctrine-absorption]] rows #28-#38 for the specific additions this amendment implements; amended 2026-07-12 per Warwick's direct operating-improvement directive, adding §"Multi-round and repeated-review discipline" — adopted after PR #10's six-round IDEA-003 evaluation review showed the anti-pattern directly: repeated full-PR re-narration, mechanical-only rounds treated as full review cycles, and no delta-review path).
 - **Default owner:** Pax, when Larry scopes the request. **This SOP does not create a new specialist.** It is a skill — the portable successor to Fusion247 Brain's old `/update QA` skill — not a permanent agent, and any specialist can run it when they need to independently verify what was claimed vs. what was actually built.
 - **Reusable by any agent.** Larry scopes the request (the review window, the control set in scope, who authored the change under review); Pax is the default evidence/methodology owner because this is the same triangulation-over-trust discipline as his other work, applied to "did the build match the claim" instead of "is this claim true." Any agent can invoke this procedure directly when they need to check their own or another agent's work before it's treated as settled.
 - **Triggered by:** "QA the recent changes," "independently verify what changed," "check this before I merge/accept it," "compare what was requested with what was actually built," "did the build match the claim," a migration or build PR that's about to be treated as complete, a task closure that depends on evidence rather than a clean task board.
@@ -110,6 +110,8 @@ Check the literal output (from Step 5) and the three-way comparison (from Step 2
 
 A single reviewed change can carry findings across several tiers; report each at its own severity rather than averaging.
 
+**What actually blocks a Pass.** A finding is Critical or Major — and therefore blocks merge/Pass — only if it concerns **behaviour, architecture, privacy, data integrity, authority, acceptance criteria, or a material cross-file inconsistency**. Everything else (wording, heading levels, timestamp drift, a missing backlink, formatting) is Minor, Observation, or Improvement opportunity, regardless of how many instances are found or how confidently they're raised. Do not let a long list of non-blocking items read as if it collectively justifies a blocking verdict.
+
 ### Step 8 — Render the verdict
 
 One of: **Pass** / **Pass with observations** / **Pass with remedials** / **Fail.** State it plainly, next to the reviewer-independence declaration from §Reviewer independence. Never render a Pass of any kind while a Critical or Major finding remains unresolved — that is the exact failure this SOP exists to prevent ("never declare the system clean while unresolved material findings remain"). Report-only by default: this SOP does not delete, archive, change schema, or rewrite a boundary itself, regardless of verdict — remedials are proposed, with an owner and a priority, for Warwick's explicit approval.
@@ -182,6 +184,15 @@ Present the report via Larry. Findings are proposed remedials with an owner and 
 
 Write `Team Knowledge/session-logs/YYYY/MM/YYYY-MM-DD-HH-MM_<agent>_independent-change-qa.md`, always tracked/public, following the same public-only vs. private-or-mixed content rules SOP-017's Step 7 already established: a normal detailed entry for public-only scope; an abstract record only (date, that a private-or-mixed review ran, finding counts by severity, independence level) for private-or-mixed scope, with no quoted content.
 
+## Multi-round and repeated-review discipline
+
+Applies whenever the same change, PR, or task gets reviewed more than once (a second Fable pass, Warwick's own follow-up review, a re-review after fixes land).
+
+- **Delta review by default.** After the first full review, a later round diffs the new commit(s) against the last-reviewed SHA and reviews only what changed — it does not repeat Step 2's three-way comparison or Step 6's full checklist against the entire PR again. Fall back to a full re-review only if scope materially changed since the last review (a new file entered the control set, an architectural question reopened, or the change is large enough that delta review alone can't establish confidence).
+- **Once substantive approval is reached, do not reopen it without genuinely new evidence.** A verdict on the architecture/decision itself (not the mechanical details) stands once rendered. A later round that finds only non-blocking items (see "What actually blocks a Pass" above) does not relitigate the approved substance — it bundles every remaining non-blocking item into **one** cleanup pass, applied together, rather than spawning a new full review round per item.
+- **Record corrections in a table, not a new prose narrative.** For any change reviewed across multiple rounds, keep one compact table — `round | finding | disposition | commit SHA` — appended to the task file or session log. Do not write a new paragraph each round that re-explains what happened in every prior round; that's how a session log balloons from a few lines to page after page for a single small change without adding proportional value.
+- **Session logs are preserved, not rewritten — but stop treating them as current operating context once the work closes.** Never delete or rewrite historical session-log content; it stays as the record. But once a task/PR closes, do not carry its full blow-by-blow log forward as something a future session needs to re-read to operate. Write one concise closure/current-state summary (a few lines: what shipped, current state, open follow-ups) and rely on git history for the detailed change-by-change record. A future session consults the full log only when specifically investigating that history, not as routine context.
+
 ## Common mistakes to avoid
 
 - **Overclaiming independence.** Running this SOP inside the same session that authored the change and reporting it as "independent QA" without the required verbatim disclosure. This is the single most damaging mistake this SOP exists to prevent.
@@ -194,3 +205,6 @@ Write `Team Knowledge/session-logs/YYYY/MM/YYYY-MM-DD-HH-MM_<agent>_independent-
 - **Auto-fixing a finding.** Report, classify, recommend. Warwick decides; the file's own owner applies any approved fix.
 - **Skipping the reviewer-independence declaration entirely.** Every report states it, even when the answer is "same-model."
 - **Treating "recent changes" as a scope you can guess at.** Use the Step 1 fallback (recent QA/session boundary → 48-hour git-log window → git history/task/session-log resolution → declared uncertainty) rather than assuming you already know what "recent" covers.
+- **Reopening approved architecture on a later round without new evidence.** If the substance was already approved, a later round finding only non-blocking items does not get to relitigate it — see "Multi-round and repeated-review discipline" above.
+- **Re-reviewing the whole PR from scratch on every round instead of the delta since the last-reviewed SHA.** Costs real time and tokens for no proportional gain once the first full review has already happened.
+- **Re-narrating every prior round in prose each time a session log or task file is updated.** Use the correction table, not a new paragraph of history.

@@ -2,19 +2,24 @@
 
 _Auto-generated. Do not edit by hand. Run `SOP-rebuild-task-index` to regenerate._
 
-_Last rebuilt: 2026-07-11T22:00:00Z_
+_Last rebuilt: 2026-07-12T09:00:00Z_
 
 ## Summary
-- Open: 3
+- Open: 4
 - In progress: 0 (0 blocked)
 - Done (this month): 7
 - Cancelled (this month): 0
 
-## Open (3)
+## Open (4)
+
+### Priority 2 — high
+- [[tsk-2026-07-12-001-evaluate-client-delivery-operational-schema-gap]] — Evaluate the Client Delivery operational schema and query-layer gap surfaced by IDEA-003 — assignee: silas — created 2026-07-12
+  - parent: [[tsk-2026-07-11-002-migration-closure-audit-remaining-blockers]]
 
 ### Priority 3 — normal
 - [[tsk-2026-07-11-002-migration-closure-audit-remaining-blockers]] — Track migration-closure-audit's remaining blockers and Warwick decisions — assignee: larry — created 2026-07-11
   - parent: [[tsk-2026-07-11-001-absorb-independent-change-qa-doctrine]] (done)
+  - sub: [[tsk-2026-07-12-001-evaluate-client-delivery-operational-schema-gap]] — assignee: silas
 
 ### Priority 4 — low
 - [[tsk-2026-07-10-004-careerair-migration-direction-decision]] — Direction decision: CareerAIR migration scope — assignee: unassigned — created 2026-07-10 — deprioritized 2026-07-11
@@ -26,7 +31,7 @@ _none_
 ## By assignee
 - larry: 1 open, 0 in-progress (0 blocked)
 - warden: 0 open, 0 in-progress (0 blocked)
-- silas: 0 open, 0 in-progress (0 blocked)
+- silas: 1 open, 0 in-progress (0 blocked)
 - pax: 0 open, 0 in-progress (0 blocked)
 - unassigned: 2 open, 0 in-progress (0 blocked)
 
