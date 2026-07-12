@@ -111,7 +111,7 @@ Build one synthetic Engagement under `Client Delivery/` with:
 
 What shipped: the synthetic Client Delivery engagement (`Client Delivery/meridian-pos-modernisation/`) validating GL-006's schema and Warden's SOPs against a worked example — merged via PR #18. Concrete findings on Actions, Milestones, Open Questions, Configuration Changes, and the write-and-verification gap are now in the repo, ready for issue #17 to weigh. This resolves the confirmed merge blocker `tsk-2026-07-11-002` tracked since 2026-07-11.
 
-Where it lives: merge commit [[6797b1d35245530d33c29ec3f6615fdbd6093eac]] on `main`. Session log: [[2026-07-12-19-30_silas_synthetic-client-delivery-engagement-proof]]. GitHub issue #16 (closed). ClickUp task `869e3mw1z`.
+Where it lives: merge commit `6797b1d35245530d33c29ec3f6615fdbd6093eac` on `main`. Session log: [[2026-07-12-19-30_silas_synthetic-client-delivery-engagement-proof]]. GitHub issue #16 (closed). ClickUp task `869e3mw1z`.
 
 Follow-ups: issue #17 (schema decision) — remains open, unauthorized, explicitly not started by this task. Depends on Warwick's separate explicit authorization.
 
