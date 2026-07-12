@@ -96,7 +96,7 @@ Assessed against the same evidence base — GL-006's actual current shape, Warde
 - *Phone-access (settled, not open — see §4b).* Phone access is settled as a non-requirement for BRK-001 Client Delivery (Warwick's decision, §4b and §7 item 6). This option's phone-friendliness is therefore not a distinguishing factor either way — a Sheets/CSV export would earn its cost (or not) purely on human-scannability grounds, independent of any phone-access consideration.
 - *Verdict:* Plausible, but strictly less proven and less immediately useful than (b) given no live pain point about human-scannability has actually been reported for `Client Delivery/` yet (the operational gaps in §2 are LLM-retrieval-ergonomics and write-verification gaps, not "the PM can't read a Markdown file" gaps). Worth naming as a real fourth option rather than a straw man, but not the one this evaluation would spend the first proof on.
 
-## 4A. Capability distinction: Viewable / Retrievable / Actionable
+### 4A. Capability distinction: Viewable / Retrievable / Actionable
 
 A framing Warwick has introduced directly, in his own terms, that this evaluation adopts as-is because it clarifies exactly what §4's options each get closer to, and what none of them get to yet:
 
@@ -110,7 +110,7 @@ A framing Warwick has introduced directly, in his own terms, that this evaluatio
 
 Connecting this to §6 explicitly: §6's recommended next proof (Register Item write-and-verification metadata, tested against a synthetic engagement) is squarely a **Retrievable**-adjacent, schema-only step — it makes the right facts exist and be machine-checkable, nothing more. **Actionable is out of scope for anything in this evaluation or its recommended next proof.** No write-path, no controlled-write layer, no UI mutation is proposed, recommended, or implied anywhere in this document.
 
-## 4B. Hosted database alternatives (Warwick's settled framing, recorded not re-derived)
+### 4B. Hosted database alternatives (Warwick's settled framing, recorded not re-derived)
 
 This is a recommendation Warwick has already made; it is recorded here, not re-derived:
 

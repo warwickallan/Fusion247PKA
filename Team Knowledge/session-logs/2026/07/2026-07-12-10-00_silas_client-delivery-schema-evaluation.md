@@ -71,7 +71,7 @@ Fable reviewed PR #10 at head `a967cb5720fed4bd8f592135642e03ed3cca2f6c` and ret
 4. **Sources SSOT framing corrected:** §7 item 7 no longer frames the register-ownership split as an open three-way question — GL-011 line 25 already settles it (per-engagement GL-006 register is Client Delivery's own, no mirroring by default). The real open question, now stated narrower: whether/how to enrich the per-engagement Sources index with stable ID, acquisition/hash, and processing metadata without duplicating SSOT; using the global register for Client-Delivery material would need an explicit future GL-011 policy change. §3's Sources row closing sentence updated to match, for internal consistency.
 5. **Meeting Metadata disposition corrected:** changed from `merge` to `insufficient evidence` in §3. Removed the overclaim that the Sources sheet already has "exactly the attendee/date/type shape" — the sanitized abstraction shows no attendee-identity column, and a meeting-to-sources cardinality question (one meeting, possibly many source records) was left untested. Recommends testing date/duration/type-only adaptation against the synthetic worked-example engagement before choosing Sources-adaptation vs. a standalone Meeting entity.
 
-No GL-006/SQLite/Cockpit/schema edit, no engagement created, no six-task fan-out, no NPL migration. This task and `tsk-2026-07-11-002` both stay open.
+No GL-006/SQLite/Cockpit/schema edit, no engagement created, no six-task fan-out, no BRK-001 migration. This task and `tsk-2026-07-11-002` both stay open.
 
 ## What the next agent should know
 
