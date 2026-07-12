@@ -14,7 +14,7 @@ blocked_by: null
 
 # Time
 created: 2026-07-12T19:30:00Z
-updated: 2026-07-12T19:30:00Z
+updated: 2026-07-12T20:00:00Z
 due: null
 
 # Provenance
@@ -36,7 +36,8 @@ linked_guidelines:
   - GL-006-client-delivery-frontmatter-conventions
   - GL-009-public-private-knowledge-boundary
 linked_my_life: []
-linked_session_logs: []
+linked_session_logs:
+  - 2026-07-12-19-30_silas_synthetic-client-delivery-engagement-proof
 linked_journal_entries: []
 linked_deliverables:
   - 2026-07-12-client-delivery-operational-schema-evaluation
@@ -53,6 +54,8 @@ tags: [client-delivery, warden, schema, synthetic-engagement, idea-003, wp1, gl-
 - Guideline: [[GL-006-client-delivery-frontmatter-conventions]], [[GL-009-public-private-knowledge-boundary]]
 - Working artifacts:
   - [[2026-07-12-client-delivery-operational-schema-evaluation]] — the evaluation this proof directly tests (§6's recommended next proof, in substance; this task builds the synthetic engagement §8 said the whole recommendation depends on)
+  - `Client Delivery/meridian-pos-modernisation/` — the synthetic engagement itself (fictional "Meridian Retail Group"/"Meridian POS Modernisation," code `MRG-POS-001`; one Engagement, three Work Packages, five Register Items covering all four kinds, three synthetic Sources + Evidence Packs)
+- Touched by: [[2026-07-12-19-30_silas_synthetic-client-delivery-engagement-proof]]
 - Parent: [[tsk-2026-07-11-002-migration-closure-audit-remaining-blockers]] — this task resolves that task's long-tracked "confirmed merge blocker": one real or synthetic `Client Delivery/` engagement to validate GL-006/Warden's schema.
 - GitHub: issue #16 (`[IDEA-003][WP1] Synthetic/redacted Client Delivery engagement proof`), tracked via `fusion-build`/`idea-003`/`wp-01`/`type-delivery` labels; branch `idea-003/wp1/869e3mw1z-synthetic-engagement-proof`.
 - ClickUp: task `869e3mw1z` (list WP1, folder IDEA-003).
@@ -100,6 +103,7 @@ Build one synthetic Engagement under `Client Delivery/` with:
 ## Updates
 
 - 2026-07-12 19:30 (larry) — created, per Warwick's explicit authorization scoped to GitHub issue #16 only. Dispatching to Silas with instruction to read GL-006 and Warden's SOPs directly rather than relying on this task's summary.
+- 2026-07-12 20:00 (larry) — Silas delivered the synthetic engagement (`Client Delivery/meridian-pos-modernisation/`). Verified directly, not on Silas's summary alone: read the Engagement note, the write-and-verification demo item (reg-002), the Action-mapping demo (reg-004), the Milestone-workaround demo (wp-003), and the Sources index in full; confirmed GL-006/SOP-002/Cockpit untouched via `git status`; re-ran the zero-real-data grep myself across every created file (one legitimate hit found — meta-commentary in the session log naming the real engagement's approved code, `NPL`, in a methodology comparison, not client data — left as-is per GL-006 v1.5's own naming-convention ruling that the code itself is not sensitive). Quality is genuinely high: every workaround is concretely demonstrated with specific evidence, not asserted abstractly, and every hard boundary (no GL-006 edit, no ad-hoc frontmatter keys, no SQLite/Cockpit touch, no real NPL data, no issue #17 decision) was respected, including one place (reg-002) where Silas started to add an ad-hoc `created_by`/`reviewed_by` field, caught itself against its own no-invented-keys rule and this task's boundary, and backed out — documenting the attempt in prose instead. Committed; PR being opened against issue #16 next.
 
 ## Outcome
 _(filled when status flips to done — see SOP-close-task)_
