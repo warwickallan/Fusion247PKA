@@ -14,7 +14,7 @@ blocked_by: null
 
 # Time
 created: 2026-07-12T09:00:00Z
-updated: 2026-07-12T09:00:00Z
+updated: 2026-07-12T10:30:00Z
 due: null
 
 # Provenance
@@ -72,14 +72,14 @@ A substantial design document about operational project registers (`Fusion247 Br
 ## Required evaluation (what the assignee must independently review, not accept on the brief's word)
 
 - The original missed "Sheets" document (`Fusion247 Brain/01_Inbox/Inbox Unsorted/Sheets.docx` in the local `fusion247brain` git mirror).
-- The live NPL workbook structure and field schemas — **use the sanitized structural abstraction already extracted** (sheet names, column headers, row counts only, no client data values) rather than opening the raw `.xlsx` files directly. Ask Larry for this abstraction if not already supplied.
+- The live BRK-001 workbook structure and field schemas — **use the sanitized structural abstraction already extracted** (sheet names, column headers, row counts only, no client data values) rather than opening the raw `.xlsx` files directly. Ask Larry for this abstraction if not already supplied.
 - The original and reframed IDEA-003 documents in Drive (`Fusion247Foundry/ideas/IDEA-003-sheets-vs-flat-markdown-project-registers/`) — read directly, do not take Larry's summary as complete.
 - `GL-006-client-delivery-frontmatter-conventions.md` and its own documented gaps (§"Known gaps", §"Future extension candidates").
 - `SOP-010` through `SOP-014` — particularly where Actions or other unbuilt entity types are currently inferred via workarounds (e.g. SOP-010/011's existing "action = a decision Register Item's own follow-through" mapping).
 - The existing SQLite regeneration architecture (`SOP-002-convert-mypka-to-sqlite`) and the Cockpit's data contract (`Expansions/mypka-cockpit/`).
 - `Deliverables/2026-07-11-migration-closure-audit.md` and its active successor, [[tsk-2026-07-11-002-migration-closure-audit-remaining-blockers]].
 
-Do not accept the Foundry's proposed answer merely because it is written confidently. Distinguish, throughout: (1) confirmed requirements actually demonstrated by real NPL usage; (2) genuine gaps in the current production model; (3) useful principles worth retaining regardless of which architecture wins; (4) assumptions or premature design choices in the Foundry material; (5) candidate future capabilities that have not yet earned implementation.
+Do not accept the Foundry's proposed answer merely because it is written confidently. Distinguish, throughout: (1) confirmed requirements actually demonstrated by real BRK-001 usage; (2) genuine gaps in the current production model; (3) useful principles worth retaining regardless of which architecture wins; (4) assumptions or premature design choices in the Foundry material; (5) candidate future capabilities that have not yet earned implementation.
 
 ## Required output — one evaluation document, not an implementation plan
 
@@ -87,7 +87,7 @@ Write `Deliverables/2026-07-12-client-delivery-operational-schema-evaluation.md`
 
 1. **Verified current state** — what GL-006, Client Delivery, SQLite, and Cockpit actually support today.
 2. **Confirmed operational gaps** — which record types or retrieval needs are genuinely unsupported or poorly represented.
-3. **Schema-level reconciliation** — at entity level, assess Actions, Configuration Changes, Questions, Milestones, Meetings, Sources, Uncertainty, and any other live NPL types using exactly one of: retain / adapt / add / merge / reject / insufficient evidence.
+3. **Schema-level reconciliation** — at entity level, assess Actions, Configuration Changes, Questions, Milestones, Meetings, Sources, Uncertainty, and any other live BRK-001 types using exactly one of: retain / adapt / add / merge / reject / insufficient evidence.
 4. **Architecture options** — fairly assess at least: (a) current structured Markdown with no dedicated query mirror; (b) structured Markdown with a generated SQLite mirror; (c) Google Sheets as an interim operational layer; (d) another justified hybrid or alternative.
 5. **Recommendation** — preferred direction, trade-offs, and the evidence supporting it.
 6. **Smallest useful next proof** — recommend exactly one next work package. Do not automatically select the Foundry's WP1, and do not activate anything.
@@ -99,14 +99,14 @@ Write `Deliverables/2026-07-12-client-delivery-operational-schema-evaluation.md`
 - Edit `GL-006`, or add/alter any schema or template.
 - Modify SQLite regeneration code or the Cockpit.
 - Build any retrieval skill.
-- Migrate any NPL record, or retire/alter the live NPL Sheet.
+- Migrate any BRK-001 record, or retire/alter the live BRK-001 Sheet.
 - Create six Git tasks from the six Drive documents — this task produces at most one recommended next-proof suggestion in §6 of the deliverable; it does not spawn sub-tasks itself.
 - Treat any Foundry `TASK-WP*` status, owner, or priority field as production authority.
 - Merge anything without Warwick's review — this lands on a fresh branch, in an open, reviewable PR, not merged.
 
 ## Privacy boundary (GL-009)
 
-The repository is public. Do not copy client-sensitive NPL content, participant names, transcript excerpts, contractual details, or live record values into Git. Use abstract entity/field names, counts where safe, synthetic examples, and Drive references/source identifiers without reproducing sensitive contents. Any detailed client-data mapping that cannot safely live in public Git stays in the private Drive evidence layer, with only an abstract conclusion recorded in the repository.
+The repository is public. Do not copy client-sensitive BRK-001 content, participant names, transcript excerpts, contractual details, or live record values into Git. Use abstract entity/field names, counts where safe, synthetic examples, and Drive references/source identifiers without reproducing sensitive contents. Any detailed client-data mapping that cannot safely live in public Git stays in the private Drive evidence layer, with only an abstract conclusion recorded in the repository.
 
 ## Success criteria
 
@@ -118,7 +118,8 @@ The repository is public. Do not copy client-sensitive NPL content, participant 
 
 ## Updates
 
-- 2026-07-12 09:00 (larry) — created, per Warwick's explicit narrow authorization following the Foundry-governance pushback on the "Larry Briefing" PDF's mandate language. Routed to Silas (schema/derived-data architecture lead) with an explicit instruction to read Warden's actual contract and `SOP-010`–`014` directly to represent operational-delivery-requirements validation, rather than treating this as two separate dispatches. Sanitized NPL workbook structural abstraction (sheet names, column headers, row counts — no client data values) already extracted by Larry and handed off, so the assignee never needs to open the raw client `.xlsx` files.
+- 2026-07-12 09:00 (larry) — created, per Warwick's explicit narrow authorization following the Foundry-governance pushback on the "Larry Briefing" PDF's mandate language. Routed to Silas (schema/derived-data architecture lead) with an explicit instruction to read Warden's actual contract and `SOP-010`–`014` directly to represent operational-delivery-requirements validation, rather than treating this as two separate dispatches. Sanitized BRK-001 workbook structural abstraction (sheet names, column headers, row counts — no client data values) already extracted by Larry and handed off, so the assignee never needs to open the raw client `.xlsx` files.
+- 2026-07-12 10:30 (larry) — Silas delivered `Deliverables/2026-07-12-client-delivery-operational-schema-evaluation.md`, all 8 required sections present. Verified directly, not on Silas's summary alone: confirmed `git diff --stat` shows only the two intended new files (deliverable + session log), spot-checked Silas's specific factual claims against GL-006's actual "Future extension candidates"/"Known gaps" sections and the four cited Cockpit files (all confirmed accurate), and scanned for GL-009 privacy compliance. One real issue found and fixed: the deliverable and Silas's own session log spelled out the real client engagement's actual name/product (used 26 times) where this repo's established convention — used throughout `Deliverables/2026-07-11-migration-closure-audit.md` — is the abstracted `BRK-001` code, never the real name. Corrected throughout both files (and my own two files from this task's creation, which had the same slip) before commit. Hard boundaries respected: no GL-006/schema/SQLite/Cockpit/skill edits, no NPL/BRK-001 Sheet touched, no new Git tasks created. Verdict, schema-reconciliation table, architecture-options assessment, and the one recommended next proof (Register Item write-and-verification metadata) are sound and evidence-grounded — see the deliverable directly. Added a cross-reference line to `tsk-2026-07-11-002`'s "Warwick decisions required" bucket per Silas's own recommendation. **This task stays open, not closed** — the evaluation work is complete and verified, but per this task's own hard boundary ("do not merge anything without Warwick's review"), final disposition awaits Warwick's review of the deliverable via the open PR.
 
 ## Outcome
 _(filled when status flips to done — see SOP-close-task)_
