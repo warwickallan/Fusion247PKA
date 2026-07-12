@@ -14,7 +14,7 @@ blocked_by: null
 
 # Time
 created: 2026-07-12T09:00:00Z
-updated: 2026-07-12T13:30:00Z
+updated: 2026-07-12T14:30:00Z
 due: null
 
 # Provenance
@@ -135,7 +135,7 @@ The repository is public. Do not copy client-sensitive NPL content, participant 
 
 What shipped: the IDEA-003 Client Delivery operational schema/query-layer evaluation (`Deliverables/2026-07-12-client-delivery-operational-schema-evaluation.md`, 8 required sections plus Appendix A) — architecture reviewed across six correction rounds (external QA + Warwick's own direct review) and **approved**; recommends exactly one next proof (Register Item write-and-verification metadata), not yet authorized or started. Same PR also carried `GL-006` v1.5 (engagement-mnemonic naming convention, settling the `NPL` question) and a general operating-improvement adoption in `SOP-018` and Larry's own contract (multi-round review discipline).
 
-Where it lives: merged via PR #10, merge commit [[6390e903e7b44958a7398c85615933a6bb549218]] on `main`. Session logs: [[2026-07-12-09-00_larry_idea-003-governance-and-evaluation-scoping]], [[2026-07-12-10-00_silas_client-delivery-schema-evaluation]], [[2026-07-12-13-30_larry_pr10-merge-and-session-close]].
+Where it lives: merged via PR #10, merge commit [[6390e903e7b44958a7398c85615933a6bb549218]] on `main`. Session logs: [[2026-07-12-09-00_larry_idea-003-governance-and-evaluation-scoping]], [[2026-07-12-10-00_silas_client-delivery-schema-evaluation]], [[2026-07-12-13-30_larry_pr10-merge-and-session-close]]. Visual tracking: ClickUp task https://app.clickup.com/t/869e3mw1r (IDEA-003 → WP1 — Schema and synthetic validation), status `complete`.
 
 Follow-ups: none new. The evaluation's recommended next proof depends on the synthetic/redacted `Client Delivery/` engagement already tracked as a confirmed merge blocker on [[tsk-2026-07-11-002-migration-closure-audit-remaining-blockers]] — that task stays open and owns this follow-up; not authorized or started here.
 

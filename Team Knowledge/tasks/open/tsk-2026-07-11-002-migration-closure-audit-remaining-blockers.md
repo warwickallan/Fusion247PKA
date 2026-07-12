@@ -14,7 +14,7 @@ blocked_by: null
 
 # Time
 created: 2026-07-11T22:00:00Z
-updated: 2026-07-12T13:30:00Z
+updated: 2026-07-12T14:30:00Z
 due: null
 
 # Provenance
@@ -99,6 +99,7 @@ This task has no single "done" state by design — it's a tracking placeholder, 
 - 2026-07-12 12:00 (larry) — Warwick settled the Client Delivery engagement-naming convention (three-character human-readable mnemonics, e.g. `NPL`, not private) via [[GL-006-client-delivery-frontmatter-conventions]] v1.5, retiring the invented `BRK-001` placeholder used across [[2026-07-12-client-delivery-operational-schema-evaluation]]'s earlier correction rounds. No content change to this task's own tracked items above; recorded here because this task links that deliverable.
 
 - 2026-07-12 13:30 (larry) — PR #10 merged (`6390e903e7b44958a7398c85615933a6bb549218`); [[tsk-2026-07-12-001-evaluate-client-delivery-operational-schema-gap]] closed done. No change to this task's own tracked blockers/decisions above — the synthetic/redacted `Client Delivery/` engagement remains the confirmed merge blocker and the required precondition for the evaluation's recommended write-and-verification proof; neither is authorized or started.
+- 2026-07-12 14:30 (larry) — Fusion delivery now also tracked visually in ClickUp (Workspace → Team Space → Folder `IDEA-003 — Client Delivery operating layer` → List `WP1 — Schema and synthetic validation`). This task's two open blockers are mirrored there as ClickUp tasks: the synthetic/redacted engagement proof (https://app.clickup.com/t/869e3mw1z, status `to do`, not authorized) and the later schema-acceptance decision (https://app.clickup.com/t/869e3mw29, status `to do`, blocked on the proof above). ClickUp is operational/visual tracking only — this task file remains the durable decision record; GitHub's merged state and this file win if the two ever disagree.
 
 ## Outcome
 _(filled when status flips to done — see SOP-close-task)_
