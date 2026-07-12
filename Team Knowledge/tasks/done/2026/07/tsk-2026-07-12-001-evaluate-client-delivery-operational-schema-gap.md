@@ -8,13 +8,13 @@ assignee: silas
 priority: 2
 
 # Status (mirrors folder location)
-status: open
+status: done
 blocked_reason: null
 blocked_by: null
 
 # Time
 created: 2026-07-12T09:00:00Z
-updated: 2026-07-12T12:00:00Z
+updated: 2026-07-12T13:30:00Z
 due: null
 
 # Provenance
@@ -41,6 +41,7 @@ linked_my_life: []
 linked_session_logs:
   - 2026-07-12-09-00_larry_idea-003-governance-and-evaluation-scoping
   - 2026-07-12-10-00_silas_client-delivery-schema-evaluation
+  - 2026-07-12-13-30_larry_pr10-merge-and-session-close
 linked_journal_entries: []
 linked_deliverables:
   - 2026-07-12-client-delivery-operational-schema-evaluation
@@ -128,5 +129,16 @@ The repository is public. Do not copy client-sensitive NPL content, participant 
 
 - 2026-07-12 12:00 (larry) — Warwick clarified and settled the Client Delivery naming convention: three-character, human-readable engagement mnemonics (e.g. `NPL`, with a numeric suffix only where multiple engagements need distinguishing) are approved and were never a privacy concern. The earlier `BRK-001` placeholder — invented across rounds 1-5 on the mistaken assumption that the engagement code itself needed anonymizing — has been retired; `NPL` restored throughout the deliverable and both session logs. Historical claims that called this a "GL-009 leak" corrected to state plainly it was not. The genuinely valid, separate privacy fix from earlier rounds (the real client organisation's actual name/product leaking into narrative prose) is unaffected and remains in force — that was never about the engagement code. Convention now recorded durably in [[GL-006-client-delivery-frontmatter-conventions]] §"Engagement mnemonics for prose and documentation" (v1.5) so future engagements apply it without re-litigating. No architectural, schema, SQLite, Cockpit, phone-access, or hosted-database content changed. Both tasks remain open; PR #10 not merged.
 
+- 2026-07-12 13:30 (larry) — done: PR #10 merged (merge commit `6390e903e7b44958a7398c85615933a6bb549218`); evaluation, GL-006 naming-convention update, and the multi-round-review operating-improvement adoption are all on `main`.
+
 ## Outcome
-_(filled when status flips to done — see SOP-close-task)_
+
+What shipped: the IDEA-003 Client Delivery operational schema/query-layer evaluation (`Deliverables/2026-07-12-client-delivery-operational-schema-evaluation.md`, 8 required sections plus Appendix A) — architecture reviewed across six correction rounds (external QA + Warwick's own direct review) and **approved**; recommends exactly one next proof (Register Item write-and-verification metadata), not yet authorized or started. Same PR also carried `GL-006` v1.5 (engagement-mnemonic naming convention, settling the `NPL` question) and a general operating-improvement adoption in `SOP-018` and Larry's own contract (multi-round review discipline).
+
+Where it lives: merged via PR #10, merge commit [[6390e903e7b44958a7398c85615933a6bb549218]] on `main`. Session logs: [[2026-07-12-09-00_larry_idea-003-governance-and-evaluation-scoping]], [[2026-07-12-10-00_silas_client-delivery-schema-evaluation]], [[2026-07-12-13-30_larry_pr10-merge-and-session-close]].
+
+Follow-ups: none new. The evaluation's recommended next proof depends on the synthetic/redacted `Client Delivery/` engagement already tracked as a confirmed merge blocker on [[tsk-2026-07-11-002-migration-closure-audit-remaining-blockers]] — that task stays open and owns this follow-up; not authorized or started here.
+
+Lessons: none requiring a separate journal entry — the operating-improvement lesson is already recorded directly in [[SOP-018-independent-change-qa]] and Larry's own contract, not duplicated here.
+
+Archived deliverables: `2026-07-12-client-delivery-operational-schema-evaluation` — archive deferred; still referenced by [[tsk-2026-07-11-002-migration-closure-audit-remaining-blockers]]'s `linked_deliverables`.

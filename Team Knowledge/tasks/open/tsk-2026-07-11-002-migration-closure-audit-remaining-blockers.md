@@ -14,7 +14,7 @@ blocked_by: null
 
 # Time
 created: 2026-07-11T22:00:00Z
-updated: 2026-07-12T12:00:00Z
+updated: 2026-07-12T13:30:00Z
 due: null
 
 # Provenance
@@ -97,6 +97,8 @@ This task has no single "done" state by design — it's a tracking placeholder, 
 - 2026-07-12 11:30 (larry) — Fable's round-4 review of PR #10 caught this task was missing the evaluation deliverable from its own `linked_deliverables`/body mirror despite already citing it in prose above (a GL-004 gap, same pattern Fable caught in round-0 closure on this task's own creation). Fixed: `2026-07-12-client-delivery-operational-schema-evaluation` added to both. No other content changed; this task remains a tracking placeholder, still open.
 
 - 2026-07-12 12:00 (larry) — Warwick settled the Client Delivery engagement-naming convention (three-character human-readable mnemonics, e.g. `NPL`, not private) via [[GL-006-client-delivery-frontmatter-conventions]] v1.5, retiring the invented `BRK-001` placeholder used across [[2026-07-12-client-delivery-operational-schema-evaluation]]'s earlier correction rounds. No content change to this task's own tracked items above; recorded here because this task links that deliverable.
+
+- 2026-07-12 13:30 (larry) — PR #10 merged (`6390e903e7b44958a7398c85615933a6bb549218`); [[tsk-2026-07-12-001-evaluate-client-delivery-operational-schema-gap]] closed done. No change to this task's own tracked blockers/decisions above — the synthetic/redacted `Client Delivery/` engagement remains the confirmed merge blocker and the required precondition for the evaluation's recommended write-and-verification proof; neither is authorized or started.
 
 ## Outcome
 _(filled when status flips to done — see SOP-close-task)_
