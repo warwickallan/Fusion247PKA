@@ -31,7 +31,6 @@ linked_sops:
   - SOP-012-warden-configuration-guide
   - SOP-013-warden-meeting-summary
   - SOP-014-warden-consultant-summary
-  - SOP-create-task
 linked_workstreams:
   - WS-004-team-retro-and-self-improvement-loop
 linked_guidelines:
@@ -41,6 +40,7 @@ linked_guidelines:
 linked_my_life: []
 linked_session_logs:
   - 2026-07-12-09-00_larry_idea-003-governance-and-evaluation-scoping
+  - 2026-07-12-10-00_silas_client-delivery-schema-evaluation
 linked_journal_entries: []
 linked_deliverables:
   - 2026-07-12-client-delivery-operational-schema-evaluation
@@ -54,10 +54,12 @@ tags: [client-delivery, warden, schema, evaluation, tier-1-proposal, gl-006, fou
 ## Context one click away
 
 - Procedure: [[SOP-002-convert-mypka-to-sqlite]], [[SOP-010-warden-extract-source-to-evidence-pack]], [[SOP-011-warden-meeting-prep]], [[SOP-012-warden-configuration-guide]], [[SOP-013-warden-meeting-summary]], [[SOP-014-warden-consultant-summary]]
+- Workstream: [[WS-004-team-retro-and-self-improvement-loop]] — this is a self-improvement/architecture-evaluation task in the same vein as prior Tier-1 proposals run under this workstream.
 - Guideline: [[GL-006-client-delivery-frontmatter-conventions]], [[GL-009-public-private-knowledge-boundary]], [[GL-011-immutable-source-retention]]
 - Working artifacts:
   - [[2026-07-12-client-delivery-operational-schema-evaluation]] — the one evaluation deliverable this task produces
 - Birthed in: [[2026-07-12-09-00_larry_idea-003-governance-and-evaluation-scoping]]
+- Touched by: [[2026-07-12-10-00_silas_client-delivery-schema-evaluation]]
 - Parent: [[tsk-2026-07-11-002-migration-closure-audit-remaining-blockers]] — this task's "confirmed merge blocker" (validating GL-006/Warden's schema against a real engagement) is directly relevant background, not superseded by this evaluation.
 - Related, explicitly not authoritative: Drive `Fusion247Foundry/ideas/IDEA-003-sheets-vs-flat-markdown-project-registers/` (the exploration doc, the converged brief, and the "Larry Briefing" PDF) — Foundry material, evidence and context only. Per the Foundry's own `00_README` doctrine, none of it authorises implementation.
 
