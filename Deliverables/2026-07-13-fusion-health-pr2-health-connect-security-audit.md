@@ -4,11 +4,15 @@ author: vex
 date: 2026-07-13
 subject: warwickallan/fusion-health PR #2 (branch build-005/wp1/health-connect-baseline)
 verdict: PASS-WITH-NOTES
+reviewed_head: a6f982ed71bbd3391cfb06f3a5250aab2ef2ffec
+scope_note: historical pre-device-test snapshot -- see closure addendum at the end of this file
 ---
 
 # Security audit — fusion-health PR #2 (Health Connect baseline)
 
-**Scope:** `AndroidManifest.xml`, `MainActivity.kt`, `app/build.gradle.kts`, `.github/workflows/android-build.yml` on branch `build-005/wp1/health-connect-baseline`. First PR in this build touching real personal health data via Android Health Connect. Reviewed as a pre-ship gate ahead of Warwick installing the test APK.
+> **Historical pre-device-test audit snapshot.** This report reviews PR2 at head `a6f982ed71bbd3391cfb06f3a5250aab2ef2ffec` — the state of the branch *before* Warwick's device testing surfaced four real defects (permission-registration, pagination, an empty-string page-token bug, and steps-count/step-total semantics) that were corrected across five subsequent commits. The findings below were accurate for that head at that time and are preserved as written, not retroactively corrected. **Read the closure addendum at the end of this file for the final accepted state.**
+
+**Scope:** `AndroidManifest.xml`, `MainActivity.kt`, `app/build.gradle.kts`, `.github/workflows/android-build.yml` on branch `build-005/wp1/health-connect-baseline`, at head `a6f982ed71bbd3391cfb06f3a5250aab2ef2ffec`. First PR in this build touching real personal health data via Android Health Connect. Reviewed as a pre-ship gate ahead of Warwick installing the test APK.
 
 **Verdict: PASS-WITH-NOTES.** No CRITICAL or HIGH findings. No committed secrets, no network capability, permissions are least-privilege and read-only, no durable storage, no sensitive logging, exported diagnostic text is metadata-only, denial/revocation paths are handled safely. Three LOW-severity/advisory notes below — none block install of the test APK.
 
@@ -47,8 +51,23 @@ No hardcoded secrets, no committed `.env`/keystore files in this PR or repo hist
 
 ## Definition of done
 
-- [x] Relevant phases covered (credential spot-check, permission/authorization-equivalent review for a client-side app, no external integration surface to hardn since app has no network/backend, data-handling review for the health-data-specific asks).
+- [x] Relevant phases covered (credential spot-check, permission/authorization-equivalent review for a client-side app, no external integration surface to harden since app has no network/backend, data-handling review for the health-data-specific asks).
 - [x] Findings have severity, fix recommendation, and verification step.
 - [x] Report filed at `Deliverables/2026-07-13-fusion-health-pr2-health-connect-security-audit.md`.
 - [x] Session-log entry filed.
 - [x] No CRITICAL/HIGH findings — none to surface urgently.
+
+## Closure addendum (compiled by Larry, 2026-07-13, from subsequent Vex delta-review records)
+
+This audit's three LOW notes and its point-in-time scope were superseded by five further device-test-driven correction rounds on the same PR2 branch, each independently delta-reviewed by Vex. Summary only — full evidence lives in the ClickUp BUILD-005 Build Log (WP1 → PR2 page) under entries `LRY-PR2-FIX2-CLEARED` through `LRY-PR2-FIX5-CLEARED`; not duplicated here.
+
+- **Final accepted head:** `f72b658eb8978f3789a5c72d5cbd1fe2b1230d5d`
+- **Merge SHA (squash onto `main`):** `9b8eda1b3e2d1add0f871a5fa55a661718f074c4`
+- **What the later deltas covered, relative to this audit's findings:**
+  - The alpha-quality dependency noted above (`connect-client:1.1.0-alpha07`) was upgraded to the stable `androidx.health.connect:connect-client:1.1.0` release.
+  - A permission-registration defect (missing Android 14+ permission-usage activity-alias) was found and corrected — this audit predates that defect and its fix.
+  - Two further pagination-related defects (first-page-only reads, then an empty-string page-token bug) were found and corrected.
+  - The source-app package names this audit flagged as "unverified against a real device" were subsequently confirmed against Warwick's real device.
+  - An aggregate daily step-total output was added, distinct from the per-record count this audit reviewed.
+- **All later Vex delta reviews passed** (PASS or PASS-WITH-NOTES, no blocking findings) at each corrected head.
+- The public-repo/public-prerelease note (this audit's second LOW finding) remains unresolved and applicable — not affected by the later corrections.
