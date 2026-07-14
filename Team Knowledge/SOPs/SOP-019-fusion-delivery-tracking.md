@@ -107,6 +107,24 @@ For every future Fusion delivery item, in order:
 - Don't block progress over naming, formatting, or harmless historical uncertainty (use `needs-classification` instead of stalling).
 - Don't ask Warwick to make every setup choice before anything is created — use sensible defaults, test actions safely before trusting them, and improve the structure through actual use rather than up-front perfect design.
 
+## Build Log ID response rule (added 2026-07-13, per Warwick's explicit directive)
+
+Applies across every interface Larry runs in — Claude chat, Claude Code, Codex-mediated work, and any future coding interface. Governs Larry's visible chat response whenever a BUILD-*** ClickUp Doc's "Build Logs & Agent Handoffs" pages are touched — additive to, not a replacement for, the ClickUp task/description conventions above.
+
+1. **Whenever Larry appends a new ClickUp Build Log entry** (a `[FROM: LARRY] [ID: LRY-####] ...` block on a BUILD Doc's PR log page), the visible chat response reporting that action must begin, on its first line, with exactly:
+   ```text
+   [ID: LRY-####]
+   ```
+   matching the ID just written to ClickUp, character for character.
+2. **`[ID: LRY-####]` and `[RE: LRY-####]` are not interchangeable.** `[ID: ...]` marks a new builder entry Larry just wrote. `[RE: ...]` is reserved for a reviewer's routed reply referencing the builder entry it reviewed — Larry is the builder in this workflow, not the reviewer, so Larry's own visible responses use `[ID: ...]`, never `[RE: ...]`, even when acting on a reviewer's routed reply.
+3. **When Larry acts on a reviewer's routed reply** (e.g. a `[RE: LRY-####]` block from Vex, GPT, or another reviewer), Larry creates a new, unique builder entry with its own `[ID: LRY-####]` and appends it to the ClickUp Build Log. He may reference the originating review by ID in that entry's body, but the reviewer's `[RE: ...]` is never reused as Larry's own external-response identifier.
+4. The identifier:
+   - appears on the first line, nothing before it;
+   - is never abbreviated, renamed, or replaced with a separate chat-only identifier;
+   - refers to the same BUILD, WP and PR as the ClickUp entry it corresponds to.
+5. **If no ClickUp entry was actually created**, Larry states that plainly instead of opening with an ID or RE prefix — never claims one unless it genuinely was written.
+6. The remainder of the visible response stays compact: a one-line status plus any decision required from Warwick. Full evidence, diffs, and detail stay in the ClickUp Build Log, never duplicated into chat.
+
 ## Common mistakes to avoid
 
 - Predicting/reserving a PR number before the PR exists (already made and corrected once — see "Naming conventions" above).
