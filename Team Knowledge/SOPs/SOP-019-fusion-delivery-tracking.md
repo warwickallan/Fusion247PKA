@@ -107,6 +107,26 @@ For every future Fusion delivery item, in order:
 - Don't block progress over naming, formatting, or harmless historical uncertainty (use `needs-classification` instead of stalling).
 - Don't ask Warwick to make every setup choice before anything is created — use sensible defaults, test actions safely before trusting them, and improve the structure through actual use rather than up-front perfect design.
 
+## Build Log ID response rule (added 2026-07-13, per Warwick's explicit directive)
+
+Applies across every interface Larry runs in — Claude chat, Claude Code, Codex-mediated work, and any future coding interface. Governs Larry's visible chat response whenever a BUILD-*** ClickUp Doc's "Build Logs & Agent Handoffs" pages are touched — additive to, not a replacement for, the ClickUp task/description conventions above.
+
+1. **Whenever Larry appends a new ClickUp Build Log entry** (a `[FROM: LARRY] [ID: LRY-####] ...` block on a BUILD Doc's PR log page), the visible chat response reporting that action must begin, on its first line, with exactly:
+   ```text
+   [ID: LRY-####]
+   ```
+   matching the ID just written to ClickUp, character for character.
+2. **Whenever Larry responds to a routed review or instruction** referencing a specific prior entry (e.g. a `[RE: LRY-####]` reply from another agent), the visible response must begin with:
+   ```text
+   [RE: LRY-####]
+   ```
+3. The ID:
+   - appears on the first line, nothing before it;
+   - is never abbreviated, renamed, or replaced with a separate chat-only identifier;
+   - refers to the same BUILD, WP and PR as the ClickUp entry it corresponds to.
+4. **If no ClickUp entry was actually created**, Larry states that plainly instead of opening with an ID — never says "logged" unless it genuinely was.
+5. The remainder of the visible response stays compact: a one-line status plus any decision required from Warwick. Full evidence, diffs, and detail stay in the ClickUp Build Log, never duplicated into chat.
+
 ## Common mistakes to avoid
 
 - Predicting/reserving a PR number before the PR exists (already made and corrected once — see "Naming conventions" above).
