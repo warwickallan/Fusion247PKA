@@ -19,6 +19,20 @@ Fusion247 Brain (the user's prior ChatGPT/Google-Drive-based system) is being ab
 - Does not re-litigate decisions already logged in [[tsk-2026-07-10-001-fold-fusion247-brain-doctrine-into-warden]]'s Decisions log. Those are settled; this Workstream checks *coverage*, not whether past decisions were correct.
 - Does not propose follow-up PRs and then implement them in the same pass. Reconciliation reports terminate in a proposal; implementation is a separate, explicitly-approved step.
 
+## BUILD-000 pass-2 assurance basis
+
+For BUILD-000 pass 2, the sole assurance denominator is the frozen **84-source** `Included` manifest pack. The wider census remains a discovery and exclusion layer only; it is not the closure denominator.
+
+Evidence is used in this order:
+
+1. the PR #5 Migration Coverage Matrix as prior capability evidence;
+2. the PR #8 closure audit as prior source-level assurance;
+3. the two Fable reports and the accepted [[2026-07-15-build-000-warwick-semantic-merge-decision-brief]] as review and decision evidence;
+4. the live current repository as authoritative evidence of what has shipped; and
+5. direct rereading where the preceding evidence is absent, contradictory, or too shallow to prove meaning and disposition.
+
+Pass 2 maintains one ledger row per frozen source in [[2026-07-15-build-000-frozen-pack-reconciliation-ledger]]. Filename resemblance never closes a row. Prior evidence may close a row only where it proves the source's relevant meaning and disposition. There is no blanket 84-document reread, and no closure claim is permitted until all 84 rows have an evidenced disposition.
+
 ## Precedence order for source material
 
 When two Fusion247 Brain documents disagree about the state of the source system, resolve in this order (highest wins):
@@ -38,7 +52,7 @@ Larry extracts the six precedence-ordered documents (and the gap-analysis) from 
 
 ### Step 2 — Build the canonical inventory (Pax)
 
-Walk the precedence-ordered sources and produce one row per **canonical Drive object or distinct capability** — not one row per file. A capability spanning several Drive objects (e.g. "CategorisAIr source-to-WIKI pipeline" spans an agent doc, a template, and a skill) is one row, with its constituent objects noted.
+For the recurring general method, walk the precedence-ordered sources and produce one row per canonical Drive object or distinct capability. For BUILD-000 pass 2, use the frozen pack instead: create exactly one row for each of its 84 included sources, preserving the exact manifest name and Copy ID even where several rows map to one present-day capability.
 
 ### Step 3 — Cross-reference against myPKA (Pax)
 
@@ -64,6 +78,8 @@ Larry takes Pax's matrix and produces the return format below, and presents it t
 
 One markdown table, one row per canonical object/capability, columns: `Source object/capability | Disposition | myPKA equivalent (path) | Commit/PR | Notes`. Saved to `Deliverables/YYYY-MM-DD-fusion247-brain-migration-coverage-matrix.md`.
 
+For BUILD-000 pass 2, the required deliverable is the 84-row frozen-pack reconciliation ledger. Its fields are: source number, exact manifest name, Copy ID, bundle, relevant PR #5 row or prior evidence, current myPKA destination, semantic disposition, evidence pointer, direct-read status, assimilation status, unresolved gap or rationale, and Warwick-review status.
+
 ## Required return format
 
 Every run of this Workstream returns, in this order:
@@ -77,8 +93,9 @@ Every run of this Workstream returns, in this order:
 
 ## Definition of done
 
-1. Every row in the Drive Object Registry (and every capability named in the master index that doesn't reduce to a single registry row) has exactly one disposition.
+1. In the recurring general method, every row in the Drive Object Registry (and every capability named in the master index that doesn't reduce to a single registry row) has exactly one disposition. In BUILD-000 pass 2, exactly 84 unique frozen-pack rows and 84 unique Copy IDs are present, with no excluded census item added.
 2. Every `absorbed` / `mapped-to-existing` row cites a real file path and commit/PR — no disposition without a citation.
-3. The report exists in `Deliverables/` and is linked from the run's task.
-4. No file outside `Deliverables/` and the tracking task was modified during this Workstream.
-5. The user has the report and has not yet been asked to approve any specific follow-up PR — that's a separate, later step.
+3. Every completed row has a real evidence pointer; every direct-read requirement is explicitly recorded; all ten targeted BUILD-000 sources are directly read.
+4. The report exists in `Deliverables/` and is linked from the run's task.
+5. No implementation is performed merely because the ledger identifies a gap; follow-up changes remain separately authorised.
+6. The user has the report and any implementation remains subject to its own approval and independent-review boundary.
