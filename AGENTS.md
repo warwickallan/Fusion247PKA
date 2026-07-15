@@ -145,12 +145,24 @@ Trigger phrases → action:
 
 | User says (or implies) | Entry type | What to capture |
 |---|---|---|
-| "close session", "close this session", "wrap", "wrap up", "log this session", "end session", "we're done for today", "let's stop here" | `close-session` | Full session summary: what we did, decisions, insights, open threads, next steps |
+| "close session", "close this session", "wrap", "wrap up", "log this session", "end session", "we're done for today", "let's stop here" | `close-session` | A **memory checkpoint** covering the window since Larry's previous `close-session` entry — see "Close-session memory checkpoints" below |
 | "keep this in mind", "remember this", "don't forget", "note this down", "save this" | `proactive` | The specific insight verbatim + why it matters + which agent/area it applies to |
 | "let's realign", "actually I want", "scratch that, instead", "no wait, do X instead", "change of plans" | `realignment` | Original direction, the correction, why the user changed course |
 | (LLM-detected — non-obvious insight surfaces during work) | `mid-session-insight` | The insight + how we got there + downstream implications |
 
 Triggers are case-insensitive. Phrasings above are illustrative; the LLM should pattern-match intent, not literal strings. When in doubt, write the entry — over-capture is preferred to under-capture.
+
+### Close-session memory checkpoints (Warwick directive, 2026-07-15)
+
+A `close-session` entry is a durable narrative and memory checkpoint, not merely a git-status check, open-item sweep, Librarian pass, or technical sign-off.
+
+**Coverage window.** Before writing, locate Larry's most recent previous session-log entry with `agent_id: larry` and `type: close-session`. That checkpoint is the start boundary: cover the work performed after it and before the current close — including work in other repositories, ClickUp changes, device tests, specialist contributions, mistakes and corrections, and Warwick realignments (preferably verbatim). Do not retell the whole project history, and do not repeat material already fully recorded in the previous checkpoint beyond the minimum context needed to make the new entry understandable. Cross-link the previous checkpoint. If no prior Larry close-session entry exists, cover the current working session from its beginning and say so. If no material work occurred since the prior close, write an honest **zero-delta checkpoint** (what was checked, open threads, next resumption point) — never invent progress.
+
+**Informative, not administrative.** Capture what Warwick set out to achieve; what was actually built, changed, tested, merged, rejected or parked (with evidence links and SHAs); decisions that affect later work; failed approaches; memorable exchanges that explain the session; unresolved threads; and the **exact next resumption point**. Curated memory, not a raw transcript. The `_template.md` sections "Coverage window" and "VlogOps / story signals" are required for `close-session` entries.
+
+**ClickUp human-readable mirror.** After the canonical Markdown log is written, Larry creates one child page beneath ClickUp's `VlogOps Doc → Larry's Session Log`, titled `YYYY-MM-DD HH:mm — <plain-language session theme>`. The post summarizes the same evidence window, names the canonical session-log path, and includes the outcome, realignments, open threads, resumption point, and useful VlogOps/story signals. It is the human-facing and editorial view — never a duplicate task/status system. The canonical operational record remains `Team Knowledge/session-logs/YYYY/MM/` in Git. If the ClickUp write fails: the canonical log stands regardless; re-read before retrying; report the mirror as pending if it cannot be completed safely; never blindly double-write.
+
+**VlogOps relationship.** Close-session checkpoints are a named VlogOps evidence stream (alongside the Daily Flight Recorder, GitHub commits/PRs/CI, ClickUp Build Logs, editorial context, and approved media). Several checkpoints may feed one Daily Editorial Handoff; a checkpoint never itself authorises publication.
 
 Set-in-stone information graduates from session-logs into SOPs / Guidelines / Workstreams; if a captured insight reaches "this is now a permanent rule" status, propose graduating it instead of letting it stagnate in session-logs.
 

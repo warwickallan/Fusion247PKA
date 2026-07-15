@@ -79,6 +79,7 @@ At session close (or on `/close-session`), Larry writes a session log.
 - **Auto-create rule:** if the `YYYY/` or `YYYY/MM/` folder does not exist, Larry creates it before writing.
 - **Filename slug:** kebab-case, derived from the session's main theme. See [[GL-001-file-naming-conventions]] for slug rules.
 - **Content:** insights, decisions, and deltas vs the prior plan. Cross-link earlier session logs with `[[wikilinks]]` (e.g. "as we noted in the previous session log"). Capture user realignments verbatim - these become persistent team memory.
+- **Close-session memory checkpoints (canonical rule: root `AGENTS.md` §"Close-session memory checkpoints"):** every `close-session` entry covers the window since Larry's previous `close-session` checkpoint (cross-linked), not the whole project history — including work in other repos, ClickUp, device tests, corrections and verbatim realignments, ending with the exact next resumption point. Zero-delta closes get an honest zero-delta checkpoint. After the canonical log, Larry mirrors a human-readable child post to ClickUp `VlogOps Doc → Larry's Session Log` (`YYYY-MM-DD HH:mm — <theme>`); a failed mirror never blocks or invalidates the canonical log.
 
 Session log skeleton:
 
