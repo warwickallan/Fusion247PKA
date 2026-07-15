@@ -2,15 +2,18 @@
 
 _Auto-generated. Do not edit by hand. Run `SOP-rebuild-task-index` to regenerate._
 
-_Last rebuilt: 2026-07-12T22:00:00Z_
+_Last rebuilt: 2026-07-15T17:30:00Z_
 
 ## Summary
-- Open: 3
+- Open: 4
 - In progress: 0 (0 blocked)
 - Done (this month): 9
 - Cancelled (this month): 0
 
-## Open (3)
+## Open (4)
+
+### Priority 2 — high
+- [[tsk-2026-07-15-001-reconcile-sop-002-with-actual-regen-script]] — Reconcile SOP-002's documented procedure with the actual regen script the Cockpit runs — assignee: silas — created 2026-07-15
 
 ### Priority 3 — normal
 - [[tsk-2026-07-11-002-migration-closure-audit-remaining-blockers]] — Track migration-closure-audit's remaining blockers and Warwick decisions — assignee: larry — created 2026-07-11
@@ -25,7 +28,7 @@ _none_
 ## By assignee
 - larry: 1 open, 0 in-progress (0 blocked)
 - warden: 0 open, 0 in-progress (0 blocked)
-- silas: 0 open, 0 in-progress (0 blocked)
+- silas: 1 open, 0 in-progress (0 blocked)
 - pax: 0 open, 0 in-progress (0 blocked)
 - unassigned: 2 open, 0 in-progress (0 blocked)
 
