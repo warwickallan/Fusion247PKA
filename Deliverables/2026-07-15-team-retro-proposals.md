@@ -5,8 +5,21 @@ agent_id: larry
 linked_workstreams: [WS-004-team-retro-and-self-improvement-loop]
 linked_sops: [SOP-close-task, SOP-004-vex-security-audit, SOP-019-fusion-delivery-tracking, SOP-018-independent-change-qa]
 linked_guidelines: []
-status: proposed
+status: partially-approved
 ---
+
+## Approval record (2026-07-15)
+
+Warwick approved all five proposals. Landed:
+
+1. **Approved, landed** — pre-send verification checklist added to `Team/Larry - Orchestrator/AGENTS.md` §"Pre-send verification".
+2. **Approved, landed** — "Known ClickUp quirks" section added to [[SOP-019-fusion-delivery-tracking]].
+3. **Approved, landed** — bundled QA/audit gap heuristic added to `Team/Larry - Orchestrator/AGENTS.md` §"Handling a bundled QA/audit gap".
+4. **Approved, landed** — literal-success-criteria clarification added to [[SOP-close-task]] §A pre-flight step 1.
+5. **Approved, landed** — Vex added the "Hardware/OS-dependent builds" note to [[SOP-004-vex-security-audit]].
+
+All five proposals landed 2026-07-15. Nothing remains in backlog from this retro cycle.
+
 
 # Team Retro — Ranked Improvement Proposals (2026-07-15)
 

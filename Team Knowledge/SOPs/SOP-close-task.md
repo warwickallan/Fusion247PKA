@@ -24,7 +24,9 @@ Both terminal. Once a task is in `done/` or `cancelled/`, do not move it back. I
 
 ### Pre-flight
 
-1. **Verify success criteria.** Re-read the task body's `## Success criteria`. All met? If not, the task isn't done.
+1. **Verify success criteria.** Re-read the task body's `## Success criteria`, verbatim — not the accumulated narrative logged inside the task (decisions, sub-tasks it spawned, everything that happened along the way). A task that grew into the running log for a much bigger effort can still be done if its own literal criteria are met; "lots happened here" is not the same test as "not actually done" (added 2026-07-15, Team Retro proposal #4). All met? If not, the task isn't done.
+
+   The one exception: if the criteria themselves are stale — written for a narrower job than the task actually grew into — that's a reason to rewrite the criteria first, not a reason to keep the task open indefinitely on vibes.
 
 2. **Check sub-tasks.**
    ```bash

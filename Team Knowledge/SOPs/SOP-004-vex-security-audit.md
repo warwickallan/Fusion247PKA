@@ -114,6 +114,10 @@ Every finding in the report follows this structure:
 
 Pad the severity ladder honestly. Inflated severity destroys the team's trust in the gate.
 
+## Hardware/OS-dependent builds (added 2026-07-15, Team Retro proposal #5)
+
+When the build under audit depends on real hardware or OS-level integration (permission grants, activity aliases, device sensors, native SDKs) rather than purely unit-testable logic, scope the review accordingly: CI-green and a clean initial review are not sufficient signals of "done." Expect multiple post-CI, device-test-driven correction rounds, each re-reviewed as a narrow delta against that round's diff rather than a full re-audit. Say so explicitly in the scope note so the team doesn't mistake the first clean pass for final. Proven case: Fusion Health PR2 (build-005/wp1/health-connect-baseline) passed CI and a clean initial review, then failed on a real device four separate times in sequence — permission-registration/activity-alias, pagination, empty-string page-token, steps-count semantics — each requiring its own delta review. See `Team Knowledge/session-logs/2026/07/2026-07-13-18-45_vex_fusion-health-pr2-health-connect-audit.md`.
+
 ## Output / definition of done
 
 A security audit is done when **all** of these are true:
