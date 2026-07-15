@@ -10,6 +10,15 @@ linked_guidelines: []     # ["GL-001-file-naming-conventions"]
 
 # <Session theme in one line>
 
+## Coverage window
+
+_(close-session entries only — see root `AGENTS.md` §"Close-session memory checkpoints".)_
+
+- **Previous close checkpoint:** `[[<previous-larry-close-session-log-slug>]]` (or "none — first checkpoint")
+- **Covered from:** <timestamp or "session start">
+- **Covered to:** <this close's timestamp>
+- **First checkpoint:** yes/no
+
 ## Context
 
 What was the session about. One or two sentences. What did the user come in
@@ -62,9 +71,20 @@ it's truly dead, write that explicitly here and close it.
 ## Next steps
 
 What the team is set up to do at the start of the next session. Concrete and
-short. Not a wishlist.
+short. Not a wishlist. For close-session entries, the first bullet is the
+exact next resumption point.
 
 - ...
+
+## VlogOps / story signals
+
+_(close-session entries only.)_ Editorial signals for the VlogOps evidence
+stream — not forced entertainment. Capture only what's genuinely there: the
+human story or arc, visible demonstrations/screenshots, memorable lines,
+failures and reversals, moments likely to support a blog, vlog or
+retrospective. Use `(none this checkpoint)` when genuinely empty.
+
+- (none this checkpoint)
 
 ## Cross-links
 

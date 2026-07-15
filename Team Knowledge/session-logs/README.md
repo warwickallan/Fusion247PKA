@@ -16,7 +16,16 @@ agents write" below. Folders nest by year and month. The agent creates the
 
 1. **At session close** (`/close-session`). Larry runs the close-session
    protocol, sweeps any open tasks, writes a `close-session` entry summarizing
-   what landed, what got deferred, and what changed.
+   what landed, what got deferred, and what changed. Each `close-session`
+   entry is a **memory checkpoint**: it covers the window since Larry's
+   previous `close-session` entry (cross-linked), not the whole project
+   history, and ends with the exact next resumption point. If nothing
+   material happened since the last close, the entry is an honest zero-delta
+   checkpoint. Canonical rule: root `AGENTS.md` §"Close-session memory
+   checkpoints". Larry also mirrors each checkpoint as a human-readable child
+   post under ClickUp's `VlogOps Doc → Larry's Session Log` — that mirror is
+   the editorial/human-facing view; this folder in Git remains the
+   authoritative durable record, and a failed mirror never invalidates it.
 2. **Mid-session, when something durable happens.** Agents may proactively
    append an entry during a session if a realignment with you produces a new
    insight, a new rule, a new decision worth remembering, or a clarification
