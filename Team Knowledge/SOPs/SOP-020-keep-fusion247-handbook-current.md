@@ -2,10 +2,12 @@
 
 - **Status:** Active (since 2026-07-15, per Warwick's explicit instruction after the initial Handbook population was accepted: "keep this updated whenever we add new features and functionality").
 - **Default owner:** Larry. Reusable by any specialist who closes a delivery item, since the trigger is "a feature/capability changed," not a fixed owner's task.
-- **Triggered by:** any of the following becoming true for Fusion 247 —
-  - a capability page (ClickUp Handbook `08.xx`) gains new user-visible functionality, a new dependency, a new security/privacy posture, a status change (e.g. PARKED → active, PARTIAL → COMPLETE, PLANNED → IMPLEMENTED), or a version bump;
+- **Triggered by:** any of the following becoming true for Fusion 247 — functionality being **added**, **materially changed**, **replaced**, **retired**, or **newly accepted** all count as triggers, not just net-new features:
+  - a capability page (ClickUp Handbook `08.xx`) gains new user-visible functionality, a new dependency, a new security/privacy posture, a status change (e.g. PARKED → active, PARTIAL → COMPLETE, PLANNED → IMPLEMENTED), or a version bump — **added/materially changed**;
+  - an existing mechanism, tool, or dependency a Handbook page describes is **replaced** by another (e.g. one library, provider, or approach swapped for a different one) — the page must be updated to describe the replacement, not merely to append a note about the old one;
+  - a feature, integration, or capability a Handbook page describes is **retired, deprecated, or removed** — the page must say so plainly (never leave a retired capability described as if still active) and the Tracker's status/gaps columns updated to match;
   - a shared operating page's subject matter changes (a new specialist hired, a new platform/integration added, a governance/delivery rule changes, a new decision/reversal/lesson worth recording);
-  - a BUILD/PR merges that a Handbook capability page describes (e.g. Fusion Health, VlogOps);
+  - a BUILD/PR merges that a Handbook capability page describes (e.g. Fusion Health, VlogOps) — **newly accepted functionality**;
   - a Foundry IDEA is promoted, parked, or rejected;
   - an open Tier-1 recommendation/direction-decision referenced from a Handbook page (e.g. AsdAIr, CareerAIr) is approved, amended, or declined by Warwick.
 - **References:** ClickUp `Fusion 247 Handbook` doc (`2kxuxw3a-812`) — `01 — Handbook Maintenance Contract`, `01A — Initial Handbook Population Brief`, `99 — Capability Page Template`, `11 — Handbook Population Tracker`; [[SOP-018-independent-change-qa]] (the same-model-review honesty rule applies to any Handbook update claiming a page is now COMPLETE); [[SOP-019-fusion-delivery-tracking]] (the delivery-tracking discipline this SOP's evidence is drawn from).
@@ -17,6 +19,7 @@ The Handbook's own Maintenance Contract (ClickUp `01`) already establishes that 
 ## Procedure
 
 1. **Notice the trigger.** At delivery closure (a PR merges, a Build Log entry records COMPLETE, a Foundry IDEA changes lifecycle status, Warwick approves/declines an open recommendation), check whether any Handbook page describes the thing that just changed. Do not wait for a dedicated "update the Handbook" request — this check is part of normal closure, the same way a session-log entry is.
+1a. **If the check finds nothing to update**, record that explicitly rather than staying silent: note **"Handbook assessed — no change required"** (with the as-of date and what was checked) in the session's close-session entry, so a future reader can tell "checked, nothing changed" apart from "never checked." Do not skip this step merely because there's nothing to write into ClickUp.
 2. **Read the current page before writing.** `clickup_get_document_pages` (or equivalent) on the affected `08.xx`/shared page. Never blind-overwrite — the update must be additive/corrective against what's there, preserving unaffected sections (per the Handbook Maintenance Contract's own review discipline, established during the first correction pass).
 3. **Update only what changed**, in the page's existing structure: status line (with an as-of date, per the convention established during the first correction pass — "status verified as of `<date>` from the cited evidence"), the relevant section (functionality, dependencies, security posture, deferred items), and the Evidence list (new file paths, commit SHAs, ClickUp IDs).
 4. **Verify volatile claims directly against source before writing them**, the same discipline used in the first correction pass — e.g. a permission count or version number should be checked against the actual manifest/repo, not carried forward from memory or an earlier draft.
