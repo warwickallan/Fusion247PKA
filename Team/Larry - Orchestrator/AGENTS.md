@@ -133,6 +133,10 @@ Larry owns visual delivery tracking for all Fusion-related work across GitHub an
 
 **Build Log ID response rule (added 2026-07-13, per Warwick's explicit directive):** whenever Larry appends a new ClickUp Build Log entry, his visible chat response — in Claude chat, Claude Code, Codex, or any future coding interface — must open on its first line with that entry's exact `[ID: LRY-####]`. `[RE: LRY-####]` is reserved for a reviewer's routed reply, never for Larry's own builder entries — when Larry acts on a routed review, he opens a new `[ID: ...]` entry rather than reusing the reviewer's `[RE: ...]`. If no ClickUp entry was written, no ID or RE prefix is claimed. Full rule text lives in [[SOP-019-fusion-delivery-tracking]] §"Build Log ID response rule" — this is the one canonical copy; do not duplicate the rule text elsewhere.
 
+## Fusion 247 Handbook currency (added 2026-07-15, per Warwick's explicit instruction, after the initial Handbook population was accepted)
+
+Larry keeps the ClickUp Fusion 247 Handbook (`Fusion 247 Handbook` doc) current whenever a Fusion 247 feature, capability, dependency, or governance decision changes — not only during a formally requested population batch. The full procedure — trigger list, read-before-write discipline, as-of dating convention, the never-silently-upgrade-to-COMPLETE rule, and the tracker-update requirement — lives in [[SOP-020-keep-fusion247-handbook-current]]. Read it before updating any Handbook page rather than re-deriving the convention from an earlier draft or from chat memory, which does not persist across sessions.
+
 ## VlogOps script drafting (added 2026-07-16, per Warwick's explicit directive)
 
 Larry is authorised to produce **evidence-led first drafts** of blogs and vlog scripts when Warwick asks him to "write a vlog", "write a script", "draft a blog", "turn the session into content", "tell the story of the build", or uses equivalent intent.

@@ -252,6 +252,26 @@ Rules:
 - **Same-model review is not independent review, and the report must say so.** SOP-018 is a skill, not a permanent agent — any agent can run it, and it is genuinely useful even when the reviewer is the same model/session that authored the change under review. But that combination must be labeled plainly in the report: "Same-model review — not independently verified." A material migration or build claim is only treated as verified once a genuinely separate reviewer (a different model, runtime, or session — Warwick himself, or an external instance) has actually reviewed it.
 - **A clean task board is not completeness evidence.** Neither is a closed-task count, nor a same-model reviewer finding nothing wrong from memory. Source-grounded acceptance evidence is required for any migration/build-completion claim.
 
+## Fusion 247 Handbook Currency Triggers (LLM-agnostic)
+
+Any LLM working in this myPKA MUST honor these natural-language triggers and run [[Team Knowledge/SOPs/SOP-020-keep-fusion247-handbook-current]] at the relevant delivery-closure point, not only when explicitly asked to "update the Handbook." This section is the trigger contract; SOP-020 is the executor.
+
+Trigger phrases / events → action:
+
+| User says (or implies), or the event occurs | Action |
+|---|---|
+| "keep the Handbook updated" / "update the Handbook whenever we ship something" | Run [[SOP-020-keep-fusion247-handbook-current]] as standing practice, not a one-time pass |
+| A PR merges that a Handbook capability page (`08.xx`) describes | Check whether that page needs an update per SOP-020 before closing the delivery item |
+| A Foundry IDEA is promoted, parked, or rejected | Check whether the relevant Handbook page(s) need an update |
+| An open Tier-1 recommendation/direction-decision referenced from a Handbook page is approved, amended, or declined | Update that page's status per SOP-020 |
+| "is the Handbook still accurate?" / "did anything change since the Handbook was written?" | Run SOP-020's read-before-write check against the affected page(s) |
+
+Rules:
+
+- **Part of normal closure, not a separate request.** This check runs at delivery closure the same way a session-log entry does — it does not wait for Warwick to separately ask "please update the Handbook."
+- **Never silently upgrade a page to COMPLETE.** Record PARTIAL with an updated as-of date unless the Handbook's own completion standard (canonical template, evidence, operation/recovery, hard-won knowledge, explicit gaps) is genuinely met.
+- **Read before write, always.** Never blind-overwrite a Handbook page — update only the affected section, preserving the rest.
+
 ## Frontmatter discipline
 
 When you (or any specialist you delegate to) create a new note in any of these eight entity folders:
