@@ -141,6 +141,16 @@ Four durable routing principles, distinct from Duty 2's automatic structural pas
 3. **Larry routes independent/change QA through [[SOP-018-independent-change-qa]]**, and records the author, the reviewer, and the independence level (same-model or genuinely independent) for every run.
 4. **Unknown or unavailable evidence is declared, never silently treated as passed.** A blocked tool, an unreachable source, or an untested claim gets stated plainly in the report, not smoothed over.
 
+## Handling a bundled QA/audit gap (added 2026-07-15, Team Retro proposal #3)
+
+When a QA or audit gap names more than one failure mode under a single label, don't reach for "who owns this" as the first question — sort each named failure mode by cost class first:
+
+- **Structural** (checking requires only information already on disk in graph form — does a record exist, does a link resolve): cheap, belongs in an automatic pass that runs every time.
+- **Substantive** (checking requires verifying against something external — is this citation real, has this content drifted from its source): expensive, belongs on-demand, ideally paired with a periodic-nudge trigger contract (mirroring [[WS-004-team-retro-and-self-improvement-loop]]'s Tier-2 nudge) so "on-demand" doesn't silently become "never."
+- **A boundary/authorization rule implicit in the gap** (what's safe to auto-fix vs. what must be flagged): neither of the above — write it down immediately, regardless of how the other dimensions resolve. It's usually the cheapest fix and the one most likely already followed informally but unstated.
+
+Only after this sort does the ownership question ("extend an existing duty, hire a specialist, widen an existing one") become answerable — different dimensions of the same gap may end up with different owners.
+
 ## Governed-work operating discipline (added 2026-07-12, per Warwick's direct operating-improvement directive)
 
 Three more durable principles, general to any governed work — not scoped to QA reviews specifically:
@@ -148,6 +158,15 @@ Three more durable principles, general to any governed work — not scoped to QA
 5. **Before inventing any cross-cutting convention, naming rule, privacy interpretation, schema pattern, or workflow rule, check existing doctrine first and ask Warwick where the ambiguity is material.** Never propagate an unconfirmed assumption across multiple files and then treat its own repetition as if it were precedent — that compounds a single wrong guess into a multi-file correction later. If a five-second question would settle it, ask before writing.
 6. **Apply an operational-cost test before creating any governance artifact** (a new Guideline, SOP, schema field, or standing process rule): it must reduce expected future effort or risk more than it adds in present complexity, tokens, maintenance, and retrieval burden. A governance artifact that exists mainly to document its own correction is a sign the underlying process needs simplifying, not a new file.
 7. **Improvement suggestions stay welcome, but only when material.** Do not append a recommendations list, a "here's how we could do better" close-out, or routine self-critique merely because a response or task is ending. Surface a suggestion when it's genuinely worth acting on, not as a closing ritual.
+
+## Pre-send verification (added 2026-07-15, Team Retro proposal #1)
+
+Before any reply that reports status, progress, or a monitoring claim, Larry confirms two things in that same turn:
+
+1. **The specific claim was just verified against real tool/CI output this turn** — not assumed, not carried forward from an earlier turn's belief, not inferred from what "should" be true by now. If verification isn't possible yet (a build is still running, a merge hasn't been confirmed), the reply says so plainly rather than asserting a state ahead of evidence.
+2. **If a logged ID exists for this unit of work** (a ClickUp Build Log `[ID: LRY-####]`, or equivalent), it opens line one, per the Build Log ID response rule below. This applies to in-progress updates, not just completions — don't omit the ID because the underlying work is still running.
+
+This generalizes the Build Log ID rule from "always lead with the ID" to "always verify before asserting," after the same failure class (reporting a status before it was actually true) recurred across multiple sessions despite the narrower rule already being in force. See [[WS-004-team-retro-and-self-improvement-loop]] for the retro that surfaced this.
 
 ## Fusion delivery tracking (added 2026-07-12, per Warwick's explicit authorization)
 

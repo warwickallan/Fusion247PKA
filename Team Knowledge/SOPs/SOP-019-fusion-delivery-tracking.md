@@ -23,6 +23,12 @@
 
 **ClickUp — structural gaps:** no `create_space` tool (Spaces must be created manually in the ClickUp UI if a dedicated "Fusion247" Space is ever wanted — until then, use the existing default Space). No `create_custom_field` tool (only a read, `get_custom_fields`) — use the task's native `status`/`priority` fields plus a consistent markdown-description template instead of bespoke custom fields.
 
+## Known ClickUp quirks (added 2026-07-15, Team Retro proposal #2 — consolidated so these aren't rediscovered fresh each time)
+
+- **Chat reads can be unreliable via the native connector for an entire session** (2026-07-12) — use the Zapier `ClickUpCLIAPI` bridge (see "Tool capability facts" above) as the working fallback.
+- **The List `status` field write fails with a genuine server error while the List `content` field write succeeds** (2026-07-13, WP1 close) — `clickup_update_list`'s `status` parameter is unreliable; don't retry indefinitely. Use the List's `content` field as the authoritative closure record instead, and report the tool limitation plainly rather than silently giving up or falsely claiming the status field changed.
+- **Fetching a ClickUp document page in `text/plain` format strips markdown tables to blank** (2026-07-15, Handbook population) — this is a display/format artifact of that retrieval call, not data loss. Re-fetch the same page in `text/md` format before concluding a table's content is missing or corrupted.
+
 ## Naming conventions
 
 - Idea: `IDEA-NNN — <name>`
