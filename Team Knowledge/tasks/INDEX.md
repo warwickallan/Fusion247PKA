@@ -2,15 +2,18 @@
 
 _Auto-generated. Do not edit by hand. Run `SOP-rebuild-task-index` to regenerate._
 
-_Last rebuilt: 2026-07-16T09:30:00Z_
+_Last rebuilt: 2026-07-16T10:00:00Z_
 
 ## Summary
-- Open: 4
+- Open: 5
 - In progress: 0 (0 blocked)
 - Done (this month): 9
 - Cancelled (this month): 0
 
-## Open (4)
+## Open (5)
+
+### Priority 2 — high
+- [[tsk-2026-07-15-001-reconcile-sop-002-with-actual-regen-script]] — Reconcile SOP-002's documented procedure with the actual regen script the Cockpit runs — assignee: silas — created 2026-07-15
 
 ### Priority 3 — normal
 - [[tsk-2026-07-16-001-exact-sha-review-gate-automation]] — Idea: Exact-SHA Review Gate Automation (Corpus Reconciliation Pipeline) — assignee: unassigned — created 2026-07-16
@@ -26,7 +29,7 @@ _none_
 ## By assignee
 - larry: 1 open, 0 in-progress (0 blocked)
 - warden: 0 open, 0 in-progress (0 blocked)
-- silas: 0 open, 0 in-progress (0 blocked)
+- silas: 1 open, 0 in-progress (0 blocked)
 - pax: 0 open, 0 in-progress (0 blocked)
 - unassigned: 3 open, 0 in-progress (0 blocked)
 
