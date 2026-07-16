@@ -1,13 +1,23 @@
 name: fusion-capture-gateway-tests
 
-# Sonnet review fix (area G): the WP0 fixtures baseline's test suite was
-# local-only evidence — the secret-scan workflow ran in CI, but nothing ran
-# `node --test`. This is the enforced control for that suite. Triggers only
-# when the gateway service, its BUILD contract records, or this workflow
-# itself change, on Node 22 (the service's `engines` requirement), installing
-# nothing beyond the zero-dependency package's own stdlib usage. Fails the
-# check on any test failure. Requires no real credentials — the whole suite is
-# fixtures-only (in-memory store, mock adapter, sandbox filesystem writer).
+# CI for the BUILD-002 WP0 capture gateway.
+#
+# Two jobs:
+#   * unit        — the fixtures-only suite (zero runtime dependencies, no DB,
+#                   no token, no network). This is the enforced gate on every
+#                   push/PR touching the service. Integration tests skip when
+#                   DATABASE_URL is unset.
+#   * integration — the SAME suite with DATABASE_URL pointed at a throwaway
+#                   Postgres 16 service, so the real-Postgres proofs actually run:
+#                   migrations apply from a clean DB, RLS deny/allow, transactional
+#                   FOR UPDATE SKIP LOCKED claim, due-retry index, retention,
+#                   cascade erasure, and the full async saga end-to-end
+#                   (intake -> durable row -> governed Markdown note -> evidence
+#                   -> completed). No real credentials, no cloud project, no
+#                   personal data — a disposable local service container only.
+#
+# Triggers only when the gateway service, its BUILD contract records, or this
+# workflow change. Node 22 (the service's engines requirement).
 
 on:
   push:
@@ -25,7 +35,7 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  unit:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -39,5 +49,40 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Run the fixtures-only test suite (zero runtime dependencies — no install needed)
+      - name: Run the fixtures-only suite (zero runtime dependencies, no DB, no token)
+        run: node --test
+
+  integration:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/fusion-capture-gateway
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # Throwaway CI service — not a real project, no personal data.
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies (pg, for the live Postgres adapter)
+        run: npm ci
+
+      - name: Run the full suite incl. real-Postgres integration + end-to-end
         run: node --test
