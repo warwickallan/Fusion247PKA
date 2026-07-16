@@ -62,6 +62,7 @@ export function createSandboxMarkdownWriter({ baseDir } = {}) {
   }
   const inboxDir = path.join(baseDir, 'inbox');
   let diskWrites = 0; // count of ACTUAL disk writes — proves idempotency in tests.
+  let failNextWrites = 0; // test-only: how many upcoming write() calls to fail.
 
   return {
     /**
@@ -79,6 +80,14 @@ export function createSandboxMarkdownWriter({ baseDir } = {}) {
       }
       if (!record || typeof record.capture_id !== 'string' || record.capture_id.length === 0) {
         throw new Error('markdownWriter.write: record.capture_id required');
+      }
+
+      // Test-only fault injection (mirrors the adapter's failNextEdit): throw a
+      // synthetic error BEFORE any path resolution or disk I/O, so no partial
+      // note leaks and diskWrites/idempotency are unaffected on a failed call.
+      if (failNextWrites > 0) {
+        failNextWrites -= 1;
+        throw new Error(`markdownWriter.write: simulated governed write failure for ${record.capture_id}`);
       }
 
       const fileName = `${safeSegment(record.capture_id)}.md`;
@@ -161,6 +170,14 @@ export function createSandboxMarkdownWriter({ baseDir } = {}) {
     /** Number of ACTUAL disk writes performed — used by tests to prove idempotency. */
     writeCount() {
       return diskWrites;
+    },
+
+    /** Test hook: force the next `n` write() calls to throw once each. */
+    failNextWrite(n = 1) {
+      if (typeof n !== 'number' || !Number.isInteger(n) || n < 0) {
+        throw new Error('markdownWriter.failNextWrite: n must be a non-negative integer');
+      }
+      failNextWrites = n;
     },
 
     inboxDir,

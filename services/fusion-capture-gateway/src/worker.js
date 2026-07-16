@@ -9,7 +9,7 @@
 //
 // FIXTURES ONLY (WP0): no network, no wall-clock. `now` is injected everywhere.
 
-import { STATES } from './core/states.js';
+import { STATES, MAX_DELIVERY_ATTEMPTS } from './core/states.js';
 import { projectCard } from './receiptProjection.js';
 
 /**
@@ -58,22 +58,72 @@ export function createWorker({ store, markdownWriter, adapter, clock, workerId, 
       // 2. claimed → writing.
       store.transition(captureId, STATES.WRITING, { now });
 
-      // 3. Governed Markdown write (idempotent). Re-processing an already-written
-      //    capture detects the existing note and does NOT rewrite.
-      const record = store.getByCaptureId(captureId);
-      const result = markdownWriter.write(record, { now });
+      // 3-6. Governed write + evidence + gated completion. If ANY step throws
+      //      (the governed Markdown write or its evidence/complete follow-up),
+      //      we record an HONEST failure and NEVER reach `completed`. Because the
+      //      writer is idempotent and the synthetic/real write faults throw
+      //      before touching disk, no partial or duplicate note leaks.
+      let final;
+      try {
+        // 3. Governed Markdown write (idempotent). Re-processing an already-
+        //    written capture detects the existing note and does NOT rewrite.
+        const record = store.getByCaptureId(captureId);
+        const result = markdownWriter.write(record, { now });
 
-      // 4. Record destination pointer, then writing → written.
-      store.recordDestination(captureId, result.destination_ref, { now });
-      store.transition(captureId, STATES.WRITTEN, { now });
+        // 4. Record destination pointer, then writing → written.
+        store.recordDestination(captureId, result.destination_ref, { now });
+        store.transition(captureId, STATES.WRITTEN, { now });
 
-      // 5. Record evidence pointer (idempotent on kind+target_ref), then
-      //    written → evidenced.
-      store.recordEvidence(captureId, result.evidence, { now });
-      store.transition(captureId, STATES.EVIDENCED, { now });
+        // 5. Record evidence pointer (idempotent on kind+target_ref), then
+        //    written → evidenced.
+        store.recordEvidence(captureId, result.evidence, { now });
+        store.transition(captureId, STATES.EVIDENCED, { now });
 
-      // 6. complete — gated by the store on evidenced + destination + evidence.
-      const final = store.complete(captureId, { now });
+        // 6. complete — gated by the store on evidenced + destination + evidence.
+        final = store.complete(captureId, { now });
+      } catch (writeErr) {
+        const errMsg = writeErr && writeErr.message ? writeErr.message : String(writeErr);
+        // Honest failure first: writing/written/evidenced → failed (all legal).
+        store.transition(captureId, STATES.FAILED, { now });
+        const failedRec = store.getByCaptureId(captureId);
+
+        // Retry-exhaustion decision belongs to the worker (states.js §): compare
+        // the claim-incremented attempt_count against the shared cap.
+        if (failedRec.attempt_count >= MAX_DELIVERY_ATTEMPTS) {
+          // Budget burned → park permanently for operator attention. Terminal;
+          // `completed` is now unreachable for this capture.
+          const dead = store.deadLetter(captureId, { now, error: errMsg });
+          // eslint-disable-next-line no-console
+          console.error(JSON.stringify({
+            service: 'fusion-capture-gateway',
+            component: 'worker',
+            event: 'delivery_dead_lettered',
+            worker_id: workerId,
+            capture_id: captureId,
+            attempt_count: failedRec.attempt_count,
+            max_delivery_attempts: MAX_DELIVERY_ATTEMPTS,
+            error: errMsg,
+            at_ms: now,
+          }));
+          return dead;
+        }
+
+        // Under the cap: leave it `failed` — a non-terminal, reclaimable state.
+        // A later reclaim (fresh claim via the queue / an expired lease) resumes
+        // the attempt; attempt_count keeps climbing toward the cap.
+        // eslint-disable-next-line no-console
+        console.error(JSON.stringify({
+          service: 'fusion-capture-gateway',
+          component: 'worker',
+          event: 'governed_write_failed',
+          worker_id: workerId,
+          capture_id: captureId,
+          attempt_count: failedRec.attempt_count,
+          error: errMsg,
+          at_ms: now,
+        }));
+        return failedRec;
+      }
 
       // 7. Edit the card to Completed. This is a RETRYABLE PROJECTION: a failure
       //    here must NOT reverse or duplicate the successful write/complete.
@@ -97,6 +147,30 @@ export function createWorker({ store, markdownWriter, adapter, clock, workerId, 
       }
 
       return final;
+    },
+
+    /**
+     * Re-project and retry the channel card for a capture. A card edit is a
+     * RETRYABLE PROJECTION: if the edit-to-Completed swallowed by processOne
+     * failed, this re-derives the card from CURRENT store state via
+     * receiptProjection and calls adapter.editCard again.
+     *
+     * Pure projection retry: it does NOT mutate store state and does NOT re-run
+     * the governed Markdown write. Idempotent — safe to call repeatedly; each
+     * call simply re-sends the card that matches the record's current state.
+     *
+     * @param {string} captureId
+     * @param {{ now?: number }} [opts]  injected epoch ms (signature parity).
+     * @returns {object} the adapter card-log entry.
+     */
+    retryCardProjection(captureId, { now: injectedNow } = {}) {
+      resolveNow({ now: injectedNow }); // signature parity + validates injection
+      const record = store.getByCaptureId(captureId);
+      if (!record) {
+        throw new Error(`retryCardProjection: unknown capture_id "${captureId}"`);
+      }
+      // Re-derive from current state and re-send. No store mutation, no re-write.
+      return adapter.editCard(captureId, projectCard(record));
     },
 
     /** Drain: process claimable items until none remain. Returns count processed. */
