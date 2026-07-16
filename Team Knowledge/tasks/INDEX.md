@@ -2,17 +2,18 @@
 
 _Auto-generated. Do not edit by hand. Run `SOP-rebuild-task-index` to regenerate._
 
-_Last rebuilt: 2026-07-12T22:00:00Z_
+_Last rebuilt: 2026-07-16T09:30:00Z_
 
 ## Summary
-- Open: 3
+- Open: 4
 - In progress: 0 (0 blocked)
 - Done (this month): 9
 - Cancelled (this month): 0
 
-## Open (3)
+## Open (4)
 
 ### Priority 3 — normal
+- [[tsk-2026-07-16-001-exact-sha-review-gate-automation]] — Idea: Exact-SHA Review Gate Automation (Corpus Reconciliation Pipeline) — assignee: unassigned — created 2026-07-16
 - [[tsk-2026-07-11-002-migration-closure-audit-remaining-blockers]] — Track migration-closure-audit's remaining blockers and Warwick decisions — assignee: larry — created 2026-07-11
 
 ### Priority 4 — low
@@ -27,7 +28,7 @@ _none_
 - warden: 0 open, 0 in-progress (0 blocked)
 - silas: 0 open, 0 in-progress (0 blocked)
 - pax: 0 open, 0 in-progress (0 blocked)
-- unassigned: 2 open, 0 in-progress (0 blocked)
+- unassigned: 3 open, 0 in-progress (0 blocked)
 
 ## Recently closed (last 7 days)
 - 2026-07-12 [[tsk-2026-07-12-002-synthetic-client-delivery-engagement-proof]] — done — larry

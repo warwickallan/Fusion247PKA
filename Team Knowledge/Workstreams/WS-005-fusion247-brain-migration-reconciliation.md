@@ -1,6 +1,6 @@
 # WS-005 - Fusion247 Brain Migration Reconciliation
 
-- **Status:** Active (since 2026-07-10)
+- **Status:** Active (since 2026-07-10) — recurring Workstream, not retired. **BUILD-000 pass closed 2026-07-16**, merge `094b6397b6f124399dc008695c35db8f499d9a16` (PR #23). See §"BUILD-000 closure record" below. The next reconciliation pass (whenever more Fusion247 Brain content needs auditing) reopens this Workstream's method, not a new one.
 - **Type:** Workstream — a multi-agent composition. Recurs each time a reconciliation pass is needed against the source system, not a one-shot task. Ships now (rather than waiting for a third repeat) because the buildout tracked in [[tsk-2026-07-10-001-fold-fusion247-brain-doctrine-into-warden]] is explicitly multi-session and more Fusion247 Brain content remains unreconciled after the first pass.
 - **Owners:** **Pax (primary executor)** — reads the precedence-ordered source registers, cross-references against this repo's git history and current file tree, produces the Migration Coverage Matrix. **Larry** — provisions Pax with extracted source text and git history (Pax has no `Bash`), synthesizes the report for the user, never edits architecture based on findings without user approval. **Silas / Warden / other specialists** — consulted when a finding requires domain judgment before disposition (e.g. "does this map to an existing schema field") but do not independently expand scope.
 - **References:** [[tsk-2026-07-10-001-fold-fusion247-brain-doctrine-into-warden]] (the buildout this reconciles against), [[GL-006-client-delivery-frontmatter-conventions]], [[SOP-001-how-to-add-a-new-specialist]]
@@ -101,3 +101,19 @@ Every run of this Workstream returns, in this order:
 4. The report exists in `Deliverables/` and is linked from the run's task.
 5. No implementation is performed merely because the ledger identifies a gap; follow-up changes remain separately authorised.
 6. The user has the report and any implementation remains subject to its own approval and independent-review boundary.
+
+(OBS-1 from Fable's final delta review, 2026-07-16: item 3's "all ten targeted BUILD-000 sources" is stale — seventeen were directly read across pass 2a and Bundle 8. True as a floor, not corrected here per that review's own low-priority/no-action note; leave for the next time this Workstream's text is substantively touched.)
+
+## BUILD-000 closure record (2026-07-16)
+
+BUILD-000 (Fusion247 Brain semantic merge assurance, the frozen 84-source pack) is closed. Summary, not a repeat of the full evidence trail — see the linked artifacts for that:
+
+- **PR:** [#23](https://github.com/warwickallan/Fusion247PKA/pull/23), approved head `501b5216ba2448ca5a71d0589ce11642d61e351b`, merge SHA `094b6397b6f124399dc008695c35db8f499d9a16`.
+- **Independent review:** three rounds — READY_TO_MERGE (stale, head `9094bf4`), CORRECTIONS_REQUIRED (head `126bc51`, 1 material + 3 minor, all resolved), final READY_TO_MERGE ([comment](https://github.com/warwickallan/Fusion247PKA/pull/23#issuecomment-4990210024), head `501b521`, 0 blocking/material/minor, 1 cosmetic observation).
+- **Final Bundle-8 totals:** 39 findings — 28 verified-already-present, 1 implemented-now, 8 defunct/no-further-action, 1 routed-to-foundry, 1 routed-to-build, 0 requires-warwick-decision. Full detail: [[2026-07-15-build-000-bundle-8-direct-audit]].
+- **Ledger:** [[2026-07-15-build-000-frozen-pack-reconciliation-ledger]] — 84 rows, 84 unique Copy IDs, mechanically verified.
+- **Telegram/TubeAIR lineage:** recorded against the existing IDEA-002 page (`https://app.clickup.com/90121891946/docs/2kxuxw3a-812/2kxuxw3a-3352` §10), completed externally by Warwick, independently verified present by Fable.
+- **CareerAIR, AsdAIr, Bellrock/Client Delivery material:** routed to their respective future Ideas/Builds (Foundry ideas, issue #17/BUILD-003), not claimed implemented.
+- **Closure statement:** `FUSION247 BRAIN CORPUS RECONCILED — EVERY AUTHORISED SOURCE ACCOUNTED FOR AND ITS USEFUL MEANING ASSIMILATED OR EXPLICITLY DISPOSITIONED.`
+
+This closes the confirmed merge blocker this Workstream existed to resolve for the frozen pack. WS-005's method remains available for any future reconciliation pass against newer Fusion247 Brain content — closing this pass does not retire the Workstream.
