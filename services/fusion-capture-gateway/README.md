@@ -64,6 +64,29 @@ Fully hermetic: no network, no real credentials. Sandbox dirs use
 - **Secrets.** Never committed. Only `.env.example` (names only) is tracked;
   `.env` is gitignored. Secrets are masked in every echo.
 
+## Secret scanning (F-02)
+
+A zero-dependency scanner at the repo root, `scripts/secret-scan.sh`, checks every
+**tracked** file for secret *values* (Telegram/JWT/Stripe/AWS/PEM/generic quoted
+secrets) and fails the build on any hit. It excludes `*.md`, `.env.example`, and
+itself to avoid matching name references.
+
+- **Enforced control:** the GitHub Actions workflow
+  `.github/workflows/secret-scan.yml` runs it on every `push` and `pull_request`.
+  CI is the control that cannot be bypassed.
+- **Run it locally:** `npm run scan` (from this service dir) or
+  `bash scripts/secret-scan.sh` from the repo root. It exits `0` on a clean tree.
+- **Optional local convenience hook** (mirrors CI, catches issues pre-commit):
+
+  ```sh
+  git config core.hooksPath services/fusion-capture-gateway/.githooks
+  # ...or copy services/fusion-capture-gateway/.githooks/pre-commit
+  #    to .git/hooks/pre-commit and chmod +x it.
+  ```
+
+  The hook runs the secret scan and `node --test`. It is a convenience only — the
+  enforced control is CI.
+
 ## Dependencies
 
 **Zero runtime dependencies.** Node 22 stdlib only (`node:fs`, `node:os`,

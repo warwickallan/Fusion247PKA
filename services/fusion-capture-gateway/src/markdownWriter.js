@@ -124,6 +124,40 @@ export function createSandboxMarkdownWriter({ baseDir } = {}) {
       };
     },
 
+    /**
+     * Erase a previously written sandbox note (security finding F-03, app layer).
+     * Idempotent: removing an already-absent note is not an error.
+     *
+     * Traversal-safe: only ever operates INSIDE this writer's inbox. A
+     * destination_ref pointing outside the sandbox is refused (defence in depth
+     * against a tampered/foreign pointer), never followed.
+     *
+     * @param {{ kind?: string, path: string }} destinationRef
+     * @param {{ now: number }} opts  injected epoch ms (signature parity with write()).
+     * @returns {{ removed: boolean, path: string }}
+     */
+    remove(destinationRef, { now } = {}) {
+      if (typeof now !== 'number' || !Number.isFinite(now)) {
+        throw new Error('markdownWriter.remove: injected numeric `now` (epoch ms) required');
+      }
+      if (!destinationRef || typeof destinationRef.path !== 'string' || destinationRef.path.length === 0) {
+        throw new Error('markdownWriter.remove: destinationRef.path required');
+      }
+
+      const resolved = path.resolve(destinationRef.path);
+      const inboxRoot = path.resolve(inboxDir);
+      // Only delete within the sandbox inbox — refuse anything outside it.
+      if (resolved !== inboxRoot && !resolved.startsWith(inboxRoot + path.sep)) {
+        throw new Error('markdownWriter.remove: refusing out-of-sandbox path');
+      }
+
+      if (!fs.existsSync(resolved)) {
+        return { removed: false, path: resolved };
+      }
+      fs.rmSync(resolved, { force: true });
+      return { removed: true, path: resolved };
+    },
+
     /** Number of ACTUAL disk writes performed — used by tests to prove idempotency. */
     writeCount() {
       return diskWrites;
