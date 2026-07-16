@@ -51,16 +51,22 @@ function renderNote(record) {
 
 /**
  * Create a sandboxed Markdown writer rooted at baseDir. Writes land under
- * `<baseDir>/inbox/<capture_id>.md`. Never escapes baseDir.
+ * `<baseDir>/<subdir>/<capture_id>.md`. Never escapes baseDir.
  *
  * @param {object} opts
- * @param {string} opts.baseDir  sandbox root (throwaway path in fixtures).
+ * @param {string} opts.baseDir   sandbox/governed root.
+ * @param {string} [opts.subdir]  leaf folder under baseDir. Default 'inbox'
+ *                 (fixtures). The LIVE governed writer passes 'captures' so real
+ *                 captures land in `Team Inbox/captures/` (see live/runtime.js).
  */
-export function createSandboxMarkdownWriter({ baseDir } = {}) {
+export function createSandboxMarkdownWriter({ baseDir, subdir = 'inbox' } = {}) {
   if (typeof baseDir !== 'string' || baseDir.length === 0) {
     throw new Error('createSandboxMarkdownWriter: baseDir required');
   }
-  const inboxDir = path.join(baseDir, 'inbox');
+  if (typeof subdir !== 'string' || subdir.length === 0) {
+    throw new Error('createSandboxMarkdownWriter: subdir must be a non-empty string');
+  }
+  const inboxDir = path.join(baseDir, subdir);
   let diskWrites = 0; // count of ACTUAL disk writes — proves idempotency in tests.
   let failNextWrites = 0; // test-only: how many upcoming write() calls to fail.
 

@@ -20,6 +20,9 @@
 // Postgres store self-registers on recordIntake today as a STOPGAP. ensure-
 // AuthorisedIdentity() is the designated owner going forward.
 
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { createInMemoryOperationalStore } from '../store/operationalStore.js';
 import { createMockTelegramAdapter } from '../adapters/telegramAdapter.js';
 import { createSandboxMarkdownWriter } from '../markdownWriter.js';
@@ -30,6 +33,38 @@ import { createAccessLogger } from '../security/accessLog.js';
 import { REQUIRED_AT_RUNTIME, DEFAULT_CAPTURE_BRAIN_DIR } from '../config.js';
 
 const FIXTURE_AUTH_ID = 'fixture-user'; // used only when fixtures config omits the id
+
+// ── Governed Markdown destination (PREPROVISION-CORRECTION-0001 §5) ──────────
+// The authority-backed governed capture landing zone is the repo's `Team Inbox/`
+// (root AGENTS.md: "where the user drops raw inputs for Larry to route. Penn
+// picks them up and files into PKM." + Team Inbox/README.md). The mechanical
+// worker performs the governed write there — it lands the raw capture; it does
+// NOT decide the semantic PKM destination (that is Larry/Penn/Cairn's later
+// triage, per source-of-truth-and-authority-matrix §1). Live captures land in
+// `Team Inbox/captures/<capture_id>.md`, namespaced apart from hand-dropped files.
+const HERE = path.dirname(fileURLToPath(import.meta.url)); // <repo>/services/fusion-capture-gateway/src/live
+const REPO_ROOT = path.resolve(HERE, '..', '..', '..', '..'); // up: live→src→service→services→repo
+export const GOVERNED_BRAIN_DIR = path.join(REPO_ROOT, 'Team Inbox');
+export const GOVERNED_CAPTURE_SUBDIR = 'captures';
+
+/**
+ * Resolve the governed Markdown base dir + leaf subdir for the given mode.
+ *  - explicit CAPTURE_BRAIN_DIR (operator override) wins in either mode;
+ *  - legacy CAPTURE_SANDBOX_DIR next;
+ *  - LIVE with nothing set → the authority-backed governed `Team Inbox/`;
+ *  - FIXTURES with nothing set → the clearly-marked throwaway default.
+ * Live always uses the 'captures' leaf; fixtures keep the default 'inbox' leaf.
+ */
+export function resolveGovernedDestination(config, mode) {
+  const explicit = config.captureBrainDir ?? config.captureSandboxDir ?? null;
+  if (explicit) {
+    return { baseDir: explicit, subdir: mode === 'live' ? GOVERNED_CAPTURE_SUBDIR : 'inbox' };
+  }
+  if (mode === 'live') {
+    return { baseDir: GOVERNED_BRAIN_DIR, subdir: GOVERNED_CAPTURE_SUBDIR };
+  }
+  return { baseDir: DEFAULT_CAPTURE_BRAIN_DIR, subdir: 'inbox' };
+}
 
 /**
  * Build the authorised sender's channel-identity descriptor. Pure — the single
@@ -174,12 +209,12 @@ export async function createLiveRuntime(config, opts = {}) {
     accessLog,
   });
 
-  // The governed writer lands in the CONFIGURED canonical destination. In WP0
-  // this is the sandboxed writer confined to CAPTURE_BRAIN_DIR (default: a
-  // clearly-marked capture-inbox) — the governed PKM destination is Larry/Cairn's
-  // call; here it is simply configurable and traversal-confined.
-  const baseDir = config.captureBrainDir ?? config.captureSandboxDir ?? DEFAULT_CAPTURE_BRAIN_DIR;
-  const markdownWriter = createSandboxMarkdownWriter({ baseDir });
+  // The governed writer lands in the authority-backed governed destination
+  // (§5). In live mode with nothing configured this is the repo `Team Inbox/`
+  // (Team Inbox/captures/<capture_id>.md); in fixtures it is the throwaway
+  // default. Traversal-confined by the writer either way.
+  const { baseDir, subdir } = resolveGovernedDestination(config, mode);
+  const markdownWriter = createSandboxMarkdownWriter({ baseDir, subdir });
 
   const workerId = config.workerId ?? 'fixture-worker';
 
