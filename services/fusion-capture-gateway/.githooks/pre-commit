@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+#
+# Sample pre-commit hook — LOCAL convenience mirror of the enforced CI control.
+#
+# Security finding F-02 (wp0-security-gate.md §6): the ENFORCED secret-scanning
+# control is the GitHub Actions workflow (.github/workflows/secret-scan.yml).
+# This hook simply runs the same checks earlier, on your machine, so a secret or
+# a broken test is caught before it ever leaves your laptop. It is NOT the source
+# of enforcement — a contributor can bypass it with --no-verify; CI cannot be.
+#
+# ENABLE (either one):
+#   git config core.hooksPath services/fusion-capture-gateway/.githooks
+#   # ...or copy this file to .git/hooks/pre-commit and chmod +x it.
+#
+set -euo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+
+echo "[pre-commit] secret scan (tracked files)..."
+bash "$ROOT/scripts/secret-scan.sh"
+
+echo "[pre-commit] service tests (node --test)..."
+( cd "$ROOT/services/fusion-capture-gateway" && node --test )
+
+echo "[pre-commit] OK — secret scan clean, tests green."
