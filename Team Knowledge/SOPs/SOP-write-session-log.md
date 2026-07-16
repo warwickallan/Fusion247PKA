@@ -54,6 +54,8 @@ linked_workstreams: []
 linked_guidelines: []
 linked_tasks: []
 linked_journal_entries: []
+runtime_host: <e.g. "Claude Code", "Codex CLI", "ChatGPT", or unknown>
+model_id: <the actual underlying model, or "unknown" with a reason>
 ---
 ```
 
@@ -63,8 +65,13 @@ Field notes:
 - `type` defaults to `end-of-session`. Other values: `mid-session-checkpoint`, `stand-down`.
 - `linked_tasks` lists tasks this session created, claimed, blocked, unblocked, or closed. Mirror of the `linked_session_logs` array those tasks carry.
 - `linked_journal_entries` lists journal entries birthed in this session.
+- **`runtime_host` / `model_id`** (added 2026-07-15, BUILD-000 correction — see [[2026-07-15-build-000-bundle-8-direct-audit]]): `agent_id` names the specialist *persona* (`larry`, `pax`, `silas`...); it does not say which runtime or model actually ran the session. The same persona can run through different hosts/models across sessions. These two fields record that separately, so provenance ("who/what actually processed this") is never conflated with agent identity ("which specialist role this was"):
+  - `runtime_host` — the host/interface the session ran in (e.g. `Claude Code`, `Codex CLI`, `ChatGPT`). Use an honest value when known.
+  - `model_id` — the specific underlying model. `unknown` is permitted only in one of two cases, and the field must say which: **(1)** the runtime genuinely does not expose a model identifier to the session — say so plainly; or **(2)** a real, external policy or an explicit Warwick instruction prohibits recording it — in this case the field must **name the constraint's actual source** (a policy/document path, the instruction's owner, and its date or a durable reference), not just assert that a constraint exists. **An unnamed, session-asserted "configured constraint" that nothing outside the session can check is never sufficient** — that is exactly the unauditable escape hatch this field exists to prevent. If no genuine, nameable reason exists, record the actual value.
+  - **Do not rewrite historical session logs** to backfill these fields — they apply going forward from 2026-07-15. Missing fields on older logs are not a defect.
+  - **Never conflate `agent_id` with `model_id`.** A session log that only fills `agent_id` accurately still owes an honest `runtime_host`/`model_id` (even if the honest value is `unknown` plus a reason) once this convention applies.
 
-The legacy v1.x session-logs only have `linked_sops`, `linked_workstreams`, `linked_guidelines`. v1.10.0 adds `linked_tasks` and `linked_journal_entries`. Existing pre-v1.10.0 logs keep working — the missing fields are interpreted as empty arrays.
+The legacy v1.x session-logs only have `linked_sops`, `linked_workstreams`, `linked_guidelines`. v1.10.0 adds `linked_tasks` and `linked_journal_entries`. `runtime_host`/`model_id` were added 2026-07-15 (BUILD-000 correction), independent of the scaffold's own version numbering. Existing logs from before that date keep working — the missing fields are interpreted as `unknown`, not errors.
 
 ## Body shape (recommended sections, not enforced)
 
