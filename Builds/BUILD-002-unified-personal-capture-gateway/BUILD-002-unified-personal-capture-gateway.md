@@ -73,7 +73,7 @@ User-facing guarantee unchanged: safe-and-waiting while the worker is offline; n
 
 | WP | Name | Status |
 | --- | --- | --- |
-| [[WP0-foundation-and-live-text-proof]] | Foundation and live text proof | **In progress — fixtures baseline implemented + Sonnet-reviewed (PR #28, 101 tests, CI-enforced); Vex delta re-touch pending; live proof pending** |
+| [[WP0-foundation-and-live-text-proof]] | Foundation and live text proof | **In progress — fixtures baseline reviewed, security-cleared (Vex delta GREEN) and MERGED to `main` (PR #28, SHA `087a4381`, 101 tests, CI-enforced); live proof pending** |
 | WP1 | Telegram cockpit & Larry communication | Planned — separately gated |
 | WP2 | Multimodal capture pack | Planned — separately gated |
 | WP3 | Specialist bot facades | Planned — separately gated |

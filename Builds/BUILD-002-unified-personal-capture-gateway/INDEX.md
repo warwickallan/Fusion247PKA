@@ -23,6 +23,12 @@ Canonical production record for the build promoted from IDEA-002 on 2026-07-16. 
   - [[supabase-operational-foundation-boundary]] — Supabase operational baseline, secrets, local worker seam, module placement, cross-build reuse.
 - **Security/**
   - [[wp0-security-gate]] — the gate that must pass before real secrets and the live phone proof.
+  - [[wp0-security-gate-execution-2026-07-16]] — round 1/round 2 gate execution (history).
+  - [[wp0-security-gate-delta-2026-07-16]] — targeted delta security review of PR #28 (PASS, SECURITY DELTA GREEN).
+
+## Implementation
+
+- `services/fusion-capture-gateway/` — the WP0 fixtures-only baseline (merged to `main` via PR #28, SHA `087a43813d31062aba63cd5e1e0ec0d42fdfc227`). Plain JS/ESM, Node 22, zero runtime deps, 101 tests, CI-enforced (`.github/workflows/fusion-capture-gateway-tests.yml`). No real secrets, no live integration.
 
 ## Delivery tracking
 
