@@ -24,7 +24,9 @@ write and proves it with an evidence pointer.
   - `src/markdownWriter.js` — sandboxed, **idempotent** governed Markdown write.
   - `src/receiptProjection.js` — pure, retryable receipt + card projections.
   - `src/intake.js` — the durable acceptance path (commit point + dedup).
-  - `src/worker.js` — the pull/claim/write/evidence/complete cycle.
+  - `src/worker.js` — the pull/claim/write/evidence/complete cycle, including
+    autonomous retry scheduling and retry-exhaustion → dead-letter.
+  - `src/core/retryPolicy.js` — deterministic bounded-retry backoff (pure logic).
 
 ## Run the tests
 
@@ -34,6 +36,10 @@ node --test
 
 Fully hermetic: no network, no real credentials. Sandbox dirs use
 `os.tmpdir()` + `fs.mkdtempSync` and are cleaned up per test.
+
+**Enforced in CI:** `.github/workflows/fusion-capture-gateway-tests.yml` runs
+this full suite on Node 22 for every push/PR that touches this service or its
+BUILD contract records — the test suite is not local-only evidence.
 
 ## The durable-saga model (why captures are never lost or falsely completed)
 
@@ -46,13 +52,22 @@ Fully hermetic: no network, no real credentials. Sandbox dirs use
 3. **Idempotent Markdown writes.** The write target is a deterministic path
    derived from `capture_id`. If the note already exists, the writer detects it
    and does **not** rewrite — resume after a crash never double-writes.
-4. **Evidence-gated completion.** `completed` is reachable **only** via
+4. **Autonomous bounded retry, then dead-letter.** A failed governed write
+   transitions to `failed` and is stamped with a deterministic backoff due time
+   (`src/core/retryPolicy.js`, exponential, capped). `store.claim()` is the ONLY
+   place retry re-entry happens — it autonomously reclaims a `failed`/`partial`
+   item once its due time arrives, with **no external scheduler or test helper**.
+   Reclaiming before the due time is refused. Once `attempt_count` reaches
+   `MAX_DELIVERY_ATTEMPTS` the item is parked in the terminal `dead_letter` state
+   instead of being rescheduled — permanently distinguishable from a transient,
+   still-retryable `failed`.
+5. **Evidence-gated completion.** `completed` is reachable **only** via
    `written → evidenced → completed`, and only once a destination pointer **and**
    an evidence pointer both exist. No false completion is possible.
-5. **Cards are retryable projections.** A card is a pure function of the store
+6. **Cards are retryable projections.** A card is a pure function of the store
    record. A **failed card edit never reverses or duplicates** the completed
    write — the worker swallows the projection error and leaves the state
-   completed; the card can be re-projected later.
+   completed; the card can be re-projected later (`worker.retryCardProjection`).
 
 ## Boundaries
 
@@ -86,6 +101,17 @@ itself to avoid matching name references.
 
   The hook runs the secret scan and `node --test`. It is a convenience only — the
   enforced control is CI.
+
+## Migrations (artifacts — not executed by the test suite)
+
+`migrations/0001_wp0_operational_baseline.sql` + `0002_wp0_deletion_and_retention.sql`
+are the Postgres/Supabase DDL artifacts. They are never applied against a real
+database in WP0. The four foreign keys `0002` drops-and-recreates with `ON DELETE`
+actions carry **explicit** `constraint <name>` declarations in `0001` — not an
+assumption about Postgres's implicit default naming — and `test/migrations.test.js`
+statically verifies the two files stay consistent (every name `0002` drops is
+declared in `0001` and re-added under the identical name), plus that RLS stays
+enabled deny-by-default and `0002` never weakens it.
 
 ## Dependencies
 

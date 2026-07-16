@@ -18,8 +18,15 @@
 import {
   STATES,
   CLAIMABLE_STATES,
+  MAX_DELIVERY_ATTEMPTS,
   assertTransition,
 } from '../core/states.js';
+
+// States from which a DUE retry is autonomously reclaimable by claim() — see
+// recordFailure() and the isDueRetry candidate check below (Sonnet review fix:
+// WP0 claimed retry behaviour that previously had no real runtime path; only a
+// test-only helper simulated it).
+const RETRYABLE_STATES = Object.freeze([STATES.FAILED, STATES.PARTIAL]);
 
 /**
  * OperationalStore interface (documentation contract). A conforming
@@ -54,6 +61,12 @@ import {
  *   complete(captureId, { now }) -> record
  *       Transition to `completed`. Refuses unless the item is `evidenced` AND
  *       both a destination pointer and an evidence pointer exist.
+ *
+ *   recordFailure(captureId, { now, error, nextAttemptAtMs }) -> record
+ *       Transition to `failed` (legal from claimed/writing/written/evidenced)
+ *       and stamp `next_attempt_at_ms` so a LATER claim() call can autonomously
+ *       reclaim this item once due — no external retry helper required. This is
+ *       the real runtime path behind the "will be retried" receipt/card copy.
  *
  *   deadLetter(captureId, { now, error }) -> record
  *       Transition to `dead_letter` (retry-exhaustion sink). Asserts legality
@@ -147,6 +160,7 @@ export function createInMemoryOperationalStore() {
         claimed_by: null,
         lease_expires_at_ms: null,
         attempt_count: 0,
+        next_attempt_at_ms: null, // set by recordFailure(); cleared once reclaimed
         last_error: null,
         destination_ref: null,
         evidence_pointers: [],
@@ -192,14 +206,21 @@ export function createInMemoryOperationalStore() {
       }
 
       // Claimable = a queued/offline_queued item, OR a claimed item whose lease
-      // has expired (a crashed/hung worker's row auto-releases).
+      // has expired (a crashed/hung worker's row auto-releases), OR a
+      // failed/partial item whose scheduled retry is now due (recordFailure()
+      // stamped next_attempt_at_ms; below the attempt cap; never before due).
+      // This is the autonomous retry seam: no external scheduler required.
       const candidates = [];
       for (const rec of byCaptureId.values()) {
         const isFreshlyClaimable = CLAIMABLE_STATES.includes(rec.state);
         const isExpiredClaim = rec.state === STATES.CLAIMED
           && rec.lease_expires_at_ms !== null
           && rec.lease_expires_at_ms <= now;
-        if (isFreshlyClaimable || isExpiredClaim) candidates.push(rec);
+        const isDueRetry = RETRYABLE_STATES.includes(rec.state)
+          && rec.next_attempt_at_ms !== null
+          && rec.next_attempt_at_ms <= now
+          && rec.attempt_count < MAX_DELIVERY_ATTEMPTS;
+        if (isFreshlyClaimable || isExpiredClaim || isDueRetry) candidates.push(rec);
       }
       if (candidates.length === 0) return null;
 
@@ -208,6 +229,8 @@ export function createInMemoryOperationalStore() {
       const rec = candidates[0];
 
       // An expired claim is re-queued first so the transition stays legal.
+      // failed/partial → claimed is ALREADY a directly legal hop (states.js) —
+      // no intermediate state needed for a due retry.
       if (rec.state === STATES.CLAIMED) {
         assertTransition(rec.state, STATES.QUEUED);
         rec.state = STATES.QUEUED;
@@ -216,6 +239,7 @@ export function createInMemoryOperationalStore() {
       rec.state = STATES.CLAIMED;
       rec.claimed_by = workerId;
       rec.lease_expires_at_ms = now + leaseMs;
+      rec.next_attempt_at_ms = null; // stale once reclaimed; recordFailure() re-stamps on the next failure
       rec.attempt_count += 1;
       rec.updated_at_ms = now;
       return cloneRecord(rec);
@@ -280,6 +304,29 @@ export function createInMemoryOperationalStore() {
       }
       assertTransition(rec.state, STATES.COMPLETED);
       rec.state = STATES.COMPLETED;
+      rec.updated_at_ms = now;
+      return cloneRecord(rec);
+    },
+
+    /**
+     * Record an honest failure AND schedule the autonomous retry (Sonnet review
+     * fix — the real runtime path behind "will be retried"). Transitions to
+     * `failed` (legal from claimed/writing/written/evidenced) and stamps
+     * `next_attempt_at_ms` so a LATER claim() call reclaims this item once due,
+     * with no external scheduler or test-only helper required. `nextAttemptAtMs`
+     * is computed by the caller (worker) via core/retryPolicy.js so the store
+     * stays free of policy/backoff logic — it only stores and enforces the due
+     * time.
+     */
+    recordFailure(captureId, opts) {
+      const now = requireNow(opts, 'recordFailure');
+      const rec = getInternal(captureId);
+      assertTransition(rec.state, STATES.FAILED);
+      rec.state = STATES.FAILED;
+      if (opts?.error !== undefined) rec.last_error = opts.error;
+      rec.next_attempt_at_ms = typeof opts?.nextAttemptAtMs === 'number' && Number.isFinite(opts.nextAttemptAtMs)
+        ? opts.nextAttemptAtMs
+        : null;
       rec.updated_at_ms = now;
       return cloneRecord(rec);
     },

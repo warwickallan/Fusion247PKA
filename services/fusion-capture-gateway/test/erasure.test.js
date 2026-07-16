@@ -140,6 +140,67 @@ test('double-erase is idempotent: second erase returns {erased:false}, no throw,
   }
 });
 
+test('erasing a record with no destination_ref yet (never written) still erases the operational row', () => {
+  const baseDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fcg-erase-partial-'));
+  try {
+    const { intake, store, eraser } = harness(baseDir);
+
+    // Accepted but never processed by the worker: no destination_ref exists.
+    const acc = intake.accept(UPDATE);
+    assert.equal(acc.ok, true);
+    assert.equal(store.getByCaptureId(acc.captureId).destination_ref, null);
+
+    const result = eraser.erase(acc.captureId, { now: T0 + 5 });
+    assert.deepEqual(result, {
+      capture_id: acc.captureId,
+      erased: true,
+      removed: { markdown: false, record: true },
+      at_ms: T0 + 5,
+    });
+    assert.equal(store.getByCaptureId(acc.captureId), undefined, 'operational row erased even with no markdown artefact');
+  } finally {
+    fs.rmSync(baseDir, { recursive: true, force: true });
+  }
+});
+
+test('a tampered/foreign destination_ref never blocks erasing the operational row (Sonnet review area F)', () => {
+  const baseDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fcg-erase-tampered-'));
+  try {
+    const { store, eraser } = harness(baseDir);
+
+    // Simulate DB corruption / a tampered pointer: an out-of-sandbox path the
+    // writer's remove() defensively refuses (proven in traversal.test.js).
+    store.recordIntake({
+      capture_id: 'cap-tampered',
+      idempotency_key: 'k-tampered',
+      source_channel: 'telegram',
+      sender_identity_ref: 'telegram:user:424242',
+      recorded_intent: 'SaveToBrain',
+      technical_source_type: 'text',
+    }, { now: T0 });
+    store.recordDestination('cap-tampered', { kind: 'markdown', path: '/etc/passwd' }, { now: T0 + 1 });
+    const before = fs.existsSync('/etc/passwd');
+
+    let result;
+    assert.doesNotThrow(() => {
+      result = eraser.erase('cap-tampered', { now: T0 + 2 });
+    }, 'erase() must not throw on a refused foreign pointer');
+
+    assert.deepEqual(result, {
+      capture_id: 'cap-tampered',
+      erased: true,
+      removed: { markdown: false, record: true }, // markdown removal honestly failed; row still erased
+      at_ms: T0 + 2,
+    });
+    // The PII-carrying operational row is gone even though the markdown step failed.
+    assert.equal(store.getByCaptureId('cap-tampered'), undefined, 'operational row erased despite the refused pointer');
+    // The foreign file was never touched by the refused removal.
+    assert.equal(fs.existsSync('/etc/passwd'), before, '/etc/passwd untouched');
+  } finally {
+    fs.rmSync(baseDir, { recursive: true, force: true });
+  }
+});
+
 test('erasing an unknown capture id never throws and reports erased:false', () => {
   const baseDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fcg-erase-unknown-'));
   try {

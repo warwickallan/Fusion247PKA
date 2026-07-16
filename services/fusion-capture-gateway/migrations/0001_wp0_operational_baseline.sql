@@ -19,6 +19,18 @@
 -- FIXTURES-ONLY NOTE: this file is the migration ARTIFACT. It is NOT executed by
 -- the WP0 test suite. No secrets, no data, no real project are provisioned here.
 --
+-- EXPLICIT FK CONSTRAINT NAMES (Sonnet review fix, area D): the four foreign
+-- keys that migration 0002 later drops-and-recreates with ON DELETE actions
+-- (capture_envelope.sender_identity_ref is NOT one of them and is named purely
+-- for consistency) carry EXPLICIT `constraint <name>` clauses below, using the
+-- exact names Postgres would otherwise assign implicitly. Before this fix, 0002
+-- silently ASSUMED those undeclared implicit names — correct today, but a
+-- future edit to this file that added or renamed a constraint could silently
+-- desync 0002 with no error until applied against a real database. Naming them
+-- here makes the contract between the two files explicit and machine-checked
+-- (see test/migrations.test.js, a static parser that fails CI if 0002 ever
+-- drops a name not declared here).
+--
 -- !! SECURITY GATE (Vex) — DO NOT WEAKEN !!
 -- Row-Level Security MUST be ENABLED on every table below before any real (non-
 -- synthetic) data or real credentials are introduced. WP0/WP1 is a SINGLE
@@ -119,13 +131,17 @@ create table fcg.capture_envelope (
   capture_id            uuid primary key,               -- server-assigned canonical id
   schema_version        text not null default 'capture-envelope/v1',
   source_channel        fcg.source_channel not null,
-  sender_identity_ref   text not null references fcg.channel_identity (identity_ref),
+  sender_identity_ref   text not null
+    constraint capture_envelope_sender_identity_ref_fkey
+    references fcg.channel_identity (identity_ref),
   recorded_intent       fcg.recorded_intent not null,
   technical_source_type fcg.technical_source_type not null,
 
   -- Inline text kept in-row for WP0; larger/binary payloads point at fcg.raw_object.
   payload_text          text,
-  raw_object_ref        uuid references fcg.raw_object (raw_object_id),
+  raw_object_ref        uuid
+    constraint capture_envelope_raw_object_ref_fkey
+    references fcg.raw_object (raw_object_id),
 
   -- Retention pointer to the untouched original (nullable only for pure inline text).
   original_store        text,
@@ -151,7 +167,9 @@ create table fcg.capture_envelope (
 
 create table fcg.idempotency_key (
   idempotency_key text primary key,                      -- <channel>:<native_msg_id>:sha256:<digest>
-  capture_id      uuid not null references fcg.capture_envelope (capture_id),
+  capture_id      uuid not null
+    constraint idempotency_key_capture_id_fkey
+    references fcg.capture_envelope (capture_id),
   created_at      timestamptz not null default now()
 );
 
@@ -162,7 +180,9 @@ create table fcg.idempotency_key (
 -- --------------------------------------------------------------------------
 
 create table fcg.processing_state (
-  capture_id       uuid primary key references fcg.capture_envelope (capture_id),
+  capture_id       uuid primary key
+    constraint processing_state_capture_id_fkey
+    references fcg.capture_envelope (capture_id),
   state            fcg.processing_state not null default 'accepted',
   claimed_by       text,                                 -- worker principal id
   claimed_at       timestamptz,
@@ -186,7 +206,9 @@ create index processing_state_claimable_idx
 
 create table fcg.evidence_pointer (
   evidence_id   uuid primary key default gen_random_uuid(),
-  capture_id    uuid not null references fcg.capture_envelope (capture_id),
+  capture_id    uuid not null
+    constraint evidence_pointer_capture_id_fkey
+    references fcg.capture_envelope (capture_id),
   evidence_kind fcg.evidence_kind not null,
   target_ref    text not null,                            -- path / commit sha / message id
   created_at    timestamptz not null default now(),

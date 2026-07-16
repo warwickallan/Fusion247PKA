@@ -59,10 +59,30 @@ export function createEraser({ store, markdownWriter } = {}) {
         };
       }
 
-      // 1. Governed Markdown note (canonical knowledge copy).
+      // 1. Governed Markdown note (canonical knowledge copy). A markdown-
+      //    removal failure (e.g. a tampered/foreign destination_ref the writer
+      //    defensively refuses — Sonnet review area F) must NOT block erasing
+      //    the operational row below: that row ALSO carries PII
+      //    (sender_identity_ref, text_preview) which must still be erased even
+      //    if the markdown step could not complete. The failure is logged
+      //    honestly (no secrets) and reflected truthfully as removed.markdown
+      //    false — never silently swallowed, never blocking step 3.
       let markdownRemoved = false;
       if (record.destination_ref && typeof record.destination_ref.path === 'string') {
-        markdownRemoved = markdownWriter.remove(record.destination_ref, { now }).removed;
+        try {
+          markdownRemoved = markdownWriter.remove(record.destination_ref, { now }).removed;
+        } catch (err) {
+          // eslint-disable-next-line no-console
+          console.error(JSON.stringify({
+            service: 'fusion-capture-gateway',
+            component: 'erasure',
+            event: 'markdown_removal_failed',
+            capture_id: captureId,
+            error: err && err.message ? err.message : String(err),
+            at_ms: now,
+          }));
+          markdownRemoved = false;
+        }
       }
 
       // 2. Raw storage object. In fixtures the raw payload is only a POINTER on

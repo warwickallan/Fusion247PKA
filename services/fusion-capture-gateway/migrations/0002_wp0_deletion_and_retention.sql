@@ -33,13 +33,19 @@
 --
 -- 0001 declared the child FKs (idempotency_key.capture_id, processing_state.
 -- capture_id, evidence_pointer.capture_id -> capture_envelope.capture_id, and
--- capture_envelope.raw_object_ref -> raw_object.raw_object_id) WITHOUT an
--- ON DELETE action, i.e. the default ON DELETE NO ACTION — which would REFUSE to
--- delete a capture that still has children. That blocks erasure. Here we make
--- the child rows cascade so one delete of the parent capture erases:
+-- capture_envelope.raw_object_ref -> raw_object.raw_object_id) WITH EXPLICIT
+-- constraint names (Sonnet review fix, area D) and WITHOUT an ON DELETE action,
+-- i.e. the default ON DELETE NO ACTION — which would REFUSE to delete a capture
+-- that still has children. That blocks erasure. Here we make the child rows
+-- cascade so one delete of the parent capture erases:
 --   - its processing_state row (queue/lease/attempt history)
 --   - its evidence_pointer rows (operational pointers, not knowledge)
 --   - its idempotency_key row (freeing the key for a genuinely new capture)
+--
+-- The `drop constraint` names below are DECLARED in 0001, not assumed from
+-- Postgres's implicit default-naming behaviour — see 0001's header note and
+-- test/migrations.test.js, which statically fails if this file ever drops a
+-- name 0001 doesn't declare.
 -- --------------------------------------------------------------------------
 
 alter table fcg.idempotency_key

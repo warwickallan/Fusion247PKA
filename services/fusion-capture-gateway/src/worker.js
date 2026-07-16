@@ -10,6 +10,7 @@
 // FIXTURES ONLY (WP0): no network, no wall-clock. `now` is injected everywhere.
 
 import { STATES, MAX_DELIVERY_ATTEMPTS } from './core/states.js';
+import { computeNextAttemptAtMs } from './core/retryPolicy.js';
 import { projectCard } from './receiptProjection.js';
 
 /**
@@ -83,8 +84,19 @@ export function createWorker({ store, markdownWriter, adapter, clock, workerId, 
         final = store.complete(captureId, { now });
       } catch (writeErr) {
         const errMsg = writeErr && writeErr.message ? writeErr.message : String(writeErr);
-        // Honest failure first: writing/written/evidenced → failed (all legal).
-        store.transition(captureId, STATES.FAILED, { now });
+        // attempt_count was already incremented by claim() at the top of this
+        // call — use it to compute THIS failure's autonomous retry due time.
+        const attemptCount = store.getByCaptureId(captureId).attempt_count;
+        // Honest failure + autonomous retry scheduling (Sonnet review fix — this
+        // is the real runtime path behind "will be retried"; no external
+        // scheduler or test-only helper required). writing/written/evidenced →
+        // failed is legal; recordFailure stamps next_attempt_at_ms so a LATER
+        // claim() reclaims this item once due.
+        store.recordFailure(captureId, {
+          now,
+          error: errMsg,
+          nextAttemptAtMs: computeNextAttemptAtMs(attemptCount, now),
+        });
         const failedRec = store.getByCaptureId(captureId);
 
         // Retry-exhaustion decision belongs to the worker (states.js §): compare

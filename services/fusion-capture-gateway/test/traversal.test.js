@@ -17,12 +17,25 @@ import { createSandboxMarkdownWriter } from '../src/markdownWriter.js';
 
 const T0 = 1_752_660_000_000;
 
-// The probe's payloads: ids that TRY to climb out of the inbox.
+// The probe's payloads: ids that TRY to climb out of the inbox. safeSegment()
+// is a POSITIVE ALLOWLIST ([^a-zA-Z0-9_-] -> '_'), which by construction
+// defeats encoding/platform tricks too — these variants make that explicit
+// and regression-proof rather than relying on the allowlist's generality alone
+// (Sonnet review area E: "including encoded and platform-specific variants").
 const MALICIOUS_IDS = [
   '../../../../tmp/EVIL',
   '/etc/passwd',
   'foo/../../bar',
   'a/../../etc/x',
+  // URL-encoded traversal — the allowlist strips '%' too, so this never decodes.
+  '%2e%2e%2f%2e%2e%2fetc%2fpasswd',
+  // Windows-style backslash separators.
+  '..\\..\\..\\windows\\system32\\config',
+  'C:\\Windows\\System32\\drivers\\etc\\hosts',
+  // Embedded NUL byte (classic path-truncation trick in some C-backed APIs).
+  'evil\0../../etc/passwd',
+  // Unicode fullwidth dot/slash look-alikes — non-ASCII, so also flattened.
+  '．．／etc／passwd',
 ];
 
 test('malicious capture_ids all resolve INSIDE the sandbox inbox — no escape, no /tmp/EVIL', () => {
