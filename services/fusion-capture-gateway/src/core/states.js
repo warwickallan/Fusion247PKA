@@ -25,15 +25,24 @@ export const STATES = Object.freeze({
   FAILED: 'failed',
   NEEDS_CLARIFICATION: 'needs_clarification',
   CANCELLED: 'cancelled',
+  // Retry-exhaustion sink: a delivery that has burned its bounded attempts and
+  // is permanently parked for human/operator attention. Genuinely terminal.
+  DEAD_LETTER: 'dead_letter',
 });
 
 export const ALL_STATES = Object.freeze(Object.values(STATES));
+
+// Bounded-retry cap. The WORKER (not the store) owns the decision: when a
+// failing item's `attempt_count` reaches this cap it is dead-lettered instead
+// of re-queued. Exposed here so the worker compares against one shared constant.
+export const MAX_DELIVERY_ATTEMPTS = 5;
 
 // Terminal outcomes: no outgoing transition (except that failed/partial are
 // "terminal-until-retry" — see below — so they are NOT in this set).
 export const TERMINAL_STATES = Object.freeze([
   STATES.COMPLETED,
   STATES.CANCELLED,
+  STATES.DEAD_LETTER,
 ]);
 
 // States where a durable item is accepted but not yet processed. Cards must
@@ -72,14 +81,16 @@ const BASE_TRANSITIONS = {
   [STATES.WRITTEN]: [STATES.EVIDENCED, STATES.PARTIAL, STATES.FAILED],
   // completed is reachable ONLY from evidenced.
   [STATES.EVIDENCED]: [STATES.COMPLETED, STATES.PARTIAL, STATES.FAILED],
-  // Retry resumes from the last durable state — never from scratch.
-  [STATES.PARTIAL]: [STATES.CLAIMED, STATES.WRITING],
-  [STATES.FAILED]: [STATES.CLAIMED],
+  // Retry resumes from the last durable state — never from scratch. Once the
+  // worker exhausts MAX_DELIVERY_ATTEMPTS the item is dead-lettered instead.
+  [STATES.PARTIAL]: [STATES.CLAIMED, STATES.WRITING, STATES.DEAD_LETTER],
+  [STATES.FAILED]: [STATES.CLAIMED, STATES.DEAD_LETTER],
   // User answers → back into processing.
   [STATES.NEEDS_CLARIFICATION]: [STATES.CLAIMED, STATES.WRITING],
   // Terminal:
   [STATES.COMPLETED]: [],
   [STATES.CANCELLED]: [],
+  [STATES.DEAD_LETTER]: [],
 };
 
 // Cancel affordance: any non-terminal state may move to `cancelled`.

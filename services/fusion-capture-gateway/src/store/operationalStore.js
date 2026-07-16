@@ -55,6 +55,12 @@ import {
  *       Transition to `completed`. Refuses unless the item is `evidenced` AND
  *       both a destination pointer and an evidence pointer exist.
  *
+ *   deadLetter(captureId, { now, error }) -> record
+ *       Transition to `dead_letter` (retry-exhaustion sink). Asserts legality
+ *       (failed/partial → dead_letter), records `error` as last_error if given.
+ *       The DECISION to dead-letter (attempt_count >= MAX_DELIVERY_ATTEMPTS) is
+ *       the worker's; the store only permits and performs the hop.
+ *
  *   deleteCapture(captureId, { now }) -> { deleted, capture_id }
  *       Idempotent hard-delete (GDPR/erasure DATA-LAYER path). Removes the
  *       byCaptureId record AND its byIdempotencyKey index entry, so the same
@@ -274,6 +280,24 @@ export function createInMemoryOperationalStore() {
       }
       assertTransition(rec.state, STATES.COMPLETED);
       rec.state = STATES.COMPLETED;
+      rec.updated_at_ms = now;
+      return cloneRecord(rec);
+    },
+
+    /**
+     * Retry-exhaustion sink: move a failed/partial item to `dead_letter` (a
+     * genuinely terminal state). Thin wrapper over the same transition
+     * machinery as `transition`/`complete`; the attempt-cap decision belongs to
+     * the worker (compare rec.attempt_count against MAX_DELIVERY_ATTEMPTS).
+     */
+    deadLetter(captureId, opts) {
+      const now = requireNow(opts, 'deadLetter');
+      const rec = getInternal(captureId);
+      assertTransition(rec.state, STATES.DEAD_LETTER);
+      rec.state = STATES.DEAD_LETTER;
+      if (opts?.error !== undefined) {
+        rec.last_error = opts.error;
+      }
       rec.updated_at_ms = now;
       return cloneRecord(rec);
     },
