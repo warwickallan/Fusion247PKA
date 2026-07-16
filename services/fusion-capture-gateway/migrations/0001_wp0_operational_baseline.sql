@@ -65,7 +65,14 @@ create type fcg.technical_source_type as enum (
 
 -- Processing lifecycle. `completed` is only ever set AFTER written + evidenced
 -- both exist (enforced in application logic; see states.js and §4 of the pack).
-create type fcg.processing_state as enum (
+--
+-- NAME NOTE: this ENUM is named `capture_processing_state`, NOT `processing_state`.
+-- A table `fcg.processing_state` (the queue, below) implicitly creates a
+-- composite type of the same name; an enum called `processing_state` would
+-- collide with it and Postgres would refuse to create the table. The enum
+-- therefore carries the `capture_` prefix; the TABLE keeps the bare name
+-- `processing_state` because it is FK-referenced and app-referenced.
+create type fcg.capture_processing_state as enum (
   'received',
   'accepted',
   'queued',
@@ -78,7 +85,9 @@ create type fcg.processing_state as enum (
   'partial',
   'failed',
   'needs_clarification',
-  'cancelled'
+  'cancelled',
+  -- Retry-exhaustion sink (states.js :: DEAD_LETTER). Genuinely terminal.
+  'dead_letter'
 );
 
 create type fcg.evidence_kind as enum (
@@ -183,7 +192,7 @@ create table fcg.processing_state (
   capture_id       uuid primary key
     constraint processing_state_capture_id_fkey
     references fcg.capture_envelope (capture_id),
-  state            fcg.processing_state not null default 'accepted',
+  state            fcg.capture_processing_state not null default 'accepted',
   claimed_by       text,                                 -- worker principal id
   claimed_at       timestamptz,
   lease_expires_at timestamptz,                           -- crashed claim auto-releases past this

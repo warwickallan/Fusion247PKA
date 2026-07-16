@@ -10,5 +10,8 @@
   "scripts": {
     "test": "node --test",
     "scan": "bash ../../scripts/secret-scan.sh"
+  },
+  "dependencies": {
+    "pg": "^8.22.0"
   }
 }
