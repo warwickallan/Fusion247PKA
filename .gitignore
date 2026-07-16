@@ -37,6 +37,15 @@ id_rsa
 # overwritable by scripts/regen-mypka-db.py wherever Python IS available.
 !/mypka.db
 
+# --- Agent-skills junction layer (machine-local) ---
+# `npx skills add` installs skill content into .agents/skills/ (tracked) and
+# creates Windows junctions under .claude/skills/ pointing at it. With
+# core.symlinks=false git would commit the junction CONTENTS as a duplicate
+# copy of the pack — so the junction layer stays local; regenerate with
+# `npx skills add supabase/agent-skills`.
+.claude/skills/supabase/
+.claude/skills/supabase-postgres-best-practices/
+
 # --- Dependencies & build artifacts ---
 node_modules/
 dist/
