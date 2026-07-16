@@ -1,0 +1,43 @@
+name: fusion-capture-gateway-tests
+
+# Sonnet review fix (area G): the WP0 fixtures baseline's test suite was
+# local-only evidence — the secret-scan workflow ran in CI, but nothing ran
+# `node --test`. This is the enforced control for that suite. Triggers only
+# when the gateway service, its BUILD contract records, or this workflow
+# itself change, on Node 22 (the service's `engines` requirement), installing
+# nothing beyond the zero-dependency package's own stdlib usage. Fails the
+# check on any test failure. Requires no real credentials — the whole suite is
+# fixtures-only (in-memory store, mock adapter, sandbox filesystem writer).
+
+on:
+  push:
+    paths:
+      - 'services/fusion-capture-gateway/**'
+      - 'Builds/BUILD-002-unified-personal-capture-gateway/**'
+      - '.github/workflows/fusion-capture-gateway-tests.yml'
+  pull_request:
+    paths:
+      - 'services/fusion-capture-gateway/**'
+      - 'Builds/BUILD-002-unified-personal-capture-gateway/**'
+      - '.github/workflows/fusion-capture-gateway-tests.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/fusion-capture-gateway
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Run the fixtures-only test suite (zero runtime dependencies — no install needed)
+        run: node --test

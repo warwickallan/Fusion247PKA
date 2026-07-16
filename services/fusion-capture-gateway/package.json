@@ -1,0 +1,14 @@
+{
+  "name": "fusion-capture-gateway",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "BUILD-002 WP0 fixtures-only domain core for the unified personal capture gateway. Pure logic + SQL, zero runtime dependencies.",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test",
+    "scan": "bash ../../scripts/secret-scan.sh"
+  }
+}

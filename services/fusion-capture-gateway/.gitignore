@@ -1,0 +1,12 @@
+# Secrets — never committed. Only .env.example is tracked.
+.env
+.env.*
+!.env.example
+
+# Node
+node_modules/
+
+# Local sandbox output (governed Markdown write target in fixtures mode).
+sandbox/
+.capture-sandbox/
+*.local
