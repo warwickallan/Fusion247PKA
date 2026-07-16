@@ -28,6 +28,7 @@ const MIGRATIONS = [
   '0002_wp0_deletion_and_retention.sql',
   '0003_wp0_rls_policies.sql',
   '0004_wp0_retry_retention_indexes.sql',
+  '0005_wp0_card_target_and_poll_offset.sql',
 ];
 
 // Drop the fcg schema and re-apply all migrations from empty. `pg` loaded here,
@@ -276,6 +277,52 @@ test('7. RLS — anon is denied; service_role works', { skip: !DB }, async () =>
     } finally {
       await pool.end();
     }
+  } finally {
+    await store.end();
+  }
+});
+
+test('9. card_ref — recordCardRef persists the durable card target and reverse-lookup finds the capture (§4)', { skip: !DB }, async () => {
+  const store = await freshStore();
+  try {
+    const e = makeEnvelope();
+    await store.recordIntake(e, { now: 100 });
+    await store.enqueue(e.capture_id, { now: 100 });
+
+    // No card target yet.
+    let rec = await store.getByCaptureId(e.capture_id);
+    assert.equal(rec.card_ref, null, 'card_ref starts null');
+
+    await store.recordCardRef(e.capture_id, { chat_id: '424242', message_id: 1001 }, { now: 200 });
+    rec = await store.getByCaptureId(e.capture_id);
+    assert.deepEqual(rec.card_ref, { chat_id: '424242', message_id: 1001 }, 'card_ref persisted durably');
+
+    // Reverse lookup resolves the owning capture (drives inbound callback routing).
+    const found = await store.findCaptureIdByCard('424242', 1001);
+    assert.equal(found, e.capture_id, 'reverse lookup finds the capture by (chat_id, message_id)');
+    const miss = await store.findCaptureIdByCard('424242', 999999);
+    assert.equal(miss, undefined, 'a card with no capture returns undefined');
+  } finally {
+    await store.end();
+  }
+});
+
+test('10. poll offset — durable, defaults to 0, advances, and is monotonic (never rewinds)', { skip: !DB }, async () => {
+  const store = await freshStore();
+  try {
+    assert.equal(await store.getPollOffset('telegram'), 0, 'unset offset defaults to 0');
+
+    const a = await store.setPollOffset('telegram', 10, { now: 100 });
+    assert.equal(a.offset_value, 10);
+    assert.equal(await store.getPollOffset('telegram'), 10, 'offset persisted durably');
+
+    const b = await store.setPollOffset('telegram', 25, { now: 200 });
+    assert.equal(b.offset_value, 25, 'offset advances');
+
+    // Monotonic guard: a stale/duplicate lower advance never rewinds the cursor.
+    const c = await store.setPollOffset('telegram', 5, { now: 300 });
+    assert.equal(c.offset_value, 25, 'a lower value cannot rewind the acknowledged cursor');
+    assert.equal(await store.getPollOffset('telegram'), 25);
   } finally {
     await store.end();
   }

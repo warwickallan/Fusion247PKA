@@ -46,6 +46,7 @@ const RECORD_SELECT = `
     (extract(epoch from ps.next_attempt_at) * 1000)::bigint  as next_attempt_at_ms,
     ps.last_error,
     ps.destination_ref,
+    ps.card_ref,
     coalesce(ev.pointers, '[]'::json)                        as evidence_pointers
   from fcg.capture_envelope ce
   join fcg.processing_state ps on ps.capture_id = ce.capture_id
@@ -90,6 +91,7 @@ function mapRow(row) {
     next_attempt_at_ms: toMs(row.next_attempt_at_ms),
     last_error: row.last_error ?? null,
     destination_ref: row.destination_ref ?? null,
+    card_ref: row.card_ref ?? null,
     evidence_pointers: (row.evidence_pointers ?? []).map((e) => ({ ...e })),
   };
 }
@@ -378,6 +380,70 @@ export async function createPostgresOperationalStore({ connectionString, poolCon
         );
         return loadByCaptureId(client, captureId);
       });
+    },
+
+    /**
+     * Persist the durable channel card target (§4): {chat_id, message_id} of the
+     * card message, so a restarted worker re-targets editCard from durable state.
+     */
+    async recordCardRef(captureId, cardRef, opts) {
+      if (!cardRef || typeof cardRef !== 'object'
+        || cardRef.chat_id === undefined || cardRef.message_id === undefined) {
+        throw new Error('recordCardRef: cardRef { chat_id, message_id } required');
+      }
+      const ts = nowTs(opts);
+      return withTx(async (client) => {
+        await currentState(client, captureId); // existence check
+        await client.query(
+          `update fcg.processing_state
+             set card_ref = $2::jsonb, updated_at = coalesce($3::timestamptz, now())
+           where capture_id = $1`,
+          [captureId, JSON.stringify({ chat_id: cardRef.chat_id, message_id: cardRef.message_id }), ts],
+        );
+        return loadByCaptureId(client, captureId);
+      });
+    },
+
+    /** Reverse lookup: which capture owns the card at (chat_id, message_id)? */
+    async findCaptureIdByCard(chatId, messageId) {
+      const res = await pool.query(
+        `select capture_id from fcg.processing_state
+           where card_ref->>'chat_id' = $1 and card_ref->>'message_id' = $2
+           order by updated_at asc
+           limit 1`,
+        [String(chatId), String(messageId)],
+      );
+      return res.rows[0]?.capture_id;
+    },
+
+    /** Read the durable long-poll offset for a channel (default 0 when unset). */
+    async getPollOffset(channel) {
+      const res = await pool.query(
+        'select offset_value from fcg.channel_poll_offset where channel = $1',
+        [String(channel)],
+      );
+      return res.rows.length > 0 ? Number(res.rows[0].offset_value) : 0;
+    },
+
+    /**
+     * Advance the durable long-poll offset for a channel. Monotonic: the upsert
+     * uses greatest(existing, new) so a re-fetched batch can never rewind
+     * acknowledged progress.
+     */
+    async setPollOffset(channel, offsetValue, opts) {
+      const next = Number(offsetValue);
+      if (!Number.isFinite(next)) throw new Error('setPollOffset: numeric offsetValue required');
+      const ts = nowTs(opts);
+      const res = await pool.query(
+        `insert into fcg.channel_poll_offset (channel, offset_value, updated_at)
+         values ($1, $2, coalesce($3::timestamptz, now()))
+         on conflict (channel) do update
+           set offset_value = greatest(fcg.channel_poll_offset.offset_value, excluded.offset_value),
+               updated_at = coalesce($3::timestamptz, now())
+         returning channel, offset_value`,
+        [String(channel), next, ts],
+      );
+      return { channel: res.rows[0].channel, offset_value: Number(res.rows[0].offset_value) };
     },
 
     async recordEvidence(captureId, evidencePointer, opts) {

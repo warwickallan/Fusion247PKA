@@ -102,6 +102,7 @@ function cloneRecord(record) {
     raw_payload_ref: record.raw_payload_ref ? { ...record.raw_payload_ref } : record.raw_payload_ref,
     original_source_ref: record.original_source_ref ? { ...record.original_source_ref } : record.original_source_ref,
     destination_ref: record.destination_ref ? { ...record.destination_ref } : null,
+    card_ref: record.card_ref ? { ...record.card_ref } : null,
     evidence_pointers: record.evidence_pointers.map((e) => ({ ...e })),
   };
 }
@@ -114,6 +115,8 @@ export function createInMemoryOperationalStore() {
   const byCaptureId = new Map();
   /** @type {Map<string, string>} idempotency_key -> capture_id */
   const byIdempotencyKey = new Map();
+  /** @type {Map<string, number>} channel -> durable long-poll offset (§4). */
+  const pollOffsets = new Map();
   let seq = 0; // monotonic insertion order for deterministic "oldest first"
 
   function getInternal(captureId) {
@@ -163,6 +166,7 @@ export function createInMemoryOperationalStore() {
         next_attempt_at_ms: null, // set by recordFailure(); cleared once reclaimed
         last_error: null,
         destination_ref: null,
+        card_ref: null, // {chat_id, message_id} once the channel card is sent (§4)
         evidence_pointers: [],
       };
       byCaptureId.set(captureId, record);
@@ -268,6 +272,63 @@ export function createInMemoryOperationalStore() {
       rec.destination_ref = { ...destinationRef };
       rec.updated_at_ms = now;
       return cloneRecord(rec);
+    },
+
+    /**
+     * Persist the durable channel card target (§4). {chat_id, message_id} of the
+     * card message so a restarted worker can re-target editCard from durable
+     * state — the in-memory adapter Map is a cache, this is the source of truth.
+     * Idempotent: recording the same target again is a harmless overwrite.
+     */
+    recordCardRef(captureId, cardRef, opts) {
+      const now = requireNow(opts, 'recordCardRef');
+      if (!cardRef || typeof cardRef !== 'object'
+        || cardRef.chat_id === undefined || cardRef.message_id === undefined) {
+        throw new Error('recordCardRef: cardRef { chat_id, message_id } required');
+      }
+      const rec = getInternal(captureId);
+      rec.card_ref = { chat_id: cardRef.chat_id, message_id: cardRef.message_id };
+      rec.updated_at_ms = now;
+      return cloneRecord(rec);
+    },
+
+    /**
+     * Reverse lookup: which capture owns the card at (chat_id, message_id)?
+     * Used to route an inbound callback_query back to its capture. Returns the
+     * capture_id or undefined. Deterministic (first match by seq order).
+     */
+    findCaptureIdByCard(chatId, messageId) {
+      const wantChat = String(chatId);
+      const wantMsg = String(messageId);
+      const matches = [...byCaptureId.values()].filter(
+        (r) => r.card_ref
+          && String(r.card_ref.chat_id) === wantChat
+          && String(r.card_ref.message_id) === wantMsg,
+      );
+      if (matches.length === 0) return undefined;
+      matches.sort((a, b) => a.seq - b.seq);
+      return matches[0].capture_id;
+    },
+
+    /** Read the durable long-poll offset for a channel (default 0 when unset). */
+    getPollOffset(channel) {
+      return pollOffsets.get(String(channel)) ?? 0;
+    },
+
+    /**
+     * Advance the durable long-poll offset for a channel. Monotonic guard: never
+     * moves the cursor backwards (a stale/duplicate advance is ignored), so a
+     * re-fetched batch cannot rewind acknowledged progress.
+     */
+    setPollOffset(channel, offsetValue, opts) {
+      requireNow(opts, 'setPollOffset');
+      const ch = String(channel);
+      const next = Number(offsetValue);
+      if (!Number.isFinite(next)) throw new Error('setPollOffset: numeric offsetValue required');
+      const cur = pollOffsets.get(ch) ?? 0;
+      const applied = next > cur ? next : cur;
+      pollOffsets.set(ch, applied);
+      return { channel: ch, offset_value: applied };
     },
 
     recordEvidence(captureId, evidencePointer, opts) {
