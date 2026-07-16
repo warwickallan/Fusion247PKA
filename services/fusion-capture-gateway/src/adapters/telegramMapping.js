@@ -129,3 +129,59 @@ export function mapTelegramUpdate({ update, now, authorisedUserId, action, defau
 
   return { ok: true, value: envelope, senderId };
 }
+
+/**
+ * Map an inbound Telegram callback_query (an action-button tap on a card) onto a
+ * channel-neutral action descriptor, enforcing the SAME single-user allowlist.
+ *
+ * A callback_query does NOT carry the original captured text — it references the
+ * bot's CARD message. So this returns the routing coordinates (chat id + card
+ * message id) + the chosen action; the caller resolves which capture that card
+ * belongs to via the durable card_ref reverse lookup (§4).
+ *
+ * Pure + deterministic (injected `now`), no I/O, no logging — parity with
+ * mapTelegramUpdate: the adapter owns rejection LOGGING.
+ *
+ * @returns {{ ok:true, value:{ callbackId, chatId, messageId, senderId, action } }
+ *          | { ok:false, reason:string, senderId:(string|null) }}
+ */
+export function mapTelegramCallbackQuery({ update, now, authorisedUserId } = {}) {
+  if (typeof now !== 'number' || !Number.isFinite(now)) {
+    throw new Error('mapTelegramCallbackQuery: injected numeric `now` (epoch ms) required');
+  }
+  if (authorisedUserId === undefined || authorisedUserId === null || authorisedUserId === '') {
+    throw new Error('mapTelegramCallbackQuery: authorisedUserId required (allowlist of one)');
+  }
+  const authorised = String(authorisedUserId);
+
+  const cq = update && typeof update === 'object' ? update.callback_query : undefined;
+  if (!cq || typeof cq !== 'object') {
+    return { ok: false, reason: 'no_callback', senderId: null };
+  }
+
+  const from = cq.from;
+  const senderId = from && from.id !== undefined ? String(from.id) : undefined;
+  // Same single-user default-deny as the message path.
+  if (senderId === undefined || senderId !== authorised) {
+    return { ok: false, reason: 'unauthorised_sender', senderId: senderId ?? null };
+  }
+
+  const msg = cq.message && typeof cq.message === 'object' ? cq.message : {};
+  const chat = msg.chat && typeof msg.chat === 'object' ? msg.chat : {};
+  const chatId = chat.id !== undefined ? String(chat.id) : senderId; // private chat → user id
+  const messageId = msg.message_id;
+  // Untrusted content stays inert: the action is validated against the known set;
+  // an unknown action is rejected rather than interpolated anywhere.
+  const action = typeof cq.data === 'string' ? cq.data : undefined;
+
+  return {
+    ok: true,
+    value: {
+      callbackId: cq.id,
+      chatId,
+      messageId,
+      senderId,
+      action,
+    },
+  };
+}

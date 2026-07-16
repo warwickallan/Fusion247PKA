@@ -13,6 +13,21 @@ import { STATES, MAX_DELIVERY_ATTEMPTS } from './core/states.js';
 import { computeNextAttemptAtMs } from './core/retryPolicy.js';
 import { projectCard } from './receiptProjection.js';
 
+// Build the card model for an edit, enriched with the DURABLE card target
+// (chat_id + message_id) from the record's persisted card_ref (§4). This is what
+// makes the completion projection restart-safe: even a freshly-started worker
+// whose adapter has an empty in-memory card map re-targets the ORIGINAL card
+// from durable state. When card_ref is absent (fixtures that never sent a card)
+// the fields are simply undefined and the adapter falls back to its own map.
+function cardModelFor(record) {
+  const model = projectCard(record);
+  if (record && record.card_ref) {
+    model.chat_id = record.card_ref.chat_id;
+    model.message_id = record.card_ref.message_id;
+  }
+  return model;
+}
+
 /**
  * @param {object} deps
  * @param {object} deps.store           OperationalStore.
@@ -159,7 +174,7 @@ export function createWorker({ store, markdownWriter, adapter, clock, workerId, 
       //    here must NOT reverse or duplicate the successful write/complete.
       //    Swallow the projection error, leave state completed, log it.
       try {
-        await adapter.editCard(captureId, projectCard(final));
+        await adapter.editCard(captureId, cardModelFor(final));
       } catch (err) {
         // Structured log (no secrets, no full payload) — the card is stale but
         // the capture is durably completed. It can be re-projected later.
@@ -200,7 +215,9 @@ export function createWorker({ store, markdownWriter, adapter, clock, workerId, 
         throw new Error(`retryCardProjection: unknown capture_id "${captureId}"`);
       }
       // Re-derive from current state and re-send. No store mutation, no re-write.
-      return adapter.editCard(captureId, projectCard(record));
+      // Enriched with the durable card target so it re-targets the original card
+      // even after a restart (empty in-memory adapter map).
+      return adapter.editCard(captureId, cardModelFor(record));
     },
 
     /** Drain: process claimable items until none remain. Returns count processed. */

@@ -17,7 +17,7 @@
 
 import { createHash, timingSafeEqual } from 'node:crypto';
 
-import { mapTelegramUpdate } from './telegramMapping.js';
+import { mapTelegramUpdate, mapTelegramCallbackQuery } from './telegramMapping.js';
 
 const DEFAULT_API_BASE = 'https://api.telegram.org';
 
@@ -124,6 +124,27 @@ export function createLiveTelegramAdapter({
   return {
     rejections,
 
+    /**
+     * Channel-neutral CALLBACK mapping + single-user default-deny. Returns the
+     * card routing coordinates + chosen action; the runner resolves the owning
+     * capture via the durable card_ref reverse lookup. Auth rejections logged.
+     */
+    toCallback(update, { now: nowMs } = {}) {
+      const mapped = mapTelegramCallbackQuery({ update, now: nowMs, authorisedUserId: authorised });
+      if (!mapped.ok) {
+        if (mapped.reason === 'unauthorised_sender') {
+          rejections.push({ sender_id: mapped.senderId, at_ms: nowMs, reason: mapped.reason });
+          if (accessLog && typeof accessLog.authRejection === 'function') {
+            accessLog.authRejection({
+              principal: mapped.senderId, channel: 'telegram', when: nowMs, reason: mapped.reason,
+            });
+          }
+        }
+        return { ok: false, reason: mapped.reason };
+      }
+      return { ok: true, value: mapped.value };
+    },
+
     /** Channel-neutral mapping + single-user default-deny (shared with mock). */
     toEnvelope(update, { now: nowMs, action } = {}) {
       const mapped = mapTelegramUpdate({
@@ -187,6 +208,29 @@ export function createLiveTelegramAdapter({
         reply_markup: inlineKeyboard(cardModel),
       });
       return parsed;
+    },
+
+    /**
+     * Acknowledge a callback_query so Telegram dismisses the button's loading
+     * spinner. `text` is a brief, secret-free toast. Best-effort: a failure here
+     * is a projection failure, never a data-integrity one — the caller decides
+     * whether to swallow it. Returns the parsed API result.
+     */
+    async answerCallbackQuery(callbackQueryId, text) {
+      return callApi('answerCallbackQuery', {
+        callback_query_id: callbackQueryId,
+        text: typeof text === 'string' ? text : undefined,
+      });
+    },
+
+    /**
+     * The durable-recovery seam: the persisted card target for a capture, if the
+     * runner has one. The runner promotes this to the operational store's
+     * card_ref so a restart can re-target editCard without this in-memory map.
+     */
+    cardTarget(captureId) {
+      const t = cardMessages.get(captureId);
+      return t ? { chatId: t.chatId, messageId: t.messageId } : undefined;
     },
 
     /**

@@ -80,6 +80,21 @@ export function createIntake({ store, adapter, clock, isWorkerOnline, rateLimite
         await store.enqueue(record.capture_id, { now, offline });
         // Initial card: safe-and-waiting. Never a completion claim.
         await adapter.sendCard(record.capture_id, projectCard(await store.getByCaptureId(record.capture_id)));
+
+        // Persist the DURABLE card target (§4): {chat_id, message_id} of the card
+        // we just sent, so the completion projection can re-target the ORIGINAL
+        // card after a worker restart (when the adapter's in-memory map is empty).
+        // Guarded so it is a no-op for stores/adapters that don't expose the seam.
+        if (typeof store.recordCardRef === 'function' && typeof adapter.cardTarget === 'function') {
+          const target = adapter.cardTarget(record.capture_id);
+          if (target && target.messageId !== undefined) {
+            await store.recordCardRef(
+              record.capture_id,
+              { chat_id: target.chatId, message_id: target.messageId },
+              { now },
+            );
+          }
+        }
       }
 
       const current = await store.getByCaptureId(record.capture_id);

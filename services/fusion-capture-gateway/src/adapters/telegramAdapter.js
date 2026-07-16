@@ -12,7 +12,7 @@
 // Channel-neutral rule: all Telegram-specific knowledge lives HERE. The intake,
 // store, worker, and contracts never mention Telegram.
 
-import { mapTelegramUpdate } from './telegramMapping.js';
+import { mapTelegramUpdate, mapTelegramCallbackQuery } from './telegramMapping.js';
 
 /**
  * TelegramAdapter interface (documentation contract). A conforming
@@ -50,12 +50,20 @@ export function createMockTelegramAdapter({ authorisedUserId, defaultAction = 'S
   const sentCards = [];
   // Rejection log — default-deny events are logged (sender id + when), never actioned.
   const rejections = [];
+  // Answered callbacks (test-observable) + scripted inbound queue for getUpdates.
+  const answered = [];
+  let pending = [];
+  // Card targets, mirroring the live adapter — so the runner can promote them to
+  // the durable store and prove restart recovery (a NEW mock loses this map).
+  const cardMessages = new Map(); // captureId -> { chatId, messageId }
+  let nextMessageId = 1000;
   let failEditOnce = false;
 
   return {
-    // --- expose the log for tests ---
+    // --- expose the logs for tests ---
     sentCards,
     rejections,
+    answered,
 
     toEnvelope(update, { now, action } = {}) {
       // Delegate the channel-neutral mapping + single-user default-deny to the
@@ -77,8 +85,23 @@ export function createMockTelegramAdapter({ authorisedUserId, defaultAction = 'S
       return { ok: true, value: mapped.value };
     },
 
+    /** Channel-neutral CALLBACK mapping + single-user default-deny (as live). */
+    toCallback(update, { now } = {}) {
+      const mapped = mapTelegramCallbackQuery({ update, now, authorisedUserId: authorised });
+      if (!mapped.ok) {
+        if (mapped.reason === 'unauthorised_sender') {
+          rejections.push({ sender_id: mapped.senderId, at_ms: now, reason: mapped.reason });
+        }
+        return { ok: false, reason: mapped.reason };
+      }
+      return { ok: true, value: mapped.value };
+    },
+
     sendCard(captureId, cardModel) {
-      const entry = { op: 'send', captureId, cardModel };
+      const chatId = (cardModel && cardModel.chat_id) ?? authorised;
+      const messageId = (nextMessageId += 1);
+      cardMessages.set(captureId, { chatId, messageId });
+      const entry = { op: 'send', captureId, cardModel, chatId, messageId };
       sentCards.push(entry);
       return entry;
     },
@@ -91,9 +114,50 @@ export function createMockTelegramAdapter({ authorisedUserId, defaultAction = 'S
         // worker swallows this and leaves state completed.
         throw new Error(`editCard: simulated card edit failure for ${captureId}`);
       }
-      const entry = { op: 'edit', captureId, cardModel };
+      // Restart-safe target resolution: prefer the in-memory map, else fall back
+      // to the {chat_id, message_id} the runner reconstructed from durable state.
+      const tracked = cardMessages.get(captureId);
+      const chatId = tracked?.chatId ?? cardModel?.chat_id;
+      const messageId = tracked?.messageId ?? cardModel?.message_id;
+      if (messageId === undefined) {
+        throw new Error(`editCard: no known message_id for capture "${captureId}" (sendCard or restore first)`);
+      }
+      const entry = { op: 'edit', captureId, cardModel, chatId, messageId };
       sentCards.push(entry);
       return entry;
+    },
+
+    /** Acknowledge a callback (test-observable). Never throws. */
+    answerCallbackQuery(callbackQueryId, text) {
+      const entry = { callbackQueryId, text };
+      answered.push(entry);
+      return entry;
+    },
+
+    /** The persisted card target for a capture, if this instance sent it. */
+    cardTarget(captureId) {
+      const t = cardMessages.get(captureId);
+      return t ? { chatId: t.chatId, messageId: t.messageId } : undefined;
+    },
+
+    /**
+     * Scripted long-poll. Returns queued updates with update_id >= offset and
+     * drops them (Telegram's offset-ack semantics), so the runner's loop
+     * terminates once the scripted batch is drained.
+     */
+    async getUpdates({ offset = 0 } = {}) {
+      const ready = pending.filter((u) => (u.update_id ?? 0) >= offset);
+      pending = pending.filter((u) => (u.update_id ?? 0) < offset);
+      return ready;
+    },
+
+    /** Test hook: enqueue inbound updates the next getUpdates will deliver. */
+    deliver(...updates) {
+      pending.push(...updates.flat());
+    },
+
+    describe() {
+      return { channel: 'telegram', mode: 'mock', authorised_user_id: authorised };
     },
 
     /** Test hook: force the next editCard to throw once. */

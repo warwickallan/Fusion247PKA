@@ -31,6 +31,7 @@ import { createMockTelegramAdapter } from '../src/adapters/telegramAdapter.js';
 import { createSandboxMarkdownWriter } from '../src/markdownWriter.js';
 import { createIntake } from '../src/intake.js';
 import { createWorker } from '../src/worker.js';
+import { createLiveRunner } from '../src/live/liveRunner.js';
 import { createAccessLogger } from '../src/security/accessLog.js';
 import { STATES, MAX_DELIVERY_ATTEMPTS } from '../src/core/states.js';
 import { MAX_BACKOFF_MS } from '../src/core/retryPolicy.js';
@@ -44,6 +45,7 @@ const MIGRATIONS = [
   '0002_wp0_deletion_and_retention.sql',
   '0003_wp0_rls_policies.sql',
   '0004_wp0_retry_retention_indexes.sql',
+  '0005_wp0_card_target_and_poll_offset.sql',
 ];
 const ADVANCE_PAST_ANY_BACKOFF_MS = MAX_BACKOFF_MS + 1;
 
@@ -156,6 +158,73 @@ test('full saga vs real Postgres: update → durable row → note on disk → ev
   } finally {
     await h.store.end();
     fs.rmSync(h.baseDir, { recursive: true, force: true });
+  }
+});
+
+test('live RUNNER vs real Postgres: long-poll → capture → completed; offset + card_ref durable across a restart', { skip: !DB }, async () => {
+  const baseDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fcg-e2e-runner-'));
+  const clock = fixedClock(1_752_600_500_000);
+  // A live-mode config; the runner reaches the REAL Postgres store via the
+  // injected factory (no pg import path change) and a mock adapter (no token).
+  const store = await createPostgresOperationalStore({ connectionString: URLS.e2e });
+  const liveConfig = {
+    fixturesMode: false,
+    missingRequired: [],
+    databaseUrl: URLS.e2e,
+    telegramBotToken: '123456:FAKE-e2e-token',
+    authorisedTelegramUserId: String(AUTH_ID),
+    workerId: 'worker-runner',
+    captureBrainDir: baseDir,
+    captureSandboxDir: null,
+    supabaseSecretKey: null,
+    telegramWebhookSecret: null,
+    describe: () => ({ DATABASE_URL: '***set (masked)***' }),
+  };
+  const adapter1 = createMockTelegramAdapter({ authorisedUserId: AUTH_ID });
+  try {
+    const runner = await createLiveRunner(liveConfig, {
+      clock,
+      leaseMs: 60_000,
+      factories: { storeFactory: async () => store, adapterFactory: async () => adapter1 },
+    });
+
+    adapter1.deliver({ update_id: 7, message: { message_id: 91001, from: { id: AUTH_ID }, text: 'runner e2e: solar log' } });
+    await runner.runUntilIdle();
+
+    // Durable capture completed in REAL Postgres, note on disk. (This file's e2e
+    // DB is shared across its tests, so select MY capture by content, not [0].)
+    const mine = (await store.list()).find((r) => r.text_preview && r.text_preview.includes('solar log'));
+    assert.ok(mine, 'the runner-captured row exists in Postgres');
+    const rec = await store.getByCaptureId(mine.capture_id);
+    assert.equal(rec.state, STATES.COMPLETED);
+    assert.ok(fs.existsSync(rec.destination_ref.path));
+    assert.ok(rec.destination_ref.path.includes(`${path.sep}captures${path.sep}`), 'lands in the governed captures leaf');
+
+    // Offset advanced AND persisted in Postgres (channel_poll_offset).
+    assert.equal(runner.offset, 8, 'offset advanced to update_id+1');
+    assert.equal(await store.getPollOffset('telegram'), 8, 'offset durable in Postgres');
+
+    // Card target persisted in Postgres (§4).
+    assert.ok(rec.card_ref && rec.card_ref.message_id !== undefined, 'card_ref persisted in Postgres');
+    const originalMessageId = rec.card_ref.message_id;
+
+    // RESTART: a fresh adapter (empty in-memory map) + a fresh runner over the
+    // SAME Postgres store. Re-project the completed card — it must re-target the
+    // ORIGINAL message id recovered purely from the durable card_ref.
+    const adapter2 = createMockTelegramAdapter({ authorisedUserId: AUTH_ID });
+    const runner2 = await createLiveRunner(liveConfig, {
+      clock,
+      leaseMs: 60_000,
+      factories: { storeFactory: async () => store, adapterFactory: async () => adapter2 },
+    });
+    // A restarted runner resumes from the durable offset — no re-fetch of acked updates.
+    assert.equal(runner2.offset, 8, 'restart resumes from the durable Postgres offset');
+    const entry = await runner2.reprojectCard(rec.capture_id);
+    assert.equal(entry.messageId, originalMessageId, 'restart re-targets the ORIGINAL card from Postgres card_ref');
+    assert.equal(entry.cardModel.is_completed, true);
+  } finally {
+    await store.end();
+    fs.rmSync(baseDir, { recursive: true, force: true });
   }
 });
 
