@@ -55,6 +55,15 @@ import {
  *       Transition to `completed`. Refuses unless the item is `evidenced` AND
  *       both a destination pointer and an evidence pointer exist.
  *
+ *   deleteCapture(captureId, { now }) -> { deleted, capture_id }
+ *       Idempotent hard-delete (GDPR/erasure DATA-LAYER path). Removes the
+ *       byCaptureId record AND its byIdempotencyKey index entry, so the same
+ *       idempotency_key can be re-accepted as a NEW capture after deletion.
+ *       Deleting an unknown capture_id is a no-op returning { deleted:false }.
+ *       This is the operational-store half; the storage object (raw bucket) and
+ *       the governed Markdown note are erased by Mack's application erase()
+ *       orchestration built on top of this method.
+ *
  *   list() -> record[]   (fixture/testing helper; not part of the durable API)
  */
 
@@ -267,6 +276,29 @@ export function createInMemoryOperationalStore() {
       rec.state = STATES.COMPLETED;
       rec.updated_at_ms = now;
       return cloneRecord(rec);
+    },
+
+    /**
+     * Idempotent hard-delete — the DATA-LAYER erasure path (GDPR §6). Removes
+     * the capture record and, crucially, its idempotency-key index entry, so the
+     * same idempotency_key can be re-accepted as a genuinely NEW capture
+     * afterwards (a real erasure, not a tombstone). Deleting an unknown/already-
+     * deleted capture_id is a no-op — never throws — so retries are safe.
+     *
+     * `now` is required for signature consistency with the rest of the store (a
+     * real implementation records an erasure/audit timestamp here).
+     */
+    deleteCapture(captureId, opts) {
+      requireNow(opts, 'deleteCapture');
+      const rec = byCaptureId.get(captureId);
+      if (!rec) return { deleted: false, capture_id: captureId };
+      byCaptureId.delete(captureId);
+      // Free the idempotency key so it can back a fresh capture later. Only
+      // remove the index entry if it still points at THIS capture_id (defensive).
+      if (byIdempotencyKey.get(rec.idempotency_key) === captureId) {
+        byIdempotencyKey.delete(rec.idempotency_key);
+      }
+      return { deleted: true, capture_id: captureId };
     },
 
     list() {
