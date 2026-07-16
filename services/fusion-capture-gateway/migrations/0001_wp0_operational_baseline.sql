@@ -31,6 +31,18 @@
 -- (see test/migrations.test.js, a static parser that fails CI if 0002 ever
 -- drops a name not declared here).
 --
+-- ENUM/TABLE NAME COLLISION (live-apply fix, first real Supabase provisioning):
+-- this file originally created BOTH `create type fcg.processing_state as enum`
+-- AND `create table fcg.processing_state`. In Postgres every table implicitly
+-- registers a composite type of the same name in the same schema, so the second
+-- statement failed with 42710 ("type already exists") the first time the
+-- migration ran against a real database. The fixtures-only WP0 suite never
+-- executes this SQL, so the collision was invisible until live apply. Fix: the
+-- ENUM is renamed to `fcg.capture_processing_state` (Capture Contract Pack
+-- vocabulary); the TABLE keeps the name `processing_state`, which the boundary
+-- docs, store code, and migration 0002 all refer to. Apply was transactional
+-- and rolled back fully — no live object carries the old enum name.
+--
 -- !! SECURITY GATE (Vex) — DO NOT WEAKEN !!
 -- Row-Level Security MUST be ENABLED on every table below before any real (non-
 -- synthetic) data or real credentials are introduced. WP0/WP1 is a SINGLE
@@ -65,7 +77,9 @@ create type fcg.technical_source_type as enum (
 
 -- Processing lifecycle. `completed` is only ever set AFTER written + evidenced
 -- both exist (enforced in application logic; see states.js and §4 of the pack).
-create type fcg.processing_state as enum (
+-- Named `capture_processing_state` (not `processing_state`) to avoid colliding
+-- with the `fcg.processing_state` TABLE's implicit composite type — see header.
+create type fcg.capture_processing_state as enum (
   'received',
   'accepted',
   'queued',
@@ -183,7 +197,7 @@ create table fcg.processing_state (
   capture_id       uuid primary key
     constraint processing_state_capture_id_fkey
     references fcg.capture_envelope (capture_id),
-  state            fcg.processing_state not null default 'accepted',
+  state            fcg.capture_processing_state not null default 'accepted',
   claimed_by       text,                                 -- worker principal id
   claimed_at       timestamptz,
   lease_expires_at timestamptz,                           -- crashed claim auto-releases past this

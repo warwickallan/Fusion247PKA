@@ -68,6 +68,23 @@ test('every constraint 0002 DROPS is re-ADDED under the exact same name (rename-
   );
 });
 
+test('0001 never gives a CREATE TYPE the same name as a CREATE TABLE (implicit composite-type collision, 42710)', () => {
+  // Every Postgres table implicitly registers a composite type of the same name
+  // in the same schema. A `create type fcg.x` + `create table fcg.x` pair fails
+  // with 42710 at live apply — invisible to the fixtures-only suite. Caught here.
+  // Strip `--` comments first: the 0001 header narrates the original collision.
+  const sql0001NoComments = sql0001.replace(/--[^\n]*/g, '');
+  const types = extractAll(sql0001NoComments, 'create\\s+type\\s+(fcg\\.\\w+)');
+  const tables = new Set(extractAll(sql0001NoComments, 'create\\s+table\\s+(fcg\\.\\w+)'));
+  assert.ok(types.length > 0, 'sanity: 0001 creates at least one type');
+  for (const typeName of types) {
+    assert.ok(
+      !tables.has(typeName),
+      `0001 creates both a type and a table named "${typeName}" — collides with the table's implicit composite type (42710)`,
+    );
+  }
+});
+
 test('0001 enables row-level security on every table it creates (security gate — DO NOT WEAKEN)', () => {
   const tables = extractAll(sql0001, 'create\\s+table\\s+(fcg\\.\\w+)');
   const rlsEnabled = new Set(extractAll(sql0001, 'alter\\s+table\\s+(fcg\\.\\w+)\\s+enable\\s+row\\s+level\\s+security'));
