@@ -63,14 +63,17 @@ Silas and Mack independently converged on the single most fragile point. It is *
 - **Telegram cards are retryable projections of current state** — never the source of truth.
 - **Failure to edit a Telegram card never reverses or duplicates a successful Markdown write.**
 - **Recovery resumes from the last evidenced state.**
+- **A transient failure is retried autonomously, bounded, then dead-lettered** — a failed item is stamped with a deterministic backoff due time and reclaimed by the SAME `claim()` seam once due (no external scheduler); once `attempt_count` reaches the cap it is parked in the terminal `dead_letter` state instead of retried again.
 
 User-facing guarantee unchanged: safe-and-waiting while the worker is offline; never false completion. This is a delegated implementation constraint, not a Warwick decision.
+
+**Implementation status (2026-07-16, Sonnet review):** every bullet above is now proven by real, tested runtime code in `services/fusion-capture-gateway/` (101 tests), not design intent alone — including the retry bullet, which an initial pass only implemented as a test-only simulation before an independent review caught and fixed the gap.
 
 ## Work packages
 
 | WP | Name | Status |
 | --- | --- | --- |
-| [[WP0-foundation-and-live-text-proof]] | Foundation and live text proof | **In progress — fixtures baseline implemented (PR #28, 84 tests); Vex gate PASS-WITH-CONDITIONS; Sonnet review pending; live proof pending** |
+| [[WP0-foundation-and-live-text-proof]] | Foundation and live text proof | **In progress — fixtures baseline implemented + Sonnet-reviewed (PR #28, 101 tests, CI-enforced); Vex delta re-touch pending; live proof pending** |
 | WP1 | Telegram cockpit & Larry communication | Planned — separately gated |
 | WP2 | Multimodal capture pack | Planned — separately gated |
 | WP3 | Specialist bot facades | Planned — separately gated |
