@@ -31,7 +31,7 @@ A real Telegram text capture travels through the complete system and returns a u
 - Capture Envelope v1, Capture Action v1, Capture Receipt v1, processing states, idempotency/retry — [[capture-contract-pack-v1]] ✅ drafted;
 - privacy and retention classes — [[source-of-truth-and-authority-matrix]] ✅ drafted;
 - honest worker-offline behaviour + local Larry-worker seam — [[supabase-operational-foundation-boundary]] ✅ specified;
-- raw text preservation, one Telegram action card, one governed permanent **Markdown** write, evidence returned to the original card — pending live implementation.
+- raw text preservation, one Telegram action card, one governed permanent **Markdown** write, evidence returned to the original card — ✅ implemented in the **fixtures baseline** (`services/fusion-capture-gateway/`, sandboxed); live wiring pending.
 
 ## Acceptance gate (cannot close on diagrams, mocks or synthetic tests alone)
 
@@ -51,8 +51,11 @@ When the local worker is unavailable, the card must state the item is **safe and
 ## Status
 
 - **Foundation design: complete.** Contract pack, authority matrix, Supabase boundary, and security gate drafted (see artifacts above).
-- **Live implementation + phone-visible proof: pending.** Requires: (1) Vex security gate executed GREEN against the built baseline; (2) real Supabase project + Telegram bot token provisioned as managed secrets (never committed); (3) gateway + local worker implemented; (4) the real phone-visible acceptance run.
-- Until the security gate passes, all work uses **synthetic/non-sensitive fixtures** — no real bot token, no production keys, no real personal data.
+- **Fixtures-only baseline: implemented** at `services/fusion-capture-gateway/` — plain JS (ESM, Node 22), **zero runtime deps**, **84 tests passing** (`node --test`), secret-scan CI green. Capabilities: channel-neutral Envelope/Action/Receipt v1; 14-state durable saga incl. **dead-letter / retry-exhaustion**; durable intake commit point + idempotent dedup; leased worker with expired-lease reclaim; idempotent sandboxed governed Markdown write; evidence-gated completion; retryable card projection (+ card-retry entrypoint); offline safe-and-waiting; single-user default-deny; GDPR erasure path; traversal-proof write. **No secrets, no network, no real Supabase/Telegram, no personal data.** Implementation PR: **#28** (open).
+- **Security gate: executed by Vex** — round 1 FAIL → remediated → **round 2 PASS-WITH-CONDITIONS** (0 CRITICAL, 0 open HIGH) against the then-65-test baseline; see [[wp0-security-gate-execution-2026-07-16]]. The dead-letter + regression additions post-date that run and warrant a light Vex re-touch. Remaining conditions are pre-live-wiring hardening (`SECURITY.md §7`).
+- **Sonnet review/fix pass: pending** (next). **Real Supabase/Telegram integration: not provisioned. Live phone-visible proof: pending.**
+- **Known limitation (for review/WP1):** the state machine has no `failed → queued` edge, so a `failed` (reclaimable) item needs an external retry-scheduler (`requeueForRetry` in tests) to re-enter — dead-lettering at the cap works; automatic reclaim of a transient `failed` is a WP1 decision.
+- All work uses **synthetic/non-sensitive fixtures** until the gate re-touch passes and real secrets are provisioned.
 
 ## Load-bearing invariant
 
@@ -60,4 +63,4 @@ The offline-safe "no false completion" guarantee is delivered by a **durable sta
 
 ## Next executable action
 
-Execute the WP0 security gate ([[wp0-security-gate]]) against the first implemented baseline (fixtures only), then provision real secrets and implement the Telegram text round-trip to the point of the phone-visible proof.
+A fresh **Sonnet 5** review-and-fix pass over the fixtures baseline in PR #28 (correctness, contracts, the `failed → queued` reclaim decision, and any defects). Then: light Vex re-touch over the dead-letter/regression additions; complete the `SECURITY.md §7` pre-live-wiring hardening (rate-limit, access logging, restrictive RLS policies, retention enforcement); stand up the isolated dev environment with managed dev secrets; then the real phone-visible acceptance proof. **WP0 is not complete** until that live proof passes.
