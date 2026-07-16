@@ -16,7 +16,7 @@ import { STATES } from '../src/core/states.js';
 
 const AUTH_ID = 424242;
 
-test('intake while worker offline ⇒ offline_queued, safe-and-waiting, not completed', () => {
+test('intake while worker offline ⇒ offline_queued, safe-and-waiting, not completed', async () => {
   const baseDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fcg-offline-'));
   try {
     const store = createInMemoryOperationalStore();
@@ -28,7 +28,7 @@ test('intake while worker offline ⇒ offline_queued, safe-and-waiting, not comp
     const clock = { now: () => t };
     const intake = createIntake({ store, adapter, clock, isWorkerOnline: () => online });
 
-    const accepted = intake.accept({
+    const accepted = await intake.accept({
       message: { message_id: 9009, from: { id: AUTH_ID }, text: 'queued while offline' },
     });
     assert.equal(accepted.ok, true);
@@ -53,7 +53,7 @@ test('intake while worker offline ⇒ offline_queued, safe-and-waiting, not comp
     const worker = createWorker({
       store, markdownWriter, adapter, workerId: 'worker-A', leaseMs: 30_000,
     });
-    const final = worker.processOne({ now: t });
+    const final = await worker.processOne({ now: t });
     assert.ok(final);
     assert.equal(final.state, STATES.COMPLETED);
     assert.ok(fs.existsSync(final.destination_ref.path));

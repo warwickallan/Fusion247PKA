@@ -20,13 +20,13 @@ function makeUpdate(messageId, text, fromId = AUTH_ID) {
   return { message: { message_id: messageId, from: { id: fromId }, text } };
 }
 
-test('synthetic update → durable accept, contract-valid safe-and-waiting receipt', () => {
+test('synthetic update → durable accept, contract-valid safe-and-waiting receipt', async () => {
   const store = createInMemoryOperationalStore();
   const adapter = createMockTelegramAdapter({ authorisedUserId: AUTH_ID });
   const clock = fixedClock(1_000_000);
   const intake = createIntake({ store, adapter, clock });
 
-  const res = intake.accept(makeUpdate(1001, 'remember to ship WP0'));
+  const res = await intake.accept(makeUpdate(1001, 'remember to ship WP0'));
   assert.equal(res.ok, true);
   assert.equal(res.isNew, true);
 
@@ -48,13 +48,13 @@ test('synthetic update → durable accept, contract-valid safe-and-waiting recei
   assert.equal(adapter.sentCards[0].cardModel.is_completed, false);
 });
 
-test('unauthorised sender is rejected (default-deny) — no capture, no row', () => {
+test('unauthorised sender is rejected (default-deny) — no capture, no row', async () => {
   const store = createInMemoryOperationalStore();
   const adapter = createMockTelegramAdapter({ authorisedUserId: AUTH_ID });
   const clock = fixedClock(2_000_000);
   const intake = createIntake({ store, adapter, clock });
 
-  const res = intake.accept(makeUpdate(2002, 'let me in', 999999));
+  const res = await intake.accept(makeUpdate(2002, 'let me in', 999999));
   assert.equal(res.ok, false);
   assert.equal(res.reason, 'unauthorised_sender');
 
@@ -65,15 +65,15 @@ test('unauthorised sender is rejected (default-deny) — no capture, no row', ()
   assert.equal(adapter.rejections[0].sender_id, '999999');
 });
 
-test('duplicate re-delivery dedups — one record, same receipt', () => {
+test('duplicate re-delivery dedups — one record, same receipt', async () => {
   const store = createInMemoryOperationalStore();
   const adapter = createMockTelegramAdapter({ authorisedUserId: AUTH_ID });
   const clock = fixedClock(3_000_000);
   const intake = createIntake({ store, adapter, clock });
 
-  const first = intake.accept(makeUpdate(3003, 'same message body'));
+  const first = await intake.accept(makeUpdate(3003, 'same message body'));
   clock.advance(5000); // even with time passing, the key is content-derived.
-  const second = intake.accept(makeUpdate(3003, 'same message body'));
+  const second = await intake.accept(makeUpdate(3003, 'same message body'));
 
   assert.equal(first.isNew, true);
   assert.equal(second.isNew, false, 're-delivery must not create a new record');

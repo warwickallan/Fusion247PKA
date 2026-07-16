@@ -60,12 +60,12 @@ const UPDATE = {
   message: { message_id: 55501, from: { id: AUTH_ID }, text: 'dead-letter me if I keep failing' },
 };
 
-test('retry-exhaustion → dead_letter: never completed, honest failure, no note/no write leak (autonomous reclaim)', () => {
+test('retry-exhaustion → dead_letter: never completed, honest failure, no note/no write leak (autonomous reclaim)', async () => {
   const baseDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fcg-dlq-'));
   try {
     const { store, adapter, markdownWriter, clock, intake, worker } = harness(baseDir);
 
-    const acc = intake.accept(UPDATE);
+    const acc = await intake.accept(UPDATE);
     assert.equal(acc.ok, true);
     const captureId = acc.captureId;
 
@@ -79,7 +79,7 @@ test('retry-exhaustion → dead_letter: never completed, honest failure, no note
     // test-only transition helper involved anywhere in this loop.
     for (let attempt = 1; attempt < MAX_DELIVERY_ATTEMPTS; attempt += 1) {
       clock.advance(1000);
-      const rec = worker.processOne({ now: clock.now() });
+      const rec = await worker.processOne({ now: clock.now() });
       assert.ok(rec, `attempt ${attempt} claimed something`);
       assert.equal(rec.state, STATES.FAILED, `attempt ${attempt} ends failed, not completed`);
       assert.equal(rec.attempt_count, attempt, 'attempt_count climbs by one per claim');
@@ -94,7 +94,7 @@ test('retry-exhaustion → dead_letter: never completed, honest failure, no note
 
       // Immediately re-processing (before the backoff elapses) must NOT claim
       // this item early — nothing else is queued, so processOne() returns null.
-      const tooSoon = worker.processOne({ now: clock.now() });
+      const tooSoon = await worker.processOne({ now: clock.now() });
       assert.equal(tooSoon, null, 'a not-yet-due failed item is never reclaimed early');
 
       // Advance past ANY possible backoff — the REAL claim() path (inside the
@@ -103,7 +103,7 @@ test('retry-exhaustion → dead_letter: never completed, honest failure, no note
     }
 
     // Final attempt hits the cap → dead-lettered, reclaimed the same real way.
-    const dead = worker.processOne({ now: clock.now() });
+    const dead = await worker.processOne({ now: clock.now() });
     assert.equal(dead.attempt_count, MAX_DELIVERY_ATTEMPTS);
     assert.equal(dead.state, STATES.DEAD_LETTER, 'exhausted attempts park in dead_letter');
     assert.notEqual(dead.state, STATES.COMPLETED);
@@ -116,7 +116,7 @@ test('retry-exhaustion → dead_letter: never completed, honest failure, no note
 
     // A dead-lettered item is never reclaimed again, even after more time passes.
     clock.advance(ADVANCE_PAST_ANY_BACKOFF_MS);
-    assert.equal(worker.processOne({ now: clock.now() }), null, 'dead_letter is never reclaimed');
+    assert.equal(await worker.processOne({ now: clock.now() }), null, 'dead_letter is never reclaimed');
 
     // NO note file leaked and NO disk write happened — every write threw before
     // touching disk, so the writer is pristine.
@@ -133,31 +133,31 @@ test('retry-exhaustion → dead_letter: never completed, honest failure, no note
   }
 });
 
-test('transient single failure recovers via the real autonomous reclaim: next due claim writes once and completes', () => {
+test('transient single failure recovers via the real autonomous reclaim: next due claim writes once and completes', async () => {
   const baseDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fcg-dlq-transient-'));
   try {
     const { store, markdownWriter, clock, intake, worker } = harness(baseDir);
 
-    const acc = intake.accept(UPDATE);
+    const acc = await intake.accept(UPDATE);
     const captureId = acc.captureId;
 
     // Only the FIRST write fails.
     markdownWriter.failNextWrite(1);
 
     clock.advance(1000);
-    const failed = worker.processOne({ now: clock.now() });
+    const failed = await worker.processOne({ now: clock.now() });
     assert.equal(failed.state, STATES.FAILED, 'first attempt fails honestly');
     assert.equal(failed.attempt_count, 1);
     assert.equal(markdownWriter.writeCount(), 0, 'the failed write never touched disk');
     assert.ok(failed.next_attempt_at_ms > clock.now(), 'a retry is scheduled in the future');
 
     // Too soon: the real claim() path must refuse to reclaim before due.
-    assert.equal(worker.processOne({ now: clock.now() }), null, 'not reclaimed before the due time');
+    assert.equal(await worker.processOne({ now: clock.now() }), null, 'not reclaimed before the due time');
 
     // Advance past the backoff — the REAL claim() autonomously reclaims it on
     // the worker's next processOne() call. No manual transition anywhere.
     clock.advance(ADVANCE_PAST_ANY_BACKOFF_MS);
-    const done = worker.processOne({ now: clock.now() });
+    const done = await worker.processOne({ now: clock.now() });
     assert.equal(done.state, STATES.COMPLETED, 'retry recovers before exhaustion');
     assert.equal(done.attempt_count, 2);
     assert.equal(markdownWriter.writeCount(), 1, 'exactly one durable write after recovery');

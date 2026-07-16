@@ -18,7 +18,7 @@ import { STATES } from '../src/core/states.js';
 
 const AUTH_ID = 424242;
 
-test('dead worker → lease expiry → second worker resumes, single write, no false completion', () => {
+test('dead worker → lease expiry → second worker resumes, single write, no false completion', async () => {
   const baseDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fcg-recovery-'));
   try {
     const store = createInMemoryOperationalStore();
@@ -28,7 +28,7 @@ test('dead worker → lease expiry → second worker resumes, single write, no f
     const leaseMs = 30_000;
 
     const intake = createIntake({ store, adapter, clock: { now: () => t0 } });
-    const accepted = intake.accept({
+    const accepted = await intake.accept({
       message: { message_id: 8008, from: { id: AUTH_ID }, text: 'survive the crash' },
     });
     const captureId = accepted.captureId;
@@ -52,7 +52,7 @@ test('dead worker → lease expiry → second worker resumes, single write, no f
     const workerB = createWorker({
       store, markdownWriter, adapter, workerId: 'worker-B', leaseMs,
     });
-    const final = workerB.processOne({ now: t1 });
+    const final = await workerB.processOne({ now: t1 });
 
     assert.ok(final, 'worker B reclaimed the expired lease');
     assert.equal(final.state, STATES.COMPLETED);

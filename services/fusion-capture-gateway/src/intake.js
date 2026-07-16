@@ -18,8 +18,11 @@ import { projectReceipt, projectCard } from './receiptProjection.js';
  * @param {object} deps.clock    { now: () => number } injected clock (epoch ms).
  * @param {function} [deps.isWorkerOnline]  () => boolean. Absent/true ⇒ online ⇒
  *                   queued; false ⇒ offline ⇒ offline_queued (still durable/safe).
+ * @param {object} [deps.rateLimiter]  F-04 per-sender token-bucket. Optional; when
+ *                   present, an authorised sender flooding is bounded — excess is
+ *                   REJECTED before the durable commit (capture NOT accepted).
  */
-export function createIntake({ store, adapter, clock, isWorkerOnline } = {}) {
+export function createIntake({ store, adapter, clock, isWorkerOnline, rateLimiter } = {}) {
   if (!store) throw new Error('createIntake: store required');
   if (!adapter) throw new Error('createIntake: adapter required');
   if (!clock || typeof clock.now !== 'function') {
@@ -36,9 +39,12 @@ export function createIntake({ store, adapter, clock, isWorkerOnline } = {}) {
      * @param {string}  [options.action]   chosen capture action (default SaveToBrain).
      * @returns {{ ok:true, receipt, isNew, captureId } | { ok:false, reason }}
      */
-    accept(update, options = {}) {
+    async accept(update, options = {}) {
       const now = clock.now();
 
+      // ASYNC-UNIFIED: every store/adapter call below is awaited. Awaiting the
+      // in-memory fixture's synchronous return is a no-op, so ONE code path
+      // drives both the fixture store and Silas's async Postgres store.
       const mapped = adapter.toEnvelope(update, { now, action: options.action });
       if (!mapped.ok) {
         // Default-deny / malformed: no capture, no durable row (fail-closed).
@@ -51,19 +57,32 @@ export function createIntake({ store, adapter, clock, isWorkerOnline } = {}) {
       }
       const envelope = validated.value;
 
+      // F-04 flood control (wp0-security-gate.md §5). Checked AFTER auth passes
+      // (only an authorised sender reaches here) and BEFORE the durable commit —
+      // so a burst cannot exhaust the store/worker/write path. Fail-closed: the
+      // excess message is rejected and NOT durably accepted.
+      if (rateLimiter && typeof rateLimiter.check === 'function') {
+        const senderId = (envelope.channel_context && envelope.channel_context.chat_id)
+          ?? envelope.sender_identity_ref;
+        const verdict = rateLimiter.check(String(senderId), now);
+        if (!verdict.allowed) {
+          return { ok: false, reason: 'rate_limited', retryAfterMs: verdict.retryAfterMs };
+        }
+      }
+
       // COMMIT POINT — durable the instant this returns. Upsert-by-idempotency
       // key: a re-delivery returns the existing record, isNew=false (dedup).
-      const { record, isNew } = store.recordIntake(envelope, { now });
+      const { record, isNew } = await store.recordIntake(envelope, { now });
 
       if (isNew) {
         const online = typeof isWorkerOnline === 'function' ? isWorkerOnline() : true;
         const offline = options.offline === true || !online;
-        store.enqueue(record.capture_id, { now, offline });
+        await store.enqueue(record.capture_id, { now, offline });
         // Initial card: safe-and-waiting. Never a completion claim.
-        adapter.sendCard(record.capture_id, projectCard(store.getByCaptureId(record.capture_id)));
+        await adapter.sendCard(record.capture_id, projectCard(await store.getByCaptureId(record.capture_id)));
       }
 
-      const current = store.getByCaptureId(record.capture_id);
+      const current = await store.getByCaptureId(record.capture_id);
       return {
         ok: true,
         receipt: projectReceipt(current),

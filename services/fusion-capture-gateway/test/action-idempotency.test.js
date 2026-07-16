@@ -44,16 +44,16 @@ const UPDATE = {
   message: { message_id: 33012, from: { id: AUTH_ID }, text: 'save this once, deliver it twice' },
 };
 
-test('re-delivering the identical Save-to-Brain update twice: one capture, same receipt, no second row', () => {
+test('re-delivering the identical Save-to-Brain update twice: one capture, same receipt, no second row', async () => {
   const baseDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fcg-actidem-'));
   try {
     const { store, intake } = harness(baseDir);
 
-    const first = intake.accept(UPDATE, { action: 'SaveToBrain' });
+    const first = await intake.accept(UPDATE, { action: 'SaveToBrain' });
     assert.equal(first.ok, true);
     assert.equal(first.isNew, true, 'first delivery creates the durable capture');
 
-    const second = intake.accept(UPDATE, { action: 'SaveToBrain' });
+    const second = await intake.accept(UPDATE, { action: 'SaveToBrain' });
     assert.equal(second.ok, true);
     assert.equal(second.isNew, false, 'the re-delivery is a dedup hit, not a new row');
     assert.equal(second.captureId, first.captureId, 'both resolve to the SAME capture_id');
@@ -66,14 +66,14 @@ test('re-delivering the identical Save-to-Brain update twice: one capture, same 
   }
 });
 
-test('re-delivery after the write completed: still one row, still one note, no second write', () => {
+test('re-delivery after the write completed: still one row, still one note, no second write', async () => {
   const baseDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fcg-actidem-post-'));
   try {
     const { store, adapter, markdownWriter, clock, intake, worker } = harness(baseDir);
 
-    const first = intake.accept(UPDATE, { action: 'SaveToBrain' });
+    const first = await intake.accept(UPDATE, { action: 'SaveToBrain' });
     clock.advance(1000);
-    const done = worker.processOne({ now: clock.now() });
+    const done = await worker.processOne({ now: clock.now() });
     assert.equal(done.state, STATES.COMPLETED);
     assert.equal(markdownWriter.writeCount(), 1);
 
@@ -81,7 +81,7 @@ test('re-delivery after the write completed: still one row, still one note, no s
 
     // Re-deliver the identical update AFTER completion.
     clock.advance(1000);
-    const replay = intake.accept(UPDATE, { action: 'SaveToBrain' });
+    const replay = await intake.accept(UPDATE, { action: 'SaveToBrain' });
     assert.equal(replay.isNew, false, 'no new capture on replay');
     assert.equal(replay.captureId, first.captureId);
 
@@ -91,7 +91,7 @@ test('re-delivery after the write completed: still one row, still one note, no s
     assert.equal(sendCardsAfter, sendCardsBefore, 'no second initial card on a dedup hit');
 
     clock.advance(1000);
-    const nothing = worker.processOne({ now: clock.now() });
+    const nothing = await worker.processOne({ now: clock.now() });
     assert.equal(nothing, null, 'nothing new to claim after a dedup re-delivery');
     assert.equal(markdownWriter.writeCount(), 1, 'still exactly one governed write');
 

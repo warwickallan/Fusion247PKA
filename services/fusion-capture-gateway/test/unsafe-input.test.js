@@ -51,7 +51,7 @@ test('a capture_id with control chars / spaces / dots flattens to a safe in-sand
   }
 });
 
-test('dangerous message TEXT is stored verbatim as inert data — no path escape, no command', () => {
+test('dangerous message TEXT is stored verbatim as inert data — no path escape, no command', async () => {
   const baseDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fcg-unsafe-text-'));
   try {
     const store = createInMemoryOperationalStore();
@@ -65,13 +65,13 @@ test('dangerous message TEXT is stored verbatim as inert data — no path escape
 
     // Injection-flavoured payload — every char here is DATA, never code/path.
     const payload = 'line one\nline two $(whoami); rm -rf / && ../../etc/passwd `id`';
-    const acc = intake.accept({
+    const acc = await intake.accept({
       message: { message_id: 71001, from: { id: AUTH_ID }, text: payload },
     });
     assert.equal(acc.ok, true);
 
     clock.advance(1000);
-    const done = worker.processOne({ now: clock.now() });
+    const done = await worker.processOne({ now: clock.now() });
     assert.equal(done.state, STATES.COMPLETED);
 
     const notePath = path.resolve(done.destination_ref.path);

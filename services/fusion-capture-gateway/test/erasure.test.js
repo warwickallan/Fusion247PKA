@@ -42,19 +42,19 @@ const UPDATE = {
   message: { message_id: 90210, from: { id: AUTH_ID }, text: 'erase-me: aquaponics pH note' },
 };
 
-test('erase() removes the governed note file AND the operational record', () => {
+test('erase() removes the governed note file AND the operational record', async () => {
   const baseDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fcg-erase-'));
   try {
     const { intake, worker, clock, store, eraser } = harness(baseDir);
 
     // capture → intake
-    const acc = intake.accept(UPDATE);
+    const acc = await intake.accept(UPDATE);
     assert.equal(acc.ok, true);
     const captureId = acc.captureId;
 
     // worker completes → note on disk
     clock.advance(1000);
-    const final = worker.processOne({ now: clock.now() });
+    const final = await worker.processOne({ now: clock.now() });
     assert.equal(final.state, STATES.COMPLETED);
     const notePath = final.destination_ref.path;
     assert.ok(fs.existsSync(notePath), 'note exists before erasure');
@@ -79,16 +79,16 @@ test('erase() removes the governed note file AND the operational record', () => 
   }
 });
 
-test('after erasure the same idempotency_key is re-accepted as a genuinely NEW capture', () => {
+test('after erasure the same idempotency_key is re-accepted as a genuinely NEW capture', async () => {
   const baseDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fcg-erase-reaccept-'));
   try {
     const { intake, worker, clock, store, eraser } = harness(baseDir);
 
-    const first = intake.accept(UPDATE);
+    const first = await intake.accept(UPDATE);
     assert.equal(first.ok, true);
     assert.equal(first.isNew, true);
     clock.advance(1000);
-    worker.processOne({ now: clock.now() });
+    await worker.processOne({ now: clock.now() });
 
     eraser.erase(first.captureId, { now: clock.now() + 5 });
     assert.equal(store.getByCaptureId(first.captureId), undefined);
@@ -96,7 +96,7 @@ test('after erasure the same idempotency_key is re-accepted as a genuinely NEW c
     // Same synthetic message ⇒ same idempotency key. Because erasure freed the
     // key, this is a FRESH capture, not a dedup hit.
     clock.advance(1000);
-    const reAccept = intake.accept(UPDATE);
+    const reAccept = await intake.accept(UPDATE);
     assert.equal(reAccept.ok, true);
     assert.equal(reAccept.isNew, true, 'freed key must produce a NEW record after erasure');
     assert.ok(store.getByCaptureId(reAccept.captureId), 'the re-accepted capture is durable');
@@ -106,14 +106,14 @@ test('after erasure the same idempotency_key is re-accepted as a genuinely NEW c
   }
 });
 
-test('double-erase is idempotent: second erase returns {erased:false}, no throw, no leftover file', () => {
+test('double-erase is idempotent: second erase returns {erased:false}, no throw, no leftover file', async () => {
   const baseDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fcg-erase-double-'));
   try {
     const { intake, worker, clock, store, eraser } = harness(baseDir);
 
-    const acc = intake.accept(UPDATE);
+    const acc = await intake.accept(UPDATE);
     clock.advance(1000);
-    const final = worker.processOne({ now: clock.now() });
+    const final = await worker.processOne({ now: clock.now() });
     const notePath = final.destination_ref.path;
 
     const first = eraser.erase(acc.captureId, { now: clock.now() + 5 });
@@ -140,13 +140,13 @@ test('double-erase is idempotent: second erase returns {erased:false}, no throw,
   }
 });
 
-test('erasing a record with no destination_ref yet (never written) still erases the operational row', () => {
+test('erasing a record with no destination_ref yet (never written) still erases the operational row', async () => {
   const baseDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fcg-erase-partial-'));
   try {
     const { intake, store, eraser } = harness(baseDir);
 
     // Accepted but never processed by the worker: no destination_ref exists.
-    const acc = intake.accept(UPDATE);
+    const acc = await intake.accept(UPDATE);
     assert.equal(acc.ok, true);
     assert.equal(store.getByCaptureId(acc.captureId).destination_ref, null);
 

@@ -75,7 +75,7 @@ test('failed / partial projections carry an honest failure block, not completed'
   }
 });
 
-test('failed editCard leaves store record completed and the Markdown write intact', () => {
+test('failed editCard leaves store record completed and the Markdown write intact', async () => {
   const baseDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fcg-projection-'));
   try {
     const store = createInMemoryOperationalStore();
@@ -88,7 +88,7 @@ test('failed editCard leaves store record completed and the Markdown write intac
       store, markdownWriter, adapter, workerId: 'worker-A', leaseMs: 30_000,
     });
 
-    const accepted = intake.accept({
+    const accepted = await intake.accept({
       message: { message_id: 5005, from: { id: AUTH_ID }, text: 'card edit will fail' },
     });
     const captureId = accepted.captureId;
@@ -97,7 +97,7 @@ test('failed editCard leaves store record completed and the Markdown write intac
     // Arm the failure BEFORE processing so the completion edit throws.
     adapter.failNextEdit();
     t += 1000;
-    const final = worker.processOne({ now: t });
+    const final = await worker.processOne({ now: t });
 
     // The failed projection did NOT reverse or duplicate the completion.
     assert.equal(final.state, STATES.COMPLETED);
