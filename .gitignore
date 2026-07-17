@@ -81,6 +81,15 @@ PKM/My Life/About Warwick/
 # the public repo (same doctrine as PKM/Journal above).
 Team Inbox/captures/
 
+# --- TubeAIR (IDEA-013) local build ---
+# Output packets hold raw third-party YouTube transcripts + draft analysis —
+# never published from the public repo (GL-011 public/private boundary). The
+# tool source and tests ARE tracked; the venv and out/ packets are not.
+/out/
+tools/tubeair/.venv/
+__pycache__/
+*.pyc
+
 # --- Local immutable external-source payloads ---
 # Keep the register and rules public, but do not publish captured transcripts,
 # PDFs, uploads, or other raw external-source payloads from the public repo.
