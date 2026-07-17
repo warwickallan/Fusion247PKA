@@ -47,18 +47,47 @@
 -- them if absent (NOLOGIN is sufficient — policies are exercised via SET ROLE).
 -- Guarded so re-running the migration, or running it against real Supabase where
 -- the roles already exist, is a no-op (idempotent).
+--
+-- CONCURRENCY-SAFE (root-cause fix, 2026-07-17): roles live in the CLUSTER-wide
+-- shared catalog (pg_authid), not in any one database. When two sessions apply
+-- this migration into DIFFERENT databases of the same cluster at the same time
+-- (exactly what CI does: the postgresStore integration file migrates the main
+-- DB while the e2e file migrates its isolated "<db>_e2e" DB, in parallel test
+-- processes on a fresh service container), the original check-then-create guard
+-- raced: both sessions saw "role absent", both ran CREATE ROLE, and the loser
+-- died with 23505 `duplicate key value violates unique constraint
+-- "pg_authid_rolname_index"` (or 42710 `role ... already exists`), aborting the
+-- whole migration. Reproduced deterministically with two concurrent appliers on
+-- a fresh cluster (~1-in-4 per attempt). The nested exception blocks below turn
+-- "somebody else created it first" into the no-op it was always meant to be.
+-- The security posture is UNCHANGED: same three NOLOGIN roles, nothing more.
 -- --------------------------------------------------------------------------
 
 do $$
 begin
   if not exists (select 1 from pg_roles where rolname = 'anon') then
-    create role anon nologin;
+    begin
+      create role anon nologin;
+    exception
+      when duplicate_object then null;  -- 42710: lost the race after our check
+      when unique_violation then null;  -- 23505: concurrent pg_authid insert
+    end;
   end if;
   if not exists (select 1 from pg_roles where rolname = 'authenticated') then
-    create role authenticated nologin;
+    begin
+      create role authenticated nologin;
+    exception
+      when duplicate_object then null;
+      when unique_violation then null;
+    end;
   end if;
   if not exists (select 1 from pg_roles where rolname = 'service_role') then
-    create role service_role nologin;
+    begin
+      create role service_role nologin;
+    exception
+      when duplicate_object then null;
+      when unique_violation then null;
+    end;
   end if;
 end
 $$;

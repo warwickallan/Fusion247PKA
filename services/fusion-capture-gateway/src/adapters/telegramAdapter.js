@@ -14,6 +14,17 @@
 
 import { mapTelegramUpdate, mapTelegramCallbackQuery } from './telegramMapping.js';
 
+// CHANNEL FIDELITY (root-cause fix, 2026-07-17): in a real Telegram chat,
+// message_id is unique and monotonically increasing — and it does NOT reset
+// when the bot process restarts. The counter is therefore MODULE-level, shared
+// across every mock instance in the process, so two adapter instances can never
+// mint the SAME {chat_id, message_id} card target. The per-instance counter it
+// replaces (every instance restarting at 1000) minted colliding card targets
+// whenever two tests shared one durable store: the card_ref reverse lookup
+// (findCaptureIdByCard) then resolved a tap to the OTHER test's capture — a
+// collision the real channel cannot produce.
+let nextMessageId = 1000;
+
 /**
  * TelegramAdapter interface (documentation contract). A conforming
  * implementation MUST provide:
@@ -57,8 +68,9 @@ export function createMockTelegramAdapter({ authorisedUserId, defaultAction = 'S
   let pending = [];
   // Card targets, mirroring the live adapter — so the runner can promote them to
   // the durable store and prove restart recovery (a NEW mock loses this map).
+  // NOTE: message ids come from the MODULE-level counter above (Telegram
+  // fidelity — ids never collide across instances of the same chat).
   const cardMessages = new Map(); // captureId -> { chatId, messageId }
-  let nextMessageId = 1000;
   let failEditOnce = false;
 
   return {
