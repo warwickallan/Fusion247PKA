@@ -1,0 +1,93 @@
+name: fusion-tower-tests
+
+# CI for the BUILD-010 WP0 Fusion Tower governance control-plane.
+#
+# Two jobs:
+#   * unit        — the fixtures-only suite (zero runtime dependencies, no DB,
+#                   no token, no network). This is the enforced gate on every
+#                   push/PR touching the service. The DB-gated integration tests
+#                   skip cleanly when DATABASE_URL is unset (each is `{ skip: !DB }`
+#                   and `pg` is imported dynamically, so no DB is reached).
+#   * integration — the SAME suite with DATABASE_URL pointed at a throwaway
+#                   Postgres 16 service, so the 14 real-Postgres proofs actually
+#                   run: migration 0001 applies from a clean DB into the `ftw`
+#                   schema (it self-creates the anon/authenticated/service_role
+#                   NOLOGIN roles), RLS deny/allow, primary + secondary event
+#                   dedup, advance-once, turn idempotency, dead-man watchdog reap,
+#                   signer-match, max_rounds CHECK, and restart-safety.
+#                   No real credentials, no cloud project, no personal data — a
+#                   disposable local service container only.
+#
+# Triggers only when the tower service, its BUILD contract records, or this
+# workflow change. Node 22 (the service's engines requirement).
+
+on:
+  push:
+    paths:
+      - 'services/fusion-tower/**'
+      - 'Builds/BUILD-010-fusion-tower/**'
+      - '.github/workflows/fusion-tower-tests.yml'
+  pull_request:
+    paths:
+      - 'services/fusion-tower/**'
+      - 'Builds/BUILD-010-fusion-tower/**'
+      - '.github/workflows/fusion-tower-tests.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/fusion-tower
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Run the fixtures-only suite (zero runtime dependencies, no DB, no token)
+        run: node --test
+
+  integration:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/fusion-tower
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # Throwaway CI service — not a real project, no personal data. The suite
+      # drops/recreates the `ftw` schema and applies migration 0001 itself.
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies (pg, for the live Postgres store)
+        run: npm ci
+
+      - name: Run the full suite incl. real-Postgres integration (migration + DB-gated tests)
+        # Serialized: several integration files reset+re-migrate the shared `ftw`
+        # schema, so they must not run concurrently or they race on schema creation.
+        run: node --test --test-concurrency=1

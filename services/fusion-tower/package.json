@@ -1,0 +1,19 @@
+{
+  "name": "fusion-tower",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "BUILD-010 WP0 Fusion Tower governance control-plane. Windows-owned, Supabase-backed, restart-safe dispatcher driving bounded, signed, honestly-labelled agent turns. No autonomous merge. Pure logic + SQL; `pg` is the only runtime dependency.",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test",
+    "scan": "bash ../../scripts/secret-scan.sh",
+    "proof:e2e": "node scripts/proof-e2e.js",
+    "proof:norelay-ack": "node scripts/proof-norelay-ack.js"
+  },
+  "dependencies": {
+    "pg": "^8.22.0"
+  }
+}
