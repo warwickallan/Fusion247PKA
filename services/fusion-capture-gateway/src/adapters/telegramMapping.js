@@ -19,6 +19,43 @@ import { isPrivateDirectChat } from '../../../../supabase/functions/fcg-webhook-
 
 export const SOURCE_CHANNEL = 'telegram';
 
+/**
+ * The TWO-LAYER inbound authority gate, in ONE place (BUILD-002 WP1 + WP2).
+ *
+ * Layer 1 — single-user numeric allowlist (default-deny). Layer 2 — the SHARED
+ * private-direct-chat predicate. Composed, they accept ONLY the authorised user's
+ * own private DM. Extracted here so BOTH the capture mapping (mapTelegramUpdate /
+ * mapTelegramCallbackQuery) AND the WP2 governance detector import the SAME gate
+ * rather than re-implementing the allowlist comparison — the two paths cannot
+ * drift. Pure + deterministic: no wall-clock, no I/O, no logging (the caller owns
+ * rejection logging). Ordering is load-bearing: the allowlist verdict comes FIRST
+ * so a stranger gets NO chat-context oracle.
+ *
+ * @param {object} args
+ * @param {object} [args.from]           the update's `from` object ({ id }).
+ * @param {unknown} [args.chat]          the update's `chat` object.
+ * @param {string|number} args.authorisedUserId  the single allowlisted numeric id.
+ * @returns {{ ok:true, senderId:string }
+ *          | { ok:false, reason:'unauthorised_sender'|'non_private_chat', senderId:(string|null) }}
+ */
+export function authorisePrivateChatSender({ from, chat, authorisedUserId } = {}) {
+  if (authorisedUserId === undefined || authorisedUserId === null || authorisedUserId === '') {
+    throw new Error('authorisePrivateChatSender: authorisedUserId required (allowlist of one)');
+  }
+  const authorised = String(authorisedUserId);
+  const senderId = from && from.id !== undefined ? String(from.id) : undefined;
+  // Layer 1 — single-user allowlist, default-deny (wp0-security-gate.md §1).
+  if (senderId === undefined || senderId !== authorised) {
+    return { ok: false, reason: 'unauthorised_sender', senderId: senderId ?? null };
+  }
+  // Layer 2 — private-direct-chat boundary (single shared predicate). Checked
+  // AFTER the allowlist so a stranger never reaches a chat-context oracle.
+  if (!isPrivateDirectChat({ chat, senderId })) {
+    return { ok: false, reason: 'non_private_chat', senderId };
+  }
+  return { ok: true, senderId };
+}
+
 // Map an optional chosen capture action onto the recorded_intent enum
 // (RECORDED_INTENTS = LarryDirect | SaveToBrain | ConfirmedAction). Default:
 // SaveToBrain — durable capture is authorised by the action itself.
@@ -85,32 +122,19 @@ export function mapTelegramUpdate({ update, now, authorisedUserId, action, defau
     return { ok: false, reason: 'no_message', senderId: null };
   }
 
-  const from = message.from;
-  const senderId = from && from.id !== undefined ? String(from.id) : undefined;
-
-  // Single-user allowlist, default-deny (wp0-security-gate.md §1). A numeric id,
-  // never a username. Any other sender is refused — the ADAPTER logs it.
-  if (senderId === undefined || senderId !== authorised) {
-    return { ok: false, reason: 'unauthorised_sender', senderId: senderId ?? null };
-  }
-
-  // PRIVATE-DIRECT-CHAT BOUNDARY (correction 3; ordering fix
-  // GPT-BUILD-002-WP1-DELTA-REVIEW-0002). This BUILD serves Warwick's DM only —
-  // never groups, supergroups, or channels. Refuse any non-private / missing /
-  // malformed chat context with the SAME quiet default-deny posture as an
-  // unauthorised sender (no envelope is ever built). SINGLE shared predicate with
-  // the WP1 webhook, so the two transports give the SAME verdict. Checked AFTER
-  // the allowlist (no content/context oracle for strangers) and — critically —
-  // BEFORE the content-type gate. Rationale: the live runner only emits the
-  // visible "Text only in WP0" notice on 'unsupported_content_type'. If content
-  // were inspected first, an authorised sender posting a photo/voice/document/
-  // empty-text INTO A GROUP would be content-rejected and the runner would REPLY
-  // INSIDE the non-private chat — breaking the quiet private-chat boundary. By
-  // returning 'non_private_chat' before any content inspection, a non-private
-  // context is refused silently and no notice can ever leak into a group.
-  if (!isPrivateDirectChat({ chat: message.chat, senderId })) {
-    return { ok: false, reason: 'non_private_chat', senderId };
-  }
+  // TWO-LAYER AUTHORITY GATE (correction 3; ordering fix
+  // GPT-BUILD-002-WP1-DELTA-REVIEW-0002), via the SHARED predicate. Layer 1 is
+  // the single-user numeric allowlist (default-deny; a numeric id, never a
+  // username). Layer 2 is the private-direct-chat boundary: this BUILD serves
+  // Warwick's DM only — never groups, supergroups, or channels — and a
+  // non-private / missing / malformed chat context is refused with the SAME quiet
+  // posture (no envelope is ever built). Checked BEFORE the content-type gate:
+  // the live runner emits the visible "Text only in WP0" notice ONLY on
+  // 'unsupported_content_type', so returning 'non_private_chat' before any content
+  // inspection guarantees no notice can ever leak into a group.
+  const auth = authorisePrivateChatSender({ from: message.from, chat: message.chat, authorisedUserId: authorised });
+  if (!auth.ok) return { ok: false, reason: auth.reason, senderId: auth.senderId };
+  const { senderId } = auth;
 
   // WP0: text only (technical_source_type 'text'). A message carrying NO usable
   // text (photo/voice/document/sticker/… or an empty/whitespace-only text field)
@@ -200,21 +224,15 @@ export function mapTelegramCallbackQuery({ update, now, authorisedUserId } = {})
     return { ok: false, reason: 'no_callback', senderId: null };
   }
 
-  const from = cq.from;
-  const senderId = from && from.id !== undefined ? String(from.id) : undefined;
-  // Same single-user default-deny as the message path.
-  if (senderId === undefined || senderId !== authorised) {
-    return { ok: false, reason: 'unauthorised_sender', senderId: senderId ?? null };
-  }
-
   const msg = cq.message && typeof cq.message === 'object' ? cq.message : {};
 
-  // PRIVATE-DIRECT-CHAT BOUNDARY (correction 3) — a tap on a card that lives in a
-  // group / supergroup / channel (or a malformed chat) is refused with the same
-  // quiet posture. SINGLE shared predicate with the webhook callback path.
-  if (!isPrivateDirectChat({ chat: msg.chat, senderId })) {
-    return { ok: false, reason: 'non_private_chat', senderId };
-  }
+  // Same two-layer authority gate as the message path, via the SHARED helper:
+  // single-user allowlist THEN the private-direct-chat boundary (a tap on a card
+  // that lives in a group / supergroup / channel, or a malformed chat, is refused
+  // with the same quiet posture).
+  const auth = authorisePrivateChatSender({ from: cq.from, chat: msg.chat, authorisedUserId: authorised });
+  if (!auth.ok) return { ok: false, reason: auth.reason, senderId: auth.senderId };
+  const { senderId } = auth;
 
   const chat = msg.chat; // predicate guarantees an object with id === senderId
   const chatId = String(chat.id); // private chat → user id

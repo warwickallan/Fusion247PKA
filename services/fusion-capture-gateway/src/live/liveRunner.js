@@ -32,6 +32,7 @@ import { loadConfig, buildSecretRedactor } from '../config.js';
 import { createLiveRuntime } from './runtime.js';
 import { STATES, TERMINAL_STATES } from '../core/states.js';
 import { projectCard } from '../receiptProjection.js';
+import { classifyUpdate } from '../governance/detect.js';
 
 const CHANNEL = 'telegram';
 // "Proved stable state" for an accepted item: a terminal outcome. A failed item
@@ -74,7 +75,12 @@ export async function createLiveRunner(config, opts = {}) {
   const pollTimeoutSec = opts.pollTimeoutSec ?? POLL_WAIT_SECONDS;
 
   const runtime = await createLiveRuntime(config, { ...opts, clock });
-  const { store, adapter, intake, worker } = runtime;
+  const { store, adapter, intake, worker, ftwCommandIntake } = runtime;
+
+  // The resolved single allowlisted id, from the runtime's authorised identity
+  // (one source — the same value the mapping/adapter default-deny uses). Fed to
+  // the WP2 governance detector so gov detection and capture auth cannot diverge.
+  const authorisedUserId = runtime.authorisedIdentity?.identity?.channel_principal_ref;
 
   // Known secret VALUES to redact from any diagnostic (defence in depth; the
   // adapter already masks the bot token, and pg errors rarely echo the DSN).
@@ -190,7 +196,105 @@ export async function createLiveRunner(config, opts = {}) {
     return { kind: 'callback', ok: Boolean(captureId), action, captureId, outcome };
   }
 
+  // GOVERNANCE COMMAND (BUILD-002 WP2). An authorised private-chat message that
+  // matched the governance grammar. Routed to the Tower as a durable ftw.run_event
+  // (kind='command:<name>', source_event_id='<update_id>', deduped on
+  // (source, source_event_id)) — NOT captured as a note. WP2 only DETECTS +
+  // WRITES; the Tower executes the command and sends any governance reply.
+  //
+  // FAIL-CLOSED: if the event cannot be written (no ftw writer wired, or the ftw
+  // schema/connection is absent so the insert throws), we NEVER silently swallow
+  // the command and NEVER capture it as a note — we log a masked, structured
+  // error and drop-with-audit. Chosen posture: dropping a governance command with
+  // a loud audit trail is safe; misfiling a `/stop` as a Brain note is not. The
+  // offset still advances (this is the sole poller — wedging it on a poison
+  // command would also block real captures, which is unacceptable).
+  async function handleGovCommand(update, cls, now) {
+    if (!ftwCommandIntake) {
+      diag('gov_command_unroutable', { reason: 'no_ftw_intake', command: cls.command });
+      return { kind: 'gov_command', ok: false, reason: 'no_ftw_intake', command: cls.command };
+    }
+    try {
+      const { event, isNew } = await ftwCommandIntake.recordCommandEvent({
+        command: cls.command,
+        args: cls.args,
+        chatId: cls.chatId,
+        senderId: cls.senderId,
+        updateId: cls.updateId,
+        now,
+      });
+      diag('gov_command_routed', {
+        command: cls.command,
+        kind: `command:${cls.command}`,
+        source_event_id: String(cls.updateId),
+        is_new: isNew,
+        run_start: cls.runStart === true,
+      });
+      return {
+        kind: 'gov_command', ok: true, isNew, command: cls.command, eventId: event?.event_id ?? null,
+      };
+    } catch (err) {
+      diag('gov_command_route_failed', { command: cls.command, error: safeErr(err) });
+      return { kind: 'gov_command', ok: false, reason: 'ftw_write_failed', command: cls.command };
+    }
+  }
+
+  // GOVERNANCE DECISION (BUILD-002 WP2). An authorised private-chat tap on a Tower
+  // decision card (callback_data starts 'dec:'). Routed to the Tower as a durable
+  // ftw.run_event (kind='command:decision', source_event_id='cb:<callback_query.id>',
+  // deduped) — NOT captured. THEN the callback is answered (answerCallbackQuery)
+  // so Telegram stops the button spinner. That answer is OUTBOUND-ONLY — it opens
+  // NO poll and is a best-effort projection: a failure there never reverses the
+  // durable event write.
+  async function handleGovDecision(update, cls, now) {
+    let routed = { ok: false, reason: 'no_ftw_intake', isNew: false, eventId: null };
+    if (ftwCommandIntake) {
+      try {
+        const { event, isNew } = await ftwCommandIntake.recordDecisionEvent({
+          callbackData: cls.callbackData,
+          decision: cls.decision,
+          gateToken: cls.gateToken,
+          chatId: cls.chatId,
+          senderId: cls.senderId,
+          messageId: cls.messageId,
+          callbackId: cls.callbackId,
+          now,
+        });
+        routed = { ok: true, isNew, eventId: event?.event_id ?? null };
+        diag('gov_decision_routed', {
+          kind: 'command:decision',
+          source_event_id: `cb:${cls.callbackId}`,
+          decision: cls.decision,
+          is_new: isNew,
+        });
+      } catch (err) {
+        diag('gov_decision_route_failed', { error: safeErr(err) });
+        routed = { ok: false, reason: 'ftw_write_failed', isNew: false, eventId: null };
+      }
+    } else {
+      diag('gov_decision_unroutable', { reason: 'no_ftw_intake' });
+    }
+
+    // Stop the button spinner. OUTBOUND ONLY — never a poll. Best-effort.
+    if (typeof adapter.answerCallbackQuery === 'function') {
+      try {
+        await adapter.answerCallbackQuery(cls.callbackId, undefined);
+      } catch (err) {
+        diag('gov_answer_callback_failed', { error: safeErr(err) });
+      }
+    }
+    return { kind: 'gov_decision', ...routed, decision: cls.decision };
+  }
+
   async function handleUpdate(update, now) {
+    // GOVERNANCE PRE-CHECK (BUILD-002 WP2): before treating an authorised private-
+    // chat update as a capture, detect whether it is a governance SIGNAL and, if
+    // so, route it to the Tower via a durable ftw.run_event INSTEAD of capturing.
+    // Non-governance updates (including unauthorised / non-private ones) fall
+    // through to the UNCHANGED capture behaviour below.
+    const cls = classifyUpdate({ update, authorisedUserId });
+    if (cls.kind === 'gov_command') return handleGovCommand(update, cls, now);
+    if (cls.kind === 'gov_decision') return handleGovDecision(update, cls, now);
     if (update && update.message) return handleMessage(update, now);
     if (update && update.callback_query) return handleCallback(update, now);
     return { kind: 'ignored' };
@@ -289,12 +393,12 @@ export async function createLiveRunner(config, opts = {}) {
     } catch (err) {
       diag('get_updates_failed', { error: safeErr(err) });
       return {
-        fetched: 0, accepted: 0, callbacks: 0, ignored: 0, processed: 0,
+        fetched: 0, accepted: 0, callbacks: 0, gov: 0, ignored: 0, processed: 0,
         cards_recovered: cardsRecovered, offset, error: true,
       };
     }
     const ordered = [...updates].sort((a, b) => (a.update_id ?? 0) - (b.update_id ?? 0));
-    let accepted = 0; let callbacks = 0; let ignored = 0;
+    let accepted = 0; let callbacks = 0; let gov = 0; let ignored = 0;
     for (const update of ordered) {
       let res;
       try {
@@ -305,6 +409,7 @@ export async function createLiveRunner(config, opts = {}) {
       }
       if (res.kind === 'message' && res.ok) accepted += 1;
       else if (res.kind === 'callback') callbacks += 1;
+      else if (res.kind === 'gov_command' || res.kind === 'gov_decision') gov += 1;
       else ignored += 1;
       // Acknowledge ONLY after durable handling. On crash before this, the update
       // redelivers and idempotent intake dedups it — no loss, no duplicate.
@@ -312,7 +417,7 @@ export async function createLiveRunner(config, opts = {}) {
     }
     const processed = await drainToStable(stepNow);
     return {
-      fetched: updates.length, accepted, callbacks, ignored, processed,
+      fetched: updates.length, accepted, callbacks, gov, ignored, processed,
       cards_recovered: cardsRecovered, offset,
     };
   }

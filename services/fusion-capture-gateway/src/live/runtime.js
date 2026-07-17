@@ -30,6 +30,7 @@ import { createIntake } from '../intake.js';
 import { createWorker } from '../worker.js';
 import { createRateLimiter } from '../security/rateLimiter.js';
 import { createAccessLogger } from '../security/accessLog.js';
+import { createInMemoryFtwCommandIntake, createPgFtwCommandIntake } from '../store/ftwCommandIntake.js';
 import { REQUIRED_AT_RUNTIME, DEFAULT_CAPTURE_BRAIN_DIR } from '../config.js';
 
 const FIXTURE_AUTH_ID = 'fixture-user'; // used only when fixtures config omits the id
@@ -236,6 +237,19 @@ export async function createLiveRuntime(config, opts = {}) {
   const intake = createIntake({ store, adapter, clock, rateLimiter });
   const worker = createWorker({ store, markdownWriter, adapter, clock, workerId, leaseMs, accessLog });
 
+  // FTW command-intake writer (BUILD-002 WP2). Governance SIGNALS the sole poller
+  // detects are routed here as durable ftw.run_event rows the Fusion Tower
+  // consumes — NEVER captured as notes. Live reuses the operational store's
+  // service_role pg pool (the low-level `store.query` seam — no second
+  // connection); fixtures (and any live-path test that injects the in-memory
+  // store, which has no `query`) use the in-memory writer so the routing + dedup
+  // are proven without a DB. FAIL-CLOSED behaviour lives in the live runner: if a
+  // gov event cannot be written (e.g. the ftw schema is not applied), the runner
+  // logs a masked error and does NOT capture the command as a note.
+  const ftwCommandIntake = (mode === 'live' && typeof store.query === 'function')
+    ? createPgFtwCommandIntake({ query: (text, params) => store.query(text, params) })
+    : createInMemoryFtwCommandIntake();
+
   // Identity registration ownership lives here, not in the store.
   const authorisedIdentity = await ensureAuthorisedIdentity({
     store,
@@ -251,6 +265,7 @@ export async function createLiveRuntime(config, opts = {}) {
     worker,
     accessLog,
     rateLimiter,
+    ftwCommandIntake,
     authorisedIdentity,
     /** Close any live resources (Postgres pool). No-op for fixtures. */
     async shutdown() {
