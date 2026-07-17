@@ -29,7 +29,7 @@ test('tap while worker offline ⇒ offline_queued, safe-and-waiting, not complet
     const intake = createIntake({ store, adapter, clock, isWorkerOnline: () => online });
 
     const accepted = await intake.accept({
-      message: { message_id: 9009, from: { id: AUTH_ID }, text: 'queued while offline' },
+      message: { message_id: 9009, from: { id: AUTH_ID }, chat: { id: AUTH_ID, type: 'private' }, text: 'queued while offline' },
     });
     assert.equal(accepted.ok, true);
     const captureId = accepted.captureId;

@@ -17,9 +17,11 @@ procedure, and the secret-scanning controls. It also enumerates the hardening th
 is **required before real data / live wiring** — deferred by design during the
 fixtures phase, mandatory before any real secret or the live phone-visible proof.
 
-**Security contact:** report suspected vulnerabilities privately to
-`<SECURITY-CONTACT-PLACEHOLDER — set before live wiring>` (Vex / component owner).
-Do not open a public issue for a suspected secret exposure or auth bypass.
+**Security contact:** OPEN ITEM (FU-5, Vex live sign-off V-06) — Warwick has not
+yet designated the security contact channel; this is his call, deliberately left
+open. Until he sets it: report suspected vulnerabilities privately to Warwick
+(repository owner) only. Do not open a public issue for a suspected secret
+exposure or auth bypass.
 
 ---
 
@@ -65,9 +67,19 @@ surfaces:**
   **Supabase MCP** (browser OAuth). Tool access, *not* an env secret; no Supabase
   password or personal access token is requested.
 - **B. Database runtime access** — `DATABASE_URL`, the ONE runtime secret. A libpq
-  connection string from the Supabase **Connect** screen carrying the **project
-  database password** (the postgres role password), TLS required
-  (`?sslmode=require`). It is **not** a service_role API key.
+  connection string from the Supabase **Connect** screen — **session pooler host**
+  (`aws-<n>-<region>.pooler.supabase.com:5432`, user `postgres.<project-ref>`) —
+  carrying the **project database password**. It is **not** a service_role API key.
+  **TLS is verify-full with the pinned pooler CA (FU-1, mandated):** either set
+  `DATABASE_SSL_CA_FILE` to the committed `certs/supabase-pooler-ca.pem` (preferred
+  — explicit `ssl: { ca, rejectUnauthorized: true }` config object; any ssl DSN
+  params are stripped so they cannot replace the pinned CA), or spell the DSN
+  `?sslmode=verify-full&sslrootcert=<ca path>`. A bare require-mode `sslmode` DSN
+  is **forbidden**: node-postgres does not verify the CA for it (under
+  `uselibpqcompat=true` libpq semantics skip CA validation by design; without
+  compat, pg-connection-string maps it to no verification at all). The static
+  guard test (`test/tlsTransportGuards.test.js`) fails CI on any reappearance of
+  the weak spelling or of `rejectUnauthorized: false`.
 - **C. Supabase Data API keys** — `SUPABASE_URL` + a Supabase secret key are needed
   **only** if code calls the REST/Data API. The WP0 runtime reaches Postgres over
   `DATABASE_URL` and does **not** use them → optional/reserved, **not required**,
@@ -112,11 +124,25 @@ secret is read from the environment by name.
 **Database password (`DATABASE_URL`).**
 1. Rotate the project database password in the Supabase dashboard
    (Settings → Database → reset password), or roll the DB role's password.
-2. Update `DATABASE_URL` in the secret store (keep `?sslmode=require`); restart the
-   worker/runner only so it re-reads env. It is server-side only — it never reaches
-   the bot/ingress surface.
+2. Update `DATABASE_URL` in the secret store — regenerate the **session-pooler**
+   form (`postgres.<project-ref>@aws-<n>-<region>.pooler.supabase.com:5432`) and
+   keep the verify-full posture: `DATABASE_SSL_CA_FILE` stays pointed at the
+   pinned `certs/supabase-pooler-ca.pem` (or, DSN-only form,
+   `?sslmode=verify-full&sslrootcert=<ca path>`). Never regenerate a bare
+   require-mode DSN. Restart the worker/runner only so it re-reads env. It is
+   server-side only — it never reaches the bot/ingress surface.
 3. Confirm `config.describe()` shows `DATABASE_URL: ***set (masked)***` and no old
-   value appears in any log.
+   value appears in any log. Re-run `scripts/tls-verify-probe.mjs` (masked) and
+   confirm `cert_verified_by_client: true`.
+
+**Pinned pooler CA (`certs/supabase-pooler-ca.pem`) — rotation/expiry.**
+1. The pin is a PUBLIC certificate, not a secret. If Supabase rotates its pooler
+   CA (watch `valid_to` in the probe output), re-extract with
+   `scripts/tls-extract-ca.mjs` (masked output, `--env-file` for the DSN) and
+   CROSS-CHECK the new chain against the dashboard-downloadable CA
+   (Database → Settings → SSL Configuration) before committing the replacement.
+2. Verify with `scripts/tls-verify-probe.mjs` → `cert_verified_by_client: true`,
+   then restart the worker.
 
 **Supabase Data API key (`SUPABASE_SECRET_KEY`) — only if/when a Data-API path exists.**
 1. Rotate in the dashboard; update the consuming surface's env.

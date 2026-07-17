@@ -41,7 +41,7 @@ function harness(baseDir) {
 
 // The same logical message ⇒ same idempotency key ⇒ same capture_id.
 const UPDATE = {
-  message: { message_id: 33012, from: { id: AUTH_ID }, text: 'save this once, deliver it twice' },
+  message: { message_id: 33012, from: { id: AUTH_ID }, chat: { id: AUTH_ID, type: 'private' }, text: 'save this once, deliver it twice' },
 };
 
 test('re-delivering the identical Save-to-Brain update twice: one capture, same receipt, no second row', async () => {

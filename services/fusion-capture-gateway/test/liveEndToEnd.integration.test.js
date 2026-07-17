@@ -46,6 +46,7 @@ const MIGRATIONS = [
   '0003_wp0_rls_policies.sql',
   '0004_wp0_retry_retention_indexes.sql',
   '0005_wp0_card_target_and_poll_offset.sql',
+  '0006_wp1_cloud_intake_rpcs.sql',
 ];
 const ADVANCE_PAST_ANY_BACKOFF_MS = MAX_BACKOFF_MS + 1;
 
@@ -111,7 +112,7 @@ async function harness({ isWorkerOnline } = {}) {
 }
 
 function update(messageId, text, fromId = AUTH_ID) {
-  return { message: { message_id: messageId, from: { id: fromId }, text } };
+  return { message: { message_id: messageId, from: { id: fromId }, chat: { id: fromId, type: 'private' }, text } };
 }
 
 before(async () => { if (DB) await resetAndMigrate(); });
@@ -192,7 +193,7 @@ test('live RUNNER vs real Postgres: long-poll → capture → completed; offset 
       factories: { storeFactory: async () => store, adapterFactory: async () => adapter1 },
     });
 
-    adapter1.deliver({ update_id: 7, message: { message_id: 91001, from: { id: AUTH_ID }, text: 'runner e2e: solar log' } });
+    adapter1.deliver({ update_id: 7, message: { message_id: 91001, from: { id: AUTH_ID }, chat: { id: AUTH_ID, type: 'private' }, text: 'runner e2e: solar log' } });
     await runner.runUntilIdle();
 
     // TAP-GATED: the capture holds pending in REAL Postgres until the tap.
@@ -209,7 +210,7 @@ test('live RUNNER vs real Postgres: long-poll → capture → completed; offset 
       update_id: 8,
       callback_query: {
         id: 'cb-e2e-1', from: { id: AUTH_ID }, data: 'SaveToBrain',
-        message: { message_id: originalMessageId, chat: { id: mine.card_ref.chat_id } },
+        message: { message_id: originalMessageId, chat: { id: mine.card_ref.chat_id, type: 'private' } },
       },
     });
     await runner.runUntilIdle();

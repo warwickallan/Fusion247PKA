@@ -113,7 +113,7 @@ test('createLiveRuntime assembles a working fixtures pipeline end-to-end', async
   assert.equal(rt.mode, 'fixtures');
   assert.equal(rt.authorisedIdentity.identity.identity_ref, 'telegram:user:424242');
 
-  const accepted = await rt.intake.accept({ message: { message_id: 1, from: { id: 424242 }, text: 'runtime wire test' } });
+  const accepted = await rt.intake.accept({ message: { message_id: 1, from: { id: 424242 }, chat: { id: 424242, type: 'private' }, text: 'runtime wire test' } });
   assert.equal(accepted.ok, true);
   await rt.intake.confirmSave(accepted.captureId); // the user taps Save to Brain
   const final = await rt.worker.processOne({ now: t });

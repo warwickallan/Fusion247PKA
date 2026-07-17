@@ -46,7 +46,7 @@ function harness(baseDir, { isWorkerOnline } = {}) {
 }
 
 function textUpdate(messageId, text) {
-  return { message: { message_id: messageId, from: { id: AUTH_ID }, text } };
+  return { message: { message_id: messageId, from: { id: AUTH_ID }, chat: { id: AUTH_ID, type: 'private' }, text } };
 }
 
 test('accept() HOLDS the capture pending: durable + card_ref, NOT claimable, NO write before the tap', async () => {
@@ -183,10 +183,16 @@ test('NON-TEXT at the intake seam: no envelope, no queue row, no card, no write 
   try {
     const { store, adapter, markdownWriter, clock, intake, worker } = harness(baseDir);
 
+    // Authorised sender, IN THEIR OWN PRIVATE CHAT (chat.type 'private',
+    // chat.id === sender), posting a photo: the private-chat boundary passes so
+    // the content-type gate is the verdict (ordering fix
+    // GPT-BUILD-002-WP1-DELTA-REVIEW-0002 — a NON-private non-text update returns
+    // non_private_chat first; that is covered in telegramMapping/liveRunner tests).
     const res = await intake.accept({
       message: {
         message_id: 5,
         from: { id: AUTH_ID },
+        chat: { id: AUTH_ID, type: 'private' },
         photo: [{ file_id: 'AgACAgQAAxk', width: 90, height: 90 }],
       },
     });

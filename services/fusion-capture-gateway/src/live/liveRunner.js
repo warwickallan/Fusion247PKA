@@ -28,7 +28,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { loadConfig } from '../config.js';
+import { loadConfig, buildSecretRedactor } from '../config.js';
 import { createLiveRuntime } from './runtime.js';
 import { STATES, TERMINAL_STATES } from '../core/states.js';
 import { projectCard } from '../receiptProjection.js';
@@ -78,24 +78,12 @@ export async function createLiveRunner(config, opts = {}) {
 
   // Known secret VALUES to redact from any diagnostic (defence in depth; the
   // adapter already masks the bot token, and pg errors rarely echo the DSN).
-  // Includes not just the whole DSN but the PASSWORD COMPONENT parsed out of it,
-  // so a diagnostic that echoes only the password fragment is still redacted.
-  const SECRET_VALUES = [
-    config.databaseUrl, config.telegramBotToken,
-    config.supabaseSecretKey, config.telegramWebhookSecret,
-  ];
-  if (typeof config.databaseUrl === 'string' && config.databaseUrl.length > 0) {
-    try {
-      const parsed = new URL(config.databaseUrl);
-      if (parsed.password) SECRET_VALUES.push(decodeURIComponent(parsed.password));
-    } catch { /* non-URL DSN — the whole-string redaction above still applies */ }
-  }
-  const secretValues = SECRET_VALUES.filter((v) => typeof v === 'string' && v.length > 0);
+  // ONE implementation — config.buildSecretRedactor — shared with the fatal
+  // (construction-time) log path in main() so no error bypasses masking (FU-4).
+  const redact = buildSecretRedactor(config);
 
   function safeErr(err) {
-    let msg = err && err.message ? err.message : String(err);
-    for (const secret of secretValues) msg = msg.split(secret).join('***redacted***');
-    return msg;
+    return redact(err && err.message ? err.message : String(err));
   }
 
   function diag(event, extra = {}) {
@@ -438,12 +426,16 @@ export async function main() {
 const invokedPath = process.argv[1] ? path.resolve(process.argv[1]) : '';
 if (invokedPath && fileURLToPath(import.meta.url) === invokedPath) {
   main().catch((err) => {
+    // FU-4 (Vex V-04): the fatal path runs OUTSIDE createLiveRunner's safeErr
+    // scope (construction-time failures — pg pool/DSN errors), so it builds its
+    // own redactor from the same env before echoing anything.
+    const redactFatal = buildSecretRedactor(loadConfig());
     // eslint-disable-next-line no-console
     console.error(JSON.stringify({
       service: 'fusion-capture-gateway',
       component: 'live-runner',
       event: 'fatal',
-      error: err && err.message ? err.message : String(err),
+      error: redactFatal(err && err.message ? err.message : String(err)),
     }));
     process.exitCode = 1;
   });

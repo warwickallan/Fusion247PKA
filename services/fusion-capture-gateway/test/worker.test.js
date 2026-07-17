@@ -33,7 +33,7 @@ test('full happy path: capture → worker → file on disk → evidence → comp
     });
 
     const accepted = await intake.accept({
-      message: { message_id: 7007, from: { id: AUTH_ID }, text: 'capture this thought' },
+      message: { message_id: 7007, from: { id: AUTH_ID }, chat: { id: AUTH_ID, type: 'private' }, text: 'capture this thought' },
     });
     assert.equal(accepted.ok, true);
     const captureId = accepted.captureId;

@@ -17,7 +17,7 @@ function fixedClock(ms) {
 }
 
 function makeUpdate(messageId, text, fromId = AUTH_ID) {
-  return { message: { message_id: messageId, from: { id: fromId }, text } };
+  return { message: { message_id: messageId, from: { id: fromId }, chat: { id: fromId, type: 'private' }, text } };
 }
 
 test('synthetic update → durable accept, contract-valid safe-and-waiting receipt', async () => {

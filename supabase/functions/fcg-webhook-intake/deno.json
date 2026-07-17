@@ -1,0 +1,8 @@
+{
+  "//": "BUILD-002 WP1 — Deno config for the fcg-webhook-intake edge function. Pins the type-check surface so `deno check index.ts` validates the ACTUAL deployment shell (the Deno runtime + the full local import graph: handler.js, derive.js, credential.js, chatBoundary.js) in CI, with NO real secrets / DB / deploy. No remote imports, so no import map is required.",
+  "lock": false,
+  "compilerOptions": {
+    "strict": true,
+    "lib": ["deno.window", "esnext"]
+  }
+}

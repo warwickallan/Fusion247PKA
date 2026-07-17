@@ -58,7 +58,7 @@ async function makeRunner(brainDir, { store, adapter, clock, logSink } = {}) {
 }
 
 function msg(updateId, text, messageId = updateId + 500) {
-  return { update_id: updateId, message: { message_id: messageId, from: { id: AUTH_ID }, text } };
+  return { update_id: updateId, message: { message_id: messageId, from: { id: AUTH_ID }, chat: { id: AUTH_ID, type: 'private' }, text } };
 }
 
 // A "Save to Brain" (or other action) button tap on the card at cardRef.
@@ -67,7 +67,7 @@ function tap(updateId, cardRef, { action = 'SaveToBrain', cbId = `cb-${updateId}
     update_id: updateId,
     callback_query: {
       id: cbId, from: { id: AUTH_ID }, data: action,
-      message: { message_id: cardRef.message_id, chat: { id: cardRef.chat_id } },
+      message: { message_id: cardRef.message_id, chat: { id: cardRef.chat_id, type: 'private' } },
     },
   };
 }
@@ -230,7 +230,7 @@ test('KeepRaw / AskLarry are WP0-minimal: honest "not available" toast, capture 
   }
 });
 
-test('NON-TEXT rejection: an authorised photo produces NO capture rows, NO write — only an honest notice', async () => {
+test('NON-TEXT rejection: an authorised PRIVATE photo produces NO capture rows, NO write — only an honest notice', async () => {
   const brainDir = tmpBrain();
   try {
     const store = createInMemoryOperationalStore();
@@ -238,14 +238,16 @@ test('NON-TEXT rejection: an authorised photo produces NO capture rows, NO write
     const clock = fixedClock(3_800_000);
     const runner = await makeRunner(brainDir, { store, adapter, clock });
 
-    // A photo update: message present, from the AUTHORISED user, but NO text
-    // (exactly the live defect shape of 2026-07-16).
+    // A photo update: message present, from the AUTHORISED user, IN THEIR OWN
+    // PRIVATE CHAT (chat.type 'private', chat.id === sender), but NO text (the
+    // live defect shape of 2026-07-16). The private-chat boundary passes, so the
+    // content-type gate is the verdict → the honest "Text only" notice is sent.
     adapter.deliver({
       update_id: 1,
       message: {
         message_id: 777,
         from: { id: AUTH_ID },
-        chat: { id: AUTH_ID },
+        chat: { id: AUTH_ID, type: 'private' },
         photo: [{ file_id: 'AgACAgQAAxk', width: 90, height: 90 }],
       },
     });
@@ -264,6 +266,99 @@ test('NON-TEXT rejection: an authorised photo produces NO capture rows, NO write
 
     // Offset advanced past the rejected update — no redelivery loop.
     assert.equal(runner.offset, 2);
+    await runner.shutdown();
+  } finally {
+    fs.rmSync(brainDir, { recursive: true, force: true });
+  }
+});
+
+// QUIET PRIVATE-CHAT BOUNDARY (ordering fix GPT-BUILD-002-WP1-DELTA-REVIEW-0002).
+// A non-text update from the AUTHORISED sender but in a GROUP / SUPERGROUP /
+// CHANNEL must resolve to 'non_private_chat' BEFORE content is examined, so the
+// live runner — which emits the visible "Text only in WP0" notice ONLY on
+// 'unsupported_content_type' — NEVER replies into the non-private chat. Proof is
+// the mock adapter's send-observability: ZERO sentMessages AND ZERO sentCards.
+// A non-private update carries a NEGATIVE chat.id (real Telegram group ids), so
+// chat.id !== the sender id AND chat.type !== 'private' — either alone refuses.
+function nonPrivate(updateId, chatType, extra, { chatId = -1000000000 - updateId, messageId = updateId + 900 } = {}) {
+  return {
+    update_id: updateId,
+    message: { message_id: messageId, from: { id: AUTH_ID }, chat: { id: chatId, type: chatType }, ...extra },
+  };
+}
+
+for (const { name, chatType, extra } of [
+  { name: 'group photo', chatType: 'group', extra: { photo: [{ file_id: 'AgACAgQAAxk', width: 90, height: 90 }] } },
+  { name: 'supergroup voice', chatType: 'supergroup', extra: { voice: { file_id: 'AwACAgQAAxk', duration: 3 } } },
+  { name: 'channel document', chatType: 'channel', extra: { document: { file_id: 'BQACAgQAAxk', file_name: 'x.pdf' } } },
+  { name: 'group whitespace-only text', chatType: 'group', extra: { text: '   \n\t ' } },
+]) {
+  test(`QUIET BOUNDARY: authorised ${name} → non_private_chat; ZERO adapter sends, ZERO rows, NO "Text only" notice`, async () => {
+    const brainDir = tmpBrain();
+    const logs = [];
+    try {
+      const store = createInMemoryOperationalStore();
+      const adapter = createMockTelegramAdapter({ authorisedUserId: AUTH_ID });
+      const clock = fixedClock(3_900_000);
+      const runner = await makeRunner(brainDir, { store, adapter, clock, logSink: (l) => logs.push(l) });
+
+      adapter.deliver(nonPrivate(1, chatType, extra));
+      const rounds = await runner.runUntilIdle();
+
+      // The verdict was non_private_chat (proven via the runner's diagnostic).
+      assert.ok(
+        logs.some((l) => l.event === 'message_not_accepted' && l.reason === 'non_private_chat'),
+        'the update was refused as non_private_chat',
+      );
+      // ZERO sends of EITHER kind — the whole quiet-boundary proof.
+      assert.equal(adapter.sentMessages.length, 0, 'NO "Text only" notice leaked into the non-private chat');
+      assert.equal(adapter.sentCards.length, 0, 'NO card sent for a non-private update');
+      assert.equal(adapter.answered.length, 0, 'no callback answers');
+      // ZERO durable footprint.
+      assert.equal(store.list().length, 0, 'no capture row for a non-private update');
+      assert.equal(runner.runtime.markdownWriter.writeCount(), 0, 'no governed write');
+      assert.equal(rounds[0].accepted, 0);
+      // Offset still advances (benign non-capture) — no redelivery loop.
+      assert.equal(runner.offset, 2);
+      await runner.shutdown();
+    } finally {
+      fs.rmSync(brainDir, { recursive: true, force: true });
+    }
+  });
+}
+
+test('QUIET BOUNDARY: a STRANGER in a private chat sending unsupported content → unauthorised_sender; ZERO response', async () => {
+  const brainDir = tmpBrain();
+  const logs = [];
+  try {
+    const store = createInMemoryOperationalStore();
+    const adapter = createMockTelegramAdapter({ authorisedUserId: AUTH_ID });
+    const clock = fixedClock(3_950_000);
+    const runner = await makeRunner(brainDir, { store, adapter, clock, logSink: (l) => logs.push(l) });
+
+    // A non-allowlisted sender (999) in their OWN private chat, sending a photo.
+    // The allowlist is verdict 1, so this is a plain unauthorised_sender — no
+    // content-type or chat-context oracle, and NO reply of any kind.
+    adapter.deliver({
+      update_id: 1,
+      message: {
+        message_id: 4242,
+        from: { id: 999 },
+        chat: { id: 999, type: 'private' },
+        photo: [{ file_id: 'AgACAgQAAxk' }],
+      },
+    });
+    await runner.runUntilIdle();
+
+    assert.ok(
+      logs.some((l) => l.event === 'message_not_accepted' && l.reason === 'unauthorised_sender'),
+      'the stranger was refused as unauthorised_sender',
+    );
+    assert.equal(adapter.sentMessages.length, 0, 'no notice to a stranger');
+    assert.equal(adapter.sentCards.length, 0, 'no card to a stranger');
+    assert.equal(adapter.answered.length, 0, 'no answer to a stranger');
+    assert.equal(store.list().length, 0, 'no durable row for a stranger');
+    assert.equal(runner.runtime.markdownWriter.writeCount(), 0, 'no governed write');
     await runner.shutdown();
   } finally {
     fs.rmSync(brainDir, { recursive: true, force: true });
@@ -307,8 +402,8 @@ test('redelivery of the same logical message is deduped — no duplicate Markdow
     // ⇒ same idempotency key ⇒ the second is a dedup hit (simulates a Telegram
     // redelivery that slipped past the offset window before ack).
     adapter.deliver(
-      { update_id: 1, message: { message_id: 900, from: { id: AUTH_ID }, text: 'idempotent note' } },
-      { update_id: 2, message: { message_id: 900, from: { id: AUTH_ID }, text: 'idempotent note' } },
+      { update_id: 1, message: { message_id: 900, from: { id: AUTH_ID }, chat: { id: AUTH_ID, type: 'private' }, text: 'idempotent note' } },
+      { update_id: 2, message: { message_id: 900, from: { id: AUTH_ID }, chat: { id: AUTH_ID, type: 'private' }, text: 'idempotent note' } },
     );
     await runner.runUntilIdle();
 

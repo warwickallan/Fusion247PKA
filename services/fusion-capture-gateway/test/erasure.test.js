@@ -39,7 +39,7 @@ function harness(baseDir) {
 }
 
 const UPDATE = {
-  message: { message_id: 90210, from: { id: AUTH_ID }, text: 'erase-me: aquaponics pH note' },
+  message: { message_id: 90210, from: { id: AUTH_ID }, chat: { id: AUTH_ID, type: 'private' }, text: 'erase-me: aquaponics pH note' },
 };
 
 test('erase() removes the governed note file AND the operational record', async () => {

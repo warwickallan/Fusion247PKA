@@ -43,7 +43,7 @@ function fixedClock(ms) {
 
 function liveEnv(brainDir) {
   return {
-    DATABASE_URL: 'postgresql://postgres:sUpErSeCrEtDbPw@localhost:5432/db?sslmode=require',
+    DATABASE_URL: 'postgresql://postgres:sUpErSeCrEtDbPw@localhost:5432/db?sslmode=verify-full&sslrootcert=/fake/ca.pem',
     TELEGRAM_BOT_TOKEN: FAKE_TOKEN,
     AUTHORISED_TELEGRAM_USER_ID: AUTH_ID,
     WORKER_ID: 'worker-live',
@@ -66,7 +66,7 @@ function tap(updateId, cardRef, { action = 'SaveToBrain', cbId = `cb-${updateId}
     update_id: updateId,
     callback_query: {
       id: cbId, from: { id: AUTH_ID }, data: action,
-      message: { message_id: cardRef.message_id, chat: { id: cardRef.chat_id } },
+      message: { message_id: cardRef.message_id, chat: { id: cardRef.chat_id, type: 'private' } },
     },
   };
 }

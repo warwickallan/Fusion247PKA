@@ -66,7 +66,7 @@ test('dangerous message TEXT is stored verbatim as inert data — no path escape
     // Injection-flavoured payload — every char here is DATA, never code/path.
     const payload = 'line one\nline two $(whoami); rm -rf / && ../../etc/passwd `id`';
     const acc = await intake.accept({
-      message: { message_id: 71001, from: { id: AUTH_ID }, text: payload },
+      message: { message_id: 71001, from: { id: AUTH_ID }, chat: { id: AUTH_ID, type: 'private' }, text: payload },
     });
     assert.equal(acc.ok, true);
     await intake.confirmSave(acc.captureId); // the user taps Save to Brain

@@ -1,0 +1,18 @@
+# Supabase CLI project config — BUILD-002 WP1 (minimal, functions-only).
+#
+# Committed so `supabase functions deploy fcg-webhook-intake` carries the
+# per-function JWT opt-out with it. verify_jwt = false is REQUIRED here:
+# Telegram cannot present a Supabase JWT (Pax Q1.6); the compensating control
+# is the constant-time X-Telegram-Bot-Api-Secret-Token check inside the
+# function. Belt-and-braces: pass --no-verify-jwt on deploy as well (see
+# Builds/BUILD-002-unified-personal-capture-gateway/Architecture/
+# wp1-safe-cutover.md for the full deploy procedure).
+#
+# `project_id` is the LOCAL workspace name only — never a project ref, never a
+# secret. No other local-dev sections are configured; this repo does not run
+# `supabase start`.
+
+project_id = "fusion247pka"
+
+[functions.fcg-webhook-intake]
+verify_jwt = false

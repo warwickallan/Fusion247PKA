@@ -107,9 +107,13 @@ poll loop and closes the Postgres pool.
   access, *not* an env secret. No Supabase password or personal access token is
   requested.
 - **B. Database runtime access** — the ONE runtime secret: `DATABASE_URL`, the
-  libpq connection string from the Supabase **Connect** screen. It carries the
-  **project database password** (the postgres role password), TLS required
-  (`?sslmode=require`). It is **not** a service_role API key.
+  libpq connection string from the Supabase **Connect** screen (**session pooler**
+  host). It carries the **project database password** (the postgres role
+  password). It is **not** a service_role API key. TLS is **verify-full with the
+  pinned pooler CA** (FU-1): set `DATABASE_SSL_CA_FILE` to the committed
+  `certs/supabase-pooler-ca.pem` (preferred), or spell the DSN
+  `?sslmode=verify-full&sslrootcert=<ca path>`. A bare require-mode `sslmode`
+  DSN does **not** verify the CA in node-postgres and fails the CI guard.
 - **C. Supabase Data API keys** — `SUPABASE_URL` + a Supabase secret key are
   needed only if code calls the REST/Data API. The WP0 runtime reaches Postgres
   over `DATABASE_URL` and does **not** use them, so they are optional/reserved
@@ -120,7 +124,8 @@ poll loop and closes the Postgres pool.
 
 | NAME | Secret? | What it is |
 |---|---|---|
-| `DATABASE_URL` | yes | Supabase Connect Postgres string (DB password inline, `?sslmode=require`) |
+| `DATABASE_URL` | yes | Supabase Connect Postgres string, session-pooler host (DB password inline; keep ssl params OUT of it when the pinned-CA form is active) |
+| `DATABASE_SSL_CA_FILE` | no | FU-1 — path to the pinned pooler CA (`certs/supabase-pooler-ca.pem`); activates verify-full via an explicit ssl config object |
 | `TELEGRAM_BOT_TOKEN` | yes | @BotFather token for a throwaway **dev** bot |
 | `AUTHORISED_TELEGRAM_USER_ID` | no | your numeric Telegram id (allowlist of one) |
 | `WORKER_ID` | no | worker principal label |
@@ -201,11 +206,17 @@ The Postgres/Supabase DDL, applied in order:
 - `0004_wp0_retry_retention_indexes.sql` — partial due-retry index + retention.
 - `0005_wp0_card_target_and_poll_offset.sql` — durable `card_ref` + long-poll
   offset cursor (restart safety, §4).
+- `0006_wp1_cloud_intake_rpcs.sql` — WP1 always-on cloud intake: transport dedup
+  ledger (`channel_update_dedup`), `intake_transport` marker, and the three
+  SECURITY DEFINER RPCs (`fcg_webhook_intake` / `fcg_webhook_confirm_tap` /
+  `fcg_webhook_card_ref`) — EXECUTE service_role-only, owned by the
+  least-privilege `fcg_rpc_owner`, `search_path=''`. `fcg` stays non-exposed.
 
 `test/migrations.test.js` statically verifies FK-name consistency between 0001
-and 0002 and that RLS stays enabled deny-by-default (0002/0005 never weaken it).
-The integration suites (`{ skip: !DATABASE_URL }`) apply every migration against a
-real throwaway Postgres and exercise the store — see below.
+and 0002 and that RLS stays enabled deny-by-default (0002/0005/0006 never weaken
+it), plus the 0006 tap-gate/EXECUTE-surface guards. The integration suites
+(`{ skip: !DATABASE_URL }`) apply every migration against a real throwaway
+Postgres and exercise the store — see below.
 
 ## Run the integration suite (real Postgres)
 
@@ -217,11 +228,28 @@ real project, no personal data):
 DATABASE_URL=postgres://postgres:postgres@localhost:5432/postgres node --test
 ```
 
-This applies migrations 0001–0005 from an empty schema and proves: transactional
+This applies migrations 0001–0006 from an empty schema and proves: transactional
 `FOR UPDATE SKIP LOCKED` claim, RLS deny/allow, due-retry index, cascade erasure,
-`card_ref` persistence + reverse lookup, the monotonic poll offset, and the full
+`card_ref` persistence + reverse lookup, the monotonic poll offset, the full
 async saga end-to-end incl. the live **runner** (offset + card target durable
-across a restart). CI runs both jobs (see the workflow).
+across a restart), the WP1 RPC surface (`test/webhookRpc.integration.test.js`,
+P1–P12: EXECUTE matrix, definer hardening, cloud allowlist zero-rows,
+transport + cross-transport dedup, rate guard, confirm-tap state matrix,
+erasure interplay), and the WP1 synthetic end-to-end proof
+(`test/webhookE2E.integration.test.js`, E2E-1…E2E-6: real pure edge handler →
+real RPCs → real worker drain → markdown + completed card, incl. restart and
+duplicate-redelivery safety). CI runs both jobs (see the workflow).
+
+## WP1 — always-on cloud intake (webhook path)
+
+The WP1 edge function lives at `supabase/functions/fcg-webhook-intake/`
+(pure portable handler + Deno shell; the handler is unit-tested by this
+service's suite — `test/webhookHandler.test.js`, `test/idempotencyParity.test.js`).
+The worker/drain contract is UNCHANGED: cloud-confirmed captures land in
+`offline_queued`, which the existing claim loop already drains on wake. Design
+of record + the safe cutover procedure (bot-B testing, setWebhook/deleteWebhook
+rules, DO-NOT list while polling is live):
+`Builds/BUILD-002-unified-personal-capture-gateway/Architecture/wp1-*.md`.
 
 ## Dependencies
 

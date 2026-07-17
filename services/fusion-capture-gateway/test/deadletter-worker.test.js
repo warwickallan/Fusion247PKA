@@ -57,7 +57,7 @@ function harness(baseDir) {
 }
 
 const UPDATE = {
-  message: { message_id: 55501, from: { id: AUTH_ID }, text: 'dead-letter me if I keep failing' },
+  message: { message_id: 55501, from: { id: AUTH_ID }, chat: { id: AUTH_ID, type: 'private' }, text: 'dead-letter me if I keep failing' },
 };
 
 test('retry-exhaustion → dead_letter: never completed, honest failure, no note/no write leak (autonomous reclaim)', async () => {

@@ -13,6 +13,9 @@
 
 import { createEnvelope } from '../core/contracts.js';
 import { buildIdempotencyKey, sha256Hex } from '../core/idempotency.js';
+// SINGLE-SOURCE private-direct-chat predicate — the SAME physical file the WP1
+// webhook handler imports, so poll and webhook cannot drift (correction 3).
+import { isPrivateDirectChat } from '../../../../supabase/functions/fcg-webhook-intake/chatBoundary.js';
 
 export const SOURCE_CHANNEL = 'telegram';
 
@@ -91,6 +94,24 @@ export function mapTelegramUpdate({ update, now, authorisedUserId, action, defau
     return { ok: false, reason: 'unauthorised_sender', senderId: senderId ?? null };
   }
 
+  // PRIVATE-DIRECT-CHAT BOUNDARY (correction 3; ordering fix
+  // GPT-BUILD-002-WP1-DELTA-REVIEW-0002). This BUILD serves Warwick's DM only —
+  // never groups, supergroups, or channels. Refuse any non-private / missing /
+  // malformed chat context with the SAME quiet default-deny posture as an
+  // unauthorised sender (no envelope is ever built). SINGLE shared predicate with
+  // the WP1 webhook, so the two transports give the SAME verdict. Checked AFTER
+  // the allowlist (no content/context oracle for strangers) and — critically —
+  // BEFORE the content-type gate. Rationale: the live runner only emits the
+  // visible "Text only in WP0" notice on 'unsupported_content_type'. If content
+  // were inspected first, an authorised sender posting a photo/voice/document/
+  // empty-text INTO A GROUP would be content-rejected and the runner would REPLY
+  // INSIDE the non-private chat — breaking the quiet private-chat boundary. By
+  // returning 'non_private_chat' before any content inspection, a non-private
+  // context is refused silently and no notice can ever leak into a group.
+  if (!isPrivateDirectChat({ chat: message.chat, senderId })) {
+    return { ok: false, reason: 'non_private_chat', senderId };
+  }
+
   // WP0: text only (technical_source_type 'text'). A message carrying NO usable
   // text (photo/voice/document/sticker/… or an empty/whitespace-only text field)
   // is REJECTED here — never mapped onto an envelope — so a non-text update can
@@ -98,7 +119,9 @@ export function mapTelegramUpdate({ update, now, authorisedUserId, action, defau
   // 'completed' (live defect 2026-07-16: a photo silently "completed" with an
   // empty note). The caller replies with an honest "text only in WP0" notice.
   // Checked AFTER the allowlist so an unauthorised photo stays a plain
-  // unauthorised_sender rejection (no content-type oracle for strangers).
+  // unauthorised_sender rejection (no content-type oracle for strangers), and
+  // AFTER the private-chat boundary so this verdict — and the runner's visible
+  // notice — is reachable ONLY inside the authorised user's own private chat.
   const text = typeof message.text === 'string' ? message.text : '';
   if (text.trim().length === 0) {
     return { ok: false, reason: 'unsupported_content_type', senderId };
@@ -122,6 +145,12 @@ export function mapTelegramUpdate({ update, now, authorisedUserId, action, defau
     idempotency_key: idempotencyKey,
     source_channel: SOURCE_CHANNEL,
     sender_identity_ref: `telegram:user:${senderId}`,
+    // WP1 consistency (wp1-architecture-decision.md §6 anomaly): the BARE
+    // NUMERIC principal, matching what the cloud allowlist (fcg_webhook_intake)
+    // matches on and what the deploy-time seed row carries. The poll path's
+    // identity upsert (ON CONFLICT DO NOTHING on identity_ref) therefore stays
+    // a no-op against the seed instead of registering a divergent shape.
+    channel_principal_ref: senderId,
     recorded_intent: intentFromAction(action ?? defaultAction),
     technical_source_type: 'text',
     raw_payload_ref: {
@@ -179,8 +208,16 @@ export function mapTelegramCallbackQuery({ update, now, authorisedUserId } = {})
   }
 
   const msg = cq.message && typeof cq.message === 'object' ? cq.message : {};
-  const chat = msg.chat && typeof msg.chat === 'object' ? msg.chat : {};
-  const chatId = chat.id !== undefined ? String(chat.id) : senderId; // private chat → user id
+
+  // PRIVATE-DIRECT-CHAT BOUNDARY (correction 3) — a tap on a card that lives in a
+  // group / supergroup / channel (or a malformed chat) is refused with the same
+  // quiet posture. SINGLE shared predicate with the webhook callback path.
+  if (!isPrivateDirectChat({ chat: msg.chat, senderId })) {
+    return { ok: false, reason: 'non_private_chat', senderId };
+  }
+
+  const chat = msg.chat; // predicate guarantees an object with id === senderId
+  const chatId = String(chat.id); // private chat → user id
   const messageId = msg.message_id;
   // Untrusted content stays inert: the action is validated against the known set;
   // an unknown action is rejected rather than interpolated anywhere.

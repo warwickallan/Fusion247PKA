@@ -89,7 +89,7 @@ test('failed editCard leaves store record completed and the Markdown write intac
     });
 
     const accepted = await intake.accept({
-      message: { message_id: 5005, from: { id: AUTH_ID }, text: 'card edit will fail' },
+      message: { message_id: 5005, from: { id: AUTH_ID }, chat: { id: AUTH_ID, type: 'private' }, text: 'card edit will fail' },
     });
     const captureId = accepted.captureId;
     await intake.confirmSave(captureId); // the user taps Save to Brain
