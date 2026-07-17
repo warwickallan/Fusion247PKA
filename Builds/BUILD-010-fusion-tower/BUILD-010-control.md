@@ -37,4 +37,5 @@ One real documentation or low-risk code PR completes the loop with **no manual r
 
 - Canonical build record: `Builds/BUILD-010-fusion-tower/`
 - Architecture: `Architecture/control-plane-schema.md`, `Architecture/dedup-and-timeout-contract.md` (Silas)
+- Security (Vex WP0 delta review, 2026-07-17): `Security/wp0-security-review-2026-07-17.md` — **GREEN-WITH-CONDITIONS** (0 CRITICAL, 1 HIGH, 1 MEDIUM, 1 LOW); no committed secret, no autonomous-merge path, honest identity locked, RLS deny-by-default; gated live actions: migration-apply YES, dispatcher-live YES-with-conditions, open-PR YES, live-acceptance YES-with-conditions.
 - Foundry provenance (IDEA-010 rationale + rejected options): retained in ClickUp (Foundry register), marked Promoted → BUILD-010.
