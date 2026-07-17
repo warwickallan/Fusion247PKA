@@ -19,9 +19,11 @@ import {
   assertRunTransition,
   assertTurnTransition,
   isTerminalRunStatus,
+  assertValidWatchLevel,
   WATCHDOG_LEASE_MS,
 } from '../core/states.js';
 import { assertSignerMatchesResponder, assertValidResponder } from '../core/guardrails.js';
+import { composeRunStatus } from '../core/runStatus.js';
 import { buildSslConfig } from './pgSslConfig.js';
 
 function nowTs(opts) {
@@ -52,6 +54,12 @@ function mapRun(r) {
     evidence_commit_sha: r.evidence_commit_sha ?? null,
     evidence_task_ref: r.evidence_task_ref ?? null,
     evidence_refs: r.evidence_refs ?? null,
+    // WP1 durable control state (migration 0005).
+    paused: r.paused,
+    watch_level: r.watch_level,
+    paused_at: r.paused_at ?? null,
+    stop_requested: r.stop_requested,
+    stop_requested_at: r.stop_requested_at ?? null,
     created_at: r.created_at,
     updated_at: r.updated_at,
   };
@@ -308,6 +316,104 @@ export async function createPostgresStore({ connectionString, caFile = null, poo
       );
       if (res.rows.length === 0) throw new Error(`setCurrentTurn: unknown run ${runId}`);
       return mapRun(res.rows[0]);
+    },
+
+    // ---- run control state (BUILD-010 WP1, migration 0005) -------------------
+    // Durable state the /pause /resume /watch /stop commands mutate. Each write is
+    // a single atomic UPDATE; the commands arrive as run_event rows (the audit),
+    // these methods only persist the resulting control state.
+
+    // /pause -> paused=true + paused_at; /resume -> paused=false + paused_at NULL.
+    async setRunPaused(runId, paused, opts = {}) {
+      const ts = nowTs(opts);
+      const res = await pool.query(
+        `update ftw.governance_run
+           set paused = $2,
+               paused_at = case when $2 then coalesce($3::timestamptz, now()) else null end,
+               updated_at = coalesce($3::timestamptz, now())
+         where run_id = $1 returning *`,
+        [runId, paused === true, ts],
+      );
+      if (res.rows.length === 0) throw new Error(`setRunPaused: unknown run ${runId}`);
+      return mapRun(res.rows[0]);
+    },
+
+    // /watch -> set the notification verbosity. The level is validated against the
+    // ftw.watch_level vocabulary before any SQL (the ::ftw.watch_level cast is the
+    // second, independent gate).
+    async setRunWatchLevel(runId, level, opts = {}) {
+      assertValidWatchLevel(level);
+      const ts = nowTs(opts);
+      const res = await pool.query(
+        `update ftw.governance_run
+           set watch_level = $2::ftw.watch_level,
+               updated_at = coalesce($3::timestamptz, now())
+         where run_id = $1 returning *`,
+        [runId, level, ts],
+      );
+      if (res.rows.length === 0) throw new Error(`setRunWatchLevel: unknown run ${runId}`);
+      return mapRun(res.rows[0]);
+    },
+
+    // /stop -> stop_requested=true. stop_requested_at is stamped ONCE (coalesce keeps
+    // the first request time), so a repeated /stop is idempotent on the timestamp.
+    // The LOOP (not this method) enforces the safe atomic-boundary halt.
+    async requestRunStop(runId, opts = {}) {
+      const ts = nowTs(opts);
+      const res = await pool.query(
+        `update ftw.governance_run
+           set stop_requested = true,
+               stop_requested_at = coalesce(stop_requested_at, coalesce($2::timestamptz, now())),
+               updated_at = coalesce($2::timestamptz, now())
+         where run_id = $1 returning *`,
+        [runId, ts],
+      );
+      if (res.rows.length === 0) throw new Error(`requestRunStop: unknown run ${runId}`);
+      return mapRun(res.rows[0]);
+    },
+
+    // Rich read-only projection for /status. Composes (never mutates) the run row +
+    // its current turn + round budget + evidence pointers + the WP1 control state +
+    // the latest run_event + the latest run-scoped notification. Returns null for an
+    // unknown run.
+    async getRunStatus(runId) {
+      const run = await this.getRun(runId);
+      if (!run) return null;
+      let currentTurn = null;
+      if (run.current_turn_id) {
+        currentTurn = (await this.getTurn(run.current_turn_id)) ?? null;
+      }
+      const evRes = await pool.query(
+        `select * from ftw.run_event
+           where run_id = $1
+           order by received_at desc, created_at desc
+           limit 1`,
+        [runId],
+      );
+      const lastEvent = mapEvent(evRes.rows[0]) ?? null;
+      const nRes = await pool.query(
+        `select * from ftw.notification_outbox
+           where run_id = $1
+           order by created_at desc
+           limit 1`,
+        [runId],
+      );
+      const lastNotification = mapNotification(nRes.rows[0]) ?? null;
+      return composeRunStatus({ run, currentTurn, lastEvent, lastNotification });
+    },
+
+    // Latest N run_events for this run, NEWEST FIRST — the durable /trace feed.
+    // Returns mapped events (kind, source/bound_responder actor, received_at, ...).
+    async recentRunEvents(runId, limit = 10) {
+      const lim = Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : 10;
+      const res = await pool.query(
+        `select * from ftw.run_event
+           where run_id = $1
+           order by received_at desc, created_at desc
+           limit $2`,
+        [runId, lim],
+      );
+      return res.rows.map(mapEvent);
     },
 
     // Idempotent per (run_id, ordinal) — ON CONFLICT DO NOTHING then read-back.

@@ -25,6 +25,7 @@ const MIGRATIONS = [
   '0002_wp0_identity_provider_binding.sql',
   '0003_wp0_external_write_outbox.sql',
   '0004_wp1_notification_outbox.sql',
+  '0005_wp1_run_control_state.sql',
 ];
 
 async function resetAndMigrate() {
@@ -566,6 +567,119 @@ test('24. outbox (d) — RLS deny-by-default on notification_outbox: anon denied
         await client.query('reset role');
       } finally { client.release(); }
     } finally { await pool.end(); }
+  } finally { await store.end(); }
+});
+
+// ---------------------------------------------------------------------------
+// BUILD-010 WP1 — durable run control state (0005), proven on a real DB with
+// 0001 -> 0002 -> 0003 -> 0004 -> 0005 applied on a clean cluster. These prove the
+// /pause /resume /watch /stop state and the /status /trace reads round-trip.
+// ---------------------------------------------------------------------------
+
+test('25. control — a fresh run defaults to not paused / milestones / no stop (0005 column defaults)', { skip: !DB }, async () => {
+  const store = await freshStore();
+  try {
+    const run = await seedRun(store);
+    assert.equal(run.paused, false);
+    assert.equal(run.watch_level, 'milestones');
+    assert.equal(run.paused_at, null);
+    assert.equal(run.stop_requested, false);
+    assert.equal(run.stop_requested_at, null);
+  } finally { await store.end(); }
+});
+
+test('26. control — setRunPaused / setRunWatchLevel / requestRunStop persist and round-trip', { skip: !DB }, async () => {
+  const store = await freshStore();
+  try {
+    const run = await seedRun(store);
+    const paused = await store.setRunPaused(run.run_id, true, { now: 2000 });
+    assert.equal(paused.paused, true);
+    assert.equal(new Date(paused.paused_at).getTime(), 2000);
+
+    const watched = await store.setRunWatchLevel(run.run_id, 'all', { now: 2100 });
+    assert.equal(watched.watch_level, 'all');
+    await assert.rejects(() => store.setRunWatchLevel(run.run_id, 'bogus', { now: 2150 }), /invalid watch_level/);
+
+    const stopped = await store.requestRunStop(run.run_id, { now: 2200 });
+    assert.equal(stopped.stop_requested, true);
+    assert.equal(new Date(stopped.stop_requested_at).getTime(), 2200);
+    // Repeated /stop is idempotent on the timestamp.
+    const again = await store.requestRunStop(run.run_id, { now: 9999 });
+    assert.equal(new Date(again.stop_requested_at).getTime(), 2200);
+
+    // Durable round-trip via a brand-new store (restart-safety of the control state).
+    const store2 = await createPostgresStore({ connectionString: DB });
+    try {
+      const r = await store2.getRun(run.run_id);
+      assert.equal(r.paused, true);
+      assert.equal(r.watch_level, 'all');
+      assert.equal(r.stop_requested, true);
+    } finally { await store2.end(); }
+
+    // Resume clears paused_at.
+    const resumed = await store.setRunPaused(run.run_id, false, { now: 2300 });
+    assert.equal(resumed.paused, false);
+    assert.equal(resumed.paused_at, null);
+  } finally { await store.end(); }
+});
+
+test('27. status — getRunStatus returns the composed shape (run + turn + rounds + evidence + control + last event + last notification)', { skip: !DB }, async () => {
+  const store = await freshStore();
+  try {
+    const run = await seedRun(store, {
+      evidencePrRef: 'owner/repo#7', evidenceCommitSha: 'deadbeef', evidenceTaskRef: 'CU-123',
+    });
+    const turn = await store.appendTurn(run.run_id, { expectedResponder: 'gpt_codex', ordinal: 1 }, { now: 1 });
+    await store.setCurrentTurn(run.run_id, turn.turn_id, { now: 2 });
+    await store.setRunPaused(run.run_id, true, { now: 3 });
+    await store.setRunWatchLevel(run.run_id, 'terminal', { now: 4 });
+    await store.ingestEvent(
+      { source: 'telegram', sourceEventId: 'u-1', kind: 'command:status', runId: run.run_id }, { now: 10 },
+    );
+    const dk = `${run.run_id}|run_created|c|x`;
+    await store.enqueueNotification({
+      dedupKey: dk, runId: run.run_id, recipient: 'c',
+      logicalSource: 'TOWER', purpose: 'run_created', body: 'created',
+    }, { now: 11 });
+    await store.markNotificationSent(dk, 'tg-1', { now: 12 });
+
+    const s = await store.getRunStatus(run.run_id);
+    assert.equal(s.run.run_id, run.run_id);
+    assert.equal(s.current_turn.expected_responder, 'gpt_codex');
+    assert.equal(s.current_turn.state, 'pending');
+    assert.deepEqual(s.rounds, { round_count: 0, max_rounds: 2 });
+    assert.deepEqual(s.evidence, { pr_ref: 'owner/repo#7', commit_sha: 'deadbeef', task_ref: 'CU-123' });
+    assert.equal(s.control.paused, true);
+    assert.equal(s.control.watch_level, 'terminal');
+    assert.equal(s.control.stop_requested, false);
+    assert.equal(s.last_event.kind, 'command:status');
+    assert.equal(new Date(s.last_event.received_at).getTime(), 10);
+    assert.equal(s.last_notification.state, 'sent');
+    assert.ok(s.last_notification.sent_at);
+
+    // Unknown run -> null.
+    assert.equal(await store.getRunStatus('00000000-0000-0000-0000-000000000000'), null);
+  } finally { await store.end(); }
+});
+
+test('28. trace — recentRunEvents returns the latest N for the run, newest first, bounded', { skip: !DB }, async () => {
+  const store = await freshStore();
+  try {
+    const run = await seedRun(store);
+    for (let i = 1; i <= 5; i += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      await store.ingestEvent(
+        { source: 'telegram', sourceEventId: `u-${i}`, kind: `command:c${i}`, runId: run.run_id },
+        { now: i * 10 },
+      );
+    }
+    const recent = await store.recentRunEvents(run.run_id, 3);
+    assert.equal(recent.length, 3, 'bounded to the requested limit');
+    assert.deepEqual(recent.map((e) => e.kind), ['command:c5', 'command:c4', 'command:c3'],
+      'newest first');
+    assert.ok(recent.every((e) => e.run_id === run.run_id), 'only this run\'s events');
+    const all = await store.recentRunEvents(run.run_id);
+    assert.equal(all.length, 5, 'default limit 10 returns all five');
   } finally { await store.end(); }
 });
 

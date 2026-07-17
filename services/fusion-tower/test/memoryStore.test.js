@@ -295,3 +295,125 @@ test('notify: getNotification returns the row or null', async () => {
   assert.equal(n.recipient, '123456789');
   assert.equal(n.logical_source, 'TOWER');
 });
+
+// ---- run control state (BUILD-010 WP1, migration 0005) ---------------------
+
+test('control: a new run defaults to not paused, milestones watch, no stop', async () => {
+  const store = createMemoryStore();
+  const run = await seedRun(store);
+  assert.equal(run.paused, false);
+  assert.equal(run.watch_level, 'milestones');
+  assert.equal(run.paused_at, null);
+  assert.equal(run.stop_requested, false);
+  assert.equal(run.stop_requested_at, null);
+});
+
+test('control: setRunPaused persists paused + paused_at, resume clears paused_at', async () => {
+  const store = createMemoryStore();
+  const run = await seedRun(store);
+  const paused = await store.setRunPaused(run.run_id, true, { now: 2000 });
+  assert.equal(paused.paused, true);
+  assert.equal(paused.paused_at, 2000);
+  // Round-trip: a fresh read sees the durable state.
+  assert.equal((await store.getRun(run.run_id)).paused, true);
+  const resumed = await store.setRunPaused(run.run_id, false, { now: 3000 });
+  assert.equal(resumed.paused, false);
+  assert.equal(resumed.paused_at, null);
+});
+
+test('control: setRunWatchLevel round-trips and rejects an invalid level', async () => {
+  const store = createMemoryStore();
+  const run = await seedRun(store);
+  for (const level of ['all', 'milestones', 'terminal']) {
+    const r = await store.setRunWatchLevel(run.run_id, level, { now: 5 });
+    assert.equal(r.watch_level, level);
+    assert.equal((await store.getRun(run.run_id)).watch_level, level);
+  }
+  await assert.rejects(
+    () => store.setRunWatchLevel(run.run_id, 'bogus', { now: 6 }),
+    /invalid watch_level/,
+  );
+});
+
+test('control: requestRunStop sets stop_requested + stamps stop_requested_at once', async () => {
+  const store = createMemoryStore();
+  const run = await seedRun(store);
+  const stopped = await store.requestRunStop(run.run_id, { now: 4000 });
+  assert.equal(stopped.stop_requested, true);
+  assert.equal(stopped.stop_requested_at, 4000);
+  // A repeated /stop is idempotent on the timestamp (keeps the first request time).
+  const again = await store.requestRunStop(run.run_id, { now: 9000 });
+  assert.equal(again.stop_requested, true);
+  assert.equal(again.stop_requested_at, 4000);
+});
+
+test('control: unknown run rejects on every mutating control method', async () => {
+  const store = createMemoryStore();
+  await assert.rejects(() => store.setRunPaused('nope', true), /unknown run/);
+  await assert.rejects(() => store.setRunWatchLevel('nope', 'all'), /unknown run/);
+  await assert.rejects(() => store.requestRunStop('nope'), /unknown run/);
+});
+
+test('status: getRunStatus composes run + turn + rounds + evidence + control + last event + last notification', async () => {
+  const store = createMemoryStore();
+  const run = await seedRun(store, {
+    evidencePrRef: 'owner/repo#7', evidenceCommitSha: 'deadbeef', evidenceTaskRef: 'CU-123',
+  });
+  const turn = await store.appendTurn(run.run_id, { expectedResponder: 'gpt_codex', ordinal: 1 }, { now: 1 });
+  await store.setCurrentTurn(run.run_id, turn.turn_id, { now: 2 });
+  await store.setRunPaused(run.run_id, true, { now: 3 });
+  await store.setRunWatchLevel(run.run_id, 'all', { now: 4 });
+  await store.ingestEvent(
+    { source: 'telegram', sourceEventId: 'u-1', kind: 'command:status', runId: run.run_id }, { now: 10 },
+  );
+  await store.enqueueNotification({
+    dedupKey: `${run.run_id}|run_created|c|x`, runId: run.run_id, recipient: 'c',
+    logicalSource: 'TOWER', purpose: 'run_created', body: 'created',
+  }, { now: 11 });
+  await store.markNotificationSent(`${run.run_id}|run_created|c|x`, 'tg-1', { now: 12 });
+
+  const s = await store.getRunStatus(run.run_id);
+  assert.equal(s.run.run_id, run.run_id);
+  assert.equal(s.current_turn.expected_responder, 'gpt_codex');
+  assert.equal(s.current_turn.state, 'pending');
+  assert.deepEqual(s.rounds, { round_count: 0, max_rounds: 2 });
+  assert.deepEqual(s.evidence, { pr_ref: 'owner/repo#7', commit_sha: 'deadbeef', task_ref: 'CU-123' });
+  assert.equal(s.control.paused, true);
+  assert.equal(s.control.paused_at, 3);
+  assert.equal(s.control.watch_level, 'all');
+  assert.equal(s.control.stop_requested, false);
+  assert.equal(s.last_event.kind, 'command:status');
+  assert.equal(s.last_event.received_at, 10);
+  assert.equal(s.last_notification.state, 'sent');
+  assert.equal(s.last_notification.sent_at, 12);
+});
+
+test('status: getRunStatus returns null for an unknown run; nulls when nothing attached', async () => {
+  const store = createMemoryStore();
+  assert.equal(await store.getRunStatus('nope'), null);
+  const run = await seedRun(store);
+  const s = await store.getRunStatus(run.run_id);
+  assert.equal(s.current_turn, null);
+  assert.equal(s.last_event, null);
+  assert.equal(s.last_notification, null);
+  assert.equal(s.control.watch_level, 'milestones');
+});
+
+test('trace: recentRunEvents returns the latest N for the run, newest first, bounded', async () => {
+  const store = createMemoryStore();
+  const run = await seedRun(store);
+  for (let i = 1; i <= 5; i += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    await store.ingestEvent(
+      { source: 'telegram', sourceEventId: `u-${i}`, kind: `command:c${i}`, runId: run.run_id },
+      { now: i * 10 },
+    );
+  }
+  const recent = await store.recentRunEvents(run.run_id, 3);
+  assert.equal(recent.length, 3);
+  assert.deepEqual(recent.map((e) => e.kind), ['command:c5', 'command:c4', 'command:c3']);
+  // Default limit is 10; only this run's events are returned.
+  const all = await store.recentRunEvents(run.run_id);
+  assert.equal(all.length, 5);
+  assert.ok(all.every((e) => e.run_id === run.run_id));
+});

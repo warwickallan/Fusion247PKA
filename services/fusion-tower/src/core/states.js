@@ -88,6 +88,34 @@ export const NOTIFICATION_STATE = Object.freeze({
   SUPERSEDED: 'superseded',
 });
 
+// Durable run-level notification verbosity (mirrors migration 0005 enum
+// ftw.watch_level exactly — BUILD-010 WP1). The /watch command sets it. The
+// command layer maps the Telegram grammar (on|milestones|off) onto these values;
+// `milestones` is the default, low-noise middle.
+export const WATCH_LEVEL = Object.freeze({
+  ALL: 'all',
+  MILESTONES: 'milestones',
+  TERMINAL: 'terminal',
+});
+
+export const WATCH_LEVELS = Object.freeze([
+  WATCH_LEVEL.ALL,
+  WATCH_LEVEL.MILESTONES,
+  WATCH_LEVEL.TERMINAL,
+]);
+
+export function isValidWatchLevel(level) {
+  return WATCH_LEVELS.includes(level);
+}
+
+export function assertValidWatchLevel(level) {
+  if (!isValidWatchLevel(level)) {
+    throw new Error(
+      `invalid watch_level: ${level} (expected one of ${WATCH_LEVELS.join(', ')})`,
+    );
+  }
+}
+
 // Legal run-status transitions (control-plane-schema.md §3). Terminal states have
 // no outgoing edges.
 const RUN_TRANSITIONS = Object.freeze({

@@ -29,9 +29,14 @@ const SQL_0001 = readMigration('0001_wp0_control_plane.sql');
 const SQL_0002 = readMigration('0002_wp0_identity_provider_binding.sql');
 const SQL_0003 = readMigration('0003_wp0_external_write_outbox.sql');
 const SQL_0004 = readMigration('0004_wp1_notification_outbox.sql');
+const SQL_0005 = readMigration('0005_wp1_run_control_state.sql');
 const norm0002 = SQL_0002.toLowerCase();
 const norm0003 = SQL_0003.toLowerCase();
 const norm0004 = SQL_0004.toLowerCase();
+const norm0005 = SQL_0005.toLowerCase();
+// Code-only view of 0005: strip `--` line comments so the DO-NOT-WEAKEN prose that
+// legitimately NAMES rls/grant/policy does not trip the DDL-absence guards below.
+const code0005 = norm0005.split('\n').map((line) => line.replace(/--.*$/, '')).join('\n');
 
 // ---------------------------------------------------------------------------
 // 0001 immutable-shape guards (unchanged posture — no weakening allowed).
@@ -270,8 +275,67 @@ test('0004 stores POINTERS ONLY — recipient is a chat id, never a token', () =
 });
 
 // ---------------------------------------------------------------------------
-// 0001 / 0002 / 0003 immutability: the earlier migrations are part of the WP0
-// proof history. 0004 is a pure delta and must NOT have edited their shape.
+// 0005 run control-state guards (BUILD-010 WP1 — durable /pause /resume /watch
+// /stop state on ftw.governance_run, plus the ftw.watch_level enum).
+// ---------------------------------------------------------------------------
+
+test('0005 references the shared convergence/interface contract in its header', () => {
+  assert.match(SQL_0005, /CONVERGENCE-fusion-governance-interface\.md/);
+});
+
+test('0005 adds the ftw.watch_level enum WITHOUT colliding with a table name', () => {
+  assert.match(norm0005, /create type ftw\.watch_level as enum/);
+  // Enum-vs-table collision rule: no table may be named watch_level.
+  assert.doesNotMatch(norm0005, /create table (if not exists )?ftw\.watch_level\b/,
+    'no table may share the watch_level enum name');
+});
+
+test('0005 enum carries all three watch levels', () => {
+  for (const s of ['all', 'milestones', 'terminal']) {
+    assert.match(norm0005, new RegExp(`'${s}'`), `watch_level enum must include ${s}`);
+  }
+});
+
+test('0005 adds the five control columns to ftw.governance_run (guarded/idempotent)', () => {
+  const cols = [
+    ['paused', /add column if not exists paused boolean not null default false/],
+    ['watch_level', /add column if not exists watch_level ftw\.watch_level not null default 'milestones'/],
+    ['paused_at', /add column if not exists paused_at timestamptz/],
+    ['stop_requested', /add column if not exists stop_requested boolean not null default false/],
+    ['stop_requested_at', /add column if not exists stop_requested_at timestamptz/],
+  ];
+  for (const [name, re] of cols) {
+    assert.match(norm0005, re, `0005 must add ${name} to governance_run guarded by IF NOT EXISTS`);
+  }
+  // The columns are added to the EXISTING run table — no new table is created.
+  assert.match(norm0005, /alter table ftw\.governance_run/);
+});
+
+test('0005 creates NO new table (it is a pure ALTER + enum delta)', () => {
+  assert.doesNotMatch(norm0005, /create table/,
+    '0005 must not create any table — it only ALTERs governance_run and adds an enum');
+});
+
+test('0005 leaves RLS UNCHANGED (no RLS/grant/policy/role DDL — prose in the security block aside)', () => {
+  // The code (comments stripped) must issue NO RLS/grant/policy DDL. governance_run
+  // keeps its 0001 deny-by-default posture; the DO-NOT-WEAKEN comment may name these.
+  assert.doesNotMatch(code0005, /row level security/,
+    '0005 must not enable/disable RLS in code');
+  assert.doesNotMatch(code0005, /create policy/, '0005 must add no policy');
+  assert.doesNotMatch(code0005, /\bgrant\b/, '0005 must add no grant');
+  assert.doesNotMatch(code0005, /\bto (anon|authenticated)\b/,
+    '0005 must never grant/policy anon or authenticated');
+  assert.match(SQL_0005, /DO NOT WEAKEN/, '0005 must carry the DO-NOT-WEAKEN security block');
+});
+
+test('0005 documents that /stop is a request the LOOP honours at a safe atomic boundary', () => {
+  assert.match(norm0005, /atomic boundary/);
+  assert.match(norm0005, /outcome_unknown/);
+});
+
+// ---------------------------------------------------------------------------
+// 0001 / 0002 / 0003 / 0004 immutability: the earlier migrations are part of the
+// WP0/WP1 proof history. 0005 is a pure delta and must NOT have edited their shape.
 // ---------------------------------------------------------------------------
 
 test('0001 remains immutable-shape (four tables created, circular FK resolved)', () => {
@@ -292,4 +356,10 @@ test('0003 remains immutable-shape (external_write outbox, per-mutation key, app
   assert.match(norm0003, /create table if not exists ftw\.external_write/);
   assert.match(norm0003, /constraint external_write_mutation_key_key unique/);
   assert.match(norm0003, /constraint external_write_applied_requires_response_chk/);
+});
+
+test('0004 remains immutable-shape (notification_outbox, dedup key, sent-requires-provider CHECK)', () => {
+  assert.match(norm0004, /create table if not exists ftw\.notification_outbox/);
+  assert.match(norm0004, /constraint notification_outbox_dedup_key_key unique/);
+  assert.match(norm0004, /constraint notification_outbox_sent_requires_provider_chk/);
 });
