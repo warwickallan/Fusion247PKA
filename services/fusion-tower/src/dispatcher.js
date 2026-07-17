@@ -27,6 +27,7 @@ import {
   budgetOk,
 } from './core/guardrails.js';
 import { verifyEnvelope } from './core/envelope.js';
+import { handleCommandEvent } from './core/commandRouter.js';
 
 // Map a terminal run status/outcome to the single Warwick-facing notification.
 const OUTCOME_NOTICE = Object.freeze({
@@ -443,6 +444,71 @@ export function createDispatcher({ store, config, adapters, notifier, outbox, no
     async close(runId, text = 'run closed') {
       const run = await store.getRun(runId);
       return emitTerminal('CLOSED', run, text);
+    },
+
+    /**
+     * Event-intake routing for governance commands (BUILD-010 WP1 ↔ BUILD-002 WP2
+     * seam). Claims the unprocessed `command:*` run_events the capture worker wrote,
+     * routes EACH to the pure command router (auth + execute against durable state +
+     * ENQUEUE a durable [TOWER] reply), then marks it processed (advance-once). This
+     * is deliberately SEPARATE from the normal event-advance path: a command event
+     * NEVER advances a run's turn loop, and a turn event never reaches this router.
+     *
+     * Non-throwing: a bad command can never crash the loop. Handle-then-mark (at-
+     * least-once + idempotent handlers/deduped replies) means a crash between handle
+     * and mark re-runs safely and never double-acts. Outbound-only: the reply is an
+     * outbox ENQUEUE — the tick's drainer performs the actual send.
+     *
+     * @param {object} [opts]
+     * @param {Array|Set|string} [opts.allowlist]  authorised sender id(s); defaults
+     *        to the Tower's single authorised Telegram user id from config.
+     * @param {number} [opts.limit]  max command events to process this pass.
+     * @returns {Promise<{ processed:number, results:object[] }>}
+     */
+    async drainCommandEvents({ allowlist, limit = 25 } = {}) {
+      const nowMs = clock();
+      const list = Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : 25;
+      const auth = allowlist ?? (config?.authorisedTelegramUserId
+        ? [String(config.authorisedTelegramUserId)]
+        : []);
+      const toMs = (v) => {
+        if (v == null) return 0;
+        if (v instanceof Date) return v.getTime();
+        if (typeof v === 'number') return v;
+        const t = Date.parse(v);
+        return Number.isFinite(t) ? t : 0;
+      };
+      let all;
+      try {
+        all = await store.listEvents();
+      } catch {
+        return { processed: 0, results: [] };
+      }
+      const commands = all
+        .filter((e) => !e.processed
+          && !e.self_generated
+          && e.source !== 'tower'
+          && String(e.kind ?? '').startsWith('command:'))
+        .sort((a, b) => toMs(a.received_at) - toMs(b.received_at))
+        .slice(0, list);
+
+      const results = [];
+      for (const event of commands) {
+        let res = null;
+        try {
+          // The durable outbox is the reply notifier (its .enqueue is the seam).
+          res = await handleCommandEvent(store, boundOutbox, event, { now: nowMs, allowlist: auth });
+        } catch (err) {
+          // handleCommandEvent is already non-throwing; this is the belt.
+          res = { ok: false, reason: `router-threw:${String(err?.message ?? err)}`, merge: false };
+        }
+        // Advance-once: mark processed AFTER handling (idempotent WHERE processed=false).
+        try {
+          await store.markEventProcessed(event.event_id, { now: nowMs });
+        } catch { /* already processed / gone — idempotent, never fatal */ }
+        results.push({ event_id: event.event_id, ...res });
+      }
+      return { processed: results.length, results };
     },
   };
 

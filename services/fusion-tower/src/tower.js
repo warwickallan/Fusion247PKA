@@ -78,6 +78,12 @@ export async function createTowerRuntime({ env = process.env, cwd = process.cwd(
     //    advance is orchestrated by higher-level logic / the E2E proof; here we
     //    only guarantee exactly-once consume for bound events.
     // (Left intentionally minimal in WP0 runtime; the proof exercises the full path.)
+    // 2b. Route governance command events (command:*) from the durable seam to the
+    //     command router (BUILD-010 WP1 ↔ BUILD-002 WP2). Each reply is ENQUEUED
+    //     durably here (never sent inline) and delivered by the drain in step 3, so a
+    //     command reply issued this tick goes out this tick. Never kills the loop.
+    let commands = null;
+    try { commands = await dispatcher.drainCommandEvents({}); } catch { /* a command failure never kills the loop */ }
     // 3. Drain the durable Telegram notification outbox — OUTBOUND sendMessage only.
     //    Gated on telegram readiness so an unconfigured Tower simply lets milestones
     //    accumulate durably (nothing is lost) until the credential is provisioned.
@@ -85,7 +91,7 @@ export async function createTowerRuntime({ env = process.env, cwd = process.cwd(
     if (outbox.ready) {
       try { notifications = await outbox.drainOnce(store, { limit: 20 }); } catch { /* a drain failure never kills the loop */ }
     }
-    return { heartbeat: { ...heartbeat }, notifications };
+    return { heartbeat: { ...heartbeat }, commands, notifications };
   }
 
   return {
