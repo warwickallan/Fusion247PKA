@@ -46,6 +46,33 @@ None of these are provisioned by the build. Each is a Warwick decision:
 5. **GitHub / ClickUp tokens**: least-privilege, for authenticated polling + the
    gated write path. Unauthenticated read of a public repo works for the proof.
 
+## 1a. Windows-owned-context identity / auth boundary (Codex controller)
+
+The Codex controller (`gpt_codex`) resolves its binary **by path**, not via PATH:
+`codexAdapter.resolveCodexBin()` reads `CODEX_BIN` if set, else discovers the
+newest `%LOCALAPPDATA%\OpenAI\Codex\bin\<hash>\codex.exe` (the `<hash>` dir changes
+on every Codex update, so it is never hard-coded; a sibling hashed dir holding only
+helper binaries such as `rg.exe` is skipped). Because resolution is path-based, a
+**Windows service finds the binary even with no PATH entry** — good.
+
+**But authentication is user-scoped.** The proven unattended route uses ChatGPT
+OAuth stored at `%USERPROFILE%\.codex\auth.json` (a `tokens` block). That file
+belongs to the interactive user (here: `Buggly`). Consequence for hosting:
+
+| Service runs as | Codex controller status |
+|---|---|
+| the SAME user (`Buggly`) whose `.codex\auth.json` holds the OAuth session | **authenticated — live turns work, no API key** |
+| `LocalSystem` / `NT AUTHORITY\SYSTEM` or any OTHER account | **NOT authenticated** — no `auth.json` in that profile → adapter fail-closes with a `no_credential` blocker (no spend, no hang) |
+
+So the NSSM service (§3) MUST be configured to run **as the authenticated user**
+(set the NSSM `ObjectName`/logon account to `Buggly`), OR a least-privilege
+`CODEX_API_KEY` must be provided in `.env` as the alternate credential. Running the
+dispatcher as SYSTEM will silently gate every Codex review turn to a blocker. The
+adapter never reads secret values from `auth.json` — it checks existence + key
+NAMES only. `--ignore-user-config` disables the host `config.toml` (which sets
+`sandbox = "elevated"`) but does **not** disable the auth store, so OAuth still
+applies under the correct user.
+
 ## 2. Install NSSM (primary path)
 
 ```powershell
