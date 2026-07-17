@@ -43,7 +43,7 @@ function fixedClock(ms) {
 
 function liveEnv(brainDir) {
   return {
-    DATABASE_URL: 'postgresql://postgres:sUpErSeCrEtDbPw@localhost:5432/db?sslmode=require',
+    DATABASE_URL: 'postgresql://postgres:sUpErSeCrEtDbPw@localhost:5432/db?sslmode=verify-full&sslrootcert=/fake/ca.pem',
     TELEGRAM_BOT_TOKEN: FAKE_TOKEN,
     AUTHORISED_TELEGRAM_USER_ID: AUTH_ID,
     WORKER_ID: 'worker-live',

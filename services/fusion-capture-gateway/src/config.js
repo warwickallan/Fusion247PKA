@@ -21,10 +21,14 @@
 //
 //   B. DATABASE RUNTIME ACCESS — the ONLY credential the running WP0 service
 //      needs: DATABASE_URL. It carries the POSTGRES CONNECTION CREDENTIALS from
-//      the Supabase "Connect" screen (the project DATABASE PASSWORD), TLS
-//      required for real Supabase (sslmode=require). It is NOT a service_role
-//      API key and NOT a service_role "password" — it is the database role's
-//      password in a libpq connection string.
+//      the Supabase "Connect" screen (the project DATABASE PASSWORD) against
+//      the SESSION POOLER host. TLS for real Supabase is verify-full with the
+//      PINNED pooler CA (FU-1): set DATABASE_SSL_CA_FILE to the committed
+//      certs/supabase-pooler-ca.pem (preferred), or spell the DSN
+//      `?sslmode=verify-full&sslrootcert=<ca path>`. A bare require-mode DSN
+//      does NOT verify the CA in node-postgres and is a Vex-gate failure.
+//      DATABASE_URL is NOT a service_role API key and NOT a service_role
+//      "password" — it is the database role's password in a libpq string.
 //
 //   C. SUPABASE DATA API KEYS — SUPABASE_URL + a Supabase secret/publishable key
 //      are needed ONLY if code calls the Supabase REST/Data API. The current
@@ -37,10 +41,17 @@
 // The environment variable NAMES this service understands. Names only — the
 // committed .env.example carries these with empty values.
 export const CONFIG_KEYS = Object.freeze({
-  // (B) DATABASE RUNTIME ACCESS — the one runtime credential WP0 needs. A libpq
-  // connection string carrying the Postgres role password (Supabase Connect →
-  // "Connection string"). TLS required for real Supabase (?sslmode=require).
+  // (B) DATABASE RUNTIME ACCESS — the one runtime credential WP0/WP1 needs. A
+  // libpq connection string carrying the Postgres role password (Supabase
+  // Connect → session pooler). TLS: verify-full with the pinned CA (FU-1) —
+  // see DATABASE_SSL_CA_FILE below and SECURITY.md §2.
   DATABASE_URL: 'DATABASE_URL',
+  // FU-1 — path to the PINNED Supabase pooler CA PEM. When set, the live
+  // runtime builds an explicit `ssl: { ca, rejectUnauthorized: true }` pool
+  // config (verify-full) and strips any ssl params from the DSN so the pinned
+  // CA can never be silently replaced (node-postgres trap, Pax Q5). The
+  // committed public cert lives at certs/supabase-pooler-ca.pem. Not a secret.
+  DATABASE_SSL_CA_FILE: 'DATABASE_SSL_CA_FILE',
   // Telegram bot token (SECRET — a full bot account credential). Masked always.
   TELEGRAM_BOT_TOKEN: 'TELEGRAM_BOT_TOKEN',
   // The local worker's identity/principal (least-privilege label, not a secret).
@@ -100,6 +111,38 @@ export function maskSecret(value) {
 }
 
 /**
+ * Build a secret-VALUE redactor for a loaded config (FU-4). Returns a function
+ * that replaces every known secret value — including the password component
+ * parsed out of DATABASE_URL — with a fixed marker. This is the ONE redaction
+ * implementation both the live runner's per-cycle diagnostics AND the fatal
+ * (construction-time) log path use, so no error can bypass masking.
+ *
+ * @param {object} config  a loadConfig() result (or any object with the
+ *                 camelCase secret accessors).
+ * @returns {(msg: unknown) => string}
+ */
+export function buildSecretRedactor(config = {}) {
+  const values = [
+    config.databaseUrl,
+    config.telegramBotToken,
+    config.supabaseSecretKey,
+    config.telegramWebhookSecret,
+  ];
+  if (typeof config.databaseUrl === 'string' && config.databaseUrl.length > 0) {
+    try {
+      const parsed = new URL(config.databaseUrl);
+      if (parsed.password) values.push(decodeURIComponent(parsed.password), parsed.password);
+    } catch { /* non-URL DSN — whole-string redaction above still applies */ }
+  }
+  const secrets = [...new Set(values.filter((v) => typeof v === 'string' && v.length > 0))];
+  return (msg) => {
+    let out = typeof msg === 'string' ? msg : String(msg ?? '');
+    for (const secret of secrets) out = out.split(secret).join('***redacted***');
+    return out;
+  };
+}
+
+/**
  * Load config from an environment map (defaults to process.env).
  *
  * Returns a plain object with normalised fields plus metadata:
@@ -119,6 +162,7 @@ export function loadConfig(env = process.env) {
   const raw = {
     // (B) runtime DB credential + (WP0-required) Telegram/worker identity.
     [CONFIG_KEYS.DATABASE_URL]: get(CONFIG_KEYS.DATABASE_URL),
+    [CONFIG_KEYS.DATABASE_SSL_CA_FILE]: get(CONFIG_KEYS.DATABASE_SSL_CA_FILE),
     [CONFIG_KEYS.TELEGRAM_BOT_TOKEN]: get(CONFIG_KEYS.TELEGRAM_BOT_TOKEN),
     [CONFIG_KEYS.WORKER_ID]: get(CONFIG_KEYS.WORKER_ID),
     [CONFIG_KEYS.AUTHORISED_TELEGRAM_USER_ID]: get(CONFIG_KEYS.AUTHORISED_TELEGRAM_USER_ID),
@@ -136,6 +180,7 @@ export function loadConfig(env = process.env) {
   const config = {
     // Convenience camelCase accessors (values are null in fixtures mode).
     databaseUrl: raw[CONFIG_KEYS.DATABASE_URL], // SECRET (Postgres DB password inline)
+    databaseSslCaFile: raw[CONFIG_KEYS.DATABASE_SSL_CA_FILE], // FU-1 pinned-CA path (not a secret)
     telegramBotToken: raw[CONFIG_KEYS.TELEGRAM_BOT_TOKEN], // SECRET
     workerId: raw[CONFIG_KEYS.WORKER_ID],
     authorisedTelegramUserId: raw[CONFIG_KEYS.AUTHORISED_TELEGRAM_USER_ID],
@@ -164,6 +209,7 @@ export function loadConfig(env = process.env) {
       return {
         // Required (WP0):
         DATABASE_URL: maskSecret(raw[CONFIG_KEYS.DATABASE_URL]),
+        DATABASE_SSL_CA_FILE: raw[CONFIG_KEYS.DATABASE_SSL_CA_FILE] ?? '(unset — DSN must carry verify-full + sslrootcert itself)',
         TELEGRAM_BOT_TOKEN: maskSecret(raw[CONFIG_KEYS.TELEGRAM_BOT_TOKEN]),
         WORKER_ID: raw[CONFIG_KEYS.WORKER_ID] ?? '(unset)',
         AUTHORISED_TELEGRAM_USER_ID: raw[CONFIG_KEYS.AUTHORISED_TELEGRAM_USER_ID] ?? '(unset)',

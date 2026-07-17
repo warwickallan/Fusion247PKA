@@ -142,7 +142,11 @@ export async function ensureAuthorisedIdentity({ store, authorisedUserId } = {})
  * live mode → validate required NAMES, then DYNAMICALLY import the Postgres store
  * (which itself dynamically imports pg) + the live Telegram adapter, and build
  * them. The worker authenticates to the store via the service_role connection
- * string (F-09). TLS required for real Supabase (sslmode=require).
+ * string (F-09). TLS for real Supabase is verify-full with the PINNED pooler CA
+ * (FU-1): DATABASE_SSL_CA_FILE activates the explicit `ssl` config-object form
+ * (src/store/pgSslConfig.js); otherwise the DSN itself must spell
+ * `sslmode=verify-full&sslrootcert=<ca>` — a bare require-mode DSN never
+ * verifies the CA in node-postgres (Pax Q5) and fails the static guard test.
  *
  * Factory overrides (storeFactory/adapterFactory) let a live-path test inject
  * doubles WITHOUT a real connection; production leaves them undefined.
@@ -168,7 +172,18 @@ export async function selectStoreAndAdapter(config, { storeFactory, adapterFacto
   // DYNAMIC imports — reached ONLY on the live path, never by the unit suite.
   const makeStore = storeFactory ?? (async ({ connectionString }) => {
     const mod = await import('../store/postgresOperationalStore.js');
-    return mod.createPostgresOperationalStore({ connectionString });
+    // FU-1: when DATABASE_SSL_CA_FILE is set, read the pinned CA once at
+    // startup and hand pg an explicit verify-full ssl object (the DSN's own
+    // ssl params are stripped so they can never replace the pinned CA).
+    const sslMod = await import('../store/pgSslConfig.js');
+    const sslCfg = sslMod.buildPgSslConfig({
+      connectionString,
+      sslCaFile: config.databaseSslCaFile ?? null,
+    });
+    return mod.createPostgresOperationalStore({
+      connectionString: sslCfg.connectionString,
+      poolConfig: sslCfg.poolConfig,
+    });
   });
   const makeAdapter = adapterFactory ?? (async ({ botToken, authorisedUserId }) => {
     const mod = await import('../adapters/telegramLiveAdapter.js');

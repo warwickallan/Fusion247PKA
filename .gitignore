@@ -24,6 +24,11 @@ __MACOSX/
 *.key
 *.pem
 id_rsa
+# BUILD-002 WP1 (FU-1): the pinned Supabase pooler CA is a PUBLIC certificate
+# (a trust anchor, not a secret) and is deliberately committed. Guards:
+# test/tlsTransportGuards.test.js fails if a PRIVATE KEY block ever appears in
+# it, and scripts/secret-scan.sh flags PEM private-key blocks repo-wide.
+!services/fusion-capture-gateway/certs/supabase-pooler-ca.pem
 
 # --- Derived database mirror & SQLite sidecars ---
 *.db
