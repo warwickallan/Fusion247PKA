@@ -42,8 +42,12 @@ function fakeSpawn(plan) {
   };
 }
 
-// A fake fs for binary discovery: dirs → whether each contains codex.exe + mtime.
-function fakeFsForBins(layout, { localAppData = 'C:/LOCALAPPDATA' } = {}) {
+// A fake fs for binary discovery: dirs → whether each contains the codex binary
+// + mtime. `binName` is parametrised so the fixture models the ACTUAL layout the
+// resolver looks for on each OS ('codex.exe' on Windows, 'codex' elsewhere). The
+// fake must be built with the SAME binName the test injects into resolveCodexBin,
+// otherwise no candidate would ever match — see the parametrised tests below.
+function fakeFsForBins(layout, { localAppData = 'C:/LOCALAPPDATA', binName = 'codex.exe' } = {}) {
   const binDir = `${localAppData}/OpenAI/Codex/bin`;
   return {
     readdirSync(dir) {
@@ -53,7 +57,7 @@ function fakeFsForBins(layout, { localAppData = 'C:/LOCALAPPDATA' } = {}) {
     statSync(p) {
       const norm = p.replace(/\\/g, '/');
       for (const [name, meta] of Object.entries(layout)) {
-        if (norm === `${binDir}/${name}/codex.exe` && meta.hasCodex) {
+        if (norm === `${binDir}/${name}/${binName}` && meta.hasCodex) {
           return { isFile: () => true, mtimeMs: meta.mtime };
         }
       }
@@ -62,6 +66,14 @@ function fakeFsForBins(layout, { localAppData = 'C:/LOCALAPPDATA' } = {}) {
     existsSync() { return true; },
   };
 }
+
+// Both OS binary names. Discovery tests run over BOTH so the outcome NEVER depends
+// on the CI runner's process.platform (win32→codex.exe, else→codex). Each case
+// injects `binName` explicitly into resolveCodexBin AND into the fake fs layout, so
+// they are decoupled from the host OS entirely.
+const BIN_NAMES = ['codex.exe', 'codex'];
+// Escape a binName for use inside a RegExp (the '.' in 'codex.exe' is a metachar).
+const rx = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const OK_JSONL = JSON.stringify({
   type: 'item.completed',
@@ -77,25 +89,27 @@ const SECRET = 'c'.repeat(40);
 
 // ── Binary resolution (survive version updates) ──────────────────────────────
 
-test('resolveCodexBin: picks the NEWEST hashed codex.exe by mtime', () => {
-  const fs = fakeFsForBins({
-    aaa11111: { hasCodex: true, mtime: 1000 },
-    bbb22222: { hasCodex: true, mtime: 5000 }, // newest
-    ccc33333: { hasCodex: true, mtime: 3000 },
+for (const binName of BIN_NAMES) {
+  test(`resolveCodexBin: picks the NEWEST hashed ${binName} by mtime [${binName}]`, () => {
+    const fs = fakeFsForBins({
+      aaa11111: { hasCodex: true, mtime: 1000 },
+      bbb22222: { hasCodex: true, mtime: 5000 }, // newest
+      ccc33333: { hasCodex: true, mtime: 3000 },
+    }, { binName });
+    const r = resolveCodexBin({ env: {}, fs, localAppData: 'C:/LOCALAPPDATA', binName });
+    assert.equal(r.source, 'discovery');
+    assert.match(r.path.replace(/\\/g, '/'), new RegExp(`bbb22222/${rx(binName)}$`));
   });
-  const r = resolveCodexBin({ env: {}, fs, localAppData: 'C:/LOCALAPPDATA' });
-  assert.equal(r.source, 'discovery');
-  assert.match(r.path.replace(/\\/g, '/'), /bbb22222\/codex\.exe$/);
-});
 
-test('resolveCodexBin: SKIPS a hashed dir with no codex.exe (helper-only, e.g. rg.exe)', () => {
-  const fs = fakeFsForBins({
-    realbin: { hasCodex: true, mtime: 1000 },
-    helperonly: { hasCodex: false, mtime: 9999 }, // newest dir but NO codex.exe
+  test(`resolveCodexBin: SKIPS a hashed dir with no ${binName} (helper-only, e.g. rg.exe) [${binName}]`, () => {
+    const fs = fakeFsForBins({
+      realbin: { hasCodex: true, mtime: 1000 },
+      helperonly: { hasCodex: false, mtime: 9999 }, // newest dir but NO codex binary
+    }, { binName });
+    const r = resolveCodexBin({ env: {}, fs, localAppData: 'C:/LOCALAPPDATA', binName });
+    assert.match(r.path.replace(/\\/g, '/'), new RegExp(`realbin/${rx(binName)}$`), 'never picks the helper-only dir');
   });
-  const r = resolveCodexBin({ env: {}, fs, localAppData: 'C:/LOCALAPPDATA' });
-  assert.match(r.path.replace(/\\/g, '/'), /realbin\/codex\.exe$/, 'never picks the helper-only dir');
-});
+}
 
 test('resolveCodexBin: CODEX_BIN override wins when it is a file', () => {
   const fs = { existsSync: () => true, statSync: () => ({ isFile: () => true }) };
