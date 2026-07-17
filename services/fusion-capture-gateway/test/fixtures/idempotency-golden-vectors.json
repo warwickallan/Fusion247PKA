@@ -1,0 +1,80 @@
+{
+  "comment": "BUILD-002 WP1 golden parity vectors (test plan U12). Expected values were generated ONCE from the WP0 Node implementation (core/idempotency.js buildIdempotencyKey + telegramMapping.deriveCaptureId) on 2026-07-17 and are PINNED. Both the Node implementation and the Deno-portable port (supabase/functions/fcg-webhook-intake/derive.js) must reproduce them byte-identically — that parity IS the poll<->webhook cross-transport dedup guarantee. textRepeat builds text as unit.repeat(times). The NFD vector uses explicit \\u0301 combining acutes and must resolve to the SAME key as its NFC twin.",
+  "vectors": [
+    {
+      "name": "plain ascii",
+      "senderId": "424242",
+      "messageId": 1001,
+      "text": "hello world",
+      "expected_idempotency_key": "telegram:chat:424242:msg:1001:sha256:b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9",
+      "expected_capture_id": "88b93eb0-2147-5f64-aa46-46f22beef802"
+    },
+    {
+      "name": "nfc composed e-acute",
+      "senderId": "424242",
+      "messageId": 1002,
+      "text": "café résumé",
+      "expected_idempotency_key": "telegram:chat:424242:msg:1002:sha256:787ba50328c24630d3e9094a1accc03d9fada07f531f274d20c78d0c11e2846c",
+      "expected_capture_id": "ef540513-0f5e-5327-ae5e-2749675dedf4"
+    },
+    {
+      "name": "nfd decomposed e-acute (must resolve to the SAME key as the composed twin)",
+      "senderId": "424242",
+      "messageId": 1002,
+      "text": "café résumé",
+      "expected_idempotency_key": "telegram:chat:424242:msg:1002:sha256:787ba50328c24630d3e9094a1accc03d9fada07f531f274d20c78d0c11e2846c",
+      "expected_capture_id": "ef540513-0f5e-5327-ae5e-2749675dedf4"
+    },
+    {
+      "name": "whitespace runs collapse",
+      "senderId": "424242",
+      "messageId": 1003,
+      "text": "  a \t b\n\nc  ",
+      "expected_idempotency_key": "telegram:chat:424242:msg:1003:sha256:0e9f64031fcb2bc708b531c2a20441580425d151a38503f38592a7dd36019d3b",
+      "expected_capture_id": "3223decc-38e1-53d6-b6cf-401cdee5ce52"
+    },
+    {
+      "name": "crlf collapse",
+      "senderId": "424242",
+      "messageId": 1004,
+      "text": "line1\r\nline2",
+      "expected_idempotency_key": "telegram:chat:424242:msg:1004:sha256:1f5c080ae39f741cb927bef27d0a79de3eb78187a13f04d17f43963dc3eb7684",
+      "expected_capture_id": "06e69aa4-f49a-5554-992a-8e02cd3b02ae"
+    },
+    {
+      "name": "emoji + skin tone modifier",
+      "senderId": "424242",
+      "messageId": 1005,
+      "text": "🚀 emoji test 👍🏽",
+      "expected_idempotency_key": "telegram:chat:424242:msg:1005:sha256:1cb0c77bfd26c4b4c7e89dc4bdb627392656995207855cd694c9ce16fc8202b8",
+      "expected_capture_id": "2bd5c4f8-fdb2-5a3f-b5ef-3b00093dd931"
+    },
+    {
+      "name": "cyrillic + cjk",
+      "senderId": "424242",
+      "messageId": 1006,
+      "text": "тест 測試",
+      "expected_idempotency_key": "telegram:chat:424242:msg:1006:sha256:ab92509e63d2668a4d9e0862afd975ee0bc7d79b8b220b7389d000693099ffda",
+      "expected_capture_id": "35543c7c-a71b-5daa-8dbf-e907b0519496"
+    },
+    {
+      "name": "4096-char max telegram text",
+      "senderId": "424242",
+      "messageId": 1007,
+      "textRepeat": {
+        "unit": "abcd",
+        "times": 1024
+      },
+      "expected_idempotency_key": "telegram:chat:424242:msg:1007:sha256:1f91053dcf43206eb082c0962785d35d86d4f629345f8bff25be7394416db908",
+      "expected_capture_id": "eeef48c9-a95a-513d-bea6-b04727ba18e5"
+    },
+    {
+      "name": "different sender same text differs",
+      "senderId": "99999999",
+      "messageId": 1001,
+      "text": "hello world",
+      "expected_idempotency_key": "telegram:chat:99999999:msg:1001:sha256:b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9",
+      "expected_capture_id": "ee9a28b1-77e4-5f84-81cf-0cf345565465"
+    }
+  ]
+}
