@@ -60,12 +60,16 @@ export const CODEX_EXEC_FLAGS = Object.freeze([
   '--json',
 ]);
 
-// The Fusion Tower reviewer result schema handed to `codex --output-schema`. The
-// final agent_message MUST conform. Kept intentionally moderate (required fields,
-// bounded enums) — Larry's spike proved --output-schema JSON round-trips cleanly.
+// The Fusion Tower reviewer result schema handed to `codex --output-schema`.
+// Codex forwards this to OpenAI structured-outputs in STRICT mode, which requires
+// `additionalProperties:false` on every object AND every property listed in
+// `required` (confirmed live: a non-strict schema → HTTP 400 invalid_json_schema).
+// So every object is closed and every field required; "optional" fields are
+// expressed as always-present but allowed-empty (e.g. [] or "").
 export const CODEX_RESULT_SCHEMA = Object.freeze({
   type: 'object',
-  required: ['verdict', 'summary', 'findings', 'proposed_action'],
+  additionalProperties: false,
+  required: ['verdict', 'summary', 'claims_verified', 'findings', 'proposed_action'],
   properties: {
     verdict: { type: 'string', enum: ['approve', 'request_changes', 'comment'] },
     summary: { type: 'string' },
@@ -73,7 +77,8 @@ export const CODEX_RESULT_SCHEMA = Object.freeze({
       type: 'array',
       items: {
         type: 'object',
-        required: ['claim', 'status'],
+        additionalProperties: false,
+        required: ['claim', 'status', 'evidence'],
         properties: {
           claim: { type: 'string' },
           status: { type: 'string', enum: ['confirmed', 'refuted', 'partial', 'unverifiable'] },
@@ -85,7 +90,8 @@ export const CODEX_RESULT_SCHEMA = Object.freeze({
       type: 'array',
       items: {
         type: 'object',
-        required: ['id', 'severity', 'evidence'],
+        additionalProperties: false,
+        required: ['id', 'severity', 'evidence', 'rationale', 'required_correction'],
         properties: {
           id: { type: 'string' },
           severity: { type: 'string', enum: ['critical', 'high', 'medium', 'low', 'info'] },
@@ -97,7 +103,8 @@ export const CODEX_RESULT_SCHEMA = Object.freeze({
     },
     proposed_action: {
       type: 'object',
-      required: ['type'],
+      additionalProperties: false,
+      required: ['type', 'target'],
       properties: {
         type: { type: 'string', enum: ['post_review', 'post_comment', 'noop'] },
         target: { type: 'string' },

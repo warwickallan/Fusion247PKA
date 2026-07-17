@@ -39,5 +39,6 @@ One real documentation or low-risk code PR completes the loop with **no manual r
 - Architecture: `Architecture/control-plane-schema.md`, `Architecture/dedup-and-timeout-contract.md` (Silas)
 - Reviewer contract: [[fusion-tower-operating-instructions]] — the GPT/Codex reviewer role (identity, pointer-inputs, method, output). The [[codexAdapter]] reviewer prompt follows it.
 - Host runbook + Codex dependency status: [[tower-host-runbook]], [[dependency-status]] (Mack)
+- Live Codex review (spike deliverable, 2026-07-17): [[codex-review-draft-2026-07-17]] — one Tower-owned, read-only, signed turn (verdict `request_changes`); NOT posted to ClickUp (bounded write not yet authorised). Raised **F-MED** (DB CHECK enforces provider vocabulary, not the per-principal binding) — follow-up migration for Silas.
 - Security (Vex WP0 delta review, 2026-07-17): `Security/wp0-security-review-2026-07-17.md` — **GREEN-WITH-CONDITIONS** (0 CRITICAL, 1 HIGH, 1 MEDIUM, 1 LOW); no committed secret, no autonomous-merge path, honest identity locked, RLS deny-by-default; gated live actions: migration-apply YES, dispatcher-live YES-with-conditions, open-PR YES, live-acceptance YES-with-conditions.
 - Foundry provenance (IDEA-010 rationale + rejected options): retained in ClickUp (Foundry register), marked Promoted → BUILD-010.
