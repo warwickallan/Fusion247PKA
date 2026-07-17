@@ -146,6 +146,18 @@ There is no RED / no-override finding in this delta.
 
 ---
 
+## Remediation (2026-07-17)
+
+Mack closed the two conditions on this branch (`build-010/wp0-fusion-tower`) with real fixes + executable controls; no exploit/PoC text is reproduced here (responsible-disclosure level, finding + fix only).
+
+- **F-HIGH-01 — FIXED** (`eb230a5`). The Larry adapter no longer places any prompt-derived text on argv, and no longer uses a shell. `runClaude()` and `verifyClaudeInvocable()` spawn with `shell:false`; the (untrusted-influenced) prompt is delivered on **stdin** (mirroring the Codex adapter), and argv is a fixed, fully-trusted constant flag set. The live headless invocation still works (`claude` is a native executable resolved via PATH/PATHEXT; re-proven by `scripts/proof-e2e.js` → "REAL headless claude", signatures verified). Guarded by `test/larryInjection.test.js`: a shell:false + prompt-on-stdin assertion and an injection-trace test (`boundedContext.task = 'x & echo INJECTED > pwned.txt'`) proving the payload stays an inert stdin token, never reaches argv, constructs no second command, and creates no `pwned.txt`.
+
+- **F-MED-01 — FIXED** (`bc853e3`). HMAC verification now fails **closed** in live mode. `dispatcher.verifySignedResult` requires, for every signing principal when `config.isRuntimeReady()`, a provisioned per-principal secret AND a verifiable signed envelope — a missing secret / unsigned result / bad signature is refused, never recorded (identity signer-match stays unconditional; fixtures mode stays lenient). `config.requireLiveSigningSecrets()` + a `createTowerRuntime` startup gate assert all `TOWER_HMAC_SECRET_*` are present in live mode, failing loud with a masked (NAMES-only) fatal. Guarded by `test/failClosed.test.js` (live rejection, live accept-when-provisioned, config both-ways, startup fail-closed).
+
+- **F-LOW-01 — OPEN (noted hardening item).** Error-path / glob hygiene is unchanged; not attacker-controlled in WP0, carried forward as a hardening note, not a sign-off blocker.
+
+CI added (`4600d17`): `.github/workflows/fusion-tower-tests.yml` (unit no-DB + integration on `postgres:16`) so both the guardrail suite and the 14 DB-gated proofs run on every change to the service. Local re-run: no-DB 79 pass / 14 skip; live throwaway Postgres 17 93 pass / 0 skip; secret scan clean.
+
 ## Definition-of-done for this review
 - [x] Privileged paths read line-by-line (migration, envelope, dispatcher, guardrails, both adapters, event intake, Telegram controls, config, both stores, SSL config, watchdog, tower entrypoint, E2E proof).
 - [x] Test suite run by the reviewer: 85 tests, 71 pass, 0 fail, 14 DB-gated skips.
