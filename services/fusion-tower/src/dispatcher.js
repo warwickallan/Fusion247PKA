@@ -64,15 +64,50 @@ export function createDispatcher({ store, config, adapters, notifier, now, lease
     return notice;
   }
 
-  // Verify a signed result envelope against the honest per-principal secret. In
-  // fixtures mode (no secret configured) verification is skipped but the honest
-  // label is still asserted inside verifyEnvelope's callers via the adapter.
+  // Verify a signed result envelope against the honest per-principal secret.
+  //
+  // Identity honesty (signer must match the dispatched responder) is asserted
+  // UNCONDITIONALLY, in every mode. The HMAC integrity check is mode-aware:
+  //
+  //   LIVE (config.isRuntimeReady()): FAIL-CLOSED (F-MED-01). A signing principal
+  //     MUST have its per-principal secret provisioned AND return a signed,
+  //     verifiable envelope. A missing secret, a missing envelope/signature, or a
+  //     bad signature is REFUSED — the turn result is rejected, never recorded.
+  //     The integrity control must not silently degrade on misconfiguration.
+  //
+  //   FIXTURES (non-runtime-ready): lenient — verify only when a secret AND a
+  //     signature are present; an honest unsigned envelope is accepted (this is
+  //     the synthetic-substrate WP0 path).
   function verifySignedResult(expectedResponder, result) {
     assertSignerMatchesResponder(expectedResponder, result.signerPrincipal);
-    const secret = config?.signingSecret ? config.signingSecret(result.signerPrincipal) : null;
+    const principal = result.signerPrincipal;
+    const secret = config?.signingSecret ? config.signingSecret(principal) : null;
+    const isSigningPrincipal = Boolean(config?.signingSecretEnvName?.(principal));
+    const live = typeof config?.isRuntimeReady === 'function' && config.isRuntimeReady();
+
+    if (live && isSigningPrincipal) {
+      if (!secret) {
+        const envName = config.signingSecretEnvName(principal);
+        throw new Error(
+          `dispatcher: refusing unsigned turn result for "${principal}" — live mode requires `
+          + `${envName} to be provisioned (fail-closed, F-MED-01)`,
+        );
+      }
+      if (!result.envelope || !result.signature) {
+        throw new Error(
+          `dispatcher: refusing unsigned turn result for "${principal}" — live mode requires a `
+          + 'signed envelope + signature (fail-closed, F-MED-01)',
+        );
+      }
+      if (!verifyEnvelope(result.envelope, result.signature, secret)) {
+        throw new Error(`dispatcher: signature verification failed for ${principal}`);
+      }
+      return true;
+    }
+
     if (secret && result.envelope && result.signature) {
       const ok = verifyEnvelope(result.envelope, result.signature, secret);
-      if (!ok) throw new Error(`dispatcher: signature verification failed for ${result.signerPrincipal}`);
+      if (!ok) throw new Error(`dispatcher: signature verification failed for ${principal}`);
     }
     return true;
   }

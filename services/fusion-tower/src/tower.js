@@ -24,6 +24,21 @@ import { createTelegramControls } from './adapters/telegramControls.js';
 export async function createTowerRuntime({ env = process.env, cwd = process.cwd() } = {}) {
   const config = loadConfig(env);
 
+  // F-MED-01 — FAIL-CLOSED startup gate. In live mode (runtime-ready) every
+  // per-principal HMAC signing secret MUST be provisioned, else turn-result
+  // integrity verification would silently degrade to fail-open. Assert BEFORE any
+  // store/adapter is built so a misconfigured live boot dies loud and early. The
+  // fatal message lists env NAMES only (never a secret value).
+  if (config.isRuntimeReady()) {
+    const sig = config.requireLiveSigningSecrets();
+    if (!sig.ok) {
+      throw new Error(
+        'fusion-tower: live mode requires all per-principal HMAC signing secrets — '
+        + `missing: ${sig.missing.join(', ')} (fail-closed, F-MED-01)`,
+      );
+    }
+  }
+
   // Store: real Postgres when DATABASE_URL is present, else the in-memory fixture.
   let store;
   if (config.isRuntimeReady()) {

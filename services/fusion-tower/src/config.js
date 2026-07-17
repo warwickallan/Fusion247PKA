@@ -171,6 +171,23 @@ export function loadConfig(env = process.env) {
       return PRINCIPAL_SIGNING_ENV[principal] ?? null;
     },
 
+    /**
+     * F-MED-01 — live-mode HMAC posture. In fixtures mode signing is optional
+     * (adapters emit honest but unsigned envelopes). In LIVE mode (runtime-ready)
+     * every signing principal MUST have its per-principal HMAC secret provisioned,
+     * otherwise turn-result integrity verification would silently degrade to
+     * fail-open. Returns { ok, missing:[env NAMES] } — NAMES only, never a value,
+     * so the caller can fail closed with a safe (masked) fatal message.
+     */
+    requireLiveSigningSecrets() {
+      if (missingCore.length > 0) return { ok: true, missing: [] }; // fixtures — not required
+      const missing = [];
+      for (const envName of Object.values(PRINCIPAL_SIGNING_ENV)) {
+        if (raw[envName] === null) missing.push(envName);
+      }
+      return { ok: missing.length === 0, missing };
+    },
+
     /** A log-safe snapshot: every secret masked, everything else shown. */
     describe() {
       return {
