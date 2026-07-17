@@ -2,11 +2,19 @@ name: fusion-capture-gateway-tests
 
 # CI for the BUILD-002 WP0 capture gateway.
 #
-# Two jobs:
+# Three jobs:
 #   * unit        — the fixtures-only suite (zero runtime dependencies, no DB,
 #                   no token, no network). This is the enforced gate on every
 #                   push/PR touching the service. Integration tests skip when
 #                   DATABASE_URL is unset.
+#   * deno-check  — validates the ACTUAL Deno edge deployment shell
+#                   (supabase/functions/fcg-webhook-intake/index.ts) and its full
+#                   local import graph (handler.js, derive.js, credential.js,
+#                   chatBoundary.js) under a pinned Deno. `deno check` alone is
+#                   the gate — NO real secrets, NO DB, NO deploy, NO Docker. It
+#                   FAILS the PR on any TypeScript / import-resolution / Deno
+#                   runtime incompatibility the Node suite (which only exercises
+#                   the pure handler) cannot see.
 #   * integration — the SAME suite with DATABASE_URL pointed at a throwaway
 #                   Postgres 16 service, so the real-Postgres proofs actually run:
 #                   migrations apply from a clean DB, RLS deny/allow, transactional
@@ -53,6 +61,23 @@ jobs:
 
       - name: Run the fixtures-only suite (zero runtime dependencies, no DB, no token)
         run: node --test
+
+  deno-check:
+    # Validates the real Deno edge shell + its import graph. No secrets, no DB,
+    # no deploy — a pure type/import gate on the deployment artifact.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up a pinned, current-supported Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.9.3
+
+      - name: deno check the edge function shell + its full local import graph
+        working-directory: supabase/functions/fcg-webhook-intake
+        run: deno check index.ts
 
   integration:
     runs-on: ubuntu-latest
