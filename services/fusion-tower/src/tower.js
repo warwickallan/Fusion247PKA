@@ -16,6 +16,7 @@ import { createDispatcher } from './dispatcher.js';
 import { createLarryAdapter } from './adapters/larryAdapter.js';
 import { createCodexAdapter } from './adapters/codexAdapter.js';
 import { createTelegramControls } from './adapters/telegramControls.js';
+import { createTelegramNotifier } from './adapters/telegramNotifier.js';
 
 /**
  * Build the runtime object (no loop started). Returns { config, store, dispatcher,
@@ -54,7 +55,12 @@ export async function createTowerRuntime({ env = process.env, cwd = process.cwd(
   const gpt_codex = createCodexAdapter({ config, cwd, mode: 'auto' }); // auto self-blocks without key/binary
   const adapters = { larry, gpt_codex };
 
-  const dispatcher = createDispatcher({ store, config, adapters });
+  // Durable OUTBOUND Telegram notifier (BUILD-010 WP1) over the notification outbox.
+  // Milestones are ENQUEUED by the dispatcher; the tick drains them. OUTBOUND ONLY —
+  // no getUpdates/polling here (BUILD-002's capture worker holds sole inbound poll).
+  const outbox = createTelegramNotifier({ config });
+
+  const dispatcher = createDispatcher({ store, config, adapters, outbox });
   const controls = createTelegramControls({ config, dispatcher });
   // Late-bind the terminal-only Telegram notifier now that both exist.
   dispatcher.setNotifier(controls.notifier);
@@ -72,7 +78,14 @@ export async function createTowerRuntime({ env = process.env, cwd = process.cwd(
     //    advance is orchestrated by higher-level logic / the E2E proof; here we
     //    only guarantee exactly-once consume for bound events.
     // (Left intentionally minimal in WP0 runtime; the proof exercises the full path.)
-    return { heartbeat: { ...heartbeat } };
+    // 3. Drain the durable Telegram notification outbox — OUTBOUND sendMessage only.
+    //    Gated on telegram readiness so an unconfigured Tower simply lets milestones
+    //    accumulate durably (nothing is lost) until the credential is provisioned.
+    let notifications = null;
+    if (outbox.ready) {
+      try { notifications = await outbox.drainOnce(store, { limit: 20 }); } catch { /* a drain failure never kills the loop */ }
+    }
+    return { heartbeat: { ...heartbeat }, notifications };
   }
 
   return {
@@ -80,6 +93,7 @@ export async function createTowerRuntime({ env = process.env, cwd = process.cwd(
     store,
     dispatcher,
     controls,
+    outbox,
     adapters,
     heartbeat,
     tick,

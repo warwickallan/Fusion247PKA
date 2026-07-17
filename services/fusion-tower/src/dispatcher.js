@@ -37,16 +37,34 @@ const OUTCOME_NOTICE = Object.freeze({
   decision_required: 'DECISION_REQUIRED',
 });
 
+// Map a terminal/decision notice KIND -> the durable outbox milestone purpose. Used
+// to enqueue the durable, deduped Telegram notification alongside the in-memory
+// terminal notice. Distinct purposes => distinct dedup keys => each fires once.
+const TERMINAL_PURPOSE = Object.freeze({
+  READY: 'terminal_ready',
+  BLOCKED: 'terminal_blocked',
+  TIMED_OUT: 'terminal_timed_out',
+  DECISION_REQUIRED: 'decision_required',
+  STOPPED: 'terminal_stopped',
+  CLOSED: 'terminal_stopped',
+  FAILED: 'terminal_failed',
+});
+
 /**
  * @param {object} deps
  * @param {object} deps.store        memoryStore or postgresStore
  * @param {object} deps.config       loadConfig() result (for signing-secret verify)
  * @param {object} deps.adapters     { larry, gpt_codex } — each: runTurn(ctx) => result
- * @param {object} [deps.notifier]   { notify(kind, {run, text}) } terminal-only
+ * @param {object} [deps.notifier]   { notify(kind, {run, text}) } terminal-only (in-memory)
+ * @param {object} [deps.outbox]     durable Telegram notifier: enqueue(store, {runId,
+ *                                   logicalSource, purpose, body}, {now}). Milestone
+ *                                   events are ENQUEUED here (durable + deduped); the
+ *                                   actual send is the drainer, so a Telegram outage
+ *                                   never blocks orchestration and never loses a milestone.
  * @param {function} [deps.now]      () => epoch ms (injectable clock)
  * @param {number} [deps.leaseMs]    dead-man lease window (default 5 min)
  */
-export function createDispatcher({ store, config, adapters, notifier, now, leaseMs } = {}) {
+export function createDispatcher({ store, config, adapters, notifier, outbox, now, leaseMs } = {}) {
   if (!store) throw new Error('createDispatcher: store required');
   const clock = typeof now === 'function' ? now : () => Date.now();
   const lease = Number.isFinite(leaseMs) ? leaseMs : WATCHDOG_LEASE_MS;
@@ -54,10 +72,38 @@ export function createDispatcher({ store, config, adapters, notifier, now, lease
   // Late-bindable so a control surface built AFTER the dispatcher (it needs the
   // dispatcher) can still supply the terminal-only notifier.
   let boundNotifier = notifier ?? null;
+  // The durable milestone outbox (late-bindable too).
+  let boundOutbox = outbox ?? null;
+
+  // Durable milestone ENQUEUE — reserve a deduped notification. NEVER sends here and
+  // NEVER throws out of orchestration: a durable enqueue failure (or a swallowed
+  // secret-scan refusal on a Tower-composed body) must not break the control loop.
+  // The drainer performs the actual send.
+  async function enqueueMilestone(purpose, run, body, logicalSource = 'TOWER') {
+    if (!boundOutbox || typeof boundOutbox.enqueue !== 'function') return null;
+    try {
+      return await boundOutbox.enqueue(store, {
+        runId: run?.run_id ?? run?.runId ?? null,
+        logicalSource,
+        purpose,
+        body,
+      }, { now: clock() });
+    } catch {
+      return null; // enqueue must never break the loop
+    }
+  }
 
   async function emitTerminal(kind, run, text) {
     const notice = { kind, run_id: run?.run_id ?? null, outcome: run?.terminal_outcome ?? null, text, at: clock() };
     notices.push(notice);
+    // Durable, deduped milestone for the terminal/decision surface (fires once per
+    // run+purpose). This is the enqueue; the drainer sends.
+    const purpose = TERMINAL_PURPOSE[kind] ?? 'terminal_closed';
+    await enqueueMilestone(
+      purpose, run,
+      `run ${run?.run_id ?? '?'}: ${kind}${text ? ` — ${text}` : ''}`,
+      'TOWER',
+    );
     if (boundNotifier && typeof boundNotifier.notify === 'function') {
       try { await boundNotifier.notify(kind, { run, text }); } catch { /* notifier failures never break the loop */ }
     }
@@ -122,6 +168,9 @@ export function createDispatcher({ store, config, adapters, notifier, now, lease
     /** Late-bind the terminal-only notifier (control surface needs the dispatcher). */
     setNotifier(n) { boundNotifier = n; },
 
+    /** Late-bind the durable milestone outbox (Telegram notifier). */
+    setOutbox(o) { boundOutbox = o; },
+
     /**
      * Create a governance run (typically from a Telegram /start) and move it to
      * active. Returns the run row.
@@ -129,6 +178,8 @@ export function createDispatcher({ store, config, adapters, notifier, now, lease
     async createRun(spec = {}) {
       const opts = { now: clock() };
       const run = await store.createRun(spec, opts);
+      // Milestone: run created.
+      await enqueueMilestone('run_created', run, `run ${run.run_id}: created — ${run.title ?? 'untitled'}`, 'TOWER');
       return run;
     },
 
@@ -167,6 +218,12 @@ export function createDispatcher({ store, config, adapters, notifier, now, lease
       const dispatched = await store.dispatchTurn(turn.turn_id, { now: nowMs, leaseMs: lease });
       await store.setCurrentTurn(runId, turn.turn_id, { now: nowMs });
       await store.setRunStatus(runId, RUN_STATUS.AWAITING_RESPONDER, { now: nowMs });
+      // Milestone: expected-responder change (a turn dispatched to a responder).
+      await enqueueMilestone(
+        `turn_dispatched_${dispatched.ordinal}`, run,
+        `run ${runId}: turn ${dispatched.ordinal} dispatched to ${expectedResponder}`,
+        'TOWER',
+      );
       return { turn: dispatched };
     },
 
@@ -186,6 +243,14 @@ export function createDispatcher({ store, config, adapters, notifier, now, lease
         // No adapter for this responder (e.g. warwick/human) — record a blocker.
         await store.recordTurnFailure(turnId, { error: `no adapter for responder ${turn.expected_responder}` }, { now: nowMs });
         return { turn: await store.getTurn(turnId), blocked: true };
+      }
+
+      // Milestone: turn START (Codex review start / Larry turn start).
+      const responder = turn.expected_responder;
+      if (responder === 'gpt_codex') {
+        await enqueueMilestone('codex_review_start', run, `run ${turn.run_id}: Codex review started (turn ${turn.ordinal})`, 'CODEX');
+      } else if (responder === 'larry') {
+        await enqueueMilestone('larry_turn_start', run, `run ${turn.run_id}: Larry turn started (turn ${turn.ordinal})`, 'LARRY');
       }
 
       let result;
@@ -211,6 +276,12 @@ export function createDispatcher({ store, config, adapters, notifier, now, lease
         assertWithinScope(run.scope_lock, action);
       }
       await this.recordResult(turnId, result, { now: nowMs });
+      // Milestone: turn COMPLETE (Codex review complete / Larry turn complete).
+      if (responder === 'gpt_codex') {
+        await enqueueMilestone('codex_review_complete', run, `run ${turn.run_id}: Codex review complete (turn ${turn.ordinal})`, 'CODEX');
+      } else if (responder === 'larry') {
+        await enqueueMilestone('larry_turn_complete', run, `run ${turn.run_id}: Larry turn complete (turn ${turn.ordinal})`, 'LARRY');
+      }
       return { turn: await store.getTurn(turnId), action: action ?? null, result };
     },
 
@@ -240,7 +311,28 @@ export function createDispatcher({ store, config, adapters, notifier, now, lease
       if (event && (runId || boundResponder)) {
         await store.bindEvent(event.event_id, runId ?? event.run_id, boundResponder, { now: nowMs });
       }
-      return { event: await store.getEvent(event.event_id), isNew };
+      const bound = await store.getEvent(event.event_id);
+      // Milestone: CI pending/green/red — enqueue once per NEW github check event.
+      if (isNew) await this._maybeEnqueueCi(bound);
+      return { event: bound, isNew };
+    },
+
+    // Map a github check event -> a CI milestone (ci_green/ci_red/ci_pending) and
+    // enqueue it durably+deduped, tagged with the CI message-identity. Non-CI or
+    // self/tower events are ignored.
+    async _maybeEnqueueCi(event) {
+      if (!event || event.source !== 'github') return;
+      const kind = String(event.kind ?? '');
+      if (!kind.startsWith('check_suite') && !kind.startsWith('check_run') && !kind.startsWith('status')) return;
+      const conclusion = String(event.payload?.conclusion ?? event.payload?.state ?? 'unknown').toLowerCase();
+      let purpose;
+      let label;
+      if (conclusion === 'success') { purpose = 'ci_green'; label = 'GREEN'; }
+      else if (['failure', 'timed_out', 'cancelled', 'action_required', 'error'].includes(conclusion)) { purpose = 'ci_red'; label = 'RED'; }
+      else { purpose = 'ci_pending'; label = 'PENDING'; }
+      const runRef = event.run_id ? { run_id: event.run_id } : null;
+      const sha = event.head_sha ? ` @ ${String(event.head_sha).slice(0, 8)}` : '';
+      await enqueueMilestone(purpose, runRef, `run ${event.run_id ?? '(unbound)'}: CI ${label}${sha}`, 'CI');
     },
 
     /**
@@ -278,6 +370,13 @@ export function createDispatcher({ store, config, adapters, notifier, now, lease
           });
           decisions.push({ turnId, decision: 'retry', retryTurnId: retry.turn?.turn_id ?? null });
         } else {
+          // Milestone: a retry is MATERIALLY BLOCKED (rounds/budget exhausted) — the
+          // distinct "cannot retry" moment, separate from the terminal outcome below.
+          await enqueueMilestone(
+            `retry_blocked_${turn.ordinal}`, run,
+            `run ${run.run_id}: retry blocked — ${rounds.allowed ? budget.reason : rounds.reason}`,
+            'TOWER',
+          );
           const notice = await this.terminate(run.run_id, RUN_STATUS.TIMED_OUT, RUN_OUTCOME.TIMED_OUT,
             `watchdog reaped turn ${turn.ordinal}; ${rounds.allowed ? budget.reason : rounds.reason}`);
           decisions.push({ turnId, decision: 'terminal', notice });
