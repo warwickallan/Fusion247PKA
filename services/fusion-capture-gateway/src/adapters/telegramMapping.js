@@ -13,6 +13,9 @@
 
 import { createEnvelope } from '../core/contracts.js';
 import { buildIdempotencyKey, sha256Hex } from '../core/idempotency.js';
+// SINGLE-SOURCE private-direct-chat predicate — the SAME physical file the WP1
+// webhook handler imports, so poll and webhook cannot drift (correction 3).
+import { isPrivateDirectChat } from '../../../../supabase/functions/fcg-webhook-intake/chatBoundary.js';
 
 export const SOURCE_CHANNEL = 'telegram';
 
@@ -104,6 +107,17 @@ export function mapTelegramUpdate({ update, now, authorisedUserId, action, defau
     return { ok: false, reason: 'unsupported_content_type', senderId };
   }
 
+  // PRIVATE-DIRECT-CHAT BOUNDARY (correction 3). This BUILD serves Warwick's DM
+  // only — never groups, supergroups, or channels. Refuse any non-private /
+  // missing / malformed chat context with the SAME quiet default-deny posture as
+  // an unauthorised sender (no envelope is ever built). SINGLE shared predicate
+  // with the WP1 webhook, so the two transports give the SAME verdict. Checked
+  // AFTER the allowlist (no content/context oracle for strangers) and after the
+  // text gate (an authorised non-text update stays a plain unsupported_content_type).
+  if (!isPrivateDirectChat({ chat: message.chat, senderId })) {
+    return { ok: false, reason: 'non_private_chat', senderId };
+  }
+
   // Untrusted content stays inert data — it is never interpolated into a
   // path/command/query here.
   const messageId = message.message_id;
@@ -185,8 +199,16 @@ export function mapTelegramCallbackQuery({ update, now, authorisedUserId } = {})
   }
 
   const msg = cq.message && typeof cq.message === 'object' ? cq.message : {};
-  const chat = msg.chat && typeof msg.chat === 'object' ? msg.chat : {};
-  const chatId = chat.id !== undefined ? String(chat.id) : senderId; // private chat → user id
+
+  // PRIVATE-DIRECT-CHAT BOUNDARY (correction 3) — a tap on a card that lives in a
+  // group / supergroup / channel (or a malformed chat) is refused with the same
+  // quiet posture. SINGLE shared predicate with the webhook callback path.
+  if (!isPrivateDirectChat({ chat: msg.chat, senderId })) {
+    return { ok: false, reason: 'non_private_chat', senderId };
+  }
+
+  const chat = msg.chat; // predicate guarantees an object with id === senderId
+  const chatId = String(chat.id); // private chat → user id
   const messageId = msg.message_id;
   // Untrusted content stays inert: the action is validated against the known set;
   // an unknown action is rejected rather than interpolated anywhere.

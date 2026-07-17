@@ -46,7 +46,7 @@ function harness(baseDir, { isWorkerOnline } = {}) {
 }
 
 function textUpdate(messageId, text) {
-  return { message: { message_id: messageId, from: { id: AUTH_ID }, text } };
+  return { message: { message_id: messageId, from: { id: AUTH_ID }, chat: { id: AUTH_ID, type: 'private' }, text } };
 }
 
 test('accept() HOLDS the capture pending: durable + card_ref, NOT claimable, NO write before the tap', async () => {

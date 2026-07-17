@@ -207,7 +207,7 @@ function tapUpdate(updateId, cardMessageId, action = 'SaveToBrain') {
       id: `cbq-${updateId}`,
       from: { id: Number(AUTH_ID) },
       data: action,
-      message: { message_id: cardMessageId, chat: { id: Number(AUTH_ID) } },
+      message: { message_id: cardMessageId, chat: { id: Number(AUTH_ID), type: 'private' } },
     },
   };
 }
@@ -506,7 +506,7 @@ test('E2E-6 auth negatives: wrong secret → 401 with ZERO DB writes; valid secr
     // Valid secret, stranger sender: allowlist refuses INSIDE the RPC (I10).
     const strangerUpdate = {
       update_id: freshUpdateId(),
-      message: { message_id: freshMessageId(), from: { id: 31337 }, chat: { id: 31337 }, text: 'let me in' },
+      message: { message_id: freshMessageId(), from: { id: 31337 }, chat: { id: 31337, type: 'private' }, text: 'let me in' },
     };
     const res = await postUpdate(strangerUpdate, s.telegram);
     assert.equal(res.status, 200, '200 so Telegram does not retry-spam');

@@ -12,7 +12,7 @@ import { createIntake } from '../src/intake.js';
 const AUTH_ID = 424242;
 
 function makeUpdate(messageId, text, fromId = AUTH_ID) {
-  return { message: { message_id: messageId, from: { id: fromId }, text } };
+  return { message: { message_id: messageId, from: { id: fromId }, chat: { id: fromId, type: 'private' }, text } };
 }
 
 test('burst is allowed up to capacity, then throttled with a retryAfterMs', () => {

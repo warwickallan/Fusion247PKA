@@ -9,7 +9,7 @@ const AUTH_ID = 424242;
 const NOW = 1_700_000_000_000;
 
 function update(messageId, text, fromId = AUTH_ID) {
-  return { message: { message_id: messageId, from: { id: fromId }, text } };
+  return { message: { message_id: messageId, from: { id: fromId }, chat: { id: fromId, type: 'private' }, text } };
 }
 
 test('authorised sender maps onto a channel-neutral envelope (no Telegram leak in intent)', () => {

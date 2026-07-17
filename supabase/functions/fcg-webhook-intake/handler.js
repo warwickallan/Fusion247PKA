@@ -44,6 +44,7 @@
 //   log(event)                       → void (structured, secret-free)
 
 import { deriveTelegramTextKeys } from './derive.js';
+import { isPrivateDirectChat } from './chatBoundary.js';
 
 // ── Card copy — MUST stay verbatim-identical to receiptProjection.js wording
 // (statusLineFor `accepted` and the queued/offline family). SSOT is enforced by
@@ -163,8 +164,18 @@ async function handleMessage(update, deps) {
     return ignored('unsupported_content_type');
   }
 
-  const chat = msg.chat && typeof msg.chat === 'object' ? msg.chat : {};
-  const chatId = chat.id !== undefined ? String(chat.id) : senderId;
+  // PRIVATE-DIRECT-CHAT BOUNDARY (correction 3). This BUILD serves Warwick's DM
+  // only. A group / supergroup / channel / missing-or-malformed chat context is
+  // refused HERE — before any derivation, RPC, card, or durable row — with the
+  // same QUIET default-deny posture as an unauthorised sender (200, no reply, no
+  // oracle). The shared predicate is the SINGLE source the poll path uses too.
+  if (!isPrivateDirectChat({ chat: msg.chat, senderId })) {
+    log({ event: 'non_private_chat_ignored', update_id: update.update_id });
+    return ignored('non_private_chat');
+  }
+
+  const chat = msg.chat; // predicate guarantees an object with id === senderId
+  const chatId = String(chat.id);
 
   // Byte-parity derivation (the cross-transport dedup guarantee).
   const { idempotencyKey, captureId } = await deriveTelegramTextKeys({
@@ -233,6 +244,16 @@ async function handleCallback(update, deps) {
 
   if (senderId === undefined || update.update_id === undefined || messageId === undefined) {
     return ignored('malformed_callback');
+  }
+
+  // PRIVATE-DIRECT-CHAT BOUNDARY (correction 3) — the callback's card message
+  // must live in the authorised user's own private chat. A tap arriving on a
+  // card in a group / supergroup / channel (or a malformed chat) is refused
+  // QUIETLY: no answer, no edit, no RPC, zero rows. Same shared predicate as the
+  // message path and the poll path.
+  if (!isPrivateDirectChat({ chat: msg.chat, senderId })) {
+    log({ event: 'non_private_chat_callback_ignored', update_id: update.update_id });
+    return ignored('non_private_chat');
   }
 
   // ONE confirm RPC — the cloud twin of confirmedByTap. Throws → 500.

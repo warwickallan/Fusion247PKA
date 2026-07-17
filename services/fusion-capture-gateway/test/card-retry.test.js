@@ -41,7 +41,7 @@ test('failed editCard → retryCardProjection re-edits to Completed; no re-write
     });
 
     const acc = await intake.accept({
-      message: { message_id: 60600, from: { id: AUTH_ID }, text: 'card should end Completed' },
+      message: { message_id: 60600, from: { id: AUTH_ID }, chat: { id: AUTH_ID, type: 'private' }, text: 'card should end Completed' },
     });
     const captureId = acc.captureId;
     await intake.confirmSave(captureId); // the user taps Save to Brain

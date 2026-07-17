@@ -76,7 +76,7 @@ function textUpdate(updateId, messageId, text, fromId = AUTH_ID) {
     message: {
       message_id: messageId,
       from: { id: Number(fromId) },
-      chat: { id: Number(fromId) },
+      chat: { id: Number(fromId), type: 'private' },
       date: 1752700000,
       text,
     },
@@ -90,7 +90,7 @@ function tapUpdate(updateId, cardMessageId, action = 'SaveToBrain', fromId = AUT
       id: `cb-${updateId}`,
       from: { id: Number(fromId) },
       data: action,
-      message: { message_id: cardMessageId, chat: { id: Number(fromId) } },
+      message: { message_id: cardMessageId, chat: { id: Number(fromId), type: 'private' } },
     },
   };
 }

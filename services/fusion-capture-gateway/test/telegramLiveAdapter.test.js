@@ -158,7 +158,7 @@ test('toEnvelope default-denies an unauthorised sender and logs the rejection', 
 
 test('toEnvelope maps an authorised sender channel-neutrally', () => {
   const a = adapter(mockFetch());
-  const ok = a.toEnvelope({ message: { message_id: 7, from: { id: AUTH_ID }, text: 'note this' } }, { now: 2000 });
+  const ok = a.toEnvelope({ message: { message_id: 7, from: { id: AUTH_ID }, chat: { id: AUTH_ID, type: 'private' }, text: 'note this' } }, { now: 2000 });
   assert.equal(ok.ok, true);
   assert.equal(ok.value.source_channel, 'telegram');
   assert.equal(ok.value.technical_source_type, 'text');

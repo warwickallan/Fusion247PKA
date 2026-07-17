@@ -58,7 +58,7 @@ async function makeRunner(brainDir, { store, adapter, clock, logSink } = {}) {
 }
 
 function msg(updateId, text, messageId = updateId + 500) {
-  return { update_id: updateId, message: { message_id: messageId, from: { id: AUTH_ID }, text } };
+  return { update_id: updateId, message: { message_id: messageId, from: { id: AUTH_ID }, chat: { id: AUTH_ID, type: 'private' }, text } };
 }
 
 // A "Save to Brain" (or other action) button tap on the card at cardRef.
@@ -67,7 +67,7 @@ function tap(updateId, cardRef, { action = 'SaveToBrain', cbId = `cb-${updateId}
     update_id: updateId,
     callback_query: {
       id: cbId, from: { id: AUTH_ID }, data: action,
-      message: { message_id: cardRef.message_id, chat: { id: cardRef.chat_id } },
+      message: { message_id: cardRef.message_id, chat: { id: cardRef.chat_id, type: 'private' } },
     },
   };
 }
@@ -307,8 +307,8 @@ test('redelivery of the same logical message is deduped — no duplicate Markdow
     // ⇒ same idempotency key ⇒ the second is a dedup hit (simulates a Telegram
     // redelivery that slipped past the offset window before ack).
     adapter.deliver(
-      { update_id: 1, message: { message_id: 900, from: { id: AUTH_ID }, text: 'idempotent note' } },
-      { update_id: 2, message: { message_id: 900, from: { id: AUTH_ID }, text: 'idempotent note' } },
+      { update_id: 1, message: { message_id: 900, from: { id: AUTH_ID }, chat: { id: AUTH_ID, type: 'private' }, text: 'idempotent note' } },
+      { update_id: 2, message: { message_id: 900, from: { id: AUTH_ID }, chat: { id: AUTH_ID, type: 'private' }, text: 'idempotent note' } },
     );
     await runner.runUntilIdle();
 

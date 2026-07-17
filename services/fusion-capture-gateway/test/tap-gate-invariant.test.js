@@ -66,7 +66,7 @@ function tap(updateId, cardRef, { action = 'SaveToBrain', cbId = `cb-${updateId}
     update_id: updateId,
     callback_query: {
       id: cbId, from: { id: AUTH_ID }, data: action,
-      message: { message_id: cardRef.message_id, chat: { id: cardRef.chat_id } },
+      message: { message_id: cardRef.message_id, chat: { id: cardRef.chat_id, type: 'private' } },
     },
   };
 }

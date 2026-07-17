@@ -179,3 +179,38 @@ last_error_message` + `pending_update_count` are the health signals (Pax Q6).
    `node --env-file=C:\.fusion247\fusion-capture-gateway.env services/fusion-capture-gateway/scripts/tls-verify-probe.mjs`
    expecting `cert_verified_by_client: true` (already observed true on
    2026-07-17 from this machine — see [[wp1-synthetic-proof-2026-07-17]] §FU-1).
+
+## 8. Private-direct-chat boundary (bot config + CODE enforcement)
+
+This BUILD is authorised for Warwick's **PRIVATE DIRECT** bot conversation
+only — never groups, supergroups, or channels (GPT-BUILD-002-WP1-REVIEW-0001,
+correction 3).
+
+1. **BotFather hardening (both the live bot AND bot B):** in @BotFather →
+   `/setjoingroups` → **Disable** — so Telegram itself refuses to add the bot to
+   groups where it allows this. Also confirm `/setprivacy` is **Enabled** (group
+   privacy on) as defence-in-depth. Do this for bot B before the §4 test and for
+   the live bot before the §6 cutover.
+2. **CODE enforcement is mandatory regardless of the bot setting.** The
+   `/setjoingroups` toggle is a convenience, not a guarantee (a pre-existing
+   group membership, a channel post, or a Telegram edge case can still deliver a
+   non-private update). Enforcement therefore lives in CODE, in BOTH transports,
+   through ONE shared predicate so they cannot drift:
+   `supabase/functions/fcg-webhook-intake/chatBoundary.js` (`isPrivateDirectChat`),
+   imported by the webhook handler (`handler.js`) and the poll mapping
+   (`src/adapters/telegramMapping.js`). It requires `chat.type === 'private'` and
+   `chat.id === the message sender's id`; any group / supergroup / channel /
+   missing / malformed chat context creates ZERO envelope/queue/ledger/card/
+   Markdown rows and returns a quiet default-deny (no reply). The sender
+   allowlist (is this the authorised user?) remains a separate authority — the
+   DB allowlist inside the `fcg_webhook_*` RPCs for the webhook, and the inline
+   `authorisedUserId` check for the poll path — so a stranger in their own
+   private chat is still refused by the allowlist, not silently by the chat gate.
+3. **Card-ref safety under the constraint.** With private + `chat.id === sender`
+   enforced, there is a single chat per authorised user, so the
+   `chat:<sender>:msg:<message_id>` native id and the `card_ref` reverse lookup
+   cannot collide across chats. No path keys a card_ref on `message_id` without
+   the enforced single-chat scope.
+4. **Note (poll path):** the code gate takes effect on the NEXT restart of the
+   running worker (PID-managed by Larry) — this WP1 change does not touch the
+   live worker in place.
