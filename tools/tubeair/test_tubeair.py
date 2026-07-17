@@ -160,18 +160,65 @@ class TestRawMarkdownFailure(unittest.TestCase):
         self.assertIn("NOT a successful capture", self.md)
 
 
-class TestAnalysisScaffolds(unittest.TestCase):
-    def test_all_three_have_required_questions(self):
+class TestCombinedReportSuccess(unittest.TestCase):
+    def setUp(self):
+        self.md = t.build_report_markdown(_sample_capture("extracted"))
+
+    def test_all_eight_sections_present_in_order(self):
+        headings = [
+            "## 1. Executive Summary",
+            "## 2. Why This Is Relevant to Warwick",
+            "## 3. Business / Monetisation Ideas",
+            "## 4. Larry & Team Learning Points",
+            "## 5. Recommendations / Possible Follow-ups",
+            "## 6. Source Metadata",
+            "## 7. Full Transcript",
+            "## 8. Run / Processing Notes",
+        ]
+        positions = [self.md.find(h) for h in headings]
+        for h, p in zip(headings, positions):
+            self.assertNotEqual(p, -1, f"missing section: {h}")
+        self.assertEqual(positions, sorted(positions), "sections out of order")
+
+    def test_transcript_included_verbatim_in_same_file(self):
+        self.assertIn("[00:00] Welcome to the build.", self.md)
+        self.assertIn("[00:12] Today we cover agent workflows.", self.md)
+
+    def test_governance_labels(self):
+        self.assertIn("source evidence", self.md)
+        self.assertIn("recommendations only", self.md.lower())
+        self.assertIn("pending", self.md.lower())
+
+    def test_frontmatter_routing(self):
+        self.assertIn("fusion_review_status: pending_cairn", self.md)
+        self.assertIn("\nnext_agent: cairn\n", self.md)
+        self.assertIn("legacy_next_agent: categorisair", self.md)
+        self.assertIn("recommendations_only: true", self.md)
+        self.assertNotIn("\nnext_agent: categorisair\n", self.md)
+
+    def test_analysis_sections_are_scaffolds(self):
+        self.assertIn("TUBEAIR:ANALYSIS_PENDING", self.md)
+
+
+class TestCombinedReportFailure(unittest.TestCase):
+    def setUp(self):
+        self.md = t.build_report_markdown(_sample_capture("extraction_failed"))
+
+    def test_analysis_marked_not_applicable(self):
+        self.assertIn("Not applicable — transcript extraction failed", self.md)
+
+    def test_failure_record_and_no_false_success(self):
+        self.assertIn("NOT a successful capture", self.md)
+        self.assertIn("fusion_review_status: extraction_failed", self.md)
+        self.assertIn("## 7. Full Transcript", self.md)  # section still present, holds the failure record
+
+
+class TestReportFilename(unittest.TestCase):
+    def test_shape(self):
         cap = _sample_capture("extracted")
-        rel = t.build_analysis_scaffold("warwick-relevance", cap, "01-raw-transcript.md")
-        mon = t.build_analysis_scaffold("monetisation-scan", cap, "01-raw-transcript.md")
-        slb = t.build_analysis_scaffold("self-learning-brief", cap, "01-raw-transcript.md")
-        self.assertIn("Why does this matter to Warwick?", rel)
-        self.assertIn("What could become a business idea?", mon)
-        self.assertIn("What can Larry and the wider AI team learn", slb)
-        for md in (rel, mon, slb):
-            self.assertIn("recommendations_only: true", md)
-            self.assertIn("TUBEAIR:ANALYSIS_PENDING", md)
+        name = t.report_filename(cap)
+        self.assertTrue(name.startswith("TubeAIR Report - "))
+        self.assertTrue(name.endswith(" - dQw4w9WgXcQ.md"))
 
 
 class TestFindYoutubeUrls(unittest.TestCase):

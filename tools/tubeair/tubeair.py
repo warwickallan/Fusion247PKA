@@ -3,11 +3,15 @@
 
 Local terminal build. Turns a YouTube URL into a Fusion247 source-capture packet:
 
-  01-raw-transcript.md   Immutable raw-transcript source (deterministic, no LLM).
-  02-warwick-relevance.md   Warwick relevance summary   (analysis scaffold).
-  03-monetisation-scan.md   Monetisation / business scan (analysis scaffold).
-  04-self-learning-brief.md Larry/team self-learning brief (analysis scaffold).
-  manifest.json             Run record.
+  TubeAIR Report - <title> - <video-id>.md   The single user-facing report:
+      §1 Executive Summary · §2 Why Relevant to Warwick · §3 Business/Monetisation
+      · §4 Larry & Team Learning · §5 Recommendations · §6 Source Metadata
+      · §7 Full Transcript (source evidence) · §8 Run/Processing Notes.
+      §§1-5 are generated analysis/recommendations (agent-authored); §7 is evidence.
+  manifest.json                              Internal run/idempotency record.
+
+The WP-D handoff also preserves a transcript-only immutable SOURCE document in
+`Sources (Immutable)/` (evidence, no analysis) and registers it for Cairn.
 
 Core principle: transcript first, brain-safe analysis second. No LLM is ever used
 to invent or paraphrase the raw transcript — deterministic caption extraction only
@@ -482,71 +486,185 @@ def build_raw_markdown(cap: Capture) -> str:
     return "\n".join(b)
 
 
-_ANALYSIS_SPECS = {
-    "warwick-relevance": {
-        "filename": "02-warwick-relevance.md",
-        "title": "Warwick relevance summary",
-        "analysis_type": "warwick_relevance",
-        "questions": [
-            "Why does this matter to Warwick?",
-            "Which of Warwick's known interests/goals does it connect to? "
-            "(Fusion247, AI operating systems, consultancy, agent workflows, productivity, "
-            "implementation, health, business, current context)",
-            "What should Warwick pay attention to?",
-            "What is noise or hype?",
-            "What should be parked?",
-        ],
-    },
-    "monetisation-scan": {
-        "filename": "03-monetisation-scan.md",
-        "title": "Monetisation / business idea scan",
-        "analysis_type": "monetisation_scan",
-        "questions": [
-            "What could become a business idea?",
-            "Could this support Fusion247, AI transformation consultancy, SME services, "
-            "VlogOps, content, productised services or internal tooling?",
-            "What is realistic now?",
-            "What is speculative?",
-            "What would be the smallest test?",
-        ],
-    },
-    "self-learning-brief": {
-        "filename": "04-self-learning-brief.md",
-        "title": "Larry / team self-learning brief",
-        "analysis_type": "self_learning_brief",
-        "questions": [
-            "What can Larry and the wider AI team learn from this?",
-            "Does it suggest better operating procedures?",
-            "Does it suggest a new skill, SOP, guardrail, pattern, agent behaviour or build practice?",
-            "What recommendation should be made to Warwick?",
-            "What should NOT be implemented yet?",
-        ],
-    },
-}
+# ----------------------------------------------------------------------------
+# Combined single-file report — the user-facing TubeAIR packet
+# ----------------------------------------------------------------------------
+
+# Analysis sections (1-5) are GENERATED ANALYSIS / RECOMMENDATIONS ONLY, authored
+# by the Brain/agent from the preserved transcript — never by the tool, never by
+# an in-tool LLM. The tool emits them as scaffolds with the guiding questions; an
+# agent fills them in. Sections 6-8 are tool-populated. §7 is source evidence.
+REPORT_ANALYSIS_SECTIONS = [
+    ("1. Executive Summary", [
+        "In 2-4 sentences: what is this video, and the single most important takeaway for Warwick?",
+    ]),
+    ("2. Why This Is Relevant to Warwick", [
+        "Why does this matter to Warwick?",
+        "Which of Warwick's known interests/goals does it connect to? (Fusion247, AI operating "
+        "systems, consultancy, agent workflows, productivity, implementation, health, business)",
+        "What should Warwick pay attention to?",
+        "What is noise or hype?",
+        "What should be parked?",
+    ]),
+    ("3. Business / Monetisation Ideas", [
+        "What could become a business idea?",
+        "Could this support Fusion247, AI transformation consultancy, SME services, VlogOps, "
+        "content, productised services or internal tooling?",
+        "What is realistic now? What is speculative?",
+        "What would be the smallest test?",
+    ]),
+    ("4. Larry & Team Learning Points", [
+        "What can Larry and the wider AI team learn from this?",
+        "Does it suggest better operating procedures, or a candidate skill / SOP / guardrail / "
+        "pattern / agent behaviour / build practice?",
+        "What should NOT be implemented yet?",
+    ]),
+    ("5. Recommendations / Possible Follow-ups", [
+        "Consolidated, clearly-actionable recommendations (recommendations only).",
+        "Suggested owner/route where relevant (e.g. Vex, Cairn, WS-004).",
+        "What explicitly should NOT be done yet.",
+    ]),
+]
 
 
-def build_analysis_scaffold(kind: str, cap: Capture, raw_filename: str) -> str:
-    spec = _ANALYSIS_SPECS[kind]
-    fm = render_frontmatter({
-        "analysis_type": spec["analysis_type"],
+def _metadata_bullets(cap: Capture) -> list[str]:
+    b = [
+        f"- **URL:** {cap.source_url}",
+        f"- **Video ID:** {cap.video_id}",
+        f"- **Title:** {_val(cap.title)}",
+        f"- **Channel:** {_val(cap.channel)}",
+        f"- **Published:** {_val(cap.published_date)}",
+    ]
+    if cap.duration_seconds:
+        b.append(f"- **Duration:** {format_timestamp(cap.duration_seconds)} ({cap.duration_seconds}s)")
+    b += [
+        f"- **Captured (UTC):** {cap.captured_at}",
+        f"- **Transcript source:** {cap.transcript_source}",
+        f"- **Language:** {_val(cap.language_code or cap.language)}",
+        f"- **Capture method:** local_terminal",
+        f"- **Segment count:** {cap.segment_count}",
+        f"- **User note:** {cap.user_note if cap.user_note else _UNKNOWN}",
+    ]
+    return b
+
+
+def _failure_bullets(cap: Capture) -> list[str]:
+    return [
+        "**A link without a transcript is NOT a successful capture.** This is a failure record, "
+        "not a usable source.",
+        "",
+        f"- **Source URL:** {cap.source_url}",
+        f"- **Video ID:** {cap.video_id}",
+        f"- **Captured (UTC):** {cap.captured_at}",
+        f"- **Error category:** {cap.error_category}",
+        f"- **Error detail:** {cap.error_detail}",
+        f"- **Retry recommendation:** {cap.retry_recommendation}",
+        f"- **Fusion review status:** extraction_failed",
+    ]
+
+
+def _run_notes_bullets(cap: Capture, handoff_info: dict | None) -> list[str]:
+    tv = cap.tool_versions or {}
+    b = [
+        f"- **Capture method:** local_terminal — deterministic; no LLM used for the transcript.",
+        f"- **Transcript status:** {cap.transcript_status} (source={cap.transcript_source}, "
+        f"segments={cap.segment_count}).",
+        f"- **Tools:** python {tv.get('python','?')}, youtube-transcript-api "
+        f"{tv.get('youtube-transcript-api','?')}, yt-dlp {tv.get('yt-dlp','?')}.",
+        "- **Analysis (§§1-5):** generated analysis / recommendations only — authored by the Brain "
+        "from the transcript, pending Warwick/Cairn review; NOT living knowledge.",
+        "- **Downstream:** Cairn (SOP-015/016), which has absorbed the legacy CategorisAIr role; "
+        "`legacy_*` frontmatter is alias-only.",
+    ]
+    if handoff_info and handoff_info.get("done"):
+        im = handoff_info["immutable"]
+        b.append(f"- **Cairn handoff:** raw source preserved at `Sources (Immutable)/{im['local_file']}` "
+                 f"({'existed' if im['existed'] else 'written'}); registered for Cairn (pending_cairn).")
+    return b
+
+
+def build_report_markdown(cap: Capture, handoff_info: dict | None = None) -> str:
+    """The single user-facing TubeAIR report: one Markdown file, eight sections,
+    with the complete timestamped transcript included. Sections 1-5 are generated
+    analysis/recommendations (scaffolded here, agent-authored); 6-8 are
+    tool-populated; §7 (transcript) is source evidence.
+    """
+    ok = cap.transcript_status == "extracted"
+    review_status = "pending_cairn" if ok else "extraction_failed"
+    fields = {
+        "packet_type": "tubeair_report",
+        "source_type": "youtube_transcript",
+        "capture_method": "local_terminal",
         "source_url": cap.source_url,
         "video_id": cap.video_id,
         "title": _val(cap.title),
-        "derived_from": raw_filename,
+        "channel": _val(cap.channel),
+        "published_date": _val(cap.published_date),
         "captured_at": cap.captured_at,
-        "review_status": "pending_warwick_review",
+        "transcript_status": cap.transcript_status,
+        "transcript_source": cap.transcript_source,
+        "language": _val(cap.language_code or cap.language),
+        "segment_count": cap.segment_count,
+        "fusion_review_status": review_status,          # pending_cairn | extraction_failed
+        "assigned_agent": "youtubair",
+        "next_agent": "cairn",
+        "legacy_next_agent": "categorisair",            # compatibility alias only
         "recommendations_only": True,
-    })
-    out = [fm, "", f"# {spec['title']} — {cap.title if cap.title else cap.video_id}", ""]
-    out.append(f"> Derived from `{raw_filename}`. Authored from the preserved transcript.")
-    out.append("> Recommendations only — no living knowledge, SOP, agent instruction or WIKI note "
-               "is changed by this file.")
-    out.append("")
-    out.append("<!-- TUBEAIR:ANALYSIS_PENDING — replace this block with authored analysis. -->")
-    out.append("")
-    for q in spec["questions"]:
-        out += [f"### {q}", "", "_Pending._", ""]
-    return "\n".join(out)
+        "user_note": cap.user_note if cap.user_note else "",
+        "tags": ["youtube", "transcript", "raw-source", "fusion-intake", "tubeair-report"],
+    }
+    if ok:
+        fields["legacy_review_status"] = "pending_categorisair"
+    fm = render_frontmatter(fields)
+
+    title_display = cap.title if cap.title else f"YouTube video {cap.video_id}"
+    b = [fm, "", f"# TubeAIR Report — {title_display}", ""]
+    b.append("> **How to read this packet.** §7 Full Transcript is **source evidence** (verbatim, "
+             "deterministic capture — not edited, not summarised). §§1-5 are **generated analysis / "
+             "recommendations only** — not living knowledge, not settled fact, and nothing here "
+             "updates any SOP, WIKI, agent instruction or register. **Review state: pending "
+             "Warwick / Cairn.** (Cairn has absorbed the legacy CategorisAIr role; `legacy_*` "
+             "frontmatter fields are compatibility aliases only.)")
+    b.append("")
+
+    # Sections 1-5 — analysis scaffolds (agent-authored) or N/A on failure.
+    for title, questions in REPORT_ANALYSIS_SECTIONS:
+        b.append(f"## {title}")
+        b.append("")
+        if ok:
+            b.append("<!-- TUBEAIR:ANALYSIS_PENDING — replace with authored analysis (recommendations only). -->")
+            for q in questions:
+                b.append(f"- {q}")
+            b.append("")
+            b.append("_Pending._")
+        else:
+            b.append("_Not applicable — transcript extraction failed; see §7 and §8._")
+        b.append("")
+
+    # 6. Source Metadata
+    b.append("## 6. Source Metadata")
+    b.append("")
+    b += _metadata_bullets(cap)
+    b.append("")
+
+    # 7. Full Transcript (source evidence)
+    b.append("## 7. Full Transcript")
+    b.append("")
+    b.append("> Source evidence — verbatim timestamped captions. Not edited, not summarised.")
+    b.append("")
+    if ok:
+        for snip in cap.snippets:
+            b.append(f"[{format_timestamp(snip['start'])}] {snip['text']}")
+    else:
+        b += _failure_bullets(cap)
+    b.append("")
+
+    # 8. Run / Processing Notes
+    b.append("## 8. Run / Processing Notes")
+    b.append("")
+    b += _run_notes_bullets(cap, handoff_info)
+    b.append("")
+    return "\n".join(b)
 
 
 def build_manifest(cap: Capture, out_dir: Path, files: list[str],
@@ -669,19 +787,22 @@ def output_dir_for(cap: Capture, out_root: Path) -> Path:
     return out_root / f"{date}__{title_slug}__{cap.video_id}"
 
 
+def report_filename(cap: Capture) -> str:
+    slug = slugify(cap.title, max_len=60) if cap.title else "untitled"
+    return f"TubeAIR Report - {slug} - {cap.video_id}.md"
+
+
 def write_packet(cap: Capture, out_root: Path,
                  handoff_info: dict | None = None) -> tuple[Path, list[str]]:
+    """Write the single user-facing report + the internal manifest. The combined
+    report (not separate analysis files) is the deliverable."""
     out_dir = output_dir_for(cap, out_root)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    raw_name = "01-raw-transcript.md"
-    (out_dir / raw_name).write_text(build_raw_markdown(cap), encoding="utf-8")
-    written = [raw_name]
-
-    for kind, spec in _ANALYSIS_SPECS.items():
-        (out_dir / spec["filename"]).write_text(
-            build_analysis_scaffold(kind, cap, raw_name), encoding="utf-8")
-        written.append(spec["filename"])
+    report_name = report_filename(cap)
+    (out_dir / report_name).write_text(
+        build_report_markdown(cap, handoff_info), encoding="utf-8")
+    written = [report_name]
 
     manifest = build_manifest(cap, out_dir, written + ["manifest.json"], handoff_info)
     (out_dir / "manifest.json").write_text(
@@ -752,8 +873,8 @@ def main(argv: list[str] | None = None) -> int:
               f"register {'appended' if handoff_info['register'].get('registered') else 'already present'}")
 
     if cap.transcript_status == "extracted":
-        print("[tubeair] OK — raw transcript captured. Analysis scaffolds written; "
-              "author them from the raw transcript (pending Brain / Warwick review).")
+        print("[tubeair] OK — transcript captured; single report written with §§1-5 as "
+              "analysis scaffolds to author from the transcript (pending Warwick/Cairn review).")
         return 0
     print(f"[tubeair] TRANSCRIPT FAILED honestly [{cap.error_category}]: {cap.error_detail}",
           file=sys.stderr)

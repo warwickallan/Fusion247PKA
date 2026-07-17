@@ -81,6 +81,19 @@ FusionDevBot code was READ only, never modified.
 - Analysis auto-fill via an LLM API key is backlog (would introduce a secret; out of the
   key-free lean scope).
 
+## Addendum — single combined report (product correction, 2026-07-17)
+
+Warwick corrected the output model before merge: the user-facing packet must be **ONE
+Warwick-readable report per video**, not separate analysis files. Refactored on the same
+PR branch (commit follows `58b0321`): `build_report_markdown` emits a single
+`TubeAIR Report - <title> - <video-id>.md` with 8 ordered sections (1 Executive Summary,
+2 Why Relevant, 3 Business/Monetisation, 4 Larry & Team Learning, 5 Recommendations,
+6 Source Metadata, 7 Full Transcript [complete, verbatim — source evidence], 8 Run Notes).
+§§1-5 are agent-authored recommendations-only; the transcript-only immutable SOURCE doc
+(`build_raw_markdown`) still feeds the WP-D Cairn handoff unchanged. `02/03/04-*.md`
+retired; `manifest.json` kept as internal artifact. Tests updated to assert the combined
+report contains all 8 sections in order + the in-file transcript (37 tests, all pass).
+
 ## Next executable action
 
 Open PR for `idea-013/tubeair-local-capture`; on merge, TubeAIR is usable via
