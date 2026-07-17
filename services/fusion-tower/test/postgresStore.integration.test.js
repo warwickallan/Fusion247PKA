@@ -20,7 +20,7 @@ import { createPostgresStore } from '../src/store/postgresStore.js';
 const DB = process.env.DATABASE_URL;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const MIGRATIONS_DIR = path.join(__dirname, '..', 'migrations');
-const MIGRATIONS = ['0001_wp0_control_plane.sql'];
+const MIGRATIONS = ['0001_wp0_control_plane.sql', '0002_wp0_identity_provider_binding.sql'];
 
 async function resetAndMigrate() {
   const pgModule = await import('pg');
@@ -203,6 +203,138 @@ test('13. restart-safety — a NEW store instance resumes from durable rows', { 
     assert.equal(again.turn_id, turnId);
     assert.equal((await store2.listTurns(runId)).length, 1);
   } finally { await store2.end(); }
+});
+
+// ---------------------------------------------------------------------------
+// F-MED-DB-CODEX-PROVIDER-CHECK-NOT-PER-PRINCIPAL — the 0002 honest per-principal
+// binding CHECK (agent_identity_provider_binding_chk), proven on a real DB with
+// 0001 THEN 0002 applied. A raw owner Pool is used so we exercise the CHECK
+// directly (CHECK constraints apply to the table owner too).
+// ---------------------------------------------------------------------------
+
+async function rawPool() {
+  await resetAndMigrate();
+  const pgModule = await import('pg');
+  const { Pool } = pgModule.default ?? pgModule;
+  return new Pool({ connectionString: DB });
+}
+
+const VALID_PAIRS = [
+  ['larry', 'anthropic-claude-code'],
+  ['gpt_codex', 'openai-codex'],
+  ['warwick', 'human'],
+  ['tower', 'fusion-tower'],
+];
+
+test('15. binding — every VALID per-principal pair inserts successfully', { skip: !DB }, async () => {
+  const pool = await rawPool();
+  try {
+    // Clear the seed (which already holds the four honest pairs) then re-insert
+    // each valid pair one at a time, proving each passes the binding CHECK.
+    await pool.query('delete from ftw.agent_identity');
+    for (const [principal, provider] of VALID_PAIRS) {
+      await pool.query(
+        'insert into ftw.agent_identity (principal, display_label, provider) values ($1, $2, $3)',
+        [principal, `${principal} label`, provider],
+      );
+    }
+    const { rows } = await pool.query('select count(*)::int as n from ftw.agent_identity');
+    assert.equal(rows[0].n, 4, 'all four honest pairs inserted');
+  } finally { await pool.end(); }
+});
+
+test('16. binding — every CROSS pair is REJECTED (no principal may hold another\'s provider)', { skip: !DB }, async () => {
+  const pool = await rawPool();
+  try {
+    const CROSS = [
+      ['gpt_codex', 'anthropic-claude-code'], // codex wearing larry's provider
+      ['larry', 'openai-codex'],              // larry wearing codex's provider
+      ['tower', 'human'],                     // tower wearing warwick's provider
+      ['warwick', 'fusion-tower'],            // warwick wearing tower's provider
+      ['larry', 'human'],
+      ['gpt_codex', 'fusion-tower'],
+    ];
+    for (const [principal, provider] of CROSS) {
+      await pool.query('delete from ftw.agent_identity where principal = $1', [principal]);
+      await assert.rejects(
+        () => pool.query(
+          'insert into ftw.agent_identity (principal, display_label, provider) values ($1, $2, $3)',
+          [principal, 'x', provider],
+        ),
+        /agent_identity_provider_binding_chk|check constraint/i,
+        `cross pair ${principal}/${provider} must be rejected`,
+      );
+    }
+  } finally { await pool.end(); }
+});
+
+test('17. binding — an INVALID provider value is rejected', { skip: !DB }, async () => {
+  const pool = await rawPool();
+  try {
+    for (const bad of ['xai-grok', 'nonsense']) {
+      await pool.query('delete from ftw.agent_identity where principal = $1', ['larry']);
+      await assert.rejects(
+        () => pool.query(
+          'insert into ftw.agent_identity (principal, display_label, provider) values ($1, $2, $3)',
+          ['larry', 'x', bad],
+        ),
+        /agent_identity_provider_binding_chk|check constraint/i,
+        `invalid provider ${bad} must be rejected`,
+      );
+    }
+  } finally { await pool.end(); }
+});
+
+test('18. binding — an UPDATE that drifts an identity to a dishonest provider is rejected', { skip: !DB }, async () => {
+  const pool = await rawPool();
+  try {
+    // Seed rows already exist and are honest. Try to drift larry off its honest
+    // provider onto codex's (and onto human) — both must be refused by the CHECK.
+    for (const bad of ['openai-codex', 'human', 'xai-grok']) {
+      await assert.rejects(
+        () => pool.query('update ftw.agent_identity set provider = $1 where principal = $2', [bad, 'larry']),
+        /agent_identity_provider_binding_chk|check constraint/i,
+        `drift of larry -> ${bad} must be rejected`,
+      );
+    }
+    // The honest value is still there and unchanged.
+    const { rows } = await pool.query("select provider from ftw.agent_identity where principal = 'larry'");
+    assert.equal(rows[0].provider, 'anthropic-claude-code', 'larry stays honestly bound');
+  } finally { await pool.end(); }
+});
+
+test('19. RLS regression — after 0002, RLS still enabled on all four tables; anon denied, service_role permitted', { skip: !DB }, async () => {
+  const pool = await rawPool();
+  try {
+    // RLS flag is still set on every ftw table (0002 did not touch it).
+    const rls = await pool.query(
+      `select c.relname, c.relrowsecurity
+         from pg_class c join pg_namespace n on n.oid = c.relnamespace
+        where n.nspname = 'ftw'
+          and c.relname in ('agent_identity','governance_run','run_turn','run_event')
+        order by c.relname`,
+    );
+    assert.equal(rls.rows.length, 4);
+    for (const r of rls.rows) {
+      assert.equal(r.relrowsecurity, true, `RLS must stay enabled on ftw.${r.relname}`);
+    }
+    // Default-deny still holds: anon refused, service_role permitted, per table.
+    const client = await pool.connect();
+    try {
+      for (const t of ['agent_identity', 'governance_run', 'run_turn', 'run_event']) {
+        await client.query('set role anon');
+        await assert.rejects(
+          () => client.query(`select count(*) from ftw.${t}`),
+          /permission denied/,
+          `anon must stay denied on ftw.${t}`,
+        );
+        await client.query('reset role');
+        await client.query('set role service_role');
+        await client.query(`select count(*) from ftw.${t}`); // permitted
+        await client.query('reset role');
+      }
+    } finally { client.release(); }
+  } finally { await pool.end(); }
 });
 
 test('14. RLS — anon denied, service_role permitted on every ftw table', { skip: !DB }, async () => {
