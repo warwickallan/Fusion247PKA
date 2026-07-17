@@ -87,5 +87,7 @@ jobs:
       - name: Install dependencies (pg, for the live Postgres store)
         run: npm ci
 
-      - name: Run the full suite incl. real-Postgres integration (migration + 14 DB-gated tests)
-        run: node --test
+      - name: Run the full suite incl. real-Postgres integration (migration + DB-gated tests)
+        # Serialized: several integration files reset+re-migrate the shared `ftw`
+        # schema, so they must not run concurrently or they race on schema creation.
+        run: node --test --test-concurrency=1
