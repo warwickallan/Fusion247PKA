@@ -5,7 +5,7 @@ wp: WP0
 artifact: wp0-synthetic-proof
 status: generated
 author: mack
-generated: 2026-07-17T11:06:10.257Z
+generated: 2026-07-17T11:42:47.210Z
 ---
 
 # Fusion Tower — WP0 Synthetic End-to-End Proof (masked transcript)
@@ -79,7 +79,7 @@ fail-closed recorded blocker (no codex binary/key on this host).
 ```json
 {
   "authorised": true,
-  "run_id": "5dcf9e86-05f7-478d-9c1f-6e6f26dba36f",
+  "run_id": "12b16903-92e1-479f-8034-0d6fe8f7142e",
   "status": "created",
   "scope": "improve the BUILD-010 README wording"
 }
@@ -89,7 +89,7 @@ fail-closed recorded blocker (no codex binary/key on this host).
 
 ```json
 {
-  "turn_id": "cd303d9a-9bac-4b1a-a5c8-75a230dde8fd",
+  "turn_id": "c40ab0c0-f5be-4052-970a-fbf30bdefce7",
   "ordinal": 1,
   "state": "dispatched",
   "lease_ms": 300000
@@ -103,11 +103,18 @@ fail-closed recorded blocker (no codex binary/key on this host).
   "state": "returned",
   "signer": "larry",
   "provider": "anthropic-claude-code",
-  "signature": "bbe350c833c75e17…(64 hex)",
+  "signature": "58f4d2ec45cafa21…(64 hex)",
   "signature_verified": true,
-  "summary": "I'm Larry, your team orchestrator at myPKA.\n\nLooks like your message came through empty — what would you like to work on?\n\nFor context, I can see we're on the `build-010/wp0-fusion-tower` branch, inside the new `services/fusion-tower/scripts` working directory. The last commit promoted IDEA-010 (control record + control-plane schema design), and there's a batch of untracked scaffolding for the fus",
+  "summary": "Reviewed services/fusion-tower/README.md (the BUILD-010 WP0 doc). It is accurate and readable; only minor copy polish is warranted, no substantive rewrite. Suggested wording nits: (1) fix the hard line-break splitting 'honestly-labelled' across lines 5-6 for cleaner rendering; (2) line 12 'no coupling to fcg' — spell out 'fcg' as the BUILD-002 codebase on first use since it is otherwise undefined for a new reader; (3) line 18 layout-table numbering starts at the migrations row but the numbered sequence 1-9 begins on the next row — consider numbering the migrations row 0 or dropping the numeric prefixes for consistency. All are cosmetic; guardrail and identity language is correct and should stay verbatim. No edits made — bounded governance turn, plan mode active, and no merge/push/destructive action taken.",
   "proposed_action": {
-    "type": "noop"
+    "type": "post_review",
+    "target": "services/fusion-tower/README.md",
+    "disposition": "approve-with-nits",
+    "suggestions": [
+      "Un-break 'honestly-labelled' onto one line (currently split L5-6)",
+      "Expand 'fcg' on first use (L12) so the exclusion is legible to new readers",
+      "Align the layout-table numbering: rows are labelled 1-9 but the migrations row is unnumbered, creating an off-by-one read"
+    ]
   }
 }
 ```
@@ -116,7 +123,7 @@ fail-closed recorded blocker (no codex binary/key on this host).
 
 ```json
 {
-  "intended_action": "noop",
+  "intended_action": "post_review",
   "performed": false,
   "self_marker": true
 }
@@ -141,7 +148,7 @@ fail-closed recorded blocker (no codex binary/key on this host).
 
 ```json
 {
-  "turn_id": "16b4a63c-bce4-4831-a265-1af07ab75252",
+  "turn_id": "8efe4d80-cf20-40ef-a68c-6950de15d0d9",
   "ordinal": 2,
   "state": "dispatched"
 }
@@ -154,7 +161,7 @@ fail-closed recorded blocker (no codex binary/key on this host).
   "state": "returned",
   "signer": "gpt_codex",
   "provider": "openai-codex",
-  "signature": "0e4a03cefe5f6c9a…(64 hex)",
+  "signature": "d633aafe38523ad0…(64 hex)",
   "signature_verified": true,
   "blocker": "blocked: no codex credential — CODEX_API_KEY/OPENAI_API_KEY unset (Warwick-owned gate R1)"
 }
@@ -185,7 +192,14 @@ fail-closed recorded blocker (no codex binary/key on this host).
 ```json
 [
   {
-    "type": "noop",
+    "type": "post_review",
+    "target": "services/fusion-tower/README.md",
+    "disposition": "approve-with-nits",
+    "suggestions": [
+      "Un-break 'honestly-labelled' onto one line (currently split L5-6)",
+      "Expand 'fcg' on first use (L12) so the exclusion is legible to new readers",
+      "Align the layout-table numbering: rows are labelled 1-9 but the migrations row is unnumbered, creating an off-by-one read"
+    ],
     "repo": "Fusion247/Fusion247PKA",
     "body": "README wording LGTM",
     "marker": "<!-- ftw:self -->",
@@ -201,10 +215,10 @@ fail-closed recorded blocker (no codex binary/key on this host).
 [
   {
     "kind": "BLOCKED",
-    "run_id": "5dcf9e86-05f7-478d-9c1f-6e6f26dba36f",
+    "run_id": "12b16903-92e1-479f-8034-0d6fe8f7142e",
     "outcome": "blocked",
     "text": "Codex review gate: blocked: no codex credential — CODEX_API_KEY/OPENAI_API_KEY unset (Warwick-owned gate R1)",
-    "at": 1784286370256
+    "at": 1784288567208
   }
 ]
 ```

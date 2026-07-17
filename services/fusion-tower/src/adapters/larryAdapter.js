@@ -74,7 +74,10 @@ export async function verifyClaudeInvocable({ claudeBin = 'claude', spawn = node
     const finish = (r) => { if (!done) { done = true; resolve(r); } };
     let child;
     try {
-      child = spawn(claudeBin, ['--version'], { shell: process.platform === 'win32' });
+      // shell:false — never hand any command line to cmd.exe (F-HIGH-01). The
+      // `claude` entrypoint on this host is a native executable resolved via
+      // PATH/PATHEXT by libuv; no shell is required to invoke it.
+      child = spawn(claudeBin, ['--version'], { shell: false });
     } catch (e) {
       return finish({ invocable: false, version: null, error: String(e?.message ?? e) });
     }
@@ -162,14 +165,19 @@ export function createLarryAdapter({
           `claude not invocable headless: ${invocation.error ?? 'unknown'}`);
       }
 
+      // F-HIGH-01: the prompt is UNTRUSTED-INFLUENCED (run.scope / boundedContext.task
+      // can carry event-derived text in a future WP). It is delivered on STDIN, never
+      // on argv. `argv` is a fixed, fully-trusted constant set of flags — nothing here
+      // is derived from run/turn/event input — so even under any shell there is no
+      // metacharacter breakout surface. We spawn with shell:false regardless.
       const argv = [
-        '-p', prompt,
+        '-p', // headless print mode; prompt read from stdin (no prompt arg on argv)
         '--output-format', 'json',
         '--permission-mode', 'plan', // read/plan only for a review turn; no writes
         '--allowedTools', LARRY_ALLOWED_TOOLS.join(','),
       ];
 
-      const spawned = await runClaude({ claudeBin, argv, cwd, spawn, timeoutMs });
+      const spawned = await runClaude({ claudeBin, argv, cwd, spawn, timeoutMs, prompt });
       if (!spawned.ok) {
         return blockerResult({ run, turn },
           `claude headless run failed (exit ${spawned.code}): ${spawned.stderr?.slice(0, 300) ?? ''}`.trim());
@@ -196,7 +204,12 @@ export function createLarryAdapter({
 }
 
 // Spawn claude, collect stdout/stderr, enforce the hard timeout.
-function runClaude({ claudeBin, argv, cwd, spawn, timeoutMs }) {
+//
+// F-HIGH-01 fix: spawn with shell:false (Node never joins argv into a cmd.exe
+// command line, so shell metacharacters can never break out), and deliver the
+// (untrusted-influenced) prompt on STDIN — mirroring the Codex adapter's stdin
+// pattern — so no prompt-derived text is ever an argv element.
+function runClaude({ claudeBin, argv, cwd, spawn, timeoutMs, prompt }) {
   return new Promise((resolve) => {
     let stdout = '';
     let stderr = '';
@@ -204,7 +217,7 @@ function runClaude({ claudeBin, argv, cwd, spawn, timeoutMs }) {
     const finish = (r) => { if (!done) { done = true; resolve(r); } };
     let child;
     try {
-      child = spawn(claudeBin, argv, { cwd, shell: process.platform === 'win32' });
+      child = spawn(claudeBin, argv, { cwd, shell: false });
     } catch (e) {
       return finish({ ok: false, code: -1, stderr: String(e?.message ?? e), stdout: '' });
     }
@@ -216,6 +229,8 @@ function runClaude({ claudeBin, argv, cwd, spawn, timeoutMs }) {
     child.stderr?.on('data', (d) => { stderr += d.toString(); });
     child.on('error', (e) => { clearTimeout(timer); finish({ ok: false, code: -1, stderr: String(e?.message ?? e), stdout }); });
     child.on('close', (code) => { clearTimeout(timer); finish({ ok: code === 0, code, stdout, stderr }); });
+    // Prompt on stdin — never on argv. Inert prompt text, never a command.
+    try { child.stdin?.write(prompt ?? ''); child.stdin?.end(); } catch { /* ignore */ }
   });
 }
 
