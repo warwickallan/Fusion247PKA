@@ -641,8 +641,9 @@ def build_report_markdown(cap: Capture, handoff_info: dict | None = None) -> str
                  "file. Retry per §8, or escalate.")
         b.append("- **Suggested follow-ups:** re-run capture on a machine/network with caption access.")
     b.append("- **No automatic living-knowledge update:** this packet updates no PKM note, SOP, "
-             "WIKI, agent instruction or register. Any promotion is Warwick's / Cairn's explicit "
-             "decision.")
+             "WIKI, agent instruction or living-knowledge register. Source-register entries may be "
+             "created only to record immutable capture / Cairn-ready handoff. Any promotion is "
+             "Warwick's / Cairn's explicit decision.")
     b.append("")
 
     # Sections 1-5 — analysis scaffolds (agent-authored) or N/A on failure.

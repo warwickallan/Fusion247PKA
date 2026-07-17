@@ -203,6 +203,7 @@ class TestCombinedReportSuccess(unittest.TestCase):
         self.assertIn("## Warwick Decision Block", self.md)
         self.assertIn("Recommended disposition:", self.md)
         self.assertIn("No automatic living-knowledge update", self.md)
+        self.assertIn("Source-register entries may be created", self.md)
         # near the top: before section 1
         self.assertLess(self.md.find("## Warwick Decision Block"), self.md.find("## 1. Executive"))
 
