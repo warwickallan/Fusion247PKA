@@ -3,10 +3,18 @@ build: BUILD-010
 component: Fusion Tower / Governance Mode
 wp: WP0
 artifact: fusion-tower-operating-instructions
-status: draft-for-wp0
+status: approved
 author: mack
+approved_by: warwick
+approved_date: 2026-07-17
 created: 2026-07-17
 ---
+
+> **HUMAN-OWNED CONTRACT.** This is a governing prompt, not just code. It was
+> approved as-is by Warwick on 2026-07-17. Any change to the reviewer's identity,
+> inputs, method, or output shape requires Warwick's explicit re-approval BEFORE
+> use — same status as a live-action gate. The runtime loads THIS file as the
+> dynamic prompt when a Codex review turn is triggered, and records its version/SHA.
 
 # Fusion Tower — Operating Instructions (reviewer role of record)
 
@@ -106,8 +114,16 @@ Two distinct outputs:
   content, never a secret. `proposed_action.type ∈ {post_review, post_comment,
   noop}` (a merge/destructive action is impossible by construction).
 
-The Tower advances run state from the compact result (verdict → next round, ready,
-or a decision gate); the human reads the full review in ClickUp.
+## 4a. HUMAN DECISION GATE — Codex review → Telegram cards → human tap → THEN Larry acts (Warwick, 2026-07-17)
+
+**Larry does NOT act on a Codex review until Warwick approves it on Telegram.** After a Codex review turn returns, the Tower:
+
+1. Posts a concise **`[CODEX]`** summary to Warwick's private Telegram chat (verdict · head SHA · findings-by-severity · one-line rationale) **with option cards** (an inline keyboard), plus a link to the full review (ClickUp/staged) for detail.
+2. Places the run in `awaiting_decision` (`decision_required = true`) — **the loop halts here.** Larry's correction turn is NOT dispatched yet.
+3. Option cards (bounded, honest — never a merge): e.g. **`✅ Proceed`** (dispatch Larry's correction turn), **`⏸ Hold`** (pause the run), **`📄 Full review`** (link/expand), **`🛑 Stop`** (safe stop). The exact card set per run is defined by the run's decision context; `Proceed` is the only card that advances to a Larry turn.
+4. Warwick's tap arrives as a `callback_query` through the **capture worker's single poller** (WP2 routes governance callbacks to the Tower as a `command:decision` event — no second poller). The Tower validates the tapper is the authorised user, records the decision durably, and only then advances.
+
+This makes every Codex→Larry handoff **human-gated**: the automation reviews and proposes, Warwick decides, then Larry acts. It is the safety valve — the loop cannot "explode" because it cannot advance past a review without a human tap. The Tower still advances *internal* run state from the compact result, but the **Larry correction turn is gated on the human card tap**; the human reads the full review via the linked ClickUp/staged detail.
 
 ## 5. Failure posture (fail-closed)
 
