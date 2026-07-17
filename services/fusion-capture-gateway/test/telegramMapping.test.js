@@ -35,10 +35,14 @@ test('malformed update with no message is rejected (no_message)', () => {
   assert.equal(r.reason, 'no_message');
 });
 
-test('NON-TEXT rejection: authorised photo/voice/document/sticker updates never map to an envelope', () => {
+test('NON-TEXT rejection: authorised PRIVATE photo/voice/document/sticker updates never map to an envelope', () => {
   // Live defect 2026-07-16: a photo produced an empty capture that falsely
   // completed. The mapping now rejects any authorised message with no usable
-  // text — no envelope is ever built for it.
+  // text — no envelope is ever built for it. These are IN THE AUTHORISED USER'S
+  // OWN PRIVATE CHAT (chat.type 'private', chat.id === sender), so the private-
+  // chat boundary passes and the content-type gate is the verdict. (A NON-private
+  // non-text update returns 'non_private_chat' first — see the dedicated tests
+  // below; ordering fix GPT-BUILD-002-WP1-DELTA-REVIEW-0002.)
   const media = [
     { photo: [{ file_id: 'AgACAgQAAxk', width: 90, height: 90 }] },
     { voice: { file_id: 'AwACAgQAAxk', duration: 3 } },
@@ -47,7 +51,7 @@ test('NON-TEXT rejection: authorised photo/voice/document/sticker updates never 
   ];
   for (const extra of media) {
     const r = mapTelegramUpdate({
-      update: { message: { message_id: 42, from: { id: AUTH_ID }, ...extra } },
+      update: { message: { message_id: 42, from: { id: AUTH_ID }, chat: { id: AUTH_ID, type: 'private' }, ...extra } },
       now: NOW,
       authorisedUserId: AUTH_ID,
     });
@@ -55,6 +59,83 @@ test('NON-TEXT rejection: authorised photo/voice/document/sticker updates never 
     assert.equal(r.reason, 'unsupported_content_type');
     assert.equal(r.senderId, String(AUTH_ID), 'sender surfaced so the caller can reply');
   }
+});
+
+test('DECISION ORDER (delta review 0002): sender-allowlist → private-chat → content-type', () => {
+  // The material ordering guarantee this fix restores. Each verdict below proves
+  // one boundary fires BEFORE the next, so the visible "Text only" notice (which
+  // the live runner emits ONLY on unsupported_content_type) can never leak into a
+  // non-private chat.
+  const photo = { photo: [{ file_id: 'AgACAgQAAxk', width: 90, height: 90 }] };
+
+  // (2) allowlist precedes chat-boundary: a STRANGER in a group with a photo is a
+  // plain unauthorised_sender — no chat/content oracle.
+  const stranger = mapTelegramUpdate({
+    update: { message: { message_id: 10, from: { id: 999 }, chat: { id: -100, type: 'supergroup' }, ...photo } },
+    now: NOW,
+    authorisedUserId: AUTH_ID,
+  });
+  assert.equal(stranger.ok, false);
+  assert.equal(stranger.reason, 'unauthorised_sender', 'allowlist is verdict 1 — before chat/content');
+
+  // (3) chat-boundary precedes content-type: an AUTHORISED sender's photo IN A
+  // GROUP is non_private_chat — NOT unsupported_content_type. This is the exact
+  // defect: pre-fix this returned unsupported_content_type and the runner replied
+  // into the group.
+  const groupPhoto = mapTelegramUpdate({
+    update: { message: { message_id: 11, from: { id: AUTH_ID }, chat: { id: -100, type: 'group' }, ...photo } },
+    now: NOW,
+    authorisedUserId: AUTH_ID,
+  });
+  assert.equal(groupPhoto.ok, false);
+  assert.equal(groupPhoto.reason, 'non_private_chat', 'chat-boundary is verdict 2 — before content-type');
+});
+
+test('NON-PRIVATE non-text: group photo / supergroup voice / channel document → non_private_chat (never unsupported_content_type)', () => {
+  const cases = [
+    { chat: { id: -100200300, type: 'group' }, extra: { photo: [{ file_id: 'AgACAgQAAxk' }] } },
+    { chat: { id: -100200301, type: 'supergroup' }, extra: { voice: { file_id: 'AwACAgQAAxk', duration: 3 } } },
+    { chat: { id: -100200302, type: 'channel' }, extra: { document: { file_id: 'BQACAgQAAxk', file_name: 'x.pdf' } } },
+  ];
+  for (const { chat, extra } of cases) {
+    const r = mapTelegramUpdate({
+      update: { message: { message_id: 55, from: { id: AUTH_ID }, chat, ...extra } },
+      now: NOW,
+      authorisedUserId: AUTH_ID,
+    });
+    assert.equal(r.ok, false, `${chat.type} non-text must not map`);
+    assert.equal(r.reason, 'non_private_chat', `${chat.type} refused on chat boundary, before content-type`);
+  }
+});
+
+test('NON-PRIVATE whitespace-only text → non_private_chat (chat boundary wins over the empty-text gate)', () => {
+  const r = mapTelegramUpdate({
+    update: { message: { message_id: 56, from: { id: AUTH_ID }, chat: { id: -100200303, type: 'group' }, text: '   \n\t ' } },
+    now: NOW,
+    authorisedUserId: AUTH_ID,
+  });
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, 'non_private_chat');
+});
+
+test('NON-PRIVATE authorised TEXT → non_private_chat (no envelope for a group message)', () => {
+  const r = mapTelegramUpdate({
+    update: { message: { message_id: 57, from: { id: AUTH_ID }, chat: { id: -100200304, type: 'supergroup' }, text: 'hello group' } },
+    now: NOW,
+    authorisedUserId: AUTH_ID,
+  });
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, 'non_private_chat');
+});
+
+test('STRANGER private unsupported content → unauthorised_sender (no content/context disclosure)', () => {
+  const r = mapTelegramUpdate({
+    update: { message: { message_id: 58, from: { id: 999 }, chat: { id: 999, type: 'private' }, photo: [{ file_id: 'AgACAgQAAxk' }] } },
+    now: NOW,
+    authorisedUserId: AUTH_ID,
+  });
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, 'unauthorised_sender', 'allowlist first — even in a genuine private chat');
 });
 
 test('NON-TEXT rejection: empty or whitespace-only text is unusable text, same rejection', () => {

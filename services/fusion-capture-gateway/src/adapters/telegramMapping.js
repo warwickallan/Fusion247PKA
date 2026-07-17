@@ -94,6 +94,24 @@ export function mapTelegramUpdate({ update, now, authorisedUserId, action, defau
     return { ok: false, reason: 'unauthorised_sender', senderId: senderId ?? null };
   }
 
+  // PRIVATE-DIRECT-CHAT BOUNDARY (correction 3; ordering fix
+  // GPT-BUILD-002-WP1-DELTA-REVIEW-0002). This BUILD serves Warwick's DM only —
+  // never groups, supergroups, or channels. Refuse any non-private / missing /
+  // malformed chat context with the SAME quiet default-deny posture as an
+  // unauthorised sender (no envelope is ever built). SINGLE shared predicate with
+  // the WP1 webhook, so the two transports give the SAME verdict. Checked AFTER
+  // the allowlist (no content/context oracle for strangers) and — critically —
+  // BEFORE the content-type gate. Rationale: the live runner only emits the
+  // visible "Text only in WP0" notice on 'unsupported_content_type'. If content
+  // were inspected first, an authorised sender posting a photo/voice/document/
+  // empty-text INTO A GROUP would be content-rejected and the runner would REPLY
+  // INSIDE the non-private chat — breaking the quiet private-chat boundary. By
+  // returning 'non_private_chat' before any content inspection, a non-private
+  // context is refused silently and no notice can ever leak into a group.
+  if (!isPrivateDirectChat({ chat: message.chat, senderId })) {
+    return { ok: false, reason: 'non_private_chat', senderId };
+  }
+
   // WP0: text only (technical_source_type 'text'). A message carrying NO usable
   // text (photo/voice/document/sticker/… or an empty/whitespace-only text field)
   // is REJECTED here — never mapped onto an envelope — so a non-text update can
@@ -101,21 +119,12 @@ export function mapTelegramUpdate({ update, now, authorisedUserId, action, defau
   // 'completed' (live defect 2026-07-16: a photo silently "completed" with an
   // empty note). The caller replies with an honest "text only in WP0" notice.
   // Checked AFTER the allowlist so an unauthorised photo stays a plain
-  // unauthorised_sender rejection (no content-type oracle for strangers).
+  // unauthorised_sender rejection (no content-type oracle for strangers), and
+  // AFTER the private-chat boundary so this verdict — and the runner's visible
+  // notice — is reachable ONLY inside the authorised user's own private chat.
   const text = typeof message.text === 'string' ? message.text : '';
   if (text.trim().length === 0) {
     return { ok: false, reason: 'unsupported_content_type', senderId };
-  }
-
-  // PRIVATE-DIRECT-CHAT BOUNDARY (correction 3). This BUILD serves Warwick's DM
-  // only — never groups, supergroups, or channels. Refuse any non-private /
-  // missing / malformed chat context with the SAME quiet default-deny posture as
-  // an unauthorised sender (no envelope is ever built). SINGLE shared predicate
-  // with the WP1 webhook, so the two transports give the SAME verdict. Checked
-  // AFTER the allowlist (no content/context oracle for strangers) and after the
-  // text gate (an authorised non-text update stays a plain unsupported_content_type).
-  if (!isPrivateDirectChat({ chat: message.chat, senderId })) {
-    return { ok: false, reason: 'non_private_chat', senderId };
   }
 
   // Untrusted content stays inert data — it is never interpolated into a
