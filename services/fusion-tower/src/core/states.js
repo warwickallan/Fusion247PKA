@@ -76,6 +76,18 @@ export const WRITE_STATE = Object.freeze({
   FAILED: 'failed',
 });
 
+// Durable Telegram notification outbox lifecycle (mirrors migration 0004 enum
+// ftw.notification_state exactly — BUILD-010 WP1). `pending` is the reserved/enqueued
+// state before a bot send; `sent` REQUIRES a real Telegram message_id (DB CHECK
+// notification_outbox_sent_requires_provider_chk); `failed` is a terminal give-up;
+// `superseded` retires a row a newer notification replaced (do-not-send).
+export const NOTIFICATION_STATE = Object.freeze({
+  PENDING: 'pending',
+  SENT: 'sent',
+  FAILED: 'failed',
+  SUPERSEDED: 'superseded',
+});
+
 // Legal run-status transitions (control-plane-schema.md §3). Terminal states have
 // no outgoing edges.
 const RUN_TRANSITIONS = Object.freeze({

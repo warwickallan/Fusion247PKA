@@ -24,6 +24,7 @@ const MIGRATIONS = [
   '0001_wp0_control_plane.sql',
   '0002_wp0_identity_provider_binding.sql',
   '0003_wp0_external_write_outbox.sql',
+  '0004_wp1_notification_outbox.sql',
 ];
 
 async function resetAndMigrate() {
@@ -439,6 +440,128 @@ test('20. outbox (d) — RLS deny-by-default on external_write: anon denied, ser
         await client.query('reset role');
         await client.query('set role service_role');
         const res = await client.query('select count(*)::int as n from ftw.external_write');
+        assert.ok(res.rows[0].n >= 1, 'service_role sees rows');
+        await client.query('reset role');
+      } finally { client.release(); }
+    } finally { await pool.end(); }
+  } finally { await store.end(); }
+});
+
+// ---------------------------------------------------------------------------
+// BUILD-010 WP1 — the durable Telegram notification outbox (0004), proven on a
+// real DB with 0001 -> 0002 -> 0003 -> 0004 applied on a clean cluster.
+// ---------------------------------------------------------------------------
+
+function notifArgs(over = {}) {
+  return {
+    dedupKey: 'run-1|decision_required|123456789|await-warwick',
+    runId: null,
+    recipient: '123456789',            // authorised chat id — a pointer, never a token
+    logicalSource: 'TOWER',
+    purpose: 'decision_required',
+    body: 'Decision required on run-1: approve the merge?',
+    ...over,
+  };
+}
+
+test('21. outbox (a) — enqueueNotification twice with the SAME dedup key: first enqueues, second returns existing (no double-send)', { skip: !DB }, async () => {
+  const store = await freshStore();
+  try {
+    const first = await store.enqueueNotification(notifArgs(), { now: 1 });
+    assert.equal(first.enqueued, true);
+    assert.equal(first.notification.state, 'pending');
+    const second = await store.enqueueNotification(notifArgs(), { now: 2 });
+    assert.equal(second.enqueued, false, 'duplicate run+event+recipient+purpose does NOT re-enqueue');
+    assert.equal(second.notification.notification_id, first.notification.notification_id,
+      'returns the durable existing row');
+    // Exactly one physical row for the logical event.
+    const rows = await store.claimPendingNotifications(50);
+    assert.equal(rows.length, 1);
+  } finally { await store.end(); }
+});
+
+test('22. outbox (b) — markNotificationSent REQUIRES provider_message_id; DB CHECK blocks sent without one', { skip: !DB }, async () => {
+  const store = await freshStore();
+  try {
+    await store.enqueueNotification(notifArgs(), { now: 1 });
+    // Store-level guard: empty/missing provider_message_id is rejected before any SQL.
+    await assert.rejects(() => store.markNotificationSent(notifArgs().dedupKey, '', { now: 2 }), /REQUIRED/);
+    // A valid Telegram message_id marks it sent.
+    const ok = await store.markNotificationSent(notifArgs().dedupKey, 'tg-msg-4711', { now: 3 });
+    assert.equal(ok.state, 'sent');
+    assert.equal(ok.provider_message_id, 'tg-msg-4711');
+    assert.ok(ok.sent_at);
+
+    // DB CHECK is the SECOND, independent gate: a raw UPDATE forcing 'sent' with a
+    // NULL provider_message_id must be refused by the constraint.
+    const pgModule = await import('pg');
+    const { Pool } = pgModule.default ?? pgModule;
+    const pool = new Pool({ connectionString: DB });
+    try {
+      await store.enqueueNotification(
+        notifArgs({ dedupKey: 'raw-key', purpose: 'ci_red' }), { now: 4 },
+      );
+      await assert.rejects(
+        () => pool.query(
+          "update ftw.notification_outbox set state = 'sent' where dedup_key = 'raw-key'",
+        ),
+        /notification_outbox_sent_requires_provider_chk|check constraint/i,
+        'DB CHECK must block sent without a provider_message_id',
+      );
+    } finally { await pool.end(); }
+  } finally { await store.end(); }
+});
+
+test('23. outbox (c) — claimPendingNotifications returns ONLY pending (sent/failed/superseded excluded)', { skip: !DB }, async () => {
+  const store = await freshStore();
+  try {
+    await store.enqueueNotification(notifArgs({ dedupKey: 'k-pending', purpose: 'run_created' }), { now: 1 });
+    await store.enqueueNotification(notifArgs({ dedupKey: 'k-sent', purpose: 'terminal_ready' }), { now: 2 });
+    await store.enqueueNotification(notifArgs({ dedupKey: 'k-failed', purpose: 'ci_red' }), { now: 3 });
+    await store.enqueueNotification(notifArgs({ dedupKey: 'k-superseded', purpose: 'decision_required' }), { now: 4 });
+    await store.markNotificationSent('k-sent', 'tg-1', { now: 5 });
+    await store.markNotificationFailed('k-failed', new Error('bot 502'), { now: 6 });
+    await store.markNotificationSuperseded('k-superseded', { now: 7 });
+
+    const pending = await store.claimPendingNotifications(50);
+    assert.equal(pending.length, 1, 'only the one pending row is claimable');
+    assert.equal(pending[0].dedup_key, 'k-pending');
+    // The failed row carries the bumped attempt_count + last_error.
+    const failed = await store.getNotification('k-failed');
+    assert.equal(failed.state, 'failed');
+    assert.equal(failed.attempt_count, 1);
+    assert.equal(failed.last_error, 'bot 502');
+    const superseded = await store.getNotification('k-superseded');
+    assert.equal(superseded.state, 'superseded');
+  } finally { await store.end(); }
+});
+
+test('24. outbox (d) — RLS deny-by-default on notification_outbox: anon denied, service_role permitted', { skip: !DB }, async () => {
+  const store = await freshStore();
+  try {
+    await store.enqueueNotification(notifArgs(), { now: 1 }); // owner insert (bypasses RLS)
+    const pgModule = await import('pg');
+    const { Pool } = pgModule.default ?? pgModule;
+    const pool = new Pool({ connectionString: DB });
+    try {
+      // RLS flag is set on the new table.
+      const rls = await pool.query(
+        `select c.relrowsecurity from pg_class c
+           join pg_namespace n on n.oid = c.relnamespace
+          where n.nspname = 'ftw' and c.relname = 'notification_outbox'`,
+      );
+      assert.equal(rls.rows[0].relrowsecurity, true, 'RLS must be enabled on notification_outbox');
+      const client = await pool.connect();
+      try {
+        await client.query('set role anon');
+        await assert.rejects(
+          () => client.query('select count(*) from ftw.notification_outbox'),
+          /permission denied/,
+          'anon must be denied on ftw.notification_outbox',
+        );
+        await client.query('reset role');
+        await client.query('set role service_role');
+        const res = await client.query('select count(*)::int as n from ftw.notification_outbox');
         assert.ok(res.rows[0].n >= 1, 'service_role sees rows');
         await client.query('reset role');
       } finally { client.release(); }

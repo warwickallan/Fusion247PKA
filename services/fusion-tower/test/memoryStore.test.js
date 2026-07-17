@@ -207,3 +207,91 @@ test('outbox: duplicate mutation_id under a different mutation_key is rejected (
     /unique/i,
   );
 });
+
+// ---- Telegram notification outbox (BUILD-010 WP1) --------------------------
+
+function notifArgs(over = {}) {
+  return {
+    dedupKey: 'run-1|decision_required|123456789|await-warwick',
+    runId: null,
+    recipient: '123456789',
+    logicalSource: 'TOWER',
+    purpose: 'decision_required',
+    body: 'Decision required on run-1: approve the merge?',
+    ...over,
+  };
+}
+
+test('notify: enqueueNotification reserves the dedup key once; a second enqueue is enqueued:false with the existing row', async () => {
+  const store = createMemoryStore();
+  const first = await store.enqueueNotification(notifArgs(), { now: 1 });
+  assert.equal(first.enqueued, true);
+  assert.equal(first.notification.state, 'pending');
+  const second = await store.enqueueNotification(notifArgs(), { now: 2 });
+  assert.equal(second.enqueued, false, 'duplicate run+event+recipient+purpose does NOT re-enqueue');
+  assert.equal(second.notification.notification_id, first.notification.notification_id);
+});
+
+test('notify: markNotificationSent REQUIRES a non-empty provider_message_id', async () => {
+  const store = createMemoryStore();
+  await store.enqueueNotification(notifArgs(), { now: 1 });
+  await assert.rejects(() => store.markNotificationSent(notifArgs().dedupKey, '', { now: 2 }), /REQUIRED/);
+  await assert.rejects(() => store.markNotificationSent(notifArgs().dedupKey, undefined, { now: 2 }), /REQUIRED/);
+  const ok = await store.markNotificationSent(notifArgs().dedupKey, 'tg-42', { now: 3 });
+  assert.equal(ok.state, 'sent');
+  assert.equal(ok.provider_message_id, 'tg-42');
+  assert.equal(ok.sent_at, 3);
+});
+
+test('notify: claimPendingNotifications returns only pending, oldest first', async () => {
+  const store = createMemoryStore();
+  await store.enqueueNotification(notifArgs({ dedupKey: 'a', purpose: 'run_created' }), { now: 1 });
+  await store.enqueueNotification(notifArgs({ dedupKey: 'b', purpose: 'ci_red' }), { now: 2 });
+  await store.enqueueNotification(notifArgs({ dedupKey: 'c', purpose: 'terminal_ready' }), { now: 3 });
+  await store.markNotificationSent('b', 'tg-9', { now: 4 });
+  const pending = await store.claimPendingNotifications(10);
+  assert.deepEqual(pending.map((n) => n.dedup_key), ['a', 'c']);
+});
+
+test('notify: error/retire transitions bump attempt_count and record last_error', async () => {
+  const store = createMemoryStore();
+  await store.enqueueNotification(notifArgs(), { now: 1 });
+  const f = await store.markNotificationFailed(notifArgs().dedupKey, new Error('bot 502'), { now: 2 });
+  assert.equal(f.state, 'failed');
+  assert.equal(f.attempt_count, 1);
+  assert.equal(f.last_error, 'bot 502');
+  const s = await store.markNotificationSuperseded(notifArgs().dedupKey, { now: 3 });
+  assert.equal(s.state, 'superseded');
+  assert.equal(s.attempt_count, 2);
+});
+
+test('notify: an invalid logical_source is rejected (vocabulary CHECK parity)', async () => {
+  const store = createMemoryStore();
+  await assert.rejects(
+    () => store.enqueueNotification(notifArgs({ logicalSource: 'BOGUS' }), { now: 1 }),
+    /invalid logical_source/,
+  );
+});
+
+test('notify: a body carrying a bot-token shape is rejected (secret backstop parity)', async () => {
+  const store = createMemoryStore();
+  // Build the token-shape string at runtime so no static secret-shaped literal sits
+  // in this file (keeps the repo secret-scan clean); the JS backstop still sees it.
+  const tokenShape = `${'9'.repeat(9)}:${'z'.repeat(35)}`;
+  await assert.rejects(
+    () => store.enqueueNotification(
+      notifArgs({ body: `leak ${tokenShape} here` }),
+      { now: 1 },
+    ),
+    /bot-token shape/,
+  );
+});
+
+test('notify: getNotification returns the row or null', async () => {
+  const store = createMemoryStore();
+  assert.equal(await store.getNotification('nope'), null);
+  await store.enqueueNotification(notifArgs(), { now: 1 });
+  const n = await store.getNotification(notifArgs().dedupKey);
+  assert.equal(n.recipient, '123456789');
+  assert.equal(n.logical_source, 'TOWER');
+});

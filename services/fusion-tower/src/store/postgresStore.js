@@ -15,6 +15,7 @@ import {
   RUN_STATUS,
   TURN_STATE,
   WRITE_STATE,
+  NOTIFICATION_STATE,
   assertRunTransition,
   assertTurnTransition,
   isTerminalRunStatus,
@@ -115,6 +116,26 @@ function mapWrite(w) {
     last_error: w.last_error ?? null,
     created_at: w.created_at,
     updated_at: w.updated_at,
+  };
+}
+
+function mapNotification(n) {
+  if (!n) return undefined;
+  return {
+    notification_id: n.notification_id,
+    dedup_key: n.dedup_key,
+    run_id: n.run_id ?? null,
+    recipient: n.recipient,
+    logical_source: n.logical_source,
+    purpose: n.purpose,
+    body: n.body,
+    state: n.state,
+    provider_message_id: n.provider_message_id ?? null,
+    attempt_count: n.attempt_count,
+    last_error: n.last_error ?? null,
+    created_at: n.created_at,
+    updated_at: n.updated_at,
+    sent_at: n.sent_at ?? null,
   };
 }
 
@@ -644,6 +665,130 @@ export async function createPostgresStore({ connectionString, caFile = null, poo
         'select * from ftw.external_write where mutation_key = $1', [mutationKey],
       );
       return mapWrite(res.rows[0]) ?? null;
+    },
+
+    // ---- Telegram notification outbox (BUILD-010 WP1) ------------------------
+    // Durable, restart-safe, deduplicated notification queue. A notification is
+    // ENQUEUED (reserved) idempotently on its per-EVENT dedup key BEFORE any bot send;
+    // a redelivery/restart/retry collides on the dedup_key and is a no-op read-back.
+    // A temporary Telegram outage can never lose a decision request / terminal outcome
+    // / blocker / READY.
+
+    // Reserve the dedup key. INSERT ... ON CONFLICT (dedup_key) DO NOTHING then
+    // read-back — the same proven pattern as appendTurn/claimWrite. Returns
+    // { enqueued:true, notification } when newly reserved (state 'pending'), or
+    // { enqueued:false, notification } with the EXISTING row when a duplicate
+    // run+event+recipient+purpose was already enqueued (so it never double-sends).
+    async enqueueNotification(args = {}, opts) {
+      const {
+        dedupKey, runId, recipient, logicalSource, purpose, body,
+      } = args;
+      if (!dedupKey) throw new Error('enqueueNotification: dedupKey required');
+      if (!recipient) throw new Error('enqueueNotification: recipient (chat id) required');
+      if (!logicalSource) throw new Error('enqueueNotification: logicalSource required');
+      if (!purpose) throw new Error('enqueueNotification: purpose required');
+      if (typeof body !== 'string' || body.length === 0) {
+        throw new Error('enqueueNotification: non-empty body required');
+      }
+      const ts = nowTs(opts);
+      return withTx(async (client) => {
+        const ins = await client.query(
+          `insert into ftw.notification_outbox
+             (dedup_key, run_id, recipient, logical_source, purpose, body,
+              created_at, updated_at)
+           values ($1,$2,$3,$4,$5,$6,
+                   coalesce($7::timestamptz, now()), coalesce($7::timestamptz, now()))
+           on conflict (dedup_key) do nothing
+           returning *`,
+          [dedupKey, runId ?? null, recipient, logicalSource, purpose, body, ts],
+        );
+        if (ins.rows.length > 0) return { enqueued: true, notification: mapNotification(ins.rows[0]) };
+        // Conflict: the (run, event, recipient, purpose) was already enqueued — return
+        // the existing row so the caller sees its current state (never re-sends).
+        const existing = await client.query(
+          'select * from ftw.notification_outbox where dedup_key = $1 for share',
+          [dedupKey],
+        );
+        return { enqueued: false, notification: mapNotification(existing.rows[0]) };
+      });
+    },
+
+    // Mark delivered. REQUIRES a non-empty providerMessageId (the real Telegram
+    // message_id): the store throws if it is missing, and the DB CHECK
+    // notification_outbox_sent_requires_provider_chk is the second, independent gate —
+    // 'sent' can NEVER be reached without a provider_message_id.
+    async markNotificationSent(dedupKey, providerMessageId, opts) {
+      if (!dedupKey) throw new Error('markNotificationSent: dedupKey required');
+      if (typeof providerMessageId !== 'string' || providerMessageId.length === 0) {
+        throw new Error(
+          'markNotificationSent: a non-empty providerMessageId (Telegram message_id) '
+          + 'is REQUIRED — a send without a message_id can never be recorded as sent',
+        );
+      }
+      const ts = nowTs(opts);
+      const res = await pool.query(
+        `update ftw.notification_outbox
+           set state = 'sent',
+               provider_message_id = $2,
+               sent_at = coalesce($3::timestamptz, now()),
+               updated_at = coalesce($3::timestamptz, now())
+         where dedup_key = $1 returning *`,
+        [dedupKey, providerMessageId, ts],
+      );
+      if (res.rows.length === 0) throw new Error(`markNotificationSent: unknown dedup_key ${dedupKey}`);
+      return mapNotification(res.rows[0]);
+    },
+
+    async markNotificationFailed(dedupKey, err, opts) {
+      return this._markNotificationState(dedupKey, NOTIFICATION_STATE.FAILED, err, opts,
+        'markNotificationFailed');
+    },
+    async markNotificationSuperseded(dedupKey, opts) {
+      return this._markNotificationState(dedupKey, NOTIFICATION_STATE.SUPERSEDED, null, opts,
+        'markNotificationSuperseded');
+    },
+
+    // Shared error/retire transition: set state + attempt_count++ + last_error.
+    // attempt_count is bumped atomically in SQL (no read-modify-write).
+    async _markNotificationState(dedupKey, state, err, opts, label) {
+      if (!dedupKey) throw new Error(`${label}: dedupKey required`);
+      const ts = nowTs(opts);
+      const lastError = err == null ? null : (err.message ?? String(err));
+      const res = await pool.query(
+        `update ftw.notification_outbox
+           set state = $2::ftw.notification_state,
+               attempt_count = attempt_count + 1,
+               last_error = coalesce($3, last_error),
+               updated_at = coalesce($4::timestamptz, now())
+         where dedup_key = $1 returning *`,
+        [dedupKey, state, lastError, ts],
+      );
+      if (res.rows.length === 0) throw new Error(`${label}: unknown dedup_key ${dedupKey}`);
+      return mapNotification(res.rows[0]);
+    },
+
+    // Drainer claim: the pending backlog, oldest first, FOR UPDATE SKIP LOCKED so two
+    // drainers never grab the same notification. Returns only pending rows.
+    async claimPendingNotifications(limit = 10, opts = {}) {
+      const lim = Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : 10;
+      return withTx(async (client) => {
+        const res = await client.query(
+          `select * from ftw.notification_outbox
+             where state = 'pending'
+             order by created_at asc
+             for update skip locked
+             limit $1`,
+          [lim],
+        );
+        return res.rows.map(mapNotification);
+      });
+    },
+
+    async getNotification(dedupKey) {
+      const res = await pool.query(
+        'select * from ftw.notification_outbox where dedup_key = $1', [dedupKey],
+      );
+      return mapNotification(res.rows[0]) ?? null;
     },
 
     async end() { await pool.end(); },

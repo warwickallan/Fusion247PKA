@@ -28,8 +28,10 @@ function readMigration(file) {
 const SQL_0001 = readMigration('0001_wp0_control_plane.sql');
 const SQL_0002 = readMigration('0002_wp0_identity_provider_binding.sql');
 const SQL_0003 = readMigration('0003_wp0_external_write_outbox.sql');
+const SQL_0004 = readMigration('0004_wp1_notification_outbox.sql');
 const norm0002 = SQL_0002.toLowerCase();
 const norm0003 = SQL_0003.toLowerCase();
+const norm0004 = SQL_0004.toLowerCase();
 
 // ---------------------------------------------------------------------------
 // 0001 immutable-shape guards (unchanged posture — no weakening allowed).
@@ -181,8 +183,95 @@ test('0003 does NOT weaken RLS and carries the DO-NOT-WEAKEN block', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 0001 / 0002 immutability: the earlier migrations are part of the WP0 proof
-// history. 0003 is a pure delta and must NOT have edited their shape.
+// 0004 notification outbox guards (BUILD-010 WP1 — durable + retry-safe +
+// deduplicated Telegram notifications).
+// ---------------------------------------------------------------------------
+
+test('0004 references the convergence-brief notification-outbox requirement in its header', () => {
+  assert.match(SQL_0004, /durable \+ retry-safe \+ deduplicated/i);
+});
+
+test('0004 adds the ftw.notification_state enum WITHOUT colliding with a table name', () => {
+  assert.match(norm0004, /create type ftw\.notification_state as enum/);
+  // Enum-vs-table collision rule: no table may be named notification_state.
+  assert.doesNotMatch(norm0004, /create table (if not exists )?ftw\.notification_state\b/,
+    'no table may share the notification_state enum name');
+});
+
+test('0004 enum carries all four notification states', () => {
+  for (const s of ['pending', 'sent', 'failed', 'superseded']) {
+    assert.match(norm0004, new RegExp(`'${s}'`), `notification_state enum must include ${s}`);
+  }
+});
+
+test('0004 creates the notification_outbox table', () => {
+  assert.match(norm0004, /create table if not exists ftw\.notification_outbox/);
+});
+
+test('0004 declares dedup_key UNIQUE with an explicit constraint name (the idempotency key)', () => {
+  assert.match(norm0004, /constraint notification_outbox_dedup_key_key unique/);
+});
+
+test('0004 enforces sent REQUIRES provider_message_id via an explicitly-named CHECK', () => {
+  assert.match(norm0004, /constraint notification_outbox_sent_requires_provider_chk/);
+  // The CHECK must be: state <> 'sent' OR provider_message_id is not null.
+  assert.match(
+    norm0004,
+    /check\s*\(\s*state\s*<>\s*'sent'\s+or\s+provider_message_id\s+is\s+not\s+null\s*\)/,
+    'the CHECK must block sent without a provider_message_id',
+  );
+});
+
+test('0004 constrains the logical_source vocabulary to TOWER/CODEX/LARRY/CI (message-identity tag)', () => {
+  assert.match(norm0004, /constraint notification_outbox_logical_source_chk/);
+  for (const s of ['TOWER', 'CODEX', 'LARRY', 'CI']) {
+    assert.match(SQL_0004, new RegExp(`'${s}'`), `logical_source CHECK must include ${s}`);
+  }
+});
+
+test('0004 has a body no-token CHECK (defence-in-depth secret backstop)', () => {
+  assert.match(norm0004, /constraint notification_outbox_body_no_token_chk/);
+});
+
+test('0004 has an attempt_count >= 0 CHECK', () => {
+  assert.match(norm0004, /constraint notification_outbox_attempt_count_nonneg_chk check \(attempt_count >= 0\)/);
+});
+
+test('0004 links run_id via an explicit FK with on delete cascade (nullable)', () => {
+  assert.match(norm0004, /constraint notification_outbox_run_id_fkey/);
+  assert.match(norm0004, /references ftw\.governance_run \(run_id\) on delete cascade/);
+});
+
+test('0004 keeps RLS enabled on notification_outbox', () => {
+  assert.match(SQL_0004, /alter table ftw\.notification_outbox\s+enable row level security/i);
+});
+
+test('0004 grants + policy are service_role-only (no anon/authenticated grant or policy)', () => {
+  assert.match(norm0004, /grant[\s\S]*?to service_role/);
+  assert.match(norm0004, /create policy service_role_all_notification_outbox/);
+  assert.doesNotMatch(norm0004, /grant[\s\S]*?to (anon|authenticated)\b/,
+    'anon/authenticated must never receive a grant');
+  assert.doesNotMatch(norm0004, /create policy[\s\S]*?to (anon|authenticated)\b/,
+    'anon/authenticated must never receive a policy');
+});
+
+test('0004 does NOT weaken RLS and carries the DO-NOT-WEAKEN block', () => {
+  assert.doesNotMatch(norm0004, /disable row level security/,
+    '0004 must never disable RLS');
+  assert.match(SQL_0004, /DO NOT WEAKEN/,
+    '0004 must carry the DO-NOT-WEAKEN security block');
+});
+
+test('0004 stores POINTERS ONLY — recipient is a chat id, never a token', () => {
+  // The recipient column comment must flag it as a chat-id pointer, never a token.
+  assert.match(norm0004, /the authorised chat id/);
+  // The message-identity tag is deliberately separate from the credential owner.
+  assert.match(norm0004, /separate from the telegram credential owner/i);
+});
+
+// ---------------------------------------------------------------------------
+// 0001 / 0002 / 0003 immutability: the earlier migrations are part of the WP0
+// proof history. 0004 is a pure delta and must NOT have edited their shape.
 // ---------------------------------------------------------------------------
 
 test('0001 remains immutable-shape (four tables created, circular FK resolved)', () => {
@@ -197,4 +286,10 @@ test('0001 remains immutable-shape (four tables created, circular FK resolved)',
 test('0002 remains immutable-shape (drops vocab CHECK, adds the per-principal binding CHECK)', () => {
   assert.match(norm0002, /drop constraint if exists agent_identity_provider_honest_chk/);
   assert.match(norm0002, /add constraint agent_identity_provider_binding_chk/);
+});
+
+test('0003 remains immutable-shape (external_write outbox, per-mutation key, applied-requires-response CHECK)', () => {
+  assert.match(norm0003, /create table if not exists ftw\.external_write/);
+  assert.match(norm0003, /constraint external_write_mutation_key_key unique/);
+  assert.match(norm0003, /constraint external_write_applied_requires_response_chk/);
 });
