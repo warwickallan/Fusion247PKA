@@ -13,6 +13,21 @@ import { STATES, MAX_DELIVERY_ATTEMPTS } from './core/states.js';
 import { computeNextAttemptAtMs } from './core/retryPolicy.js';
 import { projectCard } from './receiptProjection.js';
 
+// Build the card model for an edit, enriched with the DURABLE card target
+// (chat_id + message_id) from the record's persisted card_ref (§4). This is what
+// makes the completion projection restart-safe: even a freshly-started worker
+// whose adapter has an empty in-memory card map re-targets the ORIGINAL card
+// from durable state. When card_ref is absent (fixtures that never sent a card)
+// the fields are simply undefined and the adapter falls back to its own map.
+function cardModelFor(record) {
+  const model = projectCard(record);
+  if (record && record.card_ref) {
+    model.chat_id = record.card_ref.chat_id;
+    model.message_id = record.card_ref.message_id;
+  }
+  return model;
+}
+
 /**
  * @param {object} deps
  * @param {object} deps.store           OperationalStore.
@@ -21,8 +36,11 @@ import { projectCard } from './receiptProjection.js';
  * @param {object} deps.clock           { now: () => number } (used only if `now` not passed).
  * @param {string} deps.workerId        this worker's principal id.
  * @param {number} deps.leaseMs         claim lease duration in ms.
+ * @param {object} [deps.accessLog]     F-05 access logger. Optional; when present,
+ *                 the governed capture_write is logged (principal/capture_id/when/
+ *                 outcome) — secret-free, never the payload text.
  */
-export function createWorker({ store, markdownWriter, adapter, clock, workerId, leaseMs } = {}) {
+export function createWorker({ store, markdownWriter, adapter, clock, workerId, leaseMs, accessLog } = {}) {
   if (!store) throw new Error('createWorker: store required');
   if (!markdownWriter) throw new Error('createWorker: markdownWriter required');
   if (!adapter) throw new Error('createWorker: adapter required');
@@ -48,16 +66,19 @@ export function createWorker({ store, markdownWriter, adapter, clock, workerId, 
      * is idempotent, a second worker resuming after a dead worker's claim expires
      * completes the item without a duplicate write and without false completion.
      */
-    processOne({ now: injectedNow } = {}) {
+    async processOne({ now: injectedNow } = {}) {
       const now = resolveNow({ now: injectedNow });
 
       // 1. Atomically claim the oldest claimable (or reclaim an expired lease).
-      const claimed = store.claim(workerId, leaseMs, { now });
+      //    ASYNC-UNIFIED: every store/adapter call is awaited. Awaiting the
+      //    in-memory fixture's synchronous return is a no-op, so ONE code path
+      //    drives both the fixture store and Silas's async Postgres store.
+      const claimed = await store.claim(workerId, leaseMs, { now });
       if (!claimed) return null;
       const captureId = claimed.capture_id;
 
       // 2. claimed → writing.
-      store.transition(captureId, STATES.WRITING, { now });
+      await store.transition(captureId, STATES.WRITING, { now });
 
       // 3-6. Governed write + evidence + gated completion. If ANY step throws
       //      (the governed Markdown write or its evidence/complete follow-up),
@@ -68,43 +89,55 @@ export function createWorker({ store, markdownWriter, adapter, clock, workerId, 
       try {
         // 3. Governed Markdown write (idempotent). Re-processing an already-
         //    written capture detects the existing note and does NOT rewrite.
-        const record = store.getByCaptureId(captureId);
+        const record = await store.getByCaptureId(captureId);
         const result = markdownWriter.write(record, { now });
 
         // 4. Record destination pointer, then writing → written.
-        store.recordDestination(captureId, result.destination_ref, { now });
-        store.transition(captureId, STATES.WRITTEN, { now });
+        await store.recordDestination(captureId, result.destination_ref, { now });
+        await store.transition(captureId, STATES.WRITTEN, { now });
 
         // 5. Record evidence pointer (idempotent on kind+target_ref), then
         //    written → evidenced.
-        store.recordEvidence(captureId, result.evidence, { now });
-        store.transition(captureId, STATES.EVIDENCED, { now });
+        await store.recordEvidence(captureId, result.evidence, { now });
+        await store.transition(captureId, STATES.EVIDENCED, { now });
 
         // 6. complete — gated by the store on evidenced + destination + evidence.
-        final = store.complete(captureId, { now });
+        final = await store.complete(captureId, { now });
+
+        // F-05: log the privileged governed capture_write (who/what/when/outcome).
+        // Secret-free by construction — no payload text, only the pointer kind.
+        if (accessLog && typeof accessLog.captureWrite === 'function') {
+          accessLog.captureWrite({
+            principal: workerId,
+            captureId,
+            when: now,
+            outcome: 'completed',
+            destinationRef: result.destination_ref,
+          });
+        }
       } catch (writeErr) {
         const errMsg = writeErr && writeErr.message ? writeErr.message : String(writeErr);
         // attempt_count was already incremented by claim() at the top of this
         // call — use it to compute THIS failure's autonomous retry due time.
-        const attemptCount = store.getByCaptureId(captureId).attempt_count;
+        const attemptCount = (await store.getByCaptureId(captureId)).attempt_count;
         // Honest failure + autonomous retry scheduling (Sonnet review fix — this
         // is the real runtime path behind "will be retried"; no external
         // scheduler or test-only helper required). writing/written/evidenced →
         // failed is legal; recordFailure stamps next_attempt_at_ms so a LATER
         // claim() reclaims this item once due.
-        store.recordFailure(captureId, {
+        await store.recordFailure(captureId, {
           now,
           error: errMsg,
           nextAttemptAtMs: computeNextAttemptAtMs(attemptCount, now),
         });
-        const failedRec = store.getByCaptureId(captureId);
+        const failedRec = await store.getByCaptureId(captureId);
 
         // Retry-exhaustion decision belongs to the worker (states.js §): compare
         // the claim-incremented attempt_count against the shared cap.
         if (failedRec.attempt_count >= MAX_DELIVERY_ATTEMPTS) {
           // Budget burned → park permanently for operator attention. Terminal;
           // `completed` is now unreachable for this capture.
-          const dead = store.deadLetter(captureId, { now, error: errMsg });
+          const dead = await store.deadLetter(captureId, { now, error: errMsg });
           // eslint-disable-next-line no-console
           console.error(JSON.stringify({
             service: 'fusion-capture-gateway',
@@ -141,7 +174,7 @@ export function createWorker({ store, markdownWriter, adapter, clock, workerId, 
       //    here must NOT reverse or duplicate the successful write/complete.
       //    Swallow the projection error, leave state completed, log it.
       try {
-        adapter.editCard(captureId, projectCard(final));
+        await adapter.editCard(captureId, cardModelFor(final));
       } catch (err) {
         // Structured log (no secrets, no full payload) — the card is stale but
         // the capture is durably completed. It can be re-projected later.
@@ -175,22 +208,24 @@ export function createWorker({ store, markdownWriter, adapter, clock, workerId, 
      * @param {{ now?: number }} [opts]  injected epoch ms (signature parity).
      * @returns {object} the adapter card-log entry.
      */
-    retryCardProjection(captureId, { now: injectedNow } = {}) {
+    async retryCardProjection(captureId, { now: injectedNow } = {}) {
       resolveNow({ now: injectedNow }); // signature parity + validates injection
-      const record = store.getByCaptureId(captureId);
+      const record = await store.getByCaptureId(captureId);
       if (!record) {
         throw new Error(`retryCardProjection: unknown capture_id "${captureId}"`);
       }
       // Re-derive from current state and re-send. No store mutation, no re-write.
-      return adapter.editCard(captureId, projectCard(record));
+      // Enriched with the durable card target so it re-targets the original card
+      // even after a restart (empty in-memory adapter map).
+      return adapter.editCard(captureId, cardModelFor(record));
     },
 
     /** Drain: process claimable items until none remain. Returns count processed. */
-    drain({ now } = {}) {
+    async drain({ now } = {}) {
       let processed = 0;
       // Bounded loop guard — never spins forever on a fixture.
       for (let i = 0; i < 10_000; i += 1) {
-        const rec = this.processOne({ now });
+        const rec = await this.processOne({ now });
         if (!rec) break;
         processed += 1;
       }

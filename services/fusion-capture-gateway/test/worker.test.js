@@ -20,7 +20,7 @@ function fixedClock(ms) {
   return { now: () => t, set: (v) => { t = v; }, advance: (d) => { t += d; } };
 }
 
-test('full happy path: capture → worker → file on disk → evidence → completed card', () => {
+test('full happy path: capture → worker → file on disk → evidence → completed card', async () => {
   const baseDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fcg-worker-'));
   try {
     const store = createInMemoryOperationalStore();
@@ -32,14 +32,21 @@ test('full happy path: capture → worker → file on disk → evidence → comp
       store, markdownWriter, adapter, clock, workerId: 'worker-A', leaseMs: 30_000,
     });
 
-    const accepted = intake.accept({
+    const accepted = await intake.accept({
       message: { message_id: 7007, from: { id: AUTH_ID }, text: 'capture this thought' },
     });
     assert.equal(accepted.ok, true);
     const captureId = accepted.captureId;
 
+    // TAP-GATED: before the tap nothing is claimable — the worker must not write.
+    assert.equal(await worker.processOne({ now: clock.now() }), null, 'no write before the tap');
+
+    // The user taps "Save to Brain" on the card.
+    const confirmed = await intake.confirmSave(captureId);
+    assert.equal(confirmed.outcome, 'queued');
+
     clock.advance(1000);
-    const final = worker.processOne({ now: clock.now() });
+    const final = await worker.processOne({ now: clock.now() });
     assert.ok(final, 'worker claimed and processed an item');
     assert.equal(final.state, STATES.COMPLETED);
 
@@ -68,7 +75,7 @@ test('full happy path: capture → worker → file on disk → evidence → comp
   }
 });
 
-test('worker returns null when nothing is claimable', () => {
+test('worker returns null when nothing is claimable', async () => {
   const baseDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fcg-worker-empty-'));
   try {
     const store = createInMemoryOperationalStore();
@@ -77,7 +84,7 @@ test('worker returns null when nothing is claimable', () => {
     const worker = createWorker({
       store, markdownWriter, adapter, workerId: 'worker-A', leaseMs: 30_000,
     });
-    assert.equal(worker.processOne({ now: 1 }), null);
+    assert.equal(await worker.processOne({ now: 1 }), null);
   } finally {
     fs.rmSync(baseDir, { recursive: true, force: true });
   }

@@ -28,7 +28,7 @@ function fixedClock(ms) {
   return { now: () => t, set: (v) => { t = v; }, advance: (d) => { t += d; } };
 }
 
-test('failed editCard → retryCardProjection re-edits to Completed; no re-write, state stays completed', () => {
+test('failed editCard → retryCardProjection re-edits to Completed; no re-write, state stays completed', async () => {
   const baseDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fcg-card-retry-'));
   try {
     const store = createInMemoryOperationalStore();
@@ -40,16 +40,17 @@ test('failed editCard → retryCardProjection re-edits to Completed; no re-write
       store, markdownWriter, adapter, clock, workerId: 'worker-A', leaseMs: 30_000,
     });
 
-    const acc = intake.accept({
+    const acc = await intake.accept({
       message: { message_id: 60600, from: { id: AUTH_ID }, text: 'card should end Completed' },
     });
     const captureId = acc.captureId;
+    await intake.confirmSave(captureId); // the user taps Save to Brain
 
     // Arm the adapter so the worker's edit-to-Completed FAILS once (swallowed).
     adapter.failNextEdit();
 
     clock.advance(1000);
-    const done = worker.processOne({ now: clock.now() });
+    const done = await worker.processOne({ now: clock.now() });
     // The write + completion are durable despite the failed card projection.
     assert.equal(done.state, STATES.COMPLETED);
     assert.equal(markdownWriter.writeCount(), 1);
@@ -60,7 +61,7 @@ test('failed editCard → retryCardProjection re-edits to Completed; no re-write
 
     // Retry the projection — re-derives the card from CURRENT state and re-sends.
     clock.advance(1000);
-    const entry = worker.retryCardProjection(captureId, { now: clock.now() });
+    const entry = await worker.retryCardProjection(captureId, { now: clock.now() });
     assert.equal(entry.op, 'edit');
     assert.equal(entry.cardModel.is_completed, true);
     assert.match(entry.cardModel.status_line, /Completed/);
@@ -75,7 +76,7 @@ test('failed editCard → retryCardProjection re-edits to Completed; no re-write
 
     // Idempotent: retrying again just re-sends the same card, still no re-write.
     clock.advance(1000);
-    const again = worker.retryCardProjection(captureId, { now: clock.now() });
+    const again = await worker.retryCardProjection(captureId, { now: clock.now() });
     assert.equal(again.cardModel.is_completed, true);
     assert.equal(markdownWriter.writeCount(), 1, 'still one write after a second retry');
     assert.equal(store.getByCaptureId(captureId).state, STATES.COMPLETED);

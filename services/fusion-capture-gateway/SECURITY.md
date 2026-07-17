@@ -35,9 +35,10 @@ one Larry/Fusion Telegram bot. No multi-user path, no open enrolment in WP0/WP1.
   processing state, evidence pointers, and a private raw-object bucket
   (`fcg-raw-private`). Never the canonical knowledge home. RLS is enabled
   deny-by-default on every table (`migrations/0001_wp0_operational_baseline.sql`).
-- **Local worker (trusted).** Runs server-side with the `service_role` credential,
-  pulls jobs in-process from the store, and performs the one governed Markdown
-  write. It is the only component that holds `service_role`.
+- **Local worker/runner (trusted).** Runs server-side, connects to Postgres with the
+  `DATABASE_URL` role credential (the DB password — server-side only), pulls jobs
+  in-process from the store, and performs the one governed Markdown write. It is the
+  only component that holds the DB credential; the bot/ingress surface never reads it.
 - **Canonical Markdown (system of record).** The knowledge copy lives in
   Markdown/myPKA, never in Supabase.
 
@@ -58,23 +59,43 @@ stores, or types health data without a separate authority/privacy/security decis
 
 ## 2. Secret homes and masking
 
-**Which secrets exist:**
-- `TELEGRAM_BOT_TOKEN` — full bot account credential.
-- `SUPABASE_SERVICE_ROLE_KEY` — privileged server-side key (worker-only).
-- `SUPABASE_ANON`/publishable key — if used, low-privilege, still never committed.
+**Credential model (corrected — PREPROVISION-CORRECTION-0001 §1) — three distinct
+surfaces:**
+- **A. Build-time project access** — migrations applied via the project-scoped
+  **Supabase MCP** (browser OAuth). Tool access, *not* an env secret; no Supabase
+  password or personal access token is requested.
+- **B. Database runtime access** — `DATABASE_URL`, the ONE runtime secret. A libpq
+  connection string from the Supabase **Connect** screen carrying the **project
+  database password** (the postgres role password), TLS required
+  (`?sslmode=require`). It is **not** a service_role API key.
+- **C. Supabase Data API keys** — `SUPABASE_URL` + a Supabase secret key are needed
+  **only** if code calls the REST/Data API. The WP0 runtime reaches Postgres over
+  `DATABASE_URL` and does **not** use them → optional/reserved, **not required**,
+  **not requested**. A future Data-API need should prefer Supabase's current
+  publishable/secret key model over legacy anon/service_role.
 
-**Where they live (the only acceptable homes):** environment variables injected by a
-secret manager, or an OS-keychain-backed `.env` that lives **outside** the repo tree.
-They are **never** committed to Git, **never** pasted into a Markdown note, and
-**never** written into ClickUp. The repo ships only `.env.example` with key names and
-empty values (`.gitignore` ignores `.env` / `.env.*` and un-ignores `.env.example`).
+**Which secrets actually exist at runtime (WP0):**
+- `DATABASE_URL` — Postgres connection string (DB password inline). **Secret.**
+- `TELEGRAM_BOT_TOKEN` — full bot account credential (throwaway dev bot). **Secret.**
+- `TELEGRAM_WEBHOOK_SECRET` — **not required** for WP0: the live proof uses
+  getUpdates **long polling** (no webhook). Optional/reserved for a future webhook
+  transport; masked if ever set.
+- `SUPABASE_SECRET_KEY` — optional/reserved Data API key (unused by WP0); masked.
+
+**Where they live (the only acceptable homes):** the runtime environment's managed
+secret store (e.g. the web environment's secret/env settings), or an OS-keychain-backed
+`.env` **outside** the repo tree. They are **never** committed to Git, **never** pasted
+into a Markdown note, and **never** written into ClickUp or chat. The repo ships only
+`.env.example` with key names and empty values (`.gitignore` ignores `.env` / `.env.*`
+and un-ignores `.env.example`).
 
 **How they are read and masked.** `src/config.js` reads secrets **by name**
 (`CONFIG_KEYS`) and tags them in `SECRET_KEYS`. `config.describe()` emits a log-safe
 snapshot where every secret is rendered `***set (masked)***` or `(unset)` via
-`maskSecret()` — the raw value is never returned. The Telegram bot surface never reads
-a Supabase secret; the `service_role` key is touched only by the worker. Absence of
-these secrets is the valid `fixturesMode` state used through WP0.
+`maskSecret()`. The live runner additionally redacts known secret VALUES (and the DB
+password parsed from `DATABASE_URL`) from every diagnostic, and the Telegram adapter
+masks the bot token in every echo. Absence of the required secrets is the valid
+`fixturesMode` state used through WP0.
 
 ## 3. Rotation runbook
 
@@ -88,17 +109,18 @@ secret is read from the environment by name.
 4. Confirm `config.describe()` shows `TELEGRAM_BOT_TOKEN: ***set (masked)***` and
    that no old token value appears in any log.
 
-**Supabase `service_role` key.**
-1. Rotate in the Supabase dashboard (API settings → roll `service_role`).
-2. Update `SUPABASE_SERVICE_ROLE_KEY` in the secret store; restart the worker only.
-3. `service_role` is **worker-only** and least-privilege by placement — it never
-   reaches the bot/ingress surface. Prefer a narrower scoped role wherever the
-   operation allows; keep `service_role` off any client surface.
+**Database password (`DATABASE_URL`).**
+1. Rotate the project database password in the Supabase dashboard
+   (Settings → Database → reset password), or roll the DB role's password.
+2. Update `DATABASE_URL` in the secret store (keep `?sslmode=require`); restart the
+   worker/runner only so it re-reads env. It is server-side only — it never reaches
+   the bot/ingress surface.
+3. Confirm `config.describe()` shows `DATABASE_URL: ***set (masked)***` and no old
+   value appears in any log.
 
-**Supabase anon / publishable key.**
+**Supabase Data API key (`SUPABASE_SECRET_KEY`) — only if/when a Data-API path exists.**
 1. Rotate in the dashboard; update the consuming surface's env.
-2. RLS remains enabled deny-by-default, so an anon key alone cannot over-read even
-   between rotation and restart.
+2. Not used by the WP0 runtime, so there is nothing to restart for WP0.
 
 After any rotation, run `scripts/secret-scan.sh` to confirm nothing was pasted into a
 tracked file during the change.
@@ -187,9 +209,16 @@ none of them block the fixtures baseline from merging.
 - **F-09 — Worker trust boundary.** The worker pulls in-process today (no open local
   port). Re-audit when a real transport is introduced so the worker accepts jobs only
   from the authenticated gateway path.
-- **F-10 — Webhook / poll authenticity.** When Telegram is wired for real, verify the
-  secret path token / `X-Telegram-Bot-Api-Secret-Token` (webhooks) or bot-token-only
-  delivery (long-polling) so arbitrary callers cannot inject fake updates.
+- **F-10 — Webhook / poll authenticity.** The **WP0 live proof uses getUpdates long
+  polling**: only the bot's own token receives updates, so delivery is authentic at the
+  transport by construction and **no webhook secret is required**. The per-update sender
+  allowlist still applies (§4). `verifyWebhook()` + `TELEGRAM_WEBHOOK_SECRET` remain in
+  the code as future-capable webhook infrastructure; verify that secret-token path
+  (`X-Telegram-Bot-Api-Secret-Token`) if/when a real webhook transport is introduced.
+- **Runtime DB role vs RLS.** The `DATABASE_URL` role connects server-side. Confirm at
+  real wiring that the chosen role's RLS interaction matches intent (the deny-by-default
+  policies target `service_role`; a project-owner/superuser DB role bypasses RLS). For
+  the single authorised user this is acceptable; re-audit before any multi-user path.
 
 Transport encryption (TLS on all hops) and Supabase at-rest encryption are also
 confirmed as part of the real-wiring step.

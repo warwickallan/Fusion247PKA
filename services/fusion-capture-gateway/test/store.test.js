@@ -53,8 +53,8 @@ test('claim leases the oldest claimable item and enforces the lease', () => {
   const store = createInMemoryOperationalStore();
   store.recordIntake(envelope({ capture_id: 'cap-1', msg: 'm1' }), { now: T0 });
   store.recordIntake(envelope({ capture_id: 'cap-2', msg: 'm2' }), { now: T0 + 1 });
-  store.enqueue('cap-1', { now: T0 + 2 });
-  store.enqueue('cap-2', { now: T0 + 3 });
+  store.enqueue('cap-1', { confirmedByTap: true, now: T0 + 2 });
+  store.enqueue('cap-2', { confirmedByTap: true, now: T0 + 3 });
 
   const leaseMs = 30_000;
   const claimed = store.claim('worker-A', leaseMs, { now: T0 + 10 });
@@ -74,7 +74,7 @@ test('claim leases the oldest claimable item and enforces the lease', () => {
 test('an expired lease is reclaimable by another worker', () => {
   const store = createInMemoryOperationalStore();
   store.recordIntake(envelope({ capture_id: 'cap-1', msg: 'm1' }), { now: T0 });
-  store.enqueue('cap-1', { now: T0 + 1 });
+  store.enqueue('cap-1', { confirmedByTap: true, now: T0 + 1 });
 
   const leaseMs = 30_000;
   const a = store.claim('worker-A', leaseMs, { now: T0 + 10 });
@@ -94,7 +94,7 @@ test('an expired lease is reclaimable by another worker', () => {
 test('write → evidence → completion transitions work and are gated', () => {
   const store = createInMemoryOperationalStore();
   store.recordIntake(envelope({ capture_id: 'cap-1' }), { now: T0 });
-  store.enqueue('cap-1', { now: T0 + 1 });
+  store.enqueue('cap-1', { confirmedByTap: true, now: T0 + 1 });
   store.claim('worker-A', 30_000, { now: T0 + 2 });
 
   store.transition('cap-1', STATES.WRITING, { now: T0 + 3 });
@@ -117,7 +117,7 @@ test('write → evidence → completion transitions work and are gated', () => {
 test('complete refuses when evidenced but no destination pointer exists', () => {
   const store = createInMemoryOperationalStore();
   store.recordIntake(envelope({ capture_id: 'cap-1' }), { now: T0 });
-  store.enqueue('cap-1', { now: T0 + 1 });
+  store.enqueue('cap-1', { confirmedByTap: true, now: T0 + 1 });
   store.claim('worker-A', 30_000, { now: T0 + 2 });
   store.transition('cap-1', STATES.WRITING, { now: T0 + 3 });
   store.transition('cap-1', STATES.WRITTEN, { now: T0 + 4 });
@@ -137,7 +137,7 @@ test('evidence recording is idempotent on (kind, target_ref)', () => {
 test('illegal transition is rejected by the store', () => {
   const store = createInMemoryOperationalStore();
   store.recordIntake(envelope({ capture_id: 'cap-1' }), { now: T0 });
-  store.enqueue('cap-1', { now: T0 + 1 });
+  store.enqueue('cap-1', { confirmedByTap: true, now: T0 + 1 });
   // queued → completed is not a legal hop.
   assert.throws(() => store.transition('cap-1', STATES.COMPLETED, { now: T0 + 2 }), /Illegal state transition/);
 });

@@ -9,6 +9,10 @@
   },
   "scripts": {
     "test": "node --test",
-    "scan": "bash ../../scripts/secret-scan.sh"
+    "scan": "bash ../../scripts/secret-scan.sh",
+    "live:proof": "node src/live/liveRunner.js"
+  },
+  "dependencies": {
+    "pg": "^8.22.0"
   }
 }

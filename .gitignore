@@ -71,6 +71,10 @@ tmp/
 PKM/Journal/
 PKM/My Life/Current Context/
 PKM/My Life/About Warwick/
+# BUILD-002 governed capture inbox: raw personal captures land here from the
+# live gateway (Telegram → Brain). Personal evidence — never published from
+# the public repo (same doctrine as PKM/Journal above).
+Team Inbox/captures/
 
 # --- Local immutable external-source payloads ---
 # Keep the register and rules public, but do not publish captured transcripts,

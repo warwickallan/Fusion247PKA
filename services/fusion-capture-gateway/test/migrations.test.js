@@ -21,6 +21,7 @@ const MIGRATIONS_DIR = path.join(__dirname, '..', 'migrations');
 
 const sql0001 = fs.readFileSync(path.join(MIGRATIONS_DIR, '0001_wp0_operational_baseline.sql'), 'utf8');
 const sql0002 = fs.readFileSync(path.join(MIGRATIONS_DIR, '0002_wp0_deletion_and_retention.sql'), 'utf8');
+const sql0005 = fs.readFileSync(path.join(MIGRATIONS_DIR, '0005_wp0_card_target_and_poll_offset.sql'), 'utf8');
 
 function extractAll(sql, regex) {
   const names = [];
@@ -97,4 +98,18 @@ test('0001 enables row-level security on every table it creates (security gate �
 test('0002 does not add a permissive RLS policy or disable RLS (security gate — DO NOT WEAKEN)', () => {
   assert.doesNotMatch(sql0002, /create\s+policy/i, '0002 must not add a permissive policy');
   assert.doesNotMatch(sql0002, /disable\s+row\s+level\s+security/i, '0002 must not disable RLS');
+});
+
+test('0005 enables RLS on its new table with a service_role-only policy (security gate — DO NOT WEAKEN)', () => {
+  const created = new Set(extractAll(sql0005, 'create\\s+table\\s+(?:if\\s+not\\s+exists\\s+)?(fcg\\.\\w+)'));
+  assert.ok(created.has('fcg.channel_poll_offset'), 'sanity: 0005 creates fcg.channel_poll_offset');
+  const rlsEnabled = new Set(extractAll(sql0005, 'alter\\s+table\\s+(fcg\\.\\w+)\\s+enable\\s+row\\s+level\\s+security'));
+  for (const table of created) {
+    assert.ok(rlsEnabled.has(table), `RLS must be enabled on ${table} (security gate — DO NOT WEAKEN)`);
+  }
+  // The only policy is scoped to service_role; nothing grants anon/authenticated.
+  assert.match(sql0005, /for\s+all\s+to\s+service_role/i, '0005 policy must be service_role-only');
+  assert.doesNotMatch(sql0005, /\bto\s+anon\b/i, '0005 must not grant anon');
+  assert.doesNotMatch(sql0005, /\bto\s+authenticated\b/i, '0005 must not grant authenticated');
+  assert.doesNotMatch(sql0005, /disable\s+row\s+level\s+security/i, '0005 must not disable RLS');
 });

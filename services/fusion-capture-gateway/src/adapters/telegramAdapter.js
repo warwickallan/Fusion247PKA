@@ -12,35 +12,18 @@
 // Channel-neutral rule: all Telegram-specific knowledge lives HERE. The intake,
 // store, worker, and contracts never mention Telegram.
 
-import { createEnvelope } from '../core/contracts.js';
-import { buildIdempotencyKey, sha256Hex } from '../core/idempotency.js';
+import { mapTelegramUpdate, mapTelegramCallbackQuery } from './telegramMapping.js';
 
-const SOURCE_CHANNEL = 'telegram';
-
-// Map an optional chosen capture action onto the recorded_intent enum
-// (RECORDED_INTENTS = LarryDirect | SaveToBrain | ConfirmedAction). Default:
-// SaveToBrain — durable capture is authorised by the action itself.
-function intentFromAction(action) {
-  switch (action) {
-    case 'AskLarry':
-      return 'LarryDirect';
-    case 'Approve':
-    case 'Reject':
-      return 'ConfirmedAction';
-    case 'SaveToBrain':
-    case 'KeepRaw':
-    default:
-      return 'SaveToBrain';
-  }
-}
-
-/**
- * Derive a deterministic capture_id from the idempotency key so a re-delivery
- * of the same logical message resolves to the same id (no wall-clock, hermetic).
- */
-function deriveCaptureId(idempotencyKey) {
-  return `cap_${sha256Hex(idempotencyKey).slice(0, 24)}`;
-}
+// CHANNEL FIDELITY (root-cause fix, 2026-07-17): in a real Telegram chat,
+// message_id is unique and monotonically increasing — and it does NOT reset
+// when the bot process restarts. The counter is therefore MODULE-level, shared
+// across every mock instance in the process, so two adapter instances can never
+// mint the SAME {chat_id, message_id} card target. The per-instance counter it
+// replaces (every instance restarting at 1000) minted colliding card targets
+// whenever two tests shared one durable store: the card_ref reverse lookup
+// (findCaptureIdByCard) then resolved a tap to the OTHER test's capture — a
+// collision the real channel cannot produce.
+let nextMessageId = 1000;
 
 /**
  * TelegramAdapter interface (documentation contract). A conforming
@@ -76,76 +59,64 @@ export function createMockTelegramAdapter({ authorisedUserId, defaultAction = 'S
 
   // In-memory card log — the fixture stand-in for real Telegram card calls.
   const sentCards = [];
+  // Plain (non-card) outbound messages — e.g. the WP0 "text only" notice.
+  const sentMessages = [];
   // Rejection log — default-deny events are logged (sender id + when), never actioned.
   const rejections = [];
+  // Answered callbacks (test-observable) + scripted inbound queue for getUpdates.
+  const answered = [];
+  let pending = [];
+  // Card targets, mirroring the live adapter — so the runner can promote them to
+  // the durable store and prove restart recovery (a NEW mock loses this map).
+  // NOTE: message ids come from the MODULE-level counter above (Telegram
+  // fidelity — ids never collide across instances of the same chat).
+  const cardMessages = new Map(); // captureId -> { chatId, messageId }
   let failEditOnce = false;
 
   return {
-    // --- expose the log for tests ---
+    // --- expose the logs for tests ---
     sentCards,
+    sentMessages,
     rejections,
+    answered,
 
     toEnvelope(update, { now, action } = {}) {
-      if (typeof now !== 'number' || !Number.isFinite(now)) {
-        throw new Error('toEnvelope: injected numeric `now` (epoch ms) required');
-      }
-
-      const message = update && typeof update === 'object' ? update.message : undefined;
-      if (!message || typeof message !== 'object') {
-        return { ok: false, reason: 'no_message' };
-      }
-
-      const from = message.from;
-      const senderId = from && from.id !== undefined ? String(from.id) : undefined;
-
-      // Single-user allowlist, default-deny (wp0-security-gate.md §1). A numeric
-      // id, never a username. Any other sender is silently ignored + logged.
-      if (senderId === undefined || senderId !== authorised) {
-        rejections.push({ sender_id: senderId ?? null, at_ms: now, reason: 'unauthorised_sender' });
-        return { ok: false, reason: 'unauthorised_sender' };
-      }
-
-      // WP0: text only (technical_source_type 'text'). Untrusted content stays
-      // inert data — it is never interpolated into a path/command/query here.
-      const text = typeof message.text === 'string' ? message.text : '';
-      const messageId = message.message_id;
-      const channelNativeMessageId = `chat:${senderId}:msg:${messageId}`;
-
-      const idempotencyKey = buildIdempotencyKey({
-        source_channel: SOURCE_CHANNEL,
-        channel_native_message_id: channelNativeMessageId,
-        raw_payload: text,
+      // Delegate the channel-neutral mapping + single-user default-deny to the
+      // SHARED mapping module (identical logic the live adapter reuses).
+      const mapped = mapTelegramUpdate({
+        update,
+        now,
+        authorisedUserId: authorised,
+        action,
+        defaultAction,
       });
-      const captureId = deriveCaptureId(idempotencyKey);
-      const iso = new Date(now).toISOString();
+      if (!mapped.ok) {
+        if (mapped.reason === 'unauthorised_sender') {
+          // Default-deny event: logged (sender id + when), never actioned.
+          rejections.push({ sender_id: mapped.senderId, at_ms: now, reason: mapped.reason });
+        }
+        return { ok: false, reason: mapped.reason };
+      }
+      return { ok: true, value: mapped.value };
+    },
 
-      const envelope = createEnvelope({
-        capture_id: captureId,
-        idempotency_key: idempotencyKey,
-        source_channel: SOURCE_CHANNEL,
-        sender_identity_ref: `telegram:user:${senderId}`,
-        recorded_intent: intentFromAction(action ?? defaultAction),
-        technical_source_type: 'text',
-        raw_payload_ref: {
-          store: 'inline', // WP0 keeps text inline; bucket reserved, not used.
-          object_key: `telegram:${channelNativeMessageId}`,
-          content_type: 'text/plain',
-          bytes: Buffer.byteLength(text, 'utf8'),
-          sha256: sha256Hex(text),
-        },
-        // Pure inline text: no separate original-source object retained.
-        original_source_ref: null,
-        captured_at: iso,
-        received_at: iso,
-        text_preview: text.slice(0, 280),
-        channel_context: { chat_id: senderId, message_id: messageId },
-      });
-
-      return { ok: true, value: envelope };
+    /** Channel-neutral CALLBACK mapping + single-user default-deny (as live). */
+    toCallback(update, { now } = {}) {
+      const mapped = mapTelegramCallbackQuery({ update, now, authorisedUserId: authorised });
+      if (!mapped.ok) {
+        if (mapped.reason === 'unauthorised_sender') {
+          rejections.push({ sender_id: mapped.senderId, at_ms: now, reason: mapped.reason });
+        }
+        return { ok: false, reason: mapped.reason };
+      }
+      return { ok: true, value: mapped.value };
     },
 
     sendCard(captureId, cardModel) {
-      const entry = { op: 'send', captureId, cardModel };
+      const chatId = (cardModel && cardModel.chat_id) ?? authorised;
+      const messageId = (nextMessageId += 1);
+      cardMessages.set(captureId, { chatId, messageId });
+      const entry = { op: 'send', captureId, cardModel, chatId, messageId };
       sentCards.push(entry);
       return entry;
     },
@@ -158,9 +129,65 @@ export function createMockTelegramAdapter({ authorisedUserId, defaultAction = 'S
         // worker swallows this and leaves state completed.
         throw new Error(`editCard: simulated card edit failure for ${captureId}`);
       }
-      const entry = { op: 'edit', captureId, cardModel };
+      // Restart-safe target resolution: prefer the in-memory map, else fall back
+      // to the {chat_id, message_id} the runner reconstructed from durable state.
+      const tracked = cardMessages.get(captureId);
+      const chatId = tracked?.chatId ?? cardModel?.chat_id;
+      const messageId = tracked?.messageId ?? cardModel?.message_id;
+      if (messageId === undefined) {
+        throw new Error(`editCard: no known message_id for capture "${captureId}" (sendCard or restore first)`);
+      }
+      const entry = { op: 'edit', captureId, cardModel, chatId, messageId };
       sentCards.push(entry);
       return entry;
+    },
+
+    /**
+     * Plain informational message — NO card, NO buttons (parity with the live
+     * adapter's sendMessage). Used for the WP0 "text only" notice. Recorded
+     * in-memory so tests can assert it without any network.
+     */
+    sendMessage(chatId, text) {
+      const entry = { op: 'message', chatId, text };
+      sentMessages.push(entry);
+      return entry;
+    },
+
+    /**
+     * Acknowledge a callback (test-observable). Never throws. `showAlert`
+     * mirrors the live adapter's dismissable-pop-up option (show_alert: true)
+     * so the runner's choice of subtle-toast vs must-see-alert is assertable.
+     */
+    answerCallbackQuery(callbackQueryId, text, { showAlert = false } = {}) {
+      const entry = { callbackQueryId, text, showAlert };
+      answered.push(entry);
+      return entry;
+    },
+
+    /** The persisted card target for a capture, if this instance sent it. */
+    cardTarget(captureId) {
+      const t = cardMessages.get(captureId);
+      return t ? { chatId: t.chatId, messageId: t.messageId } : undefined;
+    },
+
+    /**
+     * Scripted long-poll. Returns queued updates with update_id >= offset and
+     * drops them (Telegram's offset-ack semantics), so the runner's loop
+     * terminates once the scripted batch is drained.
+     */
+    async getUpdates({ offset = 0 } = {}) {
+      const ready = pending.filter((u) => (u.update_id ?? 0) >= offset);
+      pending = pending.filter((u) => (u.update_id ?? 0) < offset);
+      return ready;
+    },
+
+    /** Test hook: enqueue inbound updates the next getUpdates will deliver. */
+    deliver(...updates) {
+      pending.push(...updates.flat());
+    },
+
+    describe() {
+      return { channel: 'telegram', mode: 'mock', authorised_user_id: authorised };
     },
 
     /** Test hook: force the next editCard to throw once. */

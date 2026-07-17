@@ -18,7 +18,8 @@ import {
 
 /**
  * Human-facing status line per state. Wording is honest:
- *  - accepted/queued/offline_queued/claimed/writing → item is SAFE, not yet done.
+ *  - accepted → item is SAFE and PENDING the user's tap (tap-gated capture).
+ *  - queued/offline_queued/claimed/writing → item is SAFE, not yet done.
  *  - written/evidenced → nearly there, finalising.
  *  - completed → done, with destination.
  *  - failed/partial → honest failure; nothing lost, will retry.
@@ -26,8 +27,11 @@ import {
 function statusLineFor(state, record) {
   switch (state) {
     case STATES.RECEIVED:
-    case STATES.ACCEPTED:
       return 'Received — safe and saved. Not yet written to your Brain.';
+    case STATES.ACCEPTED:
+      // TAP-GATED pending state (Warwick decision 2026-07-16): the capture is
+      // durable but is NOT written until the user taps "Save to Brain".
+      return 'Received — safe and saved. Tap "Save to Brain" to write it to your Brain.';
     case STATES.QUEUED:
     case STATES.OFFLINE_QUEUED:
     case STATES.CLAIMED:
@@ -37,8 +41,15 @@ function statusLineFor(state, record) {
     case STATES.EVIDENCED:
       return 'Almost there — write recorded, finalising your capture.';
     case STATES.COMPLETED: {
+      // The destination path is wrapped in backticks (a Telegram legacy-Markdown
+      // code span, sent with parse_mode 'Markdown' — see projectCard) so the
+      // `.md` filename renders as plain monospace text instead of being
+      // auto-linked as a bogus URL (live finding 2026-07-16: Telegram linkified
+      // the filename as a Moldovan domain). Any backtick inside the path (never
+      // produced by the governed writer) is stripped defensively so the code
+      // span cannot be broken.
       const dest = record.destination_ref && record.destination_ref.path
-        ? ` (${record.destination_ref.path})`
+        ? ` (\`${String(record.destination_ref.path).replace(/`/g, "'")}\`)`
         : '';
       return `Completed — saved to your Brain${dest}.`;
     }
@@ -112,9 +123,17 @@ export function projectCard(record) {
   if (!record || typeof record.state !== 'string') {
     throw new Error('projectCard: record with a state required');
   }
-  return {
+  const card = {
     status_line: statusLineFor(record.state, record),
     state: record.state,
     is_completed: record.state === STATES.COMPLETED,
   };
+  // ONLY the completed card carries a parse_mode: its status line embeds the
+  // destination path in a backtick code span (see statusLineFor) and Telegram
+  // needs legacy-Markdown parsing to render it as monospace. Every other status
+  // line is plain text with NO Markdown-special characters of ours, and failed
+  // lines may echo arbitrary error text — so they are deliberately sent WITHOUT
+  // a parse_mode (no risk of a Telegram parse rejection on untrusted text).
+  if (card.is_completed) card.parse_mode = 'Markdown';
+  return card;
 }
