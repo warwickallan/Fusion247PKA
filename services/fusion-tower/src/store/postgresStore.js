@@ -14,6 +14,7 @@
 import {
   RUN_STATUS,
   TURN_STATE,
+  WRITE_STATE,
   assertRunTransition,
   assertTurnTransition,
   isTerminalRunStatus,
@@ -94,6 +95,26 @@ function mapEvent(e) {
     processed_at: e.processed_at ?? null,
     received_at: e.received_at,
     created_at: e.created_at,
+  };
+}
+
+function mapWrite(w) {
+  if (!w) return undefined;
+  return {
+    write_id: w.write_id,
+    mutation_key: w.mutation_key,
+    run_id: w.run_id ?? null,
+    turn_id: w.turn_id ?? null,
+    target_kind: w.target_kind,
+    target_id: w.target_id,
+    payload_checksum: w.payload_checksum,
+    mutation_id: w.mutation_id,
+    state: w.state,
+    response_id: w.response_id ?? null,
+    attempt_count: w.attempt_count,
+    last_error: w.last_error ?? null,
+    created_at: w.created_at,
+    updated_at: w.updated_at,
   };
 }
 
@@ -514,6 +535,115 @@ export async function createPostgresStore({ connectionString, caFile = null, poo
         [ts],
       );
       return { reaped: res.rows.length, turnIds: res.rows.map((r) => r.turn_id) };
+    },
+
+    // ---- external write outbox (GPT MEDIUM-1) --------------------------------
+    // Durable, restart-safe idempotency for the ClickUp review write. The write is
+    // CLAIMED (reserved) BEFORE any remote post; a redelivery/restart/retry collides
+    // on the per-mutation key and reads back the existing row + its current state.
+
+    // Reserve the per-mutation key BEFORE posting. INSERT ... ON CONFLICT
+    // (mutation_key) DO NOTHING, then read back the existing row on conflict — the
+    // same proven pattern as appendTurn (ON CONFLICT DO NOTHING waits out a
+    // concurrent uncommitted insert, so the read-back always sees the winner).
+    // Returns { claimed:true, write } if newly reserved (state 'applying'), or
+    // { claimed:false, write } with the EXISTING row so the caller sees its state.
+    async claimWrite(args = {}, opts) {
+      const {
+        mutationKey, runId, turnId, targetKind, targetId, payloadChecksum, mutationId,
+      } = args;
+      if (!mutationKey) throw new Error('claimWrite: mutationKey required');
+      if (!targetKind) throw new Error('claimWrite: targetKind required');
+      if (!targetId) throw new Error('claimWrite: targetId required');
+      if (!payloadChecksum) throw new Error('claimWrite: payloadChecksum required');
+      if (!mutationId) throw new Error('claimWrite: mutationId required');
+      const ts = nowTs(opts);
+      return withTx(async (client) => {
+        const ins = await client.query(
+          `insert into ftw.external_write
+             (mutation_key, run_id, turn_id, target_kind, target_id, payload_checksum,
+              mutation_id, created_at, updated_at)
+           values ($1,$2,$3,$4,$5,$6,$7,
+                   coalesce($8::timestamptz, now()), coalesce($8::timestamptz, now()))
+           on conflict (mutation_key) do nothing
+           returning *`,
+          [mutationKey, runId ?? null, turnId ?? null, targetKind, targetId,
+            payloadChecksum, mutationId, ts],
+        );
+        if (ins.rows.length > 0) return { claimed: true, write: mapWrite(ins.rows[0]) };
+        // Conflict: the mutation was already claimed — return the existing row so the
+        // caller can inspect its state (e.g. applied_verified => do NOT re-post).
+        const existing = await client.query(
+          'select * from ftw.external_write where mutation_key = $1 for share',
+          [mutationKey],
+        );
+        return { claimed: false, write: mapWrite(existing.rows[0]) };
+      });
+    },
+
+    // Verify a write. REQUIRES a non-empty responseId (the real comment id): the
+    // store throws if it is missing, and the DB CHECK
+    // external_write_applied_requires_response_chk is the second, independent gate —
+    // applied_verified can NEVER be reached without a response id.
+    async markWriteApplied(mutationKey, responseId, opts) {
+      if (!mutationKey) throw new Error('markWriteApplied: mutationKey required');
+      if (typeof responseId !== 'string' || responseId.length === 0) {
+        throw new Error(
+          'markWriteApplied: a non-empty responseId (comment id) is REQUIRED — a '
+          + 'response without a comment id can never be applied_verified (GPT MEDIUM-1)',
+        );
+      }
+      const ts = nowTs(opts);
+      const res = await pool.query(
+        `update ftw.external_write
+           set state = 'applied_verified',
+               response_id = $2,
+               updated_at = coalesce($3::timestamptz, now())
+         where mutation_key = $1 returning *`,
+        [mutationKey, responseId, ts],
+      );
+      if (res.rows.length === 0) throw new Error(`markWriteApplied: unknown mutation_key ${mutationKey}`);
+      return mapWrite(res.rows[0]);
+    },
+
+    async markWriteOutcomeUnknown(mutationKey, err, opts) {
+      return this._markWriteState(mutationKey, WRITE_STATE.OUTCOME_UNKNOWN, err, opts,
+        'markWriteOutcomeUnknown');
+    },
+    async markWriteRetryPending(mutationKey, err, opts) {
+      return this._markWriteState(mutationKey, WRITE_STATE.RETRY_PENDING, err, opts,
+        'markWriteRetryPending');
+    },
+    async markWriteFailed(mutationKey, err, opts) {
+      return this._markWriteState(mutationKey, WRITE_STATE.FAILED, err, opts,
+        'markWriteFailed');
+    },
+
+    // Shared error-transition: set state + attempt_count++ + last_error. attempt_count
+    // is bumped atomically in SQL, so no read-modify-write (and no FOR UPDATE) is
+    // needed here.
+    async _markWriteState(mutationKey, state, err, opts, label) {
+      if (!mutationKey) throw new Error(`${label}: mutationKey required`);
+      const ts = nowTs(opts);
+      const lastError = err == null ? null : (err.message ?? String(err));
+      const res = await pool.query(
+        `update ftw.external_write
+           set state = $2::ftw.write_state,
+               attempt_count = attempt_count + 1,
+               last_error = $3,
+               updated_at = coalesce($4::timestamptz, now())
+         where mutation_key = $1 returning *`,
+        [mutationKey, state, lastError, ts],
+      );
+      if (res.rows.length === 0) throw new Error(`${label}: unknown mutation_key ${mutationKey}`);
+      return mapWrite(res.rows[0]);
+    },
+
+    async getWrite(mutationKey) {
+      const res = await pool.query(
+        'select * from ftw.external_write where mutation_key = $1', [mutationKey],
+      );
+      return mapWrite(res.rows[0]) ?? null;
     },
 
     async end() { await pool.end(); },

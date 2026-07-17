@@ -20,7 +20,11 @@ import { createPostgresStore } from '../src/store/postgresStore.js';
 const DB = process.env.DATABASE_URL;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const MIGRATIONS_DIR = path.join(__dirname, '..', 'migrations');
-const MIGRATIONS = ['0001_wp0_control_plane.sql', '0002_wp0_identity_provider_binding.sql'];
+const MIGRATIONS = [
+  '0001_wp0_control_plane.sql',
+  '0002_wp0_identity_provider_binding.sql',
+  '0003_wp0_external_write_outbox.sql',
+];
 
 async function resetAndMigrate() {
   const pgModule = await import('pg');
@@ -335,6 +339,111 @@ test('19. RLS regression — after 0002, RLS still enabled on all four tables; a
       }
     } finally { client.release(); }
   } finally { await pool.end(); }
+});
+
+// ---------------------------------------------------------------------------
+// GPT MEDIUM-1 — the durable external-write outbox (0003), proven on a real DB
+// with 0001 THEN 0002 THEN 0003 applied on a clean cluster.
+// ---------------------------------------------------------------------------
+
+function claimArgs(over = {}) {
+  return {
+    mutationKey: 'mk-1',
+    targetKind: 'clickup_task',
+    targetId: '869e5zu97',
+    payloadChecksum: 'sha256:abc',
+    mutationId: 'mid-1',
+    ...over,
+  };
+}
+
+test('20. outbox (a) — claimWrite twice with the SAME mutation key: first claims, second returns the existing row', { skip: !DB }, async () => {
+  const store = await freshStore();
+  try {
+    const first = await store.claimWrite(claimArgs(), { now: 1 });
+    assert.equal(first.claimed, true);
+    assert.equal(first.write.state, 'applying');
+    const second = await store.claimWrite(claimArgs(), { now: 2 });
+    assert.equal(second.claimed, false, 'second claim on same mutation_key does not re-reserve');
+    assert.equal(second.write.write_id, first.write.write_id, 'returns the durable existing row');
+  } finally { await store.end(); }
+});
+
+test('20. outbox (b) — markWriteApplied REQUIRES response_id; DB CHECK blocks applied_verified without one', { skip: !DB }, async () => {
+  const store = await freshStore();
+  try {
+    await store.claimWrite(claimArgs(), { now: 1 });
+    // Store-level guard: empty/missing response id is rejected before any SQL.
+    await assert.rejects(() => store.markWriteApplied('mk-1', '', { now: 2 }), /REQUIRED/);
+    // A valid response id verifies.
+    const ok = await store.markWriteApplied('mk-1', 'clickup-comment-123', { now: 3 });
+    assert.equal(ok.state, 'applied_verified');
+    assert.equal(ok.response_id, 'clickup-comment-123');
+
+    // DB CHECK is the SECOND, independent gate: a raw UPDATE forcing
+    // applied_verified with a NULL response_id must be refused by the constraint.
+    const pgModule = await import('pg');
+    const { Pool } = pgModule.default ?? pgModule;
+    const pool = new Pool({ connectionString: DB });
+    try {
+      await store.claimWrite(claimArgs({ mutationKey: 'mk-raw', mutationId: 'mid-raw' }), { now: 4 });
+      await assert.rejects(
+        () => pool.query(
+          "update ftw.external_write set state = 'applied_verified' where mutation_key = 'mk-raw'",
+        ),
+        /external_write_applied_requires_response_chk|check constraint/i,
+        'DB CHECK must block applied_verified without a response_id',
+      );
+    } finally { await pool.end(); }
+  } finally { await store.end(); }
+});
+
+test('20. outbox (c) — a DISTINCT mutation key to the SAME target_id succeeds (legitimate later review not blocked)', { skip: !DB }, async () => {
+  const store = await freshStore();
+  try {
+    const a = await store.claimWrite(claimArgs(), { now: 1 });
+    const b = await store.claimWrite(
+      claimArgs({ mutationKey: 'mk-2', mutationId: 'mid-2' }), { now: 2 },
+    );
+    assert.equal(a.claimed, true);
+    assert.equal(b.claimed, true, 'keying on the mutation (not the task) unblocks a later review');
+    assert.equal(b.write.target_id, '869e5zu97');
+    const rows = await store.getWrite('mk-2');
+    assert.equal(rows.target_id, '869e5zu97');
+  } finally { await store.end(); }
+});
+
+test('20. outbox (d) — RLS deny-by-default on external_write: anon denied, service_role permitted', { skip: !DB }, async () => {
+  const store = await freshStore();
+  try {
+    await store.claimWrite(claimArgs(), { now: 1 }); // owner insert (bypasses RLS)
+    const pgModule = await import('pg');
+    const { Pool } = pgModule.default ?? pgModule;
+    const pool = new Pool({ connectionString: DB });
+    try {
+      // RLS flag is set on the new table.
+      const rls = await pool.query(
+        `select c.relrowsecurity from pg_class c
+           join pg_namespace n on n.oid = c.relnamespace
+          where n.nspname = 'ftw' and c.relname = 'external_write'`,
+      );
+      assert.equal(rls.rows[0].relrowsecurity, true, 'RLS must be enabled on external_write');
+      const client = await pool.connect();
+      try {
+        await client.query('set role anon');
+        await assert.rejects(
+          () => client.query('select count(*) from ftw.external_write'),
+          /permission denied/,
+          'anon must be denied on ftw.external_write',
+        );
+        await client.query('reset role');
+        await client.query('set role service_role');
+        const res = await client.query('select count(*)::int as n from ftw.external_write');
+        assert.ok(res.rows[0].n >= 1, 'service_role sees rows');
+        await client.query('reset role');
+      } finally { client.release(); }
+    } finally { await pool.end(); }
+  } finally { await store.end(); }
 });
 
 test('14. RLS — anon denied, service_role permitted on every ftw table', { skip: !DB }, async () => {

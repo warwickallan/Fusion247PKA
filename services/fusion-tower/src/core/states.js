@@ -63,6 +63,19 @@ export const EVENT_SOURCE = Object.freeze({
   TOWER: 'tower',
 });
 
+// Durable external-write outbox lifecycle (mirrors migration 0003 enum
+// ftw.write_state exactly — GPT MEDIUM-1). `applying` is the reserved/claimed
+// state before the remote post is confirmed; `applied_verified` REQUIRES a real
+// response id (DB CHECK external_write_applied_requires_response_chk);
+// `outcome_unknown` is the ambiguous-timeout state a reconciler resolves.
+export const WRITE_STATE = Object.freeze({
+  APPLYING: 'applying',
+  APPLIED_VERIFIED: 'applied_verified',
+  OUTCOME_UNKNOWN: 'outcome_unknown',
+  RETRY_PENDING: 'retry_pending',
+  FAILED: 'failed',
+});
+
 // Legal run-status transitions (control-plane-schema.md §3). Terminal states have
 // no outgoing edges.
 const RUN_TRANSITIONS = Object.freeze({
