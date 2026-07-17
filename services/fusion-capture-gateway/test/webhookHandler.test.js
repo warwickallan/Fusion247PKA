@@ -152,6 +152,77 @@ test('U2: missing/wrong/empty secret header → 401, no rpc, secret-free log; co
   assert.equal(await timingSafeEqualStrings('abc', 'abcdefgh'), false);
 });
 
+// U2b — L-3: auth runs BEFORE the body is read. An unauthenticated request must
+// never invoke the lazy body reader, so it cannot buffer/parse a body, touch the
+// DB, send a card, or write anything durable. Proven with a readBody SPY.
+test('U2b: unauthenticated request never reads the body (L-3) — readBody spy uncalled, zero rpc, zero telegram, 401', async () => {
+  const unauthHeaderCases = [
+    {},
+    { 'X-Telegram-Bot-Api-Secret-Token': 'wrong-value' },
+    { 'x-telegram-bot-api-secret-token': '' },
+    { 'X-Telegram-Bot-Api-Secret-Token': `${CANARY_SECRET}-suffixed` },
+  ];
+  for (const headers of unauthHeaderCases) {
+    const { deps, calls } = makeDeps();
+    let readCalls = 0;
+    const readBody = async () => {
+      readCalls += 1;
+      return JSON.stringify(textUpdate(1, 1, 'x'));
+    };
+    const res = await handleTelegramWebhook({ method: 'POST', headers, readBody }, deps);
+    assert.equal(res.status, 401, `headers=${JSON.stringify(headers)} → 401`);
+    assert.equal(readCalls, 0, 'the body reader MUST NOT be invoked before auth passes');
+    assert.equal(calls.rpc.length, 0, 'no DB call before auth');
+    assert.equal(calls.telegram.length, 0, 'no card send before auth');
+  }
+  // Missing CONFIGURED secret (deployment fault) also fails closed WITHOUT reading.
+  {
+    const { deps, calls } = makeDeps();
+    deps.secret = '';
+    let readCalls = 0;
+    const res = await handleTelegramWebhook(
+      { method: 'POST', headers: { 'x-telegram-bot-api-secret-token': CANARY_SECRET }, readBody: async () => { readCalls += 1; return '{}'; } },
+      deps,
+    );
+    assert.equal(res.status, 401, 'empty configured secret fails closed');
+    assert.equal(readCalls, 0, 'no body read when the configured secret is missing');
+    assert.equal(calls.rpc.length, 0);
+  }
+  // Non-POST also short-circuits before any read (method gate is first).
+  {
+    const { deps } = makeDeps();
+    let readCalls = 0;
+    const res = await handleTelegramWebhook(
+      { method: 'GET', headers: {}, readBody: async () => { readCalls += 1; return '{}'; } },
+      deps,
+    );
+    assert.equal(res.status, 405);
+    assert.equal(readCalls, 0, 'non-POST never reads the body');
+  }
+  // POSITIVE CONTROL: an AUTHED request DOES invoke the lazy reader exactly once,
+  // and the lazy path drives normal processing (this is the path index.ts uses).
+  {
+    const { deps, calls } = makeDeps({
+      rpcOutcomes: {
+        fcg_webhook_intake: { outcome: 'new', capture_id: 'cap-lazy' },
+        fcg_webhook_card_ref: { outcome: 'ok' },
+      },
+    });
+    let readCalls = 0;
+    const readBody = async () => {
+      readCalls += 1;
+      return JSON.stringify(textUpdate(800, 40, 'lazy read works'));
+    };
+    const res = await handleTelegramWebhook(
+      { method: 'POST', headers: { 'x-telegram-bot-api-secret-token': CANARY_SECRET }, readBody },
+      deps,
+    );
+    assert.equal(res.status, 200);
+    assert.equal(readCalls, 1, 'authed request reads the body exactly once via the lazy reader');
+    assert.equal(calls.rpc.filter((c) => c.fn === 'fcg_webhook_intake').length, 1, 'lazy path drives the intake RPC');
+  }
+});
+
 // U3 — malformed JSON.
 test('U3: correct token, malformed JSON body → 200 ignored, no rpc (never a retry loop on garbage)', async () => {
   const { deps, calls } = makeDeps();

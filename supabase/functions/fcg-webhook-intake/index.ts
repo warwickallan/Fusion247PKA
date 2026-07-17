@@ -128,7 +128,10 @@ function log(event: Record<string, unknown>): void {
     {
       method: req.method,
       headers: Object.fromEntries(req.headers.entries()),
-      bodyText: await req.text(),
+      // LAZY body read (Vex L-3): the pure handler runs the constant-time
+      // secret-token gate FIRST and only invokes readBody() after auth passes,
+      // so an unauthenticated POST never forces us to buffer an arbitrary body.
+      readBody: () => req.text(),
     },
     { rpc, telegram, secret: WEBHOOK_SECRET, log },
   );

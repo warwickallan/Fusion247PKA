@@ -8,7 +8,10 @@
 //
 // The handler does five things and nothing else (Pax Q1 bottom line):
 //   1. Reject non-POST (405).
-//   2. Constant-time secret-token compare → 401, NO DB touch, NO detail leak.
+//   2. Constant-time secret-token compare → 401, NO DB touch, NO BODY READ, NO
+//      detail leak. The body is consumed LAZILY (see readBody below) so an
+//      unauthenticated POST never forces the function to buffer an arbitrary
+//      request body before the auth gate runs (Vex L-3).
 //   3. Parse the update; malformed / unknown kind → 200 {ignored} (never a
 //      retry-spam loop on garbage).
 //   4. ONE RPC call per update (fcg_webhook_intake / fcg_webhook_confirm_tap /
@@ -21,6 +24,16 @@
 // client holds it) and never logs or echoes `secret`. Every `log` line is
 // structured and secret-free by construction; test U13 sweeps every path with
 // canary secrets and asserts absence.
+//
+// REQUEST SHAPE (from the shell):
+//   method   → string
+//   headers  → header map
+//   readBody → () => Promise<string>  LAZY body reader. The pure handler invokes
+//              it ONLY after the auth gate passes, so an unauthenticated request
+//              never buffers/parses a body (Vex L-3). The Deno shell passes
+//              `readBody: () => req.text()`. A `bodyText: string` field is still
+//              honoured as a compat fallback for the unit suite; the deployed
+//              shell always uses the lazy reader.
 //
 // DEPENDENCY SHAPE (injected — the handler is pure):
 //   rpc(fnName, args)                → Promise<jsonb result>   (throws on failure)
@@ -297,11 +310,12 @@ async function handleCallback(update, deps) {
  * The pure handler. Same code under Deno (index.ts shell) and Node (unit
  * suite). Returns { status, body } — the shell serialises it.
  *
- * @param {object} request  { method, headers, bodyText }
+ * @param {object} request  { method, headers, readBody?: () => Promise<string>,
+ *                            bodyText?: string }
  * @param {object} deps     { rpc, telegram, secret, log }
  */
 export async function handleTelegramWebhook(request, deps) {
-  const { method, headers, bodyText } = request ?? {};
+  const { method, headers } = request ?? {};
   const log = (deps && typeof deps.log === 'function') ? deps.log : () => {};
   const fullDeps = { ...deps, log };
 
@@ -312,6 +326,9 @@ export async function handleTelegramWebhook(request, deps) {
 
   // 2. Constant-time secret-token gate. Missing/empty configured secret is a
   //    DEPLOYMENT fault → fail closed (401 for everyone; never an open door).
+  //    NO BODY IS READ before this gate passes (Vex L-3): an unauthenticated
+  //    request cannot make the function buffer/parse an arbitrary body, touch
+  //    the DB, send a card, or write anything durable.
   const provided = headerLookup(headers, SECRET_HEADER);
   const configured = fullDeps.secret;
   const authed = typeof configured === 'string' && configured.length > 0
@@ -322,7 +339,21 @@ export async function handleTelegramWebhook(request, deps) {
     return { status: 401, body: { ok: false, error: 'unauthorized' } };
   }
 
-  // 3. Parse. Garbage gets a 200 so Telegram never retry-spams it.
+  // 3. AUTH HAS PASSED — only now consume the body. Lazy reader is preferred
+  //    (the deployed shell passes `readBody: () => req.text()`); `bodyText` is a
+  //    compat fallback for the unit suite. A body-read failure on an authed
+  //    request is transient → 500 so Telegram redelivers (nothing lost).
+  let bodyText;
+  try {
+    bodyText = typeof request?.readBody === 'function'
+      ? await request.readBody()
+      : request?.bodyText;
+  } catch (err) {
+    log({ event: 'webhook_body_read_failed', error: maskErr(err, fullDeps.secret) });
+    return { status: 500, body: { ok: false, error: 'processing_failed' } };
+  }
+
+  // Parse. Garbage gets a 200 so Telegram never retry-spams it.
   let update;
   try {
     update = JSON.parse(bodyText);
