@@ -27,8 +27,14 @@ clear. Evidence: [[codex-review-draft-2026-07-17]] (one live Tower-owned turn),
 | **Structured output** | **PROVEN (with constraint)** | `--output-schema` works, BUT OpenAI structured-outputs STRICT mode requires `additionalProperties:false` on every object + all properties in `required` (a non-strict schema → HTTP 400 `invalid_json_schema`). `CODEX_RESULT_SCHEMA` is fully strict. |
 | **GitHub read (independent)** | **PROVEN (local) / BLOCKED (network)** | In-sandbox `git diff main...build-010/wp0-fusion-tower`, `git status`, `git rev-parse`, and file reads **worked**. Network/remote git (`git ls-remote`) was **rejected by sandbox policy** → the reviewer cannot fetch live GitHub CI. The Tower must stage CI evidence as a pointer. |
 | **ClickUp read (independent)** | **PROVEN (via staged governed read)** | Larry performed the authorised live ClickUp READ; the Tower staged it (`clickup-control-task.md`) and the reviewer read it in-sandbox (`_ftw_evidence_tmp.md`). Codex does not itself hold a ClickUp credential in this route. |
-| **ClickUp bounded write** | **NOT YET AUTHORISED** | Warwick gate. The full review is staged as [[codex-review-draft-2026-07-17]] (`proposed_action = post_review`, target task `869e5zu97`); nothing was posted. |
+| **ClickUp bounded write** | **PROVEN (one authorised write)** | Warwick authorised exactly one bounded comment (LRY-...-HANDOFF-0001). The Tower composed + target-validated (only `869e5zu97` writable; substitution refused; one-write guard; self-marker; redaction — `clickupPoster.js` + tests). Posted once → ClickUp comment id **`90120242550572`**. Round-trip read-back confirmed live. No other task/field changed. |
+| **Larry no-relay handoff** | **PROVEN** | Tower state → staged authorised read-back → one bounded real-`claude` Larry turn → Larry independently read verdict `approve` + SHA `9fda8fd` (neither in the prompt) → signed ack (signer `larry`, verifyEnvelope→true) → dispatcher recorded. No human copy-paste; no second ClickUp write. [[larry-norelay-ack-2026-07-17]]. |
+| **Codex MEDIUM (F-MED-DB-...)** | **CLOSED** | Migration `0002` per-principal binding CHECK (Silas); Vex bounded delta **GREEN**, MEDIUM closed; Codex re-review of the fix verdict **approve**, 0 new findings. [[wp0-delta-review-identity-binding-2026-07-17]], [[codex-rereview-2026-07-17]]. |
 | **OpenAI API key** | **NOT REQUIRED** | The existing route authenticates via ChatGPT-OAuth. `codexReady`/`CODEX_API_KEY` remain a valid alternate, but the live route needs no API key and no billing budget. |
+| **Telegram Desktop** | **INSTALLED — operator client only** | `%APPDATA%\Telegram Desktop\Telegram.exe` v7.0.1.0, `tdata` session present (existence noted only; NOT launched/automated, credentials untouched). A visible notification/control client for Warwick later — NOT a bot-token substitute. |
+| **Telegram bot architecture** | **OPEN** | Separate Tower bot token vs shared router with the BUILD-002 capture bot — Warwick decision (a second long-poll on the capture bot's token would 409). No BotFather/webhook/polling change made. |
+| **Live Supabase migration** | **NOT APPLIED** | 0001/0002 are design+CI-proven only; no live `ftw` apply (Warwick/Vex-gated). |
+| **Windows service** | **NOT INSTALLED** | Registration scripts + runbook provided (announce-only). Must run as user `Buggly` for Codex auth (see boundary below). |
 
 ## Windows-owned-context identity/auth boundary (carried into the runbook)
 
@@ -39,11 +45,14 @@ dispatcher must run **as the authenticated user** (here `Buggly`) OR carry a
 every Codex turn fail-closes to a `no_credential` blocker. Full detail:
 [[tower-host-runbook]] §1a.
 
-## Independent-review finding to carry forward
+## Independent-review finding — CLOSED
 
-The live review raised **F-MED-DB-CODEX-PROVIDER-CHECK-NOT-PER-PRINCIPAL**: the DB
-`agent_identity_provider_honest_chk` enforces a provider *vocabulary*, not the
-*principal→provider* binding — so the honest-identity claim is **partial at the DB
-layer** (code is fully pinned). Owner: Silas (migration). Tracked in
-[[codex-review-draft-2026-07-17]]; a fix belongs in a follow-up migration, not this
-read-only spike (no live Supabase apply authorised here).
+The first live review raised **F-MED-DB-CODEX-PROVIDER-CHECK-NOT-PER-PRINCIPAL**:
+the DB CHECK enforced a provider *vocabulary*, not the *principal→provider* binding.
+**Closed** by migration `0002_wp0_identity_provider_binding.sql` (Silas) — an exact
+four-pair binding CHECK, total over the `ftw.principal` enum, with real-Postgres
+tests (valid pairs / cross-pair rejection / invalid provider / update-drift / RLS).
+Vex bounded delta review **GREEN** (MEDIUM closed, 0 regressions); the Tower-owned
+Codex re-review of the discrete `0002` delta returned **approve**, 0 new findings.
+0001 remains byte-immutable. This closes the honest-identity claim at BOTH the code
+and DB layers.
