@@ -50,6 +50,13 @@ function assertNoMergeTool(tools) {
 // Build a bounded prompt from the run scope + this turn's context. Deliberately
 // short and pointer-shaped — never governed content.
 export function buildLarryPrompt({ run, boundedContext }) {
+  // Strict signed-ack turn: Larry reads a Tower-staged read-back of a posted
+  // ClickUp review and returns a fixed-shape acknowledgement. The verdict and the
+  // reviewed SHA are DELIBERATELY NOT in this prompt — Larry must read them from
+  // the staged file itself (that is what proves no human relay of the content).
+  if (boundedContext?.expect === 'signed-ack') {
+    return buildAckPrompt({ run, boundedContext });
+  }
   const scope = run?.scope ?? run?.title ?? 'governance task';
   const task = boundedContext?.task ?? boundedContext?.instruction ?? 'Perform the bounded governance task within scope.';
   const lines = [
@@ -60,6 +67,42 @@ export function buildLarryPrompt({ run, boundedContext }) {
     'Return ONLY a compact JSON object: {"summary": string, "proposed_action": {"type": "post_comment|post_review|set_task_status|noop", ...}, "confidence": number}.',
   ];
   return lines.join('\n');
+}
+
+// The fixed keys a signed-ack turn must return. Kept here so the prompt and the
+// payload projection can never drift apart.
+export const ACK_FIELDS = Object.freeze([
+  'reviewed_head_sha',
+  'codex_verdict',
+  'previous_medium_closed',
+  'clickup_comment_id',
+  'ack',
+]);
+
+// Build the strict acknowledgement prompt. The reviewed SHA and the verdict are
+// NEVER named here — only the pointer to the staged read-back file plus the two
+// ids used purely for cross-check. Larry reads the load-bearing facts himself.
+function buildAckPrompt({ run, boundedContext }) {
+  const file = boundedContext.review_readback_path;
+  const taskId = boundedContext.control_task_id ?? 'unknown';
+  const commentId = boundedContext.clickup_comment_id ?? 'unknown';
+  return [
+    'You are Larry running a single BOUNDED, READ-ONLY governance turn under Fusion Tower.',
+    `Scope: ${run?.scope ?? 'acknowledge the posted independent Codex re-review'}`,
+    'A reviewer posted an independent Codex re-review as ONE ClickUp comment on the control task.',
+    'Fusion Tower performed the authorised read of that LIVE comment and staged the read-back as a local file.',
+    `Read this file IN FULL using the Read tool: ${file}`,
+    `Cross-check context only: ClickUp control task id = ${taskId}; expected comment id = ${commentId}.`,
+    'From the CONTENT of that file, independently determine, reading the values yourself:',
+    '  - reviewed_head_sha : the exact reviewed head SHA the reviewer stated,',
+    '  - codex_verdict     : the exact Codex verdict the reviewer recorded (one lowercase word),',
+    '  - previous_medium_closed : true iff the file states the previously-open MEDIUM finding is now closed,',
+    '  - clickup_comment_id : the ClickUp comment id the read-back itself reports.',
+    'Do NOT merge, push, write, edit, or take any other action. This is a read + acknowledge only.',
+    'Return ONLY a compact JSON object with EXACTLY these five keys and no others:',
+    '{"reviewed_head_sha": string, "codex_verdict": string, "previous_medium_closed": boolean, "clickup_comment_id": string, "ack": boolean}',
+    'Set "ack" to true only if you actually read the file and the recorded verdict is an approval.',
+  ].join('\n');
 }
 
 /**
@@ -197,6 +240,20 @@ export function createLarryAdapter({
         confidence: structured.confidence ?? null,
         session_id: parsed?.session_id ?? null,
       };
+      // Strict signed-ack projection: carry EXACTLY the five ack fields Larry read
+      // out of the staged review file into the signed payload — nothing invented,
+      // nothing hard-coded. Non-conforming values normalise to null so a bad turn
+      // fails the downstream assertions rather than smuggling a false ack.
+      if (boundedContext?.expect === 'signed-ack') {
+        payload.ack = {
+          reviewed_head_sha: strOrNull(structured.reviewed_head_sha),
+          codex_verdict: strOrNull(structured.codex_verdict),
+          previous_medium_closed: typeof structured.previous_medium_closed === 'boolean' ? structured.previous_medium_closed : null,
+          clickup_comment_id: strOrNull(structured.clickup_comment_id),
+          ack: typeof structured.ack === 'boolean' ? structured.ack : null,
+        };
+        payload.summary = strOrNull(structured.summary) ?? 'posted Codex re-review read and acknowledged';
+      }
       const { envelope, signature } = sign(payload, { run, turn });
       return { ok: true, blocked: false, signerPrincipal: PRINCIPAL, structuredResult: payload, envelope, signature, tokensUsed };
     },
@@ -232,6 +289,14 @@ function runClaude({ claudeBin, argv, cwd, spawn, timeoutMs, prompt }) {
     // Prompt on stdin — never on argv. Inert prompt text, never a command.
     try { child.stdin?.write(prompt ?? ''); child.stdin?.end(); } catch { /* ignore */ }
   });
+}
+
+// Coerce a scalar to a non-empty trimmed string, else null. Used to normalise the
+// signed-ack fields so only genuine reader-supplied values survive into the payload.
+function strOrNull(v) {
+  if (v === null || v === undefined) return null;
+  const s = String(v).trim();
+  return s.length > 0 ? s : null;
 }
 
 // Best-effort: pull a JSON object out of the model text; fall back to a summary.
