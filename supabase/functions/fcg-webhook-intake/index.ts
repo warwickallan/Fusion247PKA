@@ -24,6 +24,7 @@
 // every thrown/logged Telegram error is masked before it can propagate.
 
 import { handleTelegramWebhook } from './handler.js';
+import { resolveServiceCredential, buildRpcHeaders } from './credential.js';
 
 const TELEGRAM_API_BASE = 'https://api.telegram.org';
 
@@ -31,30 +32,6 @@ function env(name: string): string | undefined {
   // deno-lint-ignore no-explicit-any
   const d = (globalThis as any).Deno;
   return d && d.env && typeof d.env.get === 'function' ? d.env.get(name) : undefined;
-}
-
-/** Resolve the service credential from the auto-injected env (Pax Q4). */
-function serviceCredential(): string {
-  const legacy = env('SUPABASE_SERVICE_ROLE_KEY');
-  if (legacy && legacy.length > 0) return legacy;
-  const dict = env('SUPABASE_SECRET_KEYS');
-  if (dict && dict.length > 0) {
-    try {
-      const parsed = JSON.parse(dict);
-      for (const value of Object.values(parsed)) {
-        if (typeof value === 'string' && value.length > 0) return value;
-        if (value && typeof value === 'object') {
-          // deno-lint-ignore no-explicit-any
-          const v = value as any;
-          if (typeof v.api_key === 'string') return v.api_key;
-          if (typeof v.key === 'string') return v.key;
-        }
-      }
-    } catch {
-      /* fall through to the hard failure below */
-    }
-  }
-  throw new Error('no service credential in env (SUPABASE_SERVICE_ROLE_KEY / SUPABASE_SECRET_KEYS)');
 }
 
 const SUPABASE_URL = env('SUPABASE_URL') ?? '';
@@ -70,16 +47,19 @@ const maskBotToken = (s: string): string => {
 
 /** PostgREST rpc bridge — service credential, one named function per call. */
 async function rpc(fnName: string, args: Record<string, unknown>): Promise<unknown> {
-  const credential = serviceCredential();
+  // Resolve per call (lazy): a boot with missing/malformed secrets still starts
+  // and fails LOUDLY on the first request (fail closed) rather than sending a
+  // guessed credential. The descriptor decides the EXACT header shape:
+  //   legacy JWT service_role → apikey + Authorization: Bearer
+  //   modern opaque sb_secret_ (named `default`) → apikey ONLY (a Bearer would
+  //   be parsed as a JWT and rejected). See ./credential.js for the full rules.
+  const descriptor = resolveServiceCredential({
+    serviceRoleKey: env('SUPABASE_SERVICE_ROLE_KEY'),
+    secretKeys: env('SUPABASE_SECRET_KEYS'),
+  });
   const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fnName}`, {
     method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      // sb_secret_ keys must equal the apikey header when sent as Bearer
-      // (Pax Q4); legacy service_role JWTs accept the same dual-header shape.
-      apikey: credential,
-      authorization: `Bearer ${credential}`,
-    },
+    headers: buildRpcHeaders(descriptor, { 'content-type': 'application/json' }),
     body: JSON.stringify(args),
   });
   if (!res.ok) {
