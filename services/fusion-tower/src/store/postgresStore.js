@@ -21,6 +21,9 @@ import {
   isTerminalRunStatus,
   assertValidWatchLevel,
   WATCHDOG_LEASE_MS,
+  GATE_STATUS,
+  GATE_DECISIONS,
+  assertValidDecision,
 } from '../core/states.js';
 import { assertSignerMatchesResponder, assertValidResponder } from '../core/guardrails.js';
 import { composeRunStatus } from '../core/runStatus.js';
@@ -137,6 +140,7 @@ function mapNotification(n) {
     logical_source: n.logical_source,
     purpose: n.purpose,
     body: n.body,
+    reply_markup: n.reply_markup ?? null,
     state: n.state,
     provider_message_id: n.provider_message_id ?? null,
     attempt_count: n.attempt_count,
@@ -144,6 +148,24 @@ function mapNotification(n) {
     created_at: n.created_at,
     updated_at: n.updated_at,
     sent_at: n.sent_at ?? null,
+  };
+}
+
+function mapGate(g) {
+  if (!g) return undefined;
+  return {
+    gate_id: g.gate_id,
+    run_id: g.run_id,
+    gate_token: g.gate_token,
+    review_head_sha: g.review_head_sha,
+    allowed_decisions: g.allowed_decisions ?? [],
+    status: g.status,
+    decision: g.decision ?? null,
+    decided_by: g.decided_by ?? null,
+    decided_at: g.decided_at ?? null,
+    notification_dedup_key: g.notification_dedup_key ?? null,
+    created_at: g.created_at,
+    updated_at: g.updated_at,
   };
 }
 
@@ -787,7 +809,7 @@ export async function createPostgresStore({ connectionString, caFile = null, poo
     // run+event+recipient+purpose was already enqueued (so it never double-sends).
     async enqueueNotification(args = {}, opts) {
       const {
-        dedupKey, runId, recipient, logicalSource, purpose, body,
+        dedupKey, runId, recipient, logicalSource, purpose, body, replyMarkup = null,
       } = args;
       if (!dedupKey) throw new Error('enqueueNotification: dedupKey required');
       if (!recipient) throw new Error('enqueueNotification: recipient (chat id) required');
@@ -800,13 +822,14 @@ export async function createPostgresStore({ connectionString, caFile = null, poo
       return withTx(async (client) => {
         const ins = await client.query(
           `insert into ftw.notification_outbox
-             (dedup_key, run_id, recipient, logical_source, purpose, body,
+             (dedup_key, run_id, recipient, logical_source, purpose, body, reply_markup,
               created_at, updated_at)
-           values ($1,$2,$3,$4,$5,$6,
-                   coalesce($7::timestamptz, now()), coalesce($7::timestamptz, now()))
+           values ($1,$2,$3,$4,$5,$6,$7::jsonb,
+                   coalesce($8::timestamptz, now()), coalesce($8::timestamptz, now()))
            on conflict (dedup_key) do nothing
            returning *`,
-          [dedupKey, runId ?? null, recipient, logicalSource, purpose, body, ts],
+          [dedupKey, runId ?? null, recipient, logicalSource, purpose, body,
+            replyMarkup ? JSON.stringify(replyMarkup) : null, ts],
         );
         if (ins.rows.length > 0) return { enqueued: true, notification: mapNotification(ins.rows[0]) };
         // Conflict: the (run, event, recipient, purpose) was already enqueued — return
@@ -895,6 +918,136 @@ export async function createPostgresStore({ connectionString, caFile = null, poo
         'select * from ftw.notification_outbox where dedup_key = $1', [dedupKey],
       );
       return mapNotification(res.rows[0]) ?? null;
+    },
+
+    // ---- decision gate (BUILD-010 WP1, migration 0006, OI §4a) ---------------
+    // The DURABLE, restart-safe pending-decision marker for a Codex-review HUMAN
+    // DECISION GATE. A gate is OPENED (reserved) when a Codex review returns; a human
+    // tap (routed in by WP2 as command:decision) RECORDS the decision exactly once via
+    // a single atomic pending -> decided UPDATE. A restart between "review returned" and
+    // "human tapped" cannot lose the open gate (it is a durable row), and a stale tap on
+    // an OLD review head is rejected because its gate is superseded/decided, not pending.
+
+    // Open (reserve) a gate. Idempotent for the SAME (run, review head): re-open returns
+    // the existing pending gate. A NEW review head SUPERSEDES the prior pending gate
+    // (the one-pending-gate-per-run partial unique index makes two open gates
+    // impossible), then inserts the new one. Returns { opened, gate }.
+    async openDecisionGate(args = {}, opts) {
+      const {
+        runId, reviewHeadSha, allowedDecisions = GATE_DECISIONS, gateToken, notificationDedupKey,
+      } = args;
+      if (!runId) throw new Error('openDecisionGate: runId required');
+      if (!reviewHeadSha) throw new Error('openDecisionGate: reviewHeadSha required');
+      if (!gateToken) throw new Error('openDecisionGate: gateToken required');
+      if (!Array.isArray(allowedDecisions) || allowedDecisions.length === 0) {
+        throw new Error('openDecisionGate: allowedDecisions must be a non-empty array');
+      }
+      allowedDecisions.forEach(assertValidDecision); // ⊆ {proceed,hold,stop}
+      const ts = nowTs(opts);
+      return withTx(async (client) => {
+        // Is there already a pending gate for this run? (FOR UPDATE to serialise opens.)
+        const pend = await client.query(
+          `select * from ftw.decision_gate
+             where run_id = $1 and status = 'pending' for update`,
+          [runId],
+        );
+        if (pend.rows.length > 0) {
+          const cur = mapGate(pend.rows[0]);
+          if (cur.review_head_sha === reviewHeadSha) {
+            return { opened: false, gate: cur }; // idempotent re-open, same head
+          }
+          // Newer review head — supersede the stale pending gate before inserting.
+          await client.query(
+            `update ftw.decision_gate
+               set status = 'superseded', updated_at = coalesce($2::timestamptz, now())
+             where gate_id = $1`,
+            [cur.gate_id, ts],
+          );
+        }
+        const ins = await client.query(
+          `insert into ftw.decision_gate
+             (run_id, gate_token, review_head_sha, allowed_decisions,
+              notification_dedup_key, created_at, updated_at)
+           values ($1,$2,$3,$4::text[],$5,
+                   coalesce($6::timestamptz, now()), coalesce($6::timestamptz, now()))
+           returning *`,
+          [runId, gateToken, reviewHeadSha, allowedDecisions,
+            notificationDedupKey ?? null, ts],
+        );
+        return { opened: true, gate: mapGate(ins.rows[0]) };
+      });
+    },
+
+    async getPendingDecisionGate(runId) {
+      const res = await pool.query(
+        `select * from ftw.decision_gate
+           where run_id = $1 and status = 'pending'
+           order by created_at desc limit 1`,
+        [runId],
+      );
+      return mapGate(res.rows[0]) ?? null;
+    },
+
+    async getLatestDecisionGate(runId) {
+      const res = await pool.query(
+        `select * from ftw.decision_gate
+           where run_id = $1 order by created_at desc limit 1`,
+        [runId],
+      );
+      return mapGate(res.rows[0]) ?? null;
+    },
+
+    async getDecisionGateByToken(gateToken) {
+      const res = await pool.query(
+        'select * from ftw.decision_gate where gate_token = $1', [gateToken],
+      );
+      return mapGate(res.rows[0]) ?? null;
+    },
+
+    // Record a human decision, keyed by gate_token. A SINGLE atomic conditional UPDATE
+    // (WHERE status='pending' AND the head SHA matches AND the decision is allowed)
+    // flips pending -> decided. Zero rows affected => the gate is unknown, already
+    // decided, superseded, stale-head, or the decision is not allowed => rejected
+    // idempotently (recorded:false + a reason). Exactly one decision per gate.
+    async recordDecisionGate(args = {}, opts) {
+      const { gateToken, decision, decidedBy, reviewHeadSha = null } = args;
+      if (!gateToken) throw new Error('recordDecisionGate: gateToken required');
+      assertValidDecision(decision);
+      if (!decidedBy) throw new Error('recordDecisionGate: decidedBy required (decided row invariant)');
+      const ts = nowTs(opts);
+      return withTx(async (client) => {
+        const upd = await client.query(
+          `update ftw.decision_gate
+             set status = 'decided',
+                 decision = $2,
+                 decided_by = $3,
+                 decided_at = coalesce($4::timestamptz, now()),
+                 updated_at = coalesce($4::timestamptz, now())
+           where gate_token = $1
+             and status = 'pending'
+             and decision is null
+             and ($5::text is null or review_head_sha = $5)
+             and $2 = any (allowed_decisions)
+           returning *`,
+          [gateToken, decision, String(decidedBy), ts, reviewHeadSha],
+        );
+        if (upd.rows.length > 0) {
+          return { recorded: true, reason: null, gate: mapGate(upd.rows[0]) };
+        }
+        // Nothing updated — classify WHY for an honest, idempotent rejection.
+        const cur = await client.query(
+          'select * from ftw.decision_gate where gate_token = $1', [gateToken],
+        );
+        if (cur.rows.length === 0) return { recorded: false, reason: 'unknown-gate', gate: null };
+        const gate = mapGate(cur.rows[0]);
+        let reason;
+        if (gate.status === GATE_STATUS.DECIDED) reason = 'already-decided';
+        else if (gate.status === GATE_STATUS.SUPERSEDED) reason = 'superseded';
+        else if (reviewHeadSha != null && gate.review_head_sha !== reviewHeadSha) reason = 'stale-head';
+        else if (!gate.allowed_decisions.includes(decision)) reason = 'decision-not-allowed';
+        else reason = 'rejected';
+        return { recorded: false, reason, gate };
+      });
     },
 
     async end() { await pool.end(); },

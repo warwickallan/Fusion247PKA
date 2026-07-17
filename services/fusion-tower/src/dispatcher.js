@@ -28,6 +28,11 @@ import {
 } from './core/guardrails.js';
 import { verifyEnvelope } from './core/envelope.js';
 import { handleCommandEvent } from './core/commandRouter.js';
+import {
+  postCodexReviewGate,
+  handleDecisionEvent,
+  assertLarryDispatchAllowed,
+} from './core/decisionGate.js';
 
 // Map a terminal run status/outcome to the single Warwick-facing notification.
 const OUTCOME_NOTICE = Object.freeze({
@@ -194,6 +199,15 @@ export function createDispatcher({ store, config, adapters, notifier, outbox, no
       let run = await store.getRun(runId);
       if (!run) throw new Error(`dispatchNextTurn: unknown run ${runId}`);
 
+      // HUMAN DECISION GATE (OI §4a) — STRUCTURAL enforcement. A Larry correction turn
+      // CANNOT be dispatched while a Codex-review decision gate is open (pending) or was
+      // decided anything other than Proceed. This is what makes the Codex→Larry handoff
+      // impossible to reach without Warwick's recorded Proceed — the loop cannot
+      // "explode" past a review. Non-Larry turns (e.g. a Codex review) are unaffected.
+      if (expectedResponder === 'larry') {
+        await assertLarryDispatchAllowed(store, runId);
+      }
+
       // Budget gate (time/token) — enforced in the loop.
       const budget = budgetOk(run, nowMs);
       if (!budget.allowed) {
@@ -283,7 +297,13 @@ export function createDispatcher({ store, config, adapters, notifier, outbox, no
       } else if (responder === 'larry') {
         await enqueueMilestone('larry_turn_complete', run, `run ${turn.run_id}: Larry turn complete (turn ${turn.ordinal})`, 'LARRY');
       }
-      return { turn: await store.getTurn(turnId), action: action ?? null, result };
+      // HUMAN DECISION GATE signal (OI §4a): a returned Codex REVIEW turn must NOT
+      // auto-advance to Larry — the loop must post the gate (reviewGate) and HALT for
+      // Warwick's card tap. Surface `gateRequired` so the loop driver gates instead of
+      // dispatching Larry. (Opening the gate is reviewGate's job; the structural lock in
+      // dispatchNextTurn refuses a Larry turn regardless while the gate is open.)
+      const gateRequired = responder === 'gpt_codex' && !result?.blocked;
+      return { turn: await store.getTurn(turnId), action: action ?? null, result, gateRequired };
     },
 
     /** Verify + record a signed turn result and roll up token spend. */
@@ -384,6 +404,43 @@ export function createDispatcher({ store, config, adapters, notifier, outbox, no
         }
       }
       return { reaped: sweep.reaped, decisions };
+    },
+
+    /**
+     * HUMAN DECISION GATE (OI §4a) — the point the dispatcher calls AFTER a Codex
+     * review turn returns, REPLACING any auto-advance to Larry. Posts the concise
+     * [CODEX] summary + option cards (Proceed/Hold/Stop) to Warwick's Telegram, opens a
+     * DURABLE pending-decision gate for the review head, parks the run in
+     * awaiting_decision, and HALTS. Larry's correction turn is NOT dispatched here — the
+     * structural lock in dispatchNextTurn refuses it until a Proceed decision is
+     * recorded. NEVER a merge. Never throws out of the loop.
+     *
+     * @param {string} runId
+     * @param {object} review  { verdict, headSha, findings, summary, fullReviewRef, allowedDecisions }
+     * @returns {Promise<object>} the postCodexReviewGate result { halted:true, dispatchedLarry:false, merge:false, gate, notification }
+     */
+    async reviewGate(runId, review = {}) {
+      try {
+        return await postCodexReviewGate(store, boundOutbox, { runId, ...review }, { now: clock() });
+      } catch (err) {
+        // A gate/enqueue hiccup must never crash the loop; surface it, stay halted.
+        return { ok: false, halted: true, dispatchedLarry: false, merge: false, runId, gate: null, notification: null, reason: `error:${String(err?.message ?? err)}` };
+      }
+    },
+
+    /**
+     * Process ONE Warwick card-tap decision event (kind='command:decision', routed in
+     * by WP2's single capture-worker poller — this dispatcher NEVER polls). Delegates to
+     * the pure decision handler: authenticate, validate + record the decision once
+     * (rejecting a stale/duplicate tap idempotently), apply the single effect
+     * (proceed→clear gate, hold→pause, stop→stop-request), enqueue a [TOWER] confirm.
+     * NEVER merges. NEVER throws out. `dispatchLarry:true` (on a recorded Proceed) tells
+     * the loop it MAY now dispatch Larry's correction turn.
+     */
+    async decision(event, { allowlist } = {}) {
+      const auth = allowlist ?? (config?.authorisedTelegramUserId
+        ? [String(config.authorisedTelegramUserId)] : []);
+      return handleDecisionEvent(store, boundOutbox, event, { now: clock(), allowlist: auth });
     },
 
     /**
@@ -496,8 +553,15 @@ export function createDispatcher({ store, config, adapters, notifier, outbox, no
       for (const event of commands) {
         let res = null;
         try {
-          // The durable outbox is the reply notifier (its .enqueue is the seam).
-          res = await handleCommandEvent(store, boundOutbox, event, { now: nowMs, allowlist: auth });
+          // A card-tap decision (command:decision, OI §4a) routes to the decision
+          // handler (gate validate + record + effect); every other command:* routes to
+          // the governance command router. Both are outbound-only + non-merging.
+          if (String(event.kind ?? '') === 'command:decision') {
+            res = await handleDecisionEvent(store, boundOutbox, event, { now: nowMs, allowlist: auth });
+          } else {
+            // The durable outbox is the reply notifier (its .enqueue is the seam).
+            res = await handleCommandEvent(store, boundOutbox, event, { now: nowMs, allowlist: auth });
+          }
         } catch (err) {
           // handleCommandEvent is already non-throwing; this is the belt.
           res = { ok: false, reason: `router-threw:${String(err?.message ?? err)}`, merge: false };

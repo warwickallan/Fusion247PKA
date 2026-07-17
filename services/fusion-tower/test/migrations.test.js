@@ -30,10 +30,15 @@ const SQL_0002 = readMigration('0002_wp0_identity_provider_binding.sql');
 const SQL_0003 = readMigration('0003_wp0_external_write_outbox.sql');
 const SQL_0004 = readMigration('0004_wp1_notification_outbox.sql');
 const SQL_0005 = readMigration('0005_wp1_run_control_state.sql');
+const SQL_0006 = readMigration('0006_wp1_notification_cards.sql');
 const norm0002 = SQL_0002.toLowerCase();
 const norm0003 = SQL_0003.toLowerCase();
 const norm0004 = SQL_0004.toLowerCase();
 const norm0005 = SQL_0005.toLowerCase();
+const norm0006 = SQL_0006.toLowerCase();
+// Code-only view of 0006: strip `--` line comments so DO-NOT-WEAKEN prose that names
+// merge/rls/policy does not trip the vocabulary / DDL guards below.
+const code0006 = norm0006.split('\n').map((line) => line.replace(/--.*$/, '')).join('\n');
 // Code-only view of 0005: strip `--` line comments so the DO-NOT-WEAKEN prose that
 // legitimately NAMES rls/grant/policy does not trip the DDL-absence guards below.
 const code0005 = norm0005.split('\n').map((line) => line.replace(/--.*$/, '')).join('\n');
@@ -362,4 +367,59 @@ test('0004 remains immutable-shape (notification_outbox, dedup key, sent-require
   assert.match(norm0004, /create table if not exists ftw\.notification_outbox/);
   assert.match(norm0004, /constraint notification_outbox_dedup_key_key unique/);
   assert.match(norm0004, /constraint notification_outbox_sent_requires_provider_chk/);
+  // 0006 must NOT have edited 0004 to add the card column — that belongs in 0006.
+  assert.doesNotMatch(norm0004, /reply_markup/, '0004 stays immutable; reply_markup is a 0006 delta');
+});
+
+// ---------------------------------------------------------------------------
+// 0006 — the HUMAN DECISION GATE delta (OI §4a): notification cards + decision_gate.
+// ---------------------------------------------------------------------------
+
+test('0006 references the APPROVED human-decision-gate contract in its header', () => {
+  assert.match(SQL_0006, /fusion-tower-operating-instructions\.md/);
+  assert.match(norm0006, /§?4a|human decision gate/);
+});
+
+test('0006 adds notification_outbox.reply_markup as a nullable jsonb, guarded/idempotent', () => {
+  assert.match(norm0006, /alter table ftw\.notification_outbox\s+add column if not exists reply_markup jsonb/);
+  // It must NOT be NOT NULL (a plain text notification carries no card).
+  assert.doesNotMatch(norm0006, /reply_markup jsonb not null/);
+});
+
+test('0006 creates ftw.decision_gate with the gate_token UNIQUE + one-pending-per-run guarantee', () => {
+  assert.match(norm0006, /create table if not exists ftw\.decision_gate/);
+  assert.match(norm0006, /constraint decision_gate_gate_token_key unique/);
+  assert.match(norm0006, /create unique index if not exists decision_gate_one_pending_per_run_idx[\s\S]*?where status = 'pending'/);
+  assert.match(norm0006, /references ftw\.governance_run \(run_id\) on delete cascade/);
+});
+
+test('0006 decision vocabulary is proceed|hold|stop ONLY — a card is NEVER a merge', () => {
+  assert.match(norm0006, /decision in \('proceed','hold','stop'\)/);
+  assert.match(norm0006, /allowed_decisions <@ array\['proceed','hold','stop'\]/);
+  // No merge/deploy/destructive verb may appear in the gate's EXECUTABLE code. Strip
+  // `comment on … ;` statements too (their honest "never a merge" prose is not a path).
+  const exec0006 = code0006.replace(/comment on[\s\S]*?;/g, '');
+  for (const forbidden of ['merge', 'deploy', 'force_push', 'delete_repo']) {
+    assert.ok(!exec0006.includes(forbidden), `0006 decision_gate executable code must not mention "${forbidden}"`);
+  }
+});
+
+test('0006 enforces the decided-requires-decision invariant (no empty decided row)', () => {
+  assert.match(norm0006, /decision_gate_decided_requires_decision_chk/);
+  assert.match(norm0006, /status <> 'decided'[\s\S]*?decision is not null/);
+});
+
+test('0006 adds NO enum (text + CHECK vocabulary) — no enum/table name collision', () => {
+  assert.doesNotMatch(norm0006, /create type ftw\./,
+    '0006 uses text + CHECK for status/decision, so it adds no enum (no collision risk)');
+});
+
+test('0006 keeps RLS deny-by-default on decision_gate: service_role-only, no anon/authenticated', () => {
+  assert.match(norm0006, /alter table ftw\.decision_gate enable row level security/);
+  assert.match(norm0006, /create policy service_role_all_decision_gate[\s\S]*?for all to service_role/);
+  assert.doesNotMatch(code0006, /grant[\s\S]*?to (anon|authenticated)\b/,
+    'anon/authenticated must never receive a grant');
+  assert.doesNotMatch(code0006, /create policy[\s\S]*?to (anon|authenticated)\b/,
+    'anon/authenticated must never receive a policy');
+  assert.match(SQL_0006, /DO NOT WEAKEN/, '0006 must carry the DO-NOT-WEAKEN security block');
 });

@@ -53,6 +53,12 @@ const MIGRATIONS = [
   '0001_wp0_control_plane.sql',
   '0002_wp0_identity_provider_binding.sql',
   '0003_wp0_external_write_outbox.sql',
+  // WP1 deltas — the real control plane is now the full chain, so the restart proof
+  // runs against the current schema (incl. the decision_gate the Larry-dispatch guard
+  // reads). Additive-only; the run/turn behaviour under test is unchanged.
+  '0004_wp1_notification_outbox.sql',
+  '0005_wp1_run_control_state.sql',
+  '0006_wp1_notification_cards.sql',
 ];
 
 async function resetAndMigrate() {

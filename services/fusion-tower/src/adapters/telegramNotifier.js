@@ -88,8 +88,15 @@ export function createTelegramClient({ config, fetchImpl } = {}) {
     /**
      * OUTBOUND ONLY. POST sendMessage to the authorised chat. Returns
      * { ok, message_id, chatId } on success; throws a token-scrubbed error otherwise.
+     *
+     * @param {string} recipient  chat id (or null → default authorised chat)
+     * @param {string} text       the composed message text (carries the [TAG])
+     * @param {object} [opts]
+     * @param {object} [opts.replyMarkup]  OPTIONAL Telegram inline_keyboard (option
+     *        cards). Sent verbatim as `reply_markup` when present. POINTERS only —
+     *        button labels + callback tokens, never a secret. A card is NEVER a merge.
      */
-    async sendMessage(recipient, text) {
+    async sendMessage(recipient, text, opts = {}) {
       if (!token) throw new Error('telegramClient: TELEGRAM_BOT_TOKEN is unset (masked) — cannot send');
       if (!doFetch) throw new Error('telegramClient: no fetch implementation available');
       const chatId = recipient ?? defaultChatId;
@@ -98,12 +105,16 @@ export function createTelegramClient({ config, fetchImpl } = {}) {
       // The token travels ONLY here, in the URL to api.telegram.org. It is never
       // interpolated into any log line or thrown error.
       const url = `https://api.telegram.org/bot${token}/sendMessage`;
+      const payload = { chat_id: chatId, text, disable_web_page_preview: true };
+      // Attach the inline-keyboard card verbatim ONLY when present (a plain
+      // notification stays a plain text send). reply_markup is POINTERS/labels only.
+      if (opts.replyMarkup) payload.reply_markup = opts.replyMarkup;
       let res;
       try {
         res = await doFetch(url, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ chat_id: chatId, text, disable_web_page_preview: true }),
+          body: JSON.stringify(payload),
         });
       } catch (err) {
         // undici can embed the request URL (with the token) in the error/cause —
@@ -132,7 +143,7 @@ export function createTelegramClient({ config, fetchImpl } = {}) {
  * dedup key. Returns the store result plus { dedupKey }.
  */
 export async function enqueue(store, {
-  runId, recipient, logicalSource, purpose, body,
+  runId, recipient, logicalSource, purpose, body, replyMarkup = null,
 }, opts = {}) {
   if (!recipient) return { enqueued: false, skipped: 'no-recipient' };
   if (!LOGICAL_SOURCES.includes(logicalSource)) {
@@ -151,9 +162,21 @@ export async function enqueue(store, {
       + `[${scan.hits.join(', ')}] (a token can NEVER be enqueued or sent)`,
     );
   }
+  // DEFENCE-IN-DEPTH: the optional card definition is POINTERS only (labels +
+  // callback tokens) — secret-scan its serialised form too so a token can never ride
+  // in on a reply_markup either.
+  if (replyMarkup != null) {
+    const cardScan = scanForSecrets(JSON.stringify(replyMarkup));
+    if (!cardScan.clean) {
+      throw new Error(
+        `telegramNotifier: refusing to enqueue — reply_markup contains secret-shaped `
+        + `content [${cardScan.hits.join(', ')}] (cards carry labels/tokens, never a secret)`,
+      );
+    }
+  }
   const dedupKey = computeDedupKey({ runId, purpose, recipient, logicalSource });
   const r = await store.enqueueNotification(
-    { dedupKey, runId, recipient, logicalSource, purpose, body },
+    { dedupKey, runId, recipient, logicalSource, purpose, body, replyMarkup },
     { now: opts.now },
   );
   return { ...r, dedupKey };
@@ -189,8 +212,11 @@ export async function drainOnce(store, telegramClient, opts = {}) {
 
   for (const n of pending) {
     const text = wireText(n.logical_source, n.body);
+    // Carry the durable card definition (if any) into the send — a restart between
+    // enqueue and send still delivers the buttons because reply_markup lives on the row.
+    const sendOpts = n.reply_markup ? { replyMarkup: n.reply_markup } : undefined;
     try {
-      const res = await telegramClient.sendMessage(n.recipient, text);
+      const res = await telegramClient.sendMessage(n.recipient, text, sendOpts);
       const messageId = String(res?.message_id ?? '');
       if (!messageId) throw new Error('send returned no message_id');
       // SENT-WITH-PROOF: only ever reaches 'sent' with a real message_id.

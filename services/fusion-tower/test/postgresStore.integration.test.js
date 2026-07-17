@@ -26,6 +26,7 @@ const MIGRATIONS = [
   '0003_wp0_external_write_outbox.sql',
   '0004_wp1_notification_outbox.sql',
   '0005_wp1_run_control_state.sql',
+  '0006_wp1_notification_cards.sql',
 ];
 
 async function resetAndMigrate() {

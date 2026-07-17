@@ -104,6 +104,47 @@ export const WATCH_LEVELS = Object.freeze([
   WATCH_LEVEL.TERMINAL,
 ]);
 
+// Durable human-decision-gate vocabulary (mirrors migration 0006 ftw.decision_gate
+// CHECK constraints — BUILD-010 WP1, OI §4a). The gate parks a run in
+// awaiting_decision after a Codex review; a human tap records exactly one DECISION.
+// A card is NEVER a merge — 'merge' is deliberately absent from this vocabulary.
+export const DECISION = Object.freeze({
+  PROCEED: 'proceed', // dispatch Larry's correction turn (the ONLY advancing card)
+  HOLD: 'hold',       // pause the run (setRunPaused true)
+  STOP: 'stop',       // safe stop (requestRunStop)
+});
+
+// The bounded default card set posted with a Codex-review gate. Ordered as shown on
+// the inline keyboard. NONE is a merge.
+export const GATE_DECISIONS = Object.freeze([
+  DECISION.PROCEED,
+  DECISION.HOLD,
+  DECISION.STOP,
+]);
+
+// The durable gate lifecycle (mirrors the decision_gate_status_chk vocabulary).
+//   pending    -- open, awaiting the human tap
+//   decided    -- one human tap recorded (carries decision + decided_by + decided_at)
+//   superseded -- a newer review head obsoleted it; do-not-honour (stale-tap reject)
+export const GATE_STATUS = Object.freeze({
+  PENDING: 'pending',
+  DECIDED: 'decided',
+  SUPERSEDED: 'superseded',
+});
+
+export function isValidDecision(decision) {
+  return Object.values(DECISION).includes(decision);
+}
+
+export function assertValidDecision(decision) {
+  if (!isValidDecision(decision)) {
+    throw new Error(
+      `invalid decision: ${decision} (expected one of ${Object.values(DECISION).join(', ')}) — `
+      + 'a card is NEVER a merge',
+    );
+  }
+}
+
 export function isValidWatchLevel(level) {
   return WATCH_LEVELS.includes(level);
 }
