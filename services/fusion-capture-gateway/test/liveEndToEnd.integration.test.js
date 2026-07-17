@@ -127,7 +127,11 @@ test('full saga vs real Postgres: update → durable row → note on disk → ev
 
     const afterIntake = await h.store.getByCaptureId(captureId);
     assert.ok(afterIntake, 'a durable Postgres row exists after intake');
-    assert.equal(afterIntake.state, STATES.QUEUED, 'online intake queues the item in Postgres');
+    assert.equal(afterIntake.state, STATES.ACCEPTED, 'tap-gated intake holds the item pending in Postgres');
+
+    // 1b. The user taps "Save to Brain" → the capture is queued for the worker.
+    const confirmed = await h.intake.confirmSave(captureId);
+    assert.equal(confirmed.outcome, 'queued');
 
     // 2. Worker drives the saga end-to-end against real Postgres.
     h.clock.advance(1000);
@@ -191,22 +195,33 @@ test('live RUNNER vs real Postgres: long-poll → capture → completed; offset 
     adapter1.deliver({ update_id: 7, message: { message_id: 91001, from: { id: AUTH_ID }, text: 'runner e2e: solar log' } });
     await runner.runUntilIdle();
 
-    // Durable capture completed in REAL Postgres, note on disk. (This file's e2e
-    // DB is shared across its tests, so select MY capture by content, not [0].)
+    // TAP-GATED: the capture holds pending in REAL Postgres until the tap.
+    // (This file's e2e DB is shared across its tests, so select MY capture by
+    // content, not [0].)
     const mine = (await store.list()).find((r) => r.text_preview && r.text_preview.includes('solar log'));
     assert.ok(mine, 'the runner-captured row exists in Postgres');
+    assert.equal(mine.state, STATES.ACCEPTED, 'pending until the user taps');
+    assert.ok(mine.card_ref && mine.card_ref.message_id !== undefined, 'card_ref persisted in Postgres (§4)');
+    const originalMessageId = mine.card_ref.message_id;
+
+    // The user taps "Save to Brain" on the card → the saga completes.
+    adapter1.deliver({
+      update_id: 8,
+      callback_query: {
+        id: 'cb-e2e-1', from: { id: AUTH_ID }, data: 'SaveToBrain',
+        message: { message_id: originalMessageId, chat: { id: mine.card_ref.chat_id } },
+      },
+    });
+    await runner.runUntilIdle();
+
     const rec = await store.getByCaptureId(mine.capture_id);
     assert.equal(rec.state, STATES.COMPLETED);
     assert.ok(fs.existsSync(rec.destination_ref.path));
     assert.ok(rec.destination_ref.path.includes(`${path.sep}captures${path.sep}`), 'lands in the governed captures leaf');
 
-    // Offset advanced AND persisted in Postgres (channel_poll_offset).
-    assert.equal(runner.offset, 8, 'offset advanced to update_id+1');
-    assert.equal(await store.getPollOffset('telegram'), 8, 'offset durable in Postgres');
-
-    // Card target persisted in Postgres (§4).
-    assert.ok(rec.card_ref && rec.card_ref.message_id !== undefined, 'card_ref persisted in Postgres');
-    const originalMessageId = rec.card_ref.message_id;
+    // Offset advanced past BOTH updates AND persisted in Postgres.
+    assert.equal(runner.offset, 9, 'offset advanced to last update_id+1');
+    assert.equal(await store.getPollOffset('telegram'), 9, 'offset durable in Postgres');
 
     // RESTART: a fresh adapter (empty in-memory map) + a fresh runner over the
     // SAME Postgres store. Re-project the completed card — it must re-target the
@@ -218,7 +233,7 @@ test('live RUNNER vs real Postgres: long-poll → capture → completed; offset 
       factories: { storeFactory: async () => store, adapterFactory: async () => adapter2 },
     });
     // A restarted runner resumes from the durable offset — no re-fetch of acked updates.
-    assert.equal(runner2.offset, 8, 'restart resumes from the durable Postgres offset');
+    assert.equal(runner2.offset, 9, 'restart resumes from the durable Postgres offset');
     const entry = await runner2.reprojectCard(rec.capture_id);
     assert.equal(entry.messageId, originalMessageId, 'restart re-targets the ORIGINAL card from Postgres card_ref');
     assert.equal(entry.cardModel.is_completed, true);
@@ -235,11 +250,14 @@ test('offline-safe vs real Postgres: worker down → offline_queued (durable) �
     const accepted = await h.intake.accept(update(90002, 'captured while the worker was offline'));
     assert.equal(accepted.ok, true);
     const captureId = accepted.captureId;
-
-    // Durable + offline-queued + never falsely completed.
-    const offlineRec = await h.store.getByCaptureId(captureId);
-    assert.equal(offlineRec.state, STATES.OFFLINE_QUEUED, 'offline intake is durable + offline_queued in Postgres');
     assert.equal(accepted.receipt.safe_and_waiting, true);
+
+    // The user taps while the worker is offline: durable + offline-queued +
+    // never falsely completed.
+    const confirmed = await h.intake.confirmSave(captureId);
+    assert.equal(confirmed.outcome, 'queued');
+    const offlineRec = await h.store.getByCaptureId(captureId);
+    assert.equal(offlineRec.state, STATES.OFFLINE_QUEUED, 'offline tap is durable + offline_queued in Postgres');
     assert.notEqual(offlineRec.state, STATES.COMPLETED);
 
     // Worker comes online and completes it against real Postgres.
@@ -260,6 +278,7 @@ test('dead-letter vs real Postgres: repeated write failure burns attempts → de
   try {
     const accepted = await h.intake.accept(update(90003, 'dead-letter me if I keep failing'));
     const captureId = accepted.captureId;
+    await h.intake.confirmSave(captureId); // the user taps Save to Brain
 
     // Fail the governed write on EVERY attempt up to the cap.
     h.markdownWriter.failNextWrite(MAX_DELIVERY_ATTEMPTS);

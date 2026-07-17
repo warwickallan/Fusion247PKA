@@ -44,6 +44,7 @@ test('failed editCard → retryCardProjection re-edits to Completed; no re-write
       message: { message_id: 60600, from: { id: AUTH_ID }, text: 'card should end Completed' },
     });
     const captureId = acc.captureId;
+    await intake.confirmSave(captureId); // the user taps Save to Brain
 
     // Arm the adapter so the worker's edit-to-Completed FAILS once (swallowed).
     adapter.failNextEdit();

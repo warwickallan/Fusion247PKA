@@ -89,6 +89,7 @@ test('wired into the worker: a governed capture_write is logged on completion', 
 
   const accepted = await intake.accept({ message: { message_id: 1, from: { id: AUTH_ID }, text: 'super secret diary line' } });
   assert.equal(accepted.ok, true);
+  await intake.confirmSave(accepted.captureId); // the user taps Save to Brain
   const final = await worker.processOne({ now: t });
   assert.equal(final.state, STATES.COMPLETED);
 

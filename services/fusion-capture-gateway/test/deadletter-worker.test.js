@@ -68,6 +68,7 @@ test('retry-exhaustion → dead_letter: never completed, honest failure, no note
     const acc = await intake.accept(UPDATE);
     assert.equal(acc.ok, true);
     const captureId = acc.captureId;
+    await intake.confirmSave(captureId); // the user taps Save to Brain
 
     // Arm the writer to fail the governed write on EVERY attempt up to the cap.
     markdownWriter.failNextWrite(MAX_DELIVERY_ATTEMPTS);
@@ -140,6 +141,7 @@ test('transient single failure recovers via the real autonomous reclaim: next du
 
     const acc = await intake.accept(UPDATE);
     const captureId = acc.captureId;
+    await intake.confirmSave(captureId); // the user taps Save to Brain
 
     // Only the FIRST write fails.
     markdownWriter.failNextWrite(1);

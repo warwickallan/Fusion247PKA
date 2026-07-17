@@ -36,7 +36,7 @@ function envelope(overrides = {}) {
 
 function driveToFailed(store, captureId, now) {
   store.recordIntake(envelope({ capture_id: captureId }), { now });
-  store.enqueue(captureId, { now: now + 1 });
+  store.enqueue(captureId, { confirmedByTap: true, now: now + 1 });
   const claimed = store.claim('worker-A', 30_000, { now: now + 2 });
   store.transition(captureId, STATES.WRITING, { now: now + 3 });
   const nextAttemptAtMs = computeNextAttemptAtMs(claimed.attempt_count, now + 4);
@@ -77,7 +77,7 @@ test('recordFailure transitions to failed and stamps next_attempt_at_ms', () => 
 test('recordFailure without nextAttemptAtMs leaves next_attempt_at_ms null (not autonomously retryable)', () => {
   const store = createInMemoryOperationalStore();
   store.recordIntake(envelope({ capture_id: 'cap-1' }), { now: T0 });
-  store.enqueue('cap-1', { now: T0 + 1 });
+  store.enqueue('cap-1', { confirmedByTap: true, now: T0 + 1 });
   store.claim('worker-A', 30_000, { now: T0 + 2 });
   store.transition('cap-1', STATES.WRITING, { now: T0 + 3 });
   const rec = store.recordFailure('cap-1', { now: T0 + 4, error: 'x' });
@@ -90,7 +90,7 @@ test('recordFailure without nextAttemptAtMs leaves next_attempt_at_ms null (not 
 test('recordFailure requires an injected numeric now', () => {
   const store = createInMemoryOperationalStore();
   store.recordIntake(envelope({ capture_id: 'cap-1' }), { now: T0 });
-  store.enqueue('cap-1', { now: T0 + 1 });
+  store.enqueue('cap-1', { confirmedByTap: true, now: T0 + 1 });
   store.claim('worker-A', 30_000, { now: T0 + 2 });
   assert.throws(() => store.recordFailure('cap-1', {}), /injected numeric `now`/);
 });
@@ -119,7 +119,7 @@ test('claim() autonomously reclaims a failed item exactly at (and after) its due
 test('claim() never reclaims a failed item whose attempt_count already reached the cap', () => {
   const store = createInMemoryOperationalStore();
   store.recordIntake(envelope({ capture_id: 'cap-1' }), { now: T0 });
-  store.enqueue('cap-1', { now: T0 + 1 });
+  store.enqueue('cap-1', { confirmedByTap: true, now: T0 + 1 });
 
   // Drive attempt_count up to the cap via repeated real claim + recordFailure,
   // each reclaim going through the SAME due-retry path under test.
@@ -147,7 +147,7 @@ test('claim() prefers an oldest-first ordering even across mixed queued + due-re
   // cap-2 is a fresh, ordinary queued item received AFTER cap-1 originally, but
   // both are claimable by the time we call claim() at the due moment.
   store.recordIntake(envelope({ capture_id: 'cap-2', msg: 'chat:88012345:msg:90002', raw_payload: 'second item' }), { now: T0 + 50 });
-  store.enqueue('cap-2', { now: T0 + 51 });
+  store.enqueue('cap-2', { confirmedByTap: true, now: T0 + 51 });
 
   const first = store.claim('worker-X', 30_000, { now: failed.next_attempt_at_ms });
   // cap-1 was received first (received_at_ms = T0) — oldest-first still holds
@@ -160,7 +160,7 @@ test('claim() prefers an oldest-first ordering even across mixed queued + due-re
 test('partial → claimed due-retry mirrors failed (forward-compatible; unused by WP0 worker today)', () => {
   const store = createInMemoryOperationalStore();
   store.recordIntake(envelope({ capture_id: 'cap-1' }), { now: T0 });
-  store.enqueue('cap-1', { now: T0 + 1 });
+  store.enqueue('cap-1', { confirmedByTap: true, now: T0 + 1 });
   store.claim('worker-A', 30_000, { now: T0 + 2 });
   store.transition('cap-1', STATES.WRITING, { now: T0 + 3 });
   const partial = store.transition('cap-1', STATES.PARTIAL, { now: T0 + 4 });

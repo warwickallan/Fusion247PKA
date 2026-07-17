@@ -21,6 +21,45 @@ import { mapTelegramUpdate, mapTelegramCallbackQuery } from './telegramMapping.j
 
 const DEFAULT_API_BASE = 'https://api.telegram.org';
 
+// getUpdates long-poll wait, seconds. LIVE FINDING (2026-07-17, Warwick's home
+// network): the consumer router/NAT silently kills any TCP connection held open
+// ≥~45s — every empty long-poll died at ~45s with "fetch failed", metronomic,
+// and the poisoned keep-alive socket then failed the NEXT Bot API call too.
+// 25s stays safely under the observed ~45s middlebox kill window.
+const DEFAULT_GET_UPDATES_WAIT_SECONDS = 25;
+
+// One retry, short pause — see isTransientNetworkError() below.
+const DEFAULT_TRANSIENT_RETRY_DELAY_MS = 250;
+
+/**
+ * Classify a fetch REJECTION as a transient network/socket failure. fetch()
+ * rejects ONLY at the network layer — an HTTP 4xx/5xx RESOLVES with a response
+ * and is never retried here. Walks the undici `cause` chain (global fetch wraps
+ * the real socket error in TypeError('fetch failed').cause).
+ *
+ * LIVE FINDING (2026-07-17): a NAT-killed keep-alive socket makes the next
+ * pooled request fail once; undici discards the dead socket, so ONE retry gets
+ * a FRESH socket from the pool and succeeds. This is the no-new-deps fix.
+ */
+export function isTransientNetworkError(err) {
+  const TRANSIENT_CODES = [
+    'ECONNRESET', 'ECONNREFUSED', 'ECONNABORTED', 'EPIPE', 'ETIMEDOUT',
+    'EAI_AGAIN', 'UND_ERR_SOCKET', 'UND_ERR_CONNECT_TIMEOUT',
+  ];
+  for (let e = err, depth = 0; e && depth < 5; e = e.cause, depth += 1) {
+    const msg = typeof e.message === 'string' ? e.message : '';
+    const code = typeof e.code === 'string' ? e.code : '';
+    if (TRANSIENT_CODES.includes(code)
+      || msg.includes('fetch failed')
+      || msg.includes('socket hang up')
+      || msg.includes('other side closed')
+      || msg.includes('terminated')) {
+      return true;
+    }
+  }
+  return false;
+}
+
 // The inline-keyboard action buttons offered on the initial card. callback_data
 // maps back to the recorded_intent actions the mapping understands.
 const ACTION_BUTTONS = Object.freeze([
@@ -56,6 +95,8 @@ function maskedUrl(url, token) {
  * @param {string} [opts.apiBase]           override API base (tests).
  * @param {string} [opts.defaultAction]     default capture action.
  * @param {object} [opts.accessLog]         optional access logger (auth rejections).
+ * @param {number} [opts.retryDelayMs]      pause before the single transient-network
+ *                 retry (default 250ms; tests pass 0).
  */
 export function createLiveTelegramAdapter({
   botToken,
@@ -65,6 +106,7 @@ export function createLiveTelegramAdapter({
   apiBase = DEFAULT_API_BASE,
   defaultAction = 'SaveToBrain',
   accessLog,
+  retryDelayMs = DEFAULT_TRANSIENT_RETRY_DELAY_MS,
 } = {}) {
   if (typeof botToken !== 'string' || botToken.length === 0) {
     throw new Error('createLiveTelegramAdapter: botToken required');
@@ -86,19 +128,41 @@ export function createLiveTelegramAdapter({
   /**
    * Call a Bot API method. Builds the real HTTPS request and hands it to
    * fetchImpl. NEVER logs the token; any thrown error masks it.
+   *
+   * TRANSIENT-NETWORK RESILIENCE (live finding 2026-07-17): a network-level
+   * rejection (NAT-killed keep-alive socket → 'fetch failed'/ECONNRESET) is
+   * retried ONCE after a short pause — the retry draws a FRESH socket because
+   * undici discards the dead one. HTTP-level errors (parsed ok:false) are NEVER
+   * retried. Idempotency note: if the first attempt actually reached Telegram
+   * and only the response was lost, the retry can duplicate a sendMessage
+   * (worst case: one extra card — accepted for WP0) or hit "message is not
+   * modified" on an editMessageText (surfaces as a projection failure the
+   * worker already swallows). getUpdates retries are inherently safe (offset
+   * ack semantics).
    */
   async function callApi(method, body) {
     const url = `${base}/${method}`;
+    const init = {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    };
     let res;
     try {
-      res = await fetchImpl(url, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(body),
-      });
+      res = await fetchImpl(url, init);
     } catch (netErr) {
-      const msg = netErr && netErr.message ? netErr.message : String(netErr);
-      throw new Error(`telegram ${method} request failed: ${maskedUrl(msg, botToken)}`);
+      if (!isTransientNetworkError(netErr)) {
+        const msg = netErr && netErr.message ? netErr.message : String(netErr);
+        throw new Error(`telegram ${method} request failed: ${maskedUrl(msg, botToken)}`);
+      }
+      // ONE retry on a fresh socket. A second failure is a real outage — throw.
+      await new Promise((resolve) => { setTimeout(resolve, retryDelayMs); });
+      try {
+        res = await fetchImpl(url, init);
+      } catch (retryErr) {
+        const msg = retryErr && retryErr.message ? retryErr.message : String(retryErr);
+        throw new Error(`telegram ${method} request failed after retry: ${maskedUrl(msg, botToken)}`);
+      }
     }
     const parsed = await res.json();
     if (!parsed || parsed.ok !== true) {
@@ -183,6 +247,9 @@ export function createLiveTelegramAdapter({
         chat_id: chatId,
         text: cardModel.status_line,
         reply_markup: inlineKeyboard(cardModel),
+        // Set ONLY when the projection asks for it (completed card's monospace
+        // destination path); pending/failed cards stay parse-mode-free.
+        ...(cardModel && cardModel.parse_mode ? { parse_mode: cardModel.parse_mode } : {}),
       });
       const messageId = parsed.result && parsed.result.message_id;
       if (messageId !== undefined) cardMessages.set(captureId, { chatId, messageId });
@@ -206,8 +273,22 @@ export function createLiveTelegramAdapter({
         message_id: messageId,
         text: cardModel.status_line,
         reply_markup: inlineKeyboard(cardModel),
+        // Completed receipt: parse_mode 'Markdown' renders the backticked
+        // destination path as monospace, so Telegram does not auto-link the
+        // `.md` filename as a bogus URL. Only present when the projection set it.
+        ...(cardModel && cardModel.parse_mode ? { parse_mode: cardModel.parse_mode } : {}),
       });
       return parsed;
+    },
+
+    /**
+     * Plain informational message — NO card, NO buttons, NO parse mode. Used for
+     * the WP0 "text only" notice on a non-text update. Best-effort projection:
+     * the caller decides whether to swallow a failure.
+     * @returns parsed Bot API result.
+     */
+    async sendMessage(chatId, text) {
+      return callApi('sendMessage', { chat_id: chatId, text });
     },
 
     /**
@@ -215,11 +296,18 @@ export function createLiveTelegramAdapter({
      * spinner. `text` is a brief, secret-free toast. Best-effort: a failure here
      * is a projection failure, never a data-integrity one — the caller decides
      * whether to swallow it. Returns the parsed API result.
+     *
+     * `showAlert: true` renders a DISMISSABLE POP-UP instead of the subtle
+     * ~2s toast (live phone finding 2026-07-17: the plain toast is invisible in
+     * practice — Warwick reported the KeepRaw/AskLarry buttons "just don't do
+     * anything"). Use it for answers the user MUST see; the SaveToBrain ack
+     * stays subtle because the card edit itself is the feedback.
      */
-    async answerCallbackQuery(callbackQueryId, text) {
+    async answerCallbackQuery(callbackQueryId, text, { showAlert = false } = {}) {
       return callApi('answerCallbackQuery', {
         callback_query_id: callbackQueryId,
         text: typeof text === 'string' ? text : undefined,
+        ...(showAlert ? { show_alert: true } : {}),
       });
     },
 
@@ -265,11 +353,12 @@ export function createLiveTelegramAdapter({
      *
      * @param {object} [opts]
      * @param {number} [opts.offset]   update_id offset (ack prior updates).
-     * @param {number} [opts.timeout]  long-poll seconds.
+     * @param {number} [opts.timeout]  long-poll seconds (default: the named
+     *                 constant — MUST stay under the ~45s NAT kill window).
      * @param {number} [opts.limit]    max updates per batch.
      * @returns {Promise<object[]>} the parsed updates array.
      */
-    async getUpdates({ offset, timeout = 30, limit = 100 } = {}) {
+    async getUpdates({ offset, timeout = DEFAULT_GET_UPDATES_WAIT_SECONDS, limit = 100 } = {}) {
       const parsed = await callApi('getUpdates', { offset, timeout, limit });
       return Array.isArray(parsed.result) ? parsed.result : [];
     },

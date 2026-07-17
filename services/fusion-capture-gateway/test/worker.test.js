@@ -38,6 +38,13 @@ test('full happy path: capture → worker → file on disk → evidence → comp
     assert.equal(accepted.ok, true);
     const captureId = accepted.captureId;
 
+    // TAP-GATED: before the tap nothing is claimable — the worker must not write.
+    assert.equal(await worker.processOne({ now: clock.now() }), null, 'no write before the tap');
+
+    // The user taps "Save to Brain" on the card.
+    const confirmed = await intake.confirmSave(captureId);
+    assert.equal(confirmed.outcome, 'queued');
+
     clock.advance(1000);
     const final = await worker.processOne({ now: clock.now() });
     assert.ok(final, 'worker claimed and processed an item');

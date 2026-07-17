@@ -40,9 +40,14 @@ const RETRYABLE_STATES = Object.freeze([STATES.FAILED, STATES.PARTIAL]);
  *   getByCaptureId(captureId) -> record | undefined
  *   getByIdempotencyKey(key)  -> record | undefined
  *
- *   enqueue(captureId, { now, offline }) -> record
+ *   enqueue(captureId, { now, offline, confirmedByTap }) -> record
  *       accepted -> queued (or offline_queued when offline:true). Both are the
  *       "safe and waiting" states a card renders offline-safe copy for.
+ *       TAP-GATE (hardened 2026-07-17): requires confirmedByTap:true — the
+ *       explicit acknowledgement that a USER TAP (intake.confirmSave on a
+ *       SaveToBrain callback) authorised this hop. `accepted` means awaiting
+ *       the human's tap; no startup sweep, drain, lease reclaim or future
+ *       "unstick" helper may ever auto-progress it.
  *
  *   claim(workerId, leaseMs, { now }) -> record | null
  *       Atomically lease the oldest claimable item (queued/offline_queued, or a
@@ -188,9 +193,22 @@ export function createInMemoryOperationalStore() {
     /**
      * Enqueue an accepted item: accepted -> queued (or offline_queued). Both
      * are "safe and waiting". Only a live worker moves either into processing.
+     *
+     * TAP-GATE (Warwick decision 2026-07-16; store-enforced 2026-07-17):
+     * `accepted` means AWAITING THE USER'S TAP, and this method is the ONLY
+     * exit. The explicit confirmedByTap acknowledgement asserts the caller is
+     * intake.confirmSave() acting on a SaveToBrain callback — so no recovery
+     * sweep, startup drain, or future helper can silently re-queue a pending
+     * capture. Fail-closed: missing acknowledgement throws, state unchanged.
      */
     enqueue(captureId, opts) {
       const now = requireNow(opts, 'enqueue');
+      if (opts?.confirmedByTap !== true) {
+        throw new Error(
+          'enqueue: tap-gate violation — an accepted capture leaves `accepted` only via '
+          + 'intake.confirmSave() on a user tap (caller must pass confirmedByTap: true)',
+        );
+      }
       const offline = opts?.offline === true;
       const rec = getInternal(captureId);
       const to = offline ? STATES.OFFLINE_QUEUED : STATES.QUEUED;

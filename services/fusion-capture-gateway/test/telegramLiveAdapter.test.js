@@ -67,6 +67,57 @@ test('editCard targets the tracked message_id and clears buttons when Completed'
   assert.deepEqual(edit.body.reply_markup.inline_keyboard, [], 'completed card drops action buttons');
 });
 
+test('completed editCard passes the projection parse_mode so the path renders as monospace (no auto-link)', async () => {
+  const fetchImpl = mockFetch();
+  const a = adapter(fetchImpl);
+  await a.sendCard('cap_pm', { status_line: 'waiting', is_completed: false });
+  await a.editCard('cap_pm', {
+    status_line: 'Completed — saved to your Brain (`C:\\repo\\Team Inbox\\captures\\cap_pm.md`).',
+    is_completed: true,
+    parse_mode: 'Markdown',
+  });
+
+  const send = fetchImpl.calls[0];
+  assert.equal(send.body.parse_mode, undefined, 'pending card carries NO parse_mode');
+  const edit = fetchImpl.calls[1];
+  assert.equal(edit.body.parse_mode, 'Markdown', 'completed card carries the projection parse_mode');
+  assert.match(edit.body.text, /\(`[^`]+\.md`\)/, 'destination path is backtick-wrapped in the wire text');
+});
+
+test('sendMessage sends a plain notice — no reply_markup, no parse_mode', async () => {
+  const fetchImpl = mockFetch();
+  const a = adapter(fetchImpl);
+  await a.sendMessage(String(AUTH_ID), 'Text only in WP0 — photos/voice arrive in a later work package.');
+
+  assert.equal(fetchImpl.calls.length, 1);
+  const call = fetchImpl.calls[0];
+  assert.equal(call.url, `${API_BASE}/bot${FAKE_TOKEN}/sendMessage`);
+  assert.equal(call.body.chat_id, String(AUTH_ID));
+  assert.match(call.body.text, /Text only in WP0/);
+  assert.equal(call.body.reply_markup, undefined, 'a plain notice has no buttons');
+  assert.equal(call.body.parse_mode, undefined, 'a plain notice has no parse mode');
+});
+
+test('answerCallbackQuery: show_alert lands on the wire ONLY when asked (pop-up vs subtle toast)', async () => {
+  const fetchImpl = mockFetch();
+  const a = adapter(fetchImpl);
+  // Default: subtle toast — NO show_alert field at all.
+  await a.answerCallbackQuery('cb-1', 'Saving to your Brain…');
+  // Must-see answer (live phone finding 2026-07-17: plain toasts are invisible
+  // in practice): dismissable pop-up via show_alert: true.
+  await a.answerCallbackQuery('cb-2', 'Not available in WP0 — your capture stays pending.', { showAlert: true });
+
+  const subtle = fetchImpl.calls[0];
+  assert.equal(subtle.url, `${API_BASE}/bot${FAKE_TOKEN}/answerCallbackQuery`);
+  assert.equal(subtle.body.callback_query_id, 'cb-1');
+  assert.equal(subtle.body.show_alert, undefined, 'default ack carries NO show_alert');
+
+  const popup = fetchImpl.calls[1];
+  assert.equal(popup.body.callback_query_id, 'cb-2');
+  assert.equal(popup.body.show_alert, true, 'must-see answer is a dismissable pop-up');
+  assert.match(popup.body.text, /Not available in WP0/);
+});
+
 test('editCard before sendCard is refused (no known message id)', async () => {
   const a = adapter(mockFetch());
   await assert.rejects(() => a.editCard('cap_unknown', { status_line: 'x' }), /no known message_id/);

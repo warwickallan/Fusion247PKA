@@ -276,6 +276,15 @@ export async function createPostgresOperationalStore({ connectionString, poolCon
     },
 
     async enqueue(captureId, opts) {
+      // TAP-GATE (store-enforced 2026-07-17, mirroring the in-memory fixture):
+      // `accepted` awaits the human's tap; only intake.confirmSave() may move it,
+      // and it must say so explicitly. Fail-closed before any SQL runs.
+      if (opts?.confirmedByTap !== true) {
+        throw new Error(
+          'enqueue: tap-gate violation — an accepted capture leaves `accepted` only via '
+          + 'intake.confirmSave() on a user tap (caller must pass confirmedByTap: true)',
+        );
+      }
       const offline = opts?.offline === true;
       const to = offline ? STATES.OFFLINE_QUEUED : STATES.QUEUED;
       const ts = nowTs(opts);

@@ -49,6 +49,17 @@ BUILD contract records — the test suite is not local-only evidence.
 1. **Supabase acceptance = the commit point.** The instant `recordIntake`
    returns, the capture is durable — independent of worker liveness. The card
    renders **"safe and waiting"**, never "Completed".
+1b. **Tap-gated confirmation (Warwick decision, 2026-07-16).** An accepted text
+   capture **holds at the pending, non-claimable `accepted` state** — the card
+   shows the action buttons and NOTHING is written until the user taps
+   **"Save to Brain"** (`intake.confirmSave`), which enqueues it for the worker.
+   Double-taps and taps after completion are idempotent no-ops; an untapped card
+   stays pending forever in WP0 (no timeout logic). The pending hold is
+   restart-safe: the durable `card_ref` routes a post-restart tap back to its
+   capture. A **non-text** update (photo/voice/document/sticker/empty text) is
+   rejected before the commit point (`unsupported_content_type`) — no envelope,
+   no queue row, no markdown — and answered with a plain "Text only in WP0"
+   notice.
 2. **Leased claims.** The worker atomically claims the oldest queued item and
    sets a lease. A crashed worker's lease expires and the row auto-releases, so a
    second worker can reclaim it.
@@ -135,7 +146,7 @@ text, Markdown, or chat. The committed `.env.example` carries NAMES only.
 | **Why the inbox, not a PKM note** | the mechanical worker lands the raw capture; it does **not** decide the semantic PKM home. Penn/Larry triage `Team Inbox/` into the Journal/CRM later — the worker "performs the governed write, it does not invent structure" |
 | **Traversal boundary** | the writer confines all writes to `<baseDir>/captures/`; `capture_id` is charset-sanitised; any resolved path outside the leaf is refused |
 | **Evidence-pointer form** | `{ evidence_kind: 'markdown_write', target_ref: <absolute note path>, content_hash: <git-blob sha1 of the note> }`, persisted in `fcg.evidence_pointer` |
-| **Phone card reference** | on completion the card is edited in place to `Completed — saved to your Brain (<note path>)`, re-targeting the **original** card message (recovered from the durable `card_ref` after any restart) |
+| **Phone card reference** | on completion the card is edited in place to ``Completed — saved to your Brain (`<note path>`)`` — the path sits in a Markdown code span (parse_mode `Markdown`) so Telegram renders it monospace instead of auto-linking the `.md` filename — re-targeting the **original** card message (recovered from the durable `card_ref` after any restart) |
 
 ### Restart safety (§4)
 

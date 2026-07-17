@@ -48,6 +48,8 @@ export function createMockTelegramAdapter({ authorisedUserId, defaultAction = 'S
 
   // In-memory card log — the fixture stand-in for real Telegram card calls.
   const sentCards = [];
+  // Plain (non-card) outbound messages — e.g. the WP0 "text only" notice.
+  const sentMessages = [];
   // Rejection log — default-deny events are logged (sender id + when), never actioned.
   const rejections = [];
   // Answered callbacks (test-observable) + scripted inbound queue for getUpdates.
@@ -62,6 +64,7 @@ export function createMockTelegramAdapter({ authorisedUserId, defaultAction = 'S
   return {
     // --- expose the logs for tests ---
     sentCards,
+    sentMessages,
     rejections,
     answered,
 
@@ -127,9 +130,24 @@ export function createMockTelegramAdapter({ authorisedUserId, defaultAction = 'S
       return entry;
     },
 
-    /** Acknowledge a callback (test-observable). Never throws. */
-    answerCallbackQuery(callbackQueryId, text) {
-      const entry = { callbackQueryId, text };
+    /**
+     * Plain informational message — NO card, NO buttons (parity with the live
+     * adapter's sendMessage). Used for the WP0 "text only" notice. Recorded
+     * in-memory so tests can assert it without any network.
+     */
+    sendMessage(chatId, text) {
+      const entry = { op: 'message', chatId, text };
+      sentMessages.push(entry);
+      return entry;
+    },
+
+    /**
+     * Acknowledge a callback (test-observable). Never throws. `showAlert`
+     * mirrors the live adapter's dismissable-pop-up option (show_alert: true)
+     * so the runner's choice of subtle-toast vs must-see-alert is assertable.
+     */
+    answerCallbackQuery(callbackQueryId, text, { showAlert = false } = {}) {
+      const entry = { callbackQueryId, text, showAlert };
       answered.push(entry);
       return entry;
     },

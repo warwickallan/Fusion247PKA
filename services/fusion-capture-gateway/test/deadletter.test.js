@@ -40,7 +40,7 @@ function envelope(overrides = {}) {
 // Drive a fresh capture up to `failed` deterministically for store tests.
 function makeFailed(store) {
   store.recordIntake(envelope({ capture_id: 'cap-1' }), { now: T0 });
-  store.enqueue('cap-1', { now: T0 + 1 });
+  store.enqueue('cap-1', { confirmedByTap: true, now: T0 + 1 });
   store.claim('worker-A', 30_000, { now: T0 + 2 });
   store.transition('cap-1', STATES.WRITING, { now: T0 + 3 });
   return store.transition('cap-1', STATES.FAILED, { now: T0 + 4 });
@@ -113,7 +113,7 @@ test('store.deadLetter requires an injected numeric now', () => {
 test('store.deadLetter rejects an illegal source state', () => {
   const store = createInMemoryOperationalStore();
   store.recordIntake(envelope({ capture_id: 'cap-1' }), { now: T0 });
-  store.enqueue('cap-1', { now: T0 + 1 });
+  store.enqueue('cap-1', { confirmedByTap: true, now: T0 + 1 });
   // queued → dead_letter is not a legal hop.
   assert.throws(
     () => store.deadLetter('cap-1', { now: T0 + 2 }),

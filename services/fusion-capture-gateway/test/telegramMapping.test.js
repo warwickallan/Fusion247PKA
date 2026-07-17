@@ -35,6 +35,46 @@ test('malformed update with no message is rejected (no_message)', () => {
   assert.equal(r.reason, 'no_message');
 });
 
+test('NON-TEXT rejection: authorised photo/voice/document/sticker updates never map to an envelope', () => {
+  // Live defect 2026-07-16: a photo produced an empty capture that falsely
+  // completed. The mapping now rejects any authorised message with no usable
+  // text — no envelope is ever built for it.
+  const media = [
+    { photo: [{ file_id: 'AgACAgQAAxk', width: 90, height: 90 }] },
+    { voice: { file_id: 'AwACAgQAAxk', duration: 3 } },
+    { document: { file_id: 'BQACAgQAAxk', file_name: 'x.pdf' } },
+    { sticker: { file_id: 'CAACAgQAAxk', emoji: '👍' } },
+  ];
+  for (const extra of media) {
+    const r = mapTelegramUpdate({
+      update: { message: { message_id: 42, from: { id: AUTH_ID }, ...extra } },
+      now: NOW,
+      authorisedUserId: AUTH_ID,
+    });
+    assert.equal(r.ok, false, `${Object.keys(extra)[0]} must not map`);
+    assert.equal(r.reason, 'unsupported_content_type');
+    assert.equal(r.senderId, String(AUTH_ID), 'sender surfaced so the caller can reply');
+  }
+});
+
+test('NON-TEXT rejection: empty or whitespace-only text is unusable text, same rejection', () => {
+  for (const text of ['', '   ', '\n\t ']) {
+    const r = mapTelegramUpdate({ update: update(43, text), now: NOW, authorisedUserId: AUTH_ID });
+    assert.equal(r.ok, false);
+    assert.equal(r.reason, 'unsupported_content_type');
+  }
+});
+
+test('NON-TEXT rejection: an UNAUTHORISED photo stays a plain unauthorised_sender (no content-type oracle)', () => {
+  const r = mapTelegramUpdate({
+    update: { message: { message_id: 44, from: { id: 999 }, photo: [{ file_id: 'AgACAgQAAxk' }] } },
+    now: NOW,
+    authorisedUserId: AUTH_ID,
+  });
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, 'unauthorised_sender', 'allowlist check comes first');
+});
+
 test('capture_id is deterministic per idempotency key; action maps to intent', () => {
   const a = mapTelegramUpdate({ update: update(3, 'same body'), now: NOW, authorisedUserId: AUTH_ID });
   const b = mapTelegramUpdate({ update: update(3, 'same body'), now: NOW + 5000, authorisedUserId: AUTH_ID });

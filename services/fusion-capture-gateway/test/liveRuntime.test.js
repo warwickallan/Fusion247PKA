@@ -115,6 +115,7 @@ test('createLiveRuntime assembles a working fixtures pipeline end-to-end', async
 
   const accepted = await rt.intake.accept({ message: { message_id: 1, from: { id: 424242 }, text: 'runtime wire test' } });
   assert.equal(accepted.ok, true);
+  await rt.intake.confirmSave(accepted.captureId); // the user taps Save to Brain
   const final = await rt.worker.processOne({ now: t });
   assert.equal(final.state, STATES.COMPLETED);
 

@@ -69,6 +69,7 @@ test('dangerous message TEXT is stored verbatim as inert data — no path escape
       message: { message_id: 71001, from: { id: AUTH_ID }, text: payload },
     });
     assert.equal(acc.ok, true);
+    await intake.confirmSave(acc.captureId); // the user taps Save to Brain
 
     clock.advance(1000);
     const done = await worker.processOne({ now: clock.now() });

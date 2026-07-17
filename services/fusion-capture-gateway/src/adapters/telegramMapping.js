@@ -91,9 +91,21 @@ export function mapTelegramUpdate({ update, now, authorisedUserId, action, defau
     return { ok: false, reason: 'unauthorised_sender', senderId: senderId ?? null };
   }
 
-  // WP0: text only (technical_source_type 'text'). Untrusted content stays inert
-  // data — it is never interpolated into a path/command/query here.
+  // WP0: text only (technical_source_type 'text'). A message carrying NO usable
+  // text (photo/voice/document/sticker/… or an empty/whitespace-only text field)
+  // is REJECTED here — never mapped onto an envelope — so a non-text update can
+  // NEVER produce an empty capture, an empty markdown note, or a false
+  // 'completed' (live defect 2026-07-16: a photo silently "completed" with an
+  // empty note). The caller replies with an honest "text only in WP0" notice.
+  // Checked AFTER the allowlist so an unauthorised photo stays a plain
+  // unauthorised_sender rejection (no content-type oracle for strangers).
   const text = typeof message.text === 'string' ? message.text : '';
+  if (text.trim().length === 0) {
+    return { ok: false, reason: 'unsupported_content_type', senderId };
+  }
+
+  // Untrusted content stays inert data — it is never interpolated into a
+  // path/command/query here.
   const messageId = message.message_id;
   const channelNativeMessageId = `chat:${senderId}:msg:${messageId}`;
 

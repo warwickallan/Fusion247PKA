@@ -68,7 +68,7 @@ function makeEnvelope(overrides = {}) {
 
 // Drive an item through to `evidenced` with destination + one evidence pointer.
 async function driveToEvidenced(store, captureId, now) {
-  await store.enqueue(captureId, { now });
+  await store.enqueue(captureId, { confirmedByTap: true, now });
   await store.claim('w', 60_000, { now });
   await store.transition(captureId, STATES.WRITING, { now });
   await store.transition(captureId, STATES.WRITTEN, { now });
@@ -109,7 +109,7 @@ test('3. concurrent claim safety — SKIP LOCKED lets exactly one worker win', {
     // One item, two simultaneous claims => exactly one non-null.
     const a = makeEnvelope();
     await store.recordIntake(a, { now: 100 });
-    await store.enqueue(a.capture_id, { now: 100 });
+    await store.enqueue(a.capture_id, { confirmedByTap: true, now: 100 });
 
     const [r1, r2] = await Promise.all([
       store.claim('worker-1', 60_000, { now: 200 }),
@@ -125,8 +125,8 @@ test('3. concurrent claim safety — SKIP LOCKED lets exactly one worker win', {
     const c = makeEnvelope();
     await store.recordIntake(b, { now: 300 });
     await store.recordIntake(c, { now: 301 });
-    await store.enqueue(b.capture_id, { now: 300 });
-    await store.enqueue(c.capture_id, { now: 301 });
+    await store.enqueue(b.capture_id, { confirmedByTap: true, now: 300 });
+    await store.enqueue(c.capture_id, { confirmedByTap: true, now: 301 });
 
     const [rb, rc] = await Promise.all([
       store.claim('worker-1', 60_000, { now: 400 }),
@@ -145,7 +145,7 @@ test('4. due-retry — future not claimed; past-due & under cap claimed; at/over
     // Item A: fails with a FUTURE next_attempt_at.
     const a = makeEnvelope();
     await store.recordIntake(a, { now: 100 });
-    await store.enqueue(a.capture_id, { now: 100 });
+    await store.enqueue(a.capture_id, { confirmedByTap: true, now: 100 });
     await store.claim('w', 60_000, { now: 100 }); // attempt_count -> 1
     await store.recordFailure(a.capture_id, { now: 100, error: 'boom', nextAttemptAtMs: 1000 });
 
@@ -161,7 +161,7 @@ test('4. due-retry — future not claimed; past-due & under cap claimed; at/over
     // Item B: drive attempt_count to the cap, then fail while due => NOT claimable.
     const b = makeEnvelope();
     await store.recordIntake(b, { now: 2000 });
-    await store.enqueue(b.capture_id, { now: 2000 });
+    await store.enqueue(b.capture_id, { confirmedByTap: true, now: 2000 });
     let t = 2000;
     for (let i = 0; i < MAX_DELIVERY_ATTEMPTS; i += 1) {
       const claimed = await store.claim('w', 1, { now: t }); // lease expires immediately
@@ -184,7 +184,7 @@ test('5. evidence-gated completion — complete() refuses before evidenced + poi
     const e = makeEnvelope();
     const now = 100;
     await store.recordIntake(e, { now });
-    await store.enqueue(e.capture_id, { now });
+    await store.enqueue(e.capture_id, { confirmedByTap: true, now });
     await store.claim('w', 60_000, { now });
     await store.transition(e.capture_id, STATES.WRITING, { now });
     await store.transition(e.capture_id, STATES.WRITTEN, { now });
@@ -287,7 +287,7 @@ test('9. card_ref — recordCardRef persists the durable card target and reverse
   try {
     const e = makeEnvelope();
     await store.recordIntake(e, { now: 100 });
-    await store.enqueue(e.capture_id, { now: 100 });
+    await store.enqueue(e.capture_id, { confirmedByTap: true, now: 100 });
 
     // No card target yet.
     let rec = await store.getByCaptureId(e.capture_id);
@@ -341,7 +341,7 @@ test('8. due-retry query is served by the partial index (EXPLAIN references proc
     for (let i = 0; i < 40; i += 1) {
       const e = makeEnvelope();
       await store.recordIntake(e, { now: t });
-      await store.enqueue(e.capture_id, { now: t }); // 'queued' — NOT in the partial index
+      await store.enqueue(e.capture_id, { confirmedByTap: true, now: t }); // 'queued' — NOT in the partial index
       ids.push(e.capture_id);
       t += 1;
     }

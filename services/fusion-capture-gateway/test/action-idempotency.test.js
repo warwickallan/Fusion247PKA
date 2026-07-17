@@ -72,6 +72,7 @@ test('re-delivery after the write completed: still one row, still one note, no s
     const { store, adapter, markdownWriter, clock, intake, worker } = harness(baseDir);
 
     const first = await intake.accept(UPDATE, { action: 'SaveToBrain' });
+    await intake.confirmSave(first.captureId); // the user taps Save to Brain
     clock.advance(1000);
     const done = await worker.processOne({ now: clock.now() });
     assert.equal(done.state, STATES.COMPLETED);

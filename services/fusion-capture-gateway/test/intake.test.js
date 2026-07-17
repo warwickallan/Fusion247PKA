@@ -30,10 +30,12 @@ test('synthetic update → durable accept, contract-valid safe-and-waiting recei
   assert.equal(res.ok, true);
   assert.equal(res.isNew, true);
 
-  // Durable row exists at the commit point.
+  // Durable row exists at the commit point. TAP-GATED: intake HOLDS the capture
+  // at `accepted` (pending, non-claimable) — it is NOT queued until the user
+  // taps "Save to Brain" (intake.confirmSave).
   const rec = store.getByCaptureId(res.captureId);
   assert.ok(rec, 'a durable record exists after accept');
-  assert.equal(rec.state, STATES.QUEUED, 'online intake queues the item');
+  assert.equal(rec.state, STATES.ACCEPTED, 'tap-gated intake holds the item pending');
 
   // Receipt is contract-valid, safe-and-waiting, never completed.
   const v = validateReceipt(res.receipt);

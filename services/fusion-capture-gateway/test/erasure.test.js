@@ -47,10 +47,11 @@ test('erase() removes the governed note file AND the operational record', async 
   try {
     const { intake, worker, clock, store, eraser } = harness(baseDir);
 
-    // capture → intake
+    // capture → intake → tap
     const acc = await intake.accept(UPDATE);
     assert.equal(acc.ok, true);
     const captureId = acc.captureId;
+    await intake.confirmSave(captureId); // the user taps Save to Brain
 
     // worker completes → note on disk
     clock.advance(1000);
@@ -87,6 +88,7 @@ test('after erasure the same idempotency_key is re-accepted as a genuinely NEW c
     const first = await intake.accept(UPDATE);
     assert.equal(first.ok, true);
     assert.equal(first.isNew, true);
+    await intake.confirmSave(first.captureId); // the user taps Save to Brain
     clock.advance(1000);
     await worker.processOne({ now: clock.now() });
 
@@ -100,7 +102,7 @@ test('after erasure the same idempotency_key is re-accepted as a genuinely NEW c
     assert.equal(reAccept.ok, true);
     assert.equal(reAccept.isNew, true, 'freed key must produce a NEW record after erasure');
     assert.ok(store.getByCaptureId(reAccept.captureId), 'the re-accepted capture is durable');
-    assert.equal(store.getByCaptureId(reAccept.captureId).state, STATES.QUEUED);
+    assert.equal(store.getByCaptureId(reAccept.captureId).state, STATES.ACCEPTED, 'fresh capture holds pending (tap-gated)');
   } finally {
     fs.rmSync(baseDir, { recursive: true, force: true });
   }
@@ -112,6 +114,7 @@ test('double-erase is idempotent: second erase returns {erased:false}, no throw,
     const { intake, worker, clock, store, eraser } = harness(baseDir);
 
     const acc = await intake.accept(UPDATE);
+    await intake.confirmSave(acc.captureId); // the user taps Save to Brain
     clock.advance(1000);
     const final = await worker.processOne({ now: clock.now() });
     const notePath = final.destination_ref.path;

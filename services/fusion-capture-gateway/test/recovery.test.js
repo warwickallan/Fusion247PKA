@@ -32,6 +32,7 @@ test('dead worker → lease expiry → second worker resumes, single write, no f
       message: { message_id: 8008, from: { id: AUTH_ID }, text: 'survive the crash' },
     });
     const captureId = accepted.captureId;
+    await intake.confirmSave(captureId); // the user taps Save to Brain
 
     // --- Worker A claims, writes the file, then CRASHES before committing the
     //     store transition/destination/evidence. State stays `claimed`.
