@@ -1,0 +1,17 @@
+# Secrets — never committed. Only .env.example is tracked.
+.env
+.env.*
+!.env.example
+
+# Node
+node_modules/
+
+# Throwaway local Postgres cluster + verify substrate (integration proof only).
+.pgdata/
+.pg-*/
+*.local
+
+# Generated proof scratch (adapter out.json, worktrees). Transcript is committed
+# under Builds/… not here.
+.proof-out/
+.tower-worktrees/
