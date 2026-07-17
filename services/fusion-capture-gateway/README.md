@@ -30,6 +30,35 @@ long-polls Telegram and drives the whole saga.
   - `src/worker.js` — the pull/claim/write/evidence/complete cycle, including
     autonomous retry scheduling and retry-exhaustion → dead-letter.
   - `src/core/retryPolicy.js` — deterministic bounded-retry backoff (pure logic).
+- **Governance control surface** (BUILD-002 WP2) — the sole Telegram poller also
+  recognises governance signals and routes them to the Fusion Tower, WITHOUT a
+  second poller:
+  - `src/governance/commandGrammar.js` — pure grammar: `/status`, `/trace`,
+    `/watch on|milestones|off`, `/pause`, `/resume`, `/stop`, `/approve`, and the
+    `/gov`|`/run` run-start prefix (recognised so it is not captured; run-start
+    execution is the Tower's job), plus the `dec:<gate_token>:<decision>`
+    decision-card callback parse.
+  - `src/governance/detect.js` — the additive pre-check that classifies an update
+    as `capture | gov_command | gov_decision | ignore`, reusing the SAME allowlist
+    + private-direct-chat gate (`authorisePrivateChatSender`) as capture. Auth
+    runs first: an unauthorised / non-private update returns `capture` WITHOUT
+    parsing the command, so no governance oracle leaks to a stranger.
+  - `src/store/ftwCommandIntake.js` — a thin, least-privilege writer of
+    `ftw.run_event` rows (`kind='command:<name>'` deduped on the `update_id`;
+    `kind='command:decision'` deduped on `cb:<callback_query.id>`) via
+    `INSERT … ON CONFLICT (source, source_event_id) DO NOTHING`. The live backend
+    REUSES the operational store's service_role connection (the `store.query`
+    seam — no second pool); fixtures use an in-memory backend. WP2 only DETECTS +
+    WRITES these events; the Tower consumes and executes them and sends any reply.
+  - **Fail-closed decision (documented).** If a governance event cannot be written
+    (no ftw writer wired, or the ftw schema/connection absent so the insert
+    throws), the runner logs a **masked, structured error** and does **not**
+    capture the command as a note and does **not** silently swallow it. Dropping a
+    governance command with a loud audit trail is the safe posture; misfiling a
+    `/stop` as a Brain note is not. The offset still advances — this is the sole
+    poller, so wedging it on a poison command would also block real captures. A
+    decision tap is always answered (`answerCallbackQuery`, **outbound only, no
+    poll**) so Telegram stops the button spinner.
 
 ## Run the tests
 
