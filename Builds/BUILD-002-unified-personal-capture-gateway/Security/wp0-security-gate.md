@@ -78,6 +78,8 @@ Until this gate PASSES against the implemented baseline:
 **Exact pass condition that unlocks real secrets + live proof:** Sections 1–5 all check GREEN against the implemented baseline (no CRITICAL/HIGH findings open), with special hard-stops satisfied — sender allowlist enforced and default-deny proven, zero secrets in Git/Markdown/ClickUp with `.gitignore` + secret-scanning live, `service_role` isolated to the worker with RLS on, worker write path scoped and traversal-proof, and a working deletion path. On PASS and Vex sign-off, real secrets and the live phone-visible proof are authorised — not before.
 
 > **CLOSED 2026-07-17 — live credential/transport sign-off: GREEN-WITH-CONDITIONS** at head `ecaec0c` (0 CRITICAL / 0 HIGH / 1 MEDIUM / 3 LOW / 3 INFO; mandated follow-up FU-1: pin Supabase CA + `sslmode=verify-full` before unattended operation). See [[wp0-live-signoff-2026-07-17]].
+>
+> **WP1 delta 2026-07-17 — GREEN-WITH-CONDITIONS** at `9c69cfb` (0/0/0 CRIT/HIGH/MED, 3 LOW, 5 INFO; FU-1/2/3/4 closed — FU-1 pending only the dashboard CA cross-check; all four live actions approved: 0006 apply, edge deploy, PR open, worker restart). See [[wp1-delta-review-2026-07-17]].
 
 ## 7. Gate outcome
 
