@@ -29,6 +29,7 @@ const MIGRATIONS = [
   '0003_wp0_rls_policies.sql',
   '0004_wp0_retry_retention_indexes.sql',
   '0005_wp0_card_target_and_poll_offset.sql',
+  '0006_wp1_cloud_intake_rpcs.sql',
 ];
 
 // Drop the fcg schema and re-apply all migrations from empty. `pg` loaded here,
@@ -39,6 +40,12 @@ async function resetAndMigrate() {
   const pool = new Pool({ connectionString: DB });
   try {
     await pool.query('drop schema if exists fcg cascade');
+    // The WP1 RPCs (0006) live in `public` with builtin-typed signatures, so a
+    // schema-level fcg reset does NOT remove them — drop explicitly or the
+    // re-apply hits 42723 (duplicate function).
+    await pool.query('drop function if exists public.fcg_webhook_intake(text, bigint, text, text, uuid, text, text, text, text, jsonb, timestamptz)');
+    await pool.query('drop function if exists public.fcg_webhook_confirm_tap(text, bigint, text, text, text, text)');
+    await pool.query('drop function if exists public.fcg_webhook_card_ref(uuid, text, text)');
     for (const file of MIGRATIONS) {
       const sql = fs.readFileSync(path.join(MIGRATIONS_DIR, file), 'utf8');
       await pool.query(sql);

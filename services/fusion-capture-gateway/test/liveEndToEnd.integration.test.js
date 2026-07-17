@@ -46,6 +46,7 @@ const MIGRATIONS = [
   '0003_wp0_rls_policies.sql',
   '0004_wp0_retry_retention_indexes.sql',
   '0005_wp0_card_target_and_poll_offset.sql',
+  '0006_wp1_cloud_intake_rpcs.sql',
 ];
 const ADVANCE_PAST_ANY_BACKOFF_MS = MAX_BACKOFF_MS + 1;
 

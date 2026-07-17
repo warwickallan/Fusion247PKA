@@ -122,6 +122,12 @@ export function mapTelegramUpdate({ update, now, authorisedUserId, action, defau
     idempotency_key: idempotencyKey,
     source_channel: SOURCE_CHANNEL,
     sender_identity_ref: `telegram:user:${senderId}`,
+    // WP1 consistency (wp1-architecture-decision.md §6 anomaly): the BARE
+    // NUMERIC principal, matching what the cloud allowlist (fcg_webhook_intake)
+    // matches on and what the deploy-time seed row carries. The poll path's
+    // identity upsert (ON CONFLICT DO NOTHING on identity_ref) therefore stays
+    // a no-op against the seed instead of registering a divergent shape.
+    channel_principal_ref: senderId,
     recorded_intent: intentFromAction(action ?? defaultAction),
     technical_source_type: 'text',
     raw_payload_ref: {
