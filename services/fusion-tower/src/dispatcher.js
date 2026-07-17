@@ -159,7 +159,11 @@ export function createDispatcher({ store, config, adapters, notifier, now, lease
       if (run.status !== RUN_STATUS.ACTIVE) {
         run = await store.setRunStatus(runId, RUN_STATUS.ACTIVE, { now: nowMs });
       }
-      const turn = await store.appendTurn(runId, { expectedResponder, boundedContext }, { now: nowMs });
+      // NB: the store persists the bounded context under `boundedContextRef`; map it
+      // here so the pointer context actually reaches the responder's turn (both stores
+      // read boundedContextRef). Without this the adapter would fall back to a default
+      // task and no pointers would ever reach the reviewer.
+      const turn = await store.appendTurn(runId, { expectedResponder, boundedContextRef: boundedContext }, { now: nowMs });
       const dispatched = await store.dispatchTurn(turn.turn_id, { now: nowMs, leaseMs: lease });
       await store.setCurrentTurn(runId, turn.turn_id, { now: nowMs });
       await store.setRunStatus(runId, RUN_STATUS.AWAITING_RESPONDER, { now: nowMs });
