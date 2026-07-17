@@ -199,6 +199,26 @@ class TestCombinedReportSuccess(unittest.TestCase):
     def test_analysis_sections_are_scaffolds(self):
         self.assertIn("TUBEAIR:ANALYSIS_PENDING", self.md)
 
+    def test_decision_block_present_with_no_auto_update(self):
+        self.assertIn("## Warwick Decision Block", self.md)
+        self.assertIn("Recommended disposition:", self.md)
+        self.assertIn("No automatic living-knowledge update", self.md)
+        # near the top: before section 1
+        self.assertLess(self.md.find("## Warwick Decision Block"), self.md.find("## 1. Executive"))
+
+    def test_untrusted_warning_immediately_before_transcript(self):
+        warn = self.md.find("Untrusted source")
+        sec7 = self.md.find("## 7. Full Transcript")
+        self.assertNotEqual(warn, -1)
+        self.assertNotEqual(sec7, -1)
+        self.assertLess(warn, sec7)
+        # nothing but the warning + blank line between it and the header
+        self.assertLess(sec7 - warn, 600)
+
+    def test_no_verbatim_wording(self):
+        self.assertNotIn("verbatim", self.md.lower())
+        self.assertIn("captured from YouTube captions/auto-captions", self.md)
+
 
 class TestCombinedReportFailure(unittest.TestCase):
     def setUp(self):
