@@ -24,7 +24,7 @@ import { createClickupClient } from '../src/clickupClient.js';
 import { createGithubEvidence } from '../src/githubEvidence.js';
 import { createCodexAdapter } from '../src/codexAdapter.js';
 import { createMilestoneNotifier, createTelegramClient } from '../src/telegramNotifier.js';
-import { openState, acquireLock } from '../src/state.js';
+import { openState, acquireLock, DEFAULT_LOCK_STALE_MS } from '../src/state.js';
 import { createWatcher } from '../src/watcher.js';
 import { loadQaSkill, assertStandingStartupAllowed } from '../src/qaSkill.js';
 
@@ -83,7 +83,24 @@ async function main() {
   // 2. single-watcher lock.
   const lock = acquireLock({});
   if (!lock.acquired) { log(`[TOWER] not starting — ${lock.reason}`); process.exit(3); }
-  const shutdown = () => { try { lock.release(); } catch { /* ignore */ } };
+  if (lock.reclaimedStale) log(`[TOWER] ${lock.reason}`);
+
+  // 2b. LOCK HEARTBEAT — a healthy watcher refreshes heartbeat_at forever, so it stays the
+  // live owner regardless of how old acquired_at gets (this is what keeps a long-running
+  // watcher from having its LIVE lock reclaimed by a second start). Interval well under the
+  // stale window so a missed tick or two never trips the threshold.
+  const heartbeatMs = Math.min(DEFAULT_LOCK_STALE_MS / 2, 60_000);
+  const heartbeatTimer = setInterval(() => {
+    try {
+      if (!lock.heartbeat({ log })) log('[TOWER] lock heartbeat lost — another watcher may have reclaimed the lock');
+    } catch (e) { log(`[TOWER] lock heartbeat error (continuing): ${config.redact(e?.message ?? String(e))}`); }
+  }, heartbeatMs);
+  heartbeatTimer.unref?.(); // the poll interval keeps the process alive; the heartbeat must not on its own
+
+  const shutdown = () => {
+    try { clearInterval(heartbeatTimer); } catch { /* ignore */ }
+    try { lock.release(); } catch { /* ignore */ } // releases ONLY our own (nonce-owned) lock
+  };
   process.on('SIGINT', () => { shutdown(); process.exit(0); });
   process.on('SIGTERM', () => { shutdown(); process.exit(0); });
   process.on('exit', shutdown);
