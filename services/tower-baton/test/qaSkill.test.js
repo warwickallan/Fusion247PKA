@@ -4,7 +4,7 @@ import crypto from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { loadQaSkill } from '../src/qaSkill.js';
+import { loadQaSkill, assertStandingStartupAllowed } from '../src/qaSkill.js';
 import { writeTmp, approvedSkill } from '../test-helpers/fakes.js';
 
 const SERVICE_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -61,10 +61,45 @@ test('loadQaSkill — provisional WITH proof_run_authorised loads (proof gate)',
   assert.equal(r.version, '3');
 });
 
-test('loadQaSkill — the real shipped skill loads for the proof run (not standing-ratified)', () => {
+test('loadQaSkill — the real shipped skill is ratified for standing use', () => {
   const r = loadQaSkill({ path: SHIPPED_SKILL });
   assert.equal(r.ok, true, r.error ?? '');
-  assert.equal(r.proofRunAuthorised, true, 'proof run is authorised');
-  assert.equal(r.standingUseRatified, false, 'standing use is NOT yet ratified');
+  assert.equal(r.status, 'approved', 'shipped skill is approved');
+  assert.equal(r.standingUseRatified, true, 'standing use IS ratified');
+  assert.equal(r.proofRunAuthorised, false, 'separately-authorised bounded proof run no longer required');
   assert.ok(r.version);
+});
+
+// ── STANDING-STARTUP GATE (pure) — assertStandingStartupAllowed ────────────────
+test('assertStandingStartupAllowed — (a) ratified skill → standing startup ALLOWED', () => {
+  const skill = { ok: true, status: 'approved', standingUseRatified: true, proofRunAuthorised: false };
+  const g = assertStandingStartupAllowed(skill, { proofMode: false });
+  assert.equal(g.ok, true, g.reason);
+  assert.match(g.reason, /standing use ratified/i);
+});
+
+test('assertStandingStartupAllowed — (b) not-ratified, no proof → standing startup REFUSED with reason', () => {
+  const skill = { ok: true, status: 'approved', standingUseRatified: false, proofRunAuthorised: false };
+  const g = assertStandingStartupAllowed(skill, { proofMode: false });
+  assert.equal(g.ok, false);
+  assert.match(g.reason, /not ratified for standing use/i);
+});
+
+test('assertStandingStartupAllowed — (c) proofMode + proof_run_authorised (standing false) → ALLOWED', () => {
+  const skill = { ok: true, status: 'provisional', standingUseRatified: false, proofRunAuthorised: true };
+  const g = assertStandingStartupAllowed(skill, { proofMode: true });
+  assert.equal(g.ok, true, g.reason);
+  assert.match(g.reason, /proof/i);
+});
+
+test('assertStandingStartupAllowed — proof-authorised alone does NOT unlock STANDING mode', () => {
+  const skill = { ok: true, standingUseRatified: false, proofRunAuthorised: true };
+  const g = assertStandingStartupAllowed(skill, { proofMode: false });
+  assert.equal(g.ok, false, 'standing mode must not accept a mere proof authorisation');
+});
+
+test('assertStandingStartupAllowed — a skill that did not load is refused (fail-closed)', () => {
+  const g = assertStandingStartupAllowed({ ok: false, error: 'fail-closed: draft' }, { proofMode: false });
+  assert.equal(g.ok, false);
+  assert.match(g.reason, /did not load|fail-closed/i);
 });

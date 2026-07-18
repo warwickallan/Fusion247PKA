@@ -26,6 +26,7 @@ import { createCodexAdapter } from '../src/codexAdapter.js';
 import { createMilestoneNotifier, createTelegramClient } from '../src/telegramNotifier.js';
 import { openState, acquireLock } from '../src/state.js';
 import { createWatcher } from '../src/watcher.js';
+import { loadQaSkill, assertStandingStartupAllowed } from '../src/qaSkill.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SERVICE_DIR = path.resolve(__dirname, '..');
@@ -66,6 +67,19 @@ async function main() {
     process.exit(1);
   }
 
+  // 1b. STANDING-STARTUP GATE — the standing daemon MUST refuse to come online unless the
+  // QA governing prompt is ratified for standing use. A bounded proof run (TOWER_PROOF_RUN=1)
+  // may start on proof_run_authorised. Checked BEFORE the lock/notifier so an unratified
+  // governing prompt can never bring the watcher online. Fail-closed → clean exit(1).
+  const qaSkillPath = process.env.TOWER_QA_SKILL_PATH || DEFAULT_QA_SKILL;
+  const proofMode = process.env.TOWER_PROOF_RUN === '1';
+  const gate = assertStandingStartupAllowed(loadQaSkill({ path: qaSkillPath }), { proofMode });
+  if (!gate.ok) {
+    log(`[TOWER] startup fail-closed: ${config.redact(gate.reason)}`);
+    process.exit(1);
+  }
+  log(`[TOWER] standing-startup gate: ${proofMode ? 'bounded-proof' : 'standing'} mode — ${config.redact(gate.reason)}`);
+
   // 2. single-watcher lock.
   const lock = acquireLock({});
   if (!lock.acquired) { log(`[TOWER] not starting — ${lock.reason}`); process.exit(3); }
@@ -82,7 +96,7 @@ async function main() {
   const taskId = process.env.TOWER_CLICKUP_TASK_ID;
   if (!taskId) { log('[TOWER] fail-closed: TOWER_CLICKUP_TASK_ID is not set (which ClickUp control task to watch)'); shutdown(); process.exit(1); }
   const repoDir = process.env.TOWER_REPO_DIR || REPO_ROOT;
-  const qaSkillPath = process.env.TOWER_QA_SKILL_PATH || DEFAULT_QA_SKILL;
+  // qaSkillPath was resolved + gated at the standing-startup gate above (step 1b).
   const pollMs = Number(process.env.TOWER_POLL_MS) > 0 ? Number(process.env.TOWER_POLL_MS) : 30_000;
 
   const clickup = createClickupClient({ config });

@@ -72,3 +72,38 @@ export function loadQaSkill({ path, fs = fsDefault } = {}) {
   }
   return { ok: true, text, fingerprint, version, status, proofRunAuthorised, standingUseRatified, error: null };
 }
+
+/**
+ * STANDING-STARTUP GATE (pure, testable). Decides whether the standing watcher daemon
+ * may start given a loaded QA-skill result. This is STRICTER than loadQaSkill's runnable
+ * check: a legacy `status: approved` or a bounded `proof_run_authorised` is enough to RUN
+ * a single review turn, but the STANDING daemon must refuse to come online unless the
+ * governing prompt has been explicitly ratified for standing use.
+ *
+ *   · standing mode (default): ok:true ONLY if standingUseRatified === true.
+ *   · bounded proof mode (proofMode:true): ok:true if standingUseRatified === true OR
+ *     proofRunAuthorised === true (a bounded proof run may remain separately authorised).
+ *
+ * Fail-closed: a skill that did not load (skillLoadResult.ok === false) is never allowed.
+ * Returns { ok, reason } — reason is a clear, non-sensitive blocker string.
+ */
+export function assertStandingStartupAllowed(skillLoadResult, { proofMode = false } = {}) {
+  const r = skillLoadResult ?? {};
+  if (r.ok === false) {
+    return { ok: false, reason: `standing-startup refused: QA skill did not load (${r.error ?? 'fail-closed'})` };
+  }
+  const standingUseRatified = r.standingUseRatified === true;
+  const proofRunAuthorised = r.proofRunAuthorised === true;
+  if (standingUseRatified) {
+    return { ok: true, reason: 'standing use ratified — standing startup allowed' };
+  }
+  if (proofMode && proofRunAuthorised) {
+    return { ok: true, reason: 'bounded proof run authorised — proof startup allowed (standing use not yet ratified)' };
+  }
+  return {
+    ok: false,
+    reason: proofMode
+      ? 'bounded-proof startup refused: QA skill is neither standing_use_ratified nor proof_run_authorised'
+      : 'standing startup refused: QA skill is not ratified for standing use (standing_use_ratified:false)',
+  };
+}

@@ -6,14 +6,14 @@ modelled_on: the PHILOSOPHY of Warwick's independent-QA skill (independent, read
 build: BUILD-010
 component: Fusion Tower / baton MVP
 artifact: tower-qa-skill
-status: provisional
-proof_run_authorised: true
-standing_use_ratified: false
+status: approved
+proof_run_authorised: false
+standing_use_ratified: true
 version: 1
 owner: Warwick
 reviewer: Codex (gpt_codex, provider openai-codex)
 run_authorized_by: Warwick — overnight authorization BUILD-010-TOWER-BATON-RECOVERY-OVERNIGHT-0001 (2026-07-18) commissioned this skill (modelled on his independent-QA standard, code-build vocabulary, "like Mack and Claude QA") and authorized the live proof to run under it. `proof_run_authorised: true` = cleared for the bounded proof run.
-text_ratification: PROVISIONAL — the exact wording has NOT yet been reviewed line-by-line by Warwick. It is surfaced for his sign-off at final review. The standing scheduled watcher stays OFF until he ratifies the text (`standing_use_ratified: false`). See memory [[governing-prompts-need-human-approval]].
+text_ratification: RATIFIED — Warwick reviewed version 1 line-by-line and ratified the wording as written for standing use on 2026-07-18 (`standing_use_ratified: true`). The standing scheduled watcher may now load this skill; a separately-authorised bounded proof run is no longer required (`proof_run_authorised: false`). See memory [[governing-prompts-need-human-approval]].
 change_history: recorded in the session log (Team Knowledge/session-logs/…); this
   file is loaded FRESH per review turn and its SHA-256 is fingerprinted onto every
   verdict.
