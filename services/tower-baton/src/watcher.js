@@ -28,6 +28,14 @@ import { loadQaSkill } from './qaSkill.js';
 
 export const DEFAULT_MAX_ROUNDS = 3;
 
+// Only these extensions are accepted as local-file briefs. A brief is staged verbatim
+// into the Codex prompt, so it must be plain human-readable build text — never a binary,
+// a script, or a dotfile secret store.
+export const ALLOWED_BRIEF_EXT = Object.freeze(new Set(['.md', '.markdown', '.txt']));
+// Hard cap on a local brief before it is read (stat-gated). A brief is documentation,
+// not a data dump; anything larger is refused rather than slurped into memory/the prompt.
+export const MAX_BRIEF_BYTES = 1_000_000; // 1 MB
+
 /** Resolve the approved brief from a brief_ref. Fail-closed when it cannot be read. */
 export async function resolveBrief(briefRef, { fs = fsDefault, clickup = null, taskId = null, repoRoot = null } = {}) {
   if (!briefRef) return { ok: false, error: 'fail-closed: missing brief_ref' };
@@ -35,11 +43,21 @@ export async function resolveBrief(briefRef, { fs = fsDefault, clickup = null, t
   // repo root. A brief_ref is attacker-influenceable (any comment on the control task),
   // its content is staged verbatim into the Codex prompt, and Codex's summary is posted
   // to ClickUp — so an unconstrained read of e.g. C:\.fusion247\*.env would exfiltrate
-  // secrets. CONTAINMENT: resolve against repoRoot and refuse anything that escapes it.
+  // secrets. CONTAINMENT (fail-closed at every step, only when repoRoot is provided):
+  //   1. LEXICAL: the resolved path must not escape repoRoot (../, absolute-external) —
+  //      caught even when the target does not exist;
+  //   2. extension allowlist (.md/.markdown/.txt);
+  //   3. stat + size cap BEFORE reading (must exist as a real file);
+  //   4. REAL-path containment: realpath BOTH sides (resolving symlinks/junctions) and
+  //      require the real target to stay inside the real root — defeats a link inside
+  //      the repo that points outside;
+  //   5. read + 8000-char excerpt cap.
   const cuLike = /(?:clickup\.com\/t\/|^CU-)/i.test(String(briefRef));
   if (!cuLike) {
     try {
       const abs = path.resolve(repoRoot ?? process.cwd(), briefRef);
+
+      // 1. LEXICAL containment (fires even if the target is absent).
       if (repoRoot) {
         const root = path.resolve(repoRoot);
         const rel = path.relative(root, abs);
@@ -47,7 +65,33 @@ export async function resolveBrief(briefRef, { fs = fsDefault, clickup = null, t
           return { ok: false, error: `fail-closed: brief_ref resolves OUTSIDE the governed repo root — refused (${briefRef})` };
         }
       }
-      if (fs.existsSync(abs) && fs.statSync(abs).isFile()) {
+
+      // 3. stat first (size + is-file) BEFORE any read.
+      let st = null;
+      try { st = fs.statSync(abs); } catch { st = null; }
+      if (st && st.isFile()) {
+        // 2. extension allowlist.
+        const ext = path.extname(abs).toLowerCase();
+        if (!ALLOWED_BRIEF_EXT.has(ext)) {
+          return { ok: false, error: `fail-closed: brief_ref extension "${ext || '(none)'}" is not an allowed brief type (.md/.markdown/.txt) — refused (${briefRef})` };
+        }
+        if (st.size > MAX_BRIEF_BYTES) {
+          return { ok: false, error: `fail-closed: brief_ref file is too large (${st.size} bytes > ${MAX_BRIEF_BYTES}) — refused (${briefRef})` };
+        }
+        // 4. REAL-path containment (symlink/junction escape defence) — only when governed.
+        if (repoRoot) {
+          let realRoot;
+          let realCandidate;
+          try { realRoot = fs.realpathSync(path.resolve(repoRoot)); }
+          catch { return { ok: false, error: `fail-closed: governed repo root does not resolve (${repoRoot})` }; }
+          try { realCandidate = fs.realpathSync(abs); }
+          catch { return { ok: false, error: `fail-closed: brief_ref real path does not resolve (${briefRef})` }; }
+          const relReal = path.relative(realRoot, realCandidate);
+          if (relReal === '' || relReal.startsWith('..') || path.isAbsolute(relReal)) {
+            return { ok: false, error: `fail-closed: brief_ref real path escapes the governed repo root (symlink/junction) — refused (${briefRef})` };
+          }
+        }
+        // 5. read + excerpt cap.
         const text = fs.readFileSync(abs, 'utf8');
         if (text && text.trim()) return { ok: true, kind: 'file', excerpt: text.slice(0, 8000), ref: briefRef };
         return { ok: false, error: `fail-closed: brief_ref file is empty (${briefRef})` };
@@ -167,7 +211,22 @@ export function createWatcher({ config, clickup, github, codex, notifier, state,
     if (!brief.ok) gateBlockers.push(brief.error);
     if (!skill.ok) gateBlockers.push(skill.error);
     if (!evidence.ok) gateBlockers.push(evidence.error);
-    if (evidence.ok && evidence.headMatchesBranch === false) gateBlockers.push(`fail-closed: head_sha ${checkpoint.head_sha} is not the current head of ${checkpoint.branch} (branch is at ${evidence.branchHeadSha}) — a new head invalidates this checkpoint`);
+    // Branch binding is EXPLICIT — no silent null-permissiveness:
+    //   · DEFAULT (branch-bound): the branch MUST resolve AND its head MUST equal
+    //     head_sha. Drift (resolves, wrong head) → fail closed; unresolvable branch →
+    //     fail closed (use an explicit review_mode: pinned_sha for a pinned-SHA review).
+    //   · review_mode: pinned_sha: head existence + diff are still bound to the exact
+    //     SHA (already verified by evidence.ok); branch resolution is skipped BY DESIGN.
+    if (evidence.ok) {
+      const pinnedSha = checkpoint.review_mode === 'pinned_sha';
+      if (!pinnedSha) {
+        if (evidence.headMatchesBranch === false) {
+          gateBlockers.push(`fail-closed: head_sha ${checkpoint.head_sha} is not the current head of ${checkpoint.branch} (branch is at ${evidence.branchHeadSha}) — a new head invalidates this checkpoint`);
+        } else if (evidence.headMatchesBranch === null || evidence.branchResolved === false) {
+          gateBlockers.push(`fail-closed: branch ${checkpoint.branch} could not be resolved — a branch-bound checkpoint requires a resolvable branch; set an explicit "review_mode: pinned_sha" checkpoint for a pinned-SHA-only review`);
+        }
+      }
+    }
 
     const roundsSpent = state.roundCount(ck);
     let codexResult = null;
@@ -256,6 +315,23 @@ export function createWatcher({ config, clickup, github, codex, notifier, state,
           if (!parsed.ok) continue; // not a checkpoint (or malformed → ignored on the read side)
           const cp = parsed.checkpoint;
           if (state.isAnswered(cp.checkpoint_id)) { skipped.push({ checkpointId: cp.checkpoint_id, reason: 'already-answered' }); continue; }
+          // AUTHOR GATE (defence in depth over the [LARRY → TOWER] text marker): only an
+          // allowlisted ClickUp author may trigger a Codex turn. The marker alone is NOT
+          // trust — anyone can type it into a comment.
+          //   · missing allowlist config → FAIL CLOSED for standing operation (refuse,
+          //     do NOT default-open);
+          //   · comment from an unauthorised author → IGNORED (no Codex, no reply), logged
+          //     with the author id only (no secret).
+          if (!config?.authorGateConfigured) {
+            log(`pollOnce: TOWER_AUTHORISED_AUTHOR_IDS not configured — refusing checkpoint ${cp.checkpoint_id} (fail-closed; no review, no reply)`);
+            skipped.push({ checkpointId: cp.checkpoint_id, reason: 'author-allowlist-unconfigured' });
+            continue;
+          }
+          if (!config.isAuthorisedAuthor(c.user)) {
+            log(`pollOnce: checkpoint ${cp.checkpoint_id} from unauthorised author "${c.user ?? '(unknown)'}" — ignored (no review, no reply)`);
+            skipped.push({ checkpointId: cp.checkpoint_id, reason: 'unauthorised-author' });
+            continue;
+          }
           const r = await processCheckpoint(cp);
           if (r.skipped) skipped.push({ checkpointId: r.checkpointId, reason: r.skipped });
           else processed.push(r);

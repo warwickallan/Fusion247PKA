@@ -92,9 +92,11 @@ export function createGithubEvidence({ repoDir = process.cwd(), repo = null, run
   return {
     /**
      * Collect evidence bound to the EXACT head SHA. Returns
-     * { ok, headSha, resolved, branchHeadSha, headMatchesBranch, diffRange,
-     *   changedFiles[], checks[], error }. Fail-closed: ok=false on any unresolvable
-     * SHA/branch/diff, with a specific blocker in `error`.
+     * { ok, headSha, resolved, branchProvided, branchResolved, branchHeadSha,
+     *   headMatchesBranch, diffRange, changedFiles[], checks[], error }. Fail-closed:
+     * ok=false on any unresolvable SHA/diff, with a specific blocker in `error`.
+     * Branch resolution is reported explicitly (branchResolved) so the watcher decides
+     * fail-closed vs pinned_sha; it is NOT a hard fail here.
      */
     async collect({ branch, headSha, baseSha, repo: repoOverride } = {}) {
       const ghRepo = repoOverride ?? repo;
@@ -109,14 +111,25 @@ export function createGithubEvidence({ repoDir = process.cwd(), repo = null, run
       }
       const resolvedHead = verify.stdout.trim();
 
-      // 2. branch head — a DIFFERENT live head invalidates the checkpoint.
+      // 2. branch head — a DIFFERENT live head invalidates the checkpoint. Branch
+      //    resolution is made EXPLICIT so the watcher can fail closed on an
+      //    unresolvable branch (rather than treating null as silently permissive):
+      //      · branchResolved === true  → branch resolved; headMatchesBranch is true/false
+      //      · branchResolved === false → branch did NOT resolve; headMatchesBranch = null
+      //      · branchResolved === null  → no branch supplied (not applicable)
+      const branchProvided = Boolean(branch);
       let branchHeadSha = null;
       let headMatchesBranch = null;
+      let branchResolved = null;
       if (branch) {
         const bh = await git(['rev-parse', '--verify', '--quiet', `${branch}`]);
         if (bh.code === 0 && bh.stdout.trim()) {
+          branchResolved = true;
           branchHeadSha = bh.stdout.trim();
           headMatchesBranch = branchHeadSha.startsWith(headSha) || resolvedHead === branchHeadSha;
+        } else {
+          branchResolved = false;
+          headMatchesBranch = null;
         }
       }
 
@@ -174,6 +187,8 @@ export function createGithubEvidence({ repoDir = process.cwd(), repo = null, run
         ok: true,
         headSha: resolvedHead,
         resolved: true,
+        branchProvided,
+        branchResolved,
         branchHeadSha,
         headMatchesBranch,
         diffRange,

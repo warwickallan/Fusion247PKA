@@ -27,7 +27,7 @@ function deferred() {
 }
 
 function buildWatcher({ codex, github }) {
-  const config = loadConfig({ env: { GITHUB_REPO: 'o/r' }, home: tmpPath() });
+  const config = loadConfig({ env: { GITHUB_REPO: 'o/r', TOWER_AUTHORISED_AUTHOR_IDS: 'larry' }, home: tmpPath() });
   const skillPath = writeTmp(approvedSkill(1), '.md');
   const brief = writeTmp('# Brief\nacceptance: the watcher works', '.md');
   const state = openState({ statePath: tmpPath('.json') });

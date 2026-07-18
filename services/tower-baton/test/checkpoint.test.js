@@ -93,3 +93,19 @@ test('chainKey binds build/wp/brief', () => {
   const { checkpoint } = parseCheckpoint(GOOD);
   assert.equal(chainKey(checkpoint), 'BUILD-010|WP1|Builds/BUILD-010/brief.md');
 });
+
+test('checkpoint parser — review_mode pinned_sha parses; a bad value fails closed; absent → branch-bound', () => {
+  const pinned = parseCheckpoint(`${GOOD}\nreview_mode: pinned_sha`);
+  assert.equal(pinned.ok, true, pinned.errors.join('; '));
+  assert.equal(pinned.checkpoint.review_mode, 'pinned_sha');
+
+  const bad = parseCheckpoint(`${GOOD}\nreview_mode: whatever`);
+  assert.equal(bad.ok, false);
+  assert.ok(bad.errors.some((e) => /review_mode/.test(e)));
+
+  // absent review_mode is valid (default branch-bound) and round-trips through format.
+  const { checkpoint } = parseCheckpoint(GOOD);
+  assert.equal(checkpoint.review_mode, undefined);
+  const reparsed = parseCheckpoint(formatCheckpoint({ ...checkpoint, review_mode: 'pinned_sha' }));
+  assert.equal(reparsed.checkpoint.review_mode, 'pinned_sha');
+});

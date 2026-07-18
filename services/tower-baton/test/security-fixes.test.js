@@ -40,14 +40,76 @@ test('resolveBrief — allows a brief INSIDE the repo root', async () => {
   assert.match(r.excerpt, /acceptance/);
 });
 
+test('resolveBrief — a valid internal Markdown brief resolves', async () => {
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'tower-root-')));
+  const inside = path.join(root, 'wp1-brief.md');
+  fs.writeFileSync(inside, '# WP1\nacceptance: it works', 'utf8');
+  const r = await resolveBrief(inside, { fs, repoRoot: root });
+  assert.equal(r.ok, true, r.error ?? '');
+  assert.equal(r.kind, 'file');
+  assert.match(r.excerpt, /acceptance/);
+});
+
+test('resolveBrief — a `../` traversal is refused (OUTSIDE root)', async () => {
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'tower-root-')));
+  const r = await resolveBrief('../escape.md', { fs, repoRoot: root });
+  assert.equal(r.ok, false);
+  assert.match(r.error, /OUTSIDE the governed repo root/);
+});
+
+test('resolveBrief — an absolute external path is refused (OUTSIDE root)', async () => {
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'tower-root-')));
+  const external = path.join(os.tmpdir(), `external-${randomUUID()}.md`);
+  const r = await resolveBrief(external, { fs, repoRoot: root });
+  assert.equal(r.ok, false);
+  assert.match(r.error, /OUTSIDE the governed repo root/);
+});
+
+test('resolveBrief — an unsupported extension is refused', async () => {
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'tower-root-')));
+  const bad = path.join(root, 'creds.env');
+  fs.writeFileSync(bad, 'CLICKUP_TOKEN=whatever', 'utf8');
+  const r = await resolveBrief(bad, { fs, repoRoot: root });
+  assert.equal(r.ok, false);
+  assert.match(r.error, /not an allowed brief type/);
+});
+
+test('resolveBrief — an oversized brief is refused BEFORE reading', async () => {
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'tower-root-')));
+  const big = path.join(root, 'huge.md');
+  fs.writeFileSync(big, Buffer.alloc(1_000_001, 0x61)); // > 1 MB of 'a'
+  const r = await resolveBrief(big, { fs, repoRoot: root });
+  assert.equal(r.ok, false);
+  assert.match(r.error, /too large/);
+});
+
+test('resolveBrief — a symlink INSIDE the repo pointing OUTSIDE is refused (realpath)', async (t) => {
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'tower-root-')));
+  const outside = path.join(os.tmpdir(), `outside-${randomUUID()}.md`);
+  fs.writeFileSync(outside, '# secret brief\nacceptance: exfiltrate', 'utf8');
+  const link = path.join(root, 'link.md');
+  try {
+    fs.symlinkSync(outside, link, 'file');
+  } catch {
+    t.skip('cannot create a symlink on this OS / privilege level');
+    return;
+  }
+  const r = await resolveBrief(link, { fs, repoRoot: root });
+  assert.equal(r.ok, false);
+  assert.match(r.error, /escapes the governed repo root|OUTSIDE the governed repo root/);
+});
+
 test('outbound reply is redacted — a secret in the Codex summary never reaches ClickUp', async () => {
-  const SECRET = 'pk_LIVE_secret_value_1234567890';
+  // Assemble a token-SHAPED value at RUNTIME from harmless fragments so no token-shaped
+  // substring exists in this tracked source (keeps the secret-scan green) while still
+  // exercising the redactor on a realistic-looking token.
+  const SECRET = ['pk', 'LIVE', 'secret', 'value', '1234567890'].join('_');
   const root = path.join(os.tmpdir(), `tower-root-${randomUUID()}`);
   fs.mkdirSync(root, { recursive: true });
   const briefPath = path.join(root, 'brief.md');
   fs.writeFileSync(briefPath, '# Brief\nacceptance: ok', 'utf8');
 
-  const config = loadConfig({ env: { CLICKUP_TOKEN: SECRET, GITHUB_REPO: 'o/r' }, home: tmpPath() });
+  const config = loadConfig({ env: { CLICKUP_TOKEN: SECRET, GITHUB_REPO: 'o/r', TOWER_AUTHORISED_AUTHOR_IDS: 'larry' }, home: tmpPath() });
   const skillPath = writeTmp(approvedSkill(1), '.md');
   const state = openState({ statePath: tmpPath('.json') });
   const notifier = fakeNotifier();

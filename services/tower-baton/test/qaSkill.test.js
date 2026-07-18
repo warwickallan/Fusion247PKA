@@ -34,18 +34,37 @@ test('loadQaSkill — fail-closed when frontmatter malformed/absent', () => {
   assert.match(r.error, /no frontmatter/);
 });
 
-test('loadQaSkill — fail-closed when status is not approved', () => {
+test('loadQaSkill — fail-closed when status is draft with no authorisation flags', () => {
   const p = writeTmp('---\nstatus: draft\nversion: 1\n---\nbody', '.md');
   const r = loadQaSkill({ path: p });
   assert.equal(r.ok, false);
-  assert.match(r.error, /must be "approved"/);
+  assert.match(r.error, /not runnable/);
   // fingerprint is still computed even on a rejected skill (audit)
   assert.ok(r.fingerprint);
 });
 
-test('loadQaSkill — the real shipped skill is approved + versioned', () => {
+test('loadQaSkill — provisional WITHOUT authorisation flags fails closed', () => {
+  const p = writeTmp('---\nstatus: provisional\nversion: 1\n---\nbody', '.md');
+  const r = loadQaSkill({ path: p });
+  assert.equal(r.ok, false);
+  assert.match(r.error, /not runnable/);
+  assert.equal(r.proofRunAuthorised, false);
+  assert.equal(r.standingUseRatified, false);
+});
+
+test('loadQaSkill — provisional WITH proof_run_authorised loads (proof gate)', () => {
+  const p = writeTmp('---\nstatus: provisional\nproof_run_authorised: true\nstanding_use_ratified: false\nversion: 3\n---\nbody', '.md');
+  const r = loadQaSkill({ path: p });
+  assert.equal(r.ok, true, r.error ?? '');
+  assert.equal(r.proofRunAuthorised, true);
+  assert.equal(r.standingUseRatified, false);
+  assert.equal(r.version, '3');
+});
+
+test('loadQaSkill — the real shipped skill loads for the proof run (not standing-ratified)', () => {
   const r = loadQaSkill({ path: SHIPPED_SKILL });
   assert.equal(r.ok, true, r.error ?? '');
-  assert.equal(r.status, 'approved');
+  assert.equal(r.proofRunAuthorised, true, 'proof run is authorised');
+  assert.equal(r.standingUseRatified, false, 'standing use is NOT yet ratified');
   assert.ok(r.version);
 });

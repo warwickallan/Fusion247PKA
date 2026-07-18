@@ -20,7 +20,14 @@ const RESPONSE_MARKER_RE = /\[TOWER\s*(?:→|->|=>)\s*LARRY\]/i;
 export const CHECKPOINT_STATE = 'READY_FOR_TOWER_REVIEW';
 export const VERDICTS = Object.freeze(['APPROVE', 'CORRECTIONS_REQUIRED', 'DECISION_REQUIRED', 'BLOCKED']);
 
-const CHECKPOINT_SCALARS = ['state', 'checkpoint_id', 'build_id', 'wp_id', 'brief_ref', 'branch', 'head_sha', 'base_sha', 'summary', 'tests'];
+const CHECKPOINT_SCALARS = ['state', 'checkpoint_id', 'build_id', 'wp_id', 'brief_ref', 'branch', 'head_sha', 'base_sha', 'review_mode', 'summary', 'tests'];
+
+// review_mode selects how the head_sha is bound. DEFAULT (absent) is branch-bound:
+// the branch MUST resolve and its head MUST equal head_sha. `pinned_sha` is an
+// EXPLICIT opt-in for a pinned-SHA-only review (e.g. cross-build): the exact head_sha
+// is still verified to exist and the diff is still bound to it, but branch resolution
+// is skipped by design. There is NO implicit null-permissive path.
+export const REVIEW_MODES = Object.freeze(['branch', 'pinned_sha']);
 const CHECKPOINT_LISTS = ['evidence_refs', 'questions_or_blockers'];
 
 const RESPONSE_SCALARS = ['checkpoint_id', 'reviewed_head', 'prompt_fingerprint', 'verdict', 'summary', 'next_action'];
@@ -90,6 +97,11 @@ export function parseCheckpoint(body) {
   // build_id / wp_id anchor the cross-build round chain; wp_id may be blank for a
   // single-WP build but build_id + brief_ref must pin the chain.
   if (!fields.build_id) errors.push('missing build_id');
+  // review_mode is optional (absent → branch-bound); a typo must fail closed, never
+  // silently degrade to a permissive mode.
+  if (fields.review_mode && !REVIEW_MODES.includes(fields.review_mode)) {
+    errors.push(`review_mode must be one of ${REVIEW_MODES.join('|')} (got "${fields.review_mode}")`);
+  }
 
   return { ok: errors.length === 0, checkpoint: fields, errors };
 }
@@ -103,7 +115,7 @@ export function chainKey(checkpoint) {
 export function formatCheckpoint(cp = {}) {
   const lines = [CHECKPOINT_MARKER];
   lines.push(`state: ${cp.state ?? CHECKPOINT_STATE}`);
-  for (const k of ['checkpoint_id', 'build_id', 'wp_id', 'brief_ref', 'branch', 'head_sha', 'base_sha', 'summary', 'tests']) {
+  for (const k of ['checkpoint_id', 'build_id', 'wp_id', 'brief_ref', 'branch', 'head_sha', 'base_sha', 'review_mode', 'summary', 'tests']) {
     if (cp[k] !== undefined && cp[k] !== null && cp[k] !== '') lines.push(`${k}: ${cp[k]}`);
   }
   for (const k of CHECKPOINT_LISTS) {

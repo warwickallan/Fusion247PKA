@@ -120,6 +120,14 @@ export function loadConfig({ env = process.env, home = SECRET_HOME, files = DEFA
   const githubRepo = get('GITHUB_REPO');
   const codexHmacSecret = get('TOWER_HMAC_SECRET_GPT_CODEX');
 
+  // TOWER_AUTHORISED_AUTHOR_IDS — comma-separated ClickUp user ids permitted to author a
+  // checkpoint that the watcher will act on. NOT a secret (ids, not credentials): shown in
+  // describe(). In live use this is Warwick's ClickUp user id (222204263), since checkpoints
+  // are posted under his personal CLICKUP_TOKEN. Empty/absent → the author gate is
+  // UNCONFIGURED and the watcher fails closed (no default-open).
+  const authorisedAuthorIds = String(get('TOWER_AUTHORISED_AUTHOR_IDS') ?? '')
+    .split(',').map((s) => s.trim()).filter(Boolean);
+
   const secretValues = [clickupToken, telegramBotToken, codexHmacSecret]
     .filter((v) => typeof v === 'string' && v.length > 0);
 
@@ -130,9 +138,21 @@ export function loadConfig({ env = process.env, home = SECRET_HOME, files = DEFA
     authorisedTelegramUserId,   // POINTER — safe
     githubRepo,                 // 'owner/repo' — safe
     codexHmacSecret,            // SECRET — never logged
+    authorisedAuthorIds,        // POINTER list — safe (checkpoint-author allowlist)
 
     clickupReady: clickupToken !== null,
     telegramReady: telegramBotToken !== null && authorisedTelegramUserId !== null,
+
+    // The checkpoint-author gate is CONFIGURED only when at least one id is present.
+    // Unconfigured → the watcher fails closed (defence in depth over the text marker).
+    authorGateConfigured: authorisedAuthorIds.length > 0,
+
+    /** Is this ClickUp user id an authorised checkpoint author? Fail-closed (no default-open). */
+    isAuthorisedAuthor(userId) {
+      if (authorisedAuthorIds.length === 0) return false;
+      if (userId === null || userId === undefined || userId === '') return false;
+      return authorisedAuthorIds.includes(String(userId));
+    },
 
     /** Signing secret VALUE for a principal (in-process HMAC only). Null when unset. */
     signingSecret(principal) {
@@ -174,6 +194,7 @@ export function loadConfig({ env = process.env, home = SECRET_HOME, files = DEFA
         TELEGRAM_BOT_TOKEN: maskSecret(telegramBotToken),
         AUTHORISED_TELEGRAM_USER_ID: authorisedTelegramUserId ?? '(unset)',
         GITHUB_REPO: githubRepo ?? '(unset)',
+        TOWER_AUTHORISED_AUTHOR_IDS: authorisedAuthorIds.length ? authorisedAuthorIds.join(',') : '(unset)',
         TOWER_HMAC_SECRET_GPT_CODEX: maskSecret(codexHmacSecret),
         clickupReady: clickupToken !== null,
         telegramReady: telegramBotToken !== null && authorisedTelegramUserId !== null,

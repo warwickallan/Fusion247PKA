@@ -35,6 +35,20 @@ test('collect — verifies head, diff range, changed files, CI', async () => {
   assert.equal(ev.diffRange, `${BASE}..${HEAD}`);
 });
 
+test('collect — explicit branch resolution: unresolvable branch → branchResolved:false, headMatchesBranch:null', async () => {
+  const r = fakeRunner([
+    [/rev-parse --verify --quiet .*\^\{commit\}/, { code: 0, stdout: HEAD, stderr: '' }],
+    [/rev-parse --verify --quiet nope-branch/, { code: 1, stdout: '', stderr: 'unknown revision' }],
+    [/diff --name-only/, { code: 0, stdout: 'a.js', stderr: '' }],
+  ]);
+  const gh = createGithubEvidence({ repoDir: '/repo', runCmd: r.runCmd });
+  const ev = await gh.collect({ branch: 'nope-branch', headSha: HEAD, baseSha: BASE });
+  assert.equal(ev.ok, true, ev.error ?? '');
+  assert.equal(ev.branchProvided, true);
+  assert.equal(ev.branchResolved, false);
+  assert.equal(ev.headMatchesBranch, null, 'unresolvable branch is null, not silently true');
+});
+
 test('collect — fail-closed when head_sha does not resolve', async () => {
   const r = fakeRunner([[/rev-parse --verify --quiet .*\^\{commit\}/, { code: 1, stdout: '', stderr: 'bad object' }]]);
   const gh = createGithubEvidence({ repoDir: '/repo', runCmd: r.runCmd });

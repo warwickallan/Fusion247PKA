@@ -50,6 +50,21 @@ test('maskSecret — unset vs set', () => {
   assert.equal(maskSecret('anything'), '***set (masked)***');
 });
 
+test('config — TOWER_AUTHORISED_AUTHOR_IDS parsed; missing → fail-closed gate (no default-open)', () => {
+  const c = loadConfig({ env: { TOWER_AUTHORISED_AUTHOR_IDS: '222204263, 99' }, home: tmpHome() });
+  assert.equal(c.authorGateConfigured, true);
+  assert.equal(c.isAuthorisedAuthor('222204263'), true);
+  assert.equal(c.isAuthorisedAuthor(222204263), true, 'numeric id is coerced');
+  assert.equal(c.isAuthorisedAuthor('nope'), false);
+  assert.equal(c.isAuthorisedAuthor(null), false);
+  assert.equal(c.describe().TOWER_AUTHORISED_AUTHOR_IDS, '222204263,99');
+
+  const empty = loadConfig({ env: {}, home: tmpHome() });
+  assert.equal(empty.authorGateConfigured, false);
+  assert.equal(empty.isAuthorisedAuthor('222204263'), false, 'unconfigured gate never authorises (fail-closed)');
+  assert.equal(empty.describe().TOWER_AUTHORISED_AUTHOR_IDS, '(unset)');
+});
+
 test('runtimeConfig — fail-closed on missing secret store dir', () => {
   const missing = path.join(os.tmpdir(), `does-not-exist-${randomUUID()}`);
   const r = loadRuntimeConfig({ home: missing, env: {}, required: ['CLICKUP_TOKEN'] });

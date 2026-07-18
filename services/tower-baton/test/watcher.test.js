@@ -12,8 +12,11 @@ import { fakeGithub, fakeCodex, fakeNotifier, writeTmp, approvedSkill, tmpPath }
 
 const HEAD = '1390dd6a1b2c3d4e5f60718293a4b5c6d7e8f900';
 
-function harness({ codex, github, comments, briefRef, roundsSeed } = {}) {
-  const config = loadConfig({ env: { GITHUB_REPO: 'o/r' }, home: tmpPath() }); // hermetic: no real store
+function harness({ codex, github, comments, briefRef, roundsSeed, reviewMode, authorIds = 'larry', commentUser } = {}) {
+  // authorIds === null → leave TOWER_AUTHORISED_AUTHOR_IDS unset (exercise fail-closed).
+  const env = { GITHUB_REPO: 'o/r' };
+  if (authorIds !== null) env.TOWER_AUTHORISED_AUTHOR_IDS = authorIds;
+  const config = loadConfig({ env, home: tmpPath() }); // hermetic: no real store
   const skillPath = writeTmp(approvedSkill(1), '.md');
   const skillFp = loadQaSkill({ path: skillPath }).fingerprint;
   const brief = briefRef ?? writeTmp('# Brief\nacceptance: the watcher works', '.md');
@@ -23,14 +26,18 @@ function harness({ codex, github, comments, briefRef, roundsSeed } = {}) {
   const cp = {
     state: 'READY_FOR_TOWER_REVIEW', checkpoint_id: 'cp-100', build_id: 'BUILD-010', wp_id: 'WP1',
     brief_ref: brief, branch: 'build-010/wp1', head_sha: HEAD, base_sha: HEAD + '0'.repeat(0),
-    summary: 'built it', tests: 'green', evidence_refs: ['PR#1'],
+    review_mode: reviewMode, summary: 'built it', tests: 'green', evidence_refs: ['PR#1'],
   };
-  const clickup = createFakeClickup({ comments: comments ?? [{ comment_text: formatCheckpoint(cp) }] });
+  const clickup = createFakeClickup({ comments: comments ?? [{ comment_text: formatCheckpoint(cp), user: commentUser ?? 'larry' }] });
   const watcher = createWatcher({
     config, clickup, github: github ?? fakeGithub(), codex: codex ?? fakeCodex(),
     notifier, state, taskId: 'task1', qaSkillPath: skillPath, fs, now: () => 1000,
   });
   return { watcher, clickup, state, notifier, codex: codex ?? undefined, skillFp, cp, brief };
+}
+
+function towerReplies(clickup) {
+  return clickup._comments.filter((c) => /\[TOWER → LARRY\]/.test(c.comment_text));
 }
 
 function lastReply(clickup) {
@@ -150,4 +157,68 @@ test('resolveBrief — reads a local file, fail-closed otherwise', async () => {
   assert.equal(ok.ok, true);
   const bad = await resolveBrief('C:/nope.md');
   assert.equal(bad.ok, false);
+});
+
+// ── item 3: explicit branch resolution ───────────────────────────────────────
+
+test('branch-bound (default) + valid branch + matching head → proceeds (APPROVE)', async () => {
+  const codex = fakeCodex();
+  const h = harness({ codex }); // fakeGithub default: headMatchesBranch:true
+  const r = await h.watcher.pollOnce();
+  assert.equal(r.processed[0].verdict, 'APPROVE');
+  assert.equal(codex.calls.length, 1);
+});
+
+test('branch-bound + UNRESOLVABLE branch WITHOUT pinned_sha → fail-closed BLOCKED', async () => {
+  const codex = fakeCodex();
+  const h = harness({ codex, github: fakeGithub({ headMatchesBranch: null, branchResolved: false, branchHeadSha: null }) });
+  await h.watcher.pollOnce();
+  assert.equal(lastReply(h.clickup).verdict, 'BLOCKED');
+  assert.equal(codex.calls.length, 0, 'no Codex turn when the branch cannot be resolved');
+});
+
+test('explicit review_mode: pinned_sha + resolvable head + UNRESOLVABLE branch → proceeds', async () => {
+  const codex = fakeCodex();
+  const h = harness({ codex, reviewMode: 'pinned_sha', github: fakeGithub({ headMatchesBranch: null, branchResolved: false, branchHeadSha: null }) });
+  const r = await h.watcher.pollOnce();
+  assert.equal(r.processed[0].verdict, 'APPROVE', 'pinned-SHA review skips branch resolution by design');
+  assert.equal(codex.calls.length, 1);
+});
+
+test('branch DRIFT (branch resolves, head != branch head) still fails closed even implicitly', async () => {
+  const codex = fakeCodex();
+  const h = harness({ codex, github: fakeGithub({ headMatchesBranch: false, branchResolved: true, branchHeadSha: 'DIFFERENTHEAD' }) });
+  await h.watcher.pollOnce();
+  assert.equal(lastReply(h.clickup).verdict, 'BLOCKED');
+  assert.equal(codex.calls.length, 0);
+});
+
+// ── item 4: checkpoint-author gate ───────────────────────────────────────────
+
+test('author gate — an allowlisted author is processed', async () => {
+  const codex = fakeCodex();
+  const h = harness({ codex, authorIds: 'larry', commentUser: 'larry' });
+  const r = await h.watcher.pollOnce();
+  assert.equal(r.processed[0].verdict, 'APPROVE');
+  assert.equal(codex.calls.length, 1);
+});
+
+test('author gate — an unknown author is IGNORED (no Codex turn, no reply)', async () => {
+  const codex = fakeCodex();
+  const h = harness({ codex, authorIds: 'larry', commentUser: 'mallory' });
+  const r = await h.watcher.pollOnce();
+  assert.equal(r.processed.length, 0);
+  assert.equal(codex.calls.length, 0, 'no Codex turn for an unauthorised author');
+  assert.equal(towerReplies(h.clickup).length, 0, 'no reply posted for an unauthorised author');
+  assert.ok(r.skipped.some((s) => s.reason === 'unauthorised-author'));
+});
+
+test('author gate — MISSING config fails closed (no Codex turn, no reply)', async () => {
+  const codex = fakeCodex();
+  const h = harness({ codex, authorIds: null }); // TOWER_AUTHORISED_AUTHOR_IDS unset
+  const r = await h.watcher.pollOnce();
+  assert.equal(r.processed.length, 0);
+  assert.equal(codex.calls.length, 0);
+  assert.equal(towerReplies(h.clickup).length, 0);
+  assert.ok(r.skipped.some((s) => s.reason === 'author-allowlist-unconfigured'));
 });
