@@ -20,7 +20,9 @@
 import { spawn as nodeSpawn } from 'node:child_process';
 
 const ALLOWED_GIT = new Set([
-  'rev-parse', 'cat-file', 'diff', 'log', 'show', 'merge-base', 'ls-remote', 'for-each-ref', 'branch',
+  // read-only subcommands only. NOTE: 'branch' is deliberately EXCLUDED — `git branch -f/-D/-m`
+  // are mutating and the guard only inspects the subcommand, not its flags.
+  'rev-parse', 'cat-file', 'diff', 'log', 'show', 'merge-base', 'ls-remote', 'for-each-ref',
 ]);
 // Verbs that must NEVER be shelled from this module (defence-in-depth deny-list).
 const FORBIDDEN_VERBS = new Set([
@@ -34,6 +36,10 @@ export function assertReadOnlyCommand(bin, args) {
     const sub = a.find((x) => !String(x).startsWith('-'));
     if (FORBIDDEN_VERBS.has(sub)) throw new Error(`githubEvidence: REFUSED mutating git verb "${sub}" (read-only collector; no autonomous merge)`);
     if (!ALLOWED_GIT.has(sub)) throw new Error(`githubEvidence: git subcommand "${sub}" is not on the read-only allowlist`);
+    // Even a read subcommand can WRITE via --output=<file> (e.g. `git diff --output`). Refuse it.
+    if (a.some((x) => /^--output(=|$)/.test(String(x)) || String(x) === '-o')) {
+      throw new Error('githubEvidence: REFUSED git --output/-o (writes a file; read-only collector)');
+    }
     return true;
   }
   if (bin === 'gh') {

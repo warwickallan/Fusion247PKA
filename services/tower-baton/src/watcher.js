@@ -21,6 +21,7 @@
 // NO autonomous merge anywhere.
 
 import fsDefault from 'node:fs';
+import path from 'node:path';
 
 import { parseCheckpoint, chainKey, formatResponse, answeredCheckpointIds } from './checkpoint.js';
 import { loadQaSkill } from './qaSkill.js';
@@ -28,16 +29,31 @@ import { loadQaSkill } from './qaSkill.js';
 export const DEFAULT_MAX_ROUNDS = 3;
 
 /** Resolve the approved brief from a brief_ref. Fail-closed when it cannot be read. */
-export async function resolveBrief(briefRef, { fs = fsDefault, clickup = null, taskId = null } = {}) {
+export async function resolveBrief(briefRef, { fs = fsDefault, clickup = null, taskId = null, repoRoot = null } = {}) {
   if (!briefRef) return { ok: false, error: 'fail-closed: missing brief_ref' };
-  // A local path (a build brief / WP doc in the repo).
-  try {
-    if (fs.existsSync(briefRef) && fs.statSync(briefRef).isFile()) {
-      const text = fs.readFileSync(briefRef, 'utf8');
-      if (text && text.trim()) return { ok: true, kind: 'file', excerpt: text.slice(0, 8000), ref: briefRef };
-      return { ok: false, error: `fail-closed: brief_ref file is empty (${briefRef})` };
-    }
-  } catch { /* not a readable path — try other shapes */ }
+  // A local path (a build brief / WP doc in the repo) — but ONLY inside the governed
+  // repo root. A brief_ref is attacker-influenceable (any comment on the control task),
+  // its content is staged verbatim into the Codex prompt, and Codex's summary is posted
+  // to ClickUp — so an unconstrained read of e.g. C:\.fusion247\*.env would exfiltrate
+  // secrets. CONTAINMENT: resolve against repoRoot and refuse anything that escapes it.
+  const cuLike = /(?:clickup\.com\/t\/|^CU-)/i.test(String(briefRef));
+  if (!cuLike) {
+    try {
+      const abs = path.resolve(repoRoot ?? process.cwd(), briefRef);
+      if (repoRoot) {
+        const root = path.resolve(repoRoot);
+        const rel = path.relative(root, abs);
+        if (rel === '' || rel.startsWith('..') || path.isAbsolute(rel)) {
+          return { ok: false, error: `fail-closed: brief_ref resolves OUTSIDE the governed repo root — refused (${briefRef})` };
+        }
+      }
+      if (fs.existsSync(abs) && fs.statSync(abs).isFile()) {
+        const text = fs.readFileSync(abs, 'utf8');
+        if (text && text.trim()) return { ok: true, kind: 'file', excerpt: text.slice(0, 8000), ref: briefRef };
+        return { ok: false, error: `fail-closed: brief_ref file is empty (${briefRef})` };
+      }
+    } catch { /* not a readable path — try other shapes */ }
+  }
   // A ClickUp task ref (CU-<id> / a task url) — read its description as the brief.
   const cuMatch = String(briefRef).match(/(?:clickup\.com\/t\/|CU-)([A-Za-z0-9]+)/i);
   if (cuMatch && clickup && typeof clickup.getTask === 'function') {
@@ -106,7 +122,7 @@ export function pickMaterialFindings(findings) {
  * @param {function} [deps.now]       injectable clock () => epoch ms
  * @param {function} [deps.log]       injectable logger (redacted by the caller)
  */
-export function createWatcher({ config, clickup, github, codex, notifier, state, taskId, qaSkillPath, maxRounds = DEFAULT_MAX_ROUNDS, fs = fsDefault, now = Date.now, log = () => {} } = {}) {
+export function createWatcher({ config, clickup, github, codex, notifier, state, taskId, qaSkillPath, repoRoot = null, maxRounds = DEFAULT_MAX_ROUNDS, fs = fsDefault, now = Date.now, log = () => {} } = {}) {
   let reconciled = false;
   // Re-entrancy guard: a Codex turn (~60s) is far longer than the poll interval (~15s),
   // so overlapping setInterval ticks would each start a duplicate Codex turn on the SAME
@@ -135,8 +151,8 @@ export function createWatcher({ config, clickup, github, codex, notifier, state,
 
     const ck = chainKey(checkpoint);
 
-    // (d) resolve the approved brief + WP scope. Fail-closed.
-    const brief = await resolveBrief(checkpoint.brief_ref, { fs, clickup, taskId });
+    // (d) resolve the approved brief + WP scope. Fail-closed + repo-root-contained.
+    const brief = await resolveBrief(checkpoint.brief_ref, { fs, clickup, taskId, repoRoot });
 
     // (f) load the QA skill fresh + fingerprint. Fail-closed.
     const skill = loadQaSkill({ path: qaSkillPath, fs });
@@ -193,7 +209,9 @@ export function createWatcher({ config, clickup, github, codex, notifier, state,
       material_findings: derived.material_findings,
       next_action: derived.next_action,
     };
-    const body = formatResponse(responseObj);
+    // Redact any known secret VALUE before it can reach a ClickUp comment (defence in
+    // depth behind brief_ref containment — the reply is public in the thread).
+    const body = config?.redact ? config.redact(formatResponse(responseObj)) : formatResponse(responseObj);
     let posted = null;
     try {
       posted = await clickup.createTaskComment(taskId, body);

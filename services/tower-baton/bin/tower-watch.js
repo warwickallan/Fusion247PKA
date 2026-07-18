@@ -92,7 +92,7 @@ async function main() {
   const codex = createCodexAdapter({ config, cwd: repoDir });
   const notifier = createMilestoneNotifier({ config, state });
 
-  const watcher = createWatcher({ config, clickup, github, codex, notifier, state, taskId, qaSkillPath, fs, log });
+  const watcher = createWatcher({ config, clickup, github, codex, notifier, state, taskId, qaSkillPath, repoRoot: repoDir, fs, log });
 
   // 5. startup ding — via TOWER'S OWN NOTIFIER (real event).
   await notifier.notifyMilestone({
