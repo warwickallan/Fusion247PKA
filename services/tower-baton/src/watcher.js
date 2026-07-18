@@ -168,6 +168,7 @@ export function createWatcher({ config, clickup, github, codex, notifier, state,
     } else {
       // (g) invoke Codex read-only QA.
       const packet = {
+        checkpoint_id: checkpoint.checkpoint_id ?? null, build_id: checkpoint.build_id ?? null, wp_id: checkpoint.wp_id ?? null,
         repo: config?.githubRepo ?? null, branch: checkpoint.branch, head_sha: evidence.headSha,
         base_sha: checkpoint.base_sha ?? null, diff_range: evidence.diffRange, changed_files: evidence.changedFiles,
         diff_text: evidence.diffText ?? null, diff_truncated: Boolean(evidence.diffTruncated),

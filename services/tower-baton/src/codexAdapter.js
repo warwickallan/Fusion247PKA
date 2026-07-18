@@ -142,6 +142,9 @@ export function sanitizeCodexEnv(parentEnv = process.env, apiKey = null) {
 export function buildCodexPrompt({ skillText, packet = {} }) {
   const p = packet;
   const pointerLines = [
+    `checkpoint_id: ${p.checkpoint_id ?? '(none)'}`,
+    `build_id: ${p.build_id ?? '(none)'}`,
+    `wp_id: ${p.wp_id ?? '(none)'}`,
     `repo: ${p.repo ?? '(local working tree)'}`,
     `branch: ${p.branch ?? '(unknown)'}`,
     `head_sha (EXACT — review is bound to this): ${p.head_sha ?? '(unknown)'}`,
