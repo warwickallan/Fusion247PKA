@@ -3,7 +3,7 @@ build: BUILD-002
 wp: WP1
 artifact: fu1-closure-evidence
 author: mack
-status: DONE-code-and-wiring / L-1-OPEN-pending-authoritative-crosscheck
+status: DONE / FU-1 L-1 CLOSED (authoritative cross-check MATCH 2026-07-18)
 created: 2026-07-18
 supersedes_row: "[[wp1-delta-review-2026-07-17]] FU-1 row + finding L-1"
 ---
@@ -91,18 +91,33 @@ verified leaf `*.pooler.supabase.com`, `query_ok: true`. See
 probe is cited here as prior evidence -- it was NOT re-run in this session, and
 no live connection was made now.
 
-## 4. L-1: STILL OPEN -- authoritative cross-check is a Warwick action
+## 4. L-1: CLOSED -- authoritative cross-check MATCH (2026-07-18)
 
-The pin is TOFU: it was extracted from a live handshake
-(`scripts/tls-extract-ca.mjs`, 2026-07-17), not yet cross-checked against
-Supabase's AUTHORITATIVE dashboard CA download. There is no public URL for that
-file -- it lives behind the authenticated Supabase dashboard -- so authoritative
-closure cannot be automated end-to-end; the download step is Warwick's.
+The TOFU pin has been cross-checked against Supabase's AUTHORITATIVE published
+CA and MATCHES. **L-1 is CLOSED.**
 
-**Do NOT read this note as closing L-1.** Self-consistency (section 2) proves
-the bundle is internally coherent and locked against silent drift; it does NOT
-prove the bundle matches what Supabase authoritatively publishes. Only the
-dashboard cross-check does that.
+- **Date:** 2026-07-18.
+- **Official CA source:** downloaded from Warwick's AUTHENTICATED Supabase
+  dashboard (Database -> Settings -> SSL Configuration -> "Download
+  certificate"), whose link resolves to the canonical public URL
+  `https://supabase-downloads.s3-ap-southeast-1.amazonaws.com/prod/ssl/prod-ca-2021.crt`.
+  Sourcing it via the authenticated dashboard is what makes it authoritative for
+  this project. Saved to a temporary location OUTSIDE Git; **the downloaded
+  certificate was NOT committed.** No authenticated session data was exposed,
+  pasted, uploaded, or logged.
+- **Command:** `node scripts/fu1-ca-crosscheck.mjs --official <prod-ca-2021.crt>`
+  (from `services/fusion-capture-gateway/`, on the FU-1 branch).
+- **Official certificate:** the file contained one certificate, CN "Supabase
+  Root 2021 CA", fingerprint256
+  `807025ad50d4ed219d2c9c7d299c004f824eb00cf7f65afef607d07b72e6cafa`.
+- **Result:** the pinned ROOT fingerprint is present in the official file; all
+  self-consistency + cryptographic signature checks PASS; the script printed
+  **`VERDICT: MATCH - FU-1 L-1 CLOSED`** (exit 0).
+
+The pinned root now has authoritative provenance (it matches Supabase's
+published prod-ca-2021.crt), not merely TOFU. No live configuration was changed
+and no live database was connected to produce this cross-check -- only a public
+CA file was fetched and parsed offline.
 
 **Exact closure procedure:**
 
@@ -124,9 +139,15 @@ that L-1 is OPEN.
 
 ## 5. Verification run (this session)
 
-- `test/pinnedCaGuard.test.js` alone: 8 tests, 8 pass, 0 fail.
-- Full gateway suite (`node --test`, no-DB mode): **307 tests, 275 pass, 0
-  fail, 32 DB-gated skips.**
+- `test/pinnedCaGuard.test.js` alone: 8 tests, 8 pass, 0 fail;
+  `test/fu1Crosscheck.test.js`: 10 pass, 0 fail (focused FU-1: 18/18).
+- Full gateway suite (`node --test`, no-DB mode), re-run 2026-07-18 after the
+  L-1 closure: **317 tests, 285 pass, 0 fail, 32 DB-gated skips.**
+- Secret scan (`scripts/secret-scan.sh`), re-run 2026-07-18: **clean -- 452
+  tracked files scanned, 0 secret values found.**
+- **L-1 authoritative cross-check (2026-07-18): the script printed
+  `VERDICT: MATCH - FU-1 L-1 CLOSED` (exit 0)** against the official
+  prod-ca-2021.crt (root sha256 `807025ad...`); see section 4.
 - Signature-verification negatives (proving the crypto check is real, not a
   tautology): an unrelated RSA public key and an unrelated EC public key are
   both REJECTED by `intermediate.verify(...)`; the intermediate does NOT verify
@@ -150,7 +171,7 @@ that L-1 is OPEN.
 | Pinned CA self-consistency + chain | PASS |
 | Automated pin guard | DONE (`test/pinnedCaGuard.test.js`) |
 | Prior live probe `cert_verified_by_client` | true (recorded 2026-07-17) |
-| **L-1 authoritative dashboard cross-check** | **OPEN -- Warwick action** |
+| **L-1 authoritative dashboard cross-check** | **CLOSED -- MATCH 2026-07-18 (official root sha256 807025ad...)** |
 
 ## Links
 
