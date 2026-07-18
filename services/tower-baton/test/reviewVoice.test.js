@@ -89,6 +89,43 @@ test('(e) stays under ~1200 chars even with maximal input', () => {
   assert.ok(msg.length <= MAX_BRIEFING_CHARS, `message length ${msg.length} must be <= ${MAX_BRIEFING_CHARS}`);
 });
 
+test('(e2) maximal input NEVER severs the verdict or the next-action line (F1)', () => {
+  // The real bug: with a large summary + many long findings + long claims, the old
+  // code truncated the whole assembled string from the END, dropping exactly the
+  // two mandatory lines. Reserve a DISTINCTIVE, in-budget next_action so we can
+  // assert it survives verbatim (not just that the message is short).
+  const hugeSummary = 'S'.repeat(4000);
+  const bigCorrection = 'F'.repeat(600);
+  const NEXT = 'Apply the named corrections, push a new head, and re-hand off the new checkpoint.';
+  const msg = composeReviewBriefing({
+    checkpoint: checkpoint(),
+    codexResult: {
+      status: 'ok', verdict: 'request_changes', summary: hugeSummary,
+      claims_verified: [
+        { claim: 'A'.repeat(500), status: 'confirmed', evidence: 'A'.repeat(500) },
+        { claim: 'B'.repeat(500), status: 'refuted', evidence: 'B'.repeat(500) },
+        { claim: 'C'.repeat(500), status: 'partial', evidence: 'C'.repeat(500) },
+        { claim: 'D'.repeat(500), status: 'unverifiable', evidence: 'D'.repeat(500) },
+      ],
+      findings: [
+        { id: 'F1', severity: 'critical', evidence: 'e', rationale: 'r', required_correction: bigCorrection },
+        { id: 'F2', severity: 'high', evidence: 'e', rationale: 'r', required_correction: bigCorrection },
+        { id: 'F3', severity: 'medium', evidence: 'e', rationale: 'r', required_correction: bigCorrection },
+        { id: 'F4', severity: 'low', evidence: 'e', rationale: 'r', required_correction: bigCorrection },
+      ],
+    },
+    derived: { verdict: 'CORRECTIONS_REQUIRED', material_findings: [], next_action: NEXT },
+    reviewedHead: HEAD,
+  });
+  // (a) the plain-English verdict still present
+  assert.match(msg, /My verdict:/);
+  assert.ok(msg.includes('sent it back for fixes'), 'the plain-English verdict survives maximal input');
+  // (b) the mandatory next-action line still present, in full
+  assert.ok(msg.includes(`What happens next: ${NEXT}`), 'the next-action line survives maximal input verbatim');
+  // (c) still under the Telegram ceiling
+  assert.ok(msg.length <= MAX_BRIEFING_CHARS, `message length ${msg.length} must be <= ${MAX_BRIEFING_CHARS}`);
+});
+
 test('(f) reads [CODEX], not [TOWER]', () => {
   const msg = composeReviewBriefing({
     checkpoint: checkpoint(),

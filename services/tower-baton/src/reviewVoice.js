@@ -110,6 +110,27 @@ function stripTag(s) {
   return String(s ?? '').replace(/^\s*\[[^\]]+\]\s*/, '').trim();
 }
 
+// Cost of a block of lines once joined with '\n' into a larger message: each line
+// contributes its own length plus one newline separator.
+function blockCost(lines) {
+  return lines.reduce((n, l) => n + l.length + 1, 0);
+}
+
+// Fit an OPTIONAL section into `room` characters by dropping whole lines from the
+// end (its lowest-priority items first), never by cutting mid-line. A section that
+// gets reduced to just its structural lines (a leading blank and/or a header with
+// no items left) is dropped ENTIRELY so no dangling header survives. Returns the
+// lines that fit (possibly empty). The mandatory spine is never passed here.
+function fitBlock(lines, room) {
+  if (room <= 0) return [];
+  const kept = lines.slice();
+  while (kept.length && blockCost(kept) > room) kept.pop();
+  const wasList = lines.some((l) => l.startsWith('- '));
+  const hasItem = kept.some((l) => l.startsWith('- '));
+  if (wasList && !hasItem) return []; // header would dangle with no items -> drop whole
+  return kept;
+}
+
 /**
  * Compose the CODEX review briefing for Telegram.
  *
@@ -127,63 +148,105 @@ export function composeReviewBriefing({ checkpoint = {}, codexResult = null, der
   const build = checkpoint?.build_id ? String(checkpoint.build_id) : '(build?)';
   const wp = checkpoint?.wp_id ? ` ${checkpoint.wp_id}` : '';
 
-  const lines = [];
-  lines.push(`[CODEX] ${headline(verdict)}`);
-  lines.push('');
-  lines.push(`Had a look at ${build}${wp} at ${shortSha}.`);
+  // ---------------------------------------------------------------------------
+  // MANDATORY SPINE -- reserved FIRST, must ALWAYS survive regardless of input
+  // size. The [CODEX] label leads every briefing; the verdict line and the
+  // what-happens-next line are the two MOST IMPORTANT pieces, so their character
+  // budget is claimed before any optional section. A huge summary / claims /
+  // findings payload can no longer crowd them past the length clamp and sever
+  // them (F1 -- the bug Codex found: the old code truncated the whole assembled
+  // string from the end, dropping exactly the verdict + next-action lines).
+  // ---------------------------------------------------------------------------
+  const headLines = [
+    `[CODEX] ${headline(verdict)}`,
+    '',
+    `Had a look at ${build}${wp} at ${shortSha}.`,
+  ];
+  const tailLines = [`My verdict: ${plainVerdict(verdict)}.`];
+  const next = tidy(derived?.next_action, 220);
+  if (next) tailLines.push(`What happens next: ${next}`);
 
-  // Codex's own verification summary, when we have one (never on a pre-Codex gate block).
-  const summary = codexResult && codexResult.status !== 'blocked' ? tidy(codexResult.summary, 200) : '';
-  if (summary) lines.push(`In short: ${summary}`);
+  // ---------------------------------------------------------------------------
+  // OPTIONAL SECTIONS -- built once (each already ASCII + per-field capped), then
+  // admitted whole-or-truncated in PRIORITY order into whatever budget the spine
+  // leaves, but RENDERED in reading order. Priority: what-needs-doing (findings /
+  // blockers, the most actionable) first, then Codex's short summary, then the
+  // claims tick-list -- the least load-bearing is the first to be trimmed.
+  // ---------------------------------------------------------------------------
 
-  // What I checked out -- the claims, plainly. Omitted entirely when there are none
-  // (so an APPROVE with nothing to tick off never dangles an empty header).
+  // Codex's own verification summary (never on a pre-Codex gate block).
+  const summaryText = codexResult && codexResult.status !== 'blocked' ? tidy(codexResult.summary, 200) : '';
+  const summaryBlock = summaryText ? [`In short: ${summaryText}`] : [];
+
+  // The claims, plainly. Omitted entirely when there are none (so an APPROVE with
+  // nothing to tick off never dangles an empty header).
   const claims = Array.isArray(codexResult?.claims_verified) ? codexResult.claims_verified : [];
-  if (claims.length) {
-    lines.push('');
-    lines.push('What I checked out:');
-    for (const c of claims.slice(0, 3)) {
-      const text = tidy(c?.claim, 120);
-      if (text) lines.push(`- ${claimPhrase(c?.status)}: ${text}`);
-    }
+  const claimsItems = [];
+  for (const c of claims.slice(0, 3)) {
+    const text = tidy(c?.claim, 120);
+    if (text) claimsItems.push(`- ${claimPhrase(c?.status)}: ${text}`);
   }
+  const claimsBlock = claimsItems.length ? ['', 'What I checked out:', ...claimsItems] : [];
 
-  // What needs doing / what's in the way. For a normal review this is the findings,
-  // in plain words. For a BLOCKED outcome it's the blocker(s) that stopped the review.
+  // What needs doing / what's in the way. For a normal review this is the findings
+  // in plain words; for a BLOCKED outcome it's the blocker(s) that stopped it.
+  const doingItems = [];
+  let doingHeader = '';
   if (blocked) {
+    doingHeader = "What's in the way:";
     const gateItems = Array.isArray(derived?.material_findings) && derived.material_findings.length
       ? derived.material_findings
       : (codexResult?.blocker ? [codexResult.blocker] : []);
-    if (gateItems.length) {
-      lines.push('');
-      lines.push("What's in the way:");
-      for (const g of gateItems.slice(0, 3)) {
-        const text = tidy(stripTag(g), 160);
-        if (text) lines.push(`- ${text}`);
-      }
+    for (const g of gateItems.slice(0, 3)) {
+      const text = tidy(stripTag(g), 160);
+      if (text) doingItems.push(`- ${text}`);
     }
   } else {
+    doingHeader = verdict === 'APPROVE' ? 'Worth noting:' : 'What needs doing:';
     const findings = Array.isArray(codexResult?.findings) ? codexResult.findings : [];
-    if (findings.length) {
-      lines.push('');
-      lines.push(verdict === 'APPROVE' ? 'Worth noting:' : 'What needs doing:');
-      for (const f of findings.slice(0, 3)) {
-        const what = tidy(f?.required_correction || f?.rationale || f?.id, 150);
-        if (what) lines.push(`- ${severityWord(f?.severity)}: ${what}`);
-      }
+    for (const f of findings.slice(0, 3)) {
+      const what = tidy(f?.required_correction || f?.rationale || f?.id, 150);
+      if (what) doingItems.push(`- ${severityWord(f?.severity)}: ${what}`);
     }
   }
+  const doingBlock = doingItems.length ? ['', doingHeader, ...doingItems] : [];
 
-  lines.push('');
-  lines.push(`My verdict: ${plainVerdict(verdict)}.`);
+  // ---------------------------------------------------------------------------
+  // BUDGETED ASSEMBLY. Reserve the spine's cost, then admit optional blocks in
+  // priority order until the ~1200-char ceiling is reached; a block that will not
+  // fit whole is trimmed at line granularity (its lowest items dropped, or the
+  // whole block if only its header would remain). The verdict + next-action lines
+  // are never in the truncation path.
+  // ---------------------------------------------------------------------------
+  const spine = [...headLines, '', ...tailLines];
+  let used = spine.join('\n').length;
 
-  const next = tidy(derived?.next_action, 220);
-  if (next) lines.push(`What happens next: ${next}`);
+  // read = reading-order index; prio = admit-order (lower first).
+  const blocks = [
+    { read: 0, prio: 2, lines: summaryBlock },
+    { read: 1, prio: 3, lines: claimsBlock },
+    { read: 2, prio: 1, lines: doingBlock },
+  ].filter((b) => b.lines.length);
 
-  // Whole-message ASCII pass (defence in depth over the per-field tidy), then the
-  // belt-and-braces length ceiling. The per-section caps keep us well under in
-  // practice, so the clamp never severs the verdict / next lines.
-  let out = toAscii(lines.join('\n'));
-  if (out.length > MAX_BRIEFING_CHARS) out = `${out.slice(0, MAX_BRIEFING_CHARS - 3).trimEnd()}...`;
+  const admitted = [];
+  for (const b of [...blocks].sort((a, x) => a.prio - x.prio)) {
+    let lines = b.lines;
+    if (used + blockCost(lines) > MAX_BRIEFING_CHARS) lines = fitBlock(lines, MAX_BRIEFING_CHARS - used);
+    if (lines.length) { admitted.push({ read: b.read, lines }); used += blockCost(lines); }
+  }
+  admitted.sort((a, x) => a.read - x.read);
+  const middle = [];
+  for (const b of admitted) middle.push(...b.lines);
+
+  // Whole-message ASCII pass (defence in depth over the per-field tidy). Every
+  // line is already ASCII, so this cannot grow the string past the reserved budget.
+  let out = toAscii([...headLines, ...middle, '', ...tailLines].join('\n'));
+
+  // Belt-and-braces: if some pathological spine still overran, fall back to the
+  // spine ALONE (verdict + next-action preserved) rather than severing them.
+  if (out.length > MAX_BRIEFING_CHARS) {
+    out = toAscii([...headLines, '', ...tailLines].join('\n'));
+    if (out.length > MAX_BRIEFING_CHARS) out = `${out.slice(0, MAX_BRIEFING_CHARS - 3).trimEnd()}...`;
+  }
   return out;
 }
