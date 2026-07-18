@@ -1,0 +1,14 @@
+{
+  "name": "tower-baton",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "BUILD-010 Tower baton MVP — the automated baton-carrier + read-only Codex QA reviewer that replaces Warwick's copy-paste QA relay. Larry posts a checkpoint to ClickUp; Tower detects it, verifies GitHub evidence bound to the exact head SHA, runs a read-only Codex QA turn against the approved brief + fingerprinted QA skill, and posts a compact [TOWER -> LARRY] reply back to the same thread. No Supabase, no ftw, no autonomous merge. Pure Node; zero runtime dependencies.",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test",
+    "scan": "bash scripts/secret-scan.sh"
+  }
+}

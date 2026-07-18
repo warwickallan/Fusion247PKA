@@ -1,0 +1,83 @@
+# BUILD-010 Fusion Tower — baton MVP runtime manifest.
+#
+# NAMES + PATHS ONLY. This file NEVER contains a secret value. It documents which
+# local file supplies each runtime variable, which runtime consumes it, whether it is
+# mandatory, and the health-check behaviour. It is the source of truth for the
+# launcher, the Scheduled Task, and recovery onto a fresh sign-in.
+#
+# NO Supabase / NO ftw — the baton MVP keeps dedup + recovery in a local file.
+
+manifest_version: 1
+build: BUILD-010
+component: fusion-tower / baton MVP
+secret_store: 'C:\.fusion247'        # protected store; ACLs restrict to the Buggly user
+loader: services/tower-baton/src/runtimeConfig.js   # the SINGLE loader everything uses
+
+variables:
+  - name: TELEGRAM_BOT_TOKEN
+    kind: secret
+    supplied_by: 'C:\.fusion247\fusion-capture-gateway.env'
+    consumed_by: [tower-watch (milestone notifier), preflight (--telegram getMe self-test)]
+    NOT_consumed_by: [codexAdapter]   # Codex NEVER receives this (env denylist + sanitizeCodexEnv)
+    mandatory: true                    # required for the acceptance milestone dings
+    health_check: masked present/absent only; optional getMe outbound self-test (GET, never getUpdates)
+
+  - name: AUTHORISED_TELEGRAM_USER_ID
+    kind: pointer                      # numeric chat id, not a secret
+    supplied_by: 'C:\.fusion247\fusion-capture-gateway.env'
+    consumed_by: [tower-watch (notifier recipient)]
+    mandatory: true
+    health_check: present/absent
+
+  - name: CLICKUP_TOKEN
+    kind: secret
+    supplied_by: 'C:\.fusion247\fusion-capture-gateway.env'   # (may also live in tower-baton.env)
+    consumed_by: [tower-watch (ClickUp read/write), handoff-to-tower]
+    NOT_consumed_by: [codexAdapter]   # Codex NEVER receives this (env denylist + sanitizeCodexEnv)
+    mandatory: true
+    health_check: present/absent; ABSENT → clear "CLICKUP_TOKEN missing" blocker, fail-closed, never crash
+
+  - name: TOWER_CLICKUP_TASK_ID
+    kind: config                       # which ClickUp control task/thread the watcher polls
+    supplied_by: launcher arg -TaskId / env TOWER_CLICKUP_TASK_ID
+    consumed_by: [tower-watch, handoff-to-tower]
+    mandatory: true
+    health_check: present/absent (watcher fails closed without it)
+
+  - name: GITHUB_REPO
+    kind: config                       # 'owner/repo' for gh api CI reads (optional; git works locally)
+    supplied_by: 'C:\.fusion247\fusion-capture-gateway.env' or env
+    consumed_by: [githubEvidence]
+    mandatory: false
+    health_check: present/absent
+
+  - name: TOWER_HMAC_SECRET_GPT_CODEX
+    kind: secret
+    supplied_by: 'C:\.fusion247\tower-baton.env (optional)'
+    consumed_by: [codexAdapter (verdict signing, in-process only)]
+    mandatory: false                   # absent → honest but UNSIGNED verdict envelope
+    health_check: masked present/absent
+
+auth_expectations:
+  github:
+    mechanism: gh CLI keyring session for the interactive Buggly user
+    note: NO token file — githubEvidence shells out to `gh api` / `git` (read-only allowlist)
+  codex:
+    binary: '%LOCALAPPDATA%\OpenAI\Codex\bin\<version-hash>\codex.exe (newest discovered; hash NOT hard-coded)'
+    auth: ChatGPT-OAuth via '%USERPROFILE%\.codex\auth.json' (or CODEX_API_KEY)
+    note: read-only sandbox; --ignore-user-config; Codex receives NO Telegram/ClickUp env
+
+runtime_paths:
+  durable_state: 'C:\.fusion247\tower-baton-state.json'   # dedup + per-chain rounds + notify dedup (cache; ClickUp thread is source of truth)
+  lockfile: 'C:\.fusion247\tower-baton.lock'              # single-watcher guard
+  logs: 'C:\.fusion247\logs\tower-baton\'                 # bounded rotating logs, OUTSIDE the repo
+  qa_skill: 'Builds/BUILD-010-fusion-tower/baton-mvp/tower-qa-skill.md'  # loaded fresh + SHA-256 fingerprinted per turn
+
+startup:
+  canonical_launcher: services/tower-baton/scripts/start-fusion-tower.ps1
+  command_line: 'powershell -ExecutionPolicy Bypass -File services\tower-baton\scripts\start-fusion-tower.ps1 -TaskId <clickupTaskId> [-Telegram]'
+  equivalent: 'node services/tower-baton/bin/tower-watch.js  (uses the same runtimeConfig)'
+  secrets_on_command_line: false        # the node process loads secrets itself from the store
+  startup_milestone_fresh: '[TOWER] ClickUp baton watcher online'
+  startup_milestone_recovered: '[TOWER] Watcher recovered and resumed from durable checkpoint state'
+  emitted_by: tower-baton's own milestone notifier (real event) — NOT a manual send
