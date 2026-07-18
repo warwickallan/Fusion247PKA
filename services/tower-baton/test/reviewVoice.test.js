@@ -27,19 +27,21 @@ test('(a) OPENS with a status line carrying BOTH the verdict token AND the highe
     reviewedHead: HEAD,
   });
   const line0 = firstLine(msg);
-  // (a) FIRST content line after [CODEX] is the status line, with BOTH verdict + severity token
-  assert.ok(line0.startsWith('[CODEX] '), 'the first content line is the [CODEX] status line');
-  assert.match(line0, /CORRECTIONS REQUIRED/, 'the verdict token leads the status line');
+  // (a) the composer body carries NO [CODEX] tag -- the notifier's wireText() owns the
+  //     single source prefix. The FIRST content line is the BARE status line, with
+  //     BOTH the verdict token AND the highest-severity token.
+  assert.ok(!msg.includes('[CODEX]'), 'the composer body carries no [CODEX] tag -- the notifier layer owns the single source prefix');
+  assert.ok(line0.startsWith('CORRECTIONS REQUIRED'), 'the verdict token leads the bare status line');
   assert.match(line0, /highest severity: MEDIUM/, 'the highest-severity token is on the status line');
   // (b) the status line appears BEFORE the detail sections
-  assert.ok(msg.indexOf('[CODEX]') < msg.indexOf('What I checked out'), 'status line precedes the claims detail');
-  assert.ok(msg.indexOf('[CODEX]') < msg.indexOf('What needs doing'), 'status line precedes the findings detail');
+  assert.ok(msg.indexOf('CORRECTIONS REQUIRED') < msg.indexOf('What I checked out'), 'status line precedes the claims detail');
+  assert.ok(msg.indexOf('CORRECTIONS REQUIRED') < msg.indexOf('What needs doing'), 'status line precedes the findings detail');
   // the plain-English verdict is still carried in the body
   assert.match(msg, /My verdict:/);
   assert.ok(msg.includes('sent it back for fixes'), 'plain-English CORRECTIONS_REQUIRED wording present');
 });
 
-test('(b) leading status line reads "[CODEX] CORRECTIONS REQUIRED - highest severity: HIGH"; finding rendered readably below', () => {
+test('(b) leading status line reads "CORRECTIONS REQUIRED - highest severity: HIGH" (bare, no [CODEX]); finding rendered readably below', () => {
   const msg = composeReviewBriefing({
     checkpoint: checkpoint(),
     codexResult: {
@@ -51,7 +53,7 @@ test('(b) leading status line reads "[CODEX] CORRECTIONS REQUIRED - highest seve
     reviewedHead: HEAD,
   });
   // highest severity is derived from codexResult.findings even when material_findings is empty
-  assert.equal(firstLine(msg), '[CODEX] CORRECTIONS REQUIRED - highest severity: HIGH');
+  assert.equal(firstLine(msg), 'CORRECTIONS REQUIRED - highest severity: HIGH');
   assert.ok(msg.includes('Make the Stop button record before it clears on screen'), 'the finding correction is rendered in words');
   assert.ok(msg.includes('Important:'), 'severity rendered as a plain word, not a raw code');
   assert.ok(!msg.includes('[high]'), 'no raw severity code leaks into the message');
@@ -133,7 +135,7 @@ test('(e2) maximal input NEVER severs the verdict or the next-action line (F1)',
   });
   // (a) the LEADING STATUS LINE survives as the first content line, verdict + severity intact
   const line0 = msg.split('\n')[0];
-  assert.equal(line0, '[CODEX] CORRECTIONS REQUIRED - highest severity: CRITICAL', 'the leading status line survives maximal input as line 1');
+  assert.equal(line0, 'CORRECTIONS REQUIRED - highest severity: CRITICAL', 'the leading status line survives maximal input as line 1');
   // (b) the plain-English verdict still present
   assert.match(msg, /My verdict:/);
   assert.ok(msg.includes('sent it back for fixes'), 'the plain-English verdict survives maximal input');
@@ -165,21 +167,25 @@ test('(e3) pathological identifiers NEVER inflate the spine past the ceiling or 
   assert.ok(msg.length <= MAX_BRIEFING_CHARS, `message length ${msg.length} must be <= ${MAX_BRIEFING_CHARS}`);
   // (b) the LEADING STATUS LINE is line 1 and complete -- pathological ids cannot inflate or sever it
   const line0 = msg.split('\n')[0];
-  assert.equal(line0, '[CODEX] CORRECTIONS REQUIRED - highest severity: HIGH', 'status line intact as line 1 despite pathological identifiers');
+  assert.equal(line0, 'CORRECTIONS REQUIRED - highest severity: HIGH', 'status line intact as line 1 despite pathological identifiers');
   // (c) the plain-English verdict line is present AND complete (not tail-severed)
   assert.match(msg, /My verdict: I've sent it back for fixes\./);
   // (d) a next-action line is present (verbatim -- the spine survived intact)
   assert.ok(msg.includes(`What happens next: ${NEXT}`), 'the next-action line survives pathological identifiers');
 });
 
-test('(f) reads [CODEX], not [TOWER]', () => {
+test('(f) composer body carries NO source tag (the notifier owns the single [CODEX]) and never reads [TOWER]', () => {
   const msg = composeReviewBriefing({
     checkpoint: checkpoint(),
     codexResult: { status: 'ok', verdict: 'approve', summary: 's', claims_verified: [], findings: [] },
     derived: { verdict: 'APPROVE', material_findings: [], next_action: 'proceed' },
     reviewedHead: HEAD,
   });
-  assert.ok(msg.startsWith('[CODEX]'), 'briefing leads with the CODEX label');
+  // SINGLE-OWNER PREFIX: the composer must NOT emit [CODEX] -- wireText() adds exactly
+  // one at the notifier layer. The body leads with the bare verdict/status instead.
+  assert.ok(!msg.startsWith('[CODEX]'), 'the composer no longer emits the [CODEX] prefix -- the notifier layer owns it (single owner)');
+  assert.ok(!msg.includes('[CODEX]'), 'no [CODEX] tag anywhere in the composed body');
+  assert.ok(msg.startsWith('APPROVED - no findings'), 'the body leads with the bare verdict + criticality status line');
   assert.ok(!msg.includes('[TOWER]'), 'review outcomes do not read as TOWER machine status');
 });
 
@@ -191,7 +197,7 @@ test('(g) APPROVE with no findings reads cleanly - no dangling findings section'
     reviewedHead: HEAD,
   });
   // (d) APPROVE with no findings renders "no findings" cleanly on the leading status line
-  assert.equal(firstLine(msg), '[CODEX] APPROVED - no findings', 'APPROVE-with-no-findings status line reads cleanly');
+  assert.equal(firstLine(msg), 'APPROVED - no findings', 'APPROVE-with-no-findings status line reads cleanly');
   assert.ok(msg.includes('signed it off'), 'plain-English APPROVE wording present');
   assert.ok(!msg.includes('What needs doing'), 'no empty "what needs doing" header');
   assert.ok(!msg.includes('Worth noting:'), 'no empty "worth noting" header when there are zero findings');
@@ -210,8 +216,8 @@ test('BLOCKED (pre-Codex gate) renders the blockers under "in the way" and reads
     },
     reviewedHead: HEAD,
   });
-  assert.ok(msg.startsWith('[CODEX]'), 'blocked briefing still leads with CODEX');
-  assert.equal(firstLine(msg), '[CODEX] BLOCKED - could not complete the review', 'BLOCKED status line states it could not complete, not a severity');
+  assert.ok(!msg.includes('[CODEX]'), 'blocked briefing carries no [CODEX] tag -- the notifier owns it');
+  assert.equal(firstLine(msg), 'BLOCKED - could not complete the review', 'BLOCKED status line states it could not complete, not a severity');
   assert.ok(msg.includes("couldn't complete it"), 'plain-English BLOCKED wording present');
   assert.ok(msg.includes("What's in the way:"), 'blockers get a dedicated section');
   assert.ok(msg.includes('brief_ref could not be resolved'), 'the blocker reason is shown plainly');
@@ -229,7 +235,7 @@ test('DECISION_REQUIRED reads "needs your call"', () => {
     derived: { verdict: 'DECISION_REQUIRED', material_findings: ['[critical] S1: Close the bypass'], next_action: 'Material issue (critical / security / scope) -- escalate to Warwick for a decision before proceeding.' },
     reviewedHead: HEAD,
   });
-  assert.equal(firstLine(msg), '[CODEX] DECISION REQUIRED - highest severity: CRITICAL', 'DECISION_REQUIRED status line leads with verdict token + highest severity');
+  assert.equal(firstLine(msg), 'DECISION REQUIRED - highest severity: CRITICAL', 'DECISION_REQUIRED status line leads with verdict token + highest severity');
   assert.ok(msg.includes('needs your call'), 'plain-English DECISION_REQUIRED wording present');
   assert.ok(msg.includes('Close the bypass before this goes anywhere near live'), 'the material finding is rendered');
 });

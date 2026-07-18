@@ -9,6 +9,7 @@ import { openState } from '../src/state.js';
 import { formatCheckpoint, formatResponse, parseResponse } from '../src/checkpoint.js';
 import { createFakeClickup } from '../src/clickupClient.js';
 import { fakeGithub, fakeCodex, fakeNotifier, writeTmp, approvedSkill, tmpPath } from '../test-helpers/fakes.js';
+import { wireText } from '../src/telegramNotifier.js';
 
 const HEAD = '1390dd6a1b2c3d4e5f60718293a4b5c6d7e8f900';
 
@@ -61,14 +62,20 @@ test('happy path — APPROVE posted, milestone fired, fingerprint recorded', asy
   assert.ok(h.notifier.calls.some((c) => c.purpose === 'review_posted'));
 });
 
-test('review-outcome milestone speaks in the CODEX voice (logicalSource CODEX, [CODEX] body, plain verdict)', async () => {
+test('review-outcome milestone speaks in the CODEX voice (logicalSource CODEX, bare-status body, one [CODEX] added by the notifier layer, plain verdict)', async () => {
   const codex = fakeCodex();
   const h = harness({ codex });
   await h.watcher.pollOnce();
   const ding = h.notifier.calls.find((c) => c.purpose === 'review_posted');
   assert.ok(ding, 'a review_posted milestone fired');
   assert.equal(ding.logicalSource, 'CODEX', 'review outcomes are sourced as CODEX, not TOWER');
-  assert.ok(ding.body.startsWith('[CODEX]'), 'the milestone body is the human CODEX briefing');
+  // SINGLE-OWNER PREFIX: the composed BODY carries NO [CODEX] tag; the notifier's
+  // wireText() (driven by logicalSource: 'CODEX') adds EXACTLY ONE on the final wire.
+  assert.ok(!ding.body.includes('[CODEX]'), 'the composed milestone body carries no [CODEX] tag');
+  assert.ok(ding.body.startsWith('APPROVED'), 'the body leads with the bare verdict/status line');
+  const wired = wireText(ding.logicalSource, ding.body);
+  assert.ok(wired.startsWith('[CODEX] '), 'the notifier layer adds exactly one [CODEX] prefix');
+  assert.ok(!wired.includes('[CODEX] [CODEX]'), 'no doubled [CODEX] on the final wire');
   assert.ok(ding.body.includes('signed it off'), 'the APPROVE briefing reads in plain English');
   assert.ok(ding.body.includes(HEAD.slice(0, 8)), 'the briefing carries the short reviewed SHA');
   assert.equal(ding.checkpointId, 'cp-100', 'dedup key material (checkpointId) is unchanged');
@@ -90,7 +97,9 @@ test('BLOCKED review outcome — milestone purpose "blocked", [CODEX] body, dedu
   assert.equal(ding.purpose, 'blocked', 'BLOCKED maps to the "blocked" milestone purpose (unchanged)');
   assert.equal(ding.checkpointId, 'cp-100', 'dedup key material (checkpointId) is unchanged');
   assert.equal(ding.logicalSource, 'CODEX', 'review outcomes are sourced as CODEX');
-  assert.ok(ding.body.startsWith('[CODEX]'), 'the milestone body is the [CODEX] briefing');
+  assert.ok(!ding.body.includes('[CODEX]'), 'the composed milestone body carries no [CODEX] tag -- the notifier owns it');
+  assert.ok(ding.body.startsWith('BLOCKED'), 'the body leads with the bare BLOCKED status line');
+  assert.ok(!wireText(ding.logicalSource, ding.body).includes('[CODEX] [CODEX]'), 'the notifier adds exactly one [CODEX] -- never doubled');
   assert.ok(ding.body.includes("couldn't complete it"), 'plain-English BLOCKED wording present');
   assert.ok(!ding.body.includes(leakMarker), 'the injected secret VALUE does not leak into the Telegram body');
   assert.ok(ding.body.includes('***redacted***'), 'the body was passed through config.redact');
@@ -114,7 +123,9 @@ test('DECISION_REQUIRED review outcome — milestone purpose "escalation", [CODE
   assert.equal(ding.purpose, 'escalation', 'DECISION_REQUIRED maps to the "escalation" milestone purpose (unchanged)');
   assert.equal(ding.checkpointId, 'cp-100', 'dedup key material (checkpointId) is unchanged');
   assert.equal(ding.logicalSource, 'CODEX', 'review outcomes are sourced as CODEX');
-  assert.ok(ding.body.startsWith('[CODEX]'), 'the milestone body is the [CODEX] briefing');
+  assert.ok(!ding.body.includes('[CODEX]'), 'the composed milestone body carries no [CODEX] tag -- the notifier owns it');
+  assert.ok(ding.body.startsWith('DECISION REQUIRED'), 'the body leads with the bare DECISION REQUIRED status line');
+  assert.ok(!wireText(ding.logicalSource, ding.body).includes('[CODEX] [CODEX]'), 'the notifier adds exactly one [CODEX] -- never doubled');
   assert.ok(ding.body.includes('needs your call'), 'plain-English DECISION_REQUIRED wording present');
   assert.ok(!ding.body.includes(leakMarker), 'the injected secret VALUE does not leak into the Telegram body');
   assert.ok(ding.body.includes('***redacted***'), 'the body was passed through config.redact');

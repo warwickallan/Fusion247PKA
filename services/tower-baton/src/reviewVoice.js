@@ -10,7 +10,10 @@
 //   codexResult { verdict, summary, claims_verified[], findings[] }  (CODEX_RESULT_SCHEMA)
 //   derived     { verdict, material_findings[], next_action }        (deriveVerdict)
 // It does NOT change the ratified QA skill, the Codex schema, the verdict vocabulary
-// or the loop. It only renders. Identify review outcomes honestly as [CODEX].
+// or the loop. It only renders. SOURCE-TAG OWNERSHIP: this composer emits NO [CODEX]
+// prefix -- the notifier's wireText() (driven by logicalSource: 'CODEX') is the SOLE
+// owner of the single [CODEX] label on the final wire. The body produced here leads
+// with the bare verdict + criticality status line; the wire ends up "[CODEX] <status>".
 //
 // ASCII ONLY -- this source file, and the string it produces. No em-dashes, no arrow
 // glyphs: this runtime once had a Windows scheduled task broken by a non-ASCII char,
@@ -216,7 +219,9 @@ function fitBlock(lines, room) {
  * @param {object?}  args.codexResult   the Codex structured result (or null when a gate blocked pre-Codex)
  * @param {object}   args.derived       deriveVerdict() result { verdict, material_findings[], next_action }
  * @param {string?}  args.reviewedHead  the exact reviewed head SHA (full)
- * @returns {string} a warm, plain-British, ASCII briefing under ~1200 chars, led by [CODEX].
+ * @returns {string} a warm, plain-British, ASCII briefing under ~1200 chars, led by the
+ *                   bare verdict + criticality status line. NO [CODEX] prefix here -- the
+ *                   notifier's wireText() is the single owner of the [CODEX] source tag.
  */
 export function composeReviewBriefing({ checkpoint = {}, codexResult = null, derived = {}, reviewedHead = null } = {}) {
   const verdict = derived?.verdict ?? 'BLOCKED';
@@ -229,20 +234,23 @@ export function composeReviewBriefing({ checkpoint = {}, codexResult = null, der
 
   // ---------------------------------------------------------------------------
   // MANDATORY SPINE -- reserved FIRST, must ALWAYS survive regardless of input
-  // size. The [CODEX] label leads every briefing. The LEADING STATUS LINE (the
-  // very first content line) states the verdict token and the criticality up
-  // front so Warwick can gauge how serious it is BEFORE reading any detail; it,
-  // the verdict line and the what-happens-next line are the pieces whose budget
-  // is claimed before any optional section. A huge summary / claims / findings
-  // payload can no longer crowd them past the length clamp and sever them (F1 --
-  // the bug Codex found: the old code truncated the whole assembled string from
-  // the end, dropping exactly those lines). The status line embeds NO
-  // caller-supplied identifiers -- only the bounded verdict token and a bounded
-  // severity token -- so, unlike the "Had a look at ..." line (whose build_id /
-  // wp_id are clampId()-bounded above), it cannot itself overflow the budget.
+  // size. The LEADING STATUS LINE (the very first content line) states the
+  // verdict token and the criticality up front so Warwick can gauge how serious
+  // it is BEFORE reading any detail; it, the verdict line and the what-happens-
+  // next line are the pieces whose budget is claimed before any optional section.
+  // A huge summary / claims / findings payload can no longer crowd them past the
+  // length clamp and sever them (F1 -- the bug Codex found: the old code truncated
+  // the whole assembled string from the end, dropping exactly those lines). The
+  // status line embeds NO caller-supplied identifiers -- only the bounded verdict
+  // token and a bounded severity token -- so, unlike the "Had a look at ..." line
+  // (whose build_id / wp_id are clampId()-bounded above), it cannot itself
+  // overflow the budget. The status line carries NO [CODEX] source tag: the
+  // notifier's wireText() (logicalSource: 'CODEX') is the single owner of that
+  // label, so the final wire reads exactly "[CODEX] <status line>" -- never
+  // "[CODEX] [CODEX] ...".
   // ---------------------------------------------------------------------------
   const sevToken = highestSeverityToken({ codexResult, derived });
-  const statusLine = `[CODEX] ${verdictStatusToken(verdict)} - ${criticalityClause(verdict, sevToken)}`;
+  const statusLine = `${verdictStatusToken(verdict)} - ${criticalityClause(verdict, sevToken)}`;
   const headLines = [
     statusLine,
     headline(verdict),
