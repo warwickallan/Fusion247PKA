@@ -100,6 +100,70 @@ function severityWord(severity) {
   }
 }
 
+// The verdict as a SHORT UPPERCASE status token for the leading status line
+// (mirrors the runtime-prompt sec.5 verdicts, mapped to the tested baton vocab).
+// Warwick reads this FIRST to judge how critical the outcome is before any detail.
+function verdictStatusToken(verdict) {
+  switch (verdict) {
+    case 'APPROVE': return 'APPROVED';
+    case 'CORRECTIONS_REQUIRED': return 'CORRECTIONS REQUIRED';
+    case 'DECISION_REQUIRED': return 'DECISION REQUIRED';
+    case 'BLOCKED': return 'BLOCKED';
+    default: return 'REVIEWED';
+  }
+}
+
+// Severity ranking, HIGHEST first (runtime-prompt sec.4: BLOCKER/HIGH/MEDIUM/LOW/NOTE),
+// reconciled with the tested schema's lowercase severities (critical/high/medium/low/info).
+// The winning rank drives the criticality clause on the leading status line.
+const SEVERITY_RANK = new Map([
+  ['blocker', 5],
+  ['critical', 5],
+  ['high', 4],
+  ['medium', 3],
+  ['low', 2],
+  ['info', 1],
+  ['note', 1],
+]);
+
+function severityRank(sev) {
+  return SEVERITY_RANK.get(String(sev ?? '').toLowerCase().trim()) ?? 0;
+}
+
+// The HIGHEST severity among the material findings, returned as a canonical
+// lowercase token (or null when there are none). Draws from BOTH sources the baton
+// carries: the Codex structured findings[].severity AND any "[severity]"-tagged
+// derived.material_findings strings (a "[gate]" tag has no severity and is ignored).
+// The returned token is one of a FIXED, bounded set -- it can never inflate the
+// leading status line past the budget regardless of caller input.
+function highestSeverityToken({ codexResult = null, derived = {} } = {}) {
+  const sevs = [];
+  const findings = Array.isArray(codexResult?.findings) ? codexResult.findings : [];
+  for (const f of findings) if (f?.severity) sevs.push(String(f.severity));
+  const mats = Array.isArray(derived?.material_findings) ? derived.material_findings : [];
+  for (const m of mats) {
+    const tag = String(m ?? '').match(/^\s*\[([^\]]+)\]/);
+    if (tag && SEVERITY_RANK.has(tag[1].toLowerCase().trim())) sevs.push(tag[1]);
+  }
+  let best = null;
+  let bestRank = 0;
+  for (const s of sevs) {
+    const r = severityRank(s);
+    if (r > bestRank) { bestRank = r; best = String(s).toLowerCase().trim(); }
+  }
+  return best;
+}
+
+// The criticality clause on the leading status line. BLOCKED can't be graded on
+// severity (the review never completed), so it states that plainly. Otherwise it
+// names the highest severity present, or reads "no findings" when the review is
+// clean. Every branch returns a short, bounded, ASCII string.
+function criticalityClause(verdict, sevToken) {
+  if (verdict === 'BLOCKED') return 'could not complete the review';
+  if (!sevToken) return 'no findings';
+  return `highest severity: ${sevToken.toUpperCase()}`;
+}
+
 function tidy(s, max) {
   const t = toAscii(s).replace(/\s+/g, ' ').trim();
   return t.length > max ? `${t.slice(0, max - 1).trimEnd()}...` : t;
@@ -165,15 +229,23 @@ export function composeReviewBriefing({ checkpoint = {}, codexResult = null, der
 
   // ---------------------------------------------------------------------------
   // MANDATORY SPINE -- reserved FIRST, must ALWAYS survive regardless of input
-  // size. The [CODEX] label leads every briefing; the verdict line and the
-  // what-happens-next line are the two MOST IMPORTANT pieces, so their character
-  // budget is claimed before any optional section. A huge summary / claims /
-  // findings payload can no longer crowd them past the length clamp and sever
-  // them (F1 -- the bug Codex found: the old code truncated the whole assembled
-  // string from the end, dropping exactly the verdict + next-action lines).
+  // size. The [CODEX] label leads every briefing. The LEADING STATUS LINE (the
+  // very first content line) states the verdict token and the criticality up
+  // front so Warwick can gauge how serious it is BEFORE reading any detail; it,
+  // the verdict line and the what-happens-next line are the pieces whose budget
+  // is claimed before any optional section. A huge summary / claims / findings
+  // payload can no longer crowd them past the length clamp and sever them (F1 --
+  // the bug Codex found: the old code truncated the whole assembled string from
+  // the end, dropping exactly those lines). The status line embeds NO
+  // caller-supplied identifiers -- only the bounded verdict token and a bounded
+  // severity token -- so, unlike the "Had a look at ..." line (whose build_id /
+  // wp_id are clampId()-bounded above), it cannot itself overflow the budget.
   // ---------------------------------------------------------------------------
+  const sevToken = highestSeverityToken({ codexResult, derived });
+  const statusLine = `[CODEX] ${verdictStatusToken(verdict)} - ${criticalityClause(verdict, sevToken)}`;
   const headLines = [
-    `[CODEX] ${headline(verdict)}`,
+    statusLine,
+    headline(verdict),
     '',
     `Had a look at ${build}${wp} at ${shortSha}.`,
   ];

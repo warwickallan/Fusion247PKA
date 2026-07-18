@@ -12,7 +12,10 @@ function checkpoint(overrides = {}) {
   };
 }
 
-test('(a) contains the plain-English verdict - CORRECTIONS_REQUIRED reads "sent it back for fixes"', () => {
+// The leading status line is always the FIRST content line of the message.
+function firstLine(msg) { return msg.split('\n')[0]; }
+
+test('(a) OPENS with a status line carrying BOTH the verdict token AND the highest-severity token, before any detail', () => {
   const msg = composeReviewBriefing({
     checkpoint: checkpoint(),
     codexResult: {
@@ -23,11 +26,20 @@ test('(a) contains the plain-English verdict - CORRECTIONS_REQUIRED reads "sent 
     derived: { verdict: 'CORRECTIONS_REQUIRED', material_findings: ['[medium] F1: Add a test for the timeout path'], next_action: 'Apply the named corrections, push a new head, and re-hand off the new checkpoint.' },
     reviewedHead: HEAD,
   });
+  const line0 = firstLine(msg);
+  // (a) FIRST content line after [CODEX] is the status line, with BOTH verdict + severity token
+  assert.ok(line0.startsWith('[CODEX] '), 'the first content line is the [CODEX] status line');
+  assert.match(line0, /CORRECTIONS REQUIRED/, 'the verdict token leads the status line');
+  assert.match(line0, /highest severity: MEDIUM/, 'the highest-severity token is on the status line');
+  // (b) the status line appears BEFORE the detail sections
+  assert.ok(msg.indexOf('[CODEX]') < msg.indexOf('What I checked out'), 'status line precedes the claims detail');
+  assert.ok(msg.indexOf('[CODEX]') < msg.indexOf('What needs doing'), 'status line precedes the findings detail');
+  // the plain-English verdict is still carried in the body
   assert.match(msg, /My verdict:/);
   assert.ok(msg.includes('sent it back for fixes'), 'plain-English CORRECTIONS_REQUIRED wording present');
 });
 
-test('(b) includes a real finding rendered readably (not a bare severity code)', () => {
+test('(b) leading status line reads "[CODEX] CORRECTIONS REQUIRED - highest severity: HIGH"; finding rendered readably below', () => {
   const msg = composeReviewBriefing({
     checkpoint: checkpoint(),
     codexResult: {
@@ -38,6 +50,8 @@ test('(b) includes a real finding rendered readably (not a bare severity code)',
     derived: { verdict: 'CORRECTIONS_REQUIRED', material_findings: [], next_action: 'fix it' },
     reviewedHead: HEAD,
   });
+  // highest severity is derived from codexResult.findings even when material_findings is empty
+  assert.equal(firstLine(msg), '[CODEX] CORRECTIONS REQUIRED - highest severity: HIGH');
   assert.ok(msg.includes('Make the Stop button record before it clears on screen'), 'the finding correction is rendered in words');
   assert.ok(msg.includes('Important:'), 'severity rendered as a plain word, not a raw code');
   assert.ok(!msg.includes('[high]'), 'no raw severity code leaks into the message');
@@ -117,12 +131,15 @@ test('(e2) maximal input NEVER severs the verdict or the next-action line (F1)',
     derived: { verdict: 'CORRECTIONS_REQUIRED', material_findings: [], next_action: NEXT },
     reviewedHead: HEAD,
   });
-  // (a) the plain-English verdict still present
+  // (a) the LEADING STATUS LINE survives as the first content line, verdict + severity intact
+  const line0 = msg.split('\n')[0];
+  assert.equal(line0, '[CODEX] CORRECTIONS REQUIRED - highest severity: CRITICAL', 'the leading status line survives maximal input as line 1');
+  // (b) the plain-English verdict still present
   assert.match(msg, /My verdict:/);
   assert.ok(msg.includes('sent it back for fixes'), 'the plain-English verdict survives maximal input');
-  // (b) the mandatory next-action line still present, in full
+  // (c) the mandatory next-action line still present, in full
   assert.ok(msg.includes(`What happens next: ${NEXT}`), 'the next-action line survives maximal input verbatim');
-  // (c) still under the Telegram ceiling
+  // (d) still under the Telegram ceiling
   assert.ok(msg.length <= MAX_BRIEFING_CHARS, `message length ${msg.length} must be <= ${MAX_BRIEFING_CHARS}`);
 });
 
@@ -146,9 +163,12 @@ test('(e3) pathological identifiers NEVER inflate the spine past the ceiling or 
   });
   // (a) still under the Telegram ceiling despite thousands-of-char identifiers
   assert.ok(msg.length <= MAX_BRIEFING_CHARS, `message length ${msg.length} must be <= ${MAX_BRIEFING_CHARS}`);
-  // (b) the plain-English verdict line is present AND complete (not tail-severed)
+  // (b) the LEADING STATUS LINE is line 1 and complete -- pathological ids cannot inflate or sever it
+  const line0 = msg.split('\n')[0];
+  assert.equal(line0, '[CODEX] CORRECTIONS REQUIRED - highest severity: HIGH', 'status line intact as line 1 despite pathological identifiers');
+  // (c) the plain-English verdict line is present AND complete (not tail-severed)
   assert.match(msg, /My verdict: I've sent it back for fixes\./);
-  // (c) a next-action line is present (verbatim -- the spine survived intact)
+  // (d) a next-action line is present (verbatim -- the spine survived intact)
   assert.ok(msg.includes(`What happens next: ${NEXT}`), 'the next-action line survives pathological identifiers');
 });
 
@@ -170,6 +190,8 @@ test('(g) APPROVE with no findings reads cleanly - no dangling findings section'
     derived: { verdict: 'APPROVE', material_findings: [], next_action: 'Proceed to the next WP step / final review.' },
     reviewedHead: HEAD,
   });
+  // (d) APPROVE with no findings renders "no findings" cleanly on the leading status line
+  assert.equal(firstLine(msg), '[CODEX] APPROVED - no findings', 'APPROVE-with-no-findings status line reads cleanly');
   assert.ok(msg.includes('signed it off'), 'plain-English APPROVE wording present');
   assert.ok(!msg.includes('What needs doing'), 'no empty "what needs doing" header');
   assert.ok(!msg.includes('Worth noting:'), 'no empty "worth noting" header when there are zero findings');
@@ -189,6 +211,7 @@ test('BLOCKED (pre-Codex gate) renders the blockers under "in the way" and reads
     reviewedHead: HEAD,
   });
   assert.ok(msg.startsWith('[CODEX]'), 'blocked briefing still leads with CODEX');
+  assert.equal(firstLine(msg), '[CODEX] BLOCKED - could not complete the review', 'BLOCKED status line states it could not complete, not a severity');
   assert.ok(msg.includes("couldn't complete it"), 'plain-English BLOCKED wording present');
   assert.ok(msg.includes("What's in the way:"), 'blockers get a dedicated section');
   assert.ok(msg.includes('brief_ref could not be resolved'), 'the blocker reason is shown plainly');
@@ -206,6 +229,7 @@ test('DECISION_REQUIRED reads "needs your call"', () => {
     derived: { verdict: 'DECISION_REQUIRED', material_findings: ['[critical] S1: Close the bypass'], next_action: 'Material issue (critical / security / scope) -- escalate to Warwick for a decision before proceeding.' },
     reviewedHead: HEAD,
   });
+  assert.equal(firstLine(msg), '[CODEX] DECISION REQUIRED - highest severity: CRITICAL', 'DECISION_REQUIRED status line leads with verdict token + highest severity');
   assert.ok(msg.includes('needs your call'), 'plain-English DECISION_REQUIRED wording present');
   assert.ok(msg.includes('Close the bypass before this goes anywhere near live'), 'the material finding is rendered');
 });
