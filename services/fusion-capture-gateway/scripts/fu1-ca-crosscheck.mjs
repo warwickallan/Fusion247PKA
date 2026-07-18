@@ -1,0 +1,171 @@
+// BUILD-002 FU-1 -- reproducible, OFFLINE CA cross-check.
+//
+// PURPOSE: make FU-1 L-1 (the outstanding TOFU-vs-authoritative cross-check) a
+// one-command action. The pinned bundle certs/supabase-pooler-ca.pem was
+// extracted from a LIVE handshake (trust-on-first-use). L-1 stays OPEN until it
+// is cross-checked against the AUTHORITATIVE dashboard download
+// (Supabase Dashboard -> Database -> Settings -> SSL Configuration ->
+// prod-ca-2021.crt). That download lives behind an authenticated dashboard, so
+// closure is a Warwick action; this script performs the comparison for him.
+//
+// This script is READ-ONLY on the filesystem. It reads NO env var, NO secret,
+// opens NO network connection, and touches NO database. It parses PEM files
+// with node:crypto and prints a verdict.
+//
+// USAGE:
+//   node scripts/fu1-ca-crosscheck.mjs [pathToPinnedPem] [--official <prod-ca-2021.crt>]
+//
+//   node scripts/fu1-ca-crosscheck.mjs
+//     -> self-consistency + chain check of the committed pin. Exit 0 on pass.
+//
+//   node scripts/fu1-ca-crosscheck.mjs --official ~/Downloads/prod-ca-2021.crt
+//     -> the above PLUS: assert the pinned ROOT fingerprint appears in the
+//        official download. VERDICT: MATCH (exit 0) closes L-1;
+//        VERDICT: MISMATCH (exit 2) is a stop-everything incident.
+//
+// EXIT CODES: 0 = pass/MATCH, 2 = self-consistency/chain/MISMATCH failure,
+//             1 = usage/IO error.
+
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { X509Certificate } from 'node:crypto';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const DEFAULT_PINNED = path.join(__dirname, '..', 'certs', 'supabase-pooler-ca.pem');
+
+// The pin -- kept identical to test/pinnedCaGuard.test.js on purpose.
+const EXPECTED_INTERMEDIATE_CN = 'Supabase Intermediate 2021 CA';
+const EXPECTED_ROOT_CN = 'Supabase Root 2021 CA';
+const EXPECTED_INTERMEDIATE_FP =
+  '303b0a59bbc8d77e967fbed20b3fe68ec5d7d391c3081ece9936efceef0a55ea';
+const EXPECTED_ROOT_FP =
+  '807025ad50d4ed219d2c9c7d299c004f824eb00cf7f65afef607d07b72e6cafa';
+
+const cnOf = (dn) => {
+  const line = dn.split('\n').find((l) => l.startsWith('CN='));
+  return line ? line.slice(3) : null;
+};
+const normFp = (fp) => fp.replace(/:/g, '').toLowerCase();
+
+function parseArgs(argv) {
+  let pinnedPath = DEFAULT_PINNED;
+  let officialPath = null;
+  const positional = [];
+  for (let i = 0; i < argv.length; i += 1) {
+    if (argv[i] === '--official') {
+      officialPath = argv[i + 1];
+      i += 1;
+    } else {
+      positional.push(argv[i]);
+    }
+  }
+  if (positional.length > 0) pinnedPath = positional[0];
+  return { pinnedPath, officialPath };
+}
+
+function readCerts(file) {
+  const pem = fs.readFileSync(file, 'utf8');
+  if (/-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----/.test(pem)) {
+    throw new Error(`${file} contains a PRIVATE KEY block -- refusing to treat it as a CA bundle`);
+  }
+  const blocks = pem.match(/-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/g) || [];
+  return blocks.map((b) => new X509Certificate(b));
+}
+
+function fail(msg, code) {
+  console.error(`ERROR: ${msg}`);
+  process.exit(code);
+}
+
+const { pinnedPath, officialPath } = parseArgs(process.argv.slice(2));
+
+// ---- 1. Parse + describe the pinned bundle -------------------------------
+if (!fs.existsSync(pinnedPath)) fail(`pinned PEM not found: ${pinnedPath}`, 1);
+
+let pinnedCerts;
+try {
+  pinnedCerts = readCerts(pinnedPath);
+} catch (err) {
+  fail(err.message, 1);
+}
+
+console.log(`Pinned bundle: ${pinnedPath}`);
+console.log(`Certificates found: ${pinnedCerts.length}`);
+for (const c of pinnedCerts) {
+  console.log(`  - CN=${cnOf(c.subject)}  fingerprint256=${normFp(c.fingerprint256)}`);
+}
+console.log('');
+
+// ---- 2. Self-consistency against the recorded pin ------------------------
+if (pinnedCerts.length !== 2) {
+  fail(`expected exactly 2 certificates in the pinned bundle, found ${pinnedCerts.length}`, 2);
+}
+const [intermediate, root] = pinnedCerts;
+const checks = [
+  [cnOf(intermediate.subject) === EXPECTED_INTERMEDIATE_CN, 'intermediate subject CN matches the pin'],
+  [cnOf(root.subject) === EXPECTED_ROOT_CN, 'root subject CN matches the pin'],
+  [normFp(intermediate.fingerprint256) === EXPECTED_INTERMEDIATE_FP, 'intermediate fingerprint256 matches the pin'],
+  [normFp(root.fingerprint256) === EXPECTED_ROOT_FP, 'root fingerprint256 matches the pin'],
+  [cnOf(intermediate.issuer) === EXPECTED_ROOT_CN, 'intermediate is issued by the pinned root'],
+  [cnOf(root.issuer) === cnOf(root.subject), 'root is self-signed'],
+  [intermediate.ca === true, 'intermediate is a CA cert'],
+  [root.ca === true, 'root is a CA cert'],
+];
+let selfOk = true;
+for (const [ok, label] of checks) {
+  console.log(`  [${ok ? 'PASS' : 'FAIL'}] ${label}`);
+  if (!ok) selfOk = false;
+}
+console.log('');
+if (!selfOk) {
+  fail('pinned bundle failed self-consistency / chain checks -- do not trust this bundle', 2);
+}
+console.log('Self-consistency + chain: PASS');
+console.log('');
+
+// ---- 3. Authoritative cross-check (only when --official is given) --------
+if (!officialPath) {
+  console.log('L-1 status: OPEN (no --official file supplied).');
+  console.log('To CLOSE L-1: download prod-ca-2021.crt from the Supabase dashboard');
+  console.log('  (Database -> Settings -> SSL Configuration) and re-run:');
+  console.log('  node scripts/fu1-ca-crosscheck.mjs --official <path-to-prod-ca-2021.crt>');
+  process.exit(0);
+}
+
+if (!fs.existsSync(officialPath)) fail(`official PEM not found: ${officialPath}`, 1);
+
+let officialCerts;
+try {
+  officialCerts = readCerts(officialPath);
+} catch (err) {
+  fail(err.message, 1);
+}
+
+const officialFps = officialCerts.map((c) => normFp(c.fingerprint256));
+console.log(`Official download: ${officialPath}`);
+console.log(`Certificates found: ${officialCerts.length}`);
+for (const c of officialCerts) {
+  console.log(`  - CN=${cnOf(c.subject)}  fingerprint256=${normFp(c.fingerprint256)}`);
+}
+console.log('');
+
+// The authoritative test: the pinned ROOT (the trust anchor) must be present
+// in the dashboard-issued file. If the official file also contains the
+// intermediate, we note it, but the root match is the load-bearing assertion.
+const rootMatch = officialFps.includes(EXPECTED_ROOT_FP);
+const intermediateAlsoPresent = officialFps.includes(EXPECTED_INTERMEDIATE_FP);
+
+console.log(`Pinned ROOT fingerprint present in official file: ${rootMatch ? 'YES' : 'NO'}`);
+console.log(`Pinned INTERMEDIATE fingerprint present in official file: ${intermediateAlsoPresent ? 'YES' : 'no (root match is sufficient)'}`);
+console.log('');
+
+if (rootMatch) {
+  console.log('VERDICT: MATCH - FU-1 L-1 CLOSED');
+  process.exit(0);
+} else {
+  console.log('VERDICT: MISMATCH - STOP, treat as incident');
+  console.log('The pinned root does NOT appear in the authoritative dashboard download.');
+  console.log('Do NOT cut over. Escalate: the TOFU pin may have captured a hostile chain.');
+  process.exit(2);
+}

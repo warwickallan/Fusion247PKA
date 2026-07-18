@@ -1,0 +1,141 @@
+---
+build: BUILD-002
+wp: WP1
+artifact: fu1-closure-evidence
+author: mack
+status: DONE-code-and-wiring / L-1-OPEN-pending-authoritative-crosscheck
+created: 2026-07-18
+supersedes_row: "[[wp1-delta-review-2026-07-17]] FU-1 row + finding L-1"
+---
+
+# FU-1 Closure Evidence (2026-07-18)
+
+Honest closure record for FU-1 (verify-full TLS to the Supabase session pooler
+with a PINNED CA). It records what is genuinely DONE, what is now LOCKED by an
+automated guard, and the ONE item that remains open pending a Warwick action.
+Extends the FU-1 row and finding L-1 in [[wp1-delta-review-2026-07-17]] and the
+morning actions in [[wp1-safe-cutover]] s7.
+
+**No live configuration was changed and no live database was connected while
+producing this evidence.** Everything below is either read-only file parsing of
+the committed public CA bundle, an automated test run in no-DB mode, or a
+citation of a probe already recorded in the delta review. No secret value was
+read, echoed, or logged.
+
+---
+
+## 1. Code / wiring / live-switch: DONE
+
+The FU-1 crypto and wiring are built and merged on `main`:
+
+- `services/fusion-capture-gateway/src/store/pgSslConfig.js` -- strips every
+  ssl-ish DSN param (the node-postgres replacement trap) and builds the
+  explicit verify-full ssl object with the pinned CA.
+- `services/fusion-capture-gateway/config.js` -- reads `DATABASE_SSL_CA_FILE`
+  and feeds it into the ssl config.
+- `services/fusion-capture-gateway/src/live/runtime.js` -- applies the pinned
+  CA on the live runtime path.
+- `services/fusion-capture-gateway/certs/supabase-pooler-ca.pem` -- the
+  committed public CA bundle (two certs; PUBLIC, not a secret).
+- **Live switch is set:** `DATABASE_SSL_CA_FILE` is set in the live env
+  (`C:\.fusion247\fusion-capture-gateway.env`) per [[wp1-safe-cutover]] s7.2 --
+  the machine-side switch, not this branch.
+
+Enforcement (CI, no-DB): the TLS grep-gates in
+`test/tlsTransportGuards.test.js` ban `rejectUnauthorized:false` from all
+runtime source (single named exception: the TOFU extraction script) and ban a
+bare require-mode `sslmode` DSN from runtime source + `.env.example`.
+
+## 2. Pinned CA self-consistency: PASS -- and now LOCKED
+
+The committed bundle parses cleanly and is internally authentic:
+
+- Exactly 2 certificates.
+- cert 1 subject CN "Supabase Intermediate 2021 CA",
+  fingerprint256 `303b0a59bbc8d77e967fbed20b3fe68ec5d7d391c3081ece9936efceef0a55ea`.
+- cert 2 subject CN "Supabase Root 2021 CA",
+  fingerprint256 `807025ad50d4ed219d2c9c7d299c004f824eb00cf7f65afef607d07b72e6cafa`.
+- Chain shape intact: the intermediate is issued by the root; the root is
+  self-signed; both carry basicConstraints cA:TRUE.
+- No PRIVATE KEY block anywhere in the file.
+
+(fingerprint256 values are `X509Certificate.fingerprint256` over the DER
+encoding, lowercased with colons stripped.)
+
+**This is now LOCKED by `test/pinnedCaGuard.test.js`** (6 assertions: cert
+count, subject CNs, both fingerprints, chain shape, no-private-key). The pin is
+deliberate: if Supabase rotates the CA, this test FAILS ON PURPOSE, and the new
+fingerprints must be reviewed and updated in a deliberate reviewed change --
+never silently. This closes the "no automated regression protecting the anchor"
+gap; it does NOT by itself close L-1 (that needs the authoritative cross-check
+below).
+
+## 3. Prior live probe (cited, not re-run)
+
+The delta review recorded a live TLS probe from this machine on 2026-07-17
+(`scripts/tls-verify-probe.mjs`): `mode: explicit-pinned-ca`, TLSv1.3,
+**`cert_verified_by_client: true`**, `authorization_error: null`, hostname-
+verified leaf `*.pooler.supabase.com`, `query_ok: true`. See
+[[wp1-delta-review-2026-07-17]] FU-1 row and [[wp1-safe-cutover]] s7.2. That
+probe is cited here as prior evidence -- it was NOT re-run in this session, and
+no live connection was made now.
+
+## 4. L-1: STILL OPEN -- authoritative cross-check is a Warwick action
+
+The pin is TOFU: it was extracted from a live handshake
+(`scripts/tls-extract-ca.mjs`, 2026-07-17), not yet cross-checked against
+Supabase's AUTHORITATIVE dashboard CA download. There is no public URL for that
+file -- it lives behind the authenticated Supabase dashboard -- so authoritative
+closure cannot be automated end-to-end; the download step is Warwick's.
+
+**Do NOT read this note as closing L-1.** Self-consistency (section 2) proves
+the bundle is internally coherent and locked against silent drift; it does NOT
+prove the bundle matches what Supabase authoritatively publishes. Only the
+dashboard cross-check does that.
+
+**Exact closure procedure:**
+
+1. Warwick downloads `prod-ca-2021.crt` from the Supabase dashboard
+   (Database -> Settings -> SSL Configuration).
+2. Run:
+   `node scripts/fu1-ca-crosscheck.mjs --official <path-to-prod-ca-2021.crt>`
+   (from `services/fusion-capture-gateway/`).
+3. `VERDICT: MATCH - FU-1 L-1 CLOSED` (exit 0) -> L-1 closed; record the run
+   here. `VERDICT: MISMATCH - STOP, treat as incident` (exit 2) -> stop
+   everything, do NOT cut over, escalate -- the TOFU pin may have captured a
+   hostile chain.
+
+The cross-check script (`scripts/fu1-ca-crosscheck.mjs`) is offline and
+read-only: it reads no env var or secret, opens no network or DB connection,
+and only parses PEM files. Run with no `--official` argument it prints the
+pinned bundle's fingerprints, verifies self-consistency + chain, and states
+that L-1 is OPEN.
+
+## 5. Verification run (this session)
+
+- `test/pinnedCaGuard.test.js` alone: 6 tests, 6 pass, 0 fail.
+- Full gateway suite (`node --test`, no-DB mode): **305 tests, 273 pass, 0
+  fail, 32 DB-gated skips.**
+- Negative check (pin integrity): flipping a single hex digit in the expected
+  root fingerprint makes the pin assertion FAIL -- confirming the guard would
+  catch any silent change to the committed CA.
+- Cross-check verdicts confirmed both ways offline: an official file containing
+  the pinned root prints `VERDICT: MATCH` (exit 0); an official file missing
+  the pinned root prints `VERDICT: MISMATCH` (exit 2).
+
+## Status summary
+
+| Item | Status |
+|------|--------|
+| FU-1 code / wiring | DONE (merged on main) |
+| Live switch `DATABASE_SSL_CA_FILE` | SET (machine-side env) |
+| Pinned CA self-consistency + chain | PASS |
+| Automated pin guard | DONE (`test/pinnedCaGuard.test.js`) |
+| Prior live probe `cert_verified_by_client` | true (recorded 2026-07-17) |
+| **L-1 authoritative dashboard cross-check** | **OPEN -- Warwick action** |
+
+## Links
+
+- [[wp1-delta-review-2026-07-17]] -- FU-1 row + finding L-1 this note extends.
+- [[wp1-safe-cutover]] -- s7 morning actions (cross-check + live switch).
+- [[wp0-live-signoff-2026-07-17]] -- WP0 baseline whose FU-1 condition this tracks.
