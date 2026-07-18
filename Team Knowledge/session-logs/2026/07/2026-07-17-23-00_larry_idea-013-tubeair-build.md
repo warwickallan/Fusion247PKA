@@ -15,6 +15,26 @@ runtime_host: Claude Code
 
 # IDEA-013 TubeAIR built as a local terminal capture tool; Cairn handoff, FusionDevBot inbox bridge
 
+## Work-package status (READ FIRST)
+
+**IDEA-013 / TubeAIR WP0 — Local transcript capture core + report format + Cairn-ready handoff.**
+**Status: Complete / parked pending Tower live workflow.** NOT fully delivered.
+
+Definition of done for this WP (all met):
+- local deterministic transcript capture works;
+- a single Warwick-readable TubeAIR report exists (8 sections, full transcript in-file);
+- Cairn-ready handoff / source-register behaviour exists (`pending_cairn`);
+- no living-knowledge updates (only a source-register row);
+- **no DevBot or Telegram product loop claimed** — posting a URL in DevBot and receiving
+  the report back is NOT built;
+- **parked pending Tower live activation.** The product loop (auto-trigger + outbound
+  Telegram + agent-authored summary) is deliberately deferred: it depends on the Fusion
+  Tower being live (the always-on agent that would author summaries and deliver them), not
+  on bolt-on glue. Next build is BUILD-010 — Fusion Tower Live Activation.
+
+Merged to `main` via PR #32 as the completed local-core WP (5 commits, 40 tests, diff
+TubeAIR-only, no BUILD-002/tower/supabase touched).
+
 ## Context
 
 Warwick issued an authorised build-start for IDEA-013 (TubeAIR / Youtubair, project
