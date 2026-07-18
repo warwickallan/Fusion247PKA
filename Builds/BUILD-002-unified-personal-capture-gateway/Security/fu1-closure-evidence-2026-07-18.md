@@ -12,7 +12,8 @@ supersedes_row: "[[wp1-delta-review-2026-07-17]] FU-1 row + finding L-1"
 
 Honest closure record for FU-1 (verify-full TLS to the Supabase session pooler
 with a PINNED CA). It records what is genuinely DONE, what is now LOCKED by an
-automated guard, and the ONE item that remains open pending a Warwick action.
+automated guard, and the authoritative cross-check that **CLOSED the last item
+(L-1) on 2026-07-18** -- so **FU-1 is fully closed; nothing remains pending**.
 Extends the FU-1 row and finding L-1 in [[wp1-delta-review-2026-07-17]] and the
 morning actions in [[wp1-safe-cutover]] s7.
 
