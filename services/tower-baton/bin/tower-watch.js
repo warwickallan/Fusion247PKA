@@ -113,8 +113,10 @@ async function main() {
     }
   };
   await tick();
-  const timer = setInterval(tick, pollMs);
-  timer.unref?.();
+  // The poll interval MUST keep the process alive — this is a standing daemon watcher
+  // (scheduled-task / launcher). Do NOT unref: unref'ing let `node bin/tower-watch.js`
+  // exit after the first tick, which broke session-independent standalone running.
+  setInterval(tick, pollMs);
 }
 
 function openStateSafe() { try { return openState({}); } catch { return { isNotified: () => false, recordNotified: () => {} }; } }

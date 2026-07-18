@@ -108,6 +108,11 @@ export function pickMaterialFindings(findings) {
  */
 export function createWatcher({ config, clickup, github, codex, notifier, state, taskId, qaSkillPath, maxRounds = DEFAULT_MAX_ROUNDS, fs = fsDefault, now = Date.now, log = () => {} } = {}) {
   let reconciled = false;
+  // Re-entrancy guard: a Codex turn (~60s) is far longer than the poll interval (~15s),
+  // so overlapping setInterval ticks would each start a duplicate Codex turn on the SAME
+  // checkpoint before any records "answered" (observed in the live proof: 4 duplicate
+  // reviews + 4 posted replies). One cycle at a time.
+  let polling = false;
 
   /** Cold-start: rebuild dedup truth from the thread (Fable nit #2). Idempotent. */
   async function reconcileFromThread() {
@@ -165,6 +170,7 @@ export function createWatcher({ config, clickup, github, codex, notifier, state,
       const packet = {
         repo: config?.githubRepo ?? null, branch: checkpoint.branch, head_sha: evidence.headSha,
         base_sha: checkpoint.base_sha ?? null, diff_range: evidence.diffRange, changed_files: evidence.changedFiles,
+        diff_text: evidence.diffText ?? null, diff_truncated: Boolean(evidence.diffTruncated),
         brief_ref: checkpoint.brief_ref, brief_excerpt: brief.excerpt ?? null,
         summary: checkpoint.summary ?? null, tests: checkpoint.tests ?? null,
         evidence_refs: checkpoint.evidence_refs ?? [],
@@ -219,20 +225,26 @@ export function createWatcher({ config, clickup, github, codex, notifier, state,
 
     /** One full poll cycle. Returns { processed[], skipped[], reconciled }. */
     async pollOnce() {
-      if (!reconciled) await reconcileFromThread(); // cold-start rebuild (once per process)
-      const comments = await clickup.getTaskComments(taskId);
-      const processed = [];
-      const skipped = [];
-      for (const c of comments) {
-        const parsed = parseCheckpoint(c.comment_text ?? c.text ?? '');
-        if (!parsed.ok) continue; // not a checkpoint (or malformed → ignored on the read side)
-        const cp = parsed.checkpoint;
-        if (state.isAnswered(cp.checkpoint_id)) { skipped.push({ checkpointId: cp.checkpoint_id, reason: 'already-answered' }); continue; }
-        const r = await processCheckpoint(cp);
-        if (r.skipped) skipped.push({ checkpointId: r.checkpointId, reason: r.skipped });
-        else processed.push(r);
+      if (polling) return { processed: [], skipped: [], reconciled, busy: true }; // a prior cycle is still in flight
+      polling = true;
+      try {
+        if (!reconciled) await reconcileFromThread(); // cold-start rebuild (once per process)
+        const comments = await clickup.getTaskComments(taskId);
+        const processed = [];
+        const skipped = [];
+        for (const c of comments) {
+          const parsed = parseCheckpoint(c.comment_text ?? c.text ?? '');
+          if (!parsed.ok) continue; // not a checkpoint (or malformed → ignored on the read side)
+          const cp = parsed.checkpoint;
+          if (state.isAnswered(cp.checkpoint_id)) { skipped.push({ checkpointId: cp.checkpoint_id, reason: 'already-answered' }); continue; }
+          const r = await processCheckpoint(cp);
+          if (r.skipped) skipped.push({ checkpointId: r.checkpointId, reason: r.skipped });
+          else processed.push(r);
+        }
+        return { processed, skipped, reconciled };
+      } finally {
+        polling = false;
       }
-      return { processed, skipped, reconciled };
     },
   };
 }

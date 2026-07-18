@@ -156,17 +156,30 @@ export function buildCodexPrompt({ skillText, packet = {} }) {
     p.ci_checks ? `ci_checks: ${p.ci_checks}` : null,
   ].filter(Boolean);
 
+  // STAGED EVIDENCE: on Windows a read-only sandbox blocks Codex's own shell/file reads
+  // (git, pwsh Get-Content → "rejected: blocked by policy"), so Tower stages the ACTUAL
+  // unified diff here — collected read-only via Tower's allowlisted git. Codex reviews the
+  // REAL changes from this payload; it does NOT depend on self-navigating the disk. If the
+  // sandbox DOES permit reads, Codex may additionally inspect the tree — but the staged
+  // diff is authoritative for what changed at this exact head.
+  const diffBlock = p.diff_text
+    ? ['', `── STAGED DIFF (${p.diff_range ?? 'head'}${p.diff_truncated ? ', TRUNCATED' : ''}) — the actual changes, read-only from Tower's git ──`, p.diff_text]
+    : ['', '── STAGED DIFF: (none captured — if you cannot read the disk, say so honestly and return verdict "comment" with an "unverifiable" claim; do not fabricate) ──'];
+
   return [
     String(skillText ?? '').trim(),
     '',
-    '── THIS REVIEW TURN — bounded packet (pointers, not the corpus) ──',
+    '── THIS REVIEW TURN — bounded packet (pointers + staged diff, not the whole corpus) ──',
     ...pointerLines,
+    ...diffBlock,
     '',
-    'Inspect the ACTUAL implementation on disk within the diff range via read-only tools',
-    '(file reads; `git diff <base>..<head>` if the sandbox permits). Compare Larry\'s',
-    'claims against the real code. Return ONLY JSON conforming to the provided output',
-    'schema. Keep it compact — a verdict, per-claim status, and severity-classified',
-    'findings; not an essay.',
+    'Review the STAGED DIFF above (the real changes at the exact head) against the approved',
+    'brief/acceptance. Your read-only sandbox may block shell/file access — that is expected;',
+    'the staged diff is your primary evidence, so do NOT report "blocked" merely because you',
+    'could not run git/pwsh yourself. Only return a blocked/"unverifiable" outcome if the diff',
+    'itself is absent or insufficient to judge the claim. Compare Larry\'s claims against the',
+    'staged changes. Return ONLY JSON conforming to the provided output schema. Keep it',
+    'compact — a verdict, per-claim status, and severity-classified findings; not an essay.',
   ].join('\n');
 }
 

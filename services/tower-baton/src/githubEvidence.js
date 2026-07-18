@@ -114,9 +114,17 @@ export function createGithubEvidence({ repoDir = process.cwd(), repo = null, run
         }
       }
 
-      // 3. diff range base..head → changed files (base optional; when absent, diff the commit itself).
+      // 3. diff range base..head → changed files AND the actual diff CONTENT (base
+      //    optional; when absent, diff the commit itself). The diff TEXT is captured
+      //    read-only here and STAGED into the Codex prompt: on Windows a read-only
+      //    sandbox blocks Codex's own shell/file reads, so Tower feeds it the real diff
+      //    (collected via the allowlisted read-only git) rather than relying on Codex to
+      //    self-navigate the disk. Bounded so a huge diff cannot blow the prompt.
       let diffRange = null;
       let changedFiles = [];
+      let diffText = null;
+      let diffTruncated = false;
+      const DIFF_TEXT_CAP = 120_000; // ~120 KB of unified diff
       if (baseSha) {
         const baseOk = await git(['rev-parse', '--verify', '--quiet', `${baseSha}^{commit}`]);
         if (baseOk.code !== 0 || !baseOk.stdout.trim()) {
@@ -126,10 +134,18 @@ export function createGithubEvidence({ repoDir = process.cwd(), repo = null, run
         const diff = await git(['diff', '--name-only', diffRange]);
         if (diff.code !== 0) return { ok: false, headSha: resolvedHead, resolved: true, error: `fail-closed: git diff ${diffRange} failed: ${diff.stderr.trim()}` };
         changedFiles = diff.stdout.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+        const full = await git(['diff', diffRange]);
+        if (full.code === 0) { diffText = full.stdout; }
       } else {
         diffRange = `${headSha}^..${headSha}`;
         const show = await git(['show', '--name-only', '--pretty=format:', headSha]);
         if (show.code === 0) changedFiles = show.stdout.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+        const full = await git(['show', '--pretty=format:%H%n%an%n%s%n', headSha]);
+        if (full.code === 0) { diffText = full.stdout; }
+      }
+      if (typeof diffText === 'string' && diffText.length > DIFF_TEXT_CAP) {
+        diffText = `${diffText.slice(0, DIFF_TEXT_CAP)}\n… [diff truncated at ${DIFF_TEXT_CAP} bytes — ${changedFiles.length} files changed]`;
+        diffTruncated = true;
       }
 
       // 4. CI / check conclusions for the exact head via `gh api` (best-effort; a
@@ -156,6 +172,8 @@ export function createGithubEvidence({ repoDir = process.cwd(), repo = null, run
         headMatchesBranch,
         diffRange,
         changedFiles,
+        diffText,
+        diffTruncated,
         checks,
         checksError,
         error: null,
