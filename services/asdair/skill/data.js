@@ -24,6 +24,28 @@ const { Pool } = require('pg');
 
 let pool = null;
 
+// The EXACT column list loadRules() SELECTs from asdair.rules, kept as one
+// exported constant so there is a SINGLE source of truth. schemaCompat.test.js
+// imports this array and asserts every entry is defined on asdair.rules in the
+// migration -- so schema/code drift (a column selected here but missing from
+// 001_asdair_schema.sql) is caught automatically, with no duplicated list to
+// rot. These are fixed identifiers (no external input), so building the SELECT
+// from them keeps the query SELECT-only and safe.
+const RULES_SELECT_COLUMNS = [
+  'id',
+  'category',
+  'rule_text',
+  'scope',
+  'active',
+  'household_id',
+  'directive',
+  'match_term',
+  'match_category',
+  'matched_product',
+  'reason',
+  'note'
+];
+
 // Lazily create a single shared pool from the environment. Throws a clear
 // error if the connection string is not configured. The URL value is never
 // echoed back in the error or anywhere else.
@@ -129,13 +151,15 @@ async function loadList(listDate, household) {
 // Load active standing rules. These carry free-text rule_text (informational
 // to the pure planner) plus scope/household for applicability, AND the
 // structured directive columns the planner acts on (Option A): directive,
-// match_term, match_category, matched_product. The returned row keys are the
-// raw column names, so they line up exactly with what planner.js reads
-// (rule.directive, rule.match_term, rule.match_category, rule.matched_product).
+// match_term, match_category, matched_product, plus reason and note (surfaced
+// to a human by the planner). The returned row keys are the raw column names,
+// so they line up exactly with what planner.js reads (rule.directive,
+// rule.match_term, rule.match_category, rule.matched_product, rule.reason,
+// rule.note). Columns come from the RULES_SELECT_COLUMNS constant above.
 // SELECT only.
 async function loadRules() {
   const rows = await readQuery(
-    'SELECT id, category, rule_text, scope, active, household_id, directive, match_term, match_category, matched_product FROM asdair.rules WHERE active = true ORDER BY id',
+    'SELECT ' + RULES_SELECT_COLUMNS.join(', ') + ' FROM asdair.rules WHERE active = true ORDER BY id',
     []
   );
   return rows;
@@ -182,5 +206,8 @@ module.exports = {
   loadRules: loadRules,
   loadProducts: loadProducts,
   loadBudget: loadBudget,
-  close: close
+  close: close,
+  // Exported for schemaCompat.test.js (schema/code drift guard). Not used by
+  // the CLI runtime path.
+  RULES_SELECT_COLUMNS: RULES_SELECT_COLUMNS
 };

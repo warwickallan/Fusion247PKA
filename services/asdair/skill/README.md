@@ -117,6 +117,36 @@ node cli.js --list-date 2026-07-13 --household mum
 Output: a human-readable table (status / qty / item / matched product, with
 flags and notes), then the raw JSON `{ items, summary }`.
 
+### ASDAIR_DB_URL must be a least-privilege, READ-ONLY role
+
+`ASDAIR_DB_URL` must point at a **least-privilege, READ-ONLY database role** that
+holds `SELECT` (and nothing else) on the `asdair` schema. **Do NOT** use a
+superuser DSN or the Supabase service-role connection string here. The adapter
+only ever issues SELECTs inside a `BEGIN TRANSACTION READ ONLY`, but the DB role
+is the real backstop: a SELECT-only grant means even a bug or a bad input
+physically cannot write. Example provisioning (run once, as an admin, OUTSIDE
+this tool):
+
+```
+create role asdair_ro login password '...';           -- store the password only in ASDAIR_DB_URL
+grant usage on schema asdair to asdair_ro;
+grant select on all tables in schema asdair to asdair_ro;
+alter default privileges in schema asdair grant select on tables to asdair_ro;
+```
+
+### Handling live output (contains real household data)
+
+A clean database is built from `db/001_asdair_schema.sql` alone (the seed with
+real rows is gitignored), and the CLI runs strictly read-only against it. Once it
+is pointed at the live `asdair` schema, though, the basket plan it prints is
+**real household data** (real list items, real product preferences, real
+budgets).
+
+**WARNING: never paste live CLI basket output into public logs, PRs, ClickUp, or
+any shared channel.** It is personal data. Keep live output on the local machine
+only. Everything committed to this repo -- fixtures, tests, docs -- is synthetic
+by rule; live runs are not, so they never leave your machine.
+
 ## Run the tests
 
 ```

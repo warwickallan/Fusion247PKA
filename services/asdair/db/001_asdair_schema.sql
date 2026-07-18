@@ -80,6 +80,7 @@ create table if not exists asdair.credentials_ref (
 --   scope    : granularity the rule matches
 --              global | household | category | product | one_time
 --   active   : superseded rules are set active=false (kept for audit)
+--   directive: structured action the planner takes (see comment below)
 --   household_id     : whose preference (NULL = applies to all)
 --   superseded_by    : self-FK to the rule that replaced this one
 --   source_document_id : provenance
@@ -91,6 +92,23 @@ create table if not exists asdair.rules (
     scope              text not null default 'global'
                          check (scope in ('global','household','category','product','one_time')),
     active             boolean not null default true,
+    -- STRUCTURED directive fields the planner acts on (map / needs_decision /
+    -- exclude). A row with directive='info' (the default) is purely
+    -- INFORMATIONAL: the pure planner ignores its free-text rule_text and it
+    -- never changes a basket. match_term / match_category say what the rule
+    -- targets; matched_product is the replacement for a 'map' directive; reason
+    -- and note are surfaced to a human. IMPORTANT: the actual directive VALUES
+    -- (which rule maps or excludes what) are household PREFERENCE DATA that live
+    -- ONLY in the private Supabase asdair schema and are NEVER committed to git
+    -- -- the same boundary as the gitignored seed (002_asdair_seed.sql). This
+    -- migration ships the columns (structure), never the rows (data).
+    directive          text not null default 'info'
+                         check (directive in ('info','exclude','needs_decision','map')),
+    match_term         text,
+    match_category     text,
+    matched_product    text,
+    reason             text,
+    note               text,
     household_id       bigint references asdair.households(id),
     superseded_by      bigint references asdair.rules(id),
     source_document_id bigint references asdair.source_documents(id),
