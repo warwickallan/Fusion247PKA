@@ -58,6 +58,20 @@ test('happy path — APPROVE posted, milestone fired, fingerprint recorded', asy
   assert.ok(h.notifier.calls.some((c) => c.purpose === 'review_posted'));
 });
 
+test('review-outcome milestone speaks in the CODEX voice (logicalSource CODEX, [CODEX] body, plain verdict)', async () => {
+  const codex = fakeCodex();
+  const h = harness({ codex });
+  await h.watcher.pollOnce();
+  const ding = h.notifier.calls.find((c) => c.purpose === 'review_posted');
+  assert.ok(ding, 'a review_posted milestone fired');
+  assert.equal(ding.logicalSource, 'CODEX', 'review outcomes are sourced as CODEX, not TOWER');
+  assert.ok(ding.body.startsWith('[CODEX]'), 'the milestone body is the human CODEX briefing');
+  assert.ok(ding.body.includes('signed it off'), 'the APPROVE briefing reads in plain English');
+  assert.ok(ding.body.includes(HEAD.slice(0, 8)), 'the briefing carries the short reviewed SHA');
+  assert.equal(ding.checkpointId, 'cp-100', 'dedup key material (checkpointId) is unchanged');
+  assert.ok(ding.body.length <= 1200, 'briefing stays under the Telegram ceiling');
+});
+
 test('duplicate-checkpoint suppression — second poll does not re-review or re-post', async () => {
   const codex = fakeCodex();
   const h = harness({ codex });
