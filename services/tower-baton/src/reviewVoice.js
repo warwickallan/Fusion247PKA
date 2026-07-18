@@ -105,6 +105,19 @@ function tidy(s, max) {
   return t.length > max ? `${t.slice(0, max - 1).trimEnd()}...` : t;
 }
 
+// Per-identifier clamp for tokens that land in the MANDATORY SPINE (build_id,
+// wp_id, and any other caller-supplied identifier embedded in the header line).
+// A pathologically long identifier could otherwise inflate the spine itself past
+// MAX_BRIEFING_CHARS -- and the spine-only fallback would then truncate from the
+// END, severing the verdict / next-action after all (the residual F1 edge). By
+// bounding each identifier to a sane length FIRST, the spine is guaranteed to fit
+// the budget with room reserved for the verdict + next-action lines.
+const SPINE_ID_MAX = 48;
+function clampId(s, max = SPINE_ID_MAX) {
+  const t = toAscii(s).replace(/\s+/g, ' ').trim();
+  return t.length > max ? `${t.slice(0, max - 3).trimEnd()}...` : t;
+}
+
 // Strip a leading "[tag] " marker (e.g. "[gate] ", "[critical] ") for plain reading.
 function stripTag(s) {
   return String(s ?? '').replace(/^\s*\[[^\]]+\]\s*/, '').trim();
@@ -144,9 +157,11 @@ function fitBlock(lines, room) {
 export function composeReviewBriefing({ checkpoint = {}, codexResult = null, derived = {}, reviewedHead = null } = {}) {
   const verdict = derived?.verdict ?? 'BLOCKED';
   const blocked = verdict === 'BLOCKED';
+  // shortSha is inherently bounded (first 8 chars). build_id and wp_id are
+  // caller-supplied and UNBOUNDED, so each is clamped before it enters the spine.
   const shortSha = String(reviewedHead ?? checkpoint?.head_sha ?? '').slice(0, 8) || '(unknown)';
-  const build = checkpoint?.build_id ? String(checkpoint.build_id) : '(build?)';
-  const wp = checkpoint?.wp_id ? ` ${checkpoint.wp_id}` : '';
+  const build = checkpoint?.build_id ? clampId(String(checkpoint.build_id)) : '(build?)';
+  const wp = checkpoint?.wp_id ? ` ${clampId(String(checkpoint.wp_id))}` : '';
 
   // ---------------------------------------------------------------------------
   // MANDATORY SPINE -- reserved FIRST, must ALWAYS survive regardless of input

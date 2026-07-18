@@ -126,6 +126,32 @@ test('(e2) maximal input NEVER severs the verdict or the next-action line (F1)',
   assert.ok(msg.length <= MAX_BRIEFING_CHARS, `message length ${msg.length} must be <= ${MAX_BRIEFING_CHARS}`);
 });
 
+test('(e3) pathological identifiers NEVER inflate the spine past the ceiling or sever the verdict/next-action (residual F1)', () => {
+  // The residual F1 edge: composeReviewBriefing reserves the spine first, but the
+  // spine itself embeds caller-supplied identifiers (build_id / wp_id / checkpoint_id
+  // and the short SHA). With pathologically long identifiers the spine alone could
+  // exceed MAX, and the spine-only fallback then truncates from the END -- severing
+  // the verdict / next-action after all. Clamping each identifier closes this.
+  const HUGE = 'Z'.repeat(5000);
+  const NEXT = 'Apply the named corrections, push a new head, and re-hand off the new checkpoint.';
+  const msg = composeReviewBriefing({
+    checkpoint: checkpoint({ build_id: HUGE, wp_id: HUGE, checkpoint_id: HUGE }),
+    codexResult: {
+      status: 'ok', verdict: 'request_changes', summary: 'S'.repeat(4000),
+      claims_verified: [{ claim: 'A'.repeat(500), status: 'confirmed', evidence: 'e' }],
+      findings: [{ id: 'F1', severity: 'high', evidence: 'e', rationale: 'r', required_correction: 'F'.repeat(600) }],
+    },
+    derived: { verdict: 'CORRECTIONS_REQUIRED', material_findings: [], next_action: NEXT },
+    reviewedHead: HEAD,
+  });
+  // (a) still under the Telegram ceiling despite thousands-of-char identifiers
+  assert.ok(msg.length <= MAX_BRIEFING_CHARS, `message length ${msg.length} must be <= ${MAX_BRIEFING_CHARS}`);
+  // (b) the plain-English verdict line is present AND complete (not tail-severed)
+  assert.match(msg, /My verdict: I've sent it back for fixes\./);
+  // (c) a next-action line is present (verbatim -- the spine survived intact)
+  assert.ok(msg.includes(`What happens next: ${NEXT}`), 'the next-action line survives pathological identifiers');
+});
+
 test('(f) reads [CODEX], not [TOWER]', () => {
   const msg = composeReviewBriefing({
     checkpoint: checkpoint(),
