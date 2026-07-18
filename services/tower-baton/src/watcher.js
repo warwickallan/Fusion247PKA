@@ -1,0 +1,238 @@
+// Tower baton — the watcher. ONE poll cycle carries the baton end to end.
+//
+// Cross-build by construction: everything is keyed on the checkpoint's own
+// build_id / wp_id / brief_ref, so the same watcher serves ANY build, not just
+// BUILD-010.
+//
+// A poll cycle (pollOnce):
+//   (a) the caller holds the single-watcher lock (bin/tower-watch.js acquires it);
+//   (b) read the thread → parse [LARRY → TOWER] checkpoints;
+//   (c) dedup by checkpoint_id vs durable state AND — cold start — rebuild dedup
+//       truth from the thread (already-answered checkpoint_ids). Thread is the
+//       source of truth; the state file is a cache (Fable nit #2);
+//   (d) resolve the approved brief (brief_ref) + WP scope;
+//   (e) verify branch / exact head_sha / diff / CI via githubEvidence (fail-closed);
+//   (f) load the QA skill fresh + fingerprint (SHA-256 recorded on the verdict);
+//   (g) invoke Codex read-only QA with the bounded packet;
+//   (h) post the [TOWER → LARRY] reply to the thread (additive comment);
+//   (i) update durable state incl. the PER-CHAIN round counter (Fable nit #4;
+//       max 3 → escalate DECISION_REQUIRED / BLOCKED);
+//   (j) emit the milestone Telegram (review_posted / escalation / blocked).
+// NO autonomous merge anywhere.
+
+import fsDefault from 'node:fs';
+
+import { parseCheckpoint, chainKey, formatResponse, answeredCheckpointIds } from './checkpoint.js';
+import { loadQaSkill } from './qaSkill.js';
+
+export const DEFAULT_MAX_ROUNDS = 3;
+
+/** Resolve the approved brief from a brief_ref. Fail-closed when it cannot be read. */
+export async function resolveBrief(briefRef, { fs = fsDefault, clickup = null, taskId = null } = {}) {
+  if (!briefRef) return { ok: false, error: 'fail-closed: missing brief_ref' };
+  // A local path (a build brief / WP doc in the repo).
+  try {
+    if (fs.existsSync(briefRef) && fs.statSync(briefRef).isFile()) {
+      const text = fs.readFileSync(briefRef, 'utf8');
+      if (text && text.trim()) return { ok: true, kind: 'file', excerpt: text.slice(0, 8000), ref: briefRef };
+      return { ok: false, error: `fail-closed: brief_ref file is empty (${briefRef})` };
+    }
+  } catch { /* not a readable path — try other shapes */ }
+  // A ClickUp task ref (CU-<id> / a task url) — read its description as the brief.
+  const cuMatch = String(briefRef).match(/(?:clickup\.com\/t\/|CU-)([A-Za-z0-9]+)/i);
+  if (cuMatch && clickup && typeof clickup.getTask === 'function') {
+    try {
+      const task = await clickup.getTask(cuMatch[1]);
+      const desc = task?.description ?? task?.text_content ?? '';
+      if (desc && desc.trim()) return { ok: true, kind: 'clickup', excerpt: desc.slice(0, 8000), ref: briefRef };
+    } catch { /* fall through to fail-closed */ }
+  }
+  return { ok: false, error: `fail-closed: brief_ref could not be resolved (${briefRef})` };
+}
+
+/**
+ * Map the Codex structured result + round/finding context → the baton verdict.
+ * Returns { verdict, material_findings[], next_action }.
+ *   · a blocked Codex turn         → BLOCKED
+ *   · a critical/security finding   → DECISION_REQUIRED (material — Warwick decides)
+ *   · max rounds already spent      → DECISION_REQUIRED (escalate, don't doom-loop)
+ *   · approve (or comment/no-find)  → APPROVE
+ *   · request_changes / comment+find→ CORRECTIONS_REQUIRED
+ */
+export function deriveVerdict({ codexResult, roundsSpent, maxRounds = DEFAULT_MAX_ROUNDS }) {
+  if (!codexResult || codexResult.status === 'blocked') {
+    return { verdict: 'BLOCKED', material_findings: [], next_action: `Codex QA is blocked (${codexResult?.kind ?? 'fail-closed'}). Resolve the blocker (binary/credential/evidence) and re-hand off; do not proceed unsupervised.` };
+  }
+  const findings = Array.isArray(codexResult.findings) ? codexResult.findings : [];
+  const material = pickMaterialFindings(findings);
+  const hasCritical = findings.some((f) => f.severity === 'critical');
+  const hasSecurityScope = findings.some((f) => /security|privacy|scope|architect/i.test(`${f.id} ${f.rationale} ${f.required_correction}`));
+
+  if (roundsSpent >= maxRounds) {
+    return { verdict: 'DECISION_REQUIRED', material_findings: material, next_action: `Max correction rounds (${maxRounds}) reached for this chain — escalating to Warwick. Do not open another autonomous round.` };
+  }
+  if (hasCritical || hasSecurityScope) {
+    return { verdict: 'DECISION_REQUIRED', material_findings: material, next_action: 'Material issue (critical / security / scope) — escalate to Warwick for a decision before proceeding.' };
+  }
+  if (codexResult.verdict === 'approve' || (codexResult.verdict === 'comment' && findings.length === 0)) {
+    return { verdict: 'APPROVE', material_findings: material, next_action: 'Approved against the brief + evidence. Proceed to the next WP step / final review.' };
+  }
+  return { verdict: 'CORRECTIONS_REQUIRED', material_findings: material, next_action: 'Apply the named corrections, push a new head, and re-hand off the new checkpoint.' };
+}
+
+/** Pick <=3 material findings — but let safety (critical) findings exceed the cap. */
+export function pickMaterialFindings(findings) {
+  const arr = Array.isArray(findings) ? findings : [];
+  const criticals = arr.filter((f) => f.severity === 'critical');
+  const rest = arr.filter((f) => f.severity !== 'critical');
+  const chosen = [...criticals];
+  for (const f of rest) { if (chosen.length >= 3) break; chosen.push(f); }
+  return chosen.map((f) => `[${f.severity}] ${f.id}: ${String(f.required_correction ?? f.rationale ?? '').slice(0, 200)}`);
+}
+
+/**
+ * Create the watcher.
+ * @param {object} deps
+ * @param {object} deps.config        loadConfig() result
+ * @param {object} deps.clickup       ClickUp client (getTaskComments/createTaskComment[, getTask])
+ * @param {object} deps.github        createGithubEvidence() result
+ * @param {object} deps.codex         createCodexAdapter() result
+ * @param {object} deps.notifier      createMilestoneNotifier() result
+ * @param {object} deps.state         openState() result
+ * @param {string} deps.taskId        the ClickUp control task id
+ * @param {string} deps.qaSkillPath   path to tower-qa-skill.md
+ * @param {number} [deps.maxRounds]   per-chain correction-round budget (default 3)
+ * @param {object} [deps.fs]          injectable fs (brief + skill reads)
+ * @param {function} [deps.now]       injectable clock () => epoch ms
+ * @param {function} [deps.log]       injectable logger (redacted by the caller)
+ */
+export function createWatcher({ config, clickup, github, codex, notifier, state, taskId, qaSkillPath, maxRounds = DEFAULT_MAX_ROUNDS, fs = fsDefault, now = Date.now, log = () => {} } = {}) {
+  let reconciled = false;
+
+  /** Cold-start: rebuild dedup truth from the thread (Fable nit #2). Idempotent. */
+  async function reconcileFromThread() {
+    const comments = await clickup.getTaskComments(taskId);
+    const ids = answeredCheckpointIds(comments);
+    state.mergeAnsweredIds([...ids]);
+    reconciled = true;
+    return { rebuiltFromThread: [...ids] };
+  }
+
+  /**
+   * Process ONE parsed checkpoint end to end. Returns a result record. Never posts a
+   * merge. Fail-closed at each gate (bad head, missing brief, malformed skill,
+   * Codex blocked) → a BLOCKED reply is still posted so Larry always gets an answer.
+   */
+  async function processCheckpoint(checkpoint) {
+    const cpId = checkpoint.checkpoint_id;
+    // (c) dedup — already answered?
+    if (state.isAnswered(cpId)) return { checkpointId: cpId, skipped: 'already-answered' };
+
+    const ck = chainKey(checkpoint);
+
+    // (d) resolve the approved brief + WP scope. Fail-closed.
+    const brief = await resolveBrief(checkpoint.brief_ref, { fs, clickup, taskId });
+
+    // (f) load the QA skill fresh + fingerprint. Fail-closed.
+    const skill = loadQaSkill({ path: qaSkillPath, fs });
+
+    // (e) verify branch / exact head / diff / CI. Fail-closed.
+    const evidence = await github.collect({
+      branch: checkpoint.branch, headSha: checkpoint.head_sha, baseSha: checkpoint.base_sha, repo: config?.githubRepo,
+    });
+
+    // Assemble the fail-closed blockers (any one blocks the QA turn).
+    const gateBlockers = [];
+    if (!brief.ok) gateBlockers.push(brief.error);
+    if (!skill.ok) gateBlockers.push(skill.error);
+    if (!evidence.ok) gateBlockers.push(evidence.error);
+    if (evidence.ok && evidence.headMatchesBranch === false) gateBlockers.push(`fail-closed: head_sha ${checkpoint.head_sha} is not the current head of ${checkpoint.branch} (branch is at ${evidence.branchHeadSha}) — a new head invalidates this checkpoint`);
+
+    const roundsSpent = state.roundCount(ck);
+    let codexResult = null;
+    let signed = null;
+    const promptFingerprint = skill.fingerprint ?? null;
+
+    let derived;
+    if (gateBlockers.length) {
+      // Do NOT invoke Codex when a gate is closed — respond BLOCKED with the reasons.
+      derived = { verdict: 'BLOCKED', material_findings: gateBlockers.slice(0, 3).map((b) => `[gate] ${b}`), next_action: 'Resolve the fail-closed gate(s) above, then re-hand off. Do not proceed unsupervised.' };
+    } else if (roundsSpent >= maxRounds) {
+      // (i) round budget exhausted for this chain → escalate WITHOUT another Codex turn.
+      derived = { verdict: 'DECISION_REQUIRED', material_findings: [], next_action: `Max correction rounds (${maxRounds}) reached for this chain — escalating to Warwick.` };
+    } else {
+      // (g) invoke Codex read-only QA.
+      const packet = {
+        repo: config?.githubRepo ?? null, branch: checkpoint.branch, head_sha: evidence.headSha,
+        base_sha: checkpoint.base_sha ?? null, diff_range: evidence.diffRange, changed_files: evidence.changedFiles,
+        brief_ref: checkpoint.brief_ref, brief_excerpt: brief.excerpt ?? null,
+        summary: checkpoint.summary ?? null, tests: checkpoint.tests ?? null,
+        evidence_refs: checkpoint.evidence_refs ?? [],
+        ci_checks: (evidence.checks ?? []).map((c) => `${c.name}:${c.conclusion ?? c.status}`).join(', ') || (evidence.checksError ?? 'none'),
+      };
+      const turn = await codex.runTurn({ checkpoint, packet, skillText: skill.text, promptFingerprint });
+      codexResult = turn.structuredResult ?? null;
+      signed = { envelope: turn.envelope, signature: turn.signature };
+      derived = deriveVerdict({ codexResult, roundsSpent, maxRounds });
+    }
+
+    // (h) compose + post the [TOWER → LARRY] reply (additive comment).
+    const responseObj = {
+      checkpoint_id: cpId,
+      reviewed_head: evidence.headSha ?? checkpoint.head_sha,
+      prompt_fingerprint: promptFingerprint ?? '(skill-unavailable)',
+      verdict: derived.verdict,
+      summary: codexResult?.summary ?? (derived.verdict === 'BLOCKED' ? 'Review blocked at a fail-closed gate — see material_findings.' : 'Escalated for a human decision.'),
+      material_findings: derived.material_findings,
+      next_action: derived.next_action,
+    };
+    const body = formatResponse(responseObj);
+    let posted = null;
+    try {
+      posted = await clickup.createTaskComment(taskId, body);
+    } catch (err) {
+      // A post failure is not a merge risk; surface it, do not crash the cycle.
+      log(`processCheckpoint: post failed for ${cpId}: ${config?.redact ? config.redact(err?.message ?? String(err)) : (err?.message ?? String(err))}`);
+      return { checkpointId: cpId, verdict: derived.verdict, posted: false, error: 'post-failed', response: responseObj };
+    }
+
+    // (i) durable state: mark answered + advance the per-chain round counter.
+    state.recordAnswered(cpId, { reviewedHead: responseObj.reviewed_head, verdict: derived.verdict, promptFingerprint, commentId: posted.id, now: now() });
+    if (derived.verdict === 'CORRECTIONS_REQUIRED') state.incrementRound(ck);
+
+    // (j) milestone Telegram — one per outcome, deduped by checkpoint_id.
+    const milestonePurpose = derived.verdict === 'BLOCKED' ? 'blocked'
+      : derived.verdict === 'DECISION_REQUIRED' ? 'escalation'
+      : 'review_posted';
+    await notifier.notifyMilestone({
+      purpose: milestonePurpose, logicalSource: 'TOWER',
+      body: `checkpoint ${cpId} → ${derived.verdict} (head ${String(responseObj.reviewed_head).slice(0, 8)})`,
+      checkpointId: cpId,
+    });
+
+    return { checkpointId: cpId, verdict: derived.verdict, posted: true, commentId: posted.id, response: responseObj, signed, chainKey: ck };
+  }
+
+  return {
+    reconcileFromThread,
+    processCheckpoint,
+
+    /** One full poll cycle. Returns { processed[], skipped[], reconciled }. */
+    async pollOnce() {
+      if (!reconciled) await reconcileFromThread(); // cold-start rebuild (once per process)
+      const comments = await clickup.getTaskComments(taskId);
+      const processed = [];
+      const skipped = [];
+      for (const c of comments) {
+        const parsed = parseCheckpoint(c.comment_text ?? c.text ?? '');
+        if (!parsed.ok) continue; // not a checkpoint (or malformed → ignored on the read side)
+        const cp = parsed.checkpoint;
+        if (state.isAnswered(cp.checkpoint_id)) { skipped.push({ checkpointId: cp.checkpoint_id, reason: 'already-answered' }); continue; }
+        const r = await processCheckpoint(cp);
+        if (r.skipped) skipped.push({ checkpointId: r.checkpointId, reason: r.skipped });
+        else processed.push(r);
+      }
+      return { processed, skipped, reconciled };
+    },
+  };
+}
