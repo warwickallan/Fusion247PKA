@@ -68,30 +68,46 @@ function round2(n) {
 function matchProduct(item, products, household) {
   const list = Array.isArray(products) ? products : [];
 
-  // Explicit foreign key on the list line takes priority.
+  // Explicit foreign key on the list line takes priority - but it MUST honour
+  // household scope. An explicit matched_product_id may only resolve to a
+  // GLOBAL product (household_id null/undefined) OR a product owned by the
+  // ACTIVE household. If the id resolves to a product owned by ANOTHER
+  // household, that is a cross-household scope leak: DO NOT accept it. Signal
+  // a scope mismatch so the caller sends the line to a human and never
+  // auto-substitutes the foreign product.
   if (item.matched_product_id !== null && item.matched_product_id !== undefined) {
     const byId = list.find(function (p) { return sameHousehold(p.id, item.matched_product_id); });
-    if (byId) return { product: byId, ambiguous: false };
+    if (byId) {
+      const isGlobal = byId.household_id === null || byId.household_id === undefined;
+      const isActiveHousehold = sameHousehold(byId.household_id, household);
+      if (isGlobal || isActiveHousehold) {
+        return { product: byId, ambiguous: false, scopeMismatch: false };
+      }
+      // Resolved, but to a product belonging to a DIFFERENT household.
+      return { product: null, ambiguous: false, scopeMismatch: true };
+    }
+    // The id did not resolve to any product at all -> fall through to term
+    // matching (unchanged behaviour).
   }
 
   const term = normaliseTerm(item.item_name);
-  if (term === '') return { product: null, ambiguous: false };
+  if (term === '') return { product: null, ambiguous: false, scopeMismatch: false };
 
   const sameTerm = list.filter(function (p) { return normaliseTerm(p.list_term) === term; });
 
   const scoped = sameTerm.filter(function (p) {
     return p.household_id !== null && p.household_id !== undefined && sameHousehold(p.household_id, household);
   });
-  if (scoped.length === 1) return { product: scoped[0], ambiguous: false };
-  if (scoped.length > 1) return { product: scoped[0], ambiguous: true };
+  if (scoped.length === 1) return { product: scoped[0], ambiguous: false, scopeMismatch: false };
+  if (scoped.length > 1) return { product: scoped[0], ambiguous: true, scopeMismatch: false };
 
   const global = sameTerm.filter(function (p) {
     return p.household_id === null || p.household_id === undefined;
   });
-  if (global.length === 1) return { product: global[0], ambiguous: false };
-  if (global.length > 1) return { product: global[0], ambiguous: true };
+  if (global.length === 1) return { product: global[0], ambiguous: false, scopeMismatch: false };
+  if (global.length > 1) return { product: global[0], ambiguous: true, scopeMismatch: false };
 
-  return { product: null, ambiguous: false };
+  return { product: null, ambiguous: false, scopeMismatch: false };
 }
 
 // ---------------------------------------------------------------------
@@ -205,6 +221,7 @@ function planBasket(input) {
     const match = matchProduct(line, products, household);
     let matchedProduct = match.product ? match.product.matched_product : null;
     const ambiguous = match.ambiguous;
+    const scopeMismatch = match.scopeMismatch === true;
 
     // Applicable structured directives for this line.
     const applicable = directives.filter(function (r) {
@@ -262,6 +279,13 @@ function planBasket(input) {
     } else if (applicable.some(function (r) { return r.directive === 'needs_decision'; })) {
       status = 'needs_decision';
       pushFlag(flags, 'flagged by rule');
+      pushFlag(flags, 'never auto-substitute');
+    } else if (scopeMismatch) {
+      // Security: an explicit matched_product_id resolved to a product owned by
+      // ANOTHER household. Never accept a cross-household product; send it to a
+      // human and never auto-substitute the foreign product.
+      status = 'needs_decision';
+      pushFlag(flags, 'product id household scope mismatch');
       pushFlag(flags, 'never auto-substitute');
     } else if (ambiguous) {
       // Rule 6: cannot be confidently matched -> human decision.

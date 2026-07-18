@@ -61,6 +61,16 @@ create table if not exists asdair.budget_settings (
     created_at   timestamptz not null default now()
 );
 
+-- Gap closed: the inline `household_id unique` keeps ONE row per non-null
+-- household, but a plain UNIQUE treats NULLs as distinct, so it allowed
+-- UNLIMITED global (household_id IS NULL) rows. loadBudget() reads the global
+-- band with `WHERE household_id IS NULL LIMIT 1`; two globals = silent
+-- ambiguity. This partial unique index indexes the constant expression
+-- (household_id IS NULL) over only the global rows, so at most ONE can exist.
+create unique index if not exists uq_budget_one_global
+    on asdair.budget_settings ((household_id is null))
+    where household_id is null;
+
 -- ---------------------------------------------------------------------
 -- credentials_ref  (AUDIT POINTER ONLY - NEVER A SECRET VALUE)
 -- Names the env var and describes where the real value is stored.
@@ -146,9 +156,29 @@ create table if not exists asdair.products (
     notes              text,
     household_id       bigint references asdair.households(id),
     source_document_id bigint references asdair.source_documents(id),
-    created_at         timestamptz not null default now(),
-    unique (household_id, list_term)
+    created_at         timestamptz not null default now()
 );
+
+-- Gap closed: the old inline `unique (household_id, list_term)` was both (a)
+-- NULL-permissive -- it allowed MANY global rows for the same term because
+-- NULL household_id compares distinct -- and (b) NOT normalised, so 'Widget A'
+-- and '  widget   a ' were treated as different terms even though the planner
+-- (normaliseTerm: lower-case, trim, collapse internal whitespace) treats them
+-- as identical. These two PARTIAL unique indexes normalise the term to match
+-- normaliseTerm exactly and enforce uniqueness within each scope separately:
+--   * global rows (household_id IS NULL): at most one mapping per normalised
+--     term across the whole install.
+--   * household rows (household_id IS NOT NULL): at most one mapping per term
+--     per household.
+-- A GLOBAL default and a HOUSEHOLD-specific override for the SAME term remain
+-- allowed, because they land in different partial indexes (different WHERE).
+create unique index if not exists uq_products_global_term
+    on asdair.products ((lower(regexp_replace(btrim(list_term), '\s+', ' ', 'g'))))
+    where household_id is null;
+
+create unique index if not exists uq_products_household_term
+    on asdair.products (household_id, (lower(regexp_replace(btrim(list_term), '\s+', ' ', 'g'))))
+    where household_id is not null;
 
 -- ---------------------------------------------------------------------
 -- shopping_lists

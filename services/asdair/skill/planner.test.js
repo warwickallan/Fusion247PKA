@@ -108,6 +108,65 @@ test('household scoping: a product owned by another household is not matched', f
   assert.ok(g.flags.includes('no explicit product mapping'));
 });
 
+test('scope leak: explicit matched_product_id owned by ANOTHER household -> needs_decision, foreign product NOT applied', function () {
+  // The line explicitly references product id 13 (Gadget Z), which is owned by
+  // OTHER, not the active household HH. Resolving that id ALONE would leak a
+  // cross-household product into the basket. The planner must refuse it: send
+  // the line to a human, never auto-substitute, and never set matched_product
+  // to the foreign product. Synthetic ids only; no real household data.
+  const plan = planBasket({
+    listItems: [{ item_name: 'Gadget Z', requested_qty: 4, matched_product_id: 13 }],
+    products: products, rules: [], budget: budget, household: HH
+  });
+  const g = byName(plan, 'Gadget Z');
+  assert.equal(g.status, 'needs_decision');
+  assert.equal(g.planned_qty, 0, 'nothing added pending a human decision');
+  assert.equal(g.matched_product, null, 'the cross-household product is NOT applied');
+  assert.notEqual(g.matched_product, 'Gadget Z Pack');
+  assert.ok(g.flags.includes('product id household scope mismatch'));
+  assert.ok(g.flags.includes('never auto-substitute'));
+});
+
+test('scope control: explicit matched_product_id pointing to a GLOBAL product is accepted (add)', function () {
+  // Product id 12 (Widget A) is global (household_id null): any household may
+  // resolve it by explicit id.
+  const plan = planBasket({
+    listItems: [{ item_name: 'Widget A', requested_qty: 2, matched_product_id: 12 }],
+    products: products, rules: [], budget: budget, household: HH
+  });
+  const w = byName(plan, 'Widget A');
+  assert.equal(w.status, 'add');
+  assert.equal(w.planned_qty, 2);
+  assert.equal(w.matched_product, 'Widget A Deluxe');
+  assert.ok(!w.flags.includes('product id household scope mismatch'));
+});
+
+test('scope control: explicit matched_product_id pointing to the ACTIVE household product is accepted (add)', function () {
+  // Product id 10 (Generic Milk 2L) belongs to the active household HH.
+  const plan = planBasket({
+    listItems: [{ item_name: 'Generic Milk 2L', requested_qty: 1, matched_product_id: 10 }],
+    products: products, rules: [], budget: budget, household: HH
+  });
+  const m = byName(plan, 'Generic Milk 2L');
+  assert.equal(m.status, 'add');
+  assert.equal(m.planned_qty, 1);
+  assert.equal(m.matched_product, 'Store Brand Milk 2L');
+  assert.ok(!m.flags.includes('product id household scope mismatch'));
+});
+
+test('scope: an explicit matched_product_id that resolves to NO product falls through to term matching', function () {
+  // id 999 does not exist. Behaviour must be unchanged: fall through to term
+  // matching, which finds the active-household Generic Milk 2L (id 10).
+  const plan = planBasket({
+    listItems: [{ item_name: 'Generic Milk 2L', requested_qty: 1, matched_product_id: 999 }],
+    products: products, rules: [], budget: budget, household: HH
+  });
+  const m = byName(plan, 'Generic Milk 2L');
+  assert.equal(m.status, 'add');
+  assert.equal(m.matched_product, 'Store Brand Milk 2L');
+  assert.ok(!m.flags.includes('product id household scope mismatch'));
+});
+
 test('unmatched but explicitly listed still plans as add with a flag', function () {
   const plan = planBasket({
     listItems: [{ item_name: 'Totally Unknown Thing', requested_qty: 2 }],
