@@ -24,7 +24,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { X509Certificate } from 'node:crypto';
+import { X509Certificate, generateKeyPairSync } from 'node:crypto';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CA_PATH = path.join(__dirname, '..', 'certs', 'supabase-pooler-ca.pem');
@@ -88,23 +88,93 @@ test('pin: each certificate fingerprint256 matches the recorded anchor (this is 
   );
 });
 
-test('pin: the chain shape is intact (intermediate <- root, root self-signed, both CAs)', () => {
+test('pin: the chain is cryptographically valid (intermediate SIGNED BY the pinned root; root self-signature valid)', () => {
   const [intermediate, root] = certBlocks(readPem()).map((b) => new X509Certificate(b));
-  // The intermediate is issued by the root.
+
+  // TRUST BASIS: cryptographic SIGNATURE verification, not name matching.
+  // X509Certificate.verify(publicKey) returns true iff this certificate was
+  // signed by the private key corresponding to that public key. A same-name
+  // FORGED certificate (an attacker who sets subject/issuer CN to the Supabase
+  // strings but signs with their own key) would pass a name check and FAIL
+  // here. These two asserts are the load-bearing trust anchor.
+  assert.equal(
+    intermediate.verify(root.publicKey),
+    true,
+    'the intermediate is NOT signed by the pinned root public key -- chain is cryptographically broken (a forged/rotated cert)',
+  );
+  assert.equal(
+    root.verify(root.publicKey),
+    true,
+    "the root's self-signature does NOT verify against its own public key -- it is not a valid trust anchor",
+  );
+
+  // COMPLEMENTARY sanity (names + CA flags). These are NOT the trust basis --
+  // they cannot detect a same-name forgery -- but they catch an accidentally
+  // reshaped bundle early and keep the intent readable.
   assert.equal(
     cnOf(intermediate.issuer),
     EXPECTED_ROOT_CN,
-    'the intermediate is no longer issued by the pinned root -- chain broken',
+    'the intermediate issuer CN drifted from the pinned root CN',
   );
-  // The root is self-signed (issuer CN == subject CN).
   assert.equal(
     cnOf(root.issuer),
     cnOf(root.subject),
-    'the root is not self-signed -- it is not a trust anchor',
+    'the root issuer CN != subject CN -- not self-signed by name',
   );
-  // Both must be CA certificates (basicConstraints cA:TRUE).
   assert.equal(intermediate.ca, true, 'the intermediate is not marked as a CA');
   assert.equal(root.ca, true, 'the root is not marked as a CA');
+});
+
+test('pin (negative): a WRONG public key does NOT verify the intermediate -- proves the signature check is real', () => {
+  const [intermediate, root] = certBlocks(readPem()).map((b) => new X509Certificate(b));
+
+  // Two independently-generated keypairs stand in for an attacker's key. The
+  // pinned certs are RSA; we reject both an unrelated RSA key and an unrelated
+  // EC key. If verify() were a no-op / tautology these would (wrongly) pass.
+  const wrongRsa = generateKeyPairSync('rsa', { modulusLength: 2048 }).publicKey;
+  const wrongEc = generateKeyPairSync('ec', { namedCurve: 'prime256v1' }).publicKey;
+
+  assert.equal(intermediate.verify(wrongRsa), false, 'intermediate wrongly verified against an unrelated RSA key');
+  assert.equal(intermediate.verify(wrongEc), false, 'intermediate wrongly verified against an unrelated EC key');
+  assert.equal(root.verify(wrongRsa), false, 'root wrongly verified against an unrelated RSA key');
+
+  // And the intermediate is NOT self-signed: it does not verify against its own
+  // public key. This proves verify() actually checks the signer, not merely
+  // "any well-formed key".
+  assert.equal(
+    intermediate.verify(intermediate.publicKey),
+    false,
+    'intermediate wrongly verified against its OWN key -- verify() is not checking the true signer',
+  );
+});
+
+test('pin (negative): SAME-NAME forgery -- identical CN with a different key passes the name check but FAILS signature verification', () => {
+  const [intermediate, root] = certBlocks(readPem()).map((b) => new X509Certificate(b));
+
+  // This is the exact forgery class TQA-001 named. An attacker fully controls
+  // the CN STRINGS in a certificate they mint, so a forged "Supabase Root 2021
+  // CA" trivially satisfies every CN-based check:
+  const forgedRootSubjectCn = EXPECTED_ROOT_CN; // attacker sets this freely
+  assert.equal(cnOf(intermediate.issuer), forgedRootSubjectCn, 'name-only issuer check (attacker can satisfy this)');
+  assert.equal(forgedRootSubjectCn, cnOf(root.subject), 'name-only subject check (attacker can satisfy this)');
+
+  // What the attacker CANNOT forge is the root private key. Their forged root
+  // carries a different keypair; the pinned intermediate was signed by the REAL
+  // root, so it does not verify against the forged root's public key. We model
+  // the forged root's key with an independently-generated keypair.
+  //
+  // NOTE ON SCOPE: node's stdlib crypto cannot MINT a full X509Certificate
+  // object (no cert-generation API; that needs openssl CLI or a third-party
+  // lib, neither guaranteed in CI). Per the fix brief this unrelated-public-key
+  // model is the acceptable minimum: it exercises the identical code path --
+  // X509Certificate.verify(<forged root key>) -- and proves that name equality
+  // is insufficient and the signature is what establishes trust.
+  const forgedRootPublicKey = generateKeyPairSync('rsa', { modulusLength: 2048 }).publicKey;
+  assert.equal(
+    intermediate.verify(forgedRootPublicKey),
+    false,
+    'a same-name forged root (different key) wrongly verified the intermediate -- name matching is NOT a trust basis',
+  );
 });
 
 test('pin: NO private key block is ever present in the CA file (belt-and-braces)', () => {

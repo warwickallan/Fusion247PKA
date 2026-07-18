@@ -16,7 +16,9 @@
 //   node scripts/fu1-ca-crosscheck.mjs [pathToPinnedPem] [--official <prod-ca-2021.crt>]
 //
 //   node scripts/fu1-ca-crosscheck.mjs
-//     -> self-consistency + chain check of the committed pin. Exit 0 on pass.
+//     -> self-consistency + CRYPTOGRAPHIC chain check of the committed pin
+//        (intermediate signature verified against the pinned root public key;
+//        root self-signature verified), plus fingerprint/CN pin. Exit 0 on pass.
 //
 //   node scripts/fu1-ca-crosscheck.mjs --official ~/Downloads/prod-ca-2021.crt
 //     -> the above PLUS: assert the pinned ROOT fingerprint appears in the
@@ -103,12 +105,21 @@ if (pinnedCerts.length !== 2) {
 }
 const [intermediate, root] = pinnedCerts;
 const checks = [
+  // TRUST BASIS: cryptographic SIGNATURE verification. X509Certificate.verify(
+  // publicKey) is true iff the cert was signed by the private key for that
+  // public key. A same-name forged cert would pass the CN checks below and FAIL
+  // these two -- so these are the load-bearing assertions, not the names.
+  [intermediate.verify(root.publicKey) === true, 'intermediate is SIGNED BY the pinned root public key (cryptographic chain)'],
+  [root.verify(root.publicKey) === true, "root self-signature verifies against its own public key (valid trust anchor)"],
+  // Identity + fingerprint pin.
   [cnOf(intermediate.subject) === EXPECTED_INTERMEDIATE_CN, 'intermediate subject CN matches the pin'],
   [cnOf(root.subject) === EXPECTED_ROOT_CN, 'root subject CN matches the pin'],
   [normFp(intermediate.fingerprint256) === EXPECTED_INTERMEDIATE_FP, 'intermediate fingerprint256 matches the pin'],
   [normFp(root.fingerprint256) === EXPECTED_ROOT_FP, 'root fingerprint256 matches the pin'],
-  [cnOf(intermediate.issuer) === EXPECTED_ROOT_CN, 'intermediate is issued by the pinned root'],
-  [cnOf(root.issuer) === cnOf(root.subject), 'root is self-signed'],
+  // Complementary name / CA-flag sanity (NOT a trust basis -- cannot catch a
+  // same-name forgery; kept for early detection of an accidentally reshaped bundle).
+  [cnOf(intermediate.issuer) === EXPECTED_ROOT_CN, 'intermediate issuer CN matches the pinned root (name sanity)'],
+  [cnOf(root.issuer) === cnOf(root.subject), 'root issuer CN == subject CN (self-signed by name)'],
   [intermediate.ca === true, 'intermediate is a CA cert'],
   [root.ca === true, 'root is a CA cert'],
 ];

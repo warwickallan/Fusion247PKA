@@ -55,15 +55,26 @@ The committed bundle parses cleanly and is internally authentic:
   fingerprint256 `303b0a59bbc8d77e967fbed20b3fe68ec5d7d391c3081ece9936efceef0a55ea`.
 - cert 2 subject CN "Supabase Root 2021 CA",
   fingerprint256 `807025ad50d4ed219d2c9c7d299c004f824eb00cf7f65afef607d07b72e6cafa`.
-- Chain shape intact: the intermediate is issued by the root; the root is
-  self-signed; both carry basicConstraints cA:TRUE.
+- Chain CRYPTOGRAPHICALLY valid (not merely name-matched): the intermediate's
+  signature verifies against the pinned root's public key
+  (`intermediate.verify(root.publicKey) === true`), and the root's
+  self-signature verifies against its own public key
+  (`root.verify(root.publicKey) === true`). Both carry basicConstraints cA:TRUE.
+  The issuer/subject CN equalities are kept only as complementary sanity -- they
+  are NOT the trust basis, because a same-name forged cert would satisfy them.
 - No PRIVATE KEY block anywhere in the file.
 
 (fingerprint256 values are `X509Certificate.fingerprint256` over the DER
 encoding, lowercased with colons stripped.)
 
-**This is now LOCKED by `test/pinnedCaGuard.test.js`** (6 assertions: cert
-count, subject CNs, both fingerprints, chain shape, no-private-key). The pin is
+**This is now LOCKED by `test/pinnedCaGuard.test.js`.** The trust basis is
+CRYPTOGRAPHIC SIGNATURE verification (`X509Certificate.verify`): the intermediate
+must be signed by the pinned root, and the root's self-signature must verify.
+Complementary asserts pin cert count, subject CNs, both fingerprints, CA flags,
+and no-private-key. Two negative tests prove the signature check is real: an
+unrelated public key (RSA and EC) is rejected, and -- the exact TQA-001 forgery
+class -- a same-CN "root" with a different key passes the name check but FAILS
+signature verification. The pin is
 deliberate: if Supabase rotates the CA, this test FAILS ON PURPOSE, and the new
 fingerprints must be reviewed and updated in a deliberate reviewed change --
 never silently. This closes the "no automated regression protecting the anchor"
@@ -113,15 +124,22 @@ that L-1 is OPEN.
 
 ## 5. Verification run (this session)
 
-- `test/pinnedCaGuard.test.js` alone: 6 tests, 6 pass, 0 fail.
-- Full gateway suite (`node --test`, no-DB mode): **305 tests, 273 pass, 0
+- `test/pinnedCaGuard.test.js` alone: 8 tests, 8 pass, 0 fail.
+- Full gateway suite (`node --test`, no-DB mode): **307 tests, 275 pass, 0
   fail, 32 DB-gated skips.**
+- Signature-verification negatives (proving the crypto check is real, not a
+  tautology): an unrelated RSA public key and an unrelated EC public key are
+  both REJECTED by `intermediate.verify(...)`; the intermediate does NOT verify
+  against its own key; and a same-CN "root" bearing a different key passes the
+  name check but FAILS `intermediate.verify(forgedRootKey)` -- the exact
+  TQA-001 forgery class.
 - Negative check (pin integrity): flipping a single hex digit in the expected
   root fingerprint makes the pin assertion FAIL -- confirming the guard would
   catch any silent change to the committed CA.
 - Cross-check verdicts confirmed both ways offline: an official file containing
   the pinned root prints `VERDICT: MATCH` (exit 0); an official file missing
-  the pinned root prints `VERDICT: MISMATCH` (exit 2).
+  the pinned root prints `VERDICT: MISMATCH` (exit 2). The self-consistency
+  section now also fails closed (exit 2) if signature verification fails.
 
 ## Status summary
 
