@@ -9,13 +9,17 @@ import { openState } from '../src/state.js';
 import { formatCheckpoint, formatResponse, parseResponse } from '../src/checkpoint.js';
 import { createFakeClickup } from '../src/clickupClient.js';
 import { fakeGithub, fakeCodex, fakeNotifier, writeTmp, approvedSkill, tmpPath } from '../test-helpers/fakes.js';
+import { wireText } from '../src/telegramNotifier.js';
 
 const HEAD = '1390dd6a1b2c3d4e5f60718293a4b5c6d7e8f900';
 
-function harness({ codex, github, comments, briefRef, roundsSeed, reviewMode, authorIds = 'larry', commentUser } = {}) {
+function harness({ codex, github, comments, briefRef, roundsSeed, reviewMode, authorIds = 'larry', commentUser, extraEnv = {} } = {}) {
   // authorIds === null → leave TOWER_AUTHORISED_AUTHOR_IDS unset (exercise fail-closed).
   const env = { GITHUB_REPO: 'o/r' };
   if (authorIds !== null) env.TOWER_AUTHORISED_AUTHOR_IDS = authorIds;
+  // extraEnv lets a test inject a secret VALUE (e.g. TELEGRAM_BOT_TOKEN) so the
+  // redaction path (config.redact) can be exercised end to end on the milestone body.
+  Object.assign(env, extraEnv);
   const config = loadConfig({ env, home: tmpPath() }); // hermetic: no real store
   const skillPath = writeTmp(approvedSkill(1), '.md');
   const skillFp = loadQaSkill({ path: skillPath }).fingerprint;
@@ -56,6 +60,75 @@ test('happy path — APPROVE posted, milestone fired, fingerprint recorded', asy
   assert.equal(reply.prompt_fingerprint, h.skillFp, 'reply carries the skill SHA-256 fingerprint');
   assert.equal(h.state.getAnswered('cp-100').prompt_fingerprint, h.skillFp, 'fingerprint recorded in state');
   assert.ok(h.notifier.calls.some((c) => c.purpose === 'review_posted'));
+});
+
+test('review-outcome milestone speaks in the CODEX voice (logicalSource CODEX, bare-status body, one [CODEX] added by the notifier layer, plain verdict)', async () => {
+  const codex = fakeCodex();
+  const h = harness({ codex });
+  await h.watcher.pollOnce();
+  const ding = h.notifier.calls.find((c) => c.purpose === 'review_posted');
+  assert.ok(ding, 'a review_posted milestone fired');
+  assert.equal(ding.logicalSource, 'CODEX', 'review outcomes are sourced as CODEX, not TOWER');
+  // SINGLE-OWNER PREFIX: the composed BODY carries NO [CODEX] tag; the notifier's
+  // wireText() (driven by logicalSource: 'CODEX') adds EXACTLY ONE on the final wire.
+  assert.ok(!ding.body.includes('[CODEX]'), 'the composed milestone body carries no [CODEX] tag');
+  assert.ok(ding.body.startsWith('APPROVED'), 'the body leads with the bare verdict/status line');
+  const wired = wireText(ding.logicalSource, ding.body);
+  assert.ok(wired.startsWith('[CODEX] '), 'the notifier layer adds exactly one [CODEX] prefix');
+  assert.ok(!wired.includes('[CODEX] [CODEX]'), 'no doubled [CODEX] on the final wire');
+  assert.ok(ding.body.includes('signed it off'), 'the APPROVE briefing reads in plain English');
+  assert.ok(ding.body.includes(HEAD.slice(0, 8)), 'the briefing carries the short reviewed SHA');
+  assert.equal(ding.checkpointId, 'cp-100', 'dedup key material (checkpointId) is unchanged');
+  assert.ok(ding.body.length <= 1200, 'briefing stays under the Telegram ceiling');
+});
+
+test('BLOCKED review outcome — milestone purpose "blocked", [CODEX] body, dedup key + redaction intact (F2)', async () => {
+  // Route a secret through the BLOCKED briefing: the fail-closed gate error echoes
+  // the brief_ref, so embedding the secret VALUE in the brief_ref path proves the
+  // milestone body is passed through config.redact before it reaches Telegram.
+  const leakMarker = 'blockedpath-fake-value-000001';
+  const codex = fakeCodex();
+  const h = harness({ codex, briefRef: `C:/no/such/${leakMarker}.md`, extraEnv: { TELEGRAM_BOT_TOKEN: leakMarker } });
+  await h.watcher.pollOnce();
+  assert.equal(lastReply(h.clickup).verdict, 'BLOCKED', 'a missing brief fails closed to BLOCKED');
+  assert.equal(codex.calls.length, 0, 'Codex is not invoked on a closed gate');
+  const ding = h.notifier.calls.find((c) => c.checkpointId === 'cp-100');
+  assert.ok(ding, 'a milestone fired for the checkpoint');
+  assert.equal(ding.purpose, 'blocked', 'BLOCKED maps to the "blocked" milestone purpose (unchanged)');
+  assert.equal(ding.checkpointId, 'cp-100', 'dedup key material (checkpointId) is unchanged');
+  assert.equal(ding.logicalSource, 'CODEX', 'review outcomes are sourced as CODEX');
+  assert.ok(!ding.body.includes('[CODEX]'), 'the composed milestone body carries no [CODEX] tag -- the notifier owns it');
+  assert.ok(ding.body.startsWith('BLOCKED'), 'the body leads with the bare BLOCKED status line');
+  assert.ok(!wireText(ding.logicalSource, ding.body).includes('[CODEX] [CODEX]'), 'the notifier adds exactly one [CODEX] -- never doubled');
+  assert.ok(ding.body.includes("couldn't complete it"), 'plain-English BLOCKED wording present');
+  assert.ok(!ding.body.includes(leakMarker), 'the injected secret VALUE does not leak into the Telegram body');
+  assert.ok(ding.body.includes('***redacted***'), 'the body was passed through config.redact');
+});
+
+test('DECISION_REQUIRED review outcome — milestone purpose "escalation", [CODEX] body, dedup key + redaction intact (F2)', async () => {
+  // A critical finding escalates to DECISION_REQUIRED; the finding text carries a
+  // secret VALUE so the milestone-body redaction is proven on the escalation path.
+  const leakMarker = 'escalation-fake-value-000002';
+  const codex = fakeCodex({
+    status: 'ok', verdict: 'request_changes', summary: 'security-sensitive change',
+    claims_verified: [],
+    findings: [{ id: 'S1', severity: 'critical', evidence: 'auth.js:4', rationale: 'auth bypass', required_correction: `close the bypass; do not print ${leakMarker}` }],
+    proposed_action: { type: 'noop', target: '' },
+  });
+  const h = harness({ codex, extraEnv: { TELEGRAM_BOT_TOKEN: leakMarker } });
+  await h.watcher.pollOnce();
+  assert.equal(lastReply(h.clickup).verdict, 'DECISION_REQUIRED', 'a critical finding escalates to DECISION_REQUIRED');
+  const ding = h.notifier.calls.find((c) => c.checkpointId === 'cp-100');
+  assert.ok(ding, 'a milestone fired for the checkpoint');
+  assert.equal(ding.purpose, 'escalation', 'DECISION_REQUIRED maps to the "escalation" milestone purpose (unchanged)');
+  assert.equal(ding.checkpointId, 'cp-100', 'dedup key material (checkpointId) is unchanged');
+  assert.equal(ding.logicalSource, 'CODEX', 'review outcomes are sourced as CODEX');
+  assert.ok(!ding.body.includes('[CODEX]'), 'the composed milestone body carries no [CODEX] tag -- the notifier owns it');
+  assert.ok(ding.body.startsWith('DECISION REQUIRED'), 'the body leads with the bare DECISION REQUIRED status line');
+  assert.ok(!wireText(ding.logicalSource, ding.body).includes('[CODEX] [CODEX]'), 'the notifier adds exactly one [CODEX] -- never doubled');
+  assert.ok(ding.body.includes('needs your call'), 'plain-English DECISION_REQUIRED wording present');
+  assert.ok(!ding.body.includes(leakMarker), 'the injected secret VALUE does not leak into the Telegram body');
+  assert.ok(ding.body.includes('***redacted***'), 'the body was passed through config.redact');
 });
 
 test('duplicate-checkpoint suppression — second poll does not re-review or re-post', async () => {

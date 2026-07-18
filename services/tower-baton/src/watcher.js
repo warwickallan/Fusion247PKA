@@ -25,6 +25,7 @@ import path from 'node:path';
 
 import { parseCheckpoint, chainKey, formatResponse, answeredCheckpointIds } from './checkpoint.js';
 import { loadQaSkill } from './qaSkill.js';
+import { composeReviewBriefing } from './reviewVoice.js';
 
 export const DEFAULT_MAX_ROUNDS = 3;
 
@@ -285,12 +286,19 @@ export function createWatcher({ config, clickup, github, codex, notifier, state,
     if (derived.verdict === 'CORRECTIONS_REQUIRED') state.incrementRound(ck);
 
     // (j) milestone Telegram — one per outcome, deduped by checkpoint_id.
+    // SAME purpose/trigger/dedup/frequency as before (Warwick uses these for UAT) --
+    // only the CONTENT and the logical source change: review outcomes now speak in
+    // the CODEX adviser voice (a human briefing) instead of a terse status string.
     const milestonePurpose = derived.verdict === 'BLOCKED' ? 'blocked'
       : derived.verdict === 'DECISION_REQUIRED' ? 'escalation'
       : 'review_posted';
+    const briefing = composeReviewBriefing({ checkpoint, codexResult, derived, reviewedHead: responseObj.reviewed_head });
+    // Redact any known secret VALUE from the briefing before it can reach Telegram
+    // (defence in depth -- same discipline as the ClickUp reply body above).
+    const notifyBody = config?.redact ? config.redact(briefing) : briefing;
     await notifier.notifyMilestone({
-      purpose: milestonePurpose, logicalSource: 'TOWER',
-      body: `checkpoint ${cpId} → ${derived.verdict} (head ${String(responseObj.reviewed_head).slice(0, 8)})`,
+      purpose: milestonePurpose, logicalSource: 'CODEX',
+      body: notifyBody,
       checkpointId: cpId,
     });
 

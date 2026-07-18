@@ -1,0 +1,42 @@
+name: tower-baton-tests
+
+# CI for the BUILD-010 tower-baton service (the automated baton-carrier +
+# read-only Codex QA reviewer). The baton is FIXTURES-ONLY: zero runtime
+# dependencies, no database, no token, no network -- every test injects fakes.
+# So a SINGLE unit job running the full `node --test` suite is the whole gate;
+# there is no integration/Postgres job and no DB service.
+#
+# NOTE: the sibling fusion-tower-tests.yml is path-filtered to
+# services/fusion-tower/** and runs in that directory, so it never exercised the
+# baton. This workflow is the baton's own gate on every push/PR that touches it.
+
+on:
+  push:
+    paths:
+      - 'services/tower-baton/**'
+      - '.github/workflows/tower-baton-tests.yml'
+  pull_request:
+    paths:
+      - 'services/tower-baton/**'
+      - '.github/workflows/tower-baton-tests.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/tower-baton
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Run the fixtures-only suite (zero runtime dependencies, no DB, no token, no network)
+        run: node --test
