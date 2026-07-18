@@ -10,7 +10,8 @@ status: approved
 version: 1
 owner: Warwick
 reviewer: Codex (gpt_codex, provider openai-codex)
-approved_by: Warwick
+run_authorized_by: Warwick — overnight authorization BUILD-010-TOWER-BATON-RECOVERY-OVERNIGHT-0001 (2026-07-18) commissioned this skill (modelled on his independent-QA standard, code-build vocabulary, "like Mack and Claude QA") and authorized the live proof to run under it. `status: approved` = cleared-to-run gate.
+text_ratification: PROVISIONAL — the exact wording has NOT yet been reviewed line-by-line by Warwick. It is surfaced for his sign-off at final review. The standing scheduled watcher stays OFF until he ratifies the text. See memory [[governing-prompts-need-human-approval]].
 change_history: recorded in the session log (Team Knowledge/session-logs/…); this
   file is loaded FRESH per review turn and its SHA-256 is fingerprinted onto every
   verdict.

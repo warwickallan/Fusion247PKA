@@ -28,9 +28,17 @@ export const SECRET_HOME = process.env.FUSION247_HOME || 'C:\\.fusion247';
 // Env files searched under the secret home, in precedence order (earlier wins).
 // A dedicated tower-baton.env is the preferred home for CLICKUP_TOKEN; the
 // capture-gateway file already holds TELEGRAM_BOT_TOKEN + AUTHORISED_TELEGRAM_USER_ID.
+//
+// NOTE (2026-07-18): the strict machine loader reads *.env files ONLY. Warwick's
+// `C:\.fusion247\.env keys\*.txt` files are his HUMAN credential notes ("Tower Name =
+// …", "Tower token = …", "Shopper …") — label=value, not machine KEY=VALUE — and are
+// deliberately NOT in this list: including one made the malformed-file detector
+// (correctly) fail-close the whole loader. Those notes are the SOURCE for values to
+// copy into a proper *.env file. Wiring Tower to its OWN bot (the "Tower" token) vs the
+// existing FusionDevBot is a pending Warwick decision — do NOT guess it. Once decided,
+// the chosen bot token goes into tower-baton.env in real env syntax.
 export const DEFAULT_ENV_FILES = Object.freeze([
   'tower-baton.env',
-  path.join('.env keys', 'tower.env.txt'),
   'fusion-capture-gateway.env',
 ]);
 
