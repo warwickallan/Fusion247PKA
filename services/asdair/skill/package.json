@@ -1,0 +1,19 @@
+{
+  "name": "asdair-skill",
+  "version": "0.1.0",
+  "private": true,
+  "description": "IDEA-012 AsdAIr WP1 read-only basket planner (pure planner + read-only Postgres adapter + CLI).",
+  "license": "UNLICENSED",
+  "type": "commonjs",
+  "main": "planner.js",
+  "scripts": {
+    "test": "node --test",
+    "plan": "node cli.js"
+  },
+  "dependencies": {
+    "pg": "^8.11.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
