@@ -25,8 +25,23 @@
 //        official download. VERDICT: MATCH (exit 0) closes L-1;
 //        VERDICT: MISMATCH (exit 2) is a stop-everything incident.
 //
-// EXIT CODES: 0 = pass/MATCH, 2 = self-consistency/chain/MISMATCH failure,
-//             1 = usage/IO error.
+// EXIT CODES:
+//   0 = pass / MATCH. The ONLY two exit-0 paths are: (a) a well-formed run with
+//       NO --official, which performs self-consistency + chain and prints
+//       "L-1 status: OPEN"; and (b) a well-formed --official run whose
+//       authoritative root-fingerprint comparison returned MATCH.
+//   2 = self-consistency/chain failure, --official MISMATCH, a missing/unreadable
+//       --official file, OR any malformed CLI (missing/duplicate/flag-shaped
+//       --official value, unknown flag, extra positional).
+//   1 = pinned-PEM IO/parse error only (the default bundle is committed, so a
+//       failure here is an environment fault, not a user CLI mistake).
+//
+// FAIL-CLOSED INVARIANT: if --official appears on the command line in ANY form,
+// this process CANNOT exit 0 unless the authoritative root comparison actually
+// ran and returned MATCH. A missing value, a flag-shaped value, a duplicate
+// --official, an unknown flag, an extra positional, or a missing/unreadable/
+// non-matching official file all exit non-zero. A malformed authoritative-check
+// invocation must NEVER fall through to the self-consistency-only "OPEN" path.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -50,20 +65,58 @@ const cnOf = (dn) => {
 };
 const normFp = (fp) => fp.replace(/:/g, '').toLowerCase();
 
+const USAGE =
+  'usage: node scripts/fu1-ca-crosscheck.mjs [pathToPinnedPem] [--official <prod-ca-2021.crt>]';
+
+// Malformed CLI is fail-closed: exit 2, never 0. This is what stops
+// `--official <typo>` from silently degrading to the self-consistency-only
+// "OPEN" path and handing back a false all-clear.
+function usageFail(msg) {
+  console.error(`ERROR: ${msg}`);
+  console.error(USAGE);
+  process.exit(2);
+}
+
+// Strict, explicit parse. Accepts at most one positional (the pinned PEM path;
+// defaults to the committed bundle) and an optional `--official <file>`.
+// `--official` MUST be immediately followed by exactly one NON-FLAG value; a
+// missing value, a value that begins with '-', or a duplicate --official is a
+// usageFail. Unknown flags and extra positionals are usageFails too. There is no
+// path here by which a malformed --official can be dropped and the caller still
+// reach an exit-0 branch.
 function parseArgs(argv) {
-  let pinnedPath = DEFAULT_PINNED;
   let officialPath = null;
-  const positional = [];
+  let officialSeen = false;
+  const positionals = [];
+
   for (let i = 0; i < argv.length; i += 1) {
-    if (argv[i] === '--official') {
-      officialPath = argv[i + 1];
-      i += 1;
+    const arg = argv[i];
+    if (arg === '--official') {
+      if (officialSeen) {
+        usageFail('--official was supplied more than once');
+      }
+      officialSeen = true;
+      const value = argv[i + 1];
+      if (value === undefined || value.startsWith('-')) {
+        usageFail(
+          `--official requires exactly one file-path value, got ${value === undefined ? 'nothing (end of arguments)' : `"${value}" (looks like a flag)`}`,
+        );
+      }
+      officialPath = value;
+      i += 1; // consume the value so it is not re-read as a positional
+    } else if (arg.startsWith('-')) {
+      usageFail(`unknown flag: ${arg}`);
     } else {
-      positional.push(argv[i]);
+      positionals.push(arg);
     }
   }
-  if (positional.length > 0) pinnedPath = positional[0];
-  return { pinnedPath, officialPath };
+
+  if (positionals.length > 1) {
+    usageFail(`expected at most one pinned-PEM path, got ${positionals.length}: ${positionals.join(', ')}`);
+  }
+  const pinnedPath = positionals.length === 1 ? positionals[0] : DEFAULT_PINNED;
+
+  return { pinnedPath, officialPath, officialProvided: officialSeen };
 }
 
 function readCerts(file) {
@@ -80,7 +133,7 @@ function fail(msg, code) {
   process.exit(code);
 }
 
-const { pinnedPath, officialPath } = parseArgs(process.argv.slice(2));
+const { pinnedPath, officialPath, officialProvided } = parseArgs(process.argv.slice(2));
 
 // ---- 1. Parse + describe the pinned bundle -------------------------------
 if (!fs.existsSync(pinnedPath)) fail(`pinned PEM not found: ${pinnedPath}`, 1);
@@ -136,7 +189,7 @@ console.log('Self-consistency + chain: PASS');
 console.log('');
 
 // ---- 3. Authoritative cross-check (only when --official is given) --------
-if (!officialPath) {
+if (!officialProvided) {
   console.log('L-1 status: OPEN (no --official file supplied).');
   console.log('To CLOSE L-1: download prod-ca-2021.crt from the Supabase dashboard');
   console.log('  (Database -> Settings -> SSL Configuration) and re-run:');
@@ -144,13 +197,16 @@ if (!officialPath) {
   process.exit(0);
 }
 
-if (!fs.existsSync(officialPath)) fail(`official PEM not found: ${officialPath}`, 1);
+// --official was supplied, so from here every failure is exit 2 (fail-closed):
+// once the caller asked for the authoritative check, a missing/unreadable file
+// must NOT masquerade as a clean run. Exit 0 is reachable below ONLY via MATCH.
+if (!fs.existsSync(officialPath)) fail(`official PEM not found: ${officialPath}`, 2);
 
 let officialCerts;
 try {
   officialCerts = readCerts(officialPath);
 } catch (err) {
-  fail(err.message, 1);
+  fail(err.message, 2);
 }
 
 const officialFps = officialCerts.map((c) => normFp(c.fingerprint256));
