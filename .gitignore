@@ -97,3 +97,14 @@ __pycache__/
 !/Sources (Immutable)/
 !/Sources (Immutable)/INDEX.md
 !/Sources (Immutable)/README.md
+
+# --- AsdAIr (IDEA-012) household shopping data ---
+# The schema (services/asdair/db/001_asdair_schema.sql) and the read-only skill
+# code (services/asdair/skill/) are public-safe and tracked. The SEED and any
+# list/order data carry REAL household/personal data (family names, health
+# items, shopping habits, budgets) and live ONLY in the private Supabase asdair
+# schema + local gitignored files - NEVER in git. See the personal-data doctrine
+# for this public repo.
+services/asdair/db/002_asdair_seed.sql
+services/asdair/db/*seed*.sql
+services/asdair/**/*.local.*

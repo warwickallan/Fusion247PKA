@@ -1,0 +1,495 @@
+// =====================================================================
+// IDEA-012 AsdAIr - WP1 skill: planner.js
+//
+// The "brain" half of the household-shopping agent.
+//
+// planBasket({ listItems, rules, products, budget }) -> { items, summary }
+//
+// PURE and DETERMINISTIC:
+//   * No DB, no network, no fs, no Date.now(), no randomness.
+//   * Given identical inputs it always returns an identical result.
+//   * No side effects; it only reads its arguments and returns a value.
+//
+// HARD GUARANTEES baked into this function:
+//   * It NEVER auto-substitutes a product (out-of-stock / ambiguous items
+//     become needs_decision; any alternatives are surfaced for a human,
+//     never applied to matched_product).
+//   * It NEVER emits a checkout / pay / place-order action. The goal is a
+//     checkout-ready plan; committing it is out of scope by construction.
+//   * It only ever plans items that are explicitly on the list (rule 5).
+//
+// PURE ASCII only. Currency is written as "GBP", never a symbol.
+// =====================================================================
+
+'use strict';
+
+// ---------------------------------------------------------------------
+// Small pure helpers
+// ---------------------------------------------------------------------
+
+// Normalise a term for matching: lower-case, trim, collapse whitespace.
+function normaliseTerm(value) {
+  if (value === null || value === undefined) return '';
+  return String(value).trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+// Rule 1 + 2: quantities are ITEM COUNTS (not pack sizes) and a missing
+// quantity defaults to 1. Anything that is not a positive integer -> 1.
+function normaliseQty(value) {
+  if (value === null || value === undefined || value === '') return 1;
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 1;
+  const i = Math.trunc(n);
+  return i >= 1 ? i : 1;
+}
+
+// Compare two household identifiers loosely (id number or name string).
+function sameHousehold(a, b) {
+  if (a === null || a === undefined || b === null || b === undefined) return false;
+  return String(a) === String(b);
+}
+
+// Append a flag once (keeps the flags array free of duplicates).
+function pushFlag(flags, flag) {
+  if (flag && flags.indexOf(flag) === -1) flags.push(flag);
+}
+
+// Append a product id once, comparing loosely (ids may be numbers or strings).
+// Used so every DISTINCT id seen for a merged line is retained and a
+// conflicting (possibly foreign) id can never be silently dropped.
+function pushId(ids, id) {
+  if (id === null || id === undefined) return;
+  for (let i = 0; i < ids.length; i++) {
+    if (String(ids[i]) === String(id)) return;
+  }
+  ids.push(id);
+}
+
+// Round a money amount to 2 decimal places (pure arithmetic).
+function round2(n) {
+  return Math.round((n + Number.EPSILON) * 100) / 100;
+}
+
+// ---------------------------------------------------------------------
+// Product matching (rule 9): match item_name / matched_product_id against
+// products.list_term, honouring household scope. Household-scoped rows win
+// over global (household_id null) rows. More than one candidate at the
+// winning scope means the match is AMBIGUOUS -> caller sends it to a human.
+// ---------------------------------------------------------------------
+function matchProduct(item, products, household) {
+  const list = Array.isArray(products) ? products : [];
+
+  // Explicit foreign key on the list line takes priority - but it MUST honour
+  // household scope. An explicit matched_product_id may only resolve to a
+  // GLOBAL product (household_id null/undefined) OR a product owned by the
+  // ACTIVE household. If the id resolves to a product owned by ANOTHER
+  // household, that is a cross-household scope leak: DO NOT accept it. Signal
+  // a scope mismatch so the caller sends the line to a human and never
+  // auto-substitutes the foreign product.
+  // Gather EVERY explicit product id on the line. A single list line carries
+  // its one id in matched_product_id; a merged (deduped) line additionally
+  // carries every id seen for it in matched_product_ids, so a conflicting or
+  // foreign id from a later duplicate is never silently dropped by dedupe's
+  // first-wins pick. Distinct ids only (dedupeList already normalises, but a
+  // raw caller may pass both fields).
+  const explicitIds = [];
+  pushId(explicitIds, item.matched_product_id);
+  if (Array.isArray(item.matched_product_ids)) {
+    item.matched_product_ids.forEach(function (id) { pushId(explicitIds, id); });
+  }
+
+  if (explicitIds.length > 0) {
+    const inScope = [];
+    let sawForeign = false;
+    explicitIds.forEach(function (id) {
+      const byId = list.find(function (p) { return sameHousehold(p.id, id); });
+      if (!byId) return; // unresolved id: ignore; may fall through to term match
+      const isGlobal = byId.household_id === null || byId.household_id === undefined;
+      const isActiveHousehold = sameHousehold(byId.household_id, household);
+      if (isGlobal || isActiveHousehold) {
+        if (inScope.indexOf(byId) === -1) inScope.push(byId);
+      } else {
+        sawForeign = true; // resolved to ANOTHER household -> cross-household leak
+      }
+    });
+
+    // A foreign id ANYWHERE on the line dominates: it is a data-integrity leak
+    // and must be surfaced even when a valid sibling id is also present. Never
+    // accept the foreign product; signal scopeMismatch so the caller sends the
+    // line to a human and never auto-substitutes.
+    if (sawForeign) {
+      return { product: null, ambiguous: false, scopeMismatch: true };
+    }
+    // Two or more DISTINCT in-scope products claimed by explicit id -> the line
+    // is id-conflicted and cannot be resolved confidently -> human decision.
+    if (inScope.length > 1) {
+      return { product: inScope[0], ambiguous: true, scopeMismatch: false };
+    }
+    if (inScope.length === 1) {
+      return { product: inScope[0], ambiguous: false, scopeMismatch: false };
+    }
+    // No id resolved to any product at all -> fall through to term matching
+    // (unchanged behaviour).
+  }
+
+  const term = normaliseTerm(item.item_name);
+  if (term === '') return { product: null, ambiguous: false, scopeMismatch: false };
+
+  const sameTerm = list.filter(function (p) { return normaliseTerm(p.list_term) === term; });
+
+  const scoped = sameTerm.filter(function (p) {
+    return p.household_id !== null && p.household_id !== undefined && sameHousehold(p.household_id, household);
+  });
+  if (scoped.length === 1) return { product: scoped[0], ambiguous: false, scopeMismatch: false };
+  if (scoped.length > 1) return { product: scoped[0], ambiguous: true, scopeMismatch: false };
+
+  const global = sameTerm.filter(function (p) {
+    return p.household_id === null || p.household_id === undefined;
+  });
+  if (global.length === 1) return { product: global[0], ambiguous: false, scopeMismatch: false };
+  if (global.length > 1) return { product: global[0], ambiguous: true, scopeMismatch: false };
+
+  return { product: null, ambiguous: false, scopeMismatch: false };
+}
+
+// ---------------------------------------------------------------------
+// Rule directives (data-driven planning).
+//
+// The migrated asdair.rules rows carry only free-text rule_text, which the
+// pure planner treats as INFORMATIONAL (it does not parse prose). A rule
+// only changes a plan when it carries STRUCTURED directive fields:
+//   directive : 'exclude' | 'needs_decision' | 'map' | 'info' (default 'info')
+//   match_term / match_category : what the rule targets
+//   matched_product : replacement product for a 'map' directive
+//   active (default true), scope, household_id : applicability
+// Free-text-only rows (no directive) are ignored by the planner logic.
+// ---------------------------------------------------------------------
+// An ACTIONABLE directive ('map' | 'exclude' | 'needs_decision') MUST name a
+// target: a match_term or a match_category. A target-less actionable rule would
+// otherwise blanket-apply to EVERY line (Finding 6): a target-less 'map' would
+// silently rewrite every item's matched_product and a target-less 'exclude'
+// would empty the whole basket -- a wrong-but-confident plan. So a rule whose
+// match_term AND match_category are both null/empty carries NO target and is
+// treated as NON-APPLICABLE (ignored, exactly like an 'info' row; it never
+// matches any line). (Silas adds a DB CHECK enforcing the same server-side,
+// belt-and-braces.)
+function hasTarget(rule) {
+  return normaliseTerm(rule.match_term) !== '' || normaliseTerm(rule.match_category) !== '';
+}
+
+function ruleAppliesToItem(rule, item, product, household) {
+  if (rule.household_id !== null && rule.household_id !== undefined) {
+    if (!sameHousehold(rule.household_id, household)) return false;
+  }
+  const term = normaliseTerm(item.item_name);
+  const cat = product && product.category ? normaliseTerm(product.category) : normaliseTerm(item.category);
+  switch (rule.scope) {
+    case 'global':
+    case 'household':
+      // A target is REQUIRED even at broad scope (Finding 6): match by term
+      // when one is given, else by category, else NON-APPLICABLE. A target-less
+      // rule at this scope must never blanket-match every line.
+      if (rule.match_term) return normaliseTerm(rule.match_term) === term;
+      if (rule.match_category) return normaliseTerm(rule.match_category) === cat;
+      return false;
+    case 'product':
+    case 'one_time':
+      return rule.match_term ? normaliseTerm(rule.match_term) === term : false;
+    case 'category':
+      return rule.match_category ? normaliseTerm(rule.match_category) === cat : false;
+    default:
+      return false;
+  }
+}
+
+function actionableRules(rules) {
+  return (Array.isArray(rules) ? rules : []).filter(function (r) {
+    // An actionable directive with NO target is ignored (Finding 6): hasTarget()
+    // gates it out here so it can never reach ruleAppliesToItem and rewrite or
+    // exclude every line.
+    return r && r.active !== false && r.directive && r.directive !== 'info' && hasTarget(r);
+  });
+}
+
+// ---------------------------------------------------------------------
+// Rule 3: dedupe duplicate lines for the same item, summing counts.
+// Boolean signals are OR-ed; the most restrictive explicit status wins.
+// ---------------------------------------------------------------------
+function dedupeList(listItems) {
+  const order = [];
+  const byKey = Object.create(null);
+
+  (Array.isArray(listItems) ? listItems : []).forEach(function (raw) {
+    const key = normaliseTerm(raw.item_name);
+    if (key === '') return; // rule 5: a blank line is not an item
+    if (!byKey[key]) {
+      const firstId = (raw.matched_product_id !== undefined ? raw.matched_product_id : null);
+      const ids = [];
+      pushId(ids, firstId);
+      byKey[key] = {
+        item_name: raw.item_name,
+        requested_qty: normaliseQty(raw.requested_qty),
+        matched_product_id: firstId,
+        // Every DISTINCT explicit id seen for this merged line. matched_product_id
+        // stays first-wins for backward compatibility, but matchProduct scope-
+        // checks EVERY id here so a later duplicate carrying a different (foreign)
+        // id is never silently dropped. See Finding 2.
+        matched_product_ids: ids,
+        price: (raw.price !== undefined ? raw.price : null),
+        note: (raw.note ? String(raw.note) : ''),
+        category: (raw.category !== undefined ? raw.category : null),
+        one_week_only: raw.one_week_only === true,
+        excluded_this_week: (raw.status === 'excluded_this_week' || raw.excluded_this_week === true),
+        out_of_stock: (raw.out_of_stock === true || raw.in_stock === false),
+        flagged_on_list: (raw.status === 'needs_decision'),
+        alternatives: (Array.isArray(raw.alternatives) ? raw.alternatives.slice() : [])
+      };
+      order.push(key);
+    } else {
+      const acc = byKey[key];
+      acc.requested_qty += normaliseQty(raw.requested_qty);
+      if (acc.matched_product_id === null && raw.matched_product_id !== undefined && raw.matched_product_id !== null) {
+        acc.matched_product_id = raw.matched_product_id;
+      }
+      // Retain EVERY non-null id (not just the first) so a conflicting or
+      // foreign id from a later duplicate line reaches the scope check instead
+      // of being masked by the first-wins pick above.
+      pushId(acc.matched_product_ids, raw.matched_product_id);
+      if (acc.price === null && raw.price !== undefined && raw.price !== null) acc.price = raw.price;
+      if (raw.note) acc.note = acc.note ? (acc.note + '; ' + String(raw.note)) : String(raw.note);
+      acc.one_week_only = acc.one_week_only || raw.one_week_only === true;
+      acc.excluded_this_week = acc.excluded_this_week || raw.status === 'excluded_this_week' || raw.excluded_this_week === true;
+      acc.out_of_stock = acc.out_of_stock || raw.out_of_stock === true || raw.in_stock === false;
+      acc.flagged_on_list = acc.flagged_on_list || raw.status === 'needs_decision';
+      if (Array.isArray(raw.alternatives)) acc.alternatives = acc.alternatives.concat(raw.alternatives);
+    }
+  });
+
+  return order.map(function (k) { return byKey[k]; });
+}
+
+// ---------------------------------------------------------------------
+// Main entry point.
+// ---------------------------------------------------------------------
+function planBasket(input) {
+  const args = input || {};
+  const listItems = args.listItems;
+  const rules = args.rules;
+  const products = args.products;
+  const budget = args.budget || null;
+
+  // Active household: explicit override, else derived from the budget row.
+  const household = (args.household !== undefined && args.household !== null)
+    ? args.household
+    : (budget && budget.household_id !== undefined ? budget.household_id : null);
+
+  const directives = actionableRules(rules);
+  const merged = dedupeList(listItems);
+
+  const items = merged.map(function (line) {
+    const flags = [];
+    let note = line.note || '';
+    const qty = line.requested_qty;
+
+    // Product match (rule 9).
+    const match = matchProduct(line, products, household);
+    let matchedProduct = match.product ? match.product.matched_product : null;
+    const ambiguous = match.ambiguous;
+    const scopeMismatch = match.scopeMismatch === true;
+
+    // Applicable structured directives for this line.
+    const applicable = directives.filter(function (r) {
+      return ruleAppliesToItem(r, line, match.product, household);
+    });
+
+    // 'map' directive can set / override the matched product (rule 9).
+    applicable.forEach(function (r) {
+      if (r.directive === 'map' && r.matched_product) {
+        matchedProduct = r.matched_product;
+        pushFlag(flags, 'product mapped by rule');
+        if (r.note) note = note ? (note + '; ' + r.note) : r.note;
+      }
+    });
+
+    // ---- status resolution -----------------------------------------------
+    // Precedence: standing exclude > one-week exclude > needs_decision > add.
+    //
+    // Two DISTINCT kinds of exclusion are deliberately kept apart here:
+    //   * STANDING exclude - driven by an 'exclude' DIRECTIVE rule. This is a
+    //     learned, PERMANENT "never buy this again" hard rule. It gets its own
+    //     status ('excluded') and flag ('excluded by standing rule').
+    //   * ONE-WEEK exclude - item-level only ('one_week_only' true OR the list
+    //     line's own status 'excluded_this_week'). This is transient, for THIS
+    //     list only (rule 10), and keeps status 'excluded_this_week'.
+    // A permanent rule must NEVER be mislabelled as transient, so the standing
+    // path is checked FIRST and wins even when the same line is also marked
+    // one-week on this list. planned_qty stays 0 for BOTH; neither is ever
+    // added, and the never-substitute / never-checkout guarantees are unchanged.
+    let status = 'add';
+
+    const standingExcludes = applicable.filter(function (r) { return r.directive === 'exclude'; });
+
+    if (standingExcludes.length > 0) {
+      status = 'excluded';
+      pushFlag(flags, 'excluded by standing rule');
+      // Optionally surface the rule's reason, if it carries one.
+      const reason = standingExcludes.reduce(function (acc, r) {
+        return acc || (r.reason ? String(r.reason) : '');
+      }, '');
+      if (reason) note = note ? (note + '; ' + reason) : reason;
+    } else if (line.excluded_this_week) {
+      // Rule 10: excluded THIS WEEK only (never promoted to a standing rule).
+      status = 'excluded_this_week';
+      pushFlag(flags, 'excluded this week only');
+    } else if (scopeMismatch) {
+      // Security / data integrity (Finding 1): an explicit matched_product_id
+      // resolved to a product owned by ANOTHER household. This is raised ABOVE
+      // out_of_stock / flagged_on_list / rule needs_decision / ambiguous so a
+      // foreign id can never be masked by one of those and lose its flag; it
+      // always fails safe as needs_decision. (The two exclusion statuses above
+      // still win, because an excluded line is never bought at all -- but the
+      // mismatch is STILL recorded unconditionally after this chain so it is
+      // never silently dropped.) The foreign product is never placed in
+      // matched_product (matchProduct returns product null on a scope leak).
+      status = 'needs_decision';
+      // Flags for this cause are pushed in the unconditional block below.
+    } else if (line.out_of_stock) {
+      // Rule 6: out of stock -> human decision, NEVER auto-substitute.
+      status = 'needs_decision';
+      pushFlag(flags, 'out of stock');
+      pushFlag(flags, 'never auto-substitute');
+    } else if (line.flagged_on_list) {
+      status = 'needs_decision';
+      pushFlag(flags, 'flagged on list');
+      pushFlag(flags, 'never auto-substitute');
+    } else if (applicable.some(function (r) { return r.directive === 'needs_decision'; })) {
+      status = 'needs_decision';
+      pushFlag(flags, 'flagged by rule');
+      pushFlag(flags, 'never auto-substitute');
+    } else if (ambiguous) {
+      // Rule 6: cannot be confidently matched -> human decision.
+      status = 'needs_decision';
+      pushFlag(flags, 'ambiguous match');
+      pushFlag(flags, 'never auto-substitute');
+    } else if (!matchedProduct) {
+      // Unmatched but explicitly on the list: still plan to add. It would be
+      // found in the Favourites / Regulars pages at run time (rule 4).
+      status = 'add';
+      pushFlag(flags, 'no explicit product mapping');
+    }
+
+    // Finding 1 (data integrity, ALWAYS): a foreign-household matched_product_id
+    // must be surfaced no matter which status won above -- including a standing
+    // or one-week exclusion that legitimately took the status. This guarantees
+    // the 'product id household scope mismatch' flag is never silently dropped.
+    // The foreign product itself is never in matched_product (it was refused in
+    // matchProduct), so nothing foreign can be auto-substituted or bought.
+    if (scopeMismatch) {
+      pushFlag(flags, 'product id household scope mismatch');
+      pushFlag(flags, 'never auto-substitute');
+    }
+
+    // Rule 10 book-keeping flag (informational; never becomes a rule).
+    if (line.one_week_only) pushFlag(flags, 'one week only');
+
+    // Rule 6: surface alternatives for a human decision, NEVER apply them.
+    if (status === 'needs_decision' && line.alternatives.length > 0) {
+      pushFlag(flags, 'alternatives available');
+      const names = line.alternatives.map(function (a) {
+        return a && a.alternative_name ? String(a.alternative_name) : '';
+      }).filter(function (s) { return s !== ''; });
+      if (names.length > 0) {
+        const altText = 'alternatives: ' + names.join(', ');
+        note = note ? (note + '; ' + altText) : altText;
+      }
+    }
+
+    // planned_qty: only 'add' lines put units in the basket.
+    const plannedQty = status === 'add' ? qty : 0;
+
+    // Unit price only carried through for lines we actually add.
+    const unitPrice = (line.price !== null && line.price !== undefined && Number.isFinite(Number(line.price)))
+      ? Number(line.price)
+      : null;
+
+    return {
+      item_name: line.item_name,
+      matched_product: matchedProduct,          // never a substitute; original or rule-mapped only
+      requested_qty: qty,
+      planned_qty: plannedQty,
+      status: status,                            // add | needs_decision | excluded_this_week | excluded
+      flags: flags,
+      note: note,
+      _unit_price: unitPrice                     // internal; stripped before return
+    };
+  });
+
+  // ---- budget estimate (rule 7: FLAG only, never block) ----
+  const addItems = items.filter(function (it) { return it.status === 'add'; });
+  const pricedAll = addItems.length > 0 && addItems.every(function (it) { return it._unit_price !== null; });
+
+  let estimatedTotal = null;
+  if (pricedAll) {
+    estimatedTotal = round2(addItems.reduce(function (sum, it) {
+      return sum + it._unit_price * it.planned_qty;
+    }, 0));
+  }
+
+  let budgetFlag = 'unknown';
+  if (estimatedTotal !== null && budget && budget.min_normal !== undefined && budget.max_normal !== undefined) {
+    const min = Number(budget.min_normal);
+    const max = Number(budget.max_normal);
+    if (estimatedTotal < min) budgetFlag = 'below';
+    else if (estimatedTotal > max) budgetFlag = 'above';
+    else budgetFlag = 'within';
+  }
+
+  // Attach the basket-level budget flag to every add line for traceability.
+  if (budgetFlag !== 'within' && budgetFlag !== 'unknown') {
+    addItems.forEach(function (it) { pushFlag(it.flags, 'basket ' + budgetFlag + ' budget band'); });
+  }
+
+  // Strip internal fields from the public output.
+  const publicItems = items.map(function (it) {
+    return {
+      item_name: it.item_name,
+      matched_product: it.matched_product,
+      requested_qty: it.requested_qty,
+      planned_qty: it.planned_qty,
+      status: it.status,
+      flags: it.flags,
+      note: it.note
+    };
+  });
+
+  // Exclusions are counted per kind, then rolled up. `excluded` remains the
+  // TOTAL of both kinds so existing totals still reconcile; the two additive
+  // breakdown keys tell them apart without breaking any existing summary key.
+  const excludedStanding = publicItems.filter(function (it) { return it.status === 'excluded'; }).length;
+  const excludedThisWeek = publicItems.filter(function (it) { return it.status === 'excluded_this_week'; }).length;
+
+  const summary = {
+    total_requested: publicItems.length,
+    planned_add: publicItems.filter(function (it) { return it.status === 'add'; }).length,
+    needs_decision: publicItems.filter(function (it) { return it.status === 'needs_decision'; }).length,
+    excluded: excludedStanding + excludedThisWeek,   // total of BOTH exclusion kinds
+    excluded_standing: excludedStanding,             // additive: permanent 'exclude' directive
+    excluded_this_week: excludedThisWeek,            // additive: transient one-week exclusion
+    estimated_total: estimatedTotal,
+    currency: budget && budget.currency ? String(budget.currency) : 'GBP',
+    budget_flag: budgetFlag
+  };
+
+  return { items: publicItems, summary: summary };
+}
+
+module.exports = {
+  planBasket: planBasket,
+  // exported for unit tests of the pure helpers
+  _internal: {
+    normaliseTerm: normaliseTerm,
+    normaliseQty: normaliseQty,
+    matchProduct: matchProduct,
+    dedupeList: dedupeList
+  }
+};

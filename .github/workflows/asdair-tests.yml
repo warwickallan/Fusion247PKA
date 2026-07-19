@@ -1,0 +1,108 @@
+name: asdair-tests
+
+# CI for IDEA-012 AsdAIr WP1 (the read-only household-shopping skill).
+#
+# Two jobs:
+#   * unit        - the skill's node --test suite with NO database. The pure
+#                   planner (planner.test.js) and the schema/code drift guard
+#                   (schemaCompat.test.js) run; the DESTRUCTIVE DB-gated proofs
+#                   (test/constraints.dbtest.js, test/integration.dbtest.js)
+#                   SKIP cleanly because the explicit opt-in marker
+#                   ASDAIR_DB_TEST_ALLOW_DESTRUCTIVE is NOT set here (and
+#                   ASDAIR_DB_URL is unset too). This is the zero-dependency
+#                   gate on every push/PR touching the service, and it proves
+#                   the destructive proofs stay inert without the opt-in.
+#   * integration - the SAME two DB-gated files, EXPLICITLY opted in via
+#                   ASDAIR_DB_TEST_ALLOW_DESTRUCTIVE=1 (the positive,
+#                   single-purpose marker that authorises destructive DB
+#                   testing) with ASDAIR_DB_URL pointed at a throwaway
+#                   Postgres 16 service container. Each file applies the
+#                   committed db/001_asdair_schema.sql from scratch itself, so
+#                   the constraint proofs and the full
+#                   schema->seed->data.js->planner.js path run against a real,
+#                   clean Postgres. Synthetic data only; a disposable local
+#                   service container, never a real project. Setting the marker
+#                   ONLY in this throwaway job (never in unit) is what proves
+#                   the opt-in gate works both ways.
+#
+# Secret scanning is intentionally NOT part of this workflow: the repo's
+# existing secret scan already covers all tracked files (asdair included).
+#
+# Triggers only when the asdair service or this workflow change. Node 22 to
+# match the repo's other service CI.
+
+on:
+  push:
+    paths:
+      - 'services/asdair/**'
+      - '.github/workflows/asdair-tests.yml'
+  pull_request:
+    paths:
+      - 'services/asdair/**'
+      - '.github/workflows/asdair-tests.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/asdair/skill
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies (pg)
+        run: npm ci
+
+      - name: Run the skill suite with no DB (DB-gated proofs skip)
+        run: node --test
+
+  integration:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/asdair/skill
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # Throwaway CI service container -- not a real project, no personal data.
+      # Each DB-gated file applies db/001_asdair_schema.sql from scratch itself.
+      ASDAIR_DB_URL: postgres://postgres:postgres@localhost:5432/postgres
+      # PRIMARY OPT-IN: explicitly authorise the DESTRUCTIVE DB tests to run in
+      # THIS throwaway job only. The unit job deliberately omits this marker, so
+      # the same two files skip there -- proving the positive opt-in gate works.
+      ASDAIR_DB_TEST_ALLOW_DESTRUCTIVE: '1'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies (pg, for the live Postgres adapter)
+        run: npm ci
+
+      - name: Run the DB-gated constraint + integration proofs on a clean Postgres
+        run: node --test test/constraints.dbtest.js test/integration.dbtest.js
