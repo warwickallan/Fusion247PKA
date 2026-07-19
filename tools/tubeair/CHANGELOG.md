@@ -1,0 +1,3 @@
+# TubeAIR changelog
+
+- 2026-07-20 (branch `idea-013/tubeair-url-validation-fix`) — Security: URL intake now strictly allowlists YouTube hosts. `parse_video_id` parses with the URL API and checks the parsed `hostname` against an exact-match allowlist (`youtube.com`, `www.youtube.com`, `m.youtube.com`, `music.youtube.com`, `youtu.be`, `youtube-nocookie.com` for `/embed/`), failing CLOSED on lookalike/suffix hosts, userinfo tricks, non-http(s) schemes, and missing hosts; the inbox scanner regex gained a host boundary so lookalike-suffix hosts (e.g. `evilyoutube.com`) no longer match. Added `TestUrlHostAllowlist` covering the hostile and valid cases. Fixes the Codex-flagged bug where non-YouTube hosts were accepted.

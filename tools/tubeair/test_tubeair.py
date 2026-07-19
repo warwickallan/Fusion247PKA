@@ -46,6 +46,81 @@ class TestParseVideoId(unittest.TestCase):
                 t.parse_video_id(bad)
 
 
+class TestUrlHostAllowlist(unittest.TestCase):
+    """SECURITY: parse_video_id must ONLY accept URLs served from an allowlisted
+    YouTube host. Covers the Codex-flagged bug (non-YouTube hosts were accepted)
+    plus lookalike/suffix/userinfo/bad-scheme tricks. All hostile cases must
+    fail CLOSED (raise ValueError); all valid YouTube forms must still resolve.
+    """
+
+    VALID_ID = "dQw4w9WgXcQ"
+
+    HOSTILE = [
+        # The core Codex bug: a real 11-char id but a non-YouTube host.
+        "https://example.com/watch?v=dQw4w9WgXcQ",
+        # Suffix / lookalike hosts.
+        "https://youtube.com.evil.com/watch?v=dQw4w9WgXcQ",
+        "https://evilyoutube.com/watch?v=dQw4w9WgXcQ",
+        "https://notyoutube.com/watch?v=dQw4w9WgXcQ",
+        # Unlisted subdomain (default: reject).
+        "https://sandbox.youtube.com/watch?v=dQw4w9WgXcQ",
+        # Userinfo trick — real host is evil.com, not youtube.com.
+        "https://youtube.com@evil.com/watch?v=dQw4w9WgXcQ",
+        "https://www.youtube.com@evil.com/watch?v=dQw4w9WgXcQ",
+        # Non-http(s) schemes.
+        "javascript:alert(1)//youtube.com/watch?v=dQw4w9WgXcQ",
+        "javascript:alert(1)",
+        "file:///etc/passwd",
+        "data:text/html,<script>youtube.com/watch?v=dQw4w9WgXcQ</script>",
+        "ftp://youtube.com/watch?v=dQw4w9WgXcQ",
+        "mailto:attacker@youtube.com?v=dQw4w9WgXcQ",
+        # Missing / malformed host.
+        "https:///watch?v=dQw4w9WgXcQ",
+        "//evil.com/watch?v=dQw4w9WgXcQ",
+        "",
+    ]
+
+    VALID = {
+        "https://www.youtube.com/watch?v=dQw4w9WgXcQ": VALID_ID,
+        "https://youtube.com/watch?v=dQw4w9WgXcQ": VALID_ID,
+        "https://m.youtube.com/watch?v=dQw4w9WgXcQ": VALID_ID,
+        "https://music.youtube.com/watch?v=dQw4w9WgXcQ": VALID_ID,
+        "https://youtu.be/dQw4w9WgXcQ": VALID_ID,
+        "https://youtu.be/dQw4w9WgXcQ?si=abc123": VALID_ID,
+        # Scheme-less host form must still work.
+        "youtube.com/watch?v=dQw4w9WgXcQ": VALID_ID,
+        "www.youtube.com/watch?v=dQw4w9WgXcQ": VALID_ID,
+        # Case-insensitive host match (URL API lowercases the hostname).
+        "https://WWW.YouTube.COM/watch?v=dQw4w9WgXcQ": VALID_ID,
+        # Privacy-embed host (extractor supports /embed/).
+        "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ": VALID_ID,
+        # Bare id (no host) remains valid.
+        "dQw4w9WgXcQ": VALID_ID,
+    }
+
+    def test_hostile_urls_are_rejected(self):
+        for bad in self.HOSTILE:
+            with self.subTest(url=bad):
+                with self.assertRaises(ValueError):
+                    t.parse_video_id(bad)
+
+    def test_valid_youtube_urls_still_resolve(self):
+        for good, expected in self.VALID.items():
+            with self.subTest(url=good):
+                self.assertEqual(t.parse_video_id(good), expected)
+
+    def test_scanner_rejects_lookalike_suffix_host(self):
+        # find_youtube_urls feeds the inbox path; it must not "launder" a hostile
+        # suffix host (evilyoutube.com) into a valid-looking id.
+        self.assertEqual(
+            t.find_youtube_urls("see https://evilyoutube.com/watch?v=dQw4w9WgXcQ now"),
+            [])
+
+    def test_scanner_still_finds_real_youtube_url(self):
+        hits = t.find_youtube_urls("watch https://www.youtube.com/watch?v=dQw4w9WgXcQ ok")
+        self.assertEqual(hits, [("https://www.youtube.com/watch?v=dQw4w9WgXcQ", "dQw4w9WgXcQ")])
+
+
 class TestSlugify(unittest.TestCase):
     def test_basic(self):
         self.assertEqual(t.slugify("Agentic OS Build Pattern!"), "agentic-os-build-pattern")
