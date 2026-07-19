@@ -130,10 +130,28 @@ test('asdair schema enforces scoped, normalised uniqueness', gate, async functio
     );
   }
 
+  // Insert a rule with an explicit directive and an explicit match_term
+  // (match_category left null). Used by the target-guard cases below.
+  async function insertRule(directive, matchTerm) {
+    return q(
+      'insert into ' + S + '.rules (category, rule_text, directive, match_term, match_category) ' +
+      'values ($1, $2, $3, $4, null)',
+      ['general', 'synthetic rule for constraint test', directive, matchTerm]
+    );
+  }
+
+  // Assert a query rejects with a Postgres check_violation (SQLSTATE 23514).
+  async function expectCheckViolation(promise, message) {
+    await assert.rejects(promise, function (err) {
+      assert.equal(err.code, '23514', message + ' (expected SQLSTATE 23514, got ' + err.code + ')');
+      return true;
+    }, message);
+  }
+
   // Wipe the scoped tables between assertions so each case starts clean,
   // while keeping the synthetic household row (products/budgets FK to it).
   async function reset() {
-    await q('truncate ' + S + '.products, ' + S + '.budget_settings restart identity cascade');
+    await q('truncate ' + S + '.products, ' + S + '.budget_settings, ' + S + '.rules restart identity cascade');
   }
 
   let householdId;
@@ -224,6 +242,51 @@ test('asdair schema enforces scoped, normalised uniqueness', gate, async functio
       await insertProduct('Widget B', null);
       const rows = await q('select count(*)::int as n from ' + S + '.products');
       assert.equal(rows.rows[0].n, 2, 'two distinct terms must both be allowed');
+    });
+
+    // PR #36 direct-Codex re-review: the actionable-directive target CHECK must
+    // treat an EMPTY / whitespace-only match_term (and null match_category) as
+    // NO target -- a plain `is not null` accepted '' (empty is not null), which
+    // let an effectively target-less 'map' / 'exclude' row slip through. The
+    // tightened check (nullif(btrim(...), '')) must now REJECT it with a
+    // check_violation (SQLSTATE 23514), matching the planner's hasTarget.
+    await t.test('REJECT: an actionable MAP rule with an EMPTY-STRING match_term', async function () {
+      await reset();
+      await expectCheckViolation(
+        insertRule('map', ''),
+        "a 'map' directive with an empty-string target must be rejected (no real target)"
+      );
+    });
+
+    await t.test('REJECT: an actionable EXCLUDE rule with a SPACES-ONLY match_term', async function () {
+      await reset();
+      // The CHECK uses nullif(btrim(match_term), ''). btrim() with its default
+      // argument strips ASCII SPACES, so a spaces-only target folds to '' ->
+      // NULL -> no target -> rejected. (This mirrors the empty-string case and
+      // the planner's hasTarget normalising a blank target to no-target.)
+      await expectCheckViolation(
+        insertRule('exclude', '     '),
+        "an 'exclude' directive with a spaces-only target must be rejected (no real target)"
+      );
+    });
+
+    await t.test('ALLOW: an actionable MAP rule with a NON-EMPTY match_term', async function () {
+      await reset();
+      await insertRule('map', 'widget a');
+      const rows = await q(
+        "select count(*)::int as n from " + S + ".rules where directive = 'map'"
+      );
+      assert.equal(rows.rows[0].n, 1, 'a map directive with a real target must be accepted');
+    });
+
+    await t.test('ALLOW: an INFO rule with NO target at all', async function () {
+      await reset();
+      // directive='info' is purely informational and may be target-less.
+      await insertRule('info', null);
+      const rows = await q(
+        "select count(*)::int as n from " + S + ".rules where directive = 'info'"
+      );
+      assert.equal(rows.rows[0].n, 1, 'an info rule with no target must be accepted');
     });
   } finally {
     // Always drop the throwaway schema and close the socket.

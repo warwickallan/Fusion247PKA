@@ -134,7 +134,15 @@ create table if not exists asdair.rules (
     -- ('info') may be target-less. Without this, a target-less 'map'/'exclude'
     -- row would be a silent no-op the planner cannot apply. (Mack adds the
     -- matching planner-side guard separately.)
-    check (directive = 'info' or match_term is not null or match_category is not null)
+    -- PR #36 direct-Codex re-review: an EMPTY or whitespace-only target is NOT
+    -- a real target. A plain `... is not null` accepted match_term = '' (empty
+    -- string is not null), so an actionable directive with an effectively
+    -- target-less '' / '   ' slipped through -- exactly the silent no-op this
+    -- CHECK exists to stop. nullif(btrim(...), '') folds empty/whitespace-only
+    -- back to NULL, so an actionable directive now REQUIRES a non-empty,
+    -- non-whitespace match_term or match_category. This matches the planner's
+    -- hasTarget, which already normalises empty -> no-target.
+    check (directive = 'info' or nullif(btrim(match_term), '') is not null or nullif(btrim(match_category), '') is not null)
 );
 
 -- ---------------------------------------------------------------------
