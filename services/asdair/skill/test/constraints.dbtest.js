@@ -8,17 +8,28 @@
 // two partial unique indexes on asdair.products and the single-global
 // index on asdair.budget_settings actually reject duplicate rows.
 //
-// GATED: this test only runs when ASDAIR_DB_URL is set. Without it the
-// test is a NO-OP (skipped), never a failure -- same discipline as the
-// gateway's DB-gated tests. So a laptop with no Postgres stays green.
+// GATED (two independent layers -- this test runs DROP SCHEMA ... CASCADE,
+// so it is destructive and stays INERT by default):
+//   * PRIMARY, POSITIVE OPT-IN: it runs ONLY when the operator has EXPLICITLY
+//     opted in by setting ASDAIR_DB_TEST_ALLOW_DESTRUCTIVE to exactly "1" or
+//     "true" (a dedicated, single-purpose marker -- see dbSafeTarget.js).
+//   * AND ASDAIR_DB_URL must also be set (where to run).
+//   Missing EITHER -> the test is a NO-OP (skipped), never a failure and
+//   never a destructive run. So even a box whose ASDAIR_DB_URL happens to
+//   point somewhere stays inert until the operator explicitly opts in. A
+//   laptop with no Postgres stays green.
 //
 // SAFETY:
-//   * assertSafeDbTarget() (shared with integration.dbtest.js) runs FIRST and
-//     REFUSES (throws) if ASDAIR_DB_URL points anywhere that could be live:
-//     any host containing 'supabase' or 'pooler', or any non-local host that
-//     is not an explicit *_test database. Only host / db-name are inspected;
-//     credentials are never read out or logged. So this test can never
-//     CREATE/DROP a throwaway schema on a live database.
+//   * The explicit opt-in above is the PRIMARY gate: it does not trust any
+//     hostname / db-name heuristic (a `localhost` can be a tunnel to prod; a
+//     live DB can be named `*_test`). Without the marker, nothing connects.
+//   * assertSafeDbTarget() (shared with integration.dbtest.js) is a SECONDARY
+//     defence-in-depth backstop that runs AFTER the opt-in gate passes and
+//     REFUSES (throws) if ASDAIR_DB_URL still points anywhere that could be
+//     live: any host containing 'supabase' or 'pooler', or any non-local host
+//     that is not an explicit *_test database. Only host / db-name are
+//     inspected; credentials are never read out or logged. So even an
+//     opted-in run can never CREATE/DROP a throwaway schema on a live host.
 //   * NEVER touches the real `asdair` schema or any live data. It creates
 //     a throwaway schema (asdair_test_constraints), applies the committed
 //     DDL into it (rewriting `asdair.` -> the test schema), asserts, then
@@ -29,9 +40,11 @@
 //     only ever writes there.
 //
 // HOW TO RUN (against a throwaway/local Postgres, NOT live Supabase):
-//   ASDAIR_DB_URL=postgres://user:pass@localhost:5432/postgres \
+//   ASDAIR_DB_TEST_ALLOW_DESTRUCTIVE=1 \
+//     ASDAIR_DB_URL=postgres://user:pass@localhost:5432/postgres \
 //     node --test test/constraints.dbtest.js
-//   (from services/asdair/skill). With ASDAIR_DB_URL unset it no-ops.
+//   (from services/asdair/skill). Without the explicit opt-in marker (or
+//   with ASDAIR_DB_URL unset) it no-ops.
 //
 // PURE ASCII only.
 // =====================================================================
@@ -43,13 +56,23 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const DB_URL = process.env.ASDAIR_DB_URL;
+// SAFETY GATING (shared, one source of truth with integration.dbtest.js).
+// destructiveTestsEnabled() is the PRIMARY, positive opt-in; assertSafeDbTarget()
+// is the SECONDARY defence-in-depth host check applied after the opt-in passes.
+const { assertSafeDbTarget, destructiveTestsEnabled } = require('./dbSafeTarget.js');
 
-// Gate object shared by the test: skip=false runs it, skip=<string>
-// records the reason and no-ops. When ASDAIR_DB_URL is unset we skip.
-const gate = DB_URL
+const DB_URL = process.env.ASDAIR_DB_URL;
+const OPTED_IN = destructiveTestsEnabled();
+
+// Gate object shared by the test: skip=false runs it, skip=<string> records
+// the reason and no-ops. This is a DESTRUCTIVE test, so it runs ONLY when the
+// operator has EXPLICITLY opted in (ASDAIR_DB_TEST_ALLOW_DESTRUCTIVE=1|true)
+// AND ASDAIR_DB_URL is set. Missing EITHER -> clean skip, never a DDL run.
+const gate = (OPTED_IN && DB_URL)
   ? { skip: false }
-  : { skip: 'ASDAIR_DB_URL not set -- Postgres constraint test skipped (no-op)' };
+  : { skip: !OPTED_IN
+      ? 'ASDAIR_DB_TEST_ALLOW_DESTRUCTIVE not set to 1|true -- destructive Postgres constraint test skipped (no-op)'
+      : 'ASDAIR_DB_URL not set -- Postgres constraint test skipped (no-op)' };
 
 // Deterministic throwaway schema name. It is dropped-if-exists before AND
 // after the run, so a crashed prior run cannot poison this one, and it is
@@ -57,13 +80,6 @@ const gate = DB_URL
 const TEST_SCHEMA = 'asdair_test_constraints';
 
 const SCHEMA_PATH = path.join(__dirname, '..', '..', 'db', '001_asdair_schema.sql');
-
-// SAFETY GUARD (shared, one source of truth with integration.dbtest.js):
-// refuse to run against anything that could be live. Only host / db-name are
-// inspected; credentials are never read out or logged. Throws (loud failure)
-// on an unsafe target -- pointing this test at live Supabase MUST fail, never
-// silently proceed, and never CREATE/DROP a throwaway schema on live data.
-const { assertSafeDbTarget } = require('./dbSafeTarget.js');
 
 // Rewrite the committed DDL so every object lands in the throwaway schema.
 // `create schema if not exists asdair;` and every `asdair.` reference are
@@ -76,9 +92,11 @@ function buildTestDdl(schemaName) {
 }
 
 test('asdair schema enforces scoped, normalised uniqueness', gate, async function (t) {
-  // Safety first: refuse an unsafe target BEFORE opening any connection or
-  // running any DDL, so an unsafe ASDAIR_DB_URL can never CREATE/DROP a
-  // throwaway schema on a live database.
+  // The gate above already proved the operator explicitly opted in
+  // (ASDAIR_DB_TEST_ALLOW_DESTRUCTIVE) AND ASDAIR_DB_URL is set; if not, this
+  // body never runs. As a SECONDARY defence-in-depth backstop, refuse an
+  // obviously-live target BEFORE opening any connection or running any DDL,
+  // so even an opted-in run can never CREATE/DROP a schema on a live host.
   assertSafeDbTarget(DB_URL);
 
   // Lazy-require pg so the file still loads (and skips cleanly) on a box
