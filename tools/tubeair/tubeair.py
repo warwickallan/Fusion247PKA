@@ -43,6 +43,7 @@ import sys
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlparse
 
 # ----------------------------------------------------------------------------
 # Pure helpers (unit-testable with no network)
@@ -50,12 +51,69 @@ from pathlib import Path
 
 _VIDEO_ID_RE = re.compile(r"^[A-Za-z0-9_-]{11}$")
 
+# SECURITY: the ONLY hostnames TubeAIR will accept a URL from. Exact host match,
+# no suffix/subdomain wildcards. `youtube-nocookie.com` is included because the
+# extractor supports the privacy-embed `/embed/<id>` form, which is served from
+# that host. Everything else — lookalikes (evilyoutube.com), suffix tricks
+# (youtube.com.evil.com), unlisted subdomains (sandbox.youtube.com), userinfo
+# tricks (youtube.com@evil.com), and non-http(s) schemes — is rejected.
+ALLOWED_YOUTUBE_HOSTS = frozenset({
+    "youtube.com",
+    "www.youtube.com",
+    "m.youtube.com",
+    "music.youtube.com",
+    "youtu.be",
+    "youtube-nocookie.com",
+    "www.youtube-nocookie.com",
+})
+
+
+def _validate_youtube_host(url_or_id: str) -> None:
+    """Fail CLOSED unless `url_or_id` is a URL served from an allowlisted YouTube
+    host over http(s). Parses with the URL API (not a raw-string regex) and checks
+    the *parsed hostname* — so userinfo tricks (`https://youtube.com@evil.com/...`,
+    whose real host is evil.com) and lookalike/suffix hosts are correctly rejected.
+
+    Raises ValueError on: non-http(s) scheme (javascript:/file:/data:/ftp:/mailto:),
+    missing/malformed host, disallowed/lookalike/suffix host, or any parse error.
+    Callers must handle the bare-11-char-id case *before* calling this — a bare id
+    has no host and is validated by `_VIDEO_ID_RE`, not here.
+    """
+    text = (url_or_id or "").strip()
+    try:
+        if "://" in text:
+            # Explicit scheme present (http://, https://, ftp://, file://, ...).
+            parsed = urlparse(text)
+        elif re.match(r"^[A-Za-z][A-Za-z0-9+.\-]*:", text):
+            # Opaque colon-scheme with no '//' — javascript:, data:, mailto:,
+            # file:path — never a YouTube URL. Reject before it can reach a parser.
+            raise ValueError(f"non-http(s) scheme rejected: {url_or_id!r}")
+        else:
+            # Scheme-less host form (youtube.com/..., www.youtube.com/watch?v=...).
+            # Prepend https:// so urlparse populates .hostname/.username instead of
+            # dumping the whole thing into .path (where a host check can't see it).
+            parsed = urlparse("https://" + text)
+    except ValueError:
+        raise
+    except Exception as exc:  # any parser hiccup fails CLOSED
+        raise ValueError(f"could not parse URL (rejected): {url_or_id!r}") from exc
+
+    if parsed.scheme.lower() not in ("http", "https"):
+        raise ValueError(f"non-http(s) scheme rejected: {url_or_id!r}")
+    host = (parsed.hostname or "").lower()
+    if not host:
+        raise ValueError(f"missing or malformed host (rejected): {url_or_id!r}")
+    if host not in ALLOWED_YOUTUBE_HOSTS:
+        raise ValueError(
+            f"host {host!r} is not an allowlisted YouTube host (rejected): {url_or_id!r}")
+
 
 def parse_video_id(url_or_id: str) -> str:
     """Extract the 11-char YouTube video id from any common URL form or a bare id.
 
     Supports watch?v=, youtu.be/, /shorts/, /embed/, /live/, /v/, and bare ids.
-    Raises ValueError if no valid id can be found.
+    Raises ValueError if no valid id can be found, or if the URL's host is not an
+    allowlisted YouTube host (see `_validate_youtube_host` — fails CLOSED).
     """
     if url_or_id is None:
         raise ValueError("no URL or video id supplied")
@@ -63,6 +121,12 @@ def parse_video_id(url_or_id: str) -> str:
 
     if _VIDEO_ID_RE.match(text):
         return text
+
+    # SECURITY GATE: validate the host against the YouTube allowlist BEFORE we
+    # trust any id extracted from the (raw) string. Without this, `[?&]v=<id>` and
+    # the path patterns below would happily match a non-YouTube host such as
+    # https://evil.com/watch?v=<id>. Fails closed on anything not allowlisted.
+    _validate_youtube_host(text)
 
     path_patterns = [
         r"youtu\.be/([A-Za-z0-9_-]{11})",
@@ -83,8 +147,13 @@ def parse_video_id(url_or_id: str) -> str:
     raise ValueError(f"could not extract a YouTube video id from: {url_or_id!r}")
 
 
+# The leading `(?<![\w.-])` is a host boundary: it stops a lookalike suffix host
+# such as `evilyoutube.com/watch?v=<id>` from matching at its inner `youtube.com`
+# (which would otherwise "launder" a hostile host into a valid-looking id). Only
+# the exact allowlisted subdomains (www/m/music) plus bare youtube.com/youtu.be
+# are recognised. parse_video_id() re-validates the host as a second gate.
 _YOUTUBE_URL_RE = re.compile(
-    r"(?:https?://)?(?:www\.|m\.)?"
+    r"(?<![\w.-])(?:https?://)?(?:(?:www|m|music)\.)?"
     r"(?:youtube\.com/(?:watch\?[^\s]*?v=|shorts/|embed/|live/|v/)|youtu\.be/)"
     r"([A-Za-z0-9_-]{11})",
     re.IGNORECASE,
