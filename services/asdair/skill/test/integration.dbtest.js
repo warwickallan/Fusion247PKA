@@ -52,6 +52,16 @@
 //   (from services/asdair/skill). Without the explicit opt-in marker (or
 //   with ASDAIR_DB_URL unset) it no-ops.
 //
+//   !! WARNING -- DESTRUCTIVE, RE-CREATES THE LITERAL `asdair` SCHEMA !!
+//   Because data.js is schema-qualified, this test operates on the REAL
+//   `asdair` schema name (not a throwaway `asdair_test_*` schema) on whatever
+//   ASDAIR_DB_URL reaches: it DROPs and recreates `asdair` on that database.
+//   ONLY ever point ASDAIR_DB_URL at a throwaway / CI Postgres that holds no
+//   real asdair data. As a safety net (Finding 5) the test ABORTS before the
+//   drop if it finds a pre-existing, non-empty asdair.households -- so it will
+//   refuse to clobber a real local copy rather than destroy it -- but you
+//   should still never aim it at a database you care about.
+//
 // PURE ASCII only.
 // =====================================================================
 
@@ -100,9 +110,42 @@ test('asdair full path: clean Postgres -> schema -> seed -> data.js -> planner.j
 
   const q = function (sql, params) { return client.query(sql, params); };
 
+  // Only the cleanup in `finally` may drop the schema, and ONLY once this test
+  // has itself (re)created it. If the pre-drop guard below ABORTS, this stays
+  // false so `finally` NEVER drops a pre-existing schema it did not create
+  // (Finding 5 -- otherwise the guard's own throw would fall into `finally` and
+  // destroy the very schema it just refused to clobber).
+  let createdSchema = false;
+
   try {
+    // ---- pre-drop safety guard (Finding 5) --------------------------------
+    // Never clobber a pre-existing, NON-TEST `asdair` schema. This test DROPs
+    // and recreates the literal `asdair` schema, so an opted-in operator who
+    // points ASDAIR_DB_URL at a local Postgres that happens to hold a REAL
+    // `asdair` copy would lose it. Nothing has been seeded yet, so ANY rows in
+    // asdair.households are pre-existing data we did not create: if the table
+    // exists AND holds rows, ABORT loudly instead of dropping. Only proceed
+    // when the schema is absent or empty. (to_regclass returns null when the
+    // table -- or the whole schema -- does not exist, so this is safe on a
+    // pristine DB.)
+    const pre = await q("select to_regclass('asdair.households') is not null as has_table");
+    if (pre.rows[0].has_table) {
+      const existing = (await q('select count(*)::int as n from asdair.households')).rows[0].n;
+      if (existing > 0) {
+        throw new Error(
+          'ABORT (Finding 5): asdair.households already exists and contains ' + existing +
+          ' row(s) BEFORE seeding. This integration test DROPs and recreates the literal ' +
+          '`asdair` schema and refuses to clobber a pre-existing, non-test copy. Point ' +
+          'ASDAIR_DB_URL at a throwaway/CI Postgres with no real asdair data.'
+        );
+      }
+    }
+
     // ---- clean slate: drop and re-apply the committed schema from scratch --
-    // Safe: assertSafeDbTarget() has already proven this is a throwaway DB.
+    // Safe: assertSafeDbTarget() + the guard above have proven this is a
+    // throwaway DB with no pre-existing asdair data. From here WE own the
+    // schema, so cleanup in `finally` may drop it.
+    createdSchema = true;
     await q('drop schema if exists asdair cascade');
     const ddl = fs.readFileSync(SCHEMA_PATH, 'utf8');
     await q(ddl); // idempotent: create schema/tables/indexes if not exists
@@ -260,9 +303,14 @@ test('asdair full path: clean Postgres -> schema -> seed -> data.js -> planner.j
     assert.equal(plan.summary.currency, 'GBP', 'currency carried from the budget row');
     assert.equal(plan.summary.budget_flag, 'within', 'basket sits within the household budget band');
   } finally {
-    // Always drop the throwaway schema and close BOTH the raw client and the
-    // adapter's pool, so node --test exits cleanly.
-    try { await q('drop schema if exists asdair cascade'); } catch (e) { /* best-effort */ }
+    // Drop the throwaway schema ONLY if THIS test created it (createdSchema).
+    // If the pre-drop guard aborted, createdSchema is false and we must NOT
+    // drop the pre-existing schema we just refused to clobber (Finding 5).
+    // Always close BOTH the raw client and the adapter's pool so node --test
+    // exits cleanly, regardless.
+    if (createdSchema) {
+      try { await q('drop schema if exists asdair cascade'); } catch (e) { /* best-effort */ }
+    }
     try { await client.end(); } catch (e) { /* best-effort */ }
     try { await data.close(); } catch (e) { /* best-effort */ }
   }

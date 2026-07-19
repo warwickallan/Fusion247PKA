@@ -58,7 +58,12 @@ create table if not exists asdair.budget_settings (
     min_normal   numeric(10,2) not null default 120,
     max_normal   numeric(10,2) not null default 150,
     currency     text not null default 'GBP',
-    created_at   timestamptz not null default now()
+    created_at   timestamptz not null default now(),
+    -- PR #36 Fable finding #7: guard against an inverted budget band. The
+    -- "normal" shop range must be non-empty, i.e. the floor cannot exceed the
+    -- ceiling. loadBudget() and the planner's within/over/under band logic both
+    -- assume min_normal <= max_normal.
+    check (min_normal <= max_normal)
 );
 
 -- Gap closed: the inline `household_id unique` keeps ONE row per non-null
@@ -122,7 +127,14 @@ create table if not exists asdair.rules (
     household_id       bigint references asdair.households(id),
     superseded_by      bigint references asdair.rules(id),
     source_document_id bigint references asdair.source_documents(id),
-    created_at         timestamptz not null default now()
+    created_at         timestamptz not null default now(),
+    -- PR #36 Fable finding #6 (schema-side defence): an ACTIONABLE directive
+    -- (map / exclude / needs_decision) must name a target to act on -- either a
+    -- match_term or a match_category. Only a purely INFORMATIONAL directive
+    -- ('info') may be target-less. Without this, a target-less 'map'/'exclude'
+    -- row would be a silent no-op the planner cannot apply. (Mack adds the
+    -- matching planner-side guard separately.)
+    check (directive = 'info' or match_term is not null or match_category is not null)
 );
 
 -- ---------------------------------------------------------------------
@@ -172,12 +184,23 @@ create table if not exists asdair.products (
 --     per household.
 -- A GLOBAL default and a HOUSEHOLD-specific override for the SAME term remain
 -- allowed, because they land in different partial indexes (different WHERE).
+-- NORMALISATION ORDER MATTERS (PR #36 Fable finding #2): collapse whitespace
+-- FIRST, then btrim. Postgres btrim(text) strips SPACES only, so running it
+-- BEFORE the collapse left a leading TAB/newline intact -- e.g. E'\twidget a'
+-- btrim'd to E'\twidget a', then collapsed to ' widget a' (leading space),
+-- which did NOT collide with 'widget a'. The planner's normaliseTerm
+-- (trim -> lower -> collapse) treats both as 'widget a', so the index under-
+-- enforced. Reordering to regexp_replace(collapse) -> btrim -> lower makes the
+-- index match normaliseTerm for ASCII whitespace.
+-- RESIDUAL DIVERGENCE (out of scope to fully unify here): JS `\s` matches the
+-- full Unicode space set, whereas Postgres `\s` / `[[:space:]]` cover only the
+-- ASCII/C-locale whitespace class, so exotic Unicode spaces could still differ.
 create unique index if not exists uq_products_global_term
-    on asdair.products ((lower(regexp_replace(btrim(list_term), '\s+', ' ', 'g'))))
+    on asdair.products ((lower(btrim(regexp_replace(list_term, '\s+', ' ', 'g')))))
     where household_id is null;
 
 create unique index if not exists uq_products_household_term
-    on asdair.products (household_id, (lower(regexp_replace(btrim(list_term), '\s+', ' ', 'g'))))
+    on asdair.products (household_id, (lower(btrim(regexp_replace(list_term, '\s+', ' ', 'g')))))
     where household_id is not null;
 
 -- ---------------------------------------------------------------------

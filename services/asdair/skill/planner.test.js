@@ -696,3 +696,67 @@ test('Finding 2 control: duplicate lines both carrying the SAME foreign id still
   assert.equal(g.matched_product, null);
   assert.ok(g.flags.includes('product id household scope mismatch'));
 });
+
+// ---------------------------------------------------------------------
+// Finding 6 (LOW) - a target-less ACTIONABLE directive must NOT apply to
+// EVERY line. A 'map' / 'exclude' / 'needs_decision' rule with NO target
+// (both match_term and match_category null/empty) is ignored, exactly like
+// an 'info' row -- it never matches any line. Otherwise a target-less 'map'
+// would silently rewrite every item's matched_product and a target-less
+// 'exclude' would empty the whole basket: a wrong-but-confident plan.
+// (A DB CHECK enforces the same server-side, belt-and-braces.) Synthetic
+// fixtures only; no real household data.
+// ---------------------------------------------------------------------
+
+test('Finding 6: a target-less map directive (no match_term / match_category) does NOT rewrite items', function () {
+  const rules = [
+    {
+      id: 300, scope: 'global', active: true, directive: 'map',
+      match_term: null, match_category: null,
+      matched_product: 'Should Not Apply To Everything'
+    }
+  ];
+  const plan = planBasket({
+    listItems: [
+      { item_name: 'Widget A', requested_qty: 1 },
+      { item_name: 'Generic Milk 2L', requested_qty: 1 }
+    ],
+    products: products, rules: rules, budget: budget, household: HH
+  });
+  const w = byName(plan, 'Widget A');
+  const m = byName(plan, 'Generic Milk 2L');
+  // Each line resolves by its OWN normal product match, never the rule value.
+  assert.equal(w.matched_product, 'Widget A Deluxe', 'target-less map must not overwrite Widget A');
+  assert.equal(m.matched_product, 'Store Brand Milk 2L', 'target-less map must not overwrite Generic Milk 2L');
+  assert.equal(w.matched_product !== 'Should Not Apply To Everything', true);
+  assert.ok(!w.flags.includes('product mapped by rule'), 'no line is mapped by a target-less rule');
+  assert.ok(!m.flags.includes('product mapped by rule'));
+  assert.equal(w.status, 'add');
+  assert.equal(m.status, 'add');
+});
+
+test('Finding 6: a target-less exclude directive (no match_term / match_category) does NOT empty the basket', function () {
+  const rules = [
+    {
+      id: 301, scope: 'household', active: true, directive: 'exclude',
+      match_term: '', match_category: '', household_id: HH
+    }
+  ];
+  const plan = planBasket({
+    listItems: [
+      { item_name: 'Widget A', requested_qty: 2 },
+      { item_name: 'Generic Milk 2L', requested_qty: 1 }
+    ],
+    products: products, rules: rules, budget: budget, household: HH
+  });
+  const w = byName(plan, 'Widget A');
+  const m = byName(plan, 'Generic Milk 2L');
+  assert.equal(w.status, 'add', 'a target-less exclude must not exclude Widget A');
+  assert.equal(m.status, 'add', 'a target-less exclude must not exclude Generic Milk 2L');
+  assert.equal(w.planned_qty, 2, 'the basket is not emptied');
+  assert.equal(m.planned_qty, 1);
+  assert.ok(!w.flags.includes('excluded by standing rule'));
+  assert.ok(!m.flags.includes('excluded by standing rule'));
+  assert.equal(plan.summary.planned_add, 2, 'both lines still plan to add');
+  assert.equal(plan.summary.excluded, 0, 'nothing was excluded by the target-less rule');
+});

@@ -164,22 +164,39 @@ function matchProduct(item, products, household) {
 //   active (default true), scope, household_id : applicability
 // Free-text-only rows (no directive) are ignored by the planner logic.
 // ---------------------------------------------------------------------
+// An ACTIONABLE directive ('map' | 'exclude' | 'needs_decision') MUST name a
+// target: a match_term or a match_category. A target-less actionable rule would
+// otherwise blanket-apply to EVERY line (Finding 6): a target-less 'map' would
+// silently rewrite every item's matched_product and a target-less 'exclude'
+// would empty the whole basket -- a wrong-but-confident plan. So a rule whose
+// match_term AND match_category are both null/empty carries NO target and is
+// treated as NON-APPLICABLE (ignored, exactly like an 'info' row; it never
+// matches any line). (Silas adds a DB CHECK enforcing the same server-side,
+// belt-and-braces.)
+function hasTarget(rule) {
+  return normaliseTerm(rule.match_term) !== '' || normaliseTerm(rule.match_category) !== '';
+}
+
 function ruleAppliesToItem(rule, item, product, household) {
   if (rule.household_id !== null && rule.household_id !== undefined) {
     if (!sameHousehold(rule.household_id, household)) return false;
   }
   const term = normaliseTerm(item.item_name);
+  const cat = product && product.category ? normaliseTerm(product.category) : normaliseTerm(item.category);
   switch (rule.scope) {
     case 'global':
     case 'household':
-      return rule.match_term ? normaliseTerm(rule.match_term) === term : true;
+      // A target is REQUIRED even at broad scope (Finding 6): match by term
+      // when one is given, else by category, else NON-APPLICABLE. A target-less
+      // rule at this scope must never blanket-match every line.
+      if (rule.match_term) return normaliseTerm(rule.match_term) === term;
+      if (rule.match_category) return normaliseTerm(rule.match_category) === cat;
+      return false;
     case 'product':
     case 'one_time':
       return rule.match_term ? normaliseTerm(rule.match_term) === term : false;
-    case 'category': {
-      const cat = product && product.category ? normaliseTerm(product.category) : normaliseTerm(item.category);
+    case 'category':
       return rule.match_category ? normaliseTerm(rule.match_category) === cat : false;
-    }
     default:
       return false;
   }
@@ -187,7 +204,10 @@ function ruleAppliesToItem(rule, item, product, household) {
 
 function actionableRules(rules) {
   return (Array.isArray(rules) ? rules : []).filter(function (r) {
-    return r && r.active !== false && r.directive && r.directive !== 'info';
+    // An actionable directive with NO target is ignored (Finding 6): hasTarget()
+    // gates it out here so it can never reach ruleAppliesToItem and rewrite or
+    // exclude every line.
+    return r && r.active !== false && r.directive && r.directive !== 'info' && hasTarget(r);
   });
 }
 

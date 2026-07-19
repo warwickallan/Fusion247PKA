@@ -177,6 +177,38 @@ test('asdair schema enforces scoped, normalised uniqueness', gate, async functio
       );
     });
 
+    // PR #36 Fable finding #2: prove the REORDERED index (collapse whitespace
+    // FIRST, then btrim) rejects non-space leading/trailing whitespace that
+    // normaliseTerm folds away. These FAIL against the pre-fix index, which
+    // btrim'd (spaces only) BEFORE collapsing and so left a leading tab/newline
+    // as a distinguishing leading space -> no collision.
+    await t.test('REJECT: GLOBAL duplicate with a leading TAB (normalises identically)', async function () {
+      await reset();
+      await insertProduct('Widget A', null);
+      await expectUniqueViolation(
+        insertProduct('\twidget a', null),
+        'a leading-tab variant normalises to the same term and must collide (global)'
+      );
+    });
+
+    await t.test('REJECT: GLOBAL duplicate with surrounding NEWLINES (normalises identically)', async function () {
+      await reset();
+      await insertProduct('Widget A', null);
+      await expectUniqueViolation(
+        insertProduct('\nwidget   a\n', null),
+        'a newline-wrapped variant normalises to the same term and must collide (global)'
+      );
+    });
+
+    await t.test('REJECT: HOUSEHOLD duplicate with trailing whitespace incl. TAB (normalises identically)', async function () {
+      await reset();
+      await insertProduct('Widget A', householdId);
+      await expectUniqueViolation(
+        insertProduct('widget a \t', householdId),
+        'a trailing-whitespace variant normalises to the same term and must collide (household)'
+      );
+    });
+
     await t.test('ALLOW: a GLOBAL product AND a HOUSEHOLD product for the same term (different scopes)', async function () {
       await reset();
       await insertProduct('Widget A', null);
