@@ -46,6 +46,15 @@
 //   13b. F9/F11: two concurrent connections claim DISTINCT jobs (genuine SKIP LOCKED).
 //   14. G5: an UNREFERENCED checkpoint delete is rejected by the evidence trigger.
 //   15. G6: an active verdict may not carry superseded_at; a verdict cannot be born superseded.
+//   16. R4-1: merge_gate supersession is TERMINAL (superseded->pending/approved rejected;
+//       superseded_at cannot be cleared/altered) and superseded_at may be set ONLY on the
+//       decision->superseded transition (the sloppy superseded_at-alone path is closed).
+//   17. R4-2: a merge_gate cannot be born superseded (born-live guard, 23514).
+//   18. R4-3B: a genuine two-connection update-to-approved vs concurrent verdict-supersede,
+//       both lock orders — the approval either loses (23514) or is auto-superseded by D1; no
+//       wrong (live-approved-on-a-superseded-verdict) state ever commits, and no deadlock in
+//       the two staged interleavings.
+//   19. R4-C4: catalog assertion — EVERY ops plpgsql function pins search_path.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -291,7 +300,7 @@ gated('6. merge_gate NOT NULL head + dual-gate derived overall_action_state + on
       `insert into ops.merge_gate (build_id, expected_head_sha) values ($1,$2)
        returning overall_action_state`, [buildId, SHA_A]);
     assert.equal(g0[0].overall_action_state, 'fusion_not_approved');
-    await pool.query(`update ops.merge_gate set superseded_at=now() where build_id=$1`, [buildId]);
+    await pool.query(`update ops.merge_gate set fusion_policy_decision='superseded', superseded_at=now() where build_id=$1`, [buildId]);
 
     // Approve requires the two-reviewer chain: seed checkpoint + both approvals at SHA_A.
     const cpId = await seedCheckpoint(pool, buildId, SHA_A);
@@ -310,14 +319,14 @@ gated('6. merge_gate NOT NULL head + dual-gate derived overall_action_state + on
     await rejects(pool,
       `insert into ops.merge_gate (build_id, checkpoint_id, fusion_policy_decision, expected_head_sha)
        values ($1,$2,'approved',$3)`, [buildId, cpId, SHA_A]);
-    await pool.query(`update ops.merge_gate set superseded_at=now() where build_id=$1 and superseded_at is null`, [buildId]);
+    await pool.query(`update ops.merge_gate set fusion_policy_decision='superseded', superseded_at=now() where build_id=$1 and superseded_at is null`, [buildId]);
 
     // F13: no cached head at all -> github_unobserved (distinct from head_moved)
     const { rows: gu } = await pool.query(
       `insert into ops.merge_gate (build_id, checkpoint_id, fusion_policy_decision, expected_head_sha)
        values ($1,$2,'approved',$3) returning overall_action_state`, [buildId, cpId, SHA_A]);
     assert.equal(gu[0].overall_action_state, 'github_unobserved');
-    await pool.query(`update ops.merge_gate set superseded_at=now() where build_id=$1 and superseded_at is null`, [buildId]);
+    await pool.query(`update ops.merge_gate set fusion_policy_decision='superseded', superseded_at=now() where build_id=$1 and superseded_at is null`, [buildId]);
 
     // aligned: approved + heads agree + github clean + no review decision -> mergeable
     const { rows: g2 } = await pool.query(
@@ -327,7 +336,7 @@ gated('6. merge_gate NOT NULL head + dual-gate derived overall_action_state + on
        returning heads_agree, overall_action_state`, [buildId, cpId, SHA_A]);
     assert.equal(g2[0].heads_agree, true);
     assert.equal(g2[0].overall_action_state, 'mergeable');
-    await pool.query(`update ops.merge_gate set superseded_at=now() where build_id=$1 and superseded_at is null`, [buildId]);
+    await pool.query(`update ops.merge_gate set fusion_policy_decision='superseded', superseded_at=now() where build_id=$1 and superseded_at is null`, [buildId]);
 
     // github mechanical blocked flips overall away from mergeable
     const { rows: g3 } = await pool.query(
@@ -335,7 +344,7 @@ gated('6. merge_gate NOT NULL head + dual-gate derived overall_action_state + on
          github_mech_state_cached, github_head_sha_cached)
        values ($1,$2,'approved',$3,'blocked',$3) returning overall_action_state`, [buildId, cpId, SHA_A]);
     assert.equal(g3[0].overall_action_state, 'github_blocked');
-    await pool.query(`update ops.merge_gate set superseded_at=now() where build_id=$1 and superseded_at is null`, [buildId]);
+    await pool.query(`update ops.merge_gate set fusion_policy_decision='superseded', superseded_at=now() where build_id=$1 and superseded_at is null`, [buildId]);
 
     // F7: a non-APPROVED cached GitHub review decision blocks mergeable even when clean + heads agree
     const { rows: g4 } = await pool.query(
@@ -778,5 +787,185 @@ gated('15. G6: verdict superseded-consistency CHECK + a verdict cannot be born s
        values ($1,$2,'gpt_codex','correction_loop','approve') returning state, superseded_at`, [cpId, SHA_A]);
     assert.equal(rows[0].state, 'active');
     assert.equal(rows[0].superseded_at, null);
+  } finally { await pool.end(); }
+});
+
+gated('16. R4-1: merge_gate supersession is TERMINAL + superseded_at only set on the transition', async () => {
+  const pool = await freshPool();
+  try {
+    const buildId = await seedBuild(pool);
+    const cpId = await seedCheckpoint(pool, buildId, SHA_A);
+    await approveBothReviewers(pool, cpId, SHA_A);
+    const { rows: g } = await pool.query(
+      `insert into ops.merge_gate (build_id, checkpoint_id, fusion_policy_decision, expected_head_sha,
+         github_mech_state_cached, github_head_sha_cached, github_review_decision_cached)
+       values ($1,$2,'approved',$3,'clean',$3,'APPROVED') returning id`, [buildId, cpId, SHA_A]);
+    const gid = g[0].id;
+
+    // SET-ONLY rule: superseded_at may NOT be set on a still-approved gate (the old sloppy
+    // "mark non-live via superseded_at alone" path is now closed).
+    assert.equal((await rejects(pool,
+      `update ops.merge_gate set superseded_at=now() where id=$1`, [gid])).code, '23001',
+      'superseded_at may only be set in the same update that sets decision=superseded');
+
+    // the legitimate approved -> superseded (decision + superseded_at TOGETHER) still passes.
+    await pool.query(
+      `update ops.merge_gate set fusion_policy_decision='superseded', superseded_at=now() where id=$1`, [gid]);
+
+    // TERMINAL: approved -> superseded -> pending is rejected.
+    assert.equal((await rejects(pool,
+      `update ops.merge_gate set fusion_policy_decision='pending' where id=$1`, [gid])).code, '23001',
+      'approved->superseded->pending is rejected (supersession is terminal)');
+    // TERMINAL: superseded -> approved is rejected.
+    assert.equal((await rejects(pool,
+      `update ops.merge_gate set fusion_policy_decision='approved' where id=$1`, [gid])).code, '23001');
+    // TERMINAL: clearing superseded_at on a superseded gate is rejected.
+    assert.equal((await rejects(pool,
+      `update ops.merge_gate set superseded_at=null where id=$1`, [gid])).code, '23001',
+      'clearing superseded_at on a superseded gate is rejected');
+    // TERMINAL: altering superseded_at to a different (later) time is rejected.
+    assert.equal((await rejects(pool,
+      `update ops.merge_gate set superseded_at = now() + interval '1 hour' where id=$1`, [gid])).code, '23001');
+
+    // a superseded gate's PROJECTION columns still update (decision + superseded_at unchanged).
+    await pool.query(
+      `update ops.merge_gate set github_mech_state_cached='dirty', policy_reason='post-mortem' where id=$1`, [gid]);
+  } finally { await pool.end(); }
+});
+
+gated('17. R4-2: a merge_gate cannot be born superseded (born-live guard)', async () => {
+  const pool = await freshPool();
+  try {
+    const buildId = await seedBuild(pool);
+    const cpId = await seedCheckpoint(pool, buildId, SHA_A);
+    // born with superseded_at already set (decision pending) -> rejected by the born-live guard.
+    assert.equal((await rejects(pool,
+      `insert into ops.merge_gate (build_id, checkpoint_id, fusion_policy_decision, expected_head_sha, superseded_at)
+       values ($1,$2,'pending',$3, now())`, [buildId, cpId, SHA_A])).code, '23514',
+      'a gate born with superseded_at set is rejected');
+    // born with decision='superseded' (even WITH a superseded_at so the CHECK passes) -> rejected.
+    assert.equal((await rejects(pool,
+      `insert into ops.merge_gate (build_id, checkpoint_id, fusion_policy_decision, expected_head_sha, superseded_at)
+       values ($1,$2,'superseded',$3, now())`, [buildId, cpId, SHA_A])).code, '23514',
+      'a gate born decision=superseded is rejected');
+    // a normal born-live pending gate still inserts (control).
+    const { rows } = await pool.query(
+      `insert into ops.merge_gate (build_id, expected_head_sha) values ($1,$2)
+       returning fusion_policy_decision, superseded_at`, [buildId, SHA_A]);
+    assert.equal(rows[0].fusion_policy_decision, 'pending');
+    assert.equal(rows[0].superseded_at, null);
+  } finally { await pool.end(); }
+});
+
+gated('18. R4-3B: update-to-approved vs concurrent verdict-supersede — both lock orders, no wrong commit', async () => {
+  const pool = await freshPool();
+  try {
+    // ---- Interleaving 1: SUPERSEDE-first. The pending->approved UPDATE must serialise behind
+    // the supersede (advisory lock) and be REJECTED once readiness is false.
+    {
+      const buildId = await seedBuild(pool);
+      const cpId = await seedCheckpoint(pool, buildId, SHA_A);
+      await approveBothReviewers(pool, cpId, SHA_A);
+      const { rows: g } = await pool.query(
+        `insert into ops.merge_gate (build_id, checkpoint_id, expected_head_sha) values ($1,$2,$3) returning id`,
+        [buildId, cpId, SHA_A]);
+      const gid = g[0].id;
+
+      const cS = await pool.connect();
+      const cG = await pool.connect();
+      try {
+        await cS.query('begin');
+        await cS.query(
+          `update ops.verdict set state='superseded'
+           where checkpoint_id=$1 and reviewer='gpt_codex' and state='active'`, [cpId]);
+
+        await cG.query('begin');
+        let gErr = null; let gDone = false;
+        const gPromise = cG.query(
+          `update ops.merge_gate set fusion_policy_decision='approved' where id=$1`, [gid])
+          .then(() => { gDone = true; })
+          .catch((e) => { gErr = e; });
+        await sleep(400);
+        assert.equal(gDone, false, 'the pending->approved update must block behind the supersede (advisory lock)');
+
+        await cS.query('commit');
+        await gPromise;
+        assert.ok(gErr, 'the approval must be rejected once the supersede commits');
+        assert.equal(gErr.code, '23514', 'both reviewers no longer actively approve');
+        await cG.query('rollback');
+      } finally { cS.release(); cG.release(); }
+
+      const { rows: live } = await pool.query(
+        `select count(*)::int as n from ops.merge_gate
+          where id=$1 and superseded_at is null and fusion_policy_decision='approved'`, [gid]);
+      assert.equal(live[0].n, 0, 'no approved gate committed alongside the freshly-active reject');
+    }
+
+    // ---- Interleaving 2: APPROVAL-first. The pending->approved UPDATE locks the verdict rows
+    // and commits; the concurrent supersede then blocks, and once it commits the D1 AFTER
+    // trigger auto-supersedes the just-approved gate. End state is consistent (gate superseded),
+    // never a live approved gate resting on a superseded verdict — and NO deadlock.
+    {
+      const buildId = await seedBuild(pool);
+      const cpId = await seedCheckpoint(pool, buildId, SHA_A);
+      await approveBothReviewers(pool, cpId, SHA_A);
+      const { rows: g } = await pool.query(
+        `insert into ops.merge_gate (build_id, checkpoint_id, expected_head_sha) values ($1,$2,$3) returning id`,
+        [buildId, cpId, SHA_A]);
+      const gid = g[0].id;
+
+      const cG = await pool.connect();
+      const cS = await pool.connect();
+      try {
+        await cG.query('begin');
+        // approval acquires the advisory lock + FOR UPDATE on the active verdict rows, holds them.
+        await cG.query(`update ops.merge_gate set fusion_policy_decision='approved' where id=$1`, [gid]);
+
+        await cS.query('begin');
+        let sErr = null; let sDone = false;
+        const sPromise = cS.query(
+          `update ops.verdict set state='superseded'
+           where checkpoint_id=$1 and reviewer='gpt_codex' and state='active'`, [cpId])
+          .then(() => { sDone = true; })
+          .catch((e) => { sErr = e; });
+        await sleep(400);
+        assert.equal(sDone, false, 'the supersede must block on the verdict rows the approval locked');
+
+        await cG.query('commit');   // the approved gate commits
+        await sPromise;
+        assert.ok(!sErr, `the supersede should proceed cleanly after the approval commits (got ${sErr?.code})`);
+        await cS.query('commit');   // supersede + D1 auto-supersede of the gate commits
+      } finally { cG.release(); cS.release(); }
+
+      const { rows: after } = await pool.query(
+        `select fusion_policy_decision, overall_action_state, superseded_at from ops.merge_gate where id=$1`, [gid]);
+      assert.equal(after[0].fusion_policy_decision, 'superseded',
+        'D1: the approved gate is auto-superseded when its supporting verdict is superseded');
+      assert.equal(after[0].overall_action_state, 'superseded');
+      assert.ok(after[0].superseded_at, 'superseded_at stamped by the invalidation trigger');
+      const { rows: liveN } = await pool.query(
+        `select count(*)::int as n from ops.merge_gate
+          where id=$1 and superseded_at is null and fusion_policy_decision='approved'`, [gid]);
+      assert.equal(liveN[0].n, 0, 'no live approved gate rests on the superseded verdict');
+    }
+  } finally { await pool.end(); }
+});
+
+gated('19. R4-C4: every ops plpgsql function pins search_path (regression fence)', async () => {
+  const pool = await freshPool();
+  try {
+    const { rows } = await pool.query(`
+      select p.proname
+        from pg_proc p
+        join pg_namespace n on n.oid = p.pronamespace
+        join pg_language  l on l.oid = p.prolang
+       where n.nspname = 'ops'
+         and l.lanname = 'plpgsql'
+         and not exists (
+           select 1 from unnest(coalesce(p.proconfig, array[]::text[])) cfg
+            where cfg like 'search_path=%')
+       order by p.proname`);
+    assert.deepEqual(rows.map((r) => r.proname), [],
+      `ops plpgsql functions missing a pinned search_path: ${rows.map((r) => r.proname).join(', ') || '(none)'}`);
   } finally { await pool.end(); }
 });

@@ -121,6 +121,30 @@
 --       npm test against a Postgres service container; the runner FAILs on 0 executed
 --       subtests so an all-skipped run can never go green.
 --
+-- R4-ROUND-4 CHANGE LOG (this amend — still folded into the single never-applied 001; the
+--   final narrow polish from the Codex + Fable round-3 review — Fable APPROVED, Codex a small
+--   REQUEST_CHANGES set. The core — wrong-head kill + build-binding + D1 + all prior fixes —
+--   is preserved verbatim; these only tighten the edges):
+--   R4-1 (Codex MAJOR) merge_gate supersession is now TERMINAL. merge_gate_guard_mutation:
+--       once OLD is superseded (decision='superseded' OR superseded_at NOT NULL) the decision
+--       is frozen and superseded_at can neither change nor clear; and superseded_at may be SET
+--       only in the same UPDATE that sets decision='superseded'. approved->superseded once;
+--       superseded->anything-else and clearing superseded_at are rejected.
+--   R4-2 (Fable MED) born-live gate guard: BEFORE INSERT trigger merge_gate_reject_insert_
+--       superseded rejects an INSERT with superseded_at set or decision='superseded' — a gate
+--       is born live, so an 'approved' gate always passes the require-reviewers gate.
+--   R4-3 (Codex MAJOR concurrency / Fable LOW) removed the update-path deadlock + lock churn:
+--       (3A) merge_gate_require_reviewers SKIPs reviewer re-validation AND the FOR UPDATE
+--       verdict lock for a PURE PROJECTION REFRESH of an already-live approved gate (only
+--       github_*_cached / *_observed_at / policy_reason changing); (3B) a genuine approval
+--       takes a (build, checkpoint, head) pg_advisory_xact_lock BEFORE the verdict-row lock,
+--       and verdict_supersede_invalidates_gate takes the IDENTICAL key — the two paths
+--       serialise on the advisory lock. A residual truly-simultaneous deadlock is acceptable
+--       (clean 40P01 abort); a silently-inconsistent commit is not. A genuine two-connection
+--       update-to-approved vs verdict-supersede test (both lock orders) proves no wrong commit.
+--   R4-C4 (Codex LOW) reject_event_mutation() now pins search_path; test 19 is a catalog
+--       assertion that EVERY ops plpgsql function has search_path pinned (regression fence).
+--
 -- FIELD CLASSIFICATION (R3): every table and column is tagged inline
 --   [phase0] | [later] | [projection-only] | [provenance-later] | [not-yet-justified]
 --   with the full table reproduced in services/control-plane/db/README.md.
@@ -551,9 +575,13 @@ comment on column ops.agent_event.git_provenance_eligible is
 -- this trigger is defence-in-depth: even a mis-granted UPDATE/DELETE is rejected. A
 -- correction is a NEW event, never a mutation of an existing one. restrict_violation
 -- maps to SQLSTATE 23001 (F8 — the round-1 test mis-asserted 2F004).
+-- G10/R4-C4: search_path is pinned here too (this was the ONE plpgsql function that was
+-- missing it). A catalog-assertion test (test 19) now fails if ANY ops plpgsql function
+-- leaves search_path unpinned, so this can never silently regress.
 create or replace function ops.reject_event_mutation()
 returns trigger
 language plpgsql
+set search_path = ops, pg_catalog
 as $$
 begin
   raise exception 'ops.agent_event is APPEND-ONLY: % is rejected. Corrections are NEW events, never edits.', tg_op
@@ -937,11 +965,40 @@ set search_path = ops, pg_catalog
 as $$
 declare v_ready boolean;
 begin
+  -- R4-3A (Fable): PURE PROJECTION REFRESH short-circuit. When an ALREADY-live-approved gate
+  -- is UPDATEd with ONLY its cached-GitHub projection (github_*_cached / *_observed_at) or
+  -- policy_reason changing — its build/checkpoint/head/decision/supersession all unchanged —
+  -- there is nothing to re-validate: the gate was already validated at approval time and D1
+  -- keeps it honest via verdict_supersede_invalidates_gate. Refreshing the GitHub cache must
+  -- NOT re-run the reviewer check NOR re-take the FOR UPDATE verdict lock (that lock churn was
+  -- the deadlock/contention source). Skip both entirely.
+  if tg_op = 'UPDATE'
+     and old.fusion_policy_decision = 'approved'
+     and old.superseded_at is null
+     and new.build_id          is not distinct from old.build_id
+     and new.checkpoint_id     is not distinct from old.checkpoint_id
+     and new.expected_head_sha is not distinct from old.expected_head_sha
+     and new.fusion_policy_decision is not distinct from old.fusion_policy_decision
+     and new.superseded_at     is not distinct from old.superseded_at then
+    return new;
+  end if;
+
   if new.fusion_policy_decision = 'approved' and new.superseded_at is null then
     if new.checkpoint_id is null then
       raise exception 'merge_gate: fusion_policy_decision=approved requires a checkpoint_id (the head under review)'
         using errcode = 'check_violation';
     end if;
+    -- R4-3B (Codex/Fable): DEADLOCK-SAFE ORDERING. A genuine approval (INSERT of an approved
+    -- gate, or a pending->approved UPDATE) and a concurrent verdict-supersede both need to
+    -- serialise on the SAME (build, checkpoint, head). Take a transaction-scoped ADVISORY lock
+    -- on that key BEFORE locking any verdict row; verdict_supersede_invalidates_gate takes the
+    -- IDENTICAL key (its expression MUST stay byte-identical to this one), so the two paths
+    -- serialise on the advisory lock instead of racing gate-row-vs-verdict-row in opposite
+    -- orders. In the truly-simultaneous case a residual deadlock is still possible and is
+    -- ACCEPTABLE — Postgres aborts one txn cleanly (40P01); what can never happen is a
+    -- silently-inconsistent commit (an approved gate alongside a freshly-active reject).
+    perform pg_advisory_xact_lock(
+      hashtext(new.build_id::text || '/' || new.checkpoint_id::text || '/' || new.expected_head_sha::text)::bigint);
     -- G3(b): LOCK the active verdict rows for (checkpoint_id, expected_head_sha) FOR UPDATE
     -- BEFORE reading readiness. A concurrent supersede of any supporting verdict UPDATEs
     -- one of these rows and therefore SERIALISES against this approval:
@@ -980,6 +1037,31 @@ create trigger merge_gate_require_reviewers
   before insert or update on ops.merge_gate
   for each row execute function ops.merge_gate_require_reviewers();
 
+-- R4-2 (Fable): a gate must be BORN LIVE (mirrors ops.verdict_reject_insert_superseded). An
+-- INSERT with superseded_at already set, or fusion_policy_decision='superseded', is rejected —
+-- supersession is a transition of an existing live gate, never an initial state. This also
+-- guarantees an 'approved' gate is always inserted live (superseded_at NULL), so it can never
+-- side-step the require-reviewers gate by being born already-superseded. Trigger name sorts
+-- BEFORE merge_gate_require_reviewers, so a born-superseded insert is rejected here first.
+create or replace function ops.merge_gate_reject_insert_superseded()
+returns trigger
+language plpgsql
+set search_path = ops, pg_catalog
+as $$
+begin
+  if new.superseded_at is not null or new.fusion_policy_decision = 'superseded' then
+    raise exception 'ops.merge_gate cannot be INSERTed superseded — a gate must be born live (supersede an existing live gate instead)'
+      using errcode = 'check_violation';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists merge_gate_reject_insert_superseded on ops.merge_gate;
+create trigger merge_gate_reject_insert_superseded
+  before insert on ops.merge_gate
+  for each row execute function ops.merge_gate_reject_insert_superseded();
+
 -- G2: merge_gate IMMUTABILITY. A gate is a DECISION record; once written its identity and
 -- head binding are frozen, and once APPROVED its decision can only move to superseded. This
 -- stops an approved gate being rewritten in place (e.g. UPDATE expected_head_sha/
@@ -1011,6 +1093,29 @@ begin
     raise exception 'ops.merge_gate: an approved decision may only transition to superseded (attempted approved -> %)', new.fusion_policy_decision
       using errcode = 'restrict_violation';
   end if;
+  -- R4-1 (Codex): SUPERSESSION IS TERMINAL. Once a gate is superseded — whether by the
+  -- decision reaching 'superseded' OR by superseded_at being set — its decision is frozen
+  -- there and superseded_at can never change or clear. approved->superseded is allowed ONCE;
+  -- superseded->anything-else and clearing/altering superseded_at are rejected.
+  if old.fusion_policy_decision = 'superseded' or old.superseded_at is not null then
+    if new.fusion_policy_decision is distinct from old.fusion_policy_decision then
+      raise exception 'ops.merge_gate: supersession is terminal — fusion_policy_decision cannot change once superseded (attempted % -> %)', old.fusion_policy_decision, new.fusion_policy_decision
+        using errcode = 'restrict_violation';
+    end if;
+    if new.superseded_at is distinct from old.superseded_at then
+      raise exception 'ops.merge_gate: supersession is terminal — superseded_at cannot be changed or cleared once set'
+        using errcode = 'restrict_violation';
+    end if;
+  end if;
+  -- R4-1 (Codex): superseded_at may be SET only in the SAME update that transitions the
+  -- decision to 'superseded' — so a gate cannot be quietly marked non-live (superseded_at set)
+  -- while its decision still reads pending/approved. The canonical supersede is therefore
+  -- always (fusion_policy_decision='superseded', superseded_at=now()) together.
+  if old.superseded_at is null and new.superseded_at is not null
+     and new.fusion_policy_decision <> 'superseded' then
+    raise exception 'ops.merge_gate: superseded_at may only be set in the same update that sets fusion_policy_decision=superseded'
+      using errcode = 'restrict_violation';
+  end if;
   return new;
 end;
 $$;
@@ -1037,7 +1142,15 @@ returns trigger
 language plpgsql
 set search_path = ops, pg_catalog
 as $$
+declare v_build_id uuid;
 begin
+  select c.build_id into v_build_id from ops.checkpoint c where c.id = new.checkpoint_id;
+  -- R4-3B (Codex/Fable): take the SAME (build, checkpoint, head) advisory lock the approval
+  -- path (merge_gate_require_reviewers) takes, so gate-approval and verdict-supersede serialise
+  -- on this key rather than racing gate-row-vs-verdict-row in opposite orders. This expression
+  -- MUST stay byte-identical to the one in merge_gate_require_reviewers.
+  perform pg_advisory_xact_lock(
+    hashtext(v_build_id::text || '/' || new.checkpoint_id::text || '/' || new.reviewed_commit_sha::text)::bigint);
   update ops.merge_gate g
      set fusion_policy_decision = 'superseded'::ops.fusion_policy_decision,
          superseded_at = now(),
@@ -1045,7 +1158,7 @@ begin
            || 'auto-superseded: a supporting verdict was superseded at this head'
    where g.checkpoint_id = new.checkpoint_id
      and g.expected_head_sha = new.reviewed_commit_sha
-     and g.build_id = (select c.build_id from ops.checkpoint c where c.id = new.checkpoint_id)
+     and g.build_id = v_build_id
      and g.superseded_at is null
      and g.fusion_policy_decision = 'approved';
   return null;
