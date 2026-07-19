@@ -145,6 +145,30 @@
 --   R4-C4 (Codex LOW) reject_event_mutation() now pins search_path; test 19 is a catalog
 --       assertion that EVERY ops plpgsql function has search_path pinned (regression fence).
 --
+-- R5-ROUND-5 CHANGE LOG (this amend — still folded into the single never-applied 001; the FINAL
+--   narrow polish. Fable APPROVED; Codex a single REQUEST_CHANGES + two LOWs. The core — wrong-head
+--   kill + build-binding + D1 + terminal supersession + born-live + all prior — is preserved
+--   VERBATIM; these only close the last edges):
+--   R5-1 (Codex MAJOR / Fable LOW) merge_gate immutability is now DEFAULT-DENY. merge_gate_guard_
+--       mutation freezes EVERY column by default and permits change ONLY via an explicit allow-list:
+--       ALWAYS-MUTABLE = the github_mech_state_cached / github_head_sha_cached /
+--       github_review_decision_cached / github_observed_at projection columns + policy_reason +
+--       updated_at; SUPERSEDE-ONLY = fusion_policy_decision + superseded_at (whose legality is still
+--       enforced by the approved->superseded + terminal-supersession rules, unchanged). id,
+--       created_at, build_id, checkpoint_id, expected_head_sha AND ANY future column now raise
+--       restrict_violation (23001). Generated columns (heads_agree, overall_action_state) are
+--       ENUMERATED FROM THE CATALOG and skipped (they are computed after BEFORE triggers, so NEW
+--       carries no user value). This closes id + created_at + every future unfrozen column at once
+--       and aligns merge_gate with the checkpoint/verdict guards (which already freeze created_at).
+--       The require_reviewers projection-refresh short-circuit and this guard AGREE: an id/created_at
+--       change is rejected by the guard, which fires FIRST (merge_gate_immutable_guard sorts before
+--       merge_gate_require_reviewers), so such a change can never masquerade as a projection refresh.
+--   R5-2 (Fable LOW) the search_path catalog fence (test 19) now covers `language sql` too
+--       (l.lanname in ('plpgsql','sql')), so a future `language sql` ops function with an unpinned
+--       search_path is caught, not just plpgsql.
+--   R5-3 (Codex + Fable LOW) README header refreshed to round-5 (R4-1..R4-3 + R5 change-log entries
+--       listed so the header matches the body).
+--
 -- FIELD CLASSIFICATION (R3): every table and column is tagged inline
 --   [phase0] | [later] | [projection-only] | [provenance-later] | [not-yet-justified]
 --   with the full table reproduced in services/control-plane/db/README.md.
@@ -1062,30 +1086,65 @@ create trigger merge_gate_reject_insert_superseded
   before insert on ops.merge_gate
   for each row execute function ops.merge_gate_reject_insert_superseded();
 
--- G2: merge_gate IMMUTABILITY. A gate is a DECISION record; once written its identity and
--- head binding are frozen, and once APPROVED its decision can only move to superseded. This
--- stops an approved gate being rewritten in place (e.g. UPDATE expected_head_sha/
--- checkpoint_id to retarget the approval, or approved->pending to erase the approved-for-X
--- record). DELETE is rejected outright (supersede, never delete). The github_*_cached /
--- *_observed_at projection columns, policy_reason, superseded_at, updated_at stay MUTABLE.
+-- G2 + R5-1: merge_gate IMMUTABILITY, now DEFAULT-DENY. A gate is a DECISION record; once written,
+-- EVERY column is FROZEN by default and only an explicit allow-list may change. This stops an
+-- approved gate being rewritten in place (e.g. UPDATE expected_head_sha/checkpoint_id to retarget
+-- the approval, or approved->pending to erase the approved-for-X record) AND closes id/created_at
+-- and every FUTURE column in one stroke — no more "one more unfrozen column". DELETE is rejected
+-- outright (supersede, never delete). Two allow-lists:
+--   ALLOW_ALWAYS    — the cached-GitHub projection columns + policy_reason + updated_at (freely
+--                     refreshable; this is the point of the dual-gate separation).
+--   ALLOW_SUPERSEDE — fusion_policy_decision + superseded_at, mutable ONLY for the legal
+--                     approved->superseded transition, whose legality is enforced by the
+--                     approved-transition + terminal-supersession (R4-1) rules further below.
+-- Generated columns (heads_agree, overall_action_state) are enumerated from the catalog and
+-- skipped (they are computed AFTER before-triggers). This aligns merge_gate with the
+-- checkpoint/verdict guards (which already freeze created_at).
 create or replace function ops.merge_gate_guard_mutation()
 returns trigger
 language plpgsql
 set search_path = ops, pg_catalog
 as $$
+declare
+  -- R5-1: the ONLY columns an UPDATE may change. Everything not listed here (and not a generated
+  -- column) is frozen by default -> restrict_violation (23001).
+  allow_always constant text[] := array[
+    'github_mech_state_cached', 'github_head_sha_cached',
+    'github_review_decision_cached', 'github_observed_at',
+    'policy_reason', 'updated_at'];
+  allow_supersede constant text[] := array['fusion_policy_decision', 'superseded_at'];
+  generated_cols text[];
+  old_j jsonb;
+  new_j jsonb;
+  col text;
 begin
   if tg_op = 'DELETE' then
     raise exception 'ops.merge_gate is a decision record: DELETE is rejected (supersede, never delete)'
       using errcode = 'restrict_violation';
   end if;
-  -- identity + head binding are frozen for the life of the row (is distinct from is
-  -- null-safe: it also forbids setting a NULL checkpoint_id to a value, or vice versa).
-  if new.build_id is distinct from old.build_id
-     or new.checkpoint_id is distinct from old.checkpoint_id
-     or new.expected_head_sha is distinct from old.expected_head_sha then
-    raise exception 'ops.merge_gate identity (build_id/checkpoint_id/expected_head_sha) is immutable; supersede this gate and create a new one for a new head'
-      using errcode = 'restrict_violation';
-  end if;
+  -- R5-1: skip generated columns — NEW carries no user value for them in a BEFORE trigger, and
+  -- their values are derived from base columns (which ARE frozen). Read from the catalog (never a
+  -- hard-coded name) so a FUTURE generated column is auto-skipped too.
+  select coalesce(array_agg(attname), array[]::text[]) into generated_cols
+    from pg_attribute
+   where attrelid = tg_relid and attgenerated <> '' and not attisdropped;
+  old_j := to_jsonb(old);
+  new_j := to_jsonb(new);
+  -- R5-1 DEFAULT-DENY: any base column that actually changed and is NOT on an allow-list is a
+  -- restrict_violation. allow_supersede columns pass here and are validated by the transition
+  -- rules below; allow_always columns pass freely. is-distinct-from is null-safe.
+  for col in select jsonb_object_keys(new_j) loop
+    if col = any(generated_cols) then
+      continue;
+    end if;
+    if (new_j -> col) is distinct from (old_j -> col) then
+      if col = any(allow_always) or col = any(allow_supersede) then
+        continue;
+      end if;
+      raise exception 'ops.merge_gate: column "%" is immutable (default-deny) — only the cached-GitHub projection / policy_reason / updated_at, and the approved->superseded transition, may change; supersede this gate and create a new one for a new head/decision', col
+        using errcode = 'restrict_violation';
+    end if;
+  end loop;
   -- once approved, the decision may ONLY transition to superseded (never back to pending/
   -- blocked, which would erase the approved-for-this-head record).
   if old.fusion_policy_decision = 'approved'

@@ -54,7 +54,10 @@
 //       both lock orders — the approval either loses (23514) or is auto-superseded by D1; no
 //       wrong (live-approved-on-a-superseded-verdict) state ever commits, and no deadlock in
 //       the two staged interleavings.
-//   19. R4-C4: catalog assertion — EVERY ops plpgsql function pins search_path.
+//   19. R4-C4/R5-2: catalog assertion — EVERY ops plpgsql AND sql function pins search_path.
+//   20. R5-1: merge_gate immutability is DEFAULT-DENY — id/created_at (and any non-allow-listed
+//       column) UPDATE -> 23001; a github_*_cached-only refresh and the legal approved->superseded
+//       still succeed; D1's own supersede write still passes.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -951,21 +954,95 @@ gated('18. R4-3B: update-to-approved vs concurrent verdict-supersede — both lo
   } finally { await pool.end(); }
 });
 
-gated('19. R4-C4: every ops plpgsql function pins search_path (regression fence)', async () => {
+gated('19. R4-C4/R5-2: every ops plpgsql AND sql function pins search_path (regression fence)', async () => {
   const pool = await freshPool();
   try {
+    // R5-2 (Fable LOW): widen the fence to `language sql` too — a future `language sql` ops
+    // function with an unpinned search_path is just as hijackable and must be caught, not only
+    // plpgsql. (SQL-language functions can also carry SET search_path via proconfig.)
     const { rows } = await pool.query(`
       select p.proname
         from pg_proc p
         join pg_namespace n on n.oid = p.pronamespace
         join pg_language  l on l.oid = p.prolang
        where n.nspname = 'ops'
-         and l.lanname = 'plpgsql'
+         and l.lanname in ('plpgsql','sql')
          and not exists (
            select 1 from unnest(coalesce(p.proconfig, array[]::text[])) cfg
             where cfg like 'search_path=%')
        order by p.proname`);
     assert.deepEqual(rows.map((r) => r.proname), [],
-      `ops plpgsql functions missing a pinned search_path: ${rows.map((r) => r.proname).join(', ') || '(none)'}`);
+      `ops plpgsql/sql functions missing a pinned search_path: ${rows.map((r) => r.proname).join(', ') || '(none)'}`);
+  } finally { await pool.end(); }
+});
+
+gated('20. R5-1: merge_gate immutability is DEFAULT-DENY (id/created_at/base cols frozen; allow-list mutable)', async () => {
+  const pool = await freshPool();
+  try {
+    const buildId = await seedBuild(pool);
+    const cpId = await seedCheckpoint(pool, buildId, SHA_A);
+    await approveBothReviewers(pool, cpId, SHA_A);
+    const { rows: g } = await pool.query(
+      `insert into ops.merge_gate (build_id, checkpoint_id, fusion_policy_decision, expected_head_sha,
+         github_mech_state_cached, github_head_sha_cached, github_review_decision_cached)
+       values ($1,$2,'approved',$3,'clean',$3,'APPROVED') returning id`, [buildId, cpId, SHA_A]);
+    const gid = g[0].id;
+
+    // DEFAULT-DENY: the surrogate key and the audit timestamp are frozen (the round-4 explicit
+    // freeze-list left these mutable — that is the exact "one more unfrozen column" this closes).
+    assert.equal((await rejects(pool,
+      `update ops.merge_gate set id = gen_random_uuid() where id=$1`, [gid])).code, '23001',
+      'UPDATE id must be rejected (default-deny)');
+    assert.equal((await rejects(pool,
+      `update ops.merge_gate set created_at = now() - interval '1 day' where id=$1`, [gid])).code, '23001',
+      'UPDATE created_at must be rejected (default-deny) — now consistent with checkpoint/verdict');
+    // and the identity/head-binding columns stay frozen (regression of the G2 behaviour under
+    // the new mechanism).
+    assert.equal((await rejects(pool,
+      `update ops.merge_gate set build_id = $2 where id=$1`, [gid, await seedBuild(pool)])).code, '23001');
+    assert.equal((await rejects(pool,
+      `update ops.merge_gate set checkpoint_id = null where id=$1`, [gid])).code, '23001');
+    assert.equal((await rejects(pool,
+      `update ops.merge_gate set expected_head_sha = $2 where id=$1`, [gid, SHA_B])).code, '23001');
+
+    // ALLOW-LIST: a genuine github_*_cached / observed_at / policy_reason refresh still succeeds
+    // (no lock churn — this is the projection-refresh path) and touches updated_at.
+    await pool.query(
+      `update ops.merge_gate
+          set github_mech_state_cached='blocked',
+              github_head_sha_cached=$2,
+              github_review_decision_cached='CHANGES_REQUESTED',
+              github_observed_at=now(),
+              policy_reason='cache refresh'
+        where id=$1`, [gid, SHA_B]);
+    const { rows: refreshed } = await pool.query(
+      `select github_mech_state_cached, overall_action_state from ops.merge_gate where id=$1`, [gid]);
+    assert.equal(refreshed[0].github_mech_state_cached, 'blocked', 'projection refresh applied');
+
+    // ALLOW-LIST: the legal approved->superseded (decision + superseded_at together) still passes.
+    await pool.query(
+      `update ops.merge_gate set fusion_policy_decision='superseded', superseded_at=now() where id=$1`, [gid]);
+    const { rows: sup } = await pool.query(
+      `select fusion_policy_decision, overall_action_state from ops.merge_gate where id=$1`, [gid]);
+    assert.equal(sup[0].fusion_policy_decision, 'superseded');
+    assert.equal(sup[0].overall_action_state, 'superseded');
+
+    // D1's OWN supersede write still passes under default-deny: superseding a supporting verdict
+    // auto-supersedes a fresh approved gate (the AFTER-trigger UPDATE sets decision+superseded_at+
+    // policy_reason, all allow-listed). Prove it on a second build/gate.
+    const b2 = await seedBuild(pool);
+    const cp2 = await seedCheckpoint(pool, b2, SHA_A);
+    await approveBothReviewers(pool, cp2, SHA_A);
+    const { rows: g2 } = await pool.query(
+      `insert into ops.merge_gate (build_id, checkpoint_id, fusion_policy_decision, expected_head_sha,
+         github_mech_state_cached, github_head_sha_cached, github_review_decision_cached)
+       values ($1,$2,'approved',$3,'clean',$3,'APPROVED') returning id`, [b2, cp2, SHA_A]);
+    await pool.query(
+      `update ops.verdict set state='superseded'
+        where checkpoint_id=$1 and reviewer='gpt_codex' and state='active'`, [cp2]);
+    const { rows: after } = await pool.query(
+      `select fusion_policy_decision from ops.merge_gate where id=$1`, [g2[0].id]);
+    assert.equal(after[0].fusion_policy_decision, 'superseded',
+      'D1 auto-supersede write passes through the default-deny guard');
   } finally { await pool.end(); }
 });
