@@ -560,3 +560,139 @@ test('empty / missing inputs do not throw and return an empty plan', function ()
   assert.equal(plan.summary.estimated_total, null);
   assert.equal(plan.summary.budget_flag, 'unknown');
 });
+
+// ---------------------------------------------------------------------
+// Finding 1 (HIGH) - status precedence must NOT mask a scope mismatch.
+// A foreign-household matched_product_id (id 13, Gadget Z, owned by OTHER)
+// that ALSO trips another status must STILL carry the scope-mismatch flag,
+// and the foreign product must never reach matched_product. Synthetic ids
+// only; no real household data.
+// ---------------------------------------------------------------------
+
+test('Finding 1: foreign id + out_of_stock STILL flags scope mismatch and never applies the foreign product', function () {
+  const plan = planBasket({
+    listItems: [{ item_name: 'Gadget Z', requested_qty: 2, matched_product_id: 13, in_stock: false }],
+    products: products, rules: [], budget: budget, household: HH
+  });
+  const g = byName(plan, 'Gadget Z');
+  assert.equal(g.status, 'needs_decision');
+  assert.equal(g.planned_qty, 0, 'nothing added pending a human decision');
+  assert.equal(g.matched_product, null, 'the cross-household product is NOT applied');
+  assert.notEqual(g.matched_product, 'Gadget Z Pack');
+  assert.ok(g.flags.includes('product id household scope mismatch'),
+    'scope mismatch is surfaced even though the line is also out of stock');
+  assert.ok(g.flags.includes('never auto-substitute'));
+});
+
+test('Finding 1: foreign id + excluded_this_week STILL flags scope mismatch (flag never silently dropped)', function () {
+  const plan = planBasket({
+    listItems: [{ item_name: 'Gadget Z', requested_qty: 2, matched_product_id: 13, status: 'excluded_this_week' }],
+    products: products, rules: [], budget: budget, household: HH
+  });
+  const g = byName(plan, 'Gadget Z');
+  // The exclusion legitimately keeps the status (an excluded line is never
+  // bought), but the data-integrity flag must still be recorded.
+  assert.equal(g.status, 'excluded_this_week');
+  assert.equal(g.planned_qty, 0);
+  assert.equal(g.matched_product, null, 'the cross-household product is NOT applied');
+  assert.ok(g.flags.includes('product id household scope mismatch'),
+    'scope mismatch is surfaced even when a one-week exclusion won the status');
+  assert.ok(g.flags.includes('never auto-substitute'));
+});
+
+test('Finding 1: foreign id + rule needs_decision STILL flags scope mismatch and never applies the foreign product', function () {
+  const rules = [
+    { id: 200, scope: 'product', active: true, directive: 'needs_decision', match_term: 'Gadget Z', household_id: HH }
+  ];
+  const plan = planBasket({
+    listItems: [{ item_name: 'Gadget Z', requested_qty: 2, matched_product_id: 13 }],
+    products: products, rules: rules, budget: budget, household: HH
+  });
+  const g = byName(plan, 'Gadget Z');
+  assert.equal(g.status, 'needs_decision');
+  assert.equal(g.planned_qty, 0);
+  assert.equal(g.matched_product, null, 'the cross-household product is NOT applied');
+  assert.notEqual(g.matched_product, 'Gadget Z Pack');
+  assert.ok(g.flags.includes('product id household scope mismatch'),
+    'scope mismatch is surfaced even alongside a rule-driven needs_decision');
+  assert.ok(g.flags.includes('never auto-substitute'));
+});
+
+// ---------------------------------------------------------------------
+// Finding 2 (HIGH) - dedupe must not silently drop a conflicting foreign id.
+// Two duplicate lines with the SAME normalised item_name where a LATER
+// duplicate carries a different household's id must surface the scope
+// mismatch, not first-wins the earlier (valid) id and hide the foreign one.
+// ---------------------------------------------------------------------
+
+test('Finding 2: duplicate lines whose SECOND carries a foreign id -> merged line surfaces the scope mismatch', function () {
+  const plan = planBasket({
+    listItems: [
+      { item_name: 'Generic Milk 2L', requested_qty: 1, matched_product_id: 10 },  // active-household id (would first-win)
+      { item_name: 'Generic Milk 2L', requested_qty: 1, matched_product_id: 13 }   // foreign id (must NOT be dropped)
+    ],
+    products: products, rules: [], budget: budget, household: HH
+  });
+  const rows = plan.items.filter(function (it) { return it.item_name.toLowerCase() === 'generic milk 2l'; });
+  assert.equal(rows.length, 1, 'duplicates still collapse to one line');
+  const m = rows[0];
+  assert.equal(m.requested_qty, 2, 'counts are still summed');
+  assert.equal(m.status, 'needs_decision', 'a hidden foreign id is not silently accepted as add');
+  assert.equal(m.planned_qty, 0);
+  assert.equal(m.matched_product, null, 'neither the active nor the foreign product is auto-applied on conflict');
+  assert.notEqual(m.matched_product, 'Gadget Z Pack', 'the foreign product is never applied');
+  assert.ok(m.flags.includes('product id household scope mismatch'),
+    'the second duplicate foreign id is scope-checked, not dropped by first-wins');
+  assert.ok(m.flags.includes('never auto-substitute'));
+});
+
+test('Finding 2 control: duplicate lines repeating the SAME id behave exactly as before (add, no conflict)', function () {
+  const plan = planBasket({
+    listItems: [
+      { item_name: 'Widget A', requested_qty: 2, matched_product_id: 12 },  // global id
+      { item_name: 'Widget A', requested_qty: 3, matched_product_id: 12 }   // same id repeated
+    ],
+    products: products, rules: [], budget: budget, household: HH
+  });
+  const rows = plan.items.filter(function (it) { return it.item_name.toLowerCase() === 'widget a'; });
+  assert.equal(rows.length, 1);
+  const w = rows[0];
+  assert.equal(w.requested_qty, 5, 'counts summed as before');
+  assert.equal(w.planned_qty, 5);
+  assert.equal(w.status, 'add');
+  assert.equal(w.matched_product, 'Widget A Deluxe');
+  assert.ok(!w.flags.includes('product id household scope mismatch'), 'same-id repeat is not a conflict');
+});
+
+test('Finding 2 control: an id-bearing line plus a no-id duplicate still first-wins the single id (no regression)', function () {
+  const plan = planBasket({
+    listItems: [
+      { item_name: 'Generic Milk 2L', requested_qty: 1, matched_product_id: 10 },  // active-household id
+      { item_name: 'Generic Milk 2L', requested_qty: 1 }                           // no id -> no conflict
+    ],
+    products: products, rules: [], budget: budget, household: HH
+  });
+  const rows = plan.items.filter(function (it) { return it.item_name.toLowerCase() === 'generic milk 2l'; });
+  assert.equal(rows.length, 1);
+  const m = rows[0];
+  assert.equal(m.requested_qty, 2);
+  assert.equal(m.status, 'add');
+  assert.equal(m.matched_product, 'Store Brand Milk 2L', 'active-household id resolves as before');
+  assert.ok(!m.flags.includes('product id household scope mismatch'));
+});
+
+test('Finding 2 control: duplicate lines both carrying the SAME foreign id still fail safe as scope mismatch', function () {
+  const plan = planBasket({
+    listItems: [
+      { item_name: 'Gadget Z', requested_qty: 1, matched_product_id: 13 },
+      { item_name: 'Gadget Z', requested_qty: 1, matched_product_id: 13 }
+    ],
+    products: products, rules: [], budget: budget, household: HH
+  });
+  const rows = plan.items.filter(function (it) { return it.item_name.toLowerCase() === 'gadget z'; });
+  assert.equal(rows.length, 1);
+  const g = rows[0];
+  assert.equal(g.status, 'needs_decision');
+  assert.equal(g.matched_product, null);
+  assert.ok(g.flags.includes('product id household scope mismatch'));
+});

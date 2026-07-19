@@ -54,6 +54,17 @@ function pushFlag(flags, flag) {
   if (flag && flags.indexOf(flag) === -1) flags.push(flag);
 }
 
+// Append a product id once, comparing loosely (ids may be numbers or strings).
+// Used so every DISTINCT id seen for a merged line is retained and a
+// conflicting (possibly foreign) id can never be silently dropped.
+function pushId(ids, id) {
+  if (id === null || id === undefined) return;
+  for (let i = 0; i < ids.length; i++) {
+    if (String(ids[i]) === String(id)) return;
+  }
+  ids.push(id);
+}
+
 // Round a money amount to 2 decimal places (pure arithmetic).
 function round2(n) {
   return Math.round((n + Number.EPSILON) * 100) / 100;
@@ -75,19 +86,50 @@ function matchProduct(item, products, household) {
   // household, that is a cross-household scope leak: DO NOT accept it. Signal
   // a scope mismatch so the caller sends the line to a human and never
   // auto-substitutes the foreign product.
-  if (item.matched_product_id !== null && item.matched_product_id !== undefined) {
-    const byId = list.find(function (p) { return sameHousehold(p.id, item.matched_product_id); });
-    if (byId) {
+  // Gather EVERY explicit product id on the line. A single list line carries
+  // its one id in matched_product_id; a merged (deduped) line additionally
+  // carries every id seen for it in matched_product_ids, so a conflicting or
+  // foreign id from a later duplicate is never silently dropped by dedupe's
+  // first-wins pick. Distinct ids only (dedupeList already normalises, but a
+  // raw caller may pass both fields).
+  const explicitIds = [];
+  pushId(explicitIds, item.matched_product_id);
+  if (Array.isArray(item.matched_product_ids)) {
+    item.matched_product_ids.forEach(function (id) { pushId(explicitIds, id); });
+  }
+
+  if (explicitIds.length > 0) {
+    const inScope = [];
+    let sawForeign = false;
+    explicitIds.forEach(function (id) {
+      const byId = list.find(function (p) { return sameHousehold(p.id, id); });
+      if (!byId) return; // unresolved id: ignore; may fall through to term match
       const isGlobal = byId.household_id === null || byId.household_id === undefined;
       const isActiveHousehold = sameHousehold(byId.household_id, household);
       if (isGlobal || isActiveHousehold) {
-        return { product: byId, ambiguous: false, scopeMismatch: false };
+        if (inScope.indexOf(byId) === -1) inScope.push(byId);
+      } else {
+        sawForeign = true; // resolved to ANOTHER household -> cross-household leak
       }
-      // Resolved, but to a product belonging to a DIFFERENT household.
+    });
+
+    // A foreign id ANYWHERE on the line dominates: it is a data-integrity leak
+    // and must be surfaced even when a valid sibling id is also present. Never
+    // accept the foreign product; signal scopeMismatch so the caller sends the
+    // line to a human and never auto-substitutes.
+    if (sawForeign) {
       return { product: null, ambiguous: false, scopeMismatch: true };
     }
-    // The id did not resolve to any product at all -> fall through to term
-    // matching (unchanged behaviour).
+    // Two or more DISTINCT in-scope products claimed by explicit id -> the line
+    // is id-conflicted and cannot be resolved confidently -> human decision.
+    if (inScope.length > 1) {
+      return { product: inScope[0], ambiguous: true, scopeMismatch: false };
+    }
+    if (inScope.length === 1) {
+      return { product: inScope[0], ambiguous: false, scopeMismatch: false };
+    }
+    // No id resolved to any product at all -> fall through to term matching
+    // (unchanged behaviour).
   }
 
   const term = normaliseTerm(item.item_name);
@@ -161,10 +203,18 @@ function dedupeList(listItems) {
     const key = normaliseTerm(raw.item_name);
     if (key === '') return; // rule 5: a blank line is not an item
     if (!byKey[key]) {
+      const firstId = (raw.matched_product_id !== undefined ? raw.matched_product_id : null);
+      const ids = [];
+      pushId(ids, firstId);
       byKey[key] = {
         item_name: raw.item_name,
         requested_qty: normaliseQty(raw.requested_qty),
-        matched_product_id: (raw.matched_product_id !== undefined ? raw.matched_product_id : null),
+        matched_product_id: firstId,
+        // Every DISTINCT explicit id seen for this merged line. matched_product_id
+        // stays first-wins for backward compatibility, but matchProduct scope-
+        // checks EVERY id here so a later duplicate carrying a different (foreign)
+        // id is never silently dropped. See Finding 2.
+        matched_product_ids: ids,
         price: (raw.price !== undefined ? raw.price : null),
         note: (raw.note ? String(raw.note) : ''),
         category: (raw.category !== undefined ? raw.category : null),
@@ -181,6 +231,10 @@ function dedupeList(listItems) {
       if (acc.matched_product_id === null && raw.matched_product_id !== undefined && raw.matched_product_id !== null) {
         acc.matched_product_id = raw.matched_product_id;
       }
+      // Retain EVERY non-null id (not just the first) so a conflicting or
+      // foreign id from a later duplicate line reaches the scope check instead
+      // of being masked by the first-wins pick above.
+      pushId(acc.matched_product_ids, raw.matched_product_id);
       if (acc.price === null && raw.price !== undefined && raw.price !== null) acc.price = raw.price;
       if (raw.note) acc.note = acc.note ? (acc.note + '; ' + String(raw.note)) : String(raw.note);
       acc.one_week_only = acc.one_week_only || raw.one_week_only === true;
@@ -267,6 +321,18 @@ function planBasket(input) {
       // Rule 10: excluded THIS WEEK only (never promoted to a standing rule).
       status = 'excluded_this_week';
       pushFlag(flags, 'excluded this week only');
+    } else if (scopeMismatch) {
+      // Security / data integrity (Finding 1): an explicit matched_product_id
+      // resolved to a product owned by ANOTHER household. This is raised ABOVE
+      // out_of_stock / flagged_on_list / rule needs_decision / ambiguous so a
+      // foreign id can never be masked by one of those and lose its flag; it
+      // always fails safe as needs_decision. (The two exclusion statuses above
+      // still win, because an excluded line is never bought at all -- but the
+      // mismatch is STILL recorded unconditionally after this chain so it is
+      // never silently dropped.) The foreign product is never placed in
+      // matched_product (matchProduct returns product null on a scope leak).
+      status = 'needs_decision';
+      // Flags for this cause are pushed in the unconditional block below.
     } else if (line.out_of_stock) {
       // Rule 6: out of stock -> human decision, NEVER auto-substitute.
       status = 'needs_decision';
@@ -280,13 +346,6 @@ function planBasket(input) {
       status = 'needs_decision';
       pushFlag(flags, 'flagged by rule');
       pushFlag(flags, 'never auto-substitute');
-    } else if (scopeMismatch) {
-      // Security: an explicit matched_product_id resolved to a product owned by
-      // ANOTHER household. Never accept a cross-household product; send it to a
-      // human and never auto-substitute the foreign product.
-      status = 'needs_decision';
-      pushFlag(flags, 'product id household scope mismatch');
-      pushFlag(flags, 'never auto-substitute');
     } else if (ambiguous) {
       // Rule 6: cannot be confidently matched -> human decision.
       status = 'needs_decision';
@@ -297,6 +356,17 @@ function planBasket(input) {
       // found in the Favourites / Regulars pages at run time (rule 4).
       status = 'add';
       pushFlag(flags, 'no explicit product mapping');
+    }
+
+    // Finding 1 (data integrity, ALWAYS): a foreign-household matched_product_id
+    // must be surfaced no matter which status won above -- including a standing
+    // or one-week exclusion that legitimately took the status. This guarantees
+    // the 'product id household scope mismatch' flag is never silently dropped.
+    // The foreign product itself is never in matched_product (it was refused in
+    // matchProduct), so nothing foreign can be auto-substituted or bought.
+    if (scopeMismatch) {
+      pushFlag(flags, 'product id household scope mismatch');
+      pushFlag(flags, 'never auto-substitute');
     }
 
     // Rule 10 book-keeping flag (informational; never becomes a rule).
