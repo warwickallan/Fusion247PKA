@@ -73,8 +73,8 @@ export function openState({ statePath = DEFAULT_STATE_PATH, fs = fsDefault } = {
     isAnswered(checkpointId) { return Boolean(data.answered[checkpointId]); },
     getAnswered(checkpointId) { return data.answered[checkpointId] ?? null; },
 
-    recordAnswered(checkpointId, { reviewedHead, verdict, promptFingerprint, commentId, now = Date.now() } = {}) {
-      data.answered[checkpointId] = { reviewed_head: reviewedHead ?? null, verdict: verdict ?? null, prompt_fingerprint: promptFingerprint ?? null, comment_id: commentId ?? null, answered_at: now };
+    recordAnswered(checkpointId, { reviewedHead, verdict, promptFingerprint, commentId, now = Date.now(), mergeReady = null } = {}) {
+      data.answered[checkpointId] = { reviewed_head: reviewedHead ?? null, verdict: verdict ?? null, prompt_fingerprint: promptFingerprint ?? null, comment_id: commentId ?? null, answered_at: now, merge_ready: mergeReady };
       persist();
     },
 

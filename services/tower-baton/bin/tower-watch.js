@@ -23,6 +23,7 @@ import { SECRET_HOME } from '../src/config.js';
 import { createClickupClient } from '../src/clickupClient.js';
 import { createGithubEvidence } from '../src/githubEvidence.js';
 import { createCodexAdapter } from '../src/codexAdapter.js';
+import { createFableAdapter } from '../src/fableAdapter.js';
 import { createMilestoneNotifier, createTelegramClient } from '../src/telegramNotifier.js';
 import { openState, acquireLock, DEFAULT_LOCK_STALE_MS } from '../src/state.js';
 import { createWatcher } from '../src/watcher.js';
@@ -126,9 +127,14 @@ async function main() {
   const codexTimeoutMs = Number(process.env.TOWER_CODEX_TIMEOUT_MS) > 0 ? Number(process.env.TOWER_CODEX_TIMEOUT_MS) : undefined;
   const cycleWatchdogMs = Number(process.env.TOWER_CYCLE_WATCHDOG_MS) > 0 ? Number(process.env.TOWER_CYCLE_WATCHDOG_MS) : undefined;
   const codex = createCodexAdapter({ config, cwd: repoDir, log, ...(codexTimeoutMs ? { timeoutMs: codexTimeoutMs } : {}) });
+  // The SECOND, independent reviewer: Fable cold-final (claude-fable-5, headless). Its child
+  // env is sanitised (sanitizeFableEnv) at spawn time; it runs from a NEUTRAL cwd so it never
+  // adopts the repo persona. A Codex APPROVE auto-routes here; merge-ready needs BOTH APPROVE.
+  const fableTimeoutMs = Number(process.env.TOWER_FABLE_TIMEOUT_MS) > 0 ? Number(process.env.TOWER_FABLE_TIMEOUT_MS) : undefined;
+  const fable = createFableAdapter({ config, log, ...(fableTimeoutMs ? { timeoutMs: fableTimeoutMs } : {}) });
   const notifier = createMilestoneNotifier({ config, state });
 
-  const watcher = createWatcher({ config, clickup, github, codex, notifier, state, taskId, qaSkillPath, repoRoot: repoDir, fs, log, ...(cycleWatchdogMs ? { cycleWatchdogMs } : {}) });
+  const watcher = createWatcher({ config, clickup, github, codex, fable, notifier, state, taskId, qaSkillPath, repoRoot: repoDir, fs, log, ...(cycleWatchdogMs ? { cycleWatchdogMs } : {}) });
 
   // 5. startup ding — via TOWER'S OWN NOTIFIER (real event).
   await notifier.notifyMilestone({

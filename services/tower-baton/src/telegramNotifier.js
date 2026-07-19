@@ -30,7 +30,7 @@ export const MILESTONES = Object.freeze([
   'clickup_token_missing',
 ]);
 
-export const LOGICAL_SOURCES = Object.freeze(['TOWER', 'CODEX', 'LARRY', 'CI']);
+export const LOGICAL_SOURCES = Object.freeze(['TOWER', 'CODEX', 'FABLE', 'LARRY', 'CI']);
 
 function sha256hex(s) { return crypto.createHash('sha256').update(String(s), 'utf8').digest('hex'); }
 

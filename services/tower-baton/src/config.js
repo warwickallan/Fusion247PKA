@@ -46,6 +46,7 @@ export const SECRET_KEYS = Object.freeze([
   'CLICKUP_TOKEN',
   'TELEGRAM_BOT_TOKEN',
   'TOWER_HMAC_SECRET_GPT_CODEX',
+  'TOWER_HMAC_SECRET_CLAUDE_FABLE',
 ]);
 
 /** Mask a secret for display. Never returns the real value. Absent → "(unset)". */
@@ -119,6 +120,7 @@ export function loadConfig({ env = process.env, home = SECRET_HOME, files = DEFA
   const authorisedTelegramUserId = get('AUTHORISED_TELEGRAM_USER_ID');
   const githubRepo = get('GITHUB_REPO');
   const codexHmacSecret = get('TOWER_HMAC_SECRET_GPT_CODEX');
+  const fableHmacSecret = get('TOWER_HMAC_SECRET_CLAUDE_FABLE');
 
   // TOWER_AUTHORISED_AUTHOR_IDS — comma-separated ClickUp user ids permitted to author a
   // checkpoint that the watcher will act on. NOT a secret (ids, not credentials): shown in
@@ -128,7 +130,7 @@ export function loadConfig({ env = process.env, home = SECRET_HOME, files = DEFA
   const authorisedAuthorIds = String(get('TOWER_AUTHORISED_AUTHOR_IDS') ?? '')
     .split(',').map((s) => s.trim()).filter(Boolean);
 
-  const secretValues = [clickupToken, telegramBotToken, codexHmacSecret]
+  const secretValues = [clickupToken, telegramBotToken, codexHmacSecret, fableHmacSecret]
     .filter((v) => typeof v === 'string' && v.length > 0);
 
   return {
@@ -138,6 +140,7 @@ export function loadConfig({ env = process.env, home = SECRET_HOME, files = DEFA
     authorisedTelegramUserId,   // POINTER — safe
     githubRepo,                 // 'owner/repo' — safe
     codexHmacSecret,            // SECRET — never logged
+    fableHmacSecret,            // SECRET -- never logged (Fable's per-principal verdict signer)
     authorisedAuthorIds,        // POINTER list — safe (checkpoint-author allowlist)
 
     clickupReady: clickupToken !== null,
@@ -156,7 +159,9 @@ export function loadConfig({ env = process.env, home = SECRET_HOME, files = DEFA
 
     /** Signing secret VALUE for a principal (in-process HMAC only). Null when unset. */
     signingSecret(principal) {
-      return principal === 'gpt_codex' ? codexHmacSecret : null;
+      if (principal === 'gpt_codex') return codexHmacSecret;
+      if (principal === 'claude_fable') return fableHmacSecret;
+      return null;
     },
 
     /**
@@ -196,6 +201,7 @@ export function loadConfig({ env = process.env, home = SECRET_HOME, files = DEFA
         GITHUB_REPO: githubRepo ?? '(unset)',
         TOWER_AUTHORISED_AUTHOR_IDS: authorisedAuthorIds.length ? authorisedAuthorIds.join(',') : '(unset)',
         TOWER_HMAC_SECRET_GPT_CODEX: maskSecret(codexHmacSecret),
+        TOWER_HMAC_SECRET_CLAUDE_FABLE: maskSecret(fableHmacSecret),
         clickupReady: clickupToken !== null,
         telegramReady: telegramBotToken !== null && authorisedTelegramUserId !== null,
       };

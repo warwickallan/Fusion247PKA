@@ -107,3 +107,35 @@ export function fakeFsForSchema() {
 export function codexJsonl(result) {
   return JSON.stringify({ type: 'item.completed', item: { text: JSON.stringify(result) } }) + '\n';
 }
+
+/**
+ * Build a claude `--output-format json` stdout object whose `.result` is the model's final
+ * message (the reviewer JSON, optionally wrapped in prose to prove extraction). Mirrors the
+ * real claude 2.1.214 result shape.
+ */
+export function fableCliJson(result, { wrap = false } = {}) {
+  const inner = JSON.stringify(result);
+  const message = wrap ? `Here is my review:\n\n${inner}\n\nThat is my verdict.` : inner;
+  return JSON.stringify({
+    type: 'result', subtype: 'success', is_error: false,
+    result: message, stop_reason: 'end_turn',
+    usage: { output_tokens: 42 }, modelUsage: { 'claude-fable-5': { outputTokens: 42 } },
+  });
+}
+
+/** A Fable adapter fake -- returns a structured verdict you specify, signed as claude_fable. */
+export function fakeFable(structuredResult = null) {
+  const result = structuredResult ?? {
+    status: 'ok', verdict: 'approve', summary: 'cold-final: nothing missed; the change stands up',
+    claims_verified: [], findings: [], proposed_action: { type: 'noop', target: '' },
+  };
+  const calls = [];
+  return {
+    calls,
+    principal: 'claude_fable',
+    async runTurn(args) {
+      calls.push(args);
+      return { ok: result.status !== 'blocked', blocked: result.status === 'blocked', signerPrincipal: 'claude_fable', structuredResult: result, envelope: { agent: 'claude_fable', provider: 'anthropic' }, signature: null };
+    },
+  };
+}

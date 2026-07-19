@@ -14,6 +14,10 @@ import crypto from 'node:crypto';
 export const HONEST_PROVIDER = Object.freeze({
   larry: 'anthropic-claude-code',
   gpt_codex: 'openai-codex', // NEVER 'xai-grok'. OpenAI/Codex, honestly labelled.
+  // The SECOND, INDEPENDENT reviewer -- Fable, the adversarial cold-final pass. It is
+  // Anthropic (claude-fable-5 via the claude CLI headless), signed under its OWN
+  // principal so its verdict can never be mistaken for gpt_codex's correction-loop review.
+  claude_fable: 'anthropic',
   warwick: 'human',
   tower: 'fusion-tower',
 });

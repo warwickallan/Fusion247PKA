@@ -23,11 +23,20 @@
 import fsDefault from 'node:fs';
 import path from 'node:path';
 
-import { parseCheckpoint, chainKey, formatResponse, answeredCheckpointIds } from './checkpoint.js';
+import { parseCheckpoint, chainKey, formatResponse, formatFableResponse, answeredCheckpointIds } from './checkpoint.js';
 import { loadQaSkill } from './qaSkill.js';
 import { composeReviewBriefing } from './reviewVoice.js';
 
 export const DEFAULT_MAX_ROUNDS = 3;
+
+/**
+ * The MERGE-READY GATE. Merge-ready requires BOTH principals to APPROVE the SAME head:
+ * the Codex correction-loop reviewer AND the Fable cold-final reviewer. A Codex APPROVE
+ * that has not yet passed Fable is NEVER merge-ready.
+ */
+export function computeMergeReady({ codexVerdict, fableVerdict }) {
+  return codexVerdict === 'APPROVE' && fableVerdict === 'APPROVE';
+}
 
 // Per-cycle WATCHDOG bound (WP1). A single checkpoint's processing must NEVER be able
 // to hang the poll loop silently. This deadline sits OUTSIDE the codex turn timeout
@@ -189,7 +198,11 @@ export function pickMaterialFindings(findings) {
  * @param {object} deps.config        loadConfig() result
  * @param {object} deps.clickup       ClickUp client (getTaskComments/createTaskComment[, getTask])
  * @param {object} deps.github        createGithubEvidence() result
- * @param {object} deps.codex         createCodexAdapter() result
+ * @param {object} deps.codex         createCodexAdapter() result (correction-loop reviewer)
+ * @param {object} [deps.fable]       createFableAdapter() result (cold-final reviewer). When
+ *                                    present, a Codex APPROVE auto-routes into a Fable
+ *                                    cold-final pass; merge-ready needs BOTH to APPROVE.
+ *                                    Absent → codex-only behaviour (unchanged).
  * @param {object} deps.notifier      createMilestoneNotifier() result
  * @param {object} deps.state         openState() result
  * @param {string} deps.taskId        the ClickUp control task id
@@ -199,7 +212,7 @@ export function pickMaterialFindings(findings) {
  * @param {function} [deps.now]       injectable clock () => epoch ms
  * @param {function} [deps.log]       injectable logger (redacted by the caller)
  */
-export function createWatcher({ config, clickup, github, codex, notifier, state, taskId, qaSkillPath, repoRoot = null, maxRounds = DEFAULT_MAX_ROUNDS, fs = fsDefault, now = Date.now, log = () => {}, cycleWatchdogMs = DEFAULT_CYCLE_WATCHDOG_MS, failurePostDeadlineMs = DEFAULT_FAILURE_POST_DEADLINE_MS, pollReadDeadlineMs = DEFAULT_POLL_READ_DEADLINE_MS } = {}) {
+export function createWatcher({ config, clickup, github, codex, fable = null, notifier, state, taskId, qaSkillPath, repoRoot = null, maxRounds = DEFAULT_MAX_ROUNDS, fs = fsDefault, now = Date.now, log = () => {}, cycleWatchdogMs = DEFAULT_CYCLE_WATCHDOG_MS, failurePostDeadlineMs = DEFAULT_FAILURE_POST_DEADLINE_MS, pollReadDeadlineMs = DEFAULT_POLL_READ_DEADLINE_MS } = {}) {
   let reconciled = false;
   // Re-entrancy guard: a Codex turn (~60s) is far longer than the poll interval (~15s),
   // so overlapping setInterval ticks would each start a duplicate Codex turn on the SAME
@@ -278,6 +291,10 @@ export function createWatcher({ config, clickup, github, codex, notifier, state,
     const roundsSpent = state.roundCount(ck);
     let codexResult = null;
     let signed = null;
+    // The bounded review packet -- hoisted to the cycle scope so the Fable cold-final turn
+    // can review the SAME head/diff/pointers Codex reviewed (built only on the codex-invoke
+    // path; a gate-block/round-exhaust never reaches an APPROVE and so never routes to Fable).
+    let packet = null;
     const promptFingerprint = skill.fingerprint ?? null;
 
     let derived;
@@ -289,7 +306,7 @@ export function createWatcher({ config, clickup, github, codex, notifier, state,
       derived = { verdict: 'DECISION_REQUIRED', material_findings: [], next_action: `Max correction rounds (${maxRounds}) reached for this chain — escalating to Warwick.` };
     } else {
       // (g) invoke Codex read-only QA.
-      const packet = {
+      packet = {
         checkpoint_id: checkpoint.checkpoint_id ?? null, build_id: checkpoint.build_id ?? null, wp_id: checkpoint.wp_id ?? null,
         repo: config?.githubRepo ?? null, branch: checkpoint.branch, head_sha: evidence.headSha,
         base_sha: checkpoint.base_sha ?? null, diff_range: evidence.diffRange, changed_files: evidence.changedFiles,
@@ -332,37 +349,108 @@ export function createWatcher({ config, clickup, github, codex, notifier, state,
       return { checkpointId: cpId, verdict: derived.verdict, posted: false, error: 'post-failed', response: responseObj };
     }
 
-    // FENCE before mutating durable state: the watchdog may have fired DURING the post.
-    // Do not overwrite the answered state / round counter set by the recovery path.
-    if (!stillActive('record_state')) return { checkpointId: cpId, superseded: true, posted: true, commentId: posted.id };
-    // (i) durable state: mark answered + advance the per-chain round counter.
-    progress.stage = 'record_state';
-    state.recordAnswered(cpId, { reviewedHead: responseObj.reviewed_head, verdict: derived.verdict, promptFingerprint, commentId: posted.id, now: now() });
-    if (derived.verdict === 'CORRECTIONS_REQUIRED') state.incrementRound(ck);
-
     // (j) milestone Telegram — one per outcome, deduped by checkpoint_id.
     // SAME purpose/trigger/dedup/frequency as before (Warwick uses these for UAT) --
     // only the CONTENT and the logical source change: review outcomes now speak in
     // the CODEX adviser voice (a human briefing) instead of a terse status string.
-    const milestonePurpose = derived.verdict === 'BLOCKED' ? 'blocked'
+    const codexMilestonePurpose = derived.verdict === 'BLOCKED' ? 'blocked'
       : derived.verdict === 'DECISION_REQUIRED' ? 'escalation'
       : 'review_posted';
-    const briefing = composeReviewBriefing({ checkpoint, codexResult, derived, reviewedHead: responseObj.reviewed_head });
+    const codexBriefing = composeReviewBriefing({ checkpoint, codexResult, derived, reviewedHead: responseObj.reviewed_head });
     // Redact any known secret VALUE from the briefing before it can reach Telegram
     // (defence in depth -- same discipline as the ClickUp reply body above).
-    const notifyBody = config?.redact ? config.redact(briefing) : briefing;
-    // FENCE before the notification: a superseded run must not send a late (contradictory)
-    // milestone. Telegram is best-effort, but an abandoned run must stay silent.
-    if (!stillActive('notify')) return { checkpointId: cpId, superseded: true, posted: true, commentId: posted.id, response: responseObj, chainKey: ck };
-    progress.stage = 'notify';
-    await notifier.notifyMilestone({
-      purpose: milestonePurpose, logicalSource: 'CODEX',
-      body: notifyBody,
-      checkpointId: cpId,
-    });
+    const codexNotifyBody = config?.redact ? config.redact(codexBriefing) : codexBriefing;
+
+    // TWO-MODE ROUTING. Codex is the CORRECTION-LOOP reviewer (above). A Codex APPROVE is
+    // NOT merge-ready on its own: when a Fable adapter is wired, the SAME head auto-routes
+    // into a FABLE COLD-FINAL (adversarial, whole-change) pass, and only Codex APPROVE +
+    // Fable APPROVE yields a merge-ready signal. Absent a Fable adapter, behaviour is the
+    // unchanged codex-only path.
+    const routeToFable = Boolean(fable) && derived.verdict === 'APPROVE';
+
+    if (!routeToFable) {
+      // ---- CODEX-ONLY OUTCOME (unchanged): non-APPROVE, or no Fable adapter wired ----
+      // FENCE before mutating durable state: the watchdog may have fired DURING the post.
+      if (!stillActive('record_state')) return { checkpointId: cpId, superseded: true, posted: true, commentId: posted.id };
+      // (i) durable state: mark answered + advance the per-chain round counter.
+      progress.stage = 'record_state';
+      state.recordAnswered(cpId, { reviewedHead: responseObj.reviewed_head, verdict: derived.verdict, promptFingerprint, commentId: posted.id, now: now() });
+      if (derived.verdict === 'CORRECTIONS_REQUIRED') state.incrementRound(ck);
+
+      // FENCE before the notification: a superseded run must not send a late milestone.
+      if (!stillActive('notify')) return { checkpointId: cpId, superseded: true, posted: true, commentId: posted.id, response: responseObj, chainKey: ck };
+      progress.stage = 'notify';
+      await notifier.notifyMilestone({ purpose: codexMilestonePurpose, logicalSource: 'CODEX', body: codexNotifyBody, checkpointId: cpId });
+
+      progress.stage = 'done';
+      return { checkpointId: cpId, verdict: derived.verdict, posted: true, commentId: posted.id, response: responseObj, signed, chainKey: ck };
+    }
+
+    // ---- ROUTE TO FABLE COLD-FINAL (Codex APPROVE + Fable adapter wired) ----
+    // First, the Codex approve milestone (attributed to CODEX, correction-loop stage). The
+    // checkpoint is NOT marked answered yet: the FINAL outcome is Fable's cold-final verdict.
+    if (!stillActive('notify_codex')) return { checkpointId: cpId, superseded: true, posted: true, commentId: posted.id, response: responseObj, chainKey: ck };
+    progress.stage = 'notify_codex';
+    await notifier.notifyMilestone({ purpose: codexMilestonePurpose, logicalSource: 'CODEX', body: codexNotifyBody, checkpointId: cpId });
+
+    // The Fable turn runs INSIDE this cycle, so ALL WP1 protections wrap it: the outer
+    // per-cycle watchdog reaps a stuck Fable turn (recoverable failure posted), the fence
+    // suppresses a late-resolving abandoned run, and the read-deadlines bound the reads.
+    if (!stillActive('fable_turn')) return { checkpointId: cpId, superseded: true, posted: true, commentId: posted.id, response: responseObj, chainKey: ck };
+    progress.stage = 'fable_turn';
+    const fableTurn = await fable.runTurn({ checkpoint, packet, skillText: skill.text, promptFingerprint });
+    const fableResult = fableTurn.structuredResult ?? null;
+    const fableSigned = { envelope: fableTurn.envelope, signature: fableTurn.signature };
+    // Derive Fable's verdict on ITS OWN findings (roundsSpent:0 -- the correction-round
+    // budget is a Codex-loop concept, not a cold-final concept).
+    const fableDerived = deriveVerdict({ codexResult: fableResult, roundsSpent: 0, maxRounds });
+    const mergeReady = computeMergeReady({ codexVerdict: derived.verdict, fableVerdict: fableDerived.verdict });
+
+    // Post the [FABLE -> LARRY] cold-final reply (distinct principal, merge_ready gate).
+    const fableResponseObj = {
+      checkpoint_id: cpId,
+      reviewed_head: responseObj.reviewed_head,
+      prompt_fingerprint: promptFingerprint ?? '(skill-unavailable)',
+      verdict: fableDerived.verdict,
+      merge_ready: mergeReady,
+      summary: fableResult?.summary ?? (fableDerived.verdict === 'BLOCKED' ? 'Cold-final review blocked at a fail-closed gate -- see material_findings.' : 'Cold-final adversarial review.'),
+      material_findings: fableDerived.material_findings,
+      next_action: mergeReady
+        ? 'MERGE-READY: Codex (correction-loop) and Fable (cold-final) both APPROVE this exact head. Larry may proceed under the human merge gate.'
+        : fableDerived.next_action,
+    };
+    const fableBody = config?.redact ? config.redact(formatFableResponse(fableResponseObj)) : formatFableResponse(fableResponseObj);
+    if (!stillActive('post_fable_reply')) return { checkpointId: cpId, superseded: true, posted: true, commentId: posted.id, response: responseObj, chainKey: ck };
+    progress.stage = 'post_fable_reply';
+    let fablePosted = null;
+    try {
+      fablePosted = await clickup.createTaskComment(taskId, fableBody);
+    } catch (err) {
+      log(`processCheckpoint: fable post failed for ${cpId}: ${config?.redact ? config.redact(err?.message ?? String(err)) : (err?.message ?? String(err))}`);
+      return { checkpointId: cpId, verdict: derived.verdict, fableVerdict: fableDerived.verdict, mergeReady, reviewStage: 'cold_final', posted: true, commentId: posted.id, fablePosted: false, error: 'fable-post-failed', response: responseObj, fableResponse: fableResponseObj };
+    }
+
+    // FENCE before durable state: record the FINAL (cold-final) outcome, not the codex one.
+    if (!stillActive('record_state')) return { checkpointId: cpId, superseded: true, posted: true, commentId: posted.id, fableCommentId: fablePosted.id };
+    progress.stage = 'record_state';
+    state.recordAnswered(cpId, { reviewedHead: responseObj.reviewed_head, verdict: fableDerived.verdict, promptFingerprint, commentId: fablePosted.id, now: now(), mergeReady });
+    // A Fable CORRECTIONS outcome sends Larry back to fix + re-hand off (Codex then Fable),
+    // so it advances the SAME per-chain round budget that bounds the loop.
+    if (fableDerived.verdict === 'CORRECTIONS_REQUIRED') state.incrementRound(ck);
+
+    // Fable milestone -- a DISTINCT extra ('cold_final') so it does not dedup against the
+    // CODEX ding for the same checkpoint; attributed to FABLE (the notifier owns [FABLE]).
+    const fableMilestonePurpose = fableDerived.verdict === 'BLOCKED' ? 'blocked'
+      : fableDerived.verdict === 'DECISION_REQUIRED' ? 'escalation'
+      : 'review_posted';
+    const fableBriefing = composeReviewBriefing({ checkpoint, codexResult: fableResult, derived: fableDerived, reviewedHead: responseObj.reviewed_head });
+    const fableNotifyBody = config?.redact ? config.redact(fableBriefing) : fableBriefing;
+    if (!stillActive('notify_fable')) return { checkpointId: cpId, superseded: true, posted: true, commentId: posted.id, fableCommentId: fablePosted.id, response: responseObj, fableResponse: fableResponseObj, chainKey: ck };
+    progress.stage = 'notify_fable';
+    await notifier.notifyMilestone({ purpose: fableMilestonePurpose, logicalSource: 'FABLE', body: fableNotifyBody, checkpointId: cpId, extra: 'cold_final' });
 
     progress.stage = 'done';
-    return { checkpointId: cpId, verdict: derived.verdict, posted: true, commentId: posted.id, response: responseObj, signed, chainKey: ck };
+    return { checkpointId: cpId, verdict: derived.verdict, fableVerdict: fableDerived.verdict, mergeReady, reviewStage: 'cold_final', posted: true, commentId: posted.id, fableCommentId: fablePosted.id, response: responseObj, fableResponse: fableResponseObj, signed, fableSigned, chainKey: ck };
   }
 
   /**

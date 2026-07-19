@@ -12,10 +12,15 @@
 
 export const CHECKPOINT_MARKER = '[LARRY → TOWER]';
 export const RESPONSE_MARKER = '[TOWER → LARRY]';
+// The SECOND reviewer's reply block. Codex (correction-loop) speaks as [TOWER → LARRY];
+// Fable (cold-final, adversarial) speaks as [FABLE → LARRY] so its verdict is attributed
+// to its OWN principal on the thread and can never be confused with the Codex reply.
+export const FABLE_RESPONSE_MARKER = '[FABLE → LARRY]';
 
 // ASCII fallbacks tolerated on parse (some clients mangle the arrow glyph).
 const CHECKPOINT_MARKER_RE = /\[LARRY\s*(?:→|->|=>)\s*TOWER\]/i;
 const RESPONSE_MARKER_RE = /\[TOWER\s*(?:→|->|=>)\s*LARRY\]/i;
+const FABLE_RESPONSE_MARKER_RE = /\[FABLE\s*(?:→|->|=>)\s*LARRY\]/i;
 
 export const CHECKPOINT_STATE = 'READY_FOR_TOWER_REVIEW';
 export const VERDICTS = Object.freeze(['APPROVE', 'CORRECTIONS_REQUIRED', 'DECISION_REQUIRED', 'BLOCKED']);
@@ -32,6 +37,11 @@ const CHECKPOINT_LISTS = ['evidence_refs', 'questions_or_blockers'];
 
 const RESPONSE_SCALARS = ['checkpoint_id', 'reviewed_head', 'prompt_fingerprint', 'verdict', 'summary', 'next_action'];
 const RESPONSE_LISTS = ['material_findings'];
+
+// The Fable reply carries the SAME core fields plus the cold-final DISTINCTION:
+// review_stage (correction_loop|cold_final), reviewer (the signing principal), and the
+// merge_ready gate result (yes ONLY when Codex AND Fable both APPROVE).
+const FABLE_RESPONSE_SCALARS = ['checkpoint_id', 'reviewed_head', 'prompt_fingerprint', 'review_stage', 'reviewer', 'verdict', 'merge_ready', 'summary', 'next_action'];
 
 // ── a tiny block parser (key: value, plus `- ` lists under a `key:` header) ──────
 
@@ -156,6 +166,46 @@ export function parseResponse(body) {
   if (!RESPONSE_MARKER_RE.test(text)) return { ok: false, response: null, errors: ['no [TOWER → LARRY] marker'] };
   const after = text.slice(text.search(RESPONSE_MARKER_RE) + text.match(RESPONSE_MARKER_RE)[0].length);
   const fields = parseBlock(after, RESPONSE_SCALARS, RESPONSE_LISTS);
+  fields.material_findings = fields.material_findings ?? [];
+  const errors = [];
+  if (!fields.checkpoint_id) errors.push('missing checkpoint_id');
+  if (!VERDICTS.includes(fields.verdict)) errors.push(`verdict must be one of ${VERDICTS.join('|')}`);
+  return { ok: errors.length === 0, response: fields, errors };
+}
+
+// -- Fable's cold-final reply -------------------------------------------------
+
+/**
+ * Render a `[FABLE -> LARRY]` cold-final reply. Same tight shape as the Tower reply,
+ * plus the DISTINCTION fields: review_stage: cold_final, reviewer: claude_fable, and
+ * merge_ready (yes ONLY when BOTH the Codex correction-loop AND this Fable cold-final
+ * pass APPROVE). A Codex APPROVE that has NOT yet passed Fable is never merge_ready.
+ */
+export function formatFableResponse(r = {}) {
+  const lines = [FABLE_RESPONSE_MARKER];
+  lines.push(`checkpoint_id: ${r.checkpoint_id ?? ''}`);
+  lines.push(`reviewed_head: ${r.reviewed_head ?? ''}`);
+  lines.push(`prompt_fingerprint: ${r.prompt_fingerprint ?? ''}`);
+  lines.push('review_stage: cold_final');
+  lines.push('reviewer: claude_fable');
+  lines.push(`verdict: ${r.verdict ?? ''}`);
+  lines.push(`merge_ready: ${r.merge_ready ? 'yes' : 'no'}`);
+  if (r.summary) lines.push(`summary: ${String(r.summary).slice(0, 600)}`);
+  const findings = Array.isArray(r.material_findings) ? r.material_findings : [];
+  if (findings.length) {
+    lines.push('material_findings:');
+    for (const f of findings) lines.push(`  - ${String(f).slice(0, 240)}`);
+  }
+  if (r.next_action) lines.push(`next_action: ${String(r.next_action).slice(0, 400)}`);
+  return lines.join('\n');
+}
+
+/** Parse a `[FABLE -> LARRY]` reply out of a comment body. Returns { ok, response, errors[] }. */
+export function parseFableResponse(body) {
+  const text = String(body ?? '');
+  if (!FABLE_RESPONSE_MARKER_RE.test(text)) return { ok: false, response: null, errors: ['no [FABLE → LARRY] marker'] };
+  const after = text.slice(text.search(FABLE_RESPONSE_MARKER_RE) + text.match(FABLE_RESPONSE_MARKER_RE)[0].length);
+  const fields = parseBlock(after, FABLE_RESPONSE_SCALARS, RESPONSE_LISTS);
   fields.material_findings = fields.material_findings ?? [];
   const errors = [];
   if (!fields.checkpoint_id) errors.push('missing checkpoint_id');
