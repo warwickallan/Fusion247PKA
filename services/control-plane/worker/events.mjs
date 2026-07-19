@@ -103,6 +103,19 @@ export function assertEventKindAllowed(eventKind) {
       `dotted identifiers, and ':' is reserved for delivery-key namespacing (it could steer a ` +
       `per-attempt key into a reserved lifecycle slot). Use a '.'-separated kind instead.`);
   }
+  // (WP-B final fix 4) RESERVE the whole 'job.' event_kind namespace to the runtime. The
+  // delivery_key is already 'job:'/'effect:'-namespaced and guarded, so a caller cannot forge a
+  // lifecycle DELIVERY key — but the event_kind FIELD is what consumers filter on, and a handler
+  // emitting a 'job.succeeded' (or job.failed / job.claimed / job.dead_lettered /
+  // job.lease_reclaimed / job.invalid_result / job.enqueued / job.attempt_failed / job.no_handler /
+  // any other runtime kind) could forge lifecycle EVIDENCE for those consumers. Reject the entire
+  // 'job.' prefix (the runtime emits lifecycle kinds via appendEvent directly, never through emit).
+  if (eventKind === 'job' || eventKind.startsWith('job.')) {
+    throw new Error(
+      `emit: eventKind '${eventKind.slice(0, 32)}' is reserved — the 'job.' namespace belongs to ` +
+      `the runtime for lifecycle events (job.succeeded, job.failed, job.claimed, job.dead_lettered, ` +
+      `job.lease_reclaimed, …). A handler must emit under its own namespace (e.g. 'work.done').`);
+  }
   return eventKind;
 }
 

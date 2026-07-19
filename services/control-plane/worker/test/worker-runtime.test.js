@@ -34,6 +34,16 @@
 //       the invalid_result / handler_error path, never an unhandled escape or silent success.
 //   19. default per-attempt key hardening: eventKind 'terminal:failed' cannot shadow the runtime
 //       terminal, and two same-kind emits in one attempt both land (distinct keys).
+// WP-B FINAL round (four bounded perimeter fixes):
+//   20. sanitizeError is TOTAL/non-throwing for hostile inputs (throwing getter, null-proto,
+//       cycle, ~1MB string, Symbol, bigint, Proxy, primitives); a poison throw fails closed to
+//       reclaim/dead_letter and the poll loop never crash-loops.
+//   21. system error codes are strictly allow-listed / pg-origin — a smuggled Exxx token, a 5-char
+//       uppercase secret and a huge integer are dropped everywhere; a genuine pg SQLSTATE classifies.
+//   22. invalid_result fails closed WITHOUT persisting the caller-returned status string — only a
+//       controlled { gotType (+ gotLength) } shape reaches the ledger + logs.
+//   23. the 'job.' event_kind namespace is reserved to the runtime — a handler emitting a lifecycle
+//       kind (job.succeeded, …) is rejected, so it cannot forge lifecycle evidence.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -765,5 +775,207 @@ gated('19. default eventKind key hardening — no reserved-slot shadow; repeated
     assert.equal(new Set(progress.map((e) => e.delivery_key)).size, 2, 'the two emits have DISTINCT per-attempt keys');
     const steps = new Set(progress.map((e) => e.payload.step));
     assert.ok(steps.has('a') && steps.has('b'), 'both distinct progress payloads survived');
+  } finally { await pool.end(); }
+});
+
+// ===========================================================================
+// WP-B FINAL round — four bounded perimeter fixes.
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// Fix 1 (final) — sanitizeError is TOTAL and NON-THROWING against hostile inputs, and a
+// handler throwing such a poison value does NOT kill the worker loop (fails closed to
+// reclaim/dead_letter instead of crash-looping the poll).
+gated('20. sanitizeError is total/non-throwing for hostile inputs; a poison throw fails closed', async () => {
+  // Unit: every hostile input returns the controlled 4-field shape and NEVER throws.
+  const cyclic = {}; cyclic.self = cyclic;
+  const throwingGetter = {};
+  Object.defineProperty(throwingGetter, 'message', { get() { throw new Error('nope'); }, enumerable: true });
+  Object.defineProperty(throwingGetter, 'code', { get() { throw new Error('nope'); }, enumerable: true });
+  Object.defineProperty(throwingGetter, 'constructor', { get() { throw new Error('nope'); }, enumerable: true });
+  const nullProto = Object.create(null); nullProto.message = 'plain';
+  const hostileToString = { toString() { throw new Error('no'); }, valueOf() { throw new Error('no'); } };
+  const hostileProxy = new Proxy({}, {
+    get() { throw new Error('trap'); },
+    getOwnPropertyDescriptor() { throw new Error('trap'); },
+  });
+  const hostiles = [
+    throwingGetter, nullProto, cyclic, 'x'.repeat(1_000_000), Symbol('s'), 10n ** 40n,
+    null, undefined, 42, true, hostileToString, hostileProxy,
+    { a: { b: { c: { d: { e: 'deeply nested' } } } } },
+  ];
+  for (const h of hostiles) {
+    let safe, threw = null;
+    try { safe = sanitizeError(h); } catch (e) { threw = e; }
+    assert.equal(threw, null, `sanitizeError must NOT throw for input of type ${typeof h}`);
+    assert.ok(safe && typeof safe === 'object', 'returns an object');
+    assert.equal(typeof safe.errorClass, 'string', 'errorClass is a string');
+    assert.ok(safe.errorCode === null || typeof safe.errorCode === 'string', 'errorCode is null or a string');
+    assert.equal(typeof safe.correlationId, 'string', 'correlationId is a string');
+    assert.equal(typeof safe.messageLength, 'number', 'messageLength is a number');
+    // No content leaks: the shape is exactly the four controlled keys.
+    assert.deepEqual(Object.keys(safe).sort(), ['correlationId', 'errorClass', 'errorCode', 'messageLength']);
+  }
+  // The throwing-getter object degrades to the static fallback shape (message unreadable).
+  const fromPoison = sanitizeError(throwingGetter);
+  assert.equal(fromPoison.errorClass, 'Error', 'unreadable class collapses to generic Error');
+  assert.equal(fromPoison.errorCode, null, 'unreadable code collapses to null');
+  assert.equal(fromPoison.messageLength, -1, 'unreadable message length is the -1 sentinel');
+
+  const pool = await freshPool();
+  try {
+    // A handler that throws a POISON value: a null-prototype object with a throwing message getter.
+    const poisonReg = new HandlerRegistry().register('q20', async () => {
+      const poison = Object.create(null);
+      Object.defineProperty(poison, 'message', { get() { throw new Error('boom'); }, enumerable: true });
+      Object.defineProperty(poison, 'code', { get() { throw new Error('boom'); }, enumerable: true });
+      throw poison;
+    });
+    await enqueue(pool, { jobType: 'q20', idempotencyKey: 'poison-1', maxAttempts: 1 });
+    const w = new Worker(pool, poisonReg, { workerId: 'w20', leaseSeconds: 60, logger: SILENT });
+    // processOnce must NOT throw — the poison is sanitised, the attempt fails closed.
+    let procThrew = null; let r = null;
+    try { r = await w.processOnce('q20'); } catch (e) { procThrew = e; }
+    assert.equal(procThrew, null, 'processOnce does not propagate the poison throw');
+    assert.equal(r.outcome, 'handler_error', 'the poison throw is a crash-equivalent');
+    const jr = await jobRow(pool, 'poison-1');
+    assert.notEqual(jr.status, 'succeeded', 'the poison job is NOT succeeded');
+    // Fails closed to dead_letter (budget was 1), reconstructable from the ledger.
+    await pool.query(`update ops.job set lease_deadline_at = now() - interval '1 second' where idempotency_key='poison-1'`);
+    const reclaimed = await new Reclaimer(pool, { logger: SILENT }).tick();
+    assert.ok(reclaimed.some((rr) => String(rr.id) === String(jr.id) && rr.status === 'dead_letter'),
+      'the poison job fails closed to dead_letter');
+
+    // The poll LOOP survives repeated poison throws (never crash-loops): a 2-attempt poison job
+    // is driven to dead_letter by the loop + reclaimer, and the loop stops cleanly afterwards.
+    const loopReg = new HandlerRegistry().register('q20b', async () => {
+      const poison = Object.create(null);
+      Object.defineProperty(poison, 'message', { get() { throw new Error('x'); }, enumerable: true });
+      throw poison;
+    });
+    await enqueue(pool, { jobType: 'q20b', idempotencyKey: 'poison-2', maxAttempts: 2 });
+    const reclaimer = new Reclaimer(pool, { intervalMs: 60, logger: SILENT });
+    const worker = new Worker(pool, loopReg, { workerId: 'w20b', leaseSeconds: 1, pollIntervalMs: 40, logger: SILENT });
+    reclaimer.start();
+    const loop = worker.runLoop(['q20b']);
+    const deadLettered = await waitFor(async () => (await jobRow(pool, 'poison-2')).status === 'dead_letter',
+      { timeoutMs: 12000, intervalMs: 100 });
+    worker.stop(); reclaimer.stop(); await loop;
+    assert.ok(deadLettered, 'the loop drove the poison job to dead_letter — it never crash-looped');
+    assert.equal(worker.running, false, 'the loop stopped cleanly (it never died on the poison)');
+  } finally { await pool.end(); }
+});
+
+// ---------------------------------------------------------------------------
+// Fix 2 (final) — system error codes are strictly allow-listed / pg-origin. A handler cannot
+// smuggle an arbitrary code; a genuine pg SQLSTATE still classifies.
+gated('21. error codes are allow-listed — no handler smuggling; a genuine pg SQLSTATE still classifies', async () => {
+  // Unit: hostile codes are dropped; a real Node errno constant is kept.
+  assert.equal(sanitizeError(Object.assign(new Error('x'), { code: 'EABC123SECRET' })).errorCode, null,
+    'an invented Exxx token is not an allow-listed errno -> dropped');
+  assert.equal(sanitizeError(Object.assign(new Error('x'), { code: 'ABCDE' })).errorCode, null,
+    'a 5-char uppercase secret (SQLSTATE-shaped) on a PLAIN Error is dropped (not a pg error)');
+  assert.equal(sanitizeError(Object.assign(new Error('x'), { code: 987654321 })).errorCode, null,
+    'a huge integer code is dropped');
+  assert.equal(sanitizeError(Object.assign(new Error('x'), { errno: 987654321 })).errorCode, null,
+    'a huge integer errno is dropped');
+  assert.equal(sanitizeError(Object.assign(new Error('x'), { code: 'ECONNREFUSED' })).errorCode, 'ECONNREFUSED',
+    'a known Node errno constant is a valid system code');
+
+  const pool = await freshPool();
+  const logs = [];
+  try {
+    // A GENUINE pg error (undefined_table 42P01) still classifies via its SQLSTATE.
+    let pgErr = null;
+    try { await pool.query('select * from ops.__nonexistent_table_xyz__'); } catch (e) { pgErr = e; }
+    assert.ok(pgErr, 'the bad query raised a pg error');
+    const safePg = sanitizeError(pgErr);
+    assert.equal(safePg.errorCode, pgErr.code, 'a genuine pg SQLSTATE is classified from the real error');
+    assert.match(safePg.errorCode, /^[0-9A-Z]{5}$/, 'and it is a 5-char SQLSTATE');
+
+    // Integration: a handler throwing an error with smuggled codes -> nothing persisted verbatim.
+    const SMUGGLED = 'EABC123SECRET';
+    const HUGE = '987654321';
+    const reg = new HandlerRegistry().register('q21', async () => {
+      const err = new Error('handler blew up');
+      err.code = SMUGGLED;     // invented Exxx token
+      err.errno = 987654321;   // huge integer
+      throw err;
+    });
+    const { job } = await enqueue(pool, { jobType: 'q21', idempotencyKey: 'smug-1', maxAttempts: 1 });
+    const w = new Worker(pool, reg, { workerId: 'w21', leaseSeconds: 60, logger: recordingLogger(logs) });
+    assert.equal((await w.processOnce('q21')).outcome, 'handler_error');
+
+    const evs = await eventsForJob(pool, job.id);
+    const failed = evs.filter((e) => e.event_kind === 'job.attempt_failed');
+    assert.equal(failed.length, 1, 'the failed attempt is on the ledger');
+    assert.equal(failed[0].payload.errorCode, null, 'the smuggled code was dropped from the ledger');
+    const ledgerText = JSON.stringify(evs);
+    assert.ok(!ledgerText.includes(SMUGGLED), 'the smuggled Exxx token appears NOWHERE in the ledger');
+    assert.ok(!ledgerText.includes(HUGE), 'the huge integer errno appears NOWHERE in the ledger');
+    const logText = JSON.stringify(logs);
+    assert.ok(!logText.includes(SMUGGLED), 'nor in the structured logs');
+    assert.ok(!logText.includes(HUGE), 'nor the huge integer in the structured logs');
+  } finally { await pool.end(); }
+});
+
+// ---------------------------------------------------------------------------
+// Fix 3 (final) — invalid_result fails closed WITHOUT persisting the caller-returned status
+// string. Only a controlled { gotType (+ gotLength) } shape is recorded, never the content.
+gated('22. invalid_result records only a controlled shape — the caller status string is never persisted', async () => {
+  const SECRET_STATUS = 'SECRETstatus_ABC123_do_not_persist_me';
+  const pool = await freshPool();
+  const logs = [];
+  try {
+    const reg = new HandlerRegistry().register('q22', async () => ({ status: SECRET_STATUS }));
+    const { job } = await enqueue(pool, { jobType: 'q22', idempotencyKey: 'inv-1', maxAttempts: 1 });
+    const w = new Worker(pool, reg, { workerId: 'w22', leaseSeconds: 60, logger: recordingLogger(logs) });
+
+    const r = await w.processOnce('q22');
+    assert.equal(r.outcome, 'invalid_result', 'an unknown status string is NOT success');
+    assert.notEqual((await jobRow(pool, 'inv-1')).status, 'succeeded', 'the job is not succeeded');
+
+    const evs = await eventsForJob(pool, job.id);
+    const inv = evs.filter((e) => e.event_kind === 'job.invalid_result');
+    assert.equal(inv.length, 1, 'invalid_result recorded on the ledger');
+    assert.equal(inv[0].payload.gotType, 'string', 'only the TYPE of the bad status is recorded');
+    assert.equal(inv[0].payload.gotLength, SECRET_STATUS.length, 'a length integer is allowed (a signal, not the bytes)');
+    assert.equal(inv[0].payload.got, undefined, 'the old content-bearing `got` field is gone');
+    const ledgerText = JSON.stringify(evs);
+    assert.ok(!ledgerText.includes(SECRET_STATUS), 'the caller status string appears NOWHERE in the ledger');
+    assert.ok(!JSON.stringify(logs).includes(SECRET_STATUS), 'nor in the structured logs');
+  } finally { await pool.end(); }
+});
+
+// ---------------------------------------------------------------------------
+// Fix 4 (final) — the 'job.' event_kind namespace is reserved to the runtime. A handler emitting
+// a lifecycle kind (job.succeeded, …) is rejected, so it cannot forge lifecycle evidence for
+// consumers filtering on event_kind — even though the delivery_key is already 'evt:'-namespaced.
+gated('23. the job.* event namespace is reserved — a handler cannot forge lifecycle kinds', async () => {
+  // Unit: every job.* kind is rejected; a normal kind is allowed.
+  for (const forged of ['job.succeeded', 'job.failed', 'job.claimed', 'job.dead_lettered',
+      'job.lease_reclaimed', 'job.invalid_result', 'job.enqueued', 'job.attempt_failed',
+      'job.no_handler', 'job.anything', 'job']) {
+    assert.throws(() => assertEventKindAllowed(forged), /reserved/,
+      `a handler eventKind '${forged}' is rejected`);
+  }
+  assert.equal(assertEventKindAllowed('work.done'), 'work.done', 'a normal handler kind is still allowed');
+
+  const pool = await freshPool();
+  try {
+    const reg = new HandlerRegistry().register('q23', async (ctx) => {
+      ctx.emit('job.succeeded', { payload: { jobId: String(ctx.job.id), forged: true } }); // must THROW
+      return { status: 'succeeded' };
+    });
+    const { job } = await enqueue(pool, { jobType: 'q23', idempotencyKey: 'forge-1', maxAttempts: 1 });
+    const w = new Worker(pool, reg, { workerId: 'w23', leaseSeconds: 60, logger: SILENT });
+    const r = await w.processOnce('q23');
+    assert.equal(r.outcome, 'handler_error', 'the forged job.* emit throws -> crash-equivalent, not success');
+
+    const evs = await eventsForJob(pool, job.id);
+    assert.equal(evs.filter((e) => e.payload && e.payload.forged === true).length, 0,
+      'no forged lifecycle event carrying the handler payload landed on the ledger');
+    assert.equal(evs.filter((e) => e.event_kind === 'job.succeeded').length, 0, 'no forged job.succeeded terminal');
+    assert.notEqual((await jobRow(pool, 'forge-1')).status, 'succeeded', 'the job did not complete on a rejected emit');
   } finally { await pool.end(); }
 });

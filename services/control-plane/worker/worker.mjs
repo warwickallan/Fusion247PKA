@@ -158,13 +158,17 @@ export class Worker {
     // crash-equivalent failure/retry path exactly like a throw, so ambiguous work is never lost.
     if (rs !== 'succeeded' && rs !== 'failed') {
       const safe = sanitizeError(new Error('handler returned no valid { status }'));
-      const got = typeof rs === 'string' ? rs.slice(0, 40) : (rs === undefined ? 'undefined' : typeof rs);
-      log.warn('handler_invalid_result', { got, correlationId: safe.correlationId });
+      // (WP-B final fix 3) Fail closed WITHOUT persisting the caller-controlled status. Record
+      // only a controlled shape — the TYPE (and, for a string, its LENGTH as an integer signal) —
+      // never the returned CONTENT, which could carry secret bytes into the ledger / logs.
+      const gotType = typeof rs;
+      const gotLength = gotType === 'string' ? rs.length : undefined;
+      log.warn('handler_invalid_result', { gotType, gotLength, correlationId: safe.correlationId });
       await appendEvent(this.pool, {
         deliveryKey: `job:${jobId}:attempt:${attempt}:invalid_result`,
         eventKind: 'job.invalid_result',
         actor: 'tower',
-        payload: { jobId, attempt, got, correlationId: safe.correlationId },
+        payload: { jobId, attempt, gotType, gotLength, correlationId: safe.correlationId },
       });
       return { job, outcome: 'invalid_result' };
     }
