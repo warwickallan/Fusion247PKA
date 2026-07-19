@@ -12,9 +12,11 @@
 //      => a redelivery is ingested at most once). The payload stored is POINTERS + a hash of the
 //      raw body only — never the whole GitHub payload (audit-integrity without hoarding content).
 //   4. For a CHECKPOINT-BEARING event: upsert the build + checkpoint (head canonicalised to a
-//      full lower-case SHA at the boundary) and ENQUEUE a `review` job on the WP-B queue (reuse
-//      enqueue(); do NOT build another queue). The review-job idempotency key is derived from
-//      (checkpointId, headSha) so a redelivery never enqueues a duplicate review.
+//      full lower-case SHA at the boundary), ADVANCE the authoritative current head for the build
+//      (WP-D0: ops.advance_build_head — monotonic, and it supersedes any live merge_gate bound to
+//      a DIFFERENT head, closing the stale window at the edge), and ENQUEUE a `review` job on the
+//      WP-B queue (reuse enqueue(); do NOT build another queue). The review-job idempotency key is
+//      derived from (checkpointId, headSha) so a redelivery never enqueues a duplicate review.
 //
 // Every step is INDEPENDENTLY IDEMPOTENT and CONVERGENT, so re-processing a redelivery — even
 // after a crash that left a prior attempt partial — heals to the same state (default-safe for a
@@ -135,6 +137,18 @@ async function upsertCheckpoint(client, { buildId, checkpointRef, headSha, branc
 }
 
 /**
+ * WP-D0: ADVANCE the authoritative current head for this build to (checkpointId, headSha), IN THE
+ * SAME transaction as the checkpoint upsert. ops.advance_build_head is MONOTONIC (a redelivery of
+ * an old head can never move the head backward) and, on an actual advance, supersedes any live
+ * merge_gate bound to a different head — closing the stale window at the edge. Idempotent/convergent:
+ * a redelivery is a no-op for the head authority. Runs on the pinned client (same txn).
+ */
+async function advanceBuildHead(client, { buildId, checkpointId, headSha }) {
+  await client.query(
+    `select ops.advance_build_head($1, $2, $3)`, [buildId, checkpointId, headSha]);
+}
+
+/**
  * ingestWebhook(pool, { headers, rawBody, secret }, { enqueue?, log? }) -> a result envelope.
  *
  * Result shapes:
@@ -194,6 +208,9 @@ export async function ingestWebhook(pool, { headers = {}, rawBody, secret } = {}
       buildId, checkpointRef: checkpoint.checkpointRef, headSha: checkpoint.headSha,
       branch: checkpoint.branch, briefRef: checkpoint.briefRef,
     });
+    // WP-D0: advance the authoritative current head + supersede any stale live gate, atomically
+    // with the checkpoint upsert (monotonic, redelivery-safe — see ops.advance_build_head).
+    await advanceBuildHead(client, { buildId, checkpointId, headSha: checkpoint.headSha });
     eventDeduped = !(await appendEvent(client, {
       buildId,
       deliveryKey: deliveryId,

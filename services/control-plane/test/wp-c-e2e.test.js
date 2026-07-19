@@ -41,7 +41,10 @@ import { Worker } from '../worker/worker.mjs';
 import { createLogger } from '../worker/util.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const MIGRATION = path.join(__dirname, '..', 'db', 'migrations', '001_control_plane_min_schema.sql');
+const MIGRATIONS_DIR = path.join(__dirname, '..', 'db', 'migrations');
+// WP-D0: ingress now advances ops.build_head, so the WP-C proofs run against 001 + 002.
+const MIGRATIONS = ['001_control_plane_min_schema.sql', '002_current_head_authority.sql']
+  .map((f) => path.join(MIGRATIONS_DIR, f));
 const DB = process.env.DATABASE_URL;
 const SILENT = createLogger({ level: 'silent' });
 
@@ -68,7 +71,7 @@ const gated = (name, fn) => test(name, { skip: skipReason }, fn);
 async function freshPool() {
   const pool = new Pool({ connectionString: DB, max: 12 });
   await pool.query('drop schema if exists ops cascade');
-  await pool.query(fs.readFileSync(MIGRATION, 'utf8'));
+  for (const m of MIGRATIONS) await pool.query(fs.readFileSync(m, 'utf8'));
   return pool;
 }
 

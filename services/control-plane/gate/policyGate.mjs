@@ -22,6 +22,8 @@
 // OUTCOME-C: the system cannot report merge-readiness ('mergeable') for a DIFFERENT or
 // SUPERSEDED head — proven by the e2e tests.
 
+import { canonicalizeShaOrNull } from '../review/reviewHandler.mjs';
+
 /** Canonical GitHub reviewDecision values (or null = not observed / none required). */
 const GH_REVIEW_DECISIONS = new Set(['APPROVED', 'CHANGES_REQUESTED', 'REVIEW_REQUIRED']);
 const GH_MECH_STATES = new Set(['unknown', 'clean', 'blocked', 'behind', 'dirty', 'draft', 'unstable']);
@@ -52,18 +54,62 @@ function normaliseGithub(github) {
 /**
  * evaluatePolicyGate(pool, { buildId, checkpointId, headSha, github?, policyReason? })
  *   -> { gateId, overallActionState, fusionDecision, bothApproved, superseded, action }
+ *   -> { gateId: null, action: 'refused_non_current_head', refused: true, reason, ... }  (WP-D0)
  *
- * Idempotent + serialisation-safe (the DB triggers take the advisory lock on approve/supersede).
+ * WP-D0 FAIL-CLOSED HEAD AUTHORITY: the gate is created/kept-live ONLY for the AUTHORITATIVE
+ * current head of the build (ops.build_head), bound to the full identity tuple
+ * (build_id, checkpoint_id, canonical head). A call for any OTHER head — e.g. an out-of-order /
+ * reclaimed review-job completion for a stale head after a newer head is live — is REFUSED and
+ * touches nothing (it can never revive/supersede the current gate). Check `.refused` on the result.
+ *
+ * Idempotent + serialisation-safe. Takes the build-scoped advisory lock (ops.build_head_lock_key)
+ * FIRST so it serialises with ops.advance_build_head; the DB triggers additionally take the
+ * (build, checkpoint, head) advisory lock on approve/supersede.
  * `github` is an OPTIONAL cached mechanical observation { mechState, headSha, reviewDecision,
  * observedAt } — supply it ONLY from a real GitHub read; omit it to leave the projection untouched.
  */
 export async function evaluatePolicyGate(pool, { buildId, checkpointId, headSha, github = null, policyReason = null } = {}) {
   if (!buildId || !checkpointId || !headSha) throw new Error('evaluatePolicyGate: buildId, checkpointId, headSha are required');
+  // Canonicalise the requested head at the boundary; a malformed head is a programming error.
+  const canonHead = canonicalizeShaOrNull(headSha);
+  if (!canonHead) throw new Error('evaluatePolicyGate: headSha is not a canonical 40-hex SHA');
   const gh = normaliseGithub(github);
 
   const client = await pool.connect();
   try {
     await client.query('begin');
+
+    // WP-D0 LOCK ORDER: take the build-scoped advisory lock FIRST — before the live-gate row lock —
+    // so this path and ops.advance_build_head (which takes the IDENTICAL key first) fully serialise
+    // per build. No AB-BA cycle between the build_head row and the merge_gate row is possible.
+    await client.query('select pg_advisory_xact_lock(ops.build_head_lock_key($1))', [buildId]);
+
+    // WP-D0 FAIL-CLOSED HEAD AUTHORITY: refuse to create OR keep-live a gate for any head that is
+    // NOT the authoritative current head for this build, bound to the FULL identity tuple
+    // (build_id, checkpoint_id, canonical head). This structurally kills the REVIVE-OLD-HEAD path
+    // regardless of caller: an out-of-order review-job completion for a stale head is refused here
+    // and NEVER supersedes the current gate (we return before touching ops.merge_gate).
+    const auth = await client.query(
+      `select current_checkpoint_id, current_head_sha from ops.build_head where build_id = $1`, [buildId]);
+    const a = auth.rows[0] ?? null;
+    const isCurrent = a != null && a.current_head_sha === canonHead && a.current_checkpoint_id === checkpointId;
+    if (!isCurrent) {
+      await client.query('rollback');
+      return {
+        gateId: null,
+        overallActionState: null,
+        fusionDecision: null,
+        bothApproved: false,
+        superseded: false,
+        action: 'refused_non_current_head',
+        refused: true,
+        reason: a == null
+          ? 'no authoritative current head recorded for this build'
+          : 'requested head is not the authoritative current head for this build',
+        authoritativeHead: a?.current_head_sha ?? null,
+        authoritativeCheckpointId: a?.current_checkpoint_id ?? null,
+      };
+    }
 
     // Lock the current live gate for this build (at most one by the partial unique index).
     const live = await client.query(
@@ -85,7 +131,7 @@ export async function evaluatePolicyGate(pool, { buildId, checkpointId, headSha,
     // MOVED HEAD: a live gate bound to a different head must be superseded before we record this
     // head — the prior decision can never be carried to a new head.
     let action = 'noop';
-    if (liveGate && liveGate.expected_head_sha !== headSha) {
+    if (liveGate && liveGate.expected_head_sha !== canonHead) {
       await client.query(
         `update ops.merge_gate
             set fusion_policy_decision = 'superseded', superseded_at = now(),

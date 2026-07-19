@@ -91,3 +91,12 @@ jobs:
         # Fusion policy gate reaching 'mergeable' ONLY with both head-bound approvals at the
         # CURRENT head (Outcome-C: a moved/superseded head can never report mergeable).
         run: npm run test:wpc
+
+      - name: WP-D0 — authoritative current-head hardening against real Postgres
+        # run-wpd0-tests.mjs. Same service container + 0-executed-subtest guard. Applies
+        # migrations 001 + 002 and proves the two coupled head-binding gaps are structurally
+        # closed: a moved-head ingress supersedes the stale live gate at the edge (no stale
+        # 'mergeable'); an out-of-order evaluatePolicyGate for a non-current head is refused
+        # fail-closed (no revive-old-head), including a genuine multi-connection race (no
+        # deadlock); and redelivery stays convergent (monotonic head, single build_head row).
+        run: npm run test:wpd0

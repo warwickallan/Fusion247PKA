@@ -3,7 +3,10 @@
 **Migration:** `migrations/001_control_plane_min_schema.sql`
 **Target schema:** `ops` (control-plane **DEV** namespace)
 **Status:** DESIGN ARTIFACT — **not applied to any live/prod DB by this WP.** A live apply is Larry-gated and must target an isolated dev database. Never touches the `asdair` schema or any personal/entrusted data.
-**Round:** R5 round-5 amend (round-2 → round-5 reviewer findings all folded into the single `001` migration — it has never been applied to any live DB, so there is no `002` patch; the full change log lives in the SQL header as `F1…F15` + `R3-trim` + `G1…G12`/`G-CI` + `R4-1…R4-3`/`R4-C4` + `R5-1…R5-3`). Round-5 changes:
+**Round:** R5 round-5 amend (round-2 → round-5 reviewer findings all folded into the single `001` migration — it has never been applied to any live DB, so those findings needed no `002` patch; the full change log lives in the SQL header as `F1…F15` + `R3-trim` + `G1…G12`/`G-CI` + `R4-1…R4-3`/`R4-C4` + `R5-1…R5-3`). Round-5 changes:
+
+> **WP-D0 addendum (additive `migrations/002_current_head_authority.sql`).** `001` is immutable and unchanged. `002` adds the authoritative current head per build (`ops.build_head`, `ops.advance_build_head`, `ops.build_head_lock_key`) that closes the WP-C stale-window + revive-old-head gaps at the boundary. See `../WP-D0-README.md` for the head-authority model, lock order, and tests.
+
 - **R5-1 (Codex MAJOR / Fable LOW)** — `merge_gate_guard_mutation` is now **DEFAULT-DENY**: every column is frozen unless on an explicit allow-list (always-mutable = `github_*_cached` / `github_observed_at` / `policy_reason` / `updated_at`; supersede-only = `fusion_policy_decision` / `superseded_at`). This closes `id`, `created_at`, and **any future column** in one stroke and aligns `merge_gate` with the checkpoint/verdict guards (which already freeze `created_at`).
 - **R5-2 (Fable LOW)** — the search_path catalog fence (test 19) now covers `language sql` as well as `plpgsql`.
 - **R5-3 (Codex + Fable LOW)** — this header refreshed to round-5 to match the body.
