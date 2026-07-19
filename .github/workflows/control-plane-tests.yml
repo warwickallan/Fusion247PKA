@@ -82,3 +82,12 @@ jobs:
         # exactly-one claim, crash->reclaim->exactly-once effect, dedup, dead-letter,
         # lifecycle reconstruction, and polling-only correctness (NOTIFY disabled).
         run: npm run test:worker
+
+      - name: WP-C — GitHub ingress + review handler + Fusion policy gate against real Postgres
+        # run-wpc-tests.mjs. Same service container + 0-executed-subtest guard. Proves HMAC
+        # fail-closed ingress + delivery-id idempotency, the baton review handler writing
+        # head-bound role-correct verdicts (adapters faked in CI — the point is the
+        # baton->adapter->verdict wiring + head-binding + fail-closed, not live CLIs), and the
+        # Fusion policy gate reaching 'mergeable' ONLY with both head-bound approvals at the
+        # CURRENT head (Outcome-C: a moved/superseded head can never report mergeable).
+        run: npm run test:wpc

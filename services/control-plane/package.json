@@ -7,7 +7,8 @@
   "scripts": {
     "test:db": "node db/test/run-db-tests.mjs",
     "test:worker": "node worker/test/run-worker-tests.mjs",
-    "test": "node db/test/run-db-tests.mjs && node worker/test/run-worker-tests.mjs"
+    "test:wpc": "node test/run-wpc-tests.mjs",
+    "test": "node db/test/run-db-tests.mjs && node worker/test/run-worker-tests.mjs && node test/run-wpc-tests.mjs"
   },
   "devDependencies": {
     "pg": "^8.11.0"
