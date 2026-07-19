@@ -13,6 +13,12 @@
 // gateway's DB-gated tests. So a laptop with no Postgres stays green.
 //
 // SAFETY:
+//   * assertSafeDbTarget() (shared with integration.dbtest.js) runs FIRST and
+//     REFUSES (throws) if ASDAIR_DB_URL points anywhere that could be live:
+//     any host containing 'supabase' or 'pooler', or any non-local host that
+//     is not an explicit *_test database. Only host / db-name are inspected;
+//     credentials are never read out or logged. So this test can never
+//     CREATE/DROP a throwaway schema on a live database.
 //   * NEVER touches the real `asdair` schema or any live data. It creates
 //     a throwaway schema (asdair_test_constraints), applies the committed
 //     DDL into it (rewriting `asdair.` -> the test schema), asserts, then
@@ -52,6 +58,13 @@ const TEST_SCHEMA = 'asdair_test_constraints';
 
 const SCHEMA_PATH = path.join(__dirname, '..', '..', 'db', '001_asdair_schema.sql');
 
+// SAFETY GUARD (shared, one source of truth with integration.dbtest.js):
+// refuse to run against anything that could be live. Only host / db-name are
+// inspected; credentials are never read out or logged. Throws (loud failure)
+// on an unsafe target -- pointing this test at live Supabase MUST fail, never
+// silently proceed, and never CREATE/DROP a throwaway schema on live data.
+const { assertSafeDbTarget } = require('./dbSafeTarget.js');
+
 // Rewrite the committed DDL so every object lands in the throwaway schema.
 // `create schema if not exists asdair;` and every `asdair.` reference are
 // retargeted; nothing in the real `asdair` schema is read or written.
@@ -63,6 +76,11 @@ function buildTestDdl(schemaName) {
 }
 
 test('asdair schema enforces scoped, normalised uniqueness', gate, async function (t) {
+  // Safety first: refuse an unsafe target BEFORE opening any connection or
+  // running any DDL, so an unsafe ASDAIR_DB_URL can never CREATE/DROP a
+  // throwaway schema on a live database.
+  assertSafeDbTarget(DB_URL);
+
   // Lazy-require pg so the file still loads (and skips cleanly) on a box
   // where dependencies were never installed for a DB run.
   const { Client } = require('pg');
