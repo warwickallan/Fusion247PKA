@@ -31,7 +31,7 @@ export const DEFAULT_LOCK_PATH = path.join(SECRET_HOME, 'tower-baton.lock');
 export const DEFAULT_LOCK_STALE_MS = 5 * 60 * 1000;
 
 function emptyState() {
-  return { version: 1, answered: {}, rounds: {}, notified: {} };
+  return { version: 1, answered: {}, rounds: {}, notified: {}, in_progress: {} };
 }
 
 /**
@@ -50,6 +50,7 @@ export function openState({ statePath = DEFAULT_STATE_PATH, fs = fsDefault } = {
         data.answered = data.answered ?? {};
         data.rounds = data.rounds ?? {};
         data.notified = data.notified ?? {};
+        data.in_progress = data.in_progress ?? {};
       }
     }
   } catch {
@@ -75,8 +76,23 @@ export function openState({ statePath = DEFAULT_STATE_PATH, fs = fsDefault } = {
 
     recordAnswered(checkpointId, { reviewedHead, verdict, promptFingerprint, commentId, now = Date.now(), mergeReady = null } = {}) {
       data.answered[checkpointId] = { reviewed_head: reviewedHead ?? null, verdict: verdict ?? null, prompt_fingerprint: promptFingerprint ?? null, comment_id: commentId ?? null, answered_at: now, merge_ready: mergeReady };
+      // A terminal answer clears any two-mode in-progress marker for this checkpoint.
+      if (data.in_progress) delete data.in_progress[checkpointId];
       persist();
     },
+
+    // Two-mode in-progress marker (MEDIUM G): once Codex has posted its APPROVE reply and
+    // the run is routing to the Fable cold-final, this records that the codex step is DONE
+    // so a retry/crash resumes at the FABLE step (never re-runs codex / re-posts the codex
+    // reply). Cleared by recordAnswered when the Fable terminal is recorded.
+    isInProgress(checkpointId) { return Boolean(data.in_progress?.[checkpointId]); },
+    getInProgress(checkpointId) { return data.in_progress?.[checkpointId] ?? null; },
+    recordInProgress(checkpointId, { stage, codexVerdict, reviewedHead, promptFingerprint, codexCommentId, chainKey, now = Date.now() } = {}) {
+      data.in_progress = data.in_progress ?? {};
+      data.in_progress[checkpointId] = { stage: stage ?? 'awaiting_fable', codex_verdict: codexVerdict ?? null, reviewed_head: reviewedHead ?? null, prompt_fingerprint: promptFingerprint ?? null, codex_comment_id: codexCommentId ?? null, chain_key: chainKey ?? null, at: now };
+      persist();
+    },
+    clearInProgress(checkpointId) { if (data.in_progress) { delete data.in_progress[checkpointId]; persist(); } },
 
     /** Merge a set of already-answered checkpoint_ids discovered on the thread (cold-start rebuild). */
     mergeAnsweredIds(ids) {

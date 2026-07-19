@@ -360,6 +360,40 @@ test('MAJOR 4 -- a FAILING recovery post leaves the checkpoint UNANSWERED (retri
   assert.equal(r2.processed[0].runFailed, true, 'the retry again hits the recoverable-failure path');
 });
 
+test('MAJOR F -- the recovery post is IDEMPOTENT: a recovery that timed out LOCALLY but landed server-side is not duplicated next poll', async () => {
+  // Poll 1: codex throws -> postRunFailure posts a recovery reply that LANDS on the thread
+  // but the client call never resolves locally (times out) -> NOT marked answered. Reconcile
+  // ran BEFORE the reply landed, so it did not dedup it. Poll 2 must detect the existing
+  // recovery reply and NOT post a duplicate (idempotent), then mark answered.
+  const codex = { calls: [], async runTurn() { throw new Error('codex exploded'); } };
+  let callN = 0;
+  const store = [];
+  const makeClickup = (cpComment) => {
+    store.push({ id: 'seed', comment_text: cpComment.comment_text, user: cpComment.user });
+    return {
+      _comments: store,
+      async getTaskComments() { return store.map((c) => ({ ...c })); },
+      createTaskComment(_t, body) {
+        callN += 1;
+        store.push({ id: `p${callN}`, comment_text: body, user: 'tower' }); // LANDS server-side
+        if (callN === 1) return new Promise(() => {}); // but never resolves locally -> poll 1 times out
+        return Promise.resolve({ id: `p${callN}` });
+      },
+    };
+  };
+  const h = harness({ codex, makeClickup, failurePostDeadlineMs: 20 });
+
+  const r1 = await h.watcher.pollOnce();
+  assert.equal(r1.processed[0].posted, false, 'poll 1 recovery post timed out locally');
+  assert.equal(h.state.isAnswered('cp-100'), false, 'not answered after the local timeout');
+  assert.equal(store.filter((c) => /TOWER_RUN_FAILED/.test(c.comment_text)).length, 1, 'the recovery reply DID land on the thread once');
+
+  const r2 = await h.watcher.pollOnce();
+  assert.equal(r2.processed[0].idempotent, true, 'poll 2 detects the existing recovery reply -- idempotent, no duplicate');
+  assert.equal(store.filter((c) => /TOWER_RUN_FAILED/.test(c.comment_text)).length, 1, 'still exactly ONE recovery reply (no duplicate)');
+  assert.equal(h.state.isAnswered('cp-100'), true, 'answered from the existing recovery reply');
+});
+
 test('resolveBrief — reads a local file, fail-closed otherwise', async () => {
   const p = writeTmp('acceptance criteria', '.md');
   const ok = await resolveBrief(p);

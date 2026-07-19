@@ -23,27 +23,43 @@
 import fsDefault from 'node:fs';
 import path from 'node:path';
 
-import { parseCheckpoint, chainKey, formatResponse, formatFableResponse, answeredCheckpointIds } from './checkpoint.js';
+import { parseCheckpoint, chainKey, formatResponse, formatFableResponse, terminallyAnsweredCheckpointIds, findTowerReplyFor, findFableReplyFor } from './checkpoint.js';
 import { loadQaSkill } from './qaSkill.js';
 import { composeReviewBriefing } from './reviewVoice.js';
+import { DEFAULT_CODEX_TIMEOUT_MS } from './codexAdapter.js';
+import { DEFAULT_FABLE_TIMEOUT_MS } from './fableAdapter.js';
 
 export const DEFAULT_MAX_ROUNDS = 3;
 
 /**
- * The MERGE-READY GATE. Merge-ready requires BOTH principals to APPROVE the SAME head:
- * the Codex correction-loop reviewer AND the Fable cold-final reviewer. A Codex APPROVE
- * that has not yet passed Fable is NEVER merge-ready.
+ * The MERGE-READY GATE. Merge-ready requires BOTH principals to GENUINELY APPROVE the SAME
+ * head: the Codex correction-loop reviewer AND the Fable cold-final reviewer.
+ *
+ * HIGH C -- a `comment`/unverifiable outcome is NEVER merge-ready. deriveVerdict maps
+ * verdict:'comment' + 0 findings -> APPROVE, and the reviewers are instructed to return
+ * `comment` + "unverifiable" when the diff is absent/insufficient. So an empty/insufficient
+ * diff could produce two DERIVED APPROVEs with NOTHING verified. The gate therefore requires
+ * the RAW reviewer verdict === 'approve' for BOTH (a genuine approve), excluding
+ * comment-derived approvals -- not just the derived APPROVE label.
  */
-export function computeMergeReady({ codexVerdict, fableVerdict }) {
-  return codexVerdict === 'APPROVE' && fableVerdict === 'APPROVE';
+export function computeMergeReady({ codexVerdict, fableVerdict, codexRawVerdict, fableRawVerdict }) {
+  const bothDerivedApprove = codexVerdict === 'APPROVE' && fableVerdict === 'APPROVE';
+  const bothGenuineApprove = codexRawVerdict === 'approve' && fableRawVerdict === 'approve';
+  return bothDerivedApprove && bothGenuineApprove;
 }
 
 // Per-cycle WATCHDOG bound (WP1). A single checkpoint's processing must NEVER be able
-// to hang the poll loop silently. This deadline sits OUTSIDE the codex turn timeout
-// (default 8min) so that: codex reaps its own process tree first; if a cycle still
-// exceeds this bound for ANY reason, the watcher ABORTS the cycle, posts a recoverable
-// TOWER_RUN_FAILED verdict, and KEEPS POLLING. Default 12min > the 8min codex timeout.
-export const DEFAULT_CYCLE_WATCHDOG_MS = 12 * 60 * 1000;
+// to hang the poll loop silently. This deadline sits OUTSIDE the per-turn timeouts so
+// each turn reaps its own process tree first; only if a cycle STILL exceeds this bound
+// for ANY reason does the watcher ABORT the cycle, post a recoverable TOWER_RUN_FAILED
+// verdict, and KEEP POLLING.
+//
+// HIGH D -- the routed path runs codex(<=8min) + fable(<=8min) SEQUENTIALLY inside ONE
+// watchdog, so the old 12min default falsely aborted a healthy slow run mid-fable (the
+// real verdict fenced away, BLOCKED recorded). The watchdog MUST cover BOTH turn budgets
+// plus slant: default = codexTimeout + fableTimeout + 4min slack (8+8+4 = 20min).
+export const CYCLE_WATCHDOG_SLACK_MS = 4 * 60 * 1000;
+export const DEFAULT_CYCLE_WATCHDOG_MS = DEFAULT_CODEX_TIMEOUT_MS + DEFAULT_FABLE_TIMEOUT_MS + CYCLE_WATCHDOG_SLACK_MS;
 // The recoverable-failure post (ClickUp reply + milestone) is itself bounded so it can
 // never wedge the loop it is trying to rescue. Best-effort within this deadline.
 export const DEFAULT_FAILURE_POST_DEADLINE_MS = 30 * 1000;
@@ -214,16 +230,32 @@ export function pickMaterialFindings(findings) {
  */
 export function createWatcher({ config, clickup, github, codex, fable = null, notifier, state, taskId, qaSkillPath, repoRoot = null, maxRounds = DEFAULT_MAX_ROUNDS, fs = fsDefault, now = Date.now, log = () => {}, cycleWatchdogMs = DEFAULT_CYCLE_WATCHDOG_MS, failurePostDeadlineMs = DEFAULT_FAILURE_POST_DEADLINE_MS, pollReadDeadlineMs = DEFAULT_POLL_READ_DEADLINE_MS } = {}) {
   let reconciled = false;
+  // When a Fable adapter is wired, a Codex APPROVE alone is NOT a terminal answer -- the
+  // cold-final (Fable reply) is. reconcile + resume detection are mode-aware on this flag.
+  const fableEnabled = Boolean(fable);
+  // Generation token for reconcile (MAJOR F): a reconcile whose read wedged past the poll
+  // read-deadline is ABANDONED by boundRead but keeps running; if it later resolves it must
+  // NOT mutate state behind a newer cycle. Each reconcile captures a generation and no-ops
+  // its mutations if a newer reconcile has since started.
+  let reconcileGen = 0;
   // Re-entrancy guard: a Codex turn (~60s) is far longer than the poll interval (~15s),
   // so overlapping setInterval ticks would each start a duplicate Codex turn on the SAME
   // checkpoint before any records "answered" (observed in the live proof: 4 duplicate
   // reviews + 4 posted replies). One cycle at a time.
   let polling = false;
 
-  /** Cold-start: rebuild dedup truth from the thread (Fable nit #2). Idempotent. */
+  /** Cold-start: rebuild dedup truth from the thread (Fable nit #2). Idempotent + generation-fenced. */
   async function reconcileFromThread() {
+    const gen = ++reconcileGen; // this run's generation
     const comments = await clickup.getTaskComments(taskId);
-    const ids = answeredCheckpointIds(comments);
+    // MAJOR F: if a NEWER reconcile started while this one's read was in flight (e.g. this
+    // read wedged past the deadline and was abandoned, and the next poll started a fresh
+    // reconcile), do NOT mutate state -- the newer generation owns the rebuild.
+    if (gen !== reconcileGen) return { superseded: true };
+    // Mode-aware terminal dedup: with Fable enabled a codex APPROVE without a fable reply
+    // is NOT terminal, so it stays reviewable (its cold-final resumes) rather than being
+    // silently marked answered from the codex reply alone (MEDIUM G #b).
+    const ids = terminallyAnsweredCheckpointIds(comments, { fableEnabled });
     state.mergeAnsweredIds([...ids]);
     reconciled = true;
     return { rebuiltFromThread: [...ids] };
@@ -234,7 +266,7 @@ export function createWatcher({ config, clickup, github, codex, fable = null, no
    * merge. Fail-closed at each gate (bad head, missing brief, malformed skill,
    * Codex blocked) → a BLOCKED reply is still posted so Larry always gets an answer.
    */
-  async function processCheckpoint(checkpoint, progress = { stage: 'start' }, fence = { active: true }) {
+  async function processCheckpoint(checkpoint, progress = { stage: 'start' }, fence = { active: true }, { comments = [] } = {}) {
     const cpId = checkpoint.checkpoint_id;
     // FENCE (WP1 CRITICAL): the outer watchdog can ABORT this cycle (Promise.race) while
     // this run is still alive. If codex/evidence/ClickUp later resolves, an abandoned run
@@ -251,6 +283,38 @@ export function createWatcher({ config, clickup, github, codex, fable = null, no
     if (state.isAnswered(cpId)) return { checkpointId: cpId, skipped: 'already-answered' };
 
     const ck = chainKey(checkpoint);
+
+    // RESUME / IDEMPOTENCY from the thread (MEDIUM G). The ClickUp thread is the source of
+    // truth; a durable in-progress marker is a fast-path hint behind it.
+    const priorFable = fableEnabled ? findFableReplyFor(comments, cpId) : null;
+    const priorTower = findTowerReplyFor(comments, cpId);
+    const inProgress = state.getInProgress ? state.getInProgress(cpId) : null;
+
+    if (priorFable) {
+      // The cold-final terminal already landed on the thread (e.g. a crash/timeout right
+      // AFTER the fable post but BEFORE recordAnswered). Record it answered idempotently --
+      // never re-run codex/fable, never post a duplicate reply.
+      state.recordAnswered(cpId, { reviewedHead: priorFable.reviewed_head, verdict: priorFable.verdict, promptFingerprint: priorFable.prompt_fingerprint, commentId: priorFable.comment_id, now: now(), mergeReady: priorFable.merge_ready === 'yes' });
+      return { checkpointId: cpId, skipped: 'already-answered-thread' };
+    }
+
+    // Resume at the FABLE step when codex has already APPROVE-posted for this head but the
+    // cold-final has not run yet (MEDIUM G #a fable-post-failure, #b crash between posts).
+    // Sourced from the durable marker OR, crash-safe, inferred from the thread's codex
+    // APPROVE reply. On resume codex is NEVER re-run and its [TOWER -> LARRY] reply is NOT
+    // re-posted.
+    const resumeFable = fableEnabled && !priorFable
+      && (inProgress?.stage === 'awaiting_fable' || (priorTower && priorTower.verdict === 'APPROVE'));
+    const resumeMeta = resumeFable
+      ? {
+        reviewedHead: inProgress?.reviewed_head ?? priorTower?.reviewed_head ?? null,
+        promptFingerprint: inProgress?.prompt_fingerprint ?? priorTower?.prompt_fingerprint ?? null,
+        codexCommentId: inProgress?.codex_comment_id ?? priorTower?.comment_id ?? null,
+        // RAW codex verdict is only known from the durable marker; a crash-only resume (no
+        // marker) cannot confirm a GENUINE approve, so merge_ready fails closed (raw=null).
+        codexRawVerdict: inProgress?.codex_verdict ?? null,
+      }
+      : null;
 
     // (d) resolve the approved brief + WP scope. Fail-closed + repo-root-contained.
     progress.stage = 'resolve_brief';
@@ -297,28 +361,45 @@ export function createWatcher({ config, clickup, github, codex, fable = null, no
     let packet = null;
     const promptFingerprint = skill.fingerprint ?? null;
 
+    // Build the bounded review packet from evidence (used by codex on the fresh path AND
+    // by fable on both fresh + resume paths). Only meaningful once the evidence gate is open.
+    const buildPacket = () => ({
+      checkpoint_id: checkpoint.checkpoint_id ?? null, build_id: checkpoint.build_id ?? null, wp_id: checkpoint.wp_id ?? null,
+      repo: config?.githubRepo ?? null, branch: checkpoint.branch, head_sha: evidence.headSha,
+      base_sha: checkpoint.base_sha ?? null, diff_range: evidence.diffRange, changed_files: evidence.changedFiles,
+      diff_text: evidence.diffText ?? null, diff_truncated: Boolean(evidence.diffTruncated),
+      brief_ref: checkpoint.brief_ref, brief_excerpt: brief.excerpt ?? null,
+      summary: checkpoint.summary ?? null, tests: checkpoint.tests ?? null,
+      evidence_refs: checkpoint.evidence_refs ?? [],
+      ci_checks: (evidence.checks ?? []).map((c) => `${c.name}:${c.conclusion ?? c.status}`).join(', ') || (evidence.checksError ?? 'none'),
+    });
+
     let derived;
+    // skipCodexPost: on a resume the codex [TOWER -> LARRY] reply is already on the thread,
+    // so we neither re-run codex NOR re-post its reply -- we go straight to the fable step.
+    let skipCodexPost = false;
+    let codexRawVerdict = null;
     if (gateBlockers.length) {
-      // Do NOT invoke Codex when a gate is closed — respond BLOCKED with the reasons.
+      // Do NOT invoke Codex when a gate is closed — respond BLOCKED with the reasons. This
+      // also correctly supersedes a resume whose head has since drifted (gate now closed).
       derived = { verdict: 'BLOCKED', material_findings: gateBlockers.slice(0, 3).map((b) => `[gate] ${b}`), next_action: 'Resolve the fail-closed gate(s) above, then re-hand off. Do not proceed unsupervised.' };
+    } else if (resumeFable) {
+      // RESUME (MEDIUM G): codex already reviewed + APPROVED this exact head; its reply is on
+      // the thread. Rebuild the packet and jump to the Fable cold-final without re-running codex.
+      packet = buildPacket();
+      derived = { verdict: 'APPROVE', material_findings: [], next_action: 'Resuming the cold-final: codex already approved this head; running the Fable adversarial pass.' };
+      codexRawVerdict = resumeMeta?.codexRawVerdict ?? null; // null on a crash-only resume -> merge_ready fails closed
+      skipCodexPost = true;
     } else if (roundsSpent >= maxRounds) {
       // (i) round budget exhausted for this chain → escalate WITHOUT another Codex turn.
       derived = { verdict: 'DECISION_REQUIRED', material_findings: [], next_action: `Max correction rounds (${maxRounds}) reached for this chain — escalating to Warwick.` };
     } else {
       // (g) invoke Codex read-only QA.
-      packet = {
-        checkpoint_id: checkpoint.checkpoint_id ?? null, build_id: checkpoint.build_id ?? null, wp_id: checkpoint.wp_id ?? null,
-        repo: config?.githubRepo ?? null, branch: checkpoint.branch, head_sha: evidence.headSha,
-        base_sha: checkpoint.base_sha ?? null, diff_range: evidence.diffRange, changed_files: evidence.changedFiles,
-        diff_text: evidence.diffText ?? null, diff_truncated: Boolean(evidence.diffTruncated),
-        brief_ref: checkpoint.brief_ref, brief_excerpt: brief.excerpt ?? null,
-        summary: checkpoint.summary ?? null, tests: checkpoint.tests ?? null,
-        evidence_refs: checkpoint.evidence_refs ?? [],
-        ci_checks: (evidence.checks ?? []).map((c) => `${c.name}:${c.conclusion ?? c.status}`).join(', ') || (evidence.checksError ?? 'none'),
-      };
+      packet = buildPacket();
       progress.stage = 'codex_turn';
       const turn = await codex.runTurn({ checkpoint, packet, skillText: skill.text, promptFingerprint });
       codexResult = turn.structuredResult ?? null;
+      codexRawVerdict = codexResult?.verdict ?? null;
       signed = { envelope: turn.envelope, signature: turn.signature };
       derived = deriveVerdict({ codexResult, roundsSpent, maxRounds });
     }
@@ -336,17 +417,23 @@ export function createWatcher({ config, clickup, github, codex, fable = null, no
     // Redact any known secret VALUE before it can reach a ClickUp comment (defence in
     // depth behind brief_ref containment — the reply is public in the thread).
     const body = config?.redact ? config.redact(formatResponse(responseObj)) : formatResponse(responseObj);
-    // FENCE before the FIRST externally-visible side effect (the ClickUp post): if the
-    // watchdog already aborted this cycle, do not post -- the recovery path owns the reply.
-    if (!stillActive('post_reply')) return { checkpointId: cpId, superseded: true };
-    progress.stage = 'post_reply';
     let posted = null;
-    try {
-      posted = await clickup.createTaskComment(taskId, body);
-    } catch (err) {
-      // A post failure is not a merge risk; surface it, do not crash the cycle.
-      log(`processCheckpoint: post failed for ${cpId}: ${config?.redact ? config.redact(err?.message ?? String(err)) : (err?.message ?? String(err))}`);
-      return { checkpointId: cpId, verdict: derived.verdict, posted: false, error: 'post-failed', response: responseObj };
+    if (skipCodexPost) {
+      // RESUME: the codex [TOWER -> LARRY] reply is already on the thread -- do NOT re-post
+      // it. Carry the existing comment id forward for the return record.
+      posted = { id: resumeMeta?.codexCommentId ?? null };
+    } else {
+      // FENCE before the FIRST externally-visible side effect (the ClickUp post): if the
+      // watchdog already aborted this cycle, do not post -- the recovery path owns the reply.
+      if (!stillActive('post_reply')) return { checkpointId: cpId, superseded: true };
+      progress.stage = 'post_reply';
+      try {
+        posted = await clickup.createTaskComment(taskId, body);
+      } catch (err) {
+        // A post failure is not a merge risk; surface it, do not crash the cycle.
+        log(`processCheckpoint: post failed for ${cpId}: ${config?.redact ? config.redact(err?.message ?? String(err)) : (err?.message ?? String(err))}`);
+        return { checkpointId: cpId, verdict: derived.verdict, posted: false, error: 'post-failed', response: responseObj };
+      }
     }
 
     // (j) milestone Telegram — one per outcome, deduped by checkpoint_id.
@@ -393,6 +480,14 @@ export function createWatcher({ config, clickup, github, codex, fable = null, no
     progress.stage = 'notify_codex';
     await notifier.notifyMilestone({ purpose: codexMilestonePurpose, logicalSource: 'CODEX', body: codexNotifyBody, checkpointId: cpId });
 
+    // DURABLE TWO-MODE MARKER (MEDIUM G): the codex reply is now on the thread; record that
+    // the codex step is DONE so a crash/failure BEFORE the fable terminal resumes at the
+    // FABLE step (never re-runs codex, never re-posts the codex reply). On a resume the
+    // marker already exists -- leave its RAW codex verdict intact rather than overwrite it.
+    if (!skipCodexPost) {
+      try { state.recordInProgress?.(cpId, { stage: 'awaiting_fable', codexVerdict: codexRawVerdict, reviewedHead: responseObj.reviewed_head, promptFingerprint, codexCommentId: posted?.id ?? null, chainKey: ck }); } catch { /* best-effort */ }
+    }
+
     // The Fable turn runs INSIDE this cycle, so ALL WP1 protections wrap it: the outer
     // per-cycle watchdog reaps a stuck Fable turn (recoverable failure posted), the fence
     // suppresses a late-resolving abandoned run, and the read-deadlines bound the reads.
@@ -404,7 +499,12 @@ export function createWatcher({ config, clickup, github, codex, fable = null, no
     // Derive Fable's verdict on ITS OWN findings (roundsSpent:0 -- the correction-round
     // budget is a Codex-loop concept, not a cold-final concept).
     const fableDerived = deriveVerdict({ codexResult: fableResult, roundsSpent: 0, maxRounds });
-    const mergeReady = computeMergeReady({ codexVerdict: derived.verdict, fableVerdict: fableDerived.verdict });
+    // HIGH C: merge-ready needs BOTH the derived APPROVE AND the RAW reviewer verdict to be a
+    // genuine 'approve' -- a `comment`/unverifiable (empty/insufficient diff) is never merge-ready.
+    const mergeReady = computeMergeReady({
+      codexVerdict: derived.verdict, fableVerdict: fableDerived.verdict,
+      codexRawVerdict, fableRawVerdict: fableResult?.verdict ?? null,
+    });
 
     // Post the [FABLE -> LARRY] cold-final reply (distinct principal, merge_ready gate).
     const fableResponseObj = {
@@ -462,11 +562,25 @@ export function createWatcher({ config, clickup, github, codex, fable = null, no
    * can never itself wedge the loop.
    *   evidence carried: checkpoint_id, reviewed_head, stage it failed at, elapsed ms, reason.
    */
-  async function postRunFailure({ checkpoint, progress, kind, reason, startedAt }) {
+  async function postRunFailure({ checkpoint, progress, kind, reason, startedAt, comments = [] }) {
     const cpId = checkpoint?.checkpoint_id ?? '(unknown)';
     const stage = progress?.stage ?? 'unknown';
     const elapsedMs = Math.max(0, now() - (startedAt ?? now()));
     const shortReason = String(reason ?? '').slice(0, 240);
+    // A failure in a FABLE stage is attributed to FABLE on the milestone wire (J); the
+    // recovery REPLY block itself stays a [TOWER -> LARRY] (Tower owns the recovery reply).
+    const failureSource = /fable/i.test(stage) ? 'FABLE' : 'CODEX';
+
+    // IDEMPOTENCY (MAJOR F #b): a prior recovery attempt that timed out LOCALLY may have
+    // actually landed on the thread server-side; on the next poll we must NOT post a
+    // duplicate recovery comment. If a TOWER_RUN_FAILED recovery reply for this checkpoint
+    // is already on the thread, record answered from it and return -- no second post.
+    const priorRecovery = findTowerReplyFor(comments, cpId);
+    if (priorRecovery && /TOWER_RUN_FAILED/.test(String(priorRecovery.summary ?? ''))) {
+      try { state.recordAnswered(cpId, { reviewedHead: priorRecovery.reviewed_head, verdict: 'BLOCKED', promptFingerprint: null, commentId: priorRecovery.comment_id, now: now() }); } catch { /* best-effort */ }
+      log(`postRunFailure: recovery reply for ${cpId} already on the thread -- idempotent skip (no duplicate post)`);
+      return { checkpointId: cpId, verdict: 'BLOCKED', posted: true, answered: true, runFailed: true, kind, stage, elapsedMs, idempotent: true };
+    }
     const responseObj = {
       checkpoint_id: cpId,
       reviewed_head: checkpoint?.head_sha ?? '(unknown)',
@@ -522,7 +636,7 @@ export function createWatcher({ config, clickup, github, codex, fable = null, no
     // is best-effort and does NOT gate the answered-state (fires regardless of post result).
     try {
       const ding = config?.redact ? config.redact(`BLOCKED - Tower run failed (${kind}) at stage ${stage} after ${elapsedMs} ms.`) : `BLOCKED - Tower run failed (${kind}) at stage ${stage} after ${elapsedMs} ms.`;
-      await withDeadline(notifier.notifyMilestone({ purpose: 'blocked', logicalSource: 'CODEX', body: ding, checkpointId: cpId }), failurePostDeadlineMs, { sent: false });
+      await withDeadline(notifier.notifyMilestone({ purpose: 'blocked', logicalSource: failureSource, body: ding, checkpointId: cpId }), failurePostDeadlineMs, { sent: false });
     } catch { /* best-effort */ }
 
     return { checkpointId: cpId, verdict: 'BLOCKED', posted: postConfirmed, answered: postConfirmed, runFailed: true, kind, stage, elapsedMs, response: responseObj };
@@ -535,7 +649,7 @@ export function createWatcher({ config, clickup, github, codex, fable = null, no
    * processing promise is abandoned on a watchdog abort (a genuinely wedged run never
    * resolves); the tightened codex tree-kill is what makes that abandonment clean.
    */
-  async function processCheckpointGuarded(checkpoint) {
+  async function processCheckpointGuarded(checkpoint, comments = []) {
     const startedAt = now();
     const progress = { stage: 'start', checkpointId: checkpoint?.checkpoint_id ?? null, startedAt };
     // FENCE (WP1 CRITICAL): the generation token for THIS run. processCheckpoint captures
@@ -547,26 +661,32 @@ export function createWatcher({ config, clickup, github, codex, fable = null, no
     // The watchdog timer is intentionally NOT unref'd: it must be able to FIRE and rescue
     // a wedged cycle even if the wedged work is the only other thing pending. It is
     // always cleared in the finally below, so it never lingers past a completed cycle.
+    //
+    // J -- CLOSE THE FENCE-FLIP WINDOW: flip fence.active=false INSIDE the timer callback,
+    // ATOMICALLY with (before) resolving the watchdog. Previously the flip happened only in
+    // the race handler, one microtask AFTER the timer resolved -- a side effect scheduled in
+    // that window would still see fence.active===true and slip through. Flipping it in the
+    // timer callback suppresses any side effect from the moment the deadline fires.
     const watchdog = new Promise((resolve) => {
-      timer = setTimeout(() => resolve(WATCHDOG), cycleWatchdogMs);
+      timer = setTimeout(() => { fence.active = false; resolve(WATCHDOG); }, cycleWatchdogMs);
     });
     try {
       const raced = await Promise.race([
-        processCheckpoint(checkpoint, progress, fence).then((r) => ({ ok: true, r }), (e) => ({ ok: false, e })),
+        processCheckpoint(checkpoint, progress, fence, { comments }).then((r) => ({ ok: true, r }), (e) => ({ ok: false, e })),
         watchdog,
       ]);
       if (raced === WATCHDOG) {
-        // SUPERSEDE the abandoned run BEFORE the recovery path posts: from here on the
-        // still-alive processCheckpoint must suppress every late side effect.
+        // fence.active was already set false in the timer callback (window closed). Keep the
+        // redundant assignment for clarity; it is a no-op if the timer already flipped it.
         fence.active = false;
         log(`processCheckpointGuarded: cycle watchdog fired for ${progress.checkpointId} at stage "${progress.stage}" after ${Math.max(0, now() - startedAt)}ms -- aborting cycle, loop continues`);
-        return await postRunFailure({ checkpoint, progress, kind: 'run_timeout', reason: `cycle exceeded the watchdog bound (${cycleWatchdogMs}ms) at stage "${progress.stage}"`, startedAt });
+        return await postRunFailure({ checkpoint, progress, kind: 'run_timeout', reason: `cycle exceeded the watchdog bound (${cycleWatchdogMs}ms) at stage "${progress.stage}"`, startedAt, comments });
       }
       if (raced.ok) return raced.r;
       // The cycle THREW -- convert to a recoverable failure reply (never crash the loop).
       const msg = config?.redact ? config.redact(raced.e?.message ?? String(raced.e)) : (raced.e?.message ?? String(raced.e));
       log(`processCheckpointGuarded: cycle threw for ${progress.checkpointId} at stage "${progress.stage}": ${msg}`);
-      return await postRunFailure({ checkpoint, progress, kind: 'run_error', reason: msg, startedAt });
+      return await postRunFailure({ checkpoint, progress, kind: 'run_error', reason: msg, startedAt, comments });
     } finally {
       if (timer) clearTimeout(timer);
     }
@@ -639,7 +759,7 @@ export function createWatcher({ config, clickup, github, codex, fable = null, no
             skipped.push({ checkpointId: cp.checkpoint_id, reason: 'unauthorised-author' });
             continue;
           }
-          const r = await processCheckpointGuarded(cp);
+          const r = await processCheckpointGuarded(cp, comments);
           if (r.skipped) skipped.push({ checkpointId: r.checkpointId, reason: r.skipped });
           else processed.push(r);
         }

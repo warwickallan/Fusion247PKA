@@ -84,7 +84,7 @@ export function fakeNotifier() {
  */
 export function fakeSpawn({ captured = {}, stdout = '', code = 0 } = {}) {
   return (bin, argv, opts) => {
-    captured.bin = bin; captured.argv = argv; captured.env = opts?.env;
+    captured.bin = bin; captured.argv = argv; captured.env = opts?.env; captured.cwd = opts?.cwd; captured.opts = opts;
     const child = new EventEmitter();
     child.stdout = new EventEmitter();
     child.stderr = new EventEmitter();

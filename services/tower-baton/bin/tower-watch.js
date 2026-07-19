@@ -23,7 +23,7 @@ import { SECRET_HOME } from '../src/config.js';
 import { createClickupClient } from '../src/clickupClient.js';
 import { createGithubEvidence } from '../src/githubEvidence.js';
 import { createCodexAdapter } from '../src/codexAdapter.js';
-import { createFableAdapter } from '../src/fableAdapter.js';
+import { createFableAdapter, wireFable } from '../src/fableAdapter.js';
 import { createMilestoneNotifier, createTelegramClient } from '../src/telegramNotifier.js';
 import { openState, acquireLock, DEFAULT_LOCK_STALE_MS } from '../src/state.js';
 import { createWatcher } from '../src/watcher.js';
@@ -127,11 +127,22 @@ async function main() {
   const codexTimeoutMs = Number(process.env.TOWER_CODEX_TIMEOUT_MS) > 0 ? Number(process.env.TOWER_CODEX_TIMEOUT_MS) : undefined;
   const cycleWatchdogMs = Number(process.env.TOWER_CYCLE_WATCHDOG_MS) > 0 ? Number(process.env.TOWER_CYCLE_WATCHDOG_MS) : undefined;
   const codex = createCodexAdapter({ config, cwd: repoDir, log, ...(codexTimeoutMs ? { timeoutMs: codexTimeoutMs } : {}) });
-  // The SECOND, independent reviewer: Fable cold-final (claude-fable-5, headless). Its child
-  // env is sanitised (sanitizeFableEnv) at spawn time; it runs from a NEUTRAL cwd so it never
-  // adopts the repo persona. A Codex APPROVE auto-routes here; merge-ready needs BOTH APPROVE.
+  // The SECOND, independent reviewer: Fable cold-final (claude-fable-5, headless). It is
+  // OPTIONAL (MAJOR E): wire it ONLY when TOWER_FABLE_ENABLED=1 AND it is fully provisioned
+  // (binary + auth). Otherwise pass NO fable adapter -> the byte-identical CODEX-ONLY path
+  // (an install without Fable must NOT turn every codex APPROVE into a Fable-BLOCKED flow).
+  // Enabled-but-unprovisioned fails LOUD at startup, never silently BLOCKs every checkpoint.
   const fableTimeoutMs = Number(process.env.TOWER_FABLE_TIMEOUT_MS) > 0 ? Number(process.env.TOWER_FABLE_TIMEOUT_MS) : undefined;
-  const fable = createFableAdapter({ config, log, ...(fableTimeoutMs ? { timeoutMs: fableTimeoutMs } : {}) });
+  const fableWiring = await wireFable({
+    enabled: process.env.TOWER_FABLE_ENABLED === '1',
+    buildAdapter: () => createFableAdapter({ config, log, ...(fableTimeoutMs ? { timeoutMs: fableTimeoutMs } : {}) }),
+  });
+  if (fableWiring.fatal) {
+    log(`[TOWER] startup fail-closed: ${config.redact(fableWiring.reason)}`);
+    shutdown(); process.exit(1);
+  }
+  const fable = fableWiring.fable; // null on the codex-only path
+  log(`[TOWER] Fable cold-final reviewer: ${fable ? 'ENABLED + provisioned' : 'DISABLED (codex-only path)'} -- ${config.redact(fableWiring.reason)}`);
   const notifier = createMilestoneNotifier({ config, state });
 
   const watcher = createWatcher({ config, clickup, github, codex, fable, notifier, state, taskId, qaSkillPath, repoRoot: repoDir, fs, log, ...(cycleWatchdogMs ? { cycleWatchdogMs } : {}) });

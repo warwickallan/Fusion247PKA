@@ -236,3 +236,57 @@ export function answeredCheckpointIds(comments) {
   }
   return ids;
 }
+
+/** The LAST [TOWER -> LARRY] (codex) reply for a checkpoint on the thread, or null. */
+export function findTowerReplyFor(comments, checkpointId) {
+  let found = null;
+  for (const c of comments ?? []) {
+    const parsed = parseResponse(c?.comment_text ?? c?.text ?? c?.body ?? '');
+    if (parsed.ok && parsed.response.checkpoint_id === checkpointId) found = { ...parsed.response, comment_id: c?.id ?? null };
+  }
+  return found;
+}
+
+/** The LAST [FABLE -> LARRY] (cold-final) reply for a checkpoint on the thread, or null. */
+export function findFableReplyFor(comments, checkpointId) {
+  let found = null;
+  for (const c of comments ?? []) {
+    const parsed = parseFableResponse(c?.comment_text ?? c?.text ?? c?.body ?? '');
+    if (parsed.ok && parsed.response.checkpoint_id === checkpointId) found = { ...parsed.response, comment_id: c?.id ?? null };
+  }
+  return found;
+}
+
+/**
+ * Mode-aware TERMINAL dedup (MEDIUM G #b): the checkpoint_ids that are FULLY answered on
+ * the thread. Crucially, when Fable routing is ENABLED, a Codex APPROVE reply ALONE is NOT
+ * terminal -- the cold-final (FABLE reply) is the terminal signal, so a crash between the
+ * codex post and the fable post must NOT count the checkpoint answered (cold-final would be
+ * silently skipped forever). Terminal when:
+ *   · a [FABLE -> LARRY] reply exists (cold-final ran), OR
+ *   · a non-APPROVE [TOWER -> LARRY] reply exists (never routes to Fable -- terminal), OR
+ *   · fable routing is DISABLED and any [TOWER -> LARRY] reply exists (codex-only path).
+ * An APPROVE [TOWER -> LARRY] with NO fable reply while fable is enabled is NOT terminal.
+ */
+export function terminallyAnsweredCheckpointIds(comments, { fableEnabled = false } = {}) {
+  const towerApprove = new Set();
+  const towerNonApprove = new Set();
+  const fableReplied = new Set();
+  for (const c of comments ?? []) {
+    const text = c?.comment_text ?? c?.text ?? c?.body ?? '';
+    const tr = parseResponse(text);
+    if (tr.ok && tr.response.checkpoint_id) {
+      if (tr.response.verdict === 'APPROVE') towerApprove.add(tr.response.checkpoint_id);
+      else towerNonApprove.add(tr.response.checkpoint_id);
+    }
+    const fr = parseFableResponse(text);
+    if (fr.ok && fr.response.checkpoint_id) fableReplied.add(fr.response.checkpoint_id);
+  }
+  const answered = new Set([...towerNonApprove, ...fableReplied]);
+  for (const id of towerApprove) {
+    // A codex APPROVE is terminal only on the codex-only path; when fable is enabled the
+    // cold-final (fable reply) must be present, which is already captured in fableReplied.
+    if (!fableEnabled) answered.add(id);
+  }
+  return answered;
+}

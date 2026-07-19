@@ -2,15 +2,60 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 
-import { createCodexAdapter, sanitizeCodexEnv, CODEX_ENV_DENYLIST, killProcessTree } from '../src/codexAdapter.js';
+import { createCodexAdapter, sanitizeCodexEnv, CODEX_ENV_DENYLIST, CODEX_CROSS_REVIEWER_KEYS, killProcessTree } from '../src/codexAdapter.js';
 import { fakeSpawn, fakeFsForSchema, codexJsonl } from '../test-helpers/fakes.js';
+import { EventEmitter as EE } from 'node:events';
 
-test('sanitizeCodexEnv — strips every Telegram/ClickUp/DB secret from the child env', () => {
-  const parent = { PATH: '/x', TELEGRAM_BOT_TOKEN: '123:SECRET', CLICKUP_TOKEN: 'pk_secret', AUTHORISED_TELEGRAM_USER_ID: '42', DATABASE_URL: 'postgres://u:p@h/db', HARMLESS: 'ok' };
+test('sanitizeCodexEnv — strips Telegram/ClickUp/DB secrets + the OTHER reviewer (Anthropic) creds', () => {
+  const parent = { PATH: '/x', TELEGRAM_BOT_TOKEN: '123:SECRET', CLICKUP_TOKEN: 'pk_secret', AUTHORISED_TELEGRAM_USER_ID: '42', DATABASE_URL: 'postgres://u:p@h/db', ANTHROPIC_API_KEY: 'sk-fable', CLAUDE_CODE_OAUTH_TOKEN: 'oauth-fable', HARMLESS: 'ok' };
   const child = sanitizeCodexEnv(parent);
   for (const name of CODEX_ENV_DENYLIST) assert.equal(child[name], undefined, `${name} must be stripped`);
+  // LOW I: the OTHER reviewer's (Fable/Anthropic) creds are stripped from the Codex child.
+  for (const name of CODEX_CROSS_REVIEWER_KEYS) assert.equal(child[name], undefined, `${name} (Fable cred) must be stripped from the Codex child`);
+  assert.deepEqual([...CODEX_CROSS_REVIEWER_KEYS], ['ANTHROPIC_API_KEY', 'CLAUDE_CODE_OAUTH_TOKEN']);
   assert.equal(child.PATH, '/x');
   assert.equal(child.HARMLESS, 'ok');
+});
+
+test('sanitizeCodexEnv — the api-key route still injects Codex creds AFTER the cross-strip', () => {
+  const child = sanitizeCodexEnv({ ANTHROPIC_API_KEY: 'sk-fable' }, 'codex-secret');
+  assert.equal(child.ANTHROPIC_API_KEY, undefined, 'the other reviewer cred is still stripped');
+  assert.equal(child.CODEX_API_KEY, 'codex-secret', 'the codex api key is re-added for the api-key route');
+  assert.equal(child.OPENAI_API_KEY, 'codex-secret');
+});
+
+test('CRITICAL B -- taskkill FAILURE retries the tree-kill once, then leader-only fallback, and returns tree_reaped:false (UNCONFIRMED)', async () => {
+  const events = [];
+  let taskkillSpawns = 0;
+  // taskkill ALWAYS fails (close code 1); the leader child exposes .kill for the fallback.
+  const spawn = (bin, argv) => {
+    const child = new EE();
+    child.pid = 7777;
+    if (bin === 'taskkill') {
+      taskkillSpawns += 1;
+      events.push({ ev: 'taskkill', n: taskkillSpawns });
+      setTimeout(() => child.emit('close', 1), 1); // FAIL
+    }
+    child.kill = () => { events.push({ ev: 'leader-kill' }); };
+    return child;
+  };
+  const leader = { pid: 7777, kill: () => { events.push({ ev: 'leader-kill' }); } };
+  const res = await killProcessTree({ child: leader, spawn, platform: 'win32', taskkillTimeoutMs: 50 });
+  assert.equal(res.tree_reaped, false, 'a taskkill-failure reap is UNCONFIRMED -- never reported as a confirmed reap');
+  assert.equal(taskkillSpawns, 2, 'the tree-kill is RETRIED once before the leader-only fallback');
+  assert.ok(events.some((e) => e.ev === 'leader-kill'), 'the leader-only fallback ran after taskkill failed twice');
+});
+
+test('CRITICAL B -- taskkill SUCCESS returns tree_reaped:true (confirmed)', async () => {
+  const spawn = (bin) => {
+    const child = new EE();
+    child.pid = 8888;
+    if (bin === 'taskkill') setTimeout(() => child.emit('close', 0), 1);
+    child.kill = () => {};
+    return child;
+  };
+  const res = await killProcessTree({ child: { pid: 8888, kill: () => {} }, spawn, platform: 'win32', taskkillTimeoutMs: 50 });
+  assert.equal(res.tree_reaped, true, 'a successful taskkill is a CONFIRMED tree reap');
 });
 
 test('Codex child process env contains NO Telegram/ClickUp secret (spawn-level)', async () => {

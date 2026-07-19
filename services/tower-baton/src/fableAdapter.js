@@ -10,14 +10,22 @@
 // wearing two hats):
 //
 //   - INVOCATION: the `claude` CLI headless (print mode) --
-//       claude -p --model claude-fable-5 --output-format json --allowedTools "" \
+//       claude -p --model claude-fable-5 --output-format json \
+//              --tools "" --allowedTools "" --disallowedTools Read Glob Grep Bash ... \
 //              --system-prompt <adversarial-reviewer> -
-//     Verified against claude 2.1.214: `-p/--print` is print-and-exit; `--output-format
-//     json` emits ONE result object with the final message under `.result`; `--model
-//     claude-fable-5` selects the reviewer model (confirmed present via modelUsage);
-//     `--allowedTools ""` is the tool-less allow-list (no tools); `--system-prompt`
-//     REPLACES the default Claude Code system prompt so the reviewer adopts NO repo
-//     "You are Larry" persona. Claude has NO `--output-schema` flag, so the required
+//     Verified against claude 2.1.214 (`claude --help`): `-p/--print` is print-and-exit;
+//     `--output-format json` emits ONE result object with the final message under
+//     `.result`; `--model claude-fable-5` selects the reviewer model (confirmed present
+//     via modelUsage). TOOL-LESSNESS (WP1 CRITICAL A): `--tools ""` is the AVAILABILITY
+//     flag -- `claude --help`: "Specify the list of available tools ... Use \"\" to
+//     disable all tools" -- so `--tools ""` is what actually removes Read/Glob/Grep/Bash
+//     from the child. `--allowedTools ""` is ONLY a permission PRE-APPROVAL list (it does
+//     NOT reduce availability), so it is kept as belt-and-braces alongside an explicit
+//     `--disallowedTools <every built-in tool>` denylist. Without `--tools ""` the child
+//     retained Read/Glob/Grep and could read the repo CLAUDE.md (persona leak) and
+//     C:\.fusion247\*.env (secrets) -- voiding independence + secret-freedom. `--system-
+//     prompt` REPLACES the default Claude Code system prompt so the reviewer adopts NO
+//     repo "You are Larry" persona. Claude has NO `--output-schema` flag, so the required
 //     JSON shape is described IN THE PROMPT and validated fail-closed on the way back.
 //   - NEUTRAL CWD: the child is spawned from a NEUTRAL directory (os.tmpdir()), NOT the
 //     repo, so claude's CLAUDE.md auto-discovery cannot inject the project persona. Fable
@@ -48,9 +56,17 @@ import {
 export const FABLE_MODEL_ID = 'claude-fable-5';
 
 // Print-mode headless flags proven against claude 2.1.214 (see header). `--model` and
-// `--output-format json` are fixed; `--allowedTools`/`--system-prompt`/`-` are appended
-// by buildFableArgv so the variadic `--allowedTools` can never swallow the `-` stdin marker.
+// `--output-format json` are fixed; the tool-disabling flags + `--system-prompt`/`-` are
+// appended by buildFableArgv so the variadic tool flags can never swallow the `-` stdin marker.
 export const FABLE_CLI_FLAGS = Object.freeze(['-p', '--model', FABLE_MODEL_ID, '--output-format', 'json']);
+
+// The built-in tools explicitly DENIED to the Fable child (belt-and-braces behind
+// `--tools ""`). If claude ever adds a tool, `--tools ""` (availability) still removes it;
+// this named denylist makes the intent auditable and defends the permission layer too.
+export const FABLE_TOOL_DENYLIST = Object.freeze([
+  'Read', 'Write', 'Edit', 'MultiEdit', 'NotebookEdit', 'Glob', 'Grep',
+  'Bash', 'BashOutput', 'KillShell', 'WebFetch', 'WebSearch', 'Task', 'TodoWrite',
+]);
 
 // REPLACES the default Claude Code system prompt (via --system-prompt) so the reviewer is
 // an independent adversary, never the repo's Larry persona.
@@ -66,9 +82,16 @@ export const FABLE_SYSTEM_PROMPT = [
 // secrets. Re-exported by name so the intent is explicit at the call site + in tests.
 export const FABLE_ENV_DENYLIST = CODEX_ENV_DENYLIST;
 
-// Default Fable turn timeout. Same 8min as codex: the turn's OWN tree-kill fires WELL
-// INSIDE the watcher's per-cycle watchdog (default 12min), so a stuck Fable run is reaped
-// by its own timeout first and the watchdog is the outer safety net.
+// CROSS-REVIEWER credential strip (WP1 LOW I): the Fable child authenticates with its OWN
+// Anthropic session (ANTHROPIC_API_KEY / ~/.claude OAuth) and must never carry the OTHER
+// reviewer's OpenAI/Codex creds -- strip them so a prompt-injected Fable cannot reach Codex.
+export const FABLE_CROSS_REVIEWER_KEYS = Object.freeze(['OPENAI_API_KEY', 'CODEX_API_KEY']);
+
+// Default Fable turn timeout. Same 8min as codex. On the routed path codex(<=8min) and
+// fable(<=8min) run SEQUENTIALLY inside ONE per-cycle watchdog, so that watchdog must
+// cover BOTH turns + slack (DEFAULT_CYCLE_WATCHDOG_MS = 8+8+4 = 20min in watcher.js);
+// each turn's OWN tree-kill fires first, and the watchdog is the outer safety net that
+// must NOT fire mid-fable on a healthy-but-slow two-turn cycle.
 export const DEFAULT_FABLE_TIMEOUT_MS = 8 * 60 * 1000;
 
 /** Locate the claude binary WITHOUT hard-coding a version. Override -> local-bin -> PATH. */
@@ -126,16 +149,27 @@ export function detectFableAuth({ env = process.env, homeDir = os.homedir(), fs 
 
 /** Build the read-only, tool-less headless argv. `-` is LAST so the stdin marker survives. */
 export function buildFableArgv({ systemPrompt = FABLE_SYSTEM_PROMPT } = {}) {
-  // Order matters: `--allowedTools ""` is followed by `--system-prompt` (a flag), so the
-  // variadic tool list stops at the single empty value; `--system-prompt <prompt>` takes
-  // exactly one arg; `-` (read prompt from stdin) is the final positional.
-  return [...FABLE_CLI_FLAGS, '--allowedTools', '', '--system-prompt', systemPrompt, '-'];
+  // Order matters (variadic flags are each bounded by the NEXT flag, which starts with `--`):
+  //   `--tools ""`        -> AVAILABILITY: "" disables ALL tools (the real tool-lessness).
+  //   `--allowedTools ""` -> permission pre-approval list (belt-and-braces).
+  //   `--disallowedTools <names...>` -> explicit per-tool deny (belt-and-braces), bounded
+  //                          by the following `--system-prompt` flag.
+  //   `--system-prompt <prompt>` takes exactly one arg; `-` (read prompt from stdin) is last.
+  return [
+    ...FABLE_CLI_FLAGS,
+    '--tools', '',
+    '--allowedTools', '',
+    '--disallowedTools', ...FABLE_TOOL_DENYLIST,
+    '--system-prompt', systemPrompt,
+    '-',
+  ];
 }
 
-/** Strip the SAME secret denylist Codex uses from the child env. No api key is injected. */
+/** Strip the SAME secret denylist Codex uses + the OTHER reviewer's creds. No api key is injected. */
 export function sanitizeFableEnv(parentEnv = process.env) {
   const env = { ...parentEnv };
   for (const name of FABLE_ENV_DENYLIST) delete env[name];
+  for (const name of FABLE_CROSS_REVIEWER_KEYS) delete env[name]; // never carry Codex's OpenAI creds
   return env;
 }
 
@@ -227,6 +261,14 @@ export function createFableAdapter({
 
       const parsed = parseFableJson(spawned.stdout);
       if (!parsed.ok) return blockerResult(ctx, `fable returned unusable CLI output: ${parsed.error}`, 'malformed_output');
+      // MODEL CONFIRMATION (WP1 MEDIUM H): fail-closed on a SILENT model substitution. The
+      // verdict is signed model_id=claude-fable-5 from the argv; if the CLI reports a
+      // modelUsage map that does NOT include claude-fable-5, the argv's model was NOT the
+      // one that ran -- reject as a blocker rather than sign a claim we cannot back. When
+      // modelUsage is absent (older CLI shape) we cannot confirm, so we do not block on it.
+      if (parsed.modelUsage && typeof parsed.modelUsage === 'object' && !(FABLE_MODEL_ID in parsed.modelUsage)) {
+        return blockerResult(ctx, `fable model substitution: CLI modelUsage did not include ${FABLE_MODEL_ID} (reported: ${Object.keys(parsed.modelUsage).join(', ') || '(none)'})`, 'model_substituted');
+      }
       const validation = validateCodexResult(parsed.result);
       if (!validation.ok) return blockerResult(ctx, `fable returned malformed/non-conforming output: ${validation.errors.join('; ')}`, 'malformed_output');
 
@@ -265,8 +307,8 @@ function runFable({ fableBin, argv, cwd, spawn, timeoutMs, prompt, platform = pr
       // abandoned claude tree can never survive past the turn and wedge the poll loop. The
       // reap is bounded internally so this can never hang. ALWAYS resolve timed_out after.
       Promise.resolve(killProcessTree({ child, spawn, platform, log }))
-        .catch(() => { /* reaping must never throw */ })
-        .finally(() => finish({ ok: false, code: -2, stderr: `turn timed out after ${timeoutMs}ms`, stdout, timed_out: true }));
+        .then((reap) => finish({ ok: false, code: -2, stderr: `turn timed out after ${timeoutMs}ms`, stdout, timed_out: true, tree_reaped: reap?.tree_reaped !== false }))
+        .catch(() => finish({ ok: false, code: -2, stderr: `turn timed out after ${timeoutMs}ms`, stdout, timed_out: true, tree_reaped: false }));
     }, timeoutMs);
     child.stdout?.on('data', (d) => { stdout += d.toString(); });
     child.stderr?.on('data', (d) => { stderr += d.toString(); });
@@ -283,7 +325,7 @@ function runFable({ fableBin, argv, cwd, spawn, timeoutMs, prompt, platform = pr
  */
 export function parseFableJson(text) {
   const raw = String(text ?? '').trim();
-  if (!raw) return { ok: false, result: null, tokensUsed: 0, error: 'empty CLI output' };
+  if (!raw) return { ok: false, result: null, tokensUsed: 0, modelUsage: null, error: 'empty CLI output' };
   let cli;
   try { cli = JSON.parse(raw); }
   catch {
@@ -292,17 +334,47 @@ export function parseFableJson(text) {
     for (let i = lines.length - 1; i >= 0; i -= 1) {
       try { cli = JSON.parse(lines[i]); break; } catch { /* keep scanning */ }
     }
-    if (!cli) return { ok: false, result: null, tokensUsed: 0, error: 'CLI output is not valid JSON' };
+    if (!cli) return { ok: false, result: null, tokensUsed: 0, modelUsage: null, error: 'CLI output is not valid JSON' };
   }
+  // Surface modelUsage so runTurn can fail-closed on a silent model substitution (H).
+  const modelUsage = (cli && typeof cli.modelUsage === 'object') ? cli.modelUsage : null;
   if (cli?.type === 'result' && (cli.is_error === true || (cli.subtype && cli.subtype !== 'success'))) {
-    return { ok: false, result: null, tokensUsed: 0, error: `claude reported ${cli.subtype ?? 'error'} (is_error=${cli.is_error})` };
+    return { ok: false, result: null, tokensUsed: 0, modelUsage, error: `claude reported ${cli.subtype ?? 'error'} (is_error=${cli.is_error})` };
   }
   const message = typeof cli?.result === 'string' ? cli.result : (typeof cli?.text === 'string' ? cli.text : null);
   const tokensUsed = Number(cli?.usage?.output_tokens ?? cli?.modelUsage?.[FABLE_MODEL_ID]?.outputTokens ?? 0) || 0;
-  if (!message) return { ok: false, result: null, tokensUsed, error: 'no final message text in the claude result' };
+  if (!message) return { ok: false, result: null, tokensUsed, modelUsage, error: 'no final message text in the claude result' };
   const start = message.indexOf('{'); const end = message.lastIndexOf('}');
   if (start >= 0 && end > start) {
-    try { return { ok: true, result: JSON.parse(message.slice(start, end + 1)), tokensUsed }; } catch { /* fall */ }
+    try { return { ok: true, result: JSON.parse(message.slice(start, end + 1)), tokensUsed, modelUsage }; } catch { /* fall */ }
   }
-  return { ok: false, result: null, tokensUsed, error: 'no JSON object in the final message' };
+  return { ok: false, result: null, tokensUsed, modelUsage, error: 'no JSON object in the final message' };
+}
+
+/**
+ * Decide whether to wire the Fable cold-final reviewer (WP1 MAJOR E). Fable is OPTIONAL:
+ * an install without Fable creds/binary must run the byte-identical CODEX-ONLY path, NOT
+ * turn every Codex APPROVE into a Fable-BLOCKED flow. Rules:
+ *   · not enabled (TOWER_FABLE_ENABLED !== '1')  -> { fable: null } (legacy codex-only path).
+ *   · enabled AND fully provisioned (binary + auth via verifyInvocable) -> { fable: adapter }.
+ *   · enabled BUT unprovisioned -> { fatal: true } so startup fails LOUD, never silently
+ *     BLOCKs every checkpoint.
+ * `buildAdapter()` is called ONLY when enabled, so the codex-only path constructs no Fable.
+ *
+ * @returns {Promise<{ fable, fatal?, reason, inv? }>}
+ */
+export async function wireFable({ enabled, buildAdapter }) {
+  if (!enabled) return { fable: null, reason: 'disabled -- codex-only path (set TOWER_FABLE_ENABLED=1 to enable)' };
+  const adapter = typeof buildAdapter === 'function' ? buildAdapter() : null;
+  if (!adapter || typeof adapter.verifyInvocable !== 'function') {
+    return { fable: null, fatal: true, reason: 'TOWER_FABLE_ENABLED=1 but no Fable adapter could be constructed' };
+  }
+  const inv = await adapter.verifyInvocable();
+  if (!inv?.invocable || !inv?.authenticated) {
+    return {
+      fable: null, fatal: true, inv,
+      reason: `TOWER_FABLE_ENABLED=1 but Fable is not provisioned (binary=${Boolean(inv?.invocable)}, auth=${Boolean(inv?.authenticated)})${inv?.binError ? ` -- ${inv.binError}` : ''}`,
+    };
+  }
+  return { fable: adapter, reason: 'enabled + provisioned', inv };
 }

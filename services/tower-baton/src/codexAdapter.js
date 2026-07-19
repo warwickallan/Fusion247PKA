@@ -127,10 +127,17 @@ export const CODEX_ENV_DENYLIST = Object.freeze([
   'TOWER_HMAC_SECRET_CLAUDE_FABLE',
 ]);
 
-/** Build the Codex child env: parent env MINUS the denylist, plus an optional api key. */
+// CROSS-REVIEWER credential strip (WP1 LOW I): the codex child must never carry the
+// OTHER reviewer's credentials. Codex authenticates via ChatGPT-OAuth / CODEX_API_KEY,
+// so Anthropic/Claude creds have no business in its env -- strip them (a leaked
+// ANTHROPIC_API_KEY in the codex child would let a prompt-injected codex reach Claude).
+export const CODEX_CROSS_REVIEWER_KEYS = Object.freeze(['ANTHROPIC_API_KEY', 'CLAUDE_CODE_OAUTH_TOKEN']);
+
+/** Build the Codex child env: parent env MINUS the denylist + the other reviewer's creds, plus an optional api key. */
 export function sanitizeCodexEnv(parentEnv = process.env, apiKey = null) {
   const env = { ...parentEnv };
   for (const name of CODEX_ENV_DENYLIST) delete env[name];
+  for (const name of CODEX_CROSS_REVIEWER_KEYS) delete env[name]; // never carry Fable's Anthropic creds
   if (apiKey) { env.CODEX_API_KEY = apiKey; env.OPENAI_API_KEY = apiKey; }
   return env;
 }
@@ -305,49 +312,72 @@ export const DEFAULT_TASKKILL_TIMEOUT_MS = 5000;
  *
  * Corrected reap:
  *   - win32:  run `taskkill /PID <leader> /T /F` and AWAIT its exit. taskkill kills the
- *             WHOLE tree INCLUDING the leader, so we do NOT pre-kill the leader first. A
- *             direct child.kill() fallback runs ONLY if taskkill fails/errors/times out.
- *             The taskkill call is itself bounded (DEFAULT_TASKKILL_TIMEOUT_MS) so the
- *             kill path cannot hang.
+ *             WHOLE tree INCLUDING the leader, so we do NOT pre-kill the leader first. On
+ *             a taskkill fail/error/timeout we RETRY the tree-kill ONCE (a transient race),
+ *             then fall back to a leader-only child.kill(). The taskkill call is bounded
+ *             (DEFAULT_TASKKILL_TIMEOUT_MS) so the kill path cannot hang.
  *   - posix:  the child leads its own process group (spawned `detached`), so a single
  *             process.kill(-pid, 'SIGKILL') reaps the whole group INCLUDING the leader.
+ *
+ * HONEST REAP STATUS (WP1 CRITICAL B): the earlier code logged a CONFIRMED reap even when
+ * it fell back to a leader-only kill -- so surviving descendants were reported dead. This
+ * now returns AND logs `{ tree_reaped }`: true ONLY when the whole tree was confirmed
+ * reaped (taskkill success, or a posix group kill); FALSE (unconfirmed) after a leader-only
+ * fallback, so the truth -- that descendants MAY survive -- is visible up the stack.
  *
  * Async: the caller AWAITs this so an abandoned codex tree is confirmed dead before the
  * turn resolves. Every step is guarded so this can never throw. Returns a Promise.
  */
+function spawnTaskkill(pid, { spawn, taskkillTimeoutMs }) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const done = (ok) => { if (!settled) { settled = true; resolve(ok); } };
+    let killer;
+    try { killer = spawn('taskkill', ['/PID', String(pid), '/T', '/F'], { shell: false, stdio: 'ignore' }); }
+    catch { return done(false); }
+    const timer = setTimeout(() => { try { killer?.kill?.(); } catch { /* ignore */ } done(false); }, taskkillTimeoutMs);
+    try { timer.unref?.(); } catch { /* ignore */ }
+    try { killer?.on?.('error', () => { clearTimeout(timer); done(false); }); } catch { clearTimeout(timer); return done(false); }
+    try { killer?.on?.('close', (code) => { clearTimeout(timer); done(code === 0); }); } catch { clearTimeout(timer); return done(false); }
+  });
+}
+
 export async function killProcessTree({ child, spawn = nodeSpawn, platform = process.platform, log, taskkillTimeoutMs = DEFAULT_TASKKILL_TIMEOUT_MS } = {}) {
   const pid = child?.pid;
+  let treeReaped = false;
   if (platform === 'win32') {
     if (pid != null) {
       // AWAIT taskkill: it reaps the whole tree (leader included). We must NOT pre-kill
       // the leader, or taskkill can fail to enumerate the now-dead leader's descendants.
-      const reaped = await new Promise((resolve) => {
-        let settled = false;
-        const done = (ok) => { if (!settled) { settled = true; resolve(ok); } };
-        let killer;
-        try { killer = spawn('taskkill', ['/PID', String(pid), '/T', '/F'], { shell: false, stdio: 'ignore' }); }
-        catch { return done(false); }
-        // Bound the taskkill so the kill path itself cannot hang the loop.
-        const timer = setTimeout(() => { try { killer?.kill?.(); } catch { /* ignore */ } done(false); }, taskkillTimeoutMs);
-        try { timer.unref?.(); } catch { /* ignore */ }
-        try { killer?.on?.('error', () => { clearTimeout(timer); done(false); }); } catch { clearTimeout(timer); return done(false); }
-        try { killer?.on?.('close', (code) => { clearTimeout(timer); done(code === 0); }); } catch { clearTimeout(timer); return done(false); }
-      });
-      // Fallback ONLY if taskkill did not confirm: on success taskkill already killed the
-      // leader, so signalling it again would be redundant (and it is already gone).
-      if (!reaped) { try { child?.kill?.('SIGKILL'); } catch { try { child?.kill?.(); } catch { /* ignore */ } } }
+      let reaped = await spawnTaskkill(pid, { spawn, taskkillTimeoutMs });
+      // RETRY the tree-kill ONCE on failure -- a first taskkill can lose a transient race
+      // with the just-spawned tree; a second attempt usually enumerates it cleanly.
+      if (!reaped) reaped = await spawnTaskkill(pid, { spawn, taskkillTimeoutMs });
+      if (reaped) {
+        treeReaped = true;
+      } else {
+        // Leader-only fallback: descendants MAY survive. Do NOT claim a confirmed reap.
+        try { child?.kill?.('SIGKILL'); } catch { try { child?.kill?.(); } catch { /* ignore */ } }
+        treeReaped = false;
+      }
     } else {
-      // No pid to target the tree -- best-effort direct handle kill.
+      // No pid to target the tree -- best-effort direct handle kill; unconfirmed.
       try { child?.kill?.('SIGKILL'); } catch { try { child?.kill?.(); } catch { /* ignore */ } }
+      treeReaped = false;
     }
   } else if (pid != null) {
     // The child leads its own process group (spawned detached); negative pid = group.
-    // This reaps the whole group INCLUDING the leader in one call.
+    // This reaps the whole group INCLUDING the leader in one call -- a confirmed tree reap.
     try { process.kill(-pid, 'SIGKILL'); } catch { /* group already gone / no perms */ }
+    treeReaped = true;
   } else {
     try { child?.kill?.('SIGKILL'); } catch { /* ignore */ }
+    treeReaped = false;
   }
-  if (typeof log === 'function') { try { log(`killProcessTree: reaped codex pid ${pid ?? '(unknown)'} (${platform})`); } catch { /* ignore */ } }
+  if (typeof log === 'function') {
+    try { log(`killProcessTree: pid ${pid ?? '(unknown)'} (${platform}) tree_reaped:${treeReaped}${treeReaped ? '' : ' (unconfirmed -- descendants may survive after leader-only fallback)'}`); } catch { /* ignore */ }
+  }
+  return { tree_reaped: treeReaped };
 }
 
 function runCodex({ codexBin, argv, cwd, spawn, timeoutMs, apiKey, prompt, platform = process.platform, log }) {
@@ -372,8 +402,8 @@ function runCodex({ codexBin, argv, cwd, spawn, timeoutMs, apiKey, prompt, platf
       // codex process can never survive past the turn; killProcessTree is itself bounded
       // so this can never hang. ALWAYS resolve (timed_out) once the reap settles.
       Promise.resolve(killProcessTree({ child, spawn, platform, log }))
-        .catch(() => { /* reaping must never throw */ })
-        .finally(() => finish({ ok: false, code: -2, stderr: `turn timed out after ${timeoutMs}ms`, stdout, timed_out: true }));
+        .then((reap) => finish({ ok: false, code: -2, stderr: `turn timed out after ${timeoutMs}ms`, stdout, timed_out: true, tree_reaped: reap?.tree_reaped !== false }))
+        .catch(() => finish({ ok: false, code: -2, stderr: `turn timed out after ${timeoutMs}ms`, stdout, timed_out: true, tree_reaped: false }));
     }, timeoutMs);
     child.stdout?.on('data', (d) => { stdout += d.toString(); });
     child.stderr?.on('data', (d) => { stderr += d.toString(); });
