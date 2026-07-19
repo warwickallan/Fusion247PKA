@@ -206,7 +206,12 @@ export async function verifyCodexInvocable({ codexBin, spawn = nodeSpawn, timeou
  * Create the Codex QA adapter. `runTurn({ checkpoint, packet, skillText,
  * promptFingerprint })` runs ONE read-only turn and returns a signed verdict.
  */
-export function createCodexAdapter({ config, cwd = process.cwd(), mode = 'auto', spawn = nodeSpawn, resolveBin, authProbe, fs = fsDefault, timeoutMs = 10 * 60 * 1000 } = {}) {
+// Default codex turn timeout. Tightened from 10min -> 8min (WP1) so the turn's OWN
+// tree-kill fires WELL INSIDE the watcher's per-cycle watchdog (default 12min): the
+// codex timeout reaps the process tree first; the watchdog is the outer safety net.
+export const DEFAULT_CODEX_TIMEOUT_MS = 8 * 60 * 1000;
+
+export function createCodexAdapter({ config, cwd = process.cwd(), mode = 'auto', spawn = nodeSpawn, resolveBin, authProbe, fs = fsDefault, timeoutMs = DEFAULT_CODEX_TIMEOUT_MS, platform = process.platform, log } = {}) {
   const PRINCIPAL = 'gpt_codex';
   const secret = config?.signingSecret ? config.signingSecret(PRINCIPAL) : null;
   const doResolveBin = typeof resolveBin === 'function' ? resolveBin : () => resolveCodexBin({});
@@ -260,7 +265,7 @@ export function createCodexAdapter({ config, cwd = process.cwd(), mode = 'auto',
       try {
         const prompt = buildCodexPrompt({ skillText, packet });
         const argv = buildCodexArgv({ schemaFile, workdir: cwd });
-        const spawned = await runCodex({ codexBin: bin.path, argv, cwd, spawn, timeoutMs, apiKey: auth.method === 'api-key' ? config.codexApiKey : null, prompt });
+        const spawned = await runCodex({ codexBin: bin.path, argv, cwd, spawn, timeoutMs, apiKey: auth.method === 'api-key' ? config.codexApiKey : null, prompt, platform, log });
         if (spawned.code === -2) return blockerResult(ctx, spawned.stderr || `codex turn timed out after ${timeoutMs}ms`, 'timed_out');
         if (!spawned.ok) return blockerResult(ctx, `codex exec failed (exit ${spawned.code}): ${String(spawned.stderr ?? '').slice(0, 300)}`.trim(), 'exec_failed');
 
@@ -284,7 +289,38 @@ export function createCodexAdapter({ config, cwd = process.cwd(), mode = 'auto',
   };
 }
 
-function runCodex({ codexBin, argv, cwd, spawn, timeoutMs, apiKey, prompt }) {
+/**
+ * Reap the ENTIRE process tree of a spawned codex child. This is the WP1 defect fix:
+ * on Windows `child.kill()` signals ONLY the direct child handle -- codex.exe's own
+ * subprocesses survive as ORPHANS and wedge the watcher's poll loop (silent HALT).
+ *   - win32:  spawn `taskkill /PID <pid> /T /F` (/T = whole tree, /F = force).
+ *   - posix:  the child was spawned `detached` (its own process group) so we kill the
+ *             GROUP via process.kill(-pid, 'SIGKILL').
+ * Best-effort + fail-safe: every step is guarded so this can NEVER throw or hang; a
+ * direct child.kill() is still attempted as a fallback so the leader dies even if the
+ * tree-kill spawn/group-kill was unavailable. Returns nothing.
+ */
+export function killProcessTree({ child, spawn = nodeSpawn, platform = process.platform, log } = {}) {
+  const pid = child?.pid;
+  try {
+    if (platform === 'win32') {
+      if (pid != null) {
+        const killer = spawn('taskkill', ['/PID', String(pid), '/T', '/F'], { shell: false, detached: true, stdio: 'ignore' });
+        try { killer?.on?.('error', () => {}); } catch { /* ignore -- taskkill missing must not crash */ }
+        try { killer?.unref?.(); } catch { /* ignore */ }
+      }
+    } else if (pid != null) {
+      // The child leads its own process group (spawned detached); negative pid = group.
+      try { process.kill(-pid, 'SIGKILL'); } catch { /* group already gone / no perms */ }
+    }
+  } catch { /* best-effort -- reaping must never throw */ }
+  // Fallback: also signal the child handle directly, so the leader is reaped even if
+  // the tree-kill above could not run.
+  try { child?.kill?.('SIGKILL'); } catch { try { child?.kill?.(); } catch { /* ignore */ } }
+  if (typeof log === 'function') { try { log(`killProcessTree: reaped codex pid ${pid ?? '(unknown)'} (${platform})`); } catch { /* ignore */ } }
+}
+
+function runCodex({ codexBin, argv, cwd, spawn, timeoutMs, apiKey, prompt, platform = process.platform, log }) {
   return new Promise((resolve) => {
     let stdout = ''; let stderr = ''; let done = false;
     const finish = (r) => { if (!done) { done = true; resolve(r); } };
@@ -292,9 +328,20 @@ function runCodex({ codexBin, argv, cwd, spawn, timeoutMs, apiKey, prompt }) {
     // SANITISED child env — Telegram/ClickUp/DB secrets are stripped so the reviewer
     // process can never read them. The api key (if any) rides via env, never argv.
     const env = sanitizeCodexEnv(process.env, apiKey);
-    try { child = spawn(codexBin, argv, { cwd, shell: false, env }); }
+    const spawnOpts = { cwd, shell: false, env };
+    // POSIX: give codex its OWN process group so a timeout can reap the WHOLE tree via
+    // process.kill(-pid). On win32 the tree is reaped by pid via `taskkill /T` instead,
+    // so no detach is needed (and detaching would change console-handle behaviour).
+    if (platform !== 'win32') spawnOpts.detached = true;
+    try { child = spawn(codexBin, argv, spawnOpts); }
     catch (e) { return finish({ ok: false, code: -1, stderr: String(e?.message ?? e), stdout: '' }); }
-    const timer = setTimeout(() => { try { child.kill(); } catch { /* ignore */ } finish({ ok: false, code: -2, stderr: `turn timed out after ${timeoutMs}ms`, stdout }); }, timeoutMs);
+    const timer = setTimeout(() => {
+      // TREE-kill, not child.kill(): a bare child.kill() leaves codex.exe's children
+      // as orphans on Windows, and an orphaned codex WEDGES the poll loop. Reap the
+      // whole tree, then ALWAYS resolve (timed_out) so this promise cannot hang.
+      killProcessTree({ child, spawn, platform, log });
+      finish({ ok: false, code: -2, stderr: `turn timed out after ${timeoutMs}ms`, stdout, timed_out: true });
+    }, timeoutMs);
     child.stdout?.on('data', (d) => { stdout += d.toString(); });
     child.stderr?.on('data', (d) => { stderr += d.toString(); });
     child.on('error', (e) => { clearTimeout(timer); finish({ ok: false, code: -1, stderr: String(e?.message ?? e), stdout }); });

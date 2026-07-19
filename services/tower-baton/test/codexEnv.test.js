@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { EventEmitter } from 'node:events';
 
-import { createCodexAdapter, sanitizeCodexEnv, CODEX_ENV_DENYLIST } from '../src/codexAdapter.js';
+import { createCodexAdapter, sanitizeCodexEnv, CODEX_ENV_DENYLIST, killProcessTree } from '../src/codexAdapter.js';
 import { fakeSpawn, fakeFsForSchema, codexJsonl } from '../test-helpers/fakes.js';
 
 test('sanitizeCodexEnv — strips every Telegram/ClickUp/DB secret from the child env', () => {
@@ -40,6 +41,58 @@ test('Codex child process env contains NO Telegram/ClickUp secret (spawn-level)'
     if (saved.c === undefined) delete process.env.CLICKUP_TOKEN;
     if (saved.a === undefined) delete process.env.AUTHORISED_TELEGRAM_USER_ID;
   }
+});
+
+test('runTurn timeout -- reaps the codex process TREE (win32 taskkill /PID <pid> /T /F) and returns the timed_out blocker', async () => {
+  // WP1 defect fix: a bare child.kill() leaves codex.exe children as orphans on Windows
+  // and wedges the poll loop. Prove the timeout path spawns taskkill /T /F on the child
+  // pid, and that runTurn still resolves with the `timed_out` blocker (never hangs).
+  const spawnCalls = [];
+  const spawn = (bin, argv, opts) => {
+    spawnCalls.push({ bin, argv, opts });
+    const child = new EventEmitter();
+    child.stdout = new EventEmitter();
+    child.stderr = new EventEmitter();
+    child.stdin = { write() {}, end() {} };
+    child.pid = 4242;
+    child.kill = () => { child.__killed = true; };
+    child.unref = () => {};
+    // codex child: NEVER closes (forces the timeout). taskkill child: closes at once.
+    if (bin === 'taskkill') setImmediate(() => child.emit('close', 0));
+    return child;
+  };
+  const codex = createCodexAdapter({
+    config: { signingSecret: () => null },
+    spawn,
+    resolveBin: () => ({ path: 'C:/fake/codex.exe', source: 'test', error: null }),
+    authProbe: () => ({ authenticated: true, method: 'chatgpt-oauth' }),
+    fs: fakeFsForSchema(),
+    timeoutMs: 20,      // tiny -- force the timeout branch fast
+    platform: 'win32',  // exercise the taskkill branch deterministically
+  });
+  const turn = await codex.runTurn({ checkpoint: { checkpoint_id: 'cp-1', head_sha: 'abc' }, packet: { head_sha: 'abc' }, skillText: 'skill', promptFingerprint: 'fp' });
+  assert.equal(turn.blocked, true, 'a timed-out turn is a signed blocker, never a hang');
+  assert.equal(turn.kind, 'timed_out');
+  const kill = spawnCalls.find((c) => c.bin === 'taskkill');
+  assert.ok(kill, 'taskkill was spawned to reap the whole process tree');
+  assert.deepEqual(kill.argv, ['/PID', '4242', '/T', '/F'], 'taskkill /PID <childpid> /T /F (force whole tree)');
+  assert.equal(kill.opts?.detached, true, 'the killer is detached so it cannot block the loop');
+});
+
+test('killProcessTree -- POSIX kills the process GROUP (process.kill(-pid, SIGKILL)), never spawns taskkill', () => {
+  const killed = [];
+  const savedKill = process.kill;
+  process.kill = (pid, sig) => { killed.push({ pid, sig }); };
+  try {
+    killProcessTree({
+      child: { pid: 999, kill() { killed.push({ pid: 'child-handle', sig: 'fallback' }); } },
+      spawn: () => { throw new Error('spawn (taskkill) must NOT be used on posix'); },
+      platform: 'linux',
+    });
+  } finally {
+    process.kill = savedKill;
+  }
+  assert.ok(killed.some((k) => k.pid === -999 && k.sig === 'SIGKILL'), 'kills the NEGATIVE pid -- the whole process group');
 });
 
 test('Codex adapter fail-closed — no credential → signed blocked verdict', async () => {

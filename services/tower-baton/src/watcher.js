@@ -29,6 +29,30 @@ import { composeReviewBriefing } from './reviewVoice.js';
 
 export const DEFAULT_MAX_ROUNDS = 3;
 
+// Per-cycle WATCHDOG bound (WP1). A single checkpoint's processing must NEVER be able
+// to hang the poll loop silently. This deadline sits OUTSIDE the codex turn timeout
+// (default 8min) so that: codex reaps its own process tree first; if a cycle still
+// exceeds this bound for ANY reason, the watcher ABORTS the cycle, posts a recoverable
+// TOWER_RUN_FAILED verdict, and KEEPS POLLING. Default 12min > the 8min codex timeout.
+export const DEFAULT_CYCLE_WATCHDOG_MS = 12 * 60 * 1000;
+// The recoverable-failure post (ClickUp reply + milestone) is itself bounded so it can
+// never wedge the loop it is trying to rescue. Best-effort within this deadline.
+export const DEFAULT_FAILURE_POST_DEADLINE_MS = 30 * 1000;
+
+/** Race a promise against a deadline WITHOUT ever rejecting -- resolves `onTimeout` if the
+ *  deadline wins. The timer is always cleared once either side settles, so it never
+ *  lingers; it is NOT unref'd, because the whole point is that the deadline must be able
+ *  to FIRE even when the wrapped operation is wedged (an unref'd deadline can be skipped
+ *  when nothing else keeps the loop alive). */
+function withDeadline(promise, ms, onTimeout) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const done = (v) => { if (!settled) { settled = true; clearTimeout(timer); resolve(v); } };
+    const timer = setTimeout(() => { if (!settled) { settled = true; resolve(onTimeout); } }, ms);
+    Promise.resolve(promise).then(done, () => done(onTimeout));
+  });
+}
+
 // Only these extensions are accepted as local-file briefs. A brief is staged verbatim
 // into the Codex prompt, so it must be plain human-readable build text — never a binary,
 // a script, or a dotfile secret store.
@@ -167,7 +191,7 @@ export function pickMaterialFindings(findings) {
  * @param {function} [deps.now]       injectable clock () => epoch ms
  * @param {function} [deps.log]       injectable logger (redacted by the caller)
  */
-export function createWatcher({ config, clickup, github, codex, notifier, state, taskId, qaSkillPath, repoRoot = null, maxRounds = DEFAULT_MAX_ROUNDS, fs = fsDefault, now = Date.now, log = () => {} } = {}) {
+export function createWatcher({ config, clickup, github, codex, notifier, state, taskId, qaSkillPath, repoRoot = null, maxRounds = DEFAULT_MAX_ROUNDS, fs = fsDefault, now = Date.now, log = () => {}, cycleWatchdogMs = DEFAULT_CYCLE_WATCHDOG_MS, failurePostDeadlineMs = DEFAULT_FAILURE_POST_DEADLINE_MS } = {}) {
   let reconciled = false;
   // Re-entrancy guard: a Codex turn (~60s) is far longer than the poll interval (~15s),
   // so overlapping setInterval ticks would each start a duplicate Codex turn on the SAME
@@ -189,7 +213,7 @@ export function createWatcher({ config, clickup, github, codex, notifier, state,
    * merge. Fail-closed at each gate (bad head, missing brief, malformed skill,
    * Codex blocked) → a BLOCKED reply is still posted so Larry always gets an answer.
    */
-  async function processCheckpoint(checkpoint) {
+  async function processCheckpoint(checkpoint, progress = { stage: 'start' }) {
     const cpId = checkpoint.checkpoint_id;
     // (c) dedup — already answered?
     if (state.isAnswered(cpId)) return { checkpointId: cpId, skipped: 'already-answered' };
@@ -197,12 +221,15 @@ export function createWatcher({ config, clickup, github, codex, notifier, state,
     const ck = chainKey(checkpoint);
 
     // (d) resolve the approved brief + WP scope. Fail-closed + repo-root-contained.
+    progress.stage = 'resolve_brief';
     const brief = await resolveBrief(checkpoint.brief_ref, { fs, clickup, taskId, repoRoot });
 
     // (f) load the QA skill fresh + fingerprint. Fail-closed.
+    progress.stage = 'load_skill';
     const skill = loadQaSkill({ path: qaSkillPath, fs });
 
     // (e) verify branch / exact head / diff / CI. Fail-closed.
+    progress.stage = 'collect_evidence';
     const evidence = await github.collect({
       branch: checkpoint.branch, headSha: checkpoint.head_sha, baseSha: checkpoint.base_sha, repo: config?.githubRepo,
     });
@@ -253,6 +280,7 @@ export function createWatcher({ config, clickup, github, codex, notifier, state,
         evidence_refs: checkpoint.evidence_refs ?? [],
         ci_checks: (evidence.checks ?? []).map((c) => `${c.name}:${c.conclusion ?? c.status}`).join(', ') || (evidence.checksError ?? 'none'),
       };
+      progress.stage = 'codex_turn';
       const turn = await codex.runTurn({ checkpoint, packet, skillText: skill.text, promptFingerprint });
       codexResult = turn.structuredResult ?? null;
       signed = { envelope: turn.envelope, signature: turn.signature };
@@ -272,6 +300,7 @@ export function createWatcher({ config, clickup, github, codex, notifier, state,
     // Redact any known secret VALUE before it can reach a ClickUp comment (defence in
     // depth behind brief_ref containment — the reply is public in the thread).
     const body = config?.redact ? config.redact(formatResponse(responseObj)) : formatResponse(responseObj);
+    progress.stage = 'post_reply';
     let posted = null;
     try {
       posted = await clickup.createTaskComment(taskId, body);
@@ -282,6 +311,7 @@ export function createWatcher({ config, clickup, github, codex, notifier, state,
     }
 
     // (i) durable state: mark answered + advance the per-chain round counter.
+    progress.stage = 'record_state';
     state.recordAnswered(cpId, { reviewedHead: responseObj.reviewed_head, verdict: derived.verdict, promptFingerprint, commentId: posted.id, now: now() });
     if (derived.verdict === 'CORRECTIONS_REQUIRED') state.incrementRound(ck);
 
@@ -296,13 +326,103 @@ export function createWatcher({ config, clickup, github, codex, notifier, state,
     // Redact any known secret VALUE from the briefing before it can reach Telegram
     // (defence in depth -- same discipline as the ClickUp reply body above).
     const notifyBody = config?.redact ? config.redact(briefing) : briefing;
+    progress.stage = 'notify';
     await notifier.notifyMilestone({
       purpose: milestonePurpose, logicalSource: 'CODEX',
       body: notifyBody,
       checkpointId: cpId,
     });
 
+    progress.stage = 'done';
     return { checkpointId: cpId, verdict: derived.verdict, posted: true, commentId: posted.id, response: responseObj, signed, chainKey: ck };
+  }
+
+  /**
+   * WP1 -- recoverable-failure reply. When a cycle is ABORTED by the watchdog (silent
+   * hang) or THROWS, post a structured [TOWER -> LARRY] verdict so Larry's handoff gets
+   * an ANSWER (recoverable) instead of a silent 15-min timeout HALT. Uses the EXISTING
+   * verdict vocabulary (BLOCKED) + reply format; the run-failure detail rides in
+   * summary / material_findings. Every step is BOUNDED + best-effort so this rescue path
+   * can never itself wedge the loop.
+   *   evidence carried: checkpoint_id, reviewed_head, stage it failed at, elapsed ms, reason.
+   */
+  async function postRunFailure({ checkpoint, progress, kind, reason, startedAt }) {
+    const cpId = checkpoint?.checkpoint_id ?? '(unknown)';
+    const stage = progress?.stage ?? 'unknown';
+    const elapsedMs = Math.max(0, now() - (startedAt ?? now()));
+    const shortReason = String(reason ?? '').slice(0, 240);
+    const responseObj = {
+      checkpoint_id: cpId,
+      reviewed_head: checkpoint?.head_sha ?? '(unknown)',
+      prompt_fingerprint: '(run-failed)',
+      // TOWER_RUN_FAILED is the run-state; the wire VERDICT stays in the existing
+      // vocabulary (BLOCKED = recoverable, do-not-proceed) so nothing downstream breaks.
+      verdict: 'BLOCKED',
+      summary: `TOWER_RUN_FAILED (${kind}): the review cycle did not complete. state=TOWER_RUN_FAILED stage=${stage} elapsed_ms=${elapsedMs}. ${shortReason}`.trim(),
+      material_findings: [
+        `[${kind}] cycle aborted at stage "${stage}" after ${elapsedMs} ms`,
+        `reason: ${shortReason || '(no detail)'}`,
+      ],
+      next_action: 'Recoverable failure -- the watcher aborted this cycle and kept polling (no HALT). Check for a wedged reviewer/process, confirm the head still resolves, then re-hand off a fresh checkpoint. Do not proceed unsupervised.',
+    };
+    const body = config?.redact ? config.redact(formatResponse(responseObj)) : formatResponse(responseObj);
+
+    // BOUNDED post -- a hung ClickUp write must not re-wedge the loop it is rescuing.
+    let posted = null;
+    try {
+      posted = await withDeadline(clickup.createTaskComment(taskId, body), failurePostDeadlineMs, null);
+    } catch (err) {
+      log(`postRunFailure: post failed for ${cpId}: ${config?.redact ? config.redact(err?.message ?? String(err)) : (err?.message ?? String(err))}`);
+    }
+    // Mark answered so a late resolution / the next poll does NOT reprocess (recovery,
+    // not a slow retry loop). Best-effort.
+    try {
+      state.recordAnswered(cpId, { reviewedHead: responseObj.reviewed_head, verdict: 'BLOCKED', promptFingerprint: null, commentId: posted?.id ?? null, now: now() });
+    } catch { /* best-effort */ }
+    // BOUNDED milestone -- same "blocked" purpose the existing BLOCKED path uses.
+    try {
+      const ding = config?.redact ? config.redact(`BLOCKED - Tower run failed (${kind}) at stage ${stage} after ${elapsedMs} ms.`) : `BLOCKED - Tower run failed (${kind}) at stage ${stage} after ${elapsedMs} ms.`;
+      await withDeadline(notifier.notifyMilestone({ purpose: 'blocked', logicalSource: 'CODEX', body: ding, checkpointId: cpId }), failurePostDeadlineMs, { sent: false });
+    } catch { /* best-effort */ }
+
+    return { checkpointId: cpId, verdict: 'BLOCKED', posted: Boolean(posted), runFailed: true, kind, stage, elapsedMs, response: responseObj };
+  }
+
+  /**
+   * WP1 -- run ONE checkpoint under the outer cycle WATCHDOG. Guarantees the loop
+   * recovers: whichever of {completion, error, watchdog-deadline} lands first wins, and
+   * a deadline or a throw is converted into a recoverable-failure reply. The underlying
+   * processing promise is abandoned on a watchdog abort (a genuinely wedged run never
+   * resolves); the tightened codex tree-kill is what makes that abandonment clean.
+   */
+  async function processCheckpointGuarded(checkpoint) {
+    const startedAt = now();
+    const progress = { stage: 'start', checkpointId: checkpoint?.checkpoint_id ?? null, startedAt };
+    const WATCHDOG = Symbol('watchdog');
+    let timer = null;
+    // The watchdog timer is intentionally NOT unref'd: it must be able to FIRE and rescue
+    // a wedged cycle even if the wedged work is the only other thing pending. It is
+    // always cleared in the finally below, so it never lingers past a completed cycle.
+    const watchdog = new Promise((resolve) => {
+      timer = setTimeout(() => resolve(WATCHDOG), cycleWatchdogMs);
+    });
+    try {
+      const raced = await Promise.race([
+        processCheckpoint(checkpoint, progress).then((r) => ({ ok: true, r }), (e) => ({ ok: false, e })),
+        watchdog,
+      ]);
+      if (raced === WATCHDOG) {
+        log(`processCheckpointGuarded: cycle watchdog fired for ${progress.checkpointId} at stage "${progress.stage}" after ${Math.max(0, now() - startedAt)}ms -- aborting cycle, loop continues`);
+        return await postRunFailure({ checkpoint, progress, kind: 'run_timeout', reason: `cycle exceeded the watchdog bound (${cycleWatchdogMs}ms) at stage "${progress.stage}"`, startedAt });
+      }
+      if (raced.ok) return raced.r;
+      // The cycle THREW -- convert to a recoverable failure reply (never crash the loop).
+      const msg = config?.redact ? config.redact(raced.e?.message ?? String(raced.e)) : (raced.e?.message ?? String(raced.e));
+      log(`processCheckpointGuarded: cycle threw for ${progress.checkpointId} at stage "${progress.stage}": ${msg}`);
+      return await postRunFailure({ checkpoint, progress, kind: 'run_error', reason: msg, startedAt });
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
   }
 
   return {
@@ -340,7 +460,7 @@ export function createWatcher({ config, clickup, github, codex, notifier, state,
             skipped.push({ checkpointId: cp.checkpoint_id, reason: 'unauthorised-author' });
             continue;
           }
-          const r = await processCheckpoint(cp);
+          const r = await processCheckpointGuarded(cp);
           if (r.skipped) skipped.push({ checkpointId: r.checkpointId, reason: r.skipped });
           else processed.push(r);
         }

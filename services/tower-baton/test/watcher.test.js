@@ -13,7 +13,7 @@ import { wireText } from '../src/telegramNotifier.js';
 
 const HEAD = '1390dd6a1b2c3d4e5f60718293a4b5c6d7e8f900';
 
-function harness({ codex, github, comments, briefRef, roundsSeed, reviewMode, authorIds = 'larry', commentUser, extraEnv = {} } = {}) {
+function harness({ codex, github, comments, briefRef, roundsSeed, reviewMode, authorIds = 'larry', commentUser, extraEnv = {}, cycleWatchdogMs, failurePostDeadlineMs } = {}) {
   // authorIds === null → leave TOWER_AUTHORISED_AUTHOR_IDS unset (exercise fail-closed).
   const env = { GITHUB_REPO: 'o/r' };
   if (authorIds !== null) env.TOWER_AUTHORISED_AUTHOR_IDS = authorIds;
@@ -36,6 +36,8 @@ function harness({ codex, github, comments, briefRef, roundsSeed, reviewMode, au
   const watcher = createWatcher({
     config, clickup, github: github ?? fakeGithub(), codex: codex ?? fakeCodex(),
     notifier, state, taskId: 'task1', qaSkillPath: skillPath, fs, now: () => 1000,
+    ...(cycleWatchdogMs !== undefined ? { cycleWatchdogMs } : {}),
+    ...(failurePostDeadlineMs !== undefined ? { failurePostDeadlineMs } : {}),
   });
   return { watcher, clickup, state, notifier, codex: codex ?? undefined, skillFp, cp, brief };
 }
@@ -222,6 +224,64 @@ test('no notification for internal file/test chatter — only milestones notify'
   const d = deriveVerdict({ codexResult: { status: 'ok', verdict: 'approve', findings: [] }, roundsSpent: 0 });
   assert.equal(d.verdict, 'APPROVE');
   assert.ok(milestone.includes('review_posted'));
+});
+
+// -- WP1: stuck-run watchdog + recoverable-failure evidence -------------------
+
+test('cycle watchdog -- a WEDGED Codex turn is aborted, a recoverable TOWER_RUN_FAILED verdict is posted, and the loop recovers', async () => {
+  // Simulate the exact defect: a codex turn that does not return within the cycle bound.
+  // A deferred stands in for the wedged turn; the watchdog must fire and rescue the loop
+  // WITHOUT waiting for it. We settle the deferred at the end only to leave the test
+  // runner nothing pending.
+  let releaseTurn;
+  const wedged = new Promise((res) => { releaseTurn = res; });
+  const codex = { calls: [], async runTurn(a) { this.calls.push(a); return wedged; } };
+  const h = harness({ codex, cycleWatchdogMs: 40, failurePostDeadlineMs: 40 });
+  const r = await h.watcher.pollOnce(); // MUST return (not hang) -- the loop recovers
+  const reply = lastReply(h.clickup);
+  assert.ok(reply, 'a [TOWER -> LARRY] reply was still posted (no silent HALT)');
+  assert.equal(reply.verdict, 'BLOCKED', 'a wedged cycle posts a recoverable BLOCKED verdict (existing vocabulary)');
+  assert.match(reply.summary, /TOWER_RUN_FAILED/, 'the run-state TOWER_RUN_FAILED is carried');
+  assert.match(reply.summary, /run_timeout/, 'the failure kind is run_timeout');
+  assert.match(reply.summary, /stage=codex_turn/, 'the stage it wedged at is reported');
+  assert.match(reply.summary, /elapsed_ms=/, 'elapsed ms is reported');
+  assert.equal(reply.reviewed_head, HEAD, 'the reviewed head is carried as evidence');
+  assert.equal(r.processed.length, 1, 'the aborted cycle is surfaced as a processed run-failure');
+  assert.equal(r.processed[0].runFailed, true);
+  assert.equal(r.processed[0].kind, 'run_timeout');
+  assert.ok(h.notifier.calls.some((c) => c.purpose === 'blocked'), 'a blocked milestone fired for the failure');
+  // The loop truly recovered: a second poll does NOT reprocess the now-answered checkpoint.
+  const r2 = await h.watcher.pollOnce();
+  assert.equal(r2.processed.length, 0, 'answered -- not reprocessed (recovery, not a retry loop)');
+  // Settle the abandoned turn + drain so the test runner has no pending promise.
+  releaseTurn({ ok: false, blocked: true, structuredResult: { status: 'blocked', kind: 'test' }, envelope: {}, signature: null });
+  await wedged;
+  await new Promise((res) => setTimeout(res, 0));
+});
+
+test('cycle failure -- a THROWING Codex turn posts a recoverable run_error verdict and keeps polling', async () => {
+  const codex = { calls: [], async runTurn() { throw new Error('codex spawn exploded'); } };
+  const h = harness({ codex });
+  const r = await h.watcher.pollOnce();
+  const reply = lastReply(h.clickup);
+  assert.equal(reply.verdict, 'BLOCKED', 'a thrown cycle fails closed to a recoverable BLOCKED');
+  assert.match(reply.summary, /TOWER_RUN_FAILED/);
+  assert.match(reply.summary, /run_error/, 'a throw is classified run_error');
+  assert.match(reply.summary, /stage=codex_turn/);
+  assert.equal(r.processed[0].runFailed, true);
+});
+
+test('cycle-failure post redacts secret VALUES before they reach the thread', async () => {
+  // The thrown error carries a secret value; the recoverable-failure reply must be
+  // passed through config.redact (same discipline as the normal reply path).
+  const leak = 'runfail-secret-value-000003';
+  const codex = { calls: [], async runTurn() { throw new Error(`boom ${leak}`); } };
+  const h = harness({ codex, extraEnv: { TELEGRAM_BOT_TOKEN: leak } });
+  await h.watcher.pollOnce();
+  const posts = towerReplies(h.clickup);
+  const raw = posts[posts.length - 1].comment_text;
+  assert.ok(!raw.includes(leak), 'the secret VALUE does not leak into the recoverable-failure reply');
+  assert.ok(raw.includes('***redacted***'), 'the failure reply was passed through config.redact');
 });
 
 test('resolveBrief — reads a local file, fail-closed otherwise', async () => {

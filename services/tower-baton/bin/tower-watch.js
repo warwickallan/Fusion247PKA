@@ -120,10 +120,15 @@ async function main() {
   const github = createGithubEvidence({ repoDir, repo: config.githubRepo });
   // NOTE: the Codex adapter is constructed WITHOUT any Telegram/ClickUp secret; its
   // child env is additionally sanitised (sanitizeCodexEnv) at spawn time.
-  const codex = createCodexAdapter({ config, cwd: repoDir });
+  // WP1 reliability knobs (bounded, coordinated): the codex turn timeout must sit INSIDE
+  // the per-cycle watchdog so codex reaps its OWN process tree first; the watchdog is the
+  // outer safety net that guarantees the poll loop can never wedge silently.
+  const codexTimeoutMs = Number(process.env.TOWER_CODEX_TIMEOUT_MS) > 0 ? Number(process.env.TOWER_CODEX_TIMEOUT_MS) : undefined;
+  const cycleWatchdogMs = Number(process.env.TOWER_CYCLE_WATCHDOG_MS) > 0 ? Number(process.env.TOWER_CYCLE_WATCHDOG_MS) : undefined;
+  const codex = createCodexAdapter({ config, cwd: repoDir, log, ...(codexTimeoutMs ? { timeoutMs: codexTimeoutMs } : {}) });
   const notifier = createMilestoneNotifier({ config, state });
 
-  const watcher = createWatcher({ config, clickup, github, codex, notifier, state, taskId, qaSkillPath, repoRoot: repoDir, fs, log });
+  const watcher = createWatcher({ config, clickup, github, codex, notifier, state, taskId, qaSkillPath, repoRoot: repoDir, fs, log, ...(cycleWatchdogMs ? { cycleWatchdogMs } : {}) });
 
   // 5. startup ding — via TOWER'S OWN NOTIFIER (real event).
   await notifier.notifyMilestone({
