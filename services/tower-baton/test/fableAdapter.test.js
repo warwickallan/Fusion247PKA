@@ -339,3 +339,66 @@ test('MAJOR E -- wireFable: ENABLED but UNPROVISIONED fails LOUD (fatal), never 
   assert.equal(w2.fatal, true, 'enabled-but-no-auth is fatal at startup');
   assert.equal(w2.fable, null);
 });
+
+// ── HIGH #4 — tighten Fable model attestation (exact/dated match + credible usage entry) ──
+
+// Build a claude `--output-format json` stdout whose modelUsage is exactly `usageMap`.
+function fableStdoutWithModelUsage(usageMap) {
+  const result = { verdict: 'approve', summary: 'ok', claims_verified: [], findings: [], proposed_action: { type: 'noop', target: '' } };
+  return JSON.stringify({ type: 'result', subtype: 'success', is_error: false, result: JSON.stringify(result), usage: { output_tokens: 5 }, modelUsage: usageMap });
+}
+
+function runFableWithModelUsage(usageMap) {
+  const fable = createFableAdapter({
+    config: { signingSecret: () => null },
+    spawn: fakeSpawn({ stdout: fableStdoutWithModelUsage(usageMap), code: 0 }),
+    resolveBin: () => ({ path: 'C:/fake/claude.exe', source: 'test', error: null }),
+    authProbe: () => ({ authenticated: true, method: 'oauth-credentials' }),
+  });
+  return fable.runTurn({ checkpoint: { checkpoint_id: 'cp-1', head_sha: 'abc' }, packet: { head_sha: 'abc' }, skillText: 's', promptFingerprint: 'fp' });
+}
+
+test('HIGH #4 — a NULL modelUsage entry ({"claude-fable-5": null}) fails closed (model_unverified)', async () => {
+  const turn = await runFableWithModelUsage({ 'claude-fable-5': null });
+  assert.equal(turn.blocked, true, 'a null attestation entry is not a credible model confirmation');
+  assert.equal(turn.kind, 'model_unverified');
+  assert.equal(turn.signerPrincipal, 'claude_fable');
+});
+
+test('HIGH #4 — an EMPTY modelUsage entry ({"claude-fable-5": {}}) fails closed (model_unverified: no credible numeric usage)', async () => {
+  const turn = await runFableWithModelUsage({ 'claude-fable-5': {} });
+  assert.equal(turn.blocked, true);
+  assert.equal(turn.kind, 'model_unverified');
+});
+
+test('HIGH #4 — "claude-fable-50" is REJECTED as a model substitution (startsWith no longer accepts unrelated ids)', async () => {
+  const turn = await runFableWithModelUsage({ 'claude-fable-50': { outputTokens: 5 } });
+  assert.equal(turn.blocked, true, 'claude-fable-50 must NOT be accepted as claude-fable-5');
+  assert.equal(turn.kind, 'model_substituted');
+});
+
+test('HIGH #4 — "claude-fable-5-evil" is REJECTED as a model substitution', async () => {
+  const turn = await runFableWithModelUsage({ 'claude-fable-5-evil': { outputTokens: 5 } });
+  assert.equal(turn.blocked, true, 'claude-fable-5-evil must NOT prefix-match claude-fable-5');
+  assert.equal(turn.kind, 'model_substituted');
+});
+
+test('HIGH #4 — MULTIPLE matching entries are ambiguous and fail closed (model_unverified)', async () => {
+  const turn = await runFableWithModelUsage({ 'claude-fable-5': { outputTokens: 5 }, 'claude-fable-5-20260101': { outputTokens: 3 } });
+  assert.equal(turn.blocked, true, 'an ambiguous multi-match attestation must not be signed');
+  assert.equal(turn.kind, 'model_unverified');
+});
+
+test('HIGH #4 — the EXACT alias "claude-fable-5" with real numeric usage is ACCEPTED', async () => {
+  const turn = await runFableWithModelUsage({ 'claude-fable-5': { outputTokens: 42 } });
+  assert.equal(turn.ok, true, 'the exact alias with credible numeric usage is the real model');
+  assert.notEqual(turn.blocked, true);
+  assert.equal(turn.structuredResult.verdict, 'approve');
+});
+
+test('HIGH #4 — a DATED id "claude-fable-5-20260101" with real numeric usage is ACCEPTED', async () => {
+  const turn = await runFableWithModelUsage({ 'claude-fable-5-20260101': { outputTokens: 7 } });
+  assert.equal(turn.ok, true, 'a dated claude-fable-5-YYYYMMDD id with credible usage is accepted');
+  assert.notEqual(turn.blocked, true);
+  assert.equal(turn.structuredResult.verdict, 'approve');
+});

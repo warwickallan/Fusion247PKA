@@ -58,7 +58,9 @@ test('FINDING #1 -- computeMergeReady requires BOTH principals to carry the CURR
   assert.equal(computeMergeReady({ ...g, codexHead: 'A', fableHead: 'B', currentHead: 'B' }), false, 'codex reviewed a stale head -> NOT merge-ready');
   assert.equal(computeMergeReady({ ...g, codexHead: 'B', fableHead: 'A', currentHead: 'B' }), false, 'fable reviewed a stale head -> NOT merge-ready');
   assert.equal(computeMergeReady({ ...g, codexHead: null, fableHead: 'A', currentHead: 'A' }), false, 'an unknown codex head fails closed');
-  assert.equal(computeMergeReady({ ...g }), true, 'absent head evidence preserves the prior (unit) behaviour');
+  // HIGH #2 -- the old undefined-head ESCAPE is REMOVED: absent head evidence no longer fails
+  // open to merge-ready. There is now no path to merge-ready without positive, matching heads.
+  assert.equal(computeMergeReady({ ...g }), false, 'absent head evidence now fails CLOSED (no fail-open escape)');
 });
 
 test('FINDING #1(a) -- checkpoint_id REUSE at a NEW head forces a FRESH codex turn; NOT merge-ready via the stale approval', async () => {

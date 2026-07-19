@@ -46,12 +46,13 @@ export function computeMergeReady({ codexVerdict, fableVerdict, codexRawVerdict,
   const bothDerivedApprove = codexVerdict === 'APPROVE' && fableVerdict === 'APPROVE';
   const bothGenuineApprove = codexRawVerdict === 'approve' && fableRawVerdict === 'approve';
   // CRIT #1 -- HEAD BINDING at the gate. merge-ready may ONLY combine a codex-approve and a
-  // fable-approve that BOTH reviewed the CURRENT head. When head evidence is supplied (the
-  // watcher always supplies it), require codexHead === fableHead === currentHead; a stale
-  // codex approval carried forward from an earlier head can never vouch a different head.
-  // Absent head evidence (bare unit call) the check is skipped, preserving prior behaviour.
-  const headsBind = (codexHead === undefined && fableHead === undefined && currentHead === undefined)
-    || (Boolean(currentHead) && codexHead === currentHead && fableHead === currentHead);
+  // fable-approve that BOTH reviewed the CURRENT head. Require a NON-EMPTY currentHead AND
+  // codexHead === fableHead === currentHead; a stale codex approval carried forward from an
+  // earlier head can never vouch a different head.
+  // HIGH #2 -- the old undefined-head ESCAPE (all three heads undefined -> headsBind=true) is
+  // REMOVED: it was a latent fail-open for any future caller/test/refactor that omitted the
+  // head fields. There is now no path to merge-ready without positive, matching head evidence.
+  const headsBind = Boolean(currentHead) && codexHead === currentHead && fableHead === currentHead;
   return bothDerivedApprove && bothGenuineApprove && headsBind;
 }
 
@@ -288,10 +289,19 @@ export function createWatcher({ config, clickup, github, codex, fable = null, no
     // read wedged past the deadline and was abandoned, and the next poll started a fresh
     // reconcile), do NOT mutate state -- the newer generation owns the rebuild.
     if (gen !== reconcileGen) return { superseded: true };
+    // CRIT #1 -- HEAD-AWARE reconcile. Build the CURRENT head per live checkpoint_id from the
+    // [LARRY -> TOWER] checkpoints on the thread so a terminal reply only dedups a checkpoint
+    // when it reviewed the CURRENT head. A reused checkpoint_id at a NEW head B carrying only a
+    // head-A terminal reply is therefore NOT marked answered -- it gets a FRESH review at B.
+    const checkpointHeads = new Map();
+    for (const c of comments ?? []) {
+      const parsed = parseCheckpoint(c?.comment_text ?? c?.text ?? c?.body ?? '');
+      if (parsed.ok && parsed.checkpoint.checkpoint_id) checkpointHeads.set(parsed.checkpoint.checkpoint_id, parsed.checkpoint.head_sha);
+    }
     // Mode-aware terminal dedup: with Fable enabled a codex APPROVE without a fable reply
     // is NOT terminal, so it stays reviewable (its cold-final resumes) rather than being
     // silently marked answered from the codex reply alone (MEDIUM G #b).
-    const ids = terminallyAnsweredCheckpointIds(comments, { fableEnabled, isTrustedAuthor: isTrustedReplyAuthor });
+    const ids = terminallyAnsweredCheckpointIds(comments, { fableEnabled, isTrustedAuthor: isTrustedReplyAuthor, checkpointHeads });
     state.mergeAnsweredIds([...ids]);
     reconciled = true;
     return { rebuiltFromThread: [...ids] };
@@ -315,8 +325,11 @@ export function createWatcher({ config, clickup, github, codex, fable = null, no
       log(`processCheckpoint: ${cpId} superseded (watchdog already fired) -- suppressing late side effect at "${where}"`);
       return false;
     };
-    // (c) dedup — already answered?
-    if (state.isAnswered(cpId)) return { checkpointId: cpId, skipped: 'already-answered' };
+    // (c) dedup — already answered AT THIS HEAD? CRIT #1 (durable-cache arm): the dedup is
+    // HEAD-BOUND, so a checkpoint_id genuinely answered at an EARLIER head does not short-circuit
+    // a REUSE of that id at the CURRENT head -- it runs a fresh review. A re-post at the SAME head
+    // is still deduped. (Mirrors the head-bound pollOnce short-circuit below; both gates agree.)
+    if (state.isAnswered(cpId, checkpoint.head_sha)) return { checkpointId: cpId, skipped: 'already-answered' };
 
     const ck = chainKey(checkpoint);
 
@@ -326,10 +339,16 @@ export function createWatcher({ config, clickup, github, codex, fable = null, no
     const priorTower = findTowerReplyFor(comments, cpId, { isTrustedAuthor: isTrustedReplyAuthor });
     const inProgress = state.getInProgress ? state.getInProgress(cpId) : null;
 
-    if (priorFable) {
-      // The cold-final terminal already landed on the thread (e.g. a crash/timeout right
-      // AFTER the fable post but BEFORE recordAnswered). Record it answered idempotently --
-      // never re-run codex/fable, never post a duplicate reply.
+    if (priorFable && priorFable.reviewed_head && priorFable.reviewed_head === checkpoint.head_sha) {
+      // The cold-final terminal already landed on the thread for THIS EXACT head (e.g. a
+      // crash/timeout right AFTER the fable post but BEFORE recordAnswered). Record it
+      // answered idempotently -- never re-run codex/fable, never post a duplicate reply.
+      // CRIT #1 -- HEAD BIND: this idempotency path is ONLY valid when the fable reply
+      // reviewed the CURRENT checkpoint head. A merge-ready fable reply for a DIFFERENT head
+      // (a reused checkpoint_id at a NEW head B while a head-A fable reply exists on the
+      // thread) must NOT record answered and must NOT import merge_ready -- so we fall through
+      // to a FRESH review at the current head (the same way the resume path discards a stale
+      // approval). merge_ready is only ever trusted from a reply for the MATCHING head.
       state.recordAnswered(cpId, { reviewedHead: priorFable.reviewed_head, verdict: priorFable.verdict, promptFingerprint: priorFable.prompt_fingerprint, commentId: priorFable.comment_id, now: now(), mergeReady: priorFable.merge_ready === 'yes' });
       return { checkpointId: cpId, skipped: 'already-answered-thread' };
     }
@@ -647,7 +666,16 @@ export function createWatcher({ config, clickup, github, codex, fable = null, no
     // notify (or a notify that throws) must NOT post a contradictory TOWER_RUN_FAILED BLOCKED
     // nor recordAnswered over it (which would downgrade merge_ready:true -> BLOCKED). Guard on
     // BOTH the answered flag AND a post-terminal stage (the reply+record already happened).
-    const POST_TERMINAL_STAGES = new Set(['record_state', 'notify', 'notify_fable', 'done']);
+    //
+    // MAJOR #3 -- 'record_state' is DELIBERATELY NOT in this set. progress.stage is advanced to
+    // 'record_state' BEFORE state.recordAnswered persists; if that durable write THROWS, the
+    // checkpoint is NOT actually answered (isAnswered === false) yet the stage reads
+    // 'record_state'. Treating that stage as terminal here would silently no-op the recovery and
+    // leave the checkpoint unanswered forever. The genuine F2 protection is preserved by the
+    // isAnswered(cpId) guard: once recordAnswered SUCCEEDS the checkpoint is answered, so a
+    // wedge/throw at the following notify/notify_fable/done stages is still guarded (both by
+    // isAnswered AND by those stages remaining in the set).
+    const POST_TERMINAL_STAGES = new Set(['notify', 'notify_fable', 'done']);
     if (state.isAnswered(cpId) || POST_TERMINAL_STAGES.has(stage)) {
       log(`postRunFailure: ${cpId} already terminal (answered=${state.isAnswered(cpId)}, stage="${stage}") -- NOT posting/recording a contradictory run-failure`);
       const ans = state.getAnswered?.(cpId) ?? null;
@@ -848,7 +876,12 @@ export function createWatcher({ config, clickup, github, codex, fable = null, no
           const parsed = parseCheckpoint(c.comment_text ?? c.text ?? '');
           if (!parsed.ok) continue; // not a checkpoint (or malformed → ignored on the read side)
           const cp = parsed.checkpoint;
-          if (state.isAnswered(cp.checkpoint_id)) { skipped.push({ checkpointId: cp.checkpoint_id, reason: 'already-answered' }); continue; }
+          // CRIT #1 (durable-cache arm): HEAD-BOUND dedup. This is the FIRST-hit dedup gate in
+          // the runtime path (it runs before processCheckpoint), so it MUST also be head-aware --
+          // otherwise a durable answer at an earlier head short-circuits a reused id at the
+          // current head here and the processCheckpoint gate is never reached. A thread-rebuild
+          // (null-head) record still dedups for any head (see state.isAnswered's carve-outs).
+          if (state.isAnswered(cp.checkpoint_id, cp.head_sha)) { skipped.push({ checkpointId: cp.checkpoint_id, reason: 'already-answered' }); continue; }
           // AUTHOR GATE (defence in depth over the [LARRY → TOWER] text marker): only an
           // allowlisted ClickUp author may trigger a Codex turn. The marker alone is NOT
           // trust — anyone can type it into a comment.

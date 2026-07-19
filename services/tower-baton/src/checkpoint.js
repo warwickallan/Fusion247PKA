@@ -276,8 +276,29 @@ export function findFableReplyFor(comments, checkpointId, { isTrustedAuthor = nu
  *   · a non-APPROVE [TOWER -> LARRY] reply exists (never routes to Fable -- terminal), OR
  *   · fable routing is DISABLED and any [TOWER -> LARRY] reply exists (codex-only path).
  * An APPROVE [TOWER -> LARRY] with NO fable reply while fable is enabled is NOT terminal.
+ *
+ * CRIT #1 -- HEAD-AWARENESS. A terminal reply only dedups a checkpoint for the HEAD it
+ * reviewed. `checkpointHeads` (optional) is a Map/object of checkpoint_id -> the CURRENT
+ * (live) head_sha of that checkpoint on the thread; when supplied, a reply only counts when
+ * its reviewed_head EQUALS the current head -- so a reply for a STALE head (a reused
+ * checkpoint_id at a NEW head) does NOT mark the current checkpoint answered. When absent,
+ * behaviour is head-blind (legacy), preserved for callers that do not thread heads.
  */
-export function terminallyAnsweredCheckpointIds(comments, { fableEnabled = false, isTrustedAuthor = null } = {}) {
+export function terminallyAnsweredCheckpointIds(comments, { fableEnabled = false, isTrustedAuthor = null, checkpointHeads = null } = {}) {
+  // headMatches: when checkpointHeads is supplied, require the reply's reviewed_head to equal
+  // the current head for that checkpoint_id. If the current head is unknown (the checkpoint is
+  // no longer on the thread), be conservative and do NOT dedup -- a fresh review is always
+  // safer than a wrongly-skipped one. Absent the map entirely, head is not checked (legacy).
+  const currentHeadOf = (id) => {
+    if (!checkpointHeads) return undefined;
+    return checkpointHeads instanceof Map ? checkpointHeads.get(id) : checkpointHeads[id];
+  };
+  const headMatches = (id, reviewedHead) => {
+    if (!checkpointHeads) return true;
+    const cur = currentHeadOf(id);
+    if (!cur) return false;
+    return Boolean(reviewedHead) && reviewedHead === cur;
+  };
   const towerApprove = new Set();
   const towerNonApprove = new Set();
   const fableReplied = new Set();
@@ -287,12 +308,12 @@ export function terminallyAnsweredCheckpointIds(comments, { fableEnabled = false
     if (isTrustedAuthor && !isTrustedAuthor(c?.user)) continue;
     const text = c?.comment_text ?? c?.text ?? c?.body ?? '';
     const tr = parseResponse(text);
-    if (tr.ok && tr.response.checkpoint_id) {
+    if (tr.ok && tr.response.checkpoint_id && headMatches(tr.response.checkpoint_id, tr.response.reviewed_head)) {
       if (tr.response.verdict === 'APPROVE') towerApprove.add(tr.response.checkpoint_id);
       else towerNonApprove.add(tr.response.checkpoint_id);
     }
     const fr = parseFableResponse(text);
-    if (fr.ok && fr.response.checkpoint_id) fableReplied.add(fr.response.checkpoint_id);
+    if (fr.ok && fr.response.checkpoint_id && headMatches(fr.response.checkpoint_id, fr.response.reviewed_head)) fableReplied.add(fr.response.checkpoint_id);
   }
   const answered = new Set([...towerNonApprove, ...fableReplied]);
   for (const id of towerApprove) {

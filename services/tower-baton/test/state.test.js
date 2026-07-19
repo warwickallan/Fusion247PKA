@@ -132,3 +132,20 @@ test('notify dedup cache persists', () => {
   assert.equal(s.isNotified('k1'), true);
   assert.equal(openState({ statePath }).isNotified('k1'), true);
 });
+
+test('CRIT #1 (durable-cache) — isAnswered is HEAD-AWARE via an optional head arg, null-tolerant for thread-rebuild records', () => {
+  const state = openState({ statePath: tmpPath('.json') });
+  state.recordAnswered('cp-1', { reviewedHead: 'headA', verdict: 'APPROVE', promptFingerprint: 'fp', commentId: 'c1', now: 1, mergeReady: true });
+  // legacy no-head call: unchanged behaviour (any record counts)
+  assert.equal(state.isAnswered('cp-1'), true);
+  // SAME head: still deduped (idempotency preserved)
+  assert.equal(state.isAnswered('cp-1', 'headA'), true);
+  // reused id at a NEW head: NOT answered -> a fresh review is allowed
+  assert.equal(state.isAnswered('cp-1', 'headB'), false);
+  // unknown id is never answered
+  assert.equal(state.isAnswered('nope', 'headA'), false);
+  // thread-rebuild record (reviewed_head null) dedups for ANY head (conservative carve-out)
+  state.mergeAnsweredIds(['cp-2']);
+  assert.equal(state.isAnswered('cp-2'), true);
+  assert.equal(state.isAnswered('cp-2', 'anyhead'), true);
+});

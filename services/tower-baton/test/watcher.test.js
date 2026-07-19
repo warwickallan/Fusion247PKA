@@ -465,3 +465,67 @@ test('author gate — MISSING config fails closed (no Codex turn, no reply)', as
   assert.equal(towerReplies(h.clickup).length, 0);
   assert.ok(r.skipped.some((s) => s.reason === 'author-allowlist-unconfigured'));
 });
+
+// ── MAJOR (Fix 3) — record_state must not be classified terminal when the durable write failed ──
+
+test('MAJOR (Fix 3) — a recordAnswered FAILURE at record_state (isAnswered still false) is NOT swallowed: the recovery path acts', async () => {
+  const codex = fakeCodex(); // APPROVE, codex-only (no fable wired in this harness)
+  const h = harness({ codex });
+  // Force the terminal durable write to THROW, leaving the checkpoint UNANSWERED while
+  // progress.stage === 'record_state'. The old POST_TERMINAL_STAGES included 'record_state',
+  // so postRunFailure treated the stage as terminal, no-op'd, and silently swallowed the
+  // failure — the checkpoint stayed unanswered with no recovery.
+  let threw = false;
+  h.state.recordAnswered = () => { threw = true; throw new Error('simulated durable write failure at record_state'); };
+
+  await h.watcher.pollOnce();
+
+  assert.ok(threw, 'the terminal durable write was attempted and threw');
+  const recoveries = towerReplies(h.clickup)
+    .map((c) => parseResponse(c.comment_text).response)
+    .filter((rr) => /TOWER_RUN_FAILED/.test(rr.summary ?? ''));
+  assert.equal(recoveries.length, 1, "a recovery TOWER_RUN_FAILED verdict was posted — the failure was NOT silently no-op'd");
+  assert.match(recoveries[0].summary, /stage=record_state/, 'the recovery reports the record_state stage it failed at');
+  assert.equal(h.state.isAnswered('cp-100'), false, 'the checkpoint remains unanswered (a recovery, not a false terminal)');
+});
+
+// ── CRIT #1 (durable-cache arm) — a checkpoint_id ANSWERED at head A, reused at head B ──
+
+test('CRIT #1 (durable-cache, end-to-end) — an ANSWERED checkpoint_id reused at a NEW head runs a FRESH review; a re-post at the SAME head is still deduped', async () => {
+  const env = { GITHUB_REPO: 'o/r', TOWER_AUTHORISED_AUTHOR_IDS: 'larry' };
+  const config = loadConfig({ env, home: tmpPath() });
+  const skillPath = writeTmp(approvedSkill(1), '.md');
+  const brief = writeTmp('# Brief\nacceptance: works', '.md');
+  const state = openState({ statePath: tmpPath('.json') });
+  const HA = 'a1390dd6a1b2c3d4e5f60718293a4b5c6d7e8f90';
+  const HB = 'b1390dd6a1b2c3d4e5f60718293a4b5c6d7e8f90';
+  let head = HA;
+  const mkCp = (h) => formatCheckpoint({ state: 'READY_FOR_TOWER_REVIEW', checkpoint_id: 'cp-x', build_id: 'B', wp_id: 'W', brief_ref: brief, branch: 'b', head_sha: h, summary: 's', tests: 't', evidence_refs: [] });
+  const store = [];
+  const clickup = {
+    _comments: store,
+    async getTaskComments() { return [{ id: 'seed', comment_text: mkCp(head), user: 'larry' }, ...store.map((c) => ({ ...c }))]; },
+    async createTaskComment(_t, body) { const id = `p${store.length + 1}`; store.push({ id, comment_text: body, user: 'tower' }); return { id }; },
+  };
+  const codex = fakeCodex();
+  const watcher = createWatcher({ config, clickup, github: fakeGithub(), codex, notifier: fakeNotifier(), state, taskId: 't', qaSkillPath: skillPath, fs, now: () => 1000 });
+
+  // Poll 1: cp-x answered at head A.
+  await watcher.pollOnce();
+  assert.equal(codex.calls.length, 1, 'codex reviewed head A once');
+  assert.equal(state.isAnswered('cp-x'), true);
+  assert.equal(state.getAnswered('cp-x').reviewed_head, HA);
+
+  // Poll 2: SAME head A re-seen -> still deduped (idempotency preserved).
+  const rSame = await watcher.pollOnce();
+  assert.equal(rSame.processed.length, 0, 'a re-poll at the SAME head A is still deduped');
+  assert.equal(codex.calls.length, 1, 'no fresh review at the same head');
+
+  // Poll 3: Larry REUSES the SAME checkpoint_id at a NEW head B (durable-cache residual).
+  head = HB;
+  const r2 = await watcher.pollOnce();
+  assert.equal(codex.calls.length, 2, 'the durable head-A answer no longer short-circuits the reused id at head B — a fresh review ran');
+  assert.equal(codex.calls[1].packet.head_sha, HB, 'the fresh review is at head B');
+  assert.equal(r2.processed.length, 1, 'cp-x@B was processed, not skipped as already-answered');
+  assert.equal(state.getAnswered('cp-x').reviewed_head, HB, 'the recorded answer is now head B');
+});

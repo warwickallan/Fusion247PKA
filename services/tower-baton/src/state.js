@@ -72,7 +72,23 @@ export function openState({ statePath = DEFAULT_STATE_PATH, fs = fsDefault } = {
     existedAtOpen,
     raw() { return data; },
 
-    isAnswered(checkpointId) { return Boolean(data.answered[checkpointId]); },
+    // HEAD-AWARE dedup (CRIT #1, durable-cache arm). When `head` is supplied, a checkpoint
+    // counts as answered ONLY when the stored terminal reviewed THAT head -- so a checkpoint_id
+    // genuinely answered at head A and then REUSED at head B is no longer short-circuited; it
+    // gets a fresh review at B. Two back-compat carve-outs preserve every other call site:
+    //   · head omitted (null/undefined) -> legacy: any answered record counts. All the OTHER
+    //     callers (the postRunFailure F2 terminal-guard) pass no head and keep exact semantics.
+    //   · stored reviewed_head null      -> a thread-rebuild (cold-start reconcile) record whose
+    //     head was not captured by mergeAnsweredIds. Fix 1 Part B already guarantees reconcile
+    //     only rebuilds ids whose terminal matched the CURRENT head, so an unknown-head record
+    //     is treated as answered for ANY head (conservative -- never re-review a thread-confirmed
+    //     terminal on a cold start).
+    isAnswered(checkpointId, head = null) {
+      const rec = data.answered[checkpointId];
+      if (!rec) return false;
+      if (head == null || rec.reviewed_head == null) return true;
+      return rec.reviewed_head === head;
+    },
     getAnswered(checkpointId) { return data.answered[checkpointId] ?? null; },
 
     recordAnswered(checkpointId, { reviewedHead, verdict, promptFingerprint, commentId, now = Date.now(), mergeReady = null } = {}) {

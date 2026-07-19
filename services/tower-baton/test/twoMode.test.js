@@ -12,14 +12,14 @@ import { DEFAULT_FABLE_TIMEOUT_MS } from '../src/fableAdapter.js';
 import { loadConfig } from '../src/config.js';
 import { loadQaSkill } from '../src/qaSkill.js';
 import { openState } from '../src/state.js';
-import { formatCheckpoint, formatResponse, parseResponse, parseFableResponse } from '../src/checkpoint.js';
+import { formatCheckpoint, formatResponse, formatFableResponse, parseResponse, parseFableResponse, terminallyAnsweredCheckpointIds } from '../src/checkpoint.js';
 import { createFakeClickup } from '../src/clickupClient.js';
 import { fakeGithub, fakeCodex, fakeFable, fakeNotifier, writeTmp, approvedSkill, tmpPath } from '../test-helpers/fakes.js';
 import { wireText } from '../src/telegramNotifier.js';
 
 const HEAD = '1390dd6a1b2c3d4e5f60718293a4b5c6d7e8f900';
 
-function harness({ codex, fable, extraEnv = {}, cycleWatchdogMs, failurePostDeadlineMs, makeClickup, briefRef } = {}) {
+function harness({ codex, fable, extraEnv = {}, cycleWatchdogMs, failurePostDeadlineMs, makeClickup, briefRef, headSha = HEAD, seedComments = [] } = {}) {
   const env = { GITHUB_REPO: 'o/r', TOWER_AUTHORISED_AUTHOR_IDS: 'larry' };
   Object.assign(env, extraEnv);
   const config = loadConfig({ env, home: tmpPath() });
@@ -29,17 +29,17 @@ function harness({ codex, fable, extraEnv = {}, cycleWatchdogMs, failurePostDead
   const notifier = fakeNotifier();
   const cp = {
     state: 'READY_FOR_TOWER_REVIEW', checkpoint_id: 'cp-100', build_id: 'BUILD-010', wp_id: 'WP1',
-    brief_ref: brief, branch: 'build-010/wp1', head_sha: HEAD, summary: 'built it', tests: 'green', evidence_refs: ['PR#1'],
+    brief_ref: brief, branch: 'build-010/wp1', head_sha: headSha, summary: 'built it', tests: 'green', evidence_refs: ['PR#1'],
   };
   const cpComment = { comment_text: formatCheckpoint(cp), user: 'larry' };
-  const clickup = makeClickup ? makeClickup(cpComment) : createFakeClickup({ comments: [cpComment] });
+  const clickup = makeClickup ? makeClickup(cpComment) : createFakeClickup({ comments: [cpComment, ...seedComments] });
   const watcher = createWatcher({
     config, clickup, github: fakeGithub(), codex: codex ?? fakeCodex(), fable: fable ?? fakeFable(),
     notifier, state, taskId: 'task1', qaSkillPath: skillPath, fs, now: () => 1000,
     ...(cycleWatchdogMs !== undefined ? { cycleWatchdogMs } : {}),
     ...(failurePostDeadlineMs !== undefined ? { failurePostDeadlineMs } : {}),
   });
-  return { watcher, clickup, state, notifier, brief };
+  return { watcher, clickup, state, notifier, brief, cp };
 }
 
 const towerReplies = (c) => c._comments.filter((x) => /\[TOWER [^\]]*LARRY\]/.test(x.comment_text));
@@ -48,15 +48,29 @@ const lastTower = (c) => { const p = towerReplies(c); return p.length ? parseRes
 const lastFable = (c) => { const p = fableReplies(c); return p.length ? parseFableResponse(p[p.length - 1].comment_text).response : null; };
 
 test('computeMergeReady -- merge-ready ONLY when BOTH derive APPROVE AND both RAW verdicts are genuine approve', () => {
-  const genuine = { codexRawVerdict: 'approve', fableRawVerdict: 'approve' };
+  // HIGH #2 -- the undefined-head escape is removed, so these calls now supply matching heads.
+  const genuine = { codexRawVerdict: 'approve', fableRawVerdict: 'approve', codexHead: HEAD, fableHead: HEAD, currentHead: HEAD };
   assert.equal(computeMergeReady({ codexVerdict: 'APPROVE', fableVerdict: 'APPROVE', ...genuine }), true);
   assert.equal(computeMergeReady({ codexVerdict: 'APPROVE', fableVerdict: 'CORRECTIONS_REQUIRED', ...genuine }), false);
   assert.equal(computeMergeReady({ codexVerdict: 'CORRECTIONS_REQUIRED', fableVerdict: 'APPROVE', ...genuine }), false);
   assert.equal(computeMergeReady({ codexVerdict: 'APPROVE', fableVerdict: 'BLOCKED', ...genuine }), false);
   // HIGH C: a `comment`/unverifiable outcome derives APPROVE but is NEVER merge-ready.
-  assert.equal(computeMergeReady({ codexVerdict: 'APPROVE', fableVerdict: 'APPROVE', codexRawVerdict: 'comment', fableRawVerdict: 'approve' }), false, 'codex comment-derived approve is not genuine');
-  assert.equal(computeMergeReady({ codexVerdict: 'APPROVE', fableVerdict: 'APPROVE', codexRawVerdict: 'approve', fableRawVerdict: 'comment' }), false, 'fable comment-derived approve is not genuine');
-  assert.equal(computeMergeReady({ codexVerdict: 'APPROVE', fableVerdict: 'APPROVE', codexRawVerdict: null, fableRawVerdict: null }), false, 'unknown raw (crash resume) fails closed');
+  assert.equal(computeMergeReady({ codexVerdict: 'APPROVE', fableVerdict: 'APPROVE', ...genuine, codexRawVerdict: 'comment' }), false, 'codex comment-derived approve is not genuine');
+  assert.equal(computeMergeReady({ codexVerdict: 'APPROVE', fableVerdict: 'APPROVE', ...genuine, fableRawVerdict: 'comment' }), false, 'fable comment-derived approve is not genuine');
+  assert.equal(computeMergeReady({ codexVerdict: 'APPROVE', fableVerdict: 'APPROVE', ...genuine, codexRawVerdict: null, fableRawVerdict: null }), false, 'unknown raw (crash resume) fails closed');
+});
+
+test('HIGH #2 -- computeMergeReady with heads OMITTED (or empty) no longer fails OPEN to merge-ready', () => {
+  const raw = { codexRawVerdict: 'approve', fableRawVerdict: 'approve' };
+  // Both principals genuinely approve, but NO head evidence at all -> the removed escape used
+  // to return true here. It must now be false: no merge-ready without positive head evidence.
+  assert.equal(computeMergeReady({ codexVerdict: 'APPROVE', fableVerdict: 'APPROVE', ...raw }), false, 'absent heads must NOT yield merge-ready');
+  // Empty-string heads are not valid heads either.
+  assert.equal(computeMergeReady({ codexVerdict: 'APPROVE', fableVerdict: 'APPROVE', ...raw, codexHead: '', fableHead: '', currentHead: '' }), false, 'empty heads must NOT yield merge-ready');
+  // A codex head that differs from the current head is not merge-ready even if both approve.
+  assert.equal(computeMergeReady({ codexVerdict: 'APPROVE', fableVerdict: 'APPROVE', ...raw, codexHead: 'aaaaaaa', fableHead: HEAD, currentHead: HEAD }), false, 'a stale codex head is not merge-ready');
+  // Positive, matching heads still bind to merge-ready.
+  assert.equal(computeMergeReady({ codexVerdict: 'APPROVE', fableVerdict: 'APPROVE', ...raw, codexHead: HEAD, fableHead: HEAD, currentHead: HEAD }), true, 'matching real heads still bind');
 });
 
 test('HIGH D -- the default cycle watchdog COVERS the codex + fable turn budgets plus slack', () => {
@@ -294,4 +308,70 @@ test('MAJOR F -- reconcileFromThread is GENERATION-FENCED: an older (superseded)
   const r1 = await p1;
   assert.equal(r1.superseded, true, 'the older reconcile no-ops behind the newer generation');
   assert.ok(!merged.some((ids) => ids.includes('cp-stale')), 'the superseded reconcile did NOT merge its stale ids into state');
+});
+
+// ── CRIT #1 — head-binding the reconcile / priorFable path ─────────────────────
+
+const HEAD_A = 'a390dd6a1b2c3d4e5f60718293a4b5c6d7e8f900';
+const HEAD_B = 'b390dd6a1b2c3d4e5f60718293a4b5c6d7e8f900';
+const freshCorrections = { status: 'ok', verdict: 'request_changes', summary: 'fresh cold-final: gap', claims_verified: [], findings: [{ id: 'B1', severity: 'low', evidence: 'x:1', rationale: 'gap the loop missed', required_correction: 'add the edge test' }], proposed_action: { type: 'noop', target: '' } };
+
+test('CRIT #1 (processCheckpoint) -- a merge-ready [FABLE->LARRY] for a DIFFERENT head does NOT dedup/import; a FRESH review runs at the current head', async () => {
+  const codex = fakeCodex(); // APPROVE at head B
+  // The FRESH cold-final at B sends it back (merge_ready:false) -- distinct from the stale
+  // head-A reply's merge_ready:yes, so importing the stale value would be observable.
+  const fable = fakeFable(freshCorrections);
+  const h = harness({ codex, fable, headSha: HEAD_B });
+  const staleFableA = { comment_text: formatFableResponse({ checkpoint_id: 'cp-100', reviewed_head: HEAD_A, prompt_fingerprint: 'fp', verdict: 'APPROVE', merge_ready: true, summary: 'head A cold-final approved', next_action: 'MERGE-READY' }), user: 'tower' };
+
+  const r = await h.watcher.processCheckpoint(h.cp, { stage: 'start' }, { active: true }, { comments: [staleFableA] });
+
+  assert.equal(codex.calls.length, 1, 'a FRESH codex review ran at head B (the stale head-A reply did NOT short-circuit)');
+  assert.equal(fable.calls.length, 1, 'a FRESH fable cold-final ran at head B');
+  assert.equal(fable.calls[0].packet.head_sha, HEAD_B, 'fable reviewed the CURRENT head B');
+  const ans = h.state.getAnswered('cp-100');
+  assert.equal(ans.reviewed_head, HEAD_B, 'the recorded answer is for head B, not the stale head A');
+  assert.equal(ans.verdict, 'CORRECTIONS_REQUIRED', 'the FRESH head-B outcome is recorded, not the stale head-A APPROVE');
+  assert.equal(ans.merge_ready, false, 'the stale head-A merge_ready:true was NOT imported; fresh head-B corrections => not merge-ready');
+  assert.equal(r.mergeReady, false);
+});
+
+test('CRIT #1 (processCheckpoint) -- the GENUINE crash-recovery case (fable reply reviewed_head === current head) dedups idempotently (no re-run)', async () => {
+  const codex = fakeCodex();
+  const fable = fakeFable();
+  const h = harness({ codex, fable }); // checkpoint head === HEAD
+  const priorFable = { comment_text: formatFableResponse({ checkpoint_id: 'cp-100', reviewed_head: HEAD, prompt_fingerprint: 'fp', verdict: 'APPROVE', merge_ready: true, summary: 'cold-final approved THIS head', next_action: 'MERGE-READY' }), user: 'tower' };
+
+  const r = await h.watcher.processCheckpoint(h.cp, { stage: 'start' }, { active: true }, { comments: [priorFable] });
+
+  assert.equal(codex.calls.length, 0, 'codex is NOT re-run -- the cold-final already landed for THIS head');
+  assert.equal(fable.calls.length, 0, 'fable is NOT re-run -- idempotent dedup');
+  assert.equal(r.skipped, 'already-answered-thread');
+  assert.equal(h.state.getAnswered('cp-100').verdict, 'APPROVE', 'recorded idempotently from the matching-head thread terminal');
+  assert.equal(h.state.getAnswered('cp-100').merge_ready, true, 'merge_ready is preserved ONLY because the reply reviewed the CURRENT head');
+});
+
+test('CRIT #1 (reconcile, end-to-end) -- a reused checkpoint_id at head B is NOT deduped by a head-A [FABLE->LARRY]; pollOnce runs a FRESH review at B', async () => {
+  const codex = fakeCodex();
+  const fable = fakeFable(freshCorrections);
+  const staleFableA = { comment_text: formatFableResponse({ checkpoint_id: 'cp-100', reviewed_head: HEAD_A, prompt_fingerprint: 'fp', verdict: 'APPROVE', merge_ready: true, summary: 'head A cold-final approved', next_action: 'MERGE-READY' }), user: 'tower' };
+  const h = harness({ codex, fable, headSha: HEAD_B, seedComments: [staleFableA] });
+
+  const r = await h.watcher.pollOnce();
+
+  assert.equal(codex.calls.length, 1, 'reconcile did NOT mark cp-100 answered from the stale head-A reply; a fresh codex review ran');
+  assert.equal(fable.calls.length, 1, 'a fresh fable cold-final ran at head B');
+  assert.equal(r.processed.length, 1, 'the checkpoint was processed (not skipped as already-answered)');
+  assert.equal(r.processed[0].mergeReady, false, 'the fresh head-B review is not merge-ready; nothing carried over from head A');
+  assert.equal(h.state.getAnswered('cp-100').reviewed_head, HEAD_B);
+});
+
+test('CRIT #1 (unit) -- terminallyAnsweredCheckpointIds is HEAD-AWARE: a reply for a different head does not dedup the current checkpoint', () => {
+  const fableA = { comment_text: formatFableResponse({ checkpoint_id: 'cp-100', reviewed_head: HEAD_A, prompt_fingerprint: 'fp', verdict: 'APPROVE', merge_ready: true, summary: 's', next_action: 'n' }), user: 'tower' };
+  const mismatch = terminallyAnsweredCheckpointIds([fableA], { fableEnabled: true, checkpointHeads: { 'cp-100': HEAD_B } });
+  assert.equal(mismatch.has('cp-100'), false, 'a stale-head reply must NOT mark the current (head-B) checkpoint answered');
+  const match = terminallyAnsweredCheckpointIds([fableA], { fableEnabled: true, checkpointHeads: { 'cp-100': HEAD_A } });
+  assert.equal(match.has('cp-100'), true, 'a reply for the CURRENT head dedups as before');
+  const legacy = terminallyAnsweredCheckpointIds([fableA], { fableEnabled: true });
+  assert.equal(legacy.has('cp-100'), true, 'without checkpointHeads, behaviour is unchanged (head-blind, back-compat)');
 });

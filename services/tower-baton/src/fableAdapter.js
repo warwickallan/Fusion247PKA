@@ -55,6 +55,12 @@ import {
 // NOT a version to discover -- the BINARY is discovered without a hard-coded version.
 export const FABLE_MODEL_ID = 'claude-fable-5';
 
+// ATTESTATION MATCH (HIGH #4). A modelUsage key is accepted as the Fable reviewer model ONLY
+// when it is the EXACT alias or an explicitly dated id (claude-fable-5-YYYYMMDD). Anchored on
+// both ends so unrelated ids (claude-fable-50, claude-fable-5-evil) can never match -- the
+// old startsWith(FABLE_MODEL_ID) check let those through.
+export const FABLE_MODEL_ID_RE = /^claude-fable-5(?:-\d{8})?$/;
+
 // Print-mode headless flags proven against claude 2.1.214 (see header). `--model` and
 // `--output-format json` are fixed; the tool-disabling flags + `--system-prompt`/`-` are
 // appended by buildFableArgv so the variadic tool flags can never swallow the `-` stdin marker.
@@ -309,16 +315,30 @@ export function createFableAdapter({
       //       code accepted an absent map (fail-OPEN) -- it would sign an unverified approve.
       //       The startup smoke check (verifyInvocable) confirms the CLI emits modelUsage, so
       //       an absent map mid-review is a real anomaly, not merely an "older CLI".
-      //   (b) PREFIX match on FABLE_MODEL_ID so a dated id (claude-fable-5-YYYYMMDD) is
-      //       accepted -- an exact-key match would false-block a legitimate dated model id.
+      //   (b) EXACT-or-DATED match on FABLE_MODEL_ID (HIGH #4): the earlier startsWith() check
+      //       accepted UNRELATED ids (claude-fable-50, claude-fable-5-evil) -- it is replaced by
+      //       an anchored regex that accepts ONLY the exact alias or an explicitly dated id
+      //       (claude-fable-5-YYYYMMDD). The matched modelUsage entry must ALSO be a non-null
+      //       object carrying at least one credible numeric usage field (a `{"claude-fable-5":
+      //       null}` / empty entry is malformed attestation), and a MULTIPLE/ambiguous match is
+      //       rejected -- we never sign an approve on an ambiguous or non-credible attestation.
       const mu = parsed.modelUsage;
       const muValid = mu && typeof mu === 'object' && !Array.isArray(mu) && Object.keys(mu).length > 0;
       if (!muValid) {
         return blockerResult(ctx, `fable model unverified: the CLI reported no usable modelUsage map, so it cannot be confirmed that ${FABLE_MODEL_ID} ran -- refusing to sign an unverified verdict`, 'model_unverified');
       }
-      const ranModel = Object.keys(mu).some((k) => String(k).startsWith(FABLE_MODEL_ID));
-      if (!ranModel) {
-        return blockerResult(ctx, `fable model substitution: CLI modelUsage did not include ${FABLE_MODEL_ID} (reported: ${Object.keys(mu).join(', ') || '(none)'})`, 'model_substituted');
+      const matchingKeys = Object.keys(mu).filter((k) => FABLE_MODEL_ID_RE.test(String(k)));
+      if (matchingKeys.length === 0) {
+        return blockerResult(ctx, `fable model substitution: CLI modelUsage did not include an exact/dated ${FABLE_MODEL_ID} (reported: ${Object.keys(mu).join(', ') || '(none)'})`, 'model_substituted');
+      }
+      if (matchingKeys.length > 1) {
+        return blockerResult(ctx, `fable model unverified: CLI modelUsage reported MULTIPLE ${FABLE_MODEL_ID} entries (${matchingKeys.join(', ')}) -- ambiguous attestation, refusing to sign`, 'model_unverified');
+      }
+      const modelEntry = mu[matchingKeys[0]];
+      const entryCredible = modelEntry && typeof modelEntry === 'object' && !Array.isArray(modelEntry)
+        && Object.values(modelEntry).some((v) => typeof v === 'number' && Number.isFinite(v) && v > 0);
+      if (!entryCredible) {
+        return blockerResult(ctx, `fable model unverified: the ${matchingKeys[0]} modelUsage entry is null/empty or carries no credible numeric usage -- cannot confirm the model produced output, refusing to sign`, 'model_unverified');
       }
       const validation = validateCodexResult(parsed.result);
       if (!validation.ok) return blockerResult(ctx, `fable returned malformed/non-conforming output: ${validation.errors.join('; ')}`, 'malformed_output');
