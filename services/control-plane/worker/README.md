@@ -75,22 +75,35 @@ already-delivered success; an allowed caller key is namespaced under the job's o
 
 ### Error text is sanitised
 
-A thrown handler error is reduced to non-sensitive metadata before it reaches the logs or the
-append-only `ops.agent_event` ledger: `{ errorClass, errorCode, correlationId, messageLength,
-summary }`, where `summary` is allow-list-filtered and length-capped. The raw message is
-**never** persisted — it can carry payload/secret fragments. Handlers MUST NOT rely on full
-error text surviving; put diagnostic detail in explicit, classification-tagged `ctx.emit`
-payload fields.
+A thrown handler error is reduced to a fixed, **non-message-derived** shape before it reaches
+the logs or the append-only `ops.agent_event` ledger: `{ errorClass, errorCode, correlationId,
+messageLength }`. There is deliberately **no** message-derived string field — the round-2
+allow-list `summary` was dropped because an alphanumeric secret (e.g. `ABC123SECRET`) survived
+its filter almost verbatim. `errorClass` is mapped through a **known set** of error
+constructors (an unknown/maliciously-named subclass collapses to the generic `Error`);
+`errorCode` is surfaced only when it matches a **known shape** (Postgres SQLSTATE `[0-9A-Z]{5}`,
+a Node errno string `E[A-Z0-9]+`, or an integer errno) and is otherwise dropped to `null`. The
+raw message is **never** persisted — it can carry payload/secret fragments — and `sanitizeError`
+is applied at **every** error log site (handler throw, `completion_failed_rolled_back`,
+`processOnce_unexpected`, `reclaim_tick_failed`), not just the ledger write. Handlers MUST NOT
+rely on full error text surviving; put diagnostic detail in explicit, classification-tagged
+`ctx.emit` payload fields.
 
 ### Ledger fidelity — reclaim & dead-letter are on the ledger
 
-`Reclaimer.tick` emits an idempotent `job.lease_reclaimed` (leased→pending) or
-`job.dead_lettered` (leased→dead_letter) event per reclaimed row, keyed per attempt; a
-graceful-failed completion that exhausts the retry budget also emits `job.dead_lettered`
-inside its completion transaction. The full lifecycle is therefore reconstructable from
-`ops.agent_event` alone. Non-succeeded terminal events are keyed **per attempt**
+`Reclaimer.tick` runs `ops.reclaim_expired_leases()` **and** its ledger events in **one
+transaction on a pinned client** (mirroring `enqueue`): the state transition
+(leased→pending/dead_letter) and its idempotent `job.lease_reclaimed` / `job.dead_lettered`
+events (one per reclaimed row, keyed per attempt) commit together or roll back together, so a
+crash mid-pass can never leave a moved job without its evidence. A graceful-failed completion
+that exhausts the retry budget also emits `job.dead_lettered` inside its completion
+transaction. The full lifecycle is therefore reconstructable from `ops.agent_event` alone.
+Non-succeeded terminal events are keyed **per attempt**
 (`job:<id>:attempt:<n>:terminal:failed`) so a second graceful failure does not dedup against
-the first; `terminal:succeeded` stays a per-job singleton.
+the first; `terminal:succeeded` stays a per-job singleton. Handler-emitted per-attempt events
+are keyed `job:<id>:attempt:<n>:evt:<eventKind>:<seq>` — the `evt:` segment keeps a caller
+`eventKind` out of any reserved lifecycle slot (a `:` in `eventKind` is rejected outright), and
+the per-emit `<seq>` keeps two same-kind emits in one attempt distinct instead of colliding.
 
 ### ⚠️ Lease fencing is by OWNER NAME only — workerId MUST be unique per instance (DEFERRED)
 
@@ -148,7 +161,12 @@ in the reserved lifecycle namespace is rejected; (11) reclaimer emits idempotent
 lease_reclaimed / dead_lettered ledger events; (12) graceful-failed → pending → retried →
 effect exactly once, with per-attempt terminals; (13) graceful-failed at `max_attempts` →
 `dead_letter`; (14) cross-queue idempotency-key reuse is refused; (15) concurrent same-key
-enqueues → one job + one enqueued event.
+enqueues → one job + one enqueued event. **Round-3 review fixes:** (16) reclaim atomicity —
+a fault between reclaim and its events commits neither; (17) a secret-shaped token in an error
+message never reaches the ledger or the logs; (18) a throwing `status` getter (and null / a
+primitive / a missing status) routes through invalid_result / handler_error, never an escape
+or silent success; (19) default per-attempt key hardening — a `:`-bearing eventKind cannot
+shadow the runtime terminal, and two same-kind emits in one attempt both land.
 
 ## Manual run (never auto-launched)
 

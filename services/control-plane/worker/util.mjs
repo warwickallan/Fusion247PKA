@@ -9,36 +9,64 @@ import { randomUUID } from 'node:crypto';
 
 const LEVELS = { silent: 0, error: 1, warn: 2, info: 3, debug: 4 };
 
-// A conservative allow-list of characters permitted in the length-capped error summary.
-// Anything else (quotes, braces, slashes, control chars — the shapes secrets/paths/URLs
-// take) is stripped, so a thrown message can't smuggle a payload/secret fragment into the
-// ledger or logs.
-const SAFE_SUMMARY = /[^A-Za-z0-9 ._-]/g;
-const SUMMARY_CAP = 80;
+// CONTROLLED CLASSIFICATION SET (round-3 fix 2). The ledger/log error shape must NEVER be
+// derived from arbitrary message content — the old allow-list `summary` could pass an
+// alphanumeric secret (e.g. 'ABC123SECRET') through almost verbatim. Instead we carry ONLY
+// a fixed classification drawn from a KNOWN set, a machine error-code validated to a KNOWN
+// shape, a correlationId, and the raw message LENGTH (a signal without the bytes).
+//
+// errorClass is mapped through this allow-list of built-in / recognised error constructors.
+// Anything else — including a maliciously-named custom error subclass — collapses to the
+// generic 'Error', so the class name can never smuggle message/secret bytes either.
+const KNOWN_ERROR_CLASSES = new Set([
+  'Error', 'TypeError', 'RangeError', 'ReferenceError', 'SyntaxError',
+  'EvalError', 'URIError', 'AggregateError', 'AssertionError',
+  'DatabaseError',   // pg
+  'SystemError',     // node
+]);
+
+// A machine error-code is surfaced ONLY when it matches a recognised code SHAPE:
+//   - Postgres SQLSTATE: exactly 5 chars of [0-9A-Z]  (e.g. '23001', '40P01')
+//   - Node errno string: /^E[A-Z0-9]{1,30}$/           (e.g. 'ECONNREFUSED', 'ENOENT')
+//   - Node numeric errno: a plain integer
+// Any other value on err.code / err.errno (an arbitrary/secret-shaped string a handler set)
+// is DROPPED to null — the code field is a controlled set, not a passthrough for bytes.
+const SQLSTATE = /^[0-9A-Z]{5}$/;
+const NODE_ERRNO = /^E[A-Z0-9]{1,30}$/;
+
+function classifyErrorCode(err) {
+  if (err == null) return null;
+  const raw = err.code ?? err.errno;
+  if (raw == null) return null;
+  if (typeof raw === 'number' && Number.isInteger(raw)) return raw;
+  if (typeof raw === 'string' && (SQLSTATE.test(raw) || NODE_ERRNO.test(raw))) return raw;
+  return null;
+}
 
 /**
- * Sanitise a thrown error for the ledger + logs (fix 5 — both reviewers).
+ * Sanitise a thrown error for the ledger + logs (round-3 fix 2 — both reviewers).
  *
- * Handler errors previously flowed raw into structured logs AND ops.agent_event payloads,
- * so a message built from payload/secret bytes could leak into the append-only, potentially
- * git-provenanced ledger. This reduces an error to NON-SENSITIVE metadata:
- *   - errorClass    the constructor name (e.g. 'TypeError', 'Error')
- *   - errorCode     a machine code when present (pg SQLSTATE, Node errno) — codes are safe
+ * Handler errors previously flowed raw (and, after round-2, as a message-DERIVED `summary`)
+ * into structured logs AND ops.agent_event payloads, so a message built from payload/secret
+ * bytes could leak into the append-only, potentially git-provenanced ledger. This reduces an
+ * error to a fixed, NON-MESSAGE-DERIVED shape:
+ *   - errorClass    a classification from KNOWN_ERROR_CLASSES (unknown -> generic 'Error')
+ *   - errorCode     a machine code validated to a KNOWN shape (SQLSTATE / Node errno) or null
  *   - correlationId a fresh id to cross-reference an out-of-band diagnostic, if any
  *   - messageLength the raw length only (a signal without the bytes)
- *   - summary       an allow-list-filtered, length-capped slug — never the raw message
- * The handler contract (README) states handlers MUST NOT rely on full error text being
- * persisted; put any diagnostic detail in explicit, classification-tagged event fields.
+ * There is deliberately NO message-derived string field. The handler contract (README) states
+ * handlers MUST NOT rely on full error text being persisted; put any diagnostic detail in
+ * explicit, classification-tagged event fields.
  */
 export function sanitizeError(err) {
   const rawMsg = err == null ? '' : String(err.message ?? err);
-  const summary = rawMsg.replace(SAFE_SUMMARY, '').replace(/\s+/g, ' ').trim().slice(0, SUMMARY_CAP);
+  const rawClass = (err && err.constructor && err.constructor.name) || 'Error';
+  const errorClass = KNOWN_ERROR_CLASSES.has(rawClass) ? rawClass : 'Error';
   return {
-    errorClass: (err && err.constructor && err.constructor.name) || 'Error',
-    errorCode: (err && (err.code ?? err.errno)) ?? null,
+    errorClass,
+    errorCode: classifyErrorCode(err),
     correlationId: 'corr-' + randomUUID(),
     messageLength: rawMsg.length,
-    summary,
   };
 }
 

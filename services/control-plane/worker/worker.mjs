@@ -23,7 +23,7 @@
 // NOTIFY/Realtime is NOT used: correctness rests entirely on polling + claim_job. A
 // wake-hint could be layered later purely as an optimisation; nothing here depends on it.
 
-import { appendEvent, effectDeliveryKey, assertCallerKeyAllowed } from './events.mjs';
+import { appendEvent, effectDeliveryKey, assertCallerKeyAllowed, assertEventKindAllowed } from './events.mjs';
 import { createLogger, sleep, sanitizeError } from './util.mjs';
 
 export class Worker {
@@ -87,12 +87,20 @@ export class Worker {
     // caller key is rejected if it lands in a reserved namespace, else namespaced under this
     // job's own 'custom:' segment so it can never collide across jobs.
     const events = [];
+    // (fix 4) Per-emit sequence counter scoped to THIS attempt. Two emits of the same
+    // eventKind in one attempt must produce DISTINCT default delivery keys — without a
+    // discriminator the second would collide on the unique key and be silently dropped.
+    let emitSeq = 0;
     const ctx = {
       job,
       workerId: this.workerId,
       attempt,
       effectKey: (name) => effectDeliveryKey(job.idempotency_key, name),
       emit: (eventKind, o = {}) => {
+        // (fix 4) Reject a caller eventKind carrying ':' loudly (mirror assertCallerKeyAllowed)
+        // so it can never steer a per-attempt key into a reserved lifecycle namespace.
+        assertEventKindAllowed(eventKind);
+        const seq = emitSeq++;
         let deliveryKey;
         if (o.effect !== undefined) {
           // Sanctioned idempotent-effect path: stable across retries, injective.
@@ -102,8 +110,11 @@ export class Worker {
           assertCallerKeyAllowed(o.deliveryKey);
           deliveryKey = `job:${jobId}:custom:${o.deliveryKey}`;
         } else {
-          // Default: a fresh per-attempt event.
-          deliveryKey = `job:${jobId}:attempt:${attempt}:${eventKind}`;
+          // Default: a fresh per-attempt event. (fix 4) A discriminating 'evt:' segment sits
+          // BEFORE the caller value so a caller kind can never occupy a reserved lifecycle
+          // slot (e.g. 'terminal:...'), and a per-emit sequence counter keeps repeated
+          // same-kind emits in one attempt distinct.
+          deliveryKey = `job:${jobId}:attempt:${attempt}:evt:${eventKind}:${seq}`;
         }
         events.push({
           buildId: o.buildId ?? null,
@@ -117,14 +128,19 @@ export class Worker {
       },
     };
 
-    let result;
+    let rs;
     try {
-      result = await handler(ctx);
+      const result = await handler(ctx);
+      // (fix 3) Read + validate result.status INSIDE the try so a MALFORMED result whose
+      // `status` is a throwing getter / hostile proxy is caught as a crash-equivalent here,
+      // never an unhandled escape past the runtime. A benign shape yields undefined, which
+      // the allow-list below routes to the invalid_result path.
+      rs = result == null ? undefined : result.status;
     } catch (err) {
       // (5) crash-equivalent: do NOT complete. Record the failed attempt (append-only),
       // let the lease expire -> reclaim -> retry (or dead_letter when exhausted). The error
-      // is SANITISED (fix 5) — only non-sensitive class/code + a correlation id reach the
-      // ledger, never the raw message (which could carry payload/secret fragments).
+      // is SANITISED (fix 2) — only a fixed class/code + a correlation id + message LENGTH
+      // reach the ledger, never any message-derived text (which could carry secret bytes).
       const safe = sanitizeError(err);
       log.warn('handler_threw', safe);
       await appendEvent(this.pool, {
@@ -138,9 +154,8 @@ export class Worker {
 
     // (2b — fix 2) A handler must EXPLICITLY signal its outcome. Only the allow-listed
     // statuses 'succeeded' | 'failed' are honoured; anything else (undefined, a typo'd or
-    // unknown status) is NOT silent success — it routes through the crash-equivalent
-    // failure/retry path exactly like a throw, so ambiguous work is never lost.
-    const rs = result == null ? undefined : result.status;
+    // unknown status, or a non-string) is NOT silent success — it routes through the
+    // crash-equivalent failure/retry path exactly like a throw, so ambiguous work is never lost.
     if (rs !== 'succeeded' && rs !== 'failed') {
       const safe = sanitizeError(new Error('handler returned no valid { status }'));
       const got = typeof rs === 'string' ? rs.slice(0, 40) : (rs === undefined ? 'undefined' : typeof rs);
@@ -197,8 +212,10 @@ export class Worker {
     } catch (err) {
       await client.query('rollback').catch(() => {});
       // A stale lease (reclaimed + re-leased elsewhere) lands here: the effect rolled back,
-      // the live leaseholder is untouched. Not a crash — expected under a lost race.
-      log.warn('completion_failed_rolled_back', { code: err?.code, error: String(err?.message ?? err) });
+      // the live leaseholder is untouched. Not a crash — expected under a lost race. (fix 2)
+      // The error is SANITISED — no raw message reaches the logs; only a fixed class + the
+      // validated code (the 23001 stale-lease signal survives as errorCode) + a correlation id.
+      log.warn('completion_failed_rolled_back', sanitizeError(err));
       return { job, outcome: 'completion_failed', error: err };
     } finally {
       client.release();
@@ -218,7 +235,8 @@ export class Worker {
           const r = await this.processOnce(q);
           if (r) didWork = true;
         } catch (err) {
-          this.logger.error('processOnce_unexpected', { queue: q, error: String(err?.message ?? err) });
+          // (fix 2) sanitised — no raw message in logs, even for an unexpected loop error.
+          this.logger.error('processOnce_unexpected', { queue: q, ...sanitizeError(err) });
         }
       }
       if (!didWork) await sleep(this.pollIntervalMs);
@@ -244,24 +262,39 @@ export class Reclaimer {
     this.timer = null;
   }
 
-  /** One reclaim pass. Returns the reclaimed rows. */
-  async tick() {
-    const { rows } = await this.pool.query(`select * from ops.reclaim_expired_leases()`);
-    if (rows.length) {
-      this.logger.info('leases.reclaimed', {
-        count: rows.length,
-        toPending: rows.filter((r) => r.status === 'pending').length,
-        toDeadLetter: rows.filter((r) => r.status === 'dead_letter').length,
-      });
-      // (fix 6 — Fable) The reclaimer previously emitted NO ledger events, so a lease
-      // reclaim (leased->pending) or reclaim-time dead-lettering (leased->dead_letter) was
-      // invisible in ops.agent_event — the lifecycle was not reconstructable from the ledger
-      // alone. Emit one IDEMPOTENT event per reclaimed row, keyed PER ATTEMPT so re-running a
-      // tick (or two overlapping tickers) can never duplicate it.
+  /**
+   * One reclaim pass, ATOMICALLY (round-3 fix 1 — mirrors enqueue.mjs).
+   *
+   * The state transition (leased -> pending/dead_letter) AND its ledger events commit in ONE
+   * transaction on a pinned client, or roll back together. Previously reclaim ran autocommit
+   * and the events were appended as SEPARATE autocommit statements — a crash between them lost
+   * the lease_reclaimed / dead_lettered event forever while the job had already moved on, so
+   * the lifecycle was no longer reconstructable from ops.agent_event alone. Now a fault at any
+   * point rolls the whole pass back; a clean retry re-reclaims and re-emits.
+   *
+   * `hooks.afterReclaimBeforeEvents({ client, rows })` is an OPTIONAL test seam invoked INSIDE
+   * the transaction, after reclaim_expired_leases() but before the events, used by the
+   * fault-injection proof to abort mid-transaction. It is never used in production.
+   *
+   * Returns the reclaimed rows.
+   */
+  async tick(hooks = {}) {
+    const client = await this.pool.connect();
+    try {
+      await client.query('begin');
+      const { rows } = await client.query(`select * from ops.reclaim_expired_leases()`);
+
+      if (hooks.afterReclaimBeforeEvents) {
+        await hooks.afterReclaimBeforeEvents({ client, rows });
+      }
+
+      // (fix 6 — Fable) Emit one IDEMPOTENT event per reclaimed row, keyed PER ATTEMPT so a
+      // re-run (or two overlapping tickers) can never duplicate it. These inserts share the
+      // transaction with the reclaim above, so the state move + its evidence are inseparable.
       for (const r of rows) {
         const jobId = String(r.id);
         const dead = r.status === 'dead_letter';
-        await appendEvent(this.pool, {
+        await appendEvent(client, {
           deliveryKey: `job:${jobId}:attempt:${r.attempts}:${dead ? 'dead_lettered' : 'reclaimed'}`,
           eventKind: dead ? 'job.dead_lettered' : 'job.lease_reclaimed',
           actor: 'tower',
@@ -269,16 +302,32 @@ export class Reclaimer {
             jobId, attempt: r.attempts,
             reason: dead ? 'lease_expired_exhausted' : 'lease_expired',
           },
-        }).catch((err) => this.logger.error('reclaim_event_failed', { jobId, ...sanitizeError(err) }));
+        });
       }
+
+      await client.query('commit');
+      if (rows.length) {
+        this.logger.info('leases.reclaimed', {
+          count: rows.length,
+          toPending: rows.filter((r) => r.status === 'pending').length,
+          toDeadLetter: rows.filter((r) => r.status === 'dead_letter').length,
+        });
+      }
+      return rows;
+    } catch (err) {
+      await client.query('rollback').catch(() => {});
+      // Neither the state transition nor its events committed — a clean retry redoes both.
+      throw err;
+    } finally {
+      client.release();
     }
-    return rows;
   }
 
   start() {
     if (this.timer) return;
     this.timer = setInterval(() => {
-      this.tick().catch((err) => this.logger.error('reclaim_tick_failed', { error: String(err?.message ?? err) }));
+      // (fix 2) sanitised — a failed tick logs a fixed class/code, never a raw message.
+      this.tick().catch((err) => this.logger.error('reclaim_tick_failed', sanitizeError(err)));
     }, this.intervalMs);
     this.timer.unref?.();
     this.logger.info('reclaimer.started', { intervalMs: this.intervalMs });

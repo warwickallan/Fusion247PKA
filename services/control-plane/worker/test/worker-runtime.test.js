@@ -27,6 +27,13 @@
 //   13. graceful failed at attempts==max_attempts -> dead_letter (+ ledger event) (Fable).
 //   14. cross-queue idempotency_key reuse is refused (Fable).
 //   15. concurrent same-key enqueues -> one job + one enqueued event (both).
+// ROUND-3 review fixes (final targeted pass):
+//   16. reclaim atomicity — a fault between reclaim and its events commits NEITHER (mirrors #9).
+//   17. a handler-error message carrying a secret-shaped token never reaches the ledger OR logs.
+//   18. a throwing `status` getter (and null / a primitive / a missing status) routes through
+//       the invalid_result / handler_error path, never an unhandled escape or silent success.
+//   19. default per-attempt key hardening: eventKind 'terminal:failed' cannot shadow the runtime
+//       terminal, and two same-kind emits in one attempt both land (distinct keys).
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -37,8 +44,20 @@ import { fileURLToPath } from 'node:url';
 import { enqueue } from '../enqueue.mjs';
 import { HandlerRegistry } from '../handlers.mjs';
 import { Worker, Reclaimer } from '../worker.mjs';
-import { effectDeliveryKey } from '../events.mjs';
-import { createLogger, sleep, waitFor } from '../util.mjs';
+import { effectDeliveryKey, assertEventKindAllowed } from '../events.mjs';
+import { createLogger, sanitizeError, sleep, waitFor } from '../util.mjs';
+
+/** A logger that RECORDS every line (with fields) instead of writing — for leak assertions. */
+function recordingLogger(sink) {
+  const make = () => ({
+    error: (msg, fields) => { sink.push({ level: 'error', msg, fields }); },
+    warn: (msg, fields) => { sink.push({ level: 'warn', msg, fields }); },
+    info: (msg, fields) => { sink.push({ level: 'info', msg, fields }); },
+    debug: (msg, fields) => { sink.push({ level: 'debug', msg, fields }); },
+    child: () => make(),
+  });
+  return make();
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const MIGRATION = path.join(__dirname, '..', '..', 'db', 'migrations', '001_control_plane_min_schema.sql');
@@ -556,5 +575,195 @@ gated('15. concurrent same-key enqueues (distinct connections) -> one job + one 
     assert.equal(jobs, 1, 'exactly one job row');
     const evs = (await pool.query(`select count(*)::int n from ops.agent_event where delivery_key='job:enq:race-1'`)).rows[0].n;
     assert.equal(evs, 1, 'exactly one truthful enqueued event');
+  } finally { await pool.end(); }
+});
+
+// ===========================================================================
+// ROUND-3 review fixes — final targeted pass.
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// Fix 1 (round-3) — reclaim is ATOMIC (mirrors enqueue). A fault between
+// reclaim_expired_leases() and its ledger events must commit NEITHER the state
+// transition NOR the event; a clean retry then reclaims + emits.
+gated('16. reclaim atomicity — a fault between reclaim and its events commits neither', async () => {
+  const pool = await freshPool();
+  try {
+    const reg = new HandlerRegistry().register('q16', async () => { throw new Error('boom'); });
+    const { job } = await enqueue(pool, { jobType: 'q16', idempotencyKey: 'ra-1', maxAttempts: 5 });
+    const w = new Worker(pool, reg, { workerId: 'w16', leaseSeconds: 60, logger: SILENT });
+
+    // One crash-equivalent attempt leaves the job LEASED; then force-expire its lease.
+    assert.equal((await w.processOnce('q16')).outcome, 'handler_error');
+    assert.equal((await jobRow(pool, 'ra-1')).status, 'leased', 'job is leased awaiting reclaim');
+    await pool.query(`update ops.job set lease_deadline_at = now() - interval '1 second' where idempotency_key='ra-1'`);
+
+    const reclaimer = new Reclaimer(pool, { logger: SILENT });
+
+    // Inject a fault INSIDE the reclaim transaction, after reclaim_expired_leases() has moved
+    // the row (in-txn) but before its ledger events. The whole pass must roll back.
+    let threw = null;
+    try {
+      await reclaimer.tick({
+        afterReclaimBeforeEvents: async ({ rows }) => {
+          assert.ok(rows.find((r) => String(r.id) === String(job.id)),
+            'reclaim_expired_leases returned the expired job inside the txn');
+          throw new Error('injected fault mid-reclaim');
+        },
+      });
+    } catch (e) { threw = e; }
+    assert.ok(threw, 'the injected fault propagates out of tick');
+
+    // Neither half committed: the job is STILL leased, and NO reclaim event landed.
+    assert.equal((await jobRow(pool, 'ra-1')).status, 'leased',
+      'the state transition rolled back — job is still leased, not pending');
+    const afterFault = await eventsForJob(pool, job.id);
+    assert.equal(afterFault.filter((e) => e.event_kind === 'job.lease_reclaimed').length, 0,
+      'no lease_reclaimed event committed alongside the rolled-back transition');
+
+    // A clean retry now reclaims AND emits — both together.
+    const rows = await reclaimer.tick();
+    assert.ok(rows.find((r) => String(r.id) === String(job.id) && r.status === 'pending'),
+      'the clean retry reclaims the job to pending');
+    assert.equal((await jobRow(pool, 'ra-1')).status, 'pending', 'job is now back to pending');
+    const afterClean = await eventsForJob(pool, job.id);
+    assert.equal(afterClean.filter((e) => e.event_kind === 'job.lease_reclaimed').length, 1,
+      'exactly one lease_reclaimed event now on the ledger (state + evidence committed together)');
+  } finally { await pool.end(); }
+});
+
+// ---------------------------------------------------------------------------
+// Fix 2 (round-3) — a handler error whose MESSAGE contains a secret-shaped token
+// must never surface in the ledger row OR the structured log fields. The sanitised
+// shape carries only a fixed class/code + correlationId + messageLength — no
+// message-derived text (the old allow-list `summary` would have kept it verbatim).
+gated('17. a secret-shaped token in an error message never reaches the ledger or the logs', async () => {
+  const SECRET = 'ABC123SECRETtokenXYZ789'; // alphanumeric — survived the old summary allow-list
+  const pool = await freshPool();
+  const logs = [];
+  try {
+    const reg = new HandlerRegistry().register('q17', async () => {
+      const err = new Error(`auth failed for credential ${SECRET} at https://api.example/secret`);
+      err.code = SECRET; // even a secret smuggled onto err.code must be dropped (unknown shape)
+      throw err;
+    });
+    const { job } = await enqueue(pool, { jobType: 'q17', idempotencyKey: 'sec-1', maxAttempts: 1 });
+    const w = new Worker(pool, reg, { workerId: 'w17', leaseSeconds: 60, logger: recordingLogger(logs) });
+
+    const r = await w.processOnce('q17');
+    assert.equal(r.outcome, 'handler_error', 'the throwing handler is a crash-equivalent');
+
+    // (a) LEDGER: the attempt_failed row (and every row for this job) is secret-free.
+    const evs = await eventsForJob(pool, job.id);
+    const failed = evs.filter((e) => e.event_kind === 'job.attempt_failed');
+    assert.equal(failed.length, 1, 'the failed attempt is on the ledger');
+    const ledgerText = JSON.stringify(evs);
+    assert.ok(!ledgerText.includes(SECRET), 'no secret token anywhere in the ledger rows');
+    // the sanitised shape is present and message-free
+    assert.equal(failed[0].payload.errorClass, 'Error', 'fixed classification recorded');
+    assert.equal(failed[0].payload.errorCode, null, 'a secret-shaped err.code was dropped (unknown shape)');
+    assert.equal(typeof failed[0].payload.messageLength, 'number', 'messageLength is a signal, not the bytes');
+    assert.equal(failed[0].payload.summary, undefined, 'there is NO message-derived summary field');
+
+    // (b) LOGS: no captured structured log line carries the secret in any field or message.
+    assert.ok(logs.length > 0, 'the worker emitted structured logs');
+    const logText = JSON.stringify(logs);
+    assert.ok(!logText.includes(SECRET), 'no secret token anywhere in the structured logs');
+
+    // Unit: sanitizeError itself never emits a message-derived field, even given a rich message.
+    const safe = sanitizeError(new TypeError(`boom ${SECRET}`));
+    assert.ok(!JSON.stringify(safe).includes(SECRET), 'sanitizeError output is secret-free');
+    assert.equal(safe.summary, undefined, 'sanitizeError emits no summary');
+    assert.equal(safe.errorClass, 'TypeError', 'known class preserved');
+  } finally { await pool.end(); }
+});
+
+// ---------------------------------------------------------------------------
+// Fix 3 (round-3) — result.status is read INSIDE the handler try/catch, so a
+// throwing getter / hostile proxy routes through the sanitised failure path, and
+// null / a primitive / a missing status route through invalid_result. Never an
+// unhandled escape, never a silent success.
+gated('18. a throwing status getter (and null / primitive / missing) is not an escape or a success', async () => {
+  const pool = await freshPool();
+  try {
+    const reg = new HandlerRegistry()
+      .register('thrower', async () => ({ get status() { throw new Error('hostile getter'); } }))
+      .register('nully', async () => null)
+      .register('prim', async () => 42)
+      .register('missing', async () => ({}));
+    for (const [q, key] of [['thrower', 't-1'], ['nully', 'n-1'], ['prim', 'p-1'], ['missing', 'm-1']]) {
+      await enqueue(pool, { jobType: q, idempotencyKey: key, maxAttempts: 1 });
+    }
+    const w = new Worker(pool, reg, { workerId: 'w18', leaseSeconds: 60, logger: SILENT });
+
+    const cases = [
+      { q: 'thrower', key: 't-1', expect: ['handler_error'] }, // caught inside the try
+      { q: 'nully', key: 'n-1', expect: ['invalid_result'] },
+      { q: 'prim', key: 'p-1', expect: ['invalid_result'] },
+      { q: 'missing', key: 'm-1', expect: ['invalid_result'] },
+    ];
+    for (const c of cases) {
+      const r = await w.processOnce(c.q);
+      assert.ok(c.expect.includes(r.outcome),
+        `${c.q}: outcome '${r.outcome}' routes through ${c.expect.join('/')} (no unhandled escape)`);
+      const jr = await jobRow(pool, c.key);
+      assert.notEqual(jr.status, 'succeeded', `${c.q}: job is NOT silently succeeded`);
+      const evs = await eventsForJob(pool, jr.id);
+      assert.equal(evs.filter((e) => e.event_kind === 'job.succeeded').length, 0, `${c.q}: no succeeded terminal`);
+      // an explicit ledger event marks the failed/invalid attempt (attempt_failed or invalid_result)
+      const marked = evs.filter((e) => e.event_kind === 'job.attempt_failed' || e.event_kind === 'job.invalid_result');
+      assert.equal(marked.length, 1, `${c.q}: the bad attempt is recorded on the ledger`);
+    }
+  } finally { await pool.end(); }
+});
+
+// ---------------------------------------------------------------------------
+// Fix 4 (round-3) — default per-attempt key hardening. (a) An eventKind carrying ':'
+// (e.g. 'terminal:failed') is rejected loudly, so it can never shadow the runtime's own
+// terminal slot; the runtime's legitimate terminal still lands. (b) Two same-kind emits
+// in one attempt both land, on DISTINCT keys, instead of the second being silently dropped.
+gated('19. default eventKind key hardening — no reserved-slot shadow; repeated same-kind emits both land', async () => {
+  // Unit: the guard rejects ':' loudly and accepts a dotted kind.
+  assert.throws(() => assertEventKindAllowed('terminal:failed'), /must not contain/,
+    'an eventKind with ":" is rejected');
+  assert.equal(assertEventKindAllowed('work.progress'), 'work.progress', 'a dotted kind is allowed');
+
+  const pool = await freshPool();
+  try {
+    // (a) A handler that tries to emit a ':'-bearing kind aimed at a reserved terminal slot.
+    const regShadow = new HandlerRegistry().register('q19a', async (ctx) => {
+      ctx.emit('terminal:failed', { payload: { jobId: String(ctx.job.id) } }); // must THROW here
+      return { status: 'succeeded' };
+    });
+    const { job: ja } = await enqueue(pool, { jobType: 'q19a', idempotencyKey: 'sh-1', maxAttempts: 1 });
+    const wa = new Worker(pool, regShadow, { workerId: 'w19a', leaseSeconds: 60, logger: SILENT });
+    const ra = await wa.processOnce('q19a');
+    assert.equal(ra.outcome, 'handler_error', 'the reserved-slot emit throws -> crash-equivalent, not success');
+    const evsA = await eventsForJob(pool, ja.id);
+    // The forged 'terminal:failed' never reached the ledger, and the runtime terminal is untouched.
+    assert.equal(evsA.filter((e) => e.event_kind === 'terminal:failed').length, 0, 'the ":"-kind event never landed');
+    const forgedTerminal = (await pool.query(
+      `select count(*)::int n from ops.agent_event where delivery_key = $1`,
+      [`job:${ja.id}:attempt:1:terminal:failed`])).rows[0].n;
+    assert.equal(forgedTerminal, 0, 'the runtime terminal slot was NOT shadowed by the caller');
+    assert.equal(evsA.filter((e) => e.event_kind === 'job.succeeded').length, 0, 'the job did not complete on a rejected emit');
+
+    // (b) Two same-kind emits in ONE attempt both land on distinct keys.
+    const regTwice = new HandlerRegistry().register('q19b', async (ctx) => {
+      ctx.emit('work.progress', { payload: { jobId: String(ctx.job.id), step: 'a' } });
+      ctx.emit('work.progress', { payload: { jobId: String(ctx.job.id), step: 'b' } });
+      ctx.emit('work.done', { effect: 'done', payload: { jobId: String(ctx.job.id) } });
+      return { status: 'succeeded' };
+    });
+    const { job: jb } = await enqueue(pool, { jobType: 'q19b', idempotencyKey: 'tw-1', maxAttempts: 1 });
+    const wb = new Worker(pool, regTwice, { workerId: 'w19b', leaseSeconds: 60, logger: SILENT });
+    assert.equal((await wb.processOnce('q19b')).outcome, 'succeeded');
+
+    const evsB = await eventsForJob(pool, jb.id);
+    const progress = evsB.filter((e) => e.event_kind === 'work.progress');
+    assert.equal(progress.length, 2, 'BOTH same-kind emits landed (the second was not silently dropped)');
+    assert.equal(new Set(progress.map((e) => e.delivery_key)).size, 2, 'the two emits have DISTINCT per-attempt keys');
+    const steps = new Set(progress.map((e) => e.payload.step));
+    assert.ok(steps.has('a') && steps.has('b'), 'both distinct progress payloads survived');
   } finally { await pool.end(); }
 });

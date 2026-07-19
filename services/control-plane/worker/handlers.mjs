@@ -10,6 +10,10 @@
 //                         identical across retries -> the effect lands EXACTLY ONCE. The key
 //                         is a hash of a versioned (idempotency_key, name) tuple, so any ':'
 //                         in either component can no longer collide two distinct effects.
+//                         NOTE: this key governs EXTERNAL-effect idempotency ONLY (dedup of the
+//                         ledger row that represents the side effect). It is NOT a lease token
+//                         and does NOT fence completion — stale-lease protection is enforced
+//                         separately by ops.complete_job's owner guard (see LEASE-FENCING below).
 //   ctx.emit(eventKind, opts)   buffer an ops.agent_event written ATOMICALLY with
 //                         ops.complete_job (effect + completion commit together, or roll back
 //                         together if this worker's lease is stale). Choose ONE of:
@@ -22,7 +26,13 @@
 //                                                    else namespaced under this job's own
 //                                                    'custom:' segment (no cross-job collision).
 //                           (neither)             -> a fresh per-attempt event keyed
-//                                                    job:<id>:attempt:<n>:<eventKind>.
+//                                                    job:<id>:attempt:<n>:evt:<eventKind>:<seq>.
+//                                                    The 'evt:' segment sits BEFORE the caller
+//                                                    kind so it can never occupy a reserved
+//                                                    lifecycle slot, and <seq> (a per-emit
+//                                                    counter) keeps repeated same-kind emits in
+//                                                    one attempt distinct. eventKind MUST NOT
+//                                                    contain ':' (rejected loudly).
 //                         opts also takes { payload?, actor?, classification?, buildId? }.
 //
 // RESULT CONTRACT (fix 2): a handler MUST return an explicit { status } of exactly
@@ -36,9 +46,10 @@
 //                                 expires and the reclaim ticker returns it for retry (or
 //                                 dead-letters it once the attempt budget is exhausted).
 //
-// ERROR-TEXT CONSTRAINT (fix 5): a thrown error's raw message is NEVER persisted to the
-// ledger or logs — only a sanitised { errorClass, errorCode, correlationId, messageLength,
-// summary } is recorded (the summary is allow-list-filtered + length-capped). Do NOT rely
+// ERROR-TEXT CONSTRAINT (fix 2): a thrown error's message is NEVER persisted to the ledger
+// or logs — NOT even a message-derived summary. Only a sanitised, NON-MESSAGE-DERIVED shape
+// is recorded: { errorClass (from a known set; unknown -> 'Error'), errorCode (validated to a
+// known SQLSTATE / Node-errno shape, else null), correlationId, messageLength }. Do NOT rely
 // on full error text surviving; put any diagnostic detail you need in explicit, correctly
 // classification-tagged ctx.emit payload fields.
 //

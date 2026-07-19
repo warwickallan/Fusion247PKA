@@ -8,7 +8,16 @@
 
 import { createHash } from 'node:crypto';
 
-/** sha256 fingerprint of a payload (proves integrity without storing governed content). */
+/**
+ * sha256 fingerprint of a payload (proves integrity without storing governed content).
+ *
+ * NOTE: the fingerprint is over `JSON.stringify(payload)`, which is KEY-ORDER SENSITIVE —
+ * `{a:1,b:2}` and `{b:2,a:1}` hash DIFFERENTLY. This is an integrity fingerprint, not a
+ * canonical content identity: it dedups a byte-identical re-emit, not two logically-equal
+ * payloads with reordered keys. Callers that need order-independent equality must canonicalise
+ * (sort keys) before hashing. It is deliberately NOT the exactly-once pivot — that is the
+ * unique `delivery_key`, chosen independently of payload bytes.
+ */
 export function hashPayload(payload) {
   const json = JSON.stringify(payload ?? {});
   return 'sha256:' + createHash('sha256').update(json).digest('hex');
@@ -70,6 +79,31 @@ export function assertCallerKeyAllowed(deliveryKey) {
     }
   }
   return deliveryKey;
+}
+
+/**
+ * Guard a CALLER-supplied eventKind before it is used to build a default per-attempt
+ * delivery key (round-3 fix 4 — both reviewers).
+ *
+ * The default per-attempt key embeds the caller's eventKind. If eventKind may contain ':',
+ * a value like 'terminal:failed' could steer the key toward a reserved lifecycle slot
+ * (e.g. shadow the runtime's own `job:<id>:attempt:<n>:terminal:failed`). Event kinds are
+ * dotted identifiers ('work.done', 'work.progress') and legitimately never contain ':', so
+ * we REJECT ':' loudly — mirroring assertCallerKeyAllowed — so a caller eventKind can never
+ * reach a reserved namespace. (Defence-in-depth: the runtime ALSO prefixes an 'evt:' segment
+ * and a per-emit sequence counter, so even a slipped-through ':' could not shadow or dedup.)
+ */
+export function assertEventKindAllowed(eventKind) {
+  if (typeof eventKind !== 'string' || eventKind.length === 0) {
+    throw new Error('emit: eventKind must be a non-empty string');
+  }
+  if (eventKind.includes(':')) {
+    throw new Error(
+      `emit: eventKind '${eventKind.slice(0, 32)}' must not contain ':' — event kinds are ` +
+      `dotted identifiers, and ':' is reserved for delivery-key namespacing (it could steer a ` +
+      `per-attempt key into a reserved lifecycle slot). Use a '.'-separated kind instead.`);
+  }
+  return eventKind;
 }
 
 /**
