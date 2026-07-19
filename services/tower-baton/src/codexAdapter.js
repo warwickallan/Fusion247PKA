@@ -367,9 +367,13 @@ export async function killProcessTree({ child, spawn = nodeSpawn, platform = pro
     }
   } else if (pid != null) {
     // The child leads its own process group (spawned detached); negative pid = group.
-    // This reaps the whole group INCLUDING the leader in one call -- a confirmed tree reap.
-    try { process.kill(-pid, 'SIGKILL'); } catch { /* group already gone / no perms */ }
-    treeReaped = true;
+    // This reaps the whole group INCLUDING the leader in one call. HONEST STATUS (posix
+    // parity with win32, finding #3): a CONFIRMED reap only when the group kill did not
+    // throw, OR it threw ESRCH (the group is already gone == already reaped). EPERM/any
+    // other error means the descendants MAY survive -- report tree_reaped:false, never a
+    // false-confirmed reap (the old code set true unconditionally, even on EPERM).
+    try { process.kill(-pid, 'SIGKILL'); treeReaped = true; }
+    catch (e) { treeReaped = e?.code === 'ESRCH'; } // ESRCH = group already gone (reaped); EPERM/other = unconfirmed
   } else {
     try { child?.kill?.('SIGKILL'); } catch { /* ignore */ }
     treeReaped = false;

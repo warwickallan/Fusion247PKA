@@ -31,7 +31,7 @@ export const DEFAULT_LOCK_PATH = path.join(SECRET_HOME, 'tower-baton.lock');
 export const DEFAULT_LOCK_STALE_MS = 5 * 60 * 1000;
 
 function emptyState() {
-  return { version: 1, answered: {}, rounds: {}, notified: {}, in_progress: {} };
+  return { version: 1, answered: {}, rounds: {}, notified: {}, in_progress: {}, pending_failures: {} };
 }
 
 /**
@@ -51,6 +51,7 @@ export function openState({ statePath = DEFAULT_STATE_PATH, fs = fsDefault } = {
         data.rounds = data.rounds ?? {};
         data.notified = data.notified ?? {};
         data.in_progress = data.in_progress ?? {};
+        data.pending_failures = data.pending_failures ?? {};
       }
     }
   } catch {
@@ -88,11 +89,41 @@ export function openState({ statePath = DEFAULT_STATE_PATH, fs = fsDefault } = {
     isInProgress(checkpointId) { return Boolean(data.in_progress?.[checkpointId]); },
     getInProgress(checkpointId) { return data.in_progress?.[checkpointId] ?? null; },
     recordInProgress(checkpointId, { stage, codexVerdict, reviewedHead, promptFingerprint, codexCommentId, chainKey, now = Date.now() } = {}) {
+      // Fence-of-record (Fable fence-gap #6): NEVER mark a checkpoint in-progress once it
+      // has been terminally answered. A superseded/abandoned run that resolves late must
+      // not re-open an awaiting_fable marker on an already-closed checkpoint.
+      if (data.answered?.[checkpointId]) return;
       data.in_progress = data.in_progress ?? {};
       data.in_progress[checkpointId] = { stage: stage ?? 'awaiting_fable', codex_verdict: codexVerdict ?? null, reviewed_head: reviewedHead ?? null, prompt_fingerprint: promptFingerprint ?? null, codex_comment_id: codexCommentId ?? null, chain_key: chainKey ?? null, at: now };
       persist();
     },
     clearInProgress(checkpointId) { if (data.in_progress) { delete data.in_progress[checkpointId]; persist(); } },
+
+    // DURABLE PENDING-FAILURE OUTBOX (HIGH-2). A recoverable-failure verdict is written
+    // here BEFORE the ClickUp post is attempted and marked delivered ONLY after the post is
+    // confirmed. If the process crashes mid-post the pending record survives on disk, so the
+    // failure evidence is never lost between the decision to post and the confirmed publish.
+    getPendingFailure(checkpointId) { return data.pending_failures?.[checkpointId] ?? null; },
+    recordPendingFailure(checkpointId, { stage, kind, reason, elapsedMs, operationId, reviewedHead, now = Date.now() } = {}) {
+      data.pending_failures = data.pending_failures ?? {};
+      data.pending_failures[checkpointId] = {
+        checkpoint_id: checkpointId, stage: stage ?? 'unknown', kind: kind ?? 'run_failed',
+        reason: reason ?? null, elapsed_ms: elapsedMs ?? null, operation_id: operationId ?? null,
+        reviewed_head: reviewedHead ?? null, delivered: false, at: now,
+      };
+      persist();
+      return data.pending_failures[checkpointId];
+    },
+    markFailureDelivered(checkpointId, operationId = null, now = Date.now()) {
+      const rec = data.pending_failures?.[checkpointId];
+      // Only mark delivered when the operation id matches (or none was tracked) so a newer
+      // pending record for the same checkpoint is not falsely marked by a stale confirmation.
+      if (!rec) return false;
+      if (operationId && rec.operation_id && rec.operation_id !== operationId) return false;
+      rec.delivered = true; rec.delivered_at = now;
+      persist();
+      return true;
+    },
 
     /** Merge a set of already-answered checkpoint_ids discovered on the thread (cold-start rebuild). */
     mergeAnsweredIds(ids) {

@@ -26,7 +26,7 @@ import { createCodexAdapter } from '../src/codexAdapter.js';
 import { createFableAdapter, wireFable } from '../src/fableAdapter.js';
 import { createMilestoneNotifier, createTelegramClient } from '../src/telegramNotifier.js';
 import { openState, acquireLock, DEFAULT_LOCK_STALE_MS } from '../src/state.js';
-import { createWatcher } from '../src/watcher.js';
+import { createWatcher, deriveCycleWatchdogMs } from '../src/watcher.js';
 import { loadQaSkill, assertStandingStartupAllowed } from '../src/qaSkill.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -125,7 +125,6 @@ async function main() {
   // the per-cycle watchdog so codex reaps its OWN process tree first; the watchdog is the
   // outer safety net that guarantees the poll loop can never wedge silently.
   const codexTimeoutMs = Number(process.env.TOWER_CODEX_TIMEOUT_MS) > 0 ? Number(process.env.TOWER_CODEX_TIMEOUT_MS) : undefined;
-  const cycleWatchdogMs = Number(process.env.TOWER_CYCLE_WATCHDOG_MS) > 0 ? Number(process.env.TOWER_CYCLE_WATCHDOG_MS) : undefined;
   const codex = createCodexAdapter({ config, cwd: repoDir, log, ...(codexTimeoutMs ? { timeoutMs: codexTimeoutMs } : {}) });
   // The SECOND, independent reviewer: Fable cold-final (claude-fable-5, headless). It is
   // OPTIONAL (MAJOR E): wire it ONLY when TOWER_FABLE_ENABLED=1 AND it is fully provisioned
@@ -133,6 +132,14 @@ async function main() {
   // (an install without Fable must NOT turn every codex APPROVE into a Fable-BLOCKED flow).
   // Enabled-but-unprovisioned fails LOUD at startup, never silently BLOCKs every checkpoint.
   const fableTimeoutMs = Number(process.env.TOWER_FABLE_TIMEOUT_MS) > 0 ? Number(process.env.TOWER_FABLE_TIMEOUT_MS) : undefined;
+  // Finding #8: derive the per-cycle watchdog from the EFFECTIVE (possibly env-overridden)
+  // turn timeouts when TOWER_CYCLE_WATCHDOG_MS is unset, so raising a turn timeout does not
+  // leave a healthy slow cycle to be falsely aborted by the fixed 20-min default.
+  const cycleWatchdogMs = deriveCycleWatchdogMs({
+    override: process.env.TOWER_CYCLE_WATCHDOG_MS,
+    effectiveCodexTimeoutMs: codexTimeoutMs,
+    effectiveFableTimeoutMs: fableTimeoutMs,
+  });
   const fableWiring = await wireFable({
     enabled: process.env.TOWER_FABLE_ENABLED === '1',
     buildAdapter: () => createFableAdapter({ config, log, ...(fableTimeoutMs ? { timeoutMs: fableTimeoutMs } : {}) }),
@@ -145,7 +152,7 @@ async function main() {
   log(`[TOWER] Fable cold-final reviewer: ${fable ? 'ENABLED + provisioned' : 'DISABLED (codex-only path)'} -- ${config.redact(fableWiring.reason)}`);
   const notifier = createMilestoneNotifier({ config, state });
 
-  const watcher = createWatcher({ config, clickup, github, codex, fable, notifier, state, taskId, qaSkillPath, repoRoot: repoDir, fs, log, ...(cycleWatchdogMs ? { cycleWatchdogMs } : {}) });
+  const watcher = createWatcher({ config, clickup, github, codex, fable, notifier, state, taskId, qaSkillPath, repoRoot: repoDir, fs, log, cycleWatchdogMs });
 
   // 5. startup ding — via TOWER'S OWN NOTIFIER (real event).
   await notifier.notifyMilestone({

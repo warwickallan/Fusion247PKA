@@ -145,6 +145,28 @@ test('runTurn timeout -- AWAITS taskkill /PID <leader> /T /F (whole tree, leader
   assert.equal(iLeaderKill, -1, 'on a successful taskkill the leader is never separately child.kill()ed');
 });
 
+test('FINDING #3 -- POSIX reap is HONEST: EPERM from process.kill(-pid) yields tree_reaped:FALSE (unconfirmed)', async () => {
+  // The posix branch previously set tree_reaped:true UNCONDITIONALLY -- even when the group
+  // kill threw EPERM (descendants may survive). It must now be honest, at win32 parity.
+  const savedKill = process.kill;
+  process.kill = () => { const e = new Error('operation not permitted'); e.code = 'EPERM'; throw e; };
+  let res;
+  try {
+    res = await killProcessTree({ child: { pid: 4242, kill() {} }, platform: 'linux', spawn: () => { throw new Error('no taskkill on posix'); } });
+  } finally { process.kill = savedKill; }
+  assert.equal(res.tree_reaped, false, 'an EPERM group-kill is UNCONFIRMED -- never reported as a confirmed reap');
+});
+
+test('FINDING #3 -- POSIX reap: ESRCH (group already gone) IS a confirmed reap (tree_reaped:true)', async () => {
+  const savedKill = process.kill;
+  process.kill = () => { const e = new Error('no such process'); e.code = 'ESRCH'; throw e; };
+  let res;
+  try {
+    res = await killProcessTree({ child: { pid: 4243, kill() {} }, platform: 'linux', spawn: () => { throw new Error('no taskkill on posix'); } });
+  } finally { process.kill = savedKill; }
+  assert.equal(res.tree_reaped, true, 'ESRCH means the group is already gone == reaped -> confirmed');
+});
+
 test('killProcessTree -- POSIX kills the process GROUP (process.kill(-pid, SIGKILL)), never spawns taskkill', () => {
   const killed = [];
   const savedKill = process.kill;

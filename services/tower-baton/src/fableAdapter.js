@@ -134,6 +134,39 @@ export function findOnPath(binName, { env = process.env, fs = fsDefault } = {}) 
   return null;
 }
 
+/**
+ * STARTUP model-resolution smoke check (finding #4c). Reads `claude --help` (a read, NOT a
+ * gate-disabling probe) to confirm at STARTUP — not mid-review — that this claude CLI:
+ *   · exits 0 (the binary is genuinely invocable), AND
+ *   · advertises the `--tools` availability flag (so tool-lessness is enforceable), AND
+ *   · advertises the `--model` flag (so the reviewer model is selectable / resolvable).
+ * A missing flag or a non-zero exit means a mid-review turn could silently run without
+ * tool-lessness or with an unresolvable model — caught here, LOUD, before the watcher comes
+ * online rather than as a mid-review blocker. Bounded so a hung `--help` can never wedge startup.
+ */
+export function probeFableCli({ bin, spawn = nodeSpawn, timeoutMs = 15000 } = {}) {
+  if (!bin) return Promise.resolve({ ok: false, supportsToolless: false, supportsModel: false, error: 'no claude binary to probe' });
+  return new Promise((resolve) => {
+    let out = ''; let err = ''; let done = false;
+    const finish = (r) => { if (!done) { done = true; resolve(r); } };
+    let child;
+    try { child = spawn(bin, ['--help'], { shell: false }); }
+    catch (e) { return finish({ ok: false, supportsToolless: false, supportsModel: false, error: String(e?.message ?? e) }); }
+    const timer = setTimeout(() => { try { child?.kill?.(); } catch { /* ignore */ } finish({ ok: false, supportsToolless: false, supportsModel: false, error: 'claude --help probe timed out' }); }, timeoutMs);
+    child.stdout?.on('data', (d) => { out += d.toString(); });
+    child.stderr?.on('data', (d) => { err += d.toString(); });
+    child.on('error', (e) => { clearTimeout(timer); finish({ ok: false, supportsToolless: false, supportsModel: false, error: String(e?.message ?? e) }); });
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      const help = `${out}\n${err}`;
+      const supportsToolless = /--tools\b/.test(help);
+      const supportsModel = /--model\b/.test(help);
+      const ok = code === 0 && supportsToolless && supportsModel;
+      finish({ ok, supportsToolless, supportsModel, error: ok ? null : (code !== 0 ? `claude --help exited ${code}` : 'claude --help lacks --tools/--model support (model tool-lessness unverifiable at startup)') });
+    });
+  });
+}
+
 /** Detect claude auth WITHOUT reading any secret value (existence + key NAMES only). */
 export function detectFableAuth({ env = process.env, homeDir = os.homedir(), fs = fsDefault } = {}) {
   if (env?.ANTHROPIC_API_KEY) return { authenticated: true, method: 'api-key', authPath: null, keyNames: null };
@@ -242,7 +275,15 @@ export function createFableAdapter({
     async verifyInvocable() {
       const bin = doResolveBin();
       const auth = doAuthProbe();
-      return { invocable: Boolean(bin.path), binPath: bin.path ?? null, binSource: bin.source, binError: bin.error, authenticated: auth.authenticated, authMethod: auth.method };
+      // STARTUP smoke check (#4c): a resolvable binary is not enough — confirm the CLI runs
+      // and advertises --tools/--model so a missing tool-lessness/model support fails LOUD at
+      // startup, not mid-review. invocable requires BOTH a binary AND a passing smoke probe.
+      const smoke = bin.path ? await probeFableCli({ bin: bin.path, spawn }) : { ok: false, supportsToolless: false, supportsModel: false, error: bin.error ?? 'no claude binary' };
+      return {
+        invocable: Boolean(bin.path) && smoke.ok, binPath: bin.path ?? null, binSource: bin.source,
+        binError: bin.error ?? (smoke.ok ? null : smoke.error), authenticated: auth.authenticated, authMethod: auth.method,
+        modelSmoke: smoke,
+      };
     },
 
     async runTurn({ checkpoint, packet, skillText, promptFingerprint }) {
@@ -261,13 +302,23 @@ export function createFableAdapter({
 
       const parsed = parseFableJson(spawned.stdout);
       if (!parsed.ok) return blockerResult(ctx, `fable returned unusable CLI output: ${parsed.error}`, 'malformed_output');
-      // MODEL CONFIRMATION (WP1 MEDIUM H): fail-closed on a SILENT model substitution. The
-      // verdict is signed model_id=claude-fable-5 from the argv; if the CLI reports a
-      // modelUsage map that does NOT include claude-fable-5, the argv's model was NOT the
-      // one that ran -- reject as a blocker rather than sign a claim we cannot back. When
-      // modelUsage is absent (older CLI shape) we cannot confirm, so we do not block on it.
-      if (parsed.modelUsage && typeof parsed.modelUsage === 'object' && !(FABLE_MODEL_ID in parsed.modelUsage)) {
-        return blockerResult(ctx, `fable model substitution: CLI modelUsage did not include ${FABLE_MODEL_ID} (reported: ${Object.keys(parsed.modelUsage).join(', ') || '(none)'})`, 'model_substituted');
+      // MODEL CONFIRMATION (finding #4): fail-CLOSED on both a SILENT substitution AND an
+      // UNVERIFIABLE run. The verdict is signed model_id=claude-fable-5 from the argv; we must
+      // NEVER sign that claim without positive evidence the model actually ran.
+      //   (a) absent/malformed/ambiguous modelUsage -> BLOCKED (model_unverified). The earlier
+      //       code accepted an absent map (fail-OPEN) -- it would sign an unverified approve.
+      //       The startup smoke check (verifyInvocable) confirms the CLI emits modelUsage, so
+      //       an absent map mid-review is a real anomaly, not merely an "older CLI".
+      //   (b) PREFIX match on FABLE_MODEL_ID so a dated id (claude-fable-5-YYYYMMDD) is
+      //       accepted -- an exact-key match would false-block a legitimate dated model id.
+      const mu = parsed.modelUsage;
+      const muValid = mu && typeof mu === 'object' && !Array.isArray(mu) && Object.keys(mu).length > 0;
+      if (!muValid) {
+        return blockerResult(ctx, `fable model unverified: the CLI reported no usable modelUsage map, so it cannot be confirmed that ${FABLE_MODEL_ID} ran -- refusing to sign an unverified verdict`, 'model_unverified');
+      }
+      const ranModel = Object.keys(mu).some((k) => String(k).startsWith(FABLE_MODEL_ID));
+      if (!ranModel) {
+        return blockerResult(ctx, `fable model substitution: CLI modelUsage did not include ${FABLE_MODEL_ID} (reported: ${Object.keys(mu).join(', ') || '(none)'})`, 'model_substituted');
       }
       const validation = validateCodexResult(parsed.result);
       if (!validation.ok) return blockerResult(ctx, `fable returned malformed/non-conforming output: ${validation.errors.join('; ')}`, 'malformed_output');

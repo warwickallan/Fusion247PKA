@@ -237,20 +237,29 @@ export function answeredCheckpointIds(comments) {
   return ids;
 }
 
-/** The LAST [TOWER -> LARRY] (codex) reply for a checkpoint on the thread, or null. */
-export function findTowerReplyFor(comments, checkpointId) {
+/**
+ * The LAST [TOWER -> LARRY] (codex) reply for a checkpoint on the thread, or null.
+ * REPLY-AUTHOR TRUST (#5): when `isTrustedAuthor` is supplied, a reply is only honoured
+ * when its comment author is trusted (the Tower's own posting identity) — a reply forged by
+ * any other author is skipped, so it can never terminally dedup or resume the checkpoint.
+ * When the predicate is absent the behaviour is unchanged (any author, legacy trust-all).
+ */
+export function findTowerReplyFor(comments, checkpointId, { isTrustedAuthor = null } = {}) {
   let found = null;
   for (const c of comments ?? []) {
+    if (isTrustedAuthor && !isTrustedAuthor(c?.user)) continue; // forged reply from an untrusted author
     const parsed = parseResponse(c?.comment_text ?? c?.text ?? c?.body ?? '');
     if (parsed.ok && parsed.response.checkpoint_id === checkpointId) found = { ...parsed.response, comment_id: c?.id ?? null };
   }
   return found;
 }
 
-/** The LAST [FABLE -> LARRY] (cold-final) reply for a checkpoint on the thread, or null. */
-export function findFableReplyFor(comments, checkpointId) {
+/** The LAST [FABLE -> LARRY] (cold-final) reply for a checkpoint on the thread, or null.
+ *  Same reply-author trust gate as findTowerReplyFor (#5). */
+export function findFableReplyFor(comments, checkpointId, { isTrustedAuthor = null } = {}) {
   let found = null;
   for (const c of comments ?? []) {
+    if (isTrustedAuthor && !isTrustedAuthor(c?.user)) continue; // forged reply from an untrusted author
     const parsed = parseFableResponse(c?.comment_text ?? c?.text ?? c?.body ?? '');
     if (parsed.ok && parsed.response.checkpoint_id === checkpointId) found = { ...parsed.response, comment_id: c?.id ?? null };
   }
@@ -268,11 +277,14 @@ export function findFableReplyFor(comments, checkpointId) {
  *   · fable routing is DISABLED and any [TOWER -> LARRY] reply exists (codex-only path).
  * An APPROVE [TOWER -> LARRY] with NO fable reply while fable is enabled is NOT terminal.
  */
-export function terminallyAnsweredCheckpointIds(comments, { fableEnabled = false } = {}) {
+export function terminallyAnsweredCheckpointIds(comments, { fableEnabled = false, isTrustedAuthor = null } = {}) {
   const towerApprove = new Set();
   const towerNonApprove = new Set();
   const fableReplied = new Set();
   for (const c of comments ?? []) {
+    // REPLY-AUTHOR TRUST (#5): a forged reply from an untrusted author must NOT terminally
+    // dedup the checkpoint. When no predicate is supplied, behaviour is unchanged.
+    if (isTrustedAuthor && !isTrustedAuthor(c?.user)) continue;
     const text = c?.comment_text ?? c?.text ?? c?.body ?? '';
     const tr = parseResponse(text);
     if (tr.ok && tr.response.checkpoint_id) {

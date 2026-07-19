@@ -231,7 +231,11 @@ test('MEDIUM H -- a CLI modelUsage that lacks claude-fable-5 fails closed (silen
   assert.equal(turn.kind, 'model_substituted');
 });
 
-test('MEDIUM H -- absent modelUsage does NOT block (older CLI shape cannot be confirmed, so not held against it)', async () => {
+test('FINDING #4a (REVERSAL) -- absent modelUsage now FAILS CLOSED (model_unverified): NEVER sign an unverified model', async () => {
+  // Round-2 reviewers reversed the earlier "absent modelUsage does not block" decision: an
+  // absent/ambiguous modelUsage is UNVERIFIABLE, and the verdict is signed model_id=claude-
+  // fable-5 from the argv, so accepting it is fail-OPEN. The startup smoke check confirms the
+  // CLI emits modelUsage, so an absent map mid-review is a real anomaly -> signed BLOCKED.
   const result = { verdict: 'approve', summary: 'ok', claims_verified: [], findings: [], proposed_action: { type: 'noop', target: '' } };
   const noUsage = JSON.stringify({ type: 'result', subtype: 'success', is_error: false, result: JSON.stringify(result) });
   const fable = createFableAdapter({
@@ -241,7 +245,71 @@ test('MEDIUM H -- absent modelUsage does NOT block (older CLI shape cannot be co
     authProbe: () => ({ authenticated: true, method: 'oauth-credentials' }),
   });
   const turn = await fable.runTurn({ checkpoint: { checkpoint_id: 'cp-1', head_sha: 'abc' }, packet: { head_sha: 'abc' }, skillText: 's', promptFingerprint: 'fp' });
-  assert.equal(turn.ok, true, 'no modelUsage -> unconfirmable, not a substitution blocker');
+  assert.equal(turn.blocked, true, 'absent modelUsage is now a signed blocker, never an accepted unverified approve');
+  assert.equal(turn.kind, 'model_unverified');
+  assert.equal(turn.signerPrincipal, 'claude_fable');
+});
+
+test('FINDING #4a -- an EMPTY modelUsage map ({}) also fails closed (model_unverified)', async () => {
+  const result = { verdict: 'approve', summary: 'ok', claims_verified: [], findings: [], proposed_action: { type: 'noop', target: '' } };
+  const emptyUsage = JSON.stringify({ type: 'result', subtype: 'success', is_error: false, result: JSON.stringify(result), modelUsage: {} });
+  const fable = createFableAdapter({
+    config: { signingSecret: () => null },
+    spawn: fakeSpawn({ stdout: emptyUsage, code: 0 }),
+    resolveBin: () => ({ path: 'C:/fake/claude.exe', source: 'test', error: null }),
+    authProbe: () => ({ authenticated: true, method: 'oauth-credentials' }),
+  });
+  const turn = await fable.runTurn({ checkpoint: { checkpoint_id: 'cp-1', head_sha: 'abc' }, packet: { head_sha: 'abc' }, skillText: 's', promptFingerprint: 'fp' });
+  assert.equal(turn.blocked, true);
+  assert.equal(turn.kind, 'model_unverified');
+});
+
+test('FINDING #4b -- a DATED model id (claude-fable-5-YYYYMMDD) is accepted via PREFIX match (no false-block)', async () => {
+  // An exact-key match would false-block a legitimate dated model id. The prefix match on
+  // FABLE_MODEL_ID accepts claude-fable-5-20260715 as the reviewer model actually running.
+  const result = { verdict: 'approve', summary: 'ok', claims_verified: [], findings: [], proposed_action: { type: 'noop', target: '' } };
+  const dated = JSON.stringify({
+    type: 'result', subtype: 'success', is_error: false, result: JSON.stringify(result),
+    usage: { output_tokens: 5 }, modelUsage: { 'claude-fable-5-20260715': { outputTokens: 5 } },
+  });
+  const fable = createFableAdapter({
+    config: { signingSecret: () => null },
+    spawn: fakeSpawn({ stdout: dated, code: 0 }),
+    resolveBin: () => ({ path: 'C:/fake/claude.exe', source: 'test', error: null }),
+    authProbe: () => ({ authenticated: true, method: 'oauth-credentials' }),
+  });
+  const turn = await fable.runTurn({ checkpoint: { checkpoint_id: 'cp-1', head_sha: 'abc' }, packet: { head_sha: 'abc' }, skillText: 's', promptFingerprint: 'fp' });
+  assert.equal(turn.ok, true, 'a dated claude-fable-5-* id prefix-matches and is accepted as the model that ran');
+  assert.notEqual(turn.blocked, true, 'a dated id is not a blocker');
+  assert.equal(turn.structuredResult.verdict, 'approve');
+});
+
+test('FINDING #4c -- verifyInvocable STARTUP smoke check: claude --help must advertise --tools AND --model', async () => {
+  // A resolvable binary is not enough: verifyInvocable now probes `claude --help` (a READ,
+  // never a gate-disable) and requires the CLI advertise --tools (tool-lessness) and --model
+  // (model resolution). A help output missing --tools -> invocable:false (fails LOUD at start).
+  const goodHelp = 'Usage: claude [options]\n  --model <m>   the model\n  --tools <t>   Use "" to disable all tools\n';
+  const okAdapter = createFableAdapter({
+    config: { signingSecret: () => null },
+    spawn: fakeSpawn({ stdout: goodHelp, code: 0 }),
+    resolveBin: () => ({ path: 'C:/fake/claude.exe', source: 'test', error: null }),
+    authProbe: () => ({ authenticated: true, method: 'oauth-credentials' }),
+  });
+  const okInv = await okAdapter.verifyInvocable();
+  assert.equal(okInv.invocable, true, 'a claude --help advertising --tools + --model passes the startup smoke check');
+  assert.equal(okInv.modelSmoke.supportsToolless, true);
+  assert.equal(okInv.modelSmoke.supportsModel, true);
+
+  const badHelp = 'Usage: claude [options]\n  --model <m>   the model\n'; // NO --tools support
+  const badAdapter = createFableAdapter({
+    config: { signingSecret: () => null },
+    spawn: fakeSpawn({ stdout: badHelp, code: 0 }),
+    resolveBin: () => ({ path: 'C:/fake/claude.exe', source: 'test', error: null }),
+    authProbe: () => ({ authenticated: true, method: 'oauth-credentials' }),
+  });
+  const badInv = await badAdapter.verifyInvocable();
+  assert.equal(badInv.invocable, false, 'a CLI lacking --tools support fails the startup smoke check (caught at startup, not mid-review)');
+  assert.match(badInv.binError, /--tools/);
 });
 
 test('MAJOR E -- wireFable: DISABLED yields NO fable (codex-only path)', async () => {

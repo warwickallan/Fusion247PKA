@@ -130,6 +130,17 @@ export function loadConfig({ env = process.env, home = SECRET_HOME, files = DEFA
   const authorisedAuthorIds = String(get('TOWER_AUTHORISED_AUTHOR_IDS') ?? '')
     .split(',').map((s) => s.trim()).filter(Boolean);
 
+  // TOWER_SELF_AUTHOR_IDS — the ClickUp user id(s) the Tower ITSELF posts replies under
+  // (defence in depth over the [TOWER→LARRY]/[FABLE→LARRY] text markers — MED security #5).
+  // A reply block is only trusted (recorded answered / merge_ready, or used to resume) when
+  // its comment author is one of these. NOT a secret (ids, not credentials): shown in
+  // describe(). In the single-token live design the Tower posts under Warwick's personal
+  // CLICKUP_TOKEN, so this is his ClickUp user id (222204263). Empty/absent → the reply-
+  // author gate is UNCONFIGURED and reply-trust falls back to the legacy trust-all behaviour
+  // (no gating) so an install that has not set it is unchanged; set it to activate the gate.
+  const selfAuthorIds = String(get('TOWER_SELF_AUTHOR_IDS') ?? '')
+    .split(',').map((s) => s.trim()).filter(Boolean);
+
   const secretValues = [clickupToken, telegramBotToken, codexHmacSecret, fableHmacSecret]
     .filter((v) => typeof v === 'string' && v.length > 0);
 
@@ -142,6 +153,7 @@ export function loadConfig({ env = process.env, home = SECRET_HOME, files = DEFA
     codexHmacSecret,            // SECRET — never logged
     fableHmacSecret,            // SECRET -- never logged (Fable's per-principal verdict signer)
     authorisedAuthorIds,        // POINTER list — safe (checkpoint-author allowlist)
+    selfAuthorIds,              // POINTER list — safe (the Tower's own reply-author identity)
 
     clickupReady: clickupToken !== null,
     telegramReady: telegramBotToken !== null && authorisedTelegramUserId !== null,
@@ -150,11 +162,29 @@ export function loadConfig({ env = process.env, home = SECRET_HOME, files = DEFA
     // Unconfigured → the watcher fails closed (defence in depth over the text marker).
     authorGateConfigured: authorisedAuthorIds.length > 0,
 
+    // The reply-author gate (#5) is CONFIGURED only when TOWER_SELF_AUTHOR_IDS is set.
+    // When configured, ONLY replies authored by the Tower's own identity are trusted; when
+    // unconfigured, reply-trust is the legacy trust-all (no gating) so existing installs run
+    // unchanged. Set TOWER_SELF_AUTHOR_IDS to the Tower's ClickUp user id to activate it.
+    replyAuthorGateConfigured: selfAuthorIds.length > 0,
+
     /** Is this ClickUp user id an authorised checkpoint author? Fail-closed (no default-open). */
     isAuthorisedAuthor(userId) {
       if (authorisedAuthorIds.length === 0) return false;
       if (userId === null || userId === undefined || userId === '') return false;
       return authorisedAuthorIds.includes(String(userId));
+    },
+
+    /**
+     * Is this ClickUp user id trusted to have AUTHORED a [TOWER→LARRY]/[FABLE→LARRY] reply?
+     * When TOWER_SELF_AUTHOR_IDS is configured, only the Tower's own identity is trusted (a
+     * forged reply from any other author is ignored — never recorded answered/merge_ready,
+     * never used to resume). When unconfigured, returns true (legacy trust-all, no gating).
+     */
+    isTrustedReplyAuthor(userId) {
+      if (selfAuthorIds.length === 0) return true; // unconfigured → no gating (legacy behaviour)
+      if (userId === null || userId === undefined || userId === '') return false;
+      return selfAuthorIds.includes(String(userId));
     },
 
     /** Signing secret VALUE for a principal (in-process HMAC only). Null when unset. */
@@ -200,6 +230,7 @@ export function loadConfig({ env = process.env, home = SECRET_HOME, files = DEFA
         AUTHORISED_TELEGRAM_USER_ID: authorisedTelegramUserId ?? '(unset)',
         GITHUB_REPO: githubRepo ?? '(unset)',
         TOWER_AUTHORISED_AUTHOR_IDS: authorisedAuthorIds.length ? authorisedAuthorIds.join(',') : '(unset)',
+        TOWER_SELF_AUTHOR_IDS: selfAuthorIds.length ? selfAuthorIds.join(',') : '(unset)',
         TOWER_HMAC_SECRET_GPT_CODEX: maskSecret(codexHmacSecret),
         TOWER_HMAC_SECRET_CLAUDE_FABLE: maskSecret(fableHmacSecret),
         clickupReady: clickupToken !== null,
