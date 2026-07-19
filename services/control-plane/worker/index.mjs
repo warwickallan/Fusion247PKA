@@ -32,10 +32,11 @@ async function main() {
   const pool = createPool();
 
   const registry = new HandlerRegistry();
-  // A minimal demo handler: records an idempotent effect event then succeeds.
+  // A minimal demo handler: records an idempotent effect event then succeeds. The effect
+  // key is runtime-derived from the sanctioned { effect } form (never a hand-crafted key).
   registry.register('demo', async (ctx) => {
     ctx.emit('demo.effect', {
-      deliveryKey: ctx.effectKey('demo'),
+      effect: 'demo',
       payload: { jobId: String(ctx.job.id) },
     });
     return { status: 'succeeded' };
@@ -73,9 +74,12 @@ async function main() {
   await worker.runLoop((process.env.QUEUES ?? 'demo').split(',').map((s) => s.trim()));
 }
 
-// Only run when invoked directly — never on import. pathToFileURL normalises Windows
-// backslash paths + drive letters so the comparison is correct cross-platform.
+// Only run when invoked directly — never on import (fix 11). The bootstrap is gated SOLELY
+// on the direct-entrypoint check: pathToFileURL normalises Windows backslash paths + drive
+// letters so the comparison is correct cross-platform. The former `WORKER_MAIN=1` ambient
+// trigger is REMOVED — an env var must never be able to make `import`ing this module start
+// timers or DB work. Import is inert; a runtime is a deliberate, direct `node worker/index.mjs`.
 const invokedDirectly = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
-if (invokedDirectly || process.env.WORKER_MAIN === '1') {
+if (invokedDirectly) {
   main().catch((err) => { console.error(err); process.exit(1); });
 }

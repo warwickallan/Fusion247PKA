@@ -8,7 +8,7 @@
 // Point DATABASE_URL at an ISOLATED throwaway dev Postgres ONLY: every test DROPs and
 // rebuilds the `ops` schema from the WP-A migration.
 //
-// The six acceptance proofs (over the WP-A ops.job / ops.agent_event runtime):
+// The acceptance proofs (over the WP-A ops.job / ops.agent_event runtime):
 //   1. One job + N concurrent workers -> claimed by EXACTLY ONE (genuine multi-connection).
 //   2. Worker crash mid-lease -> reclaim -> another worker completes it EXACTLY once
 //      (real interleaving: the stale worker's completion is rejected + rolled back).
@@ -17,6 +17,16 @@
 //   5. ops.agent_event append-only reconstructs the full lifecycle (enqueued -> claimed ->
 //      handler events -> terminal), and remains immutable (UPDATE rejected, 23001).
 //   6. Correctness with NOTIFY/Realtime disabled entirely (polling-only loop).
+// ROUND-2 review fixes (Codex + Fable consolidation):
+//   7.  effect-key INJECTIVITY despite ':' in idempotency_key/name (Codex CRIT).
+//   8.  malformed handler return (undefined / unknown status) is NOT success (Codex MAJOR).
+//   9.  enqueue is ATOMIC: neither the job nor the enqueued event commits alone (both).
+//   10. a caller deliveryKey in the reserved lifecycle namespace is rejected (Codex HIGH).
+//   11. reclaimer emits idempotent lease_reclaimed / dead_lettered ledger events (Fable).
+//   12. graceful failed -> pending -> retried -> effect exactly once; per-attempt terminals (Fable).
+//   13. graceful failed at attempts==max_attempts -> dead_letter (+ ledger event) (Fable).
+//   14. cross-queue idempotency_key reuse is refused (Fable).
+//   15. concurrent same-key enqueues -> one job + one enqueued event (both).
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -27,6 +37,7 @@ import { fileURLToPath } from 'node:url';
 import { enqueue } from '../enqueue.mjs';
 import { HandlerRegistry } from '../handlers.mjs';
 import { Worker, Reclaimer } from '../worker.mjs';
+import { effectDeliveryKey } from '../events.mjs';
 import { createLogger, sleep, waitFor } from '../util.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -76,7 +87,7 @@ async function jobRow(pool, idempotencyKey) {
 function effectHandler(effectName = 'done') {
   return async (ctx) => {
     ctx.emit('work.done', {
-      deliveryKey: ctx.effectKey(effectName),
+      effect: effectName,
       payload: { jobId: String(ctx.job.id), effect: effectName },
     });
     return { status: 'succeeded' };
@@ -229,7 +240,7 @@ gated('5. agent_event append-only reconstructs the full lifecycle + stays immuta
     const reg = new HandlerRegistry().register('q5', async (ctx) => {
       // a per-attempt progress event + the idempotent effect event
       ctx.emit('work.progress', { payload: { jobId: String(ctx.job.id), step: 'started' } });
-      ctx.emit('work.done', { deliveryKey: ctx.effectKey('done'), payload: { jobId: String(ctx.job.id) } });
+      ctx.emit('work.done', { effect: 'done', payload: { jobId: String(ctx.job.id) } });
       return { status: 'succeeded' };
     });
     const { job } = await enqueue(pool, { jobType: 'q5', idempotencyKey: 'life-1' });
@@ -287,5 +298,263 @@ gated('6. correctness with NOTIFY/Realtime DISABLED (polling-only loop drives it
     assert.equal((await jobRow(pool, 'poll-1')).status, 'succeeded');
     const evs = await eventsForJob(pool, job.id);
     assert.equal(evs.filter((e) => e.event_kind === 'work.done').length, 1, 'exactly one effect via polling');
+  } finally { await pool.end(); }
+});
+
+// ===========================================================================
+// ROUND-2 review fixes — additional proofs (Codex + Fable consolidation).
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// Fix 1 (Codex CRIT) — effect-key INJECTIVITY. The old effect:${key}:${name}
+// template collided whenever key/name contained ':'. The hashed versioned tuple
+// must keep distinct (key,name) pairs distinct — proven at the unit level AND by
+// two jobs whose OLD keys would have flattened to the same string both landing.
+gated('7. effect keys are INJECTIVE despite ":" in idempotency_key/name — distinct effects both land', async () => {
+  // Unit: the two tuples the OLD template flattened to `effect:a::b`.
+  assert.notEqual(effectDeliveryKey('a:', 'b'), effectDeliveryKey('a', ':b'),
+    'colliding (key,name) tuples must yield DISTINCT delivery keys');
+
+  const pool = await freshPool();
+  try {
+    const reg = new HandlerRegistry().register('q7', async (ctx) => {
+      ctx.emit('work.done', { effect: ctx.job.payload.effectName, payload: { jobId: String(ctx.job.id) } });
+      return { status: 'succeeded' };
+    });
+    // Job X: key 'k:1', name 'n'  |  Job Y: key 'k', name '1:n'.  OLD encoding: BOTH `effect:k:1:n`.
+    const { job: jx } = await enqueue(pool, { jobType: 'q7', idempotencyKey: 'k:1', payload: { effectName: 'n' } });
+    const { job: jy } = await enqueue(pool, { jobType: 'q7', idempotencyKey: 'k', payload: { effectName: '1:n' } });
+
+    const w = new Worker(pool, reg, { workerId: 'w7', leaseSeconds: 30, logger: SILENT });
+    assert.equal((await w.processOnce('q7')).outcome, 'succeeded');
+    assert.equal((await w.processOnce('q7')).outcome, 'succeeded');
+    assert.equal(await w.processOnce('q7'), null, 'both jobs processed');
+
+    const kx = (await eventsForJob(pool, jx.id)).filter((e) => e.event_kind === 'work.done');
+    const ky = (await eventsForJob(pool, jy.id)).filter((e) => e.event_kind === 'work.done');
+    assert.equal(kx.length, 1, 'job X effect landed');
+    assert.equal(ky.length, 1, 'job Y effect landed (would have been dropped by the old collision)');
+    assert.notEqual(kx[0].delivery_key, ky[0].delivery_key, 'the two effects have DISTINCT delivery keys');
+    assert.equal(kx[0].delivery_key, effectDeliveryKey('k:1', 'n'));
+    assert.equal(ky[0].delivery_key, effectDeliveryKey('k', '1:n'));
+  } finally { await pool.end(); }
+});
+
+// ---------------------------------------------------------------------------
+// Fix 2 (Codex MAJOR) — a malformed handler return is NOT success. undefined and
+// a typo'd status must route through the failure/retry path, never silently commit.
+gated('8. malformed handler return (undefined / unknown status) is NOT success', async () => {
+  const pool = await freshPool();
+  try {
+    const reg = new HandlerRegistry()
+      .register('undef', async () => { /* returns undefined */ })
+      .register('bogus', async () => ({ status: 'donezo' }));
+    await enqueue(pool, { jobType: 'undef', idempotencyKey: 'u-1', maxAttempts: 1 });
+    await enqueue(pool, { jobType: 'bogus', idempotencyKey: 'b-1', maxAttempts: 1 });
+
+    const w = new Worker(pool, reg, { workerId: 'w8', leaseSeconds: 60, logger: SILENT });
+    assert.equal((await w.processOnce('undef')).outcome, 'invalid_result', 'undefined return is not success');
+    assert.equal((await w.processOnce('bogus')).outcome, 'invalid_result', 'unknown status is not success');
+
+    // Not completed: still leased (awaiting reclaim), never a terminal succeeded.
+    const ju = await jobRow(pool, 'u-1');
+    assert.equal(ju.status, 'leased', 'undefined-return job left for reclaim, not succeeded');
+    assert.equal((await jobRow(pool, 'b-1')).status, 'leased', 'unknown-status job left for reclaim, not succeeded');
+    const evu = await eventsForJob(pool, ju.id);
+    assert.equal(evu.filter((e) => e.event_kind === 'job.succeeded').length, 0, 'never succeeded');
+    assert.equal(evu.filter((e) => e.event_kind === 'job.invalid_result').length, 1, 'invalid_result recorded on the ledger');
+
+    // On reclaim (max_attempts=1, already at 1 attempt) the ambiguous work dead-letters —
+    // parked for a human, NOT silently marked done.
+    await pool.query(`update ops.job set lease_deadline_at = now() - interval '1 second' where status='leased'`);
+    const reclaimed = await new Reclaimer(pool, { logger: SILENT }).tick();
+    assert.equal(reclaimed.length, 2, 'both stuck jobs reclaimed');
+    assert.ok(reclaimed.every((r) => r.status === 'dead_letter'), 'exhausted invalid-result jobs dead-letter, never succeed');
+  } finally { await pool.end(); }
+});
+
+// ---------------------------------------------------------------------------
+// Fix 3 (both) — enqueue is ATOMIC: a fault between the job insert and the
+// enqueued event must commit NEITHER half.
+gated('9. enqueue atomicity — a fault between job insert and enqueued event commits neither', async () => {
+  const pool = await freshPool();
+  try {
+    let threw = null;
+    try {
+      await enqueue(pool, { jobType: 'q9', idempotencyKey: 'atomic-1' }, {
+        afterJobInsertBeforeEvent: async () => { throw new Error('injected fault'); },
+      });
+    } catch (e) { threw = e; }
+    assert.ok(threw, 'the injected fault propagates out of enqueue');
+
+    const jobs = (await pool.query(`select count(*)::int n from ops.job where idempotency_key='atomic-1'`)).rows[0].n;
+    assert.equal(jobs, 0, 'NO job row committed (the insert rolled back with the txn)');
+    const evs = (await pool.query(`select count(*)::int n from ops.agent_event where delivery_key='job:enq:atomic-1'`)).rows[0].n;
+    assert.equal(evs, 0, 'NO enqueued event committed either — neither half lands alone');
+
+    // A clean re-enqueue afterwards still yields exactly one job + one enqueued event.
+    const { deduped } = await enqueue(pool, { jobType: 'q9', idempotencyKey: 'atomic-1' });
+    assert.equal(deduped, false, 'the earlier abort left nothing behind — this is a fresh insert');
+    const e2 = (await pool.query(`select count(*)::int n from ops.agent_event where delivery_key='job:enq:atomic-1'`)).rows[0].n;
+    assert.equal(e2, 1, 'the retry enqueue lands exactly one enqueued event');
+  } finally { await pool.end(); }
+});
+
+// ---------------------------------------------------------------------------
+// Fix 4 (Codex HIGH) — a caller deliveryKey inside the reserved lifecycle
+// namespace is REJECTED, never read as an already-delivered success.
+gated('10. a caller deliveryKey colliding with the reserved lifecycle namespace is rejected', async () => {
+  const pool = await freshPool();
+  try {
+    const reg = new HandlerRegistry().register('q10', async (ctx) => {
+      // Try to hand-craft a key in another job's reserved terminal slot.
+      ctx.emit('work.done', { deliveryKey: 'job:999999:terminal:succeeded', payload: { jobId: String(ctx.job.id) } });
+      return { status: 'succeeded' };
+    });
+    const { job } = await enqueue(pool, { jobType: 'q10', idempotencyKey: 'guard-1', maxAttempts: 1 });
+    const w = new Worker(pool, reg, { workerId: 'w10', leaseSeconds: 60, logger: SILENT });
+    const r = await w.processOnce('q10');
+    assert.equal(r.outcome, 'handler_error', 'the reserved-namespace emit throws -> crash-equivalent, not success');
+
+    const forged = (await pool.query(
+      `select count(*)::int n from ops.agent_event where delivery_key='job:999999:terminal:succeeded'`)).rows[0].n;
+    assert.equal(forged, 0, 'the forged reserved key never landed as an event');
+    const evs = await eventsForJob(pool, job.id);
+    assert.equal(evs.filter((e) => e.event_kind === 'job.succeeded').length, 0, 'the job did NOT complete on a rejected key');
+    assert.notEqual((await jobRow(pool, 'guard-1')).status, 'succeeded', 'the job is not marked done');
+  } finally { await pool.end(); }
+});
+
+// ---------------------------------------------------------------------------
+// Fix 6 (Fable) — the reclaimer emits idempotent lease_reclaimed / dead_lettered
+// ledger events so the lifecycle is reconstructable from ops.agent_event alone.
+gated('11. reclaimer emits idempotent lease_reclaimed / dead_lettered ledger events', async () => {
+  const pool = await freshPool();
+  try {
+    const reg = new HandlerRegistry().register('q11', async () => { throw new Error('boom'); });
+    await enqueue(pool, { jobType: 'q11', idempotencyKey: 'rc-1', maxAttempts: 2 });
+    const reclaimer = new Reclaimer(pool, { logger: SILENT });
+    const w = new Worker(pool, reg, { workerId: 'w11', leaseSeconds: 60, logger: SILENT });
+
+    // Attempt 1: throw -> expire -> reclaim -> pending (job.lease_reclaimed).
+    await w.processOnce('q11');
+    await pool.query(`update ops.job set lease_deadline_at = now() - interval '1 second' where idempotency_key='rc-1'`);
+    assert.equal((await reclaimer.tick())[0].status, 'pending', 'attempt-1 reclaim returns to pending');
+    const job = await jobRow(pool, 'rc-1');
+    assert.equal((await eventsForJob(pool, job.id)).filter((e) => e.event_kind === 'job.lease_reclaimed').length, 1,
+      'a lease_reclaimed event is on the ledger');
+    // Idempotent across ticks: nothing left to reclaim, no duplicate emitted.
+    await reclaimer.tick();
+    assert.equal((await eventsForJob(pool, job.id)).filter((e) => e.event_kind === 'job.lease_reclaimed').length, 1,
+      'reclaim event is not duplicated');
+
+    // Attempt 2: throw -> expire -> reclaim -> dead_letter (job.dead_lettered).
+    await w.processOnce('q11');
+    await pool.query(`update ops.job set lease_deadline_at = now() - interval '1 second' where idempotency_key='rc-1'`);
+    assert.equal((await reclaimer.tick())[0].status, 'dead_letter', 'attempt-2 reclaim dead-letters (budget exhausted)');
+    const evs = await eventsForJob(pool, job.id);
+    assert.equal(evs.filter((e) => e.event_kind === 'job.dead_lettered').length, 1, 'a dead_lettered event is on the ledger');
+    const kinds = new Set(evs.map((e) => e.event_kind));
+    assert.ok(kinds.has('job.enqueued') && kinds.has('job.claimed')
+      && kinds.has('job.lease_reclaimed') && kinds.has('job.dead_lettered'),
+      `ledger reconstructs the reclaim + dead-letter lifecycle (got: ${[...kinds].join(', ')})`);
+  } finally { await pool.end(); }
+});
+
+// ---------------------------------------------------------------------------
+// Fix 7 + 8 (Fable) — graceful {status:'failed'} path has real coverage:
+// pending -> retried -> effect EXACTLY once; and each failed terminal is
+// per-attempt (not dedup-collapsed against attempt 1).
+gated('12. graceful failed -> pending -> retried -> effect exactly once; per-attempt terminals', async () => {
+  const pool = await freshPool();
+  try {
+    let calls = 0;
+    const reg = new HandlerRegistry().register('q12', async (ctx) => {
+      calls += 1;
+      if (calls < 3) return { status: 'failed' };
+      ctx.emit('work.done', { effect: 'done', payload: { jobId: String(ctx.job.id) } });
+      return { status: 'succeeded' };
+    });
+    const { job } = await enqueue(pool, { jobType: 'q12', idempotencyKey: 'gf-1', maxAttempts: 5 });
+    const w = new Worker(pool, reg, { workerId: 'w12', leaseSeconds: 60, logger: SILENT });
+
+    assert.equal((await w.processOnce('q12')).outcome, 'failed', 'attempt 1 graceful-failed');
+    assert.equal((await jobRow(pool, 'gf-1')).status, 'pending', 'immediately back to pending (no reclaim needed)');
+    assert.equal((await w.processOnce('q12')).outcome, 'failed', 'attempt 2 graceful-failed');
+    assert.equal((await w.processOnce('q12')).outcome, 'succeeded', 'attempt 3 succeeds');
+
+    const finalJob = await jobRow(pool, 'gf-1');
+    assert.equal(finalJob.status, 'succeeded');
+    assert.equal(finalJob.attempts, 3, 'three attempts');
+
+    const evs = await eventsForJob(pool, job.id);
+    assert.equal(evs.filter((e) => e.event_kind === 'work.done').length, 1, 'effect ran EXACTLY once across the retries');
+    const failed = evs.filter((e) => e.event_kind === 'job.failed');
+    assert.equal(failed.length, 2, 'both graceful-failed terminals survive on the ledger (per-attempt keys)');
+    assert.equal(new Set(failed.map((e) => e.delivery_key)).size, 2, 'the two failed terminals have DISTINCT keys');
+    assert.equal(evs.filter((e) => e.event_kind === 'job.succeeded').length, 1, 'one succeeded terminal (singleton)');
+  } finally { await pool.end(); }
+});
+
+// ---------------------------------------------------------------------------
+// Fix 8 (Fable) — graceful-failed at attempts==max_attempts dead-letters, with a
+// ledger event, and never succeeds.
+gated('13. graceful failed at attempts==max_attempts -> dead_letter (+ ledger event)', async () => {
+  const pool = await freshPool();
+  try {
+    const reg = new HandlerRegistry().register('q13', async () => ({ status: 'failed' }));
+    const MAX = 2;
+    const { job } = await enqueue(pool, { jobType: 'q13', idempotencyKey: 'gd-1', maxAttempts: MAX });
+    const w = new Worker(pool, reg, { workerId: 'w13', leaseSeconds: 60, logger: SILENT });
+
+    assert.equal((await w.processOnce('q13')).outcome, 'failed', 'attempt 1');
+    assert.equal((await jobRow(pool, 'gd-1')).status, 'pending', 'still retryable after attempt 1');
+    assert.equal((await w.processOnce('q13')).outcome, 'failed', 'attempt 2 (budget now exhausted)');
+
+    const dead = await jobRow(pool, 'gd-1');
+    assert.equal(dead.status, 'dead_letter', 'graceful-failed at max_attempts dead-letters immediately');
+    assert.equal(dead.attempts, MAX);
+    assert.ok(dead.dead_lettered_at, 'dead_lettered_at stamped');
+    const evs = await eventsForJob(pool, job.id);
+    assert.equal(evs.filter((e) => e.event_kind === 'job.dead_lettered').length, 1, 'graceful-exhaustion dead-letter on the ledger');
+    assert.equal(evs.filter((e) => e.event_kind === 'job.succeeded').length, 0, 'never succeeded');
+    assert.equal(await w.processOnce('q13'), null, 'a dead-lettered job is not re-claimed');
+  } finally { await pool.end(); }
+});
+
+// ---------------------------------------------------------------------------
+// Fix 9 (Fable) — reusing an idempotency_key on a DIFFERENT queue is refused, so
+// the caller's work is never silently absorbed into a different-type job.
+gated('14. cross-queue idempotency_key reuse is refused (no silent cross-type absorption)', async () => {
+  const pool = await freshPool();
+  try {
+    assert.equal((await enqueue(pool, { jobType: 'typeA', idempotencyKey: 'x-1' })).deduped, false);
+    let threw = null;
+    try { await enqueue(pool, { jobType: 'typeB', idempotencyKey: 'x-1' }); }
+    catch (e) { threw = e; }
+    assert.ok(threw, 'a cross-queue key reuse throws');
+    assert.match(String(threw.message), /different-type job|already exists on queue/);
+    const rows = (await pool.query(`select queue from ops.job where idempotency_key='x-1'`)).rows;
+    assert.equal(rows.length, 1, 'still exactly one job');
+    assert.equal(rows[0].queue, 'typeA', 'and it is still the original type');
+  } finally { await pool.end(); }
+});
+
+// ---------------------------------------------------------------------------
+// Fix 10 (both) — two concurrent same-key enqueues on DISTINCT connections yield
+// exactly one job and one truthful enqueued event.
+gated('15. concurrent same-key enqueues (distinct connections) -> one job + one enqueued event', async () => {
+  const pool = await freshPool();
+  try {
+    const [a, b] = await Promise.all([
+      enqueue(pool, { jobType: 'q15', idempotencyKey: 'race-1', payload: { v: 1 } }),
+      enqueue(pool, { jobType: 'q15', idempotencyKey: 'race-1', payload: { v: 2 } }),
+    ]);
+    assert.equal(String(a.job.id), String(b.job.id), 'both enqueues resolve to the same job row');
+    assert.equal([a.deduped, b.deduped].filter(Boolean).length, 1, 'exactly one of the two is deduped');
+    const jobs = (await pool.query(`select count(*)::int n from ops.job where idempotency_key='race-1'`)).rows[0].n;
+    assert.equal(jobs, 1, 'exactly one job row');
+    const evs = (await pool.query(`select count(*)::int n from ops.agent_event where delivery_key='job:enq:race-1'`)).rows[0].n;
+    assert.equal(evs, 1, 'exactly one truthful enqueued event');
   } finally { await pool.end(); }
 });

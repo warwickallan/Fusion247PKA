@@ -5,19 +5,48 @@
 //   ctx.job        the claimed ops.job row
 //   ctx.workerId   the leasing worker's id
 //   ctx.attempt    this lease's attempt number (from job.attempts)
-//   ctx.effectKey(name)   a STABLE delivery_key for an idempotent effect event, scoped
-//                         to the unit of work (idempotency_key) so it is identical across
-//                         retries -> the effect lands EXACTLY ONCE (at-least-once delivery,
-//                         exactly-once effect).
-//   ctx.emit(eventKind, { payload?, deliveryKey?, actor?, classification?, buildId? })
-//                         buffer an ops.agent_event to be written ATOMICALLY with
-//                         ops.complete_job (so effect + completion commit together, or
-//                         roll back together if this worker's lease is stale).
+//   ctx.effectKey(name)   the runtime-derived, INJECTIVE delivery_key for an idempotent
+//                         effect, scoped to the unit of work (idempotency_key) so it is
+//                         identical across retries -> the effect lands EXACTLY ONCE. The key
+//                         is a hash of a versioned (idempotency_key, name) tuple, so any ':'
+//                         in either component can no longer collide two distinct effects.
+//   ctx.emit(eventKind, opts)   buffer an ops.agent_event written ATOMICALLY with
+//                         ops.complete_job (effect + completion commit together, or roll back
+//                         together if this worker's lease is stale). Choose ONE of:
+//                           { effect: '<name>' }  -> idempotent effect (exactly-once across
+//                                                    retries); the delivery key is derived,
+//                                                    never hand-crafted. PREFERRED.
+//                           { deliveryKey: '<k>' } -> a caller-scoped custom key. It is
+//                                                    REJECTED if it lands in a reserved
+//                                                    namespace ('job:' lifecycle / 'effect:'),
+//                                                    else namespaced under this job's own
+//                                                    'custom:' segment (no cross-job collision).
+//                           (neither)             -> a fresh per-attempt event keyed
+//                                                    job:<id>:attempt:<n>:<eventKind>.
+//                         opts also takes { payload?, actor?, classification?, buildId? }.
 //
-// Return { status: 'succeeded' } (default) or { status: 'failed' } for a graceful,
-// handler-decided failure. THROW to signal a crash-equivalent failure: the job is NOT
-// completed, its lease simply expires and the reclaim ticker returns it for retry (or
-// dead-letters it once the attempt budget is exhausted).
+// RESULT CONTRACT (fix 2): a handler MUST return an explicit { status } of exactly
+// 'succeeded' or 'failed'. Any other value — undefined, a typo'd or unknown status — is
+// NOT treated as success: it routes through the crash-equivalent failure/retry path, so
+// ambiguous work is never silently lost.
+//   - { status: 'succeeded' }  -> terminal success.
+//   - { status: 'failed' }     -> graceful, handler-decided failure -> back to 'pending'
+//                                 for retry (or 'dead_letter' once the budget is exhausted).
+//   - THROW                    -> crash-equivalent: the job is NOT completed; its lease
+//                                 expires and the reclaim ticker returns it for retry (or
+//                                 dead-letters it once the attempt budget is exhausted).
+//
+// ERROR-TEXT CONSTRAINT (fix 5): a thrown error's raw message is NEVER persisted to the
+// ledger or logs — only a sanitised { errorClass, errorCode, correlationId, messageLength,
+// summary } is recorded (the summary is allow-list-filtered + length-capped). Do NOT rely
+// on full error text surviving; put any diagnostic detail you need in explicit, correctly
+// classification-tagged ctx.emit payload fields.
+//
+// LEASE-FENCING CONSTRAINT (DEFERRED — see README): completion is fenced by lease OWNER
+// NAME only (ops.complete_job requires status='leased' AND lease_owner=workerId). There is
+// no per-lease token yet (that needs a WP-A schema change). Therefore every worker instance
+// MUST use a UNIQUE workerId — two live workers sharing an id could each pass the ownership
+// guard for the other's lease. True token-based fencing is tracked as a follow-up.
 
 export class HandlerRegistry {
   #handlers = new Map();

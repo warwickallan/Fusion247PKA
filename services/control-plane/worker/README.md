@@ -58,6 +58,51 @@ unique `delivery_key` on `ops.agent_event` (dedup) and the lease-guarded `comple
 - **Throw** → crash-equivalent → lease-expiry retry path (spec default).
 - **Return `{ status: 'failed' }`** → a handler-decided graceful failure → `complete_job(…,
   'failed')` returns the job to `pending` (or `dead_letter` when exhausted) immediately.
+- **Return anything else** (undefined, a typo'd/unknown status) → **NOT success**. The result
+  status is allow-listed to exactly `succeeded | failed`; any other value routes through the
+  crash-equivalent failure/retry path, so ambiguous work is never silently completed.
+
+### Effect keys are injective
+
+`ctx.effectKey(name)` (and the sanctioned `ctx.emit(eventKind, { effect: name })` form) derive
+the effect's `delivery_key` as `effect:v1:<sha256 of JSON.stringify(['v1', idempotency_key,
+name])>`. Hashing an unambiguously-encoded tuple means a `:` in either the idempotency key or
+the effect name can no longer flatten two **distinct** effects onto the same key (the old
+`effect:${key}:${name}` template could). A hand-crafted `deliveryKey` that lands in a reserved
+runtime namespace (`job:` lifecycle or `effect:`) is **rejected**, never read as an
+already-delivered success; an allowed caller key is namespaced under the job's own
+`job:<id>:custom:` segment so it cannot collide across jobs.
+
+### Error text is sanitised
+
+A thrown handler error is reduced to non-sensitive metadata before it reaches the logs or the
+append-only `ops.agent_event` ledger: `{ errorClass, errorCode, correlationId, messageLength,
+summary }`, where `summary` is allow-list-filtered and length-capped. The raw message is
+**never** persisted — it can carry payload/secret fragments. Handlers MUST NOT rely on full
+error text surviving; put diagnostic detail in explicit, classification-tagged `ctx.emit`
+payload fields.
+
+### Ledger fidelity — reclaim & dead-letter are on the ledger
+
+`Reclaimer.tick` emits an idempotent `job.lease_reclaimed` (leased→pending) or
+`job.dead_lettered` (leased→dead_letter) event per reclaimed row, keyed per attempt; a
+graceful-failed completion that exhausts the retry budget also emits `job.dead_lettered`
+inside its completion transaction. The full lifecycle is therefore reconstructable from
+`ops.agent_event` alone. Non-succeeded terminal events are keyed **per attempt**
+(`job:<id>:attempt:<n>:terminal:failed`) so a second graceful failure does not dedup against
+the first; `terminal:succeeded` stays a per-job singleton.
+
+### ⚠️ Lease fencing is by OWNER NAME only — workerId MUST be unique per instance (DEFERRED)
+
+Completion is fenced by lease **owner name**: `ops.complete_job` requires
+`status='leased' AND lease_owner=workerId`. There is **no per-lease fencing token** yet — that
+needs a WP-A schema change (a token returned by `claim_job` and required by `complete_job`),
+which is out of scope for this work package and **deferred**. Consequently:
+
+> **Every worker instance MUST use a UNIQUE `workerId`.** Two live workers sharing an id could
+> each satisfy the ownership guard for the other's lease, so name-collision defeats the
+> stale-lease protection. Do not derive `workerId` from something non-unique (host name alone,
+> a fixed constant, etc.). True token-based fencing is tracked as a follow-up on WP-A.
 
 ## NOTIFY / Realtime is optional and unused
 
@@ -91,17 +136,26 @@ npm test
 DATABASE_URL=postgres://…/scratch node --test worker/test/worker-runtime.test.js
 ```
 
-The six proofs: (1) one job + N concurrent workers → exactly one claim (multi-connection);
+The proofs: (1) one job + N concurrent workers → exactly one claim (multi-connection);
 (2) crash mid-lease → reclaim → another worker completes exactly once (real interleaving —
 the stale completion is rejected and rolled back); (3) duplicate enqueue → one job, one
 effect; (4) `attempts` increment on retry, `dead_letter` after `max_attempts`; (5)
 append-only ledger reconstructs the full lifecycle and stays immutable; (6) polling-only
-correctness with NOTIFY disabled.
+correctness with NOTIFY disabled. **Round-2 review fixes:** (7) effect-key injectivity with
+`:` in the idempotency key/name; (8) a malformed handler return is not success; (9) enqueue
+atomicity — neither the job nor the enqueued event commits alone; (10) a caller `deliveryKey`
+in the reserved lifecycle namespace is rejected; (11) reclaimer emits idempotent
+lease_reclaimed / dead_lettered ledger events; (12) graceful-failed → pending → retried →
+effect exactly once, with per-attempt terminals; (13) graceful-failed at `max_attempts` →
+`dead_letter`; (14) cross-queue idempotency-key reuse is refused; (15) concurrent same-key
+enqueues → one job + one enqueued event.
 
 ## Manual run (never auto-launched)
 
 `index.mjs` exposes a demo runtime that starts **only** when the file is the process
-entrypoint (or `WORKER_MAIN=1`). Importing the module is inert. To run it yourself:
+entrypoint. The former `WORKER_MAIN=1` ambient trigger has been **removed** — no environment
+variable can make `import`ing this module start timers or DB work. Importing the module is
+inert. To run it yourself:
 
 ```bash
 DATABASE_URL=postgres://…/scratch QUEUES=demo node worker/index.mjs

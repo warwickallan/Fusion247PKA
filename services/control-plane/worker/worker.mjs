@@ -23,8 +23,8 @@
 // NOTIFY/Realtime is NOT used: correctness rests entirely on polling + claim_job. A
 // wake-hint could be layered later purely as an optimisation; nothing here depends on it.
 
-import { appendEvent } from './events.mjs';
-import { createLogger, sleep } from './util.mjs';
+import { appendEvent, effectDeliveryKey, assertCallerKeyAllowed } from './events.mjs';
+import { createLogger, sleep, sanitizeError } from './util.mjs';
 
 export class Worker {
   constructor(pool, registry, opts = {}) {
@@ -40,7 +40,8 @@ export class Worker {
   /**
    * Claim + process at most ONE job from `queue`. Returns null when the queue has no
    * eligible work, else an outcome object { job, outcome, error? } where outcome is one
-   * of 'succeeded' | 'failed' | 'handler_error' | 'completion_failed' | 'no_handler'.
+   * of 'succeeded' | 'failed' | 'handler_error' | 'invalid_result' | 'completion_failed'
+   * | 'no_handler'.
    *
    * `hooks.beforeComplete({ job, workerId, events })` is an OPTIONAL test seam invoked
    * after the handler runs but before the completion transaction — used by the crash/
@@ -81,16 +82,32 @@ export class Worker {
     }
 
     // (3) run the handler. Effect events are buffered and flushed inside the completion txn.
+    // Delivery keys are runtime-derived (fixes 1 & 4): an idempotent effect uses an INJECTIVE
+    // hash of (idempotency_key, name); a per-attempt event is scoped to job+attempt; a raw
+    // caller key is rejected if it lands in a reserved namespace, else namespaced under this
+    // job's own 'custom:' segment so it can never collide across jobs.
     const events = [];
     const ctx = {
       job,
       workerId: this.workerId,
       attempt,
-      effectKey: (name) => `effect:${job.idempotency_key}:${name}`,
+      effectKey: (name) => effectDeliveryKey(job.idempotency_key, name),
       emit: (eventKind, o = {}) => {
+        let deliveryKey;
+        if (o.effect !== undefined) {
+          // Sanctioned idempotent-effect path: stable across retries, injective.
+          deliveryKey = effectDeliveryKey(job.idempotency_key, o.effect);
+        } else if (o.deliveryKey !== undefined) {
+          // Caller-chosen key: reject reserved namespaces, then scope to THIS job.
+          assertCallerKeyAllowed(o.deliveryKey);
+          deliveryKey = `job:${jobId}:custom:${o.deliveryKey}`;
+        } else {
+          // Default: a fresh per-attempt event.
+          deliveryKey = `job:${jobId}:attempt:${attempt}:${eventKind}`;
+        }
         events.push({
           buildId: o.buildId ?? null,
-          deliveryKey: o.deliveryKey ?? `job:${jobId}:attempt:${attempt}:${eventKind}`,
+          deliveryKey,
           eventKind,
           actor: o.actor ?? null,
           payload: o.payload ?? {},
@@ -105,18 +122,38 @@ export class Worker {
       result = await handler(ctx);
     } catch (err) {
       // (5) crash-equivalent: do NOT complete. Record the failed attempt (append-only),
-      // let the lease expire -> reclaim -> retry (or dead_letter when exhausted).
-      log.warn('handler_threw', { error: String(err?.message ?? err) });
+      // let the lease expire -> reclaim -> retry (or dead_letter when exhausted). The error
+      // is SANITISED (fix 5) — only non-sensitive class/code + a correlation id reach the
+      // ledger, never the raw message (which could carry payload/secret fragments).
+      const safe = sanitizeError(err);
+      log.warn('handler_threw', safe);
       await appendEvent(this.pool, {
         deliveryKey: `job:${jobId}:attempt:${attempt}:failed`,
         eventKind: 'job.attempt_failed',
         actor: 'tower',
-        payload: { jobId, attempt, error: String(err?.message ?? err) },
+        payload: { jobId, attempt, ...safe },
       });
       return { job, outcome: 'handler_error', error: err };
     }
 
-    const status = result?.status === 'failed' ? 'failed' : 'succeeded';
+    // (2b — fix 2) A handler must EXPLICITLY signal its outcome. Only the allow-listed
+    // statuses 'succeeded' | 'failed' are honoured; anything else (undefined, a typo'd or
+    // unknown status) is NOT silent success — it routes through the crash-equivalent
+    // failure/retry path exactly like a throw, so ambiguous work is never lost.
+    const rs = result == null ? undefined : result.status;
+    if (rs !== 'succeeded' && rs !== 'failed') {
+      const safe = sanitizeError(new Error('handler returned no valid { status }'));
+      const got = typeof rs === 'string' ? rs.slice(0, 40) : (rs === undefined ? 'undefined' : typeof rs);
+      log.warn('handler_invalid_result', { got, correlationId: safe.correlationId });
+      await appendEvent(this.pool, {
+        deliveryKey: `job:${jobId}:attempt:${attempt}:invalid_result`,
+        eventKind: 'job.invalid_result',
+        actor: 'tower',
+        payload: { jobId, attempt, got, correlationId: safe.correlationId },
+      });
+      return { job, outcome: 'invalid_result' };
+    }
+    const status = rs;
 
     if (hooks.beforeComplete) {
       await hooks.beforeComplete({ job, workerId: this.workerId, events });
@@ -127,17 +164,35 @@ export class Worker {
     try {
       await client.query('begin');
       for (const ev of events) await appendEvent(client, ev);
+      // (fix 7) terminal-succeeded is a singleton per job; a non-succeeded terminal is
+      // keyed PER ATTEMPT so a 2nd graceful {status:'failed'} does not dedup against
+      // attempt-1's terminal (which would lose it from the ledger).
+      const terminalKey = status === 'succeeded'
+        ? `job:${jobId}:terminal:succeeded`
+        : `job:${jobId}:attempt:${attempt}:terminal:${status}`;
       await appendEvent(client, {
-        deliveryKey: `job:${jobId}:terminal:${status}`,
+        deliveryKey: terminalKey,
         eventKind: `job.${status}`,
         actor: 'tower',
         payload: { jobId, status, attempt, workerId: this.workerId },
       });
       // Raises restrict_violation (23001) if this worker no longer holds the lease —
-      // rolling back the buffered effect above. This is the exactly-once guard.
-      await client.query(`select ops.complete_job($1, $2, $3)`, [job.id, this.workerId, status]);
+      // rolling back the buffered effect above. This is the exactly-once guard. `select *`
+      // expands the returned ops.job so we can see whether a graceful 'failed' exhausted
+      // the retry budget and landed in dead_letter.
+      const cj = await client.query(`select * from ops.complete_job($1, $2, $3)`, [job.id, this.workerId, status]);
+      const finalStatus = cj.rows[0]?.status;
+      // (fix 6) graceful-exhaustion dead-lettering must be reconstructable from the ledger.
+      if (finalStatus === 'dead_letter') {
+        await appendEvent(client, {
+          deliveryKey: `job:${jobId}:attempt:${attempt}:dead_lettered`,
+          eventKind: 'job.dead_lettered',
+          actor: 'tower',
+          payload: { jobId, attempt, reason: 'graceful_failed_exhausted' },
+        });
+      }
       await client.query('commit');
-      log.info('job.completed', { status });
+      log.info('job.completed', { status, finalStatus });
       return { job, outcome: status };
     } catch (err) {
       await client.query('rollback').catch(() => {});
@@ -198,6 +253,24 @@ export class Reclaimer {
         toPending: rows.filter((r) => r.status === 'pending').length,
         toDeadLetter: rows.filter((r) => r.status === 'dead_letter').length,
       });
+      // (fix 6 — Fable) The reclaimer previously emitted NO ledger events, so a lease
+      // reclaim (leased->pending) or reclaim-time dead-lettering (leased->dead_letter) was
+      // invisible in ops.agent_event — the lifecycle was not reconstructable from the ledger
+      // alone. Emit one IDEMPOTENT event per reclaimed row, keyed PER ATTEMPT so re-running a
+      // tick (or two overlapping tickers) can never duplicate it.
+      for (const r of rows) {
+        const jobId = String(r.id);
+        const dead = r.status === 'dead_letter';
+        await appendEvent(this.pool, {
+          deliveryKey: `job:${jobId}:attempt:${r.attempts}:${dead ? 'dead_lettered' : 'reclaimed'}`,
+          eventKind: dead ? 'job.dead_lettered' : 'job.lease_reclaimed',
+          actor: 'tower',
+          payload: {
+            jobId, attempt: r.attempts,
+            reason: dead ? 'lease_expired_exhausted' : 'lease_expired',
+          },
+        }).catch((err) => this.logger.error('reclaim_event_failed', { jobId, ...sanitizeError(err) }));
+      }
     }
     return rows;
   }
