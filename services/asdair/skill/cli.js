@@ -5,7 +5,7 @@
 // and prints a human-readable basket plan followed by the raw JSON.
 //
 // Usage:
-//   node cli.js --list-date 2026-07-13 --household mum
+//   node cli.js --list-date 2026-07-13 --household household-a
 //
 // Requires the connection string in the environment:
 //   ASDAIR_DB_URL=postgres://...   (never passed on the command line)

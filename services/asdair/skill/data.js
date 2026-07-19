@@ -77,7 +77,7 @@ async function readQuery(text, params) {
   }
 }
 
-// Resolve a household argument (a stable name like 'mum' or a numeric id)
+// Resolve a household argument (a stable name like 'household-a' or a numeric id)
 // to its numeric id. Returns null when it cannot be resolved.
 async function resolveHouseholdId(household) {
   if (household === null || household === undefined || String(household).trim() === '') return null;

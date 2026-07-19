@@ -111,7 +111,7 @@ npm install                      # installs pg (runtime dependency of the adapte
 export ASDAIR_DB_URL='postgres://...'      # bash
 # or PowerShell:  $env:ASDAIR_DB_URL='postgres://...'
 
-node cli.js --list-date 2026-07-13 --household mum
+node cli.js --list-date 2026-07-13 --household household-a
 ```
 
 Output: a human-readable table (status / qty / item / matched product, with
