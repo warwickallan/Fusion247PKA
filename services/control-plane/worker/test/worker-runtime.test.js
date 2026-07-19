@@ -648,13 +648,13 @@ gated('16. reclaim atomicity — a fault between reclaim and its events commits 
 // shape carries only a fixed class/code + correlationId + messageLength — no
 // message-derived text (the old allow-list `summary` would have kept it verbatim).
 gated('17. a secret-shaped token in an error message never reaches the ledger or the logs', async () => {
-  const SECRET = 'ABC123SECRETtokenXYZ789'; // alphanumeric — survived the old summary allow-list
+  const leakCanary = 'ABC123SECRETtokenXYZ789'; // alphanumeric — survived the old summary allow-list
   const pool = await freshPool();
   const logs = [];
   try {
     const reg = new HandlerRegistry().register('q17', async () => {
-      const err = new Error(`auth failed for credential ${SECRET} at https://api.example/secret`);
-      err.code = SECRET; // even a secret smuggled onto err.code must be dropped (unknown shape)
+      const err = new Error(`auth failed for credential ${leakCanary} at https://api.example/secret`);
+      err.code = leakCanary; // even a secret smuggled onto err.code must be dropped (unknown shape)
       throw err;
     });
     const { job } = await enqueue(pool, { jobType: 'q17', idempotencyKey: 'sec-1', maxAttempts: 1 });
@@ -668,7 +668,7 @@ gated('17. a secret-shaped token in an error message never reaches the ledger or
     const failed = evs.filter((e) => e.event_kind === 'job.attempt_failed');
     assert.equal(failed.length, 1, 'the failed attempt is on the ledger');
     const ledgerText = JSON.stringify(evs);
-    assert.ok(!ledgerText.includes(SECRET), 'no secret token anywhere in the ledger rows');
+    assert.ok(!ledgerText.includes(leakCanary), 'no secret token anywhere in the ledger rows');
     // the sanitised shape is present and message-free
     assert.equal(failed[0].payload.errorClass, 'Error', 'fixed classification recorded');
     assert.equal(failed[0].payload.errorCode, null, 'a secret-shaped err.code was dropped (unknown shape)');
@@ -678,11 +678,11 @@ gated('17. a secret-shaped token in an error message never reaches the ledger or
     // (b) LOGS: no captured structured log line carries the secret in any field or message.
     assert.ok(logs.length > 0, 'the worker emitted structured logs');
     const logText = JSON.stringify(logs);
-    assert.ok(!logText.includes(SECRET), 'no secret token anywhere in the structured logs');
+    assert.ok(!logText.includes(leakCanary), 'no secret token anywhere in the structured logs');
 
     // Unit: sanitizeError itself never emits a message-derived field, even given a rich message.
-    const safe = sanitizeError(new TypeError(`boom ${SECRET}`));
-    assert.ok(!JSON.stringify(safe).includes(SECRET), 'sanitizeError output is secret-free');
+    const safe = sanitizeError(new TypeError(`boom ${leakCanary}`));
+    assert.ok(!JSON.stringify(safe).includes(leakCanary), 'sanitizeError output is secret-free');
     assert.equal(safe.summary, undefined, 'sanitizeError emits no summary');
     assert.equal(safe.errorClass, 'TypeError', 'known class preserved');
   } finally { await pool.end(); }
