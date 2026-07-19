@@ -38,6 +38,14 @@ export const DEFAULT_CYCLE_WATCHDOG_MS = 12 * 60 * 1000;
 // The recoverable-failure post (ClickUp reply + milestone) is itself bounded so it can
 // never wedge the loop it is trying to rescue. Best-effort within this deadline.
 export const DEFAULT_FAILURE_POST_DEADLINE_MS = 30 * 1000;
+// Per-cycle READ deadline (WP1 MAJOR). The per-checkpoint watchdog only bounds the
+// per-checkpoint processing; the poll cycle ALSO makes unbounded ClickUp reads BEFORE
+// that (reconcileFromThread + getTaskComments). A wedged read would hold polling=true
+// forever and silently stop the watcher. Every ClickUp read in a poll cycle is bounded
+// by this single deadline; on a wedge the cycle ABORTS and the loop keeps polling (the
+// polling flag is ALWAYS released in the finally). Default 60s -- a ClickUp read is a
+// few seconds in practice; anything past this is a wedge, not a slow read.
+export const DEFAULT_POLL_READ_DEADLINE_MS = 60 * 1000;
 
 /** Race a promise against a deadline WITHOUT ever rejecting -- resolves `onTimeout` if the
  *  deadline wins. The timer is always cleared once either side settles, so it never
@@ -191,7 +199,7 @@ export function pickMaterialFindings(findings) {
  * @param {function} [deps.now]       injectable clock () => epoch ms
  * @param {function} [deps.log]       injectable logger (redacted by the caller)
  */
-export function createWatcher({ config, clickup, github, codex, notifier, state, taskId, qaSkillPath, repoRoot = null, maxRounds = DEFAULT_MAX_ROUNDS, fs = fsDefault, now = Date.now, log = () => {}, cycleWatchdogMs = DEFAULT_CYCLE_WATCHDOG_MS, failurePostDeadlineMs = DEFAULT_FAILURE_POST_DEADLINE_MS } = {}) {
+export function createWatcher({ config, clickup, github, codex, notifier, state, taskId, qaSkillPath, repoRoot = null, maxRounds = DEFAULT_MAX_ROUNDS, fs = fsDefault, now = Date.now, log = () => {}, cycleWatchdogMs = DEFAULT_CYCLE_WATCHDOG_MS, failurePostDeadlineMs = DEFAULT_FAILURE_POST_DEADLINE_MS, pollReadDeadlineMs = DEFAULT_POLL_READ_DEADLINE_MS } = {}) {
   let reconciled = false;
   // Re-entrancy guard: a Codex turn (~60s) is far longer than the poll interval (~15s),
   // so overlapping setInterval ticks would each start a duplicate Codex turn on the SAME
@@ -213,8 +221,19 @@ export function createWatcher({ config, clickup, github, codex, notifier, state,
    * merge. Fail-closed at each gate (bad head, missing brief, malformed skill,
    * Codex blocked) → a BLOCKED reply is still posted so Larry always gets an answer.
    */
-  async function processCheckpoint(checkpoint, progress = { stage: 'start' }) {
+  async function processCheckpoint(checkpoint, progress = { stage: 'start' }, fence = { active: true }) {
     const cpId = checkpoint.checkpoint_id;
+    // FENCE (WP1 CRITICAL): the outer watchdog can ABORT this cycle (Promise.race) while
+    // this run is still alive. If codex/evidence/ClickUp later resolves, an abandoned run
+    // must NEVER post a (contradictory) verdict, overwrite the answered state, increment
+    // the round counter, or notify. Before EVERY externally-visible side effect we check
+    // we are still the ACTIVE generation; if the watchdog already fired/superseded us, we
+    // no-op and log. The watchdog abort flips fence.active in processCheckpointGuarded.
+    const stillActive = (where) => {
+      if (fence.active) return true;
+      log(`processCheckpoint: ${cpId} superseded (watchdog already fired) -- suppressing late side effect at "${where}"`);
+      return false;
+    };
     // (c) dedup — already answered?
     if (state.isAnswered(cpId)) return { checkpointId: cpId, skipped: 'already-answered' };
 
@@ -300,6 +319,9 @@ export function createWatcher({ config, clickup, github, codex, notifier, state,
     // Redact any known secret VALUE before it can reach a ClickUp comment (defence in
     // depth behind brief_ref containment — the reply is public in the thread).
     const body = config?.redact ? config.redact(formatResponse(responseObj)) : formatResponse(responseObj);
+    // FENCE before the FIRST externally-visible side effect (the ClickUp post): if the
+    // watchdog already aborted this cycle, do not post -- the recovery path owns the reply.
+    if (!stillActive('post_reply')) return { checkpointId: cpId, superseded: true };
     progress.stage = 'post_reply';
     let posted = null;
     try {
@@ -310,6 +332,9 @@ export function createWatcher({ config, clickup, github, codex, notifier, state,
       return { checkpointId: cpId, verdict: derived.verdict, posted: false, error: 'post-failed', response: responseObj };
     }
 
+    // FENCE before mutating durable state: the watchdog may have fired DURING the post.
+    // Do not overwrite the answered state / round counter set by the recovery path.
+    if (!stillActive('record_state')) return { checkpointId: cpId, superseded: true, posted: true, commentId: posted.id };
     // (i) durable state: mark answered + advance the per-chain round counter.
     progress.stage = 'record_state';
     state.recordAnswered(cpId, { reviewedHead: responseObj.reviewed_head, verdict: derived.verdict, promptFingerprint, commentId: posted.id, now: now() });
@@ -326,6 +351,9 @@ export function createWatcher({ config, clickup, github, codex, notifier, state,
     // Redact any known secret VALUE from the briefing before it can reach Telegram
     // (defence in depth -- same discipline as the ClickUp reply body above).
     const notifyBody = config?.redact ? config.redact(briefing) : briefing;
+    // FENCE before the notification: a superseded run must not send a late (contradictory)
+    // milestone. Telegram is best-effort, but an abandoned run must stay silent.
+    if (!stillActive('notify')) return { checkpointId: cpId, superseded: true, posted: true, commentId: posted.id, response: responseObj, chainKey: ck };
     progress.stage = 'notify';
     await notifier.notifyMilestone({
       purpose: milestonePurpose, logicalSource: 'CODEX',
@@ -367,25 +395,49 @@ export function createWatcher({ config, clickup, github, codex, notifier, state,
     };
     const body = config?.redact ? config.redact(formatResponse(responseObj)) : formatResponse(responseObj);
 
-    // BOUNDED post -- a hung ClickUp write must not re-wedge the loop it is rescuing.
+    // BOUNDED post -- a hung ClickUp write must not re-wedge the loop it is rescuing. But
+    // SUCCESS, TIMEOUT and FAILURE must be DISTINGUISHED (WP1 MAJOR): withDeadline()
+    // collapses both a rejection and a timeout into the same value, which made the old
+    // `catch` unreachable AND recorded the checkpoint ANSWERED even when the recovery
+    // [TOWER -> LARRY] verdict never actually posted -- a silent unanswered handoff again.
+    // We race explicitly so we only mark answered on a CONFIRMED post.
+    const POST_TIMEOUT = Symbol('post-timeout');
     let posted = null;
-    try {
-      posted = await withDeadline(clickup.createTaskComment(taskId, body), failurePostDeadlineMs, null);
-    } catch (err) {
-      log(`postRunFailure: post failed for ${cpId}: ${config?.redact ? config.redact(err?.message ?? String(err)) : (err?.message ?? String(err))}`);
+    let postConfirmed = false;
+    {
+      let timer = null;
+      const deadline = new Promise((resolve) => { timer = setTimeout(() => resolve(POST_TIMEOUT), failurePostDeadlineMs); });
+      try {
+        const raced = await Promise.race([
+          Promise.resolve(clickup.createTaskComment(taskId, body)).then((r) => ({ ok: true, r }), (e) => ({ ok: false, e })),
+          deadline,
+        ]);
+        if (raced === POST_TIMEOUT) {
+          log(`postRunFailure: recovery post for ${cpId} timed out after ${failurePostDeadlineMs}ms -- NOT marking answered (next poll retries)`);
+        } else if (raced.ok && raced.r) {
+          posted = raced.r; postConfirmed = true;
+        } else {
+          const emsg = raced.e?.message ?? String(raced.e);
+          log(`postRunFailure: recovery post for ${cpId} FAILED: ${config?.redact ? config.redact(emsg) : emsg} -- NOT marking answered (next poll retries)`);
+        }
+      } finally { if (timer) clearTimeout(timer); }
     }
-    // Mark answered so a late resolution / the next poll does NOT reprocess (recovery,
-    // not a slow retry loop). Best-effort.
-    try {
-      state.recordAnswered(cpId, { reviewedHead: responseObj.reviewed_head, verdict: 'BLOCKED', promptFingerprint: null, commentId: posted?.id ?? null, now: now() });
-    } catch { /* best-effort */ }
-    // BOUNDED milestone -- same "blocked" purpose the existing BLOCKED path uses.
+    // Mark answered ONLY when the recovery verdict post is CONFIRMED on the thread. If it
+    // did not post (timeout/failure), LEAVE the checkpoint unanswered so the next poll
+    // re-attempts the recovery -- never a silently-swallowed handoff.
+    if (postConfirmed) {
+      try {
+        state.recordAnswered(cpId, { reviewedHead: responseObj.reviewed_head, verdict: 'BLOCKED', promptFingerprint: null, commentId: posted?.id ?? null, now: now() });
+      } catch { /* best-effort */ }
+    }
+    // BOUNDED milestone -- same "blocked" purpose the existing BLOCKED path uses. Telegram
+    // is best-effort and does NOT gate the answered-state (fires regardless of post result).
     try {
       const ding = config?.redact ? config.redact(`BLOCKED - Tower run failed (${kind}) at stage ${stage} after ${elapsedMs} ms.`) : `BLOCKED - Tower run failed (${kind}) at stage ${stage} after ${elapsedMs} ms.`;
       await withDeadline(notifier.notifyMilestone({ purpose: 'blocked', logicalSource: 'CODEX', body: ding, checkpointId: cpId }), failurePostDeadlineMs, { sent: false });
     } catch { /* best-effort */ }
 
-    return { checkpointId: cpId, verdict: 'BLOCKED', posted: Boolean(posted), runFailed: true, kind, stage, elapsedMs, response: responseObj };
+    return { checkpointId: cpId, verdict: 'BLOCKED', posted: postConfirmed, answered: postConfirmed, runFailed: true, kind, stage, elapsedMs, response: responseObj };
   }
 
   /**
@@ -398,6 +450,10 @@ export function createWatcher({ config, clickup, github, codex, notifier, state,
   async function processCheckpointGuarded(checkpoint) {
     const startedAt = now();
     const progress = { stage: 'start', checkpointId: checkpoint?.checkpoint_id ?? null, startedAt };
+    // FENCE (WP1 CRITICAL): the generation token for THIS run. processCheckpoint captures
+    // it and no-ops every side effect once it goes inactive. A watchdog abort flips it so
+    // the abandoned-but-alive processCheckpoint can never post/overwrite/notify late.
+    const fence = { active: true };
     const WATCHDOG = Symbol('watchdog');
     let timer = null;
     // The watchdog timer is intentionally NOT unref'd: it must be able to FIRE and rescue
@@ -408,10 +464,13 @@ export function createWatcher({ config, clickup, github, codex, notifier, state,
     });
     try {
       const raced = await Promise.race([
-        processCheckpoint(checkpoint, progress).then((r) => ({ ok: true, r }), (e) => ({ ok: false, e })),
+        processCheckpoint(checkpoint, progress, fence).then((r) => ({ ok: true, r }), (e) => ({ ok: false, e })),
         watchdog,
       ]);
       if (raced === WATCHDOG) {
+        // SUPERSEDE the abandoned run BEFORE the recovery path posts: from here on the
+        // still-alive processCheckpoint must suppress every late side effect.
+        fence.active = false;
         log(`processCheckpointGuarded: cycle watchdog fired for ${progress.checkpointId} at stage "${progress.stage}" after ${Math.max(0, now() - startedAt)}ms -- aborting cycle, loop continues`);
         return await postRunFailure({ checkpoint, progress, kind: 'run_timeout', reason: `cycle exceeded the watchdog bound (${cycleWatchdogMs}ms) at stage "${progress.stage}"`, startedAt });
       }
@@ -425,6 +484,26 @@ export function createWatcher({ config, clickup, github, codex, notifier, state,
     }
   }
 
+  // Bound a single ClickUp READ in a poll cycle (WP1 MAJOR). A wedged read (one that never
+  // settles) is converted to { timedOut: true } so the cycle can abort and RELEASE polling
+  // -- otherwise polling stays true forever and the watcher silently stops. A genuine read
+  // REJECTION is preserved (rethrown) so real errors keep their existing behaviour (logged
+  // by the caller, loop continues) rather than being masked as a wedge.
+  async function boundRead(promise) {
+    const READ_TIMEOUT = Symbol('read-timeout');
+    let timer = null;
+    const deadline = new Promise((resolve) => { timer = setTimeout(() => resolve(READ_TIMEOUT), pollReadDeadlineMs); });
+    try {
+      const raced = await Promise.race([
+        Promise.resolve(promise).then((v) => ({ ok: true, v }), (e) => ({ ok: false, e })),
+        deadline,
+      ]);
+      if (raced === READ_TIMEOUT) return { timedOut: true };
+      if (!raced.ok) throw raced.e; // preserve genuine read errors
+      return { value: raced.v };
+    } finally { if (timer) clearTimeout(timer); }
+  }
+
   return {
     reconcileFromThread,
     processCheckpoint,
@@ -434,8 +513,20 @@ export function createWatcher({ config, clickup, github, codex, notifier, state,
       if (polling) return { processed: [], skipped: [], reconciled, busy: true }; // a prior cycle is still in flight
       polling = true;
       try {
-        if (!reconciled) await reconcileFromThread(); // cold-start rebuild (once per process)
-        const comments = await clickup.getTaskComments(taskId);
+        if (!reconciled) {
+          // cold-start rebuild (once per process) -- BOUNDED so a wedged read cannot hang.
+          const rec = await boundRead(reconcileFromThread());
+          if (rec.timedOut) {
+            log(`pollOnce: reconcile read wedged (> ${pollReadDeadlineMs}ms) -- aborting cycle, loop keeps polling`);
+            return { processed: [], skipped: [], reconciled, aborted: 'reconcile-timeout' };
+          }
+        }
+        const commentsRead = await boundRead(clickup.getTaskComments(taskId)); // BOUNDED
+        if (commentsRead.timedOut) {
+          log(`pollOnce: comment read wedged (> ${pollReadDeadlineMs}ms) -- aborting cycle, loop keeps polling`);
+          return { processed: [], skipped: [], reconciled, aborted: 'comments-timeout' };
+        }
+        const comments = commentsRead.value;
         const processed = [];
         const skipped = [];
         for (const c of comments) {

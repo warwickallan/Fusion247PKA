@@ -289,34 +289,63 @@ export function createCodexAdapter({ config, cwd = process.cwd(), mode = 'auto',
   };
 }
 
+// Bound on the taskkill reap itself so the kill path can never hang the poll loop.
+export const DEFAULT_TASKKILL_TIMEOUT_MS = 5000;
+
 /**
- * Reap the ENTIRE process tree of a spawned codex child. This is the WP1 defect fix:
- * on Windows `child.kill()` signals ONLY the direct child handle -- codex.exe's own
- * subprocesses survive as ORPHANS and wedge the watcher's poll loop (silent HALT).
- *   - win32:  spawn `taskkill /PID <pid> /T /F` (/T = whole tree, /F = force).
- *   - posix:  the child was spawned `detached` (its own process group) so we kill the
- *             GROUP via process.kill(-pid, 'SIGKILL').
- * Best-effort + fail-safe: every step is guarded so this can NEVER throw or hang; a
- * direct child.kill() is still attempted as a fallback so the leader dies even if the
- * tree-kill spawn/group-kill was unavailable. Returns nothing.
+ * Reap the ENTIRE process tree of a spawned codex child, and CONFIRM the reap before
+ * resolving. This is the WP1 defect fix (CRITICAL): on Windows `child.kill()` signals
+ * ONLY the direct child handle -- codex.exe's own subprocesses survive as ORPHANS and
+ * wedge the watcher's poll loop (silent HALT).
+ *
+ * The earlier fix still had a Windows race: it spawned `taskkill /T /F` detached+unref'd
+ * and then IMMEDIATELY did `child.kill('SIGKILL')`. If the leader died before taskkill
+ * enumerated its descendants, taskkill failed and the orphans survived -- unconfirmed.
+ *
+ * Corrected reap:
+ *   - win32:  run `taskkill /PID <leader> /T /F` and AWAIT its exit. taskkill kills the
+ *             WHOLE tree INCLUDING the leader, so we do NOT pre-kill the leader first. A
+ *             direct child.kill() fallback runs ONLY if taskkill fails/errors/times out.
+ *             The taskkill call is itself bounded (DEFAULT_TASKKILL_TIMEOUT_MS) so the
+ *             kill path cannot hang.
+ *   - posix:  the child leads its own process group (spawned `detached`), so a single
+ *             process.kill(-pid, 'SIGKILL') reaps the whole group INCLUDING the leader.
+ *
+ * Async: the caller AWAITs this so an abandoned codex tree is confirmed dead before the
+ * turn resolves. Every step is guarded so this can never throw. Returns a Promise.
  */
-export function killProcessTree({ child, spawn = nodeSpawn, platform = process.platform, log } = {}) {
+export async function killProcessTree({ child, spawn = nodeSpawn, platform = process.platform, log, taskkillTimeoutMs = DEFAULT_TASKKILL_TIMEOUT_MS } = {}) {
   const pid = child?.pid;
-  try {
-    if (platform === 'win32') {
-      if (pid != null) {
-        const killer = spawn('taskkill', ['/PID', String(pid), '/T', '/F'], { shell: false, detached: true, stdio: 'ignore' });
-        try { killer?.on?.('error', () => {}); } catch { /* ignore -- taskkill missing must not crash */ }
-        try { killer?.unref?.(); } catch { /* ignore */ }
-      }
-    } else if (pid != null) {
-      // The child leads its own process group (spawned detached); negative pid = group.
-      try { process.kill(-pid, 'SIGKILL'); } catch { /* group already gone / no perms */ }
+  if (platform === 'win32') {
+    if (pid != null) {
+      // AWAIT taskkill: it reaps the whole tree (leader included). We must NOT pre-kill
+      // the leader, or taskkill can fail to enumerate the now-dead leader's descendants.
+      const reaped = await new Promise((resolve) => {
+        let settled = false;
+        const done = (ok) => { if (!settled) { settled = true; resolve(ok); } };
+        let killer;
+        try { killer = spawn('taskkill', ['/PID', String(pid), '/T', '/F'], { shell: false, stdio: 'ignore' }); }
+        catch { return done(false); }
+        // Bound the taskkill so the kill path itself cannot hang the loop.
+        const timer = setTimeout(() => { try { killer?.kill?.(); } catch { /* ignore */ } done(false); }, taskkillTimeoutMs);
+        try { timer.unref?.(); } catch { /* ignore */ }
+        try { killer?.on?.('error', () => { clearTimeout(timer); done(false); }); } catch { clearTimeout(timer); return done(false); }
+        try { killer?.on?.('close', (code) => { clearTimeout(timer); done(code === 0); }); } catch { clearTimeout(timer); return done(false); }
+      });
+      // Fallback ONLY if taskkill did not confirm: on success taskkill already killed the
+      // leader, so signalling it again would be redundant (and it is already gone).
+      if (!reaped) { try { child?.kill?.('SIGKILL'); } catch { try { child?.kill?.(); } catch { /* ignore */ } } }
+    } else {
+      // No pid to target the tree -- best-effort direct handle kill.
+      try { child?.kill?.('SIGKILL'); } catch { try { child?.kill?.(); } catch { /* ignore */ } }
     }
-  } catch { /* best-effort -- reaping must never throw */ }
-  // Fallback: also signal the child handle directly, so the leader is reaped even if
-  // the tree-kill above could not run.
-  try { child?.kill?.('SIGKILL'); } catch { try { child?.kill?.(); } catch { /* ignore */ } }
+  } else if (pid != null) {
+    // The child leads its own process group (spawned detached); negative pid = group.
+    // This reaps the whole group INCLUDING the leader in one call.
+    try { process.kill(-pid, 'SIGKILL'); } catch { /* group already gone / no perms */ }
+  } else {
+    try { child?.kill?.('SIGKILL'); } catch { /* ignore */ }
+  }
   if (typeof log === 'function') { try { log(`killProcessTree: reaped codex pid ${pid ?? '(unknown)'} (${platform})`); } catch { /* ignore */ } }
 }
 
@@ -337,10 +366,13 @@ function runCodex({ codexBin, argv, cwd, spawn, timeoutMs, apiKey, prompt, platf
     catch (e) { return finish({ ok: false, code: -1, stderr: String(e?.message ?? e), stdout: '' }); }
     const timer = setTimeout(() => {
       // TREE-kill, not child.kill(): a bare child.kill() leaves codex.exe's children
-      // as orphans on Windows, and an orphaned codex WEDGES the poll loop. Reap the
-      // whole tree, then ALWAYS resolve (timed_out) so this promise cannot hang.
-      killProcessTree({ child, spawn, platform, log });
-      finish({ ok: false, code: -2, stderr: `turn timed out after ${timeoutMs}ms`, stdout, timed_out: true });
+      // as orphans on Windows, and an orphaned codex WEDGES the poll loop. AWAIT the tree
+      // reap (taskkill confirms the whole tree is dead) BEFORE resolving, so an abandoned
+      // codex process can never survive past the turn; killProcessTree is itself bounded
+      // so this can never hang. ALWAYS resolve (timed_out) once the reap settles.
+      Promise.resolve(killProcessTree({ child, spawn, platform, log }))
+        .catch(() => { /* reaping must never throw */ })
+        .finally(() => finish({ ok: false, code: -2, stderr: `turn timed out after ${timeoutMs}ms`, stdout, timed_out: true }));
     }, timeoutMs);
     child.stdout?.on('data', (d) => { stdout += d.toString(); });
     child.stderr?.on('data', (d) => { stderr += d.toString(); });

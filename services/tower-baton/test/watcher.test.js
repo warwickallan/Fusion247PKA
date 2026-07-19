@@ -13,7 +13,7 @@ import { wireText } from '../src/telegramNotifier.js';
 
 const HEAD = '1390dd6a1b2c3d4e5f60718293a4b5c6d7e8f900';
 
-function harness({ codex, github, comments, briefRef, roundsSeed, reviewMode, authorIds = 'larry', commentUser, extraEnv = {}, cycleWatchdogMs, failurePostDeadlineMs } = {}) {
+function harness({ codex, github, comments, briefRef, roundsSeed, reviewMode, authorIds = 'larry', commentUser, extraEnv = {}, cycleWatchdogMs, failurePostDeadlineMs, pollReadDeadlineMs, makeClickup } = {}) {
   // authorIds === null → leave TOWER_AUTHORISED_AUTHOR_IDS unset (exercise fail-closed).
   const env = { GITHUB_REPO: 'o/r' };
   if (authorIds !== null) env.TOWER_AUTHORISED_AUTHOR_IDS = authorIds;
@@ -32,12 +32,14 @@ function harness({ codex, github, comments, briefRef, roundsSeed, reviewMode, au
     brief_ref: brief, branch: 'build-010/wp1', head_sha: HEAD, base_sha: HEAD + '0'.repeat(0),
     review_mode: reviewMode, summary: 'built it', tests: 'green', evidence_refs: ['PR#1'],
   };
-  const clickup = createFakeClickup({ comments: comments ?? [{ comment_text: formatCheckpoint(cp), user: commentUser ?? 'larry' }] });
+  const cpComment = { comment_text: formatCheckpoint(cp), user: commentUser ?? 'larry' };
+  const clickup = makeClickup ? makeClickup(cpComment) : createFakeClickup({ comments: comments ?? [cpComment] });
   const watcher = createWatcher({
     config, clickup, github: github ?? fakeGithub(), codex: codex ?? fakeCodex(),
     notifier, state, taskId: 'task1', qaSkillPath: skillPath, fs, now: () => 1000,
     ...(cycleWatchdogMs !== undefined ? { cycleWatchdogMs } : {}),
     ...(failurePostDeadlineMs !== undefined ? { failurePostDeadlineMs } : {}),
+    ...(pollReadDeadlineMs !== undefined ? { pollReadDeadlineMs } : {}),
   });
   return { watcher, clickup, state, notifier, codex: codex ?? undefined, skillFp, cp, brief };
 }
@@ -282,6 +284,80 @@ test('cycle-failure post redacts secret VALUES before they reach the thread', as
   const raw = posts[posts.length - 1].comment_text;
   assert.ok(!raw.includes(leak), 'the secret VALUE does not leak into the recoverable-failure reply');
   assert.ok(raw.includes('***redacted***'), 'the failure reply was passed through config.redact');
+});
+
+test('CRITICAL 1 (fence) -- a run that resolves AFTER its watchdog abort produces NO second post, NO state overwrite, NO late notification', async () => {
+  // The wedged codex turn is abandoned when the watchdog fires; the recovery path posts a
+  // BLOCKED verdict + records answered=BLOCKED. Later the ABANDONED turn resolves with an
+  // APPROVE -- the fence must suppress it: no contradictory second post, no state overwrite
+  // (still BLOCKED), no late milestone.
+  let releaseTurn;
+  const wedged = new Promise((res) => { releaseTurn = res; });
+  const codex = { calls: [], async runTurn(a) { this.calls.push(a); return wedged; } };
+  const h = harness({ codex, cycleWatchdogMs: 30, failurePostDeadlineMs: 30 });
+
+  const r = await h.watcher.pollOnce(); // watchdog fires -> recovery BLOCKED posted
+  assert.equal(r.processed[0].runFailed, true, 'the aborted cycle is surfaced as a run-failure');
+  assert.equal(towerReplies(h.clickup).length, 1, 'exactly one reply (the recovery BLOCKED) after the abort');
+  assert.equal(h.state.getAnswered('cp-100').verdict, 'BLOCKED', 'answered state is the recovery BLOCKED');
+  const notifyCountAfterAbort = h.notifier.calls.length;
+  assert.ok(h.notifier.calls.some((c) => c.purpose === 'blocked'), 'the recovery blocked milestone fired');
+
+  // The abandoned turn now resolves LATE with a contradicting APPROVE.
+  releaseTurn({ ok: true, blocked: false, structuredResult: { status: 'ok', verdict: 'approve', summary: 'late approve', claims_verified: [], findings: [], proposed_action: { type: 'noop', target: '' } }, envelope: {}, signature: null });
+  await wedged;
+  await new Promise((res) => setTimeout(res, 40)); // let the abandoned continuation flush
+
+  assert.equal(towerReplies(h.clickup).length, 1, 'the abandoned APPROVE produced NO second post');
+  assert.equal(h.state.getAnswered('cp-100').verdict, 'BLOCKED', 'the late APPROVE did NOT overwrite the answered state');
+  assert.equal(h.notifier.calls.length, notifyCountAfterAbort, 'the abandoned run sent NO late notification');
+  assert.ok(!h.notifier.calls.some((c) => c.purpose === 'review_posted'), 'no APPROVE (review_posted) milestone from the superseded run');
+});
+
+test('MAJOR 3 -- a WEDGED ClickUp read aborts the cycle and the loop keeps polling (polling flag released)', async () => {
+  // The FIRST ClickUp read (reconcile) wedges forever; the poll must NOT hang and must
+  // RELEASE the polling flag so the NEXT poll runs the cycle normally to completion.
+  const posted = [];
+  let n = 0;
+  const makeClickup = (cpComment) => ({
+    _comments: posted,
+    async getTaskComments() { n += 1; if (n === 1) return new Promise(() => {}); return [cpComment]; },
+    async createTaskComment(_taskId, text) { const c = { id: `c${posted.length + 1}`, comment_text: text }; posted.push(c); return c; },
+  });
+  const h = harness({ codex: fakeCodex(), makeClickup, pollReadDeadlineMs: 30 });
+
+  const r1 = await h.watcher.pollOnce(); // reconcile read wedges -> abort, polling released
+  assert.equal(r1.aborted, 'reconcile-timeout', 'the wedged read aborts the cycle');
+  assert.equal(r1.processed.length, 0, 'nothing processed on the aborted cycle');
+
+  const r2 = await h.watcher.pollOnce(); // loop recovered -> normal processing (flag was released)
+  assert.equal(r2.processed.length, 1, 'the loop kept polling -- the next cycle processes normally');
+  assert.equal(r2.processed[0].verdict, 'APPROVE');
+});
+
+test('MAJOR 4 -- a FAILING recovery post leaves the checkpoint UNANSWERED (retried next poll)', async () => {
+  // A throwing codex turn drives postRunFailure; its recovery post to ClickUp FAILS. The
+  // checkpoint must NOT be marked answered (that was the silent-unanswered-handoff defect),
+  // so the next poll re-attempts the recovery.
+  const posted = [];
+  const makeClickup = (cpComment) => ({
+    _comments: posted,
+    async getTaskComments() { return [cpComment]; },
+    async createTaskComment() { throw new Error('clickup 500 -- recovery post failed'); },
+  });
+  const codex = { calls: [], async runTurn() { throw new Error('codex spawn exploded'); } };
+  const h = harness({ codex, makeClickup });
+
+  const r = await h.watcher.pollOnce();
+  assert.equal(r.processed[0].runFailed, true);
+  assert.equal(r.processed[0].kind, 'run_error');
+  assert.equal(r.processed[0].posted, false, 'the recovery post did not confirm');
+  assert.equal(r.processed[0].answered, false, 'a failed recovery post does NOT mark answered');
+  assert.equal(h.state.getAnswered('cp-100'), null, 'the checkpoint is left UNANSWERED');
+
+  const r2 = await h.watcher.pollOnce();
+  assert.equal(r2.processed.length, 1, 'the unanswered checkpoint is RETRIED on the next poll');
+  assert.equal(r2.processed[0].runFailed, true, 'the retry again hits the recoverable-failure path');
 });
 
 test('resolveBrief — reads a local file, fail-closed otherwise', async () => {
