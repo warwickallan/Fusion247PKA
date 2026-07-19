@@ -83,6 +83,44 @@
 --   R3-trim  workflow_run REMOVED (unreferenced projection-only, no Phase-0 proof
 --            needs it — Codex flab call); agent_run.role REMOVED (free-text [later]).
 --
+-- R3-ROUND-3 CHANGE LOG (this amend — still folded into the single never-applied 001):
+--   G1  merge_gate is bound to the BUILD, not just the head. checkpoint gains a
+--       unique (build_id, id, head_sha); merge_gate carries build_id and its composite
+--       FK is (build_id, checkpoint_id, expected_head_sha) -> checkpoint
+--       (build_id, id, head_sha); merge_gate_require_reviewers also filters build_id.
+--       A gate for build B can no longer borrow build A's checkpoint/approvals.
+--   G2  merge_gate IMMUTABILITY: guard trigger freezes build_id/checkpoint_id/
+--       expected_head_sha always, and (once approved) the decision except *->superseded.
+--       DELETE rejected (supersede, never delete); DELETE revoked from service_role;
+--       BEFORE TRUNCATE guard added. github_*_cached/*_observed_at/policy_reason/
+--       superseded_at stay mutable.
+--   G3  D1 CLOSED STRUCTURALLY (not deferred): (a) an AFTER trigger on verdict
+--       active->superseded supersedes any live approved gate at that
+--       (build_id, checkpoint_id, head_sha) — superseding a supporting verdict
+--       invalidates the gate (no recursion: superseding a gate writes no verdicts);
+--       (b) merge_gate_require_reviewers LOCKs the active verdict rows FOR UPDATE at
+--       approval time so a concurrent supersede serialises against gate approval.
+--   G4  job attempt-bounding + completion guard: CHECK attempts <= max_attempts;
+--       claim_job selects only attempts < max_attempts and parks exhausted pending
+--       into dead_letter; new ops.complete_job(id, owner, status) requires
+--       status='leased' AND lease_owner=owner (a stale-lease worker can't clobber the
+--       live leaseholder).
+--   G5  checkpoint DELETE rejected by trigger (evidence) + DELETE revoked from
+--       service_role. All checkpoint deletes now surface as 23001 (the trigger fires
+--       before the referenced-FK RESTRICT).
+--   G6  verdict superseded-consistency CHECK ((state='superseded')=(superseded_at is
+--       not null)); INSERT of state='superseded' rejected (must pass through active).
+--   G8  verdict_active_unique scoped to (checkpoint_id, reviewer, verdict_type) — head
+--       implied by the composite FK; two builds sharing a head no longer collide.
+--   G9  verdict_guard_mutation uses `is distinct from` for prompt_fingerprint and forces
+--       superseded_at := now() unconditionally (non-forgeable).
+--   G10 every plpgsql function pins `set search_path = ops, pg_catalog`; EXECUTE on all
+--       ops functions revoked from public before the explicit service_role grants.
+--   G12 canonicalize_sha whitespace doc aligned with btrim (ASCII space 0x20 only).
+--   G-CI a real CI workflow (.github/workflows/control-plane-tests.yml) runs npm ci &&
+--       npm test against a Postgres service container; the runner FAILs on 0 executed
+--       subtests so an all-skipped run can never go green.
+--
 -- FIELD CLASSIFICATION (R3): every table and column is tagged inline
 --   [phase0] | [later] | [projection-only] | [provenance-later] | [not-yet-justified]
 --   with the full table reproduced in services/control-plane/db/README.md.
@@ -216,12 +254,15 @@ exception when duplicate_object then null; end $$;
 -- acceptance is refused here). Use this to normalise an inbound head BEFORE storing.
 -- F12: the exception reports only the candidate LENGTH, never the raw candidate —
 -- a SHA is not itself a secret, but not echoing untrusted input into server logs is
--- house discipline. WHITESPACE POLICY (documented in README): only leading/trailing
--- ASCII whitespace is stripped; any interior whitespace or non-hex char fails.
+-- house discipline. WHITESPACE POLICY (G12 — documented in README, aligned with the
+-- code): btrim() with no character set strips leading/trailing ASCII SPACE (0x20) ONLY.
+-- A tab/newline/CR-padded head is therefore NOT trimmed and fails canonicalisation
+-- (fail-closed), as does any interior whitespace or non-hex char.
 create or replace function ops.canonicalize_sha(raw text)
 returns ops.git_sha
 language plpgsql
 immutable
+set search_path = ops, pg_catalog
 as $$
 declare v text := lower(btrim(coalesce(raw, '')));
 begin
@@ -238,6 +279,7 @@ $$;
 create or replace function ops.touch_updated_at()
 returns trigger
 language plpgsql
+set search_path = ops, pg_catalog
 as $$
 begin
   new.updated_at := now();
@@ -252,6 +294,7 @@ $$;
 create or replace function ops.reject_truncate()
 returns trigger
 language plpgsql
+set search_path = ops, pg_catalog
 as $$
 begin
   raise exception 'ops.% is append-only/evidence: TRUNCATE is rejected.', tg_table_name
@@ -328,6 +371,9 @@ create table if not exists ops.job (
     constraint job_attempts_nonneg_chk check (attempts >= 0),
   max_attempts   integer not null default 5                      -- [phase0]
     constraint job_max_attempts_positive_chk check (max_attempts >= 1),
+  -- G4: attempts can NEVER exceed the retry budget. claim_job only leases jobs with
+  -- attempts < max_attempts, so the claim-time increment lands at most on max_attempts.
+  constraint job_attempts_within_budget_chk check (attempts <= max_attempts),
 
   -- [phase0] DEAD-LETTER. A job may only be dead_letter once its attempts are
   -- exhausted (structural, not merely conventional).
@@ -360,15 +406,26 @@ comment on constraint job_lease_iff_leased_chk on ops.job is
 create or replace function ops.claim_job(p_queue text, p_owner text, p_lease_seconds integer default 30)
 returns ops.job
 language plpgsql
+set search_path = ops, pg_catalog
 as $$
 declare j ops.job;
 begin
   if p_lease_seconds <= 0 then
     raise exception 'lease seconds must be positive' using errcode = 'check_violation';
   end if;
+  -- G4: park any pending-but-exhausted job (attempts already at budget) into dead_letter
+  -- so it is never (re)leased. A job reaches this only via out-of-band edits; the normal
+  -- path exhausts on reclaim/complete. Scoped to this queue.
+  update ops.job
+     set status = 'dead_letter'::ops.job_status,
+         dead_lettered_at = coalesce(dead_lettered_at, now()),
+         lease_owner = null,
+         lease_deadline_at = null
+   where queue = p_queue and status = 'pending' and attempts >= max_attempts;
+  -- G4: only lease a job whose retry budget is NOT yet exhausted (attempts < max).
   select * into j
     from ops.job
-   where queue = p_queue and status = 'pending'
+   where queue = p_queue and status = 'pending' and attempts < max_attempts
    order by id
    for update skip locked
    limit 1;
@@ -393,6 +450,7 @@ $$;
 create or replace function ops.reclaim_expired_leases()
 returns setof ops.job
 language plpgsql
+set search_path = ops, pg_catalog
 as $$
 begin
   return query
@@ -403,6 +461,46 @@ begin
          lease_deadline_at = null
    where status = 'leased' and lease_deadline_at < now()
    returning *;
+end;
+$$;
+
+-- [phase0] Transactional COMPLETE (G4): the ONLY sanctioned way for a worker to finish a
+-- leased job. It requires the row to be status='leased' AND still owned by p_owner — so an
+-- EXPIRED-lease worker (whose lease was reclaimed and re-leased to someone else) can NOT
+-- clobber the live leaseholder: its UPDATE matches no row and the function RAISES. On
+-- 'succeeded' the job is terminal; on 'failed' it returns to 'pending' for retry, or is
+-- parked in 'dead_letter' when the retry budget is exhausted. The lease is cleared either
+-- way (biconditional lease hygiene stays satisfied).
+create or replace function ops.complete_job(p_id bigint, p_owner text, p_status ops.job_status)
+returns ops.job
+language plpgsql
+set search_path = ops, pg_catalog
+as $$
+declare j ops.job;
+begin
+  if p_status not in ('succeeded', 'failed') then
+    raise exception 'complete_job: p_status must be succeeded or failed (got %)', p_status
+      using errcode = 'check_violation';
+  end if;
+  update ops.job
+     set status = case
+                    when p_status = 'succeeded' then 'succeeded'::ops.job_status
+                    when attempts >= max_attempts then 'dead_letter'::ops.job_status
+                    else 'pending'::ops.job_status
+                  end,
+         dead_lettered_at = case
+                    when p_status = 'failed' and attempts >= max_attempts then coalesce(dead_lettered_at, now())
+                    else dead_lettered_at
+                  end,
+         lease_owner = null,
+         lease_deadline_at = null
+   where id = p_id and status = 'leased' and lease_owner = p_owner
+   returning * into j;
+  if not found then
+    raise exception 'complete_job: job % is not leased by % (stale lease, wrong owner, or already terminal) — refusing to clobber the live leaseholder', p_id, p_owner
+      using errcode = 'restrict_violation';
+  end if;
+  return j;
 end;
 $$;
 
@@ -502,17 +600,30 @@ create table if not exists ops.checkpoint (
   -- F11: natural key is PER-BUILD — a (ref, head) pair is unique within a build, not
   -- globally (two builds may legitimately share a checkpoint_ref/head).
   constraint checkpoint_build_ref_head_key unique (build_id, checkpoint_ref, head_sha),
-  -- The composite-FK target: lets verdict/merge_gate bind to this checkpoint's EXACT head.
-  constraint checkpoint_id_head_uk unique (id, head_sha)
+  -- The composite-FK target for verdict: binds a verdict to this checkpoint's EXACT head.
+  constraint checkpoint_id_head_uk unique (id, head_sha),
+  -- G1: the BUILD-scoped composite-FK target for merge_gate — lets a gate bind to
+  -- (build_id, checkpoint_id, expected_head_sha), so a gate can never borrow another
+  -- build's checkpoint. (id is already unique, so this is trivially unique too; it exists
+  -- purely to be the FK reference target that carries build_id.)
+  constraint checkpoint_build_id_head_uk unique (build_id, id, head_sha)
 );
 
--- Evidence guard (F3): checkpoint IDENTITY is immutable; only the branch/brief_ref
--- pointers may be updated. DELETE is left to the FK (NO ACTION -> 23503 when referenced).
+-- Evidence guard (F3 + G5): checkpoint IDENTITY is immutable; only the branch/brief_ref
+-- pointers may be updated. DELETE is now REJECTED outright (G5) — a checkpoint is review
+-- evidence and must never be removed, referenced or not. Because this BEFORE DELETE
+-- trigger fires ahead of the referenced-FK RESTRICT check, ALL checkpoint deletes surface
+-- as 23001 (restrict_violation), not 23503.
 create or replace function ops.checkpoint_guard_mutation()
 returns trigger
 language plpgsql
+set search_path = ops, pg_catalog
 as $$
 begin
+  if tg_op = 'DELETE' then
+    raise exception 'ops.checkpoint is review evidence: DELETE is rejected (checkpoints are immutable; head changes are NEW rows, never deletions)'
+      using errcode = 'restrict_violation';
+  end if;
   if new.id <> old.id
      or new.build_id <> old.build_id
      or new.checkpoint_ref <> old.checkpoint_ref
@@ -527,7 +638,7 @@ $$;
 
 drop trigger if exists checkpoint_immutable_identity on ops.checkpoint;
 create trigger checkpoint_immutable_identity
-  before update on ops.checkpoint
+  before update or delete on ops.checkpoint
   for each row execute function ops.checkpoint_guard_mutation();
 
 drop trigger if exists checkpoint_no_truncate on ops.checkpoint;
@@ -562,6 +673,14 @@ create table if not exists ops.verdict (
     or (verdict_type = 'cold_final' and reviewer = 'fable')
   ),
 
+  -- G6: superseded-consistency — a row is 'superseded' IFF superseded_at is set. An
+  -- 'active' verdict therefore always has a NULL superseded_at, and a 'superseded' one
+  -- always carries its timestamp. (INSERT of state='superseded' is separately rejected
+  -- by verdict_reject_insert_superseded — a superseded row must pass through active.)
+  constraint verdict_superseded_consistency_chk check (
+    (state = 'superseded') = (superseded_at is not null)
+  ),
+
   -- EXACT-SHA BINDING: the verdict can ONLY reference a head that this checkpoint
   -- actually recorded. A verdict for the "wrong head" cannot be inserted at all.
   -- ON DELETE NO ACTION (F3): deleting a checkpoint that has verdicts is a 23503, not
@@ -576,8 +695,15 @@ create table if not exists ops.verdict (
 -- MUST first supersede the prior (state='superseded') in the SAME transaction. A
 -- concurrent second active row is a 23505. This closes the round-1 hole where a bumped
 -- generation let a stale active 'approve' co-exist with (and mask) a newer active reject.
+-- G8: scoped to (checkpoint_id, reviewer, verdict_type). The head is IMPLIED by the
+-- composite FK (checkpoint_id, reviewed_commit_sha) -> checkpoint (id, head_sha) plus the
+-- immutable checkpoint identity, so keying on reviewed_commit_sha is redundant AND harmful:
+-- two DIFFERENT builds/checkpoints that legitimately share a head would collide on
+-- (reviewer, sha, type). Keying on checkpoint_id (which is per-build) removes that false
+-- cross-build conflict while preserving "at most one active verdict per reviewer/type at
+-- this checkpoint's head".
 create unique index if not exists verdict_active_unique
-  on ops.verdict (reviewer, reviewed_commit_sha, verdict_type)
+  on ops.verdict (checkpoint_id, reviewer, verdict_type)
   where state = 'active';
 
 comment on constraint verdict_checkpoint_head_fkey on ops.verdict is
@@ -600,6 +726,7 @@ comment on index ops.verdict_active_unique is
 create or replace function ops.verdict_guard_mutation()
 returns trigger
 language plpgsql
+set search_path = ops, pg_catalog
 as $$
 begin
   if tg_op = 'DELETE' then
@@ -610,6 +737,8 @@ begin
     raise exception 'ops.verdict UPDATE only permits the active->superseded transition (got % -> %)', old.state, new.state
       using errcode = 'restrict_violation';
   end if;
+  -- G9: `is distinct from` handles NULLs without the coalesce sentinel trick, and matches
+  -- the null-safe comparison style used elsewhere.
   if new.id <> old.id
      or new.checkpoint_id <> old.checkpoint_id
      or new.reviewed_commit_sha <> old.reviewed_commit_sha
@@ -617,12 +746,14 @@ begin
      or new.verdict_type <> old.verdict_type
      or new.verdict <> old.verdict
      or new.active_generation <> old.active_generation
-     or coalesce(new.prompt_fingerprint, '') <> coalesce(old.prompt_fingerprint, '')
+     or new.prompt_fingerprint is distinct from old.prompt_fingerprint
      or new.created_at <> old.created_at then
     raise exception 'ops.verdict UPDATE may only set state=superseded (+ superseded_at); no other column may change'
       using errcode = 'restrict_violation';
   end if;
-  new.superseded_at := coalesce(new.superseded_at, now());
+  -- G9: force the supersession timestamp — a caller cannot forge a fake superseded_at (an
+  -- earlier/later time) to fabricate the audit trail; it is ALWAYS the transaction's now().
+  new.superseded_at := now();
   return new;
 end;
 $$;
@@ -631,6 +762,28 @@ drop trigger if exists verdict_evidence_guard on ops.verdict;
 create trigger verdict_evidence_guard
   before update or delete on ops.verdict
   for each row execute function ops.verdict_guard_mutation();
+
+-- G6: a verdict may NOT be born superseded — it must pass through 'active' first, so the
+-- audit chain (active -> superseded) is unforgeable. This BEFORE INSERT guard complements
+-- the verdict_superseded_consistency_chk CHECK (which only ties state to superseded_at).
+create or replace function ops.verdict_reject_insert_superseded()
+returns trigger
+language plpgsql
+set search_path = ops, pg_catalog
+as $$
+begin
+  if new.state = 'superseded' then
+    raise exception 'ops.verdict cannot be INSERTed with state=superseded — a superseded verdict must have passed through active (supersede an existing active row instead)'
+      using errcode = 'check_violation';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists verdict_reject_insert_superseded on ops.verdict;
+create trigger verdict_reject_insert_superseded
+  before insert on ops.verdict
+  for each row execute function ops.verdict_reject_insert_superseded();
 
 drop trigger if exists verdict_no_truncate on ops.verdict;
 create trigger verdict_no_truncate
@@ -748,10 +901,14 @@ create table if not exists ops.merge_gate (
   created_at     timestamptz not null default now(),             -- [phase0]
   updated_at     timestamptz not null default now(),             -- [phase0]
 
-  -- F2(a): composite FK binds expected_head_sha to the checkpoint's recorded head.
+  -- F2(a)+G1: BUILD-SCOPED composite FK binds (build_id, checkpoint_id, expected_head_sha)
+  -- to the checkpoint's (build_id, id, head_sha). build_id is NOT NULL and expected_head_sha
+  -- is NOT NULL, so a set checkpoint_id always makes all three non-null and MATCH SIMPLE
+  -- fires. This is what stops a gate for build B borrowing build A's checkpoint (and thus
+  -- build A's approvals): the (B, cpA, head) tuple is not a recorded checkpoint -> 23503.
   constraint merge_gate_checkpoint_head_fkey
-    foreign key (checkpoint_id, expected_head_sha)
-    references ops.checkpoint (id, head_sha) match simple on delete no action,
+    foreign key (build_id, checkpoint_id, expected_head_sha)
+    references ops.checkpoint (build_id, id, head_sha) match simple on delete no action,
   -- F7: restrict the cached review decision to GitHub's known reviewDecision values
   -- (or NULL = not-yet-observed / no review required).
   constraint merge_gate_github_review_decision_chk check (
@@ -776,6 +933,7 @@ create unique index if not exists merge_gate_one_live_per_build
 create or replace function ops.merge_gate_require_reviewers()
 returns trigger
 language plpgsql
+set search_path = ops, pg_catalog
 as $$
 declare v_ready boolean;
 begin
@@ -784,14 +942,32 @@ begin
       raise exception 'merge_gate: fusion_policy_decision=approved requires a checkpoint_id (the head under review)'
         using errcode = 'check_violation';
     end if;
-    -- The composite FK already guarantees (checkpoint_id, expected_head_sha) is a real
-    -- recorded checkpoint head, so this lookup always finds exactly one row.
+    -- G3(b): LOCK the active verdict rows for (checkpoint_id, expected_head_sha) FOR UPDATE
+    -- BEFORE reading readiness. A concurrent supersede of any supporting verdict UPDATEs
+    -- one of these rows and therefore SERIALISES against this approval:
+    --   * if we lock first, the supersede blocks until we commit, then its AFTER trigger
+    --     (verdict_supersede_invalidates_gate) supersedes the gate we just approved;
+    --   * if the supersede locks first, our FOR UPDATE waits, then re-evaluates under the
+    --     committed change — the superseded row no longer matches state='active', readiness
+    --     is now false, and this approval is rejected below.
+    -- FOR UPDATE (not FOR KEY SHARE) is deliberate: superseding sets a NON-key column
+    -- (state), which takes FOR NO KEY UPDATE and would NOT conflict with FOR KEY SHARE.
+    perform 1
+       from ops.verdict
+      where checkpoint_id = new.checkpoint_id
+        and reviewed_commit_sha = new.expected_head_sha
+        and state = 'active'
+      for update;
+    -- The composite FK already guarantees (build_id, checkpoint_id, expected_head_sha) is a
+    -- real recorded checkpoint head for THIS build (G1), so this lookup finds exactly one
+    -- row. G1: filter build_id too, so readiness can never be borrowed from another build.
     select both_reviewers_approved_this_head into v_ready
       from ops.checkpoint_merge_readiness
      where checkpoint_id = new.checkpoint_id
-       and head_sha = new.expected_head_sha;
+       and head_sha = new.expected_head_sha
+       and build_id = new.build_id;
     if not coalesce(v_ready, false) then
-      raise exception 'merge_gate: cannot approve — both required reviewers (gpt_codex correction_loop + fable cold_final) do not have an ACTIVE approve at head %', new.expected_head_sha
+      raise exception 'merge_gate: cannot approve — both required reviewers (gpt_codex correction_loop + fable cold_final) do not have an ACTIVE approve at head % for build %', new.expected_head_sha, new.build_id
         using errcode = 'check_violation';
     end if;
   end if;
@@ -803,6 +979,85 @@ drop trigger if exists merge_gate_require_reviewers on ops.merge_gate;
 create trigger merge_gate_require_reviewers
   before insert or update on ops.merge_gate
   for each row execute function ops.merge_gate_require_reviewers();
+
+-- G2: merge_gate IMMUTABILITY. A gate is a DECISION record; once written its identity and
+-- head binding are frozen, and once APPROVED its decision can only move to superseded. This
+-- stops an approved gate being rewritten in place (e.g. UPDATE expected_head_sha/
+-- checkpoint_id to retarget the approval, or approved->pending to erase the approved-for-X
+-- record). DELETE is rejected outright (supersede, never delete). The github_*_cached /
+-- *_observed_at projection columns, policy_reason, superseded_at, updated_at stay MUTABLE.
+create or replace function ops.merge_gate_guard_mutation()
+returns trigger
+language plpgsql
+set search_path = ops, pg_catalog
+as $$
+begin
+  if tg_op = 'DELETE' then
+    raise exception 'ops.merge_gate is a decision record: DELETE is rejected (supersede, never delete)'
+      using errcode = 'restrict_violation';
+  end if;
+  -- identity + head binding are frozen for the life of the row (is distinct from is
+  -- null-safe: it also forbids setting a NULL checkpoint_id to a value, or vice versa).
+  if new.build_id is distinct from old.build_id
+     or new.checkpoint_id is distinct from old.checkpoint_id
+     or new.expected_head_sha is distinct from old.expected_head_sha then
+    raise exception 'ops.merge_gate identity (build_id/checkpoint_id/expected_head_sha) is immutable; supersede this gate and create a new one for a new head'
+      using errcode = 'restrict_violation';
+  end if;
+  -- once approved, the decision may ONLY transition to superseded (never back to pending/
+  -- blocked, which would erase the approved-for-this-head record).
+  if old.fusion_policy_decision = 'approved'
+     and new.fusion_policy_decision not in ('approved', 'superseded') then
+    raise exception 'ops.merge_gate: an approved decision may only transition to superseded (attempted approved -> %)', new.fusion_policy_decision
+      using errcode = 'restrict_violation';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists merge_gate_immutable_guard on ops.merge_gate;
+create trigger merge_gate_immutable_guard
+  before update or delete on ops.merge_gate
+  for each row execute function ops.merge_gate_guard_mutation();
+
+-- G2: TRUNCATE bypasses row triggers — guard it like the other decision/evidence tables.
+drop trigger if exists merge_gate_no_truncate on ops.merge_gate;
+create trigger merge_gate_no_truncate
+  before truncate on ops.merge_gate
+  for each statement execute function ops.reject_truncate();
+
+-- G3(a): D1 CLOSED. When a supporting verdict transitions active->superseded, any LIVE
+-- approved gate at that (build_id, checkpoint_id, head) loses the approval it depended on,
+-- so it MUST be superseded too — an approved gate can never outlive its approvals at the
+-- same head. This is the SERIAL half of D1 (the concurrent half is the FOR UPDATE lock in
+-- merge_gate_require_reviewers). NO RECURSION: this only UPDATEs merge_gate (sets it
+-- superseded); it writes no verdicts, so it cannot re-fire itself.
+create or replace function ops.verdict_supersede_invalidates_gate()
+returns trigger
+language plpgsql
+set search_path = ops, pg_catalog
+as $$
+begin
+  update ops.merge_gate g
+     set fusion_policy_decision = 'superseded'::ops.fusion_policy_decision,
+         superseded_at = now(),
+         policy_reason = coalesce(g.policy_reason || ' | ', '')
+           || 'auto-superseded: a supporting verdict was superseded at this head'
+   where g.checkpoint_id = new.checkpoint_id
+     and g.expected_head_sha = new.reviewed_commit_sha
+     and g.build_id = (select c.build_id from ops.checkpoint c where c.id = new.checkpoint_id)
+     and g.superseded_at is null
+     and g.fusion_policy_decision = 'approved';
+  return null;
+end;
+$$;
+
+drop trigger if exists verdict_supersede_invalidates_gate on ops.verdict;
+create trigger verdict_supersede_invalidates_gate
+  after update on ops.verdict
+  for each row
+  when (old.state = 'active' and new.state = 'superseded')
+  execute function ops.verdict_supersede_invalidates_gate();
 
 comment on column ops.merge_gate.overall_action_state is
   'DUAL-GATE SEPARATION (do not collapse): derived from BOTH the Fusion policy side '
@@ -903,8 +1158,15 @@ $$;
 grant usage on schema ops to service_role;
 -- Full DML for service_role on the fully-mutable tables...
 grant select, insert, update, delete on
-  ops.build, ops.agent_run, ops.job, ops.checkpoint, ops.merge_gate, ops.command_request
+  ops.build, ops.agent_run, ops.job, ops.command_request
   to service_role;
+-- ...checkpoint is EVIDENCE (G5): NO DELETE at the privilege layer. UPDATE is allowed but
+-- the checkpoint_immutable_identity trigger narrows it to the branch/brief_ref pointers.
+grant select, insert, update on ops.checkpoint to service_role;
+-- ...merge_gate is a DECISION record (G2): NO DELETE at the privilege layer (supersede,
+-- never delete). UPDATE is allowed but the merge_gate_immutable_guard trigger freezes the
+-- identity/head binding and the approved decision (except *->superseded).
+grant select, insert, update on ops.merge_gate to service_role;
 -- ...verdict is EVIDENCE: NO DELETE at the privilege layer (F3). UPDATE is allowed but
 -- the evidence-guard trigger narrows it to active->superseded only.
 grant select, insert, update on ops.verdict to service_role;
@@ -916,10 +1178,14 @@ grant usage, select on all sequences in schema ops to service_role;
 -- no one — a functional dead-end). security_invoker means the caller still needs SELECT
 -- on the underlying checkpoint/verdict, which service_role has.
 grant select on ops.checkpoint_merge_readiness to service_role;
+-- G10: default-deny function EXECUTE. Postgres grants EXECUTE to PUBLIC on new functions by
+-- default; revoke that first so ONLY the explicit service_role grants below can run them.
+revoke execute on all functions in schema ops from public;
 -- The transactional job helpers + the boundary canonicaliser.
 grant execute on function ops.canonicalize_sha(text) to service_role;
 grant execute on function ops.claim_job(text, text, integer) to service_role;
 grant execute on function ops.reclaim_expired_leases() to service_role;
+grant execute on function ops.complete_job(bigint, text, ops.job_status) to service_role;
 
 -- One permissive FOR ALL policy per table, scoped TO service_role. Because no policy
 -- names anon/authenticated and RLS is enabled+forced, those roles stay denied. The

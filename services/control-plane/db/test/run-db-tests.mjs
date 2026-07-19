@@ -57,11 +57,33 @@ async function withReusedDb() {
 
 function runNodeTest(databaseUrl) {
   return new Promise((resolve) => {
+    // Tee stdout so we can BOTH stream it live AND parse the TAP summary. This is what lets
+    // us fail on an all-skipped run: a mis-wired `node --test` (wrong file, or DATABASE_URL
+    // not reaching the child so every gated() subtest skips) prints `# pass 0` and would
+    // otherwise EXIT 0 — a green-on-skips false pass. We refuse that here (F8 hardening).
     const child = spawn(process.execPath, ['--test', TEST_FILE], {
-      stdio: 'inherit',
+      stdio: ['inherit', 'pipe', 'inherit'],
       env: { ...process.env, DATABASE_URL: databaseUrl },
     });
-    child.on('exit', (code) => resolve(code ?? 1));
+    let out = '';
+    child.stdout.on('data', (d) => { out += d.toString(); process.stdout.write(d); });
+    child.on('exit', (code) => {
+      const num = (re) => { const m = out.match(re); return m ? Number(m[1]) : null; };
+      const pass = num(/^#\s*pass\s+(\d+)/m);
+      const failN = num(/^#\s*fail\s+(\d+)/m);
+      const skipped = num(/^#\s*skipped\s+(\d+)/m);
+      const tests = num(/^#\s*tests\s+(\d+)/m);
+      const executed = (pass ?? 0) + (failN ?? 0);
+      if (executed === 0) {
+        console.error(
+          `\n[run-db-tests] GUARD FAILURE (F8): 0 subtests EXECUTED ` +
+          `(tests=${tests}, pass=${pass}, fail=${failN}, skipped=${skipped}). ` +
+          `A DB-gated run that skips everything is NOT a pass — the DB proofs never ran. ` +
+          `Check that DATABASE_URL reached the test process. Failing loudly.`);
+        return resolve(code && code !== 0 ? code : 1);
+      }
+      resolve(code ?? 1);
+    });
   });
 }
 
