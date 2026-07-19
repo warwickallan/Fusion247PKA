@@ -1,0 +1,9 @@
+# WP-D disposable proof — runtime artifacts NEVER get committed.
+.runtime/
+# Directus: commit package.json + .env.example only; ignore installed deps + real secrets.
+directus/node_modules/
+directus/package-lock.json
+directus/.env
+directus/uploads/
+directus/*.log
+*.log
