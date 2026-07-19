@@ -153,6 +153,154 @@ function matchProduct(item, products, household) {
 }
 
 // ---------------------------------------------------------------------
+// Household scope test (rule 9): a product is IN SCOPE for the active
+// household when it is GLOBAL (household_id null/undefined) OR owned by the
+// ACTIVE household. A product owned by ANOTHER household is out of scope and
+// must never be surfaced -- the same cross-household boundary matchProduct
+// enforces. Kept as one helper so the ranker and the matcher agree exactly.
+// ---------------------------------------------------------------------
+function inHouseholdScope(product, household) {
+  if (!product) return false;
+  const isGlobal = product.household_id === null || product.household_id === undefined;
+  return isGlobal || sameHousehold(product.household_id, household);
+}
+
+// Compare two product ids for a DETERMINISTIC tie-break: numeric when both
+// parse as finite numbers (so 2 sorts before 10), else a stable string compare.
+function compareProductIds(a, b) {
+  const na = Number(a);
+  const nb = Number(b);
+  if (Number.isFinite(na) && Number.isFinite(nb) && na !== nb) return na - nb;
+  const sa = String(a);
+  const sb = String(b);
+  if (sa < sb) return -1;
+  if (sa > sb) return 1;
+  return 0;
+}
+
+// Coerce a raw price to a finite number, or null when it is absent/unusable.
+function priceOf(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+// ---------------------------------------------------------------------
+// Alternative / substitution SUGGESTION ranker (rule 6, suggestion-only).
+//
+// rankAlternatives(line, products, household) -> [{ name, price, reason, score }]
+//
+// For a line that resolves to needs_decision (out of stock / ambiguous), this
+// proposes RANKED candidate products drawn from the products set. It is PURE
+// and DETERMINISTIC (no DB, no network, no clock, no randomness) and it is
+// SUGGESTION-ONLY: it returns a ranked list for a human to choose from and
+// NEVER sets or writes matched_product. The planner attaches the returned array
+// to the line additively; nothing here mutates the line or a product.
+//
+// Candidate rule (all three must hold):
+//   1. SAME CATEGORY as the line. The target category is taken from the line's
+//      own in-scope product mapping(s) when it has one, else the resolved match,
+//      else the line's category hint. With no determinable category we cannot
+//      say "same category" -> [].
+//   2. IN HOUSEHOLD SCOPE (global or the active household). A product owned by
+//      ANOTHER household is NEVER surfaced (no cross-household leak).
+//   3. NOT the line's own currently matched product (that is the item that is
+//      out of stock / the resolved ambiguous pick; suggesting it back is noise).
+//
+// Ranking (higher score = better; deterministic tie-break by product id asc):
+//   * PRICE PROXIMITY (primary, weight 0.7): closeness of the candidate price to
+//     the line's price. Only contributes when BOTH prices are known and the
+//     target price is positive; otherwise it is NEUTRAL (0.5) so a missing price
+//     neither helps nor hurts. (The base products schema carries no price
+//     column, so in the live path proximity is neutral and ordering falls back
+//     to scope then id -- see the shape note in the README/handback.)
+//   * HOUSEHOLD PREFERENCE (secondary, weight 0.3): a candidate owned by the
+//     active household outranks an equally-priced global one.
+// ---------------------------------------------------------------------
+function rankAlternatives(line, products, household) {
+  const list = Array.isArray(products) ? products : [];
+  if (!line) return [];
+
+  // The line's own product match: used BOTH to derive the target category and
+  // to exclude the item's own (out-of-stock / resolved-ambiguous) product from
+  // the suggestions. Reuses matchProduct so the ranker and matcher never drift.
+  const selfMatch = matchProduct(line, list, household);
+  const selfProduct = selfMatch.product || null;
+
+  // Target category set. Prefer the categories of the line's own in-scope
+  // same-term products (covers the ambiguous case with several mappings), then
+  // the resolved self product, then the line's own category hint.
+  const term = normaliseTerm(line.item_name);
+  const targetCategories = Object.create(null);
+  list.forEach(function (p) {
+    if (!inHouseholdScope(p, household)) return;
+    if (term === '' || normaliseTerm(p.list_term) !== term) return;
+    const c = normaliseTerm(p.category);
+    if (c !== '') targetCategories[c] = true;
+  });
+  if (selfProduct) {
+    const sc = normaliseTerm(selfProduct.category);
+    if (sc !== '') targetCategories[sc] = true;
+  }
+  const lineCat = normaliseTerm(line.category);
+  if (lineCat !== '') targetCategories[lineCat] = true;
+
+  if (Object.keys(targetCategories).length === 0) return [];
+
+  const targetPrice = priceOf(line.price);
+
+  // Build the candidate set.
+  const candidates = list.filter(function (p) {
+    if (!inHouseholdScope(p, household)) return false;                    // rule 2
+    const cat = normaliseTerm(p.category);
+    if (cat === '' || !targetCategories[cat]) return false;               // rule 1
+    if (selfProduct && sameHousehold(p.id, selfProduct.id)) return false; // rule 3
+    return true;
+  });
+
+  const scored = candidates.map(function (p) {
+    const candPrice = priceOf(p.price);
+    let priceScore = 0.5; // neutral when a price is unknown
+    if (targetPrice !== null && targetPrice > 0 && candPrice !== null) {
+      const rel = Math.abs(candPrice - targetPrice) / targetPrice;
+      priceScore = rel >= 1 ? 0 : (1 - rel);
+    }
+    const isHousehold = p.household_id !== null && p.household_id !== undefined
+      && sameHousehold(p.household_id, household);
+    const scopeScore = isHousehold ? 1 : 0;
+    const score = round2(0.7 * priceScore + 0.3 * scopeScore);
+
+    const parts = ['same category (' + normaliseTerm(p.category) + ')'];
+    parts.push(isHousehold ? 'household preference' : 'global option');
+    if (candPrice !== null) {
+      parts.push(targetPrice !== null
+        ? 'price GBP ' + candPrice.toFixed(2) + ' vs GBP ' + targetPrice.toFixed(2)
+        : 'price GBP ' + candPrice.toFixed(2));
+    } else {
+      parts.push('price unknown');
+    }
+
+    return {
+      _id: p.id,
+      name: p.matched_product,
+      price: candPrice,
+      reason: parts.join('; '),
+      score: score
+    };
+  });
+
+  scored.sort(function (a, b) {
+    if (b.score !== a.score) return b.score - a.score;   // best score first
+    return compareProductIds(a._id, b._id);              // deterministic tie-break
+  });
+
+  // Strip the internal sort key; the public shape is { name, price, reason, score }.
+  return scored.map(function (a) {
+    return { name: a.name, price: a.price, reason: a.reason, score: a.score };
+  });
+}
+
+// ---------------------------------------------------------------------
 // Rule directives (data-driven planning).
 //
 // The migrated asdair.rules rows carry only free-text rule_text, which the
@@ -404,6 +552,15 @@ function planBasket(input) {
       }
     }
 
+    // Rule 6: surface RANKED alternative SUGGESTIONS for a human decision.
+    // This is SUGGESTION-ONLY and additive: it NEVER writes matched_product
+    // (matchedProduct above is left exactly as resolved -- original or rule-
+    // mapped, or null). Only needs_decision lines get ranked candidates; every
+    // other status carries an empty array so the output shape stays consistent.
+    const rankedAlternatives = status === 'needs_decision'
+      ? rankAlternatives(line, products, household)
+      : [];
+
     // planned_qty: only 'add' lines put units in the basket.
     const plannedQty = status === 'add' ? qty : 0;
 
@@ -420,6 +577,7 @@ function planBasket(input) {
       status: status,                            // add | needs_decision | excluded_this_week | excluded
       flags: flags,
       note: note,
+      alternatives: rankedAlternatives,          // suggestion-only; never sets matched_product
       _unit_price: unitPrice                     // internal; stripped before return
     };
   });
@@ -458,7 +616,8 @@ function planBasket(input) {
       planned_qty: it.planned_qty,
       status: it.status,
       flags: it.flags,
-      note: it.note
+      note: it.note,
+      alternatives: it.alternatives
     };
   });
 
@@ -485,11 +644,14 @@ function planBasket(input) {
 
 module.exports = {
   planBasket: planBasket,
+  rankAlternatives: rankAlternatives,   // suggestion-only alternative ranker (rule 6)
   // exported for unit tests of the pure helpers
   _internal: {
     normaliseTerm: normaliseTerm,
     normaliseQty: normaliseQty,
     matchProduct: matchProduct,
-    dedupeList: dedupeList
+    dedupeList: dedupeList,
+    rankAlternatives: rankAlternatives,
+    inHouseholdScope: inHouseholdScope
   }
 };

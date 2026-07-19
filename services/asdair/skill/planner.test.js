@@ -533,9 +533,10 @@ test('rule 8: the plan NEVER contains any checkout / pay / place-order action', 
   plan.items.forEach(function (it) {
     assert.deepEqual(
       Object.keys(it).sort(),
-      ['flags', 'item_name', 'matched_product', 'note', 'planned_qty', 'requested_qty', 'status']
+      ['alternatives', 'flags', 'item_name', 'matched_product', 'note', 'planned_qty', 'requested_qty', 'status']
     );
     assert.ok(['add', 'needs_decision', 'excluded_this_week', 'excluded'].includes(it.status));
+    assert.ok(Array.isArray(it.alternatives), 'alternatives is always an array (suggestion-only, additive)');
   });
 });
 
