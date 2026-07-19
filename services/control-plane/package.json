@@ -2,13 +2,14 @@
   "name": "@fusion247/control-plane-db",
   "version": "0.0.0",
   "private": true,
-  "description": "BUILD-014 control-plane — WP-A minimum Phase-0 schema + constraint-invariant proofs, and WP-B durable worker runtime + ledger proofs (DEV-only design artifact).",
+  "description": "BUILD-014 control-plane — WP-A minimum Phase-0 schema + constraint-invariant proofs, WP-B durable worker runtime + ledger proofs, WP-C GitHub ingress + review handler + Fusion policy gate, WP-D0 authoritative current-head hardening (DEV-only design artifact).",
   "type": "module",
   "scripts": {
     "test:db": "node db/test/run-db-tests.mjs",
     "test:worker": "node worker/test/run-worker-tests.mjs",
     "test:wpc": "node test/run-wpc-tests.mjs",
-    "test": "node db/test/run-db-tests.mjs && node worker/test/run-worker-tests.mjs && node test/run-wpc-tests.mjs"
+    "test:wpd0": "node test/run-wpd0-tests.mjs",
+    "test": "node db/test/run-db-tests.mjs && node worker/test/run-worker-tests.mjs && node test/run-wpc-tests.mjs && node test/run-wpd0-tests.mjs"
   },
   "devDependencies": {
     "pg": "^8.11.0"
