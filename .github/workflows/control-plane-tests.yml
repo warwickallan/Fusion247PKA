@@ -1,18 +1,23 @@
 name: control-plane-tests
 
-# CI for the BUILD-014 WP-A control-plane MINIMUM Phase-0 schema
-# (services/control-plane/db/migrations/001_control_plane_min_schema.sql) and its
-# constraint-invariant proofs.
+# CI for the BUILD-014 control-plane:
+#   WP-A — the MINIMUM Phase-0 schema (db/migrations/001_control_plane_min_schema.sql)
+#          + its constraint-invariant proofs (db/test).
+#   WP-B — the durable worker runtime + append-only event ledger over that schema
+#          (worker/) + its runtime proofs (worker/test).
 #
-# This is a DB-GATED suite: every proof runs migration 001 into the `ops` schema of a
-# throwaway Postgres and asserts the structural invariants (exact-SHA head binding, the
-# merge-gate build-binding + immutability, D1 verdict-supersede invalidation, append-only
-# / evidence guards, job lease/attempt bounding, etc.) as real SQL failures/successes.
+# Both are DB-GATED suites: every proof runs migration 001 into a fresh `ops` schema of a
+# throwaway Postgres and asserts real behaviour as SQL/runtime successes and failures —
+# WP-A the structural invariants (exact-SHA head binding, merge-gate build-binding +
+# immutability, D1 verdict-supersede invalidation, append-only / evidence guards, job
+# lease/attempt bounding); WP-B the runtime invariants (exactly-one claim across concurrent
+# workers, crash -> reclaim -> exactly-once effect, dedup enqueue, attempts -> dead_letter,
+# lifecycle reconstruction, polling-only correctness with NOTIFY disabled).
 #
-# The runner (db/test/run-db-tests.mjs) FAILS if the child `node --test` reports 0 EXECUTED
-# subtests (all-skipped) — so a mis-wired run where DATABASE_URL never reaches the test
-# process can NOT go green on skips. Here we point the runner at a Postgres service
-# container via REUSE_DATABASE_URL=1 so the proofs actually execute.
+# Each runner (db/test/run-db-tests.mjs, worker/test/run-worker-tests.mjs) FAILS if the
+# child `node --test` reports 0 EXECUTED subtests (all-skipped) — so a mis-wired run where
+# DATABASE_URL never reaches the test process can NOT go green on skips. Both point at a
+# Postgres service container via REUSE_DATABASE_URL=1 so the proofs actually execute.
 #
 # DEV-only design artifact: this schema is never applied to any live/prod project by this
 # workflow. The service container is a disposable local Postgres — no real credentials, no
@@ -66,8 +71,14 @@ jobs:
       - name: Install dependencies (pg driver, for the live Postgres proofs)
         run: npm ci
 
-      - name: Run the constraint-invariant proofs against real Postgres
-        # `npm test` -> run-db-tests.mjs. With REUSE_DATABASE_URL=1 it runs against the
-        # service container above rather than provisioning its own cluster, and it FAILS
-        # on 0 executed subtests (an all-skipped run is never a pass).
-        run: npm test
+      - name: WP-A — constraint-invariant proofs against real Postgres
+        # run-db-tests.mjs. With REUSE_DATABASE_URL=1 it runs against the service container
+        # above rather than provisioning its own cluster, and it FAILS on 0 executed
+        # subtests (an all-skipped run is never a pass).
+        run: npm run test:db
+
+      - name: WP-B — durable worker runtime + ledger proofs against real Postgres
+        # run-worker-tests.mjs. Same service container + 0-executed-subtest guard. Proves
+        # exactly-one claim, crash->reclaim->exactly-once effect, dedup, dead-letter,
+        # lifecycle reconstruction, and polling-only correctness (NOTIFY disabled).
+        run: npm run test:worker
