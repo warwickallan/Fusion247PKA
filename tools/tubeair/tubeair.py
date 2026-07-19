@@ -240,6 +240,148 @@ def render_frontmatter(fields: dict) -> str:
 
 
 # ----------------------------------------------------------------------------
+# Transcript readability / cleanup (pure text ops — no LLM, no network)
+# ----------------------------------------------------------------------------
+#
+# Auto-captions emit a rolling window: each caption line repeats a run of words
+# from the END of the previous line and appends only a few genuinely new words at
+# the front's expense (the Karpathy proof had 1704 such overlapping segments — a
+# wall of near-duplicate text). These two deterministic functions collapse that
+# redundancy and reflow the result into readable paragraphs. They INVENT NOTHING:
+# only exact word-sequence overlap is removed, and the immutable raw transcript is
+# never replaced — the cleaned view is rendered ALONGSIDE the unaltered source.
+
+_MAX_OVERLAP_WORDS = 60  # a single caption line is never longer than this
+
+_SENTENCE_END_RE = re.compile(r"""[.!?]["')\]]?$""")
+
+
+def _snippet_words(snip: dict) -> list[str]:
+    return ((snip.get("text") or "").strip()).split()
+
+
+def _dedupe_once(snippets: list) -> list:
+    """One de-duplication pass. For each snippet, drop the leading run of words
+    that exactly continues the words already kept (a word-level suffix/prefix
+    overlap against the running tail), keeping only the genuinely new tail. A
+    snippet that adds no new words (an exact duplicate or a subset already covered)
+    is dropped entirely. Each surviving snippet keeps its own start/duration.
+    """
+    kept: list = []
+    tail: list[str] = []  # every word emitted so far (bounded window compared)
+    for snip in snippets:
+        words = _snippet_words(snip)
+        if not words:
+            continue
+        window = tail[-_MAX_OVERLAP_WORDS:]
+        max_k = min(len(window), len(words))
+        overlap = 0
+        for k in range(max_k, 0, -1):
+            if window[-k:] == words[:k]:
+                overlap = k
+                break
+        new_words = words[overlap:]
+        if not new_words:
+            continue  # fully redundant — nothing new to keep
+        kept.append({
+            "text": " ".join(new_words),
+            "start": float(snip.get("start", 0.0)),
+            "duration": float(snip.get("duration", 0.0)),
+        })
+        tail.extend(new_words)
+    return kept
+
+
+def dedupe_rolling_snippets(snippets: list) -> list:
+    """Collapse rolling-window auto-caption duplication, deterministically.
+
+    Heuristic: walk the caption lines in order, keeping a running list of the
+    words emitted so far. For each new line, find the LONGEST run of words that is
+    simultaneously a suffix of what's already been kept and a prefix of this line,
+    and keep only the words after that overlap. Lines that contribute no new words
+    are dropped. No text is invented, paraphrased or reordered — this is pure
+    exact-overlap removal, so the fullest coverage is preserved while the redundant
+    overlaps disappear. Each surviving snippet retains its own timestamp.
+
+    Idempotent by construction: the result is a fixed point of the pass, so running
+    the cleanup again finds no overlap and returns an equal list.
+    """
+    result = _dedupe_once(snippets)
+    for _ in range(_MAX_OVERLAP_WORDS):  # converges fast; bound guards pathological input
+        again = _dedupe_once(result)
+        if again == result:
+            return result
+        result = again
+    return result
+
+
+def _ends_sentence(text: str) -> bool:
+    return bool(_SENTENCE_END_RE.search(text.rstrip()))
+
+
+def reflow_paragraphs(snippets: list, gap_seconds: float = 2.0,
+                      soft_max_chars: int = 320) -> list:
+    """Join (de-duped) caption lines into readable paragraphs.
+
+    A new paragraph starts when there is a timing gap of at least `gap_seconds`
+    between the end of the previous line and the start of the next, OR — so a long
+    gap-free stretch does not become an unreadable wall — once a paragraph has
+    grown past `soft_max_chars` and the text so far ends on a sentence boundary.
+    Each paragraph keeps the start timestamp of its first line. Pure and
+    order-preserving; no text is invented, paraphrased or dropped.
+
+    Returns a list of {"start": float, "text": str}.
+    """
+    paragraphs: list = []
+    words: list[str] = []
+    para_start = None
+    prev_end = None
+    for snip in snippets:
+        text = " ".join((snip.get("text") or "").split())
+        if not text:
+            continue
+        start = float(snip.get("start", 0.0))
+        duration = float(snip.get("duration", 0.0))
+        if words:
+            gap = (start - prev_end) if prev_end is not None else 0.0
+            joined = " ".join(words)
+            long_enough = bool(soft_max_chars) and len(joined) >= soft_max_chars
+            if gap >= gap_seconds or (long_enough and _ends_sentence(joined)):
+                paragraphs.append({"start": para_start, "text": joined})
+                words = []
+                para_start = None
+        if not words:
+            para_start = start
+        words.extend(text.split())
+        prev_end = (start + duration) if duration else start
+    if words:
+        paragraphs.append({"start": para_start, "text": " ".join(words)})
+    return paragraphs
+
+
+def _cleaned_transcript_lines(cap: "Capture", gap_seconds: float = 2.0) -> list:
+    """Render the CLEANED §7 reading view: rolling-window duplication removed, then
+    reflowed into timestamped paragraphs. A pure derivation of the captured
+    captions — nothing invented, paraphrased or summarised. The raw evidence block
+    that follows it, and the immutable GL-011 source file, stay byte-for-byte
+    unchanged; this only ADDS a readable view alongside the raw source."""
+    paragraphs = reflow_paragraphs(dedupe_rolling_snippets(cap.snippets), gap_seconds)
+    out = ["### 7.1 Cleaned reading view (de-duplicated, reflowed)", ""]
+    out.append("> Readability aid only — deterministic exact-overlap de-duplication of the rolling "
+               "auto-caption window, reflowed into paragraphs on timing gaps. No text is invented, "
+               "paraphrased or summarised; the raw captured transcript below is unaltered.")
+    out.append("")
+    if not paragraphs:
+        out.append("_No transcript content to clean._")
+        out.append("")
+        return out
+    for para in paragraphs:
+        out.append(f"[{format_timestamp(para['start'])}] {para['text']}")
+        out.append("")
+    return out
+
+
+# ----------------------------------------------------------------------------
 # Capture data model
 # ----------------------------------------------------------------------------
 
@@ -748,6 +890,14 @@ def build_report_markdown(cap: Capture, handoff_info: dict | None = None) -> str
              "captured; not edited or summarised.")
     b.append("")
     if ok:
+        # Cleaned reading view FIRST (readability), then the unaltered raw evidence.
+        # The cleaned view is a pure derivation; it never replaces the raw source.
+        b += _cleaned_transcript_lines(cap)
+        b.append("### 7.2 Raw captured transcript (unaltered source evidence)")
+        b.append("")
+        b.append("> The exact captions as captured, including any auto-caption rolling-window "
+                 "overlap. This block is unchanged by the cleanup pass above.")
+        b.append("")
         for snip in cap.snippets:
             b.append(f"[{format_timestamp(snip['start'])}] {snip['text']}")
     else:

@@ -347,5 +347,166 @@ class TestOutputDir(unittest.TestCase):
         self.assertIn("2026-07-17__agentic-os-build-pattern__", d.name)
 
 
+# ---------------------------------------------------------------------------
+# Transcript readability / cleanup (dedupe + reflow) — pure text ops, no network
+# ---------------------------------------------------------------------------
+
+# Synthetic overlapping-caption fixture: a dozen-plus rolling auto-caption lines
+# modelling the real YouTube ASR pattern (each line repeats the tail of the
+# previous line and adds a few new words). Includes one EXACT duplicate line
+# (s04 == s03), one fully-contained trailing line (s13), and a deliberate timing
+# gap between the two spoken sentences (s09 ends at 12.5s; s10 starts at 16.0s)
+# so reflow has a real boundary to break on. Deterministic; no network.
+def _rolling_snippets():
+    return [
+        {"text": "so today we're going to", "start": 0.0, "duration": 2.0},
+        {"text": "today we're going to build a small", "start": 1.5, "duration": 2.0},
+        {"text": "going to build a small local agent", "start": 3.0, "duration": 2.0},
+        {"text": "going to build a small local agent", "start": 3.0, "duration": 2.0},   # exact dup
+        {"text": "build a small local agent that reads a", "start": 4.5, "duration": 2.0},
+        {"text": "local agent that reads a youtube transcript", "start": 6.0, "duration": 2.0},
+        {"text": "reads a youtube transcript and turns it into", "start": 7.5, "duration": 2.0},
+        {"text": "transcript and turns it into a clean readable", "start": 9.0, "duration": 2.0},
+        {"text": "turns it into a clean readable document", "start": 10.5, "duration": 2.0},
+        # --- timing gap here (12.5 -> 16.0) : new spoken sentence ---
+        {"text": "and later the team can review it and", "start": 16.0, "duration": 2.0},
+        {"text": "later the team can review it and decide what", "start": 17.5, "duration": 2.0},
+        {"text": "team can review it and decide what to keep", "start": 19.0, "duration": 2.0},
+        {"text": "and decide what to keep", "start": 20.5, "duration": 2.0},                # contained
+    ]
+
+# The two sentences the rolling window is a noisy encoding of.
+_SENTENCE_A = ("so today we're going to build a small local agent that reads a "
+               "youtube transcript and turns it into a clean readable document")
+_SENTENCE_B = "and later the team can review it and decide what to keep"
+
+
+class TestDedupeRollingSnippets(unittest.TestCase):
+    def setUp(self):
+        self.raw = _rolling_snippets()
+        self.cleaned = t.dedupe_rolling_snippets(self.raw)
+
+    def test_removes_redundancy(self):
+        # 13 rolling lines collapse: the exact dup (s04) and the fully-contained
+        # trailing line (s13) are dropped; the rest keep only their new tail.
+        self.assertLess(len(self.cleaned), len(self.raw))
+        self.assertEqual(len(self.cleaned), 11)
+
+    def test_reconstructs_full_unique_content_exactly(self):
+        # Joining the kept tails must reproduce the two source sentences verbatim —
+        # every unique word preserved, in order, none invented.
+        joined = " ".join(s["text"] for s in self.cleaned)
+        self.assertEqual(joined, f"{_SENTENCE_A} {_SENTENCE_B}")
+
+    def test_no_word_is_invented(self):
+        raw_words = set(" ".join(s["text"] for s in self.raw).split())
+        for s in self.cleaned:
+            for w in s["text"].split():
+                self.assertIn(w, raw_words)
+
+    def test_total_word_count_drops(self):
+        raw_words = sum(len(s["text"].split()) for s in self.raw)
+        clean_words = sum(len(s["text"].split()) for s in self.cleaned)
+        self.assertLess(clean_words, raw_words)      # real redundancy removed
+        self.assertEqual(clean_words, 35)            # 95 -> 35 on this fixture
+
+    def test_timestamps_preserved_on_survivors(self):
+        # Each surviving snippet keeps its own start time (paragraph anchoring).
+        self.assertEqual(self.cleaned[0]["start"], 0.0)
+        self.assertEqual(self.cleaned[-1]["start"], 19.0)
+
+    def test_idempotent(self):
+        once = t.dedupe_rolling_snippets(self.raw)
+        twice = t.dedupe_rolling_snippets(once)
+        self.assertEqual(once, twice)
+
+    def test_does_not_mutate_input(self):
+        before = [dict(s) for s in self.raw]
+        t.dedupe_rolling_snippets(self.raw)
+        self.assertEqual(self.raw, before)
+
+    def test_empty_input(self):
+        self.assertEqual(t.dedupe_rolling_snippets([]), [])
+
+
+class TestReflowParagraphs(unittest.TestCase):
+    def setUp(self):
+        self.cleaned = t.dedupe_rolling_snippets(_rolling_snippets())
+        self.paras = t.reflow_paragraphs(self.cleaned, gap_seconds=2.0)
+
+    def test_breaks_on_timing_gap(self):
+        # The 3.5s gap between the two sentences yields exactly two paragraphs.
+        self.assertEqual(len(self.paras), 2)
+
+    def test_paragraph_start_timestamps_preserved(self):
+        self.assertEqual(self.paras[0]["start"], 0.0)    # -> [00:00]
+        self.assertEqual(self.paras[1]["start"], 16.0)   # -> [00:16]
+
+    def test_paragraph_text_is_the_reflowed_sentences(self):
+        self.assertEqual(self.paras[0]["text"], _SENTENCE_A)
+        self.assertEqual(self.paras[1]["text"], _SENTENCE_B)
+
+    def test_no_gap_means_single_paragraph(self):
+        # With a huge gap threshold nothing breaks -> one paragraph.
+        paras = t.reflow_paragraphs(self.cleaned, gap_seconds=9999)
+        self.assertEqual(len(paras), 1)
+        self.assertEqual(paras[0]["text"], f"{_SENTENCE_A} {_SENTENCE_B}")
+
+    def test_idempotent_render(self):
+        # Cleaning already-clean snippets a second time gives the same paragraphs.
+        again = t.reflow_paragraphs(t.dedupe_rolling_snippets(self.cleaned), gap_seconds=2.0)
+        self.assertEqual(self.paras, again)
+
+    def test_empty_input(self):
+        self.assertEqual(t.reflow_paragraphs([]), [])
+
+
+class TestCleanedTranscriptInReport(unittest.TestCase):
+    """The report must ADD a cleaned §7 view while leaving the raw evidence
+    (and, separately, the immutable GL-011 source) unchanged."""
+
+    def _cap_with_rolling(self):
+        cap = _sample_capture("extracted")
+        cap.snippets = _rolling_snippets()
+        cap.segment_count = len(cap.snippets)
+        return cap
+
+    def setUp(self):
+        self.cap = self._cap_with_rolling()
+        self.md = t.build_report_markdown(self.cap)
+
+    def test_cleaned_view_present(self):
+        self.assertIn("### 7.1 Cleaned reading view", self.md)
+        self.assertIn(f"[00:00] {_SENTENCE_A}", self.md)
+        self.assertIn(f"[00:16] {_SENTENCE_B}", self.md)
+
+    def test_raw_evidence_block_unchanged(self):
+        # Every original rolling caption line is still present, unaltered, in the
+        # raw evidence sub-block — the cleaned view is additive, not a replacement.
+        self.assertIn("### 7.2 Raw captured transcript", self.md)
+        for snip in _rolling_snippets():
+            self.assertIn(f"[{t.format_timestamp(snip['start'])}] {snip['text']}", self.md)
+
+    def test_cleaned_view_precedes_raw_block(self):
+        self.assertLess(self.md.find("### 7.1 Cleaned reading view"),
+                        self.md.find("### 7.2 Raw captured transcript"))
+
+    def test_immutable_raw_source_is_untouched_by_cleanup(self):
+        # build_raw_markdown is the GL-011 immutable source: it must contain the
+        # raw overlapping lines and NONE of the cleaned-view scaffolding.
+        raw_md = t.build_raw_markdown(self.cap)
+        for snip in _rolling_snippets():
+            self.assertIn(f"[{t.format_timestamp(snip['start'])}] {snip['text']}", raw_md)
+        self.assertNotIn("Cleaned reading view", raw_md)
+
+    def test_report_still_has_all_eight_sections(self):
+        for h in ["## 6. Source Metadata", "## 7. Full Transcript", "## 8. Run / Processing Notes"]:
+            self.assertIn(h, self.md)
+
+    def test_no_verbatim_wording_regression(self):
+        # The pre-existing governance rule: the word "verbatim" must not appear.
+        self.assertNotIn("verbatim", self.md.lower())
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
