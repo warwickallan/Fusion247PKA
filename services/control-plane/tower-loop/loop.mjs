@@ -50,6 +50,32 @@ export function serializeReconstructedTurn({ turn, prompt }) {
   ].join('\n');
 }
 
+/**
+ * INGEST — how a new eligible Larry turn ARRIVES. Split from processing: this only records
+ * the turn as `state='pending'`; the persistent watcher claims and processes it later. The
+ * prompt is intentionally NOT bound here — the watcher binds the ACTIVE prompt at process
+ * time (load-prompt-FIRST stays a property of processing, not of arrival).
+ *
+ * @param {import('pg').Pool} pool
+ * @param {object} input
+ * @param {string}  input.instruction    what Warwick/Tower asked
+ * @param {string} [input.larryResponse] Larry's response / proposed action
+ * @param {string} [input.buildRef]      build this turn belongs to (default 'BUILD-014')
+ * @param {boolean}[input.goalComplete]  caller signals this turn ships the goal
+ */
+export async function ingestTurn(pool, { instruction, larryResponse = null, buildRef, goalComplete = false }) {
+  if (typeof instruction !== 'string' || instruction.length === 0) {
+    throw new Error('ingestTurn: instruction must be a non-empty string');
+  }
+  const { rows } = await pool.query(
+    `insert into tower.turn (build_ref, instruction, larry_response, state, goal_complete)
+     values (coalesce($1, 'BUILD-014'), $2, $3, 'pending', $4)
+     returning id, seq, build_ref, state, created_at`,
+    [buildRef ?? null, instruction, larryResponse, goalComplete === true],
+  );
+  return rows[0];
+}
+
 /** Load the single ACTIVE supervisor prompt. Fail-closed if none active. */
 export async function loadActivePrompt(pool) {
   const { rows } = await pool.query(

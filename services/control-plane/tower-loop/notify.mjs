@@ -42,6 +42,24 @@ export async function notify(pool, { turnId, reason, state, message }) {
     throw new Error(`notify: unknown reason '${reason}' (expected one of ${NOTIFY_REASONS.join('|')})`);
   }
 
+  // IDEMPOTENCY — claim the (turn_id, reason) slot FIRST. If we do not win the insert, this
+  // notification already exists (e.g. a restart re-processed the turn): do NOT POST again and
+  // do NOT create a duplicate row. Only the winner of the insert POSTs to Telegram.
+  const claim = await pool.query(
+    `insert into tower.notification (turn_id, reason, state, message, telegram_ok)
+     values ($1, $2, $3, $4, false)
+     on conflict (turn_id, reason) do nothing
+     returning id`,
+    [turnId, reason, state, message],
+  );
+  if (claim.rows.length === 0) {
+    return {
+      notificationId: null, deduped: true, telegram_ok: false, telegram_message_id: null,
+      detail: 'deduped — notification already exists for (turn_id, reason); Telegram not re-sent',
+    };
+  }
+  const notificationId = claim.rows[0].id;
+
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.AUTHORISED_TELEGRAM_USER_ID;
 
@@ -82,14 +100,13 @@ export async function notify(pool, { turnId, reason, state, message }) {
     }
   }
 
-  const { rows } = await pool.query(
-    `insert into tower.notification (turn_id, reason, state, message, telegram_ok, telegram_message_id)
-     values ($1, $2, $3, $4, $5, $6)
-     returning id`,
-    [turnId, reason, state, message, telegramOk, telegramMessageId],
+  // Record the REAL delivery result onto the row we already claimed.
+  await pool.query(
+    `update tower.notification set telegram_ok = $2, telegram_message_id = $3 where id = $1`,
+    [notificationId, telegramOk, telegramMessageId],
   );
 
-  return { notificationId: rows[0].id, telegram_ok: telegramOk, telegram_message_id: telegramMessageId, detail };
+  return { notificationId, deduped: false, telegram_ok: telegramOk, telegram_message_id: telegramMessageId, detail };
 }
 
 /** Compose the human-facing Watcher message body. Identifies turn/build, state, Codex verdict, action. */

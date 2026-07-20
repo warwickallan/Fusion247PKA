@@ -12,7 +12,7 @@
 //   CONTROL_PLANE_DEV_DATABASE_URL=postgres://... node run-proof.mjs
 
 import pg from 'pg';
-import { applySchema } from './apply.mjs';
+import { applySchema, applyWatcherSchema } from './apply.mjs';
 import { seedPrompt } from './seed.mjs';
 import { runTurn, reconstructTurn } from './loop.mjs';
 
@@ -25,7 +25,9 @@ async function main() {
 
   hr('STEP 1 — apply schema (idempotent)');
   const applied = await applySchema(DB_URL);
-  console.log(`applied: ${applied.applied} from ${applied.sqlPath}`);
+  console.log(`applied base: ${applied.applied} from ${applied.sqlPath}`);
+  const appliedDelta = await applyWatcherSchema(DB_URL);
+  console.log(`applied watcher delta: ${appliedDelta.applied} from ${appliedDelta.sqlPath}`);
 
   hr('STEP 2 — seed active supervisor prompt');
   const seeded = await seedPrompt(DB_URL);

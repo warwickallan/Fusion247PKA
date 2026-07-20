@@ -27,8 +27,28 @@ export async function applySchema(databaseUrl = process.env.CONTROL_PLANE_DEV_DA
   }
 }
 
+/** Apply the watcher schema delta (db/watcher_schema.sql). Idempotent; safe alongside the
+ *  base schema. The watcher needs lease columns, dedup index, heartbeat + finding tables. */
+export async function applyWatcherSchema(databaseUrl = process.env.CONTROL_PLANE_DEV_DATABASE_URL) {
+  if (!databaseUrl) throw new Error('CONTROL_PLANE_DEV_DATABASE_URL is not set — point it at the throwaway local Postgres (or Supabase DEV).');
+  const sqlPath = path.join(__dirname, 'db', 'watcher_schema.sql');
+  const sql = fs.readFileSync(sqlPath, 'utf8');
+  const pool = new pg.Pool({ connectionString: databaseUrl });
+  try {
+    await pool.query(sql);
+    return { applied: true, sqlPath };
+  } finally {
+    await pool.end();
+  }
+}
+
 if (import.meta.url === `file://${process.argv[1]}` || process.argv[1] === fileURLToPath(import.meta.url)) {
-  applySchema()
-    .then((r) => { console.log(`[apply] schema applied (idempotent) from ${r.sqlPath}`); process.exit(0); })
+  (async () => {
+    const base = await applySchema();
+    console.log(`[apply] base schema applied (idempotent) from ${base.sqlPath}`);
+    const delta = await applyWatcherSchema();
+    console.log(`[apply] watcher delta applied (idempotent) from ${delta.sqlPath}`);
+  })()
+    .then(() => process.exit(0))
     .catch((e) => { console.error(`[apply] FAILED: ${e.message}`); process.exit(1); });
 }
