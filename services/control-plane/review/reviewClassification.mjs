@@ -25,10 +25,17 @@ export const REQUIRED_DISPOSITIONS = Object.freeze([
   'REQUIRED_BEFORE_EXTERNAL_OR_UNTRUSTED_ACCESS', 'TRACKED_FOLLOWUP', 'NOTE_ONLY',
 ]);
 
-// amendment three-axis -> the existing ops.finding enums (no schema change — we consume PR-1's schema).
-// technical_impact -> finding_severity; reachability -> finding_reachability. The required_disposition
-// (the merge lever) + the assumed baseline are carried in the finding.impact text (queryable), because
-// a NEWLY-opened finding is state='open' and MUST be disposition='unresolved' (003 CHECK).
+// The classification policy version stamped onto every classifier-produced finding. It is a RUNTIME
+// policy fact (the amendment version), not a reviewer choice, so the runtime stamps it — and its
+// presence is what marks a finding as NON-LEGACY (a legacy finding carries classification_version NULL).
+export const CLASSIFICATION_VERSION = 'reviewer-classification-amendment@1';
+
+// amendment three-axis -> the ops.finding schema. technical_impact -> finding_severity;
+// reachability -> finding_reachability; required_disposition -> the TYPED ops.required_disposition
+// column (006, the merge lever) + assumed_deployment_baseline -> its own bounded column + a stamped
+// classification_version. A human-readable `impact` summary is ALSO kept for the cockpit, but authority
+// is NEVER parsed from it — the readiness gate reads the typed columns. A newly-opened finding is
+// state='open' and MUST be disposition='unresolved' (003 CHECK) — the LIFECYCLE disposition is distinct.
 const IMPACT_TO_SEVERITY = Object.freeze({ BLOCKER: 'critical', HIGH: 'high', MEDIUM: 'medium', LOW: 'low', NOTE: 'info' });
 const REACH_TO_ENUM = Object.freeze({ ACTIVE: 'reachable', LATENT: 'conditional', HYPOTHETICAL: 'unreachable' });
 export const mapImpactToSeverity = (i) => IMPACT_TO_SEVERITY[i] ?? 'medium';
@@ -192,18 +199,27 @@ export async function persistReviewerClassification(client, {
     const rid = String(nf.id ?? nf.ref ?? nf.finding_ref ?? '').trim();
     if (!rid) continue;
     const findingRef = makeFindingRef({ reviewerPrincipal, checkpointRef, findingId: rid, headSha });
+    const baselineText = String(nf.assumed_deployment_baseline ?? '').replace(/\s+/g, ' ').slice(0, 240);
+    const classificationVersion = (typeof nf.classification_version === 'string' && nf.classification_version.trim())
+      ? nf.classification_version.trim().slice(0, 120)
+      : CLASSIFICATION_VERSION;
+    // Human-readable summary ONLY (the cockpit reads it; the readiness gate NEVER parses authority from it).
     const impactText = `technical_impact=${nf.technical_impact};reachability=${nf.reachability};`
-      + `required_disposition=${nf.required_disposition};`
-      + `assumed_deployment_baseline=${String(nf.assumed_deployment_baseline ?? '').replace(/\s+/g, ' ').slice(0, 240)}`;
+      + `required_disposition=${nf.required_disposition};assumed_deployment_baseline=${baselineText}`;
     const title = String(nf.title ?? nf.summary ?? rid).slice(0, 200);
+    // Write the TYPED merge lever + baseline + classification_version (006) — retry-idempotent via the
+    // deterministic finding_ref + ON CONFLICT DO NOTHING (a re-run neither duplicates NOR alters the row).
     const ins = await client.query(
       `insert into ops.finding
-         (build_id, finding_ref, opened_by, title, impact, severity, reachability, disposition, state, opened_at_sha)
-       values ($1,$2,$3::ops.principal,$4,$5,$6::ops.finding_severity,$7::ops.finding_reachability,'unresolved','open', ops.canonicalize_sha($8))
+         (build_id, finding_ref, opened_by, title, impact, severity, reachability, disposition, state,
+          required_disposition, assumed_deployment_baseline, classification_version, opened_at_sha)
+       values ($1,$2,$3::ops.principal,$4,$5,$6::ops.finding_severity,$7::ops.finding_reachability,'unresolved','open',
+          $8::ops.required_disposition,$9,$10, ops.canonicalize_sha($11))
          on conflict (build_id, finding_ref) do nothing
        returning id`,
       [buildId, findingRef, reviewerPrincipal, title, impactText,
-        mapImpactToSeverity(nf.technical_impact), mapReachability(nf.reachability), headSha]);
+        mapImpactToSeverity(nf.technical_impact), mapReachability(nf.reachability),
+        nf.required_disposition, baselineText, classificationVersion, headSha]);
     let findingId = ins.rows[0]?.id ?? null;
     if (!findingId) {
       const sel = await client.query(`select id from ops.finding where build_id=$1 and finding_ref=$2`, [buildId, findingRef]);

@@ -41,6 +41,7 @@ const MIGRATIONS = [
   '002_current_head_authority.sql',
   '003_contract_acceptance_schema.sql',
   '004_reviewer_registry_and_packet.sql',
+  '006_finding_required_disposition.sql', // typed required_disposition merge lever + readiness consume it
 ].map((f) => path.join(MIGRATIONS_DIR, f));
 const DB = process.env.DATABASE_URL;
 
@@ -652,5 +653,159 @@ gated('6d. write-path is RETRY-IDEMPOTENT: a re-run at the same head yields no d
     assert.equal(fdup.length, 0, 'no duplicate finding rows across the retry');
     const { rows: fn } = await pool.query(`select count(*)::int n from ops.finding where build_id=$1 and finding_ref like 'TR-%DUP-1%'`, [build.id]);
     assert.equal(fn[0].n, 1, 'the new finding is opened exactly once across retries');
+  } finally { await pool.end(); }
+});
+
+// ==========================================================================
+// 7. TYPED required_disposition MERGE LEVER (migration 006) — readiness consumes the TYPED column,
+//    never parsed from impact text. Both readiness paths proved: flag OFF byte-for-byte legacy;
+//    flag ON structurally blocks on BLOCKS_CURRENT_MERGE, non-blockers don't block, a classifier
+//    finding missing its classification fails closed. Plus retry does not duplicate/alter records.
+// ==========================================================================
+
+async function effReadiness(pool, cpId) {
+  const { rows } = await pool.query(
+    `select governing_policy, effective_merge_ready, legacy_both_reviewers_approved,
+            role_based_all_required_satisfied, role_based_blocked_reviewer_unavailable,
+            role_based_disposition_blocked, role_based_unclassified_finding
+       from ops.checkpoint_effective_readiness where checkpoint_id=$1`, [cpId]);
+  return rows[0];
+}
+// The typed finding a REQUIRED_BEFORE_LIVE classifier opens (id: REQ-1) — links to the checkpoint's
+// review_run via review_run_finding(relation='opened'), so it is "current material" for readiness.
+async function openReqBeforeLiveFinding(pool, cpId) {
+  const reviewer = classifyingReviewer({ verdict: 'approve', findings: [
+    { id: 'REQ-1', technical_impact: 'HIGH', reachability: 'LATENT', required_disposition: 'REQUIRED_BEFORE_LIVE',
+      assumed_deployment_baseline: 'DEV control-plane; no live-apply wired', evidence: 'latent hardening', required_correction: 'harden before live' },
+  ] });
+  const pb = createPacketBuilder({ pool, evidenceSources: gitFake(), log: SILENT });
+  const res = await runTowerReview({ pool, checkpointId: cpId, reviewers: [reviewer], packetBuilder: pb, productQaPrompt: loadPrompt(), evidenceSources: gitFake(), log: SILENT });
+  assert.equal(res.runs[0].outcome, 'approved', 'a REQUIRED_BEFORE_LIVE (non-blocking) finding still approves — roles satisfied');
+  return res;
+}
+async function reqFindingRow(pool, buildId) {
+  const { rows } = await pool.query(
+    `select id, finding_ref, required_disposition::text as rd, assumed_deployment_baseline as base,
+            classification_version as ver, state::text as state
+       from ops.finding where build_id=$1 and finding_ref like 'TR-%REQ-1%'`, [buildId]);
+  return rows[0];
+}
+
+// (i) flag OFF -> historical readiness is byte-for-byte unchanged; the typed lever is INERT (advisory only).
+gated('7a. flag OFF -> historical readiness unchanged; a BLOCKS_CURRENT_MERGE finding does NOT leak into the OFF path', async () => {
+  const pool = await freshPool();
+  try {
+    const { cpId } = await seedReviewable(pool);
+    // A reviewer that opens a BLOCKS_CURRENT_MERGE finding (so the lever WOULD fire if it governed).
+    const blocker = classifyingReviewer({ verdict: 'approve', findings: [
+      { id: 'OFF-BLK', technical_impact: 'HIGH', reachability: 'ACTIVE', required_disposition: 'BLOCKS_CURRENT_MERGE',
+        assumed_deployment_baseline: 'DEV; reachable now', evidence: 'active break', required_correction: 'fix now' },
+    ] });
+    const pb = createPacketBuilder({ pool, evidenceSources: gitFake(), log: SILENT });
+    await runTowerReview({ pool, checkpointId: cpId, reviewers: [blocker], packetBuilder: pb, productQaPrompt: loadPrompt(), evidenceSources: gitFake(), log: SILENT });
+    const eff = await effReadiness(pool, cpId);
+    assert.equal(eff.governing_policy, 'legacy_both_required', 'default flag OFF -> legacy governs');
+    // The lever IS computed (advisory), proving it saw the blocking finding...
+    assert.equal(eff.role_based_disposition_blocked, true, 'the typed lever advisory-fires (a BLOCKS finding is present)');
+    // ...but the OFF governing result is EXACTLY the legacy value — the lever cannot leak into the OFF path.
+    assert.equal(eff.effective_merge_ready, eff.legacy_both_reviewers_approved,
+      'flag OFF: effective readiness == legacy both-required, unchanged by the disposition lever');
+    assert.equal(eff.effective_merge_ready, false, 'only product_qa approved -> legacy both-required not ready (unchanged behaviour)');
+  } finally { await pool.end(); }
+});
+
+// (iii) flag ON -> other dispositions do NOT block by themselves; legacy (unlinked) findings stay off-path.
+gated('7b. flag ON -> a non-blocking disposition (REQUIRED_BEFORE_LIVE) does NOT block; a legacy open finding does not fail closed', async () => {
+  const pool = await freshPool();
+  try {
+    const { build, cpId } = await seedReviewable(pool); // also seeds LEGACY open finding F-100 (required_disposition NULL, UNLINKED)
+    await openReqBeforeLiveFinding(pool, cpId);
+    await pool.query(`update ops.feature_flag set enabled=true where flag_key='role_based_readiness'`);
+    const eff = await effReadiness(pool, cpId);
+    assert.equal(eff.governing_policy, 'role_based');
+    assert.equal(eff.role_based_all_required_satisfied, true, 'product_qa approved -> required roles satisfied');
+    assert.equal(eff.role_based_disposition_blocked, false, 'REQUIRED_BEFORE_LIVE does not block the current merge');
+    assert.equal(eff.role_based_unclassified_finding, false, 'the classifier finding carries its required_disposition');
+    assert.equal(eff.effective_merge_ready, true, 'flag ON: non-blocking disposition -> merge-ready');
+    // The LEGACY finding F-100 (required_disposition NULL, never review_run-linked) does NOT fail closed.
+    const { rows: leg } = await pool.query(`select state::text as state, required_disposition::text as rd from ops.finding where build_id=$1 and finding_ref='F-100'`, [build.id]);
+    assert.equal(leg[0].state, 'open', 'the legacy finding is still open (append-only)');
+    assert.equal(leg[0].rd, null, 'the legacy finding keeps required_disposition NULL (not backfilled)');
+    // ...yet readiness is still ready -> legacy findings stay behind the compatibility path.
+  } finally { await pool.end(); }
+});
+
+// (ii) flag ON -> a current BLOCKS_CURRENT_MERGE finding STRUCTURALLY blocks, EVEN when every role is satisfied.
+gated('7c. flag ON -> a current BLOCKS_CURRENT_MERGE finding structurally blocks even with all roles satisfied', async () => {
+  const pool = await freshPool();
+  try {
+    const { build, cpId } = await seedReviewable(pool);
+    await openReqBeforeLiveFinding(pool, cpId);           // approved review -> roles satisfied; opens REQ-1 (non-blocking)
+    const f = await reqFindingRow(pool, build.id);
+    await pool.query(`update ops.feature_flag set enabled=true where flag_key='role_based_readiness'`);
+    // Baseline: ready (roles satisfied, non-blocking disposition).
+    let eff = await effReadiness(pool, cpId);
+    assert.equal(eff.effective_merge_ready, true, 'baseline: roles satisfied + non-blocking -> ready');
+    // Flip ONLY the typed disposition to BLOCKS_CURRENT_MERGE (roles unchanged) -> structurally NOT ready.
+    await pool.query(`update ops.finding set required_disposition='BLOCKS_CURRENT_MERGE' where id=$1`, [f.id]);
+    eff = await effReadiness(pool, cpId);
+    assert.equal(eff.role_based_all_required_satisfied, true, 'roles are UNCHANGED (the review_run still approved) — the block is the lever, not a role gap');
+    assert.equal(eff.role_based_disposition_blocked, true, 'the typed BLOCKS_CURRENT_MERGE lever fires');
+    assert.equal(eff.effective_merge_ready, false, 'a current BLOCKS_CURRENT_MERGE finding structurally blocks the merge');
+  } finally { await pool.end(); }
+});
+
+// (iv) flag ON -> a current classifier finding MISSING its required_disposition FAILS CLOSED.
+gated('7d. flag ON -> a current classifier finding missing its required_disposition fails closed (not-ready)', async () => {
+  const pool = await freshPool();
+  try {
+    const { build, cpId } = await seedReviewable(pool);
+    await openReqBeforeLiveFinding(pool, cpId);
+    const f = await reqFindingRow(pool, build.id);
+    assert.equal(f.rd, 'REQUIRED_BEFORE_LIVE', 'precondition: the classifier finding started fully classified');
+    await pool.query(`update ops.feature_flag set enabled=true where flag_key='role_based_readiness'`);
+    // Strip the required_disposition off a NON-LEGACY (review_run-linked) finding -> fail closed.
+    await pool.query(`update ops.finding set required_disposition=null where id=$1`, [f.id]);
+    const eff = await effReadiness(pool, cpId);
+    assert.equal(eff.role_based_all_required_satisfied, true, 'roles are still satisfied — this is a classification gap, not a role gap');
+    assert.equal(eff.role_based_unclassified_finding, true, 'a review_run-opened finding with NULL required_disposition is flagged');
+    assert.equal(eff.effective_merge_ready, false, 'a classifier finding missing its required_disposition FAILS CLOSED');
+  } finally { await pool.end(); }
+});
+
+// (v) retrying the SAME review does NOT duplicate OR alter the typed classification records.
+gated('7e. retry-idempotent typed classification: a re-run neither duplicates nor alters the typed columns', async () => {
+  const pool = await freshPool();
+  try {
+    const { build, cpId } = await seedReviewable(pool);
+    const reviewer = classifyingReviewer({ verdict: 'approve', findings: [
+      { id: 'IDEM-1', technical_impact: 'MEDIUM', reachability: 'LATENT', required_disposition: 'TRACKED_FOLLOWUP',
+        assumed_deployment_baseline: 'DEV control-plane', evidence: 'x', required_correction: 'later' },
+    ] });
+    const readTyped = async () => {
+      const { rows } = await pool.query(
+        `select finding_ref, required_disposition::text as rd, assumed_deployment_baseline as base,
+                classification_version as ver, updated_at
+           from ops.finding where build_id=$1 and finding_ref like 'TR-%IDEM-1%'`, [build.id]);
+      return rows;
+    };
+    // Run 1.
+    const pb1 = createPacketBuilder({ pool, evidenceSources: gitFake(), log: SILENT });
+    await runTowerReview({ pool, checkpointId: cpId, reviewers: [reviewer], packetBuilder: pb1, productQaPrompt: loadPrompt(), evidenceSources: gitFake(), log: SILENT });
+    const after1 = await readTyped();
+    assert.equal(after1.length, 1, 'the typed classification finding is written once');
+    assert.equal(after1[0].rd, 'TRACKED_FOLLOWUP', 'the TYPED required_disposition column is populated (not parsed from impact)');
+    assert.ok(after1[0].base && after1[0].base.length > 0, 'assumed_deployment_baseline is populated in its own typed column');
+    assert.equal(after1[0].ver, 'reviewer-classification-amendment@1', 'classification_version is stamped (marks the finding non-legacy)');
+    // Run 2 at the SAME head (fresh packet -> reaches the write-path again; the write-path must dedupe).
+    const pb2 = createPacketBuilder({ pool, evidenceSources: gitFake(), log: SILENT });
+    await runTowerReview({ pool, checkpointId: cpId, reviewers: [reviewer], packetBuilder: pb2, productQaPrompt: loadPrompt(), evidenceSources: gitFake(), log: SILENT });
+    const after2 = await readTyped();
+    assert.equal(after2.length, 1, 'no duplicate classification record across the retry');
+    assert.equal(after2[0].rd, after1[0].rd, 'required_disposition unchanged across retry');
+    assert.equal(after2[0].ver, after1[0].ver, 'classification_version unchanged across retry');
+    assert.equal(after2[0].base, after1[0].base, 'assumed_deployment_baseline unchanged across retry');
+    assert.equal(after2[0].updated_at.getTime(), after1[0].updated_at.getTime(),
+      'updated_at is IDENTICAL — on-conflict-do-nothing did not touch the row (record not altered)');
   } finally { await pool.end(); }
 });

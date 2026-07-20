@@ -115,3 +115,35 @@ New `review/prompts/prompt-approvals.json` records `{fingerprint: cd65539a…253
 5. **Single active PRD/Plan assumption:** the packet resolves the single ACTIVE PRD/Plan for the build (latest by `created_at` if multiple keys). A multi-PRD build would need the checkpoint→PRD linkage that a later slice adds.
 6. **The orientation layer is AI-authored DRAFT** (residual by design): it needs Warwick's explicit approval before the `role_based_readiness` flag is flipped and it governs live.
 7. **Base-SHA-required blocked path:** if even the git base cannot resolve, no `review_packet` row is constructable (base_sha is NOT NULL) — that case returns a row-less BLOCKED outcome + a durable `review.blocked` event instead of a blocked packet row. All other mandatory-source failures produce a blocked packet row with a reason.
+
+---
+
+## § Disposition correction (migration 006) — a first-class TYPED home for the merge lever
+
+**Warwick's explicit direction:** the reviewer-classification merge lever must be TYPED, not free-text. Previously `review/reviewClassification.mjs` carried `required_disposition` (the merge lever) + `assumed_deployment_baseline` (R2) inside the free-text `ops.finding.impact` column — nowhere typed to put them. This slice gives them typed columns and makes readiness consume the enum, never a substring. **DEV/synthetic only; no hosted apply; no PR/merge; no prompt-byte changes; legacy findings NOT backfilled.**
+
+### Schema (migration `006_finding_required_disposition.sql` — additive + idempotent, matching 001/003/004 discipline)
+- **New enum** `ops.required_disposition` = `BLOCKS_CURRENT_MERGE | REQUIRED_BEFORE_LIVE | REQUIRED_BEFORE_EXTERNAL_OR_UNTRUSTED_ACCESS | TRACKED_FOLLOWUP | NOTE_ONLY` (DO-block guarded). **Deliberately SEPARATE** from the lifecycle `ops.finding_disposition` (003) — two axes, two enums, never overloaded.
+- **Three NULLABLE columns on `ops.finding`** (legacy compatibility — a legacy row keeps them NULL, no backfill): `required_disposition ops.required_disposition`, `assumed_deployment_baseline text` (a dedicated bounded field — NOT a deployment-registry subsystem), `classification_version text` (its presence marks a finding non-legacy).
+- `technical_impact` stays mapped to the existing `severity`; `reachability` stays the existing `finding_reachability` enum (both already typed).
+- **Guarded named CHECK** `finding_typed_disposition_needs_version_chk` = `(required_disposition is null or classification_version is not null)`. It does NOT force a classifier finding to carry a disposition — a classifier finding MISSING its `required_disposition` stays representable on purpose so the readiness gate FAILS CLOSED on it rather than a constraint hiding it.
+- **No new RLS/grants:** `ops.finding` already has FORCED RLS + a `service_role` SELECT/INSERT/UPDATE grant (003); the table-level UPDATE covers the new columns; `anon`/`authenticated` get NEITHER. `search_path`-pinned funcs unchanged. Migration number **006** (not 005) avoids colliding with the external-write outbox `005` on the parallel chain.
+
+### Write-path (`review/reviewClassification.mjs`)
+A NEW classifier-produced finding now WRITES all of: `classification_version` (runtime-stamped `reviewer-classification-amendment@1`), `required_disposition` (typed enum), `assumed_deployment_baseline` (typed column), `technical_impact`→`severity`, `reachability`→`reachability`. The human-readable `impact` summary is retained for the cockpit, but **authority is never parsed from it**. Retry-idempotent unchanged: deterministic `finding_ref` + `ON CONFLICT DO NOTHING` — a re-run neither duplicates NOR alters the typed columns (proven `updated_at` identical across retries).
+
+### Readiness consumes the typed lever (`ops.checkpoint_effective_readiness` replaced via create-or-replace; `review/readiness.mjs` surfaces two new advisory columns)
+"Current material for checkpoint C" is recognised **structurally**: `finding ← review_run_finding(relation='opened') ← review_run ← review_packet(checkpoint_id=C)` — never by impact-text parsing. When `role_based_readiness` is **ON**:
+- an open current finding with `required_disposition = BLOCKS_CURRENT_MERGE` → **structurally NOT merge-ready**;
+- other dispositions do NOT block by themselves;
+- an open current **classifier-produced** finding MISSING its `required_disposition` (NULL, but review_run-linked) → **fail closed**;
+- LEGACY findings (never review_run-linked, `required_disposition` NULL) are OUT of scope — they neither block nor fail closed, staying behind the compatibility path.
+When the flag is **OFF → the legacy both-required path is byte-for-byte unchanged** (the lever is advisory-only and cannot leak into the OFF path). Two appended advisory columns: `role_based_disposition_blocked`, `role_based_unclassified_finding`.
+
+### Tests (EXECUTED, throwaway Postgres) — runtime suite now **22/22** (17 + 5 new)
+`006` is added to the runtime suite's migration set. New named tests: **7a** flag OFF → historical readiness unchanged (a BLOCKS finding does not leak into the OFF path); **7b** flag ON → a non-blocking disposition does NOT block + a legacy open finding does not fail closed; **7c** flag ON → a BLOCKS_CURRENT_MERGE finding structurally blocks **even with all roles satisfied** (the block is isolated to the lever, roles unchanged); **7d** flag ON → a classifier finding missing its `required_disposition` fails closed; **7e** retry does not duplicate or alter the typed classification records (`updated_at` identical). **Regression re-run, all green:** db/001 25/25 · contract/003 11/11 · registry/004 9/9 · worker 23/23 · WP-C 14/14 · WP-D0 9/9.
+
+### Prompt fingerprint — UNCHANGED (no prompt bytes touched)
+This slice changes **zero** prompt-component bytes (`tower-qa-skill.md`, `reviewer-classification-amendment.md`, `product-qa-runtime-orientation.md`, `prompt-approvals.json` all untouched), so no re-approval is triggered. The campaign approval remains bound to the orientation hash `cd65539a…253135` (intact).
+
+> **⚠ Pre-existing build-note drift flagged for reviewers (NOT introduced here):** the § Fingerprints table above states composed = `6b3bc8e5…` and classification-amendment = `6f963043…`, but at this commit the **actual on-disk** values are composed = `02fdfbc8968eb80b6b411b1a439629847c2a0e938eca9699b077ca2c1ff18041` and classification-amendment = `5c254258811800bf…` (base `f2fc2f26…` and orientation `cd65539a…` DO match). The committed `reviewer-classification-amendment.md` bytes and the § Fingerprints table were already out of sync before this slice. The disposition correction did not change either — the composed fingerprint is byte-for-byte identical before and after (`02fdfbc8…`). Reviewers/Larry should decide whether to reconcile the stale § Fingerprints table (it is documentation, not the approval anchor — approval is bound to the orientation hash, which is intact).
