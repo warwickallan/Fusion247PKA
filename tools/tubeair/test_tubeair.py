@@ -429,6 +429,61 @@ class TestDedupeRollingSnippets(unittest.TestCase):
         self.assertEqual(t.dedupe_rolling_snippets([]), [])
 
 
+class TestDedupeTimingGapAware(unittest.TestCase):
+    """F-046-A regression: a legitimately-repeated word across a caption seam (a
+    real timing gap) must NOT be collapsed as rolling-window overlap. Rolling
+    windows with no gap must still collapse (the core feature is not neutered)."""
+
+    # The exact seam from the finding: "please go home" then, after a PAUSE, a new
+    # sentence that genuinely begins with "home". prev active window is [0, 2]; the
+    # next line starts at 5.0 -> a 3.0s gap, >= the 2.0s reflow boundary.
+    _SEAM = [
+        {"text": "please go home", "start": 0.0, "duration": 2.0},
+        {"text": "home is where we begin", "start": 5.0, "duration": 3.0},
+    ]
+
+    # Control: the same words but as two GENUINELY-overlapping rolling captions
+    # (no gap) — the second line starts at 1.0, inside the first's [0, 2] window,
+    # and re-emits the tail "home". This IS redundant and must collapse.
+    _ROLLING = [
+        {"text": "please go home", "start": 0.0, "duration": 2.0},
+        {"text": "home is where we begin", "start": 1.0, "duration": 2.0},
+    ]
+
+    def test_repeat_across_gap_is_preserved(self):
+        cleaned = t.dedupe_rolling_snippets(self._SEAM)
+        joined = " ".join(s["text"] for s in cleaned)
+        # BOTH "home"s survive — the repeat across the seam is legitimate content.
+        self.assertEqual(joined, "please go home home is where we begin")
+        self.assertEqual(joined.split().count("home"), 2)
+
+    def test_overlapping_rolling_caption_still_collapses(self):
+        cleaned = t.dedupe_rolling_snippets(self._ROLLING)
+        joined = " ".join(s["text"] for s in cleaned)
+        # No gap -> genuine rolling-window overlap -> the duplicated "home" is
+        # collapsed exactly once (core de-dup feature intact).
+        self.assertEqual(joined, "please go home is where we begin")
+        self.assertEqual(joined.split().count("home"), 1)
+
+    def test_seam_output_is_a_subsequence_of_input(self):
+        # No invented/reordered words: the cleaned stream is a subsequence of the
+        # concatenated input words.
+        cleaned = t.dedupe_rolling_snippets(self._SEAM)
+        out_words = " ".join(s["text"] for s in cleaned).split()
+        in_words = " ".join(s["text"] for s in self._SEAM).split()
+        it = iter(in_words)
+        self.assertTrue(all(w in it for w in out_words))
+
+    def test_seam_dedupe_is_idempotent(self):
+        once = t.dedupe_rolling_snippets(self._SEAM)
+        twice = t.dedupe_rolling_snippets(once)
+        self.assertEqual(once, twice)
+
+    def test_seam_survivors_keep_their_own_timestamps(self):
+        cleaned = t.dedupe_rolling_snippets(self._SEAM)
+        self.assertEqual([s["start"] for s in cleaned], [0.0, 5.0])
+
+
 class TestReflowParagraphs(unittest.TestCase):
     def setUp(self):
         self.cleaned = t.dedupe_rolling_snippets(_rolling_snippets())

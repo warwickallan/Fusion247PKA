@@ -260,39 +260,75 @@ def _snippet_words(snip: dict) -> list[str]:
     return ((snip.get("text") or "").strip()).split()
 
 
-def _dedupe_once(snippets: list) -> list:
+def _dedupe_once(snippets: list, gap_seconds: float = 2.0) -> list:
     """One de-duplication pass. For each snippet, drop the leading run of words
     that exactly continues the words already kept (a word-level suffix/prefix
-    overlap against the running tail), keeping only the genuinely new tail. A
-    snippet that adds no new words (an exact duplicate or a subset already covered)
-    is dropped entirely. Each surviving snippet keeps its own start/duration.
+    overlap against the running tail), keeping only the genuinely new tail — BUT
+    only when the snippet belongs to the SAME rolling caption window as the one
+    before it. A snippet that adds no new words (an exact duplicate or a subset
+    already covered) is dropped entirely. Each surviving snippet keeps its own
+    start/duration.
+
+    Timing-gap awareness (the fix for F-046-A). Auto-caption overlap is an artefact
+    of the rolling on-screen window: consecutive lines physically co-exist on screen
+    and re-emit each other's tail. So an overlap is only redundant when the two
+    lines actually share that window. The gate, preferring rolling-window
+    containment, collapses the overlap when the current snippet's `start` falls
+    inside the previous snippet's active window `[prev.start, prev.start +
+    prev.duration]` (an overlapping rolling caption), OR the inter-snippet gap is
+    below `gap_seconds`. When a REAL timing gap (>= `gap_seconds`, the same boundary
+    reflow breaks paragraphs on) separates the two, a suffix/prefix word match is
+    legitimately-repeated content across a caption seam — e.g. "...please go home"
+    then, after a pause, "home is where we begin" — and is kept verbatim, never
+    collapsed. The first snippet has no predecessor, so nothing is trimmed from it.
     """
     kept: list = []
     tail: list[str] = []  # every word emitted so far (bounded window compared)
+    prev_start: float | None = None
+    prev_end: float | None = None   # prev.start + prev.duration (active-window end)
     for snip in snippets:
         words = _snippet_words(snip)
         if not words:
             continue
-        window = tail[-_MAX_OVERLAP_WORDS:]
-        max_k = min(len(window), len(words))
+        start = float(snip.get("start", 0.0))
+        duration = float(snip.get("duration", 0.0))
+        # Timing gate: collapse the overlap ONLY when this snippet shares the
+        # previous snippet's rolling caption window. Rolling-window containment is
+        # the primary rule; a sub-`gap_seconds` gap is tolerated as the same window.
+        # A gap >= gap_seconds is a genuine seam -> keep any repeat verbatim.
+        same_rolling_window = (
+            prev_start is not None and prev_end is not None
+            and prev_start <= start <= prev_end          # rolling-window containment
+        )
+        small_gap = (
+            prev_end is not None and (start - prev_end) < gap_seconds
+        )
+        collapse = prev_start is None or same_rolling_window or small_gap
         overlap = 0
-        for k in range(max_k, 0, -1):
-            if window[-k:] == words[:k]:
-                overlap = k
-                break
+        if collapse:
+            window = tail[-_MAX_OVERLAP_WORDS:]
+            max_k = min(len(window), len(words))
+            for k in range(max_k, 0, -1):
+                if window[-k:] == words[:k]:
+                    overlap = k
+                    break
         new_words = words[overlap:]
+        # Advance the timing cursor to THIS snippet before any early-continue, so a
+        # fully-redundant (dropped) line still anchors the next line's gate: the
+        # rolling window is a property of the input stream, not of what survived.
+        prev_start, prev_end = start, start + duration
         if not new_words:
-            continue  # fully redundant — nothing new to keep
+            continue  # fully redundant within its window — nothing new to keep
         kept.append({
             "text": " ".join(new_words),
-            "start": float(snip.get("start", 0.0)),
-            "duration": float(snip.get("duration", 0.0)),
+            "start": start,
+            "duration": duration,
         })
         tail.extend(new_words)
     return kept
 
 
-def dedupe_rolling_snippets(snippets: list) -> list:
+def dedupe_rolling_snippets(snippets: list, gap_seconds: float = 2.0) -> list:
     """Collapse rolling-window auto-caption duplication, deterministically.
 
     Heuristic: walk the caption lines in order, keeping a running list of the
@@ -301,14 +337,23 @@ def dedupe_rolling_snippets(snippets: list) -> list:
     and keep only the words after that overlap. Lines that contribute no new words
     are dropped. No text is invented, paraphrased or reordered — this is pure
     exact-overlap removal, so the fullest coverage is preserved while the redundant
-    overlaps disappear. Each surviving snippet retains its own timestamp.
+    overlaps disappear. Each surviving snippet retains its own timestamp; the output
+    is always a subsequence of the input words.
 
-    Idempotent by construction: the result is a fixed point of the pass, so running
-    the cleanup again finds no overlap and returns an equal list.
+    Timing-gap aware: an overlap is only collapsed when the two snippets share the
+    same rolling caption window (rolling-window containment, or a gap below
+    `gap_seconds`). A word repeated across a real timing gap (>= `gap_seconds`,
+    matching the reflow paragraph boundary) is legitimate content and is preserved
+    verbatim — see `_dedupe_once`. `gap_seconds` defaults to the reflow default so
+    the cleaned view's de-dup and paragraph boundaries agree.
+
+    Idempotent by construction: the result is a fixed point of the pass (survivors
+    keep their original start/duration, so the timing gate is stable), so running
+    the cleanup again finds no collapsible overlap and returns an equal list.
     """
-    result = _dedupe_once(snippets)
+    result = _dedupe_once(snippets, gap_seconds)
     for _ in range(_MAX_OVERLAP_WORDS):  # converges fast; bound guards pathological input
-        again = _dedupe_once(result)
+        again = _dedupe_once(result, gap_seconds)
         if again == result:
             return result
         result = again
