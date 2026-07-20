@@ -1,0 +1,38 @@
+diff --git a/src/tubeair/reflow.mjs b/src/tubeair/reflow.mjs
+index 1a2b3c4..5d6e7f8 100644
+--- a/src/tubeair/reflow.mjs
++++ b/src/tubeair/reflow.mjs
+@@ -10,6 +10,21 @@ export function reflowTranscript(segments) {
+   const out = [];
+   let buffer = '';
++  // AC-01: collapse duplicate adjacent lines that differ only by trailing whitespace.
++  function dedupeAdjacent(lines) {
++    const result = [];
++    for (const line of lines) {
++      const prev = result[result.length - 1];
++      if (prev !== undefined && prev.trimEnd() === line.trimEnd()) continue;
++      result.push(line);
++    }
++    return result;
++  }
++
+   for (const seg of segments) {
+     buffer += normaliseSpacing(seg.text) + '\n';
+   }
+-  return buffer;
++  // AC-02: reflow to a max column width for readability.
++  const reflowed = dedupeAdjacent(buffer.split('\n')).join('\n');
++  return reflowed;
+ }
+diff --git a/test/reflow.test.js b/test/reflow.test.js
+index aaaaaaa..bbbbbbb 100644
+--- a/test/reflow.test.js
++++ b/test/reflow.test.js
+@@ -1,3 +1,9 @@
+ import test from 'node:test';
++import assert from 'node:assert/strict';
++import { reflowTranscript } from '../src/tubeair/reflow.mjs';
++
++test('AC-01 dedupes adjacent duplicate lines', () => {
++  assert.equal(reflowTranscript([{ text: 'a' }, { text: 'a ' }]).trim(), 'a');
++});

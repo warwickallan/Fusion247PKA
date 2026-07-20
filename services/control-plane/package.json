@@ -6,10 +6,15 @@
   "type": "module",
   "scripts": {
     "test:db": "node db/test/run-db-tests.mjs",
+    "test:contract": "node db/test/run-contract-tests.mjs",
+    "test:registry": "node db/test/run-registry-tests.mjs",
+    "test:runtime": "node review/test/run-runtime-tests.mjs",
     "test:worker": "node worker/test/run-worker-tests.mjs",
     "test:wpc": "node test/run-wpc-tests.mjs",
     "test:wpd0": "node test/run-wpd0-tests.mjs",
-    "test": "node db/test/run-db-tests.mjs && node worker/test/run-worker-tests.mjs && node test/run-wpc-tests.mjs && node test/run-wpd0-tests.mjs"
+    "test:outbox": "node db/test/run-outbox-tests.mjs",
+    "test:notifier": "node notifier/test/run-notifier-tests.mjs",
+    "test": "node db/test/run-db-tests.mjs && node db/test/run-contract-tests.mjs && node db/test/run-registry-tests.mjs && node review/test/run-runtime-tests.mjs && node worker/test/run-worker-tests.mjs && node test/run-wpc-tests.mjs && node test/run-wpd0-tests.mjs && node db/test/run-outbox-tests.mjs && node notifier/test/run-notifier-tests.mjs"
   },
   "devDependencies": {
     "pg": "^8.11.0"
