@@ -1,0 +1,61 @@
+name: tubeair-tests
+
+# CI for IDEA-013 TubeAIR (the local YouTube transcript -> Karpathy-packet tool and
+# its capture-inbox watcher). Runs the two offline unit suites:
+#
+#   * test_tubeair       - core: URL parsing + host allowlist, slugify, timestamp
+#                          formatting, raw/report Markdown generation, honest-failure
+#                          states. Pure functions, no network.
+#   * test_tubeair_watch - the inbox reader + watcher: end-to-end capture->packet on a
+#                          fixture, idempotency, backoff + the do-not-hammer-YouTube
+#                          retry ledger, atomic/backup-safe state (torn-write + corrupt
+#                          -state proofs), per-capture exception isolation, and the
+#                          starvation proof (a raising capture cannot starve a healthy
+#                          sibling).
+#
+# OFFLINE BY DESIGN — no API key, no bot token, no network. tubeair.py imports
+# youtube-transcript-api / yt-dlp LAZILY (only inside the fetch functions), and every
+# test monkeypatches tubeair.fetch_transcript / tubeair.fetch_metadata to a
+# deterministic fixture. So the suites exercise the real capture->packet code path
+# with zero third-party dependencies installed; the transcript egress is never hit.
+# _tool_versions() degrades gracefully to "not-installed" for the absent packages.
+#
+# Triggers only when the TubeAIR tool or this workflow change. Matrix over the two
+# Python versions the tool targets.
+
+on:
+  push:
+    paths:
+      - 'tools/tubeair/**'
+      - '.github/workflows/tubeair-tests.yml'
+  pull_request:
+    paths:
+      - 'tools/tubeair/**'
+      - '.github/workflows/tubeair-tests.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11', '3.13']
+    defaults:
+      run:
+        working-directory: tools/tubeair
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Run the TubeAIR core + watcher suites (offline, monkeypatched)
+        # unittest exits non-zero on any failure/error; -v surfaces per-test names.
+        # Run from tools/tubeair so the sibling modules import without packaging.
+        run: python -m unittest test_tubeair test_tubeair_watch -v

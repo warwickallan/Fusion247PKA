@@ -191,24 +191,30 @@ def _ledger_path(args: argparse.Namespace) -> Path:
     return state_full.with_name("_watch_retry.json")
 
 
+def _validate_ledger(data) -> None:
+    if not isinstance(data, dict) or not isinstance(data.get("attempts"), dict):
+        raise ValueError("watcher ledger must be a JSON object with an 'attempts' object")
+
+
 def _ledger_load(path: Path) -> dict:
-    if path.exists():
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-            if isinstance(data, dict) and isinstance(data.get("attempts"), dict):
-                return data
-        except (json.JSONDecodeError, OSError):
-            pass
-    return {"attempts": {}}
+    """Load the watcher's retry ledger. A corrupt/unreadable ledger fails LOUDLY (or
+    recovers from ``.bak``) rather than silently resetting to empty: a silent reset
+    would zero every stuck video's attempt count and let it be re-fetched
+    MAX_RETRIES_PER_VIDEO more times — re-opening the exact YouTube-hammering hole the
+    ledger exists to close. Shares the atomic/backup-aware store with the inbox state
+    (SSOT for the durability logic)."""
+    return tubeair_inbox.load_json_with_backup(
+        path, _validate_ledger, lambda: {"attempts": {}},
+        label="TubeAIR watcher retry ledger",
+        on_recover=lambda msg: _log("ledger_recovered", note=msg))
 
 
 def _ledger_save(path: Path, ledger: dict) -> None:
     try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(ledger, indent=2, ensure_ascii=False),
-                        encoding="utf-8")
+        # Atomic write + .bak rotation (no torn ledgers). Shared with the inbox state.
+        tubeair_inbox.atomic_write_json(path, ledger)
     except OSError as exc:
-        # The ledger is an optimization; a write failure must not kill the watcher.
+        # A write failure must not kill the watcher; the next cycle re-persists.
         _log("ledger_save_failed", error=f"{type(exc).__name__}: {exc}")
 
 

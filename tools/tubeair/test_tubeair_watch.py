@@ -15,6 +15,7 @@ Run:  tools/tubeair/.venv/Scripts/python.exe -m pytest tools/tubeair/test_tubeai
 or:   python -m unittest tools.tubeair.test_tubeair_watch   (from repo root, tools/tubeair on path)
 """
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -24,7 +25,9 @@ import tubeair_inbox
 import tubeair_watch
 
 VIDEO_ID = "dQw4w9WgXcQ"
+VIDEO_ID2 = "abcdefghijk"  # a second healthy 11-char id (fixture resolves any non-stuck id)
 STUCK_VIDEO_ID = "stuckVIDEO0"  # 11-char valid YouTube id whose captions never resolve
+RAISE_VIDEO_ID = "raiseVIDEO0"  # 11-char valid id whose fetch RAISES (a crashing capture)
 
 # The deterministic fixture transcript that stands in for a real YouTube fetch.
 _FIXTURE_SNIPPETS = [
@@ -423,6 +426,277 @@ class TestIntervalValidation(unittest.TestCase):
 
     def test_negative_max_cycles_is_rejected(self):
         self._expect_error(["--interval", "1", "--max-cycles", "-1"])
+
+
+# ---------------------------------------------------------------------------
+# Fix 1 + Fix 2 — atomic writes + corrupt-state fails visibly/safely (never empty)
+# ---------------------------------------------------------------------------
+
+class TestAtomicWriteAndCorruptInboxState(unittest.TestCase):
+    """Fix 1 (atomic writes) + Fix 2 (corrupt state fails loud, never silently empty)
+    for the INBOX state file. The store is shared with the watcher ledger, so proving
+    it here covers the durability logic both depend on."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        # A nested path so we also prove atomic_write_json creates parent dirs.
+        self.state = self.root / "sub" / "state.json"
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _bak(self):
+        return self.state.with_name(self.state.name + ".bak")
+
+    def test_atomic_write_creates_file_and_leaves_no_tempfile(self):
+        tubeair_inbox.atomic_write_json(self.state, {"processed": {"a.md": ["dQw4w9WgXcQ"]}})
+        self.assertTrue(self.state.exists())
+        self.assertEqual(tubeair_inbox._load_state(self.state)["processed"]["a.md"],
+                         ["dQw4w9WgXcQ"])
+        leftovers = list(self.state.parent.glob("*.tmp*"))
+        self.assertEqual(leftovers, [], f"atomic write must clean up its temp: {leftovers}")
+
+    def test_second_write_rotates_last_known_good_backup(self):
+        tubeair_inbox.atomic_write_json(self.state, {"processed": {"a": ["v1"]}})
+        tubeair_inbox.atomic_write_json(self.state, {"processed": {"a": ["v1", "v2"]}})
+        self.assertTrue(self._bak().exists(), "second write must leave a .bak of prior good state")
+        # The .bak holds the FIRST write (last-known-good before the second landed).
+        self.assertEqual(json.loads(self._bak().read_text("utf-8"))["processed"]["a"], ["v1"])
+        # Primary holds the latest.
+        self.assertEqual(tubeair_inbox._load_state(self.state)["processed"]["a"], ["v1", "v2"])
+
+    def test_corrupt_state_raises_never_silent_empty(self):
+        self.state.parent.mkdir(parents=True, exist_ok=True)
+        self.state.write_text("{ this is not valid json ", encoding="utf-8")
+        with self.assertRaises(tubeair_inbox.StateCorruptError):
+            tubeair_inbox._load_state(self.state)
+
+    def test_wrong_shape_state_is_treated_as_corrupt(self):
+        self.state.parent.mkdir(parents=True, exist_ok=True)
+        self.state.write_text('{"processed": [1, 2, 3]}', encoding="utf-8")  # list, not object
+        with self.assertRaises(tubeair_inbox.StateCorruptError):
+            tubeair_inbox._load_state(self.state)
+
+    def test_corrupt_primary_recovers_from_backup(self):
+        tubeair_inbox.atomic_write_json(self.state, {"processed": {"a": ["v1"]}})
+        tubeair_inbox.atomic_write_json(self.state, {"processed": {"a": ["v1", "v2"]}})
+        # Corrupt only the primary; the .bak still holds a valid last-known-good.
+        self.state.write_text("GARBAGE", encoding="utf-8")
+        recovered = tubeair_inbox._load_state(self.state)
+        self.assertEqual(recovered["processed"]["a"], ["v1"],
+                         "must recover the last-known-good set, not reset to empty")
+
+    def test_missing_primary_with_valid_backup_recovers(self):
+        tubeair_inbox.atomic_write_json(self.state, {"processed": {"a": ["v1"]}})
+        tubeair_inbox.atomic_write_json(self.state, {"processed": {"a": ["v1", "v2"]}})
+        self.state.unlink()  # accidental deletion of the live file
+        recovered = tubeair_inbox._load_state(self.state)
+        self.assertIn("a", recovered["processed"],
+                      "a deleted primary with a good backup must recover, not start empty")
+
+    def test_truly_fresh_returns_empty_not_error(self):
+        # No primary, no backup → genuine first run → empty set (NOT an error).
+        self.assertEqual(tubeair_inbox._load_state(self.state), {"processed": {}})
+
+
+class TestWatcherLedgerDurability(unittest.TestCase):
+    """Fix 1 + Fix 2 for the WATCHER retry ledger: atomic writes, and a corrupt ledger
+    fails loud / recovers from .bak — never silently resets the anti-hammer counters."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.ledger = self.root / "out" / "_watch_retry.json"
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _bak(self):
+        return self.ledger.with_name(self.ledger.name + ".bak")
+
+    def test_ledger_save_is_atomic_and_rotates_backup(self):
+        tubeair_watch._ledger_save(self.ledger, {"attempts": {"k": 1}})
+        tubeair_watch._ledger_save(self.ledger, {"attempts": {"k": 2}})
+        self.assertTrue(self._bak().exists(), "second ledger save must leave a .bak")
+        self.assertEqual(list(self.ledger.parent.glob("*.tmp*")), [],
+                         "atomic ledger write must clean up its temp")
+        self.assertEqual(tubeair_watch._ledger_load(self.ledger)["attempts"]["k"], 2)
+
+    def test_corrupt_ledger_raises_never_silent_empty(self):
+        self.ledger.parent.mkdir(parents=True, exist_ok=True)
+        self.ledger.write_text("not json at all", encoding="utf-8")
+        with self.assertRaises(tubeair_inbox.StateCorruptError):
+            tubeair_watch._ledger_load(self.ledger)
+
+    def test_corrupt_ledger_recovers_from_backup(self):
+        tubeair_watch._ledger_save(self.ledger, {"attempts": {"k": 1}})
+        tubeair_watch._ledger_save(self.ledger, {"attempts": {"k": 2}})
+        self.ledger.write_text("GARBAGE", encoding="utf-8")  # corrupt the primary only
+        recovered = tubeair_watch._ledger_load(self.ledger)
+        self.assertEqual(recovered["attempts"]["k"], 1,
+                         "a corrupt ledger must recover prior counters, not zero them")
+
+    def test_fresh_ledger_is_empty_not_error(self):
+        self.assertEqual(tubeair_watch._ledger_load(self.ledger), {"attempts": {}})
+
+
+# ---------------------------------------------------------------------------
+# Fix 3 + Fix 4 — per-capture isolation in the inbox loop, and PROOF that a
+# raising capture cannot starve/exhaust a healthy sibling.
+# ---------------------------------------------------------------------------
+
+class _RaisingHealthyBase(unittest.TestCase):
+    """Temp inbox where the transcript fetch RAISES for RAISE_VIDEO_ID (an actual
+    exception mid-capture, not an honest 'no captions' failure) and resolves to the
+    fixture for every other id. Every fetch is counted."""
+
+    def setUp(self):
+        self.fetch_counts = {}
+        self._orig_fetch = tubeair.fetch_transcript
+        self._orig_meta = tubeair.fetch_metadata
+
+        def _dispatch(video_id, languages):
+            self.fetch_counts[video_id] = self.fetch_counts.get(video_id, 0) + 1
+            if video_id == RAISE_VIDEO_ID:
+                raise RuntimeError("fixture: transcript fetch blew up mid-capture")
+            return _fake_fetch_transcript(video_id, languages)
+
+        tubeair.fetch_transcript = _dispatch
+        tubeair.fetch_metadata = _fake_fetch_metadata
+
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.inbox = self.root / "inbox"
+        self.inbox.mkdir(parents=True)
+        self.out = self.root / "out"
+        self.state = self.root / "state.json"
+
+    def tearDown(self):
+        tubeair.fetch_transcript = self._orig_fetch
+        tubeair.fetch_metadata = self._orig_meta
+        tubeair_watch._reset_stop()
+        self._tmp.cleanup()
+
+    def _add_capture(self, capture_id, video_id):
+        # capture_id is also the filename stem, so it controls scan_inbox sort order.
+        (self.inbox / f"{capture_id}.md").write_text(
+            _synthetic_capture_text(capture_id, video_id), encoding="utf-8")
+
+    def _inbox_argv(self, *extra):
+        return ["--repo-root", str(self.root), "--inbox", "inbox",
+                "--out", str(self.out), "--state", str(self.state), *extra]
+
+    def _reports_for(self, video_id):
+        return sorted(self.out.glob(f"*/TubeAIR Report *{video_id}.md"))
+
+
+class TestInboxPerCaptureIsolation(_RaisingHealthyBase):
+    def test_raising_capture_isolated_healthy_after_it_still_persists(self):
+        # The RAISING capture sorts BEFORE the healthy one ('aaa' < 'zzz'), so it is
+        # processed FIRST. It must not abort the loop or block the healthy sibling.
+        self._add_capture("aaa-raises", RAISE_VIDEO_ID)
+        self._add_capture("zzz-healthy", VIDEO_ID)
+
+        code = tubeair_inbox.main(self._inbox_argv())
+
+        # The crashing capture surfaces as a retryable non-zero exit...
+        self.assertEqual(code, 2)
+        # ...but the healthy sibling queued AFTER it still produced its packet.
+        self.assertEqual(len(self._reports_for(VIDEO_ID)), 1,
+                         "healthy capture must process despite an earlier raising sibling")
+        # Its success is PERSISTED; the raising one is NOT marked processed.
+        state_txt = self.state.read_text(encoding="utf-8")
+        self.assertIn(VIDEO_ID, state_txt)
+        self.assertNotIn(RAISE_VIDEO_ID, state_txt)
+        # Each was attempted exactly once — the raise neither short-circuited the loop
+        # nor caused the healthy capture to be re-driven.
+        self.assertEqual(self.fetch_counts.get(RAISE_VIDEO_ID), 1)
+        self.assertEqual(self.fetch_counts.get(VIDEO_ID), 1)
+
+    def test_state_is_flushed_after_each_success_not_only_at_end(self):
+        # Two healthy captures with a RAISING capture wedged BETWEEN them. If state
+        # were only saved once at the very end, a crash mid-loop would lose the first
+        # success — so we assert the saver is invoked per-success (incrementally).
+        self._add_capture("aaa-good", VIDEO_ID)
+        self._add_capture("mmm-raises", RAISE_VIDEO_ID)
+        self._add_capture("zzz-good", VIDEO_ID2)
+
+        saves = {"n": 0}
+        real_save = tubeair_inbox._save_state
+
+        def _counting_save(sp, st):
+            saves["n"] += 1
+            return real_save(sp, st)
+
+        tubeair_inbox._save_state = _counting_save
+        self.addCleanup(setattr, tubeair_inbox, "_save_state", real_save)
+
+        code = tubeair_inbox.main(self._inbox_argv())
+
+        self.assertEqual(code, 2, "the wedged raising capture still surfaces exit 2")
+        # Both healthy packets exist and both are persisted; the raise is not.
+        self.assertEqual(len(self._reports_for(VIDEO_ID)), 1)
+        self.assertEqual(len(self._reports_for(VIDEO_ID2)), 1)
+        state_txt = self.state.read_text(encoding="utf-8")
+        self.assertIn(VIDEO_ID, state_txt)
+        self.assertIn(VIDEO_ID2, state_txt)
+        self.assertNotIn(RAISE_VIDEO_ID, state_txt)
+        # >= one save per success proves incremental persistence (2 successes here),
+        # not a single end-of-loop write.
+        self.assertGreaterEqual(saves["n"], 2,
+                                "state must be flushed after each successful capture")
+
+
+class TestRaisingCaptureDoesNotStarveHealthySibling(_RaisingHealthyBase):
+    """Fix 4 — the starvation/exhaustion proof at the WATCHER level. A capture whose
+    fetch RAISES, sorted BEFORE a healthy one, is driven through the watcher across
+    several cycles. The healthy pair must process on the first sweep, persist, and be
+    CLEARED from the retry ledger; the raising pair accrues attempts and eventually
+    exhausts and stops being fetched — it must never starve or exhaust the healthy
+    pair, nor keep the watcher hammering YouTube."""
+
+    def _watch_argv(self, *extra):
+        return ["--repo-root", str(self.root), "--inbox", "inbox",
+                "--out", str(self.out), "--state", str(self.state), *extra]
+
+    def _patch_sleep(self):
+        orig = tubeair_watch._interruptible_sleep
+        tubeair_watch._interruptible_sleep = lambda s: None
+        self.addCleanup(setattr, tubeair_watch, "_interruptible_sleep", orig)
+
+    def test_healthy_processes_and_raiser_exhausts_without_starving_it(self):
+        self._add_capture("aaa-raises", RAISE_VIDEO_ID)  # sorts first → driven first
+        self._add_capture("zzz-healthy", VIDEO_ID)
+        self._patch_sleep()
+
+        # Run enough cycles for the raising pair to hit the retry ceiling and exhaust.
+        code = tubeair_watch.main(self._watch_argv(
+            "--interval", "1", "--max-cycles", str(tubeair_watch.MAX_RETRIES_PER_VIDEO + 3)))
+
+        # Healthy pair: processed on the very first sweep, exactly once, and persisted.
+        self.assertEqual(len(self._reports_for(VIDEO_ID)), 1,
+                         "healthy capture must not be starved by a raising sibling")
+        self.assertEqual(self.fetch_counts.get(VIDEO_ID), 1,
+                         "healthy capture processed once then skipped (already done)")
+        state_txt = self.state.read_text(encoding="utf-8")
+        self.assertIn(VIDEO_ID, state_txt)
+        self.assertNotIn(RAISE_VIDEO_ID, state_txt)
+
+        # Raising pair: fetched at most the retry ceiling, then exhausted → the watcher
+        # stops fetching it (anti-hammer). It never consumed the healthy pair's slot.
+        self.assertEqual(self.fetch_counts.get(RAISE_VIDEO_ID),
+                         tubeair_watch.MAX_RETRIES_PER_VIDEO,
+                         "a permanently raising capture must stop being fetched at the ceiling")
+
+        # The retry ledger cleared the healthy pair (success) and exhausted the raiser.
+        # The ledger is co-located with the inbox state file (sibling _watch_retry.json).
+        ledger = tubeair_watch._ledger_load(
+            self.state.with_name("_watch_retry.json"))["attempts"]
+        healthy_key = tubeair_watch._pair_key("zzz-healthy.md", VIDEO_ID)
+        raiser_key = tubeair_watch._pair_key("aaa-raises.md", RAISE_VIDEO_ID)
+        self.assertNotIn(healthy_key, ledger, "healthy pair must be cleared, never exhausted")
+        self.assertEqual(ledger.get(raiser_key), tubeair_watch.MAX_RETRIES_PER_VIDEO)
 
 
 if __name__ == "__main__":
