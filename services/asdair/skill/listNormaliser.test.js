@@ -186,6 +186,90 @@ const FIXTURES = [
       needs_review: [{ raw: '0 milk', reason: 'non-positive quantity: 0' }]
     }
   },
+  // ---- FIX-FORWARD: adversarial classes both reviewers flagged as missing ----
+  {
+    name: 'trailing xN doubled -> conflict, not a welded name ("milk x2 x3")',
+    raw: 'milk x2 x3',
+    expected: {
+      items: [],
+      needs_review: [{ raw: 'milk x2 x3', reason: 'conflicting quantities: 3 vs 2' }]
+    }
+  },
+  {
+    name: 'trailing xN doubled with a note interleaved ("milk x2 (organic) x3")',
+    raw: 'milk x2 (organic) x3',
+    expected: {
+      items: [],
+      needs_review: [{ raw: 'milk x2 (organic) x3', reason: 'conflicting quantities: 3 vs 2' }]
+    }
+  },
+  {
+    name: 'upper-bound: quantity above the household cap -> needs_review ("1000 eggs")',
+    raw: '1000 eggs',
+    expected: {
+      items: [],
+      needs_review: [{ raw: '1000 eggs', reason: 'implausible quantity: 1000' }]
+    }
+  },
+  {
+    name: 'upper-bound: exactly the cap (999) is still a valid quantity',
+    raw: '999 eggs',
+    expected: {
+      items: [{ item_name: 'eggs', requested_qty: 999, note: '' }],
+      needs_review: []
+    }
+  },
+  {
+    name: 'upper-bound: overflow-scale quantity -> needs_review ("999999999999999999999 milk")',
+    raw: '999999999999999999999 milk',
+    expected: {
+      items: [],
+      needs_review: [{ raw: '999999999999999999999 milk', reason: 'implausible quantity: 1e+21' }]
+    }
+  },
+  {
+    name: 'word-number collision: "seven up" is a product, not 7x "up" -> needs_review',
+    raw: 'seven up',
+    expected: {
+      items: [],
+      needs_review: [{ raw: 'seven up', reason: 'ambiguous word-number vs item name: seven up' }]
+    }
+  },
+  {
+    name: 'word-number collision: "five spice" is a product, not 5x "spice" -> needs_review',
+    raw: 'five spice',
+    expected: {
+      items: [],
+      needs_review: [{ raw: 'five spice', reason: 'ambiguous word-number vs item name: five spice' }]
+    }
+  },
+  {
+    name: 'word-number collision is case/whitespace-insensitive ("Seven   Up")',
+    raw: 'Seven   Up',
+    expected: {
+      items: [],
+      needs_review: [{ raw: 'Seven   Up', reason: 'ambiguous word-number vs item name: seven up' }]
+    }
+  },
+  {
+    name: 'digit form "7 up" is a stronger quantity signal -> left as-is (item)',
+    raw: '7 up',
+    expected: {
+      items: [{ item_name: 'up', requested_qty: 7, note: '' }],
+      needs_review: []
+    }
+  },
+  {
+    name: 'collision guard does NOT regress legit word-number quantities ("two milk", "three eggs")',
+    raw: 'two milk\nthree eggs',
+    expected: {
+      items: [
+        { item_name: 'milk', requested_qty: 2, note: '' },
+        { item_name: 'eggs', requested_qty: 3, note: '' }
+      ],
+      needs_review: []
+    }
+  },
   {
     name: 'a realistic mixed block: items and one review line together',
     raw: [
@@ -253,6 +337,43 @@ test('invariant: every item has a positive-integer requested_qty', function () {
 // ---------------------------------------------------------------------
 // Targeted edge cases and empty/nullish input.
 // ---------------------------------------------------------------------
+// ---------------------------------------------------------------------
+// FIX-FORWARD: explicit NEVER-DROP audit over the adversarial classes.
+// Every non-blank line must resolve to EXACTLY one item or one review, and
+// every review must preserve its raw line and carry a non-empty reason.
+// ---------------------------------------------------------------------
+test('NEVER-DROP audit: adversarial lines each yield exactly one item or one review', function () {
+  const adversarial = [
+    'milk x2 x3',                    // trailing conflict        -> review
+    'milk x2 (organic) x3',          // interleaved-note conflict -> review
+    '999999999999999999999 milk',    // overflow-scale qty        -> review
+    '1000 eggs',                     // over the cap              -> review
+    'seven up',                      // word-number collision     -> review
+    'five spice',                    // word-number collision     -> review
+    '7 up',                          // digit form                -> item
+    'two milk',                      // legit word-number qty     -> item
+    '999 eggs'                       // exactly the cap           -> item
+  ].join('\n');
+
+  const out = normaliseRawList(adversarial);
+  const nonBlank = adversarial
+    .split(/\r\n|\r|\n/)
+    .map(function (l) { return _internal.stripPrefix(l.trim()).trim(); })
+    .filter(function (l) { return l !== ''; }).length;
+
+  assert.equal(out.items.length + out.needs_review.length, nonBlank,
+    'no adversarial line is dropped or split into two rows');
+  assert.equal(out.items.length, 3);
+  assert.equal(out.needs_review.length, 6);
+
+  for (const r of out.needs_review) {
+    assert.equal(typeof r.raw, 'string');
+    assert.equal(r.raw.length > 0, true, 'review preserves the raw line');
+    assert.equal(typeof r.reason, 'string');
+    assert.equal(r.reason.length > 0, true, 'review carries a reason');
+  }
+});
+
 test('empty / nullish input returns empty structures, never throws', function () {
   assert.deepEqual(normaliseRawList(''), { items: [], needs_review: [] });
   assert.deepEqual(normaliseRawList('   \n\t\n'), { items: [], needs_review: [] });
@@ -297,6 +418,11 @@ test('helper extractQuantities finds each leading/trailing form', function () {
   assert.deepEqual(_internal.extractQuantities('milk x2'), { qtys: [2], rest: 'milk' });
   assert.deepEqual(_internal.extractQuantities('two milk'), { qtys: [2], rest: 'milk' });
   assert.deepEqual(_internal.extractQuantities('milk'), { qtys: [], rest: 'milk' });
+});
+
+test('helper extractQuantities LOOPS trailing xN (doubled form -> two qtys)', function () {
+  // A single trailing pass would keep "milk x2" as rest and only qtys [3].
+  assert.deepEqual(_internal.extractQuantities('milk x2 x3'), { qtys: [3, 2], rest: 'milk' });
 });
 
 test('helper extractParentheticals splits numeric qty from a text note', function () {

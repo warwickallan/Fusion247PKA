@@ -73,6 +73,31 @@ const WORD_NUMBERS = {
   nineteen: 19, twenty: 20
 };
 
+// Known WORD-NUMBER COLLISIONS: product names whose first token is also a
+// spelled-out number, so the leading word-number extractor would otherwise
+// read the number as a quantity and the product's tail as the item
+// ("seven up" -> qty 7 x "up"; "five spice" -> qty 5 x "spice"). Both are
+// real grocery items, so in the NEVER-GUESS spirit these route to review.
+//
+// We use an explicit, curated exception list rather than the broader rule
+// "any leading word-number followed by a single-token remainder -> review".
+// That broader rule is unsafe here because it also flags LEGITIMATE
+// quantities with a single-token item ("two milk", "three eggs") -- both of
+// which are existing, correct fixtures. Digit forms ("7 up") are left alone:
+// a typed digit is a much stronger quantity signal than a spelled word.
+// Keys are the fully normalised (lower-cased, single-spaced) phrase.
+const WORD_NUMBER_COLLISIONS = {
+  'seven up': true,   // 7 Up (soft drink)
+  'five spice': true  // Chinese five-spice blend
+};
+
+// Upper sanity bound on an explicit quantity. A household shopping list will
+// never legitimately request more than this; a value above it (or one that
+// has lost integer precision past Number.MAX_SAFE_INTEGER) is far likelier a
+// typo or an OCR run-on than a real request, so it routes to review. This is
+// the symmetric partner of the existing non-positive ("0 milk") guard.
+const MAX_QTY = 999;
+
 // ---------------------------------------------------------------------
 // Prefix stripping (bullets and ordinals)
 //
@@ -159,11 +184,18 @@ function extractQuantities(coreIn) {
   let working = collapseWs(coreIn);
   const qtys = [];
 
-  // trailing " xN" (consumed once)
-  const trailing = working.match(/(?:^|\s)x\s*(\d+)\s*$/i);
-  if (trailing) {
+  // trailing " xN", consumed REPEATEDLY until none remains. A single pass
+  // would leave a second trailing form welded into the name: "milk x2 x3"
+  // would strip only " x3" and keep "milk x2" as the item. Looping surfaces
+  // BOTH quantities so a doubled trailing form ("milk x2 x3", or with a note
+  // interleaved "milk x2 (organic) x3" once the paren is stripped upstream)
+  // becomes a conflict in the caller rather than a silently guessed qty. The
+  // leading loop below already works this way; the two are now symmetric.
+  let trailing = working.match(/(?:^|\s)x\s*(\d+)\s*$/i);
+  while (trailing) {
     qtys.push(parseInt(trailing[1], 10));
     working = working.slice(0, trailing.index).trim();
+    trailing = working.match(/(?:^|\s)x\s*(\d+)\s*$/i);
   }
 
   // leading quantities, consumed repeatedly until none remains
@@ -186,6 +218,20 @@ function extractQuantities(coreIn) {
 // ---------------------------------------------------------------------
 function parseLine(line) {
   const paren = extractParentheticals(line);
+
+  // Word-number collision guard (runs BEFORE quantity extraction): if the
+  // whole paren-stripped line is a known product whose first token is a
+  // spelled number ("seven up", "five spice"), do not let the leading
+  // word-number extractor split it. The check is on the fully normalised
+  // phrase so it is case- and whitespace-insensitive, and it fires whether
+  // or not a trailing note was present ("seven up (organic)" strips to the
+  // same key). Digit forms ("7 up") never match a key and pass straight
+  // through as a real quantity.
+  const collisionKey = normaliseItemName(paren.stripped);
+  if (Object.prototype.hasOwnProperty.call(WORD_NUMBER_COLLISIONS, collisionKey)) {
+    return { kind: 'review', reason: 'ambiguous word-number vs item name: ' + collisionKey };
+  }
+
   const quant = extractQuantities(paren.stripped);
 
   const allQtys = paren.qtys.concat(quant.qtys);
@@ -200,6 +246,13 @@ function parseLine(line) {
   // A single explicit non-positive quantity ("0 milk") is ambiguous.
   if (distinct.length === 1 && distinct[0] < 1) {
     return { kind: 'review', reason: 'non-positive quantity: ' + distinct[0] };
+  }
+  // A single explicit quantity above the household sanity cap (or one that
+  // has overflowed integer precision) is implausible -> review. Symmetric
+  // with the non-positive guard above; keeps "999999999999999999999 milk"
+  // out of the item list instead of asserting a nonsense 1e21 request.
+  if (distinct.length === 1 && distinct[0] > MAX_QTY) {
+    return { kind: 'review', reason: 'implausible quantity: ' + distinct[0] };
   }
   // A quantity (or nothing) but no item text ("x2", "(2)", "5") -> review.
   if (!hasLetter(item_name)) {
