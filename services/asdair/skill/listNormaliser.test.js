@@ -11,8 +11,11 @@
 // Exercises normaliseRawList across:
 //   * every quantity form: "2x milk", "milk x2", "milk (2)", "2 milk",
 //     "two milk"
-//   * bullet + numbered prefixes ("- ", "* ", "1. ") and the ordinal-vs-
-//     quantity distinction ("1. milk" -> qty 1 ; "2 milk" -> qty 2)
+//   * bullet + numbered prefixes ("- ", "* ", "1. ", "2. ", "3) ") as LIST
+//     MARKERS: a whole numbered list parses as ordinary items at qty 1, while
+//     a bare number with no "."/")" ("2 milk") IS a quantity of 2
+//   * the leading word-number heuristic: single token -> quantity ("two milk");
+//     multiple tokens -> review ("four cheese pizza"); digit forms exempt
 //   * blank / whitespace-only lines (skipped, never reviewed)
 //   * a trailing note via a parenthetical
 //   * default qty = 1
@@ -20,9 +23,8 @@
 //   * ambiguous lines landing in needs_review (conflicting qty, no item)
 //   * STRICTER BAR (2026-07-20): malformed numeric-looking tokens -> review,
 //     NEVER silent qty 1 -- signed ("+2 milk", "-2 milk"), decimal
-//     ("1.5 milk", "2.5 milk"), unicode/fullwidth + Arabic-indic digits,
-//     ambiguous ordinal-vs-quantity ("2. milk"); and marker-only lines
-//     ("-", "5.", "2)") surfaced to review, NEVER dropped.
+//     ("1.5 milk", "2.5 milk"), unicode/fullwidth + Arabic-indic digits; and
+//     marker-only lines ("-", "5.", "2)") surfaced to review, NEVER dropped.
 //
 // PURE ASCII source only. The unicode-digit fixtures are written with \u
 // escapes ("\uFF12" fullwidth two, "\u0662" Arabic-indic two) so this source
@@ -277,6 +279,44 @@ const FIXTURES = [
       needs_review: []
     }
   },
+  // ---- word-number heuristic: leading spelled number + MULTIPLE tokens ----
+  // A spelled leading number followed by more than one token is ambiguous
+  // between a quantity and a product name; it routes to review, NEVER a silent
+  // truncated-name quantity ("four cheese pizza" must not become 4 x "cheese
+  // pizza"). Single-token spelled forms ("two milk") and digit forms ("4 cheese
+  // pizza") are unaffected.
+  {
+    name: 'word-number ambiguity: "four cheese pizza" (multi-token) -> review, never 4x "cheese pizza"',
+    raw: 'four cheese pizza',
+    expected: {
+      items: [],
+      needs_review: [{ raw: 'four cheese pizza', reason: 'ambiguous word-number vs item name: four cheese pizza' }]
+    }
+  },
+  {
+    name: 'word-number ambiguity: "six pack beer" (multi-token) -> review, never 6x "pack beer"',
+    raw: 'six pack beer',
+    expected: {
+      items: [],
+      needs_review: [{ raw: 'six pack beer', reason: 'ambiguous word-number vs item name: six pack beer' }]
+    }
+  },
+  {
+    name: 'word-number single-token stays a quantity ("twenty apples" -> 20)',
+    raw: 'twenty apples',
+    expected: {
+      items: [{ item_name: 'apples', requested_qty: 20, note: '' }],
+      needs_review: []
+    }
+  },
+  {
+    name: 'digit form is EXEMPT: "4 cheese pizza" stays 4 x "cheese pizza" (stronger signal)',
+    raw: '4 cheese pizza',
+    expected: {
+      items: [{ item_name: 'cheese pizza', requested_qty: 4, note: '' }],
+      needs_review: []
+    }
+  },
   // ---- STRICTER BAR (2026-07-20): malformed numeric-looking tokens ----
   // Every one of these previously silently became an item at qty 1 (or, for
   // marker-only lines, was silently dropped). Under the raised NEVER-GUESS /
@@ -345,24 +385,40 @@ const FIXTURES = [
       needs_review: [{ raw: 'milk \uFF12', reason: 'malformed quantity syntax: \uFF12' }]
     }
   },
+  // A numbered-list marker of ANY magnitude is a LIST MARKER, not a quantity:
+  // it is stripped and the item parses at qty 1. This is what makes a real
+  // numbered list parse as ordinary items (regression: the prior pass wrongly
+  // sent "2." / "3)" list items to review).
   {
-    name: 'ambiguous ordinal: "2. milk" (ordinal-vs-quantity) -> review, never qty 1',
+    name: 'numbered-list marker "2. milk" is a list marker -> item at qty 1 (NOT review)',
     raw: '2. milk',
     expected: {
-      items: [],
-      needs_review: [{ raw: '2. milk', reason: 'ambiguous ordinal vs quantity: 2' }]
+      items: [{ item_name: 'milk', requested_qty: 1, note: '' }],
+      needs_review: []
     }
   },
   {
-    name: 'ambiguous ordinal: "3) eggs" (paren ordinal > 1) -> review',
+    name: 'numbered-list marker "3) eggs" is a list marker -> item at qty 1 (NOT review)',
     raw: '3) eggs',
     expected: {
-      items: [],
-      needs_review: [{ raw: '3) eggs', reason: 'ambiguous ordinal vs quantity: 3' }]
+      items: [{ item_name: 'eggs', requested_qty: 1, note: '' }],
+      needs_review: []
     }
   },
   {
-    name: 'ordinal of exactly 1 stays an unambiguous item ("1. milk" -> qty 1)',
+    name: 'a FULL numbered list (1./2./3.) parses as three items at qty 1',
+    raw: '1. jam\n2. bread\n3. milk',
+    expected: {
+      items: [
+        { item_name: 'jam', requested_qty: 1, note: '' },
+        { item_name: 'bread', requested_qty: 1, note: '' },
+        { item_name: 'milk', requested_qty: 1, note: '' }
+      ],
+      needs_review: []
+    }
+  },
+  {
+    name: 'numbered-list marker "1. milk" stays an item at qty 1',
     raw: '1. milk',
     expected: {
       items: [{ item_name: 'milk', requested_qty: 1, note: '' }],

@@ -31,9 +31,15 @@
 //     is not a clean supported positive-integer form. Conflicting quantities,
 //     and malformed numeric-looking tokens -- SIGNED (`+2`, `-2`), DECIMAL
 //     (`1.5`, `2.5`, `2.`), NON-ASCII / UNICODE digits (fullwidth, Arabic-
-//     indic), and an ordinal marker whose number is > 1 (`2. milk`, `3) eggs`,
-//     ambiguous ordinal-vs-quantity) -- all send the line to `needs_review`
-//     untouched.
+//     indic) -- all send the line to `needs_review` untouched.
+//   * A NUMBERED-LIST marker ("1. ", "2. ", "3) ") is a list marker, NOT a
+//     quantity: it is stripped and the item parses normally at qty 1, so a real
+//     numbered list ("1. jam / 2. bread / 3. milk") yields ordinary items. Only
+//     a marker-ONLY line (no item text after stripping: "5.", "-") -> review.
+//   * A SPELLED-OUT leading word-number is only read as a quantity when a
+//     SINGLE token follows ("two milk" -> 2). Followed by MULTIPLE tokens
+//     ("four cheese pizza", "six pack beer") it is ambiguous -> review, never a
+//     silent guessed quantity. Digit forms ("4 cheese pizza") are exempt.
 //   * A line with NO numeric-looking leading/trailing token at all defaults
 //     to requested_qty = 1. A bare in-name integer that is not a quantity
 //     form ("omega 3", "2x4 timber") stays part of the item name.
@@ -154,10 +160,11 @@ const MAX_QTY = 999;
 // are no longer skipped: the caller surfaces them to `needs_review` (reason
 // `marker-only line`) so nothing is silently dropped.
 //
-// Note on ordinal magnitude: stripPrefix removes ANY "N." / "N)" marker, but
-// the caller treats an ordinal whose number is > 1 ("2. milk") as ambiguous
-// (ordinal-vs-quantity) and routes it to review. Only an ordinal of exactly 1
-// is unambiguous (its number equals the default qty) and passes through here.
+// Note on ordinal magnitude: stripPrefix removes ANY "N." / "N)" marker of ANY
+// magnitude, because a numbered-list marker is never a quantity. "2. milk" and
+// "3) eggs" therefore strip to "milk" / "eggs" and parse as ordinary items at
+// qty 1 -- a real numbered list parses as a list. (Contrast "2 milk", a bare
+// number with no "." / ")", which IS a quantity of 2.)
 // ---------------------------------------------------------------------
 function stripPrefix(s) {
   return s
@@ -279,6 +286,32 @@ function parseLine(line) {
     return { kind: 'review', reason: 'ambiguous word-number vs item name: ' + collisionKey };
   }
 
+  // Leading word-number ambiguity heuristic (runs BEFORE quantity extraction).
+  // A SPELLED-OUT leading number ("two", "four", "six") is only an unambiguous
+  // quantity when EXACTLY ONE token follows it: "two milk" -> 2 x milk,
+  // "twenty apples" -> 20 x apples. When MULTIPLE tokens follow, the leading
+  // word could equally be part of the product name ("four cheese pizza",
+  // "six pack beer"), so -- in the NEVER-GUESS spirit -- the line routes to
+  // review rather than silently asserting a quantity and a truncated name
+  // (which is what "four cheese pizza" -> 4 x "cheese pizza" would do).
+  //
+  // Scope is deliberately narrow:
+  //   * DIGIT forms are EXEMPT ("4 cheese pizza" stays 4 x "cheese pizza"): a
+  //     typed digit is a far stronger quantity signal than a spelled word, so
+  //     the current digit behaviour is preserved unchanged.
+  //   * SINGLE-token spelled forms pass through here and are resolved by the
+  //     normal extractor, so legit quantities ("two milk", "three eggs") are
+  //     untouched. The curated WORD_NUMBER_COLLISIONS list above still handles
+  //     the single-token product collisions ("seven up", "five spice").
+  const leadToks = collapseWs(paren.stripped).split(' ').filter(function (x) { return x !== ''; });
+  if (leadToks.length > 2 &&
+      Object.prototype.hasOwnProperty.call(WORD_NUMBERS, leadToks[0].toLowerCase())) {
+    return {
+      kind: 'review',
+      reason: 'ambiguous word-number vs item name: ' + normaliseItemName(paren.stripped)
+    };
+  }
+
   const quant = extractQuantities(paren.stripped);
 
   const allQtys = paren.qtys.concat(quant.qtys);
@@ -350,20 +383,14 @@ function normaliseRawList(text) {
       continue;
     }
 
-    // Ordinal-vs-quantity ambiguity guard. A numbered-list marker whose number
-    // is > 1 ("2. milk", "3) eggs") is ambiguous between the Nth ordinal and a
-    // quantity of N. Only an ordinal of exactly 1 is unambiguous (its number
-    // coincides with the default qty), so > 1 -> review. Checked on the raw
-    // (pre-strip) trimmed line; marker-only ordinals were already handled above.
-    const ordinal = trimmed.match(/^\s*(\d+)[.)](?:\s+|$)/);
-    if (ordinal !== null && parseInt(ordinal[1], 10) > 1) {
-      needs_review.push({
-        raw: trimmed,
-        reason: 'ambiguous ordinal vs quantity: ' + parseInt(ordinal[1], 10)
-      });
-      continue;
-    }
-
+    // A numbered-list marker ("1. ", "2. ", "3) ") is a LIST MARKER, not a
+    // quantity: stripPrefix has already removed it, so the residual item text
+    // parses normally and defaults to qty 1 (unless it carries its own quantity
+    // form). This is what makes a real numbered list ("1. jam\n2. bread\n3. milk")
+    // parse as three ordinary items at qty 1 rather than sending items 2 and 3
+    // to review. A marker whose line has NO item text after stripping ("5.",
+    // "2)", "-") is caught by the `core === ''` marker-only branch above and
+    // surfaced to needs_review; it is never dropped.
     const parsed = parseLine(core);
     if (parsed.kind === 'item') {
       items.push({
