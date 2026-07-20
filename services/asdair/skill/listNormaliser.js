@@ -19,14 +19,27 @@
 //   * Given identical input text it always returns an identical result.
 //   * No side effects; it only reads its argument and returns a value.
 //
-// HARD GUARANTEES:
-//   * It NEVER silently drops a line. Every non-blank line becomes either
-//     one `items` entry or one `needs_review` entry.
-//   * It NEVER guesses an ambiguous quantity. Conflicting or malformed
-//     quantity signals send the line to `needs_review` untouched.
-//   * A line with no explicit quantity defaults to requested_qty = 1.
+// HARD GUARANTEES (stricter bar, 2026-07-20):
+//   * It NEVER silently drops a line. Every non-blank line -- INCLUDING a
+//     line that reduces to only a list marker/ordinal ("-", "*", "5.", "2)")
+//     -- becomes EXACTLY one `items` entry or one `needs_review` entry.
+//     Marker-only lines are surfaced to `needs_review` (reason
+//     `marker-only line`), NEVER dropped. (This supersedes the earlier
+//     "documented skip" behaviour for lone markers.)
+//   * It NEVER guesses an ambiguous quantity, and it NEVER silently defaults
+//     to qty 1 when a leading/trailing token merely LOOKS like a quantity but
+//     is not a clean supported positive-integer form. Conflicting quantities,
+//     and malformed numeric-looking tokens -- SIGNED (`+2`, `-2`), DECIMAL
+//     (`1.5`, `2.5`, `2.`), NON-ASCII / UNICODE digits (fullwidth, Arabic-
+//     indic), and an ordinal marker whose number is > 1 (`2. milk`, `3) eggs`,
+//     ambiguous ordinal-vs-quantity) -- all send the line to `needs_review`
+//     untouched.
+//   * A line with NO numeric-looking leading/trailing token at all defaults
+//     to requested_qty = 1. A bare in-name integer that is not a quantity
+//     form ("omega 3", "2x4 timber") stays part of the item name.
 //
-// PURE ASCII only.
+// PURE ASCII only (unicode-digit handling is done via property escapes; the
+// source stays ASCII).
 // =====================================================================
 
 'use strict';
@@ -52,6 +65,33 @@ function normaliseItemName(value) {
 // "2", "###", or an emptied string are NOT items -> needs_review.
 function hasLetter(value) {
   return /[a-z]/i.test(value);
+}
+
+// A whitespace-delimited token that LOOKS like a quantity but is NOT one of
+// the clean supported positive-integer forms. Used to guard the residual item
+// text's leading/trailing token so a numeric-looking scrap is surfaced to
+// review instead of being silently swallowed into the name at qty 1.
+//
+// Flags (all -> needs_review):
+//   * SIGNED integer .............. "+2", "-2", "+10"
+//   * DECIMAL / dotted number ..... "1.5", "2.5", ".5", "2.", "-2.5"
+//   * NON-ASCII / UNICODE digits ... fullwidth "\uFF12", Arabic-indic "\u0662"
+//     (a token made ENTIRELY of decimal digits where at least one digit is not
+//      ASCII 0-9). A plain ASCII integer ("3" in "omega 3") is NOT flagged --
+//      that is a legitimate in-name number, not a malformed quantity.
+// It deliberately does NOT flag mixed alnum tokens ("2x4", "b12") or clean
+// ASCII integers; those are handled elsewhere or are legitimate item text.
+function isMalformedNumericToken(t) {
+  if (typeof t !== 'string' || t === '') return false;
+  // signed integer: "+2", "-2"
+  if (/^[+-]\d+$/.test(t)) return true;
+  // decimal / dotted number, optionally signed: "1.5", ".5", "2.", "-2.5"
+  if (/^[+-]?(?:\d+\.\d*|\.\d+)$/.test(t)) return true;
+  // token made entirely of decimal digits, at least one of them non-ASCII
+  // (fullwidth / Arabic-indic / etc.). \p{Nd} = any Unicode decimal digit;
+  // [^\P{Nd}0-9] = a Unicode digit that is not ASCII 0-9.
+  if (/^\p{Nd}+$/u.test(t) && /[^\P{Nd}0-9]/u.test(t)) return true;
+  return false;
 }
 
 // Return the distinct numeric values in order of first appearance.
@@ -102,7 +142,7 @@ const MAX_QTY = 999;
 // Prefix stripping (bullets and ordinals)
 //
 // Removes a leading list marker so it is never mistaken for content:
-//   * "- ", "* ", bullet "• "  -> dash / star / bullet
+//   * "- ", "* ", bullet "\u2022 "  -> dash / star / bullet
 //   * "1. ", "2) "                  -> NUMBERED ORDINAL. The number here is
 //                                      an ordinal, NOT a quantity, so it is
 //                                      dropped. This is what distinguishes
@@ -110,11 +150,18 @@ const MAX_QTY = 999;
 //                                      "2 milk" (bare number -> qty 2).
 // The ordinal form requires the "." / ")" to be followed by whitespace or
 // end-of-line, so a decimal like "1.5 milk" is never split, yet a line that
-// is ONLY a marker ("-" or "1.") collapses to empty and is skipped as blank.
+// is ONLY a marker ("-" or "1.") collapses to empty. Such marker-only lines
+// are no longer skipped: the caller surfaces them to `needs_review` (reason
+// `marker-only line`) so nothing is silently dropped.
+//
+// Note on ordinal magnitude: stripPrefix removes ANY "N." / "N)" marker, but
+// the caller treats an ordinal whose number is > 1 ("2. milk") as ambiguous
+// (ordinal-vs-quantity) and routes it to review. Only an ordinal of exactly 1
+// is unambiguous (its number equals the default qty) and passes through here.
 // ---------------------------------------------------------------------
 function stripPrefix(s) {
   return s
-    .replace(/^\s*[-*•](?:\s+|$)/, '')
+    .replace(/^\s*[-*\u2022](?:\s+|$)/, '')
     .replace(/^\s*\d+[.)](?:\s+|$)/, '');
 }
 
@@ -254,6 +301,23 @@ function parseLine(line) {
   if (distinct.length === 1 && distinct[0] > MAX_QTY) {
     return { kind: 'review', reason: 'implausible quantity: ' + distinct[0] };
   }
+  // Malformed numeric-looking residue guard. After the clean quantity forms
+  // have been consumed, if the LEADING or TRAILING token of the residual item
+  // text still looks like a quantity but is not a clean supported form
+  // (signed "+2"/"-2", decimal "1.5"/"2.", or a non-ASCII/unicode digit like
+  // "\uFF12"/"\u0662"), the line is ambiguous -> review. It is NEVER silently defaulted
+  // to qty 1. Checked on the raw residual (pre-lowercase) tokens.
+  const restToks = collapseWs(quant.rest).split(' ').filter(function (x) { return x !== ''; });
+  if (restToks.length > 0) {
+    const leadTok = restToks[0];
+    const tailTok = restToks[restToks.length - 1];
+    if (isMalformedNumericToken(leadTok)) {
+      return { kind: 'review', reason: 'malformed quantity syntax: ' + leadTok };
+    }
+    if (isMalformedNumericToken(tailTok)) {
+      return { kind: 'review', reason: 'malformed quantity syntax: ' + tailTok };
+    }
+  }
   // A quantity (or nothing) but no item text ("x2", "(2)", "5") -> review.
   if (!hasLetter(item_name)) {
     return { kind: 'review', reason: 'no item text' };
@@ -276,10 +340,29 @@ function normaliseRawList(text) {
   for (let i = 0; i < lines.length; i++) {
     const original = lines[i];
     const trimmed = original.trim();
-    if (trimmed === '') continue;             // blank line -> skipped, never reviewed
+    if (trimmed === '') continue;             // truly blank line -> skipped, never reviewed
 
     const core = stripPrefix(trimmed).trim();
-    if (core === '') continue;                // a lone bullet marker -> nothing to capture
+    if (core === '') {
+      // A non-blank line that reduces to only a marker/ordinal ("-", "*",
+      // "5.", "2)") is surfaced, NEVER silently dropped.
+      needs_review.push({ raw: trimmed, reason: 'marker-only line' });
+      continue;
+    }
+
+    // Ordinal-vs-quantity ambiguity guard. A numbered-list marker whose number
+    // is > 1 ("2. milk", "3) eggs") is ambiguous between the Nth ordinal and a
+    // quantity of N. Only an ordinal of exactly 1 is unambiguous (its number
+    // coincides with the default qty), so > 1 -> review. Checked on the raw
+    // (pre-strip) trimmed line; marker-only ordinals were already handled above.
+    const ordinal = trimmed.match(/^\s*(\d+)[.)](?:\s+|$)/);
+    if (ordinal !== null && parseInt(ordinal[1], 10) > 1) {
+      needs_review.push({
+        raw: trimmed,
+        reason: 'ambiguous ordinal vs quantity: ' + parseInt(ordinal[1], 10)
+      });
+      continue;
+    }
 
     const parsed = parseLine(core);
     if (parsed.kind === 'item') {
@@ -305,6 +388,7 @@ module.exports = {
     stripPrefix: stripPrefix,
     extractParentheticals: extractParentheticals,
     extractQuantities: extractQuantities,
+    isMalformedNumericToken: isMalformedNumericToken,
     parseLine: parseLine,
     WORD_NUMBERS: WORD_NUMBERS
   }
