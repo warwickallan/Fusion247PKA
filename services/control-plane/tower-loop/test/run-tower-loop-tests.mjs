@@ -49,7 +49,10 @@ const TERMINAL = new Set(['reviewed', 'acted', 'blocked', 'awaiting_warwick', 'c
 function spawnWatcher(watcherId, extraEnv = {}) {
   const child = spawn(process.execPath, ['watcher.mjs'], {
     cwd: LOOP_DIR,
-    env: { ...process.env, ...DOUBLES_ENV, WATCHER_ID: watcherId, WATCHER_POLL_MS: '400', WATCHER_LEASE_SECONDS: '20', ...extraEnv },
+    // watcher.mjs reads ONLY CONTROL_PLANE_DEV_DATABASE_URL; the harness resolves DB_URL from
+    // either CONTROL_PLANE_DEV_DATABASE_URL or DATABASE_URL (CI sets the latter), so propagate
+    // the resolved value to the child explicitly — otherwise CI-spawned watchers FATAL "unset".
+    env: { ...process.env, ...DOUBLES_ENV, CONTROL_PLANE_DEV_DATABASE_URL: DB_URL, WATCHER_ID: watcherId, WATCHER_POLL_MS: '400', WATCHER_LEASE_SECONDS: '20', ...extraEnv },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   const tag = `[${watcherId}]`;
