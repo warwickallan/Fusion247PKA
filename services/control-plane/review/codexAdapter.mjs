@@ -35,12 +35,17 @@ export const CODEX_EXEC_FLAGS = Object.freeze([
   'exec', '--sandbox', 'read-only', '--skip-git-repo-check', '--ignore-user-config', '--json',
 ]);
 
-// The QA reviewer result schema handed to `codex --output-schema` (STRICT mode:
-// every object closed, every property required).
+// The SHARED reviewer result schema handed to `codex --output-schema` (STRICT mode: every object
+// closed, every property required) AND embedded in the Fable prompt in-band. PR-2b completion extends
+// it to match the fail-closed prompt: EXPLICIT machine-readable answers — per-acceptance results,
+// per-prior-finding dispositions, and three-axis-CLASSIFIED findings (technical impact / reachability /
+// required disposition + a stated baseline, per the APPROVED reviewer-classification amendment) — so
+// the answers live in typed arrays, never buried in `summary`. The runtime (review/reviewClassification
+// .mjs::validateReviewerResult) validates these FAIL-CLOSED and persists them to the append-only records.
 export const CODEX_RESULT_SCHEMA = Object.freeze({
   type: 'object',
   additionalProperties: false,
-  required: ['verdict', 'summary', 'claims_verified', 'findings', 'proposed_action'],
+  required: ['verdict', 'summary', 'claims_verified', 'acceptance_results', 'prior_finding_results', 'findings', 'proposed_action'],
   properties: {
     verdict: { type: 'string', enum: ['approve', 'request_changes', 'comment'] },
     summary: { type: 'string' },
@@ -56,16 +61,50 @@ export const CODEX_RESULT_SCHEMA = Object.freeze({
         },
       },
     },
+    // One result per acceptance criterion (acceptance-FIRST). acceptance_row_id = the criterion's ref
+    // (e.g. AC-01) or its row id, as staged in the packet.
+    acceptance_results: {
+      type: 'array',
+      items: {
+        type: 'object', additionalProperties: false,
+        required: ['acceptance_row_id', 'result', 'rationale', 'evidence'],
+        properties: {
+          acceptance_row_id: { type: 'string' },
+          result: { type: 'string', enum: ['pass', 'fail', 'partial', 'blocked', 'not_applicable'] },
+          rationale: { type: 'string' },
+          evidence: { type: 'string' },
+        },
+      },
+    },
+    // One disposition per PRIOR OPEN finding staged in the packet (no silent carry-over).
+    prior_finding_results: {
+      type: 'array',
+      items: {
+        type: 'object', additionalProperties: false,
+        required: ['finding_id', 'status', 'rationale'],
+        properties: {
+          finding_id: { type: 'string' },
+          status: { type: 'string', enum: ['addressed', 'remains_open', 'unrelated'] },
+          rationale: { type: 'string' },
+        },
+      },
+    },
+    // NEW findings, each carrying the three-axis classification + a stated deployment baseline (R2).
     findings: {
       type: 'array',
       items: {
         type: 'object', additionalProperties: false,
-        required: ['id', 'severity', 'evidence', 'rationale', 'required_correction'],
+        required: ['id', 'technical_impact', 'reachability', 'required_disposition', 'assumed_deployment_baseline', 'evidence', 'required_correction'],
         properties: {
           id: { type: 'string' },
-          severity: { type: 'string', enum: ['critical', 'high', 'medium', 'low', 'info'] },
+          technical_impact: { type: 'string', enum: ['BLOCKER', 'HIGH', 'MEDIUM', 'LOW', 'NOTE'] },
+          reachability: { type: 'string', enum: ['ACTIVE', 'LATENT', 'HYPOTHETICAL'] },
+          required_disposition: {
+            type: 'string',
+            enum: ['BLOCKS_CURRENT_MERGE', 'REQUIRED_BEFORE_LIVE', 'REQUIRED_BEFORE_EXTERNAL_OR_UNTRUSTED_ACCESS', 'TRACKED_FOLLOWUP', 'NOTE_ONLY'],
+          },
+          assumed_deployment_baseline: { type: 'string' },
           evidence: { type: 'string' },
-          rationale: { type: 'string' },
           required_correction: { type: 'string' },
         },
       },
@@ -197,8 +236,16 @@ export function buildCodexPrompt({ skillText, packet = {} }) {
     'the staged diff is your primary evidence, so do NOT report "blocked" merely because you',
     'could not run git/pwsh yourself. Only return a blocked/"unverifiable" outcome if the diff',
     'itself is absent or insufficient to judge the claim. Compare Larry\'s claims against the',
-    'staged changes. Return ONLY JSON conforming to the provided output schema. Keep it',
-    'compact — a verdict, per-claim status, and severity-classified findings; not an essay.',
+    'staged changes. Return ONLY JSON conforming to the provided output schema. Keep it compact.',
+    'FAIL-CLOSED OUTPUT CONTRACT (answers in typed arrays, NEVER buried in summary):',
+    '  · acceptance_results[]: one {acceptance_row_id, result, rationale, evidence} for EVERY staged',
+    '    acceptance criterion — a missing one BLOCKS the review.',
+    '  · prior_finding_results[]: one {finding_id, status, rationale} for EVERY staged prior open',
+    '    finding — an omitted disposition BLOCKS the review (no silent carry-over).',
+    '  · findings[]: each carries technical_impact + reachability + required_disposition +',
+    '    assumed_deployment_baseline (the three-judgement classifier). The DISPOSITION, not the',
+    '    severity, decides the merge: only a BLOCKS_CURRENT_MERGE finding (or a failed acceptance)',
+    '    blocks; an improvement (NOTE_ONLY / TRACKED_FOLLOWUP) never blocks.',
   ].join('\n');
 }
 
