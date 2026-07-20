@@ -19,14 +19,33 @@
 //   * Given identical input text it always returns an identical result.
 //   * No side effects; it only reads its argument and returns a value.
 //
-// HARD GUARANTEES:
-//   * It NEVER silently drops a line. Every non-blank line becomes either
-//     one `items` entry or one `needs_review` entry.
-//   * It NEVER guesses an ambiguous quantity. Conflicting or malformed
-//     quantity signals send the line to `needs_review` untouched.
-//   * A line with no explicit quantity defaults to requested_qty = 1.
+// HARD GUARANTEES (stricter bar, 2026-07-20):
+//   * It NEVER silently drops a line. Every non-blank line -- INCLUDING a
+//     line that reduces to only a list marker/ordinal ("-", "*", "5.", "2)")
+//     -- becomes EXACTLY one `items` entry or one `needs_review` entry.
+//     Marker-only lines are surfaced to `needs_review` (reason
+//     `marker-only line`), NEVER dropped. (This supersedes the earlier
+//     "documented skip" behaviour for lone markers.)
+//   * It NEVER guesses an ambiguous quantity, and it NEVER silently defaults
+//     to qty 1 when a leading/trailing token merely LOOKS like a quantity but
+//     is not a clean supported positive-integer form. Conflicting quantities,
+//     and malformed numeric-looking tokens -- SIGNED (`+2`, `-2`), DECIMAL
+//     (`1.5`, `2.5`, `2.`), NON-ASCII / UNICODE digits (fullwidth, Arabic-
+//     indic) -- all send the line to `needs_review` untouched.
+//   * A NUMBERED-LIST marker ("1. ", "2. ", "3) ") is a list marker, NOT a
+//     quantity: it is stripped and the item parses normally at qty 1, so a real
+//     numbered list ("1. jam / 2. bread / 3. milk") yields ordinary items. Only
+//     a marker-ONLY line (no item text after stripping: "5.", "-") -> review.
+//   * A SPELLED-OUT leading word-number is only read as a quantity when a
+//     SINGLE token follows ("two milk" -> 2). Followed by MULTIPLE tokens
+//     ("four cheese pizza", "six pack beer") it is ambiguous -> review, never a
+//     silent guessed quantity. Digit forms ("4 cheese pizza") are exempt.
+//   * A line with NO numeric-looking leading/trailing token at all defaults
+//     to requested_qty = 1. A bare in-name integer that is not a quantity
+//     form ("omega 3", "2x4 timber") stays part of the item name.
 //
-// PURE ASCII only.
+// PURE ASCII only (unicode-digit handling is done via property escapes; the
+// source stays ASCII).
 // =====================================================================
 
 'use strict';
@@ -54,6 +73,33 @@ function hasLetter(value) {
   return /[a-z]/i.test(value);
 }
 
+// A whitespace-delimited token that LOOKS like a quantity but is NOT one of
+// the clean supported positive-integer forms. Used to guard the residual item
+// text's leading/trailing token so a numeric-looking scrap is surfaced to
+// review instead of being silently swallowed into the name at qty 1.
+//
+// Flags (all -> needs_review):
+//   * SIGNED integer .............. "+2", "-2", "+10"
+//   * DECIMAL / dotted number ..... "1.5", "2.5", ".5", "2.", "-2.5"
+//   * NON-ASCII / UNICODE digits ... fullwidth "\uFF12", Arabic-indic "\u0662"
+//     (a token made ENTIRELY of decimal digits where at least one digit is not
+//      ASCII 0-9). A plain ASCII integer ("3" in "omega 3") is NOT flagged --
+//      that is a legitimate in-name number, not a malformed quantity.
+// It deliberately does NOT flag mixed alnum tokens ("2x4", "b12") or clean
+// ASCII integers; those are handled elsewhere or are legitimate item text.
+function isMalformedNumericToken(t) {
+  if (typeof t !== 'string' || t === '') return false;
+  // signed integer: "+2", "-2"
+  if (/^[+-]\d+$/.test(t)) return true;
+  // decimal / dotted number, optionally signed: "1.5", ".5", "2.", "-2.5"
+  if (/^[+-]?(?:\d+\.\d*|\.\d+)$/.test(t)) return true;
+  // token made entirely of decimal digits, at least one of them non-ASCII
+  // (fullwidth / Arabic-indic / etc.). \p{Nd} = any Unicode decimal digit;
+  // [^\P{Nd}0-9] = a Unicode digit that is not ASCII 0-9.
+  if (/^\p{Nd}+$/u.test(t) && /[^\P{Nd}0-9]/u.test(t)) return true;
+  return false;
+}
+
 // Return the distinct numeric values in order of first appearance.
 function distinctNumbers(nums) {
   const out = [];
@@ -73,11 +119,36 @@ const WORD_NUMBERS = {
   nineteen: 19, twenty: 20
 };
 
+// Known WORD-NUMBER COLLISIONS: product names whose first token is also a
+// spelled-out number, so the leading word-number extractor would otherwise
+// read the number as a quantity and the product's tail as the item
+// ("seven up" -> qty 7 x "up"; "five spice" -> qty 5 x "spice"). Both are
+// real grocery items, so in the NEVER-GUESS spirit these route to review.
+//
+// We use an explicit, curated exception list rather than the broader rule
+// "any leading word-number followed by a single-token remainder -> review".
+// That broader rule is unsafe here because it also flags LEGITIMATE
+// quantities with a single-token item ("two milk", "three eggs") -- both of
+// which are existing, correct fixtures. Digit forms ("7 up") are left alone:
+// a typed digit is a much stronger quantity signal than a spelled word.
+// Keys are the fully normalised (lower-cased, single-spaced) phrase.
+const WORD_NUMBER_COLLISIONS = {
+  'seven up': true,   // 7 Up (soft drink)
+  'five spice': true  // Chinese five-spice blend
+};
+
+// Upper sanity bound on an explicit quantity. A household shopping list will
+// never legitimately request more than this; a value above it (or one that
+// has lost integer precision past Number.MAX_SAFE_INTEGER) is far likelier a
+// typo or an OCR run-on than a real request, so it routes to review. This is
+// the symmetric partner of the existing non-positive ("0 milk") guard.
+const MAX_QTY = 999;
+
 // ---------------------------------------------------------------------
 // Prefix stripping (bullets and ordinals)
 //
 // Removes a leading list marker so it is never mistaken for content:
-//   * "- ", "* ", bullet "• "  -> dash / star / bullet
+//   * "- ", "* ", bullet "\u2022 "  -> dash / star / bullet
 //   * "1. ", "2) "                  -> NUMBERED ORDINAL. The number here is
 //                                      an ordinal, NOT a quantity, so it is
 //                                      dropped. This is what distinguishes
@@ -85,11 +156,19 @@ const WORD_NUMBERS = {
 //                                      "2 milk" (bare number -> qty 2).
 // The ordinal form requires the "." / ")" to be followed by whitespace or
 // end-of-line, so a decimal like "1.5 milk" is never split, yet a line that
-// is ONLY a marker ("-" or "1.") collapses to empty and is skipped as blank.
+// is ONLY a marker ("-" or "1.") collapses to empty. Such marker-only lines
+// are no longer skipped: the caller surfaces them to `needs_review` (reason
+// `marker-only line`) so nothing is silently dropped.
+//
+// Note on ordinal magnitude: stripPrefix removes ANY "N." / "N)" marker of ANY
+// magnitude, because a numbered-list marker is never a quantity. "2. milk" and
+// "3) eggs" therefore strip to "milk" / "eggs" and parse as ordinary items at
+// qty 1 -- a real numbered list parses as a list. (Contrast "2 milk", a bare
+// number with no "." / ")", which IS a quantity of 2.)
 // ---------------------------------------------------------------------
 function stripPrefix(s) {
   return s
-    .replace(/^\s*[-*•](?:\s+|$)/, '')
+    .replace(/^\s*[-*\u2022](?:\s+|$)/, '')
     .replace(/^\s*\d+[.)](?:\s+|$)/, '');
 }
 
@@ -159,11 +238,18 @@ function extractQuantities(coreIn) {
   let working = collapseWs(coreIn);
   const qtys = [];
 
-  // trailing " xN" (consumed once)
-  const trailing = working.match(/(?:^|\s)x\s*(\d+)\s*$/i);
-  if (trailing) {
+  // trailing " xN", consumed REPEATEDLY until none remains. A single pass
+  // would leave a second trailing form welded into the name: "milk x2 x3"
+  // would strip only " x3" and keep "milk x2" as the item. Looping surfaces
+  // BOTH quantities so a doubled trailing form ("milk x2 x3", or with a note
+  // interleaved "milk x2 (organic) x3" once the paren is stripped upstream)
+  // becomes a conflict in the caller rather than a silently guessed qty. The
+  // leading loop below already works this way; the two are now symmetric.
+  let trailing = working.match(/(?:^|\s)x\s*(\d+)\s*$/i);
+  while (trailing) {
     qtys.push(parseInt(trailing[1], 10));
     working = working.slice(0, trailing.index).trim();
+    trailing = working.match(/(?:^|\s)x\s*(\d+)\s*$/i);
   }
 
   // leading quantities, consumed repeatedly until none remains
@@ -186,6 +272,46 @@ function extractQuantities(coreIn) {
 // ---------------------------------------------------------------------
 function parseLine(line) {
   const paren = extractParentheticals(line);
+
+  // Word-number collision guard (runs BEFORE quantity extraction): if the
+  // whole paren-stripped line is a known product whose first token is a
+  // spelled number ("seven up", "five spice"), do not let the leading
+  // word-number extractor split it. The check is on the fully normalised
+  // phrase so it is case- and whitespace-insensitive, and it fires whether
+  // or not a trailing note was present ("seven up (organic)" strips to the
+  // same key). Digit forms ("7 up") never match a key and pass straight
+  // through as a real quantity.
+  const collisionKey = normaliseItemName(paren.stripped);
+  if (Object.prototype.hasOwnProperty.call(WORD_NUMBER_COLLISIONS, collisionKey)) {
+    return { kind: 'review', reason: 'ambiguous word-number vs item name: ' + collisionKey };
+  }
+
+  // Leading word-number ambiguity heuristic (runs BEFORE quantity extraction).
+  // A SPELLED-OUT leading number ("two", "four", "six") is only an unambiguous
+  // quantity when EXACTLY ONE token follows it: "two milk" -> 2 x milk,
+  // "twenty apples" -> 20 x apples. When MULTIPLE tokens follow, the leading
+  // word could equally be part of the product name ("four cheese pizza",
+  // "six pack beer"), so -- in the NEVER-GUESS spirit -- the line routes to
+  // review rather than silently asserting a quantity and a truncated name
+  // (which is what "four cheese pizza" -> 4 x "cheese pizza" would do).
+  //
+  // Scope is deliberately narrow:
+  //   * DIGIT forms are EXEMPT ("4 cheese pizza" stays 4 x "cheese pizza"): a
+  //     typed digit is a far stronger quantity signal than a spelled word, so
+  //     the current digit behaviour is preserved unchanged.
+  //   * SINGLE-token spelled forms pass through here and are resolved by the
+  //     normal extractor, so legit quantities ("two milk", "three eggs") are
+  //     untouched. The curated WORD_NUMBER_COLLISIONS list above still handles
+  //     the single-token product collisions ("seven up", "five spice").
+  const leadToks = collapseWs(paren.stripped).split(' ').filter(function (x) { return x !== ''; });
+  if (leadToks.length > 2 &&
+      Object.prototype.hasOwnProperty.call(WORD_NUMBERS, leadToks[0].toLowerCase())) {
+    return {
+      kind: 'review',
+      reason: 'ambiguous word-number vs item name: ' + normaliseItemName(paren.stripped)
+    };
+  }
+
   const quant = extractQuantities(paren.stripped);
 
   const allQtys = paren.qtys.concat(quant.qtys);
@@ -200,6 +326,30 @@ function parseLine(line) {
   // A single explicit non-positive quantity ("0 milk") is ambiguous.
   if (distinct.length === 1 && distinct[0] < 1) {
     return { kind: 'review', reason: 'non-positive quantity: ' + distinct[0] };
+  }
+  // A single explicit quantity above the household sanity cap (or one that
+  // has overflowed integer precision) is implausible -> review. Symmetric
+  // with the non-positive guard above; keeps "999999999999999999999 milk"
+  // out of the item list instead of asserting a nonsense 1e21 request.
+  if (distinct.length === 1 && distinct[0] > MAX_QTY) {
+    return { kind: 'review', reason: 'implausible quantity: ' + distinct[0] };
+  }
+  // Malformed numeric-looking residue guard. After the clean quantity forms
+  // have been consumed, if the LEADING or TRAILING token of the residual item
+  // text still looks like a quantity but is not a clean supported form
+  // (signed "+2"/"-2", decimal "1.5"/"2.", or a non-ASCII/unicode digit like
+  // "\uFF12"/"\u0662"), the line is ambiguous -> review. It is NEVER silently defaulted
+  // to qty 1. Checked on the raw residual (pre-lowercase) tokens.
+  const restToks = collapseWs(quant.rest).split(' ').filter(function (x) { return x !== ''; });
+  if (restToks.length > 0) {
+    const leadTok = restToks[0];
+    const tailTok = restToks[restToks.length - 1];
+    if (isMalformedNumericToken(leadTok)) {
+      return { kind: 'review', reason: 'malformed quantity syntax: ' + leadTok };
+    }
+    if (isMalformedNumericToken(tailTok)) {
+      return { kind: 'review', reason: 'malformed quantity syntax: ' + tailTok };
+    }
   }
   // A quantity (or nothing) but no item text ("x2", "(2)", "5") -> review.
   if (!hasLetter(item_name)) {
@@ -223,11 +373,24 @@ function normaliseRawList(text) {
   for (let i = 0; i < lines.length; i++) {
     const original = lines[i];
     const trimmed = original.trim();
-    if (trimmed === '') continue;             // blank line -> skipped, never reviewed
+    if (trimmed === '') continue;             // truly blank line -> skipped, never reviewed
 
     const core = stripPrefix(trimmed).trim();
-    if (core === '') continue;                // a lone bullet marker -> nothing to capture
+    if (core === '') {
+      // A non-blank line that reduces to only a marker/ordinal ("-", "*",
+      // "5.", "2)") is surfaced, NEVER silently dropped.
+      needs_review.push({ raw: trimmed, reason: 'marker-only line' });
+      continue;
+    }
 
+    // A numbered-list marker ("1. ", "2. ", "3) ") is a LIST MARKER, not a
+    // quantity: stripPrefix has already removed it, so the residual item text
+    // parses normally and defaults to qty 1 (unless it carries its own quantity
+    // form). This is what makes a real numbered list ("1. jam\n2. bread\n3. milk")
+    // parse as three ordinary items at qty 1 rather than sending items 2 and 3
+    // to review. A marker whose line has NO item text after stripping ("5.",
+    // "2)", "-") is caught by the `core === ''` marker-only branch above and
+    // surfaced to needs_review; it is never dropped.
     const parsed = parseLine(core);
     if (parsed.kind === 'item') {
       items.push({
@@ -252,6 +415,7 @@ module.exports = {
     stripPrefix: stripPrefix,
     extractParentheticals: extractParentheticals,
     extractQuantities: extractQuantities,
+    isMalformedNumericToken: isMalformedNumericToken,
     parseLine: parseLine,
     WORD_NUMBERS: WORD_NUMBERS
   }
