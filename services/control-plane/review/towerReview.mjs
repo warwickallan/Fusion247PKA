@@ -23,10 +23,22 @@ import { verdictFromAdapterResult, recordVerdict, SIGNER_ROLE } from './reviewCo
 import { deriveDiffSurfaces, computeAssurance, persistAssurance, requiredRolesFromProfile } from './riskRouting.mjs';
 import { dispatchRoles } from './registryDispatch.mjs';
 import { readEffectiveReadiness } from './readiness.mjs';
+import {
+  validateReviewerResult, dispositionBlocksMerge, acceptanceFailed, persistReviewerClassification,
+} from './reviewClassification.mjs';
 
 const OUTCOME_MAP = Object.freeze({
   approve: 'approved',
   request_changes: 'changes_requested',
+  comment: 'comment',
+  blocked: 'blocked',
+});
+
+// Effective run outcome -> the legacy ops.verdict_value (so the flag-OFF readiness stays consistent
+// with the disposition-derived outcome, not the raw reviewer verdict).
+const OUTCOME_TO_VERDICT = Object.freeze({
+  approved: 'approve',
+  changes_requested: 'request_changes',
   comment: 'comment',
   blocked: 'blocked',
 });
@@ -155,7 +167,31 @@ export async function runTowerReview({
     // Head-attestation cross-check preserved (downgrade to blocked on a signed head != checkpoint head).
     const decision = verdictFromAdapterResult(result, headSha);
     const refused = decision.refused === true;
-    const runOutcome = refused ? 'blocked' : (OUTCOME_MAP[decision.verdict] ?? 'blocked');
+    // adapterBlocked = the adapter itself blocked, OR head-mismatch / non-conforming verdict downgrade.
+    const adapterBlocked = !refused && decision.verdict === 'blocked';
+
+    // FAIL-CLOSED classification validation (Condition 2): a non-blocked reviewer result MUST carry the
+    // explicit machine-readable answers — a per-acceptance result, a per-prior-finding disposition, and
+    // three-axis-classified findings — or the review is BLOCKED (never accepted with answers buried in
+    // summary). The DISPOSITION (not severity) then decides the merge (amendment merge rule).
+    let classValidation = { ok: true, errors: [] };
+    let effectiveVerdict = decision.verdict;
+    let persistClassification = false;
+    if (!refused && !adapterBlocked) {
+      classValidation = validateReviewerResult(result?.structuredResult, {
+        acceptanceRows: packet.resolvedPayload.acceptance_rows ?? [],
+        openFindings: packet.resolvedPayload.open_findings ?? [],
+      });
+      if (!classValidation.ok) {
+        effectiveVerdict = 'blocked'; // answers missing/malformed -> fail-closed
+      } else {
+        const sr = result.structuredResult;
+        const blocks = dispositionBlocksMerge(sr.findings) || acceptanceFailed(sr.acceptance_results);
+        effectiveVerdict = blocks ? 'request_changes' : decision.verdict;
+        persistClassification = true; // validated + head-matched -> persist the answers to the records
+      }
+    }
+    const runOutcome = refused ? 'blocked' : (OUTCOME_MAP[effectiveVerdict] ?? 'blocked');
     const promptVersion = role === 'product_qa'
       ? productQaPrompt.promptVersion
       : `${productQaPrompt.promptVersion}+adversarial-cold-final(builtin)`;
@@ -181,12 +217,28 @@ export async function runTowerReview({
           packet.prdVersionId, packet.planVersionId, runOutcome, evidenceAccessed]);
       const reviewRunId = ins.rows[0].id;
 
-      // Legacy verdict for legacy principals (preserves flag-OFF governing readiness). A non-legacy
-      // reviewer (e.g. a future grok) has no SIGNER_ROLE mapping -> review_run only, no legacy verdict.
+      // WRITE-PATH (Condition 2): persist the validated answers to the APPEND-ONLY records — in THIS
+      // same transaction so it commits/rolls back atomically with the run (retry-idempotent: a rolled-
+      // back attempt persisted nothing; a committed run is skipped by the dedup above; and each write is
+      // itself idempotent at the same head). Only when the result is head-matched + classification-valid.
+      if (persistClassification) {
+        await persistReviewerClassification(client, {
+          buildId: checkpoint.build_id, checkpointId: checkpoint.id, checkpointRef: checkpoint.checkpoint_ref,
+          headSha, reviewerPrincipal: decision.reviewer, reviewRunId,
+          prdVersionId: packet.prdVersionId, planVersionId: packet.planVersionId,
+          acceptanceRows: packet.resolvedPayload.acceptance_rows ?? [],
+          openFindings: packet.resolvedPayload.open_findings ?? [],
+          structuredResult: result.structuredResult,
+        });
+      }
+
+      // Legacy verdict for legacy principals (preserves flag-OFF governing readiness). Uses the
+      // DISPOSITION-derived effective verdict (amendment merge rule), not the raw reviewer verdict. A
+      // non-legacy reviewer (e.g. a future grok) has no SIGNER_ROLE mapping -> review_run only.
       if (!refused && SIGNER_ROLE[result?.signerPrincipal ?? result?.envelope?.agent]) {
         await recordVerdict(client, {
           checkpointId: checkpoint.id, headSha, reviewer: decision.reviewer, verdictType: decision.verdictType,
-          verdict: decision.verdict, promptFingerprint: productQaPrompt.promptFingerprint });
+          verdict: OUTCOME_TO_VERDICT[runOutcome] ?? 'blocked', promptFingerprint: productQaPrompt.promptFingerprint });
       }
 
       // review_run_finding: only from an EXPLICIT linker (never fabricated from fuzzy text). The linker
@@ -208,7 +260,9 @@ export async function runTowerReview({
         payload: { checkpointId: checkpoint.id, headSha, packetHash: packet.packetHash, reviewerKey, role, outcome: runOutcome, promptVersion },
       });
       await client.query('commit');
-      runs.push({ role, reviewerKey, reviewRunId, outcome: runOutcome, promptVersion, blockedReason: decision.blockedReason ?? null });
+      const blockedReason = decision.blockedReason
+        ?? (!classValidation.ok ? `classification fail-closed: ${classValidation.errors.slice(0, 4).join('; ')}` : null);
+      runs.push({ role, reviewerKey, reviewRunId, outcome: runOutcome, promptVersion, blockedReason });
     } catch (err) {
       await client.query('rollback').catch(() => {});
       log?.warn?.('review.run_write_failed', { checkpointId: checkpoint.id, reviewerKey, role });

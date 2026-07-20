@@ -56,6 +56,46 @@ Subtests: (1a) resolved-payload persisted + `packet_hash` re-hashes to match, al
 
 **Regression (re-run, all green, no changes to those files):** db/001 25/25 · contract/003 11/11 · registry/004 9/9 · WP-C 14/14 · WP-D0 9/9 · worker 23/23.
 
+---
+
+## § Completion (PR-2b) — Warwick's 4 mechanical conditions + the retry-idempotency addition
+
+Closed in one pass on top of `build-014/wp-2b-tower-runtime-packet-prompt`. **DEV/synthetic only; no hosted-DB apply; no PR/merge; no new migration** (consumes 001+002+003+004 unchanged). The Warwick-approved orientation body is **byte-for-byte unchanged** — its hash is still `cd65539a23882309e0b903f81d59ecda32c6befdd9dde08e8651838d9a253135` (asserted in test 4b).
+
+### Fingerprints (recorded on every `review_run`)
+| Component | Fingerprint (sha256) |
+|---|---|
+| base — `tower-qa-skill.md` (APPROVED, ratified) | `f2fc2f26ef9b6adbaa2c64754a343acf93309898085e913a74a3eb59814b739a` |
+| classification-amendment (APPROVED + LIVE) | `6f96304352daadaa8c8966ee3fb313d7ee308e95786a90a9d7eac59562f4e4d8` |
+| orientation (campaign-approved; body unchanged) | `cd65539a23882309e0b903f81d59ecda32c6befdd9dde08e8651838d9a253135` |
+| **composed** = base+classification+orientation (recomputed) | `6b3bc8e50cd435ec4a833298e11b808413918f96ca43f58d7b17740fe2b0adc3` |
+
+`review_run.prompt_fingerprint` = the composed fingerprint; `review_run.prompt_version` carries all three component fingerprints + provenance stamps:
+`tower-qa-skill@1(approved;fp=f2fc2f26ef9b)+classification-amendment@1(APPROVED_LIVE;fp=6f96304352da)+orientation@1(APPROVED_FOR_BUILD_014_DEV_CAMPAIGN;approved_by=warwick;governs_live=false);orientation_fp=cd65539a2388`.
+
+### Condition 1 — LIVE classification governance as a versioned prompt component
+New `review/prompts/reviewer-classification-amendment.md` carries the APPROVED+LIVE governing text verbatim from `Deliverables/2026-07-19-reviewer-classification-amendment-v1-DRAFT.md` (three judgements; disposition-governs-merge rule; R1 fail-closed split-on-HIGH+; R2 stated-baseline; round-economy). `productQaPrompt.mjs` loads it **fail-closed** (missing/empty/unratified → `ok:false`, like the base) and fingerprints it. **Composed prompt = base + classification-amendment + orientation + resolved evidence**, and `towerReview` stages that one composed prompt to EVERY required reviewer (Codex, adversarial/Fable, future Grok).
+
+### Condition 2 — fail-closed output schema matched to the prompt + the runtime WRITE-PATH
+- **Shared schema** (`codexAdapter.mjs::CODEX_RESULT_SCHEMA`, used by Codex AND Fable) extended with `acceptance_results[]`, `prior_finding_results[]`, and three-axis-classified `findings[]` (`technical_impact` / `reachability` / `required_disposition` / `assumed_deployment_baseline` + stable id + evidence + required_correction).
+- **Fail-closed validation** (`review/reviewClassification.mjs::validateReviewerResult`): every staged acceptance criterion must carry a result, every prior open finding must carry a disposition (no silent carry-over), every finding must carry the full three-axis classification + a stated baseline (R2). Missing/malformed → the run is recorded **`blocked`** — never accepted with the answer buried in `summary`.
+- **Write-path** (`persistReviewerClassification`, inside the `review_run` transaction): `acceptance_results` → `ops.acceptance_verification` (REVIEWER principal, bound to checkpoint + EXACT head + prd/plan versions); `prior_finding_results` → `ops.finding` disposition update (`addressed` → closed/fixed, append-only) + `review_run_finding` link; new `findings` → `ops.finding` (three-axis classification; `technical_impact`→severity, `reachability`→reachability enum, `required_disposition`+baseline in `impact`) + `acceptance_finding` link + `review_run_finding` relation `opened`. The legacy `verdict` write is kept (now the **disposition-derived** effective verdict), so flag-OFF readiness stays consistent. Proven executed: tests 6a–6d land rows in `acceptance_verification` + `finding` with the classification fields populated.
+- **Merge rule wired:** the DISPOSITION (not severity) decides the merge — an improvement (NOTE_ONLY / TRACKED_FOLLOWUP) can never block; only a `BLOCKS_CURRENT_MERGE` finding (or a failed/blocked acceptance) blocks the current merge.
+
+### Retry-idempotency (Warwick's addition)
+The write-path is retry-idempotent at the same head: acceptance_verification uses `INSERT … WHERE NOT EXISTS` on `(acceptance_row_id, checkpoint_id, reviewer, exact_sha)`; findings use a deterministic `finding_ref` with `ON CONFLICT DO NOTHING`; the `addressed` transition is `… and state='open'` (single-valued); the whole persistence runs in the run's transaction (atomic on rollback). Proven by test **6d** (same review run twice at the same head → exactly one verification per (row, reviewer, head); no duplicate finding rows).
+
+### Condition 3 — three dedicated fail-closed fixtures
+- **6a** two-round finding persistence: a round-1 finding is injected into round-2's packet; an omitted round-2 disposition **fails closed** (blocked); the finding **cannot vanish** (still open, append-only).
+- **6b** improvement does not block: NOTE_ONLY/TRACKED_FOLLOWUP (even technically HIGH) with verdict=approve → **approved**; a `BLOCKS_CURRENT_MERGE` finding → **blocks** even though the reviewer said approve.
+- **6c** low-risk not over-polished: completed acceptance + no material blocker → approval permitted; optional improvement tracked + nonblocking; NO adversarial reviewer invoked where `checkpoint_assurance` does not require one.
+
+### Condition 4 — approval recorded honestly WITHOUT changing the approved bytes
+New `review/prompts/prompt-approvals.json` records `{fingerprint: cd65539a…253135, scope: BUILD_014_DEV_CAMPAIGN, approved_by: warwick, approved_at: 2026-07-20, governs_live: false}`. `productQaPrompt.mjs` reads it: when the on-disk orientation fingerprint matches an approved-for-campaign entry, the provenance stamp becomes `orientation@1(APPROVED_FOR_BUILD_014_DEV_CAMPAIGN;approved_by=warwick;governs_live=false)` — **not** `UNRATIFIED-draft`. The orientation `.md` body/frontmatter are untouched; `governs_live` stays false so `role_based_readiness`/live remain gated (the flag is NOT flipped). Composed fingerprint recomputed + recorded above.
+
+### Test result (EXECUTED)
+`node review/test/run-runtime-tests.mjs` → **17/17** (13 original + 6a/6b/6c/6d). Regression re-run, all green: db/001 25/25 · contract/003 11/11 · registry/004 9/9 · WP-C 14/14 · WP-D0 9/9 · worker 23/23 (WP-C/WP-D0 use the legacy non-packet `createReviewHandler` path, byte-for-byte unchanged).
+
 ## Self-review vs the discipline
 
 - **Fail-closed everywhere:** thrown adapter → blocked; missing/blocked packet → no reviews; unresolved mandatory evidence / truncated diff → BLOCKED; unmappable/unavailable reviewer for a required role → BLOCKED; a thrown git source → blocked. No unhandled escape. ✔

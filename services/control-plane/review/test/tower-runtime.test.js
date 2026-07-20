@@ -29,7 +29,7 @@ import { fileURLToPath } from 'node:url';
 
 import { makeSignedVerdict } from '../envelope.mjs';
 import { createPacketBuilder, packetHash } from '../packetBuilder.mjs';
-import { loadProductQaPrompt, DEFAULT_APPROVED_SKILL_PATH } from '../productQaPrompt.mjs';
+import { loadProductQaPrompt, DEFAULT_APPROVED_SKILL_PATH, DEFAULT_ORIENTATION_PATH } from '../productQaPrompt.mjs';
 import { deriveDiffSurfaces, computeAssurance } from '../riskRouting.mjs';
 import { runTowerReview } from '../towerReview.mjs';
 import { createReviewHandler } from '../reviewHandler.mjs';
@@ -47,6 +47,7 @@ const DB = process.env.DATABASE_URL;
 const SHA_HEAD = 'a'.repeat(40);
 const SHA_BASE = 'b'.repeat(40);
 const SHA_WRONG = 'c'.repeat(40);
+const SHA_HEAD2 = 'd'.repeat(40);
 const SILENT = { warn() {}, info() {} };
 const BENIGN_DIFF = fs.readFileSync(path.join(__dirname, 'fixtures', 'sample.diff'), 'utf8');
 const AUTONOMOUS_DIFF = [
@@ -138,6 +139,23 @@ function gitFake({ base = SHA_BASE, diffText = BENIGN_DIFF, changedFiles = ['src
 }
 
 // ---- fake reviewers (the injectable adapter seam) ------------------------
+// A COMPLIANT reviewer emits the fail-closed machine-readable answers the runtime now requires: a
+// result for EVERY staged acceptance criterion, a disposition for EVERY staged prior open finding, and
+// three-axis-classified findings. Built from the packet the runtime hands the adapter (acceptance_rows
+// + open_findings), so the fakes model an honest reviewer instead of hiding answers in `summary`.
+function compliantAnswers(packet, { accResult = 'pass', extraFindings = [], skipFindingRefs = [] } = {}) {
+  const acceptance_results = (packet.acceptance_rows ?? []).map((a) => ({
+    acceptance_row_id: a.acceptance_ref,
+    result: accResult,
+    rationale: 'verified against the staged diff',
+    evidence: a.expected_proof ?? 'n/a',
+  }));
+  const prior_finding_results = (packet.open_findings ?? [])
+    .filter((f) => !skipFindingRefs.includes(f.finding_ref))
+    .map((f) => ({ finding_id: f.finding_ref, status: 'remains_open', rationale: 'unchanged by this diff; still tracked' }));
+  return { acceptance_results, prior_finding_results, findings: extraFindings };
+}
+
 function fakeReviewer({ principal, provider, verdict = 'approve', reviewedHead = null, blocked = false }) {
   return {
     principal,
@@ -147,7 +165,7 @@ function fakeReviewer({ principal, provider, verdict = 'approve', reviewedHead =
       const head = reviewedHead ?? packet.head_sha;
       const payload = blocked
         ? { status: 'blocked', kind: 'forced', proposed_action: { type: 'noop', target: '' } }
-        : { status: 'ok', verdict, summary: 'fake', claims_verified: [], findings: [], proposed_action: { type: 'noop', target: '' } };
+        : { status: 'ok', verdict, summary: 'fake', claims_verified: [], ...compliantAnswers(packet), proposed_action: { type: 'noop', target: '' } };
       const { envelope, signature } = makeSignedVerdict({ principal, provider, modelId: 'fake', reviewedHead: head, payload }, null);
       if (blocked) return { ok: false, blocked: true, signerPrincipal: principal, structuredResult: payload, envelope, signature, error: 'forced' };
       return { ok: true, blocked: false, signerPrincipal: principal, structuredResult: payload, envelope, signature };
@@ -156,6 +174,42 @@ function fakeReviewer({ principal, provider, verdict = 'approve', reviewedHead =
 }
 const codex = (opts = {}) => fakeReviewer({ principal: 'gpt_codex', provider: 'openai-codex', ...opts });
 const fable = (opts = {}) => fakeReviewer({ principal: 'claude_fable', provider: 'anthropic', ...opts });
+
+// A reviewer that returns arbitrary three-axis-classified findings (auto-disposing every prior open
+// finding + passing every acceptance) — used to prove the DISPOSITION-drives-merge rule + idempotency.
+function classifyingReviewer({ principal = 'gpt_codex', provider = 'openai-codex', verdict = 'approve', findings = [], accResult = 'pass' } = {}) {
+  return {
+    principal,
+    lastSkillText: null,
+    async runTurn({ packet, skillText }) {
+      this.lastSkillText = skillText;
+      const head = packet.head_sha;
+      const payload = { status: 'ok', verdict, summary: 'classified review', claims_verified: [], ...compliantAnswers(packet, { accResult, extraFindings: findings }), proposed_action: { type: 'noop', target: '' } };
+      const { envelope, signature } = makeSignedVerdict({ principal, provider, modelId: 'fake', reviewedHead: head, payload }, null);
+      return { ok: true, blocked: false, signerPrincipal: principal, structuredResult: payload, envelope, signature };
+    },
+  };
+}
+
+// A reviewer that can be told to SKIP disposing certain prior findings (to prove fail-closed on an
+// omitted disposition) and/or to OPEN a new classified finding (round-1 of the two-round proof).
+function disposingReviewer({ principal = 'gpt_codex', provider = 'openai-codex', verdict = 'approve', skipRefs = [], newFindingId = null, newFindingDisposition = 'REQUIRED_BEFORE_LIVE' } = {}) {
+  return {
+    principal,
+    lastSkillText: null,
+    async runTurn({ packet, skillText }) {
+      this.lastSkillText = skillText;
+      const head = packet.head_sha;
+      const findings = newFindingId ? [{
+        id: newFindingId, technical_impact: 'HIGH', reachability: 'LATENT', required_disposition: newFindingDisposition,
+        assumed_deployment_baseline: 'DEV control-plane; no live-apply wired', evidence: 'opened this round', required_correction: 'address before live',
+      }] : [];
+      const payload = { status: 'ok', verdict, summary: 'disposing review', claims_verified: [], ...compliantAnswers(packet, { extraFindings: findings, skipFindingRefs: skipRefs }), proposed_action: { type: 'noop', target: '' } };
+      const { envelope, signature } = makeSignedVerdict({ principal, provider, modelId: 'fake', reviewedHead: head, payload }, null);
+      return { ok: true, blocked: false, signerPrincipal: principal, structuredResult: payload, envelope, signature };
+    },
+  };
+}
 
 // A reviewer that FOLLOWS the acceptance-first prompt: it parses the staged ACCEPTANCE CRITERIA
 // block, reports the FIRST unmet ordinary acceptance criterion (expected-proof marker absent from
@@ -175,18 +229,33 @@ function acceptanceFollowingCodex() {
       const accBlock = afterAcc.split('PRIOR OPEN FINDINGS')[0] ?? '';
       const lines = accBlock.split(/\r?\n/).filter((l) => /^\s*- \[/.test(l));
       const diff = packet.diff_text ?? '';
+      const baseline = 'current authorised deployment: DEV control-plane; no live-apply wired';
       const findings = [];
       for (const line of lines) {
         const ref = (line.match(/\[([^\]]+)\]/) || [])[1];
         const proof = (line.match(/expected proof:\s*([^)]+)\)/) || [])[1]?.trim();
         if (ref && proof && !diff.includes(proof)) {
-          findings.push({ id: ref, severity: 'high', evidence: `acceptance ${ref} unmet`, rationale: 'ordinary acceptance criterion not met', required_correction: `implement ${proof}` });
+          // An unmet ORDINARY acceptance criterion breaches acceptance -> BLOCKS_CURRENT_MERGE.
+          findings.push({
+            id: ref, technical_impact: 'HIGH', reachability: 'ACTIVE', required_disposition: 'BLOCKS_CURRENT_MERGE',
+            assumed_deployment_baseline: baseline, evidence: `acceptance ${ref} unmet — ${proof} absent from staged diff`,
+            required_correction: `implement ${proof}`,
+          });
         }
       }
-      // Only AFTER acceptance do we add an exotic/perimeter observation.
-      findings.push({ id: 'EXOTIC-1', severity: 'low', evidence: 'hypothetical race under concurrent reflow', rationale: 'edge', required_correction: 'guard' });
+      // Only AFTER acceptance do we add an exotic/perimeter observation (non-blocking, HYPOTHETICAL).
+      findings.push({
+        id: 'EXOTIC-1', technical_impact: 'LOW', reachability: 'HYPOTHETICAL', required_disposition: 'NOTE_ONLY',
+        assumed_deployment_baseline: baseline, evidence: 'hypothetical race under concurrent reflow', required_correction: 'optional guard',
+      });
+      const acceptance_results = (packet.acceptance_rows ?? []).map((a) => ({
+        acceptance_row_id: a.acceptance_ref,
+        result: (a.expected_proof && !diff.includes(a.expected_proof)) ? 'fail' : 'pass',
+        rationale: 'checked against the staged diff', evidence: a.expected_proof ?? 'n/a',
+      }));
+      const prior_finding_results = (packet.open_findings ?? []).map((f) => ({ finding_id: f.finding_ref, status: 'remains_open', rationale: 'unchanged by this diff' }));
       const verdict = findings.some((f) => /^AC-/.test(f.id)) ? 'request_changes' : 'approve';
-      const payload = { status: 'ok', verdict, summary: 'acceptance-first review', claims_verified: [], findings, proposed_action: { type: 'post_review', target: '' } };
+      const payload = { status: 'ok', verdict, summary: 'acceptance-first review', claims_verified: [], acceptance_results, prior_finding_results, findings, proposed_action: { type: 'post_review', target: '' } };
       const { envelope, signature } = makeSignedVerdict({ principal: 'gpt_codex', provider: 'openai-codex', modelId: 'fake', reviewedHead: head, payload }, null);
       return { ok: true, blocked: false, signerPrincipal: 'gpt_codex', structuredResult: payload, envelope, signature };
     },
@@ -295,9 +364,11 @@ gated('2a. review_run records the versioned prompt (version+fingerprint) + hones
     assert.equal(r.reviewer_key, 'gpt_codex', 'honest registry identity');
     assert.equal(r.role, 'product_qa');
     assert.equal(r.outcome, 'approved');
-    assert.match(r.prompt_version, /tower-qa-skill@1\(approved\)/, 'approved base version recorded');
-    assert.match(r.prompt_version, /orientation-draft@1\(UNRATIFIED-draft\)/, 'draft orientation flagged in the version stamp');
-    assert.equal(r.prompt_fingerprint, prompt.promptFingerprint, 'exact prompt-template fingerprint bound to the run');
+    assert.match(r.prompt_version, /tower-qa-skill@1\(approved/, 'approved base version recorded (with fingerprint)');
+    assert.match(r.prompt_version, /classification-amendment@1\(APPROVED_LIVE/, 'the LIVE classification amendment component is recorded (with fingerprint)');
+    assert.match(r.prompt_version, /orientation@1\(APPROVED_FOR_BUILD_014_DEV_CAMPAIGN;approved_by=warwick;governs_live=false\)/, 'orientation carries the campaign-approved provenance (NOT UNRATIFIED-draft)');
+    assert.doesNotMatch(r.prompt_version, /UNRATIFIED-draft/, 'the honest-but-superseded UNRATIFIED-draft stamp is gone once campaign-approved');
+    assert.equal(r.prompt_fingerprint, prompt.promptFingerprint, 'exact composed prompt-template fingerprint (base+classification+orientation) bound to the run');
     assert.equal(r.model_provider, 'openai-codex', 'honest provider label preserved');
   } finally { await pool.end(); }
 });
@@ -415,6 +486,8 @@ gated('4b. the runtime stages the REAL versioned prompt (not the legacy thin/emp
     const staged = reviewer.lastSkillText;
     assert.ok(staged && staged.length > 200, 'skillText is the REAL prompt, not the legacy empty thin skill');
     assert.match(staged, /Tower QA — independent Codex review/, 'the APPROVED ratified skill body is staged');
+    assert.match(staged, /three judgements/i, 'the LIVE reviewer-classification amendment is staged (base+classification+orientation)');
+    assert.match(staged, /BLOCKS_CURRENT_MERGE/, 'the disposition vocabulary + fail-closed output contract are staged');
     assert.match(staged, /ACCEPTANCE FIRST/, 'the acceptance-first orientation layer is staged');
     assert.match(staged, /\[AC-01\]/, 'acceptance criteria are staged for verification');
     assert.match(staged, /\[F-100\]/, 'ALL prior open findings are staged (explicit consumption)');
@@ -422,7 +495,13 @@ gated('4b. the runtime stages the REAL versioned prompt (not the legacy thin/emp
     const onDisk = crypto.createHash('sha256').update(fs.readFileSync(DEFAULT_APPROVED_SKILL_PATH, 'utf8'), 'utf8').digest('hex');
     assert.equal(prompt.approvedSkillFingerprint, onDisk, 'approved product-QA skill found + fingerprinted');
     assert.equal(prompt.approvedSkillRatified, true, 'the base product-QA prompt is Warwick-ratified/approved');
-    assert.equal(prompt.orientationApproved, false, 'the orientation layer is (honestly) flagged NOT-YET-APPROVED');
+    assert.equal(prompt.classificationRatified, true, 'the classification amendment is APPROVED+LIVE');
+    assert.equal(prompt.orientationApproved, false, 'orientation LIVE governance stays gated (governs_live=false) — never flipped');
+    assert.equal(prompt.orientationCampaignApproved, true, 'orientation is campaign-approved (bound to the exact approved hash)');
+    // The campaign approval is bound to the EXACT bytes Warwick approved — the orientation body is unchanged.
+    const orientationDisk = crypto.createHash('sha256').update(fs.readFileSync(DEFAULT_ORIENTATION_PATH, 'utf8'), 'utf8').digest('hex');
+    assert.equal(prompt.orientationFingerprint, orientationDisk, 'orientation fingerprint matches the on-disk bytes');
+    assert.equal(orientationDisk, 'cd65539a23882309e0b903f81d59ecda32c6befdd9dde08e8651838d9a253135', 'orientation body is byte-for-byte the Warwick-approved hash');
   } finally { await pool.end(); }
 });
 
@@ -447,5 +526,131 @@ gated('5. flag OFF (default) -> legacy both-required governs (unchanged); flag O
     const { rows } = await pool.query(`select governing_policy, effective_merge_ready from ops.checkpoint_effective_readiness where checkpoint_id=$1`, [cpId]);
     assert.equal(rows[0].governing_policy, 'role_based');
     assert.equal(rows[0].effective_merge_ready, true, 'role-based product_qa-only readiness governs when ON');
+  } finally { await pool.end(); }
+});
+
+// ==========================================================================
+// 6. CLASSIFICATION WRITE-PATH + THE THREE FAIL-CLOSED FIXTURES + IDEMPOTENCY (PR-2b completion)
+// ==========================================================================
+
+// Fixture A — TWO-ROUND FINDING PERSISTENCE: a round-1 finding is injected into round-2's packet and
+// MUST get an explicit disposition; an omitted disposition FAILS CLOSED (blocked); the finding cannot
+// silently vanish (append-only ops.finding).
+gated('6a. two-round finding persistence: omitted round-2 disposition fails closed; finding cannot vanish', async () => {
+  const pool = await freshPool();
+  try {
+    const { build, cpId } = await seedReviewable(pool); // head A; seeded open finding F-100
+    // Round 1 (head A): dispose F-100 + OPEN a new classified finding (NEW-1).
+    const pb1 = createPacketBuilder({ pool, evidenceSources: gitFake(), log: SILENT });
+    const res1 = await runTowerReview({ pool, checkpointId: cpId, reviewers: [disposingReviewer({ newFindingId: 'NEW-1' })], packetBuilder: pb1, productQaPrompt: loadPrompt(), evidenceSources: gitFake(), log: SILENT });
+    assert.equal(res1.runs[0].outcome, 'approved', 'round-1 opens a REQUIRED_BEFORE_LIVE finding — non-blocking, approves');
+    const { rows: opened } = await pool.query(`select finding_ref, state::text as state from ops.finding where build_id=$1 and finding_ref like 'TR-%NEW-1%'`, [build.id]);
+    assert.equal(opened.length, 1, 'the round-1 finding was persisted (append-only ops.finding)');
+    const round1Ref = opened[0].finding_ref;
+
+    // Round 2 (head B): the packet now injects BOTH F-100 and the round-1 finding.
+    const cp2 = await seedCheckpoint(pool, build.id, SHA_HEAD2, 'cp2');
+    // (i) OMIT the round-1 finding's disposition -> FAIL CLOSED (blocked); the finding must not vanish.
+    const pb2 = createPacketBuilder({ pool, evidenceSources: gitFake({ base: SHA_BASE }), log: SILENT });
+    const resOmit = await runTowerReview({ pool, checkpointId: cp2, reviewers: [disposingReviewer({ skipRefs: [round1Ref] })], packetBuilder: pb2, productQaPrompt: loadPrompt(), evidenceSources: gitFake({ base: SHA_BASE }), log: SILENT });
+    assert.equal(resOmit.runs[0].outcome, 'blocked', 'an omitted prior-finding disposition fails closed (no silent carry-over)');
+    const { rows: still } = await pool.query(`select state::text as state from ops.finding where finding_ref=$1`, [round1Ref]);
+    assert.equal(still[0].state, 'open', 'the round-1 finding CANNOT silently vanish — still open (append-only)');
+    // No acceptance_verification was written for the blocked round-2 attempt.
+    const { rows: av2 } = await pool.query(`select count(*)::int n from ops.acceptance_verification where checkpoint_id=$1`, [cp2]);
+    assert.equal(av2[0].n, 0, 'a fail-closed (blocked) run persists NO acceptance verifications');
+
+    // (ii) Dispose EVERY prior open finding -> the run succeeds.
+    const pb3 = createPacketBuilder({ pool, evidenceSources: gitFake({ base: SHA_BASE }), log: SILENT });
+    const resOk = await runTowerReview({ pool, checkpointId: cp2, reviewers: [disposingReviewer({})], packetBuilder: pb3, productQaPrompt: loadPrompt(), evidenceSources: gitFake({ base: SHA_BASE }), log: SILENT });
+    assert.equal(resOk.runs[0].outcome, 'approved', 'once every prior finding is explicitly disposed, the review completes');
+  } finally { await pool.end(); }
+});
+
+// Fixture B — IMPROVEMENT DOES NOT BLOCK: an improvement-only result (NOTE_ONLY / TRACKED_FOLLOWUP,
+// even technically HIGH) cannot produce a blocking gate; only a BLOCKS_CURRENT_MERGE finding does.
+gated('6b. improvement (NOTE_ONLY/TRACKED_FOLLOWUP) does NOT block; a BLOCKS_CURRENT_MERGE finding DOES', async () => {
+  const pool = await freshPool();
+  try {
+    const { build, cpId } = await seedReviewable(pool);
+    // Improvement-only, verdict=approve: a technically-HIGH LATENT finding + a LOW note — neither blocks.
+    const improver = classifyingReviewer({ verdict: 'approve', findings: [
+      { id: 'IMP-1', technical_impact: 'HIGH', reachability: 'LATENT', required_disposition: 'REQUIRED_BEFORE_LIVE', assumed_deployment_baseline: 'DEV; no live-apply', evidence: 'latent hardening for a future live path', required_correction: 'harden before live' },
+      { id: 'IMP-2', technical_impact: 'LOW', reachability: 'HYPOTHETICAL', required_disposition: 'NOTE_ONLY', assumed_deployment_baseline: 'DEV', evidence: 'nit', required_correction: 'optional' },
+    ] });
+    const pb = createPacketBuilder({ pool, evidenceSources: gitFake(), log: SILENT });
+    const res = await runTowerReview({ pool, checkpointId: cpId, reviewers: [improver], packetBuilder: pb, productQaPrompt: loadPrompt(), evidenceSources: gitFake(), log: SILENT });
+    assert.equal(res.runs[0].outcome, 'approved', 'improvement-only (no BLOCKS_CURRENT_MERGE) does NOT block, even at HIGH technical impact');
+    const { rows: fc } = await pool.query(`select count(*)::int n from ops.finding where build_id=$1 and finding_ref like 'TR-%'`, [build.id]);
+    assert.ok(fc[0].n >= 2, 'the improvements are TRACKED as findings (nonblocking, not discarded)');
+
+    // Same shape but with a BLOCKS_CURRENT_MERGE finding -> blocks, even though the reviewer said approve.
+    const cp2 = await seedCheckpoint(pool, build.id, SHA_HEAD2, 'cp2b');
+    const blocker = classifyingReviewer({ verdict: 'approve', findings: [
+      { id: 'BLK-1', technical_impact: 'HIGH', reachability: 'ACTIVE', required_disposition: 'BLOCKS_CURRENT_MERGE', assumed_deployment_baseline: 'DEV; reachable in the current authorised deployment', evidence: 'active correctness break', required_correction: 'fix now' },
+    ] });
+    const pb2 = createPacketBuilder({ pool, evidenceSources: gitFake({ base: SHA_BASE }), log: SILENT });
+    const res2 = await runTowerReview({ pool, checkpointId: cp2, reviewers: [blocker], packetBuilder: pb2, productQaPrompt: loadPrompt(), evidenceSources: gitFake({ base: SHA_BASE }), log: SILENT });
+    assert.equal(res2.runs[0].outcome, 'changes_requested', 'a material BLOCKS_CURRENT_MERGE finding blocks the gate (disposition governs, not the reviewer verdict word)');
+  } finally { await pool.end(); }
+});
+
+// Fixture C — LOW-RISK NOT OVER-POLISHED: completed acceptance + no material blocker permits approval;
+// optional improvements stay tracked + nonblocking; and NO adversarial reviewer is invoked where the
+// checkpoint_assurance profile does not require one.
+gated('6c. low-risk: completed acceptance approves; improvements tracked+nonblocking; no adversarial invoked', async () => {
+  const pool = await freshPool();
+  try {
+    const { build, cpId } = await seedReviewable(pool); // low-risk benign diff
+    const reviewer = classifyingReviewer({ verdict: 'approve', findings: [
+      { id: 'NICE-1', technical_impact: 'LOW', reachability: 'HYPOTHETICAL', required_disposition: 'TRACKED_FOLLOWUP', assumed_deployment_baseline: 'DEV control-plane', evidence: 'optional polish', required_correction: 'later' },
+    ] });
+    const fableAdapter = fable();
+    const pb = createPacketBuilder({ pool, evidenceSources: gitFake(), log: SILENT });
+    await runTowerReview({ pool, checkpointId: cpId, reviewers: [reviewer, fableAdapter], packetBuilder: pb, productQaPrompt: loadPrompt(), evidenceSources: gitFake(), log: SILENT });
+    const runs = await runsForCheckpoint(pool, cpId);
+    assert.equal(runs.length, 1, 'only product_qa ran on a low-risk checkpoint');
+    assert.equal(runs[0].role, 'product_qa');
+    assert.equal(runs[0].outcome, 'approved', 'completed acceptance + no material blocker -> approval permitted (not over-polished)');
+    assert.equal(fableAdapter.lastSkillText, null, 'NO adversarial reviewer invoked where checkpoint_assurance does not require one');
+    const { rows } = await pool.query(`select impact from ops.finding where build_id=$1 and finding_ref like 'TR-%NICE-1%'`, [build.id]);
+    assert.equal(rows.length, 1, 'the optional improvement is tracked as a finding');
+    assert.match(rows[0].impact, /required_disposition=TRACKED_FOLLOWUP/, 'its nonblocking disposition is recorded on the finding');
+    const { rows: av } = await pool.query(`select count(*)::int n from ops.acceptance_verification where checkpoint_id=$1`, [cpId]);
+    assert.equal(av[0].n, 2, 'both acceptance criteria were verified + persisted to acceptance_verification (reviewer-principal)');
+    const { rows: who } = await pool.query(`select distinct reviewer::text as reviewer from ops.acceptance_verification where checkpoint_id=$1`, [cpId]);
+    assert.equal(who[0].reviewer, 'gpt_codex', 'verifications are written under a REVIEWER principal (builder cannot self-verify)');
+  } finally { await pool.end(); }
+});
+
+// Fixture D — RETRY IDEMPOTENCY (Warwick): re-running the SAME review at the SAME head must NOT
+// duplicate acceptance_verification or finding rows (acceptance_verification is append-only in PR-1).
+gated('6d. write-path is RETRY-IDEMPOTENT: a re-run at the same head yields no duplicate verification/finding rows', async () => {
+  const pool = await freshPool();
+  try {
+    const { build, cpId } = await seedReviewable(pool);
+    const reviewer = classifyingReviewer({ verdict: 'approve', findings: [
+      { id: 'DUP-1', technical_impact: 'MEDIUM', reachability: 'LATENT', required_disposition: 'REQUIRED_BEFORE_LIVE', assumed_deployment_baseline: 'DEV', evidence: 'x', required_correction: 'later' },
+    ] });
+    // Run the SAME review TWICE at the SAME head (simulated retry / re-lease). Each call builds a fresh
+    // packet, so BOTH reach the write-path — the write-path itself must dedupe (not the run dedup).
+    for (let i = 0; i < 2; i += 1) {
+      const pb = createPacketBuilder({ pool, evidenceSources: gitFake(), log: SILENT });
+      await runTowerReview({ pool, checkpointId: cpId, reviewers: [reviewer], packetBuilder: pb, productQaPrompt: loadPrompt(), evidenceSources: gitFake(), log: SILENT });
+    }
+    // exactly ONE acceptance_verification per (acceptance_row, reviewer, head) — no duplicate append.
+    const { rows: dup } = await pool.query(
+      `select acceptance_row_id, reviewer::text as reviewer, exact_sha, count(*)::int n
+         from ops.acceptance_verification where checkpoint_id=$1
+        group by acceptance_row_id, reviewer, exact_sha having count(*) > 1`, [cpId]);
+    assert.equal(dup.length, 0, 'no duplicate acceptance_verification rows across the retry');
+    const { rows: avn } = await pool.query(`select count(*)::int n from ops.acceptance_verification where checkpoint_id=$1`, [cpId]);
+    assert.equal(avn[0].n, 2, 'exactly one verification per acceptance row at this head (2 rows), not 4');
+    // no duplicate findings (deterministic finding_ref -> on-conflict-do-nothing).
+    const { rows: fdup } = await pool.query(
+      `select finding_ref, count(*)::int n from ops.finding where build_id=$1 group by finding_ref having count(*) > 1`, [build.id]);
+    assert.equal(fdup.length, 0, 'no duplicate finding rows across the retry');
+    const { rows: fn } = await pool.query(`select count(*)::int n from ops.finding where build_id=$1 and finding_ref like 'TR-%DUP-1%'`, [build.id]);
+    assert.equal(fn[0].n, 1, 'the new finding is opened exactly once across retries');
   } finally { await pool.end(); }
 });

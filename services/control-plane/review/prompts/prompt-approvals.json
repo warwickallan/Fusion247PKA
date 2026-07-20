@@ -1,0 +1,16 @@
+{
+  "schema": "tower.prompt-approvals/v1",
+  "note": "Controlled record of Warwick's per-fingerprint prompt approvals. Approving a prompt here records consent AGAINST A SPECIFIC on-disk fingerprint WITHOUT modifying the approved artifact's own bytes/frontmatter — so the exact hash Warwick approved is preserved. A scope of BUILD_014_DEV_CAMPAIGN with governs_live=false authorises use for the DEV/synthetic BUILD-014 campaign review ONLY; it does NOT enable live governance or flip role_based_readiness.",
+  "approvals": [
+    {
+      "artifact": "product-qa-runtime-orientation",
+      "path": "review/prompts/product-qa-runtime-orientation.md",
+      "fingerprint": "cd65539a23882309e0b903f81d59ecda32c6befdd9dde08e8651838d9a253135",
+      "scope": "BUILD_014_DEV_CAMPAIGN",
+      "approved_by": "warwick",
+      "approved_at": "2026-07-20",
+      "governs_live": false,
+      "note": "Warwick approved THIS orientation body hash (cd65539a…253135) for DEV/synthetic BUILD-014 campaign review only. The .md body/frontmatter stay byte-for-byte at this hash; approval is recorded here, not by editing the artifact. Live governance remains gated (role_based_readiness OFF)."
+    }
+  ]
+}

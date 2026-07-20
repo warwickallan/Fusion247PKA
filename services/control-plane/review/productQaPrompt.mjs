@@ -15,11 +15,18 @@
 //     must not govern a live review until Warwick approves it — which is why the role_based_readiness
 //     flag stays OFF and live activation is a Warwick gate.
 //
-// The assembled per-turn prompt = [ratified skill] + [draft orientation] + [resolved evidence:
-// ALL acceptance criteria, then ALL prior open findings]. Acceptance criteria are injected BEFORE
-// the adapter appends the staged diff, so acceptance-first ordering is STRUCTURAL, not merely
-// requested. The reviewer subprocess still receives ONLY this staged text (secret-stripping in the
-// adapters is preserved) — never DB or GitHub credentials.
+// The assembled per-turn prompt = [ratified skill] + [APPROVED+LIVE classification amendment] +
+// [orientation] + [resolved evidence: ALL acceptance criteria, then ALL prior open findings].
+// Acceptance criteria are injected BEFORE the adapter appends the staged diff, so acceptance-first
+// ordering is STRUCTURAL, not merely requested. EVERY reviewer (Codex, adversarial/Fable, a future
+// Grok) receives this same composed prompt. The reviewer subprocess still receives ONLY this staged
+// text (secret-stripping in the adapters is preserved) — never DB or GitHub credentials.
+//
+// PR-2b COMPLETION provenance change (Condition 4): Warwick APPROVED the orientation body hash
+// (cd65539a…253135) for the DEV/synthetic BUILD-014 campaign — recorded in prompts/prompt-approvals
+// .json WITHOUT editing the orientation's own bytes/frontmatter (that exact hash is what he approved).
+// When the on-disk orientation fingerprint matches an approved-for-campaign entry, its provenance
+// stamp becomes APPROVED_FOR_BUILD_014_DEV_CAMPAIGN (governs_live=false) rather than UNRATIFIED-draft.
 
 import crypto from 'node:crypto';
 import fsDefault from 'node:fs';
@@ -31,8 +38,14 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Repo-root-relative default paths. review/ -> control-plane/ -> services/ -> repo root.
 export const DEFAULT_APPROVED_SKILL_PATH = path.resolve(
   __dirname, '..', '..', '..', 'Builds', 'BUILD-010-fusion-tower', 'baton-mvp', 'tower-qa-skill.md');
+export const DEFAULT_CLASSIFICATION_PATH = path.resolve(
+  __dirname, 'prompts', 'reviewer-classification-amendment.md');
 export const DEFAULT_ORIENTATION_PATH = path.resolve(
   __dirname, 'prompts', 'product-qa-runtime-orientation.md');
+export const DEFAULT_APPROVALS_PATH = path.resolve(
+  __dirname, 'prompts', 'prompt-approvals.json');
+
+const CAMPAIGN_SCOPE = 'BUILD_014_DEV_CAMPAIGN';
 
 function sha256(text) {
   return crypto.createHash('sha256').update(String(text), 'utf8').digest('hex');
@@ -66,7 +79,9 @@ const isTrue = (v) => /^true$/i.test(String(v ?? '').trim());
  */
 export function loadProductQaPrompt({
   skillPath = DEFAULT_APPROVED_SKILL_PATH,
+  classificationPath = DEFAULT_CLASSIFICATION_PATH,
   orientationPath = DEFAULT_ORIENTATION_PATH,
+  approvalsPath = DEFAULT_APPROVALS_PATH,
   fs = fsDefault,
 } = {}) {
   // --- base (approved, ratified) ---
@@ -91,28 +106,72 @@ export function loadProductQaPrompt({
     };
   }
 
-  // --- orientation (DRAFT — wired but flagged) ---
+  // --- classification amendment (APPROVED + LIVE governance — fail-closed like the base) ---
+  // The three-judgement classifier + merge rule + R1 + R2 + round-economy is LIVE governance (Warwick,
+  // 2026-07-19). It is load-bearing, so a missing/empty/unratified amendment fails the load.
+  let classificationText;
+  try {
+    if (!fs.existsSync(classificationPath)) return { ok: false, error: `fail-closed: reviewer-classification-amendment not found at ${classificationPath}` };
+    classificationText = fs.readFileSync(classificationPath, 'utf8');
+  } catch (e) {
+    return { ok: false, error: `fail-closed: reviewer-classification-amendment unreadable (${String(e?.message ?? e)})` };
+  }
+  if (!classificationText || !classificationText.trim()) return { ok: false, error: 'fail-closed: reviewer-classification-amendment is empty' };
+  const classificationFingerprint = sha256(classificationText);
+  const cfm = parseFrontmatter(classificationText);
+  const classificationVersion = cfm.fields.version ?? null;
+  const classificationRatified = isTrue(cfm.fields.governs_live) || cfm.fields.status === 'approved';
+  if (!classificationRatified) {
+    return {
+      ok: false,
+      error: `fail-closed: reviewer-classification-amendment is not approved/live (status="${cfm.fields.status ?? '(none)'}", `
+        + `governs_live=${isTrue(cfm.fields.governs_live)}) — the classifier is LIVE governance and must be ratified to drive a review`,
+    };
+  }
+
+  // --- orientation (DRAFT — wired; live-approval flagged; campaign-approval read from the record) ---
   let orientationText = '';
   let orientationFingerprint = null;
-  let orientationApproved = false;
+  let orientationApproved = false;      // LIVE governance approval (from the .md frontmatter) — stays false
+  let orientationVersion = '0';
   try {
     if (fs.existsSync(orientationPath)) {
       orientationText = fs.readFileSync(orientationPath, 'utf8');
       orientationFingerprint = sha256(orientationText);
       const ofm = parseFrontmatter(orientationText);
       orientationApproved = isTrue(ofm.fields.governs_live) || ofm.fields.status === 'approved';
+      orientationVersion = ofm.fields.version ?? '0';
     }
   } catch { /* orientation is optional reinforcement; absence is not fatal */ }
 
-  // The stable prompt TEMPLATE identity (skill + orientation), recorded on every review_run. The
-  // per-checkpoint evidence lives in the packet (packet_hash), so the template fingerprint is
-  // stable across checkpoints and identifies exactly which governing prompt produced a verdict.
-  const template = `${skillText}\n\n${orientationText}`;
+  // --- campaign approval record (Condition 4) — consent bound to the exact on-disk orientation hash,
+  // WITHOUT editing the approved artifact's bytes. governs_live stays false, so readiness/live remain gated.
+  let campaignEntry = null;
+  try {
+    if (orientationFingerprint && fs.existsSync(approvalsPath)) {
+      const parsed = JSON.parse(fs.readFileSync(approvalsPath, 'utf8'));
+      const approvals = Array.isArray(parsed?.approvals) ? parsed.approvals : [];
+      campaignEntry = approvals.find((a) => a && a.fingerprint === orientationFingerprint && a.scope === CAMPAIGN_SCOPE) ?? null;
+    }
+  } catch { /* an unreadable/malformed approvals record is treated as NO campaign approval (fail-closed) */ }
+  const orientationCampaignApproved = Boolean(campaignEntry);
+
+  // The stable prompt TEMPLATE identity = base + classification + orientation, recorded on every
+  // review_run. Per-checkpoint evidence lives in the packet (packet_hash); this template fingerprint
+  // is stable across checkpoints and identifies exactly which composed governing prompt produced a verdict.
+  const template = `${skillText}\n\n${classificationText}\n\n${orientationText}`;
   const promptFingerprint = sha256(template);
+  const composedFingerprint = promptFingerprint;
+  const short = (h) => String(h ?? '').slice(0, 12);
+  const orientationStamp = orientationCampaignApproved
+    ? `orientation@${orientationVersion}(APPROVED_FOR_${CAMPAIGN_SCOPE};approved_by=${campaignEntry.approved_by};governs_live=${campaignEntry.governs_live})`
+    : (orientationApproved ? `orientation@${orientationVersion}(approved)` : `orientation-draft@${orientationVersion}(UNRATIFIED-draft)`);
+  // prompt_version records ALL THREE component fingerprints (short) + the provenance stamps; the full
+  // composed fingerprint is bound separately on review_run.prompt_fingerprint.
   const promptVersion =
-    `tower-qa-skill@${approvedSkillVersion ?? '?'}(approved)`
-    + `+orientation-draft@${parseFrontmatter(orientationText).fields.version ?? '0'}`
-    + `(${orientationApproved ? 'approved' : 'UNRATIFIED-draft'})`;
+    `tower-qa-skill@${approvedSkillVersion ?? '?'}(approved;fp=${short(approvedSkillFingerprint)})`
+    + `+classification-amendment@${classificationVersion ?? '?'}(APPROVED_LIVE;fp=${short(classificationFingerprint)})`
+    + `+${orientationStamp};orientation_fp=${short(orientationFingerprint)}`;
 
   /**
    * Assemble the exact per-turn product-QA prompt string handed to the reviewer as `skillText`.
@@ -127,13 +186,13 @@ export function loadProductQaPrompt({
     const finds = Array.isArray(packet.open_findings) ? packet.open_findings : [];
 
     const accBlock = acc.length
-      ? acc.map((a) => `  - [${a.acceptance_ref}] ${a.requirement_text}`
+      ? acc.map((a) => `  - [${a.acceptance_ref}] (row_id: ${a.id}) ${a.requirement_text}`
           + (a.expected_proof ? `  (expected proof: ${a.expected_proof})` : '')).join('\n')
       : '  (none resolved — if acceptance criteria were required and none resolved, the packet is BLOCKED)';
 
     const findBlock = finds.length
-      ? finds.map((f) => `  - [${f.finding_ref}] (${f.severity}) ${f.title ?? ''}`
-          + ` — you MUST state: addressed / still-open / unrelated`).join('\n')
+      ? finds.map((f) => `  - [${f.finding_ref}] (id: ${f.id}) (${f.severity}) ${f.title ?? ''}`
+          + ` — you MUST state a prior_finding_results status: addressed / remains_open / unrelated`).join('\n')
       : '  (no prior open findings for this build)';
 
     return [
@@ -145,6 +204,18 @@ export function loadProductQaPrompt({
       '════════ PRIOR OPEN FINDINGS (you MUST account for each — no silent carry-over) ════════',
       findBlock,
       '',
+      '════════ REQUIRED MACHINE-READABLE OUTPUT (fail-closed — answers in typed arrays, NEVER in prose) ════════',
+      '  · acceptance_results[]: one {acceptance_row_id, result∈{pass,fail,partial,blocked,not_applicable},',
+      '    rationale, evidence} for EVERY acceptance criterion above (a missing one BLOCKS the review).',
+      '  · prior_finding_results[]: one {finding_id, status∈{addressed,remains_open,unrelated}, rationale}',
+      '    for EVERY prior open finding above (an omitted disposition BLOCKS — no silent carry-over).',
+      '  · findings[]: each {id, technical_impact∈{BLOCKER,HIGH,MEDIUM,LOW,NOTE}, reachability∈{ACTIVE,',
+      '    LATENT,HYPOTHETICAL}, required_disposition∈{BLOCKS_CURRENT_MERGE,REQUIRED_BEFORE_LIVE,',
+      '    REQUIRED_BEFORE_EXTERNAL_OR_UNTRUSTED_ACCESS,TRACKED_FOLLOWUP,NOTE_ONLY},',
+      '    assumed_deployment_baseline, evidence, required_correction}. DISPOSITION (not severity) decides',
+      '    the merge: only a BLOCKS_CURRENT_MERGE finding (or a failed acceptance) blocks; an improvement',
+      '    (NOTE_ONLY / TRACKED_FOLLOWUP) never blocks (reviewer-classification amendment, above).',
+      '',
     ].join('\n');
   }
 
@@ -155,11 +226,21 @@ export function loadProductQaPrompt({
     approvedSkillFingerprint,
     approvedSkillVersion,
     approvedSkillRatified,
+    classificationText,
+    classificationFingerprint,
+    classificationVersion,
+    classificationRatified,
     orientationText,
     orientationFingerprint,
-    orientationApproved,
+    orientationVersion,
+    orientationApproved,               // LIVE governance approval — stays false (Warwick-gated)
+    orientationCampaignApproved,       // DEV/synthetic BUILD-014 campaign approval (bound to the hash)
+    orientationApprovalScope: campaignEntry?.scope ?? null,
+    orientationApprovedBy: campaignEntry?.approved_by ?? null,
+    orientationGovernsLive: campaignEntry ? Boolean(campaignEntry.governs_live) : false,
     promptVersion,
     promptFingerprint,
+    composedFingerprint,               // = base + classification + orientation (recomputed this PR)
     assemble,
   };
 }
