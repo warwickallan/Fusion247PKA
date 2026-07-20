@@ -20,9 +20,11 @@ import unittest
 from pathlib import Path
 
 import tubeair
+import tubeair_inbox
 import tubeair_watch
 
 VIDEO_ID = "dQw4w9WgXcQ"
+STUCK_VIDEO_ID = "stuckVIDEO0"  # 11-char valid YouTube id whose captions never resolve
 
 # The deterministic fixture transcript that stands in for a real YouTube fetch.
 _FIXTURE_SNIPPETS = [
@@ -199,6 +201,228 @@ class TestBuildInboxArgv(unittest.TestCase):
         argv = tubeair_watch.build_inbox_argv(self._args(handoff=True, dry_run=True))
         self.assertIn("--handoff", argv)
         self.assertIn("--dry-run", argv)
+
+
+# ---------------------------------------------------------------------------
+# Fix 1 — backoff + watcher-owned retry ledger (the do-not-hammer-YouTube guard)
+# Fix 5 — coverage for stuck-backs-off / healthy-still-processes / isolation
+# ---------------------------------------------------------------------------
+
+def _fail_fetch_transcript(video_id, languages):
+    """A caption-less / unavailable video: an *honest* failure (not a crash).
+    The core still writes a packet, but transcript_status != 'extracted', so the
+    inbox returns exit code 2 and does NOT mark it processed → it stays pending."""
+    return {
+        "status": "unavailable",
+        "source": None,
+        "language": None,
+        "language_code": None,
+        "snippets": [],
+        "error_category": "no_captions",
+        "error_detail": "fixture: captionless / unavailable",
+        "retry_recommendation": "manual",
+    }
+
+
+class _StuckHealthyBase(unittest.TestCase):
+    """Temp inbox where the transcript fetch is dispatched per video_id: STUCK_VIDEO_ID
+    always fails honestly; every other id resolves to the fixture. Every fetch is
+    counted so tests can assert the watcher stops hammering YouTube."""
+
+    def setUp(self):
+        self.fetch_counts = {}
+        self._orig_fetch = tubeair.fetch_transcript
+        self._orig_meta = tubeair.fetch_metadata
+
+        def _dispatch(video_id, languages):
+            self.fetch_counts[video_id] = self.fetch_counts.get(video_id, 0) + 1
+            if video_id == STUCK_VIDEO_ID:
+                return _fail_fetch_transcript(video_id, languages)
+            return _fake_fetch_transcript(video_id, languages)
+
+        tubeair.fetch_transcript = _dispatch
+        tubeair.fetch_metadata = _fake_fetch_metadata
+
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.inbox = self.root / "inbox"
+        self.inbox.mkdir(parents=True)
+        self.out = self.root / "out"
+        self.state = self.root / "state.json"
+
+    def tearDown(self):
+        tubeair.fetch_transcript = self._orig_fetch
+        tubeair.fetch_metadata = self._orig_meta
+        tubeair_watch._reset_stop()
+        self._tmp.cleanup()
+
+    def _add_capture(self, capture_id, video_id):
+        (self.inbox / f"{capture_id}.md").write_text(
+            _synthetic_capture_text(capture_id, video_id), encoding="utf-8")
+
+    def _base_argv(self, *extra):
+        return ["--repo-root", str(self.root), "--inbox", "inbox",
+                "--out", str(self.out), "--state", str(self.state), *extra]
+
+    def _reports_for(self, video_id):
+        return sorted(self.out.glob(f"*/TubeAIR Report *{video_id}.md"))
+
+    def _patch_sleep_recorder(self):
+        """Replace the interruptible sleep with a no-wait recorder; return the list
+        of requested sleep durations so backoff growth can be asserted directly."""
+        recorded = []
+        orig = tubeair_watch._interruptible_sleep
+        tubeair_watch._interruptible_sleep = lambda s: recorded.append(s)
+        self.addCleanup(setattr, tubeair_watch, "_interruptible_sleep", orig)
+        return recorded
+
+
+class TestStuckCaptureBacksOff(_StuckHealthyBase):
+    def test_interval_grows_exponentially_while_failing(self):
+        self._add_capture("stuck", STUCK_VIDEO_ID)
+        recorded = self._patch_sleep_recorder()
+        code = tubeair_watch.main(self._base_argv("--interval", "1", "--max-cycles", "4"))
+        # 4 cycles all fail (attempts 1..4 < ceiling), sleeps after cycles 1..3.
+        self.assertEqual(recorded, [2.0, 4.0, 8.0], "interval must back off base*2^n")
+        self.assertEqual(code, 2, "a failing cycle propagates the inbox's exit code 2")
+        # The stuck video was never marked processed.
+        self.assertNotIn(STUCK_VIDEO_ID, self.state.read_text(encoding="utf-8"))
+
+
+class TestStuckCaptureExhaustsAndStopsFetching(_StuckHealthyBase):
+    def test_fetch_count_caps_at_retry_ceiling(self):
+        self._add_capture("stuck", STUCK_VIDEO_ID)
+        self._patch_sleep_recorder()
+        code = tubeair_watch.main(self._base_argv("--interval", "1", "--max-cycles", "8"))
+        # After MAX_RETRIES_PER_VIDEO failed cycles the pair is exhausted and the
+        # watcher SKIPS the inbox — so YouTube is hit exactly the ceiling, not once
+        # per cycle. This is the anti-IP-block guarantee.
+        self.assertEqual(self.fetch_counts.get(STUCK_VIDEO_ID),
+                         tubeair_watch.MAX_RETRIES_PER_VIDEO,
+                         "a permanently stuck video must stop being fetched after the ceiling")
+        # Last cycles were skips → cadence reset → clean exit code.
+        self.assertEqual(code, 0)
+
+
+class TestHealthyProcessesAlongsideStuck(_StuckHealthyBase):
+    def test_healthy_capture_not_starved_by_a_stuck_sibling(self):
+        self._add_capture("stuck", STUCK_VIDEO_ID)
+        self._add_capture("healthy", VIDEO_ID)
+        self._patch_sleep_recorder()
+        code = tubeair_watch.main(self._base_argv("--interval", "0", "--max-cycles", "1"))
+        # Healthy capture produced its packet in the very first cycle...
+        self.assertEqual(len(self._reports_for(VIDEO_ID)), 1,
+                         "healthy capture must process promptly despite a stuck sibling")
+        # ...and only the healthy one was marked processed; the stuck one stays pending.
+        state_txt = self.state.read_text(encoding="utf-8")
+        self.assertIn(VIDEO_ID, state_txt)
+        self.assertNotIn(STUCK_VIDEO_ID, state_txt)
+        self.assertEqual(code, 2, "the co-pending stuck failure still surfaces exit 2")
+
+
+class TestFailedFetchContinues(_StuckHealthyBase):
+    def test_loop_survives_consecutive_honest_failures(self):
+        self._add_capture("stuck", STUCK_VIDEO_ID)
+        self._patch_sleep_recorder()
+        code = tubeair_watch.main(self._base_argv("--interval", "0", "--max-cycles", "3"))
+        # All three cycles ran (attempts still under the ceiling) and none killed
+        # the watcher — an exit-2 cycle is isolated and retried.
+        self.assertEqual(self.fetch_counts.get(STUCK_VIDEO_ID), 3)
+        self.assertEqual(code, 2)
+
+
+class TestSignalAndErrorIsolation(_StuckHealthyBase):
+    def test_keyboardinterrupt_during_cycle_stops_gracefully(self):
+        self._add_capture("healthy", VIDEO_ID)
+        orig = tubeair_inbox.main
+
+        def _ki(argv):
+            raise KeyboardInterrupt()
+
+        tubeair_inbox.main = _ki
+        self.addCleanup(setattr, tubeair_inbox, "main", orig)
+        self._patch_sleep_recorder()
+        # Offline: no real signal needed — a KeyboardInterrupt raised inside the
+        # cycle is the same path SIGINT drives. The watcher must break, not hang.
+        code = tubeair_watch.main(self._base_argv("--interval", "0", "--max-cycles", "5"))
+        self.assertEqual(code, 0)
+
+    def test_signal_stop_between_cycles_ends_loop(self):
+        self._add_capture("healthy", VIDEO_ID)
+        recorded = []
+
+        def _sleep_then_stop(seconds):
+            recorded.append(seconds)
+            tubeair_watch._set_stop()  # simulate SIGINT arriving during the wait
+
+        orig = tubeair_watch._interruptible_sleep
+        tubeair_watch._interruptible_sleep = _sleep_then_stop
+        self.addCleanup(setattr, tubeair_watch, "_interruptible_sleep", orig)
+
+        code = tubeair_watch.main(self._base_argv("--interval", "1", "--max-cycles", "5"))
+        self.assertEqual(len(recorded), 1, "a stop during the first sleep must end the loop")
+        self.assertEqual(len(self._reports_for(VIDEO_ID)), 1, "the first cycle still processed")
+        self.assertEqual(code, 0)
+
+    def test_injected_exception_is_isolated_and_loop_continues(self):
+        self._add_capture("healthy", VIDEO_ID)
+        real = tubeair_inbox.main
+        seq = {"n": 0}
+
+        def _flaky(argv):
+            seq["n"] += 1
+            if seq["n"] == 1:
+                raise RuntimeError("injected boom")
+            return real(argv)
+
+        tubeair_inbox.main = _flaky
+        self.addCleanup(setattr, tubeair_inbox, "main", real)
+        self._patch_sleep_recorder()
+
+        code = tubeair_watch.main(self._base_argv("--interval", "0", "--max-cycles", "3"))
+        # Cycle 1 crashed and was isolated; cycle 2 processed the healthy capture.
+        self.assertGreaterEqual(seq["n"], 2)
+        self.assertEqual(len(self._reports_for(VIDEO_ID)), 1,
+                         "watcher must survive a cycle exception and process on a later sweep")
+        self.assertEqual(code, 0)
+
+
+class TestIntervalValidation(unittest.TestCase):
+    """Fix 2 — interval==0 footgun, NaN interval, negative --max-cycles."""
+
+    def _expect_error(self, argv):
+        with self.assertRaises(SystemExit):
+            tubeair_watch.main(argv)
+
+    def test_zero_interval_unbounded_is_rejected(self):
+        self._expect_error(["--interval", "0"])
+
+    def test_zero_interval_ok_with_once(self):
+        # Parses fine (routes to run_once) — no SystemExit at validation. We stub the
+        # inbox so this is fully offline.
+        orig = tubeair_inbox.main
+        tubeair_inbox.main = lambda argv: 0
+        self.addCleanup(setattr, tubeair_inbox, "main", orig)
+        self.assertEqual(tubeair_watch.main(["--interval", "0", "--once"]), 0)
+
+    def test_zero_interval_ok_with_max_cycles(self):
+        orig = tubeair_inbox.main
+        tubeair_inbox.main = lambda argv: 0
+        self.addCleanup(setattr, tubeair_inbox, "main", orig)
+        # Bounded loop with interval 0 is allowed; no real sleeping (max-cycles=1).
+        self.assertIn(tubeair_watch.main(["--interval", "0", "--max-cycles", "1"]), (0, 2))
+
+    def test_nan_interval_is_rejected(self):
+        self._expect_error(["--interval", "nan", "--max-cycles", "1"])
+
+    def test_inf_interval_is_rejected(self):
+        self._expect_error(["--interval", "inf", "--max-cycles", "1"])
+
+    def test_negative_interval_is_rejected(self):
+        self._expect_error(["--interval", "-5", "--max-cycles", "1"])
+
+    def test_negative_max_cycles_is_rejected(self):
+        self._expect_error(["--interval", "1", "--max-cycles", "-1"])
 
 
 if __name__ == "__main__":
