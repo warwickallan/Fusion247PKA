@@ -66,12 +66,12 @@ Closed in one pass on top of `build-014/wp-2b-tower-runtime-packet-prompt`. **DE
 | Component | Fingerprint (sha256) |
 |---|---|
 | base — `tower-qa-skill.md` (APPROVED, ratified) | `f2fc2f26ef9b6adbaa2c64754a343acf93309898085e913a74a3eb59814b739a` |
-| classification-amendment (APPROVED + LIVE) | `6f96304352daadaa8c8966ee3fb313d7ee308e95786a90a9d7eac59562f4e4d8` |
+| classification-amendment (APPROVED + LIVE) | `5c254258811800bf59520bdd60ee1473a3c99df25e9e1ff6047b1ed4de7c676d` |
 | orientation (campaign-approved; body unchanged) | `cd65539a23882309e0b903f81d59ecda32c6befdd9dde08e8651838d9a253135` |
-| **composed** = base+classification+orientation (recomputed) | `6b3bc8e50cd435ec4a833298e11b808413918f96ca43f58d7b17740fe2b0adc3` |
+| **composed** = base+classification+orientation (recomputed) | `02fdfbc8968eb80b6b411b1a439629847c2a0e938eca9699b077ca2c1ff18041` |
 
 `review_run.prompt_fingerprint` = the composed fingerprint; `review_run.prompt_version` carries all three component fingerprints + provenance stamps:
-`tower-qa-skill@1(approved;fp=f2fc2f26ef9b)+classification-amendment@1(APPROVED_LIVE;fp=6f96304352da)+orientation@1(APPROVED_FOR_BUILD_014_DEV_CAMPAIGN;approved_by=warwick;governs_live=false);orientation_fp=cd65539a2388`.
+`tower-qa-skill@1(approved;fp=f2fc2f26ef9b)+classification-amendment@1(APPROVED_LIVE;fp=5c254258811800)+orientation@1(APPROVED_FOR_BUILD_014_DEV_CAMPAIGN;approved_by=warwick;governs_live=false);orientation_fp=cd65539a2388`.
 
 ### Condition 1 — LIVE classification governance as a versioned prompt component
 New `review/prompts/reviewer-classification-amendment.md` carries the APPROVED+LIVE governing text verbatim from `Deliverables/2026-07-19-reviewer-classification-amendment-v1-DRAFT.md` (three judgements; disposition-governs-merge rule; R1 fail-closed split-on-HIGH+; R2 stated-baseline; round-economy). `productQaPrompt.mjs` loads it **fail-closed** (missing/empty/unratified → `ok:false`, like the base) and fingerprints it. **Composed prompt = base + classification-amendment + orientation + resolved evidence**, and `towerReview` stages that one composed prompt to EVERY required reviewer (Codex, adversarial/Fable, future Grok).
@@ -146,4 +146,4 @@ When the flag is **OFF → the legacy both-required path is byte-for-byte unchan
 ### Prompt fingerprint — UNCHANGED (no prompt bytes touched)
 This slice changes **zero** prompt-component bytes (`tower-qa-skill.md`, `reviewer-classification-amendment.md`, `product-qa-runtime-orientation.md`, `prompt-approvals.json` all untouched), so no re-approval is triggered. The campaign approval remains bound to the orientation hash `cd65539a…253135` (intact).
 
-> **⚠ Pre-existing build-note drift flagged for reviewers (NOT introduced here):** the § Fingerprints table above states composed = `6b3bc8e5…` and classification-amendment = `6f963043…`, but at this commit the **actual on-disk** values are composed = `02fdfbc8968eb80b6b411b1a439629847c2a0e938eca9699b077ca2c1ff18041` and classification-amendment = `5c254258811800bf…` (base `f2fc2f26…` and orientation `cd65539a…` DO match). The committed `reviewer-classification-amendment.md` bytes and the § Fingerprints table were already out of sync before this slice. The disposition correction did not change either — the composed fingerprint is byte-for-byte identical before and after (`02fdfbc8…`). Reviewers/Larry should decide whether to reconcile the stale § Fingerprints table (it is documentation, not the approval anchor — approval is bound to the orientation hash, which is intact).
+> **✓ Fingerprint reconciliation (Larry, 2026-07-20).** An earlier draft of this note recorded stale intermediate fingerprints (composed `6b3bc8e5…`, classification-amendment `6f963043…`). The § Fingerprints table + the prompt_version stamp above are now corrected to the **authoritative values computed by the runtime's own `loadProductQaPrompt()` at this head**: base `f2fc2f26…`, classification-amendment `5c254258…`, orientation `cd65539a…` (the campaign-approval anchor — intact + verified), composed `02fdfbc8…` (the value stamped on every `review_run.prompt_fingerprint`). No prompt-component bytes changed at any point; the classification component's content was verified faithful to the APPROVED+LIVE amendment. Approval remains bound to the orientation hash `cd65539a…`.
