@@ -62,18 +62,43 @@ export function serializeReconstructedTurn({ turn, prompt }) {
  * @param {string} [input.larryResponse] Larry's response / proposed action
  * @param {string} [input.buildRef]      build this turn belongs to (default 'BUILD-014')
  * @param {boolean}[input.goalComplete]  caller signals this turn ships the goal
+ * @param {string} [input.kind]          'ordinary' (default) or 'merge_review' (FIX 1)
+ * @param {number} [input.prNumber]      merge-class: PR number
+ * @param {string} [input.repo]          merge-class: owner/name
+ * @param {string} [input.baseSha]       merge-class: base commit
+ * @param {string} [input.headSha]       merge-class: exact head commit under review
+ * @param {string} [input.sessionTurnKey] idempotency key (FIX 2 Stop-hook bridge). When a
+ *   row with this key already exists, the existing row is returned and NO new turn is created.
+ * @returns {Promise<{id,seq,build_ref,state,created_at,kind,deduped?:boolean}>}
  */
-export async function ingestTurn(pool, { instruction, larryResponse = null, buildRef, goalComplete = false }) {
+export async function ingestTurn(pool, {
+  instruction, larryResponse = null, buildRef, goalComplete = false,
+  kind = 'ordinary', prNumber = null, repo = null, baseSha = null, headSha = null,
+  sessionTurnKey = null,
+}) {
   if (typeof instruction !== 'string' || instruction.length === 0) {
     throw new Error('ingestTurn: instruction must be a non-empty string');
   }
+  // Idempotent per session-turn key: the same Larry reply (same key) can never double-ingest.
   const { rows } = await pool.query(
-    `insert into tower.turn (build_ref, instruction, larry_response, state, goal_complete)
-     values (coalesce($1, 'BUILD-014'), $2, $3, 'pending', $4)
-     returning id, seq, build_ref, state, created_at`,
-    [buildRef ?? null, instruction, larryResponse, goalComplete === true],
+    `insert into tower.turn
+       (build_ref, instruction, larry_response, state, goal_complete,
+        kind, pr_number, repo, base_sha, head_sha, session_turn_key)
+     values (coalesce($1, 'BUILD-014'), $2, $3, 'pending', $4, $5, $6, $7, $8, $9, $10)
+     on conflict (session_turn_key) where session_turn_key is not null do nothing
+     returning id, seq, build_ref, state, created_at, kind`,
+    [buildRef ?? null, instruction, larryResponse, goalComplete === true,
+     kind ?? 'ordinary', prNumber, repo, baseSha, headSha, sessionTurnKey],
   );
-  return rows[0];
+  if (rows.length > 0) return { ...rows[0], deduped: false };
+
+  // Lost the insert to an existing key — return the pre-existing turn (idempotent, no dup).
+  const existing = await pool.query(
+    `select id, seq, build_ref, state, created_at, kind
+       from tower.turn where session_turn_key = $1`,
+    [sessionTurnKey],
+  );
+  return { ...existing.rows[0], deduped: true };
 }
 
 /** Load the single ACTIVE supervisor prompt. Fail-closed if none active. */

@@ -67,7 +67,12 @@ export async function notify(pool, { turnId, reason, state, message }) {
   let telegramMessageId = null;
   let detail = '';
 
-  if (!token || !chatId) {
+  // FAKE TRANSPORT (test double, injected via env): TOWER_NOTIFY_TRANSPORT=none makes notify
+  // record the notification (dedup insert already happened above) WITHOUT any network call —
+  // so the CI doubles suite exercises the real dedup path with no Telegram dependency.
+  if (process.env.TOWER_NOTIFY_TRANSPORT === 'none') {
+    detail = 'not sent — TOWER_NOTIFY_TRANSPORT=none (test double, no network)';
+  } else if (!token || !chatId) {
     detail = `not sent — missing ${!token ? 'TELEGRAM_BOT_TOKEN' : ''}${!token && !chatId ? ' and ' : ''}${!chatId ? 'AUTHORISED_TELEGRAM_USER_ID' : ''}`;
   } else {
     try {

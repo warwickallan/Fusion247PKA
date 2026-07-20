@@ -33,7 +33,7 @@ const TERMINAL = new Set(['reviewed', 'acted', 'blocked', 'awaiting_warwick', 'c
 const VERDICT_TO_STATE = { continue: 'reviewed', correct: 'acted', block: 'blocked', ask_warwick: 'awaiting_warwick' };
 
 // ── watcher child management ─────────────────────────────────────────────────
-function spawnWatcher(watcherId) {
+function spawnWatcher(watcherId, extraEnv = {}) {
   const child = spawn(process.execPath, ['watcher.mjs'], {
     cwd: __dirname,
     env: {
@@ -41,6 +41,11 @@ function spawnWatcher(watcherId) {
       WATCHER_ID: watcherId,
       WATCHER_POLL_MS: '700',
       WATCHER_LEASE_SECONDS: '20',
+      // Cases A–D are pure DELIVERY-supervision archetypes: keep the merge-class content
+      // heuristic OFF so their completion wording does not turn them into merge-class turns.
+      // The merge-class QA path is exercised EXPLICITLY by CASE E (kind='merge_review').
+      TOWER_MERGE_CLASS_HEURISTIC: 'off',
+      ...extraEnv,
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -208,6 +213,59 @@ async function main() {
   });
   console.log(`D verdict=${dProof.verdict} state=${dState} finding_after=${findingAfter.state}`);
 
+  // ── CASE E — MERGE-CLASS QA over REAL Git evidence (FIX 1) ──────────────────
+  // Explicit merge_review turn: the watcher ALSO runs the APPROVED Tower QA skill against the
+  // repo's ACTUAL current head (base=HEAD~1) — REAL Codex reviewing a REAL diff, not prose.
+  hr('CASE E — MERGE-CLASS (explicit): Tower QA skill runs on REAL Git evidence at HEAD');
+  const E = await ingestTurn(pool, {
+    kind: 'merge_review', headSha: 'HEAD',
+    instruction: 'Warwick: review the current head of this repo against its changes and tell me whether it is sound to merge.',
+    larryResponse: 'Larry: the latest commit is complete; please verify the diff against the change it claims.',
+  });
+  const eState = await waitForProcessed(pool, E.id);
+  const eReview = (await pool.query(
+    `select verdict, prompts_applied, merge_review, model_id, staged_input, packet_hash
+       from tower.supervisor_review where turn_id = $1 order by created_at asc`, [E.id])).rows;
+  const eMr = eReview[0]?.merge_review ?? null;
+  const eApplied = (eReview[0]?.prompts_applied ?? []).map((p) => p.name);
+  const eQaFp = (eReview[0]?.prompts_applied ?? []).find((p) => p.name === 'tower_qa_skill')?.fingerprint;
+  const eChecks = {
+    exactly_one_review: eReview.length === 1,
+    merge_review_persisted: !!eMr && eMr.isMergeClass === true,
+    git_evidence_resolved: eMr?.evidence?.resolved === true && !!eMr?.evidence?.diff_range,
+    both_prompts_recorded: eApplied.includes('delivery_supervisor') && eApplied.includes('tower_qa_skill'),
+    qa_skill_fingerprinted: typeof eQaFp === 'string' && eQaFp.length === 64,
+    qa_verdict_present: !eMr?.blocked
+      ? ['approve', 'request_changes', 'comment'].includes(eMr?.qa?.verdict)
+      : eMr?.qa?.verdict === 'blocked', // fail-closed is an acceptable honest outcome
+  };
+  const ePass = Object.values(eChecks).every(Boolean);
+  console.log(`E state=${eState} mergeBlocked=${eMr?.blocked} qaVerdict=${eMr?.qa?.verdict} changed=${eMr?.evidence?.changed_files_count} model=${eMr?.model_id}`);
+
+  // ── CASE F — EXACTLY-ONCE during a long run + concurrent watcher (FIX 4) ─────
+  // Two extra watchers with a SHORT lease contend for ONE turn while REAL Codex runs longer
+  // than that lease. The lease renewer keeps the healthy turn from being reclaimed → exactly
+  // one supervisor_review row and exactly one notification (backed by unique(turn_id)).
+  hr('CASE F — EXACTLY-ONCE: concurrent short-lease watchers, long real Codex run (FIX 4)');
+  const fEnv = { WATCHER_LEASE_SECONDS: '4', WATCHER_POLL_MS: '400' };
+  const f1 = spawnWatcher('watcher-F1', fEnv);
+  const f2 = spawnWatcher('watcher-F2', fEnv);
+  await sleep(1200);
+  const F = await ingestTurn(pool, {
+    instruction: 'Warwick: ship the one-file CSV→JSON converter. Just make it work.',
+    larryResponse: "Larry: Before writing it I'm going to build a pluggable ETL framework with a plugin registry and architecture doc first.",
+  });
+  const fState = await waitForProcessed(pool, F.id);
+  await sleep(2500); // give any wrongly-racing second processor time to (not) appear
+  const fReviews = (await pool.query(`select id from tower.supervisor_review where turn_id = $1`, [F.id])).rows;
+  const fNotes = (await pool.query(`select reason, count(*) c from tower.notification where turn_id = $1 group by reason`, [F.id])).rows;
+  const fDup = fNotes.filter((n) => Number(n.c) > 1);
+  const fChecks = { exactly_one_review: fReviews.length === 1, no_dup_notification: fDup.length === 0 };
+  const fPass = Object.values(fChecks).every(Boolean);
+  console.log(`F state=${fState} reviews=${fReviews.length} notes=${JSON.stringify(fNotes)}`);
+  f1.kill(); await waitExit(f1);
+  f2.kill(); await waitExit(f2);
+
   // ── GLOBAL REQUIREMENTS ────────────────────────────────────────────────────
   hr('GLOBAL REQUIREMENTS');
   // no dup Telegram: unique (turn_id, reason) across the whole run.
@@ -224,6 +282,8 @@ async function main() {
     no_dup_codex_any_turn: [aBundle, bBundle, cBundle, dBundle].every((b) => b.reviews.length === 1),
     no_dup_telegram: dupNotes.length === 0,
     watcher_still_running: watcherStillRunning,
+    merge_class_real_qa_on_git_evidence: ePass, // CASE E (FIX 1)
+    exactly_once_concurrent_long_run: fPass,     // CASE F (FIX 4)
   };
 
   // Stop the watcher cleanly now that assertions captured its still-running state.
@@ -238,7 +298,11 @@ async function main() {
     checks: p.checks,
     telegram: p.notes.map((n) => ({ reason: n.reason, telegram_ok: n.telegram_ok, message_id: n.telegram_message_id })),
   }));
-  console.log(JSON.stringify({ perCase, globals, heartbeats: beats, dupNotifications: dupNotes }, null, 2));
+  console.log(JSON.stringify({
+    perCase, globals, heartbeats: beats, dupNotifications: dupNotes,
+    caseE: { state: eState, checks: eChecks, mergeReview: eMr },
+    caseF: { state: fState, checks: fChecks, notes: fNotes },
+  }, null, 2));
 
   hr('PASS / FAIL');
   const lines = [];

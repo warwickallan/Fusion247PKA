@@ -26,6 +26,9 @@ import {
   CODEX_EXEC_FLAGS,
   sanitizeCodexEnv,
   parseCodexJsonl,
+  buildCodexPrompt,
+  CODEX_RESULT_SCHEMA,
+  validateCodexResult,
 } from '../review/codexAdapter.mjs';
 
 // STRICT output schema handed to `codex exec --output-schema` (every property required,
@@ -138,6 +141,47 @@ function runCodexChild({ codexBin, argv, cwd, spawn, timeoutMs, apiKey, prompt, 
 }
 
 /**
+ * SHARED robust Codex invocation (the ONE proven path). Resolves auth + binary fail-closed,
+ * stages the strict output schema, spawns the double-sanitised child (secret-denylist +
+ * this build's DB url), and parses the JSONL. Returns either a `{ blocked, kind, blocker }`
+ * marker (never a hang, never a fake verdict) or `{ blocked:false, parsed, rawStdout, modelId }`.
+ * Both runSupervisor (delivery review, SUPERVISOR_SCHEMA) and runMergeReview (merge-class QA,
+ * CODEX_RESULT_SCHEMA) compose this — the invocation is reused, not re-implemented.
+ */
+async function invokeCodexJson({ prompt, schema, cwd, spawn, fs, timeoutMs }) {
+  const auth = detectCodexAuth({});
+  if (!auth.authenticated) {
+    return { blocked: true, kind: 'no_credential', blocker: 'no codex credential — neither CODEX_API_KEY/OPENAI_API_KEY nor ChatGPT-OAuth auth.json present (do NOT auto-provision)' };
+  }
+  const bin = resolveCodexBin({});
+  if (!bin.path) {
+    return { blocked: true, kind: 'no_binary', blocker: `no codex binary — ${bin.error ?? 'not resolvable'} (do NOT auto-install)` };
+  }
+  const schemaFile = path.join(os.tmpdir(), `tower-schema-${randomUUID()}.json`);
+  try {
+    fs.writeFileSync(schemaFile, JSON.stringify(schema), 'utf8');
+  } catch (e) {
+    return { blocked: true, kind: 'schema_write_failed', blocker: `could not stage output schema — ${String(e?.message ?? e)}` };
+  }
+  try {
+    // CODEX_EXEC_FLAGS carries: exec --sandbox read-only --skip-git-repo-check
+    // --ignore-user-config --json. Add the output schema, the workdir, and `-` for stdin.
+    // The child env is DOUBLE-sanitised: the review denylist + this build's DB url. On the
+    // OAuth route no api key rides the env; on api-key auth it is re-added.
+    const argv = [...CODEX_EXEC_FLAGS, '--output-schema', schemaFile, '-C', cwd, '-'];
+    const apiKey = auth.method === 'api-key' ? (process.env.CODEX_API_KEY || process.env.OPENAI_API_KEY || null) : null;
+    const env = stripSupervisorSecrets(sanitizeCodexEnv(process.env, null));
+    const spawned = await runCodexChild({ codexBin: bin.path, argv, cwd, spawn, timeoutMs, apiKey, prompt, env });
+    if (spawned.code === -2) return { blocked: true, kind: 'timed_out', blocker: spawned.stderr };
+    if (!spawned.ok) return { blocked: true, kind: 'exec_failed', blocker: `codex exec failed (exit ${spawned.code}): ${String(spawned.stderr ?? '').slice(0, 400)}`.trim() };
+    const parsed = parseCodexJsonl(spawned.stdout);
+    return { blocked: false, parsed, rawStdout: spawned.stdout, modelId: 'openai-codex-exec' };
+  } finally {
+    try { fs.unlinkSync(schemaFile); } catch { /* best-effort */ }
+  }
+}
+
+/**
  * Run ONE real Codex supervisor turn over a reconstructed turn.
  *
  * @param {object} args
@@ -153,61 +197,81 @@ export async function runSupervisor({
   fs = fsDefault,
   timeoutMs = 8 * 60 * 1000,
 } = {}) {
-  const auth = detectCodexAuth({});
-  if (!auth.authenticated) {
-    return blocked('no_credential', 'no codex credential — neither CODEX_API_KEY/OPENAI_API_KEY nor ChatGPT-OAuth auth.json present (do NOT auto-provision)');
+  const prompt = buildSupervisorPrompt({ supervisorPromptText, reconstructedTurnText });
+  const inv = await invokeCodexJson({ prompt, schema: SUPERVISOR_SCHEMA, cwd, spawn, fs, timeoutMs });
+  if (inv.blocked) return blocked(inv.kind, inv.blocker);
+
+  const validation = validateSupervisorResult(inv.parsed.result);
+  if (!validation.ok) {
+    return blocked('malformed_output', `codex returned non-conforming supervisor output: ${validation.errors.join('; ')}`);
   }
-  const bin = resolveCodexBin({});
-  if (!bin.path) {
-    return blocked('no_binary', `no codex binary — ${bin.error ?? 'not resolvable'} (do NOT auto-install)`);
-  }
+  const r = inv.parsed.result;
+  return {
+    ok: true,
+    blocked: false,
+    modelId: inv.modelId,
+    result: {
+      status: 'ok',
+      aligned: r.aligned,
+      over_engineering: r.over_engineering,
+      drifting: r.drifting,
+      administering: r.administering,
+      next_action: r.next_action,
+      warwick_needed: r.warwick_needed,
+      verdict: r.verdict,
+      summary: r.summary,
+    },
+    rawStdout: inv.rawStdout,
+  };
+}
 
-  const schemaFile = path.join(os.tmpdir(), `tower-supervisor-schema-${randomUUID()}.json`);
-  try {
-    fs.writeFileSync(schemaFile, JSON.stringify(SUPERVISOR_SCHEMA), 'utf8');
-  } catch (e) {
-    return blocked('schema_write_failed', `could not stage output schema — ${String(e?.message ?? e)}`);
-  }
-
-  try {
-    // CODEX_EXEC_FLAGS already carries: exec --sandbox read-only --skip-git-repo-check
-    // --ignore-user-config --json. We add the supervisor output schema, the workdir, and
-    // `-` for stdin. The child env is DOUBLE-sanitised: the review denylist + this build's
-    // DB url. On the OAuth route no api key rides the env; on api-key auth it is re-added.
-    const argv = [...CODEX_EXEC_FLAGS, '--output-schema', schemaFile, '-C', cwd, '-'];
-    const apiKey = auth.method === 'api-key' ? (process.env.CODEX_API_KEY || process.env.OPENAI_API_KEY || null) : null;
-    const env = stripSupervisorSecrets(sanitizeCodexEnv(process.env, null));
-    const prompt = buildSupervisorPrompt({ supervisorPromptText, reconstructedTurnText });
-
-    const spawned = await runCodexChild({ codexBin: bin.path, argv, cwd, spawn, timeoutMs, apiKey, prompt, env });
-    if (spawned.code === -2) return blocked('timed_out', spawned.stderr);
-    if (!spawned.ok) return blocked('exec_failed', `codex exec failed (exit ${spawned.code}): ${String(spawned.stderr ?? '').slice(0, 400)}`.trim());
-
-    const parsed = parseCodexJsonl(spawned.stdout);
-    const validation = validateSupervisorResult(parsed.result);
-    if (!validation.ok) {
-      return blocked('malformed_output', `codex returned non-conforming supervisor output: ${validation.errors.join('; ')}`);
-    }
-
-    const r = parsed.result;
+/**
+ * Run ONE real Codex MERGE-CLASS review: the APPROVED Tower QA skill judged against REAL Git
+ * evidence (packet built from gatherGitEvidence). Reuses the exact invocation above but with
+ * the QA skill text + the CODEX_RESULT_SCHEMA (verdict approve|request_changes|comment +
+ * typed acceptance/finding arrays). FAIL-CLOSED: unresolved evidence or malformed output →
+ * `{ ok:false, blocked:true, result:{ status:'blocked', verdict:'blocked', … } }`.
+ *
+ * @param {object} args
+ * @param {string} args.qaSkillText  the fingerprinted Tower QA skill (governing prompt) content
+ * @param {object} args.packet       the staged Git-evidence packet (buildCodexPrompt shape)
+ * @returns {Promise<{ok:boolean, blocked:boolean, result:object, modelId?:string, rawStdout?:string}>}
+ */
+export async function runMergeReview({
+  qaSkillText,
+  packet = {},
+  cwd = process.cwd(),
+  spawn = nodeSpawn,
+  fs = fsDefault,
+  timeoutMs = 8 * 60 * 1000,
+} = {}) {
+  const prompt = buildCodexPrompt({ skillText: qaSkillText, packet });
+  const inv = await invokeCodexJson({ prompt, schema: CODEX_RESULT_SCHEMA, cwd, spawn, fs, timeoutMs });
+  if (inv.blocked) {
     return {
-      ok: true,
-      blocked: false,
-      modelId: 'openai-codex-exec',
-      result: {
-        status: 'ok',
-        aligned: r.aligned,
-        over_engineering: r.over_engineering,
-        drifting: r.drifting,
-        administering: r.administering,
-        next_action: r.next_action,
-        warwick_needed: r.warwick_needed,
-        verdict: r.verdict,
-        summary: r.summary,
-      },
-      rawStdout: spawned.stdout,
+      ok: false, blocked: true, modelId: null,
+      result: { status: 'blocked', kind: inv.kind, blocker: inv.blocker, verdict: 'blocked', summary: `Merge-class QA could not run (${inv.kind}); ${inv.blocker}` },
     };
-  } finally {
-    try { fs.unlinkSync(schemaFile); } catch { /* best-effort */ }
   }
+  const validation = validateCodexResult(inv.parsed.result);
+  if (!validation.ok) {
+    return {
+      ok: false, blocked: true, modelId: inv.modelId,
+      result: { status: 'blocked', kind: 'malformed_output', blocker: validation.errors.join('; '), verdict: 'blocked', summary: `Merge-class QA returned non-conforming output: ${validation.errors.join('; ')}` },
+    };
+  }
+  const r = inv.parsed.result;
+  return {
+    ok: true, blocked: false, modelId: inv.modelId,
+    result: {
+      status: 'ok',
+      verdict: r.verdict, // approve | request_changes | comment
+      summary: r.summary,
+      claims_verified: Array.isArray(r.claims_verified) ? r.claims_verified : [],
+      acceptance_results: Array.isArray(r.acceptance_results) ? r.acceptance_results : [],
+      prior_finding_results: Array.isArray(r.prior_finding_results) ? r.prior_finding_results : [],
+      findings: Array.isArray(r.findings) ? r.findings : [],
+    },
+    rawStdout: inv.rawStdout,
+  };
 }

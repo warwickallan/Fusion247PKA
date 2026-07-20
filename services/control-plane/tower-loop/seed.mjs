@@ -1,9 +1,16 @@
 // BUILD-014 Tower supervisor loop — seed the active supervisor prompt.
 //
 // Seeds prompts/supervisor-prompt.md as tower.supervisor_prompt v1, active=true,
-// content_hash=sha256(content), approved_by='warwick'. Idempotent by content_hash: if a
-// row with the same hash already exists it is (re)activated rather than duplicated. Loading
-// a NEW active prompt deactivates any prior active one (the schema enforces a single active).
+// content_hash=sha256(content), approved_by='ai-authored-unapproved'. Idempotent by
+// content_hash: if a row with the same hash already exists it is (re)activated rather than
+// duplicated. Loading a NEW active prompt deactivates any prior active one (the schema
+// enforces a single active).
+//
+// TRUTHFUL APPROVAL (FIX 1a): this delivery-supervisor prompt is AI-authored and has NOT
+// been reviewed/approved by Warwick. We label it honestly as 'ai-authored-unapproved' and
+// never auto-claim Warwick approval. (The Tower QA skill run on merge-class turns IS the
+// separately-approved, Warwick-ratified governing prompt.) When Warwick reviews and approves
+// this prompt, set approved_by='warwick' explicitly — the seed must never do it for him.
 //
 //   node seed.mjs
 
@@ -49,7 +56,7 @@ export async function seedPrompt(databaseUrl = process.env.CONTROL_PLANE_DEV_DAT
       await client.query(`update tower.supervisor_prompt set active = false where active = true`);
       const ins = await client.query(
         `insert into tower.supervisor_prompt (version, content, content_hash, active, approved_by)
-         values ($1, $2, $3, true, 'warwick')
+         values ($1, $2, $3, true, 'ai-authored-unapproved')
          returning id, version, content_hash, active, approved_by`,
         [nextVersion, content, contentHash],
       );
