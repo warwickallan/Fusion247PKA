@@ -33,26 +33,42 @@ function readStdin() {
   });
 }
 
-/** Extract the user text from a transcript line's message. Returns null if it is not a real
- *  user instruction (tool_result rows, command stdout wrappers, meta rows are excluded). */
+/** Content injected as user-role transcript rows that is NOT a genuine Warwick instruction:
+ *  system reminders, background-task notifications, hook output, slash-command scaffolding,
+ *  local-command stdout, and interruption markers. Codex must NEVER review against these. */
+function isSystemGenerated(s) {
+  if (!s) return true;
+  const head = s.slice(0, 64);
+  return (
+    head.startsWith('<task-notification>') ||
+    head.startsWith('<system-reminder>') ||
+    head.startsWith('<local-command-stdout>') ||
+    head.startsWith('<command-name>') ||
+    head.startsWith('<command-message>') ||
+    head.startsWith('[Request interrupted') ||
+    s.includes('[SYSTEM NOTIFICATION - NOT USER INPUT]') ||
+    s.includes('This is an automated background-task event')
+  );
+}
+
+/** Extract the text of a transcript line's message ONLY when it is a genuine Warwick
+ *  instruction. Returns null for tool_result rows, command/stdout wrappers, and
+ *  system/hook/notification rows (all of which arrive as user-role lines but are NOT
+ *  real instructions). This is what makes the selector fail closed on non-genuine input. */
 function userText(msg) {
   if (!msg) return null;
   const c = msg.content;
-  if (typeof c === 'string') {
-    const s = c.trim();
-    if (!s) return null;
-    // Skip slash-command scaffolding / local-command stdout wrappers — not a user instruction.
-    if (s.startsWith('<local-command-stdout>') || s.startsWith('<command-name>') || s.startsWith('<command-message>')) return null;
-    return s;
-  }
-  if (Array.isArray(c)) {
-    // A tool_result-only message is NOT a user instruction.
+  let s = null;
+  if (typeof c === 'string') s = c.trim();
+  else if (Array.isArray(c)) {
+    // A tool_result-only message contributes no text → not a user instruction.
     const texts = c.filter((b) => b?.type === 'text' && typeof b.text === 'string').map((b) => b.text);
     if (texts.length === 0) return null;
-    const joined = texts.join('\n').trim();
-    return joined || null;
+    s = texts.join('\n').trim();
   }
-  return null;
+  if (!s) return null;
+  if (isSystemGenerated(s)) return null; // system / tool / hook / notification → not a genuine instruction
+  return s;
 }
 
 /** Concatenate the assistant TEXT blocks from an assistant transcript line (skip thinking/tool_use). */
