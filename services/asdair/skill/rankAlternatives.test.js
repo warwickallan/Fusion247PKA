@@ -233,3 +233,160 @@ test('purity: rankAlternatives does not mutate its inputs', function () {
   assert.deepEqual(line, lineCopy, 'the line is not mutated');
   assert.deepEqual(products, productsCopy, 'the products set is not mutated');
 });
+
+// =====================================================================
+// Regression coverage for the Codex + Fable consensus findings.
+// =====================================================================
+
+// ---------------------------------------------------------------------
+// FIX 1 (FIX-BEFORE-MERGE): category resolution is a strict FALLBACK CHAIN,
+// not a union. A line that maps to a product must IGNORE a stale/conflicting
+// free-text category hint, so a wrong-category product never surfaces.
+//
+// The proven defect: an 'Orange Juice 1L' line (maps to juice products 20/21)
+// carrying a conflicting `category: 'soft drinks'` hint used to UNION juice +
+// soft drinks and surface Store Cola at rank 1 (score 0.84), beating the true
+// juice option -- violating the module's own SAME-CATEGORY rule.
+// ---------------------------------------------------------------------
+
+test('FIX 1: a conflicting category hint on a mapped line is ignored (cola never surfaces for a juice line)', function () {
+  const plan = planBasket({
+    listItems: [{
+      item_name: 'Orange Juice 1L',   // maps to products 20/21 -> category juice
+      category: 'soft drinks',        // stale, conflicting hint -> must be ignored
+      requested_qty: 1,
+      out_of_stock: true,
+      price: 1.30
+    }],
+    products: products, rules: [], budget: budget, household: HH
+  });
+  const j = byName(plan, 'Orange Juice 1L');
+  assert.equal(j.status, 'needs_decision');
+
+  const names = j.alternatives.map(function (a) { return a.name; });
+  assert.ok(!names.includes('Store Cola 2L'),
+    'the conflicting soft-drinks hint is ignored: cola (wrong category) never surfaces');
+  j.alternatives.forEach(function (a) {
+    assert.ok(a.reason.includes('same category (juice)'),
+      'every suggestion is a juice, matching the line\'s product mapping (not its stale hint)');
+  });
+  // The true juice option now wins rank 1, not the cola the union used to float up.
+  assert.equal(j.alternatives[0].name, 'Store Apple Juice 1L',
+    'a same-category juice takes rank 1, not the mis-categorised cola');
+  assert.ok(j.alternatives[0].score < 0.84,
+    'the spurious 0.84 cola score is gone');
+});
+
+test('FIX 1: the category hint is STILL used as a genuine fallback when the line has no product mapping', function () {
+  // 'Mystery Juice' matches no product -> tiers (a)/(b) empty -> tier (c) hint used.
+  const alts = rankAlternatives(
+    { item_name: 'Mystery Juice', category: 'juice', out_of_stock: true, price: 1.30 },
+    products, HH
+  );
+  assert.ok(alts.length > 0, 'the hint still drives suggestions when nothing else determines a category');
+  alts.forEach(function (a) {
+    assert.ok(a.reason.includes('same category (juice)'));
+  });
+});
+
+// ---------------------------------------------------------------------
+// FIX 2 (FOLD): sort on the UNROUNDED raw score; round only the display value.
+// Two candidates whose distinct raw scores round to the SAME 2dp value must
+// stay ordered by raw score, NOT collapse into an id-ascending tie.
+// ---------------------------------------------------------------------
+
+test('FIX 2: distinct raw scores that round to the same 2dp value are ordered by raw score, not by id', function () {
+  // Both GLOBAL (scope 0), same category, line price 1.00.
+  //   id 50 price 1.100 -> rel .100 -> raw 0.7*0.900 = 0.6300 -> display 0.63
+  //   id 51 price 1.095 -> rel .095 -> raw 0.7*0.905 = 0.6335 -> display 0.63
+  // Raw: 51 (0.6335) > 50 (0.6300). Rounded: tie at 0.63 -> id asc would put 50 first.
+  const rawProducts = [
+    { id: 50, list_term: 'Tea Fifty',    matched_product: 'Tea Fifty',    category: 'tea', household_id: null, price: 1.100 },
+    { id: 51, list_term: 'Tea FiftyOne', matched_product: 'Tea FiftyOne', category: 'tea', household_id: null, price: 1.095 }
+  ];
+  const line = { item_name: 'Mystery Tea', category: 'tea', out_of_stock: true, price: 1.00 };
+  const alts = rankAlternatives(line, rawProducts, HH);
+  assert.deepEqual(alts.map(function (a) { return a.name; }), ['Tea FiftyOne', 'Tea Fifty'],
+    'higher RAW score (id 51) sorts first, even though it has the higher id');
+  assert.equal(alts[0].score, alts[1].score,
+    'both display the same rounded score (0.63) -- proving the sort used the raw value, not the display');
+  assert.equal(alts[0].score, 0.63);
+});
+
+// ---------------------------------------------------------------------
+// FIX 3 (FOLD): the ranked list is capped at TOP_N (5). A large same-category
+// set must not produce an unbounded payload.
+// ---------------------------------------------------------------------
+
+test('FIX 3: the alternatives payload is capped at 5 (TOP_N), best-first', function () {
+  const many = [];
+  for (let i = 0; i < 8; i++) {
+    many.push({
+      id: 200 + i,
+      list_term: 'Bulk Juice ' + i,
+      matched_product: 'Bulk Juice ' + i,
+      category: 'juice',
+      household_id: HH,
+      price: 1.00 + i * 0.10
+    });
+  }
+  const alts = rankAlternatives(
+    { item_name: 'Mystery Juice', category: 'juice', out_of_stock: true, price: 1.30 },
+    many, HH
+  );
+  assert.equal(alts.length, 5, '8 same-category candidates are capped to the top 5');
+  let prev = Infinity;
+  alts.forEach(function (a) { assert.ok(a.score <= prev); prev = a.score; });
+});
+
+// ---------------------------------------------------------------------
+// FIX 4 (FOLD): degenerate-row guard + id-less self exclusion.
+//   * a candidate with no usable identity (empty matched_product) is dropped.
+//   * the line's own product is excluded even when it carries no id (by name),
+//     where the old id-only check re-suggested it.
+// ---------------------------------------------------------------------
+
+test('FIX 4: a nameless candidate is dropped, and an id-LESS self product is not re-suggested', function () {
+  const widgets = [
+    // self product for the line: matches by term, carries NO id.
+    { list_term: 'Widget', matched_product: 'No-Id Widget', category: 'widgets', household_id: HH },
+    // a genuine alternative.
+    { id: 60, list_term: 'Gadget', matched_product: 'Other Widget', category: 'widgets', household_id: HH },
+    // degenerate: same category, in scope, but NO usable name -> must be dropped.
+    { id: 61, list_term: 'Nameless', matched_product: '', category: 'widgets', household_id: HH }
+  ];
+  const alts = rankAlternatives(
+    { item_name: 'Widget', out_of_stock: true },
+    widgets, HH
+  );
+  const names = alts.map(function (a) { return a.name; });
+  assert.ok(!names.includes('No-Id Widget'),
+    'the id-less self product is excluded by name, not re-suggested');
+  assert.ok(!names.some(function (n) { return normalise(n) === ''; }),
+    'no nameless (degenerate) candidate is surfaced');
+  assert.deepEqual(names, ['Other Widget'], 'only the genuine alternative remains');
+
+  function normalise(v) { return v === null || v === undefined ? '' : String(v).trim(); }
+});
+
+// ---------------------------------------------------------------------
+// FIX 5 (COSMETIC): priceOf() treats a non-positive price as "no price" (null).
+// A candidate priced 0 contributes a NEUTRAL price component and reports its
+// price as null / "price unknown".
+// ---------------------------------------------------------------------
+
+test('FIX 5: a non-positive price is treated as unknown (null), not a real GBP 0.00 shelf price', function () {
+  const freebies = [
+    { id: 70, list_term: 'Free Juice',  matched_product: 'Free Juice 1L',  category: 'juice', household_id: HH, price: 0 },
+    { id: 71, list_term: 'Cheap Juice', matched_product: 'Cheap Juice 1L', category: 'juice', household_id: HH, price: -5 }
+  ];
+  const alts = rankAlternatives(
+    { item_name: 'Mystery Juice', category: 'juice', out_of_stock: true, price: 1.30 },
+    freebies, HH
+  );
+  assert.equal(alts.length, 2);
+  alts.forEach(function (a) {
+    assert.equal(a.price, null, 'a non-positive price surfaces as null, never 0 or a negative');
+    assert.ok(a.reason.includes('price unknown'), 'the reason reports the price as unknown');
+  });
+});

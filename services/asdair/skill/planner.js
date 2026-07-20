@@ -178,11 +178,14 @@ function compareProductIds(a, b) {
   return 0;
 }
 
-// Coerce a raw price to a finite number, or null when it is absent/unusable.
+// Coerce a raw price to a POSITIVE finite number, or null when it is absent or
+// unusable. A non-positive value (0 or negative) is never a real shelf price, so
+// it is treated as "no price known" -> null (price proximity stays neutral).
 function priceOf(value) {
   if (value === null || value === undefined || value === '') return null;
   const n = Number(value);
-  return Number.isFinite(n) ? n : null;
+  if (!Number.isFinite(n)) return null;
+  return n > 0 ? n : null;
 }
 
 // ---------------------------------------------------------------------
@@ -197,15 +200,32 @@ function priceOf(value) {
 // NEVER sets or writes matched_product. The planner attaches the returned array
 // to the line additively; nothing here mutates the line or a product.
 //
-// Candidate rule (all three must hold):
-//   1. SAME CATEGORY as the line. The target category is taken from the line's
-//      own in-scope product mapping(s) when it has one, else the resolved match,
-//      else the line's category hint. With no determinable category we cannot
-//      say "same category" -> [].
+// Candidate rule (all four must hold):
+//   1. SAME CATEGORY as the line, resolved by a strict FALLBACK CHAIN (not a
+//      union across sources):
+//        (a) the categories of the line's own same-term, in-scope products, if
+//            that set is non-empty. A term that maps to products spanning MORE
+//            THAN ONE category legitimately unions those categories -- but the
+//            union is confined to THIS tier (the ambiguous-mapping case);
+//        (b) ELSE the resolved self product's category;
+//        (c) ELSE the line's own free-text category hint.
+//      Because tier (c) is reached ONLY when no product mapping yielded a
+//      category, a stale or conflicting hint on a line that DOES map to a
+//      product is ignored -- it can never drag in a wrong-category candidate.
+//      With no determinable category we cannot say "same category" -> [].
 //   2. IN HOUSEHOLD SCOPE (global or the active household). A product owned by
 //      ANOTHER household is NEVER surfaced (no cross-household leak).
 //   3. NOT the line's own currently matched product (that is the item that is
 //      out of stock / the resolved ambiguous pick; suggesting it back is noise).
+//      Excluded by id when the self product has one, else by normalised name.
+//   4. USABLE IDENTITY: the candidate must carry a non-empty matched_product
+//      name (a nameless row is noise a human cannot act on).
+//
+// The ranked list is capped at the top TOP_N (5) suggestions after sorting, so
+// the payload stays bounded regardless of how many products share the category.
+// Sorting is on the UNROUNDED raw score; round2 is applied only to the returned
+// display `score`, so two genuinely distinct raw scores never collapse to an
+// id-order tie.
 //
 // Ranking (higher score = better; deterministic tie-break by product id asc):
 //   * PRICE PROXIMITY (primary, weight 0.7): closeness of the candidate price to
@@ -217,6 +237,10 @@ function priceOf(value) {
 //   * HOUSEHOLD PREFERENCE (secondary, weight 0.3): a candidate owned by the
 //     active household outranks an equally-priced global one.
 // ---------------------------------------------------------------------
+// Maximum number of ranked suggestions returned for one line. Keeps the payload
+// bounded (a 500-product category would otherwise yield 500 alternatives).
+const TOP_N = 5;
+
 function rankAlternatives(line, products, household) {
   const list = Array.isArray(products) ? products : [];
   if (!line) return [];
@@ -227,34 +251,66 @@ function rankAlternatives(line, products, household) {
   const selfMatch = matchProduct(line, list, household);
   const selfProduct = selfMatch.product || null;
 
-  // Target category set. Prefer the categories of the line's own in-scope
-  // same-term products (covers the ambiguous case with several mappings), then
-  // the resolved self product, then the line's own category hint.
+  // Target category set, resolved by a strict FALLBACK CHAIN (see the contract
+  // comment above). Each tier is consulted ONLY when the tiers above it produced
+  // no category, so a line that maps to a product is never contaminated by a
+  // stale/conflicting free-text category hint.
   const term = normaliseTerm(line.item_name);
   const targetCategories = Object.create(null);
+
+  // Tier (a): categories of the line's own same-term, in-scope products. A term
+  // mapping to products in >1 category unions them HERE (the ambiguous case);
+  // the union never spills across tiers.
   list.forEach(function (p) {
     if (!inHouseholdScope(p, household)) return;
     if (term === '' || normaliseTerm(p.list_term) !== term) return;
     const c = normaliseTerm(p.category);
     if (c !== '') targetCategories[c] = true;
   });
-  if (selfProduct) {
+
+  // Tier (b): only when tier (a) was empty, fall back to the resolved self
+  // product's category.
+  if (Object.keys(targetCategories).length === 0 && selfProduct) {
     const sc = normaliseTerm(selfProduct.category);
     if (sc !== '') targetCategories[sc] = true;
   }
-  const lineCat = normaliseTerm(line.category);
-  if (lineCat !== '') targetCategories[lineCat] = true;
+
+  // Tier (c): only when neither tier above yielded a category, fall back to the
+  // line's own free-text category hint.
+  if (Object.keys(targetCategories).length === 0) {
+    const lineCat = normaliseTerm(line.category);
+    if (lineCat !== '') targetCategories[lineCat] = true;
+  }
 
   if (Object.keys(targetCategories).length === 0) return [];
 
   const targetPrice = priceOf(line.price);
+
+  // The self product's identity, used to exclude it from its own suggestions
+  // (rule 3). Prefer id; fall back to normalised name when the self product
+  // carries no id (an id-less self product would otherwise be re-suggested).
+  const selfHasId = selfProduct
+    && selfProduct.id !== null && selfProduct.id !== undefined;
+  const selfName = selfProduct ? normaliseTerm(selfProduct.matched_product) : '';
 
   // Build the candidate set.
   const candidates = list.filter(function (p) {
     if (!inHouseholdScope(p, household)) return false;                    // rule 2
     const cat = normaliseTerm(p.category);
     if (cat === '' || !targetCategories[cat]) return false;               // rule 1
-    if (selfProduct && sameHousehold(p.id, selfProduct.id)) return false; // rule 3
+    // rule 4: a candidate must carry a usable identity (a non-empty name).
+    const candName = normaliseTerm(p.matched_product);
+    if (candName === '') return false;
+    // rule 3: never suggest the line's own product back. By id when BOTH the
+    // self product and this candidate carry one, else by normalised name.
+    if (selfProduct) {
+      const candHasId = p.id !== null && p.id !== undefined;
+      if (selfHasId && candHasId) {
+        if (sameHousehold(p.id, selfProduct.id)) return false;
+      } else if (selfName !== '' && candName === selfName) {
+        return false;
+      }
+    }
     return true;
   });
 
@@ -268,7 +324,9 @@ function rankAlternatives(line, products, household) {
     const isHousehold = p.household_id !== null && p.household_id !== undefined
       && sameHousehold(p.household_id, household);
     const scopeScore = isHousehold ? 1 : 0;
-    const score = round2(0.7 * priceScore + 0.3 * scopeScore);
+    // Keep the UNROUNDED score for sorting; round only for the display value so
+    // two distinct raw scores never collapse into an id-order tie.
+    const rawScore = 0.7 * priceScore + 0.3 * scopeScore;
 
     const parts = ['same category (' + normaliseTerm(p.category) + ')'];
     parts.push(isHousehold ? 'household preference' : 'global option');
@@ -282,20 +340,23 @@ function rankAlternatives(line, products, household) {
 
     return {
       _id: p.id,
+      _raw: rawScore,
       name: p.matched_product,
       price: candPrice,
       reason: parts.join('; '),
-      score: score
+      score: round2(rawScore)
     };
   });
 
   scored.sort(function (a, b) {
-    if (b.score !== a.score) return b.score - a.score;   // best score first
+    if (b._raw !== a._raw) return b._raw - a._raw;       // best RAW score first
     return compareProductIds(a._id, b._id);              // deterministic tie-break
   });
 
-  // Strip the internal sort key; the public shape is { name, price, reason, score }.
-  return scored.map(function (a) {
+  // Cap the payload at the top TOP_N suggestions (bounded output regardless of
+  // how many products share the category), then strip the internal sort keys;
+  // the public shape is { name, price, reason, score }.
+  return scored.slice(0, TOP_N).map(function (a) {
     return { name: a.name, price: a.price, reason: a.reason, score: a.score };
   });
 }
