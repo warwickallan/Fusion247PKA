@@ -150,47 +150,40 @@ async function fireTriggers(pool, { turnId, buildRef, turnSeq, nextState, r, blo
     buildRef, turnSeq, turnId, state: nextState, verdict: r.verdict,
     summary: r.summary, nextAction: r.next_action, warwickNeeded: r.warwick_needed,
   };
-  const out = [];
-  if (blocked) {
-    out.push(await notifyFn(pool, {
-      turnId, reason: 'tower_failure', state: nextState,
-      message: composeMessage({ ...base, summary: `Tower supervisor unavailable — ${r.summary}` }),
-    }));
-  }
-
-  // Merge-class QA gate.
   const mergeBlocked = merge?.isMergeClass && merge.blocked;
   const mergeNotApprove = merge?.isMergeClass && !merge.blocked && merge.verdict !== 'approve';
-  if (mergeBlocked) {
-    out.push(await notifyFn(pool, {
-      turnId, reason: 'tower_failure', state: nextState,
-      message: composeMessage({ ...base, warwickNeeded: true, summary: `Merge-class QA could NOT verify Git evidence — ${merge.summary ?? 'evidence unresolved'}` }),
-    }));
-  } else if (mergeNotApprove) {
-    out.push(await notifyFn(pool, {
-      turnId, reason: 'codex_block_or_redirect', state: nextState,
-      message: composeMessage({ ...base, warwickNeeded: true, summary: `Merge-class QA verdict=${merge.verdict} — ${merge.summary ?? r.summary}` }),
-    }));
-  }
+  const mergeLine = merge?.isMergeClass
+    ? ` | Merge-class QA verdict=${mergeBlocked ? 'BLOCKED (evidence unresolved)' : merge.verdict}${merge.summary ? ` — ${merge.summary}` : ''}`
+    : '';
 
-  if (r.verdict === 'ask_warwick' || r.warwick_needed === true) {
-    out.push(await notifyFn(pool, { turnId, reason: 'warwick_input_required', state: nextState, message: composeMessage(base) }));
-  }
-  if (r.verdict === 'block' || r.verdict === 'correct') {
-    out.push(await notifyFn(pool, { turnId, reason: 'codex_block_or_redirect', state: nextState, message: composeMessage(base) }));
-  }
-
-  // goal_complete only when the caller signalled it AND (not merge-class, or merge-class QA
-  // approved). A blocked / non-approve merge-class QA withholds the completion ping.
-  const goalOk = goalComplete === true && !mergeBlocked && !mergeNotApprove;
-  if (goalOk) {
+  // ONE durable turn -> ONE notification. Previously each matched trigger fired its own Telegram,
+  // so an ask_warwick turn whose merge-class QA also requested changes sent TWO messages. Now we
+  // pick the single highest-priority reason and fold the merge-class QA verdict into that one
+  // message. Priority: tower_failure > warwick_input_required > codex_block_or_redirect > goal_complete.
+  let reason = null;
+  let state = nextState;
+  let summary = r.summary;
+  let warwickNeeded = r.warwick_needed === true;
+  if (blocked || mergeBlocked) {
+    reason = 'tower_failure'; warwickNeeded = true;
+    summary = blocked
+      ? `Tower supervisor unavailable — ${r.summary}`
+      : `Merge-class QA could NOT verify Git evidence — ${merge.summary ?? 'evidence unresolved'}`;
+  } else if (r.verdict === 'ask_warwick' || r.warwick_needed === true) {
+    reason = 'warwick_input_required'; warwickNeeded = true; summary = `${r.summary}${mergeLine}`;
+  } else if (r.verdict === 'block' || r.verdict === 'correct' || mergeNotApprove) {
+    reason = 'codex_block_or_redirect'; warwickNeeded = mergeNotApprove || r.warwick_needed === true;
+    summary = `${r.summary}${mergeLine}`;
+  } else if (goalComplete === true) {
     await pool.query(`update tower.turn set state = 'complete', updated_at = now() where id = $1`, [turnId]);
-    out.push(await notifyFn(pool, {
-      turnId, reason: 'goal_complete', state: 'complete',
-      message: composeMessage({ ...base, state: 'complete', summary: `Goal complete — ${r.summary}` }),
-    }));
+    reason = 'goal_complete'; state = 'complete'; summary = `Goal complete — ${r.summary}`;
   }
-  return out;
+
+  if (!reason) return []; // continue / aligned -> SILENT (no Telegram)
+  return [await notifyFn(pool, {
+    turnId, reason, state,
+    message: composeMessage({ ...base, state, warwickNeeded, summary }),
+  })];
 }
 
 // ── lease renewer (FIX 4) ─────────────────────────────────────────────────────
