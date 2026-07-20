@@ -14,6 +14,7 @@
     "test:wpd0": "node test/run-wpd0-tests.mjs",
     "test:outbox": "node db/test/run-outbox-tests.mjs",
     "test:notifier": "node notifier/test/run-notifier-tests.mjs",
+    "test:tower-loop": "node tower-loop/test/run-tower-loop-tests.mjs",
     "test": "node db/test/run-db-tests.mjs && node db/test/run-contract-tests.mjs && node db/test/run-registry-tests.mjs && node review/test/run-runtime-tests.mjs && node worker/test/run-worker-tests.mjs && node test/run-wpc-tests.mjs && node test/run-wpd0-tests.mjs && node db/test/run-outbox-tests.mjs && node notifier/test/run-notifier-tests.mjs"
   },
   "devDependencies": {

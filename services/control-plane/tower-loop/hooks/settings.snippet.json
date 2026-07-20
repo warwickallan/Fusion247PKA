@@ -1,0 +1,16 @@
+{
+  "//": "FIX 2 — paste this hooks block into .claude/settings.json (merge with any existing hooks). The Stop hook fires when Larry finishes a turn; bridge-ingest.mjs reads the hook JSON on stdin (session_id, transcript_path), extracts the last instruction + Larry's response, and idempotently ingests one pending Tower turn. CONTROL_PLANE_DEV_DATABASE_URL must be in the session env. Use an ABSOLUTE path to bridge-ingest.mjs. Exits 0 always (never blocks the session).",
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node C:/Fusion247PKA/services/control-plane/tower-loop/bridge-ingest.mjs"
+          }
+        ]
+      }
+    ]
+  }
+}

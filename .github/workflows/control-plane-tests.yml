@@ -100,3 +100,14 @@ jobs:
         # fail-closed (no revive-old-head), including a genuine multi-connection race (no
         # deadlock); and redelivery stays convergent (monotonic head, single build_head row).
         run: npm run test:wpd0
+
+      - name: Tower-loop — supervisor watcher CI acceptance (deterministic doubles)
+        # run-tower-loop-tests.mjs. Same Postgres service container (uses DATABASE_URL) + the
+        # same 0-executed-subtest guard. Spawns the REAL watcher.mjs child processes with a
+        # FAKE reviewer (canned verdicts, no Codex) and a FAKE Telegram transport (no network),
+        # injected via env, and proves on the exact PR head: ingest→claim→process→verdict→notify,
+        # notification dedup, restart recovery, crash-reclaim, the merge-class QA routing
+        # (Tower QA skill over staged Git evidence, incl. fail-closed BLOCK), and exactly-once
+        # during a long run with a concurrent watcher (lease renewal + unique(turn_id) backstop).
+        # Real Codex/Telegram/Supabase acceptance stays separate (accept.mjs, run by Warwick).
+        run: npm run test:tower-loop
