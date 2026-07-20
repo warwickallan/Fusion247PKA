@@ -12,6 +12,11 @@
 import { STATES, MAX_DELIVERY_ATTEMPTS } from './core/states.js';
 import { computeNextAttemptAtMs } from './core/retryPolicy.js';
 import { projectCard } from './receiptProjection.js';
+import { deriveRawObject } from './transcription/transcriptionStage.js';
+
+// Multimodal source types the transcription stage handles. A capture of any other
+// type (text) NEVER enters the transcription branch — the text path is unchanged.
+const TRANSCRIBABLE_TYPES = Object.freeze(['image', 'voice']);
 
 // Build the card model for an edit, enriched with the DURABLE card target
 // (chat_id + message_id) from the record's persisted card_ref (§4). This is what
@@ -39,8 +44,14 @@ function cardModelFor(record) {
  * @param {object} [deps.accessLog]     F-05 access logger. Optional; when present,
  *                 the governed capture_write is logged (principal/capture_id/when/
  *                 outcome) — secret-free, never the payload text.
+ * @param {object} [deps.transcriptionStage]  OPT-IN multimodal stage (D1). When
+ *                 present, a claimed capture whose technical_source_type is
+ *                 'image'|'voice' runs transcription (OCR/STT via the injected
+ *                 transcriber) BEFORE the governed write — so a transcription
+ *                 failure retries via the SAME bounded-retry -> dead-letter saga.
+ *                 Absent (default) → the text-only path is completely unchanged.
  */
-export function createWorker({ store, markdownWriter, adapter, clock, workerId, leaseMs, accessLog } = {}) {
+export function createWorker({ store, markdownWriter, adapter, clock, workerId, leaseMs, accessLog, transcriptionStage } = {}) {
   if (!store) throw new Error('createWorker: store required');
   if (!markdownWriter) throw new Error('createWorker: markdownWriter required');
   if (!adapter) throw new Error('createWorker: adapter required');
@@ -89,7 +100,34 @@ export function createWorker({ store, markdownWriter, adapter, clock, workerId, 
       try {
         // 3. Governed Markdown write (idempotent). Re-processing an already-
         //    written capture detects the existing note and does NOT rewrite.
-        const record = await store.getByCaptureId(captureId);
+        let record = await store.getByCaptureId(captureId);
+
+        // 3a. MULTIMODAL TRANSCRIPTION STAGE (D1) — opt-in, guarded. Runs inside
+        //     this try block so an OCR/STT failure is an HONEST failure that
+        //     retries via the existing bounded-retry -> dead-letter saga (one
+        //     evidence trail). For 'image' the OCR text is normalised into a
+        //     structured list; for 'voice' the transcript text is the note body.
+        //     Both then flow into the UNCHANGED governed write seam (D2). The
+        //     text path never enters here, so it is byte-for-byte unchanged.
+        if (transcriptionStage && TRANSCRIBABLE_TYPES.includes(record.technical_source_type)) {
+          const rawObject = deriveRawObject(record);
+          const transcription = record.technical_source_type === 'image'
+            ? await transcriptionStage.transcribe(rawObject)
+            : await transcriptionStage.transcribeVoice(rawObject);
+          // Enrich the record handed to the writer (in-memory only — the store
+          // schema is unchanged; raw_object schema seam is flagged for Silas). The
+          // writer renders `transcription` when present; text_preview carries the
+          // transcript so the note is never empty (fixes the 2026-07-16 empty-note
+          // defect for non-text). Structured-table (asdair) write is the remainder.
+          record = {
+            ...record,
+            text_preview: (typeof transcription.text === 'string' && transcription.text.trim().length > 0)
+              ? transcription.text.slice(0, 280)
+              : record.text_preview,
+            transcription,
+          };
+        }
+
         const result = markdownWriter.write(record, { now });
 
         // 4. Record destination pointer, then writing → written.

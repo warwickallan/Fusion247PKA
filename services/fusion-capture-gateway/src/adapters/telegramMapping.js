@@ -68,10 +68,18 @@ export function deriveCaptureId(idempotencyKey) {
  * @param {string|number} args.authorisedUserId  the single allowlisted numeric id
  * @param {string} [args.action]         chosen capture action
  * @param {string} [args.defaultAction]  default action when none chosen
+ * @param {boolean} [args.acceptMultimodal]  OPT-IN (default false). When false the
+ *        WP0 text-only contract is UNCHANGED — an authorised private photo/voice
+ *        update is rejected 'unsupported_content_type'. When true an authorised
+ *        PRIVATE photo or voice note is ACCEPTED and mapped onto a multimodal
+ *        envelope (technical_source_type 'image'|'voice') carrying a raw_object
+ *        pointer. Default-off keeps the live path text-only until the isolated
+ *        remainder (real getFile→bucket byte-fetch + OCR/STT model + credential)
+ *        is wired. Non-photo/voice non-text (document/sticker/…) still rejects.
  * @returns {{ ok:true, value:Envelope, senderId:string }
  *          | { ok:false, reason:string, senderId:(string|null) }}
  */
-export function mapTelegramUpdate({ update, now, authorisedUserId, action, defaultAction = 'SaveToBrain' } = {}) {
+export function mapTelegramUpdate({ update, now, authorisedUserId, action, defaultAction = 'SaveToBrain', acceptMultimodal = false } = {}) {
   if (typeof now !== 'number' || !Number.isFinite(now)) {
     throw new Error('mapTelegramUpdate: injected numeric `now` (epoch ms) required');
   }
@@ -124,6 +132,19 @@ export function mapTelegramUpdate({ update, now, authorisedUserId, action, defau
   // notice — is reachable ONLY inside the authorised user's own private chat.
   const text = typeof message.text === 'string' ? message.text : '';
   if (text.trim().length === 0) {
+    // MULTIMODAL OPT-IN (G2). Only reachable here — for an AUTHORISED sender in
+    // their OWN PRIVATE chat — so the security ORDER is preserved exactly: a
+    // stranger's photo was already refused 'unauthorised_sender', and a group
+    // photo already refused 'non_private_chat', BEFORE any content inspection.
+    // When enabled, a photo → 'image' envelope and a voice note → 'voice'
+    // envelope, each with a raw_object pointer. Anything else non-text
+    // (document/sticker/empty text) falls through to the unchanged rejection.
+    if (acceptMultimodal) {
+      const multimodal = mapMultimodalMessage({
+        message, senderId, now, action, defaultAction,
+      });
+      if (multimodal) return { ok: true, value: multimodal, senderId };
+    }
     return { ok: false, reason: 'unsupported_content_type', senderId };
   }
 
@@ -169,6 +190,153 @@ export function mapTelegramUpdate({ update, now, authorisedUserId, action, defau
   });
 
   return { ok: true, value: envelope, senderId };
+}
+
+// ---------------------------------------------------------------------------
+// MULTIMODAL MAPPING (G2) — photo + voice. Pure + deterministic (injected `now`),
+// no I/O, no logging, no byte-fetch. The actual media bytes are NOT downloaded
+// here: the envelope carries a raw_object POINTER (Telegram file_id + the private
+// bucket object_key it WILL land at). The durable getFile → bucket write and the
+// OCR/STT model call are the isolated remainder (see the transcription stage).
+// ---------------------------------------------------------------------------
+
+// Telegram delivers a photo as an array of PhotoSize thumbnails in ascending
+// size. Choose the LARGEST (best OCR fidelity); tie-break to the last element.
+function largestPhoto(photoArray) {
+  let best = null;
+  let bestArea = -1;
+  for (const p of photoArray) {
+    if (!p || typeof p !== 'object' || typeof p.file_id !== 'string') continue;
+    const area = (Number(p.width) || 0) * (Number(p.height) || 0);
+    if (area >= bestArea) { bestArea = area; best = p; }
+  }
+  return best;
+}
+
+// Build the channel-neutral raw_object descriptor (G2). `object_key` is the
+// private-bucket key the fetched bytes WILL occupy; it also encodes the stable
+// file reference so the downstream transcriber can locate the bytes. `fetched`
+// is false and `sha256` null until the byte-fetch remainder lands.
+function buildRawObject({ technicalSourceType, contentType, fileId, fileUniqueId, fileIds, bytes }) {
+  const uid = fileUniqueId || fileId;
+  return {
+    technical_source_type: technicalSourceType,
+    store: 'supabase-storage',
+    bucket: 'fcg-raw-private',
+    object_key: `telegram:${technicalSourceType}:${uid}`,
+    content_type: contentType,
+    bytes: Number.isInteger(bytes) && bytes >= 0 ? bytes : null,
+    sha256: null,
+    fetched: false,
+    source: {
+      channel: SOURCE_CHANNEL,
+      file_id: fileId,
+      file_unique_id: fileUniqueId ?? null,
+      file_ids: fileIds,
+    },
+  };
+}
+
+// Assemble a multimodal Capture Envelope from a raw_object descriptor. Mirrors
+// the text path's identity/idempotency semantics: the idempotency key folds the
+// stable per-file id, so a RE-SENT identical photo/voice dedups to one capture.
+function envelopeFromRawObject({
+  message, senderId, now, action, defaultAction, technicalSourceType, rawObject, dedupPayload,
+}) {
+  const messageId = message.message_id;
+  const channelNativeMessageId = `chat:${senderId}:msg:${messageId}`;
+  const idempotencyKey = buildIdempotencyKey({
+    source_channel: SOURCE_CHANNEL,
+    channel_native_message_id: channelNativeMessageId,
+    raw_payload: dedupPayload,
+  });
+  const captureId = deriveCaptureId(idempotencyKey);
+  const iso = new Date(now).toISOString();
+  const caption = typeof message.caption === 'string' ? message.caption : '';
+
+  return createEnvelope({
+    capture_id: captureId,
+    idempotency_key: idempotencyKey,
+    source_channel: SOURCE_CHANNEL,
+    sender_identity_ref: `telegram:user:${senderId}`,
+    channel_principal_ref: senderId,
+    recorded_intent: intentFromAction(action ?? defaultAction),
+    technical_source_type: technicalSourceType,
+    // raw_payload_ref IS the raw_object pointer (contract §5: telegram_file_id via
+    // object_key, sha256/bytes-in-store). Bytes present only when Telegram gave a
+    // size; sha256 is added by the byte-fetch remainder.
+    raw_payload_ref: {
+      store: rawObject.store,
+      object_key: rawObject.object_key,
+      content_type: rawObject.content_type,
+      ...(rawObject.bytes !== null ? { bytes: rawObject.bytes } : {}),
+    },
+    // The untouched original media is retained (matrix §2) in the channel/bucket.
+    original_source_ref: {
+      store: rawObject.store,
+      object_key: rawObject.object_key,
+      message_ref: `telegram:file:${rawObject.source.file_id}`,
+      retained: true,
+    },
+    // Self-describing raw_object descriptor (G2). Extra field: validateEnvelope
+    // ignores it. The durable store persists technical_source_type + the pointer;
+    // the transcription stage reconstructs raw_object via deriveRawObject(record).
+    raw_object: rawObject,
+    captured_at: iso,
+    received_at: iso,
+    text_preview: caption.slice(0, 280),
+    channel_context: { chat_id: senderId, message_id: messageId },
+  });
+}
+
+/**
+ * Map an authorised, private, non-text message onto a multimodal envelope.
+ * Returns the Envelope for a photo or voice note, or null for any other
+ * non-text kind (document/sticker/…) — the caller then rejects as
+ * 'unsupported_content_type'. Only reached when acceptMultimodal is on.
+ */
+function mapMultimodalMessage({ message, senderId, now, action, defaultAction }) {
+  // PHOTO → technical_source_type 'image'.
+  if (Array.isArray(message.photo) && message.photo.length > 0) {
+    const p = largestPhoto(message.photo);
+    if (!p) return null;
+    const rawObject = buildRawObject({
+      technicalSourceType: 'image',
+      contentType: 'image/jpeg',
+      fileId: p.file_id,
+      fileUniqueId: p.file_unique_id,
+      fileIds: message.photo.map((x) => (x && x.file_id) || null).filter(Boolean),
+      bytes: p.file_size,
+    });
+    return envelopeFromRawObject({
+      message, senderId, now, action, defaultAction,
+      technicalSourceType: 'image',
+      rawObject,
+      dedupPayload: p.file_unique_id || p.file_id,
+    });
+  }
+
+  // VOICE → technical_source_type 'voice'.
+  const v = message.voice;
+  if (v && typeof v === 'object' && typeof v.file_id === 'string') {
+    const rawObject = buildRawObject({
+      technicalSourceType: 'voice',
+      contentType: (typeof v.mime_type === 'string' && v.mime_type) ? v.mime_type : 'audio/ogg',
+      fileId: v.file_id,
+      fileUniqueId: v.file_unique_id,
+      fileIds: [v.file_id],
+      bytes: v.file_size,
+    });
+    return envelopeFromRawObject({
+      message, senderId, now, action, defaultAction,
+      technicalSourceType: 'voice',
+      rawObject,
+      dedupPayload: v.file_unique_id || v.file_id,
+    });
+  }
+
+  // Document / sticker / other non-text: not handled by this increment.
+  return null;
 }
 
 /**
