@@ -168,13 +168,22 @@ def build_inbox_argv(args: argparse.Namespace) -> list[str]:
     return argv
 
 
-def run_once(args: argparse.Namespace) -> int:
+def run_once(args: argparse.Namespace, *, skip_pairs=None) -> int:
     """Drive the inbox pipeline exactly once. Returns the inbox reader's exit code
-    (0 = nothing new / all good, 2 = an honest extraction failure to retry)."""
+    (0 = nothing new / all good, 2 = an honest extraction failure to retry).
+
+    ``skip_pairs`` (optional): retry-ceiling-exhausted (capture_name, video_id) pairs
+    the inbox must NOT fetch this cycle (Fix 3). Only forwarded when non-empty so the
+    single hand-run code path (`tubeair_inbox.main(argv)`) is preserved verbatim when
+    there is nothing to skip — and so a test that stubs `tubeair_inbox.main` with a
+    one-arg signature keeps working on the no-exhausted-work path."""
     argv = build_inbox_argv(args)
     _log("cycle_start", inbox=args.inbox, out=args.out, handoff=bool(args.handoff),
-         dry_run=bool(args.dry_run))
-    code = tubeair_inbox.main(argv)
+         dry_run=bool(args.dry_run), skip_exhausted=(len(skip_pairs) if skip_pairs else 0))
+    if skip_pairs:
+        code = tubeair_inbox.main(argv, skip_pairs=skip_pairs)
+    else:
+        code = tubeair_inbox.main(argv)
     _log("cycle_end", exit_code=code)
     return code
 
@@ -209,13 +218,22 @@ def _ledger_load(path: Path) -> dict:
         on_recover=lambda msg: _log("ledger_recovered", note=msg))
 
 
-def _ledger_save(path: Path, ledger: dict) -> None:
+def _ledger_save(path: Path, ledger: dict) -> bool:
+    """Atomically persist the ledger. Returns True on success, False on a write
+    failure. A failure must NOT kill the watcher AND must NOT be silently ignored:
+    the caller keeps the in-memory ledger authoritative for the session (so retry
+    accounting — and the anti-hammer guarantee — still hold this run) and surfaces the
+    degraded durability loudly (Fix 2). Passes the ledger validator so a corrupt
+    on-disk primary is never rotated over a good .bak (Fix 1)."""
     try:
         # Atomic write + .bak rotation (no torn ledgers). Shared with the inbox state.
-        tubeair_inbox.atomic_write_json(path, ledger)
-    except OSError as exc:
-        # A write failure must not kill the watcher; the next cycle re-persists.
-        _log("ledger_save_failed", error=f"{type(exc).__name__}: {exc}")
+        tubeair_inbox.atomic_write_json(path, ledger, validate=_validate_ledger)
+        return True
+    except Exception as exc:  # noqa: BLE001 — a ledger save must never kill the watcher
+        _log("ledger_save_failed", error=f"{type(exc).__name__}: {exc}",
+             note="in-memory ledger stays authoritative for this session; on-disk "
+                  "durability degraded until a write succeeds")
+        return False
 
 
 def _pair_key(capture_name: str, video_id: str) -> str:
@@ -304,6 +322,7 @@ def watch(args: argparse.Namespace) -> int:
     cycles = 0
     last_code = 0
     consecutive_failures = 0
+    ledger_durable = True  # flips False the first time a ledger disk-write fails
 
     while not _STOP:
         cycles += 1
@@ -325,7 +344,9 @@ def watch(args: argparse.Namespace) -> int:
         errored = False
         if run_inbox:
             try:
-                last_code = run_once(args)
+                # Fix 3: tell the inbox to skip exhausted pairs so a stuck video gets
+                # ZERO egress even when a fresh healthy capture triggers this run.
+                last_code = run_once(args, skip_pairs=(exhausted or None))
             except KeyboardInterrupt:
                 _log("interrupted", note="KeyboardInterrupt during cycle")
                 break
@@ -335,12 +356,14 @@ def watch(args: argparse.Namespace) -> int:
                 _log("cycle_error", error=f"{type(exc).__name__}: {exc}",
                      note="isolated; will retry next cycle")
 
-            # Update the retry ledger from the inbox's own post-cycle state: any
-            # pair we attempted that is now processed = success (clear); still
-            # pending = one more failed attempt.
+            # Update the retry ledger from the inbox's own post-cycle state. We only
+            # touch the pairs we ACTUALLY drove this cycle — the fresh ones. Exhausted
+            # pairs were skipped (Fix 3), so their counters must freeze at the ceiling,
+            # never inflate past it. A driven pair now processed = success (clear);
+            # still pending = one more failed attempt.
             if pending is not None:
                 processed_after = _processed_pairs(args)
-                for pair in pending:
+                for pair in fresh:
                     key = _pair_key(*pair)
                     if pair in processed_after:
                         attempts.pop(key, None)
@@ -350,7 +373,25 @@ def watch(args: argparse.Namespace) -> int:
                             _log("retry_exhausted", capture=pair[0], video_id=pair[1],
                                  attempts=attempts[key],
                                  note="giving up auto-retry; stops hammering YouTube")
-                _ledger_save(ledger_path, ledger)
+                if not _ledger_save(ledger_path, ledger):
+                    # Fix 2: the ledger could not be persisted. Do NOT pretend it is
+                    # durable — surface loudly (once, on the first failure). The
+                    # in-memory `attempts` dict remains authoritative for this running
+                    # session, so the anti-hammer accounting is NOT lost mid-run; only
+                    # durability across a restart is degraded.
+                    if ledger_durable:
+                        print("[tubeair_watch] WARNING: retry ledger could not be "
+                              "persisted to disk. In-memory retry accounting remains "
+                              "authoritative for THIS session (the anti-hammer ceiling "
+                              "is still enforced), but a restart could lose it — a "
+                              "stuck video could then be re-fetched up to the ceiling "
+                              "again. Check disk space / permissions for: "
+                              f"{ledger_path}", file=sys.stderr, flush=True)
+                        _log("ledger_durability_degraded", ledger_path=str(ledger_path),
+                             note="ledger disk-write failing; in-memory accounting "
+                                  "authoritative for this session, durability lost "
+                                  "across a restart until a write succeeds")
+                    ledger_durable = False
         else:
             # Nothing worth fetching — do not touch YouTube.
             last_code = 0
@@ -378,7 +419,8 @@ def watch(args: argparse.Namespace) -> int:
                  next_interval_seconds=sleep_for)
         _interruptible_sleep(sleep_for)
 
-    _log("watch_stop", cycles=cycles, last_exit_code=last_code)
+    _log("watch_stop", cycles=cycles, last_exit_code=last_code,
+         ledger_durable=ledger_durable)
     return last_code
 
 

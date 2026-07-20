@@ -334,6 +334,93 @@ class TestFailedFetchContinues(_StuckHealthyBase):
         self.assertEqual(code, 2)
 
 
+class TestLedgerSaveFailureKeepsInMemoryAuthoritative(_StuckHealthyBase):
+    """Fix 2 — a ledger disk-write failure must not be silently swallowed, and must not
+    re-open the anti-hammer hole for the running session. Even if EVERY ledger save
+    fails, the in-memory retry accounting stays authoritative, so a permanently stuck
+    video is still fetched at most the retry ceiling — not once per cycle."""
+
+    def test_ledger_write_failure_does_not_reopen_anti_hammer_hole(self):
+        self._add_capture("stuck", STUCK_VIDEO_ID)
+        self._patch_sleep_recorder()
+
+        # Fail ONLY the ledger's disk write; the inbox state write still succeeds.
+        real_awj = tubeair_inbox.atomic_write_json
+
+        def _fail_ledger_only(path, data, **kw):
+            if Path(path).name == "_watch_retry.json":
+                raise OSError("fixture: cannot persist retry ledger")
+            return real_awj(path, data, **kw)
+
+        tubeair_inbox.atomic_write_json = _fail_ledger_only
+        self.addCleanup(setattr, tubeair_inbox, "atomic_write_json", real_awj)
+
+        # Collect the structured events so we can prove the degradation was surfaced.
+        events = []
+        real_log = tubeair_watch._log
+        tubeair_watch._log = lambda event, **f: events.append(event)
+        self.addCleanup(setattr, tubeair_watch, "_log", real_log)
+
+        code = tubeair_watch.main(self._base_argv("--interval", "1", "--max-cycles", "8"))
+
+        # The stuck video is fetched at most the ceiling despite every ledger save
+        # failing — the in-memory ledger stayed authoritative for the session.
+        self.assertEqual(self.fetch_counts.get(STUCK_VIDEO_ID),
+                         tubeair_watch.MAX_RETRIES_PER_VIDEO,
+                         "in-memory accounting must cap fetches even when the ledger "
+                         "cannot be persisted (anti-hammer hole must NOT reopen)")
+        # The failure was surfaced, not silently ignored.
+        self.assertIn("ledger_save_failed", events)
+        self.assertIn("ledger_durability_degraded", events)
+        # The degraded event fires ONCE (on the first failure), not every cycle.
+        self.assertEqual(events.count("ledger_durability_degraded"), 1)
+        # The watcher stayed alive and exited cleanly (skips after exhaustion).
+        self.assertEqual(code, 0)
+
+
+class TestExhaustedCaptureGetsZeroEgressAlongsideFreshWork(_StuckHealthyBase):
+    """Fix 3 — an EXHAUSTED (retry-ceiling-hit) capture must get ZERO further egress
+    even when a fresh healthy capture triggers an inbox run. The watcher passes the
+    exhausted (capture, video) set to the inbox, which skips it while still processing
+    the healthy sibling."""
+
+    def _patch_sleep(self):
+        orig = tubeair_watch._interruptible_sleep
+        tubeair_watch._interruptible_sleep = lambda s: None
+        self.addCleanup(setattr, tubeair_watch, "_interruptible_sleep", orig)
+
+    def test_exhausted_video_not_refetched_when_fresh_capture_runs(self):
+        self._add_capture("stuck", STUCK_VIDEO_ID)
+        self._patch_sleep()
+
+        # Phase 1: drive the stuck capture alone until it exhausts the retry ceiling.
+        tubeair_watch.main(self._base_argv(
+            "--interval", "1", "--max-cycles", str(tubeair_watch.MAX_RETRIES_PER_VIDEO + 2)))
+        self.assertEqual(self.fetch_counts.get(STUCK_VIDEO_ID),
+                         tubeair_watch.MAX_RETRIES_PER_VIDEO,
+                         "stuck video must have hit the ceiling in phase 1")
+        # The ledger persisted the exhausted counter to disk (co-located sibling).
+        ledger = tubeair_watch._ledger_load(
+            self.state.with_name("_watch_retry.json"))["attempts"]
+        self.assertEqual(ledger.get(tubeair_watch._pair_key("stuck.md", STUCK_VIDEO_ID)),
+                         tubeair_watch.MAX_RETRIES_PER_VIDEO)
+
+        # Phase 2: a FRESH healthy capture lands. It must be processed, while the
+        # exhausted stuck capture rides along with ZERO further egress.
+        fetches_before = self.fetch_counts.get(STUCK_VIDEO_ID)
+        self._add_capture("healthy", VIDEO_ID)
+        tubeair_watch.main(self._base_argv("--interval", "1", "--max-cycles", "2"))
+
+        # The healthy capture produced its packet and was fetched exactly once.
+        self.assertEqual(len(self._reports_for(VIDEO_ID)), 1,
+                         "fresh healthy capture must still be processed")
+        self.assertEqual(self.fetch_counts.get(VIDEO_ID), 1)
+        # The exhausted stuck capture got ZERO further egress despite the fresh run.
+        self.assertEqual(self.fetch_counts.get(STUCK_VIDEO_ID), fetches_before,
+                         "an exhausted capture must get zero further egress even when "
+                         "a fresh healthy capture triggers an inbox run")
+
+
 class TestSignalAndErrorIsolation(_StuckHealthyBase):
     def test_keyboardinterrupt_during_cycle_stops_gracefully(self):
         self._add_capture("healthy", VIDEO_ID)
@@ -498,6 +585,58 @@ class TestAtomicWriteAndCorruptInboxState(unittest.TestCase):
     def test_truly_fresh_returns_empty_not_error(self):
         # No primary, no backup → genuine first run → empty set (NOT an error).
         self.assertEqual(tubeair_inbox._load_state(self.state), {"processed": {}})
+
+    def test_recovered_backup_not_clobbered_by_corrupt_primary_on_next_save(self):
+        """Fix 1 (regression): backup rotation must NOT destroy the only good copy.
+
+        Sequence that broke the old code:
+          write v1, write v1+v2  → primary={v1,v2}, .bak={v1}
+          primary corrupted on disk; load recovers {v1} from .bak
+          next save → OLD code copied the corrupt primary over the good .bak, so a
+          *subsequent* primary corruption had no valid backup left → last-known-good
+          lost. The saver must validate the primary and refuse to rotate a corrupt one.
+        """
+        v = tubeair_inbox._validate_inbox_state
+        tubeair_inbox.atomic_write_json(self.state, {"processed": {"a": ["v1"]}}, validate=v)
+        tubeair_inbox.atomic_write_json(self.state, {"processed": {"a": ["v1", "v2"]}}, validate=v)
+        # .bak now holds the last-known-good {a:[v1]}; primary holds {a:[v1,v2]}.
+        self.assertEqual(json.loads(self._bak().read_text("utf-8"))["processed"]["a"], ["v1"])
+
+        # Corrupt the primary on disk, then recover from the good .bak on load.
+        self.state.write_text("GARBAGE", encoding="utf-8")
+        recovered = tubeair_inbox._load_state(self.state)
+        self.assertEqual(recovered["processed"]["a"], ["v1"])
+
+        # The next save happens while the on-disk primary is STILL the corrupt copy.
+        recovered["processed"]["a"].append("v3")
+        tubeair_inbox._save_state(self.state, recovered)
+
+        # The .bak must NOT have been clobbered with the corrupt primary content.
+        bak_txt = self._bak().read_text("utf-8")
+        self.assertNotIn("GARBAGE", bak_txt,
+                         "a corrupt primary must never overwrite a good .bak")
+        self.assertEqual(json.loads(bak_txt)["processed"]["a"], ["v1"],
+                         ".bak must still hold the last-known-good state")
+
+        # Primary now holds the new good state...
+        self.assertEqual(tubeair_inbox._load_state(self.state)["processed"]["a"], ["v1", "v3"])
+
+        # ...and a SUBSEQUENT primary corruption still recovers the real state, proving
+        # redundancy survived (this is exactly what the old code destroyed).
+        self.state.write_text("GARBAGE AGAIN", encoding="utf-8")
+        self.assertEqual(tubeair_inbox._load_state(self.state)["processed"]["a"], ["v1"],
+                         "the good .bak must survive so a later corruption is recoverable")
+
+    def test_atomic_write_skips_rotation_when_primary_is_corrupt(self):
+        """Fix 1 (unit): with a validator, a corrupt on-disk primary is not rotated —
+        the prior good .bak is left intact rather than overwritten."""
+        v = tubeair_inbox._validate_inbox_state
+        tubeair_inbox.atomic_write_json(self.state, {"processed": {"a": ["v1"]}}, validate=v)
+        tubeair_inbox.atomic_write_json(self.state, {"processed": {"a": ["v1", "v2"]}}, validate=v)
+        self.state.write_text("CORRUPT", encoding="utf-8")  # corrupt the primary only
+        tubeair_inbox.atomic_write_json(self.state, {"processed": {"a": ["v9"]}}, validate=v)
+        # .bak still holds the last VALID primary ({a:[v1]}), never the CORRUPT text.
+        self.assertEqual(json.loads(self._bak().read_text("utf-8"))["processed"]["a"], ["v1"])
 
 
 class TestWatcherLedgerDurability(unittest.TestCase):
