@@ -26,9 +26,12 @@ cockpit hangs off.
 - **Least-privilege is proven two ways:** `cp_directus` reads `asdair.regulars` (91) and is denied
   `asdair.rules` at the DB layer (SQLSTATE 42501); over the Directus API, `/items/rules` → 403 while
   `/items/regulars` → 91 real rows.
-- **Personal-data doctrine holds:** real household data is reachable **only from this machine**
-  (Directus binds `127.0.0.1`). **No off-loopback / phone exposure here** — that is gated by Vex's
-  CRIT-1 + G1–G8, unchanged.
+- **Personal-data doctrine holds:** Directus binds `127.0.0.1` on this machine and is reached from
+  Warwick's own devices (incl. phone) **only over the private Tailscale tailnet** — HTTPS via
+  `tailscale serve` (tailnet-scoped, **not** funnel), behind Directus authentication and the
+  least-privilege `cp_directus` role. There is **no public internet exposure**. This supersedes the
+  original slice-1 loopback-only read-proof; the vulnerable legacy `mypka-cockpit` stays localhost-only
+  and its CRIT-1 repair (Vex's G1–G8) remains separately tracked, unchanged.
 
 ## Run it (from `services/control-plane/`)
 ```bash

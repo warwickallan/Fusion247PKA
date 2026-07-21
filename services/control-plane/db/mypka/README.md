@@ -15,7 +15,8 @@ for the cockpit layer** — captured faithfully from the live catalog, not from 
 | `020_cockpit_roles.sql` | least-priv login roles `cp_directus`, `cp_worker` (no password — set out-of-band) | teardown |
 | `030_command_request.sql` | `asdair.command_request` write-back INTENT queue + two guard triggers | teardown |
 | `040_cockpit_grants.sql` | the asymmetric least-privilege grants (revoke-then-grant, atomic, idempotent) | teardown |
-| `teardown.sql` | **rollback path** — reverses 010–040; leaves the asdair data tables untouched | — |
+| `050_cockpit_portfolio.sql` | the `cockpit` schema + portfolio/build-state records (`overall_state`, `build`, `decision`, `movement`, `domain_summary`) that drive the management view | teardown |
+| `teardown.sql` | **rollback path** — reverses 010–050 (incl. dropping the `cockpit` schema); leaves the asdair data tables untouched | — |
 
 **Secrets:** role passwords are **never** in these migrations. `020` creates the roles with no
 password; the runtime provisioner sets them from the gitignored `.runtime-live/` store

@@ -1,7 +1,7 @@
 -- =============================================================================
 -- MyPKA cockpit — TEARDOWN / rollback path (tested; see test/apply-teardown.test.mjs)
 --
--- Fully reverses migrations 010–040, leaving the MyPKA brain schemas (asdair etc.) exactly
+-- Fully reverses migrations 010–050, leaving the MyPKA brain schemas (asdair etc.) exactly
 -- as they were before the cockpit layer was added. Ordered so dependent objects go first.
 --
 -- SAFETY: this drops the Directus system schema and the command-request queue. It does NOT
@@ -17,6 +17,9 @@ drop schema if exists directus_sys cascade;
 drop table if exists asdair.command_request cascade;
 drop function if exists asdair.command_request_insert_guard();
 drop function if exists asdair.command_request_update_guard();
+
+-- 2b. The portfolio schema (migration 050) — the cockpit schema + all its records/objects.
+drop schema if exists cockpit cascade;
 
 -- 3. Remove every privilege the cockpit roles hold, then drop the roles. DROP OWNED clears
 --    grants + any objects still owned by the role across the database.
