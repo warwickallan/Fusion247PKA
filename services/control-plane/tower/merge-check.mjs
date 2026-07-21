@@ -143,30 +143,49 @@ Return ONLY compact JSON: {"status":"READY_TO_MERGE|FIX_REQUIRED|NEEDS_WARWICK|B
 // local branch happens to be checked out. And because Codex inspects the LOCAL repo read-only during
 // its run, the local checkout MUST equal the PR head or Codex would review the wrong tree. So: use
 // the PR head for the packet/records, and FAIL CLOSED when localHead != prHead (or prHead is missing).
-export function headGuard({ pr, localHead, prHead }) {
+const short = (s) => String(s ?? '(none)').slice(0, 12);
+// The exact-head evidence chain must be consistent across the WHOLE collection window (TOCTOU
+// close): the PR head read BEFORE collection, the PR head read AFTER, the SHA the CI evidence is
+// for, and the local checkout must ALL equal one authoritative SHA. Any mismatch — the PR advanced
+// mid-collection, or the local tree differs — fails closed (Codex inspects the local repo read-only).
+export function headGuard({ pr, localHead, prHead1, prHead2, ciSha }) {
   if (!pr) return { ok: true, head: localHead };
-  if (!prHead) return { ok: false, reason: 'no_pr_head', message: `could not resolve PR #${pr} head via gh pr view (fail-closed)` };
-  if (localHead !== prHead) {
-    return { ok: false, reason: 'head_mismatch', prHead, localHead,
-      message: `local HEAD ${String(localHead).slice(0, 12)} != PR #${pr} head ${String(prHead).slice(0, 12)} — check out the PR head before running the gate (Codex inspects the local repo read-only, so a mismatch would review the wrong tree).` };
+  if (!prHead1 || !prHead2) return { ok: false, reason: 'no_pr_head', message: `could not resolve PR #${pr} head via gh pr view (fail-closed)` };
+  const ref = prHead1;
+  const ciEff = ciSha ?? prHead1;
+  if (prHead2 !== ref || ciEff !== ref || localHead !== ref) {
+    return { ok: false, reason: 'head_mismatch',
+      chain: { prHead1: ref, prHead2, ciSha: ciEff, localHead },
+      message: `exact-head chain broken (PR #${pr}): prHead(before)=${short(ref)} prHead(after)=${short(prHead2)} ciSha=${short(ciEff)} localHead=${short(localHead)} — the PR head moved during evidence collection or the local checkout differs. Fail closed; check out the exact PR head on a quiesced PR and re-run.` };
   }
-  return { ok: true, head: prHead };
+  return { ok: true, head: ref };
 }
 
 // ---------- evidence ----------
 function collectEvidence() {
   const localHead = sh('git rev-parse HEAD');
-  let diff = '', prState = '(local branch)', ci = '', prHead = null;
+  let diff = '', prState = '(local branch)', ci = '', prHead1 = null, prHead2 = null, ciSha = null;
   if (PR) {
-    prHead = (sh(`gh pr view ${PR} --json headRefOid -q .headRefOid 2>/dev/null`) || '').trim() || null;
+    // 1. authoritative PR head BEFORE collection
+    prHead1 = (sh(`gh pr view ${PR} --json headRefOid -q .headRefOid 2>/dev/null`) || '').trim() || null;
+    // 2. diff + CI for that EXACT SHA (check-runs queried by SHA, not "the PR's current head")
     diff = sh(`gh pr diff ${PR} 2>/dev/null`);
     prState = sh(`gh pr view ${PR} --json state,title,mergeable,url -q '"\\(.state) | \\(.title) | mergeable=\\(.mergeable) | \\(.url)"' 2>/dev/null`) || '(pr not found)';
-    ci = sh(`gh pr checks ${PR} 2>/dev/null | head -20`);
+    if (prHead1) {
+      const repo = (sh(`gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null`) || '').trim();
+      const cr = sh(`gh api repos/${repo}/commits/${prHead1}/check-runs 2>/dev/null`);
+      try {
+        const j = JSON.parse(cr); const runs = j.check_runs || [];
+        ci = runs.length ? runs.map((x) => `${x.name}: ${x.conclusion || x.status}`).join('\n') : '(no check-runs for this SHA)';
+        ciSha = runs[0]?.head_sha || prHead1;   // the SHA the CI evidence actually ran on
+      } catch { ci = '(could not read check-runs)'; ciSha = null; }
+    }
+    // 3. authoritative PR head AFTER collection
+    prHead2 = (sh(`gh pr view ${PR} --json headRefOid -q .headRefOid 2>/dev/null`) || '').trim() || null;
   }
-  const guard = headGuard({ pr: PR, localHead, prHead });
+  const guard = headGuard({ pr: PR, localHead, prHead1, prHead2, ciSha });
   if (!diff && !PR) diff = sh('git diff origin/main...HEAD 2>/dev/null');
   if (diff.length > 60000) diff = diff.slice(0, 60000) + '\n... [diff truncated at 60k]';
-  // head is the AUTHORITATIVE PR head in PR mode (guard.head); local head otherwise.
   return { head: guard.head ?? localHead, diff, prState, ci, guard };
 }
 async function auditContext(c) {
