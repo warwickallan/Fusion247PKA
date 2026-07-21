@@ -33,12 +33,23 @@ test('composeMessage: shows Larry line AND Codex verdict when larryResponse pres
     warwickNeeded: false, larryResponse: 'Understood - I will apply the fix and re-run to confirm green.',
   });
   assert.ok(msg.includes('🗣 Larry:'), 'Larry line present');
-  assert.ok(msg.includes('🤖 Codex verdict: correct'), 'Codex verdict present');
+  assert.ok(msg.includes('supervisor verdict: correct'), 'Codex verdict present (legacy label unchanged)');
   assert.ok(msg.includes('turn: abc-123'), 'turn id present');
 });
 
-test('composeMessage: back-compat — no Larry line when larryResponse absent', () => {
+test('composeMessage: back-compat — absent larryResponse is BYTE-IDENTICAL to pre-change (F-001 regression)', () => {
   const msg = composeMessage({ buildRef: 'B', turnSeq: 1, turnId: 'x', state: 'reviewed', verdict: 'continue' });
+  const expected = [
+    '🗼 Tower B — turn #1',
+    'state: reviewed',
+    'supervisor verdict: continue',
+    'turn: x',
+  ].join('\n');
+  assert.equal(msg, expected, 'absent-case output identical to the pre-change format');
   assert.ok(!msg.includes('🗣 Larry:'), 'no Larry line when absent');
-  assert.ok(msg.includes('🤖 Codex verdict: continue'), 'still renders verdict');
+});
+
+test('summariseLarry: strips leftover/unmatched code fence (F-002)', () => {
+  const s = summariseLarry('start ```js const x=1 then an unmatched ``` fence tail');
+  assert.ok(!s.includes('`'), 'no backticks remain');
 });

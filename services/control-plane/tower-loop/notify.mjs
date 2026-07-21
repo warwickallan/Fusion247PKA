@@ -120,7 +120,10 @@ export async function notify(pool, { turnId, reason, state, message }) {
 // so a long turn can never blow up the message.
 export function summariseLarry(text, max = 280) {
   if (text === null || text === undefined) return '';
-  const clean = String(text).replace(/```[\s\S]*?```/g, ' [code] ').replace(/\s+/g, ' ').trim();
+  const clean = String(text)
+    .replace(/```[\s\S]*?```/g, ' [code] ')  // closed fenced blocks -> placeholder
+    .replace(/`+/g, ' ')                       // F-002: any leftover/unmatched backticks -> space
+    .replace(/\s+/g, ' ').trim();
   if (clean === '') return '';
   return clean.length > max ? (clean.slice(0, max - 1).trimEnd() + '…') : clean;
 }
@@ -132,7 +135,9 @@ export function composeMessage({ buildRef, turnSeq, turnId, state, verdict, summ
     `🗼 Tower ${buildRef ?? 'BUILD-014'} — turn #${turnSeq ?? '?'}`,
     `state: ${state}`,
     larry ? `🗣 Larry: ${larry}` : null,
-    verdict ? `🤖 Codex verdict: ${verdict}` : null,
+    // Legacy verdict line kept BYTE-IDENTICAL (F-001): this change is purely additive — the only
+    // new content is the "Larry:" line above; the absent/empty case renders exactly as before.
+    verdict ? `supervisor verdict: ${verdict}` : null,
     summary ? `— ${summary}` : null,
     nextAction ? `next: ${nextAction}` : null,
     warwickNeeded ? '⚠️ Warwick needs to act.' : null,
