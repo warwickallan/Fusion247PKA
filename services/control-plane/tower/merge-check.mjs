@@ -104,8 +104,14 @@ ${packet.audit || '(none)'}
 ── STAGED DIFF (authoritative — the actual change at this head) ──
 ${packet.diff || '(no diff captured)'}
 
+CLOSURE-EVIDENCE GATE (MANDATORY — a lesson learned 2026-07-21): merge-readiness is NOT code quality alone. Before you may return READY_TO_MERGE you MUST verify the deliverable is visible and mergeable:
+  - it is a DEDICATED GitHub PR (pr_state above must be a real PR, NOT "(local branch)");
+  - CI/tests results are present AND passing (ci_checks above);
+  - required closure records exist (the GitHub PR, and where applicable a ClickUp task + a session record).
+If there is NO PR, or CI is absent/failing/pending, or closure evidence is missing, that is NOT ready — return FIX_REQUIRED ("open the PR / get CI green / attach the closure evidence") or NEEDS_WARWICK. Never wave a change through on the strength of the diff alone when its merge-visibility/closure evidence is absent. (GPT had to catch exactly this once; you catch it now.)
+
 Decide ONE status:
-- READY_TO_MERGE — acceptance met, no merge-blocking defect.
+- READY_TO_MERGE — acceptance met, closure-evidence gate satisfied, no merge-blocking defect.
 - FIX_REQUIRED — specific, named things Larry must change before merge.
 - NEEDS_WARWICK — a genuine decision/authority call only Warwick can make.
 - BLOCKED — cannot assess (missing evidence/diff) or a hard blocker.
