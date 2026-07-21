@@ -1,5 +1,7 @@
 # WP-D disposable proof — runtime artifacts NEVER get committed.
 .runtime/
+# Live cockpit — hosted-Supabase DSN + real secrets NEVER get committed.
+.runtime-live/
 # Directus: commit package.json + .env.example only; ignore installed deps + real secrets.
 directus/node_modules/
 directus/package-lock.json
