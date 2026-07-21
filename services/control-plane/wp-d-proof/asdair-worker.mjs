@@ -23,8 +23,14 @@ const cfg = JSON.parse(fs.readFileSync(path.join(here, '.runtime-live', 'directu
 if (!cfg.worker_password) { console.error('[worker] run provision-writeback-live.mjs first (no cp_worker)'); process.exit(1); }
 const ca = fs.readFileSync(cfg.ssl_ca_file);
 
-const argv = new Set(process.argv.slice(2));
+const rawArgs = process.argv.slice(2);
+const argv = new Set(rawArgs);
 const MODE = argv.has('--watch') ? 'watch' : argv.has('--once') ? 'once' : 'drain';
+// --key-prefix=<pfx>: claim ONLY intents whose idempotency_key starts with <pfx>. The
+// synthetic-first proofs pass their own throwaway prefix so a proof can NEVER drain a real
+// pending request (fixes review finding: an unscoped --drain would execute real queued rows).
+const keyPrefixArg = rawArgs.find((a) => a.startsWith('--key-prefix='));
+const KEY_PREFIX = keyPrefixArg ? keyPrefixArg.slice('--key-prefix='.length) : null;
 
 const ALLOWLIST = new Set(['add_regular_to_next_week']);
 
@@ -42,6 +48,12 @@ async function execute(client, command, args) {
     const reg = await client.query('select id, household_id, name from asdair.regulars where id = $1', [regularId]);
     if (reg.rowCount === 0) return { ok: false, command, error: `regular ${regularId} not found`, worker: 'cp_worker', executed_at: at };
     const { household_id: householdId, name } = reg.rows[0];
+
+    // Serialize the effect PER HOUSEHOLD within this txn so concurrent workers can never both
+    // create a draft list or both insert the same item (the select-then-insert would otherwise
+    // race when the SELECT returns nothing and FOR UPDATE locks no row). Transaction-scoped:
+    // released on commit/rollback. No schema change to the real tables required.
+    await client.query('select pg_advisory_xact_lock($1)', [householdId]);
 
     // Find or create the household's next_week_draft list.
     let list = await client.query(
@@ -82,7 +94,8 @@ async function drainOne(client) {
   try {
     const claim = await client.query(
       `select id, command, args from asdair.command_request
-        where status = 'requested' order by requested_at for update skip locked limit 1`);
+        where status = 'requested' and ($1::text is null or idempotency_key like $1 || '%')
+        order by requested_at for update skip locked limit 1`, [KEY_PREFIX]);
     if (claim.rowCount === 0) { await client.query('commit'); return null; }
     const row = claim.rows[0];
     await client.query(`update asdair.command_request set status='claimed', claimed_at=now() where id=$1`, [row.id]);

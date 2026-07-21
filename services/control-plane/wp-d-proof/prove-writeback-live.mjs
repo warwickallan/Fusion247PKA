@@ -34,7 +34,8 @@ async function expectErr(fn, code, msg) {
   catch (e) { const good = !code || e.code === code; if (good) { pass++; console.log('  PASS', msg, `(${e.code})`); } else { fail++; console.log('  FAIL', msg, `(got ${e.code}, wanted ${code})`); } }
 }
 function drainWorker() {
-  const r = spawnSync(process.execPath, [path.join(here, 'asdair-worker.mjs'), '--drain'], { encoding: 'utf8' });
+  // Scope the drain to THIS proof's synthetic key prefix so it can never touch a real pending request.
+  const r = spawnSync(process.execPath, [path.join(here, 'asdair-worker.mjs'), '--drain', `--key-prefix=${KEYPFX}`], { encoding: 'utf8' });
   process.stdout.write(r.stdout.split('\n').filter((l) => l.includes('[worker]')).map((l) => '    ' + l).join('\n') + '\n');
   if (r.status !== 0) throw new Error('worker exited ' + r.status + ' ' + r.stderr);
 }
@@ -109,6 +110,17 @@ async function main() {
     `insert into asdair.command_request (requested_by, command, args, idempotency_key, status)
      values ('a','x','{}'::jsonb,$1,'claimed')`, [`${KEYPFX}-g`]), '23514', 'insert-guard rejects status!=requested (even for a privileged conn)');
 
+  // ---- 7. ISOLATION: a scoped drain must NEVER touch a real pending request ----
+  console.log('7) synthetic-scope isolation (a real pending request is left untouched):');
+  await admin.query(
+    `insert into asdair.command_request (requested_by, command, args, idempotency_key, is_synthetic)
+     values ('real:decoy','add_regular_to_next_week', $1::jsonb, $2, false)`,
+    [JSON.stringify({ regular_id: 1, qty: 1 }), `REAL-decoy-${KEYPFX}`]);
+  drainWorker(); // scoped to KEYPFX -> must skip the REAL-decoy row
+  const decoy = (await admin.query(`select status from asdair.command_request where idempotency_key=$1`, [`REAL-decoy-${KEYPFX}`])).rows[0];
+  ok(decoy.status === 'requested', 'a non-synthetic pending request is NOT drained by the synthetic-scoped proof');
+  await admin.query(`delete from asdair.command_request where idempotency_key=$1`, [`REAL-decoy-${KEYPFX}`]);
+
   console.log(`\nRESULT: ${fail === 0 ? 'PASS ✓' : 'FAIL ✗'} — ${pass} passed, ${fail} failed`);
 }
 
@@ -118,7 +130,7 @@ async function cleanup() {
     if (householdId) {
       await admin.query(`delete from asdair.shopping_lists where household_id=$1`, [householdId]);
       await admin.query(`delete from asdair.regulars where household_id=$1`, [householdId]);
-      await admin.query(`delete from asdair.command_request where idempotency_key like $1`, [`${KEYPFX}-%`]);
+      await admin.query(`delete from asdair.command_request where idempotency_key like $1 or idempotency_key = $2`, [`${KEYPFX}-%`, `REAL-decoy-${KEYPFX}`]);
       await admin.query(`delete from asdair.households where id=$1`, [householdId]);
     }
     console.log('[cleanup] synthetic household + all its rows removed (real data untouched).');

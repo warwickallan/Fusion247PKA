@@ -41,7 +41,7 @@ async function main() {
   ok(landed && landed.status === 'requested' && landed.receipt === null, 'intent landed status=requested (Directus requested, did not execute)');
 
   console.log('2) worker executes it:');
-  const w = spawnSync(process.execPath, [path.join(here, 'asdair-worker.mjs'), '--drain'], { encoding: 'utf8' });
+  const w = spawnSync(process.execPath, [path.join(here, 'asdair-worker.mjs'), '--drain', `--key-prefix=${KEY}`], { encoding: 'utf8' });
   process.stdout.write(w.stdout.split('\n').filter((l) => l.includes('[worker]')).map((l) => '    ' + l).join('\n') + '\n');
   const done = (await admin.query(`select status, receipt from asdair.command_request where idempotency_key=$1`, [`${KEY}-a`])).rows[0];
   ok(done.status === 'done' && done.receipt?.ok === true, 'worker completed it, receipt.ok');
