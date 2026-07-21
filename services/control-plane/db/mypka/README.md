@@ -16,7 +16,10 @@ for the cockpit layer** — captured faithfully from the live catalog, not from 
 | `030_command_request.sql` | `asdair.command_request` write-back INTENT queue + two guard triggers | teardown |
 | `040_cockpit_grants.sql` | the asymmetric least-privilege grants (revoke-then-grant, atomic, idempotent) | teardown |
 | `050_cockpit_portfolio.sql` | the `cockpit` schema + portfolio/build-state records (`overall_state`, `build`, `decision`, `movement`, `domain_summary`) that drive the management view | teardown |
-| `teardown.sql` | **rollback path** — reverses 010–050 (incl. dropping the `cockpit` schema); leaves the asdair data tables untouched | — |
+| `060_build_contract.sql` | BUILD-002 build-acceptance layer: `cockpit.build_contract` (approved-version record + readable projection) + `cockpit.contract_command` (approval INTENT queue) + guard triggers | teardown |
+| `070_build_contract_grants.sql` | least-privilege grants for the contract layer (cp_directus render+request-only; cp_worker execute-only; atomic revoke-then-grant) | teardown |
+| `seed/build-002-contract-draft.sql` | seeds the BUILD-002 v0.1-draft contract row (DRAFT state; readable projection; bound to the Git commit/blob/sha256) | — |
+| `teardown.sql` | **rollback path** — reverses 010–070 (the `cockpit`-schema cascade drops the 060 objects + guards; `drop owned by cp_*` clears the 070 grants); leaves the asdair data tables untouched | — |
 
 **Secrets:** role passwords are **never** in these migrations. `020` creates the roles with no
 password; the runtime provisioner sets them from the gitignored `.runtime-live/` store
