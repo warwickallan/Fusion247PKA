@@ -12,6 +12,7 @@
 - **myPKA Markdown and Google Drive** own durable decisions, architecture, governance, and accepted outcomes. This is where reasoning lives. Never duplicate a full Markdown document into ClickUp — link to it and summarize only what's needed to manage delivery.
 - **Claude session/chat history** is temporary working context. It is not a source of truth and must be refreshed against `main`, ClickUp, and the canonical myPKA task record on every resumption — never rely on compressed prior-session memory alone.
 - **A ClickUp card, a GitHub issue, or a GitHub Project card is never itself implementation authorization.** Existing task/PR governance (Warwick's explicit sign-off) always applies on top, regardless of what the board shows.
+- **Foundry vs build — the layer boundary (do not confuse these).** Foundry — both the *Fusion 247 Foundry* Space in ClickUp (IDEA Portfolio, per-idea lists/docs) **and** Fable's Foundry in Drive — is for **idea exploration, promotion readiness, source evidence, risks, options, and handoff pointers**: the idea, not its build. **Once an IDEA is promoted into build, production records — build/WP status, PR execution notes, closeouts, implementation logs — belong in MyPKA (Fusion 247 MyPKA ClickUp), the GitHub PR, the repo session log under `Team Knowledge/`, and the relevant MyPKA BUILD/WP task records — NEVER in Foundry.** Foundry may receive only a **lightweight promotion/status pointer**, e.g. *"IDEA-NNN promoted to BUILD/WP; implementation tracked in `<MyPKA task / PR / session log>`."* Do not write build closeouts, WP status, PR execution notes, or implementation logs into any Foundry list, task, or doc. Layer summary: **Foundry preserves the idea · MyPKA manages the build · GitHub records the code · session logs preserve execution evidence.** (Added 2026-07-18 after a breach: a TubeAIR WP0 closeout was wrongly posted into the Foundry `IDEA-013 — TubeAIR Build Notes` list; corrected to a pointer.)
 
 ## Tool capability facts (established by direct testing, 2026-07-12 — don't assume, verify if this ever seems wrong again)
 
@@ -99,7 +100,7 @@ For every future Fusion delivery item, in order:
 
 ## Guardrails
 
-- Fusion only. Never configure or populate Foundry.
+- Fusion only. Never configure or populate Foundry beyond a lightweight promotion/status pointer — build status, WP records, PR notes and closeouts go to MyPKA/GitHub/session-logs, never Foundry (see Division of authority §"Foundry vs build").
 - Never alter application architecture, schema, or implementation scope as a side effect of an organisational/tracking pass.
 - Never build a bespoke integration, connector, or dashboard for this — use the native ClickUp MCP when reachable, the Zapier `ClickUpCLIAPI` bridge as fallback, GitHub's native issue/label/PR primitives, and Warwick's already-configured Project auto-add workflow.
 - Never expose private client content in GitHub or public ClickUp records.
