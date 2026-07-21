@@ -15,7 +15,7 @@ import { spawn as nodeSpawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import pg from 'file:///C:/Fusion247PKA/services/control-plane/node_modules/pg/lib/index.js';
 import { resolveCodexBin, sanitizeCodexEnv } from '../review/codexAdapter.mjs';
 
@@ -34,7 +34,8 @@ const WP = arg('wp', '');
 const CLAIM = arg('claim', '');
 let ACCEPTANCE = arg('acceptance', '');
 if (ACCEPTANCE && fs.existsSync(ACCEPTANCE)) ACCEPTANCE = fs.readFileSync(ACCEPTANCE, 'utf8').slice(0, 6000);
-if (!CLAIM) { console.error('merge-check: --claim "<your completion claim>" is required'); process.exit(2); }
+// NB: the `--claim` requirement is enforced inside main() (not at import time) so importing this
+// module for its pure exports (e.g. headGuard) is side-effect-free.
 
 const sh = (cmd) => { try { return spawnSync('bash', ['-lc', cmd], { cwd: REPO, encoding: 'utf8', maxBuffer: 20 * 1024 * 1024 }).stdout?.trim() ?? ''; } catch { return ''; } };
 
@@ -110,8 +111,10 @@ CLOSURE-EVIDENCE GATE (MANDATORY — a lesson learned 2026-07-21): merge-readine
   - required closure records exist (the GitHub PR, and where applicable a ClickUp task + a session record).
 If there is NO PR, or CI is absent/failing/pending, or closure evidence is missing, that is NOT ready — return FIX_REQUIRED ("open the PR / get CI green / attach the closure evidence") or NEEDS_WARWICK. Never wave a change through on the strength of the diff alone when its merge-visibility/closure evidence is absent. (GPT had to catch exactly this once; you catch it now.)
 
+EVIDENCE-INTEGRITY / PROVENANCE GATE (MANDATORY — lesson 2026-07-21): scrutinise that the review is bound to the AUTHORITATIVE head and that the code under review does the same. In PR mode the authoritative head is the PR headRefOid (from "gh pr view"), NOT a local "git rev-parse HEAD". Treat as MERGE-BLOCKING: any code path that binds a review/record/verdict to a non-authoritative or mismatchable identifier (e.g. local HEAD instead of the PR head), or that could record a review of one PR against unrelated local/branch state; and any inconsistency where the packet head, diff and CI are not all for the SAME exact head. When you review code that itself collects evidence or writes records, verify it uses the authoritative head and fails closed on a local/PR-head mismatch. If provenance is inconsistent or unverifiable, return BLOCKED. Do not pass admin/provenance soundness on functional behaviour alone. (GPT had to catch a local-vs-PR head-provenance bug once; you catch this class now.)
+
 Decide ONE status:
-- READY_TO_MERGE — acceptance met, closure-evidence gate satisfied, no merge-blocking defect.
+- READY_TO_MERGE — acceptance met, closure + provenance gates satisfied, no merge-blocking defect.
 - FIX_REQUIRED — specific, named things Larry must change before merge.
 - NEEDS_WARWICK — a genuine decision/authority call only Warwick can make.
 - BLOCKED — cannot assess (missing evidence/diff) or a hard blocker.
@@ -134,18 +137,37 @@ Return ONLY compact JSON: {"status":"READY_TO_MERGE|FIX_REQUIRED|NEEDS_WARWICK|B
   });
 }
 
+// ---------- head-provenance guard (pure + testable) ----------
+// In PR mode the AUTHORITATIVE head is the PR's headRefOid (from `gh pr view`), NEVER a local
+// `git rev-parse HEAD` — otherwise a review of PR X could be recorded against whatever unrelated
+// local branch happens to be checked out. And because Codex inspects the LOCAL repo read-only during
+// its run, the local checkout MUST equal the PR head or Codex would review the wrong tree. So: use
+// the PR head for the packet/records, and FAIL CLOSED when localHead != prHead (or prHead is missing).
+export function headGuard({ pr, localHead, prHead }) {
+  if (!pr) return { ok: true, head: localHead };
+  if (!prHead) return { ok: false, reason: 'no_pr_head', message: `could not resolve PR #${pr} head via gh pr view (fail-closed)` };
+  if (localHead !== prHead) {
+    return { ok: false, reason: 'head_mismatch', prHead, localHead,
+      message: `local HEAD ${String(localHead).slice(0, 12)} != PR #${pr} head ${String(prHead).slice(0, 12)} — check out the PR head before running the gate (Codex inspects the local repo read-only, so a mismatch would review the wrong tree).` };
+  }
+  return { ok: true, head: prHead };
+}
+
 // ---------- evidence ----------
 function collectEvidence() {
-  const head = sh('git rev-parse HEAD');
-  let diff = '', prState = '(local branch)', ci = '';
+  const localHead = sh('git rev-parse HEAD');
+  let diff = '', prState = '(local branch)', ci = '', prHead = null;
   if (PR) {
+    prHead = (sh(`gh pr view ${PR} --json headRefOid -q .headRefOid 2>/dev/null`) || '').trim() || null;
     diff = sh(`gh pr diff ${PR} 2>/dev/null`);
     prState = sh(`gh pr view ${PR} --json state,title,mergeable,url -q '"\\(.state) | \\(.title) | mergeable=\\(.mergeable) | \\(.url)"' 2>/dev/null`) || '(pr not found)';
     ci = sh(`gh pr checks ${PR} 2>/dev/null | head -20`);
   }
-  if (!diff) diff = sh('git diff origin/main...HEAD 2>/dev/null');
+  const guard = headGuard({ pr: PR, localHead, prHead });
+  if (!diff && !PR) diff = sh('git diff origin/main...HEAD 2>/dev/null');
   if (diff.length > 60000) diff = diff.slice(0, 60000) + '\n... [diff truncated at 60k]';
-  return { head, diff, prState, ci };
+  // head is the AUTHORITATIVE PR head in PR mode (guard.head); local head otherwise.
+  return { head: guard.head ?? localHead, diff, prState, ci, guard };
 }
 async function auditContext(c) {
   try {
@@ -156,6 +178,7 @@ async function auditContext(c) {
 
 // ---------- main ----------
 async function main() {
+  if (!CLAIM) { console.error('merge-check: --claim "<your completion claim>" is required'); process.exit(2); }
   const url = process.env.CONTROL_PLANE_DEV_DATABASE_URL;
   if (!url) { console.error('merge-check: CONTROL_PLANE_DEV_DATABASE_URL not set (run with --env-file=control-plane-dev.env)'); process.exit(2); }
   const c = new pg.Client({ connectionString: url, ssl: { rejectUnauthorized: false } });
@@ -163,6 +186,13 @@ async function main() {
   await ensureSchema(c);
 
   const ev = collectEvidence();
+  // FAIL CLOSED on a head-provenance failure — do NOT run Codex or record a review bound to the
+  // wrong head. No Codex spend, no misleading audit row; the operator fixes the checkout and re-runs.
+  if (!ev.guard.ok) {
+    console.error(`\n=== Codex QA — BLOCKED (head provenance) ===\n${ev.guard.message}\n`);
+    await c.end();
+    process.exit(3);
+  }
   const audit = await auditContext(c);
 
   // Find or open the run using a STABLE key so a corrective commit (new HEAD) stays in the SAME
@@ -209,4 +239,7 @@ async function main() {
   if (verdict.status === 'READY_TO_MERGE') console.log('(Codex QA is satisfied. Merge remains Warwick\'s explicit yes.)');
   process.exit(0);
 }
-main().catch((e) => { console.error('merge-check error:', e.message); process.exit(1); });
+// Run only when invoked directly (so tests can import headGuard without executing the tool).
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((e) => { console.error('merge-check error:', e.message); process.exit(1); });
+}
