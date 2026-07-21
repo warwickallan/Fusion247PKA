@@ -40,6 +40,7 @@ node wp-d-proof/.runtime-live/provision-and-prove.mjs # create cp_directus + PRO
 node wp-d-proof/setup-directus-live.mjs               # bootstrap Directus (system tables in directus_sys)
 node wp-d-proof/register-live.mjs                     # expose asdair.regulars as a read-only collection
 node wp-d-proof/start-directus-live.mjs               # start (detached, 127.0.0.1). ANNOUNCE ONLY.
+node wp-d-proof/ensure-directus-live.mjs              # reboot-recovery launcher: start → wait-for-bind → retry (up to 8×); the delivered self-healing mechanism the reboot-recovery acceptance proof runs against
 node wp-d-proof/prove-live.mjs                        # acceptance: 91 real rows at the authenticated URL
 node wp-d-proof/stop-live.mjs                         # stop Directus
 ```
