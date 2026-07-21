@@ -159,8 +159,13 @@ async function main() {
   const ev = collectEvidence();
   const audit = await auditContext(c);
 
-  // find or open the run for this PR
-  const key = PR ? { col: 'pr_number', val: Number(PR) } : { col: 'head_sha', val: ev.head };
+  // Find or open the run using a STABLE key so a corrective commit (new HEAD) stays in the SAME
+  // run and the 3-round limit holds (Codex QA round-1 finding): PR mode keys on pr_number; local
+  // mode keys on --wp (required), NEVER on head_sha (which changes every fix and would reset rounds).
+  let key;
+  if (PR) key = { col: 'pr_number', val: Number(PR) };
+  else if (WP) key = { col: 'wp_ref', val: WP };
+  else { console.error('merge-check: local mode needs a stable --wp (or use --pr) so the round count survives corrective commits'); process.exit(2); }
   let run = (await c.query(`select * from tower.merge_check_run where ${key.col}=$1 and status='open' order by created_at desc limit 1`, [key.val])).rows[0];
   if (!run) run = (await c.query(`insert into tower.merge_check_run (pr_number, build_ref, wp_ref, head_sha, status) values ($1,$2,$3,$4,'open') returning *`, [PR ? Number(PR) : null, BUILD, WP, ev.head])).rows[0];
   const round = run.rounds + 1;
