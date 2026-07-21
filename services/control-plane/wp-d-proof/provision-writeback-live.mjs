@@ -52,6 +52,23 @@ end
 $do$;`);
 console.log('[wb] role cp_worker ready');
 
+// ---- Idempotent least-privilege: REVOKE the write-back objects first, then grant the narrow
+//      set, so re-running actually ENFORCES the "ONLY" claim (a re-run can never leave a wider
+//      privilege in place). Scoped to the write-back tables ONLY — cp_directus keeps its
+//      regulars SELECT (slice 1) and its directus_sys ownership (Directus runtime) untouched.
+for (const t of ['command_request', 'shopping_lists', 'shopping_list_items']) {
+  await priv.query(`revoke all on asdair.${t} from cp_directus`);
+  await priv.query(`revoke all on asdair.${t} from cp_worker`);
+}
+await priv.query(`revoke all on asdair.regulars   from cp_worker`);   // cp_directus KEEPS regulars (slice 1)
+await priv.query(`revoke all on asdair.households  from cp_worker`);
+console.log('[wb] revoked prior write-back grants from both roles (idempotent least-privilege)');
+
+// Sequence-grant note (review F4): shopping_lists/shopping_list_items ids are GENERATED ... AS
+// IDENTITY BY DEFAULT — INSERT privilege covers the identity default; no separate sequence USAGE
+// grant is needed (and none exists to leak). Proven empirically: cp_worker inserts lists + items
+// in every passing proof run.
+
 // ---- cp_directus: request-only on the queue (belt-and-braces with the insert guard) ----
 await priv.query(`grant usage on schema asdair to cp_directus`);
 await priv.query(`grant select on asdair.command_request to cp_directus`);

@@ -70,6 +70,15 @@ synthetic-first test." Built and proven:
   are immutable once done.
 - **Strong backstop:** because the DB grant limits `cp_directus` to intent-only, *even a Directus
   admin POST cannot execute or write items* — the DB layer holds regardless of Directus role config.
+- **`is_synthetic` semantics (review F5):** it records *trusted-setup* provenance, not cockpit
+  self-declaration — the cockpit is column-scoped and cannot set it, so a real cockpit/Directus
+  request is `is_synthetic=false` by design (it can never lie about being "just a test"). DB-level
+  synthetic test intents are marked `true` by the trusted setup. A proof's isolation therefore comes
+  from the **synthetic household + `--key-prefix` scoped drain + guaranteed cleanup**, not from the
+  flag; the Directus proof's rows are removed in `finally` so an interrupted run leaves nothing real.
+- **Idempotent least-privilege (review F3):** `provision-writeback-live.mjs` revokes the write-back
+  objects before granting, so a re-run always enforces the exact "ONLY" set. Identity-column inserts
+  need no sequence grant (review F4).
 
 Run + prove (synthetic-first; the real household id 1 is never touched):
 ```bash
