@@ -101,6 +101,13 @@ jobs:
         # deadlock); and redelivery stays convergent (monotonic head, single build_head row).
         run: npm run test:wpd0
 
+      - name: Tower-loop — notification composer unit tests (pure, no DB)
+        # notify.test.mjs (node:test). Proves the Larry-voice change: the Tower Telegram shows
+        # BOTH sides of the Larry<->Codex dialogue (bounded "Larry:" excerpt + Codex verdict),
+        # is length-capped, strips code fences, and stays back-compatible when no larry_response
+        # is present. Pure functions, so it runs without the Postgres service.
+        run: npm run test:tower-loop-unit
+
       - name: Tower-loop — supervisor watcher CI acceptance (deterministic doubles)
         # run-tower-loop-tests.mjs. Same Postgres service container (uses DATABASE_URL) + the
         # same 0-executed-subtest guard. Spawns the REAL watcher.mjs child processes with a

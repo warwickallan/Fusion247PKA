@@ -145,10 +145,11 @@ async function claimOne(pool) {
 // A merge-class turn ONLY reaches goal_complete when its Tower-QA review APPROVED against
 // real Git evidence; a blocked/unresolved QA fires tower_failure, a non-approve fires
 // codex_block_or_redirect — a prose "done" can never silently ship.
-async function fireTriggers(pool, { turnId, buildRef, turnSeq, nextState, r, blocked, goalComplete, notifyFn = notify, merge = null }) {
+async function fireTriggers(pool, { turnId, buildRef, turnSeq, nextState, r, blocked, goalComplete, notifyFn = notify, merge = null, larryResponse = null }) {
   const base = {
     buildRef, turnSeq, turnId, state: nextState, verdict: r.verdict,
     summary: r.summary, nextAction: r.next_action, warwickNeeded: r.warwick_needed,
+    larryResponse,
   };
   const mergeBlocked = merge?.isMergeClass && merge.blocked;
   const mergeNotApprove = merge?.isMergeClass && !merge.blocked && merge.verdict !== 'approve';
@@ -268,7 +269,7 @@ export async function processTurn(pool, turnId, deps = REAL_DEPS) {
     const merge = mergeFlagsFrom(rr.merge_review);
     const nextState = VERDICT_TO_STATE[r.verdict] ?? 'reviewed';
     await pool.query(`update tower.turn set state = $2, updated_at = now() where id = $1`, [turnId, nextState]);
-    const notifications = await fireTriggers(pool, { turnId, buildRef, turnSeq, nextState, r, blocked, goalComplete, notifyFn: doNotify, merge });
+    const notifications = await fireTriggers(pool, { turnId, buildRef, turnSeq, nextState, r, blocked, goalComplete, notifyFn: doNotify, merge, larryResponse: turnRow.larry_response });
     log('processed_idempotent', { turnId, verdict: r.verdict, state: nextState, mergeClass: !!merge });
     return { turnId, reused: true, verdict: r.verdict, state: nextState, notifications };
   }
@@ -374,7 +375,7 @@ export async function processTurn(pool, turnId, deps = REAL_DEPS) {
     const mergeWin = mergeFlagsFrom(wr.merge_review);
     const stateWin = VERDICT_TO_STATE[rWin.verdict] ?? 'reviewed';
     await pool.query(`update tower.turn set state = $2, updated_at = now() where id = $1`, [turnId, stateWin]);
-    const notifications = await fireTriggers(pool, { turnId, buildRef, turnSeq, nextState: stateWin, r: rWin, blocked: rWin.status === 'blocked', goalComplete, notifyFn: doNotify, merge: mergeWin });
+    const notifications = await fireTriggers(pool, { turnId, buildRef, turnSeq, nextState: stateWin, r: rWin, blocked: rWin.status === 'blocked', goalComplete, notifyFn: doNotify, merge: mergeWin, larryResponse: turnRow.larry_response });
     return { turnId, reused: true, verdict: rWin.verdict, state: stateWin, notifications };
   }
 
@@ -383,7 +384,7 @@ export async function processTurn(pool, turnId, deps = REAL_DEPS) {
   await pool.query(`update tower.turn set state = $2, lease_owner = null, updated_at = now() where id = $1`, [turnId, nextState]);
 
   // (h cont.) auto-Telegram on the trigger conditions (idempotent), incl. the merge-class gate.
-  const notifications = await fireTriggers(pool, { turnId, buildRef, turnSeq, nextState, r, blocked: sup.blocked, goalComplete, notifyFn: doNotify, merge: mergeFlags });
+  const notifications = await fireTriggers(pool, { turnId, buildRef, turnSeq, nextState, r, blocked: sup.blocked, goalComplete, notifyFn: doNotify, merge: mergeFlags, larryResponse: turnRow.larry_response });
 
   log('processed', {
     turnId, verdict: r.verdict, blocked: sup.blocked, state: nextState,
