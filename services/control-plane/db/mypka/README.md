@@ -30,10 +30,11 @@ only in gitignored provisioning scripts) are now represented here as versioned S
 ```bash
 bash services/control-plane/db/mypka/test/run-migration-test.sh
 ```
-Provisions a throwaway local Postgres, builds a minimal asdair stub, applies 010–040, proves the
+Provisions a throwaway local Postgres, builds a minimal asdair stub, applies 010–050, proves the
 least-privilege boundary reproduced (cp_directus request-only, cp_worker execute-only, guards fire),
-then applies `teardown.sql` and asserts every cockpit object is gone and the data tables survive.
-**15/15 pass.** (The driver provisions the cluster in a repo-local dir — node-spawned `initdb` under
+then applies `teardown.sql` and asserts every cockpit object — including the `cockpit` schema
+(migration 050) — is gone and the data tables survive.
+**19/19 pass.** (The driver provisions the cluster in a repo-local dir — node-spawned `initdb` under
 `%TEMP%` stalls on this machine's file scanning.)
 
 ## Applying to hosted MyPKA
