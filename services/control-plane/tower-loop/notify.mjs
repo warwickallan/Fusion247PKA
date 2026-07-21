@@ -114,11 +114,29 @@ export async function notify(pool, { turnId, reason, state, message }) {
   return { notificationId, deduped: false, telegram_ok: telegramOk, telegram_message_id: telegramMessageId, detail };
 }
 
-/** Compose the human-facing Watcher message body. Identifies turn/build, state, Codex verdict, action. */
-export function composeMessage({ buildRef, turnSeq, turnId, state, verdict, summary, nextAction, warwickNeeded }) {
+// Bounded, human-readable excerpt of Larry's turn so the Telegram message shows LARRY'S SIDE of
+// the Larry<->Codex dialogue, not just Codex's verdict (Warwick's ask: "I have no idea what you
+// are doing in response to Codex"). Strips code fences + collapses whitespace and caps the length
+// so a long turn can never blow up the message.
+export function summariseLarry(text, max = 280) {
+  if (text === null || text === undefined) return '';
+  const clean = String(text)
+    .replace(/```[\s\S]*?```/g, ' [code] ')  // closed fenced blocks -> placeholder
+    .replace(/`+/g, ' ')                       // F-002: any leftover/unmatched backticks -> space
+    .replace(/\s+/g, ' ').trim();
+  if (clean === '') return '';
+  return clean.length > max ? (clean.slice(0, max - 1).trimEnd() + '…') : clean;
+}
+
+/** Compose the human-facing Watcher message body. Shows BOTH sides: what Larry did + Codex's verdict/action. */
+export function composeMessage({ buildRef, turnSeq, turnId, state, verdict, summary, nextAction, warwickNeeded, larryResponse }) {
+  const larry = summariseLarry(larryResponse);
   const lines = [
     `🗼 Tower ${buildRef ?? 'BUILD-014'} — turn #${turnSeq ?? '?'}`,
     `state: ${state}`,
+    larry ? `🗣 Larry: ${larry}` : null,
+    // Legacy verdict line kept BYTE-IDENTICAL (F-001): this change is purely additive — the only
+    // new content is the "Larry:" line above; the absent/empty case renders exactly as before.
     verdict ? `supervisor verdict: ${verdict}` : null,
     summary ? `— ${summary}` : null,
     nextAction ? `next: ${nextAction}` : null,
