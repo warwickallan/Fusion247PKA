@@ -1,0 +1,9 @@
+{
+  "name": "wp-d-directus",
+  "private": true,
+  "type": "module",
+  "description": "WP-D disposable Directus cockpit proof (local-only, dev-only).",
+  "dependencies": {
+    "directus": "^11.17.4"
+  }
+}
