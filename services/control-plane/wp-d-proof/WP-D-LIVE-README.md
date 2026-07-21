@@ -51,6 +51,40 @@ drop role if exists cp_directus;
 ```
 This leaves the hosted MyPKA Supabase exactly as it was.
 
+## Slice 2 — the AsdAIr write-back trust seam (authorised, synthetic-first)
+Authorised by Warwick 2026-07-21: "narrow AsdAIr command-request write-back against the real
+schema, using allowlisted actions, least privilege, idempotency, receipt logging and a
+synthetic-first test." Built and proven:
+
+- **One new table** on the real schema (`asdair.command_request`, migration `asdair_005_cockpit_command`)
+  — additive; existing asdair tables are untouched. Two guard triggers: inserts are intent-only,
+  the request core is immutable and only valid forward transitions are allowed.
+- **Asymmetric least-privilege roles:** `cp_directus` (cockpit) may only INSERT the intent columns
+  and SELECT — it can never execute or write shopping items. `cp_worker` (executor) claims + receipts
+  the queue and performs the effect, but cannot fabricate a request. Neither can touch the rest of asdair.
+- **One allowlisted command** `add_regular_to_next_week {regular_id, qty}` → the worker upserts a
+  `shopping_list_item` into the regular's household `next_week_draft` list. Anything else → `failed`,
+  never executed.
+- **Idempotency** two ways: unique `idempotency_key` (duplicate → 23505) and effect-level upsert by
+  (list, item name) so replays update rather than duplicate. **Receipts** are written to the row and
+  are immutable once done.
+- **Strong backstop:** because the DB grant limits `cp_directus` to intent-only, *even a Directus
+  admin POST cannot execute or write items* — the DB layer holds regardless of Directus role config.
+
+Run + prove (synthetic-first; the real household id 1 is never touched):
+```bash
+node wp-d-proof/provision-writeback-live.mjs      # create cp_worker + the seam grants
+node wp-d-proof/prove-writeback-live.mjs          # 10/10: seam, asymmetry, idempotency, allowlist, guards
+node wp-d-proof/prove-writeback-directus.mjs      # 4/4: the SAME write end-to-end through the Directus API (no terminal)
+node wp-d-proof/asdair-worker.mjs --drain|--watch # the trusted executor
+```
+Reversible: `drop table asdair.command_request cascade; drop role cp_worker;` (+ the slice-1 reversal).
+
+**Pre-existing posture surfaced (not introduced here):** Supabase advises `asdair` has RLS disabled
+on all tables. The schema is NOT exposed on the REST API (no anon reach) and the cockpit uses the
+dedicated least-priv `cp_directus`/`cp_worker` logins, so this write-back does not widen exposure —
+flagged for a separate decision, not auto-changed.
+
 ## Known architecture fork (Warwick's call, flagged not decided)
 The four cockpit surfaces span **two** Supabase projects: `asdair` + TubeAIR + AsdAIr live in the
 **MyPKA** project (`kerdinlgcfxnjrztwqde`); the **Tower** supervision timeline + HUD live in the

@@ -20,6 +20,7 @@ await c.connect();
 await c.query(`set search_path to ${CONN.directus_schema}, asdair`);
 const collections = [
   ['regulars', 'shopping_cart', 'AsdAIr Regulars — the real weekly-shop favourites (LIVE, read-only, hosted MyPKA Supabase).'],
+  ['command_request', 'send', 'AsdAIr write-back seam: the cockpit INSERTs an INTENT (add_regular_to_next_week); a trusted worker executes it + writes a receipt. The cockpit can never execute.'],
 ];
 try {
   for (const [name, icon, note] of collections) {
