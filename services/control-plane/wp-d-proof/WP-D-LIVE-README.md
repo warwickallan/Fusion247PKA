@@ -1,6 +1,6 @@
 # BUILD-014 — LIVE cockpit (Priority One), slice 1: real asdair regulars
 
-**Status:** BUILT + PROVEN on this machine (2026-07-21). LOCAL-only (`127.0.0.1`), LIVE hosted data.
+**Status:** DEPLOYED to the private tailnet (S21 access, real data) — usable now. NOT-yet-fully-LIVE: the restart/reboot-recovery acceptance proof is still outstanding (parked by Warwick).
 **Branch:** `build-014/directus-live-cockpit`.
 
 This is the first executable slice of the morning-reset **Priority One** ("live Directus cockpit,
