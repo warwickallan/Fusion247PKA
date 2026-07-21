@@ -173,3 +173,37 @@ green on the exact head — that is the gate before the merge recommendation.
 
 Watcher (PID 21060) was **left running on purpose** — not intentionally stopped. No further Tower
 implementation performed after this log. AsdAIr starts afresh in a new session.
+
+---
+
+## ADDENDUM (2026-07-20, later session) — merge closed + deferred hardening
+
+Resumed only to close §6A→§6E. Done: CI env-wiring fixed (`940f56d`, spawned watcher children now
+get the resolved DB URL); **PR #52 merged to main `84138e2`** (exact-head guarded); watcher
+**relaunched from merged main, PID 15420**; one Tower "watcher online" notification sent via
+@Fusion247towerbot (**msg_id 85**). SessionStart hook added to `.claude/settings.local.json` →
+`ensure-watcher.mjs` (idempotent, reboot-safe: recent DB heartbeat AND encoded PID alive) so every
+new session brings Tower online automatically. `ensure-watcher.mjs` is on-disk (untracked); commit to
+main in a future Tower touch (non-blocking).
+
+**Independent Codex CLI product-QA of PR #52** (real `codex.exe`, ChatGPT-OAuth — not simulated;
+staged diff, read-only) returned `request_changes` with four crash-durability findings. Warwick
+decision: **preserve as DEFERRED HARDENING, do NOT fix tonight** unless one prevents the loop
+operating (none do — the loop runs). Land these before any live/at-scale gate:
+
+- **F-001 (HIGH):** `notify()` inserts the `(turn_id, reason)` dedup row *before* the Telegram POST;
+  a crash in that gap permanently suppresses retry (row exists ⇒ deduped) though no message was sent.
+  Fix: durable outbox with retryable delivery states; reclaim/resend unsent rows; never treat row
+  existence as proof of delivery.
+- **F-002 (HIGH):** `fireTriggers` emits **no** notification for aligned `continue` turns (returns
+  `[]`), so "one durable turn → one notification" does not hold for ordinary turns. Decide the
+  intended notification policy (silent-on-aligned may be desired) and make the code match it.
+- **F-003 (MEDIUM):** reviewer is invoked *before* the `supervisor_review` INSERT; a crash between
+  Codex-return and persist causes re-invocation on lease reclaim (the unique index dedupes rows, not
+  invocations). Fix: narrow the claim to exactly-once *persisted verdict* + at-least-once invocation,
+  or add durable invocation state.
+- **F-004 (MEDIUM):** `bridge-ingest.mjs` catches ingest failures, logs, and exits 0 with no durable
+  local spool, so a real Larry↔Warwick turn is lost if the DEV DB is down at capture time. Fix: a
+  bounded local spool/retry keyed on `session_turn_key` for idempotent replay.
+
+Full structured verdict: scratchpad `pr52-codex-result.json` (this session). **Tower parked again.**
