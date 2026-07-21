@@ -161,11 +161,20 @@ try {
 } finally { await dir.end(); }
 
 console.log('\n=== INCREMENT 2 — DB-LAYER LEAST-PRIVILEGE: cp_worker (the executor) ===');
+// Seed two dedicated requested rows (as superuser) for the worker-lifecycle assertions.
+const su = new pg.Client({ connectionString: `postgres://${rt.superuser}:${rt.password}@${rt.host}:${rt.port}/${rt.database}` });
+await su.connect();
+const rowA = (await su.query(`insert into public.command_request (requested_by, command, idempotency_key) values ('seed','echo','wtestA-'||gen_random_uuid()) returning id`)).rows[0].id;
+const rowB = (await su.query(`insert into public.command_request (requested_by, command, idempotency_key) values ('seed','echo','wtestB-'||gen_random_uuid()) returning id`)).rows[0].id;
+await su.end();
+
 const wrk = new pg.Client({ connectionString: `postgres://${rt.dbRoles.workerUser}:${rt.dbRoles.workerPassword}@${rt.host}:${rt.port}/${rt.database}` });
 await wrk.connect();
 try {
-  const w1 = await attempt(wrk, `update public.command_request set claimed_at = now() where status = 'requested'`);
-  check('W1  cp_worker CAN update command_request (claim/receipt)', w1.ok, w1.ok ? 'ok' : `SQLSTATE ${w1.code}`);
+  // W1: the legitimate lifecycle — claim (requested->claimed) then complete (claimed->done + receipt).
+  const w1a = await attempt(wrk, `update public.command_request set status='claimed', claimed_at=now() where id=$1`, [rowA]);
+  const w1b = await attempt(wrk, `update public.command_request set status='done', completed_at=now(), receipt='{"ok":true}'::jsonb where id=$1`, [rowA]);
+  check('W1  cp_worker CAN claim then complete (requested->claimed->done + receipt)', w1a.ok && w1b.ok, (w1a.ok && w1b.ok) ? 'ok' : `SQLSTATE ${w1a.code || w1b.code}`);
   const w2 = await attempt(wrk, `insert into public.command_request (requested_by, command, args, idempotency_key) values ('cp_worker','x','{}','w-'||gen_random_uuid())`);
   check('W2  cp_worker CANNOT insert command_request (cannot fabricate requests)', !w2.ok && w2.code === '42501', `SQLSTATE ${w2.code} (expected 42501)`);
   const w3 = await attempt(wrk, `select 1 from ops.agent_event limit 1`);
@@ -174,6 +183,18 @@ try {
   check('W4  cp_worker CANNOT write shopping (list_items)', !w4.ok && w4.code === '42501', `SQLSTATE ${w4.code} (expected 42501)`);
   const w5 = await attempt(wrk, `insert into public.cockpit_metric (key, value, computed_by) values ('worker_probe', 1, 'cp_worker') on conflict (key) do update set value = 1`);
   check('W5  cp_worker CAN write cockpit_metric (its side-effect surface)', w5.ok, w5.ok ? 'ok' : `SQLSTATE ${w5.code}`);
+  // --- F2 fail-closed: the worker CANNOT rewrite the request or its provenance (columns not granted) ---
+  const w6 = await attempt(wrk, `update public.command_request set command = 'rm -rf' where id=$1`, [rowB]);
+  check('W6  cp_worker CANNOT rewrite command (column not granted)', !w6.ok && w6.code === '42501', `SQLSTATE ${w6.code} (expected 42501)`);
+  const w7 = await attempt(wrk, `update public.command_request set requested_by = 'attacker' where id=$1`, [rowB]);
+  check('W7  cp_worker CANNOT rewrite requested_by (column not granted)', !w7.ok && w7.code === '42501', `SQLSTATE ${w7.code} (expected 42501)`);
+  const w8 = await attempt(wrk, `update public.command_request set is_synthetic = false where id=$1`, [rowB]);
+  check('W8  cp_worker CANNOT flip is_synthetic (column not granted)', !w8.ok && w8.code === '42501', `SQLSTATE ${w8.code} (expected 42501)`);
+  // --- F2 lifecycle: the worker CANNOT skip the claim or resurrect a completed row (transition trigger) ---
+  const w9 = await attempt(wrk, `update public.command_request set status='done', receipt='{"forged":true}'::jsonb where id=$1`, [rowB]);
+  check('W9  cp_worker CANNOT skip claim (requested->done rejected by transition trigger)', !w9.ok && w9.code === '23514', `SQLSTATE ${w9.code} (expected 23514)`);
+  const w10 = await attempt(wrk, `update public.command_request set status='claimed' where id=$1`, [rowA]);
+  check('W10 cp_worker CANNOT resurrect a completed row (done->claimed rejected)', !w10.ok && w10.code === '23514', `SQLSTATE ${w10.code} (expected 23514)`);
 } finally { await wrk.end(); }
 
 console.log('\n=== INCREMENT 2 — INTENT-ONLY GUARDS (belt-and-braces, fire for every role) ===');
@@ -185,10 +206,19 @@ try {
   check('G1  INSERT with status!=requested rejected by guard', !g1.ok && g1.code === '23514', `SQLSTATE ${g1.code} (expected 23514)`);
   const g2 = await attempt(g, `insert into public.command_request (requested_by, command, idempotency_key, receipt) values ('x','echo','g2-'||gen_random_uuid(),'{"forged":true}')`);
   check('G2  INSERT with a receipt rejected by guard', !g2.ok && g2.code === '23514', `SQLSTATE ${g2.code} (expected 23514)`);
-  // The request CORE is immutable: you may advance status but not rewrite the command.
-  await g.query(`insert into public.command_request (requested_by, command, idempotency_key) values ('x','echo','g3-'||gen_random_uuid())`);
-  const g3 = await attempt(g, `update public.command_request set command = 'rm -rf' where command = 'echo'`);
+  // Insert a dedicated requested row and prove the guards fire for EVERY role (superuser here).
+  const gid = (await g.query(`insert into public.command_request (requested_by, command, idempotency_key) values ('gseed','noop','g-'||gen_random_uuid()) returning id`)).rows[0].id;
+  const g3 = await attempt(g, `update public.command_request set command = 'rm -rf' where id=$1`, [gid]);
   check('G3  UPDATE rewriting the request command rejected by guard', !g3.ok && g3.code === '23514', `SQLSTATE ${g3.code} (expected 23514)`);
+  const g4 = await attempt(g, `update public.command_request set is_synthetic = false where id=$1`, [gid]);
+  check('G4  UPDATE flipping is_synthetic rejected by guard', !g4.ok && g4.code === '23514', `SQLSTATE ${g4.code} (expected 23514)`);
+  const g5 = await attempt(g, `update public.command_request set status = 'done' where id=$1`, [gid]);
+  check('G5  UPDATE skipping the claim (requested->done) rejected by guard', !g5.ok && g5.code === '23514', `SQLSTATE ${g5.code} (expected 23514)`);
+  // Drive it legitimately to done, then prove a completed row is FINAL (no resurrection).
+  await g.query(`update public.command_request set status='claimed', claimed_at=now() where id=$1`, [gid]);
+  await g.query(`update public.command_request set status='done', completed_at=now(), receipt='{}'::jsonb where id=$1`, [gid]);
+  const g6 = await attempt(g, `update public.command_request set status = 'claimed' where id=$1`, [gid]);
+  check('G6  UPDATE resurrecting a completed row rejected by guard', !g6.ok && g6.code === '23514', `SQLSTATE ${g6.code} (expected 23514)`);
 } finally { await g.end(); }
 
 console.log(`\n[permission-test] ${pass} passed, ${fail} failed.`);

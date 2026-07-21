@@ -120,12 +120,18 @@ try {
   //  cp_worker — the TRUSTED EXECUTOR. Claims + completes queue rows and
   //  writes the safe metric. It cannot fabricate requests or touch the ledger.
   // =====================================================================
-  await admin.query(`grant select, update on public.command_request to cp_worker`);
+  await admin.query(`grant select on public.command_request to cp_worker`);
+  // Column-scoped UPDATE: the worker may ONLY advance the lifecycle + stamp times +
+  // append a receipt. It CANNOT rewrite requested_by/command/args/idempotency_key or
+  // flip is_synthetic (those columns are not granted -> 42501). The transition trigger
+  // further constrains which status moves are legal.
+  await admin.query(`grant update (status, claimed_at, completed_at, receipt) on public.command_request to cp_worker`);
   await admin.query(`grant select on public.list_items to cp_worker`);       // to recompute counts
   await admin.query(`grant select, insert, update on public.cockpit_metric to cp_worker`);
   // NO INSERT on command_request (asymmetry: requests come from the cockpit only).
-  // NO write on shopping/read-models. NO ops.* ledger. NO directus_* access.
-  console.log('[db-roles] cp_worker: SELECT+UPDATE(command_request), SELECT(list_items), R/W(cockpit_metric) ONLY');
+  // NO update on the request fields / is_synthetic. NO write on shopping/read-models.
+  // NO ops.* ledger. NO directus_* access.
+  console.log('[db-roles] cp_worker: SELECT + UPDATE(status,claimed_at,completed_at,receipt) on command_request, SELECT(list_items), R/W(cockpit_metric) ONLY');
 
   // ---- Persist dev-only passwords (gitignored) ---------------------------------
   rt.dbRoles = {

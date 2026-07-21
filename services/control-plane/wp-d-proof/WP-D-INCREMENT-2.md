@@ -1,10 +1,12 @@
 # BUILD-014 WP-D increment 2 — the write-back trust seam
 
 **Status:** BUILT + PROVEN on this machine (2026-07-21). DEV-only, LOCAL-only, SYNTHETIC data only.
-**Branch:** `build-014/wp-d-writeback-seam` (fresh off `main`).
+**Branch:** `build-014/wp-d-cockpit-v2` (clean, off REAL `main` `42f74e9`).
 **Author:** Silas (Database Architect).
 **Foundation:** increment 1's harness (READ views + read-only cockpit + 11/11 permission test),
 brought forward unchanged from `build-014/wp-d-cockpit-proof`.
+**Review:** independent Codex review applied — F2 fixed (worker write-scope hardened), F1
+confirmed (read-models are curated), F3 tracked (§9). Permission matrix now **41/41 PASS**.
 
 This increment adds the narrow, permission-bounded **write-back** that makes a Directus
 cockpit worth running — *without* letting the cockpit become the runtime. It proves a
@@ -92,24 +94,51 @@ delete the queue (cannot execute/complete), cannot see the Tower ledger, cannot 
 |---|---|---|
 | `public.lists` | `SELECT` | — |
 | `public.list_items` | `SELECT`, **`UPDATE(is_checked)`** (column-scoped) | `SELECT` |
-| `public.tower_review_log` / `tower_verdicts` | `SELECT` | — |
-| `public.command_request` | `SELECT`, **`INSERT(requested_by,command,args,idempotency_key)`** | `SELECT`, `UPDATE` |
+| `public.tower_review_log` / `tower_verdicts` | `SELECT` (curated read-models — see §3d) | — |
+| `public.command_request` | `SELECT`, **`INSERT(requested_by,command,args,idempotency_key)`** | `SELECT`, **`UPDATE(status,claimed_at,completed_at,receipt)`** (column-scoped — F2) |
 | `public.cockpit_metric` | `SELECT` | `SELECT`, `INSERT`, `UPDATE` |
 | `directus_*` system tables | **OWNER** (runs the CMS) | — (no access) |
 | schema `ops` (the ledger) | **no USAGE** — invisible | **no USAGE** — invisible |
 
 The **asymmetry is the trust boundary**: `cp_directus` can *request* (INSERT intent) but not
-*execute* (no UPDATE on the queue); `cp_worker` can *execute* (UPDATE + receipt) but not
-*fabricate* requests (no INSERT on the queue). Neither role can touch the `ops.*` ledger at all.
+*execute* (no UPDATE on the queue); `cp_worker` can *execute* (advance status + write receipt)
+but not *fabricate* requests (no INSERT on the queue) and not *rewrite* what was requested —
+its UPDATE is **column-scoped to `status,claimed_at,completed_at,receipt` only** (F2). Neither
+role can touch the `ops.*` ledger at all.
+
+> **F2 fix (Codex MEDIUM, applied):** increment-2 v1 gave `cp_worker` table-wide `UPDATE` on
+> `command_request`, so it could rewrite `requested_by`/`command`/`args`/`is_synthetic`. Now the
+> grant is **column-scoped** (above), AND the update guard (§3c) enforces valid transitions.
+> The worker literally cannot rewrite the request or its provenance — proven by W6–W10 (§6).
 
 ### 3c. Belt-and-braces guards (trigger-enforced for **every** role, incl. superuser)
 
 - **Intent-only insert:** any `command_request` INSERT with `status != 'requested'`, or a
   non-null `receipt`, or a pre-set `claimed_at`/`completed_at` → rejected `23514`.
 - **Immutable request core:** any UPDATE that changes `requested_by`/`command`/`args`/
-  `idempotency_key`/`requested_at` → rejected `23514`. The worker may only advance status,
-  stamp times, and append a receipt.
+  `idempotency_key`/`requested_at` → rejected `23514`.
+- **Immutable synthetic provenance (F2):** any UPDATE that flips `is_synthetic` → rejected `23514`.
+- **Valid lifecycle transitions only (F2):** when `status` changes, only `requested → claimed`
+  and `claimed → done|failed` are allowed; skipping the claim (`requested → done`), un-claiming,
+  or any other move → rejected `23514`.
+- **Completed rows are FINAL (F2):** any UPDATE to a row already `done`/`failed` (resurrection or
+  receipt tampering) → rejected `23514`.
 - **Idempotency:** `command_request.idempotency_key` is `UNIQUE` (duplicate intent rejected).
+
+The worker may therefore ONLY: claim its own request, then stamp a receipt + terminal status.
+
+### 3d. F1 confirmation (Codex HIGH — adjudicated NOT a defect; verified curated)
+
+`cp_directus` has `SELECT` on `public.tower_review_log` and `public.tower_verdicts`. This is the
+**intended** cockpit display (a Tower-interactions cockpit must show verdicts). Verified curated:
+
+- The `ops.*` schema (migration 001) contains **no** `raw_output` / `staged_input` / `raw_*`
+  columns at all — there is no raw reviewer payload to leak.
+- The read-models expose only curated display fields:
+  `tower_review_log(id, occurred_at, build_ref, actor, event_kind, summary, checkpoint_ref, classification)`
+  and `tower_verdicts(id, build_ref, checkpoint_ref, reviewer, verdict_type, verdict, state, reviewed_commit_sha, created_at)`.
+- `cp_directus` has **no** access to `ops.*` (no schema USAGE) — it reads only the curated public
+  projections. **No curation change required.**
 
 ---
 
@@ -160,9 +189,9 @@ the worker still drains a queued request to done, then restarts Directus and sho
 
 ---
 
-## 6. Result — full permission matrix (33/33 PASS)
+## 6. Result — full permission matrix (41/41 PASS)
 
-`node wp-d-proof/permission-test.mjs` → **33 passed, 0 failed.** Highlights:
+`node wp-d-proof/permission-test.mjs` → **41 passed, 0 failed.** Highlights:
 
 | Group | Assertions | Result |
 |---|---|---|
@@ -172,8 +201,8 @@ the worker still drains a queued request to done, then restarts Directus and sho
 | **Seam (app)** | **C3 request 200 (intent-only); C4 complete 403; C5 delete 403; C6 metric 403** | pass |
 | Ledger immutability (DB) | D1 UPDATE/DELETE `ops.agent_event` → `23001` | pass |
 | **`cp_directus` least-priv (DB)** | **DB1 is_checked ok; DB2 item_name `42501`; DB3 insert-intent ok; DB4 queue-update `42501`; DB5 ledger `42501`; DB6 lists `42501`; DB7 metric `42501`** | pass |
-| **`cp_worker` least-priv (DB)** | **W1 queue-update ok; W2 queue-insert `42501`; W3 ledger `42501`; W4 shopping `42501`; W5 metric ok** | pass |
-| **Intent guards (DB)** | **G1 status≠requested `23514`; G2 receipt-on-insert `23514`; G3 rewrite command `23514`** | pass |
+| **`cp_worker` least-priv (DB) — F2** | **W1 claim→complete ok; W2 queue-insert `42501`; W3 ledger `42501`; W4 shopping `42501`; W5 metric ok; W6 rewrite command `42501`; W7 rewrite requested_by `42501`; W8 flip is_synthetic `42501`; W9 skip-claim `23514`; W10 resurrect `23514`** | pass |
+| **Intent + lifecycle guards (DB) — F2** | **G1 status≠requested `23514`; G2 receipt-on-insert `23514`; G3 rewrite command `23514`; G4 flip is_synthetic `23514`; G5 skip-claim `23514`; G6 resurrect completed `23514`** | pass |
 
 ---
 
@@ -186,7 +215,9 @@ the worker still drains a queued request to done, then restarts Directus and sho
   claims (`FOR UPDATE SKIP LOCKED`), executes one safe synthetic command, writes a visible receipt.
 - Directus + worker run as **least-privilege roles, never superuser** at runtime.
 - Outage-independence: the worker drains the queue with Directus fully down; state survives restart.
-- 33/33 permission assertions incl. fail-closed DB-layer denials for every out-of-scope write.
+- 41/41 permission assertions incl. fail-closed DB-layer denials for every out-of-scope write,
+  and (F2) proof the worker cannot rewrite a request, flip `is_synthetic`, skip the claim, or
+  resurrect a completed row.
 
 **Scope boundaries / partial (called out honestly):**
 - This is a **disposable DEV proof**, not a hosted deployment. No TLS, no reverse proxy, no
@@ -200,8 +231,15 @@ the worker still drains a queued request to done, then restarts Directus and sho
   load-tested in this increment; the locking is correct by construction but not stress-proven here.
 - Worker "safe commands" are a fixed synthetic allow-list; there is no general command execution
   surface (by design).
-- No independent reviewer (Codex) has run against this branch yet; these results are the
-  builder's own executed tests.
+- **F3 (Codex LOW, tracked):** the worker holds the `FOR UPDATE SKIP LOCKED` row lock across
+  command execution + receipt commit (one transaction). For the current safe, fast synthetic
+  commands this is fine and gives the simplest exactly-once guarantee (no orphaned `claimed` rows
+  on crash). If future commands become slow/external, split into a short claim txn (`requested →
+  claimed`, commit) + execute + a receipt txn (`claimed → done`, commit) plus a stale-claim reaper.
+  **Deliberately not changed here** — splitting now would trade a proven, orphan-free path for
+  added crash-recovery surface with no current benefit.
+- **Review:** independent Codex review has run against this work — F2 fixed, F1 confirmed (§3d),
+  F3 tracked above. No Fable. Warwick's merge gate still sits on top; not merged.
 
 ---
 

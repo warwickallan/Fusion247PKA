@@ -90,18 +90,39 @@ create trigger command_request_insert_guard_t
   before insert on public.command_request
   for each row execute function public.command_request_insert_guard();
 
--- ---- Guard 2: the request CORE is immutable after creation ------------------
--- The worker may only advance status / stamp times / append a receipt. It cannot
--- rewrite what was requested (append-only-ish request provenance).
+-- ---- Guard 2: the request CORE is immutable + only valid forward transitions --
+-- The worker may only CLAIM (requested->claimed) and COMPLETE (claimed->done|failed),
+-- stamping times + appending a receipt. It may NOT rewrite what was requested, flip
+-- is_synthetic, skip the claim, un-claim, or resurrect/re-write a completed row.
+-- This trigger fires for EVERY role (belt-and-braces with the column-scoped worker
+-- GRANT), so even a bypass connection cannot corrupt request provenance or lifecycle.
 create or replace function public.command_request_update_guard() returns trigger
 language plpgsql as $$
 begin
+  -- (a) the request CORE (what was asked) is immutable after creation.
   if new.requested_by    is distinct from old.requested_by
      or new.command      is distinct from old.command
      or new.args         is distinct from old.args
      or new.idempotency_key is distinct from old.idempotency_key
      or new.requested_at  is distinct from old.requested_at then
     raise exception 'command_request core fields (requested_by/command/args/idempotency_key/requested_at) are immutable after creation'
+      using errcode = '23514';
+  end if;
+  -- (b) synthetic provenance cannot be flipped (no "promoting" a dev row to real).
+  if new.is_synthetic is distinct from old.is_synthetic then
+    raise exception 'command_request.is_synthetic is immutable'
+      using errcode = '23514';
+  end if;
+  -- (c) completed rows are FINAL — no resurrection, no receipt tampering after done/failed.
+  if old.status in ('done','failed') then
+    raise exception 'a completed command_request (status=%) is immutable', old.status
+      using errcode = '23514';
+  end if;
+  -- (d) when status changes, only the valid forward lifecycle transitions are allowed.
+  if new.status is distinct from old.status
+     and not ( (old.status = 'requested' and new.status = 'claimed')
+            or (old.status = 'claimed'   and new.status in ('done','failed')) ) then
+    raise exception 'invalid command_request status transition % -> %', old.status, new.status
       using errcode = '23514';
   end if;
   return new;
