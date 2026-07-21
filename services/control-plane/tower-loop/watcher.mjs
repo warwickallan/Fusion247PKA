@@ -29,7 +29,7 @@ import {
 import { runSupervisor, runMergeReview } from './supervisorCodex.mjs';
 import { gatherGitEvidence } from './gitEvidence.mjs';
 import { detectMergeClass } from './mergeClass.mjs';
-import { notify, composeMessage } from './notify.mjs';
+import { notify, composeMessage, composeLarryMessage } from './notify.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -181,10 +181,14 @@ async function fireTriggers(pool, { turnId, buildRef, turnSeq, nextState, r, blo
   }
 
   if (!reason) return []; // continue / aligned -> SILENT (no Telegram)
-  return [await notifyFn(pool, {
-    turnId, reason, state,
-    message: composeMessage({ ...base, state, warwickNeeded, summary }),
-  })];
+  // Two SEPARATE Telegram messages (one dedup row): Larry's side of the dialogue first, THEN Codex's
+  // verdict — an actual back-and-forth on TowerBot, never one combined message. Larry's is omitted
+  // when there is no larry_response, so a pure-Codex turn still sends exactly one message.
+  const messages = [
+    composeLarryMessage({ buildRef, turnSeq, turnId, larryResponse }),
+    composeMessage({ ...base, state, warwickNeeded, summary }),
+  ].filter(Boolean);
+  return [await notifyFn(pool, { turnId, reason, state, message: messages })];
 }
 
 // ── lease renewer (FIX 4) ─────────────────────────────────────────────────────

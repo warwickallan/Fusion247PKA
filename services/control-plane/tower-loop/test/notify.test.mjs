@@ -4,7 +4,7 @@
 // to Codex"). Run: node --test test/notify.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { composeMessage, summariseLarry } from '../notify.mjs';
+import { composeMessage, composeLarryMessage, summariseLarry } from '../notify.mjs';
 
 test('summariseLarry: bounds long text and appends an ellipsis', () => {
   const long = 'x'.repeat(1000);
@@ -26,27 +26,33 @@ test('summariseLarry: empty / absent input returns empty string', () => {
   }
 });
 
-test('composeMessage: shows Larry line AND Codex verdict when larryResponse present', () => {
+test('composeMessage: Codex message carries ONLY Codex\'s side (no Larry line)', () => {
   const msg = composeMessage({
     buildRef: 'BUILD-014', turnSeq: 14, turnId: 'abc-123', state: 'acted',
-    verdict: 'correct', summary: 'drifted slightly', nextAction: 'apply fix',
-    warwickNeeded: false, larryResponse: 'Understood - I will apply the fix and re-run to confirm green.',
+    verdict: 'correct', summary: 'drifted slightly', nextAction: 'apply fix', warwickNeeded: false,
   });
-  assert.ok(msg.includes('🗣 Larry:'), 'Larry line present');
-  assert.ok(msg.includes('supervisor verdict: correct'), 'Codex verdict present (legacy label unchanged)');
+  assert.ok(msg.includes('🤖 Codex'), 'Codex header present');
+  assert.ok(msg.includes('verdict: correct'), 'Codex verdict present');
   assert.ok(msg.includes('turn: abc-123'), 'turn id present');
+  assert.ok(!msg.includes('🗣 Larry'), 'Larry line NOT combined into the Codex message');
 });
 
-test('composeMessage: back-compat — absent larryResponse is BYTE-IDENTICAL to pre-change (F-001 regression)', () => {
-  const msg = composeMessage({ buildRef: 'B', turnSeq: 1, turnId: 'x', state: 'reviewed', verdict: 'continue' });
-  const expected = [
-    '🗼 Tower B — turn #1',
-    'state: reviewed',
-    'supervisor verdict: continue',
-    'turn: x',
-  ].join('\n');
-  assert.equal(msg, expected, 'absent-case output identical to the pre-change format');
-  assert.ok(!msg.includes('🗣 Larry:'), 'no Larry line when absent');
+test('composeLarryMessage: Larry message carries ONLY Larry\'s side, keyed to the same turn', () => {
+  const msg = composeLarryMessage({
+    buildRef: 'BUILD-014', turnSeq: 14, turnId: 'abc-123',
+    larryResponse: 'Understood - I will apply the fix and re-run to confirm green.',
+  });
+  assert.ok(msg.includes('🗣 Larry'), 'Larry header present');
+  assert.ok(msg.includes('re-run to confirm green'), 'Larry excerpt present');
+  assert.ok(msg.includes('turn: abc-123'), 'same turn id — pairs with the Codex message');
+  assert.ok(!msg.includes('🤖 Codex'), 'Codex verdict NOT combined into the Larry message');
+});
+
+test('composeLarryMessage: returns empty string when there is no larry_response', () => {
+  for (const v of [null, undefined, '', '   ']) {
+    assert.equal(composeLarryMessage({ buildRef: 'B', turnSeq: 1, turnId: 'x', larryResponse: v }), '',
+      'no Larry message when there is nothing to say (then only the Codex message sends)');
+  }
 });
 
 test('summariseLarry: strips leftover/unmatched code fence (F-002)', () => {
