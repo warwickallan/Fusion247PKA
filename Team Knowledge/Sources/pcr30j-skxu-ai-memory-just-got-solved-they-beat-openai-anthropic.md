@@ -81,6 +81,18 @@ _All three are recommendations only — no change is made until you Accept._
 - Single promotional narrator; no independent corroboration captured.
 - The immutable **RAW transcript** (source evidence) is preserved and linked below; this note is a reconstruction, not a copy.
 
+## Verification update — Pax research (2026-07-22)
+
+Cross-source-verified by Pax (Senior Researcher); full brief in `Deliverables/2026-07-22-pax-honcho-mypka-research.md`. Key corrections/confirmations to the source's claims:
+
+- **Vendor + licence:** Honcho is by **Plastic Labs**, **AGPL-3.0** — copyleft with source-disclosure obligations for networked products (warrants a Vex pass before any distributed use).
+- **NOT private, even self-hosted [material correction]:** self-hosting still **requires a cloud LLM API key** (Gemini/Anthropic/OpenAI) for the deriver — so everything Honcho observes **egresses to a third-party model**. The video's "self-host on your own hardware, nothing to the labs" aspiration is *not* what shipping Honcho does today.
+- **Architecture confirmed:** Postgres + pgvector + Redis + a background "deriver" that LLM-reasons conversations into per-peer cards. "Neuromancer XR" (fine-tuned **Qwen3-8B**) is real but **appears proprietary / not open-weight**.
+- **Benchmarks — caveat confirmed:** BEAM ≈ **0.631 @ 1M / 0.406 @ 10M** matches the primary source, BUT the published runs used **gemini-2.5-flash-lite + claude-haiku-4-5**, *not* Neuromancer XR — so the custom model's contribution to the marquee numbers is ambiguous; all benchmarks are **self-run + LLM-judged**; "beat OpenAI & Anthropic" is promoter spin (the real comparison is memory-systems vs Mem0).
+- **Unresolved:** exact "dreaming" triggers + queue cadence (doc 404'd); no independent benchmark replication yet.
+
+**Pax recommendation:** a **scoped, throwaway spike only — do NOT adopt into governed memory.** Honcho structurally clashes with MyPKA's human-curated, git-diffable, public-repo, Markdown-SSOT doctrine. Smallest test: managed cloud + the $100 credits, one agent via MCP, **synthetic non-personal data only**, ~half a day; inspect the derived peer cards + token cost. (This resolves learning-candidate LC-3.)
+
 ## Related
 
 - [[ai-native-dev-model-vision]] — Fusion247's AI-native, memory-persistent operating-model thesis.
