@@ -35,20 +35,26 @@ async function processOne(resp) {
       return { id: resp.id, matched: false };
     }
 
-    // Governed follow-on work for the chosen option — correlated to the card. Dedupe by card so a
-    // re-answer for the same card does not multiply tasks (the human changing their mind updates, but
-    // a duplicate identical intent cannot double-create).
-    let followOnId = (await cx.query(`select id from cockpit.follow_on_task where correlation_id=$1 and origin='decision_response'`, [card.id])).rows[0]?.id ?? null;
-    if (!followOnId) {
+    // A decision_card is DECIDED ONCE. The first matched answer creates the ONE governed follow_on_task.
+    // A later valid answer for the SAME card is recorded HONESTLY but does NOT mutate or duplicate the
+    // task: the receipt says applied=false + already_decided (with the original choice), so the durable
+    // task and every receipt stay in agreement (no A-vs-B disagreement) — and the worker never needs
+    // write access to the task's governed content. Changing a made decision is a deliberate separate act.
+    const prior = (await cx.query(`select id, title from cockpit.follow_on_task where correlation_id=$1 and origin='decision_response'`, [card.id])).rows[0];
+    let receipt;
+    if (prior) {
+      const decidedMatch = /→ ([A-Za-z0-9]+) \(/.exec(prior.title || '');
+      const originalKey = decidedMatch ? decidedMatch[1] : null;
+      receipt = { ok: true, matched: true, applied: choice.key === originalKey, already_decided: true, chosen_key: choice.key, chosen_label: choice.label, original_choice: originalKey, card_id: card.id, follow_on_task_id: prior.id };
+    } else {
       const title = `Decision: ${String(card.subject).slice(0, 90)} → ${choice.key} (${choice.label})`;
       const detail = `Warwick chose ${choice.key} — ${choice.label} for "${card.subject}".${card.related_ref ? `\n\nref: ${card.related_ref}` : ''}`;
       const fo = await cx.query(
         `insert into cockpit.follow_on_task (origin, correlation_id, title, detail, created_by)
          values ('decision_response',$1,$2,$3,$4) returning id`,
         [card.id, title, detail, resp.responder]);
-      followOnId = fo.rows[0].id;
+      receipt = { ok: true, matched: true, applied: true, chosen_key: choice.key, chosen_label: choice.label, card_id: card.id, follow_on_task_id: fo.rows[0].id };
     }
-    const receipt = { ok: true, matched: true, chosen_key: choice.key, chosen_label: choice.label, card_id: card.id, follow_on_task_id: followOnId };
     await cx.query(`update cockpit.decision_response set chosen_key=$2, chosen_label=$3, status='done', completed_at=now(), receipt=$4::jsonb where id=$1`,
       [resp.id, choice.key, choice.label, JSON.stringify(receipt)]);
     await cx.query('commit');

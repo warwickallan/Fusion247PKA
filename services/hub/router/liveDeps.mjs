@@ -64,9 +64,23 @@ export async function createLiveYoutubeRoutingWriter({ markdownWriter }) {
     extract: async (url, videoId) => realExtract(url, videoId),
     preserveRaw: ({ videoId, packetFiles }) => vaultPreserveRaw({ vaultRoot: VAULT, videoId, packetFiles }),
     async upsertSource(row) {
+      // ON CONFLICT: REPAIR a partial/legacy row (e.g. one left by a prior failed extraction) by
+      // FILLING its null RAW pointer + metadata — COALESCE(existing, new) so a valid immutable
+      // raw_sha256/raw_path is NEVER overwritten, only a missing one is filled. This closes the
+      // "partial row re-extracts forever + never gains evidence" path (Codex round-2 blocker 1).
       await db.query(
         `insert into cockpit.youtube_source (video_id, title, source_url, channel, published, transcript_source, segment_count, captured_at, capture_id, review_state, note_path, raw_path, raw_sha256, learning_count)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,'ai_created',NULL,$10,$11,0) on conflict (video_id) do nothing`,
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,'ai_created',NULL,$10,$11,0)
+         on conflict (video_id) do update set
+           raw_path = coalesce(cockpit.youtube_source.raw_path, excluded.raw_path),
+           raw_sha256 = coalesce(cockpit.youtube_source.raw_sha256, excluded.raw_sha256),
+           title = coalesce(cockpit.youtube_source.title, excluded.title),
+           source_url = coalesce(cockpit.youtube_source.source_url, excluded.source_url),
+           channel = coalesce(cockpit.youtube_source.channel, excluded.channel),
+           published = coalesce(cockpit.youtube_source.published, excluded.published),
+           transcript_source = coalesce(cockpit.youtube_source.transcript_source, excluded.transcript_source),
+           segment_count = coalesce(cockpit.youtube_source.segment_count, excluded.segment_count),
+           updated_at = now()`,
         [row.video_id, row.title, row.source_url, row.channel, row.published, row.transcript_source, row.segment_count, row.captured_at, row.capture_id, row.raw_path, row.raw_sha256]);
     },
   };

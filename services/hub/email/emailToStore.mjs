@@ -24,6 +24,7 @@ export async function emailToStore(email, store, { now } = {}) {
     return { record: null, isNew: false, route, reason }; // not recorded as actionable — held for clarification
   }
   const capture_id = captureIdFor(envelope.message_id);
-  const { record, isNew } = await store.recordIntake({ ...envelope, capture_id, source_channel: 'email', technical_source_type: 'email', recorded_intent: route }, { now });
+  // The store persists text_preview — land the subject+body there so the content is durable.
+  const { record, isNew } = await store.recordIntake({ ...envelope, capture_id, text_preview: envelope.payload_text, source_channel: 'email', technical_source_type: 'email', recorded_intent: route }, { now });
   return { record, isNew, route };
 }

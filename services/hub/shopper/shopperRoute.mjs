@@ -24,8 +24,8 @@ export const SHOPPER_CONTEXT = 'shopping';
 export async function shopperRoute(payload, opts = {}) {
   const requestedBy = opts.requestedBy || 'shopperbot:warwick';
   const listDate = opts.listDate || null; // a real caller supplies next-week's date; kept explicit, no clock here
-  const sourceId = opts.sourceId ?? opts.keyPrefix; // keyPrefix kept as a back-compat alias
-  if (!sourceId || typeof sourceId !== 'string') throw new Error('shopperRoute: opts.sourceId (unique per inbound message) is required — it scopes the idempotency keys so distinct messages never collide');
+  const sourceId = opts.sourceId; // strictly required — no static default/alias that could collide across messages
+  if (!sourceId || typeof sourceId !== 'string') throw new Error('shopperRoute: opts.sourceId (unique per inbound message, e.g. the Telegram message/update id) is required — it scopes the idempotency keys so distinct messages never collide');
   const keyPrefix = `shop:${sourceId}`;
   const { rawText, provenance } = await resolvePayload(payload, opts.transcribers || {});
   const { items, needs_review: needsReview } = normaliseRawList(rawText);

@@ -55,6 +55,16 @@ async function main() {
   ok(fo.length === 1 && String(fo[0].correlation_id) === String(cardId), 'exactly one follow_on_task correlated to the card');
   ok(done.receipt?.follow_on_task_id && String(done.receipt.follow_on_task_id) === String(fo[0].id), 'receipt references the follow_on_task');
 
+  console.log('3c) RE-ANSWER with a different valid choice: first decision is IMMUTABLE, recorded honestly:');
+  await cockpit.query(`insert into cockpit.decision_response (card_id, responder, raw_text, idempotency_key) values ($1,'telegram:warwick','B',$2)`, [cardId, `${KEY}-a2`]);
+  runWorker();
+  const foAfter = (await admin.query(`select id, title from cockpit.follow_on_task where correlation_id=$1 and origin='decision_response'`, [cardId])).rows;
+  ok(foAfter.length === 1 && String(foAfter[0].id) === String(fo[0].id), 'still exactly one task (same id — no duplicate)');
+  ok(/→ A \(/.test(foAfter[0].title), 'the task still reflects the FIRST decision (A) — not silently overwritten');
+  const resp2 = (await admin.query(`select chosen_key, receipt from cockpit.decision_response where idempotency_key=$1`, [`${KEY}-a2`])).rows[0];
+  ok(resp2.receipt.matched === true && resp2.receipt.applied === false && resp2.receipt.already_decided === true && resp2.receipt.original_choice === 'A' && resp2.receipt.chosen_key === 'B',
+    'the 2nd reply is recorded HONESTLY: matched B, applied=false, already_decided (original A) — no A/B disagreement');
+
   console.log('4) an ambiguous/no-match reply completes honestly (re-answerable), no extra task:');
   await cockpit.query(`insert into cockpit.decision_response (card_id, responder, raw_text, idempotency_key) values ($1,'telegram:warwick','hmm maybe',$2)`, [cardId, `${KEY}-b`]);
   runWorker();
