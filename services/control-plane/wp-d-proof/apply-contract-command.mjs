@@ -105,17 +105,35 @@ async function processOne(cmd) {
   }
 }
 
-async function main() {
-  await worker.connect();
+const watchArg = args.find((a) => a === '--watch' || a.startsWith('--watch='));
+const WATCH_SEC = watchArg ? Number(watchArg.split('=')[1] || 15) : null;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function processPending() {
   const where = KEYPFX ? `status='requested' and idempotency_key like $1` : `status='requested'`;
   const params = KEYPFX ? [`${KEYPFX}%`] : [];
   const pending = (await worker.query(
     `select id, requested_by, command, build_id, contract_version, bound_git_sha, bound_content_hash, note
        from cockpit.contract_command where ${where} order by requested_at asc`, params)).rows;
-  console.log(`[apply] ${pending.length} pending contract_command(s)${KEYPFX ? ` (scope ${KEYPFX})` : ''}`);
+  if (pending.length) console.log(`[apply] ${pending.length} pending contract_command(s)${KEYPFX ? ` (scope ${KEYPFX})` : ''}`);
   for (const cmd of pending) await processOne(cmd);
+}
+
+async function main() {
+  await worker.connect();
+  if (WATCH_SEC) {
+    console.log(`[apply] operational watch loop — polling cockpit.contract_command every ${WATCH_SEC}s`);
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      try { await processPending(); }
+      catch (e) { console.error('[apply] poll error (continuing):', e.message); }
+      await sleep(WATCH_SEC * 1000);
+    }
+  } else {
+    await processPending();
+  }
 }
 
 main()
   .catch((e) => { console.error('[apply] error', e.message); process.exitCode = 1; })
-  .finally(async () => { await worker.end().catch(() => {}); });
+  .finally(async () => { if (!WATCH_SEC) await worker.end().catch(() => {}); });

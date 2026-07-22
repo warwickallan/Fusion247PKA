@@ -19,9 +19,12 @@ for the cockpit layer** — captured faithfully from the live catalog, not from 
 | `060_build_contract.sql` | BUILD-002 build-acceptance layer: `cockpit.build_contract` (approved-version record + readable projection) + `cockpit.contract_command` (approval INTENT queue) + guard triggers | teardown |
 | `070_build_contract_grants.sql` | least-privilege grants for the contract layer (cp_directus render+request-only; cp_worker execute-only; atomic revoke-then-grant) | teardown |
 | `080_build_contract_pack.sql` | evolves `build_contract` to the three-document PACK model: adds `documents` jsonb + `pack_content_hash`; guard v2 freezes them once set | teardown |
-| `seed/build-002-contract-draft.sql` | seeds the interim single-doc v0.1-draft row (now superseded by the pack) | — |
-| `seed/build-002-contract-pack-v1.sql` | supersedes v0.1-draft + seeds the v1.0-draft three-document pack row (bound to pack commit + `pack_content_hash`) | — |
-| `teardown.sql` | **rollback path** — reverses 010–080 (the `cockpit`-schema cascade drops the 060/080 objects + guards; `drop owned by cp_*` clears the 070 grants); leaves the asdair data tables untouched | — |
+| `090_build_contract_doc.sql` | `cockpit.build_contract_doc` — readable Markdown BODY + Git identity per pack member (Brief/Contract/Plan); append-only; cp_directus SELECT | teardown |
+| `seed/build-002-contract-draft.sql` | seeds the interim single-doc v0.1-draft row (now superseded) | — |
+| `seed/build-002-contract-pack-v1.sql` | the v1.0-draft pack seed (now superseded by v1.1) | — |
+| `teardown.sql` | **rollback path** — reverses 010–090 (the `cockpit`-schema cascade drops the 060/080/090 objects + guards; `drop owned by cp_*` clears the 070 grants); leaves the asdair data tables untouched | — |
+
+**Reproducible pack population** (GPT review): the live pack row + readable doc bodies are loaded from Git by the committed `services/control-plane/wp-d-proof/load-contract-pack.mjs` (`node load-contract-pack.mjs --version=v1.1-draft`) — no manual live-row editing. Directus collections + the `body_markdown` Markdown interface are registered by `register-contract-collections.mjs`. The approval-apply worker runs operationally via `ensure-contract-worker.mjs` (watch loop) + `apply-contract-command.mjs --watch`.
 
 **Secrets:** role passwords are **never** in these migrations. `020` creates the roles with no
 password; the runtime provisioner sets them from the gitignored `.runtime-live/` store
