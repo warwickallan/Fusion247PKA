@@ -16,6 +16,7 @@ import { spawnSync } from 'node:child_process';
 import pg from 'file:///C:/Fusion247PKA/services/control-plane/node_modules/pg/lib/index.js';
 import { classifyYouTube } from './youtubeClassify.mjs';
 import { preserveRaw } from './ingest.mjs';
+import { YOUTUBE_SOURCE_SUCCESS_UPSERT } from './youtubeSourceSql.mjs';
 
 const VAULT = 'C:/Fusion247PKA/Team Knowledge';
 const TUBEAIR = 'C:/Fusion247PKA/tools/tubeair';
@@ -85,10 +86,7 @@ async function scanOnce() {
     const packetFiles = [{ name: 'tubeair-report.md', content: t.report }, { name: 'manifest.json', content: JSON.stringify(m, null, 2) }];
     const raw = await preserveRaw({ vaultRoot: VAULT, videoId: cls.videoId, packetFiles });
     const stub = `> **Extracted + RAW preserved — standalone knowledge note pending in-session authoring by Larry** (D-cairn: the semantic step runs in-session, not headless).\n\n- **Title:** ${m.title}\n- **Channel:** ${m.channel}\n- **Published:** ${m.published_date}\n- **Transcript:** ${m.transcript_source}, ${m.segment_count} segments\n- **RAW evidence:** \`${raw.dir}/\` (sha256 \`${raw.files[0].sha256.slice(0, 12)}…\`)\n`;
-    await db.query(
-      `insert into cockpit.youtube_source (video_id, title, source_url, channel, published, transcript_source, segment_count, captured_at, capture_id, review_state, note_path, raw_path, raw_sha256, brief_markdown, learning_count)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,'ai_created',NULL,$10,$11,$12,0)
-       on conflict (video_id) do nothing`,
+    await db.query(YOUTUBE_SOURCE_SUCCESS_UPSERT,
       [cls.videoId, m.title, m.source_url, m.channel, m.published_date, m.transcript_source, m.segment_count, m.captured_at, cap.capture_id, raw.dir, raw.files[0].sha256, stub]);
     console.log(`[watch]   ${cls.videoId} extracted (${m.segment_count} segments) + RAW preserved + youtube_source created (note pending in-session).`);
     processed++;

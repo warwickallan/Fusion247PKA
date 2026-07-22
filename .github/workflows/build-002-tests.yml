@@ -93,6 +93,8 @@ jobs:
         run: node services/control-plane/db/mypka/test/apply-teardown-full.test.mjs
       - name: AsdAIr add_list_item write handler (real asdair schema on a throwaway Postgres)
         run: node services/control-plane/wp-d-proof/add-list-item.dbtest.mjs
+      - name: YouTube source retry upsert (TQA-006 — failed partial row → success fills RAW/source pointers)
+        run: node services/control-plane/wp-d-proof/youtube-retry.dbtest.mjs
 
   voice-sapi-windows:
     runs-on: windows-latest
