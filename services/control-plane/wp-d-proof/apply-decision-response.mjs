@@ -35,27 +35,27 @@ async function processOne(resp) {
       return { id: resp.id, ok: true, matched: false };
     }
 
-    // A decision_card is DECIDED ONCE. The first matched answer creates the ONE governed follow_on_task.
-    // A later valid answer for the SAME card is recorded HONESTLY but does NOT mutate or duplicate the
-    // task: the receipt says applied=false + already_decided (with the original choice), so the durable
-    // task and every receipt stay in agreement (no A-vs-B disagreement) — and the worker never needs
-    // write access to the task's governed content. Changing a made decision is a deliberate separate act.
-    const prior = (await cx.query(`select id, title from cockpit.follow_on_task where correlation_id=$1 and origin='decision_response'`, [card.id])).rows[0];
+    // A decision_card is DECIDED ONCE. CONCURRENCY-SAFE (QA2 finding A): the partial unique index on
+    // (correlation_id, origin) for decision_response tasks means the INSERT is the ONE authoritative
+    // create — two response intents for the same card on two connections can never both insert. The
+    // connection that wins the insert records applied:true; any other (concurrent OR a later re-answer)
+    // gets DO NOTHING and records applied:false + already_decided honestly, so the durable task and every
+    // receipt always agree (no A-vs-B disagreement, no duplicate task).
+    const title = `Decision: ${String(card.subject).slice(0, 90)} → ${choice.key} (${choice.label})`;
+    const detail = `Warwick chose ${choice.key} — ${choice.label} for "${card.subject}".${card.related_ref ? `\n\nref: ${card.related_ref}` : ''}`;
+    const ins = await cx.query(
+      `insert into cockpit.follow_on_task (origin, correlation_id, title, detail, created_by)
+       values ('decision_response',$1,$2,$3,$4)
+       on conflict (correlation_id, origin) where origin = 'decision_response' and correlation_id is not null do nothing
+       returning id`,
+      [card.id, title, detail, resp.responder]);
     let receipt;
-    if (prior) {
-      const decidedMatch = /→ ([A-Za-z0-9]+) \(/.exec(prior.title || '');
-      const originalKey = decidedMatch ? decidedMatch[1] : null;
-      // Decide-once: ANY later valid answer is applied:false (the decision stands from the FIRST answer).
-      // same_choice distinguishes a harmless idempotent re-tap from an attempted change of mind.
-      receipt = { ok: true, matched: true, applied: false, already_decided: true, same_choice: choice.key === originalKey, chosen_key: choice.key, chosen_label: choice.label, original_choice: originalKey, card_id: card.id, follow_on_task_id: prior.id };
+    if (ins.rows[0]) {
+      receipt = { ok: true, matched: true, applied: true, chosen_key: choice.key, chosen_label: choice.label, card_id: card.id, follow_on_task_id: ins.rows[0].id };
     } else {
-      const title = `Decision: ${String(card.subject).slice(0, 90)} → ${choice.key} (${choice.label})`;
-      const detail = `Warwick chose ${choice.key} — ${choice.label} for "${card.subject}".${card.related_ref ? `\n\nref: ${card.related_ref}` : ''}`;
-      const fo = await cx.query(
-        `insert into cockpit.follow_on_task (origin, correlation_id, title, detail, created_by)
-         values ('decision_response',$1,$2,$3,$4) returning id`,
-        [card.id, title, detail, resp.responder]);
-      receipt = { ok: true, matched: true, applied: true, chosen_key: choice.key, chosen_label: choice.label, card_id: card.id, follow_on_task_id: fo.rows[0].id };
+      const prior = (await cx.query(`select id, title from cockpit.follow_on_task where correlation_id=$1 and origin='decision_response'`, [card.id])).rows[0];
+      const originalKey = (/→ ([A-Za-z0-9]+) \(/.exec(prior?.title || '') || [])[1] ?? null;
+      receipt = { ok: true, matched: true, applied: false, already_decided: true, same_choice: choice.key === originalKey, chosen_key: choice.key, chosen_label: choice.label, original_choice: originalKey, card_id: card.id, follow_on_task_id: prior?.id ?? null };
     }
     await cx.query(`update cockpit.decision_response set chosen_key=$2, chosen_label=$3, status='done', completed_at=now(), receipt=$4::jsonb where id=$1`,
       [resp.id, choice.key, choice.label, JSON.stringify(receipt)]);

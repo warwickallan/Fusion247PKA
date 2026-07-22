@@ -52,7 +52,7 @@ async function main() {
   ok(done.receipt?.ok === true && done.receipt?.dry_run === true && done.receipt?.sent === false, 'receipt: ok, dry_run=true, sent=false (nothing sent)');
   ok(done.receipt?.options_count === 3, 'receipt records 3 options');
   const rc = done.receipt?.rendered_card || '';
-  ok(/\*A\* — Accept/.test(rc) && /\*B\* — Decline/.test(rc) && /\*C\* — Defer/.test(rc), 'rendered card carries the A/B/C human-tap options');
+  ok(/A — Accept/.test(rc) && /B — Decline/.test(rc) && /C — Defer/.test(rc), 'rendered card carries the A/B/C human-tap options');
   ok(/Decision needed/.test(rc) && /Fusion247 AI Assessment/.test(rc), 'rendered card carries subject + body');
 
   console.log('4) even with dry_run=false, worker WITHOUT --allow-send still does not send:');

@@ -13,6 +13,9 @@ export function parseChoice(text, options) {
   if (!raw) return { ok: false, reason: 'empty' };
   const lower = raw.toLowerCase();
 
+  // Escape any regex metacharacters in the key before it enters a RegExp — a key like "(" must never
+  // throw or misbehave (QA2 finding D; defence-in-depth on top of the card-boundary key-shape check).
+  const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const matches = [];
   for (const o of options) {
     const key = String(o.key ?? '').toLowerCase();
@@ -23,7 +26,7 @@ export function parseChoice(text, options) {
       lower === `option ${key}` ||
       lower === `${key})` ||
       lower === `${key}.` ||
-      new RegExp(`^${key}[\\s):.\\-–—]`).test(lower); // "A - accept", "A: go", "A) foo"
+      new RegExp(`^${escapeRe(key)}[\\s):.\\-–—]`).test(lower); // "A - accept", "A: go", "A) foo"
     const labelHit = label && lower === label;
     if (keyHit || labelHit) matches.push({ key: o.key, label: o.label });
   }

@@ -22,8 +22,8 @@ test('an AMBIGUOUS voice intent is resolved through the A/B/C decision seam (no 
       interpretations: [{ key: 'A', label: 'Shopping list' }, { key: 'B', label: 'A note' }, { key: 'C', label: 'A reminder' }] }),
   });
   assert.equal(r.route, 'needs_decision');
-  assert.match(r.card.rendered, /\*A\* — Shopping list/);
-  assert.match(r.card.rendered, /\*C\* — A reminder/);
+  assert.match(r.card.rendered, /A — Shopping list/);
+  assert.match(r.card.rendered, /C — A reminder/);
   assert.equal(r.card.intent.related_ref, 'voice:V3');
   assert.equal(r.card.intent.options.length, 3);
 });

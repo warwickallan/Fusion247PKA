@@ -55,6 +55,18 @@ async function main() {
   ok((await admin.query(`select status from cockpit.learning_candidate where id=$1`, [cand2])).rows[0].status === 'declined', 'decline -> candidate declined');
   ok((await admin.query(`select count(*)::int n from cockpit.follow_on_task where source_candidate_id=$1`, [cand2])).rows[0].n === 0, 'decline created NO follow_on_task');
 
+  console.log('5) QA2-B correction: ACCEPT then DECLINE drops the stale open task (no contradictory work):');
+  const cand3 = (await admin.query(`insert into cockpit.learning_candidate (source_video_id, candidate_ref, recommendation, status) values ($1,'LC-SYNTH3','synthetic 3','pending') returning id`, [`SYNTH-${KEY}`])).rows[0].id;
+  await cockpit.query(`insert into cockpit.learning_command (requested_by, command, candidate_id, idempotency_key) values ('cockpit:warwick','accept',$1,$2)`, [cand3, `${KEY}-e1`]);
+  runWorker();
+  ok((await admin.query(`select status from cockpit.follow_on_task where source_candidate_id=$1`, [cand3])).rows[0]?.status === 'open', 'accept -> open task');
+  await cockpit.query(`insert into cockpit.learning_command (requested_by, command, candidate_id, note, idempotency_key) values ('cockpit:warwick','decline',$1,'changed my mind',$2)`, [cand3, `${KEY}-e2`]);
+  runWorker();
+  const t3 = (await admin.query(`select status from cockpit.follow_on_task where source_candidate_id=$1`, [cand3])).rows[0];
+  ok(t3?.status === 'dropped', 'decline-after-accept -> the open task is DROPPED (not left contradictory)');
+  const dcmd = (await admin.query(`select receipt from cockpit.learning_command where idempotency_key=$1`, [`${KEY}-e2`])).rows[0];
+  ok(dcmd.receipt?.prev_status === 'accepted' && dcmd.receipt?.new_status === 'declined' && dcmd.receipt?.dropped_follow_on_task_id, 'receipt records prev=accepted, new=declined, and the dropped task id');
+
   console.log(`\nRESULT: ${fail === 0 ? 'PASS ✓' : 'FAIL ✗'} — ${pass} passed, ${fail} failed`);
 }
 async function cleanup() {
