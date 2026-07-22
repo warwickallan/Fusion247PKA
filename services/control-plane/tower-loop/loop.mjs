@@ -16,6 +16,7 @@
 import { createHash } from 'node:crypto';
 import { runSupervisor } from './supervisorCodex.mjs';
 import { notify, composeMessage } from './notify.mjs';
+import { classifyBuildRef } from './classifyBuild.mjs';
 
 export const VERDICT_TO_STATE = Object.freeze({
   continue: 'reviewed',
@@ -79,15 +80,18 @@ export async function ingestTurn(pool, {
   if (typeof instruction !== 'string' || instruction.length === 0) {
     throw new Error('ingestTurn: instruction must be a non-empty string');
   }
+  // Classify the build (QA2): explicit build_ref > TOWER_BUILD_REF > strict leading [BUILD-NNN] tag >
+  // UNCLASSIFIED. NEVER default to BUILD-014, never fuzzy-guess from prose.
+  const { build_ref: classifiedRef } = classifyBuildRef({ explicit: buildRef, envRef: process.env.TOWER_BUILD_REF, text: instruction });
   // Idempotent per session-turn key: the same Larry reply (same key) can never double-ingest.
   const { rows } = await pool.query(
     `insert into tower.turn
        (build_ref, instruction, larry_response, state, goal_complete,
         kind, pr_number, repo, base_sha, head_sha, session_turn_key)
-     values (coalesce($1, 'BUILD-014'), $2, $3, 'pending', $4, $5, $6, $7, $8, $9, $10)
+     values ($1, $2, $3, 'pending', $4, $5, $6, $7, $8, $9, $10)
      on conflict (session_turn_key) where session_turn_key is not null do nothing
      returning id, seq, build_ref, state, created_at, kind`,
-    [buildRef ?? null, instruction, larryResponse, goalComplete === true,
+    [classifiedRef, instruction, larryResponse, goalComplete === true,
      kind ?? 'ordinary', prNumber, repo, baseSha, headSha, sessionTurnKey],
   );
   if (rows.length > 0) return { ...rows[0], deduped: false };
