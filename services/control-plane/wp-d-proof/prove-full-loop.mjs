@@ -9,7 +9,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pg from 'file:///C:/Fusion247PKA/services/control-plane/node_modules/pg/lib/index.js';
-import { mapInboundDecision, decisionCallbackData } from '../../hub/decision/telegramInbound.mjs';
+import { decisionCallbackData } from '../../hub/decision/telegramInbound.mjs';
+import { fileInboundDecision } from './file-inbound-decision.mjs';
 import { listOpenFollowOns } from './resume-followups.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -41,18 +42,19 @@ async function main() {
     [OPTS, `${KEY}-card`])).rows[0].id;
   ok(true, `card ${String(cardId).slice(0, 8)} filed`);
 
-  console.log('2) INBOUND — a Telegram button tap arrives and is mapped to this card:');
-  const update = { callback_query: { data: decisionCallbackData(cardId, 'A'), from: { id: 777 } } };
-  const mapped = mapInboundDecision(update);
-  ok(mapped.ok && String(mapped.card_id) === String(cardId) && mapped.raw_text === 'A', 'inbound tap mapped to {card_id, raw_text=A}');
-  // cp_directus files the raw reply as a decision_response intent (all it may do).
-  await cockpit.query(`insert into cockpit.decision_response (card_id, responder, raw_text, idempotency_key) values ($1,$2,$3,$4)`,
-    [mapped.card_id, mapped.responder, mapped.raw_text, `${KEY}-resp`]);
-  ok(true, 'decision_response intent filed by cp_directus');
+  console.log('2) INBOUND — an ACTUAL Telegram button tap flows through the inbound handler:');
+  // The exact callback_query Telegram delivers when Warwick taps the "A" button on the sent card. Its
+  // callback_data is what apply-decision-card put on the button (decision:<card_id>:A) — self-correlating.
+  const update = { callback_query: { id: `${KEY}-cb`, data: decisionCallbackData(cardId, 'A'), from: { id: 777 } } };
+  const filed = await fileInboundDecision(cockpit, update, { keyPrefix: `${KEY}-` });
+  ok(filed.filed && String(filed.card_id) === String(cardId) && filed.raw_text === 'A', 'the tap is mapped to this card and a decision_response intent is filed by cp_directus');
+  // Idempotent: a re-delivered identical update does not double-file.
+  const dupe = await fileInboundDecision(cockpit, update, { keyPrefix: `${KEY}-` });
+  ok(dupe.filed === false, 'a re-delivered identical tap does NOT double-file (idempotent inbound)');
 
   console.log('3) worker parses the answer + creates correlated follow-on work:');
   worker('apply-decision-response.mjs');
-  const resp = (await admin.query(`select status, chosen_key, receipt from cockpit.decision_response where idempotency_key=$1`, [`${KEY}-resp`])).rows[0];
+  const resp = (await admin.query(`select status, chosen_key, receipt from cockpit.decision_response where idempotency_key=$1`, [filed.idempotency_key])).rows[0];
   ok(resp.status === 'done' && resp.chosen_key === 'A' && resp.receipt?.matched === true, 'answer -> done, matched A');
   taskId = resp.receipt?.follow_on_task_id;
   ok(taskId, 'a follow_on_task was created');

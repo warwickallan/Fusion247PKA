@@ -12,6 +12,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import pg from 'file:///C:/Fusion247PKA/services/control-plane/node_modules/pg/lib/index.js';
 import { renderCard } from '../../hub/decision/renderCard.mjs';
+import { decisionCallbackData } from '../../hub/decision/telegramInbound.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const cfg = JSON.parse(fs.readFileSync(path.join(here, '.runtime-live', 'directus-live.env.json'), 'utf8'));
@@ -22,14 +23,20 @@ const worker = new pg.Client({ host: cfg.host, port: cfg.port, database: cfg.dat
   user: cfg.worker_pooler_user, password: cfg.worker_password, ssl: { ca: fs.readFileSync(cfg.ssl_ca_file), rejectUnauthorized: true } });
 
 // Real send via FusionDevBot (only reached when dry_run=false AND --allow-send). Never overnight.
-function sendTelegram(rendered) {
+// The inline keyboard (reply_markup) is passed so the sent card has tappable A/B/C buttons; the sender
+// records the resulting Telegram message_id where the transport returns it (for typed-reply correlation;
+// button taps already self-correlate via callback_data). larry-ding side-channels the markup as JSON.
+function sendTelegram(rendered, replyMarkup) {
   const msgFile = path.join(here, `.decision-card-${Date.now()}.txt`);
   fs.writeFileSync(msgFile, rendered);
+  const mkFile = path.join(here, `.decision-card-${Date.now()}.markup.json`);
+  fs.writeFileSync(mkFile, JSON.stringify(replyMarkup || {}));
   try {
-    const r = spawnSync(process.execPath, ['--env-file=C:/.fusion247/fusion-capture-gateway.env', 'C:/.fusion247/larry-ding.mjs', msgFile], { encoding: 'utf8' });
+    const r = spawnSync(process.execPath, ['--env-file=C:/.fusion247/fusion-capture-gateway.env', 'C:/.fusion247/larry-ding.mjs', msgFile, '--reply-markup', mkFile], { encoding: 'utf8' });
     if (r.status !== 0) throw new Error((r.stderr || r.stdout || 'ding failed').trim().split('\n').slice(-1)[0]);
-    return { sent: true };
-  } finally { try { fs.unlinkSync(msgFile); } catch {} }
+    let message_id = null; try { message_id = JSON.parse(r.stdout).message_id ?? null; } catch {}
+    return { sent: true, message_id };
+  } finally { try { fs.unlinkSync(msgFile); } catch {} try { fs.unlinkSync(mkFile); } catch {} }
 }
 
 async function processOne(cmd) {
@@ -39,11 +46,15 @@ async function processOne(cmd) {
   await cx.query('begin');
   try {
     const rendered = renderCard({ subject: cmd.subject, body_markdown: cmd.body_markdown, options: cmd.options, related_ref: cmd.related_ref });
+    // The card carries actual tappable inline buttons. Each button's callback_data self-correlates the
+    // reply to THIS card via `decision:<card_id>:<key>` — so a tap needs no separate message-id map;
+    // the inbound mapper (telegramInbound.mapInboundDecision) reads the card_id + choice straight back.
+    const reply_markup = { inline_keyboard: cmd.options.map((o) => [{ text: `${o.key} — ${o.label}`, callback_data: decisionCallbackData(cmd.id, o.key) }]) };
     const willSend = ALLOW_SEND && cmd.dry_run === false;
     let sendResult = { sent: false, dry_run: true };
-    if (willSend) sendResult = { ...sendTelegram(rendered), dry_run: false };
+    if (willSend) sendResult = { ...sendTelegram(rendered, reply_markup), dry_run: false };
     const receipt = { ok: true, channel: cmd.channel, target: cmd.target, dry_run: !willSend,
-      would_send_to: `${cmd.channel}:${cmd.target}`, options_count: cmd.options.length, rendered_card: rendered, ...sendResult };
+      would_send_to: `${cmd.channel}:${cmd.target}`, options_count: cmd.options.length, rendered_card: rendered, reply_markup, ...sendResult };
     await cx.query(`update cockpit.decision_card set status='done', completed_at=now(), receipt=$2::jsonb where id=$1`, [cmd.id, JSON.stringify(receipt)]);
     await cx.query('commit');
     console.log(`[card] ${cmd.id} rendered (${cmd.options.length} options) -> ${willSend ? 'SENT' : 'dry-run (no send)'} (done)`);

@@ -45,7 +45,9 @@ async function processOne(resp) {
     if (prior) {
       const decidedMatch = /→ ([A-Za-z0-9]+) \(/.exec(prior.title || '');
       const originalKey = decidedMatch ? decidedMatch[1] : null;
-      receipt = { ok: true, matched: true, applied: choice.key === originalKey, already_decided: true, chosen_key: choice.key, chosen_label: choice.label, original_choice: originalKey, card_id: card.id, follow_on_task_id: prior.id };
+      // Decide-once: ANY later valid answer is applied:false (the decision stands from the FIRST answer).
+      // same_choice distinguishes a harmless idempotent re-tap from an attempted change of mind.
+      receipt = { ok: true, matched: true, applied: false, already_decided: true, same_choice: choice.key === originalKey, chosen_key: choice.key, chosen_label: choice.label, original_choice: originalKey, card_id: card.id, follow_on_task_id: prior.id };
     } else {
       const title = `Decision: ${String(card.subject).slice(0, 90)} → ${choice.key} (${choice.label})`;
       const detail = `Warwick chose ${choice.key} — ${choice.label} for "${card.subject}".${card.related_ref ? `\n\nref: ${card.related_ref}` : ''}`;
@@ -58,7 +60,7 @@ async function processOne(resp) {
     await cx.query(`update cockpit.decision_response set chosen_key=$2, chosen_label=$3, status='done', completed_at=now(), receipt=$4::jsonb where id=$1`,
       [resp.id, choice.key, choice.label, JSON.stringify(receipt)]);
     await cx.query('commit');
-    console.log(`[resp] ${resp.id} matched ${choice.key} (${choice.label}) -> done + follow_on ${followOnId}`);
+    console.log(`[resp] ${resp.id} matched ${choice.key} (${choice.label}) -> done + follow_on ${receipt.follow_on_task_id}${receipt.applied === false ? ' (already decided; not re-applied)' : ''}`);
     return { id: resp.id, matched: true };
   } catch (e) {
     await cx.query('rollback');
