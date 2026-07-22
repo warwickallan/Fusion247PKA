@@ -41,6 +41,16 @@ function statusLineFor(state, record) {
     case STATES.EVIDENCED:
       return 'Almost there — write recorded, finalising your capture.';
     case STATES.COMPLETED: {
+      // WP2: a YouTube capture completes via the routing writer — the durable
+      // work is the extracted transcript + immutable RAW + youtube_source row,
+      // and the standalone knowledge note is authored in-session afterwards
+      // (D-cairn). The card must say that TRUTHFULLY — NOT "saved to your Brain"
+      // (which would over-claim a finished note). Keyed on the destination kind
+      // the routing writer records, so the plain-markdown path is unchanged.
+      if (record.destination_ref && record.destination_ref.kind === 'youtube_source') {
+        const vid = record.destination_ref.video_id ? ` (${record.destination_ref.video_id})` : '';
+        return `Completed — transcript extracted and preserved${vid}. Knowledge note pending in-session authoring, then it appears for review.`;
+      }
       // The destination path is wrapped in backticks (a Telegram legacy-Markdown
       // code span, sent with parse_mode 'Markdown' — see projectCard) so the
       // `.md` filename renders as plain monospace text instead of being
@@ -134,6 +144,13 @@ export function projectCard(record) {
   // line is plain text with NO Markdown-special characters of ours, and failed
   // lines may echo arbitrary error text — so they are deliberately sent WITHOUT
   // a parse_mode (no risk of a Telegram parse rejection on untrusted text).
-  if (card.is_completed) card.parse_mode = 'Markdown';
+  // parse_mode 'Markdown' is needed ONLY for the markdown-destination completed
+  // line, whose backtick code span renders the `.md` path as monospace. The
+  // youtube_source completed line has no code span and a video id can contain
+  // `_`/`-` (legacy-Markdown italic markers) — so it is sent WITHOUT a parse_mode
+  // to avoid a Telegram parse rejection on an unbalanced marker.
+  if (card.is_completed && record.destination_ref && record.destination_ref.path) {
+    card.parse_mode = 'Markdown';
+  }
   return card;
 }

@@ -90,7 +90,11 @@ export function createWorker({ store, markdownWriter, adapter, clock, workerId, 
         // 3. Governed Markdown write (idempotent). Re-processing an already-
         //    written capture detects the existing note and does NOT rewrite.
         const record = await store.getByCaptureId(captureId);
-        const result = markdownWriter.write(record, { now });
+        // ASYNC-UNIFIED (WP2): the governed writer may be async (e.g. the routing
+        // writer that runs a YouTube extraction subprocess) or the sync fixtures
+        // markdownWriter. Awaiting a sync return is a no-op, so ONE code path
+        // drives both — same discipline already used for every store call above.
+        const result = await markdownWriter.write(record, { now });
 
         // 4. Record destination pointer, then writing → written.
         await store.recordDestination(captureId, result.destination_ref, { now });

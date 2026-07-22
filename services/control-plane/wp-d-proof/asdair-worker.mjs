@@ -17,6 +17,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pg from 'file:///C:/Fusion247PKA/services/control-plane/node_modules/pg/lib/index.js';
+import { execute } from './asdairCommands.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const cfg = JSON.parse(fs.readFileSync(path.join(here, '.runtime-live', 'directus-live.env.json'), 'utf8'));
@@ -32,62 +33,8 @@ const MODE = argv.has('--watch') ? 'watch' : argv.has('--once') ? 'once' : 'drai
 const keyPrefixArg = rawArgs.find((a) => a.startsWith('--key-prefix='));
 const KEY_PREFIX = keyPrefixArg ? keyPrefixArg.slice('--key-prefix='.length) : null;
 
-const ALLOWLIST = new Set(['add_regular_to_next_week']);
-
-async function execute(client, command, args) {
-  const at = new Date().toISOString();
-  if (!ALLOWLIST.has(command)) {
-    return { ok: false, command, error: 'command not in allowlist (not executed)', worker: 'cp_worker', executed_at: at };
-  }
-  if (command === 'add_regular_to_next_week') {
-    const regularId = Number(args?.regular_id);
-    const qty = Number(args?.qty);
-    if (!Number.isInteger(regularId) || regularId <= 0) return { ok: false, command, error: 'bad regular_id', worker: 'cp_worker', executed_at: at };
-    if (!Number.isInteger(qty) || qty < 1 || qty > 99) return { ok: false, command, error: 'qty must be an integer 1..99', worker: 'cp_worker', executed_at: at };
-
-    const reg = await client.query('select id, household_id, name from asdair.regulars where id = $1', [regularId]);
-    if (reg.rowCount === 0) return { ok: false, command, error: `regular ${regularId} not found`, worker: 'cp_worker', executed_at: at };
-    const { household_id: householdId, name } = reg.rows[0];
-
-    // Serialize the effect PER HOUSEHOLD within this txn so concurrent workers can never both
-    // create a draft list or both insert the same item (the select-then-insert would otherwise
-    // race when the SELECT returns nothing and FOR UPDATE locks no row). Transaction-scoped:
-    // released on commit/rollback. No schema change to the real tables required.
-    await client.query('select pg_advisory_xact_lock($1)', [householdId]);
-
-    // Find or create the household's next_week_draft list.
-    let list = await client.query(
-      `select id from asdair.shopping_lists where household_id = $1 and status = 'next_week_draft' order by id desc limit 1`,
-      [householdId]);
-    let listId;
-    if (list.rowCount === 0) {
-      const ins = await client.query(
-        `insert into asdair.shopping_lists (household_id, status, list_date)
-         values ($1, 'next_week_draft', (current_date + 7)) returning id`, [householdId]);
-      listId = ins.rows[0].id;
-    } else { listId = list.rows[0].id; }
-
-    // Effect-level idempotency: upsert by (list_id, lower(item_name)).
-    const existing = await client.query(
-      `select id from asdair.shopping_list_items where list_id = $1 and lower(item_name) = lower($2) limit 1 for update`,
-      [listId, name]);
-    let itemId, action;
-    if (existing.rowCount > 0) {
-      itemId = existing.rows[0].id;
-      await client.query(`update asdair.shopping_list_items set requested_qty = $2 where id = $1`, [itemId, qty]);
-      action = 'updated';
-    } else {
-      const ins = await client.query(
-        `insert into asdair.shopping_list_items (list_id, item_name, requested_qty, status, note)
-         values ($1, $2, $3, 'requested', 'added via cockpit') returning id`, [listId, name, qty]);
-      itemId = ins.rows[0].id;
-      action = 'inserted';
-    }
-    return { ok: true, command, regular_id: regularId, regular_name: name, household_id: householdId,
-      list_id: listId, item_id: itemId, qty, action, worker: 'cp_worker', executed_at: at };
-  }
-  return { ok: false, command, error: 'unhandled command', worker: 'cp_worker', executed_at: at };
-}
+// ALLOWLIST + execute() now live in asdairCommands.mjs (importable + testable against a throwaway
+// Postgres). The worker's behaviour is unchanged — it just sources the handlers from there.
 
 async function drainOne(client) {
   await client.query('begin');

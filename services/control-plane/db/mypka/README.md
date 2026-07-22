@@ -16,7 +16,18 @@ for the cockpit layer** — captured faithfully from the live catalog, not from 
 | `030_command_request.sql` | `asdair.command_request` write-back INTENT queue + two guard triggers | teardown |
 | `040_cockpit_grants.sql` | the asymmetric least-privilege grants (revoke-then-grant, atomic, idempotent) | teardown |
 | `050_cockpit_portfolio.sql` | the `cockpit` schema + portfolio/build-state records (`overall_state`, `build`, `decision`, `movement`, `domain_summary`) that drive the management view | teardown |
-| `teardown.sql` | **rollback path** — reverses 010–050 (incl. dropping the `cockpit` schema); leaves the asdair data tables untouched | — |
+| `060_build_contract.sql` | BUILD-002 build-acceptance layer: `cockpit.build_contract` (approved-version record + readable projection) + `cockpit.contract_command` (approval INTENT queue) + guard triggers | teardown |
+| `070_build_contract_grants.sql` | least-privilege grants for the contract layer (cp_directus render+request-only; cp_worker execute-only; atomic revoke-then-grant) | teardown |
+| `080_build_contract_pack.sql` | evolves `build_contract` to the three-document PACK model: adds `documents` jsonb + `pack_content_hash`; guard v2 freezes them once set | teardown |
+| `090_build_contract_doc.sql` | `cockpit.build_contract_doc` — readable Markdown BODY + Git identity per pack member (Brief/Contract/Plan); append-only; cp_directus SELECT | teardown |
+| `100_build_contract_doc_url_fix.sql` | refines the doc append-only guard to permit a `github_url`-only correction (commit-pinned URLs); identity/body/hashes stay frozen | teardown |
+| `110_youtube_source.sql` | WP2: `cockpit.youtube_source` (readable knowledge-brief page + RAW/note links) + `cockpit.learning_candidate` (suggested learnings); cp_directus SELECT | teardown |
+| `120_learning_command.sql` | WP3: `cockpit.learning_command` — learning Accept/Decline INTENT queue + guards + least-privilege grants (cp_directus request-only; cp_worker applies candidate status) | teardown |
+| `seed/build-002-contract-draft.sql` | seeds the interim single-doc v0.1-draft row (now superseded) | — |
+| `seed/build-002-contract-pack-v1.sql` | the v1.0-draft pack seed (now superseded by v1.1) | — |
+| `teardown.sql` | **rollback path** — reverses 010–090 (the `cockpit`-schema cascade drops the 060/080/090 objects + guards; `drop owned by cp_*` clears the 070 grants); leaves the asdair data tables untouched | — |
+
+**Reproducible pack population** (GPT review): the live pack row + readable doc bodies are loaded from Git by the committed `services/control-plane/wp-d-proof/load-contract-pack.mjs` — pin to the approved commit (`node load-contract-pack.mjs --commit=<sha> --version=v1.1-draft`); it **fails closed** if an existing version doesn't exactly match the requested commit + member identities + pack hash, stores **commit-pinned** GitHub URLs, and never overwrites content. Directus collections + the `body_markdown` Markdown interface are registered by `register-contract-collections.mjs`. `verify-directus-auth.mjs` proves the docs + approval receipt read through Directus's **authenticated** API (ephemeral read-only token). The approval-apply worker runs operationally via `apply-contract-command.mjs --watch` + the **start-on-demand** launcher `ensure-contract-worker.mjs` (crash/reboot recovery = the `MyPKA-Contract-Worker` scheduled task, which needs elevation).
 
 **Secrets:** role passwords are **never** in these migrations. `020` creates the roles with no
 password; the runtime provisioner sets them from the gitignored `.runtime-live/` store

@@ -3,7 +3,7 @@ build: BUILD-002
 component: Capture & Conversation Gateway
 wp: WP0
 artifact: supabase-operational-foundation-boundary
-status: draft-for-wp0
+status: accepted-for-merge (Warwick 2026-07-22)
 author: mack
 created: 2026-07-16
 ---

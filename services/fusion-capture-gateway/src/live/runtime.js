@@ -231,10 +231,24 @@ export async function createLiveRuntime(config, opts = {}) {
   const { baseDir, subdir } = resolveGovernedDestination(config, mode);
   const markdownWriter = createSandboxMarkdownWriter({ baseDir, subdir });
 
+  // WP2 spine YouTube route — FEATURE-FLAGGED (default OFF). When HUB_YOUTUBE_ROUTE=1 the governed
+  // writer becomes a routing writer that sends a YouTube capture to the extract→RAW→youtube_source
+  // lane and everything else to the plain markdown writer, UNCHANGED. Dynamically imported so the
+  // unit suite never loads pg / spawns TubeAIR (same discipline as the Postgres store). Enabling is
+  // a deliberate switch: set the flag, restart, and stop the standalone auto-detect poller.
+  let governedWriter = markdownWriter;
+  let closeRouting = null;
+  if (mode === 'live' && process.env.HUB_YOUTUBE_ROUTE === '1') {
+    const mod = await import('../../../hub/router/liveDeps.mjs');
+    const routing = await mod.createLiveYoutubeRoutingWriter({ markdownWriter });
+    governedWriter = routing.writer;
+    closeRouting = routing.close;
+  }
+
   const workerId = config.workerId ?? 'fixture-worker';
 
   const intake = createIntake({ store, adapter, clock, rateLimiter });
-  const worker = createWorker({ store, markdownWriter, adapter, clock, workerId, leaseMs, accessLog });
+  const worker = createWorker({ store, markdownWriter: governedWriter, adapter, clock, workerId, leaseMs, accessLog });
 
   // Identity registration ownership lives here, not in the store.
   const authorisedIdentity = await ensureAuthorisedIdentity({
@@ -252,8 +266,9 @@ export async function createLiveRuntime(config, opts = {}) {
     accessLog,
     rateLimiter,
     authorisedIdentity,
-    /** Close any live resources (Postgres pool). No-op for fixtures. */
+    /** Close any live resources (Postgres pool + routing writer pool). No-op for fixtures. */
     async shutdown() {
+      if (closeRouting) await closeRouting();
       if (store && typeof store.end === 'function') await store.end();
     },
   };

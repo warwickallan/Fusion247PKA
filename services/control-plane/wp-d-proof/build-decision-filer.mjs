@@ -1,0 +1,30 @@
+// BUILD-002 WP4 — build the live decision-inbound filer for the gateway (cp_directus, least-privilege).
+//
+// Constructs the (update)->Promise filer that liveRunner calls on a `decision:*` button tap, backed by a
+// cp_directus connection (INSERT-intent-only) and the authorised Telegram user id (defence-in-depth on
+// top of the gateway's toCallback allowlist). Kept out of the gateway's static import graph — main()
+// imports it dynamically only when HUB_DECISION_INBOUND=1. Returns { filer, close }.
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { fileInboundDecision } from './file-inbound-decision.mjs';
+
+export async function buildDecisionFiler({ authorizedUserId } = {}) {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const cfg = JSON.parse(fs.readFileSync(path.join(here, '.runtime-live', 'directus-live.env.json'), 'utf8'));
+  const { default: pg } = await import('file:///C:/Fusion247PKA/services/control-plane/node_modules/pg/lib/index.js');
+  const client = new pg.Client({ host: cfg.host, port: cfg.port, database: cfg.database,
+    user: cfg.pooler_user, password: cfg.password, ssl: { ca: fs.readFileSync(cfg.ssl_ca_file), rejectUnauthorized: true } });
+  await client.connect();
+  // Async resolver for a TYPED reply: map the replied-to Telegram message back to its card via the
+  // durable sent-message map (migration 200). Button taps self-correlate and never hit this.
+  const resolveCardByMessage = async (chatId, messageId) => {
+    if (messageId == null) return null;
+    const r = await client.query(`select id from cockpit.decision_card where sent_chat_id=$1 and sent_message_id=$2 limit 1`, [String(chatId), Number(messageId)]);
+    return r.rows[0]?.id ?? null;
+  };
+  return {
+    filer: (update) => fileInboundDecision(client, update, { authorizedUserId, resolveCardByMessage }),
+    close: () => client.end().catch(() => {}),
+  };
+}

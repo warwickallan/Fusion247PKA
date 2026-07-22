@@ -72,6 +72,11 @@ export async function createLiveRunner(config, opts = {}) {
     console.error(JSON.stringify(line));
   });
   const pollTimeoutSec = opts.pollTimeoutSec ?? POLL_WAIT_SECONDS;
+  // WP4 inbound decision wiring (opt-in, Warwick-gated activation): a function (update)->Promise that
+  // files a decision_response from a `decision:<card_id>:<key>` button tap. Default null → decision
+  // callbacks fall through to the existing "unknown action" ack (current safe behaviour). When present
+  // (main() builds it from the cockpit DSN under HUB_DECISION_INBOUND=1), a tap is durably recorded.
+  const decisionFiler = opts.decisionFiler ?? null;
 
   const runtime = await createLiveRuntime(config, { ...opts, clock });
   const { store, adapter, intake, worker } = runtime;
@@ -118,6 +123,23 @@ export async function createLiveRunner(config, opts = {}) {
   // notice. The notice is a best-effort projection: a crash between notice and
   // offset persist can at worst repeat the notice, never duplicate data.
   async function handleMessage(update, _now) {
+    // WP4 typed reply: a reply to a decision card is routed to the decision filer BEFORE ordinary capture
+    // intake, so answering a card by TEXT (not just tapping a button) records a decision_response instead
+    // of being captured as a note. The filer resolves the card via the durable sent-message map; a reply
+    // to a NON-card message (not correlated) falls through to normal capture. A durable filing failure
+    // holds the offset (same rule as the callback path).
+    const rmsg = update && update.message;
+    if (decisionFiler && rmsg && rmsg.reply_to_message) {
+      let filed = null;
+      let durableFailure = false;
+      try { filed = await decisionFiler(update); } catch (err) { durableFailure = true; diag('decision_reply_file_failed', { error: safeErr(err) }); }
+      if (durableFailure) return { kind: 'decision_reply', ok: false, durableFailure: true };
+      if (filed && (filed.filed || filed.card_id || filed.reason === 'unauthorized_sender')) {
+        diag('decision_reply_filed', { filed: filed.filed, card_id: filed.card_id });
+        return { kind: 'decision_reply', ok: Boolean(filed.filed), filed: Boolean(filed.filed) };
+      }
+      // Not a decision reply (no correlated card) → fall through to normal capture intake.
+    }
     const res = await intake.accept(update, {});
     if (!res.ok) {
       diag('message_not_accepted', { reason: res.reason });
@@ -149,6 +171,24 @@ export async function createLiveRunner(config, opts = {}) {
       return { kind: 'callback', ok: false, reason: mapped.reason };
     }
     const { callbackId, chatId, messageId, action } = mapped.value;
+
+    // WP4: a decision-card button tap (`decision:<card_id>:<key>`). mapped.ok above already enforced the
+    // single-user allowlist (default-deny), so this only runs for the authorised user. The tap is filed
+    // as a durable, correlated decision_response (idempotent) BEFORE the offset advances; the ack is a
+    // best-effort projection. Non-decision callbacks (SaveToBrain etc.) fall through unchanged.
+    if (typeof action === 'string' && action.startsWith('decision:') && decisionFiler) {
+      let filed = null;
+      let durableFailure = false;
+      try { filed = await decisionFiler(update); }
+      catch (err) { durableFailure = true; diag('decision_file_failed', { error: safeErr(err) }); }
+      // HONEST ack: only claim recorded when it actually was (new) or was already recorded (idempotent);
+      // on a durable (transient DB) failure, tell the user to tap again — never a false "recorded".
+      const toast = durableFailure ? "Couldn't record that — please tap again." : (filed && filed.filed ? 'Decision recorded.' : 'Already recorded.');
+      try { await adapter.answerCallbackQuery(callbackId, toast, { showAlert: durableFailure }); } catch (err) { diag('answer_callback_failed', { error: safeErr(err) }); }
+      // durableFailure => pollOnce must NOT advance the offset, so Telegram redelivers this tap (no loss).
+      return { kind: 'callback', ok: !durableFailure, action: 'decision', filed: filed ? filed.filed : false, durableFailure };
+    }
+
     let captureId;
     if (typeof store.findCaptureIdByCard === 'function') {
       captureId = await store.findCaptureIdByCard(chatId, messageId);
@@ -306,6 +346,10 @@ export async function createLiveRunner(config, opts = {}) {
       if (res.kind === 'message' && res.ok) accepted += 1;
       else if (res.kind === 'callback') callbacks += 1;
       else ignored += 1;
+      // A durable decision-filing FAILURE (transient DB fault) must NOT be acknowledged: hold the offset
+      // and STOP the batch here so this tap — and every later update — redelivers next cycle rather than
+      // being skipped. Idempotent inbound filing makes the redelivery safe (no duplicate decision_response).
+      if (res && res.durableFailure) { diag('offset_held_on_durable_failure', { update_id: update.update_id }); break; }
       // Acknowledge ONLY after durable handling. On crash before this, the update
       // redelivers and idempotent intake dedups it — no loss, no duplicate.
       await persistOffset((update.update_id ?? 0) + 1, stepNow());
@@ -407,7 +451,24 @@ export async function main() {
     return;
   }
 
-  const runner = await createLiveRunner(config);
+  // WP4 inbound (opt-in): build the decision filer from the cockpit DSN so a `decision:*` button tap is
+  // durably recorded. Dynamic + guarded — a wiring failure logs and the gateway still runs (capture path
+  // unaffected). Default OFF: without HUB_DECISION_INBOUND=1 the gateway behaves exactly as before.
+  let decisionFiler = null;
+  let closeFiler = null;
+  if (process.env.HUB_DECISION_INBOUND === '1') {
+    try {
+      const mod = await import('../../../control-plane/wp-d-proof/build-decision-filer.mjs');
+      const built = await mod.buildDecisionFiler({ authorizedUserId: config.authorisedTelegramUserId });
+      decisionFiler = built.filer;
+      closeFiler = built.close;
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error(JSON.stringify({ service: 'fusion-capture-gateway', component: 'live-runner', event: 'decision_inbound_wiring_failed', error: buildSecretRedactor(config)(err && err.message ? err.message : String(err)) }));
+    }
+  }
+
+  const runner = await createLiveRunner(config, { decisionFiler });
   runner.start();
 
   const ac = new AbortController();
@@ -418,6 +479,7 @@ export async function main() {
   try {
     await runner.loop({ signal: ac.signal });
   } finally {
+    if (closeFiler) await closeFiler();
     await runner.shutdown();
   }
 }

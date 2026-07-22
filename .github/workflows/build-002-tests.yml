@@ -1,0 +1,107 @@
+name: build-002-tests
+
+# CI for BUILD-002 (Unified Fusion Hub). Enforces the platform-neutral hub logic, the gateway spine,
+# the full cockpit migration chain (apply/reapply/teardown), the AsdAIr add_list_item write handler,
+# and the AsdAIr skill suite — so a change to BUILD-002's own files is gated by BUILD-002's own CI (a
+# green BUILD-014 workflow is NOT evidence that these files pass). The Windows-only SAPI voice proof
+# runs on a Windows job; the platform-neutral voice adapter contract (voiceIntake/voiceToStore) runs
+# everywhere (the SAPI test skips cleanly off-Windows).
+#
+# NOT covered here (declared honestly): the LIVE-SEAM synthetic proofs (prove-full-loop,
+# prove-crash-reclaim, prove-decision-*, prove-learning-apply, prove-command-request, prove-contract-
+# apply, prove-decision-concurrency) connect as cp_directus/cp_worker to the live cockpit and are run
+# as live synthetic proofs, not in CI. CI-enabling them needs a throwaway cockpit (apply 010-200 +
+# ALTER ROLE ... PASSWORD for cp_directus/cp_worker) and a parameterised DSN — a scoped follow-up.
+
+on:
+  push:
+    paths:
+      - 'services/hub/**'
+      - 'services/fusion-capture-gateway/**'
+      - 'services/control-plane/db/mypka/**'
+      - 'services/control-plane/wp-d-proof/**'
+      - '.github/workflows/build-002-tests.yml'
+  pull_request:
+    paths:
+      - 'services/hub/**'
+      - 'services/fusion-capture-gateway/**'
+      - 'services/control-plane/db/mypka/**'
+      - 'services/control-plane/wp-d-proof/**'
+      - '.github/workflows/build-002-tests.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  hub:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - name: Hub node tests (SAPI voice test skips off-Windows; adapter contract runs)
+        working-directory: services/hub
+        run: node --test
+
+  gateway:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - name: Install gateway deps
+        working-directory: services/fusion-capture-gateway
+        run: npm ci || npm install --no-audit --no-fund
+      - name: Gateway spine suite (worker / receiptProjection / liveRunner edits)
+        working-directory: services/fusion-capture-gateway
+        run: node --test
+
+  asdair-skill:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - name: Install skill deps
+        working-directory: services/asdair/skill
+        run: npm ci || npm install --no-audit --no-fund
+      - name: AsdAIr skill suite (DB-gated proofs skip)
+        working-directory: services/asdair/skill
+        run: node --test
+
+  cockpit-db:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres, POSTGRES_DB: postgres }
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 10s --health-timeout 5s --health-retries 10
+    env:
+      PGPORT: '5432'
+      PGHOST: '127.0.0.1'
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - name: Install control-plane deps (pg)
+        working-directory: services/control-plane
+        run: npm ci || npm install --no-audit --no-fund
+      - name: Full cockpit migration chain 010-200 apply / re-apply / teardown
+        run: node services/control-plane/db/mypka/test/apply-teardown-full.test.mjs
+      - name: AsdAIr add_list_item write handler (real asdair schema on a throwaway Postgres)
+        run: node services/control-plane/wp-d-proof/add-list-item.dbtest.mjs
+      - name: YouTube source retry upsert (TQA-006 — failed partial row → success fills RAW/source pointers)
+        run: node services/control-plane/wp-d-proof/youtube-retry.dbtest.mjs
+
+  voice-sapi-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - name: Windows SAPI voice transcription proof (real audio -> transcript)
+        working-directory: services/hub
+        run: node --test voice/voiceTranscribe.test.mjs
