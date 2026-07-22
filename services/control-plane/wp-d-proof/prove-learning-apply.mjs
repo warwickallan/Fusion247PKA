@@ -42,15 +42,22 @@ async function main() {
   const cmd = (await admin.query(`select status, receipt from cockpit.learning_command where idempotency_key=$1`, [`${KEY}-a`])).rows[0];
   ok(cmd.status === 'done' && cmd.receipt?.ok === true && cmd.receipt?.new_status === 'accepted', 'intent -> done, receipt.ok, new_status=accepted');
 
+  console.log('3b) accept created GOVERNED FOLLOW-ON WORK (not a silent edit):');
+  const fo = (await admin.query(`select id, origin, source_candidate_id, source_video_id, status, title from cockpit.follow_on_task where source_candidate_id=$1`, [cand])).rows;
+  ok(fo.length === 1 && fo[0].origin === 'learning_accept' && fo[0].status === 'open', 'exactly one open follow_on_task from the accept');
+  ok(String(fo[0].source_candidate_id) === String(cand) && fo[0].source_video_id === `SYNTH-${KEY}`, 'follow_on_task correlated to candidate + source');
+  ok(cmd.receipt?.follow_on_task_id && String(cmd.receipt.follow_on_task_id) === String(fo[0].id), 'receipt references the follow_on_task id');
+
   console.log('4) decline path:');
   const cand2 = (await admin.query(`insert into cockpit.learning_candidate (source_video_id, candidate_ref, recommendation, status) values ($1,'LC-SYNTH2','synthetic 2','pending') returning id`, [`SYNTH-${KEY}`])).rows[0].id;
   await cockpit.query(`insert into cockpit.learning_command (requested_by, command, candidate_id, note, idempotency_key) values ('cockpit:warwick','decline',$1,'not now',$2)`, [cand2, `${KEY}-d`]);
   runWorker();
   ok((await admin.query(`select status from cockpit.learning_candidate where id=$1`, [cand2])).rows[0].status === 'declined', 'decline -> candidate declined');
+  ok((await admin.query(`select count(*)::int n from cockpit.follow_on_task where source_candidate_id=$1`, [cand2])).rows[0].n === 0, 'decline created NO follow_on_task');
 
   console.log(`\nRESULT: ${fail === 0 ? 'PASS ✓' : 'FAIL ✗'} — ${pass} passed, ${fail} failed`);
 }
 async function cleanup() {
-  try { await admin.query(`delete from cockpit.learning_command where idempotency_key like $1`, [`${KEY}-%`]); await admin.query(`delete from cockpit.learning_candidate where source_video_id like $1`, [`SYNTH-${KEY}`]); console.log('[cleanup] synthetic rows removed.'); } catch (e) { console.log('[cleanup] WARN', e.message); }
+  try { await admin.query(`delete from cockpit.follow_on_task where source_video_id like $1`, [`SYNTH-${KEY}`]); await admin.query(`delete from cockpit.learning_command where idempotency_key like $1`, [`${KEY}-%`]); await admin.query(`delete from cockpit.learning_candidate where source_video_id like $1`, [`SYNTH-${KEY}`]); console.log('[cleanup] synthetic rows removed.'); } catch (e) { console.log('[cleanup] WARN', e.message); }
 }
 main().catch((e) => { console.error('[prove-learn] error', e.message); fail++; }).finally(async () => { await cleanup(); await admin.end().catch(()=>{}); await cockpit.end().catch(()=>{}); process.exit(fail === 0 ? 0 : 1); });

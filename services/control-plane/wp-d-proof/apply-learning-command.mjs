@@ -24,11 +24,26 @@ async function processOne(cmd) {
   if (claimed.rowCount === 0) return null;
   await cx.query('begin');
   try {
-    const cand = (await cx.query(`select id, status from cockpit.learning_candidate where id=$1 for update`, [cmd.candidate_id])).rows[0];
+    const cand = (await cx.query(`select id, status, source_video_id, correlation_id, recommendation, why, proposed_target from cockpit.learning_candidate where id=$1 for update`, [cmd.candidate_id])).rows[0];
     if (!cand) throw new Error('learning_candidate not found');
     const target = NEW_STATUS[cmd.command];
     await cx.query(`update cockpit.learning_candidate set status=$2, updated_at=now() where id=$1`, [cmd.candidate_id, target]);
-    const receipt = { ok: true, action: cmd.command, candidate_id: cmd.candidate_id, new_status: target, by: cmd.requested_by, note: cmd.note ?? null };
+
+    // WP3: ACCEPT creates governed FOLLOW-ON WORK, never a silent edit of protected material. A durable,
+    // correlated task is recorded (unique per candidate+origin, so a re-applied accept never multiplies
+    // it); Larry/Warwick action it deliberately. decline/defer create nothing.
+    let followOnId = null;
+    if (cmd.command === 'accept') {
+      const detail = `${cand.recommendation}${cand.why ? `\n\nWhy: ${cand.why}` : ''}`;
+      const fo = await cx.query(
+        `insert into cockpit.follow_on_task (origin, source_candidate_id, source_video_id, correlation_id, title, detail, proposed_target, created_by)
+         values ('learning_accept',$1,$2,$3,$4,$5,$6,$7)
+         on conflict (source_candidate_id, origin) where source_candidate_id is not null do nothing
+         returning id`,
+        [cand.id, cand.source_video_id, cand.correlation_id, String(cand.recommendation).slice(0, 120), detail, cand.proposed_target, cmd.requested_by]);
+      followOnId = fo.rows[0] ? fo.rows[0].id : (await cx.query(`select id from cockpit.follow_on_task where source_candidate_id=$1 and origin='learning_accept'`, [cand.id])).rows[0]?.id ?? null;
+    }
+    const receipt = { ok: true, action: cmd.command, candidate_id: cmd.candidate_id, new_status: target, by: cmd.requested_by, note: cmd.note ?? null, follow_on_task_id: followOnId };
     await cx.query(`update cockpit.learning_command set status='done', completed_at=now(), receipt=$2::jsonb where id=$1`, [cmd.id, JSON.stringify(receipt)]);
     await cx.query('commit');
     console.log(`[learn] ${cmd.command} candidate ${cmd.candidate_id} -> ${target} (done)`);
