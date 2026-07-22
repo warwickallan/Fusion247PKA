@@ -45,6 +45,11 @@ async function main() {
   await expectErr(() => admin.query(`insert into cockpit.decision_card (requested_by,target,subject,body_markdown,options,idempotency_key,status) values ('a','t','s','b',$1::jsonb,$2,'claimed')`, [OPTS, `${KEY}-bad`]), '23514', 'insert-guard rejects status!=requested');
   await expectErr(() => admin.query(`insert into cockpit.decision_card (requested_by,target,subject,body_markdown,options,idempotency_key) values ('a','t','s','b','{}'::jsonb,$1)`, [`${KEY}-bad2`]), '23514', 'check rejects non-array options');
 
+  console.log('2b) QA2-D structural option validation is enforced AT THE DB (not just the worker):');
+  for (const [opts, desc] of [['[{"key":"(","label":"x"}]', 'bad key shape'], ['[{"key":"A","label":"x"},{"key":"A","label":"y"}]', 'duplicate key'], ['[{"key":"A","label":"Go"},{"key":"B","label":"go"}]', 'duplicate label'], ['[{"key":"A","label":"  "}]', 'blank label']]) {
+    await expectErr(() => admin.query(`insert into cockpit.decision_card (requested_by,target,subject,body_markdown,options,is_synthetic,idempotency_key) values ('a','t','s','b',$1::jsonb,true,$2)`, [opts, `${KEY}-o-${Math.floor(Number(process.hrtime.bigint() % 100000n))}`]), '23514', `DB rejects ${desc}`);
+  }
+
   console.log('3) worker claims + renders + receipts (DRY-RUN, no send):');
   runWorker();
   const done = (await admin.query(`select status, receipt from cockpit.decision_card where idempotency_key=$1`, [`${KEY}-a`])).rows[0];

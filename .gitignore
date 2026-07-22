@@ -112,3 +112,4 @@ __pycache__/
 services/asdair/db/002_asdair_seed.sql
 services/asdair/db/*seed*.sql
 services/asdair/**/*.local.*
+.decision-card-*

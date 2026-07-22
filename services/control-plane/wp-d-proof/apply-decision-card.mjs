@@ -7,6 +7,7 @@
 // pass --allow-send, so no phone is ever pinged as a side-effect of processing the queue. Claim commits
 // separately from apply so a poison intent is marked failed, not left requested. Fail-closed on a bad card.
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -28,16 +29,25 @@ const worker = new pg.Client({ host: cfg.host, port: cfg.port, database: cfg.dat
 // records the resulting Telegram message_id where the transport returns it (for typed-reply correlation;
 // button taps already self-correlate via callback_data). larry-ding side-channels the markup as JSON.
 function sendTelegram(rendered, replyMarkup) {
-  const msgFile = path.join(here, `.decision-card-${Date.now()}.txt`);
-  fs.writeFileSync(msgFile, rendered);
-  const mkFile = path.join(here, `.decision-card-${Date.now()}.markup.json`);
-  fs.writeFileSync(mkFile, JSON.stringify(replyMarkup || {}));
+  // QA2-B: personal card content must NEVER be written into the repo tree (a crash could strand it for
+  // accidental commit). Use an OS-private temp dir with 0700 perms, not `here` (wp-d-proof).
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mypka-card-'));
+  const msgFile = path.join(tmpDir, 'card.txt');
+  const mkFile = path.join(tmpDir, 'markup.json');
+  fs.writeFileSync(msgFile, rendered, { mode: 0o600 });
+  fs.writeFileSync(mkFile, JSON.stringify(replyMarkup || {}), { mode: 0o600 });
   try {
-    const r = spawnSync(process.execPath, ['--env-file=C:/.fusion247/fusion-capture-gateway.env', 'C:/.fusion247/larry-ding.mjs', msgFile, '--reply-markup', mkFile], { encoding: 'utf8' });
+    // Explicit PLAIN TEXT at the transport boundary (QA2-B finding C): renderCard is plain text, and the
+    // sender is told NOT to apply a parse_mode so punctuation-heavy content can never be mis-parsed.
+    const r = spawnSync(process.execPath, ['--env-file=C:/.fusion247/fusion-capture-gateway.env', 'C:/.fusion247/larry-ding.mjs', msgFile, '--reply-markup', mkFile, '--plain-text'], { encoding: 'utf8' });
     if (r.status !== 0) throw new Error((r.stderr || r.stdout || 'ding failed').trim().split('\n').slice(-1)[0]);
-    let message_id = null; try { message_id = JSON.parse(r.stdout).message_id ?? null; } catch {}
-    return { sent: true, message_id };
-  } finally { try { fs.unlinkSync(msgFile); } catch {} try { fs.unlinkSync(mkFile); } catch {} }
+    // Telegram's sendMessage response carries result.message_id + result.chat.id — persist BOTH so a
+    // TYPED reply (which arrives with the numeric chat.id) can correlate. The symbolic target is NOT a
+    // chat id and must never be stored as one.
+    let message_id = null; let chat_id = null;
+    try { const o = JSON.parse(r.stdout); message_id = o.message_id ?? o.result?.message_id ?? null; chat_id = o.chat_id ?? o.result?.chat?.id ?? null; } catch {}
+    return { sent: true, message_id, chat_id };
+  } finally { try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {} }
 }
 
 async function processOne(cmd) {
@@ -73,8 +83,11 @@ async function processOne(cmd) {
     const receipt = { ok: true, channel: cmd.channel, target: cmd.target, dry_run: !willSend,
       would_send_to: `${cmd.channel}:${cmd.target}`, options_count: cmd.options.length, rendered_card: rendered, reply_markup, ...sendResult };
     // On a real send, record the durable card message map so a TYPED reply can correlate back (mig 200).
-    if (willSend && sendResult.message_id != null) {
-      await cx.query(`update cockpit.decision_card set sent_chat_id=$2, sent_message_id=$3 where id=$1`, [cmd.id, String(cmd.target), Number(sendResult.message_id)]);
+    // Store the REAL Telegram (chat_id, message_id) the send returned — NOT the symbolic target (QA2-B).
+    // If the transport did not return a numeric chat_id, we leave the map null: typed-reply correlation
+    // then simply does not resolve (button taps still self-correlate), rather than storing a wrong key.
+    if (willSend && sendResult.message_id != null && sendResult.chat_id != null) {
+      await cx.query(`update cockpit.decision_card set sent_chat_id=$2, sent_message_id=$3 where id=$1`, [cmd.id, String(sendResult.chat_id), Number(sendResult.message_id)]);
     }
     await cx.query(`update cockpit.decision_card set status='done', completed_at=now(), receipt=$2::jsonb where id=$1`, [cmd.id, JSON.stringify(receipt)]);
     await cx.query('commit');
