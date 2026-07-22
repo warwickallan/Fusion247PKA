@@ -20,7 +20,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
 import pg from 'pg';
-import { applySchema, applyWatcherSchema } from './apply.mjs';
+import { applySchema, applyWatcherSchema, applyHoldSchema } from './apply.mjs';
 import {
   loadActivePrompt,
   reconstructTurn,
@@ -443,6 +443,7 @@ export async function runWatcher() {
   // Self-sufficient boot: ensure both schemas exist (idempotent).
   await applySchema(DB_URL);
   await applyWatcherSchema(DB_URL);
+  await applyHoldSchema(DB_URL);
 
   const pool = new pg.Pool({ connectionString: DB_URL, max: 6 });
   const deps = await resolveDeps();
