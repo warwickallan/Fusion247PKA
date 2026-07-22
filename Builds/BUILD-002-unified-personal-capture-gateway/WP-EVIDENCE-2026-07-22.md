@@ -3,8 +3,8 @@ build_id: BUILD-002
 title: Unified Fusion Hub — exact-head evidence packet (WP7)
 branch: build-002/unified-fusion-hub
 pr: 57
-head_sha: cab68ec3733622e65b4f5f408335d75fdfc982dc  # code-complete head (post-Codex-fixes). Later commits are docs/memory only — use the live branch head for the final review.
-codex_review_head: 106110fb80b07f30887bad80e497a5a1d50dee73  # exact head Codex reviewed; its 6 blockers were fixed AFTER this in the code-complete head above (re-review at head_sha is the remaining step)
+head_sha: 661b7a4cbb774d2a799b7aa7129fad229398f495  # code-complete head — Codex returned READY_TO_MERGE here (round 6). Later commits are docs/memory only.
+codex_verdict: READY_TO_MERGE (round 6, bound to 661b7a4) — after 6 rounds: rounds 1-5 found blockers, all fixed + re-verified
 pack_approved: v1.1-draft (commit 8e59cb4, pack hash 017a9db7, approved_by warwick)
 status: DRAFT — not merged; needs exact-head Codex READY_TO_MERGE + Warwick
 ---
@@ -55,11 +55,23 @@ One integration branch, **PR #57 (DRAFT, not merged)**. Everything below is comm
 4. **Restart/recovery proof is a FIXTURE SIMULATION, not a live OS proof.** `assurance.test.mjs` proves the *logic* of resume-after-failure (dedup, no double durable work, no false completion) on the in-memory spine. It does **NOT** prove that the live gateway/watcher survive a real Windows process kill or a machine reboot — that needs the reboot-recovery scheduled task (elevation = Warwick) and a genuine restart. That live process/reboot proof remains **Warwick-gated** and is not claimed here.
 5. **Codex independent review:** run at the exact review head — see the "Independent review" section below. Fable selective-verification is the remaining pre-merge step.
 
-## Independent review (WP7)
+## Independent review (WP7) — Codex, 6 rounds → READY_TO_MERGE
 
-- **Codex — DONE** at `codex_review_head` (`106110f`). A read-only, separate-runtime fitness review found **6 genuine normal-use blockers** (email async not awaited; Shopper key collision across messages; `list_date` ignored; manufactured YouTube evidence hash; unfileable voice card; resume-queue UUID-cast that breaks the whole queue on a non-UUID correlation) + 3 fold-before-live + 1 cosmetic. **Every one was fixed** in the code-complete head (`head_sha`, `cab68ec`) and re-proven; Codex independently confirmed the core seams sound. Full triage: `CODEX-REVIEW-106110f.md` (+ `-raw.md`).
-- **Codex re-review** at `head_sha` (post-fix) is the remaining independent-review step and can run without special authorisation.
-- **Fable is NOT scheduled.** Per Warwick (2026-07-23) Fable must **never** be summoned without his explicit, in-the-moment yes — the review process isn't nailed down yet, and the Fable instruction was a policy/GPT artifact, not a confirmed step. Codex-only review stands as the independent check here.
+A read-only, separate-runtime (OpenAI Codex) review ran to convergence over **6 exact-head rounds**, each fixed + re-verified:
+
+| Round | Head | Found | Outcome |
+| --- | --- | --- | --- |
+| 1 | `106110f` | 6 blockers + 3 fold + 1 cosmetic | all fixed |
+| 2 | `d772e56` | 2 blockers (partial-row repair; re-answer mutates task) | all fixed |
+| 3 | `56fb6af` | 3 blockers (log ref; decide-once; WP4 loop not closed in code) | all fixed |
+| 4 | `03d870c` | return-shape; **auth hazard**; live wiring absent | all fixed |
+| 5 | `0103e88` | 1 regression (decision-tap failure lost the tap) | fixed |
+| **6** | **`661b7a4`** | — | **`READY_TO_MERGE`** |
+
+Every blocker was a genuine normal-use defect (several my own tests missed — e.g. the resume-queue UUID-cast that only breaks with a *mixed* queue; the offset-advance-on-failure lost-tap). Full triage: `CODEX-REVIEW-106110f.md`; final verdict: `CODEX-REVIEW-661b7a4-READY_TO_MERGE.md`. Codex confirmed no remaining correctness/leak/availability/audit defect under first-party use, and that the two residuals below are correctly Warwick-gated activation work, out of scope for merge-readiness of the reviewed code.
+
+- **Warwick-gated activation residuals** (NOT un-built logic): (a) inbound wiring activates with `HUB_DECISION_INBOUND=1` + a live gateway restart; (b) a real card shows A/B/C buttons only once the external `larry-ding` sender honours the `--reply-markup` the worker already emits (recorded in the dry-run receipt today).
+- **Fable is NOT scheduled / not run.** Per Warwick (2026-07-23) Fable is **never** summoned without his explicit yes; Codex-only is the independent check here. [[fable-confirm-first-hardlock]]
 
 ## Resume-after-dependency map
 
