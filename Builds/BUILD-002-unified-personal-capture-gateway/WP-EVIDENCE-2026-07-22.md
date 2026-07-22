@@ -3,7 +3,7 @@ build_id: BUILD-002
 title: Unified Fusion Hub — exact-head evidence packet (WP7)
 branch: build-002/unified-fusion-hub
 pr: 57
-head_sha: 22c509c9b2c1fa19fc74d063fb59d3071dff2b19
+head_sha: 1ccdac573b3d9234de12ef21bc021fc10f8bce58  # code-complete head; any later commits are docs/memory only — use the live branch head for review
 pack_approved: v1.1-draft (commit 8e59cb4, pack hash 017a9db7, approved_by warwick)
 status: DRAFT — not merged; needs exact-head Codex READY_TO_MERGE + Warwick
 ---
