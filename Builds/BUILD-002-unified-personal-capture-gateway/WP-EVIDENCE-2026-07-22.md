@@ -24,7 +24,7 @@ One integration branch, **PR #57 (DRAFT, not merged)**. Everything below is comm
 | **WP4** | Bidirectional decision control | inbound A/B/C parse+correlate+continue (decision_response + parseChoice); safe Directus command route (command_request, allowlisted, fail-closed); outbound dry-run card renderer | inbound 10/10, command 9/9, card 13/13, parseChoice 5/5 | **~90%** | the real Telegram phone ping (`dry_run=false` + worker `--allow-send`) is with-Warwick |
 | **WP5** | Shopper / AsdAIr route | typed/photo/voice front door (the parked "B half"), reuses AsdAIr normaliser → add-only list intents; no checkout/payment/substitution; ambiguous → durable needs_decision | shopper 6/6 | **~70%** | LIVE household write (extend `asdair-worker` allowlist with `add_list_item` + write the real shopping schema) — deferred by the **personal-data doctrine**, a reviewed with-Warwick step |
 | **WP6** | Fixture-first email + voice | email intake preserving message-id/recipients/subject/body/attachments + routing; voice intake transcribe + ambiguous→A/B/C seam | email 6/6, voice 4/4 | **~85%** | live mailbox / voice credentials are OPTIONAL (fixture-first is complete); real transcriber wiring is with-Warwick |
-| **WP7** | Assurance | duplicate-delivery + restart/recovery harness; this evidence packet; scope reconciliation | assurance 4/4 | **~70%** | independent Codex/Fable review (pre-merge gate); migration reproducibility harness currently covers 010–050 only |
+| **WP7** | Assurance | duplicate-delivery + restart/recovery harness; full-chain migration reproducibility+rollback; this evidence packet; scope reconciliation | assurance 4/4, full-chain 16/16 | **~80%** | independent Codex/Fable review (pre-merge gate) |
 
 **Overall BUILD-002 completion: ~80%.** The remaining ~20% is almost entirely **Warwick-gated live actions + independent review + merge** — not un-built logic. Every non-blocked arm is built and proven.
 
@@ -43,12 +43,13 @@ One integration branch, **PR #57 (DRAFT, not merged)**. Everything below is comm
 - **Hub suite** (`services/hub`, `node --test`): **46/46** — youtube classify/ingest, vault, decision renderCard + parseChoice, router route + assurance, shopper, email, voice.
 - **Gateway suite** (`services/fusion-capture-gateway`): **285 pass / 0 fail / 32 skipped** (spine edits safe).
 - **Live seam proofs** (synthetic, self-cleaning): contract 8/8, learning 10/10, decision-card 13/13, decision-response 10/10, command-request 9/9.
+- **Migration reproducibility** (throwaway cluster): full-chain 010–160 apply + idempotent re-apply + teardown reversal **16/16**.
 
 ## Known limitations / findings (honest)
 
 1. **Live cut-overs are Warwick-gated** (by design + safety): Directus restart to surface new collections; `HUB_YOUTUBE_ROUTE=1` + restart + stop poller; real Telegram send; live AsdAIr household write; live mailbox/voice credentials.
 2. **Pre-existing AsdAIr suite failures (NOT WP5):** `services/asdair/skill` `node --test` shows 6 failures — `schemaCompat.test.js` (RULES_SELECT_COLUMNS vs schema drift) + 5 `dbSafeTarget` guard tests. No `services/asdair` file was modified by this Build; the reused normaliser fixtures are all green. Recorded for a separate fix.
-3. **Migration reproducibility harness** (`db/mypka/test`) exercises 010–050 against a throwaway Postgres; 060–160 are proven idempotent by live apply+reapply but not yet in that throwaway harness. Extending it is a WP7 follow-up.
+3. ~~Migration reproducibility harness covers only 010–050.~~ **RESOLVED:** `apply-teardown-full.test.mjs` (+ `run-migration-test-full.sh`) now applies the FULL 010–160 chain to a throwaway Postgres, proves idempotent re-apply, asserts every BUILD-002 object, and proves `teardown.sql` fully reverses the cockpit layer while leaving AsdAIr untouched — **16/16 on a clean cluster.**
 4. **Independent review not yet run.** Per [[merge-ready-means-independently-reviewed]], PR #57 needs an exact-head Codex (+ Fable where useful) pass before merge. This packet is the review input.
 
 ## Resume-after-dependency map
