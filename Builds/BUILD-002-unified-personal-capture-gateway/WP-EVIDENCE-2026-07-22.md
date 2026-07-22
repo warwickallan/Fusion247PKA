@@ -3,8 +3,8 @@ build_id: BUILD-002
 title: Unified Fusion Hub — exact-head evidence packet (WP7)
 branch: build-002/unified-fusion-hub
 pr: 57
-head_sha: 661b7a4cbb774d2a799b7aa7129fad229398f495  # code-complete head — Codex returned READY_TO_MERGE here (round 6). Later commits are docs/memory only.
-codex_verdict: READY_TO_MERGE (round 6, bound to 661b7a4) — after 6 rounds: rounds 1-5 found blockers, all fixed + re-verified
+head_sha: (QA2 in progress — see the live branch head; the pre-review evidence commit is prepared BEFORE the final QA2 so the reviewed SHA == PR head)
+codex_verdict_round6: READY_TO_MERGE (bound to 661b7a4) — SUPERSEDED. A Warwick+GPT adversarial pass then found my round-1 TRIAGE had dropped 4 raw findings (A/B/C/D) that rounds 2-6 never re-checked (curated diffs). Those + crash-safety + typed-reply + boundary + CI are now fixed — see CODEX-FINDING-LEDGER.md. A fresh FULL-PR Codex QA2 at the exact head is the gate.
 pack_approved: v1.1-draft (commit 8e59cb4, pack hash 017a9db7, approved_by warwick)
 status: DRAFT — not merged; needs exact-head Codex READY_TO_MERGE + Warwick
 ---
@@ -72,6 +72,24 @@ Every blocker was a genuine normal-use defect (several my own tests missed — e
 
 - **Warwick-gated activation residuals** (NOT un-built logic): (a) inbound wiring activates with `HUB_DECISION_INBOUND=1` + a live gateway restart; (b) a real card shows A/B/C buttons only once the external `larry-ding` sender honours the `--reply-markup` the worker already emits (recorded in the dry-run receipt today).
 - **Fable is NOT scheduled / not run.** Per Warwick (2026-07-23) Fable is **never** summoned without his explicit yes; Codex-only is the independent check here. [[fable-confirm-first-hardlock]]
+- **"Same-model" caveat:** the Codex CLI stamps "Same-model review — not independently verified" as stock boilerplate; the actual reviewer is OpenAI Codex, cross-vendor from the Claude-Opus implementer. Surfaced, not suppressed. See CODEX-FINDING-LEDGER.md.
+
+## QA2 adversarial pass (2026-07-23) — round-6 READY_TO_MERGE was superseded
+
+A Warwick+GPT adversarial pass found that my round-1 triage narrative had DROPPED four raw fold-before-live findings (concurrent duplicate task; accept-then-decline; Telegram escaping; RegExp key injection), and that rounds 2-6 reviewed curated diffs so never re-checked them. **All are now fixed + proven**, plus crash/restart lease-reclaim across every queue, the send-before-receipt window, the typed-reply path, the intent-boundary restore, and enforced CI. The complete disposition of EVERY finding is in **`CODEX-FINDING-LEDGER.md`** (the reviewer's raw list, never a narrative). The gate is a fresh full-PR Codex QA2 at the exact head.
+
+## CI coverage (QA2 point 5) — file-to-job map
+
+`build-002-tests.yml` enforces: **hub** job → all `services/hub/**` node tests; **gateway** job → `services/fusion-capture-gateway` spine suite (worker/receiptProjection/liveRunner, incl. offset-hold + typed-reply); **asdair-skill** job → `services/asdair/skill`; **cockpit-db** job (postgres:16) → full migration chain `010-200` apply/reapply/teardown + `add_list_item` handler; **voice-sapi-windows** job → the real-audio SAPI proof. NOT-yet-in-CI (declared): the live-seam synthetic proofs (`prove-full-loop`, `prove-crash-reclaim`, `prove-decision-*`, `prove-learning-apply`, `prove-command-request`, `prove-contract-apply`, `prove-decision-concurrency`) run as LIVE proofs against the live cockpit; CI-enabling them needs a throwaway cockpit + parameterised DSN (scoped follow-up).
+
+## Live-vs-fixture declarations
+
+- **Pure/fixture (no I/O):** classifyRoute, parseChoice, renderCard, telegramInbound, resolvePayload, shopperRoute, emailIntake, voiceIntake — unit tests.
+- **Fixture-driven spine:** route/assurance/liveRunner tests use the in-memory store + mock adapter (no network/DB).
+- **Real local resource:** voiceTranscribe uses the Windows SAPI recognizer on a real WAV (skips off-Windows).
+- **Throwaway Postgres:** the migration chain + add_list_item handler (CI + local disposable cluster).
+- **LIVE cockpit (synthetic rows, self-cleaning):** the intent→worker→receipt proofs (contract/learning/decision/command/full-loop/crash-reclaim/concurrency) connect as cp_directus/cp_worker to the live MyPKA cockpit and delete their synthetic rows.
+- **Warwick-gated live actions (NOT run):** real Telegram send, live gateway restart, live AsdAIr household write, Directus restart.
 
 ## Resume-after-dependency map
 
