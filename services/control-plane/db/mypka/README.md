@@ -18,8 +18,10 @@ for the cockpit layer** — captured faithfully from the live catalog, not from 
 | `050_cockpit_portfolio.sql` | the `cockpit` schema + portfolio/build-state records (`overall_state`, `build`, `decision`, `movement`, `domain_summary`) that drive the management view | teardown |
 | `060_build_contract.sql` | BUILD-002 build-acceptance layer: `cockpit.build_contract` (approved-version record + readable projection) + `cockpit.contract_command` (approval INTENT queue) + guard triggers | teardown |
 | `070_build_contract_grants.sql` | least-privilege grants for the contract layer (cp_directus render+request-only; cp_worker execute-only; atomic revoke-then-grant) | teardown |
-| `seed/build-002-contract-draft.sql` | seeds the BUILD-002 v0.1-draft contract row (DRAFT state; readable projection; bound to the Git commit/blob/sha256) | — |
-| `teardown.sql` | **rollback path** — reverses 010–070 (the `cockpit`-schema cascade drops the 060 objects + guards; `drop owned by cp_*` clears the 070 grants); leaves the asdair data tables untouched | — |
+| `080_build_contract_pack.sql` | evolves `build_contract` to the three-document PACK model: adds `documents` jsonb + `pack_content_hash`; guard v2 freezes them once set | teardown |
+| `seed/build-002-contract-draft.sql` | seeds the interim single-doc v0.1-draft row (now superseded by the pack) | — |
+| `seed/build-002-contract-pack-v1.sql` | supersedes v0.1-draft + seeds the v1.0-draft three-document pack row (bound to pack commit + `pack_content_hash`) | — |
+| `teardown.sql` | **rollback path** — reverses 010–080 (the `cockpit`-schema cascade drops the 060/080 objects + guards; `drop owned by cp_*` clears the 070 grants); leaves the asdair data tables untouched | — |
 
 **Secrets:** role passwords are **never** in these migrations. `020` creates the roles with no
 password; the runtime provisioner sets them from the gitignored `.runtime-live/` store
