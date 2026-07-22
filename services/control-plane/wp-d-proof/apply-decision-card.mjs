@@ -13,6 +13,7 @@ import { fileURLToPath } from 'node:url';
 import pg from 'file:///C:/Fusion247PKA/services/control-plane/node_modules/pg/lib/index.js';
 import { renderCard } from '../../hub/decision/renderCard.mjs';
 import { decisionCallbackData } from '../../hub/decision/telegramInbound.mjs';
+import { claimById, claimableWhere } from './claimIntent.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const cfg = JSON.parse(fs.readFileSync(path.join(here, '.runtime-live', 'directus-live.env.json'), 'utf8'));
@@ -41,8 +42,25 @@ function sendTelegram(rendered, replyMarkup) {
 
 async function processOne(cmd) {
   const cx = worker;
-  const claimed = await cx.query(`update cockpit.decision_card set status='claimed', claimed_at=now() where id=$1 and status='requested' returning id`, [cmd.id]);
+  const claimed = await claimById(cx, 'cockpit.decision_card', cmd.id);
   if (claimed.rowCount === 0) return null;
+  const willSend = ALLOW_SEND && cmd.dry_run === false;
+
+  // SEND-BEFORE-RECEIPT WINDOW (QA2 point 2): a real send is an external side effect. If a prior attempt
+  // already stamped send_attempted_at but the row is still 'claimed' (it crashed before the receipt), we
+  // MUST NOT re-send — a duplicate card can't be recalled. Fail closed for manual re-projection.
+  if (willSend) {
+    const prior = (await cx.query(`select send_attempted_at from cockpit.decision_card where id=$1`, [cmd.id])).rows[0];
+    if (prior && prior.send_attempted_at) {
+      await cx.query(`update cockpit.decision_card set status='failed', completed_at=now(), receipt=$2::jsonb where id=$1 and status='claimed'`,
+        [cmd.id, JSON.stringify({ ok: false, error: 'a previous send attempt did not confirm; NOT re-sending to avoid a duplicate card — re-project manually' })]);
+      console.log(`[card] ${cmd.id} -> FAILED (send already attempted; not re-sending)`);
+      return { id: cmd.id, ok: false };
+    }
+    // Durable delivery-attempt record BEFORE the external send (committed, status stays 'claimed').
+    await cx.query(`update cockpit.decision_card set send_attempted_at=now() where id=$1`, [cmd.id]);
+  }
+
   await cx.query('begin');
   try {
     const rendered = renderCard({ subject: cmd.subject, body_markdown: cmd.body_markdown, options: cmd.options, related_ref: cmd.related_ref });
@@ -50,7 +68,6 @@ async function processOne(cmd) {
     // reply to THIS card via `decision:<card_id>:<key>` — so a tap needs no separate message-id map;
     // the inbound mapper (telegramInbound.mapInboundDecision) reads the card_id + choice straight back.
     const reply_markup = { inline_keyboard: cmd.options.map((o) => [{ text: `${o.key} — ${o.label}`, callback_data: decisionCallbackData(cmd.id, o.key) }]) };
-    const willSend = ALLOW_SEND && cmd.dry_run === false;
     let sendResult = { sent: false, dry_run: true };
     if (willSend) sendResult = { ...sendTelegram(rendered, reply_markup), dry_run: false };
     const receipt = { ok: true, channel: cmd.channel, target: cmd.target, dry_run: !willSend,
@@ -70,7 +87,7 @@ async function processOne(cmd) {
 
 async function main() {
   await worker.connect();
-  const where = KEYPFX ? `status='requested' and idempotency_key like $1` : `status='requested'`;
+  const where = KEYPFX ? `${claimableWhere()} and idempotency_key like $1` : claimableWhere();
   const params = KEYPFX ? [`${KEYPFX}%`] : [];
   const pending = (await worker.query(`select id, requested_by, channel, target, subject, body_markdown, options, related_ref, dry_run from cockpit.decision_card where ${where} order by requested_at asc`, params)).rows;
   if (pending.length) console.log(`[card] ${pending.length} pending decision_card(s)${ALLOW_SEND ? ' [--allow-send ON]' : ''}`);

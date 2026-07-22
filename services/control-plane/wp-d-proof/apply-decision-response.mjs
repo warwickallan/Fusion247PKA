@@ -9,6 +9,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pg from 'file:///C:/Fusion247PKA/services/control-plane/node_modules/pg/lib/index.js';
 import { parseChoice } from '../../hub/decision/parseChoice.mjs';
+import { claimById, claimableWhere } from './claimIntent.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const cfg = JSON.parse(fs.readFileSync(path.join(here, '.runtime-live', 'directus-live.env.json'), 'utf8'));
@@ -19,7 +20,7 @@ const worker = new pg.Client({ host: cfg.host, port: cfg.port, database: cfg.dat
 
 async function processOne(resp) {
   const cx = worker;
-  const claimed = await cx.query(`update cockpit.decision_response set status='claimed', claimed_at=now() where id=$1 and status='requested' returning id`, [resp.id]);
+  const claimed = await claimById(cx, 'cockpit.decision_response', resp.id);
   if (claimed.rowCount === 0) return null;
   await cx.query('begin');
   try {
@@ -73,7 +74,7 @@ async function processOne(resp) {
 
 async function main() {
   await worker.connect();
-  const where = KEYPFX ? `status='requested' and idempotency_key like $1` : `status='requested'`;
+  const where = KEYPFX ? `${claimableWhere()} and idempotency_key like $1` : claimableWhere();
   const params = KEYPFX ? [`${KEYPFX}%`] : [];
   const pending = (await worker.query(`select id, card_id, responder, raw_text from cockpit.decision_response where ${where} order by requested_at asc`, params)).rows;
   if (pending.length) console.log(`[resp] ${pending.length} pending decision_response(s)`);

@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pg from 'file:///C:/Fusion247PKA/services/control-plane/node_modules/pg/lib/index.js';
+import { claimById, claimableWhere } from './claimIntent.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const cfg = JSON.parse(fs.readFileSync(path.join(here, '.runtime-live', 'directus-live.env.json'), 'utf8'));
@@ -20,7 +21,7 @@ const NEW_STATUS = { accept: 'accepted', decline: 'declined', defer: 'deferred' 
 
 async function processOne(cmd) {
   const cx = worker;
-  const claimed = await cx.query(`update cockpit.learning_command set status='claimed', claimed_at=now() where id=$1 and status='requested' returning id`, [cmd.id]);
+  const claimed = await claimById(cx, 'cockpit.learning_command', cmd.id);
   if (claimed.rowCount === 0) return null;
   await cx.query('begin');
   try {
@@ -69,7 +70,7 @@ async function processOne(cmd) {
 
 async function main() {
   await worker.connect();
-  const where = KEYPFX ? `status='requested' and idempotency_key like $1` : `status='requested'`;
+  const where = KEYPFX ? `${claimableWhere()} and idempotency_key like $1` : claimableWhere();
   const params = KEYPFX ? [`${KEYPFX}%`] : [];
   const pending = (await worker.query(`select id, requested_by, command, candidate_id, note from cockpit.learning_command where ${where} order by requested_at asc`, params)).rows;
   if (pending.length) console.log(`[learn] ${pending.length} pending learning_command(s)`);

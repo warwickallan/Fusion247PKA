@@ -16,6 +16,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pg from 'file:///C:/Fusion247PKA/services/control-plane/node_modules/pg/lib/index.js';
+import { claimById, claimableWhere } from './claimIntent.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const cfg = JSON.parse(fs.readFileSync(path.join(here, '.runtime-live', 'directus-live.env.json'), 'utf8'));
@@ -66,10 +67,8 @@ async function processOne(cmd) {
   // Claim in its OWN committed statement (autocommit) so a later apply failure can mark the row
   // 'failed' — if the claim shared the apply txn, a rollback would revert it to 'requested' and the
   // poison intent would retry forever (defect caught by prove-contract-apply.mjs).
-  const claimed = await cx.query(
-    `update cockpit.contract_command set status='claimed', claimed_at=now() where id=$1 and status='requested' returning id`,
-    [cmd.id]);
-  if (claimed.rowCount === 0) return null; // someone else took it
+  const claimed = await claimById(cx, 'cockpit.contract_command', cmd.id);
+  if (claimed.rowCount === 0) return null; // someone else took it (or its lease is still live)
 
   await cx.query('begin');
   try {
@@ -110,7 +109,7 @@ const WATCH_SEC = watchArg ? Number(watchArg.split('=')[1] || 15) : null;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function processPending() {
-  const where = KEYPFX ? `status='requested' and idempotency_key like $1` : `status='requested'`;
+  const where = KEYPFX ? `${claimableWhere()} and idempotency_key like $1` : claimableWhere();
   const params = KEYPFX ? [`${KEYPFX}%`] : [];
   const pending = (await worker.query(
     `select id, requested_by, command, build_id, contract_version, bound_git_sha, bound_content_hash, note
