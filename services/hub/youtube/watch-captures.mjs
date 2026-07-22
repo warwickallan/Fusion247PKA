@@ -41,10 +41,15 @@ function runTubeair(url, videoId) {
     { cwd: TUBEAIR, encoding: 'utf8', timeout: 180000 });
   if (r.status !== 0) return { ok: false, error: (r.stderr || r.stdout || 'tubeair failed').split('\n').slice(-3).join(' ') };
   const outRoot = path.join(TUBEAIR, OUT);
-  const dir = fs.existsSync(outRoot) ? fs.readdirSync(outRoot).find((d) => d.includes(videoId)) : null;
-  if (!dir) return { ok: false, error: 'tubeair ran but no packet dir found' };
-  const full = path.join(outRoot, dir);
+  // NEWEST matching packet dir + manifest.video_id validation (QA2-A: a stale/mismatched older packet
+  // must never be ingested; find() order is not a freshness guarantee).
+  const dirs = fs.existsSync(outRoot)
+    ? fs.readdirSync(outRoot).filter((d) => d.includes(videoId)).map((d) => ({ d, m: fs.statSync(path.join(outRoot, d)).mtimeMs })).sort((a, b) => b.m - a.m)
+    : [];
+  if (!dirs.length) return { ok: false, error: 'tubeair ran but no packet dir found' };
+  const full = path.join(outRoot, dirs[0].d);
   const manifest = JSON.parse(fs.readFileSync(path.join(full, 'manifest.json'), 'utf8'));
+  if (manifest.video_id !== videoId) return { ok: false, error: `packet manifest video_id ${manifest.video_id} != requested ${videoId} — refusing stale/mismatched packet` };
   const reportName = fs.readdirSync(full).find((f) => f.endsWith('.md'));
   const report = fs.readFileSync(path.join(full, reportName), 'utf8');
   return { ok: true, manifest, report };
@@ -58,16 +63,22 @@ async function scanOnce() {
   for (const cap of caps) {
     const cls = classifyYouTube(cap.text);
     if (!cls.isYouTube) { continue; }
-    const exists = (await db.query(`select 1 from cockpit.youtube_source where video_id=$1`, [cls.videoId])).rowCount > 0;
-    if (exists) { skipped++; continue; }
-    console.log(`[watch] new YouTube capture ${cls.videoId} (fcg ${cap.capture_id}) — extracting…`);
+    // QA2-A: skip only a COMPLETE row (raw_path present) or a failed row that has EXHAUSTED its bounded
+    // retries — a transient failure (raw_path null, attempts < cap) is re-attempted, not permanently
+    // suppressed. (The watcher is single-instance — ensure-youtube-watcher kills any prior instance — so
+    // two concurrent extractions do not arise in practice; the youtube_source unique row is the backstop.)
+    const MAX_ATTEMPTS = 3;
+    const row = (await db.query(`select raw_path, extract_attempts from cockpit.youtube_source where video_id=$1`, [cls.videoId])).rows[0];
+    if (row && (row.raw_path !== null || row.extract_attempts >= MAX_ATTEMPTS)) { skipped++; continue; }
+    console.log(`[watch] YouTube capture ${cls.videoId} (fcg ${cap.capture_id}) — extracting (attempt ${(row?.extract_attempts ?? 0) + 1})…`);
     const t = runTubeair(cls.canonicalUrl, cls.videoId);
     if (!t.ok) {
-      console.log(`[watch]   extraction FAILED for ${cls.videoId}: ${t.error} — recorded as failed (no hammering; will not retry an existing row)`);
+      console.log(`[watch]   extraction FAILED for ${cls.videoId}: ${t.error} — attempt recorded (bounded retry up to ${MAX_ATTEMPTS})`);
       await db.query(
-        `insert into cockpit.youtube_source (video_id, title, source_url, capture_id, review_state, brief_markdown)
-         values ($1,$2,$3,$4,'ai_created',$5) on conflict (video_id) do nothing`,
-        [cls.videoId, `(extraction failed) ${cls.videoId}`, cls.canonicalUrl, cap.capture_id, `> Extraction failed: ${t.error}. Retryable via Directus command (WP4).`]);
+        `insert into cockpit.youtube_source (video_id, title, source_url, capture_id, review_state, brief_markdown, extract_attempts)
+         values ($1,$2,$3,$4,'ai_created',$5,1)
+         on conflict (video_id) do update set extract_attempts = cockpit.youtube_source.extract_attempts + 1, brief_markdown = excluded.brief_markdown`,
+        [cls.videoId, `(extraction failed) ${cls.videoId}`, cls.canonicalUrl, cap.capture_id, `> Extraction failed: ${t.error}. Bounded retry (up to ${MAX_ATTEMPTS} attempts).`]);
       failed++; continue;
     }
     const m = t.manifest;

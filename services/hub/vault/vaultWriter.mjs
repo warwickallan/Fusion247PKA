@@ -44,6 +44,15 @@ export class FsVaultAdapter {
     await fs.promises.mkdir(path.dirname(abs), { recursive: true });
     await fs.promises.writeFile(abs, content, 'utf8');
   }
+  // EXCLUSIVE create (O_EXCL): the ONLY race-safe write-once primitive. Returns {created:true} when this
+  // call wrote the file, {created:false} when it already existed (the idempotent outcome). Concurrent
+  // writers can never both "win" — exactly one gets created:true (QA2-A: exists()/write() was a race).
+  async writeNew(rel, content) {
+    const abs = this._abs(rel);
+    await fs.promises.mkdir(path.dirname(abs), { recursive: true });
+    try { await fs.promises.writeFile(abs, content, { encoding: 'utf8', flag: 'wx' }); return { created: true }; }
+    catch (e) { if (e && e.code === 'EEXIST') return { created: false }; throw e; }
+  }
   async list(subdir = '') {
     const abs = this._abs(subdir);
     try { return (await fs.promises.readdir(abs)).filter((f) => f.endsWith('.md')); } catch { return []; }
@@ -76,11 +85,16 @@ export class VaultWriter {
   async writeNote({ sourceId, title, frontmatter = {}, body }) {
     if (!sourceId) throw new Error('VaultWriter.writeNote requires a stable sourceId for idempotency');
     const rel = this.notePath(sourceId, title);
-    if (await this.adapter.exists(rel)) {
-      return { path: rel, relPath: rel, created: false, adapter: this.adapter.constructor.name, link: this.adapter.linkFor?.(rel) };
-    }
     const content = renderNote({ source_id: sourceId, ...frontmatter }, body);
-    await this.adapter.write(rel, content);
-    return { path: rel, relPath: rel, created: true, adapter: this.adapter.constructor.name, link: this.adapter.linkFor?.(rel) };
+    // Race-safe write-once: exclusive create when the adapter supports it (EEXIST => already written,
+    // the idempotent outcome); fall back to exists()/write() only for adapters without writeNew.
+    let created;
+    if (typeof this.adapter.writeNew === 'function') {
+      created = (await this.adapter.writeNew(rel, content)).created;
+    } else {
+      if (await this.adapter.exists(rel)) created = false;
+      else { await this.adapter.write(rel, content); created = true; }
+    }
+    return { path: rel, relPath: rel, created, adapter: this.adapter.constructor.name, link: this.adapter.linkFor?.(rel) };
   }
 }

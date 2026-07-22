@@ -23,8 +23,23 @@ export async function preserveRaw({ vaultRoot, videoId, packetFiles, subdir = 'S
   let created = false;
   for (const f of packetFiles) {
     const rel = path.posix.join(rawDirRel, f.name);
-    if (!(await a.exists(rel))) { await a.write(rel, f.content); created = true; }
-    files.push({ file: rel, sha256: sha256(f.content), bytes: Buffer.byteLength(f.content) });
+    const incomingSha = sha256(f.content);
+    let storedSha;
+    // Race-safe exclusive create when available (EEXIST => already preserved); else exists/write.
+    let wrote;
+    if (typeof a.writeNew === 'function') wrote = (await a.writeNew(rel, f.content)).created;
+    else wrote = !(await a.exists(rel)) ? (await a.write(rel, f.content), true) : false;
+    if (wrote) {
+      created = true; storedSha = incomingSha;
+    } else {
+      // The file already exists (RAW is immutable/write-once). Report the sha of the STORED bytes, not
+      // the incoming ones — and FAIL CLOSED if they differ (QA2-A: a retry with changed/corrupt content
+      // must never return evidence for content that was not written).
+      const stored = await a.read(rel);
+      storedSha = sha256(stored);
+      if (storedSha !== incomingSha) throw new Error(`RAW immutability violation for ${rel}: stored content sha ${storedSha.slice(0, 12)} != incoming ${incomingSha.slice(0, 12)}`);
+    }
+    files.push({ file: rel, sha256: storedSha, bytes: Buffer.byteLength(f.content) });
   }
   return { dir: rawDirRel, created, files, adapter: a };
 }

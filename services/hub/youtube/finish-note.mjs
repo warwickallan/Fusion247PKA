@@ -21,10 +21,13 @@ const OUT = arg('out', 'out/auto');
 if (!VIDEO || !BODY) { console.error('usage: --video=<id> --body=<path.md> [--candidates=<path.json>] [--out=out/auto]'); process.exit(2); }
 
 const PACKET = `C:/Fusion247PKA/tools/tubeair/${OUT}`;
-const dirName = fs.readdirSync(PACKET).find((d) => d.includes(VIDEO));
-if (!dirName) { console.error(`no TubeAIR packet dir for ${VIDEO} under ${PACKET}`); process.exit(1); }
-const dir = path.join(PACKET, dirName);
+// NEWEST matching packet dir + mandatory manifest.video_id equality (QA2-A: never file a stale/mismatched
+// packet under the requested video).
+const dirs = fs.readdirSync(PACKET).filter((d) => d.includes(VIDEO)).map((d) => ({ d, m: fs.statSync(path.join(PACKET, d)).mtimeMs })).sort((a, b) => b.m - a.m);
+if (!dirs.length) { console.error(`no TubeAIR packet dir for ${VIDEO} under ${PACKET}`); process.exit(1); }
+const dir = path.join(PACKET, dirs[0].d);
 const manifest = JSON.parse(fs.readFileSync(path.join(dir, 'manifest.json'), 'utf8'));
+if (manifest.video_id !== VIDEO) { console.error(`packet manifest video_id ${manifest.video_id} != requested ${VIDEO} — refusing stale/mismatched packet`); process.exit(1); }
 const report = fs.readFileSync(path.join(dir, fs.readdirSync(dir).find((f) => f.endsWith('.md'))), 'utf8');
 const authoredBody = fs.readFileSync(BODY, 'utf8');
 const CANDIDATES = CANDIDATES_FILE ? JSON.parse(fs.readFileSync(CANDIDATES_FILE, 'utf8')) : [];
