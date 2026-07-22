@@ -1,7 +1,7 @@
 ---
 build_id: BUILD-002
 title: Unified Fusion Hub — Human-Readable Build Brief
-pack_version: v1.1-draft
+pack_version: v1.1 (accepted for merge — Warwick 2026-07-22)
 doc_role: brief
 lifecycle_state: draft_pending_warwick_approval
 owner: Warwick

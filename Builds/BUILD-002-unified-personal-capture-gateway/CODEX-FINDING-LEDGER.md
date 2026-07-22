@@ -62,8 +62,13 @@ My original round-1 triage narrative dropped four fold-before-live findings (7-1
 - **Fable:** unauthorised; never scheduled/required. Codex-only independent review. [[fable-confirm-first-hardlock]]
 - **Exact-head QA:** the final QA2 (point 7) reviews the FULL PR at the exact head; its verdict is recorded in the PR conversation (not a commit that would move the head after review).
 
-## PARKED (2026-07-23, Warwick) — BUILD-002 frozen at c7f641b70bdfbf5257eeafd1ae697941a4ca5f6d
+## PARK LIFTED + MERGE AUTHORISED (2026-07-22, Warwick) — superseding the earlier park
 
-QA2 loop stopped by Warwick; Tower recovery took priority. PR #57 stays DRAFT/unmerged; no further Codex reviews.
+The earlier park (BUILD-002 frozen at `c7f641b` while Tower recovery took priority) is **LIFTED**.
+Warwick authorised finishing BUILD-002 PR #57 end-to-end. Current state:
 
-**Open Warwick-gated LIVE-SEND ACTIVATION item (NOT repo code):** `C:\.fusion247\larry-ding.mjs` (external sender) does not yet consume `--reply-markup` or `--plain-text`, and does not return the Telegram `result.chat.id`. Until it does, a REAL decision-card send (`dry_run=false` + `--allow-send`, itself Warwick-gated) would: send no inline buttons, be sent without an explicit plain-text guarantee, and leave the typed-reply `sent_chat_id` map null (button taps still self-correlate). Dry-run (default) is unaffected. Fix at real-send cut-over: make larry-ding consume `--reply-markup`, omit `parse_mode`, and return `result.chat.id`; then a transport-contract test.
+- **Reconciled** onto current `origin/main` (`82e5334`, which now carries the merged Tower recovery); all baseline QA2 work at `c7f641b` preserved.
+- **Live-send activation item — RESOLVED + PROVEN.** `C:\.fusion247\larry-ding.mjs` now **consumes `--reply-markup`**, **sends explicit plain-text (no `parse_mode`)**, and **returns the Telegram `result.chat.id`**; existing send-gating preserved. Proven by a `--dry-run` transport-contract check **and a real A/B/C card send** (message id 124, `chat_id` returned). So a real decision-card send now shows inline buttons and populates the typed-reply `sent_chat_id` map.
+- **Live cut-over performed** (Warwick-authorised): Directus restarted; gateway restarted with `HUB_YOUTUBE_ROUTE=1` + `HUB_DECISION_INBOUND=1` (fresh liveRunner, resumed from durable offset); durable-seam live proofs all green (full-loop/command/contract/learning/crash-reclaim/concurrency/decision-response/decision-card/writeback-live); a bounded live AsdAIr add-item is durable. The legacy YouTube poller is retained as the proven path (spine route enabled + CI-proven + idempotent; full live e2e needs a real video extraction).
+- **CI GREEN** at the reconciled head (`build-002-tests`: hub, gateway, asdair-skill, cockpit-db, voice-sapi-windows all pass) — fixed a real cockpit-db failure (the `add_list_item` dbtest was inheriting the migration-chain asdair stub in the shared CI Postgres; made hermetic).
+- **Final QA** via the recovered Tower merge-check path (exact-head, bounded rounds); merge under Warwick's match-head guard.
