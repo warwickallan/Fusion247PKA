@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import pg from 'file:///C:/Fusion247PKA/services/control-plane/node_modules/pg/lib/index.js';
+import pg from 'pg';
 
 const MIG = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const PORT = Number(process.env.PGPORT || 0);
