@@ -43,13 +43,14 @@ function liveEnv(brainDir, overrides = {}) {
 }
 
 // Build a live-mode runner over an injectable shared store + adapter.
-async function makeRunner(brainDir, { store, adapter, clock, logSink } = {}) {
+async function makeRunner(brainDir, { store, adapter, clock, logSink, decisionFiler } = {}) {
   const config = loadConfig(liveEnv(brainDir));
   assert.equal(config.fixturesMode, false, 'minimal live config is not fixtures mode');
   return createLiveRunner(config, {
     clock,
     logSink,
     leaseMs: 30_000,
+    decisionFiler,
     factories: {
       storeFactory: async () => store,
       adapterFactory: async () => adapter,
@@ -88,6 +89,38 @@ test('governed destination resolves the authority-backed Team Inbox in live mode
   // Explicit override wins in either mode.
   const override = resolveGovernedDestination({ captureBrainDir: '/tmp/x', captureSandboxDir: null }, 'live');
   assert.equal(override.baseDir, '/tmp/x');
+});
+
+test('WP4 decision tap: a durable filing FAILURE holds the offset (no lost tap)', async () => {
+  const brainDir = tmpBrain();
+  try {
+    const store = createInMemoryOperationalStore();
+    const adapter = createMockTelegramAdapter({ authorisedUserId: AUTH_ID });
+    let calls = 0;
+    const decisionFiler = async () => { calls += 1; throw new Error('transient DB fault'); };
+    const runner = await makeRunner(brainDir, { store, adapter, clock: fixedClock(1_000_000), decisionFiler });
+    adapter.deliver(tap(1, { chat_id: AUTH_ID, message_id: 9 }, { action: 'decision:card-1:A' }));
+    await runner.pollOnce();
+    assert.equal(calls, 1, 'the decision filer was invoked');
+    assert.equal(runner.offset, 0, 'offset HELD at 0 — the failed tap is not acknowledged, so Telegram redelivers it');
+    assert.equal(await store.getPollOffset('telegram'), 0, 'no offset persisted on durable failure');
+    await runner.shutdown();
+  } finally { fs.rmSync(brainDir, { recursive: true, force: true }); }
+});
+
+test('WP4 decision tap: a successful filing advances the offset', async () => {
+  const brainDir = tmpBrain();
+  try {
+    const store = createInMemoryOperationalStore();
+    const adapter = createMockTelegramAdapter({ authorisedUserId: AUTH_ID });
+    const seen = [];
+    const decisionFiler = async (update) => { seen.push(update.callback_query.data); return { filed: true, card_id: 'card-1', raw_text: 'A' }; };
+    const runner = await makeRunner(brainDir, { store, adapter, clock: fixedClock(1_000_000), decisionFiler });
+    adapter.deliver(tap(3, { chat_id: AUTH_ID, message_id: 9 }, { action: 'decision:card-1:A' }));
+    await runner.pollOnce();
+    assert.deepEqual(seen, ['decision:card-1:A'], 'the tap was routed to the decision filer');
+    assert.equal(runner.offset, 4, 'offset advanced past the successfully-filed tap');
+  } finally { fs.rmSync(brainDir, { recursive: true, force: true }); }
 });
 
 test('startup + shutdown: live mode assembled, masked start diagnostic, clean shutdown', async () => {

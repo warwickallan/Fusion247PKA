@@ -161,9 +161,15 @@ export async function createLiveRunner(config, opts = {}) {
     // best-effort projection. Non-decision callbacks (SaveToBrain etc.) fall through unchanged.
     if (typeof action === 'string' && action.startsWith('decision:') && decisionFiler) {
       let filed = null;
-      try { filed = await decisionFiler(update); } catch (err) { diag('decision_file_failed', { error: safeErr(err) }); }
-      try { await adapter.answerCallbackQuery(callbackId, filed && filed.filed ? 'Decision recorded.' : 'Already recorded.', {}); } catch (err) { diag('answer_callback_failed', { error: safeErr(err) }); }
-      return { kind: 'callback', ok: Boolean(filed), action: 'decision', filed: filed ? filed.filed : false };
+      let durableFailure = false;
+      try { filed = await decisionFiler(update); }
+      catch (err) { durableFailure = true; diag('decision_file_failed', { error: safeErr(err) }); }
+      // HONEST ack: only claim recorded when it actually was (new) or was already recorded (idempotent);
+      // on a durable (transient DB) failure, tell the user to tap again — never a false "recorded".
+      const toast = durableFailure ? "Couldn't record that — please tap again." : (filed && filed.filed ? 'Decision recorded.' : 'Already recorded.');
+      try { await adapter.answerCallbackQuery(callbackId, toast, { showAlert: durableFailure }); } catch (err) { diag('answer_callback_failed', { error: safeErr(err) }); }
+      // durableFailure => pollOnce must NOT advance the offset, so Telegram redelivers this tap (no loss).
+      return { kind: 'callback', ok: !durableFailure, action: 'decision', filed: filed ? filed.filed : false, durableFailure };
     }
 
     let captureId;
@@ -323,6 +329,10 @@ export async function createLiveRunner(config, opts = {}) {
       if (res.kind === 'message' && res.ok) accepted += 1;
       else if (res.kind === 'callback') callbacks += 1;
       else ignored += 1;
+      // A durable decision-filing FAILURE (transient DB fault) must NOT be acknowledged: hold the offset
+      // and STOP the batch here so this tap — and every later update — redelivers next cycle rather than
+      // being skipped. Idempotent inbound filing makes the redelivery safe (no duplicate decision_response).
+      if (res && res.durableFailure) { diag('offset_held_on_durable_failure', { update_id: update.update_id }); break; }
       // Acknowledge ONLY after durable handling. On crash before this, the update
       // redelivers and idempotent intake dedups it — no loss, no duplicate.
       await persistOffset((update.update_id ?? 0) + 1, stepNow());
