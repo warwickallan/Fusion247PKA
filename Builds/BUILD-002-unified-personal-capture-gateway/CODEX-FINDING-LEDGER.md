@@ -61,3 +61,9 @@ My original round-1 triage narrative dropped four fold-before-live findings (7-1
 - **"Same-model review" caveat:** the Codex CLI appends "Same-model review — not independently verified" as a stock disclaimer. The reviewer is **OpenAI Codex**, a different vendor + model from the implementer (**Claude Opus 4.8**), so the review IS cross-vendor independent; the phrase is Codex boilerplate, not a statement that the same model reviewed its own work. Surfaced honestly rather than suppressed.
 - **Fable:** unauthorised; never scheduled/required. Codex-only independent review. [[fable-confirm-first-hardlock]]
 - **Exact-head QA:** the final QA2 (point 7) reviews the FULL PR at the exact head; its verdict is recorded in the PR conversation (not a commit that would move the head after review).
+
+## PARKED (2026-07-23, Warwick) — BUILD-002 frozen at c7f641b70bdfbf5257eeafd1ae697941a4ca5f6d
+
+QA2 loop stopped by Warwick; Tower recovery took priority. PR #57 stays DRAFT/unmerged; no further Codex reviews.
+
+**Open Warwick-gated LIVE-SEND ACTIVATION item (NOT repo code):** `C:\.fusion247\larry-ding.mjs` (external sender) does not yet consume `--reply-markup` or `--plain-text`, and does not return the Telegram `result.chat.id`. Until it does, a REAL decision-card send (`dry_run=false` + `--allow-send`, itself Warwick-gated) would: send no inline buttons, be sent without an explicit plain-text guarantee, and leave the typed-reply `sent_chat_id` map null (button taps still self-correlate). Dry-run (default) is unaffected. Fix at real-send cut-over: make larry-ding consume `--reply-markup`, omit `parse_mode`, and return `result.chat.id`; then a transport-contract test.
