@@ -72,6 +72,10 @@ async function processOne(cmd) {
     if (willSend) sendResult = { ...sendTelegram(rendered, reply_markup), dry_run: false };
     const receipt = { ok: true, channel: cmd.channel, target: cmd.target, dry_run: !willSend,
       would_send_to: `${cmd.channel}:${cmd.target}`, options_count: cmd.options.length, rendered_card: rendered, reply_markup, ...sendResult };
+    // On a real send, record the durable card message map so a TYPED reply can correlate back (mig 200).
+    if (willSend && sendResult.message_id != null) {
+      await cx.query(`update cockpit.decision_card set sent_chat_id=$2, sent_message_id=$3 where id=$1`, [cmd.id, String(cmd.target), Number(sendResult.message_id)]);
+    }
     await cx.query(`update cockpit.decision_card set status='done', completed_at=now(), receipt=$2::jsonb where id=$1`, [cmd.id, JSON.stringify(receipt)]);
     await cx.query('commit');
     console.log(`[card] ${cmd.id} rendered (${cmd.options.length} options) -> ${willSend ? 'SENT' : 'dry-run (no send)'} (done)`);

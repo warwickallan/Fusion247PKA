@@ -20,7 +20,15 @@ export async function fileInboundDecision(cockpitClient, update, opts = {}) {
     const fromId = update?.callback_query?.from?.id ?? update?.message?.from?.id;
     if (String(fromId) !== String(opts.authorizedUserId)) return { filed: false, reason: 'unauthorized_sender' };
   }
-  const mapped = mapInboundDecision(update, { resolveCardByMessage: opts.resolveCardByMessage });
+  // A TYPED reply correlates to its card via the durable sent-message map — an ASYNC DB lookup. Resolve
+  // it up front, then hand mapInboundDecision a sync closure over the fetched card id. Button taps
+  // self-correlate via callback_data and need no lookup.
+  let preResolved = null;
+  const msg = update && update.message;
+  if (msg && msg.reply_to_message && typeof opts.resolveCardByMessage === 'function') {
+    preResolved = await opts.resolveCardByMessage(msg.chat && msg.chat.id, msg.reply_to_message.message_id);
+  }
+  const mapped = mapInboundDecision(update, { resolveCardByMessage: () => preResolved });
   if (!mapped.ok) return { filed: false, reason: mapped.reason };
 
   // Idempotency key derived from the update itself so a re-delivered tap/reply never double-files.

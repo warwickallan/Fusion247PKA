@@ -123,6 +123,23 @@ export async function createLiveRunner(config, opts = {}) {
   // notice. The notice is a best-effort projection: a crash between notice and
   // offset persist can at worst repeat the notice, never duplicate data.
   async function handleMessage(update, _now) {
+    // WP4 typed reply: a reply to a decision card is routed to the decision filer BEFORE ordinary capture
+    // intake, so answering a card by TEXT (not just tapping a button) records a decision_response instead
+    // of being captured as a note. The filer resolves the card via the durable sent-message map; a reply
+    // to a NON-card message (not correlated) falls through to normal capture. A durable filing failure
+    // holds the offset (same rule as the callback path).
+    const rmsg = update && update.message;
+    if (decisionFiler && rmsg && rmsg.reply_to_message) {
+      let filed = null;
+      let durableFailure = false;
+      try { filed = await decisionFiler(update); } catch (err) { durableFailure = true; diag('decision_reply_file_failed', { error: safeErr(err) }); }
+      if (durableFailure) return { kind: 'decision_reply', ok: false, durableFailure: true };
+      if (filed && (filed.filed || filed.card_id || filed.reason === 'unauthorized_sender')) {
+        diag('decision_reply_filed', { filed: filed.filed, card_id: filed.card_id });
+        return { kind: 'decision_reply', ok: Boolean(filed.filed), filed: Boolean(filed.filed) };
+      }
+      // Not a decision reply (no correlated card) → fall through to normal capture intake.
+    }
     const res = await intake.accept(update, {});
     if (!res.ok) {
       diag('message_not_accepted', { reason: res.reason });

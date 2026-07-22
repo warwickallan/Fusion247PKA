@@ -108,6 +108,36 @@ test('WP4 decision tap: a durable filing FAILURE holds the offset (no lost tap)'
   } finally { fs.rmSync(brainDir, { recursive: true, force: true }); }
 });
 
+test('WP4 typed reply: a reply correlated to a card routes to the filer, not capture intake', async () => {
+  const brainDir = tmpBrain();
+  try {
+    const store = createInMemoryOperationalStore();
+    const adapter = createMockTelegramAdapter({ authorisedUserId: AUTH_ID });
+    const seen = [];
+    // The filer resolves a reply to message 77 as a known card; anything else is "not correlated".
+    const decisionFiler = async (update) => {
+      seen.push(update.message ? update.message.text : update.callback_query.data);
+      const repliedTo = update.message && update.message.reply_to_message && update.message.reply_to_message.message_id;
+      return repliedTo === 77 ? { filed: true, card_id: 'card-1', raw_text: update.message.text } : { filed: false, reason: 'reply not correlated to a known card' };
+    };
+    const runner = await makeRunner(brainDir, { store, adapter, clock: fixedClock(1_000_000), decisionFiler });
+    // A typed reply to the card message (77) → filed as a decision, NOT captured.
+    const reply = { update_id: 10, message: { message_id: 900, from: { id: AUTH_ID }, chat: { id: AUTH_ID, type: 'private' }, text: 'A', reply_to_message: { message_id: 77 } } };
+    adapter.deliver(reply);
+    await runner.pollOnce();
+    assert.deepEqual(seen, ['A'], 'the reply reached the decision filer');
+    assert.equal(store.list().length, 0, 'a decision reply is NOT captured as a note');
+    assert.equal(runner.offset, 11, 'offset advanced past the handled reply');
+
+    // A reply to a NON-card message → NOT correlated → falls through to ordinary capture intake.
+    const other = { update_id: 11, message: { message_id: 901, from: { id: AUTH_ID }, chat: { id: AUTH_ID, type: 'private' }, text: 'just a note', reply_to_message: { message_id: 5 } } };
+    adapter.deliver(other);
+    await runner.pollOnce();
+    assert.equal(store.list().length, 1, 'an uncorrelated reply falls through and IS captured');
+    await runner.shutdown();
+  } finally { fs.rmSync(brainDir, { recursive: true, force: true }); }
+});
+
 test('WP4 decision tap: a successful filing advances the offset', async () => {
   const brainDir = tmpBrain();
   try {

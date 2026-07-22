@@ -3,10 +3,14 @@
 //   node wp-d-proof/resume-followups.mjs --json
 //
 // A matched A/B/C answer (or an accepted learning candidate) creates a governed follow_on_task. This is
-// how Larry (or a named specialist) ACTUALLY SEES AND CONTINUES that work when awake: it lists open
-// tasks with their full provenance/correlation (which card, which candidate, which source), so the
-// in-session Larry model (no paid autonomous runtime) has a concrete, durable work queue to resume from.
-// Continuing a task = the command route's close_follow_on (or a status update) — a receipted action.
+// the durable, queryable work queue Larry reads IN-SESSION to see + continue that work. Continuing a
+// task = the command route's close_follow_on — a receipted action (NOT a direct table write).
+//
+// HONEST SCOPE (QA2 point 3): this is an IN-SESSION queryable surface, NOT an automatic push. It does
+// NOT notify Larry when he is not in a session — automatic resumption/notification-without-a-session
+// needs the headless runtime that is deliberately NOT authorised (D-cairn / [[fable-confirm-first]] style
+// gate). An automatic Telegram nudge for open tasks is a small opt-in addition (mirrors the youtube
+// "note pending" nudge) but is Warwick's call. The WP4 completion claim is narrowed accordingly.
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import pg from 'file:///C:/Fusion247PKA/services/control-plane/node_modules/pg/lib/index.js';

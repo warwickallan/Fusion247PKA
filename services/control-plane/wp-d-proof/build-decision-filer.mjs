@@ -16,8 +16,15 @@ export async function buildDecisionFiler({ authorizedUserId } = {}) {
   const client = new pg.Client({ host: cfg.host, port: cfg.port, database: cfg.database,
     user: cfg.pooler_user, password: cfg.password, ssl: { ca: fs.readFileSync(cfg.ssl_ca_file), rejectUnauthorized: true } });
   await client.connect();
+  // Async resolver for a TYPED reply: map the replied-to Telegram message back to its card via the
+  // durable sent-message map (migration 200). Button taps self-correlate and never hit this.
+  const resolveCardByMessage = async (chatId, messageId) => {
+    if (messageId == null) return null;
+    const r = await client.query(`select id from cockpit.decision_card where sent_chat_id=$1 and sent_message_id=$2 limit 1`, [String(chatId), Number(messageId)]);
+    return r.rows[0]?.id ?? null;
+  };
   return {
-    filer: (update) => fileInboundDecision(client, update, { authorizedUserId }),
+    filer: (update) => fileInboundDecision(client, update, { authorizedUserId, resolveCardByMessage }),
     close: () => client.end().catch(() => {}),
   };
 }
