@@ -10,6 +10,7 @@
 // session, not a headless API key). Idempotent: youtube_source.video_id is unique, so a re-scan or a
 // duplicate capture never re-processes.
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import pg from 'file:///C:/Fusion247PKA/services/control-plane/node_modules/pg/lib/index.js';
@@ -84,11 +85,34 @@ async function scanOnce() {
   return { processed, skipped, failed };
 }
 
+// Option C (Warwick): nudge ONCE per video that is extracted-but-note-pending, so nothing sits
+// silently. Idempotent via pending_nudged_at — a re-scan never re-nudges. Best-effort: a ding failure
+// never breaks the scan loop.
+async function nudgePending() {
+  let pend;
+  try {
+    pend = (await db.query(`select video_id, title from cockpit.youtube_source where note_path is null and pending_nudged_at is null order by created_at`)).rows;
+  } catch (e) { return; } // column may not exist yet if migration 170 not applied
+  if (!pend.length) return;
+  const lines = pend.map((p) => `• ${p.title || p.video_id}`).join('\n');
+  const msg = `📝 ${pend.length} YouTube link(s) extracted — knowledge note pending (I'll write it next session):\n${lines}`;
+  const tmp = path.join(os.tmpdir(), `yt-nudge-${pend.map((p) => p.video_id).join('-').slice(0, 40)}.txt`);
+  try {
+    fs.writeFileSync(tmp, msg);
+    const r = spawnSync(process.execPath, ['--env-file=C:/.fusion247/fusion-capture-gateway.env', 'C:/.fusion247/larry-ding.mjs', tmp], { encoding: 'utf8' });
+    if (r.status === 0) {
+      for (const p of pend) await db.query(`update cockpit.youtube_source set pending_nudged_at=now() where video_id=$1`, [p.video_id]);
+      console.log(`[watch]   nudged Warwick about ${pend.length} pending note(s)`);
+    }
+  } catch (e) { /* best-effort */ } finally { try { fs.unlinkSync(tmp); } catch {} }
+}
+
 async function main() {
   await db.connect();
   do {
     const r = await scanOnce();
     console.log(`[watch] pass: ${r.processed} newly extracted, ${r.skipped} already processed, ${r.failed} failed`);
+    await nudgePending();
     if (WATCH_SEC) await sleep(WATCH_SEC * 1000);
   } while (WATCH_SEC);
 }
