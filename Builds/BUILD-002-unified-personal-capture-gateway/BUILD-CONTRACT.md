@@ -1,7 +1,13 @@
 ---
 build_id: BUILD-002
 title: Unified Fusion Hub — Build Contract
-contract_version: v0.1-draft
+contract_version: v1.0-draft
+pack_version: v1.0-draft
+doc_role: contract
+approval_pack:
+  - BUILD-BRIEF.md
+  - BUILD-CONTRACT.md (this file)
+  - IMPLEMENTATION-PLAN.md
 lifecycle_state: draft_pending_warwick_approval
 owner_and_final_approver: Warwick
 implementation_owner: Larry
@@ -26,6 +32,12 @@ tags:
 ---
 
 # BUILD-002 — Unified Fusion Hub · Build Contract
+
+> **Three-document approval pack (v1.0-draft).** This contract is one of three co-approved documents:
+> [[BUILD-BRIEF]] (the approved human-readable narrative, executive summary first), this **BUILD-CONTRACT**
+> (scope, non-goals, the nine acceptance criteria), and [[IMPLEMENTATION-PLAN]] (Larry's concrete technical
+> delivery approach + workflow). **Warwick's approval binds the exact pack** — all three committed hashes
+> together. A material change to any member creates a new pack version requiring reapproval.
 
 > **Canonical readable contract.** GitHub Markdown (this file) is authoritative for the contract text.
 > Supabase (`cockpit.build_contract`) is the operational approved-version record and structured QA
@@ -132,4 +144,4 @@ Approved contract version + content hash; exact branch / PR / head SHA; Directus
 
 ## Contract version
 
-**v0.1-draft** — authored by Larry from Warwick's order + ClickUp/Foundry source material, 2026-07-22. Not approved; does not authorise substantial implementation. Supersedes nothing. Warwick's approval via Directus (bound to this version + the committed Git SHA + content hash) is required before substantial build begins.
+**v1.0-draft** (pack member) — authored by Larry from Warwick's order + ClickUp/Foundry source material, 2026-07-22; re-bound into the three-document approval pack per Warwick's 2026-07-22 decision. Not approved; does not authorise substantial implementation. Supersedes the interim single-document v0.1-draft. Warwick's approval via Directus binds the **exact three-document pack** (BUILD-BRIEF + BUILD-CONTRACT + IMPLEMENTATION-PLAN, each by committed Git SHA + content hash) before substantial build begins.
