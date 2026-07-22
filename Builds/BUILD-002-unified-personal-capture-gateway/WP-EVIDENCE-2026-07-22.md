@@ -3,7 +3,8 @@ build_id: BUILD-002
 title: Unified Fusion Hub — exact-head evidence packet (WP7)
 branch: build-002/unified-fusion-hub
 pr: 57
-head_sha: 1ccdac573b3d9234de12ef21bc021fc10f8bce58  # code-complete head; any later commits are docs/memory only — use the live branch head for review
+head_sha: cab68ec3733622e65b4f5f408335d75fdfc982dc  # code-complete head (post-Codex-fixes). Later commits are docs/memory only — use the live branch head for the final review.
+codex_review_head: 106110fb80b07f30887bad80e497a5a1d50dee73  # exact head Codex reviewed; its 6 blockers were fixed AFTER this in the code-complete head above (re-review at head_sha is the remaining step)
 pack_approved: v1.1-draft (commit 8e59cb4, pack hash 017a9db7, approved_by warwick)
 status: DRAFT — not merged; needs exact-head Codex READY_TO_MERGE + Warwick
 ---
@@ -56,8 +57,9 @@ One integration branch, **PR #57 (DRAFT, not merged)**. Everything below is comm
 
 ## Independent review (WP7)
 
-- **Codex:** run against the exact review head (`head_sha` above). Result recorded in `CODEX-REVIEW-<head>.md` alongside this packet.
-- **Fable:** selective executed-verification of the highest-risk seams (least-privilege guards, fail-closed command route) is the remaining pre-merge step, per the approved review policy.
+- **Codex — DONE** at `codex_review_head` (`106110f`). A read-only, separate-runtime fitness review found **6 genuine normal-use blockers** (email async not awaited; Shopper key collision across messages; `list_date` ignored; manufactured YouTube evidence hash; unfileable voice card; resume-queue UUID-cast that breaks the whole queue on a non-UUID correlation) + 3 fold-before-live + 1 cosmetic. **Every one was fixed** in the code-complete head (`head_sha`, `cab68ec`) and re-proven; Codex independently confirmed the core seams sound. Full triage: `CODEX-REVIEW-106110f.md` (+ `-raw.md`).
+- **Codex re-review** at `head_sha` (post-fix) is the remaining independent-review step and can run without special authorisation.
+- **Fable is NOT scheduled.** Per Warwick (2026-07-23) Fable must **never** be summoned without his explicit, in-the-moment yes — the review process isn't nailed down yet, and the Fable instruction was a policy/GPT artifact, not a confirmed step. Codex-only review stands as the independent check here.
 
 ## Resume-after-dependency map
 
