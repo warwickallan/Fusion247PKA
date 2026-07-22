@@ -14,14 +14,20 @@ export const OPTION_KEY_RE = /^[A-Za-z0-9]{1,3}$/;
 // non-empty labels. Throws on any violation so an ill-formed card fails closed rather than being sent.
 export function validateDecisionOptions(options) {
   if (!Array.isArray(options) || options.length < 1) throw new Error('decision options: at least one option required');
-  const seen = new Set();
+  const seenKeys = new Set();
+  const seenLabels = new Set();
   for (const o of options) {
     const key = o && o.key != null ? String(o.key) : '';
     const label = o && o.label != null ? String(o.label) : '';
     if (!OPTION_KEY_RE.test(key)) throw new Error(`decision option key "${key}" must match ${OPTION_KEY_RE} (1-3 alphanumerics)`);
     if (!label.trim()) throw new Error(`decision option "${key}" needs a non-empty label`);
-    if (seen.has(key)) throw new Error(`decision option key "${key}" is not unique`);
-    seen.add(key);
+    if (seenKeys.has(key)) throw new Error(`decision option key "${key}" is not unique`);
+    // Labels must also be unique (case-insensitively) — a typed reply matching a label must be
+    // unambiguous (QA2 call-A finding: two options could otherwise share a label).
+    const labelNorm = label.trim().toLowerCase();
+    if (seenLabels.has(labelNorm)) throw new Error(`decision option label "${label}" is not unique`);
+    seenKeys.add(key);
+    seenLabels.add(labelNorm);
   }
   return true;
 }

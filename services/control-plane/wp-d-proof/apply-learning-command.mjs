@@ -44,7 +44,15 @@ async function processOne(cmd) {
          on conflict (source_candidate_id, origin) where source_candidate_id is not null do nothing
          returning id`,
         [cand.id, cand.source_video_id, cand.correlation_id, String(cand.recommendation).slice(0, 120), detail, cand.proposed_target, cmd.requested_by]);
-      followOnId = fo.rows[0] ? fo.rows[0].id : (await cx.query(`select id from cockpit.follow_on_task where source_candidate_id=$1 and origin='learning_accept'`, [cand.id])).rows[0]?.id ?? null;
+      if (fo.rows[0]) { followOnId = fo.rows[0].id; }
+      else {
+        // A task already exists for this candidate. If a prior decline DROPPED it, a RE-ACCEPT must
+        // REOPEN it (QA2 call-A finding: else the candidate is accepted with no open task). A 'done'
+        // task (the work was already completed) is left as-is. Return whichever id applies.
+        const existing = (await cx.query(`select id, status from cockpit.follow_on_task where source_candidate_id=$1 and origin='learning_accept'`, [cand.id])).rows[0];
+        if (existing && existing.status === 'dropped') await cx.query(`update cockpit.follow_on_task set status='open', updated_at=now() where id=$1`, [existing.id]);
+        followOnId = existing?.id ?? null;
+      }
     } else if (prevStatus === 'accepted') {
       // QA2 finding B — CORRECTION SEMANTICS: moving AWAY from accepted (decline/defer) must not leave a
       // contradictory OPEN acceptance task in Larry's resume queue. Drop it in the SAME transaction and

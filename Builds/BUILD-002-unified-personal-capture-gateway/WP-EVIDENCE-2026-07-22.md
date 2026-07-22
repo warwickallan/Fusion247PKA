@@ -12,7 +12,7 @@ status: DRAFT — not merged; needs exact-head Codex READY_TO_MERGE + Warwick
 # BUILD-002 — evidence packet (continuation, 2026-07-22)
 
 One integration branch, **PR #57 (DRAFT, not merged)**. Everything below is committed + pushed at head
-`22c509c`. Nothing personal is on this public repo. No pack change, no API key, no autonomous paid runtime.
+The live branch head (QA2 in progress; see `head_sha` note above). Nothing personal is on this public repo. No pack change, no API key, no autonomous paid runtime.
 
 ## Per-WP status + evidence
 
@@ -20,14 +20,14 @@ One integration branch, **PR #57 (DRAFT, not merged)**. Everything below is comm
 | --- | --- | --- | --- | --- | --- |
 | **WP0** | Build-acceptance mechanism | (prior) approved v1.1 pack bound to `8e59cb4`/`017a9db7`, recorded via worker | contract 8/8 | **100%** | — |
 | **WP1** | Obsidian + one write authority | (prior) VaultWriter (write-once, path-confined); Obsidian Local REST API live | VaultWriter 5/5, API 8/8 | **~90%** | community-plugin toggle already done by Warwick; a live Obsidian-REST VaultWriter adapter is optional (FsVaultAdapter is the production writer) |
-| **WP2** | YouTube route on the durable spine | routing writer in the worker's governed-write slot (extract→RAW→youtube_source), truthful completed card, feature-flag + live deps; auto-detect watcher live | route 6/6, gateway 285/0, watcher proven live | **~90%** | LIVE cut-over = set `HUB_YOUTUBE_ROUTE=1` + restart gateway + stop the standalone poller (with-Warwick); in-session note authoring is inherent (D-cairn) |
-| **WP3** | Learning Accept/Decline loop | ACCEPT creates governed, correlated follow-on work (follow_on_task), not a silent edit; decline/defer create none | learning 10/10 | **~90%** | Warwick's real Accept/Decline taps in Directus; Larry then DOING the accepted follow-on work |
-| **WP4** | Bidirectional decision control | inbound A/B/C parse+correlate+continue; **real Telegram inbound mapper** (callback/reply → decision_response); **resumption consumer** (open-follow_on queue Larry resumes from); safe Directus command route (allowlisted, fail-closed); outbound dry-run card | inbound 10/10, command 9/9, card 13/13, parseChoice 5/5, **inbound-mapper 4/4, full-loop 11/11** | **~95%** | only the real Telegram phone send (`dry_run=false` + `--allow-send`) and wiring the mapper into liveRunner (needs restart) are with-Warwick |
+| **WP2** | YouTube route on the durable spine | routing writer in the worker's governed-write slot (extract→RAW→youtube_source), truthful completed card, feature-flag + live deps; auto-detect watcher live | route 6/6, gateway 288/0, watcher proven live | **~90%** | LIVE cut-over = set `HUB_YOUTUBE_ROUTE=1` + restart gateway + stop the standalone poller (with-Warwick); in-session note authoring is inherent (D-cairn) |
+| **WP3** | Learning Accept/Decline loop | ACCEPT creates governed, correlated follow-on work (follow_on_task), not a silent edit; decline/defer  create none; correction semantics | learning 15/15 | **~90%** | Warwick's real Accept/Decline taps in Directus; Larry then DOING the accepted follow-on work |
+| **WP4** | Bidirectional decision control | inbound A/B/C parse+correlate+continue; **real Telegram inbound mapper** (callback/reply → decision_response); **resumption consumer** (open-follow_on queue Larry resumes from); safe Directus command route (allowlisted, fail-closed); outbound dry-run card | inbound 10/10, command 9/9, card 13/13, parseChoice 5/5, **inbound-mapper 4/4, full-loop 11/11** | **~95%** | liveRunner IS wired (callback + typed-reply, default-off via HUB_DECISION_INBOUND); activating (restart) + a real phone send are with-Warwick |
 | **WP5** | Shopper / AsdAIr route | typed/photo/voice front door (reuses AsdAIr normaliser) → add-only list intents; **add_list_item handler + allowlist + persistence BUILT** | shopper 6/6, **add_list_item 15/15 (throwaway asdair schema)** | **~90%** | only the final REAL household write (worker → live asdair DB) is Warwick-gated; the logic is complete + synthetic-proven |
 | **WP6** | Fixture-first email + voice | **email→durable store** (not just a mapper); **real LOCAL voice transcription** (Windows SAPI, no credential) proving audio→transcript→routed durable work | email 6/6 + **email→store 4/4**, voice 4/4 + **real-audio 2/2** | **~90%** | a higher-accuracy transcriber (whisper) + a live mailbox credential are OPTIONAL — the local route is complete |
-| **WP7** | Assurance | duplicate-delivery + restart/recovery harness; full-chain migration reproducibility+rollback; independent Codex review; evidence packet; scope reconciliation | assurance 4/4, full-chain 16/16, **AsdAIr suite 141/141**, Codex review (see below) | **~90%** | Fable selective-verification + merge are the pre-merge gate |
+| **WP7** | Assurance | duplicate-delivery + restart/recovery harness; full-chain migration reproducibility+rollback; independent Codex review; evidence packet; scope reconciliation | assurance 4/4, full-chain 16/16, **AsdAIr suite 141/141**, Codex review (see below) | **~90%** | full-PR Codex QA2 + merge are the pre-merge gate |
 
-**Overall BUILD-002 completion: ~90%.** The remaining ~10% is **Warwick-gated live actions + the final Fable pass + merge** — not un-built logic. Every non-blocked arm is built and proven; the WP4 inbound + resumption, WP5 write handler, and WP6 real-audio paths that the second directive flagged are now implemented and tested.
+**Overall BUILD-002 completion: ~90%.** The remaining ~10% is **Warwick-gated live actions + merge** — not un-built logic. Every non-blocked arm is built and proven; the WP4 inbound + resumption, WP5 write handler, and WP6 real-audio paths that the second directive flagged are now implemented and tested.
 
 ## Scope / non-goal reconciliation (BUILD-CONTRACT)
 
@@ -37,23 +37,23 @@ One integration branch, **PR #57 (DRAFT, not merged)**. Everything below is comm
 
 ## Live migrations (all applied + idempotent + schema-cascade reversible)
 
-`db/mypka/` 060–120 (prior) + **130 decision_card**, **140 follow_on_task**, **150 decision_response**, **160 command_request** (this continuation). Each applied AND re-applied cleanly (idempotent); all live in the `cockpit` schema, reversed by `teardown.sql`'s `drop schema cockpit cascade`. New Directus collections registered (decision_card, follow_on_task, decision_response, command_request) — **surface on the next Directus restart** (not restarted overnight; intermittent-boot risk to the live cockpit).
+`db/mypka/` migrations 010-200 (BUILD-002 adds 130 decision_card, 140 follow_on_task, 150 decision_response, 160 command_request, 170 youtube nudge, 180 follow-on integrity + boundary, 190 send marker, 200 message map). Each applied AND re-applied cleanly (idempotent); all live in the `cockpit` schema, reversed by `teardown.sql`'s `drop schema cockpit cascade`. New Directus collections surface on the next Directus restart (Warwick-gated). Full-chain 010-200 apply/reapply/teardown proven 16/16 (CI + local).
 
 ## Test + proof inventory (at review head — see `head_sha`)
 
-- **Hub suite** (`services/hub`, `node --test`): **56/56** — youtube classify/ingest, vault, decision renderCard + parseChoice + telegram-inbound, router route + assurance, shopper, email + email→store, voice + real-audio SAPI.
-- **Gateway suite** (`services/fusion-capture-gateway`): **285 pass / 0 fail / 32 skipped** (spine edits safe).
+- **Hub suite** (`services/hub`, `node --test`): **62/62** — youtube classify/ingest, vault, decision renderCard + parseChoice + telegram-inbound, router route + assurance, shopper, email + email→store, voice + real-audio SAPI.
+- **Gateway suite** (`services/fusion-capture-gateway`): **288 pass / 0 fail / 32 skipped** (spine + offset-hold + typed-reply).
 - **AsdAIr skill suite** (`services/asdair/skill`, after `npm ci`): **141 pass / 2 skipped** (DB-gated) — see finding 2.
-- **Live seam proofs** (synthetic, self-cleaning): contract 8/8, learning 10/10, decision-card 13/13, decision-response 10/10, command-request 9/9, **full-loop 11/11**.
-- **DB handler proofs** (throwaway cluster): full-chain migration 010–170 **16/16**; **add_list_item 15/15** (real asdair schema).
+- **Live seam proofs** (synthetic, self-cleaning): contract 8/8, learning 15/15, decision-card 13/13, decision-response 13/13, command-request 9/9, full-loop 11/11, crash-reclaim 6/6, decision-concurrency 3/3.
+- **DB handler proofs** (throwaway cluster): full-chain migration 010-200 **16/16**; **add_list_item 19/19** (real asdair schema).
 
 ## Known limitations / findings (honest)
 
 1. **Live cut-overs are Warwick-gated** (by design + safety): Directus restart to surface new collections; `HUB_YOUTUBE_ROUTE=1` + restart + stop poller; real Telegram send; live AsdAIr household write; wiring the inbound mapper + spine flag into liveRunner (needs a gateway restart); a higher-accuracy voice engine + a live mailbox credential (both optional).
 2. ~~Pre-existing AsdAIr suite failures.~~ **RESOLVED (AC7 green):** the 6 failures were entirely a **missing local `npm install`** in `services/asdair/skill` (its declared `pg` dep was absent, so `schemaCompat` couldn't load pg and `dbSafeTarget` couldn't load `pg-connection-string`). After install the suite is **141/141 (2 DB-gated skips)**; no `services/asdair` file was ever modified, and CI runs `npm ci` so it was always green there. Not drift, not a regression — a local setup artifact.
-3. ~~Migration reproducibility harness covers only 010–050.~~ **RESOLVED:** full-chain 010–170 apply + idempotent re-apply + teardown reversal, **16/16 on a clean cluster**.
+3. ~~Migration reproducibility harness covers only 010–050.~~ **RESOLVED:** full-chain 010-200 apply + idempotent re-apply + teardown reversal, **16/16 on a clean cluster**.
 4. **Restart/recovery proof is a FIXTURE SIMULATION, not a live OS proof.** `assurance.test.mjs` proves the *logic* of resume-after-failure (dedup, no double durable work, no false completion) on the in-memory spine. It does **NOT** prove that the live gateway/watcher survive a real Windows process kill or a machine reboot — that needs the reboot-recovery scheduled task (elevation = Warwick) and a genuine restart. That live process/reboot proof remains **Warwick-gated** and is not claimed here.
-5. **Codex independent review:** run at the exact review head — see the "Independent review" section below. Fable selective-verification is the remaining pre-merge step.
+5. **Codex independent review:** run at the exact review head — see the QA2 section + CODEX-FINDING-LEDGER.md. Codex-only; no Fable.
 
 ## Independent review (WP7) — Codex, 6 rounds → READY_TO_MERGE
 
@@ -98,4 +98,4 @@ A Warwick+GPT adversarial pass found that my round-1 triage narrative had DROPPE
 - Warwick approves a real card send → flip `dry_run=false` + run the worker with `--allow-send`; wire the inbound mapper into liveRunner.handleCallback.
 - Warwick approves the AsdAIr write → point `asdair-worker` at the live asdair DB (the `add_list_item` handler + allowlist are already built + synthetic-proven).
 - Warwick registers the reboot-recovery scheduled task (elevation) → the live process/reboot proof (finding 4) can be run.
-- Warwick + Codex/Fable exact-head review → merge with the head-SHA guard.
+- Warwick + Codex exact-head review → merge with the head-SHA guard.

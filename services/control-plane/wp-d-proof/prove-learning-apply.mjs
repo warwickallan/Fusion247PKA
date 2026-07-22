@@ -67,6 +67,13 @@ async function main() {
   const dcmd = (await admin.query(`select receipt from cockpit.learning_command where idempotency_key=$1`, [`${KEY}-e2`])).rows[0];
   ok(dcmd.receipt?.prev_status === 'accepted' && dcmd.receipt?.new_status === 'declined' && dcmd.receipt?.dropped_follow_on_task_id, 'receipt records prev=accepted, new=declined, and the dropped task id');
 
+  console.log('5b) RE-ACCEPT after decline REOPENS the dropped task (full reversal, no orphaned state):');
+  await cockpit.query(`insert into cockpit.learning_command (requested_by, command, candidate_id, idempotency_key) values ('cockpit:warwick','accept',$1,$2)`, [cand3, `${KEY}-e3`]);
+  runWorker();
+  const t3b = (await admin.query(`select status from cockpit.follow_on_task where source_candidate_id=$1`, [cand3])).rows;
+  ok(t3b.length === 1 && t3b[0].status === 'open', 're-accept -> the SAME task is REOPENED to open (candidate accepted + an open task exists again)');
+  ok((await admin.query(`select status from cockpit.learning_candidate where id=$1`, [cand3])).rows[0].status === 'accepted', 'candidate is accepted again');
+
   console.log(`\nRESULT: ${fail === 0 ? 'PASS ✓' : 'FAIL ✗'} — ${pass} passed, ${fail} failed`);
 }
 async function cleanup() {
