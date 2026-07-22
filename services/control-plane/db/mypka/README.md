@@ -22,6 +22,7 @@ for the cockpit layer** — captured faithfully from the live catalog, not from 
 | `090_build_contract_doc.sql` | `cockpit.build_contract_doc` — readable Markdown BODY + Git identity per pack member (Brief/Contract/Plan); append-only; cp_directus SELECT | teardown |
 | `100_build_contract_doc_url_fix.sql` | refines the doc append-only guard to permit a `github_url`-only correction (commit-pinned URLs); identity/body/hashes stay frozen | teardown |
 | `110_youtube_source.sql` | WP2: `cockpit.youtube_source` (readable knowledge-brief page + RAW/note links) + `cockpit.learning_candidate` (suggested learnings); cp_directus SELECT | teardown |
+| `120_learning_command.sql` | WP3: `cockpit.learning_command` — learning Accept/Decline INTENT queue + guards + least-privilege grants (cp_directus request-only; cp_worker applies candidate status) | teardown |
 | `seed/build-002-contract-draft.sql` | seeds the interim single-doc v0.1-draft row (now superseded) | — |
 | `seed/build-002-contract-pack-v1.sql` | the v1.0-draft pack seed (now superseded by v1.1) | — |
 | `teardown.sql` | **rollback path** — reverses 010–090 (the `cockpit`-schema cascade drops the 060/080/090 objects + guards; `drop owned by cp_*` clears the 070 grants); leaves the asdair data tables untouched | — |

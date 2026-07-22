@@ -12,7 +12,9 @@ const collections = [
   ['youtube_source', 'smart_display', '{{title}} — {{review_state}}', null,
     'Processed YouTube sources (BUILD-002): the standalone knowledge brief (readable Markdown), review state, and links to the immutable RAW transcript + git-tracked vault note.'],
   ['learning_candidate', 'lightbulb', '{{candidate_ref}} — {{recommendation}} ({{status}})', 'sort',
-    'Suggested learnings from processed sources — recommendation + why + evidence + confidence/risk. Readable; Accept/Decline (durable governed decision) is the WP3 seam.'],
+    'Suggested learnings from processed sources — recommendation + why + evidence + confidence/risk. Readable; Accept/Decline via learning_command.'],
+  ['learning_command', 'how_to_reg', '{{command}} {{candidate_id}} ({{status}})', null,
+    'Learning Accept/Decline seam: create an INTENT (command = accept | decline | defer; candidate_id from learning_candidate). A trusted worker applies it + writes a receipt. Accept records a durable decision; it does not rewrite governed material.'],
 ];
 try {
   for (const [name, icon, tmpl, sortField, note] of collections) {
