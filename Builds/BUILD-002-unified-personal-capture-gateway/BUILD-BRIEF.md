@@ -1,7 +1,7 @@
 ---
 build_id: BUILD-002
 title: Unified Fusion Hub — Human-Readable Build Brief
-pack_version: v1.0-draft
+pack_version: v1.1-draft
 doc_role: brief
 lifecycle_state: draft_pending_warwick_approval
 owner: Warwick
@@ -15,7 +15,7 @@ approval_pack:
   - BUILD-CONTRACT.md
   - IMPLEMENTATION-PLAN.md
 provenance:
-  source: ClickUp BUILD-002 Doc page "05 — WP2 Human-Readable Build Brief" (preserved verbatim below)
+  source: "Warwick-supplied ClickUp DRAFT/SOURCE page 05 — WP2 Human-Readable Build Brief (preserved verbatim below; NOT yet Warwick-approved)"
   clickup_doc: 2kxuxw3a-852
   clickup_page: 2kxuxw3a-5992
   clickup_url: https://app.clickup.com/90121891946/docs/2kxuxw3a-852/2kxuxw3a-5992
@@ -26,8 +26,8 @@ tags:
   - build-brief
 ---
 
-> **Preserved from the approved ClickUp human-readable page (05).** This Brief is the canonical
-> readable narrative of BUILD-002. The [[BUILD-CONTRACT]] carries the acceptance criteria and
+> **Preserved from the Warwick-supplied ClickUp draft/source page (05)** — not yet Warwick-approved.
+> This Brief is the canonical readable narrative of BUILD-002. The [[BUILD-CONTRACT]] carries the acceptance criteria and
 > boundaries; the [[IMPLEMENTATION-PLAN]] carries Larry's concrete technical delivery approach.
 > Approval binds the exact three-document pack (see each file's committed hash).
 

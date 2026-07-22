@@ -1,7 +1,7 @@
 ---
 build_id: BUILD-002
 title: Unified Fusion Hub — Implementation Plan
-pack_version: v1.0-draft
+pack_version: v1.1-draft
 doc_role: plan
 lifecycle_state: draft_pending_warwick_approval
 author: Larry
@@ -143,6 +143,25 @@ The rule: **no human stall is ever allowed to idle the critical path** — every
 
 Serialise **only** the two governance gates (approval, merge) and the genuine tech dependencies (schema-before-worker, writer-before-note-write, build-before-review, live-migration/Directus-restart single-threading). Parallelise everything else through worktree-isolated subagents. Sequence human-gated slices late or fixture-first so a human stall never blocks the critical path, and keep a standing non-blocked backlog behind a different dependency for every anticipated gate. Deliver thin vertical slices with a visible proof each session, batch human decisions, and let independent review gate each slice before merge.
 
+## 5b. Cairn / LLM execution bridge — how the semantic step actually runs
+
+The order (§10, §13–§14) and GPT's review rightly demand the concrete answer to: *when there is no interactive Larry/Claude session open, what process actually runs Cairn's semantic categorisation and the generative knowledge-note reconstruction?* Honest answer, split by what needs an LLM:
+
+- **Deterministic, no LLM:** URL parse, TubeAIR caption extraction, RAW preservation, the Karpathy packet, the knowledge-note *template scaffold*, idempotency/dedup, and Cairn's *rule-based* filing constraints all run headless in the Node workers with no model call.
+- **Generative, needs an LLM:** the standalone knowledge-note reconstruction, the semantic "create-vs-enrich-vs-clarify" decision, and justified-backlink selection require a Claude call.
+
+**The bridge (concrete):**
+- **Which persistent process claims the job:** a dedicated **`cairn-worker`** (Node, on the Yoga) claims a `semantic_note` specialist job from the fcg queue by lease — the *same* claim/lease/idempotency seam as every other worker. It is **not** the interactive Claude Code session and does not depend on one being open.
+- **How Cairn's instructions are invoked:** the worker invokes Claude **programmatically** with Cairn's canonical contract (`Team/Cairn - Knowledge Intake Specialist/AGENTS.md` + the F247 knowledge-note template + classification/backlink rules) as the system prompt. Two viable runtimes, in preference order:
+  1. **Claude Agent SDK** (`@anthropic-ai/claude-agent-sdk`) — Claude Code packaged as a library, running headless on the Yoga with built-in filesystem tools (Read/Write/Edit/Glob/Grep) + MCP. Best fit because the job *is* read-the-vault → write-a-governed-note. Model default `claude-opus-4-8`.
+  2. **Anthropic Messages API** (manual loop / tool-runner) — for a thinner integration where the worker owns the file writes and Claude only produces the note content.
+  (Anthropic **Managed Agents** — Anthropic-hosted loop + sandbox — is a third option but heavier than this first-party hobby build needs.)
+- **Does it work without an open interactive Claude session:** **yes** — it is a programmatic API call authenticated by an **Anthropic API key** read from the Yoga secret store (never Git/logs/Supabase). No human, no open terminal, no interactive session required.
+- **Correlation / retries / evidence / terminal failure — all via fcg:** the `semantic_note` job carries the correlation ID; the worker runs under the existing lease + bounded-retry + `dead_letter` machinery; on success it writes `evidence_pointer` rows (note path, git sha, packet path) and only then marks `completed`; on exhaustion it dead-letters with an honest reason projected to the Telegram card. The generative step is idempotent on `(video_id)` so a retry never double-writes a note.
+- **What queues safely when the execution runtime is unavailable** (no API key, no budget, network down, or a `529 overloaded` / rate-limit): the job **stays queued** in `processing_state` (degraded, reported honestly — "knowledge processing waiting on the AI runtime"), the RAW transcript is already preserved immutably, and nothing is lost. This mirrors the Obsidian-outage rule (WP1): the specialist runtime being unavailable degrades, never drops.
+
+**Genuine Warwick decisions this raises** (see §6 D-cairn): providing an Anthropic **API key** for the Yoga `cairn-worker` and accepting **per-run API cost** is a credential + paid dependency — Warwick's call. Until then, WP2 can run the semantic step **in-session** (Larry/Claude processes a queued `semantic_note` job when a session is open) as an honest, lower-throughput fallback that proves the whole pipeline without the standing paid dependency.
+
 ## 6. Risks & genuine Warwick decisions
 
 - **R1 — Obsidian API reliability on the Yoga** (Directus already boots intermittently here). Mitigation: `VaultWriter` fs adapter + queue-not-lose + the supervisor/startup pattern already proven for Directus. *No decision needed.*
@@ -150,6 +169,8 @@ Serialise **only** the two governance gates (approval, merge) and the genuine te
 - **D-1 (Warwick):** live mailbox choice + credential for the *live* email route (fixture route needs nothing). **Deferred, optional.**
 - **D-2 (Warwick):** whether phone (Tailscale) access is wanted for this build's reviews, or desktop is enough for now.
 - **D-3 (Warwick):** review intensity per slice (usage vs assurance) — default: match to stakes.
+- **D-cairn-1 (Warwick — credential + paid):** provide an Anthropic **API key** for the Yoga `cairn-worker` and accept **per-run API cost** so the semantic note-generation step runs **headless/autonomously**? If not now, WP2 uses the **in-session fallback** (Larry processes queued semantic jobs when a session is open) — the pipeline still works end-to-end, just human-paced. Recommend: prove WP2 with the in-session fallback first, then wire the headless key once the flow is trusted.
+- **D-cairn-2 (Larry's recommendation, Warwick may override):** headless runtime = **Claude Agent SDK** (best fit for vault read/write) over the raw Messages API or Managed Agents. Recorded as a Larry method decision, not a blocker.
 
 ## 7. Deliberate exclusions (this delivery)
 
