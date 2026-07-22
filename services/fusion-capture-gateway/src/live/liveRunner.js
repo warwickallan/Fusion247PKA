@@ -72,6 +72,11 @@ export async function createLiveRunner(config, opts = {}) {
     console.error(JSON.stringify(line));
   });
   const pollTimeoutSec = opts.pollTimeoutSec ?? POLL_WAIT_SECONDS;
+  // WP4 inbound decision wiring (opt-in, Warwick-gated activation): a function (update)->Promise that
+  // files a decision_response from a `decision:<card_id>:<key>` button tap. Default null → decision
+  // callbacks fall through to the existing "unknown action" ack (current safe behaviour). When present
+  // (main() builds it from the cockpit DSN under HUB_DECISION_INBOUND=1), a tap is durably recorded.
+  const decisionFiler = opts.decisionFiler ?? null;
 
   const runtime = await createLiveRuntime(config, { ...opts, clock });
   const { store, adapter, intake, worker } = runtime;
@@ -149,6 +154,18 @@ export async function createLiveRunner(config, opts = {}) {
       return { kind: 'callback', ok: false, reason: mapped.reason };
     }
     const { callbackId, chatId, messageId, action } = mapped.value;
+
+    // WP4: a decision-card button tap (`decision:<card_id>:<key>`). mapped.ok above already enforced the
+    // single-user allowlist (default-deny), so this only runs for the authorised user. The tap is filed
+    // as a durable, correlated decision_response (idempotent) BEFORE the offset advances; the ack is a
+    // best-effort projection. Non-decision callbacks (SaveToBrain etc.) fall through unchanged.
+    if (typeof action === 'string' && action.startsWith('decision:') && decisionFiler) {
+      let filed = null;
+      try { filed = await decisionFiler(update); } catch (err) { diag('decision_file_failed', { error: safeErr(err) }); }
+      try { await adapter.answerCallbackQuery(callbackId, filed && filed.filed ? 'Decision recorded.' : 'Already recorded.', {}); } catch (err) { diag('answer_callback_failed', { error: safeErr(err) }); }
+      return { kind: 'callback', ok: Boolean(filed), action: 'decision', filed: filed ? filed.filed : false };
+    }
+
     let captureId;
     if (typeof store.findCaptureIdByCard === 'function') {
       captureId = await store.findCaptureIdByCard(chatId, messageId);
@@ -407,7 +424,24 @@ export async function main() {
     return;
   }
 
-  const runner = await createLiveRunner(config);
+  // WP4 inbound (opt-in): build the decision filer from the cockpit DSN so a `decision:*` button tap is
+  // durably recorded. Dynamic + guarded — a wiring failure logs and the gateway still runs (capture path
+  // unaffected). Default OFF: without HUB_DECISION_INBOUND=1 the gateway behaves exactly as before.
+  let decisionFiler = null;
+  let closeFiler = null;
+  if (process.env.HUB_DECISION_INBOUND === '1') {
+    try {
+      const mod = await import('../../../control-plane/wp-d-proof/build-decision-filer.mjs');
+      const built = await mod.buildDecisionFiler({ authorizedUserId: config.authorisedTelegramUserId });
+      decisionFiler = built.filer;
+      closeFiler = built.close;
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error(JSON.stringify({ service: 'fusion-capture-gateway', component: 'live-runner', event: 'decision_inbound_wiring_failed', error: buildSecretRedactor(config)(err && err.message ? err.message : String(err)) }));
+    }
+  }
+
+  const runner = await createLiveRunner(config, { decisionFiler });
   runner.start();
 
   const ac = new AbortController();
@@ -418,6 +452,7 @@ export async function main() {
   try {
     await runner.loop({ signal: ac.signal });
   } finally {
+    if (closeFiler) await closeFiler();
     await runner.shutdown();
   }
 }

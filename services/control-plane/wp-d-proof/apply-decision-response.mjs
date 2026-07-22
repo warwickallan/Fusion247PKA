@@ -32,7 +32,7 @@ async function processOne(resp) {
       await cx.query(`update cockpit.decision_response set status='done', completed_at=now(), receipt=$2::jsonb where id=$1`, [resp.id, JSON.stringify(receipt)]);
       await cx.query('commit');
       console.log(`[resp] ${resp.id} no-match (${choice.reason}) -> done (re-answerable)`);
-      return { id: resp.id, matched: false };
+      return { id: resp.id, ok: true, matched: false };
     }
 
     // A decision_card is DECIDED ONCE. The first matched answer creates the ONE governed follow_on_task.
@@ -61,7 +61,7 @@ async function processOne(resp) {
       [resp.id, choice.key, choice.label, JSON.stringify(receipt)]);
     await cx.query('commit');
     console.log(`[resp] ${resp.id} matched ${choice.key} (${choice.label}) -> done + follow_on ${receipt.follow_on_task_id}${receipt.applied === false ? ' (already decided; not re-applied)' : ''}`);
-    return { id: resp.id, matched: true };
+    return { id: resp.id, ok: true, matched: true };
   } catch (e) {
     await cx.query('rollback');
     await cx.query(`update cockpit.decision_response set status='failed', completed_at=now(), receipt=$2::jsonb where id=$1 and status='claimed'`,

@@ -13,6 +13,13 @@ import { mapInboundDecision } from '../../hub/decision/telegramInbound.mjs';
 // opts.keyPrefix: optional prefix for the idempotency key (tests scope their own). opts.resolveCardByMessage:
 // reverse lookup for typed replies. Returns { filed, card_id, responder, raw_text, idempotency_key } | { filed:false, reason }.
 export async function fileInboundDecision(cockpitClient, update, opts = {}) {
+  // DEFAULT-DENY sender boundary (Codex round-4 hazard): if an authorizedUserId is supplied, the reply
+  // MUST come from that user — otherwise fail closed. The live gateway passes its authorised Telegram
+  // user id here, reusing the same boundary the capture path enforces; an anonymous/foreign tap files nothing.
+  if (opts.authorizedUserId !== undefined && opts.authorizedUserId !== null) {
+    const fromId = update?.callback_query?.from?.id ?? update?.message?.from?.id;
+    if (String(fromId) !== String(opts.authorizedUserId)) return { filed: false, reason: 'unauthorized_sender' };
+  }
   const mapped = mapInboundDecision(update, { resolveCardByMessage: opts.resolveCardByMessage });
   if (!mapped.ok) return { filed: false, reason: mapped.reason };
 
