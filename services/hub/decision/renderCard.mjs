@@ -21,12 +21,15 @@ export function validateDecisionOptions(options) {
     const label = o && o.label != null ? String(o.label) : '';
     if (!OPTION_KEY_RE.test(key)) throw new Error(`decision option key "${key}" must match ${OPTION_KEY_RE} (1-3 alphanumerics)`);
     if (!label.trim()) throw new Error(`decision option "${key}" needs a non-empty label`);
-    if (seenKeys.has(key)) throw new Error(`decision option key "${key}" is not unique`);
+    // Keys are matched CASE-INSENSITIVELY by parseChoice, so uniqueness must be case-insensitive too
+    // (else "A" and "a" would both match a reply and be ambiguous).
+    const keyNorm = key.toLowerCase();
+    if (seenKeys.has(keyNorm)) throw new Error(`decision option key "${key}" is not unique (case-insensitive)`);
     // Labels must also be unique (case-insensitively) — a typed reply matching a label must be
     // unambiguous (QA2 call-A finding: two options could otherwise share a label).
     const labelNorm = label.trim().toLowerCase();
     if (seenLabels.has(labelNorm)) throw new Error(`decision option label "${label}" is not unique`);
-    seenKeys.add(key);
+    seenKeys.add(keyNorm);
     seenLabels.add(labelNorm);
   }
   return true;

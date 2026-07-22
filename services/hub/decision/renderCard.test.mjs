@@ -47,6 +47,8 @@ test('QA2-D: option keys are structurally constrained; bad shapes fail closed', 
   assert.throws(() => renderCard({ subject: 's', options: [{ key: 'A B', label: 'x' }] }), /must match/); // space
   assert.throws(() => validateDecisionOptions([{ key: 'A', label: '  ' }]), /non-empty label/);
   assert.throws(() => validateDecisionOptions([{ key: 'A', label: 'x' }, { key: 'A', label: 'y' }]), /key "A" is not unique/);
+  // keys are unique CASE-INSENSITIVELY (parseChoice lowercases) — 'A' and 'a' would be ambiguous.
+  assert.throws(() => validateDecisionOptions([{ key: 'A', label: 'x' }, { key: 'a', label: 'y' }]), /key .* is not unique/);
   // labels must ALSO be unique (case-insensitively) — else a typed label reply is ambiguous.
   assert.throws(() => validateDecisionOptions([{ key: 'A', label: 'Accept' }, { key: 'B', label: 'accept' }]), /label .* is not unique/);
   assert.throws(() => validateDecisionOptions([]), /at least one option/);

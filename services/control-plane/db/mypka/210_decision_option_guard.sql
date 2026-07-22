@@ -18,9 +18,9 @@ begin
     k := o->>'key'; l := o->>'label';
     if k is null or k !~ '^[A-Za-z0-9]{1,3}$' then raise exception 'decision option key "%" must be 1-3 alphanumerics', coalesce(k,'<null>') using errcode='23514'; end if;
     if l is null or btrim(l) = '' then raise exception 'decision option "%" needs a non-empty label', k using errcode='23514'; end if;
-    if k = any(keys) then raise exception 'decision option key "%" is not unique', k using errcode='23514'; end if;
+    if lower(k) = any(keys) then raise exception 'decision option key "%" is not unique (case-insensitive)', k using errcode='23514'; end if;
     if lower(btrim(l)) = any(labels) then raise exception 'decision option label "%" is not unique', l using errcode='23514'; end if;
-    keys := keys || k; labels := labels || lower(btrim(l));
+    keys := keys || lower(k); labels := labels || lower(btrim(l));
   end loop;
 end $$;
 

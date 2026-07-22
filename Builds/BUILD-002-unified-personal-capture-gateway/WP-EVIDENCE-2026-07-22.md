@@ -3,7 +3,7 @@ build_id: BUILD-002
 title: Unified Fusion Hub — exact-head evidence packet (WP7)
 branch: build-002/unified-fusion-hub
 pr: 57
-head_sha: (QA2 in progress — see the live branch head; the pre-review evidence commit is prepared BEFORE the final QA2 so the reviewed SHA == PR head)
+head_sha: the current PR branch head (git rev-parse origin/build-002/unified-fusion-hub). The exact reviewed SHA is NOT duplicated here (it would go stale on the next commit) — the final QA2 verdict + its exact head are recorded in the PR #57 conversation. Migrations: 010-210.
 codex_verdict_round6: READY_TO_MERGE (bound to 661b7a4) — SUPERSEDED. A Warwick+GPT adversarial pass then found my round-1 TRIAGE had dropped 4 raw findings (A/B/C/D) that rounds 2-6 never re-checked (curated diffs). Those + crash-safety + typed-reply + boundary + CI are now fixed — see CODEX-FINDING-LEDGER.md. A fresh FULL-PR Codex QA2 at the exact head is the gate.
 pack_approved: v1.1-draft (commit 8e59cb4, pack hash 017a9db7, approved_by warwick)
 status: DRAFT — not merged; needs exact-head Codex READY_TO_MERGE + Warwick
@@ -37,7 +37,7 @@ The live branch head (QA2 in progress; see `head_sha` note above). Nothing perso
 
 ## Live migrations (all applied + idempotent + schema-cascade reversible)
 
-`db/mypka/` migrations 010-200 (BUILD-002 adds 130 decision_card, 140 follow_on_task, 150 decision_response, 160 command_request, 170 youtube nudge, 180 follow-on integrity + boundary, 190 send marker, 200 message map). Each applied AND re-applied cleanly (idempotent); all live in the `cockpit` schema, reversed by `teardown.sql`'s `drop schema cockpit cascade`. New Directus collections surface on the next Directus restart (Warwick-gated). Full-chain 010-200 apply/reapply/teardown proven 16/16 (CI + local).
+`db/mypka/` migrations 010-210 (BUILD-002 adds 130 decision_card, 140 follow_on_task, 150 decision_response, 160 command_request, 170 youtube nudge, 180 follow-on integrity + boundary, 190 send marker, 200 message map). Each applied AND re-applied cleanly (idempotent); all live in the `cockpit` schema, reversed by `teardown.sql`'s `drop schema cockpit cascade`. New Directus collections surface on the next Directus restart (Warwick-gated). Full-chain 010-210 apply/reapply/teardown proven 16/16 (CI + local).
 
 ## Test + proof inventory (at review head — see `head_sha`)
 
@@ -45,13 +45,13 @@ The live branch head (QA2 in progress; see `head_sha` note above). Nothing perso
 - **Gateway suite** (`services/fusion-capture-gateway`): **288 pass / 0 fail / 32 skipped** (spine + offset-hold + typed-reply).
 - **AsdAIr skill suite** (`services/asdair/skill`, after `npm ci`): **141 pass / 2 skipped** (DB-gated) — see finding 2.
 - **Live seam proofs** (synthetic, self-cleaning): contract 8/8, learning 15/15, decision-card 13/13, decision-response 13/13, command-request 9/9, full-loop 11/11, crash-reclaim 6/6, decision-concurrency 3/3.
-- **DB handler proofs** (throwaway cluster): full-chain migration 010-200 **16/16**; **add_list_item 19/19** (real asdair schema).
+- **DB handler proofs** (throwaway cluster): full-chain migration 010-210 **16/16**; **add_list_item 19/19** (real asdair schema).
 
 ## Known limitations / findings (honest)
 
 1. **Live cut-overs are Warwick-gated** (by design + safety): Directus restart to surface new collections; `HUB_YOUTUBE_ROUTE=1` + restart + stop poller; real Telegram send; live AsdAIr household write; wiring the inbound mapper + spine flag into liveRunner (needs a gateway restart); a higher-accuracy voice engine + a live mailbox credential (both optional).
 2. ~~Pre-existing AsdAIr suite failures.~~ **RESOLVED (AC7 green):** the 6 failures were entirely a **missing local `npm install`** in `services/asdair/skill` (its declared `pg` dep was absent, so `schemaCompat` couldn't load pg and `dbSafeTarget` couldn't load `pg-connection-string`). After install the suite is **141/141 (2 DB-gated skips)**; no `services/asdair` file was ever modified, and CI runs `npm ci` so it was always green there. Not drift, not a regression — a local setup artifact.
-3. ~~Migration reproducibility harness covers only 010–050.~~ **RESOLVED:** full-chain 010-200 apply + idempotent re-apply + teardown reversal, **16/16 on a clean cluster**.
+3. ~~Migration reproducibility harness covers only 010–050.~~ **RESOLVED:** full-chain 010-210 apply + idempotent re-apply + teardown reversal, **16/16 on a clean cluster**.
 4. **Restart/recovery proof is a FIXTURE SIMULATION, not a live OS proof.** `assurance.test.mjs` proves the *logic* of resume-after-failure (dedup, no double durable work, no false completion) on the in-memory spine. It does **NOT** prove that the live gateway/watcher survive a real Windows process kill or a machine reboot — that needs the reboot-recovery scheduled task (elevation = Warwick) and a genuine restart. That live process/reboot proof remains **Warwick-gated** and is not claimed here.
 5. **Codex independent review:** run at the exact review head — see the QA2 section + CODEX-FINDING-LEDGER.md. Codex-only; no Fable.
 
@@ -80,7 +80,7 @@ A Warwick+GPT adversarial pass found that my round-1 triage narrative had DROPPE
 
 ## CI coverage (QA2 point 5) — file-to-job map
 
-`build-002-tests.yml` enforces: **hub** job → all `services/hub/**` node tests; **gateway** job → `services/fusion-capture-gateway` spine suite (worker/receiptProjection/liveRunner, incl. offset-hold + typed-reply); **asdair-skill** job → `services/asdair/skill`; **cockpit-db** job (postgres:16) → full migration chain `010-200` apply/reapply/teardown + `add_list_item` handler; **voice-sapi-windows** job → the real-audio SAPI proof. NOT-yet-in-CI (declared): the live-seam synthetic proofs (`prove-full-loop`, `prove-crash-reclaim`, `prove-decision-*`, `prove-learning-apply`, `prove-command-request`, `prove-contract-apply`, `prove-decision-concurrency`) run as LIVE proofs against the live cockpit; CI-enabling them needs a throwaway cockpit + parameterised DSN (scoped follow-up).
+`build-002-tests.yml` enforces: **hub** job → all `services/hub/**` node tests; **gateway** job → `services/fusion-capture-gateway` spine suite (worker/receiptProjection/liveRunner, incl. offset-hold + typed-reply); **asdair-skill** job → `services/asdair/skill`; **cockpit-db** job (postgres:16) → full migration chain `010-210` apply/reapply/teardown + `add_list_item` handler; **voice-sapi-windows** job → the real-audio SAPI proof. NOT-yet-in-CI (declared): the live-seam synthetic proofs (`prove-full-loop`, `prove-crash-reclaim`, `prove-decision-*`, `prove-learning-apply`, `prove-command-request`, `prove-contract-apply`, `prove-decision-concurrency`) run as LIVE proofs against the live cockpit; CI-enabling them needs a throwaway cockpit + parameterised DSN (scoped follow-up).
 
 ## Live-vs-fixture declarations
 
