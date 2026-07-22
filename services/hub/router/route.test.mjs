@@ -37,19 +37,19 @@ function fakeAdapter() {
 
 // Fake youtube processor deps with call counters + a source registry (idempotency).
 function fakeYtDeps({ extractOk = true } = {}) {
-  const sources = new Set();
+  const sources = new Map();
   const calls = { extract: 0, preserveRaw: 0, upsert: 0 };
   return {
     deps: {
       classify: classifyYouTube,
-      async sourceExists(videoId) { return sources.has(videoId); },
+      async getExistingSource(videoId) { return sources.get(videoId) || null; },
       async extract() {
         calls.extract += 1;
         if (!extractOk) return { ok: false, error: 'no transcript available' };
         return { ok: true, manifest: { title: 'Fake', channel: 'Chan', source_url: YT_URL, segment_count: 3, transcript_source: 'auto' }, packetFiles: [{ name: 'tubeair-report.md', content: '# fake' }] };
       },
       async preserveRaw({ videoId }) { calls.preserveRaw += 1; return { dir: `Sources/_raw/${videoId}`, files: [{ sha256: 'deadbeef'.repeat(8) }], created: true }; },
-      async upsertSource(row) { calls.upsert += 1; sources.add(row.video_id); },
+      async upsertSource(row) { calls.upsert += 1; sources.set(row.video_id, { raw_path: row.raw_path, raw_sha256: row.raw_sha256 }); },
     },
     calls, sources,
   };

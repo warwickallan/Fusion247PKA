@@ -34,10 +34,16 @@ function realExtract(url, videoId) {
     { cwd: TUBEAIR, encoding: 'utf8', timeout: 180000 });
   if (r.status !== 0) return { ok: false, error: (r.stderr || r.stdout || 'tubeair failed').split('\n').slice(-3).join(' ') };
   const outRoot = path.join(TUBEAIR, OUT);
-  const dir = fs.existsSync(outRoot) ? fs.readdirSync(outRoot).find((d) => d.includes(videoId)) : null;
-  if (!dir) return { ok: false, error: 'tubeair ran but no packet dir found' };
-  const full = path.join(outRoot, dir);
+  // Pick the NEWEST packet dir for this video (a stale older packet must never be ingested), then
+  // VALIDATE the manifest actually belongs to the requested capture — belt-and-braces against a
+  // find() ordering surprise or a moved/renamed dir feeding the wrong transcript into the gate.
+  const dirs = fs.existsSync(outRoot)
+    ? fs.readdirSync(outRoot).filter((d) => d.includes(videoId)).map((d) => ({ d, m: fs.statSync(path.join(outRoot, d)).mtimeMs })).sort((a, b) => b.m - a.m)
+    : [];
+  if (!dirs.length) return { ok: false, error: 'tubeair ran but no packet dir found' };
+  const full = path.join(outRoot, dirs[0].d);
   const manifest = JSON.parse(fs.readFileSync(path.join(full, 'manifest.json'), 'utf8'));
+  if (manifest.video_id !== videoId) return { ok: false, error: `packet manifest video_id ${manifest.video_id} != requested ${videoId} — refusing stale/mismatched packet` };
   const reportName = fs.readdirSync(full).find((f) => f.endsWith('.md'));
   const report = fs.readFileSync(path.join(full, reportName), 'utf8');
   return { ok: true, manifest, packetFiles: [{ name: 'tubeair-report.md', content: report }, { name: 'manifest.json', content: JSON.stringify(manifest, null, 2) }] };
@@ -51,7 +57,10 @@ export async function createLiveYoutubeRoutingWriter({ markdownWriter }) {
 
   const deps = {
     classify: classifyYouTube,
-    async sourceExists(videoId) { return (await db.query('select 1 from cockpit.youtube_source where video_id=$1', [videoId])).rowCount > 0; },
+    async getExistingSource(videoId) {
+      const r = await db.query('select raw_path, raw_sha256 from cockpit.youtube_source where video_id=$1', [videoId]);
+      return r.rowCount ? { raw_path: r.rows[0].raw_path, raw_sha256: r.rows[0].raw_sha256 } : null;
+    },
     extract: async (url, videoId) => realExtract(url, videoId),
     preserveRaw: ({ videoId, packetFiles }) => vaultPreserveRaw({ vaultRoot: VAULT, videoId, packetFiles }),
     async upsertSource(row) {

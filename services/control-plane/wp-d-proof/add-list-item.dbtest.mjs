@@ -68,7 +68,15 @@ async function main() {
   const r6 = await run('add_regular_to_next_week', { regular_id: reg, qty: 6 });
   ok(r6.ok && r6.regular_name === 'Eggs', 'add_regular_to_next_week unaffected by the refactor');
 
-  console.log('7) no checkout/order side effect — the orders table is untouched:');
+  console.log('7) list_date is honoured — an item for a specific date lands on that specific list:');
+  const r7 = await run('add_list_item', { item_name: 'Bread', requested_qty: 1, status: 'requested', list_date: '2026-08-10' });
+  ok(r7.ok, 'add with an explicit list_date succeeds');
+  const dated = (await db.query(`select to_char(sl.list_date,'YYYY-MM-DD') as list_date from asdair.shopping_list_items sli join asdair.shopping_lists sl on sl.id=sli.list_id where sli.list_id=$1 and lower(sli.item_name)='bread'`, [r7.list_id])).rows[0];
+  ok(dated && dated.list_date === '2026-08-10', 'the item is on the 2026-08-10 draft list, not the default one');
+  ok(r7.list_id !== listId, 'a distinct list was used for the distinct date');
+  ok((await run('add_list_item', { item_name: 'X', status: 'requested', list_date: 'not-a-date' })).ok === false, 'a malformed list_date is rejected');
+
+  console.log('8) no checkout/order side effect — the orders table is untouched:');
   ok((await db.query(`select count(*)::int n from asdair.orders`)).rows[0].n === 0, 'no order row was ever created (add-only, no checkout)');
 
   console.log(`\nRESULT: ${fail === 0 ? 'PASS ✓' : 'FAIL ✗'} — ${pass} passed, ${fail} failed`);

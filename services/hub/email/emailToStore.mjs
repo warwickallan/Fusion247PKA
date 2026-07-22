@@ -13,7 +13,10 @@ function captureIdFor(messageId) {
 }
 
 // email: see emailIntake. store: an OperationalStore (recordIntake). Returns { record, isNew, route }.
-export function emailToStore(email, store, { now } = {}) {
+// ASYNC: recordIntake is synchronous on the in-memory fixture but a Promise on the Postgres store —
+// awaiting a sync return is a no-op, so ONE path is correct for both (and a live-store rejection is not
+// detached). Callers MUST await.
+export async function emailToStore(email, store, { now } = {}) {
   if (!store || typeof store.recordIntake !== 'function') throw new Error('emailToStore: an OperationalStore is required');
   if (typeof now !== 'number') throw new Error('emailToStore: numeric now required');
   const { envelope, route, reason } = emailIntake(email);
@@ -21,6 +24,6 @@ export function emailToStore(email, store, { now } = {}) {
     return { record: null, isNew: false, route, reason }; // not recorded as actionable — held for clarification
   }
   const capture_id = captureIdFor(envelope.message_id);
-  const { record, isNew } = store.recordIntake({ ...envelope, capture_id, source_channel: 'email', technical_source_type: 'email', recorded_intent: route }, { now });
+  const { record, isNew } = await store.recordIntake({ ...envelope, capture_id, source_channel: 'email', technical_source_type: 'email', recorded_intent: route }, { now });
   return { record, isNew, route };
 }

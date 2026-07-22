@@ -17,7 +17,7 @@ export async function listOpenFollowOns(db) {
            dc.subject         as card_subject,
            lc.recommendation  as candidate_recommendation
       from cockpit.follow_on_task f
-      left join cockpit.decision_card dc on dc.id = f.correlation_id::uuid and f.origin = 'decision_response'
+      left join cockpit.decision_card dc on dc.id::text = f.correlation_id and f.origin = 'decision_response'
       left join cockpit.learning_candidate lc on lc.id = f.source_candidate_id
      where f.status = 'open'
      order by f.created_at`)).rows;

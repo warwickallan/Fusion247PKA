@@ -7,9 +7,9 @@ import { createInMemoryOperationalStore } from '../../fusion-capture-gateway/src
 const NOW = 1_800_000_000_000;
 const EMAIL = { message_id: '<store1@x>', from: 'w@x', to: ['a@x'], subject: 'Follow up', body: 'chase the pricing model' };
 
-test('an email is recorded as a durable capture (accepted) with its route', () => {
+test('an email is recorded as a durable capture (accepted) with its route', async () => {
   const store = createInMemoryOperationalStore();
-  const r = emailToStore(EMAIL, store, { now: NOW });
+  const r = await emailToStore(EMAIL, store, { now: NOW });
   assert.equal(r.isNew, true);
   assert.equal(r.record.state, 'accepted');
   assert.equal(r.record.source_channel, 'email');
@@ -17,24 +17,24 @@ test('an email is recorded as a durable capture (accepted) with its route', () =
   assert.equal(store.list().length, 1);
 });
 
-test('re-delivery of the same message id dedups (idempotent on message id)', () => {
+test('re-delivery of the same message id dedups (idempotent on message id)', async () => {
   const store = createInMemoryOperationalStore();
-  emailToStore(EMAIL, store, { now: NOW });
-  const again = emailToStore({ ...EMAIL, subject: 'edited subject' }, store, { now: NOW + 5 });
+  await emailToStore(EMAIL, store, { now: NOW });
+  const again = await emailToStore({ ...EMAIL, subject: 'edited subject' }, store, { now: NOW + 5 });
   assert.equal(again.isNew, false);
   assert.equal(store.list().length, 1);
 });
 
-test('a YouTube-link email is recorded and routed to the youtube lane', () => {
+test('a YouTube-link email is recorded and routed to the youtube lane', async () => {
   const store = createInMemoryOperationalStore();
-  const r = emailToStore({ ...EMAIL, message_id: '<yt@x>', body: 'https://youtu.be/pcR30j-sKxU' }, store, { now: NOW });
+  const r = await emailToStore({ ...EMAIL, message_id: '<yt@x>', body: 'https://youtu.be/pcR30j-sKxU' }, store, { now: NOW });
   assert.equal(r.route, 'youtube');
   assert.equal(r.record.state, 'accepted');
 });
 
-test('an empty email is held for clarification, NOT recorded as actionable', () => {
+test('an empty email is held for clarification, NOT recorded as actionable', async () => {
   const store = createInMemoryOperationalStore();
-  const r = emailToStore({ message_id: '<empty@x>', from: 'x', subject: '', body: '' }, store, { now: NOW });
+  const r = await emailToStore({ message_id: '<empty@x>', from: 'x', subject: '', body: '' }, store, { now: NOW });
   assert.equal(r.route, 'needs_clarification');
   assert.equal(r.record, null);
   assert.equal(store.list().length, 0);

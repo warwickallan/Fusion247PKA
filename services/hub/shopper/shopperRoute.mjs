@@ -17,11 +17,16 @@ const { normaliseRawList } = listNormaliser;
 export const ALLOWED_SHOPPER_COMMANDS = Object.freeze(['add_list_item']);
 export const SHOPPER_CONTEXT = 'shopping';
 
-// payload: see resolvePayload. opts: { requestedBy, listDate, transcribers?, keyPrefix? }
+// payload: see resolvePayload. opts: { requestedBy, listDate, transcribers?, sourceId }
+// sourceId is REQUIRED and must be unique per inbound message (a Telegram message/update id, the
+// voice/photo file ref, etc.) — the per-item idempotency keys are derived from it, so two DIFFERENT
+// messages can never collide on shop-0/shop-1 (a real second message would otherwise be deduped away).
 export async function shopperRoute(payload, opts = {}) {
   const requestedBy = opts.requestedBy || 'shopperbot:warwick';
   const listDate = opts.listDate || null; // a real caller supplies next-week's date; kept explicit, no clock here
-  const keyPrefix = opts.keyPrefix || 'shop';
+  const sourceId = opts.sourceId ?? opts.keyPrefix; // keyPrefix kept as a back-compat alias
+  if (!sourceId || typeof sourceId !== 'string') throw new Error('shopperRoute: opts.sourceId (unique per inbound message) is required — it scopes the idempotency keys so distinct messages never collide');
+  const keyPrefix = `shop:${sourceId}`;
   const { rawText, provenance } = await resolvePayload(payload, opts.transcribers || {});
   const { items, needs_review: needsReview } = normaliseRawList(rawText);
 

@@ -49,7 +49,7 @@ function statusLineFor(state, record) {
       // the routing writer records, so the plain-markdown path is unchanged.
       if (record.destination_ref && record.destination_ref.kind === 'youtube_source') {
         const vid = record.destination_ref.video_id ? ` (${record.destination_ref.video_id})` : '';
-        return `Completed — transcript extracted and preserved${vid}. Your knowledge note is being written and will appear for review.`;
+        return `Completed — transcript extracted and preserved${vid}. Knowledge note pending in-session authoring, then it appears for review.`;
       }
       // The destination path is wrapped in backticks (a Telegram legacy-Markdown
       // code span, sent with parse_mode 'Markdown' — see projectCard) so the

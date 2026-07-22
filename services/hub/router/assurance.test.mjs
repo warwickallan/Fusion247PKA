@@ -23,21 +23,21 @@ const NOW = 1_800_000_000_000;
 const YT = 'https://youtu.be/pcR30j-sKxU';
 
 function ytDeps({ failFirstExtract = false } = {}) {
-  const sources = new Set();
+  const sources = new Map();
   const calls = { extract: 0, upsert: 0 };
   let failed = failFirstExtract;
   return {
     sources, calls,
     deps: {
       classify: classifyYouTube,
-      async sourceExists(v) { return sources.has(v); },
+      async getExistingSource(v) { return sources.get(v) || null; },
       async extract() {
         calls.extract += 1;
         if (failed) { failed = false; return { ok: false, error: 'transient extraction failure' }; }
         return { ok: true, manifest: { title: 'X', channel: 'C', source_url: YT, segment_count: 1, transcript_source: 'auto' }, packetFiles: [{ name: 'r.md', content: '#' }] };
       },
       async preserveRaw({ videoId }) { return { dir: `Sources/_raw/${videoId}`, files: [{ sha256: 'a'.repeat(64) }], created: true }; },
-      async upsertSource(row) { calls.upsert += 1; sources.add(row.video_id); },
+      async upsertSource(row) { calls.upsert += 1; sources.set(row.video_id, { raw_path: row.raw_path, raw_sha256: row.raw_sha256 }); },
     },
   };
 }

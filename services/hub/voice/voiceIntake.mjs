@@ -32,7 +32,9 @@ export async function voiceIntake(voice, deps = {}) {
       ? t.interpretations
       : [{ key: 'A', label: 'Save as a note' }, { key: 'B', label: 'Discard' }];
     const rendered = renderCard({ subject: 'What did you want to do with this voice memo?', body_markdown: t.text, options: interpretations, related_ref: `voice:${voice.voice_ref}` });
-    const cardIntent = { requested_by: 'voice:warwick', target: 'devbot:warwick', subject: 'What did you want to do with this voice memo?', body_markdown: t.text, options: interpretations, related_ref: `voice:${voice.voice_ref}` };
+    // A COMPLETE, ready-to-file decision_card intent: idempotency_key is NOT NULL in the schema, so a
+    // source-derived key is required (a re-delivered voice memo dedups to the same card); dry_run true.
+    const cardIntent = { requested_by: 'voice:warwick', target: 'devbot:warwick', subject: 'What did you want to do with this voice memo?', body_markdown: t.text, options: interpretations, related_ref: `voice:${voice.voice_ref}`, idempotency_key: `voice-decision:${voice.voice_ref}`, dry_run: true };
     return { envelope, route: 'needs_decision', card: { rendered, intent: cardIntent } };
   }
 

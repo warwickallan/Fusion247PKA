@@ -28,7 +28,19 @@ async function resolveHousehold(client, household) {
   return null; // 0 or >1 with no selector -> caller fails closed
 }
 
-async function findOrCreateDraftList(client, householdId) {
+// If listDate is given, resolve/create the draft list for THAT date exactly (so an item is never added
+// to a different week's list around a boundary); otherwise fall back to the latest next_week_draft or
+// create one dated next week. listDate must be an ISO YYYY-MM-DD when provided.
+async function findOrCreateDraftList(client, householdId, listDate = null) {
+  if (listDate) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(listDate)) throw new Error(`invalid list_date "${listDate}" (want YYYY-MM-DD)`);
+    const byDate = await client.query(
+      `select id from asdair.shopping_lists where household_id=$1 and status='next_week_draft' and list_date=$2 order by id desc limit 1`, [householdId, listDate]);
+    if (byDate.rowCount) return byDate.rows[0].id;
+    const insDate = await client.query(
+      `insert into asdair.shopping_lists (household_id, status, list_date) values ($1,'next_week_draft',$2) returning id`, [householdId, listDate]);
+    return insDate.rows[0].id;
+  }
   const list = await client.query(
     `select id from asdair.shopping_lists where household_id=$1 and status='next_week_draft' order by id desc limit 1`, [householdId]);
   if (list.rowCount) return list.rows[0].id;
@@ -75,16 +87,19 @@ export async function execute(client, command, args) {
     const storedQty = qty ?? 1;
     const note = typeof args?.note === 'string' ? args.note : null;
 
+    const listDate = args?.list_date ?? null;
     const householdId = await resolveHousehold(client, args?.household);
     if (!householdId) return { ok: false, command, error: 'household could not be resolved (missing selector or ambiguous)', worker: 'cp_worker', executed_at: at };
     await client.query('select pg_advisory_xact_lock($1)', [householdId]);
-    const listId = await findOrCreateDraftList(client, householdId);
+    const listId = await findOrCreateDraftList(client, householdId, listDate);
 
-    const existing = await client.query(`select id, requested_qty, status from asdair.shopping_list_items where list_id=$1 and lower(item_name)=lower($2) limit 1 for update`, [listId, itemName]);
+    const existing = await client.query(`select id, requested_qty, status, note from asdair.shopping_list_items where list_id=$1 and lower(item_name)=lower($2) limit 1 for update`, [listId, itemName]);
     let itemId, action, corrected = false;
     if (existing.rowCount) {
       itemId = existing.rows[0].id;
-      corrected = existing.rows[0].requested_qty !== storedQty || existing.rows[0].status !== status;
+      // A note change is also a correction — the receipt must not under-report a real data change.
+      const noteChanges = note !== null && note !== existing.rows[0].note;
+      corrected = existing.rows[0].requested_qty !== storedQty || existing.rows[0].status !== status || noteChanges;
       await client.query(`update asdair.shopping_list_items set requested_qty=$2, status=$3, note=coalesce($4,note) where id=$1`, [itemId, storedQty, status, note]);
       action = corrected ? 'corrected' : 'unchanged';
     } else {

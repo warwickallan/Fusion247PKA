@@ -12,13 +12,13 @@
 //
 // deps:
 //   classify(text)            -> { isYouTube, videoId, canonicalUrl }
-//   sourceExists(videoId)     -> Promise<boolean>            (idempotency short-circuit)
+//   getExistingSource(videoId)-> Promise<{ raw_path, raw_sha256 } | null>   (idempotency short-circuit)
 //   extract(url, videoId)     -> Promise<{ ok, manifest, packetFiles, error? }>
 //   preserveRaw({videoId, packetFiles}) -> Promise<{ dir, files:[{sha256}], created }>
 //   upsertSource(row)         -> Promise<void>               (idempotent on video_id)
 export function createYoutubeProcessor(deps = {}) {
-  const { classify, sourceExists, extract, preserveRaw, upsertSource } = deps;
-  for (const [k, v] of Object.entries({ classify, sourceExists, extract, preserveRaw, upsertSource })) {
+  const { classify, getExistingSource, extract, preserveRaw, upsertSource } = deps;
+  for (const [k, v] of Object.entries({ classify, getExistingSource, extract, preserveRaw, upsertSource })) {
     if (typeof v !== 'function') throw new Error(`createYoutubeProcessor: dep "${k}" (function) required`);
   }
 
@@ -30,12 +30,16 @@ export function createYoutubeProcessor(deps = {}) {
       if (!yt.isYouTube) throw new Error('youtubeProcessor.process: not a YouTube capture (router misroute)');
       const videoId = yt.videoId;
 
-      // Idempotency short-circuit: if the source row already exists, re-processing must NOT re-extract
-      // or re-write RAW — return a stable destination + evidence (mirrors markdownWriter's `existed`).
-      if (await sourceExists(videoId)) {
+      // Idempotency short-circuit: only if an existing row carries the REAL preserved-RAW pointer +
+      // hash may we complete without re-extracting — the evidence must be the true RAW hash, never a
+      // manufactured placeholder (that would let a partial/legacy row falsely satisfy the evidence
+      // gate). A row missing raw_path/raw_sha256 is NOT a valid short-circuit → fall through + re-extract
+      // (preserveRaw is write-once; upsert is on-conflict-do-nothing, so this repairs rather than dupes).
+      const existing = await getExistingSource(videoId);
+      if (existing && existing.raw_path && existing.raw_sha256) {
         return {
           destination_ref: { kind: 'youtube_source', video_id: videoId, source_url: yt.canonicalUrl },
-          evidence: { evidence_kind: 'raw_transcript', target_ref: `Sources/_raw/${videoId}`, content_hash: `existing:${videoId}` },
+          evidence: { evidence_kind: 'raw_transcript', target_ref: existing.raw_path, content_hash: existing.raw_sha256 },
           existed: true,
         };
       }
