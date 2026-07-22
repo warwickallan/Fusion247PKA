@@ -1,0 +1,41 @@
+{
+  "source_url": "https://www.youtube.com/watch?v=dhbcVxYhWaQ",
+  "video_id": "dhbcVxYhWaQ",
+  "captured_at": "2026-07-22T02:35:02+00:00",
+  "title": "The $1,000/hour Solo AI business (Full Course)",
+  "channel": "Greg Isenberg",
+  "published_date": "2026-07-15",
+  "duration_seconds": 3665,
+  "user_note": "BUILD-002 WP2 auto-detect",
+  "transcript_status": "extracted",
+  "transcript_source": "auto_captions",
+  "language": "English (auto-generated)",
+  "language_code": "en",
+  "segment_count": 1748,
+  "error_category": null,
+  "error_detail": null,
+  "retry_recommendation": null,
+  "tool_versions": {
+    "python": "3.13.6",
+    "youtube-transcript-api": "1.2.4",
+    "yt-dlp": "2026.7.4"
+  },
+  "routing": {
+    "fusion_review_status": "pending_cairn",
+    "assigned_agent": "youtubair",
+    "next_agent": "cairn",
+    "legacy_review_status": "pending_categorisair",
+    "legacy_next_agent": "categorisair",
+    "note": "Cairn has absorbed the legacy CategorisAIr role; legacy_* are aliases only."
+  },
+  "handoff": null,
+  "output_dir": "out\\auto\\2026-07-22__the-1000hour-solo-ai-business-full-course__dhbcVxYhWaQ",
+  "files": [
+    "TubeAIR Report - the-1000hour-solo-ai-business-full-course - dhbcVxYhWaQ.md",
+    "manifest.json"
+  ],
+  "idea": "IDEA-013",
+  "project_id": "F247-YT-INGRESS-001",
+  "build": "TubeAIR",
+  "schema_version": 2
+}

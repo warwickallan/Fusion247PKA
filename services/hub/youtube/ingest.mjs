@@ -14,6 +14,21 @@ import { VaultWriter, FsVaultAdapter } from '../vault/vaultWriter.mjs';
 
 const sha256 = (buf) => createHash('sha256').update(buf).digest('hex');
 
+// Preserve the RAW packet immutably (write-once) under <subdir>/_raw/<videoId>/, with sha256 evidence.
+// Shared by ingestYouTube (in-session, with a note) and the auto-detect watcher (headless, RAW only).
+export async function preserveRaw({ vaultRoot, videoId, packetFiles, subdir = 'Sources', adapter }) {
+  const a = adapter || new FsVaultAdapter(vaultRoot);
+  const rawDirRel = path.posix.join(subdir, '_raw', videoId);
+  const files = [];
+  let created = false;
+  for (const f of packetFiles) {
+    const rel = path.posix.join(rawDirRel, f.name);
+    if (!(await a.exists(rel))) { await a.write(rel, f.content); created = true; }
+    files.push({ file: rel, sha256: sha256(f.content), bytes: Buffer.byteLength(f.content) });
+  }
+  return { dir: rawDirRel, created, files, adapter: a };
+}
+
 // meta: { videoId, title, sourceUrl, channel, published, transcriptSource, capturedAt, captureId }
 // packetFiles: [{ name, content }]  — the TubeAIR report + manifest (RAW source evidence)
 // authoredBody: the in-session-authored standalone knowledge note (Markdown, no frontmatter)
@@ -22,15 +37,11 @@ export async function ingestYouTube({ vaultRoot, meta, packetFiles, authoredBody
   if (!authoredBody) throw new Error('ingestYouTube requires an authored knowledge-note body');
   const adapter = new FsVaultAdapter(vaultRoot);
 
-  // 1. Preserve RAW immutably (write-once) under Sources/_raw/<videoId>/, with sha256 evidence.
-  const rawDirRel = path.posix.join(subdir, '_raw', meta.videoId);
-  const rawEvidence = [];
-  let rawCreated = false;
-  for (const f of packetFiles) {
-    const rel = path.posix.join(rawDirRel, f.name);
-    if (!(await adapter.exists(rel))) { await adapter.write(rel, f.content); rawCreated = true; }
-    rawEvidence.push({ file: rel, sha256: sha256(f.content), bytes: Buffer.byteLength(f.content) });
-  }
+  // 1. Preserve RAW immutably (write-once) with sha256 evidence.
+  const rawResult = await preserveRaw({ videoId: meta.videoId, packetFiles, subdir, adapter });
+  const rawDirRel = rawResult.dir;
+  const rawEvidence = rawResult.files;
+  const rawCreated = rawResult.created;
 
   // 2. Write the knowledge note through VaultWriter (idempotent on videoId).
   const vw = new VaultWriter(adapter, { subdir });
