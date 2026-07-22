@@ -1,0 +1,16 @@
+{
+  "record": "tower-backlog-metadata",
+  "note": "METADATA ONLY. Deliberately excludes all raw turn content, instructions, responses, prompts, email addresses, credentials, opaque row IDs and any personal or operational data. Replaces the earlier snapshot that inadvertently included an instruction excerpt with PII (removed from PR #58 history under Warwick's authorisation).",
+  "snapshot_date": "2026-07-23",
+  "project": "tower-dev",
+  "held_backlog": {
+    "count": 24,
+    "seq_range": "79-102",
+    "state": "held",
+    "reviews_on_held": 0,
+    "notifications_on_held": 0,
+    "hold_reason": "Warwick recovery — durable hold; excluded from claim/reclaim; released only explicitly"
+  },
+  "pending_count": 0,
+  "source_of_truth": "The Tower DEV Supabase `tower.turn` / `tower.supervisor_review` tables retain the full historical records; this file carries only safe aggregate metadata."
+}
