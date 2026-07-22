@@ -25,15 +25,16 @@ const MEMBERS = [
   { role: 'contract', file: 'BUILD-CONTRACT.md',      title: 'Build Contract / PRD',       sort: 1 },
   { role: 'plan',     file: 'IMPLEMENTATION-PLAN.md', title: 'Implementation Plan',        sort: 2 },
 ];
-const GH = `https://github.com/warwickallan/Fusion247PKA/blob/build-002/unified-fusion-hub/${DIR}`;
 const sha256 = (buf) => createHash('sha256').update(buf).digest('hex');
 
-// Read each member from Git (committed content — line-ending stable).
+// Read each member from Git (committed content — line-ending stable). URLs are COMMIT-PINNED
+// (/blob/<commit>/...) not branch URLs, so a clicked link always shows the approved content.
 const docs = MEMBERS.map((m) => {
   const path = `${DIR}/${m.file}`;
   const body = execFileSync('git', ['cat-file', 'blob', `${commit}:${path}`], { cwd: REPO, maxBuffer: 64 * 1024 * 1024 });
   const blob = execFileSync('git', ['rev-parse', `${commit}:${path}`], { cwd: REPO }).toString().trim();
-  return { ...m, path, url: `${GH}/${m.file}`, body: body.toString('utf8'), git_blob_sha: blob, content_sha256: sha256(body) };
+  return { ...m, path, url: `https://github.com/warwickallan/Fusion247PKA/blob/${commit}/${path}`,
+    body: body.toString('utf8'), git_blob_sha: blob, content_sha256: sha256(body) };
 });
 // pack hash = sha256 over the three member content_sha256 lines (order brief,contract,plan; newline-terminated).
 const packHash = sha256(docs.map((d) => d.content_sha256).join('\n') + '\n');
@@ -56,6 +57,29 @@ async function main() {
   for (const d of docs) console.log(`[load]   ${d.role.padEnd(8)} blob ${d.git_blob_sha.slice(0, 10)} sha256 ${d.content_sha256.slice(0, 12)}…`);
   console.log(`[load]   pack_content_hash ${packHash}`);
 
+  // FAIL CLOSED: if this version already exists, it MUST match the requested commit + pack hash +
+  // every member identity exactly. A mismatch aborts (never silently skips, never overwrites) — an
+  // approved/bound pack version can only ever mean one exact set of documents.
+  const existing = (await db.query(
+    `select git_commit_sha, pack_content_hash, lifecycle_state from cockpit.build_contract where build_id='BUILD-002' and contract_version=$1`, [version])).rows[0];
+  if (existing) {
+    const mismatches = [];
+    if (existing.git_commit_sha !== commit) mismatches.push(`commit ${existing.git_commit_sha} != requested ${commit}`);
+    if (existing.pack_content_hash !== packHash) mismatches.push(`pack_content_hash ${existing.pack_content_hash} != computed ${packHash}`);
+    const existingDocs = (await db.query(
+      `select doc_role, content_sha256, git_blob_sha from cockpit.build_contract_doc where build_id='BUILD-002' and pack_version=$1`, [version])).rows;
+    for (const d of docs) {
+      const ex = existingDocs.find((x) => x.doc_role === d.role);
+      if (!ex) mismatches.push(`member '${d.role}' missing from stored pack`);
+      else if (ex.content_sha256 !== d.content_sha256) mismatches.push(`member '${d.role}' content_sha256 ${ex.content_sha256} != ${d.content_sha256}`);
+      else if (ex.git_blob_sha !== d.git_blob_sha) mismatches.push(`member '${d.role}' git_blob_sha ${ex.git_blob_sha} != ${d.git_blob_sha}`);
+    }
+    if (mismatches.length) {
+      throw new Error(`FAIL CLOSED: pack ${version} already exists (${existing.lifecycle_state}) and does NOT match the requested commit/identities:\n  - ` + mismatches.join('\n  - ') + `\nA material document change requires a NEW pack version, not a reload of ${version}.`);
+    }
+    console.log(`[load] pack ${version} already present and EXACT-MATCHES the requested commit + hashes — idempotent (only github_url is refreshed to commit-pinned).`);
+  }
+
   await db.query('begin');
   try {
     // Supersede any prior non-terminal BUILD-002 contract (except this exact version, if re-run).
@@ -76,7 +100,7 @@ async function main() {
        values ('BUILD-002', $1, 'build_contract_pack',
           'BUILD-002 — Unified Fusion Hub · Approval Pack (Brief + Contract + Plan)', $2,
           $3, $4, $5, $6, $7, $8::jsonb, $9, 'WP0', 'draft', false)
-       on conflict (build_id, contract_version) do nothing`,
+       on conflict (build_id, contract_version) do update set github_url=excluded.github_url`,
       [version, OUTCOME, contract.path, contract.url, commit, contract.git_blob_sha, contract.content_sha256,
        documentsJson, packHash]);
 
@@ -86,7 +110,7 @@ async function main() {
            (build_id, pack_version, doc_role, title, github_path, github_url,
             git_commit_sha, git_blob_sha, content_sha256, body_markdown, sort)
          values ('BUILD-002', $1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-         on conflict (build_id, pack_version, doc_role) do nothing`,
+         on conflict (build_id, pack_version, doc_role) do update set github_url=excluded.github_url`,
         [version, d.role, d.title, d.path, d.url, commit, d.git_blob_sha, d.content_sha256, d.body, d.sort]);
     }
     await db.query('commit');
