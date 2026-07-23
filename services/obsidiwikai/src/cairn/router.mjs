@@ -5,6 +5,7 @@ import { LANE, INTENT } from './contracts.mjs';
 import { q } from '../clients/db.mjs';
 import { enqueuePacket, deliverPacket } from '../core/contextOutbox.mjs';
 import { enqueueCompileJob } from '../core/compileQueue.mjs';
+import { recordPersonalEntry, recordTaskItem } from '../core/laneStores.mjs';
 
 const PACKET_TYPES = new Set(['preference', 'correction', 'decision', 'interest', 'standing_instruction', 'session_conclusion']);
 // A subject that is ONLY the routing instruction ("Honch that", "→ Honcho") is not content —
@@ -62,8 +63,8 @@ const adapters = {
     const res = await deliverPacket(row); // applies the outbox privacy gate: restricted → held, prohibited → rejected
     return { lane: LANE.HONCHO, did: `context ${res.state} → Honcho`, handoff: 'context-outbox → Honcho lens', packet_id: packetId, state: res.state, honcho_ref: res.honcho_ref || null };
   },
-  [LANE.PERSONAL]: async () => ({ lane: LANE.PERSONAL, did: 'routed to personal/Obsidian lane', handoff: 'Obsidian journal/backlink pipeline (lane stub — not built this increment)' }),
-  [LANE.TASK]: async () => ({ lane: LANE.TASK, did: 'routed to task lane', handoff: 'task lane (stub — not built this increment)' }),
+  [LANE.PERSONAL]: async (capture, d) => recordPersonalEntry(capture, d),
+  [LANE.TASK]: async (capture) => recordTaskItem(capture),
   [LANE.WORK]: async () => ({ lane: LANE.WORK, did: 'held for walled work lane', handoff: 'work/Bellrock lane — deferred by design (WP7)' }),
   [LANE.UNKNOWN]: async () => ({ lane: LANE.UNKNOWN, did: 'no route — asking Warwick', handoff: null }),
 };
