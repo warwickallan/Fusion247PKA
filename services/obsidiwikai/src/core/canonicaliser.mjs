@@ -3,11 +3,38 @@
 // applies it automatically (confident) or raises a one-tap Directus review (uncertain).
 import { searchConcepts, createConcept, addAlias, addEvidence, relate, linkSource } from './encyclopedia.mjs';
 import { generateJSON } from './llm.mjs';
+import { lightrag } from '../clients/lightrag.mjs';
 import { q } from '../clients/db.mjs';
 import { thresholds } from '../config.mjs';
 
+// Find match candidates for a concept: lexical (Neo4j name/alias) first, then SEMANTIC
+// (LightRAG retrieval surfaces related concepts under different wording, e.g. "LLM" -> "GPT"),
+// mapped back to our encyclopedia. Excludes the concept's own exact node so we link islands
+// rather than self-match. Semantic lookup is gated on relevance to bound cost.
+export async function findMatches(cand) {
+  const self = String(cand.raw_name).toLowerCase();
+  const lex = (await searchConcepts(cand.raw_name, thresholds.matchCandidates)).filter((m) => m.canonical_name.toLowerCase() !== self);
+  const pool = [...lex];
+  const wantSemantic = (cand.relevance == null || cand.relevance >= 0.5) && lex.length < 3;
+  if (wantSemantic) {
+    try {
+      const qd = await lightrag.queryData(`${cand.raw_name}. ${(cand.description || '').slice(0, 160)}`, { mode: 'mix', topK: 6, onlyContext: true });
+      const names = [...new Set((qd?.data?.entities || []).map((e) => e.entity_name).filter(Boolean))];
+      for (const nm of names) {
+        if (nm.toLowerCase() === self) continue;
+        const hits = await searchConcepts(nm, 1);
+        for (const h of hits) if (h.canonical_name.toLowerCase() !== self) pool.push(h);
+      }
+    } catch { /* semantic assist is best-effort */ }
+  }
+  const seen = new Set();
+  const out = [];
+  for (const m of pool) { if (!seen.has(m.canonical_id)) { seen.add(m.canonical_id); out.push(m); } }
+  return out.slice(0, thresholds.matchCandidates);
+}
+
 export async function resolveAndApply(cand, { runId, sourceId, model = 'gpt-5-mini' }) {
-  const matches = await searchConcepts(cand.raw_name, thresholds.matchCandidates);
+  const matches = await findMatches(cand);
 
   // Cold-start / no candidates → new concept (no LLM call needed).
   let decision;
