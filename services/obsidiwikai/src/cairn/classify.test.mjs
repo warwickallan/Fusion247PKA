@@ -74,6 +74,26 @@ test('an email with no clear signal → ask (fails safe, does not guess Honcho)'
   assert.equal(d.action, ACTION.ASK);
 });
 
+// A bare mention of "Honcho" is NOT a command — must never auto-ACT to the Honcho lane.
+test('mentioning Honcho in prose is not a command', () => {
+  const d = classify({ capture_id: 'h5', text: 'This article discusses Honcho and other memory systems.' });
+  assert.notEqual(d.lane, LANE.HONCHO);
+  assert.notEqual(d.action, ACTION.ACT);
+});
+test('comparing Honcho with X is not a command', () => {
+  const d = classify({ capture_id: 'h6', text: "I'm comparing Honcho with another memory system for the build." });
+  assert.notEqual(d.lane, LANE.HONCHO);
+});
+test('NEGATION: "don\'t send this to Honcho" must not route to Honcho', () => {
+  const d = classify({ capture_id: 'h7', text: "Interesting note, but don't send this to Honcho." });
+  assert.notEqual(d.lane, LANE.HONCHO);
+});
+test('explicit imperative "send this to Honcho" DOES command', () => {
+  const d = classify({ capture_id: 'h8', text: 'send this to Honcho please' });
+  assert.equal(d.lane, LANE.HONCHO);
+  assert.equal(d.action, ACTION.ACT);
+});
+
 test('learned feedback raises confidence', () => {
   const fb = [{ pattern_key: 'url_host:medium.com', correct_lane: LANE.ENCYCLOPEDIA, correct_intent: INTENT.LEARN, weight: 3 }];
   const d = classify({ capture_id: 'c8', url: 'https://medium.com/some-article' }, { feedback: fb });

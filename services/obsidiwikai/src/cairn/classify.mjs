@@ -16,11 +16,27 @@ function firstUrl(c) {
   return m ? m[0] : null;
 }
 
+// Is this an actual "send to Honcho" COMMAND (not merely a mention of the word Honcho)?
+// Deliberately tight: a bare "Honcho" or "…discusses Honcho…" must NOT trigger an auto-ACT,
+// and an explicit negation ("don't send this to Honcho") must NOT either.
+export function isHonchoCommand(t) {
+  // Unambiguous structured / command markers.
+  if (/#honcho\b/i.test(t) || /→\s*honcho\b/i.test(t) || /(^|\n)\s*honch(o)?\s+(that|this|it)\b/i.test(t)) return true;
+  // Imperative "send/forward/save this to Honcho" — but never when negated.
+  const imperative = /\b(send|forward|save|add|put|post)\s+(this|that|it|these|the\s+\w+)\s+(to|into|in)\s+honcho\b/i;
+  const remember = /\bremember\s+(this|that)\s+about\s+me\b/i;
+  if (imperative.test(t) || remember.test(t)) {
+    if (/\b(don'?t|do not|never|no need to|not)\b[^.!?\n]*\bhoncho\b/i.test(t)) return false;
+    return true;
+  }
+  return false;
+}
+
 // Explicit destination markers — Warwick telling Cairn where it goes. Outranks inference.
 // `t` is subject + body combined, so an email whose SUBJECT is "Honch that" is caught.
 function explicitTarget(t) {
   // "Honch that" is Warwick's deliberate GPT→brain instruction. → Honcho context lane.
-  if (/\bhonch(o)?\b\s*(that|this|it)?|→\s*honcho|send (this|that|it)? ?to honcho|for honcho|remember (this|that)?\s*about me/i.test(t)) return { lane: LANE.HONCHO, intent: INTENT.REMEMBER, what: 'explicit → Honcho context' };
+  if (isHonchoCommand(t)) return { lane: LANE.HONCHO, intent: INTENT.REMEMBER, what: 'explicit → Honcho context' };
   if (/#journal|→\s*obsidian|to obsidian|save to journal/i.test(t)) return { lane: LANE.PERSONAL, intent: INTENT.JOURNAL, what: 'explicit → journal' };
   if (/#task|→\s*task\b|as a task/i.test(t)) return { lane: LANE.TASK, intent: INTENT.TASK, what: 'explicit → task' };
   if (/#keep|keep raw|just keep/i.test(t)) return { lane: LANE.ENCYCLOPEDIA, intent: INTENT.KEEP, treatment: INTENT.KEEP, what: 'explicit → keep' };

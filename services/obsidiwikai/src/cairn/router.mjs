@@ -12,16 +12,29 @@ const MARKER_ONLY = /^\s*(honch(o)?\s*(that|this|it)?|→?\s*honcho|for honcho|r
 
 // Turn a captured object into a Context-Outbox packet. Cairn decided it's FOR Honcho;
 // the outbox owns delivery + its own privacy gate (health/employer held, never auto-shipped).
-function packetFrom(capture) {
+//
+// TWO distinct contracts:
+//  - REMEMBER ("Honch that"): preserve the WHOLE coherent exchange VERBATIM. The routing marker is
+//    an instruction only; the body is kept in full (no 600/4000 truncation). Privacy scans the full
+//    payload (evidence carries it); idempotency is keyed on the message identity, not a summary fragment.
+//  - otherwise: a compact context packet (preference/correction updates) — summarised is fine.
+export function packetFrom(capture, d) {
   const body = (capture.text || capture.payload_text || '').trim();
   const rawSubject = (capture.subject || '').trim();
-  const subject = MARKER_ONLY.test(rawSubject) ? '' : rawSubject; // drop a marker-only subject
-  // Substantive subject → headline (summary) with the body as evidence; otherwise the body IS the content.
+  const subject = MARKER_ONLY.test(rawSubject) ? '' : rawSubject; // a marker-only subject is instruction, not content
+  const type = PACKET_TYPES.has(capture.packet_type) ? capture.packet_type : 'session_conclusion';
+  const identity = capture.source_id || capture.capture_id || null;
+  const source_pointer = identity ? `${capture.source_type || 'capture'}:${identity}` : null;
+  const idempotency_key = identity ? `honcho:${identity}` : undefined; // distinct exchanges never collide; replays dedupe
+
+  if (d?.intent === INTENT.REMEMBER) {
+    let header = (subject || body.split('\n').find((l) => l.trim()) || 'GPT exchange').trim().slice(0, 200);
+    if (header.length < 3) header = 'GPT exchange';
+    return { type, summary: header, evidence: body || null, source_pointer, idempotency_key, lifespan: 'permanent', verbatim: true };
+  }
   const summary = (subject || body || rawSubject || 'context').slice(0, 600);
   const evidence = subject && body ? body.slice(0, 4000) : null;
-  const type = PACKET_TYPES.has(capture.packet_type) ? capture.packet_type : 'session_conclusion';
-  const src = capture.source_id ? `${capture.source_type || 'capture'}:${capture.source_id}` : `capture:${capture.capture_id}`;
-  return { type, summary, evidence, source_pointer: src, lifespan: 'permanent' };
+  return { type, summary, evidence, source_pointer, idempotency_key, lifespan: 'permanent' };
 }
 
 const adapters = {
@@ -36,9 +49,9 @@ const adapters = {
       source_id: capture.source_id || capture.url || null,
     };
   },
-  [LANE.HONCHO]: async (capture) => {
+  [LANE.HONCHO]: async (capture, d) => {
     // Reuse the existing, proven Context-Outbox delivery pipeline as the Honcho lane adapter.
-    const packet = packetFrom(capture);
+    const packet = packetFrom(capture, d);
     const packetId = await enqueuePacket(packet); // null = duplicate (idempotent at the outbox layer)
     if (!packetId) return { lane: LANE.HONCHO, did: 'already delivered to Honcho (duplicate packet)', handoff: 'context-outbox (idempotent)' };
     const row = (await q('select * from obsidiwikai.context_packet where packet_id=$1', [packetId])).rows[0];
