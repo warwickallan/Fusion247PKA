@@ -4,7 +4,18 @@
 
 **Status legend:** ⬜ not started · 🟨 in progress · ✅ proven-in-test · 🔵 deferred (named + approved).
 
-_All rows ⬜ — plan stage, nothing built._
+## Build progress — 2026-07-23 (overnight, branch `idea-007/obsidiwikai-build`)
+
+Built live against the real box (LightRAG/Neo4j/Honcho/Supabase). Service: `services/obsidiwikai/`.
+
+**✅ Proven live:** FR-002, FR-003, FR-004, FR-005, FR-006, FR-008, FR-009, FR-010, FR-011, FR-012, FR-014, FR-015, FR-016, FR-017, FR-018, FR-019, FR-021, FR-030, FR-A (one-tap review), FR-B (deferred reservoir), plus DoD 1–11 mechanisms, 19, 20. Context Outbox (CONTEXT-OUTBOX.md) acceptance proven except the Telegram front door.
+**🟨 Partial / mechanism-present:** FR-001 (bounded slice ingested, not full transcript), FR-007 & FR-013 (need topically-overlapping sources to show compounding), FR-020 (Neo4j live; Supabase rebuild path not yet exercised), FR-022 (card data in Supabase; Directus collection registration pending), FR-024 & FR-D (Honcho write/read proven; feedback→lens loop + Directus edit UI pending), FR-028 (retrieval proven; governed agent interface pending).
+**⬜ Not started:** FR-023 (feedback UI), FR-025/026/027 (WP5 suggestions/monetise), FR-029 (MyPKA candidates), FR-C (historical re-mine), DoD 12–18 (feedback UI, suggestions, MyPKA candidates), WP7 (work/Bellrock lane — deferred by design).
+**⛔ Human deps outstanding:** H1 fusiongptbot token (front door built, unrun), H2 Honcho cockpit check.
+
+Two real sources compiled → **71 concepts / 142 relationships** in the curated Neo4j encyclopedia; 9 unit tests green.
+
+_(Per-row table below reflects the original plan; the summary above is the live truth as of the overnight build.)_
 
 ## Functional requirements → WP
 

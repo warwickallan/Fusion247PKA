@@ -36,6 +36,15 @@ export const lightrag = {
     });
   },
 
+  // Full grounded answer (RAG) over the accumulated source knowledge.
+  async query(query, { mode = 'mix', topK = 12 } = {}) {
+    const j = await jf('/query', {
+      method: 'POST',
+      body: JSON.stringify({ query, mode, top_k: topK, only_need_context: false }),
+    });
+    return j.response ?? j.data ?? '';
+  },
+
   // Graph-management primitives (verified live). Used for curation experiments; our canonical
   // writes go to Neo4j, but these let us merge within LightRAG's store when useful.
   async mergeEntities(sourceEntities, targetEntity, mergeStrategy) {
