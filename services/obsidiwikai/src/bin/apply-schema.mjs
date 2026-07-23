@@ -1,6 +1,6 @@
 // Apply the ObsidiWikAi schema to the live stores: Supabase (obsidiwikai.*) + Neo4j (Owai* graph).
 // Idempotent. Run: node --env-file=... src/bin/apply-schema.mjs
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { q, close } from '../clients/db.mjs';
@@ -10,12 +10,16 @@ import { assertConfig } from '../config.mjs';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 async function applySupabase() {
-  const sql = readFileSync(join(root, 'migrations', '0001_obsidiwikai_core.sql'), 'utf8');
-  await q(sql);
+  const dir = join(root, 'migrations');
+  const files = readdirSync(dir).filter((f) => f.endsWith('.sql')).sort();
+  for (const f of files) {
+    await q(readFileSync(join(dir, f), 'utf8'));
+    console.log('  applied migration', f);
+  }
   const r = await q(
-    "select table_name from information_schema.tables where table_schema='obsidiwikai' order by table_name"
+    "select table_schema||'.'||table_name t from information_schema.tables where table_schema in ('obsidiwikai','cairn') order by table_schema, table_name"
   );
-  return r.rows.map((x) => x.table_name);
+  return r.rows.map((x) => x.t);
 }
 
 async function applyNeo4j() {

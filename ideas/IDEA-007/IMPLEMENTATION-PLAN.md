@@ -195,3 +195,21 @@ The overnight build (branch `idea-007/obsidiwikai-build`, PR #59) proved the WP0
 - Qwen = benchmark **challenger**, not a commitment. Local inference deferred (no GPU on CX33; a future gateway config line).
 - **Code decoupled to roles** (2026-07-23): `llm.mjs` reasoning now flows through `models.mjs → reason()` (provider-neutral), not LightRAG's OpenAI path.
 - Guiding principles (Warwick, standing): build for scalability/future-proofing unless cost-prohibitive; build **to the goal**, use thin slices only to prove — never ship a slice as the goal.
+
+## 15. Plan correction — Cairn / Unified Intake Intelligence (the missing upstream layer, 2026-07-23)
+
+Not a new feature and not a YouTube add-on — this **closes a gap in the existing plan between durable Unified Fusion capture and the downstream specialist processors.** It replaces the deferred "D-cairn" (manual, in-session hand-authoring), now buildable because the LLM pipeline (gateway + LightRAG + Honcho + Compiler) exists.
+
+**Cairn's responsibility** — for every *durably captured* object, decide: what it is · likely Warwick intent · privacy/domain class · destination lane/processor · treatment/action · confidence + bounded rationale · whether to **act / confirm / ask**.
+**Cairn does NOT:** clean transcripts (TubeAIR owns that) · extract encyclopedia knowledge (LightRAG/Compiler) · become the personal vault · replace Honcho (Honcho = the evolving Warwick lens).
+**Privacy ordering (non-negotiable):** classify routing/privacy *first*, locally, **without** shipping unrestricted raw content to Honcho/external reasoning to discover whether it's private. Fail closed.
+
+**Knowledge treatment simplified** (Experiment B proved indexing is intrinsic to extraction — the Extract/Deep distinction was fake): **📄 Keep** (retain only) / **🧠 Learn** (full-quality extraction + encyclopedia + searchability). No Extract-vs-Deep tier.
+
+**Lanes:** Lane 1 = real YouTube → external_knowledge/learn → TubeAIR (raw + faithful-clean + retained analysis) → LightRAG(clean) → Honcho lens → canonicaliser → searchable encyclopedia. Synthetic fixtures prove the generic contract: journal→personal/Obsidian, task→task, ambiguous→ask, explicit→explicit-wins. Other lanes are stubs this increment.
+
+**Learning:** confirm-first for inferred actions; persist Warwick's corrections as governed routing feedback; explicit instruction outranks learned; low confidence asks; high-confidence learned may later be receipt-only, never silently crossing privacy/domain.
+
+**Acceptance:** capture durable before Cairn · idempotent reruns · decision+confidence+rationale receipted · explicit wins · ambiguity asks · privacy fails closed · YouTube routes into the existing pipeline · journal/task fixtures prove generic architecture · Cairn failure cannot lose the object · decisions correctable/replayable · source-adapter based so email/article/audio/document add without rewriting Cairn.
+
+**Sequence:** Cairn is built **before** the final Telegram buttons — the buttons are merely Cairn's confirmation UI. Experiment A stays a TubeAIR tuning task, not a Cairn blocker.
