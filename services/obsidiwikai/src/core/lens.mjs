@@ -2,6 +2,10 @@
 // Honcho enrichment plugs in at WP3 behind this same interface. The compiler consumes the
 // lens and does not care where it came from.
 import { q } from '../clients/db.mjs';
+import { honcho, PEER_WARWICK } from '../clients/honcho.mjs';
+import { extractJson } from './llm.mjs';
+
+const uniq = (a) => [...new Set(a.filter(Boolean).map((s) => String(s).trim()))];
 
 // Seed profile (thin-slice per Pax): a reasonable first lens so the interest pass has signal
 // on day one. Warwick can edit any of this in Directus (WP3); feedback + Honcho grow it.
@@ -48,15 +52,33 @@ export async function buildLens() {
     goals: by('goal'), current_projects: by('project'), open_questions: by('question'),
     negative_signals: by('negative'), adjacent_topics: [],
   };
+  // WP3 — enrich the lens from Honcho's live model of Warwick (best-effort; seed stands on failure).
+  let origin = 'supabase_seed';
+  try {
+    const ans = await honcho.chat(
+      PEER_WARWICK,
+      'Return ONLY JSON describing Warwick: {"active":[],"emerging":[],"goals":[],"negative":[]}. Max 6 short phrases each. active=current interests/projects, emerging=newer curiosities, negative=things he finds low value.'
+    );
+    const txt = typeof ans === 'string' ? ans : (ans?.content || JSON.stringify(ans));
+    const j = extractJson(txt);
+    if (j) {
+      lens.active = uniq([...lens.active, ...(j.active || [])]);
+      lens.emerging = uniq([...lens.emerging, ...(j.emerging || [])]);
+      lens.goals = uniq([...lens.goals, ...(j.goals || [])]);
+      lens.negative_signals = uniq([...lens.negative_signals, ...(j.negative || [])]);
+      origin = 'honcho+supabase';
+    }
+  } catch { /* seed lens stands */ }
+
   const version = Date.now();
   const ins = await q(
     `insert into obsidiwikai.interest_lens
        (lens_version,origin,enduring,active,emerging,goals,current_projects,open_questions,negative_signals,adjacent_topics)
-     values($1,'supabase_seed',$2,$3,$4,$5,$6,$7,$8,$9) returning lens_id`,
+     values($1,$10,$2,$3,$4,$5,$6,$7,$8,$9) returning lens_id`,
     [version, j(lens.enduring), j(lens.active), j(lens.emerging), j(lens.goals),
-     j(lens.current_projects), j(lens.open_questions), j(lens.negative_signals), j(lens.adjacent_topics)]
+     j(lens.current_projects), j(lens.open_questions), j(lens.negative_signals), j(lens.adjacent_topics), origin]
   );
-  return { lensId: ins.rows[0].lens_id, version, ...lens };
+  return { lensId: ins.rows[0].lens_id, version, origin, ...lens };
 }
 
 export function lensSummary(lens) {
