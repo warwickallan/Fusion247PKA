@@ -49,6 +49,31 @@ test('work/Bellrock → walled work lane', () => {
   assert.equal(d.lane, LANE.WORK);
 });
 
+test('explicit "Honch that" → Honcho lane, remember, act', () => {
+  const d = classify({ capture_id: 'h1', text: 'Honch that — Warwick prefers building for scale within reasonable cost' });
+  assert.equal(d.lane, LANE.HONCHO);
+  assert.equal(d.intent, INTENT.REMEMBER);
+  assert.equal(d.action, ACTION.ACT);
+});
+
+test('email SUBJECT "Honcho that" is caught (subject-aware)', () => {
+  const d = classify({ capture_id: 'h2', subject: 'Honcho that', source_type: 'email', text: 'He always prefers to build to the goal, not a narrow slice.' });
+  assert.equal(d.lane, LANE.HONCHO);
+  assert.equal(d.action, ACTION.ACT);
+});
+
+test('an ordinary email with a YouTube link → encyclopedia (Cairn owns routing, not the mailbox)', () => {
+  const d = classify({ capture_id: 'h3', source_type: 'email', subject: 'Great video', text: 'thought you\'d like https://youtu.be/abc123' });
+  assert.equal(d.lane, LANE.ENCYCLOPEDIA);
+  assert.equal(d.intent, INTENT.LEARN);
+});
+
+test('an email with no clear signal → ask (fails safe, does not guess Honcho)', () => {
+  const d = classify({ capture_id: 'h4', source_type: 'email', subject: 'Fwd:', text: 'see below' });
+  assert.equal(d.lane, LANE.UNKNOWN);
+  assert.equal(d.action, ACTION.ASK);
+});
+
 test('learned feedback raises confidence', () => {
   const fb = [{ pattern_key: 'url_host:medium.com', correct_lane: LANE.ENCYCLOPEDIA, correct_intent: INTENT.LEARN, weight: 3 }];
   const d = classify({ capture_id: 'c8', url: 'https://medium.com/some-article' }, { feedback: fb });

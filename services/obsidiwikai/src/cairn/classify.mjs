@@ -17,18 +17,22 @@ function firstUrl(c) {
 }
 
 // Explicit destination markers — Warwick telling Cairn where it goes. Outranks inference.
-function explicitTarget(c) {
-  const t = c.text || '';
+// `t` is subject + body combined, so an email whose SUBJECT is "Honch that" is caught.
+function explicitTarget(t) {
+  // "Honch that" is Warwick's deliberate GPT→brain instruction. → Honcho context lane.
+  if (/\bhonch(o)?\b\s*(that|this|it)?|→\s*honcho|send (this|that|it)? ?to honcho|for honcho|remember (this|that)?\s*about me/i.test(t)) return { lane: LANE.HONCHO, intent: INTENT.REMEMBER, what: 'explicit → Honcho context' };
   if (/#journal|→\s*obsidian|to obsidian|save to journal/i.test(t)) return { lane: LANE.PERSONAL, intent: INTENT.JOURNAL, what: 'explicit → journal' };
   if (/#task|→\s*task\b|as a task/i.test(t)) return { lane: LANE.TASK, intent: INTENT.TASK, what: 'explicit → task' };
   if (/#keep|keep raw|just keep/i.test(t)) return { lane: LANE.ENCYCLOPEDIA, intent: INTENT.KEEP, treatment: INTENT.KEEP, what: 'explicit → keep' };
-  if (/#learn|→\s*brain|learn this|save to brain/i.test(t) || c.recorded_intent === 'SaveToBrain') return { lane: LANE.ENCYCLOPEDIA, intent: INTENT.LEARN, treatment: INTENT.LEARN, what: 'explicit → learn' };
+  if (/#learn|→\s*brain|learn this|save to brain/i.test(t)) return { lane: LANE.ENCYCLOPEDIA, intent: INTENT.LEARN, treatment: INTENT.LEARN, what: 'explicit → learn' };
   return null;
 }
 
 export function classify(capture, { feedback = [] } = {}) {
-  const text = capture.text || capture.payload_text || capture.text_preview || '';
-  const url = firstUrl(capture);
+  const body = capture.text || capture.payload_text || capture.text_preview || '';
+  // subject-aware: source adapters (email) pass a subject line that may carry the instruction.
+  const text = [capture.subject, body].filter(Boolean).join('\n');
+  const url = firstUrl({ url: capture.url, text });
 
   // 1) PRIVACY FIRST, locally (fail closed). Governs what may leave for external reasoning.
   let privacy = PRIVACY.WORLD;
@@ -36,7 +40,8 @@ export function classify(capture, { feedback = [] } = {}) {
   else if (PERSONAL_RE.test(text) || JOURNAL_MARK.test(text)) privacy = PRIVACY.PERSONAL;
 
   // 2) EXPLICIT instruction wins (may not downgrade privacy).
-  const explicit = explicitTarget(capture);
+  let explicit = explicitTarget(text);
+  if (!explicit && capture.recorded_intent === 'SaveToBrain') explicit = { lane: LANE.ENCYCLOPEDIA, intent: INTENT.LEARN, treatment: INTENT.LEARN, what: 'explicit → learn' };
 
   // 3) infer
   let d;

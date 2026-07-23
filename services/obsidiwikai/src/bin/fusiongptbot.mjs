@@ -1,3 +1,9 @@
+// ⚠️ DEPRECATED / ROLLBACK-ONLY (2026-07-23). Superseded by Cairn's Honcho lane fed by the
+// Microsoft Graph email adapter (src/sources/email.mjs → Cairn → LANE.HONCHO → Context Outbox).
+// The dedicated front-door bot is redundant: any input arriving at the unified door is routed to
+// Honcho by Cairn ("Honch that" → LANE.HONCHO). Kept running as rollback ONLY until the email/Cairn
+// path passes end-to-end live acceptance; retire it after that (do not extend it).
+//
 // The ChatGPT->Honcho outbox FRONT DOOR: a dedicated Telegram bot (fusiongptbot).
 // You paste/forward a compact packet from ChatGPT; it enqueues to the Context Outbox; the
 // outbox-worker delivers it to Honcho. Separate bot/token from the main capture gateway, so
@@ -31,6 +37,7 @@ function toPacket(text) {
 }
 
 let offset = 0;
+console.log('⚠️ fusiongptbot is DEPRECATED / rollback-only — superseded by the Cairn Honcho lane (email adapter). Retire after the email path passes live e2e.');
 console.log('fusiongptbot outbox listener started (single getUpdates consumer — no poller conflict)');
 for (;;) {
   let upd;

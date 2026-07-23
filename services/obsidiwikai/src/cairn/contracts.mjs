@@ -6,6 +6,7 @@ export const LANE = Object.freeze({
   PERSONAL: 'personal',         // journals/reflections → Obsidian personal vault
   TASK: 'task',                 // reminders/todos → task lane
   WORK: 'work',                 // Bellrock/client — walled, deferred lane (WP7)
+  HONCHO: 'honcho',             // context ABOUT Warwick → Context Outbox → Honcho lens
   UNKNOWN: 'unknown',           // can't tell → ask Warwick
 });
 
@@ -14,6 +15,7 @@ export const INTENT = Object.freeze({
   KEEP: 'keep',     // retain the source only, no semantic extraction
   JOURNAL: 'journal',
   TASK: 'task',
+  REMEMBER: 'remember', // persist as durable context about Warwick (Honcho)
   ASK: 'ask',
 });
 

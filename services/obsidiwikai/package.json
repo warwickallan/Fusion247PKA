@@ -7,7 +7,7 @@
   "scripts": {
     "spike": "node src/bin/spike-verify.mjs",
     "compile": "node src/bin/compile-source.mjs",
-    "test": "node --test src/core/contextOutbox.test.mjs src/core/llm.test.mjs src/cairn/classify.test.mjs"
+    "test": "node --test src/core/contextOutbox.test.mjs src/core/llm.test.mjs src/cairn/classify.test.mjs src/sources/email.test.mjs"
   },
   "dependencies": {
     "pg": "^8.11.5"

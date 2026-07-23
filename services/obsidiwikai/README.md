@@ -30,7 +30,12 @@ npm test                                             # unit tests
 Drop the token in `C:\.fusion247\fusiongptbot.env` (`FUSIONGPTBOT_TOKEN=...`,
 `FUSIONGPTBOT_AUTHORISED_USER_ID=...`) then:
 ```
-node --env-file=C:/.fusion247/fusiongptbot.env $ENVS src/bin/fusiongptbot.mjs   # + outbox-worker --watch
+node --env-file=C:/.fusion247/fusiongptbot.env $ENVS src/bin/fusiongptbot.mjs   # DEPRECATED/rollback-only
+
+# Email source adapter (Fusion247 mailbox → Cairn). One-time setup + auth: see EMAIL-SETUP.md
+node --env-file=C:/.fusion247/msgraph.env $ENVS src/bin/email-authorize.mjs    # one-time device-code auth
+node --env-file=C:/.fusion247/msgraph.env $ENVS src/bin/email-baseline.mjs     # skip pre-existing mail, set cursor
+node --env-file=C:/.fusion247/msgraph.env $ENVS src/bin/email-poll.mjs         # poll → capture → Cairn (EMAIL_POLL_INTERVAL_S to daemonise)
 ```
 
 ## Proven live (overnight)
