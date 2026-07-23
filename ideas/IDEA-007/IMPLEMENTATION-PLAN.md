@@ -173,3 +173,25 @@ All 20 PRD §12 criteria. **First-build exit bar** (agreed with the compounding 
 4. Confirm the first-build exit bar (§11: ~3–5 sources) is the bar we're judged on.
 
 *Nothing in this plan is built until you say go.*
+
+---
+
+## 14. Amendments — post-build decisions (2026-07-23)
+
+The overnight build (branch `idea-007/obsidiwikai-build`, PR #59) proved the WP0–WP6 mechanisms. After a cost scare (the "£10" full-index was actually **~£0.60** — a misremembered credit balance) three decisions were taken (Warwick + GPT + Larry, unanimous).
+
+### Three-axis model architecture — never welded together
+- **INTENT** (`keep_raw` / `extract` / `deep_index`) — human-chosen at capture (the Telegram cards); decides *how much semantic work* a source earns. Default = `extract` (extract knowledge → populate Neo4j → link the raw source). `deep_index` (full-transcript search index) = explicit and priced.
+- **ROLE** (`fusion.extract / keyword / query / reason / embed`) — *what capability* is needed. The app requests a role, never a provider/model.
+- **GATEWAY** (thin LiteLLM) — *who supplies it*; maps role→provider→model by config, with centrally-enforced spend/rate limits (+ the provider's own credit cap as the ultimate backstop — deliberately **not** described as a penny-precise circuit breaker).
+
+### New work packages (extend the goal — not a re-scope)
+- **WP-INTENT** — intent-aware capture + compiler. *ObsidiWikAi side DONE (intent contract `src/core/intent.mjs`, `keep_raw` short-circuit, raw-link recorded). Telegram card buttons are capture-side (touch the live bot) → Warwick nod required.*
+- **WP-GATEWAY** — thin LiteLLM on `fusion247-core`: 5 role aliases, one hard-budget key, Postgres+Redis, memory-capped, healthcheck. All roles → OpenAI initially (no new provider key). Acceptance: a deliberate over-budget call is blocked. *Live infra → Warwick's go.* Code already gateway-ready (`src/core/models.mjs`; set `FUSION_GATEWAY_URL` to activate).
+- **WP-TOKEN-HYGIENE** — the real cost lever: chunk/overlap tuning, gleaning-pass count, caching, idempotent source-hash reprocess, Honcho-guided extraction depth. Profile *before* any model shopping.
+
+### Standing decisions
+- Keep OpenAI + `text-embedding-3-large`; build the `workspace`-based **blue-green re-index capability**, don't switch embeddings now.
+- Qwen = benchmark **challenger**, not a commitment. Local inference deferred (no GPU on CX33; a future gateway config line).
+- **Code decoupled to roles** (2026-07-23): `llm.mjs` reasoning now flows through `models.mjs → reason()` (provider-neutral), not LightRAG's OpenAI path.
+- Guiding principles (Warwick, standing): build for scalability/future-proofing unless cost-prohibitive; build **to the goal**, use thin slices only to prove — never ship a slice as the goal.

@@ -10,17 +10,29 @@ import { resolveAndApply } from './canonicaliser.mjs';
 import { buildCard } from './directusCard.mjs';
 import { thresholds } from '../config.mjs';
 import { conceptId } from './util.mjs';
+import { normaliseIntent } from './intent.mjs';
 
-export async function compileSource({ sourceId, title, url }) {
-  await ensureSource({ sourceId, title, url });
+export async function compileSource({ sourceId, title, url, intent, rawRef } = {}) {
+  const mode = normaliseIntent(intent);
+  await ensureSource({ sourceId, title, url, rawRef: rawRef || null });
   const runIns = await q(
-    `insert into obsidiwikai.processing_run(source_id,state,idempotency_key,attempt)
-     values($1,'received',$2,(select coalesce(max(attempt),0)+1 from obsidiwikai.processing_run where source_id=$1))
+    `insert into obsidiwikai.processing_run(source_id,state,idempotency_key,attempt,stats)
+     values($1,'received',$2,(select coalesce(max(attempt),0)+1 from obsidiwikai.processing_run where source_id=$1),$3)
      returning run_id`,
-    [sourceId, sourceId + ':' + Date.now()]
+    [sourceId, sourceId + ':' + Date.now(), JSON.stringify({ intent: mode })]
   );
   const runId = runIns.rows[0].run_id;
   const log = (...a) => console.log(`[run ${runId.slice(0, 8)}]`, ...a);
+
+  // KEEP RAW — preserve the source + its raw link, do zero semantic work (£0 spend).
+  if (mode === 'keep_raw') {
+    await q(
+      `update obsidiwikai.processing_run set state='completed', finished_at=now(), stats=$2 where run_id=$1`,
+      [runId, JSON.stringify({ intent: mode, note: 'keep_raw — raw preserved, no extraction' })]
+    );
+    log('KEEP_RAW — raw preserved, no semantic work');
+    return { runId, intent: mode, stats: { intent: mode, note: 'raw only' } };
+  }
 
   try {
     // 1. lens
@@ -84,7 +96,7 @@ export async function compileSource({ sourceId, title, url }) {
     await q(`update obsidiwikai.processing_run set state='carded' where run_id=$1`, [runId]);
 
     // 7. complete
-    const statsObj = { candidates: candidates.length, deferred, ...summaryObj(actions), encyclopedia: stats };
+    const statsObj = { intent: mode, candidates: candidates.length, deferred, ...summaryObj(actions), encyclopedia: stats };
     await q(`update obsidiwikai.processing_run set state='completed', finished_at=now(), stats=$2 where run_id=$1`, [runId, JSON.stringify(statsObj)]);
     log('COMPLETED —', JSON.stringify(statsObj));
     return { runId, cardId: card.cardId, stats: statsObj, card };
