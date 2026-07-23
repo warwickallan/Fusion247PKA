@@ -1,0 +1,15 @@
+{
+  "name": "@fusion247/obsidiwikai",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "description": "ObsidiWikAi Knowledge Compiler (IDEA-007) — interest-conditioned semantic extraction into a curated Neo4j encyclopedia.",
+  "scripts": {
+    "spike": "node src/bin/spike-verify.mjs",
+    "compile": "node src/bin/compile-source.mjs",
+    "test": "node --test src/**/*.test.mjs"
+  },
+  "dependencies": {
+    "pg": "^8.11.5"
+  }
+}
