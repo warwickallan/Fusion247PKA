@@ -4,6 +4,7 @@
 import { LANE, INTENT } from './contracts.mjs';
 import { q } from '../clients/db.mjs';
 import { enqueuePacket, deliverPacket } from '../core/contextOutbox.mjs';
+import { enqueueCompileJob } from '../core/compileQueue.mjs';
 
 const PACKET_TYPES = new Set(['preference', 'correction', 'decision', 'interest', 'standing_instruction', 'session_conclusion']);
 // A subject that is ONLY the routing instruction ("Honch that", "→ Honcho") is not content —
@@ -42,11 +43,14 @@ const adapters = {
     if (d.treatment === INTENT.KEEP) {
       return { lane: LANE.ENCYCLOPEDIA, did: 'retained source only (keep)', handoff: 'raw preserved + linked, no extraction' };
     }
-    // learn → the knowledge pipeline (the existing working flow); Cairn records the routing + treatment.
+    // learn → enqueue a DURABLE compile job; the compile-worker grows the encyclopedia async
+    // (routing never blocks on a slow/costly compile; a crash can't lose the capture).
+    const jobId = await enqueueCompileJob(capture, 'learn');
     return {
-      lane: LANE.ENCYCLOPEDIA, did: 'routed to knowledge pipeline (learn)',
-      handoff: 'TubeAIR → LightRAG(clean) → Honcho lens → canonicaliser → searchable encyclopedia',
-      source_id: capture.source_id || capture.url || null,
+      lane: LANE.ENCYCLOPEDIA,
+      did: jobId ? 'queued compile job (learn)' : 'compile already queued (idempotent)',
+      handoff: 'compile-worker → TubeAIR → LightRAG(clean) → canonicaliser → searchable encyclopedia',
+      job_id: jobId, source_id: capture.source_id || capture.url || null,
     };
   },
   [LANE.HONCHO]: async (capture, d) => {
