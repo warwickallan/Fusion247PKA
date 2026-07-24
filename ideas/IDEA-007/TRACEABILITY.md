@@ -1,13 +1,25 @@
 # ObsidiWikAi — Traceability Matrix
 
-> ## ✅ WP "Neo4j-backed one-graph cutover" COMPLETE (2026-07-24)
-> The knowledge graph is now **LightRAG 1.5.4 on Neo4JStorage** (one graph, physically in Neo4j). The
-> old NetworkX backend + the duplicate `OwaiConcept` projection are retired (NetworkX kept as rollback).
-> **Proven:** parallel instance → Neo4JStorage; 383→587 nodes / cross-source merges from faithful-clean
-> §7.1 transcripts; provenance node→chunk→passage→§7.1→raw; restart-persistence; a fresh source
-> (`bankdPmQnHU`) through the finished **capture→Cairn→LEARN→learn-worker→LightRAG→Neo4j→searchable**
-> route with the auto health check. Intent simplified to **KEEP | LEARN**. Production `lightrag-neo4j-prod`
-> box `:9621`. NOT merged (Warwick's merge gate + independent review still required).
+> ## ✅ STATUS 2026-07-24 (head b7729d6) — WP1–WP5 COMPLETE; FR-029/DoD#18 is the NEXT BUILD
+> **One authoritative graph:** LightRAG 1.5.4 on **Neo4JStorage** (physically in Neo4j); NetworkX + the
+> duplicate `OwaiConcept` projection retired (NetworkX kept as rollback). Intent = **KEEP | LEARN**.
+>
+> - **WP1 ✅** Neo4JStorage cutover; Learn fully automatic (Cairn→learn-worker→§7.1→Neo4j) + health check.
+> - **WP2 ✅ (bar 1 human dep)** Honcho lane (verbatim) + hardened outbox + MS Graph email adapter;
+>   **needs Warwick: mailbox account + one-time OAuth** to finish email E2E.
+> - **WP3 ✅** interest-lens management (surface + edit + feed Honcho).
+> - **WP4 ✅** compounding loop — source_interpretation snapshots + reanalyse → **"Since you first learned
+>   this…" DELTA**, history preserved. Proven: graph-agents re-lit after adding interest "operational agent memory".
+> - **WP5 ✅** grounded so-what suggestions (self_improve/fusion247/content/monetise), cited/confidence/
+>   human-gated → Directus `learning_candidate`; Accept/Decline → Honcho.
+> - **WP6 ⬜** agent/MCP grounded Q&A (partly: `ask.mjs`/`trace.mjs` + the report's grounded queries). Not closed.
+> - **WP7 🔵** work/Bellrock walled lane — deferred by design.
+>
+> **Delivered product surfaces (Tailscale, managed):** report `fusion-report` box:8701 · graph `fusion-graph`
+> box:8700 (both banked at `services/obsidiwikai/ops/`). **NOT merged** (Codex review + Warwick gate stand).
+>
+> **⬜ NEXT BUILD — FR-029 / DoD #18:** governed **MyPKA self-improvement candidates** ("🛠 Make the Brain
+> Better") via the existing `follow_on_task` machinery — see `services/obsidiwikai/HANDOFF-CODEX.md`. NOT started.
 
 **Purpose:** the single source that maps PRD requirements → work package → PR → test → status, so **Codex QA (and Warwick) can judge alignment + progress**, not cosmetics. Kept live in Git; status ledger mirrored to Supabase.
 
