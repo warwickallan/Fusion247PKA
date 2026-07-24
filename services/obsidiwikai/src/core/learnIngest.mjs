@@ -77,6 +77,10 @@ export async function reconcileLearn({ staleMinutes = 30 } = {}) {
     const st = byFile[job.source_id];
     if (st === 'processed') {
       await q(`update obsidiwikai.compile_job set state='done', receipt='searchable + represented in the graph', done_at=now() where job_id=$1`, [job.job_id]);
+      // Reflect the learn outcome on the Directus-visible cockpit record: a learned source moves
+      // into Warwick's review queue ('pending_warwick_review' is the in-schema state Directus surfaces).
+      // Best-effort — no-op if it isn't a youtube source.
+      await q(`update cockpit.youtube_source set review_state='pending_warwick_review', learning_count=coalesce(learning_count,0)+1, updated_at=now() where video_id=$1 and review_state='ai_created'`, [job.source_id]).catch(() => {});
       out.push({ job_id: job.job_id, state: 'done', source: job.source_id });
     } else if (st === 'failed') {
       await q(`update obsidiwikai.compile_job set state='failed', error='LightRAG extraction failed' where job_id=$1`, [job.job_id]);
