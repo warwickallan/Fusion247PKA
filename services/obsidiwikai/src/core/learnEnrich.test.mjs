@@ -1,6 +1,23 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { planAction, readAuthoritativeGraph, ENRICH_LIMITS } from './learnEnrich.mjs';
+import { planAction, readAuthoritativeGraph, extractLensDirected, ENRICH_LIMITS } from './learnEnrich.mjs';
+
+const FAKE_LENS = { enduring: [], active: ['knowledge graphs'], emerging: [], goals: [], negative_signals: [] };
+
+// Lens-directed extraction (FR-006): shape/trim/bound candidates, skip trivially-short text, no invention.
+test('extractLensDirected skips tiny text and shapes/bounds candidates', async () => {
+  assert.deepEqual(await extractLensDirected('too short', FAKE_LENS), []);
+  const fakeGen = async () => [
+    { name: '  Agentic Retrieval  ', entity_type: 'method', description: 'x'.repeat(400), why: 'core' },
+    { description: 'no name — dropped' },
+    { name: 'Honcho' },
+  ];
+  const out = await extractLensDirected('a'.repeat(500), FAKE_LENS, { generate: fakeGen, limit: 5 });
+  assert.equal(out.length, 2);            // the nameless candidate is dropped
+  assert.equal(out[0].name, 'Agentic Retrieval'); // trimmed
+  assert.ok(out[0].description.length <= 300);     // bounded
+  assert.equal(out[1].entity_type, 'concept');     // default type
+});
 
 // The conservative decision rule — the single "auto-change the graph vs leave for a human" gate.
 test('planAction: deterministic alias → merge (no model confidence needed)', () => {

@@ -88,7 +88,7 @@ export async function reconcileLearn({ staleMinutes = 30, maxEnrichAttempts = 5 
       try {
         const en = await enrichSource(job.source_id);
         await q(`update obsidiwikai.compile_job set state='done', error=null, receipt=$2, done_at=now() where job_id=$1`,
-          [job.job_id, `searchable + represented · enriched (merged ${en.merged}, related ${en.related}, held ${en.held}, deferred ${en.deferred})`]);
+          [job.job_id, `searchable + represented · enriched (merged ${en.merged}, related ${en.related}, added ${en.added}, held ${en.held}, deferred ${en.deferred})`]);
         await q(`update cockpit.youtube_source set review_state='pending_warwick_review', learning_count=coalesce(learning_count,0)+1, updated_at=now() where video_id=$1 and review_state='ai_created'`, [job.source_id]).catch(() => {});
         out.push({ job_id: job.job_id, state: 'done', source: job.source_id });
       } catch (e) {

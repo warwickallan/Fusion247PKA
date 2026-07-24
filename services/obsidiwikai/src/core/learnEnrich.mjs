@@ -9,9 +9,10 @@
 //   - provenance stays on LightRAG's own nodes (source_id / file_path), which merges preserve.
 import { q } from '../clients/db.mjs';
 import { lightrag } from '../clients/lightrag.mjs';
-import { buildLens } from './lens.mjs';
+import { buildLens, lensSummary } from './lens.mjs';
 import { scoreRelevanceBatched } from './relevance.mjs';
 import { generateJSON } from './llm.mjs';
+import { faithfulClean } from './learnIngest.mjs';
 
 export const ENRICH_LIMITS = {
   relevanceFloor: 0.35,    // below this (and not emerging) → deferred reservoir, not canonicalised
@@ -19,7 +20,7 @@ export const ENRICH_LIMITS = {
                            // aliases + genuinely corroborated ≥0.98 auto-merge; 0.85–0.979 is HELD.
   relateConfidence: 0.85,  // typed relationships are additive + reversible → a lower bar than a merge
   holdFloor: 0.85,         // similar-but-uncertain identity in [holdFloor, mergeConfidence) → held for review
-  maxCanonicalise: 60,     // bound LLM cost per source
+  maxCanonicalise: Number(process.env.WP15_MAX_CANONICALISE) || 60, // bound LLM cost per source/pass
 };
 
 // FR-010 full outcome set → how each maps to a durable edge on the ONE graph. Identity outcomes
@@ -115,6 +116,84 @@ export function planAction(decision, entityName, limits = ENRICH_LIMITS) {
   return 'keep';
 }
 
+// Canonicalise ONE candidate against the authoritative graph + apply per policy, recording the decision.
+// `mode` distinguishes the broad pass (candidate already IS a graph entity → NEW means leave it) from
+// the lens-directed pass (candidate may be genuinely absent → NEW means ADD it, with provenance). All
+// mutations are gated by `apply`. Returns the ledger action taken.
+async function canonicaliseCandidate(candidate, { catalog, client, limits, apply, runId, sourceId, pass, mode }) {
+  let decision;
+  try {
+    decision = await classifyOneGraph(candidate, catalog, { client });
+  } catch {
+    decision = { classification: 'UNCERTAIN', matched_name: null, confidence: 0, rationale: 'canonicalise error' };
+  }
+  const plan = planAction(decision, candidate.name, limits);
+  let action = 'kept';
+  try {
+    if (plan === 'merge') {
+      if (apply) await client.mergeEntities([candidate.name], decision.matched_name);
+      action = 'merged';
+    } else if (plan === 'relate') {
+      // FR-010: a TYPED relationship, NOT a merge. NARROWER reverses direction (matched IS_A candidate).
+      const relType = REL_TYPE[decision.classification] || 'RELATED_TO';
+      const [src, tgt] = decision.classification === 'NARROWER_THAN'
+        ? [decision.matched_name, candidate.name] : [candidate.name, decision.matched_name];
+      if (apply) await client.createRelation(src, tgt, {
+        description: decision.rationale || `${relType} (WP1.5 lens canonicalisation)`, keywords: relType, weight: decision.confidence ?? 0,
+      });
+      action = 'related';
+    } else if (plan === 'hold') {
+      action = 'held';   // genuine ambiguity — leave BOTH entities, record for human review
+    } else if (mode === 'lens_directed' && decision.classification === 'NEW_CONCEPT') {
+      // The lens surfaced a relevant concept the broad pass did NOT extract → ADD it to the one graph
+      // with provenance, so the lens genuinely EXPANDS what the Brain notices (FR-006), not just scores.
+      if (apply) await client.createEntity(candidate.name, {
+        entity_type: candidate.entity_type || 'concept',
+        description: (candidate.description || '').slice(0, 500),
+        source_id: sourceId, file_path: sourceId,
+      });
+      action = 'added';
+    } else {
+      action = 'kept';   // NEW (broad) / below threshold — LightRAG already has it, leave as-is
+    }
+  } catch {
+    action = 'held';     // an apply failure is held, never a partial/blind graph change
+  }
+  await q(
+    `insert into obsidiwikai.wp15_canonicalisation(run_id,source_id,entity_name,classification,matched_name,action,confidence,rationale,pass)
+     values($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+    [runId, sourceId, candidate.name, decision.classification || 'UNCERTAIN',
+      decision.matched_name || null, action, decision.confidence ?? null, decision.rationale || null, pass],
+  );
+  return action;
+}
+
+// LENS-DIRECTED extraction (FR-006) — steer a second pass over the faithful-clean source by the CURRENT
+// lens, surfacing concepts genuinely present but under-noticed by the broad extraction. No invention.
+export async function extractLensDirected(text, lens, { generate = generateJSON, limit = 15 } = {}) {
+  if (!text || text.length < 200) return [];
+  const prompt = `You extract concepts from a source that are SPECIFICALLY relevant to a person, Warwick, given his interest lens — especially concepts a generic extraction might under-emphasise. Only concepts GENUINELY present in the source; do not invent.
+
+WARWICK'S LENS:
+${lensSummary(lens)}
+
+SOURCE (faithful-clean, may be truncated):
+${text.slice(0, 12000)}
+
+Return ONLY a JSON array of up to ${limit} objects:
+{"name":"exact concept name","entity_type":"concept|tool|method|person|org","description":"<=200 chars grounded in the source","why":"<=12 words why it matters to Warwick"}`;
+  const arr = await generate(prompt);
+  return (Array.isArray(arr) ? arr : [])
+    .filter((c) => c && c.name)
+    .slice(0, limit)
+    .map((c) => ({
+      name: String(c.name).trim(),
+      entity_type: c.entity_type || 'concept',
+      description: String(c.description || '').slice(0, 300),
+      why: c.why || '',
+    }));
+}
+
 // Read the authoritative graph once: full entity catalog + this source's just-extracted entities.
 export async function readAuthoritativeGraph(sourceId, { maxNodes = 4000, client = lightrag } = {}) {
   const g = await client.graphs({ label: '*', maxDepth: 2, maxNodes });
@@ -138,7 +217,9 @@ export async function readAuthoritativeGraph(sourceId, { maxNodes = 4000, client
 // apply=false → OBSERVE mode: record exactly what the pass WOULD do (relevance + canonicalisation
 // decisions/actions) without mutating the authoritative graph. Used to prove new logic is sane on a
 // real source before any live merge/relate.
-export async function enrichSource(sourceId, { lens = null, client = lightrag, limits = ENRICH_LIMITS, apply = true } = {}) {
+// reportId defaults to sourceId (the permanent path uses one id for both the faithful-clean report and
+// the graph file_source). It exists only for historical sources whose report key ≠ graph slug.
+export async function enrichSource(sourceId, { lens = null, client = lightrag, limits = ENRICH_LIMITS, apply = true, reportId = null } = {}) {
   const runId = (await q(
     `insert into obsidiwikai.wp15_enrich_run(source_id,state) values($1,'enriching') returning run_id`,
     [sourceId],
@@ -173,52 +254,45 @@ export async function enrichSource(sourceId, { lens = null, client = lightrag, l
     // 2) CANONICALISATION — for the RELEVANT entities only (the lens decides where we spend semantic
     // judgement), conservatively resolve against the authoritative graph. Catalog excludes this
     // source's own entities so we link islands rather than self-match.
-    const own = new Set(sourceEntities.map((e) => e.name));
-    const catalog = entities.filter((e) => !own.has(e.name));
+    const own = new Set(sourceEntities.map((e) => e.name.toLowerCase()));
+    const catalog = entities.filter((e) => !own.has(e.name.toLowerCase()));
     const relevant = scored
       .filter((s) => s.relevance >= limits.relevanceFloor || s.emerging)
       .slice(0, limits.maxCanonicalise);
-    let merged = 0, related = 0, held = 0, kept = 0;
+    const tally = { merged: 0, related: 0, held: 0, kept: 0, added: 0 };
+    const bump = (a) => { if (a === 'merged') tally.merged++; else if (a === 'related') tally.related++; else if (a === 'held') tally.held++; else if (a === 'added') tally.added++; else tally.kept++; };
     for (const s of relevant) {
-      let decision;
-      try {
-        decision = await classifyOneGraph({ name: s.raw_name, description: s.description || '' }, catalog, { client });
-      } catch {
-        decision = { classification: 'UNCERTAIN', matched_name: null, confidence: 0, rationale: 'canonicalise error' };
-      }
-      const plan = planAction(decision, s.raw_name, limits);
-      let action = 'kept';
-      try {
-        if (plan === 'merge') {
-          // MERGE the near-duplicate into the canonical entity — on the ONE graph, native API.
-          if (apply) await client.mergeEntities([s.raw_name], decision.matched_name);
-          action = 'merged'; merged++;
-        } else if (plan === 'relate') {
-          // FR-010: a TYPED relationship, NOT a merge. NARROWER reverses direction (matched IS_A candidate).
-          const relType = REL_TYPE[decision.classification] || 'RELATED_TO';
-          const [src, tgt] = decision.classification === 'NARROWER_THAN'
-            ? [decision.matched_name, s.raw_name] : [s.raw_name, decision.matched_name];
-          if (apply) await client.createRelation(src, tgt, {
-            description: decision.rationale || `${relType} (WP1.5 lens canonicalisation)`, keywords: relType, weight: decision.confidence ?? 0,
-          });
-          action = 'related'; related++;
-        } else if (plan === 'hold') {
-          action = 'held'; held++;   // genuine ambiguity — leave BOTH entities, record for human review
-        } else {
-          action = 'kept'; kept++;   // NEW_CONCEPT / below threshold — LightRAG already has it, leave as-is
-        }
-      } catch {
-        action = 'held'; held++;     // an apply failure is held, never a partial/blind graph change
-      }
-      await q(
-        `insert into obsidiwikai.wp15_canonicalisation(run_id,source_id,entity_name,classification,matched_name,action,confidence,rationale)
-         values($1,$2,$3,$4,$5,$6,$7,$8)`,
-        [runId, sourceId, s.raw_name, decision.classification || 'UNCERTAIN',
-          decision.matched_name || null, action, decision.confidence ?? null, decision.rationale || null],
+      const act = await canonicaliseCandidate(
+        { name: s.raw_name, entity_type: s.entity_type, description: s.description || '' },
+        { catalog, client, limits, apply, runId, sourceId, pass: 'broad', mode: 'broad' },
       );
+      bump(act);
     }
 
-    const stats = { applied: apply, source_entities: sourceEntities.length, scored: scored.length, deferred, canonicalised: relevant.length, merged, related, held, kept };
+    // 3) LENS-DIRECTED PASS (FR-006) — steer a SECOND extraction over the faithful-clean source by the
+    // CURRENT lens, surfacing relevant concepts the broad pass under-noticed, then feed them through the
+    // SAME one-graph canonicalisation. Genuinely-new relevant concepts are ADDED with provenance, so the
+    // lens is DIRECTIVE (it changes what the Brain notices), not merely a post-hoc scorer. Best-effort:
+    // if the faithful-clean text is unavailable the broad-pass enrichment still stands.
+    let lensDirected = 0;
+    try {
+      const text = faithfulClean(reportId || sourceId);
+      const candidates = await extractLensDirected(text, lens, { limit: Math.min(15, limits.maxCanonicalise) });
+      const fresh = candidates.filter((c) => !own.has(c.name.toLowerCase())).slice(0, limits.maxCanonicalise);
+      lensDirected = fresh.length;
+      for (const c of fresh) {
+        const act = await canonicaliseCandidate(c, { catalog, client, limits, apply, runId, sourceId, pass: 'lens_directed', mode: 'lens_directed' });
+        bump(act);
+        own.add(c.name.toLowerCase()); // avoid re-adding within the same run
+      }
+    } catch (e) {
+      lensDirected = -1; // faithful-clean unavailable → lens-directed pass skipped (broad pass still applied)
+    }
+
+    const stats = {
+      applied: apply, source_entities: sourceEntities.length, scored: scored.length, deferred,
+      canonicalised: relevant.length, lens_directed: lensDirected, ...tally,
+    };
     await q(`update obsidiwikai.wp15_enrich_run set state='completed', lens_version=$2, stats=$3, finished_at=now() where run_id=$1`,
       [runId, lensVersion, JSON.stringify(stats)]);
     return { runId, sourceId, ...stats };

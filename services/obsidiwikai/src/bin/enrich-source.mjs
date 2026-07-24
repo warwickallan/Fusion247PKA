@@ -9,13 +9,15 @@ import { close } from '../clients/db.mjs';
 assertConfig();
 const sourceId = process.argv[2];
 const apply = process.argv.includes('--apply');
+const reportFlag = process.argv.indexOf('--report');
+const reportId = reportFlag > -1 ? process.argv[reportFlag + 1] : null;
 if (!sourceId) {
-  console.error('usage: enrich-source.mjs <sourceId> [--apply]');
+  console.error('usage: enrich-source.mjs <sourceId> [--apply] [--report <reportId>]');
   process.exit(1);
 }
 try {
-  console.log(`WP1.5 enrich ${sourceId} — ${apply ? 'LIVE APPLY' : 'OBSERVE (no mutation)'}`);
-  const r = await enrichSource(sourceId, { apply });
+  console.log(`WP1.5 enrich ${sourceId} — ${apply ? 'LIVE APPLY' : 'OBSERVE (no mutation)'}${reportId ? ` (report=${reportId})` : ''}`);
+  const r = await enrichSource(sourceId, { apply, reportId });
   console.log(JSON.stringify(r, null, 2));
 } finally {
   await close();
