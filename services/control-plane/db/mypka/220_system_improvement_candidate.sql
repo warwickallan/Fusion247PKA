@@ -46,4 +46,4 @@ comment on column cockpit.learning_candidate.next_step is
 -- Keep the existing trust boundary: Directus/report may request a decision, but
 -- only cp_worker may apply candidate state or create correlated follow-on work.
 grant select on cockpit.learning_candidate to cp_directus;
-grant select on cockpit.learning_candidate to cp_worker;
+grant select on cockpit.learning_candidate, cockpit.youtube_source to cp_worker;

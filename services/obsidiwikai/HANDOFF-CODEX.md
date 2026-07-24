@@ -3,11 +3,11 @@
 Durable handoff to continue the build on Codex without losing momentum. Written 2026-07-24.
 
 ## Where we are
-- **Branch:** `idea-007/obsidiwikai-build` · **head:** `b7729d6` · working tree clean · **PR #59** (draft, NOT merged).
-- **32/32 unit tests** green (`cd services/obsidiwikai && npm test`).
+- **Branch:** `idea-007/obsidiwikai-build` · live-completion base `323d90c` · **PR #59** (draft, NOT merged).
+- **35/35 ObsidiWikAi tests** green, plus 3/3 resolver/handoff tests and a 24/24 live acceptance run.
 - **WP1–WP5 COMPLETE.** WP6 partial (grounded Q&A via `ask.mjs`/`trace.mjs`). WP7 deferred by design.
-- **Do NOT merge / branch / start Codex review or FR-029 implementation from the parking session.** Warwick's
-  merge gate + independent review still stand. Next requirement = FR-029 (below).
+- **Do NOT merge or create another branch/PR.** Warwick's
+  merge gate + independent review still stand. FR-029 completion evidence is below.
 
 ## Architecture (final, one graph)
 ```
@@ -106,24 +106,10 @@ subset) with a stable ref, surface a "🛠 Make the Brain Better" section on the
 - 35 ObsidiWikAi tests + 3 resolver/handoff tests + 9 endpoint security checks green;
 - Vera screenshots at 375/768/1280 px: no overflow, 44 px targets, visible keyboard focus.
 
-### NOT yet live-proven — genuine blocker
+### LIVE-PROVEN — Yoga completion
 
-This Codex workstation does not have `C:\Users\Warwick.Allen\.ssh\hetzner_fusion247_ed25519` and has no Tailscale adapter. SSH to `100.101.240.85` timed out before any remote change. Therefore:
+The Yoga supplied the authorised Tailscale/SSH route. Migration 220 is live; `fusion-report` is deployed with the request-only `cp_directus` action DSN; the real Cerebras source completed Accept → correlated open `follow_on_task` → Larry resume visibility and Dismiss → no task. The human phrase `Action A from the Cerebras report` resolves on the Windows CLI. No canonical MyPKA content was changed.
 
-- migration 220 is not applied live;
-- the report is not redeployed;
-- no real source candidate has been generated;
-- Accept → `follow_on_task`, Dismiss → no task, cockpit state and live resume output are not yet evidenced;
-- FR-029 / DoD #18 remains **PARTIAL / BLOCKED**, not complete.
+Two live-only defects were fixed before completion: the report's disallowed row lock under `cp_directus`, and the missing narrow `cp_worker` read of `cockpit.youtube_source`; the Windows direct-run guard in `resume-followups.mjs` was also corrected. The failed pre-fix intents remain durably recorded; the successful retry and aggregate proof left exactly one Action A task and no Action B task.
 
-### Exact resumption point (runtime with box access)
-
-1. Apply `services/control-plane/db/mypka/220_system_improvement_candidate.sql` idempotently to the live cockpit database.
-2. Configure `REPORT_ACTION_DATABASE_URL` with the existing request-only `cp_directus` DSN.
-3. Deploy `services/obsidiwikai/ops/report-server.py` and restart `fusion-report`.
-4. Run `suggest-system.mjs --source=<one already-learned real video id>`.
-5. Open that source report and confirm the real candidate appears under `🛠 Make the Brain Better`.
-6. Run `prove-idea007-system-loop.mjs --source=<same id>`; it Accepts Action A, Dismisses Action B, proves Larry resume visibility and leaves the real evidence durable.
-7. Capture live report + Directus/cockpit evidence, then and only then mark FR-029 / DoD #18 complete.
-
-Do not create a branch/PR, merge, or redesign when resuming. Continue this branch and draft PR #59.
+FR-029 / DoD #18 are **COMPLETE**. Use [[ideas/IDEA-007/TRACEABILITY]] as the canonical evidence record. Continue on this branch and draft PR #59; do not merge without Warwick's gate.

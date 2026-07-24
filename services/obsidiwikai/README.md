@@ -66,7 +66,7 @@ this — no silent "captured but never finished" state.
 
 ## FR-029 — governed “Make the Brain Better” loop
 
-**Status:** code-ready and locally verified; live migration/deploy/real-source proof is pending a runtime with the Fusion247 SSH identity + Tailscale access. Do not mark DoD #18 complete until the committed real-source proof passes.
+**Status:** live-deployed and real-source proven on 2026-07-24; FR-029 / DoD #18 are complete. Draft PR #59 remains unmerged. Canonical evidence: [[ideas/IDEA-007/TRACEABILITY]].
 
 The source-level report now distinguishes two suggestion scopes:
 
@@ -101,4 +101,4 @@ Real-source acceptance proof (leaves the real decisions/task durable):
 node services/control-plane/wp-d-proof/prove-idea007-system-loop.mjs --source=<video-id>
 ```
 
-Before enabling report buttons live, apply `services/control-plane/db/mypka/220_system_improvement_candidate.sql` and set `REPORT_ACTION_DATABASE_URL` to the existing request-only `cp_directus` connection.
+For a fresh deployment, apply `services/control-plane/db/mypka/220_system_improvement_candidate.sql` and set `REPORT_ACTION_DATABASE_URL` to the existing request-only `cp_directus` connection before starting the report. The live Fusion247 deployment has both prerequisites.

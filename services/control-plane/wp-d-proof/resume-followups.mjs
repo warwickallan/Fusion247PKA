@@ -7,6 +7,7 @@
 // queryable queue Larry reads in-session. Completion still uses command_request close_follow_on,
 // producing a result event + receipt rather than a direct, unreceipted table write.
 import fs from 'node:fs';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pg from 'file:///C:/Fusion247PKA/services/control-plane/node_modules/pg/lib/index.js';
 import { resolveActionCandidate } from './candidate-resolver.mjs';
@@ -49,7 +50,7 @@ function printCandidate(c) {
 }
 
 // CLI (only when run directly)
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1].replace(/\\/g, '/').replace(/^([a-z]):/i, (m, d) => d.toUpperCase() + ':')) {
+if (process.argv[1] && path.resolve(fileURLToPath(import.meta.url)) === path.resolve(process.argv[1])) {
   const db = new pg.Client(gatewayDsn());
   await db.connect();
   const resolveArg = process.argv.find((arg) => arg.startsWith('--resolve='));

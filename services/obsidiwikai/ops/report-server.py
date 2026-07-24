@@ -23,9 +23,9 @@ def _clean_dsn(url):
 
 
 PG = _clean_dsn(os.environ['DATABASE_URL'])
-# Prefer a cp_directus-scoped DSN for decision intents. The fallback preserves the current private
-# report deployment, while DB insert guards still force status=requested and forbid receipts/claims.
-PG_ACTION = _clean_dsn(os.environ.get('REPORT_ACTION_DATABASE_URL', os.environ['DATABASE_URL']))
+# Decision intents must use the request-only cp_directus role. Fail closed rather
+# than silently falling back to the report's broader read connection.
+PG_ACTION = _clean_dsn(os.environ['REPORT_ACTION_DATABASE_URL'])
 LR = os.environ.get('LIGHTRAG_URL', 'http://lightrag-neo4j-prod:9621')
 LRKEY = os.environ.get('LIGHTRAG_API_KEY', '')
 GRAPH = os.environ.get('GRAPH_URL', 'http://100.101.240.85:8700')
@@ -142,7 +142,7 @@ def file_candidate_decision(candidate_id, command, token, requested_by='report:w
             "select lc.source_video_id, lc.status, lc.updated_at, f.status "
             "from cockpit.learning_candidate lc "
             "left join cockpit.follow_on_task f on f.source_candidate_id=lc.id and f.origin='learning_accept' "
-            "where lc.id=%s and lc.candidate_scope='system_improvement' for update of lc",
+            "where lc.id=%s and lc.candidate_scope='system_improvement'",
             (candidate_id,),
         )
         row = cursor.fetchone()
