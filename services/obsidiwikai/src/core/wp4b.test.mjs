@@ -2,12 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   EXTRACTION_PROFILE_VERSION,
+  applyPlan,
   buildCanonicalPlan,
+  canonicaliseEntity,
   idempotencyKey,
   joinRefs,
   lensFingerprint,
   realDelta,
   selectExactCandidates,
+  selectLensExpansionCandidates,
   stableJson,
   validateBundleIdentity,
   verifyPlan,
@@ -213,4 +216,140 @@ test('verification requires graph, reverse and vector provenance for every exact
 
   after.catalog.relationships[0].reverse_chunks = [];
   assert.equal(verifyPlan(plan, after).passed, false);
+});
+
+
+test('ranking prefers direct grounded lens expansion with a safe existing endpoint over generic or alias-shaped choices', async () => {
+  const before = beforeState();
+  before.entities = [before.catalog.entities[0]];
+  before.catalog.entities.push({
+    name: 'AI Agent',
+    description: 'An autonomous software agent',
+    entity_type: 'Concept',
+    source_ids: ['chunk-other'],
+    file_paths: ['source-other'],
+  });
+  const grounded = (content) => [{ ...evidence()[0], content }];
+  const candidate = {
+    ...candidateBundle(),
+    entities: [
+      {
+        name: 'Local AI',
+        description: 'A broad local technology category',
+        source_ids: ['chunk-new'],
+        file_paths: ['source-a'],
+        evidence: grounded('local AI runs on nearby hardware'),
+      },
+      {
+        name: 'Air Gap',
+        description: 'A disconnected local deployment',
+        source_ids: ['chunk-new'],
+        file_paths: ['source-a'],
+        evidence: grounded('an air gap isolates the deployment'),
+      },
+      {
+        name: 'Sensitive Documents',
+        description: 'Private client records requiring controlled processing',
+        source_ids: ['chunk-new'],
+        file_paths: ['source-a'],
+        evidence: grounded('Sensitive client documents need data sovereignty and full control.'),
+      },
+    ],
+    relationships: [
+      {
+        source: 'Local AI', target: 'Air Gap',
+        source_ids: ['chunk-new'], file_paths: ['source-a'], evidence: grounded('local AI can use an air gap'),
+      },
+      {
+        source: 'Sensitive Documents', target: 'AI Agents',
+        source_ids: ['chunk-new'], file_paths: ['source-a'],
+        evidence: grounded('AI agents process sensitive client documents under full control.'),
+      },
+    ],
+  };
+  const selection = await selectLensExpansionCandidates(
+    before,
+    candidate,
+    ['AI data sovereignty for sensitive client documents'],
+    {
+      generate: async () => ({
+        entities: ['Local AI', 'Air Gap'],
+        relationships: [{ source: 'Local AI', target: 'Air Gap' }],
+      }),
+    },
+  );
+  assert.deepEqual(selection, {
+    entityNames: ['Sensitive Documents'],
+    relationshipPairs: ['ai agents::sensitive documents'],
+  });
+
+  const plan = await buildCanonicalPlan(before, candidate, selection, {
+    client: { async queryData() { return { entities: [] }; } },
+    generate: async () => ({ classification: 'NEW_CONCEPT', confidence: 0.95 }),
+  });
+  assert.deepEqual(plan.operations.map((item) => item.kind), ['entity_create', 'relation_create']);
+  assert.deepEqual(plan.operations[1].target, { source: 'Sensitive Documents', target: 'AI Agent' });
+});
+
+test('canonicalisation resolves normalized aliases, holds alias-shaped duplicates, and preserves distinct RELATED_TO concepts', async () => {
+  const catalog = beforeState().catalog.entities;
+  const alias = await canonicaliseEntity({ name: 'Air-Gap' }, [{ ...catalog[0], name: 'Air Gap' }]);
+  assert.equal(alias.classification, 'ALIAS_OF');
+  assert.equal(alias.canonical_name, 'Air Gap');
+
+  const duplicate = await canonicaliseEntity({ name: 'Air Gap' }, catalog, {
+    generate: async () => ({ classification: 'NEW_CONCEPT', confidence: 0.99 }),
+  });
+  assert.equal(duplicate.classification, 'UNCERTAIN');
+  assert.match(duplicate.rationale, /alias-shaped duplicate/);
+
+  const related = await canonicaliseEntity({
+    name: 'Sensitive Records',
+    description: 'Regulated records with special handling needs',
+  }, [{ name: 'Client Documents', description: 'Documents received from clients' }], {
+    client: { async queryData() { return { entities: [{ entity_name: 'Client Documents' }] }; } },
+    generate: async () => ({
+      classification: 'RELATED_TO',
+      matched_name: 'Client Documents',
+      confidence: 0.94,
+      rationale: 'distinct subset with a meaningful relationship',
+    }),
+  });
+  assert.equal(related.classification, 'RELATED_TO');
+  assert.equal(related.canonical_name, 'Sensitive Records');
+  assert.equal(related.related_to, 'Client Documents');
+});
+
+test('reapply after rollback does not reuse stale create and backfill responses', async () => {
+  const calls = [];
+  const client = {
+    async createEntity() { calls.push('createEntity'); return { ok: true }; },
+    async editEntity() { calls.push('editEntity'); return { ok: true }; },
+    async createRelation() { calls.push('createRelation'); return { ok: true }; },
+    async editRelation() { calls.push('editRelation'); return { ok: true }; },
+  };
+  const query = async (sql) => {
+    if (sql.includes('select * from obsidiwikai.wp4b_operation_receipt')) {
+      return { rows: [{ state: 'rolled_back', response: { created: { stale: true }, backfilled: { stale: true } } }] };
+    }
+    return { rows: [] };
+  };
+  await applyPlan('run-a', {
+    operations: [
+      {
+        kind: 'entity_create', sequence: 1, operationKey: 'entity-op', target: { entity: 'Novel Concept' },
+        preImage: null, evidence: evidence(),
+        request: { entityName: 'Novel Concept', entityData: { source_id: 'chunk-new', file_path: 'source-a' } },
+      },
+      {
+        kind: 'relation_create', sequence: 2, operationKey: 'relation-op',
+        target: { source: 'Novel Concept', target: 'Existing Concept' }, preImage: null, evidence: evidence(),
+        request: {
+          sourceEntity: 'Novel Concept', targetEntity: 'Existing Concept',
+          relationData: { source_id: 'chunk-new', file_path: 'source-a' },
+        },
+      },
+    ],
+  }, { client, query });
+  assert.deepEqual(calls, ['createEntity', 'editEntity', 'createRelation', 'editRelation']);
 });

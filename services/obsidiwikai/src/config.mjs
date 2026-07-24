@@ -50,3 +50,10 @@ export function assertConfig() {
   if (!secrets.databaseUrl) missing.push('DATABASE_URL');
   if (missing.length) throw new Error(`obsidiwikai: missing env: ${missing.join(', ')}`);
 }
+
+// Retrieval/agent access is deliberately narrower than the compiler. It talks only to
+// LightRAG's governed read surface, so it must not require Neo4j or operational-ledger
+// credentials merely to answer a question.
+export function assertRetrievalConfig() {
+  if (!secrets.lightragKey) throw new Error('obsidiwikai retrieval: missing env: LIGHTRAG_API_KEY');
+}

@@ -14,6 +14,11 @@ const norm = (value) => String(value || '').trim().toLowerCase();
 const pairKey = (a, b) => [norm(a), norm(b)].sort().join('::');
 const json = (value) => JSON.stringify(value);
 const uniq = (values) => [...new Set(values.filter(Boolean))];
+const GENERIC_QUALIFIERS = new Set([
+  'approach', 'architecture', 'concept', 'deployment', 'environment',
+  'framework', 'implementation', 'local', 'method', 'model', 'process',
+  'service', 'solution', 'system', 'technology',
+]);
 
 export function sha256(value) {
   return createHash('sha256').update(String(value), 'utf8').digest('hex');
@@ -107,6 +112,90 @@ export function selectExactCandidates(raw, candidateBundle) {
   };
 }
 
+function lexicalTokens(value) {
+  return norm(value).split(/[^a-z0-9]+/).filter((word) => word.length > 2).map((word) => {
+    if (/([a-z])\1ed$/.test(word)) return word.replace(/([a-z])\1ed$/, '$1');
+    if (word.endsWith('ed') && word.length > 5) return word.slice(0, -2);
+    if (word.endsWith('ing') && word.length > 6) return word.slice(0, -3);
+    if (word.endsWith('s') && word.length > 4) return word.slice(0, -1);
+    return word;
+  });
+}
+
+function aliasKey(value) {
+  return lexicalTokens(value).join(' ');
+}
+
+function exactCatalogMatch(name, catalog) {
+  const key = aliasKey(name);
+  return catalog.find((item) => aliasKey(item.name) === key);
+}
+
+function aliasShapedMatch(name, catalog) {
+  const candidateTokens = new Set(lexicalTokens(name));
+  if (!candidateTokens.size) return null;
+  return catalog.find((item) => {
+    const existingTokens = new Set(lexicalTokens(item.name));
+    if (!existingTokens.size || aliasKey(item.name) === aliasKey(name)) return false;
+    const smaller = candidateTokens.size <= existingTokens.size ? candidateTokens : existingTokens;
+    const larger = candidateTokens.size <= existingTokens.size ? existingTokens : candidateTokens;
+    if (![...smaller].every((token) => larger.has(token))) return false;
+    const extras = [...larger].filter((token) => !smaller.has(token));
+    return extras.length > 0 && extras.every((token) => GENERIC_QUALIFIERS.has(token));
+  }) || null;
+}
+
+function candidateRanking(before, candidateBundle, approvedAdditions, advisory) {
+  const sourcePrior = new Set((before.entities || []).map((item) => aliasKey(item.name)));
+  const catalog = before.catalog?.entities || before.entities || [];
+  const candidates = (candidateBundle.entities || [])
+    .filter((item) => !sourcePrior.has(aliasKey(item.name)) && evidenceFor(item).length);
+  const documents = candidates.map((item) => new Set(lexicalTokens(`${item.name} ${item.description || ''}`)));
+  const frequencies = new Map();
+  for (const tokens of documents) {
+    for (const token of tokens) frequencies.set(token, (frequencies.get(token) || 0) + 1);
+  }
+  const lensTokens = new Set(lexicalTokens((approvedAdditions || []).join(' ')));
+  const advisoryEntities = new Set((advisory.entityNames || []).map(norm));
+  const advisoryRelationships = new Set(advisory.relationshipPairs || []);
+  const relationships = (candidateBundle.relationships || []).filter((item) => evidenceFor(item).length);
+  const ranked = candidates.map((item) => {
+    const nameTokens = new Set(lexicalTokens(item.name));
+    const descriptionTokens = new Set(lexicalTokens(item.description || ''));
+    const evidenceTokens = new Set(lexicalTokens(evidenceFor(item).map((entry) => entry.content || '').join(' ')));
+    const direct = [...nameTokens].filter((token) => lensTokens.has(token)).length;
+    const contextual = [...descriptionTokens].filter((token) => lensTokens.has(token)).length;
+    const grounded = [...nameTokens].filter((token) => evidenceTokens.has(token)).length;
+    const groundedLens = [...lensTokens].filter((token) => evidenceTokens.has(token)).length;
+    const rarity = [...nameTokens].reduce((sum, token) => sum + Math.log((candidates.length + 1) / ((frequencies.get(token) || 0) + 1)), 0);
+    const exact = exactCatalogMatch(item.name, catalog);
+    const aliasShaped = aliasShapedMatch(item.name, catalog);
+    const safeRelationships = relationships.filter((relation) => {
+      const other = norm(relation.source) === norm(item.name) ? relation.target
+        : norm(relation.target) === norm(item.name) ? relation.source : null;
+      return other && exactCatalogMatch(other, catalog);
+    });
+    const advisoryRelation = safeRelationships.some((relation) => advisoryRelationships.has(pairKey(relation.source, relation.target)));
+    const broad = nameTokens.size <= 2 && rarity < 1.25 && direct < 2;
+    const score = (direct * 12) + (contextual * 3) + (grounded * 2)
+      + Math.min(groundedLens, 4) + (rarity * 2) + (safeRelationships.length ? 10 : 0)
+      + (advisoryEntities.has(norm(item.name)) ? 2 : 0) + (advisoryRelation ? 1 : 0)
+      - (exact ? 5 : 0) - (broad ? 10 : 0);
+    return { item, score, direct, grounded, aliasShaped, safeRelationships };
+  }).filter((entry) => !entry.aliasShaped && entry.direct > 0 && entry.grounded > 0)
+    .sort((a, b) => b.score - a.score || String(a.item.name).localeCompare(String(b.item.name)));
+  const winner = ranked[0];
+  if (!winner || winner.score < 12) return { entityNames: [], relationshipPairs: [] };
+  const safeRelationship = winner.safeRelationships
+    .map((item) => ({ item, advisory: advisoryRelationships.has(pairKey(item.source, item.target)) }))
+    .sort((a, b) => Number(b.advisory) - Number(a.advisory)
+      || String(pairKey(a.item.source, a.item.target)).localeCompare(pairKey(b.item.source, b.item.target)))[0]?.item;
+  return {
+    entityNames: [winner.item.name],
+    relationshipPairs: safeRelationship ? [pairKey(safeRelationship.source, safeRelationship.target)] : [],
+  };
+}
+
 export async function selectLensExpansionCandidates(before, candidateBundle, approvedAdditions, { generate = generateJSON } = {}) {
   const priorEntities = new Set((before.entities || []).map((item) => norm(item.name)));
   const priorRelationships = new Set((before.relationships || []).map((item) => pairKey(item.source, item.target)));
@@ -136,17 +225,8 @@ RELATIONSHIPS ABSENT FROM THIS SOURCE'S PRIOR CONTRIBUTION: ${JSON.stringify(new
 An item qualifies only when its quoted source passage materially supports it and the approved addition explains why it
 was newly noticed. Empty arrays are correct. Return ONLY JSON:
 {"entities":["exact entity name"],"relationships":[{"source":"exact endpoint","target":"exact endpoint"}]}`;
-  return selectExactCandidates(await generate(prompt), candidateBundle);
-}
-
-function lexicalTokens(value) {
-  return norm(value).split(/[^a-z0-9]+/).filter((word) => word.length > 2).map((word) => {
-    if (/([a-z])\1ed$/.test(word)) return word.replace(/([a-z])\1ed$/, '$1');
-    if (word.endsWith('ed') && word.length > 5) return word.slice(0, -2);
-    if (word.endsWith('ing') && word.length > 6) return word.slice(0, -3);
-    if (word.endsWith('s') && word.length > 4) return word.slice(0, -1);
-    return word;
-  });
+  const advisory = selectExactCandidates(await generate(prompt), candidateBundle);
+  return candidateRanking(before, candidateBundle, approvedAdditions, advisory);
 }
 
 function lexicalMatches(candidate, catalog, limit = 12) {
@@ -166,6 +246,14 @@ export async function canonicaliseEntity(candidate, catalogEntities, {
 } = {}) {
   const exact = catalogEntities.find((item) => norm(item.name) === norm(candidate.name));
   if (exact) return { classification: 'SAME_CONCEPT', canonical_name: exact.name, confidence: 1, rationale: 'exact canonical name' };
+  const normalizedAlias = exactCatalogMatch(candidate.name, catalogEntities);
+  if (normalizedAlias) {
+    return { classification: 'ALIAS_OF', canonical_name: normalizedAlias.name, confidence: 1, rationale: 'exact normalized alias' };
+  }
+  const aliasShaped = aliasShapedMatch(candidate.name, catalogEntities);
+  if (aliasShaped) {
+    return { classification: 'UNCERTAIN', canonical_name: null, confidence: 0, rationale: `alias-shaped duplicate of ${aliasShaped.name}` };
+  }
   let retrieved = [];
   try {
     const data = await client.queryData(`${candidate.name}. ${String(candidate.description || '').slice(0, 240)}`, { mode: 'mix', topK: 8 });
@@ -193,6 +281,9 @@ Return ONLY JSON:
   }
   if (classification === 'NEW_CONCEPT' && confidence >= 0.85) {
     return { classification, canonical_name: candidate.name, confidence, rationale: raw.rationale || '' };
+  }
+  if (classification === 'RELATED_TO' && matched && confidence >= 0.85) {
+    return { classification, canonical_name: candidate.name, related_to: matched.name, confidence, rationale: raw.rationale || '' };
   }
   return { classification: 'UNCERTAIN', canonical_name: null, confidence, rationale: raw?.rationale || 'below auto-apply threshold' };
 }
@@ -264,7 +355,7 @@ export async function buildCanonicalPlan(before, candidateBundle, selection, opt
   const resolveEndpoint = (name) => {
     const decision = decisions.get(norm(name));
     if (decision?.canonical_name) return decision.canonical_name;
-    return catalogEntityMap.get(norm(name))?.name || null;
+    return catalogEntityMap.get(norm(name))?.name || exactCatalogMatch(name, catalogEntities)?.name || null;
   };
 
   for (const relationPair of selection.relationshipPairs || []) {
@@ -387,8 +478,8 @@ export function realDelta(before, after, plan, verification) {
   };
 }
 
-async function recordReceipt(runId, operation) {
-  await q(
+async function recordReceipt(runId, operation, query = q) {
+  await query(
     `insert into obsidiwikai.wp4b_operation_receipt
        (run_id,sequence,operation_key,operation_kind,target,pre_image,request)
      values($1,$2,$3,$4,$5,$6,$7)
@@ -398,15 +489,15 @@ async function recordReceipt(runId, operation) {
   );
 }
 
-async function receiptState(runId, operationKey) {
-  return (await q(
+async function receiptState(runId, operationKey, query = q) {
+  return (await query(
     `select * from obsidiwikai.wp4b_operation_receipt where run_id=$1 and operation_key=$2`,
     [runId, operationKey]
   )).rows[0];
 }
 
-async function markApplied(runId, operation, response) {
-  await q(
+async function markApplied(runId, operation, response, query = q) {
+  await query(
     `update obsidiwikai.wp4b_operation_receipt
      set state='applied',response=$3,applied_at=coalesce(applied_at,now()),error=null
      where run_id=$1 and operation_key=$2`,
@@ -414,61 +505,63 @@ async function markApplied(runId, operation, response) {
   );
 }
 
-export async function applyPlan(runId, plan, { client = lightrag } = {}) {
-  await q(`update obsidiwikai.wp4b_bundle set status='applying',updated_at=now() where run_id=$1`, [runId]);
-  for (const operation of plan.operations || []) await recordReceipt(runId, operation);
+export async function applyPlan(runId, plan, { client = lightrag, query = q } = {}) {
+  await query(`update obsidiwikai.wp4b_bundle set status='applying',updated_at=now() where run_id=$1`, [runId]);
+  for (const operation of plan.operations || []) await recordReceipt(runId, operation, query);
   for (const operation of plan.operations || []) {
-    const prior = await receiptState(runId, operation.operationKey);
+    const prior = await receiptState(runId, operation.operationKey, query);
     if (prior?.state === 'verified') continue;
     try {
       if (operation.kind === 'entity_evidence') {
         if (prior?.state !== 'applied') {
           const response = await client.editEntity(operation.request.entityName, operation.request.updatedData);
-          await markApplied(runId, operation, response);
+          await markApplied(runId, operation, response, query);
         }
       } else if (operation.kind === 'entity_create') {
-        let created = prior?.response?.created;
-        let backfilled = prior?.response?.backfilled;
+        const priorResponse = prior?.state === 'rolled_back' ? null : prior?.response;
+        let created = priorResponse?.created;
+        let backfilled = priorResponse?.backfilled;
         if (!created) {
           created = await client.createEntity(operation.request.entityName, operation.request.entityData);
-          await markApplied(runId, operation, { created });
+          await markApplied(runId, operation, { created }, query);
         }
         if (!backfilled) {
           backfilled = await client.editEntity(operation.request.entityName, {
             source_id: operation.request.entityData.source_id,
             file_path: operation.request.entityData.file_path,
           });
-          await markApplied(runId, operation, { created, backfilled });
+          await markApplied(runId, operation, { created, backfilled }, query);
         }
       } else if (operation.kind === 'relation_evidence') {
         if (prior?.state !== 'applied') {
           const response = await client.editRelation(operation.request.sourceEntity, operation.request.targetEntity, operation.request.updatedData);
-          await markApplied(runId, operation, response);
+          await markApplied(runId, operation, response, query);
         }
       } else if (operation.kind === 'relation_create') {
-        let created = prior?.response?.created;
-        let backfilled = prior?.response?.backfilled;
+        const priorResponse = prior?.state === 'rolled_back' ? null : prior?.response;
+        let created = priorResponse?.created;
+        let backfilled = priorResponse?.backfilled;
         if (!created) {
           created = await client.createRelation(operation.request.sourceEntity, operation.request.targetEntity, operation.request.relationData);
-          await markApplied(runId, operation, { created });
+          await markApplied(runId, operation, { created }, query);
         }
         if (!backfilled) {
           backfilled = await client.editRelation(operation.request.sourceEntity, operation.request.targetEntity, {
             source_id: operation.request.relationData.source_id,
             file_path: operation.request.relationData.file_path,
           });
-          await markApplied(runId, operation, { created, backfilled });
+          await markApplied(runId, operation, { created, backfilled }, query);
         }
       }
     } catch (error) {
-      await q(
+      await query(
         `update obsidiwikai.wp4b_operation_receipt set state='failed',error=$3 where run_id=$1 and operation_key=$2`,
         [runId, operation.operationKey, String(error.message).slice(0, 1200)]
       );
       throw error;
     }
   }
-  await q(`update obsidiwikai.wp4b_bundle set status='applied',updated_at=now() where run_id=$1`, [runId]);
+  await query(`update obsidiwikai.wp4b_bundle set status='applied',updated_at=now() where run_id=$1`, [runId]);
 }
 
 export async function storeVerification(runId, verification) {

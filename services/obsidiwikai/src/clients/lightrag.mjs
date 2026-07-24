@@ -9,10 +9,16 @@ export function createLightRagClient({
 } = {}) {
   const headers = { 'X-API-Key': apiKey, 'Content-Type': 'application/json' };
   async function jf(path, opts = {}) {
-    const res = await fetchImpl(base + path, { headers, ...opts });
+    const { timeoutMs, signal, ...request } = opts;
+    const timeoutSignal = timeoutMs ? AbortSignal.timeout(timeoutMs) : null;
+    const requestSignal = signal && timeoutSignal
+      ? AbortSignal.any([signal, timeoutSignal])
+      : (signal || timeoutSignal || undefined);
+    const res = await fetchImpl(base + path, { headers, ...request, signal: requestSignal });
     if (!res.ok) {
-      const t = await res.text().catch(() => '');
-      throw new Error(`lightrag ${opts.method || 'GET'} ${path} -> ${res.status}: ${t.slice(0, 300)}`);
+      // Never propagate an upstream payload: it may contain credentials, private metadata,
+      // or source content. The status is sufficient for operational diagnosis.
+      throw new Error(`lightrag request failed with status ${res.status}`);
     }
     return res.json();
   }
@@ -31,18 +37,24 @@ export function createLightRagClient({
     },
     async labels() { return jf('/graph/label/list'); },
 
-    async queryData(query, { mode = 'mix', topK = 12, onlyContext = true } = {}) {
+    async queryData(query, { mode = 'mix', topK = 12, onlyContext = true, timeoutMs } = {}) {
       return jf('/query/data', {
         method: 'POST',
         body: JSON.stringify({ query, mode, top_k: topK, only_need_context: onlyContext }),
+        timeoutMs,
       });
     },
 
-    async query(query, { mode = 'mix', topK = 12 } = {}) {
-      const j = await jf('/query', {
+    async queryResult(query, { mode = 'mix', topK = 12, timeoutMs } = {}) {
+      return jf('/query', {
         method: 'POST',
         body: JSON.stringify({ query, mode, top_k: topK, only_need_context: false }),
+        timeoutMs,
       });
+    },
+
+    async query(query, options = {}) {
+      const j = await this.queryResult(query, options);
       return j.response ?? j.data ?? '';
     },
 

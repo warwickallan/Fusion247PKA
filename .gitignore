@@ -119,3 +119,6 @@ services/asdair/**/*.local.*
 .wt-campaign-codex-review/
 tools/tubeair/out/
 Team Knowledge/.obsidian/workspace.json
+
+# --- Codex local tooling ---
+.codex/

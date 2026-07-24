@@ -93,3 +93,22 @@ test('entity merge uses the exact pinned 0313 payload', async () => {
     entity_to_change_into: 'Canonical',
   });
 });
+
+test('queryResult preserves native answer references and applies a request timeout', async () => {
+  const calls = [];
+  const native = { response: 'grounded', references: [{ reference_id: 'chunk-1' }] };
+  const client = createLightRagClient({
+    base: 'https://lightrag.test',
+    apiKey: 'test-key',
+    fetchImpl: async (url, options) => {
+      calls.push({ url, options });
+      return { ok: true, async json() { return native; } };
+    },
+  });
+  const got = await client.queryResult('question', { mode: 'mix', topK: 5, timeoutMs: 1000 });
+  assert.equal(got, native);
+  assert.deepEqual(JSON.parse(calls[0].options.body), {
+    query: 'question', mode: 'mix', top_k: 5, only_need_context: false,
+  });
+  assert.ok(calls[0].options.signal instanceof AbortSignal);
+});
