@@ -1,48 +1,91 @@
-// WP5 — grounded suggestions (FR-025/026/027). Reads the encyclopedia + lens, proposes
-// self-improvement / Fusion247 / content / monetisation ideas. Every suggestion MUST cite the
-// concepts it stands on, state confidence + what would invalidate it, and is a PROPOSAL only
-// (no autonomous action, FR-027).
+// WP5 — grounded "so what" suggestions (FR-025/026/027). Reads the ONE live knowledge graph
+// (LightRAG/Neo4j) + Warwick's interest lens, and proposes self-improve / Fusion247 / content /
+// monetise ideas. Every suggestion MUST cite the concepts it stands on, state confidence + what
+// would invalidate it, and is a PROPOSAL only (human-gated; no autonomous action, FR-027).
+// Output lands in the Directus-visible cockpit.learning_candidate collection — the report view.
 import { q } from '../clients/db.mjs';
-import { rows as cyrows } from '../clients/neo4j.mjs';
+import { lightrag } from '../clients/lightrag.mjs';
 import { buildLens, lensSummary } from './lens.mjs';
 import { generateJSON } from './llm.mjs';
+import { enqueuePacket, deliverPacket } from './contextOutbox.mjs';
 
-export async function generateSuggestions({ limit = 6, runId = null } = {}) {
+const TARGET = { self_improve: 'self_improve', fusion247: 'fusion247', content: 'content', monetise: 'monetise' };
+
+// Top concepts from the live graph, ranked by connectedness (the densest, most-connected ideas).
+async function topConcepts(n = 40) {
+  const g = await lightrag.graphs({ label: '*', maxNodes: 1400 });
+  const nodes = g.nodes || [];
+  const edges = g.edges || g.relationships || [];
+  const deg = {};
+  for (const e of edges) {
+    const a = e.source ?? e.from ?? e.start ?? e.properties?.source;
+    const b = e.target ?? e.to ?? e.end ?? e.properties?.target;
+    if (a) deg[a] = (deg[a] || 0) + 1;
+    if (b) deg[b] = (deg[b] || 0) + 1;
+  }
+  return nodes
+    .map((x) => ({ name: x.properties?.entity_id || x.id, type: x.properties?.entity_type || 'concept', description: x.properties?.description || '', deg: deg[x.id] || 0 }))
+    .filter((c) => c.name)
+    .sort((a, b) => b.deg - a.deg)
+    .slice(0, n);
+}
+
+export async function generateSuggestions({ limit = 6 } = {}) {
   const lens = await buildLens();
-  const concepts = await cyrows(
-    `MATCH (c:OwaiConcept) WHERE c.status='accepted'
-     OPTIONAL MATCH (c)-[r]->()
-     RETURN c.canonical_id AS id, c.canonical_name AS name, c.type AS type, c.description AS description,
-            c.evidence_count AS ev, count(r) AS deg
-     ORDER BY deg DESC, ev DESC LIMIT 40`
-  );
-  const srcs = (await q(`select source_id, title from obsidiwikai.source`)).rows;
+  const concepts = await topConcepts(40);
   const conceptList = concepts.map((c) => `- ${c.name} [${c.type}]: ${(c.description || '').slice(0, 120)}`).join('\n');
 
-  const prompt = `You are Larry advising Warwick. Using ONLY the knowledge below (do not invent facts), propose ${limit} GROUNDED, practical suggestions spread across these kinds: self_improve (skills/learning), fusion247 (product/system improvements), content (things worth making), monetise (ways to earn from this).
+  const prompt = `You are Larry advising Warwick. Using ONLY the knowledge below (do NOT invent facts), propose ${limit} GROUNDED, practical suggestions spread across these kinds: self_improve (a skill/learning), fusion247 (a product/system/service improvement), content (something worth making), monetise (a concrete way to earn from this).
 
-WARWICK'S LENS:
+WARWICK'S LENS (what he cares about):
 ${lensSummary(lens)}
 
-KNOWLEDGE IN HIS ENCYCLOPEDIA (from ${srcs.length} sources):
+KNOWLEDGE IN HIS BRAIN (the most-connected concepts):
 ${conceptList}
 
-Rules: each suggestion MUST cite the specific concept names it is based on; give confidence 0..1; a concrete next step; and what would invalidate it. No hype, nothing ungrounded, no autonomous actions — proposals only.
-Return ONLY a JSON array of {"kind":"self_improve|fusion247|content|monetise","summary":"...","cites":["concept name",...],"confidence":0..1,"benefit":"...","next_step":"...","what_invalidates":"..."}`;
+Rules: each suggestion MUST cite the specific concept names it is based on; give confidence 0..1; a concrete next step; and what would invalidate it. No hype, nothing ungrounded, no autonomous actions — proposals only. Prefer suggestions that combine concepts from DIFFERENT sources.
+Return ONLY a JSON array of {"kind":"self_improve|fusion247|content|monetise","summary":"the recommendation","cites":["concept name",...],"confidence":0..1,"benefit":"why it matters to Warwick","next_step":"concrete first step","what_invalidates":"..."}`;
 
   const arr = await generateJSON(prompt);
   const list = Array.isArray(arr) ? arr : [];
-  const byName = new Map(concepts.map((c) => [c.name.toLowerCase(), c.id]));
+  const ts = Date.now().toString(36);
   const stored = [];
+  let i = 0;
   for (const s of list) {
-    const ids = (s.cites || []).map((nm) => byName.get(String(nm).toLowerCase())).filter(Boolean);
+    i++;
+    const cites = Array.isArray(s.cites) ? s.cites : [];
     const r = await q(
-      `insert into obsidiwikai.suggestion(run_id,kind,summary,evidence,confidence,benefit,next_step,what_invalidates,status)
-       values($1,$2,$3,$4,$5,$6,$7,$8,'proposed') returning suggestion_id`,
-      [runId, s.kind || 'self_improve', s.summary || '', JSON.stringify(ids.length ? ids : (s.cites || [])),
-       Number(s.confidence) || null, s.benefit || null, s.next_step || null, s.what_invalidates || null]
+      `insert into cockpit.learning_candidate
+         (build_id, source_video_id, candidate_ref, recommendation, why, evidence, proposed_target, expected_effect, confidence, risk, status, sort)
+       values('IDEA-007', null, $1, $2, $3, $4, $5, $6, $7, $8, 'pending', $9)
+       returning id`,
+      [`WP5-${ts}-${i}`, s.summary || '', s.benefit || '', cites.join(', '),
+       TARGET[s.kind] || 'self_improve', s.next_step || '', Number(s.confidence) || null,
+       s.what_invalidates || '', i]
     );
-    stored.push({ id: r.rows[0].suggestion_id, ...s, cited_ids: ids });
+    stored.push({ id: r.rows[0].id, kind: s.kind, summary: s.summary, confidence: s.confidence, cites, next_step: s.next_step, what_invalidates: s.what_invalidates });
   }
   return stored;
+}
+
+// HUMAN-GATE LOOP — Warwick's Accept/Decline on the Directus report teaches Honcho, so the next
+// suggestions + lens shift. Accepted → he wants it (preference); declined → not interested (correction).
+// Idempotent: each candidate is fed once (marked via correlation_id).
+export async function feedDecisions() {
+  const rows = (await q(
+    `select id, status, recommendation, proposed_target from cockpit.learning_candidate
+     where status in ('accepted','declined') and correlation_id is null order by updated_at limit 30`
+  )).rows;
+  const out = [];
+  for (const c of rows) {
+    const accepted = c.status === 'accepted';
+    const summary = `Warwick ${accepted ? 'ACCEPTED (wants to pursue)' : 'DECLINED (not interested in)'} the ${c.proposed_target} suggestion: ${c.recommendation}`.slice(0, 500);
+    try {
+      const id = await enqueuePacket({ type: accepted ? 'preference' : 'correction', summary, source_pointer: 'wp5-learning-candidate', idempotency_key: 'lc:' + c.id });
+      if (id) { const row = (await q('select * from obsidiwikai.context_packet where packet_id=$1', [id])).rows[0]; await deliverPacket(row).catch(() => {}); }
+      await q(`update cockpit.learning_candidate set correlation_id='honcho-fed', updated_at=now() where id=$1`, [c.id]);
+      out.push({ id: c.id, status: c.status, fed: true });
+    } catch (e) { out.push({ id: c.id, error: e.message }); }
+  }
+  return out;
 }
