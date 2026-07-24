@@ -1,6 +1,6 @@
 # ObsidiWikAi — Traceability Matrix
 
-> ## ✅ STATUS 2026-07-24 (live completion) — WP1–WP5 COMPLETE; FR-029 / DoD #18 LIVE-PROVEN
+> ## STATUS 2026-07-24 — FR-029 / DoD #18 LIVE-PROVEN; WP4 EXIT-BAR PROOF REMAINS PARTIAL
 > **One authoritative graph:** LightRAG 1.5.4 on **Neo4JStorage** (physically in Neo4j); NetworkX + the
 > duplicate `OwaiConcept` projection retired (NetworkX kept as rollback). Intent = **KEEP | LEARN**.
 >
@@ -8,8 +8,9 @@
 > - **WP2 ✅ (bar 1 human dep)** Honcho lane (verbatim) + hardened outbox + MS Graph email adapter;
 >   **needs Warwick: mailbox account + one-time OAuth** to finish email E2E.
 > - **WP3 ✅** interest-lens management (surface + edit + feed Honcho).
-> - **WP4 ✅** compounding loop — source_interpretation snapshots + reanalyse → **"Since you first learned
->   this…" DELTA**, history preserved. Proven: graph-agents re-lit after adding interest "operational agent memory".
+> - **WP4 🟨** compounding mechanism exists and preserves interpretation history, but the bounded three-source
+>   acceptance proof did **not** show repeatable grounded lens expansion. Earlier one-pass deltas were rejected as
+>   model-selection churn; the current live interpretations correctly carry no delta.
 > - **WP5 ✅** grounded so-what suggestions (self_improve/fusion247/content/monetise), cited/confidence/
 >   human-gated → Directus `learning_candidate`; Accept/Decline → Honcho.
 > - **WP6 ⬜** agent/MCP grounded Q&A (partly: `ask.mjs`/`trace.mjs` + the report's grounded queries). Not closed.
@@ -30,8 +31,8 @@
 Built live against the real box (LightRAG/Neo4j/Honcho/Supabase). Service: `services/obsidiwikai/`.
 
 **✅ Proven live:** FR-002, FR-003, FR-004, FR-005, FR-006, FR-008, FR-009, FR-010, FR-011, FR-012, FR-014, FR-015, FR-016, FR-017, FR-018, FR-019, FR-021, FR-029, FR-030, FR-A (one-tap review), FR-B (deferred reservoir), plus DoD 1–11, 18–20 mechanisms. Context Outbox (CONTEXT-OUTBOX.md) acceptance proven except the Telegram front door.
-**🟨 Partial / mechanism-present:** FR-001 (bounded slice ingested, not full transcript), FR-007 & FR-013 (need topically-overlapping sources to show compounding), FR-020 (Neo4j live; Supabase rebuild path not yet exercised), FR-022 (card data in Supabase; Directus collection registration pending), FR-024 & FR-D (Honcho write/read proven; feedback→lens loop + Directus edit UI pending), FR-028 (retrieval proven; governed agent interface pending).
-**⬜ Not started:** FR-023 (feedback UI), FR-025/026/027 (WP5 suggestions/monetise), FR-C (historical re-mine), DoD 12–17 (feedback UI and suggestions), WP7 (work/Bellrock lane — deferred by design).
+**🟨 Partial / mechanism-present:** FR-001 (bounded slice ingested, not full transcript), FR-007, FR-C & DoD #14 (three-source proof run but no repeatable grounded expansion), FR-013 (needs topically-overlapping sources to show compounding), FR-020 (Neo4j live; Supabase rebuild path not yet exercised), FR-022 (card data in Supabase; Directus collection registration pending), FR-024 & FR-D (Honcho write/read proven; feedback→lens loop + Directus edit UI pending), FR-028 (retrieval proven; governed agent interface pending).
+**⬜ Not started:** FR-023 (feedback UI), FR-025/026/027 (WP5 suggestions/monetise), remaining DoD 12–17, WP7 (work/Bellrock lane — deferred by design).
 **⛔ Human deps outstanding:** H1 fusiongptbot token (front door built, unrun), H2 Honcho cockpit check.
 
 Two real sources compiled → **71 concepts / 142 relationships** in the curated Neo4j encyclopedia; 9 unit tests green.
@@ -48,7 +49,7 @@ _(Per-row table below reflects the original plan; the summary above is the live 
 | FR-004 | Interest horizons (enduring/active/emerging/…) | WP1/WP3 | lens record has all horizons | ⬜ |
 | FR-005 | Broad discovery pass | WP1 | important concept captured w/ no lens match | ⬜ |
 | FR-006 | Interest-conditioned pass | WP1 | lens-steered deeper extraction observed | ⬜ |
-| FR-007 | Expanding semantic scope | WP4 | wider lens → more captured on re-run | ⬜ |
+| FR-007 | Expanding semantic scope | WP4 | wider lens → more captured on re-run | 🟨 three-source proof failed conservatively |
 | FR-008 | Emerging-interest discovery | WP1/WP4 | out-of-lens concept offered as emerging | ⬜ |
 | FR-009 | Semantic entity search before create | WP1 | candidate matched vs existing by embedding+graph | ⬜ |
 | FR-010 | Multi-outcome canonicalisation | WP1 | all 10 classifications exercised | ⬜ |
@@ -74,7 +75,7 @@ _(Per-row table below reflects the original plan; the summary above is the live 
 | FR-030 | Privacy separation (raw personal excluded) | cross-cutting/WP0 | classification blocks personal→external | ⬜ |
 | FR-A (follow-up) | Human-assisted semantic resolution | WP1 | uncertain → one-tap Directus question | ⬜ |
 | FR-B (follow-up) | Deferred semantic reservoir | WP4 | below-threshold retained, not discarded | ⬜ |
-| FR-C (follow-up) | Historical re-analysis on lens change | WP4 | old sources re-mined, explained | ⬜ |
+| FR-C (follow-up) | Historical re-analysis on lens change | WP4 | old sources re-mined, explained | 🟨 history/re-run proven; useful delta not proven |
 | FR-D (follow-up) | Interest-lens management surface | WP3 | inspect+correct lens; Supabase canonical mirror | ⬜ |
 
 ## 20 Definition-of-Done criteria → WP
@@ -94,7 +95,7 @@ _(Per-row table below reflects the original plan; the summary above is the live 
 | 11 | Directus visibility of changes | WP1/WP3 | ⬜ |
 | 12 | Warwick correction/feedback controls | WP3 | ⬜ |
 | 13 | Honcho learns from feedback | WP3 | ⬜ |
-| 14 | Observable lens expansion over time | WP4 | ⬜ |
+| 14 | Observable lens expansion over time | WP4 | 🟨 three-source proof found zero repeatable expansion |
 | 15 | Grounded self-improvement suggestions | WP5 | ⬜ |
 | 16 | Grounded Fusion247 suggestions | WP5 | ⬜ |
 | 17 | Grounded content/monetisation opportunities | WP5 | ⬜ |
@@ -103,6 +104,42 @@ _(Per-row table below reflects the original plan; the summary above is the live 
 | 20 | Clear separation of vault / encyclopedia / lens | cross-cutting | ⬜ |
 
 **First-build exit bar:** all 20 mechanisms ✅ with compounding shown across ~3–5 real sources + observable lens expansion. Deferred past first build (named + approved): **WP7 work/Bellrock lane** 🔵.
+
+## WP4 bounded three-source compounding proof — honest non-pass (2026-07-24)
+
+**Scope:** Cerebras `eCx3SSCcISo` (174 concepts / 43 connected), Graph Agents `MUN1eAlL0lc`
+(253 / 62), and healthy overlapping AI Memory `pcR30j-sKxU` (134 / 40). No source was re-ingested and no
+graph, schema, scheduler, UI, or product layer was added.
+
+**Warwick-approved lens correction:** existing interest control added active interest
+`support-resolution retrieval tested on representative questions` at weight `0.9`; the existing Context Outbox
+delivered the correction to Honcho. This synthesises Warwick's already explicit priorities: operational agent
+memory, a selected Knowledge Base or Support Tickets, representative retrieval questions, and an implementation
+recommendation rather than autonomous operation.
+
+**History preserved:** common pre-change interpretations were appended as `3738dc14…` (Cerebras), `c78f5167…`
+(Graph Agents), and `a036eca2…` (AI Memory). Earlier Graph Agents interpretations and every exploratory after-run
+remain in the append-only ledger.
+
+**Why this does not pass:** the first one-pass re-analysis produced plausible prose and different selected concepts,
+but both before and after selections were capped at 18; that could be ranking churn rather than expansion. The
+acceptance path was therefore tightened to (a) require exact live-graph concept strings, (b) require at least one
+known cross-source endpoint for a relationship, and (c) run two paired BEFORE/AFTER comparisons and accept only
+their intersection. The final run isolated the comparison to the one approved interest string, excluding unrelated Honcho wording. Both passes returned zero newly visible concepts, zero newly visible
+cross-source concepts, and zero new lens-driven relationships for all three sources. The graph also gained zero
+connections because the retained sources were re-analysed, not re-ingested.
+
+**Current honest live rows:** `62928d16…` (Cerebras), `993881a9…` (Graph Agents), `c89e799d…` (AI Memory).
+Each has `lens_expansion=false`, a null delta, and two zero/zero/zero paired-comparison runs. In plain English:
+before, the Brain already understood operational memory, support-ticket/knowledge-base retrieval, representative
+testing, and implementation recommendations. After Warwick's lens correction, the Brain could phrase that focus
+more sharply, but it did not reliably notice additional grounded material or connections. The old sources did not
+become measurably more useful in this run.
+
+**Verdict:** WP4's history and re-run mechanism are real; FR-007, FR-C and DoD #14 remain 🟨 partial. The
+first-build exit bar is not met. A future proof needs a genuinely novel approved interest shift relative to the
+stored baseline, not a more specific label for interests the baseline already contained.
+
 ## FR-029 / DoD #18 — live acceptance evidence (2026-07-24)
 
 **Implemented, deployed, and proven on the existing branch and draft PR #59; not merged.**
