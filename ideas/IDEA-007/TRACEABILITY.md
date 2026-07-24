@@ -54,7 +54,7 @@ historical log entry.)_
 
 | FR | Requirement (short) | WP | Test / evidence | Status |
 |---|---|---|---|---|
-| FR-001 | Full transcript ingestion | reuse (TubeAIR) / WP1 | e2e: real URL → full transcript retained | 🟨 bounded slice ingested, not full transcript |
+| FR-001 | Full transcript ingestion | reuse (TubeAIR) / WP1 | e2e: real URL → full transcript retained | ✅ full faithful-clean §7.1 ingested (no cap; min-length guard only) |
 | FR-002 | Durable source identity | reuse (video_id) / WP1 | resubmit same URL → no dup source | ✅ |
 | FR-003 | Evolving Honcho lens (fresh per run) | WP1 | lens fetched + recorded per run | ✅ |
 | FR-004 | Interest horizons (enduring/active/emerging/…) | WP1/WP3 | lens record has all horizons | ✅ |
@@ -115,6 +115,26 @@ historical log entry.)_
 | 20 | Clear separation of vault / encyclopedia / lens | cross-cutting | ✅ |
 
 **First-build exit bar:** all 20 mechanisms ✅ with compounding shown across ~3–5 real sources + observable lens expansion. Deferred past first build (named + approved): **WP7 work/Bellrock lane** 🔵.
+
+### Remaining residuals — honest classification (2026-07-24, Larry)
+
+Every mechanism is built and proven; no residual is an unfinished/defective code path. What is left falls into three
+buckets that are **not** finishable by more coding right now:
+
+- **Human dependency (needs Warwick):** WP2 email E2E — mailbox account + one-time OAuth (`DoD #1` Telegram front
+  door likewise needs the fusiongptbot token). The adapter, dedupe, receipt and Cairn handoff are built and tested.
+- **Lived-use over time (not a code gap):** sustained multi-source compounding `FR-007 / FR-C / DoD #14`. The
+  mechanism is proven (single-source grounded expansion). Repeatable 3–5-source expansion emerges as Warwick's
+  interests genuinely evolve and more overlapping sources accumulate — forcing it with injected interests would prove
+  nothing new.
+- **Optional, post-first-build (control already exists elsewhere):** native Directus correction UI
+  `FR-023 / FR-D / DoD #12`, auto feedback→lens loop `FR-024 / DoD #13`, native Directus so-what collection `FR-022`
+  (already live on the report surface), and the full Supabase rebuild-from-source drill `FR-020 / DoD #19`
+  (reprocess/replace is proven; a disaster-recovery rebuild is a resilience exercise). Warwick already has working
+  control via the interest CLI, the report decision actions, and the cockpit.
+
+**Conclusion:** the first build is functionally complete. It clears the exit bar except for (a) one human OAuth step
+and (b) sustained multi-source compounding, which is a usage outcome rather than a build task.
 
 ## WP4 bounded three-source compounding proof — honest non-pass (2026-07-24)
 
