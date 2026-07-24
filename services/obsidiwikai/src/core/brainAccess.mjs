@@ -87,7 +87,7 @@ function stableReference(item) {
   if (!item || typeof item !== 'object' || Array.isArray(item)) return null;
   const aliases = {
     source_id: ['source_id'],
-    file_source: ['file_source'],
+    file_source: ['file_source', 'file_path'],
     document_id: ['document_id'],
     doc_id: ['doc_id'],
     chunk_id: ['chunk_id', 'reference_id', 'text_unit_id', 'id'],
