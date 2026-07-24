@@ -62,8 +62,10 @@ export async function runLearnQueue({ limit = 5 } = {}) {
 }
 
 // HEALTH CHECK — an 'ingesting' LEARN source must become searchable+represented, or fail visibly.
-export async function reconcileLearn({ staleMinutes = 30 } = {}) {
-  const rows = (await q(`select * from obsidiwikai.compile_job where state='ingesting'`)).rows;
+export async function reconcileLearn({ staleMinutes = 30, maxEnrichAttempts = 5 } = {}) {
+  // 'enrich_pending' = LightRAG extracted the source but the REQUIRED WP1.5 enrichment has not yet
+  // succeeded — picked up here for retry alongside freshly-ingesting jobs.
+  const rows = (await q(`select * from obsidiwikai.compile_job where state in ('ingesting','enrich_pending')`)).rows;
   if (!rows.length) return [];
   let byFile = {};
   try {
@@ -76,24 +78,34 @@ export async function reconcileLearn({ staleMinutes = 30 } = {}) {
   const out = [];
   for (const job of rows) {
     const st = byFile[job.source_id];
-    if (st === 'processed') {
-      // WP1.5 — the lens genuinely conditions the INITIAL learn path here: as soon as LightRAG has
-      // extracted the source into the authoritative graph, run the lens-conditioning + conservative
-      // canonicalisation pass ON THAT graph. Best-effort: a raw source IS searchable regardless, and
-      // a failed enrichment is recorded (wp15_enrich_run='failed') + retriable, so it never blocks 'done'.
-      let enrichNote = '';
+    // A job already awaiting enrichment is extracted → go straight to the enrich attempt.
+    const readyToEnrich = job.state === 'enrich_pending' || st === 'processed';
+    if (readyToEnrich) {
+      // WP1.5 — the lens genuinely conditions the INITIAL learn path here, and enrichment is REQUIRED
+      // for a finished Learn outcome. Success → 'done'. Failure → the raw source stays searchable but
+      // the job stays visibly 'enrich_pending' + retriable — it must NOT claim the Learn is finished
+      // when the lens-conditioning/canonicalisation it promised has not run.
       try {
         const en = await enrichSource(job.source_id);
-        enrichNote = ` · enriched (merged ${en.merged}, related ${en.related}, held ${en.held}, deferred ${en.deferred})`;
+        await q(`update obsidiwikai.compile_job set state='done', error=null, receipt=$2, done_at=now() where job_id=$1`,
+          [job.job_id, `searchable + represented · enriched (merged ${en.merged}, related ${en.related}, held ${en.held}, deferred ${en.deferred})`]);
+        await q(`update cockpit.youtube_source set review_state='pending_warwick_review', learning_count=coalesce(learning_count,0)+1, updated_at=now() where video_id=$1 and review_state='ai_created'`, [job.source_id]).catch(() => {});
+        out.push({ job_id: job.job_id, state: 'done', source: job.source_id });
       } catch (e) {
-        enrichNote = ` · enrichment deferred: ${String(e.message).slice(0, 80)}`;
+        const attempts = Number(job.stats?.enrich_attempts || 0) + 1;
+        const terminal = attempts >= maxEnrichAttempts;
+        await q(
+          `update obsidiwikai.compile_job
+             set state=$4, receipt=$2, error=$3,
+                 stats=jsonb_set(coalesce(stats,'{}'::jsonb),'{enrich_attempts}',to_jsonb($5::int))
+           where job_id=$1`,
+          [job.job_id,
+            terminal ? 'searchable in graph, but WP1.5 enrichment failed — needs attention'
+              : 'searchable in graph; WP1.5 enrichment failed — retrying',
+            `WP1.5 enrichment ${terminal ? `failed after ${attempts} attempts` : 'failed, will retry'}: ${String(e.message).slice(0, 300)}`,
+            terminal ? 'failed' : 'enrich_pending', attempts]);
+        out.push({ job_id: job.job_id, state: terminal ? 'enrich_failed' : 'enrich_pending', source: job.source_id });
       }
-      await q(`update obsidiwikai.compile_job set state='done', receipt=$2, done_at=now() where job_id=$1`, [job.job_id, 'searchable + represented in the graph' + enrichNote]);
-      // Reflect the learn outcome on the Directus-visible cockpit record: a learned source moves
-      // into Warwick's review queue ('pending_warwick_review' is the in-schema state Directus surfaces).
-      // Best-effort — no-op if it isn't a youtube source.
-      await q(`update cockpit.youtube_source set review_state='pending_warwick_review', learning_count=coalesce(learning_count,0)+1, updated_at=now() where video_id=$1 and review_state='ai_created'`, [job.source_id]).catch(() => {});
-      out.push({ job_id: job.job_id, state: 'done', source: job.source_id });
     } else if (st === 'failed') {
       await q(`update obsidiwikai.compile_job set state='failed', error='LightRAG extraction failed' where job_id=$1`, [job.job_id]);
       out.push({ job_id: job.job_id, state: 'failed', source: job.source_id });
