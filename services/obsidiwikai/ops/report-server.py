@@ -16,6 +16,10 @@ GRAPH = os.environ.get('GRAPH_URL', 'http://100.101.240.85:8700')
 DS = json.load(open('/data/rag_storage/kv_store_doc_status.json'))
 TC = json.load(open('/data/rag_storage/kv_store_text_chunks.json'))
 VID2DOC = {v.get('file_path'): k for k, v in DS.items() if v.get('file_path')}
+# early rebuild sources were ingested under artefact names, not their video ids — map them.
+ALIAS = {'MUN1eAlL0lc': 'graph-agents-MUN1e', 'pcR30j-sKxU': 'ai-memory-pcR30j'}
+def doc_for(vid):
+    return VID2DOC.get(vid) or VID2DOC.get(ALIAS.get(vid, ''))
 WHY = {}
 
 def pgq(sql, args=()):
@@ -37,7 +41,7 @@ def why_matters(vid, concepts):
     return WHY[vid]
 
 def source_data(vid):
-    doc = VID2DOC.get(vid)
+    doc = doc_for(vid)
     with neo.session() as s:
         rows = s.run(f"MATCH (n:{WS}) WHERE n.source_id CONTAINS $d "
                      f"RETURN n.entity_id AS id, coalesce(n.description,'') AS desc, "
@@ -123,6 +127,9 @@ def source_page(vid):
                "where status='pending' order by confidence desc nulls last limit 5")
     b = "<a href=/ class=mut>← your brain</a>"
     b += f"<div class=eyebrow>{html.escape(ch or '')}</div><h1>{html.escape(ttl)}</h1>"
+    interp = pgq("select delta from obsidiwikai.source_interpretation where source_id=%s and is_current=true and delta is not null order by created_at desc limit 1", (vid,))
+    if interp and interp[0][0]:
+        b += f"<div class=sec style='border-color:#8f8dff'><h2>🔄 Since you first learned this…</h2><div class=why>{html.escape(interp[0][0])}</div></div>"
     if d['why']:
         b += f"<div class=sec><h2>🎯 Why this matters to you</h2><div class=why>{html.escape(d['why'])}</div></div>"
     b += (f"<div class=sec><h2>🔄 What changed in your brain</h2><div class=stat>"
@@ -169,6 +176,12 @@ class H(BaseHTTPRequestHandler):
         u = urllib.parse.urlparse(self.path); qs = urllib.parse.parse_qs(u.query)
         try:
             if u.path == '/' or u.path == '/index.html': self._send(dashboard())
+            elif u.path.startswith('/api/source/'):
+                vid = urllib.parse.unquote(u.path[len('/api/source/'):]); d = source_data(vid)
+                row = pgq("select title from cockpit.youtube_source where video_id=%s", (vid,))
+                body = json.dumps({'source_id': vid, 'title': (row[0][0] if row else vid), 'total': d['total'],
+                                   'new': [r['id'] for r in d['new']], 'connected': [r['id'] for r in d['conn']], 'why': d['why']})
+                self.send_response(200); self.send_header('Content-Type', 'application/json'); self.end_headers(); self.wfile.write(body.encode())
             elif u.path.startswith('/s/'): self._send(source_page(urllib.parse.unquote(u.path[3:])))
             elif u.path == '/decide': self._send(decide(qs.get('vid', [''])[0], qs.get('v', [''])[0]))
             else: self.send_response(404); self.end_headers()
