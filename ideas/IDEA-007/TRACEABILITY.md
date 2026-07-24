@@ -158,3 +158,36 @@ stored baseline, not a more specific label for interests the baseline already co
 - Deployment-only defects fixed: request-only DSN now fails closed; report decision read no longer requests disallowed UPDATE locking; `cp_worker` has the narrow source-title read it needs; the resume CLI direct-run guard is Windows-safe.
 
 **Completion rule met:** FR-029 and DoD #18 are ✅ complete. The accepted improvement is deliberately left with Larry as governed work and was not implemented during this acceptance proof.
+
+## WP4B additive re-mining — implementation present, one-source acceptance held (2026-07-24)
+
+**Scope:** retained faithful-clean `bankdPmQnHU` (“DEPLOY Fully Private + Local AI RAG Agents”), with Warwick's
+approved emerging interest `AI data sovereignty for sensitive client documents`. No YouTube download or TubeAIR
+work was repeated, and no authoritative graph node, relationship or provenance record was written.
+
+- The pinned `lightrag-neo4j:1.5.4-pinned` isolated create→edit/backfill gate passed all eight checks: entity and
+  relation reverse indexes, entity and relation vector provenance, stored chunk, entity retrieval and retrieval
+  provenance. The temporary container had no Neo4j credentials or production storage mount.
+- The retained source hash matched the authoritative full document exactly
+  (`ea5736aa8b7839127c1479bebbb9c4a08177ec175a5e1651497a54f2787a2ead`); identity remained
+  `bankdPmQnHU` / `doc-4ea6861fc6f1fe52307e848bb6548639` / 13 stable chunks.
+- BEFORE was stored through existing WP4A: 332 source concepts, 392 relationships, 78 cross-source concepts. It
+  understood a private n8n/Docling/Qdrant/Ollama RAG implementation, including `Air-Gapped Local Deployment` and
+  `Client Documents`, but not `Sensitive Documents` as a source contribution.
+- Isolated WP4B extraction produced a frozen 327-entity / 405-relationship candidate bundle. It newly extracted
+  `Sensitive Documents` from exact chunk `...-chunk-000` (source chars 0–5556), grounded in the passage about
+  legal, medical, financial and client documents requiring full control.
+- The conservative selection chose `Local AI`, `Air Gap` and their relationship instead. `Local AI` was held
+  uncertain; the relationship was consequently held; and `Air Gap` risked duplicating the existing
+  `Air-Gapped Local Deployment`. Run `e080e42f-9ad6-462f-b7ea-c5b82956d834` preserves the frozen evidence as
+  `held`, with zero operation receipts; the apply gate stopped before any LightRAG mutation.
+
+**Plain English:** Before, the Brain understood the source as a practical private local-RAG deployment. After
+Warwick's lens changed, isolated re-mining genuinely noticed the previously unrepresented `Sensitive Documents`
+evidence, but the conservative promotion gate did not safely connect and canonicalise that evidence into the
+authoritative graph. The old source has not yet become measurably more useful in the live Brain.
+
+**Verdict:** the retained-source→fresh-extraction connection is implemented and the isolated pinned
+write/provenance mechanics are proven. The authoritative additive apply/rollback path remains unexercised by live
+knowledge because the one-source semantic proof honestly stopped. FR-007, FR-C, DoD #14 and the three-source exit
+bar remain 🟨 partial; the prior three sources were not rerun.
