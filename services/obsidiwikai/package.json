@@ -9,7 +9,7 @@
     "compile": "node src/bin/compile-source.mjs",
     "suggest:system": "node src/bin/suggest-system.mjs",
     "brain:mcp": "node src/bin/brain-mcp.mjs",
-    "test": "node --test src/clients/lightrag.test.mjs src/core/brainAccess.test.mjs src/bin/brain-mcp.test.mjs src/core/contextOutbox.test.mjs src/core/lensDelta.test.mjs src/core/llm.test.mjs src/core/reanalyse.test.mjs src/core/systemImprovements.test.mjs src/core/wp4b.test.mjs src/bin/wp4b-resume.test.mjs src/cairn/classify.test.mjs src/cairn/router.test.mjs src/sources/email.test.mjs"
+    "test": "node --test src/clients/lightrag.test.mjs src/core/brainAccess.test.mjs src/bin/brain-mcp.test.mjs src/core/contextOutbox.test.mjs src/core/lensDelta.test.mjs src/core/learnEnrich.test.mjs src/core/llm.test.mjs src/core/reanalyse.test.mjs src/core/systemImprovements.test.mjs src/core/wp4b.test.mjs src/bin/wp4b-resume.test.mjs src/cairn/classify.test.mjs src/cairn/router.test.mjs src/sources/email.test.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { q } from '../clients/db.mjs';
 import { lightrag } from '../clients/lightrag.mjs';
+import { enrichSource } from './learnEnrich.mjs';
 
 // services/obsidiwikai/src/core/learnIngest.mjs → repo root is four levels up.
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
@@ -76,7 +77,18 @@ export async function reconcileLearn({ staleMinutes = 30 } = {}) {
   for (const job of rows) {
     const st = byFile[job.source_id];
     if (st === 'processed') {
-      await q(`update obsidiwikai.compile_job set state='done', receipt='searchable + represented in the graph', done_at=now() where job_id=$1`, [job.job_id]);
+      // WP1.5 — the lens genuinely conditions the INITIAL learn path here: as soon as LightRAG has
+      // extracted the source into the authoritative graph, run the lens-conditioning + conservative
+      // canonicalisation pass ON THAT graph. Best-effort: a raw source IS searchable regardless, and
+      // a failed enrichment is recorded (wp15_enrich_run='failed') + retriable, so it never blocks 'done'.
+      let enrichNote = '';
+      try {
+        const en = await enrichSource(job.source_id);
+        enrichNote = ` · enriched (merged ${en.merged}, related ${en.related}, held ${en.held}, deferred ${en.deferred})`;
+      } catch (e) {
+        enrichNote = ` · enrichment deferred: ${String(e.message).slice(0, 80)}`;
+      }
+      await q(`update obsidiwikai.compile_job set state='done', receipt=$2, done_at=now() where job_id=$1`, [job.job_id, 'searchable + represented in the graph' + enrichNote]);
       // Reflect the learn outcome on the Directus-visible cockpit record: a learned source moves
       // into Warwick's review queue ('pending_warwick_review' is the in-schema state Directus surfaces).
       // Best-effort — no-op if it isn't a youtube source.
