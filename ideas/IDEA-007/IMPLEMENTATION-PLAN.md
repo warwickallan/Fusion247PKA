@@ -1,5 +1,15 @@
 # IMPLEMENTATION PLAN — ObsidiWikAi
 
+> ## ✅ FINAL ARCHITECTURE (2026-07-24) — supersedes any conflicting design below
+> **ONE authoritative knowledge graph.** `Cairn LEARN → faithful-clean full-detail source (TubeAIR §7.1)
+> → LightRAG → Neo4JStorage → Neo4j`. LightRAG **builds + retrieves**; Neo4j **stores + traverses** the
+> *same* graph (Cypher-queryable). TubeAIR/raw = source truth; Honcho = lens; Supabase = ledger/health.
+> **The separate `OwaiConcept` curated projection is RETIRED/PARKED** (no duplicate graph) — its lens/
+> canonicalisation/reservoir/suggestion logic is kept to rehome onto the one graph. **Intent = KEEP | LEARN**
+> (the old Keep/Extract/Deep-index model is gone). The Learn path is **automatic** (learn-worker) — no
+> Larry-in-session step. Production = `lightrag-neo4j-prod` on box `:9621`; old NetworkX stopped + retained
+> as rollback. Proven A–G + a fresh E2E on the finished route. See README (obsidiwikai) + TRACEABILITY.
+
 **Idea:** IDEA-007 · **Author:** Larry · **Date:** 2026-07-23
 **Authority:** Builds to the canon in `PRD.md` + `PRD-FOLLOWUP.md` + `CONTEXT-OUTBOX.md` (this folder).
 **Status:** Plan for Warwick approval. **No implementation authorised until Warwick says go.**

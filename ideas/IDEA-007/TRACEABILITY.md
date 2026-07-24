@@ -1,5 +1,14 @@
 # ObsidiWikAi — Traceability Matrix
 
+> ## ✅ WP "Neo4j-backed one-graph cutover" COMPLETE (2026-07-24)
+> The knowledge graph is now **LightRAG 1.5.4 on Neo4JStorage** (one graph, physically in Neo4j). The
+> old NetworkX backend + the duplicate `OwaiConcept` projection are retired (NetworkX kept as rollback).
+> **Proven:** parallel instance → Neo4JStorage; 383→587 nodes / cross-source merges from faithful-clean
+> §7.1 transcripts; provenance node→chunk→passage→§7.1→raw; restart-persistence; a fresh source
+> (`bankdPmQnHU`) through the finished **capture→Cairn→LEARN→learn-worker→LightRAG→Neo4j→searchable**
+> route with the auto health check. Intent simplified to **KEEP | LEARN**. Production `lightrag-neo4j-prod`
+> box `:9621`. NOT merged (Warwick's merge gate + independent review still required).
+
 **Purpose:** the single source that maps PRD requirements → work package → PR → test → status, so **Codex QA (and Warwick) can judge alignment + progress**, not cosmetics. Kept live in Git; status ledger mirrored to Supabase.
 
 **Status legend:** ⬜ not started · 🟨 in progress · ✅ proven-in-test · 🔵 deferred (named + approved).

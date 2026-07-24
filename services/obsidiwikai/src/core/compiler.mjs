@@ -1,3 +1,11 @@
+// ⚠️ PARKED (2026-07-24) — this orchestrator PROJECTED LightRAG's graph into a SECOND curated
+// `OwaiConcept` Neo4j graph. That duplicate is retired: the authoritative graph is now LightRAG's
+// own Neo4JStorage graph (one graph). The Learn path (src/core/learnIngest.mjs) ingests directly.
+// KEPT ONLY as a source of reusable logic to REHOME onto the single graph / ledgers — Honcho-lens
+// relevance (lens.mjs/relevance.mjs), semantic canonicalisation + SAME/ALIAS/BROADER/… reasoning
+// (canonicaliser.mjs), deferred reservoir, and grounded suggestions (suggestions.mjs). Do NOT wire
+// this back into the Learn path — it must not create a duplicate graph.
+//
 // The Knowledge Compiler orchestrator. Consumes a source's extracted knowledge from LightRAG,
 // scores it through the Warwick lens, canonicalises it into the Neo4j encyclopedia with provenance,
 // and renders a Directus knowledge card. Source-keyed + idempotent per run.

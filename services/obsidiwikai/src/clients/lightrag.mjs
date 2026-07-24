@@ -21,6 +21,9 @@ export const lightrag = {
   },
   async trackStatus(trackId) { return jf('/documents/track_status/' + encodeURIComponent(trackId)); },
   async statusCounts() { return jf('/documents/status_counts'); },
+  // Document processing state, grouped by status (pending/processing/processed/failed). Used by the
+  // Learn health check to confirm a LEARN source became searchable+represented (or visibly failed).
+  async documents() { return jf('/documents'); },
 
   // Retrieve the extracted graph (nodes + edges). label '*' = whole graph.
   async graphs({ label = '*', maxDepth = 3, maxNodes = 1000 } = {}) {

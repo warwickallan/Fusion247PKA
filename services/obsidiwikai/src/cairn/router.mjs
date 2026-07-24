@@ -49,8 +49,8 @@ const adapters = {
     const jobId = await enqueueCompileJob(capture, 'learn');
     return {
       lane: LANE.ENCYCLOPEDIA,
-      did: jobId ? 'queued compile job (learn)' : 'compile already queued (idempotent)',
-      handoff: 'compile-worker → TubeAIR → LightRAG(clean) → canonicaliser → searchable encyclopedia',
+      did: jobId ? 'queued learn job' : 'learn already queued (idempotent)',
+      handoff: 'learn-worker → §7.1 faithful-clean → LightRAG → Neo4JStorage (one searchable graph)',
       job_id: jobId, source_id: capture.source_id || capture.url || null,
     };
   },

@@ -1,25 +1,25 @@
-// Source intent — the human categorisation Warwick chooses at capture time (the Telegram cards).
-// It decides HOW MUCH semantic work (and cost) a source earns. Independent of which model supplies
-// the intelligence (that's the gateway/role axis) — the three axes stay unwelded.
+// Source intent — the human categorisation Warwick chooses at capture time (the Telegram card).
+// Two modes only (the earlier Keep/Extract/Deep-index model is retired):
+//   KEEP  = retain the source without learning it (raw preserved, £0 semantic spend)
+//   LEARN = process it: faithful-clean full transcript → LightRAG → Neo4j → searchable graph
 export const INTENT = {
-  KEEP_RAW: 'keep_raw',      // preserve the transcript only; £0 semantic spend
-  EXTRACT: 'extract',        // DEFAULT: extract knowledge → populate Neo4j → link the raw source (cheap)
-  DEEP_INDEX: 'deep_index',  // OPT-IN: also full-index the entire transcript for search (costs real money)
+  KEEP: 'keep',
+  LEARN: 'learn',
 };
 
-export const DEFAULT_INTENT = INTENT.EXTRACT;
+export const DEFAULT_INTENT = INTENT.LEARN;
 
+// Accepts legacy values (keep_raw / extract / deep_index) and folds them into the 2-mode model.
 export function normaliseIntent(v) {
   const s = String(v || '').toLowerCase();
-  return Object.values(INTENT).includes(s) ? s : DEFAULT_INTENT;
+  if (s === 'keep' || s === 'keep_raw') return INTENT.KEEP;
+  return INTENT.LEARN; // extract / deep_index / learn / anything else → LEARN
 }
 
-// Card contract (for the capture-flow Telegram buttons — wired capture-side, respected here):
-//   📄 Keep raw   → intent=keep_raw
-//   🧠 Extract    → intent=extract      (default tap)
-//   🔍 Deep-index → intent=deep_index   (explicit, priced)
+// Card contract (capture-flow Telegram buttons — wired capture-side, respected here):
+//   📄 Keep   → intent=keep
+//   🧠 Learn  → intent=learn   (default tap)
 export const CARD_BUTTONS = [
-  { key: 'keep_raw', label: '📄 Keep raw' },
-  { key: 'extract', label: '🧠 Extract to Brain' },
-  { key: 'deep_index', label: '🔍 Deep-index' },
+  { key: 'keep', label: '📄 Keep' },
+  { key: 'learn', label: '🧠 Learn' },
 ];
