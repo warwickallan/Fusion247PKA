@@ -80,7 +80,10 @@ export function createBrainMcpServer({ access = createBrainAccess() } = {}) {
 
 export async function main() {
   assertRetrievalConfig();
-  const server = createBrainMcpServer();
+  // Live LightRAG retrieval is ~10s cold; give each call generous headroom so the MCP tool
+  // doesn't return insufficient_evidence merely because a real query was slow.
+  const access = createBrainAccess({ timeoutMs: Number(process.env.BRAIN_TIMEOUT_MS) || 45_000 });
+  const server = createBrainMcpServer({ access });
   await server.connect(new StdioServerTransport());
 }
 
