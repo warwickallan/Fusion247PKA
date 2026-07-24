@@ -11,6 +11,14 @@ import { enqueuePacket, deliverPacket } from './contextOutbox.mjs';
 
 const TARGET = { self_improve: 'self_improve', fusion247: 'fusion247', content: 'content', monetise: 'monetise' };
 
+// Exact (case-insensitive) concept match — a cite only counts as grounding if it IS one of the
+// concepts we actually showed the model (mirrors the FR-029 systemImprovements exactConcept gate).
+function exactConcept(value, concepts) {
+  const wanted = String(value || '').trim().toLowerCase();
+  if (!wanted) return null;
+  return concepts.find((c) => String(c).toLowerCase() === wanted) || null;
+}
+
 // Top concepts from the live graph, ranked by connectedness (the densest, most-connected ideas).
 async function topConcepts(n = 40) {
   const g = await lightrag.graphs({ label: '*', maxNodes: 1400 });
@@ -48,22 +56,32 @@ Return ONLY a JSON array of {"kind":"self_improve|fusion247|content|monetise","s
 
   const arr = await generateJSON(prompt);
   const list = Array.isArray(arr) ? arr : [];
+  // GROUNDING GATE (GPT-003): a suggestion is only "grounded" if it cites REAL concepts from the graph
+  // slice we handed the model. Validate cites by exact match and require a valid kind + confidence —
+  // otherwise a model could fabricate citations and we would store them as evidence for a false
+  // "grounded" claim. Ungrounded/malformed proposals are rejected, not stored.
+  const conceptNames = concepts.map((c) => c.name).filter(Boolean);
   const ts = Date.now().toString(36);
   const stored = [];
   let i = 0;
   for (const s of list) {
+    if (!s || typeof s !== 'object') continue;
+    const kind = TARGET[s.kind];
+    const confidence = Number(s.confidence);
+    const cites = [...new Set((Array.isArray(s.cites) ? s.cites : [])
+      .map((c) => exactConcept(c, conceptNames)).filter(Boolean))];
+    if (!kind || !Number.isFinite(confidence) || confidence < 0 || confidence > 1 || cites.length === 0) continue;
     i++;
-    const cites = Array.isArray(s.cites) ? s.cites : [];
     const r = await q(
       `insert into cockpit.learning_candidate
          (build_id, source_video_id, candidate_ref, recommendation, why, evidence, proposed_target, expected_effect, confidence, risk, status, sort)
        values('IDEA-007', null, $1, $2, $3, $4, $5, $6, $7, $8, 'pending', $9)
        returning id`,
       [`WP5-${ts}-${i}`, s.summary || '', s.benefit || '', cites.join(', '),
-       TARGET[s.kind] || 'self_improve', s.next_step || '', Number(s.confidence) || null,
+       kind, s.next_step || '', confidence,
        s.what_invalidates || '', i]
     );
-    stored.push({ id: r.rows[0].id, kind: s.kind, summary: s.summary, confidence: s.confidence, cites, next_step: s.next_step, what_invalidates: s.what_invalidates });
+    stored.push({ id: r.rows[0].id, kind, summary: s.summary, confidence, cites, next_step: s.next_step, what_invalidates: s.what_invalidates });
   }
   return stored;
 }

@@ -16,9 +16,12 @@ export async function routeCapture(capture) {
   const captureId = String(capture.capture_id || capture.source_id || capture.url || '').trim();
   if (!captureId) throw new Error('cairn: capture_id required');
 
-  // idempotent — a prior decision wins (correctable/replayable, but not silently re-run)
+  // idempotent — a prior decision wins (correctable/replayable, but not silently re-run) EXCEPT a
+  // prior ACT whose lane enqueue previously FAILED: that is a transient delivery failure, not a
+  // settled decision, so it must be re-driven (Fable-2) rather than returned as terminal.
   const prior = (await q('select * from cairn.decision where capture_id=$1', [captureId])).rows[0];
-  if (prior) return { captureId, decision: prior, idempotent: true, receipt: receiptLine(prior) };
+  const retrying = !!(prior && prior.action === 'act' && prior.status === 'failed');
+  if (prior && !retrying) return { captureId, decision: prior, idempotent: true, receipt: receiptLine(prior) };
 
   const d = classify(capture, { feedback: await loadFeedback() });
 
@@ -29,16 +32,21 @@ export async function routeCapture(capture) {
     catch (e) { status = 'failed'; error = String(e.message).slice(0, 300); }
   }
 
-  const actedAt = d.action === ACTION.ACT ? new Date().toISOString() : null;
+  const actedAt = d.action === ACTION.ACT && status === 'acted' ? new Date().toISOString() : null;
+  // First decision → insert. Re-driving a FAILED act → update that row only (the guard never lets a
+  // retry overwrite a good/pending decision), so recovery is safe and idempotency for settled rows holds.
   const ins = await q(
     `insert into cairn.decision(capture_id,source_type,what,intent,privacy_domain,lane,treatment,confidence,rationale,action,status,decided_by,routed_ref,error,acted_at)
      values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
-     on conflict (capture_id) do nothing
+     on conflict (capture_id) do update set
+       status=excluded.status, routed_ref=excluded.routed_ref, error=excluded.error,
+       acted_at=coalesce(cairn.decision.acted_at, excluded.acted_at)
+     where cairn.decision.status='failed'
      returning *`,
     [captureId, d.source_type, d.what, d.intent, d.privacy, d.lane, d.treatment, d.confidence, d.rationale, d.action, status, d.decided_by, routed ? JSON.stringify(routed) : null, error, actedAt]
   );
   const rec = ins.rows[0] || (await q('select * from cairn.decision where capture_id=$1', [captureId])).rows[0];
-  return { captureId, decision: rec, routed, receipt: receiptLine(rec) };
+  return { captureId, decision: rec, routed, retried: retrying || undefined, receipt: receiptLine(rec) };
 }
 
 // Warwick confirms/corrects → persist as governed routing feedback so repeated patterns gain confidence.

@@ -1,7 +1,7 @@
 // ChatGPT -> Honcho Context Outbox (CONTEXT-OUTBOX.md). A governed, replay-safe bridge:
 // a compact packet is enqueued, validated, delivered to Honcho exactly once, and receipted.
 // Privacy is enforced here: personal/health/employer material is held, never auto-delivered.
-import { q } from '../clients/db.mjs';
+import { q, tx } from '../clients/db.mjs';
 import { honcho, PEER_WARWICK, SESSION_CONTEXT } from '../clients/honcho.mjs';
 
 const TYPES = new Set(['preference', 'correction', 'decision', 'interest', 'standing_instruction', 'session_conclusion']);
@@ -30,10 +30,10 @@ export async function enqueuePacket(p) {
   const idem = p.idempotency_key
     || 'pkt:' + Buffer.from(`${p.type}|${String(p.summary).trim().toLowerCase()}`).toString('base64').slice(0, 60);
   const r = await q(
-    `insert into obsidiwikai.context_packet(idempotency_key,type,summary,evidence,confidence,sensitivity,lifespan,source_pointer,state)
-     values($1,$2,$3,$4,$5,$6,$7,$8,'queued')
+    `insert into obsidiwikai.context_packet(idempotency_key,type,summary,evidence,confidence,sensitivity,lifespan,source_pointer,supersedes,state)
+     values($1,$2,$3,$4,$5,$6,$7,$8,$9,'queued')
      on conflict (idempotency_key) do nothing returning packet_id`,
-    [idem, p.type, p.summary, p.evidence || null, p.confidence || null, effectiveSensitivity(p), p.lifespan || 'permanent', p.source_pointer || null]
+    [idem, p.type, p.summary, p.evidence || null, p.confidence || null, effectiveSensitivity(p), p.lifespan || 'permanent', p.source_pointer || null, p.supersedes || null]
   );
   return r.rows[0]?.packet_id || null; // null = duplicate → replay-safe (FR: no duplicate memory)
 }
@@ -43,31 +43,32 @@ export async function enqueuePacket(p) {
 // single-worker CLAIM (queued→delivering) so two workers can never both call Honcho for one packet;
 // (c) a crash after the claim never blindly re-sends — the row is surfaced for reconcile. The
 // packet_id rides in the Honcho message metadata as a stable dedup handle for that reconcile.
-export async function deliverPacket(row, { honchoClient = honcho } = {}) {
+export async function deliverPacket(row, { honchoClient = honcho, db = { q, tx } } = {}) {
   const v = validatePacket(row);
   if (!v.ok) {
-    await q(`update obsidiwikai.context_packet set state='rejected', error=$2 where packet_id=$1 and state='queued'`, [row.packet_id, v.errs.join('; ')]);
+    await db.q(`update obsidiwikai.context_packet set state='rejected', error=$2 where packet_id=$1 and state='queued'`, [row.packet_id, v.errs.join('; ')]);
     return { packet_id: row.packet_id, state: 'rejected', errs: v.errs };
   }
   const sens = effectiveSensitivity(row);
   if (sens === 'prohibited') {
-    await q(`update obsidiwikai.context_packet set state='rejected', error='prohibited content' where packet_id=$1 and state='queued'`, [row.packet_id]);
+    await db.q(`update obsidiwikai.context_packet set state='rejected', error='prohibited content' where packet_id=$1 and state='queued'`, [row.packet_id]);
     return { packet_id: row.packet_id, state: 'rejected' };
   }
   if (sens === 'restricted') {
-    await q(`update obsidiwikai.context_packet set state='held', error='restricted — needs explicit review' where packet_id=$1 and state='queued'`, [row.packet_id]);
+    await db.q(`update obsidiwikai.context_packet set state='held', error='restricted — needs explicit review' where packet_id=$1 and state='queued'`, [row.packet_id]);
     return { packet_id: row.packet_id, state: 'held' };
   }
   // ATOMIC CLAIM — only the worker that flips queued→delivering proceeds. A losing/duplicate worker
   // gets rowCount 0 and must NOT deliver.
-  const claim = await q(
+  const claim = await db.q(
     `update obsidiwikai.context_packet set state='delivering', claimed_at=now() where packet_id=$1 and state='queued' returning packet_id`,
     [row.packet_id]
   );
   if (claim.rowCount === 0) {
-    const cur = (await q(`select state, honcho_ref from obsidiwikai.context_packet where packet_id=$1`, [row.packet_id])).rows[0];
+    const cur = (await db.q(`select state, honcho_ref from obsidiwikai.context_packet where packet_id=$1`, [row.packet_id])).rows[0];
     return { packet_id: row.packet_id, state: cur?.state || 'unknown', skipped: true, honcho_ref: cur?.honcho_ref || null };
   }
+  let honchoAccepted = false;
   try {
     await honchoClient.ensureWorkspace();
     await honchoClient.ensurePeer(PEER_WARWICK);
@@ -76,12 +77,31 @@ export async function deliverPacket(row, { honchoClient = honcho } = {}) {
     const res = await honchoClient.addMessage(SESSION_CONTEXT, PEER_WARWICK, content, {
       packet_id: row.packet_id, type: row.type, source: 'context-outbox', lifespan: row.lifespan,
     });
+    // Honcho now HAS the message. From here a resend would DUPLICATE, so any later failure must
+    // fail-safe to needs_reconcile — never back to queued.
+    honchoAccepted = true;
     const ref = Array.isArray(res) && res[0]?.id ? res[0].id : (res?.id || null);
-    await q(`update obsidiwikai.context_packet set state='delivered', honcho_ref=$2, delivered_at=now() where packet_id=$1`, [row.packet_id, ref]);
-    return { packet_id: row.packet_id, state: 'delivered', honcho_ref: ref };
+    // Record the receipt AND retire any packet this one supersedes, atomically (CONTEXT-OUTBOX §supersedes:
+    // a later correction leaves no contradictory active memory).
+    await db.tx(async (c) => {
+      await c.query(`update obsidiwikai.context_packet set state='delivered', honcho_ref=$2, delivered_at=now() where packet_id=$1 and state='delivering'`, [row.packet_id, ref]);
+      if (row.supersedes) {
+        await c.query(`update obsidiwikai.context_packet set state='superseded', error=$2 where packet_id=$1 and state not in ('superseded','rejected')`,
+          [row.supersedes, `superseded by ${row.packet_id}`]);
+      }
+    });
+    return { packet_id: row.packet_id, state: 'delivered', honcho_ref: ref, superseded: row.supersedes || null };
   } catch (e) {
-    // Delivery FAILED (Honcho not confirmed) → release back to queued for a clean retry.
-    await q(`update obsidiwikai.context_packet set state='queued', claimed_at=null, error=$2 where packet_id=$1 and state='delivering'`, [row.packet_id, String(e.message).slice(0, 300)]);
+    if (honchoAccepted) {
+      // Honcho ACCEPTED but we could not record the receipt (or supersession) — resending would
+      // duplicate the memory, so fail SAFE to needs_reconcile (the exact ambiguity migration 0004
+      // reserves this state for). Reconcile via metadata.packet_id already carried in Honcho's message.
+      await db.q(`update obsidiwikai.context_packet set state='needs_reconcile', error=$2 where packet_id=$1 and state='delivering'`,
+        [row.packet_id, ('delivered to Honcho but receipt not recorded — verify metadata.packet_id before resend: ' + String(e.message)).slice(0, 300)]);
+      return { packet_id: row.packet_id, state: 'needs_reconcile', honcho_accepted: true };
+    }
+    // Honcho NOT confirmed → release back to queued for a clean retry.
+    await db.q(`update obsidiwikai.context_packet set state='queued', claimed_at=null, error=$2 where packet_id=$1 and state='delivering'`, [row.packet_id, String(e.message).slice(0, 300)]);
     throw e;
   }
 }

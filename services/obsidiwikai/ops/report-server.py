@@ -343,18 +343,32 @@ def source_page(video_id):
     if data['ev']:
         body += f"<div class=sec><h2>📚 Evidence</h2><p class=mut>“{html.escape(data['ev']['concept'])}” — traced to the transcript:</p><div class=ev>{html.escape(data['ev']['passage'])}…</div></div>"
     body += ("<div class=sec><h2>👍 Your call</h2><div class=btns>"
-             f"<a href='/decide?vid={urllib.parse.quote(video_id)}&v=useful'>Useful</a>"
-             f"<a href='/decide?vid={urllib.parse.quote(video_id)}&v=not'>Not useful</a>"
+             "<form method=post action=/decide>"
+             f"<input type=hidden name=vid value='{html.escape(video_id)}'>"
+             "<input type=hidden name=v value=useful>"
+             f"<input type=hidden name=token value='{action_token(video_id, 'useful')}'>"
+             "<button type=submit>Useful</button></form>"
+             "<form method=post action=/decide>"
+             f"<input type=hidden name=vid value='{html.escape(video_id)}'>"
+             "<input type=hidden name=v value=not>"
+             f"<input type=hidden name=token value='{action_token(video_id, 'not')}'>"
+             "<button type=submit>Not useful</button></form>"
              f"<a href='{html.escape(GRAPH)}'>Explore in graph</a></div><p class=mut>your call teaches Honcho</p></div>")
     return page(title, body)
 
 
 def decide(video_id, value):
+    # Files a Warwick preference/correction into the Context Outbox. Deliberate action only — the
+    # caller (do_POST) has already verified a POST + valid HMAC token + allowed origin, so a
+    # link-preview/prefetch or accidental GET can no longer fire this (Fable-1). Any DB failure
+    # PROPAGATES so the outcome is reported honestly, never a silent "Noted".
+    if value not in ('useful', 'not'):
+        raise ValueError('invalid decision value')
     useful = value == 'useful'
     title = (pgq("select title from cockpit.youtube_source where video_id=%s", (video_id,)) or [['?']])[0][0]
+    summary = f"Warwick found the source \"{title}\" {'USEFUL / worth acting on' if useful else 'NOT useful'}."
+    connection = psycopg2.connect(PG)
     try:
-        summary = f"Warwick found the source \"{title}\" {'USEFUL / worth acting on' if useful else 'NOT useful'}."
-        connection = psycopg2.connect(PG)
         cursor = connection.cursor()
         cursor.execute(
             "insert into obsidiwikai.context_packet(idempotency_key,type,summary,sensitivity,lifespan,source_pointer,state) "
@@ -362,11 +376,9 @@ def decide(video_id, value):
             ('rep:' + video_id + ':' + value, 'preference' if useful else 'correction', summary),
         )
         connection.commit()
-        cursor.close()
+    finally:
         connection.close()
-    except Exception:
-        pass
-    return page("Thanks", f"<h1>{'👍' if useful else '👎'} Noted</h1><p>Honcho will learn from this.</p><a href='/s/{urllib.parse.quote(video_id)}'>← back to the report</a> · <a href=/>your brain</a>")
+    return {'video_id': video_id, 'useful': useful}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -412,15 +424,13 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(response, content_type='application/json; charset=utf-8')
             elif parsed.path.startswith('/s/'):
                 self._send(source_page(urllib.parse.unquote(parsed.path[3:])))
-            elif parsed.path == '/decide':
-                self._send(decide(query.get('vid', [''])[0], query.get('v', [''])[0]))
             else:
                 self._send(page('Not found', '<h1>Not found</h1><a href=/>← back</a>'), status=404)
         except Exception:
             self._send(page('Error', '<h1>Something went wrong</h1><p>The error was recorded. No decision was applied.</p><a href=/>← back</a>'), status=500)
 
     def do_POST(self):
-        if self.path != '/candidate-decision':
+        if self.path not in ('/candidate-decision', '/decide'):
             self._send(page('Not found', '<h1>Not found</h1>'), status=404)
             return
         if not origin_allowed(self.headers):
@@ -435,6 +445,16 @@ class Handler(BaseHTTPRequestHandler):
             if length <= 0 or length > 4096:
                 raise ValueError('invalid request length')
             form = urllib.parse.parse_qs(self.rfile.read(length).decode('utf-8'), strict_parsing=True)
+            if self.path == '/decide':
+                # Deliberate preference/correction — verify the per-(source,value) HMAC token before
+                # touching Honcho's lens, exactly like the candidate path (Fable-1).
+                vid = form.get('vid', [''])[0]
+                value = form.get('v', [''])[0]
+                if not valid_action_token(vid, value, form.get('token', [''])[0]):
+                    raise PermissionError('invalid decision token')
+                decide(vid, value)
+                self._redirect('/s/' + urllib.parse.quote(vid))
+                return
             result = file_candidate_decision(
                 form.get('candidate_id', [''])[0], form.get('command', [''])[0], form.get('token', [''])[0],
             )

@@ -3,7 +3,7 @@
 // DELTA ("since you first learned this…") rather than re-summarise. Previous interpretation + lens
 // are preserved (never silently replaced). The reliable per-source graph read comes from the report
 // server's /api/source endpoint (box-side Neo4j); the lens + delta reasoning are here.
-import { q } from '../clients/db.mjs';
+import { q, tx } from '../clients/db.mjs';
 import { buildLens } from './lens.mjs';
 import { generateJSON } from './llm.mjs';
 import { compareLensDelta } from './lensDelta.mjs';
@@ -105,15 +105,20 @@ export async function snapshot(sourceId, { delta = null, deltaFacets = null, dat
       ...(deltaFacets?.metrics || {}),
     },
   };
-  await q(`update obsidiwikai.source_interpretation set is_current=false where source_id=$1 and is_current=true`, [sourceId]);
-  const r = await q(
-    `insert into obsidiwikai.source_interpretation
-       (source_id,lens_version,why_matters,top_concepts,cross_source,concept_count,lens_snapshot,delta,delta_facets,is_current)
-     values($1,$2,$3,$4,$5,$6,$7,$8,$9,true) returning interp_id`,
-    [sourceId, lens.version, interpretation.summary || data.why || '', JSON.stringify(interpretation.noticed_concepts),
-     JSON.stringify(data.connected || []), data.total, JSON.stringify(lensObj(lens)),
-     delta, JSON.stringify(facets)]
-  );
+  // Atomic: retire the prior interpretation and insert its replacement in ONE transaction. A crash
+  // between the two statements must never leave a source with zero is_current rows — that would make
+  // the next reanalyse() find no prior and silently re-baseline, losing delta continuity.
+  const r = await tx(async (c) => {
+    await c.query(`update obsidiwikai.source_interpretation set is_current=false where source_id=$1 and is_current=true`, [sourceId]);
+    return c.query(
+      `insert into obsidiwikai.source_interpretation
+         (source_id,lens_version,why_matters,top_concepts,cross_source,concept_count,lens_snapshot,delta,delta_facets,is_current)
+       values($1,$2,$3,$4,$5,$6,$7,$8,$9,true) returning interp_id`,
+      [sourceId, lens.version, interpretation.summary || data.why || '', JSON.stringify(interpretation.noticed_concepts),
+       JSON.stringify(data.connected || []), data.total, JSON.stringify(lensObj(lens)),
+       delta, JSON.stringify(facets)]
+    );
+  });
   return {
     interpId: r.rows[0].interp_id,
     baseline: !delta,
@@ -171,7 +176,6 @@ export async function reanalyse(sourceId, { lens: providedLens = null, baselineI
       deltaFacets: {
         previous_interpretation_summary: oldInterpretation.summary || prev.why_matters || '',
         new_interests: newInterests,
-    approved_interest_changes: approvedAdditions,
         approved_interest_changes: approvedAdditions,
         dropped_interests: droppedInterests,
         newly_visible_concepts: newlyVisible,

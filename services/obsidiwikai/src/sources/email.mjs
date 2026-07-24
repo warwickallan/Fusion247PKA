@@ -99,6 +99,14 @@ export function createEmailSource({ graph, store, route, log = () => {} }) {
     // durably captured (routed=false) and is re-driven by routeUnrouted().
     try {
       const r = await route(capture);
+      // Cairn swallows a lane-enqueue failure into a 'failed' decision rather than throwing, so an
+      // ACT that did not actually reach its lane must NOT be marked routed — leave it for
+      // routeUnrouted() to re-drive (which now re-attempts a failed ACT). Fable-2.
+      if (r?.decision?.status === 'failed') {
+        await store.markError(capture.capture_id, ('lane routing failed, will retry: ' + (r.decision.error || 'unknown')).slice(0, 300));
+        log(`lane routing failed for ${capture.capture_id} (captured, will retry): ${r.decision.error || 'unknown'}`);
+        return 'captured';
+      }
       await store.markRouted(capture.capture_id, r?.receipt || '');
       return 'routed';
     } catch (e) {

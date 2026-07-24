@@ -4,7 +4,12 @@
 > **One authoritative graph:** LightRAG 1.5.4 on **Neo4JStorage** (physically in Neo4j); NetworkX + the
 > duplicate `OwaiConcept` projection retired (NetworkX kept as rollback). Intent = **KEEP | LEARN**.
 >
-> - **WP1 ✅** Neo4JStorage cutover; Learn fully automatic (Cairn→learn-worker→§7.1→Neo4j) + health check.
+> - **WP1 ✅ core spine / 🟨 lens+canonicaliser rehome pending (GPT-001 → WP1.5).** Neo4JStorage cutover; Learn
+>   automatic (Cairn→learn-worker→§7.1→LightRAG→Neo4j) + health check. **Honest gap:** the live permanent spine
+>   ingests via LightRAG's *native* extraction; the interest-conditioned extraction pass and our semantic
+>   canonicaliser (`compiler.mjs`/`canonicaliser.mjs`) are built + proven but **PARKED** — they still project into the
+>   retired second graph, so re-pointing them onto LightRAG's own graph APIs is the next work-package (WP1.5), not a
+>   surgical fix. FR-003/006/009/010 downgraded to 🟨 accordingly (see the GPT-001 section).
 > - **WP2 ✅ (bar 1 human dep)** Honcho lane (verbatim) + hardened outbox + MS Graph email adapter;
 >   **needs Warwick: mailbox account + one-time OAuth** to finish email E2E.
 > - **WP3 ✅** interest-lens management (surface + edit + feed Honcho).
@@ -56,14 +61,14 @@ historical log entry.)_
 |---|---|---|---|---|
 | FR-001 | Full transcript ingestion | reuse (TubeAIR) / WP1 | e2e: real URL → full transcript retained | ✅ full faithful-clean §7.1 ingested (no cap; min-length guard only) |
 | FR-002 | Durable source identity | reuse (video_id) / WP1 | resubmit same URL → no dup source | ✅ |
-| FR-003 | Evolving Honcho lens (fresh per run) | WP1 | lens fetched + recorded per run | ✅ |
+| FR-003 | Evolving Honcho lens (fresh per run) | WP1 | lens fetched + recorded per run | 🟨 lens built fresh + used in re-analysis/WP5/FR-029; NOT yet during initial ingest extraction (WP1.5) |
 | FR-004 | Interest horizons (enduring/active/emerging/…) | WP1/WP3 | lens record has all horizons | ✅ |
 | FR-005 | Broad discovery pass | WP1 | important concept captured w/ no lens match | ✅ |
-| FR-006 | Interest-conditioned pass | WP1 | lens-steered deeper extraction observed | ✅ |
+| FR-006 | Interest-conditioned pass | WP1 | lens-steered deeper extraction observed | 🟨 built (compiler) but PARKED; live spine uses LightRAG native extraction — rehome = WP1.5 |
 | FR-007 | Expanding semantic scope | WP4 | wider lens → more captured on re-run | 🟨 mechanism proven single-source; sustained multi-source pending |
 | FR-008 | Emerging-interest discovery | WP1/WP4 | out-of-lens concept offered as emerging | ✅ |
-| FR-009 | Semantic entity search before create | WP1 | candidate matched vs existing by embedding+graph | ✅ |
-| FR-010 | Multi-outcome canonicalisation | WP1 | all 10 classifications exercised | ✅ |
+| FR-009 | Semantic entity search before create | WP1 | candidate matched vs existing by embedding+graph | 🟨 canonicaliser built but PARKED (writes 2nd graph); live spine relies on LightRAG's own merge — rehome = WP1.5 |
+| FR-010 | Multi-outcome canonicalisation | WP1 | all 10 classifications exercised | 🟨 canonicaliser SAME/ALIAS/BROADER reasoning built + unit-proven but PARKED off the live spine — rehome = WP1.5 |
 | FR-011 | Canonical concept identity | WP0/WP1 | node carries full canonical record | ✅ |
 | FR-012 | Source-preserving aliases | WP1 | original wording retained on merge | ✅ |
 | FR-013 | Duplicate prevention | WP1 | phrasing variants → one node | ✅ |
@@ -96,10 +101,10 @@ historical log entry.)_
 | 1 | Telegram→transcript ingestion | reuse/WP1 | 🟨 pipeline proven; Telegram front door built, unrun (H1 token) |
 | 2 | Fresh Honcho lens generation | WP1 | ✅ |
 | 3 | Broad semantic discovery | WP1 | ✅ |
-| 4 | Interest-conditioned analysis | WP1 | ✅ |
+| 4 | Interest-conditioned analysis | WP1 | 🟨 built but parked off live spine (GPT-001 → WP1.5) |
 | 5 | Adjacent/emerging interests identified | WP1/WP4 | ✅ |
-| 6 | Semantic match vs existing concepts | WP1 | ✅ |
-| 7 | All classification outcomes | WP1 | ✅ |
+| 6 | Semantic match vs existing concepts | WP1 | 🟨 canonicaliser parked off live spine (GPT-001 → WP1.5) |
+| 7 | All classification outcomes | WP1 | 🟨 canonicaliser outcomes unit-proven but parked off live spine (GPT-001 → WP1.5) |
 | 8 | Duplicate-resistant Neo4j updates | WP1 | ✅ |
 | 9 | Provenance on every node/edge | WP1 | ✅ |
 | 10 | LightRAG retrieval across sources | WP6 | ✅ live `brain_ask` grounded + refs |
@@ -133,8 +138,42 @@ buckets that are **not** finishable by more coding right now:
   (reprocess/replace is proven; a disaster-recovery rebuild is a resilience exercise). Warwick already has working
   control via the interest CLI, the report decision actions, and the cockpit.
 
-**Conclusion:** the first build is functionally complete. It clears the exit bar except for (a) one human OAuth step
-and (b) sustained multi-source compounding, which is a usage outcome rather than a build task.
+**Conclusion:** the retrieval/governance/compounding/report Brain is functionally complete and proven, but the
+first-build exit bar is **not** fully met: beyond (a) one human OAuth step and (b) sustained multi-source
+compounding (a usage outcome), independent review surfaced (c) **GPT-001** — the live ingest spine does not yet run
+the interest-conditioned extraction + semantic canonicaliser (they are built but parked off the one graph). (c) is
+the next work-package (WP1.5), not a surgical fix.
+
+## Review round 1 — Fable + GPT independent QA (2026-07-24)
+
+Two independent read-only reviewers against frozen `cbdea7b`. **Fable:** 0 blockers / 3 fold-before-live / 5
+cosmetic. **GPT:** 3 blockers (thumbs-up on WP6 + FR-029). Larry adjudicated every finding on the actual code
+(not by averaging the reviewers), then fixed the genuine ones in one pass; suite **62/62**.
+
+- **GPT-002 (fixed)** — outbox could duplicate after Honcho success: a receipt-write failure *after* Honcho
+  accepted reset `delivering→queued` (resend). Now fails safe to `needs_reconcile`; `supersedes` is now persisted +
+  retires the prior packet on delivery (migration 0009 adds the `superseded` state). Failure + supersession tests
+  added.
+- **GPT-003 (fixed)** — WP5 suggestions stored model-returned citations unchecked. Now gated by the FR-029
+  `exactConcept` pattern: cites must be real graph concepts, kind + confidence validated, ungrounded proposals
+  rejected.
+- **GPT-001 (honest downgrade + WP1.5 scoped, NOT a surgical fix)** — the live Learn spine
+  (`learn-worker→learnIngest→LightRAG`) uses LightRAG's native extraction; it does not build/use the fresh lens for
+  extraction nor run our semantic canonicaliser before knowledge enters the authoritative graph. `compiler.mjs`/
+  `canonicaliser.mjs` implement this but PARKED — and as written they project into the **retired second graph**, so
+  wiring them in naively would resurrect the duplicate graph GPT explicitly forbade. Correct fix = re-point the
+  lens-relevance + SAME/ALIAS/BROADER reasoning onto LightRAG's own graph APIs (`mergeEntities`/`editEntity`) — a
+  genuine work-package (**WP1.5**), scheduled next. FR-003/006/009/010 and DoD #4/#6/#7 downgraded to 🟨 to make the
+  matrix honest in the meantime.
+- **Fable-1 (fixed)** — report `/decide` was a GET side-effect firing a permanent Honcho preference with no
+  token/confirmation + a silent "Noted" on failure. Now a POST guarded by the same HMAC action-token + origin +
+  rate limits as the FR-029 path, and it reports the true outcome.
+- **Fable-2 (fixed)** — an ACT-lane enqueue failure was recorded as a terminal `failed` decision and marked
+  `routed`, so recovery never re-drove it. `routeCapture` now re-drives *only* a prior failed ACT; the email path
+  leaves a failed route un-`routed` for `routeUnrouted()`.
+- **Fable-3 (fixed)** — `snapshot()` retired+inserted interpretations non-transactionally; now atomic via `tx()`.
+- **Fable cosmetics #5–#8 (noted, deferred by Warwick — "no cosmetic findings" this pass)**; the duplicate-key #4
+  was removed opportunistically.
 
 ## WP4 bounded three-source compounding proof — honest non-pass (2026-07-24)
 
