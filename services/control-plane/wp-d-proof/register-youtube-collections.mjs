@@ -27,5 +27,13 @@ try {
   await c.query(`delete from directus_fields where collection='youtube_source' and field='brief_markdown'`);
   await c.query(`insert into directus_fields (collection, field, interface, display, sort, width) values ('youtube_source','brief_markdown','input-rich-text-md','formatted-value',30,'full')`);
   console.log('[register-yt] field: youtube_source.brief_markdown -> Markdown');
+  for (const [field, sort] of [['why', 40], ['evidence', 50], ['expected_effect', 60], ['next_step', 70], ['risk', 80]]) {
+    await c.query(`delete from directus_fields where collection='learning_candidate' and field=$1`, [field]);
+    await c.query(
+      `insert into directus_fields (collection, field, interface, display, sort, width)
+       values ('learning_candidate',$1,'input-multiline','formatted-value',$2,'full')`,
+      [field, sort]);
+  }
+  console.log('[register-yt] fields: learning_candidate evidence/lifecycle detail -> multiline');
 } finally { await c.end(); }
 console.log('[register-yt] done — restart Directus to pick these up.');

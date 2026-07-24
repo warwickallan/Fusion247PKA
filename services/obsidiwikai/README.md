@@ -63,3 +63,42 @@ this — no silent "captured but never finished" state.
 ## Deprecated
 - `fusiongptbot.mjs` — rollback-only (superseded by Cairn's Honcho lane + email adapter).
 - `compile-source.mjs` / the OwaiConcept projection — parked (see Architecture).
+
+## FR-029 — governed “Make the Brain Better” loop
+
+**Status:** code-ready and locally verified; live migration/deploy/real-source proof is pending a runtime with the Fusion247 SSH identity + Tailscale access. Do not mark DoD #18 complete until the committed real-source proof passes.
+
+The source-level report now distinguishes two suggestion scopes:
+
+- `warwick_opportunity` — the existing WP5 suggestions for Warwick;
+- `system_improvement` — source-grounded proposals to improve Larry, MyPKA, Cairn, TubeAIR, LightRAG, Neo4j, Directus, Fusion247 or the workflow itself.
+
+Generate the latter for one already-learned source:
+
+```text
+node <ENVS> src/bin/suggest-system.mjs --source=<video-id> --limit=4
+```
+
+Each candidate has a deterministic ref (`OWAI:<video-id>:A`), source/graph evidence, target/category, proposed change, expected effect, confidence, invalidation risk and a concrete next step. The report shows `🛠 Make the Brain Better` with:
+
+```text
+proposed → accepted → with Larry → completed
+                     or
+proposed → dismissed
+```
+
+Accept/Dismiss files an existing `cockpit.learning_command`. The existing worker applies it; Accept creates one correlated `cockpit.follow_on_task`; Larry reads it through `resume-followups.mjs`; completion remains the existing `command_request close_follow_on` result/receipt. Accept never writes canonical MyPKA.
+
+Human fallback resolution is supported:
+
+```text
+node services/control-plane/wp-d-proof/resume-followups.mjs --resolve="Action A from the Cerebras report"
+```
+
+Real-source acceptance proof (leaves the real decisions/task durable):
+
+```text
+node services/control-plane/wp-d-proof/prove-idea007-system-loop.mjs --source=<video-id>
+```
+
+Before enabling report buttons live, apply `services/control-plane/db/mypka/220_system_improvement_candidate.sql` and set `REPORT_ACTION_DATABASE_URL` to the existing request-only `cp_directus` connection.

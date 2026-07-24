@@ -87,3 +87,43 @@ Likely shape (suggestion, not prescription): extend `suggestions.mjs` with a MyP
 (target=the system, not Warwick's business), write candidates to `cockpit.learning_candidate` (or a clearly-tagged
 subset) with a stable ref, surface a "🛠 Make the Brain Better" section on the report, and on Accept file a
 `cockpit.follow_on_task` for the resume/command consumer. Keep it governed + human-gated throughout.
+
+---
+
+## LATEST CONTINUATION — Codex FR-029 increment (2026-07-24)
+
+**Authority:** this section supersedes the earlier “NOT started” wording for FR-029 only.
+
+### Built and locally proven
+
+- source-specific system-improvement generation with strict anti-generic/evidence validation;
+- deterministic `OWAI:<source>:<Action>` refs and natural-language resolution (`Action A from <source> report`);
+- migration 220 extends the existing `learning_candidate` record; no parallel task system;
+- existing `learning_command → follow_on_task → resume-followups → command_request result/receipt` path reused;
+- accepted task detail contains exact improvement, source, graph evidence, rationale, expected effect, confidence, risk, next step, ref and Warwick approval;
+- source report extended with `🛠 Make the Brain Better`, Accept/Dismiss, and proposed/queued/with-Larry/completed/dismissed lifecycle;
+- POST-only decision intent, HMAC action token, origin check, request limit, rate limit and response security headers;
+- 35 ObsidiWikAi tests + 3 resolver/handoff tests + 9 endpoint security checks green;
+- Vera screenshots at 375/768/1280 px: no overflow, 44 px targets, visible keyboard focus.
+
+### NOT yet live-proven — genuine blocker
+
+This Codex workstation does not have `C:\Users\Warwick.Allen\.ssh\hetzner_fusion247_ed25519` and has no Tailscale adapter. SSH to `100.101.240.85` timed out before any remote change. Therefore:
+
+- migration 220 is not applied live;
+- the report is not redeployed;
+- no real source candidate has been generated;
+- Accept → `follow_on_task`, Dismiss → no task, cockpit state and live resume output are not yet evidenced;
+- FR-029 / DoD #18 remains **PARTIAL / BLOCKED**, not complete.
+
+### Exact resumption point (runtime with box access)
+
+1. Apply `services/control-plane/db/mypka/220_system_improvement_candidate.sql` idempotently to the live cockpit database.
+2. Configure `REPORT_ACTION_DATABASE_URL` with the existing request-only `cp_directus` DSN.
+3. Deploy `services/obsidiwikai/ops/report-server.py` and restart `fusion-report`.
+4. Run `suggest-system.mjs --source=<one already-learned real video id>`.
+5. Open that source report and confirm the real candidate appears under `🛠 Make the Brain Better`.
+6. Run `prove-idea007-system-loop.mjs --source=<same id>`; it Accepts Action A, Dismisses Action B, proves Larry resume visibility and leaves the real evidence durable.
+7. Capture live report + Directus/cockpit evidence, then and only then mark FR-029 / DoD #18 complete.
+
+Do not create a branch/PR, merge, or redesign when resuming. Continue this branch and draft PR #59.

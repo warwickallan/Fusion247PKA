@@ -1,6 +1,6 @@
 # ObsidiWikAi — Traceability Matrix
 
-> ## ✅ STATUS 2026-07-24 (head b7729d6) — WP1–WP5 COMPLETE; FR-029/DoD#18 is the NEXT BUILD
+> ## 🟨 STATUS 2026-07-24 (continued from head 92180ee) — WP1–WP5 COMPLETE; FR-029 CODE-READY / LIVE PROOF BLOCKED
 > **One authoritative graph:** LightRAG 1.5.4 on **Neo4JStorage** (physically in Neo4j); NetworkX + the
 > duplicate `OwaiConcept` projection retired (NetworkX kept as rollback). Intent = **KEEP | LEARN**.
 >
@@ -18,8 +18,8 @@
 > **Delivered product surfaces (Tailscale, managed):** report `fusion-report` box:8701 · graph `fusion-graph`
 > box:8700 (both banked at `services/obsidiwikai/ops/`). **NOT merged** (Codex review + Warwick gate stand).
 >
-> **⬜ NEXT BUILD — FR-029 / DoD #18:** governed **MyPKA self-improvement candidates** ("🛠 Make the Brain
-> Better") via the existing `follow_on_task` machinery — see `services/obsidiwikai/HANDOFF-CODEX.md`. NOT started.
+> **🟨 FR-029 / DoD #18:** governed **MyPKA self-improvement candidates** ("🛠 Make the Brain
+> Better") via the existing `follow_on_task` machinery — code + local QA are complete; live migration/deploy/real-source acceptance are blocked by missing SSH/Tailscale access in this runtime. See `services/obsidiwikai/HANDOFF-CODEX.md`.
 
 **Purpose:** the single source that maps PRD requirements → work package → PR → test → status, so **Codex QA (and Warwick) can judge alignment + progress**, not cosmetics. Kept live in Git; status ledger mirrored to Supabase.
 
@@ -70,7 +70,7 @@ _(Per-row table below reflects the original plan; the summary above is the live 
 | FR-026 | Suggestion uncertainty stated | WP5 | evidence+confidence+what-invalidates shown | ⬜ |
 | FR-027 | No autonomous monetisation action | WP5 | human-gate enforced | ⬜ |
 | FR-028 | Governed agent access | WP6 | agents retrieve via governed interface | ⬜ |
-| FR-029 | MyPKA improvement candidates (governed) | WP5/WP6 | candidate ≠ canonical without governance | ⬜ |
+| FR-029 | MyPKA improvement candidates (governed) | WP5/WP6 | candidate ≠ canonical without governance | 🟨 code/local proof complete; live real-source loop blocked |
 | FR-030 | Privacy separation (raw personal excluded) | cross-cutting/WP0 | classification blocks personal→external | ⬜ |
 | FR-A (follow-up) | Human-assisted semantic resolution | WP1 | uncertain → one-tap Directus question | ⬜ |
 | FR-B (follow-up) | Deferred semantic reservoir | WP4 | below-threshold retained, not discarded | ⬜ |
@@ -98,8 +98,23 @@ _(Per-row table below reflects the original plan; the summary above is the live 
 | 15 | Grounded self-improvement suggestions | WP5 | ⬜ |
 | 16 | Grounded Fusion247 suggestions | WP5 | ⬜ |
 | 17 | Grounded content/monetisation opportunities | WP5 | ⬜ |
-| 18 | Governed MyPKA idea/change candidates | WP5/WP6 | ⬜ |
+| 18 | Governed MyPKA idea/change candidates | WP5/WP6 | 🟨 code/local proof complete; live real-source loop blocked |
 | 19 | Safe reprocessing + rebuilding | WP1/WP4 | ⬜ |
 | 20 | Clear separation of vault / encyclopedia / lens | cross-cutting | ⬜ |
 
 **First-build exit bar:** all 20 mechanisms ✅ with compounding shown across ~3–5 real sources + observable lens expansion. Deferred past first build (named + approved): **WP7 work/Bellrock lane** 🔵.
+## FR-029 / DoD #18 — Codex continuation evidence (2026-07-24)
+
+**Implemented on the existing branch/PR; not live-deployed.**
+
+- Generation: `services/obsidiwikai/src/core/systemImprovements.mjs` + `src/bin/suggest-system.mjs`.
+- Durable schema: migration `220_system_improvement_candidate.sql` extends `cockpit.learning_candidate`; stable source/action ref is unique only for `candidate_scope='system_improvement'`.
+- UX: source report section `🛠 Make the Brain Better`, evidence/detail, Accept/Dismiss POST, lifecycle derived from existing candidate/command/task state.
+- Governance: existing `apply-learning-command.mjs` creates the correlated task; `resume-followups.mjs` exposes full context; completion remains `command_request close_follow_on` + receipt.
+- Fallback: `candidate-resolver.mjs` resolves `Action A from <source> report` or fails closed on zero/multiple matches.
+- Repeatable real proof: `prove-idea007-system-loop.mjs --source=<video-id>`.
+- Local evidence: 35/35 ObsidiWikAi tests; 3/3 resolver/handoff tests; 9/9 report endpoint security checks; Vera responsive screenshots at 375/768/1280 px; `PKM/` unchanged.
+- Security condition: configure live `REPORT_ACTION_DATABASE_URL` to `cp_directus` before enabling the buttons.
+- Blocker: no SSH identity or Tailscale adapter on this Codex workstation; the box timed out and no remote state changed.
+
+**Completion rule:** FR-029 / DoD #18 stays 🟨 until one real already-learned source proves candidate generation, visible report state, Accept → correlated `follow_on_task` visible to Larry, Dismiss → no task, and no canonical MyPKA mutation on the live system.
