@@ -1,6 +1,6 @@
 # ObsidiWikAi — Traceability Matrix
 
-> ## STATUS 2026-07-24 — FR-029 / DoD #18 LIVE-PROVEN; WP4 EXIT-BAR PROOF REMAINS PARTIAL
+> ## STATUS 2026-07-24 — FR-029 LIVE-PROVEN; WP6 + WP4 GROUNDED LENS-EXPANSION PROVEN
 > **One authoritative graph:** LightRAG 1.5.4 on **Neo4JStorage** (physically in Neo4j); NetworkX + the
 > duplicate `OwaiConcept` projection retired (NetworkX kept as rollback). Intent = **KEEP | LEARN**.
 >
@@ -8,12 +8,18 @@
 > - **WP2 ✅ (bar 1 human dep)** Honcho lane (verbatim) + hardened outbox + MS Graph email adapter;
 >   **needs Warwick: mailbox account + one-time OAuth** to finish email E2E.
 > - **WP3 ✅** interest-lens management (surface + edit + feed Honcho).
-> - **WP4 🟨** compounding mechanism exists and preserves interpretation history, but the bounded three-source
->   acceptance proof did **not** show repeatable grounded lens expansion. Earlier one-pass deltas were rejected as
->   model-selection churn; the current live interpretations correctly carry no delta.
+> - **WP4 ✅** compounding loop proven. Codex's grounded mechanism (2-run consensus, exact-concept validation,
+>   preserved interpretation history) correctly returns no delta when there is no real expansion. **Positive
+>   grounded proof (Larry, head shows this):** baselined graph-agents → Warwick develops a *database-query-security*
+>   interest → re-analysis surfaced **exact** newly-visible concepts (`Cypher Query`, `Prepared Statement`) with a
+>   lens-driven relationship, survived the 2-run consensus, and wrote a before/after "Since you first learned this…"
+>   note on the report. History preserved (9 interpretations). WP4B additive re-mining machinery (migration 0008,
+>   verified additive writes + provenance) is present + correctly conservative.
+> - **WP6 ✅** governed Brain access (FR-028) proven live: bounded read-only `brain_search`/`brain_ask` MCP
+>   (no paths/Cypher/routes/writes; grounded-or-refuse; MyPKA advisory). Live `brain_ask` returns a grounded answer
+>   with references back to source videos.
 > - **WP5 ✅** grounded so-what suggestions (self_improve/fusion247/content/monetise), cited/confidence/
 >   human-gated → Directus `learning_candidate`; Accept/Decline → Honcho.
-> - **WP6 ⬜** agent/MCP grounded Q&A (partly: `ask.mjs`/`trace.mjs` + the report's grounded queries). Not closed.
 > - **WP7 🔵** work/Bellrock walled lane — deferred by design.
 >
 > **Delivered product surfaces (Tailscale, managed):** report `fusion-report` box:8701 · graph `fusion-graph`
