@@ -1,0 +1,41 @@
+{
+  "source_url": "https://www.youtube.com/watch?v=y72TrpffdSk",
+  "video_id": "y72TrpffdSk",
+  "captured_at": "2026-07-23T17:19:20+00:00",
+  "title": "This RAG Trick Makes Your AI Agents WAY More Accurate (n8n)",
+  "channel": "The AI Automators",
+  "published_date": "2025-10-13",
+  "duration_seconds": 2075,
+  "user_note": "BUILD-002 WP2 auto-detect",
+  "transcript_status": "extracted",
+  "transcript_source": "auto_captions",
+  "language": "English (auto-generated)",
+  "language_code": "en",
+  "segment_count": 954,
+  "error_category": null,
+  "error_detail": null,
+  "retry_recommendation": null,
+  "tool_versions": {
+    "python": "3.13.6",
+    "youtube-transcript-api": "1.2.4",
+    "yt-dlp": "2026.7.4"
+  },
+  "routing": {
+    "fusion_review_status": "pending_cairn",
+    "assigned_agent": "youtubair",
+    "next_agent": "cairn",
+    "legacy_review_status": "pending_categorisair",
+    "legacy_next_agent": "categorisair",
+    "note": "Cairn has absorbed the legacy CategorisAIr role; legacy_* are aliases only."
+  },
+  "handoff": null,
+  "output_dir": "out\\auto\\2026-07-23__this-rag-trick-makes-your-ai-agents-way-more-accurate-n8n__y72TrpffdSk",
+  "files": [
+    "TubeAIR Report - this-rag-trick-makes-your-ai-agents-way-more-accurate-n8n - y72TrpffdSk.md",
+    "manifest.json"
+  ],
+  "idea": "IDEA-013",
+  "project_id": "F247-YT-INGRESS-001",
+  "build": "TubeAIR",
+  "schema_version": 2
+}

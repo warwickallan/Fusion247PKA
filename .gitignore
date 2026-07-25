@@ -113,3 +113,12 @@ services/asdair/db/002_asdair_seed.sql
 services/asdair/db/*seed*.sql
 services/asdair/**/*.local.*
 .decision-card-*
+
+# --- transient worktrees + build output (local only) ---
+.claude/worktrees/
+.wt-campaign-codex-review/
+tools/tubeair/out/
+Team Knowledge/.obsidian/workspace.json
+
+# --- Codex local tooling ---
+.codex/
