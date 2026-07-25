@@ -46,7 +46,7 @@ const notifyMark = (p) => (p === 'immediate' ? '🔔' : p === 'selective' ? '' :
 
 createApp({
   setup() {
-    const state = ref({ attention: [], outputs: [], ingested: [], ingestedCount: 0, wins: [], builds: [] });
+    const state = ref({ attention: [], outputs: [], archived: [], ingested: [], ingestedCount: 0, wins: [], builds: [] });
     const area = ref('home');
     const detail = ref(null);
     const busy = ref(false);
@@ -74,6 +74,7 @@ createApp({
     const lifeAttn = computed(() => activeAttn.value.filter((i) => kindOf(i) !== 'blocked' && laneOf(i) === 'life').sort(byKind));
     const buildAttn = computed(() => activeAttn.value.filter((i) => kindOf(i) !== 'blocked' && laneOf(i) === 'build').sort(byKind));
 
+    const archived = computed(() => state.value.archived || []);
     const outputs = computed(() => dedupe(state.value.outputs || []));
     const newOutputs = computed(() => outputs.value.filter((o) => (o.status || 'new') === 'new').length);
     const itemsAdded = computed(() => outputs.value
@@ -124,7 +125,7 @@ createApp({
     return {
       AREAS, state, area, detail, busy, loading,
       kindOf, catLabel, moduleLabel, oneLine, ago, humanValue, notifyMark,
-      attn, deferred, blocked, decisions, suggestions, lifeAttn, buildAttn, toneOf, laneOf,
+      attn, deferred, archived, blocked, decisions, suggestions, lifeAttn, buildAttn, toneOf, laneOf,
       outputs, newOutputs, itemsAdded, jobsFound, wins, builds,
       statusTone, statusLine, tiles, go, open, closeDetail, decide, primaryAction, load, REPORT, GRAPH,
     };
@@ -158,7 +159,7 @@ createApp({
 
       <!-- ATTENTION -->
       <section v-else-if="area==='attention'" class="pane">
-        <header class="p-h"><h1>Attention</h1></header>
+        <header class="p-h"><h1>Attention</h1><button v-if="archived.length" class="refresh" style="margin-left:auto" @click="go('archive')">🗄 Archive · {{ archived.length }}</button></header>
         <div class="grp" v-if="blocked.length">
           <h2>🔴 Blocked by you<span class="g-count">{{ blocked.length }}</span></h2>
           <div v-for="it in blocked" :key="it.id" class="item red">
@@ -231,6 +232,16 @@ createApp({
           <h2>Recently ingested<span class="lane-sub">captured &amp; processed — not the same as "learned"</span></h2>
           <div v-if="!(state.ingested||[]).length" class="empty">Nothing ingested yet.</div>
           <div v-for="s in (state.ingested||[])" :key="s.video_id" class="item grey"><div class="i-main"><div class="i-title">{{ s.title || s.video_id }}</div><div class="i-why">ingested {{ ago(s.updated_at) }} ago</div></div></div>
+        </div>
+      </section>
+
+      <!-- ARCHIVE (declined items — change your mind here) -->
+      <section v-else-if="area==='archive'" class="pane">
+        <header class="p-h"><button class="back" style="padding:0;margin-right:4px" @click="go('attention')">‹</button><h1>Archive</h1><span class="count">{{ archived.length }}</span></header>
+        <p class="empty" v-if="!archived.length">Nothing declined — nothing to change your mind about.</p>
+        <div v-for="it in archived" :key="it.id" class="item grey">
+          <div class="i-main" @click="open(it,'attention')"><div class="i-eyebrow">Declined · {{ moduleLabel(it.source_module) }}</div><div class="i-title">{{ it.title }}</div></div>
+          <div class="i-act"><button class="act" :disabled="busy" @click.stop="decide(it,'reopen')">Bring back</button></div>
         </div>
       </section>
 

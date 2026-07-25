@@ -34,11 +34,16 @@ async function apiState() {
     `select id, source_module, source_type, source_key, title, value, status, produced_at,
             evidence_url, provenance_ref, related_ref, detail_route, notify_policy
      from cockpit.output_item where coalesce(status,'new') <> 'archived' order by produced_at desc nulls last limit 100`);
+  // Declined items live on in the Archive so a change of mind can always find + reopen them.
+  const archived = await safe(
+    `select id, source_module, source_type, source_key, title, reason, priority, status, kind,
+            notify_policy, actions, provenance_ref, related_ref, detail_route, updated_at
+     from cockpit.attention_item where status='declined' order by updated_at desc limit 60`);
   const ingested = await safe(`select video_id, title, updated_at from cockpit.youtube_source order by updated_at desc nulls last limit 12`);
   const ingestedCount = await safe(`select count(*)::int n from cockpit.youtube_source`);
   const wins = await safe(`select id, text, happened_at from cockpit.movement order by happened_at desc nulls last limit 8`);
   const builds = await safe(`select id, name, gives, status, status_tone, progress_pct, sort from cockpit.build order by sort nulls last limit 50`);
-  return { attention, outputs, ingested, ingestedCount: ingestedCount[0]?.n ?? ingested.length, wins, builds, at: new Date().toISOString() };
+  return { attention, outputs, archived, ingested, ingestedCount: ingestedCount[0]?.n ?? ingested.length, wins, builds, at: new Date().toISOString() };
 }
 
 // One decision endpoint for the whole lifecycle: accept (fires the real governed action + records
