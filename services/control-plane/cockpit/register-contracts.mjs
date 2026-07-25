@@ -14,6 +14,7 @@ await c.query('set search_path to directus_sys, cockpit');
 const collections = [
   ['attention_item', 'Attention — things that genuinely need you', 'inbox'],
   ['output_item', 'Outputs — genuine results Fusion made for you', 'move_to_inbox'],
+  ['brain_command', 'Brain held-decision intent queue (merge/keep)', 'merge_type'],
 ];
 for (const [name, note, icon] of collections) {
   await c.query(
