@@ -195,7 +195,12 @@ for Warwick's review (a Directus surface for them is a nice-to-have, not a gap).
 - A directed relate/merge can no longer reference a phantom node — the node is ensured (with evidence) before
   relating, and a directed identity-duplicate is `kept` not a failed merge (Fable-5).
 - A truncated graph snapshot FAILS the run rather than silently completing empty (Fable-6).
-Suite 79→82 green.
+- **Directed-pass full-source coverage (GPT fixed-head review of `ca43908`):** `extractLensDirected` now inspects
+  EVERY window (no early break when the shortlist fills, no silent `maxWindows` cap), collects/dedupes
+  evidence-verified candidates across the whole source, and the caller reduces to the bounded canonicalisation
+  number; a window that cannot be analysed PROPAGATES (no false `done` on a partial scan); an over-ceiling source
+  FAILS VISIBLY. Regression-tested (last-window discovery, window-failure propagation, over-ceiling).
+Suite 79→85 green.
 
 ## Review round 1 — Fable + GPT independent QA (2026-07-24)
 

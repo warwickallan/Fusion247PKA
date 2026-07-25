@@ -227,19 +227,30 @@ The "evidence" MUST be copied verbatim from the source — not paraphrased — o
 }
 
 // LENS-DIRECTED extraction (FR-006) — steer a second pass over the faithful-clean source by the CURRENT
-// lens, surfacing concepts genuinely present but under-noticed by the broad extraction. Processes the
-// FULL source in overlapping windows (not just the head), and REQUIRES each concept to carry an exact
-// verbatim evidence span that is verified against the source — hallucinated concepts are discarded.
+// lens, surfacing concepts genuinely present but under-noticed by the broad extraction. Inspects the
+// WHOLE faithful-clean source in overlapping windows — EVERY window, never stopping early because the
+// shortlist filled — and REQUIRES each concept to carry an exact verbatim evidence span verified against
+// the source (hallucinated concepts discarded). Returns ALL evidence-verified, deduped candidates across
+// the whole source; the CALLER reduces to the bounded number it canonicalises (the scan is complete;
+// only canonicalisation cost is bounded). `limit` is a per-window extraction hint, not a total cap.
 export async function extractLensDirected(text, lens, {
-  generate = generateJSON, limit = 15, windowSize = 9000, overlap = 1000, maxWindows = 10,
+  generate = generateJSON, limit = 15, windowSize = 9000, overlap = 1000, maxWindows = 20,
 } = {}) {
   if (!text || text.length < 200) return [];
   const normSrc = normWs(text);
   const step = Math.max(1, windowSize - overlap);
+  const windowCount = Math.ceil(Math.max(1, text.length - overlap) / step);
+  if (windowCount > maxWindows) {
+    // A cost ceiling must FAIL VISIBLY, never silently truncate the source — a silent cap would break the
+    // WP1.5 promise to inspect the WHOLE faithful-clean source. Surfaced → the run fails and retries.
+    throw new Error(`lens-directed: source needs ${windowCount} windows, over the ${maxWindows} ceiling — raise maxWindows`);
+  }
   const byName = new Map();
-  for (let i = 0, n = 0; i < text.length && n < maxWindows; i += step, n += 1) {
-    let arr;
-    try { arr = await generate(lensDirectedPrompt(text.slice(i, i + windowSize), lens, limit)); } catch { arr = []; }
+  for (let i = 0; i < text.length; i += step) {
+    // Every window MUST be inspected: do NOT break because the shortlist is full, and do NOT swallow a
+    // window failure — it propagates so enrichSource fails and the Learn job stays retriable, never a
+    // false 'done' on a partial scan.
+    const arr = await generate(lensDirectedPrompt(text.slice(i, i + windowSize), lens, limit));
     for (const c of (Array.isArray(arr) ? arr : [])) {
       if (!c || !c.name || !c.evidence) continue;               // must cite exact evidence
       const key = String(c.name).trim().toLowerCase();
@@ -252,9 +263,7 @@ export async function extractLensDirected(text, lens, {
         why: c.why || '',
         evidence: String(c.evidence).trim().slice(0, 500),
       });
-      if (byName.size >= limit) break;
     }
-    if (byName.size >= limit) break;
   }
   return [...byName.values()];
 }

@@ -17,6 +17,39 @@ test('classifyOneGraph: percent-scale confidence fails SAFE to 0 → no accident
   assert.equal(planAction(d, 'Retrieval Augmented Gen'), 'keep'); // must NOT merge on malformed confidence
 });
 
+test('extractLensDirected: scans the WHOLE source — a concept in the LAST window is found despite 15 earlier', async () => {
+  // Multi-window source; the tail phrase exists only near the end.
+  const tailPhrase = 'the final concept lives right here at the end';
+  const text = `${'alpha beta gamma delta '.repeat(500)} ${tailPhrase}`; // ~11.5k chars → >1 window
+  let call = 0;
+  const fakeGen = async () => {
+    call += 1;
+    if (call === 1) return Array.from({ length: 15 }, (_, k) => ({ name: `Early ${k}`, evidence: 'alpha beta gamma', description: 'x' }));
+    return [{ name: 'Final Concept', evidence: tailPhrase, description: 'y' }]; // only reachable if scanning continues past window 1
+  };
+  const out = await extractLensDirected(text, FAKE_LENS, { generate: fakeGen, windowSize: 9000, overlap: 1000, limit: 15, maxWindows: 50 });
+  assert.ok(out.some((c) => c.name === 'Final Concept'), 'last-window concept must still be discovered');
+  assert.ok(out.length > 15, 'candidates are collected across the whole source, not capped at the shortlist');
+});
+
+test('extractLensDirected: a window-generation failure PROPAGATES (no silent partial coverage → no false done)', async () => {
+  const text = 'gamma delta epsilon '.repeat(700); // ~14k chars → multiple windows
+  let call = 0;
+  const fakeGen = async () => { call += 1; if (call === 2) throw new Error('window read failed'); return [{ name: `C${call}`, evidence: 'gamma delta', description: 'x' }]; };
+  await assert.rejects(
+    extractLensDirected(text, FAKE_LENS, { generate: fakeGen, windowSize: 9000, overlap: 1000, maxWindows: 50 }),
+    /window read failed/,
+  );
+});
+
+test('extractLensDirected: an over-ceiling source FAILS VISIBLY rather than silently truncating', async () => {
+  const text = 'x'.repeat(200000); // far more windows than the ceiling
+  await assert.rejects(
+    extractLensDirected(text, FAKE_LENS, { generate: async () => [], windowSize: 9000, overlap: 1000, maxWindows: 5 }),
+    /over the 5 ceiling/,
+  );
+});
+
 test('extractLensDirected: rejects candidates whose evidence is not a verbatim source span', async () => {
   const src = 'The retrieval pipeline uses vector embeddings and a knowledge graph for grounded answers. '.repeat(4);
   const fakeGen = async () => [
