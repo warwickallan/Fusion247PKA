@@ -7,9 +7,9 @@ const REPORT = 'http://100.101.240.85:8701';
 const GRAPH = 'http://100.101.240.85:8700';
 const AREAS = [
   { key: 'home', label: 'Home', icon: '🏠' },
-  { key: 'attention', label: 'Attention', icon: '🔔' },
-  { key: 'outputs', label: 'Outputs', icon: '📤' },
+  { key: 'ideas', label: 'Ideas', icon: '💡' },
   { key: 'brain', label: 'Brain', icon: '🧠' },
+  { key: 'outputs', label: 'Outputs', icon: '📤' },
   { key: 'system', label: 'System', icon: '🛠' },
 ];
 
@@ -44,6 +44,16 @@ function humanPoints(v) {
     try { const j = JSON.parse(s); if (Array.isArray(j.relevant)) return j.relevant.map((r) => r && r.why).filter(Boolean); } catch (e) { /* not our shape */ }
   }
   return [];
+}
+// SPIN detail for an idea — rendered if the generator has emitted structured fields; else fall back to the plain reason.
+function spinOf(it) {
+  const r = it && it.reason;
+  if (!r) return null;
+  const s = String(r).trim();
+  if (s.startsWith('{')) {
+    try { const j = JSON.parse(s); if (j.situation || j.problem || j.implication || j.payoff) return { s: j.situation, p: j.problem, i: j.implication, payoff: j.payoff }; } catch (e) { /* not SPIN */ }
+  }
+  return null;
 }
 // Collapse duplicate projections of the same source into one card (belt-and-braces to the projector fix).
 function dedupe(list) {
@@ -88,6 +98,12 @@ createApp({
     const blocked = computed(() => activeAttn.value.filter((i) => kindOf(i) === 'blocked'));
     const decisions = computed(() => activeAttn.value.filter((i) => kindOf(i) === 'decision'));
     const suggestions = computed(() => activeAttn.value.filter((i) => kindOf(i) === 'suggestion'));
+    // Genuine "needs you" (blockers + decisions) — pinned to the top of Home.
+    const needsYou = computed(() => activeAttn.value.filter((i) => kindOf(i) === 'blocked' || kindOf(i) === 'decision'));
+    // Ideas = suggestions, split Brain (improve F247) vs Cash (make money). Category from a forward-compatible signal.
+    const ideaCat = (it) => ((/cash/i.test(it.source_type || '') || /💰/.test(it.title || '')) ? 'cash' : 'brain');
+    const ideasBrain = computed(() => suggestions.value.filter((i) => ideaCat(i) === 'brain'));
+    const ideasCash = computed(() => suggestions.value.filter((i) => ideaCat(i) === 'cash'));
 
     const LIFE = new Set(['shopping', 'asdair', 'careerair']);
     const laneOf = (it) => (LIFE.has(it.source_module) ? 'life' : 'build');
@@ -110,6 +126,14 @@ createApp({
     const jobsFound = computed(() => outputs.value.filter((o) => o.source_module === 'careerair').length);
     const wins = computed(() => state.value.wins || []);
     const builds = computed(() => state.value.builds || []);
+    // Latest = a merged, time-sorted feed of recent activity (under the Home tiles).
+    const latest = computed(() => {
+      const rows = [];
+      for (const o of outputs.value) rows.push({ t: o.produced_at, label: outputTitle(o), kind: 'Output', area: 'outputs' });
+      for (const s of (state.value.ingested || [])) rows.push({ t: s.updated_at, label: s.title || s.video_id, kind: 'Ingested', area: 'brain' });
+      for (const w of wins.value) rows.push({ t: w.happened_at, label: w.text, kind: 'Win', area: 'system' });
+      return rows.filter((x) => x.t && x.label).sort((a, b) => new Date(b.t) - new Date(a.t)).slice(0, 8);
+    });
 
     const blockedN = computed(() => blocked.value.length);
     const statusTone = computed(() => (blockedN.value ? 'red' : 'green'));
@@ -117,14 +141,10 @@ createApp({
 
     const tiles = computed(() => {
       const t = [];
-      if (blocked.value.length) t.push({ num: blocked.value.length, label: 'Blocked by you', desc: "I can't move without you", tone: 'red', area: 'attention' });
-      if (decisions.value.length) t.push({ num: decisions.value.length, label: 'Decisions', desc: 'a choice is waiting', tone: 'amber', area: 'attention' });
-      if (suggestions.value.length) t.push({ num: suggestions.value.length, label: 'Suggestions', desc: 'ideas to consider', tone: 'blue', area: 'attention' });
-      if (itemsAdded.value) t.push({ num: itemsAdded.value, label: 'Items added', desc: 'to your shopping', tone: 'green', area: 'outputs' });
-      if (jobsFound.value) t.push({ num: jobsFound.value, label: 'Jobs found', desc: 'worth a look', tone: 'green', area: 'outputs' });
-      if (newOutputs.value) t.push({ num: newOutputs.value, label: 'New outputs', desc: 'results for you', tone: 'green', area: 'outputs' });
-      if (wins.value.length) t.push({ num: wins.value.length, label: 'Recent wins', desc: 'just finished', tone: 'green', area: 'system' });
+      t.push({ num: suggestions.value.length, label: 'Ideas', desc: 'brain & cash', tone: 'blue', area: 'ideas' });
+      t.push({ num: outputs.value.length, label: 'Outputs', desc: 'made for you', tone: 'green', area: 'outputs' });
       t.push({ num: state.value.ingestedCount ?? '—', label: 'Brain', desc: 'sources ingested', tone: 'grey', area: 'brain' });
+      if (wins.value.length) t.push({ num: wins.value.length, label: 'Recent wins', desc: 'just finished', tone: 'green', area: 'system' });
       return t;
     });
 
@@ -161,8 +181,8 @@ createApp({
 
     return {
       AREAS, state, area, detail, busy, loading,
-      kindOf, catLabel, moduleLabel, oneLine, ago, terse, impactStars, outputTitle, humanValue, humanPoints, notifyMark, build, housekeeping, host, when,
-      attn, deferred, archived, blocked, decisions, suggestions, lifeAttn, buildAttn, toneOf, laneOf,
+      kindOf, catLabel, moduleLabel, oneLine, ago, terse, impactStars, outputTitle, humanValue, humanPoints, spinOf, notifyMark, build, housekeeping, host, when,
+      attn, deferred, archived, blocked, decisions, suggestions, needsYou, ideaCat, ideasBrain, ideasCash, latest, toneOf,
       outputs, newOutputs, itemsAdded, jobsFound, wins, builds,
       statusTone, statusLine, tiles, go, open, closeDetail, decide, copyTranscript, primaryAction, load, REPORT, GRAPH,
     };
@@ -172,7 +192,7 @@ createApp({
   <nav class="nav">
     <button v-for="a in AREAS" :key="a.key" class="nav-btn" :class="{on: area===a.key}" @click="go(a.key)">
       <span class="nav-ico">{{ a.icon }}</span><span class="nav-lbl">{{ a.label }}</span>
-      <span v-if="a.key==='attention' && blocked.length" class="nav-badge">{{ blocked.length }}</span>
+      <span v-if="a.key==='home' && needsYou.length" class="nav-badge">{{ needsYou.length }}</span>
     </button>
   </nav>
 
@@ -188,60 +208,58 @@ createApp({
       <!-- HOME -->
       <section v-if="area==='home'" class="pane">
         <div class="status-line" :class="{red: statusTone==='red'}"><span>{{ statusTone==='red' ? '🔴' : '🟢' }}</span>{{ statusLine }}</div>
+
+        <!-- Needs you: genuine blockers + decisions, pinned at the top -->
+        <div class="grp" v-if="needsYou.length">
+          <h2>🔔 Needs you<span class="g-count">{{ needsYou.length }}</span></h2>
+          <div v-for="it in needsYou" :key="it.id" class="item" :class="toneOf(it)">
+            <div class="i-main" @click="open(it,'attention')"><div class="i-eyebrow" :class="kindOf(it)">{{ catLabel(it) }} · {{ moduleLabel(it.source_module) }}</div><div class="i-title">{{ terse(it.title) }}</div><div v-if="it.reason" class="i-why">{{ oneLine(it.reason) }}</div></div>
+            <div class="i-act"><span v-if="it._done" class="done-pill">✅ {{ it._done }}</span><template v-else><button class="act accept" :disabled="busy" @click.stop="decide(it,'accept',primaryAction(it))">Accept</button><button class="act defer" :disabled="busy" @click.stop="decide(it,'defer')">Later</button><button class="act decline" :disabled="busy" @click.stop="decide(it,'decline')">Decline</button></template></div>
+          </div>
+        </div>
+
         <div class="tiles">
           <button v-for="t in tiles" :key="t.label" class="tile" :class="t.tone" @click="go(t.area)">
             <span class="t-num">{{ t.num }}</span><span class="t-lbl">{{ t.label }}</span><span class="t-desc">{{ t.desc }}</span>
           </button>
         </div>
+
+        <!-- Latest: recent activity, under the tiles -->
+        <div class="grp" style="margin-top:20px" v-if="latest.length">
+          <h2>🕑 Latest</h2>
+          <div v-for="(l,idx) in latest" :key="idx" class="item grey" @click="go(l.area)">
+            <div class="i-main"><div class="i-eyebrow">{{ l.kind }} · {{ ago(l.t) }} ago</div><div class="i-title">{{ terse(l.label) }}</div></div>
+            <span class="chev">›</span>
+          </div>
+        </div>
       </section>
 
-      <!-- ATTENTION -->
-      <section v-else-if="area==='attention'" class="pane">
-        <header class="p-h"><h1>Attention</h1><button v-if="archived.length" class="refresh" style="margin-left:auto" @click="go('archive')">🗄 Archive · {{ archived.length }}</button></header>
-        <div class="grp" v-if="blocked.length">
-          <h2>🔴 Blocked by you<span class="g-count">{{ blocked.length }}</span></h2>
-          <div v-for="it in blocked" :key="it.id" class="item red">
-            <div class="i-main" @click="open(it,'attention')"><div class="i-eyebrow blocked">{{ moduleLabel(it.source_module) }}</div><div class="i-title">{{ terse(it.title) }}</div><div v-if="it.reason" class="i-why">{{ oneLine(it.reason) }}</div></div>
-            <div class="i-act"><span v-if="it._done" class="done-pill">✅ {{ it._done }}</span><template v-else><button v-for="ax in (it.actions||[])" :key="ax.key" class="act" :class="ax.key" :disabled="busy" @click.stop="decide(it,'accept',ax)">{{ ax.label }}</button></template></div>
+      <!-- IDEAS (was Attention) — Brain (improve F247) vs Cash (make money) -->
+      <section v-else-if="area==='ideas'" class="pane">
+        <header class="p-h"><h1>Ideas</h1><button v-if="archived.length" class="refresh" style="margin-left:auto" @click="go('archive')">🗄 Archive · {{ archived.length }}</button></header>
+
+        <div class="grp" v-if="ideasBrain.length">
+          <h2>🧠 Brain<span class="g-count">{{ ideasBrain.length }}</span><span class="lane-sub">improve F247</span></h2>
+          <div v-for="it in ideasBrain" :key="it.id" class="item blue">
+            <div class="i-main" @click="open(it,'idea')"><div class="i-eyebrow"><span style="color:var(--warn)">{{ impactStars(it.priority) }}</span> impact</div><div class="i-title">{{ terse(it.title) }}</div><div v-if="it.reason" class="i-why">{{ oneLine(it.reason) }}</div></div>
+            <div class="i-act"><span v-if="it._done" class="done-pill">✅ {{ it._done }}</span><template v-else><button class="act accept" :disabled="busy" @click.stop="decide(it,'accept',primaryAction(it))">Accept</button><button class="act defer" :disabled="busy" @click.stop="decide(it,'defer')">Later</button><button class="act decline" :disabled="busy" @click.stop="decide(it,'decline')">Decline</button></template></div>
           </div>
         </div>
 
-        <div class="grp" v-if="decisions.length">
-          <h2>⚖️ Decisions<span class="g-count">{{ decisions.length }}</span><span class="lane-sub">a choice to make</span></h2>
-          <div v-for="it in decisions" :key="it.id" class="item amber">
-            <div class="i-main" @click="open(it,'attention')"><div class="i-eyebrow">{{ moduleLabel(it.source_module) }}</div><div class="i-title">{{ terse(it.title) }}</div><div v-if="it.reason" class="i-why">{{ oneLine(it.reason) }}</div></div>
-            <div class="i-act">
-              <span v-if="it._done" class="done-pill">✅ {{ it._done }}</span>
-              <template v-else>
-                <button class="act accept" :disabled="busy" @click.stop="decide(it,'accept',primaryAction(it))">Accept</button>
-                <button class="act defer" :disabled="busy" @click.stop="decide(it,'defer')">Later</button>
-                <button class="act decline" :disabled="busy" @click.stop="decide(it,'decline')">Decline</button>
-              </template>
-            </div>
+        <div class="grp" v-if="ideasCash.length">
+          <h2>💰 Cash<span class="g-count">{{ ideasCash.length }}</span><span class="lane-sub">make money</span></h2>
+          <div v-for="it in ideasCash" :key="it.id" class="item green">
+            <div class="i-main" @click="open(it,'idea')"><div class="i-eyebrow"><span style="color:var(--warn)">{{ impactStars(it.priority) }}</span> impact</div><div class="i-title">{{ terse(it.title) }}</div><div v-if="it.reason" class="i-why">{{ oneLine(it.reason) }}</div></div>
+            <div class="i-act"><span v-if="it._done" class="done-pill">✅ {{ it._done }}</span><template v-else><button class="act accept" :disabled="busy" @click.stop="decide(it,'accept',primaryAction(it))">Accept</button><button class="act defer" :disabled="busy" @click.stop="decide(it,'defer')">Later</button><button class="act decline" :disabled="busy" @click.stop="decide(it,'decline')">Decline</button></template></div>
           </div>
         </div>
 
-        <div class="grp" v-if="suggestions.length">
-          <h2>💡 Suggestions<span class="g-count">{{ suggestions.length }}</span><span class="lane-sub">optional — worth a look</span></h2>
-          <div v-for="it in suggestions" :key="it.id" class="item blue">
-            <div class="i-main" @click="open(it,'attention')"><div class="i-eyebrow">{{ moduleLabel(it.source_module) }} · <span style="color:var(--warn)">{{ impactStars(it.priority) }}</span> impact</div><div class="i-title">{{ terse(it.title) }}</div><div v-if="it.reason" class="i-why">{{ oneLine(it.reason) }}</div></div>
-            <div class="i-act">
-              <span v-if="it._done" class="done-pill">✅ {{ it._done }}</span>
-              <template v-else>
-                <button class="act accept" :disabled="busy" @click.stop="decide(it,'accept',primaryAction(it))">Accept</button>
-                <button class="act defer" :disabled="busy" @click.stop="decide(it,'defer')">Later</button>
-                <button class="act decline" :disabled="busy" @click.stop="decide(it,'decline')">Decline</button>
-              </template>
-            </div>
-          </div>
-        </div>
-
-        <div v-if="!blocked.length && !decisions.length && !suggestions.length && !deferred.length" class="empty big">All clear — nothing needs you right now. 🎉</div>
+        <div v-if="!ideasBrain.length && !ideasCash.length" class="empty big">No ideas yet — the scout + dPax will fill this. 💡</div>
 
         <div class="grp" v-if="deferred.length">
           <h2>🕒 Later<span class="g-count">{{ deferred.length }}</span><span class="lane-sub">you parked these</span></h2>
           <div v-for="it in deferred" :key="it.id" class="item deferred" :class="toneOf(it)">
-            <div class="i-main" @click="open(it,'attention')"><div class="i-title">{{ it.title }}</div></div>
+            <div class="i-main" @click="open(it,'idea')"><div class="i-title">{{ terse(it.title) }}</div></div>
             <div class="i-act"><button class="act" :disabled="busy" @click.stop="decide(it,'reopen')">Bring back</button></div>
           </div>
         </div>
@@ -270,6 +288,7 @@ createApp({
           <a class="tile blue" :href="GRAPH" target="_blank" rel="noopener" style="text-decoration:none"><span class="t-num">🌌</span><span class="t-lbl">Galaxy</span><span class="t-desc">explore the graph ↗</span></a>
           <a class="tile grey" :href="REPORT" target="_blank" rel="noopener" style="text-decoration:none"><span class="t-num">📄</span><span class="t-lbl">Report</span><span class="t-desc">full knowledge report ↗</span></a>
         </div>
+        <p class="empty" style="margin-top:10px">🌌 <b>Galaxy</b> = your knowledge as an explorable map you can fly around. 📄 <b>Report</b> = the full written write-up of everything the Brain has ingested.</p>
         <div class="grp" style="margin-top:20px">
           <h2>Recently ingested<span class="lane-sub">captured &amp; processed — not the same as "learned"</span></h2>
           <div v-if="!(state.ingested||[]).length" class="empty">Nothing ingested yet.</div>
@@ -338,7 +357,13 @@ createApp({
       </template>
 
       <template v-else>
-        <div v-if="detail.reason" class="d-reason">{{ detail.reason }}</div>
+        <div v-if="spinOf(detail)" class="read">
+          <h3>Situation</h3><p>{{ spinOf(detail).s }}</p>
+          <h3>Problem</h3><p>{{ spinOf(detail).p }}</p>
+          <h3>Implication</h3><p>{{ spinOf(detail).i }}</p>
+          <h3>Payoff</h3><p>{{ spinOf(detail).payoff }}</p>
+        </div>
+        <div v-else-if="detail.reason" class="d-reason">{{ detail.reason }}</div>
         <div class="d-actions" v-if="!detail._done">
           <button class="act accept" :disabled="busy" @click="decide(detail,'accept',primaryAction(detail))">Accept</button>
           <button class="act defer" :disabled="busy" @click="decide(detail,'defer')">Later</button>

@@ -1,6 +1,6 @@
 {
   "name": "fusion247-cockpit",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "private": true,
   "type": "module",
   "description": "Standalone first-party Fusion247 Cockpit — Warwick-facing control/output surface (IDEA-016). Reads the cockpit contracts, files governed intents, tailnet-private. Replaces the Directus admin shell as the front door.",
