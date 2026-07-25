@@ -130,6 +130,16 @@ createApp({
       } catch (e) { item._error = e.message; }
       finally { busy.value = false; }
     }
+    async function copyTranscript(s) {
+      s._copyErr = null;
+      try {
+        const r = await fetch('/api/transcript?video=' + encodeURIComponent(s.video_id));
+        const d = await r.json();
+        if (!d.ok) throw new Error(d.error || 'no transcript');
+        await navigator.clipboard.writeText(d.text);
+        s._copied = true; setTimeout(() => { s._copied = false; }, 2500);
+      } catch (e) { s._copyErr = 'copy failed: ' + (e.message || e); }
+    }
     // Primary governed action for an item (accept fires it). Brain items carry explicit actions[]; if
     // an item has a first action we treat Accept as "do it", else Accept is a plain acknowledge.
     const primaryAction = (it) => (Array.isArray(it.actions) && it.actions.length ? it.actions.find((a) => a.key === 'accept' || a.key === 'merge') || it.actions[0] : null);
@@ -139,7 +149,7 @@ createApp({
       kindOf, catLabel, moduleLabel, oneLine, ago, humanValue, humanPoints, notifyMark, build, host, when,
       attn, deferred, archived, blocked, decisions, suggestions, lifeAttn, buildAttn, toneOf, laneOf,
       outputs, newOutputs, itemsAdded, jobsFound, wins, builds,
-      statusTone, statusLine, tiles, go, open, closeDetail, decide, primaryAction, load, REPORT, GRAPH,
+      statusTone, statusLine, tiles, go, open, closeDetail, decide, copyTranscript, primaryAction, load, REPORT, GRAPH,
     };
   },
   template: `
@@ -153,7 +163,7 @@ createApp({
 
   <div class="shell-main">
     <header class="topbar">
-      <div class="brand"><span class="dot" :class="{red: statusTone==='red'}"></span> Fusion247</div>
+      <div class="brand" @click="go('home')" title="Home" style="cursor:pointer"><span class="dot" :class="{red: statusTone==='red'}"></span> Fusion247</div>
       <div class="status-mini" :class="{red: statusTone==='red'}">{{ statusLine }}</div>
       <button class="refresh" @click="go('settings')" title="Settings">⚙</button>
       <button class="refresh" @click="load" :disabled="loading">{{ loading ? '…' : '↻' }}</button>
@@ -244,7 +254,10 @@ createApp({
         <div class="grp" style="margin-top:20px">
           <h2>Recently ingested<span class="lane-sub">captured &amp; processed — not the same as "learned"</span></h2>
           <div v-if="!(state.ingested||[]).length" class="empty">Nothing ingested yet.</div>
-          <div v-for="s in (state.ingested||[])" :key="s.video_id" class="item grey"><div class="i-main"><div class="i-title">{{ s.title || s.video_id }}</div><div class="i-why">ingested {{ ago(s.updated_at) }} ago</div></div></div>
+          <div v-for="s in (state.ingested||[])" :key="s.video_id" class="item grey">
+            <div class="i-main"><div class="i-title">{{ s.title || s.video_id }}</div><div class="i-why" :class="{err: s._copyErr}">{{ s._copyErr ? s._copyErr : ('ingested ' + ago(s.updated_at) + ' ago') }}</div></div>
+            <div class="i-act"><button class="act" :disabled="busy" @click="copyTranscript(s)">{{ s._copied ? '✓ Copied' : '⧉ Transcript' }}</button></div>
+          </div>
         </div>
       </section>
 

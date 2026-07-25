@@ -11,6 +11,8 @@ import { q, w } from './db.mjs';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
 const PUB = path.join(DIR, 'public');
+const REPO = path.resolve(DIR, '..', '..');
+const TK = path.join(REPO, 'Team Knowledge');
 const PORT = Number(process.env.COCKPIT_PORT || 8090);
 const BIND = process.env.COCKPIT_BIND || '127.0.0.1'; // localhost; Tailscale serve exposes it tailnet-only over HTTPS (matches Directus)
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml', '.ico': 'image/x-icon' };
@@ -71,6 +73,33 @@ async function apiDecide(body) {
   return { ok: true, id, status };
 }
 
+// Copy-transcript: pull the cleaned reading view (§7.1) out of the video's TubeAIR report.
+function extractTranscript(md) {
+  const lines = md.split(/\r?\n/);
+  let start = -1, end = lines.length;
+  for (let i = 0; i < lines.length; i++) {
+    if (start < 0 && /^###\s*7\.1\b/.test(lines[i])) { start = i + 1; }
+    else if (start >= 0 && /^###\s*7\.2\b/.test(lines[i])) { end = i; break; }
+  }
+  if (start < 0) { // fall back to the whole §7
+    for (let i = 0; i < lines.length; i++) {
+      if (start < 0 && /^##\s*7\.\s/.test(lines[i])) { start = i + 1; }
+      else if (start >= 0 && /^##\s*8\.\s/.test(lines[i])) { end = i; break; }
+    }
+  }
+  if (start < 0) return md.trim();
+  return lines.slice(start, end).filter((l) => !/^>\s/.test(l)).join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+async function apiTranscript(video) {
+  if (!video || !/^[A-Za-z0-9_-]{6,24}$/.test(video)) return { ok: false, error: 'bad video id' };
+  const rows = (await q('select raw_path, title from cockpit.youtube_source where video_id=$1 limit 1', [video])).rows;
+  if (!rows.length || !rows[0].raw_path) return { ok: false, error: 'no source on file for this video' };
+  const fp = path.join(TK, path.normalize(rows[0].raw_path.replace(/^[/\\]+/, '')), 'tubeair-report.md');
+  if (!fp.startsWith(TK)) return { ok: false, error: 'path' };
+  let md; try { md = fs.readFileSync(fp, 'utf8'); } catch { return { ok: false, error: 'transcript file missing' }; }
+  return { ok: true, video, title: rows[0].title, text: extractTranscript(md) };
+}
+
 function serveStatic(req, res) {
   let rel = decodeURIComponent(req.url.split('?')[0]);
   if (rel === '/' || rel === '') rel = '/index.html';
@@ -91,6 +120,7 @@ const server = http.createServer(async (req, res) => {
       req.on('end', async () => { try { j(res, 200, await apiDecide(JSON.parse(raw || '{}'))); } catch (e) { j(res, 500, { ok: false, error: e.message }); } });
       return;
     }
+    if (req.url.startsWith('/api/transcript')) { const v = new URL(req.url, 'http://x').searchParams.get('video'); return j(res, 200, await apiTranscript(v)); }
     if (req.url.startsWith('/api/health')) return j(res, 200, { status: 'ok', build: BUILD });
     return serveStatic(req, res);
   } catch (e) { j(res, 500, { ok: false, error: e.message }); }

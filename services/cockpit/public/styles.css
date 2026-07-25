@@ -86,6 +86,8 @@ button { font-family:inherit; }
 .sheet { position:fixed; inset:0; background:rgba(6,10,16,.5); display:flex; align-items:flex-end; justify-content:center; z-index:20; animation:fade .15s ease; }
 .sheet-card { background:var(--panel); width:100%; max-width:680px; max-height:92vh; overflow-y:auto; border-radius:18px 18px 0 0; padding:20px 20px calc(24px + env(safe-area-inset-bottom)); }
 .back { background:none; border:none; color:var(--accent-ink); font-weight:700; cursor:pointer; font-size:14px; padding:0 0 12px; }
+/* Detail-sheet Back stays reachable even when the read is long (was scrolling out of reach → felt like a dead-end) */
+.sheet-card .back { position:sticky; top:0; z-index:3; background:var(--panel); margin:-20px -20px 6px; padding:16px 20px 10px; box-shadow:0 1px 0 var(--hair); }
 .d-eyebrow { font-family:var(--mono); font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink3); }
 .sheet-card h1 { font-size:21px; letter-spacing:-.02em; margin:6px 0 12px; text-wrap:balance; }
 .d-reason { font-size:15px; color:var(--ink2); line-height:1.6; white-space:pre-line; margin-bottom:16px; }
