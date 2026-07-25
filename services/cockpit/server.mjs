@@ -11,8 +11,8 @@ import { q, w } from './db.mjs';
 const DIR = path.dirname(fileURLToPath(import.meta.url));
 const PUB = path.join(DIR, 'public');
 const PORT = Number(process.env.COCKPIT_PORT || 8090);
-const BIND = process.env.COCKPIT_BIND || '100.80.175.41'; // Yoga tailnet IP — private, not LAN
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.svg': 'image/svg+xml', '.ico': 'image/x-icon' };
+const BIND = process.env.COCKPIT_BIND || '127.0.0.1'; // localhost; Tailscale serve exposes it tailnet-only over HTTPS (matches Directus)
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml', '.ico': 'image/x-icon' };
 
 // Governed intent queues the surface may file into, with their allowlisted payload columns.
 const INTENTS = {
