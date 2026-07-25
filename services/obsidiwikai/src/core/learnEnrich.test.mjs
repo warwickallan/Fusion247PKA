@@ -1,6 +1,34 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { planAction, readAuthoritativeGraph, extractLensDirected, relationEndpoints, deterministicMatch, ENRICH_LIMITS } from './learnEnrich.mjs';
+import { planAction, readAuthoritativeGraph, extractLensDirected, relationEndpoints, deterministicMatch, classifyOneGraph, ENRICH_LIMITS } from './learnEnrich.mjs';
+
+// Safety-gate hardening from the seam QA (Fable).
+test('deterministicMatch: entity-type mismatch blocks a plural weld (Windows[tool] vs Window[concept])', () => {
+  assert.equal(deterministicMatch({ name: 'Windows', entity_type: 'tool' }, [{ name: 'Window', entity_type: 'concept' }]), null);
+  assert.equal(deterministicMatch({ name: 'Agents', entity_type: 'concept' }, [{ name: 'Agent', entity_type: 'concept' }])?.kind, 'ALIAS_OF');
+});
+
+test('classifyOneGraph: percent-scale confidence fails SAFE to 0 → no accidental merge', async () => {
+  const fakeClient = { async queryData() { return { data: { entities: [] } }; } };
+  const fakeGen = async () => ({ classification: 'SAME_CONCEPT', matched_index: 0, confidence: 90 }); // drift: 90 not 0.90
+  const catalog = [{ name: 'Retrieval Augmented Generation', description: 'x' }];
+  const d = await classifyOneGraph({ name: 'Retrieval Augmented Gen', description: 'y' }, catalog, { client: fakeClient, generate: fakeGen });
+  assert.equal(d.confidence, 0);
+  assert.equal(planAction(d, 'Retrieval Augmented Gen'), 'keep'); // must NOT merge on malformed confidence
+});
+
+test('extractLensDirected: rejects candidates whose evidence is not a verbatim source span', async () => {
+  const src = 'The retrieval pipeline uses vector embeddings and a knowledge graph for grounded answers. '.repeat(4);
+  const fakeGen = async () => [
+    { name: 'Vector Embeddings', evidence: 'vector embeddings and a knowledge graph', description: 'real' },
+    { name: 'Hallucinated', evidence: 'a phrase that never appears in the source text', description: 'fake' },
+    { name: 'No Evidence', description: 'missing evidence' },
+  ];
+  const out = await extractLensDirected(src, FAKE_LENS, { generate: fakeGen, limit: 5, maxWindows: 1 });
+  assert.equal(out.length, 1);
+  assert.equal(out[0].name, 'Vector Embeddings');
+  assert.ok(out[0].evidence.includes('vector embeddings'));
+});
 
 // Deterministic alias matching — the ONLY sub-0.98 auto-merge, so it must be tight.
 test('deterministicMatch: plural/punctuation aliases match on LONGER words', () => {
@@ -33,14 +61,15 @@ test('relationEndpoints: RELATED/SUPPORTS read candidate→matched', () => {
 const FAKE_LENS = { enduring: [], active: ['knowledge graphs'], emerging: [], goals: [], negative_signals: [] };
 
 // Lens-directed extraction (FR-006): shape/trim/bound candidates, skip trivially-short text, no invention.
-test('extractLensDirected skips tiny text and shapes/bounds candidates', async () => {
+test('extractLensDirected skips tiny text and shapes/bounds candidates (with evidence)', async () => {
   assert.deepEqual(await extractLensDirected('too short', FAKE_LENS), []);
+  const src = 'Agentic Retrieval and Honcho power the system together. '.repeat(20);
   const fakeGen = async () => [
-    { name: '  Agentic Retrieval  ', entity_type: 'method', description: 'x'.repeat(400), why: 'core' },
+    { name: '  Agentic Retrieval  ', entity_type: 'method', description: 'x'.repeat(400), why: 'core', evidence: 'Agentic Retrieval and Honcho' },
     { description: 'no name — dropped' },
-    { name: 'Honcho' },
+    { name: 'Honcho', evidence: 'Honcho power the system' },
   ];
-  const out = await extractLensDirected('a'.repeat(500), FAKE_LENS, { generate: fakeGen, limit: 5 });
+  const out = await extractLensDirected(src, FAKE_LENS, { generate: fakeGen, limit: 5, maxWindows: 1 });
   assert.equal(out.length, 2);            // the nameless candidate is dropped
   assert.equal(out[0].name, 'Agentic Retrieval'); // trimmed
   assert.ok(out[0].description.length <= 300);     // bounded

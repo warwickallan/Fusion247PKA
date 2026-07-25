@@ -177,6 +177,23 @@ forever"). Encoded in `planAction`, unit-proven.
 **Verdict:** FR-003/006/009/010 + DoD #4/#6/#7 are ✅ **earned on the live spine**. Held items are durably recorded
 for Warwick's review (a Directus surface for them is a nice-to-have, not a gap). WP1/WP1.5 complete.
 
+**Hardening — review round 2 (GPT head-check + Fable seam QA, 2026-07-25; 0 blockers, all fold-items fixed):**
+- Directed-pass failure is no longer swallowed → it propagates → the enrich run fails → the Learn job stays
+  `enrich_pending`/retriable, never a false `done` (GPT-1 / Fable-4).
+- Lens-directed discoveries now process the FULL faithful-clean source in overlapping windows (not just the first
+  12k) and each candidate/edge must carry a VERIFIED verbatim evidence span (rejected if it is not a real source
+  span), preserved through the LightRAG write + the `wp15_canonicalisation.evidence` ledger (GPT-2, migration 0012).
+  Proven live: `Neo4j knowledge graph` (added), `Graph agent in N8N`, `LightRAG entity/relationship extraction` —
+  each carries a verbatim quote.
+- Model confidence FAILS SAFE to 0 on percent-scale/malformed drift, so a bad value can never clear the ≥0.98 merge
+  gate (Fable-1).
+- A graph-apply failure is recorded as `error` and FAILS the run (retriable), never a fake `held`+`done` (Fable-2).
+- Deterministic plural-alias now requires matching entity_type (`Windows`[tool] ≠ `Window`[concept]) (Fable-3).
+- A directed relate/merge can no longer reference a phantom node — the node is ensured (with evidence) before
+  relating, and a directed identity-duplicate is `kept` not a failed merge (Fable-5).
+- A truncated graph snapshot FAILS the run rather than silently completing empty (Fable-6).
+Suite 79→82 green.
+
 ## Review round 1 — Fable + GPT independent QA (2026-07-24)
 
 Two independent read-only reviewers against frozen `cbdea7b`. **Fable:** 0 blockers / 3 fold-before-live / 5

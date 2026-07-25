@@ -26,8 +26,8 @@ export const ENRICH_LIMITS = {
 // FR-010 full outcome set → how each maps to a durable edge on the ONE graph. Identity outcomes
 // (SAME/ALIAS) are handled as merges; the rest become TYPED relationships (never a merge).
 const REL_TYPE = {
-  BROADER_THAN: 'IS_A',    // candidate IS_A matched (matched is the broader concept)
-  NARROWER_THAN: 'IS_A',   // reversed in apply: matched IS_A candidate
+  BROADER_THAN: 'IS_A',    // candidate is BROADER → matched (narrower) IS_A candidate (see relationEndpoints)
+  NARROWER_THAN: 'IS_A',   // candidate is NARROWER → candidate IS_A matched
   RELATED_TO: 'RELATED_TO',
   SUPPORTS: 'SUPPORTS',
   CONTRADICTS: 'CONTRADICTS',
@@ -48,15 +48,25 @@ const canonKey = (s) => {
   const k = norm(s).replace(/[^a-z0-9]+/g, '');
   return k.length > 3 ? k.replace(/s$/, '') : k;
 };
+// Whitespace-insensitive normalisation for verbatim-evidence verification.
+const normWs = (s) => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+// A model confidence is trusted only if it is a real [0,1] float. Anything else (missing, NaN, or a
+// percent-scale drift like 90) FAILS SAFE to 0 — never let a malformed value clear the ≥0.98 merge gate.
+const safeConf = (x) => { const c = Number(x); return Number.isFinite(c) && c >= 0 && c <= 1 ? c : 0; };
 
 // A DETERMINISTIC alias — same name, or same after stripping punctuation/plurals. No model judgement,
-// so it is always safe to auto-merge (this is the only non-≥0.98 auto-merge Warwick allows).
-export function deterministicMatch(name, catalog) {
+// so it is the only non-≥0.98 auto-merge Warwick allows. `candidate` may be a string or {name,entity_type}.
+export function deterministicMatch(candidate, catalog) {
+  const name = typeof candidate === 'string' ? candidate : candidate?.name;
+  const type = typeof candidate === 'string' ? null : candidate?.entity_type;
   const key = norm(name);
   const exact = catalog.find((e) => norm(e.name) === key);
-  if (exact) return { entity: exact, kind: 'SAME_CONCEPT' };
+  if (exact) return { entity: exact, kind: 'SAME_CONCEPT' }; // identical name = same concept
   const ck = canonKey(name);
-  const alias = catalog.find((e) => canonKey(e.name) === ck && norm(e.name) !== key);
+  // A plural/punctuation alias is only DETERMINISTICALLY safe when the entity TYPES agree — otherwise
+  // 'Windows' [tool] vs 'Window' [concept] would falsely weld. A type mismatch falls through to the model.
+  const alias = catalog.find((e) => canonKey(e.name) === ck && norm(e.name) !== key
+    && (!type || !e.entity_type || norm(e.entity_type) === norm(type)));
   if (alias) return { entity: alias, kind: 'ALIAS_OF' };
   return null;
 }
@@ -84,7 +94,7 @@ async function findMatches(candidate, catalog, client) {
 // WP1.5 one-graph canonicaliser — FULL FR-010 outcome set, against the authoritative LightRAG graph.
 // Conservative by prompt: prefer a relationship over a merge when the concepts are merely connected.
 export async function classifyOneGraph(candidate, catalog, { client = lightrag, generate = generateJSON } = {}) {
-  const det = deterministicMatch(candidate.name, catalog);
+  const det = deterministicMatch(candidate, catalog);
   if (det) return { classification: det.kind, matched_name: det.entity.name, confidence: 1, deterministic: true, rationale: 'deterministic alias' };
   const matches = await findMatches(candidate, catalog, client);
   if (!matches.length) return { classification: 'NEW_CONCEPT', matched_name: null, confidence: 0.9, deterministic: false, rationale: 'no existing match' };
@@ -97,7 +107,8 @@ Description: ${candidate.description || '(none)'}
 EXISTING CONCEPTS:
 ${opts}
 
-Return ONLY JSON: {"classification":"SAME_CONCEPT|ALIAS_OF|BROADER_THAN|NARROWER_THAN|RELATED_TO|SUPPORTS|CONTRADICTS|SUPERSEDES|NEW_CONCEPT|UNCERTAIN","matched_index":<index or null>,"confidence":<0..1>,"rationale":"<=15 words"}
+Direction: BROADER_THAN = the CANDIDATE is broader/more general than the existing concept; NARROWER_THAN = the candidate is more specific.
+Return ONLY JSON: {"classification":"SAME_CONCEPT|ALIAS_OF|BROADER_THAN|NARROWER_THAN|RELATED_TO|SUPPORTS|CONTRADICTS|SUPERSEDES|NEW_CONCEPT|UNCERTAIN","matched_index":<index or null>,"confidence":<0..1 decimal>,"rationale":"<=15 words"}
 SAME_CONCEPT/ALIAS_OF ONLY if truly the same idea in different words. UNCERTAIN if you genuinely cannot tell.`;
   const j = await generate(prompt);
   const idx = j?.matched_index == null ? null : Number(j.matched_index);
@@ -105,7 +116,7 @@ SAME_CONCEPT/ALIAS_OF ONLY if truly the same idea in different words. UNCERTAIN 
   return {
     classification: String(j?.classification || 'UNCERTAIN').toUpperCase(),
     matched_name: matched,
-    confidence: Number(j?.confidence) || 0,
+    confidence: safeConf(j?.confidence), // out-of-range/percent-scale drift → 0 (fails safe, no merge)
     deterministic: false,
     rationale: j?.rationale || '',
   };
@@ -140,75 +151,123 @@ async function canonicaliseCandidate(candidate, { catalog, client, limits, apply
     decision = { classification: 'UNCERTAIN', matched_name: null, confidence: 0, rationale: 'canonicalise error' };
   }
   const plan = planAction(decision, candidate.name, limits);
+  const ev = candidate.evidence || null;               // verbatim source span — directed pass carries this
+  const relType = REL_TYPE[decision.classification] || 'RELATED_TO';
+  const nodeDesc = `${(candidate.description || '').slice(0, 400)}${ev ? `\n\n[source evidence] "${ev.slice(0, 300)}"` : ''}`;
+  const relDesc = `${decision.rationale || `${relType} (WP1.5)`}${ev ? ` · [evidence] "${ev.slice(0, 200)}"` : ''}`;
   let action = 'kept';
+  let applyError = null;
   try {
     if (plan === 'merge') {
-      if (apply) await client.mergeEntities([candidate.name], decision.matched_name);
-      action = 'merged';
+      if (mode === 'lens_directed') {
+        action = 'kept';   // a directed text-concept duplicating an existing entity is already represented — no node to merge
+      } else if (apply) {
+        await client.mergeEntities([candidate.name], decision.matched_name);
+        action = 'merged';
+      } else { action = 'merged'; }
     } else if (plan === 'relate') {
-      // FR-010: a TYPED relationship, NOT a merge, with the correct direction (see relationEndpoints).
-      const relType = REL_TYPE[decision.classification] || 'RELATED_TO';
+      // FR-010: a TYPED relationship, NOT a merge, with the correct direction (relationEndpoints).
       const [src, tgt] = relationEndpoints(decision.classification, candidate.name, decision.matched_name);
-      if (apply) await client.createRelation(src, tgt, {
-        description: decision.rationale || `${relType} (WP1.5 lens canonicalisation)`, keywords: relType, weight: decision.confidence ?? 0,
-      });
-      action = 'related';
+      if (mode === 'lens_directed' && !ev) {
+        action = 'held';   // a directed relation with no verifiable evidence → hold, never assert unproven
+      } else {
+        if (apply) {
+          // A directed candidate may not yet be a node — ensure it exists (with provenance) BEFORE
+          // relating, so we never create an edge to a phantom endpoint (Fable-5).
+          if (mode === 'lens_directed') {
+            try { await client.createEntity(candidate.name, { entity_type: candidate.entity_type || 'concept', description: nodeDesc, source_id: sourceId, file_path: sourceId }); } catch { /* already exists → fine */ }
+          }
+          await client.createRelation(src, tgt, { description: relDesc, keywords: relType, weight: decision.confidence ?? 0 });
+        }
+        action = 'related';
+      }
     } else if (plan === 'hold') {
       action = 'held';   // genuine ambiguity — leave BOTH entities, record for human review
     } else if (mode === 'lens_directed' && decision.classification === 'NEW_CONCEPT') {
       // The lens surfaced a relevant concept the broad pass did NOT extract → ADD it to the one graph
-      // with provenance, so the lens genuinely EXPANDS what the Brain notices (FR-006), not just scores.
-      if (apply) await client.createEntity(candidate.name, {
-        entity_type: candidate.entity_type || 'concept',
-        description: (candidate.description || '').slice(0, 500),
-        source_id: sourceId, file_path: sourceId,
-      });
-      action = 'added';
+      // WITH verifiable evidence, so the lens genuinely EXPANDS what the Brain notices (FR-006).
+      if (!ev) {
+        action = 'held';   // never add a model-inferred concept without a verified source span
+      } else {
+        if (apply) await client.createEntity(candidate.name, {
+          entity_type: candidate.entity_type || 'concept', description: nodeDesc, source_id: sourceId, file_path: sourceId,
+        });
+        action = 'added';
+      }
     } else {
       action = 'kept';   // NEW (broad) / below threshold — LightRAG already has it, leave as-is
     }
-  } catch {
-    action = 'held';     // an apply failure is held, never a partial/blind graph change
+  } catch (e) {
+    // A mutation THREW (e.g. LightRAG unreachable). This is NOT a deliberate 'held' — it is an infra
+    // failure; record it as an error so enrichSource fails + retries, never a false 'enriched' (Fable-2).
+    action = 'error';
+    applyError = String(e.message).slice(0, 200);
   }
   await q(
-    `insert into obsidiwikai.wp15_canonicalisation(run_id,source_id,entity_name,classification,matched_name,action,confidence,rationale,pass)
-     values($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+    `insert into obsidiwikai.wp15_canonicalisation(run_id,source_id,entity_name,classification,matched_name,action,confidence,rationale,pass,evidence)
+     values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
     [runId, sourceId, candidate.name, decision.classification || 'UNCERTAIN',
-      decision.matched_name || null, action, decision.confidence ?? null, decision.rationale || null, pass],
+      decision.matched_name || null, action, decision.confidence ?? null, applyError || decision.rationale || null, pass, ev],
   );
   return action;
 }
 
-// LENS-DIRECTED extraction (FR-006) — steer a second pass over the faithful-clean source by the CURRENT
-// lens, surfacing concepts genuinely present but under-noticed by the broad extraction. No invention.
-export async function extractLensDirected(text, lens, { generate = generateJSON, limit = 15 } = {}) {
-  if (!text || text.length < 200) return [];
-  const prompt = `You extract concepts from a source that are SPECIFICALLY relevant to a person, Warwick, given his interest lens — especially concepts a generic extraction might under-emphasise. Only concepts GENUINELY present in the source; do not invent.
+function lensDirectedPrompt(win, lens, limit) {
+  return `You extract concepts from a source that are SPECIFICALLY relevant to a person, Warwick, given his interest lens — especially concepts a generic extraction might under-emphasise. Only concepts GENUINELY present in this text; do not invent.
 
 WARWICK'S LENS:
 ${lensSummary(lens)}
 
-SOURCE (faithful-clean, may be truncated):
-${text.slice(0, 12000)}
+SOURCE (a window of the faithful-clean source):
+${win}
 
 Return ONLY a JSON array of up to ${limit} objects:
-{"name":"exact concept name","entity_type":"concept|tool|method|person|org","description":"<=200 chars grounded in the source","why":"<=12 words why it matters to Warwick"}`;
-  const arr = await generate(prompt);
-  return (Array.isArray(arr) ? arr : [])
-    .filter((c) => c && c.name)
-    .slice(0, limit)
-    .map((c) => ({
-      name: String(c.name).trim(),
-      entity_type: c.entity_type || 'concept',
-      description: String(c.description || '').slice(0, 300),
-      why: c.why || '',
-    }));
+{"name":"exact concept name","entity_type":"concept|tool|method|person|org","description":"<=200 chars grounded in the text","why":"<=12 words why it matters to Warwick","evidence":"a short EXACT verbatim quote (5-30 words) copied WORD-FOR-WORD from the SOURCE above supporting this concept"}
+The "evidence" MUST be copied verbatim from the source — not paraphrased — or the concept is discarded.`;
+}
+
+// LENS-DIRECTED extraction (FR-006) — steer a second pass over the faithful-clean source by the CURRENT
+// lens, surfacing concepts genuinely present but under-noticed by the broad extraction. Processes the
+// FULL source in overlapping windows (not just the head), and REQUIRES each concept to carry an exact
+// verbatim evidence span that is verified against the source — hallucinated concepts are discarded.
+export async function extractLensDirected(text, lens, {
+  generate = generateJSON, limit = 15, windowSize = 9000, overlap = 1000, maxWindows = 10,
+} = {}) {
+  if (!text || text.length < 200) return [];
+  const normSrc = normWs(text);
+  const step = Math.max(1, windowSize - overlap);
+  const byName = new Map();
+  for (let i = 0, n = 0; i < text.length && n < maxWindows; i += step, n += 1) {
+    let arr;
+    try { arr = await generate(lensDirectedPrompt(text.slice(i, i + windowSize), lens, limit)); } catch { arr = []; }
+    for (const c of (Array.isArray(arr) ? arr : [])) {
+      if (!c || !c.name || !c.evidence) continue;               // must cite exact evidence
+      const key = String(c.name).trim().toLowerCase();
+      if (!key || byName.has(key)) continue;
+      if (!normSrc.includes(normWs(c.evidence))) continue;       // evidence not a real span → reject (no hallucinated concept)
+      byName.set(key, {
+        name: String(c.name).trim(),
+        entity_type: c.entity_type || 'concept',
+        description: String(c.description || '').slice(0, 300),
+        why: c.why || '',
+        evidence: String(c.evidence).trim().slice(0, 500),
+      });
+      if (byName.size >= limit) break;
+    }
+    if (byName.size >= limit) break;
+  }
+  return [...byName.values()];
 }
 
 // Read the authoritative graph once: full entity catalog + this source's just-extracted entities.
-export async function readAuthoritativeGraph(sourceId, { maxNodes = 4000, client = lightrag } = {}) {
+export async function readAuthoritativeGraph(sourceId, { maxNodes = 10000, client = lightrag } = {}) {
   const g = await client.graphs({ label: '*', maxDepth: 2, maxNodes });
   const nodes = g.nodes || [];
+  if (nodes.length >= maxNodes) {
+    // The snapshot hit the cap → the catalog is INCOMPLETE. Enriching on a partial graph risks a false
+    // 'no source entities' completion and duplicate adds, so fail loudly (retriable) rather than lie (Fable-6).
+    throw new Error(`authoritative-graph snapshot truncated at ${maxNodes} nodes — raise maxNodes before enriching`);
+  }
   const entities = nodes.map((n) => ({
     // Require a real entity name (entity_id) — never fall back to LightRAG's internal node id, which
     // is not a canonicalisable name. Malformed/nameless nodes are dropped by the .filter below.
@@ -243,7 +302,7 @@ export async function enrichSource(sourceId, { lens = null, client = lightrag, l
       const stats = { note: 'no source entities matched in graph', graph_entities: entities.length };
       await q(`update obsidiwikai.wp15_enrich_run set state='completed', stats=$2, finished_at=now() where run_id=$1`,
         [runId, JSON.stringify(stats)]);
-      return { runId, sourceId, sourceEntities: 0, deferred: 0, merged: 0, related: 0, held: 0, kept: 0, ...stats };
+      return { runId, sourceId, sourceEntities: 0, deferred: 0, merged: 0, related: 0, held: 0, kept: 0, added: 0, ...stats };
     }
 
     // 1) LENS-CONDITIONING — score each just-extracted entity's relevance to Warwick, THROUGH the lens.
@@ -256,8 +315,8 @@ export async function enrichSource(sourceId, { lens = null, client = lightrag, l
       const isDeferred = s.relevance < limits.relevanceFloor && !s.emerging;
       if (isDeferred) deferred++;
       await q(
-        `insert into obsidiwikai.wp15_entity_relevance(run_id,source_id,entity_name,entity_type,relevance,why,emerging,deferred,lens_version)
-         values($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+        `insert into obsidiwikai.wp15_entity_relevance(run_id,source_id,entity_name,entity_type,relevance,why,emerging,deferred,lens_version,pass)
+         values($1,$2,$3,$4,$5,$6,$7,$8,$9,'broad')`,
         [runId, sourceId, s.raw_name, s.entity_type || null, s.relevance, s.why || null, !!s.emerging, isDeferred, lensVersion],
       );
     }
@@ -270,8 +329,8 @@ export async function enrichSource(sourceId, { lens = null, client = lightrag, l
     const relevant = scored
       .filter((s) => s.relevance >= limits.relevanceFloor || s.emerging)
       .slice(0, limits.maxCanonicalise);
-    const tally = { merged: 0, related: 0, held: 0, kept: 0, added: 0 };
-    const bump = (a) => { if (a === 'merged') tally.merged++; else if (a === 'related') tally.related++; else if (a === 'held') tally.held++; else if (a === 'added') tally.added++; else tally.kept++; };
+    const tally = { merged: 0, related: 0, held: 0, kept: 0, added: 0, error: 0 };
+    const bump = (a) => { if (tally[a] != null) tally[a] += 1; else tally.kept += 1; };
     for (const s of relevant) {
       const act = await canonicaliseCandidate(
         { name: s.raw_name, entity_type: s.entity_type, description: s.description || '' },
@@ -283,27 +342,28 @@ export async function enrichSource(sourceId, { lens = null, client = lightrag, l
     // 3) LENS-DIRECTED PASS (FR-006) — steer a SECOND extraction over the faithful-clean source by the
     // CURRENT lens, surfacing relevant concepts the broad pass under-noticed, then feed them through the
     // SAME one-graph canonicalisation. Genuinely-new relevant concepts are ADDED with provenance, so the
-    // lens is DIRECTIVE (it changes what the Brain notices), not merely a post-hoc scorer. Best-effort:
-    // if the faithful-clean text is unavailable the broad-pass enrichment still stands.
-    let lensDirected = 0;
-    try {
-      const text = faithfulClean(reportId || sourceId);
-      const candidates = await extractLensDirected(text, lens, { limit: Math.min(15, limits.maxCanonicalise) });
-      const fresh = candidates.filter((c) => !own.has(c.name.toLowerCase())).slice(0, limits.maxCanonicalise);
-      lensDirected = fresh.length;
-      for (const c of fresh) {
-        const act = await canonicaliseCandidate(c, { catalog, client, limits, apply, runId, sourceId, pass: 'lens_directed', mode: 'lens_directed' });
-        bump(act);
-        own.add(c.name.toLowerCase()); // avoid re-adding within the same run
-      }
-    } catch (e) {
-      lensDirected = -1; // faithful-clean unavailable → lens-directed pass skipped (broad pass still applied)
+    // lens is DIRECTIVE (it changes what the Brain notices), not merely a post-hoc scorer.
+    // This is a REQUIRED part of the WP1.5 promise: its failure is NOT swallowed — it propagates to the
+    // outer catch → the enrich run is marked 'failed' → reconcileLearn keeps the Learn job retriable
+    // (the raw broad-pass result stays searchable, but the job must NOT claim 'done').
+    const text = faithfulClean(reportId || sourceId);
+    const candidates = await extractLensDirected(text, lens, { limit: Math.min(15, limits.maxCanonicalise) });
+    const fresh = candidates.filter((c) => !own.has(c.name.toLowerCase())).slice(0, limits.maxCanonicalise);
+    const lensDirected = fresh.length;
+    for (const c of fresh) {
+      const act = await canonicaliseCandidate(c, { catalog, client, limits, apply, runId, sourceId, pass: 'lens_directed', mode: 'lens_directed' });
+      bump(act);
+      own.add(c.name.toLowerCase()); // avoid re-adding within the same run
     }
 
     const stats = {
       applied: apply, source_entities: sourceEntities.length, scored: scored.length, deferred,
       canonicalised: relevant.length, lens_directed: lensDirected, ...tally,
     };
+    // A graph-apply failure is an infra problem, NOT a completed enrichment. Fail the run (retriable)
+    // so reconcileLearn keeps the Learn job from claiming 'done' on a half-applied pass (Fable-2). The
+    // per-candidate ledger rows above record exactly what did/didn't apply.
+    if (tally.error > 0) throw new Error(`${tally.error} graph-apply failure(s) during enrichment — retriable`);
     await q(`update obsidiwikai.wp15_enrich_run set state='completed', lens_version=$2, stats=$3, finished_at=now() where run_id=$1`,
       [runId, lensVersion, JSON.stringify(stats)]);
     return { runId, sourceId, ...stats };

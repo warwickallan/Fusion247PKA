@@ -41,9 +41,9 @@ create table if not exists obsidiwikai.wp15_canonicalisation (
   run_id         uuid not null references obsidiwikai.wp15_enrich_run(run_id) on delete cascade,
   source_id      text not null,
   entity_name    text not null,
-  classification text not null,                       -- SAME_CONCEPT|ALIAS_OF|RELATED_TO|NEW_CONCEPT|UNCERTAIN
+  classification text not null,                       -- full FR-010 set: SAME_CONCEPT|ALIAS_OF|BROADER_THAN|NARROWER_THAN|RELATED_TO|SUPPORTS|CONTRADICTS|SUPERSEDES|NEW_CONCEPT|UNCERTAIN
   matched_name   text,
-  action         text not null,                       -- merged | related | held | kept
+  action         text not null,                       -- merged | related | added | held | kept | error
   confidence     numeric,
   rationale      text,
   created_at     timestamptz not null default now()
