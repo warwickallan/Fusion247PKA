@@ -16,13 +16,14 @@ await c.connect();
 async function upsertAttention(r) {
   await c.query(
     `insert into cockpit.attention_item
-       (source_module, source_type, source_key, title, reason, priority, status, actions, provenance_ref, related_ref, detail_route)
-     values ('brain',$1,$2,$3,$4,$5,'open',$6,$7,$8,$9)
+       (source_module, source_type, source_key, title, reason, priority, kind, notify_policy, status, actions, provenance_ref, related_ref, detail_route)
+     values ('brain',$1,$2,$3,$4,$5,$6,$7,'open',$8,$9,$10,$11)
      on conflict (source_module, source_key) do update set
        source_type=excluded.source_type, title=excluded.title, reason=excluded.reason, priority=excluded.priority,
-       actions=excluded.actions, provenance_ref=excluded.provenance_ref, related_ref=excluded.related_ref,
-       detail_route=excluded.detail_route, status='open', updated_at=now()`,
-    [r.source_type, r.source_key, r.title, r.reason, r.priority, JSON.stringify(r.actions || []), r.provenance_ref, r.related_ref || null, r.detail_route || null],
+       kind=excluded.kind, notify_policy=excluded.notify_policy, actions=excluded.actions, provenance_ref=excluded.provenance_ref,
+       related_ref=excluded.related_ref, detail_route=excluded.detail_route, status='open', updated_at=now()`,
+    [r.source_type, r.source_key, r.title, r.reason, r.priority, r.kind || 'suggestion', r.notify_policy || 'none',
+      JSON.stringify(r.actions || []), r.provenance_ref, r.related_ref || null, r.detail_route || null],
   );
 }
 async function upsertOutput(r) {
@@ -56,6 +57,8 @@ for (const k of cands) {
     title: (sys ? '🛠 Make the Brain Better — ' : '💡 ') + (k.recommendation || 'suggestion'),
     reason: k.why || null,
     priority: Number(k.confidence) >= 0.8 ? 'high' : 'medium',
+    kind: 'suggestion',
+    notify_policy: 'none',
     actions: [
       { key: 'accept', label: 'Accept', intent: 'learning_command', args: { candidate_id: k.id, command: 'accept' } },
       { key: 'decline', label: 'Decline', intent: 'learning_command', args: { candidate_id: k.id, command: 'decline' } },
@@ -81,6 +84,8 @@ for (const h of held) {
     reason: (h.rationale || 'The Brain held this for your review rather than merging automatically.')
       + (h.evidence ? `\nEvidence: "${String(h.evidence).slice(0, 180)}"` : ''),
     priority: 'medium',
+    kind: 'decision',
+    notify_policy: 'selective',
     actions: [
       { key: 'merge', label: 'Merge them', intent: 'brain_command', args: { held_id: h.id, command: 'merge' } },
       { key: 'keep', label: 'Keep separate', intent: 'brain_command', args: { held_id: h.id, command: 'keep' } },

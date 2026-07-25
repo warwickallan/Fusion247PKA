@@ -1,105 +1,71 @@
 <template>
   <private-view title="Fusion247 Cockpit">
-    <div class="ck" :class="{ 'has-detail': !!detail }">
-
-      <!-- SIDEBAR (icon rail / drawer on narrow, real sidebar ≥780px) -->
+    <div class="ck">
+      <!-- SIDEBAR (icon rail / drawer on narrow; real sidebar ≥780px) -->
       <nav class="nav">
         <div class="nav-brand"><span class="pip" :class="statusTone"></span><b>Fusion247</b></div>
         <button v-for="a in areas" :key="a.key" class="nav-btn" :class="{ on: area === a.key }" @click="go(a.key)">
           <span class="nav-ico">{{ a.icon }}</span><span class="nav-lbl">{{ a.label }}</span>
-          <span v-if="a.key === 'attention' && blockers.length" class="nav-badge">{{ blockers.length }}</span>
+          <span v-if="a.key === 'attention' && blocked.length" class="nav-badge">{{ blocked.length }}</span>
         </button>
         <div class="nav-foot"><span class="pip" :class="statusTone"></span>{{ statusLine }}</div>
       </nav>
 
       <main class="main">
-        <!-- ===== DETAIL (drill-down) ===== -->
+        <!-- ===== L3/L4 DETAIL ===== -->
         <section v-if="detail" class="pane">
           <button class="back" @click="detail = null">← Back</button>
           <div class="detail">
             <div class="d-eyebrow">{{ catLabel(detail) }} · {{ moduleLabel(detail.source_module) }}</div>
             <h1>{{ detail.title }}</h1>
-            <!-- CLICK 2: human "so what" -->
             <p v-if="detail.reason || detail.value" class="d-reason">{{ detail.reason || detail.value }}</p>
-
             <div v-if="detail._kind === 'attention'" class="d-actions">
               <span v-if="detail._done" class="done-pill">✅ {{ detail._done }} — queued</span>
-              <template v-else>
-                <button v-for="ax in (detail.actions || [])" :key="ax.key" class="act" :class="ax.key" :disabled="busy" @click="doAction(detail, ax)">{{ ax.label }}</button>
-              </template>
+              <template v-else><button v-for="ax in (detail.actions || [])" :key="ax.key" class="act" :class="ax.key" :disabled="busy" @click="doAction(detail, ax)">{{ ax.label }}</button></template>
               <span v-if="detail._error" class="err">⚠ {{ detail._error }}</span>
             </div>
-            <div class="d-links">
-              <a v-if="detail.evidence_url" :href="detail.evidence_url" target="_blank" rel="noopener">Open the full result ↗</a>
-            </div>
-            <!-- CLICK 3+: technical, deliberately buried -->
+            <div class="d-links"><a v-if="detail.evidence_url" :href="detail.evidence_url" target="_blank" rel="noopener">Open the full result / source ↗</a></div>
+            <!-- LEVEL 4: technical, deliberately buried -->
             <details class="tech"><summary>Technical detail</summary>
-              <div class="tech-body"><span class="mono">{{ detail.provenance_ref }}</span><span v-if="detail.related_ref" class="mono"> · {{ detail.related_ref }}</span></div>
+              <div class="tech-body"><span class="mono">{{ detail.provenance_ref }}</span><span v-if="detail.related_ref" class="mono"> · related {{ detail.related_ref }}</span></div>
             </details>
           </div>
         </section>
 
-        <!-- ===== HOME: tiles only ===== -->
+        <!-- ===== LEVEL 1: HOME (tiles only) ===== -->
         <section v-else-if="area === 'home'" class="pane">
           <div class="status" :class="statusTone"><span class="pip" :class="statusTone"></span><span>{{ statusLine }}</span></div>
           <div class="tiles">
-            <button class="tile" :class="blockers.length ? 'red' : 'green'" @click="go('attention')">
-              <span class="t-num">{{ blockers.length }}</span><span class="t-lbl">Needs you</span><span class="t-desc">blockers waiting on you</span>
-            </button>
-            <button class="tile blue" @click="go('attention')">
-              <span class="t-num">{{ suggestions.length }}</span><span class="t-lbl">Suggestions</span><span class="t-desc">ideas to consider</span>
-            </button>
-            <button class="tile amber" @click="go('attention')">
-              <span class="t-num">{{ reviews.length }}</span><span class="t-lbl">To review</span><span class="t-desc">merges the Brain held</span>
-            </button>
-            <button class="tile green" @click="go('outputs')">
-              <span class="t-num">{{ outputs.length }}</span><span class="t-lbl">Insights</span><span class="t-desc">"so what" the Brain found</span>
-            </button>
-            <button v-if="itemsAdded" class="tile green" @click="go('outputs')">
-              <span class="t-num">{{ itemsAdded }}</span><span class="t-lbl">Items added</span><span class="t-desc">to your lists</span>
-            </button>
-            <button v-if="jobsFound" class="tile green" @click="go('outputs')">
-              <span class="t-num">{{ jobsFound }}</span><span class="t-lbl">Jobs found</span><span class="t-desc">worth a look</span>
-            </button>
-            <button class="tile grey" @click="go('brain')">
-              <span class="t-num">{{ live.learned ?? '—' }}</span><span class="t-lbl">Learned</span><span class="t-desc">sources in your Brain</span>
+            <button v-for="t in tiles" :key="t.label" class="tile" :class="t.tone" @click="go(t.area)">
+              <span class="t-num">{{ t.num }}</span><span class="t-lbl">{{ t.label }}</span><span class="t-desc">{{ t.desc }}</span>
             </button>
           </div>
         </section>
 
-        <!-- ===== ATTENTION: blockers → suggestions → review ===== -->
+        <!-- ===== LEVEL 2: ATTENTION (grouped by real category) ===== -->
         <section v-else-if="area === 'attention'" class="pane">
           <header class="p-h"><h1>Attention</h1></header>
-
-          <div class="grp">
-            <h2>Waiting on you<span class="g-count">{{ blockers.length }}</span></h2>
-            <div v-if="!blockers.length" class="empty">Nothing's blocked on you. I'm free to crack on. 🟢</div>
-            <div v-for="it in blockers" :key="it.id" class="item red" @click="open(it, 'attention')">
-              <div class="i-main"><div class="i-title">{{ it.title }}</div><div v-if="it.reason" class="i-why">{{ oneLine(it.reason) }}</div></div><span class="chev">›</span>
+          <div class="grp" v-if="blocked.length">
+            <h2>Blocked by you<span class="g-count">{{ blocked.length }}</span></h2>
+            <div v-for="it in blocked" :key="it.id" class="item red">
+              <div class="i-main tap" @click="open(it, 'attention')"><div class="i-title">{{ it.title }}</div><div v-if="it.reason" class="i-why">{{ oneLine(it.reason) }}</div></div>
+              <div class="i-act"><span v-if="it._done" class="done-pill sm">✅ {{ it._done }}</span><template v-else><button v-for="ax in it.actions" :key="ax.key" class="act sm" :class="ax.key" :disabled="busy" @click.stop="doAction(it, ax)">{{ ax.label }}</button></template></div>
             </div>
           </div>
-
           <div class="grp">
-            <h2>Suggestions to consider<span class="g-count">{{ suggestions.length }}</span></h2>
+            <h2>Decisions<span class="g-count">{{ decisions.length }}</span></h2>
+            <div v-if="!decisions.length" class="empty">No decisions waiting.</div>
+            <div v-for="it in decisions" :key="it.id" class="item amber">
+              <div class="i-main tap" @click="open(it, 'attention')"><div class="i-title">{{ it.title }}</div><div v-if="it.reason" class="i-why">{{ oneLine(it.reason) }}</div></div>
+              <div class="i-act"><span v-if="it._done" class="done-pill sm">✅ {{ it._done }}</span><template v-else><button v-for="ax in it.actions" :key="ax.key" class="act sm" :class="ax.key" :disabled="busy" @click.stop="doAction(it, ax)">{{ ax.label }}</button></template></div>
+            </div>
+          </div>
+          <div class="grp">
+            <h2>Suggestions<span class="g-count">{{ suggestions.length }}</span></h2>
             <div v-if="!suggestions.length" class="empty">No suggestions right now.</div>
             <div v-for="it in suggestions" :key="it.id" class="item blue">
               <div class="i-main tap" @click="open(it, 'attention')"><div class="i-title">{{ it.title }}</div><div v-if="it.reason" class="i-why">{{ oneLine(it.reason) }}</div></div>
-              <div class="i-act" v-if="it.actions && it.actions.length">
-                <span v-if="it._done" class="done-pill sm">✅ {{ it._done }}</span>
-                <template v-else><button v-for="ax in it.actions" :key="ax.key" class="act sm" :class="ax.key" :disabled="busy" @click.stop="doAction(it, ax)">{{ ax.label }}</button></template>
-              </div>
-            </div>
-          </div>
-
-          <div class="grp">
-            <h2>Held for your review<span class="g-count">{{ reviews.length }}</span></h2>
-            <div v-if="!reviews.length" class="empty">Nothing to review.</div>
-            <div v-for="it in reviews" :key="it.id" class="item amber">
-              <div class="i-main tap" @click="open(it, 'attention')"><div class="i-title">{{ it.title }}</div></div>
-              <div class="i-act">
-                <span v-if="it._done" class="done-pill sm">✅ {{ it._done }}</span>
-                <template v-else><button v-for="ax in it.actions" :key="ax.key" class="act sm" :class="ax.key" :disabled="busy" @click.stop="doAction(it, ax)">{{ ax.label }}</button></template>
-              </div>
+              <div class="i-act"><span v-if="it._done" class="done-pill sm">✅ {{ it._done }}</span><template v-else><button v-for="ax in it.actions" :key="ax.key" class="act sm" :class="ax.key" :disabled="busy" @click.stop="doAction(it, ax)">{{ ax.label }}</button></template></div>
             </div>
           </div>
         </section>
@@ -118,13 +84,12 @@
         <section v-else-if="area === 'brain'" class="pane">
           <header class="p-h"><h1>Brain</h1><div class="tabs"><a :href="reportUrl" target="_blank" rel="noopener" class="tab-link">Report ↗</a><a :href="graphUrl" target="_blank" rel="noopener" class="tab-link">Galaxy ↗</a></div></header>
           <div class="tiles sm">
-            <button class="tile green" @click="go('outputs')"><span class="t-num">{{ outputs.length }}</span><span class="t-lbl">Insights</span></button>
-            <button class="tile amber" @click="go('attention')"><span class="t-num">{{ reviews.length }}</span><span class="t-lbl">To review</span></button>
-            <button class="tile blue" @click="go('attention')"><span class="t-num">{{ makeBetter.length }}</span><span class="t-lbl">Make better</span></button>
             <button class="tile grey"><span class="t-num">{{ live.learned ?? '—' }}</span><span class="t-lbl">Learned</span></button>
+            <button class="tile green" @click="go('outputs')"><span class="t-num">{{ outputs.length }}</span><span class="t-lbl">Insights</span></button>
+            <button class="tile amber" @click="go('attention')"><span class="t-num">{{ decisions.length }}</span><span class="t-lbl">To review</span></button>
+            <button class="tile blue" @click="go('attention')"><span class="t-num">{{ makeBetter.length }}</span><span class="t-lbl">Make better</span></button>
           </div>
-          <div class="grp">
-            <h2>Recently learned</h2>
+          <div class="grp"><h2>Recently learned</h2>
             <div v-if="!learned.length" class="empty">Nothing learned yet.</div>
             <div v-for="s in learned" :key="s.id" class="item grey"><div class="i-main"><div class="i-title">{{ s.title || s.video_id }}</div></div></div>
           </div>
@@ -133,10 +98,15 @@
         <!-- ===== SYSTEM ===== -->
         <section v-else class="pane">
           <header class="p-h"><h1>Builds &amp; System</h1></header>
-          <div v-if="!builds.length" class="empty big">No builds tracked.</div>
-          <div v-for="b in builds" :key="b.id" class="item" :class="b.status_tone === 'block' ? 'red' : 'grey'">
-            <div class="i-main"><div class="i-title">{{ b.name }}</div><div class="i-why">{{ b.gives }} · {{ b.progress_pct || 0 }}%</div></div>
-            <span class="chip" :class="b.status_tone"><span class="dot"></span>{{ b.status }}</span>
+          <div class="grp" v-if="wins.length"><h2>Recent wins<span class="g-count">{{ wins.length }}</span></h2>
+            <div v-for="w in wins" :key="w.id" class="item green"><div class="i-main"><div class="i-title">{{ w.text }}</div></div></div>
+          </div>
+          <div class="grp"><h2>Active work<span class="g-count">{{ builds.length }}</span></h2>
+            <div v-if="!builds.length" class="empty">No builds tracked.</div>
+            <div v-for="b in builds" :key="b.id" class="item" :class="b.status_tone === 'block' ? 'red' : 'grey'">
+              <div class="i-main"><div class="i-title">{{ b.name }}</div><div class="i-why">{{ b.gives }} · {{ b.progress_pct || 0 }}%</div></div>
+              <span class="chip" :class="b.status_tone"><span class="dot"></span>{{ b.status }}</span>
+            </div>
           </div>
         </section>
       </main>
@@ -159,7 +129,6 @@ export default {
       { key: 'brain', label: 'Brain', icon: '🧠' },
       { key: 'system', label: 'System', icon: '🛠' },
     ];
-    const CAT = { learning_candidate: 'suggestion', system_improvement: 'suggestion', held_canonicalisation: 'review' };
     const area = ref('home');
     const detail = ref(null);
     const busy = ref(false);
@@ -167,23 +136,39 @@ export default {
     const outputs = ref([]);
     const builds = ref([]);
     const learned = ref([]);
+    const wins = ref([]);
     const live = ref({ learned: null });
 
     const api = useApi();
     const get = async (p, params) => { try { const r = await api.get(p, { params }); return r?.data?.data; } catch { return null; } };
 
-    const catOf = (it) => CAT[it.source_type] || it.kind || 'suggestion';
-    const blockers = computed(() => attention.value.filter((i) => catOf(i) === 'blocker'));
-    const suggestions = computed(() => attention.value.filter((i) => catOf(i) === 'suggestion'));
-    const reviews = computed(() => attention.value.filter((i) => catOf(i) === 'review'));
+    const kindOf = (it) => it.kind || 'suggestion';
+    const blocked = computed(() => attention.value.filter((i) => kindOf(i) === 'blocked'));
+    const decisions = computed(() => attention.value.filter((i) => kindOf(i) === 'decision'));
+    const suggestions = computed(() => attention.value.filter((i) => kindOf(i) === 'suggestion'));
     const makeBetter = computed(() => attention.value.filter((i) => i.source_type === 'system_improvement'));
+    const newOutputs = computed(() => outputs.value.filter((o) => o.status === 'new').length);
     const itemsAdded = computed(() => outputs.value.filter((o) => o.source_module === 'shopping').length);
     const jobsFound = computed(() => outputs.value.filter((o) => o.source_module === 'careerair').length);
 
-    const statusTone = computed(() => (blockers.value.length ? 'red' : 'green'));
-    const statusLine = computed(() => (blockers.value.length ? `Blocked on you — ${blockers.value.length} item${blockers.value.length > 1 ? 's' : ''}` : 'Building — nothing blocking me'));
+    const statusTone = computed(() => (blocked.value.length ? 'red' : 'green'));
+    const statusLine = computed(() => (blocked.value.length ? `Blocked by you — ${blocked.value.length} item${blocked.value.length > 1 ? 's' : ''}` : 'Building — nothing blocking me'));
 
-    const catLabel = (it) => ({ blocker: 'Needs you', suggestion: 'Suggestion', review: 'To review' }[catOf(it)] || 'Output');
+    // LEVEL 1: Home tiles — Warwick-facing outcomes, only when backed by real state (no "so what" zeros).
+    const tiles = computed(() => {
+      const t = [];
+      if (blocked.value.length) t.push({ num: blocked.value.length, label: 'Blocked by you', desc: "I can't continue without you", tone: 'red', area: 'attention' });
+      if (decisions.value.length) t.push({ num: decisions.value.length, label: 'Decisions', desc: 'a choice is waiting', tone: 'amber', area: 'attention' });
+      if (suggestions.value.length) t.push({ num: suggestions.value.length, label: 'Suggestions', desc: 'ideas to consider', tone: 'blue', area: 'attention' });
+      if (newOutputs.value) t.push({ num: newOutputs.value, label: 'New outputs', desc: 'results Fusion made you', tone: 'green', area: 'outputs' });
+      if (itemsAdded.value) t.push({ num: itemsAdded.value, label: 'Items added', desc: 'to your lists', tone: 'green', area: 'outputs' });
+      if (jobsFound.value) t.push({ num: jobsFound.value, label: 'Jobs found', desc: 'worth a look', tone: 'green', area: 'outputs' });
+      if (wins.value.length) t.push({ num: wins.value.length, label: 'Recent wins', desc: 'just finished', tone: 'green', area: 'system' });
+      t.push({ num: live.value.learned ?? '—', label: 'Brain', desc: 'sources learned', tone: 'grey', area: 'brain' });
+      return t;
+    });
+
+    const catLabel = (it) => ({ blocked: 'Blocked by you', decision: 'Decision', suggestion: 'Suggestion' }[kindOf(it)] || 'Output');
     const moduleLabel = (m) => ({ brain: 'Brain', shopping: 'Shopping', builds: 'Builds', careerair: 'CareerAIr' }[m] || m);
     const oneLine = (t) => { if (!t) return ''; const s = String(t).split('\n')[0]; return s.length > 130 ? s.slice(0, 127) + '…' : s; };
     const ago = (ts) => { if (!ts) return ''; const d = (Date.now() - new Date(ts).getTime()) / 60000; if (d < 60) return `${Math.max(1, Math.round(d))}m`; if (d < 1440) return `${Math.round(d / 60)}h`; return `${Math.round(d / 1440)}d`; };
@@ -212,13 +197,14 @@ export default {
       outputs.value = ot || [];
       builds.value = (await get('/items/build', { sort: ['sort'], limit: 50 })) || [];
       learned.value = (await get('/items/youtube_source', { sort: ['-updated_at'], limit: 12 })) || [];
+      wins.value = (await get('/items/movement', { sort: ['-happened_at'], limit: 8 })) || [];
       const reg = await get('/items/youtube_source', { aggregate: { count: '*' } });
       live.value.learned = (reg && reg[0]) ? (Number(reg[0].count) || learned.value.length) : learned.value.length;
     }
     onMounted(load);
 
-    return { areas, area, detail, busy, attention, outputs, builds, learned, live, reportUrl, graphUrl,
-      blockers, suggestions, reviews, makeBetter, itemsAdded, jobsFound, statusTone, statusLine,
+    return { areas, area, detail, busy, attention, outputs, builds, learned, wins, live, reportUrl, graphUrl,
+      blocked, decisions, suggestions, makeBetter, tiles, statusTone, statusLine,
       catLabel, moduleLabel, oneLine, ago, go, open, doAction };
   },
 };
@@ -245,11 +231,9 @@ export default {
 .main { padding:16px; max-width:1500px; margin:0 auto; width:100%; box-sizing:border-box; }
 .pane { animation:fade .18s ease; } @keyframes fade { from{opacity:0;transform:translateY(4px);} to{opacity:1;} }
 
-/* HOME status line — small, just building/blocked */
-.status { display:flex; align-items:center; gap:9px; font-size:13.5px; font-weight:600; color:var(--ink2); padding:10px 14px; background:var(--panel); border:1px solid var(--hair); border-radius:12px; margin-bottom:14px; }
-.status.red { color:var(--stop); } .status.green .pip { background:var(--ok); }
+.status { display:flex; align-items:center; gap:9px; font-size:14px; font-weight:600; color:var(--ink2); padding:11px 15px; background:var(--panel); border:1px solid var(--hair); border-radius:12px; margin-bottom:14px; }
+.status.red { color:var(--stop); }
 
-/* TILES */
 .tiles { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; }
 .tiles.sm { grid-template-columns:repeat(2,1fr); margin-bottom:16px; }
 .tile { text-align:left; background:var(--panel); border:1px solid var(--hair); border-left:4px solid var(--park); border-radius:14px; padding:16px; display:flex; flex-direction:column; gap:2px; cursor:pointer; transition:transform .1s; }
@@ -260,7 +244,6 @@ export default {
 .t-lbl { font-size:15px; font-weight:700; margin-top:6px; } .t-desc { font-size:12px; color:var(--ink3); }
 .tiles.sm .t-num { font-size:24px; } .tiles.sm .t-desc { display:none; }
 
-/* GROUPS + items */
 .p-h { display:flex; align-items:center; gap:12px; margin-bottom:14px; } .p-h h1 { font-size:22px; letter-spacing:-.02em; }
 .count,.g-count { font-family:var(--mono); font-weight:700; background:var(--accent-w); color:var(--accent-ink); padding:1px 9px; border-radius:20px; font-size:13px; }
 .tabs { margin-left:auto; display:flex; gap:10px; } .tab-link,.d-links a { color:var(--accent-ink); text-decoration:none; font-size:13px; font-weight:600; }
@@ -268,10 +251,10 @@ export default {
 .grp .g-count { font-size:11px; }
 .empty { color:var(--ink3); font-size:14px; padding:4px 2px; } .empty.big { padding:30px 6px; text-align:center; font-size:15px; }
 
-.item { display:flex; align-items:center; gap:12px; background:var(--panel); border:1px solid var(--hair); border-left:4px solid var(--park); border-radius:12px; padding:13px 15px; margin-bottom:9px; cursor:pointer; }
+.item { display:flex; align-items:center; gap:12px; background:var(--panel); border:1px solid var(--hair); border-left:4px solid var(--park); border-radius:12px; padding:13px 15px; margin-bottom:9px; }
 .item.red{border-left-color:var(--stop);} .item.blue{border-left-color:var(--accent);} .item.amber{border-left-color:var(--warn);} .item.green{border-left-color:var(--ok);} .item.grey{border-left-color:var(--park);}
 .item:hover { border-color:var(--accent); }
-.i-main { flex:1; min-width:0; } .i-title { font-size:14.5px; font-weight:600; letter-spacing:-.01em; }
+.i-main { flex:1; min-width:0; cursor:pointer; } .i-title { font-size:14.5px; font-weight:600; letter-spacing:-.01em; }
 .i-why { font-size:12.5px; color:var(--ink3); margin-top:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .i-act { display:flex; flex-wrap:wrap; gap:7px; align-items:center; } .chev { color:var(--ink3); font-size:20px; } .fresh { font-family:var(--mono); font-size:11px; color:var(--ink3); }
 .act { font-weight:600; font-size:13px; padding:8px 15px; border-radius:9px; border:1px solid var(--hair); background:var(--panel2); color:var(--ink); cursor:pointer; }
@@ -282,7 +265,6 @@ export default {
 .chip { display:inline-flex; align-items:center; gap:6px; font-family:var(--mono); font-size:11px; font-weight:600; padding:4px 9px; border-radius:20px; }
 .chip .dot{width:7px;height:7px;border-radius:50%;} .chip.block{background:var(--stop-w);color:var(--stop);} .chip.block .dot{background:var(--stop);} .chip.ok{background:var(--ok-w);color:var(--ok);} .chip.ok .dot{background:var(--ok);} .chip.prog{background:var(--accent-w);color:var(--accent-ink);} .chip.prog .dot{background:var(--accent);}
 
-/* DETAIL */
 .back { background:none; border:none; color:var(--accent-ink); font-weight:600; cursor:pointer; font-size:14px; padding:0 0 12px; }
 .detail { background:var(--panel); border:1px solid var(--hair); border-radius:16px; padding:22px; }
 .d-eyebrow { font-family:var(--mono); font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink3); }
