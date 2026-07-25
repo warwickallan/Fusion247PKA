@@ -52,6 +52,19 @@ function dedupe(list) {
   return [...seen.values()];
 }
 const notifyMark = (p) => (p === 'immediate' ? '🔔' : p === 'selective' ? '' : '');
+// Keep list cards terse — full prose lives behind the click (depth-ladder rule).
+const terse = (t, n = 66) => { const s = String(t || '').trim(); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
+function humanizeSlug(s) {
+  const parts = String(s || '').split(/[-_]/).filter(Boolean);
+  if (parts.length > 1) { const last = parts[parts.length - 1]; if ((/[A-Z]/.test(last) && /[a-z0-9]/.test(last)) || (/[0-9]/.test(last) && last.length >= 4)) parts.pop(); }
+  return parts.join(' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+// Human output title — no machine slugs/IDs in the primary UI.
+function outputTitle(o) {
+  let t = String(o.title || '').replace(/^so what\s*[—-]\s*/i, '').trim();
+  if (t && !/\s/.test(t) && /[-_]/.test(t)) t = humanizeSlug(t);
+  return t || 'Insight';
+}
 
 createApp({
   setup() {
@@ -146,7 +159,7 @@ createApp({
 
     return {
       AREAS, state, area, detail, busy, loading,
-      kindOf, catLabel, moduleLabel, oneLine, ago, humanValue, humanPoints, notifyMark, build, host, when,
+      kindOf, catLabel, moduleLabel, oneLine, ago, terse, outputTitle, humanValue, humanPoints, notifyMark, build, host, when,
       attn, deferred, archived, blocked, decisions, suggestions, lifeAttn, buildAttn, toneOf, laneOf,
       outputs, newOutputs, itemsAdded, jobsFound, wins, builds,
       statusTone, statusLine, tiles, go, open, closeDetail, decide, copyTranscript, primaryAction, load, REPORT, GRAPH,
@@ -186,16 +199,15 @@ createApp({
         <div class="grp" v-if="blocked.length">
           <h2>🔴 Blocked by you<span class="g-count">{{ blocked.length }}</span></h2>
           <div v-for="it in blocked" :key="it.id" class="item red">
-            <div class="i-main" @click="open(it,'attention')"><div class="i-eyebrow blocked">Blocked by you</div><div class="i-title">{{ it.title }}</div><div v-if="it.reason" class="i-why">{{ oneLine(it.reason) }}</div></div>
+            <div class="i-main" @click="open(it,'attention')"><div class="i-eyebrow blocked">{{ moduleLabel(it.source_module) }}</div><div class="i-title">{{ terse(it.title) }}</div><div v-if="it.reason" class="i-why">{{ oneLine(it.reason) }}</div></div>
             <div class="i-act"><span v-if="it._done" class="done-pill">✅ {{ it._done }}</span><template v-else><button v-for="ax in (it.actions||[])" :key="ax.key" class="act" :class="ax.key" :disabled="busy" @click.stop="decide(it,'accept',ax)">{{ ax.label }}</button></template></div>
           </div>
         </div>
 
-        <div class="grp">
-          <h2>🏡 Life<span class="g-count">{{ lifeAttn.length }}</span><span class="lane-sub">seconds each</span></h2>
-          <div v-if="!lifeAttn.length" class="empty">Nothing on the home front.</div>
-          <div v-for="it in lifeAttn" :key="it.id" class="item" :class="toneOf(it)">
-            <div class="i-main" @click="open(it,'attention')"><div class="i-eyebrow" :class="kindOf(it)">{{ catLabel(it) }}</div><div class="i-title">{{ it.title }}</div><div v-if="it.reason" class="i-why">{{ oneLine(it.reason) }}</div></div>
+        <div class="grp" v-if="decisions.length">
+          <h2>⚖️ Decisions<span class="g-count">{{ decisions.length }}</span><span class="lane-sub">a choice to make</span></h2>
+          <div v-for="it in decisions" :key="it.id" class="item amber">
+            <div class="i-main" @click="open(it,'attention')"><div class="i-eyebrow">{{ moduleLabel(it.source_module) }}</div><div class="i-title">{{ terse(it.title) }}</div><div v-if="it.reason" class="i-why">{{ oneLine(it.reason) }}</div></div>
             <div class="i-act">
               <span v-if="it._done" class="done-pill">✅ {{ it._done }}</span>
               <template v-else>
@@ -207,11 +219,10 @@ createApp({
           </div>
         </div>
 
-        <div class="grp">
-          <h2>🛠 Build<span class="g-count">{{ buildAttn.length }}</span><span class="lane-sub">for a thinking block</span></h2>
-          <div v-if="!buildAttn.length" class="empty">Nothing needs your head right now.</div>
-          <div v-for="it in buildAttn" :key="it.id" class="item" :class="toneOf(it)">
-            <div class="i-main" @click="open(it,'attention')"><div class="i-eyebrow" :class="kindOf(it)">{{ catLabel(it) }}</div><div class="i-title">{{ it.title }}</div><div v-if="it.reason" class="i-why">{{ oneLine(it.reason) }}</div></div>
+        <div class="grp" v-if="suggestions.length">
+          <h2>💡 Suggestions<span class="g-count">{{ suggestions.length }}</span><span class="lane-sub">optional — worth a look</span></h2>
+          <div v-for="it in suggestions" :key="it.id" class="item blue">
+            <div class="i-main" @click="open(it,'attention')"><div class="i-eyebrow">{{ moduleLabel(it.source_module) }}</div><div class="i-title">{{ terse(it.title) }}</div><div v-if="it.reason" class="i-why">{{ oneLine(it.reason) }}</div></div>
             <div class="i-act">
               <span v-if="it._done" class="done-pill">✅ {{ it._done }}</span>
               <template v-else>
@@ -222,6 +233,8 @@ createApp({
             </div>
           </div>
         </div>
+
+        <div v-if="!blocked.length && !decisions.length && !suggestions.length && !deferred.length" class="empty big">All clear — nothing needs you right now. 🎉</div>
 
         <div class="grp" v-if="deferred.length">
           <h2>🕒 Later<span class="g-count">{{ deferred.length }}</span><span class="lane-sub">you parked these</span></h2>
@@ -237,19 +250,23 @@ createApp({
         <header class="p-h"><h1>Outputs</h1><span class="count">{{ outputs.length }}</span></header>
         <div v-if="!outputs.length" class="empty big">Nothing produced for you yet.</div>
         <div v-for="o in outputs" :key="o.id" class="item green">
-          <div class="i-main" @click="open(o,'output')"><div class="i-title">{{ o.title }}</div><div v-if="humanValue(o.value)" class="i-why">{{ oneLine(humanValue(o.value)) }}</div></div>
-          <div class="i-side"><span class="fresh">{{ ago(o.produced_at) }}</span><span class="chev">›</span></div>
+          <div class="i-main" @click="open(o,'output')"><div class="i-eyebrow">{{ moduleLabel(o.source_module) }} · {{ ago(o.produced_at) }} ago</div><div class="i-title">{{ terse(outputTitle(o)) }}</div><div v-if="humanValue(o.value)" class="i-why">{{ oneLine(humanValue(o.value)) }}</div></div>
+          <div class="i-side"><span class="chev">›</span></div>
         </div>
       </section>
 
       <!-- BRAIN -->
       <section v-else-if="area==='brain'" class="pane">
-        <header class="p-h"><h1>Brain</h1><div class="d-links" style="margin-left:auto"><a :href="REPORT" target="_blank" rel="noopener">Report ↗</a><a :href="GRAPH" target="_blank" rel="noopener">Galaxy ↗</a></div></header>
+        <header class="p-h"><h1>Brain</h1></header>
         <div class="tiles">
           <button class="tile grey"><span class="t-num">{{ state.ingestedCount ?? '—' }}</span><span class="t-lbl">Ingested</span><span class="t-desc">sources processed</span></button>
           <button class="tile green" @click="go('outputs')"><span class="t-num">{{ outputs.length }}</span><span class="t-lbl">Insights</span><span class="t-desc">so-what for you</span></button>
           <button class="tile amber" @click="go('attention')"><span class="t-num">{{ decisions.length }}</span><span class="t-lbl">To review</span><span class="t-desc">held decisions</span></button>
           <button class="tile blue" @click="go('attention')"><span class="t-num">{{ suggestions.length }}</span><span class="t-lbl">Make better</span><span class="t-desc">brain ideas</span></button>
+        </div>
+        <div class="tiles" style="margin-top:12px">
+          <a class="tile blue" :href="GRAPH" target="_blank" rel="noopener" style="text-decoration:none"><span class="t-num">🌌</span><span class="t-lbl">Galaxy</span><span class="t-desc">explore the graph ↗</span></a>
+          <a class="tile grey" :href="REPORT" target="_blank" rel="noopener" style="text-decoration:none"><span class="t-num">📄</span><span class="t-lbl">Report</span><span class="t-desc">full knowledge report ↗</span></a>
         </div>
         <div class="grp" style="margin-top:20px">
           <h2>Recently ingested<span class="lane-sub">captured &amp; processed — not the same as "learned"</span></h2>
@@ -282,19 +299,22 @@ createApp({
         </div>
       </section>
 
-      <!-- SYSTEM -->
+      <!-- SYSTEM — answers "what's happening now?"; history is deeper down -->
       <section v-else class="pane">
-        <header class="p-h"><h1>Builds &amp; System</h1></header>
-        <div class="grp" v-if="wins.length"><h2>Recent wins<span class="g-count">{{ wins.length }}</span></h2>
-          <div v-for="wn in wins" :key="wn.id" class="item green"><div class="i-main"><div class="i-title">{{ wn.text }}</div><div class="i-why">{{ ago(wn.happened_at) }} ago</div></div></div>
-        </div>
-        <div class="grp"><h2>Active work<span class="g-count">{{ builds.length }}</span></h2>
-          <div v-if="!builds.length" class="empty">No builds tracked.</div>
+        <header class="p-h"><h1>System</h1></header>
+        <div class="status-line" :class="{red: statusTone==='red'}"><span>{{ statusTone==='red' ? '🔴' : '🟢' }}</span>{{ statusLine }}</div>
+        <div class="grp"><h2>Happening now<span class="g-count">{{ builds.length }}</span></h2>
+          <div v-if="!builds.length" class="empty">Nothing actively building.</div>
           <div v-for="b in builds" :key="b.id" class="item" :class="b.status_tone==='block' ? 'red':'grey'">
             <div class="i-main"><div class="i-title">{{ b.name }}</div><div class="i-why">{{ b.gives }} · {{ b.progress_pct || 0 }}%</div></div>
             <span class="chip" :class="b.status_tone==='block' ? 'block' : (b.status_tone==='ok' ? 'ok':'prog')"><span class="d"></span>{{ b.status }}</span>
           </div>
         </div>
+        <details class="tech" v-if="wins.length"><summary>Recent history · {{ wins.length }}</summary>
+          <div class="tech-body">
+            <div v-for="wn in wins" :key="wn.id" class="item green" style="margin-top:8px"><div class="i-main"><div class="i-title">{{ wn.text }}</div><div class="i-why">{{ ago(wn.happened_at) }} ago</div></div></div>
+          </div>
+        </details>
       </section>
     </main>
   </div>
@@ -304,7 +324,7 @@ createApp({
     <div class="sheet-card">
       <button class="back" @click="closeDetail">‹ Back</button>
       <div class="d-eyebrow">{{ detail._as==='output' ? (moduleLabel(detail.source_module)+' · output') : catLabel(detail) }}</div>
-      <h1>{{ detail.title }}</h1>
+      <h1>{{ detail._as==='output' ? outputTitle(detail) : detail.title }}</h1>
 
       <template v-if="detail._as==='output'">
         <ul v-if="humanPoints(detail.value).length" class="read"><li v-for="(p,i) in humanPoints(detail.value)" :key="i">{{ p }}</li></ul>
