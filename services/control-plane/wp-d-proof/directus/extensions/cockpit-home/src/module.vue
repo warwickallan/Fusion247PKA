@@ -2,153 +2,142 @@
   <private-view title="Fusion247 Cockpit">
     <div class="ck" :class="{ 'has-detail': !!detail }">
 
-      <!-- LEFT SIDEBAR (collapses to an icon rail / drawer on narrow) -->
+      <!-- SIDEBAR (icon rail / drawer on narrow, real sidebar ≥780px) -->
       <nav class="nav">
-        <div class="nav-brand"><span class="pip" :class="overall.tone"></span><b>Fusion247</b></div>
+        <div class="nav-brand"><span class="pip" :class="statusTone"></span><b>Fusion247</b></div>
         <button v-for="a in areas" :key="a.key" class="nav-btn" :class="{ on: area === a.key }" @click="go(a.key)">
-          <span class="nav-ico">{{ a.icon }}</span>
-          <span class="nav-lbl">{{ a.label }}</span>
-          <span v-if="badge(a.key)" class="nav-badge" :class="a.tone">{{ badge(a.key) }}</span>
+          <span class="nav-ico">{{ a.icon }}</span><span class="nav-lbl">{{ a.label }}</span>
+          <span v-if="a.key === 'attention' && blockers.length" class="nav-badge">{{ blockers.length }}</span>
         </button>
-        <div class="nav-foot"><span class="pip" :class="overall.tone"></span>Larry: {{ overall.larry_now || 'idle' }}</div>
+        <div class="nav-foot"><span class="pip" :class="statusTone"></span>{{ statusLine }}</div>
       </nav>
 
-      <!-- MAIN -->
       <main class="main">
-        <!-- DETAIL (drill-down) -->
+        <!-- ===== DETAIL (drill-down) ===== -->
         <section v-if="detail" class="pane">
           <button class="back" @click="detail = null">← Back</button>
           <div class="detail">
-            <div class="d-eyebrow">{{ detail._kind === 'attention' ? 'Needs you' : 'Output' }} · {{ moduleLabel(detail.source_module) }}</div>
+            <div class="d-eyebrow">{{ catLabel(detail) }} · {{ moduleLabel(detail.source_module) }}</div>
             <h1>{{ detail.title }}</h1>
-            <p v-if="detail.reason" class="d-reason">{{ detail.reason }}</p>
-            <p v-if="detail.value" class="d-reason">{{ detail.value }}</p>
+            <!-- CLICK 2: human "so what" -->
+            <p v-if="detail.reason || detail.value" class="d-reason">{{ detail.reason || detail.value }}</p>
 
             <div v-if="detail._kind === 'attention'" class="d-actions">
-              <template v-if="detail._done"><span class="done-pill">✅ {{ detail._done }} — queued</span></template>
+              <span v-if="detail._done" class="done-pill">✅ {{ detail._done }} — queued</span>
               <template v-else>
                 <button v-for="ax in (detail.actions || [])" :key="ax.key" class="act" :class="ax.key" :disabled="busy" @click="doAction(detail, ax)">{{ ax.label }}</button>
               </template>
               <span v-if="detail._error" class="err">⚠ {{ detail._error }}</span>
             </div>
-
             <div class="d-links">
-              <a v-if="detail.evidence_url" :href="detail.evidence_url" target="_blank" rel="noopener">Open evidence / report ↗</a>
-              <a v-if="detail.source_module === 'brain'" :href="reportUrl" target="_blank" rel="noopener">Your brain report ↗</a>
-              <a v-if="detail.source_module === 'brain'" :href="graphUrl" target="_blank" rel="noopener">Graph explorer ↗</a>
+              <a v-if="detail.evidence_url" :href="detail.evidence_url" target="_blank" rel="noopener">Open the full result ↗</a>
             </div>
-            <div class="d-prov"><span class="mono">{{ detail.provenance_ref }}</span></div>
+            <!-- CLICK 3+: technical, deliberately buried -->
+            <details class="tech"><summary>Technical detail</summary>
+              <div class="tech-body"><span class="mono">{{ detail.provenance_ref }}</span><span v-if="detail.related_ref" class="mono"> · {{ detail.related_ref }}</span></div>
+            </details>
           </div>
         </section>
 
-        <!-- HOME -->
+        <!-- ===== HOME: tiles only ===== -->
         <section v-else-if="area === 'home'" class="pane">
-          <div class="banner" :class="overall.tone">
-            <div class="beacon"><span></span></div>
-            <div><div class="eyebrow">Overall</div><h1>{{ overall.headline || homeHeadline }}</h1><p>{{ overall.sub || homeSub }}</p></div>
-          </div>
-          <div class="gauges">
-            <button class="gauge wait" @click="go('attention')"><span class="lbl">Needs you</span><span class="val">{{ attention.length }}</span></button>
-            <button class="gauge done" @click="go('outputs')"><span class="lbl">New outputs</span><span class="val">{{ freshOutputs }}</span></button>
-            <button class="gauge" :class="blocked.length ? 'block' : 'ok'" @click="go('system')"><span class="lbl">Blocked</span><span class="val">{{ blocked.length }}</span></button>
-            <button class="gauge ok" @click="go('brain')"><span class="lbl">Brain learned</span><span class="val">{{ live.learned ?? '—' }}</span></button>
-          </div>
-          <div class="cols">
-            <div class="card">
-              <h2>What needs you</h2>
-              <div v-if="!attention.length" class="empty">Nothing waiting on you. 🎉</div>
-              <div v-for="it in attention.slice(0, 4)" :key="it.id" class="row tap" @click="open(it, 'attention')">
-                <span class="prio" :class="it.priority">{{ it.priority[0].toUpperCase() }}</span>
-                <div><div class="r-title">{{ it.title }}</div><div class="r-sub">{{ moduleLabel(it.source_module) }}</div></div>
-                <span class="chev">›</span>
-              </div>
-              <button v-if="attention.length > 4" class="more" @click="go('attention')">See all {{ attention.length }} →</button>
-            </div>
-            <div class="card">
-              <h2>Recently produced</h2>
-              <div v-if="!outputs.length" class="empty">Nothing produced yet.</div>
-              <div v-for="o in outputs.slice(0, 4)" :key="o.id" class="row tap" @click="open(o, 'output')">
-                <span class="odot"></span>
-                <div><div class="r-title">{{ o.title }}</div><div class="r-sub">{{ ago(o.produced_at) }}</div></div>
-                <span class="chev">›</span>
-              </div>
-              <button v-if="outputs.length > 4" class="more" @click="go('outputs')">See all outputs →</button>
-            </div>
+          <div class="status" :class="statusTone"><span class="pip" :class="statusTone"></span><span>{{ statusLine }}</span></div>
+          <div class="tiles">
+            <button class="tile" :class="blockers.length ? 'red' : 'green'" @click="go('attention')">
+              <span class="t-num">{{ blockers.length }}</span><span class="t-lbl">Needs you</span><span class="t-desc">blockers waiting on you</span>
+            </button>
+            <button class="tile blue" @click="go('attention')">
+              <span class="t-num">{{ suggestions.length }}</span><span class="t-lbl">Suggestions</span><span class="t-desc">ideas to consider</span>
+            </button>
+            <button class="tile amber" @click="go('attention')">
+              <span class="t-num">{{ reviews.length }}</span><span class="t-lbl">To review</span><span class="t-desc">merges the Brain held</span>
+            </button>
+            <button class="tile green" @click="go('outputs')">
+              <span class="t-num">{{ outputs.length }}</span><span class="t-lbl">Insights</span><span class="t-desc">"so what" the Brain found</span>
+            </button>
+            <button v-if="itemsAdded" class="tile green" @click="go('outputs')">
+              <span class="t-num">{{ itemsAdded }}</span><span class="t-lbl">Items added</span><span class="t-desc">to your lists</span>
+            </button>
+            <button v-if="jobsFound" class="tile green" @click="go('outputs')">
+              <span class="t-num">{{ jobsFound }}</span><span class="t-lbl">Jobs found</span><span class="t-desc">worth a look</span>
+            </button>
+            <button class="tile grey" @click="go('brain')">
+              <span class="t-num">{{ live.learned ?? '—' }}</span><span class="t-lbl">Learned</span><span class="t-desc">sources in your Brain</span>
+            </button>
           </div>
         </section>
 
-        <!-- ATTENTION -->
+        <!-- ===== ATTENTION: blockers → suggestions → review ===== -->
         <section v-else-if="area === 'attention'" class="pane">
-          <header class="p-h"><h1>Attention</h1><span class="count">{{ attention.length }}</span></header>
-          <div v-if="!attention.length" class="empty big">Nothing needs you right now. Go and live your life. ❤️</div>
-          <div v-for="it in attention" :key="it.id" class="att-card" :class="it.priority">
-            <div class="tap att-top" @click="open(it, 'attention')">
-              <span class="prio" :class="it.priority">{{ it.priority[0].toUpperCase() }}</span>
-              <div class="att-body"><div class="r-title">{{ it.title }}</div><div v-if="it.reason" class="r-reason">{{ it.reason }}</div><div class="r-sub">{{ moduleLabel(it.source_module) }}</div></div>
-              <span class="chev">›</span>
+          <header class="p-h"><h1>Attention</h1></header>
+
+          <div class="grp">
+            <h2>Waiting on you<span class="g-count">{{ blockers.length }}</span></h2>
+            <div v-if="!blockers.length" class="empty">Nothing's blocked on you. I'm free to crack on. 🟢</div>
+            <div v-for="it in blockers" :key="it.id" class="item red" @click="open(it, 'attention')">
+              <div class="i-main"><div class="i-title">{{ it.title }}</div><div v-if="it.reason" class="i-why">{{ oneLine(it.reason) }}</div></div><span class="chev">›</span>
             </div>
-            <div class="att-actions" v-if="it.actions && it.actions.length">
-              <template v-if="it._done"><span class="done-pill">✅ {{ it._done }} — queued</span></template>
-              <template v-else>
-                <button v-for="ax in it.actions" :key="ax.key" class="act" :class="ax.key" :disabled="busy" @click.stop="doAction(it, ax)">{{ ax.label }}</button>
-              </template>
-              <span v-if="it._error" class="err">⚠ {{ it._error }}</span>
+          </div>
+
+          <div class="grp">
+            <h2>Suggestions to consider<span class="g-count">{{ suggestions.length }}</span></h2>
+            <div v-if="!suggestions.length" class="empty">No suggestions right now.</div>
+            <div v-for="it in suggestions" :key="it.id" class="item blue">
+              <div class="i-main tap" @click="open(it, 'attention')"><div class="i-title">{{ it.title }}</div><div v-if="it.reason" class="i-why">{{ oneLine(it.reason) }}</div></div>
+              <div class="i-act" v-if="it.actions && it.actions.length">
+                <span v-if="it._done" class="done-pill sm">✅ {{ it._done }}</span>
+                <template v-else><button v-for="ax in it.actions" :key="ax.key" class="act sm" :class="ax.key" :disabled="busy" @click.stop="doAction(it, ax)">{{ ax.label }}</button></template>
+              </div>
+            </div>
+          </div>
+
+          <div class="grp">
+            <h2>Held for your review<span class="g-count">{{ reviews.length }}</span></h2>
+            <div v-if="!reviews.length" class="empty">Nothing to review.</div>
+            <div v-for="it in reviews" :key="it.id" class="item amber">
+              <div class="i-main tap" @click="open(it, 'attention')"><div class="i-title">{{ it.title }}</div></div>
+              <div class="i-act">
+                <span v-if="it._done" class="done-pill sm">✅ {{ it._done }}</span>
+                <template v-else><button v-for="ax in it.actions" :key="ax.key" class="act sm" :class="ax.key" :disabled="busy" @click.stop="doAction(it, ax)">{{ ax.label }}</button></template>
+              </div>
             </div>
           </div>
         </section>
 
-        <!-- OUTPUTS -->
+        <!-- ===== OUTPUTS ===== -->
         <section v-else-if="area === 'outputs'" class="pane">
           <header class="p-h"><h1>Outputs</h1><span class="count">{{ outputs.length }}</span></header>
-          <div v-if="!outputs.length" class="empty big">No results yet — feed the Brain something. 🧠</div>
-          <div v-for="o in outputs" :key="o.id" class="out-card tap" @click="open(o, 'output')">
-            <div class="out-top"><span class="odot"></span><div class="r-title">{{ o.title }}</div><span class="fresh">{{ ago(o.produced_at) }}</span></div>
-            <div v-if="o.value" class="out-val">{{ o.value }}</div>
-            <div class="out-foot"><span class="chip prog">{{ moduleLabel(o.source_module) }}</span><a v-if="o.evidence_url" :href="o.evidence_url" target="_blank" rel="noopener" @click.stop>Open ↗</a></div>
+          <div v-if="!outputs.length" class="empty big">Nothing produced yet.</div>
+          <div v-for="o in outputs" :key="o.id" class="item green" @click="open(o, 'output')">
+            <div class="i-main"><div class="i-title">{{ o.title }}</div><div v-if="o.value" class="i-why">{{ oneLine(o.value) }}</div></div>
+            <span class="fresh">{{ ago(o.produced_at) }}</span><span class="chev">›</span>
           </div>
         </section>
 
-        <!-- BRAIN -->
+        <!-- ===== BRAIN ===== -->
         <section v-else-if="area === 'brain'" class="pane">
           <header class="p-h"><h1>Brain</h1><div class="tabs"><a :href="reportUrl" target="_blank" rel="noopener" class="tab-link">Report ↗</a><a :href="graphUrl" target="_blank" rel="noopener" class="tab-link">Galaxy ↗</a></div></header>
-          <div class="cols">
-            <div class="card">
-              <h2>Latest "so what"</h2>
-              <div v-if="!brainOutputs.length" class="empty">No insights yet.</div>
-              <div v-for="o in brainOutputs" :key="o.id" class="row tap" @click="open(o, 'output')"><span class="odot"></span><div><div class="r-title">{{ o.title }}</div><div class="r-sub">{{ o.value ? o.value.slice(0,90) : '' }}</div></div><span class="chev">›</span></div>
-            </div>
-            <div class="card">
-              <h2>Held for your review</h2>
-              <div v-if="!heldItems.length" class="empty">No held decisions — the Brain's confident. ✅</div>
-              <div v-for="it in heldItems" :key="it.id" class="row tap" @click="open(it, 'attention')"><span class="prio medium">?</span><div><div class="r-title">{{ it.title }}</div></div><span class="chev">›</span></div>
-            </div>
-            <div class="card">
-              <h2>🛠 Make the Brain better</h2>
-              <div v-if="!makeBetter.length" class="empty">No self-improvement candidates.</div>
-              <div v-for="it in makeBetter" :key="it.id" class="row tap" @click="open(it, 'attention')"><span class="prio" :class="it.priority">↑</span><div><div class="r-title">{{ it.title }}</div></div><span class="chev">›</span></div>
-            </div>
-            <div class="card">
-              <h2>Recently learned</h2>
-              <div v-if="!learned.length" class="empty">Nothing learned yet.</div>
-              <div v-for="s in learned" :key="s.id" class="row"><span class="odot"></span><div><div class="r-title">{{ s.title || s.video_id }}</div><div class="r-sub">{{ s.review_state }}</div></div></div>
-            </div>
+          <div class="tiles sm">
+            <button class="tile green" @click="go('outputs')"><span class="t-num">{{ outputs.length }}</span><span class="t-lbl">Insights</span></button>
+            <button class="tile amber" @click="go('attention')"><span class="t-num">{{ reviews.length }}</span><span class="t-lbl">To review</span></button>
+            <button class="tile blue" @click="go('attention')"><span class="t-num">{{ makeBetter.length }}</span><span class="t-lbl">Make better</span></button>
+            <button class="tile grey"><span class="t-num">{{ live.learned ?? '—' }}</span><span class="t-lbl">Learned</span></button>
+          </div>
+          <div class="grp">
+            <h2>Recently learned</h2>
+            <div v-if="!learned.length" class="empty">Nothing learned yet.</div>
+            <div v-for="s in learned" :key="s.id" class="item grey"><div class="i-main"><div class="i-title">{{ s.title || s.video_id }}</div></div></div>
           </div>
         </section>
 
-        <!-- SYSTEM -->
+        <!-- ===== SYSTEM ===== -->
         <section v-else class="pane">
           <header class="p-h"><h1>Builds &amp; System</h1></header>
-          <div class="card">
-            <h2>Active work</h2>
-            <div v-if="!builds.length" class="empty">No builds tracked.</div>
-            <div v-for="b in builds" :key="b.id" class="build">
-              <div class="build-top"><span class="bname">{{ b.name }}</span><span class="chip" :class="b.status_tone"><span class="dot"></span>{{ b.status }}</span></div>
-              <div class="bgives">{{ b.gives }}</div>
-              <div class="prog"><div class="track"><div class="fill" :class="b.status_tone" :style="{ width: (b.progress_pct||0) + '%' }"></div></div><span class="pct">{{ b.progress_pct||0 }}%</span></div>
-              <div v-if="b.next_result" class="bnext"><span class="arrow">→</span>{{ b.next_result }}</div>
-            </div>
+          <div v-if="!builds.length" class="empty big">No builds tracked.</div>
+          <div v-for="b in builds" :key="b.id" class="item" :class="b.status_tone === 'block' ? 'red' : 'grey'">
+            <div class="i-main"><div class="i-title">{{ b.name }}</div><div class="i-why">{{ b.gives }} · {{ b.progress_pct || 0 }}%</div></div>
+            <span class="chip" :class="b.status_tone"><span class="dot"></span>{{ b.status }}</span>
           </div>
-          <details class="tech"><summary>Technical evidence</summary><div class="tech-body"><p>Cockpit reads live MyPKA state via cp_directus. Actions run the governed intent→worker→receipt seam. {{ live.queueNote }}</p></div></details>
         </section>
       </main>
     </div>
@@ -165,35 +154,39 @@ export default {
     const graphUrl = 'http://100.101.240.85:8700';
     const areas = [
       { key: 'home', label: 'Home', icon: '🏠' },
-      { key: 'attention', label: 'Attention', icon: '🔔', tone: 'wait' },
-      { key: 'outputs', label: 'Outputs', icon: '📤', tone: 'done' },
+      { key: 'attention', label: 'Attention', icon: '🔔' },
+      { key: 'outputs', label: 'Outputs', icon: '📤' },
       { key: 'brain', label: 'Brain', icon: '🧠' },
       { key: 'system', label: 'System', icon: '🛠' },
     ];
+    const CAT = { learning_candidate: 'suggestion', system_improvement: 'suggestion', held_canonicalisation: 'review' };
     const area = ref('home');
     const detail = ref(null);
     const busy = ref(false);
     const attention = ref([]);
     const outputs = ref([]);
     const builds = ref([]);
-    const blocked = ref([]);
     const learned = ref([]);
-    const overall = ref({ tone: 'ok', headline: '', sub: '', larry_now: '' });
-    const live = ref({ learned: null, queueNote: '' });
+    const live = ref({ learned: null });
 
     const api = useApi();
-    const get = async (path, params) => { try { const r = await api.get(path, { params }); return r?.data?.data; } catch { return null; } };
+    const get = async (p, params) => { try { const r = await api.get(p, { params }); return r?.data?.data; } catch { return null; } };
 
-    const freshOutputs = computed(() => outputs.value.filter((o) => o.status === 'new').length);
-    const brainOutputs = computed(() => outputs.value.filter((o) => o.source_module === 'brain'));
-    const heldItems = computed(() => attention.value.filter((i) => i.source_type === 'held_canonicalisation'));
+    const catOf = (it) => CAT[it.source_type] || it.kind || 'suggestion';
+    const blockers = computed(() => attention.value.filter((i) => catOf(i) === 'blocker'));
+    const suggestions = computed(() => attention.value.filter((i) => catOf(i) === 'suggestion'));
+    const reviews = computed(() => attention.value.filter((i) => catOf(i) === 'review'));
     const makeBetter = computed(() => attention.value.filter((i) => i.source_type === 'system_improvement'));
-    const homeHeadline = computed(() => attention.value.length ? `${attention.value.length} thing${attention.value.length > 1 ? 's' : ''} need you` : 'All clear');
-    const homeSub = computed(() => `${freshOutputs.value} new output${freshOutputs.value === 1 ? '' : 's'} · ${live.value.learned ?? 0} sources learned`);
+    const itemsAdded = computed(() => outputs.value.filter((o) => o.source_module === 'shopping').length);
+    const jobsFound = computed(() => outputs.value.filter((o) => o.source_module === 'careerair').length);
 
-    const badge = (k) => (k === 'attention' ? attention.value.length || '' : k === 'outputs' ? freshOutputs.value || '' : '');
+    const statusTone = computed(() => (blockers.value.length ? 'red' : 'green'));
+    const statusLine = computed(() => (blockers.value.length ? `Blocked on you — ${blockers.value.length} item${blockers.value.length > 1 ? 's' : ''}` : 'Building — nothing blocking me'));
+
+    const catLabel = (it) => ({ blocker: 'Needs you', suggestion: 'Suggestion', review: 'To review' }[catOf(it)] || 'Output');
     const moduleLabel = (m) => ({ brain: 'Brain', shopping: 'Shopping', builds: 'Builds', careerair: 'CareerAIr' }[m] || m);
-    const ago = (ts) => { if (!ts) return ''; const d = (Date.now() - new Date(ts).getTime()) / 60000; if (d < 60) return `${Math.max(1, Math.round(d))}m ago`; if (d < 1440) return `${Math.round(d / 60)}h ago`; return `${Math.round(d / 1440)}d ago`; };
+    const oneLine = (t) => { if (!t) return ''; const s = String(t).split('\n')[0]; return s.length > 130 ? s.slice(0, 127) + '…' : s; };
+    const ago = (ts) => { if (!ts) return ''; const d = (Date.now() - new Date(ts).getTime()) / 60000; if (d < 60) return `${Math.max(1, Math.round(d))}m`; if (d < 1440) return `${Math.round(d / 60)}h`; return `${Math.round(d / 1440)}d`; };
 
     const go = (k) => { detail.value = null; area.value = k; };
     const open = (item, kind) => { detail.value = { ...item, _kind: kind }; };
@@ -202,41 +195,37 @@ export default {
       busy.value = true; item._error = null;
       try {
         const idem = `${ax.intent}:${ax.args.candidate_id || ax.args.held_id}:${ax.key}:${Date.now()}`;
-        const body = { requested_by: 'cockpit:warwick', idempotency_key: idem, ...ax.args };
-        await api.post(`/items/${ax.intent}`, body);
+        await api.post(`/items/${ax.intent}`, { requested_by: 'cockpit:warwick', idempotency_key: idem, ...ax.args });
         item._done = ax.label;
         if (detail.value && detail.value.id === item.id) detail.value._done = ax.label;
-        // optimistic: drop from the live attention list
-        attention.value = attention.value.filter((i) => i.id !== item.id || i._done);
-      } catch (e) {
-        item._error = e?.response?.data?.errors?.[0]?.message || e?.message || 'Action failed';
-      } finally { busy.value = false; }
+        attention.value = attention.value.map((i) => (i.id === item.id ? { ...i, _done: ax.label } : i));
+      } catch (e) { item._error = e?.response?.data?.errors?.[0]?.message || e?.message || 'Action failed'; }
+      finally { busy.value = false; }
     }
 
     async function load() {
       const [at, ot] = await Promise.all([
-        get('/items/attention_item', { filter: { status: { _eq: 'open' } }, sort: ['priority', '-updated_at'], limit: 100 }),
+        get('/items/attention_item', { filter: { status: { _eq: 'open' } }, sort: ['priority', '-updated_at'], limit: 200 }),
         get('/items/output_item', { filter: { status: { _neq: 'archived' } }, sort: ['-produced_at'], limit: 100 }),
       ]);
       attention.value = (at || []).map((x) => ({ ...x, actions: Array.isArray(x.actions) ? x.actions : (x.actions ? JSON.parse(x.actions) : []) }));
       outputs.value = ot || [];
       builds.value = (await get('/items/build', { sort: ['sort'], limit: 50 })) || [];
-      blocked.value = builds.value.filter((b) => b.status_tone === 'block');
       learned.value = (await get('/items/youtube_source', { sort: ['-updated_at'], limit: 12 })) || [];
-      const os = await get('/items/overall_state', { limit: 1 }); if (os && os[0]) overall.value = { ...overall.value, ...os[0] };
-      const reg = await get('/items/youtube_source', { aggregate: { count: '*' } }); if (reg && reg[0]) live.value.learned = Number(reg[0].count) || learned.value.length;
-      live.value.queueNote = `${attention.value.length} open · ${outputs.value.length} outputs`;
+      const reg = await get('/items/youtube_source', { aggregate: { count: '*' } });
+      live.value.learned = (reg && reg[0]) ? (Number(reg[0].count) || learned.value.length) : learned.value.length;
     }
-
     onMounted(load);
-    return { areas, area, detail, busy, attention, outputs, builds, blocked, learned, overall, live, reportUrl, graphUrl,
-      freshOutputs, brainOutputs, heldItems, makeBetter, homeHeadline, homeSub, badge, moduleLabel, ago, go, open, doAction };
+
+    return { areas, area, detail, busy, attention, outputs, builds, learned, live, reportUrl, graphUrl,
+      blockers, suggestions, reviews, makeBetter, itemsAdded, jobsFound, statusTone, statusLine,
+      catLabel, moduleLabel, oneLine, ago, go, open, doAction };
   },
 };
 </script>
 
 <style scoped>
-.ck { container-type: inline-size; display: grid; grid-template-columns: 1fr; gap: 0;
+.ck { container-type: inline-size; display: grid; grid-template-columns: 1fr;
   --ok:#1f9d57;--ok-w:#e4f4ea;--warn:#b26a12;--warn-w:#f8ecda;--stop:#c1453c;--stop-w:#f8e5e3;
   --accent:#0e7c86;--accent-ink:#0a5c64;--accent-w:#e2f1f2;--park:#66748a;
   --panel:#fff;--panel2:#f7f9fc;--ink:#16202e;--ink2:#47566b;--ink3:#768498;--hair:#e2e7ee;
@@ -245,107 +234,74 @@ export default {
 @media (prefers-color-scheme: dark) { .ck { --panel:#18212e;--panel2:#1d2836;--ink:#e7edf5;--ink2:#a3b0c2;--ink3:#6c7a8f;--hair:#2a3644;
   --ok:#3ad07f;--ok-w:#10331f;--warn:#e0a63a;--warn-w:#3a2c12;--stop:#ee6a5f;--stop-w:#3a1c19;--accent:#37c3c9;--accent-ink:#6fd8dc;--accent-w:#123138; } }
 .ck h1,.ck h2,.ck p { margin:0; }
-.pip { width:9px;height:9px;border-radius:50%;background:var(--ok);display:inline-block; }
-.pip.warn{background:var(--warn);} .pip.block{background:var(--stop);}
+.pip { width:9px;height:9px;border-radius:50%;background:var(--ok);display:inline-block; } .pip.red{background:var(--stop);} .pip.green{background:var(--ok);}
 
-/* NAV — mobile default = horizontal icon rail (drawer feel), NOT a wasted full sidebar */
 .nav { display:flex; gap:6px; overflow-x:auto; padding:10px 12px; background:var(--panel); border-bottom:1px solid var(--hair); position:sticky; top:0; z-index:5; }
 .nav-brand,.nav-foot { display:none; }
 .nav-btn { flex:0 0 auto; display:flex; flex-direction:column; align-items:center; gap:2px; background:none; border:none; border-radius:10px; padding:7px 12px; cursor:pointer; color:var(--ink2); position:relative; }
-.nav-btn.on { background:var(--accent-w); color:var(--accent-ink); }
-.nav-ico { font-size:18px; } .nav-lbl { font-size:11px; font-weight:600; }
-.nav-badge { position:absolute; top:2px; right:6px; background:var(--accent); color:#fff; font-size:10px; font-weight:700; padding:1px 5px; border-radius:9px; }
-.nav-badge.wait{background:var(--accent);} .nav-badge.done{background:var(--ok);}
+.nav-btn.on { background:var(--accent-w); color:var(--accent-ink); } .nav-ico { font-size:19px; } .nav-lbl { font-size:11px; font-weight:600; }
+.nav-badge { position:absolute; top:2px; right:6px; background:var(--stop); color:#fff; font-size:10px; font-weight:700; padding:1px 5px; border-radius:9px; }
 
 .main { padding:16px; max-width:1500px; margin:0 auto; width:100%; box-sizing:border-box; }
-.pane { animation:fade .2s ease; } @keyframes fade { from{opacity:0;transform:translateY(4px);} to{opacity:1;} }
-.p-h { display:flex; align-items:center; gap:12px; margin-bottom:14px; }
-.p-h h1 { font-size:22px; letter-spacing:-.02em; }
-.count { font-family:var(--mono); font-weight:700; background:var(--accent-w); color:var(--accent-ink); padding:2px 10px; border-radius:20px; font-size:14px; }
-.tabs { margin-left:auto; display:flex; gap:8px; } .tab-link,.d-links a,.out-foot a { color:var(--accent-ink); text-decoration:none; font-size:13px; font-weight:600; }
+.pane { animation:fade .18s ease; } @keyframes fade { from{opacity:0;transform:translateY(4px);} to{opacity:1;} }
 
-.banner { display:grid; grid-template-columns:auto 1fr; gap:14px; align-items:center; background:var(--panel); border:1px solid var(--hair); border-radius:16px; padding:18px; position:relative; overflow:hidden; }
-.banner::before { content:""; position:absolute; left:0; top:0; bottom:0; width:5px; background:var(--ok); }
-.banner.warn::before{background:var(--warn);} .banner.block::before{background:var(--stop);}
-.beacon { width:42px;height:42px;border-radius:50%;background:var(--ok-w);display:grid;place-items:center; } .beacon span{width:14px;height:14px;border-radius:50%;background:var(--ok);}
-.banner.warn .beacon{background:var(--warn-w);} .banner.warn .beacon span{background:var(--warn);}
-.eyebrow { font-family:var(--mono); font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink3); }
-.banner h1 { font-size:20px; letter-spacing:-.02em; margin:2px 0; } .banner p { color:var(--ink2); font-size:14px; }
+/* HOME status line — small, just building/blocked */
+.status { display:flex; align-items:center; gap:9px; font-size:13.5px; font-weight:600; color:var(--ink2); padding:10px 14px; background:var(--panel); border:1px solid var(--hair); border-radius:12px; margin-bottom:14px; }
+.status.red { color:var(--stop); } .status.green .pip { background:var(--ok); }
 
-.gauges { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin:14px 0; }
-.gauge { text-align:left; background:var(--panel); border:1px solid var(--hair); border-radius:12px; padding:12px 13px; display:flex; flex-direction:column; gap:4px; cursor:pointer; }
-.gauge .lbl { font-family:var(--mono); font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink3); }
-.gauge .val { font-family:var(--mono); font-weight:700; font-size:26px; line-height:1; }
-.gauge.wait .val{color:var(--accent);} .gauge.done .val{color:var(--ok);} .gauge.block .val{color:var(--stop);} .gauge.ok .val{color:var(--ok);}
+/* TILES */
+.tiles { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; }
+.tiles.sm { grid-template-columns:repeat(2,1fr); margin-bottom:16px; }
+.tile { text-align:left; background:var(--panel); border:1px solid var(--hair); border-left:4px solid var(--park); border-radius:14px; padding:16px; display:flex; flex-direction:column; gap:2px; cursor:pointer; transition:transform .1s; }
+.tile:hover { transform:translateY(-2px); }
+.tile.red{border-left-color:var(--stop);} .tile.green{border-left-color:var(--ok);} .tile.blue{border-left-color:var(--accent);} .tile.amber{border-left-color:var(--warn);} .tile.grey{border-left-color:var(--park);}
+.t-num { font-family:var(--mono); font-weight:700; font-size:34px; line-height:1; }
+.tile.red .t-num{color:var(--stop);} .tile.green .t-num{color:var(--ok);} .tile.blue .t-num{color:var(--accent);} .tile.amber .t-num{color:var(--warn);}
+.t-lbl { font-size:15px; font-weight:700; margin-top:6px; } .t-desc { font-size:12px; color:var(--ink3); }
+.tiles.sm .t-num { font-size:24px; } .tiles.sm .t-desc { display:none; }
 
-.cols { display:grid; grid-template-columns:1fr; gap:14px; }
-.card { background:var(--panel); border:1px solid var(--hair); border-radius:14px; padding:16px 18px; }
-.card h2 { font-family:var(--mono); font-size:12px; letter-spacing:.09em; text-transform:uppercase; color:var(--ink2); font-weight:600; margin-bottom:12px; }
-.empty { color:var(--ink3); font-size:14px; } .empty.big { padding:30px 6px; text-align:center; font-size:15px; }
+/* GROUPS + items */
+.p-h { display:flex; align-items:center; gap:12px; margin-bottom:14px; } .p-h h1 { font-size:22px; letter-spacing:-.02em; }
+.count,.g-count { font-family:var(--mono); font-weight:700; background:var(--accent-w); color:var(--accent-ink); padding:1px 9px; border-radius:20px; font-size:13px; }
+.tabs { margin-left:auto; display:flex; gap:10px; } .tab-link,.d-links a { color:var(--accent-ink); text-decoration:none; font-size:13px; font-weight:600; }
+.grp { margin-bottom:22px; } .grp h2 { display:flex; align-items:center; gap:9px; font-family:var(--mono); font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink2); font-weight:600; margin-bottom:11px; }
+.grp .g-count { font-size:11px; }
+.empty { color:var(--ink3); font-size:14px; padding:4px 2px; } .empty.big { padding:30px 6px; text-align:center; font-size:15px; }
 
-.row { display:grid; grid-template-columns:auto 1fr auto; gap:12px; align-items:center; padding:11px 0; border-top:1px solid var(--hair); }
-.row:first-of-type { border-top:none; } .tap { cursor:pointer; } .tap:hover .r-title { color:var(--accent-ink); }
-.r-title { font-size:14.5px; font-weight:600; letter-spacing:-.01em; } .r-sub { font-size:12px; color:var(--ink3); margin-top:2px; }
-.r-reason { font-size:13px; color:var(--ink2); margin-top:4px; white-space:pre-line; }
-.chev { color:var(--ink3); font-size:20px; } .more { margin-top:10px; background:none; border:none; color:var(--accent-ink); font-weight:600; cursor:pointer; font-size:13px; padding:0; }
-.prio { font-family:var(--mono); font-weight:700; width:26px; height:26px; border-radius:8px; display:grid; place-items:center; font-size:13px; background:var(--warn-w); color:var(--warn); }
-.prio.high{background:var(--stop-w);color:var(--stop);} .prio.medium{background:var(--warn-w);color:var(--warn);} .prio.low{background:var(--accent-w);color:var(--accent-ink);}
-.odot { width:9px;height:9px;border-radius:50%;background:var(--ok); }
-
-.att-card { background:var(--panel); border:1px solid var(--hair); border-radius:14px; padding:14px 16px; margin-bottom:12px; border-left:4px solid var(--warn); }
-.att-card.high{border-left-color:var(--stop);} .att-card.low{border-left-color:var(--accent);}
-.att-top { display:grid; grid-template-columns:auto 1fr auto; gap:12px; align-items:start; }
-.att-actions { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:12px; padding-top:12px; border-top:1px solid var(--hair); }
-.act { font-weight:600; font-size:13px; padding:8px 16px; border-radius:9px; border:1px solid var(--hair); background:var(--panel2); color:var(--ink); cursor:pointer; }
-.act:hover { border-color:var(--accent); } .act:disabled { opacity:.5; cursor:default; }
-.act.accept,.act.merge { background:var(--accent); color:#fff; border-color:var(--accent); } .act.decline,.act.keep { background:var(--panel2); }
-.done-pill { font-size:13px; font-weight:600; color:var(--ok); background:var(--ok-w); padding:6px 12px; border-radius:8px; }
+.item { display:flex; align-items:center; gap:12px; background:var(--panel); border:1px solid var(--hair); border-left:4px solid var(--park); border-radius:12px; padding:13px 15px; margin-bottom:9px; cursor:pointer; }
+.item.red{border-left-color:var(--stop);} .item.blue{border-left-color:var(--accent);} .item.amber{border-left-color:var(--warn);} .item.green{border-left-color:var(--ok);} .item.grey{border-left-color:var(--park);}
+.item:hover { border-color:var(--accent); }
+.i-main { flex:1; min-width:0; } .i-title { font-size:14.5px; font-weight:600; letter-spacing:-.01em; }
+.i-why { font-size:12.5px; color:var(--ink3); margin-top:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.i-act { display:flex; flex-wrap:wrap; gap:7px; align-items:center; } .chev { color:var(--ink3); font-size:20px; } .fresh { font-family:var(--mono); font-size:11px; color:var(--ink3); }
+.act { font-weight:600; font-size:13px; padding:8px 15px; border-radius:9px; border:1px solid var(--hair); background:var(--panel2); color:var(--ink); cursor:pointer; }
+.act.sm { padding:6px 12px; font-size:12px; } .act:hover { border-color:var(--accent); } .act:disabled { opacity:.5; }
+.act.accept,.act.merge { background:var(--accent); color:#fff; border-color:var(--accent); }
+.done-pill { font-size:13px; font-weight:600; color:var(--ok); background:var(--ok-w); padding:6px 12px; border-radius:8px; } .done-pill.sm { font-size:12px; padding:4px 10px; }
 .err { color:var(--stop); font-size:12px; }
-
-.out-card { background:var(--panel); border:1px solid var(--hair); border-radius:14px; padding:15px 17px; margin-bottom:12px; cursor:pointer; }
-.out-card:hover { border-color:var(--accent); } .out-top { display:flex; align-items:center; gap:10px; }
-.fresh { margin-left:auto; font-family:var(--mono); font-size:11px; color:var(--ink3); }
-.out-val { font-size:13.5px; color:var(--ink2); margin:8px 0 10px; line-height:1.5; }
-.out-foot { display:flex; align-items:center; justify-content:space-between; }
-
 .chip { display:inline-flex; align-items:center; gap:6px; font-family:var(--mono); font-size:11px; font-weight:600; padding:4px 9px; border-radius:20px; }
-.chip .dot{width:7px;height:7px;border-radius:50%;} .chip.prog{background:var(--accent-w);color:var(--accent-ink);} .chip.ok{background:var(--ok-w);color:var(--ok);} .chip.ok .dot{background:var(--ok);}
-.chip.warn{background:var(--warn-w);color:var(--warn);} .chip.warn .dot{background:var(--warn);} .chip.block{background:var(--stop-w);color:var(--stop);} .chip.block .dot{background:var(--stop);} .chip.prog .dot{background:var(--accent);}
+.chip .dot{width:7px;height:7px;border-radius:50%;} .chip.block{background:var(--stop-w);color:var(--stop);} .chip.block .dot{background:var(--stop);} .chip.ok{background:var(--ok-w);color:var(--ok);} .chip.ok .dot{background:var(--ok);} .chip.prog{background:var(--accent-w);color:var(--accent-ink);} .chip.prog .dot{background:var(--accent);}
 
-.build { padding:13px 0; border-top:1px solid var(--hair); } .build:first-of-type{border-top:none;}
-.build-top { display:flex; align-items:center; justify-content:space-between; gap:10px; } .bname{font-weight:700;font-size:15px;}
-.bgives { font-size:13px; color:var(--ink2); margin:3px 0 8px; } .prog{display:flex;align-items:center;gap:10px;}
-.track { flex:1; height:7px; border-radius:4px; background:var(--hair); overflow:hidden; } .fill{height:100%;border-radius:4px;background:var(--accent);}
-.fill.ok{background:var(--ok);} .fill.block{background:var(--stop);} .pct{font-family:var(--mono);font-size:12px;font-weight:700;}
-.bnext { font-size:13px; color:var(--ink2); margin-top:7px; } .bnext .arrow{color:var(--accent);font-weight:700;margin-right:5px;}
-
+/* DETAIL */
 .back { background:none; border:none; color:var(--accent-ink); font-weight:600; cursor:pointer; font-size:14px; padding:0 0 12px; }
 .detail { background:var(--panel); border:1px solid var(--hair); border-radius:16px; padding:22px; }
 .d-eyebrow { font-family:var(--mono); font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink3); }
 .detail h1 { font-size:21px; letter-spacing:-.02em; margin:6px 0 12px; text-wrap:balance; }
 .d-reason { font-size:15px; color:var(--ink2); line-height:1.6; white-space:pre-line; margin-bottom:16px; }
 .d-actions { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin:18px 0; }
-.d-links { display:flex; flex-wrap:wrap; gap:16px; margin:16px 0 12px; padding-top:14px; border-top:1px solid var(--hair); }
-.d-prov { margin-top:8px; } .mono { font-family:var(--mono); font-size:11px; color:var(--ink3); }
-.tech { margin-top:16px; border:1px solid var(--hair); border-radius:12px; background:var(--panel2); }
-.tech summary { cursor:pointer; padding:12px 16px; font-family:var(--mono); font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink3); }
-.tech-body { padding:0 16px 14px; font-size:13px; color:var(--ink2); }
+.d-links { display:flex; gap:16px; margin:14px 0; }
+.tech { margin-top:14px; border:1px solid var(--hair); border-radius:10px; background:var(--panel2); }
+.tech summary { cursor:pointer; padding:11px 14px; font-family:var(--mono); font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--ink3); }
+.tech-body { padding:0 14px 12px; } .mono { font-family:var(--mono); font-size:11px; color:var(--ink3); }
 
-/* YOGA / SURFACE — real left sidebar + two-column working view */
 @container (min-width: 780px) {
   .ck { grid-template-columns: 210px 1fr; }
   .nav { flex-direction:column; overflow:visible; border-bottom:none; border-right:1px solid var(--hair); height:100%; padding:16px 12px; gap:4px; position:sticky; top:0; align-self:start; }
   .nav-brand { display:flex; align-items:center; gap:8px; font-size:15px; padding:6px 10px 14px; }
-  .nav-btn { flex-direction:row; justify-content:flex-start; gap:11px; padding:10px 12px; width:100%; }
-  .nav-lbl { font-size:14px; } .nav-badge { position:static; margin-left:auto; }
-  .nav-foot { display:flex; align-items:center; gap:8px; margin-top:auto; padding:12px 10px; font-size:12px; color:var(--accent-ink); }
-  .gauges { grid-template-columns:repeat(4,1fr); }
-  .cols { grid-template-columns:1fr 1fr; }
+  .nav-btn { flex-direction:row; justify-content:flex-start; gap:11px; padding:10px 12px; width:100%; } .nav-lbl { font-size:14px; } .nav-badge { position:static; margin-left:auto; }
+  .nav-foot { display:flex; align-items:center; gap:8px; margin-top:auto; padding:12px 10px; font-size:12px; color:var(--ink2); }
+  .tiles { grid-template-columns:repeat(3,1fr); } .tiles.sm { grid-template-columns:repeat(4,1fr); }
 }
-/* 28-INCH — richer multi-column */
-@container (min-width: 1280px) {
-  .main { padding:26px; } .cols { grid-template-columns:repeat(2,1fr); }
-  .att-card, .out-card { max-width:none; }
-}
-@container (min-width: 1600px) { .cols { grid-template-columns:repeat(3,1fr); } }
+@container (min-width: 1280px) { .main { padding:26px; } .tiles { grid-template-columns:repeat(4,1fr); } }
+@container (min-width: 1600px) { .tiles { grid-template-columns:repeat(6,1fr); } }
 </style>
