@@ -4,12 +4,15 @@
 > **One authoritative graph:** LightRAG 1.5.4 on **Neo4JStorage** (physically in Neo4j); NetworkX + the
 > duplicate `OwaiConcept` projection retired (NetworkX kept as rollback). Intent = **KEEP | LEARN**.
 >
-> - **WP1 ✅ core spine / 🟨 lens+canonicaliser rehome pending (GPT-001 → WP1.5).** Neo4JStorage cutover; Learn
->   automatic (Cairn→learn-worker→§7.1→LightRAG→Neo4j) + health check. **Honest gap:** the live permanent spine
->   ingests via LightRAG's *native* extraction; the interest-conditioned extraction pass and our semantic
->   canonicaliser (`compiler.mjs`/`canonicaliser.mjs`) are built + proven but **PARKED** — they still project into the
->   retired second graph, so re-pointing them onto LightRAG's own graph APIs is the next work-package (WP1.5), not a
->   surgical fix. FR-003/006/009/010 downgraded to 🟨 accordingly (see the GPT-001 section).
+> - **WP1 ✅ (incl. WP1.5 — GPT-001 closed, proven live).** Neo4JStorage cutover; Learn automatic
+>   (Cairn→learn-worker→§7.1→LightRAG→Neo4j) + health check. **WP1.5 rehome DONE on the ONE graph:** at the learn
+>   completion seam the fresh Honcho lens now (a) conditions the initial learn path — scoring every extracted entity
+>   for Warwick-relevance and deferring noise to a reservoir, (b) drives a lens-DIRECTED second extraction over the
+>   faithful-clean source (FR-006), and (c) conservatively canonicalises via LightRAG's OWN graph APIs
+>   (`mergeEntities`/`createRelation`/`createEntity`) with the full FR-010 outcome set. Proven E2E on graph-agents:
+>   deterministic-alias merges collapsed duplicates (`Agent`→`Agents`, `Embeddings`→`Embedding`), 5 typed
+>   relationships added (edges 1358→1363), 4 borderline HELD — no second graph, no bad welds. Auto-merge policy:
+>   deterministic aliases + ≥0.98 identity only; 0.85–0.979 held for review.
 > - **WP2 ✅ (bar 1 human dep)** Honcho lane (verbatim) + hardened outbox + MS Graph email adapter;
 >   **needs Warwick: mailbox account + one-time OAuth** to finish email E2E.
 > - **WP3 ✅** interest-lens management (surface + edit + feed Honcho).
@@ -61,14 +64,14 @@ historical log entry.)_
 |---|---|---|---|---|
 | FR-001 | Full transcript ingestion | reuse (TubeAIR) / WP1 | e2e: real URL → full transcript retained | ✅ full faithful-clean §7.1 ingested (no cap; min-length guard only) |
 | FR-002 | Durable source identity | reuse (video_id) / WP1 | resubmit same URL → no dup source | ✅ |
-| FR-003 | Evolving Honcho lens (fresh per run) | WP1 | lens fetched + recorded per run | 🟨 lens built fresh + used in re-analysis/WP5/FR-029; NOT yet during initial ingest extraction (WP1.5) |
+| FR-003 | Evolving Honcho lens (fresh per run) | WP1 | lens fetched + recorded per run | ✅ WP1.5: fresh lens conditions the initial learn path (proven live) |
 | FR-004 | Interest horizons (enduring/active/emerging/…) | WP1/WP3 | lens record has all horizons | ✅ |
 | FR-005 | Broad discovery pass | WP1 | important concept captured w/ no lens match | ✅ |
-| FR-006 | Interest-conditioned pass | WP1 | lens-steered deeper extraction observed | 🟨 built (compiler) but PARKED; live spine uses LightRAG native extraction — rehome = WP1.5 |
+| FR-006 | Interest-conditioned pass | WP1 | lens-steered deeper extraction observed | ✅ WP1.5 lens-DIRECTED second pass over faithful-clean source (proven live) |
 | FR-007 | Expanding semantic scope | WP4 | wider lens → more captured on re-run | 🟨 mechanism proven single-source; sustained multi-source pending |
 | FR-008 | Emerging-interest discovery | WP1/WP4 | out-of-lens concept offered as emerging | ✅ |
-| FR-009 | Semantic entity search before create | WP1 | candidate matched vs existing by embedding+graph | 🟨 canonicaliser built but PARKED (writes 2nd graph); live spine relies on LightRAG's own merge — rehome = WP1.5 |
-| FR-010 | Multi-outcome canonicalisation | WP1 | all 10 classifications exercised | 🟨 canonicaliser SAME/ALIAS/BROADER reasoning built + unit-proven but PARKED off the live spine — rehome = WP1.5 |
+| FR-009 | Semantic entity search before create | WP1 | candidate matched vs existing by embedding+graph | ✅ WP1.5 classifyOneGraph matches vs authoritative graph before merge/relate/add (proven live) |
+| FR-010 | Multi-outcome canonicalisation | WP1 | all 10 classifications exercised | ✅ WP1.5 full set on one graph; SAME/ALIAS→merge, BROADER/NARROWER/RELATED/SUPPORTS→typed edge, held/kept (proven live) |
 | FR-011 | Canonical concept identity | WP0/WP1 | node carries full canonical record | ✅ |
 | FR-012 | Source-preserving aliases | WP1 | original wording retained on merge | ✅ |
 | FR-013 | Duplicate prevention | WP1 | phrasing variants → one node | ✅ |
@@ -101,10 +104,10 @@ historical log entry.)_
 | 1 | Telegram→transcript ingestion | reuse/WP1 | 🟨 pipeline proven; Telegram front door built, unrun (H1 token) |
 | 2 | Fresh Honcho lens generation | WP1 | ✅ |
 | 3 | Broad semantic discovery | WP1 | ✅ |
-| 4 | Interest-conditioned analysis | WP1 | 🟨 built but parked off live spine (GPT-001 → WP1.5) |
+| 4 | Interest-conditioned analysis | WP1 | ✅ WP1.5 lens conditions initial learn + directed pass (proven live) |
 | 5 | Adjacent/emerging interests identified | WP1/WP4 | ✅ |
-| 6 | Semantic match vs existing concepts | WP1 | 🟨 canonicaliser parked off live spine (GPT-001 → WP1.5) |
-| 7 | All classification outcomes | WP1 | 🟨 canonicaliser outcomes unit-proven but parked off live spine (GPT-001 → WP1.5) |
+| 6 | Semantic match vs existing concepts | WP1 | ✅ WP1.5 matches vs authoritative graph (proven live) |
+| 7 | All classification outcomes | WP1 | ✅ WP1.5 full FR-010 outcome set applied on one graph (proven live) |
 | 8 | Duplicate-resistant Neo4j updates | WP1 | ✅ |
 | 9 | Provenance on every node/edge | WP1 | ✅ |
 | 10 | LightRAG retrieval across sources | WP6 | ✅ live `brain_ask` grounded + refs |
@@ -138,11 +141,41 @@ buckets that are **not** finishable by more coding right now:
   (reprocess/replace is proven; a disaster-recovery rebuild is a resilience exercise). Warwick already has working
   control via the interest CLI, the report decision actions, and the cockpit.
 
-**Conclusion:** the retrieval/governance/compounding/report Brain is functionally complete and proven, but the
-first-build exit bar is **not** fully met: beyond (a) one human OAuth step and (b) sustained multi-source
-compounding (a usage outcome), independent review surfaced (c) **GPT-001** — the live ingest spine does not yet run
-the interest-conditioned extraction + semantic canonicaliser (they are built but parked off the one graph). (c) is
-the next work-package (WP1.5), not a surgical fix.
+**Conclusion:** the Brain is functionally complete and proven, **including WP1.5 (GPT-001 closed, proven live on the
+one graph — see the WP1.5 section below).** The remaining first-build items are only (a) one human OAuth step
+(email) and (b) sustained multi-source compounding — a lived-use outcome as Warwick's interests genuinely evolve,
+not a build task.
+
+## WP1.5 — lens-conditioning + one-graph canonicalisation (GPT-001 close, proven live 2026-07-25)
+
+The rehome GPT-001 required, built onto the **one authoritative LightRAG→Neo4j graph** (no OwaiConcept, no second
+graph). Runs at the learn completion seam (`reconcileLearn`, on LightRAG `processed`), so the fresh Honcho lens
+conditions the **initial** learn path. Machinery: `learnEnrich.mjs` (`enrichSource`, `classifyOneGraph`,
+`planAction`, `extractLensDirected`), migrations 0010/0011, wired into `learnIngest.reconcileLearn`.
+
+**Three gaps GPT flagged — all closed:**
+1. *Lens is directive, not just a scorer.* A second **lens-directed extraction** (`extractLensDirected`) over the
+   faithful-clean source surfaces relevant concepts the broad pass under-noticed and feeds them through the same
+   one-graph canonicalisation (NEW+relevant → added with provenance). Broad discovery is untouched — this is added.
+2. *Failure ≠ done.* Enrichment is now **required** for a `done` Learn job; on failure the raw source stays
+   searchable but the job stays visibly `enrich_pending` + retriable (bounded to 5 attempts → visibly `failed`).
+3. *Full FR-010 outcome set on the one graph.* SAME/ALIAS → merge; BROADER/NARROWER/RELATED/SUPPORTS/CONTRADICTS/
+   SUPERSEDES → **typed relationship** (`IS_A` etc.); UNCERTAIN → held; NEW → kept/added.
+
+**Merge-safety policy (Warwick):** auto-merge ONLY deterministic aliases + genuinely corroborated identity ≥0.98;
+the model-assisted **0.85–0.979 band is HELD for review** ("a held concept is a 5-second review; a bad weld is
+forever"). Encoded in `planAction`, unit-proven.
+
+**Observe-then-apply proof (graph-agents-MUN1e, real source):**
+- Observe (no mutation) validated: 249 entities scored; **55 deferred** (Subscribe/Like/Jon Snow — noise, not
+  deleted); only deterministic aliases proposed for merge; every borderline pair became a typed relationship.
+- Live apply (conservative): `Agent`→`Agents` and `Embeddings`→`Embedding` **merged** (post-check:
+  `entityExists`=false for the collapsed forms, true for the canonical); **5 typed relationships added** (edges
+  1358→1363); **4 borderline HELD**; 0 welds. All on the one graph.
+- Full ledger provenance in `obsidiwikai.wp15_*` (relevance scores, per-pass canonicalisation decisions, held items).
+
+**Verdict:** FR-003/006/009/010 + DoD #4/#6/#7 are ✅ **earned on the live spine**. Held items are durably recorded
+for Warwick's review (a Directus surface for them is a nice-to-have, not a gap). WP1/WP1.5 complete.
 
 ## Review round 1 — Fable + GPT independent QA (2026-07-24)
 

@@ -1,6 +1,34 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { planAction, readAuthoritativeGraph, extractLensDirected, ENRICH_LIMITS } from './learnEnrich.mjs';
+import { planAction, readAuthoritativeGraph, extractLensDirected, relationEndpoints, deterministicMatch, ENRICH_LIMITS } from './learnEnrich.mjs';
+
+// Deterministic alias matching — the ONLY sub-0.98 auto-merge, so it must be tight.
+test('deterministicMatch: plural/punctuation aliases match on LONGER words', () => {
+  assert.equal(deterministicMatch('Agents', [{ name: 'Agent' }])?.kind, 'ALIAS_OF');
+  assert.equal(deterministicMatch('n8n', [{ name: 'N8N' }])?.kind, 'SAME_CONCEPT'); // case-only = same
+  assert.equal(deterministicMatch('Knowledge-Graph', [{ name: 'Knowledge Graph' }])?.kind, 'ALIAS_OF'); // punctuation-normalised alias
+});
+test('deterministicMatch: short acronyms are NOT plural-collided (no CSS↔CS false weld)', () => {
+  assert.equal(deterministicMatch('CSS', [{ name: 'CS' }]), null);
+  assert.equal(deterministicMatch('APIs', [{ name: 'AP' }]), null); // "APIs"→"api" ≠ "ap"
+});
+test('deterministicMatch: no match → null (falls through to the model classifier)', () => {
+  assert.equal(deterministicMatch('Neo4j', [{ name: 'LightRAG' }, { name: 'Honcho' }]), null);
+});
+
+// IS_A / typed-edge direction — narrower→broader. Regression guard for the direction bug the seam QA caught.
+test('relationEndpoints: BROADER_THAN points matched→candidate (narrower IS_A broader)', () => {
+  // "N8N BROADER_THAN N8N Workflow": N8N is broader → N8N Workflow IS_A N8N
+  assert.deepEqual(relationEndpoints('BROADER_THAN', 'N8N', 'N8N Workflow'), ['N8N Workflow', 'N8N']);
+});
+test('relationEndpoints: NARROWER_THAN points candidate→matched (narrower IS_A broader)', () => {
+  // "AI Agent NARROWER_THAN Agents": AI Agent is narrower → AI Agent IS_A Agents
+  assert.deepEqual(relationEndpoints('NARROWER_THAN', 'AI Agent', 'Agents'), ['AI Agent', 'Agents']);
+});
+test('relationEndpoints: RELATED/SUPPORTS read candidate→matched', () => {
+  assert.deepEqual(relationEndpoints('RELATED_TO', 'LightRAG', 'RAG Pipeline'), ['LightRAG', 'RAG Pipeline']);
+  assert.deepEqual(relationEndpoints('SUPPORTS', 'A', 'B'), ['A', 'B']);
+});
 
 const FAKE_LENS = { enduring: [], active: ['knowledge graphs'], emerging: [], goals: [], negative_signals: [] };
 

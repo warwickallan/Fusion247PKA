@@ -34,12 +34,24 @@ const REL_TYPE = {
   SUPERSEDES: 'SUPERSEDES',
 };
 
+// Directed endpoints for a typed relationship. IS_A points narrower→broader. For BROADER_THAN the
+// candidate IS the broader concept, so the (narrower) matched entity IS_A the candidate → [matched,
+// candidate]. Everything else (NARROWER/RELATED/SUPPORTS/SUPERSEDES/CONTRADICTS) reads candidate→matched.
+export function relationEndpoints(classification, candidateName, matchedName) {
+  return classification === 'BROADER_THAN' ? [matchedName, candidateName] : [candidateName, matchedName];
+}
+
 const norm = (s) => String(s || '').trim().toLowerCase();
-const canonKey = (s) => norm(s).replace(/[^a-z0-9]+/g, '').replace(/s$/, ''); // strip punct + trailing plural
+// Strip punctuation, and a trailing plural 's' ONLY on longer words — never on short acronyms, so
+// 'CSS'→'css' does not collide with 'CS'→'cs' (that would be a false auto-merge with no review).
+const canonKey = (s) => {
+  const k = norm(s).replace(/[^a-z0-9]+/g, '');
+  return k.length > 3 ? k.replace(/s$/, '') : k;
+};
 
 // A DETERMINISTIC alias — same name, or same after stripping punctuation/plurals. No model judgement,
 // so it is always safe to auto-merge (this is the only non-≥0.98 auto-merge Warwick allows).
-function deterministicMatch(name, catalog) {
+export function deterministicMatch(name, catalog) {
   const key = norm(name);
   const exact = catalog.find((e) => norm(e.name) === key);
   if (exact) return { entity: exact, kind: 'SAME_CONCEPT' };
@@ -134,10 +146,9 @@ async function canonicaliseCandidate(candidate, { catalog, client, limits, apply
       if (apply) await client.mergeEntities([candidate.name], decision.matched_name);
       action = 'merged';
     } else if (plan === 'relate') {
-      // FR-010: a TYPED relationship, NOT a merge. NARROWER reverses direction (matched IS_A candidate).
+      // FR-010: a TYPED relationship, NOT a merge, with the correct direction (see relationEndpoints).
       const relType = REL_TYPE[decision.classification] || 'RELATED_TO';
-      const [src, tgt] = decision.classification === 'NARROWER_THAN'
-        ? [decision.matched_name, candidate.name] : [candidate.name, decision.matched_name];
+      const [src, tgt] = relationEndpoints(decision.classification, candidate.name, decision.matched_name);
       if (apply) await client.createRelation(src, tgt, {
         description: decision.rationale || `${relType} (WP1.5 lens canonicalisation)`, keywords: relType, weight: decision.confidence ?? 0,
       });
