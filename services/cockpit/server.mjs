@@ -6,6 +6,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { execSync } from 'node:child_process';
 import { q, w } from './db.mjs';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -13,6 +14,11 @@ const PUB = path.join(DIR, 'public');
 const PORT = Number(process.env.COCKPIT_PORT || 8090);
 const BIND = process.env.COCKPIT_BIND || '127.0.0.1'; // localhost; Tailscale serve exposes it tailnet-only over HTTPS (matches Directus)
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml', '.ico': 'image/x-icon' };
+
+// Build identity so the app can show "you're on the latest" and tell itself apart from Directus/old URLs.
+let SHA = 'dev'; try { SHA = execSync('git rev-parse --short HEAD', { cwd: DIR }).toString().trim(); } catch { /* not a repo */ }
+let VERSION = '0.0.0'; try { VERSION = JSON.parse(fs.readFileSync(path.join(DIR, 'package.json'), 'utf8')).version; } catch { /* no pkg */ }
+const BUILD = { version: VERSION, sha: SHA, startedAt: new Date().toISOString() };
 
 // Governed intent queues the surface may file into, with their allowlisted payload columns.
 const INTENTS = {
@@ -43,7 +49,7 @@ async function apiState() {
   const ingestedCount = await safe(`select count(*)::int n from cockpit.youtube_source`);
   const wins = await safe(`select id, text, happened_at from cockpit.movement order by happened_at desc nulls last limit 8`);
   const builds = await safe(`select id, name, gives, status, status_tone, progress_pct, sort from cockpit.build order by sort nulls last limit 50`);
-  return { attention, outputs, archived, ingested, ingestedCount: ingestedCount[0]?.n ?? ingested.length, wins, builds, at: new Date().toISOString() };
+  return { attention, outputs, archived, ingested, ingestedCount: ingestedCount[0]?.n ?? ingested.length, wins, builds, build: BUILD, at: new Date().toISOString() };
 }
 
 // One decision endpoint for the whole lifecycle: accept (fires the real governed action + records
@@ -85,7 +91,7 @@ const server = http.createServer(async (req, res) => {
       req.on('end', async () => { try { j(res, 200, await apiDecide(JSON.parse(raw || '{}'))); } catch (e) { j(res, 500, { ok: false, error: e.message }); } });
       return;
     }
-    if (req.url.startsWith('/api/health')) return j(res, 200, { status: 'ok' });
+    if (req.url.startsWith('/api/health')) return j(res, 200, { status: 'ok', build: BUILD });
     return serveStatic(req, res);
   } catch (e) { j(res, 500, { ok: false, error: e.message }); }
 });

@@ -36,6 +36,15 @@ function humanValue(v) {
   }
   return s;
 }
+// Hybrid readable outputs: the "so what" points rendered in-app as a list; the full deep read stays a link.
+function humanPoints(v) {
+  if (!v) return [];
+  const s = String(v).trim();
+  if (s.startsWith('{') || s.startsWith('[')) {
+    try { const j = JSON.parse(s); if (Array.isArray(j.relevant)) return j.relevant.map((r) => r && r.why).filter(Boolean); } catch (e) { /* not our shape */ }
+  }
+  return [];
+}
 // Collapse duplicate projections of the same source into one card (belt-and-braces to the projector fix).
 function dedupe(list) {
   const seen = new Map();
@@ -75,6 +84,9 @@ createApp({
     const buildAttn = computed(() => activeAttn.value.filter((i) => kindOf(i) !== 'blocked' && laneOf(i) === 'build').sort(byKind));
 
     const archived = computed(() => state.value.archived || []);
+    const build = computed(() => state.value.build || { version: '?', sha: '?', startedAt: null });
+    const host = (typeof window !== 'undefined' && window.location) ? window.location.host : '';
+    const when = (ts) => (ts ? new Date(ts).toLocaleString('en-GB') : '—');
     const outputs = computed(() => dedupe(state.value.outputs || []));
     const newOutputs = computed(() => outputs.value.filter((o) => (o.status || 'new') === 'new').length);
     const itemsAdded = computed(() => outputs.value
@@ -124,7 +136,7 @@ createApp({
 
     return {
       AREAS, state, area, detail, busy, loading,
-      kindOf, catLabel, moduleLabel, oneLine, ago, humanValue, notifyMark,
+      kindOf, catLabel, moduleLabel, oneLine, ago, humanValue, humanPoints, notifyMark, build, host, when,
       attn, deferred, archived, blocked, decisions, suggestions, lifeAttn, buildAttn, toneOf, laneOf,
       outputs, newOutputs, itemsAdded, jobsFound, wins, builds,
       statusTone, statusLine, tiles, go, open, closeDetail, decide, primaryAction, load, REPORT, GRAPH,
@@ -143,6 +155,7 @@ createApp({
     <header class="topbar">
       <div class="brand"><span class="dot" :class="{red: statusTone==='red'}"></span> Fusion247</div>
       <div class="status-mini" :class="{red: statusTone==='red'}">{{ statusLine }}</div>
+      <button class="refresh" @click="go('settings')" title="Settings">⚙</button>
       <button class="refresh" @click="load" :disabled="loading">{{ loading ? '…' : '↻' }}</button>
     </header>
 
@@ -245,6 +258,17 @@ createApp({
         </div>
       </section>
 
+      <!-- SETTINGS (version — so you know you're on the latest, and which thing you're looking at) -->
+      <section v-else-if="area==='settings'" class="pane">
+        <header class="p-h"><button class="back" style="padding:0;margin-right:4px" @click="go('home')">‹</button><h1>Settings</h1></header>
+        <div class="grp">
+          <h2>This app</h2>
+          <div class="item green"><div class="i-main"><div class="i-title">Fusion247 Cockpit — v{{ build.version }}</div><div class="i-why">build {{ build.sha }} · live since {{ when(build.startedAt) }}</div></div></div>
+          <div class="item grey"><div class="i-main"><div class="i-title">You're on the standalone Cockpit ✅</div><div class="i-why">{{ host }} — the https tailnet app (not Directus, not the old IP link)</div></div></div>
+          <div class="item grey"><div class="i-main"><div class="i-title">On the latest?</div><div class="i-why">Reload the app — if the build code above changes, you've picked up a newer version.</div></div></div>
+        </div>
+      </section>
+
       <!-- SYSTEM -->
       <section v-else class="pane">
         <header class="p-h"><h1>Builds &amp; System</h1></header>
@@ -270,7 +294,8 @@ createApp({
       <h1>{{ detail.title }}</h1>
 
       <template v-if="detail._as==='output'">
-        <div v-if="humanValue(detail.value)" class="read">{{ humanValue(detail.value) }}</div>
+        <ul v-if="humanPoints(detail.value).length" class="read"><li v-for="(p,i) in humanPoints(detail.value)" :key="i">{{ p }}</li></ul>
+        <div v-else-if="humanValue(detail.value)" class="read">{{ humanValue(detail.value) }}</div>
         <div v-else class="d-reason">A result was produced — open the full read below.</div>
         <div class="d-links">
           <a v-if="detail.evidence_url" :href="detail.evidence_url" target="_blank" rel="noopener">📄 Open the full read ↗</a>
