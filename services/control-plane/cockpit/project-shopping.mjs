@@ -37,30 +37,28 @@ async function upsertOutput(r) {
 
 const attnKeys = [];
 
-// 1) Alternatives awaiting Warwick's choice → decision
-const alts = (await c.query(
-  `select pa.id, pa.alternative_name, pa.price, li.item_name
-   from asdair.product_alternatives pa join asdair.shopping_list_items li on li.id = pa.list_item_id
-   where coalesce(pa.chosen,false) = false`,
+// ONE decisive card per item that needs Warwick — an item lands here if it is flagged needs_decision
+// OR it has an unchosen alternative. The suggested swap is FOLDED INTO the same card (no second
+// "choose an alternative" card for the same item). Keyed by item id, so it can never duplicate.
+const items = (await c.query(
+  `select li.id, li.item_name, li.status, li.note,
+          (select json_agg(json_build_object('name', pa.alternative_name, 'price', pa.price) order by pa.price nulls last)
+           from asdair.product_alternatives pa
+           where pa.list_item_id = li.id and coalesce(pa.chosen,false) = false) as alts
+   from asdair.shopping_list_items li
+   where li.status = 'needs_decision'
+      or exists (select 1 from asdair.product_alternatives pa
+                 where pa.list_item_id = li.id and coalesce(pa.chosen,false) = false)`,
 )).rows;
-for (const a of alts) {
-  const key = 'alt:' + a.id; attnKeys.push(key);
+for (const it of items) {
+  const key = 'item:' + it.id; attnKeys.push(key);
+  const alt = (it.alts && it.alts[0]) || null;
+  const rec = alt ? `Suggested swap: ${alt.name}${alt.price ? ` (£${alt.price})` : ''}.` : null;
+  const why = it.note || (it.status === 'needs_decision' ? "The usual pick isn't available." : 'Waiting on your call before it goes in the basket.');
   await upsertAttention({
-    source_type: 'shopping_alternative', source_key: key,
-    title: `Choose an alternative for "${a.item_name}"`,
-    reason: `Suggested: ${a.alternative_name}${a.price ? ` at £${a.price}` : ''} — or keep the original.`,
-    provenance_ref: 'asdair:product_alternative:' + a.id, detail_route: '/shopping/alt/' + a.id,
-  });
-}
-
-// 2) Items needing a decision → decision
-const nd = (await c.query(`select id, item_name, note from asdair.shopping_list_items where status = 'needs_decision'`)).rows;
-for (const it of nd) {
-  const key = 'needdec:' + it.id; attnKeys.push(key);
-  await upsertAttention({
-    source_type: 'shopping_needs_decision', source_key: key,
-    title: `Decide on "${it.item_name}"`,
-    reason: it.note || 'This item needs your decision before the order goes through.',
+    source_type: 'shopping_decision', source_key: key,
+    title: `Sort "${it.item_name}"`,
+    reason: rec ? `${why} ${rec} — or keep looking.` : why,
     provenance_ref: 'asdair:list_item:' + it.id, detail_route: '/shopping/item/' + it.id,
   });
 }
@@ -90,5 +88,5 @@ await c.query(
   [attnKeys],
 );
 
-console.log(JSON.stringify({ ok: true, attention: { alternatives: alts.length, needs_decision: nd.length, total_open: attnKeys.length }, output: { lists_with_items_added: outN } }, null, 2));
+console.log(JSON.stringify({ ok: true, attention: { decisions: items.length, total_open: attnKeys.length }, output: { lists_with_items_added: outN } }, null, 2));
 await c.end();

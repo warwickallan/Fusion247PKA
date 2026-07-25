@@ -42,29 +42,35 @@
           </div>
         </section>
 
-        <!-- ===== LEVEL 2: ATTENTION (grouped by real category) ===== -->
+        <!-- ===== LEVEL 2: ATTENTION (Life vs Build lanes; blockers always on top) ===== -->
         <section v-else-if="area === 'attention'" class="pane">
           <header class="p-h"><h1>Attention</h1></header>
+
+          <!-- Blockers are rare + loud: always above the lanes -->
           <div class="grp" v-if="blocked.length">
-            <h2>Blocked by you<span class="g-count">{{ blocked.length }}</span></h2>
+            <h2>🔴 Blocked by you<span class="g-count">{{ blocked.length }}</span></h2>
             <div v-for="it in blocked" :key="it.id" class="item red">
-              <div class="i-main tap" @click="open(it, 'attention')"><div class="i-title">{{ it.title }}</div><div v-if="it.reason" class="i-why">{{ oneLine(it.reason) }}</div></div>
+              <div class="i-main tap" @click="open(it, 'attention')"><div class="i-eyebrow blocked">Blocked by you</div><div class="i-title">{{ it.title }}</div><div v-if="it.reason" class="i-why">{{ oneLine(it.reason) }}</div></div>
               <div class="i-act"><span v-if="it._done" class="done-pill sm">✅ {{ it._done }}</span><template v-else><button v-for="ax in it.actions" :key="ax.key" class="act sm" :class="ax.key" :disabled="busy" @click.stop="doAction(it, ax)">{{ ax.label }}</button></template></div>
             </div>
           </div>
-          <div class="grp">
-            <h2>Decisions<span class="g-count">{{ decisions.length }}</span></h2>
-            <div v-if="!decisions.length" class="empty">No decisions waiting.</div>
-            <div v-for="it in decisions" :key="it.id" class="item amber">
-              <div class="i-main tap" @click="open(it, 'attention')"><div class="i-title">{{ it.title }}</div><div v-if="it.reason" class="i-why">{{ oneLine(it.reason) }}</div></div>
+
+          <!-- LIFE: quick domestic/personal calls -->
+          <div class="grp lane">
+            <h2>🏡 Life<span class="g-count">{{ lifeAttn.length }}</span><span class="lane-sub">seconds each</span></h2>
+            <div v-if="!lifeAttn.length" class="empty">Nothing on the home front.</div>
+            <div v-for="it in lifeAttn" :key="it.id" class="item" :class="toneOf(it)">
+              <div class="i-main tap" @click="open(it, 'attention')"><div class="i-eyebrow" :class="kindOf(it)">{{ catLabel(it) }}</div><div class="i-title">{{ it.title }}</div><div v-if="it.reason" class="i-why">{{ oneLine(it.reason) }}</div></div>
               <div class="i-act"><span v-if="it._done" class="done-pill sm">✅ {{ it._done }}</span><template v-else><button v-for="ax in it.actions" :key="ax.key" class="act sm" :class="ax.key" :disabled="busy" @click.stop="doAction(it, ax)">{{ ax.label }}</button></template></div>
             </div>
           </div>
-          <div class="grp">
-            <h2>Suggestions<span class="g-count">{{ suggestions.length }}</span></h2>
-            <div v-if="!suggestions.length" class="empty">No suggestions right now.</div>
-            <div v-for="it in suggestions" :key="it.id" class="item blue">
-              <div class="i-main tap" @click="open(it, 'attention')"><div class="i-title">{{ it.title }}</div><div v-if="it.reason" class="i-why">{{ oneLine(it.reason) }}</div></div>
+
+          <!-- BUILD: architecture/knowledge — a proper thinking block, not urgent -->
+          <div class="grp lane">
+            <h2>🛠 Build<span class="g-count">{{ buildAttn.length }}</span><span class="lane-sub">for a thinking block</span></h2>
+            <div v-if="!buildAttn.length" class="empty">Nothing needs your head right now.</div>
+            <div v-for="it in buildAttn" :key="it.id" class="item" :class="toneOf(it)">
+              <div class="i-main tap" @click="open(it, 'attention')"><div class="i-eyebrow" :class="kindOf(it)">{{ catLabel(it) }}</div><div class="i-title">{{ it.title }}</div><div v-if="it.reason" class="i-why">{{ oneLine(it.reason) }}</div></div>
               <div class="i-act"><span v-if="it._done" class="done-pill sm">✅ {{ it._done }}</span><template v-else><button v-for="ax in it.actions" :key="ax.key" class="act sm" :class="ax.key" :disabled="busy" @click.stop="doAction(it, ax)">{{ ax.label }}</button></template></div>
             </div>
           </div>
@@ -146,9 +152,19 @@ export default {
     const blocked = computed(() => attention.value.filter((i) => kindOf(i) === 'blocked'));
     const decisions = computed(() => attention.value.filter((i) => kindOf(i) === 'decision'));
     const suggestions = computed(() => attention.value.filter((i) => kindOf(i) === 'suggestion'));
+    // Two lanes so domestic 10-second calls don't thrash against architecture questions.
+    const LIFE = new Set(['shopping', 'asdair', 'careerair']);
+    const laneOf = (it) => (LIFE.has(it.source_module) ? 'life' : 'build');
+    const toneOf = (it) => ({ blocked: 'red', decision: 'amber', suggestion: 'blue' }[kindOf(it)] || 'blue');
+    const kRank = { blocked: 0, decision: 1, suggestion: 2 };
+    const byKind = (a, b) => (kRank[kindOf(a)] ?? 9) - (kRank[kindOf(b)] ?? 9);
+    const lifeAttn = computed(() => attention.value.filter((i) => kindOf(i) !== 'blocked' && laneOf(i) === 'life').sort(byKind));
+    const buildAttn = computed(() => attention.value.filter((i) => kindOf(i) !== 'blocked' && laneOf(i) === 'build').sort(byKind));
     const makeBetter = computed(() => attention.value.filter((i) => i.source_type === 'system_improvement'));
     const newOutputs = computed(() => outputs.value.filter((o) => o.status === 'new').length);
-    const itemsAdded = computed(() => outputs.value.filter((o) => o.source_module === 'shopping').length);
+    const itemsAdded = computed(() => outputs.value
+      .filter((o) => o.source_module === 'shopping' && o.source_type === 'items_added')
+      .reduce((n, o) => { const m = String(o.title || '').match(/^\s*(\d+)/); return n + (m ? Number(m[1]) : 1); }, 0));
     const jobsFound = computed(() => outputs.value.filter((o) => o.source_module === 'careerair').length);
 
     const statusTone = computed(() => (blocked.value.length ? 'red' : 'green'));
@@ -205,6 +221,7 @@ export default {
 
     return { areas, area, detail, busy, attention, outputs, builds, learned, wins, live, reportUrl, graphUrl,
       blocked, decisions, suggestions, makeBetter, tiles, statusTone, statusLine,
+      lifeAttn, buildAttn, toneOf, kindOf,
       catLabel, moduleLabel, oneLine, ago, go, open, doAction };
   },
 };
@@ -249,6 +266,10 @@ export default {
 .tabs { margin-left:auto; display:flex; gap:10px; } .tab-link,.d-links a { color:var(--accent-ink); text-decoration:none; font-size:13px; font-weight:600; }
 .grp { margin-bottom:22px; } .grp h2 { display:flex; align-items:center; gap:9px; font-family:var(--mono); font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink2); font-weight:600; margin-bottom:11px; }
 .grp .g-count { font-size:11px; }
+.lane h2 { font-size:14px; letter-spacing:0; text-transform:none; color:var(--ink); font-weight:700; }
+.lane-sub { font-family:var(--v-font-family,system-ui,sans-serif); font-size:11px; letter-spacing:0; text-transform:none; color:var(--ink3); font-weight:500; margin-left:2px; }
+.i-eyebrow { font-family:var(--mono); font-size:9.5px; letter-spacing:.08em; text-transform:uppercase; font-weight:700; margin-bottom:3px; opacity:.85; }
+.i-eyebrow.decision { color:var(--warn); } .i-eyebrow.suggestion { color:var(--accent-ink); } .i-eyebrow.blocked { color:var(--stop); }
 .empty { color:var(--ink3); font-size:14px; padding:4px 2px; } .empty.big { padding:30px 6px; text-align:center; font-size:15px; }
 
 .item { display:flex; align-items:center; gap:12px; background:var(--panel); border:1px solid var(--hair); border-left:4px solid var(--park); border-radius:12px; padding:13px 15px; margin-bottom:9px; }

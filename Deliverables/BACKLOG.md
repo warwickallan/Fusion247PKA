@@ -32,3 +32,14 @@ chasing a tangent mid-flow (see the "challenge context-diluting requests" rule).
   item, approve over-budget) via the asdair command_request seam + a new allowlisted command in the asdair
   worker. Deliberately NOT done at the tail of a long session because it MUTATES live household shopping data —
   do it in a focused pass with proof-first. Shopping is already VISIBLE in the cockpit (read-only projection).
+
+## 💡 Cockpit UX (from Grok's cold-read of the screenshots, 2026-07-25)
+- **Outputs cards read passive.** The "so what" cards state an observation but don't carry a clear next
+  action or a strong "this matters because…". Give each output a recommended next step or a sharper stakes line.
+- **A "parked / later" state for Build-lane questions** so architectural decisions never sit in the same
+  urgency lane as "we're about to run out of toothpaste". (Life/Build lanes are the first cut of this; a real
+  defer state is the next.) Ties to notify_policy.
+- DONE in this pass: killed duplicate shopping cards (one decisive card per item, swap folded in); split
+  Attention into Life vs Build lanes (blockers stay loud on top).
+- The metric that matters (Grok): "how often do you clear the Attention list in under two minutes?" — worth
+  instrumenting once actions are wired.
