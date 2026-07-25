@@ -13,8 +13,11 @@
 >   deterministic-alias merges collapsed duplicates (`Agent`→`Agents`, `Embeddings`→`Embedding`), 5 typed
 >   relationships added (edges 1358→1363), 4 borderline HELD — no second graph, no bad welds. Auto-merge policy:
 >   deterministic aliases + ≥0.98 identity only; 0.85–0.979 held for review.
-> - **WP2 ✅ (bar 1 human dep)** Honcho lane (verbatim) + hardened outbox + MS Graph email adapter;
->   **needs Warwick: mailbox account + one-time OAuth** to finish email E2E.
+> - **WP2 ✅.** Honcho lane (verbatim) + hardened crash-safe outbox — proven. **Email ingestion DELIBERATELY
+>   DESCOPED from first build (2026-07-25):** the Microsoft Graph route needs an Entra tenant + Azure app
+>   registration — disproportionate for "forward Larry the occasional email". The intended path is a local
+>   Outlook-folder→watcher→Cairn bridge (a Yoga-on desktop-session convenience, Classic Outlook COM; not Graph, not
+>   24/7 infra), built if/when there's a real need. Not an unfinished Brain — a scoped-out nice-to-have.
 > - **WP3 ✅** interest-lens management (surface + edit + feed Honcho).
 > - **WP4 — mechanism ✅ / sustained-multi-source 🟨.** The compounding *mechanism* is proven: baselined
 >   graph-agents → a genuinely new *database-query-security* lens → re-analysis surfaced **exact** newly-visible
@@ -142,9 +145,9 @@ buckets that are **not** finishable by more coding right now:
   control via the interest CLI, the report decision actions, and the cockpit.
 
 **Conclusion:** the Brain is functionally complete and proven, **including WP1.5 (GPT-001 closed, proven live on the
-one graph — see the WP1.5 section below).** The remaining first-build items are only (a) one human OAuth step
-(email) and (b) sustained multi-source compounding — a lived-use outcome as Warwick's interests genuinely evolve,
-not a build task.
+one graph).** No human-dependency blocker remains: email ingestion is **deliberately descoped** (see WP2 above), so
+the only open item is (b) sustained multi-source compounding — a lived-use outcome as Warwick's interests genuinely
+evolve, not a build task.
 
 ## WP1.5 — lens-conditioning + one-graph canonicalisation (GPT-001 close, proven live 2026-07-25)
 
