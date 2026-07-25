@@ -54,6 +54,7 @@ function dedupe(list) {
 const notifyMark = (p) => (p === 'immediate' ? '🔔' : p === 'selective' ? '' : '');
 // Keep list cards terse — full prose lives behind the click (depth-ladder rule).
 const terse = (t, n = 66) => { const s = String(t || '').trim(); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
+const impactStars = (p) => ({ high: '★★★', medium: '★★', low: '★' }[p] || '★★');
 function humanizeSlug(s) {
   const parts = String(s || '').split(/[-_]/).filter(Boolean);
   if (parts.length > 1) { const last = parts[parts.length - 1]; if ((/[A-Z]/.test(last) && /[a-z0-9]/.test(last)) || (/[0-9]/.test(last) && last.length >= 4)) parts.pop(); }
@@ -98,6 +99,7 @@ createApp({
 
     const archived = computed(() => state.value.archived || []);
     const build = computed(() => state.value.build || { version: '?', sha: '?', startedAt: null });
+    const housekeeping = computed(() => state.value.housekeeping || 0);
     const host = (typeof window !== 'undefined' && window.location) ? window.location.host : '';
     const when = (ts) => (ts ? new Date(ts).toLocaleString('en-GB') : '—');
     const outputs = computed(() => dedupe(state.value.outputs || []));
@@ -159,7 +161,7 @@ createApp({
 
     return {
       AREAS, state, area, detail, busy, loading,
-      kindOf, catLabel, moduleLabel, oneLine, ago, terse, outputTitle, humanValue, humanPoints, notifyMark, build, host, when,
+      kindOf, catLabel, moduleLabel, oneLine, ago, terse, impactStars, outputTitle, humanValue, humanPoints, notifyMark, build, housekeeping, host, when,
       attn, deferred, archived, blocked, decisions, suggestions, lifeAttn, buildAttn, toneOf, laneOf,
       outputs, newOutputs, itemsAdded, jobsFound, wins, builds,
       statusTone, statusLine, tiles, go, open, closeDetail, decide, copyTranscript, primaryAction, load, REPORT, GRAPH,
@@ -222,7 +224,7 @@ createApp({
         <div class="grp" v-if="suggestions.length">
           <h2>💡 Suggestions<span class="g-count">{{ suggestions.length }}</span><span class="lane-sub">optional — worth a look</span></h2>
           <div v-for="it in suggestions" :key="it.id" class="item blue">
-            <div class="i-main" @click="open(it,'attention')"><div class="i-eyebrow">{{ moduleLabel(it.source_module) }}</div><div class="i-title">{{ terse(it.title) }}</div><div v-if="it.reason" class="i-why">{{ oneLine(it.reason) }}</div></div>
+            <div class="i-main" @click="open(it,'attention')"><div class="i-eyebrow">{{ moduleLabel(it.source_module) }} · <span style="color:var(--warn)">{{ impactStars(it.priority) }}</span> impact</div><div class="i-title">{{ terse(it.title) }}</div><div v-if="it.reason" class="i-why">{{ oneLine(it.reason) }}</div></div>
             <div class="i-act">
               <span v-if="it._done" class="done-pill">✅ {{ it._done }}</span>
               <template v-else>
@@ -261,8 +263,8 @@ createApp({
         <div class="tiles">
           <button class="tile grey"><span class="t-num">{{ state.ingestedCount ?? '—' }}</span><span class="t-lbl">Ingested</span><span class="t-desc">sources processed</span></button>
           <button class="tile green" @click="go('outputs')"><span class="t-num">{{ outputs.length }}</span><span class="t-lbl">Insights</span><span class="t-desc">so-what for you</span></button>
-          <button class="tile amber" @click="go('attention')"><span class="t-num">{{ decisions.length }}</span><span class="t-lbl">To review</span><span class="t-desc">held decisions</span></button>
           <button class="tile blue" @click="go('attention')"><span class="t-num">{{ suggestions.length }}</span><span class="t-lbl">Make better</span><span class="t-desc">brain ideas</span></button>
+          <button class="tile grey" title="graph merges I'm holding — not something you need to action"><span class="t-num">{{ housekeeping }}</span><span class="t-lbl">Housekeeping</span><span class="t-desc">graph Qs I'm holding</span></button>
         </div>
         <div class="tiles" style="margin-top:12px">
           <a class="tile blue" :href="GRAPH" target="_blank" rel="noopener" style="text-decoration:none"><span class="t-num">🌌</span><span class="t-lbl">Galaxy</span><span class="t-desc">explore the graph ↗</span></a>

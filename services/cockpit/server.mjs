@@ -33,11 +33,15 @@ async function safe(text, params) { try { return (await q(text, params)).rows; }
 
 async function apiState() {
   // Bring open + deferred (deferred feeds the "Later" section); declined/accepted/resolved drop out of active view.
+  // Held graph merges ("is X the same as Y?") are BRAIN HOUSEKEEPING, not Warwick's decisions — keep them
+  // out of Attention entirely (surfaced only as a low-key count under Brain).
   const attention = await safe(
     `select id, source_module, source_type, source_key, title, reason, priority, status, kind, notify_policy,
             actions, provenance_ref, related_ref, detail_route, updated_at
-     from cockpit.attention_item where status in ('open','deferred')
+     from cockpit.attention_item
+     where status in ('open','deferred') and source_type <> 'held_canonicalisation'
      order by (status='deferred'), case priority when 'high' then 0 when 'medium' then 1 else 2 end, updated_at desc`);
+  const housekeeping = (await safe(`select count(*)::int n from cockpit.attention_item where source_type='held_canonicalisation' and status='open'`))[0]?.n ?? 0;
   const outputs = await safe(
     `select id, source_module, source_type, source_key, title, value, status, produced_at,
             evidence_url, provenance_ref, related_ref, detail_route, notify_policy
@@ -51,7 +55,7 @@ async function apiState() {
   const ingestedCount = await safe(`select count(*)::int n from cockpit.youtube_source`);
   const wins = await safe(`select id, text, happened_at from cockpit.movement order by happened_at desc nulls last limit 8`);
   const builds = await safe(`select id, name, gives, status, status_tone, progress_pct, sort from cockpit.build order by sort nulls last limit 50`);
-  return { attention, outputs, archived, ingested, ingestedCount: ingestedCount[0]?.n ?? ingested.length, wins, builds, build: BUILD, at: new Date().toISOString() };
+  return { attention, outputs, archived, housekeeping, ingested, ingestedCount: ingestedCount[0]?.n ?? ingested.length, wins, builds, build: BUILD, at: new Date().toISOString() };
 }
 
 // One decision endpoint for the whole lifecycle: accept (fires the real governed action + records

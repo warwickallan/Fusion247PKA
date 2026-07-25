@@ -1,7 +1,7 @@
 // Fusion247 Cockpit service worker — makes it an installable app (home-screen icon, fullscreen,
 // offline shell). Shell is cache-first; live data (/api/*) is always network-first so the cockpit
 // never shows stale attention/outputs — it just fails soft when off the tailnet.
-const CACHE = 'f247-cockpit-v5';
+const CACHE = 'f247-cockpit-v6';
 const SHELL = ['/', '/index.html', '/app.js', '/styles.css', '/vendor/vue.global.prod.js', '/manifest.webmanifest', '/icon.svg'];
 
 self.addEventListener('install', (e) => {
