@@ -40,12 +40,14 @@ async function apiState() {
             actions, provenance_ref, related_ref, detail_route, updated_at
      from cockpit.attention_item
      where status in ('open','deferred') and source_type <> 'held_canonicalisation'
+       and source_module <> 'shopping'  -- AsdAIr parked until mum gets her own linked app
      order by (status='deferred'), case priority when 'high' then 0 when 'medium' then 1 else 2 end, updated_at desc`);
   const housekeeping = (await safe(`select count(*)::int n from cockpit.attention_item where source_type='held_canonicalisation' and status='open'`))[0]?.n ?? 0;
   const outputs = await safe(
     `select id, source_module, source_type, source_key, title, value, status, produced_at,
             evidence_url, provenance_ref, related_ref, detail_route, notify_policy
-     from cockpit.output_item where coalesce(status,'new') <> 'archived' order by produced_at desc nulls last limit 100`);
+     from cockpit.output_item where coalesce(status,'new') <> 'archived' and source_module <> 'shopping'
+     order by produced_at desc nulls last limit 100`);
   // Declined items live on in the Archive so a change of mind can always find + reopen them.
   const archived = await safe(
     `select id, source_module, source_type, source_key, title, reason, priority, status, kind,
