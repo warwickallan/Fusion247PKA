@@ -57,7 +57,7 @@ async function apiState() {
   const ingestedCount = await safe(`select count(*)::int n from cockpit.youtube_source`);
   const wins = await safe(`select id, text, happened_at from cockpit.movement order by happened_at desc nulls last limit 8`);
   const builds = await safe(`select id, name, gives, status, status_tone, progress_pct, sort from cockpit.build order by sort nulls last limit 50`);
-  return { attention, outputs, archived, housekeeping, ingested, ingestedCount: ingestedCount[0]?.n ?? ingested.length, wins, builds, build: BUILD, at: new Date().toISOString() };
+  return { attention, outputs, archived, housekeeping, deliverables: listDeliverables().slice(0, 20), ingested, ingestedCount: ingestedCount[0]?.n ?? ingested.length, wins, builds, build: BUILD, at: new Date().toISOString() };
 }
 
 // One decision endpoint for the whole lifecycle: accept (fires the real governed action + records
@@ -106,6 +106,27 @@ async function apiTranscript(video) {
   return { ok: true, video, title: rows[0].title, text: extractTranscript(md) };
 }
 
+// Deliverables = produced docs (Pax reports etc.) living in the repo's Deliverables/ folder — the synced
+// "things for Warwick to read". Listed newest-first with a human title from the first H1.
+function listDeliverables() {
+  const dir = path.join(REPO, 'Deliverables');
+  let names = [];
+  try { names = fs.readdirSync(dir).filter((f) => f.toLowerCase().endsWith('.md') && f.toUpperCase() !== 'BACKLOG.MD'); } catch { return []; }
+  return names.map((f) => {
+    const fp = path.join(dir, f); let st = null, title = f.replace(/\.md$/i, '');
+    try { st = fs.statSync(fp); const h = fs.readFileSync(fp, 'utf8').split(/\r?\n/).find((l) => /^#\s+/.test(l)); if (h) title = h.replace(/^#\s+/, '').trim(); } catch { /* skip */ }
+    return { file: f, title, mtime: st ? Math.round(st.mtimeMs) : 0 };
+  }).sort((a, b) => b.mtime - a.mtime);
+}
+async function apiDeliverable(file) {
+  const safe = path.basename(String(file || ''));
+  if (!safe.toLowerCase().endsWith('.md')) return { ok: false, error: 'not a document' };
+  const dir = path.join(REPO, 'Deliverables');
+  const fp = path.join(dir, safe);
+  if (!fp.startsWith(dir)) return { ok: false, error: 'path' };
+  try { return { ok: true, file: safe, text: fs.readFileSync(fp, 'utf8') }; } catch { return { ok: false, error: 'document missing' }; }
+}
+
 function serveStatic(req, res) {
   let rel = decodeURIComponent(req.url.split('?')[0]);
   if (rel === '/' || rel === '') rel = '/index.html';
@@ -127,6 +148,7 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     if (req.url.startsWith('/api/transcript')) { const v = new URL(req.url, 'http://x').searchParams.get('video'); return j(res, 200, await apiTranscript(v)); }
+    if (req.url.startsWith('/api/deliverable')) { const f = new URL(req.url, 'http://x').searchParams.get('file'); return j(res, 200, await apiDeliverable(f)); }
     if (req.url.startsWith('/api/health')) return j(res, 200, { status: 'ok', build: BUILD });
     return serveStatic(req, res);
   } catch (e) { j(res, 500, { ok: false, error: e.message }); }

@@ -45,6 +45,29 @@ function humanPoints(v) {
   }
   return [];
 }
+// Minimal, safe markdown → HTML for reading deliverables/docs inside the app (escape first, then format;
+// content is first-party so this is sufficient). Handles headings, bold, code, lists, quotes, links.
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function mdToHtml(md) {
+  const inline = (t) => t
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  let html = '', inList = false, inCode = false;
+  for (const raw of esc(md || '').split(/\r?\n/)) {
+    if (/^```/.test(raw)) { if (inCode) { html += '</pre>'; inCode = false; } else { if (inList) { html += '</ul>'; inList = false; } html += '<pre>'; inCode = true; } continue; }
+    if (inCode) { html += raw + '\n'; continue; }
+    if (/^\s*[-*]\s+/.test(raw)) { if (!inList) { html += '<ul>'; inList = true; } html += '<li>' + inline(raw.replace(/^\s*[-*]\s+/, '')) + '</li>'; continue; }
+    if (inList) { html += '</ul>'; inList = false; }
+    const h = raw.match(/^(#{1,4})\s+(.*)$/);
+    if (h) { const n = h[1].length; html += `<h${n}>${inline(h[2])}</h${n}>`; continue; }
+    if (/^\s*>/.test(raw)) { html += '<blockquote>' + inline(raw.replace(/^\s*>\s?/, '')) + '</blockquote>'; continue; }
+    if (raw.trim() === '') continue;
+    html += '<p>' + inline(raw) + '</p>';
+  }
+  if (inList) html += '</ul>'; if (inCode) html += '</pre>';
+  return html;
+}
 // SPIN detail for an idea — rendered if the generator has emitted structured fields; else fall back to the plain reason.
 function spinOf(it) {
   const r = it && it.reason;
@@ -165,6 +188,18 @@ createApp({
       } catch (e) { item._error = e.message; }
       finally { busy.value = false; }
     }
+    const deliverables = computed(() => state.value.deliverables || []);
+    function download(name, text) { const b = new Blob([text || ''], { type: 'text/markdown' }); const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(u); }
+    async function copyText(text) { try { await navigator.clipboard.writeText(text || ''); return true; } catch (e) { return false; } }
+    async function fetchDoc(file) { const r = await fetch('/api/deliverable?file=' + encodeURIComponent(file)); return r.json(); }
+    async function openDeliverable(d) {
+      detail.value = { _as: 'doc', title: d.title, file: d.file };
+      try { const j = await fetchDoc(d.file); if (!j.ok) throw new Error(j.error); if (detail.value && detail.value.file === d.file) detail.value = { _as: 'doc', title: d.title, file: d.file, text: j.text }; }
+      catch (e) { if (detail.value && detail.value.file === d.file) detail.value = { _as: 'doc', title: d.title, file: d.file, _error: e.message }; }
+    }
+    async function copyDoc(d) { const j = await fetchDoc(d.file); if (j.ok && await copyText(j.text)) { d._copied = true; setTimeout(() => { d._copied = false; }, 2000); } }
+    async function downloadDoc(d) { const j = await fetchDoc(d.file); if (j.ok) download(d.file, j.text); }
+    async function downloadTranscript(s) { try { const r = await fetch('/api/transcript?video=' + encodeURIComponent(s.video_id)); const j = await r.json(); if (j.ok) download((s.title || s.video_id) + '.txt', j.text); } catch (e) { s._copyErr = 'download failed'; } }
     async function copyTranscript(s) {
       s._copyErr = null;
       try {
@@ -181,7 +216,8 @@ createApp({
 
     return {
       AREAS, state, area, detail, busy, loading,
-      kindOf, catLabel, moduleLabel, oneLine, ago, terse, impactStars, outputTitle, humanValue, humanPoints, spinOf, notifyMark, build, housekeeping, host, when,
+      kindOf, catLabel, moduleLabel, oneLine, ago, terse, impactStars, outputTitle, humanValue, humanPoints, spinOf, mdToHtml, notifyMark, build, housekeeping, host, when,
+      deliverables, openDeliverable, copyDoc, downloadDoc, downloadTranscript, download, copyText,
       attn, deferred, archived, blocked, decisions, suggestions, needsYou, ideaCat, ideasBrain, ideasCash, latest, toneOf,
       outputs, newOutputs, itemsAdded, jobsFound, wins, builds,
       statusTone, statusLine, tiles, go, open, closeDetail, decide, copyTranscript, primaryAction, load, REPORT, GRAPH,
@@ -265,13 +301,35 @@ createApp({
         </div>
       </section>
 
-      <!-- OUTPUTS -->
+      <!-- OUTPUTS = Insights / Deliverables / Transcripts -->
       <section v-else-if="area==='outputs'" class="pane">
-        <header class="p-h"><h1>Outputs</h1><span class="count">{{ outputs.length }}</span></header>
-        <div v-if="!outputs.length" class="empty big">Nothing produced for you yet.</div>
-        <div v-for="o in outputs" :key="o.id" class="item green">
-          <div class="i-main" @click="open(o,'output')"><div class="i-eyebrow">{{ moduleLabel(o.source_module) }} · {{ ago(o.produced_at) }} ago</div><div class="i-title">{{ terse(outputTitle(o)) }}</div><div v-if="humanValue(o.value)" class="i-why">{{ oneLine(humanValue(o.value)) }}</div></div>
-          <div class="i-side"><span class="chev">›</span></div>
+        <header class="p-h"><h1>Outputs</h1></header>
+
+        <div class="grp">
+          <h2>💡 Insights<span class="g-count">{{ outputs.length }}</span><span class="lane-sub">so-what from the Brain</span></h2>
+          <div v-if="!outputs.length" class="empty">No insights yet.</div>
+          <div v-for="o in outputs.slice(0,5)" :key="o.id" class="item green">
+            <div class="i-main" @click="open(o,'output')"><div class="i-eyebrow">{{ moduleLabel(o.source_module) }} · {{ ago(o.produced_at) }} ago</div><div class="i-title">{{ terse(outputTitle(o)) }}</div><div v-if="humanValue(o.value)" class="i-why">{{ oneLine(humanValue(o.value)) }}</div></div>
+            <span class="chev">›</span>
+          </div>
+        </div>
+
+        <div class="grp">
+          <h2>📄 Deliverables<span class="g-count">{{ deliverables.length }}</span><span class="lane-sub">produced docs — read / copy / download</span></h2>
+          <div v-if="!deliverables.length" class="empty">No deliverables yet — dPax will drop them here.</div>
+          <div v-for="d in deliverables.slice(0,5)" :key="d.file" class="item grey">
+            <div class="i-main" @click="openDeliverable(d)"><div class="i-eyebrow">doc · {{ ago(d.mtime) }} ago</div><div class="i-title">{{ terse(d.title) }}</div></div>
+            <div class="i-act"><button class="act" :disabled="busy" @click.stop="copyDoc(d)">{{ d._copied ? '✓' : '⧉' }}</button><button class="act" @click.stop="downloadDoc(d)">⭳</button></div>
+          </div>
+        </div>
+
+        <div class="grp">
+          <h2>📝 Transcripts<span class="g-count">{{ (state.ingested||[]).length }}</span><span class="lane-sub">source text — copy / download</span></h2>
+          <div v-if="!(state.ingested||[]).length" class="empty">Nothing ingested yet.</div>
+          <div v-for="s in (state.ingested||[]).slice(0,5)" :key="s.video_id" class="item grey">
+            <div class="i-main"><div class="i-title">{{ terse(s.title || s.video_id) }}</div><div class="i-why" :class="{err:s._copyErr}">{{ s._copyErr ? s._copyErr : ('ingested ' + ago(s.updated_at) + ' ago') }}</div></div>
+            <div class="i-act"><button class="act" :disabled="busy" @click="copyTranscript(s)">{{ s._copied ? '✓' : '⧉' }}</button><button class="act" @click="downloadTranscript(s)">⭳</button></div>
+          </div>
         </div>
       </section>
 
@@ -344,10 +402,20 @@ createApp({
   <div v-if="detail" class="sheet" @click.self="closeDetail">
     <div class="sheet-card">
       <button class="back" @click="closeDetail">‹ Back</button>
-      <div class="d-eyebrow">{{ detail._as==='output' ? (moduleLabel(detail.source_module)+' · output') : catLabel(detail) }}</div>
+      <div class="d-eyebrow">{{ detail._as==='doc' ? 'Deliverable' : (detail._as==='output' ? (moduleLabel(detail.source_module)+' · output') : catLabel(detail)) }}</div>
       <h1>{{ detail._as==='output' ? outputTitle(detail) : detail.title }}</h1>
 
-      <template v-if="detail._as==='output'">
+      <template v-if="detail._as==='doc'">
+        <div v-if="detail._error" class="err">{{ detail._error }}</div>
+        <div v-else-if="detail.text" class="read" v-html="mdToHtml(detail.text)"></div>
+        <div v-else class="d-reason">Loading…</div>
+        <div class="d-actions" v-if="detail.text">
+          <button class="act" @click="copyText(detail.text)">⧉ Copy</button>
+          <button class="act" @click="download(detail.file, detail.text)">⭳ Download</button>
+        </div>
+      </template>
+
+      <template v-else-if="detail._as==='output'">
         <ul v-if="humanPoints(detail.value).length" class="read"><li v-for="(p,i) in humanPoints(detail.value)" :key="i">{{ p }}</li></ul>
         <div v-else-if="humanValue(detail.value)" class="read">{{ humanValue(detail.value) }}</div>
         <div v-else class="d-reason">A result was produced — open the full read below.</div>
