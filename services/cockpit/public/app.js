@@ -1,0 +1,293 @@
+/* Fusion247 Cockpit — the Warwick-facing surface. Reads /api/state (the spine, via cp_directus),
+   files decisions to /api/decide (governed intents + surface lifecycle). Depth ladder, Life/Build
+   lanes, decision lifecycle (accept/decline/defer + Archive + Later), readable outputs. No build step. */
+const { createApp, ref, computed, onMounted } = Vue;
+
+const REPORT = 'http://100.101.240.85:8701';
+const GRAPH = 'http://100.101.240.85:8700';
+const AREAS = [
+  { key: 'home', label: 'Home', icon: '🏠' },
+  { key: 'attention', label: 'Attention', icon: '🔔' },
+  { key: 'outputs', label: 'Outputs', icon: '📤' },
+  { key: 'brain', label: 'Brain', icon: '🧠' },
+  { key: 'system', label: 'System', icon: '🛠' },
+];
+
+const kindOf = (it) => it.kind || 'suggestion';
+const catLabel = (it) => ({ blocked: 'Blocked by you', decision: 'Decision', suggestion: 'Suggestion' }[kindOf(it)] || 'Output');
+const moduleLabel = (m) => ({ brain: 'Brain', shopping: 'Shopping', asdair: 'Shopping', builds: 'Builds', careerair: 'CareerAIr' }[m] || m || '');
+const oneLine = (t) => { if (!t) return ''; const s = String(t).split('\n')[0]; return s.length > 130 ? s.slice(0, 127) + '…' : s; };
+const ago = (ts) => { if (!ts) return ''; const d = (Date.now() - new Date(ts).getTime()) / 60000; if (d < 60) return `${Math.max(1, Math.round(d))}m`; if (d < 1440) return `${Math.round(d / 60)}h`; return `${Math.round(d / 1440)}d`; };
+
+// Outputs must read as human products, never raw JSON. Pull a sentence out of known shapes; if it's
+// machine detail we can't humanise, return null so the card falls back to its title and the JSON is
+// buried in L4 Technical only.
+function humanValue(v) {
+  if (!v) return '';
+  const s = String(v).trim();
+  if (s.startsWith('{') || s.startsWith('[')) {
+    try {
+      const j = JSON.parse(s);
+      if (Array.isArray(j.relevant)) { const w = j.relevant.map((r) => r && r.why).filter(Boolean); if (w.length) return w.join(' · '); }
+      if (j.why_it_matters) return j.why_it_matters;
+      if (j.why) return j.why; if (j.summary) return j.summary; if (j.so_what) return j.so_what;
+    } catch (e) { /* fall through */ }
+    return null;
+  }
+  return s;
+}
+// Collapse duplicate projections of the same source into one card (belt-and-braces to the projector fix).
+function dedupe(list) {
+  const seen = new Map();
+  for (const o of list) { const k = (o.source_module || '') + '|' + (o.provenance_ref || o.source_key || o.title); if (!seen.has(k)) seen.set(k, o); }
+  return [...seen.values()];
+}
+const notifyMark = (p) => (p === 'immediate' ? '🔔' : p === 'selective' ? '' : '');
+
+createApp({
+  setup() {
+    const state = ref({ attention: [], outputs: [], ingested: [], ingestedCount: 0, wins: [], builds: [] });
+    const area = ref('home');
+    const detail = ref(null);
+    const busy = ref(false);
+    const loading = ref(true);
+
+    async function load() {
+      loading.value = true;
+      try { const r = await fetch('/api/state', { cache: 'no-store' }); state.value = await r.json(); } catch (e) { /* keep last */ }
+      loading.value = false;
+    }
+    onMounted(load);
+
+    const attn = computed(() => state.value.attention || []);
+    const activeAttn = computed(() => attn.value.filter((i) => i.status !== 'deferred'));
+    const deferred = computed(() => attn.value.filter((i) => i.status === 'deferred'));
+    const blocked = computed(() => activeAttn.value.filter((i) => kindOf(i) === 'blocked'));
+    const decisions = computed(() => activeAttn.value.filter((i) => kindOf(i) === 'decision'));
+    const suggestions = computed(() => activeAttn.value.filter((i) => kindOf(i) === 'suggestion'));
+
+    const LIFE = new Set(['shopping', 'asdair', 'careerair']);
+    const laneOf = (it) => (LIFE.has(it.source_module) ? 'life' : 'build');
+    const toneOf = (it) => ({ blocked: 'red', decision: 'amber', suggestion: 'blue' }[kindOf(it)] || 'blue');
+    const kRank = { blocked: 0, decision: 1, suggestion: 2 };
+    const byKind = (a, b) => (kRank[kindOf(a)] ?? 9) - (kRank[kindOf(b)] ?? 9);
+    const lifeAttn = computed(() => activeAttn.value.filter((i) => kindOf(i) !== 'blocked' && laneOf(i) === 'life').sort(byKind));
+    const buildAttn = computed(() => activeAttn.value.filter((i) => kindOf(i) !== 'blocked' && laneOf(i) === 'build').sort(byKind));
+
+    const outputs = computed(() => dedupe(state.value.outputs || []));
+    const newOutputs = computed(() => outputs.value.filter((o) => (o.status || 'new') === 'new').length);
+    const itemsAdded = computed(() => outputs.value
+      .filter((o) => o.source_module === 'shopping' && o.source_type === 'items_added')
+      .reduce((n, o) => { const m = String(o.title || '').match(/^\s*(\d+)/); return n + (m ? Number(m[1]) : 1); }, 0));
+    const jobsFound = computed(() => outputs.value.filter((o) => o.source_module === 'careerair').length);
+    const wins = computed(() => state.value.wins || []);
+    const builds = computed(() => state.value.builds || []);
+
+    const blockedN = computed(() => blocked.value.length);
+    const statusTone = computed(() => (blockedN.value ? 'red' : 'green'));
+    const statusLine = computed(() => (blockedN.value ? `Blocked by you — ${blockedN.value} thing${blockedN.value > 1 ? 's' : ''}` : 'Building — nothing blocking me'));
+
+    const tiles = computed(() => {
+      const t = [];
+      if (blocked.value.length) t.push({ num: blocked.value.length, label: 'Blocked by you', desc: "I can't move without you", tone: 'red', area: 'attention' });
+      if (decisions.value.length) t.push({ num: decisions.value.length, label: 'Decisions', desc: 'a choice is waiting', tone: 'amber', area: 'attention' });
+      if (suggestions.value.length) t.push({ num: suggestions.value.length, label: 'Suggestions', desc: 'ideas to consider', tone: 'blue', area: 'attention' });
+      if (itemsAdded.value) t.push({ num: itemsAdded.value, label: 'Items added', desc: 'to your shopping', tone: 'green', area: 'outputs' });
+      if (jobsFound.value) t.push({ num: jobsFound.value, label: 'Jobs found', desc: 'worth a look', tone: 'green', area: 'outputs' });
+      if (newOutputs.value) t.push({ num: newOutputs.value, label: 'New outputs', desc: 'results for you', tone: 'green', area: 'outputs' });
+      if (wins.value.length) t.push({ num: wins.value.length, label: 'Recent wins', desc: 'just finished', tone: 'green', area: 'system' });
+      t.push({ num: state.value.ingestedCount ?? '—', label: 'Brain', desc: 'sources ingested', tone: 'grey', area: 'brain' });
+      return t;
+    });
+
+    const go = (k) => { detail.value = null; area.value = k; };
+    const open = (item, as) => { detail.value = { ...item, _as: as }; };
+    const closeDetail = () => { detail.value = null; };
+
+    async function decide(item, decision, ax) {
+      busy.value = true; item._error = null;
+      try {
+        const body = { id: item.id, decision };
+        if (decision === 'accept' && ax) { body.intent = ax.intent; body.args = ax.args; }
+        const r = await fetch('/api/decide', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+        const res = await r.json();
+        if (!res.ok) throw new Error(res.error || 'failed');
+        if (detail.value && detail.value.id === item.id) closeDetail();
+        await load();
+      } catch (e) { item._error = e.message; }
+      finally { busy.value = false; }
+    }
+    // Primary governed action for an item (accept fires it). Brain items carry explicit actions[]; if
+    // an item has a first action we treat Accept as "do it", else Accept is a plain acknowledge.
+    const primaryAction = (it) => (Array.isArray(it.actions) && it.actions.length ? it.actions.find((a) => a.key === 'accept' || a.key === 'merge') || it.actions[0] : null);
+
+    return {
+      AREAS, state, area, detail, busy, loading,
+      kindOf, catLabel, moduleLabel, oneLine, ago, humanValue, notifyMark,
+      attn, deferred, blocked, decisions, suggestions, lifeAttn, buildAttn, toneOf, laneOf,
+      outputs, newOutputs, itemsAdded, jobsFound, wins, builds,
+      statusTone, statusLine, tiles, go, open, closeDetail, decide, primaryAction, load, REPORT, GRAPH,
+    };
+  },
+  template: `
+<div class="app">
+  <nav class="nav">
+    <button v-for="a in AREAS" :key="a.key" class="nav-btn" :class="{on: area===a.key}" @click="go(a.key)">
+      <span class="nav-ico">{{ a.icon }}</span><span class="nav-lbl">{{ a.label }}</span>
+      <span v-if="a.key==='attention' && blocked.length" class="nav-badge">{{ blocked.length }}</span>
+    </button>
+  </nav>
+
+  <div class="shell-main">
+    <header class="topbar">
+      <div class="brand"><span class="dot" :class="{red: statusTone==='red'}"></span> Fusion247</div>
+      <div class="status-mini" :class="{red: statusTone==='red'}">{{ statusLine }}</div>
+      <button class="refresh" @click="load" :disabled="loading">{{ loading ? '…' : '↻' }}</button>
+    </header>
+
+    <main class="main">
+      <!-- HOME -->
+      <section v-if="area==='home'" class="pane">
+        <div class="status-line" :class="{red: statusTone==='red'}"><span>{{ statusTone==='red' ? '🔴' : '🟢' }}</span>{{ statusLine }}</div>
+        <div class="tiles">
+          <button v-for="t in tiles" :key="t.label" class="tile" :class="t.tone" @click="go(t.area)">
+            <span class="t-num">{{ t.num }}</span><span class="t-lbl">{{ t.label }}</span><span class="t-desc">{{ t.desc }}</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- ATTENTION -->
+      <section v-else-if="area==='attention'" class="pane">
+        <header class="p-h"><h1>Attention</h1></header>
+        <div class="grp" v-if="blocked.length">
+          <h2>🔴 Blocked by you<span class="g-count">{{ blocked.length }}</span></h2>
+          <div v-for="it in blocked" :key="it.id" class="item red">
+            <div class="i-main" @click="open(it,'attention')"><div class="i-eyebrow blocked">Blocked by you</div><div class="i-title">{{ it.title }}</div><div v-if="it.reason" class="i-why">{{ oneLine(it.reason) }}</div></div>
+            <div class="i-act"><span v-if="it._done" class="done-pill">✅ {{ it._done }}</span><template v-else><button v-for="ax in (it.actions||[])" :key="ax.key" class="act" :class="ax.key" :disabled="busy" @click.stop="decide(it,'accept',ax)">{{ ax.label }}</button></template></div>
+          </div>
+        </div>
+
+        <div class="grp">
+          <h2>🏡 Life<span class="g-count">{{ lifeAttn.length }}</span><span class="lane-sub">seconds each</span></h2>
+          <div v-if="!lifeAttn.length" class="empty">Nothing on the home front.</div>
+          <div v-for="it in lifeAttn" :key="it.id" class="item" :class="toneOf(it)">
+            <div class="i-main" @click="open(it,'attention')"><div class="i-eyebrow" :class="kindOf(it)">{{ catLabel(it) }}</div><div class="i-title">{{ it.title }}</div><div v-if="it.reason" class="i-why">{{ oneLine(it.reason) }}</div></div>
+            <div class="i-act">
+              <span v-if="it._done" class="done-pill">✅ {{ it._done }}</span>
+              <template v-else>
+                <button class="act accept" :disabled="busy" @click.stop="decide(it,'accept',primaryAction(it))">Accept</button>
+                <button class="act defer" :disabled="busy" @click.stop="decide(it,'defer')">Later</button>
+                <button class="act decline" :disabled="busy" @click.stop="decide(it,'decline')">Decline</button>
+              </template>
+            </div>
+          </div>
+        </div>
+
+        <div class="grp">
+          <h2>🛠 Build<span class="g-count">{{ buildAttn.length }}</span><span class="lane-sub">for a thinking block</span></h2>
+          <div v-if="!buildAttn.length" class="empty">Nothing needs your head right now.</div>
+          <div v-for="it in buildAttn" :key="it.id" class="item" :class="toneOf(it)">
+            <div class="i-main" @click="open(it,'attention')"><div class="i-eyebrow" :class="kindOf(it)">{{ catLabel(it) }}</div><div class="i-title">{{ it.title }}</div><div v-if="it.reason" class="i-why">{{ oneLine(it.reason) }}</div></div>
+            <div class="i-act">
+              <span v-if="it._done" class="done-pill">✅ {{ it._done }}</span>
+              <template v-else>
+                <button class="act accept" :disabled="busy" @click.stop="decide(it,'accept',primaryAction(it))">Accept</button>
+                <button class="act defer" :disabled="busy" @click.stop="decide(it,'defer')">Later</button>
+                <button class="act decline" :disabled="busy" @click.stop="decide(it,'decline')">Decline</button>
+              </template>
+            </div>
+          </div>
+        </div>
+
+        <div class="grp" v-if="deferred.length">
+          <h2>🕒 Later<span class="g-count">{{ deferred.length }}</span><span class="lane-sub">you parked these</span></h2>
+          <div v-for="it in deferred" :key="it.id" class="item deferred" :class="toneOf(it)">
+            <div class="i-main" @click="open(it,'attention')"><div class="i-title">{{ it.title }}</div></div>
+            <div class="i-act"><button class="act" :disabled="busy" @click.stop="decide(it,'reopen')">Bring back</button></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- OUTPUTS -->
+      <section v-else-if="area==='outputs'" class="pane">
+        <header class="p-h"><h1>Outputs</h1><span class="count">{{ outputs.length }}</span></header>
+        <div v-if="!outputs.length" class="empty big">Nothing produced for you yet.</div>
+        <div v-for="o in outputs" :key="o.id" class="item green">
+          <div class="i-main" @click="open(o,'output')"><div class="i-title">{{ o.title }}</div><div v-if="humanValue(o.value)" class="i-why">{{ oneLine(humanValue(o.value)) }}</div></div>
+          <div class="i-side"><span class="fresh">{{ ago(o.produced_at) }}</span><span class="chev">›</span></div>
+        </div>
+      </section>
+
+      <!-- BRAIN -->
+      <section v-else-if="area==='brain'" class="pane">
+        <header class="p-h"><h1>Brain</h1><div class="d-links" style="margin-left:auto"><a :href="REPORT" target="_blank" rel="noopener">Report ↗</a><a :href="GRAPH" target="_blank" rel="noopener">Galaxy ↗</a></div></header>
+        <div class="tiles">
+          <button class="tile grey"><span class="t-num">{{ state.ingestedCount ?? '—' }}</span><span class="t-lbl">Ingested</span><span class="t-desc">sources processed</span></button>
+          <button class="tile green" @click="go('outputs')"><span class="t-num">{{ outputs.length }}</span><span class="t-lbl">Insights</span><span class="t-desc">so-what for you</span></button>
+          <button class="tile amber" @click="go('attention')"><span class="t-num">{{ decisions.length }}</span><span class="t-lbl">To review</span><span class="t-desc">held decisions</span></button>
+          <button class="tile blue" @click="go('attention')"><span class="t-num">{{ suggestions.length }}</span><span class="t-lbl">Make better</span><span class="t-desc">brain ideas</span></button>
+        </div>
+        <div class="grp" style="margin-top:20px">
+          <h2>Recently ingested<span class="lane-sub">captured &amp; processed — not the same as "learned"</span></h2>
+          <div v-if="!(state.ingested||[]).length" class="empty">Nothing ingested yet.</div>
+          <div v-for="s in (state.ingested||[])" :key="s.video_id" class="item grey"><div class="i-main"><div class="i-title">{{ s.title || s.video_id }}</div><div class="i-why">ingested {{ ago(s.updated_at) }} ago</div></div></div>
+        </div>
+      </section>
+
+      <!-- SYSTEM -->
+      <section v-else class="pane">
+        <header class="p-h"><h1>Builds &amp; System</h1></header>
+        <div class="grp" v-if="wins.length"><h2>Recent wins<span class="g-count">{{ wins.length }}</span></h2>
+          <div v-for="wn in wins" :key="wn.id" class="item green"><div class="i-main"><div class="i-title">{{ wn.text }}</div><div class="i-why">{{ ago(wn.happened_at) }} ago</div></div></div>
+        </div>
+        <div class="grp"><h2>Active work<span class="g-count">{{ builds.length }}</span></h2>
+          <div v-if="!builds.length" class="empty">No builds tracked.</div>
+          <div v-for="b in builds" :key="b.id" class="item" :class="b.status_tone==='block' ? 'red':'grey'">
+            <div class="i-main"><div class="i-title">{{ b.name }}</div><div class="i-why">{{ b.gives }} · {{ b.progress_pct || 0 }}%</div></div>
+            <span class="chip" :class="b.status_tone==='block' ? 'block' : (b.status_tone==='ok' ? 'ok':'prog')"><span class="d"></span>{{ b.status }}</span>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- DETAIL SHEET (L3 + L4) -->
+  <div v-if="detail" class="sheet" @click.self="closeDetail">
+    <div class="sheet-card">
+      <button class="back" @click="closeDetail">‹ Back</button>
+      <div class="d-eyebrow">{{ detail._as==='output' ? (moduleLabel(detail.source_module)+' · output') : catLabel(detail) }}</div>
+      <h1>{{ detail.title }}</h1>
+
+      <template v-if="detail._as==='output'">
+        <div v-if="humanValue(detail.value)" class="read">{{ humanValue(detail.value) }}</div>
+        <div v-else class="d-reason">A result was produced — open the full read below.</div>
+        <div class="d-links">
+          <a v-if="detail.evidence_url" :href="detail.evidence_url" target="_blank" rel="noopener">📄 Open the full read ↗</a>
+        </div>
+      </template>
+
+      <template v-else>
+        <div v-if="detail.reason" class="d-reason">{{ detail.reason }}</div>
+        <div class="d-actions" v-if="!detail._done">
+          <button class="act accept" :disabled="busy" @click="decide(detail,'accept',primaryAction(detail))">Accept</button>
+          <button class="act defer" :disabled="busy" @click="decide(detail,'defer')">Later</button>
+          <button class="act decline" :disabled="busy" @click="decide(detail,'decline')">Decline</button>
+        </div>
+        <div v-else class="done-pill">✅ {{ detail._done }}</div>
+        <div v-if="detail._error" class="err">{{ detail._error }}</div>
+      </template>
+
+      <details class="tech">
+        <summary>Technical evidence</summary>
+        <div class="tech-body"><div class="mono">module: {{ detail.source_module }}
+type: {{ detail.source_type }}
+provenance: {{ detail.provenance_ref }}
+{{ detail.related_ref ? 'related: ' + detail.related_ref : '' }}
+notify: {{ detail.notify_policy }}
+id: {{ detail.id }}{{ detail.value ? '\\nvalue: ' + detail.value : '' }}</div></div>
+      </details>
+    </div>
+  </div>
+</div>
+`,
+}).mount('#app');

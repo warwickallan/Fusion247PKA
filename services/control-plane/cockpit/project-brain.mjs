@@ -21,7 +21,8 @@ async function upsertAttention(r) {
      on conflict (source_module, source_key) do update set
        source_type=excluded.source_type, title=excluded.title, reason=excluded.reason, priority=excluded.priority,
        kind=excluded.kind, notify_policy=excluded.notify_policy, actions=excluded.actions, provenance_ref=excluded.provenance_ref,
-       related_ref=excluded.related_ref, detail_route=excluded.detail_route, status='open', updated_at=now()`,
+       related_ref=excluded.related_ref, detail_route=excluded.detail_route, updated_at=now(),
+       status = case when attention_item.status in ('accepted','declined','deferred') then attention_item.status else 'open' end`,
     [r.source_type, r.source_key, r.title, r.reason, r.priority, r.kind || 'suggestion', r.notify_policy || 'none',
       JSON.stringify(r.actions || []), r.provenance_ref, r.related_ref || null, r.detail_route || null],
   );
