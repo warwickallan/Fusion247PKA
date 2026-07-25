@@ -26,3 +26,9 @@ chasing a tangent mid-flow (see the "challenge context-diluting requests" rule).
 - Telegram notification loop: durable outbox → consequential notification → deep-link into the exact cockpit
   item → act → receipt — DONE-criterion #5.
 - CareerAIr plug-in proof (sidebar route + one projector) — DONE-criterion #7.
+
+## 🔨 Shopping actions (next focused pass — mutates live household data)
+- Wire the governed choose/approve buttons for shopping decisions (choose_alternative, accept needs-decision
+  item, approve over-budget) via the asdair command_request seam + a new allowlisted command in the asdair
+  worker. Deliberately NOT done at the tail of a long session because it MUTATES live household shopping data —
+  do it in a focused pass with proof-first. Shopping is already VISIBLE in the cockpit (read-only projection).
