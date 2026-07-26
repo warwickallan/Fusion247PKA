@@ -176,7 +176,10 @@ export function createLiveTelegramAdapter({
   function inlineKeyboard(cardModel) {
     // Once completed the action buttons are cleared; the card is terminal.
     if (cardModel && cardModel.is_completed) return { inline_keyboard: [] };
-    return { inline_keyboard: [ACTION_BUTTONS.map((b) => ({ ...b }))] };
+    // Save to Brain gets its own full-width row so its label never truncates ("Save to Brai…");
+    // the two secondary actions share the second row.
+    const b = ACTION_BUTTONS.map((x) => ({ ...x }));
+    return { inline_keyboard: [[b[0]], b.slice(1)] };
   }
 
   function chatIdFor(captureId, cardModel) {
