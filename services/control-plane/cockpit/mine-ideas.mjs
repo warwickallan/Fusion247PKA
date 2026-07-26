@@ -33,7 +33,7 @@ const C_SLICE = `GOVERNANCE (deterministic):
   hobby-brain threat bar = correctness/leak/availability/audit, NOT adversarial hardening.
 - Authority: Warwick holds merge/Fable/live-apply; Larry orchestrates + commits on judgement otherwise.`;
 
-function assembleBrief() {
+export function assembleBrief() {
   let now = '';
   try {
     const branch = execSync('git rev-parse --abbrev-ref HEAD', { cwd: REPO }).toString().trim();
@@ -56,7 +56,7 @@ async function getSource(video) {
   return j.text;
 }
 
-function buildPrompt(brief, source, mineId) {
+export function buildPrompt(brief, source, mineId) {
   return `You are the Transfer Specialist of Fusion / myPKA. Transfer intelligence, NOT idea generation. Find where a mechanism, principle, surprising observation, failure-mode or causal claim from ONE source could GENUINELY improve a specific Fusion component — including non-obvious, cross-domain transfer.
 Verbs: RECOGNISE->ANALOGISE->TRANSFER->PROPOSE. You do NOT research/verify. NVFI scores PROVISIONAL. You MAY say "this might be mad, but…"; NO separate critic — your own kill-pass (E) is the quality gate.
 MUST HOLD: (1) WHOLE-SOURCE — consider the ENTIRE source; NEVER pre-filter for relevance; the best transfers usually live in the part that does NOT obviously match Fusion. (2) NEVER MANUFACTURE — a forced analogy is worse than none; ZERO is a correct, valued answer.
@@ -154,4 +154,7 @@ async function main() {
     cost_usd: call.cost_usd, duration_ms: call.duration_ms,
   }, null, 2));
 }
-main().catch((e) => { console.error('[mine] FAILED:', e.message); process.exit(1); });
+// Only auto-run as a CLI; stay importable (the T1-vs-T2 experiment reuses buildPrompt/assembleBrief).
+if (process.argv[1] && process.argv[1].replace(/\\/g, '/').endsWith('mine-ideas.mjs')) {
+  main().catch((e) => { console.error('[mine] FAILED:', e.message); process.exit(1); });
+}

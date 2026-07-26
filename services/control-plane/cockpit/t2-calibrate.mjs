@@ -40,8 +40,15 @@ const C_SLICE = `GOVERNANCE (deterministic):
 - Authority: Warwick holds merge/Fable/live-apply; Larry orchestrates + commits on judgement otherwise.`;
 
 // Targets FOREGROUNDED in the shared brief — the convergence pass uses this to classify convergence type.
-const FOREGROUNDED = ['Brain', 'Outputs Layer', 'Cockpit', 'Gateway', 'TubeAIR', 'AsdAIr', 'Tower',
+export const FOREGROUNDED = ['Brain', 'Outputs Layer', 'Cockpit', 'Gateway', 'TubeAIR', 'AsdAIr', 'Tower',
   'CareerAIr', 'Scout', 'Cash', 'Fable', 'Honcho', 'knowledge graph', 'Transfer'];
+
+export async function getSource(video, cockpit = COCKPIT) {
+  const r = await fetch(`${cockpit}/api/transcript?video=${encodeURIComponent(video)}`);
+  const j = await r.json();
+  if (!j.ok) throw new Error('no transcript: ' + (j.error || 'unknown'));
+  return j.text;
+}
 
 function gitNow() {
   try {
@@ -66,7 +73,7 @@ ${backlog()}`;
 
 // ---------- the 5 isolated frames — each a DIFFERENT objective function + a frame-tailored B-slice ----------
 // B is tailored per frame precisely to REDUCE the shared-context contamination that A+C impose.
-const FRAMES = [
+export const FRAMES = [
   {
     id: 'F1-mechanism', name: 'Mechanism / structural transfer',
     b: `## B — frame lens: STRUCTURAL FIDELITY. Full roster is in play; foreground the Brain graph, Outputs Layer,
@@ -122,7 +129,7 @@ NOT manufacture to look clever.`,
 ];
 
 // ---------- branch prompt (isolated) ----------
-function branchPrompt(frame, source) {
+export function branchPrompt(frame, source) {
   return `You are the Transfer Specialist of Fusion / myPKA, running as ONE isolated reasoning frame. Transfer
 intelligence, NOT idea generation. RECOGNISE->ANALOGISE->TRANSFER->PROPOSE. You do NOT research/verify; NVFI is
 PROVISIONAL. You MAY say "this might be mad, but…". Your OWN self-kill pass is the quality gate — there is no separate
@@ -161,7 +168,7 @@ OUTPUT — return ONLY this JSON, no preamble, no markdown fences:
 }
 
 // ---------- Sonnet call via claude -p (async, for parallel branches) ----------
-function callClaude(prompt, label) {
+export function callClaude(prompt, label) {
   return new Promise((resolve) => {
     const t0 = Date.now();
     const ch = spawn('claude', ['-p', '--output-format', 'json', '--model', 'sonnet'], { shell: true });
@@ -190,17 +197,17 @@ function callClaude(prompt, label) {
     ch.stdin.write(prompt); ch.stdin.end();
   });
 }
-function parseJSON(text) {
+export function parseJSON(text) {
   let s = String(text).trim().replace(/^```(json)?/i, '').replace(/```$/, '').trim();
   const a = s.indexOf('{'); const b = s.lastIndexOf('}');
   if (a >= 0 && b > a) s = s.slice(a, b + 1);
   return JSON.parse(s);
 }
-function reportedTotal(c) { return (c.output || 0) + (c.cache_creation || 0) + (c.cache_read || 0); }
+export function reportedTotal(c) { return (c.output || 0) + (c.cache_creation || 0) + (c.cache_read || 0); }
 
 // ---------- NON-MODEL Neo4j enrichment (AFTER emit, BEFORE convergence) — annotates, NEVER gates/deletes ----------
 function terms(s) { return String(s || '').split(/[^A-Za-z0-9]+/).filter((w) => w.length > 3).slice(0, 4); }
-async function enrich(cand) {
+export async function enrich(cand) {
   const mech = cand.source_evidence?.named_mechanism || cand.lens || '';
   const target = cand.fusion_target || '';
   const ann = { fired: [], not_wired_today: [] };
@@ -240,7 +247,7 @@ async function enrich(cand) {
 }
 
 // ---------- convergence / lead pass (one Sonnet call) ----------
-function convergencePrompt(enriched) {
+export function convergencePrompt(enriched) {
   return `You are Larry's convergence/lead pass for the Transfer-Intelligence engine. Five ISOLATED specialist frames
 each ran a full transfer pass on the SAME source, blind to each other. Below are all their surviving candidates, each
 tagged with its originating frame, its provisional NVFI, and NON-MODEL graph/history enrichment gathered AFTER emit.
@@ -267,6 +274,10 @@ DO THIS:
 6. RE-SCORE NVFI at cluster level (do NOT average): novelty may DROP for context_induced; viability/impact CONFIDENCE
    may RISE on novel_independent convergence. Keep each branch's original scores in provenance.
 7. Lead every kept candidate with plain-English SPIN (why it matters to a human in seconds); machine detail underneath.
+8. ENGINE-NEUTRAL PROSE (critical): spin AND transfer_reasoning must describe the IDEA ONLY — source evidence →
+   invariant → Fusion target. Do NOT mention frames, lenses, "convergence", "different angles", or that multiple
+   passes agreed. That provenance lives ONLY in contributing_frames / convergence_type. The prose must read identically
+   whether one frame or three produced it (these candidates are blind-scored against a single-pass engine).
 
 INPUT (branch candidates + enrichment):
 ${JSON.stringify(enriched, null, 1)}
@@ -285,16 +296,42 @@ OUTPUT — return ONLY this JSON, no preamble, no fences:
  "convergence_summary":""}`;
 }
 
+// ---------- reusable T2 pipeline (branches → non-model enrichment → convergence) ----------
+export async function runT2Pipeline(video, source, log = () => {}) {
+  const branchCalls = await Promise.all(FRAMES.map((f) => callClaude(branchPrompt(f, source), f.id)));
+  const branchOutputs = [];
+  for (const c of branchCalls) {
+    if (!c.ok) { log(`branch ${c.label} FAILED: ${c.error}`); branchOutputs.push({ frame: c.label, candidates: [], _failed: c.error }); continue; }
+    let parsed; try { parsed = parseJSON(c.resultText); } catch (e) { parsed = { frame: c.label, candidates: [], zero_reason: `parse-error: ${e.message}` }; }
+    (parsed.candidates || []).forEach((k) => { k._frame = c.label; });
+    branchOutputs.push({ frame: c.label, ...parsed });
+    log(`branch ${c.label}: ${(parsed.candidates || []).length} cand · ${reportedTotal(c).toLocaleString()} tok · ${(c.duration_ms / 1000).toFixed(1)}s`);
+  }
+  const flat = branchOutputs.flatMap((b) => (b.candidates || []).map((k) => ({ ...k, frame: b.frame })));
+  log(`${flat.length} candidate(s) pre-convergence · enriching (non-model Neo4j)…`);
+  const enriched = [];
+  for (const k of flat) { const g = await enrich(k); enriched.push({ ...k, _graph: g }); }
+  log('convergence pass (Sonnet)…');
+  const convCall = await callClaude(convergencePrompt(enriched), 'convergence');
+  let conv = { kept: [], killed: [], conflicts: [], convergence_summary: '' };
+  if (convCall.ok) { try { conv = parseJSON(convCall.resultText); } catch (e) { log(`convergence parse-error: ${e.message}`); } }
+  else log(`convergence FAILED: ${convCall.error}`);
+  return { video, branchCalls, branchOutputs, enriched, convCall, conv };
+}
+
 // ---------- artefact writers ----------
-function stars(n) { const v = Math.max(0, Math.min(5, Number(n) || 0)); return '★'.repeat(v) + '☆'.repeat(5 - v); }
+export function stars(n) { const v = Math.max(0, Math.min(5, Number(n) || 0)); return '★'.repeat(v) + '☆'.repeat(5 - v); }
 function nv(x) { return x?.nvfi || {}; }
 // Blind integrity: scrub frame/convergence/origin provenance from the copy Warwick scores (it lives in the KEY).
-function blindSanitize(t) {
+export function blindSanitize(t) {
   if (!t) return t;
   let s = String(t)
-    .replace(/\bF[1-5]\b/g, 'one lens')
-    .replace(/\b(two|three|four|five|multiple|several|both)\s+(distinct\s+|independent\s+)*frames?\b/gi, 'the analysis')
+    .replace(/\bF[1-5]\b/g, 'the analysis')
+    .replace(/\b(two|three|four|five|multiple|several|both|2|3|4)\s+(distinct\s+|independent\s+)*(frames?|mechanisms?|lenses?)\s+(converge\w*|agree\w*|land\w*|reach\w*|found?|identif\w*)[^.;]*/gi, 'the same target is reached')
     .replace(/\b(distinct|independent|different|separate)\s+frames?\b/gi, 'angles')
+    .replace(/\bfrom (two|three|different|several|multiple)( different)? angles?\b/gi, '')
+    .replace(/\bconverge(s|d|nce)?\b/gi, 'applies')
+    .replace(/\bTogether:\s*/g, '')
     .replace(/\b[0-9a-f]{7,40}\b/g, '(a recent commit)')
     .replace(/[—-]?\s*see convergence_summary/gi, '')
     .replace(/thematic-sibling:[^;]*;?/gi, '')
@@ -304,7 +341,7 @@ function blindSanitize(t) {
   return s.replace(/\s{2,}/g, ' ').replace(/\s+;/g, ';').trim();
 }
 // Drop traps that are pure frame/convergence provenance rather than a real risk to the idea.
-function blindTraps(traps) {
+export function blindTraps(traps) {
   return (traps || []).filter((t) => !/sibling|convergence|\bframe/i.test(`${t.type} ${t.note}`));
 }
 
@@ -470,40 +507,16 @@ async function main() {
   }
   const runId = crypto.randomUUID().slice(0, 8);
   const stampFile = `${OUT}/idea-engine-T2-calibration-raw-${runId}.json`;
-  const r = await fetch(`${COCKPIT}/api/transcript?video=${encodeURIComponent(VIDEO)}`);
-  const j = await r.json();
-  if (!j.ok) throw new Error('no transcript: ' + (j.error || 'unknown'));
-  const source = j.text;
+  const source = await getSource(VIDEO);
   console.error(`[t2] runId ${runId} · source ${VIDEO} ${source.length} chars · launching ${FRAMES.length} isolated branches (Sonnet, parallel)…`);
 
-  // 1) five isolated branches, parallel
-  const branchCalls = await Promise.all(FRAMES.map((f) => callClaude(branchPrompt(f, source), f.id)));
-  const branchOutputs = [];
-  for (const c of branchCalls) {
-    if (!c.ok) { console.error(`[t2] branch ${c.label} FAILED: ${c.error}`); branchOutputs.push({ frame: c.label, candidates: [], _failed: c.error }); continue; }
-    let parsed; try { parsed = parseJSON(c.resultText); } catch (e) { parsed = { frame: c.label, candidates: [], zero_reason: `parse-error: ${e.message}` }; }
-    (parsed.candidates || []).forEach((k) => { k._frame = c.label; });
-    branchOutputs.push({ frame: c.label, ...parsed });
-    console.error(`[t2] branch ${c.label}: ${(parsed.candidates || []).length} candidate(s) · ${(reportedTotal(c)).toLocaleString()} tok · ${(c.duration_ms / 1000).toFixed(1)}s`);
-  }
+  const { branchCalls, branchOutputs, enriched, convCall, conv } = await runT2Pipeline(VIDEO, source, (m) => console.error(`[t2] ${m}`));
 
-  // 2) NON-MODEL enrichment (after emit, before convergence)
-  const flat = branchOutputs.flatMap((b) => (b.candidates || []).map((k) => ({ ...k, frame: b.frame })));
-  console.error(`[t2] ${flat.length} candidate(s) pre-convergence · enriching (non-model Neo4j)…`);
-  const enriched = [];
-  for (const k of flat) { const g = await enrich(k); enriched.push({ ...k, _graph: g }); }
-
-  // 3) convergence / lead pass
-  console.error(`[t2] convergence pass (Sonnet)…`);
-  const convCall = await callClaude(convergencePrompt(enriched), 'convergence');
-  let conv = { kept: [], killed: [], conflicts: [], convergence_summary: '' };
-  if (convCall.ok) { try { conv = parseJSON(convCall.resultText); } catch (e) { console.error('[t2] convergence parse-error', e.message); } }
-  else console.error('[t2] convergence FAILED', convCall.error);
-  const kept = conv.kept || []; const killed = conv.killed || [];
-
-  // 4) artefacts (persist raw FIRST so a formatting regen is always possible without re-running Sonnet)
+  // artefacts (persist raw FIRST so a formatting regen is always possible without re-running Sonnet)
   fs.writeFileSync(stampFile, JSON.stringify({ runId, video: VIDEO, branchCalls, branchOutputs, enriched, convCall, conv }, null, 1));
   const { totals } = emitArtefacts(runId, branchCalls, branchOutputs, enriched, convCall, conv);
+  const kept = conv.kept || []; const killed = conv.killed || [];
+  const flat = enriched;
 
   console.log(JSON.stringify({
     ok: true, runId, source: VIDEO,
@@ -514,4 +527,7 @@ async function main() {
     artefacts: ['idea-engine-T2-calibration-BLIND.md', 'idea-engine-T2-calibration-COST.md', 'idea-engine-T2-calibration-KEY.md', stampFile.split('/').pop()],
   }, null, 2));
 }
-main().catch((e) => { console.error('[t2] FAILED:', e.stack || e.message); process.exit(1); });
+// Only auto-run as a CLI; stay importable as a library (the experiment orchestrator reuses the pipeline).
+if (process.argv[1] && process.argv[1].replace(/\\/g, '/').endsWith('t2-calibrate.mjs')) {
+  main().catch((e) => { console.error('[t2] FAILED:', e.stack || e.message); process.exit(1); });
+}
