@@ -24,9 +24,18 @@ nodes have description/source_id/file_path/created_at. entity_type populated (co
 
 ## (b) Proposed graph-context slice — augments, NEVER gates
 **Architectural rule (preserves the invariant):** graph touches the pipeline ONLY as **post-hoc per-candidate
-enrichment AFTER the Specialist emits** — never seeds ideation, never touches RECOGNISE/ANALOGISE/TRANSFER, never
-decides candidate-set membership. It only adds **priors** on Novelty/Fit/Impact. A sparse/graph-absent mechanism is
-transferred + emitted at FULL strength; graph can only ADD a "novel to your brain" boost, never subtract.
+enrichment** — never seeds ideation, never touches RECOGNISE/ANALOGISE/TRANSFER, never decides candidate-set
+membership. **Placement (Warwick correction 2026-07-26): enrichment runs AFTER the isolated branches emit but
+BEFORE convergence**, so the lead/convergence pass can reason over graph evidence WITHOUT the graph shaping what
+the branches were allowed to discover. **Hard invariant: Neo4j NEVER gates candidate generation and NEVER silently
+deletes a candidate.**
+
+**Correction to "graph can only add a boost" (Warwick 2026-07-26):** post-discovery graph/history evidence may
+legitimately inform BOTH directions — it may **raise relevance · lower provisional priority · flag prior rejection ·
+flag possible duplication/already-known · flag recurrence · identify related active problems · strengthen
+novelty-to-graph · (later) contribute recency/trajectory.** In every case the candidate **survives visibly with the
+annotation attached** — graph = *evidence about a discovered idea, not permission to have the idea*. A sparse/absent
+mechanism is still transferred + emitted at FULL strength.
 Per candidate, `graph_context`:
 1. **`novelty_to_graph`** (HEADLINE) `{novel|partial|known, nearest}` — "genuinely new to your brain" vs "seen before".
    novel RAISES Novelty; known lowers it but MUST NOT drop the candidate (known mechanism → new target is valid).

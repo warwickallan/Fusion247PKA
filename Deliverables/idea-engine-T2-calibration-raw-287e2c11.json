@@ -1,0 +1,1750 @@
+{
+ "runId": "287e2c11",
+ "video": "n5G26mmJ7I0",
+ "branchCalls": [
+  {
+   "label": "F1-mechanism",
+   "ok": true,
+   "resultText": "{\"frame\":\"F1-mechanism\",\"discarded_obvious\":[\"AWD splitting power across four wheels to reduce component wear vs. one channel — direct 'parallelize load across agents/workers' mapping; too generic given myPKA already runs multi-agent parallel dispatch with worktree isolation, no source-specific tightness beyond the obvious load-distribution principle.\",\"Officials dynamically handicapping the leading team each year to preserve exciting/uncertain race outcomes — direct 'inject diversity into rankings so the feed doesn't get boring/predictable' mapping; overlaps standard anti-filter-bubble/exploration-exploitation pattern, not a distinctive structural correspondence to any named Fusion component.\"],\"candidates\":[{\"spin\":{\"situation\":\"Every time the idea-engine runs, it produces a pile of killed/discarded ideas alongside the good ones.\",\"problem\":\"Right now those discards are just thrown away — pure waste, same as exhaust shooting out a tailpipe.\",\"implication\":\"That's expensive: to get more good ideas out, the instinct is to run bigger/pricier passes (more frames, Fable) rather than getting more out of what's already been paid for.\",\"need_payoff\":\"If the 'exhaust' (killed candidates) were captured and fed back in as extra fuel for the next pass, you'd get a bigger boost in idea quality/volume without buying a bigger engine.\"},\"source_evidence\":{\"quote\":\"One side spins from the exhaust and the other side spins to suck fresh air into the engine. So the explosions are even bigger.\",\"timestamp\":\"07:03\",\"named_mechanism\":\"turbocharger — twin-turbine shaft coupling exhaust waste-energy recovery to intake forced induction\"},\"transfer_reasoning\":\"Invariant: a shared-shaft mechanism captures the discarded byproduct of a process and mechanically couples it back into that same process's input, so a small fixed-capacity 'engine' outperforms a much larger one without adding base capacity — bounded by a wastegate that vents excess so it doesn't overboost/knock. Fusion's idea-engine already generates this exact byproduct every run (the discarded_obvious list and killed NVFI candidates this very frame emits) and currently vents it to nothing.\",\"fusion_target\":\"idea-engine kill-pass/discard output across Cairn→Transfer→Critic pipeline\",\"category\":\"brain\",\"lens\":\"structural fidelity — discard/reject pipeline recycling\",\"nvfi\":{\"novelty\":3,\"viability\":4,\"fit\":4,\"impact\":3},\"traps\":[{\"type\":\"overboost/knock\",\"note\":\"if too much recycled exhaust is re-injected, it drowns the current pass's signal in stale/killed material — needs an explicit cap analogous to a wastegate\"},{\"type\":\"needs evidence\",\"note\":\"provisional — untested whether killed-candidate volume is actually a fertile reservoir vs. correctly-dead material\"}]},{\"spin\":{\"situation\":\"Every new Larry session currently starts cold and has to re-read AGENTS.md/INDEX files to rebuild context.\",\"problem\":\"That's exactly turbo lag — the moment you actually need Larry sharp, there's a delay while everything spools back up.\",\"implication\":\"Minutes lost every session to re-deriving state that was already known before compaction/restart — the HIGH-ish backlog item already flagged.\",\"need_payoff\":\"Keep a small background 'throttle' open at all times (a continuously topped-up context log) so that the moment a session starts, full context is already spinning and ready — zero lag.\"},\"source_evidence\":{\"quote\":\"But if I stay on the gas and press the brake, you slow down for the corner and the turbo keeps spinning. And the moment I let off the brake.\",\"timestamp\":\"13:33\",\"named_mechanism\":\"left-foot braking / two-pedal turbo anti-lag — maintaining spool via simultaneous throttle+brake\"},\"transfer_reasoning\":\"Invariant: decouple the 'maintain internal readiness' channel (throttle: keep the shaft spinning) from the 'external deployment' channel (brake: suppress forward motion/cost), running both concurrently, so that at trigger release full capacity is available with zero spool-up lag — versus a cold system where readiness only begins building once the trigger fires. Larry's context today is coupled: it only rebuilds once a new session starts reading cold, producing exactly this lag.\",\"fusion_target\":\"Larry's cross-session context continuity (durable decision-rationale log + session-continuity capture, bcf9b41/5d57de9)\",\"category\":\"brain\",\"lens\":\"structural fidelity — session/context continuity architecture\",\"nvfi\":{\"novelty\":3,\"viability\":3,\"fit\":4,\"impact\":4},\"traps\":[{\"type\":\"cost\",\"note\":\"continuous background top-up writes have a small but nonzero token/write cost every session close — needs bounding\"},{\"type\":\"already-partially-built\",\"note\":\"session-continuity capture already exists (5d57de9); this refines it into an explicit two-channel model rather than net-new machinery\"}]},{\"spin\":{\"situation\":\"myPKA's quality/security gates (the idea Critic's NVFI+traps check, Vex's security checklist) work by checking a list of specific named things.\",\"problem\":\"A checklist only catches what's on the list — it can't catch a NEW combination of individually-fine things that together beats the whole point of the gate, same as the race officials' weight/tire rules completely missing the AWD-plus-two-pedal combo.\",\"implication\":\"Something could sail through every named check and still quietly defeat what the gate exists to protect, and nobody would notice until it's already won repeatedly.\",\"need_payoff\":\"Add one extra, bounded question to every checklist gate — 'does this still defeat the point, even though it passes every line?' — catching the gap cheaply instead of discovering it after the fact.\"},\"source_evidence\":{\"quote\":\"You can only enforce the letter of the law. What was written... the spirit of law is what you wanted to happen or what you \\\"meant.\\\"\",\"timestamp\":\"14:22\",\"named_mechanism\":\"enumerated-parameter rulebook vs. unenumerated structural combination that is individually legal but collectively defeats rule-intent\"},\"transfer_reasoning\":\"Invariant: a governance gate built as a list of specific, enumerated parameter checks is structurally blind to new combinations of individually-compliant primitives that jointly defeat the gate's actual intent, because it checks letter (named parameters) not spirit (the outcome it exists to preserve). The source's fix only arrives ex-post (ban AWD outright next year) — expensive and reactive. The tight structural fix is adding one intent-check question distinct from the enumerated list, not more enumerated items.\",\"fusion_target\":\"idea-engine Critic's NVFI+traps step and Vex's WS-003 Expansion security checklist\",\"category\":\"cash\",\"lens\":\"structural fidelity — governance/gate architecture\",\"nvfi\":{\"novelty\":3,\"viability\":4,\"fit\":3,\"impact\":3},\"traps\":[{\"type\":\"scope-creep risk\",\"note\":\"an open-ended 'spirit' question can become a vague catch-all that overrides objective checks — needs to stay a single bounded question, not a new discretionary veto layer\"},{\"type\":\"needs evidence\",\"note\":\"provisional; no concrete instance yet of a myPKA gate being beaten this way — flagging the architecture gap, not a proven incident\"}]}],\"zero_reason\":null}",
+   "duration_ms": 149866,
+   "cost_usd": 0.3313758,
+   "payload_input_est": 4595,
+   "output": 11335,
+   "cache_creation": 25139,
+   "cache_read": 35036
+  },
+  {
+   "label": "F2-inversion",
+   "ok": true,
+   "resultText": "```json\n{\"frame\":\"F2-inversion\",\"discarded_obvious\":[\n  \"turbocharging = generic 'boost/acceleration' metaphor for any Fusion feature (too generic, not a failure mode)\",\n  \"AWD = redundancy/multiple-paths-are-good (positive feature restatement, not an inversion)\",\n  \"underdog engineering beats the favorite = 'innovation wins' (generic positive story, no specific breakage)\",\n  \"incremental rule escalation ending in an outright AWD/engine ban (folds into the letter-vs-spirit candidate; kept as one transfer, not two)\"\n],\"candidates\":[\n  {\"spin\":{\n    \"situation\":\"Larry's YouTube capture pipeline and Larry's own rich session context both depend on staying 'spooled up' while a session is actively running.\",\n    \"problem\":\"The instant the session ends or context compacts, that in-progress work loses momentum — it either stalls out as a stub note ('knowledge note pending — I'll write it next session') or evaporates outright, exactly like a turbo losing pressure the moment you lift off the gas.\",\n    \"implication\":\"Every session boundary becomes a mini cold-start: work has to re-spool from zero next time, producing placeholder notes and lost context that compound as Fusion runs more sessions.\",\n    \"need_payoff\":\"A small 'anti-lag' move — firing a lightweight checkpoint/flush at the exact moment attention lifts, instead of waiting for the next session to re-spin from cold — removes the stall without needing continuous foreground presence.\"\n  },\n   \"source_evidence\":{\"quote\":\"If I press the brake and let off the gas, I lose turbo pressure. *Futututoooo* ... But if I stay on the gas and press the brake, you slow down for the corner and the turbo keeps spinning.\",\"timestamp\":\"13:09-13:52\",\"named_mechanism\":\"anti-lag: holding two normally-exclusive controls together to keep a background process spinning through a gap where it would otherwise decay and 'sneeze'\"},\n   \"transfer_reasoning\":\"The source shows a system whose stored power decays the instant the driving input stops, producing an audible failure signal (the sneeze) at that exact transition — and the fix is not 'push harder' but an inverted control combo that keeps the process alive DURING the gap. Fusion's capture pipeline and Larry's cross-session context have the identical assumption baked in: 'this only needs to run while I'm actively driving it (in-session).' The backlog items show that assumption failing the same way the un-fixed turbo failed.\",\n   \"fusion_target\":\"YouTube capture pipeline (Gateway/TubeAIR knowledge-note step) + Larry's session-continuity/compaction-survival mechanism\",\n   \"category\":\"brain\",\"lens\":\"inverted assumption: 'the process only needs to run while actively driven' — false, it needs to keep spinning through the gap\",\n   \"nvfi\":{\"novelty\":4,\"viability\":3,\"fit\":5,\"impact\":4},\n   \"traps\":[\n     {\"type\":\"scope-creep\",\"note\":\"could balloon into a full checkpoint/persistence subsystem instead of one minimal auto-flush at session-end — keep it to the anti-lag-sized fix\"},\n     {\"type\":\"needs-evidence\",\"note\":\"NVFI is provisional — confirm the actual mechanism of the capture stall (attention-bound vs. a real blocking call) before building anything\"}\n   ]},\n  {\"spin\":{\n    \"situation\":\"Fusion's merge gate leans on independent review (Codex + Fable) as the safety backstop before code goes live.\",\n    \"problem\":\"In the source, the rule-enforcer keeps losing because he can only ever enforce the LETTER of his own rules — he doesn't understand the actual mechanism (turbo, AWD tire-wear) he's regulating, so his nerfs never land on what's really happening. Codex reviews under a read-only sandbox that can't even read the files it's reviewing.\",\n    \"implication\":\"A review gate that's satisfied on the letter (tests pass, checklist ticked) but doesn't structurally see the mechanism under review gives false confidence — it can rubber-stamp exactly the kind of change it exists to catch.\",\n    \"need_payoff\":\"Worth an explicit, per-review check: did the reviewer actually see the mechanism, or just the surface diff? Where it's the latter, log it as reduced-confidence review rather than a clean independent pass.\"\n  },\n   \"source_evidence\":{\"quote\":\"You broke the spirit of the rules... You can only enforce the letter of the law. What was written.\",\"timestamp\":\"14:22-14:44\",\"named_mechanism\":\"letter-vs-spirit enforcement gap, compounded by the enforcer not understanding the mechanism he's policing ('I don't think he knows how a turbo works', 06:07)\"},\n   \"transfer_reasoning\":\"The failure isn't that rules were absent — it's that the enforcer's mental model of the mechanism was incomplete, so every rule he wrote only ever caught the letter, never the spirit, and the gap was continuously exploited. Fusion already has a documented instance of the same shape: a reviewer (Codex) working blind because its sandbox blocks self-inspection. This is the same structural blind spot, not a new one — worth naming explicitly as a residual audit risk rather than assuming 'independent review ran' equals 'the mechanism was actually seen.'\",\n   \"fusion_target\":\"Multi-model build-verify loop / merge-ready gate (Codex read-only review step specifically)\",\n   \"category\":\"brain\",\"lens\":\"inverted assumption: 'a review gate = safety' — false when the reviewer cannot see the mechanism, only the letter of the diff\",\n   \"nvfi\":{\"novelty\":3,\"viability\":3,\"fit\":4,\"impact\":4},\n   \"traps\":[\n     {\"type\":\"already-partially-addressed\",\"note\":\"memory already flags Codex's read-only self-inspection gap and works around it by staging the diff into the prompt — this may be reinforcing evidence for that existing mitigation, not a new build\"},\n     {\"type\":\"governance-scope\",\"note\":\"don't let this read as a call for MORE adversarial hardening — the hobby-brain threat bar stays correctness/leak/availability/audit, not crevice-hunting\"}\n   ]},\n  {\"spin\":{\n    \"situation\":\"cockpit.build and cockpit.overall_state are known-stale self-model tables, last updated 2026-07-22, that get corrected field-by-field when someone notices one is wrong.\",\n    \"problem\":\"The source's rule-enforcer does the same thing to the racers — nerfs tires, then power, then weight, one visible lever at a time — and still loses every race, because the team's real edge is an interaction (AWD grip + anti-lag) that lever-by-lever patching never touches.\",\n    \"implication\":\"If Fusion keeps correcting cockpit.build/overall_state one field at a time, the tables can stay wrong in ways no single patch reaches — the enforcer's 'still untouchable' problem, just for Fusion's self-model instead of a race car.\",\n    \"need_payoff\":\"Before the next one-off field fix, find the actual process that's supposed to keep those tables current and repair that, instead of adding another isolated correction.\"\n  },\n   \"source_evidence\":{\"quote\":\"I gave you smaller tires. I reduced your power by adding a restrictor, and I added a whole lot of weight. And then you're still out there, just untouchable.\",\"timestamp\":\"11:05-11:24\",\"named_mechanism\":\"lever-by-lever symptom-nerfing that never reaches the underlying mechanism (AWD-reduced tire wear + brake-held turbo spool)\"},\n   \"transfer_reasoning\":\"The assumption under test is 'adjusting each visible variable independently controls the outcome' — the source shows it failing three times in a row against the same unaddressed root mechanism. Fusion's stale self-model tables are a live instance of the identical pattern: symptom-level corrections instead of fixing whatever process should be feeding those tables continuously.\",\n   \"fusion_target\":\"cockpit.build / cockpit.overall_state self-model tables\",\n   \"category\":\"brain\",\"lens\":\"inverted assumption: 'nerfing each visible lever controls the outcome' — false when the real driver is an un-addressed interaction/process\",\n   \"nvfi\":{\"novelty\":3,\"viability\":4,\"fit\":4,\"impact\":3},\n   \"traps\":[\n     {\"type\":\"generic-advice-risk\",\"note\":\"root-cause-vs-symptom is a common trope — keep this grounded to the specific quoted mechanism (lever-by-lever nerfs failing against an unaddressed interaction), or it degrades into generic advice\"}\n   ]}\n],\"zero_reason\":null}\n```",
+   "duration_ms": 128158,
+   "cost_usd": 0.3103848,
+   "payload_input_est": 4627,
+   "output": 9922,
+   "cache_creation": 25173,
+   "cache_read": 35036
+  },
+  {
+   "label": "F3-operational",
+   "ok": true,
+   "resultText": "{\"frame\":\"F3-operational\",\"discarded_obvious\":[\"underdog-beats-incumbent-via-clever-engineering = 'disruptive innovation' — too generic, doesn't name a component or change any action\",\"AWD's four-wheel grip = redundancy/resilience — surface-level image match, no operational hook\",\"rules keep changing to nerf the winner = 'regulatory capture / competitor sabotage' — no live Fusion trust boundary this maps to right now\",\"turbocharging = 'force-multiplying a small resource' — true but too abstract to change what Warwick does next week\"],\"candidates\":[{\"spin\":{\"situation\":\"Larry's context (decisions, WHY, current state) gets rebuilt whenever a session restarts or compacts.\",\"problem\":\"That rebuild is currently a point-in-time capture, not a running process — there's a real lag before Larry is back up to full context speed, and the backlog already flags this as a HIGH-ish, just-identified risk (2026-07-26).\",\"implication\":\"Every compaction/restart costs Warwick attention re-explaining state, and worse, a decision made in the gap could quietly get lost or contradicted because Larry starts cold.\",\"need_payoff\":\"Keep a lightweight state file continuously updated through the session (not only written at close), so Larry resumes at full speed the instant a session starts — no cold-start tax.\"},\"source_evidence\":{\"quote\":\"We found a problem with our turbo, and we fixed it by pressing the brakes more... If I stay on the gas and press the brake, you slow down for the corner and the turbo keeps spinning.\",\"timestamp\":\"12:42-13:33\",\"named_mechanism\":\"anti-lag / two-pedal driving: keep the turbo pre-spun through off-throttle moments so full power is instantly available, instead of letting it spool down and re-spooling cold.\"},\"transfer_reasoning\":\"The car's power delivery has a lag between 'want power' and 'have power' unless the spinning mass is kept warm continuously — the fix isn't a bigger turbo, it's never letting it spin down. Larry's rich context has the identical lag shape: the expensive resource (session state) spins down at compaction/restart and must respool before it's useful.\",\"fusion_target\":\"Session-continuity capture (the mechanism behind commit 5d57de9, 'current-state + session-handoff + SPIN-first') — extend it from a point-in-time capture to a rolling state file Larry writes to continuously through a session, not only at close.\",\"category\":\"brain\",\"lens\":\"F3-operational\",\"nvfi\":{\"novelty\":3,\"viability\":4,\"fit\":5,\"impact\":4},\"traps\":[{\"type\":\"already-partially-done\",\"note\":\"session-continuity capture already exists (5d57de9) — this is 'make it continuous' not 'build from zero', so treat impact as incremental, not foundational.\"}]},{\"spin\":{\"situation\":\"The T2 divergence architecture + Neo4j graph-signal audit just landed as a design package, explicitly logged as 'delegated, report-only.'\",\"problem\":\"A report-only design audit is a paper calculation — it says the architecture SHOULD work, not that it DOES work against live graph data.\",\"implication\":\"If T2 gets treated as done because the design reads well, the first real test of whether it holds happens later in production, when it's expensive to unwind.\",\"need_payoff\":\"Before calling T2 divergence 'ready,' run it against a real slice of the live Neo4j graph and check the signal behaves as the audit predicted — prove it on tarmac, not on paper.\"},\"source_evidence\":{\"quote\":\"We calculated how the car should perform and on paper it should do quite well... No no, no, we don't race on paper either. Like we race on tarmac.\",\"timestamp\":\"00:55-01:18\",\"named_mechanism\":\"paper-performance vs track-performance: a calculated/simulated result isn't credited until it runs on the real surface.\"},\"transfer_reasoning\":\"The engineers trusted their model of grip and power delivery, but only what shows up on tarmac counts. The T2 design + audit is Fusion's 'calculation' — a report-only, delegated pass — and hasn't yet been run against the live graph the way a car is run on track.\",\"fusion_target\":\"T2 divergence architecture (Deliverables/idea-engine-T2-design-DRAFT.md) and its Neo4j graph-signal audit — gate its 'done' status on one live-graph test run, not on the design audit alone.\",\"category\":\"brain\",\"lens\":\"F3-operational\",\"nvfi\":{\"novelty\":2,\"viability\":4,\"fit\":5,\"impact\":4},\"traps\":[{\"type\":\"restating-known-principle\",\"note\":\"Warwick already holds 'build to the goal, don't ship the slice as the goal' as a standing principle — this candidate's only new value is pointing that principle at the specific T2 artifact sitting delegated right now.\"}]}],\"zero_reason\":null}",
+   "duration_ms": 112567,
+   "cost_usd": 0.2840508,
+   "payload_input_est": 4598,
+   "output": 8186,
+   "cache_creation": 25124,
+   "cache_read": 35036
+  },
+  {
+   "label": "F4-commercial",
+   "ok": true,
+   "resultText": "{\"frame\":\"F4-commercial\",\"discarded_obvious\":[\"Underdog outsider beats complacent incumbents through technical merit — generic motivational reading, no transferable mechanism, no named Fusion component.\",\"Letter-of-the-law vs spirit-of-the-law rules-lawyering — too abstract as a business lesson, and the concrete version (loophole/regulatory arbitrage as a service) has no plausible external buyer and an ethically fuzzy value prop; self-kills.\",\"AWD spreads torque across four tires so each wears slower ('lifting weight with both arms') — real engineering insight but purely internal-efficiency framed, no external revenue or independence path visible.\",\"Governing body bans the foreign competitor by writing an 'American engines only' rule — protectionist drama with no transferable commercial mechanism for Fusion, discard.\"],\"candidates\":[{\"spin\":{\"situation\":\"Fusion runs an idea-engine that consumes outside content (like this transcript) and produces commercial transfer candidates for Warwick alone.\",\"problem\":\"Everything this engine produces today — including the discarded candidates and rationale trail — is exhaust that gets used once internally and then thrown away.\",\"implication\":\"That is the same waste the turbo eliminates: high-pressure output being vented uselessly instead of being fed back to make more output, meaning Fusion is paying the full cost of the engine but only monetising a fraction of what it makes.\",\"need_payoff\":\"If outside people could feed their own consumed content into the same engine and get back paid transfer candidates, the exhaust becomes a second revenue stream built on machinery Fusion already owns and runs for free internally.\"},\"source_evidence\":{\"quote\":\"We turn the exhaust back into energy that we can use.\",\"timestamp\":\"06:49\",\"named_mechanism\":\"turbocharging — recovering waste exhaust energy and feeding it back to amplify the very process that produced it\"},\"transfer_reasoning\":\"The turbo doesn't add a new engine — it recaptures a byproduct of the existing one and routes it back in to compound output. Fusion's Cockpit + Transfer-Intelligence pipeline already generates far more raw ideation exhaust (discarded candidates, rationale logs, per-frame outputs) than Warwick alone consumes. Exposing a thin customer-facing valve on the same pipeline — 'feed us what you've read/watched, get back external-value transfer candidates' — recovers that wasted throughput as paid output without building a new core mechanism.\",\"fusion_target\":\"Cockpit + Transfer-Intelligence specialist pipeline (this frame's own engine), exposed via a client-facing intake valve\",\"category\":\"cash\",\"lens\":\"byproduct-recycling\",\"nvfi\":{\"novelty\":3,\"viability\":3,\"fit\":4,\"impact\":4},\"traps\":[{\"type\":\"scope-creep\",\"note\":\"this is exactly the BUILD-014 platform trap — start with one manual run against one outside person's reading list, not a subscription product\"},{\"type\":\"needs-evidence\",\"note\":\"zero validated external demand yet; needs one unpaid or paid pilot before any build decision\"}]},{\"spin\":{\"situation\":\"Most businesses treat slow strategy/ideation cycles (weeks of workshops, consultant decks) as a fixed cost of doing business.\",\"problem\":\"They accept that lag the same way the American teams accepted turbo lag as just how turbo engines are — a limitation nobody thought to attack because the fix uses an unrelated control.\",\"implication\":\"Whoever finds the odd coupling that removes the lag gets a durable, hard-to-copy edge — the AWD team didn't out-spend rivals, they out-found them.\",\"need_payoff\":\"Fusion already owns the odd coupling: a multi-frame ideation engine that runs many independent lenses over one source in a single sitting. Selling that as a same-day rapid-ideation sprint for outside companies converts an internal capability into a second income stream, which is the concrete lever for reducing dependence on Bellrock.\"},\"source_evidence\":{\"quote\":\"if I stay on the gas and press the brake, you slow down for the corner and the turbo keeps spinning\",\"timestamp\":\"13:24\",\"named_mechanism\":\"anti-lag brake-boost — coupling an unrelated existing control (the brake) to eliminate lag in a different subsystem (turbo spool-up)\"},\"transfer_reasoning\":\"The insight wasn't a new part, it was noticing that a control already in the car (the brake pedal) could be repurposed to solve a problem in a system rivals treated as inherently slow. Fusion's multi-frame parallel Transfer-Intelligence run is an already-built capability that could be repurposed the same way: pointed at an outside client's problem instead of Warwick's, sold as a same-day 'idea lag' removal sprint, competing against consultancies whose ideation cycle is weeks long.\",\"fusion_target\":\"Transfer-Intelligence specialist (multi-frame parallel run), repackaged as a client-facing rapid-ideation sprint\",\"category\":\"cash\",\"lens\":\"latency-arbitrage\",\"nvfi\":{\"novelty\":3,\"viability\":3,\"fit\":3,\"impact\":3},\"traps\":[{\"type\":\"cost\",\"note\":\"selling a service requires packaging/pricing/outreach effort entirely outside current build scope — not a code task, needs Warwick's own time\"},{\"type\":\"already-doing-it\",\"note\":\"Fusion already runs this internally for Warwick; the only delta is 'sell it externally' — confirm appetite exists before building any client-facing tooling\"}]},{\"spin\":{\"situation\":\"The manufacturer didn't enter the series to win a trophy — they raced specifically to be seen, because attention was the thing that actually converted to car sales in a market where nobody knew their brand.\",\"problem\":\"Fusion's idea-engine output (including candidates like this one) stays entirely private to Warwick, so even once a cash-tier idea is validated and built, there's no visible proof for outside buyers to react to.\",\"implication\":\"Without a public, provable showcase, any future cash product has to be pitched cold and abstractly — the hardest way to sell anything — instead of pointing at a result that already happened.\",\"need_payoff\":\"A small public 'show your work' channel for the engine's proven wins gives Fusion the same distribution shortcut the manufacturer used: let the result itself be the advertisement.\"},\"source_evidence\":{\"quote\":\"Winning will get the most eyeballs on our car... We want to sell more cars here in America. To do that, we need attention.\",\"timestamp\":\"00:25\",\"named_mechanism\":\"racing-as-marketing — competing publicly to earn attention that converts to sales, treating the win as a distribution channel rather than the goal itself\"},\"transfer_reasoning\":\"The team's real objective was never the podium; the podium was instrumental to being seen by the exact buyers they wanted. Fusion's equivalent instrumental move is publishing a proven, provenance-tagged case study once any transfer candidate from this same engine is actually built and makes money — using the demonstrated result as the pitch instead of describing the mechanism to prospects who have no reason to believe it works yet.\",\"fusion_target\":\"Cockpit output surface — a public case-study/showcase feed for the idea engine's proven cash-tier hits\",\"category\":\"cash\",\"lens\":\"attention-as-distribution\",\"nvfi\":{\"novelty\":2,\"viability\":3,\"fit\":3,\"impact\":2},\"traps\":[{\"type\":\"premature\",\"note\":\"there is nothing to showcase yet — this only fires after a cash-tier idea from this same engine has actually been built and proven; do not build the showcase ahead of a result\"}]}],\"zero_reason\":null}",
+   "duration_ms": 121622,
+   "cost_usd": 0.3043668,
+   "payload_input_est": 4594,
+   "output": 8130,
+   "cache_creation": 28650,
+   "cache_read": 35036
+  },
+  {
+   "label": "F5-crossdomain",
+   "ok": true,
+   "resultText": "{\"frame\":\"F5-crossdomain\",\"discarded_obvious\":[\"Winning races = eyeballs/attention (00:25-00:55) — direct 1:1 marketing-attention mapping, no transfer needed\",\"Custom tube-frame chassis vs modified sedan (01:34-01:54) — obvious purpose-built-vs-adapted build-vs-buy analogy\",\"AWD splits power across four wheels vs RWD (11:24-11:44) — maps straight onto Fusion's existing multi-specialist load-splitting roster, already the design\",\"Blue flags letting a faster car pass a slower one unimpeded (05:10-05:19) — generic priority-queue/interrupt pattern, no distance\",\"Lapping the whole field despite handicaps proving legitimacy (10:43-11:24) — obvious 'overwhelming evidence = high confidence score' mapping\"],\"candidates\":[{\"spin\":{\"situation\":\"Warwick clicks Decline or Later on Cockpit idea cards fairly often.\",\"problem\":\"Right now those declines just vanish — the reasoning behind 'no' is vented and lost, like an engine dumping its exhaust straight into the air.\",\"implication\":\"The Transfer-Intelligence pipeline keeps re-proposing similar misses because it never learns from what got rejected and why — wasted exhaust pressure that could have made the next batch of ideas stronger.\",\"need_payoff\":\"Route Decline reasons back into Cairn/Transfer-Intelligence as forced input for the next pass — same mechanism as a turbo using waste exhaust to force-feed the same engine more air.\"},\"source_evidence\":{\"quote\":\"we use the exhaust to spin another thing... one side spins from the exhaust and the other side spins to suck fresh air into the engine. So the explosions are even bigger.\",\"timestamp\":\"06:32-06:49\",\"named_mechanism\":\"turbocharger: waste exhaust gas drives a compressor that force-feeds richer intake into the very same engine, closing an open-loop waste stream into a closed loop\"},\"transfer_reasoning\":\"Structural invariant: a byproduct normally vented as waste is instead coupled on a shared shaft to compress richer input for the same process. Fusion's Cockpit Decline/Later stream is the exhaust — currently vented (logged-and-forgotten) rather than compressing the next round of candidate generation. The defensible claim in one sentence: 'a mechanism that turns a system's own rejected output into forced input for its own next cycle is structurally a turbocharger, not a cache.'\",\"fusion_target\":\"Cockpit Decline/Later action stream -> feedback loop into Cairn intake / Transfer-Intelligence specialist's next mining pass\",\"category\":\"brain\",\"lens\":\"F5-crossdomain\",\"nvfi\":{\"novelty\":5,\"viability\":3,\"fit\":4,\"impact\":3},\"traps\":[{\"type\":\"cost\",\"note\":\"needs decline-reason capture (not just a click event) plus a labeled-negative-signal pipeline — nontrivial build, not a config flag\"},{\"type\":\"needs-evidence\",\"note\":\"unproven whether decline reasons are specific enough to be useful compressor fuel vs just noise\"}]},{\"spin\":{\"situation\":\"When Warwick opens the Cockpit expecting a proactive 'you nearly missed this' surfacing, there's sometimes a beat of lag before it appears.\",\"problem\":\"That lag is the graph-traversal + embedding cold-start — the equivalent of turbo lag: the compressor has spun down and needs time to spool back up.\",\"implication\":\"A user who has to wait for insight loses the 'nearly missed this' urgency — by the time it renders, the moment feels less proactive and more like a report.\",\"need_payoff\":\"Keep the expensive path lightly spinning during idle Cockpit time (not full cache-warming, but throttle-open-under-braking style priming) so the answer is already spooled when Warwick actually asks.\"},\"source_evidence\":{\"quote\":\"if I stay on the gas and press the brake, you slow down for the corner and the turbo keeps spinning. And the moment I let off the brake... [instant power]\",\"timestamp\":\"13:33-13:57\",\"named_mechanism\":\"anti-lag: the throttle is deliberately kept open under braking so the turbo never drops speed, eliminating spool-up delay exactly when power is needed\"},\"transfer_reasoning\":\"Structural invariant: a component with high spin-up cost is kept 'lightly loaded but never idle' during a low-demand phase, so the moment full demand returns there is zero lag — distinct from static caching because it requires continuous light throttle, not a one-time precompute. Applied to the Outputs Layer's Neo4j/embedding path during Warwick's idle Cockpit browsing.\",\"fusion_target\":\"Outputs Layer proactive-surfacing pipeline (Neo4j traversal + embedding call warm path)\",\"category\":\"brain\",\"lens\":\"F5-crossdomain\",\"nvfi\":{\"novelty\":3,\"viability\":4,\"fit\":3,\"impact\":3},\"traps\":[{\"type\":\"already-doing-it\",\"note\":\"if a keep-alive/warm-cache already exists on this path this collapses to nothing new — check before proposing\"}]},{\"spin\":{\"situation\":\"Fusion already has one hardlocked rule (Fable confirm-first) that exists specifically because a softer, incremental fix kept getting worked around by GPT-relayed directive text sneaking in.\",\"problem\":\"That pattern — patch the letter of the rule, watch it get legally out-maneuvered, patch again, repeat — is exactly the regulator's losing strategy in the source before it finally banned the whole category outright.\",\"implication\":\"Without a named threshold for 'stop patching, escalate to a categorical rule,' each future loophole will eat another full incident cycle before Warwick has to manually decide to hardlock it, same as it took years of re-nerfing before the AWD ban.\",\"need_payoff\":\"Write an explicit escalation ladder into the decision-rationale log: N re-exploited patches on the same rule triggers an automatic proposal to Warwick for a categorical (hardlock) rule, rather than relying on Larry noticing the pattern each time.\"},\"source_evidence\":{\"quote\":\"You can only enforce the letter of the law... the spirit of the law is what you wanted to happen or what you meant... All wheel drive is banned there. (This actually happened)\",\"timestamp\":\"14:22-15:37\",\"named_mechanism\":\"a regulator abandons incremental letter-of-the-rule patches for a categorical prohibition only after the same structural advantage keeps re-emerging through legal loopholes\"},\"transfer_reasoning\":\"Structural invariant: incremental patches to a rule's letter lose repeatedly to a fixed structural advantage; the only fix that closes the gap is a categorical rule targeting the advantage itself, decided explicitly rather than organically. Fusion has lived this once (Fable hardlock) but has no formalized trigger for recognizing it earlier next time — the transfer is naming and logging the threshold, not the individual hardlock.\",\"fusion_target\":\"Decision-rationale log — formal escalation policy for converting repeatedly-worked-around soft rules into hardlocks\",\"category\":\"brain\",\"lens\":\"F5-crossdomain\",\"nvfi\":{\"novelty\":3,\"viability\":4,\"fit\":4,\"impact\":3},\"traps\":[{\"type\":\"already-doing-it\",\"note\":\"the Fable hardlock is this pattern already instantiated once ad hoc — value here is only in generalizing/logging it as a named policy, not discovering something unprecedented\"}]}],\"zero_reason\":null}",
+   "duration_ms": 148097,
+   "cost_usd": 0.3631641,
+   "payload_input_est": 4609,
+   "output": 9501,
+   "cache_creation": 32012,
+   "cache_read": 95217
+  }
+ ],
+ "branchOutputs": [
+  {
+   "frame": "F1-mechanism",
+   "discarded_obvious": [
+    "AWD splitting power across four wheels to reduce component wear vs. one channel — direct 'parallelize load across agents/workers' mapping; too generic given myPKA already runs multi-agent parallel dispatch with worktree isolation, no source-specific tightness beyond the obvious load-distribution principle.",
+    "Officials dynamically handicapping the leading team each year to preserve exciting/uncertain race outcomes — direct 'inject diversity into rankings so the feed doesn't get boring/predictable' mapping; overlaps standard anti-filter-bubble/exploration-exploitation pattern, not a distinctive structural correspondence to any named Fusion component."
+   ],
+   "candidates": [
+    {
+     "spin": {
+      "situation": "Every time the idea-engine runs, it produces a pile of killed/discarded ideas alongside the good ones.",
+      "problem": "Right now those discards are just thrown away — pure waste, same as exhaust shooting out a tailpipe.",
+      "implication": "That's expensive: to get more good ideas out, the instinct is to run bigger/pricier passes (more frames, Fable) rather than getting more out of what's already been paid for.",
+      "need_payoff": "If the 'exhaust' (killed candidates) were captured and fed back in as extra fuel for the next pass, you'd get a bigger boost in idea quality/volume without buying a bigger engine."
+     },
+     "source_evidence": {
+      "quote": "One side spins from the exhaust and the other side spins to suck fresh air into the engine. So the explosions are even bigger.",
+      "timestamp": "07:03",
+      "named_mechanism": "turbocharger — twin-turbine shaft coupling exhaust waste-energy recovery to intake forced induction"
+     },
+     "transfer_reasoning": "Invariant: a shared-shaft mechanism captures the discarded byproduct of a process and mechanically couples it back into that same process's input, so a small fixed-capacity 'engine' outperforms a much larger one without adding base capacity — bounded by a wastegate that vents excess so it doesn't overboost/knock. Fusion's idea-engine already generates this exact byproduct every run (the discarded_obvious list and killed NVFI candidates this very frame emits) and currently vents it to nothing.",
+     "fusion_target": "idea-engine kill-pass/discard output across Cairn→Transfer→Critic pipeline",
+     "category": "brain",
+     "lens": "structural fidelity — discard/reject pipeline recycling",
+     "nvfi": {
+      "novelty": 3,
+      "viability": 4,
+      "fit": 4,
+      "impact": 3
+     },
+     "traps": [
+      {
+       "type": "overboost/knock",
+       "note": "if too much recycled exhaust is re-injected, it drowns the current pass's signal in stale/killed material — needs an explicit cap analogous to a wastegate"
+      },
+      {
+       "type": "needs evidence",
+       "note": "provisional — untested whether killed-candidate volume is actually a fertile reservoir vs. correctly-dead material"
+      }
+     ],
+     "_frame": "F1-mechanism"
+    },
+    {
+     "spin": {
+      "situation": "Every new Larry session currently starts cold and has to re-read AGENTS.md/INDEX files to rebuild context.",
+      "problem": "That's exactly turbo lag — the moment you actually need Larry sharp, there's a delay while everything spools back up.",
+      "implication": "Minutes lost every session to re-deriving state that was already known before compaction/restart — the HIGH-ish backlog item already flagged.",
+      "need_payoff": "Keep a small background 'throttle' open at all times (a continuously topped-up context log) so that the moment a session starts, full context is already spinning and ready — zero lag."
+     },
+     "source_evidence": {
+      "quote": "But if I stay on the gas and press the brake, you slow down for the corner and the turbo keeps spinning. And the moment I let off the brake.",
+      "timestamp": "13:33",
+      "named_mechanism": "left-foot braking / two-pedal turbo anti-lag — maintaining spool via simultaneous throttle+brake"
+     },
+     "transfer_reasoning": "Invariant: decouple the 'maintain internal readiness' channel (throttle: keep the shaft spinning) from the 'external deployment' channel (brake: suppress forward motion/cost), running both concurrently, so that at trigger release full capacity is available with zero spool-up lag — versus a cold system where readiness only begins building once the trigger fires. Larry's context today is coupled: it only rebuilds once a new session starts reading cold, producing exactly this lag.",
+     "fusion_target": "Larry's cross-session context continuity (durable decision-rationale log + session-continuity capture, bcf9b41/5d57de9)",
+     "category": "brain",
+     "lens": "structural fidelity — session/context continuity architecture",
+     "nvfi": {
+      "novelty": 3,
+      "viability": 3,
+      "fit": 4,
+      "impact": 4
+     },
+     "traps": [
+      {
+       "type": "cost",
+       "note": "continuous background top-up writes have a small but nonzero token/write cost every session close — needs bounding"
+      },
+      {
+       "type": "already-partially-built",
+       "note": "session-continuity capture already exists (5d57de9); this refines it into an explicit two-channel model rather than net-new machinery"
+      }
+     ],
+     "_frame": "F1-mechanism"
+    },
+    {
+     "spin": {
+      "situation": "myPKA's quality/security gates (the idea Critic's NVFI+traps check, Vex's security checklist) work by checking a list of specific named things.",
+      "problem": "A checklist only catches what's on the list — it can't catch a NEW combination of individually-fine things that together beats the whole point of the gate, same as the race officials' weight/tire rules completely missing the AWD-plus-two-pedal combo.",
+      "implication": "Something could sail through every named check and still quietly defeat what the gate exists to protect, and nobody would notice until it's already won repeatedly.",
+      "need_payoff": "Add one extra, bounded question to every checklist gate — 'does this still defeat the point, even though it passes every line?' — catching the gap cheaply instead of discovering it after the fact."
+     },
+     "source_evidence": {
+      "quote": "You can only enforce the letter of the law. What was written... the spirit of law is what you wanted to happen or what you \"meant.\"",
+      "timestamp": "14:22",
+      "named_mechanism": "enumerated-parameter rulebook vs. unenumerated structural combination that is individually legal but collectively defeats rule-intent"
+     },
+     "transfer_reasoning": "Invariant: a governance gate built as a list of specific, enumerated parameter checks is structurally blind to new combinations of individually-compliant primitives that jointly defeat the gate's actual intent, because it checks letter (named parameters) not spirit (the outcome it exists to preserve). The source's fix only arrives ex-post (ban AWD outright next year) — expensive and reactive. The tight structural fix is adding one intent-check question distinct from the enumerated list, not more enumerated items.",
+     "fusion_target": "idea-engine Critic's NVFI+traps step and Vex's WS-003 Expansion security checklist",
+     "category": "cash",
+     "lens": "structural fidelity — governance/gate architecture",
+     "nvfi": {
+      "novelty": 3,
+      "viability": 4,
+      "fit": 3,
+      "impact": 3
+     },
+     "traps": [
+      {
+       "type": "scope-creep risk",
+       "note": "an open-ended 'spirit' question can become a vague catch-all that overrides objective checks — needs to stay a single bounded question, not a new discretionary veto layer"
+      },
+      {
+       "type": "needs evidence",
+       "note": "provisional; no concrete instance yet of a myPKA gate being beaten this way — flagging the architecture gap, not a proven incident"
+      }
+     ],
+     "_frame": "F1-mechanism"
+    }
+   ],
+   "zero_reason": null
+  },
+  {
+   "frame": "F2-inversion",
+   "discarded_obvious": [
+    "turbocharging = generic 'boost/acceleration' metaphor for any Fusion feature (too generic, not a failure mode)",
+    "AWD = redundancy/multiple-paths-are-good (positive feature restatement, not an inversion)",
+    "underdog engineering beats the favorite = 'innovation wins' (generic positive story, no specific breakage)",
+    "incremental rule escalation ending in an outright AWD/engine ban (folds into the letter-vs-spirit candidate; kept as one transfer, not two)"
+   ],
+   "candidates": [
+    {
+     "spin": {
+      "situation": "Larry's YouTube capture pipeline and Larry's own rich session context both depend on staying 'spooled up' while a session is actively running.",
+      "problem": "The instant the session ends or context compacts, that in-progress work loses momentum — it either stalls out as a stub note ('knowledge note pending — I'll write it next session') or evaporates outright, exactly like a turbo losing pressure the moment you lift off the gas.",
+      "implication": "Every session boundary becomes a mini cold-start: work has to re-spool from zero next time, producing placeholder notes and lost context that compound as Fusion runs more sessions.",
+      "need_payoff": "A small 'anti-lag' move — firing a lightweight checkpoint/flush at the exact moment attention lifts, instead of waiting for the next session to re-spin from cold — removes the stall without needing continuous foreground presence."
+     },
+     "source_evidence": {
+      "quote": "If I press the brake and let off the gas, I lose turbo pressure. *Futututoooo* ... But if I stay on the gas and press the brake, you slow down for the corner and the turbo keeps spinning.",
+      "timestamp": "13:09-13:52",
+      "named_mechanism": "anti-lag: holding two normally-exclusive controls together to keep a background process spinning through a gap where it would otherwise decay and 'sneeze'"
+     },
+     "transfer_reasoning": "The source shows a system whose stored power decays the instant the driving input stops, producing an audible failure signal (the sneeze) at that exact transition — and the fix is not 'push harder' but an inverted control combo that keeps the process alive DURING the gap. Fusion's capture pipeline and Larry's cross-session context have the identical assumption baked in: 'this only needs to run while I'm actively driving it (in-session).' The backlog items show that assumption failing the same way the un-fixed turbo failed.",
+     "fusion_target": "YouTube capture pipeline (Gateway/TubeAIR knowledge-note step) + Larry's session-continuity/compaction-survival mechanism",
+     "category": "brain",
+     "lens": "inverted assumption: 'the process only needs to run while actively driven' — false, it needs to keep spinning through the gap",
+     "nvfi": {
+      "novelty": 4,
+      "viability": 3,
+      "fit": 5,
+      "impact": 4
+     },
+     "traps": [
+      {
+       "type": "scope-creep",
+       "note": "could balloon into a full checkpoint/persistence subsystem instead of one minimal auto-flush at session-end — keep it to the anti-lag-sized fix"
+      },
+      {
+       "type": "needs-evidence",
+       "note": "NVFI is provisional — confirm the actual mechanism of the capture stall (attention-bound vs. a real blocking call) before building anything"
+      }
+     ],
+     "_frame": "F2-inversion"
+    },
+    {
+     "spin": {
+      "situation": "Fusion's merge gate leans on independent review (Codex + Fable) as the safety backstop before code goes live.",
+      "problem": "In the source, the rule-enforcer keeps losing because he can only ever enforce the LETTER of his own rules — he doesn't understand the actual mechanism (turbo, AWD tire-wear) he's regulating, so his nerfs never land on what's really happening. Codex reviews under a read-only sandbox that can't even read the files it's reviewing.",
+      "implication": "A review gate that's satisfied on the letter (tests pass, checklist ticked) but doesn't structurally see the mechanism under review gives false confidence — it can rubber-stamp exactly the kind of change it exists to catch.",
+      "need_payoff": "Worth an explicit, per-review check: did the reviewer actually see the mechanism, or just the surface diff? Where it's the latter, log it as reduced-confidence review rather than a clean independent pass."
+     },
+     "source_evidence": {
+      "quote": "You broke the spirit of the rules... You can only enforce the letter of the law. What was written.",
+      "timestamp": "14:22-14:44",
+      "named_mechanism": "letter-vs-spirit enforcement gap, compounded by the enforcer not understanding the mechanism he's policing ('I don't think he knows how a turbo works', 06:07)"
+     },
+     "transfer_reasoning": "The failure isn't that rules were absent — it's that the enforcer's mental model of the mechanism was incomplete, so every rule he wrote only ever caught the letter, never the spirit, and the gap was continuously exploited. Fusion already has a documented instance of the same shape: a reviewer (Codex) working blind because its sandbox blocks self-inspection. This is the same structural blind spot, not a new one — worth naming explicitly as a residual audit risk rather than assuming 'independent review ran' equals 'the mechanism was actually seen.'",
+     "fusion_target": "Multi-model build-verify loop / merge-ready gate (Codex read-only review step specifically)",
+     "category": "brain",
+     "lens": "inverted assumption: 'a review gate = safety' — false when the reviewer cannot see the mechanism, only the letter of the diff",
+     "nvfi": {
+      "novelty": 3,
+      "viability": 3,
+      "fit": 4,
+      "impact": 4
+     },
+     "traps": [
+      {
+       "type": "already-partially-addressed",
+       "note": "memory already flags Codex's read-only self-inspection gap and works around it by staging the diff into the prompt — this may be reinforcing evidence for that existing mitigation, not a new build"
+      },
+      {
+       "type": "governance-scope",
+       "note": "don't let this read as a call for MORE adversarial hardening — the hobby-brain threat bar stays correctness/leak/availability/audit, not crevice-hunting"
+      }
+     ],
+     "_frame": "F2-inversion"
+    },
+    {
+     "spin": {
+      "situation": "cockpit.build and cockpit.overall_state are known-stale self-model tables, last updated 2026-07-22, that get corrected field-by-field when someone notices one is wrong.",
+      "problem": "The source's rule-enforcer does the same thing to the racers — nerfs tires, then power, then weight, one visible lever at a time — and still loses every race, because the team's real edge is an interaction (AWD grip + anti-lag) that lever-by-lever patching never touches.",
+      "implication": "If Fusion keeps correcting cockpit.build/overall_state one field at a time, the tables can stay wrong in ways no single patch reaches — the enforcer's 'still untouchable' problem, just for Fusion's self-model instead of a race car.",
+      "need_payoff": "Before the next one-off field fix, find the actual process that's supposed to keep those tables current and repair that, instead of adding another isolated correction."
+     },
+     "source_evidence": {
+      "quote": "I gave you smaller tires. I reduced your power by adding a restrictor, and I added a whole lot of weight. And then you're still out there, just untouchable.",
+      "timestamp": "11:05-11:24",
+      "named_mechanism": "lever-by-lever symptom-nerfing that never reaches the underlying mechanism (AWD-reduced tire wear + brake-held turbo spool)"
+     },
+     "transfer_reasoning": "The assumption under test is 'adjusting each visible variable independently controls the outcome' — the source shows it failing three times in a row against the same unaddressed root mechanism. Fusion's stale self-model tables are a live instance of the identical pattern: symptom-level corrections instead of fixing whatever process should be feeding those tables continuously.",
+     "fusion_target": "cockpit.build / cockpit.overall_state self-model tables",
+     "category": "brain",
+     "lens": "inverted assumption: 'nerfing each visible lever controls the outcome' — false when the real driver is an un-addressed interaction/process",
+     "nvfi": {
+      "novelty": 3,
+      "viability": 4,
+      "fit": 4,
+      "impact": 3
+     },
+     "traps": [
+      {
+       "type": "generic-advice-risk",
+       "note": "root-cause-vs-symptom is a common trope — keep this grounded to the specific quoted mechanism (lever-by-lever nerfs failing against an unaddressed interaction), or it degrades into generic advice"
+      }
+     ],
+     "_frame": "F2-inversion"
+    }
+   ],
+   "zero_reason": null
+  },
+  {
+   "frame": "F3-operational",
+   "discarded_obvious": [
+    "underdog-beats-incumbent-via-clever-engineering = 'disruptive innovation' — too generic, doesn't name a component or change any action",
+    "AWD's four-wheel grip = redundancy/resilience — surface-level image match, no operational hook",
+    "rules keep changing to nerf the winner = 'regulatory capture / competitor sabotage' — no live Fusion trust boundary this maps to right now",
+    "turbocharging = 'force-multiplying a small resource' — true but too abstract to change what Warwick does next week"
+   ],
+   "candidates": [
+    {
+     "spin": {
+      "situation": "Larry's context (decisions, WHY, current state) gets rebuilt whenever a session restarts or compacts.",
+      "problem": "That rebuild is currently a point-in-time capture, not a running process — there's a real lag before Larry is back up to full context speed, and the backlog already flags this as a HIGH-ish, just-identified risk (2026-07-26).",
+      "implication": "Every compaction/restart costs Warwick attention re-explaining state, and worse, a decision made in the gap could quietly get lost or contradicted because Larry starts cold.",
+      "need_payoff": "Keep a lightweight state file continuously updated through the session (not only written at close), so Larry resumes at full speed the instant a session starts — no cold-start tax."
+     },
+     "source_evidence": {
+      "quote": "We found a problem with our turbo, and we fixed it by pressing the brakes more... If I stay on the gas and press the brake, you slow down for the corner and the turbo keeps spinning.",
+      "timestamp": "12:42-13:33",
+      "named_mechanism": "anti-lag / two-pedal driving: keep the turbo pre-spun through off-throttle moments so full power is instantly available, instead of letting it spool down and re-spooling cold."
+     },
+     "transfer_reasoning": "The car's power delivery has a lag between 'want power' and 'have power' unless the spinning mass is kept warm continuously — the fix isn't a bigger turbo, it's never letting it spin down. Larry's rich context has the identical lag shape: the expensive resource (session state) spins down at compaction/restart and must respool before it's useful.",
+     "fusion_target": "Session-continuity capture (the mechanism behind commit 5d57de9, 'current-state + session-handoff + SPIN-first') — extend it from a point-in-time capture to a rolling state file Larry writes to continuously through a session, not only at close.",
+     "category": "brain",
+     "lens": "F3-operational",
+     "nvfi": {
+      "novelty": 3,
+      "viability": 4,
+      "fit": 5,
+      "impact": 4
+     },
+     "traps": [
+      {
+       "type": "already-partially-done",
+       "note": "session-continuity capture already exists (5d57de9) — this is 'make it continuous' not 'build from zero', so treat impact as incremental, not foundational."
+      }
+     ],
+     "_frame": "F3-operational"
+    },
+    {
+     "spin": {
+      "situation": "The T2 divergence architecture + Neo4j graph-signal audit just landed as a design package, explicitly logged as 'delegated, report-only.'",
+      "problem": "A report-only design audit is a paper calculation — it says the architecture SHOULD work, not that it DOES work against live graph data.",
+      "implication": "If T2 gets treated as done because the design reads well, the first real test of whether it holds happens later in production, when it's expensive to unwind.",
+      "need_payoff": "Before calling T2 divergence 'ready,' run it against a real slice of the live Neo4j graph and check the signal behaves as the audit predicted — prove it on tarmac, not on paper."
+     },
+     "source_evidence": {
+      "quote": "We calculated how the car should perform and on paper it should do quite well... No no, no, we don't race on paper either. Like we race on tarmac.",
+      "timestamp": "00:55-01:18",
+      "named_mechanism": "paper-performance vs track-performance: a calculated/simulated result isn't credited until it runs on the real surface."
+     },
+     "transfer_reasoning": "The engineers trusted their model of grip and power delivery, but only what shows up on tarmac counts. The T2 design + audit is Fusion's 'calculation' — a report-only, delegated pass — and hasn't yet been run against the live graph the way a car is run on track.",
+     "fusion_target": "T2 divergence architecture (Deliverables/idea-engine-T2-design-DRAFT.md) and its Neo4j graph-signal audit — gate its 'done' status on one live-graph test run, not on the design audit alone.",
+     "category": "brain",
+     "lens": "F3-operational",
+     "nvfi": {
+      "novelty": 2,
+      "viability": 4,
+      "fit": 5,
+      "impact": 4
+     },
+     "traps": [
+      {
+       "type": "restating-known-principle",
+       "note": "Warwick already holds 'build to the goal, don't ship the slice as the goal' as a standing principle — this candidate's only new value is pointing that principle at the specific T2 artifact sitting delegated right now."
+      }
+     ],
+     "_frame": "F3-operational"
+    }
+   ],
+   "zero_reason": null
+  },
+  {
+   "frame": "F4-commercial",
+   "discarded_obvious": [
+    "Underdog outsider beats complacent incumbents through technical merit — generic motivational reading, no transferable mechanism, no named Fusion component.",
+    "Letter-of-the-law vs spirit-of-the-law rules-lawyering — too abstract as a business lesson, and the concrete version (loophole/regulatory arbitrage as a service) has no plausible external buyer and an ethically fuzzy value prop; self-kills.",
+    "AWD spreads torque across four tires so each wears slower ('lifting weight with both arms') — real engineering insight but purely internal-efficiency framed, no external revenue or independence path visible.",
+    "Governing body bans the foreign competitor by writing an 'American engines only' rule — protectionist drama with no transferable commercial mechanism for Fusion, discard."
+   ],
+   "candidates": [
+    {
+     "spin": {
+      "situation": "Fusion runs an idea-engine that consumes outside content (like this transcript) and produces commercial transfer candidates for Warwick alone.",
+      "problem": "Everything this engine produces today — including the discarded candidates and rationale trail — is exhaust that gets used once internally and then thrown away.",
+      "implication": "That is the same waste the turbo eliminates: high-pressure output being vented uselessly instead of being fed back to make more output, meaning Fusion is paying the full cost of the engine but only monetising a fraction of what it makes.",
+      "need_payoff": "If outside people could feed their own consumed content into the same engine and get back paid transfer candidates, the exhaust becomes a second revenue stream built on machinery Fusion already owns and runs for free internally."
+     },
+     "source_evidence": {
+      "quote": "We turn the exhaust back into energy that we can use.",
+      "timestamp": "06:49",
+      "named_mechanism": "turbocharging — recovering waste exhaust energy and feeding it back to amplify the very process that produced it"
+     },
+     "transfer_reasoning": "The turbo doesn't add a new engine — it recaptures a byproduct of the existing one and routes it back in to compound output. Fusion's Cockpit + Transfer-Intelligence pipeline already generates far more raw ideation exhaust (discarded candidates, rationale logs, per-frame outputs) than Warwick alone consumes. Exposing a thin customer-facing valve on the same pipeline — 'feed us what you've read/watched, get back external-value transfer candidates' — recovers that wasted throughput as paid output without building a new core mechanism.",
+     "fusion_target": "Cockpit + Transfer-Intelligence specialist pipeline (this frame's own engine), exposed via a client-facing intake valve",
+     "category": "cash",
+     "lens": "byproduct-recycling",
+     "nvfi": {
+      "novelty": 3,
+      "viability": 3,
+      "fit": 4,
+      "impact": 4
+     },
+     "traps": [
+      {
+       "type": "scope-creep",
+       "note": "this is exactly the BUILD-014 platform trap — start with one manual run against one outside person's reading list, not a subscription product"
+      },
+      {
+       "type": "needs-evidence",
+       "note": "zero validated external demand yet; needs one unpaid or paid pilot before any build decision"
+      }
+     ],
+     "_frame": "F4-commercial"
+    },
+    {
+     "spin": {
+      "situation": "Most businesses treat slow strategy/ideation cycles (weeks of workshops, consultant decks) as a fixed cost of doing business.",
+      "problem": "They accept that lag the same way the American teams accepted turbo lag as just how turbo engines are — a limitation nobody thought to attack because the fix uses an unrelated control.",
+      "implication": "Whoever finds the odd coupling that removes the lag gets a durable, hard-to-copy edge — the AWD team didn't out-spend rivals, they out-found them.",
+      "need_payoff": "Fusion already owns the odd coupling: a multi-frame ideation engine that runs many independent lenses over one source in a single sitting. Selling that as a same-day rapid-ideation sprint for outside companies converts an internal capability into a second income stream, which is the concrete lever for reducing dependence on Bellrock."
+     },
+     "source_evidence": {
+      "quote": "if I stay on the gas and press the brake, you slow down for the corner and the turbo keeps spinning",
+      "timestamp": "13:24",
+      "named_mechanism": "anti-lag brake-boost — coupling an unrelated existing control (the brake) to eliminate lag in a different subsystem (turbo spool-up)"
+     },
+     "transfer_reasoning": "The insight wasn't a new part, it was noticing that a control already in the car (the brake pedal) could be repurposed to solve a problem in a system rivals treated as inherently slow. Fusion's multi-frame parallel Transfer-Intelligence run is an already-built capability that could be repurposed the same way: pointed at an outside client's problem instead of Warwick's, sold as a same-day 'idea lag' removal sprint, competing against consultancies whose ideation cycle is weeks long.",
+     "fusion_target": "Transfer-Intelligence specialist (multi-frame parallel run), repackaged as a client-facing rapid-ideation sprint",
+     "category": "cash",
+     "lens": "latency-arbitrage",
+     "nvfi": {
+      "novelty": 3,
+      "viability": 3,
+      "fit": 3,
+      "impact": 3
+     },
+     "traps": [
+      {
+       "type": "cost",
+       "note": "selling a service requires packaging/pricing/outreach effort entirely outside current build scope — not a code task, needs Warwick's own time"
+      },
+      {
+       "type": "already-doing-it",
+       "note": "Fusion already runs this internally for Warwick; the only delta is 'sell it externally' — confirm appetite exists before building any client-facing tooling"
+      }
+     ],
+     "_frame": "F4-commercial"
+    },
+    {
+     "spin": {
+      "situation": "The manufacturer didn't enter the series to win a trophy — they raced specifically to be seen, because attention was the thing that actually converted to car sales in a market where nobody knew their brand.",
+      "problem": "Fusion's idea-engine output (including candidates like this one) stays entirely private to Warwick, so even once a cash-tier idea is validated and built, there's no visible proof for outside buyers to react to.",
+      "implication": "Without a public, provable showcase, any future cash product has to be pitched cold and abstractly — the hardest way to sell anything — instead of pointing at a result that already happened.",
+      "need_payoff": "A small public 'show your work' channel for the engine's proven wins gives Fusion the same distribution shortcut the manufacturer used: let the result itself be the advertisement."
+     },
+     "source_evidence": {
+      "quote": "Winning will get the most eyeballs on our car... We want to sell more cars here in America. To do that, we need attention.",
+      "timestamp": "00:25",
+      "named_mechanism": "racing-as-marketing — competing publicly to earn attention that converts to sales, treating the win as a distribution channel rather than the goal itself"
+     },
+     "transfer_reasoning": "The team's real objective was never the podium; the podium was instrumental to being seen by the exact buyers they wanted. Fusion's equivalent instrumental move is publishing a proven, provenance-tagged case study once any transfer candidate from this same engine is actually built and makes money — using the demonstrated result as the pitch instead of describing the mechanism to prospects who have no reason to believe it works yet.",
+     "fusion_target": "Cockpit output surface — a public case-study/showcase feed for the idea engine's proven cash-tier hits",
+     "category": "cash",
+     "lens": "attention-as-distribution",
+     "nvfi": {
+      "novelty": 2,
+      "viability": 3,
+      "fit": 3,
+      "impact": 2
+     },
+     "traps": [
+      {
+       "type": "premature",
+       "note": "there is nothing to showcase yet — this only fires after a cash-tier idea from this same engine has actually been built and proven; do not build the showcase ahead of a result"
+      }
+     ],
+     "_frame": "F4-commercial"
+    }
+   ],
+   "zero_reason": null
+  },
+  {
+   "frame": "F5-crossdomain",
+   "discarded_obvious": [
+    "Winning races = eyeballs/attention (00:25-00:55) — direct 1:1 marketing-attention mapping, no transfer needed",
+    "Custom tube-frame chassis vs modified sedan (01:34-01:54) — obvious purpose-built-vs-adapted build-vs-buy analogy",
+    "AWD splits power across four wheels vs RWD (11:24-11:44) — maps straight onto Fusion's existing multi-specialist load-splitting roster, already the design",
+    "Blue flags letting a faster car pass a slower one unimpeded (05:10-05:19) — generic priority-queue/interrupt pattern, no distance",
+    "Lapping the whole field despite handicaps proving legitimacy (10:43-11:24) — obvious 'overwhelming evidence = high confidence score' mapping"
+   ],
+   "candidates": [
+    {
+     "spin": {
+      "situation": "Warwick clicks Decline or Later on Cockpit idea cards fairly often.",
+      "problem": "Right now those declines just vanish — the reasoning behind 'no' is vented and lost, like an engine dumping its exhaust straight into the air.",
+      "implication": "The Transfer-Intelligence pipeline keeps re-proposing similar misses because it never learns from what got rejected and why — wasted exhaust pressure that could have made the next batch of ideas stronger.",
+      "need_payoff": "Route Decline reasons back into Cairn/Transfer-Intelligence as forced input for the next pass — same mechanism as a turbo using waste exhaust to force-feed the same engine more air."
+     },
+     "source_evidence": {
+      "quote": "we use the exhaust to spin another thing... one side spins from the exhaust and the other side spins to suck fresh air into the engine. So the explosions are even bigger.",
+      "timestamp": "06:32-06:49",
+      "named_mechanism": "turbocharger: waste exhaust gas drives a compressor that force-feeds richer intake into the very same engine, closing an open-loop waste stream into a closed loop"
+     },
+     "transfer_reasoning": "Structural invariant: a byproduct normally vented as waste is instead coupled on a shared shaft to compress richer input for the same process. Fusion's Cockpit Decline/Later stream is the exhaust — currently vented (logged-and-forgotten) rather than compressing the next round of candidate generation. The defensible claim in one sentence: 'a mechanism that turns a system's own rejected output into forced input for its own next cycle is structurally a turbocharger, not a cache.'",
+     "fusion_target": "Cockpit Decline/Later action stream -> feedback loop into Cairn intake / Transfer-Intelligence specialist's next mining pass",
+     "category": "brain",
+     "lens": "F5-crossdomain",
+     "nvfi": {
+      "novelty": 5,
+      "viability": 3,
+      "fit": 4,
+      "impact": 3
+     },
+     "traps": [
+      {
+       "type": "cost",
+       "note": "needs decline-reason capture (not just a click event) plus a labeled-negative-signal pipeline — nontrivial build, not a config flag"
+      },
+      {
+       "type": "needs-evidence",
+       "note": "unproven whether decline reasons are specific enough to be useful compressor fuel vs just noise"
+      }
+     ],
+     "_frame": "F5-crossdomain"
+    },
+    {
+     "spin": {
+      "situation": "When Warwick opens the Cockpit expecting a proactive 'you nearly missed this' surfacing, there's sometimes a beat of lag before it appears.",
+      "problem": "That lag is the graph-traversal + embedding cold-start — the equivalent of turbo lag: the compressor has spun down and needs time to spool back up.",
+      "implication": "A user who has to wait for insight loses the 'nearly missed this' urgency — by the time it renders, the moment feels less proactive and more like a report.",
+      "need_payoff": "Keep the expensive path lightly spinning during idle Cockpit time (not full cache-warming, but throttle-open-under-braking style priming) so the answer is already spooled when Warwick actually asks."
+     },
+     "source_evidence": {
+      "quote": "if I stay on the gas and press the brake, you slow down for the corner and the turbo keeps spinning. And the moment I let off the brake... [instant power]",
+      "timestamp": "13:33-13:57",
+      "named_mechanism": "anti-lag: the throttle is deliberately kept open under braking so the turbo never drops speed, eliminating spool-up delay exactly when power is needed"
+     },
+     "transfer_reasoning": "Structural invariant: a component with high spin-up cost is kept 'lightly loaded but never idle' during a low-demand phase, so the moment full demand returns there is zero lag — distinct from static caching because it requires continuous light throttle, not a one-time precompute. Applied to the Outputs Layer's Neo4j/embedding path during Warwick's idle Cockpit browsing.",
+     "fusion_target": "Outputs Layer proactive-surfacing pipeline (Neo4j traversal + embedding call warm path)",
+     "category": "brain",
+     "lens": "F5-crossdomain",
+     "nvfi": {
+      "novelty": 3,
+      "viability": 4,
+      "fit": 3,
+      "impact": 3
+     },
+     "traps": [
+      {
+       "type": "already-doing-it",
+       "note": "if a keep-alive/warm-cache already exists on this path this collapses to nothing new — check before proposing"
+      }
+     ],
+     "_frame": "F5-crossdomain"
+    },
+    {
+     "spin": {
+      "situation": "Fusion already has one hardlocked rule (Fable confirm-first) that exists specifically because a softer, incremental fix kept getting worked around by GPT-relayed directive text sneaking in.",
+      "problem": "That pattern — patch the letter of the rule, watch it get legally out-maneuvered, patch again, repeat — is exactly the regulator's losing strategy in the source before it finally banned the whole category outright.",
+      "implication": "Without a named threshold for 'stop patching, escalate to a categorical rule,' each future loophole will eat another full incident cycle before Warwick has to manually decide to hardlock it, same as it took years of re-nerfing before the AWD ban.",
+      "need_payoff": "Write an explicit escalation ladder into the decision-rationale log: N re-exploited patches on the same rule triggers an automatic proposal to Warwick for a categorical (hardlock) rule, rather than relying on Larry noticing the pattern each time."
+     },
+     "source_evidence": {
+      "quote": "You can only enforce the letter of the law... the spirit of the law is what you wanted to happen or what you meant... All wheel drive is banned there. (This actually happened)",
+      "timestamp": "14:22-15:37",
+      "named_mechanism": "a regulator abandons incremental letter-of-the-rule patches for a categorical prohibition only after the same structural advantage keeps re-emerging through legal loopholes"
+     },
+     "transfer_reasoning": "Structural invariant: incremental patches to a rule's letter lose repeatedly to a fixed structural advantage; the only fix that closes the gap is a categorical rule targeting the advantage itself, decided explicitly rather than organically. Fusion has lived this once (Fable hardlock) but has no formalized trigger for recognizing it earlier next time — the transfer is naming and logging the threshold, not the individual hardlock.",
+     "fusion_target": "Decision-rationale log — formal escalation policy for converting repeatedly-worked-around soft rules into hardlocks",
+     "category": "brain",
+     "lens": "F5-crossdomain",
+     "nvfi": {
+      "novelty": 3,
+      "viability": 4,
+      "fit": 4,
+      "impact": 3
+     },
+     "traps": [
+      {
+       "type": "already-doing-it",
+       "note": "the Fable hardlock is this pattern already instantiated once ad hoc — value here is only in generalizing/logging it as a named policy, not discovering something unprecedented"
+      }
+     ],
+     "_frame": "F5-crossdomain"
+    }
+   ],
+   "zero_reason": null
+  }
+ ],
+ "enriched": [
+  {
+   "spin": {
+    "situation": "Every time the idea-engine runs, it produces a pile of killed/discarded ideas alongside the good ones.",
+    "problem": "Right now those discards are just thrown away — pure waste, same as exhaust shooting out a tailpipe.",
+    "implication": "That's expensive: to get more good ideas out, the instinct is to run bigger/pricier passes (more frames, Fable) rather than getting more out of what's already been paid for.",
+    "need_payoff": "If the 'exhaust' (killed candidates) were captured and fed back in as extra fuel for the next pass, you'd get a bigger boost in idea quality/volume without buying a bigger engine."
+   },
+   "source_evidence": {
+    "quote": "One side spins from the exhaust and the other side spins to suck fresh air into the engine. So the explosions are even bigger.",
+    "timestamp": "07:03",
+    "named_mechanism": "turbocharger — twin-turbine shaft coupling exhaust waste-energy recovery to intake forced induction"
+   },
+   "transfer_reasoning": "Invariant: a shared-shaft mechanism captures the discarded byproduct of a process and mechanically couples it back into that same process's input, so a small fixed-capacity 'engine' outperforms a much larger one without adding base capacity — bounded by a wastegate that vents excess so it doesn't overboost/knock. Fusion's idea-engine already generates this exact byproduct every run (the discarded_obvious list and killed NVFI candidates this very frame emits) and currently vents it to nothing.",
+   "fusion_target": "idea-engine kill-pass/discard output across Cairn→Transfer→Critic pipeline",
+   "category": "brain",
+   "lens": "structural fidelity — discard/reject pipeline recycling",
+   "nvfi": {
+    "novelty": 3,
+    "viability": 4,
+    "fit": 4,
+    "impact": 3
+   },
+   "traps": [
+    {
+     "type": "overboost/knock",
+     "note": "if too much recycled exhaust is re-injected, it drowns the current pass's signal in stale/killed material — needs an explicit cap analogous to a wastegate"
+    },
+    {
+     "type": "needs evidence",
+     "note": "provisional — untested whether killed-candidate volume is actually a fertile reservoir vs. correctly-dead material"
+    }
+   ],
+   "_frame": "F1-mechanism",
+   "frame": "F1-mechanism",
+   "_graph": {
+    "fired": [
+     "novelty_to_graph",
+     "related_prior_decision",
+     "related_active_problem"
+    ],
+    "not_wired_today": [
+     "prior_rejection/duplication (needs idea_candidate history join)",
+     "recurrence footprint (corpus too thin — ~5 docs)",
+     "recency/trajectory (single ingest window)"
+    ],
+    "novelty_to_graph": {
+     "status": "novel_to_graph",
+     "nearest": []
+    },
+    "related_prior_decision": [
+     "Cloud engine room"
+    ],
+    "related_active_problem": [
+     "pass"
+    ]
+   }
+  },
+  {
+   "spin": {
+    "situation": "Every new Larry session currently starts cold and has to re-read AGENTS.md/INDEX files to rebuild context.",
+    "problem": "That's exactly turbo lag — the moment you actually need Larry sharp, there's a delay while everything spools back up.",
+    "implication": "Minutes lost every session to re-deriving state that was already known before compaction/restart — the HIGH-ish backlog item already flagged.",
+    "need_payoff": "Keep a small background 'throttle' open at all times (a continuously topped-up context log) so that the moment a session starts, full context is already spinning and ready — zero lag."
+   },
+   "source_evidence": {
+    "quote": "But if I stay on the gas and press the brake, you slow down for the corner and the turbo keeps spinning. And the moment I let off the brake.",
+    "timestamp": "13:33",
+    "named_mechanism": "left-foot braking / two-pedal turbo anti-lag — maintaining spool via simultaneous throttle+brake"
+   },
+   "transfer_reasoning": "Invariant: decouple the 'maintain internal readiness' channel (throttle: keep the shaft spinning) from the 'external deployment' channel (brake: suppress forward motion/cost), running both concurrently, so that at trigger release full capacity is available with zero spool-up lag — versus a cold system where readiness only begins building once the trigger fires. Larry's context today is coupled: it only rebuilds once a new session starts reading cold, producing exactly this lag.",
+   "fusion_target": "Larry's cross-session context continuity (durable decision-rationale log + session-continuity capture, bcf9b41/5d57de9)",
+   "category": "brain",
+   "lens": "structural fidelity — session/context continuity architecture",
+   "nvfi": {
+    "novelty": 3,
+    "viability": 3,
+    "fit": 4,
+    "impact": 4
+   },
+   "traps": [
+    {
+     "type": "cost",
+     "note": "continuous background top-up writes have a small but nonzero token/write cost every session close — needs bounding"
+    },
+    {
+     "type": "already-partially-built",
+     "note": "session-continuity capture already exists (5d57de9); this refines it into an explicit two-channel model rather than net-new machinery"
+    }
+   ],
+   "_frame": "F1-mechanism",
+   "frame": "F1-mechanism",
+   "_graph": {
+    "fired": [
+     "novelty_to_graph",
+     "related_active_problem"
+    ],
+    "not_wired_today": [
+     "prior_rejection/duplication (needs idea_candidate history join)",
+     "recurrence footprint (corpus too thin — ~5 docs)",
+     "recency/trajectory (single ingest window)"
+    ],
+    "novelty_to_graph": {
+     "status": "known_or_partial",
+     "nearest": [
+      "Footnote"
+     ]
+    },
+    "related_active_problem": [
+     "Larry",
+     "session",
+     "context"
+    ]
+   }
+  },
+  {
+   "spin": {
+    "situation": "myPKA's quality/security gates (the idea Critic's NVFI+traps check, Vex's security checklist) work by checking a list of specific named things.",
+    "problem": "A checklist only catches what's on the list — it can't catch a NEW combination of individually-fine things that together beats the whole point of the gate, same as the race officials' weight/tire rules completely missing the AWD-plus-two-pedal combo.",
+    "implication": "Something could sail through every named check and still quietly defeat what the gate exists to protect, and nobody would notice until it's already won repeatedly.",
+    "need_payoff": "Add one extra, bounded question to every checklist gate — 'does this still defeat the point, even though it passes every line?' — catching the gap cheaply instead of discovering it after the fact."
+   },
+   "source_evidence": {
+    "quote": "You can only enforce the letter of the law. What was written... the spirit of law is what you wanted to happen or what you \"meant.\"",
+    "timestamp": "14:22",
+    "named_mechanism": "enumerated-parameter rulebook vs. unenumerated structural combination that is individually legal but collectively defeats rule-intent"
+   },
+   "transfer_reasoning": "Invariant: a governance gate built as a list of specific, enumerated parameter checks is structurally blind to new combinations of individually-compliant primitives that jointly defeat the gate's actual intent, because it checks letter (named parameters) not spirit (the outcome it exists to preserve). The source's fix only arrives ex-post (ban AWD outright next year) — expensive and reactive. The tight structural fix is adding one intent-check question distinct from the enumerated list, not more enumerated items.",
+   "fusion_target": "idea-engine Critic's NVFI+traps step and Vex's WS-003 Expansion security checklist",
+   "category": "cash",
+   "lens": "structural fidelity — governance/gate architecture",
+   "nvfi": {
+    "novelty": 3,
+    "viability": 4,
+    "fit": 3,
+    "impact": 3
+   },
+   "traps": [
+    {
+     "type": "scope-creep risk",
+     "note": "an open-ended 'spirit' question can become a vague catch-all that overrides objective checks — needs to stay a single bounded question, not a new discretionary veto layer"
+    },
+    {
+     "type": "needs evidence",
+     "note": "provisional; no concrete instance yet of a myPKA gate being beaten this way — flagging the architecture gap, not a proven incident"
+    }
+   ],
+   "_frame": "F1-mechanism",
+   "frame": "F1-mechanism",
+   "_graph": {
+    "fired": [
+     "novelty_to_graph",
+     "related_prior_decision"
+    ],
+    "not_wired_today": [
+     "prior_rejection/duplication (needs idea_candidate history join)",
+     "recurrence footprint (corpus too thin — ~5 docs)",
+     "recency/trajectory (single ingest window)"
+    ],
+    "novelty_to_graph": {
+     "status": "known_or_partial",
+     "nearest": [
+      "Model Parameters",
+      "Chunk Overlap Parameter (100)",
+      "Files Parameter"
+     ]
+    },
+    "related_prior_decision": [
+     "Cloud engine room"
+    ]
+   }
+  },
+  {
+   "spin": {
+    "situation": "Larry's YouTube capture pipeline and Larry's own rich session context both depend on staying 'spooled up' while a session is actively running.",
+    "problem": "The instant the session ends or context compacts, that in-progress work loses momentum — it either stalls out as a stub note ('knowledge note pending — I'll write it next session') or evaporates outright, exactly like a turbo losing pressure the moment you lift off the gas.",
+    "implication": "Every session boundary becomes a mini cold-start: work has to re-spool from zero next time, producing placeholder notes and lost context that compound as Fusion runs more sessions.",
+    "need_payoff": "A small 'anti-lag' move — firing a lightweight checkpoint/flush at the exact moment attention lifts, instead of waiting for the next session to re-spin from cold — removes the stall without needing continuous foreground presence."
+   },
+   "source_evidence": {
+    "quote": "If I press the brake and let off the gas, I lose turbo pressure. *Futututoooo* ... But if I stay on the gas and press the brake, you slow down for the corner and the turbo keeps spinning.",
+    "timestamp": "13:09-13:52",
+    "named_mechanism": "anti-lag: holding two normally-exclusive controls together to keep a background process spinning through a gap where it would otherwise decay and 'sneeze'"
+   },
+   "transfer_reasoning": "The source shows a system whose stored power decays the instant the driving input stops, producing an audible failure signal (the sneeze) at that exact transition — and the fix is not 'push harder' but an inverted control combo that keeps the process alive DURING the gap. Fusion's capture pipeline and Larry's cross-session context have the identical assumption baked in: 'this only needs to run while I'm actively driving it (in-session).' The backlog items show that assumption failing the same way the un-fixed turbo failed.",
+   "fusion_target": "YouTube capture pipeline (Gateway/TubeAIR knowledge-note step) + Larry's session-continuity/compaction-survival mechanism",
+   "category": "brain",
+   "lens": "inverted assumption: 'the process only needs to run while actively driven' — false, it needs to keep spinning through the gap",
+   "nvfi": {
+    "novelty": 4,
+    "viability": 3,
+    "fit": 5,
+    "impact": 4
+   },
+   "traps": [
+    {
+     "type": "scope-creep",
+     "note": "could balloon into a full checkpoint/persistence subsystem instead of one minimal auto-flush at session-end — keep it to the anti-lag-sized fix"
+    },
+    {
+     "type": "needs-evidence",
+     "note": "NVFI is provisional — confirm the actual mechanism of the capture stall (attention-bound vs. a real blocking call) before building anything"
+    }
+   ],
+   "_frame": "F2-inversion",
+   "frame": "F2-inversion",
+   "_graph": {
+    "fired": [
+     "novelty_to_graph",
+     "related_active_problem"
+    ],
+    "not_wired_today": [
+     "prior_rejection/duplication (needs idea_candidate history join)",
+     "recurrence footprint (corpus too thin — ~5 docs)",
+     "recency/trajectory (single ingest window)"
+    ],
+    "novelty_to_graph": {
+     "status": "known_or_partial",
+     "nearest": [
+      "Quantization",
+      "Anti-Gravity"
+     ]
+    },
+    "related_active_problem": [
+     "YouTube",
+     "capture"
+    ]
+   }
+  },
+  {
+   "spin": {
+    "situation": "Fusion's merge gate leans on independent review (Codex + Fable) as the safety backstop before code goes live.",
+    "problem": "In the source, the rule-enforcer keeps losing because he can only ever enforce the LETTER of his own rules — he doesn't understand the actual mechanism (turbo, AWD tire-wear) he's regulating, so his nerfs never land on what's really happening. Codex reviews under a read-only sandbox that can't even read the files it's reviewing.",
+    "implication": "A review gate that's satisfied on the letter (tests pass, checklist ticked) but doesn't structurally see the mechanism under review gives false confidence — it can rubber-stamp exactly the kind of change it exists to catch.",
+    "need_payoff": "Worth an explicit, per-review check: did the reviewer actually see the mechanism, or just the surface diff? Where it's the latter, log it as reduced-confidence review rather than a clean independent pass."
+   },
+   "source_evidence": {
+    "quote": "You broke the spirit of the rules... You can only enforce the letter of the law. What was written.",
+    "timestamp": "14:22-14:44",
+    "named_mechanism": "letter-vs-spirit enforcement gap, compounded by the enforcer not understanding the mechanism he's policing ('I don't think he knows how a turbo works', 06:07)"
+   },
+   "transfer_reasoning": "The failure isn't that rules were absent — it's that the enforcer's mental model of the mechanism was incomplete, so every rule he wrote only ever caught the letter, never the spirit, and the gap was continuously exploited. Fusion already has a documented instance of the same shape: a reviewer (Codex) working blind because its sandbox blocks self-inspection. This is the same structural blind spot, not a new one — worth naming explicitly as a residual audit risk rather than assuming 'independent review ran' equals 'the mechanism was actually seen.'",
+   "fusion_target": "Multi-model build-verify loop / merge-ready gate (Codex read-only review step specifically)",
+   "category": "brain",
+   "lens": "inverted assumption: 'a review gate = safety' — false when the reviewer cannot see the mechanism, only the letter of the diff",
+   "nvfi": {
+    "novelty": 3,
+    "viability": 3,
+    "fit": 4,
+    "impact": 4
+   },
+   "traps": [
+    {
+     "type": "already-partially-addressed",
+     "note": "memory already flags Codex's read-only self-inspection gap and works around it by staging the diff into the prompt — this may be reinforcing evidence for that existing mitigation, not a new build"
+    },
+    {
+     "type": "governance-scope",
+     "note": "don't let this read as a call for MORE adversarial hardening — the hobby-brain threat bar stays correctness/leak/availability/audit, not crevice-hunting"
+    }
+   ],
+   "_frame": "F2-inversion",
+   "frame": "F2-inversion",
+   "_graph": {
+    "fired": [
+     "novelty_to_graph",
+     "related_active_problem"
+    ],
+    "not_wired_today": [
+     "prior_rejection/duplication (needs idea_candidate history join)",
+     "recurrence footprint (corpus too thin — ~5 docs)",
+     "recency/trajectory (single ingest window)"
+    ],
+    "novelty_to_graph": {
+     "status": "novel_to_graph",
+     "nearest": []
+    },
+    "related_active_problem": [
+     "model",
+     "build"
+    ]
+   }
+  },
+  {
+   "spin": {
+    "situation": "cockpit.build and cockpit.overall_state are known-stale self-model tables, last updated 2026-07-22, that get corrected field-by-field when someone notices one is wrong.",
+    "problem": "The source's rule-enforcer does the same thing to the racers — nerfs tires, then power, then weight, one visible lever at a time — and still loses every race, because the team's real edge is an interaction (AWD grip + anti-lag) that lever-by-lever patching never touches.",
+    "implication": "If Fusion keeps correcting cockpit.build/overall_state one field at a time, the tables can stay wrong in ways no single patch reaches — the enforcer's 'still untouchable' problem, just for Fusion's self-model instead of a race car.",
+    "need_payoff": "Before the next one-off field fix, find the actual process that's supposed to keep those tables current and repair that, instead of adding another isolated correction."
+   },
+   "source_evidence": {
+    "quote": "I gave you smaller tires. I reduced your power by adding a restrictor, and I added a whole lot of weight. And then you're still out there, just untouchable.",
+    "timestamp": "11:05-11:24",
+    "named_mechanism": "lever-by-lever symptom-nerfing that never reaches the underlying mechanism (AWD-reduced tire wear + brake-held turbo spool)"
+   },
+   "transfer_reasoning": "The assumption under test is 'adjusting each visible variable independently controls the outcome' — the source shows it failing three times in a row against the same unaddressed root mechanism. Fusion's stale self-model tables are a live instance of the identical pattern: symptom-level corrections instead of fixing whatever process should be feeding those tables continuously.",
+   "fusion_target": "cockpit.build / cockpit.overall_state self-model tables",
+   "category": "brain",
+   "lens": "inverted assumption: 'nerfing each visible lever controls the outcome' — false when the real driver is an un-addressed interaction/process",
+   "nvfi": {
+    "novelty": 3,
+    "viability": 4,
+    "fit": 4,
+    "impact": 3
+   },
+   "traps": [
+    {
+     "type": "generic-advice-risk",
+     "note": "root-cause-vs-symptom is a common trope — keep this grounded to the specific quoted mechanism (lever-by-lever nerfs failing against an unaddressed interaction), or it degrades into generic advice"
+    }
+   ],
+   "_frame": "F2-inversion",
+   "frame": "F2-inversion",
+   "_graph": {
+    "fired": [
+     "novelty_to_graph",
+     "related_active_problem"
+    ],
+    "not_wired_today": [
+     "prior_rejection/duplication (needs idea_candidate history join)",
+     "recurrence footprint (corpus too thin — ~5 docs)",
+     "recency/trajectory (single ingest window)"
+    ],
+    "novelty_to_graph": {
+     "status": "novel_to_graph",
+     "nearest": []
+    },
+    "related_active_problem": [
+     "cockpit",
+     "build",
+     "overall"
+    ]
+   }
+  },
+  {
+   "spin": {
+    "situation": "Larry's context (decisions, WHY, current state) gets rebuilt whenever a session restarts or compacts.",
+    "problem": "That rebuild is currently a point-in-time capture, not a running process — there's a real lag before Larry is back up to full context speed, and the backlog already flags this as a HIGH-ish, just-identified risk (2026-07-26).",
+    "implication": "Every compaction/restart costs Warwick attention re-explaining state, and worse, a decision made in the gap could quietly get lost or contradicted because Larry starts cold.",
+    "need_payoff": "Keep a lightweight state file continuously updated through the session (not only written at close), so Larry resumes at full speed the instant a session starts — no cold-start tax."
+   },
+   "source_evidence": {
+    "quote": "We found a problem with our turbo, and we fixed it by pressing the brakes more... If I stay on the gas and press the brake, you slow down for the corner and the turbo keeps spinning.",
+    "timestamp": "12:42-13:33",
+    "named_mechanism": "anti-lag / two-pedal driving: keep the turbo pre-spun through off-throttle moments so full power is instantly available, instead of letting it spool down and re-spooling cold."
+   },
+   "transfer_reasoning": "The car's power delivery has a lag between 'want power' and 'have power' unless the spinning mass is kept warm continuously — the fix isn't a bigger turbo, it's never letting it spin down. Larry's rich context has the identical lag shape: the expensive resource (session state) spins down at compaction/restart and must respool before it's useful.",
+   "fusion_target": "Session-continuity capture (the mechanism behind commit 5d57de9, 'current-state + session-handoff + SPIN-first') — extend it from a point-in-time capture to a rolling state file Larry writes to continuously through a session, not only at close.",
+   "category": "brain",
+   "lens": "F3-operational",
+   "nvfi": {
+    "novelty": 3,
+    "viability": 4,
+    "fit": 5,
+    "impact": 4
+   },
+   "traps": [
+    {
+     "type": "already-partially-done",
+     "note": "session-continuity capture already exists (5d57de9) — this is 'make it continuous' not 'build from zero', so treat impact as incremental, not foundational."
+    }
+   ],
+   "_frame": "F3-operational",
+   "frame": "F3-operational",
+   "_graph": {
+    "fired": [
+     "novelty_to_graph",
+     "related_active_problem"
+    ],
+    "not_wired_today": [
+     "prior_rejection/duplication (needs idea_candidate history join)",
+     "recurrence footprint (corpus too thin — ~5 docs)",
+     "recency/trajectory (single ingest window)"
+    ],
+    "novelty_to_graph": {
+     "status": "known_or_partial",
+     "nearest": [
+      "Quantization",
+      "Anti-Gravity"
+     ]
+    },
+    "related_active_problem": [
+     "Session",
+     "capture"
+    ]
+   }
+  },
+  {
+   "spin": {
+    "situation": "The T2 divergence architecture + Neo4j graph-signal audit just landed as a design package, explicitly logged as 'delegated, report-only.'",
+    "problem": "A report-only design audit is a paper calculation — it says the architecture SHOULD work, not that it DOES work against live graph data.",
+    "implication": "If T2 gets treated as done because the design reads well, the first real test of whether it holds happens later in production, when it's expensive to unwind.",
+    "need_payoff": "Before calling T2 divergence 'ready,' run it against a real slice of the live Neo4j graph and check the signal behaves as the audit predicted — prove it on tarmac, not on paper."
+   },
+   "source_evidence": {
+    "quote": "We calculated how the car should perform and on paper it should do quite well... No no, no, we don't race on paper either. Like we race on tarmac.",
+    "timestamp": "00:55-01:18",
+    "named_mechanism": "paper-performance vs track-performance: a calculated/simulated result isn't credited until it runs on the real surface."
+   },
+   "transfer_reasoning": "The engineers trusted their model of grip and power delivery, but only what shows up on tarmac counts. The T2 design + audit is Fusion's 'calculation' — a report-only, delegated pass — and hasn't yet been run against the live graph the way a car is run on track.",
+   "fusion_target": "T2 divergence architecture (Deliverables/idea-engine-T2-design-DRAFT.md) and its Neo4j graph-signal audit — gate its 'done' status on one live-graph test run, not on the design audit alone.",
+   "category": "brain",
+   "lens": "F3-operational",
+   "nvfi": {
+    "novelty": 2,
+    "viability": 4,
+    "fit": 5,
+    "impact": 4
+   },
+   "traps": [
+    {
+     "type": "restating-known-principle",
+     "note": "Warwick already holds 'build to the goal, don't ship the slice as the goal' as a standing principle — this candidate's only new value is pointing that principle at the specific T2 artifact sitting delegated right now."
+    }
+   ],
+   "_frame": "F3-operational",
+   "frame": "F3-operational",
+   "_graph": {
+    "fired": [
+     "novelty_to_graph"
+    ],
+    "not_wired_today": [
+     "prior_rejection/duplication (needs idea_candidate history join)",
+     "recurrence footprint (corpus too thin — ~5 docs)",
+     "recency/trajectory (single ingest window)"
+    ],
+    "novelty_to_graph": {
+     "status": "novel_to_graph",
+     "nearest": []
+    }
+   }
+  },
+  {
+   "spin": {
+    "situation": "Fusion runs an idea-engine that consumes outside content (like this transcript) and produces commercial transfer candidates for Warwick alone.",
+    "problem": "Everything this engine produces today — including the discarded candidates and rationale trail — is exhaust that gets used once internally and then thrown away.",
+    "implication": "That is the same waste the turbo eliminates: high-pressure output being vented uselessly instead of being fed back to make more output, meaning Fusion is paying the full cost of the engine but only monetising a fraction of what it makes.",
+    "need_payoff": "If outside people could feed their own consumed content into the same engine and get back paid transfer candidates, the exhaust becomes a second revenue stream built on machinery Fusion already owns and runs for free internally."
+   },
+   "source_evidence": {
+    "quote": "We turn the exhaust back into energy that we can use.",
+    "timestamp": "06:49",
+    "named_mechanism": "turbocharging — recovering waste exhaust energy and feeding it back to amplify the very process that produced it"
+   },
+   "transfer_reasoning": "The turbo doesn't add a new engine — it recaptures a byproduct of the existing one and routes it back in to compound output. Fusion's Cockpit + Transfer-Intelligence pipeline already generates far more raw ideation exhaust (discarded candidates, rationale logs, per-frame outputs) than Warwick alone consumes. Exposing a thin customer-facing valve on the same pipeline — 'feed us what you've read/watched, get back external-value transfer candidates' — recovers that wasted throughput as paid output without building a new core mechanism.",
+   "fusion_target": "Cockpit + Transfer-Intelligence specialist pipeline (this frame's own engine), exposed via a client-facing intake valve",
+   "category": "cash",
+   "lens": "byproduct-recycling",
+   "nvfi": {
+    "novelty": 3,
+    "viability": 3,
+    "fit": 4,
+    "impact": 4
+   },
+   "traps": [
+    {
+     "type": "scope-creep",
+     "note": "this is exactly the BUILD-014 platform trap — start with one manual run against one outside person's reading list, not a subscription product"
+    },
+    {
+     "type": "needs-evidence",
+     "note": "zero validated external demand yet; needs one unpaid or paid pilot before any build decision"
+    }
+   ],
+   "_frame": "F4-commercial",
+   "frame": "F4-commercial",
+   "_graph": {
+    "fired": [
+     "novelty_to_graph",
+     "related_active_problem"
+    ],
+    "not_wired_today": [
+     "prior_rejection/duplication (needs idea_candidate history join)",
+     "recurrence footprint (corpus too thin — ~5 docs)",
+     "recency/trajectory (single ingest window)"
+    ],
+    "novelty_to_graph": {
+     "status": "novel_to_graph",
+     "nearest": []
+    },
+    "related_active_problem": [
+     "Cockpit"
+    ]
+   }
+  },
+  {
+   "spin": {
+    "situation": "Most businesses treat slow strategy/ideation cycles (weeks of workshops, consultant decks) as a fixed cost of doing business.",
+    "problem": "They accept that lag the same way the American teams accepted turbo lag as just how turbo engines are — a limitation nobody thought to attack because the fix uses an unrelated control.",
+    "implication": "Whoever finds the odd coupling that removes the lag gets a durable, hard-to-copy edge — the AWD team didn't out-spend rivals, they out-found them.",
+    "need_payoff": "Fusion already owns the odd coupling: a multi-frame ideation engine that runs many independent lenses over one source in a single sitting. Selling that as a same-day rapid-ideation sprint for outside companies converts an internal capability into a second income stream, which is the concrete lever for reducing dependence on Bellrock."
+   },
+   "source_evidence": {
+    "quote": "if I stay on the gas and press the brake, you slow down for the corner and the turbo keeps spinning",
+    "timestamp": "13:24",
+    "named_mechanism": "anti-lag brake-boost — coupling an unrelated existing control (the brake) to eliminate lag in a different subsystem (turbo spool-up)"
+   },
+   "transfer_reasoning": "The insight wasn't a new part, it was noticing that a control already in the car (the brake pedal) could be repurposed to solve a problem in a system rivals treated as inherently slow. Fusion's multi-frame parallel Transfer-Intelligence run is an already-built capability that could be repurposed the same way: pointed at an outside client's problem instead of Warwick's, sold as a same-day 'idea lag' removal sprint, competing against consultancies whose ideation cycle is weeks long.",
+   "fusion_target": "Transfer-Intelligence specialist (multi-frame parallel run), repackaged as a client-facing rapid-ideation sprint",
+   "category": "cash",
+   "lens": "latency-arbitrage",
+   "nvfi": {
+    "novelty": 3,
+    "viability": 3,
+    "fit": 3,
+    "impact": 3
+   },
+   "traps": [
+    {
+     "type": "cost",
+     "note": "selling a service requires packaging/pricing/outreach effort entirely outside current build scope — not a code task, needs Warwick's own time"
+    },
+    {
+     "type": "already-doing-it",
+     "note": "Fusion already runs this internally for Warwick; the only delta is 'sell it externally' — confirm appetite exists before building any client-facing tooling"
+    }
+   ],
+   "_frame": "F4-commercial",
+   "frame": "F4-commercial",
+   "_graph": {
+    "fired": [
+     "novelty_to_graph"
+    ],
+    "not_wired_today": [
+     "prior_rejection/duplication (needs idea_candidate history join)",
+     "recurrence footprint (corpus too thin — ~5 docs)",
+     "recency/trajectory (single ingest window)"
+    ],
+    "novelty_to_graph": {
+     "status": "known_or_partial",
+     "nearest": [
+      "Quantization",
+      "Anti-Gravity"
+     ]
+    }
+   }
+  },
+  {
+   "spin": {
+    "situation": "The manufacturer didn't enter the series to win a trophy — they raced specifically to be seen, because attention was the thing that actually converted to car sales in a market where nobody knew their brand.",
+    "problem": "Fusion's idea-engine output (including candidates like this one) stays entirely private to Warwick, so even once a cash-tier idea is validated and built, there's no visible proof for outside buyers to react to.",
+    "implication": "Without a public, provable showcase, any future cash product has to be pitched cold and abstractly — the hardest way to sell anything — instead of pointing at a result that already happened.",
+    "need_payoff": "A small public 'show your work' channel for the engine's proven wins gives Fusion the same distribution shortcut the manufacturer used: let the result itself be the advertisement."
+   },
+   "source_evidence": {
+    "quote": "Winning will get the most eyeballs on our car... We want to sell more cars here in America. To do that, we need attention.",
+    "timestamp": "00:25",
+    "named_mechanism": "racing-as-marketing — competing publicly to earn attention that converts to sales, treating the win as a distribution channel rather than the goal itself"
+   },
+   "transfer_reasoning": "The team's real objective was never the podium; the podium was instrumental to being seen by the exact buyers they wanted. Fusion's equivalent instrumental move is publishing a proven, provenance-tagged case study once any transfer candidate from this same engine is actually built and makes money — using the demonstrated result as the pitch instead of describing the mechanism to prospects who have no reason to believe it works yet.",
+   "fusion_target": "Cockpit output surface — a public case-study/showcase feed for the idea engine's proven cash-tier hits",
+   "category": "cash",
+   "lens": "attention-as-distribution",
+   "nvfi": {
+    "novelty": 2,
+    "viability": 3,
+    "fit": 3,
+    "impact": 2
+   },
+   "traps": [
+    {
+     "type": "premature",
+     "note": "there is nothing to showcase yet — this only fires after a cash-tier idea from this same engine has actually been built and proven; do not build the showcase ahead of a result"
+    }
+   ],
+   "_frame": "F4-commercial",
+   "frame": "F4-commercial",
+   "_graph": {
+    "fired": [
+     "novelty_to_graph",
+     "related_active_problem"
+    ],
+    "not_wired_today": [
+     "prior_rejection/duplication (needs idea_candidate history join)",
+     "recurrence footprint (corpus too thin — ~5 docs)",
+     "recency/trajectory (single ingest window)"
+    ],
+    "novelty_to_graph": {
+     "status": "novel_to_graph",
+     "nearest": []
+    },
+    "related_active_problem": [
+     "Cockpit"
+    ]
+   }
+  },
+  {
+   "spin": {
+    "situation": "Warwick clicks Decline or Later on Cockpit idea cards fairly often.",
+    "problem": "Right now those declines just vanish — the reasoning behind 'no' is vented and lost, like an engine dumping its exhaust straight into the air.",
+    "implication": "The Transfer-Intelligence pipeline keeps re-proposing similar misses because it never learns from what got rejected and why — wasted exhaust pressure that could have made the next batch of ideas stronger.",
+    "need_payoff": "Route Decline reasons back into Cairn/Transfer-Intelligence as forced input for the next pass — same mechanism as a turbo using waste exhaust to force-feed the same engine more air."
+   },
+   "source_evidence": {
+    "quote": "we use the exhaust to spin another thing... one side spins from the exhaust and the other side spins to suck fresh air into the engine. So the explosions are even bigger.",
+    "timestamp": "06:32-06:49",
+    "named_mechanism": "turbocharger: waste exhaust gas drives a compressor that force-feeds richer intake into the very same engine, closing an open-loop waste stream into a closed loop"
+   },
+   "transfer_reasoning": "Structural invariant: a byproduct normally vented as waste is instead coupled on a shared shaft to compress richer input for the same process. Fusion's Cockpit Decline/Later stream is the exhaust — currently vented (logged-and-forgotten) rather than compressing the next round of candidate generation. The defensible claim in one sentence: 'a mechanism that turns a system's own rejected output into forced input for its own next cycle is structurally a turbocharger, not a cache.'",
+   "fusion_target": "Cockpit Decline/Later action stream -> feedback loop into Cairn intake / Transfer-Intelligence specialist's next mining pass",
+   "category": "brain",
+   "lens": "F5-crossdomain",
+   "nvfi": {
+    "novelty": 5,
+    "viability": 3,
+    "fit": 4,
+    "impact": 3
+   },
+   "traps": [
+    {
+     "type": "cost",
+     "note": "needs decline-reason capture (not just a click event) plus a labeled-negative-signal pipeline — nontrivial build, not a config flag"
+    },
+    {
+     "type": "needs-evidence",
+     "note": "unproven whether decline reasons are specific enough to be useful compressor fuel vs just noise"
+    }
+   ],
+   "_frame": "F5-crossdomain",
+   "frame": "F5-crossdomain",
+   "_graph": {
+    "fired": [
+     "novelty_to_graph",
+     "related_active_problem"
+    ],
+    "not_wired_today": [
+     "prior_rejection/duplication (needs idea_candidate history join)",
+     "recurrence footprint (corpus too thin — ~5 docs)",
+     "recency/trajectory (single ingest window)"
+    ],
+    "novelty_to_graph": {
+     "status": "novel_to_graph",
+     "nearest": []
+    },
+    "related_active_problem": [
+     "Cockpit",
+     "action"
+    ]
+   }
+  },
+  {
+   "spin": {
+    "situation": "When Warwick opens the Cockpit expecting a proactive 'you nearly missed this' surfacing, there's sometimes a beat of lag before it appears.",
+    "problem": "That lag is the graph-traversal + embedding cold-start — the equivalent of turbo lag: the compressor has spun down and needs time to spool back up.",
+    "implication": "A user who has to wait for insight loses the 'nearly missed this' urgency — by the time it renders, the moment feels less proactive and more like a report.",
+    "need_payoff": "Keep the expensive path lightly spinning during idle Cockpit time (not full cache-warming, but throttle-open-under-braking style priming) so the answer is already spooled when Warwick actually asks."
+   },
+   "source_evidence": {
+    "quote": "if I stay on the gas and press the brake, you slow down for the corner and the turbo keeps spinning. And the moment I let off the brake... [instant power]",
+    "timestamp": "13:33-13:57",
+    "named_mechanism": "anti-lag: the throttle is deliberately kept open under braking so the turbo never drops speed, eliminating spool-up delay exactly when power is needed"
+   },
+   "transfer_reasoning": "Structural invariant: a component with high spin-up cost is kept 'lightly loaded but never idle' during a low-demand phase, so the moment full demand returns there is zero lag — distinct from static caching because it requires continuous light throttle, not a one-time precompute. Applied to the Outputs Layer's Neo4j/embedding path during Warwick's idle Cockpit browsing.",
+   "fusion_target": "Outputs Layer proactive-surfacing pipeline (Neo4j traversal + embedding call warm path)",
+   "category": "brain",
+   "lens": "F5-crossdomain",
+   "nvfi": {
+    "novelty": 3,
+    "viability": 4,
+    "fit": 3,
+    "impact": 3
+   },
+   "traps": [
+    {
+     "type": "already-doing-it",
+     "note": "if a keep-alive/warm-cache already exists on this path this collapses to nothing new — check before proposing"
+    }
+   ],
+   "_frame": "F5-crossdomain",
+   "frame": "F5-crossdomain",
+   "_graph": {
+    "fired": [
+     "novelty_to_graph"
+    ],
+    "not_wired_today": [
+     "prior_rejection/duplication (needs idea_candidate history join)",
+     "recurrence footprint (corpus too thin — ~5 docs)",
+     "recency/trajectory (single ingest window)"
+    ],
+    "novelty_to_graph": {
+     "status": "known_or_partial",
+     "nearest": [
+      "Quantization",
+      "Anti-Gravity"
+     ]
+    }
+   }
+  },
+  {
+   "spin": {
+    "situation": "Fusion already has one hardlocked rule (Fable confirm-first) that exists specifically because a softer, incremental fix kept getting worked around by GPT-relayed directive text sneaking in.",
+    "problem": "That pattern — patch the letter of the rule, watch it get legally out-maneuvered, patch again, repeat — is exactly the regulator's losing strategy in the source before it finally banned the whole category outright.",
+    "implication": "Without a named threshold for 'stop patching, escalate to a categorical rule,' each future loophole will eat another full incident cycle before Warwick has to manually decide to hardlock it, same as it took years of re-nerfing before the AWD ban.",
+    "need_payoff": "Write an explicit escalation ladder into the decision-rationale log: N re-exploited patches on the same rule triggers an automatic proposal to Warwick for a categorical (hardlock) rule, rather than relying on Larry noticing the pattern each time."
+   },
+   "source_evidence": {
+    "quote": "You can only enforce the letter of the law... the spirit of the law is what you wanted to happen or what you meant... All wheel drive is banned there. (This actually happened)",
+    "timestamp": "14:22-15:37",
+    "named_mechanism": "a regulator abandons incremental letter-of-the-rule patches for a categorical prohibition only after the same structural advantage keeps re-emerging through legal loopholes"
+   },
+   "transfer_reasoning": "Structural invariant: incremental patches to a rule's letter lose repeatedly to a fixed structural advantage; the only fix that closes the gap is a categorical rule targeting the advantage itself, decided explicitly rather than organically. Fusion has lived this once (Fable hardlock) but has no formalized trigger for recognizing it earlier next time — the transfer is naming and logging the threshold, not the individual hardlock.",
+   "fusion_target": "Decision-rationale log — formal escalation policy for converting repeatedly-worked-around soft rules into hardlocks",
+   "category": "brain",
+   "lens": "F5-crossdomain",
+   "nvfi": {
+    "novelty": 3,
+    "viability": 4,
+    "fit": 4,
+    "impact": 3
+   },
+   "traps": [
+    {
+     "type": "already-doing-it",
+     "note": "the Fable hardlock is this pattern already instantiated once ad hoc — value here is only in generalizing/logging it as a named policy, not discovering something unprecedented"
+    }
+   ],
+   "_frame": "F5-crossdomain",
+   "frame": "F5-crossdomain",
+   "_graph": {
+    "fired": [
+     "novelty_to_graph"
+    ],
+    "not_wired_today": [
+     "prior_rejection/duplication (needs idea_candidate history join)",
+     "recurrence footprint (corpus too thin — ~5 docs)",
+     "recency/trajectory (single ingest window)"
+    ],
+    "novelty_to_graph": {
+     "status": "novel_to_graph",
+     "nearest": []
+    }
+   }
+  }
+ ],
+ "convCall": {
+  "label": "convergence",
+  "ok": true,
+  "resultText": "{\"kept\":[\n  {\"spin\":{\"situation\":\"Every new Larry session — and every in-flight capture job like the YouTube pipeline — currently starts or resumes cold, re-reading files or restarting from a point-in-time snapshot instead of already being 'spun up'.\",\"problem\":\"That's turbo lag: the moment full context or full capture momentum is actually needed, there's a delay while it re-spools from zero — sometimes producing placeholder stub notes, sometimes just lost minutes re-deriving state that was already known.\",\"implication\":\"Every session boundary or attention-shift becomes a mini cold-start. Minutes lost per session, and in the capture-pipeline case, work can stall out as a stub instead of finishing — and this compounds as Fusion runs more sessions.\",\"need_payoff\":\"Keep a small 'throttle' open continuously — a rolling, always-topped-up state/log (not a one-time end-of-session snapshot) — so the moment a session starts or attention lifts, full context or momentum is already spinning. Zero lag, at roughly the cost of the machinery already built (5d57de9).\"},\n   \"source_evidence\":{\"quote\":\"We found a problem with our turbo, and we fixed it by pressing the brakes more... if I stay on the gas and press the brake, you slow down for the corner and the turbo keeps spinning. And the moment I let off the brake...\",\"timestamp\":\"12:42-13:57\",\"named_mechanism\":\"anti-lag / two-pedal driving — keeping the compressor spinning continuously via an unrelated control (the brake) so there is zero spool-up lag when the driving input is released\"},\n   \"transfer_reasoning\":\"Invariant: decouple the 'maintain internal readiness' channel from the 'external deployment/trigger' channel and run both concurrently, so full capacity is available at the instant of trigger release — versus a cold system where readiness only starts building once the trigger fires. Three independent frames landed on the same real gap from three angles: F1 frames it as decoupling a readiness channel from a deployment channel for Larry's cross-session context; F2 frames it as an inverted assumption ('this only needs to run while actively driven' is false) and extends the same fix to the YouTube/TubeAIR capture pipeline, not just Larry's context; F3 frames it as converting the already-existing session-continuity capture (5d57de9) from a point-in-time snapshot into a continuously-updated rolling state file. None invent new machinery — all three point at extending what bcf9b41/5d57de9 already started.\",\"fusion_target\":\"Larry's cross-session context continuity (decision-rationale log + session-continuity capture, commits bcf9b41/5d57de9) — extend from point-in-time capture to a continuously-maintained rolling state; the same fix additionally applies to the YouTube capture pipeline (Gateway/TubeAIR knowledge-note step), per F2.\",\n   \"category\":\"brain\",\"lens\":\"structural fidelity + inverted-assumption — session/capture continuity architecture (three-frame convergence)\",\n   \"nvfi\":{\"novelty\":4,\"viability\":4,\"fit\":5,\"impact\":5},\n   \"contributing_frames\":[\"F1-mechanism\",\"F2-inversion\",\"F3-operational\"],\n   \"convergence_type\":\"novel_independent\",\n   \"graph_note\":\"Graph marks this known_or_partial (nearest: Footnote, Quantization, Anti-Gravity) and ties it to active problem threads on Larry/session/context/capture — corroborating this is a live, already-surfacing gap, not a hypothetical one. Target is not on the foregrounded-brief list, so independent convergence from 3 distinct frames is a genuine novelty signal.\",\n   \"conflict_with\":null,\"forced_analogy\":false,\n   \"traps\":[\n    {\"type\":\"already-partially-built\",\"note\":\"session-continuity capture already exists (5d57de9); this refines it into a continuous/two-channel model rather than net-new machinery — treat impact as incremental-but-compounding, not foundational\"},\n    {\"type\":\"cost\",\"note\":\"continuous background top-up writes have a small but nonzero token/write cost every session — needs bounding, not unlimited\"},\n    {\"type\":\"scope-creep\",\"note\":\"could balloon into a full checkpoint/persistence subsystem instead of one minimal, anti-lag-sized rolling update — keep it that size\"},\n    {\"type\":\"needs-evidence\",\"note\":\"confirm the actual mechanism of any capture stall (attention-bound vs. a real blocking call) before building anything\"}\n   ]\n  },\n  {\"spin\":{\"situation\":\"Every idea-engine run produces two exhaust streams today: the automated kill-pass discards (Cairn→Transfer→Critic's discarded_obvious / killed-NVFI candidates) and Warwick's own Cockpit Decline/Later clicks.\",\"problem\":\"Both streams are just vented — thrown away after one use, like exhaust shooting out a tailpipe — instead of being captured and used.\",\"implication\":\"To get more/better ideas out, the instinct becomes 'run a bigger, pricier pass' (more frames, Fable) rather than getting more out of what's already been paid for and already exists as signal.\",\"need_payoff\":\"Route BOTH exhaust streams — the engine's own kill-pass discards AND Warwick's Decline/Later reasons — back in as forced input/fuel for the next Cairn/Transfer-Intelligence pass, the same way a turbo's waste-gas compressor force-feeds the same engine's intake, bounded by a wastegate so it doesn't drown the current pass in stale material.\"},\n   \"source_evidence\":{\"quote\":\"We turn the exhaust back into energy that we can use... one side spins from the exhaust and the other side spins to suck fresh air into the engine. So the explosions are even bigger.\",\"timestamp\":\"06:32-07:03\",\"named_mechanism\":\"turbocharger — shared-shaft coupling that recovers a process's own waste byproduct and force-feeds it back into that same process's input, vented above a threshold by a wastegate\"},\n   \"transfer_reasoning\":\"Invariant: a shared-shaft mechanism captures the discarded byproduct of a process and mechanically couples it back into that same process's input, so a small fixed-capacity engine outperforms a much larger one, bounded by a wastegate that vents excess. Two distinct frames independently found two different exhaust sources feeding the identical target mechanism: F1 identified the engine's own automated kill-pass output (candidates the Critic already rejects every run); F5 independently identified the human Decline/Later signal Warwick already generates in the Cockpit. Different mechanisms of discovery, same underlying invariant and target — route rejection data back into the next mining pass instead of discarding it.\",\"fusion_target\":\"idea-engine's discarded output — both the automated kill-pass (Cairn→Transfer→Critic discarded_obvious/killed-NVFI list) and the Cockpit Decline/Later action stream — routed back as forced input into the next Cairn/Transfer-Intelligence mining pass.\",\n   \"category\":\"brain\",\"lens\":\"discard/reject pipeline recycling — automated kill-pass AND human decline signal (two-frame convergence)\",\n   \"nvfi\":{\"novelty\":3,\"viability\":3,\"fit\":5,\"impact\":4},\n   \"contributing_frames\":[\"F1-mechanism\",\"F5-crossdomain\"],\n   \"convergence_type\":\"context_induced\",\n   \"graph_note\":\"Kill-pass angle links to the 'Cloud engine room' prior decision and an active 'pass' problem thread (known_or_partial); Decline/Later angle is novel_to_graph with no prior duplication found, tied to the active 'Cockpit action' thread. Cockpit and Transfer are both foregrounded targets, so this convergence is real and strong on fit/impact but shouldn't be read as high novelty — preserved honestly per rule 3, not discarded as prompt echo.\",\n   \"conflict_with\":null,\"forced_analogy\":false,\n   \"traps\":[\n    {\"type\":\"overboost/knock\",\"note\":\"too much recycled exhaust re-injected drowns the current pass's signal in stale/killed material — needs an explicit cap, analogous to a wastegate\"},\n    {\"type\":\"cost\",\"note\":\"the Decline/Later half needs structured decline-reason capture, not just a click event — a labeled-negative-signal pipeline is a nontrivial build, not a config flag\"},\n    {\"type\":\"needs-evidence\",\"note\":\"unproven whether killed-candidate volume or decline reasons are actually fertile reservoirs vs. correctly-dead material / noise\"}\n   ]\n  },\n  {\"spin\":{\"situation\":\"myPKA's quality/security gates (the idea Critic's NVFI+traps check, Vex's WS-003 security checklist) work by checking a list of specific named things.\",\"problem\":\"A checklist only catches what's on the list — it can't catch a NEW combination of individually-fine things that together beats the whole point of the gate.\",\"implication\":\"Something could sail through every named check and still quietly defeat what the gate exists to protect, and nobody would notice until it's already happened repeatedly.\",\"need_payoff\":\"Add one extra, bounded question to every checklist gate — 'does this still defeat the point, even though it passes every line?' — catching the gap cheaply instead of discovering it after the fact.\"},\n   \"source_evidence\":{\"quote\":\"You can only enforce the letter of the law. What was written... the spirit of law is what you wanted to happen or what you \\\"meant.\\\"\",\"timestamp\":\"14:22\",\"named_mechanism\":\"enumerated-parameter rulebook vs. unenumerated structural combination that is individually legal but collectively defeats rule-intent\"},\n   \"transfer_reasoning\":\"A governance gate built as a list of enumerated parameter checks is structurally blind to new combinations of individually-compliant primitives that jointly defeat its intent, because it checks letter, not spirit. The tight fix is one intent-check question distinct from the enumerated list, not more list items.\",\"fusion_target\":\"idea-engine Critic's NVFI+traps step and Vex's WS-003 Expansion security checklist\",\n   \"category\":\"cash\",\"lens\":\"structural fidelity — governance/gate architecture\",\n   \"nvfi\":{\"novelty\":3,\"viability\":4,\"fit\":3,\"impact\":3},\n   \"contributing_frames\":[\"F1-mechanism\"],\n   \"convergence_type\":\"single_frame\",\n   \"graph_note\":\"Known_or_partial, nearest graph hits are parameter-shaped (Model Parameters, Chunk Overlap Parameter, Files Parameter) — reinforcing that graph currently only models named parameters, exactly the blind spot this candidate names. Relates to Cloud engine room prior decision.\",\n   \"conflict_with\":null,\"forced_analogy\":false,\n   \"traps\":[\n    {\"type\":\"scope-creep risk\",\"note\":\"an open-ended 'spirit' question can become a vague catch-all overriding objective checks — keep it a single bounded question, not a new discretionary veto layer\"},\n    {\"type\":\"needs evidence\",\"note\":\"provisional; no concrete instance yet of a myPKA gate being beaten this way — flagging an architecture gap, not a proven incident\"},\n    {\"type\":\"thematic-sibling\",\"note\":\"same letter-vs-spirit lens independently recurs in two other candidates against different targets (Codex reviewer blind spot; hardlock-escalation policy) — see convergence_summary\"}\n   ]\n  },\n  {\"spin\":{\"situation\":\"Fusion's merge gate leans on independent review (Codex + Fable) as the safety backstop before code goes live.\",\"problem\":\"Codex reviews under a read-only sandbox that can't even read the files it's reviewing — it can only ever see the letter of the diff, never the underlying mechanism, the same way the source's rule-enforcer kept losing because he didn't understand the mechanism he was regulating.\",\"implication\":\"A review gate satisfied on the letter (tests pass, checklist ticked) but blind to the actual mechanism gives false confidence — it can rubber-stamp exactly the kind of change it exists to catch.\",\"need_payoff\":\"Log an explicit, per-review flag: did the reviewer actually see the mechanism, or just the surface diff? Where it's the latter, treat it as reduced-confidence review, not a clean independent pass.\"},\n   \"source_evidence\":{\"quote\":\"You broke the spirit of the rules... You can only enforce the letter of the law. What was written.\",\"timestamp\":\"14:22-14:44\",\"named_mechanism\":\"letter-vs-spirit enforcement gap, compounded by the enforcer not understanding the mechanism he's policing\"},\n   \"transfer_reasoning\":\"The failure isn't absent rules — it's an incomplete mental model of the mechanism, so every rule only ever catches the letter. Fusion already has a documented instance of this exact shape: Codex working blind because its sandbox blocks self-inspection. This candidate names it as a residual audit risk rather than assuming 'independent review ran' equals 'the mechanism was actually seen.'\",\"fusion_target\":\"Multi-model build-verify loop / merge-ready gate — specifically the Codex read-only review step\",\n   \"category\":\"brain\",\"lens\":\"inverted assumption: 'a review gate = safety' — false when the reviewer cannot see the mechanism, only the letter of the diff\",\n   \"nvfi\":{\"novelty\":3,\"viability\":3,\"fit\":4,\"impact\":4},\n   \"contributing_frames\":[\"F2-inversion\"],\n   \"convergence_type\":\"single_frame\",\n   \"graph_note\":\"Novel_to_graph (no nearest match), tied to the active 'model/build' problem thread. This corroborates rather than duplicates the existing memory record of Codex's read-only self-inspection gap and its diff-staging workaround.\",\n   \"conflict_with\":null,\"forced_analogy\":false,\n   \"traps\":[\n    {\"type\":\"already-partially-addressed\",\"note\":\"memory already flags Codex's read-only self-inspection gap and works around it by staging the diff into the prompt — this reinforces that existing mitigation rather than proposing a new build\"},\n    {\"type\":\"governance-scope\",\"note\":\"don't read this as a call for MORE adversarial hardening — the hobby-brain threat bar stays correctness/leak/availability/audit, not crevice-hunting\"},\n    {\"type\":\"thematic-sibling\",\"note\":\"same letter-vs-spirit lens independently recurs in two other candidates against different targets (Critic/Vex checklist; hardlock-escalation policy) — see convergence_summary\"}\n   ]\n  },\n  {\"spin\":{\"situation\":\"The T2 divergence architecture + Neo4j graph-signal audit just landed as a design package, explicitly logged as 'delegated, report-only.'\",\"problem\":\"A report-only design audit is a paper calculation — it says the architecture SHOULD work, not that it DOES work against live graph data.\",\"implication\":\"If T2 gets treated as done because the design reads well, the first real test of whether it holds happens later in production, when it's expensive to unwind.\",\"need_payoff\":\"Before calling T2 divergence 'ready,' run it against a real slice of the live Neo4j graph and check the signal behaves as the audit predicted — prove it on tarmac, not on paper.\"},\n   \"source_evidence\":{\"quote\":\"We calculated how the car should perform and on paper it should do quite well... No no, no, we don't race on paper either. Like we race on tarmac.\",\"timestamp\":\"00:55-01:18\",\"named_mechanism\":\"paper-performance vs track-performance — a calculated/simulated result isn't credited until it runs on the real surface\"},\n   \"transfer_reasoning\":\"The engineers trusted their model of grip and power delivery, but only what shows up on tarmac counts. The T2 design + audit is Fusion's 'calculation' — a report-only, delegated pass — and hasn't yet been run against the live graph the way a car is run on track.\",\"fusion_target\":\"T2 divergence architecture (Deliverables/idea-engine-T2-design-DRAFT.md) and its Neo4j graph-signal audit — gate its 'done' status on one live-graph test run, not on the design audit alone.\",\n   \"category\":\"brain\",\"lens\":\"F3-operational — calculated design vs. live-data proof\",\n   \"nvfi\":{\"novelty\":2,\"viability\":4,\"fit\":5,\"impact\":4},\n   \"contributing_frames\":[\"F3-operational\"],\n   \"convergence_type\":\"single_frame\",\n   \"graph_note\":\"Novel_to_graph — consistent with T2-design-DRAFT.md and the Neo4j audit being freshly-landed, currently-uncommitted work (both files show modified in the working tree right now).\",\n   \"conflict_with\":null,\"forced_analogy\":false,\n   \"traps\":[\n    {\"type\":\"restating-known-principle\",\"note\":\"Warwick already holds 'build to the goal, don't ship the slice as the goal' as a standing principle — this candidate's value is pointing that principle at the specific T2 artifact sitting delegated right now, not discovering something new\"}\n   ]\n  },\n  {\"spin\":{\"situation\":\"Fusion runs an idea-engine that consumes outside content and produces commercial transfer candidates for Warwick alone.\",\"problem\":\"Everything this engine produces today — including discarded candidates and rationale trails — is exhaust used once internally, then thrown away.\",\"implication\":\"Fusion pays the full cost of the engine but only monetizes a fraction of what it makes, the same waste a turbo eliminates by recovering exhaust energy instead of venting it.\",\"need_payoff\":\"If outside people fed their own consumed content into the same engine and got back paid transfer candidates, the exhaust becomes a second revenue stream built on machinery Fusion already owns and runs for free internally.\"},\n   \"source_evidence\":{\"quote\":\"We turn the exhaust back into energy that we can use.\",\"timestamp\":\"06:49\",\"named_mechanism\":\"turbocharging — recovering waste exhaust energy and feeding it back to amplify the very process that produced it\"},\n   \"transfer_reasoning\":\"The turbo doesn't add a new engine — it recaptures a byproduct of the existing one and routes it back to compound output. Fusion's Cockpit + Transfer-Intelligence pipeline already generates far more raw ideation exhaust than Warwick alone consumes; a thin client-facing intake valve on the same pipeline recovers that wasted throughput as paid output without building a new core mechanism.\",\"fusion_target\":\"Cockpit + Transfer-Intelligence specialist pipeline, exposed via a client-facing intake valve ('feed us what you've read/watched, get back transfer candidates')\",\n   \"category\":\"cash\",\"lens\":\"byproduct-recycling\",\"nvfi\":{\"novelty\":3,\"viability\":3,\"fit\":4,\"impact\":4},\n   \"contributing_frames\":[\"F4-commercial\"],\n   \"convergence_type\":\"single_frame\",\n   \"graph_note\":\"Novel_to_graph, tied to the active 'Cockpit' problem thread — no prior duplicate found.\",\n   \"conflict_with\":null,\"forced_analogy\":false,\n   \"traps\":[\n    {\"type\":\"scope-creep\",\"note\":\"this is exactly the BUILD-014 platform trap — start with one manual run against one outside person's reading list, not a subscription product\"},\n    {\"type\":\"needs-evidence\",\"note\":\"zero validated external demand yet; needs one unpaid or paid pilot before any build decision\"}\n   ]\n  },\n  {\"spin\":{\"situation\":\"Most businesses treat slow strategy/ideation cycles (weeks of workshops, consultant decks) as a fixed cost of doing business.\",\"problem\":\"They accept that lag the same way American teams accepted turbo lag as inherent — a limitation nobody thought to attack because the fix uses an unrelated control.\",\"implication\":\"Whoever finds the odd coupling that removes the lag gets a durable, hard-to-copy edge.\",\"need_payoff\":\"Fusion already owns the odd coupling: a multi-frame ideation engine running many independent lenses over one source in a single sitting. Selling that as a same-day rapid-ideation sprint converts an internal capability into a second income stream.\"},\n   \"source_evidence\":{\"quote\":\"if I stay on the gas and press the brake, you slow down for the corner and the turbo keeps spinning\",\"timestamp\":\"13:24\",\"named_mechanism\":\"anti-lag brake-boost — coupling an unrelated existing control to eliminate lag rivals treat as inherently slow\"},\n   \"transfer_reasoning\":\"The insight wasn't a new part — it was repurposing a control already in the car to solve a problem rivals treated as inherently slow. Fusion's multi-frame parallel Transfer-Intelligence run is an already-built capability that could be pointed at an outside client's problem instead of Warwick's, sold as a same-day 'idea lag' removal sprint against consultancies whose ideation cycle is weeks long.\",\"fusion_target\":\"Transfer-Intelligence specialist (multi-frame parallel run), repackaged as a client-facing rapid-ideation sprint\",\n   \"category\":\"cash\",\"lens\":\"latency-arbitrage\",\"nvfi\":{\"novelty\":3,\"viability\":3,\"fit\":3,\"impact\":3},\n   \"contributing_frames\":[\"F4-commercial\"],\n   \"convergence_type\":\"single_frame\",\n   \"graph_note\":\"Known_or_partial, nearest graph hits (Quantization, Anti-Gravity) are low-confidence/generic matches, not a real duplicate.\",\n   \"conflict_with\":null,\"forced_analogy\":false,\n   \"traps\":[\n    {\"type\":\"cost\",\"note\":\"selling a service requires packaging/pricing/outreach effort entirely outside current build scope — needs Warwick's own time, not a code task\"},\n    {\"type\":\"already-doing-it\",\"note\":\"Fusion already runs this internally for Warwick; the only delta is 'sell it externally' — confirm appetite exists before building any client-facing tooling\"},\n    {\"type\":\"overlap-with-sibling\",\"note\":\"shares a target family with the byproduct-recycling cash candidate (intake-valve model) from the same frame — kept separate because the underlying mechanism (latency-arbitrage vs. byproduct-recycling) and business model differ, not because they're independent\"}\n   ]\n  },\n  {\"spin\":{\"situation\":\"The manufacturer raced specifically to be seen, because attention converted to car sales in a market where nobody knew their brand.\",\"problem\":\"Fusion's idea-engine output stays entirely private to Warwick, so even once a cash-tier idea is validated and built, there's no visible proof for outside buyers to react to.\",\"implication\":\"Without a public, provable showcase, any future cash product has to be pitched cold and abstractly — the hardest way to sell anything.\",\"need_payoff\":\"A small public 'show your work' channel for the engine's proven wins gives Fusion the same distribution shortcut — let the result itself be the advertisement.\"},\n   \"source_evidence\":{\"quote\":\"Winning will get the most eyeballs on our car... We want to sell more cars here in America. To do that, we need attention.\",\"timestamp\":\"00:25\",\"named_mechanism\":\"racing-as-marketing — competing publicly to earn attention that converts to sales, treating the win as a distribution channel rather than the goal itself\"},\n   \"transfer_reasoning\":\"The team's real objective was never the podium; the podium was instrumental to being seen by exact buyers. Fusion's equivalent move is publishing a proven, provenance-tagged case study once a transfer candidate from this engine is actually built and makes money — using the demonstrated result as the pitch instead of describing the mechanism to prospects with no reason to believe it works yet.\",\"fusion_target\":\"Cockpit output surface — a public case-study/showcase feed for the idea engine's proven cash-tier hits\",\n   \"category\":\"cash\",\"lens\":\"attention-as-distribution\",\"nvfi\":{\"novelty\":2,\"viability\":3,\"fit\":3,\"impact\":2},\n   \"contributing_frames\":[\"F4-commercial\"],\n   \"convergence_type\":\"single_frame\",\n   \"graph_note\":\"Novel_to_graph, tied to the active 'Cockpit' problem thread.\",\n   \"conflict_with\":null,\"forced_analogy\":false,\n   \"traps\":[\n    {\"type\":\"premature\",\"note\":\"there is nothing to showcase yet — this only fires after a cash-tier idea from this same engine has actually been built and proven; do not build the showcase ahead of a result\"}\n   ]\n  },\n  {\"spin\":{\"situation\":\"When Warwick opens the Cockpit expecting proactive 'you nearly missed this' surfacing, there's sometimes a beat of lag before it appears.\",\"problem\":\"That lag is the graph-traversal + embedding cold-start — the compressor has spun down and needs time to spool back up.\",\"implication\":\"A user who has to wait for insight loses the 'nearly missed this' urgency — by the time it renders, the moment feels less proactive and more like a report.\",\"need_payoff\":\"Keep the expensive path lightly spinning during idle Cockpit time (throttle-open-under-braking style priming, not full cache-warming) so the answer is already spooled when Warwick asks.\"},\n   \"source_evidence\":{\"quote\":\"if I stay on the gas and press the brake, you slow down for the corner and the turbo keeps spinning. And the moment I let off the brake... [instant power]\",\"timestamp\":\"13:33-13:57\",\"named_mechanism\":\"anti-lag — throttle deliberately kept open under braking so the turbo never drops speed, eliminating spool-up delay exactly when power is needed\"},\n   \"transfer_reasoning\":\"A component with high spin-up cost is kept lightly loaded but never idle during a low-demand phase, so full demand returns with zero lag — distinct from static caching because it requires continuous light throttle, not a one-time precompute. Applied to the Outputs Layer's Neo4j/embedding path during Warwick's idle Cockpit browsing.\",\"fusion_target\":\"Outputs Layer proactive-surfacing pipeline (Neo4j traversal + embedding call warm path)\",\n   \"category\":\"brain\",\"lens\":\"F5-crossdomain — anti-lag applied to a different subsystem than the session-continuity cluster\",\"nvfi\":{\"novelty\":3,\"viability\":4,\"fit\":3,\"impact\":3},\n   \"contributing_frames\":[\"F5-crossdomain\"],\n   \"convergence_type\":\"single_frame\",\n   \"graph_note\":\"Known_or_partial, nearest graph hits (Quantization, Anti-Gravity) are low-confidence matches — no real duplicate found. Same anti-lag family as the Larry session-continuity cluster but applied to a distinct, foregrounded target (Outputs Layer); kept separate since only one frame proposed it here.\",\n   \"conflict_with\":null,\"forced_analogy\":false,\n   \"traps\":[\n    {\"type\":\"already-doing-it\",\"note\":\"if a keep-alive/warm-cache already exists on this path this collapses to nothing new — check before proposing\"}\n   ]\n  },\n  {\"spin\":{\"situation\":\"Fusion already has one hardlocked rule (Fable confirm-first) that exists specifically because a softer, incremental fix kept getting worked around by GPT-relayed directive text sneaking in.\",\"problem\":\"That pattern — patch the letter of the rule, watch it get worked around, patch again — is exactly the regulator's losing strategy before it finally banned the whole category outright.\",\"implication\":\"Without a named threshold for 'stop patching, escalate to a categorical rule,' each future loophole eats another full incident cycle before Warwick manually decides to hardlock it.\",\"need_payoff\":\"Write an explicit escalation ladder into the decision-rationale log: N re-exploited patches on the same rule triggers an automatic proposal to Warwick for a categorical (hardlock) rule, rather than relying on Larry noticing the pattern each time.\"},\n   \"source_evidence\":{\"quote\":\"You can only enforce the letter of the law... the spirit of the law is what you wanted to happen or what you meant... All wheel drive is banned there. (This actually happened)\",\"timestamp\":\"14:22-15:37\",\"named_mechanism\":\"a regulator abandons incremental letter-of-the-rule patches for a categorical prohibition only after the same structural advantage keeps re-emerging through legal loopholes\"},\n   \"transfer_reasoning\":\"Incremental patches to a rule's letter lose repeatedly to a fixed structural advantage; the only fix that closes the gap is a categorical rule targeting the advantage itself, decided explicitly. Fusion has lived this once (Fable hardlock) but has no formalized trigger for recognizing it earlier next time — the transfer is naming and logging the threshold, not the individual hardlock.\",\"fusion_target\":\"Decision-rationale log — formal escalation policy for converting repeatedly-worked-around soft rules into hardlocks\",\n   \"category\":\"brain\",\"lens\":\"F5-crossdomain — letter-vs-spirit, applied as a meta-policy rather than a single gate fix\",\"nvfi\":{\"novelty\":3,\"viability\":4,\"fit\":4,\"impact\":3},\n   \"contributing_frames\":[\"F5-crossdomain\"],\n   \"convergence_type\":\"single_frame\",\n   \"graph_note\":\"Novel_to_graph — no prior formalized version of this escalation ladder found, consistent with the Fable hardlock having been decided ad hoc rather than via a named policy.\",\n   \"conflict_with\":null,\"forced_analogy\":false,\n   \"traps\":[\n    {\"type\":\"already-doing-it\",\"note\":\"the Fable hardlock is this pattern already instantiated once ad hoc — value here is only in generalizing/logging it as a named policy, not discovering something unprecedented\"},\n    {\"type\":\"thematic-sibling\",\"note\":\"same letter-vs-spirit lens independently recurs in two other candidates against different targets (Critic/Vex checklist; Codex reviewer blind spot) — see convergence_summary\"}\n   ]\n  }\n ],\n \"killed\":[\n  {\"fusion_target\":\"cockpit.build / cockpit.overall_state self-model tables\",\"frames\":[\"F2-inversion\"],\"reason\":\"Under cross-examination against sibling candidates that each propose a specific, distinct build mechanism (recycle exhaust, keep anti-lag warm, add one bounded intent-check question, run one live-graph test), this candidate's fix is 'find the actual process and repair it' — no named mechanism, just the root-cause-vs-symptom trope, which the frame's own trap note already half-concedes ('keep this grounded... or it degrades into generic advice'). It restates a principle Warwick already holds (build-to-goal, not lever-by-lever patching) without the mechanism-level insight its siblings deliver.\",\"forced_analogy\":true}\n ],\n \"conflicts\":[],\n \"convergence_summary\":\"Two genuine cross-frame convergences surfaced. The strongest is novel_independent: three distinct frames (F1, F2, F3), reasoning three different ways, all landed on the same non-foregrounded target — Larry's session-continuity capture needs to become a continuously-updated rolling state instead of a point-in-time snapshot, with F2 extending the identical fix to the YouTube capture pipeline. That's real independent-discovery signal, not prompt echo. The second is context_induced: F1 and F5 independently proposed routing idea-engine rejection data (automated kill-pass discards, and Warwick's Cockpit Decline/Later clicks) back into the next mining pass — strong fit/impact since Cockpit and Transfer are both foregrounded targets, but not claimed as high novelty. A third, weaker pattern is thematic rather than a mergeable cluster: the 'letter vs. spirit' governance-gap lens recurred independently in three frames (F1 on the Critic/Vex checklist, F2 on Codex's read-only review blind spot, F5 as a formal hardlock-escalation policy) — three different targets, same underlying worry, worth watching as a recurring architecture concern even though each stays a single_frame candidate. One candidate (cockpit self-model table drift) was killed as a forced/generic root-cause trope with no distinct proposed mechanism. No true same-target opposite-recommendation conflicts were found. Most immediately actionable single candidate: proving the T2 divergence design against live Neo4j data, since that work is sitting uncommitted in the working tree right now.\"}",
+  "duration_ms": 306555,
+  "cost_usd": 0.778161,
+  "payload_input_est": 10674,
+  "output": 29874,
+  "cache_creation": 49952,
+  "cache_read": 101090
+ },
+ "conv": {
+  "kept": [
+   {
+    "spin": {
+     "situation": "Every new Larry session — and every in-flight capture job like the YouTube pipeline — currently starts or resumes cold, re-reading files or restarting from a point-in-time snapshot instead of already being 'spun up'.",
+     "problem": "That's turbo lag: the moment full context or full capture momentum is actually needed, there's a delay while it re-spools from zero — sometimes producing placeholder stub notes, sometimes just lost minutes re-deriving state that was already known.",
+     "implication": "Every session boundary or attention-shift becomes a mini cold-start. Minutes lost per session, and in the capture-pipeline case, work can stall out as a stub instead of finishing — and this compounds as Fusion runs more sessions.",
+     "need_payoff": "Keep a small 'throttle' open continuously — a rolling, always-topped-up state/log (not a one-time end-of-session snapshot) — so the moment a session starts or attention lifts, full context or momentum is already spinning. Zero lag, at roughly the cost of the machinery already built (5d57de9)."
+    },
+    "source_evidence": {
+     "quote": "We found a problem with our turbo, and we fixed it by pressing the brakes more... if I stay on the gas and press the brake, you slow down for the corner and the turbo keeps spinning. And the moment I let off the brake...",
+     "timestamp": "12:42-13:57",
+     "named_mechanism": "anti-lag / two-pedal driving — keeping the compressor spinning continuously via an unrelated control (the brake) so there is zero spool-up lag when the driving input is released"
+    },
+    "transfer_reasoning": "Invariant: decouple the 'maintain internal readiness' channel from the 'external deployment/trigger' channel and run both concurrently, so full capacity is available at the instant of trigger release — versus a cold system where readiness only starts building once the trigger fires. Three independent frames landed on the same real gap from three angles: F1 frames it as decoupling a readiness channel from a deployment channel for Larry's cross-session context; F2 frames it as an inverted assumption ('this only needs to run while actively driven' is false) and extends the same fix to the YouTube/TubeAIR capture pipeline, not just Larry's context; F3 frames it as converting the already-existing session-continuity capture (5d57de9) from a point-in-time snapshot into a continuously-updated rolling state file. None invent new machinery — all three point at extending what bcf9b41/5d57de9 already started.",
+    "fusion_target": "Larry's cross-session context continuity (decision-rationale log + session-continuity capture, commits bcf9b41/5d57de9) — extend from point-in-time capture to a continuously-maintained rolling state; the same fix additionally applies to the YouTube capture pipeline (Gateway/TubeAIR knowledge-note step), per F2.",
+    "category": "brain",
+    "lens": "structural fidelity + inverted-assumption — session/capture continuity architecture (three-frame convergence)",
+    "nvfi": {
+     "novelty": 4,
+     "viability": 4,
+     "fit": 5,
+     "impact": 5
+    },
+    "contributing_frames": [
+     "F1-mechanism",
+     "F2-inversion",
+     "F3-operational"
+    ],
+    "convergence_type": "novel_independent",
+    "graph_note": "Graph marks this known_or_partial (nearest: Footnote, Quantization, Anti-Gravity) and ties it to active problem threads on Larry/session/context/capture — corroborating this is a live, already-surfacing gap, not a hypothetical one. Target is not on the foregrounded-brief list, so independent convergence from 3 distinct frames is a genuine novelty signal.",
+    "conflict_with": null,
+    "forced_analogy": false,
+    "traps": [
+     {
+      "type": "already-partially-built",
+      "note": "session-continuity capture already exists (5d57de9); this refines it into a continuous/two-channel model rather than net-new machinery — treat impact as incremental-but-compounding, not foundational"
+     },
+     {
+      "type": "cost",
+      "note": "continuous background top-up writes have a small but nonzero token/write cost every session — needs bounding, not unlimited"
+     },
+     {
+      "type": "scope-creep",
+      "note": "could balloon into a full checkpoint/persistence subsystem instead of one minimal, anti-lag-sized rolling update — keep it that size"
+     },
+     {
+      "type": "needs-evidence",
+      "note": "confirm the actual mechanism of any capture stall (attention-bound vs. a real blocking call) before building anything"
+     }
+    ]
+   },
+   {
+    "spin": {
+     "situation": "Every idea-engine run produces two exhaust streams today: the automated kill-pass discards (Cairn→Transfer→Critic's discarded_obvious / killed-NVFI candidates) and Warwick's own Cockpit Decline/Later clicks.",
+     "problem": "Both streams are just vented — thrown away after one use, like exhaust shooting out a tailpipe — instead of being captured and used.",
+     "implication": "To get more/better ideas out, the instinct becomes 'run a bigger, pricier pass' (more frames, Fable) rather than getting more out of what's already been paid for and already exists as signal.",
+     "need_payoff": "Route BOTH exhaust streams — the engine's own kill-pass discards AND Warwick's Decline/Later reasons — back in as forced input/fuel for the next Cairn/Transfer-Intelligence pass, the same way a turbo's waste-gas compressor force-feeds the same engine's intake, bounded by a wastegate so it doesn't drown the current pass in stale material."
+    },
+    "source_evidence": {
+     "quote": "We turn the exhaust back into energy that we can use... one side spins from the exhaust and the other side spins to suck fresh air into the engine. So the explosions are even bigger.",
+     "timestamp": "06:32-07:03",
+     "named_mechanism": "turbocharger — shared-shaft coupling that recovers a process's own waste byproduct and force-feeds it back into that same process's input, vented above a threshold by a wastegate"
+    },
+    "transfer_reasoning": "Invariant: a shared-shaft mechanism captures the discarded byproduct of a process and mechanically couples it back into that same process's input, so a small fixed-capacity engine outperforms a much larger one, bounded by a wastegate that vents excess. Two distinct frames independently found two different exhaust sources feeding the identical target mechanism: F1 identified the engine's own automated kill-pass output (candidates the Critic already rejects every run); F5 independently identified the human Decline/Later signal Warwick already generates in the Cockpit. Different mechanisms of discovery, same underlying invariant and target — route rejection data back into the next mining pass instead of discarding it.",
+    "fusion_target": "idea-engine's discarded output — both the automated kill-pass (Cairn→Transfer→Critic discarded_obvious/killed-NVFI list) and the Cockpit Decline/Later action stream — routed back as forced input into the next Cairn/Transfer-Intelligence mining pass.",
+    "category": "brain",
+    "lens": "discard/reject pipeline recycling — automated kill-pass AND human decline signal (two-frame convergence)",
+    "nvfi": {
+     "novelty": 3,
+     "viability": 3,
+     "fit": 5,
+     "impact": 4
+    },
+    "contributing_frames": [
+     "F1-mechanism",
+     "F5-crossdomain"
+    ],
+    "convergence_type": "context_induced",
+    "graph_note": "Kill-pass angle links to the 'Cloud engine room' prior decision and an active 'pass' problem thread (known_or_partial); Decline/Later angle is novel_to_graph with no prior duplication found, tied to the active 'Cockpit action' thread. Cockpit and Transfer are both foregrounded targets, so this convergence is real and strong on fit/impact but shouldn't be read as high novelty — preserved honestly per rule 3, not discarded as prompt echo.",
+    "conflict_with": null,
+    "forced_analogy": false,
+    "traps": [
+     {
+      "type": "overboost/knock",
+      "note": "too much recycled exhaust re-injected drowns the current pass's signal in stale/killed material — needs an explicit cap, analogous to a wastegate"
+     },
+     {
+      "type": "cost",
+      "note": "the Decline/Later half needs structured decline-reason capture, not just a click event — a labeled-negative-signal pipeline is a nontrivial build, not a config flag"
+     },
+     {
+      "type": "needs-evidence",
+      "note": "unproven whether killed-candidate volume or decline reasons are actually fertile reservoirs vs. correctly-dead material / noise"
+     }
+    ]
+   },
+   {
+    "spin": {
+     "situation": "myPKA's quality/security gates (the idea Critic's NVFI+traps check, Vex's WS-003 security checklist) work by checking a list of specific named things.",
+     "problem": "A checklist only catches what's on the list — it can't catch a NEW combination of individually-fine things that together beats the whole point of the gate.",
+     "implication": "Something could sail through every named check and still quietly defeat what the gate exists to protect, and nobody would notice until it's already happened repeatedly.",
+     "need_payoff": "Add one extra, bounded question to every checklist gate — 'does this still defeat the point, even though it passes every line?' — catching the gap cheaply instead of discovering it after the fact."
+    },
+    "source_evidence": {
+     "quote": "You can only enforce the letter of the law. What was written... the spirit of law is what you wanted to happen or what you \"meant.\"",
+     "timestamp": "14:22",
+     "named_mechanism": "enumerated-parameter rulebook vs. unenumerated structural combination that is individually legal but collectively defeats rule-intent"
+    },
+    "transfer_reasoning": "A governance gate built as a list of enumerated parameter checks is structurally blind to new combinations of individually-compliant primitives that jointly defeat its intent, because it checks letter, not spirit. The tight fix is one intent-check question distinct from the enumerated list, not more list items.",
+    "fusion_target": "idea-engine Critic's NVFI+traps step and Vex's WS-003 Expansion security checklist",
+    "category": "cash",
+    "lens": "structural fidelity — governance/gate architecture",
+    "nvfi": {
+     "novelty": 3,
+     "viability": 4,
+     "fit": 3,
+     "impact": 3
+    },
+    "contributing_frames": [
+     "F1-mechanism"
+    ],
+    "convergence_type": "single_frame",
+    "graph_note": "Known_or_partial, nearest graph hits are parameter-shaped (Model Parameters, Chunk Overlap Parameter, Files Parameter) — reinforcing that graph currently only models named parameters, exactly the blind spot this candidate names. Relates to Cloud engine room prior decision.",
+    "conflict_with": null,
+    "forced_analogy": false,
+    "traps": [
+     {
+      "type": "scope-creep risk",
+      "note": "an open-ended 'spirit' question can become a vague catch-all overriding objective checks — keep it a single bounded question, not a new discretionary veto layer"
+     },
+     {
+      "type": "needs evidence",
+      "note": "provisional; no concrete instance yet of a myPKA gate being beaten this way — flagging an architecture gap, not a proven incident"
+     },
+     {
+      "type": "thematic-sibling",
+      "note": "same letter-vs-spirit lens independently recurs in two other candidates against different targets (Codex reviewer blind spot; hardlock-escalation policy) — see convergence_summary"
+     }
+    ]
+   },
+   {
+    "spin": {
+     "situation": "Fusion's merge gate leans on independent review (Codex + Fable) as the safety backstop before code goes live.",
+     "problem": "Codex reviews under a read-only sandbox that can't even read the files it's reviewing — it can only ever see the letter of the diff, never the underlying mechanism, the same way the source's rule-enforcer kept losing because he didn't understand the mechanism he was regulating.",
+     "implication": "A review gate satisfied on the letter (tests pass, checklist ticked) but blind to the actual mechanism gives false confidence — it can rubber-stamp exactly the kind of change it exists to catch.",
+     "need_payoff": "Log an explicit, per-review flag: did the reviewer actually see the mechanism, or just the surface diff? Where it's the latter, treat it as reduced-confidence review, not a clean independent pass."
+    },
+    "source_evidence": {
+     "quote": "You broke the spirit of the rules... You can only enforce the letter of the law. What was written.",
+     "timestamp": "14:22-14:44",
+     "named_mechanism": "letter-vs-spirit enforcement gap, compounded by the enforcer not understanding the mechanism he's policing"
+    },
+    "transfer_reasoning": "The failure isn't absent rules — it's an incomplete mental model of the mechanism, so every rule only ever catches the letter. Fusion already has a documented instance of this exact shape: Codex working blind because its sandbox blocks self-inspection. This candidate names it as a residual audit risk rather than assuming 'independent review ran' equals 'the mechanism was actually seen.'",
+    "fusion_target": "Multi-model build-verify loop / merge-ready gate — specifically the Codex read-only review step",
+    "category": "brain",
+    "lens": "inverted assumption: 'a review gate = safety' — false when the reviewer cannot see the mechanism, only the letter of the diff",
+    "nvfi": {
+     "novelty": 3,
+     "viability": 3,
+     "fit": 4,
+     "impact": 4
+    },
+    "contributing_frames": [
+     "F2-inversion"
+    ],
+    "convergence_type": "single_frame",
+    "graph_note": "Novel_to_graph (no nearest match), tied to the active 'model/build' problem thread. This corroborates rather than duplicates the existing memory record of Codex's read-only self-inspection gap and its diff-staging workaround.",
+    "conflict_with": null,
+    "forced_analogy": false,
+    "traps": [
+     {
+      "type": "already-partially-addressed",
+      "note": "memory already flags Codex's read-only self-inspection gap and works around it by staging the diff into the prompt — this reinforces that existing mitigation rather than proposing a new build"
+     },
+     {
+      "type": "governance-scope",
+      "note": "don't read this as a call for MORE adversarial hardening — the hobby-brain threat bar stays correctness/leak/availability/audit, not crevice-hunting"
+     },
+     {
+      "type": "thematic-sibling",
+      "note": "same letter-vs-spirit lens independently recurs in two other candidates against different targets (Critic/Vex checklist; hardlock-escalation policy) — see convergence_summary"
+     }
+    ]
+   },
+   {
+    "spin": {
+     "situation": "The T2 divergence architecture + Neo4j graph-signal audit just landed as a design package, explicitly logged as 'delegated, report-only.'",
+     "problem": "A report-only design audit is a paper calculation — it says the architecture SHOULD work, not that it DOES work against live graph data.",
+     "implication": "If T2 gets treated as done because the design reads well, the first real test of whether it holds happens later in production, when it's expensive to unwind.",
+     "need_payoff": "Before calling T2 divergence 'ready,' run it against a real slice of the live Neo4j graph and check the signal behaves as the audit predicted — prove it on tarmac, not on paper."
+    },
+    "source_evidence": {
+     "quote": "We calculated how the car should perform and on paper it should do quite well... No no, no, we don't race on paper either. Like we race on tarmac.",
+     "timestamp": "00:55-01:18",
+     "named_mechanism": "paper-performance vs track-performance — a calculated/simulated result isn't credited until it runs on the real surface"
+    },
+    "transfer_reasoning": "The engineers trusted their model of grip and power delivery, but only what shows up on tarmac counts. The T2 design + audit is Fusion's 'calculation' — a report-only, delegated pass — and hasn't yet been run against the live graph the way a car is run on track.",
+    "fusion_target": "T2 divergence architecture (Deliverables/idea-engine-T2-design-DRAFT.md) and its Neo4j graph-signal audit — gate its 'done' status on one live-graph test run, not on the design audit alone.",
+    "category": "brain",
+    "lens": "F3-operational — calculated design vs. live-data proof",
+    "nvfi": {
+     "novelty": 2,
+     "viability": 4,
+     "fit": 5,
+     "impact": 4
+    },
+    "contributing_frames": [
+     "F3-operational"
+    ],
+    "convergence_type": "single_frame",
+    "graph_note": "Novel_to_graph — consistent with T2-design-DRAFT.md and the Neo4j audit being freshly-landed, currently-uncommitted work (both files show modified in the working tree right now).",
+    "conflict_with": null,
+    "forced_analogy": false,
+    "traps": [
+     {
+      "type": "restating-known-principle",
+      "note": "Warwick already holds 'build to the goal, don't ship the slice as the goal' as a standing principle — this candidate's value is pointing that principle at the specific T2 artifact sitting delegated right now, not discovering something new"
+     }
+    ]
+   },
+   {
+    "spin": {
+     "situation": "Fusion runs an idea-engine that consumes outside content and produces commercial transfer candidates for Warwick alone.",
+     "problem": "Everything this engine produces today — including discarded candidates and rationale trails — is exhaust used once internally, then thrown away.",
+     "implication": "Fusion pays the full cost of the engine but only monetizes a fraction of what it makes, the same waste a turbo eliminates by recovering exhaust energy instead of venting it.",
+     "need_payoff": "If outside people fed their own consumed content into the same engine and got back paid transfer candidates, the exhaust becomes a second revenue stream built on machinery Fusion already owns and runs for free internally."
+    },
+    "source_evidence": {
+     "quote": "We turn the exhaust back into energy that we can use.",
+     "timestamp": "06:49",
+     "named_mechanism": "turbocharging — recovering waste exhaust energy and feeding it back to amplify the very process that produced it"
+    },
+    "transfer_reasoning": "The turbo doesn't add a new engine — it recaptures a byproduct of the existing one and routes it back to compound output. Fusion's Cockpit + Transfer-Intelligence pipeline already generates far more raw ideation exhaust than Warwick alone consumes; a thin client-facing intake valve on the same pipeline recovers that wasted throughput as paid output without building a new core mechanism.",
+    "fusion_target": "Cockpit + Transfer-Intelligence specialist pipeline, exposed via a client-facing intake valve ('feed us what you've read/watched, get back transfer candidates')",
+    "category": "cash",
+    "lens": "byproduct-recycling",
+    "nvfi": {
+     "novelty": 3,
+     "viability": 3,
+     "fit": 4,
+     "impact": 4
+    },
+    "contributing_frames": [
+     "F4-commercial"
+    ],
+    "convergence_type": "single_frame",
+    "graph_note": "Novel_to_graph, tied to the active 'Cockpit' problem thread — no prior duplicate found.",
+    "conflict_with": null,
+    "forced_analogy": false,
+    "traps": [
+     {
+      "type": "scope-creep",
+      "note": "this is exactly the BUILD-014 platform trap — start with one manual run against one outside person's reading list, not a subscription product"
+     },
+     {
+      "type": "needs-evidence",
+      "note": "zero validated external demand yet; needs one unpaid or paid pilot before any build decision"
+     }
+    ]
+   },
+   {
+    "spin": {
+     "situation": "Most businesses treat slow strategy/ideation cycles (weeks of workshops, consultant decks) as a fixed cost of doing business.",
+     "problem": "They accept that lag the same way American teams accepted turbo lag as inherent — a limitation nobody thought to attack because the fix uses an unrelated control.",
+     "implication": "Whoever finds the odd coupling that removes the lag gets a durable, hard-to-copy edge.",
+     "need_payoff": "Fusion already owns the odd coupling: a multi-frame ideation engine running many independent lenses over one source in a single sitting. Selling that as a same-day rapid-ideation sprint converts an internal capability into a second income stream."
+    },
+    "source_evidence": {
+     "quote": "if I stay on the gas and press the brake, you slow down for the corner and the turbo keeps spinning",
+     "timestamp": "13:24",
+     "named_mechanism": "anti-lag brake-boost — coupling an unrelated existing control to eliminate lag rivals treat as inherently slow"
+    },
+    "transfer_reasoning": "The insight wasn't a new part — it was repurposing a control already in the car to solve a problem rivals treated as inherently slow. Fusion's multi-frame parallel Transfer-Intelligence run is an already-built capability that could be pointed at an outside client's problem instead of Warwick's, sold as a same-day 'idea lag' removal sprint against consultancies whose ideation cycle is weeks long.",
+    "fusion_target": "Transfer-Intelligence specialist (multi-frame parallel run), repackaged as a client-facing rapid-ideation sprint",
+    "category": "cash",
+    "lens": "latency-arbitrage",
+    "nvfi": {
+     "novelty": 3,
+     "viability": 3,
+     "fit": 3,
+     "impact": 3
+    },
+    "contributing_frames": [
+     "F4-commercial"
+    ],
+    "convergence_type": "single_frame",
+    "graph_note": "Known_or_partial, nearest graph hits (Quantization, Anti-Gravity) are low-confidence/generic matches, not a real duplicate.",
+    "conflict_with": null,
+    "forced_analogy": false,
+    "traps": [
+     {
+      "type": "cost",
+      "note": "selling a service requires packaging/pricing/outreach effort entirely outside current build scope — needs Warwick's own time, not a code task"
+     },
+     {
+      "type": "already-doing-it",
+      "note": "Fusion already runs this internally for Warwick; the only delta is 'sell it externally' — confirm appetite exists before building any client-facing tooling"
+     },
+     {
+      "type": "overlap-with-sibling",
+      "note": "shares a target family with the byproduct-recycling cash candidate (intake-valve model) from the same frame — kept separate because the underlying mechanism (latency-arbitrage vs. byproduct-recycling) and business model differ, not because they're independent"
+     }
+    ]
+   },
+   {
+    "spin": {
+     "situation": "The manufacturer raced specifically to be seen, because attention converted to car sales in a market where nobody knew their brand.",
+     "problem": "Fusion's idea-engine output stays entirely private to Warwick, so even once a cash-tier idea is validated and built, there's no visible proof for outside buyers to react to.",
+     "implication": "Without a public, provable showcase, any future cash product has to be pitched cold and abstractly — the hardest way to sell anything.",
+     "need_payoff": "A small public 'show your work' channel for the engine's proven wins gives Fusion the same distribution shortcut — let the result itself be the advertisement."
+    },
+    "source_evidence": {
+     "quote": "Winning will get the most eyeballs on our car... We want to sell more cars here in America. To do that, we need attention.",
+     "timestamp": "00:25",
+     "named_mechanism": "racing-as-marketing — competing publicly to earn attention that converts to sales, treating the win as a distribution channel rather than the goal itself"
+    },
+    "transfer_reasoning": "The team's real objective was never the podium; the podium was instrumental to being seen by exact buyers. Fusion's equivalent move is publishing a proven, provenance-tagged case study once a transfer candidate from this engine is actually built and makes money — using the demonstrated result as the pitch instead of describing the mechanism to prospects with no reason to believe it works yet.",
+    "fusion_target": "Cockpit output surface — a public case-study/showcase feed for the idea engine's proven cash-tier hits",
+    "category": "cash",
+    "lens": "attention-as-distribution",
+    "nvfi": {
+     "novelty": 2,
+     "viability": 3,
+     "fit": 3,
+     "impact": 2
+    },
+    "contributing_frames": [
+     "F4-commercial"
+    ],
+    "convergence_type": "single_frame",
+    "graph_note": "Novel_to_graph, tied to the active 'Cockpit' problem thread.",
+    "conflict_with": null,
+    "forced_analogy": false,
+    "traps": [
+     {
+      "type": "premature",
+      "note": "there is nothing to showcase yet — this only fires after a cash-tier idea from this same engine has actually been built and proven; do not build the showcase ahead of a result"
+     }
+    ]
+   },
+   {
+    "spin": {
+     "situation": "When Warwick opens the Cockpit expecting proactive 'you nearly missed this' surfacing, there's sometimes a beat of lag before it appears.",
+     "problem": "That lag is the graph-traversal + embedding cold-start — the compressor has spun down and needs time to spool back up.",
+     "implication": "A user who has to wait for insight loses the 'nearly missed this' urgency — by the time it renders, the moment feels less proactive and more like a report.",
+     "need_payoff": "Keep the expensive path lightly spinning during idle Cockpit time (throttle-open-under-braking style priming, not full cache-warming) so the answer is already spooled when Warwick asks."
+    },
+    "source_evidence": {
+     "quote": "if I stay on the gas and press the brake, you slow down for the corner and the turbo keeps spinning. And the moment I let off the brake... [instant power]",
+     "timestamp": "13:33-13:57",
+     "named_mechanism": "anti-lag — throttle deliberately kept open under braking so the turbo never drops speed, eliminating spool-up delay exactly when power is needed"
+    },
+    "transfer_reasoning": "A component with high spin-up cost is kept lightly loaded but never idle during a low-demand phase, so full demand returns with zero lag — distinct from static caching because it requires continuous light throttle, not a one-time precompute. Applied to the Outputs Layer's Neo4j/embedding path during Warwick's idle Cockpit browsing.",
+    "fusion_target": "Outputs Layer proactive-surfacing pipeline (Neo4j traversal + embedding call warm path)",
+    "category": "brain",
+    "lens": "F5-crossdomain — anti-lag applied to a different subsystem than the session-continuity cluster",
+    "nvfi": {
+     "novelty": 3,
+     "viability": 4,
+     "fit": 3,
+     "impact": 3
+    },
+    "contributing_frames": [
+     "F5-crossdomain"
+    ],
+    "convergence_type": "single_frame",
+    "graph_note": "Known_or_partial, nearest graph hits (Quantization, Anti-Gravity) are low-confidence matches — no real duplicate found. Same anti-lag family as the Larry session-continuity cluster but applied to a distinct, foregrounded target (Outputs Layer); kept separate since only one frame proposed it here.",
+    "conflict_with": null,
+    "forced_analogy": false,
+    "traps": [
+     {
+      "type": "already-doing-it",
+      "note": "if a keep-alive/warm-cache already exists on this path this collapses to nothing new — check before proposing"
+     }
+    ]
+   },
+   {
+    "spin": {
+     "situation": "Fusion already has one hardlocked rule (Fable confirm-first) that exists specifically because a softer, incremental fix kept getting worked around by GPT-relayed directive text sneaking in.",
+     "problem": "That pattern — patch the letter of the rule, watch it get worked around, patch again — is exactly the regulator's losing strategy before it finally banned the whole category outright.",
+     "implication": "Without a named threshold for 'stop patching, escalate to a categorical rule,' each future loophole eats another full incident cycle before Warwick manually decides to hardlock it.",
+     "need_payoff": "Write an explicit escalation ladder into the decision-rationale log: N re-exploited patches on the same rule triggers an automatic proposal to Warwick for a categorical (hardlock) rule, rather than relying on Larry noticing the pattern each time."
+    },
+    "source_evidence": {
+     "quote": "You can only enforce the letter of the law... the spirit of the law is what you wanted to happen or what you meant... All wheel drive is banned there. (This actually happened)",
+     "timestamp": "14:22-15:37",
+     "named_mechanism": "a regulator abandons incremental letter-of-the-rule patches for a categorical prohibition only after the same structural advantage keeps re-emerging through legal loopholes"
+    },
+    "transfer_reasoning": "Incremental patches to a rule's letter lose repeatedly to a fixed structural advantage; the only fix that closes the gap is a categorical rule targeting the advantage itself, decided explicitly. Fusion has lived this once (Fable hardlock) but has no formalized trigger for recognizing it earlier next time — the transfer is naming and logging the threshold, not the individual hardlock.",
+    "fusion_target": "Decision-rationale log — formal escalation policy for converting repeatedly-worked-around soft rules into hardlocks",
+    "category": "brain",
+    "lens": "F5-crossdomain — letter-vs-spirit, applied as a meta-policy rather than a single gate fix",
+    "nvfi": {
+     "novelty": 3,
+     "viability": 4,
+     "fit": 4,
+     "impact": 3
+    },
+    "contributing_frames": [
+     "F5-crossdomain"
+    ],
+    "convergence_type": "single_frame",
+    "graph_note": "Novel_to_graph — no prior formalized version of this escalation ladder found, consistent with the Fable hardlock having been decided ad hoc rather than via a named policy.",
+    "conflict_with": null,
+    "forced_analogy": false,
+    "traps": [
+     {
+      "type": "already-doing-it",
+      "note": "the Fable hardlock is this pattern already instantiated once ad hoc — value here is only in generalizing/logging it as a named policy, not discovering something unprecedented"
+     },
+     {
+      "type": "thematic-sibling",
+      "note": "same letter-vs-spirit lens independently recurs in two other candidates against different targets (Critic/Vex checklist; Codex reviewer blind spot) — see convergence_summary"
+     }
+    ]
+   }
+  ],
+  "killed": [
+   {
+    "fusion_target": "cockpit.build / cockpit.overall_state self-model tables",
+    "frames": [
+     "F2-inversion"
+    ],
+    "reason": "Under cross-examination against sibling candidates that each propose a specific, distinct build mechanism (recycle exhaust, keep anti-lag warm, add one bounded intent-check question, run one live-graph test), this candidate's fix is 'find the actual process and repair it' — no named mechanism, just the root-cause-vs-symptom trope, which the frame's own trap note already half-concedes ('keep this grounded... or it degrades into generic advice'). It restates a principle Warwick already holds (build-to-goal, not lever-by-lever patching) without the mechanism-level insight its siblings deliver.",
+    "forced_analogy": true
+   }
+  ],
+  "conflicts": [],
+  "convergence_summary": "Two genuine cross-frame convergences surfaced. The strongest is novel_independent: three distinct frames (F1, F2, F3), reasoning three different ways, all landed on the same non-foregrounded target — Larry's session-continuity capture needs to become a continuously-updated rolling state instead of a point-in-time snapshot, with F2 extending the identical fix to the YouTube capture pipeline. That's real independent-discovery signal, not prompt echo. The second is context_induced: F1 and F5 independently proposed routing idea-engine rejection data (automated kill-pass discards, and Warwick's Cockpit Decline/Later clicks) back into the next mining pass — strong fit/impact since Cockpit and Transfer are both foregrounded targets, but not claimed as high novelty. A third, weaker pattern is thematic rather than a mergeable cluster: the 'letter vs. spirit' governance-gap lens recurred independently in three frames (F1 on the Critic/Vex checklist, F2 on Codex's read-only review blind spot, F5 as a formal hardlock-escalation policy) — three different targets, same underlying worry, worth watching as a recurring architecture concern even though each stays a single_frame candidate. One candidate (cockpit self-model table drift) was killed as a forced/generic root-cause trope with no distinct proposed mechanism. No true same-target opposite-recommendation conflicts were found. Most immediately actionable single candidate: proving the T2 divergence design against live Neo4j data, since that work is sitting uncommitted in the working tree right now."
+ }
+}

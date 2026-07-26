@@ -1,4 +1,14 @@
-# T2 — True-Divergence Idea Engine — DESIGN (draft for Warwick + GPT red-team; NO build)
+# T2 — True-Divergence Idea Engine — DESIGN (Warwick + GPT red-team AGREED core; 4 corrections folded 2026-07-26)
+
+> **Status 2026-07-26:** core T2 architecture AGREED by Warwick + GPT red-team. Four corrections folded (do NOT
+> reopen architecture generally): (1) **Neo4j = 5 core branches + a post-emit ENRICHMENT layer, not a 6th reasoning
+> branch** (Larry integration call — corpus=5, degree anti-signal, no join key); enrichment runs AFTER branches emit,
+> BEFORE convergence, informs BOTH directions (raise/lower/flag), never gates, never silently deletes. (2) Convergence
+> distinguishes **NOVEL-INDEPENDENT** vs **CONTEXT-INDUCED** convergence — both preserved, scored honestly; a
+> brief-foregrounded target is NOT worthless "prompt echo". (3) Warwick blind rating = **DEFENSIBLE? / VALUE? /
+> TIMING? / SURPRISED-ME?** per candidate, origin hidden. (4) The ~75k envelope was a faculty estimate — real
+> `claude -p` usage is wrapper/cache-dominated (T1 reported ~144k); **T2's real cost must be MEASURED, not asserted**
+> (quality-first on Max, not optimised away). ONE Audi calibration authorised before the full six-fixture experiment.
 
 **Core framing:** T1 already runs an 8-lens set *inside one call* — but along ONE reasoning trajectory, which
 collapses to sameness (the ADHD-source finding). T2's "frames" are NOT T1's internal lenses — each frame is a
@@ -44,10 +54,14 @@ the sameness collapse). It clusters/dedups/detects/flags/re-scores/presents only
    (a genuine fork for Warwick); never average.
 3. **Independent-convergence** — cluster from ≥2 different frames via different reasoning → `independent_convergence`,
    confidence boost. Orthogonal frames agreeing = strongest positive signal.
-4. **Genuine convergence vs shared-prompt contamination** (the subtle one) — discriminator per cluster:
-   `n_distinct_frames` (↑ genuine) · `mechanism_diversity` (different invariants ↑ genuine; overlap ⇒ same path ⇒
-   contamination-suspect) · `target_in_shared_brief` (foregrounded in shared A+C ⇒ contamination-suspect). Credit
-   convergence ONLY when distinct frames AND diverging mechanisms AND target NOT brief-foregrounded; else down-weight.
+4. **Two convergence types — both preserved, scored honestly (Warwick correction 2026-07-26):**
+   **(A) NOVEL INDEPENDENT CONVERGENCE** — different isolated frames/mechanisms independently reach a target that was
+   NOT foregrounded in shared A/B/C ⇒ strong novelty + convergence evidence.
+   **(B) CONTEXT-INDUCED CONVERGENCE** — different isolated frames reach a target already prominent in A/B/C ⇒ may
+   still be strong Fit/Impact/priority evidence, but NOT strong novelty evidence. **Do NOT discard B as "prompt echo".**
+   Discriminator per cluster: `n_distinct_frames` · `mechanism_diversity` (diverging invariants ⇒ genuine; overlap ⇒
+   same-path suspect) · `target_in_shared_brief` (the A-vs-B classifier). Novelty credit only for type A; Fit/Impact
+   credit for both.
 5. **Re-score NVFI** at cluster level (don't average) — Novelty may DROP if many frames found it; Impact/Viability
    confidence RISES on genuine independent convergence. Retain each branch's original NVFI in provenance.
 6. **Cross-branch kill (L2 — NEW adversarial pressure)** — apply each branch's own trap-reasoning to the OTHER
@@ -68,9 +82,11 @@ judges defensible) · semantic diversity (on SURVIVORS) · duplicate/reword rate
 survivors-as-strong) · independent-convergence count (contamination-adjusted) · NVFI distribution (Novelty×Impact
 cross-tab) · fixture-1 known-minimum hit (miss=FAIL) · thin-source restraint (5,6 → near-zero; strong survivor=FAIL)
 · graph contribution (on/off delta) · raw Claude tokens · wall-clock.
-**Judging standard — BETTER intelligence not MORE text:** BLIND rating (Warwick sees a merged de-labelled list,
-rates each defensible? + would-seriously-consider-now?; origin revealed only after). Headline = **T2-exclusive
-HIGH-RATED count**, never raw count. Anti-volume guards: (1) report high-rated-exclusive not raw; (2) signal-to-noise
+**Judging standard — BETTER intelligence not MORE text:** BLIND rating (Warwick sees a merged de-labelled list;
+origin revealed only after). **Per-candidate judgement (Warwick correction 2026-07-26): DEFENSIBLE? y/n · VALUE?
+low/med/high · TIMING? now/later/no · SURPRISED-ME? y/n.** "Seriously-consider-now" is NOT the sole outcome — a
+**high-value _Later_ idea is still successful Transfer Intelligence**; the strongest T2 evidence is a **defensible,
+high-value, SURPRISING candidate T1 did not find.** Headline = **T2-exclusive defensible+high-value count**, never raw count. Anti-volume guards: (1) report high-rated-exclusive not raw; (2) signal-to-noise
 = high-rated/total-emitted must NOT worsen vs T1; (3) attention-cost proxy = candidates×read-time; (4) forced-analogy
 survivors count HARD against T2 (3 gems + 10 forced analogies ≠ pass). **Per-frame attribution:** tag every surviving
 high-rated T2-exclusive by frame → a frame with zero high-rated exclusives across rich fixtures + non-trivial
@@ -86,9 +102,15 @@ fixture-4 trigger).
 | T1 | ~12k | ~20–40s |
 | T2 (5 core) | 5×~10k + ~25k convergence ≈ **~75k (~6× T1)** | branches PARALLEL (~20–40s) + convergence ≈ **~1–1.5 min** |
 | T2 (6, +graph) | ≈ **~85k (~7× T1)** | ~same |
-Sonnet-start throughout; Opus reserved for the convergence pass if judgement demands. Neo4j audit = non-Claude query
-(~0 Claude tokens). Larry reconciliation outside the envelope (as T1). Optimisation target = **max useful
+Sonnet-start throughout; Opus reserved for the convergence pass if judgement demands. Neo4j enrichment = non-Claude
+query (~0 Claude tokens). Larry reconciliation outside the envelope (as T1). Optimisation target = **max useful
 intelligence per Warwick decision**, not min tokens; the ~6–7× spend is justified ONLY if §C's headline clears the bar.
+
+> **⚠️ Cost caveat (Warwick correction 2026-07-26) — the ~75k is a FACULTY/payload estimate, NOT measured Max usage.**
+> Real production T1 through `claude -p` reported **~144k total Claude-Code usage per Mine** because wrapper/cache
+> activity dominates. Therefore T2's real cost is **~6 wrapper-heavy `claude -p` calls** and must be **MEASURED** (see
+> the Audi calibration report), not asserted as ~75k. We are deliberately quality-first on the 20× Max sub — the ask
+> is honest measurement, not optimising the wrapper away.
 
 **Reviewer should probe:** (1) is the 5-core set genuinely minimal (§C per-frame attribution is the empirical check);
 (2) does the §B4 contamination discriminator actually separate genuine convergence from shared-brief echo (audited in
