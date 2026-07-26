@@ -28,6 +28,9 @@ create table if not exists cockpit.idea_atom (
   created_at       timestamptz not null default now()
 );
 create index if not exists idea_atom_state_idx on cockpit.idea_atom (atom_state);
+-- Stable natural key so re-seeding UPSERTS (keeps atom_id stable) instead of delete+reinsert — which would
+-- cascade away opportunity_atom provenance and break the disposition-carry chain (Fable BLOCKER-1).
+create unique index if not exists idea_atom_natkey on cockpit.idea_atom (origin, source_ref, n);
 
 -- Re-runnable synthesis passes (each = one Mason run over the register).
 create table if not exists cockpit.opportunity_run (
@@ -90,13 +93,20 @@ create table if not exists cockpit.opportunity_event (
 );
 create index if not exists opportunity_event_idx on cockpit.opportunity_event (opportunity_id, ts);
 
--- Grants only where the cockpit roles exist (skipped on the dev sandbox that has no cp_* roles).
+-- Grants only where each cockpit role exists — guarded PER ROLE so an env with one but not the other still
+-- applies cleanly (skipped entirely on the dev sandbox that has neither).
 do $$ begin
   if exists (select 1 from pg_roles where rolname = 'cp_directus') then
-    grant usage on schema cockpit to cp_directus, cp_worker;
+    grant usage on schema cockpit to cp_directus;
     grant select on cockpit.idea_atom, cockpit.opportunity, cockpit.opportunity_atom,
-                    cockpit.opportunity_run, cockpit.opportunity_event to cp_directus, cp_worker;
-    grant insert on cockpit.opportunity_event to cp_directus, cp_worker;
+                    cockpit.opportunity_run, cockpit.opportunity_event to cp_directus;
+    grant insert on cockpit.opportunity_event to cp_directus;
+  end if;
+  if exists (select 1 from pg_roles where rolname = 'cp_worker') then
+    grant usage on schema cockpit to cp_worker;
+    grant select on cockpit.idea_atom, cockpit.opportunity, cockpit.opportunity_atom,
+                    cockpit.opportunity_run, cockpit.opportunity_event to cp_worker;
+    grant insert on cockpit.opportunity_event to cp_worker;
     grant update (state, disposition, disposition_at, disposition_conflict, matched_from, updated_at) on cockpit.opportunity to cp_worker;
   end if;
 end $$;

@@ -36,12 +36,17 @@ async function main() {
   const atoms = loadAtoms();
   const c = new pg.Client({ connectionString: URL, ssl: { rejectUnauthorized: false } });
   await c.connect();
-  await c.query("delete from cockpit.idea_atom where origin='experiment'");
+  // UPSERT by the stable natural key (origin, source_ref, n) so re-seeding keeps each atom_id STABLE — a
+  // delete+reinsert would cascade away opportunity_atom provenance and break the disposition-carry chain.
   for (const a of atoms) {
     await c.query(
       `insert into cockpit.idea_atom (n, source_ref, engine, frames, convergence, category, fusion_target,
          spin, transfer_reasoning, source_evidence, nvfi, origin)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'experiment')`,
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'experiment')
+       on conflict (origin, source_ref, n) do update set
+         engine=excluded.engine, frames=excluded.frames, convergence=excluded.convergence, category=excluded.category,
+         fusion_target=excluded.fusion_target, spin=excluded.spin, transfer_reasoning=excluded.transfer_reasoning,
+         source_evidence=excluded.source_evidence, nvfi=excluded.nvfi`,
       [a.n, a.source_ref, a.engine, a.frames, a.convergence, a.category, a.fusion_target,
         JSON.stringify(a.spin), a.transfer_reasoning, JSON.stringify(a.source_evidence), JSON.stringify(a.nvfi)],
     );
