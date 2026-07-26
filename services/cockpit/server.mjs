@@ -10,7 +10,9 @@ import { execSync, spawn } from 'node:child_process';
 import { q, w } from './db.mjs';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
-const PUB = path.join(DIR, 'public');
+// Serves from ./public by default; COCKPIT_PUB points a throwaway instance at a STAGING copy so cockpit UI
+// changes can be render-checked (node services/cockpit/render-check.mjs) BEFORE they replace the live assets.
+const PUB = path.resolve(process.env.COCKPIT_PUB || path.join(DIR, 'public')); // resolve so the startsWith() guard matches regardless of slash style
 const REPO = path.resolve(DIR, '..', '..');
 const TK = path.join(REPO, 'Team Knowledge');
 const PORT = Number(process.env.COCKPIT_PORT || 8090);

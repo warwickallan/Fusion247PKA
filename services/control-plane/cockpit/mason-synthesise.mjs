@@ -66,9 +66,13 @@ async function main() {
   if (!call.ok) { console.error('[mason] call FAILED:', call.error); process.exit(1); }
   const out = parseJSON(call.resultText);
 
-  // reset placement from any prior run, then persist this run
+  // Persist this run TRANSACTIONALLY — a mid-run failure must not leave a partial run selected as the
+  // cockpit's "latest" (which would hide the last good run). Vars used after the tx are hoisted here.
+  let carried = 0; let conflicts = 0; let unplaced = []; let run;
+  await c.query('begin');
+  try {
   await c.query("update cockpit.idea_atom set atom_state='registered'");
-  const run = (await c.query(
+  run = (await c.query(
     `insert into cockpit.opportunity_run (atom_count, surfaced, emerging, rejected, standalone, duration_ms, output_tokens)
      values ($1,$2,$3,$4,$5,$6,$7) returning run_id`,
     [atoms.length, (out.surfaced || []).length, (out.emerging || []).length, (out.rejected_clusters || []).length, (out.standalone_atoms || []).length, call.duration_ms, call.output],
@@ -106,7 +110,6 @@ async function main() {
     `select o.opportunity_id id, array_agg(oa.atom_id) atoms
        from cockpit.opportunity o join cockpit.opportunity_atom oa on oa.opportunity_id = o.opportunity_id
       where o.run_id = $1 and o.state in ('surfaced','emerging') group by o.opportunity_id`, [run])).rows;
-  let carried = 0; let conflicts = 0;
   for (const nOpp of newOpps) {
     const scored = priorDecided.map((p) => ({ p, s: jac(nOpp.atoms, p.atoms) })).filter((x) => x.s >= 0.3).sort((a, b) => b.s - a.s);
     if (!scored.length) continue;
@@ -124,8 +127,10 @@ async function main() {
   }
 
   // accounting: any atom the model didn't place defaults to standalone (register), and is flagged
-  const unplaced = (await c.query("select n from cockpit.idea_atom where atom_state='registered' order by n")).rows.map((r) => r.n);
+  unplaced = (await c.query("select n from cockpit.idea_atom where atom_state='registered' order by n")).rows.map((r) => r.n);
   if (unplaced.length) await c.query("update cockpit.idea_atom set atom_state='standalone' where atom_state='registered'");
+  await c.query('commit');
+  } catch (e) { try { await c.query('rollback'); } catch { /* */ } await c.end(); throw e; }
 
   const counts = (await c.query('select atom_state, count(*)::int n from cockpit.idea_atom group by 1 order by 1')).rows;
   const surfaced = (await c.query("select headline, otype from cockpit.opportunity where run_id=$1 and state='surfaced' order by created_at", [run])).rows;
