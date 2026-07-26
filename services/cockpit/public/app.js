@@ -331,18 +331,22 @@ createApp({
         <div class="grp">
           <h2>📄 Deliverables<span class="g-count">{{ deliverables.length }}</span><span class="lane-sub">produced docs — read / copy / download</span></h2>
           <div v-if="!deliverables.length" class="empty">No deliverables yet — dPax will drop them here.</div>
-          <div v-for="d in deliverables.slice(0,5)" :key="d.file" class="item grey">
+          <div class="lane-scroll">
+          <div v-for="d in deliverables" :key="d.file" class="item grey">
             <div class="i-main" @click="openDeliverable(d)"><div class="i-eyebrow">doc · {{ ago(d.mtime) }} ago</div><div class="i-title">{{ terse(d.title) }}</div></div>
             <div class="i-act"><button class="act" :disabled="busy" @click.stop="copyDoc(d)">{{ d._copied ? '✓' : '⧉' }}</button><button class="act" @click.stop="downloadDoc(d)">⭳</button></div>
+          </div>
           </div>
         </div>
 
         <div class="grp">
           <h2>📝 Transcripts<span class="g-count">{{ (state.ingested||[]).length }}</span><span class="lane-sub">source text — copy / download</span></h2>
           <div v-if="!(state.ingested||[]).length" class="empty">Nothing ingested yet.</div>
-          <div v-for="s in (state.ingested||[]).slice(0,5)" :key="s.video_id" class="item grey">
+          <div class="lane-scroll">
+          <div v-for="s in (state.ingested||[])" :key="s.video_id" class="item grey">
             <div class="i-main"><div class="i-title">{{ terse(s.title || s.video_id) }}</div><div class="i-why" :class="{err:s._copyErr}">{{ s._copyErr ? s._copyErr : ('ingested ' + ago(s.updated_at) + ' ago') }}</div></div>
             <div class="i-act"><button class="act" :disabled="busy" @click="copyTranscript(s)">{{ s._copied ? '✓' : '⧉' }}</button><button class="act" @click="downloadTranscript(s)">⭳</button></div>
+          </div>
           </div>
         </div>
       </section>

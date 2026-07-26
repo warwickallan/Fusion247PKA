@@ -57,6 +57,11 @@ button { font-family:inherit; }
 .g-count { font-family:var(--mono); font-size:11px; font-weight:700; background:var(--accent-w); color:var(--accent-ink); padding:1px 8px; border-radius:20px; }
 .lane-sub { font-size:11px; color:var(--ink3); font-weight:500; }
 .empty { color:var(--ink3); font-size:14px; padding:6px 2px; } .empty.big { padding:34px 6px; text-align:center; font-size:15px; }
+/* long lanes (deliverables / transcripts) scroll instead of getting capped — shows ~5, scrolls for the rest */
+.lane-scroll { max-height:360px; overflow-y:auto; overflow-x:hidden; padding-right:5px; margin-right:-5px; overscroll-behavior:contain; }
+.lane-scroll::-webkit-scrollbar { width:8px; }
+.lane-scroll::-webkit-scrollbar-thumb { background:var(--hair); border-radius:8px; }
+.lane-scroll { scrollbar-width:thin; scrollbar-color:var(--hair) transparent; }
 
 .item { display:flex; align-items:center; gap:12px; background:var(--panel); border:1px solid var(--hair); border-left:4px solid var(--park); border-radius:13px; padding:13px 15px; margin-bottom:9px; }
 .item.red{border-left-color:var(--stop);} .item.blue{border-left-color:var(--accent);} .item.amber{border-left-color:var(--warn);} .item.green{border-left-color:var(--ok);} .item.grey{border-left-color:var(--park);}
