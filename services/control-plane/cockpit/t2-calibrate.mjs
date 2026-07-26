@@ -326,7 +326,10 @@ OUTPUT — return ONLY this JSON, no preamble, no fences:
 // ---------- reusable T2 pipeline (branches → non-model enrichment → convergence) ----------
 export async function runT2Pipeline(video, source, log = () => {}) {
   const bStart = Date.now();
-  const branchCalls = await mapPool(FRAMES, 2, (f) => callClaude(branchPrompt(f, source), f.id));
+  // Branch concurrency (execution detail only; identical results either way). 5-wide is fine and fast when the
+  // fixture runs FOREGROUND (its whole branch phase stays inside the ~10-min window); long BACKGROUND runs proved
+  // fragile (killed mid-run), so the experiment is driven one fixture per foreground call.
+  const branchCalls = await mapPool(FRAMES, 5, (f) => callClaude(branchPrompt(f, source), f.id));
   const branchWallMs = Date.now() - bStart;
   const branchOutputs = [];
   for (const c of branchCalls) {

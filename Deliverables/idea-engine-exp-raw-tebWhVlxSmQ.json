@@ -1,0 +1,136 @@
+{
+ "fixture": {
+  "n": 6,
+  "id": "tebWhVlxSmQ",
+  "label": "Clean an Air Fryer (7s)",
+  "cls": "thin / negative"
+ },
+ "t1": {
+  "call": {
+   "label": "T1",
+   "ok": true,
+   "resultText": "```json\n{\"mine_id\":\"8c0dc7c4-f45f-4a27-923f-5a519be2ba41\",\"brief_hash\":\"ef98acbac5ab8996\",\"discarded_obvious\":[],\"candidates\":[],\"zero_reason\":\"Source is a fragmentary YouTube outro/subscribe-reminder clip (garbled ASR, no substantive mechanism, principle, or claim) — nothing to transfer.\"}\n```",
+   "duration_ms": 14401,
+   "cost_usd": 0.1587036,
+   "payload_input_est": 2005,
+   "output": 463,
+   "cache_creation": 23848,
+   "cache_read": 28882
+  },
+  "candidates": [],
+  "zero_reason": "Source is a fragmentary YouTube outro/subscribe-reminder clip (garbled ASR, no substantive mechanism, principle, or claim) — nothing to transfer."
+ },
+ "t2": {
+  "video": "tebWhVlxSmQ",
+  "branchCalls": [
+   {
+    "label": "F1-mechanism",
+    "ok": true,
+    "resultText": "{\"frame\":\"F1-mechanism\",\"discarded_obvious\":[],\"candidates\":[],\"zero_reason\":\"Source is a fragment of video-outro boilerplate (Hindi: 'I'll cut from here, F5, and subscribe — be sure to subscribe' plus a stray English clause and a music tag). No mechanism, process, or system architecture is described anywhere in the text — nothing exists to recognise, so nothing can be analogised or transferred without manufacturing a false correspondence.\"}",
+    "duration_ms": 14731,
+    "cost_usd": 0.14410289999999998,
+    "payload_input_est": 1336,
+    "output": 640,
+    "cache_creation": 20647,
+    "cache_read": 35383
+   },
+   {
+    "label": "F2-inversion",
+    "ok": true,
+    "resultText": "{\"frame\":\"F2-inversion\",\"discarded_obvious\":[],\"candidates\":[],\"zero_reason\":\"Source is a single fragmentary line — a YouTube outro/subscribe bumper ('मैं यहां से कट करेंगे...सब्सक्राइब जरुर सब्सक्राइब', [संगीत]) with a garbled, likely mistranscribed English clause ('mixed introspect and destroyed the inside of fixed on'). There is no described mechanism, system, or assumption that fails, breaks, or gets exploited — nothing for this frame's negation lens to invert. Forcing a failure-mode transfer out of noise would violate NEVER MANUFACTURE; zero is correct.\"}",
+    "duration_ms": 16009,
+    "cost_usd": 0.1460319,
+    "payload_input_est": 1368,
+    "output": 755,
+    "cache_creation": 20681,
+    "cache_read": 35383
+   },
+   {
+    "label": "F3-operational",
+    "ok": true,
+    "resultText": "{\"frame\":\"F3-operational\",\"discarded_obvious\":[],\"candidates\":[],\"zero_reason\":\"Source is a garbled YouTube outro fragment (\\\"मैं यहां से कट करेंगे f5 व सब्सक्राइब जरुर सब्सक्राइब\\\" — \\\"I'll cut here, F5 and subscribe, please subscribe\\\" — plus two stray English words \\\"introspect and destroyed... inside of fixed\\\"). No mechanism, workflow, tool, or process is described anywhere in the transcript — it is channel-outro boilerplate with no operational content to recognise. Forcing a transfer here would violate NEVER MANUFACTURE; zero is correct.\"}",
+    "duration_ms": 16926,
+    "cost_usd": 0.1495479,
+    "payload_input_est": 1339,
+    "output": 1009,
+    "cache_creation": 20632,
+    "cache_read": 35383
+   },
+   {
+    "label": "F4-commercial",
+    "ok": true,
+    "resultText": "{\"frame\":\"F4-commercial\",\"discarded_obvious\":[\"\\\"सब्सक्राइब जरुर सब्सक्राइब\\\" (subscribe CTA) -> generic YouTube-growth-hack mapping to Fusion channel/audience building — surface-level, not a transferable mechanism, discarded\"],\"candidates\":[],\"zero_reason\":\"The cleaned source is a single fragmentary line — a YouTube outro (\\\"I'll cut from here, F5 and subscribe, do subscribe\\\") garbled together with what looks like an unrelated video title fragment (\\\"mixed introspect and destroyed the inside of fixed on\\\") plus a [Music] tag. There is no intact mechanism, process, or principle here to recognise — it reads as a transcription/segmentation failure on a near-empty or mis-clipped source, not content. Per MUST HOLD (never manufacture), forcing a commercial analogy onto boilerplate subscribe-CTA text would be fabrication, not transfer. Zero is correct — flag upstream that this source likely needs re-capture (TubeAIR pending_cairn / stale transcript) rather than mining what exists.\"}",
+    "duration_ms": 20439,
+    "cost_usd": 0.14080890000000001,
+    "payload_input_est": 1336,
+    "output": 1110,
+    "cache_creation": 18923,
+    "cache_read": 35383
+   },
+   {
+    "label": "F5-crossdomain",
+    "ok": true,
+    "resultText": "```json\n{\"frame\":\"F5-crossdomain\",\"discarded_obvious\":[],\"candidates\":[],\"zero_reason\":\"Source is a ~15s fragment of ASR-garbled video-outro noise (\\\"I'll cut from here, F5, subscribe, definitely subscribe\\\" + a run of nonsense phonetic English/Hindi mix + [music] tag). There is no mechanism, narrative, system, or claim in it — just a subscribe call-to-action and transcription artifacts. Nothing here has a structural shape to map onto any Fusion component without inventing content the source doesn't contain, which this frame's harsh self-kill calibration forbids. Zero is correct.\"}\n```",
+    "duration_ms": 16283,
+    "cost_usd": 0.1258179,
+    "payload_input_est": 1350,
+    "output": 845,
+    "cache_creation": 17087,
+    "cache_read": 35383
+   }
+  ],
+  "branchOutputs": [
+   {
+    "frame": "F1-mechanism",
+    "discarded_obvious": [],
+    "candidates": [],
+    "zero_reason": "Source is a fragment of video-outro boilerplate (Hindi: 'I'll cut from here, F5, and subscribe — be sure to subscribe' plus a stray English clause and a music tag). No mechanism, process, or system architecture is described anywhere in the text — nothing exists to recognise, so nothing can be analogised or transferred without manufacturing a false correspondence."
+   },
+   {
+    "frame": "F2-inversion",
+    "discarded_obvious": [],
+    "candidates": [],
+    "zero_reason": "Source is a single fragmentary line — a YouTube outro/subscribe bumper ('मैं यहां से कट करेंगे...सब्सक्राइब जरुर सब्सक्राइब', [संगीत]) with a garbled, likely mistranscribed English clause ('mixed introspect and destroyed the inside of fixed on'). There is no described mechanism, system, or assumption that fails, breaks, or gets exploited — nothing for this frame's negation lens to invert. Forcing a failure-mode transfer out of noise would violate NEVER MANUFACTURE; zero is correct."
+   },
+   {
+    "frame": "F3-operational",
+    "discarded_obvious": [],
+    "candidates": [],
+    "zero_reason": "Source is a garbled YouTube outro fragment (\"मैं यहां से कट करेंगे f5 व सब्सक्राइब जरुर सब्सक्राइब\" — \"I'll cut here, F5 and subscribe, please subscribe\" — plus two stray English words \"introspect and destroyed... inside of fixed\"). No mechanism, workflow, tool, or process is described anywhere in the transcript — it is channel-outro boilerplate with no operational content to recognise. Forcing a transfer here would violate NEVER MANUFACTURE; zero is correct."
+   },
+   {
+    "frame": "F4-commercial",
+    "discarded_obvious": [
+     "\"सब्सक्राइब जरुर सब्सक्राइब\" (subscribe CTA) -> generic YouTube-growth-hack mapping to Fusion channel/audience building — surface-level, not a transferable mechanism, discarded"
+    ],
+    "candidates": [],
+    "zero_reason": "The cleaned source is a single fragmentary line — a YouTube outro (\"I'll cut from here, F5 and subscribe, do subscribe\") garbled together with what looks like an unrelated video title fragment (\"mixed introspect and destroyed the inside of fixed on\") plus a [Music] tag. There is no intact mechanism, process, or principle here to recognise — it reads as a transcription/segmentation failure on a near-empty or mis-clipped source, not content. Per MUST HOLD (never manufacture), forcing a commercial analogy onto boilerplate subscribe-CTA text would be fabrication, not transfer. Zero is correct — flag upstream that this source likely needs re-capture (TubeAIR pending_cairn / stale transcript) rather than mining what exists."
+   },
+   {
+    "frame": "F5-crossdomain",
+    "discarded_obvious": [],
+    "candidates": [],
+    "zero_reason": "Source is a ~15s fragment of ASR-garbled video-outro noise (\"I'll cut from here, F5, subscribe, definitely subscribe\" + a run of nonsense phonetic English/Hindi mix + [music] tag). There is no mechanism, narrative, system, or claim in it — just a subscribe call-to-action and transcription artifacts. Nothing here has a structural shape to map onto any Fusion component without inventing content the source doesn't contain, which this frame's harsh self-kill calibration forbids. Zero is correct."
+   }
+  ],
+  "enriched": [],
+  "convCall": {
+   "label": "convergence",
+   "ok": true,
+   "resultText": "```json\n{\"kept\":[],\n \"killed\":[],\n \"conflicts\":[],\n \"convergence_summary\":\"No branch candidates were provided in the input (empty array) — nothing to dedup, cluster, or score. Awaiting the five specialist frame outputs before a convergence pass can run.\"}\n```",
+   "duration_ms": 8621,
+   "cost_usd": 0.1325529,
+   "payload_input_est": 909,
+   "output": 226,
+   "cache_creation": 19757,
+   "cache_read": 35383
+  },
+  "conv": {
+   "kept": [],
+   "killed": [],
+   "conflicts": [],
+   "convergence_summary": "No branch candidates were provided in the input (empty array) — nothing to dedup, cluster, or score. Awaiting the five specialist frame outputs before a convergence pass can run."
+  },
+  "branchWallMs": 47940
+ }
+}

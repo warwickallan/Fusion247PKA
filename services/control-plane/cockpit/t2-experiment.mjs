@@ -146,11 +146,27 @@ _A high-value "later" is still a win. The prize is a defensible, high-value, sur
   return { gT1t, gT2t, gT1c, gT2c };
 }
 
+// assemble the master BLIND/KEY/COST from whatever per-fixture raws exist on disk (accumulates across per-fixture runs)
+function buildMasterFromDisk(runId) {
+  const results = [];
+  for (const f of FIXTURES) {
+    const p = `${OUT}/idea-engine-exp-raw-${f.id}.json`;
+    if (fs.existsSync(p)) results.push(JSON.parse(fs.readFileSync(p, 'utf8')));
+    else console.error(`[master] no raw yet for fixture ${f.n} ${f.id}`);
+  }
+  const totals = writeArtefacts(results, runId);
+  return { results, totals };
+}
+
 async function main() {
   const runId = crypto.randomUUID().slice(0, 8);
+  if (process.argv[2] === '--build-master') {
+    const { results } = buildMasterFromDisk(runId);
+    console.log(JSON.stringify({ ok: true, master: true, fixtures: results.map((r) => ({ n: r.fixture.n, t1: r.t1.candidates.length, t2: (r.t2?.conv?.kept || []).length })) }, null, 2));
+    return;
+  }
   const only = process.argv[2] ? new Set(process.argv[2].split(',')) : null;
   const fixtures = only ? FIXTURES.filter((f) => only.has(f.id)) : FIXTURES;
-  const results = [];
   for (const fixture of fixtures) {
     const log = (m) => console.error(`[exp ${fixture.n}/${fixture.id}] ${m}`);
     const rawPath = `${OUT}/idea-engine-exp-raw-${fixture.id}.json`;
@@ -160,13 +176,14 @@ async function main() {
     const t1 = await runT1(fixture.id, source, log);
     const t2 = await runT2Pipeline(fixture.id, source, (m) => log(m));
     const r = { fixture, t1, t2 };
-    results.push(r);
     fs.writeFileSync(rawPath, JSON.stringify(r, null, 1));
-    log(`done · T1 ${t1.candidates.length} · T2 ${(t2.conv?.kept || []).length}`);
+    log(`done · T1 ${t1.candidates.length} · T2 ${(t2.conv?.kept || []).length} · raw persisted`);
   }
-  const totals = writeArtefacts(results, runId);
+  // rebuild the master artefacts from ALL per-fixture raws on disk (so per-fixture runs accumulate)
+  const { results, totals } = buildMasterFromDisk(runId);
   console.log(JSON.stringify({
-    ok: true, runId, fixtures: results.map((r) => ({ n: r.fixture.n, id: r.fixture.id, t1: r.t1.candidates.length, t2: (r.t2?.conv?.kept || []).length })),
+    ok: true, runId, ran: fixtures.map((f) => f.id), have_raws: results.map((r) => r.fixture.n),
+    fixtures: results.map((r) => ({ n: r.fixture.n, id: r.fixture.id, t1: r.t1.candidates.length, t2: (r.t2?.conv?.kept || []).length })),
     grand: { t1_tok: totals.gT1t, t2_tok: totals.gT2t, combined_tok: totals.gT1t + totals.gT2t, cost_usd: +(totals.gT1c + totals.gT2c).toFixed(2) },
     artefacts: ['idea-engine-T1vsT2-experiment-BLIND.md', 'idea-engine-T1vsT2-experiment-KEY.md', 'idea-engine-T1vsT2-experiment-COST.md'],
   }, null, 2));
