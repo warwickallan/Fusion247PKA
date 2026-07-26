@@ -6,7 +6,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { execSync } from 'node:child_process';
+import { execSync, spawn } from 'node:child_process';
 import { q, w } from './db.mjs';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -57,7 +57,13 @@ async function apiState() {
   const ingestedCount = await safe(`select count(*)::int n from cockpit.youtube_source`);
   const wins = await safe(`select id, text, happened_at from cockpit.movement order by happened_at desc nulls last limit 8`);
   const builds = await safe(`select id, name, gives, status, status_tone, progress_pct, sort from cockpit.build order by sort nulls last limit 50`);
-  return { attention, outputs, archived, housekeeping, deliverables: listDeliverables().slice(0, 20), ingested, ingestedCount: ingestedCount[0]?.n ?? ingested.length, wins, builds, build: BUILD, at: new Date().toISOString() };
+  // Transfer-Intelligence ideas (SPIN-first surface). Highest Impact first.
+  const ideas = await safe(
+    `select candidate_id id, mine_id, category, lens, spin, source_evidence, transfer_reasoning, fusion_target,
+            nvfi, traps, larry_recon, lifecycle_state, created_at
+     from cockpit.idea_candidate where lifecycle_state in ('proposed','reconciled','later')
+     order by (nvfi->>'impact')::int desc nulls last, created_at desc limit 100`);
+  return { attention, outputs, archived, housekeeping, deliverables: listDeliverables().slice(0, 20), ideas, ingested, ingestedCount: ingestedCount[0]?.n ?? ingested.length, wins, builds, build: BUILD, at: new Date().toISOString() };
 }
 
 // One decision endpoint for the whole lifecycle: accept (fires the real governed action + records
@@ -149,6 +155,35 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.url.startsWith('/api/transcript')) { const v = new URL(req.url, 'http://x').searchParams.get('video'); return j(res, 200, await apiTranscript(v)); }
     if (req.url.startsWith('/api/deliverable')) { const f = new URL(req.url, 'http://x').searchParams.get('file'); return j(res, 200, await apiDeliverable(f)); }
+    if (req.url.startsWith('/api/mine') && req.method === 'POST') {
+      let raw = ''; req.on('data', (d) => { raw += d; if (raw.length > 1e4) req.destroy(); });
+      req.on('end', () => {
+        try {
+          const v = String(JSON.parse(raw || '{}').video || '');
+          if (!/^[A-Za-z0-9_-]{6,24}$/.test(v)) return j(res, 200, { ok: false, error: 'bad video id' });
+          // fire the Mine runner detached (one Sonnet call, ~2 min) — ideas appear in /api/state when done
+          const p = spawn('node', ['--env-file=C:/.fusion247/fusion-capture-gateway.env', `${REPO}/services/control-plane/cockpit/mine-ideas.mjs`, v], { detached: true, stdio: 'ignore', cwd: REPO });
+          p.unref();
+          j(res, 200, { ok: true, mining: v });
+        } catch (e) { j(res, 500, { ok: false, error: e.message }); }
+      });
+      return;
+    }
+    if (req.url.startsWith('/api/idea-decide') && req.method === 'POST') {
+      let raw = ''; req.on('data', (d) => { raw += d; if (raw.length > 1e4) req.destroy(); });
+      req.on('end', async () => {
+        try {
+          const { id, decision } = JSON.parse(raw || '{}');
+          const map = { keep: 'kept', later: 'later', decline: 'declined', research: 'researching' };
+          if (!id || !map[decision]) return j(res, 200, { ok: false, error: 'bad decision' });
+          await w('update cockpit.idea_candidate set lifecycle_state=$2, updated_at=now() where candidate_id=$1', [id, map[decision]]);
+          await w("insert into cockpit.idea_event (candidate_id, actor, event, note) values ($1,'warwick',$2,$3)",
+            [id, decision === 'research' ? 'research_started' : decision, 'cockpit']);
+          j(res, 200, { ok: true, id, state: map[decision] });
+        } catch (e) { j(res, 500, { ok: false, error: e.message }); }
+      });
+      return;
+    }
     if (req.url.startsWith('/api/health')) return j(res, 200, { status: 'ok', build: BUILD });
     return serveStatic(req, res);
   } catch (e) { j(res, 500, { ok: false, error: e.message }); }
