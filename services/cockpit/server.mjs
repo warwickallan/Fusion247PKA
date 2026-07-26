@@ -59,10 +59,14 @@ async function apiState() {
   const builds = await safe(`select id, name, gives, status, status_tone, progress_pct, sort from cockpit.build order by sort nulls last limit 50`);
   // Transfer-Intelligence ideas (SPIN-first surface). Highest Impact first.
   const ideas = await safe(
-    `select candidate_id id, mine_id, category, lens, spin, source_evidence, transfer_reasoning, fusion_target,
-            nvfi, traps, larry_recon, lifecycle_state, created_at
-     from cockpit.idea_candidate where lifecycle_state in ('proposed','reconciled','later')
-     order by (nvfi->>'impact')::int desc nulls last, created_at desc limit 100`);
+    `select ic.candidate_id id, ic.mine_id, ic.category, ic.lens, ic.spin, ic.source_evidence, ic.transfer_reasoning,
+            ic.fusion_target, ic.nvfi, ic.traps, ic.larry_recon, ic.lifecycle_state, ic.brief_hash, ic.created_at,
+            im.source_ref, coalesce(ys.title, im.source_ref) as source_title, im.model as mine_model
+     from cockpit.idea_candidate ic
+     join cockpit.idea_mine im on im.mine_id = ic.mine_id
+     left join cockpit.youtube_source ys on ys.video_id = im.source_ref
+     where ic.lifecycle_state in ('proposed','reconciled','later')
+     order by (ic.nvfi->>'impact')::int desc nulls last, ic.created_at desc limit 100`);
   return { attention, outputs, archived, housekeeping, deliverables: listDeliverables().slice(0, 20), ideas, ingested, ingestedCount: ingestedCount[0]?.n ?? ingested.length, wins, builds, build: BUILD, at: new Date().toISOString() };
 }
 
