@@ -66,6 +66,8 @@ button { font-family:inherit; }
 .opp-atom { font-size:11.5px; color:var(--ink3); padding:3px 0 3px 8px; border-left:2px solid var(--hair); margin-top:3px; }
 .opp .i-act { margin-top:10px; flex-wrap:wrap; gap:7px; }
 .opp-body .mono { font-family:var(--mono); font-size:11px; }
+.opp-disp { display:inline-block; margin-left:7px; padding:1px 7px; border-radius:20px; background:var(--accent-w); color:var(--accent-ink); font-weight:700; font-size:10.5px; }
+.opp-conflict { display:inline-block; margin-left:7px; padding:1px 7px; border-radius:20px; background:var(--warn,#e08a1e); color:#fff; font-weight:700; font-size:10.5px; }
 /* long lanes (deliverables / transcripts) scroll instead of getting capped — shows ~5, scrolls for the rest */
 .lane-scroll { max-height:360px; overflow-y:auto; overflow-x:hidden; padding-right:5px; margin-right:-5px; overscroll-behavior:contain; }
 .lane-scroll::-webkit-scrollbar { width:8px; }

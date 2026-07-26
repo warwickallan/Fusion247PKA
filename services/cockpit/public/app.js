@@ -345,7 +345,10 @@ createApp({
           <h2>🎯 Opportunities<span class="g-count">{{ opps.length }}</span><span class="lane-sub">Mason — joined-up build theses, not single ideas</span></h2>
           <div v-for="o in opps" :key="o.id" class="item blue opp">
             <div class="i-main">
-              <div class="i-eyebrow">{{ o.otype==='strategic' ? '🧭 strategic' : '🔧 self-improvement' }} · {{ o.roi && o.roi.band ? o.roi.band+' ROI / '+o.roi.value_type : '' }} · {{ o.atoms ? o.atoms.length : 0 }} ideas</div>
+              <div class="i-eyebrow">{{ o.otype==='strategic' ? '🧭 strategic' : '🔧 self-improvement' }} · {{ o.roi && o.roi.band ? o.roi.band+' ROI / '+o.roi.value_type : '' }} · {{ o.atoms ? o.atoms.length : 0 }} ideas
+                <span v-if="o.disposition && !o.disposition_conflict" class="opp-disp">your call: {{ o.disposition }}</span>
+                <span v-if="o.disposition_conflict" class="opp-conflict">⚠ evidence changed — re-confirm your call</span>
+              </div>
               <div class="i-title">{{ o.headline }}</div>
               <div v-if="o.spin" class="i-why">{{ oneLine(o.spin.problem) }}</div>
             </div>

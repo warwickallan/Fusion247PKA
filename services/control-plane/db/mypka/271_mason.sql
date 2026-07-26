@@ -55,10 +55,22 @@ create table if not exists cockpit.opportunity (
   coherence_note  text,
   rejected_reason text,                           -- for state=rejected: semantic | volume | incoherent
   score           numeric,
+  -- Warwick's DISPOSITION is durable human authority, separate from synthesis `state`. A re-synthesis updates
+  -- content/evidence/membership but must CARRY the disposition forward (matched by atom-set overlap), or flag a
+  -- conflict for Warwick rather than guessing. Never silently overwrite his call.
+  disposition        text check (disposition in ('watching','researching','brief','later','declined')),
+  disposition_at     timestamptz,
+  disposition_conflict boolean not null default false,  -- ambiguous carry-forward → needs Warwick review
+  matched_from       uuid,                              -- prior opportunity this one inherited disposition from
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now()
 );
 create index if not exists opportunity_state_idx on cockpit.opportunity (state, otype);
+-- idempotent for installs created before the disposition columns existed
+alter table cockpit.opportunity add column if not exists disposition text;
+alter table cockpit.opportunity add column if not exists disposition_at timestamptz;
+alter table cockpit.opportunity add column if not exists disposition_conflict boolean not null default false;
+alter table cockpit.opportunity add column if not exists matched_from uuid;
 
 -- Provenance: which atoms support each opportunity (also carries rejected-cluster membership).
 create table if not exists cockpit.opportunity_atom (
@@ -85,6 +97,6 @@ do $$ begin
     grant select on cockpit.idea_atom, cockpit.opportunity, cockpit.opportunity_atom,
                     cockpit.opportunity_run, cockpit.opportunity_event to cp_directus, cp_worker;
     grant insert on cockpit.opportunity_event to cp_directus, cp_worker;
-    grant update (state, updated_at) on cockpit.opportunity to cp_worker;
+    grant update (state, disposition, disposition_at, disposition_conflict, matched_from, updated_at) on cockpit.opportunity to cp_worker;
   end if;
 end $$;

@@ -93,6 +93,36 @@ async function main() {
   await c.query("update cockpit.idea_atom set atom_state='standalone' where atom_id = any($1)", [ids(out.standalone_atoms)]);
   for (const o of (out.emerging || [])) { await persistOpp(o, 'emerging'); await c.query("update cockpit.idea_atom set atom_state='emerging_member' where atom_id = any($1)", [ids(o.member_atoms)]); }
   for (const o of (out.surfaced || [])) { await persistOpp(o, 'surfaced'); await c.query("update cockpit.idea_atom set atom_state='surfaced_member' where atom_id = any($1)", [ids(o.member_atoms)]); }
+
+  // ---- Carry Warwick's DISPOSITION across runs (durable human authority) ----
+  // Match this run's opportunities to prior DECIDED ones by atom-set overlap (Jaccard). A confident, unique match
+  // carries the disposition forward; an ambiguous match is flagged as a conflict for Warwick — never guessed.
+  const jac = (a, b) => { const A = new Set(a); const B = new Set(b); let i = 0; for (const x of A) if (B.has(x)) i++; return i / (A.size + B.size - i || 1); };
+  const priorDecided = (await c.query(
+    `select o.opportunity_id id, o.disposition, array_agg(oa.atom_id) atoms
+       from cockpit.opportunity o join cockpit.opportunity_atom oa on oa.opportunity_id = o.opportunity_id
+      where o.disposition is not null and o.run_id <> $1 group by o.opportunity_id, o.disposition`, [run])).rows;
+  const newOpps = (await c.query(
+    `select o.opportunity_id id, array_agg(oa.atom_id) atoms
+       from cockpit.opportunity o join cockpit.opportunity_atom oa on oa.opportunity_id = o.opportunity_id
+      where o.run_id = $1 and o.state in ('surfaced','emerging') group by o.opportunity_id`, [run])).rows;
+  let carried = 0; let conflicts = 0;
+  for (const nOpp of newOpps) {
+    const scored = priorDecided.map((p) => ({ p, s: jac(nOpp.atoms, p.atoms) })).filter((x) => x.s >= 0.3).sort((a, b) => b.s - a.s);
+    if (!scored.length) continue;
+    const best = scored[0];
+    const ambiguous = best.s < 0.6 || (scored[1] && scored[1].s >= 0.4);
+    if (ambiguous) {
+      await c.query('update cockpit.opportunity set disposition_conflict=true, matched_from=$2, updated_at=now() where opportunity_id=$1', [nOpp.id, best.p.id]);
+      await c.query("insert into cockpit.opportunity_event (opportunity_id, actor, event, note) values ($1,'system','disposition_conflict',$2)", [nOpp.id, `ambiguous carry (jaccard ${best.s.toFixed(2)}) — Warwick to re-decide`]);
+      conflicts++;
+    } else {
+      await c.query('update cockpit.opportunity set disposition=$2, disposition_at=now(), matched_from=$3, updated_at=now() where opportunity_id=$1', [nOpp.id, best.p.disposition, best.p.id]);
+      await c.query("insert into cockpit.opportunity_event (opportunity_id, actor, event, note) values ($1,'system','disposition_carried',$2)", [nOpp.id, `carried '${best.p.disposition}' from ${best.p.id} (jaccard ${best.s.toFixed(2)})`]);
+      carried++;
+    }
+  }
+
   // accounting: any atom the model didn't place defaults to standalone (register), and is flagged
   const unplaced = (await c.query("select n from cockpit.idea_atom where atom_state='registered' order by n")).rows.map((r) => r.n);
   if (unplaced.length) await c.query("update cockpit.idea_atom set atom_state='standalone' where atom_state='registered'");
@@ -110,6 +140,7 @@ async function main() {
     atom_accounting: Object.fromEntries(counts.map((r) => [r.atom_state, r.n])),
     unplaced_defaulted_to_standalone: unplaced,
     every_atom_accounted: counts.reduce((a, r) => a + r.n, 0) === atoms.length && !counts.find((r) => r.atom_state === 'registered'),
+    disposition_carried: carried, disposition_conflicts: conflicts,
     tok_out: call.output, s: +(call.duration_ms / 1000).toFixed(1),
   }, null, 2));
 }
