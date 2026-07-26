@@ -26,6 +26,15 @@ chasing a tangent mid-flow (see the "challenge context-diluting requests" rule).
   *trustworthy* context (git-derived "happening now" + backlog + rule files + a hand-distilled Warwick seed),
   and Larry's reconciliation layer backstops the lean packet.
 
+## 🧠 Session continuity / durable context (separate problem — do NOT build now)
+- **[HIGH-ish] Larry's rich context must not evaporate on compaction/restart.** Identified 2026-07-26 during the
+  idea-engine B-context design. Larry's session memory is useful *today* but must NOT be the permanent home of
+  operational truth (A) or Warwick context (B). Direction: **A** reconstructed from live sources (git/processes/DB);
+  **B** = a durable `curated_seed` file (maintained by a future **/close-session** ritual or **CuratAir**), progressively
+  replaced/enriched by **Honcho** as it proves mature; **C** stays in deterministic files. **Do NOT turn this into a
+  CuratAir/memory-system build now** — for the idea-engine experiment, the smallest durable B artefact
+  (`Team Knowledge/fusion-brief/warwick-context.curated_seed.md`, provenance `curated_seed`) is sufficient.
+
 ## 💡 Feature requests / ideas
 - **Backlog surface in the cockpit.** Once the cockpit's mature, surface this backlog as a cockpit area (or an
   Attention/Output feed) so feature-requests/bugs are captured + triaged from the phone, not a markdown file.
