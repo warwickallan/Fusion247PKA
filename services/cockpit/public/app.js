@@ -107,13 +107,23 @@ createApp({
     const detail = ref(null);
     const busy = ref(false);
     const loading = ref(true);
+    const loadErr = ref(false);
 
-    async function load() {
+    // Fetch state with retry — a transient failure (e.g. a service-worker update mid-session) must not
+    // strand the app on empty state forever. Retries a few times, then shows a visible retry banner.
+    async function load(attempt = 1) {
       loading.value = true;
-      try { const r = await fetch('/api/state', { cache: 'no-store' }); state.value = await r.json(); } catch (e) { /* keep last */ }
-      loading.value = false;
+      try {
+        const r = await fetch('/api/state', { cache: 'no-store' });
+        if (!r.ok) throw new Error('http ' + r.status);
+        state.value = await r.json();
+        loadErr.value = false; loading.value = false;
+      } catch (e) {
+        if (attempt < 4) { setTimeout(() => load(attempt + 1), 700 * attempt); return; }
+        loadErr.value = true; loading.value = false; // keep last state; banner offers a manual retry
+      }
     }
-    onMounted(load);
+    onMounted(() => load());
 
     const attn = computed(() => state.value.attention || []);
     const activeAttn = computed(() => attn.value.filter((i) => i.status !== 'deferred'));
@@ -236,7 +246,7 @@ createApp({
     const primaryAction = (it) => (Array.isArray(it.actions) && it.actions.length ? it.actions.find((a) => a.key === 'accept' || a.key === 'merge') || it.actions[0] : null);
 
     return {
-      AREAS, state, area, detail, busy, loading,
+      AREAS, state, area, detail, busy, loading, loadErr,
       kindOf, catLabel, moduleLabel, oneLine, ago, terse, impactStars, outputTitle, humanValue, humanPoints, spinOf, mdToHtml, notifyMark, build, housekeeping, host, when,
       deliverables, openDeliverable, copyDoc, downloadDoc, downloadTranscript, download, copyText,
       attn, deferred, archived, blocked, decisions, suggestions, needsYou, ideaCat, ideasBrain, ideasCash, latest, toneOf,
@@ -259,8 +269,10 @@ createApp({
       <div class="brand" @click="go('home')" title="Home" style="cursor:pointer"><span class="dot" :class="{red: statusTone==='red'}"></span> Fusion247</div>
       <div class="status-mini" :class="{red: statusTone==='red'}">{{ statusLine }}</div>
       <button class="refresh" @click="go('settings')" title="Settings">⚙</button>
-      <button class="refresh" @click="load" :disabled="loading">{{ loading ? '…' : '↻' }}</button>
+      <button class="refresh" @click="load()" :disabled="loading">{{ loading ? '…' : '↻' }}</button>
     </header>
+
+    <div v-if="loadErr" class="load-err" @click="load()">⚠ Couldn't reach the cockpit — tap to retry</div>
 
     <main class="main">
       <!-- HOME -->
