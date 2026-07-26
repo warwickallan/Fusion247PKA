@@ -11,6 +11,8 @@
 //   node --env-file=C:/.fusion247/neo4j.env services/control-plane/cockpit/t2-calibrate.mjs [video_id]
 import { execSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import crypto from 'node:crypto';
 import { rows } from 'file:///C:/Fusion247PKA/services/obsidiwikai/src/clients/neo4j.mjs';
 
@@ -167,17 +169,24 @@ OUTPUT — return ONLY this JSON, no preamble, no markdown fences:
 ],"zero_reason":null}`;
 }
 
-// ---------- Sonnet call via claude -p (async, for parallel branches) ----------
-export function callClaude(prompt, label) {
+// ---------- Sonnet call via claude -p ----------
+// Robust against large prompts + concurrency: the prompt goes via a TEMP FILE redirected to stdin (no pipe
+// backpressure/truncation), the call retries on empty/garbled output, and callers cap concurrency (see mapPool).
+function oneCall(prompt, label) {
   return new Promise((resolve) => {
     const t0 = Date.now();
-    const ch = spawn('claude', ['-p', '--output-format', 'json', '--model', 'sonnet'], { shell: true });
+    const tmp = path.join(os.tmpdir(), `t2call-${crypto.randomBytes(7).toString('hex')}.txt`);
+    try { fs.writeFileSync(tmp, prompt); } catch (e) { resolve({ label, ok: false, error: `tmp-write: ${e.message}`, duration_ms: 0 }); return; }
+    const cmd = `claude -p --output-format json --model sonnet < "${tmp.replace(/\\/g, '/')}"`;
+    const ch = spawn(cmd, { shell: true });
     let out = ''; let err = '';
     const killer = setTimeout(() => { try { ch.kill('SIGKILL'); } catch { /* */ } }, 300000);
     ch.stdout.on('data', (d) => { out += d; });
     ch.stderr.on('data', (d) => { err += d; });
+    ch.on('error', (e) => { err += ` spawn:${e.message}`; });
     ch.on('close', () => {
       clearTimeout(killer);
+      try { fs.unlinkSync(tmp); } catch { /* */ }
       const duration_ms = Date.now() - t0;
       try {
         const j = JSON.parse(out);
@@ -191,11 +200,29 @@ export function callClaude(prompt, label) {
           cache_read: u.cache_read_input_tokens ?? 0,
         });
       } catch (e) {
-        resolve({ label, ok: false, error: `${e.message} | ${err}`.slice(0, 600), duration_ms, raw: out.slice(0, 800) });
+        resolve({ label, ok: false, error: `${e.message} | ${(err || '(empty)').trim()}`.slice(0, 600), duration_ms, raw: out.slice(0, 400) });
       }
     });
-    ch.stdin.write(prompt); ch.stdin.end();
   });
+}
+export async function callClaude(prompt, label) {
+  let last;
+  for (let a = 1; a <= 3; a++) {
+    const r = await oneCall(prompt, label);
+    if (r.ok) { if (a > 1) r.retries = a - 1; return r; }
+    last = r;
+    await new Promise((res) => setTimeout(res, 2000 * a));
+  }
+  return { ...last, retries: 2 };
+}
+// bounded-concurrency map (keeps a few claude -p calls in flight without a thundering herd)
+export async function mapPool(items, limit, fn) {
+  const results = new Array(items.length);
+  let i = 0;
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (i < items.length) { const idx = i++; results[idx] = await fn(items[idx], idx); }
+  }));
+  return results;
 }
 export function parseJSON(text) {
   let s = String(text).trim().replace(/^```(json)?/i, '').replace(/```$/, '').trim();
@@ -298,7 +325,9 @@ OUTPUT — return ONLY this JSON, no preamble, no fences:
 
 // ---------- reusable T2 pipeline (branches → non-model enrichment → convergence) ----------
 export async function runT2Pipeline(video, source, log = () => {}) {
-  const branchCalls = await Promise.all(FRAMES.map((f) => callClaude(branchPrompt(f, source), f.id)));
+  const bStart = Date.now();
+  const branchCalls = await mapPool(FRAMES, 2, (f) => callClaude(branchPrompt(f, source), f.id));
+  const branchWallMs = Date.now() - bStart;
   const branchOutputs = [];
   for (const c of branchCalls) {
     if (!c.ok) { log(`branch ${c.label} FAILED: ${c.error}`); branchOutputs.push({ frame: c.label, candidates: [], _failed: c.error }); continue; }
@@ -316,7 +345,7 @@ export async function runT2Pipeline(video, source, log = () => {}) {
   let conv = { kept: [], killed: [], conflicts: [], convergence_summary: '' };
   if (convCall.ok) { try { conv = parseJSON(convCall.resultText); } catch (e) { log(`convergence parse-error: ${e.message}`); } }
   else log(`convergence FAILED: ${convCall.error}`);
-  return { video, branchCalls, branchOutputs, enriched, convCall, conv };
+  return { video, branchCalls, branchOutputs, enriched, convCall, conv, branchWallMs };
 }
 
 // ---------- artefact writers ----------

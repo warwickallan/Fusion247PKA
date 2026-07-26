@@ -128,7 +128,7 @@ _A high-value "later" is still a win. The prize is a defensible, high-value, sur
     const t2c = t2calls.reduce((a, c) => a + (c.cost_usd || 0), 0);
     const t2f = t2calls.reduce((a, c) => a + faculty(c), 0);
     gT1t += t1t; gT2t += t2t; gT1c += t1c; gT2c += t2c; gT1f += t1f; gT2f += t2f;
-    const t2wall = r.t2 ? (Math.max(...(r.t2.branchCalls || [{ duration_ms: 0 }]).map((b) => b.duration_ms || 0)) + (r.t2.convCall?.duration_ms || 0)) : 0;
+    const t2wall = r.t2 ? ((r.t2.branchWallMs || Math.max(...(r.t2.branchCalls || [{ duration_ms: 0 }]).map((b) => b.duration_ms || 0))) + (r.t2.convCall?.duration_ms || 0)) : 0;
     gWall += (r.t1.call.duration_ms || 0) + t2wall;
     cost += `| ${r.fixture.n} ${r.fixture.label} | ${r.fixture.cls} | ${t1t.toLocaleString()} | ${t2t.toLocaleString()} | ${t1t ? (t2t / t1t).toFixed(1) : '—'} | ${t1f.toLocaleString()} | ${t2f.toLocaleString()} | ${r.t1.candidates.length} | ${(r.t2?.conv?.kept || []).length} |\n`;
   }
