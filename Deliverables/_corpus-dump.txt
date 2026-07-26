@@ -1,0 +1,341 @@
+CORPUS: 68 candidates
+
+#1 [1 ADHD/agent-skill|T1|—|single|brain|N3V4F4I3]
+  TARGET: services/control-plane/cockpit/t2-calibrate.mjs (T1-vs-T2 tier-selection gate in the idea engine)
+  SITUATION: Right now the idea engine has multiple cost tiers (T1 fast/cheap, T2 deeper multi-angle), and you're mid-experiment on exactly this — the T1vsT2-experiment files and t2-calibrate.m…
+  REASONING: The video's skill spins up five isolated agents (expensive) only after a cheap three-question filter decides the fan-out is worth it. Fusion's idea-engine has the identical expensive/cheap tier shape (T1 vs T2) but is calibrating the bounda…
+
+#2 [1 ADHD/agent-skill|T1|—|single|brain|N3V3F3I3]
+  TARGET: Cockpit / Outputs Layer pre-ship check (e.g. before the YouTube-capture knowledge-note write-up is marked 'done')
+  SITUATION: You've got a live backlog item where a feature — YouTube knowledge-note capture — still just says 'pending, I'll write it next session' instead of doing the thing, a gap between wh…
+  REASONING: The video runs its tree-of-thought mechanism not only for ideation but as a pre-launch audit: several isolated agents each read the whole app/PRD through a different lens and independently flag mismatches a single continuous read misses. Fu…
+
+#3 [1 ADHD/agent-skill|T2|F1-mechanism|single_frame|brain|N5V8F9I8]
+  TARGET: Foundry idea-to-build handoff / CLAUDE.md pointer pattern: require a linked PRD+tech-spec doc pair in the build session's context file befor…
+  SITUATION: Warwick already knows the real bottleneck in shipping any Fusion idea isn't the coding, it's that ideas arrive without a proper brief.
+  REASONING: Structural invariant: expensive, creative multi-agent work is gated on a durable, config-referenced spec artifact, not on live conversational context. Fusion's own CLAUDE.md already uses this exact shape — a pointer file linking to a canoni…
+
+#4 [1 ADHD/agent-skill|T2|F1-mechanism+F3-operational|novel_independent|brain|N6V8F8I8]
+  TARGET: Larry's Builder Preflight (7-point pre-merge self-check) — add an 8th point: single-pass PRD-vs-built drift + confusion-point audit (finding…
+  SITUATION: Larry runs a 7-point Builder Preflight before every Tower merge-check — git-clean, artefacts-in-PR, migration/doc parity, and so on.
+  REASONING: The invariant is a dedicated audit stage whose only comparison object is the original brief against the finished artifact — not code parity, not test pass/fail. Larry's Builder Preflight currently checks only internal consistency (git/artef…
+
+#5 [1 ADHD/agent-skill|T2|F2-inversion|single_frame|brain|N6V8F8I6]
+  TARGET: Critic/shortlist step in the idea-engine pipeline (Cairn→Transfer-Intelligence→Critic→Cockpit Accept) — verify each candidate set is critiqu…
+  SITUATION: The whole fix in the source works because each idea gets judged in its own clean context so ideas can't bleed into each other and skew the score.
+  REASONING: The source names shared-context bleed as the failure this architecture exists to kill, but only fixes it at generation time. The same mechanism — multiple items judged in one context causing anchoring and noise — can silently re-enter at wh…
+
+#6 [1 ADHD/agent-skill|T2|F2-inversion|single_frame|brain|N6V7F7I6]
+  TARGET: Cairn's intake triage — the decision of whether an ingested source gets full Transfer-Intelligence treatment or gets shallow-filed. Needs a …
+  SITUATION: A cheap gate decides, before spending tokens, whether a problem is even worth deeper multi-angle treatment — otherwise it just answers directly.
+  REASONING: Inverting the assumption behind the gate: it's presented as pure cost-saving, but a false negative reproduces the same 'settles for the safe answer' failure the deeper multi-angle treatment exists to prevent — except invisibly, since no dow…
+
+#7 [1 ADHD/agent-skill|T2|F2-inversion|single_frame|brain|N7V7F8I7]
+  TARGET: TubeAIR's transcript ingestion feeding this idea-engine run, and directly, IDEA-016's T1-vs-T2 experiment harness where all six branches sha…
+  SITUATION: Before forking into isolated agents, a single shared pass gathers context on the target, then hands that same context to every branch.
+  REASONING: Inverted assumption: isolation is assumed to guarantee independence, but independence only starts after the fork — everything upstream of the fork is a single point of failure the branch structure cannot see or correct for, since no branch …
+
+#8 [1 ADHD/agent-skill|T2|F2-inversion|single_frame|brain|N8V6F7I7]
+  TARGET: The Critic step in idea-engine (N/V/F scoring) — specifically whether high-novelty candidates are getting systematically suppressed on viabi…
+  SITUATION: The premise behind splitting reasoning across angles is that a model defaults to whatever answer showed up most often in training data — the safe, familiar pattern — unless deliber…
+  REASONING: The source diagnoses this bias only in the generator and fixes it there. But the critic is built on the same kind of model and is never checked for the identical bias — an unfamiliar-but-genuinely-good transfer looks statistically 'wrong' t…
+
+#9 [1 ADHD/agent-skill|T2|F3-operational|single_frame|brain|N4V9F8I7]
+  TARGET: Cockpit idea/output card schema (Ideas Brain/Cash, Keep/Decline/Later) — add a mandatory 'first step' field populated at generation time, sh…
+  SITUATION: When Warwick accepts an idea in the Cockpit, it sits there as a stored decision.
+  REASONING: The source treats 'first step' as a mandatory output field, not an afterthought — it's what turns a scored idea into something actionable without the human having to translate it. Fusion's Cockpit idea cards currently surface the idea and i…
+
+#10 [1 ADHD/agent-skill|T2|F4-commercial|single_frame|cash|N5V7F8I6]
+  TARGET: idea-engine / T2 divergence architecture — package as a standalone public skill/tool
+  SITUATION: Fusion is already mid-build on its own idea-engine that spins up several isolated AI thinking styles at once so ideas don't all come back sounding the same, then scores and prunes …
+  REASONING: The source names a mechanism — split divergent thinking across isolated passes, prune with a skeptical scorer — that, packaged as a standalone tool, drew heavy external adoption within days. That's evidence the underlying capability is inde…
+
+#11 [1 ADHD/agent-skill|T2|F4-commercial|single_frame|cash|N4V6F7I6]
+  TARGET: idea-engine / Critic loop, offered as a client-facing Cockpit audit workflow (Ship-Ready Audit)
+  SITUATION: There's a concrete two-moment audit pattern available: before you build (test-strategy planning) and right before you ship (churn/UX risk-finding), both run by testing a plan/codeb…
+  REASONING: The invariant is running a plan/codebase through a two-checkpoint audit — before build, before ship — that surfaces gaps a single-pass read misses and hands back scored findings with fixes and traps rather than doing the fix itself. Fusion'…
+
+#12 [1 ADHD/agent-skill|T2|F5-crossdomain|single_frame|brain|N8V5F7I7]
+  TARGET: Larry's session-continuity / anti-context-evaporation architecture (open backlog item, currently undesigned)
+  SITUATION: Long sessions pile ideation, build history, backlog, and decisions all into one single conversation thread.
+  REASONING: The cure for single-context degradation — isolate parallel concerns, never let them share a window, merge only conclusions — targets the same failure shape as context evaporating on compaction: a long single thread accumulating unrelated co…
+
+#13 [1 ADHD/agent-skill|T2|F5-crossdomain|single_frame|cash|N6V6F7I6]
+  TARGET: T1/T2 tier auto-selection layer for the idea-engine work-package pipeline (currently manual calibration)
+  SITUATION: There's an ongoing manual, human-supervised effort to work out when the cheap model tier is good enough versus when the expensive tier earns its cost.
+  REASONING: The named mechanism — given one job, auto-pick from a pool of models and batch multiple variants across that pool in a single pass instead of manual serial switching — maps directly onto a still-manual tier decision: extending calibration w…
+
+#14 [2 Business-4-tasks|T1|—|single|brain|N4V4F5I4]
+  TARGET: Larry's durable decision-rationale log / session-context persistence (closes the Fresh-Larry WHY gap, currently flagged as an open HIGH-ish …
+  SITUATION: Right now, if Larry's session gets compacted or restarted, a lot of what he's learned and decided lives only inside that one conversation — not written down anywhere durable.
+  REASONING: Invariant: a process or knowledge base that exists only inside one actor's live working memory is unmeasurable, non-delegatable, and dies with that actor's state. At Larry's own context-persistence layer this is the identical anti-pattern —…
+
+#15 [2 Business-4-tasks|T1|—|single|brain|N3V3F4I3]
+  TARGET: idea-engine pipeline (Cairn intake → Transfer Specialist → Warwick Cockpit shortlist → Pax verify → build)
+  SITUATION: The idea-engine is mining sources like this one right now, generating candidate ideas, and you review/accept or decline them in the Cockpit.
+  REASONING: Invariant: any multi-stage funnel run purely on feel produces a feast/famine perception cycle; a minimal stage-count converts it into a known, actionable number. Applied to the idea-engine's own mine→shortlist→build pipeline, the same blind…
+
+#16 [2 Business-4-tasks|T1|—|single|brain|N3V5F5I4]
+  TARGET: TubeAIR (IDEA-013) pending_cairn knowledge-note write-up step, Gateway→Cairn hand-off
+  SITUATION: TubeAIR already pulls a clean YouTube transcript and hands it to the Cairn inbox, flagged pending_cairn for a write-up.
+  REASONING: Invariant: work mentally filed as 'do it later, informally' rather than 'a defined step in the system' reliably doesn't get done and silently accumulates. At TubeAIR's pending_cairn write-up step this is the identical failure mode already l…
+
+#17 [2 Business-4-tasks|T2|F1-mechanism+F2-inversion|context_induced|brain|N2V4F5I5]
+  TARGET: Larry's durable operating-knowledge store (the decision-rationale log / Brain graph) — the externalisation target for context currently trap…
+  SITUATION: Larry carries a large amount of operating knowledge — the reasoning behind past decisions, hard-won judgement calls, accumulated context — that currently exists only inside whichev…
+  REASONING: Invariant: a process or body of knowledge that exists only inside one non-persistent location — an owner's head, a live session's context — is a single point of failure that cannot be handed off, audited, or trusted to survive that location…
+
+#18 [2 Business-4-tasks|T2|F1-mechanism+F3-operational|context_induced|brain|N2V4F5I4]
+  TARGET: Outputs Layer / Cockpit pipeline view — read-only stage-count + staleness (time-in-state) instrumentation over ideas and work-packages, refr…
+  SITUATION: Ideas and work-packages keep moving through Cockpit's pipeline (captured, awaiting Warwick's decision, shortlisted, built), and the Outputs Layer's whole premise is 'Warwick, you n…
+  REASONING: Invariant: proactive systems fail silently when their input signal is a feeling rather than a measured state — stage counts plus time-since-last-movement. The fix isn't a dashboard for its own sake, it's specifically counting items by stage…
+
+#19 [2 Business-4-tasks|T2|F1-mechanism|single_frame|brain|N3V4F4I3]
+  TARGET: Cockpit lifecycle spec for the 'Later' bucket — an explicit stall-branch rule (re-surface trigger or archive decision), folded into the alre…
+  SITUATION: The video's sales-process document doesn't just list happy-path steps — it explicitly scripts what happens when a prospect goes quiet, as a named branch in the process.
+  REASONING: Invariant: a documented process is only as complete as its handling of its stall state — a spec that only scripts the forward path silently degrades the moment something goes quiet, because the fallback was never specified. Cockpit's lifecy…
+
+#20 [2 Business-4-tasks|T2|F2-inversion|single_frame|brain|N4V4F5I4]
+  TARGET: cockpit.build and cockpit.overall_state self-model tables (stale since 2026-07-22)
+  SITUATION: Fusion has self-model status tables meant to tell Larry what's actually true about the build right now.
+  REASONING: The literal failure mode described is 'no gauge'; the actual failure mode here is sharper — a gauge that exists, looks structured, and is wrong. That's a stricter version of the same inverted assumption ('if the dashboard shows something, i…
+
+#21 [2 Business-4-tasks|T2|F2-inversion|single_frame|brain|N2V4F5I4]
+  TARGET: TubeAIR/Gateway live YouTube capture → knowledge-note write step (currently manual 'pending — I'll write it next session')
+  SITUATION: The video calls out treating the most important job as a 'when I get a spare minute' afterthought rather than a first-class step.
+  REASONING: An inverted assumption — 'I'll do it later' is silently optimistic and unaudited — applies directly to the flagged, manual, deferred YouTube-capture note.
+
+#22 [2 Business-4-tasks|T2|F3-operational|single_frame|brain|N2V4F5I4]
+  TARGET: Cockpit — refresh cockpit.overall_state/cockpit.build into a live idea-pipeline view (captured / awaiting-decision / stale>14d / NVFI-weight…
+  SITUATION: Ideas keep landing in Cockpit/Foundry every week while Cockpit's own tracking tables (cockpit.build, cockpit.overall_state) are already stale as of 2026-07-22.
+  REASONING: An active process that isn't measured degenerates into mood-based guessing no matter how good the underlying system is. The idea-engine is that unmeasured process here — the fix isn't a smarter model, it's exposing state that already exists…
+
+#23 [2 Business-4-tasks|T2|F3-operational|single_frame|brain|N3V4F5I4]
+  TARGET: Cockpit decision layer — a short written NVFI-to-verdict rubric applied before surfacing a card, so Warwick reviews fewer, better-sorted car…
+  SITUATION: Every idea reaching Cockpit gets an Accept/Decline/Later call from Warwick.
+  REASONING: An undocumented decision process can't be handed off or made consistent, however good the person running it is. The scoring side (NVFI) already exists; this closes the loop by turning scores into a written, standing verdict rule, rather tha…
+
+#24 [2 Business-4-tasks|T2|F3-operational|single_frame|brain|N3V3F4I3]
+  TARGET: Larry/FusionDevBot notifier — add a staleness trigger (idea or build item untouched >N days) alongside the existing handback-ding trigger
+  SITUATION: Ideas and build work-in-progress sit in Foundry/Cockpit for days or weeks between touches.
+  REASONING: Visibility has to be pushed, not just made available, or it never gets checked in a busy week. An existing working push channel (FusionDevBot ding) can be reused for a new trigger — time-since-last-touch on Foundry/Cockpit items — alongside…
+
+#25 [2 Business-4-tasks|T2|F3-operational|single_frame|brain|N2V3F4I3]
+  TARGET: Outputs Layer (north-star) — smallest slice: a weekly one-line 'current constraint' note from Larry to Warwick
+  SITUATION: Fusion keeps growing in scope (idea-engine, Cockpit, Tower, AsdAIr, infra) with Warwick as the single decision-maker across all of it.
+  REASONING: The constraint on growth moves over time and has to be actively re-asked, not solved once. This is a direct, cheap instantiation of the standing proactive-outputs north star — the smallest concrete first output for it: a weekly one-line con…
+
+#26 [2 Business-4-tasks|T2|F4-commercial|single_frame|cash|N4V3F3I4]
+  TARGET: Brain ingestion pipeline (transcript intake → graph structuring → readable output), repointed at external clients' own sales-call recordings…
+  SITUATION: Solo and small-team service-business owners (consultants, agencies, engineers, trades) run their entire sales process from memory — no one else could pick it up and sell for them.
+  REASONING: A consultant listens to a business owner talk through their sales process across a few calls, converting an unstructured tacit process into a structured, hand-off-ready written system. The capture-to-structure-to-output pipeline already bui…
+
+#27 [2 Business-4-tasks|T2|F4-commercial|single_frame|cash|N2V2F3I2]
+  TARGET: Cockpit dashboard pattern (already built for internal use) repackaged as a minimal external pipeline-visibility add-on sold alongside the sa…
+  SITUATION: The same small service-business owners have no visibility into their own pipeline — no idea how many leads, what's stuck, what's closing this month.
+  REASONING: Converting an invisible, felt process into visible numbers on a screen is the underlying mechanism; measurability precedes control. The same lightweight dashboard pattern already built for internal use, stripped down, is a plausible thin ad…
+
+#28 [2 Business-4-tasks|T2|F5-crossdomain|single_frame|brain|N4V4F4I3]
+  TARGET: Team/agent-index.md + Larry's session-log / orchestration record — a periodic charter-vs-actual drift check
+  SITUATION: Fusion runs a roster of specialist agents (Cairn, Pax, Penn, Mack, Silas, Nolan, Warden, Vera, Vex...), each with a written charter of what it's supposed to do.
+  REASONING: An owner auditing whether a hired employee's actual time matches their job description catches role-conflation before it's expensive. A written role definition only functions as a control if actual behaviour is periodically checked against …
+
+#29 [2 Business-4-tasks|T2|F5-crossdomain|single_frame|brain|N4V3F4I4]
+  TARGET: Neo4j/LightRAG schema & canonicalisation layer (the Brain compiler)
+  SITUATION: The Brain keeps ingesting more sources into the graph on the working assumption that more input keeps making it smarter.
+  REASONING: A plant's growth is capped by pot size, not nutrient density — more feed does nothing once roots hit the edge. When a system's growth stalls despite more input, the fix is expanding the container, not increasing the feed. At the schema/onto…
+
+#30 [3 ContextGraphs|T1|—|single|brain|N4V3F5I4]
+  TARGET: idea-engine decision-rationale log / Larry context-preservation (Brain graph schema)
+  SITUATION: You've already flagged that Larry's rich context — the reasoning behind decisions — can evaporate when a session compacts or restarts.
+  REASONING: SOURCE treats short-term/working memory as a first-class, graph-persisted layer alongside long-term and reasoning memory; the invariant is 'ephemeral working state should live in the same durable structure as settled facts, not a separate f…
+
+#31 [3 ContextGraphs|T1|—|single|brain|N4V4F5I4]
+  TARGET: idea-engine Critic kill-pass output -> Brain graph (Neo4j)
+  SITUATION: The idea engine already runs a kill-pass (the Critic step) that decides a mined idea isn't worth pursuing.
+  REASONING: SOURCE captures a negative decision (loan rejection) with the same reasoning-trace richness as a positive one; the invariant is 'a decision's reasoning is data regardless of its verdict'; at the idea-engine Critic kill-pass it means persist…
+
+#32 [3 ContextGraphs|T1|—|single|brain|N3V3F4I3]
+  TARGET: Cockpit Ideas Brain feed (Neo4j GDS Louvain clustering)
+  SITUATION: The Cockpit is your phone-first front door for reviewing mined ideas one at a time (Keep/Decline/Later).
+  REASONING: SOURCE uses fastRP vector embeddings purely as an entry hook into the graph, then Louvain community detection to group and navigate; the invariant is 'algorithmic thematic clustering beats a flat similarity-ranked list for surfacing related…
+
+#33 [3 ContextGraphs|T2|F1-mechanism|single_frame|brain|N3V4F5I4]
+  TARGET: Brain (LightRAG->Neo4j) — decision-rationale log ingestion path
+  SITUATION: Fusion just started keeping a log of WHY decisions were made (the Fresh-Larry WHY gap fix, seeded 2026-07).
+  REASONING: A context graph's structural advantage over a plain audit log is entity/relationship-linked WHY, queryable alongside WHAT. Fusion's decision-rationale log is currently WHAT-style flat storage, not graph-native — folding new entries in as li…
+
+#34 [3 ContextGraphs|T2|F1-mechanism|single_frame|brain|N3V3F5I5]
+  TARGET: Cockpit (Accept/Decline/Later action) -> Brain write path
+  SITUATION: Cockpit lets Warwick Accept/Decline/Later an idea with one tap.
+  REASONING: Retrieval and action aren't the end of the cycle — the outcome gets written back into the same graph so future retrieval is smarter. Fusion's Cockpit-to-Brain path is currently one-way (Brain surfaces, Cockpit records); closing it into a wr…
+
+#35 [3 ContextGraphs|T2|F1-mechanism|single_frame|brain|N4V3F4I4]
+  TARGET: idea-engine graph schema (T1/T2 calibration)
+  SITUATION: The idea-engine (T1 vs T2 calibration) is actively deciding how ideas get scored and stored right now.
+  REASONING: A strict 3-way node-type split (who, what-happened, why) rather than folding decision + rationale into entity properties maps directly onto the idea-engine's live schema question: Idea (entity) / Calibration-run or Accept-Decline (event) / …
+
+#36 [3 ContextGraphs|T2|F1-mechanism|single_frame|brain|N2V2F3I3]
+  TARGET: Brain (LightRAG->Neo4j) access layer
+  SITUATION: Multiple Fusion specialists all need to read and write the Brain's memory.
+  REASONING: Packaging graph access behind a standard memory API rather than leaving every agent to query the graph raw addresses fan-out risk (several specialists reading/writing one Brain graph) — but this is weaker fidelity than a data-shape mapping;…
+
+#37 [3 ContextGraphs|T2|F2-inversion|single_frame|brain|N2V3F4I4]
+  TARGET: Brain retrieval path (LightRAG→Neo4j) feeding brain_ask / output queries
+  SITUATION: Larry answers Warwick's questions by pulling from the Brain (LightRAG→Neo4j).
+  REASONING: Retrieval method determines what background survives: similarity search can fail to preserve context that graph traversal preserves. At Fusion's Brain/brain_ask retrieval layer, the same failure mode applies if similarity search is the defa…
+
+#38 [3 ContextGraphs|T2|F2-inversion+F5-crossdomain|context_induced|brain|N4V4F6I5]
+  TARGET: cockpit.build / cockpit.overall_state self-model tables
+  SITUATION: Larry keeps a live self-model of Fusion's state in flat SQL tables (cockpit.build, cockpit.overall_state).
+  REASONING: Keeping 'what is true' (domain graph) separate from 'what we decided and are tracking' (reasoning graph), and refreshing the reasoning graph as a routine loop step rather than an occasional maintenance task, prevents self-models from going …
+
+#39 [3 ContextGraphs|T2|F3-operational|single_frame|brain|N2V4F5I4]
+  TARGET: Brain (Neo4j graph) — current-task/current-session node, written incrementally
+  SITUATION: Larry sometimes hits a context compaction or a restart in the middle of a session.
+  REASONING: Short-term (in-flight) memory as its own persisted category, written incrementally, not reconstructed after the fact. Fusion's current fix for context loss on compaction/restart is session-close logging — after the fact. Writing a distinct …
+
+#40 [3 ContextGraphs|T2|F2-inversion+F3-operational|context_induced|brain|N3V4F4I4]
+  TARGET: Cockpit (Keep/Decline/Later) and idea-engine shortlist — precedent surfacing + dedup
+  SITUATION: Warwick reviews new ideas or recommendations that Larry or the Cockpit surfaces to him, and separately taps Keep/Decline/Later on them.
+  REASONING: Pulling the specific prior decision and reason and putting it in front of the human at the moment of a new decision — rather than leaving it in a general audit trail someone has to dig through — requires two structural pieces: a stored reas…
+
+#41 [3 ContextGraphs|T2|F4-commercial|single_frame|cash|N3V3F4I4]
+  TARGET: Cockpit decision-rationale log + Brain (Neo4j) — externally-sold 'Decision Provenance' module
+  SITUATION: Companies putting AI agents into regulated decisions are under growing pressure to show WHY an AI said no, not just that it did.
+  REASONING: Storing WHY an agent recommended a decision as a queryable, explainable graph layer separate from the verdict itself — decision provenance as first-class structured data, not prose buried in logs — is already live at Fusion's Brain/Cockpit …
+
+#42 [3 ContextGraphs|T2|F4-commercial|single_frame|cash|N2V2F3I5]
+  TARGET: myPKA Cockpit + Brain (LightRAG->Neo4j) + Gateway capture — hosted multi-tenant product
+  SITUATION: Warwick built myPKA to solve his own 'disparate knowledge, no single brain' problem.
+  REASONING: Pouring N siloed data sources for an org into one context graph and exposing it through one simple UI is the product, not any single source. myPKA already does this for one user across journal/CRM/sources/decisions; the same spine offered m…
+
+#43 [3 ContextGraphs|T2|F5-crossdomain|single_frame|brain|N6V7F6I6]
+  TARGET: services/control-plane/cockpit/t2-calibrate.mjs (T2 calibration harness)
+  SITUATION: You're trying to work out when the expensive, careful-thinking tier (T2) is actually worth paying for over the cheap fast tier (T1).
+  REASONING: Same question, escalating tiers of context, diff what reappears — turns tier selection into a measurement instead of a judgment call. Folding a planted 'causally relevant, lexically dissimilar' fact into T2 calibration fixtures and scoring …
+
+#44 [3 ContextGraphs|T2|F5-crossdomain|single_frame|brain|N8V4F5I7]
+  TARGET: Outputs Layer (proactive surfacing consumer of the Brain's Neo4j graph)
+  SITUATION: The Brain's whole reason for existing is to tell Warwick 'you nearly missed this' — something newly relevant that he wasn't looking for.
+  REASONING: Instead of query-in/answer-out, running community detection periodically as new sources land and watching for nodes whose community membership shifts flips a reactive lookup mechanism into a proactive one: a shift means new information just…
+
+#45 [4 Audi(poor-fit)|T1|—|single|brain|N4V4F5I4]
+  TARGET: Gateway capture->categorise->route pipeline (the 'knowledge note pending' HIGH backlog item)
+  SITUATION: Right now, when something gets captured (a YouTube link, a note, an idea) the write-up often doesn't happen right away — the backlog literally says 'knowledge note pending — I'll w…
+  REASONING: Invariant: a system with response latency avoids that latency not by being bigger/faster but by never fully idling — a cheap secondary input keeps the expensive resource primed between demands. Fusion's Gateway capture pipeline has the same…
+
+#46 [4 Audi(poor-fit)|T1|—|single|brain|N4V5F5I3]
+  TARGET: Vex's WS-003 Expansion security checklist / Builder Preflight 7-point check / T2 calibration scoring rules
+  SITUATION: Fusion runs several literal checklists — Vex's WS-003 security review, the 7-point Builder Preflight, the T2 calibration rules — each written as a fixed list of things to check.
+  REASONING: Invariant: any literal, enumerable rule set is gameable by a compliant-but-unintended implementation, because the enforcer can only check the letter, not the unstated intent. Fusion's governance checklists are literal rule sets of exactly t…
+
+#47 [4 Audi(poor-fit)|T1|—|single|brain|N4V3F5I4]
+  TARGET: T2 calibration harness (services/control-plane/cockpit/t2-calibrate.mjs) — discarded_obvious + killed-candidate corpus as calibration input
+  SITUATION: Every time this Transfer specialist (or the Critic) runs, it produces a pile of rejected material — the three 'obvious' analogies binned before the real work starts, plus whatever …
+  REASONING: Invariant: a process already produces a high-energy byproduct as pure waste; routing that byproduct into a second process that needs exactly that kind of input yields free capability with no new fuel spent. The Transfer/Critic pipeline alre…
+
+#48 [4 Audi(poor-fit)|T1|—|single|brain|N3V3F4I4]
+  TARGET: Larry's session-context continuity across compaction/restart (flagged 2026-07-26, HIGH-ish)
+  SITUATION: Larry's understanding of a long session builds up entirely inside one live conversation thread.
+  REASONING: Invariant: distributing a sustained load across multiple channels prevents any one channel from degrading to failure; concentrating it in one channel trades short-term simplicity for a catastrophic failure point at the end of a long run. La…
+
+#49 [4 Audi(poor-fit)|T1|—|single|brain|N3V3F4I3]
+  TARGET: T2 experiment/calibration harness (idea-engine) — add longitudinal novelty-decay tracking across mining runs, not just per-run NVFI
+  SITUATION: The whole point of the idea-engine is to surface things Warwick would otherwise miss — genuinely surprising, non-obvious transfers.
+  REASONING: Invariant: a system whose value depends on sustained surprise degrades invisibly if checked one outcome at a time — the boredom/predictability failure only shows up as a trend across many runs. The idea-engine already names its own version …
+
+#50 [4 Audi(poor-fit)|T2|F1-mechanism+F5-crossdomain|context_induced|brain|N5V5F8I6]
+  TARGET: Outputs Layer's call into the Brain (LightRAG→Neo4j via brain_ask/brain_search) — run a scheduled, low-stakes background query so the retrie…
+  SITUATION: Outputs Layer's proactive alerts and Brain queries sometimes have to spin up cold before they can answer.
+  REASONING: A process with a spool-up delay doesn't need a faster core — it needs 'staying primed' decoupled from 'being used': a cheap, continuously-run background signal keeps the expensive path warm so the real request meets zero latency. Applied to…
+
+#51 [4 Audi(poor-fit)|T2|F1-mechanism|single_frame|brain|N5V6F7I6]
+  TARGET: Cockpit Keep/Decline/Later handler feeding directly into the Outputs Layer's next-candidate ranking within the same session/batch, not only …
+  SITUATION: Cockpit already lets Warwick Keep/Decline/Later ideas the Brain surfaces.
+  REASONING: The structural claim isn't 'feedback exists' — it's that the waste product of a cycle gets captured and fed back into the SAME cycle's input before the next iteration completes, with no separate offline step. That argues specifically agains…
+
+#52 [4 Audi(poor-fit)|T2|F1-mechanism|single_frame|brain|N6V5F7I5]
+  TARGET: Background/async agent lifecycle (Workflow tool, background Bash, scheduled wakeups) — an explicit vent path (e.g. a superseded-run discard …
+  SITUATION: Background subagents keep working asynchronously after being launched.
+  REASONING: The invariant is specifically about decoupled, inertial subsystems — ones that can't stop on a dime — needing a designed release valve distinct from their normal output path, not just 'have a cancel button' in general, but a path that safel…
+
+#53 [4 Audi(poor-fit)|T2|F2-inversion|single_frame|brain|N3V3F4I4]
+  TARGET: idea-engine T2 calibration / the static mega-prompt approach.
+  SITUATION: A regulator catches a team beating everyone and hits them with penalties targeted at specific measurable numbers — smaller tires, a power restrictor, extra ballast weight.
+  REASONING: Penalizing the lever that's easy to measure — never the actual generative mechanism — means each fix is reactive and lever-specific, so the advantage simply relocates. That's the same shape as a static prompt/ruleset patched clause-by-claus…
+
+#54 [4 Audi(poor-fit)|T2|F2-inversion|single_frame|brain|N2V4F5I4]
+  TARGET: cockpit.build / cockpit.overall_state self-model staleness.
+  SITUATION: A regulator is penalizing a mechanism he openly admits he doesn't understand.
+  REASONING: Authority to penalize doesn't require an accurate model of the thing being penalized. Any orchestration or gating decision made off a self-model table inherits whatever staleness that table carries, silently.
+
+#55 [4 Audi(poor-fit)|T2|F2-inversion|single_frame|brain|N4V3F4I4]
+  TARGET: Critic's N/V/F/I scoring as a proxy for idea quality, under the live T1-vs-T2 calibration experiment.
+  SITUATION: Everyone assumes one visible number determines the outcome — until a competitor using a different mechanism entirely embarrasses that assumption.
+  REASONING: Treating one measurable input as causally sufficient for an outcome breaks the moment an unmodeled mechanism intervenes. A scoring dimension risks the same severance if it's treated as causally sufficient for 'idea will actually get acted o…
+
+#56 [4 Audi(poor-fit)|T2|F3-operational|single_frame|brain|N3V4F5I5]
+  TARGET: Context-continuity fix — a small durable checkpoint file, written at natural pause points (turn end, before compaction), that the next sessi…
+  SITUATION: Rich session context can evaporate on compaction or restart.
+  REASONING: A resource that's expensive to re-spool should be kept live through idle/transition periods via a cheap secondary maintenance action, rather than left to go cold and rebuilt on demand. A periodic state checkpoint written at natural pause po…
+
+#57 [4 Audi(poor-fit)|T2|F3-operational|single_frame|brain|N3V4F4I4]
+  TARGET: TubeAIR → Cairn auto-file handoff — close the loop so the knowledge note is written automatically on capture instead of deferred to a future…
+  SITUATION: Live capture into a knowledge-note pipeline still ends with 'pending — I'll write it next session' as a standing manual step.
+  REASONING: When a recurring toil item keeps getting small individual patches — a reminder, a promise, a note — and still keeps recurring, that's the signal the patch-tier is exhausted and the fix has to eliminate the category itself, not add another r…
+
+#58 [4 Audi(poor-fit)|T2|F4-commercial|single_frame|cash|N3V3F2I3]
+  TARGET: Outputs Layer (new capability) — a generation sibling to the transcript-ingestion pipeline, tentatively 'ExplainAIr'.
+  SITUATION: A pipeline already pulls source transcripts like this one into the knowledge base.
+  REASONING: A technically dense topic becomes gripping when an antagonist keeps forcing successive plain-English reductions of it — that's a content pattern, not a domain fact. The ingestion side of a knowledge pipeline already knows how to pull struct…
+
+#59 [4 Audi(poor-fit)|T2|F5-crossdomain|single_frame|brain|N4V4F3I3]
+  TARGET: idea-engine Critic + T2 calibration harness — capture killed/declined candidates as negative examples and fold them into the calibration cor…
+  SITUATION: Right now every idea-engine run produces a pile of rejected material — killed candidates, discarded lists, corrections — and it's currently just thrown away once the run ends.
+  REASONING: The trick isn't generic 'reduce waste' — it's routing the discarded byproduct of a cycle back into the intake of the SAME process to amplify the next cycle. That's a calibration feedback loop: the much larger stream of per-run discarded/kil…
+
+#60 [4 Audi(poor-fit)|T2|F5-crossdomain|single_frame|brain|N4V5F4I4]
+  TARGET: idea-engine Critic self-kill pass / trap taxonomy — lock the taxonomy and kill-criteria before each run's candidates are generated.
+  SITUATION: The idea-engine's Critic kills candidates against a fixed set of traps — that's the whole quality gate, there's no second critic.
+  REASONING: An enforcer who can redefine 'what I meant' after the fact is not constrained by rules at all, regardless of domain. That applies directly to any self-kill/critic pass whose criteria aren't fixed in advance of seeing the output.
+
+#61 [5 AirFryer-26s|T1|—|single|brain|N3V4F4I3]
+  TARGET: Brain — Neo4j/LightRAG graph internals (entity + embedding layer), as a check distinct from Cockpit per-source review
+  SITUATION: Right now, the only thing that gets looked at is what surfaces in the Cockpit — the ideas and sources you actually see and Accept/Decline.
+  REASONING: The invariant: the part touched by EVERY use, including trivial ones, and never directly interacted with by the user (heating element) silently accumulates residue and is exactly the part people skip because it's invisible — while the visib…
+
+#62 [5 AirFryer-26s|T1|—|single|brain|N3V4F4I3]
+  TARGET: Brain — Neo4j entity-resolution/dedup logic (Cockpit lift-out corrections)
+  SITUATION: Dedup/entity-merge corrections for the graph are already planned as part of the Cockpit lift-out work.
+  REASONING: The invariant: shortcuts that trade speed for irreversibility are the dangerous ones, regardless of how good they look in the moment — the coating damage isn't visible until it's already done. Fusion's existing principle is 'human-in-the-lo…
+
+#63 [5 AirFryer-26s|T2|F1-mechanism|single_frame|brain|N2V4F4I4]
+  TARGET: Brain compiler's LightRAG->Neo4j entity-extraction/merge stage (the step ObsidiWikAi's WP1.5 lens-conditioning already touches)
+  SITUATION: Every source that gets ingested into the Brain passes through one specific step: entity extraction and merge, the part of the pipeline that actually turns raw text into graph nodes…
+  REASONING: Invariant: in a system with one central transformation point, that point accumulates a byproduct of its own operation - not from misuse - and the byproduct is invisible to normal-mode inspection, only found by looking directly at that compo…
+
+#64 [5 AirFryer-26s|T2|F1-mechanism|single_frame|brain|N4V3F4I4]
+  TARGET: Neo4j graph-signal audit - relation-propagation and similarity-edge logic in the Brain compiler
+  SITUATION: The Brain's hot-air circulation is exactly what makes the graph valuable - relation-propagation and similarity-linking connect facts across separate sources.
+  REASONING: Invariant: when one mechanism is responsible both for a system's core value and for distributing its byproducts, contamination is never localized to the input point - it travels wherever the value-producing mechanism reaches. A bad entity t…
+
+#65 [5 AirFryer-26s|T2|F1-mechanism+F3-operational|context_induced|brain|N2V4F4I4]
+  TARGET: Pre-ingestion staging/normalization for known-messy input paths: Gateway-side normalization for raw transcripts/voice notes before they reac…
+  SITUATION: Some inputs to the Brain are known in advance to be messy - raw YouTube transcripts, voice notes, and large bulk imports - while most content flows in clean.
+  REASONING: Invariant: when you already know in advance which inputs will run messy, intercepting the mess at the boundary with a cheap, selective barrier is structurally cheaper than cleaning the core mechanism after contact. That applies twice here: …
+
+#66 [5 AirFryer-26s|T2|F2-inversion+F3-operational|context_induced|brain|N3V5F5I5]
+  TARGET: cockpit.build / cockpit.overall_state self-model tables (plus cross-compaction context store) - refreshed automatically on every merge/build…
+  SITUATION: Larry's own self-model tables - cockpit.build and cockpit.overall_state - sit outside the normal day-to-day work loop, so nobody is naturally in them the way they're naturally in t…
+  REASONING: Invariant: the component hardest to see gets the least maintenance and the worst decay, precisely because looking fine at the surface hides it. The self-model tables (cockpit.build, cockpit.overall_state) and cross-compaction context are st…
+
+#67 [5 AirFryer-26s|T2|F2-inversion|single_frame|brain|N4V3F4I4]
+  TARGET: Neo4j knowledge graph / Directus canonical store - manual writes bypassing the governed ingestion pipeline
+  SITUATION: There are plenty of quick cleaning hacks that promise a fast fix but actually scratch the surface they're meant to help.
+  REASONING: Inverted assumption: 'a quick fix is harmless because it solves the immediate problem.' In fact the fix itself is the damage vector because it acts on a surface that needs a specific, gentler process. The governed graph/store is exactly thi…
+
+#68 [5 AirFryer-26s|T2|F2-inversion+F5-crossdomain|context_induced|brain|N3V5F5I5]
+  TARGET: Brain/Neo4j hygiene-pass trigger logic - moving from messy-event-triggered to fixed-cadence, to catch drift from routine everyday captures a…
+  SITUATION: Every routine capture into the Brain - an ordinary YouTube transcript, a quick journal note - passes through the same shared ingestion mechanism as any large or obviously messy imp…
+  REASONING: Invariant: fouling here doesn't come from extreme inputs but from the ordinary operating mechanism touching the whole system on every routine use. If any Brain process similarly touches the whole graph on every ingest, it will foul the whol…
