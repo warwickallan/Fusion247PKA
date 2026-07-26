@@ -70,7 +70,10 @@ THE WHOLE CLEANED SOURCE (consider it entirely):
 ${source}
 
 METHOD (one pass): A RECOGNISE (mechanisms w/ verbatim quote+timestamp) · B FIRST-THREE-DISCARD (bin the 3 most obvious mappings into discarded_obvious) · C ANALOGISE via lenses [mechanism,constraint,failure_mode,incentive,structure,inversion,scale,feedback] (push past obvious) · D TRANSFER ("SOURCE has X(quote); invariant Y; at COMPONENT Z it does W"; name the EXACT Fusion component; use B priorities + C governance for PROVISIONAL Fit+Impact; flag any C breach) · E SELF-CRITIQUE/KILL (real structural match or surface? already doing it? cost? needs evidence? drop superficial; risks->traps) · F EMIT 3-7 only if they survive E, else fewer/zero.
-Each candidate: {"source_evidence":{"quote","timestamp","named_mechanism"},"transfer_reasoning","fusion_target","spin","category":"brain"|"cash","lens","nvfi":{"novelty":1-5,"viability":1-5,"fit":1-5,"impact":1-5},"traps":[{"type","note"}]} (NVFI: Novelty=non-obvious? Viability=realistically doable? Fit=aligns with Fusion/Warwick? Impact=if it worked, how much would it MATERIALLY matter?).
+Each candidate MUST lead with plain-English SPIN (the human-facing layer — an average-intellect person must get why it matters in SECONDS, NO architecture shorthand), with the machine detail preserved underneath:
+{"spin":{"situation":"plain-English: what's happening today / what context makes this relevant","problem":"what is wrong, missing, inefficient or exposed","implication":"why Warwick should care — what this costs, blocks, risks or prevents if we do nothing","need_payoff":"what concretely gets better if we act"},
+ "source_evidence":{"quote","timestamp","named_mechanism"},"transfer_reasoning":"the analogical leap","fusion_target":"the EXACT Fusion component","category":"brain"|"cash","lens","nvfi":{"novelty":1-5,"viability":1-5,"fit":1-5,"impact":1-5},"traps":[{"type","note"}]}
+(SPIN = why it matters to a human; NVFI = how the machine ranks it — Novelty=non-obvious? Viability=realistically doable? Fit=aligns with Fusion/Warwick? Impact=if it worked, how much would it MATERIALLY matter?). Write SPIN in second person to Warwick, no jargon.
 ZERO RULE: nothing survives ⇒ candidates:[] + one-line zero_reason. Never pad.
 OUTPUT — return ONLY this JSON, no preamble, no markdown fences:
 {"mine_id":"${mineId}","brief_hash":"${assembleBrief.__hash || ''}","discarded_obvious":[],"candidates":[],"zero_reason":null}`;
@@ -101,6 +104,7 @@ function parseCandidates(text) {
 
 async function main() {
   const video = process.argv[2];
+  if (video === '--brief') { const b = assembleBrief(); console.log('brief_hash', b.hash, '·', b.text.length, 'chars\n'); console.log(b.text); return; }
   if (!video) throw new Error('usage: mine-ideas.mjs <video_id>');
   const { text: brief, hash } = assembleBrief();
   assembleBrief.__hash = hash;
@@ -133,7 +137,7 @@ async function main() {
     const cid = (await c.query(
       `insert into cockpit.idea_candidate (mine_id, brief_hash, source_evidence, transfer_reasoning, fusion_target, spin, category, lens, nvfi, traps, lifecycle_state)
        values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'proposed') returning candidate_id`,
-      [mineId, hash, JSON.stringify(k.source_evidence || {}), k.transfer_reasoning || '', k.fusion_target || '', k.spin || '',
+      [mineId, hash, JSON.stringify(k.source_evidence || {}), k.transfer_reasoning || '', k.fusion_target || '', JSON.stringify(k.spin || {}),
         cat, k.lens || '', JSON.stringify(k.nvfi || {}), JSON.stringify(k.traps || [])],
     )).rows[0].candidate_id;
     await c.query(`insert into cockpit.idea_event (candidate_id, mine_id, actor, event, note) values ($1,$2,'specialist','emitted',$3)`,
