@@ -231,6 +231,16 @@ createApp({
         await load();
       } catch (e) { it._error = e.message; } finally { busy.value = false; }
     }
+    const opps = computed(() => state.value.opportunities || []);
+    async function opportunityDecide(o, decision) {
+      busy.value = true; o._error = null;
+      try {
+        const r = await fetch('/api/opportunity-decide', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: o.id, decision }) });
+        const res = await r.json(); if (!res.ok) throw new Error(res.error || 'failed');
+        o._done = { watch: 'Watching', research: 'Pax queued →', brief: 'Brief queued →', later: 'Later', decline: 'Declined' }[decision];
+        await load();
+      } catch (e) { o._error = e.message; } finally { busy.value = false; }
+    }
     async function copyTranscript(s) {
       s._copyErr = null;
       try {
@@ -250,7 +260,7 @@ createApp({
       kindOf, catLabel, moduleLabel, oneLine, ago, terse, impactStars, outputTitle, humanValue, humanPoints, spinOf, mdToHtml, notifyMark, build, housekeeping, host, when,
       deliverables, openDeliverable, copyDoc, downloadDoc, downloadTranscript, download, copyText,
       attn, deferred, archived, blocked, decisions, suggestions, needsYou, ideaCat, ideasBrain, ideasCash, latest, toneOf,
-      tiBrain, tiCash, tiSpin, tiStars, mine, ideaDecide,
+      tiBrain, tiCash, tiSpin, tiStars, mine, ideaDecide, opps, opportunityDecide,
       outputs, newOutputs, itemsAdded, jobsFound, wins, builds,
       statusTone, statusLine, tiles, go, open, closeDetail, decide, copyTranscript, primaryAction, load, REPORT, GRAPH,
     };
@@ -330,6 +340,40 @@ createApp({
       <!-- OUTPUTS = Insights / Deliverables / Transcripts -->
       <section v-else-if="area==='outputs'" class="pane">
         <header class="p-h"><h1>Outputs</h1></header>
+
+        <div class="grp" v-if="opps.length">
+          <h2>🎯 Opportunities<span class="g-count">{{ opps.length }}</span><span class="lane-sub">Mason — joined-up build theses, not single ideas</span></h2>
+          <div v-for="o in opps" :key="o.id" class="item blue opp">
+            <div class="i-main">
+              <div class="i-eyebrow">{{ o.otype==='strategic' ? '🧭 strategic' : '🔧 self-improvement' }} · {{ o.roi && o.roi.band ? o.roi.band+' ROI / '+o.roi.value_type : '' }} · {{ o.atoms ? o.atoms.length : 0 }} ideas</div>
+              <div class="i-title">{{ o.headline }}</div>
+              <div v-if="o.spin" class="i-why">{{ oneLine(o.spin.problem) }}</div>
+            </div>
+            <div class="opp-body">
+              <div v-if="o.spin"><b>Situation.</b> {{ o.spin.situation }}</div>
+              <div v-if="o.spin"><b>Implication.</b> {{ o.spin.implication }}</div>
+              <div v-if="o.spin"><b>Need-payoff.</b> {{ o.spin.need_payoff }}</div>
+              <div v-if="o.why_now"><b>Why now.</b> {{ o.why_now }}</div>
+              <div v-if="o.roi && o.roi.note"><b>ROI.</b> {{ o.roi.note }}</div>
+              <div v-if="o.evidence"><b>Evidence.</b> {{ o.evidence.independent_sources }} sources · {{ o.evidence.frames }} frames{{ o.evidence.live_anchors && o.evidence.live_anchors.length ? ' · '+o.evidence.live_anchors.join('; ') : '' }}</div>
+              <div v-if="o.what_wed_build"><b>What we'd build.</b> {{ o.what_wed_build }}</div>
+              <details v-if="o.atoms && o.atoms.length"><summary>Provenance — {{ o.atoms.length }} supporting ideas</summary>
+                <div v-for="a in o.atoms" :key="a.n" class="opp-atom">#{{ a.n }} <span class="mono">{{ a.source }} · {{ a.engine }}</span> — {{ a.situation || a.target }}</div>
+              </details>
+              <div class="i-act">
+                <span v-if="o._done" class="done-pill">✅ {{ o._done }}</span>
+                <template v-else>
+                  <button class="act" :disabled="busy" @click="opportunityDecide(o,'watch')">Keep watching</button>
+                  <button class="act accept" :disabled="busy" @click="opportunityDecide(o,'research')">Research w/ Pax</button>
+                  <button class="act accept" :disabled="busy" @click="opportunityDecide(o,'brief')">Build brief</button>
+                  <button class="act defer" :disabled="busy" @click="opportunityDecide(o,'later')">Later</button>
+                  <button class="act decline" :disabled="busy" @click="opportunityDecide(o,'decline')">Decline</button>
+                </template>
+              </div>
+              <div v-if="o._error" class="i-why err">{{ o._error }}</div>
+            </div>
+          </div>
+        </div>
 
         <div class="grp">
           <h2>💡 Insights<span class="g-count">{{ outputs.length }}</span><span class="lane-sub">so-what from the Brain</span></h2>

@@ -67,7 +67,20 @@ async function apiState() {
      left join cockpit.youtube_source ys on ys.video_id = im.source_ref
      where ic.lifecycle_state in ('proposed','reconciled','later')
      order by (ic.nvfi->>'impact')::int desc nulls last, ic.created_at desc limit 100`);
-  return { attention, outputs, archived, housekeeping, deliverables: listDeliverables().slice(0, 20), ideas, ingested, ingestedCount: ingestedCount[0]?.n ?? ingested.length, wins, builds, build: BUILD, at: new Date().toISOString() };
+  // Mason/Brains OPPORTUNITIES — synthesised build-theses (SPIN-first). Only the LATEST run's surfaced set,
+  // so re-running synthesis doesn't stack duplicates; full atom provenance rides along for the detail sheet.
+  const opportunities = await safe(
+    `select o.opportunity_id id, o.headline, o.otype, o.state, o.spin, o.why_now, o.roi, o.evidence,
+            o.what_wed_build, o.coherence_note, o.created_at,
+            coalesce((select jsonb_agg(jsonb_build_object('n', a.n, 'source', a.source_ref, 'engine', a.engine,
+                       'target', a.fusion_target, 'situation', a.spin->>'situation') order by a.n)
+              from cockpit.opportunity_atom oa join cockpit.idea_atom a on a.atom_id = oa.atom_id
+              where oa.opportunity_id = o.opportunity_id), '[]') as atoms
+     from cockpit.opportunity o
+     where o.state = 'surfaced'
+       and o.run_id = (select run_id from cockpit.opportunity_run order by created_at desc limit 1)
+     order by o.otype, o.created_at`);
+  return { attention, outputs, archived, housekeeping, deliverables: listDeliverables().slice(0, 20), ideas, opportunities, ingested, ingestedCount: ingestedCount[0]?.n ?? ingested.length, wins, builds, build: BUILD, at: new Date().toISOString() };
 }
 
 // One decision endpoint for the whole lifecycle: accept (fires the real governed action + records
@@ -183,6 +196,21 @@ const server = http.createServer(async (req, res) => {
           await w('update cockpit.idea_candidate set lifecycle_state=$2, updated_at=now() where candidate_id=$1', [id, map[decision]]);
           await w("insert into cockpit.idea_event (candidate_id, actor, event, note) values ($1,'warwick',$2,$3)",
             [id, decision === 'research' ? 'research_started' : decision, 'cockpit']);
+          j(res, 200, { ok: true, id, state: map[decision] });
+        } catch (e) { j(res, 500, { ok: false, error: e.message }); }
+      });
+      return;
+    }
+    if (req.url.startsWith('/api/opportunity-decide') && req.method === 'POST') {
+      let raw = ''; req.on('data', (d) => { raw += d; if (raw.length > 1e4) req.destroy(); });
+      req.on('end', async () => {
+        try {
+          const { id, decision } = JSON.parse(raw || '{}');
+          // Warwick proposes a transition; Mason/Pax/Larry act on it downstream. No build is authorised here.
+          const map = { watch: 'surfaced', research: 'researching', brief: 'brief', later: 'later', decline: 'declined' };
+          if (!id || !map[decision]) return j(res, 200, { ok: false, error: 'bad decision' });
+          await w('update cockpit.opportunity set state=$2, updated_at=now() where opportunity_id=$1', [id, map[decision]]);
+          await w("insert into cockpit.opportunity_event (opportunity_id, actor, event, note) values ($1,'warwick',$2,'cockpit')", [id, decision]);
           j(res, 200, { ok: true, id, state: map[decision] });
         } catch (e) { j(res, 500, { ok: false, error: e.message }); }
       });
