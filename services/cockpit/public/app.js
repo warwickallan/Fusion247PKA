@@ -107,13 +107,23 @@ createApp({
     const detail = ref(null);
     const busy = ref(false);
     const loading = ref(true);
+    const loadErr = ref(false);
 
-    async function load() {
+    // Fetch state with retry — a transient failure (e.g. a service-worker update mid-session) must not
+    // strand the app on empty state forever. Retries a few times, then shows a visible retry banner.
+    async function load(attempt = 1) {
       loading.value = true;
-      try { const r = await fetch('/api/state', { cache: 'no-store' }); state.value = await r.json(); } catch (e) { /* keep last */ }
-      loading.value = false;
+      try {
+        const r = await fetch('/api/state', { cache: 'no-store' });
+        if (!r.ok) throw new Error('http ' + r.status);
+        state.value = await r.json();
+        loadErr.value = false; loading.value = false;
+      } catch (e) {
+        if (attempt < 4) { setTimeout(() => load(attempt + 1), 700 * attempt); return; }
+        loadErr.value = true; loading.value = false; // keep last state; banner offers a manual retry
+      }
     }
-    onMounted(load);
+    onMounted(() => load());
 
     const attn = computed(() => state.value.attention || []);
     const activeAttn = computed(() => attn.value.filter((i) => i.status !== 'deferred'));
@@ -127,6 +137,12 @@ createApp({
     const ideaCat = (it) => ((/cash/i.test(it.source_type || '') || /💰/.test(it.title || '')) ? 'cash' : 'brain');
     const ideasBrain = computed(() => suggestions.value.filter((i) => ideaCat(i) === 'brain'));
     const ideasCash = computed(() => suggestions.value.filter((i) => ideaCat(i) === 'cash'));
+    // Transfer-Intelligence candidates (SPIN-first). Highest Impact first.
+    const tiIdeas = computed(() => state.value.ideas || []);
+    const tiBrain = computed(() => tiIdeas.value.filter((i) => i.category === 'brain'));
+    const tiCash = computed(() => tiIdeas.value.filter((i) => i.category === 'cash'));
+    const tiSpin = (it) => (it && it.spin && typeof it.spin === 'object' ? it.spin : {});
+    const tiStars = (it) => '★'.repeat(Math.max(1, Math.min(5, Number((it.nvfi || {}).impact) || 3)));
 
     const LIFE = new Set(['shopping', 'asdair', 'careerair']);
     const laneOf = (it) => (LIFE.has(it.source_module) ? 'life' : 'build');
@@ -200,6 +216,31 @@ createApp({
     async function copyDoc(d) { const j = await fetchDoc(d.file); if (j.ok && await copyText(j.text)) { d._copied = true; setTimeout(() => { d._copied = false; }, 2000); } }
     async function downloadDoc(d) { const j = await fetchDoc(d.file); if (j.ok) download(d.file, j.text); }
     async function downloadTranscript(s) { try { const r = await fetch('/api/transcript?video=' + encodeURIComponent(s.video_id)); const j = await r.json(); if (j.ok) download((s.title || s.video_id) + '.txt', j.text); } catch (e) { s._copyErr = 'download failed'; } }
+    async function mine(s) {
+      s._mining = true; s._mineErr = null;
+      try { const r = await fetch('/api/mine', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ video: s.video_id }) }); const d = await r.json(); if (!d.ok) throw new Error(d.error); s._mined = true; setTimeout(() => { s._mined = false; }, 6000); }
+      catch (e) { s._mineErr = e.message; } finally { s._mining = false; }
+    }
+    async function ideaDecide(it, decision) {
+      busy.value = true; it._error = null;
+      try {
+        const r = await fetch('/api/idea-decide', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: it.id, decision }) });
+        const res = await r.json(); if (!res.ok) throw new Error(res.error || 'failed');
+        it._done = { keep: 'Kept', later: 'Later', decline: 'Declined', research: 'Research queued →' }[decision];
+        if (detail.value && detail.value.id === it.id) closeDetail();
+        await load();
+      } catch (e) { it._error = e.message; } finally { busy.value = false; }
+    }
+    const opps = computed(() => state.value.opportunities || []);
+    async function opportunityDecide(o, decision) {
+      busy.value = true; o._error = null;
+      try {
+        const r = await fetch('/api/opportunity-decide', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: o.id, decision }) });
+        const res = await r.json(); if (!res.ok) throw new Error(res.error || 'failed');
+        o._done = { watch: 'Watching', research: 'Pax queued →', brief: 'Brief queued →', later: 'Later', decline: 'Declined' }[decision];
+        await load();
+      } catch (e) { o._error = e.message; } finally { busy.value = false; }
+    }
     async function copyTranscript(s) {
       s._copyErr = null;
       try {
@@ -215,10 +256,11 @@ createApp({
     const primaryAction = (it) => (Array.isArray(it.actions) && it.actions.length ? it.actions.find((a) => a.key === 'accept' || a.key === 'merge') || it.actions[0] : null);
 
     return {
-      AREAS, state, area, detail, busy, loading,
+      AREAS, state, area, detail, busy, loading, loadErr,
       kindOf, catLabel, moduleLabel, oneLine, ago, terse, impactStars, outputTitle, humanValue, humanPoints, spinOf, mdToHtml, notifyMark, build, housekeeping, host, when,
       deliverables, openDeliverable, copyDoc, downloadDoc, downloadTranscript, download, copyText,
       attn, deferred, archived, blocked, decisions, suggestions, needsYou, ideaCat, ideasBrain, ideasCash, latest, toneOf,
+      tiBrain, tiCash, tiSpin, tiStars, mine, ideaDecide, opps, opportunityDecide,
       outputs, newOutputs, itemsAdded, jobsFound, wins, builds,
       statusTone, statusLine, tiles, go, open, closeDetail, decide, copyTranscript, primaryAction, load, REPORT, GRAPH,
     };
@@ -237,8 +279,10 @@ createApp({
       <div class="brand" @click="go('home')" title="Home" style="cursor:pointer"><span class="dot" :class="{red: statusTone==='red'}"></span> Fusion247</div>
       <div class="status-mini" :class="{red: statusTone==='red'}">{{ statusLine }}</div>
       <button class="refresh" @click="go('settings')" title="Settings">⚙</button>
-      <button class="refresh" @click="load" :disabled="loading">{{ loading ? '…' : '↻' }}</button>
+      <button class="refresh" @click="load()" :disabled="loading">{{ loading ? '…' : '↻' }}</button>
     </header>
+
+    <div v-if="loadErr" class="load-err" @click="load()">⚠ Couldn't reach the cockpit — tap to retry</div>
 
     <main class="main">
       <!-- HOME -->
@@ -270,40 +314,69 @@ createApp({
         </div>
       </section>
 
-      <!-- IDEAS (was Attention) — Brain (improve F247) vs Cash (make money) -->
+      <!-- IDEAS — Transfer-Intelligence candidates, SPIN-first (Situation leads; tech detail behind Details) -->
       <section v-else-if="area==='ideas'" class="pane">
-        <header class="p-h"><h1>Ideas</h1><button v-if="archived.length" class="refresh" style="margin-left:auto" @click="go('archive')">🗄 Archive · {{ archived.length }}</button></header>
+        <header class="p-h"><h1>Ideas</h1></header>
 
-        <div class="grp" v-if="ideasBrain.length">
-          <h2>🧠 Brain<span class="g-count">{{ ideasBrain.length }}</span><span class="lane-sub">improve F247</span></h2>
-          <div v-for="it in ideasBrain" :key="it.id" class="item blue">
-            <div class="i-main" @click="open(it,'idea')"><div class="i-eyebrow"><span style="color:var(--warn)">{{ impactStars(it.priority) }}</span> impact</div><div class="i-title">{{ terse(it.title) }}</div><div v-if="it.reason" class="i-why">{{ oneLine(it.reason) }}</div></div>
-            <div class="i-act"><span v-if="it._done" class="done-pill">✅ {{ it._done }}</span><template v-else><button class="act accept" :disabled="busy" @click.stop="decide(it,'accept',primaryAction(it))">Accept</button><button class="act defer" :disabled="busy" @click.stop="decide(it,'defer')">Later</button><button class="act decline" :disabled="busy" @click.stop="decide(it,'decline')">Decline</button></template></div>
+        <div class="grp" v-if="tiBrain.length">
+          <h2>🧠 Brain<span class="g-count">{{ tiBrain.length }}</span><span class="lane-sub">improve F247</span></h2>
+          <div v-for="it in tiBrain" :key="it.id" class="item blue">
+            <div class="i-main" @click="open(it,'idea')"><div class="i-eyebrow"><span style="color:var(--warn)">{{ tiStars(it) }}</span> impact · {{ it.lens }} · FROM {{ terse(it.source_title, 38) }}</div><div class="i-title">{{ terse(tiSpin(it).situation, 92) }}</div><div v-if="tiSpin(it).implication" class="i-why">{{ oneLine(tiSpin(it).implication) }}</div></div>
+            <div class="i-act"><span v-if="it._done" class="done-pill">✅ {{ it._done }}</span><template v-else><button class="act accept" :disabled="busy" @click.stop="ideaDecide(it,'keep')">Keep</button><button class="act defer" :disabled="busy" @click.stop="ideaDecide(it,'later')">Later</button><button class="act decline" :disabled="busy" @click.stop="ideaDecide(it,'decline')">Decline</button></template></div>
           </div>
         </div>
 
-        <div class="grp" v-if="ideasCash.length">
-          <h2>💰 Cash<span class="g-count">{{ ideasCash.length }}</span><span class="lane-sub">make money</span></h2>
-          <div v-for="it in ideasCash" :key="it.id" class="item green">
-            <div class="i-main" @click="open(it,'idea')"><div class="i-eyebrow"><span style="color:var(--warn)">{{ impactStars(it.priority) }}</span> impact</div><div class="i-title">{{ terse(it.title) }}</div><div v-if="it.reason" class="i-why">{{ oneLine(it.reason) }}</div></div>
-            <div class="i-act"><span v-if="it._done" class="done-pill">✅ {{ it._done }}</span><template v-else><button class="act accept" :disabled="busy" @click.stop="decide(it,'accept',primaryAction(it))">Accept</button><button class="act defer" :disabled="busy" @click.stop="decide(it,'defer')">Later</button><button class="act decline" :disabled="busy" @click.stop="decide(it,'decline')">Decline</button></template></div>
+        <div class="grp" v-if="tiCash.length">
+          <h2>💰 Cash<span class="g-count">{{ tiCash.length }}</span><span class="lane-sub">make money</span></h2>
+          <div v-for="it in tiCash" :key="it.id" class="item green">
+            <div class="i-main" @click="open(it,'idea')"><div class="i-eyebrow"><span style="color:var(--warn)">{{ tiStars(it) }}</span> impact · {{ it.lens }} · FROM {{ terse(it.source_title, 38) }}</div><div class="i-title">{{ terse(tiSpin(it).situation, 92) }}</div><div v-if="tiSpin(it).implication" class="i-why">{{ oneLine(tiSpin(it).implication) }}</div></div>
+            <div class="i-act"><span v-if="it._done" class="done-pill">✅ {{ it._done }}</span><template v-else><button class="act accept" :disabled="busy" @click.stop="ideaDecide(it,'keep')">Keep</button><button class="act defer" :disabled="busy" @click.stop="ideaDecide(it,'later')">Later</button><button class="act decline" :disabled="busy" @click.stop="ideaDecide(it,'decline')">Decline</button></template></div>
           </div>
         </div>
 
-        <div v-if="!ideasBrain.length && !ideasCash.length" class="empty big">No ideas yet — the scout + dPax will fill this. 💡</div>
-
-        <div class="grp" v-if="deferred.length">
-          <h2>🕒 Later<span class="g-count">{{ deferred.length }}</span><span class="lane-sub">you parked these</span></h2>
-          <div v-for="it in deferred" :key="it.id" class="item deferred" :class="toneOf(it)">
-            <div class="i-main" @click="open(it,'idea')"><div class="i-title">{{ terse(it.title) }}</div></div>
-            <div class="i-act"><button class="act" :disabled="busy" @click.stop="decide(it,'reopen')">Bring back</button></div>
-          </div>
-        </div>
+        <div v-if="!tiBrain.length && !tiCash.length" class="empty big">No ideas yet — tap <b>🧠 Mine for ideas</b> on a source in Brain. 💡</div>
       </section>
 
       <!-- OUTPUTS = Insights / Deliverables / Transcripts -->
       <section v-else-if="area==='outputs'" class="pane">
         <header class="p-h"><h1>Outputs</h1></header>
+
+        <div class="grp" v-if="opps.length">
+          <h2>🎯 Opportunities<span class="g-count">{{ opps.length }}</span><span class="lane-sub">Mason — joined-up build theses, not single ideas</span></h2>
+          <div v-for="o in opps" :key="o.id" class="item blue opp">
+            <div class="i-main">
+              <div class="i-eyebrow">{{ o.otype==='strategic' ? '🧭 strategic' : '🔧 self-improvement' }} · {{ o.roi && o.roi.band ? o.roi.band+' ROI / '+o.roi.value_type : '' }} · {{ o.atoms ? o.atoms.length : 0 }} ideas
+                <span v-if="o.disposition && !o.disposition_conflict" class="opp-disp">your call: {{ o.disposition }}</span>
+                <span v-if="o.disposition_conflict" class="opp-conflict">⚠ evidence changed — re-confirm your call</span>
+              </div>
+              <div class="i-title">{{ o.headline }}</div>
+              <div v-if="o.spin" class="i-why">{{ oneLine(o.spin.problem) }}</div>
+            </div>
+            <div class="opp-body">
+              <div v-if="o.spin"><b>Situation.</b> {{ o.spin.situation }}</div>
+              <div v-if="o.spin"><b>Implication.</b> {{ o.spin.implication }}</div>
+              <div v-if="o.spin"><b>Need-payoff.</b> {{ o.spin.need_payoff }}</div>
+              <div v-if="o.why_now"><b>Why now.</b> {{ o.why_now }}</div>
+              <div v-if="o.roi && o.roi.note"><b>ROI.</b> {{ o.roi.note }}</div>
+              <div v-if="o.evidence"><b>Evidence.</b> {{ o.evidence.independent_sources }} sources · {{ o.evidence.frames }} frames{{ o.evidence.live_anchors && o.evidence.live_anchors.length ? ' · '+o.evidence.live_anchors.join('; ') : '' }}</div>
+              <div v-if="o.what_wed_build"><b>What we'd build.</b> {{ o.what_wed_build }}</div>
+              <details v-if="o.atoms && o.atoms.length"><summary>Provenance — {{ o.atoms.length }} supporting ideas</summary>
+                <div v-for="a in o.atoms" :key="a.n" class="opp-atom">#{{ a.n }} <span class="mono">{{ a.source }} · {{ a.engine }}</span> — {{ a.situation || a.target }}</div>
+              </details>
+              <div class="i-act">
+                <span v-if="o._done" class="done-pill">✅ {{ o._done }}</span>
+                <template v-else>
+                  <button class="act" :disabled="busy" @click="opportunityDecide(o,'watch')">Keep watching</button>
+                  <button class="act accept" :disabled="busy" @click="opportunityDecide(o,'research')">Research w/ Pax</button>
+                  <button class="act accept" :disabled="busy" @click="opportunityDecide(o,'brief')">Build brief</button>
+                  <button class="act defer" :disabled="busy" @click="opportunityDecide(o,'later')">Later</button>
+                  <button class="act decline" :disabled="busy" @click="opportunityDecide(o,'decline')">Decline</button>
+                </template>
+              </div>
+              <div v-if="o._error" class="i-why err">{{ o._error }}</div>
+            </div>
+          </div>
+        </div>
 
         <div class="grp">
           <h2>💡 Insights<span class="g-count">{{ outputs.length }}</span><span class="lane-sub">so-what from the Brain</span></h2>
@@ -317,18 +390,22 @@ createApp({
         <div class="grp">
           <h2>📄 Deliverables<span class="g-count">{{ deliverables.length }}</span><span class="lane-sub">produced docs — read / copy / download</span></h2>
           <div v-if="!deliverables.length" class="empty">No deliverables yet — dPax will drop them here.</div>
-          <div v-for="d in deliverables.slice(0,5)" :key="d.file" class="item grey">
+          <div class="lane-scroll">
+          <div v-for="d in deliverables" :key="d.file" class="item grey">
             <div class="i-main" @click="openDeliverable(d)"><div class="i-eyebrow">doc · {{ ago(d.mtime) }} ago</div><div class="i-title">{{ terse(d.title) }}</div></div>
             <div class="i-act"><button class="act" :disabled="busy" @click.stop="copyDoc(d)">{{ d._copied ? '✓' : '⧉' }}</button><button class="act" @click.stop="downloadDoc(d)">⭳</button></div>
+          </div>
           </div>
         </div>
 
         <div class="grp">
           <h2>📝 Transcripts<span class="g-count">{{ (state.ingested||[]).length }}</span><span class="lane-sub">source text — copy / download</span></h2>
           <div v-if="!(state.ingested||[]).length" class="empty">Nothing ingested yet.</div>
-          <div v-for="s in (state.ingested||[]).slice(0,5)" :key="s.video_id" class="item grey">
+          <div class="lane-scroll">
+          <div v-for="s in (state.ingested||[])" :key="s.video_id" class="item grey">
             <div class="i-main"><div class="i-title">{{ terse(s.title || s.video_id) }}</div><div class="i-why" :class="{err:s._copyErr}">{{ s._copyErr ? s._copyErr : ('ingested ' + ago(s.updated_at) + ' ago') }}</div></div>
             <div class="i-act"><button class="act" :disabled="busy" @click="copyTranscript(s)">{{ s._copied ? '✓' : '⧉' }}</button><button class="act" @click="downloadTranscript(s)">⭳</button></div>
+          </div>
           </div>
         </div>
       </section>
@@ -352,7 +429,7 @@ createApp({
           <div v-if="!(state.ingested||[]).length" class="empty">Nothing ingested yet.</div>
           <div v-for="s in (state.ingested||[])" :key="s.video_id" class="item grey">
             <div class="i-main"><div class="i-title">{{ s.title || s.video_id }}</div><div class="i-why" :class="{err: s._copyErr}">{{ s._copyErr ? s._copyErr : ('ingested ' + ago(s.updated_at) + ' ago') }}</div></div>
-            <div class="i-act"><button class="act" :disabled="busy" @click="copyTranscript(s)">{{ s._copied ? '✓ Copied' : '⧉ Transcript' }}</button></div>
+            <div class="i-act"><button class="act accept" :disabled="s._mining" @click="mine(s)">{{ s._mined ? '✓ Mining…' : (s._mining ? '…' : '🧠 Mine for ideas') }}</button><button class="act" :disabled="busy" @click="copyTranscript(s)">{{ s._copied ? '✓' : '⧉' }}</button></div>
           </div>
         </div>
       </section>
@@ -402,8 +479,8 @@ createApp({
   <div v-if="detail" class="sheet" @click.self="closeDetail">
     <div class="sheet-card">
       <button class="back" @click="closeDetail">‹ Back</button>
-      <div class="d-eyebrow">{{ detail._as==='doc' ? 'Deliverable' : (detail._as==='output' ? (moduleLabel(detail.source_module)+' · output') : catLabel(detail)) }}</div>
-      <h1>{{ detail._as==='output' ? outputTitle(detail) : detail.title }}</h1>
+      <div class="d-eyebrow">{{ detail._as==='doc' ? 'Deliverable' : detail._as==='idea' ? ((detail.category==='cash'?'💰 Cash':'🧠 Brain')+' idea · '+tiStars(detail)+' impact') : (detail._as==='output' ? (moduleLabel(detail.source_module)+' · output') : catLabel(detail)) }}</div>
+      <h1>{{ detail._as==='output' ? outputTitle(detail) : detail._as==='idea' ? terse(tiSpin(detail).situation, 110) : detail.title }}</h1>
 
       <template v-if="detail._as==='doc'">
         <div v-if="detail._error" class="err">{{ detail._error }}</div>
@@ -422,6 +499,34 @@ createApp({
         <div class="d-links">
           <a v-if="detail.evidence_url" :href="detail.evidence_url" target="_blank" rel="noopener">📄 Open the full read ↗</a>
         </div>
+      </template>
+
+      <template v-else-if="detail._as==='idea'">
+        <div class="read">
+          <h3>Situation</h3><p>{{ tiSpin(detail).situation }}</p>
+          <h3>Problem</h3><p>{{ tiSpin(detail).problem }}</p>
+          <h3>Implication — why it matters</h3><p>{{ tiSpin(detail).implication }}</p>
+          <h3>Need-payoff — what gets better</h3><p>{{ tiSpin(detail).need_payoff }}</p>
+        </div>
+        <div class="d-actions" v-if="!detail._done">
+          <button class="act accept" :disabled="busy" @click="ideaDecide(detail,'keep')">Keep</button>
+          <button class="act defer" :disabled="busy" @click="ideaDecide(detail,'later')">Later</button>
+          <button class="act decline" :disabled="busy" @click="ideaDecide(detail,'decline')">Decline</button>
+          <button class="act" :disabled="busy" @click="ideaDecide(detail,'research')" style="border-color:var(--accent);color:var(--accent-ink)">🔬 Research with Pax →</button>
+        </div>
+        <div v-else class="done-pill">✅ {{ detail._done }}</div>
+        <div v-if="detail._error" class="err">{{ detail._error }}</div>
+        <details class="tech"><summary>Details (technical)</summary>
+          <div class="tech-body"><div class="mono">target: {{ detail.fusion_target }}
+lens: {{ detail.lens }} · nvfi: {{ JSON.stringify(detail.nvfi) }}
+mechanism: {{ (detail.source_evidence||{}).named_mechanism }}
+evidence: "{{ (detail.source_evidence||{}).quote }}"  [{{ (detail.source_evidence||{}).timestamp }}]
+transfer: {{ detail.transfer_reasoning }}
+traps: {{ JSON.stringify(detail.traps) }}
+larry reconciliation: {{ detail.larry_recon ? JSON.stringify(detail.larry_recon) : 'pending' }}
+source: {{ detail.source_title }} ({{ detail.source_ref }}) · {{ detail.mine_model }}
+brief_hash: {{ detail.brief_hash }} · mine: {{ detail.mine_id }}</div></div>
+        </details>
       </template>
 
       <template v-else>

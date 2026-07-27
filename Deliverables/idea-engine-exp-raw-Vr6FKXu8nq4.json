@@ -1,0 +1,1301 @@
+{
+ "fixture": {
+  "n": 5,
+  "id": "Vr6FKXu8nq4",
+  "label": "Clean an Air Fryer (26s)",
+  "cls": "thin / negative"
+ },
+ "t1": {
+  "call": {
+   "label": "T1",
+   "ok": true,
+   "resultText": "{\"mine_id\":\"d3470e90-0746-46c8-a653-0f47e4c39964\",\"brief_hash\":\"ef98acbac5ab8996\",\"discarded_obvious\":[\"Clean your air fryer after every use -> generically clean/maintain the Neo4j graph regularly (too generic, no falsifiable action)\",\"Use a non-abrasive sponge because it's non-stick -> be gentle/careful when touching delicate systems (too vague, not a specific mechanism)\",\"Step-by-step external wipe-down routine -> have a maintenance checklist for Fusion systems (generic ops advice, not source-specific)\"],\"candidates\":[{\"spin\":{\"situation\":\"Right now, the only thing that gets looked at is what surfaces in the Cockpit — the ideas and sources you actually see and Accept/Decline.\",\"problem\":\"The Neo4j/LightRAG graph underneath never gets its own inspection. Every ingestion, even a throwaway 3-minute cleaning-tips video like this one, writes new entities, embeddings and relationships into that shared substrate — and none of it gets checked unless a downstream card happens to look obviously wrong.\",\"implication\":\"Like grease from basic fries quietly coating the whole inside of the air fryer, low-grade or messy extractions can build up in the graph's internals for months without anyone noticing — until Outputs start surfacing duller or wrong ideas, by which point the rot is baked into everything downstream.\",\"need_payoff\":\"A scheduled, separate substrate check — orphaned nodes, drifted embeddings, index bloat — run on the graph itself, independent of whether any single source's card looked fine, catches structural decay before it quietly degrades every future output.\"},\"source_evidence\":{\"quote\":\"here is a step most people skip. Cleaning around the heating element... remember that heating even basic French fries can leave your air fryer greasy. The heat from the air fryer circulates that grease all around\",\"timestamp\":\"00:00\",\"named_mechanism\":\"invisible high-traffic internal part accumulates residue from every use (even the most basic one) while attention stays on the visible surface\"},\"transfer_reasoning\":\"The invariant: the part touched by EVERY use, including trivial ones, and never directly interacted with by the user (heating element) silently accumulates residue and is exactly the part people skip because it's invisible — while the visible 'basket' gets all the attention. At the Brain, Cockpit per-source review is the basket; the Neo4j/LightRAG entity and embedding layer is the heating element — touched by every ingestion, inspected by no one.\",\"fusion_target\":\"Brain — Neo4j/LightRAG graph internals (entity + embedding layer), as a check distinct from Cockpit per-source review\",\"category\":\"brain\",\"lens\":\"structure\",\"nvfi\":{\"novelty\":3,\"viability\":4,\"fit\":4,\"impact\":3},\"traps\":[{\"type\":\"possible_overlap\",\"note\":\"backlog already flags 'stale Fusion self-model tables' (cockpit.build/overall_state) as MED — that's status metadata, not graph internals, but check for overlap before standing up a second monitoring path.\"}]},{\"spin\":{\"situation\":\"Dedup/entity-merge corrections for the graph are already planned as part of the Cockpit lift-out work.\",\"problem\":\"The video warns that most cleaning hacks 'do more harm than good' because they scratch the non-stick coating for a quick win. The same shape of mistake is available in dedup logic: an automated merge that looks like a fast, effective cleanup can permanently collapse two genuinely distinct entities.\",\"implication\":\"Grease can be re-cleaned next time; a bad auto-merge can't. If dedup is built to auto-merge or auto-delete outright, one bad match doesn't just add noise — it destroys the pre-merge state for good, the same way an abrasive hack destroys a coating with no way back.\",\"need_payoff\":\"Make irreversibility — not confidence-of-match or how 'trusted' the automation is — the trigger for a human gate: any merge/delete that can't be trivially undone gets staged for review; anything reversible can run automatically.\"},\"source_evidence\":{\"quote\":\"There are tons of cleaning hacks out there, but keep in mind that most will do more harm than good\",\"timestamp\":\"00:00\",\"named_mechanism\":\"a fast shortcut that appears to clean but permanently damages the substrate\"},\"transfer_reasoning\":\"The invariant: shortcuts that trade speed for irreversibility are the dangerous ones, regardless of how good they look in the moment — the coating damage isn't visible until it's already done. Fusion's existing principle is 'human-in-the-loop while proving, automate once trusted,' which gates on trust level; this sharpens the actual criterion to irreversibility of the specific action, since a trusted automation can still perform an unrecoverable merge.\",\"fusion_target\":\"Brain — Neo4j entity-resolution/dedup logic (Cockpit lift-out corrections)\",\"category\":\"brain\",\"lens\":\"inversion\",\"nvfi\":{\"novelty\":3,\"viability\":4,\"fit\":4,\"impact\":3},\"traps\":[{\"type\":\"already_known_principle\",\"note\":\"only survives as non-redundant if the dedup design isn't already gating on reversibility specifically — if it is, this collapses into the existing 'automate once trusted' principle and adds nothing.\"}]}],\"zero_reason\":null}",
+   "duration_ms": 117376,
+   "cost_usd": 0.36280140000000005,
+   "payload_input_est": 2219,
+   "output": 8992,
+   "cache_creation": 33765,
+   "cache_read": 84398
+  },
+  "candidates": [
+   {
+    "spin": {
+     "situation": "Right now, the only thing that gets looked at is what surfaces in the Cockpit — the ideas and sources you actually see and Accept/Decline.",
+     "problem": "The Neo4j/LightRAG graph underneath never gets its own inspection. Every ingestion, even a throwaway 3-minute cleaning-tips video like this one, writes new entities, embeddings and relationships into that shared substrate — and none of it gets checked unless a downstream card happens to look obviously wrong.",
+     "implication": "Like grease from basic fries quietly coating the whole inside of the air fryer, low-grade or messy extractions can build up in the graph's internals for months without anyone noticing — until Outputs start surfacing duller or wrong ideas, by which point the rot is baked into everything downstream.",
+     "need_payoff": "A scheduled, separate substrate check — orphaned nodes, drifted embeddings, index bloat — run on the graph itself, independent of whether any single source's card looked fine, catches structural decay before it quietly degrades every future output."
+    },
+    "source_evidence": {
+     "quote": "here is a step most people skip. Cleaning around the heating element... remember that heating even basic French fries can leave your air fryer greasy. The heat from the air fryer circulates that grease all around",
+     "timestamp": "00:00",
+     "named_mechanism": "invisible high-traffic internal part accumulates residue from every use (even the most basic one) while attention stays on the visible surface"
+    },
+    "transfer_reasoning": "The invariant: the part touched by EVERY use, including trivial ones, and never directly interacted with by the user (heating element) silently accumulates residue and is exactly the part people skip because it's invisible — while the visible 'basket' gets all the attention. At the Brain, Cockpit per-source review is the basket; the Neo4j/LightRAG entity and embedding layer is the heating element — touched by every ingestion, inspected by no one.",
+    "fusion_target": "Brain — Neo4j/LightRAG graph internals (entity + embedding layer), as a check distinct from Cockpit per-source review",
+    "category": "brain",
+    "lens": "structure",
+    "nvfi": {
+     "novelty": 3,
+     "viability": 4,
+     "fit": 4,
+     "impact": 3
+    },
+    "traps": [
+     {
+      "type": "possible_overlap",
+      "note": "backlog already flags 'stale Fusion self-model tables' (cockpit.build/overall_state) as MED — that's status metadata, not graph internals, but check for overlap before standing up a second monitoring path."
+     }
+    ]
+   },
+   {
+    "spin": {
+     "situation": "Dedup/entity-merge corrections for the graph are already planned as part of the Cockpit lift-out work.",
+     "problem": "The video warns that most cleaning hacks 'do more harm than good' because they scratch the non-stick coating for a quick win. The same shape of mistake is available in dedup logic: an automated merge that looks like a fast, effective cleanup can permanently collapse two genuinely distinct entities.",
+     "implication": "Grease can be re-cleaned next time; a bad auto-merge can't. If dedup is built to auto-merge or auto-delete outright, one bad match doesn't just add noise — it destroys the pre-merge state for good, the same way an abrasive hack destroys a coating with no way back.",
+     "need_payoff": "Make irreversibility — not confidence-of-match or how 'trusted' the automation is — the trigger for a human gate: any merge/delete that can't be trivially undone gets staged for review; anything reversible can run automatically."
+    },
+    "source_evidence": {
+     "quote": "There are tons of cleaning hacks out there, but keep in mind that most will do more harm than good",
+     "timestamp": "00:00",
+     "named_mechanism": "a fast shortcut that appears to clean but permanently damages the substrate"
+    },
+    "transfer_reasoning": "The invariant: shortcuts that trade speed for irreversibility are the dangerous ones, regardless of how good they look in the moment — the coating damage isn't visible until it's already done. Fusion's existing principle is 'human-in-the-loop while proving, automate once trusted,' which gates on trust level; this sharpens the actual criterion to irreversibility of the specific action, since a trusted automation can still perform an unrecoverable merge.",
+    "fusion_target": "Brain — Neo4j entity-resolution/dedup logic (Cockpit lift-out corrections)",
+    "category": "brain",
+    "lens": "inversion",
+    "nvfi": {
+     "novelty": 3,
+     "viability": 4,
+     "fit": 4,
+     "impact": 3
+    },
+    "traps": [
+     {
+      "type": "already_known_principle",
+      "note": "only survives as non-redundant if the dedup design isn't already gating on reversibility specifically — if it is, this collapses into the existing 'automate once trusted' principle and adds nothing."
+     }
+    ]
+   }
+  ],
+  "zero_reason": null
+ },
+ "t2": {
+  "video": "Vr6FKXu8nq4",
+  "branchCalls": [
+   {
+    "label": "F1-mechanism",
+    "ok": true,
+    "resultText": "{\"frame\":\"F1-mechanism\",\"discarded_obvious\":[\"\\\"Clean your air fryer after every use\\\" (basket soak+scrub) -> generic 'do routine maintenance' - too loose, maps to any system, not a structural transfer\",\"\\\"Wipe down the outside with a microfiber cloth\\\" -> purely cosmetic/surface cleaning with no invariant mechanism worth transferring\"],\"candidates\":[\n  {\"spin\":{\"situation\":\"Every source that gets ingested into the Brain passes through one specific step: entity extraction and merge, the part of the pipeline that actually turns raw text into graph nodes.\",\"problem\":\"That's exactly the stage where mess collects - duplicate entities, uncertain merges, contradiction flags - but none of it shows up if you just browse the graph normally, same as grease you'd never see just by glancing at a clean-looking basket.\",\"implication\":\"Left unchecked, the buildup sits at one concentrated point and quietly degrades everything downstream that reads from the graph (Outputs Layer, Cockpit surfacing) without ever throwing an obvious error.\",\"need_payoff\":\"A recurring, narrowly-targeted audit of just the extraction/merge stage - not a full graph review - would catch it early, the same way the video says to specifically check around the heating element instead of only wiping the basket.\"},\n   \"source_evidence\":{\"quote\":\"Cleaning around the heating element. This is what it looks like if you don't routinely clean it.\",\"timestamp\":\"00:00\",\"named_mechanism\":\"targeted inspection of the core active component, distinct from routine surface cleaning\"},\n   \"transfer_reasoning\":\"Invariant: in a system with one central transformation point, that point accumulates a byproduct of its own operation - not from misuse - and the byproduct is invisible to normal-mode inspection, only found by looking directly at that component. The air fryer's basket-wash is the graph's normal browsing; the heating-element check is the entity-extraction/merge audit. Same shape: general upkeep misses the one place actual transformation happens.\",\"fusion_target\":\"Brain compiler's LightRAG->Neo4j entity-extraction/merge stage (the step ObsidiWikAi's WP1.5 lens-conditioning already touches)\",\"category\":\"brain\",\"lens\":\"mechanism/structural\",\n   \"nvfi\":{\"novelty\":3,\"viability\":4,\"fit\":4,\"impact\":4},\n   \"traps\":[{\"type\":\"scope-creep\",\"note\":\"keep this a thin recurring spot-check, not a new governance platform - echoes the BUILD-014 lesson about building the machine instead of the thing\"},{\"type\":\"evidence-needed\",\"note\":\"unverified - needs Silas or Pax to confirm the extraction/merge stage currently lacks any targeted audit before this is built\"}]},\n  {\"spin\":{\"situation\":\"The air fryer's hot-air circulation is exactly what cooks the food well - and it's also exactly what carries grease to every surface inside, not just where the food sat.\",\"problem\":\"In the Brain, relation-propagation and similarity-linking is exactly what makes the graph valuable (connecting facts across separate sources) - but it's that same connective mechanism that can carry a bad or duplicate entity out to everything it links to, not just the one ingest it came from.\",\"implication\":\"A single messy source doesn't stay contained to its own node - the very mechanism that makes the Brain useful is the one that fans mess out network-wide, so a small ingest error can surface far from where it entered.\",\"need_payoff\":\"The already-authorised Neo4j graph-signal audit should explicitly test propagation paths - trace where contamination could fan out along relation/similarity edges - not just check individual nodes in isolation.\"},\n   \"source_evidence\":{\"quote\":\"The heat from the air fryer circulates that grease all around.\",\"timestamp\":\"00:00\",\"named_mechanism\":\"the value-producing mechanism (circulation) is also the contamination-spreading mechanism\"},\n   \"transfer_reasoning\":\"Invariant: when one mechanism is responsible both for the system's core value and for distributing its byproducts, contamination is never localized to the input point - it travels wherever the value-producing mechanism reaches. Grease travels wherever hot air reaches; a bad entity travels wherever relation-propagation/similarity-matching reaches. This reframes graph-signal auditing from per-node checks to path-tracing.\",\"fusion_target\":\"Neo4j graph-signal audit (delegated 06c8974) - relation-propagation and similarity-edge logic in the Brain compiler\",\"category\":\"brain\",\"lens\":\"mechanism/structural\",\n   \"nvfi\":{\"novelty\":3,\"viability\":3,\"fit\":4,\"impact\":4},\n   \"traps\":[{\"type\":\"duplication-risk\",\"note\":\"may already sit inside the delegated graph-signal audit's scope - check that report before spinning up new work\"},{\"type\":\"unfalsifiable-as-stated\",\"note\":\"no concrete evidence yet that a bad ingest has actually propagated this way - treat as a hypothesis to test, not a confirmed defect\"}]},\n  {\"spin\":{\"situation\":\"For recipes known to run messy, the fix isn't to scrub harder afterward - it's to lay a perforated liner down first, so the mess never touches the actual cooking surface.\",\"problem\":\"Known-messy sources (raw YouTube transcripts, voice memos) currently go straight into ingestion, and any cleanup of duplicates or junk entities happens only after they've already touched the graph.\",\"implication\":\"Cleaning up after the fact is costlier and riskier than catching it before entry - residue baked onto a bare heating element is much harder to remove than residue caught on a liner, and the same is true for junk that's already merged into the graph versus junk caught before it ever gets there.\",\"need_payoff\":\"A cheap, optional pre-ingestion normalization pass at the Gateway - applied only to source types already known to be messy - before they reach the Brain's extraction stage.\"},\n   \"source_evidence\":{\"quote\":\"For really messy recipes, grab some perforated air fryer parchment sheet.\",\"timestamp\":\"00:00\",\"named_mechanism\":\"a disposable liner intercepts mess before it reaches the core surface, used selectively by mess-level of the input\"},\n   \"transfer_reasoning\":\"Invariant: when you already know in advance which inputs will be messy, intercepting the mess at the boundary with a cheap disposable layer is structurally cheaper than cleaning the core mechanism after contact. TubeAIR's no-LLM transcript cleanup is the closest existing precedent - this generalizes that same 'liner-before-core' shape to other known-messy source types at the Gateway.\",\"fusion_target\":\"Gateway ingestion path - a pre-LightRAG normalization pass applied only to known-messy source types (raw transcripts, voice notes) before they reach the Brain's extraction stage\",\"category\":\"brain\",\"lens\":\"mechanism/structural\",\n   \"nvfi\":{\"novelty\":2,\"viability\":4,\"fit\":4,\"impact\":3},\n   \"traps\":[{\"type\":\"scope-creep\",\"note\":\"must stay a thin optional pre-filter for specific source types, not a general new ingestion layer\"},{\"type\":\"already-partial\",\"note\":\"TubeAIR already does exactly this for YouTube - confirm whether this is genuinely new ground or just extending an existing pattern to other source types\"}]}\n],\"zero_reason\":null}",
+    "duration_ms": 88587,
+    "cost_usd": 0.2379882,
+    "payload_input_est": 1551,
+    "output": 7502,
+    "cache_creation": 19143,
+    "cache_read": 35314
+   },
+   {
+    "label": "F2-inversion",
+    "ok": true,
+    "resultText": "{\"frame\":\"F2-inversion\",\"discarded_obvious\":[\"Schedule regular Cockpit UI cleanup/maintenance reminders — that's a restated positive feature, not a failure-mode transfer\",\"Use parchment-sheet-style disposable staging folders for messy imports — a literal one-to-one restatement, not an inverted-assumption transfer\",\"Use a non-abrasive review checklist for QA — surface pattern-match on 'non-abrasive sponge', not a genuine failure mode\"],\"candidates\":[\n  {\"spin\":{\"situation\":\"Most people only ever clean the part of the air fryer they can see — the basket — and never touch the heating element hidden underneath, until a friend's unit shows just how bad the buildup gets back there.\",\"problem\":\"Fusion has the same blind spot: attention goes to the visible surface (Cockpit screens, dashboards) while the low-level tables that describe the system to itself — cockpit.build, cockpit.overall_state, and Larry's own working context across compaction/restart — go unlooked-at until they're badly out of date.\",\"implication\":\"By the time anyone notices, the system has quietly been running on a stale picture of itself, the same way that friend's air fryer looked fine from the outside while crusted around the element.\",\"need_payoff\":\"A recurring 'check behind the element' pass — a scheduled look at hidden self-model state, not just the visible surface — catches this before it compounds into decisions made on stale self-knowledge.\"},\n   \"source_evidence\":{\"quote\":\"here is a step most people skip. Cleaning around the heating element. This is what it looks like if you don't routinely clean it. I borrowed a friend to show you just how bad it can get.\",\"timestamp\":\"00:00\",\"named_mechanism\":\"neglected-because-invisible component silently accumulating damage\"},\n   \"transfer_reasoning\":\"The video's invariant is: the component hardest to see gets the least maintenance and the worst decay, precisely because looking fine at the surface hides it. Fusion's self-model tables (cockpit.build, cockpit.overall_state) and Larry's cross-session context are structurally the same kind of component — internal, load-bearing, and invisible during normal use.\",\"fusion_target\":\"cockpit.build / cockpit.overall_state self-model tables + Larry's cross-compaction context store\",\"category\":\"brain\",\"lens\":\"inversion — hidden component decays invisibly while the visible surface looks fine\",\n   \"nvfi\":{\"novelty\":3,\"viability\":4,\"fit\":5,\"impact\":4},\"traps\":[{\"type\":\"needs evidence\",\"note\":\"Assumes stale self-model tables actually degrade Larry's decisions rather than being only cosmetically stale — unverified without checking what currently reads from those tables.\"}]},\n  {\"spin\":{\"situation\":\"The video warns that most 'cleaning hacks' people try on their air fryer actually scratch the non-stick coating and do more damage than the grease they were meant to remove.\",\"problem\":\"The same trap exists for Fusion's governed knowledge graph: a quick manual edit written straight into Neo4j or Directus to fix something fast bypasses the governed ingestion pipeline (Cairn intake to compiler) and scratches the canonical 'coating' — the SSOT guarantee that every fact lives in exactly one governed place.\",\"implication\":\"It looks like a harmless shortcut in the moment, but it seeds a small permanent scratch — a fact now out of sync with its source of truth — that gets worse every time the same shortcut gets reached for again.\",\"need_payoff\":\"Treat any direct/manual write to the graph or Directus store as an abrasive hack by default: route fixes back through the governed pipeline, or explicitly flag and track the scratch so it doesn't silently compound.\"},\n   \"source_evidence\":{\"quote\":\"There are tons of cleaning hacks out there, but keep in mind that most will do more harm than good.\",\"timestamp\":\"00:00\",\"named_mechanism\":\"well-intentioned shortcut that damages the protective surface it was meant to help\"},\n   \"transfer_reasoning\":\"Inverted assumption: 'a quick fix is harmless because it solves the immediate problem.' The video shows the opposite — the fix itself is the damage vector because it acts on a surface (non-stick coating) that needs a specific, gentler process. Fusion's SSOT-governed graph is exactly this kind of surface: it needs to be written to only through its designed pipeline, not patched directly.\",\"fusion_target\":\"Neo4j knowledge graph / Directus canonical store — manual writes bypassing the LightRAG governed ingestion pipeline\",\"category\":\"brain\",\"lens\":\"inversion — the fix-shortcut is itself the failure mode\",\n   \"nvfi\":{\"novelty\":4,\"viability\":3,\"fit\":4,\"impact\":4},\"traps\":[{\"type\":\"manufactured risk\",\"note\":\"No confirmed instance yet of a manual Neo4j/Directus write bypassing the governed pipeline on this repo — this is a preventive pattern from the analogy, not an observed incident.\"}]},\n  {\"spin\":{\"situation\":\"Even cooking something as basic as French fries leaves the air fryer greasy, because the heat circulates that grease around the whole unit — routine, mundane use is what actually causes the buildup, not the occasional messy recipe.\",\"problem\":\"Fusion's routine, low-effort captures — an ordinary YouTube transcript via TubeAIR, a quick journal note via Penn — are the 'French fries' of the Brain: individually trivial, but their residue circulates through the one shared graph with every ingestion, same as heat circulating grease through the whole fryer.\",\"implication\":\"Nobody budgets cleaning time for 'just fries', so graph drift from routine, everyday captures accumulates invisibly while attention stays fixed on the big, obviously messy imports instead.\",\"need_payoff\":\"Build a periodic graph-quality re-validation pass sized for cumulative routine drift, not only triggered by flagged large or messy imports.\"},\n   \"source_evidence\":{\"quote\":\"remember that heating even basic French fries can leave your air fryer greasy. The heat from the air fryer circulates that grease all around.\",\"timestamp\":\"00:00\",\"named_mechanism\":\"routine normal-use residue circulating through the whole system, not just the messy edge cases\"},\n   \"transfer_reasoning\":\"Inverted assumption: 'only the obviously messy/complex inputs create maintenance burden.' The video shows routine, low-stakes use is the actual driver of systemic residue because the same circulation mechanism touches everything, big or small. Fusion's Brain ingests routine low-effort captures through the identical shared pipeline as any other source, so the same circulation logic applies to graph drift.\",\"fusion_target\":\"LightRAG->Neo4j Brain ingestion pipeline fed by routine Gateway/TubeAIR/Penn captures\",\"category\":\"brain\",\"lens\":\"inversion — mundane routine use, not the messy edge case, drives systemic residue\",\n   \"nvfi\":{\"novelty\":3,\"viability\":3,\"fit\":4,\"impact\":3},\"traps\":[{\"type\":\"needs evidence\",\"note\":\"No measurement yet that routine low-effort captures degrade graph quality more than occasional large imports do — this is borrowed from the analogy's mechanism, not from actual graph metrics.\"}]}\n],\"zero_reason\":null}",
+    "duration_ms": 94487,
+    "cost_usd": 0.25419420000000004,
+    "payload_input_est": 1582,
+    "output": 7884,
+    "cache_creation": 20889,
+    "cache_read": 35314
+   },
+   {
+    "label": "F3-operational",
+    "ok": true,
+    "resultText": "{\"frame\":\"F3-operational\",\"discarded_obvious\":[\"wipe down the outside with a microfiber cloth -> generic 'keep things tidy' housekeeping (already standard, no specific leverage)\",\"soak the basket in soapy water -> generic 'restart/reset a stuck process' (too generic to be a real transfer)\",\"air fryers are non-stick, don't scrub hard -> 'be careful with fragile subsystems' (already covered by SSOT/write-discipline rules)\"],\"candidates\":[{\"spin\":{\"situation\":\"Larry already flagged that cockpit.build and cockpit.overall_state are stale (last touched 2026-07-22) because updating them is a manual afterthought nobody remembers to do.\",\"problem\":\"The video's cleaning routine covers the basket and the outside every time, but the part most people skip is the heating element -- the hidden component that actually causes problems, and you only find out how bad it got once someone shows you.\",\"implication\":\"Fusion's self-model tables are the 'heating element': not part of the obvious day-to-day loop, so they quietly go stale and Larry ends up reasoning from an outdated picture of what's actually built.\",\"need_payoff\":\"Fire the self-model refresh automatically on every merge/build event -- the 'clean after every use' cadence -- instead of leaving it as a manual step that gets forgotten.\"},\"source_evidence\":{\"quote\":\"Cleaning around the heating element. This is what it looks like if you don't routinely clean it.\",\"timestamp\":\"00:00\",\"named_mechanism\":\"the routinely-skipped hidden component\"},\"transfer_reasoning\":\"RECOGNISE: routine cleaning has a visible layer (basket, outside) everyone does and a hidden layer (heating element) everyone skips, and skipping it is what actually degrades the machine. ANALOGISE: Fusion's self-model (cockpit.build, cockpit.overall_state) is the hidden layer -- not touched by normal day-to-day work, only updated when someone remembers. TRANSFER: bind the update to the event that dirties it (a merge/build, i.e. 'a use') rather than to memory or a calendar, the same invariant as 'clean after every use' applied specifically to the part people forget.\",\"fusion_target\":\"cockpit.build / cockpit.overall_state self-model refresh, triggered post-merge\",\"category\":\"brain\",\"lens\":\"hidden-component maintenance\",\"nvfi\":{\"novelty\":3,\"viability\":4,\"fit\":5,\"impact\":4},\"traps\":[{\"type\":\"scope-creep\",\"note\":\"keep this to a lightweight post-merge hook that touches the two known-stale tables -- do not let it grow into a new monitoring/observability platform (the BUILD-014 platform-instead-of-slice mistake).\"}]},{\"spin\":{\"situation\":\"Bulk or noisy imports -- a big playlist, a large journal migration -- are the 'messy recipes' of Fusion's ingestion pipeline.\",\"problem\":\"The video's fix for messy recipes isn't a better post-hoc scrub, it's a liner that catches the mess before it touches the pan: cleanup becomes 'throw the sheet away', not 'scrub baked-on grease out of the basket'.\",\"implication\":\"If a bulk/noisy capture writes straight into the live Neo4j graph, every messy batch means de-duplicating and correcting the actual graph afterwards -- the harder cleanup the video is telling people to avoid.\",\"need_payoff\":\"Check whether high-volume imports already land in a staging/quarantine table before merging into the live graph; if not, add that liner so a bad batch is a delete, not a graph repair.\"},\"source_evidence\":{\"quote\":\"For really messy recipes, grab some perforated air fryer parchment sheet.\",\"timestamp\":\"00:00\",\"named_mechanism\":\"a preventive liner for known-messy jobs\"},\"transfer_reasoning\":\"RECOGNISE: for jobs known in advance to be messy, the fix is a disposable barrier placed before the mess happens, not a stronger cleaning method after. ANALOGISE: Fusion already knows in advance which capture paths are high-volume/noisy (bulk imports, playlist ingests) -- the equivalent of 'messy recipes'. TRANSFER: route those known-messy paths through a staging layer first so the live graph is never directly dirtied, mirroring the liner rather than a bigger scrub brush.\",\"fusion_target\":\"Neo4j/LightRAG ingestion staging layer for bulk/high-volume capture paths (WS-002 / Silas import route)\",\"category\":\"brain\",\"lens\":\"preventive liner vs. post-hoc scrub\",\"nvfi\":{\"novelty\":3,\"viability\":3,\"fit\":3,\"impact\":3},\"traps\":[{\"type\":\"needs-evidence\",\"note\":\"unverified whether bulk imports already stage before touching the live graph -- confirm the current WS-002/Silas path before proposing this as new work.\"}]}],\"zero_reason\":null}",
+    "duration_ms": 78673,
+    "cost_usd": 0.21506219999999998,
+    "payload_input_est": 1553,
+    "output": 6652,
+    "cache_creation": 17447,
+    "cache_read": 35314
+   },
+   {
+    "label": "F4-commercial",
+    "ok": true,
+    "resultText": "{\"frame\":\"F4-commercial\",\"discarded_obvious\":[\"Fusion enters the home-appliance cleaning-content or accessory-retail market — no connection to any Fusion component, purely surface-level topic match\",\"Sell air fryer cleaning kits/parchment sheets as a dropship product — generic e-commerce idea with no structural link to a named Fusion mechanism, would be manufactured not transferred\"],\"candidates\":[],\"zero_reason\":\"Source is generic consumer-appliance maintenance content (air fryer cleaning routine). RECOGNISE surfaced only domain-specific mechanisms — baking-soda paste, heating-element neglect, parchment liners — none of which carry an invariant that maps onto any named Fusion component (Brain, Outputs Layer, Cockpit, Gateway, AsdAIr, Tower) or onto an external buyer/beneficiary Fusion could serve. Forcing a 'sell maintenance tips/accessories' analogy would be a manufactured mapping, not a structural transfer, so per MUST-HOLD(2) it is correctly killed. No cash-frame survivors this pass.\"}",
+    "duration_ms": 26774,
+    "cost_usd": 0.1397922,
+    "payload_input_est": 1550,
+    "output": 1702,
+    "cache_creation": 17277,
+    "cache_read": 35314
+   },
+   {
+    "label": "F5-crossdomain",
+    "ok": true,
+    "resultText": "{\"frame\":\"F5-crossdomain\",\"discarded_obvious\":[\"Wipe exterior with microfiber cloth → trivial 'keep the surface tidy' mapping, no structural distance.\",\"True/false quiz cold-open → standard content-marketing engagement hook, not distinctive under harsh self-kill.\",\"'Clean after every use' framed generally → generic 'do regular maintenance', names no specific mechanism.\",\"Perforated parchment sheets for recipes known in advance to be messy → the differential-triage idea (quarantine only predicted-messy sources) is undercut by the source's own next beat, that plain routine use fouls everything anyway; superseded by the routine-use candidate below rather than run in parallel.\",\"Non-stick coating constrains cleaning method to non-abrasive only → maps to 'respect immutability, don't scrub the audit log hard', already covered by existing write-discipline governance — not novel.\",\"Heating element is the step users skip because it's hidden behind the visible basket → 'audit the internals, not just the UI' is a standard software-maintenance truism, fails the distance bar.\"],\"candidates\":[{\"spin\":{\"situation\":\"Warwick's knowledge graph is actively tended, so from the inside it never looks broken.\",\"problem\":\"That means there's no shape for 'starting to rot' to compare against — Larry only knows decay by definition, not by pattern, until it's already visibly bad.\",\"implication\":\"By the time decay shows up in the real graph it's already tangled and expensive to unpick, exactly like the borrowed air fryer's heating element.\",\"need_payoff\":\"Deliberately let a small throwaway slice of the graph decay on purpose, and use it as a reference pattern so Larry can spot early rot in the real one before it compounds.\"},\"source_evidence\":{\"quote\":\"I borrowed a friend to show you just how bad it can get.\",\"timestamp\":\"00:00\",\"named_mechanism\":\"external-degraded-reference-standard\"},\"transfer_reasoning\":\"A system that is actively kept clean cannot show you what 'dirty' looks like from the inside — the video needed an external, deliberately neglected unit to demonstrate decay; a maintained knowledge graph has the same blind spot, so decay-recognition needs a synthetic degraded reference, not more staring at the healthy graph.\",\"fusion_target\":\"Neo4j graph decay/drift-detection heuristic (Brain hygiene monitoring)\",\"category\":\"brain\",\"lens\":\"self-blindness-in-maintained-systems\",\"nvfi\":{\"novelty\":8,\"viability\":5,\"fit\":6,\"impact\":6},\"traps\":[{\"type\":\"unfalsifiable-baseline\",\"note\":\"a synthetic decay fixture is only useful if validated against real historical decay patterns — otherwise it's just guessing what 'bad' looks like.\"},{\"type\":\"cost\",\"note\":\"building and maintaining a deliberately-rotten reference copy is itself upkeep overhead that could go stale too.\"}]},{\"spin\":{\"situation\":\"Even the most basic, harmless-looking use — plain fries — leaves the whole air fryer greasy.\",\"problem\":\"That's because the same hot air that cooks the food also circulates the residue everywhere; the mess isn't caused by extreme use, it's caused by the ordinary operating mechanism itself.\",\"implication\":\"If Fusion only runs deep hygiene passes after 'messy' events (bulk imports, migrations), the everyday small stuff — a routine journal entry, a plain Telegram note — could still be quietly foul the whole graph between those passes, via whatever mechanism touches the whole graph on every ingest.\",\"need_payoff\":\"Schedule baseline whole-graph hygiene on a fixed cadence regardless of how clean recent inputs looked, instead of triggering it only off perceived-messy events.\"},\"source_evidence\":{\"quote\":\"Heating even basic French fries can leave your air fryer greasy. The heat from the air fryer circulates that grease all around.\",\"timestamp\":\"00:00\",\"named_mechanism\":\"circulating-byproduct-of-core-mechanism\"},\"transfer_reasoning\":\"The fouling here doesn't come from extreme inputs but from the ordinary operating mechanism (circulating hot air) touching the whole unit on every routine use; if any Fusion process similarly touches the whole graph on every ingest (e.g. re-embedding or re-clustering), it will foul the whole graph on 'boring' inputs too — so a hygiene trigger keyed to 'was this input messy' misses the actual fouling pathway.\",\"fusion_target\":\"Brain/Neo4j hygiene-pass trigger logic (when dedup/audit runs)\",\"category\":\"brain\",\"lens\":\"routine-operation-still-fouls-the-whole-system\",\"nvfi\":{\"novelty\":6,\"viability\":6,\"fit\":6,\"impact\":6},\"traps\":[{\"type\":\"needs-evidence\",\"note\":\"this assumes Fusion's ingestion pipeline actually has a global-touch property (e.g. re-embedding reaching unrelated nodes); if ingestion is genuinely localized/incremental, the transfer collapses — verify the mechanism before acting.\"},{\"type\":\"already-doing-it?\",\"note\":\"if a fixed-cadence hygiene pass already exists independent of import size, this is redundant — check current LightRAG/Neo4j maintenance schedule first.\"}]}],\"zero_reason\":null}",
+    "duration_ms": 128159,
+    "cost_usd": 0.2673252,
+    "payload_input_est": 1565,
+    "output": 10197,
+    "cache_creation": 17295,
+    "cache_read": 35314
+   }
+  ],
+  "branchOutputs": [
+   {
+    "frame": "F1-mechanism",
+    "discarded_obvious": [
+     "\"Clean your air fryer after every use\" (basket soak+scrub) -> generic 'do routine maintenance' - too loose, maps to any system, not a structural transfer",
+     "\"Wipe down the outside with a microfiber cloth\" -> purely cosmetic/surface cleaning with no invariant mechanism worth transferring"
+    ],
+    "candidates": [
+     {
+      "spin": {
+       "situation": "Every source that gets ingested into the Brain passes through one specific step: entity extraction and merge, the part of the pipeline that actually turns raw text into graph nodes.",
+       "problem": "That's exactly the stage where mess collects - duplicate entities, uncertain merges, contradiction flags - but none of it shows up if you just browse the graph normally, same as grease you'd never see just by glancing at a clean-looking basket.",
+       "implication": "Left unchecked, the buildup sits at one concentrated point and quietly degrades everything downstream that reads from the graph (Outputs Layer, Cockpit surfacing) without ever throwing an obvious error.",
+       "need_payoff": "A recurring, narrowly-targeted audit of just the extraction/merge stage - not a full graph review - would catch it early, the same way the video says to specifically check around the heating element instead of only wiping the basket."
+      },
+      "source_evidence": {
+       "quote": "Cleaning around the heating element. This is what it looks like if you don't routinely clean it.",
+       "timestamp": "00:00",
+       "named_mechanism": "targeted inspection of the core active component, distinct from routine surface cleaning"
+      },
+      "transfer_reasoning": "Invariant: in a system with one central transformation point, that point accumulates a byproduct of its own operation - not from misuse - and the byproduct is invisible to normal-mode inspection, only found by looking directly at that component. The air fryer's basket-wash is the graph's normal browsing; the heating-element check is the entity-extraction/merge audit. Same shape: general upkeep misses the one place actual transformation happens.",
+      "fusion_target": "Brain compiler's LightRAG->Neo4j entity-extraction/merge stage (the step ObsidiWikAi's WP1.5 lens-conditioning already touches)",
+      "category": "brain",
+      "lens": "mechanism/structural",
+      "nvfi": {
+       "novelty": 3,
+       "viability": 4,
+       "fit": 4,
+       "impact": 4
+      },
+      "traps": [
+       {
+        "type": "scope-creep",
+        "note": "keep this a thin recurring spot-check, not a new governance platform - echoes the BUILD-014 lesson about building the machine instead of the thing"
+       },
+       {
+        "type": "evidence-needed",
+        "note": "unverified - needs Silas or Pax to confirm the extraction/merge stage currently lacks any targeted audit before this is built"
+       }
+      ],
+      "_frame": "F1-mechanism"
+     },
+     {
+      "spin": {
+       "situation": "The air fryer's hot-air circulation is exactly what cooks the food well - and it's also exactly what carries grease to every surface inside, not just where the food sat.",
+       "problem": "In the Brain, relation-propagation and similarity-linking is exactly what makes the graph valuable (connecting facts across separate sources) - but it's that same connective mechanism that can carry a bad or duplicate entity out to everything it links to, not just the one ingest it came from.",
+       "implication": "A single messy source doesn't stay contained to its own node - the very mechanism that makes the Brain useful is the one that fans mess out network-wide, so a small ingest error can surface far from where it entered.",
+       "need_payoff": "The already-authorised Neo4j graph-signal audit should explicitly test propagation paths - trace where contamination could fan out along relation/similarity edges - not just check individual nodes in isolation."
+      },
+      "source_evidence": {
+       "quote": "The heat from the air fryer circulates that grease all around.",
+       "timestamp": "00:00",
+       "named_mechanism": "the value-producing mechanism (circulation) is also the contamination-spreading mechanism"
+      },
+      "transfer_reasoning": "Invariant: when one mechanism is responsible both for the system's core value and for distributing its byproducts, contamination is never localized to the input point - it travels wherever the value-producing mechanism reaches. Grease travels wherever hot air reaches; a bad entity travels wherever relation-propagation/similarity-matching reaches. This reframes graph-signal auditing from per-node checks to path-tracing.",
+      "fusion_target": "Neo4j graph-signal audit (delegated 06c8974) - relation-propagation and similarity-edge logic in the Brain compiler",
+      "category": "brain",
+      "lens": "mechanism/structural",
+      "nvfi": {
+       "novelty": 3,
+       "viability": 3,
+       "fit": 4,
+       "impact": 4
+      },
+      "traps": [
+       {
+        "type": "duplication-risk",
+        "note": "may already sit inside the delegated graph-signal audit's scope - check that report before spinning up new work"
+       },
+       {
+        "type": "unfalsifiable-as-stated",
+        "note": "no concrete evidence yet that a bad ingest has actually propagated this way - treat as a hypothesis to test, not a confirmed defect"
+       }
+      ],
+      "_frame": "F1-mechanism"
+     },
+     {
+      "spin": {
+       "situation": "For recipes known to run messy, the fix isn't to scrub harder afterward - it's to lay a perforated liner down first, so the mess never touches the actual cooking surface.",
+       "problem": "Known-messy sources (raw YouTube transcripts, voice memos) currently go straight into ingestion, and any cleanup of duplicates or junk entities happens only after they've already touched the graph.",
+       "implication": "Cleaning up after the fact is costlier and riskier than catching it before entry - residue baked onto a bare heating element is much harder to remove than residue caught on a liner, and the same is true for junk that's already merged into the graph versus junk caught before it ever gets there.",
+       "need_payoff": "A cheap, optional pre-ingestion normalization pass at the Gateway - applied only to source types already known to be messy - before they reach the Brain's extraction stage."
+      },
+      "source_evidence": {
+       "quote": "For really messy recipes, grab some perforated air fryer parchment sheet.",
+       "timestamp": "00:00",
+       "named_mechanism": "a disposable liner intercepts mess before it reaches the core surface, used selectively by mess-level of the input"
+      },
+      "transfer_reasoning": "Invariant: when you already know in advance which inputs will be messy, intercepting the mess at the boundary with a cheap disposable layer is structurally cheaper than cleaning the core mechanism after contact. TubeAIR's no-LLM transcript cleanup is the closest existing precedent - this generalizes that same 'liner-before-core' shape to other known-messy source types at the Gateway.",
+      "fusion_target": "Gateway ingestion path - a pre-LightRAG normalization pass applied only to known-messy source types (raw transcripts, voice notes) before they reach the Brain's extraction stage",
+      "category": "brain",
+      "lens": "mechanism/structural",
+      "nvfi": {
+       "novelty": 2,
+       "viability": 4,
+       "fit": 4,
+       "impact": 3
+      },
+      "traps": [
+       {
+        "type": "scope-creep",
+        "note": "must stay a thin optional pre-filter for specific source types, not a general new ingestion layer"
+       },
+       {
+        "type": "already-partial",
+        "note": "TubeAIR already does exactly this for YouTube - confirm whether this is genuinely new ground or just extending an existing pattern to other source types"
+       }
+      ],
+      "_frame": "F1-mechanism"
+     }
+    ],
+    "zero_reason": null
+   },
+   {
+    "frame": "F2-inversion",
+    "discarded_obvious": [
+     "Schedule regular Cockpit UI cleanup/maintenance reminders — that's a restated positive feature, not a failure-mode transfer",
+     "Use parchment-sheet-style disposable staging folders for messy imports — a literal one-to-one restatement, not an inverted-assumption transfer",
+     "Use a non-abrasive review checklist for QA — surface pattern-match on 'non-abrasive sponge', not a genuine failure mode"
+    ],
+    "candidates": [
+     {
+      "spin": {
+       "situation": "Most people only ever clean the part of the air fryer they can see — the basket — and never touch the heating element hidden underneath, until a friend's unit shows just how bad the buildup gets back there.",
+       "problem": "Fusion has the same blind spot: attention goes to the visible surface (Cockpit screens, dashboards) while the low-level tables that describe the system to itself — cockpit.build, cockpit.overall_state, and Larry's own working context across compaction/restart — go unlooked-at until they're badly out of date.",
+       "implication": "By the time anyone notices, the system has quietly been running on a stale picture of itself, the same way that friend's air fryer looked fine from the outside while crusted around the element.",
+       "need_payoff": "A recurring 'check behind the element' pass — a scheduled look at hidden self-model state, not just the visible surface — catches this before it compounds into decisions made on stale self-knowledge."
+      },
+      "source_evidence": {
+       "quote": "here is a step most people skip. Cleaning around the heating element. This is what it looks like if you don't routinely clean it. I borrowed a friend to show you just how bad it can get.",
+       "timestamp": "00:00",
+       "named_mechanism": "neglected-because-invisible component silently accumulating damage"
+      },
+      "transfer_reasoning": "The video's invariant is: the component hardest to see gets the least maintenance and the worst decay, precisely because looking fine at the surface hides it. Fusion's self-model tables (cockpit.build, cockpit.overall_state) and Larry's cross-session context are structurally the same kind of component — internal, load-bearing, and invisible during normal use.",
+      "fusion_target": "cockpit.build / cockpit.overall_state self-model tables + Larry's cross-compaction context store",
+      "category": "brain",
+      "lens": "inversion — hidden component decays invisibly while the visible surface looks fine",
+      "nvfi": {
+       "novelty": 3,
+       "viability": 4,
+       "fit": 5,
+       "impact": 4
+      },
+      "traps": [
+       {
+        "type": "needs evidence",
+        "note": "Assumes stale self-model tables actually degrade Larry's decisions rather than being only cosmetically stale — unverified without checking what currently reads from those tables."
+       }
+      ],
+      "_frame": "F2-inversion"
+     },
+     {
+      "spin": {
+       "situation": "The video warns that most 'cleaning hacks' people try on their air fryer actually scratch the non-stick coating and do more damage than the grease they were meant to remove.",
+       "problem": "The same trap exists for Fusion's governed knowledge graph: a quick manual edit written straight into Neo4j or Directus to fix something fast bypasses the governed ingestion pipeline (Cairn intake to compiler) and scratches the canonical 'coating' — the SSOT guarantee that every fact lives in exactly one governed place.",
+       "implication": "It looks like a harmless shortcut in the moment, but it seeds a small permanent scratch — a fact now out of sync with its source of truth — that gets worse every time the same shortcut gets reached for again.",
+       "need_payoff": "Treat any direct/manual write to the graph or Directus store as an abrasive hack by default: route fixes back through the governed pipeline, or explicitly flag and track the scratch so it doesn't silently compound."
+      },
+      "source_evidence": {
+       "quote": "There are tons of cleaning hacks out there, but keep in mind that most will do more harm than good.",
+       "timestamp": "00:00",
+       "named_mechanism": "well-intentioned shortcut that damages the protective surface it was meant to help"
+      },
+      "transfer_reasoning": "Inverted assumption: 'a quick fix is harmless because it solves the immediate problem.' The video shows the opposite — the fix itself is the damage vector because it acts on a surface (non-stick coating) that needs a specific, gentler process. Fusion's SSOT-governed graph is exactly this kind of surface: it needs to be written to only through its designed pipeline, not patched directly.",
+      "fusion_target": "Neo4j knowledge graph / Directus canonical store — manual writes bypassing the LightRAG governed ingestion pipeline",
+      "category": "brain",
+      "lens": "inversion — the fix-shortcut is itself the failure mode",
+      "nvfi": {
+       "novelty": 4,
+       "viability": 3,
+       "fit": 4,
+       "impact": 4
+      },
+      "traps": [
+       {
+        "type": "manufactured risk",
+        "note": "No confirmed instance yet of a manual Neo4j/Directus write bypassing the governed pipeline on this repo — this is a preventive pattern from the analogy, not an observed incident."
+       }
+      ],
+      "_frame": "F2-inversion"
+     },
+     {
+      "spin": {
+       "situation": "Even cooking something as basic as French fries leaves the air fryer greasy, because the heat circulates that grease around the whole unit — routine, mundane use is what actually causes the buildup, not the occasional messy recipe.",
+       "problem": "Fusion's routine, low-effort captures — an ordinary YouTube transcript via TubeAIR, a quick journal note via Penn — are the 'French fries' of the Brain: individually trivial, but their residue circulates through the one shared graph with every ingestion, same as heat circulating grease through the whole fryer.",
+       "implication": "Nobody budgets cleaning time for 'just fries', so graph drift from routine, everyday captures accumulates invisibly while attention stays fixed on the big, obviously messy imports instead.",
+       "need_payoff": "Build a periodic graph-quality re-validation pass sized for cumulative routine drift, not only triggered by flagged large or messy imports."
+      },
+      "source_evidence": {
+       "quote": "remember that heating even basic French fries can leave your air fryer greasy. The heat from the air fryer circulates that grease all around.",
+       "timestamp": "00:00",
+       "named_mechanism": "routine normal-use residue circulating through the whole system, not just the messy edge cases"
+      },
+      "transfer_reasoning": "Inverted assumption: 'only the obviously messy/complex inputs create maintenance burden.' The video shows routine, low-stakes use is the actual driver of systemic residue because the same circulation mechanism touches everything, big or small. Fusion's Brain ingests routine low-effort captures through the identical shared pipeline as any other source, so the same circulation logic applies to graph drift.",
+      "fusion_target": "LightRAG->Neo4j Brain ingestion pipeline fed by routine Gateway/TubeAIR/Penn captures",
+      "category": "brain",
+      "lens": "inversion — mundane routine use, not the messy edge case, drives systemic residue",
+      "nvfi": {
+       "novelty": 3,
+       "viability": 3,
+       "fit": 4,
+       "impact": 3
+      },
+      "traps": [
+       {
+        "type": "needs evidence",
+        "note": "No measurement yet that routine low-effort captures degrade graph quality more than occasional large imports do — this is borrowed from the analogy's mechanism, not from actual graph metrics."
+       }
+      ],
+      "_frame": "F2-inversion"
+     }
+    ],
+    "zero_reason": null
+   },
+   {
+    "frame": "F3-operational",
+    "discarded_obvious": [
+     "wipe down the outside with a microfiber cloth -> generic 'keep things tidy' housekeeping (already standard, no specific leverage)",
+     "soak the basket in soapy water -> generic 'restart/reset a stuck process' (too generic to be a real transfer)",
+     "air fryers are non-stick, don't scrub hard -> 'be careful with fragile subsystems' (already covered by SSOT/write-discipline rules)"
+    ],
+    "candidates": [
+     {
+      "spin": {
+       "situation": "Larry already flagged that cockpit.build and cockpit.overall_state are stale (last touched 2026-07-22) because updating them is a manual afterthought nobody remembers to do.",
+       "problem": "The video's cleaning routine covers the basket and the outside every time, but the part most people skip is the heating element -- the hidden component that actually causes problems, and you only find out how bad it got once someone shows you.",
+       "implication": "Fusion's self-model tables are the 'heating element': not part of the obvious day-to-day loop, so they quietly go stale and Larry ends up reasoning from an outdated picture of what's actually built.",
+       "need_payoff": "Fire the self-model refresh automatically on every merge/build event -- the 'clean after every use' cadence -- instead of leaving it as a manual step that gets forgotten."
+      },
+      "source_evidence": {
+       "quote": "Cleaning around the heating element. This is what it looks like if you don't routinely clean it.",
+       "timestamp": "00:00",
+       "named_mechanism": "the routinely-skipped hidden component"
+      },
+      "transfer_reasoning": "RECOGNISE: routine cleaning has a visible layer (basket, outside) everyone does and a hidden layer (heating element) everyone skips, and skipping it is what actually degrades the machine. ANALOGISE: Fusion's self-model (cockpit.build, cockpit.overall_state) is the hidden layer -- not touched by normal day-to-day work, only updated when someone remembers. TRANSFER: bind the update to the event that dirties it (a merge/build, i.e. 'a use') rather than to memory or a calendar, the same invariant as 'clean after every use' applied specifically to the part people forget.",
+      "fusion_target": "cockpit.build / cockpit.overall_state self-model refresh, triggered post-merge",
+      "category": "brain",
+      "lens": "hidden-component maintenance",
+      "nvfi": {
+       "novelty": 3,
+       "viability": 4,
+       "fit": 5,
+       "impact": 4
+      },
+      "traps": [
+       {
+        "type": "scope-creep",
+        "note": "keep this to a lightweight post-merge hook that touches the two known-stale tables -- do not let it grow into a new monitoring/observability platform (the BUILD-014 platform-instead-of-slice mistake)."
+       }
+      ],
+      "_frame": "F3-operational"
+     },
+     {
+      "spin": {
+       "situation": "Bulk or noisy imports -- a big playlist, a large journal migration -- are the 'messy recipes' of Fusion's ingestion pipeline.",
+       "problem": "The video's fix for messy recipes isn't a better post-hoc scrub, it's a liner that catches the mess before it touches the pan: cleanup becomes 'throw the sheet away', not 'scrub baked-on grease out of the basket'.",
+       "implication": "If a bulk/noisy capture writes straight into the live Neo4j graph, every messy batch means de-duplicating and correcting the actual graph afterwards -- the harder cleanup the video is telling people to avoid.",
+       "need_payoff": "Check whether high-volume imports already land in a staging/quarantine table before merging into the live graph; if not, add that liner so a bad batch is a delete, not a graph repair."
+      },
+      "source_evidence": {
+       "quote": "For really messy recipes, grab some perforated air fryer parchment sheet.",
+       "timestamp": "00:00",
+       "named_mechanism": "a preventive liner for known-messy jobs"
+      },
+      "transfer_reasoning": "RECOGNISE: for jobs known in advance to be messy, the fix is a disposable barrier placed before the mess happens, not a stronger cleaning method after. ANALOGISE: Fusion already knows in advance which capture paths are high-volume/noisy (bulk imports, playlist ingests) -- the equivalent of 'messy recipes'. TRANSFER: route those known-messy paths through a staging layer first so the live graph is never directly dirtied, mirroring the liner rather than a bigger scrub brush.",
+      "fusion_target": "Neo4j/LightRAG ingestion staging layer for bulk/high-volume capture paths (WS-002 / Silas import route)",
+      "category": "brain",
+      "lens": "preventive liner vs. post-hoc scrub",
+      "nvfi": {
+       "novelty": 3,
+       "viability": 3,
+       "fit": 3,
+       "impact": 3
+      },
+      "traps": [
+       {
+        "type": "needs-evidence",
+        "note": "unverified whether bulk imports already stage before touching the live graph -- confirm the current WS-002/Silas path before proposing this as new work."
+       }
+      ],
+      "_frame": "F3-operational"
+     }
+    ],
+    "zero_reason": null
+   },
+   {
+    "frame": "F4-commercial",
+    "discarded_obvious": [
+     "Fusion enters the home-appliance cleaning-content or accessory-retail market — no connection to any Fusion component, purely surface-level topic match",
+     "Sell air fryer cleaning kits/parchment sheets as a dropship product — generic e-commerce idea with no structural link to a named Fusion mechanism, would be manufactured not transferred"
+    ],
+    "candidates": [],
+    "zero_reason": "Source is generic consumer-appliance maintenance content (air fryer cleaning routine). RECOGNISE surfaced only domain-specific mechanisms — baking-soda paste, heating-element neglect, parchment liners — none of which carry an invariant that maps onto any named Fusion component (Brain, Outputs Layer, Cockpit, Gateway, AsdAIr, Tower) or onto an external buyer/beneficiary Fusion could serve. Forcing a 'sell maintenance tips/accessories' analogy would be a manufactured mapping, not a structural transfer, so per MUST-HOLD(2) it is correctly killed. No cash-frame survivors this pass."
+   },
+   {
+    "frame": "F5-crossdomain",
+    "discarded_obvious": [
+     "Wipe exterior with microfiber cloth → trivial 'keep the surface tidy' mapping, no structural distance.",
+     "True/false quiz cold-open → standard content-marketing engagement hook, not distinctive under harsh self-kill.",
+     "'Clean after every use' framed generally → generic 'do regular maintenance', names no specific mechanism.",
+     "Perforated parchment sheets for recipes known in advance to be messy → the differential-triage idea (quarantine only predicted-messy sources) is undercut by the source's own next beat, that plain routine use fouls everything anyway; superseded by the routine-use candidate below rather than run in parallel.",
+     "Non-stick coating constrains cleaning method to non-abrasive only → maps to 'respect immutability, don't scrub the audit log hard', already covered by existing write-discipline governance — not novel.",
+     "Heating element is the step users skip because it's hidden behind the visible basket → 'audit the internals, not just the UI' is a standard software-maintenance truism, fails the distance bar."
+    ],
+    "candidates": [
+     {
+      "spin": {
+       "situation": "Warwick's knowledge graph is actively tended, so from the inside it never looks broken.",
+       "problem": "That means there's no shape for 'starting to rot' to compare against — Larry only knows decay by definition, not by pattern, until it's already visibly bad.",
+       "implication": "By the time decay shows up in the real graph it's already tangled and expensive to unpick, exactly like the borrowed air fryer's heating element.",
+       "need_payoff": "Deliberately let a small throwaway slice of the graph decay on purpose, and use it as a reference pattern so Larry can spot early rot in the real one before it compounds."
+      },
+      "source_evidence": {
+       "quote": "I borrowed a friend to show you just how bad it can get.",
+       "timestamp": "00:00",
+       "named_mechanism": "external-degraded-reference-standard"
+      },
+      "transfer_reasoning": "A system that is actively kept clean cannot show you what 'dirty' looks like from the inside — the video needed an external, deliberately neglected unit to demonstrate decay; a maintained knowledge graph has the same blind spot, so decay-recognition needs a synthetic degraded reference, not more staring at the healthy graph.",
+      "fusion_target": "Neo4j graph decay/drift-detection heuristic (Brain hygiene monitoring)",
+      "category": "brain",
+      "lens": "self-blindness-in-maintained-systems",
+      "nvfi": {
+       "novelty": 8,
+       "viability": 5,
+       "fit": 6,
+       "impact": 6
+      },
+      "traps": [
+       {
+        "type": "unfalsifiable-baseline",
+        "note": "a synthetic decay fixture is only useful if validated against real historical decay patterns — otherwise it's just guessing what 'bad' looks like."
+       },
+       {
+        "type": "cost",
+        "note": "building and maintaining a deliberately-rotten reference copy is itself upkeep overhead that could go stale too."
+       }
+      ],
+      "_frame": "F5-crossdomain"
+     },
+     {
+      "spin": {
+       "situation": "Even the most basic, harmless-looking use — plain fries — leaves the whole air fryer greasy.",
+       "problem": "That's because the same hot air that cooks the food also circulates the residue everywhere; the mess isn't caused by extreme use, it's caused by the ordinary operating mechanism itself.",
+       "implication": "If Fusion only runs deep hygiene passes after 'messy' events (bulk imports, migrations), the everyday small stuff — a routine journal entry, a plain Telegram note — could still be quietly foul the whole graph between those passes, via whatever mechanism touches the whole graph on every ingest.",
+       "need_payoff": "Schedule baseline whole-graph hygiene on a fixed cadence regardless of how clean recent inputs looked, instead of triggering it only off perceived-messy events."
+      },
+      "source_evidence": {
+       "quote": "Heating even basic French fries can leave your air fryer greasy. The heat from the air fryer circulates that grease all around.",
+       "timestamp": "00:00",
+       "named_mechanism": "circulating-byproduct-of-core-mechanism"
+      },
+      "transfer_reasoning": "The fouling here doesn't come from extreme inputs but from the ordinary operating mechanism (circulating hot air) touching the whole unit on every routine use; if any Fusion process similarly touches the whole graph on every ingest (e.g. re-embedding or re-clustering), it will foul the whole graph on 'boring' inputs too — so a hygiene trigger keyed to 'was this input messy' misses the actual fouling pathway.",
+      "fusion_target": "Brain/Neo4j hygiene-pass trigger logic (when dedup/audit runs)",
+      "category": "brain",
+      "lens": "routine-operation-still-fouls-the-whole-system",
+      "nvfi": {
+       "novelty": 6,
+       "viability": 6,
+       "fit": 6,
+       "impact": 6
+      },
+      "traps": [
+       {
+        "type": "needs-evidence",
+        "note": "this assumes Fusion's ingestion pipeline actually has a global-touch property (e.g. re-embedding reaching unrelated nodes); if ingestion is genuinely localized/incremental, the transfer collapses — verify the mechanism before acting."
+       },
+       {
+        "type": "already-doing-it?",
+        "note": "if a fixed-cadence hygiene pass already exists independent of import size, this is redundant — check current LightRAG/Neo4j maintenance schedule first."
+       }
+      ],
+      "_frame": "F5-crossdomain"
+     }
+    ],
+    "zero_reason": null
+   }
+  ],
+  "enriched": [
+   {
+    "spin": {
+     "situation": "Every source that gets ingested into the Brain passes through one specific step: entity extraction and merge, the part of the pipeline that actually turns raw text into graph nodes.",
+     "problem": "That's exactly the stage where mess collects - duplicate entities, uncertain merges, contradiction flags - but none of it shows up if you just browse the graph normally, same as grease you'd never see just by glancing at a clean-looking basket.",
+     "implication": "Left unchecked, the buildup sits at one concentrated point and quietly degrades everything downstream that reads from the graph (Outputs Layer, Cockpit surfacing) without ever throwing an obvious error.",
+     "need_payoff": "A recurring, narrowly-targeted audit of just the extraction/merge stage - not a full graph review - would catch it early, the same way the video says to specifically check around the heating element instead of only wiping the basket."
+    },
+    "source_evidence": {
+     "quote": "Cleaning around the heating element. This is what it looks like if you don't routinely clean it.",
+     "timestamp": "00:00",
+     "named_mechanism": "targeted inspection of the core active component, distinct from routine surface cleaning"
+    },
+    "transfer_reasoning": "Invariant: in a system with one central transformation point, that point accumulates a byproduct of its own operation - not from misuse - and the byproduct is invisible to normal-mode inspection, only found by looking directly at that component. The air fryer's basket-wash is the graph's normal browsing; the heating-element check is the entity-extraction/merge audit. Same shape: general upkeep misses the one place actual transformation happens.",
+    "fusion_target": "Brain compiler's LightRAG->Neo4j entity-extraction/merge stage (the step ObsidiWikAi's WP1.5 lens-conditioning already touches)",
+    "category": "brain",
+    "lens": "mechanism/structural",
+    "nvfi": {
+     "novelty": 3,
+     "viability": 4,
+     "fit": 4,
+     "impact": 4
+    },
+    "traps": [
+     {
+      "type": "scope-creep",
+      "note": "keep this a thin recurring spot-check, not a new governance platform - echoes the BUILD-014 lesson about building the machine instead of the thing"
+     },
+     {
+      "type": "evidence-needed",
+      "note": "unverified - needs Silas or Pax to confirm the extraction/merge stage currently lacks any targeted audit before this is built"
+     }
+    ],
+    "_frame": "F1-mechanism",
+    "frame": "F1-mechanism",
+    "_graph": {
+     "fired": [
+      "novelty_to_graph"
+     ],
+     "not_wired_today": [
+      "prior_rejection/duplication (needs idea_candidate history join)",
+      "recurrence footprint (corpus too thin — ~5 docs)",
+      "recency/trajectory (single ingest window)"
+     ],
+     "novelty_to_graph": {
+      "status": "known_or_partial",
+      "nearest": [
+       "Documen Core",
+       "Core Data"
+      ]
+     }
+    }
+   },
+   {
+    "spin": {
+     "situation": "The air fryer's hot-air circulation is exactly what cooks the food well - and it's also exactly what carries grease to every surface inside, not just where the food sat.",
+     "problem": "In the Brain, relation-propagation and similarity-linking is exactly what makes the graph valuable (connecting facts across separate sources) - but it's that same connective mechanism that can carry a bad or duplicate entity out to everything it links to, not just the one ingest it came from.",
+     "implication": "A single messy source doesn't stay contained to its own node - the very mechanism that makes the Brain useful is the one that fans mess out network-wide, so a small ingest error can surface far from where it entered.",
+     "need_payoff": "The already-authorised Neo4j graph-signal audit should explicitly test propagation paths - trace where contamination could fan out along relation/similarity edges - not just check individual nodes in isolation."
+    },
+    "source_evidence": {
+     "quote": "The heat from the air fryer circulates that grease all around.",
+     "timestamp": "00:00",
+     "named_mechanism": "the value-producing mechanism (circulation) is also the contamination-spreading mechanism"
+    },
+    "transfer_reasoning": "Invariant: when one mechanism is responsible both for the system's core value and for distributing its byproducts, contamination is never localized to the input point - it travels wherever the value-producing mechanism reaches. Grease travels wherever hot air reaches; a bad entity travels wherever relation-propagation/similarity-matching reaches. This reframes graph-signal auditing from per-node checks to path-tracing.",
+    "fusion_target": "Neo4j graph-signal audit (delegated 06c8974) - relation-propagation and similarity-edge logic in the Brain compiler",
+    "category": "brain",
+    "lens": "mechanism/structural",
+    "nvfi": {
+     "novelty": 3,
+     "viability": 3,
+     "fit": 4,
+     "impact": 4
+    },
+    "traps": [
+     {
+      "type": "duplication-risk",
+      "note": "may already sit inside the delegated graph-signal audit's scope - check that report before spinning up new work"
+     },
+     {
+      "type": "unfalsifiable-as-stated",
+      "note": "no concrete evidence yet that a bad ingest has actually propagated this way - treat as a hypothesis to test, not a confirmed defect"
+     }
+    ],
+    "_frame": "F1-mechanism",
+    "frame": "F1-mechanism",
+    "_graph": {
+     "fired": [
+      "novelty_to_graph"
+     ],
+     "not_wired_today": [
+      "prior_rejection/duplication (needs idea_candidate history join)",
+      "recurrence footprint (corpus too thin — ~5 docs)",
+      "recency/trajectory (single ingest window)"
+     ],
+     "novelty_to_graph": {
+      "status": "novel_to_graph",
+      "nearest": []
+     }
+    }
+   },
+   {
+    "spin": {
+     "situation": "For recipes known to run messy, the fix isn't to scrub harder afterward - it's to lay a perforated liner down first, so the mess never touches the actual cooking surface.",
+     "problem": "Known-messy sources (raw YouTube transcripts, voice memos) currently go straight into ingestion, and any cleanup of duplicates or junk entities happens only after they've already touched the graph.",
+     "implication": "Cleaning up after the fact is costlier and riskier than catching it before entry - residue baked onto a bare heating element is much harder to remove than residue caught on a liner, and the same is true for junk that's already merged into the graph versus junk caught before it ever gets there.",
+     "need_payoff": "A cheap, optional pre-ingestion normalization pass at the Gateway - applied only to source types already known to be messy - before they reach the Brain's extraction stage."
+    },
+    "source_evidence": {
+     "quote": "For really messy recipes, grab some perforated air fryer parchment sheet.",
+     "timestamp": "00:00",
+     "named_mechanism": "a disposable liner intercepts mess before it reaches the core surface, used selectively by mess-level of the input"
+    },
+    "transfer_reasoning": "Invariant: when you already know in advance which inputs will be messy, intercepting the mess at the boundary with a cheap disposable layer is structurally cheaper than cleaning the core mechanism after contact. TubeAIR's no-LLM transcript cleanup is the closest existing precedent - this generalizes that same 'liner-before-core' shape to other known-messy source types at the Gateway.",
+    "fusion_target": "Gateway ingestion path - a pre-LightRAG normalization pass applied only to known-messy source types (raw transcripts, voice notes) before they reach the Brain's extraction stage",
+    "category": "brain",
+    "lens": "mechanism/structural",
+    "nvfi": {
+     "novelty": 2,
+     "viability": 4,
+     "fit": 4,
+     "impact": 3
+    },
+    "traps": [
+     {
+      "type": "scope-creep",
+      "note": "must stay a thin optional pre-filter for specific source types, not a general new ingestion layer"
+     },
+     {
+      "type": "already-partial",
+      "note": "TubeAIR already does exactly this for YouTube - confirm whether this is genuinely new ground or just extending an existing pattern to other source types"
+     }
+    ],
+    "_frame": "F1-mechanism",
+    "frame": "F1-mechanism",
+    "_graph": {
+     "fired": [
+      "novelty_to_graph"
+     ],
+     "not_wired_today": [
+      "prior_rejection/duplication (needs idea_candidate history join)",
+      "recurrence footprint (corpus too thin — ~5 docs)",
+      "recency/trajectory (single ingest window)"
+     ],
+     "novelty_to_graph": {
+      "status": "known_or_partial",
+      "nearest": [
+       "Message",
+       "Messaging Platform",
+       "Slack Message"
+      ]
+     }
+    }
+   },
+   {
+    "spin": {
+     "situation": "Most people only ever clean the part of the air fryer they can see — the basket — and never touch the heating element hidden underneath, until a friend's unit shows just how bad the buildup gets back there.",
+     "problem": "Fusion has the same blind spot: attention goes to the visible surface (Cockpit screens, dashboards) while the low-level tables that describe the system to itself — cockpit.build, cockpit.overall_state, and Larry's own working context across compaction/restart — go unlooked-at until they're badly out of date.",
+     "implication": "By the time anyone notices, the system has quietly been running on a stale picture of itself, the same way that friend's air fryer looked fine from the outside while crusted around the element.",
+     "need_payoff": "A recurring 'check behind the element' pass — a scheduled look at hidden self-model state, not just the visible surface — catches this before it compounds into decisions made on stale self-knowledge."
+    },
+    "source_evidence": {
+     "quote": "here is a step most people skip. Cleaning around the heating element. This is what it looks like if you don't routinely clean it. I borrowed a friend to show you just how bad it can get.",
+     "timestamp": "00:00",
+     "named_mechanism": "neglected-because-invisible component silently accumulating damage"
+    },
+    "transfer_reasoning": "The video's invariant is: the component hardest to see gets the least maintenance and the worst decay, precisely because looking fine at the surface hides it. Fusion's self-model tables (cockpit.build, cockpit.overall_state) and Larry's cross-session context are structurally the same kind of component — internal, load-bearing, and invisible during normal use.",
+    "fusion_target": "cockpit.build / cockpit.overall_state self-model tables + Larry's cross-compaction context store",
+    "category": "brain",
+    "lens": "inversion — hidden component decays invisibly while the visible surface looks fine",
+    "nvfi": {
+     "novelty": 3,
+     "viability": 4,
+     "fit": 5,
+     "impact": 4
+    },
+    "traps": [
+     {
+      "type": "needs evidence",
+      "note": "Assumes stale self-model tables actually degrade Larry's decisions rather than being only cosmetically stale — unverified without checking what currently reads from those tables."
+     }
+    ],
+    "_frame": "F2-inversion",
+    "frame": "F2-inversion",
+    "_graph": {
+     "fired": [
+      "novelty_to_graph",
+      "related_active_problem"
+     ],
+     "not_wired_today": [
+      "prior_rejection/duplication (needs idea_candidate history join)",
+      "recurrence footprint (corpus too thin — ~5 docs)",
+      "recency/trajectory (single ingest window)"
+     ],
+     "novelty_to_graph": {
+      "status": "novel_to_graph",
+      "nearest": []
+     },
+     "related_active_problem": [
+      "cockpit",
+      "build",
+      "overall"
+     ]
+    }
+   },
+   {
+    "spin": {
+     "situation": "The video warns that most 'cleaning hacks' people try on their air fryer actually scratch the non-stick coating and do more damage than the grease they were meant to remove.",
+     "problem": "The same trap exists for Fusion's governed knowledge graph: a quick manual edit written straight into Neo4j or Directus to fix something fast bypasses the governed ingestion pipeline (Cairn intake to compiler) and scratches the canonical 'coating' — the SSOT guarantee that every fact lives in exactly one governed place.",
+     "implication": "It looks like a harmless shortcut in the moment, but it seeds a small permanent scratch — a fact now out of sync with its source of truth — that gets worse every time the same shortcut gets reached for again.",
+     "need_payoff": "Treat any direct/manual write to the graph or Directus store as an abrasive hack by default: route fixes back through the governed pipeline, or explicitly flag and track the scratch so it doesn't silently compound."
+    },
+    "source_evidence": {
+     "quote": "There are tons of cleaning hacks out there, but keep in mind that most will do more harm than good.",
+     "timestamp": "00:00",
+     "named_mechanism": "well-intentioned shortcut that damages the protective surface it was meant to help"
+    },
+    "transfer_reasoning": "Inverted assumption: 'a quick fix is harmless because it solves the immediate problem.' The video shows the opposite — the fix itself is the damage vector because it acts on a surface (non-stick coating) that needs a specific, gentler process. Fusion's SSOT-governed graph is exactly this kind of surface: it needs to be written to only through its designed pipeline, not patched directly.",
+    "fusion_target": "Neo4j knowledge graph / Directus canonical store — manual writes bypassing the LightRAG governed ingestion pipeline",
+    "category": "brain",
+    "lens": "inversion — the fix-shortcut is itself the failure mode",
+    "nvfi": {
+     "novelty": 4,
+     "viability": 3,
+     "fit": 4,
+     "impact": 4
+    },
+    "traps": [
+     {
+      "type": "manufactured risk",
+      "note": "No confirmed instance yet of a manual Neo4j/Directus write bypassing the governed pipeline on this repo — this is a preventive pattern from the analogy, not an observed incident."
+     }
+    ],
+    "_frame": "F2-inversion",
+    "frame": "F2-inversion",
+    "_graph": {
+     "fired": [
+      "novelty_to_graph",
+      "related_active_problem"
+     ],
+     "not_wired_today": [
+      "prior_rejection/duplication (needs idea_candidate history join)",
+      "recurrence footprint (corpus too thin — ~5 docs)",
+      "recency/trajectory (single ingest window)"
+     ],
+     "novelty_to_graph": {
+      "status": "novel_to_graph",
+      "nearest": []
+     },
+     "related_active_problem": [
+      "knowledge",
+      "Directus"
+     ]
+    }
+   },
+   {
+    "spin": {
+     "situation": "Even cooking something as basic as French fries leaves the air fryer greasy, because the heat circulates that grease around the whole unit — routine, mundane use is what actually causes the buildup, not the occasional messy recipe.",
+     "problem": "Fusion's routine, low-effort captures — an ordinary YouTube transcript via TubeAIR, a quick journal note via Penn — are the 'French fries' of the Brain: individually trivial, but their residue circulates through the one shared graph with every ingestion, same as heat circulating grease through the whole fryer.",
+     "implication": "Nobody budgets cleaning time for 'just fries', so graph drift from routine, everyday captures accumulates invisibly while attention stays fixed on the big, obviously messy imports instead.",
+     "need_payoff": "Build a periodic graph-quality re-validation pass sized for cumulative routine drift, not only triggered by flagged large or messy imports."
+    },
+    "source_evidence": {
+     "quote": "remember that heating even basic French fries can leave your air fryer greasy. The heat from the air fryer circulates that grease all around.",
+     "timestamp": "00:00",
+     "named_mechanism": "routine normal-use residue circulating through the whole system, not just the messy edge cases"
+    },
+    "transfer_reasoning": "Inverted assumption: 'only the obviously messy/complex inputs create maintenance burden.' The video shows routine, low-stakes use is the actual driver of systemic residue because the same circulation mechanism touches everything, big or small. Fusion's Brain ingests routine low-effort captures through the identical shared pipeline as any other source, so the same circulation logic applies to graph drift.",
+    "fusion_target": "LightRAG->Neo4j Brain ingestion pipeline fed by routine Gateway/TubeAIR/Penn captures",
+    "category": "brain",
+    "lens": "inversion — mundane routine use, not the messy edge case, drives systemic residue",
+    "nvfi": {
+     "novelty": 3,
+     "viability": 3,
+     "fit": 4,
+     "impact": 3
+    },
+    "traps": [
+     {
+      "type": "needs evidence",
+      "note": "No measurement yet that routine low-effort captures degrade graph quality more than occasional large imports do — this is borrowed from the analogy's mechanism, not from actual graph metrics."
+     }
+    ],
+    "_frame": "F2-inversion",
+    "frame": "F2-inversion",
+    "_graph": {
+     "fired": [
+      "novelty_to_graph"
+     ],
+     "not_wired_today": [
+      "prior_rejection/duplication (needs idea_candidate history join)",
+      "recurrence footprint (corpus too thin — ~5 docs)",
+      "recency/trajectory (single ingest window)"
+     ],
+     "novelty_to_graph": {
+      "status": "novel_to_graph",
+      "nearest": []
+     }
+    }
+   },
+   {
+    "spin": {
+     "situation": "Larry already flagged that cockpit.build and cockpit.overall_state are stale (last touched 2026-07-22) because updating them is a manual afterthought nobody remembers to do.",
+     "problem": "The video's cleaning routine covers the basket and the outside every time, but the part most people skip is the heating element -- the hidden component that actually causes problems, and you only find out how bad it got once someone shows you.",
+     "implication": "Fusion's self-model tables are the 'heating element': not part of the obvious day-to-day loop, so they quietly go stale and Larry ends up reasoning from an outdated picture of what's actually built.",
+     "need_payoff": "Fire the self-model refresh automatically on every merge/build event -- the 'clean after every use' cadence -- instead of leaving it as a manual step that gets forgotten."
+    },
+    "source_evidence": {
+     "quote": "Cleaning around the heating element. This is what it looks like if you don't routinely clean it.",
+     "timestamp": "00:00",
+     "named_mechanism": "the routinely-skipped hidden component"
+    },
+    "transfer_reasoning": "RECOGNISE: routine cleaning has a visible layer (basket, outside) everyone does and a hidden layer (heating element) everyone skips, and skipping it is what actually degrades the machine. ANALOGISE: Fusion's self-model (cockpit.build, cockpit.overall_state) is the hidden layer -- not touched by normal day-to-day work, only updated when someone remembers. TRANSFER: bind the update to the event that dirties it (a merge/build, i.e. 'a use') rather than to memory or a calendar, the same invariant as 'clean after every use' applied specifically to the part people forget.",
+    "fusion_target": "cockpit.build / cockpit.overall_state self-model refresh, triggered post-merge",
+    "category": "brain",
+    "lens": "hidden-component maintenance",
+    "nvfi": {
+     "novelty": 3,
+     "viability": 4,
+     "fit": 5,
+     "impact": 4
+    },
+    "traps": [
+     {
+      "type": "scope-creep",
+      "note": "keep this to a lightweight post-merge hook that touches the two known-stale tables -- do not let it grow into a new monitoring/observability platform (the BUILD-014 platform-instead-of-slice mistake)."
+     }
+    ],
+    "_frame": "F3-operational",
+    "frame": "F3-operational",
+    "_graph": {
+     "fired": [
+      "novelty_to_graph",
+      "related_active_problem"
+     ],
+     "not_wired_today": [
+      "prior_rejection/duplication (needs idea_candidate history join)",
+      "recurrence footprint (corpus too thin — ~5 docs)",
+      "recency/trajectory (single ingest window)"
+     ],
+     "novelty_to_graph": {
+      "status": "known_or_partial",
+      "nearest": [
+       "Hidden Insights"
+      ]
+     },
+     "related_active_problem": [
+      "cockpit",
+      "build",
+      "overall"
+     ]
+    }
+   },
+   {
+    "spin": {
+     "situation": "Bulk or noisy imports -- a big playlist, a large journal migration -- are the 'messy recipes' of Fusion's ingestion pipeline.",
+     "problem": "The video's fix for messy recipes isn't a better post-hoc scrub, it's a liner that catches the mess before it touches the pan: cleanup becomes 'throw the sheet away', not 'scrub baked-on grease out of the basket'.",
+     "implication": "If a bulk/noisy capture writes straight into the live Neo4j graph, every messy batch means de-duplicating and correcting the actual graph afterwards -- the harder cleanup the video is telling people to avoid.",
+     "need_payoff": "Check whether high-volume imports already land in a staging/quarantine table before merging into the live graph; if not, add that liner so a bad batch is a delete, not a graph repair."
+    },
+    "source_evidence": {
+     "quote": "For really messy recipes, grab some perforated air fryer parchment sheet.",
+     "timestamp": "00:00",
+     "named_mechanism": "a preventive liner for known-messy jobs"
+    },
+    "transfer_reasoning": "RECOGNISE: for jobs known in advance to be messy, the fix is a disposable barrier placed before the mess happens, not a stronger cleaning method after. ANALOGISE: Fusion already knows in advance which capture paths are high-volume/noisy (bulk imports, playlist ingests) -- the equivalent of 'messy recipes'. TRANSFER: route those known-messy paths through a staging layer first so the live graph is never directly dirtied, mirroring the liner rather than a bigger scrub brush.",
+    "fusion_target": "Neo4j/LightRAG ingestion staging layer for bulk/high-volume capture paths (WS-002 / Silas import route)",
+    "category": "brain",
+    "lens": "preventive liner vs. post-hoc scrub",
+    "nvfi": {
+     "novelty": 3,
+     "viability": 3,
+     "fit": 3,
+     "impact": 3
+    },
+    "traps": [
+     {
+      "type": "needs-evidence",
+      "note": "unverified whether bulk imports already stage before touching the live graph -- confirm the current WS-002/Silas path before proposing this as new work."
+     }
+    ],
+    "_frame": "F3-operational",
+    "frame": "F3-operational",
+    "_graph": {
+     "fired": [
+      "novelty_to_graph"
+     ],
+     "not_wired_today": [
+      "prior_rejection/duplication (needs idea_candidate history join)",
+      "recurrence footprint (corpus too thin — ~5 docs)",
+      "recency/trajectory (single ingest window)"
+     ],
+     "novelty_to_graph": {
+      "status": "novel_to_graph",
+      "nearest": []
+     }
+    }
+   },
+   {
+    "spin": {
+     "situation": "Warwick's knowledge graph is actively tended, so from the inside it never looks broken.",
+     "problem": "That means there's no shape for 'starting to rot' to compare against — Larry only knows decay by definition, not by pattern, until it's already visibly bad.",
+     "implication": "By the time decay shows up in the real graph it's already tangled and expensive to unpick, exactly like the borrowed air fryer's heating element.",
+     "need_payoff": "Deliberately let a small throwaway slice of the graph decay on purpose, and use it as a reference pattern so Larry can spot early rot in the real one before it compounds."
+    },
+    "source_evidence": {
+     "quote": "I borrowed a friend to show you just how bad it can get.",
+     "timestamp": "00:00",
+     "named_mechanism": "external-degraded-reference-standard"
+    },
+    "transfer_reasoning": "A system that is actively kept clean cannot show you what 'dirty' looks like from the inside — the video needed an external, deliberately neglected unit to demonstrate decay; a maintained knowledge graph has the same blind spot, so decay-recognition needs a synthetic degraded reference, not more staring at the healthy graph.",
+    "fusion_target": "Neo4j graph decay/drift-detection heuristic (Brain hygiene monitoring)",
+    "category": "brain",
+    "lens": "self-blindness-in-maintained-systems",
+    "nvfi": {
+     "novelty": 8,
+     "viability": 5,
+     "fit": 6,
+     "impact": 6
+    },
+    "traps": [
+     {
+      "type": "unfalsifiable-baseline",
+      "note": "a synthetic decay fixture is only useful if validated against real historical decay patterns — otherwise it's just guessing what 'bad' looks like."
+     },
+     {
+      "type": "cost",
+      "note": "building and maintaining a deliberately-rotten reference copy is itself upkeep overhead that could go stale too."
+     }
+    ],
+    "_frame": "F5-crossdomain",
+    "frame": "F5-crossdomain",
+    "_graph": {
+     "fired": [
+      "novelty_to_graph"
+     ],
+     "not_wired_today": [
+      "prior_rejection/duplication (needs idea_candidate history join)",
+      "recurrence footprint (corpus too thin — ~5 docs)",
+      "recency/trajectory (single ingest window)"
+     ],
+     "novelty_to_graph": {
+      "status": "known_or_partial",
+      "nearest": [
+       "External APIs",
+       "Preferences",
+       "Referenced Flag",
+       "Cross Reference",
+       "Standard Pipeline"
+      ]
+     }
+    }
+   },
+   {
+    "spin": {
+     "situation": "Even the most basic, harmless-looking use — plain fries — leaves the whole air fryer greasy.",
+     "problem": "That's because the same hot air that cooks the food also circulates the residue everywhere; the mess isn't caused by extreme use, it's caused by the ordinary operating mechanism itself.",
+     "implication": "If Fusion only runs deep hygiene passes after 'messy' events (bulk imports, migrations), the everyday small stuff — a routine journal entry, a plain Telegram note — could still be quietly foul the whole graph between those passes, via whatever mechanism touches the whole graph on every ingest.",
+     "need_payoff": "Schedule baseline whole-graph hygiene on a fixed cadence regardless of how clean recent inputs looked, instead of triggering it only off perceived-messy events."
+    },
+    "source_evidence": {
+     "quote": "Heating even basic French fries can leave your air fryer greasy. The heat from the air fryer circulates that grease all around.",
+     "timestamp": "00:00",
+     "named_mechanism": "circulating-byproduct-of-core-mechanism"
+    },
+    "transfer_reasoning": "The fouling here doesn't come from extreme inputs but from the ordinary operating mechanism (circulating hot air) touching the whole unit on every routine use; if any Fusion process similarly touches the whole graph on every ingest (e.g. re-embedding or re-clustering), it will foul the whole graph on 'boring' inputs too — so a hygiene trigger keyed to 'was this input messy' misses the actual fouling pathway.",
+    "fusion_target": "Brain/Neo4j hygiene-pass trigger logic (when dedup/audit runs)",
+    "category": "brain",
+    "lens": "routine-operation-still-fouls-the-whole-system",
+    "nvfi": {
+     "novelty": 6,
+     "viability": 6,
+     "fit": 6,
+     "impact": 6
+    },
+    "traps": [
+     {
+      "type": "needs-evidence",
+      "note": "this assumes Fusion's ingestion pipeline actually has a global-touch property (e.g. re-embedding reaching unrelated nodes); if ingestion is genuinely localized/incremental, the transfer collapses — verify the mechanism before acting."
+     },
+     {
+      "type": "already-doing-it?",
+      "note": "if a fixed-cadence hygiene pass already exists independent of import size, this is redundant — check current LightRAG/Neo4j maintenance schedule first."
+     }
+    ],
+    "_frame": "F5-crossdomain",
+    "frame": "F5-crossdomain",
+    "_graph": {
+     "fired": [
+      "novelty_to_graph",
+      "related_active_problem"
+     ],
+     "not_wired_today": [
+      "prior_rejection/duplication (needs idea_candidate history join)",
+      "recurrence footprint (corpus too thin — ~5 docs)",
+      "recency/trajectory (single ingest window)"
+     ],
+     "novelty_to_graph": {
+      "status": "known_or_partial",
+      "nearest": [
+       "Documen Core",
+       "Core Data"
+      ]
+     },
+     "related_active_problem": [
+      "pass"
+     ]
+    }
+   }
+  ],
+  "convCall": {
+   "label": "convergence",
+   "ok": true,
+   "resultText": "{\"kept\":[\n  {\"spin\":{\"situation\":\"Every source that gets ingested into the Brain passes through one specific step: entity extraction and merge, the part of the pipeline that actually turns raw text into graph nodes.\",\"problem\":\"That's exactly the stage where mess collects - duplicate entities, uncertain merges, contradiction flags - but none of it shows up if you just browse the graph normally, same as grease you'd never see just by glancing at a clean-looking basket.\",\"implication\":\"Left unchecked, the buildup sits at one concentrated point and quietly degrades everything downstream that reads from the graph (Outputs Layer, Cockpit surfacing) without ever throwing an obvious error.\",\"need_payoff\":\"A recurring, narrowly-targeted audit of just the extraction/merge stage - not a full graph review - would catch it early, the same way you'd specifically check around the heating element instead of only wiping the basket.\"},\n   \"source_evidence\":{\"quote\":\"Cleaning around the heating element. This is what it looks like if you don't routinely clean it.\",\"timestamp\":\"00:00\",\"named_mechanism\":\"targeted inspection of the core active component, distinct from routine surface cleaning\"},\n   \"transfer_reasoning\":\"Invariant: in a system with one central transformation point, that point accumulates a byproduct of its own operation - not from misuse - and the byproduct is invisible to normal-mode inspection, only found by looking directly at that component. General upkeep misses the one place actual transformation happens, so the fix is a narrow, recurring check aimed at that single stage rather than a broader sweep.\",\"fusion_target\":\"Brain compiler's LightRAG->Neo4j entity-extraction/merge stage (the step ObsidiWikAi's WP1.5 lens-conditioning already touches)\",\"category\":\"brain\",\"lens\":\"mechanism-structural: central transformation point accumulates invisible byproduct\",\n   \"nvfi\":{\"novelty\":2,\"viability\":4,\"fit\":4,\"impact\":4},\n   \"contributing_frames\":[\"F1-mechanism\"],\"convergence_type\":\"single_frame\",\n   \"graph_note\":\"Nearest graph neighbors are generic 'Documen Core'/'Core Data' nodes, not a close prior match - treat as largely novel but corpus is thin (~5 docs), so confidence is provisional.\",\"conflict_with\":null,\"forced_analogy\":false,\n   \"traps\":[{\"type\":\"scope-creep\",\"note\":\"keep this a thin recurring spot-check, not a new governance platform - echoes the BUILD-014 lesson about building the machine instead of the thing\"},{\"type\":\"evidence-needed\",\"note\":\"unverified - needs confirmation the extraction/merge stage currently lacks any targeted audit before this is built\"}]},\n\n  {\"spin\":{\"situation\":\"The Brain's hot-air circulation is exactly what makes the graph valuable - relation-propagation and similarity-linking connect facts across separate sources.\",\"problem\":\"That same connective mechanism can carry a bad or duplicate entity out to everything it links to, not just the one ingest it came from.\",\"implication\":\"A single messy source doesn't stay contained to its own node - the very mechanism that makes the Brain useful is the one that fans mess out network-wide, so a small ingest error can surface far from where it entered.\",\"need_payoff\":\"Graph-signal auditing should explicitly trace propagation paths along relation/similarity edges, not just check individual nodes in isolation.\"},\n   \"source_evidence\":{\"quote\":\"The heat from the air fryer circulates that grease all around.\",\"timestamp\":\"00:00\",\"named_mechanism\":\"the value-producing mechanism (circulation) is also the contamination-spreading mechanism\"},\n   \"transfer_reasoning\":\"Invariant: when one mechanism is responsible both for a system's core value and for distributing its byproducts, contamination is never localized to the input point - it travels wherever the value-producing mechanism reaches. A bad entity travels wherever relation-propagation/similarity-matching reaches, which reframes graph-signal auditing from per-node checks to path-tracing.\",\"fusion_target\":\"Neo4j graph-signal audit - relation-propagation and similarity-edge logic in the Brain compiler\",\"category\":\"brain\",\"lens\":\"mechanism-structural: value-mechanism doubles as contamination-spreading mechanism\",\n   \"nvfi\":{\"novelty\":4,\"viability\":3,\"fit\":4,\"impact\":4},\n   \"contributing_frames\":[\"F1-mechanism\"],\"convergence_type\":\"single_frame\",\n   \"graph_note\":\"No similar nodes found in the graph (novel_to_graph) - strengthens novelty. Worth checking against the already-delegated Neo4j graph-signal audit (commit 06c8974) before treating this as new scope; it may already be in-flight.\",\"conflict_with\":null,\"forced_analogy\":false,\n   \"traps\":[{\"type\":\"duplication-risk\",\"note\":\"may already sit inside the delegated graph-signal audit's scope - check that report before spinning up new work\"},{\"type\":\"unfalsifiable-as-stated\",\"note\":\"no concrete evidence yet that a bad ingest has actually propagated this way - treat as a hypothesis to test, not a confirmed defect\"}]},\n\n  {\"spin\":{\"situation\":\"Some inputs to the Brain are known in advance to be messy - raw YouTube transcripts, voice notes, and large bulk imports - while most content flows in clean.\",\"problem\":\"Cleanup for these known-messy paths currently happens only after the fact, once duplicates and junk have already merged into the live graph, instead of being intercepted before they ever touch it.\",\"implication\":\"Cleaning up after the mess has already merged into the graph is far more expensive and riskier than catching it at the door - once junk is baked into relations and merges, unpicking it is much harder than filtering it on the way in.\",\"need_payoff\":\"A cheap, selective pre-ingestion interception layer - applied only to source types already known to run messy - sits between capture and the live graph, catching mess before it ever reaches the core.\"},\n   \"source_evidence\":{\"quote\":\"For really messy recipes, grab some perforated air fryer parchment sheet.\",\"timestamp\":\"00:00\",\"named_mechanism\":\"a disposable liner intercepts mess before it reaches the core surface, used selectively by mess-level of the input\"},\n   \"transfer_reasoning\":\"Invariant: when you already know in advance which inputs will run messy, intercepting the mess at the boundary with a cheap, selective barrier is structurally cheaper than cleaning the core mechanism after contact. That applies twice here: at the Gateway, known-messy source types (raw transcripts, voice notes) can be normalized before they reach the Brain's extraction stage; and for known-messy volume patterns (bulk/high-volume imports), the same liner logic argues for a staging layer before merge into the live graph, so a bad batch is a delete, not a graph repair. Existing no-LLM transcript cleanup for YouTube sources is the closest working precedent for the first case.\",\"fusion_target\":\"Pre-ingestion staging/normalization for known-messy input paths: Gateway-side normalization for raw transcripts/voice notes before they reach the Brain's extraction stage, plus a staging/quarantine layer for bulk/high-volume imports (WS-002/Silas route) before merge into the live graph\",\"category\":\"brain\",\"lens\":\"mechanism-structural: liner-before-core interception for known-messy inputs\",\n   \"nvfi\":{\"novelty\":2,\"viability\":4,\"fit\":4,\"impact\":4},\n   \"contributing_frames\":[\"F1-mechanism\",\"F3-operational\"],\"convergence_type\":\"context_induced\",\n   \"graph_note\":\"Graph shows only loose matches ('Message'/'Messaging Platform'/'Slack Message' nodes) - not a strong prior for this specific staging pattern. Confirm the current WS-002/Silas bulk-import path before building - it may already stage before touching the live graph.\",\"conflict_with\":null,\"forced_analogy\":false,\n   \"traps\":[{\"type\":\"scope-creep\",\"note\":\"must stay a thin optional pre-filter, not a new general ingestion layer - echoes the BUILD-014 platform-instead-of-slice mistake\"},{\"type\":\"already-partial\",\"note\":\"YouTube transcript cleanup already does this for one source type - confirm whether extending to others is genuinely new ground\"},{\"type\":\"needs-evidence\",\"note\":\"unverified whether bulk imports already stage before touching the live graph\"}]},\n\n  {\"spin\":{\"situation\":\"Larry's own self-model tables - cockpit.build and cockpit.overall_state - sit outside the normal day-to-day work loop, so nobody is naturally in them the way they're naturally in the Cockpit's visible screens.\",\"problem\":\"These tables have already gone stale (last touched 2026-07-22) because updating them is a manual afterthought that's easy to forget, while attention stays on the visible surface.\",\"implication\":\"By the time anyone notices, Larry has been reasoning from an outdated picture of what's actually built - the same way a hidden, un-cleaned component quietly gets worse while everything visible still looks fine.\",\"need_payoff\":\"Bind the self-model refresh to the event that makes it stale - a merge or build - so it fires automatically every time, rather than depending on someone remembering to run a periodic check.\"},\n   \"source_evidence\":{\"quote\":\"Cleaning around the heating element. This is what it looks like if you don't routinely clean it. I borrowed a friend to show you just how bad it can get.\",\"timestamp\":\"00:00\",\"named_mechanism\":\"neglected-because-invisible component silently accumulating damage, routinely skipped\"},\n   \"transfer_reasoning\":\"Invariant: the component hardest to see gets the least maintenance and the worst decay, precisely because looking fine at the surface hides it. The self-model tables (cockpit.build, cockpit.overall_state) and cross-compaction context are structurally the same kind of component - internal, load-bearing, invisible during normal use. The fix is to bind their refresh to the event that dirties them (a merge or build) rather than to memory or a calendar, so the hidden layer gets the same 'clean after every use' treatment the visible layer already gets.\",\"fusion_target\":\"cockpit.build / cockpit.overall_state self-model tables (plus cross-compaction context store) - refreshed automatically on every merge/build event rather than manually\",\"category\":\"brain\",\"lens\":\"inversion: hidden load-bearing component decays invisibly while the visible surface looks fine\",\n   \"nvfi\":{\"novelty\":3,\"viability\":5,\"fit\":5,\"impact\":5},\n   \"contributing_frames\":[\"F2-inversion\",\"F3-operational\"],\"convergence_type\":\"context_induced\",\n   \"graph_note\":\"Graph independently flags this as a related active problem (cockpit/build/overall) - this isn't hypothetical, it corroborates a real, already-known staleness issue, which is why viability/impact confidence is raised here.\",\"conflict_with\":null,\"forced_analogy\":false,\n   \"traps\":[{\"type\":\"scope-creep\",\"note\":\"keep this a lightweight post-merge hook touching the two known-stale tables, not a new monitoring/observability platform - the BUILD-014 mistake\"},{\"type\":\"needs-evidence\",\"note\":\"confirm stale tables actually degrade decisions rather than being only cosmetically stale, by checking what currently reads from them\"}]},\n\n  {\"spin\":{\"situation\":\"There are plenty of quick cleaning hacks that promise a fast fix but actually scratch the surface they're meant to help.\",\"problem\":\"The same trap exists for Fusion's governed knowledge graph: a quick manual edit written straight into Neo4j or Directus to fix something fast bypasses the governed ingestion pipeline and scratches the canonical guarantee that every fact lives in exactly one governed place.\",\"implication\":\"It looks like a harmless shortcut in the moment, but it seeds a small permanent scratch - a fact now out of sync with its source of truth - that gets worse every time the same shortcut gets reached for again.\",\"need_payoff\":\"Treat any direct/manual write to the graph or Directus store as an abrasive hack by default: route fixes back through the governed pipeline, or explicitly flag and track the scratch so it doesn't silently compound.\"},\n   \"source_evidence\":{\"quote\":\"There are tons of cleaning hacks out there, but keep in mind that most will do more harm than good.\",\"timestamp\":\"00:00\",\"named_mechanism\":\"well-intentioned shortcut that damages the protective surface it was meant to help\"},\n   \"transfer_reasoning\":\"Inverted assumption: 'a quick fix is harmless because it solves the immediate problem.' In fact the fix itself is the damage vector because it acts on a surface that needs a specific, gentler process. The governed graph/store is exactly this kind of surface: it needs to be written to only through its designed pipeline, not patched directly.\",\"fusion_target\":\"Neo4j knowledge graph / Directus canonical store - manual writes bypassing the governed ingestion pipeline\",\"category\":\"brain\",\"lens\":\"inversion: the fix-shortcut is itself the failure mode\",\n   \"nvfi\":{\"novelty\":4,\"viability\":3,\"fit\":4,\"impact\":4},\n   \"contributing_frames\":[\"F2-inversion\"],\"convergence_type\":\"single_frame\",\n   \"graph_note\":\"Graph flags this as touching a related active problem area (knowledge/Directus) - raises relevance even though only one frame surfaced it; still needs a confirmed instance before treating as an active defect rather than a preventive pattern.\",\"conflict_with\":null,\"forced_analogy\":false,\n   \"traps\":[{\"type\":\"manufactured-risk\",\"note\":\"no confirmed instance yet of a manual Neo4j/Directus write bypassing the governed pipeline on this repo - this is a preventive pattern from the analogy, not an observed incident\"}]},\n\n  {\"spin\":{\"situation\":\"Every routine capture into the Brain - an ordinary YouTube transcript, a quick journal note - passes through the same shared ingestion mechanism as any large or obviously messy import.\",\"problem\":\"If graph hygiene passes only trigger off perceived-messy events (bulk imports, migrations), the ordinary day-to-day captures can still quietly foul the graph between those passes, because whatever mechanism touches the whole graph on ingest (re-embedding, re-clustering) touches it on every input, big or small.\",\"implication\":\"Nobody budgets cleanup time for 'just a routine note', so drift from everyday captures accumulates invisibly while attention stays fixed on the big, obviously messy imports instead.\",\"need_payoff\":\"Run graph hygiene on a fixed cadence regardless of how clean recent inputs looked, rather than triggering it only off perceived-messy events - sized for cumulative routine drift, not just flagged large imports.\"},\n   \"source_evidence\":{\"quote\":\"Remember that heating even basic French fries can leave your air fryer greasy. The heat from the air fryer circulates that grease all around.\",\"timestamp\":\"00:00\",\"named_mechanism\":\"routine normal-use residue circulating through the whole system via the same mechanism that produces its value\"},\n   \"transfer_reasoning\":\"Invariant: fouling here doesn't come from extreme inputs but from the ordinary operating mechanism touching the whole system on every routine use. If any Brain process similarly touches the whole graph on every ingest, it will foul the whole graph on routine, low-effort captures just as much as on big imports - so a hygiene trigger keyed to 'was this input messy' misses the actual fouling pathway. The fix is a hygiene pass on a fixed cadence, independent of perceived import size.\",\"fusion_target\":\"Brain/Neo4j hygiene-pass trigger logic - moving from messy-event-triggered to fixed-cadence, to catch drift from routine everyday captures as well as bulk imports\",\"category\":\"brain\",\"lens\":\"inversion: routine operation, not the messy edge case, drives systemic residue\",\n   \"nvfi\":{\"novelty\":3,\"viability\":5,\"fit\":5,\"impact\":5},\n   \"contributing_frames\":[\"F2-inversion\",\"F5-crossdomain\"],\"convergence_type\":\"context_induced\",\n   \"graph_note\":\"One contributing pass flagged a weak 'related_active_problem' hit on the generic string 'pass' - too thin to count as corroboration. Otherwise novel_to_graph with no strong prior; treat the cadence question as open rather than already decided.\",\"conflict_with\":null,\"forced_analogy\":false,\n   \"traps\":[{\"type\":\"needs-evidence\",\"note\":\"assumes the ingestion pipeline has a global-touch property (e.g. re-embedding reaching unrelated nodes); if ingestion is genuinely localized/incremental the transfer collapses - verify the mechanism before acting\"},{\"type\":\"already-doing-it\",\"note\":\"if a fixed-cadence hygiene pass independent of import size already exists, this is redundant - check the current maintenance schedule first\"}]}\n],\n \"killed\":[\n  {\"fusion_target\":\"Neo4j graph decay/drift-detection heuristic via a deliberately-neglected synthetic reference graph\",\"frames\":[\"F5-crossdomain\"],\"reason\":\"The source borrowed a friend's degraded unit purely as a demonstration device - because a decayed sample wasn't otherwise available to film - not because a decayed reference is technically necessary to recognize decay. Under cross-examination, decay signals in a knowledge graph (duplicate entities, orphaned edges, contradiction flags) are already directly definable and measurable without building and maintaining a synthetic rotten twin; the 'need a degraded reference standard' mechanism is a demo-production artifact, not a transferable technical invariant.\",\"forced_analogy\":true}\n ],\n \"conflicts\":[],\n \"convergence_summary\":\"Six candidates survive. Three are context-induced convergences - a pre-ingestion staging/liner pattern for known-messy inputs (two frames, different specific paths: Gateway transcripts/voice vs. bulk-import staging), a cockpit self-model staleness fix (two frames, complementary mechanisms - periodic check vs. merge-triggered auto-refresh - independently confirmed by a related-active-problem graph flag), and a shift from messy-event-triggered to fixed-cadence graph hygiene (two frames converging on the same cadence fix from different mechanistic routes). Three are single-frame findings worth keeping on individual merit: a targeted entity-extraction/merge audit, a propagation-path-tracing extension to the already-delegated Neo4j graph-signal audit, and a preventive pattern against manual Neo4j/Directus writes bypassing governed ingestion (also graph-corroborated as touching a live problem area). One candidate - a deliberately-decayed reference-graph fixture - was killed as a forced analogy: it mistakes a video's demo device for a technical necessity. No direct opposite-recommendation conflicts were found among the surviving candidates.\"}",
+   "duration_ms": 248594,
+   "cost_usd": 0.6524181,
+   "payload_input_est": 7697,
+   "output": 23786,
+   "cache_creation": 44387,
+   "cache_read": 97647
+  },
+  "conv": {
+   "kept": [
+    {
+     "spin": {
+      "situation": "Every source that gets ingested into the Brain passes through one specific step: entity extraction and merge, the part of the pipeline that actually turns raw text into graph nodes.",
+      "problem": "That's exactly the stage where mess collects - duplicate entities, uncertain merges, contradiction flags - but none of it shows up if you just browse the graph normally, same as grease you'd never see just by glancing at a clean-looking basket.",
+      "implication": "Left unchecked, the buildup sits at one concentrated point and quietly degrades everything downstream that reads from the graph (Outputs Layer, Cockpit surfacing) without ever throwing an obvious error.",
+      "need_payoff": "A recurring, narrowly-targeted audit of just the extraction/merge stage - not a full graph review - would catch it early, the same way you'd specifically check around the heating element instead of only wiping the basket."
+     },
+     "source_evidence": {
+      "quote": "Cleaning around the heating element. This is what it looks like if you don't routinely clean it.",
+      "timestamp": "00:00",
+      "named_mechanism": "targeted inspection of the core active component, distinct from routine surface cleaning"
+     },
+     "transfer_reasoning": "Invariant: in a system with one central transformation point, that point accumulates a byproduct of its own operation - not from misuse - and the byproduct is invisible to normal-mode inspection, only found by looking directly at that component. General upkeep misses the one place actual transformation happens, so the fix is a narrow, recurring check aimed at that single stage rather than a broader sweep.",
+     "fusion_target": "Brain compiler's LightRAG->Neo4j entity-extraction/merge stage (the step ObsidiWikAi's WP1.5 lens-conditioning already touches)",
+     "category": "brain",
+     "lens": "mechanism-structural: central transformation point accumulates invisible byproduct",
+     "nvfi": {
+      "novelty": 2,
+      "viability": 4,
+      "fit": 4,
+      "impact": 4
+     },
+     "contributing_frames": [
+      "F1-mechanism"
+     ],
+     "convergence_type": "single_frame",
+     "graph_note": "Nearest graph neighbors are generic 'Documen Core'/'Core Data' nodes, not a close prior match - treat as largely novel but corpus is thin (~5 docs), so confidence is provisional.",
+     "conflict_with": null,
+     "forced_analogy": false,
+     "traps": [
+      {
+       "type": "scope-creep",
+       "note": "keep this a thin recurring spot-check, not a new governance platform - echoes the BUILD-014 lesson about building the machine instead of the thing"
+      },
+      {
+       "type": "evidence-needed",
+       "note": "unverified - needs confirmation the extraction/merge stage currently lacks any targeted audit before this is built"
+      }
+     ]
+    },
+    {
+     "spin": {
+      "situation": "The Brain's hot-air circulation is exactly what makes the graph valuable - relation-propagation and similarity-linking connect facts across separate sources.",
+      "problem": "That same connective mechanism can carry a bad or duplicate entity out to everything it links to, not just the one ingest it came from.",
+      "implication": "A single messy source doesn't stay contained to its own node - the very mechanism that makes the Brain useful is the one that fans mess out network-wide, so a small ingest error can surface far from where it entered.",
+      "need_payoff": "Graph-signal auditing should explicitly trace propagation paths along relation/similarity edges, not just check individual nodes in isolation."
+     },
+     "source_evidence": {
+      "quote": "The heat from the air fryer circulates that grease all around.",
+      "timestamp": "00:00",
+      "named_mechanism": "the value-producing mechanism (circulation) is also the contamination-spreading mechanism"
+     },
+     "transfer_reasoning": "Invariant: when one mechanism is responsible both for a system's core value and for distributing its byproducts, contamination is never localized to the input point - it travels wherever the value-producing mechanism reaches. A bad entity travels wherever relation-propagation/similarity-matching reaches, which reframes graph-signal auditing from per-node checks to path-tracing.",
+     "fusion_target": "Neo4j graph-signal audit - relation-propagation and similarity-edge logic in the Brain compiler",
+     "category": "brain",
+     "lens": "mechanism-structural: value-mechanism doubles as contamination-spreading mechanism",
+     "nvfi": {
+      "novelty": 4,
+      "viability": 3,
+      "fit": 4,
+      "impact": 4
+     },
+     "contributing_frames": [
+      "F1-mechanism"
+     ],
+     "convergence_type": "single_frame",
+     "graph_note": "No similar nodes found in the graph (novel_to_graph) - strengthens novelty. Worth checking against the already-delegated Neo4j graph-signal audit (commit 06c8974) before treating this as new scope; it may already be in-flight.",
+     "conflict_with": null,
+     "forced_analogy": false,
+     "traps": [
+      {
+       "type": "duplication-risk",
+       "note": "may already sit inside the delegated graph-signal audit's scope - check that report before spinning up new work"
+      },
+      {
+       "type": "unfalsifiable-as-stated",
+       "note": "no concrete evidence yet that a bad ingest has actually propagated this way - treat as a hypothesis to test, not a confirmed defect"
+      }
+     ]
+    },
+    {
+     "spin": {
+      "situation": "Some inputs to the Brain are known in advance to be messy - raw YouTube transcripts, voice notes, and large bulk imports - while most content flows in clean.",
+      "problem": "Cleanup for these known-messy paths currently happens only after the fact, once duplicates and junk have already merged into the live graph, instead of being intercepted before they ever touch it.",
+      "implication": "Cleaning up after the mess has already merged into the graph is far more expensive and riskier than catching it at the door - once junk is baked into relations and merges, unpicking it is much harder than filtering it on the way in.",
+      "need_payoff": "A cheap, selective pre-ingestion interception layer - applied only to source types already known to run messy - sits between capture and the live graph, catching mess before it ever reaches the core."
+     },
+     "source_evidence": {
+      "quote": "For really messy recipes, grab some perforated air fryer parchment sheet.",
+      "timestamp": "00:00",
+      "named_mechanism": "a disposable liner intercepts mess before it reaches the core surface, used selectively by mess-level of the input"
+     },
+     "transfer_reasoning": "Invariant: when you already know in advance which inputs will run messy, intercepting the mess at the boundary with a cheap, selective barrier is structurally cheaper than cleaning the core mechanism after contact. That applies twice here: at the Gateway, known-messy source types (raw transcripts, voice notes) can be normalized before they reach the Brain's extraction stage; and for known-messy volume patterns (bulk/high-volume imports), the same liner logic argues for a staging layer before merge into the live graph, so a bad batch is a delete, not a graph repair. Existing no-LLM transcript cleanup for YouTube sources is the closest working precedent for the first case.",
+     "fusion_target": "Pre-ingestion staging/normalization for known-messy input paths: Gateway-side normalization for raw transcripts/voice notes before they reach the Brain's extraction stage, plus a staging/quarantine layer for bulk/high-volume imports (WS-002/Silas route) before merge into the live graph",
+     "category": "brain",
+     "lens": "mechanism-structural: liner-before-core interception for known-messy inputs",
+     "nvfi": {
+      "novelty": 2,
+      "viability": 4,
+      "fit": 4,
+      "impact": 4
+     },
+     "contributing_frames": [
+      "F1-mechanism",
+      "F3-operational"
+     ],
+     "convergence_type": "context_induced",
+     "graph_note": "Graph shows only loose matches ('Message'/'Messaging Platform'/'Slack Message' nodes) - not a strong prior for this specific staging pattern. Confirm the current WS-002/Silas bulk-import path before building - it may already stage before touching the live graph.",
+     "conflict_with": null,
+     "forced_analogy": false,
+     "traps": [
+      {
+       "type": "scope-creep",
+       "note": "must stay a thin optional pre-filter, not a new general ingestion layer - echoes the BUILD-014 platform-instead-of-slice mistake"
+      },
+      {
+       "type": "already-partial",
+       "note": "YouTube transcript cleanup already does this for one source type - confirm whether extending to others is genuinely new ground"
+      },
+      {
+       "type": "needs-evidence",
+       "note": "unverified whether bulk imports already stage before touching the live graph"
+      }
+     ]
+    },
+    {
+     "spin": {
+      "situation": "Larry's own self-model tables - cockpit.build and cockpit.overall_state - sit outside the normal day-to-day work loop, so nobody is naturally in them the way they're naturally in the Cockpit's visible screens.",
+      "problem": "These tables have already gone stale (last touched 2026-07-22) because updating them is a manual afterthought that's easy to forget, while attention stays on the visible surface.",
+      "implication": "By the time anyone notices, Larry has been reasoning from an outdated picture of what's actually built - the same way a hidden, un-cleaned component quietly gets worse while everything visible still looks fine.",
+      "need_payoff": "Bind the self-model refresh to the event that makes it stale - a merge or build - so it fires automatically every time, rather than depending on someone remembering to run a periodic check."
+     },
+     "source_evidence": {
+      "quote": "Cleaning around the heating element. This is what it looks like if you don't routinely clean it. I borrowed a friend to show you just how bad it can get.",
+      "timestamp": "00:00",
+      "named_mechanism": "neglected-because-invisible component silently accumulating damage, routinely skipped"
+     },
+     "transfer_reasoning": "Invariant: the component hardest to see gets the least maintenance and the worst decay, precisely because looking fine at the surface hides it. The self-model tables (cockpit.build, cockpit.overall_state) and cross-compaction context are structurally the same kind of component - internal, load-bearing, invisible during normal use. The fix is to bind their refresh to the event that dirties them (a merge or build) rather than to memory or a calendar, so the hidden layer gets the same 'clean after every use' treatment the visible layer already gets.",
+     "fusion_target": "cockpit.build / cockpit.overall_state self-model tables (plus cross-compaction context store) - refreshed automatically on every merge/build event rather than manually",
+     "category": "brain",
+     "lens": "inversion: hidden load-bearing component decays invisibly while the visible surface looks fine",
+     "nvfi": {
+      "novelty": 3,
+      "viability": 5,
+      "fit": 5,
+      "impact": 5
+     },
+     "contributing_frames": [
+      "F2-inversion",
+      "F3-operational"
+     ],
+     "convergence_type": "context_induced",
+     "graph_note": "Graph independently flags this as a related active problem (cockpit/build/overall) - this isn't hypothetical, it corroborates a real, already-known staleness issue, which is why viability/impact confidence is raised here.",
+     "conflict_with": null,
+     "forced_analogy": false,
+     "traps": [
+      {
+       "type": "scope-creep",
+       "note": "keep this a lightweight post-merge hook touching the two known-stale tables, not a new monitoring/observability platform - the BUILD-014 mistake"
+      },
+      {
+       "type": "needs-evidence",
+       "note": "confirm stale tables actually degrade decisions rather than being only cosmetically stale, by checking what currently reads from them"
+      }
+     ]
+    },
+    {
+     "spin": {
+      "situation": "There are plenty of quick cleaning hacks that promise a fast fix but actually scratch the surface they're meant to help.",
+      "problem": "The same trap exists for Fusion's governed knowledge graph: a quick manual edit written straight into Neo4j or Directus to fix something fast bypasses the governed ingestion pipeline and scratches the canonical guarantee that every fact lives in exactly one governed place.",
+      "implication": "It looks like a harmless shortcut in the moment, but it seeds a small permanent scratch - a fact now out of sync with its source of truth - that gets worse every time the same shortcut gets reached for again.",
+      "need_payoff": "Treat any direct/manual write to the graph or Directus store as an abrasive hack by default: route fixes back through the governed pipeline, or explicitly flag and track the scratch so it doesn't silently compound."
+     },
+     "source_evidence": {
+      "quote": "There are tons of cleaning hacks out there, but keep in mind that most will do more harm than good.",
+      "timestamp": "00:00",
+      "named_mechanism": "well-intentioned shortcut that damages the protective surface it was meant to help"
+     },
+     "transfer_reasoning": "Inverted assumption: 'a quick fix is harmless because it solves the immediate problem.' In fact the fix itself is the damage vector because it acts on a surface that needs a specific, gentler process. The governed graph/store is exactly this kind of surface: it needs to be written to only through its designed pipeline, not patched directly.",
+     "fusion_target": "Neo4j knowledge graph / Directus canonical store - manual writes bypassing the governed ingestion pipeline",
+     "category": "brain",
+     "lens": "inversion: the fix-shortcut is itself the failure mode",
+     "nvfi": {
+      "novelty": 4,
+      "viability": 3,
+      "fit": 4,
+      "impact": 4
+     },
+     "contributing_frames": [
+      "F2-inversion"
+     ],
+     "convergence_type": "single_frame",
+     "graph_note": "Graph flags this as touching a related active problem area (knowledge/Directus) - raises relevance even though only one frame surfaced it; still needs a confirmed instance before treating as an active defect rather than a preventive pattern.",
+     "conflict_with": null,
+     "forced_analogy": false,
+     "traps": [
+      {
+       "type": "manufactured-risk",
+       "note": "no confirmed instance yet of a manual Neo4j/Directus write bypassing the governed pipeline on this repo - this is a preventive pattern from the analogy, not an observed incident"
+      }
+     ]
+    },
+    {
+     "spin": {
+      "situation": "Every routine capture into the Brain - an ordinary YouTube transcript, a quick journal note - passes through the same shared ingestion mechanism as any large or obviously messy import.",
+      "problem": "If graph hygiene passes only trigger off perceived-messy events (bulk imports, migrations), the ordinary day-to-day captures can still quietly foul the graph between those passes, because whatever mechanism touches the whole graph on ingest (re-embedding, re-clustering) touches it on every input, big or small.",
+      "implication": "Nobody budgets cleanup time for 'just a routine note', so drift from everyday captures accumulates invisibly while attention stays fixed on the big, obviously messy imports instead.",
+      "need_payoff": "Run graph hygiene on a fixed cadence regardless of how clean recent inputs looked, rather than triggering it only off perceived-messy events - sized for cumulative routine drift, not just flagged large imports."
+     },
+     "source_evidence": {
+      "quote": "Remember that heating even basic French fries can leave your air fryer greasy. The heat from the air fryer circulates that grease all around.",
+      "timestamp": "00:00",
+      "named_mechanism": "routine normal-use residue circulating through the whole system via the same mechanism that produces its value"
+     },
+     "transfer_reasoning": "Invariant: fouling here doesn't come from extreme inputs but from the ordinary operating mechanism touching the whole system on every routine use. If any Brain process similarly touches the whole graph on every ingest, it will foul the whole graph on routine, low-effort captures just as much as on big imports - so a hygiene trigger keyed to 'was this input messy' misses the actual fouling pathway. The fix is a hygiene pass on a fixed cadence, independent of perceived import size.",
+     "fusion_target": "Brain/Neo4j hygiene-pass trigger logic - moving from messy-event-triggered to fixed-cadence, to catch drift from routine everyday captures as well as bulk imports",
+     "category": "brain",
+     "lens": "inversion: routine operation, not the messy edge case, drives systemic residue",
+     "nvfi": {
+      "novelty": 3,
+      "viability": 5,
+      "fit": 5,
+      "impact": 5
+     },
+     "contributing_frames": [
+      "F2-inversion",
+      "F5-crossdomain"
+     ],
+     "convergence_type": "context_induced",
+     "graph_note": "One contributing pass flagged a weak 'related_active_problem' hit on the generic string 'pass' - too thin to count as corroboration. Otherwise novel_to_graph with no strong prior; treat the cadence question as open rather than already decided.",
+     "conflict_with": null,
+     "forced_analogy": false,
+     "traps": [
+      {
+       "type": "needs-evidence",
+       "note": "assumes the ingestion pipeline has a global-touch property (e.g. re-embedding reaching unrelated nodes); if ingestion is genuinely localized/incremental the transfer collapses - verify the mechanism before acting"
+      },
+      {
+       "type": "already-doing-it",
+       "note": "if a fixed-cadence hygiene pass independent of import size already exists, this is redundant - check the current maintenance schedule first"
+      }
+     ]
+    }
+   ],
+   "killed": [
+    {
+     "fusion_target": "Neo4j graph decay/drift-detection heuristic via a deliberately-neglected synthetic reference graph",
+     "frames": [
+      "F5-crossdomain"
+     ],
+     "reason": "The source borrowed a friend's degraded unit purely as a demonstration device - because a decayed sample wasn't otherwise available to film - not because a decayed reference is technically necessary to recognize decay. Under cross-examination, decay signals in a knowledge graph (duplicate entities, orphaned edges, contradiction flags) are already directly definable and measurable without building and maintaining a synthetic rotten twin; the 'need a degraded reference standard' mechanism is a demo-production artifact, not a transferable technical invariant.",
+     "forced_analogy": true
+    }
+   ],
+   "conflicts": [],
+   "convergence_summary": "Six candidates survive. Three are context-induced convergences - a pre-ingestion staging/liner pattern for known-messy inputs (two frames, different specific paths: Gateway transcripts/voice vs. bulk-import staging), a cockpit self-model staleness fix (two frames, complementary mechanisms - periodic check vs. merge-triggered auto-refresh - independently confirmed by a related-active-problem graph flag), and a shift from messy-event-triggered to fixed-cadence graph hygiene (two frames converging on the same cadence fix from different mechanistic routes). Three are single-frame findings worth keeping on individual merit: a targeted entity-extraction/merge audit, a propagation-path-tracing extension to the already-delegated Neo4j graph-signal audit, and a preventive pattern against manual Neo4j/Directus writes bypassing governed ingestion (also graph-corroborated as touching a live problem area). One candidate - a deliberately-decayed reference-graph fixture - was killed as a forced analogy: it mistakes a video's demo device for a technical necessity. No direct opposite-recommendation conflicts were found among the surviving candidates."
+  },
+  "branchWallMs": 249426
+ }
+}

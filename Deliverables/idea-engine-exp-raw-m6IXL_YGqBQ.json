@@ -1,0 +1,1734 @@
+{
+ "fixture": {
+  "n": 1,
+  "id": "m6IXL_YGqBQ",
+  "label": "AI-agent skill (ADHD)",
+  "cls": "rich, same-domain positive"
+ },
+ "t1": {
+  "call": {
+   "label": "T1",
+   "ok": true,
+   "resultText": "{\"mine_id\":\"4a1122d8-b4d1-4bee-9d7c-64240a60efab\",\"brief_hash\":\"ef98acbac5ab8996\",\"discarded_obvious\":[\"Fusion's idea-engine (Transfer-Intelligence specialist + Critic scoring N/V/F+traps) is already the tree-of-thought/frame/critic pattern this video describes — noting the resemblance isn't a transfer, it's recognising our own architecture reflected back.\",\"Install the trending ADHD-tree skill itself for general Fusion brainstorming — that's tool-adoption, not a mechanism transferred into a named component.\",\"Make the critic persona harsher/more adversarial across all Fusion reviews ('skeptical senior engineer, hard on everything') — already covered by Fable/adversarial critic, and actively conflicts with the standing hobby-brain 'QA not pentest' bar rather than adding anything.\"],\"candidates\":[{\"spin\":{\"situation\":\"Right now the idea engine has multiple cost tiers (T1 fast/cheap, T2 deeper multi-angle), and you're mid-experiment on exactly this — the T1vsT2-experiment files and t2-calibrate.mjs sitting in your working tree right now are you trying to nail down when each tier should fire.\",\"problem\":\"The trigger for 'go expensive' is still being calibrated case-by-case rather than run through a named, reusable rule decided BEFORE the expensive pass starts.\",\"implication\":\"Without a cheap gate up front, you either burn tokens running the deep multi-frame tier on requests that only ever had one sensible answer, or you under-use it on things that genuinely needed the deeper pass — and you're spending your own attention eyeballing each call instead of the gate deciding it.\",\"need_payoff\":\"A three-question pre-check — is there more than one reasonable answer here, are the stakes actually high if the obvious answer is wrong, and did Warwick's own phrasing signal 'quick/standard' — run before fan-out gives the live T1-vs-T2 calibration a concrete, testable heuristic instead of a vibe.\"},\"source_evidence\":{\"quote\":\"would someone experienced have a few different answers that all work here or just one right answer... would it genuinely cost you something if the obvious answer turned out to be the wrong one... If you used words like quick or standard, you're clearly after the straightforward answer, so it stops there\",\"timestamp\":\"[06:01]-[06:27]\",\"named_mechanism\":\"three-question pre-check gate run before expensive multi-agent fan-out\"},\"transfer_reasoning\":\"The video's skill spins up five isolated agents (expensive) only after a cheap three-question filter decides the fan-out is worth it. Fusion's idea-engine has the identical expensive/cheap tier shape (T1 vs T2) but is calibrating the boundary empirically, case by case, rather than via a named rule. Transferring the specific rule — especially the phrasing-signal check, which is the least obvious of the three — gives the live calibration effort a candidate heuristic to test against its frozen fixtures.\",\"fusion_target\":\"services/control-plane/cockpit/t2-calibrate.mjs (T1-vs-T2 tier-selection gate in the idea engine)\",\"category\":\"brain\",\"lens\":\"structure\",\"nvfi\":{\"novelty\":3,\"viability\":4,\"fit\":4,\"impact\":3},\"traps\":[{\"type\":\"overfit\",\"note\":\"a phrasing-based filter ('quick'/'standard') risks downgrading genuinely high-value requests just because Warwick phrased them casually — could quietly starve T2 of the exact cases it exists to catch.\"},{\"type\":\"needs_evidence\",\"note\":\"untested against Fusion's real request history — should be run against the T1vsT2 experiment's own frozen fixtures before wiring in, not adopted on faith.\"}]},{\"spin\":{\"situation\":\"You've got a live backlog item where a feature — YouTube knowledge-note capture — still just says 'pending, I'll write it next session' instead of doing the thing, a gap between what was promised and what actually got built.\",\"problem\":\"Catching 'promised but never actually built' gaps currently depends on a single continuous read-through noticing the mismatch — and a single thread of attention is exactly where this kind of silent gap slips through, because everything gets read in one pass and blurs together.\",\"implication\":\"Left unchecked, this pattern repeats quietly: things get marked 'done' that aren't, and you only find out when you go to use the feature and it isn't there — same shape as the YouTube capture gap sitting in the backlog right now.\",\"need_payoff\":\"A handful of isolated checks, each blind to the others and each looking through a different lens (promised-but-missing, where-you'd-get-confused, where-behaviour-silently-regressed), then merged by one pass — catches more of these gaps than one linear read, because the checks can't bleed into and dilute each other.\"},\"source_evidence\":{\"quote\":\"it caught gaps that had gone completely undetected, like features that were promised in the PRD but never actually got built... they're isolated, so they share zero context and none of them know what the others are working on\",\"timestamp\":\"[12:20] / [02:41]\",\"named_mechanism\":\"isolated multi-frame pre-ship audit against the PRD\"},\"transfer_reasoning\":\"The video runs its tree-of-thought mechanism not only for ideation but as a pre-launch audit: several isolated agents each read the whole app/PRD through a different lens and independently flag mismatches a single continuous read misses. Fusion already has a live, named instance of exactly this failure mode (YouTube capture, promised-but-not-built). The transferable piece isn't 'add more review' — Codex+Fable already gate merges generally — it's the isolation-so-attention-doesn't-bleed-together mechanism, applied narrowly as a completeness/blind-spot sweep before a Cockpit-facing feature gets marked done.\",\"fusion_target\":\"Cockpit / Outputs Layer pre-ship check (e.g. before the YouTube-capture knowledge-note write-up is marked 'done')\",\"category\":\"brain\",\"lens\":\"feedback\",\"nvfi\":{\"novelty\":3,\"viability\":3,\"fit\":3,\"impact\":3},\"traps\":[{\"type\":\"governance_creep\",\"note\":\"Warwick has explicitly flagged 'building the verify/governance machinery before the thing works' as a rejected pattern (the BUILD-014 fiasco) — this must stay a lightweight, occasional check, never a standing gate, or it repeats that exact mistake.\"},{\"type\":\"redundant_with_existing_gate\",\"note\":\"Codex+Fable independent review already exists as the merge-ready gate — this only earns its keep if it targets a distinct failure mode (promised-but-silently-unbuilt) that general code review has already been shown to miss, as in the YouTube-capture case; otherwise it's duplicate machinery.\"}]}],\"zero_reason\":null}",
+   "duration_ms": 134187,
+   "cost_usd": 0.3555876,
+   "payload_input_est": 5989,
+   "output": 11375,
+   "cache_creation": 29382,
+   "cache_read": 28882
+  },
+  "candidates": [
+   {
+    "spin": {
+     "situation": "Right now the idea engine has multiple cost tiers (T1 fast/cheap, T2 deeper multi-angle), and you're mid-experiment on exactly this — the T1vsT2-experiment files and t2-calibrate.mjs sitting in your working tree right now are you trying to nail down when each tier should fire.",
+     "problem": "The trigger for 'go expensive' is still being calibrated case-by-case rather than run through a named, reusable rule decided BEFORE the expensive pass starts.",
+     "implication": "Without a cheap gate up front, you either burn tokens running the deep multi-frame tier on requests that only ever had one sensible answer, or you under-use it on things that genuinely needed the deeper pass — and you're spending your own attention eyeballing each call instead of the gate deciding it.",
+     "need_payoff": "A three-question pre-check — is there more than one reasonable answer here, are the stakes actually high if the obvious answer is wrong, and did Warwick's own phrasing signal 'quick/standard' — run before fan-out gives the live T1-vs-T2 calibration a concrete, testable heuristic instead of a vibe."
+    },
+    "source_evidence": {
+     "quote": "would someone experienced have a few different answers that all work here or just one right answer... would it genuinely cost you something if the obvious answer turned out to be the wrong one... If you used words like quick or standard, you're clearly after the straightforward answer, so it stops there",
+     "timestamp": "[06:01]-[06:27]",
+     "named_mechanism": "three-question pre-check gate run before expensive multi-agent fan-out"
+    },
+    "transfer_reasoning": "The video's skill spins up five isolated agents (expensive) only after a cheap three-question filter decides the fan-out is worth it. Fusion's idea-engine has the identical expensive/cheap tier shape (T1 vs T2) but is calibrating the boundary empirically, case by case, rather than via a named rule. Transferring the specific rule — especially the phrasing-signal check, which is the least obvious of the three — gives the live calibration effort a candidate heuristic to test against its frozen fixtures.",
+    "fusion_target": "services/control-plane/cockpit/t2-calibrate.mjs (T1-vs-T2 tier-selection gate in the idea engine)",
+    "category": "brain",
+    "lens": "structure",
+    "nvfi": {
+     "novelty": 3,
+     "viability": 4,
+     "fit": 4,
+     "impact": 3
+    },
+    "traps": [
+     {
+      "type": "overfit",
+      "note": "a phrasing-based filter ('quick'/'standard') risks downgrading genuinely high-value requests just because Warwick phrased them casually — could quietly starve T2 of the exact cases it exists to catch."
+     },
+     {
+      "type": "needs_evidence",
+      "note": "untested against Fusion's real request history — should be run against the T1vsT2 experiment's own frozen fixtures before wiring in, not adopted on faith."
+     }
+    ]
+   },
+   {
+    "spin": {
+     "situation": "You've got a live backlog item where a feature — YouTube knowledge-note capture — still just says 'pending, I'll write it next session' instead of doing the thing, a gap between what was promised and what actually got built.",
+     "problem": "Catching 'promised but never actually built' gaps currently depends on a single continuous read-through noticing the mismatch — and a single thread of attention is exactly where this kind of silent gap slips through, because everything gets read in one pass and blurs together.",
+     "implication": "Left unchecked, this pattern repeats quietly: things get marked 'done' that aren't, and you only find out when you go to use the feature and it isn't there — same shape as the YouTube capture gap sitting in the backlog right now.",
+     "need_payoff": "A handful of isolated checks, each blind to the others and each looking through a different lens (promised-but-missing, where-you'd-get-confused, where-behaviour-silently-regressed), then merged by one pass — catches more of these gaps than one linear read, because the checks can't bleed into and dilute each other."
+    },
+    "source_evidence": {
+     "quote": "it caught gaps that had gone completely undetected, like features that were promised in the PRD but never actually got built... they're isolated, so they share zero context and none of them know what the others are working on",
+     "timestamp": "[12:20] / [02:41]",
+     "named_mechanism": "isolated multi-frame pre-ship audit against the PRD"
+    },
+    "transfer_reasoning": "The video runs its tree-of-thought mechanism not only for ideation but as a pre-launch audit: several isolated agents each read the whole app/PRD through a different lens and independently flag mismatches a single continuous read misses. Fusion already has a live, named instance of exactly this failure mode (YouTube capture, promised-but-not-built). The transferable piece isn't 'add more review' — Codex+Fable already gate merges generally — it's the isolation-so-attention-doesn't-bleed-together mechanism, applied narrowly as a completeness/blind-spot sweep before a Cockpit-facing feature gets marked done.",
+    "fusion_target": "Cockpit / Outputs Layer pre-ship check (e.g. before the YouTube-capture knowledge-note write-up is marked 'done')",
+    "category": "brain",
+    "lens": "feedback",
+    "nvfi": {
+     "novelty": 3,
+     "viability": 3,
+     "fit": 3,
+     "impact": 3
+    },
+    "traps": [
+     {
+      "type": "governance_creep",
+      "note": "Warwick has explicitly flagged 'building the verify/governance machinery before the thing works' as a rejected pattern (the BUILD-014 fiasco) — this must stay a lightweight, occasional check, never a standing gate, or it repeats that exact mistake."
+     },
+     {
+      "type": "redundant_with_existing_gate",
+      "note": "Codex+Fable independent review already exists as the merge-ready gate — this only earns its keep if it targets a distinct failure mode (promised-but-silently-unbuilt) that general code review has already been shown to miss, as in the YouTube-capture case; otherwise it's duplicate machinery."
+     }
+    ]
+   }
+  ],
+  "zero_reason": null
+ },
+ "t2": {
+  "video": "m6IXL_YGqBQ",
+  "branchCalls": [
+   {
+    "label": "F1-mechanism",
+    "ok": true,
+    "resultText": "{\"frame\":\"F1-mechanism\",\"discarded_obvious\":[\"Isolated multi-branch frame fan-out + critic N/V/F/traps + shortlist-then-verify — this IS the idea-engine architecture already running as this very frame call; transferring it back onto itself is zero-fidelity.\",\"Self-contained single-file skill packaging (skill.md, no external refs, portable across 45 hosts) — Fusion's CLAUDE.md/AGENTS.md pointer-contract pattern already achieves self-contained, portable specialist contracts; no gap to close.\",\"3-question pre-fanout triage gate (open-ended? high-stakes? phrasing signals 'quick'?) — overlaps with Fusion's existing 3-cost-tier system for the idea-engine; transferring it would duplicate an existing control rather than add new structural fidelity.\"],\"candidates\":[{\"spin\":{\"situation\":\"Warwick already knows the real bottleneck in shipping any Fusion idea isn't the coding, it's that ideas arrive without a proper brief.\",\"problem\":\"A promoted idea can go straight into a build session on nothing more than a paragraph of intent, so whoever builds it has to guess at scope from the live conversation, and different sessions guess differently.\",\"implication\":\"That guessing is what the BUILD-014 fiasco was made of — building the wrong-sized thing because the input wasn't pinned down — and it recurs until every promoted idea carries a real, durable brief instead of relying on chat memory.\",\"need_payoff\":\"If a PRD + tech-spec pair became a mandatory, config-linked prerequisite before any build session opens — exactly how this skill refuses to fan agents out until a PRD and tech-spec are linked in its config file — builders get forced, durable grounding instead of re-deriving scope each time.\"},\"source_evidence\":{\"quote\":\"you need to write down what needs to be built like a PRD... alongside that, you should also give it a technical specification document... You link both of those inside your claw.md file, so it picks up that context from the very start.\",\"timestamp\":\"08:37\",\"named_mechanism\":\"config-linked PRD+tech-spec as a hard prerequisite gating agent fan-out\"},\"transfer_reasoning\":\"Structural invariant: expensive, creative multi-agent work is gated on a durable, config-referenced spec artifact, not on live conversational context. Fusion's own CLAUDE.md already uses this exact shape — a pointer file linking to a canonical doc (AGENTS.md) rather than duplicating it. Extending that identical shape to the Foundry-to-build handoff isn't a new invention for Fusion, it's applying Fusion's own established pattern to the one seam memory already flags as unresolved (build inputs need a PRD + robust home).\",\"fusion_target\":\"Foundry idea-to-build handoff / CLAUDE.md pointer pattern: require a linked PRD+tech-spec doc pair in the build session's context file before any builder agent opens, mirroring how CLAUDE.md links to AGENTS.md\",\"category\":\"brain\",\"lens\":\"structural fidelity — config-linked prerequisite gating\",\"nvfi\":{\"novelty\":5,\"viability\":8,\"fit\":9,\"impact\":8},\"traps\":[{\"type\":\"scope-creep\",\"note\":\"don't let 'PRD required' become a heavyweight gate for tiny quick-wins — needs a size threshold or it recreates BUILD-014's over-engineering\"},{\"type\":\"stale-doc\",\"note\":\"a linked PRD can drift from the actual build the same way runtime.json still holds the old Directus password — needs a freshness/last-verified marker, not a fire-and-forget link\"}]},{\"spin\":{\"situation\":\"Larry already runs a 7-point Builder Preflight before every Tower merge-check: git-clean, artefacts-in-PR, migration/teardown parity, docs-match-deploy, and so on.\",\"problem\":\"All seven of those checks confirm the build is INTERNALLY consistent — code matches PR matches CI. None of them ask whether the shipped thing still delivers everything the original brief promised.\",\"implication\":\"That's precisely the gap the video's pre-launch audit exists to catch — features 'promised in the PRD but never actually built' slipping through into a live version nobody re-read against the brief.\",\"need_payoff\":\"A dedicated PRD-fidelity pass — isolated frame-agents diffing the shipped artifact against the original brief, scored and trapped the same way idea candidates are — would surface promise-vs-delivery gaps before merge, not after Warwick discovers them live.\"},\"source_evidence\":{\"quote\":\"it caught gaps that had gone completely undetected, like features that were promised in the PRD but never actually got built, so we'd have shipped something that didn't match what we said it would do\",\"timestamp\":\"12:20\",\"named_mechanism\":\"post-build PRD-vs-shipped fidelity audit via isolated frame agents, scored N/V/F with a trap list\"},\"transfer_reasoning\":\"Structural invariant: a dedicated, separately-gated audit stage whose sole comparison object is the ORIGINAL BRIEF against the FINAL ARTIFACT — not code-parity, not pass/fail tests. Fusion's Builder Preflight checks internal consistency only (git/artefact/test-range parity), so this is a distinct check object, additive rather than a repeat of an existing point.\",\"fusion_target\":\"Larry's Builder Preflight (7-point pre-merge self-check) — add an 8th point: PRD-promise-fidelity audit before merge-check\",\"category\":\"brain\",\"lens\":\"structural fidelity — brief-vs-artifact diff as its own audit object\",\"nvfi\":{\"novelty\":6,\"viability\":7,\"fit\":8,\"impact\":6},\"traps\":[{\"type\":\"reviewer-overlap\",\"note\":\"could bleed into Codex/Fable's existing fitness-for-purpose review scope — needs an explicit boundary so it's additive, not duplicate reviewing\"},{\"type\":\"ownerless-checklist\",\"note\":\"needs a named owner (Larry vs Warden) or it becomes an 8th checklist line nobody actually runs, same failure mode a stale process item always has\"}]}],\"zero_reason\":null}",
+    "duration_ms": 134994,
+    "cost_usd": 0.3165384,
+    "payload_input_est": 5320,
+    "output": 10813,
+    "cache_creation": 23964,
+    "cache_read": 35178
+   },
+   {
+    "label": "F2-inversion",
+    "ok": true,
+    "resultText": "```json\n{\"frame\":\"F2-inversion\",\"discarded_obvious\":[\n  \"Adopt tree-of-thought/frame-isolation for ideation — already the live idea-engine architecture (Cairn→Transfer→Critic), would just restate a shipped feature.\",\n  \"Add novelty/viability/fit + trap-list scoring to a critic agent — already built per idea-engine-agent-architecture memory.\",\n  \"Give the critic a 'skeptical senior engineer' persona — already the Pax/critic role; not a failure-mode transfer, just a feature restatement.\"\n],\n\"candidates\":[\n  {\"spin\":{\n    \"situation\":\"The video's whole fix works because each idea gets judged in its own clean context so ideas can't bleed into each other and skew the score.\",\n    \"problem\":\"If the step that scores or merges the frame outputs reads all of them back in ONE shared context, the exact bleed-through problem the isolation was built to prevent sneaks back in at the scoring stage — order of presentation quietly nudges which candidate looks strongest.\",\n    \"implication\":\"You'd have gone to the trouble of isolating six frames, then thrown that discipline away in the one place where an unfair thumb on the scale (which candidate got read first, which wording anchored the reviewer) matters most — a shortlist that looks rigorous but isn't.\",\n    \"need_payoff\":\"Score/critique each frame's output in its own isolated pass, same as generation, before any shared merge step ever sees more than one candidate at a time.\"\n  },\n   \"source_evidence\":{\"quote\":\"Every possibility gets worked through in the same context window, so the ideas bleed into each other and the context fills up with noise. The thinking gets worse instead of better.\",\"timestamp\":\"02:08\",\"named_mechanism\":\"shared-context bleed-through degrading judgment quality\"},\n   \"transfer_reasoning\":\"The source names shared-context bleed as THE failure this whole architecture exists to kill — but only fixes it at generation time. The same mechanism (multiple items judged in one context → anchoring/noise) can silently re-enter at whichever step reads multiple candidates together. Inverting the fix: isolation has to hold at scoring too, not just at ideation.\",\n   \"fusion_target\":\"Critic/shortlist step in the idea-engine pipeline (Cairn→Transfer-Intelligence→Critic→Cockpit Accept) — verify each frame's candidates are critiqued in a separate pass, not one shared read-all-six-then-score call.\",\n   \"category\":\"brain\",\"lens\":\"inversion\",\n   \"nvfi\":{\"novelty\":6,\"viability\":8,\"fit\":8,\"impact\":6},\n   \"traps\":[{\"type\":\"cost\",\"note\":\"per-candidate isolated critique multiplies critic-agent calls; needs a cheap batching compromise that still avoids cross-candidate anchoring\"}]\n  },\n  {\"spin\":{\n    \"situation\":\"The tool has a cheap 3-question gate that decides, before spending tokens, whether a problem is even worth the multi-agent treatment — otherwise it just answers directly.\",\n    \"problem\":\"That gate is itself a single-pass judgment with no visibility: if it wrongly decides 'this is closed-ended / low stakes,' the system silently falls back to the shallow default answer and nobody downstream ever sees that a deeper pass was skipped, let alone why.\",\n    \"implication\":\"The exact failure the tool was built to defeat (agents quietly settling for the safe, obvious answer) reappears one level up, disguised as an efficiency feature — and because it's silent, it looks like thoroughness happened when it didn't.\",\n    \"need_payoff\":\"Any triage gate that decides 'shallow vs deep' must leave a visible trace of its own verdict and reasoning, so a wrong shallow-routing is discoverable instead of invisible.\"\n  },\n   \"source_evidence\":{\"quote\":\"it runs the problem through three questions... If there's only one right answer, then thinking from multiple angles is pointless and just wastes tokens, so it stops there.\",\"timestamp\":\"06:01\",\"named_mechanism\":\"silent pre-check gate that can auto-downgrade to shallow single-pass reasoning\"},\n   \"transfer_reasoning\":\"Inverting the assumption behind the gate: it's presented as pure cost-saving, but a false-negative here reproduces the same 'settles for the safe answer' failure the multi-agent design exists to prevent — except now it's invisible because no downstream step ever sees the road not taken.\",\n   \"fusion_target\":\"Cairn's intake triage — the decision of whether an ingested source gets full Transfer-Intelligence treatment or gets shallow-filed. Needs a visible 'shallow-routed + why' marker (not a silent drop) so Warwick can audit misjudged sources.\",\n   \"category\":\"brain\",\"lens\":\"inversion\",\n   \"nvfi\":{\"novelty\":6,\"viability\":7,\"fit\":7,\"impact\":6},\n   \"traps\":[{\"type\":\"noise\",\"note\":\"if every shallow-routing gets surfaced, it could flood Warwick's review queue with low-value 'skipped' notices — needs a threshold or batched digest, not per-item pings\"}]\n  },\n  {\"spin\":{\n    \"situation\":\"Before the tool forks into isolated agents, it does one shared pass to gather context on the app, then hands that same context to every branch.\",\n    \"problem\":\"The branches look diverse because they think through different frames, but they all inherit the exact same upstream context snapshot — if that one gathering pass missed or distorted something, every 'independent' branch inherits the identical blind spot, and the appearance of six-way diversity papers over a single point of failure.\",\n    \"implication\":\"You get a shortlist that looks thoroughly cross-checked from six angles, when in fact all six angles were built on one possibly-flawed foundation nobody re-checked.\",\n    \"need_payoff\":\"Treat the shared context/evidence-gathering step as its own trust boundary — verify completeness or fidelity of that base BEFORE forking, since forking afterward can't undo a corrupted or incomplete starting point.\"\n  },\n   \"source_evidence\":{\"quote\":\"It started by going through the application in depth to gather context, then spun up its agents the same way.\",\"timestamp\":\"11:40\",\"named_mechanism\":\"single shared context-gathering pass feeding all isolated branches\"},\n   \"transfer_reasoning\":\"Inverted assumption: isolation is assumed to guarantee independence, but independence only starts AFTER the fork — everything upstream of the fork is a single point of failure the frame architecture cannot see or correct for, since no frame is positioned to notice the shared input was already lossy.\",\n   \"fusion_target\":\"TubeAIR's transcript ingestion (link→cleaned transcript, no LLM) that feeds this very idea-engine run — and, directly, IDEA-016's 'T1-vs-T2 experiment harness (all 6 fresh, one brief)' where all six branches share exactly one upstream brief.\",\n   \"category\":\"brain\",\"lens\":\"inversion\",\n   \"nvfi\":{\"novelty\":7,\"viability\":7,\"fit\":8,\"impact\":7},\n   \"traps\":[{\"type\":\"evidence\",\"note\":\"claim that a shared brief/transcript is complete needs a concrete check (e.g. transcript-length/coverage sanity check) before trusting six-way diversity built on it — not just asserted\"}]\n  },\n  {\"spin\":{\n    \"situation\":\"The tool's whole premise is that agents default to whatever answer showed up most often in training data — the safe, familiar pattern — unless deliberately pushed past it.\",\n    \"problem\":\"That same 'reach for the familiar pattern' bias doesn't only threaten the generation step — the review/scoring step (the skeptical senior-engineer critic) is graded on the SAME kind of model, so it likely carries the SAME bias, just aimed at judging instead of proposing: it may reflexively down-score genuinely novel transfers as 'too risky/unfamiliar' precisely because they're unfamiliar, which is the opposite of what a novelty score is supposed to reward.\",\n    \"implication\":\"A critic built to catch bad ideas can end up systematically killing the most valuable (most novel) ones for the same root reason the base model needed the multi-frame fix in the first place — an unexamined blind spot in the very component meant to be the quality gate.\",\n    \"need_payoff\":\"Explicitly test whether the critic penalizes unfamiliarity-as-risk versus genuine-viability-risk, and calibrate so novelty isn't structurally taxed by the same safe-pattern bias it's supposed to reward.\"\n  },\n   \"source_evidence\":{\"quote\":\"An agent reaches for the pattern that showed up most often in the data it learned from because seeing the same answer repeated is what taught it that the answer is a good one.\",\"timestamp\":\"01:40\",\"named_mechanism\":\"training-frequency bias toward the most common/safe pattern\"},\n   \"transfer_reasoning\":\"Inversion: the source diagnoses this bias only in the generator and fixes it there. But the critic is built on the same kind of model and is never checked for the identical bias — an unfamiliar-but-genuinely-good transfer looks statistically 'wrong' to a model trained the same way, so the failure mode just relocates from generation to judgment, invisibly.\",\n   \"fusion_target\":\"The Critic step in idea-engine (N/V/F scoring) — specifically whether high-novelty candidates are getting systematically suppressed on viability/fit as a proxy for 'unfamiliar,' which the T1-vs-T2 calibration data (Deliverables/idea-engine-T2-calibration-*) may already be able to test empirically.\",\n   \"category\":\"brain\",\"lens\":\"inversion\",\n   \"nvfi\":{\"novelty\":8,\"viability\":6,\"fit\":7,\"impact\":7},\n   \"traps\":[{\"type\":\"needs-evidence\",\"note\":\"provisional — would need to actually mine the existing T1/T2 calibration data for a novelty-vs-score correlation before treating this as more than a hypothesis\"}]\n  }\n],\n\"zero_reason\":null}\n```",
+    "duration_ms": 97780,
+    "cost_usd": 0.2751114,
+    "payload_input_est": 5352,
+    "output": 7018,
+    "cache_creation": 26547,
+    "cache_read": 35178
+   },
+   {
+    "label": "F3-operational",
+    "ok": true,
+    "resultText": "```json\n{\"frame\":\"F3-operational\",\"discarded_obvious\":[\n  \"Whole source = tree-of-thought/frame-library/isolated-agents architecture mirrors the very idea-engine this frame is running inside (git history shows T2-calibration + T1vsT2-experiment already mid-build) — recognising 'this describes our own tool' is not a transfer, it's a mirror.\",\n  \"Zero-shared-context isolation between frame-agents ('they're isolated so they share zero context... none of them know what the others are working on') — that is literally this frame's own operating condition right now, not a new mechanism to transfer.\",\n  \"Critic-agent scoring on Novelty/Viability/Fit as a 'skeptical senior engineer' persona — duplicates the NVFI calibration work already underway (idea-engine-T2-calibration-KEY/BLIND/COST files in progress).\",\n  \"3-question pre-check gate (open-ended? high-stakes? how-you-asked) mapped onto a cheap-vs-deep tier router — too close to the in-progress T1-vs-T2 experiment to safely claim as new leverage without seeing what that harness already does.\",\n  \"TopView sponsor segment (batch video-ad generation from one prompt) — no evidence Warwick has a video-production workflow to attach this to; would be a manufactured need.\"\n],\n\"candidates\":[\n  {\"spin\":{\n    \"situation\":\"Before any feature ships or merges, Larry runs a manual 7-point Builder Preflight checklist by eye.\",\n    \"problem\":\"That checklist catches artefact/doc mismatches, but nothing in it specifically hunts for 'we promised this in the plan and quietly never built it' or 'where would Warwick get confused and bail.'\",\n    \"implication\":\"That exact failure mode already burned the team once — the BUILD-014 fiasco was Larry building more than what was scoped, undetected until Warwick caught it after the fact.\",\n    \"need_payoff\":\"A cheap, dedicated pass that reads the PRD/plan against what was actually built and flags drift + confusion points BEFORE the merge-check, so Warwick isn't the one catching it live.\"\n  },\n  \"source_evidence\":{\n    \"quote\":\"it caught gaps that had gone completely undetected, like features that were promised in the PRD but never actually got built, so we'd have shipped something that didn't match what we said it would do... for every one of them, it suggested a fix and listed out the traps and risks\",\n    \"timestamp\":\"[12:20]\",\n    \"named_mechanism\":\"pre-ship UX/churn fan-out run against the PRD, surfacing spec-drift + confusion points with fix suggestions and traps, findings handed back for a human to implement (never auto-fixed)\"\n  },\n  \"transfer_reasoning\":\"The source runs its fan-out not just for ideation but as a pre-launch QUALITY gate: agent re-reads the built app against the PRD and flags exactly the promised-vs-built gap that caused BUILD-014. Fusion already has a manual version of this (Builder Preflight) but nothing automated does the PRD-vs-built diff specifically. Bolting a lightweight single-pass 'spec-drift + confusion-point' check onto the existing preflight closes a gap that has already cost Warwick real rework once.\",\n  \"fusion_target\":\"Larry's Builder Preflight self-check (the 7-point pass before every Tower merge-check) — add a PRD-vs-built drift pass as one of the checks, output format: finding + suggested fix + trap, feeding the existing 'claimed artefacts in PR' and 'docs match deploy' checklist items instead of replacing them\",\n  \"category\":\"brain\",\n  \"lens\":\"blind-spot catch, pre-ship\",\n  \"nvfi\":{\"novelty\":5,\"viability\":8,\"fit\":8,\"impact\":7},\n  \"traps\":[\n    {\"type\":\"scope creep\",\"note\":\"Don't let this become a second governance layer on top of Builder Preflight — it's one more check inside the existing pass, not a new ceremony (echoes the BUILD-014 lesson itself: don't build the machine, ship the thin slice).\"},\n    {\"type\":\"latency\",\"note\":\"Must stay a single cheap pass, not a full multi-frame fan-out, or it slows every merge and gets skipped under time pressure.\"}\n  ]},\n  {\"spin\":{\n    \"situation\":\"When Warwick accepts an idea in the Cockpit (Keep on a Brain/Cash card), the idea sits there as a stored decision.\",\n    \"problem\":\"Turning 'accepted idea' into 'thing I actually did this week' still requires Warwick to work out the first concrete action himself — that's a manual step the card doesn't remove.\",\n    \"implication\":\"Attention is his scarcest resource; an accepted idea with no obvious next click is exactly the kind of thing that quietly rots in a backlog instead of becoming a next-action.\",\n    \"need_payoff\":\"Every accepted idea card should carry a concrete first-step field so 'Keep' turns straight into 'here's what to do next', not another thing to re-think later.\"\n  },\n  \"source_evidence\":{\n    \"quote\":\"Each idea also comes with a sketch of how it would be built, the risks involved, and the first steps for getting started on it.\",\n    \"timestamp\":\"[08:37]\",\n    \"named_mechanism\":\"every surviving idea ships with an explicit 'first steps to get started' field alongside its score and risks — the tool plans, it doesn't implement, but it never hands back a bare idea\"\n  },\n  \"transfer_reasoning\":\"The source treats 'first step' as a mandatory output field, not an afterthought — it's what turns a scored idea into something actionable without the human having to translate it. Fusion's Cockpit idea cards (Keep/Decline/Later) currently surface the idea and its score but nothing forces a concrete 'do this first' line. Un-clever, but it's the exact toil-killer this frame is meant to catch: one field, removes one recurring manual translation step for Warwick.\",\n  \"fusion_target\":\"Cockpit idea/output card schema (Ideas Brain/Cash, Keep/Decline/Later) — add a mandatory 'first step' field populated at generation time by the Transfer-Intelligence/Critic pass, shown on the card itself, not buried in a linked doc\",\n  \"category\":\"brain\",\n  \"lens\":\"kill a manual next-action-translation step\",\n  \"nvfi\":{\"novelty\":4,\"viability\":9,\"fit\":8,\"impact\":7},\n  \"traps\":[\n    {\"type\":\"garbage-in\",\"note\":\"A generic or hand-wavy 'first step' (e.g. 'research further') is worse than none — only add the field if the generating pass can produce a genuinely concrete one.\"},\n    {\"type\":\"scope creep\",\"note\":\"Keep it to one line, not a mini project plan bolted onto the card — the card's job is triage, not planning.\"}\n  ]}\n],\n\"zero_reason\":null}\n```",
+    "duration_ms": 124695,
+    "cost_usd": 0.3059604,
+    "payload_input_est": 5323,
+    "output": 9665,
+    "cache_creation": 25071,
+    "cache_read": 35178
+   },
+   {
+    "label": "F4-commercial",
+    "ok": true,
+    "resultText": "```json\n{\"frame\":\"F4-commercial\",\"discarded_obvious\":[\"Just install/use the ADHD-style multi-agent ideation skill for Fusion's own internal brainstorming — that's an internal capability upgrade, not an external revenue path; belongs to the internal frames, not this one.\",\"TopView sponsor segment (AI video-model aggregator skill for ad generation) — no structural link to Fusion's actual competency (knowledge-graph/idea-engine work); pursuing it would be a forced analogy, not a transfer.\",\"'Subscribe and hit the bell' community-building mechanic — generic channel-growth tactic, not a mechanism Fusion can transfer into a revenue line.\"],\n\"candidates\":[\n  {\"spin\":{\"situation\":\"Fusion is already mid-build on its own idea-engine (IDEA-016) that spins up several isolated AI 'thinking styles' at once so ideas don't all come back sounding the same, then scores and prunes them with a skeptical critic.\",\"problem\":\"Right now that entire capability lives only inside Fusion's own walls — it earns Warwick nothing and has zero audience outside this repo.\",\"implication\":\"A near-identical but by-the-look-of-it less rigorous version of this same mechanism, released as a public tool, picked up heavy community traction within days of release — proof there's real external demand (attention, sponsorship, willing users) for exactly this category of tool, and Fusion's version already has a differentiator (explicit self-kill calibration + trap lists + frame-blindness) that the source tool doesn't describe having.\",\"need_payoff\":\"If Fusion packages its T2 idea-engine as a standalone public skill/tool (the repo is already public), it opens a genuine income and reputation stream — downloads, sponsorships, paid support/consulting — that exists independently of Warwick's job at Bellrock.\"},\n   \"source_evidence\":{\"quote\":\"The ADHD skill came out fairly recently and picked up a lot of stars within a few days... it takes ideation or really any task with a lot of possible directions and splits it across separate agents as a tree of thought.\",\"timestamp\":\"02:08-03:41\",\"named_mechanism\":\"tree-of-thought frame-isolated multi-agent ideation skill with critic scoring (N/V/F)\"},\n   \"transfer_reasoning\":\"SOURCE has a frame-isolated multi-agent ideation skill (quote above); invariant: splitting divergent thinking across blind, isolated agents and pruning with a skeptical scorer is itself a sellable capability, not just an internal process improvement. At Fusion's idea-engine (IDEA-016 / T2 divergence architecture, cd4e380/06c8974) it does the same W — but Fusion's version already carries stronger discipline (explicit self-kill calibration per frame, trap-list triage, WHOLE-SOURCE + NEVER-MANUFACTURE guardrails) than what's described of the source tool, meaning the transfer is 'package what you already built for outside buyers,' not 'go build something new.'\",\n   \"fusion_target\":\"idea-engine / T2 divergence architecture (this Transfer-Intelligence frame system itself, .claude Cockpit tooling)\",\n   \"category\":\"cash\",\"lens\":\"external productization of an internally-proven mechanism\",\n   \"nvfi\":{\"novelty\":5,\"viability\":7,\"fit\":8,\"impact\":6},\n   \"traps\":[\n     {\"type\":\"fast-follower risk\",\"note\":\"the source tool already has first-mover attention in this exact category; Fusion would need a genuinely visible edge (e.g. the self-kill/trap-list rigor) to avoid being noise, not just a clone with a different name.\"},\n     {\"type\":\"open-source cannibalization\",\"note\":\"Fusion247PKA is a public repo — if the differentiated engine internals are fully visible in git history, others can copy the mechanism before Fusion captures any value from it; needs a deliberate decision on what's given away free vs. what's paywalled (hosted version, support, curated frame library).\"}\n   ]},\n  {\"spin\":{\"situation\":\"The source shows a concrete two-moment audit pattern: before you build (multi-angle test-strategy planning) and right before you ship (multi-angle churn/UX risk-finding) — both run by spinning up isolated AI agents through different lenses and scoring what comes back.\",\"problem\":\"Small software teams and agencies routinely ship with untested edge cases and features quietly dropped from the original plan, and they usually only find out once real users hit the gaps or churn.\",\"implication\":\"Fixing that after launch — refunds, support fires, trust damage, rework — costs far more than catching it beforehand, yet most small teams have no structured way to run this kind of check on themselves before they ship.\",\"need_payoff\":\"Fusion could sell a two-stage 'Ship-Ready Audit' — hand us your PRD and your codebase, we run it before you build and again before you launch — as a paid service to outside dev teams/agencies, using the same frame-plus-critic mechanism Fusion is already building for itself.\"},\n   \"source_evidence\":{\"quote\":\"it caught gaps that had gone completely undetected, like features that were promised in the PRD but never actually got built... for every one of them, it suggested a fix and listed out the traps and risks that came with it\",\"timestamp\":\"11:40-12:52\",\"named_mechanism\":\"pre-build TDD test-strategy planning + pre-launch churn/UX risk audit, both frame-isolated and critic-scored\"},\n   \"transfer_reasoning\":\"SOURCE has a two-checkpoint audit mechanism (quote above); invariant: running isolated multi-lens agents against a PRD/codebase at two specific decision moments (before build, before ship) surfaces gaps a single-pass agent misses, and hands back scored findings + fixes + traps rather than doing the fix itself. At Fusion's Cockpit/idea-engine tooling it does the same W, but pointed at an EXTERNAL client's PRD+repo instead of Fusion's own — turning an internal QA habit into a billable engagement.\",\"fusion_target\":\"idea-engine / T2 frame-and-critic loop, offered as a client-facing Cockpit audit workflow\",\n   \"category\":\"cash\",\"lens\":\"service-ify an internal QA mechanism for external dev teams\",\n   \"nvfi\":{\"novelty\":4,\"viability\":6,\"fit\":7,\"impact\":6},\n   \"traps\":[\n     {\"type\":\"delivery cost\",\"note\":\"a real client engagement needs a human (Larry/Warwick) to intake the client's PRD, run the loop, and curate results per client — without a templated/productized wrapper this becomes bespoke consulting time, not scalable software margin.\"},\n     {\"type\":\"liability\",\"note\":\"if Fusion is paid to run this audit and a churn-causing bug still ships, that's a reputational and possibly contractual exposure — needs clear scope/disclaimer language before selling it as a service rather than a courtesy check.\"}\n   ]}\n],\n\"zero_reason\":null}\n```",
+    "duration_ms": 108287,
+    "cost_usd": 0.2779584,
+    "payload_input_est": 5320,
+    "output": 7797,
+    "cache_creation": 25074,
+    "cache_read": 35178
+   },
+   {
+    "label": "F5-crossdomain",
+    "ok": true,
+    "resultText": "{\"frame\":\"F5-crossdomain\",\"discarded_obvious\":[\"Using the ADHD/tree-of-thought skill itself to run Fusion's idea-engine — that's the literal system already being built this branch, not a transfer.\",\"Mapping the N/V/F critic scoring onto Pax/Fable — Fusion's Critic already scores exactly this way; it's the recognized origin of this frame's own output schema, not a transfer target.\",\"Using the frame-diversity mechanism to make the Outputs Layer surface less repetitive — too direct an application of the source tool to another Fusion subsystem, belongs to the structural frame.\",\"TDD-via-frames for writing tests before building — obviously maps to Vera/build-review QA, not a distant transfer.\",\"The pre-check gate (open-ended? high-stakes? how you asked?) as a triage step — this is already the shape of Cairn's intake triage per the idea-engine architecture; applying it back to ideation is circular, not a transfer.\"],\"candidates\":[{\"spin\":{\"situation\":\"Larry runs long sessions where ideation, build history, backlog, and decisions all pile up in one single conversation thread.\",\"problem\":\"When that thread gets compacted or Larry restarts, hard-won context quietly evaporates because it was never kept separate from the noise of everything else happening in that same thread — this is an open, unsolved backlog item as of today.\",\"implication\":\"Warwick ends up re-explaining decisions and history, and the subtle-but-important context gets silently lost right when it would matter most.\",\"need_payoff\":\"If Larry's own continuity were built the way this tool builds ideation — isolate each concern in its own clean window, merge only the finished output back — compaction would lose noise, not substance.\"},\"source_evidence\":{\"quote\":\"Every possibility gets worked through in the same context window, so the ideas bleed into each other and the context fills up with noise. The thinking gets worse instead of better.\",\"timestamp\":\"[02:08]\",\"named_mechanism\":\"per-branch context isolation with merge-only-at-the-end\"},\"transfer_reasoning\":\"The source's cure for single-context degradation (isolate parallel concerns, never let them share a window, merge only conclusions) targets the exact same failure shape as Larry's context-evaporation-on-compaction problem — a long single thread accumulating unrelated concerns until the signal degrades. The domain jump is real: the source only ever applies this to brainstorming variations, never to an agent's own session continuity.\",\"fusion_target\":\"Larry's session-continuity / anti-context-evaporation architecture (open backlog item, currently undesigned)\",\"category\":\"brain\",\"lens\":\"isolation-then-merge as a memory architecture, not an ideation tool\",\"nvfi\":{\"novelty\":8,\"viability\":5,\"fit\":6,\"impact\":7},\"traps\":[{\"type\":\"scope-creep\",\"note\":\"could balloon into rebuilding Larry's whole memory system instead of a targeted fix for the one backlog item\"},{\"type\":\"unproven\",\"note\":\"provisional only — no evidence yet that isolate-then-merge actually prevents evaporation rather than just relocating the noise elsewhere\"}]},{\"spin\":{\"situation\":\"Fusion is mid-way through a manual, human-supervised project (the T1-vs-T2 calibration harness) to work out when the cheap model tier is good enough versus when the expensive tier earns its cost.\",\"problem\":\"That tier decision is currently a one-off calibration exercise Larry runs and interprets by hand, work-package by work-package, rather than something that happens automatically and at scale.\",\"implication\":\"Every new work-package still needs a fresh manual tier judgment call, which won't hold up as the number of work-packages grows.\",\"need_payoff\":\"An auto-router that classifies tier per work-package on the fly, and batch-runs both tiers as parallel variants whenever it's ambiguous, would turn today's one-time calibration exercise into a permanent, self-serve system.\"},\"source_evidence\":{\"quote\":\"It even auto selects the right model for the job... You describe what you want once and it batch generates dozens of videos across different models, styles, and aspect ratios in a single session.\",\"timestamp\":\"[07:51]\",\"named_mechanism\":\"auto-model-selection plus batched multi-model variant generation in one pass\"},\"transfer_reasoning\":\"This is a sponsor-ad segment other frames would likely discard as irrelevant filler, but structurally it names a mechanism — given one job, auto-pick from a pool of models AND batch multiple variants across that pool in a single pass instead of manual serial switching — that maps directly onto Fusion's still-manual T1-vs-T2 tier decision, extending calibration work already underway into a live auto-router.\",\"fusion_target\":\"T1/T2 tier auto-selection layer for the idea-engine work-package pipeline (currently manual calibration per T2-calibration/T1vsT2-experiment deliverables)\",\"category\":\"cash\",\"lens\":\"sponsor-segment auto-routing as a tier-selection mechanism, not a video tool\",\"nvfi\":{\"novelty\":6,\"viability\":6,\"fit\":7,\"impact\":6},\"traps\":[{\"type\":\"overlap\",\"note\":\"may duplicate the in-flight T2 divergence architecture design package (06c8974) — check before building anything new\"},{\"type\":\"cost\",\"note\":\"batch-running both tiers in parallel doubles spend on every ambiguous work-package unless the batching is bounded\"}]}],\"zero_reason\":null}",
+    "duration_ms": 125780,
+    "cost_usd": 0.30511140000000003,
+    "payload_input_est": 5334,
+    "output": 9180,
+    "cache_creation": 26142,
+    "cache_read": 35178
+   }
+  ],
+  "branchOutputs": [
+   {
+    "frame": "F1-mechanism",
+    "discarded_obvious": [
+     "Isolated multi-branch frame fan-out + critic N/V/F/traps + shortlist-then-verify — this IS the idea-engine architecture already running as this very frame call; transferring it back onto itself is zero-fidelity.",
+     "Self-contained single-file skill packaging (skill.md, no external refs, portable across 45 hosts) — Fusion's CLAUDE.md/AGENTS.md pointer-contract pattern already achieves self-contained, portable specialist contracts; no gap to close.",
+     "3-question pre-fanout triage gate (open-ended? high-stakes? phrasing signals 'quick'?) — overlaps with Fusion's existing 3-cost-tier system for the idea-engine; transferring it would duplicate an existing control rather than add new structural fidelity."
+    ],
+    "candidates": [
+     {
+      "spin": {
+       "situation": "Warwick already knows the real bottleneck in shipping any Fusion idea isn't the coding, it's that ideas arrive without a proper brief.",
+       "problem": "A promoted idea can go straight into a build session on nothing more than a paragraph of intent, so whoever builds it has to guess at scope from the live conversation, and different sessions guess differently.",
+       "implication": "That guessing is what the BUILD-014 fiasco was made of — building the wrong-sized thing because the input wasn't pinned down — and it recurs until every promoted idea carries a real, durable brief instead of relying on chat memory.",
+       "need_payoff": "If a PRD + tech-spec pair became a mandatory, config-linked prerequisite before any build session opens — exactly how this skill refuses to fan agents out until a PRD and tech-spec are linked in its config file — builders get forced, durable grounding instead of re-deriving scope each time."
+      },
+      "source_evidence": {
+       "quote": "you need to write down what needs to be built like a PRD... alongside that, you should also give it a technical specification document... You link both of those inside your claw.md file, so it picks up that context from the very start.",
+       "timestamp": "08:37",
+       "named_mechanism": "config-linked PRD+tech-spec as a hard prerequisite gating agent fan-out"
+      },
+      "transfer_reasoning": "Structural invariant: expensive, creative multi-agent work is gated on a durable, config-referenced spec artifact, not on live conversational context. Fusion's own CLAUDE.md already uses this exact shape — a pointer file linking to a canonical doc (AGENTS.md) rather than duplicating it. Extending that identical shape to the Foundry-to-build handoff isn't a new invention for Fusion, it's applying Fusion's own established pattern to the one seam memory already flags as unresolved (build inputs need a PRD + robust home).",
+      "fusion_target": "Foundry idea-to-build handoff / CLAUDE.md pointer pattern: require a linked PRD+tech-spec doc pair in the build session's context file before any builder agent opens, mirroring how CLAUDE.md links to AGENTS.md",
+      "category": "brain",
+      "lens": "structural fidelity — config-linked prerequisite gating",
+      "nvfi": {
+       "novelty": 5,
+       "viability": 8,
+       "fit": 9,
+       "impact": 8
+      },
+      "traps": [
+       {
+        "type": "scope-creep",
+        "note": "don't let 'PRD required' become a heavyweight gate for tiny quick-wins — needs a size threshold or it recreates BUILD-014's over-engineering"
+       },
+       {
+        "type": "stale-doc",
+        "note": "a linked PRD can drift from the actual build the same way runtime.json still holds the old Directus password — needs a freshness/last-verified marker, not a fire-and-forget link"
+       }
+      ],
+      "_frame": "F1-mechanism"
+     },
+     {
+      "spin": {
+       "situation": "Larry already runs a 7-point Builder Preflight before every Tower merge-check: git-clean, artefacts-in-PR, migration/teardown parity, docs-match-deploy, and so on.",
+       "problem": "All seven of those checks confirm the build is INTERNALLY consistent — code matches PR matches CI. None of them ask whether the shipped thing still delivers everything the original brief promised.",
+       "implication": "That's precisely the gap the video's pre-launch audit exists to catch — features 'promised in the PRD but never actually built' slipping through into a live version nobody re-read against the brief.",
+       "need_payoff": "A dedicated PRD-fidelity pass — isolated frame-agents diffing the shipped artifact against the original brief, scored and trapped the same way idea candidates are — would surface promise-vs-delivery gaps before merge, not after Warwick discovers them live."
+      },
+      "source_evidence": {
+       "quote": "it caught gaps that had gone completely undetected, like features that were promised in the PRD but never actually got built, so we'd have shipped something that didn't match what we said it would do",
+       "timestamp": "12:20",
+       "named_mechanism": "post-build PRD-vs-shipped fidelity audit via isolated frame agents, scored N/V/F with a trap list"
+      },
+      "transfer_reasoning": "Structural invariant: a dedicated, separately-gated audit stage whose sole comparison object is the ORIGINAL BRIEF against the FINAL ARTIFACT — not code-parity, not pass/fail tests. Fusion's Builder Preflight checks internal consistency only (git/artefact/test-range parity), so this is a distinct check object, additive rather than a repeat of an existing point.",
+      "fusion_target": "Larry's Builder Preflight (7-point pre-merge self-check) — add an 8th point: PRD-promise-fidelity audit before merge-check",
+      "category": "brain",
+      "lens": "structural fidelity — brief-vs-artifact diff as its own audit object",
+      "nvfi": {
+       "novelty": 6,
+       "viability": 7,
+       "fit": 8,
+       "impact": 6
+      },
+      "traps": [
+       {
+        "type": "reviewer-overlap",
+        "note": "could bleed into Codex/Fable's existing fitness-for-purpose review scope — needs an explicit boundary so it's additive, not duplicate reviewing"
+       },
+       {
+        "type": "ownerless-checklist",
+        "note": "needs a named owner (Larry vs Warden) or it becomes an 8th checklist line nobody actually runs, same failure mode a stale process item always has"
+       }
+      ],
+      "_frame": "F1-mechanism"
+     }
+    ],
+    "zero_reason": null
+   },
+   {
+    "frame": "F2-inversion",
+    "discarded_obvious": [
+     "Adopt tree-of-thought/frame-isolation for ideation — already the live idea-engine architecture (Cairn→Transfer→Critic), would just restate a shipped feature.",
+     "Add novelty/viability/fit + trap-list scoring to a critic agent — already built per idea-engine-agent-architecture memory.",
+     "Give the critic a 'skeptical senior engineer' persona — already the Pax/critic role; not a failure-mode transfer, just a feature restatement."
+    ],
+    "candidates": [
+     {
+      "spin": {
+       "situation": "The video's whole fix works because each idea gets judged in its own clean context so ideas can't bleed into each other and skew the score.",
+       "problem": "If the step that scores or merges the frame outputs reads all of them back in ONE shared context, the exact bleed-through problem the isolation was built to prevent sneaks back in at the scoring stage — order of presentation quietly nudges which candidate looks strongest.",
+       "implication": "You'd have gone to the trouble of isolating six frames, then thrown that discipline away in the one place where an unfair thumb on the scale (which candidate got read first, which wording anchored the reviewer) matters most — a shortlist that looks rigorous but isn't.",
+       "need_payoff": "Score/critique each frame's output in its own isolated pass, same as generation, before any shared merge step ever sees more than one candidate at a time."
+      },
+      "source_evidence": {
+       "quote": "Every possibility gets worked through in the same context window, so the ideas bleed into each other and the context fills up with noise. The thinking gets worse instead of better.",
+       "timestamp": "02:08",
+       "named_mechanism": "shared-context bleed-through degrading judgment quality"
+      },
+      "transfer_reasoning": "The source names shared-context bleed as THE failure this whole architecture exists to kill — but only fixes it at generation time. The same mechanism (multiple items judged in one context → anchoring/noise) can silently re-enter at whichever step reads multiple candidates together. Inverting the fix: isolation has to hold at scoring too, not just at ideation.",
+      "fusion_target": "Critic/shortlist step in the idea-engine pipeline (Cairn→Transfer-Intelligence→Critic→Cockpit Accept) — verify each frame's candidates are critiqued in a separate pass, not one shared read-all-six-then-score call.",
+      "category": "brain",
+      "lens": "inversion",
+      "nvfi": {
+       "novelty": 6,
+       "viability": 8,
+       "fit": 8,
+       "impact": 6
+      },
+      "traps": [
+       {
+        "type": "cost",
+        "note": "per-candidate isolated critique multiplies critic-agent calls; needs a cheap batching compromise that still avoids cross-candidate anchoring"
+       }
+      ],
+      "_frame": "F2-inversion"
+     },
+     {
+      "spin": {
+       "situation": "The tool has a cheap 3-question gate that decides, before spending tokens, whether a problem is even worth the multi-agent treatment — otherwise it just answers directly.",
+       "problem": "That gate is itself a single-pass judgment with no visibility: if it wrongly decides 'this is closed-ended / low stakes,' the system silently falls back to the shallow default answer and nobody downstream ever sees that a deeper pass was skipped, let alone why.",
+       "implication": "The exact failure the tool was built to defeat (agents quietly settling for the safe, obvious answer) reappears one level up, disguised as an efficiency feature — and because it's silent, it looks like thoroughness happened when it didn't.",
+       "need_payoff": "Any triage gate that decides 'shallow vs deep' must leave a visible trace of its own verdict and reasoning, so a wrong shallow-routing is discoverable instead of invisible."
+      },
+      "source_evidence": {
+       "quote": "it runs the problem through three questions... If there's only one right answer, then thinking from multiple angles is pointless and just wastes tokens, so it stops there.",
+       "timestamp": "06:01",
+       "named_mechanism": "silent pre-check gate that can auto-downgrade to shallow single-pass reasoning"
+      },
+      "transfer_reasoning": "Inverting the assumption behind the gate: it's presented as pure cost-saving, but a false-negative here reproduces the same 'settles for the safe answer' failure the multi-agent design exists to prevent — except now it's invisible because no downstream step ever sees the road not taken.",
+      "fusion_target": "Cairn's intake triage — the decision of whether an ingested source gets full Transfer-Intelligence treatment or gets shallow-filed. Needs a visible 'shallow-routed + why' marker (not a silent drop) so Warwick can audit misjudged sources.",
+      "category": "brain",
+      "lens": "inversion",
+      "nvfi": {
+       "novelty": 6,
+       "viability": 7,
+       "fit": 7,
+       "impact": 6
+      },
+      "traps": [
+       {
+        "type": "noise",
+        "note": "if every shallow-routing gets surfaced, it could flood Warwick's review queue with low-value 'skipped' notices — needs a threshold or batched digest, not per-item pings"
+       }
+      ],
+      "_frame": "F2-inversion"
+     },
+     {
+      "spin": {
+       "situation": "Before the tool forks into isolated agents, it does one shared pass to gather context on the app, then hands that same context to every branch.",
+       "problem": "The branches look diverse because they think through different frames, but they all inherit the exact same upstream context snapshot — if that one gathering pass missed or distorted something, every 'independent' branch inherits the identical blind spot, and the appearance of six-way diversity papers over a single point of failure.",
+       "implication": "You get a shortlist that looks thoroughly cross-checked from six angles, when in fact all six angles were built on one possibly-flawed foundation nobody re-checked.",
+       "need_payoff": "Treat the shared context/evidence-gathering step as its own trust boundary — verify completeness or fidelity of that base BEFORE forking, since forking afterward can't undo a corrupted or incomplete starting point."
+      },
+      "source_evidence": {
+       "quote": "It started by going through the application in depth to gather context, then spun up its agents the same way.",
+       "timestamp": "11:40",
+       "named_mechanism": "single shared context-gathering pass feeding all isolated branches"
+      },
+      "transfer_reasoning": "Inverted assumption: isolation is assumed to guarantee independence, but independence only starts AFTER the fork — everything upstream of the fork is a single point of failure the frame architecture cannot see or correct for, since no frame is positioned to notice the shared input was already lossy.",
+      "fusion_target": "TubeAIR's transcript ingestion (link→cleaned transcript, no LLM) that feeds this very idea-engine run — and, directly, IDEA-016's 'T1-vs-T2 experiment harness (all 6 fresh, one brief)' where all six branches share exactly one upstream brief.",
+      "category": "brain",
+      "lens": "inversion",
+      "nvfi": {
+       "novelty": 7,
+       "viability": 7,
+       "fit": 8,
+       "impact": 7
+      },
+      "traps": [
+       {
+        "type": "evidence",
+        "note": "claim that a shared brief/transcript is complete needs a concrete check (e.g. transcript-length/coverage sanity check) before trusting six-way diversity built on it — not just asserted"
+       }
+      ],
+      "_frame": "F2-inversion"
+     },
+     {
+      "spin": {
+       "situation": "The tool's whole premise is that agents default to whatever answer showed up most often in training data — the safe, familiar pattern — unless deliberately pushed past it.",
+       "problem": "That same 'reach for the familiar pattern' bias doesn't only threaten the generation step — the review/scoring step (the skeptical senior-engineer critic) is graded on the SAME kind of model, so it likely carries the SAME bias, just aimed at judging instead of proposing: it may reflexively down-score genuinely novel transfers as 'too risky/unfamiliar' precisely because they're unfamiliar, which is the opposite of what a novelty score is supposed to reward.",
+       "implication": "A critic built to catch bad ideas can end up systematically killing the most valuable (most novel) ones for the same root reason the base model needed the multi-frame fix in the first place — an unexamined blind spot in the very component meant to be the quality gate.",
+       "need_payoff": "Explicitly test whether the critic penalizes unfamiliarity-as-risk versus genuine-viability-risk, and calibrate so novelty isn't structurally taxed by the same safe-pattern bias it's supposed to reward."
+      },
+      "source_evidence": {
+       "quote": "An agent reaches for the pattern that showed up most often in the data it learned from because seeing the same answer repeated is what taught it that the answer is a good one.",
+       "timestamp": "01:40",
+       "named_mechanism": "training-frequency bias toward the most common/safe pattern"
+      },
+      "transfer_reasoning": "Inversion: the source diagnoses this bias only in the generator and fixes it there. But the critic is built on the same kind of model and is never checked for the identical bias — an unfamiliar-but-genuinely-good transfer looks statistically 'wrong' to a model trained the same way, so the failure mode just relocates from generation to judgment, invisibly.",
+      "fusion_target": "The Critic step in idea-engine (N/V/F scoring) — specifically whether high-novelty candidates are getting systematically suppressed on viability/fit as a proxy for 'unfamiliar,' which the T1-vs-T2 calibration data (Deliverables/idea-engine-T2-calibration-*) may already be able to test empirically.",
+      "category": "brain",
+      "lens": "inversion",
+      "nvfi": {
+       "novelty": 8,
+       "viability": 6,
+       "fit": 7,
+       "impact": 7
+      },
+      "traps": [
+       {
+        "type": "needs-evidence",
+        "note": "provisional — would need to actually mine the existing T1/T2 calibration data for a novelty-vs-score correlation before treating this as more than a hypothesis"
+       }
+      ],
+      "_frame": "F2-inversion"
+     }
+    ],
+    "zero_reason": null
+   },
+   {
+    "frame": "F3-operational",
+    "discarded_obvious": [
+     "Whole source = tree-of-thought/frame-library/isolated-agents architecture mirrors the very idea-engine this frame is running inside (git history shows T2-calibration + T1vsT2-experiment already mid-build) — recognising 'this describes our own tool' is not a transfer, it's a mirror.",
+     "Zero-shared-context isolation between frame-agents ('they're isolated so they share zero context... none of them know what the others are working on') — that is literally this frame's own operating condition right now, not a new mechanism to transfer.",
+     "Critic-agent scoring on Novelty/Viability/Fit as a 'skeptical senior engineer' persona — duplicates the NVFI calibration work already underway (idea-engine-T2-calibration-KEY/BLIND/COST files in progress).",
+     "3-question pre-check gate (open-ended? high-stakes? how-you-asked) mapped onto a cheap-vs-deep tier router — too close to the in-progress T1-vs-T2 experiment to safely claim as new leverage without seeing what that harness already does.",
+     "TopView sponsor segment (batch video-ad generation from one prompt) — no evidence Warwick has a video-production workflow to attach this to; would be a manufactured need."
+    ],
+    "candidates": [
+     {
+      "spin": {
+       "situation": "Before any feature ships or merges, Larry runs a manual 7-point Builder Preflight checklist by eye.",
+       "problem": "That checklist catches artefact/doc mismatches, but nothing in it specifically hunts for 'we promised this in the plan and quietly never built it' or 'where would Warwick get confused and bail.'",
+       "implication": "That exact failure mode already burned the team once — the BUILD-014 fiasco was Larry building more than what was scoped, undetected until Warwick caught it after the fact.",
+       "need_payoff": "A cheap, dedicated pass that reads the PRD/plan against what was actually built and flags drift + confusion points BEFORE the merge-check, so Warwick isn't the one catching it live."
+      },
+      "source_evidence": {
+       "quote": "it caught gaps that had gone completely undetected, like features that were promised in the PRD but never actually got built, so we'd have shipped something that didn't match what we said it would do... for every one of them, it suggested a fix and listed out the traps and risks",
+       "timestamp": "[12:20]",
+       "named_mechanism": "pre-ship UX/churn fan-out run against the PRD, surfacing spec-drift + confusion points with fix suggestions and traps, findings handed back for a human to implement (never auto-fixed)"
+      },
+      "transfer_reasoning": "The source runs its fan-out not just for ideation but as a pre-launch QUALITY gate: agent re-reads the built app against the PRD and flags exactly the promised-vs-built gap that caused BUILD-014. Fusion already has a manual version of this (Builder Preflight) but nothing automated does the PRD-vs-built diff specifically. Bolting a lightweight single-pass 'spec-drift + confusion-point' check onto the existing preflight closes a gap that has already cost Warwick real rework once.",
+      "fusion_target": "Larry's Builder Preflight self-check (the 7-point pass before every Tower merge-check) — add a PRD-vs-built drift pass as one of the checks, output format: finding + suggested fix + trap, feeding the existing 'claimed artefacts in PR' and 'docs match deploy' checklist items instead of replacing them",
+      "category": "brain",
+      "lens": "blind-spot catch, pre-ship",
+      "nvfi": {
+       "novelty": 5,
+       "viability": 8,
+       "fit": 8,
+       "impact": 7
+      },
+      "traps": [
+       {
+        "type": "scope creep",
+        "note": "Don't let this become a second governance layer on top of Builder Preflight — it's one more check inside the existing pass, not a new ceremony (echoes the BUILD-014 lesson itself: don't build the machine, ship the thin slice)."
+       },
+       {
+        "type": "latency",
+        "note": "Must stay a single cheap pass, not a full multi-frame fan-out, or it slows every merge and gets skipped under time pressure."
+       }
+      ],
+      "_frame": "F3-operational"
+     },
+     {
+      "spin": {
+       "situation": "When Warwick accepts an idea in the Cockpit (Keep on a Brain/Cash card), the idea sits there as a stored decision.",
+       "problem": "Turning 'accepted idea' into 'thing I actually did this week' still requires Warwick to work out the first concrete action himself — that's a manual step the card doesn't remove.",
+       "implication": "Attention is his scarcest resource; an accepted idea with no obvious next click is exactly the kind of thing that quietly rots in a backlog instead of becoming a next-action.",
+       "need_payoff": "Every accepted idea card should carry a concrete first-step field so 'Keep' turns straight into 'here's what to do next', not another thing to re-think later."
+      },
+      "source_evidence": {
+       "quote": "Each idea also comes with a sketch of how it would be built, the risks involved, and the first steps for getting started on it.",
+       "timestamp": "[08:37]",
+       "named_mechanism": "every surviving idea ships with an explicit 'first steps to get started' field alongside its score and risks — the tool plans, it doesn't implement, but it never hands back a bare idea"
+      },
+      "transfer_reasoning": "The source treats 'first step' as a mandatory output field, not an afterthought — it's what turns a scored idea into something actionable without the human having to translate it. Fusion's Cockpit idea cards (Keep/Decline/Later) currently surface the idea and its score but nothing forces a concrete 'do this first' line. Un-clever, but it's the exact toil-killer this frame is meant to catch: one field, removes one recurring manual translation step for Warwick.",
+      "fusion_target": "Cockpit idea/output card schema (Ideas Brain/Cash, Keep/Decline/Later) — add a mandatory 'first step' field populated at generation time by the Transfer-Intelligence/Critic pass, shown on the card itself, not buried in a linked doc",
+      "category": "brain",
+      "lens": "kill a manual next-action-translation step",
+      "nvfi": {
+       "novelty": 4,
+       "viability": 9,
+       "fit": 8,
+       "impact": 7
+      },
+      "traps": [
+       {
+        "type": "garbage-in",
+        "note": "A generic or hand-wavy 'first step' (e.g. 'research further') is worse than none — only add the field if the generating pass can produce a genuinely concrete one."
+       },
+       {
+        "type": "scope creep",
+        "note": "Keep it to one line, not a mini project plan bolted onto the card — the card's job is triage, not planning."
+       }
+      ],
+      "_frame": "F3-operational"
+     }
+    ],
+    "zero_reason": null
+   },
+   {
+    "frame": "F4-commercial",
+    "discarded_obvious": [
+     "Just install/use the ADHD-style multi-agent ideation skill for Fusion's own internal brainstorming — that's an internal capability upgrade, not an external revenue path; belongs to the internal frames, not this one.",
+     "TopView sponsor segment (AI video-model aggregator skill for ad generation) — no structural link to Fusion's actual competency (knowledge-graph/idea-engine work); pursuing it would be a forced analogy, not a transfer.",
+     "'Subscribe and hit the bell' community-building mechanic — generic channel-growth tactic, not a mechanism Fusion can transfer into a revenue line."
+    ],
+    "candidates": [
+     {
+      "spin": {
+       "situation": "Fusion is already mid-build on its own idea-engine (IDEA-016) that spins up several isolated AI 'thinking styles' at once so ideas don't all come back sounding the same, then scores and prunes them with a skeptical critic.",
+       "problem": "Right now that entire capability lives only inside Fusion's own walls — it earns Warwick nothing and has zero audience outside this repo.",
+       "implication": "A near-identical but by-the-look-of-it less rigorous version of this same mechanism, released as a public tool, picked up heavy community traction within days of release — proof there's real external demand (attention, sponsorship, willing users) for exactly this category of tool, and Fusion's version already has a differentiator (explicit self-kill calibration + trap lists + frame-blindness) that the source tool doesn't describe having.",
+       "need_payoff": "If Fusion packages its T2 idea-engine as a standalone public skill/tool (the repo is already public), it opens a genuine income and reputation stream — downloads, sponsorships, paid support/consulting — that exists independently of Warwick's job at Bellrock."
+      },
+      "source_evidence": {
+       "quote": "The ADHD skill came out fairly recently and picked up a lot of stars within a few days... it takes ideation or really any task with a lot of possible directions and splits it across separate agents as a tree of thought.",
+       "timestamp": "02:08-03:41",
+       "named_mechanism": "tree-of-thought frame-isolated multi-agent ideation skill with critic scoring (N/V/F)"
+      },
+      "transfer_reasoning": "SOURCE has a frame-isolated multi-agent ideation skill (quote above); invariant: splitting divergent thinking across blind, isolated agents and pruning with a skeptical scorer is itself a sellable capability, not just an internal process improvement. At Fusion's idea-engine (IDEA-016 / T2 divergence architecture, cd4e380/06c8974) it does the same W — but Fusion's version already carries stronger discipline (explicit self-kill calibration per frame, trap-list triage, WHOLE-SOURCE + NEVER-MANUFACTURE guardrails) than what's described of the source tool, meaning the transfer is 'package what you already built for outside buyers,' not 'go build something new.'",
+      "fusion_target": "idea-engine / T2 divergence architecture (this Transfer-Intelligence frame system itself, .claude Cockpit tooling)",
+      "category": "cash",
+      "lens": "external productization of an internally-proven mechanism",
+      "nvfi": {
+       "novelty": 5,
+       "viability": 7,
+       "fit": 8,
+       "impact": 6
+      },
+      "traps": [
+       {
+        "type": "fast-follower risk",
+        "note": "the source tool already has first-mover attention in this exact category; Fusion would need a genuinely visible edge (e.g. the self-kill/trap-list rigor) to avoid being noise, not just a clone with a different name."
+       },
+       {
+        "type": "open-source cannibalization",
+        "note": "Fusion247PKA is a public repo — if the differentiated engine internals are fully visible in git history, others can copy the mechanism before Fusion captures any value from it; needs a deliberate decision on what's given away free vs. what's paywalled (hosted version, support, curated frame library)."
+       }
+      ],
+      "_frame": "F4-commercial"
+     },
+     {
+      "spin": {
+       "situation": "The source shows a concrete two-moment audit pattern: before you build (multi-angle test-strategy planning) and right before you ship (multi-angle churn/UX risk-finding) — both run by spinning up isolated AI agents through different lenses and scoring what comes back.",
+       "problem": "Small software teams and agencies routinely ship with untested edge cases and features quietly dropped from the original plan, and they usually only find out once real users hit the gaps or churn.",
+       "implication": "Fixing that after launch — refunds, support fires, trust damage, rework — costs far more than catching it beforehand, yet most small teams have no structured way to run this kind of check on themselves before they ship.",
+       "need_payoff": "Fusion could sell a two-stage 'Ship-Ready Audit' — hand us your PRD and your codebase, we run it before you build and again before you launch — as a paid service to outside dev teams/agencies, using the same frame-plus-critic mechanism Fusion is already building for itself."
+      },
+      "source_evidence": {
+       "quote": "it caught gaps that had gone completely undetected, like features that were promised in the PRD but never actually got built... for every one of them, it suggested a fix and listed out the traps and risks that came with it",
+       "timestamp": "11:40-12:52",
+       "named_mechanism": "pre-build TDD test-strategy planning + pre-launch churn/UX risk audit, both frame-isolated and critic-scored"
+      },
+      "transfer_reasoning": "SOURCE has a two-checkpoint audit mechanism (quote above); invariant: running isolated multi-lens agents against a PRD/codebase at two specific decision moments (before build, before ship) surfaces gaps a single-pass agent misses, and hands back scored findings + fixes + traps rather than doing the fix itself. At Fusion's Cockpit/idea-engine tooling it does the same W, but pointed at an EXTERNAL client's PRD+repo instead of Fusion's own — turning an internal QA habit into a billable engagement.",
+      "fusion_target": "idea-engine / T2 frame-and-critic loop, offered as a client-facing Cockpit audit workflow",
+      "category": "cash",
+      "lens": "service-ify an internal QA mechanism for external dev teams",
+      "nvfi": {
+       "novelty": 4,
+       "viability": 6,
+       "fit": 7,
+       "impact": 6
+      },
+      "traps": [
+       {
+        "type": "delivery cost",
+        "note": "a real client engagement needs a human (Larry/Warwick) to intake the client's PRD, run the loop, and curate results per client — without a templated/productized wrapper this becomes bespoke consulting time, not scalable software margin."
+       },
+       {
+        "type": "liability",
+        "note": "if Fusion is paid to run this audit and a churn-causing bug still ships, that's a reputational and possibly contractual exposure — needs clear scope/disclaimer language before selling it as a service rather than a courtesy check."
+       }
+      ],
+      "_frame": "F4-commercial"
+     }
+    ],
+    "zero_reason": null
+   },
+   {
+    "frame": "F5-crossdomain",
+    "discarded_obvious": [
+     "Using the ADHD/tree-of-thought skill itself to run Fusion's idea-engine — that's the literal system already being built this branch, not a transfer.",
+     "Mapping the N/V/F critic scoring onto Pax/Fable — Fusion's Critic already scores exactly this way; it's the recognized origin of this frame's own output schema, not a transfer target.",
+     "Using the frame-diversity mechanism to make the Outputs Layer surface less repetitive — too direct an application of the source tool to another Fusion subsystem, belongs to the structural frame.",
+     "TDD-via-frames for writing tests before building — obviously maps to Vera/build-review QA, not a distant transfer.",
+     "The pre-check gate (open-ended? high-stakes? how you asked?) as a triage step — this is already the shape of Cairn's intake triage per the idea-engine architecture; applying it back to ideation is circular, not a transfer."
+    ],
+    "candidates": [
+     {
+      "spin": {
+       "situation": "Larry runs long sessions where ideation, build history, backlog, and decisions all pile up in one single conversation thread.",
+       "problem": "When that thread gets compacted or Larry restarts, hard-won context quietly evaporates because it was never kept separate from the noise of everything else happening in that same thread — this is an open, unsolved backlog item as of today.",
+       "implication": "Warwick ends up re-explaining decisions and history, and the subtle-but-important context gets silently lost right when it would matter most.",
+       "need_payoff": "If Larry's own continuity were built the way this tool builds ideation — isolate each concern in its own clean window, merge only the finished output back — compaction would lose noise, not substance."
+      },
+      "source_evidence": {
+       "quote": "Every possibility gets worked through in the same context window, so the ideas bleed into each other and the context fills up with noise. The thinking gets worse instead of better.",
+       "timestamp": "[02:08]",
+       "named_mechanism": "per-branch context isolation with merge-only-at-the-end"
+      },
+      "transfer_reasoning": "The source's cure for single-context degradation (isolate parallel concerns, never let them share a window, merge only conclusions) targets the exact same failure shape as Larry's context-evaporation-on-compaction problem — a long single thread accumulating unrelated concerns until the signal degrades. The domain jump is real: the source only ever applies this to brainstorming variations, never to an agent's own session continuity.",
+      "fusion_target": "Larry's session-continuity / anti-context-evaporation architecture (open backlog item, currently undesigned)",
+      "category": "brain",
+      "lens": "isolation-then-merge as a memory architecture, not an ideation tool",
+      "nvfi": {
+       "novelty": 8,
+       "viability": 5,
+       "fit": 6,
+       "impact": 7
+      },
+      "traps": [
+       {
+        "type": "scope-creep",
+        "note": "could balloon into rebuilding Larry's whole memory system instead of a targeted fix for the one backlog item"
+       },
+       {
+        "type": "unproven",
+        "note": "provisional only — no evidence yet that isolate-then-merge actually prevents evaporation rather than just relocating the noise elsewhere"
+       }
+      ],
+      "_frame": "F5-crossdomain"
+     },
+     {
+      "spin": {
+       "situation": "Fusion is mid-way through a manual, human-supervised project (the T1-vs-T2 calibration harness) to work out when the cheap model tier is good enough versus when the expensive tier earns its cost.",
+       "problem": "That tier decision is currently a one-off calibration exercise Larry runs and interprets by hand, work-package by work-package, rather than something that happens automatically and at scale.",
+       "implication": "Every new work-package still needs a fresh manual tier judgment call, which won't hold up as the number of work-packages grows.",
+       "need_payoff": "An auto-router that classifies tier per work-package on the fly, and batch-runs both tiers as parallel variants whenever it's ambiguous, would turn today's one-time calibration exercise into a permanent, self-serve system."
+      },
+      "source_evidence": {
+       "quote": "It even auto selects the right model for the job... You describe what you want once and it batch generates dozens of videos across different models, styles, and aspect ratios in a single session.",
+       "timestamp": "[07:51]",
+       "named_mechanism": "auto-model-selection plus batched multi-model variant generation in one pass"
+      },
+      "transfer_reasoning": "This is a sponsor-ad segment other frames would likely discard as irrelevant filler, but structurally it names a mechanism — given one job, auto-pick from a pool of models AND batch multiple variants across that pool in a single pass instead of manual serial switching — that maps directly onto Fusion's still-manual T1-vs-T2 tier decision, extending calibration work already underway into a live auto-router.",
+      "fusion_target": "T1/T2 tier auto-selection layer for the idea-engine work-package pipeline (currently manual calibration per T2-calibration/T1vsT2-experiment deliverables)",
+      "category": "cash",
+      "lens": "sponsor-segment auto-routing as a tier-selection mechanism, not a video tool",
+      "nvfi": {
+       "novelty": 6,
+       "viability": 6,
+       "fit": 7,
+       "impact": 6
+      },
+      "traps": [
+       {
+        "type": "overlap",
+        "note": "may duplicate the in-flight T2 divergence architecture design package (06c8974) — check before building anything new"
+       },
+       {
+        "type": "cost",
+        "note": "batch-running both tiers in parallel doubles spend on every ambiguous work-package unless the batching is bounded"
+       }
+      ],
+      "_frame": "F5-crossdomain"
+     }
+    ],
+    "zero_reason": null
+   }
+  ],
+  "enriched": [
+   {
+    "spin": {
+     "situation": "Warwick already knows the real bottleneck in shipping any Fusion idea isn't the coding, it's that ideas arrive without a proper brief.",
+     "problem": "A promoted idea can go straight into a build session on nothing more than a paragraph of intent, so whoever builds it has to guess at scope from the live conversation, and different sessions guess differently.",
+     "implication": "That guessing is what the BUILD-014 fiasco was made of — building the wrong-sized thing because the input wasn't pinned down — and it recurs until every promoted idea carries a real, durable brief instead of relying on chat memory.",
+     "need_payoff": "If a PRD + tech-spec pair became a mandatory, config-linked prerequisite before any build session opens — exactly how this skill refuses to fan agents out until a PRD and tech-spec are linked in its config file — builders get forced, durable grounding instead of re-deriving scope each time."
+    },
+    "source_evidence": {
+     "quote": "you need to write down what needs to be built like a PRD... alongside that, you should also give it a technical specification document... You link both of those inside your claw.md file, so it picks up that context from the very start.",
+     "timestamp": "08:37",
+     "named_mechanism": "config-linked PRD+tech-spec as a hard prerequisite gating agent fan-out"
+    },
+    "transfer_reasoning": "Structural invariant: expensive, creative multi-agent work is gated on a durable, config-referenced spec artifact, not on live conversational context. Fusion's own CLAUDE.md already uses this exact shape — a pointer file linking to a canonical doc (AGENTS.md) rather than duplicating it. Extending that identical shape to the Foundry-to-build handoff isn't a new invention for Fusion, it's applying Fusion's own established pattern to the one seam memory already flags as unresolved (build inputs need a PRD + robust home).",
+    "fusion_target": "Foundry idea-to-build handoff / CLAUDE.md pointer pattern: require a linked PRD+tech-spec doc pair in the build session's context file before any builder agent opens, mirroring how CLAUDE.md links to AGENTS.md",
+    "category": "brain",
+    "lens": "structural fidelity — config-linked prerequisite gating",
+    "nvfi": {
+     "novelty": 5,
+     "viability": 8,
+     "fit": 9,
+     "impact": 8
+    },
+    "traps": [
+     {
+      "type": "scope-creep",
+      "note": "don't let 'PRD required' become a heavyweight gate for tiny quick-wins — needs a size threshold or it recreates BUILD-014's over-engineering"
+     },
+     {
+      "type": "stale-doc",
+      "note": "a linked PRD can drift from the actual build the same way runtime.json still holds the old Directus password — needs a freshness/last-verified marker, not a fire-and-forget link"
+     }
+    ],
+    "_frame": "F1-mechanism",
+    "frame": "F1-mechanism",
+    "_graph": {
+     "fired": [
+      "novelty_to_graph",
+      "related_active_problem"
+     ],
+     "not_wired_today": [
+      "prior_rejection/duplication (needs idea_candidate history join)",
+      "recurrence footprint (corpus too thin — ~5 docs)",
+      "recency/trajectory (single ingest window)"
+     ],
+     "novelty_to_graph": {
+      "status": "known_or_partial",
+      "nearest": [
+       "config.json",
+       "Edit Config",
+       "Claw Desktop Config.json",
+       "Whirlpool Refrigerator Spec Sheet",
+       "Chunk-Specific Metadata"
+      ]
+     },
+     "related_active_problem": [
+      "build"
+     ]
+    }
+   },
+   {
+    "spin": {
+     "situation": "Larry already runs a 7-point Builder Preflight before every Tower merge-check: git-clean, artefacts-in-PR, migration/teardown parity, docs-match-deploy, and so on.",
+     "problem": "All seven of those checks confirm the build is INTERNALLY consistent — code matches PR matches CI. None of them ask whether the shipped thing still delivers everything the original brief promised.",
+     "implication": "That's precisely the gap the video's pre-launch audit exists to catch — features 'promised in the PRD but never actually built' slipping through into a live version nobody re-read against the brief.",
+     "need_payoff": "A dedicated PRD-fidelity pass — isolated frame-agents diffing the shipped artifact against the original brief, scored and trapped the same way idea candidates are — would surface promise-vs-delivery gaps before merge, not after Warwick discovers them live."
+    },
+    "source_evidence": {
+     "quote": "it caught gaps that had gone completely undetected, like features that were promised in the PRD but never actually got built, so we'd have shipped something that didn't match what we said it would do",
+     "timestamp": "12:20",
+     "named_mechanism": "post-build PRD-vs-shipped fidelity audit via isolated frame agents, scored N/V/F with a trap list"
+    },
+    "transfer_reasoning": "Structural invariant: a dedicated, separately-gated audit stage whose sole comparison object is the ORIGINAL BRIEF against the FINAL ARTIFACT — not code-parity, not pass/fail tests. Fusion's Builder Preflight checks internal consistency only (git/artefact/test-range parity), so this is a distinct check object, additive rather than a repeat of an existing point.",
+    "fusion_target": "Larry's Builder Preflight (7-point pre-merge self-check) — add an 8th point: PRD-promise-fidelity audit before merge-check",
+    "category": "brain",
+    "lens": "structural fidelity — brief-vs-artifact diff as its own audit object",
+    "nvfi": {
+     "novelty": 6,
+     "viability": 7,
+     "fit": 8,
+     "impact": 6
+    },
+    "traps": [
+     {
+      "type": "reviewer-overlap",
+      "note": "could bleed into Codex/Fable's existing fitness-for-purpose review scope — needs an explicit boundary so it's additive, not duplicate reviewing"
+     },
+     {
+      "type": "ownerless-checklist",
+      "note": "needs a named owner (Larry vs Warden) or it becomes an 8th checklist line nobody actually runs, same failure mode a stale process item always has"
+     }
+    ],
+    "_frame": "F1-mechanism",
+    "frame": "F1-mechanism",
+    "_graph": {
+     "fired": [
+      "novelty_to_graph",
+      "related_active_problem"
+     ],
+     "not_wired_today": [
+      "prior_rejection/duplication (needs idea_candidate history join)",
+      "recurrence footprint (corpus too thin — ~5 docs)",
+      "recency/trajectory (single ingest window)"
+     ],
+     "novelty_to_graph": {
+      "status": "known_or_partial",
+      "nearest": [
+       "Postgres",
+       "Blog Post",
+       "Postgrql",
+       "Fellow Builders"
+      ]
+     },
+     "related_active_problem": [
+      "Larry",
+      "build"
+     ]
+    }
+   },
+   {
+    "spin": {
+     "situation": "The video's whole fix works because each idea gets judged in its own clean context so ideas can't bleed into each other and skew the score.",
+     "problem": "If the step that scores or merges the frame outputs reads all of them back in ONE shared context, the exact bleed-through problem the isolation was built to prevent sneaks back in at the scoring stage — order of presentation quietly nudges which candidate looks strongest.",
+     "implication": "You'd have gone to the trouble of isolating six frames, then thrown that discipline away in the one place where an unfair thumb on the scale (which candidate got read first, which wording anchored the reviewer) matters most — a shortlist that looks rigorous but isn't.",
+     "need_payoff": "Score/critique each frame's output in its own isolated pass, same as generation, before any shared merge step ever sees more than one candidate at a time."
+    },
+    "source_evidence": {
+     "quote": "Every possibility gets worked through in the same context window, so the ideas bleed into each other and the context fills up with noise. The thinking gets worse instead of better.",
+     "timestamp": "02:08",
+     "named_mechanism": "shared-context bleed-through degrading judgment quality"
+    },
+    "transfer_reasoning": "The source names shared-context bleed as THE failure this whole architecture exists to kill — but only fixes it at generation time. The same mechanism (multiple items judged in one context → anchoring/noise) can silently re-enter at whichever step reads multiple candidates together. Inverting the fix: isolation has to hold at scoring too, not just at ideation.",
+    "fusion_target": "Critic/shortlist step in the idea-engine pipeline (Cairn→Transfer-Intelligence→Critic→Cockpit Accept) — verify each frame's candidates are critiqued in a separate pass, not one shared read-all-six-then-score call.",
+    "category": "brain",
+    "lens": "inversion",
+    "nvfi": {
+     "novelty": 6,
+     "viability": 8,
+     "fit": 8,
+     "impact": 6
+    },
+    "traps": [
+     {
+      "type": "cost",
+      "note": "per-candidate isolated critique multiplies critic-agent calls; needs a cheap batching compromise that still avoids cross-candidate anchoring"
+     }
+    ],
+    "_frame": "F2-inversion",
+    "frame": "F2-inversion",
+    "_graph": {
+     "fired": [
+      "novelty_to_graph",
+      "related_active_problem"
+     ],
+     "not_wired_today": [
+      "prior_rejection/duplication (needs idea_candidate history join)",
+      "recurrence footprint (corpus too thin — ~5 docs)",
+      "recency/trajectory (single ingest window)"
+     ],
+     "novelty_to_graph": {
+      "status": "known_or_partial",
+      "nearest": [
+       "Shared Directory",
+       "Shared Folder",
+       "Data Shared",
+       "Context Expansion",
+       "Context Expansion Endpoint"
+      ]
+     },
+     "related_active_problem": [
+      "context"
+     ]
+    }
+   },
+   {
+    "spin": {
+     "situation": "The tool has a cheap 3-question gate that decides, before spending tokens, whether a problem is even worth the multi-agent treatment — otherwise it just answers directly.",
+     "problem": "That gate is itself a single-pass judgment with no visibility: if it wrongly decides 'this is closed-ended / low stakes,' the system silently falls back to the shallow default answer and nobody downstream ever sees that a deeper pass was skipped, let alone why.",
+     "implication": "The exact failure the tool was built to defeat (agents quietly settling for the safe, obvious answer) reappears one level up, disguised as an efficiency feature — and because it's silent, it looks like thoroughness happened when it didn't.",
+     "need_payoff": "Any triage gate that decides 'shallow vs deep' must leave a visible trace of its own verdict and reasoning, so a wrong shallow-routing is discoverable instead of invisible."
+    },
+    "source_evidence": {
+     "quote": "it runs the problem through three questions... If there's only one right answer, then thinking from multiple angles is pointless and just wastes tokens, so it stops there.",
+     "timestamp": "06:01",
+     "named_mechanism": "silent pre-check gate that can auto-downgrade to shallow single-pass reasoning"
+    },
+    "transfer_reasoning": "Inverting the assumption behind the gate: it's presented as pure cost-saving, but a false-negative here reproduces the same 'settles for the safe answer' failure the multi-agent design exists to prevent — except now it's invisible because no downstream step ever sees the road not taken.",
+    "fusion_target": "Cairn's intake triage — the decision of whether an ingested source gets full Transfer-Intelligence treatment or gets shallow-filed. Needs a visible 'shallow-routed + why' marker (not a silent drop) so Warwick can audit misjudged sources.",
+    "category": "brain",
+    "lens": "inversion",
+    "nvfi": {
+     "novelty": 6,
+     "viability": 7,
+     "fit": 7,
+     "impact": 6
+    },
+    "traps": [
+     {
+      "type": "noise",
+      "note": "if every shallow-routing gets surfaced, it could flood Warwick's review queue with low-value 'skipped' notices — needs a threshold or batched digest, not per-item pings"
+     }
+    ],
+    "_frame": "F2-inversion",
+    "frame": "F2-inversion",
+    "_graph": {
+     "fired": [
+      "novelty_to_graph"
+     ],
+     "not_wired_today": [
+      "prior_rejection/duplication (needs idea_candidate history join)",
+      "recurrence footprint (corpus too thin — ~5 docs)",
+      "recency/trajectory (single ingest window)"
+     ],
+     "novelty_to_graph": {
+      "status": "known_or_partial",
+      "nearest": [
+       "Health Checks",
+       "Checklists",
+       "Payment Gateway"
+      ]
+     }
+    }
+   },
+   {
+    "spin": {
+     "situation": "Before the tool forks into isolated agents, it does one shared pass to gather context on the app, then hands that same context to every branch.",
+     "problem": "The branches look diverse because they think through different frames, but they all inherit the exact same upstream context snapshot — if that one gathering pass missed or distorted something, every 'independent' branch inherits the identical blind spot, and the appearance of six-way diversity papers over a single point of failure.",
+     "implication": "You get a shortlist that looks thoroughly cross-checked from six angles, when in fact all six angles were built on one possibly-flawed foundation nobody re-checked.",
+     "need_payoff": "Treat the shared context/evidence-gathering step as its own trust boundary — verify completeness or fidelity of that base BEFORE forking, since forking afterward can't undo a corrupted or incomplete starting point."
+    },
+    "source_evidence": {
+     "quote": "It started by going through the application in depth to gather context, then spun up its agents the same way.",
+     "timestamp": "11:40",
+     "named_mechanism": "single shared context-gathering pass feeding all isolated branches"
+    },
+    "transfer_reasoning": "Inverted assumption: isolation is assumed to guarantee independence, but independence only starts AFTER the fork — everything upstream of the fork is a single point of failure the frame architecture cannot see or correct for, since no frame is positioned to notice the shared input was already lossy.",
+    "fusion_target": "TubeAIR's transcript ingestion (link→cleaned transcript, no LLM) that feeds this very idea-engine run — and, directly, IDEA-016's 'T1-vs-T2 experiment harness (all 6 fresh, one brief)' where all six branches share exactly one upstream brief.",
+    "category": "brain",
+    "lens": "inversion",
+    "nvfi": {
+     "novelty": 7,
+     "viability": 7,
+     "fit": 8,
+     "impact": 7
+    },
+    "traps": [
+     {
+      "type": "evidence",
+      "note": "claim that a shared brief/transcript is complete needs a concrete check (e.g. transcript-length/coverage sanity check) before trusting six-way diversity built on it — not just asserted"
+     }
+    ],
+    "_frame": "F2-inversion",
+    "frame": "F2-inversion",
+    "_graph": {
+     "fired": [
+      "novelty_to_graph",
+      "related_active_problem"
+     ],
+     "not_wired_today": [
+      "prior_rejection/duplication (needs idea_candidate history join)",
+      "recurrence footprint (corpus too thin — ~5 docs)",
+      "recency/trajectory (single ingest window)"
+     ],
+     "novelty_to_graph": {
+      "status": "known_or_partial",
+      "nearest": [
+       "Instruction Manual 24in Single Wall Oven",
+       "Impava 24in Single Wall Ovens Instruction Manual",
+       "EPA 24in Single Wall Oven Instruction Manual",
+       "Shared Directory",
+       "Shared Folder"
+      ]
+     },
+     "related_active_problem": [
+      "context"
+     ]
+    }
+   },
+   {
+    "spin": {
+     "situation": "The tool's whole premise is that agents default to whatever answer showed up most often in training data — the safe, familiar pattern — unless deliberately pushed past it.",
+     "problem": "That same 'reach for the familiar pattern' bias doesn't only threaten the generation step — the review/scoring step (the skeptical senior-engineer critic) is graded on the SAME kind of model, so it likely carries the SAME bias, just aimed at judging instead of proposing: it may reflexively down-score genuinely novel transfers as 'too risky/unfamiliar' precisely because they're unfamiliar, which is the opposite of what a novelty score is supposed to reward.",
+     "implication": "A critic built to catch bad ideas can end up systematically killing the most valuable (most novel) ones for the same root reason the base model needed the multi-frame fix in the first place — an unexamined blind spot in the very component meant to be the quality gate.",
+     "need_payoff": "Explicitly test whether the critic penalizes unfamiliarity-as-risk versus genuine-viability-risk, and calibrate so novelty isn't structurally taxed by the same safe-pattern bias it's supposed to reward."
+    },
+    "source_evidence": {
+     "quote": "An agent reaches for the pattern that showed up most often in the data it learned from because seeing the same answer repeated is what taught it that the answer is a good one.",
+     "timestamp": "01:40",
+     "named_mechanism": "training-frequency bias toward the most common/safe pattern"
+    },
+    "transfer_reasoning": "Inversion: the source diagnoses this bias only in the generator and fixes it there. But the critic is built on the same kind of model and is never checked for the identical bias — an unfamiliar-but-genuinely-good transfer looks statistically 'wrong' to a model trained the same way, so the failure mode just relocates from generation to judgment, invisibly.",
+    "fusion_target": "The Critic step in idea-engine (N/V/F scoring) — specifically whether high-novelty candidates are getting systematically suppressed on viability/fit as a proxy for 'unfamiliar,' which the T1-vs-T2 calibration data (Deliverables/idea-engine-T2-calibration-*) may already be able to test empirically.",
+    "category": "brain",
+    "lens": "inversion",
+    "nvfi": {
+     "novelty": 8,
+     "viability": 6,
+     "fit": 7,
+     "impact": 7
+    },
+    "traps": [
+     {
+      "type": "needs-evidence",
+      "note": "provisional — would need to actually mine the existing T1/T2 calibration data for a novelty-vs-score correlation before treating this as more than a hypothesis"
+     }
+    ],
+    "_frame": "F2-inversion",
+    "frame": "F2-inversion",
+    "_graph": {
+     "fired": [
+      "novelty_to_graph",
+      "related_prior_decision"
+     ],
+     "not_wired_today": [
+      "prior_rejection/duplication (needs idea_candidate history join)",
+      "recurrence footprint (corpus too thin — ~5 docs)",
+      "recency/trajectory (single ingest window)"
+     ],
+     "novelty_to_graph": {
+      "status": "novel_to_graph",
+      "nearest": []
+     },
+     "related_prior_decision": [
+      "Cloud engine room"
+     ]
+    }
+   },
+   {
+    "spin": {
+     "situation": "Before any feature ships or merges, Larry runs a manual 7-point Builder Preflight checklist by eye.",
+     "problem": "That checklist catches artefact/doc mismatches, but nothing in it specifically hunts for 'we promised this in the plan and quietly never built it' or 'where would Warwick get confused and bail.'",
+     "implication": "That exact failure mode already burned the team once — the BUILD-014 fiasco was Larry building more than what was scoped, undetected until Warwick caught it after the fact.",
+     "need_payoff": "A cheap, dedicated pass that reads the PRD/plan against what was actually built and flags drift + confusion points BEFORE the merge-check, so Warwick isn't the one catching it live."
+    },
+    "source_evidence": {
+     "quote": "it caught gaps that had gone completely undetected, like features that were promised in the PRD but never actually got built, so we'd have shipped something that didn't match what we said it would do... for every one of them, it suggested a fix and listed out the traps and risks",
+     "timestamp": "[12:20]",
+     "named_mechanism": "pre-ship UX/churn fan-out run against the PRD, surfacing spec-drift + confusion points with fix suggestions and traps, findings handed back for a human to implement (never auto-fixed)"
+    },
+    "transfer_reasoning": "The source runs its fan-out not just for ideation but as a pre-launch QUALITY gate: agent re-reads the built app against the PRD and flags exactly the promised-vs-built gap that caused BUILD-014. Fusion already has a manual version of this (Builder Preflight) but nothing automated does the PRD-vs-built diff specifically. Bolting a lightweight single-pass 'spec-drift + confusion-point' check onto the existing preflight closes a gap that has already cost Warwick real rework once.",
+    "fusion_target": "Larry's Builder Preflight self-check (the 7-point pass before every Tower merge-check) — add a PRD-vs-built drift pass as one of the checks, output format: finding + suggested fix + trap, feeding the existing 'claimed artefacts in PR' and 'docs match deploy' checklist items instead of replacing them",
+    "category": "brain",
+    "lens": "blind-spot catch, pre-ship",
+    "nvfi": {
+     "novelty": 5,
+     "viability": 8,
+     "fit": 8,
+     "impact": 7
+    },
+    "traps": [
+     {
+      "type": "scope creep",
+      "note": "Don't let this become a second governance layer on top of Builder Preflight — it's one more check inside the existing pass, not a new ceremony (echoes the BUILD-014 lesson itself: don't build the machine, ship the thin slice)."
+     },
+     {
+      "type": "latency",
+      "note": "Must stay a single cheap pass, not a full multi-frame fan-out, or it slows every merge and gets skipped under time pressure."
+     }
+    ],
+    "_frame": "F3-operational",
+    "frame": "F3-operational",
+    "_graph": {
+     "fired": [
+      "novelty_to_graph",
+      "related_prior_decision",
+      "related_active_problem"
+     ],
+     "not_wired_today": [
+      "prior_rejection/duplication (needs idea_candidate history join)",
+      "recurrence footprint (corpus too thin — ~5 docs)",
+      "recency/trajectory (single ingest window)"
+     ],
+     "novelty_to_graph": {
+      "status": "known_or_partial",
+      "nearest": [
+       "Relationships",
+       "Paid Sponsorship",
+       "Dummy Relationship"
+      ]
+     },
+     "related_prior_decision": [
+      "Yoga self-hosting"
+     ],
+     "related_active_problem": [
+      "Larry",
+      "self"
+     ]
+    }
+   },
+   {
+    "spin": {
+     "situation": "When Warwick accepts an idea in the Cockpit (Keep on a Brain/Cash card), the idea sits there as a stored decision.",
+     "problem": "Turning 'accepted idea' into 'thing I actually did this week' still requires Warwick to work out the first concrete action himself — that's a manual step the card doesn't remove.",
+     "implication": "Attention is his scarcest resource; an accepted idea with no obvious next click is exactly the kind of thing that quietly rots in a backlog instead of becoming a next-action.",
+     "need_payoff": "Every accepted idea card should carry a concrete first-step field so 'Keep' turns straight into 'here's what to do next', not another thing to re-think later."
+    },
+    "source_evidence": {
+     "quote": "Each idea also comes with a sketch of how it would be built, the risks involved, and the first steps for getting started on it.",
+     "timestamp": "[08:37]",
+     "named_mechanism": "every surviving idea ships with an explicit 'first steps to get started' field alongside its score and risks — the tool plans, it doesn't implement, but it never hands back a bare idea"
+    },
+    "transfer_reasoning": "The source treats 'first step' as a mandatory output field, not an afterthought — it's what turns a scored idea into something actionable without the human having to translate it. Fusion's Cockpit idea cards (Keep/Decline/Later) currently surface the idea and its score but nothing forces a concrete 'do this first' line. Un-clever, but it's the exact toil-killer this frame is meant to catch: one field, removes one recurring manual translation step for Warwick.",
+    "fusion_target": "Cockpit idea/output card schema (Ideas Brain/Cash, Keep/Decline/Later) — add a mandatory 'first step' field populated at generation time by the Transfer-Intelligence/Critic pass, shown on the card itself, not buried in a linked doc",
+    "category": "brain",
+    "lens": "kill a manual next-action-translation step",
+    "nvfi": {
+     "novelty": 4,
+     "viability": 9,
+     "fit": 8,
+     "impact": 7
+    },
+    "traps": [
+     {
+      "type": "garbage-in",
+      "note": "A generic or hand-wavy 'first step' (e.g. 'research further') is worse than none — only add the field if the generating pass can produce a genuinely concrete one."
+     },
+     {
+      "type": "scope creep",
+      "note": "Keep it to one line, not a mini project plan bolted onto the card — the card's job is triage, not planning."
+     }
+    ],
+    "_frame": "F3-operational",
+    "frame": "F3-operational",
+    "_graph": {
+     "fired": [
+      "novelty_to_graph",
+      "related_active_problem"
+     ],
+     "not_wired_today": [
+      "prior_rejection/duplication (needs idea_candidate history join)",
+      "recurrence footprint (corpus too thin — ~5 docs)",
+      "recency/trajectory (single ingest window)"
+     ],
+     "novelty_to_graph": {
+      "status": "known_or_partial",
+      "nearest": [
+       "Every Slack Conversation",
+       "Relationships",
+       "Relationships/Edges"
+      ]
+     },
+     "related_active_problem": [
+      "Cockpit"
+     ]
+    }
+   },
+   {
+    "spin": {
+     "situation": "Fusion is already mid-build on its own idea-engine (IDEA-016) that spins up several isolated AI 'thinking styles' at once so ideas don't all come back sounding the same, then scores and prunes them with a skeptical critic.",
+     "problem": "Right now that entire capability lives only inside Fusion's own walls — it earns Warwick nothing and has zero audience outside this repo.",
+     "implication": "A near-identical but by-the-look-of-it less rigorous version of this same mechanism, released as a public tool, picked up heavy community traction within days of release — proof there's real external demand (attention, sponsorship, willing users) for exactly this category of tool, and Fusion's version already has a differentiator (explicit self-kill calibration + trap lists + frame-blindness) that the source tool doesn't describe having.",
+     "need_payoff": "If Fusion packages its T2 idea-engine as a standalone public skill/tool (the repo is already public), it opens a genuine income and reputation stream — downloads, sponsorships, paid support/consulting — that exists independently of Warwick's job at Bellrock."
+    },
+    "source_evidence": {
+     "quote": "The ADHD skill came out fairly recently and picked up a lot of stars within a few days... it takes ideation or really any task with a lot of possible directions and splits it across separate agents as a tree of thought.",
+     "timestamp": "02:08-03:41",
+     "named_mechanism": "tree-of-thought frame-isolated multi-agent ideation skill with critic scoring (N/V/F)"
+    },
+    "transfer_reasoning": "SOURCE has a frame-isolated multi-agent ideation skill (quote above); invariant: splitting divergent thinking across blind, isolated agents and pruning with a skeptical scorer is itself a sellable capability, not just an internal process improvement. At Fusion's idea-engine (IDEA-016 / T2 divergence architecture, cd4e380/06c8974) it does the same W — but Fusion's version already carries stronger discipline (explicit self-kill calibration per frame, trap-list triage, WHOLE-SOURCE + NEVER-MANUFACTURE guardrails) than what's described of the source tool, meaning the transfer is 'package what you already built for outside buyers,' not 'go build something new.'",
+    "fusion_target": "idea-engine / T2 divergence architecture (this Transfer-Intelligence frame system itself, .claude Cockpit tooling)",
+    "category": "cash",
+    "lens": "external productization of an internally-proven mechanism",
+    "nvfi": {
+     "novelty": 5,
+     "viability": 7,
+     "fit": 8,
+     "impact": 6
+    },
+    "traps": [
+     {
+      "type": "fast-follower risk",
+      "note": "the source tool already has first-mover attention in this exact category; Fusion would need a genuinely visible edge (e.g. the self-kill/trap-list rigor) to avoid being noise, not just a clone with a different name."
+     },
+     {
+      "type": "open-source cannibalization",
+      "note": "Fusion247PKA is a public repo — if the differentiated engine internals are fully visible in git history, others can copy the mechanism before Fusion captures any value from it; needs a deliberate decision on what's given away free vs. what's paywalled (hosted version, support, curated frame library)."
+     }
+    ],
+    "_frame": "F4-commercial",
+    "frame": "F4-commercial",
+    "_graph": {
+     "fired": [
+      "novelty_to_graph",
+      "related_prior_decision"
+     ],
+     "not_wired_today": [
+      "prior_rejection/duplication (needs idea_candidate history join)",
+      "recurrence footprint (corpus too thin — ~5 docs)",
+      "recency/trajectory (single ingest window)"
+     ],
+     "novelty_to_graph": {
+      "status": "known_or_partial",
+      "nearest": [
+       "Isolated Node"
+      ]
+     },
+     "related_prior_decision": [
+      "Cloud engine room"
+     ]
+    }
+   },
+   {
+    "spin": {
+     "situation": "The source shows a concrete two-moment audit pattern: before you build (multi-angle test-strategy planning) and right before you ship (multi-angle churn/UX risk-finding) — both run by spinning up isolated AI agents through different lenses and scoring what comes back.",
+     "problem": "Small software teams and agencies routinely ship with untested edge cases and features quietly dropped from the original plan, and they usually only find out once real users hit the gaps or churn.",
+     "implication": "Fixing that after launch — refunds, support fires, trust damage, rework — costs far more than catching it beforehand, yet most small teams have no structured way to run this kind of check on themselves before they ship.",
+     "need_payoff": "Fusion could sell a two-stage 'Ship-Ready Audit' — hand us your PRD and your codebase, we run it before you build and again before you launch — as a paid service to outside dev teams/agencies, using the same frame-plus-critic mechanism Fusion is already building for itself."
+    },
+    "source_evidence": {
+     "quote": "it caught gaps that had gone completely undetected, like features that were promised in the PRD but never actually got built... for every one of them, it suggested a fix and listed out the traps and risks that came with it",
+     "timestamp": "11:40-12:52",
+     "named_mechanism": "pre-build TDD test-strategy planning + pre-launch churn/UX risk audit, both frame-isolated and critic-scored"
+    },
+    "transfer_reasoning": "SOURCE has a two-checkpoint audit mechanism (quote above); invariant: running isolated multi-lens agents against a PRD/codebase at two specific decision moments (before build, before ship) surfaces gaps a single-pass agent misses, and hands back scored findings + fixes + traps rather than doing the fix itself. At Fusion's Cockpit/idea-engine tooling it does the same W, but pointed at an EXTERNAL client's PRD+repo instead of Fusion's own — turning an internal QA habit into a billable engagement.",
+    "fusion_target": "idea-engine / T2 frame-and-critic loop, offered as a client-facing Cockpit audit workflow",
+    "category": "cash",
+    "lens": "service-ify an internal QA mechanism for external dev teams",
+    "nvfi": {
+     "novelty": 4,
+     "viability": 6,
+     "fit": 7,
+     "impact": 6
+    },
+    "traps": [
+     {
+      "type": "delivery cost",
+      "note": "a real client engagement needs a human (Larry/Warwick) to intake the client's PRD, run the loop, and curate results per client — without a templated/productized wrapper this becomes bespoke consulting time, not scalable software margin."
+     },
+     {
+      "type": "liability",
+      "note": "if Fusion is paid to run this audit and a churn-causing bug still ships, that's a reputational and possibly contractual exposure — needs clear scope/disclaimer language before selling it as a service rather than a courtesy check."
+     }
+    ],
+    "_frame": "F4-commercial",
+    "frame": "F4-commercial",
+    "_graph": {
+     "fired": [
+      "novelty_to_graph",
+      "related_prior_decision",
+      "related_active_problem"
+     ],
+     "not_wired_today": [
+      "prior_rejection/duplication (needs idea_candidate history join)",
+      "recurrence footprint (corpus too thin — ~5 docs)",
+      "recency/trajectory (single ingest window)"
+     ],
+     "novelty_to_graph": {
+      "status": "known_or_partial",
+      "nearest": [
+       "Fellow Builders",
+       "Test Data Set",
+       "Test Node",
+       "Tests"
+      ]
+     },
+     "related_prior_decision": [
+      "Cloud engine room"
+     ],
+     "related_active_problem": [
+      "build"
+     ]
+    }
+   },
+   {
+    "spin": {
+     "situation": "Larry runs long sessions where ideation, build history, backlog, and decisions all pile up in one single conversation thread.",
+     "problem": "When that thread gets compacted or Larry restarts, hard-won context quietly evaporates because it was never kept separate from the noise of everything else happening in that same thread — this is an open, unsolved backlog item as of today.",
+     "implication": "Warwick ends up re-explaining decisions and history, and the subtle-but-important context gets silently lost right when it would matter most.",
+     "need_payoff": "If Larry's own continuity were built the way this tool builds ideation — isolate each concern in its own clean window, merge only the finished output back — compaction would lose noise, not substance."
+    },
+    "source_evidence": {
+     "quote": "Every possibility gets worked through in the same context window, so the ideas bleed into each other and the context fills up with noise. The thinking gets worse instead of better.",
+     "timestamp": "[02:08]",
+     "named_mechanism": "per-branch context isolation with merge-only-at-the-end"
+    },
+    "transfer_reasoning": "The source's cure for single-context degradation (isolate parallel concerns, never let them share a window, merge only conclusions) targets the exact same failure shape as Larry's context-evaporation-on-compaction problem — a long single thread accumulating unrelated concerns until the signal degrades. The domain jump is real: the source only ever applies this to brainstorming variations, never to an agent's own session continuity.",
+    "fusion_target": "Larry's session-continuity / anti-context-evaporation architecture (open backlog item, currently undesigned)",
+    "category": "brain",
+    "lens": "isolation-then-merge as a memory architecture, not an ideation tool",
+    "nvfi": {
+     "novelty": 8,
+     "viability": 5,
+     "fit": 6,
+     "impact": 7
+    },
+    "traps": [
+     {
+      "type": "scope-creep",
+      "note": "could balloon into rebuilding Larry's whole memory system instead of a targeted fix for the one backlog item"
+     },
+     {
+      "type": "unproven",
+      "note": "provisional only — no evidence yet that isolate-then-merge actually prevents evaporation rather than just relocating the noise elsewhere"
+     }
+    ],
+    "_frame": "F5-crossdomain",
+    "frame": "F5-crossdomain",
+    "_graph": {
+     "fired": [
+      "novelty_to_graph",
+      "related_active_problem"
+     ],
+     "not_wired_today": [
+      "prior_rejection/duplication (needs idea_candidate history join)",
+      "recurrence footprint (corpus too thin — ~5 docs)",
+      "recency/trajectory (single ingest window)"
+     ],
+     "novelty_to_graph": {
+      "status": "known_or_partial",
+      "nearest": [
+       "Context Expansion",
+       "Context Expansion Endpoint",
+       "Context Window",
+       "Webpage With N8N Chat Widget"
+      ]
+     },
+     "related_active_problem": [
+      "Larry",
+      "session",
+      "context"
+     ]
+    }
+   },
+   {
+    "spin": {
+     "situation": "Fusion is mid-way through a manual, human-supervised project (the T1-vs-T2 calibration harness) to work out when the cheap model tier is good enough versus when the expensive tier earns its cost.",
+     "problem": "That tier decision is currently a one-off calibration exercise Larry runs and interprets by hand, work-package by work-package, rather than something that happens automatically and at scale.",
+     "implication": "Every new work-package still needs a fresh manual tier judgment call, which won't hold up as the number of work-packages grows.",
+     "need_payoff": "An auto-router that classifies tier per work-package on the fly, and batch-runs both tiers as parallel variants whenever it's ambiguous, would turn today's one-time calibration exercise into a permanent, self-serve system."
+    },
+    "source_evidence": {
+     "quote": "It even auto selects the right model for the job... You describe what you want once and it batch generates dozens of videos across different models, styles, and aspect ratios in a single session.",
+     "timestamp": "[07:51]",
+     "named_mechanism": "auto-model-selection plus batched multi-model variant generation in one pass"
+    },
+    "transfer_reasoning": "This is a sponsor-ad segment other frames would likely discard as irrelevant filler, but structurally it names a mechanism — given one job, auto-pick from a pool of models AND batch multiple variants across that pool in a single pass instead of manual serial switching — that maps directly onto Fusion's still-manual T1-vs-T2 tier decision, extending calibration work already underway into a live auto-router.",
+    "fusion_target": "T1/T2 tier auto-selection layer for the idea-engine work-package pipeline (currently manual calibration per T2-calibration/T1vsT2-experiment deliverables)",
+    "category": "cash",
+    "lens": "sponsor-segment auto-routing as a tier-selection mechanism, not a video tool",
+    "nvfi": {
+     "novelty": 6,
+     "viability": 6,
+     "fit": 7,
+     "impact": 6
+    },
+    "traps": [
+     {
+      "type": "overlap",
+      "note": "may duplicate the in-flight T2 divergence architecture design package (06c8974) — check before building anything new"
+     },
+     {
+      "type": "cost",
+      "note": "batch-running both tiers in parallel doubles spend on every ambiguous work-package unless the batching is bounded"
+     }
+    ],
+    "_frame": "F5-crossdomain",
+    "frame": "F5-crossdomain",
+    "_graph": {
+     "fired": [
+      "novelty_to_graph",
+      "related_active_problem"
+     ],
+     "not_wired_today": [
+      "prior_rejection/duplication (needs idea_candidate history join)",
+      "recurrence footprint (corpus too thin — ~5 docs)",
+      "recency/trajectory (single ingest window)"
+     ],
+     "novelty_to_graph": {
+      "status": "known_or_partial",
+      "nearest": [
+       "AI Automators",
+       "AI Automators Community",
+       "Rolling Auto-Caption Window",
+       "Intelligent Model",
+       "Large Language Models (LLMs)"
+      ]
+     },
+     "related_active_problem": [
+      "model"
+     ]
+    }
+   }
+  ],
+  "convCall": {
+   "label": "convergence",
+   "ok": true,
+   "resultText": "```json\n{\"kept\":[\n  {\"spin\":{\n     \"situation\":\"Warwick already knows the real bottleneck in shipping any Fusion idea isn't the coding, it's that ideas arrive without a proper brief.\",\n     \"problem\":\"A promoted idea can go straight into a build session on nothing more than a paragraph of intent, so whoever builds it has to guess at scope from the live conversation, and different sessions guess differently.\",\n     \"implication\":\"That guessing is what the BUILD-014 fiasco was made of — building the wrong-sized thing because the input wasn't pinned down — and it recurs until every promoted idea carries a real, durable brief instead of relying on chat memory.\",\n     \"need_payoff\":\"If a PRD + tech-spec pair became a mandatory, config-linked prerequisite before any build session opens, builders get forced, durable grounding instead of re-deriving scope each time.\"\n   },\n   \"source_evidence\":{\"quote\":\"you need to write down what needs to be built like a PRD... alongside that, you should also give it a technical specification document... You link both of those inside your claw.md file, so it picks up that context from the very start.\",\"timestamp\":\"08:37\",\"named_mechanism\":\"config-linked PRD+tech-spec as a hard prerequisite gating agent fan-out\"},\n   \"transfer_reasoning\":\"Structural invariant: expensive, creative multi-agent work is gated on a durable, config-referenced spec artifact, not on live conversational context. Fusion's own CLAUDE.md already uses this exact shape — a pointer file linking to a canonical doc rather than duplicating it. Extending that identical shape to the idea-to-build handoff isn't a new invention for Fusion, it's applying Fusion's own established pattern to the one seam already known to be unresolved.\",\n   \"fusion_target\":\"Foundry idea-to-build handoff / CLAUDE.md pointer pattern: require a linked PRD+tech-spec doc pair in the build session's context file before any builder agent opens\",\n   \"category\":\"brain\",\"lens\":\"structural fidelity — config-linked prerequisite gating\",\n   \"nvfi\":{\"novelty\":5,\"viability\":8,\"fit\":9,\"impact\":8},\n   \"contributing_frames\":[\"F1-mechanism\"],\"convergence_type\":\"single_frame\",\n   \"graph_note\":\"Graph shows partial precedent only (config.json / Edit Config style artifacts as nearest neighbors) and independently fires 'build' as an active related problem — corroborating this closes a live gap rather than inventing one.\",\n   \"conflict_with\":null,\"forced_analogy\":false,\n   \"traps\":[{\"type\":\"scope-creep\",\"note\":\"don't let 'PRD required' become a heavyweight gate for tiny quick-wins — needs a size threshold or it recreates BUILD-014's over-engineering\"},{\"type\":\"stale-doc\",\"note\":\"a linked PRD can drift from the actual build — needs a freshness/last-verified marker, not a fire-and-forget link\"}]\n  },\n  {\"spin\":{\n     \"situation\":\"Larry runs a 7-point Builder Preflight before every Tower merge-check — git-clean, artefacts-in-PR, migration/doc parity, and so on.\",\n     \"problem\":\"None of those seven points ever compares the finished build back against the original plan, so a feature promised but quietly never built — or a confusion point a user would hit — can sail straight through to merge.\",\n     \"implication\":\"That's the exact shape of the BUILD-014 fiasco: the built thing didn't match what was scoped, and nobody caught it until it was live.\",\n     \"need_payoff\":\"A dedicated, single-pass PRD-vs-built drift check — returning a finding, a suggested fix, and a named trap for each gap — added as an eighth Preflight point would catch promise-vs-delivery drift and confusion points before merge, not after.\"\n   },\n   \"source_evidence\":{\"quote\":\"it caught gaps that had gone completely undetected, like features that were promised in the PRD but never actually got built, so we'd have shipped something that didn't match what we said it would do... for every one of them, it suggested a fix and listed out the traps and risks that came with it\",\"timestamp\":\"12:20\",\"named_mechanism\":\"post-build PRD-vs-shipped fidelity audit, and separately a pre-launch churn/UX risk audit, both diffing the artifact against the original brief and returning finding+fix+trap\"},\n   \"transfer_reasoning\":\"The invariant is a dedicated audit stage whose only comparison object is the original brief against the finished artifact — not code parity, not test pass/fail. Larry's Builder Preflight currently checks only internal consistency (git/artefact/test-range parity); nothing in it reads the plan back against what actually got built or asks where a user would get confused. Adding that as an eighth point, as one lightweight single pass rather than a full fan-out, closes a distinct gap without duplicating the existing six checks or the separate Codex/Fable fitness-for-purpose review.\",\n   \"fusion_target\":\"Larry's Builder Preflight (7-point pre-merge self-check) — add an 8th point: single-pass PRD-vs-built drift + confusion-point audit (finding + suggested fix + trap per gap)\",\n   \"category\":\"brain\",\"lens\":\"PRD-vs-built drift as its own pre-merge audit object\",\n   \"nvfi\":{\"novelty\":6,\"viability\":8,\"fit\":8,\"impact\":8},\n   \"contributing_frames\":[\"F1-mechanism\",\"F3-operational\"],\"convergence_type\":\"novel_independent\",\n   \"graph_note\":\"Both contributing passes independently fire related_active_problem on 'Larry'/'build' — the graph corroborates this touches a live, already-active problem area rather than a hypothetical one; no strong duplicate precedent found (nearest neighbors are unrelated: Postgres, Paid Sponsorship).\",\n   \"conflict_with\":null,\"forced_analogy\":false,\n   \"traps\":[{\"type\":\"reviewer-overlap\",\"note\":\"could bleed into Codex/Fable's existing fitness-for-purpose review scope — needs an explicit boundary so it's additive, not duplicate reviewing\"},{\"type\":\"ownerless-checklist\",\"note\":\"needs a named owner or it becomes an 8th checklist line nobody actually runs\"},{\"type\":\"latency/scope-creep\",\"note\":\"must stay a single cheap pass, not a full multi-agent fan-out or a second governance layer, or it slows every merge and gets skipped under time pressure\"}]\n  },\n  {\"spin\":{\n     \"situation\":\"The whole fix in the source works because each idea gets judged in its own clean context so ideas can't bleed into each other and skew the score.\",\n     \"problem\":\"If the step that scores or merges the outputs reads them all back in one shared context, the exact bleed-through problem the isolation was built to prevent sneaks back in at the scoring stage — order of presentation quietly nudges which candidate looks strongest.\",\n     \"implication\":\"Isolating generation and then throwing that discipline away at the one place an unfair thumb on the scale matters most produces a shortlist that looks rigorous but isn't.\",\n     \"need_payoff\":\"Score/critique each candidate in its own isolated pass, same as generation, before any shared merge step ever sees more than one candidate at a time.\"\n   },\n   \"source_evidence\":{\"quote\":\"Every possibility gets worked through in the same context window, so the ideas bleed into each other and the context fills up with noise. The thinking gets worse instead of better.\",\"timestamp\":\"02:08\",\"named_mechanism\":\"shared-context bleed-through degrading judgment quality\"},\n   \"transfer_reasoning\":\"The source names shared-context bleed as the failure this architecture exists to kill, but only fixes it at generation time. The same mechanism — multiple items judged in one context causing anchoring and noise — can silently re-enter at whichever step reads multiple candidates together. Inverting the fix means isolation has to hold at scoring too, not just at ideation.\",\n   \"fusion_target\":\"Critic/shortlist step in the idea-engine pipeline (Cairn→Transfer-Intelligence→Critic→Cockpit Accept) — verify each candidate set is critiqued in a separate pass, not one shared read-all-then-score call\",\n   \"category\":\"brain\",\"lens\":\"inversion — isolation must hold at scoring, not just generation\",\n   \"nvfi\":{\"novelty\":6,\"viability\":8,\"fit\":8,\"impact\":6},\n   \"contributing_frames\":[\"F2-inversion\"],\"convergence_type\":\"single_frame\",\n   \"graph_note\":\"Graph independently flags 'context' as an active related problem, consistent with this being a live architectural concern; nearest neighbors (Shared Directory/Folder, Context Expansion) show partial precedent for the shared-context risk itself.\",\n   \"conflict_with\":null,\"forced_analogy\":false,\n   \"traps\":[{\"type\":\"cost\",\"note\":\"per-candidate isolated critique multiplies critic-agent calls; needs a cheap batching compromise that still avoids cross-candidate anchoring\"}]\n  },\n  {\"spin\":{\n     \"situation\":\"A cheap gate decides, before spending tokens, whether a problem is even worth deeper multi-angle treatment — otherwise it just answers directly.\",\n     \"problem\":\"That gate is itself a single-pass judgment with no visibility: if it wrongly decides a case is closed-ended or low stakes, the system silently falls back to the shallow default and nobody downstream ever sees that a deeper pass was skipped, let alone why.\",\n     \"implication\":\"The exact failure the deeper treatment exists to defeat — quietly settling for the safe, obvious answer — reappears one level up, disguised as an efficiency feature, and because it's silent it looks like thoroughness happened when it didn't.\",\n     \"need_payoff\":\"Any triage gate that decides shallow-vs-deep must leave a visible trace of its own verdict and reasoning, so a wrong shallow-routing is discoverable instead of invisible.\"\n   },\n   \"source_evidence\":{\"quote\":\"it runs the problem through three questions... If there's only one right answer, then thinking from multiple angles is pointless and just wastes tokens, so it stops there.\",\"timestamp\":\"06:01\",\"named_mechanism\":\"silent pre-check gate that can auto-downgrade to shallow single-pass reasoning\"},\n   \"transfer_reasoning\":\"Inverting the assumption behind the gate: it's presented as pure cost-saving, but a false negative reproduces the same 'settles for the safe answer' failure the deeper multi-angle treatment exists to prevent — except invisibly, since no downstream step ever sees the road not taken.\",\n   \"fusion_target\":\"Cairn's intake triage — the decision of whether an ingested source gets full Transfer-Intelligence treatment or gets shallow-filed. Needs a visible 'shallow-routed + why' marker instead of a silent drop.\",\n   \"category\":\"brain\",\"lens\":\"inversion — silent triage gate needs a visible trace\",\n   \"nvfi\":{\"novelty\":6,\"viability\":7,\"fit\":7,\"impact\":6},\n   \"contributing_frames\":[\"F2-inversion\"],\"convergence_type\":\"single_frame\",\n   \"graph_note\":\"Weak graph corroboration — nearest neighbors (Health Checks, Payment Gateway) are only superficially related and no active-problem or prior-decision link fired, so this reads as more speculative than the other candidates until checked against real Cairn triage logs.\",\n   \"conflict_with\":null,\"forced_analogy\":false,\n   \"traps\":[{\"type\":\"noise\",\"note\":\"if every shallow-routing gets surfaced, it could flood the review queue with low-value 'skipped' notices — needs a threshold or batched digest, not per-item pings\"}]\n  },\n  {\"spin\":{\n     \"situation\":\"Before forking into isolated agents, a single shared pass gathers context on the target, then hands that same context to every branch.\",\n     \"problem\":\"The branches look diverse because they think through different frames, but they all inherit the exact same upstream context snapshot — if that one gathering pass missed or distorted something, every 'independent' branch inherits the identical blind spot, and the appearance of diversity papers over a single point of failure.\",\n     \"implication\":\"You get a shortlist that looks thoroughly cross-checked from several angles, when in fact all of them were built on one possibly-flawed foundation nobody re-checked.\",\n     \"need_payoff\":\"Treat the shared context/evidence-gathering step as its own trust boundary — verify completeness or fidelity of that base before forking, since forking afterward can't undo a corrupted or incomplete starting point.\"\n   },\n   \"source_evidence\":{\"quote\":\"It started by going through the application in depth to gather context, then spun up its agents the same way.\",\"timestamp\":\"11:40\",\"named_mechanism\":\"single shared context-gathering pass feeding all isolated branches\"},\n   \"transfer_reasoning\":\"Inverted assumption: isolation is assumed to guarantee independence, but independence only starts after the fork — everything upstream of the fork is a single point of failure the branch structure cannot see or correct for, since no branch is positioned to notice the shared input was already lossy.\",\n   \"fusion_target\":\"TubeAIR's transcript ingestion feeding this idea-engine run, and directly, IDEA-016's T1-vs-T2 experiment harness where all six branches share exactly one upstream brief\",\n   \"category\":\"brain\",\"lens\":\"inversion — shared upstream context as an unchecked single point of failure\",\n   \"nvfi\":{\"novelty\":7,\"viability\":7,\"fit\":8,\"impact\":7},\n   \"contributing_frames\":[\"F2-inversion\"],\"convergence_type\":\"single_frame\",\n   \"graph_note\":\"Corpus signal here is thin and partly noisy (nearest neighbors include unrelated appliance manuals), but 'context' fires as a related active problem, and the target ties directly to the live IDEA-016 T1-vs-T2 harness — the strongest anchor for this candidate is the repo's own current design, not the graph.\",\n   \"conflict_with\":null,\"forced_analogy\":false,\n   \"traps\":[{\"type\":\"evidence\",\"note\":\"claim that a shared brief/transcript is complete needs a concrete check (e.g. transcript-length/coverage sanity check) before trusting multi-way diversity built on it, not just asserted\"}]\n  },\n  {\"spin\":{\n     \"situation\":\"The premise behind splitting reasoning across angles is that a model defaults to whatever answer showed up most often in training data — the safe, familiar pattern — unless deliberately pushed past it.\",\n     \"problem\":\"That same bias doesn't only threaten the generation step — the review/scoring step is built on the same kind of model, so it likely carries the same bias aimed at judging instead of proposing: it may reflexively down-score genuinely novel transfers as 'too risky/unfamiliar' precisely because they're unfamiliar, the opposite of what a novelty score should reward.\",\n     \"implication\":\"A critic built to catch bad ideas can end up systematically killing the most valuable ones for the same root reason the generator needed a fix in the first place — an unexamined blind spot in the very component meant to be the quality gate.\",\n     \"need_payoff\":\"Explicitly test whether the critic penalizes unfamiliarity-as-risk versus genuine-viability-risk, and calibrate so novelty isn't structurally taxed by the same safe-pattern bias it's supposed to reward.\"\n   },\n   \"source_evidence\":{\"quote\":\"An agent reaches for the pattern that showed up most often in the data it learned from because seeing the same answer repeated is what taught it that the answer is a good one.\",\"timestamp\":\"01:40\",\"named_mechanism\":\"training-frequency bias toward the most common/safe pattern\"},\n   \"transfer_reasoning\":\"The source diagnoses this bias only in the generator and fixes it there. But the critic is built on the same kind of model and is never checked for the identical bias — an unfamiliar-but-genuinely-good transfer looks statistically 'wrong' to a model trained the same way, so the failure mode just relocates from generation to judgment, invisibly.\",\n   \"fusion_target\":\"The Critic step in idea-engine (N/V/F scoring) — specifically whether high-novelty candidates are getting systematically suppressed on viability/fit as a proxy for 'unfamiliar,' testable against the existing T1-vs-T2 calibration data\",\n   \"category\":\"brain\",\"lens\":\"inversion — the critic may carry the same bias it's meant to catch\",\n   \"nvfi\":{\"novelty\":8,\"viability\":6,\"fit\":7,\"impact\":7},\n   \"contributing_frames\":[\"F2-inversion\"],\"convergence_type\":\"single_frame\",\n   \"graph_note\":\"Graph marks this as fully novel to the graph — no existing nearest neighbors — strengthening the novelty read; it also touches the 'Cloud engine room' prior decision, worth checking whether the calibration data this candidate proposes mining is retrievable from what's already logged there.\",\n   \"conflict_with\":null,\"forced_analogy\":false,\n   \"traps\":[{\"type\":\"needs-evidence\",\"note\":\"provisional — would need to actually mine the existing T1/T2 calibration data for a novelty-vs-score correlation before treating this as more than a hypothesis\"}]\n  },\n  {\"spin\":{\n     \"situation\":\"When Warwick accepts an idea in the Cockpit, it sits there as a stored decision.\",\n     \"problem\":\"Turning an accepted idea into something actually done this week still requires Warwick to work out the first concrete action himself — that's a manual step the card doesn't remove.\",\n     \"implication\":\"Attention is his scarcest resource; an accepted idea with no obvious next click is exactly the kind of thing that quietly rots in a backlog instead of becoming a next action.\",\n     \"need_payoff\":\"Every accepted idea card should carry a concrete first-step field so 'Keep' turns straight into 'here's what to do next,' not another thing to re-think later.\"\n   },\n   \"source_evidence\":{\"quote\":\"Each idea also comes with a sketch of how it would be built, the risks involved, and the first steps for getting started on it.\",\"timestamp\":\"08:37\",\"named_mechanism\":\"every surviving idea ships with an explicit 'first steps to get started' field alongside its score and risks\"},\n   \"transfer_reasoning\":\"The source treats 'first step' as a mandatory output field, not an afterthought — it's what turns a scored idea into something actionable without the human having to translate it. Fusion's Cockpit idea cards currently surface the idea and its score but nothing forces a concrete 'do this first' line. Small, but it removes one recurring manual translation step.\",\n   \"fusion_target\":\"Cockpit idea/output card schema (Ideas Brain/Cash, Keep/Decline/Later) — add a mandatory 'first step' field populated at generation time, shown on the card itself\",\n   \"category\":\"brain\",\"lens\":\"kill a manual next-action-translation step\",\n   \"nvfi\":{\"novelty\":4,\"viability\":9,\"fit\":8,\"impact\":7},\n   \"contributing_frames\":[\"F3-operational\"],\"convergence_type\":\"single_frame\",\n   \"graph_note\":\"Graph fires 'Cockpit' as a related active problem, corroborating that this touches live, already-in-motion surface area rather than a speculative add-on.\",\n   \"conflict_with\":null,\"forced_analogy\":false,\n   \"traps\":[{\"type\":\"garbage-in\",\"note\":\"a generic or hand-wavy 'first step' is worse than none — only add the field if the generating pass can produce a genuinely concrete one\"},{\"type\":\"scope-creep\",\"note\":\"keep it to one line, not a mini project plan bolted onto the card — the card's job is triage, not planning\"}]\n  },\n  {\"spin\":{\n     \"situation\":\"Fusion is already mid-build on its own idea-engine that spins up several isolated AI thinking styles at once so ideas don't all come back sounding the same, then scores and prunes them with a skeptical critic.\",\n     \"problem\":\"Right now that capability lives only inside Fusion's own walls — it earns nothing and has zero audience outside the repo.\",\n     \"implication\":\"A less rigorous public version of a near-identical mechanism picked up heavy community traction within days of release — proof there's real external demand for this category of tool, and Fusion's version already has a differentiator the public tool isn't described as having.\",\n     \"need_payoff\":\"If Fusion packages its idea-engine as a standalone public skill/tool, it opens a genuine income and reputation stream that exists independently of Warwick's day job.\"\n   },\n   \"source_evidence\":{\"quote\":\"The ADHD skill came out fairly recently and picked up a lot of stars within a few days... it takes ideation or really any task with a lot of possible directions and splits it across separate agents as a tree of thought.\",\"timestamp\":\"02:08-03:41\",\"named_mechanism\":\"tree-of-thought frame-isolated multi-agent ideation skill with critic scoring (N/V/F)\"},\n   \"transfer_reasoning\":\"The source names a mechanism — split divergent thinking across isolated passes, prune with a skeptical scorer — that, packaged as a standalone tool, drew heavy external adoption within days. That's evidence the underlying capability is independently sellable, not just useful internally. Fusion's own idea-engine already implements a stricter version of the same mechanism — explicit self-kill calibration, trap-list triage, and never-manufacture guardrails the public tool isn't described as having — so the transfer is packaging an existing internal capability for outside buyers, not building something new.\",\n   \"fusion_target\":\"idea-engine / T2 divergence architecture — package as a standalone public skill/tool\",\n   \"category\":\"cash\",\"lens\":\"external productization of an internally-built mechanism\",\n   \"nvfi\":{\"novelty\":5,\"viability\":7,\"fit\":8,\"impact\":6},\n   \"contributing_frames\":[\"F4-commercial\"],\"convergence_type\":\"single_frame\",\n   \"graph_note\":\"Thin graph traction (a single weak neighbor, 'Isolated Node'), but the target sits directly on the 'Cloud engine room' prior decision — infra a hosted/public version would need already exists as a made decision, not a new ask.\",\n   \"conflict_with\":null,\"forced_analogy\":false,\n   \"traps\":[{\"type\":\"fast-follower risk\",\"note\":\"the public tool already has first-mover attention in this category; needs a genuinely visible edge (the self-kill/trap-list rigor) to avoid being noise\"},{\"type\":\"open-source cannibalization\",\"note\":\"Fusion247PKA is a public repo — if the differentiated engine internals are fully visible in git history, others can copy the mechanism first; needs a decision on what's free vs. paywalled\"}]\n  },\n  {\"spin\":{\n     \"situation\":\"There's a concrete two-moment audit pattern available: before you build (test-strategy planning) and right before you ship (churn/UX risk-finding), both run by testing a plan/codebase from several angles and scoring what comes back.\",\n     \"problem\":\"Small software teams and agencies routinely ship with untested edge cases and features quietly dropped from the original plan, and usually only find out once real users hit the gaps or churn.\",\n     \"implication\":\"Fixing that after launch — refunds, support fires, trust damage, rework — costs far more than catching it beforehand, yet most small teams have no structured way to run this kind of check on themselves before they ship.\",\n     \"need_payoff\":\"Fusion could sell a two-stage 'Ship-Ready Audit' — hand over a PRD and codebase, get it checked before build and again before launch — as a paid service to outside dev teams and agencies.\"\n   },\n   \"source_evidence\":{\"quote\":\"it caught gaps that had gone completely undetected, like features that were promised in the PRD but never actually got built... for every one of them, it suggested a fix and listed out the traps and risks that came with it\",\"timestamp\":\"11:40-12:52\",\"named_mechanism\":\"pre-build test-strategy planning and pre-launch churn/UX risk audit, both scored and returning fix + trap per gap\"},\n   \"transfer_reasoning\":\"The invariant is running a plan/codebase through a two-checkpoint audit — before build, before ship — that surfaces gaps a single-pass read misses and hands back scored findings with fixes and traps rather than doing the fix itself. Fusion's Cockpit/idea-engine tooling does the same job internally; pointing it at an external client's PRD and repo instead of Fusion's own turns an internal QA habit into a billable engagement.\",\n   \"fusion_target\":\"idea-engine / Critic loop, offered as a client-facing Cockpit audit workflow (Ship-Ready Audit)\",\n   \"category\":\"cash\",\"lens\":\"service-ify an internal QA mechanism for external clients\",\n   \"nvfi\":{\"novelty\":4,\"viability\":6,\"fit\":7,\"impact\":6},\n   \"contributing_frames\":[\"F4-commercial\"],\"convergence_type\":\"single_frame\",\n   \"graph_note\":\"Graph fires both an active problem ('build') and the 'Cloud engine room' prior decision, corroborating this touches real, already-active surface area rather than a hypothetical extension.\",\n   \"conflict_with\":null,\"forced_analogy\":false,\n   \"traps\":[{\"type\":\"delivery cost\",\"note\":\"a real client engagement needs a human to intake the client's PRD, run the loop, and curate results per client — without a templated wrapper this is bespoke consulting time, not scalable margin\"},{\"type\":\"liability\",\"note\":\"if Fusion is paid to run this audit and a churn-causing bug still ships, that's reputational and possibly contractual exposure — needs clear scope/disclaimer language before selling it\"}]\n  },\n  {\"spin\":{\n     \"situation\":\"Long sessions pile ideation, build history, backlog, and decisions all into one single conversation thread.\",\n     \"problem\":\"When that thread gets compacted or restarted, hard-won context quietly evaporates because it was never kept separate from the noise of everything else happening in the same thread — an open, unsolved gap today.\",\n     \"implication\":\"Decisions and subtle-but-important context get re-explained or silently lost right when they'd matter most.\",\n     \"need_payoff\":\"If session continuity were built the same way — isolate each concern in its own clean window, merge only the finished output back — compaction would lose noise, not substance.\"\n   },\n   \"source_evidence\":{\"quote\":\"Every possibility gets worked through in the same context window, so the ideas bleed into each other and the context fills up with noise. The thinking gets worse instead of better.\",\"timestamp\":\"02:08\",\"named_mechanism\":\"per-branch context isolation with merge-only-at-the-end\"},\n   \"transfer_reasoning\":\"The cure for single-context degradation — isolate parallel concerns, never let them share a window, merge only conclusions — targets the same failure shape as context evaporating on compaction: a long single thread accumulating unrelated concerns until the signal degrades. The domain jump is real: this mechanism is normally only applied to brainstorming variations, never to an agent's own session continuity.\",\n   \"fusion_target\":\"Larry's session-continuity / anti-context-evaporation architecture (open backlog item, currently undesigned)\",\n   \"category\":\"brain\",\"lens\":\"isolation-then-merge as a memory architecture, not an ideation tool\",\n   \"nvfi\":{\"novelty\":8,\"viability\":5,\"fit\":7,\"impact\":7},\n   \"contributing_frames\":[\"F5-crossdomain\"],\"convergence_type\":\"single_frame\",\n   \"graph_note\":\"Graph independently flags 'Larry', 'session', and 'context' as related active problems — direct corroboration that this maps onto Larry's own known, currently-undesigned context-evaporation backlog item, not a speculative parallel.\",\n   \"conflict_with\":null,\"forced_analogy\":false,\n   \"traps\":[{\"type\":\"scope-creep\",\"note\":\"could balloon into rebuilding the whole memory system instead of a targeted fix for the one backlog item\"},{\"type\":\"unproven\",\"note\":\"provisional only — no evidence yet that isolate-then-merge actually prevents evaporation rather than just relocating the noise elsewhere\"}]\n  },\n  {\"spin\":{\n     \"situation\":\"There's an ongoing manual, human-supervised effort to work out when the cheap model tier is good enough versus when the expensive tier earns its cost.\",\n     \"problem\":\"That tier decision is currently a one-off calibration exercise run and interpreted by hand, work-package by work-package, rather than something automatic and at scale.\",\n     \"implication\":\"Every new work-package still needs a fresh manual tier judgment call, which won't hold up as the number of work-packages grows.\",\n     \"need_payoff\":\"An auto-router that classifies tier per work-package on the fly, and batch-runs both tiers as parallel variants whenever it's ambiguous, would turn today's one-time calibration exercise into a permanent, self-serve system.\"\n   },\n   \"source_evidence\":{\"quote\":\"It even auto selects the right model for the job... You describe what you want once and it batch generates dozens of videos across different models, styles, and aspect ratios in a single session.\",\"timestamp\":\"07:51\",\"named_mechanism\":\"auto-model-selection plus batched multi-model variant generation in one pass\"},\n   \"transfer_reasoning\":\"The named mechanism — given one job, auto-pick from a pool of models and batch multiple variants across that pool in a single pass instead of manual serial switching — maps directly onto a still-manual tier decision: extending calibration work already underway into a live auto-router instead of a one-off exercise repeated by hand.\",\n   \"fusion_target\":\"T1/T2 tier auto-selection layer for the idea-engine work-package pipeline (currently manual calibration)\",\n   \"category\":\"cash\",\"lens\":\"auto-routing as a tier-selection mechanism\",\n   \"nvfi\":{\"novelty\":6,\"viability\":6,\"fit\":7,\"impact\":6},\n   \"contributing_frames\":[\"F5-crossdomain\"],\"convergence_type\":\"single_frame\",\n   \"graph_note\":\"Graph fires 'model' as a related active problem, consistent with the in-flight T2 calibration work — but that same overlap raises real duplication risk against the in-flight T2 divergence architecture design package; check that package before building anything new.\",\n   \"conflict_with\":null,\"forced_analogy\":false,\n   \"traps\":[{\"type\":\"overlap\",\"note\":\"may duplicate the in-flight T2 divergence architecture design package — check before building anything new\"},{\"type\":\"cost\",\"note\":\"batch-running both tiers in parallel doubles spend on every ambiguous work-package unless the batching is bounded\"}]\n  }\n],\n \"killed\":[],\n \"conflicts\":[],\n \"convergence_summary\":\"One genuine multi-frame convergence surfaced: two independently-run passes, via different mechanisms (a structural-fidelity audit vs. a pre-ship blind-spot catch), both arrived at the same fix — add a PRD-vs-built drift check to Larry's Builder Preflight — and because Builder Preflight wasn't part of the shared brief this counts as strong novel_independent evidence rather than prompt echo; its confidence was raised accordingly rather than averaged. Every other surviving candidate was found by only one pass, spanning brain-side process fixes (pre-build spec gating, isolating the critic step, a visible triage-gate trace, treating shared upstream context as its own trust boundary, testing the critic itself for novelty bias, a Cockpit first-step field, and a cross-domain isolation-then-merge idea for Larry's own session continuity) and cash-side productization ideas (packaging the idea-engine publicly, a paid Ship-Ready Audit service, and a T1/T2 tier auto-router). No candidate was killed as a forced or surface analogy under cross-examination, and no two candidates recommended opposite actions on the same target, so no conflicts were flagged.\"\n}\n```",
+   "duration_ms": 223333,
+   "cost_usd": 0.5498664,
+   "payload_input_est": 10309,
+   "output": 23641,
+   "cache_creation": 30782,
+   "cache_read": 35178
+  },
+  "conv": {
+   "kept": [
+    {
+     "spin": {
+      "situation": "Warwick already knows the real bottleneck in shipping any Fusion idea isn't the coding, it's that ideas arrive without a proper brief.",
+      "problem": "A promoted idea can go straight into a build session on nothing more than a paragraph of intent, so whoever builds it has to guess at scope from the live conversation, and different sessions guess differently.",
+      "implication": "That guessing is what the BUILD-014 fiasco was made of — building the wrong-sized thing because the input wasn't pinned down — and it recurs until every promoted idea carries a real, durable brief instead of relying on chat memory.",
+      "need_payoff": "If a PRD + tech-spec pair became a mandatory, config-linked prerequisite before any build session opens, builders get forced, durable grounding instead of re-deriving scope each time."
+     },
+     "source_evidence": {
+      "quote": "you need to write down what needs to be built like a PRD... alongside that, you should also give it a technical specification document... You link both of those inside your claw.md file, so it picks up that context from the very start.",
+      "timestamp": "08:37",
+      "named_mechanism": "config-linked PRD+tech-spec as a hard prerequisite gating agent fan-out"
+     },
+     "transfer_reasoning": "Structural invariant: expensive, creative multi-agent work is gated on a durable, config-referenced spec artifact, not on live conversational context. Fusion's own CLAUDE.md already uses this exact shape — a pointer file linking to a canonical doc rather than duplicating it. Extending that identical shape to the idea-to-build handoff isn't a new invention for Fusion, it's applying Fusion's own established pattern to the one seam already known to be unresolved.",
+     "fusion_target": "Foundry idea-to-build handoff / CLAUDE.md pointer pattern: require a linked PRD+tech-spec doc pair in the build session's context file before any builder agent opens",
+     "category": "brain",
+     "lens": "structural fidelity — config-linked prerequisite gating",
+     "nvfi": {
+      "novelty": 5,
+      "viability": 8,
+      "fit": 9,
+      "impact": 8
+     },
+     "contributing_frames": [
+      "F1-mechanism"
+     ],
+     "convergence_type": "single_frame",
+     "graph_note": "Graph shows partial precedent only (config.json / Edit Config style artifacts as nearest neighbors) and independently fires 'build' as an active related problem — corroborating this closes a live gap rather than inventing one.",
+     "conflict_with": null,
+     "forced_analogy": false,
+     "traps": [
+      {
+       "type": "scope-creep",
+       "note": "don't let 'PRD required' become a heavyweight gate for tiny quick-wins — needs a size threshold or it recreates BUILD-014's over-engineering"
+      },
+      {
+       "type": "stale-doc",
+       "note": "a linked PRD can drift from the actual build — needs a freshness/last-verified marker, not a fire-and-forget link"
+      }
+     ]
+    },
+    {
+     "spin": {
+      "situation": "Larry runs a 7-point Builder Preflight before every Tower merge-check — git-clean, artefacts-in-PR, migration/doc parity, and so on.",
+      "problem": "None of those seven points ever compares the finished build back against the original plan, so a feature promised but quietly never built — or a confusion point a user would hit — can sail straight through to merge.",
+      "implication": "That's the exact shape of the BUILD-014 fiasco: the built thing didn't match what was scoped, and nobody caught it until it was live.",
+      "need_payoff": "A dedicated, single-pass PRD-vs-built drift check — returning a finding, a suggested fix, and a named trap for each gap — added as an eighth Preflight point would catch promise-vs-delivery drift and confusion points before merge, not after."
+     },
+     "source_evidence": {
+      "quote": "it caught gaps that had gone completely undetected, like features that were promised in the PRD but never actually got built, so we'd have shipped something that didn't match what we said it would do... for every one of them, it suggested a fix and listed out the traps and risks that came with it",
+      "timestamp": "12:20",
+      "named_mechanism": "post-build PRD-vs-shipped fidelity audit, and separately a pre-launch churn/UX risk audit, both diffing the artifact against the original brief and returning finding+fix+trap"
+     },
+     "transfer_reasoning": "The invariant is a dedicated audit stage whose only comparison object is the original brief against the finished artifact — not code parity, not test pass/fail. Larry's Builder Preflight currently checks only internal consistency (git/artefact/test-range parity); nothing in it reads the plan back against what actually got built or asks where a user would get confused. Adding that as an eighth point, as one lightweight single pass rather than a full fan-out, closes a distinct gap without duplicating the existing six checks or the separate Codex/Fable fitness-for-purpose review.",
+     "fusion_target": "Larry's Builder Preflight (7-point pre-merge self-check) — add an 8th point: single-pass PRD-vs-built drift + confusion-point audit (finding + suggested fix + trap per gap)",
+     "category": "brain",
+     "lens": "PRD-vs-built drift as its own pre-merge audit object",
+     "nvfi": {
+      "novelty": 6,
+      "viability": 8,
+      "fit": 8,
+      "impact": 8
+     },
+     "contributing_frames": [
+      "F1-mechanism",
+      "F3-operational"
+     ],
+     "convergence_type": "novel_independent",
+     "graph_note": "Both contributing passes independently fire related_active_problem on 'Larry'/'build' — the graph corroborates this touches a live, already-active problem area rather than a hypothetical one; no strong duplicate precedent found (nearest neighbors are unrelated: Postgres, Paid Sponsorship).",
+     "conflict_with": null,
+     "forced_analogy": false,
+     "traps": [
+      {
+       "type": "reviewer-overlap",
+       "note": "could bleed into Codex/Fable's existing fitness-for-purpose review scope — needs an explicit boundary so it's additive, not duplicate reviewing"
+      },
+      {
+       "type": "ownerless-checklist",
+       "note": "needs a named owner or it becomes an 8th checklist line nobody actually runs"
+      },
+      {
+       "type": "latency/scope-creep",
+       "note": "must stay a single cheap pass, not a full multi-agent fan-out or a second governance layer, or it slows every merge and gets skipped under time pressure"
+      }
+     ]
+    },
+    {
+     "spin": {
+      "situation": "The whole fix in the source works because each idea gets judged in its own clean context so ideas can't bleed into each other and skew the score.",
+      "problem": "If the step that scores or merges the outputs reads them all back in one shared context, the exact bleed-through problem the isolation was built to prevent sneaks back in at the scoring stage — order of presentation quietly nudges which candidate looks strongest.",
+      "implication": "Isolating generation and then throwing that discipline away at the one place an unfair thumb on the scale matters most produces a shortlist that looks rigorous but isn't.",
+      "need_payoff": "Score/critique each candidate in its own isolated pass, same as generation, before any shared merge step ever sees more than one candidate at a time."
+     },
+     "source_evidence": {
+      "quote": "Every possibility gets worked through in the same context window, so the ideas bleed into each other and the context fills up with noise. The thinking gets worse instead of better.",
+      "timestamp": "02:08",
+      "named_mechanism": "shared-context bleed-through degrading judgment quality"
+     },
+     "transfer_reasoning": "The source names shared-context bleed as the failure this architecture exists to kill, but only fixes it at generation time. The same mechanism — multiple items judged in one context causing anchoring and noise — can silently re-enter at whichever step reads multiple candidates together. Inverting the fix means isolation has to hold at scoring too, not just at ideation.",
+     "fusion_target": "Critic/shortlist step in the idea-engine pipeline (Cairn→Transfer-Intelligence→Critic→Cockpit Accept) — verify each candidate set is critiqued in a separate pass, not one shared read-all-then-score call",
+     "category": "brain",
+     "lens": "inversion — isolation must hold at scoring, not just generation",
+     "nvfi": {
+      "novelty": 6,
+      "viability": 8,
+      "fit": 8,
+      "impact": 6
+     },
+     "contributing_frames": [
+      "F2-inversion"
+     ],
+     "convergence_type": "single_frame",
+     "graph_note": "Graph independently flags 'context' as an active related problem, consistent with this being a live architectural concern; nearest neighbors (Shared Directory/Folder, Context Expansion) show partial precedent for the shared-context risk itself.",
+     "conflict_with": null,
+     "forced_analogy": false,
+     "traps": [
+      {
+       "type": "cost",
+       "note": "per-candidate isolated critique multiplies critic-agent calls; needs a cheap batching compromise that still avoids cross-candidate anchoring"
+      }
+     ]
+    },
+    {
+     "spin": {
+      "situation": "A cheap gate decides, before spending tokens, whether a problem is even worth deeper multi-angle treatment — otherwise it just answers directly.",
+      "problem": "That gate is itself a single-pass judgment with no visibility: if it wrongly decides a case is closed-ended or low stakes, the system silently falls back to the shallow default and nobody downstream ever sees that a deeper pass was skipped, let alone why.",
+      "implication": "The exact failure the deeper treatment exists to defeat — quietly settling for the safe, obvious answer — reappears one level up, disguised as an efficiency feature, and because it's silent it looks like thoroughness happened when it didn't.",
+      "need_payoff": "Any triage gate that decides shallow-vs-deep must leave a visible trace of its own verdict and reasoning, so a wrong shallow-routing is discoverable instead of invisible."
+     },
+     "source_evidence": {
+      "quote": "it runs the problem through three questions... If there's only one right answer, then thinking from multiple angles is pointless and just wastes tokens, so it stops there.",
+      "timestamp": "06:01",
+      "named_mechanism": "silent pre-check gate that can auto-downgrade to shallow single-pass reasoning"
+     },
+     "transfer_reasoning": "Inverting the assumption behind the gate: it's presented as pure cost-saving, but a false negative reproduces the same 'settles for the safe answer' failure the deeper multi-angle treatment exists to prevent — except invisibly, since no downstream step ever sees the road not taken.",
+     "fusion_target": "Cairn's intake triage — the decision of whether an ingested source gets full Transfer-Intelligence treatment or gets shallow-filed. Needs a visible 'shallow-routed + why' marker instead of a silent drop.",
+     "category": "brain",
+     "lens": "inversion — silent triage gate needs a visible trace",
+     "nvfi": {
+      "novelty": 6,
+      "viability": 7,
+      "fit": 7,
+      "impact": 6
+     },
+     "contributing_frames": [
+      "F2-inversion"
+     ],
+     "convergence_type": "single_frame",
+     "graph_note": "Weak graph corroboration — nearest neighbors (Health Checks, Payment Gateway) are only superficially related and no active-problem or prior-decision link fired, so this reads as more speculative than the other candidates until checked against real Cairn triage logs.",
+     "conflict_with": null,
+     "forced_analogy": false,
+     "traps": [
+      {
+       "type": "noise",
+       "note": "if every shallow-routing gets surfaced, it could flood the review queue with low-value 'skipped' notices — needs a threshold or batched digest, not per-item pings"
+      }
+     ]
+    },
+    {
+     "spin": {
+      "situation": "Before forking into isolated agents, a single shared pass gathers context on the target, then hands that same context to every branch.",
+      "problem": "The branches look diverse because they think through different frames, but they all inherit the exact same upstream context snapshot — if that one gathering pass missed or distorted something, every 'independent' branch inherits the identical blind spot, and the appearance of diversity papers over a single point of failure.",
+      "implication": "You get a shortlist that looks thoroughly cross-checked from several angles, when in fact all of them were built on one possibly-flawed foundation nobody re-checked.",
+      "need_payoff": "Treat the shared context/evidence-gathering step as its own trust boundary — verify completeness or fidelity of that base before forking, since forking afterward can't undo a corrupted or incomplete starting point."
+     },
+     "source_evidence": {
+      "quote": "It started by going through the application in depth to gather context, then spun up its agents the same way.",
+      "timestamp": "11:40",
+      "named_mechanism": "single shared context-gathering pass feeding all isolated branches"
+     },
+     "transfer_reasoning": "Inverted assumption: isolation is assumed to guarantee independence, but independence only starts after the fork — everything upstream of the fork is a single point of failure the branch structure cannot see or correct for, since no branch is positioned to notice the shared input was already lossy.",
+     "fusion_target": "TubeAIR's transcript ingestion feeding this idea-engine run, and directly, IDEA-016's T1-vs-T2 experiment harness where all six branches share exactly one upstream brief",
+     "category": "brain",
+     "lens": "inversion — shared upstream context as an unchecked single point of failure",
+     "nvfi": {
+      "novelty": 7,
+      "viability": 7,
+      "fit": 8,
+      "impact": 7
+     },
+     "contributing_frames": [
+      "F2-inversion"
+     ],
+     "convergence_type": "single_frame",
+     "graph_note": "Corpus signal here is thin and partly noisy (nearest neighbors include unrelated appliance manuals), but 'context' fires as a related active problem, and the target ties directly to the live IDEA-016 T1-vs-T2 harness — the strongest anchor for this candidate is the repo's own current design, not the graph.",
+     "conflict_with": null,
+     "forced_analogy": false,
+     "traps": [
+      {
+       "type": "evidence",
+       "note": "claim that a shared brief/transcript is complete needs a concrete check (e.g. transcript-length/coverage sanity check) before trusting multi-way diversity built on it, not just asserted"
+      }
+     ]
+    },
+    {
+     "spin": {
+      "situation": "The premise behind splitting reasoning across angles is that a model defaults to whatever answer showed up most often in training data — the safe, familiar pattern — unless deliberately pushed past it.",
+      "problem": "That same bias doesn't only threaten the generation step — the review/scoring step is built on the same kind of model, so it likely carries the same bias aimed at judging instead of proposing: it may reflexively down-score genuinely novel transfers as 'too risky/unfamiliar' precisely because they're unfamiliar, the opposite of what a novelty score should reward.",
+      "implication": "A critic built to catch bad ideas can end up systematically killing the most valuable ones for the same root reason the generator needed a fix in the first place — an unexamined blind spot in the very component meant to be the quality gate.",
+      "need_payoff": "Explicitly test whether the critic penalizes unfamiliarity-as-risk versus genuine-viability-risk, and calibrate so novelty isn't structurally taxed by the same safe-pattern bias it's supposed to reward."
+     },
+     "source_evidence": {
+      "quote": "An agent reaches for the pattern that showed up most often in the data it learned from because seeing the same answer repeated is what taught it that the answer is a good one.",
+      "timestamp": "01:40",
+      "named_mechanism": "training-frequency bias toward the most common/safe pattern"
+     },
+     "transfer_reasoning": "The source diagnoses this bias only in the generator and fixes it there. But the critic is built on the same kind of model and is never checked for the identical bias — an unfamiliar-but-genuinely-good transfer looks statistically 'wrong' to a model trained the same way, so the failure mode just relocates from generation to judgment, invisibly.",
+     "fusion_target": "The Critic step in idea-engine (N/V/F scoring) — specifically whether high-novelty candidates are getting systematically suppressed on viability/fit as a proxy for 'unfamiliar,' testable against the existing T1-vs-T2 calibration data",
+     "category": "brain",
+     "lens": "inversion — the critic may carry the same bias it's meant to catch",
+     "nvfi": {
+      "novelty": 8,
+      "viability": 6,
+      "fit": 7,
+      "impact": 7
+     },
+     "contributing_frames": [
+      "F2-inversion"
+     ],
+     "convergence_type": "single_frame",
+     "graph_note": "Graph marks this as fully novel to the graph — no existing nearest neighbors — strengthening the novelty read; it also touches the 'Cloud engine room' prior decision, worth checking whether the calibration data this candidate proposes mining is retrievable from what's already logged there.",
+     "conflict_with": null,
+     "forced_analogy": false,
+     "traps": [
+      {
+       "type": "needs-evidence",
+       "note": "provisional — would need to actually mine the existing T1/T2 calibration data for a novelty-vs-score correlation before treating this as more than a hypothesis"
+      }
+     ]
+    },
+    {
+     "spin": {
+      "situation": "When Warwick accepts an idea in the Cockpit, it sits there as a stored decision.",
+      "problem": "Turning an accepted idea into something actually done this week still requires Warwick to work out the first concrete action himself — that's a manual step the card doesn't remove.",
+      "implication": "Attention is his scarcest resource; an accepted idea with no obvious next click is exactly the kind of thing that quietly rots in a backlog instead of becoming a next action.",
+      "need_payoff": "Every accepted idea card should carry a concrete first-step field so 'Keep' turns straight into 'here's what to do next,' not another thing to re-think later."
+     },
+     "source_evidence": {
+      "quote": "Each idea also comes with a sketch of how it would be built, the risks involved, and the first steps for getting started on it.",
+      "timestamp": "08:37",
+      "named_mechanism": "every surviving idea ships with an explicit 'first steps to get started' field alongside its score and risks"
+     },
+     "transfer_reasoning": "The source treats 'first step' as a mandatory output field, not an afterthought — it's what turns a scored idea into something actionable without the human having to translate it. Fusion's Cockpit idea cards currently surface the idea and its score but nothing forces a concrete 'do this first' line. Small, but it removes one recurring manual translation step.",
+     "fusion_target": "Cockpit idea/output card schema (Ideas Brain/Cash, Keep/Decline/Later) — add a mandatory 'first step' field populated at generation time, shown on the card itself",
+     "category": "brain",
+     "lens": "kill a manual next-action-translation step",
+     "nvfi": {
+      "novelty": 4,
+      "viability": 9,
+      "fit": 8,
+      "impact": 7
+     },
+     "contributing_frames": [
+      "F3-operational"
+     ],
+     "convergence_type": "single_frame",
+     "graph_note": "Graph fires 'Cockpit' as a related active problem, corroborating that this touches live, already-in-motion surface area rather than a speculative add-on.",
+     "conflict_with": null,
+     "forced_analogy": false,
+     "traps": [
+      {
+       "type": "garbage-in",
+       "note": "a generic or hand-wavy 'first step' is worse than none — only add the field if the generating pass can produce a genuinely concrete one"
+      },
+      {
+       "type": "scope-creep",
+       "note": "keep it to one line, not a mini project plan bolted onto the card — the card's job is triage, not planning"
+      }
+     ]
+    },
+    {
+     "spin": {
+      "situation": "Fusion is already mid-build on its own idea-engine that spins up several isolated AI thinking styles at once so ideas don't all come back sounding the same, then scores and prunes them with a skeptical critic.",
+      "problem": "Right now that capability lives only inside Fusion's own walls — it earns nothing and has zero audience outside the repo.",
+      "implication": "A less rigorous public version of a near-identical mechanism picked up heavy community traction within days of release — proof there's real external demand for this category of tool, and Fusion's version already has a differentiator the public tool isn't described as having.",
+      "need_payoff": "If Fusion packages its idea-engine as a standalone public skill/tool, it opens a genuine income and reputation stream that exists independently of Warwick's day job."
+     },
+     "source_evidence": {
+      "quote": "The ADHD skill came out fairly recently and picked up a lot of stars within a few days... it takes ideation or really any task with a lot of possible directions and splits it across separate agents as a tree of thought.",
+      "timestamp": "02:08-03:41",
+      "named_mechanism": "tree-of-thought frame-isolated multi-agent ideation skill with critic scoring (N/V/F)"
+     },
+     "transfer_reasoning": "The source names a mechanism — split divergent thinking across isolated passes, prune with a skeptical scorer — that, packaged as a standalone tool, drew heavy external adoption within days. That's evidence the underlying capability is independently sellable, not just useful internally. Fusion's own idea-engine already implements a stricter version of the same mechanism — explicit self-kill calibration, trap-list triage, and never-manufacture guardrails the public tool isn't described as having — so the transfer is packaging an existing internal capability for outside buyers, not building something new.",
+     "fusion_target": "idea-engine / T2 divergence architecture — package as a standalone public skill/tool",
+     "category": "cash",
+     "lens": "external productization of an internally-built mechanism",
+     "nvfi": {
+      "novelty": 5,
+      "viability": 7,
+      "fit": 8,
+      "impact": 6
+     },
+     "contributing_frames": [
+      "F4-commercial"
+     ],
+     "convergence_type": "single_frame",
+     "graph_note": "Thin graph traction (a single weak neighbor, 'Isolated Node'), but the target sits directly on the 'Cloud engine room' prior decision — infra a hosted/public version would need already exists as a made decision, not a new ask.",
+     "conflict_with": null,
+     "forced_analogy": false,
+     "traps": [
+      {
+       "type": "fast-follower risk",
+       "note": "the public tool already has first-mover attention in this category; needs a genuinely visible edge (the self-kill/trap-list rigor) to avoid being noise"
+      },
+      {
+       "type": "open-source cannibalization",
+       "note": "Fusion247PKA is a public repo — if the differentiated engine internals are fully visible in git history, others can copy the mechanism first; needs a decision on what's free vs. paywalled"
+      }
+     ]
+    },
+    {
+     "spin": {
+      "situation": "There's a concrete two-moment audit pattern available: before you build (test-strategy planning) and right before you ship (churn/UX risk-finding), both run by testing a plan/codebase from several angles and scoring what comes back.",
+      "problem": "Small software teams and agencies routinely ship with untested edge cases and features quietly dropped from the original plan, and usually only find out once real users hit the gaps or churn.",
+      "implication": "Fixing that after launch — refunds, support fires, trust damage, rework — costs far more than catching it beforehand, yet most small teams have no structured way to run this kind of check on themselves before they ship.",
+      "need_payoff": "Fusion could sell a two-stage 'Ship-Ready Audit' — hand over a PRD and codebase, get it checked before build and again before launch — as a paid service to outside dev teams and agencies."
+     },
+     "source_evidence": {
+      "quote": "it caught gaps that had gone completely undetected, like features that were promised in the PRD but never actually got built... for every one of them, it suggested a fix and listed out the traps and risks that came with it",
+      "timestamp": "11:40-12:52",
+      "named_mechanism": "pre-build test-strategy planning and pre-launch churn/UX risk audit, both scored and returning fix + trap per gap"
+     },
+     "transfer_reasoning": "The invariant is running a plan/codebase through a two-checkpoint audit — before build, before ship — that surfaces gaps a single-pass read misses and hands back scored findings with fixes and traps rather than doing the fix itself. Fusion's Cockpit/idea-engine tooling does the same job internally; pointing it at an external client's PRD and repo instead of Fusion's own turns an internal QA habit into a billable engagement.",
+     "fusion_target": "idea-engine / Critic loop, offered as a client-facing Cockpit audit workflow (Ship-Ready Audit)",
+     "category": "cash",
+     "lens": "service-ify an internal QA mechanism for external clients",
+     "nvfi": {
+      "novelty": 4,
+      "viability": 6,
+      "fit": 7,
+      "impact": 6
+     },
+     "contributing_frames": [
+      "F4-commercial"
+     ],
+     "convergence_type": "single_frame",
+     "graph_note": "Graph fires both an active problem ('build') and the 'Cloud engine room' prior decision, corroborating this touches real, already-active surface area rather than a hypothetical extension.",
+     "conflict_with": null,
+     "forced_analogy": false,
+     "traps": [
+      {
+       "type": "delivery cost",
+       "note": "a real client engagement needs a human to intake the client's PRD, run the loop, and curate results per client — without a templated wrapper this is bespoke consulting time, not scalable margin"
+      },
+      {
+       "type": "liability",
+       "note": "if Fusion is paid to run this audit and a churn-causing bug still ships, that's reputational and possibly contractual exposure — needs clear scope/disclaimer language before selling it"
+      }
+     ]
+    },
+    {
+     "spin": {
+      "situation": "Long sessions pile ideation, build history, backlog, and decisions all into one single conversation thread.",
+      "problem": "When that thread gets compacted or restarted, hard-won context quietly evaporates because it was never kept separate from the noise of everything else happening in the same thread — an open, unsolved gap today.",
+      "implication": "Decisions and subtle-but-important context get re-explained or silently lost right when they'd matter most.",
+      "need_payoff": "If session continuity were built the same way — isolate each concern in its own clean window, merge only the finished output back — compaction would lose noise, not substance."
+     },
+     "source_evidence": {
+      "quote": "Every possibility gets worked through in the same context window, so the ideas bleed into each other and the context fills up with noise. The thinking gets worse instead of better.",
+      "timestamp": "02:08",
+      "named_mechanism": "per-branch context isolation with merge-only-at-the-end"
+     },
+     "transfer_reasoning": "The cure for single-context degradation — isolate parallel concerns, never let them share a window, merge only conclusions — targets the same failure shape as context evaporating on compaction: a long single thread accumulating unrelated concerns until the signal degrades. The domain jump is real: this mechanism is normally only applied to brainstorming variations, never to an agent's own session continuity.",
+     "fusion_target": "Larry's session-continuity / anti-context-evaporation architecture (open backlog item, currently undesigned)",
+     "category": "brain",
+     "lens": "isolation-then-merge as a memory architecture, not an ideation tool",
+     "nvfi": {
+      "novelty": 8,
+      "viability": 5,
+      "fit": 7,
+      "impact": 7
+     },
+     "contributing_frames": [
+      "F5-crossdomain"
+     ],
+     "convergence_type": "single_frame",
+     "graph_note": "Graph independently flags 'Larry', 'session', and 'context' as related active problems — direct corroboration that this maps onto Larry's own known, currently-undesigned context-evaporation backlog item, not a speculative parallel.",
+     "conflict_with": null,
+     "forced_analogy": false,
+     "traps": [
+      {
+       "type": "scope-creep",
+       "note": "could balloon into rebuilding the whole memory system instead of a targeted fix for the one backlog item"
+      },
+      {
+       "type": "unproven",
+       "note": "provisional only — no evidence yet that isolate-then-merge actually prevents evaporation rather than just relocating the noise elsewhere"
+      }
+     ]
+    },
+    {
+     "spin": {
+      "situation": "There's an ongoing manual, human-supervised effort to work out when the cheap model tier is good enough versus when the expensive tier earns its cost.",
+      "problem": "That tier decision is currently a one-off calibration exercise run and interpreted by hand, work-package by work-package, rather than something automatic and at scale.",
+      "implication": "Every new work-package still needs a fresh manual tier judgment call, which won't hold up as the number of work-packages grows.",
+      "need_payoff": "An auto-router that classifies tier per work-package on the fly, and batch-runs both tiers as parallel variants whenever it's ambiguous, would turn today's one-time calibration exercise into a permanent, self-serve system."
+     },
+     "source_evidence": {
+      "quote": "It even auto selects the right model for the job... You describe what you want once and it batch generates dozens of videos across different models, styles, and aspect ratios in a single session.",
+      "timestamp": "07:51",
+      "named_mechanism": "auto-model-selection plus batched multi-model variant generation in one pass"
+     },
+     "transfer_reasoning": "The named mechanism — given one job, auto-pick from a pool of models and batch multiple variants across that pool in a single pass instead of manual serial switching — maps directly onto a still-manual tier decision: extending calibration work already underway into a live auto-router instead of a one-off exercise repeated by hand.",
+     "fusion_target": "T1/T2 tier auto-selection layer for the idea-engine work-package pipeline (currently manual calibration)",
+     "category": "cash",
+     "lens": "auto-routing as a tier-selection mechanism",
+     "nvfi": {
+      "novelty": 6,
+      "viability": 6,
+      "fit": 7,
+      "impact": 6
+     },
+     "contributing_frames": [
+      "F5-crossdomain"
+     ],
+     "convergence_type": "single_frame",
+     "graph_note": "Graph fires 'model' as a related active problem, consistent with the in-flight T2 calibration work — but that same overlap raises real duplication risk against the in-flight T2 divergence architecture design package; check that package before building anything new.",
+     "conflict_with": null,
+     "forced_analogy": false,
+     "traps": [
+      {
+       "type": "overlap",
+       "note": "may duplicate the in-flight T2 divergence architecture design package — check before building anything new"
+      },
+      {
+       "type": "cost",
+       "note": "batch-running both tiers in parallel doubles spend on every ambiguous work-package unless the batching is bounded"
+      }
+     ]
+    }
+   ],
+   "killed": [],
+   "conflicts": [],
+   "convergence_summary": "One genuine multi-frame convergence surfaced: two independently-run passes, via different mechanisms (a structural-fidelity audit vs. a pre-ship blind-spot catch), both arrived at the same fix — add a PRD-vs-built drift check to Larry's Builder Preflight — and because Builder Preflight wasn't part of the shared brief this counts as strong novel_independent evidence rather than prompt echo; its confidence was raised accordingly rather than averaged. Every other surviving candidate was found by only one pass, spanning brain-side process fixes (pre-build spec gating, isolating the critic step, a visible triage-gate trace, treating shared upstream context as its own trust boundary, testing the critic itself for novelty bias, a Cockpit first-step field, and a cross-domain isolation-then-merge idea for Larry's own session continuity) and cash-side productization ideas (packaging the idea-engine publicly, a paid Ship-Ready Audit service, and a T1/T2 tier auto-router). No candidate was killed as a forced or surface analogy under cross-examination, and no two candidates recommended opposite actions on the same target, so no conflicts were flagged."
+  },
+  "branchWallMs": 134995
+ }
+}

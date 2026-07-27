@@ -6,11 +6,13 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { execSync } from 'node:child_process';
+import { execSync, spawn } from 'node:child_process';
 import { q, w } from './db.mjs';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
-const PUB = path.join(DIR, 'public');
+// Serves from ./public by default; COCKPIT_PUB points a throwaway instance at a STAGING copy so cockpit UI
+// changes can be render-checked (node services/cockpit/render-check.mjs) BEFORE they replace the live assets.
+const PUB = path.resolve(process.env.COCKPIT_PUB || path.join(DIR, 'public')); // resolve so the startsWith() guard matches regardless of slash style
 const REPO = path.resolve(DIR, '..', '..');
 const TK = path.join(REPO, 'Team Knowledge');
 const PORT = Number(process.env.COCKPIT_PORT || 8090);
@@ -57,7 +59,31 @@ async function apiState() {
   const ingestedCount = await safe(`select count(*)::int n from cockpit.youtube_source`);
   const wins = await safe(`select id, text, happened_at from cockpit.movement order by happened_at desc nulls last limit 8`);
   const builds = await safe(`select id, name, gives, status, status_tone, progress_pct, sort from cockpit.build order by sort nulls last limit 50`);
-  return { attention, outputs, archived, housekeeping, deliverables: listDeliverables().slice(0, 20), ingested, ingestedCount: ingestedCount[0]?.n ?? ingested.length, wins, builds, build: BUILD, at: new Date().toISOString() };
+  // Transfer-Intelligence ideas (SPIN-first surface). Highest Impact first.
+  const ideas = await safe(
+    `select ic.candidate_id id, ic.mine_id, ic.category, ic.lens, ic.spin, ic.source_evidence, ic.transfer_reasoning,
+            ic.fusion_target, ic.nvfi, ic.traps, ic.larry_recon, ic.lifecycle_state, ic.brief_hash, ic.created_at,
+            im.source_ref, coalesce(ys.title, im.source_ref) as source_title, im.model as mine_model
+     from cockpit.idea_candidate ic
+     join cockpit.idea_mine im on im.mine_id = ic.mine_id
+     left join cockpit.youtube_source ys on ys.video_id = im.source_ref
+     where ic.lifecycle_state in ('proposed','reconciled','later')
+     order by (ic.nvfi->>'impact')::int desc nulls last, ic.created_at desc limit 100`);
+  // Mason/Brains OPPORTUNITIES — synthesised build-theses (SPIN-first). Only the LATEST run's surfaced set (no
+  // stacking across re-syntheses); declined ones stay hidden; full atom provenance rides along for the detail sheet.
+  const opportunities = await safe(
+    `select o.opportunity_id id, o.headline, o.otype, o.state, o.spin, o.why_now, o.roi, o.evidence,
+            o.what_wed_build, o.coherence_note, o.disposition, o.disposition_conflict, o.created_at,
+            coalesce((select jsonb_agg(jsonb_build_object('n', a.n, 'source', a.source_ref, 'engine', a.engine,
+                       'target', a.fusion_target, 'situation', a.spin->>'situation') order by a.n)
+              from cockpit.opportunity_atom oa join cockpit.idea_atom a on a.atom_id = oa.atom_id
+              where oa.opportunity_id = o.opportunity_id), '[]') as atoms
+     from cockpit.opportunity o
+     where o.state = 'surfaced'
+       and o.run_id = (select run_id from cockpit.opportunity_run order by created_at desc limit 1)
+       and coalesce(o.disposition,'') <> 'declined'
+     order by (o.disposition_conflict) desc, o.otype, o.created_at`);
+  return { attention, outputs, archived, housekeeping, deliverables: listDeliverables().slice(0, 20), ideas, opportunities, ingested, ingestedCount: ingestedCount[0]?.n ?? ingested.length, wins, builds, build: BUILD, at: new Date().toISOString() };
 }
 
 // One decision endpoint for the whole lifecycle: accept (fires the real governed action + records
@@ -149,6 +175,51 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.url.startsWith('/api/transcript')) { const v = new URL(req.url, 'http://x').searchParams.get('video'); return j(res, 200, await apiTranscript(v)); }
     if (req.url.startsWith('/api/deliverable')) { const f = new URL(req.url, 'http://x').searchParams.get('file'); return j(res, 200, await apiDeliverable(f)); }
+    if (req.url.startsWith('/api/mine') && req.method === 'POST') {
+      let raw = ''; req.on('data', (d) => { raw += d; if (raw.length > 1e4) req.destroy(); });
+      req.on('end', () => {
+        try {
+          const v = String(JSON.parse(raw || '{}').video || '');
+          if (!/^[A-Za-z0-9_-]{6,24}$/.test(v)) return j(res, 200, { ok: false, error: 'bad video id' });
+          // fire the Mine runner detached (one Sonnet call, ~2 min) — ideas appear in /api/state when done
+          const p = spawn('node', ['--env-file=C:/.fusion247/fusion-capture-gateway.env', `${REPO}/services/control-plane/cockpit/mine-ideas.mjs`, v], { detached: true, stdio: 'ignore', cwd: REPO });
+          p.unref();
+          j(res, 200, { ok: true, mining: v });
+        } catch (e) { j(res, 500, { ok: false, error: e.message }); }
+      });
+      return;
+    }
+    if (req.url.startsWith('/api/idea-decide') && req.method === 'POST') {
+      let raw = ''; req.on('data', (d) => { raw += d; if (raw.length > 1e4) req.destroy(); });
+      req.on('end', async () => {
+        try {
+          const { id, decision } = JSON.parse(raw || '{}');
+          const map = { keep: 'kept', later: 'later', decline: 'declined', research: 'researching' };
+          if (!id || !map[decision]) return j(res, 200, { ok: false, error: 'bad decision' });
+          await w('update cockpit.idea_candidate set lifecycle_state=$2, updated_at=now() where candidate_id=$1', [id, map[decision]]);
+          await w("insert into cockpit.idea_event (candidate_id, actor, event, note) values ($1,'warwick',$2,$3)",
+            [id, decision === 'research' ? 'research_started' : decision, 'cockpit']);
+          j(res, 200, { ok: true, id, state: map[decision] });
+        } catch (e) { j(res, 500, { ok: false, error: e.message }); }
+      });
+      return;
+    }
+    if (req.url.startsWith('/api/opportunity-decide') && req.method === 'POST') {
+      let raw = ''; req.on('data', (d) => { raw += d; if (raw.length > 1e4) req.destroy(); });
+      req.on('end', async () => {
+        try {
+          const { id, decision } = JSON.parse(raw || '{}');
+          // Warwick's call is his DURABLE DISPOSITION (survives re-synthesis), not a synthesis state. Mason/Pax/Larry
+          // act on it downstream; no build is authorised here. Deciding also clears any carry-forward conflict flag.
+          const map = { watch: 'watching', research: 'researching', brief: 'brief', later: 'later', decline: 'declined' };
+          if (!id || !map[decision]) return j(res, 200, { ok: false, error: 'bad decision' });
+          await w('update cockpit.opportunity set disposition=$2, disposition_at=now(), disposition_conflict=false, updated_at=now() where opportunity_id=$1', [id, map[decision]]);
+          await w("insert into cockpit.opportunity_event (opportunity_id, actor, event, note) values ($1,'warwick',$2,'cockpit')", [id, decision]);
+          j(res, 200, { ok: true, id, state: map[decision] });
+        } catch (e) { j(res, 500, { ok: false, error: e.message }); }
+      });
+      return;
+    }
     if (req.url.startsWith('/api/health')) return j(res, 200, { status: 'ok', build: BUILD });
     return serveStatic(req, res);
   } catch (e) { j(res, 500, { ok: false, error: e.message }); }

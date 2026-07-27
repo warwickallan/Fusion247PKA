@@ -1,0 +1,280 @@
+{
+ "call": {
+  "output": 35382,
+  "ms": 371777,
+  "cost": 0.7773306
+ },
+ "out": {
+  "surfaced": [
+   {
+    "headline": "Give Larry a durable memory: persist decision-rationale and session working-state in the graph, not just live context",
+    "type": "self_improvement",
+    "spin": {
+     "situation": "Larry's reasoning, judgment calls, and in-session working state currently live only inside whatever conversation happens to be running.",
+     "problem": "When a session compacts or restarts, that reasoning evaporates — Warwick has to re-explain context and Larry has to re-derive decisions already made.",
+     "implication": "This is already a flagged HIGH-ish gap (the Fresh-Larry WHY gap), and it compounds as Fusion's scope grows — more subsystems, more decisions, more lost every time a thread ends.",
+     "need_payoff": "A graph-persisted session/decision layer — an incrementally-written current-session node, decision-rationale linked into the Brain graph, and a checkpoint at natural pause points — turns 'hope compaction doesn't hit at a bad time' into a non-issue."
+    },
+    "why_now": "Already named as a live, flagged problem, and IDEA-016's own Brain/Neo4j schema work is actively deciding node types right now — the moment to bake the memory layer in rather than retrofit it later.",
+    "roi": {
+     "value_type": "reliability",
+     "band": "high",
+     "note": "Removes a recurring, compounding failure point in Larry's own operation, not a one-off convenience."
+    },
+    "evidence": {
+     "member_atoms": [
+      12,
+      14,
+      17,
+      30,
+      33,
+      39,
+      48,
+      56
+     ],
+     "independent_sources": 4,
+     "frames": 4,
+     "live_anchors": [
+      "Fresh-Larry WHY gap (flagged HIGH-ish, 2026-07-26)",
+      "IDEA-016 Brain/Neo4j schema currently being decided"
+     ],
+     "convergence_note": "Four independently-mined sources — an ADHD-skill video, a business-tasks video, a context-graphs paper, and an Audi ad — using four different reasoning frames (mechanism, inversion, operational, crossdomain), all land on the identical structural fix: durable graph-backed state instead of live-conversation-only state."
+    },
+    "what_wed_build": "A session/decision-rationale layer in the Brain graph: a current-task/current-session node written incrementally through a session (not reconstructed after the fact), a decision-rationale node type linked to entities/sources, and a lightweight checkpoint file written at natural pause points (turn end, pre-compaction) that the next session reads first.",
+    "coherence_note": "Passes all four bars — one describable artifact (graph-backed session+rationale layer), eight non-redundant facets, four independent sources, and a real named live problem.",
+    "actions": [
+     "Make build brief",
+     "Research with Pax"
+    ]
+   },
+   {
+    "headline": "Stop trusting stale gauges: bind cockpit.build/overall_state refresh to real events, not manual updates",
+    "type": "self_improvement",
+    "spin": {
+     "situation": "Larry's self-model tables (cockpit.build, cockpit.overall_state) exist to tell Larry what's actually true about the build right now.",
+     "problem": "They've been stale since 2026-07-22, with nothing forcing a refresh — updated manually, if at all.",
+     "implication": "Any orchestration or gating decision Larry makes off these tables silently inherits whatever staleness they carry — a gauge that looks structured and is wrong is worse than no gauge, because nobody thinks to double-check it.",
+     "need_payoff": "Refresh automatically on real trigger events (merge, build-state-change) and treat these tables as reasoning-graph material with a routine drift check, not ad-hoc SQL nobody revisits."
+    },
+    "why_now": "The tables are demonstrably stale right now — this is exactly the kind of invisible, load-bearing component that looks fine at the surface while decaying underneath.",
+    "roi": {
+     "value_type": "reliability",
+     "band": "high",
+     "note": "Cheap fix (event-bound refresh trigger) for a silent trust failure that could mislead a future merge/gating decision."
+    },
+    "evidence": {
+     "member_atoms": [
+      20,
+      22,
+      38,
+      54,
+      66
+     ],
+     "independent_sources": 3,
+     "frames": 3,
+     "live_anchors": [
+      "cockpit.build / cockpit.overall_state confirmed stale since 2026-07-22"
+     ],
+     "convergence_note": "Three sources converge from different angles — a stale-gauge-is-worse-than-no-gauge inversion, a domain-graph-vs-reasoning-graph structural split, and an invisible-component-decays-fastest pattern — all naming the same two tables as the concrete fix target."
+    },
+    "what_wed_build": "An event-bound refresh trigger (fires on merge/build-state-change) for cockpit.build/cockpit.overall_state, plus a routine drift check that flags when the tables haven't moved despite real activity elsewhere.",
+    "coherence_note": "Concrete and narrow — low risk of being a semantic trap since every atom names the literal same two tables, not just shared vocabulary.",
+    "actions": [
+     "Make build brief"
+    ]
+   },
+   {
+    "headline": "Close the loop: TubeAIR captures land in Cairn's inbox and the knowledge note still waits on 'next session'",
+    "type": "self_improvement",
+    "spin": {
+     "situation": "TubeAIR already pulls a clean YouTube transcript and hands it to Cairn's inbox, flagged pending_cairn.",
+     "problem": "The write-up step is informal — 'pending, I'll write it next session' — a promise, not a defined pipeline step, so it silently accumulates.",
+     "implication": "Already a logged HIGH backlog item, and the failure mode (deferred-to-a-vibe rather than a scripted step) will recur for every future capture type built the same way.",
+     "need_payoff": "Make the write-up an automatic step triggered on capture, or at minimum keep the pipeline primed with cheap background activity so the expensive synthesis step never fully idles."
+    },
+    "why_now": "Already a named, logged HIGH backlog item — the smallest, most concrete, most shovel-ready fix in the whole set.",
+    "roi": {
+     "value_type": "time",
+     "band": "med",
+     "note": "Removes one recurring manual promise that's already known to slip."
+    },
+    "evidence": {
+     "member_atoms": [
+      16,
+      21,
+      45,
+      57
+     ],
+     "independent_sources": 2,
+     "frames": 3,
+     "live_anchors": [
+      "TubeAIR pending_cairn write-up step, logged HIGH backlog item"
+     ],
+     "convergence_note": "Two independent sources name the identical concrete target (the pending_cairn write-up step) and converge on the same diagnosis — a step filed as an informal promise rather than a defined pipeline stage — while proposing two complementary fixes (auto-write-on-capture vs. keep-the-pipeline-warm)."
+    },
+    "what_wed_build": "An automatic trigger that fires the knowledge-note write-up the moment a transcript lands pending_cairn; if full automation isn't safe yet, a scheduled low-stakes background pass that keeps the synthesis path primed so the real request never queues cold.",
+    "coherence_note": "Smallest, most concrete, most shovel-ready of the surfaced set.",
+    "actions": [
+     "Make build brief"
+    ]
+   },
+   {
+    "headline": "Close the Cockpit↔Brain decision loop: every Keep/Decline/Later gets written back, ruled, and reused",
+    "type": "self_improvement",
+    "spin": {
+     "situation": "Warwick reviews Cockpit cards and taps Keep/Decline/Later while the Brain surfaces new candidates to review.",
+     "problem": "That loop is mostly one-way — no mandatory first-step, no written verdict rule, no explicit handling of a stalled 'Later,' and no precedent check before a near-duplicate idea resurfaces.",
+     "implication": "Every gap costs Warwick a small amount of friction on every single card, and it compounds — vaguer decisions, silent re-litigation of already-declined ideas, 'Later' items quietly rotting.",
+     "need_payoff": "A tighter loop: cards carry a mandatory first-step, a written NVFI-to-verdict rubric sorts cards before they reach Warwick, 'Later' gets an explicit re-surface/archive rule, and past decisions plus reasons write back into the graph so precedent is checked before a repeat surfaces."
+    },
+    "why_now": "Cockpit's Keep/Decline/Later is Warwick's single highest-frequency touchpoint with this whole system — friction here is paid daily — and the Brain graph schema work happening right now is the natural place to add the write-back edge.",
+    "roi": {
+     "value_type": "cognitive_load",
+     "band": "high",
+     "note": "Reduces the number and vagueness of decisions Warwick has to make per card, and stops already-declined ideas from resurfacing."
+    },
+    "evidence": {
+     "member_atoms": [
+      9,
+      19,
+      23,
+      34,
+      40,
+      51
+     ],
+     "independent_sources": 4,
+     "frames": 3,
+     "live_anchors": [
+      "Cockpit Keep/Decline/Later — Warwick's live daily decision surface"
+     ],
+     "convergence_note": "Four independent sources each name a distinct gap in the same live Cockpit decision loop — actionability, consistency, stall-handling, write-back, precedent, same-session feedback — none restating another's point."
+    },
+    "what_wed_build": "Extend the Cockpit card schema with a mandatory first-step field and a written NVFI-to-verdict rubric; add an explicit stall-branch rule for 'Later' (re-surface trigger or archive); write Accept/Decline/Later outcomes plus reasons back into the Brain graph; check new candidates against that stored precedent before they reach a Cockpit card.",
+    "coherence_note": "Six atoms, four sources, zero restatement — each solves a genuinely different piece of the same funnel, anchored to the one live surface Warwick actually uses every day.",
+    "actions": [
+     "Make build brief",
+     "Explain"
+    ]
+   },
+   {
+    "headline": "Point the Brain's own capture→structure→output pipeline at other people's sales calls, sell the output",
+    "type": "strategic",
+    "spin": {
+     "situation": "Solo/small service-business owners (consultants, agencies, trades) run their entire sales process from memory — undocumented, un-handoffable.",
+     "problem": "Fusion already built the exact pipeline needed to fix that for itself — recording intake, graph structuring, readable output — but it's only ever been pointed at Warwick's own knowledge.",
+     "implication": "The same spine, repointed at a client's own recorded sales calls, converts an unstructured tacit process into a structured, sellable, hand-off-ready system, with a lightweight pipeline-visibility dashboard as a natural add-on.",
+     "need_payoff": "A genuinely new external revenue line built almost entirely on capability that already exists, not a from-scratch product."
+    },
+    "why_now": "The ingestion pipeline (capture → graph structuring → readable output) is already live and proven internally (TubeAIR, ObsidiWikAi) — this is a repointing exercise, not a new build.",
+    "roi": {
+     "value_type": "money",
+     "band": "med",
+     "note": "Unvalidated externally — real upside if the target market bites, but needs a market check before any build spend."
+    },
+    "evidence": {
+     "member_atoms": [
+      26,
+      27
+     ],
+     "independent_sources": 1,
+     "frames": 1,
+     "live_anchors": [
+      "Brain ingestion pipeline (already built for internal knowledge)",
+      "Cockpit dashboard pattern (already built for internal use)"
+     ],
+     "convergence_note": "Single source, but two genuinely complementary facets — the extraction service and a dashboard bolt-on — forming one coherent, sellable bundle rather than a restatement."
+    },
+    "what_wed_build": "Nothing yet — this needs Pax market validation first (real demand, price point, target segment) before any build brief.",
+    "coherence_note": "Only one independent source, below the normal two-source bar — surfaced anyway as the strongest external/strategic candidate in the set; flagged as needing validation, not build-ready.",
+    "actions": [
+     "Research with Pax",
+     "Explain"
+    ]
+   }
+  ],
+  "emerging": [
+   {
+    "headline": "Add a PRD-vs-built drift audit to Larry's pre-merge check",
+    "type": "self_improvement",
+    "member_atoms": [
+     2,
+     4
+    ],
+    "why_not_surfaced_yet": "Single source — two frames within one atom (mechanism+operational) clear the frame-diversity bar on their own, but there's no cross-source corroboration yet. Worth watching for a second independent hit before elevating."
+   },
+   {
+    "headline": "Give the idea pipeline itself a measured flow-state (stage counts + staleness) instead of vibes",
+    "type": "self_improvement",
+    "member_atoms": [
+     15,
+     18,
+     24
+    ],
+    "why_not_surfaced_yet": "All three atoms come from the same single source restating the same 'measure the funnel' insight at slightly different targets — fails non-redundant-facets and independent-support. Distinct from the self-model-tables opportunity above, which targets existing tables, not this pipeline-specific view."
+   },
+   {
+    "headline": "Give the Brain's entity-extraction/merge stage a dedicated, scheduled hygiene pass distinct from Cockpit's per-source review",
+    "type": "self_improvement",
+    "member_atoms": [
+     61,
+     62,
+     63,
+     64,
+     65,
+     67,
+     68
+    ],
+    "why_not_surfaced_yet": "Seven atoms with genuinely differentiated facets (prevention, detection, containment, governance, cadence) and a tie to already-authorized Cockpit lift-out dedup work — but all seven come from a single source (one ad), so it reads as one source's central metaphor applied seven times rather than independent corroboration. Worth a second mining pass before build-briefing."
+   },
+   {
+    "headline": "myPKA itself, offered multi-tenant",
+    "type": "strategic",
+    "member_atoms": [
+     42
+    ],
+    "why_not_surfaced_yet": "Single atom, single source, no corroboration — and it's a substantial pivot deserving explicit research rather than surfacing off one line. Flagged for its scale, not its evidence."
+   }
+  ],
+  "rejected_clusters": [
+   {
+    "label": "Idea-engine self-tuning (T1/T2 calibration, Critic isolation, tier auto-routing, taxonomy locking, discard-recycling)",
+    "member_atoms": [
+     1,
+     5,
+     6,
+     7,
+     8,
+     10,
+     11,
+     13,
+     31,
+     35,
+     43,
+     46,
+     47,
+     49,
+     53,
+     59
+    ],
+    "why_rejected": "volume — this is exactly the corpus's flagged self-referential bias (mined mid-experiment on the idea-engine's own T1-vs-T2 tiering). 16 of 68 atoms — nearly a quarter of the corpus — all point back at the idea-engine examining itself. Frame and source diversity don't rescue it: most atoms are a handful of source videos re-applying their central mechanism to slightly different internal targets rather than independently converging on one build thesis. None individually clears a Warwick-attention bar; a couple (taxonomy-lock-before-run, score causal-sufficiency risk) are sound enough to just apply quietly without a brief — see standalone_atoms."
+   }
+  ],
+  "standalone_atoms": [
+   3,
+   25,
+   28,
+   29,
+   32,
+   36,
+   37,
+   41,
+   44,
+   50,
+   52,
+   55,
+   58,
+   60
+  ],
+  "notes": "Corpus explicitly warned as over-weighted toward the idea-engine improving itself; that mass (16 atoms) was isolated into one rejected cluster rather than allowed to leak volume-credit into any surfaced opportunity — no surfaced item above depends on idea-engine-internal atom count for its evidence. Every atom landed in surfaced, emerging, rejected, or standalone; nothing silently dropped."
+ }
+}

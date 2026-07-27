@@ -14,6 +14,27 @@ chasing a tangent mid-flow (see the "challenge context-diluting requests" rule).
   (Directus only uses ADMIN_PASSWORD to create the admin, which already exists), but stale — refresh it if any
   re-provisioning tooling ever needs the admin password again.
 
+## 🔧 Operational-truth debt (recorded separately — NOT idea-engine scope)
+- **[MED] Stale Fusion self-model tables.** `cockpit.build` (last updated 2026-07-22) + `cockpit.overall_state`
+  (2026-07-21) are **hand-maintained and days stale** — they don't reflect the cockpit lift-out or the
+  idea-engine. The dynamic self-model (what's live / being-built / parked / broken) should progressively be
+  **DERIVED from authoritative live sources** (git activity, running processes, migrations) rather than
+  hand-updated. Longer-term direction (Warwick): Fusion reconstructs **A** (self-model) from live sources;
+  Larry's session memory is useful now but **must not** become the permanent operational truth; **Honcho**
+  progressively takes over **B** (autobiographical); **C** (governance) stays in deterministic files.
+  Deliberately OUT of scope for the Transfer-Intelligence experiment — that slice uses the smallest
+  *trustworthy* context (git-derived "happening now" + backlog + rule files + a hand-distilled Warwick seed),
+  and Larry's reconciliation layer backstops the lean packet.
+
+## 🧠 Session continuity / durable context (separate problem — do NOT build now)
+- **[HIGH-ish] Larry's rich context must not evaporate on compaction/restart.** Identified 2026-07-26 during the
+  idea-engine B-context design. Larry's session memory is useful *today* but must NOT be the permanent home of
+  operational truth (A) or Warwick context (B). Direction: **A** reconstructed from live sources (git/processes/DB);
+  **B** = a durable `curated_seed` file (maintained by a future **/close-session** ritual or **CuratAir**), progressively
+  replaced/enriched by **Honcho** as it proves mature; **C** stays in deterministic files. **Do NOT turn this into a
+  CuratAir/memory-system build now** — for the idea-engine experiment, the smallest durable B artefact
+  (`Team Knowledge/fusion-brief/warwick-context.curated_seed.md`, provenance `curated_seed`) is sufficient.
+
 ## 💡 Feature requests / ideas
 - **Backlog surface in the cockpit.** Once the cockpit's mature, surface this backlog as a cockpit area (or an
   Attention/Output feed) so feature-requests/bugs are captured + triaged from the phone, not a markdown file.
