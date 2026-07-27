@@ -25,10 +25,18 @@ const COCKPIT = process.env.COCKPIT_URL || 'http://127.0.0.1:8090';
 // source yields a padded note, so the note length is a poor richness signal). RICH → T2 divergent; THIN → cheap/refuse.
 const RICH_CHARS = 12000;   // ~2000+ words of real source → deserves the deep divergent pass
 const THIN_CHARS = 1500;    // near-empty → a single cheap pass, ZERO is the expected answer
-export function tierOf(transcriptLen) {
-  if (transcriptLen >= RICH_CHARS) return 'rich';
-  if (transcriptLen < THIN_CHARS) return 'thin';
+export function tierOf(len) {
+  if (len >= RICH_CHARS) return 'rich';
+  if (len < THIN_CHARS) return 'thin';
   return 'medium';
+}
+
+// The substance signal to tier on. Prefer the raw-transcript length (the real source size — a note is padded for
+// thin sources, so note length over-reads). But if the transcript is UNAVAILABLE (fetch failed → ''), fall back to
+// the source-core length so a rich NOTED source is never misclassified 'thin' just because a transcript fetch
+// hiccuped (TQA-003 — a reachable availability/correctness defect). transcriptLen>0 ⇒ transcript; else ⇒ core.
+export function substanceLength({ transcriptLen, coreLen }) {
+  return transcriptLen > 0 ? transcriptLen : coreLen;
 }
 
 // The SI note's own interpretation sections — Arc must NOT consume these (they are pre-written transfer conclusions).
@@ -133,7 +141,7 @@ export async function runArc(video, opts = {}) {
   const { text: brief, hash } = assembleBrief();
   assembleBrief.__hash = hash;
   const [{ core, basis, hasNote }, transcript] = await Promise.all([getSourceCore(video), getTranscript(video)]);
-  const substanceLen = Math.max(transcript.length, hasNote ? 0 : core.length);
+  const substanceLen = substanceLength({ transcriptLen: transcript.length, coreLen: core.length });
   let tier = tierOf(substanceLen);
   const forced = (opts.forceTier || '').toLowerCase();
   if (forced === 't1') tier = 'medium'; else if (forced === 't2') tier = 'rich'; else if (forced === 'thin') tier = 'thin';

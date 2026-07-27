@@ -4,7 +4,7 @@
 // duplicate control (AC-07/AC-08), and verbatim-evidence verification (AC-05). Run: node --test arc.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { tierOf, stripInterpretation, normalize } from '../arc.mjs';
+import { tierOf, stripInterpretation, normalize, substanceLength } from '../arc.mjs';
 import { atomKey, verifyEvidence } from '../atom-register.mjs';
 
 const NOTE = `---
@@ -57,6 +57,17 @@ test('AC-02 tierOf is deterministic on substance length', () => {
   assert.equal(tierOf(1500), 'medium');  // boundary
   assert.equal(tierOf(1499), 'thin');
   assert.equal(tierOf(379), 'thin');     // near-empty air-fryer
+});
+
+test('AC-02 substanceLength: a rich noted source is NOT misclassified thin when the transcript fetch fails (TQA-003)', () => {
+  // transcript available → it is the substance signal
+  assert.equal(substanceLength({ transcriptLen: 42442, coreLen: 23669 }), 42442);
+  assert.equal(tierOf(substanceLength({ transcriptLen: 42442, coreLen: 23669 })), 'rich');
+  // transcript fetch FAILED ('' → 0) but a rich note-core exists → fall back to core, stays rich (the bug fix)
+  assert.equal(substanceLength({ transcriptLen: 0, coreLen: 23669 }), 23669);
+  assert.equal(tierOf(substanceLength({ transcriptLen: 0, coreLen: 23669 })), 'rich');
+  // both unavailable → 0 → thin (correct)
+  assert.equal(tierOf(substanceLength({ transcriptLen: 0, coreLen: 0 })), 'thin');
 });
 
 test('AC-04/AC-06 normalize: T2 carries frames + convergence + admission; T1 is single/no-frames', () => {
