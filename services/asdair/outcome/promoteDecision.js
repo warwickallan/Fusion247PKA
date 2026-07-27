@@ -116,6 +116,14 @@ const SOURCE_DOC_SQL = 'SELECT doc_type FROM asdair.source_documents WHERE id = 
 // ever wrote it -- so the evidence that authorised a directive was not itself
 // durable, and no later runtime could re-check it. It is written now.
 const LOG_COLUMNS = ['asked_on', 'question', 'answer', 'applies_going_forward', 'household_id', 'source_document_id'];
+// `source_document_id` is carried onto the RULE as well as the decision log
+// (TQA-PR73-002). Without it a promoted rule held no provenance pointer of its
+// own, so auditing "which document was cited to authorise this actionable
+// directive?" meant walking back through rule_qa_log by the promoted_rule_id
+// back-link -- and an actionable rule created from a MISCITED document left no
+// trace on the rule itself. The pointer does not prove the instruction came
+// from that document (see the LIMITATION note on verifySourceAuthority), but it
+// makes the claim permanently auditable at the artefact it authorised.
 const RULE_COLUMNS = [
   'category',
   'rule_text',
@@ -127,7 +135,8 @@ const RULE_COLUMNS = [
   'reason',
   'note',
   'active',
-  'household_id'
+  'household_id',
+  'source_document_id'
 ];
 
 let pool = null;
@@ -320,7 +329,11 @@ function buildPromotion(decision) {
     active: true,
     // Defaults to the decision's own household, so a household's answer
     // becomes that household's rule rather than leaking to everyone.
-    household_id: r.household_id === undefined ? householdId : optionalId(r.household_id, 'rule.household_id')
+    household_id: r.household_id === undefined ? householdId : optionalId(r.household_id, 'rule.household_id'),
+    // The rule carries the SAME cited document as its decision -- never a
+    // separately-supplied one, or a caller could cite an authoritative document
+    // to pass the guard and then stamp a different one onto the artefact.
+    source_document_id: sourceDocumentId
   };
 
   return {

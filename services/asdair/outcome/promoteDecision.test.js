@@ -128,7 +128,10 @@ test('applies_going_forward true: a STRUCTURED rule is built the planner can act
     reason: 'household decided it is not wanted',
     note: null,
     active: true,                 // a promoted rule is live by definition
-    household_id: 1               // inherits the decision's household
+    household_id: 1,              // inherits the decision's household
+    // TQA-PR73-002: the rule carries its own provenance pointer, always the SAME
+    // document the decision cited. Null here because this fixture cites none.
+    source_document_id: null
   });
   assert.deepEqual(built.verification, {
     required: true,
@@ -580,4 +583,22 @@ test('no connection string is ever hardcoded; ASDAIR_WRITE_DB_URL is the only en
   assert.equal(/postgres(ql)?:\/\//.test(src), false);
   const envReads = src.match(/process\.env\.[A-Z_]+/g) || [];
   assert.deepEqual(Array.from(new Set(envReads)), ['process.env.ASDAIR_WRITE_DB_URL']);
+});
+
+// TQA-PR73-002 guard. The rule's provenance pointer must always be the SAME
+// document the DECISION cited. If a caller could supply it separately, it could
+// cite an authoritative document to pass the verification gate and then stamp a
+// different one onto the artefact that survives -- defeating the audit.
+test('the rule cites the SAME source document as its decision, never a separate one', function () {
+  const built = buildPromotion(standingDecision({
+    source_document_id: 7,
+    rule: {
+      category: 'household', rule_text: 'Do not buy Widget A.', directive: 'exclude',
+      match_term: 'Widget A', scope: 'product',
+      source_document_id: 99          // a caller trying to stamp a different document
+    }
+  }));
+  assert.equal(built.rule.source_document_id, 7, 'must inherit the decision document, not the rule payload one');
+  assert.equal(built.log.source_document_id, 7);
+  assert.equal(built.verification.source_document_id, 7);
 });

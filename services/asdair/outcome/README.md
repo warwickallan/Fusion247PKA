@@ -65,6 +65,26 @@ inert rule.
 
 The objective: **autonomous learning, without one ambiguous event becoming permanent false doctrine.**
 
+### Known limitation of the guard (TQA-PR73-002, raised by independent QA)
+
+**The guard proves the citation, not the content.** It verifies that the cited `source_document_id` resolves to a
+document whose `doc_type` is authoritative — it does **not** prove the promoted instruction actually appears in
+that document. A caller that cites the agent spec while promoting an unrelated instruction would pass.
+
+This is a real and deliberate boundary, not an oversight:
+
+- **What it does buy.** The bar moves from "a caller asserted a boolean" to "a caller pointed at a real, typed,
+  durable artefact" — and that pointer is now written to **both** the decision and the rule it authorised, so the
+  claim is permanently auditable at the artefact itself. A caller cannot cite one document to pass the gate and
+  stamp a different one on the rule; the rule always inherits the decision's document (guarded by test).
+- **Why it is not closed.** `asdair.source_documents` stores a title and a pointer, **not document content**.
+  Verifying that an instruction appears in a document would need a new capability, not a fix.
+- **Residual risk in context.** Callers here are first-party (Larry and Asdair) against a recoverable personal
+  estate, and every promotion is reversible — `active=false` retires a rule, and the back-link explains why it
+  existed. The failure requires deliberate miscitation, which the audit trail records.
+
+Do not describe this guard as proving provenance of content. It proves provenance of **citation**.
+
 ## Tests
 
 `npm test` (or `node --test`) — pure-logic tests need no database. DB-touching tests follow the repo's gated
