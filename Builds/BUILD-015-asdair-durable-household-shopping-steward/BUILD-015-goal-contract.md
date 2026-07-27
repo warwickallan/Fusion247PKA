@@ -38,6 +38,24 @@ The failure this build exists to close: the method lived only in machine-local m
 scratchpads, and the three loop tables (`orders`, `order_events`, `rule_qa_log`) had **zero writers anywhere in
 the repo, including tests**. Each week started no better informed than the last.
 
+## The accepted acceptance bar — SUPERVISED, not fully hands-off (Warwick, 2026-07-28)
+
+**Fully hands-off shopping was descoped by Warwick on 2026-07-21** ("a HUMAN logs into Asda"). The approved
+product scope for BUILD-015 is the **supervised** workflow:
+
+> Warwick/list -> AsdAIr resolves against Mum's durable Regulars/rules -> genuine unknowns are held and asked ->
+> **Larry drives the ASDA browser using SOP-021** -> never auto-substitute -> never checkout or pay -> record the
+> actual outcome -> persist learning for the next shop.
+
+**Alias/Regular coverage improving through real shops is operational learning, NOT a merge blocker.** A recorded
+verdict of "not ready for AUTONOMOUS lane" is therefore not a statement that this build failed its bar - it is a
+statement about a scope Warwick has explicitly deferred.
+
+Note also that AsdAIr is an **A+B hybrid** by design (Warwick-approved 2026-07-18): (A) the deterministic planner
+drives unambiguous structured directives, exclusions and quantities; (B) an LLM instance handles fuzzy judgement
+such as closest-Regulars matching. Measuring A alone understates the delivered capability - the real shop of
+2026-07-27 ran largely hands-off because B was doing the resolution.
+
 ## Success criteria
 
 Real acceptance evidence, not aspiration. Where already established, marked ✅.

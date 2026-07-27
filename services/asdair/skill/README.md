@@ -143,10 +143,11 @@ regulars answering the same term is AMBIGUOUS -> `needs_decision` (flags
 (rule 6). `substitutes_allowed = false` adds the informational flag
 `no substitutes allowed` - the planner never substitutes at all.
 
-**Schema note:** `asdair.regulars` exists in the live schema but is NOT yet
-defined in the committed `db/001_asdair_schema.sql`, so a database built from
-git alone does not have it and the CLI will error on `loadRegulars`. Adding it
-to the migration is tracked separately.
+**Schema note:** `asdair.regulars` is defined by `db/004_asdair_regulars.sql`,
+faithful to the live table. Its `household_id` is **NOT NULL** - unlike
+`products` and `budget_settings` there is no global regular - so
+`loadRegulars` requires a named household and throws rather than silently
+returning an empty set.
 
 ## Run the CLI (live acceptance)
 
