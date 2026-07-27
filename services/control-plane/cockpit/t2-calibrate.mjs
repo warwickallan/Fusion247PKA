@@ -305,20 +305,24 @@ DO THIS:
    invariant → Fusion target. Do NOT mention frames, lenses, "convergence", "different angles", or that multiple
    passes agreed. That provenance lives ONLY in contributing_frames / convergence_type. The prose must read identically
    whether one frame or three produced it (these candidates are blind-scored against a single-pass engine).
+9. ACCOUNT FOR EVERY CANDIDATE: each INPUT candidate has a "cid". Every cid MUST appear in exactly one kept item's
+   member_ids OR one killed item's member_ids. A merged kept item lists ALL cids it absorbed. Never drop a cid
+   silently — if you're binning one, it goes in killed with a reason. (A deterministic post-check will auto-flag any
+   cid you leave out, so completeness is enforced regardless.)
 
-INPUT (branch candidates + enrichment):
+INPUT (branch candidates + enrichment — note the "cid" on each):
 ${JSON.stringify(enriched, null, 1)}
 
-OUTPUT — return ONLY this JSON, no preamble, no fences:
+OUTPUT — return ONLY this JSON, no preamble, no fences (member_ids are the input "cid"s):
 {"kept":[
-  {"spin":{"situation":"","problem":"","implication":"","need_payoff":""},
+  {"member_ids":[],"spin":{"situation":"","problem":"","implication":"","need_payoff":""},
    "source_evidence":{"quote":"","timestamp":"","named_mechanism":""},
    "transfer_reasoning":"","fusion_target":"","category":"brain|cash","lens":"",
    "nvfi":{"novelty":1,"viability":1,"fit":1,"impact":1},
    "contributing_frames":[],"convergence_type":"single_frame|context_induced|novel_independent",
    "graph_note":"","conflict_with":null,"forced_analogy":false,"traps":[{"type":"","note":""}]}
 ],
- "killed":[{"fusion_target":"","frames":[],"reason":"","forced_analogy":true}],
+ "killed":[{"member_ids":[],"fusion_target":"","frames":[],"reason":"","forced_analogy":true}],
  "conflicts":[{"target":"","a":"","b":""}],
  "convergence_summary":""}`;
 }
@@ -340,6 +344,7 @@ export async function runT2Pipeline(video, source, log = () => {}) {
     log(`branch ${c.label}: ${(parsed.candidates || []).length} cand · ${reportedTotal(c).toLocaleString()} tok · ${(c.duration_ms / 1000).toFixed(1)}s`);
   }
   const flat = branchOutputs.flatMap((b) => (b.candidates || []).map((k) => ({ ...k, frame: b.frame })));
+  flat.forEach((k, i) => { k.cid = `c${i + 1}`; });   // deterministic per-candidate id for convergence accounting (Fable B3)
   log(`${flat.length} candidate(s) pre-convergence · enriching (non-model Neo4j)…`);
   const enriched = [];
   for (const k of flat) { const g = await enrich(k); enriched.push({ ...k, _graph: g }); }
@@ -350,22 +355,21 @@ export async function runT2Pipeline(video, source, log = () => {}) {
   if (convCall.ok) { try { conv = parseJSON(convCall.resultText); convParsed = true; } catch (e) { log(`convergence parse-error: ${e.message}`); } }
   else log(`convergence FAILED: ${convCall.error}`);
   conv.parsed = convParsed;   // Fable F4: a failed/unparsed convergence must be distinguishable from a genuine zero
-  // Fable B3: enforce kept ∪ killed accounts for the input — a whole frame's candidates must not vanish with no
-  // record. Any input frame absent from every kept.contributing_frames and killed.frames is auto-flagged into killed.
+  // Fable B3 (candidate granularity): every input cid MUST appear in some kept.member_ids or killed.member_ids.
+  // Reconcile deterministically — any cid the model left out is auto-appended to killed with a reason. This does not
+  // trust the model's frame attributions; it checks the actual input candidates against the actual output ids.
   if (convParsed) {
-    const accounted = new Set([
-      ...(conv.kept || []).flatMap((k) => k.contributing_frames || []),
-      ...(conv.killed || []).flatMap((k) => k.frames || []),
+    const accountedIds = new Set([
+      ...(conv.kept || []).flatMap((k) => k.member_ids || []),
+      ...(conv.killed || []).flatMap((k) => k.member_ids || []),
     ]);
-    const inputFrames = [...new Set(flat.map((k) => k.frame))];
-    const dropped = inputFrames.filter((f) => !accounted.has(f));
+    const unaccounted = flat.filter((k) => !accountedIds.has(k.cid));
     conv.killed = conv.killed || [];
-    for (const f of dropped) {
-      const lost = flat.filter((k) => k.frame === f);
-      conv.killed.push({ fusion_target: `(frame ${f}: ${lost.length} candidate(s) unaccounted)`, frames: [f], reason: 'unaccounted-by-convergence-pass (auto-flagged)', forced_analogy: false });
+    for (const u of unaccounted) {
+      conv.killed.push({ member_ids: [u.cid], fusion_target: u.fusion_target || `(${u.cid} from ${u.frame})`, frames: [u.frame], reason: 'unaccounted-by-convergence-pass (auto-flagged)', forced_analogy: false });
     }
-    conv.unaccounted_frames = dropped.length;
-    if (dropped.length) log(`⚠ convergence left ${dropped.length} input frame(s) unaccounted — auto-flagged into killed`);
+    conv.unaccounted = unaccounted.length;
+    if (unaccounted.length) log(`⚠ convergence left ${unaccounted.length} candidate(s) unaccounted — auto-flagged into killed`);
   }
   return { video, branchCalls, branchOutputs, enriched, convCall, conv, branchWallMs };
 }

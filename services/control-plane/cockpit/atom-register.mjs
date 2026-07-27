@@ -6,9 +6,9 @@ import crypto from 'node:crypto';
 
 // Stable identity of an atom = its origin + source + the transfer it asserts (target + reasoning). Two runs that
 // produce the same transfer from the same source collapse to one row; different transfers never collide.
+// '|'-delimited so field boundaries are unambiguous (matches the basis documented in 271_mason.sql).
 export function atomKey(a) {
-  const basis = [a.origin || 'production', a.source_ref || '', a.fusion_target || '', a.transfer_reasoning || '']
-    .join('');
+  const basis = [a.origin || 'production', a.source_ref || '', a.fusion_target || '', a.transfer_reasoning || ''].join('|');
   return crypto.createHash('sha256').update(basis).digest('hex');
 }
 

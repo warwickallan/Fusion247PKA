@@ -1,7 +1,8 @@
 // Mason v1 — backfill the durable atom register (cockpit.idea_atom) from the frozen-experiment raws.
-// Idempotent + provenance-safe: UPSERTS on the stable natural key (origin, source_ref, n) so atom_ids never
-// change across re-seeds — opportunity_atom provenance and the disposition-carry chain survive. (Do NOT reintroduce
-// a delete: it would cascade away provenance.) Production Mines write atoms here too — the register is not a one-off.
+// Idempotent + provenance-safe: rekeys any pre-existing rows to the canonical CONTENT hash (atom-register.mjs
+// atomKey), then UPSERTS on that content key so atom_ids never change across re-seeds — opportunity_atom provenance
+// and the disposition-carry chain survive. (Do NOT reintroduce a delete: it would cascade away provenance.)
+// Production Mines write atoms here too (mine-ideas → idea_atom) — the register is not a one-off.
 //   node --env-file=<db.env> services/control-plane/cockpit/mason-backfill.mjs
 import fs from 'node:fs';
 import pg from 'file:///C:/Fusion247PKA/services/control-plane/node_modules/pg/lib/index.js';
