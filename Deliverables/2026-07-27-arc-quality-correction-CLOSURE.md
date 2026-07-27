@@ -5,7 +5,7 @@ smallest robust correction is built, proven on the real failure fixture `vJEy3nP
 delivers Warwick's terminal state: SI reads the source for him → Arc comprehensively spots transfers he might not →
 durable atoms → Mason converges to a small coherent opportunity set.
 
-Reviewed head `<REVIEWED_HEAD>` · merged via PR `<PR>` → main `<FINAL_SHA>`.
+Reviewed head `3bf2b1f` · merged via PR `#68` (expected-base guard `eee9637`) → main merge commit `c706b959`.
 
 ---
 
