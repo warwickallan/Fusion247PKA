@@ -46,3 +46,18 @@ note: PROPOSED format (Phase-1 of the T2 design package) — seeded with this se
 - **decision:** T1 is the proven base layer, not the finished architecture; design T2 (true isolated divergence) as a report-back package before any build.
 - **rationale:** the goal is maximum useful intelligence per Warwick decision, not the first successful experiment.
 - **alternatives rejected:** declaring T1 "done"; bolting 5 Sonnet calls onto T1 on faith. **date:** 2026-07-26 · **scope:** idea-engine roadmap · **provenance:** Warwick.
+
+## DEC-2026-07-27-01 · The idea engine is NOT a backlog generator
+- **decision:** the engine's product is a SMALL number of coherent, evidence-backed OPPORTUNITIES worth Warwick's attention. Atoms are evidence/substrate, not automatically work items. Weak/emerging/standalone atoms stay durable + inspectable without demanding attention.
+- **rationale:** turning 68 atoms into 68 triage items would fail the whole point — synthesis exists to PROTECT Warwick's attention, not consume it.
+- **alternatives rejected:** surfacing every atom; a Warwick-managed ideas backlog. **date:** 2026-07-27 · **scope:** idea-intelligence layer (canonical) · **provenance:** Warwick + the T1/T2 experiment finding.
+
+## DEC-2026-07-27-02 · Two-faculty split with Arc (generate) and Mason (synthesise), instantiated as bound agents
+- **decision:** generation (Arc: source→atoms) and synthesis (Mason: atoms→opportunities) are distinct roles with a hard boundary — Arc never synthesises/decides-surfacing; Mason never generates/implements/self-approves. Both instantiated as real subagents (canonical: `Deliverables/fusion-operating-model.md`).
+- **rationale:** divergent vs convergent are opposite cognitive jobs; merging them collapses to sameness or navel-gazing. Fable review confirmed the internal boundary clean.
+- **alternatives rejected:** one agent doing both; "Brains" as the agent name (collides with the Neo4j "Brain"). **date:** 2026-07-27 · **scope:** operating model · **provenance:** Warwick + GPT + Fable review.
+
+## DEC-2026-07-27-03 · Cockpit render-check gate; never serve un-render-checked assets live
+- **decision:** the cockpit serves its front-end straight from the working tree (no build step) → a UI change is LIVE on save. No cockpit UI change ships without a headless render-check pass (`services/cockpit/render-check.mjs`).
+- **rationale:** an un-render-checked Mason UI edit blanked Warwick's cockpit mid-session (`node --check` misses Vue template errors). Editing = deploying.
+- **date:** 2026-07-27 · **scope:** cockpit · **provenance:** Warwick ("this must never happen again") + the outage.
