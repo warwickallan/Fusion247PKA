@@ -9,8 +9,10 @@
 //      RECALL: the register stores it, Mason controls attention); thin/near-empty stays cheap / refuses.
 //  Persists converged atoms to cockpit.idea_atom (Mason consumes them) + idea_candidate (Cockpit shows them),
 //  transactionally, with provenance + admission + verified evidence.
-//    node --env-file=C:/.fusion247/fusion-capture-gateway.env --env-file=C:/.fusion247/neo4j.env \
+//    node --env-file=C:/.fusion247/fusion-capture-gateway.env --env-file-if-exists=C:/.fusion247/neo4j.env \
 //         services/control-plane/cockpit/arc.mjs <video_id> [--force-tier=t1|t2|thin] [--dry]
+//  neo4j.env is OPTIONAL — only the non-model graph enrichment uses it, and enrich() degrades gracefully; a missing
+//  file must NEVER stop Arc launching, hence --env-file-if-exists at the call site (server.mjs /api/mine).
 import crypto from 'node:crypto';
 import pg from 'file:///C:/Fusion247PKA/services/control-plane/node_modules/pg/lib/index.js';
 import { assembleBrief, buildPrompt } from 'file:///C:/Fusion247PKA/services/control-plane/cockpit/mine-ideas.mjs';
@@ -65,7 +67,7 @@ async function getTranscript(video) {
 }
 
 // Normalise a T1 candidate OR a T2 converged "kept" item to ONE atom shape for the register.
-function normalize(k, engine) {
+export function normalize(k, engine) {
   const t2 = engine === 'T2';
   return {
     spin: k.spin || {},
