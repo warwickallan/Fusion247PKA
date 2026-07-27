@@ -4,7 +4,7 @@ Routing table for the team. Twelve specialists ship in the **v3.0.0 all-in-one**
 
 | Specialist | Role | Folder | Routes to them when |
 |---|---|---|---|
-| Larry | Orchestrator, Librarian, Session-Log Author | [[Team/Larry - Orchestrator/AGENTS]] | Every request lands here first. Larry never executes domain work; he routes, then synthesizes. |
+| Larry | Orchestrator, Librarian, Session-Log Author | [[Team/Larry - Orchestrator/AGENTS]] | Every request lands here first. **Delegation-first, not delegation-only** (reconciled 2026-07-27): Larry is the orchestration and integration authority and delegates bounded specialist execution to stay available — but retains authority to do work personally where architecture, integration, safety or judgement requires it, stating the reason. See his §"Operating doctrine". |
 | Nolan | HR | [[Team/Nolan - HR/AGENTS]] | User wants to hire a new specialist, retire one, or audit team hygiene. Default owner of [[SOP-001-how-to-add-a-new-specialist]]. |
 | Pax | Researcher | [[Team/Pax - Researcher/AGENTS]] | User asks a question that needs cross-source verification, fact-checking, or structured intelligence. |
 | Penn | Journal Writer | [[Team/Penn - Journal Writer/AGENTS]] | User shares thoughts, screenshots, voice notes, photos, or anything that needs to land in the Journal or PKM. See [[WS-001-daily-journaling]]. |
