@@ -91,11 +91,13 @@ structural transfer over 3 loose ones. If the correspondence is decorative, KILL
     b: `## B — frame lens: NEGATION. Foreground Fusion's CURRENT PROBLEMS (backlog above) and REJECTED PATTERNS:
 static mega-prompts going stale · building verify/governance machinery before the thing works · manufacturing ideas
 to hit a quota · merging without independent review. Governance risks (privacy leak, availability, audit).`,
-    objective: `Derive transfers by NEGATION. Where the source shows something FAILING, breaking, exploited, or resting
-on a hidden assumption, ask: "what in Fusion breaks the SAME way, or rests on the SAME assumption?" Mine failure-modes
-and inverted assumptions the positive-match frames structurally cannot reach.`,
-    kill: `KILL anything that is just a restated positive feature idea. This frame keeps ONLY genuine failure-mode /
-inverted-assumption transfers. If it isn't about something breaking, it isn't yours.`,
+    objective: `Derive transfers by NEGATION and STRATEGIC WARNING. Where the source shows something FAILING, breaking,
+exploited, resting on a hidden assumption, or warns against a path (dependency, vendor lock-in, a bet that ages badly,
+a subsidised-now-expensive-later trap), ask: "what in Fusion / Warwick's plan breaks the SAME way, or rests on the SAME
+assumption?" Mine failure-modes, inverted assumptions, AND strategic warnings the positive-match frames structurally
+cannot reach. A dependency/lock-in warning or a "don't build X on Y" caution is squarely yours.`,
+    kill: `KILL anything that is just a restated positive feature idea. Keep genuine failure-mode / inverted-assumption /
+strategic-warning transfers. If it isn't about something breaking or a risk to heed, it isn't yours.`,
   },
   {
     id: 'F3-operational', name: 'Operational leverage / Warwick reality',
@@ -128,6 +130,22 @@ structurally-defensible transfer.`,
 sentence a skeptic would accept, KILL it. On this adversarial poor-fit source, ZERO is a perfectly good answer — do
 NOT manufacture to look clever.`,
   },
+  {
+    id: 'F6-reputation-career', name: 'Reputation / career / distribution',
+    b: `## B — frame lens: WARWICK THE PERSON, not just the system. Warwick builds Fusion partly to grow his own
+capability, positioning and independence (CareerAIr is a planned consumer; the north star includes not needing
+Bellrock). Building-in-public, proof-of-work, audience/authority, and distribution are legitimate value. VlogOps / X /
+a public record of what he's building are live threads. Career implications and reputation compounding are IN scope —
+they are NOT "someone else's job".`,
+    objective: `Mine CAREER, REPUTATION and DISTRIBUTION transfers: where a mechanism, example or person in the source
+shows how building/ sharing / positioning / audience-building compounds into capability, authority, opportunity or
+income for WARWICK personally — or how Fusion's outputs could become public proof-of-work. Named exemplars of
+"public building → outsized outcome" (people who grew reputation/career this way) are first-class evidence, not colour.`,
+    kill: `KILL anything that is a purely internal system improvement with no career/reputation/distribution angle —
+that belongs to the other frames. Keep transfers about Warwick's positioning, public building, audience, authority or
+career trajectory. A defensible "this is how you'd build reputation/proof-of-work" transfer is a KEEP even if obvious,
+provided it is materially valuable to Warwick.`,
+  },
 ];
 
 // ---------- branch prompt (isolated) ----------
@@ -142,8 +160,15 @@ FRAME OBJECTIVE: ${frame.objective}
 FRAME SELF-KILL CALIBRATION: ${frame.kill}
 
 MUST HOLD: (1) WHOLE-SOURCE — consider the ENTIRE source; NEVER pre-filter for relevance; the best transfers usually
-live in the part that does NOT obviously match Fusion. (2) NEVER MANUFACTURE — a forced analogy is worse than none;
-ZERO is a correct, valued answer. (3) Stay in your frame's lane — emit only what THIS frame's objective targets.
+live in the part that does NOT obviously match Fusion. (2) NEVER MANUFACTURE — a forced analogy is worse than none. But
+do NOT confuse OBVIOUS with LOW-VALUE: an obvious-but-materially-valuable transfer — including an externally-derived
+VALIDATION or IMPLEMENTATION-SHARPENING of something Fusion is already pursuing — is a KEEP, not a discard. (3) Stay in
+your frame's lane — emit only what THIS frame's objective targets. (4) FAVOUR RECALL: a downstream convergence pass and
+Mason control Warwick's attention, so a real transfer you drop is lost forever while a marginal one you keep costs
+almost nothing — when unsure, KEEP with a caveat. (5) VERBATIM PROVENANCE: source_evidence.quote MUST be an exact
+word-for-word span COPIED from the source-core below (never paraphrased, compressed or reworded), with its [timestamp].
+This is machine-checked; a paraphrased quote is flagged unverified. If the source NAMES a specific person or case as
+the exemplar of a pattern (e.g. someone who grew reputation/career by building in public), NAME them and quote their line.
 
 ${A_SLICE}
 
@@ -152,19 +177,16 @@ ${frame.b}
 ## C — GOVERNANCE
 ${C_SLICE}
 
-THE WHOLE CLEANED SOURCE (consider it entirely):
+THE FACTUAL SOURCE-CORE (claims · mechanisms · examples · people/tools · evidence/timestamps · caveats · themes — consider it entirely):
 ${source}
 
-METHOD (one pass): RECOGNISE mechanisms (verbatim quote+timestamp) · discard the most obvious mappings ·
-ANALOGISE through THIS frame's objective · TRANSFER ("SOURCE has X (quote); invariant Y; at COMPONENT Z it does W" —
-name the EXACT Fusion component) · SELF-KILL per this frame's calibration (structural match or surface? already doing
-it? cost? needs evidence?) · EMIT only survivors (0-6). Each candidate leads with plain-English SPIN (an
-average-intellect person must get why it matters in SECONDS — no architecture shorthand), machine detail underneath.
+METHOD (one pass): RECOGNISE mechanisms/claims/examples/themes (verbatim quote+timestamp) · ADMISSION on each: obvious+low-value → discard_obvious; obvious+HIGH-value → KEEP (mark admission.kind=validation|sharpening); non-obvious → keep if defensible · ANALOGISE through THIS frame's objective · TRANSFER ("SOURCE says X (quote); invariant Y; for Warwick/Fusion this means W" — name the exact target where there is one, else the domain) · SELF-KILL per this frame's calibration (forced/surface analogy? -> kill; genuine but obvious+high-value? -> KEEP; cost? needs evidence? -> caveat, not kill) · EMIT every survivor (no fixed cap; favour recall). Each candidate leads with plain-English SPIN (an average-intellect person must get why it matters in SECONDS — no architecture shorthand), machine detail underneath.
 OUTPUT — return ONLY this JSON, no preamble, no markdown fences:
 {"frame":"${frame.id}","discarded_obvious":[],"candidates":[
   {"spin":{"situation":"","problem":"","implication":"","need_payoff":""},
    "source_evidence":{"quote":"","timestamp":"","named_mechanism":""},
-   "transfer_reasoning":"","fusion_target":"","category":"brain|cash","lens":"",
+   "transfer_reasoning":"","fusion_target":"","category":"brain|cash","lens":"","domain":"",
+   "admission":{"obvious":false,"value":"medium","kind":"new"},
    "nvfi":{"novelty":1,"viability":1,"fit":1,"impact":1},"traps":[{"type":"","note":""}]}
 ],"zero_reason":null}`;
 }
@@ -292,15 +314,21 @@ DO THIS:
      evidence, but NOT strong novelty. DO NOT discard this as "prompt echo" — preserve and describe it honestly.
    - "single_frame" — only one frame found it.
    FOREGROUNDED targets (for the A-vs-B test): ${FOREGROUNDED.join(', ')}.
-4. CROSS-BRANCH KILL (L2): apply each frame's own trap-reasoning to the OTHER frames' candidates. If a candidate is a
-   forced/surface analogy under adversarial cross-examination, set forced_analogy=true and move it to "killed" with a
-   reason (do NOT silently drop — killed items stay auditable).
+4. CROSS-BRANCH KILL (L2): apply each frame's own trap-reasoning to the OTHER frames' candidates. KILL ONLY genuine
+   FORCED/SURFACE analogies — set forced_analogy=true and move to "killed" with a reason (do NOT silently drop —
+   killed items stay auditable). DO NOT kill a candidate for being obvious, low-novelty, or "already being done":
+   an obvious-but-materially-valuable transfer — an external VALIDATION or IMPLEMENTATION-SHARPENING of a direction
+   Fusion already pursues — is a KEEP (preserve its admission.kind). Pruning for Warwick's attention is Mason's job
+   downstream, NOT yours; favour recall.
 5. REASON OVER GRAPH EVIDENCE (it may raise relevance, lower provisional priority, flag a prior decision, flag a
    related active problem, or strengthen novelty). Graph evidence NEVER removes a candidate — it annotates. Reflect it
    in nvfi + a one-line graph_note per candidate.
 6. RE-SCORE NVFI at cluster level (do NOT average): novelty may DROP for context_induced; viability/impact CONFIDENCE
    may RISE on novel_independent convergence.
 7. Lead every kept candidate with plain-English SPIN (why it matters to a human in seconds); machine detail underneath.
+7b. PRESERVE VERBATIM QUOTE: NEVER rewrite, paraphrase or compress source_evidence.quote — copy the exact quote and
+   [timestamp] from the strongest contributing branch candidate verbatim. A reworded quote breaks provenance (it is
+   machine-checked against the source). Keep the named exemplar (person/case) in the evidence if a branch cited one.
 8. ENGINE-NEUTRAL PROSE (critical): spin AND transfer_reasoning must describe the IDEA ONLY — source evidence →
    invariant → Fusion target. Do NOT mention frames, lenses, "convergence", "different angles", or that multiple
    passes agreed. That provenance lives ONLY in contributing_frames / convergence_type. The prose must read identically
@@ -317,7 +345,8 @@ OUTPUT — return ONLY this JSON, no preamble, no fences (member_ids are the inp
 {"kept":[
   {"member_ids":[],"spin":{"situation":"","problem":"","implication":"","need_payoff":""},
    "source_evidence":{"quote":"","timestamp":"","named_mechanism":""},
-   "transfer_reasoning":"","fusion_target":"","category":"brain|cash","lens":"",
+   "transfer_reasoning":"","fusion_target":"","category":"brain|cash","lens":"","domain":"",
+   "admission":{"obvious":false,"value":"medium","kind":"new"},
    "nvfi":{"novelty":1,"viability":1,"fit":1,"impact":1},
    "contributing_frames":[],"convergence_type":"single_frame|context_induced|novel_independent",
    "graph_note":"","conflict_with":null,"forced_analogy":false,"traps":[{"type":"","note":""}]}
@@ -333,7 +362,7 @@ export async function runT2Pipeline(video, source, log = () => {}) {
   // Branch concurrency (execution detail only; identical results either way). 5-wide is fine and fast when the
   // fixture runs FOREGROUND (its whole branch phase stays inside the ~10-min window); long BACKGROUND runs proved
   // fragile (killed mid-run), so the experiment is driven one fixture per foreground call.
-  const branchCalls = await mapPool(FRAMES, 5, (f) => callClaude(branchPrompt(f, source), f.id));
+  const branchCalls = await mapPool(FRAMES, FRAMES.length, (f) => callClaude(branchPrompt(f, source), f.id));
   const branchWallMs = Date.now() - bStart;
   const branchOutputs = [];
   for (const c of branchCalls) {

@@ -7,12 +7,16 @@ It supersedes the interim `fusion-operating-model-brains.md` note (which it abso
 instantiated both via SOP-001: `Team/Arc - Transfer Intelligence Specialist/AGENTS.md` +
 `Team/Mason - Opportunity Synthesis Specialist/AGENTS.md` (contracts), `.claude/agents/arc.md` +
 `.claude/agents/mason.md` (host shims, tools `Read, Bash, Glob, Grep`), and `Team/agent-index.md` rows.
-Both were **proven end-to-end** on a real source (`vJEy3nP2_C8`): Arc mined it into 3 provenance-bearing
-production atoms into the register; Mason converged the 71-atom estate → 5 surfaced / 4 emerging / 15
-standalone / 2 rejected clusters, every atom accounted, provenance traced source→atom→opportunity, the
-boundary held both ways, and no experiment behaviour regressed. The T1/T2 generation implementation received
+Both were **proven end-to-end** on a real source (`vJEy3nP2_C8`). The initial proof was defective — Arc mined
+only 3 atoms (mechanism→component bias, interpretation contamination, obvious-discard, one lossy pass). After
+**Warwick's Arc quality correction (2026-07-27)** Arc on the same source (reading the factual source-core, T2
+divergent across 6 domain frames) mines **24 provenance-bearing atoms (24/24 verbatim-verified), covering 15/16
+major transfer veins** including the previously-missed strategic (vendor-lock-in), attention/phone-first, career
+and public-reputation (Sahil-Bloom-style building-in-public) veins; Mason then converged the **92-atom estate →
+5 surfaced / 5 emerging / 24 standalone / 3 rejected clusters, every atom accounted** — the richer estate did NOT
+become a landfill (Arc favours recall, Mason protects attention). The T1/T2 generation implementation received
 independent **Fable** review (Warwick-authorised); its three blockers (production→register wiring, positional-
-key corruption, convergence silent-loss) were fixed and re-confirmed.
+key corruption, convergence silent-loss) were fixed and re-confirmed. See `Deliverables/2026-07-27-arc-quality-correction-CLOSURE.md`.
 
 ---
 
@@ -29,8 +33,23 @@ point of synthesis is to protect his attention, not consume it.
 
 **Arc — Transfer Intelligence (generation).** Source → atomic transferable ideas. Recognise → analogise → transfer
 → propose. Deliberately bold ("this might be mad, but…"); its own self-kill is the quality gate. It does NOT
-research/verify (Pax) and does NOT decide what Warwick sees (Mason). T1 = one pass; T2 = N isolated frames +
-convergence. Output = atoms (with provenance + provisional NVFI), NOT opportunities.
+research/verify (Pax) and does NOT decide what Warwick sees (Mason). Output = atoms (with provenance + provisional
+NVFI), NOT opportunities.
+
+**Arc corrected behaviour (Warwick's Arc quality correction, 2026-07-27 — entrypoint `arc.mjs`):**
+- **Reads a FACTUAL source-core, not the interpretation.** The Source-Intelligence note's factual sections (claims ·
+  mechanisms · examples · people/tools · evidence/timestamps · caveats · themes) with the pre-written "What this means
+  for Fusion247" / "Actions" conclusions STRIPPED — so legitimate transfers are not recognised-then-killed as "already
+  said". The human note is untouched. Falls back to the transcript when no note exists.
+- **Broad transfer domains** (they overlap): Fusion/system · architecture/technical · operational/process · Warwick
+  workflow/attention · career · commercial/money · product/service · public reputation/distribution · strategic
+  warnings (lock-in) · cross-domain. Strategic/career/commercial/reputation are IN Arc's remit — NOT SI-only. This
+  was a **current Arc limitation** (mechanism→component bias), now corrected — not an intended boundary.
+- **Obvious ≠ discard:** obvious+low-value → discard; obvious+HIGH-value (external validation / implementation-
+  sharpening of an existing direction) → KEEP (`admission {obvious,value,kind}`).
+- **Deterministic tier by substance, favouring RECALL:** rich/mechanism-dense source → T2 divergent (6 domain frames
+  F1-F6 + non-model enrichment + convergence); medium → one strong T1 pass; thin/near-empty → cheap / ZERO. The
+  register stores everything; Mason controls Warwick's attention downstream. Verbatim, machine-checked provenance.
 
 **Mason — Improvement / Product Manager (synthesis).** Atom estate → cross-idea synthesis → coherent OPPORTUNITIES
 → mature SPIN + ROI → what deserves Warwick's scarce attention. Owns the durable idea/opportunity estate; watches
