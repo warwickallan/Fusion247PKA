@@ -1,0 +1,41 @@
+{
+  "source_url": "https://www.youtube.com/watch?v=tebWhVlxSmQ",
+  "video_id": "tebWhVlxSmQ",
+  "captured_at": "2026-07-26T11:04:57+00:00",
+  "title": "How to Clean an Air Fryer",
+  "channel": "ehow",
+  "published_date": "2021-11-18",
+  "duration_seconds": 32,
+  "user_note": "BUILD-002 WP2 auto-detect",
+  "transcript_status": "extracted",
+  "transcript_source": "auto_captions",
+  "language": "Hindi (auto-generated)",
+  "language_code": "hi",
+  "segment_count": 7,
+  "error_category": null,
+  "error_detail": null,
+  "retry_recommendation": null,
+  "tool_versions": {
+    "python": "3.13.6",
+    "youtube-transcript-api": "1.2.4",
+    "yt-dlp": "2026.7.4"
+  },
+  "routing": {
+    "fusion_review_status": "pending_cairn",
+    "assigned_agent": "youtubair",
+    "next_agent": "cairn",
+    "legacy_review_status": "pending_categorisair",
+    "legacy_next_agent": "categorisair",
+    "note": "Cairn has absorbed the legacy CategorisAIr role; legacy_* are aliases only."
+  },
+  "handoff": null,
+  "output_dir": "out\\auto\\2026-07-26__how-to-clean-an-air-fryer__tebWhVlxSmQ",
+  "files": [
+    "TubeAIR Report - how-to-clean-an-air-fryer - tebWhVlxSmQ.md",
+    "manifest.json"
+  ],
+  "idea": "IDEA-013",
+  "project_id": "F247-YT-INGRESS-001",
+  "build": "TubeAIR",
+  "schema_version": 2
+}

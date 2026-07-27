@@ -82,9 +82,12 @@ Then classify each item:
    Merged to main via PR #74 (main `1cb73e8`). **Verify it rather than trust this line:** `SOP-021`, `SOP-022`,
    the Asdair contract and the reconciled iron rule should all be present on `origin/main`. If any is missing,
    that is your first and most important finding.
-2. **BUILD-015 / AsdAIr** — durability repair, verdict recorded as **NOT READY autonomous / READY supervised**.
-   See `Builds/BUILD-015-.../ACCEPTANCE-AND-EVIDENCE.md`. Its branch carries real, reviewed, CI-green work and
-   named unblocking items. **Class A. Do not tidy it away.**
+2. **BUILD-015 / AsdAIr — PR #73 is OPEN and deliberately UNMERGED.** Final exact-head Codex verdict was
+   `request_changes`, so Warwick's merge condition (READY + green CI) was not met and the merge was withheld.
+   Two HIGHs remain and they map onto Warwick's own supervised bar: unmatched items ship an EMPTY alternatives
+   queue, and NO RUNTIME PATH invokes the outcome/learning writers. Full record in
+   `Builds/BUILD-015-.../ACCEPTANCE-AND-EVIDENCE.md`. The branch carries real, reviewed, CI-green work.
+   **Class A. Do not tidy it away, and do NOT merge it to make the estate look finished.**
 3. **Several worktrees predate tonight** and may hold uncommitted work from earlier builds. Two sampled earlier in
    the session were dirty, one sitting on deleted CI workflow files. **Treat every dirty tree as class C until
    proven otherwise.**
