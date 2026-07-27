@@ -207,23 +207,30 @@ async function loadProducts() {
 // plan was confidently wrong. SELECT only.
 //
 // Scoping is done HERE as well as in the planner, deliberately narrower than
-// loadRules(): regulars carry a household's private preferences, so a run that
-// names a household gets that household's rows plus the global ones, and a run
-// that names none gets ONLY the global rows -- another household's regulars are
-// never loaded into memory in the first place.
+// loadRules(): regulars carry a household's private preferences, so a run loads
+// exactly ONE household's rows and another household's regulars never enter
+// memory in the first place.
 //
-// An unresolvable household THROWS rather than silently falling back to the
-// global set (the loadList precedent, not the loadBudget one). A silent
-// fallback here would quietly drop all of the household's resolution knowledge
-// and reproduce exactly the confidently-wrong plan this function fixes.
+// THERE ARE NO GLOBAL REGULARS. `asdair.regulars.household_id` is NOT NULL
+// (see 004_asdair_regulars.sql, which is faithful to the live table) -- unlike
+// `products` and `budget_settings`, which DO carry a nullable global row. An
+// earlier version of this function assumed the global-row convention held here
+// too, so an unnamed run queried `household_id IS NULL` and SILENTLY returned
+// zero regulars: a planner that resolved nothing while appearing to work, which
+// is the exact confidently-wrong failure this function exists to fix. Found by
+// independent QA at the integration seam -- the migration and this loader were
+// written by different workers and only contradicted each other once merged.
+//
+// So a run MUST name its household. Unnamed or unresolvable THROWS (the
+// loadList precedent, not the loadBudget one) rather than returning an empty
+// set, because silently dropping every piece of the household's resolution
+// knowledge is worse than failing loudly.
 async function loadRegulars(household) {
-  const cols = REGULARS_SELECT_COLUMNS.join(', ');
   const named = !(household === null || household === undefined || String(household).trim() === '');
-
   if (!named) {
-    return await readQuery(
-      'SELECT ' + cols + ' FROM asdair.regulars WHERE active = true AND household_id IS NULL ORDER BY id',
-      []
+    throw new Error(
+      'loadRegulars requires a household: asdair.regulars.household_id is NOT NULL, so there are no global '
+      + 'regulars to fall back to. Pass --household <name>.'
     );
   }
 
@@ -232,7 +239,8 @@ async function loadRegulars(household) {
     throw new Error('Unknown household "' + String(household) + '". Check asdair.households.name.');
   }
   return await readQuery(
-    'SELECT ' + cols + ' FROM asdair.regulars WHERE active = true AND (household_id = $1 OR household_id IS NULL) ORDER BY id',
+    'SELECT ' + REGULARS_SELECT_COLUMNS.join(', ')
+      + ' FROM asdair.regulars WHERE active = true AND household_id = $1 ORDER BY id',
     [householdId]
   );
 }

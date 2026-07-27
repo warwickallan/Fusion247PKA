@@ -210,6 +210,39 @@ test('drift guard: IF the migration defines asdair.regulars, every selected colu
   });
 });
 
+// Regression guard for the integration defect independent QA found on PR #73
+// (TQA-PR73-001). asdair.regulars.household_id is NOT NULL -- unlike products
+// and budget_settings, there is NO global regular. loadRegulars once queried
+// `household_id IS NULL` for an unnamed run and therefore returned zero rows
+// SILENTLY, giving a planner that resolved nothing while appearing to work. It
+// must fail loudly instead, and must never reintroduce a global-row query.
+// Neither the migration author nor the loader author could see this alone; it
+// only existed at the seam between them.
+test('loadRegulars never queries asdair.regulars for a global (NULL household) row', function () {
+  const src = fs.readFileSync(path.join(__dirname, 'data.js'), 'utf8');
+  const start = src.indexOf('async function loadRegulars');
+  assert.ok(start !== -1, 'loadRegulars must exist in data.js');
+  const body = src.slice(start, src.indexOf('\n}', start));
+  const sql = body.split('\n').filter(function (l) { return l.trim().indexOf('//') !== 0; }).join('\n');
+  assert.equal(
+    /household_id\s+IS\s+NULL/i.test(sql), false,
+    'asdair.regulars.household_id is NOT NULL; an IS NULL predicate matches nothing and fails silently'
+  );
+});
+
+test('the committed regulars migration keeps household_id NOT NULL (the loader depends on it)', function () {
+  const p = path.join(__dirname, '..', 'db', '004_asdair_regulars.sql');
+  if (!fs.existsSync(p)) return;                       // activates once the migration lands
+  const sql = fs.readFileSync(p, 'utf8').toLowerCase();
+  const line = sql.split('\n').find(function (l) { return l.trim().indexOf('household_id') === 0; });
+  assert.ok(line, 'household_id column must be defined');
+  assert.ok(
+    line.indexOf('not null') !== -1,
+    'if household_id ever becomes nullable, loadRegulars must be revisited: a global-regular row would then be '
+    + 'possible and the loader deliberately does not look for one'
+  );
+});
+
 // ---------------------------------------------------------------------
 // Sanity check: prove the comparison logic actually detects a missing
 // column, using a SYNTHETIC create-table string (nothing real, no DB). This
