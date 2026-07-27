@@ -65,25 +65,34 @@ inert rule.
 
 The objective: **autonomous learning, without one ambiguous event becoming permanent false doctrine.**
 
-### Known limitation of the guard (TQA-PR73-002, raised by independent QA)
+### What the guard guarantees — and what it does not (TQA-PR73-002)
 
-**The guard proves the citation, not the content.** It verifies that the cited `source_document_id` resolves to a
-document whose `doc_type` is authoritative — it does **not** prove the promoted instruction actually appears in
-that document. A caller that cites the agent spec while promoting an unrelated instruction would pass.
+Raised as HIGH by independent Codex QA; **Codex was correct**, and Warwick accepted the residual for BUILD-015 on
+2026-07-28 as a deliberate product decision.
 
-This is a real and deliberate boundary, not an oversight:
+**Guaranteed — AUTHORITATIVE PROVENANCE ELIGIBILITY:**
 
-- **What it does buy.** The bar moves from "a caller asserted a boolean" to "a caller pointed at a real, typed,
-  durable artefact" — and that pointer is now written to **both** the decision and the rule it authorised, so the
-  claim is permanently auditable at the artefact itself. A caller cannot cite one document to pass the gate and
-  stamp a different one on the rule; the rule always inherits the decision's document (guarded by test).
-- **Why it is not closed.** `asdair.source_documents` stores a title and a pointer, **not document content**.
-  Verifying that an instruction appears in a document would need a new capability, not a fix.
-- **Residual risk in context.** Callers here are first-party (Larry and Asdair) against a recoverable personal
-  estate, and every promotion is reversible — `active=false` retires a rule, and the back-link explains why it
-  existed. The failure requires deliberate miscitation, which the audit trail records.
+> An actionable promotion must inherit the **persisted decision's** `source_document_id`, and that source must be
+> an **authorised document type** (`agent_spec` / `decisions_log`), verified by lookup in the database.
 
-Do not describe this guard as proving provenance of content. It proves provenance of **citation**.
+**NOT guaranteed:**
+
+> The system does **not** prove that the promoted instruction text literally occurs in the cited document.
+
+**Never describe this as "content-proven explicitness" or any equivalent.** It proves provenance of **citation**,
+not of **content**. A caller citing the agent spec while promoting an unrelated instruction would pass the gate.
+
+**Why the residual is accepted here:** promotion callers are first-party Fusion components · non-authoritative
+learning is downgraded to behaviourally inert `info` rather than dropped · the promotion-stage caller **cannot
+substitute a different `source_document_id`** (the rule always inherits the decision's — guarded by test) · every
+resulting rule retains provenance and audit history · hard rules are reversible via `active = false` · Warwick
+retains the consequential checkout and payment gate · and content verification would require a genuinely new
+source-content capability, since `asdair.source_documents` stores a title and a pointer, not text.
+
+**Trigger to reconsider:** this bound does **not** automatically survive if hard-rule promotion is opened to
+untrusted or external inputs, materially more autonomous sources, or higher-consequence domains.
+
+Full record: `Builds/BUILD-015-asdair-durable-household-shopping-steward/ACCEPTANCE-AND-EVIDENCE.md`.
 
 ## Tests
 

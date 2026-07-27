@@ -91,6 +91,14 @@ otherwise it is `null` and `budget_flag` is `unknown`.
    on a list that genuinely needed a human).
 7. A normal shop is GBP 120-150 excluding delivery; the basket is **flagged**
    (never blocked) when the estimated total falls outside that band.
+   **NOT CURRENTLY OPERATIVE - do not claim budget flagging works.** The rule is
+   documented and implemented but structurally unevaluable: neither `products`
+   nor `regulars` carries a price column, and `estimated_total` is only computed
+   when EVERY planned-add line has a price. On any real list the total is
+   therefore `null` and `budget_flag` is permanently `unknown` - which the
+   outcome recorder correctly treats as "not outside the band", never as a
+   breach. Reviving the rule needs a price source; deferred, with the claim
+   corrected rather than the capability pretended (see BUILD-015).
 8. The goal is a checkout-ready basket; the planner **NEVER checks out**.
 9. Product matches come from the `products` table (list_term -> matched_product)
    plus product-scope directive rows in `rules`, honouring household scope.
@@ -151,7 +159,7 @@ npm install                      # installs pg (runtime dependency of the adapte
 export ASDAIR_DB_URL='postgres://...'      # bash
 # or PowerShell:  $env:ASDAIR_DB_URL='postgres://...'
 
-node cli.js --list-date 2026-07-13 --household household-a
+node cli.js --list-date 2026-07-13 --household <household-name>
 ```
 
 Output: a human-readable table (status / qty / item / matched product, with
