@@ -200,8 +200,10 @@ const server = http.createServer(async (req, res) => {
         try {
           const v = String(JSON.parse(raw || '{}').video || '');
           if (!/^[A-Za-z0-9_-]{6,24}$/.test(v)) return j(res, 200, { ok: false, error: 'bad video id' });
-          // fire the Mine runner detached (one Sonnet call, ~2 min) — ideas appear in /api/state when done
-          const p = spawn('node', ['--env-file=C:/.fusion247/fusion-capture-gateway.env', `${REPO}/services/control-plane/cockpit/mine-ideas.mjs`, v], { detached: true, stdio: 'ignore', cwd: REPO });
+          // fire Arc detached — reads the factual source-core, tiers by substance (rich → T2 divergent multi-frame),
+          // favours recall, persists the converged atoms. Rich sources take longer (T2, several min); atoms appear
+          // in /api/state when done. neo4j.env enables the non-model graph enrichment (degrades gracefully if absent).
+          const p = spawn('node', ['--env-file=C:/.fusion247/fusion-capture-gateway.env', '--env-file=C:/.fusion247/neo4j.env', `${REPO}/services/control-plane/cockpit/arc.mjs`, v], { detached: true, stdio: 'ignore', cwd: REPO });
           p.unref();
           j(res, 200, { ok: true, mining: v });
         } catch (e) { j(res, 500, { ok: false, error: e.message }); }
