@@ -76,10 +76,19 @@ otherwise it is `null` and `budget_flag` is `unknown`.
 1. Quantities on a list are ITEM COUNTS, not pack sizes.
 2. An item with no quantity defaults to 1.
 3. Duplicate lines for the same item are deduped (counts summed).
-4. Items are expected in Favourites / Regulars (informational).
+4. Items are expected in Favourites / Regulars. `asdair.regulars` is a real
+   resolution source for the planner (see "How Regulars drive resolution").
 5. Nothing is added unless it is explicitly on the list.
 6. Out of stock or not confidently matched -> `needs_decision`, with any
    alternatives surfaced for a human. **NEVER auto-substitute.**
+   **CONFIDENTLY MATCHED** means the planner can NAME a product for the line -
+   `matched_product` is non-null after all four resolution sources (explicit
+   in-scope `matched_product_id` > `products.list_term` > `map` directive >
+   regulars). Anything else is `needs_decision` with ranked candidates
+   surfaced, `planned_qty` 0, flags `no explicit product mapping` +
+   `never auto-substitute`. It is never status `add` with a flag - that was the
+   old behaviour and it produced confidently wrong plans (`needs_decision: 0`
+   on a list that genuinely needed a human).
 7. A normal shop is GBP 120-150 excluding delivery; the basket is **flagged**
    (never blocked) when the estimated total falls outside that band.
 8. The goal is a checkout-ready basket; the planner **NEVER checks out**.
@@ -196,9 +205,9 @@ on the public repo. The planner and its tests have no third-party dependencies.
 - **No browser, no checkout, no pay.** The planner produces a plan; it never
   emits a checkout / pay / place-order action. A test asserts the output surface
   is strictly `{ items, summary }` with no action verbs.
-- **Never auto-substitute.** Out-of-stock / ambiguous items become
-  `needs_decision`; alternatives are surfaced in the note for a human and are
-  never written into `matched_product`.
+- **Never auto-substitute.** Out-of-stock / ambiguous / not-confidently-matched
+  items become `needs_decision`; alternatives are surfaced in the note (and as
+  ranked candidates) for a human and are never written into `matched_product`.
 - **No secrets in git.** The connection string lives only in `ASDAIR_DB_URL`.
 - **No personal data in git.** All committed fixtures are invented. Pure ASCII
   throughout; currency is written as "GBP".

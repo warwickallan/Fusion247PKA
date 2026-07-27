@@ -12,7 +12,7 @@
 //   * no-qty -> 1
 //   * dedupe / sum
 //   * product match (household-scoped preferred over global)
-//   * unmatched-but-listed -> add + "no explicit product mapping"
+//   * unmatched-but-listed -> needs_decision + "no explicit product mapping"
 //   * needs_decision: out of stock, flagged-on-list, ambiguous, rule
 //   * never auto-substitute (alternatives surfaced, not applied)
 //   * excluded_this_week (item status + one-week rule)
@@ -104,7 +104,12 @@ test('household scoping: a product owned by another household is not matched', f
   });
   const g = byName(plan, 'Gadget Z');
   assert.equal(g.matched_product, null);
-  assert.equal(g.status, 'add');
+  // Defect C: this line's ORIGINAL point -- the foreign product is not matched
+  // -- is unchanged and still asserted above. Only the STATUS expectation moved
+  // from 'add' to 'needs_decision': an item the planner cannot identify at all
+  // now goes to a human (rule 6) instead of being silently added.
+  assert.equal(g.status, 'needs_decision');
+  assert.equal(g.planned_qty, 0);
   assert.ok(g.flags.includes('no explicit product mapping'));
 });
 
@@ -167,16 +172,29 @@ test('scope: an explicit matched_product_id that resolves to NO product falls th
   assert.ok(!m.flags.includes('product id household scope mismatch'));
 });
 
-test('unmatched but explicitly listed still plans as add with a flag', function () {
+// DEFECT C: this test previously asserted the OLD BROKEN behaviour --
+// "unmatched but explicitly listed still plans as add with a flag". That was
+// wrong against standing rule 6 ("not confidently matched -> needs_decision,
+// with alternatives surfaced for a human"): an item the planner could not
+// identify at all was silently added, and a genuinely ambiguous list produced
+// needs_decision: 0. The old rationale was that a human would find the item in
+// Favourites / Regulars at run time (rule 4) -- but the planner could not SEE
+// Regulars, so that rationale never held. It can now (defect B), so anything
+// still unresolved after all four resolution sources really is unidentified.
+// The expectation is corrected here rather than the assertion weakened.
+test('rule 6 (defect C): an unmatched item -> needs_decision, never a silent add', function () {
   const plan = planBasket({
     listItems: [{ item_name: 'Totally Unknown Thing', requested_qty: 2 }],
     products: products, rules: [], budget: budget, household: HH
   });
   const u = byName(plan, 'Totally Unknown Thing');
-  assert.equal(u.status, 'add');
+  assert.equal(u.status, 'needs_decision');
   assert.equal(u.matched_product, null);
-  assert.equal(u.planned_qty, 2);
+  assert.equal(u.planned_qty, 0, 'nothing is added pending a human decision');
   assert.ok(u.flags.includes('no explicit product mapping'));
+  assert.ok(u.flags.includes('never auto-substitute'));
+  assert.equal(plan.summary.needs_decision, 1, 'it is COUNTED in the summary');
+  assert.equal(plan.summary.planned_add, 0);
 });
 
 test('rule 6: ambiguous match (two household products) -> needs_decision, no substitute', function () {
@@ -242,7 +260,7 @@ test('summary: excluded total reconciles BOTH kinds, with additive breakdown key
     listItems: [
       { item_name: 'Widget A', requested_qty: 1 },                                      // standing exclude
       { item_name: 'Generic Milk 2L', requested_qty: 1, status: 'excluded_this_week' }, // one-week exclude
-      { item_name: 'Totally Unknown Thing', requested_qty: 1 }                          // add
+      { item_name: 'Totally Unknown Thing', requested_qty: 1 }                          // unidentified
     ],
     products: products, rules: rules, budget: budget, household: HH
   });
@@ -251,7 +269,18 @@ test('summary: excluded total reconciles BOTH kinds, with additive breakdown key
   assert.equal(plan.summary.excluded, 2, 'total counts BOTH exclusion kinds');
   assert.equal(plan.summary.excluded_standing, 1);
   assert.equal(plan.summary.excluded_this_week, 1);
-  assert.equal(plan.summary.planned_add, 1);
+  // Defect C: the third line is unidentified, so it is now needs_decision
+  // rather than a silent add. The exclusion book-keeping this test exists for
+  // is untouched; the reconciliation invariant is asserted explicitly below.
+  assert.equal(plan.summary.planned_add, 0);
+  assert.equal(plan.summary.needs_decision, 1);
+  const s = plan.summary;
+  assert.equal(
+    s.planned_add + s.needs_decision + s.excluded,
+    s.total_requested,
+    'every line lands in exactly one summary bucket'
+  );
+  assert.equal(s.excluded_standing + s.excluded_this_week, s.excluded);
 });
 
 test('rule directive: standing exclude rule -> status excluded + standing-rule flag (qty 0)', function () {
@@ -427,10 +456,16 @@ test('directive columns: info directive and active=false rule with a matching ma
     products: [], rules: rules, budget: budget, household: HH
   });
   const b = byName(plan, 'banana fizz');
-  assert.equal(b.status, 'add', 'info / inactive rules never change the plan');
-  assert.equal(b.planned_qty, 2);
+  // The point of this test -- info / inactive rules map NOTHING -- is asserted
+  // here and is unchanged.
   assert.equal(b.matched_product, null, 'no product was mapped');
+  assert.ok(!b.flags.includes('product mapped by rule'), 'no rule mapping was applied');
   assert.ok(b.flags.includes('no explicit product mapping'));
+  // Defect C: with nothing mapped and no products / regulars to fall back on,
+  // the line is unidentified, so rule 6 sends it to a human rather than adding
+  // it silently. Only the status expectation moved.
+  assert.equal(b.status, 'needs_decision');
+  assert.equal(b.planned_qty, 0);
 });
 
 test('rule 10: one_week_only is flagged for this list only', function () {
@@ -474,13 +509,19 @@ test('rule 7: budget flag ABOVE when total exceeds the band', function () {
 });
 
 test('rule 7: budget flag UNKNOWN when any add item has no price', function () {
+  // Defect C: the unpriced line must be a line that actually PLANS TO ADD, so
+  // the fixture now uses a MATCHED product with no price ('Generic Milk 2L')
+  // instead of an unmatched one. An unmatched line is needs_decision now and so
+  // is excluded from the estimate by design, which would not have exercised
+  // this rule at all. The behaviour under test is unchanged and still asserted.
   const plan = planBasket({
     listItems: [
       { item_name: 'Widget A', requested_qty: 1, price: 100 },
-      { item_name: 'Totally Unknown Thing', requested_qty: 1 }  // no price
+      { item_name: 'Generic Milk 2L', requested_qty: 1 }  // matched, but no price
     ],
     products: products, rules: [], budget: budget, household: HH
   });
+  assert.equal(byName(plan, 'Generic Milk 2L').status, 'add', 'the unpriced line really is an add line');
   assert.equal(plan.summary.estimated_total, null);
   assert.equal(plan.summary.budget_flag, 'unknown');
 });
@@ -974,4 +1015,130 @@ test('defect B helper: regularDisplayName prepends brand only when needed', func
   assert.equal(_internal.regularDisplayName({ name: 'Plain', brand: null }), 'Plain');
   assert.equal(_internal.regularDisplayName({ name: '', brand: 'OnlyBrand' }), 'OnlyBrand');
   assert.equal(_internal.regularDisplayName({ name: '', brand: '' }), null);
+});
+
+// =====================================================================
+// DEFECT C: an item that resolves to nothing identifiable goes to
+// needs_decision with candidates surfaced -- NEVER status 'add' with a flag.
+//
+// Standing rule 6 ("out of stock or not confidently matched -> needs_decision,
+// with alternatives surfaced for a human. NEVER auto-substitute") was enforced
+// by the operator rather than by the code: an unmatched line fell through to
+// 'add', so a genuinely ambiguous list produced needs_decision: 0.
+//
+// CONFIDENTLY MATCHED (the rule chosen, mirrored from planner.js): the planner
+// can NAME a specific product for the line -- matched_product is non-null after
+// all four sources (explicit in-scope id > products.list_term > `map` directive
+// > regulars). Nothing else counts.
+// =====================================================================
+
+test('defect C: an unidentified line surfaces RANKED candidates for the human', function () {
+  // Rule 6 requires alternatives to be SURFACED, not applied. The line carries
+  // a category hint, so the ranker can propose same-category candidates.
+  const plan = planBasket({
+    listItems: [{ item_name: 'Unknown Dairy Thing', requested_qty: 1, category: 'dairy' }],
+    products: products, rules: [], regulars: [], budget: budget, household: HH
+  });
+  const u = byName(plan, 'Unknown Dairy Thing');
+  assert.equal(u.status, 'needs_decision');
+  assert.equal(u.matched_product, null, 'no candidate is ever applied');
+  assert.ok(u.alternatives.length > 0, 'candidates are surfaced for a human');
+  u.alternatives.forEach(function (a) {
+    assert.ok(typeof a.name === 'string' && a.name !== '');
+    assert.ok(typeof a.score === 'number');
+  });
+});
+
+test('defect C: CONTROL - a confidently matched line still plans to add', function () {
+  // The four resolution sources, each proving a confident match is untouched.
+  const cases = [
+    { label: 'products.list_term', line: { item_name: 'Widget A', requested_qty: 1 }, rules: [], regs: [] },
+    { label: 'explicit in-scope id', line: { item_name: 'Widget A', requested_qty: 1, matched_product_id: 12 }, rules: [], regs: [] },
+    {
+      label: 'map directive',
+      line: { item_name: 'mapped thing', requested_qty: 1 },
+      rules: [{
+        id: 501, scope: 'product', active: true, directive: 'map',
+        match_term: 'mapped thing', match_category: null,
+        matched_product: 'Mapped Thing Deluxe', household_id: HH
+      }],
+      regs: []
+    },
+    { label: 'regulars', line: { item_name: 'squash', requested_qty: 1 }, rules: [], regs: regulars }
+  ];
+  cases.forEach(function (c) {
+    const plan = planBasket({
+      listItems: [c.line], products: products, rules: c.rules,
+      regulars: c.regs, budget: budget, household: HH
+    });
+    const it = plan.items[0];
+    assert.equal(it.status, 'add', c.label + ' must still plan to add');
+    assert.ok(it.matched_product, c.label + ' must name a product');
+    assert.equal(plan.summary.planned_add, 1, c.label);
+    assert.equal(plan.summary.needs_decision, 0, c.label);
+  });
+});
+
+test('defect C: the summary contract still reconciles across a mixed basket', function () {
+  const rules = [
+    { id: 601, scope: 'product', active: true, directive: 'exclude', match_term: 'Widget A', household_id: HH }
+  ];
+  const plan = planBasket({
+    listItems: [
+      { item_name: 'Widget A', requested_qty: 1 },                                       // standing exclude
+      { item_name: 'Generic Milk 2L', requested_qty: 1, status: 'excluded_this_week' },   // one-week exclude
+      { item_name: 'Twin Item', requested_qty: 1 },                                       // ambiguous
+      { item_name: 'Totally Unknown Thing', requested_qty: 1 },                           // unidentified
+      { item_name: 'squash', requested_qty: 3 }                                           // regulars match -> add
+    ],
+    products: products, rules: rules, regulars: regulars, budget: budget, household: HH
+  });
+  const s = plan.summary;
+  assert.equal(s.total_requested, 5);
+  assert.equal(s.planned_add, 1);
+  assert.equal(s.needs_decision, 2, 'the ambiguous AND the unidentified line both count');
+  assert.equal(s.excluded, 2, 'total of BOTH exclusion kinds');
+  assert.equal(s.excluded_standing, 1);
+  assert.equal(s.excluded_this_week, 1);
+  assert.equal(s.excluded_standing + s.excluded_this_week, s.excluded, 'breakdown is additive');
+  assert.equal(
+    s.planned_add + s.needs_decision + s.excluded,
+    s.total_requested,
+    'every line lands in exactly one summary bucket'
+  );
+  // planned_qty is 0 for everything that is not an add line.
+  plan.items.forEach(function (it) {
+    if (it.status !== 'add') assert.equal(it.planned_qty, 0, it.item_name + ' must plan 0 units');
+  });
+});
+
+test('defect C: the reported live failure no longer yields needs_decision 0', function () {
+  // The live symptom: a list whose items the planner could not identify came
+  // back entirely as 'add' with needs_decision: 0 -- a confidently wrong plan.
+  const plan = planBasket({
+    listItems: [
+      { item_name: 'twin loaf', requested_qty: 1 },            // two real candidates
+      { item_name: 'Totally Unknown Thing', requested_qty: 1 } // nothing identifiable
+    ],
+    products: products, rules: [], regulars: regulars, budget: budget, household: HH
+  });
+  assert.equal(plan.summary.needs_decision, 2);
+  assert.equal(plan.summary.planned_add, 0);
+  plan.items.forEach(function (it) {
+    assert.ok(it.flags.includes('never auto-substitute'), it.item_name);
+    assert.equal(it.matched_product, null, it.item_name + ' is never auto-resolved');
+  });
+});
+
+test('defect C: an unidentified line is excluded from the budget estimate', function () {
+  const plan = planBasket({
+    listItems: [
+      { item_name: 'Widget A', requested_qty: 1, price: 130 },
+      { item_name: 'Totally Unknown Thing', requested_qty: 1, price: 500 }
+    ],
+    products: products, rules: [], regulars: [], budget: budget, household: HH
+  });
+  assert.equal(byName(plan, 'Totally Unknown Thing').status, 'needs_decision');
+  assert.equal(plan.summary.estimated_total, 130, 'only the add line is estimated');
+  assert.equal(plan.summary.budget_flag, 'within');
 });

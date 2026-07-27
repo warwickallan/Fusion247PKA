@@ -20,6 +20,12 @@
 //   * It NEVER auto-substitutes a product (out-of-stock / ambiguous items
 //     become needs_decision; any alternatives are surfaced for a human,
 //     never applied to matched_product).
+//   * It NEVER silently adds an item it cannot identify. A line is CONFIDENTLY
+//     MATCHED only when the planner can NAME a product for it -- matched_product
+//     non-null after all four resolution sources (explicit in-scope
+//     matched_product_id > products.list_term > `map` directive > regulars).
+//     Anything else is needs_decision with ranked candidates surfaced (rule 6),
+//     never status 'add' with a flag.
 //   * It NEVER emits a checkout / pay / place-order action. The goal is a
 //     checkout-ready plan; committing it is out of scope by construction.
 //   * It only ever plans items that are explicitly on the list (rule 5).
@@ -706,10 +712,32 @@ function planBasket(input) {
       if (regularAmbiguous) pushFlag(flags, 'ambiguous regulars match');
       pushFlag(flags, 'never auto-substitute');
     } else if (!matchedProduct) {
-      // Unmatched but explicitly on the list: still plan to add. It would be
-      // found in the Favourites / Regulars pages at run time (rule 4).
-      status = 'add';
+      // Rule 6, enforced by the CODE rather than by the operator (defect C).
+      //
+      // WHAT COUNTS AS "CONFIDENTLY MATCHED" (the rule chosen here):
+      //   a line is confidently matched when, after ALL resolution sources have
+      //   run, the planner can NAME a specific product for it -- i.e.
+      //   matched_product is non-null. The four sources are, in precedence
+      //   order: an in-scope explicit matched_product_id; a products.list_term
+      //   mapping; a `map` directive rule; a regulars name/aka match. Nothing
+      //   else counts -- an item merely being spelled plausibly is not a match.
+      //
+      // Everything that reaches this branch therefore has NO identification at
+      // all, and rule 6 says such a line goes to a human with any alternatives
+      // surfaced. It used to fall through to status 'add' on the reasoning that
+      // a human would find it in Favourites / Regulars at run time (rule 4) --
+      // but the planner could not SEE Regulars, so that reasoning never held,
+      // and the effect was a confidently wrong plan with needs_decision: 0.
+      // Now that regulars ARE a resolution source (defect B), an item that
+      // still resolves to nothing genuinely is unidentified.
+      //
+      // planned_qty becomes 0 and rankAlternatives supplies ranked candidates
+      // below, so the line reaches a human WITH options. Nothing is ever
+      // auto-substituted; the summary keys and their reconciliation are
+      // unchanged (this only moves lines from planned_add to needs_decision).
+      status = 'needs_decision';
       pushFlag(flags, 'no explicit product mapping');
+      pushFlag(flags, 'never auto-substitute');
     }
 
     // Finding 1 (data integrity, ALWAYS): a foreign-household matched_product_id
