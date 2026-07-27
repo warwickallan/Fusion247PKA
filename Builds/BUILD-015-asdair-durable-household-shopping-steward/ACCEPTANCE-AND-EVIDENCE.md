@@ -100,3 +100,81 @@ Codex could not see test or CI results in the read-only packet. Recorded here in
 
 Remaining Class-A fixes · behavioural fresh-AsdAIr acceptance on the full scenario · final integrated CI ·
 independent Tower/Codex QA against this revised contract.
+
+---
+
+## FINAL VERDICT (behavioural acceptance, 2026-07-28)
+
+# NOT READY for autonomous Lane 2. READY for **supervised** Lane 2.
+
+A fresh bound Asdair instance ran the full scenario against the repaired code and actively tried to break it.
+
+### What passed — on evidence, not assertion
+
+- **Quantity parsing.** `milk 2` → 2, `yazoo strawberry 4` → 4, and **`omega 3` survived intact as an identity**,
+  not a quantity. Probed both directions: `omega 3 x2` → 2 × "omega 3", `milk 2L` → qty 1, `7up` → qty 1. The
+  curated collision-list mechanism is the honest approach rather than a clever regex that would fail later.
+- **Never auto-substitute.** Nothing invented a substitute; `matched_product` was null on every held line.
+- **Hard excludes fire on both alias orderings** — `yazoo banana` and `banana yazoo` both excluded, qty 0.
+- **Nothing unidentified reached `add`.** The old confidently-wrong failure is gone.
+- **The read path physically cannot write.** Every statement a SELECT as `asdair_ro`.
+
+Criteria **5, 6 and 7 pass on evidence.**
+
+### What blocks autonomy
+
+1. **Resolution is 52% on the household's own historical vocabulary.** Measured over 73 distinct past list terms:
+   38 add / 34 needs_decision / 1 excluded. `matchRegular` does **exact normalised-string equality** against
+   `name` and each `aka`, so `"yazoo strawberry"` misses the alias `"strawberry yazoo"` **on word order alone** —
+   proven by running the reversed form, which resolves. Only 28 of 91 regulars carry any alias.
+   *A lane that hands back half the list every week is a triage queue, not a lane.*
+2. **The needs-decision queue ships with `alternatives: []`.** `rankAlternatives` consults `products` (11 rows)
+   only, never `regulars`, and needs a resolvable category an unmatched free-text line does not have. Standing
+   rule 6 has two clauses — never substitute **and** surface alternatives. The second is currently performed by
+   whichever human reads the output.
+3. **The learning loop cannot close where it matters most.** Every one of the six held decisions is fundamentally
+   "this name means that product" — an `aka` alias — and **`asdair_rw` has no write on `regulars`**.
+   `promoteDecision` writes `rules` and `rule_qa_log` only. Without a governed `regulars` writer, next week's
+   instance asks the same six questions. That is precisely the failure this build exists to end.
+
+### Disqualifying for the stated gate — and Larry's error
+
+**The acceptance ran against a worktree that does not contain the specialist contract or SOP-021.** Both are
+committed only on `idea-016/idea-engine`; they are absent from `main` and therefore from this build's ancestry.
+The instance passed only because it went looking on another branch and recovered them by inference. A stricter
+instance would have stopped, or improvised a method.
+
+**Criterion 1 is corrected to ⚠️ above.** Cause: Larry committed every governance artefact tonight while the main
+tree sat on `idea-016/idea-engine`, never noticing the branch. Fix is a merge decision, not a code change.
+
+### Further defects found, recorded not fixed
+
+- **Same-class silent-null trap on the budget side.** If a household has no `budget_settings` row, `loadBudget`
+  returns the **global** row with `household_id: null`, `planBasket` derives `household = null`, and **every
+  household-scoped regular falls out of scope — resolving nothing while appearing to work.** This is the exact
+  failure Codex caught in `loadRegulars` (TQA-PR73-001), through a different door, and it is **not** guarded.
+- **`map` directives can resolve to prose, and prose reaches `add`.** Rule 23 maps `sure male` →
+  *"Sure Men Anti-Perspirant Deodorant (blue variant)"*; confirmed to return `status: add, planned_qty: 1`.
+  "Confidently matched" means `matched_product !== null`, which a human-readable *instruction* satisfies — so a
+  line can be planned as `add` with a name nobody can put in a trolley.
+- **Rotation is structurally dead.** SOP-021 §2 makes the last order a *required* planning input; there is no
+  `loadLastOrder` and `planBasket` has no parameter for it, so rule 32 (rotate the Sure variant) cannot run —
+  the same "documented, implemented, dead" class as rule 7.
+- **`Arla BOB Semi-Skimmed 2L` (regular 69) is ACTIVE** while rule 10 says never buy BOB. Rule 10 is `info` with
+  no `match_term`, so nothing enforces it. `milk` resolves correctly today **only because regular 69 happens to
+  carry no alias.** Add `milk` as an alias there and the planner would add a product a standing rule forbids.
+- **`Yazoo Banana` appears in `previously_ordered` dated 2026-07-20** — two days *after* the hard-exclude was
+  recorded. The planner would have excluded it; whatever produced that row did not.
+- **Exclude rules carry no reason to the human** (`reason` is NULL on 17/26), so an excluded line cannot say why.
+- **`substitutes_allowed` is `false` on all 91 regulars**, so the flag currently carries no discriminating
+  information — the mechanism works, the data does not exercise it.
+- Stale claim in `skill/README.md` (~lines 146–149) that `regulars` is not in a committed migration; `004` now
+  defines it on this branch.
+
+### Unblocking work, named for a future build — NOT started
+
+(a) land the contract and SOP-021 into this build's ancestry · (b) order-insensitive alias matching plus alias
+coverage on `regulars` · (c) `rankAlternatives` to consult `regulars` · (d) a governed writer for `regulars.aka`
+and a `loadLastOrder` input · (e) guard the budget-side null-household trap · (f) reject prose as a `map` target.
+
+**Per doctrine, the specialist named these and touched no line of `services/**` to fix them.**

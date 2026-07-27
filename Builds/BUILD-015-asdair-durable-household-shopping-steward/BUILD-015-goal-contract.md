@@ -42,7 +42,7 @@ the repo, including tests**. Each week started no better informed than the last.
 
 Real acceptance evidence, not aspiration. Where already established, marked ✅.
 
-1. ✅ **Durable method** — the operating method lives in Git (`SOP-021`), not in memory or a scratchpad. A method
+1. ⚠️ **Durable method — NOT TRUE AT THIS HEAD.** SOP-021 and the Asdair specialist contract are committed only on `idea-016/idea-engine`; they are absent from `main` and therefore from this branch. The behavioural acceptance instance could not read its own contract or method from the worktree it was bound to, and recovered them by guessing another branch. **Do not mark this criterion passed until those files reach this build ancestry.** Original intent — the operating method lives in Git (`SOP-021`), not in memory or a scratchpad. A method
    copy previously held in `asdair.skill_steps` is superseded non-destructively; Git wins.
 2. ✅ **Durable read/write state paths** — two least-privilege roles: `ASDAIR_DB_URL`/`asdair_ro` (SELECT-only)
    and `ASDAIR_WRITE_DB_URL`/`asdair_rw` (SELECT+INSERT on the four loop tables, column-scoped UPDATE on
