@@ -7,6 +7,31 @@ durable atoms → Mason converges to a small coherent opportunity set.
 
 Reviewed head `3bf2b1f` · merged via PR `#68` (expected-base guard `eee9637`) → main merge commit `c706b959`.
 
+## Independent Codex closure review — via TOWER (the mandatory QA gate)
+
+The Arc code merged (PR #68) **before** the mandatory independent Codex merge-QA gate — recorded here as a
+**governance sequencing exception** (the code was proven + live, so it was not reverted merely to recreate the
+sequence, per Warwick's instruction). Codex QA is a **Tower capability**, not a Larry-shell command: it was run
+through Tower's committed merge-check entry point `services/control-plane/tower-loop/mergeCheck.mjs`
+(`runMergeReview` → `codexAdapter` `resolveCodexBin`+`detectCodexAuth` → real `codex exec --sandbox read-only
+--json`; ChatGPT-OAuth), from the `C:/Fusion247PKA-tower` worktree with `TOWER_EVIDENCE_REPO_DIR=C:/Fusion247PKA`.
+
+Rounds (each bound to an exact head, real Codex `openai-codex-exec`, under the approved Tower QA skill):
+- **Run `f2ce5878`** @ `3bf2b1f` → `request_changes` (3): **TQA-001** [HIGH] `--env-file=neo4j.env` unconditional
+  (missing optional file blocks the Mine launch); **TQA-002** [HIGH] no in-packet executable/proof evidence;
+  **TQA-003** [MED] docs excluded from staged diff. Codex passed AC-01/02/03/04.
+- **Run `78928b70`** @ `c38cfb2` (fixed TQA-001 via `--env-file-if-exists`; added `arc.test.mjs`) → `request_changes`
+  (2): **TQA-003** [HIGH, BLOCKS_CURRENT_MERGE] a real defect — a rich NOTED source misclassified `thin` when the
+  transcript fetch fails (`substanceLen` zeroed the note-core); **TQA-004** [LOW, TRACKED_FOLLOWUP] operating-model
+  excluded from the diff (non-blocking).
+- **Run `9bf43627`** @ `02fd974` (fixed TQA-003 via testable `substanceLength()`, +test 7/7) → **`approve` / ready**.
+  AC-01–AC-11 aligned; AC-12 partial only because `Deliverables/**` is excluded from Tower's staged diff (the two
+  in-diff Arc contracts match) — the single remaining finding **TQA-004** is a non-blocking tracked follow-up.
+
+**Codex-reviewed head `02fd974` merged via PR `#70` (expected-base guard `1deddd7`) → main merge commit
+`ae1ccf6` = FINAL main.** Verified: main contains the exact reviewed Arc implementation (no divergence), 7/7 Arc
+tests green. The premature-merge sequencing exception is recorded; the QA gate is now satisfied at the exact head.
+
 ---
 
 ## 1. Exact Arc changes
