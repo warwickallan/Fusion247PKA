@@ -43,10 +43,25 @@ Branch `idea-016/idea-engine` · commits `181fae6` (build) + `88dd451` (QA folds
 6. **F — Arc re-evaluated with the note available (observed, NOT tuned).** Finding: the note makes Arc *recognise*
    the manager-delegation, model-routing and watchdog veins — then its FIRST-THREE-DISCARD/self-kill **bins them
    as "already said"**, partly *because* the note's own "What this means for Fusion247" section pre-states them.
-   Vendor-lock-in / attention / reputation are still structurally missed (Arc's mechanism→component lens can't see
-   non-component themes). Conclusion (for a LATER tuning, not now): withhold the note's *interpretation* section
-   from Arc, and accept that strategic/career veins belong to the Source-Intelligence note, not the transfer
-   extractor. Arc also turned inward and flagged the pipeline's own (now-closed) "note pending" gap.
+   Vendor-lock-in / attention / reputation are still missed entirely. These are recorded as **Arc quality findings,
+   NOT out-of-scope**, per Warwick's canonical correction (2026-07-27):
+
+   - **CURRENT ARC LIMITATION (a defect to fix, not an intended boundary):** Arc's present mechanism→component lens
+     structurally under-recognises non-component transfer domains — including strategic, commercial, career,
+     public-reputation and attention-management implications. The X/Sahil-Bloom, vendor-lock-in and attention-cadence
+     misses are therefore **Arc quality findings** to correct later, not evidence that those domains sit outside Arc.
+   - **Source Intelligence and Arc may legitimately OVERLAP.** Their responsibilities differ, they do not partition
+     the domains: **Source Intelligence** = faithfully reconstruct enough of the source that Warwick need not consume
+     the original. **Arc** = identify useful transfers/implications Warwick might not independently notice —
+     Fusion/system improvements, operational/process patterns, commercial/money opportunities, career implications,
+     public-reputation/distribution, attention/workflow patterns, strategic warnings, and cross-domain/weird-but-
+     defensible transfers. Strategic/career/reputation/attention are squarely **in** Arc's remit.
+   - **Contamination finding (retained):** feeding Arc the note's pre-written "What this means for Fusion247"
+     *interpretation* causes legitimate transfers to be discarded as already-said. This suggests Arc should consume a
+     **factual / source-core representation**, not pre-written transfer conclusions.
+
+   Arc also turned inward and flagged the pipeline's own (now-closed) "note pending" gap. **The remaining Arc quality
+   correction is a SEPARATE piece of work, to be done before Larry's promotion — not started here.**
 
 7. **G/QA — Independent Fable review (you authorised; Codex unavailable).** Verdict: **merge-ready-after-fixes,
    no blockers.** Confirmed sound: fail-closed completeness gate, RAW immutability on regeneration, retry
