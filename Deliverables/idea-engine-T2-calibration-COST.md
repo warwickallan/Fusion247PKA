@@ -1,6 +1,6 @@
 # Idea-engine — Audi calibration · TECHNICAL / COST report
 
-**Calibration id:** 287e2c11 · **source:** --regen ("How Audi Cheated in 1988") · **frozen fixture #4** (adversarial poor-fit) · **2026-07-26 17:46 UTC**
+**Calibration id:** 287e2c11 · **source:** --regen ("How Audi Cheated in 1988") · **frozen fixture #4** (adversarial poor-fit) · **2026-07-26 18:27 UTC**
 **Path:** 5 isolated Sonnet branches (parallel) → non-model Neo4j enrichment → 1 Sonnet convergence pass. No Fable, no Opus.
 
 ## Real measured usage (per `claude -p` call)

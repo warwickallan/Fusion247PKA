@@ -1,6 +1,6 @@
 # Idea-engine — Audi calibration · HELD KEY (do NOT open until Warwick has scored the blind set)
 
-**Calibration id:** 287e2c11 · 2026-07-26 17:46 UTC. This is the origin/frame/convergence key for the blind candidates,
+**Calibration id:** 287e2c11 · 2026-07-26 18:27 UTC. This is the origin/frame/convergence key for the blind candidates,
 plus the T1 comparison. Held per Warwick's instruction: reveal only after the blind scoring is in.
 
 ## Blind-id → frame attribution & convergence
