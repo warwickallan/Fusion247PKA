@@ -107,13 +107,23 @@ createApp({
     const detail = ref(null);
     const busy = ref(false);
     const loading = ref(true);
+    const loadErr = ref(false);
 
-    async function load() {
+    // Fetch state with retry — a transient failure (e.g. a service-worker update mid-session) must not
+    // strand the app on empty state forever. Retries a few times, then shows a visible retry banner.
+    async function load(attempt = 1) {
       loading.value = true;
-      try { const r = await fetch('/api/state', { cache: 'no-store' }); state.value = await r.json(); } catch (e) { /* keep last */ }
-      loading.value = false;
+      try {
+        const r = await fetch('/api/state', { cache: 'no-store' });
+        if (!r.ok) throw new Error('http ' + r.status);
+        state.value = await r.json();
+        loadErr.value = false; loading.value = false;
+      } catch (e) {
+        if (attempt < 4) { setTimeout(() => load(attempt + 1), 700 * attempt); return; }
+        loadErr.value = true; loading.value = false; // keep last state; banner offers a manual retry
+      }
     }
-    onMounted(load);
+    onMounted(() => load());
 
     const attn = computed(() => state.value.attention || []);
     const activeAttn = computed(() => attn.value.filter((i) => i.status !== 'deferred'));
@@ -221,6 +231,16 @@ createApp({
         await load();
       } catch (e) { it._error = e.message; } finally { busy.value = false; }
     }
+    const opps = computed(() => state.value.opportunities || []);
+    async function opportunityDecide(o, decision) {
+      busy.value = true; o._error = null;
+      try {
+        const r = await fetch('/api/opportunity-decide', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: o.id, decision }) });
+        const res = await r.json(); if (!res.ok) throw new Error(res.error || 'failed');
+        o._done = { watch: 'Watching', research: 'Pax queued →', brief: 'Brief queued →', later: 'Later', decline: 'Declined' }[decision];
+        await load();
+      } catch (e) { o._error = e.message; } finally { busy.value = false; }
+    }
     async function copyTranscript(s) {
       s._copyErr = null;
       try {
@@ -236,11 +256,11 @@ createApp({
     const primaryAction = (it) => (Array.isArray(it.actions) && it.actions.length ? it.actions.find((a) => a.key === 'accept' || a.key === 'merge') || it.actions[0] : null);
 
     return {
-      AREAS, state, area, detail, busy, loading,
+      AREAS, state, area, detail, busy, loading, loadErr,
       kindOf, catLabel, moduleLabel, oneLine, ago, terse, impactStars, outputTitle, humanValue, humanPoints, spinOf, mdToHtml, notifyMark, build, housekeeping, host, when,
       deliverables, openDeliverable, copyDoc, downloadDoc, downloadTranscript, download, copyText,
       attn, deferred, archived, blocked, decisions, suggestions, needsYou, ideaCat, ideasBrain, ideasCash, latest, toneOf,
-      tiBrain, tiCash, tiSpin, tiStars, mine, ideaDecide,
+      tiBrain, tiCash, tiSpin, tiStars, mine, ideaDecide, opps, opportunityDecide,
       outputs, newOutputs, itemsAdded, jobsFound, wins, builds,
       statusTone, statusLine, tiles, go, open, closeDetail, decide, copyTranscript, primaryAction, load, REPORT, GRAPH,
     };
@@ -259,8 +279,10 @@ createApp({
       <div class="brand" @click="go('home')" title="Home" style="cursor:pointer"><span class="dot" :class="{red: statusTone==='red'}"></span> Fusion247</div>
       <div class="status-mini" :class="{red: statusTone==='red'}">{{ statusLine }}</div>
       <button class="refresh" @click="go('settings')" title="Settings">⚙</button>
-      <button class="refresh" @click="load" :disabled="loading">{{ loading ? '…' : '↻' }}</button>
+      <button class="refresh" @click="load()" :disabled="loading">{{ loading ? '…' : '↻' }}</button>
     </header>
+
+    <div v-if="loadErr" class="load-err" @click="load()">⚠ Couldn't reach the cockpit — tap to retry</div>
 
     <main class="main">
       <!-- HOME -->
@@ -319,6 +341,43 @@ createApp({
       <section v-else-if="area==='outputs'" class="pane">
         <header class="p-h"><h1>Outputs</h1></header>
 
+        <div class="grp" v-if="opps.length">
+          <h2>🎯 Opportunities<span class="g-count">{{ opps.length }}</span><span class="lane-sub">Mason — joined-up build theses, not single ideas</span></h2>
+          <div v-for="o in opps" :key="o.id" class="item blue opp">
+            <div class="i-main">
+              <div class="i-eyebrow">{{ o.otype==='strategic' ? '🧭 strategic' : '🔧 self-improvement' }} · {{ o.roi && o.roi.band ? o.roi.band+' ROI / '+o.roi.value_type : '' }} · {{ o.atoms ? o.atoms.length : 0 }} ideas
+                <span v-if="o.disposition && !o.disposition_conflict" class="opp-disp">your call: {{ o.disposition }}</span>
+                <span v-if="o.disposition_conflict" class="opp-conflict">⚠ evidence changed — re-confirm your call</span>
+              </div>
+              <div class="i-title">{{ o.headline }}</div>
+              <div v-if="o.spin" class="i-why">{{ oneLine(o.spin.problem) }}</div>
+            </div>
+            <div class="opp-body">
+              <div v-if="o.spin"><b>Situation.</b> {{ o.spin.situation }}</div>
+              <div v-if="o.spin"><b>Implication.</b> {{ o.spin.implication }}</div>
+              <div v-if="o.spin"><b>Need-payoff.</b> {{ o.spin.need_payoff }}</div>
+              <div v-if="o.why_now"><b>Why now.</b> {{ o.why_now }}</div>
+              <div v-if="o.roi && o.roi.note"><b>ROI.</b> {{ o.roi.note }}</div>
+              <div v-if="o.evidence"><b>Evidence.</b> {{ o.evidence.independent_sources }} sources · {{ o.evidence.frames }} frames{{ o.evidence.live_anchors && o.evidence.live_anchors.length ? ' · '+o.evidence.live_anchors.join('; ') : '' }}</div>
+              <div v-if="o.what_wed_build"><b>What we'd build.</b> {{ o.what_wed_build }}</div>
+              <details v-if="o.atoms && o.atoms.length"><summary>Provenance — {{ o.atoms.length }} supporting ideas</summary>
+                <div v-for="a in o.atoms" :key="a.n" class="opp-atom">#{{ a.n }} <span class="mono">{{ a.source }} · {{ a.engine }}</span> — {{ a.situation || a.target }}</div>
+              </details>
+              <div class="i-act">
+                <span v-if="o._done" class="done-pill">✅ {{ o._done }}</span>
+                <template v-else>
+                  <button class="act" :disabled="busy" @click="opportunityDecide(o,'watch')">Keep watching</button>
+                  <button class="act accept" :disabled="busy" @click="opportunityDecide(o,'research')">Research w/ Pax</button>
+                  <button class="act accept" :disabled="busy" @click="opportunityDecide(o,'brief')">Build brief</button>
+                  <button class="act defer" :disabled="busy" @click="opportunityDecide(o,'later')">Later</button>
+                  <button class="act decline" :disabled="busy" @click="opportunityDecide(o,'decline')">Decline</button>
+                </template>
+              </div>
+              <div v-if="o._error" class="i-why err">{{ o._error }}</div>
+            </div>
+          </div>
+        </div>
+
         <div class="grp">
           <h2>💡 Insights<span class="g-count">{{ outputs.length }}</span><span class="lane-sub">so-what from the Brain</span></h2>
           <div v-if="!outputs.length" class="empty">No insights yet.</div>
@@ -331,18 +390,22 @@ createApp({
         <div class="grp">
           <h2>📄 Deliverables<span class="g-count">{{ deliverables.length }}</span><span class="lane-sub">produced docs — read / copy / download</span></h2>
           <div v-if="!deliverables.length" class="empty">No deliverables yet — dPax will drop them here.</div>
-          <div v-for="d in deliverables.slice(0,5)" :key="d.file" class="item grey">
+          <div class="lane-scroll">
+          <div v-for="d in deliverables" :key="d.file" class="item grey">
             <div class="i-main" @click="openDeliverable(d)"><div class="i-eyebrow">doc · {{ ago(d.mtime) }} ago</div><div class="i-title">{{ terse(d.title) }}</div></div>
             <div class="i-act"><button class="act" :disabled="busy" @click.stop="copyDoc(d)">{{ d._copied ? '✓' : '⧉' }}</button><button class="act" @click.stop="downloadDoc(d)">⭳</button></div>
+          </div>
           </div>
         </div>
 
         <div class="grp">
           <h2>📝 Transcripts<span class="g-count">{{ (state.ingested||[]).length }}</span><span class="lane-sub">source text — copy / download</span></h2>
           <div v-if="!(state.ingested||[]).length" class="empty">Nothing ingested yet.</div>
-          <div v-for="s in (state.ingested||[]).slice(0,5)" :key="s.video_id" class="item grey">
+          <div class="lane-scroll">
+          <div v-for="s in (state.ingested||[])" :key="s.video_id" class="item grey">
             <div class="i-main"><div class="i-title">{{ terse(s.title || s.video_id) }}</div><div class="i-why" :class="{err:s._copyErr}">{{ s._copyErr ? s._copyErr : ('ingested ' + ago(s.updated_at) + ' ago') }}</div></div>
             <div class="i-act"><button class="act" :disabled="busy" @click="copyTranscript(s)">{{ s._copied ? '✓' : '⧉' }}</button><button class="act" @click="downloadTranscript(s)">⭳</button></div>
+          </div>
           </div>
         </div>
       </section>
