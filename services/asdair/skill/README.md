@@ -190,10 +190,21 @@ is pointed at the live `asdair` schema, though, the basket plan it prints is
 **real household data** (real list items, real product preferences, real
 budgets).
 
-**WARNING: never paste live CLI basket output into public logs, PRs, ClickUp, or
-any shared channel.** It is personal data. Keep live output on the local machine
-only. Everything committed to this repo -- fixtures, tests, docs -- is synthetic
-by rule; live runs are not, so they never leave your machine.
+**SUPERSEDED (Warwick's ruling, 2026-07-27): shopping content is explicitly NOT
+a privacy matter.** This paragraph previously warned that live basket output was
+personal data and must never leave the machine. That is no longer the rule, and
+it directly contradicted the contract and SOP-021 -- a fresh Asdair instance
+found the conflict and had no reliable way to adjudicate it beyond noticing one
+statement carried a date.
+
+Baskets, items, brands, quantities and preferences may be reported plainly. Do
+not redact them or add data-sensitivity ceremony.
+
+What still applies is **secrets**, which is security rather than privacy: no
+tokens, connection strings, passwords or key material in git, logs or any shared
+channel. Separately -- and for engineering reasons, not secrecy -- committed
+fixtures stay synthetic, because runtime STATE belongs in Postgres where the
+planner can read it, never in repo files. See [[SOP-021-run-the-weekly-asdair-shop]].
 
 ## Run the tests
 
