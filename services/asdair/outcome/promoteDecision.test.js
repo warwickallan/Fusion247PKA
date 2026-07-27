@@ -22,11 +22,14 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { promoteDecision, buildPromotion, _internal } = require('./promoteDecision');
+const { promoteDecision, buildPromotion, applySourceVerdict, _internal } = require('./promoteDecision');
 
 // A fake pg client: records statements, hands back synthetic ids. The log
 // insert and the rule insert get DIFFERENT ids so the back-link can be
 // proven to carry the RULE id, not just "an" id.
+// opts.docType   : what the fake asdair.source_documents lookup returns.
+//                  undefined -> the id resolves to NO row.
+// opts.docFails  : the lookup throws (denied grant / missing table).
 function fakeClient(options) {
   const opts = options || {};
   const calls = [];
@@ -38,11 +41,27 @@ function fakeClient(options) {
       if (opts.failOn && opts.failOn.test(text)) {
         throw new Error('synthetic failure on: ' + text.slice(0, 40));
       }
+      if (/FROM asdair\.source_documents/i.test(text)) {
+        if (opts.docFails) throw new Error('synthetic: permission denied for table source_documents');
+        // undefined -> the id resolves to NO row. Any other value (including
+        // null or '') -> a row that exists but is not authoritative.
+        return { rows: opts.docType !== undefined ? [{ doc_type: opts.docType }] : [] };
+      }
       if (/INSERT INTO asdair\.rule_qa_log/i.test(text)) return { rows: [{ id: opts.logId || 501 }] };
       if (/INSERT INTO asdair\.rules/i.test(text)) return { rows: [{ id: opts.ruleId || 902 }] };
       return { rows: [] };
     }
   };
+}
+
+// Pull the row a fake INSERT was given, as { column: value }.
+function insertedRow(client, tableRe) {
+  const call = client.calls.find(function (c) { return tableRe.test(c.sql); });
+  if (!call) return null;
+  const cols = call.sql.match(/\(([^)]*)\) VALUES/)[1].split(',').map(function (s) { return s.trim(); });
+  const row = {};
+  cols.forEach(function (c, i) { row[c] = call.params[i]; });
+  return row;
 }
 
 function sqlOf(client) {
@@ -83,12 +102,14 @@ test('applies_going_forward false: the answer is logged and NOTHING is promoted'
     household_id: 1
   });
   assert.equal(built.rule, null);
+  assert.equal(built.verification, null);
   assert.deepEqual(built.log, {
     asked_on: '2026-07-27',
     question: 'Skip Widget A this week?',
     answer: 'Yes, just this week.',
     applies_going_forward: false,
-    household_id: 1
+    household_id: 1,
+    source_document_id: null
   });
 });
 
@@ -98,7 +119,9 @@ test('applies_going_forward true: a STRUCTURED rule is built the planner can act
     category: 'household',
     rule_text: 'Do not buy Widget A.',
     scope: 'product',
-    directive: 'exclude',
+    // DEFAULT-DENY: 'exclude' was REQUESTED, but the pure layer never grants an
+    // actionable directive -- only a verified authoritative source can.
+    directive: 'info',
     match_term: 'Widget A',
     match_category: null,
     matched_product: null,
@@ -106,6 +129,11 @@ test('applies_going_forward true: a STRUCTURED rule is built the planner can act
     note: null,
     active: true,                 // a promoted rule is live by definition
     household_id: 1               // inherits the decision's household
+  });
+  assert.deepEqual(built.verification, {
+    required: true,
+    requested_directive: 'exclude',
+    source_document_id: null
   });
   assert.deepEqual(Object.keys(built.rule).slice().sort(), _internal.RULE_COLUMNS.slice().sort());
 });
@@ -270,6 +298,281 @@ test('a failure after the log insert ROLLBACKs, so a log never claims a rule tha
   const statements = sqlOf(client);
   assert.equal(statements.indexOf('COMMIT'), -1);
   assert.equal(statements[statements.length - 1], 'ROLLBACK');
+});
+
+// =====================================================================
+// THE PROVENANCE GUARD
+//
+// An ACTIONABLE directive (exclude / needs_decision / map) changes every
+// future basket. It may be created ONLY where the decision's own durable
+// provenance -- asdair.source_documents.doc_type, read from the DATABASE --
+// shows the instruction was explicit. Everything else is DOWNGRADED to the
+// inert 'info', never refused: the learning is still worth keeping.
+// =====================================================================
+
+// Real doc_types that are NOT instructions, plus the degenerate rows.
+const NON_AUTHORITATIVE = ['order_history', 'shopping_list', 'readme', 'meeting_notes', '', null];
+
+// The same decision, promoted through a fake client whose source-document
+// lookup returns `docType`. Returns the asdair.rules row that was inserted.
+async function promoteWithSource(docType, extra, clientOpts) {
+  const client = fakeClient(Object.assign({ docType: docType }, clientOpts || {}));
+  const res = await promoteDecision(
+    standingDecision(Object.assign({ source_document_id: 77 }, extra || {})),
+    { client: client }
+  );
+  return { rule: insertedRow(client, /INSERT INTO asdair\.rules/), client: client, res: res };
+}
+
+// ---- 1. an ambiguous/automatic learning CANNOT create an actionable rule ----
+
+test('GUARD 1: a non-authoritative source can NEVER produce an actionable directive', async function () {
+  for (const docType of NON_AUTHORITATIVE) {
+    const out = await promoteWithSource(docType);
+    assert.equal(out.rule.directive, 'info',
+      'doc_type ' + JSON.stringify(docType) + ' must not be able to authorise an actionable directive');
+    assert.match(out.rule.note, /auto-downgraded/);
+  }
+});
+
+test('GUARD 1: an ABSENT, UNRESOLVABLE or UNREADABLE source is equally unproven', async function () {
+  // No source_document_id at all.
+  const noneClient = fakeClient();
+  await promoteDecision(standingDecision(), { client: noneClient });
+  assert.equal(insertedRow(noneClient, /INSERT INTO asdair\.rules/).directive, 'info');
+
+  // An id that resolves to no row (docType undefined -> zero rows).
+  const missing = await promoteWithSource(undefined);
+  assert.equal(missing.rule.directive, 'info');
+  assert.match(missing.rule.note, /resolves to no asdair\.source_documents row/);
+
+  // The lookup itself fails (e.g. the SELECT grant was revoked). Fail SAFE:
+  // unproven, not "assume yes", and NOT a lost decision.
+  const denied = await promoteWithSource('agent_spec', null, { docFails: true });
+  assert.equal(denied.rule.directive, 'info',
+    'a failed lookup must never be treated as proof');
+  assert.match(denied.rule.note, /could not be completed/);
+  assert.ok(denied.res.logId, 'the decision is still recorded');
+});
+
+// ---- 2. the learning is PRESERVED, not dropped and not refused -------------
+
+test('GUARD 2: a downgraded learning is preserved intact, with the reason recorded', async function () {
+  const out = await promoteWithSource('order_history');
+
+  assert.equal(out.rule.directive, 'info');
+  // Everything the human actually said survives.
+  assert.equal(out.rule.rule_text, 'Do not buy Widget A.');
+  assert.equal(out.rule.category, 'household');
+  assert.equal(out.rule.match_term, 'Widget A');
+  assert.equal(out.rule.household_id, 1);
+  assert.equal(out.rule.active, true);
+  assert.equal(out.rule.reason, 'household decided it is not wanted',
+    'the caller-supplied reason must not be clobbered');
+
+  // ...and WHY it was downgraded is durable and human-readable.
+  assert.match(out.rule.note, /auto-downgraded/);
+  assert.match(out.rule.note, /'exclude'/);
+  assert.match(out.rule.note, /order_history/);
+  assert.match(out.rule.note, /not authoritative/);
+});
+
+test('GUARD 2: a downgrade APPENDS to an existing note rather than overwriting it', async function () {
+  const out = await promoteWithSource('readme', {
+    rule: {
+      category: 'household', rule_text: 'Do not buy Widget A.', scope: 'product',
+      directive: 'exclude', match_term: 'Widget A', note: 'raised at the Tuesday review'
+    }
+  });
+  assert.match(out.rule.note, /^raised at the Tuesday review \| /);
+  assert.match(out.rule.note, /auto-downgraded/);
+});
+
+// ---- 3. a genuinely explicit source STILL creates the actionable rule -------
+
+test('GUARD 3: an authoritative source still produces the intended actionable directive', async function () {
+  for (const docType of _internal.AUTHORITATIVE_DOC_TYPES) {
+    const out = await promoteWithSource(docType);
+    assert.equal(out.rule.directive, 'exclude',
+      "doc_type '" + docType + "' is authoritative and must promote as asked");
+    assert.equal(out.rule.note, null, 'a granted directive carries no downgrade note');
+    assert.equal(out.rule.match_term, 'Widget A');
+  }
+  assert.deepEqual(_internal.AUTHORITATIVE_DOC_TYPES, ['agent_spec', 'decisions_log']);
+});
+
+test("GUARD 3: 'map' and 'needs_decision' are granted on proof too, and inert without it", async function () {
+  const mapRule = {
+    category: 'mapping', rule_text: 'Widget A maps to Widget A Deluxe', scope: 'product',
+    directive: 'map', match_term: 'Widget A', matched_product: 'Widget A Deluxe'
+  };
+  const proven = await promoteWithSource('decisions_log', { rule: mapRule });
+  assert.equal(proven.rule.directive, 'map');
+  assert.equal(proven.rule.matched_product, 'Widget A Deluxe');
+
+  const unproven = await promoteWithSource('shopping_list', { rule: mapRule });
+  assert.equal(unproven.rule.directive, 'info');
+  assert.equal(unproven.rule.matched_product, 'Widget A Deluxe', 'the mapping itself is preserved');
+
+  const nd = await promoteWithSource('agent_spec', {
+    rule: { category: 'household', rule_text: 'Ask about Widget A', scope: 'product',
+            directive: 'needs_decision', match_term: 'Widget A' }
+  });
+  assert.equal(nd.rule.directive, 'needs_decision');
+});
+
+// ---- 4. rule 10 is untouched by any of this --------------------------------
+
+test('GUARD 4: one_week_only / one_time stays non-promotable EVEN from an authoritative source', async function () {
+  const client = fakeClient({ docType: 'agent_spec' });
+  await assert.rejects(
+    promoteDecision(standingDecision({ source_document_id: 77, one_week_only: true }), { client: client }),
+    /one-week-only/);
+
+  await assert.rejects(promoteDecision(standingDecision({
+    source_document_id: 77,
+    rule: { category: 'household', rule_text: 'Skip Widget A', scope: 'one_time',
+            directive: 'exclude', match_term: 'Widget A' }
+  }), { client: client }), /one_time/);
+
+  // Refused BEFORE anything is read or written -- authoritative provenance
+  // buys no exemption from rule 10.
+  assert.equal(client.calls.length, 0);
+});
+
+// ---- 5. provenance / back-link intact in EVERY promoting case --------------
+
+test('GUARD 5: the back-link is written whether the directive was granted or downgraded', async function () {
+  for (const docType of ['agent_spec', 'order_history', undefined]) {
+    const client = fakeClient({ docType: docType, logId: 501, ruleId: 902 });
+    const res = await promoteDecision(
+      standingDecision({ source_document_id: 77 }), { client: client });
+
+    assert.deepEqual(res, { logId: 501, ruleId: 902 });
+    const backlink = client.calls.find(function (c) { return c.sql === _internal.BACKLINK_SQL; });
+    assert.ok(backlink, 'the promoted_rule_id back-link must always be written');
+    assert.deepEqual(backlink.params, [902, 501]);
+    assert.equal(client.calls[client.calls.length - 1].sql, 'COMMIT');
+  }
+});
+
+test('GUARD 5: the verified source_document_id is persisted; an unresolvable one is nulled (FK-safe)', async function () {
+  // Resolved -> the evidence that authorised the directive is itself durable.
+  const proven = fakeClient({ docType: 'agent_spec' });
+  await promoteDecision(standingDecision({ source_document_id: 77 }), { client: proven });
+  assert.equal(insertedRow(proven, /INSERT INTO asdair\.rule_qa_log/).source_document_id, 77);
+
+  // Unresolvable -> null, or the FK would raise 23503 and REFUSE the decision,
+  // which is exactly the outcome the downgrade contract forbids.
+  const dangling = fakeClient({ docType: undefined });
+  const res = await promoteDecision(standingDecision({ source_document_id: 999999 }), { client: dangling });
+  assert.equal(insertedRow(dangling, /INSERT INTO asdair\.rule_qa_log/).source_document_id, null);
+  assert.ok(res.logId, 'the decision is still recorded');
+});
+
+test('GUARD 5: the provenance lookup happens BEFORE BEGIN, so a denied read cannot abort the write', async function () {
+  const client = fakeClient({ docType: 'agent_spec' });
+  await promoteDecision(standingDecision({ source_document_id: 77 }), { client: client });
+
+  const statements = sqlOf(client);
+  assert.match(statements[0], /FROM asdair\.source_documents/);
+  assert.equal(statements[1], 'BEGIN');
+  assert.deepEqual(client.calls[0].params, [77]);
+});
+
+// ---- 6. THE PROPERTY MOST LIKELY TO BE ERODED LATER ------------------------
+
+test('GUARD 6: NO caller-supplied boolean can force an actionable directive', async function () {
+  // Every flag name a future change might plausibly reach for, on BOTH the
+  // decision and the rule payload, with a deliberately non-authoritative
+  // source. If any of these ever works, the trust boundary has moved from
+  // source evidence back to caller assertion and the guard is void.
+  const FLAGS = [
+    'explicit', 'trusted', 'force', 'forced', 'verified', 'authoritative',
+    'is_explicit', 'source_authoritative', 'skip_verification', 'bypass',
+    'directive_verified', 'allow_actionable', 'confirmed', 'human_confirmed',
+    'override', 'proven', 'validated', 'trust', 'admin', 'internal'
+  ];
+
+  for (const flag of FLAGS) {
+    // On the decision.
+    const a = await promoteWithSource('order_history', (function () {
+      const o = {}; o[flag] = true; return o;
+    })());
+    assert.equal(a.rule.directive, 'info',
+      'decision.' + flag + ' must not be able to force an actionable directive');
+
+    // On the rule payload.
+    const ruleWithFlag = {
+      category: 'household', rule_text: 'Do not buy Widget A.', scope: 'product',
+      directive: 'exclude', match_term: 'Widget A'
+    };
+    ruleWithFlag[flag] = true;
+    const b = await promoteWithSource('order_history', { rule: ruleWithFlag });
+    assert.equal(b.rule.directive, 'info',
+      'rule.' + flag + ' must not be able to force an actionable directive');
+  }
+
+  // ...and the verification record itself is not a caller-writable back door:
+  // a decision cannot declare its own request already satisfied.
+  const spoofed = await promoteWithSource('order_history', {
+    verification: { required: false, requested_directive: 'exclude' }
+  });
+  assert.equal(spoofed.rule.directive, 'info');
+});
+
+test('GUARD 6: doc_type from the DATABASE is the ONLY variable that flips the outcome', function () {
+  // Identical decision, identical everything -- only the database verdict
+  // differs. That is the whole trust boundary, stated as a property.
+  const built = buildPromotion(standingDecision({ source_document_id: 77 }));
+  assert.equal(built.rule.directive, 'info', 'the pure layer NEVER emits an actionable directive');
+
+  const granted = applySourceVerdict(built.rule, built.verification,
+    { supplied: true, resolved: true, doc_type: 'agent_spec', failed: false });
+  const refused = applySourceVerdict(built.rule, built.verification,
+    { supplied: true, resolved: true, doc_type: 'order_history', failed: false });
+
+  assert.equal(granted.directive, 'exclude');
+  assert.equal(refused.directive, 'info');
+
+  // Pure: the input rule is never mutated.
+  assert.equal(built.rule.directive, 'info');
+
+  // A missing/garbage verdict is unproven, never a grant.
+  [undefined, {}, { resolved: true }, { resolved: false, doc_type: 'agent_spec' },
+   { resolved: true, doc_type: 'AGENT_SPEC' }].forEach(function (v) {
+    assert.equal(applySourceVerdict(built.rule, built.verification, v).directive, 'info',
+      'verdict ' + JSON.stringify(v) + ' must not grant an actionable directive');
+  });
+});
+
+test('GUARD 6: buildPromotion is DB-free and applySourceVerdict is pure', function () {
+  // The guard's pure half must stay pure: these run with no database, no
+  // client, and no env var set at all.
+  const saved = process.env.ASDAIR_WRITE_DB_URL;
+  delete process.env.ASDAIR_WRITE_DB_URL;
+  try {
+    const built = buildPromotion(standingDecision({ source_document_id: 77 }));
+    assert.equal(built.verification.requested_directive, 'exclude');
+    assert.equal(applySourceVerdict(built.rule, built.verification,
+      { supplied: true, resolved: true, doc_type: 'decisions_log' }).directive, 'exclude');
+  } finally {
+    if (saved !== undefined) process.env.ASDAIR_WRITE_DB_URL = saved;
+  }
+
+  // No I/O crept into the pure function.
+  const src = fs.readFileSync(path.join(__dirname, 'promoteDecision.js'), 'utf8');
+  const pure = src.slice(src.indexOf('function buildPromotion('), src.indexOf('function applySourceVerdict('));
+  assert.equal(/client|query|await|pool|getPool/i.test(pure), false,
+    'buildPromotion must contain no I/O');
+});
+
+test('GUARD 6: source_document_id is validated like any other id', function () {
+  ['0', -1, 'abc', '12x'].forEach(function (bad) {
+    assert.throws(function () {
+      buildPromotion(standingDecision({ source_document_id: bad }));
+    }, /source_document_id must be a positive integer id/);
+  });
 });
 
 test('no connection string is ever hardcoded; ASDAIR_WRITE_DB_URL is the only env var read', function () {

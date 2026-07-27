@@ -217,6 +217,14 @@ test('asdair outcome path: clean Postgres -> migrations -> record a shop -> prom
     // =====================================================================
     // promoteDecision: the learning loop is no longer dead code
     // =====================================================================
+    // The provenance the guard verifies against. Both are SYNTHETIC.
+    const specDocId = (await q(
+      "insert into asdair.source_documents (title, doc_type) values ('Test Agent Spec', 'agent_spec') returning id"
+    )).rows[0].id;
+    const historyDocId = (await q(
+      "insert into asdair.source_documents (title, doc_type) values ('Test Order History', 'order_history') returning id"
+    )).rows[0].id;
+
     await t.test('applies_going_forward true promotes a rule and writes the back-link', async function () {
       const res = await promoter.promoteDecision({
         asked_on: '2026-07-27',
@@ -224,6 +232,9 @@ test('asdair outcome path: clean Postgres -> migrations -> record a shop -> prom
         answer: 'No - stop buying Widget A from now on.',
         applies_going_forward: true,
         household_id: householdId,
+        // An AUTHORITATIVE source: the doc_type is read from the database and
+        // is what permits the actionable 'exclude' below.
+        source_document_id: specDocId,
         rule: {
           category: 'household',
           rule_text: 'Do not buy Widget A.',
@@ -240,6 +251,8 @@ test('asdair outcome path: clean Postgres -> migrations -> record a shop -> prom
       const log = (await q('select * from asdair.rule_qa_log where id = $1', [res.logId])).rows[0];
       assert.equal(log.applies_going_forward, true);
       assert.equal(String(log.promoted_rule_id), String(res.ruleId), 'the back-link must point at the new rule');
+      assert.equal(String(log.source_document_id), String(specDocId),
+        'the provenance that authorised the directive must itself be durable');
 
       const rule = (await q('select * from asdair.rules where id = $1', [res.ruleId])).rows[0];
       assert.equal(rule.directive, 'exclude');
@@ -252,6 +265,78 @@ test('asdair outcome path: clean Postgres -> migrations -> record a shop -> prom
       // active, so loadRules() would return it and the planner would act on it.
       const active = (await q('select count(*)::int as n from asdair.rules where active = true and match_term = $1', ['Widget A'])).rows[0].n;
       assert.equal(active, 1);
+    });
+
+    // =====================================================================
+    // The provenance guard, proven against REAL doc_type rows and re-read
+    // from the database afterwards (not just from the return value).
+    // =====================================================================
+    await t.test('a NON-authoritative source is downgraded to info, and the learning survives', async function () {
+      const res = await promoter.promoteDecision({
+        asked_on: '2026-07-27',
+        question: 'Should we stop buying Widget D?',
+        answer: 'We have not bought it lately.',
+        applies_going_forward: true,
+        household_id: householdId,
+        source_document_id: historyDocId,   // order_history: an observation, not an instruction
+        rule: {
+          category: 'household',
+          rule_text: 'Do not buy Widget D.',
+          scope: 'product',
+          directive: 'exclude',             // REQUESTED, and must NOT be granted
+          match_term: 'Widget D'
+        }
+      });
+
+      assert.ok(res.ruleId, 'the learning must be kept, not refused');
+
+      // FRESH READ of the resulting state.
+      const rule = (await q('select * from asdair.rules where id = $1', [res.ruleId])).rows[0];
+      assert.equal(rule.directive, 'info', 'an order_history source cannot authorise behaviour change');
+      assert.equal(rule.rule_text, 'Do not buy Widget D.', 'the learning is preserved verbatim');
+      assert.equal(rule.match_term, 'Widget D');
+      assert.equal(String(rule.household_id), String(householdId));
+      assert.match(rule.note, /auto-downgraded/, 'the downgrade must be auditable, not silent');
+      assert.match(rule.note, /order_history/);
+
+      // The back-link is intact in the downgraded case too.
+      const log = (await q('select * from asdair.rule_qa_log where id = $1', [res.logId])).rows[0];
+      assert.equal(String(log.promoted_rule_id), String(res.ruleId));
+      assert.equal(String(log.source_document_id), String(historyDocId));
+
+      // THE POINT: an inert rule cannot change a basket. The read-only skill
+      // loads it, but the planner only acts on ACTIONABLE directives, so
+      // Widget D is not excluded from anything.
+      const actionable = (await q(
+        "select count(*)::int as n from asdair.rules where match_term = $1 and directive <> 'info'",
+        ['Widget D'])).rows[0].n;
+      assert.equal(actionable, 0, 'an unproven learning must leave zero actionable rules behind');
+    });
+
+    await t.test('a dangling source_document_id downgrades and is nulled, never a 23503 refusal', async function () {
+      const ghost = (await q('select coalesce(max(id), 0) + 1000 as id from asdair.source_documents')).rows[0].id;
+
+      const res = await promoter.promoteDecision({
+        asked_on: '2026-07-27',
+        question: 'Should we stop buying Widget E?',
+        answer: 'Probably.',
+        applies_going_forward: true,
+        household_id: householdId,
+        source_document_id: ghost,          // references nothing
+        rule: {
+          category: 'household', rule_text: 'Do not buy Widget E.', scope: 'product',
+          directive: 'exclude', match_term: 'Widget E'
+        }
+      });
+
+      assert.ok(res.ruleId, 'a dangling provenance must not lose the decision');
+
+      const log = (await q('select * from asdair.rule_qa_log where id = $1', [res.logId])).rows[0];
+      assert.equal(log.source_document_id, null, 'an unresolvable FK is stored as null');
+
+      const rule = (await q('select * from asdair.rules where id = $1', [res.ruleId])).rows[0];
+      assert.equal(rule.directive, 'info');
+      assert.match(rule.note, /resolves to no asdair\.source_documents row/);
     });
 
     await t.test('applies_going_forward false records the answer and promotes NOTHING', async function () {
