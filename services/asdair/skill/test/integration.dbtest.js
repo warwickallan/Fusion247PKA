@@ -251,9 +251,12 @@ test('asdair full path: clean Postgres -> schema -> seed -> data.js -> planner.j
     const byName = Object.create(null);
     plan.items.forEach(function (it) { byName[it.item_name] = it; });
 
-    // Item 1 -- plain add, no mapping.
-    assert.equal(byName['plain thing'].status, 'add', 'plain item plans to add');
+    // Item 1 -- unmapped, so rule 6 sends it to a human (defect C). This
+    // assertion previously expected status 'add'; that encoded the old broken
+    // behaviour (an unidentifiable item silently added to the basket).
+    assert.equal(byName['plain thing'].status, 'needs_decision', 'an unmapped item goes to a human');
     assert.equal(byName['plain thing'].matched_product, null, 'plain item has no matched product');
+    assert.equal(byName['plain thing'].planned_qty, 0, 'nothing added pending a human decision');
     assert.ok(
       byName['plain thing'].flags.indexOf('no explicit product mapping') !== -1,
       'plain item is flagged as unmapped'
@@ -294,12 +297,19 @@ test('asdair full path: clean Postgres -> schema -> seed -> data.js -> planner.j
     );
 
     // ---- summary counts ------------------------------------------------
+    // Counts shifted by defect C: 'plain thing' is unmapped, so it moved from
+    // planned_add to needs_decision and its 10.00 left the estimate.
     assert.equal(plan.summary.total_requested, 5, 'five distinct list lines');
-    assert.equal(plan.summary.planned_add, 3, 'three lines plan to add');
-    assert.equal(plan.summary.needs_decision, 2, 'two lines need a human decision');
+    assert.equal(plan.summary.planned_add, 2, 'two lines plan to add');
+    assert.equal(plan.summary.needs_decision, 3, 'three lines need a human decision');
     assert.equal(plan.summary.excluded, 0, 'no exclusions in this list');
-    // 10.00*1 + 20.00*2 + 5.00*1 = 55.00, within the household band [25,60].
-    assert.equal(plan.summary.estimated_total, 55, 'basket estimate sums the add lines');
+    assert.equal(
+      plan.summary.planned_add + plan.summary.needs_decision + plan.summary.excluded,
+      plan.summary.total_requested,
+      'every line lands in exactly one summary bucket'
+    );
+    // 20.00*2 + 5.00*1 = 45.00, within the household band [25,60].
+    assert.equal(plan.summary.estimated_total, 45, 'basket estimate sums the add lines');
     assert.equal(plan.summary.currency, 'GBP', 'currency carried from the budget row');
     assert.equal(plan.summary.budget_flag, 'within', 'basket sits within the household budget band');
   } finally {
