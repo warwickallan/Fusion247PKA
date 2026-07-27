@@ -202,8 +202,9 @@ const server = http.createServer(async (req, res) => {
           if (!/^[A-Za-z0-9_-]{6,24}$/.test(v)) return j(res, 200, { ok: false, error: 'bad video id' });
           // fire Arc detached — reads the factual source-core, tiers by substance (rich → T2 divergent multi-frame),
           // favours recall, persists the converged atoms. Rich sources take longer (T2, several min); atoms appear
-          // in /api/state when done. neo4j.env enables the non-model graph enrichment (degrades gracefully if absent).
-          const p = spawn('node', ['--env-file=C:/.fusion247/fusion-capture-gateway.env', '--env-file=C:/.fusion247/neo4j.env', `${REPO}/services/control-plane/cockpit/arc.mjs`, v], { detached: true, stdio: 'ignore', cwd: REPO });
+          // in /api/state when done. neo4j.env is OPTIONAL (only the non-model graph enrichment uses it, which
+          // degrades gracefully): --env-file-if-exists so a MISSING neo4j.env can never stop Arc from launching (TQA-001).
+          const p = spawn('node', ['--env-file=C:/.fusion247/fusion-capture-gateway.env', '--env-file-if-exists=C:/.fusion247/neo4j.env', `${REPO}/services/control-plane/cockpit/arc.mjs`, v], { detached: true, stdio: 'ignore', cwd: REPO });
           p.unref();
           j(res, 200, { ok: true, mining: v });
         } catch (e) { j(res, 500, { ok: false, error: e.message }); }
