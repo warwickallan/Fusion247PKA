@@ -205,4 +205,4 @@ _A high-value "later" is still a win. The prize is a defensible, high-value, sur
 </details>
 
 ---
-_10 candidates · generated 2026-07-26 17:46 UTC · calibration id 287e2c11_
+_10 candidates · generated 2026-07-26 18:27 UTC · calibration id 287e2c11_
