@@ -1,37 +1,64 @@
 ---
 artefact: session-handoff
-provenance: curated (2026-07-26, Larry) — compact next-session resume, NOT a transcript
-owner_intent: produced by a future /close-session ritual (delegated curator / CuratAir); consumed by the next
-  Larry session + Arc's A+B+C assembly. Supersede on next close.
+provenance: curated (2026-07-27, Larry) — compact next-session resume, NOT a transcript
+owner_intent: consumed by the next Larry session + Arc's A+B+C assembly. Supersede on next close.
 ---
 
 # Next-session handoff (resume here)
 
-**Where we are:** Cockpit merged to main (v0.10.0, front door live). Idea-engine **T1 vertical BUILT + proven**
-on `idea-016/idea-engine` (not merged) — Warwick PASSED the frozen-fixture experiment and GO'd the build.
+## Where we are (terminal state, 2026-07-27)
 
-**Decisions locked this session (durable — do not re-litigate):**
-- **Path A execution:** idea-engine runs on Warwick's **Anthropic Max sub via `claude -p` (Sonnet) ONLY**.
-  No Anthropic API key, no OpenAI/LiteLLM swap. Keep the runner's execution boundary swappable if volume grows.
-- **SPIN-first presentation law** (general, not just idea-engine): every idea/finding leads with plain-English
-  SPIN (Situation/Problem/Implication/Need-payoff) — average human gets *why it matters* in seconds; ALL
-  machine detail (evidence, transfer reasoning, target, NVFI, traps, provenance) preserved behind Details.
-  NVFI ranks for the machine; SPIN tells Warwick why it matters.
-- **Idea-engine architecture** (see memory `idea-engine-agent-architecture` + SPEC): Cairn triage → Transfer
-  Specialist (recognise→analogise→transfer→propose, provisional NVFI) → **Larry operational-reconciliation on
-  Brain / Cash direct to Warwick** → Keep/Later/Decline → separate Research-with-Pax. No separate Critic in T1.
-  Fixtures frozen; graph-wide `suggestions.mjs` preserved separately.
+The **idea-intelligence layer is COMPLETE, proven, reviewed, and locked** — merged to **main = `d0ad341`**,
+live on the cockpit DB (`kerdinlgc`).
 
-**Next moves (in order):**
-1. **Research-with-Pax auto-dispatch (dPax)** — currently only marks `researching`; wire the actual Pax→deliverable run.
-2. Merge `idea-016/idea-engine` to main when Warwick accepts.
-3. **Neo4j relevance / T2-depth** questions — Warwick is discussing these SEPARATELY with GPT; do NOT reopen
-   unilaterally; bring back when he does.
-4. **Session-continuity / CuratAir** upgrade — the /close-session contract prototyped by THIS capture (below).
-5. Later: the outbound **Scout** agent (feeds Cash ideas + CareerAIr).
+- **Arc** (Transfer Intelligence — generation) and **Mason** (Opportunity Synthesis — the convergent PM faculty)
+  are **instantiated as real bound subagents** (`.claude/agents/arc.md`, `mason.md` + Team contracts + index)
+  and **proven end-to-end**: real source → Arc → 3 provenance-bearing production atoms in the register → Mason
+  → coherent opportunities. Every atom accounted, provenance traced, boundary held, no regression.
+- **Mason v1** live: durable atom register (`cockpit.idea_atom`, CONTENT-hash keyed), coherence-gated synthesis,
+  Opportunities lane in the cockpit, cross-run disposition persistence (Warwick's Keep/Later/Decline survives
+  re-synthesis; conflict only on genuine disagreement).
+- **Independent review:** Fable (Warwick-authorised substitute for Codex) reviewed T1/T2 generation + Mason
+  code → all blockers fixed + re-confirmed READY.
+- **Render-check gate** exists (`services/cockpit/render-check.mjs`) after an outage caused by serving
+  un-render-checked cockpit assets — see memory `cockpit-serves-from-worktree-render-check`.
 
-**Do-not-lose threads:** the ~138k/Mine CC-wrapper cost (accepted for low-volume, revisit if high-volume);
-stale self-model tables (backlog); auto-Cairn-daemon HIGH bug; shopping actions parked (household-data caution).
+**The one deferral:** the cockpit **visual** check on Warwick's device is **owner-deferred** (not failed).
+No material provisional implementation/QA items remain.
 
-**How to resume:** a fresh Larry session reads its memory + this handoff + `current-state.md` + `BACKLOG.md` +
+## What the NEXT session is about
+
+**Promote Larry from primary builder → engineering ORCHESTRATOR, and stand up the build team
+(Larry Builder Delegation).** Design already delivered, review-pending:
+`Deliverables/larry-builder-delegation-DESIGN.md` — delegation loop, builder authority/tools, what Larry retains
+exclusively, evidence-not-assertions reporting, and the smallest single-loop proof (delegate a bounded `--dry-run`
+task end-to-end). **NOT yet GO to build** — Warwick + GPT review first.
+
+## Locked decisions (durable — do NOT re-litigate)
+
+- **THE IDEA ENGINE IS NOT A BACKLOG GENERATOR** — product = a small set of coherent, evidence-backed
+  opportunities; atoms are evidence/substrate, not auto work-items. Weak/emerging/standalone stay durable +
+  inspectable without demanding attention.
+- **Roles (canonical: `Deliverables/fusion-operating-model.md`):** Arc (generate) · Mason (synthesise) ·
+  Pax (research) · Silas (architecture) · Larry (orchestrator/quarterback, NOT default builder) ·
+  Warwick (strategic authority + BUILD auth). Lifecycle: source→atoms→Mason→opportunity→Warwick interest→Pax→
+  brief→Larry impl plan→Warwick GO→delegated build→QA→merge.
+- **Path A execution** unchanged: Sonnet via `claude -p` on Warwick's Max sub; no API key / no OpenAI-LiteLLM swap.
+- **Fable HARDLOCK:** only on Warwick's explicit per-use yes (Codex is default reviewer; Fable the substitute).
+- **Governance gates:** merge-to-main, live-apply, Fable use = Warwick's explicit yes. Larry commits/pushes
+  otherwise. Never serve un-render-checked cockpit assets live.
+
+## Runtime pointers
+
+- Live cockpit DB writer: `DATABASE_URL` in `C:/.fusion247/fusion-capture-gateway.env` (→ kerdinlgc). Dev sandbox:
+  `CONTROL_PLANE_DEV_DATABASE_URL` in `control-plane-dev.env`.
+- Arc runs `mine-ideas.mjs` (T1) / `t2-calibrate.mjs` (T2); Mason runs `mason-synthesise.mjs`; register seeded by
+  `mason-backfill.mjs`; shared writer `atom-register.mjs`.
+- Cockpit: `services/cockpit/server.mjs` (node server.mjs; tailnet `:8443` via Tailscale serve). Render-check
+  before ANY cockpit UI change.
+- Ding Warwick on handback: `node --env-file=C:/.fusion247/fusion-capture-gateway.env C:/.fusion247/larry-ding.mjs <msgfile>`.
+
+## How to resume
+
+A fresh Larry reads its memory + this handoff + `current-state.md` + `Deliverables/BACKLOG.md` +
 `warwick-context.curated_seed.md`. Fusion should know itself from these, not from Larry's remembered context.
