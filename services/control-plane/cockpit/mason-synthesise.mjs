@@ -104,6 +104,7 @@ async function main() {
   // A clear match carries the disposition; conflict is raised ONLY when rival matches genuinely DISAGREE on
   // disposition — membership drift alone is not a conflict. Never guessed.
   const ov = (a, b) => { const A = new Set(a); const B = new Set(b); let i = 0; for (const x of A) if (B.has(x)) i++; return i / (Math.min(A.size, B.size) || 1); };
+  const isect = (a, b) => { const B = new Set(b); return a.filter((x) => B.has(x)).length; };
   const priorDecided = (await c.query(
     `select o.opportunity_id id, o.disposition, o.disposition_at, array_agg(oa.atom_id) atoms
        from cockpit.opportunity o join cockpit.opportunity_atom oa on oa.opportunity_id = o.opportunity_id
@@ -123,11 +124,21 @@ async function main() {
       await c.query('update cockpit.opportunity set disposition_conflict=true, matched_from=$2, updated_at=now() where opportunity_id=$1', [nOpp.id, best.p.id]);
       await c.query("insert into cockpit.opportunity_event (opportunity_id, actor, event, note) values ($1,'system','disposition_conflict',$2)", [nOpp.id, `rival prior decisions disagree (${[...distinctDisp].join('/')}) — Warwick to re-confirm`]);
       conflicts++;
-    } else {                                                          // single match, or several that AGREE → carry
+    } else {                                                          // single match, or several that AGREE
       const chosen = matches[0];                                      // highest overlap, then most-recent decision
-      await c.query('update cockpit.opportunity set disposition=$2, disposition_at=$4, matched_from=$3, updated_at=now() where opportunity_id=$1', [nOpp.id, chosen.p.disposition, chosen.p.id, chosen.p.disposition_at]);
-      await c.query("insert into cockpit.opportunity_event (opportunity_id, actor, event, note) values ($1,'system','disposition_carried',$2)", [nOpp.id, `carried '${chosen.p.disposition}' from ${chosen.p.id} (overlap ${chosen.s.toFixed(2)})`]);
-      carried++;
+      // Guard the subset-swallow asymmetry: a DECLINE on a small prior fully contained in a much BROADER new thesis
+      // scores ov=1.0 but the decline only covers <50% of the new thesis — over-applying it would silently hide a
+      // genuinely broader opportunity. Re-confirm instead (fails safe; every other disposition is visible so self-corrects).
+      const coverNew = isect(nOpp.atoms, chosen.p.atoms) / (nOpp.atoms.length || 1);
+      if (chosen.p.disposition === 'declined' && coverNew < 0.5) {
+        await c.query('update cockpit.opportunity set disposition_conflict=true, matched_from=$2, updated_at=now() where opportunity_id=$1', [nOpp.id, chosen.p.id]);
+        await c.query("insert into cockpit.opportunity_event (opportunity_id, actor, event, note) values ($1,'system','disposition_conflict',$2)", [nOpp.id, `declined prior covers only ${Math.round(coverNew * 100)}% of a broader new thesis — Warwick to re-confirm`]);
+        conflicts++;
+      } else {
+        await c.query('update cockpit.opportunity set disposition=$2, disposition_at=$4, matched_from=$3, updated_at=now() where opportunity_id=$1', [nOpp.id, chosen.p.disposition, chosen.p.id, chosen.p.disposition_at]);
+        await c.query("insert into cockpit.opportunity_event (opportunity_id, actor, event, note) values ($1,'system','disposition_carried',$2)", [nOpp.id, `carried '${chosen.p.disposition}' from ${chosen.p.id} (overlap ${chosen.s.toFixed(2)})`]);
+        carried++;
+      }
     }
   }
 
