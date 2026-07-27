@@ -252,9 +252,21 @@ test('with no band or no actual total it falls back to the plan flag; unknown is
     false
   );
 
-  // The real planner returns 'unknown' when the add lines are not all priced,
-  // so this fallback is the live case, not a hypothetical.
-  assert.equal(plan.summary.budget_flag, 'unknown');
+  // The real planner returns 'unknown' when the add lines are not all priced, so this fallback is the live
+  // case and not a hypothetical. Proved with a MATCHED but unpriced line: since the planner began routing
+  // unmatched items to needs_decision (standing rule 6), an *unmatched* line no longer yields an unpriced ADD
+  // line, so the previous demonstration stopped demonstrating anything. The shared planFixture is deliberately
+  // left alone because other tests assert its counts.
+  const matchedUnpriced = planBasket({
+    listItems: [{ item_name: 'Widget A', requested_qty: 1 }],   // present in `products`, deliberately unpriced
+    products: products,
+    rules: [],
+    budget: { min_normal: 120, max_normal: 150, currency: 'GBP', household_id: HH },
+    household: HH
+  });
+  assert.equal(matchedUnpriced.summary.planned_add, 1, 'must be an ADD line, not needs_decision');
+  assert.equal(matchedUnpriced.summary.estimated_total, null);
+  assert.equal(matchedUnpriced.summary.budget_flag, 'unknown');
 });
 
 test('basket_total is rounded to 2dp, and null when the run did not know it', function () {
