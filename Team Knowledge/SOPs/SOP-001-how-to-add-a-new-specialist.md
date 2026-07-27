@@ -56,7 +56,18 @@ Keep it short. The shipped four are the template. Do not paste Pax's research br
 
 ### 5. Draft the host subagent shim(s) (Nolan)
 
-**Mandatory for every hire, in every host the user has activated.** Without the shim, Larry can only role-play the new specialist within the main context — Larry cannot dispatch them as a parallel subagent via the host's agent-tool. The shim is what binds the wiki contract to the host runtime.
+**Mandatory for every hire, in every host that can truthfully perform the specialist's declared function.** Without the shim, Larry can only role-play the new specialist within the main context — Larry cannot dispatch them as a parallel subagent via the host's agent-tool. The shim is what binds the wiki contract to the host runtime.
+
+#### Host role distinction (Warwick's ruling, 2026-07-27) — shim by capability, not by symmetry
+
+- **Claude / Larry runtime = the execution and orchestration host.** Specialists that do work are shimmed here.
+- **Codex = the independent review / QA host**, unless a future capability explicitly requires Codex *execution*.
+
+**A specialist shim should exist on a host only where that host can truthfully perform that specialist's declared function.** Shimming for symmetry is worse than not shimming: it advertises a capability the host cannot deliver. Codex runs read-only sandboxed here, so a Codex-dispatched specialist whose job needs shell execution or a database write would announce a role it physically cannot perform.
+
+Worked example: Asdair (hired 2026-07-27) ships a Claude Code shim and deliberately **no** Codex shim — its function is `Bash` execution plus governed database writes, neither of which Codex can do in a read-only sandbox.
+
+**Known legacy drift, to audit later — do NOT fix as part of another hire.** `.codex/agents/` holds 13 specialist `.toml` shims predating this ruling, while Arc, Mason and Asdair have none. Warwick's instruction: do not backfill for symmetry, and do not delete or refactor the existing 13 as a side-effect of unrelated work. Audit them as their own deliberate pass.
 
 The principle is host-agnostic: a thin pointer to the wiki contract, never a copy of it. The exact path and frontmatter convention is host-specific:
 

@@ -50,6 +50,19 @@ AsdAIr / the Asda household-shopping project: a decisions log, order history, a 
 
 ## The recommendation
 
+> ⚠️ **SUPERSEDED 2026-07-27 by Warwick's ruling.** The "stays external" half of the recommendation below no
+> longer holds. The AsdAIr **function is ACTIVE and in-repo**: the method is committed as
+> [[SOP-021-run-the-weekly-asdair-shop]], the code lives in `services/asdair/**`, and a specialist —
+> **Asdair, Household Shopping Steward** ([[Team/Asdair - Household Shopping Steward/AGENTS]]) — was hired the
+> same day. The governing split is now **Git owns the durable FUNCTION; Supabase owns the durable STATE**, not
+> in-myPKA vs external.
+>
+> What survives from below: the **live browser drive** genuinely does stay outside the specialist (Larry holds it,
+> Warwick logs in), and the `PKM/My Life/Projects/` entry is still an open, unbuilt question. What is withdrawn:
+> the claim that the automation layer should not be hosted in this repo.
+>
+> This task is left `open` only because formal closure (Outcome + move to `tasks/done/`) is Larry's bookkeeping.
+
 **Split the disposition by layer, rather than a single blanket retained-external call:**
 
 - **The operational application and browser automation** (the Claude-in-Chrome basket-build flow, the live order-execution mechanics) — **stays external, not migrated into myPKA at this stage.** This is a runtime/automation concern, not a knowledge-management one; nothing in myPKA's current architecture (a markdown-first PKM, not an app-automation platform) is the right home for it.
@@ -82,6 +95,7 @@ Reasoning: unlike CareerAIR (row 36 — an active drafting/knowledge capability 
 - 2026-07-10 23:47 (pax) — created, per tsk-2026-07-10-001 decision 14 disposition of Migration Coverage Matrix follow-up #5. Cross-refs: 2/7 populated (workstreams, deliverables). All other slots (sops, guidelines, my_life, session_logs, journal_entries) walked and confirmed genuinely empty — no existing SOP, Guideline, My Life entry, session log, or journal entry covers AsdAIr specifically, and the source matrix row itself was not readable this session (flagged above and in report to Larry).
 - 2026-07-11 00:15 (larry) — read matrix row 37 directly (now accessible) and substantially revised the recommendation per external QA review: split disposition by layer rather than a blanket call — the operational app/browser-automation stays external; the project's knowledge (decisions, status, order history as record) may get a `PKM/My Life/Projects/` entry; a future Cockpit could expose AsdAIr as a linked external app without moving the automation inside myPKA. Still gated for approval, not implemented.
 - 2026-07-11 01:35 (larry) — deprioritized (3 → 4, low) per explicit user instruction: left open, not actively worked, while #1 (Knowledge Intake and Synthesis) proceeds first.
+- 2026-07-27 (nolan) — **recommendation SUPERSEDED by Warwick's ruling** (banner added above), as part of the Asdair hire/binding. The AsdAIr function is active and in-repo (SOP-021 + `services/asdair/**` + the Asdair specialist contract and shim); `Team Knowledge/fusion-brief/current-state.md` amended in the same pass to unpark it. Recommend Larry close this task per SOP-close-task. Not closed here: closure needs an `## Outcome` and a move to `tasks/done/`, which is Larry's bookkeeping, and `services/cockpit/server.mjs:45` (the live cockpit shopping filter) is a separate decision deliberately left untouched.
 
 ## Outcome
 _(filled when status flips to done — see SOP-close-task)_
