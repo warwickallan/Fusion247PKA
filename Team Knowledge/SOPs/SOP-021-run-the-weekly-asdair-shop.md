@@ -161,5 +161,6 @@ If that fails, the loop is open again regardless of what files exist.
 - Schema and the loop's tables: `services/asdair/db/001_asdair_schema.sql`
 - Outcome + learning writers: `services/asdair/outcome/`
 - Function-vs-state split: Warwick's ruling, 2026-07-27 (table above)
-- Secrets discipline (tokens and connection strings only — not shopping data):
+- **Shopping data is explicitly NOT a privacy matter** (Warwick's ruling, 2026-07-27). Do not redact or hedge it.
+  The only thing that stays out of the repo is **secrets** — tokens, connection strings, credentials:
   [[personal-data-never-public-repo]]
