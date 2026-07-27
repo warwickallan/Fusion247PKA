@@ -272,9 +272,9 @@ test('a failure after the log insert ROLLBACKs, so a log never claims a rule tha
   assert.equal(statements[statements.length - 1], 'ROLLBACK');
 });
 
-test('no connection string is ever hardcoded; ASDAIR_DB_URL is the only env var read', function () {
+test('no connection string is ever hardcoded; ASDAIR_WRITE_DB_URL is the only env var read', function () {
   const src = fs.readFileSync(path.join(__dirname, 'promoteDecision.js'), 'utf8');
   assert.equal(/postgres(ql)?:\/\//.test(src), false);
   const envReads = src.match(/process\.env\.[A-Z_]+/g) || [];
-  assert.deepEqual(Array.from(new Set(envReads)), ['process.env.ASDAIR_DB_URL']);
+  assert.deepEqual(Array.from(new Set(envReads)), ['process.env.ASDAIR_WRITE_DB_URL']);
 });

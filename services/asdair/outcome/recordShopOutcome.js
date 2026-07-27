@@ -30,15 +30,15 @@
 //     every value and cannot be injected into.
 //
 // SECRETS:
-//   * The connection string comes ONLY from process.env.ASDAIR_DB_URL, the
+//   * The connection string comes ONLY from process.env.ASDAIR_WRITE_DB_URL, the
 //     same convention as skill/data.js. It is never hardcoded, never printed,
 //     never logged.
-//   * OPERATIONAL NOTE: skill/README.md provisions ASDAIR_DB_URL as a
+//   * OPERATIONAL NOTE: skill/README.md provisions ASDAIR_WRITE_DB_URL as a
 //     SELECT-only role for the read-only skill. A role with only SELECT
 //     cannot run this writer -- recording an outcome needs INSERT (and
 //     UPDATE for promoteDecision.js) on the asdair schema. Which role the
 //     writer runs as is a deployment decision for the operator; this module
-//     hardcodes nothing and simply uses whatever ASDAIR_DB_URL provides.
+//     hardcodes nothing and simply uses whatever ASDAIR_WRITE_DB_URL provides.
 //
 // PURE ASCII only.
 // =====================================================================
@@ -63,9 +63,9 @@ let pool = null;
 // module (and its pure validation) loads on a box with no deps installed.
 function getPool() {
   if (pool) return pool;
-  const url = process.env.ASDAIR_DB_URL;
+  const url = process.env.ASDAIR_WRITE_DB_URL;
   if (!url || String(url).trim() === '') {
-    throw new Error('ASDAIR_DB_URL is not set. Export the asdair Postgres connection string as ASDAIR_DB_URL before recording an outcome.');
+    throw new Error('ASDAIR_WRITE_DB_URL is not set. Export the asdair Postgres connection string as ASDAIR_WRITE_DB_URL before recording an outcome.');
   }
   const { Pool } = require('pg');
   pool = new Pool({ connectionString: url });
@@ -143,7 +143,7 @@ const EVENT_INSERT_SQL =
 // exists so tests and callers that are composing several writes into one
 // caller-owned connection can do so; it hardcodes no connection string and
 // changes nothing about the SQL. When omitted, a client is taken from the
-// shared pool built from ASDAIR_DB_URL and released afterwards.
+// shared pool built from ASDAIR_WRITE_DB_URL and released afterwards.
 // ---------------------------------------------------------------------
 async function recordShopOutcome(outcome, options) {
   assertRecordable(outcome);

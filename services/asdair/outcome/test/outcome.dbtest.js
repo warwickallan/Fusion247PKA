@@ -13,7 +13,7 @@
 // so it is destructive and stays INERT by default):
 //   * PRIMARY, POSITIVE OPT-IN: it runs ONLY when the operator has EXPLICITLY
 //     set ASDAIR_DB_TEST_ALLOW_DESTRUCTIVE to exactly "1" or "true".
-//   * AND ASDAIR_DB_URL must also be set (where to run).
+//   * AND ASDAIR_WRITE_DB_URL must also be set (where to run).
 //   Missing EITHER -> the test is a NO-OP (skipped), never a failure and
 //   never a destructive run. A laptop with no Postgres stays green.
 //   The gate helpers are REUSED from the skill's test/dbSafeTarget.js so
@@ -36,10 +36,10 @@
 //
 // HOW TO RUN (against a throwaway/local Postgres, NOT live Supabase):
 //   ASDAIR_DB_TEST_ALLOW_DESTRUCTIVE=1 \
-//     ASDAIR_DB_URL=postgres://user:pass@localhost:5432/postgres \
+//     ASDAIR_WRITE_DB_URL=postgres://user:pass@localhost:5432/postgres \
 //     node --test test/outcome.dbtest.js
 //   (from services/asdair/outcome). Without the explicit opt-in marker (or
-//   with ASDAIR_DB_URL unset) it no-ops.
+//   with ASDAIR_WRITE_DB_URL unset) it no-ops.
 //
 // PURE ASCII only.
 // =====================================================================
@@ -59,20 +59,20 @@ const { buildOutcome } = require('../buildOutcome.js');
 const recorder = require('../recordShopOutcome.js');
 const promoter = require('../promoteDecision.js');
 
-const DB_URL = process.env.ASDAIR_DB_URL;
+const DB_URL = process.env.ASDAIR_WRITE_DB_URL;
 const OPTED_IN = destructiveTestsEnabled();
 
 const gate = (OPTED_IN && DB_URL)
   ? { skip: false }
   : { skip: !OPTED_IN
       ? 'ASDAIR_DB_TEST_ALLOW_DESTRUCTIVE not set to 1|true -- destructive Postgres outcome test skipped (no-op)'
-      : 'ASDAIR_DB_URL not set -- Postgres outcome test skipped (no-op)' };
+      : 'ASDAIR_WRITE_DB_URL not set -- Postgres outcome test skipped (no-op)' };
 
 const DB_DIR = path.join(__dirname, '..', '..', 'db');
 const MIGRATIONS = ['001_asdair_schema.sql', '004_asdair_regulars.sql'];
 
 test('asdair outcome path: clean Postgres -> migrations -> record a shop -> promote a decision', gate, async function (t) {
-  // The gate proved the operator explicitly opted in AND ASDAIR_DB_URL is
+  // The gate proved the operator explicitly opted in AND ASDAIR_WRITE_DB_URL is
   // set. SECONDARY defence-in-depth: refuse an obviously-live target before
   // opening any connection or running any DDL.
   assertSafeDbTarget(DB_URL);
@@ -99,7 +99,7 @@ test('asdair outcome path: clean Postgres -> migrations -> record a shop -> prom
         throw new Error(
           'ABORT: asdair.households already exists and contains ' + existing +
           ' row(s) BEFORE seeding. This test DROPs and recreates the literal `asdair` schema and ' +
-          'refuses to clobber a pre-existing, non-test copy. Point ASDAIR_DB_URL at a throwaway ' +
+          'refuses to clobber a pre-existing, non-test copy. Point ASDAIR_WRITE_DB_URL at a throwaway ' +
           'Postgres with no real asdair data.'
         );
       }
@@ -183,7 +183,7 @@ test('asdair outcome path: clean Postgres -> migrations -> record a shop -> prom
         }
       });
 
-      // Uses the module's own pool, built from ASDAIR_DB_URL -- the real path.
+      // Uses the module's own pool, built from ASDAIR_WRITE_DB_URL -- the real path.
       orderId = await recorder.recordShopOutcome(outcome);
       assert.ok(orderId, 'an order id is returned');
 

@@ -38,7 +38,7 @@
 //   checked HERE first so the failure is a clear message, not a 23514.
 //
 // SECRETS:
-//   * The connection string comes ONLY from process.env.ASDAIR_DB_URL, the
+//   * The connection string comes ONLY from process.env.ASDAIR_WRITE_DB_URL, the
 //     same convention as skill/data.js. Never hardcoded, never logged.
 //
 // PURE ASCII only.
@@ -70,9 +70,9 @@ let pool = null;
 
 function getPool() {
   if (pool) return pool;
-  const url = process.env.ASDAIR_DB_URL;
+  const url = process.env.ASDAIR_WRITE_DB_URL;
   if (!url || String(url).trim() === '') {
-    throw new Error('ASDAIR_DB_URL is not set. Export the asdair Postgres connection string as ASDAIR_DB_URL before recording a decision.');
+    throw new Error('ASDAIR_WRITE_DB_URL is not set. Export the asdair Postgres connection string as ASDAIR_WRITE_DB_URL before recording a decision.');
   }
   const { Pool } = require('pg');
   pool = new Pool({ connectionString: url });

@@ -167,15 +167,15 @@ test('a null occurred_at defers to the database default rather than writing NULL
   assert.match(_internal.EVENT_INSERT_SQL, /COALESCE\(\$4::timestamptz, now\(\)\)/);
 });
 
-test('no connection string is ever hardcoded; ASDAIR_DB_URL is the only env var read', function () {
+test('no connection string is ever hardcoded; ASDAIR_WRITE_DB_URL is the only env var read', function () {
   const src = fs.readFileSync(path.join(__dirname, 'recordShopOutcome.js'), 'utf8');
   assert.equal(/postgres(ql)?:\/\//.test(src), false, 'no connection string literal in the writer');
   const envReads = src.match(/process\.env\.[A-Z_]+/g) || [];
-  assert.deepEqual(Array.from(new Set(envReads)), ['process.env.ASDAIR_DB_URL']);
+  assert.deepEqual(Array.from(new Set(envReads)), ['process.env.ASDAIR_WRITE_DB_URL']);
 });
 
-test('with no ASDAIR_DB_URL configured the writer refuses clearly instead of guessing', {
-  skip: process.env.ASDAIR_DB_URL ? 'ASDAIR_DB_URL is set in this environment' : false
+test('with no ASDAIR_WRITE_DB_URL configured the writer refuses clearly instead of guessing', {
+  skip: process.env.ASDAIR_WRITE_DB_URL ? 'ASDAIR_WRITE_DB_URL is set in this environment' : false
 }, async function () {
-  await assert.rejects(recordShopOutcome(OUTCOME), /ASDAIR_DB_URL is not set/);
+  await assert.rejects(recordShopOutcome(OUTCOME), /ASDAIR_WRITE_DB_URL is not set/);
 });
