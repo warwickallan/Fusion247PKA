@@ -60,7 +60,10 @@ from the dev bot and the Tower bot. **Never cross the tokens.**
 > request, it must be handed the payload, not given the token.
 
 **Handwritten lists:** transcription is done by vision, in-context — there is no separate OCR service. Transcribe
-to structured items, then normalise via `services/asdair/skill/listNormaliser.js`.
+**every** line to structured items, then normalise via `services/asdair/skill/listNormaliser.js`. Dedupe repeat
+sends of the same list, and ignore anything from a sender outside the allowlist. Store the photo reference and the
+raw transcription on the `asdair.shopping_lists` row, so a later dispute about "was that on the list?" is settled
+by the record rather than by memory.
 
 ## 2. Plan
 
@@ -76,12 +79,30 @@ Connection comes from `ASDAIR_DB_URL` in the environment only, never on the comm
 Resolution is **offline** against `asdair.regulars` and `asdair.products` — do not scrape the live site to work
 out what an item means. That was the original slow path and it is solved.
 
+Also load **the last order** as part of the planning inputs. Some regulars rotate deliberately (a different
+variant each week), and rotation cannot be resolved without knowing what the previous shop actually contained.
+The rotation itself is item-specific, so it lives as `rules`/`regulars` rows — this SOP only records that the
+last order is a required *input*, not an optional nicety.
+
+Anything the plan cannot resolve from regulars, `aka` aliases or rules is **genuinely new** and goes to step 3.
+
+**Multibuy round-ups.** Where a multibuy makes the extra unit **50% or more off**, offering the round-up is
+reasonable domain guidance rather than an assumption — surface it as an offer, never apply it silently. Like every
+other planning behaviour, it only changes a basket once it exists as a structured `rules` row; written here alone
+it is guidance for whoever encodes it, not an active rule.
+
 ## 3. Human approval
 
 The plan returns a `needs_decision` queue. **Never auto-substitute** (standing rule 6). Surface alternatives and
 let a human choose. Budget breaches **flag, never block** (rule 7).
 
-Every answer given here is a learning event — carry it to step 6.
+**Ask once.** Collect every open question — genuinely-new items, ambiguous lines, unresolved alternatives — and
+put them to the shopper bot as **one batch**, then wait. Do not drip-feed questions one at a time across the shop;
+that is the pattern that makes a shop feel like an interrogation and stretches a ten-minute job across an evening.
+
+Every answer given here is a learning event — carry it to step 6. Capture the answer as a `rules` row and, where
+the answer was really "this name means that product", as an `aka` alias too, **so the same question is never asked
+twice**. An answer that only lives in the conversation will be asked again next week.
 
 ## 4. Shop
 
@@ -94,6 +115,8 @@ cannot open the extension sidebar.
   individual adds only. Use Regulars.
 - **Sort A–Z** and do a **full single pass**: tick every match, then one bulk add. Do not scroll-hunt and do not
   switch views mid-pass — the grid reshuffles and resets sort. Two-at-a-time is a fallback only.
+  (**Open question:** the superseded database copy of this method specified sort by **BRAND** A–Z, both for the
+  grid and for the order of the resolved basket. See "Open questions" below — unresolved, do not silently pick one.)
 - The grid **will not scroll by wheel or keyboard.** `scroll_to` on an element ref is the scroll lever. The DOM
   **accumulates** loaded items, so: scroll until everything is loaded, `read_page` the accessibility tree **once**
   (persist to a file if large and parse it for checkbox refs), then batch-click every target ref and add in one go.
@@ -104,14 +127,41 @@ cannot open the extension sidebar.
 > **The real cause of a failed bulk add is a single OUT-OF-STOCK item silently rejecting the WHOLE batch.** It is
 > not batch size, and it is not an expired delivery slot (that theory was tested and is wrong). Out-of-stock items
 > still appear in Regulars/Favourites. If a bulk add fails, split the batch only to isolate and drop the
-> out-of-stock item, then resume the full pass.
+> out-of-stock item, then resume the full pass. **Dropping is the action — never auto-substitute the missing
+> item.** Use an already-approved fallback if one exists; otherwise flag the alternatives for a human (step 3).
 
 **Never book a delivery slot. Never check out.** The goal is a checkout-ready basket and nothing further
 (standing rule 8). Payment and any consequential purchase remain Warwick's gate.
 
 ## 5. Reconcile, then RECORD
 
-On the trolley page, do a line-by-line quantity reconcile and **untick "Allow substitutions for all."**
+On the trolley page, do a line-by-line quantity reconcile, then set substitutions, then record. Order matters —
+substitutions are set **last, after the audit passes**, so they are set against the basket that actually exists.
+
+**Auditing quantities — two traps, both learned the hard way:**
+
+> **Read the actual quantity field. NEVER infer quantity from price.** Multibuys and offers distort the line
+> price, so "the price looks about right" is not evidence that the quantity is right. Read the qty each line
+> actually carries.
+
+> **Fix quantities with the `+` / `−` STEPPER buttons. Typing into the quantity text field does NOT persist
+> server-side.** The number changes on screen and the basket does not change underneath it — a silent
+> corruption that survives every visual check and only shows up when the shop arrives wrong. This is the single
+> most expensive non-obvious fact in this SOP.
+
+Diff every line against the original list: right product, right quantity, exclusions actually omitted,
+substitutions and out-of-stock drops flagged. Check the total against the GBP 120–150 band and flag if outside
+(rule 7 — flag, never block).
+
+**Then set substitutions:**
+
+- **untick "Allow substitutions for all"**, and
+- set the **per-item** substitution flag from each product's `substitutes_allowed`.
+
+Unticking the global toggle alone is not the whole job — it makes the default safe, but items that are genuinely
+fine to substitute stay durable state in the database, and the per-item settings are how that state reaches the
+basket. **Never auto-substitute** (standing rule 6) still governs everything the *planner* does; this step is
+only about honouring already-recorded per-product permissions on the ASDA page.
 
 Then write what *actually* happened — not what was planned:
 
@@ -133,7 +183,52 @@ each answer. Use `services/asdair/outcome/promoteDecision.js`.
 
 ## 7. Confirm
 
-Ping "basket ready" back through the shopper bot. Warwick reviews and completes any purchase himself.
+Ping back through the shopper bot. Warwick reviews and completes any purchase himself. Two standard messages,
+used verbatim so they are instantly recognisable on a phone:
+
+- Success (trolley confirmed against the original list): **"You are ready to check out at Asda!"**
+- Stuck at any point, at any step: **"Larry is stuck in Asda!"**
+
+Follow the success ping with the summary: item count, total, substitutions, out-of-stock items, and anything
+still needing a decision.
+
+---
+
+## Provenance of the operational detail above
+
+A parallel copy of this method lived as 21 rows in `asdair.skill_steps` (version 1). The genuinely useful,
+non-duplicated knowledge in it was folded into this SOP on **2026-07-27**; the two points where it conflicted with
+this SOP or with the standing rules are recorded below rather than resolved.
+
+That copy breached the function/state split — **Git owns the METHOD, Postgres owns the STATE** — and a fresh Asdair
+instance found it by introspection and correctly reported it as an SSOT violation. **Git (this file) is now the sole
+home of the method.** The database copy is being superseded separately. If a future instance finds a method table in
+the `asdair` schema, this file wins; report the table rather than following it.
+
+## Open questions — raised 2026-07-27, NOT resolved here
+
+Both come from the rescued database copy. They are recorded as questions on purpose: neither is a call for a worker
+or for Larry to make.
+
+**1. Sort order — BRAND A–Z or plain A–Z?** §4 above says sort A–Z. The database copy said sort **BRAND** A–Z, and
+also that the resolved basket should be output sorted by brand. These may be the same intent loosely worded, or the
+brand sort may be a deliberate refinement that made the single-pass tick reliable. Unknown which. Whoever knows the
+answer should settle it in §4 and delete this entry.
+
+**2. SAFETY CONFLICT — "substitute Banana -> Strawberry".** ⚠️ The database copy's resolution step instructed
+*"substitute Banana -> Strawberry"*. This cannot be taken at face value:
+
+- **Standing rule 6 is "NEVER auto-substitute"** (`services/asdair/skill/README.md`).
+- Live rules (reported as rules 17 and 26) **hard-exclude Banana Yazoo**.
+- So a fresh instance trusting the database method could add an item that a standing rule permanently excludes.
+
+There is a reading in which it is entirely legitimate: the rule model has a **`map` directive** (a learned
+"this list line means that product" mapping) which is a *different mechanism* from an out-of-stock auto-substitution,
+and "always give me the strawberry one, never the banana one" is exactly what a `map` plus an `exclude` express
+together. There is also a reading in which it is a genuine safety bug in the database copy.
+
+**Which one it is is a domain judgement for Warwick — it is not the worker's or Larry's to make.** Neither reading
+is encoded above as fact. Until Warwick rules, treat any banana/strawberry line as `needs_decision` and ask.
 
 ---
 
