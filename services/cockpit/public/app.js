@@ -221,6 +221,12 @@ createApp({
       try { const r = await fetch('/api/mine', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ video: s.video_id }) }); const d = await r.json(); if (!d.ok) throw new Error(d.error); s._mined = true; setTimeout(() => { s._mined = false; }, 6000); }
       catch (e) { s._mineErr = e.message; } finally { s._mining = false; }
     }
+    const synthing = ref(false); const synthMsg = ref(null);
+    async function synthesise() {
+      synthing.value = true; synthMsg.value = null;
+      try { const r = await fetch('/api/synthesise', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }); const d = await r.json(); if (!d.ok) throw new Error(d.error); synthMsg.value = 'Mason is synthesising — new opportunities appear here in a few minutes. Tap ↻ to check.'; }
+      catch (e) { synthMsg.value = 'Failed: ' + e.message; } finally { synthing.value = false; }
+    }
     async function ideaDecide(it, decision) {
       busy.value = true; it._error = null;
       try {
@@ -260,7 +266,7 @@ createApp({
       kindOf, catLabel, moduleLabel, oneLine, ago, terse, impactStars, outputTitle, humanValue, humanPoints, spinOf, mdToHtml, notifyMark, build, housekeeping, host, when,
       deliverables, openDeliverable, copyDoc, downloadDoc, downloadTranscript, download, copyText,
       attn, deferred, archived, blocked, decisions, suggestions, needsYou, ideaCat, ideasBrain, ideasCash, latest, toneOf,
-      tiBrain, tiCash, tiSpin, tiStars, mine, ideaDecide, opps, opportunityDecide,
+      tiBrain, tiCash, tiSpin, tiStars, mine, ideaDecide, opps, opportunityDecide, synthesise, synthing, synthMsg,
       outputs, newOutputs, itemsAdded, jobsFound, wins, builds,
       statusTone, statusLine, tiles, go, open, closeDetail, decide, copyTranscript, primaryAction, load, REPORT, GRAPH,
     };
@@ -341,8 +347,11 @@ createApp({
       <section v-else-if="area==='outputs'" class="pane">
         <header class="p-h"><h1>Outputs</h1></header>
 
-        <div class="grp" v-if="opps.length">
-          <h2>🎯 Opportunities<span class="g-count">{{ opps.length }}</span><span class="lane-sub">Mason — joined-up build theses, not single ideas</span></h2>
+        <div class="grp">
+          <h2>🎯 Opportunities<span class="g-count">{{ opps.length }}</span><span class="lane-sub">Mason — joined-up build theses, not single ideas</span>
+            <button class="act" style="margin-left:auto" :disabled="synthing" @click="synthesise()">{{ synthing ? '…' : '🧩 Synthesise' }}</button></h2>
+          <div v-if="synthMsg" class="i-why" style="margin-bottom:9px">{{ synthMsg }}</div>
+          <div v-if="!opps.length" class="empty">No opportunities surfaced yet — tap <b>🧩 Synthesise</b> to have Mason converge the idea estate.</div>
           <div v-for="o in opps" :key="o.id" class="item blue opp">
             <div class="i-main">
               <div class="i-eyebrow">{{ o.otype==='strategic' ? '🧭 strategic' : '🔧 self-improvement' }} · {{ o.roi && o.roi.band ? o.roi.band+' ROI / '+o.roi.value_type : '' }} · {{ o.atoms ? o.atoms.length : 0 }} ideas

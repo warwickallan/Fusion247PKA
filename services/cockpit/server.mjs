@@ -204,6 +204,15 @@ const server = http.createServer(async (req, res) => {
       });
       return;
     }
+    if (req.url.startsWith('/api/synthesise') && req.method === 'POST') {
+      // Fire Mason's synthesis over the whole atom estate, detached (one Sonnet pass, ~5 min) — surfaced
+      // opportunities appear in /api/state when done. This is the cockpit trigger for lifecycle Step 4.
+      try {
+        const p = spawn('node', ['--env-file=C:/.fusion247/fusion-capture-gateway.env', `${REPO}/services/control-plane/cockpit/mason-synthesise.mjs`], { detached: true, stdio: 'ignore', cwd: REPO });
+        p.unref();
+        return j(res, 200, { ok: true, synthesising: true });
+      } catch (e) { return j(res, 500, { ok: false, error: e.message }); }
+    }
     if (req.url.startsWith('/api/opportunity-decide') && req.method === 'POST') {
       let raw = ''; req.on('data', (d) => { raw += d; if (raw.length > 1e4) req.destroy(); });
       req.on('end', async () => {
