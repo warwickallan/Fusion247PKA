@@ -112,6 +112,25 @@ test('a near-miss heading does not satisfy the claims section', () => {
   assert.deepEqual(r.missingIds, ['claims_confidence']);
 });
 
+test('merely naming Fusion247 does not satisfy the implications section', () => {
+  // Warwick's ruling, 2026-07-27: a heading that only MENTIONS Fusion247 is not an implications section. The
+  // contract wants source content separated from Fusion247 interpretation (§205) and Fusion247 relevance (§239).
+  const r = validateNoteStructure(
+    noteFrom(CANONICAL.map((h) => (h === '## What this means for Fusion247' ? '## Fusion247 background' : h))),
+  );
+  assert.equal(r.ok, false);
+  assert.deepEqual(r.missingIds, ['fusion247_implications']);
+});
+
+test('the implications section still accepts contract wording, not just the canonical heading', () => {
+  for (const heading of ['## What this means for Fusion247', '## Fusion247 relevance', '## Implications for F247']) {
+    const r = validateNoteStructure(
+      noteFrom(CANONICAL.map((h) => (h === '## What this means for Fusion247' ? heading : h))),
+    );
+    assert.equal(r.ok, true, `expected "${heading}" to satisfy fusion247_implications`);
+  }
+});
+
 test('sections reports every required section in canonical order, present or not', () => {
   const r = validateNoteStructure(noteWithout('Executive orientation'));
   assert.deepEqual(r.sections.map((s) => s.id), REQUIRED_SECTIONS.map((s) => s.id));

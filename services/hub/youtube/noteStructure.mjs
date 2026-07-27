@@ -6,8 +6,13 @@
 // enforceable version of that requirement: pure, dependency-free, no I/O, no LLM.
 //
 // It validates STRUCTURE ONLY — that each required section is present as a markdown heading. It deliberately
-// does NOT judge the prose inside a section (not-a-dump, not-a-thin-summary, provenance, backlinks, review
-// state and the other §8 quality properties are outside a structural gate's remit).
+// does NOT judge the prose inside a section (not-a-dump, not-a-thin-summary, review state and the other §8
+// quality properties are outside a structural gate's remit).
+//
+// SCOPE RULING (Warwick, 2026-07-27): the required set is TEN structural sections. The contract's other two
+// note requirements — provenance/metadata (§200) and related-notes/backlinks (§206, §240) — are NOT headings and
+// are deliberately NOT validated here; they are frontmatter and inline-link properties needing their own separate
+// validation. Do not invent headings merely to raise the count to 11 or 12.
 //
 //   import { validateNoteStructure, REQUIRED_SECTIONS } from './noteStructure.mjs';
 //   const r = validateNoteStructure(noteMarkdown);
@@ -72,7 +77,13 @@ export const REQUIRED_SECTIONS = Object.freeze([
     id: 'fusion247_implications',
     label: 'What this means for Fusion247',
     canonicalHeading: '## What this means for Fusion247',
-    patterns: [/\bfusion ?247\b/, /\bf247\b/],
+    // Naming Fusion247 is NOT enough. The contract requires the note to separate source content from Fusion247
+    // *interpretation* (§205) and to carry Fusion247 *relevance* (§239) — so the heading must name both Fusion247
+    // and the implication dimension. "## Fusion247 background" is a mention, not an implications section, and
+    // must fail. Same two-anchor shape as `claims_confidence` above.
+    patterns: [
+      /^(?=.*(\bfusion ?247\b|\bf247\b))(?=.*(\bmeans\b|\bimplicat|\brelevance\b|\brelevant\b|\binterpretation\b|\bapplies\b|\bapplication\b))/,
+    ],
   },
   {
     id: 'key_takeaways',
