@@ -253,6 +253,7 @@ createApp({
         const r = await fetch('/api/opportunity-decide', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: o.id, decision }) });
         const res = await r.json(); if (!res.ok) throw new Error(res.error || 'failed');
         o._done = { watch: 'Watching', research: 'Pax queued →', brief: 'Brief queued →', later: 'Later', decline: 'Declined' }[decision];
+        if (detail.value && detail.value.id === o.id) closeDetail(); // acted from the detail sheet → return to the refreshed lane
         await load();
       } catch (e) { o._error = e.message; } finally { busy.value = false; }
     }
@@ -368,38 +369,14 @@ createApp({
             <button class="act" style="margin-left:auto" :disabled="synthing" @click="synthesise()">{{ synthing ? '…' : '🧩 Synthesise' }}</button></h2>
           <div v-if="synthMsg" class="i-why" style="margin-bottom:9px">{{ synthMsg }}</div>
           <div v-if="!opps.length" class="empty">No opportunities surfaced yet — tap <b>🧩 Synthesise</b> to have Mason converge the idea estate.</div>
-          <div v-for="o in opps" :key="o.id" class="item blue opp">
-            <div class="i-main">
-              <div class="i-eyebrow">{{ o.otype==='strategic' ? '🧭 strategic' : '🔧 self-improvement' }} · {{ o.roi && o.roi.band ? o.roi.band+' ROI / '+o.roi.value_type : '' }} · {{ o.atoms ? o.atoms.length : 0 }} ideas
-                <span v-if="o.disposition && !o.disposition_conflict" class="opp-disp">your call: {{ o.disposition }}</span>
-                <span v-if="o.disposition_conflict" class="opp-conflict">⚠ evidence changed — re-confirm your call</span>
-              </div>
-              <div class="i-title">{{ o.headline }}</div>
-              <div v-if="o.spin" class="i-why">{{ oneLine(o.spin.problem) }}</div>
+          <div class="lane-scroll">
+          <div v-for="o in opps" :key="o.id" class="item blue">
+            <div class="i-main" @click="open(o,'opp')">
+              <div class="i-eyebrow">{{ o.otype==='strategic' ? '🧭 strategic' : '🔧 self-improvement' }}<template v-if="o.roi && o.roi.band"> · {{ o.roi.band }} ROI / {{ o.roi.value_type }}</template> · {{ o.atoms ? o.atoms.length : 0 }} ideas<span v-if="o.disposition && !o.disposition_conflict" class="opp-disp"> · your call: {{ o.disposition }}</span><span v-if="o.disposition_conflict" class="opp-conflict"> · ⚠ re-confirm</span></div>
+              <div class="i-title">{{ terse(o.headline) }}</div>
             </div>
-            <div class="opp-body">
-              <div v-if="o.spin"><b>Situation.</b> {{ o.spin.situation }}</div>
-              <div v-if="o.spin"><b>Implication.</b> {{ o.spin.implication }}</div>
-              <div v-if="o.spin"><b>Need-payoff.</b> {{ o.spin.need_payoff }}</div>
-              <div v-if="o.why_now"><b>Why now.</b> {{ o.why_now }}</div>
-              <div v-if="o.roi && o.roi.note"><b>ROI.</b> {{ o.roi.note }}</div>
-              <div v-if="o.evidence"><b>Evidence.</b> {{ o.evidence.independent_sources }} sources · {{ o.evidence.frames }} frames{{ o.evidence.live_anchors && o.evidence.live_anchors.length ? ' · '+o.evidence.live_anchors.join('; ') : '' }}</div>
-              <div v-if="o.what_wed_build"><b>What we'd build.</b> {{ o.what_wed_build }}</div>
-              <details v-if="o.atoms && o.atoms.length"><summary>Provenance — {{ o.atoms.length }} supporting ideas</summary>
-                <div v-for="a in o.atoms" :key="a.n" class="opp-atom">#{{ a.n }} <span class="mono">{{ a.source }} · {{ a.engine }}</span> — {{ a.situation || a.target }}</div>
-              </details>
-              <div class="i-act">
-                <span v-if="o._done" class="done-pill">✅ {{ o._done }}</span>
-                <template v-else>
-                  <button class="act" :disabled="busy" @click="opportunityDecide(o,'watch')">Keep watching</button>
-                  <button class="act accept" :disabled="busy" @click="opportunityDecide(o,'research')">Research w/ Pax</button>
-                  <button class="act accept" :disabled="busy" @click="opportunityDecide(o,'brief')">Build brief</button>
-                  <button class="act defer" :disabled="busy" @click="opportunityDecide(o,'later')">Later</button>
-                  <button class="act decline" :disabled="busy" @click="opportunityDecide(o,'decline')">Decline</button>
-                </template>
-              </div>
-              <div v-if="o._error" class="i-why err">{{ o._error }}</div>
-            </div>
+            <span class="chev">›</span>
+          </div>
           </div>
         </div>
 
@@ -504,8 +481,8 @@ createApp({
   <div v-if="detail" class="sheet" @click.self="closeDetail">
     <div class="sheet-card">
       <button class="back" @click="closeDetail">‹ Back</button>
-      <div class="d-eyebrow">{{ detail._as==='doc' ? 'Deliverable' : detail._as==='idea' ? ((detail.category==='cash'?'💰 Cash':'🧠 Brain')+' idea · '+tiStars(detail)+' impact') : (detail._as==='output' ? (moduleLabel(detail.source_module)+' · output') : catLabel(detail)) }}</div>
-      <h1>{{ detail._as==='output' ? outputTitle(detail) : detail._as==='idea' ? terse(tiSpin(detail).situation, 110) : detail.title }}</h1>
+      <div class="d-eyebrow">{{ detail._as==='doc' ? 'Deliverable' : detail._as==='idea' ? ((detail.category==='cash'?'💰 Cash':'🧠 Brain')+' idea · '+tiStars(detail)+' impact') : detail._as==='opp' ? ('🎯 Opportunity — Mason'+(detail.roi&&detail.roi.band?' · '+detail.roi.band+' ROI / '+detail.roi.value_type:'')+' · '+(detail.atoms?detail.atoms.length:0)+' ideas') : (detail._as==='output' ? (moduleLabel(detail.source_module)+' · output') : catLabel(detail)) }}</div>
+      <h1>{{ detail._as==='output' ? outputTitle(detail) : detail._as==='idea' ? terse(tiSpin(detail).situation, 110) : detail._as==='opp' ? detail.headline : detail.title }}</h1>
 
       <template v-if="detail._as==='doc'">
         <div v-if="detail._error" class="err">{{ detail._error }}</div>
@@ -552,6 +529,33 @@ larry reconciliation: {{ detail.larry_recon ? JSON.stringify(detail.larry_recon)
 source: {{ detail.source_title }} ({{ detail.source_ref }}) · {{ detail.mine_model }}
 brief_hash: {{ detail.brief_hash }} · mine: {{ detail.mine_id }}</div></div>
         </details>
+      </template>
+
+      <template v-else-if="detail._as==='opp'">
+        <div v-if="detail.disposition_conflict" class="opp-conflict" style="margin-bottom:8px">⚠ evidence changed since you last looked — worth re-confirming your call</div>
+        <div v-else-if="detail.disposition" class="opp-disp" style="margin-bottom:8px">your call so far: {{ detail.disposition }}</div>
+        <div v-if="detail.spin" class="read">
+          <h3>Situation</h3><p>{{ detail.spin.situation }}</p>
+          <h3>Problem</h3><p>{{ detail.spin.problem }}</p>
+          <h3>Implication — why it matters</h3><p>{{ detail.spin.implication }}</p>
+          <h3>Need-payoff — what gets better</h3><p>{{ detail.spin.need_payoff }}</p>
+          <template v-if="detail.why_now"><h3>Why now</h3><p>{{ detail.why_now }}</p></template>
+          <template v-if="detail.roi && detail.roi.note"><h3>ROI</h3><p>{{ detail.roi.note }}</p></template>
+          <template v-if="detail.evidence"><h3>Evidence</h3><p>{{ detail.evidence.independent_sources }} sources · {{ detail.evidence.frames }} frames{{ detail.evidence.live_anchors && detail.evidence.live_anchors.length ? ' · '+detail.evidence.live_anchors.join('; ') : '' }}</p></template>
+          <template v-if="detail.what_wed_build"><h3>What we'd build</h3><p>{{ detail.what_wed_build }}</p></template>
+        </div>
+        <details v-if="detail.atoms && detail.atoms.length" class="tech"><summary>Provenance — {{ detail.atoms.length }} supporting ideas</summary>
+          <div class="tech-body"><div v-for="a in detail.atoms" :key="a.n" class="opp-atom">#{{ a.n }} <span class="mono">{{ a.source }} · {{ a.engine }}</span> — {{ a.situation || a.target }}</div></div>
+        </details>
+        <div class="d-actions" v-if="!detail._done">
+          <button class="act" :disabled="busy" @click="opportunityDecide(detail,'watch')">Keep watching</button>
+          <button class="act accept" :disabled="busy" @click="opportunityDecide(detail,'research')">Research w/ Pax</button>
+          <button class="act accept" :disabled="busy" @click="opportunityDecide(detail,'brief')">Build brief</button>
+          <button class="act defer" :disabled="busy" @click="opportunityDecide(detail,'later')">Later</button>
+          <button class="act decline" :disabled="busy" @click="opportunityDecide(detail,'decline')">Decline</button>
+        </div>
+        <div v-else class="done-pill">✅ {{ detail._done }}</div>
+        <div v-if="detail._error" class="err">{{ detail._error }}</div>
       </template>
 
       <template v-else>
