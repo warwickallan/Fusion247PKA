@@ -4,8 +4,8 @@
 // (RAW immutability + one write authority) → flips cockpit.youtube_source pending→noted. No hand-authoring, no new
 // agent (Cairn owns Source Intelligence). Failure is EXPLICIT + retryable: an incomplete/invalid note is never
 // persisted or marked complete, and the DB stays 'pending'.
-//   node --env-file=C:/.fusion247/fusion-capture-gateway.env services/hub/youtube/generate-source-note.mjs --video=<id> [--out=out/auto] [--force] [--dry]
-// Also exports generateSourceNote({ video, out, force, dry }) for the live watcher (returns a result; never exits).
+//   node --env-file=C:/.fusion247/fusion-capture-gateway.env services/hub/youtube/generate-source-note.mjs --video=<id> [--out=out/auto] [--dry]
+// Also exports generateSourceNote({ video, out, dry }) for the live watcher (returns a result; never exits).
 import fs from 'node:fs';
 import path from 'node:path';
 import pg from 'file:///C:/Fusion247PKA/services/control-plane/node_modules/pg/lib/index.js';
@@ -102,7 +102,7 @@ function gatewayDsn() {
 
 // Generate + (unless dry) persist the standalone knowledge note for one video. Returns a RESULT object; never
 // exits the process. Failure => { ok:false, retryable, reason } and the DB is left 'pending' (nothing persisted).
-export async function generateSourceNote({ video, out = 'out/auto', force = false, dry = false }) {
+export async function generateSourceNote({ video, out = 'out/auto', dry = false }) {
   if (!video) return { ok: false, retryable: false, reason: 'no video id' };
   // Locate the TubeAIR packet (newest matching + manifest.video_id equality — never file a stale/mismatched packet).
   const PACKET = `C:/Fusion247PKA/tools/tubeair/${out}`;
@@ -158,8 +158,8 @@ if (isCli) {
   const arg = (n, d) => { const a = args.find((x) => x.startsWith(`--${n}=`)); return a ? a.split('=').slice(1).join('=') : d; };
   const flag = (n) => args.includes(`--${n}`);
   const video = arg('video');
-  if (!video) { console.error('usage: --video=<id> [--out=out/auto] [--force] [--dry]'); process.exit(2); }
-  generateSourceNote({ video, out: arg('out', 'out/auto'), force: flag('force'), dry: flag('dry') })
+  if (!video) { console.error('usage: --video=<id> [--out=out/auto] [--dry]'); process.exit(2); }
+  generateSourceNote({ video, out: arg('out', 'out/auto'), dry: flag('dry') })
     .then((r) => {
       if (!r.ok) { console.error(`[note] ${r.retryable ? 'FAILED (retryable — DB left pending)' : 'REFUSED'}: ${r.reason}`); process.exit(1); }
       console.log(JSON.stringify(r, null, 2));

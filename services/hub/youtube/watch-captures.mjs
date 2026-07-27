@@ -122,18 +122,26 @@ async function generatePendingNotes() {
   }
 }
 
-// Option C (Warwick): nudge ONCE per video whose note generation has EXHAUSTED its bounded retries, so a
-// genuinely-failing source doesn't sit silently. Transient failures self-heal via generatePendingNotes and never
-// nudge. Idempotent via pending_nudged_at — a re-scan never re-nudges. Best-effort: a ding failure never breaks
-// the scan loop.
+// Option C (Warwick): nudge ONCE per video that is genuinely STUCK — either extraction has exhausted its bounded
+// retries (caption-less video: raw_path null) OR note generation has exhausted its bounded retries (extracted but
+// note_path still null). Transient failures self-heal (extract/generatePendingNotes retry) and never nudge — only
+// exhaustion does, so nothing sits silently. Idempotent via pending_nudged_at. Best-effort: a ding failure never
+// breaks the scan loop.
 async function nudgePending() {
   let pend;
   try {
-    pend = (await db.query(`select video_id, title from cockpit.youtube_source where note_path is null and note_attempts >= $1 and pending_nudged_at is null order by created_at`, [MAX_NOTE_ATTEMPTS])).rows;
-  } catch (e) { return; } // columns may not exist yet if migrations 170/280 not applied
+    pend = (await db.query(
+      `select video_id, title,
+              (raw_path is null and extract_attempts >= $1) as extract_failed
+         from cockpit.youtube_source
+        where pending_nudged_at is null
+          and ((raw_path is null and extract_attempts >= $1)
+               or (raw_path is not null and note_path is null and note_attempts >= $2))
+        order by created_at`, [3, MAX_NOTE_ATTEMPTS])).rows;
+  } catch (e) { return; } // columns may not exist yet if migrations 170/220/280 not applied
   if (!pend.length) return;
-  const lines = pend.map((p) => `• ${p.title || p.video_id}`).join('\n');
-  const msg = `📝 ${pend.length} YouTube link(s) extracted but the standalone note did not generate (will retry automatically; flag me if it persists):\n${lines}`;
+  const lines = pend.map((p) => `• ${p.title || p.video_id} — ${p.extract_failed ? 'transcript extraction failed' : 'note generation failed'}`).join('\n');
+  const msg = `📝 ${pend.length} YouTube link(s) are STUCK after automatic retries (flag me and I'll look):\n${lines}`;
   const tmp = path.join(os.tmpdir(), `yt-nudge-${pend.map((p) => p.video_id).join('-').slice(0, 40)}.txt`);
   try {
     fs.writeFileSync(tmp, msg);

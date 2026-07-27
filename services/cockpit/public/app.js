@@ -269,6 +269,13 @@ createApp({
     // Primary governed action for an item (accept fires it). Brain items carry explicit actions[]; if
     // an item has a first action we treat Accept as "do it", else Accept is a plain acknowledge.
     const primaryAction = (it) => (Array.isArray(it.actions) && it.actions.length ? it.actions.find((a) => a.key === 'accept' || a.key === 'merge') || it.actions[0] : null);
+    // Human-readable status for an ingested source — a STUCK source must never read "generating…" forever.
+    const sourceStatus = (s) => {
+      if (s.noted) return 'standalone note ready · ' + ago(s.updated_at) + ' ago';
+      if (!s.extracted && (s.extract_attempts || 0) >= 3) return '⚠ transcript extraction failed — flagged';
+      if (s.extracted && (s.note_attempts || 0) >= 3) return '⚠ note generation failed — flagged';
+      return 'note generating…';
+    };
 
     return {
       AREAS, state, area, detail, busy, loading, loadErr,
@@ -277,7 +284,7 @@ createApp({
       attn, deferred, archived, blocked, decisions, suggestions, needsYou, ideaCat, ideasBrain, ideasCash, latest, toneOf,
       tiBrain, tiCash, tiSpin, tiStars, mine, ideaDecide, opps, opportunityDecide, synthesise, synthing, synthMsg,
       outputs, newOutputs, itemsAdded, jobsFound, wins, builds,
-      statusTone, statusLine, tiles, go, open, closeDetail, decide, copyTranscript, primaryAction, load, REPORT, GRAPH,
+      statusTone, statusLine, tiles, go, open, closeDetail, decide, copyTranscript, primaryAction, sourceStatus, load, REPORT, GRAPH,
     };
   },
   template: `
@@ -421,7 +428,7 @@ createApp({
           <div v-if="!(state.ingested||[]).length" class="empty">Nothing ingested yet.</div>
           <div class="lane-scroll">
           <div v-for="s in (state.ingested||[])" :key="s.video_id" class="item grey">
-            <div class="i-main" style="cursor:pointer" @click="openBrief(s)"><div class="i-title">{{ terse(s.title || s.video_id) }}</div><div class="i-why" :class="{err:s._copyErr}">{{ s._copyErr ? s._copyErr : (s.noted ? ('standalone note ready · ' + ago(s.updated_at) + ' ago') : 'note generating…') }}</div></div>
+            <div class="i-main" style="cursor:pointer" @click="openBrief(s)"><div class="i-title">{{ terse(s.title || s.video_id) }}</div><div class="i-why" :class="{err:s._copyErr}">{{ s._copyErr ? s._copyErr : sourceStatus(s) }}</div></div>
             <div class="i-act"><button class="act accept" @click="openBrief(s)">📖 Read</button><button class="act" :disabled="busy" @click="copyTranscript(s)" title="copy raw transcript">{{ s._copied ? '✓' : '⧉' }}</button><button class="act" @click="downloadTranscript(s)" title="download raw transcript">⭳</button></div>
           </div>
           </div>
@@ -446,7 +453,7 @@ createApp({
           <h2>Recently ingested<span class="lane-sub">captured &amp; processed — read the brief, or mine it for ideas</span></h2>
           <div v-if="!(state.ingested||[]).length" class="empty">Nothing ingested yet.</div>
           <div v-for="s in (state.ingested||[])" :key="s.video_id" class="item grey">
-            <div class="i-main" style="cursor:pointer" @click="openBrief(s)"><div class="i-title">{{ s.title || s.video_id }}</div><div class="i-why" :class="{err: s._copyErr}">{{ s._copyErr ? s._copyErr : (s.noted ? ('standalone note ready · ' + ago(s.updated_at) + ' ago') : 'note generating…') }}</div></div>
+            <div class="i-main" style="cursor:pointer" @click="openBrief(s)"><div class="i-title">{{ s.title || s.video_id }}</div><div class="i-why" :class="{err: s._copyErr}">{{ s._copyErr ? s._copyErr : sourceStatus(s) }}</div></div>
             <div class="i-act"><button class="act accept" @click="openBrief(s)">📖 Read</button><button class="act" :disabled="s._mining" @click="mine(s)">{{ s._mined ? '✓ Mining…' : (s._mining ? '…' : '🧠 Mine') }}</button><button class="act" :disabled="busy" @click="copyTranscript(s)" title="copy raw transcript">{{ s._copied ? '✓' : '⧉' }}</button></div>
           </div>
         </div>
