@@ -12,6 +12,12 @@ const clip = (s, n) => { s = String(s || '').replace(/\s+/g, ' ').trim(); return
 
 // The PROVEN synthesis prompt (same faculty validated in idea-engine-synthesis-PROOF.md), fed atoms from the register.
 function prompt(atoms) {
+  // Fable C6: derive the self-referential caveat from the actual register, not a hardcoded claim that goes false
+  // the moment production atoms arrive. Only warn when the experiment corpus still dominates.
+  const expShare = atoms.length ? atoms.filter((a) => a._origin === 'experiment').length / atoms.length : 0;
+  const skewNote = expShare > 0.5
+    ? `NOTE: ${Math.round(expShare * 100)}% of this register was mined under a git-live experiment brief ("you are mid-experiment on the idea-engine's own T1-vs-T2 tiering"), so it is OVER-WEIGHTED toward the idea-engine improving itself — do not surface that on volume alone.`
+    : 'NOTE: judge every cluster on its own evidence; do not surface any topic on volume alone.';
   return `You are BRAINS — Fusion / myPKA's Improvement & Product-Manager synthesiser (the agent is "Mason"). You are
 NOT a fact-researcher (Pax), NOT a technical/data architect (Silas), NOT an implementer, and you do NOT approve your
 own recommendations. Read ${atoms.length} atomic idea candidates (with provenance) and synthesise the SMALL set of
@@ -22,20 +28,22 @@ A coherent BUILD THESIS, not a SEMANTIC CLUSTER — qualifies ONLY if all four h
  (2) NON-REDUNDANT FACETS — atoms add different evidence/angles, not restatements;
  (3) INDEPENDENT SUPPORT — >=2 independent SOURCES or >=2 independent reasoning FRAMES reach it;
  (4) LIVE ANCHOR — attaches to a real Fusion problem/build/decision.
-EDGE COUNT / shared vocabulary IS NOT EVIDENCE. You MUST reject tempting SEMANTIC clusters and VOLUME traps. NOTE:
-this corpus was mined under a git-live brief that told the engine "you are mid-experiment on the idea-engine's own
-T1-vs-T2 tiering", so it is OVER-WEIGHTED toward the idea-engine improving itself — do not surface that on volume alone.
+EDGE COUNT / shared vocabulary IS NOT EVIDENCE. You MUST reject tempting SEMANTIC clusters and VOLUME traps.
+Atoms flagged ⚠forced or ⚠unverified below are weak evidence — never let them carry an opportunity alone. ${skewNote}
 
 DO NOT create a backlog. Surface only the few (aim 3-5) that deserve Warwick's attention now; everything else is
 EMERGING (coherent but below the bar) or STANDALONE (stays in the register). Classify every surfaced/emerging item as
 "strategic" or "self_improvement". End each with actions (Keep watching / Explain / Research with Pax / Make build
 brief / Later / Decline) — you propose; you never authorise a build.
 
-THE ATOMS (id · [source|engine|frames|convergence|category|NVFI] · target · situation · reasoning):
-${atoms.map((a) => `#${a.n} [${a.source_ref}|${a.engine}|${(a.frames || []).join('+') || '—'}|${a.convergence}|${a.category}|N${a.nvfi?.novelty || '?'}V${a.nvfi?.viability || '?'}F${a.nvfi?.fit || '?'}I${a.nvfi?.impact || '?'}]
+THE ATOMS (id · [source|engine|frames|convergence|category|NVFI] · flags · target · situation · reasoning):
+${atoms.map((a) => {
+  const flags = [(a.meta?.forced_analogy ? '⚠forced' : ''), (a.source_evidence?.verified === false ? '⚠unverified' : '')].filter(Boolean).join(' ');
+  return `#${a.idx} [${a.source_ref}|${a.engine}|${(a.frames || []).join('+') || '—'}|${a.convergence}|${a.category}|N${a.nvfi?.novelty || '?'}V${a.nvfi?.viability || '?'}F${a.nvfi?.fit || '?'}I${a.nvfi?.impact || '?'}]${flags ? ' ' + flags : ''}
   TARGET: ${clip(a.fusion_target, 160)}
   SITUATION: ${clip(a.spin?.situation, 220)}
-  REASONING: ${clip(a.transfer_reasoning, 340)}`).join('\n')}
+  REASONING: ${clip(a.transfer_reasoning, 340)}`;
+}).join('\n')}
 
 OUTPUT — return ONLY this JSON, no preamble, no fences (member_atoms are the #N ids above):
 {"surfaced":[
@@ -55,11 +63,15 @@ async function main() {
   const c = new pg.Client({ connectionString: URL, ssl: { rejectUnauthorized: false } });
   await c.connect();
   const atoms = (await c.query(
-    'select atom_id, n, source_ref, engine, frames, convergence, category, fusion_target, spin, transfer_reasoning, nvfi from cockpit.idea_atom order by n',
+    `select atom_id, n, source_ref, engine, frames, convergence, category, fusion_target, spin, transfer_reasoning,
+            nvfi, coalesce(meta,'{}'::jsonb) meta, coalesce(source_evidence,'{}'::jsonb) source_evidence, origin
+       from cockpit.idea_atom order by origin, n nulls last, created_at`,
   )).rows;
-  if (!atoms.length) { console.error('[mason] register empty — run mason-backfill first'); process.exit(1); }
-  const byN = new Map(atoms.map((a) => [a.n, a.atom_id]));
-  const ids = (ns) => (ns || []).map((n) => byN.get(n)).filter(Boolean);
+  if (!atoms.length) { console.error('[mason] register empty — run mason-backfill/mine first'); process.exit(1); }
+  // Reference atoms by LOAD-ORDER index (#idx), not the DB `n` (which is display-only + null for production atoms).
+  atoms.forEach((a, i) => { a.idx = i + 1; a._origin = a.origin; });
+  const byIdx = new Map(atoms.map((a) => [a.idx, a.atom_id]));
+  const ids = (ns) => (ns || []).map((n) => byIdx.get(n)).filter(Boolean);
 
   console.error(`[mason] ${atoms.length} atoms · one Sonnet synthesis pass…`);
   const call = await callClaude(prompt(atoms), 'mason');

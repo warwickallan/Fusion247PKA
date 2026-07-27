@@ -299,7 +299,7 @@ DO THIS:
    related active problem, or strengthen novelty). Graph evidence NEVER removes a candidate — it annotates. Reflect it
    in nvfi + a one-line graph_note per candidate.
 6. RE-SCORE NVFI at cluster level (do NOT average): novelty may DROP for context_induced; viability/impact CONFIDENCE
-   may RISE on novel_independent convergence. Keep each branch's original scores in provenance.
+   may RISE on novel_independent convergence.
 7. Lead every kept candidate with plain-English SPIN (why it matters to a human in seconds); machine detail underneath.
 8. ENGINE-NEUTRAL PROSE (critical): spin AND transfer_reasoning must describe the IDEA ONLY — source evidence →
    invariant → Fusion target. Do NOT mention frames, lenses, "convergence", "different angles", or that multiple
@@ -346,8 +346,27 @@ export async function runT2Pipeline(video, source, log = () => {}) {
   log('convergence pass (Sonnet)…');
   const convCall = await callClaude(convergencePrompt(enriched), 'convergence');
   let conv = { kept: [], killed: [], conflicts: [], convergence_summary: '' };
-  if (convCall.ok) { try { conv = parseJSON(convCall.resultText); } catch (e) { log(`convergence parse-error: ${e.message}`); } }
+  let convParsed = false;
+  if (convCall.ok) { try { conv = parseJSON(convCall.resultText); convParsed = true; } catch (e) { log(`convergence parse-error: ${e.message}`); } }
   else log(`convergence FAILED: ${convCall.error}`);
+  conv.parsed = convParsed;   // Fable F4: a failed/unparsed convergence must be distinguishable from a genuine zero
+  // Fable B3: enforce kept ∪ killed accounts for the input — a whole frame's candidates must not vanish with no
+  // record. Any input frame absent from every kept.contributing_frames and killed.frames is auto-flagged into killed.
+  if (convParsed) {
+    const accounted = new Set([
+      ...(conv.kept || []).flatMap((k) => k.contributing_frames || []),
+      ...(conv.killed || []).flatMap((k) => k.frames || []),
+    ]);
+    const inputFrames = [...new Set(flat.map((k) => k.frame))];
+    const dropped = inputFrames.filter((f) => !accounted.has(f));
+    conv.killed = conv.killed || [];
+    for (const f of dropped) {
+      const lost = flat.filter((k) => k.frame === f);
+      conv.killed.push({ fusion_target: `(frame ${f}: ${lost.length} candidate(s) unaccounted)`, frames: [f], reason: 'unaccounted-by-convergence-pass (auto-flagged)', forced_analogy: false });
+    }
+    conv.unaccounted_frames = dropped.length;
+    if (dropped.length) log(`⚠ convergence left ${dropped.length} input frame(s) unaccounted — auto-flagged into killed`);
+  }
   return { video, branchCalls, branchOutputs, enriched, convCall, conv, branchWallMs };
 }
 

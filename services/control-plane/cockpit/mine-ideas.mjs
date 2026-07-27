@@ -9,6 +9,7 @@ import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 import pg from 'file:///C:/Fusion247PKA/services/control-plane/node_modules/pg/lib/index.js';
+import { upsertAtom, verifyEvidence } from 'file:///C:/Fusion247PKA/services/control-plane/cockpit/atom-register.mjs';
 
 const REPO = 'C:/Fusion247PKA';
 const COCKPIT = process.env.COCKPIT_URL || 'http://127.0.0.1:8090';
@@ -123,26 +124,40 @@ async function main() {
   const payloadInEst = Math.ceil(prompt.length / 4);
   call.payload_input = payloadInEst;
   const total = (call.output || 0) + (call.cache_creation || 0) + (call.cache_read || 0) + 4;
-  const mine = (await c.query(
-    `insert into cockpit.idea_mine (mine_id, source_ref, brief_hash, brief_snapshot, discarded_obvious, zero_reason,
-        payload_input_tokens, output_tokens, wrapper_cache_creation_tokens, wrapper_cache_read_tokens, total_reported_tokens, cost_usd, duration_ms)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) returning mine_id`,
-    [mineId, video, hash, brief, JSON.stringify(out.discarded_obvious || []), out.zero_reason || null,
-      call.payload_input, call.output, call.cache_creation, call.cache_read, total, call.cost_usd, call.duration_ms],
-  )).rows[0].mine_id;
-  await c.query(`insert into cockpit.idea_event (mine_id, actor, event, note) values ($1,'specialist','mined',$2)`,
-    [mineId, `${cands.length} candidates`]);
-  for (const k of cands) {
-    const cat = (k.category === 'cash') ? 'cash' : 'brain';
-    const cid = (await c.query(
-      `insert into cockpit.idea_candidate (mine_id, brief_hash, source_evidence, transfer_reasoning, fusion_target, spin, category, lens, nvfi, traps, lifecycle_state)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'proposed') returning candidate_id`,
-      [mineId, hash, JSON.stringify(k.source_evidence || {}), k.transfer_reasoning || '', k.fusion_target || '', JSON.stringify(k.spin || {}),
-        cat, k.lens || '', JSON.stringify(k.nvfi || {}), JSON.stringify(k.traps || [])],
-    )).rows[0].candidate_id;
-    await c.query(`insert into cockpit.idea_event (candidate_id, mine_id, actor, event, note) values ($1,$2,'specialist','emitted',$3)`,
-      [cid, mineId, cat]);
-  }
+  // Transactional (Fable F8): the mine row, its 'mined' event, the candidates, AND the register atoms all commit
+  // together or roll back — no partial mine with a lying count, no half-populated register.
+  await c.query('begin');
+  try {
+    const mine = (await c.query(
+      `insert into cockpit.idea_mine (mine_id, source_ref, brief_hash, brief_snapshot, discarded_obvious, zero_reason,
+          payload_input_tokens, output_tokens, wrapper_cache_creation_tokens, wrapper_cache_read_tokens, total_reported_tokens, cost_usd, duration_ms)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) returning mine_id`,
+      [mineId, video, hash, brief, JSON.stringify(out.discarded_obvious || []), out.zero_reason || null,
+        call.payload_input, call.output, call.cache_creation, call.cache_read, total, call.cost_usd, call.duration_ms],
+    )).rows[0].mine_id;
+    void mine;
+    await c.query(`insert into cockpit.idea_event (mine_id, actor, event, note) values ($1,'specialist','mined',$2)`,
+      [mineId, `${cands.length} candidates`]);
+    for (const k of cands) {
+      const cat = (k.category === 'cash') ? 'cash' : 'brain';
+      const ev = verifyEvidence(k.source_evidence, source); // Fable F5: flag hallucinated/empty quotes, never silently trust
+      const cid = (await c.query(
+        `insert into cockpit.idea_candidate (mine_id, brief_hash, source_evidence, transfer_reasoning, fusion_target, spin, category, lens, nvfi, traps, lifecycle_state)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'proposed') returning candidate_id`,
+        [mineId, hash, JSON.stringify(ev), k.transfer_reasoning || '', k.fusion_target || '', JSON.stringify(k.spin || {}),
+          cat, k.lens || '', JSON.stringify(k.nvfi || {}), JSON.stringify(k.traps || [])],
+      )).rows[0].candidate_id;
+      await c.query(`insert into cockpit.idea_event (candidate_id, mine_id, actor, event, note) values ($1,$2,'specialist','emitted',$3)`,
+        [cid, mineId, cat]);
+      // Fable B1: production candidates ALSO land in the durable atom register, so Mason actually sees them.
+      await upsertAtom(c, {
+        source_ref: video, engine: 'T1', frames: [], convergence: 'single', category: cat,
+        fusion_target: k.fusion_target || '', spin: k.spin || {}, transfer_reasoning: k.transfer_reasoning || '',
+        source_evidence: ev, nvfi: k.nvfi || {}, meta: { traps: k.traps || [], forced_analogy: false }, origin: 'production',
+      });
+    }
+    await c.query('commit');
+  } catch (e) { try { await c.query('rollback'); } catch { /* */ } await c.end(); throw e; }
   await c.end();
 
   console.log(JSON.stringify({

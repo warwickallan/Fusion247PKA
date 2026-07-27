@@ -33,10 +33,11 @@ async function runT1(video, source, log) {
   const mineId = crypto.randomUUID();
   const call = await callClaude(buildPrompt(brief, source, mineId), 'T1');
   let out = { candidates: [], zero_reason: null };
-  if (call.ok) { try { out = parseJSON(call.resultText); } catch (e) { out.zero_reason = `parse-error: ${e.message}`; } }
-  else log(`T1 FAILED: ${call.error}`);
-  log(`T1: ${(out.candidates || []).length} candidate(s) · ${reportedTotal(call).toLocaleString()} tok · ${(call.duration_ms / 1000).toFixed(1)}s`);
-  return { call, candidates: out.candidates || [], zero_reason: out.zero_reason };
+  let failed = false; // Fable F4: a T1 call/parse FAILURE must not read as a genuine zero downstream
+  if (call.ok) { try { out = parseJSON(call.resultText); } catch (e) { out.zero_reason = `parse-error: ${e.message}`; failed = true; } }
+  else { failed = true; out.zero_reason = `T1 call FAILED: ${call.error}`; log(`T1 FAILED: ${call.error}`); }
+  log(`T1: ${failed ? 'FAILED' : (out.candidates || []).length + ' candidate(s)'} · ${reportedTotal(call).toLocaleString()} tok · ${(call.duration_ms / 1000).toFixed(1)}s`);
+  return { call, candidates: out.candidates || [], zero_reason: out.zero_reason, failed };
 }
 
 // ---------- shared blind card renderer (identical for T1 and T2 candidates — nothing reveals origin) ----------
