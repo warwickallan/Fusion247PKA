@@ -55,7 +55,9 @@ async function apiState() {
     `select id, source_module, source_type, source_key, title, reason, priority, status, kind,
             notify_policy, actions, provenance_ref, related_ref, detail_route, updated_at
      from cockpit.attention_item where status='declined' order by updated_at desc limit 60`);
-  const ingested = await safe(`select video_id, title, updated_at from cockpit.youtube_source order by updated_at desc nulls last limit 12`);
+  const ingested = await safe(`select video_id, title, updated_at, (note_path is not null) as noted,
+     (raw_path is not null) as extracted, coalesce(extract_attempts,0) as extract_attempts, coalesce(note_attempts,0) as note_attempts
+     from cockpit.youtube_source order by updated_at desc nulls last limit 12`);
   const ingestedCount = await safe(`select count(*)::int n from cockpit.youtube_source`);
   const wins = await safe(`select id, text, happened_at from cockpit.movement order by happened_at desc nulls last limit 8`);
   const builds = await safe(`select id, name, gives, status, status_tone, progress_pct, sort from cockpit.build order by sort nulls last limit 50`);
@@ -132,6 +134,22 @@ async function apiTranscript(video) {
   return { ok: true, video, title: rows[0].title, text: extractTranscript(md) };
 }
 
+// Source brief = the PRIMARY output for an ingested source: the standalone "what this source says" knowledge
+// note (Cairn/Sonnet), understandable WITHOUT Arc's transfers or Mason's opportunities. Served from the
+// brief_markdown column the note generator populates (a pending/failed row returns its stub, clearly labelled).
+async function apiSourceBrief(video) {
+  if (!video || !/^[A-Za-z0-9_-]{6,24}$/.test(video)) return { ok: false, error: 'bad video id' };
+  const rows = (await q('select title, brief_markdown, (note_path is not null) as noted from cockpit.youtube_source where video_id=$1 limit 1', [video])).rows;
+  if (!rows.length) return { ok: false, error: 'no source on file for this video' };
+  const r = rows[0];
+  // Strip a leading YAML frontmatter block so the flagship reading surface opens with the note itself, not the
+  // vault plumbing (VaultWriter prepends frontmatter; mdToHtml has no frontmatter handling). One place = covers
+  // every row, including legacy in-session notes. A stub (no frontmatter) is unaffected.
+  const text = (r.brief_markdown || '').replace(/^﻿?---\r?\n[\s\S]*?\r?\n---\r?\n+/, '')
+    || '_No standalone note yet — this source was captured but its knowledge note has not been generated. It will generate automatically; if this persists, the generation failed and is retrying._';
+  return { ok: true, video, title: r.title, noted: r.noted, text };
+}
+
 // Deliverables = produced docs (Pax reports etc.) living in the repo's Deliverables/ folder — the synced
 // "things for Warwick to read". Listed newest-first with a human title from the first H1.
 function listDeliverables() {
@@ -174,6 +192,7 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     if (req.url.startsWith('/api/transcript')) { const v = new URL(req.url, 'http://x').searchParams.get('video'); return j(res, 200, await apiTranscript(v)); }
+    if (req.url.startsWith('/api/source-brief')) { const v = new URL(req.url, 'http://x').searchParams.get('video'); return j(res, 200, await apiSourceBrief(v)); }
     if (req.url.startsWith('/api/deliverable')) { const f = new URL(req.url, 'http://x').searchParams.get('file'); return j(res, 200, await apiDeliverable(f)); }
     if (req.url.startsWith('/api/mine') && req.method === 'POST') {
       let raw = ''; req.on('data', (d) => { raw += d; if (raw.length > 1e4) req.destroy(); });
@@ -203,6 +222,15 @@ const server = http.createServer(async (req, res) => {
         } catch (e) { j(res, 500, { ok: false, error: e.message }); }
       });
       return;
+    }
+    if (req.url.startsWith('/api/synthesise') && req.method === 'POST') {
+      // Fire Mason's synthesis over the whole atom estate, detached (one Sonnet pass, ~5 min) — surfaced
+      // opportunities appear in /api/state when done. This is the cockpit trigger for lifecycle Step 4.
+      try {
+        const p = spawn('node', ['--env-file=C:/.fusion247/fusion-capture-gateway.env', `${REPO}/services/control-plane/cockpit/mason-synthesise.mjs`], { detached: true, stdio: 'ignore', cwd: REPO });
+        p.unref();
+        return j(res, 200, { ok: true, synthesising: true });
+      } catch (e) { return j(res, 500, { ok: false, error: e.message }); }
     }
     if (req.url.startsWith('/api/opportunity-decide') && req.method === 'POST') {
       let raw = ''; req.on('data', (d) => { raw += d; if (raw.length > 1e4) req.destroy(); });

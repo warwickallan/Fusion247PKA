@@ -213,6 +213,15 @@ createApp({
       try { const j = await fetchDoc(d.file); if (!j.ok) throw new Error(j.error); if (detail.value && detail.value.file === d.file) detail.value = { _as: 'doc', title: d.title, file: d.file, text: j.text }; }
       catch (e) { if (detail.value && detail.value.file === d.file) detail.value = { _as: 'doc', title: d.title, file: d.file, _error: e.message }; }
     }
+    // Open the PRIMARY output for a source: the standalone "what this source says" knowledge note, in the read
+    // sheet — understandable without Arc/Mason. Mirrors openDeliverable (renders markdown via mdToHtml at detail.text).
+    async function openBrief(s) {
+      const key = s.video_id; const title = s.title || s.video_id;
+      detail.value = { _as: 'doc', title, _brief: key };
+      try { const r = await fetch('/api/source-brief?video=' + encodeURIComponent(key)); const j = await r.json(); if (!j.ok) throw new Error(j.error);
+        if (detail.value && detail.value._brief === key) detail.value = { _as: 'doc', title, _brief: key, text: j.text }; }
+      catch (e) { if (detail.value && detail.value._brief === key) detail.value = { _as: 'doc', title, _brief: key, _error: e.message }; }
+    }
     async function copyDoc(d) { const j = await fetchDoc(d.file); if (j.ok && await copyText(j.text)) { d._copied = true; setTimeout(() => { d._copied = false; }, 2000); } }
     async function downloadDoc(d) { const j = await fetchDoc(d.file); if (j.ok) download(d.file, j.text); }
     async function downloadTranscript(s) { try { const r = await fetch('/api/transcript?video=' + encodeURIComponent(s.video_id)); const j = await r.json(); if (j.ok) download((s.title || s.video_id) + '.txt', j.text); } catch (e) { s._copyErr = 'download failed'; } }
@@ -220,6 +229,12 @@ createApp({
       s._mining = true; s._mineErr = null;
       try { const r = await fetch('/api/mine', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ video: s.video_id }) }); const d = await r.json(); if (!d.ok) throw new Error(d.error); s._mined = true; setTimeout(() => { s._mined = false; }, 6000); }
       catch (e) { s._mineErr = e.message; } finally { s._mining = false; }
+    }
+    const synthing = ref(false); const synthMsg = ref(null);
+    async function synthesise() {
+      synthing.value = true; synthMsg.value = null;
+      try { const r = await fetch('/api/synthesise', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }); const d = await r.json(); if (!d.ok) throw new Error(d.error); synthMsg.value = 'Mason is synthesising — new opportunities appear here in a few minutes. Tap ↻ to check.'; }
+      catch (e) { synthMsg.value = 'Failed: ' + e.message; } finally { synthing.value = false; }
     }
     async function ideaDecide(it, decision) {
       busy.value = true; it._error = null;
@@ -238,6 +253,7 @@ createApp({
         const r = await fetch('/api/opportunity-decide', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: o.id, decision }) });
         const res = await r.json(); if (!res.ok) throw new Error(res.error || 'failed');
         o._done = { watch: 'Watching', research: 'Pax queued →', brief: 'Brief queued →', later: 'Later', decline: 'Declined' }[decision];
+        if (detail.value && detail.value.id === o.id) closeDetail(); // acted from the detail sheet → return to the refreshed lane
         await load();
       } catch (e) { o._error = e.message; } finally { busy.value = false; }
     }
@@ -254,15 +270,22 @@ createApp({
     // Primary governed action for an item (accept fires it). Brain items carry explicit actions[]; if
     // an item has a first action we treat Accept as "do it", else Accept is a plain acknowledge.
     const primaryAction = (it) => (Array.isArray(it.actions) && it.actions.length ? it.actions.find((a) => a.key === 'accept' || a.key === 'merge') || it.actions[0] : null);
+    // Human-readable status for an ingested source — a STUCK source must never read "generating…" forever.
+    const sourceStatus = (s) => {
+      if (s.noted) return 'standalone note ready · ' + ago(s.updated_at) + ' ago';
+      if (!s.extracted && (s.extract_attempts || 0) >= 3) return '⚠ transcript extraction failed — flagged';
+      if (s.extracted && (s.note_attempts || 0) >= 3) return '⚠ note generation failed — flagged';
+      return 'note generating…';
+    };
 
     return {
       AREAS, state, area, detail, busy, loading, loadErr,
       kindOf, catLabel, moduleLabel, oneLine, ago, terse, impactStars, outputTitle, humanValue, humanPoints, spinOf, mdToHtml, notifyMark, build, housekeeping, host, when,
-      deliverables, openDeliverable, copyDoc, downloadDoc, downloadTranscript, download, copyText,
+      deliverables, openDeliverable, openBrief, copyDoc, downloadDoc, downloadTranscript, download, copyText,
       attn, deferred, archived, blocked, decisions, suggestions, needsYou, ideaCat, ideasBrain, ideasCash, latest, toneOf,
-      tiBrain, tiCash, tiSpin, tiStars, mine, ideaDecide, opps, opportunityDecide,
+      tiBrain, tiCash, tiSpin, tiStars, mine, ideaDecide, opps, opportunityDecide, synthesise, synthing, synthMsg,
       outputs, newOutputs, itemsAdded, jobsFound, wins, builds,
-      statusTone, statusLine, tiles, go, open, closeDetail, decide, copyTranscript, primaryAction, load, REPORT, GRAPH,
+      statusTone, statusLine, tiles, go, open, closeDetail, decide, copyTranscript, primaryAction, sourceStatus, load, REPORT, GRAPH,
     };
   },
   template: `
@@ -341,40 +364,19 @@ createApp({
       <section v-else-if="area==='outputs'" class="pane">
         <header class="p-h"><h1>Outputs</h1></header>
 
-        <div class="grp" v-if="opps.length">
-          <h2>🎯 Opportunities<span class="g-count">{{ opps.length }}</span><span class="lane-sub">Mason — joined-up build theses, not single ideas</span></h2>
-          <div v-for="o in opps" :key="o.id" class="item blue opp">
-            <div class="i-main">
-              <div class="i-eyebrow">{{ o.otype==='strategic' ? '🧭 strategic' : '🔧 self-improvement' }} · {{ o.roi && o.roi.band ? o.roi.band+' ROI / '+o.roi.value_type : '' }} · {{ o.atoms ? o.atoms.length : 0 }} ideas
-                <span v-if="o.disposition && !o.disposition_conflict" class="opp-disp">your call: {{ o.disposition }}</span>
-                <span v-if="o.disposition_conflict" class="opp-conflict">⚠ evidence changed — re-confirm your call</span>
-              </div>
-              <div class="i-title">{{ o.headline }}</div>
-              <div v-if="o.spin" class="i-why">{{ oneLine(o.spin.problem) }}</div>
+        <div class="grp">
+          <h2>🎯 Opportunities<span class="g-count">{{ opps.length }}</span><span class="lane-sub">Mason — joined-up build theses, not single ideas</span>
+            <button class="act" style="margin-left:auto" :disabled="synthing" @click="synthesise()">{{ synthing ? '…' : '🧩 Synthesise' }}</button></h2>
+          <div v-if="synthMsg" class="i-why" style="margin-bottom:9px">{{ synthMsg }}</div>
+          <div v-if="!opps.length" class="empty">No opportunities surfaced yet — tap <b>🧩 Synthesise</b> to have Mason converge the idea estate.</div>
+          <div class="lane-scroll">
+          <div v-for="o in opps" :key="o.id" class="item blue">
+            <div class="i-main" @click="open(o,'opp')">
+              <div class="i-eyebrow">{{ o.otype==='strategic' ? '🧭 strategic' : '🔧 self-improvement' }}<template v-if="o.roi && o.roi.band"> · {{ o.roi.band }} ROI / {{ o.roi.value_type }}</template> · {{ o.atoms ? o.atoms.length : 0 }} ideas<span v-if="o.disposition && !o.disposition_conflict" class="opp-disp"> · your call: {{ o.disposition }}</span><span v-if="o.disposition_conflict" class="opp-conflict"> · ⚠ re-confirm</span></div>
+              <div class="i-title">{{ terse(o.headline) }}</div>
             </div>
-            <div class="opp-body">
-              <div v-if="o.spin"><b>Situation.</b> {{ o.spin.situation }}</div>
-              <div v-if="o.spin"><b>Implication.</b> {{ o.spin.implication }}</div>
-              <div v-if="o.spin"><b>Need-payoff.</b> {{ o.spin.need_payoff }}</div>
-              <div v-if="o.why_now"><b>Why now.</b> {{ o.why_now }}</div>
-              <div v-if="o.roi && o.roi.note"><b>ROI.</b> {{ o.roi.note }}</div>
-              <div v-if="o.evidence"><b>Evidence.</b> {{ o.evidence.independent_sources }} sources · {{ o.evidence.frames }} frames{{ o.evidence.live_anchors && o.evidence.live_anchors.length ? ' · '+o.evidence.live_anchors.join('; ') : '' }}</div>
-              <div v-if="o.what_wed_build"><b>What we'd build.</b> {{ o.what_wed_build }}</div>
-              <details v-if="o.atoms && o.atoms.length"><summary>Provenance — {{ o.atoms.length }} supporting ideas</summary>
-                <div v-for="a in o.atoms" :key="a.n" class="opp-atom">#{{ a.n }} <span class="mono">{{ a.source }} · {{ a.engine }}</span> — {{ a.situation || a.target }}</div>
-              </details>
-              <div class="i-act">
-                <span v-if="o._done" class="done-pill">✅ {{ o._done }}</span>
-                <template v-else>
-                  <button class="act" :disabled="busy" @click="opportunityDecide(o,'watch')">Keep watching</button>
-                  <button class="act accept" :disabled="busy" @click="opportunityDecide(o,'research')">Research w/ Pax</button>
-                  <button class="act accept" :disabled="busy" @click="opportunityDecide(o,'brief')">Build brief</button>
-                  <button class="act defer" :disabled="busy" @click="opportunityDecide(o,'later')">Later</button>
-                  <button class="act decline" :disabled="busy" @click="opportunityDecide(o,'decline')">Decline</button>
-                </template>
-              </div>
-              <div v-if="o._error" class="i-why err">{{ o._error }}</div>
-            </div>
+            <span class="chev">›</span>
+          </div>
           </div>
         </div>
 
@@ -399,12 +401,12 @@ createApp({
         </div>
 
         <div class="grp">
-          <h2>📝 Transcripts<span class="g-count">{{ (state.ingested||[]).length }}</span><span class="lane-sub">source text — copy / download</span></h2>
+          <h2>📖 Source briefs<span class="g-count">{{ (state.ingested||[]).length }}</span><span class="lane-sub">what each source says — read it instead of watching</span></h2>
           <div v-if="!(state.ingested||[]).length" class="empty">Nothing ingested yet.</div>
           <div class="lane-scroll">
           <div v-for="s in (state.ingested||[])" :key="s.video_id" class="item grey">
-            <div class="i-main"><div class="i-title">{{ terse(s.title || s.video_id) }}</div><div class="i-why" :class="{err:s._copyErr}">{{ s._copyErr ? s._copyErr : ('ingested ' + ago(s.updated_at) + ' ago') }}</div></div>
-            <div class="i-act"><button class="act" :disabled="busy" @click="copyTranscript(s)">{{ s._copied ? '✓' : '⧉' }}</button><button class="act" @click="downloadTranscript(s)">⭳</button></div>
+            <div class="i-main" style="cursor:pointer" @click="openBrief(s)"><div class="i-title">{{ terse(s.title || s.video_id) }}</div><div class="i-why" :class="{err:s._copyErr}">{{ s._copyErr ? s._copyErr : sourceStatus(s) }}</div></div>
+            <div class="i-act"><button class="act accept" @click="openBrief(s)">📖 Read</button><button class="act" :disabled="busy" @click="copyTranscript(s)" title="copy raw transcript">{{ s._copied ? '✓' : '⧉' }}</button><button class="act" @click="downloadTranscript(s)" title="download raw transcript">⭳</button></div>
           </div>
           </div>
         </div>
@@ -425,11 +427,11 @@ createApp({
         </div>
         <p class="empty" style="margin-top:10px">🌌 <b>Galaxy</b> = your knowledge as an explorable map you can fly around. 📄 <b>Report</b> = the full written write-up of everything the Brain has ingested.</p>
         <div class="grp" style="margin-top:20px">
-          <h2>Recently ingested<span class="lane-sub">captured &amp; processed — not the same as "learned"</span></h2>
+          <h2>Recently ingested<span class="lane-sub">captured &amp; processed — read the brief, or mine it for ideas</span></h2>
           <div v-if="!(state.ingested||[]).length" class="empty">Nothing ingested yet.</div>
           <div v-for="s in (state.ingested||[])" :key="s.video_id" class="item grey">
-            <div class="i-main"><div class="i-title">{{ s.title || s.video_id }}</div><div class="i-why" :class="{err: s._copyErr}">{{ s._copyErr ? s._copyErr : ('ingested ' + ago(s.updated_at) + ' ago') }}</div></div>
-            <div class="i-act"><button class="act accept" :disabled="s._mining" @click="mine(s)">{{ s._mined ? '✓ Mining…' : (s._mining ? '…' : '🧠 Mine for ideas') }}</button><button class="act" :disabled="busy" @click="copyTranscript(s)">{{ s._copied ? '✓' : '⧉' }}</button></div>
+            <div class="i-main" style="cursor:pointer" @click="openBrief(s)"><div class="i-title">{{ s.title || s.video_id }}</div><div class="i-why" :class="{err: s._copyErr}">{{ s._copyErr ? s._copyErr : sourceStatus(s) }}</div></div>
+            <div class="i-act"><button class="act accept" @click="openBrief(s)">📖 Read</button><button class="act" :disabled="s._mining" @click="mine(s)">{{ s._mined ? '✓ Mining…' : (s._mining ? '…' : '🧠 Mine') }}</button><button class="act" :disabled="busy" @click="copyTranscript(s)" title="copy raw transcript">{{ s._copied ? '✓' : '⧉' }}</button></div>
           </div>
         </div>
       </section>
@@ -479,8 +481,8 @@ createApp({
   <div v-if="detail" class="sheet" @click.self="closeDetail">
     <div class="sheet-card">
       <button class="back" @click="closeDetail">‹ Back</button>
-      <div class="d-eyebrow">{{ detail._as==='doc' ? 'Deliverable' : detail._as==='idea' ? ((detail.category==='cash'?'💰 Cash':'🧠 Brain')+' idea · '+tiStars(detail)+' impact') : (detail._as==='output' ? (moduleLabel(detail.source_module)+' · output') : catLabel(detail)) }}</div>
-      <h1>{{ detail._as==='output' ? outputTitle(detail) : detail._as==='idea' ? terse(tiSpin(detail).situation, 110) : detail.title }}</h1>
+      <div class="d-eyebrow">{{ detail._as==='doc' ? 'Deliverable' : detail._as==='idea' ? ((detail.category==='cash'?'💰 Cash':'🧠 Brain')+' idea · '+tiStars(detail)+' impact') : detail._as==='opp' ? ('🎯 Opportunity — Mason'+(detail.roi&&detail.roi.band?' · '+detail.roi.band+' ROI / '+detail.roi.value_type:'')+' · '+(detail.atoms?detail.atoms.length:0)+' ideas') : (detail._as==='output' ? (moduleLabel(detail.source_module)+' · output') : catLabel(detail)) }}</div>
+      <h1>{{ detail._as==='output' ? outputTitle(detail) : detail._as==='idea' ? terse(tiSpin(detail).situation, 110) : detail._as==='opp' ? detail.headline : detail.title }}</h1>
 
       <template v-if="detail._as==='doc'">
         <div v-if="detail._error" class="err">{{ detail._error }}</div>
@@ -527,6 +529,33 @@ larry reconciliation: {{ detail.larry_recon ? JSON.stringify(detail.larry_recon)
 source: {{ detail.source_title }} ({{ detail.source_ref }}) · {{ detail.mine_model }}
 brief_hash: {{ detail.brief_hash }} · mine: {{ detail.mine_id }}</div></div>
         </details>
+      </template>
+
+      <template v-else-if="detail._as==='opp'">
+        <div v-if="detail.disposition_conflict" class="opp-conflict" style="margin-bottom:8px">⚠ evidence changed since you last looked — worth re-confirming your call</div>
+        <div v-else-if="detail.disposition" class="opp-disp" style="margin-bottom:8px">your call so far: {{ detail.disposition }}</div>
+        <div v-if="detail.spin" class="read">
+          <h3>Situation</h3><p>{{ detail.spin.situation }}</p>
+          <h3>Problem</h3><p>{{ detail.spin.problem }}</p>
+          <h3>Implication — why it matters</h3><p>{{ detail.spin.implication }}</p>
+          <h3>Need-payoff — what gets better</h3><p>{{ detail.spin.need_payoff }}</p>
+          <template v-if="detail.why_now"><h3>Why now</h3><p>{{ detail.why_now }}</p></template>
+          <template v-if="detail.roi && detail.roi.note"><h3>ROI</h3><p>{{ detail.roi.note }}</p></template>
+          <template v-if="detail.evidence"><h3>Evidence</h3><p>{{ detail.evidence.independent_sources }} sources · {{ detail.evidence.frames }} frames{{ detail.evidence.live_anchors && detail.evidence.live_anchors.length ? ' · '+detail.evidence.live_anchors.join('; ') : '' }}</p></template>
+          <template v-if="detail.what_wed_build"><h3>What we'd build</h3><p>{{ detail.what_wed_build }}</p></template>
+        </div>
+        <details v-if="detail.atoms && detail.atoms.length" class="tech"><summary>Provenance — {{ detail.atoms.length }} supporting ideas</summary>
+          <div class="tech-body"><div v-for="a in detail.atoms" :key="a.n" class="opp-atom">#{{ a.n }} <span class="mono">{{ a.source }} · {{ a.engine }}</span> — {{ a.situation || a.target }}</div></div>
+        </details>
+        <div class="d-actions" v-if="!detail._done">
+          <button class="act" :disabled="busy" @click="opportunityDecide(detail,'watch')">Keep watching</button>
+          <button class="act accept" :disabled="busy" @click="opportunityDecide(detail,'research')">Research w/ Pax</button>
+          <button class="act accept" :disabled="busy" @click="opportunityDecide(detail,'brief')">Build brief</button>
+          <button class="act defer" :disabled="busy" @click="opportunityDecide(detail,'later')">Later</button>
+          <button class="act decline" :disabled="busy" @click="opportunityDecide(detail,'decline')">Decline</button>
+        </div>
+        <div v-else class="done-pill">✅ {{ detail._done }}</div>
+        <div v-if="detail._error" class="err">{{ detail._error }}</div>
       </template>
 
       <template v-else>
