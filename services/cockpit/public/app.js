@@ -213,6 +213,15 @@ createApp({
       try { const j = await fetchDoc(d.file); if (!j.ok) throw new Error(j.error); if (detail.value && detail.value.file === d.file) detail.value = { _as: 'doc', title: d.title, file: d.file, text: j.text }; }
       catch (e) { if (detail.value && detail.value.file === d.file) detail.value = { _as: 'doc', title: d.title, file: d.file, _error: e.message }; }
     }
+    // Open the PRIMARY output for a source: the standalone "what this source says" knowledge note, in the read
+    // sheet — understandable without Arc/Mason. Mirrors openDeliverable (renders markdown via mdToHtml at detail.text).
+    async function openBrief(s) {
+      const key = s.video_id; const title = s.title || s.video_id;
+      detail.value = { _as: 'doc', title, _brief: key };
+      try { const r = await fetch('/api/source-brief?video=' + encodeURIComponent(key)); const j = await r.json(); if (!j.ok) throw new Error(j.error);
+        if (detail.value && detail.value._brief === key) detail.value = { _as: 'doc', title, _brief: key, text: j.text }; }
+      catch (e) { if (detail.value && detail.value._brief === key) detail.value = { _as: 'doc', title, _brief: key, _error: e.message }; }
+    }
     async function copyDoc(d) { const j = await fetchDoc(d.file); if (j.ok && await copyText(j.text)) { d._copied = true; setTimeout(() => { d._copied = false; }, 2000); } }
     async function downloadDoc(d) { const j = await fetchDoc(d.file); if (j.ok) download(d.file, j.text); }
     async function downloadTranscript(s) { try { const r = await fetch('/api/transcript?video=' + encodeURIComponent(s.video_id)); const j = await r.json(); if (j.ok) download((s.title || s.video_id) + '.txt', j.text); } catch (e) { s._copyErr = 'download failed'; } }
@@ -264,7 +273,7 @@ createApp({
     return {
       AREAS, state, area, detail, busy, loading, loadErr,
       kindOf, catLabel, moduleLabel, oneLine, ago, terse, impactStars, outputTitle, humanValue, humanPoints, spinOf, mdToHtml, notifyMark, build, housekeeping, host, when,
-      deliverables, openDeliverable, copyDoc, downloadDoc, downloadTranscript, download, copyText,
+      deliverables, openDeliverable, openBrief, copyDoc, downloadDoc, downloadTranscript, download, copyText,
       attn, deferred, archived, blocked, decisions, suggestions, needsYou, ideaCat, ideasBrain, ideasCash, latest, toneOf,
       tiBrain, tiCash, tiSpin, tiStars, mine, ideaDecide, opps, opportunityDecide, synthesise, synthing, synthMsg,
       outputs, newOutputs, itemsAdded, jobsFound, wins, builds,
@@ -408,12 +417,12 @@ createApp({
         </div>
 
         <div class="grp">
-          <h2>📝 Transcripts<span class="g-count">{{ (state.ingested||[]).length }}</span><span class="lane-sub">source text — copy / download</span></h2>
+          <h2>📖 Source briefs<span class="g-count">{{ (state.ingested||[]).length }}</span><span class="lane-sub">what each source says — read it instead of watching</span></h2>
           <div v-if="!(state.ingested||[]).length" class="empty">Nothing ingested yet.</div>
           <div class="lane-scroll">
           <div v-for="s in (state.ingested||[])" :key="s.video_id" class="item grey">
-            <div class="i-main"><div class="i-title">{{ terse(s.title || s.video_id) }}</div><div class="i-why" :class="{err:s._copyErr}">{{ s._copyErr ? s._copyErr : ('ingested ' + ago(s.updated_at) + ' ago') }}</div></div>
-            <div class="i-act"><button class="act" :disabled="busy" @click="copyTranscript(s)">{{ s._copied ? '✓' : '⧉' }}</button><button class="act" @click="downloadTranscript(s)">⭳</button></div>
+            <div class="i-main" style="cursor:pointer" @click="openBrief(s)"><div class="i-title">{{ terse(s.title || s.video_id) }}</div><div class="i-why" :class="{err:s._copyErr}">{{ s._copyErr ? s._copyErr : (s.noted ? ('standalone note ready · ' + ago(s.updated_at) + ' ago') : 'note generating…') }}</div></div>
+            <div class="i-act"><button class="act accept" @click="openBrief(s)">📖 Read</button><button class="act" :disabled="busy" @click="copyTranscript(s)" title="copy raw transcript">{{ s._copied ? '✓' : '⧉' }}</button><button class="act" @click="downloadTranscript(s)" title="download raw transcript">⭳</button></div>
           </div>
           </div>
         </div>
@@ -434,11 +443,11 @@ createApp({
         </div>
         <p class="empty" style="margin-top:10px">🌌 <b>Galaxy</b> = your knowledge as an explorable map you can fly around. 📄 <b>Report</b> = the full written write-up of everything the Brain has ingested.</p>
         <div class="grp" style="margin-top:20px">
-          <h2>Recently ingested<span class="lane-sub">captured &amp; processed — not the same as "learned"</span></h2>
+          <h2>Recently ingested<span class="lane-sub">captured &amp; processed — read the brief, or mine it for ideas</span></h2>
           <div v-if="!(state.ingested||[]).length" class="empty">Nothing ingested yet.</div>
           <div v-for="s in (state.ingested||[])" :key="s.video_id" class="item grey">
-            <div class="i-main"><div class="i-title">{{ s.title || s.video_id }}</div><div class="i-why" :class="{err: s._copyErr}">{{ s._copyErr ? s._copyErr : ('ingested ' + ago(s.updated_at) + ' ago') }}</div></div>
-            <div class="i-act"><button class="act accept" :disabled="s._mining" @click="mine(s)">{{ s._mined ? '✓ Mining…' : (s._mining ? '…' : '🧠 Mine for ideas') }}</button><button class="act" :disabled="busy" @click="copyTranscript(s)">{{ s._copied ? '✓' : '⧉' }}</button></div>
+            <div class="i-main" style="cursor:pointer" @click="openBrief(s)"><div class="i-title">{{ s.title || s.video_id }}</div><div class="i-why" :class="{err: s._copyErr}">{{ s._copyErr ? s._copyErr : (s.noted ? ('standalone note ready · ' + ago(s.updated_at) + ' ago') : 'note generating…') }}</div></div>
+            <div class="i-act"><button class="act accept" @click="openBrief(s)">📖 Read</button><button class="act" :disabled="s._mining" @click="mine(s)">{{ s._mined ? '✓ Mining…' : (s._mining ? '…' : '🧠 Mine') }}</button><button class="act" :disabled="busy" @click="copyTranscript(s)" title="copy raw transcript">{{ s._copied ? '✓' : '⧉' }}</button></div>
           </div>
         </div>
       </section>

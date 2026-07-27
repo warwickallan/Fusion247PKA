@@ -55,7 +55,7 @@ async function apiState() {
     `select id, source_module, source_type, source_key, title, reason, priority, status, kind,
             notify_policy, actions, provenance_ref, related_ref, detail_route, updated_at
      from cockpit.attention_item where status='declined' order by updated_at desc limit 60`);
-  const ingested = await safe(`select video_id, title, updated_at from cockpit.youtube_source order by updated_at desc nulls last limit 12`);
+  const ingested = await safe(`select video_id, title, updated_at, (note_path is not null) as noted from cockpit.youtube_source order by updated_at desc nulls last limit 12`);
   const ingestedCount = await safe(`select count(*)::int n from cockpit.youtube_source`);
   const wins = await safe(`select id, text, happened_at from cockpit.movement order by happened_at desc nulls last limit 8`);
   const builds = await safe(`select id, name, gives, status, status_tone, progress_pct, sort from cockpit.build order by sort nulls last limit 50`);
@@ -132,6 +132,18 @@ async function apiTranscript(video) {
   return { ok: true, video, title: rows[0].title, text: extractTranscript(md) };
 }
 
+// Source brief = the PRIMARY output for an ingested source: the standalone "what this source says" knowledge
+// note (Cairn/Sonnet), understandable WITHOUT Arc's transfers or Mason's opportunities. Served from the
+// brief_markdown column the note generator populates (a pending/failed row returns its stub, clearly labelled).
+async function apiSourceBrief(video) {
+  if (!video || !/^[A-Za-z0-9_-]{6,24}$/.test(video)) return { ok: false, error: 'bad video id' };
+  const rows = (await q('select title, brief_markdown, (note_path is not null) as noted from cockpit.youtube_source where video_id=$1 limit 1', [video])).rows;
+  if (!rows.length) return { ok: false, error: 'no source on file for this video' };
+  const r = rows[0];
+  return { ok: true, video, title: r.title, noted: r.noted,
+    text: r.brief_markdown || '_No standalone note yet — this source was captured but its knowledge note has not been generated. It will generate automatically; if this persists, the generation failed and is retrying._' };
+}
+
 // Deliverables = produced docs (Pax reports etc.) living in the repo's Deliverables/ folder — the synced
 // "things for Warwick to read". Listed newest-first with a human title from the first H1.
 function listDeliverables() {
@@ -174,6 +186,7 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     if (req.url.startsWith('/api/transcript')) { const v = new URL(req.url, 'http://x').searchParams.get('video'); return j(res, 200, await apiTranscript(v)); }
+    if (req.url.startsWith('/api/source-brief')) { const v = new URL(req.url, 'http://x').searchParams.get('video'); return j(res, 200, await apiSourceBrief(v)); }
     if (req.url.startsWith('/api/deliverable')) { const f = new URL(req.url, 'http://x').searchParams.get('file'); return j(res, 200, await apiDeliverable(f)); }
     if (req.url.startsWith('/api/mine') && req.method === 'POST') {
       let raw = ''; req.on('data', (d) => { raw += d; if (raw.length > 1e4) req.destroy(); });

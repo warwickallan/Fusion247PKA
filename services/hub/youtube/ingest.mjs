@@ -47,7 +47,7 @@ export async function preserveRaw({ vaultRoot, videoId, packetFiles, subdir = 'S
 // meta: { videoId, title, sourceUrl, channel, published, transcriptSource, capturedAt, captureId }
 // packetFiles: [{ name, content }]  — the TubeAIR report + manifest (RAW source evidence)
 // authoredBody: the in-session-authored standalone knowledge note (Markdown, no frontmatter)
-export async function ingestYouTube({ vaultRoot, meta, packetFiles, authoredBody, subdir = 'Sources' }) {
+export async function ingestYouTube({ vaultRoot, meta, packetFiles, authoredBody, subdir = 'Sources', authoredBy = 'larry-in-session' }) {
   if (!meta?.videoId) throw new Error('ingestYouTube requires meta.videoId');
   if (!authoredBody) throw new Error('ingestYouTube requires an authored knowledge-note body');
   const adapter = new FsVaultAdapter(vaultRoot);
@@ -78,7 +78,7 @@ export async function ingestYouTube({ vaultRoot, meta, packetFiles, authoredBody
       capture_id: meta.captureId,
       review_state: 'ai_created',
       build: 'BUILD-002',
-      authored_by: 'larry-in-session',
+      authored_by: authoredBy,
       raw_evidence: rawEvidence.map((e) => e.file),
       tags: ['youtube', 'source-knowledge', 'pending-warwick-review'],
     },
