@@ -77,11 +77,11 @@ Then classify each item:
 
 **These are leads, not facts. Every one may have moved.**
 
-1. **The doctrine and the AsdAIr governance artefacts are committed on `idea-016/idea-engine`, not `main`.**
-   This is the single most important thing to check first. A fresh Larry opening this folder gets them *because
-   the working tree sits on that branch* — but they are absent from `main`, so any worktree branched from `main`
-   cannot see them. That is exactly how the AsdAIr behavioural acceptance ran against a tree with no specialist
-   contract and no `SOP-021`. **Getting these onto `main` is a merge decision for Warwick, not a cleanup action.**
+1. **RESOLVED at session close — doctrine is now ON MAIN.** It was committed only on `idea-016/idea-engine`
+   and, worse, **unpushed** until the final minutes; twelve commits existed on one machine and nowhere else.
+   Merged to main via PR #74 (main `1cb73e8`). **Verify it rather than trust this line:** `SOP-021`, `SOP-022`,
+   the Asdair contract and the reconciled iron rule should all be present on `origin/main`. If any is missing,
+   that is your first and most important finding.
 2. **BUILD-015 / AsdAIr** — durability repair, verdict recorded as **NOT READY autonomous / READY supervised**.
    See `Builds/BUILD-015-.../ACCEPTANCE-AND-EVIDENCE.md`. Its branch carries real, reviewed, CI-green work and
    named unblocking items. **Class A. Do not tidy it away.**
