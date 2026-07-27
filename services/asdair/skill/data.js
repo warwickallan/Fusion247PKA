@@ -2,7 +2,8 @@
 // IDEA-012 AsdAIr - WP1 skill: data.js
 //
 // READ-ONLY data adapter. It loads the pure planner's inputs from the
-// live asdair Postgres schema and returns plain objects.
+// live asdair Postgres schema and returns plain objects:
+//   loadList / loadRules / loadProducts / loadRegulars / loadBudget
 //
 // READ-ONLY INTENT (enforced by review):
 //   * Every query in this file is a SELECT. There is NO INSERT, UPDATE,
@@ -44,6 +45,31 @@ const RULES_SELECT_COLUMNS = [
   'matched_product',
   'reason',
   'note'
+];
+
+// The EXACT column list loadRegulars() SELECTs from asdair.regulars, kept as
+// one exported constant for the same single-source-of-truth reason as
+// RULES_SELECT_COLUMNS above. These are fixed identifiers (no external input),
+// so building the SELECT from them keeps the query SELECT-only and safe.
+//
+// SCHEMA NOTE (drift, reported not fixed): asdair.regulars exists in the LIVE
+// asdair schema but is NOT defined in the committed migration
+// db/001_asdair_schema.sql, so it is not covered by the schemaCompat.test.js
+// drift guard the way asdair.rules is. Adding it to the migration is out of
+// scope for this change; until it lands, a database built from git alone does
+// not have this table and loadRegulars() will throw against it.
+const REGULARS_SELECT_COLUMNS = [
+  'id',
+  'household_id',
+  'high_level_category',
+  'category',
+  'name',
+  'brand',
+  'aka',
+  'asda_product_id',
+  'asda_url',
+  'typical_qty',
+  'substitutes_allowed'
 ];
 
 // Lazily create a single shared pool from the environment. Throws a clear
@@ -174,6 +200,43 @@ async function loadProducts() {
   return rows;
 }
 
+// Load the household's ACTIVE Regulars -- the standing "this is what we
+// actually buy" knowledge (brand, `aka` aliases, asda_product_id,
+// substitutes_allowed). This is the resolution source the planner was missing:
+// without it an item the household buys every week resolved to nothing and the
+// plan was confidently wrong. SELECT only.
+//
+// Scoping is done HERE as well as in the planner, deliberately narrower than
+// loadRules(): regulars carry a household's private preferences, so a run that
+// names a household gets that household's rows plus the global ones, and a run
+// that names none gets ONLY the global rows -- another household's regulars are
+// never loaded into memory in the first place.
+//
+// An unresolvable household THROWS rather than silently falling back to the
+// global set (the loadList precedent, not the loadBudget one). A silent
+// fallback here would quietly drop all of the household's resolution knowledge
+// and reproduce exactly the confidently-wrong plan this function fixes.
+async function loadRegulars(household) {
+  const cols = REGULARS_SELECT_COLUMNS.join(', ');
+  const named = !(household === null || household === undefined || String(household).trim() === '');
+
+  if (!named) {
+    return await readQuery(
+      'SELECT ' + cols + ' FROM asdair.regulars WHERE active = true AND household_id IS NULL ORDER BY id',
+      []
+    );
+  }
+
+  const householdId = await resolveHouseholdId(household);
+  if (householdId === null) {
+    throw new Error('Unknown household "' + String(household) + '". Check asdair.households.name.');
+  }
+  return await readQuery(
+    'SELECT ' + cols + ' FROM asdair.regulars WHERE active = true AND (household_id = $1 OR household_id IS NULL) ORDER BY id',
+    [householdId]
+  );
+}
+
 // Load the budget band for a household, falling back to the global default
 // row (household_id IS NULL) when the household has no specific band.
 // SELECT only.
@@ -205,9 +268,11 @@ module.exports = {
   loadList: loadList,
   loadRules: loadRules,
   loadProducts: loadProducts,
+  loadRegulars: loadRegulars,
   loadBudget: loadBudget,
   close: close,
   // Exported for schemaCompat.test.js (schema/code drift guard). Not used by
   // the CLI runtime path.
-  RULES_SELECT_COLUMNS: RULES_SELECT_COLUMNS
+  RULES_SELECT_COLUMNS: RULES_SELECT_COLUMNS,
+  REGULARS_SELECT_COLUMNS: REGULARS_SELECT_COLUMNS
 };

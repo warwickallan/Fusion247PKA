@@ -18,15 +18,17 @@ order**. Larry runs the live-data acceptance separately.
 Three clean layers:
 
 1. **`planner.js` - pure, deterministic, dependency-free.**
-   `planBasket({ listItems, rules, products, budget }) -> { items, summary }`
+   `planBasket({ listItems, rules, products, regulars, budget }) -> { items, summary }`
    No DB, no network, no fs, no clock, no randomness. Same inputs -> same output.
-   All the shopping logic lives here (see "Standing rules" below).
+   All the shopping logic lives here (see "Standing rules" below). `regulars` is
+   an ARGUMENT like `rules` / `products`; the planner never loads it itself.
 
 2. **`data.js` - read-only Postgres adapter.**
    `loadList(listDate, household)`, `loadRules()`, `loadProducts()`,
-   `loadBudget(household)`. **SELECT statements only** - no INSERT / UPDATE /
-   DELETE / DDL anywhere. Every query runs inside a `BEGIN TRANSACTION READ ONLY`
-   so the database itself rejects any accidental write.
+   `loadRegulars(household)`, `loadBudget(household)`. **SELECT statements only**
+   - no INSERT / UPDATE / DELETE / DDL anywhere. Every query runs inside a
+   `BEGIN TRANSACTION READ ONLY` so the database itself rejects any accidental
+   write.
 
 3. **`cli.js` - view a plan.**
    Loads via `data.js`, runs `planner.js`, prints a human-readable basket plan
@@ -99,6 +101,35 @@ changes a plan when it carries **structured directive fields**:
 
 Free-text-only rows have no planning effect. This keeps the planner deterministic
 and auditable rather than guessing intent from prose.
+
+### How Regulars drive resolution
+
+`asdair.regulars` is the household's standing "this is what we actually buy"
+set: `name`, `aka` (alias array), `brand`, `asda_product_id`, `typical_qty`,
+`substitutes_allowed`. `loadRegulars(household)` reads the ACTIVE rows for the
+named household plus the global ones (never another household's), and
+`planBasket` takes them as an argument.
+
+Regulars are the **lowest-priority** resolution source. Existing precedence is
+unchanged:
+
+```
+explicit matched_product_id  >  products.list_term  >  `map` directive rule  >  regulars
+```
+
+A regulars match is case-insensitive over `name` and every `aka` alias, honours
+household scope (household-scoped beats global), and sets `matched_product` to
+the regular's brand + name, flag `matched from regulars`, with
+`regulars asda_product_id <id>` surfaced in the note. Two or more active
+regulars answering the same term is AMBIGUOUS -> `needs_decision` (flags
+`ambiguous match` + `ambiguous regulars match`); the planner never picks one
+(rule 6). `substitutes_allowed = false` adds the informational flag
+`no substitutes allowed` - the planner never substitutes at all.
+
+**Schema note:** `asdair.regulars` exists in the live schema but is NOT yet
+defined in the committed `db/001_asdair_schema.sql`, so a database built from
+git alone does not have it and the CLI will error on `loadRegulars`. Adding it
+to the migration is tracked separately.
 
 ## Run the CLI (live acceptance)
 

@@ -3,7 +3,13 @@
 //
 // The "brain" half of the household-shopping agent.
 //
-// planBasket({ listItems, rules, products, budget }) -> { items, summary }
+// planBasket({ listItems, rules, products, regulars, budget })
+//   -> { items, summary }
+//
+// `regulars` is the household's standing "this is what we actually buy" set
+// (name, `aka` aliases, brand, asda_product_id, substitutes_allowed). It is an
+// ARGUMENT, exactly like `rules` and `products`: this function stays PURE and
+// does no I/O of its own. data.js loadRegulars() supplies it.
 //
 // PURE and DETERMINISTIC:
 //   * No DB, no network, no fs, no Date.now(), no randomness.
@@ -163,6 +169,87 @@ function inHouseholdScope(product, household) {
   if (!product) return false;
   const isGlobal = product.household_id === null || product.household_id === undefined;
   return isGlobal || sameHousehold(product.household_id, household);
+}
+
+// ---------------------------------------------------------------------
+// Regulars matching (rule 4 + rule 9): the household's standing
+// "this is what we actually buy" set, used as an ADDITIONAL resolution source
+// BELOW products and rules.
+//
+// Why it exists: asdair.regulars carries nearly all of the household's real
+// resolution knowledge (brand, `aka` aliases, asda_product_id,
+// substitutes_allowed) and the planner could not see any of it, so items the
+// household buys every week resolved to nothing and produced a confidently
+// wrong plan.
+//
+// PRECEDENCE IS UNCHANGED. A regulars match is only consulted when the
+// existing sources produced nothing: explicit matched_product_id, then a
+// products.list_term match, then a `map` directive rule all keep priority.
+// Regulars never override any of them.
+//
+// Matching is case-insensitive over the regular's `name` AND every entry of
+// its `aka` alias array. Only ACTIVE rows count (`active === false` is
+// excluded; an absent `active` is treated as active, matching how
+// actionableRules reads rules). Household scope is the SAME boundary
+// matchProduct and rankAlternatives enforce: global rows plus the active
+// household's, never another household's. A household-scoped regular beats a
+// global one; two or more at the winning scope is AMBIGUOUS -> the caller
+// sends the line to a human and never picks one (rule 6).
+// ---------------------------------------------------------------------
+
+// Every normalised name this regular answers to: its `name` plus each `aka`
+// alias. Distinct, order preserved.
+function regularAliases(reg) {
+  const names = [];
+  if (!reg) return names;
+  const primary = normaliseTerm(reg.name);
+  if (primary !== '') names.push(primary);
+  const aka = Array.isArray(reg.aka) ? reg.aka : [];
+  aka.forEach(function (a) {
+    const t = normaliseTerm(a);
+    if (t !== '' && names.indexOf(t) === -1) names.push(t);
+  });
+  return names;
+}
+
+// The product name a regulars match resolves to. `brand` is prepended when the
+// regular carries one and the name does not already lead with it, so the plan
+// names the actual thing to buy ("Yazoo Strawberry Milkshake") rather than the
+// household's shorthand. Returns null when there is nothing usable to name.
+function regularDisplayName(reg) {
+  if (!reg) return null;
+  const name = (reg.name === null || reg.name === undefined) ? '' : String(reg.name).trim();
+  const brand = (reg.brand === null || reg.brand === undefined) ? '' : String(reg.brand).trim();
+  if (name === '') return brand === '' ? null : brand;
+  if (brand === '') return name;
+  return normaliseTerm(name).indexOf(normaliseTerm(brand)) === 0 ? name : brand + ' ' + name;
+}
+
+function matchRegular(item, regulars, household) {
+  const list = Array.isArray(regulars) ? regulars : [];
+  const term = normaliseTerm(item && item.item_name);
+  if (term === '') return { regular: null, ambiguous: false };
+
+  const hits = list.filter(function (r) {
+    if (!r || r.active === false) return false;             // only ACTIVE rows
+    if (!inHouseholdScope(r, household)) return false;      // no cross-household leak
+    return regularAliases(r).indexOf(term) !== -1;           // name or aka alias
+  });
+
+  const scoped = hits.filter(function (r) {
+    return r.household_id !== null && r.household_id !== undefined
+      && sameHousehold(r.household_id, household);
+  });
+  if (scoped.length === 1) return { regular: scoped[0], ambiguous: false };
+  if (scoped.length > 1) return { regular: scoped[0], ambiguous: true };
+
+  const global = hits.filter(function (r) {
+    return r.household_id === null || r.household_id === undefined;
+  });
+  if (global.length === 1) return { regular: global[0], ambiguous: false };
+  if (global.length > 1) return { regular: global[0], ambiguous: true };
+
+  return { regular: null, ambiguous: false };
 }
 
 // Compare two product ids for a DETERMINISTIC tie-break: numeric when both
@@ -485,6 +572,7 @@ function planBasket(input) {
   const listItems = args.listItems;
   const rules = args.rules;
   const products = args.products;
+  const regulars = args.regulars;   // household Regulars: an ARGUMENT, no I/O here
   const budget = args.budget || null;
 
   // Active household: explicit override, else derived from the budget row.
@@ -519,6 +607,40 @@ function planBasket(input) {
         if (r.note) note = note ? (note + '; ' + r.note) : r.note;
       }
     });
+
+    // Regulars: the LOWEST-priority resolution source. Consulted ONLY when
+    // everything above produced no product, so existing precedence is
+    // untouched: explicit matched_product_id > products.list_term > `map`
+    // directive > regulars. Skipped entirely on a scope mismatch (that line is
+    // already failing safe to a human) and when the product match was already
+    // ambiguous (a second source cannot resolve an existing ambiguity).
+    let regularAmbiguous = false;
+    if (!matchedProduct && !scopeMismatch && !ambiguous) {
+      const regMatch = matchRegular(line, regulars, household);
+      if (regMatch.ambiguous) {
+        // Two or more active regulars answer to this term (the real "bread"
+        // case). Rule 6: never pick one -- send it to a human.
+        regularAmbiguous = true;
+      } else if (regMatch.regular) {
+        const display = regularDisplayName(regMatch.regular);
+        if (display) {
+          matchedProduct = display;
+          pushFlag(flags, 'matched from regulars');
+          // Surface the store identifier so a human / the browser half can act
+          // on the exact product rather than re-searching by name.
+          const pid = regMatch.regular.asda_product_id;
+          if (pid !== null && pid !== undefined && String(pid).trim() !== '') {
+            const idText = 'regulars asda_product_id ' + String(pid);
+            note = note ? (note + '; ' + idText) : idText;
+          }
+          // Rule 6 book-keeping: the household has said this item must not be
+          // swapped. Informational only -- the planner never substitutes at all.
+          if (regMatch.regular.substitutes_allowed === false) {
+            pushFlag(flags, 'no substitutes allowed');
+          }
+        }
+      }
+    }
 
     // ---- status resolution -----------------------------------------------
     // Precedence: standing exclude > one-week exclude > needs_decision > add.
@@ -575,10 +697,13 @@ function planBasket(input) {
       status = 'needs_decision';
       pushFlag(flags, 'flagged by rule');
       pushFlag(flags, 'never auto-substitute');
-    } else if (ambiguous) {
-      // Rule 6: cannot be confidently matched -> human decision.
+    } else if (ambiguous || regularAmbiguous) {
+      // Rule 6: cannot be confidently matched -> human decision. This covers
+      // BOTH an ambiguous products match and an ambiguous REGULARS match (two
+      // active regulars answering to the same term / alias).
       status = 'needs_decision';
       pushFlag(flags, 'ambiguous match');
+      if (regularAmbiguous) pushFlag(flags, 'ambiguous regulars match');
       pushFlag(flags, 'never auto-substitute');
     } else if (!matchedProduct) {
       // Unmatched but explicitly on the list: still plan to add. It would be
@@ -711,6 +836,9 @@ module.exports = {
     normaliseTerm: normaliseTerm,
     normaliseQty: normaliseQty,
     matchProduct: matchProduct,
+    matchRegular: matchRegular,
+    regularAliases: regularAliases,
+    regularDisplayName: regularDisplayName,
     dedupeList: dedupeList,
     rankAlternatives: rankAlternatives,
     inHouseholdScope: inHouseholdScope

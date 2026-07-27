@@ -40,7 +40,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { RULES_SELECT_COLUMNS } = require('./data');
+const data = require('./data');
+const { RULES_SELECT_COLUMNS, REGULARS_SELECT_COLUMNS } = data;
 
 const SCHEMA_PATH = path.join(__dirname, '..', 'db', '001_asdair_schema.sql');
 
@@ -157,6 +158,56 @@ test('the directive CHECK lists exactly the planner vocabulary: info, exclude, n
   // needs_decision / exclude directives drive the plan).
   const expected = ['exclude', 'info', 'map', 'needs_decision'];
   assert.deepEqual(values.slice().sort(), expected);
+});
+
+// ---------------------------------------------------------------------
+// loadRegulars() surface + drift guard (defect B).
+//
+// NOTE ON THE GAP THIS DOCUMENTS: `asdair.regulars` exists in the LIVE schema
+// but is NOT defined in the committed db/001_asdair_schema.sql, so a database
+// built from git alone does not have it. Adding it to the migration was out of
+// scope for this change. The drift assertion below is therefore CONDITIONAL:
+// it is inert while the table is absent from the migration and becomes a real
+// guard - identical to the asdair.rules one - the moment the table is added.
+// It is deliberately NOT written as "assert the table is missing", which would
+// go red when the gap is fixed.
+// ---------------------------------------------------------------------
+test('data.js exports loadRegulars with a safe, non-empty column list', function () {
+  assert.equal(typeof data.loadRegulars, 'function', 'loadRegulars must be exported');
+  assert.ok(Array.isArray(REGULARS_SELECT_COLUMNS), 'REGULARS_SELECT_COLUMNS must be an array');
+  assert.ok(REGULARS_SELECT_COLUMNS.length > 0, 'REGULARS_SELECT_COLUMNS must not be empty');
+  // Distinct entries only (a duplicated column would produce an ambiguous row).
+  assert.equal(
+    new Set(REGULARS_SELECT_COLUMNS).size,
+    REGULARS_SELECT_COLUMNS.length,
+    'REGULARS_SELECT_COLUMNS must not repeat a column'
+  );
+  // Every entry is a plain SQL identifier. The SELECT is built by joining this
+  // constant, so this is what keeps that interpolation safe by construction.
+  REGULARS_SELECT_COLUMNS.forEach(function (col) {
+    assert.match(col, /^[a-z_][a-z0-9_]*$/, 'not a plain identifier: ' + col);
+  });
+  // The columns the planner's regulars resolution actually reads.
+  ['id', 'household_id', 'name', 'brand', 'aka', 'asda_product_id', 'substitutes_allowed']
+    .forEach(function (col) {
+      assert.ok(REGULARS_SELECT_COLUMNS.includes(col), 'loadRegulars must select ' + col);
+    });
+});
+
+test('drift guard: IF the migration defines asdair.regulars, every selected column is present', function () {
+  const sql = fs.readFileSync(SCHEMA_PATH, 'utf8');
+  if (sql.indexOf('create table if not exists asdair.regulars') === -1) {
+    // The table is not in the committed migration yet (see the note above).
+    // Nothing to compare; the assertion below activates automatically once it is.
+    return;
+  }
+  const schemaColumns = parseTableColumns(sql, 'asdair.regulars');
+  REGULARS_SELECT_COLUMNS.forEach(function (col) {
+    assert.ok(
+      schemaColumns.indexOf(col.toLowerCase()) !== -1,
+      'loadRegulars() selects "' + col + '" but asdair.regulars has no such column in 001_asdair_schema.sql'
+    );
+  });
 });
 
 // ---------------------------------------------------------------------

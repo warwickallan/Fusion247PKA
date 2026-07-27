@@ -761,3 +761,217 @@ test('Finding 6: a target-less exclude directive (no match_term / match_category
   assert.equal(plan.summary.planned_add, 2, 'both lines still plan to add');
   assert.equal(plan.summary.excluded, 0, 'nothing was excluded by the target-less rule');
 });
+
+// =====================================================================
+// DEFECT B: the planner can now SEE the household's Regulars.
+//
+// asdair.regulars carries nearly all of the household's real resolution
+// knowledge (brand, `aka` aliases, asda_product_id, substitutes_allowed) and
+// planBasket could not see any of it, so items the household buys every week
+// resolved to nothing and the plan was confidently wrong.
+//
+// Regulars are the LOWEST-priority resolution source; products mappings and
+// rules directives keep priority. SYNTHETIC fixtures only.
+// =====================================================================
+
+const regulars = [
+  {
+    id: 90, household_id: HH, name: 'Generic Cordial 1L', brand: 'Generic',
+    aka: ['squash', 'juice thing'], category: 'drinks',
+    asda_product_id: 'SYN-90', typical_qty: 1, substitutes_allowed: true, active: true
+  },
+  {
+    id: 91, household_id: null, name: 'Global Spread 500g', brand: null,
+    aka: ['spread'], category: 'dairy',
+    asda_product_id: null, typical_qty: 1, substitutes_allowed: true, active: true
+  },
+  {
+    id: 92, household_id: HH, name: 'Locked Item', brand: 'Brandy',
+    aka: [], category: 'misc',
+    asda_product_id: 'SYN-92', typical_qty: 2, substitutes_allowed: false, active: true
+  },
+  {
+    id: 93, household_id: HH, name: 'Retired Item', brand: null,
+    aka: ['retired'], category: 'misc',
+    asda_product_id: null, typical_qty: 1, substitutes_allowed: true, active: false
+  },
+  {
+    id: 94, household_id: OTHER, name: 'Foreign Regular', brand: null,
+    aka: ['foreign thing'], category: 'misc',
+    asda_product_id: null, typical_qty: 1, substitutes_allowed: true, active: true
+  },
+  // Two ACTIVE household regulars answering the same term -> ambiguous.
+  {
+    id: 95, household_id: HH, name: 'Twin Loaf White', brand: null,
+    aka: ['twin loaf'], category: 'bakery',
+    asda_product_id: 'SYN-95', typical_qty: 1, substitutes_allowed: true, active: true
+  },
+  {
+    id: 96, household_id: HH, name: 'Twin Loaf Brown', brand: null,
+    aka: ['twin loaf'], category: 'bakery',
+    asda_product_id: 'SYN-96', typical_qty: 1, substitutes_allowed: true, active: true
+  }
+];
+
+test('defect B: an item found ONLY in regulars now resolves (brand + name, id surfaced)', function () {
+  const plan = planBasket({
+    listItems: [{ item_name: 'Generic Cordial 1L', requested_qty: 2 }],
+    products: products, rules: [], regulars: regulars, budget: budget, household: HH
+  });
+  const c = byName(plan, 'Generic Cordial 1L');
+  assert.equal(c.matched_product, 'Generic Cordial 1L', 'brand already leads the name, not doubled');
+  assert.equal(c.status, 'add');
+  assert.equal(c.planned_qty, 2);
+  assert.ok(c.flags.includes('matched from regulars'));
+  assert.ok(c.note.includes('regulars asda_product_id SYN-90'));
+});
+
+test('defect B: an aka alias resolves, case-insensitively', function () {
+  const plan = planBasket({
+    listItems: [{ item_name: 'SQUASH', requested_qty: 1 }],
+    products: products, rules: [], regulars: regulars, budget: budget, household: HH
+  });
+  const s = byName(plan, 'SQUASH');
+  assert.equal(s.matched_product, 'Generic Cordial 1L');
+  assert.ok(s.flags.includes('matched from regulars'));
+});
+
+test('defect B: brand is prepended when the name does not already carry it', function () {
+  const plan = planBasket({
+    listItems: [{ item_name: 'Locked Item', requested_qty: 1 }],
+    products: products, rules: [], regulars: regulars, budget: budget, household: HH
+  });
+  const l = byName(plan, 'Locked Item');
+  assert.equal(l.matched_product, 'Brandy Locked Item');
+});
+
+test('defect B: substitutes_allowed = false surfaces an informational flag', function () {
+  const plan = planBasket({
+    listItems: [{ item_name: 'Locked Item', requested_qty: 1 }],
+    products: products, rules: [], regulars: regulars, budget: budget, household: HH
+  });
+  const l = byName(plan, 'Locked Item');
+  assert.ok(l.flags.includes('no substitutes allowed'));
+});
+
+test('defect B: a GLOBAL regular resolves for any household', function () {
+  const plan = planBasket({
+    listItems: [{ item_name: 'spread', requested_qty: 1 }],
+    products: products, rules: [], regulars: regulars, budget: budget, household: HH
+  });
+  const s = byName(plan, 'spread');
+  assert.equal(s.matched_product, 'Global Spread 500g');
+  assert.equal(s.note, '', 'no asda_product_id on this row -> nothing appended');
+});
+
+test('defect B: an INACTIVE regular never resolves', function () {
+  const plan = planBasket({
+    listItems: [{ item_name: 'retired', requested_qty: 1 }],
+    products: products, rules: [], regulars: regulars, budget: budget, household: HH
+  });
+  const r = byName(plan, 'retired');
+  assert.equal(r.matched_product, null, 'active = false is not a resolution source');
+  assert.ok(!r.flags.includes('matched from regulars'));
+});
+
+test('defect B: a regular owned by ANOTHER household is NEVER used (no cross-household leak)', function () {
+  const plan = planBasket({
+    listItems: [{ item_name: 'foreign thing', requested_qty: 1 }],
+    products: products, rules: [], regulars: regulars, budget: budget, household: HH
+  });
+  const f = byName(plan, 'foreign thing');
+  assert.equal(f.matched_product, null);
+  assert.notEqual(f.matched_product, 'Foreign Regular');
+  assert.ok(!f.flags.includes('matched from regulars'));
+});
+
+test('defect B / rule 6: two active regulars on the same term -> needs_decision, never a pick', function () {
+  // This is the reported live failure: a genuinely ambiguous item (two real
+  // candidates) must reach a human, never be silently resolved.
+  const plan = planBasket({
+    listItems: [{ item_name: 'twin loaf', requested_qty: 1 }],
+    products: products, rules: [], regulars: regulars, budget: budget, household: HH
+  });
+  const t = byName(plan, 'twin loaf');
+  assert.equal(t.status, 'needs_decision');
+  assert.equal(t.planned_qty, 0, 'nothing added pending a human decision');
+  assert.equal(t.matched_product, null, 'neither candidate is picked');
+  assert.ok(t.flags.includes('ambiguous match'));
+  assert.ok(t.flags.includes('ambiguous regulars match'));
+  assert.ok(t.flags.includes('never auto-substitute'));
+  assert.equal(plan.summary.needs_decision, 1);
+});
+
+test('defect B: PRECEDENCE - a products.list_term mapping still beats a regulars match', function () {
+  const withClash = regulars.concat([{
+    id: 97, household_id: HH, name: 'Regulars Milk', brand: null,
+    aka: ['generic milk 2l'], category: 'dairy',
+    asda_product_id: 'SYN-97', typical_qty: 1, substitutes_allowed: true, active: true
+  }]);
+  const plan = planBasket({
+    listItems: [{ item_name: 'Generic Milk 2L', requested_qty: 1 }],
+    products: products, rules: [], regulars: withClash, budget: budget, household: HH
+  });
+  const m = byName(plan, 'Generic Milk 2L');
+  assert.equal(m.matched_product, 'Store Brand Milk 2L', 'products mapping wins');
+  assert.ok(!m.flags.includes('matched from regulars'));
+});
+
+test('defect B: PRECEDENCE - a map directive rule still beats a regulars match', function () {
+  const mapRules = [{
+    id: 401, scope: 'product', active: true, directive: 'map',
+    match_term: 'squash', match_category: null,
+    matched_product: 'Rule Mapped Cordial', household_id: HH
+  }];
+  const plan = planBasket({
+    listItems: [{ item_name: 'squash', requested_qty: 1 }],
+    products: products, rules: mapRules, regulars: regulars, budget: budget, household: HH
+  });
+  const s = byName(plan, 'squash');
+  assert.equal(s.matched_product, 'Rule Mapped Cordial', 'the map directive wins');
+  assert.ok(s.flags.includes('product mapped by rule'));
+  assert.ok(!s.flags.includes('matched from regulars'));
+});
+
+test('defect B: PRECEDENCE - a scope-mismatched explicit id is NOT rescued by regulars', function () {
+  const withGadget = regulars.concat([{
+    id: 98, household_id: HH, name: 'Regulars Gadget', brand: null,
+    aka: ['gadget z'], category: 'household',
+    asda_product_id: 'SYN-98', typical_qty: 1, substitutes_allowed: true, active: true
+  }]);
+  const plan = planBasket({
+    listItems: [{ item_name: 'Gadget Z', requested_qty: 1, matched_product_id: 13 }],
+    products: products, rules: [], regulars: withGadget, budget: budget, household: HH
+  });
+  const g = byName(plan, 'Gadget Z');
+  assert.equal(g.status, 'needs_decision');
+  assert.equal(g.matched_product, null, 'the line still fails safe to a human');
+  assert.ok(g.flags.includes('product id household scope mismatch'));
+});
+
+test('defect B: planBasket stays PURE - omitting regulars equals passing [], and repeats exactly', function () {
+  const items = [{ item_name: 'Widget A', requested_qty: 1 }];
+  const a = planBasket({ listItems: items, products: products, rules: [], budget: budget, household: HH });
+  const b = planBasket({ listItems: items, products: products, rules: [], regulars: [], budget: budget, household: HH });
+  assert.deepEqual(a, b);
+  const c = planBasket({ listItems: items, products: products, rules: [], regulars: regulars, budget: budget, household: HH });
+  const d = planBasket({ listItems: items, products: products, rules: [], regulars: regulars, budget: budget, household: HH });
+  assert.deepEqual(c, d);
+});
+
+test('defect B helper: regularAliases returns name + aka, distinct and normalised', function () {
+  assert.deepEqual(
+    _internal.regularAliases({ name: '  Twin  Loaf White ', aka: ['TWIN LOAF', 'twin loaf', ''] }),
+    ['twin loaf white', 'twin loaf']
+  );
+  assert.deepEqual(_internal.regularAliases({ name: 'X', aka: null }), ['x']);
+  assert.deepEqual(_internal.regularAliases(null), []);
+});
+
+test('defect B helper: regularDisplayName prepends brand only when needed', function () {
+  assert.equal(_internal.regularDisplayName({ name: 'Locked Item', brand: 'Brandy' }), 'Brandy Locked Item');
+  assert.equal(_internal.regularDisplayName({ name: 'Brandy Locked Item', brand: 'Brandy' }), 'Brandy Locked Item');
+  assert.equal(_internal.regularDisplayName({ name: 'Plain', brand: null }), 'Plain');
+  assert.equal(_internal.regularDisplayName({ name: '', brand: 'OnlyBrand' }), 'OnlyBrand');
+  assert.equal(_internal.regularDisplayName({ name: '', brand: '' }), null);
+});
