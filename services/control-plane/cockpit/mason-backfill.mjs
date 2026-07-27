@@ -1,10 +1,12 @@
 // Mason v1 — backfill the durable atom register (cockpit.idea_atom) from the frozen-experiment raws.
-// Idempotent + provenance-safe: UPSERTS on the stable natural key (origin, source_ref, n) so atom_ids never
-// change across re-seeds — opportunity_atom provenance and the disposition-carry chain survive. (Do NOT reintroduce
-// a delete: it would cascade away provenance.) Production Mines write atoms here too — the register is not a one-off.
+// Idempotent + provenance-safe: rekeys any pre-existing rows to the canonical CONTENT hash (atom-register.mjs
+// atomKey), then UPSERTS on that content key so atom_ids never change across re-seeds — opportunity_atom provenance
+// and the disposition-carry chain survive. (Do NOT reintroduce a delete: it would cascade away provenance.)
+// Production Mines write atoms here too (mine-ideas → idea_atom) — the register is not a one-off.
 //   node --env-file=<db.env> services/control-plane/cockpit/mason-backfill.mjs
 import fs from 'node:fs';
 import pg from 'file:///C:/Fusion247PKA/services/control-plane/node_modules/pg/lib/index.js';
+import { upsertAtom, atomKey } from 'file:///C:/Fusion247PKA/services/control-plane/cockpit/atom-register.mjs';
 
 const OUT = 'C:/Fusion247PKA/Deliverables';
 const F = [['m6IXL_YGqBQ', '1 ADHD/agent-skill'], ['MO3vBmrYyHI', '2 Business-4-tasks'], ['eW_vxrjvERk', '3 ContextGraphs'],
@@ -26,6 +28,8 @@ function loadAtoms() {
         convergence: c.convergence_type || 'single', category: c.category || 'brain',
         fusion_target: c.fusion_target || '', spin: c.spin || {}, transfer_reasoning: c.transfer_reasoning || '',
         source_evidence: c.source_evidence || {}, nvfi: c.nvfi || {},
+        meta: { traps: c.traps || [], forced_analogy: c.forced_analogy || false, graph_note: c.graph_note || null },
+        origin: 'experiment',
       });
     }
   }
@@ -37,21 +41,16 @@ async function main() {
   const atoms = loadAtoms();
   const c = new pg.Client({ connectionString: URL, ssl: { rejectUnauthorized: false } });
   await c.connect();
-  // UPSERT by the stable natural key (origin, source_ref, n) so re-seeding keeps each atom_id STABLE — a
-  // delete+reinsert would cascade away opportunity_atom provenance and break the disposition-carry chain.
-  for (const a of atoms) {
-    await c.query(
-      `insert into cockpit.idea_atom (n, source_ref, engine, frames, convergence, category, fusion_target,
-         spin, transfer_reasoning, source_evidence, nvfi, origin)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'experiment')
-       on conflict (origin, source_ref, n) do update set
-         engine=excluded.engine, frames=excluded.frames, convergence=excluded.convergence, category=excluded.category,
-         fusion_target=excluded.fusion_target, spin=excluded.spin, transfer_reasoning=excluded.transfer_reasoning,
-         source_evidence=excluded.source_evidence, nvfi=excluded.nvfi`,
-      [a.n, a.source_ref, a.engine, a.frames, a.convergence, a.category, a.fusion_target,
-        JSON.stringify(a.spin), a.transfer_reasoning, JSON.stringify(a.source_evidence), JSON.stringify(a.nvfi)],
-    );
+  // Rekey any pre-existing rows to the CANONICAL JS content key (idempotent) — repairs SQL/JS key drift and
+  // pre-rekey NULLs so the upsert below matches instead of inserting duplicates. atom_id is preserved (provenance-safe).
+  const existing = (await c.query('select atom_id, origin, source_ref, fusion_target, transfer_reasoning from cockpit.idea_atom')).rows;
+  for (const e of existing) {
+    const k = atomKey(e);
+    try { await c.query('update cockpit.idea_atom set atom_key=$2 where atom_id=$1 and atom_key is distinct from $2', [e.atom_id, k]); }
+    catch (err) { /* content-duplicate collision — leave the existing key; dedup of identical atoms is Mason's concern */ }
   }
+  // UPSERT via the shared content-hash writer — keeps atom_id STABLE across re-seeds without a positional key.
+  for (const a of atoms) await upsertAtom(c, a);
   const tot = (await c.query('select count(*)::int n from cockpit.idea_atom')).rows[0].n;
   await c.end();
   console.log(JSON.stringify({ ok: true, backfilled: atoms.length, register_total: tot }, null, 2));

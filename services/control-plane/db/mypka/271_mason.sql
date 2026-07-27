@@ -11,7 +11,8 @@ create schema if not exists cockpit;
 -- Durable atomic idea register. Complete corpus lives here; atom_state records how synthesis placed it.
 create table if not exists cockpit.idea_atom (
   atom_id          uuid primary key default gen_random_uuid(),
-  n                int,                          -- stable corpus index for traceability
+  atom_key         text,                         -- CONTENT hash (origin|source|target|reasoning) — stable identity
+  n                int,                          -- display index only (NOT identity — positional keys corrupt on re-run)
   source_ref       text not null,               -- source id / label
   engine           text,                         -- T1 | T2 (generator tier)
   frames           text[],                       -- contributing reasoning frames (T2)
@@ -20,17 +21,23 @@ create table if not exists cockpit.idea_atom (
   fusion_target    text,
   spin             jsonb,                        -- { situation, problem, implication, need_payoff }
   transfer_reasoning text,
-  source_evidence  jsonb,                        -- { quote, timestamp, named_mechanism }
+  source_evidence  jsonb,                        -- { quote, timestamp, named_mechanism, verified }
   nvfi             jsonb,                        -- { novelty, viability, fit, impact } PROVISIONAL
+  meta             jsonb not null default '{}',  -- traps / forced_analogy / graph_note — the atom's risk channel
   origin           text not null default 'production',  -- production | experiment
   atom_state       text not null default 'registered'
     check (atom_state in ('registered','surfaced_member','emerging_member','standalone','rejected_member')),
   created_at       timestamptz not null default now()
 );
 create index if not exists idea_atom_state_idx on cockpit.idea_atom (atom_state);
--- Stable natural key so re-seeding UPSERTS (keeps atom_id stable) instead of delete+reinsert — which would
--- cascade away opportunity_atom provenance and break the disposition-carry chain (Fable BLOCKER-1).
-create unique index if not exists idea_atom_natkey on cockpit.idea_atom (origin, source_ref, n);
+-- CONTENT-HASH identity (Fable B2): re-seeding/re-running UPSERTS on the transfer's content, so it never
+-- content-swaps or duplicates an atom the way a positional key does; atom_id + provenance + disposition-carry stay stable.
+-- The key is computed in ONE place — atom-register.mjs atomKey() (JS) — so migration only adds the column + index;
+-- pre-existing rows are rekeyed by mason-backfill's rekey step (never in SQL, to avoid JS/SQL hash-basis drift).
+alter table cockpit.idea_atom add column if not exists atom_key text;
+alter table cockpit.idea_atom add column if not exists meta jsonb not null default '{}';
+drop index if exists cockpit.idea_atom_natkey;   -- retire the positional key
+create unique index if not exists idea_atom_key on cockpit.idea_atom (atom_key);  -- NULLs distinct: pre-rekey rows coexist
 
 -- Re-runnable synthesis passes (each = one Mason run over the register).
 create table if not exists cockpit.opportunity_run (

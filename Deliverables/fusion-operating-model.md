@@ -1,9 +1,18 @@
 # Fusion / myPKA — Operating Model (CANONICAL, locked 2026-07-27)
 
 This is the canonical record of the operating model established through the idea-engine → Mason work.
-It supersedes the interim `fusion-operating-model-brains.md` note (which it absorbs). Roles here are
-operating identities Larry adopts/dispatches; instantiating Arc and Mason as bound subagents (via Nolan /
-SOP-001) is a follow-up, not required for this record to be authoritative.
+It supersedes the interim `fusion-operating-model-brains.md` note (which it absorbs).
+
+**Instantiation status (2026-07-27): Arc and Mason are LIVE, bound subagents** — not future intent. Nolan
+instantiated both via SOP-001: `Team/Arc - Transfer Intelligence Specialist/AGENTS.md` +
+`Team/Mason - Opportunity Synthesis Specialist/AGENTS.md` (contracts), `.claude/agents/arc.md` +
+`.claude/agents/mason.md` (host shims, tools `Read, Bash, Glob, Grep`), and `Team/agent-index.md` rows.
+Both were **proven end-to-end** on a real source (`vJEy3nP2_C8`): Arc mined it into 3 provenance-bearing
+production atoms into the register; Mason converged the 71-atom estate → 5 surfaced / 4 emerging / 15
+standalone / 2 rejected clusters, every atom accounted, provenance traced source→atom→opportunity, the
+boundary held both ways, and no experiment behaviour regressed. The T1/T2 generation implementation received
+independent **Fable** review (Warwick-authorised); its three blockers (production→register wiring, positional-
+key corruption, convergence silent-loss) were fixed and re-confirmed.
 
 ---
 
