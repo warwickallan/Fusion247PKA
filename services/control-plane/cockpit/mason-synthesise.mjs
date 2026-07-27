@@ -99,29 +99,34 @@ async function main() {
   for (const o of (out.surfaced || [])) { await persistOpp(o, 'surfaced'); await c.query("update cockpit.idea_atom set atom_state='surfaced_member' where atom_id = any($1)", [ids(o.member_atoms)]); }
 
   // ---- Carry Warwick's DISPOSITION across runs (durable human authority) ----
-  // Match this run's opportunities to prior DECIDED ones by atom-set overlap (Jaccard). A confident, unique match
-  // carries the disposition forward; an ambiguous match is flagged as a conflict for Warwick — never guessed.
-  const jac = (a, b) => { const A = new Set(a); const B = new Set(b); let i = 0; for (const x of A) if (B.has(x)) i++; return i / (A.size + B.size - i || 1); };
+  // Identity across runs = atom-set OVERLAP COEFFICIENT (|A∩B| / min(|A|,|B|)), which is robust to the LLM
+  // including slightly different atoms each run (Jaccard punished that and false-flagged the SAME thesis).
+  // A clear match carries the disposition; conflict is raised ONLY when rival matches genuinely DISAGREE on
+  // disposition — membership drift alone is not a conflict. Never guessed.
+  const ov = (a, b) => { const A = new Set(a); const B = new Set(b); let i = 0; for (const x of A) if (B.has(x)) i++; return i / (Math.min(A.size, B.size) || 1); };
   const priorDecided = (await c.query(
-    `select o.opportunity_id id, o.disposition, array_agg(oa.atom_id) atoms
+    `select o.opportunity_id id, o.disposition, o.disposition_at, array_agg(oa.atom_id) atoms
        from cockpit.opportunity o join cockpit.opportunity_atom oa on oa.opportunity_id = o.opportunity_id
-      where o.disposition is not null and o.run_id <> $1 group by o.opportunity_id, o.disposition`, [run])).rows;
+      where o.disposition is not null and o.run_id <> $1 group by o.opportunity_id, o.disposition, o.disposition_at`, [run])).rows;
   const newOpps = (await c.query(
     `select o.opportunity_id id, array_agg(oa.atom_id) atoms
        from cockpit.opportunity o join cockpit.opportunity_atom oa on oa.opportunity_id = o.opportunity_id
       where o.run_id = $1 and o.state in ('surfaced','emerging') group by o.opportunity_id`, [run])).rows;
   for (const nOpp of newOpps) {
-    const scored = priorDecided.map((p) => ({ p, s: jac(nOpp.atoms, p.atoms) })).filter((x) => x.s >= 0.3).sort((a, b) => b.s - a.s);
-    if (!scored.length) continue;
-    const best = scored[0];
-    const ambiguous = best.s < 0.6 || (scored[1] && scored[1].s >= 0.4);
-    if (ambiguous) {
+    // matches = prior decided opps whose core atoms are substantially present in this new opp (overlap >= 0.6)
+    const matches = priorDecided.map((p) => ({ p, s: ov(nOpp.atoms, p.atoms) })).filter((x) => x.s >= 0.6)
+      .sort((a, b) => b.s - a.s || (new Date(b.p.disposition_at) - new Date(a.p.disposition_at)));
+    if (!matches.length) continue;                                    // no clear match — genuinely new thesis
+    const distinctDisp = new Set(matches.map((m) => m.p.disposition));
+    if (distinctDisp.size > 1) {                                      // rival matches DISAGREE → genuinely ambiguous
+      const best = matches[0];
       await c.query('update cockpit.opportunity set disposition_conflict=true, matched_from=$2, updated_at=now() where opportunity_id=$1', [nOpp.id, best.p.id]);
-      await c.query("insert into cockpit.opportunity_event (opportunity_id, actor, event, note) values ($1,'system','disposition_conflict',$2)", [nOpp.id, `ambiguous carry (jaccard ${best.s.toFixed(2)}) — Warwick to re-decide`]);
+      await c.query("insert into cockpit.opportunity_event (opportunity_id, actor, event, note) values ($1,'system','disposition_conflict',$2)", [nOpp.id, `rival prior decisions disagree (${[...distinctDisp].join('/')}) — Warwick to re-confirm`]);
       conflicts++;
-    } else {
-      await c.query('update cockpit.opportunity set disposition=$2, disposition_at=now(), matched_from=$3, updated_at=now() where opportunity_id=$1', [nOpp.id, best.p.disposition, best.p.id]);
-      await c.query("insert into cockpit.opportunity_event (opportunity_id, actor, event, note) values ($1,'system','disposition_carried',$2)", [nOpp.id, `carried '${best.p.disposition}' from ${best.p.id} (jaccard ${best.s.toFixed(2)})`]);
+    } else {                                                          // single match, or several that AGREE → carry
+      const chosen = matches[0];                                      // highest overlap, then most-recent decision
+      await c.query('update cockpit.opportunity set disposition=$2, disposition_at=$4, matched_from=$3, updated_at=now() where opportunity_id=$1', [nOpp.id, chosen.p.disposition, chosen.p.id, chosen.p.disposition_at]);
+      await c.query("insert into cockpit.opportunity_event (opportunity_id, actor, event, note) values ($1,'system','disposition_carried',$2)", [nOpp.id, `carried '${chosen.p.disposition}' from ${chosen.p.id} (overlap ${chosen.s.toFixed(2)})`]);
       carried++;
     }
   }
