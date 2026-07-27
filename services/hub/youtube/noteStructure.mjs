@@ -135,9 +135,13 @@ export function extractHeadings(markdown) {
     const line = lines[i];
     const fenceMatch = line.match(FENCE);
     if (fenceMatch) {
+      // CommonMark: a closing fence must use the SAME character and be AT LEAST AS LONG as the opening one.
+      // Tracking only the character (Codex F2) let a ``` line close a ```` block, so headings in the remainder
+      // of that block leaked out and counted as sections.
       const marker = fenceMatch[1][0];
-      if (fence === null) fence = marker;
-      else if (fence === marker) fence = null;
+      const len = fenceMatch[1].length;
+      if (fence === null) fence = { marker, len };
+      else if (fence.marker === marker && len >= fence.len) fence = null;
       continue;
     }
     if (fence !== null) continue;
@@ -171,9 +175,15 @@ export function validateNoteStructure(markdown) {
   }
   const headings = extractHeadings(markdown);
 
+  // Each heading may satisfy AT MOST ONE required section (Codex F1). Without this, one broad heading such as
+  // "## Tools, examples & mechanisms" satisfied three sections at once, so a three-heading note could pass a
+  // ten-section gate. Sections are matched in canonical order and consume the first heading they claim, which
+  // guarantees N distinct headings for N sections.
+  const claimed = new Set();
+
   const sections = REQUIRED_SECTIONS.map((section) => {
-    // First heading that satisfies the section wins (a note may legitimately repeat/subdivide a section).
-    const hit = headings.find((h) => section.patterns.some((p) => p.test(h.text)));
+    const hit = headings.find((h) => !claimed.has(h) && section.patterns.some((p) => p.test(h.text)));
+    if (hit) claimed.add(hit);
     return {
       id: section.id,
       label: section.label,

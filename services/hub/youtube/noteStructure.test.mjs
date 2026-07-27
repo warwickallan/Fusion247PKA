@@ -112,6 +112,27 @@ test('a near-miss heading does not satisfy the claims section', () => {
   assert.deepEqual(r.missingIds, ['claims_confidence']);
 });
 
+test('one broad heading cannot satisfy several required sections (Codex F1)', () => {
+  // "## Tools, examples & mechanisms" previously satisfied tools_people_products, examples AND mechanisms,
+  // so a note with a handful of broad headings could pass a ten-section gate.
+  const collapsed = CANONICAL.filter(
+    (h) => !['## Mechanisms, methods & implementation detail', '## Tools, people, products & organisations', '## Examples & use cases'].includes(h),
+  );
+  const r = validateNoteStructure(noteFrom([...collapsed, '## Tools, examples & mechanisms']));
+  assert.equal(r.ok, false);
+  // The one broad heading may claim a single section; the other two must be reported missing.
+  assert.equal(r.missingCount, 2);
+  for (const id of r.missingIds) assert.ok(['mechanisms', 'tools_people_products', 'examples'].includes(id));
+});
+
+test('a longer fence is not closed by a shorter one (Codex F2)', () => {
+  // ```` block containing a ``` line: the inner marker must NOT close it, or headings after it leak out.
+  const leaked = `${noteWithout('Actions & open questions')}\n\n\`\`\`\`markdown\n\`\`\`\n## Actions & open questions\n\`\`\`\`\n`;
+  const r = validateNoteStructure(leaked);
+  assert.equal(r.ok, false);
+  assert.deepEqual(r.missingIds, ['actions_open_questions']);
+});
+
 test('merely naming Fusion247 does not satisfy the implications section', () => {
   // Warwick's ruling, 2026-07-27: a heading that only MENTIONS Fusion247 is not an implications section. The
   // contract wants source content separated from Fusion247 interpretation (§205) and Fusion247 relevance (§239).
