@@ -40,6 +40,17 @@
 //     SINGLE token follows ("two milk" -> 2). Followed by MULTIPLE tokens
 //     ("four cheese pizza", "six pack beer") it is ambiguous -> review, never a
 //     silent guessed quantity. Digit forms ("4 cheese pizza") are exempt.
+//   * A TRAILING BARE INTEGER ("milk 2", "yazoo strawberry 4") IS a quantity:
+//     it is the commonest hand-written list form and was previously welded
+//     into the item name at qty 1. It is consumed ONLY when it is a clean,
+//     whitespace-separated, pure-ASCII integer at end of line -- so a SIZE /
+//     VOLUME / PACK token that carries a unit ("yazoo 400ml", "milk 2L",
+//     "tuna 4 pack") or a glued form ("7up", "2x4") is NEVER stripped. Product
+//     names whose IDENTITY ends in a bare number ("omega 3", "factor 50",
+//     "wd 40") are protected by an explicit curated exception list --
+//     TRAILING_NUMBER_COLLISIONS below -- exactly like the existing
+//     WORD_NUMBER_COLLISIONS guard, because no syntactic rule can separate
+//     "milk 2" from "omega 3".
 //   * A line with NO numeric-looking leading/trailing token at all defaults
 //     to requested_qty = 1. A bare in-name integer that is not a quantity
 //     form ("omega 3", "2x4 timber") stays part of the item name.
@@ -137,6 +148,35 @@ const WORD_NUMBER_COLLISIONS = {
   'five spice': true  // Chinese five-spice blend
 };
 
+// Known TRAILING-BARE-NUMBER COLLISIONS: product names whose own IDENTITY ends
+// in a bare integer, so the trailing-bare-quantity extractor must NOT strip it
+// ("omega 3" -> 3 x "omega"; "factor 50" -> 50 x "factor"; "wd 40" -> 40 x
+// "wd"). These are the exact mirror image of WORD_NUMBER_COLLISIONS above and
+// exist for the same reason: "milk 2" and "omega 3" are SYNTACTICALLY
+// IDENTICAL (<word(s)> <bare integer>), so no rule over the text alone can
+// separate a count from a designator. A curated, explicit list is therefore the
+// only honest mechanism; it is deliberately small and is extended by adding a
+// key, not by loosening the parser.
+//
+// A hit here means the number STAYS PART OF THE NAME and the line parses at
+// qty 1 -- it does NOT route to review. That preserves the module's documented
+// "a bare in-name integer stays part of the item name" guarantee (and its
+// existing "omega 3" fixture), and it is the right answer: the line is not
+// ambiguous once we know the phrase, it simply has no explicit quantity.
+//
+// The check is applied to the CURRENT working string at the moment the
+// trailing-bare extractor is about to fire, not to the whole raw line, so a
+// collision name that DOES carry an explicit quantity in another form still
+// parses correctly ("omega 3 x2" -> qty 2 x "omega 3", "2x omega 3" -> qty 2).
+// Keys are the fully normalised (lower-cased, single-spaced) phrase.
+const TRAILING_NUMBER_COLLISIONS = {
+  'omega 3': true,    // fish-oil supplement
+  'factor 15': true,  // sun cream SPF
+  'factor 30': true,
+  'factor 50': true,
+  'wd 40': true       // lubricant spray
+};
+
 // Upper sanity bound on an explicit quantity. A household shopping list will
 // never legitimately request more than this; a value above it (or one that
 // has lost integer precision past Number.MAX_SAFE_INTEGER) is far likelier a
@@ -208,6 +248,7 @@ function extractParentheticals(s) {
 //                        a pack spec like "2x4 timber" is left untouched)
 //   * leading  "N "   -> "2 milk"    (bare number)
 //   * leading  word   -> "two milk"  (one..twenty)
+//   * trailing " N"   -> "milk 2"    (bare number; runs LAST, see below)
 //
 // Every detected value is collected; the caller decides agreement vs
 // conflict. This function never resolves a conflict itself.
@@ -258,6 +299,40 @@ function extractQuantities(coreIn) {
     qtys.push(lead.value);
     working = lead.rest;
     lead = extractLeadingQuantity(working);
+  }
+
+  // TRAILING BARE INTEGER ("milk 2", "yazoo strawberry 4"). Runs LAST, after
+  // the xN and leading forms have been consumed, which is what keeps the
+  // existing behaviour intact:
+  //   * "x 2"  -> already consumed by the trailing-xN pass above, so this pass
+  //              never turns the marker "x" into an item name.
+  //   * "2 3"  -> the leading pass takes the 2 first, leaving "3", which has no
+  //              preceding whitespace and so is not consumed here (the line
+  //              still correctly ends up at "no item text").
+  //   * "milk 2 x3" -> xN gives 3, this pass gives 2 -> a CONFLICT surfaces to
+  //              review rather than a silently welded "milk 2" at qty 3.
+  //
+  // OVER-MATCH BOUNDARY (deliberate, both directions are tested):
+  //   * `\s` before the digits is REQUIRED, so a glued form is untouched:
+  //     "7up", "2x4", "b12".
+  //   * the token must be PURE ASCII DIGITS to end of line, so a SIZE / VOLUME
+  //     / UNIT token is untouched: "yazoo 400ml", "milk 2L", "tuna 500g".
+  //     Malformed numeric look-alikes ("milk 2.", "milk +2", a fullwidth digit)
+  //     also fail this test and are caught later by isMalformedNumericToken.
+  //   * a bare number followed by ANY further token is untouched, because the
+  //     match is anchored to end of line: "tuna 4 pack" keeps its "4".
+  //   * a phrase in TRAILING_NUMBER_COLLISIONS keeps its number in the NAME.
+  //     Checked against the CURRENT working string each iteration, so
+  //     "omega 3" stays qty 1 while "omega 3 x2" is qty 2 x "omega 3".
+  // Looping matches the trailing-xN pass, so "milk 2 3" surfaces BOTH values as
+  // a conflict instead of welding one of them into the name.
+  let bare = working.match(/\s(\d+)\s*$/);
+  while (bare && !Object.prototype.hasOwnProperty.call(
+    TRAILING_NUMBER_COLLISIONS, normaliseItemName(working)
+  )) {
+    qtys.push(parseInt(bare[1], 10));
+    working = working.slice(0, bare.index).trim();
+    bare = working.match(/\s(\d+)\s*$/);
   }
 
   return { qtys: qtys, rest: working };
@@ -417,6 +492,7 @@ module.exports = {
     extractQuantities: extractQuantities,
     isMalformedNumericToken: isMalformedNumericToken,
     parseLine: parseLine,
-    WORD_NUMBERS: WORD_NUMBERS
+    WORD_NUMBERS: WORD_NUMBERS,
+    TRAILING_NUMBER_COLLISIONS: TRAILING_NUMBER_COLLISIONS
   }
 };
