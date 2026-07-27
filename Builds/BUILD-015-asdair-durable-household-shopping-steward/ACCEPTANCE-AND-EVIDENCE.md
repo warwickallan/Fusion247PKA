@@ -178,3 +178,47 @@ coverage on `regulars` · (c) `rankAlternatives` to consult `regulars` · (d) a 
 and a `loadLastOrder` input · (e) guard the budget-side null-household trap · (f) reject prose as a `map` target.
 
 **Per doctrine, the specialist named these and touched no line of `services/**` to fix them.**
+
+---
+
+## FINAL independent QA — NOT MERGED (2026-07-28)
+
+Final Tower/Codex merge-check at exact head `8729c241` under `BUILD-015`, **against the supervised bar**:
+**`request_changes`**. Warwick's merge condition was *"if the final exact-head verdict is READY and CI remains
+green"*. It is not READY. **PR #73 was therefore NOT merged.**
+
+| Finding | Sev | What |
+|---|---|---|
+| TQA-PR73-004 | HIGH | **FIXED** — dangling FK: the provenance null was applied to the log but not the rule, so an unresolvable citation rolled the transaction back and *refused* a decision instead of downgrading it. Larry's defect, introduced when the rule began carrying its own pointer. |
+| TQA-PR73-005 | HIGH | Unmatched items still produce an **empty alternatives queue** |
+| TQA-PR73-006 | HIGH | **No runtime path invokes the outcome/learning writers** |
+| TQA-PR73-007 | MED | Exact-head CI evidence not staged in the packet |
+
+### Why this is the honest answer, not a technicality
+
+005 and 006 map **directly onto two steps of Warwick's own stated supervised bar**:
+
+> …genuine unknowns are **held/asked** … → **record actual outcome** → **persist learning for the next shop**
+
+- Rule 6 has two clauses — never substitute **and** surface alternatives. The first is enforced in code; the
+  second is not, because `rankAlternatives` never consults `regulars`.
+- The writers are built, tested and proven end-to-end, but **nothing calls them**, so recording and learning
+  happen only if a human runs them.
+
+**Codex and the fresh Asdair instance found these independently, by different routes.** That convergence is what
+makes them credible rather than pedantic.
+
+### The uncomfortable read
+
+In the supervised workflow these steps *do* happen — because **Larry does them by hand**, exactly as the fresh
+instance did when it surfaced the candidate list itself. That is the same class of gap this build exists to
+close: it works because a session does it, not because the system does.
+
+### Status
+
+**BUILD-015: NOT READY — merge withheld.** The code is a genuine, reviewed, CI-green improvement and is safe
+(never-substitute, hard excludes, no checkout, read path cannot write). Two of the seven supervised-bar steps are
+not yet code-complete.
+
+**Remaining to close it, all named and none started:** point `rankAlternatives` at `regulars`; wire a runtime
+caller for `recordShopOutcome` / `promoteDecision`; stage exact-head CI evidence in the packet.
