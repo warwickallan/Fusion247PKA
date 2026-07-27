@@ -602,3 +602,26 @@ test('the rule cites the SAME source document as its decision, never a separate 
   assert.equal(built.log.source_document_id, 7);
   assert.equal(built.verification.source_document_id, 7);
 });
+
+// TQA-PR73-004 (HIGH, merge-blocking). source_document_id is a FOREIGN KEY on
+// BOTH rule_qa_log and rules. When the cited id does not resolve, the null must
+// be applied to BOTH rows -- otherwise the rule insert raises 23503, the whole
+// transaction rolls back, and the decision is REFUSED instead of downgraded to
+// inert info. That inverts the downgrade-never-refuse contract exactly.
+test('an unresolvable source document nulls the pointer on the RULE as well as the log', async function () {
+  const client = fakeClient({ docType: undefined });   // id resolves to NO row
+  const out = await promoteDecision(
+    standingDecision({ source_document_id: 4242 }),
+    { client: client }
+  );
+
+  const logRow = insertedRow(client, /INSERT INTO asdair\.rule_qa_log/i);
+  const ruleRow = insertedRow(client, /INSERT INTO asdair\.rules/i);
+
+  assert.equal(logRow.source_document_id, null, 'log pointer must be nulled');
+  assert.ok(ruleRow, 'the decision must still be promoted, not refused');
+  assert.equal(ruleRow.source_document_id, null, 'RULE pointer must be nulled too, or the FK dangles');
+  assert.equal(ruleRow.directive, 'info', 'unresolvable provenance can never grant an actionable directive');
+  assert.ok(/resolves to no/i.test(String(ruleRow.note)), 'the downgrade must be explained on the rule');
+  assert.ok(out.ruleId, 'a rule id is returned, proving the transaction committed');
+});

@@ -469,17 +469,27 @@ async function promoteDecision(decision, options) {
     // the write transaction (25P02) and take the whole decision with it.
     const verdict = await lookupSourceDocument(client, built.log.source_document_id);
 
-    // FK safety: source_document_id REFERENCES asdair.source_documents(id), so
-    // only a PROVEN-resolvable id may be written. An unresolvable one is
-    // recorded as null (and explained in the rule's note) rather than raising a
-    // 23503 that would refuse the decision outright.
-    const log = verdict.resolved === true
-      ? built.log
-      : Object.assign({}, built.log, { source_document_id: null });
+    // FK safety: source_document_id REFERENCES asdair.source_documents(id) on
+    // BOTH asdair.rule_qa_log AND asdair.rules, so only a PROVEN-resolvable id
+    // may be written to EITHER. An unresolvable one is recorded as null (and
+    // explained in the rule's note) rather than raising a 23503.
+    //
+    // TQA-PR73-004: this null was originally applied to the log only. Once the
+    // rule began carrying its own provenance pointer, an unresolvable id left a
+    // dangling FK on the RULE insert -- so the whole transaction rolled back and
+    // the decision was REFUSED, exactly inverting the downgrade-never-refuse
+    // contract this function exists to honour. One resolved value now feeds both
+    // rows, so they can never disagree about their own provenance either.
+    const provenanceId = verdict.resolved === true ? built.log.source_document_id : null;
+
+    const log = Object.assign({}, built.log, { source_document_id: provenanceId });
 
     // The single gate. An actionable directive exists past this line only if
     // the database said so.
-    const rule = applySourceVerdict(built.rule, built.verification, verdict);
+    const ruleBase = applySourceVerdict(built.rule, built.verification, verdict);
+    const rule = ruleBase
+      ? Object.assign({}, ruleBase, { source_document_id: provenanceId })
+      : null;
 
     await client.query('BEGIN');
 
