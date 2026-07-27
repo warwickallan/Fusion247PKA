@@ -15,5 +15,6 @@ Delivery status, sequencing and portfolio visibility live in ClickUp; code and m
 ## Builds
 
 - [[BUILD-002-unified-personal-capture-gateway]] — Unified Personal Capture Gateway. Promoted 2026-07-16. Active; WP0 authorised (foundation designed, live proof pending).
+- [[BUILD-015-asdair-durable-household-shopping-steward]] — AsdAIr Durable Household Shopping Steward. Promoted from IDEA-012 on 2026-07-27 at main 87c7ff6. Active; durability repair in flight (PR #73).
 
 _(BUILD-000, BUILD-003 and BUILD-005 are tracked via their existing artifacts and ClickUp folders; add their durable records here if/when consolidated.)_
