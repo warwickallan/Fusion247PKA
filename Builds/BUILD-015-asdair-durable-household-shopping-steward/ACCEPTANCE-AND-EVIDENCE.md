@@ -222,3 +222,35 @@ not yet code-complete.
 
 **Remaining to close it, all named and none started:** point `rankAlternatives` at `regulars`; wire a runtime
 caller for `recordShopOutcome` / `promoteDecision`; stage exact-head CI evidence in the packet.
+
+---
+
+## MERGE — accepted residuals (Warwick's ruling, 2026-07-28)
+
+TQA-PR73-005 and 006 were **fixed and confirmed by Codex** at head `075ffdf`:
+
+> *"fixes the previously reported empty-alternatives and missing-writer-entrypoint defects, and lands the
+> specialist contract/SOP in this build ancestry."*
+
+Two further findings were then raised. Both are **real**, both were **already named** in the behavioural
+acceptance record, and **neither is a safety failure**. Warwick ruled them **accepted residuals** on the same
+basis as TQA-PR73-002, and authorised the merge.
+
+| Finding | What | Why accepted |
+|---|---|---|
+| **TQA-PR73-008** (HIGH) | An actionable `map` directive can resolve to **prose**, and prose satisfies "confidently matched", so a line can be planned as `add` with a name nobody can put in a trolley (e.g. rule 23 → *"Sure Men Anti-Perspirant Deodorant (blue variant)"*). | **Supervised workflow**: Larry reads the plan and drives the browser, so an instruction-shaped product name is visible at the point it matters. Flagged in the next-session brief. |
+| **TQA-PR73-009** (HIGH) | No `loadLastOrder`, so rotation rules ("a different variant each week") cannot run — SOP-021 names the last order as a required planning input. | One rule (Sure) is affected. Supervised, the driver can check the previous order. Real plumbing, deferred deliberately rather than rushed. |
+| TQA-PR73-010 (MED) | Exact-head CI not staged in the read-only packet. | CI **is** green at `075ffdf` — `unit`, `integration`, `secret-scan`. Packet limitation, not a code defect. |
+
+**Nothing unsafe ships.** Never-auto-substitute, hard excludes on both alias orderings, `checked_out` enforced
+false in SQL, the read path physically unable to write, and the provenance guard holding through the new caller —
+all proven under attack.
+
+### Final status
+
+**BUILD-015 — MERGED. Ready for the SUPERVISED lane**, which is the approved product scope. Not autonomous, and
+not claimed to be.
+
+Remaining work, ranked, none started: a governed writer for `asdair.regulars` (**highest value** — alias learning
+cannot persist without it) · order-insensitive alias matching · reject prose as a `map` target · `loadLastOrder`
+for rotation · guard the budget-side null-household trap · a price source to revive rule 7.
