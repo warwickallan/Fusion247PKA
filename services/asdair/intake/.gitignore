@@ -1,0 +1,14 @@
+# Defence in depth. The offset state file and the downloaded list photos default
+# OUTSIDE this (PUBLIC) repo — see defaultIntakeHome() in shopperIntake.js. If
+# anyone ever points SHOPPER_INTAKE_STATE_FILE / SHOPPER_INTAKE_MEDIA_DIR at this
+# folder, the household data still cannot be committed.
+shopper-intake-state.json
+shopper-intake-state.json.tmp
+*.state.json
+shopper-media/
+*.local.*
+
+# Never a credential file, at any name, in the repo.
+.env
+.env.*
+*.env.txt
