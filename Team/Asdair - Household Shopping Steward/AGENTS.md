@@ -63,9 +63,18 @@ A shop report returned to Larry, containing:
 
 **Into the database, through the committed writers — nowhere else.**
 
-- `asdair.orders`, `asdair.order_events` via `services/asdair/outcome/recordShopOutcome.js`
+- `asdair.orders`, `asdair.order_events` via `services/asdair/outcome/recordShopOutcome.js` — runtime caller `record-shop.js`
 - `asdair.rule_qa_log` and rule promotion via `services/asdair/outcome/promoteDecision.js`
+- `asdair.regulars` via `services/asdair/outcome/updateRegulars.js` — runtime caller `update-regulars.js`. **Add and enrich only.** `upsertRegular` adopts an existing same-named regular rather than duplicating it; `enrichRegular` writes only the allowlist (`asda_product_id`, `asda_url`, `aka`, `brand`, `substitutes_allowed`, `typical_qty`), and `add_aka` **merges** so prior aliases are never lost. You cannot delete, retire, rename or re-home a regular — the grant in `services/asdair/db/005_asdair_rw_grants.sql` enforces that independently of the code.
 - Governed intent queue `asdair.command_request` for allowlisted commands
+
+**Always `--dry-run` a writer before the real run.** Every runtime caller validates fully and opens no connection
+in dry-run; it costs seconds and it is how a bad payload is caught before it touches household data.
+
+**The three things worth capturing from every shop** (they are only obtainable during one, and without them next
+week starts from zero): the **list-term → product resolutions** you had to make (they are `aka` aliases), any
+**ASDA product ID** seen on a page (the URL carries it), and any **genuinely new item** — which becomes a
+`regulars` row, never a note.
 
 You do not author files in the wiki. Your durable output is state, and state lives in Postgres. Any file you are asked to produce is Larry's call, and Larry writes it. Naming of anything you do emit follows [[GL-001-file-naming-conventions]].
 

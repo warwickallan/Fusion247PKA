@@ -53,6 +53,19 @@ from the dev bot and the Tower bot. **Never cross the tokens.**
   store, never in this repo and never in SQL (`asdair.credentials_ref` is an audit pointer, not a value).
 - Intake polls `getUpdates` and downloads any photo attachments.
 
+**Use the committed receiver — do NOT hand-roll one.** `services/asdair/intake/fetch-shopper-list.js` (module:
+`shopperIntake.js`) is the intake, added 2026-07-28. It fetches, filters to the allowed senders, picks the
+largest photo, downloads it, persists the update offset atomically **outside the repo**, and emits a payload in
+exactly the shape `services/hub/shopper/shopperRoute.mjs` accepts — with a `sourceId` that scopes the downstream
+idempotency keys. `--dry-run` fetches nothing and writes no state.
+
+> Until 2026-07-28 this receiver was re-written into a session scratchpad **every single week** and thrown away.
+> That is why it now lives in Git with 21 offline tests. If you find yourself about to write a `getUpdates`
+> snippet, stop — you are recreating the exact defect this SOP exists to prevent.
+
+It deliberately **does not transcribe** (that is the vision step below) and holds the offset on genuine failure
+so a list can never be silently consumed and lost.
+
 > **CONCURRENCY HAZARD — do not ignore.** `getUpdates` is a single-consumer, destructive-ack protocol with no
 > lock or lease. Its entire safety argument is *"nothing else polls this token."* **A second concurrent poller
 > breaks that by existing** — the realistic failure is a shopping list silently consumed and permanently lost,
@@ -181,6 +194,22 @@ each answer. Use `services/asdair/outcome/promoteDecision.js`.
 - An item found missing from the regulars catalogue becomes a `regulars` row, not a note.
 - Provenance is preserved by the back-link — we can always see *why* a rule exists.
 
+**The regulars half of the learning has a writer as of 2026-07-28** — use
+`services/asdair/outcome/update-regulars.js` (`--dry-run` first, every time). Two operations and nothing else:
+
+| Operation | Use it for |
+|---|---|
+| `upsertRegular` | A genuinely new item found mid-shop. Safe to re-run: an existing regular with the same normalised name is **adopted**, never duplicated (a duplicate would make the planner treat that term as AMBIGUOUS and break it every week). |
+| `enrichRegular` | An alias (`add_aka`, which **merges** — prior aliases are never lost), a harvested `asda_product_id`/`asda_url`, brand, typical qty, substitutes flag. |
+
+It **cannot** delete, retire, rename or re-home a regular — not by flag, not by argument. The database grant
+enforces that independently of the code (`db/005_asdair_rw_grants.sql`).
+
+> **Harvest product IDs while you shop — they are only obtainable there.** Every ASDA product URL carries its id
+> (`/groceries/product/<category>/<slug>/<ID>`), and the accessibility tree you already read for the bulk tick
+> pass is full of them. Capturing them as you go took coverage from 21/91 to 41/97 in one shop. An item with an
+> id resolves by id next week instead of by name.
+
 ## 7. Confirm
 
 Ping back through the shopper bot. Warwick reviews and completes any purchase himself. Two standard messages,
@@ -248,7 +277,21 @@ If that fails, the loop is open again regardless of what files exist.
 - **The ASDA session is a singleton** — one profile, one login, one live trolley holding real money. It cannot be
   worktree-isolated or run concurrently.
 - **Fully hands-off is descoped** (Warwick, 2026-07-21): a human logs in. One shop per week.
-- Some regulars still lack captured ASDA product IDs, so those resolve by name rather than by ID.
+- Some regulars still lack captured ASDA product IDs, so those resolve by name rather than by ID. **56 of 97 as
+  at 2026-07-28** (was 70 of 91 — one shop's harvesting closed 20 of them). Keep harvesting.
+- **Nothing drains the intent queue.** `services/control-plane/wp-d-proof/asdair-worker.mjs` is built and tested
+  but is **not running and not scheduled** (verified 2026-07-28). So a list arriving on Telegram becomes
+  `add_list_item` intents in `asdair.command_request` that sit there until a worker is run by hand. Wiring it to
+  run unattended needs Warwick's go-ahead, because it means something unsupervised starts touching household data.
+- **Rule 7 (the GBP 120-150 budget band) is structurally inoperative** — no price column exists anywhere in the
+  schema, so `budget_flag` is permanently `unknown`. Any budget observation in a shop report is a *human* one.
+  Do not claim the system flagged it.
+- **Alias matching is exact-string**, so word order alone defeats it (`"yazoo strawberry"` misses the stored
+  alias `"strawberry yazoo"`). Measured resolution over the household's own history was **52%**. Tonight's alias
+  additions raise coverage but not the matching algorithm; order-insensitive matching remains the real fix.
+- **`map` directives can resolve to prose.** Rule 23 maps `sure male` to *"Sure Men Anti-Perspirant Deodorant
+  (blue variant)"* — an instruction, not a product — and the planner treats it as confidently matched. Watch for
+  it when driving.
 
 ## References
 

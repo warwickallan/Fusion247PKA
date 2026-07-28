@@ -38,8 +38,22 @@ SELECT on asdair.source_documents                 -- read-only, for provenance v
 USAGE  on the four loop tables' identity sequences
 ```
 
-Verified by negative probe, connected as the role: it **cannot** update any other column, **cannot** DELETE,
-**cannot** read or write `asdair.regulars` or `asdair.products`, and **cannot** CREATE. It is not a superuser and
+Since 2026-07-28 (migration `db/005_asdair_rw_grants.sql`) the role additionally holds the **narrow learning
+grant** on `asdair.regulars`, which is what `updateRegulars.js` writes through:
+
+```
+SELECT                on asdair.regulars
+INSERT (household_id, high_level_category, category, name, brand, asda_product_id,
+        asda_url, typical_qty, source, active, aka, substitutes_allowed)
+UPDATE (asda_product_id, asda_url, aka, brand, substitutes_allowed, typical_qty, updated_at)
+```
+
+Note what is **absent** from that UPDATE list, and must stay absent: `name`, `household_id` and `active`. The
+database therefore enforces — independently of the code — that a learning write can ADD a regular and ENRICH a
+regular, and can never RETIRE, RENAME or RE-HOME one. Retirement stays a deliberate human act.
+
+Verified by negative probe, connected as the role: it **cannot** update any column outside those allowlists,
+**cannot** DELETE, **cannot** write `asdair.products`, and **cannot** CREATE. It is not a superuser and
 holds no CREATEROLE/CREATEDB/BYPASSRLS. Secrets live only in the off-repo store, never here.
 
 ## The promotion guard
@@ -102,10 +116,11 @@ Full record: `Builds/BUILD-015-asdair-durable-household-shopping-steward/ACCEPTA
 
 ## Known gaps
 
-- **`asdair.regulars` has no governed writer.** `asdair_rw` holds no write on it, so the commonest learning of
-  all - "this list name means that product", i.e. a new `aka` alias - cannot be persisted through this path.
-  Until that exists, alias coverage improves only by hand, and a fresh instance re-asks the same questions.
-  **This is the highest-value remaining gap.**
+- ~~**`asdair.regulars` has no governed writer.**~~ **CLOSED 2026-07-28.** `buildRegularsUpdate.js` +
+  `updateRegulars.js` + `update-regulars.js` are that writer, and migration `db/005_asdair_rw_grants.sql` opens
+  the narrow grant it needs. First real use the same day persisted the 2026-07-27 shop's learning: 20 harvested
+  ASDA product IDs (coverage 21/91 -> 41/97), 6 genuinely-new items found mid-shop, and 5 alias sets - including
+  `chips` -> ASDA Crispy Skin-On Fries, which the planner previously could not resolve at all.
 - **No `loadLastOrder`.** SOP-021 makes the previous order a required planning input, but nothing loads it, so
   rotation rules ("a different variant each week") are structurally unimplementable - the same
   documented-implemented-dead class as standing rule 7.
