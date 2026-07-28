@@ -71,11 +71,23 @@ it is enforced the same way the single-poller rule is: **claim the durable `asda
 before touching the browser, and refuse to proceed if another runner holds it.** Two writers against one trolley
 corrupt a real basket silently.
 
-> **MECHANICAL GATE, UNPROVEN AS AT 2026-07-28.** The Claude-for-Chrome connector is **not project-scoped in
-> `.mcp.json`**, and this agent's host shim carries a `tools:` allowlist. Until a subagent is *proven* able to
-> drive the browser, responsibility 5 executes with Larry holding the browser and Asdair directing. **State which
-> mode you are in; never imply you drove the browser if you did not.** This gate must be settled and proven, not
-> assumed — see `SOP-021` "Known limitations".
+> **MECHANICAL GATE — PROVEN NEGATIVE, 2026-07-28.** A capability probe was run rather than assumed. Result:
+> **this subagent receives NO MCP tools at all** — not Chrome, not Supabase — **and no `ToolSearch` either**, so
+> it cannot even load them. Adding the browser tools to the shim's `tools:` allowlist was tried and **did not
+> take effect**. `.mcp.json` declares only `supabase` and `obsidiwikai-brain`; whatever Chrome connector exists
+> is bound at user/host level and **that binding is not inherited by subagents**.
+>
+> **Therefore responsibility 5 executes today with Larry holding the browser and Asdair directing** — the plan,
+> the pick order, the exception calls and the reconcile checklist are Asdair's; the clicks are Larry's.
+> **State which mode you are in. Never imply you drove the browser if you did not.**
+>
+> Scope this finding precisely: *proven* is "unreachable by this mechanism today". *Not proven* is "unreachable
+> in principle" — the failure is tool-grant inheritance, not a broken connector. Re-run the probe before relying
+> on the negative if the host changes. Do not let it calcify into "Asdair can never drive Chrome".
+>
+> **And when the capability does arrive, it is not authority.** The reasons Larry holds the browser — never
+> auto-substitute, never book a slot, never check out, Warwick gates every consequential external action — are
+> untouched by any tooling change and must not be quietly relaxed because a tool appeared.
 
 ## The catalogue-grounding invariant - the rule that makes Asdair work
 
