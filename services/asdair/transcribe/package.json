@@ -1,0 +1,16 @@
+{
+  "name": "asdair-transcribe",
+  "version": "0.1.0",
+  "private": true,
+  "description": "BUILD-015 Stage 1: one-shot vision transcription of a photographed handwritten shopping list into a structured transcript. No daemon, no database, no persistent agent.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "main": "transcribeList.js",
+  "scripts": {
+    "test": "node --test",
+    "transcribe": "node transcribe-list.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
