@@ -1,0 +1,11 @@
+# Fusion247PKA is a PUBLIC repo. Nothing operational or personal belongs here.
+node_modules/
+
+# Proof scratch. The durable fake database, the temporary state directories and
+# the captured logs a proof run produces are evidence, not source - the results
+# are transcribed into RUNTIME-PROOF.md by hand.
+.proof-run/
+*.log
+status.json
+runtime.pid
+runtime.armed
