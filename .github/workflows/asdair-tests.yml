@@ -112,6 +112,16 @@ jobs:
         working-directory: services/asdair/reconcile
         run: node --test
 
+      # THE CATALOGUE-GROUNDING INVARIANT. This suite is the guard against
+      # silently regressing to open-ended transcription - the method that read
+      # "Gourmet cat food" as "gourmet coffee" and invented a line that was not
+      # on the page. It asserts the catalogue is loaded BEFORE any model call,
+      # that the model is asked for candidate IDs rather than product names, and
+      # that each known reading maps to its correct live regular id.
+      - name: Run the catalogue-grounding invariant suite (offline)
+        working-directory: services/asdair/interpret
+        run: node --test
+
   integration:
     runs-on: ubuntu-latest
     defaults:
