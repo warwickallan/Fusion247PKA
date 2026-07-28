@@ -41,7 +41,16 @@ function sourceFiles() {
   const walk = (dir) => {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) { walk(full); continue; }
+      // Scan OUR source only. Installed dependencies are not this module's
+      // capabilities: the `pg` driver legitimately contains the word "password"
+      // and connection strings, and walking into node_modules turns these
+      // invariants into an assertion about npm rather than about us. Excluded
+      // by scope, NOT by relaxing the patterns - the patterns are the point.
+      if (entry.isDirectory()) {
+        if (entry.name === 'node_modules' || entry.name === '.git') continue;
+        walk(full);
+        continue;
+      }
       if (/\.(js|mjs)$/.test(entry.name)) out.push(full);
     }
   };
