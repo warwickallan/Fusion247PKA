@@ -313,14 +313,17 @@ const C5b = {
   const rb = readJson(path.join(RUN, 't5b-b.json'));
   const server = readServer(C5b.tg);
   const audit = auditServer(C5b.tg, rb.handled_update_ids);
-  // Documented as a KNOWN, REPRODUCIBLE defect: the check asserts the loss, so
-  // it will start failing the day the ordering is fixed. That is deliberate.
-  check('DEFECT REPRODUCED: the restart created no shop, and Telegram has deleted the message',
-    rb.counts.shop === 0 && server.pending.length === 0 && audit.lost.includes(221),
+  // FIXED 2026-07-28 (Codex flagged it merge-blocking, and was right). The shop
+  // is now persisted INSIDE onRecord, before the offset is acknowledged - so a
+  // process that dies "after acking" has already written the shop. This check was
+  // inverted from asserting the LOSS to asserting SURVIVAL, which is the whole
+  // point of having written it as an assertion in the first place.
+  check('NO LOSS: the shop survived the crash because it was persisted BEFORE the ack',
+    rb.counts.shop >= 1,
     { shops_after_restart: rb.counts.shop, still_pending_on_telegram: server.pending.map((u) => u.update_id), lost: audit.lost });
-  check('...and nothing anywhere records that a list went missing',
-    (rb.events || []).every((e) => e.event !== 'failed_offset_held'),
-    'no failure event, no held offset, no error - the loss is silent');
+  check('...and the list is accounted for rather than silently gone',
+    rb.counts.shop >= 1 || server.pending.length > 0,
+    'either the shop exists, or Telegram still holds the update for redelivery');
 }
 
 // =====================================================================

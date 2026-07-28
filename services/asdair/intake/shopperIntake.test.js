@@ -503,3 +503,39 @@ test('this module can never order, check out, or pay — no such path exists in 
     }
   }
 });
+
+// ── the crash window that used to lose a list silently ──────────────────────
+// Codex flagged this as merge-blocking, and rightly: advancing the offset is an
+// ACKNOWLEDGEMENT, after which Telegram forgets the update forever. Acknowledging
+// before the shop exists durably means a crash in that window loses a shopping
+// list with no error and nothing to recover from.
+
+test('THE OFFSET IS NOT ACKNOWLEDGED until the record is durably persisted', async () => {
+  const state = createMemoryStateStore();
+  const out = await runIntake({
+    config: testConfig(),
+    telegram: fakeTelegram({ updates: [textUpdate({ updateId: 900, messageId: 90 })] }),
+    state,
+    media: fakeMedia(),
+    onRecord: async () => { throw new Error('database unavailable'); },
+  });
+  assert.equal(out.emitted.length, 0, 'nothing may be emitted when persistence failed');
+  assert.equal(out.failed.length, 1);
+  assert.equal((await state.read()).lastUpdateId, null,
+    'THE POINT: the offset must NOT advance, so Telegram redelivers and the list survives');
+});
+
+test('the offset IS acknowledged once persistence succeeds', async () => {
+  const state = createMemoryStateStore();
+  const seen = [];
+  const out = await runIntake({
+    config: testConfig(),
+    telegram: fakeTelegram({ updates: [textUpdate({ updateId: 901, messageId: 91 })] }),
+    state,
+    media: fakeMedia(),
+    onRecord: async (r) => { seen.push(r.sourceId); },
+  });
+  assert.equal(out.emitted.length, 1);
+  assert.equal(seen.length, 1, 'the persistence hook ran BEFORE acknowledgement');
+  assert.equal((await state.read()).lastUpdateId, 901);
+});

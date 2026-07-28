@@ -606,6 +606,10 @@ export async function runIntake({
   dryRun = false,
   now = Date.now,
   log = () => {},
+  // Durable-persistence hook. When supplied, a record MUST be persisted by this
+  // callback before its Telegram offset is acknowledged - see the ordering note
+  // at the advance site. The runtime supplies it; standalone/dry-run does not.
+  onRecord = null,
 } = {}) {
   if (!config || !Array.isArray(config.allowedSenderIds)) throw new Error('runIntake: config (loadIntakeConfig result) required');
   if (!telegram || typeof telegram.getUpdates !== 'function') throw new Error('runIntake: telegram client required (injected)');
@@ -654,6 +658,37 @@ export async function runIntake({
       failed.push(entry);
       log('failed_offset_held', entry);
       break;
+    }
+
+    // THE ORDERING THAT MATTERS. Advancing the Telegram offset is an
+    // ACKNOWLEDGEMENT: it tells Telegram "I have this, stop sending it", and
+    // Telegram then forgets the update permanently. If we acknowledge before the
+    // shop exists durably, a crash in the window between the two loses a
+    // shopping list SILENTLY - no error, no retry, nothing to recover from.
+    //
+    // So when the caller supplies onRecord (the runtime does), the record must be
+    // durably persisted FIRST and the offset advances only after that resolves.
+    // A throw holds the offset and stops the batch, exactly like a download
+    // failure, so Telegram redelivers and the list survives.
+    //
+    // Duplicate-on-redelivery is handled downstream and structurally: the shop
+    // table's unique (telegram_chat_id, telegram_message_id) index makes a
+    // second delivery resume the same shop instead of creating another. Given a
+    // choice between "might process twice" and "might lose it forever", the
+    // duplicate is the safe failure - and here it is not even a duplicate.
+    if (typeof onRecord === 'function') {
+      try {
+        await onRecord(record);
+      } catch (err) {
+        const entry = {
+          updateId: verdict.updateId,
+          sourceId: record.sourceId,
+          error: maskTokenIn(err && err.message ? err.message : String(err), config.botToken),
+        };
+        failed.push(entry);
+        log('persist_failed_offset_held', entry);
+        break;
+      }
     }
 
     emitted.push(record);

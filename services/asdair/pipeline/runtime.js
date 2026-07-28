@@ -90,17 +90,21 @@ export async function pollIntake(deps, { intake, householdId, now, log = () => {
   // test - and a runtime with a wrong clock is a wrong shop_ref, which is the
   // kind of bug that only shows up on the night it matters.
   const clock = now || intake.now || Date.now;
-  const result = await intake.runIntake({
-    config: intake.config,
-    telegram: intake.telegram,
-    state: intake.state,
-    media: intake.media,
-    now: clock,
-    log,
-  });
-
+  // THE ACKNOWLEDGEMENT BOUNDARY.
+  //
+  // Advancing the Telegram offset tells Telegram "I have this", and Telegram
+  // then forgets the update permanently. This used to happen the moment a record
+  // was emitted, with the shop created afterwards - so a crash in that window
+  // lost a shopping list SILENTLY: no error, no retry, nothing to recover from.
+  //
+  // receiveList now runs INSIDE onRecord, so the shop is durable BEFORE the
+  // offset moves. If it throws, the offset is held, the batch stops, and
+  // Telegram redelivers. A redelivery is harmless because shop's unique
+  // (telegram_chat_id, telegram_message_id) index resumes the same shop rather
+  // than creating a second one.
   const received = [];
-  for (const record of result.emitted) {
+
+  const persist = async (record) => {
     const meta = record.meta || {};
     // The week a list belongs to is the day it arrived. Derived once, from the
     // receiver's own stamp, so a redelivery cannot land on a different week -
@@ -123,7 +127,17 @@ export async function pollIntake(deps, { intake, householdId, now, log = () => {
       actor: `telegram:${meta.senderId ?? 'unknown'}`,
     };
     received.push(await commands.receiveList(spec, deps));
-  }
+  };
+
+  const result = await intake.runIntake({
+    config: intake.config,
+    telegram: intake.telegram,
+    state: intake.state,
+    media: intake.media,
+    now: clock,
+    log,
+    onRecord: persist,
+  });
 
   return {
     fetched: result.fetched,
