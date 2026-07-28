@@ -66,7 +66,7 @@ never in a command line, never in a log, never in a comment.
 | Env var | Required | Meaning |
 | --- | --- | --- |
 | `SHOPPER_BOT_TOKEN` | **yes** | **SECRET.** The @Fusion247shopperbot bot token (a full bot account credential). Deliberately a different name from the capture gateway's `TELEGRAM_BOT_TOKEN`, so the wrong bot can never be picked up by accident. Always masked (`<botid>:***masked***`) in every diagnostic; never logged, thrown, or returned. |
-| `SHOPPER_ALLOWED_SENDER_IDS` | **yes** | Allowlist of permitted Telegram **numeric** user ids, comma/space separated. Not a secret. Absent or empty ⇒ the receiver refuses to run — there is no allow-all. Usernames are rejected (spoofable). |
+| `SHOPPER_ALLOWED_SENDER_IDS` | **yes** | Allowlist of permitted Telegram **numeric** user ids, comma/space separated. Not a secret. Absent or empty ⇒ the receiver refuses to run — there is no allow-all. Usernames are rejected (spoofable). **Alias:** `SHOPPER_ALLOWED_USER_IDS` is also accepted (the machine credentials file for this bot predates this module and uses that name). The canonical name wins if both are set; the alias is a name, not a relaxation — default-deny still applies. |
 | `SHOPPER_INTAKE_STATE_FILE` | no | Override the offset state file path. |
 | `SHOPPER_INTAKE_MEDIA_DIR` | no | Override where downloaded list photos land. |
 | `SHOPPER_TELEGRAM_API_BASE` | no | Bot API base override (diagnostics/tests). |

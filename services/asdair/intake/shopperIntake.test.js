@@ -435,6 +435,31 @@ test('config fails closed without a token or an allowlist, and describe() masks 
   assert.ok(!JSON.stringify(described).includes('FAKE-TEST-TOKEN-NOT-REAL'));
 });
 
+test('SHOPPER_ALLOWED_USER_IDS is accepted as an alias for the allowlist, and is still default-deny', () => {
+  // The machine credentials file for this bot predates this module and uses
+  // SHOPPER_ALLOWED_USER_IDS. Proven live 2026-07-28: without this alias the
+  // receiver fails closed against the real config and next week's list never lands.
+  const cfg = loadIntakeConfig({
+    [SHOPPER_INTAKE_ENV.SHOPPER_BOT_TOKEN]: FAKE_TOKEN,
+    SHOPPER_ALLOWED_USER_IDS: '8601328832',
+  });
+  assert.deepEqual(cfg.allowedSenderIds, ['8601328832']);
+
+  // The canonical name still wins when both are present.
+  const both = loadIntakeConfig({
+    [SHOPPER_INTAKE_ENV.SHOPPER_BOT_TOKEN]: FAKE_TOKEN,
+    [SHOPPER_INTAKE_ENV.SHOPPER_ALLOWED_SENDER_IDS]: '111',
+    SHOPPER_ALLOWED_USER_IDS: '222',
+  });
+  assert.deepEqual(both.allowedSenderIds, ['111']);
+
+  // An alias that is present but empty must NOT become allow-all.
+  assert.throws(
+    () => loadIntakeConfig({ [SHOPPER_INTAKE_ENV.SHOPPER_BOT_TOKEN]: FAKE_TOKEN, SHOPPER_ALLOWED_USER_IDS: '   ' }),
+    new RegExp(SHOPPER_INTAKE_ENV.SHOPPER_ALLOWED_SENDER_IDS),
+  );
+});
+
 test('the Telegram client is fully injectable — the fake sees the calls, nothing hits the network', async () => {
   const seen = [];
   const client = createShopperTelegramClient({

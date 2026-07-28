@@ -183,7 +183,14 @@ export function loadIntakeConfig(env = process.env, pathDeps) {
   if (!botToken) {
     throw new Error(`${SHOPPER_INTAKE_ENV.SHOPPER_BOT_TOKEN} is required (pass it with node --env-file=<credentials file>; never on the command line)`);
   }
-  const allowedSenderIds = parseAllowedSenderIds(get(SHOPPER_INTAKE_ENV.SHOPPER_ALLOWED_SENDER_IDS));
+  // Accepted aliases for the sender allowlist. The pre-existing machine credentials
+  // file for this bot uses SHOPPER_ALLOWED_USER_IDS, which predates this module; the
+  // canonical name is SHOPPER_ALLOWED_SENDER_IDS. First non-empty wins. This is an
+  // alias, NOT a relaxation: an absent/empty/all-blank list still throws (default-deny),
+  // and there is still no allow-all.
+  const allowedSenderIds = parseAllowedSenderIds(
+    get(SHOPPER_INTAKE_ENV.SHOPPER_ALLOWED_SENDER_IDS) ?? get('SHOPPER_ALLOWED_USER_IDS'),
+  );
 
   const rawTimeout = get(SHOPPER_INTAKE_ENV.SHOPPER_POLL_TIMEOUT_SECONDS);
   const pollTimeoutSeconds = clampPollTimeout(rawTimeout === null ? DEFAULT_POLL_TIMEOUT_SECONDS : Number(rawTimeout));
