@@ -73,7 +73,46 @@ the expected-head guard.
 **Current suite totals — 638 passing, 0 failing:**
 skill 210 · outcome 123 · shop 91 · bot 77 · reconcile 79 · transcribe 36 · intake 22.
 
-## 3. The finding that changes the design — read before building the transcription step
+## 3a. ⚠️ THE CATALOGUE-GROUNDING INVARIANT — supersedes §3 below
+
+**Warwick's correction, 2026-07-28, and it was right.** §3 measured the WRONG product behaviour: open-ended OCR,
+asking a model to invent a product name. AsdAIr interprets a list **against the household's known catalogue**.
+
+Re-run grounded — same photo, same model (`gpt-5.6-terra`), grounding the only change:
+
+| Open-ended (§3's method) | Catalogue-grounded |
+|---|---|
+| "gourmet **coffee**" | **"3 gourmet cat food"** |
+| "**camomile** cheese" | **"1 Dreamies cheese large"** |
+| "**beefs** protein" | **"1 Weetabix protein"** |
+| "**waffles** sausage rolls" | **"4 Walls sausage rolls"** |
+| "ARLA **1 litre**" | **"3 semi skimmed Arla 4pts"** |
+| invented *"fruit shoot"* | **invented nothing** |
+
+Deterministic matching then resolved **28/31 (90%)** vs a previously measured **52%**. Misses were honest:
+Stardrops (not stocked), "fruit splits" (real new item), "choc Yazoo" (alias gap, since closed).
+
+**§3's verdict is withdrawn.** Do not reinstate "the model is unfit" without re-running the grounded comparison.
+Do not claim the model alone is accurate either — the catalogue does much of the work; the product is the
+combined system.
+
+**Module:** `services/asdair/interpret/` — `loadCatalogue.js` → `groundedPrompt.js` → `resolveByCatalogue.js`
+(identity). 13 regression tests pin the invariant, including that the catalogue is loaded **before** any model
+call and that open-ended transcription is not the primary path.
+
+**Authority boundary:** model READS/RANKS · catalogue DETERMINES IDENTITY · human resolves ambiguity · confirmed
+outcomes ENRICH ALIASES. The model returns an **id**, never a name.
+
+**Both arcs, or neither works:** write-back each week grounds next week's read. The 2026-07-27 shop learned three
+new items in-session and persisted none — it only appeared to work because the session context held the
+catalogue. That is not durability, and it is the whole reason BUILD-015 exists.
+
+**Nothing lives permanently in a scratchpad.** At checkout-ready, flush everything that matters into Postgres:
+order, new regulars, aliases, product IDs, rotation history, pending favourite actions.
+
+---
+
+## 3. (SUPERSEDED by 3a — retained as the record of the wrong experiment) The open-ended vision measurement
 
 **Automatic vision transcription is NOT fit for Mum's handwriting on the currently available models.** Measured
 2026-07-28 against the real photo, through the live gateway:

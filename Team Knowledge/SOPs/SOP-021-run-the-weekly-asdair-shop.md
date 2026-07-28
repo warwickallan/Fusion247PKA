@@ -72,8 +72,39 @@ so a list can never be silently consumed and lost.
 > with no error surfaced. Exactly one process may poll the shopper token at a time. If another lane needs the
 > request, it must be handed the payload, not given the token.
 
-**Handwritten lists:** transcription is done by vision, in-context — there is no separate OCR service. Transcribe
-**every** line to structured items, then normalise via `services/asdair/skill/listNormaliser.js`. Dedupe repeat
+### ⚠️ THE CATALOGUE-GROUNDING INVARIANT — never interpret a list without loading the catalogue first
+
+**Load the household's catalogue BEFORE interpreting any photographed list.** Active regulars, aliases, ASDA
+product IDs, brands, categories, typical quantities, standing rules and the previous completed order are
+**required INPUTS to reading the list** — not merely outputs to update afterwards. Supabase is the operational
+authority; where the old Google Doc survives it is provenance/fallback only and must never override newer
+Supabase state. Never build a second catalogue for transcription.
+
+The job is **not** "read handwriting and invent a product name". It is *"given this household's known products
+and aliases, which of them does each mark refer to?"* Use `services/asdair/interpret/` — `loadCatalogue.js`,
+then `groundedPrompt.js`, then `resolveByCatalogue.js` for identity.
+
+**Measured 2026-07-28, same photo and same model, grounding the only change:** open-ended read *Gourmet cat food*
+as "gourmet coffee", *Dreamies cheese* as "camomile cheese", *Weetabix Protein* as "beefs protein", *Wall's* as
+"waffles", and **invented a line that was not on the page**. Grounded, every one of those read correctly and
+nothing was invented; deterministic matching then resolved **28/31 lines (90%)** against a previously measured
+**52%**. An earlier verdict that "the vision model is unfit" was therefore **wrong and is withdrawn** — the
+defect was missing catalogue context. Do not reinstate that conclusion without re-running the grounded
+comparison. Equally, do not claim the model alone is accurate: the catalogue does much of the work, and the
+product is the combined system.
+
+**The authority boundary:** the model READS and RANKS · the catalogue DETERMINES IDENTITY · the human resolves
+genuine ambiguity · confirmed outcomes ENRICH ALIASES for next week. The model returns a candidate **id**, never
+a product name; canonical names are looked up from our own rows. If nothing genuinely fits, the answer is
+`unmatched_new_item` — never the least-bad catalogue item.
+
+**Both arcs of the cycle are mandatory.** Writing new items/aliases/product IDs back each week is what grounds
+next week's reading. Skip the write-back and the read degrades against a stale catalogue — which is exactly what
+happened when the 2026-07-27 shop learned three new items in-session and persisted none of them. It appeared to
+work only because a session's own context was holding the catalogue; that is not durability.
+
+**Handwritten lists:** interpretation is grounded vision (above) — there is no separate OCR service. Interpret
+**every** line, then normalise via `services/asdair/skill/listNormaliser.js`. Dedupe repeat
 sends of the same list, and ignore anything from a sender outside the allowlist. Store the photo reference and the
 raw transcription on the `asdair.shopping_lists` row, so a later dispute about "was that on the list?" is settled
 by the record rather than by memory.
@@ -193,6 +224,12 @@ each answer. Use `services/asdair/outcome/promoteDecision.js`.
 - A **one-week-only** exclusion is never promoted (standing rule 10).
 - An item found missing from the regulars catalogue becomes a `regulars` row, not a note.
 - Provenance is preserved by the back-link — we can always see *why* a rule exists.
+
+> **NOTHING LIVES PERMANENTLY IN A SCRATCHPAD.** Working files are fine *during* a shop. **When the basket is
+> deemed checkout-ready, everything still in a scratchpad that matters must be made permanent** — the order, new
+> regulars, aliases, harvested ASDA product IDs, rotation history, pending favourite actions. A shop that ends
+> with knowledge in a temp directory has taught the household nothing, and next week starts from zero. This is
+> the same failure as the missing write-back arc above, wearing a different hat.
 
 **The regulars half of the learning has a writer as of 2026-07-28** — use
 `services/asdair/outcome/update-regulars.js` (`--dry-run` first, every time). Two operations and nothing else:

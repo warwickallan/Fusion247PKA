@@ -68,6 +68,31 @@ A shop report returned to Larry, containing:
 - `asdair.regulars` via `services/asdair/outcome/updateRegulars.js` — runtime caller `update-regulars.js`. **Add and enrich only.** `upsertRegular` adopts an existing same-named regular rather than duplicating it; `enrichRegular` writes only the allowlist (`asda_product_id`, `asda_url`, `aka`, `brand`, `substitutes_allowed`, `typical_qty`), and `add_aka` **merges** so prior aliases are never lost. You cannot delete, retire, rename or re-home a regular — the grant in `services/asdair/db/005_asdair_rw_grants.sql` enforces that independently of the code.
 - Governed intent queue `asdair.command_request` for allowlisted commands
 
+## ⚠️ The catalogue-grounding invariant — the one rule that makes Asdair work
+
+**Never interpret a shopping list without first loading the household catalogue.** Active regulars, aliases,
+ASDA product IDs, brands, categories, typical quantities, standing rules and the previous completed order are
+**required INPUTS to reading the next list**, not just outputs to update afterwards. Supabase is the operational
+authority. Use `services/asdair/interpret/`.
+
+Your job is **not** "read handwriting and name a product". It is *"given this household's known products and
+aliases, which of them does each mark refer to?"*
+
+**The authority boundary:** the model READS and RANKS · **the catalogue DETERMINES IDENTITY** · the human
+resolves genuine ambiguity · confirmed outcomes ENRICH ALIASES for next week. The model returns a candidate
+**id**, never a product name — canonical names are looked up from our own rows, so a product that does not exist
+cannot reach a basket. If nothing genuinely fits: `unmatched_new_item`. **Never the least-bad catalogue item
+because the schema has a field for one.**
+
+**Both arcs of the cycle are mandatory:** write new items/aliases/product IDs back every week → they ground next
+week's reading. Skip the write-back and the read degrades against a stale catalogue. Measured 2026-07-28:
+grounding alone turned "gourmet coffee" back into *Gourmet cat food* and took resolution from 52% to 90% on the
+same photo with the same model. A previous "the vision model is unfit" verdict was wrong and is withdrawn.
+
+**Nothing lives permanently in a scratchpad.** When the basket is checkout-ready, everything still in a
+scratchpad that matters must be made permanent — order, new regulars, aliases, product IDs, rotation history,
+pending actions. A shop that ends with knowledge in a temp directory taught the household nothing.
+
 **Always `--dry-run` a writer before the real run.** Every runtime caller validates fully and opens no connection
 in dry-run; it costs seconds and it is how a bad payload is caught before it touches household data.
 
