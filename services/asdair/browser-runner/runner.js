@@ -190,6 +190,15 @@ class Runner {
         return { outcome: 'lease_lost' };
       }
       if (e instanceof ReauthRequiredError) return this.finishReauth(e.reauth_reason || e.message);
+      if (e instanceof RateLimitedError) {
+        // Being throttled is not a failed request - it is a "come back later".
+        // Marking it failed would need a human to re-queue work that is fine.
+        this.log('ASDA is throttling this profile - releasing the lease, leaving the request queued to be picked up later');
+        try { this.progress = P.setRunnerState(this.progress, 'paused'); await this.save(null, 'rate limited by ASDA; retry later'); } catch { /* the release below still matters */ }
+        this.stopHeartbeat();
+        await lease.release(this.query, { requestId: this.request.id, runnerId: this.runnerId, reason: 'rate limited by ASDA' });
+        return { outcome: 'rate_limited', summary: P.summary(this.progress) };
+      }
       this.log(`FAILED: ${e.name}: ${e.message}`);
       try {
         this.progress = P.setRunnerState(this.progress, 'failed');
@@ -256,7 +265,13 @@ class Runner {
     this.log(`step ${step.step_id}: ${step.command} ${step.product_ref || step.term || ''}`);
     try {
       const result = await this.dispatch(step);
-      if (result && result.reason === 'unavailable') {
+      if (result && result.reason === 'already-in-trolley') {
+        // The product page shows a stepper rather than an Add control, which
+        // means the item is already there. That is the PLANNED outcome, not a
+        // failure - a retried step must converge, not report an error.
+        this.progress = P.markCompleted(this.progress, step, { outcome: 'ok' });
+        this.log('  -> already in the trolley; recorded complete, not added twice');
+      } else if (result && result.reason === 'unavailable') {
         this.progress = P.markUnavailable(this.progress, step, result.title || null);
         this.log('  -> UNAVAILABLE (reported for a human; the runner never swaps an item)');
       } else if (result && result.added === false && result.reason === 'approved-result-not-in-search') {

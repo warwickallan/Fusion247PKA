@@ -3,7 +3,7 @@ const { test } = require('node:test');
 const assert = require('node:assert');
 const { Runner, parseArgs } = require('./runner.js');
 const { makeFakeStore, makeFakeSession, makeFakeControl } = require('./test/fakeRequestStore.cjs');
-const { ReauthRequiredError } = require('./browser.cjs');
+const { ReauthRequiredError, RateLimitedError } = require('./browser.cjs');
 
 const PLAN = [
   { step_id: 's1', command: 'add_known_product', product_ref: '489747', origin: 'regular', name: 'Cravendale 2L' },
@@ -261,6 +261,27 @@ test('the runner refuses a plan naming anything off the allowlist rather than pa
   assert.strictEqual(res.outcome, 'failed');
   assert.match(res.error, /not on the allowlist/);
   assert.deepStrictEqual(commandsIssued(session), [], 'validation happens before ANY step runs');
+});
+
+test('a step whose item is ALREADY in the trolley converges rather than failing', async () => {
+  const session = makeFakeSession({
+    add_known_product: async (r) => ({ product_ref: r, added: false, reason: 'already-in-trolley', qty: 1 }),
+  });
+  const { runner, logs } = scenario({ plan: [PLAN[0]], session });
+  const res = await runner.run({});
+  assert.strictEqual(res.summary.failed_actions, 0, 'a retried add that already landed is not an error');
+  assert.strictEqual(res.summary.regulars_added, 1);
+  assert.ok(logs.some((l) => /not added twice/.test(l)));
+});
+
+test('being throttled leaves the request queued for later rather than marking it failed', async () => {
+  const session = makeFakeSession({ open_groceries: async () => { throw new RateLimitedError(); } });
+  const { runner, query } = scenario({ session });
+  const res = await runner.run({});
+  assert.strictEqual(res.outcome, 'rate_limited');
+  const row = query.state.requests[0];
+  assert.strictEqual(row.status, 'queued', 'still queued - no human has to re-create work that was fine');
+  assert.strictEqual(row.claimed_by, null, 'and the lease is given back');
 });
 
 test('argument parsing carries only known switches', () => {
