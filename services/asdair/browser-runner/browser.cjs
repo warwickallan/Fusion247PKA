@@ -1,0 +1,375 @@
+// =====================================================================
+// BUILD-015 AsdAIr browser runner - THE BROWSER SESSION.
+//
+// One long-lived CDP session against ONE reused tab in the visible, dedicated
+// Chrome profile. Every method here maps 1:1 to a command on the allowlist in
+// commands.cjs; there is nothing else it can do.
+//
+// EVERY navigation goes through guards.assertPermittedUrl and EVERY click goes
+// through the in-page deny check built from guards.DENY_TARGET, so the refusal
+// layer cannot be bypassed by a selector change on ASDA's side.
+//
+// The runner NEVER synthesises keyboard or pointer input: it calls no CDP
+// `Input.` method. Searching is done by navigating to a search URL; quantity is
+// changed by clicking the real +/- steppers and reading the value back.
+// =====================================================================
+'use strict';
+
+const cdp = require('./cdp.js');
+const guards = require('./guards.cjs');
+const { normaliseProductRef, normaliseTerm, normaliseQty } = require('./commands.cjs');
+
+const BASE = 'https://www.asda.com';
+const URLS = {
+  groceries: `${BASE}/groceries`,
+  trolley: `${BASE}/groceries/trolley`,
+  regulars: `${BASE}/groceries/favourites-lists/regulars`,
+  product: (ref) => `${BASE}/groceries/product/${ref}`,
+  search: (term) => `${BASE}/groceries/search/${encodeURIComponent(term)}`,
+};
+
+// ---------------------------------------------------------------------
+// In-page helpers. Injected as expressions; they read and click, never type.
+// ---------------------------------------------------------------------
+
+const LABEL_OF = `(el) => (el.getAttribute('aria-label') || el.textContent || '').replace(/\\s+/g,' ').trim()`;
+
+/** Click the first button matching `pred`, refusing anything on the deny list. */
+function clickExpr(predSource) {
+  return `JSON.stringify((()=>{
+    const deny = ${guards.inPageDenyRegexLiteral()};
+    const labelOf = ${LABEL_OF};
+    const pred = ${predSource};
+    const buttons = Array.from(document.querySelectorAll('button, a[role="button"]'));
+    const hit = buttons.find(b => { try { return pred(b, labelOf(b)); } catch(e) { return false; } });
+    if (!hit) return {ok:false, reason:'no-matching-control'};
+    const label = labelOf(hit);
+    if (deny.test(label)) return {ok:false, reason:'refused-by-deny-list', label};
+    if (hit.disabled || hit.getAttribute('aria-disabled') === 'true') return {ok:false, reason:'control-disabled', label};
+    hit.click();
+    return {ok:true, label};
+  })())`;
+}
+
+/**
+ * Page state: enough to tell a usable store page from an authentication
+ * surface from a rate limit.
+ *
+ * The signed-out test is deliberately POSITIVE-EVIDENCE-BASED. ASDA does not
+ * always bounce a signed-out shopper to login.asda.com immediately - it will
+ * happily render the groceries landing page with a "Register / Sign in" header
+ * and only redirect when the trolley is touched. Detecting that header state up
+ * front is what stops the runner walking into a redirect halfway through a
+ * write, so it reports re-authentication BEFORE it has half-built a basket.
+ */
+const PAGE_STATE = `JSON.stringify((()=>{
+  const txt = (document.body && document.body.innerText) || '';
+  const head = txt.slice(0, 1500);
+  const guest = /(^|\\n)\\s*Register\\s*(\\n|$)/.test(head) && /(^|\\n)\\s*Sign in\\s*(\\n|$)/i.test(head);
+  const member = /(^|\\n)\\s*(Sign out|My Account)\\s*(\\n|$)/i.test(head);
+  return {
+    url: location.href,
+    title: document.title,
+    text_head: txt.slice(0, 400),
+    rate_limited: /too many requests/i.test(txt.slice(0, 400)),
+    signed_out_marker: (guest && !member) || /sign in to (your )?asda/i.test(txt.slice(0, 4000)),
+    signed_in_marker: member,
+  };
+})())`;
+
+/** Trolley snapshot. READ-ONLY. */
+const TROLLEY_SNAPSHOT = `JSON.stringify((()=>{
+  const txt = (document.body && document.body.innerText) || '';
+  const order_total = (txt.match(/Order total\\s*£(\\d+\\.\\d{2})/) || [])[1] || null;
+  const item_count = (txt.match(/(\\d+)\\s+items? subtotal/) || [])[1] || null;
+  const product_count = (txt.match(/Your products\\s*\\((\\d+)\\)/) || [])[1] || null;
+  const header = txt.match(/Trolley\\s+(\\d+)\\s+items?\\s+total price\\s+([\\d.]+)\\s+pounds/i);
+  const empty = /trolley is empty/i.test(txt);
+  const names = Array.from(document.querySelectorAll('a[href*="/groceries/product/"]'))
+    .map(a => ({ name: (a.textContent||'').replace(/\\s+/g,' ').trim().slice(0,90), href: a.getAttribute('href') }))
+    .filter(x => x.name);
+  const seen = new Set(); const products = [];
+  for (const n of names) {
+    const id = (n.href.match(/(\\d{3,12})(?:[/?#]|$)/) || [])[1] || null;
+    const key = id || n.name;
+    if (!seen.has(key)) { seen.add(key); products.push({ name: n.name, product_ref: id }); }
+  }
+  return {
+    order_total: order_total || (header ? header[2] : null),
+    item_count: item_count || (header ? header[1] : null),
+    product_count: product_count != null ? product_count : (empty ? '0' : (products.length ? String(products.length) : null)),
+    empty, products
+  };
+})())`;
+
+/**
+ * Read the quantity currently shown by the stepper on a product page.
+ * Three fallbacks, because ASDA has moved this control before.
+ */
+const READ_QTY = `JSON.stringify((()=>{
+  const inc = document.querySelector('button[aria-label^="Increase" i]');
+  const dec = document.querySelector('button[aria-label^="Decrease" i]');
+  if (!inc && !dec) {
+    const add = Array.from(document.querySelectorAll('button'))
+      .find(b => /^\\s*add\\s*$/i.test(b.textContent||'') || /add item .* to cart/i.test(b.getAttribute('aria-label')||''));
+    return { qty: add ? 0 : null, via: add ? 'add-button-present' : 'no-stepper' };
+  }
+  const scope = (inc && inc.closest('div,section,form')) || (dec && dec.closest('div,section,form'));
+  const input = scope && scope.querySelector('input');
+  if (input && input.value !== '' && !isNaN(Number(input.value))) return { qty: Number(input.value), via: 'input-value' };
+  const labelled = scope && Array.from(scope.querySelectorAll('[aria-label]'))
+    .map(e => e.getAttribute('aria-label'))
+    .find(a => /quantity/i.test(a) && /\\d/.test(a));
+  if (labelled) return { qty: Number((labelled.match(/(\\d+)/)||[])[1]), via: 'aria-label' };
+  const t = scope ? (scope.innerText||'').replace(/\\s+/g,' ').trim() : '';
+  const m = t.match(/(?:^|\\D)(\\d{1,3})(?:\\D|$)/);
+  return { qty: m ? Number(m[1]) : null, via: 'stepper-text', raw: t.slice(0,80) };
+})())`;
+
+/** Availability of the product currently displayed. Reports; never substitutes. */
+const READ_AVAILABILITY = `JSON.stringify((()=>{
+  const txt = ((document.body && document.body.innerText) || '').slice(0, 6000);
+  const out_of_stock = /out of stock|currently unavailable|not available|sold out/i.test(txt);
+  const add = Array.from(document.querySelectorAll('button'))
+    .find(b => /^\\s*add\\s*$/i.test(b.textContent||'') || /add item .* to cart/i.test(b.getAttribute('aria-label')||''));
+  const stepper = !!document.querySelector('button[aria-label^="Increase" i]');
+  return { out_of_stock, addable: !!add || stepper, title: document.title };
+})())`;
+
+// ---------------------------------------------------------------------
+// Session
+// ---------------------------------------------------------------------
+
+class ReauthRequiredError extends Error {
+  constructor(url, reason) {
+    super(`ASDA needs re-authentication: ${reason || url} - that is Warwick's step, never the runner's`);
+    this.name = 'ReauthRequiredError';
+    this.url = url;
+    this.reauth_reason = reason || `authentication required at ${url}`;
+  }
+}
+class RateLimitedError extends Error {
+  constructor() { super('ASDA returned "Too Many Requests" - backing off'); this.name = 'RateLimitedError'; }
+}
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+class Session {
+  constructor({ settleMs = 6000, navTimeoutMs = 45_000, log = () => {} } = {}) {
+    this.settleMs = settleMs;
+    this.navTimeoutMs = navTimeoutMs;
+    this.log = log;
+    this.conn = null;
+    this.tabId = null;
+  }
+
+  /** Attach to the visible dedicated profile and take (or reuse) the runner's tab. */
+  async open() {
+    const v = await cdp.assertVisibleBrowser();
+    this.browser = v.Browser;
+    const tab = await cdp.reuseTab(`${BASE}/groceries`, `${BASE}/groceries`);
+    this.tabId = tab.id;
+    let ws = tab.webSocketDebuggerUrl;
+    if (!ws) {
+      const found = (await cdp.targets()).find((t) => t.id === tab.id);
+      ws = found && found.webSocketDebuggerUrl;
+    }
+    if (!ws) throw new Error('runner tab has no websocket debugger url');
+    this.conn = await cdp.connect(ws);
+    await this.send('Page.enable');
+    await this.send('Runtime.enable');
+    this.log(`attached to ${this.browser} tab ${this.tabId}`);
+    return this;
+  }
+
+  /** Every CDP call passes the forbidden-method gate. */
+  async send(method, params) {
+    guards.assertSafeCdpMethod(method);
+    if (!this.conn) throw new Error('session not open');
+    return this.conn.send(method, params);
+  }
+
+  async evaluate(expression) {
+    const r = await this.send('Runtime.evaluate', { returnByValue: true, expression, awaitPromise: false });
+    if (r.result && r.result.exceptionDetails) throw new Error('page evaluation failed: ' + JSON.stringify(r.result.exceptionDetails).slice(0, 300));
+    return r.result && r.result.result ? r.result.result.value : undefined;
+  }
+
+  async evaluateJson(expression) {
+    const raw = await this.evaluate(expression);
+    if (raw == null) return null;
+    try { return JSON.parse(raw); } catch { return null; }
+  }
+
+  /** Navigate, wait for load, settle, then classify the page we landed on. */
+  async goto(url, { settleMs = this.settleMs } = {}) {
+    guards.assertPermittedUrl(url);
+    const loaded = new Promise((res) => {
+      const off = this.conn.on((msg) => { if (msg.method === 'Page.loadEventFired') { off(); res('load'); } });
+      setTimeout(() => { off(); res('timeout'); }, this.navTimeoutMs);
+    });
+    await this.send('Page.navigate', { url });
+    await loaded;
+    await sleep(settleMs);
+    return this.state();
+  }
+
+  /** Current page classification. Detects re-authentication; never resolves it. */
+  async state() {
+    const s = (await this.evaluateJson(PAGE_STATE)) || { url: null, title: null, text_head: '' };
+    const redirected = guards.looksLikeAuthSurface({ url: s.url, title: s.title, text: s.text_head });
+    s.reauth_required = redirected || s.signed_out_marker === true;
+    s.reauth_reason = redirected
+      ? `redirected to an authentication surface (${s.url})`
+      : (s.signed_out_marker === true ? `the store rendered its signed-out header on ${s.url} - the ASDA session has lapsed` : null);
+    return s;
+  }
+
+  /** Throw the right typed error when the page is not a usable store page. */
+  assertUsable(s) {
+    if (s.rate_limited) throw new RateLimitedError();
+    if (s.reauth_required) throw new ReauthRequiredError(s.url, s.reauth_reason);
+    return s;
+  }
+
+  /** Close the websocket. THE TAB AND THE BROWSER STAY OPEN, by design. */
+  close() { if (this.conn) this.conn.close(); this.conn = null; }
+
+  // ---- allowlisted commands -----------------------------------------
+
+  async open_groceries() { return this.assertUsable(await this.goto(URLS.groceries)); }
+  async open_trolley() { return this.assertUsable(await this.goto(URLS.trolley)); }
+  async open_regulars() { return this.assertUsable(await this.goto(URLS.regulars)); }
+
+  async locate_product(ref) {
+    const r = normaliseProductRef(ref);
+    const s = this.assertUsable(await this.goto(URLS.product(r)));
+    const avail = await this.evaluateJson(READ_AVAILABILITY);
+    return { product_ref: r, url: s.url, title: s.title, ...(avail || {}) };
+  }
+
+  async search(term) {
+    const t = normaliseTerm(term);
+    const s = this.assertUsable(await this.goto(URLS.search(t)));
+    const results = await this.evaluateJson(`JSON.stringify((()=>{
+      const out=[]; const seen=new Set();
+      for (const a of document.querySelectorAll('a[href*="/groceries/product/"]')) {
+        const href=a.getAttribute('href')||'';
+        const id=(href.match(/(\\d{3,12})(?:[/?#]|$)/)||[])[1];
+        if(!id||seen.has(id))continue; seen.add(id);
+        out.push({product_ref:id, name:(a.textContent||'').replace(/\\s+/g,' ').trim().slice(0,90)});
+        if(out.length>=40)break;
+      }
+      return out;})())`);
+    return { term: t, url: s.url, results: results || [] };
+  }
+
+  /**
+   * Add a product whose ASDA reference is already known. This is the ONLY way
+   * anything reaches the trolley: an add always names an explicit reference,
+   * so nothing can be added that was not planned.
+   */
+  async add_known_product(ref) {
+    const r = normaliseProductRef(ref);
+    const before = await this.locate_product(r);
+    if (before.out_of_stock || before.addable === false) {
+      return { product_ref: r, added: false, reason: 'unavailable', ...before };
+    }
+    const pre = await this.evaluateJson(READ_QTY);
+    const click = await this.evaluateJson(clickExpr(
+      `(b,l)=> /^\\s*add\\s*$/i.test(b.textContent||'') || /add item .* to cart/i.test(l)`
+    ));
+    if (!click || !click.ok) {
+      const already = pre && pre.qty > 0;
+      return { product_ref: r, added: false, reason: already ? 'already-in-trolley' : (click && click.reason) || 'click-failed', qty: pre && pre.qty };
+    }
+    await sleep(5000);
+    const post = await this.evaluateJson(READ_QTY);
+    return { product_ref: r, added: true, label: click.label, qty_before: pre && pre.qty, qty_after: post && post.qty, name: before.title };
+  }
+
+  /**
+   * Search, then add ONE result the plan explicitly approved by reference. The
+   * runner never picks a result on its own judgement - `product_ref` must be in
+   * the result set, or nothing is added.
+   */
+  async select_search_result(term, ref) {
+    const r = normaliseProductRef(ref);
+    const found = await this.search(term);
+    const hit = found.results.find((x) => x.product_ref === r);
+    if (!hit) return { product_ref: r, term: found.term, added: false, reason: 'approved-result-not-in-search', results: found.results.slice(0, 10) };
+    const add = await this.add_known_product(r);
+    return { ...add, term: found.term, via: 'search' };
+  }
+
+  async read_quantity(ref) {
+    const r = normaliseProductRef(ref);
+    const s = this.assertUsable(await this.goto(URLS.product(r)));
+    const q = await this.evaluateJson(READ_QTY);
+    return { product_ref: r, qty: q ? q.qty : null, via: q ? q.via : null, title: s.title };
+  }
+
+  /**
+   * Change quantity with the REAL +/- steppers, one click at a time, reading
+   * the value back after each. Never by typing: a typed quantity does not
+   * persist server-side.
+   */
+  async set_quantity(ref, qty) {
+    const r = normaliseProductRef(ref);
+    const target = normaliseQty(qty);
+    this.assertUsable(await this.goto(URLS.product(r)));
+    let cur = (await this.evaluateJson(READ_QTY)) || { qty: null };
+    if (cur.qty == null) return { product_ref: r, ok: false, reason: 'quantity-not-readable', target };
+    const clicks = [];
+    const maxClicks = 40;
+    while (cur.qty !== target && clicks.length < maxClicks) {
+      const up = cur.qty < target;
+      const res = await this.evaluateJson(clickExpr(
+        up ? `(b,l)=> /^increase\\b/i.test(l)` : `(b,l)=> /^decrease\\b/i.test(l)`
+      ));
+      if (!res || !res.ok) {
+        if (!up && cur.qty === 1) {
+          const rm = await this.evaluateJson(clickExpr(`(b,l)=> /^remove\\b/i.test(l)`));
+          if (rm && rm.ok) { clicks.push(rm.label); await sleep(3500); cur = (await this.evaluateJson(READ_QTY)) || cur; continue; }
+        }
+        return { product_ref: r, ok: false, reason: (res && res.reason) || 'stepper-click-failed', qty: cur.qty, target, clicks };
+      }
+      clicks.push(res.label);
+      await sleep(3000);
+      const next = (await this.evaluateJson(READ_QTY)) || cur;
+      if (next.qty === cur.qty) {
+        await sleep(3000);
+        const retry = (await this.evaluateJson(READ_QTY)) || next;
+        if (retry.qty === cur.qty) return { product_ref: r, ok: false, reason: 'stepper-did-not-move', qty: cur.qty, target, clicks };
+        cur = retry;
+      } else cur = next;
+    }
+    return { product_ref: r, ok: cur.qty === target, qty: cur.qty, target, clicks };
+  }
+
+  async add_to_favourites(ref) {
+    const r = normaliseProductRef(ref);
+    this.assertUsable(await this.goto(URLS.product(r)));
+    const res = await this.evaluateJson(clickExpr(`(b,l)=> /add to (favourites|favorites)|save to (favourites|favorites)/i.test(l)`));
+    return { product_ref: r, ok: !!(res && res.ok), reason: res && res.reason, label: res && res.label };
+  }
+
+  /** Report - not resolve - an item ASDA cannot supply. */
+  async report_unavailable(ref) {
+    const r = normaliseProductRef(ref);
+    const s = this.assertUsable(await this.goto(URLS.product(r)));
+    const a = (await this.evaluateJson(READ_AVAILABILITY)) || {};
+    return { product_ref: r, unavailable: a.out_of_stock === true || a.addable === false, title: s.title, url: s.url };
+  }
+
+  async read_basket() {
+    this.assertUsable(await this.goto(URLS.trolley));
+    const snap = await this.evaluateJson(TROLLEY_SNAPSHOT);
+    return snap || { order_total: null, item_count: null, product_count: null, products: [] };
+  }
+
+  async read_basket_line_count() { const b = await this.read_basket(); return { product_count: b.product_count, products: b.products }; }
+  async read_estimated_total() { const b = await this.read_basket(); return { estimated_total: b.order_total, item_count: b.item_count }; }
+}
+
+module.exports = { Session, URLS, BASE, ReauthRequiredError, RateLimitedError, TROLLEY_SNAPSHOT, READ_QTY, PAGE_STATE, clickExpr, sleep };
