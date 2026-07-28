@@ -48,8 +48,11 @@ test('sendCard builds a real sendMessage request with the action inline keyboard
   assert.equal(call.url, `${API_BASE}/bot${FAKE_TOKEN}/sendMessage`);
   assert.equal(call.body.chat_id, String(AUTH_ID));
   assert.equal(call.body.text, 'Saved and safe — waiting.');
-  const buttons = call.body.reply_markup.inline_keyboard[0].map((b) => b.text);
-  assert.deepEqual(buttons, ['Save to Brain', 'Ask Larry', 'Keep Raw']);
+  // Save to Brain owns a full-width first row so its label never truncates
+  // ("Save to Brai…"); the two secondary actions share the second row. Assert the
+  // whole layout, not just row 0 — reading one row is what let this drift unnoticed.
+  const rows = call.body.reply_markup.inline_keyboard.map((r) => r.map((b) => b.text));
+  assert.deepEqual(rows, [['Save to Brain'], ['Ask Larry', 'Keep Raw']]);
   assert.equal(result.result.message_id, 555, 'parsed Bot API result is returned');
 });
 
