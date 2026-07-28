@@ -126,6 +126,14 @@ jobs:
         working-directory: services/asdair/cockpit-api
         run: node --test
 
+      # THE KEYSTONE. Runs the REAL shopStore/shopperRoute/planner/resolveByCatalogue
+      # against an in-memory pg carrying migration 006 and 008's ACTUAL unique
+      # indexes and CHECKs, so a duplicate is refused by the same mechanism
+      # Postgres uses rather than by a mock told to say no.
+      - name: Run the pipeline orchestrator suite (offline)
+        working-directory: services/asdair/pipeline
+        run: node --test
+
   integration:
     runs-on: ubuntu-latest
     defaults:
