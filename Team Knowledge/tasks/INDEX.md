@@ -2,19 +2,22 @@
 
 _Auto-generated. Do not edit by hand. Run `SOP-rebuild-task-index` to regenerate._
 
-_Last rebuilt: 2026-07-16T09:30:00Z_
+_Last rebuilt: 2026-07-28T09:48:00Z_
 
 ## Summary
-- Open: 4
+- Open: 5
 - In progress: 0 (0 blocked)
 - Done (this month): 9
 - Cancelled (this month): 0
 
-## Open (4)
+## Open (5)
+
+### Priority 2 — high
+- [[tsk-2026-07-15-001-reconcile-sop-002-with-actual-regen-script]] — Reconcile SOP-002's documented procedure with the actual regen script the Cockpit runs — assignee: silas — created 2026-07-15
 
 ### Priority 3 — normal
-- [[tsk-2026-07-16-001-exact-sha-review-gate-automation]] — Idea: Exact-SHA Review Gate Automation (Corpus Reconciliation Pipeline) — assignee: unassigned — created 2026-07-16
 - [[tsk-2026-07-11-002-migration-closure-audit-remaining-blockers]] — Track migration-closure-audit's remaining blockers and Warwick decisions — assignee: larry — created 2026-07-11
+- [[tsk-2026-07-16-001-exact-sha-review-gate-automation]] — Idea: Exact-SHA Review Gate Automation (Corpus Reconciliation Pipeline) — assignee: unassigned — created 2026-07-16
 
 ### Priority 4 — low
 - [[tsk-2026-07-10-004-careerair-migration-direction-decision]] — Direction decision: CareerAIR migration scope — assignee: unassigned — created 2026-07-10 — deprioritized 2026-07-11
@@ -26,17 +29,9 @@ _none_
 ## By assignee
 - larry: 1 open, 0 in-progress (0 blocked)
 - warden: 0 open, 0 in-progress (0 blocked)
-- silas: 0 open, 0 in-progress (0 blocked)
+- silas: 1 open, 0 in-progress (0 blocked)
 - pax: 0 open, 0 in-progress (0 blocked)
 - unassigned: 3 open, 0 in-progress (0 blocked)
 
 ## Recently closed (last 7 days)
-- 2026-07-12 [[tsk-2026-07-12-002-synthetic-client-delivery-engagement-proof]] — done — larry
-- 2026-07-12 [[tsk-2026-07-12-001-evaluate-client-delivery-operational-schema-gap]] — done — larry
-- 2026-07-11 [[tsk-2026-07-11-001-absorb-independent-change-qa-doctrine]] — done — larry
-- 2026-07-11 [[tsk-2026-07-10-001-fold-fusion247-brain-doctrine-into-warden]] — done — larry
-- 2026-07-11 [[tsk-2026-07-10-006-verifiair-content-integrity-qa-gap-proposal]] — done — larry
-- 2026-07-11 [[tsk-2026-07-10-008-design-warwick-knowledge-value-profile]] — done — silas
-- 2026-07-11 [[tsk-2026-07-10-007-raw-source-retention-design-proposal]] — done — silas
-- 2026-07-11 [[tsk-2026-07-10-003-categorisair-equivalent-design-proposal]] — done — larry
-- 2026-07-10 [[tsk-2026-07-10-002-fusion247-brain-migration-coverage-matrix]] — done — larry
+_none_
