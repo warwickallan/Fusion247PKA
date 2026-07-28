@@ -18,6 +18,8 @@
 <body>
   <div id="app"></div>
   <script src="/vendor/vue.global.prod.js"></script>
+  <!-- The apps registry publishes window.FUSION_APPS and MUST load before app.js reads it. -->
+  <script src="/apps.js"></script>
   <script src="/app.js"></script>
   <script>
     // Register the service worker only in a secure context (https / localhost). Over plain http on the
