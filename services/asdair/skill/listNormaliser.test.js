@@ -433,6 +433,139 @@ const FIXTURES = [
       needs_review: []
     }
   },
+  // ---- TRAILING BARE QUANTITY (defect A) ----
+  // The commonest hand-written form. Previously welded into the name at qty 1
+  // ("milk 2" -> 1 x "milk 2"), which silently under-ordered every such line.
+  {
+    name: 'quantity form: trailing bare number ("milk 2")',
+    raw: 'milk 2',
+    expected: {
+      items: [{ item_name: 'milk', requested_qty: 2, note: '' }],
+      needs_review: []
+    }
+  },
+  {
+    name: 'quantity form: trailing bare number after a multi-word name ("yazoo strawberry 4")',
+    raw: 'yazoo strawberry 4',
+    expected: {
+      items: [{ item_name: 'yazoo strawberry', requested_qty: 4, note: '' }],
+      needs_review: []
+    }
+  },
+  {
+    name: 'trailing bare qty alongside a parenthetical note ("bread 3 (thick sliced)")',
+    raw: 'bread 3 (thick sliced)',
+    expected: {
+      items: [{ item_name: 'bread', requested_qty: 3, note: 'thick sliced' }],
+      needs_review: []
+    }
+  },
+  // ---- NEGATIVE / BOUNDARY: a trailing number that is NOT a quantity ----
+  {
+    name: 'over-match guard: a trailing SIZE token is not a quantity ("yazoo 400ml")',
+    raw: 'yazoo 400ml',
+    expected: {
+      items: [{ item_name: 'yazoo 400ml', requested_qty: 1, note: '' }],
+      needs_review: []
+    }
+  },
+  {
+    name: 'over-match guard: a trailing VOLUME token is not a quantity ("milk 2L")',
+    raw: 'milk 2L',
+    expected: {
+      items: [{ item_name: 'milk 2l', requested_qty: 1, note: '' }],
+      needs_review: []
+    }
+  },
+  {
+    name: 'over-match guard: a mid-line pack number is not a quantity ("tuna 4 pack")',
+    raw: 'tuna 4 pack',
+    expected: {
+      items: [{ item_name: 'tuna 4 pack', requested_qty: 1, note: '' }],
+      needs_review: []
+    }
+  },
+  {
+    name: 'over-match guard: a glued in-name number is not a quantity ("7up")',
+    raw: '7up',
+    expected: {
+      items: [{ item_name: '7up', requested_qty: 1, note: '' }],
+      needs_review: []
+    }
+  },
+  {
+    name: 'over-match guard: curated identity collision "factor 50" stays qty 1',
+    raw: 'factor 50',
+    expected: {
+      items: [{ item_name: 'factor 50', requested_qty: 1, note: '' }],
+      needs_review: []
+    }
+  },
+  {
+    name: 'over-match guard: curated identity collision "wd 40" stays qty 1',
+    raw: 'wd 40',
+    expected: {
+      items: [{ item_name: 'wd 40', requested_qty: 1, note: '' }],
+      needs_review: []
+    }
+  },
+  {
+    name: 'collision name WITH an explicit trailing quantity still parses ("omega 3 x2")',
+    raw: 'omega 3 x2',
+    expected: {
+      items: [{ item_name: 'omega 3', requested_qty: 2, note: '' }],
+      needs_review: []
+    }
+  },
+  {
+    name: 'collision name with a LEADING quantity still parses ("2x omega 3")',
+    raw: '2x omega 3',
+    expected: {
+      items: [{ item_name: 'omega 3', requested_qty: 2, note: '' }],
+      needs_review: []
+    }
+  },
+  // ---- NEVER GUESS: a trailing bare qty that CONFLICTS routes to review ----
+  {
+    name: 'trailing bare qty conflicting with a trailing xN -> review, never a guess',
+    raw: 'milk 2 x3',
+    expected: {
+      items: [],
+      needs_review: [{ raw: 'milk 2 x3', reason: 'conflicting quantities: 3 vs 2' }]
+    }
+  },
+  {
+    name: 'trailing bare qty conflicting with a leading qty -> review, never a guess',
+    raw: '2 milk 3',
+    expected: {
+      items: [],
+      needs_review: [{ raw: '2 milk 3', reason: 'conflicting quantities: 2 vs 3' }]
+    }
+  },
+  {
+    name: 'trailing bare qty over the sanity cap -> review ("milk 1000")',
+    raw: 'milk 1000',
+    expected: {
+      items: [],
+      needs_review: [{ raw: 'milk 1000', reason: 'implausible quantity: 1000' }]
+    }
+  },
+  {
+    name: 'trailing bare qty of zero -> review ("milk 0")',
+    raw: 'milk 0',
+    expected: {
+      items: [],
+      needs_review: [{ raw: 'milk 0', reason: 'non-positive quantity: 0' }]
+    }
+  },
+  {
+    name: 'trailing numeric look-alike is still malformed, not a bare qty ("milk 2.")',
+    raw: 'milk 2.',
+    expected: {
+      items: [],
+      needs_review: [{ raw: 'milk 2.', reason: 'malformed quantity syntax: 2.' }]
+    }
+  },
   // ---- STRICTER BAR: marker-only lines surfaced, NEVER dropped ----
   {
     name: 'marker-only: dash "-" surfaced to review, never dropped',
@@ -627,6 +760,41 @@ test('helper extractQuantities finds each leading/trailing form', function () {
   assert.deepEqual(_internal.extractQuantities('milk x2'), { qtys: [2], rest: 'milk' });
   assert.deepEqual(_internal.extractQuantities('two milk'), { qtys: [2], rest: 'milk' });
   assert.deepEqual(_internal.extractQuantities('milk'), { qtys: [], rest: 'milk' });
+});
+
+test('helper extractQuantities reads a TRAILING BARE integer as a quantity', function () {
+  assert.deepEqual(_internal.extractQuantities('milk 2'), { qtys: [2], rest: 'milk' });
+  assert.deepEqual(_internal.extractQuantities('yazoo strawberry 4'), { qtys: [4], rest: 'yazoo strawberry' });
+});
+
+test('helper extractQuantities does NOT strip a trailing UNIT/SIZE or glued number', function () {
+  // The token must be pure ASCII digits to end of line, whitespace-separated.
+  assert.deepEqual(_internal.extractQuantities('yazoo 400ml'), { qtys: [], rest: 'yazoo 400ml' });
+  assert.deepEqual(_internal.extractQuantities('milk 2L'), { qtys: [], rest: 'milk 2L' });
+  assert.deepEqual(_internal.extractQuantities('7up'), { qtys: [], rest: '7up' });
+  assert.deepEqual(_internal.extractQuantities('2x4 timber'), { qtys: [], rest: '2x4 timber' });
+  // anchored to END of line, so a mid-line pack number survives
+  assert.deepEqual(_internal.extractQuantities('tuna 4 pack'), { qtys: [], rest: 'tuna 4 pack' });
+});
+
+test('helper extractQuantities honours the TRAILING_NUMBER_COLLISIONS identity list', function () {
+  // A product whose IDENTITY ends in a bare number keeps it in the name...
+  assert.deepEqual(_internal.extractQuantities('omega 3'), { qtys: [], rest: 'omega 3' });
+  assert.deepEqual(_internal.extractQuantities('factor 50'), { qtys: [], rest: 'factor 50' });
+  assert.deepEqual(_internal.extractQuantities('wd 40'), { qtys: [], rest: 'wd 40' });
+  // ...but an explicit quantity in another form is still read, because the
+  // collision check runs against the CURRENT working string each iteration.
+  assert.deepEqual(_internal.extractQuantities('omega 3 x2'), { qtys: [2], rest: 'omega 3' });
+  assert.deepEqual(_internal.extractQuantities('2x omega 3'), { qtys: [2], rest: 'omega 3' });
+  // the list is exported so the boundary is inspectable, not implicit
+  assert.equal(_internal.TRAILING_NUMBER_COLLISIONS['omega 3'], true);
+  assert.equal(Object.prototype.hasOwnProperty.call(_internal.TRAILING_NUMBER_COLLISIONS, 'milk 2'), false);
+});
+
+test('helper extractQuantities LOOPS the trailing bare form (doubled -> two qtys)', function () {
+  // Symmetric with the trailing-xN loop: both values surface so the caller
+  // can call a conflict instead of welding one into the name.
+  assert.deepEqual(_internal.extractQuantities('milk 2 3'), { qtys: [3, 2], rest: 'milk' });
 });
 
 test('helper extractQuantities LOOPS trailing xN (doubled form -> two qtys)', function () {

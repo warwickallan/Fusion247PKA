@@ -390,3 +390,55 @@ test('FIX 5: a non-positive price is treated as unknown (null), not a real GBP 0
     assert.ok(a.reason.includes('price unknown'), 'the reason reports the price as unknown');
   });
 });
+
+// TQA-PR73-005 (HIGH). rankAlternatives consults `products` and needs a
+// resolvable category, so an unmatched free-text line got an EMPTY queue -
+// precisely where `regulars` holds the answer. Rule 6 has two clauses: never
+// substitute AND surface alternatives. These guard the second.
+const REGS = [
+  { id: 1, household_id: 1, active: true, name: 'Fairy Max Power Washing Up Liquid 545ML', aka: [], asda_product_id: 'X1' },
+  { id: 2, household_id: 1, active: true, name: 'Warburtons Danish Lighter White Bread 400g', aka: ['danish bread'] },
+  { id: 3, household_id: 1, active: true, name: 'ASDA Shortbread Fingers 210g', aka: [] },
+  { id: 4, household_id: 99, active: true, name: 'Other Household Bread', aka: [] },
+  { id: 5, household_id: 1, active: false, name: 'Retired Bread', aka: [] }
+];
+
+test('an unmatched line surfaces regulars candidates instead of an empty queue', function () {
+  const p = planBasket({
+    listItems: [{ item_name: 'washing up liquid', requested_qty: 1 }],
+    rules: [], products: [], regulars: REGS, budget: null, household: 1
+  });
+  const line = p.items[0];
+  assert.equal(line.status, 'needs_decision');
+  assert.equal(line.matched_product, null, 'suggestions must NEVER set matched_product');
+  assert.ok(line.alternatives.length > 0, 'rule 6 requires alternatives to be surfaced');
+  assert.match(line.alternatives[0].name, /Fairy Max Power/);
+});
+
+test('whole-word hits outrank substring hits, so "bread" does not suggest shortbread first', function () {
+  const p = planBasket({
+    listItems: [{ item_name: 'bread', requested_qty: 1 }],
+    rules: [], products: [], regulars: REGS, budget: null, household: 1
+  });
+  const names = p.items[0].alternatives.map(function (a) { return a.name; });
+  assert.match(names[0], /Warburtons/, 'a real loaf must outrank shortbread');
+});
+
+test('regulars candidates never leak another household, and skip inactive rows', function () {
+  const p = planBasket({
+    listItems: [{ item_name: 'bread', requested_qty: 1 }],
+    rules: [], products: [], regulars: REGS, budget: null, household: 1
+  });
+  const names = p.items[0].alternatives.map(function (a) { return a.name; }).join(' | ');
+  assert.equal(/Other Household/.test(names), false, 'no cross-household leak');
+  assert.equal(/Retired/.test(names), false, 'inactive regulars are not suggested');
+});
+
+test('a resolved line carries no suggestions (shape stays consistent)', function () {
+  const p = planBasket({
+    listItems: [{ item_name: 'Fairy Max Power Washing Up Liquid 545ML', requested_qty: 1 }],
+    rules: [], products: [], regulars: REGS, budget: null, household: 1
+  });
+  assert.equal(p.items[0].status, 'add');
+  assert.deepEqual(p.items[0].alternatives, []);
+});

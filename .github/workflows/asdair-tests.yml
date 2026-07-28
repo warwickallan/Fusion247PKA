@@ -12,7 +12,16 @@ name: asdair-tests
 #                   ASDAIR_DB_URL is unset too). This is the zero-dependency
 #                   gate on every push/PR touching the service, and it proves
 #                   the destructive proofs stay inert without the opt-in.
-#   * integration - the SAME two DB-gated files, EXPLICITLY opted in via
+#                   The SAME job also runs the outcome recorder's suite
+#                   (services/asdair/outcome) -- the pure buildOutcome tests,
+#                   the writers' fake-client transaction proofs and the write-
+#                   side schema drift guard. That suite needs no dependencies
+#                   at all (pg is lazily required), so it runs with no install
+#                   step, and its own DB-gated proof skips here too.
+#   * integration - the SAME two DB-gated files (plus the outcome recorder's
+#                   own DB-gated proof, run as a SEPARATE step because it and
+#                   integration.dbtest.js both re-create the literal `asdair`
+#                   schema and must never run concurrently), EXPLICITLY opted in via
 #                   ASDAIR_DB_TEST_ALLOW_DESTRUCTIVE=1 (the positive,
 #                   single-purpose marker that authorises destructive DB
 #                   testing) with ASDAIR_DB_URL pointed at a throwaway
@@ -65,6 +74,15 @@ jobs:
       - name: Run the skill suite with no DB (DB-gated proofs skip)
         run: node --test
 
+      # The outcome recorder (the ONLY writers for asdair.orders /
+      # order_events / rule_qa_log). Its unit suite is dependency-free: the
+      # writers lazy-require pg and the transaction proofs use a fake client,
+      # so nothing here connects to anything. test/outcome.dbtest.js skips,
+      # for the same reason the skill's DB-gated proofs do.
+      - name: Run the outcome recorder suite with no DB (DB-gated proof skips)
+        working-directory: services/asdair/outcome
+        run: node --test
+
   integration:
     runs-on: ubuntu-latest
     defaults:
@@ -106,3 +124,19 @@ jobs:
 
       - name: Run the DB-gated constraint + integration proofs on a clean Postgres
         run: node --test test/constraints.dbtest.js test/integration.dbtest.js
+
+      - name: Install dependencies for the outcome writers (pg)
+        working-directory: services/asdair/outcome
+        run: npm ci
+
+      # SEPARATE step on purpose: this proof re-creates the literal `asdair`
+      # schema, exactly as integration.dbtest.js does, so the two must run
+      # sequentially rather than concurrently in one `node --test` invocation.
+      # It applies the committed 001 + 004 migrations from scratch, records a
+      # synthetic shop through recordShopOutcome.js, and proves the
+      # rule_qa_log -> rules promotion back-link. Synthetic data only.
+      # (The shared safety gate skill/test/dbSafeTarget.js resolves
+      # pg-connection-string from the skill's node_modules, installed above.)
+      - name: Run the DB-gated outcome + promotion proof on a clean Postgres
+        working-directory: services/asdair/outcome
+        run: node --test test/outcome.dbtest.js

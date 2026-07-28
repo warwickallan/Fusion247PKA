@@ -2,7 +2,8 @@
 // IDEA-012 AsdAIr - WP1 skill: data.js
 //
 // READ-ONLY data adapter. It loads the pure planner's inputs from the
-// live asdair Postgres schema and returns plain objects.
+// live asdair Postgres schema and returns plain objects:
+//   loadList / loadRules / loadProducts / loadRegulars / loadBudget
 //
 // READ-ONLY INTENT (enforced by review):
 //   * Every query in this file is a SELECT. There is NO INSERT, UPDATE,
@@ -44,6 +45,31 @@ const RULES_SELECT_COLUMNS = [
   'matched_product',
   'reason',
   'note'
+];
+
+// The EXACT column list loadRegulars() SELECTs from asdair.regulars, kept as
+// one exported constant for the same single-source-of-truth reason as
+// RULES_SELECT_COLUMNS above. These are fixed identifiers (no external input),
+// so building the SELECT from them keeps the query SELECT-only and safe.
+//
+// SCHEMA NOTE (drift, reported not fixed): asdair.regulars exists in the LIVE
+// asdair schema but is NOT defined in the committed migration
+// db/001_asdair_schema.sql, so it is not covered by the schemaCompat.test.js
+// drift guard the way asdair.rules is. Adding it to the migration is out of
+// scope for this change; until it lands, a database built from git alone does
+// not have this table and loadRegulars() will throw against it.
+const REGULARS_SELECT_COLUMNS = [
+  'id',
+  'household_id',
+  'high_level_category',
+  'category',
+  'name',
+  'brand',
+  'aka',
+  'asda_product_id',
+  'asda_url',
+  'typical_qty',
+  'substitutes_allowed'
 ];
 
 // Lazily create a single shared pool from the environment. Throws a clear
@@ -174,6 +200,51 @@ async function loadProducts() {
   return rows;
 }
 
+// Load the household's ACTIVE Regulars -- the standing "this is what we
+// actually buy" knowledge (brand, `aka` aliases, asda_product_id,
+// substitutes_allowed). This is the resolution source the planner was missing:
+// without it an item the household buys every week resolved to nothing and the
+// plan was confidently wrong. SELECT only.
+//
+// Scoping is done HERE as well as in the planner, deliberately narrower than
+// loadRules(): regulars carry a household's private preferences, so a run loads
+// exactly ONE household's rows and another household's regulars never enter
+// memory in the first place.
+//
+// THERE ARE NO GLOBAL REGULARS. `asdair.regulars.household_id` is NOT NULL
+// (see 004_asdair_regulars.sql, which is faithful to the live table) -- unlike
+// `products` and `budget_settings`, which DO carry a nullable global row. An
+// earlier version of this function assumed the global-row convention held here
+// too, so an unnamed run queried `household_id IS NULL` and SILENTLY returned
+// zero regulars: a planner that resolved nothing while appearing to work, which
+// is the exact confidently-wrong failure this function exists to fix. Found by
+// independent QA at the integration seam -- the migration and this loader were
+// written by different workers and only contradicted each other once merged.
+//
+// So a run MUST name its household. Unnamed or unresolvable THROWS (the
+// loadList precedent, not the loadBudget one) rather than returning an empty
+// set, because silently dropping every piece of the household's resolution
+// knowledge is worse than failing loudly.
+async function loadRegulars(household) {
+  const named = !(household === null || household === undefined || String(household).trim() === '');
+  if (!named) {
+    throw new Error(
+      'loadRegulars requires a household: asdair.regulars.household_id is NOT NULL, so there are no global '
+      + 'regulars to fall back to. Pass --household <name>.'
+    );
+  }
+
+  const householdId = await resolveHouseholdId(household);
+  if (householdId === null) {
+    throw new Error('Unknown household "' + String(household) + '". Check asdair.households.name.');
+  }
+  return await readQuery(
+    'SELECT ' + REGULARS_SELECT_COLUMNS.join(', ')
+      + ' FROM asdair.regulars WHERE active = true AND household_id = $1 ORDER BY id',
+    [householdId]
+  );
+}
+
 // Load the budget band for a household, falling back to the global default
 // row (household_id IS NULL) when the household has no specific band.
 // SELECT only.
@@ -205,9 +276,11 @@ module.exports = {
   loadList: loadList,
   loadRules: loadRules,
   loadProducts: loadProducts,
+  loadRegulars: loadRegulars,
   loadBudget: loadBudget,
   close: close,
   // Exported for schemaCompat.test.js (schema/code drift guard). Not used by
   // the CLI runtime path.
-  RULES_SELECT_COLUMNS: RULES_SELECT_COLUMNS
+  RULES_SELECT_COLUMNS: RULES_SELECT_COLUMNS,
+  REGULARS_SELECT_COLUMNS: REGULARS_SELECT_COLUMNS
 };

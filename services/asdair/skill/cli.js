@@ -5,7 +5,7 @@
 // and prints a human-readable basket plan followed by the raw JSON.
 //
 // Usage:
-//   node cli.js --list-date 2026-07-13 --household household-a
+//   node cli.js --list-date 2026-07-13 --household <household-name>
 //
 // Requires the connection string in the environment:
 //   ASDAIR_DB_URL=postgres://...   (never passed on the command line)
@@ -88,12 +88,14 @@ async function main() {
     const listBundle = await data.loadList(args.listDate, args.household);
     const rules = await data.loadRules();
     const products = await data.loadProducts();
+    const regulars = await data.loadRegulars(args.household);
     const budget = await data.loadBudget(args.household);
 
     const plan = planBasket({
       listItems: listBundle.listItems,
       rules: rules,
       products: products,
+      regulars: regulars,
       budget: budget,
       household: listBundle.household_id
     });

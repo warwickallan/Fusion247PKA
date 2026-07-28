@@ -3,7 +3,13 @@
 //
 // The "brain" half of the household-shopping agent.
 //
-// planBasket({ listItems, rules, products, budget }) -> { items, summary }
+// planBasket({ listItems, rules, products, regulars, budget })
+//   -> { items, summary }
+//
+// `regulars` is the household's standing "this is what we actually buy" set
+// (name, `aka` aliases, brand, asda_product_id, substitutes_allowed). It is an
+// ARGUMENT, exactly like `rules` and `products`: this function stays PURE and
+// does no I/O of its own. data.js loadRegulars() supplies it.
 //
 // PURE and DETERMINISTIC:
 //   * No DB, no network, no fs, no Date.now(), no randomness.
@@ -14,6 +20,12 @@
 //   * It NEVER auto-substitutes a product (out-of-stock / ambiguous items
 //     become needs_decision; any alternatives are surfaced for a human,
 //     never applied to matched_product).
+//   * It NEVER silently adds an item it cannot identify. A line is CONFIDENTLY
+//     MATCHED only when the planner can NAME a product for it -- matched_product
+//     non-null after all four resolution sources (explicit in-scope
+//     matched_product_id > products.list_term > `map` directive > regulars).
+//     Anything else is needs_decision with ranked candidates surfaced (rule 6),
+//     never status 'add' with a flag.
 //   * It NEVER emits a checkout / pay / place-order action. The goal is a
 //     checkout-ready plan; committing it is out of scope by construction.
 //   * It only ever plans items that are explicitly on the list (rule 5).
@@ -163,6 +175,154 @@ function inHouseholdScope(product, household) {
   if (!product) return false;
   const isGlobal = product.household_id === null || product.household_id === undefined;
   return isGlobal || sameHousehold(product.household_id, household);
+}
+
+// ---------------------------------------------------------------------
+// Regulars matching (rule 4 + rule 9): the household's standing
+// "this is what we actually buy" set, used as an ADDITIONAL resolution source
+// BELOW products and rules.
+//
+// Why it exists: asdair.regulars carries nearly all of the household's real
+// resolution knowledge (brand, `aka` aliases, asda_product_id,
+// substitutes_allowed) and the planner could not see any of it, so items the
+// household buys every week resolved to nothing and produced a confidently
+// wrong plan.
+//
+// PRECEDENCE IS UNCHANGED. A regulars match is only consulted when the
+// existing sources produced nothing: explicit matched_product_id, then a
+// products.list_term match, then a `map` directive rule all keep priority.
+// Regulars never override any of them.
+//
+// Matching is case-insensitive over the regular's `name` AND every entry of
+// its `aka` alias array. Only ACTIVE rows count (`active === false` is
+// excluded; an absent `active` is treated as active, matching how
+// actionableRules reads rules). Household scope is the SAME boundary
+// matchProduct and rankAlternatives enforce: global rows plus the active
+// household's, never another household's. A household-scoped regular beats a
+// global one; two or more at the winning scope is AMBIGUOUS -> the caller
+// sends the line to a human and never picks one (rule 6).
+// ---------------------------------------------------------------------
+
+// Every normalised name this regular answers to: its `name` plus each `aka`
+// alias. Distinct, order preserved.
+function regularAliases(reg) {
+  const names = [];
+  if (!reg) return names;
+  const primary = normaliseTerm(reg.name);
+  if (primary !== '') names.push(primary);
+  const aka = Array.isArray(reg.aka) ? reg.aka : [];
+  aka.forEach(function (a) {
+    const t = normaliseTerm(a);
+    if (t !== '' && names.indexOf(t) === -1) names.push(t);
+  });
+  return names;
+}
+
+// The product name a regulars match resolves to. `brand` is prepended when the
+// regular carries one and the name does not already lead with it, so the plan
+// names the actual thing to buy ("Yazoo Strawberry Milkshake") rather than the
+// household's shorthand. Returns null when there is nothing usable to name.
+function regularDisplayName(reg) {
+  if (!reg) return null;
+  const name = (reg.name === null || reg.name === undefined) ? '' : String(reg.name).trim();
+  const brand = (reg.brand === null || reg.brand === undefined) ? '' : String(reg.brand).trim();
+  if (name === '') return brand === '' ? null : brand;
+  if (brand === '') return name;
+  return normaliseTerm(name).indexOf(normaliseTerm(brand)) === 0 ? name : brand + ' ' + name;
+}
+
+// ---------------------------------------------------------------------
+// regularCandidates(line, regulars, household) -> [{ name, price, reason, score }]
+//
+// SUGGESTION ONLY, for a needs_decision line that `rankAlternatives` could not
+// help with. Exact alias matching (matchRegular) has already failed by the time
+// this runs, so this is the deliberately LOOSER pass: partial WORD OVERLAP
+// against every regular's name and aliases.
+//
+// It never chooses and never sets matched_product -- rule 6's "never
+// auto-substitute" is untouched. It exists to keep rule 6's OTHER clause:
+// "with any alternatives surfaced for a human". Without it a held line was
+// handed back with an empty queue while the answer sat in `regulars`.
+//
+// Ranking: proportion of the line's own words that the candidate covers, so
+// "washing up liquid" ranks "Fairy Max Power Washing Up Liquid 545ML" top.
+// Household-scoped rows outrank global ones at equal score, mirroring
+// rankAlternatives. Bounded to TOP_N.
+// ---------------------------------------------------------------------
+function regularCandidates(line, regulars, household) {
+  const list = Array.isArray(regulars) ? regulars : [];
+  const term = normaliseTerm(line && line.item_name);
+  if (term === '') return [];
+
+  const words = term.split(' ').filter(function (w) { return w.length > 2; });
+  if (words.length === 0) return [];
+
+  const scored = [];
+  list.forEach(function (r) {
+    if (!r || r.active === false) return;
+    if (!inHouseholdScope(r, household)) return;
+
+    // Score against the best of the regular's own name and each alias.
+    // A WHOLE-WORD hit scores full; a mere substring hit scores half. Without
+    // this, "bread" ranks "ASDA Shortbread Fingers" level with "Warburtons ...
+    // White Bread" -- technically a match, useless as a suggestion.
+    let best = 0;
+    regularAliases(r).forEach(function (alias) {
+      const hay = ' ' + alias + ' ';
+      let hit = 0;
+      words.forEach(function (w) {
+        if (hay.indexOf(' ' + w + ' ') !== -1 || hay.indexOf(' ' + w) !== -1) hit += 1;
+        else if (hay.indexOf(w) !== -1) hit += 0.5;
+      });
+      const score = hit / words.length;
+      if (score > best) best = score;
+    });
+    if (best === 0) return;
+
+    const scopedBonus = (r.household_id !== null && r.household_id !== undefined
+      && sameHousehold(r.household_id, household)) ? 0.3 : 0;
+
+    scored.push({
+      name: regularDisplayName(r),
+      price: null,                                  // regulars carry no price column
+      reason: 'partial match in regulars'
+        + (r.asda_product_id ? ' (asda_product_id ' + r.asda_product_id + ')' : ''),
+      score: Number((best + scopedBonus).toFixed(3))
+    });
+  });
+
+  scored.sort(function (a, b) {
+    if (b.score !== a.score) return b.score - a.score;
+    return a.name < b.name ? -1 : (a.name > b.name ? 1 : 0);   // stable, deterministic
+  });
+  return scored.slice(0, TOP_N);
+}
+
+function matchRegular(item, regulars, household) {
+  const list = Array.isArray(regulars) ? regulars : [];
+  const term = normaliseTerm(item && item.item_name);
+  if (term === '') return { regular: null, ambiguous: false };
+
+  const hits = list.filter(function (r) {
+    if (!r || r.active === false) return false;             // only ACTIVE rows
+    if (!inHouseholdScope(r, household)) return false;      // no cross-household leak
+    return regularAliases(r).indexOf(term) !== -1;           // name or aka alias
+  });
+
+  const scoped = hits.filter(function (r) {
+    return r.household_id !== null && r.household_id !== undefined
+      && sameHousehold(r.household_id, household);
+  });
+  if (scoped.length === 1) return { regular: scoped[0], ambiguous: false };
+  if (scoped.length > 1) return { regular: scoped[0], ambiguous: true };
+
+  const global = hits.filter(function (r) {
+    return r.household_id === null || r.household_id === undefined;
+  });
+  if (global.length === 1) return { regular: global[0], ambiguous: false };
+  if (global.length > 1) return { regular: global[0], ambiguous: true };
+
+  return { regular: null, ambiguous: false };
 }
 
 // Compare two product ids for a DETERMINISTIC tie-break: numeric when both
@@ -485,6 +645,7 @@ function planBasket(input) {
   const listItems = args.listItems;
   const rules = args.rules;
   const products = args.products;
+  const regulars = args.regulars;   // household Regulars: an ARGUMENT, no I/O here
   const budget = args.budget || null;
 
   // Active household: explicit override, else derived from the budget row.
@@ -519,6 +680,40 @@ function planBasket(input) {
         if (r.note) note = note ? (note + '; ' + r.note) : r.note;
       }
     });
+
+    // Regulars: the LOWEST-priority resolution source. Consulted ONLY when
+    // everything above produced no product, so existing precedence is
+    // untouched: explicit matched_product_id > products.list_term > `map`
+    // directive > regulars. Skipped entirely on a scope mismatch (that line is
+    // already failing safe to a human) and when the product match was already
+    // ambiguous (a second source cannot resolve an existing ambiguity).
+    let regularAmbiguous = false;
+    if (!matchedProduct && !scopeMismatch && !ambiguous) {
+      const regMatch = matchRegular(line, regulars, household);
+      if (regMatch.ambiguous) {
+        // Two or more active regulars answer to this term (the real "bread"
+        // case). Rule 6: never pick one -- send it to a human.
+        regularAmbiguous = true;
+      } else if (regMatch.regular) {
+        const display = regularDisplayName(regMatch.regular);
+        if (display) {
+          matchedProduct = display;
+          pushFlag(flags, 'matched from regulars');
+          // Surface the store identifier so a human / the browser half can act
+          // on the exact product rather than re-searching by name.
+          const pid = regMatch.regular.asda_product_id;
+          if (pid !== null && pid !== undefined && String(pid).trim() !== '') {
+            const idText = 'regulars asda_product_id ' + String(pid);
+            note = note ? (note + '; ' + idText) : idText;
+          }
+          // Rule 6 book-keeping: the household has said this item must not be
+          // swapped. Informational only -- the planner never substitutes at all.
+          if (regMatch.regular.substitutes_allowed === false) {
+            pushFlag(flags, 'no substitutes allowed');
+          }
+        }
+      }
+    }
 
     // ---- status resolution -----------------------------------------------
     // Precedence: standing exclude > one-week exclude > needs_decision > add.
@@ -575,16 +770,41 @@ function planBasket(input) {
       status = 'needs_decision';
       pushFlag(flags, 'flagged by rule');
       pushFlag(flags, 'never auto-substitute');
-    } else if (ambiguous) {
-      // Rule 6: cannot be confidently matched -> human decision.
+    } else if (ambiguous || regularAmbiguous) {
+      // Rule 6: cannot be confidently matched -> human decision. This covers
+      // BOTH an ambiguous products match and an ambiguous REGULARS match (two
+      // active regulars answering to the same term / alias).
       status = 'needs_decision';
       pushFlag(flags, 'ambiguous match');
+      if (regularAmbiguous) pushFlag(flags, 'ambiguous regulars match');
       pushFlag(flags, 'never auto-substitute');
     } else if (!matchedProduct) {
-      // Unmatched but explicitly on the list: still plan to add. It would be
-      // found in the Favourites / Regulars pages at run time (rule 4).
-      status = 'add';
+      // Rule 6, enforced by the CODE rather than by the operator (defect C).
+      //
+      // WHAT COUNTS AS "CONFIDENTLY MATCHED" (the rule chosen here):
+      //   a line is confidently matched when, after ALL resolution sources have
+      //   run, the planner can NAME a specific product for it -- i.e.
+      //   matched_product is non-null. The four sources are, in precedence
+      //   order: an in-scope explicit matched_product_id; a products.list_term
+      //   mapping; a `map` directive rule; a regulars name/aka match. Nothing
+      //   else counts -- an item merely being spelled plausibly is not a match.
+      //
+      // Everything that reaches this branch therefore has NO identification at
+      // all, and rule 6 says such a line goes to a human with any alternatives
+      // surfaced. It used to fall through to status 'add' on the reasoning that
+      // a human would find it in Favourites / Regulars at run time (rule 4) --
+      // but the planner could not SEE Regulars, so that reasoning never held,
+      // and the effect was a confidently wrong plan with needs_decision: 0.
+      // Now that regulars ARE a resolution source (defect B), an item that
+      // still resolves to nothing genuinely is unidentified.
+      //
+      // planned_qty becomes 0 and rankAlternatives supplies ranked candidates
+      // below, so the line reaches a human WITH options. Nothing is ever
+      // auto-substituted; the summary keys and their reconciliation are
+      // unchanged (this only moves lines from planned_add to needs_decision).
+      status = 'needs_decision';
       pushFlag(flags, 'no explicit product mapping');
+      pushFlag(flags, 'never auto-substitute');
     }
 
     // Finding 1 (data integrity, ALWAYS): a foreign-household matched_product_id
@@ -618,9 +838,19 @@ function planBasket(input) {
     // (matchedProduct above is left exactly as resolved -- original or rule-
     // mapped, or null). Only needs_decision lines get ranked candidates; every
     // other status carries an empty array so the output shape stays consistent.
-    const rankedAlternatives = status === 'needs_decision'
-      ? rankAlternatives(line, products, household)
-      : [];
+    // TQA-PR73-005: rankAlternatives consults `products` (a small mapping table)
+    // and needs a resolvable category, which an unmatched free-text line does
+    // not have -- so held lines shipped an EMPTY queue precisely where
+    // `regulars` holds the answers. Rule 6 has two clauses: never substitute
+    // AND surface alternatives. This keeps the second one. It still never
+    // CHOOSES -- suggestions only, the human decides.
+    let rankedAlternatives = [];
+    if (status === 'needs_decision') {
+      rankedAlternatives = rankAlternatives(line, products, household);
+      if (rankedAlternatives.length === 0) {
+        rankedAlternatives = regularCandidates(line, regulars, household);
+      }
+    }
 
     // planned_qty: only 'add' lines put units in the basket.
     const plannedQty = status === 'add' ? qty : 0;
@@ -711,6 +941,9 @@ module.exports = {
     normaliseTerm: normaliseTerm,
     normaliseQty: normaliseQty,
     matchProduct: matchProduct,
+    matchRegular: matchRegular,
+    regularAliases: regularAliases,
+    regularDisplayName: regularDisplayName,
     dedupeList: dedupeList,
     rankAlternatives: rankAlternatives,
     inHouseholdScope: inHouseholdScope
