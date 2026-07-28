@@ -23,8 +23,10 @@ It is also **not a receiver**. It never polls Telegram — see [Why there is no 
 | `callbackProtocol.js` | The wire format. One module owns the exact bytes on a button, imported by both halves so they cannot drift. |
 | `renderMessages.js` | The message catalogue. Nine pure renderers, each returning `{ text, reply_markup }`. |
 | `inboundRouter.js` | Maps one inbound Telegram update onto one intent `{ action, shopRef, arg, responder, raw }`. |
+| `questionRender.js` | Builds a question card **and its render contract** from one list, and persists what was displayed. |
+| `resolveTap.js` | Resolves a tapped index back through the stored contract to a product — or refuses it, visibly. |
 | `sendShopperMessage.js` | The outbound sender: `sendMessage` · `editMessageText` · `answerCallbackQuery`. Injectable HTTP client. |
-| `*.test.js` | `node --test`, fully offline. 77 tests, no network, no database, no credentials file. |
+| `*.test.js` | `node --test`, fully offline. 126 tests, no network, no database, no credentials file. |
 
 Zero runtime dependencies. ESM. Node ≥ 18.
 
@@ -173,6 +175,213 @@ A test asserts no `keep` / `raw` / `discard` / `delete` button ever appears on t
 
 ---
 
+## The render contract
+
+**A question button carries a candidate *index*. That is what forces everything below.**
+
+The index is not a shortcut — it is the only encoding that provably fits Telegram's 64-byte
+`callback_data` ceiling. An ASDA product id is unbounded; an index is one to three digits. The whole
+byte budget above depends on it.
+
+The consequence is absolute:
+
+> **An index is meaningless except against the exact list that was displayed.**
+
+If the candidates for a question are ever recomputed in a different order — a fresh catalogue
+search, a re-ranked match, a candidate that has gone out of stock and dropped out — then button #2
+on the card still sitting in Warwick's scrollback now points at a **different product**. Nothing
+errors. The wrong thing is simply added to the basket, and nobody finds out until it arrives.
+
+So the ordered list is **persisted at render time**, and a tapped index is resolved against **that
+stored list**, never against a freshly computed one. There is no code path in `resolveTap.js` that
+recomputes candidates, and there must never be one.
+
+### What is stored
+
+`asdair.shop_question` (migration 006, extended by 009) holds one contract per
+`(shop_id, question_key)` — the **current** render:
+
+| Column | What it is |
+|---|---|
+| `card_chat_id`, `card_message_id` | The Telegram card this contract is bound to. |
+| `rendered_candidates` (jsonb) | `[{ index, id, label }, …]` — the displayed candidates, **in display order**. |
+| `render_fingerprint` (text) | Seal over what was displayed (below). |
+| `render_version` (integer) | 1 for the first card; bumped by every re-render. |
+| `callback_index` (integer) | Which index was actually tapped, once answered. |
+
+`UNIQUE (shop_id, question_key)` already guarantees a question is asked at most once per shop.
+
+### One function builds both the card and the contract
+
+`prepareQuestionCard()` calls `renderQuestionCard()` and derives the contract from the **same
+sliced, ordered array**. They cannot drift, because there is no second list to drift from.
+(`renderQuestionCard` caps a card at `MAX_CANDIDATE_BUTTONS`; a contract built from the uncapped
+input would disagree the moment a question had nine candidates.)
+
+```js
+import { sendQuestionCard } from './questionRender.js';
+
+await sendQuestionCard({
+  sender, store, chatId,
+  shopRef: 'shop-2026-07-28',
+  questionKey: 'q7',
+  item: 'natural yogurt',
+  candidates: [                       // { id, label } — a bare string is REFUSED
+    { id: 'P-1001', label: 'Yeo Valley Natural Yogurt 500g' },
+    { id: 'P-1002', label: 'Arla Skyr Natural 450g' },
+  ],
+});
+```
+
+**Every candidate must carry an id.** A bare string is refused even though `renderQuestionCard`
+renders one happily: a string is a *label*, and two ASDA products can share a label
+("Semi Skimmed Milk 2 Pints"). Resolving a tap to a label would reintroduce, one layer down, exactly
+the ambiguity the contract exists to remove.
+
+The order is **send, then persist** — the contract keys on a `message_id` Telegram has not allocated
+until the card is sent. The failure window is therefore *"a card exists with no contract"*, and that
+direction is safe: a tap with no contract is refused. The dangerous direction — a contract that does
+not describe the live card — is unreachable. If the persist does fail, the card is edited to say it
+is not usable, so Warwick is not left tapping a button that will only ever refuse.
+
+### The fingerprint, exactly
+
+```
+render_fingerprint = sha256_hex( JSON.stringify([
+  "asdair.shop_question.render/v1",   // FINGERPRINT_DOMAIN
+  question_key,
+  render_version,
+  [candidate_id_0, candidate_id_1, …] // DISPLAY ORDER
+]) )
+```
+
+Three properties earn the JSON tuple over a delimiter-joined string:
+
+1. **Injection-proof.** JSON escapes every field, so an id containing a separator cannot forge an
+   extra element and collide with a different list. `['A:B','C']` and `['A','B:C']` fingerprint
+   differently; under a naive `join(':')` they would not.
+2. **Order-sensitive.** The ids are an array, not a set. Reordering the *same* candidates changes
+   the fingerprint — which is the entire point.
+3. **Version-bound.** `render_version` is inside the hash, so version *N* and version *N+1* of an
+   identical list still differ, and a contract cannot be replayed across versions.
+
+Deliberately **not** in the hash: chat id and message id. The fingerprint seals *what* was
+displayed; *where* is checked separately by exact `(card_chat_id, card_message_id)` match. Keeping
+them apart lets the fingerprint be computed **before** the card is sent — i.e. before a message id
+exists — and lets a caller pin an expected fingerprint into a downstream job.
+
+### How a stale tap is detected
+
+**The fingerprint cannot ride in `callback_data`, and that is arithmetic, not oversight.** The arg
+budget is 16 bytes, and `<questionKey>.<candidateIndex>` already spends all 16 in the worst case
+(12 + 1 + 3). Widening it pushes the worst legal payload past 64 bytes, which Telegram rejects — and
+narrowing the question key to make room would break existing keys.
+
+So **the card itself is the render token.** Each render version is bound to exactly one Telegram
+message, and `persistQuestionRender()` **throws** if asked to bind a changed candidate ordering to a
+`message_id` an earlier version already used. Editing a question card's candidates in place would
+leave the old buttons live, addressing the new list, with no signal that anything had changed — the
+precise silent misresolution this exists to stop. **Re-render = new card. Always.**
+
+A tap then falls into exactly one of three buckets:
+
+| `(chat_id, message_id)` | Meaning | Result |
+|---|---|---|
+| **is** the recorded card | the live render | resolve the index through `rendered_candidates` |
+| **is not**, but the question exists | a **superseded** card | **refuse**, offer a refresh |
+| neither | unknown card | **refuse** |
+
+On top of that, three further checks fail closed rather than guessing:
+
+* the stored contract is **re-hashed** and must match its stored fingerprint — a row edited without
+  re-sealing is refused as corrupt;
+* a caller that knows which render it expects may pin `expectedRenderVersion` /
+  `expectedRenderFingerprint`, and a mismatch is refused;
+* the index must be **inside** the stored list — an index past the end is a shrunken re-render, and
+  is treated as staleness, not as a bad tap.
+
+Nowhere does `resolveTap` conclude *"probably still the same order"*.
+
+### What Warwick sees
+
+A refusal is a Telegram **alert** (`show_alert: true` — a popup he must dismiss), not a silent toast:
+
+> *This card is out of date — the options were re-listed since it was sent. Nothing was changed. Ask
+> for the question again to get a fresh card.*
+
+The result carries `refresh: true`, plus which card was tapped and which card is current, so the
+pipeline can offer a fresh one. **Nothing is written on any refusal.**
+
+### Idempotency: first answer wins
+
+Telegram redelivers. Warwick double-taps. A repeated tap must return the **same** durable answer and
+must not rewrite it — otherwise the second tap of a fat-fingered pair would overwrite a decision
+that has already been acted on.
+
+Enforcement is a **compare-and-set in the store**, not a read-then-write in `resolveTap`: two taps
+racing must not both see `open` and both write.
+
+```sql
+-- store.recordAnswer() MUST be this shape. The `and status = 'open'` is load-bearing.
+update asdair.shop_question
+   set status         = 'answered',
+       answer_text    = $2,
+       answer_source  = 'button',
+       callback_index = $3,
+       answered_at    = $4
+ where id = $1
+   and status = 'open'
+returning *;
+-- 0 rows updated => somebody else answered first. Re-read the row and return
+-- THAT answer verbatim: { applied: false, question: <row> }.
+```
+
+A losing tap gets `outcome: 'already_answered'`, `wrote: false`, and the winner's answer. If it
+tapped a *different* candidate it also gets `conflicting: true` — reported, never acted on.
+
+### The Store contract
+
+Injected, never constructed in this folder — no module here opens a database connection (a test
+proves it). Four async methods:
+
+```js
+store = {
+  getQuestionByCard({ chatId, messageId }),          // -> row | null
+  getQuestionByKey({ shopRef, questionKey }),        // -> row | null
+  saveRender({ shopRef, questionKey, chatId, messageId,
+               renderedCandidates, renderFingerprint, renderVersion }),   // -> row
+  recordAnswer({ questionId, answerText, answerSource,
+                 callbackIndex, answeredAt }),       // -> { applied, question }
+};
+```
+
+Rows come back in the **database's own shape** — the snake_case columns of `asdair.shop_question`,
+plus a joined `shop_ref` (`asdair.shop`), because reading them leniently is how a misread starts.
+
+### Resolving a tap
+
+```js
+import { handleAsdairTap } from './resolveTap.js';
+
+const out = await handleAsdairTap(update, { store, sender });
+// { ok: true,  outcome: 'answered' | 'already_answered', candidateId, candidateLabel,
+//   answerText, candidateIndex, renderVersion, renderFingerprint, wrote, acknowledged }
+// { ok: false, code: <TAP_REFUSALS.*>, notice, refresh, acknowledged }
+```
+
+`handleAsdairTap` is the seam between `inboundRouter.routeAsdairUpdate` (what was asked, by whom)
+and `resolveTap` (what it means, durably). The two stay separate on purpose — routing is not
+deciding. A foreign `decision:` callback is handed back **unacknowledged**, so the hub keeps its own
+spinner; a *typed* reply is handed back unresolved, because matching words to a candidate is a
+decision made downstream.
+
+**`answerCallbackQuery` is emitted on every path, including every refusal.** A tap that is never
+answered spins for ~30 seconds and then looks, to Warwick, like the bot died — which is worse than
+an honest "this card is out of date". If the acknowledgement itself fails, the resolve still stands
+and the result says `acknowledged: false` with a masked `ackError`.
+
+---
+
 ## How a typed reply is correlated to its question
 
 Warwick often will not tap. He replies *"the Yeo Valley one please"*. That must land on the right
@@ -194,6 +403,12 @@ routeAsdairUpdate(update, {
   resolveQuestionByMessage: (chatId, messageId) => /* your reverse lookup */ null,
 });
 ```
+
+`questionRender.questionLookupFrom(rows)` builds that lookup off the **same** stored render
+contracts the buttons use, so a tap and a typed reply correlate through one source of truth rather
+than two that can disagree. (`routeAsdairUpdate` calls the lookup synchronously, so it is built over
+a snapshot of rows the caller has already loaded — which keeps the choice of *when* to read the
+database with whoever owns the connection.)
 
 The lookup is injected because the question state belongs to whoever owns it, not to the router.
 The reply **text is passed through verbatim** in `raw.text` (trimmed only) and the intent's `arg` is
