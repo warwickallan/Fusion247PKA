@@ -102,7 +102,7 @@ Full record: `Builds/BUILD-015-asdair-durable-household-shopping-steward/ACCEPTA
 
 ## Known gaps
 
-- ** has no governed writer.** `asdair_rw` holds no write on it, so the commonest learning of
+- **`asdair.regulars` has no governed writer.** `asdair_rw` holds no write on it, so the commonest learning of
   all - "this list name means that product", i.e. a new `aka` alias - cannot be persisted through this path.
   Until that exists, alias coverage improves only by hand, and a fresh instance re-asks the same questions.
   **This is the highest-value remaining gap.**
