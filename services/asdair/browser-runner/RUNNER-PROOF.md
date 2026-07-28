@@ -21,8 +21,8 @@ created for this purpose, so no real weekly shop is disturbed. The practice-shop
 
 ```
 $ cd services/asdair/browser-runner && node --test
-# tests 63
-# pass 63
+# tests 65
+# pass 65
 # fail 0
 ```
 
@@ -299,6 +299,34 @@ profile.
 **Nothing needs restoring, because nothing was changed.**
 
 ---
+
+## State left behind
+
+| Thing | State |
+|---|---|
+| Trolley | empty, `0 items £0.00` — exactly as found |
+| Chrome | still running, **visible**, on the dedicated profile, port 9222 |
+| Tabs | tidied from 13 stale tabs to 2 (`/groceries` and an ASDA login page) |
+| Shop 1 / request 1 | untouched — the practice-shop record from `EXPERIMENT-RESULT.md` |
+| Shop 2 (`SHOP-RUNNERPROOF-2026-07-28`) | `WAITING_FOR_BROWSER` — synthetic, created for this proof |
+| Request 2 | `queued`, `human_reauth_required: true`, no lease held |
+
+Request 2 is deliberately left queued rather than cancelled: that *is* the accurate state of the world
+— there is a browser build request waiting on a human sign-in. Any runner that picks it up will detect
+the lapsed session, report it, release the lease and stop, which is the behaviour proved above.
+
+## Which browser actions are live-validated, and which are not
+
+Being straight about this, because a green test suite says nothing about ASDA's DOM.
+
+| Behaviour | Status |
+|---|---|
+| CDP attach to the visible dedicated profile, tab reuse, navigation, DOM read-back | **live-validated in this build** |
+| Signed-out / re-authentication detection | **live-validated in this build** (it fired for real) |
+| Headless refusal, URL allowlist, click deny-list, no-typing invariant | **enforced and unit-tested**; the allowlist blocked nothing legitimate in live use |
+| Add by product reference, the real +/− stepper, trolley read-back | **proved in `EXPERIMENT-RESULT.md`** against the live logged-in site; the selectors here are the same ones. Not re-exercised in this build, because the session lapsed. |
+| Search-and-add of an approved result | same — proved in the experiment, not re-exercised here |
+| The `locate_product` fallback (find by reference through search when the bare-id URL does not resolve) | **written, unit-covered, NOT live-exercised.** It is a belt-and-braces path that only runs when the primary URL fails, which it did not do in the experiment. |
 
 ## What is NOT yet proved — and exactly what it needs
 
