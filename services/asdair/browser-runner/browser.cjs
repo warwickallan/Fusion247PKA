@@ -126,14 +126,20 @@ const READ_QTY = `JSON.stringify((()=>{
   return { qty: m ? Number(m[1]) : null, via: 'stepper-text', raw: t.slice(0,80) };
 })())`;
 
-/** Availability of the product currently displayed. Reports; never substitutes. */
+/**
+ * Availability of the product currently displayed. Reports; never swaps.
+ * `is_product_page` matters as much as the rest: it is how the runner tells
+ * "this item is out of stock" from "that URL did not resolve to a product at
+ * all", which are the same DOM from a naive read and want opposite responses.
+ */
 const READ_AVAILABILITY = `JSON.stringify((()=>{
   const txt = ((document.body && document.body.innerText) || '').slice(0, 6000);
   const out_of_stock = /out of stock|currently unavailable|not available|sold out/i.test(txt);
   const add = Array.from(document.querySelectorAll('button'))
     .find(b => /^\\s*add\\s*$/i.test(b.textContent||'') || /add item .* to cart/i.test(b.getAttribute('aria-label')||''));
   const stepper = !!document.querySelector('button[aria-label^="Increase" i]');
-  return { out_of_stock, addable: !!add || stepper, title: document.title };
+  const is_product_page = /\\/groceries\\/product\\//.test(location.pathname) && !!document.querySelector('h1');
+  return { out_of_stock, addable: !!add || stepper, is_product_page, title: document.title, path: location.pathname };
 })())`;
 
 // ---------------------------------------------------------------------
@@ -241,11 +247,36 @@ class Session {
   async open_trolley() { return this.assertUsable(await this.goto(URLS.trolley)); }
   async open_regulars() { return this.assertUsable(await this.goto(URLS.regulars)); }
 
+  /**
+   * Open a product page from its reference alone.
+   *
+   * ASDA's canonical product URL carries a slug as well as the id
+   * (/groceries/product/<category>/<slug>/<id>). The bare-id form usually
+   * resolves, but "usually" is not a basis for a supervised shop: if it ever
+   * stops, the runner would silently be looking at a non-product page and would
+   * report every planned item as unavailable. So the bare form is tried first,
+   * and if what comes back is not a product page the product is found BY ITS
+   * OWN REFERENCE through search, and the canonical link followed. The
+   * reference is never loosened - only the route to it.
+   */
   async locate_product(ref) {
     const r = normaliseProductRef(ref);
-    const s = this.assertUsable(await this.goto(URLS.product(r)));
-    const avail = await this.evaluateJson(READ_AVAILABILITY);
-    return { product_ref: r, url: s.url, title: s.title, ...(avail || {}) };
+    let s = this.assertUsable(await this.goto(URLS.product(r)));
+    let avail = await this.evaluateJson(READ_AVAILABILITY);
+    let via = 'reference-url';
+
+    if (!avail || avail.is_product_page !== true) {
+      const found = await this.search(r);
+      const hit = found.results.find((x) => x.product_ref === r);
+      if (hit && hit.href) {
+        s = this.assertUsable(await this.goto(BASE + hit.href.replace(/[?#].*$/, '')));
+        avail = await this.evaluateJson(READ_AVAILABILITY);
+        via = 'canonical-link-via-reference-search';
+      } else {
+        return { product_ref: r, url: s.url, title: s.title, via: 'not-found', is_product_page: false, addable: false, out_of_stock: false, not_found: true };
+      }
+    }
+    return { product_ref: r, url: s.url, title: s.title, via, ...(avail || {}) };
   }
 
   async search(term) {
@@ -257,7 +288,7 @@ class Session {
         const href=a.getAttribute('href')||'';
         const id=(href.match(/(\\d{3,12})(?:[/?#]|$)/)||[])[1];
         if(!id||seen.has(id))continue; seen.add(id);
-        out.push({product_ref:id, name:(a.textContent||'').replace(/\\s+/g,' ').trim().slice(0,90)});
+        out.push({product_ref:id, href, name:(a.textContent||'').replace(/\\s+/g,' ').trim().slice(0,90)});
         if(out.length>=40)break;
       }
       return out;})())`);
@@ -272,6 +303,7 @@ class Session {
   async add_known_product(ref) {
     const r = normaliseProductRef(ref);
     const before = await this.locate_product(r);
+    if (before.not_found === true) return { product_ref: r, added: false, reason: 'product-not-found', ...before };
     if (before.out_of_stock || before.addable === false) {
       return { product_ref: r, added: false, reason: 'unavailable', ...before };
     }
