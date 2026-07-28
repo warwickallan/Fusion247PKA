@@ -51,9 +51,13 @@ pattern: a Windows logon scheduled task, exactly like `MyPKA-Directus-Live` (see
 `[[directus-reboot-recovery-autostart]]`). **This is the point at which something unattended begins touching
 household data — it needs Warwick's explicit go-ahead.**
 
-### 2.3 Order reconciliation
-An agent was building `services/asdair/reconcile/` when this brief was written. **Check whether branch
-`build-015/order-reconciliation` exists and merge it** before assuming it is missing.
+### 2.3 Order reconciliation — ~~pending~~ **DONE, merged**
+`services/asdair/reconcile/` is in the branch: `parseConfirmation.js` (pure), `reconcile.js` (pure, seven
+outcomes), `recordConfirmation.js` (writer), `record-confirmation.js` (runtime caller). 79 tests.
+The headline fixture parses exactly as specified — **32 lines, 47 units, £110.75 stated, Wall's unpriced
+surviving as `null`/`unknown` end-to-end**. Idempotent on `(shop_id, content_fingerprint)`; an amended
+confirmation is recorded as new evidence rather than swallowed. Derivation is opt-in and refused unless there is
+an authoritative total, exactly one unpriced line, no non-product charges, and a non-negative residual.
 
 ### 2.4 Live acceptance
 The 16-point list in Warwick's directive. Send exactly one message — "Send last night's list to ShopperBot now."
@@ -62,9 +66,12 @@ has only ever been dry-run. Expected confirmation facts: 32 product lines, 47 un
 prices, Wall's 4 Pork Sausage Rolls with **no visible price** — do NOT invent it.
 
 ### 2.5 CI, QA, merge
-`.github/workflows/asdair-tests.yml` runs only the `skill` and `outcome` suites — **`intake`, `shop`, `bot`,
-`transcribe` and `reconcile` are not in CI.** Add them. Then Codex/Tower review at the exact head, fix genuine
-findings, merge with the expected-head guard.
+~~CI covers only `skill` and `outcome`.~~ **CI now runs all seven suites** (`asdair-tests.yml`, one step each so
+a failure names the module). Remaining: Codex/Tower review at the exact head, fix genuine findings, merge with
+the expected-head guard.
+
+**Current suite totals — 638 passing, 0 failing:**
+skill 210 · outcome 123 · shop 91 · bot 77 · reconcile 79 · transcribe 36 · intake 22.
 
 ## 3. The finding that changes the design — read before building the transcription step
 
