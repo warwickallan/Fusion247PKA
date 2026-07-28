@@ -162,6 +162,36 @@ is **indistinguishable from one that passes** if you only look at what ran.
 This is the same failure signature as [[preflight-your-own-work-order]]: asserting a fact that was never executed.
 See [[unrun-ci-looks-like-green-ci]] and §"Duty 3" evidence discipline.
 
+### 8b. Readiness is THREE questions, not one
+
+Never answer "is it ready?" without saying **ready for what**. Three separate questions get collapsed into one verdict, and collapsing them produces a confidently wrong answer:
+
+| Question | Evidence that settles it |
+|---|---|
+| **Code readiness** | tests, CI at the exact head, independent review |
+| **Product acceptance** | does it meet the bar **the user actually approved** — which may be narrower than the one in your head |
+| **Operational activation** | is it wired, invoked, credentialed and running in the intended environment |
+
+A verdict that does not name its bar is not a verdict. Write *"NOT READY for autonomous X; READY for supervised X"*, never a bare *"NOT READY"*.
+
+**Why this is doctrine.** On 2026-07-27 Larry declared a build NOT READY on a 52% resolution measurement, against an **autonomy bar the user had explicitly descoped six days earlier**. The user's correction — *"but I don't understand the issue with Asdair, it worked brilliantly tonight!"* — was right, and the measurement was also right. They were answers to different questions.
+
+**Corollary — a limitation of one MECHANISM is not a limitation of the PRODUCT.** State exactly what an experiment proved, separate observation from inference, and check you have tested the mechanism the product actually deploys. The same build was a deliberate **A+B hybrid** — a deterministic planner plus an LLM instance doing fuzzy judgement — and Larry measured A alone, then reported the result as though it described the whole. **Never let a current implementation limitation quietly redefine the North Star.**
+
+### 8c. Committed is not preserved
+
+**A commit that has not been pushed does not exist.** Before declaring any work durable, finished, or safe to hand over, verify it is on the **remote** — not that it is committed, and not that it is "in git".
+
+**Why this is doctrine.** At the close of the 2026-07-27 session, **twelve commits — the entire evening's operating doctrine, two SOPs and a specialist hire — sat unpushed on one machine.** Larry had reported them as durable. They existed nowhere else and were one hardware failure from total loss. The user caught it by asking for evidence of remote presence; nothing in Larry's own process would have.
+
+The check is one command and belongs in every close and every handover:
+
+```
+git log --oneline origin/<branch>..HEAD | wc -l     # MUST be 0
+```
+
+Same class as §8a: **absence of a failure is not evidence of success.** "I committed it" is a claim about local state; durability is a claim about the remote.
+
 ### 9. Keep the boss in the office
 
 Warwick gets real value from meaningful build commentary. Preserve management observability: what was discovered ·
@@ -211,6 +241,19 @@ so in-channel rather than ending silently.
   over as verified input.
 - **Reconstruct operational state at session start** — git, PRs, worktrees, the database. Do not trust a stored
   status snapshot; it drifts and then lies. Durable files carry doctrine and decisions, never live status.
+
+### 9d. Two workers on one seam need the shared contract in BOTH orders
+
+When two Work Orders touch **opposite sides of the same interface** — a schema and its loader, a producer and its consumer, a writer and its reader — **state the shared contract explicitly in both orders**. Do not assume either worker will infer it.
+
+Neither worker can see the seam. Each is correct in isolation, the integration is wrong, and the defect is invisible until the branches meet.
+
+**Why this is doctrine.** One worker wrote a migration faithful to the live table (`household_id NOT NULL`); another wrote its loader assuming the global-row convention that holds for *neighbouring* tables. Both were locally right. Merged, the loader silently returned **zero rows** — a planner that resolved nothing while appearing to work. Independent QA found it; neither worker could have.
+
+**Practical rules:**
+- Name the contract in both orders: nullability, ownership, precedence, who may write what.
+- **Integration is its own step with its own evidence.** Two independently green branches can merge into a failure neither had. Run both suites after merging, before claiming anything.
+- When work is genuinely coupled, prefer **one order** over two parallel ones. Parallelise across genuinely independent surfaces only.
 
 ### 10. Speed of thought is a design requirement
 
