@@ -116,3 +116,34 @@ fence-stripping/trailing-junk parser `generateJSON()` uses — and applies the s
 retry-with-stricter-suffix policy. It cannot call `generateJSON()` itself because that function is
 hard-wired to the `reason` (text) role; routing an image task through it would send a blind model a
 prompt about a photo. Same parse behaviour, correct role.
+
+---
+
+## MEASURED QUALITY — read this before trusting an automatic transcript
+
+**Tested 2026-07-28 against a real photo of Mum's handwritten list (the 2026-07-27 shop, 33 lines), through the
+live Fusion gateway (LiteLLM, tailnet). Both available models were UNFIT for this handwriting.**
+
+| Model | Outcome |
+|---|---|
+| `gpt-5.6-terra` | Read **"Gourmet cat food"** as *"gourmet coffee"*, **"Milky Way"** as *"pork pie large"*, **"Dreamies cheese"** as *"camomile cheese"*, **"Weetabix Protein"** as *"beefs protein"*, **"Lurpak butter"** as *"pepper & souter"*, **"Stardrops"** as *"strawberry"*. **Invented** a line ("bottle of fruit shoot"). **Dropped the Sure deodorant entirely.** Most errors carried `uncertain: false`. |
+| `gpt-5-mini` | Materially worse — *"goosebumps cheese"*, *"gooseberries coles food"*, *"green grapes - cheese - large"*, *"courgettes cauliflower"*. (It did read STARDROPS correctly, which `terra` did not.) |
+
+The **mechanism is sound** — the image reaches the model as a base64 data URL, JSON comes back, the parse and the
+quantity guards work, and `needs_review` was correctly raised. The **model quality is the problem**, and no
+prompt tuning fixes a model that reads *cat food* as *coffee*.
+
+### What follows from that
+
+1. **An automatic transcript is a DRAFT, never a fact.** It must be confirmed by the human before a list is
+   built from it. This is exactly what the "Review list" button on the receipt is for.
+2. **A confidently-wrong line is the real hazard**, not an uncertain one. `uncertain: true` routes to the
+   question loop and is safe. `uncertain: false` + wrong is what puts cat food in the coffee aisle, and no
+   guard in this module can catch it — only a human reading the transcript can.
+3. **The accurate path today is supervised in-session vision** (Larry reads the photo directly), which produced
+   a correct 33-line transcription of this same image. `SOP-021` step 1 already specifies that.
+4. Binding a genuinely capable vision model to the gateway alias `fusion.vision` would change this assessment.
+   Until then, **do not present an automatic transcript as the list.**
+
+Set the model with `FUSION_MODEL_VISION`; there is currently no `fusion.vision` alias bound on the gateway, so
+the role must be pointed at a concrete model id explicitly.
