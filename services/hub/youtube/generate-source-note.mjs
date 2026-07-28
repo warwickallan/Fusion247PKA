@@ -10,6 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import pg from 'file:///C:/Fusion247PKA/services/control-plane/node_modules/pg/lib/index.js';
 import { ingestYouTube } from './ingest.mjs';
+import { persistCapture, captureCommitMessage } from './persistCapture.mjs';
 import { callClaude } from 'file:///C:/Fusion247PKA/services/control-plane/cockpit/t2-calibrate.mjs';
 
 const VAULT = 'C:/Fusion247PKA/Team Knowledge';
@@ -138,6 +139,19 @@ export async function generateSourceNote({ video, out = 'out/auto', dry = false 
   const notePathRel = result.note.path.replace(/^.*Team Knowledge[\\/]/, '').replace(/\\/g, '/');
   const brief = fs.readFileSync(path.join(VAULT, notePathRel), 'utf8');
 
+  // AUTO-PERSIST the generated artefact so it cannot sit untracked on one machine (Warwick's ruling,
+  // 2026-07-28). Done BEFORE the DB write so the note and its immutable _raw evidence are durable
+  // even if the DB is unreachable. Persisting is NOT approving: review_state stays `ai_created` and
+  // the pending-warwick-review tag is untouched. Fail-soft — never blocks a capture.
+  const vaultDir = path.basename(VAULT);
+  const persisted = persistCapture({
+    repoRoot: path.dirname(VAULT),
+    paths: [`${vaultDir}/${notePathRel}`, `${vaultDir}/${result.raw.dir}`],
+    message: captureCommitMessage({ videoId: video, title: meta.title }),
+  });
+  if (persisted.committed) console.error(`[note] persisted ${persisted.sha.slice(0, 8)} (stored, still pending review)`);
+  else console.error(`[note] NOT persisted to git (${persisted.reason}${persisted.error ? `: ${persisted.error}` : ''}) — capture continues`);
+
   const db = new pg.Client(gatewayDsn());
   await db.connect();
   try {
@@ -146,6 +160,7 @@ export async function generateSourceNote({ video, out = 'out/auto', dry = false 
     return {
       ok: true, video, note_path: notePathRel, note_chars: brief.length, note_created: result.note.created,
       raw_preserved: result.raw.dir, noted: src?.noted, review_state: src?.review_state,
+      persisted: persisted.committed, persisted_sha: persisted.sha ?? null, persist_reason: persisted.reason ?? null,
       faculty_output_tokens: call.output, cost_usd: call.cost_usd, s: +(call.duration_ms / 1000).toFixed(1),
     };
   } finally { await db.end().catch(() => {}); }

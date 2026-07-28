@@ -52,8 +52,15 @@ Gateway suite run exactly as CI runs it (`node --test` in `services/fusion-captu
 
 ## 2. The capture path leaks knowledge
 
-`services/obsidiwikai/src/bin/compile-source.mjs` writes source notes and their `_raw` evidence into
-the working tree. **Nothing commits them.** Two were sitting untracked tonight, and the second
+> **Correction (later the same night).** This section originally named
+> `services/obsidiwikai/src/bin/compile-source.mjs` as the writer. That is wrong — it is a 36-line
+> wrapper the ObsidiWikAi README lists as *parked*. The real writer is
+> `services/hub/youtube/generate-source-note.mjs` → `ingestYouTube()` in
+> `services/hub/youtube/ingest.mjs`. The leak itself was real and is described correctly below;
+> only the attribution was wrong. **Now fixed** — see `services/hub/youtube/persistCapture.mjs`.
+
+`services/hub/youtube/generate-source-note.mjs` writes source notes and their `_raw` evidence into
+the working tree. **Nothing committed them.** Two were sitting untracked tonight, and the second
 appeared *during* this pass — which is what proves it is a standing leak rather than an oversight:
 
 - `Team Knowledge/Sources/bcljofch8ms-…md` + `_raw/bCljOfCH8Ms/` (44KB note)
