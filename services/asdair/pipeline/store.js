@@ -2,55 +2,62 @@
 // BUILD-015 AsdAIr Stage 1 - pipeline/store.js
 //
 // THE DURABLE-STATE SEAM. Every fact the pipeline acts on is read here, from
-// Postgres, in one place - and every write goes through the components that
-// already own it (services/asdair/shop/shopStore.js above all).
+// Postgres, in one place - and every write goes through the component that
+// already owns the table (services/asdair/shop/shopStore.js above all).
 //
-// THIS MODULE ADDS NO NEW WRITE PATH. It issues SELECTs, and it calls
-// shopStore. It contains no INSERT, no DELETE and exactly ONE UPDATE-bearing
-// call - shopStore's own exported `applyTransition`, used for the single case
-// the public `transition()` cannot express (see advanceWithList below).
+// ── THE MACHINE LEDGER IS NOT THE HUMAN'S TO-DO LIST ────────────────────────
+// Until migration 009 this module kept the pipeline's command, resume and
+// outbox bookkeeping in `asdair.pending_action`, namespaced `cmd:` / `msg:`.
+// That table is what the Cockpit and the Telegram status card surface as
+// OUTSTANDING ACTIONS - so machine plumbing appeared as things WARWICK had to
+// do. Filtering it in the UI was explicitly rejected: it hides the symptom and
+// leaves the confusion in the data. Migration 009 gives the two concepts two
+// homes and this module now honours that split:
 //
-// ── WHY THE COMMAND LEDGER LIVES IN asdair.pending_action ───────────────────
-// Migration 006 already provides a durable, household-scoped record whose
-// unique index is EXACTLY the idempotency a command surface needs:
+//     asdair.pipeline_command   the MACHINE ledger. Commands, resume state and
+//                               the outbox. Written here, read here, shown to
+//                               nobody as a to-do.
+//     asdair.pending_action     GENUINE HUMAN ACTIONS ONLY ("add Wall's to ASDA
+//                               Favourites"). This module READS it in exactly
+//                               one place (listHouseholdActions) and WRITES it
+//                               NOWHERE. There is no code path left that can.
 //
-//     pending_action_key_uniq (household_id, action_type, action_key)
-//                             WHERE status = 'pending'
+// ── WHERE THE IDEMPOTENCY NOW LIVES ─────────────────────────────────────────
+//     pipeline_command_idem_uniq  UNIQUE (idempotency_key)
 //
-// So "record this command; if the same command is already outstanding, adopt it
-// instead of stacking a duplicate" is one INSERT ... ON CONFLICT DO NOTHING,
-// decided by the DATABASE rather than by a check-then-insert in this file. A
-// dedicated table would mean owning a migration inside a component folder this
-// work package must not modify.
-//
-// The cost, stated plainly: shopStatus.outstanding_actions surfaces
-// pending_action rows to a human. Pipeline rows are namespaced `cmd:` and
-// `msg:` (see keys.js) so any surface can filter them out, and
-// `listHouseholdActions` does exactly that.
+// "Record this command; if the same command is already outstanding, adopt it
+// instead of stacking a duplicate" is still one INSERT ... ON CONFLICT DO
+// NOTHING decided by the DATABASE. What changed is the shape of the index:
+// migration 006's was PARTIAL (unique only WHILE PENDING), migration 009's is
+// TOTAL. `recordLedgerEntry` below restores the half that difference would
+// otherwise have destroyed - see the argument there, it is the single most
+// important comment in this file.
 //
 // ── READ/WRITE SPLIT ────────────────────────────────────────────────────────
 // Reads go through the injected `readQuery` (the SELECT-only asdair_ro role,
-// ASDAIR_DB_URL). Writes go through the injected `shopStore` (asdair_rw,
-// ASDAIR_WRITE_DB_URL). Neither connection string appears in this file, is
-// logged, or is read from any credentials file - env var NAMES only, and the
-// naming lives in deps.js.
+// ASDAIR_DB_URL). Writes go through the injected `shopStore` (asdair_rw) or,
+// for the ledger table shopStore does not own, the injected `writeQuery` -
+// exactly as shopLines.js already does for asdair.shop_line (migration 008).
+// Migration 009 grants asdair_rw SELECT/INSERT/UPDATE on pipeline_command and
+// asdair_ro SELECT; there is no DELETE anywhere in this file. Neither
+// connection string appears here, is logged, or is read from any credentials
+// file - env var NAMES only, and the naming lives in deps.js.
 // =====================================================================
 
 import {
-  COMMAND_PREFIX,
-  OUTBOX_PREFIX,
-  commandActionType,
-  outboxActionType,
+  LEDGER_KINDS,
+  LEDGER_TERMINAL_STATUSES,
   isPipelineActionType,
+  ledgerFamilyKey,
+  ledgerIdempotencyKey,
 } from './keys.js';
 import { COMMAND_NAMES, COMMAND_SPECS, CONSUMPTION } from './commandNames.js';
 
-/** The `cmd:` action_types that a runner is expected to CONSUME. Derived from
- *  the command specs so the two can never drift. */
-export const CONSUMABLE_COMMAND_TYPES = Object.freeze(
+/** The command names a runner is expected to CONSUME. Derived from the command
+ *  specs so the two can never drift. */
+export const CONSUMABLE_COMMANDS = Object.freeze(
   COMMAND_NAMES
-    .filter((n) => COMMAND_SPECS[n].durable && COMMAND_SPECS[n].consumption === CONSUMPTION.CONSUME)
-    .map(commandActionType),
+    .filter((n) => COMMAND_SPECS[n].durable && COMMAND_SPECS[n].consumption === CONSUMPTION.CONSUME),
 );
 
 const LIVE_BROWSER_STATUSES = ['queued', 'claimed', 'running'];
@@ -60,11 +67,12 @@ const SHOP_COLUMNS =
   'telegram_update_id, raw_text, raw_media_path, transcript, needs_review, list_id, last_error, ' +
   'created_at, updated_at';
 
-/** PURE. Strip the `cmd:` prefix back off an action_type. */
-function commandNameOf(actionType) {
-  const t = String(actionType ?? '');
-  return t.startsWith(COMMAND_PREFIX) ? t.slice(COMMAND_PREFIX.length) : null;
-}
+/** Every column of asdair.pipeline_command this module reads back. Named
+ *  explicitly (never `*`) so a column added by a later migration cannot change
+ *  the shape of a record without somebody deciding it should. */
+export const LEDGER_COLUMNS =
+  'id, shop_id, kind, command, args, idempotency_key, status, attempts, last_error, result, ' +
+  'created_at, updated_at';
 
 function asObject(value) {
   if (value === null || value === undefined) return {};
@@ -136,24 +144,25 @@ export async function requireShop(deps, { shopId = null, shopRef = null, househo
  *
  *   2. Terminal shops that still carry an OUTSTANDING, CONSUMABLE command.
  *      Without this, a button tapped after the week finished records a command
- *      the runner never visits - and it sits "pending" in the household's
- *      outstanding-actions list forever, one more for every tap. The runner
- *      retires it with a reason (runPipeline.abandonOutstanding) and the shop
- *      then drops out of this query for good.
+ *      the runner never visits - and it sits "pending" in the machine ledger
+ *      forever, one more for every tap, quietly holding that generation of the
+ *      command open so the next legitimate issue of it can never be minted. The
+ *      runner retires it with a reason (runPipeline.abandonOutstanding) and the
+ *      shop then drops out of this query for good.
  *
  * LATCH commands are deliberately NOT in the second clause. They are permanent
  * facts about the week ("this is where it came from", "a human approved this")
  * and stay pending by design, so including them would make every finished shop
  * reappear on every pass, forever.
  */
-export async function listActiveShops(deps, consumableCommandTypes = []) {
+export async function listActiveShops(deps, consumableCommands = []) {
   const res = await deps.readQuery(
     `SELECT ${SHOP_COLUMNS} FROM asdair.shop
       WHERE status NOT IN ('RECONCILED','CANCELLED')
-         OR id IN (SELECT shop_id FROM asdair.pending_action
-                    WHERE status = 'pending' AND shop_id IS NOT NULL
-                      AND action_type = ANY($1))
-      ORDER BY id ASC`, [consumableCommandTypes],
+         OR id IN (SELECT shop_id FROM asdair.pipeline_command
+                    WHERE status = 'pending' AND kind = 'command' AND shop_id IS NOT NULL
+                      AND command = ANY($1))
+      ORDER BY id ASC`, [consumableCommands],
   );
   return rowsOf(res);
 }
@@ -219,30 +228,206 @@ export async function listListItems(deps, listId) {
   return rowsOf(res).map((r) => ({ ...r, alternatives: [] }));
 }
 
-// ---------------------------------------------------------------------
-// The command ledger
-// ---------------------------------------------------------------------
+// =====================================================================
+// THE MACHINE LEDGER - asdair.pipeline_command
+//
+// One table, two populations (`kind`): the COMMAND ledger and the OUTBOX. They
+// share a table because they share every mechanic - a deterministic key, an
+// idempotent insert, a guarded resolution, durable survival of a restart - and
+// splitting them would mean two copies of the argument below.
+//
+// NOTHING HERE TOUCHES asdair.pending_action. That is the whole point.
+// =====================================================================
 
-function toCommandRecord(row) {
+/** The statuses from which a ledger row can still be acted on. `running` is
+ *  reserved by migration 009's CHECK for a future claiming runner; no code
+ *  writes it today, and it is treated as LIVE wherever it could appear so that
+ *  introducing it later cannot silently duplicate work. */
+const LEDGER_LIVE_STATUSES = ['pending', 'running'];
+
+/**
+ * How a resolution reaching this module maps onto migration 009's status CHECK.
+ *
+ * `abandoned` was migration 006's vocabulary and is still what runPipeline and
+ * runtime say when they give up on a row. It means RETIRED here - the same
+ * fact, the spelling the live CHECK constraint accepts.
+ */
+const RESOLUTION_STATUS = Object.freeze({
+  done: 'done',
+  abandoned: 'retired',
+  retired: 'retired',
+  failed: 'failed',
+});
+
+const INSERT_LEDGER_SQL =
+  `INSERT INTO asdair.pipeline_command (shop_id, kind, command, args, idempotency_key, status)
+   VALUES ($1, $2, $3, $4::jsonb, $5, 'pending')
+   ON CONFLICT (idempotency_key) DO NOTHING
+   RETURNING ${LEDGER_COLUMNS}`;
+
+const SELECT_LEDGER_BY_IDEMPOTENCY_KEY_SQL =
+  `SELECT ${LEDGER_COLUMNS} FROM asdair.pipeline_command WHERE idempotency_key = $1`;
+
+/** How many generations of this family are SPENT. See recordLedgerEntry. */
+const COUNT_SPENT_GENERATIONS_SQL =
+  `SELECT count(*)::int AS n FROM asdair.pipeline_command
+    WHERE args->>'ledger_key' = $1 AND status = ANY($2)`;
+
+/**
+ * The number of times recordLedgerEntry will re-derive a generation before
+ * giving up.
+ *
+ * It only ever loops when the generation it computed was resolved by another
+ * process between the count and the insert - i.e. once per interleaved
+ * resolution. A handful is far more than a single-runner deployment can
+ * produce, and a bound is what stops a pathological loop becoming a hang.
+ */
+const MAX_GENERATION_PROBES = 8;
+
+function toLedgerRow(row) {
+  const args = asObject(row.args);
   return {
     id: row.id,
-    command: commandNameOf(row.action_type),
-    key: row.action_key,
-    status: row.status,
-    payload: asObject(row.payload),
     shop_id: row.shop_id,
-    household_id: row.household_id,
+    kind: row.kind,
+    command: row.command,
+    // The ACTION key, unchanged from what migration 006 called `action_key`.
+    // NOT the family key: `stepApplyCorrections` derives an `add_list_item`
+    // idempotency key from this (`<key>:correction`), so changing what it means
+    // would change an idempotency key downstream of this table, in a component
+    // this work package does not own.
+    key: args.ledger_action_key ?? null,
+    args,
+    idempotency_key: row.idempotency_key,
+    status: row.status,
+    attempts: row.attempts,
+    last_error: row.last_error,
+    result: asObject(row.result),
     created_at: row.created_at,
+    updated_at: row.updated_at,
   };
+}
+
+/** The shape stages.js reads. `payload` is kept as the field name so the pure
+ *  stage table, which never knew which table it came from, is unchanged. */
+function toCommandRecord(row) {
+  const r = toLedgerRow(row);
+  return {
+    id: r.id,
+    command: r.command,
+    key: r.key,
+    status: r.status,
+    payload: r.args,
+    shop_id: r.shop_id,
+    household_id: r.args.household_id ?? null,
+    created_at: r.created_at,
+    idempotency_key: r.idempotency_key,
+  };
+}
+
+/**
+ * Record ONE unit of machine bookkeeping durably. IDEMPOTENT BY CONSTRUCTION.
+ *
+ * ── THE ARGUMENT, IN FULL, BECAUSE THE GUARANTEE DEPENDS ON IT ──────────────
+ * Migration 006's index was PARTIAL: unique on (household_id, action_type,
+ * action_key) WHERE status = 'pending'. Two behaviours fell out of that shape,
+ * and BOTH are load-bearing:
+ *
+ *   A. A repeat WHILE THE COMMAND IS OUTSTANDING adopts the existing row. That
+ *      is what makes a double-tapped Telegram button a no-op.
+ *   B. A repeat AFTER the command has been consumed starts a NEW one. That is
+ *      the CONSUME contract in commandNames.js - "ask for the basket again
+ *      after a pause", "retry a shop that failed twice", "correct the same line
+ *      a second time". Without it those requests would be silently swallowed.
+ *
+ * Migration 009's index is TOTAL - UNIQUE (idempotency_key), no predicate. A
+ * naive port that reused the old key would keep (A) and DESTROY (B): the second
+ * request would collide with the finished row and be adopted as a duplicate.
+ * That is not a cosmetic difference; it is a shopper tapping "Build ASDA
+ * basket" after a pause and nothing ever happening.
+ *
+ * So the key carries a GENERATION, and the generation is DERIVED FROM DURABLE
+ * STATE - the number of rows in this family that are already terminal - never
+ * from a counter, a clock or a random value:
+ *
+ *   * While the current generation is live, every repeat computes the SAME
+ *     spent-count, therefore the SAME key, and the UNIQUE INDEX refuses the
+ *     second insert. The DATABASE decides the duplicate, exactly as before -
+ *     this code does not check first and insert second.
+ *   * Once that generation is resolved, the spent-count has moved on, so the
+ *     next request mints the next generation and is a genuinely new unit of
+ *     work.
+ *
+ * The one remaining window is a generation being created AND resolved between
+ * our count and our insert, which would leave us adopting a finished row. It is
+ * closed rather than documented away: if the row we adopt is terminal, the
+ * generation we picked is stale, so we re-derive and try again (bounded by
+ * MAX_GENERATION_PROBES). The function therefore NEVER returns a terminal row
+ * as if it were a live one.
+ *
+ * @returns {{id:*, created:boolean, resumed:boolean, row:object}}
+ */
+export async function recordLedgerEntry(deps, { kind, householdId, shopId, name, key, payload }) {
+  const family = ledgerFamilyKey({ kind, householdId, name, key });
+  // `ledger_key` is written onto the row, not merely encoded in the idempotency
+  // key, so "which family is this row in" is a column read rather than a string
+  // parse - and so the generation count is one exact equality. The three
+  // reserved names are namespaced `ledger_*` so a command payload cannot
+  // collide with them.
+  const args = {
+    ...(payload || {}),
+    ledger_key: family,
+    ledger_action_key: String(key),
+    household_id: householdId,
+  };
+
+  for (let probe = 0; probe < MAX_GENERATION_PROBES; probe += 1) {
+    const spent = await spentLedgerGenerations(deps, family);
+    const idempotencyKey = ledgerIdempotencyKey(family, spent);
+
+    const inserted = rowsOf(await deps.writeQuery(INSERT_LEDGER_SQL, [
+      shopId ?? null, kind, name, JSON.stringify(args), idempotencyKey,
+    ]))[0];
+    if (inserted) {
+      const row = toLedgerRow(inserted);
+      return { id: row.id, created: true, resumed: false, row };
+    }
+
+    // The UNIQUE index refused us. Somebody else owns this generation.
+    const existing = rowsOf(await deps.readQuery(SELECT_LEDGER_BY_IDEMPOTENCY_KEY_SQL, [idempotencyKey]))[0];
+    if (!existing) {
+      throw new Error(`store: the ledger insert wrote nothing and no row carries idempotency_key "${idempotencyKey}". Nothing was written.`);
+    }
+    if (!LEDGER_TERMINAL_STATUSES.includes(existing.status)) {
+      const row = toLedgerRow(existing);
+      return { id: row.id, created: false, resumed: true, row };
+    }
+    // Stale generation: it was resolved between the count and the insert. Never
+    // hand a caller a finished row as though its request had been adopted.
+  }
+
+  throw new Error(`store: could not settle a ledger generation for "${family}" after ${MAX_GENERATION_PROBES} attempts. Nothing was written.`);
+}
+
+/**
+ * How many generations of one ledger family are SPENT - i.e. can never be acted
+ * on again. THE definition of "which generation comes next", exported so
+ * migrate-command-ledger.js derives it from the same place the runtime does. If
+ * the two ever disagreed, the backfill would write keys the runtime could not
+ * recognise, and a carried-over pending command would be silently duplicated
+ * the next time Warwick tapped the button.
+ */
+export async function spentLedgerGenerations(deps, family) {
+  const res = await deps.readQuery(COUNT_SPENT_GENERATIONS_SQL, [family, [...LEDGER_TERMINAL_STATUSES]]);
+  return Number(rowsOf(res)[0]?.n) || 0;
 }
 
 /** Every OUTSTANDING command for a shop, oldest first. */
 export async function listPendingCommands(deps, shopId) {
   const res = await deps.readQuery(
-    `SELECT id, household_id, shop_id, action_type, action_key, payload, status, note, created_at
-       FROM asdair.pending_action
-      WHERE shop_id = $1 AND status = 'pending' AND action_type LIKE $2
-      ORDER BY id ASC`, [shopId, `${COMMAND_PREFIX}%`],
+    `SELECT ${LEDGER_COLUMNS} FROM asdair.pipeline_command
+      WHERE shop_id = $1 AND kind = 'command' AND status = 'pending'
+      ORDER BY id ASC`, [shopId],
   );
   return rowsOf(res).map(toCommandRecord);
 }
@@ -255,35 +440,55 @@ export async function listPendingCommands(deps, shopId) {
  */
 export async function listIssuedCommandNames(deps, shopId) {
   const res = await deps.readQuery(
-    `SELECT DISTINCT action_type FROM asdair.pending_action
-      WHERE shop_id = $1 AND action_type LIKE $2`, [shopId, `${COMMAND_PREFIX}%`],
+    `SELECT DISTINCT command FROM asdair.pipeline_command
+      WHERE shop_id = $1 AND kind = 'command'`, [shopId],
   );
-  return rowsOf(res).map((r) => commandNameOf(r.action_type)).filter(Boolean);
+  return rowsOf(res).map((r) => r.command).filter(Boolean);
 }
 
 /**
- * Record a command durably. IDEMPOTENT BY CONSTRUCTION.
- *
- * shopStore.addPendingAction is INSERT ... ON CONFLICT DO NOTHING plus a
- * re-select, so a repeated tap of the same button while the command is still
- * outstanding ADOPTS the existing row - it does not stack a second one, and the
- * caller is told which happened (`created` / `resumed`).
+ * Record a command durably. A repeated tap of the same button while the command
+ * is still outstanding ADOPTS the existing row - it does not stack a second one,
+ * and the caller is told which happened (`created` / `resumed`).
  */
 export async function recordCommand(deps, { householdId, shopId, command, key, payload }) {
-  const res = await deps.shopStore.addPendingAction({
-    household_id: householdId,
-    shop_id: shopId,
-    action_type: commandActionType(command),
-    action_key: key,
-    payload: payload || {},
+  return recordLedgerEntry(deps, {
+    kind: LEDGER_KINDS.COMMAND, householdId, shopId, name: command, key, payload,
   });
-  return { id: res.action.id, created: res.created, resumed: res.resumed, row: res.action };
 }
 
-/** Mark a command done (or abandoned). Only a PENDING row can be resolved, so
- *  the record of how it ended is written exactly once. */
-export async function resolveCommand(deps, actionId, status = 'done', note = null) {
-  return deps.shopStore.resolvePendingAction(actionId, { status, note });
+/**
+ * Mark a ledger row done (or abandoned/failed). Only a LIVE row can be
+ * resolved, so the record of how it ended is written exactly once - the same
+ * guarantee migration 006's resolver gave, carried over verbatim in the
+ * `AND status = ANY(<live>)` clause below.
+ *
+ * The reason is kept in `result.note` rather than overwriting `last_error`:
+ * "consumed by act:interpret" is a receipt, not an error, and conflating the
+ * two would make a healthy row look like a failed one in the ledger.
+ */
+export async function resolveCommand(deps, ledgerId, status = 'done', note = null) {
+  const mapped = RESOLUTION_STATUS[status];
+  if (!mapped) {
+    throw new Error(`store: resolveCommand status must be one of ${Object.keys(RESOLUTION_STATUS).join(', ')}, got "${String(status)}"`);
+  }
+  const result = JSON.stringify({ note: note === undefined ? null : note, resolution: status });
+  const res = await deps.writeQuery(
+    `UPDATE asdair.pipeline_command
+        SET status = $1,
+            result = coalesce(result, '{}'::jsonb) || $2::jsonb,
+            last_error = CASE WHEN $1 = 'failed' THEN $3 ELSE last_error END,
+            attempts = attempts + 1,
+            updated_at = now()
+      WHERE id = $4 AND status = ANY($5)
+      RETURNING ${LEDGER_COLUMNS}`,
+    [mapped, result, note === undefined ? null : note, ledgerId, [...LEDGER_LIVE_STATUSES]],
+  );
+  const row = rowsOf(res)[0];
+  if (!row) {
+    throw new Error(`store: pipeline_command ${String(ledgerId)} is not live (already resolved, or no such row). Nothing was written.`);
+  }
+  return { action: toLedgerRow(row), changed: true };
 }
 
 // ---------------------------------------------------------------------
@@ -298,43 +503,55 @@ export async function resolveCommand(deps, actionId, status = 'done', note = nul
  * retried. Queuing it under a key derived from the MILESTONE (not the moment)
  * makes both impossible: the same milestone can only ever have one unsent row,
  * and the row survives a restart.
+ *
+ * A queued card is machine bookkeeping, not a household to-do, which is exactly
+ * why it no longer lands in the list Warwick is shown.
  */
 export async function enqueueMessage(deps, { householdId, shopId, kind, key, payload }) {
-  const res = await deps.shopStore.addPendingAction({
-    household_id: householdId,
-    shop_id: shopId,
-    action_type: outboxActionType(kind),
-    action_key: key,
-    payload: payload || {},
+  return recordLedgerEntry(deps, {
+    kind: LEDGER_KINDS.OUTBOX, householdId, shopId, name: kind, key, payload,
   });
-  return { id: res.action.id, created: res.created, resumed: res.resumed, row: res.action };
 }
 
 /** Every unsent message, oldest first. */
 export async function listOutbox(deps, { shopId = null } = {}) {
   const sql = shopId === null
-    ? `SELECT id, household_id, shop_id, action_type, action_key, payload, status, created_at
-         FROM asdair.pending_action WHERE status = 'pending' AND action_type LIKE $1 ORDER BY id ASC`
-    : `SELECT id, household_id, shop_id, action_type, action_key, payload, status, created_at
-         FROM asdair.pending_action WHERE status = 'pending' AND action_type LIKE $1 AND shop_id = $2 ORDER BY id ASC`;
-  const params = shopId === null ? [`${OUTBOX_PREFIX}%`] : [`${OUTBOX_PREFIX}%`, shopId];
-  const res = await deps.readQuery(sql, params);
-  return rowsOf(res).map((row) => ({
-    id: row.id,
-    kind: String(row.action_type).slice(OUTBOX_PREFIX.length),
-    key: row.action_key,
-    payload: asObject(row.payload),
-    shop_id: row.shop_id,
-    household_id: row.household_id,
-  }));
+    ? `SELECT ${LEDGER_COLUMNS} FROM asdair.pipeline_command
+        WHERE status = 'pending' AND kind = 'outbox' ORDER BY id ASC`
+    : `SELECT ${LEDGER_COLUMNS} FROM asdair.pipeline_command
+        WHERE status = 'pending' AND kind = 'outbox' AND shop_id = $1 ORDER BY id ASC`;
+  const res = await deps.readQuery(sql, shopId === null ? [] : [shopId]);
+  return rowsOf(res).map((row) => {
+    const r = toLedgerRow(row);
+    return {
+      id: r.id,
+      kind: r.command,
+      key: r.key,
+      payload: r.args,
+      shop_id: r.shop_id,
+      household_id: r.args.household_id ?? null,
+    };
+  });
 }
 
+// ---------------------------------------------------------------------
+// The human's list - READ ONLY, and the only mention of pending_action left
+// ---------------------------------------------------------------------
+
 /**
- * The household's GENUINE outstanding actions - pipeline plumbing filtered out.
+ * The household's GENUINE outstanding actions.
  *
- * Exposed so the cockpit and the status card can show Warwick the things that
- * really must not be forgotten ("add Wall's to ASDA Favourites") without
- * drowning them in the pipeline's own command and outbox rows.
+ * THE ONLY STATEMENT IN THIS MODULE THAT NAMES asdair.pending_action, and it is
+ * a SELECT. Since migration 009 the pipeline writes its own bookkeeping to
+ * asdair.pipeline_command, so everything this returns is a real thing a human
+ * must do ("add Wall's to ASDA Favourites").
+ *
+ * The legacy `cmd:`/`msg:` filter is KEPT anyway, and deliberately: between
+ * deploying this code and running migrate-command-ledger.js against live there
+ * are still historical plumbing rows in the table, and showing Warwick a
+ * `cmd:buildShop` from three weeks ago as an outstanding action is the exact
+ * defect this work package exists to remove. After the backfill the filter
+ * matches nothing - it is a belt, not the braces.
  */
 export async function listHouseholdActions(deps, householdId) {
   const res = await deps.readQuery(
@@ -377,7 +594,7 @@ export async function readSnapshot(deps, handle) {
 }
 
 // ---------------------------------------------------------------------
-// The one write this module performs that shopStore's public API cannot
+// The one write to a shopStore-owned table that its public API cannot express
 // ---------------------------------------------------------------------
 
 /**

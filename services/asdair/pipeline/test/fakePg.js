@@ -21,6 +21,13 @@
 //   shop_question_key_uniq     (shop_id, question_key)
 //   bbr_one_live_per_shop      (shop_id) where status in queued|claimed|running
 //   pending_action_key_uniq    (household_id, action_type, action_key) where pending
+//   pipeline_command_idem_uniq (idempotency_key)                       TOTAL  [009]
+//
+// The CHECK constraints modelled, because a test that can write a status
+// Postgres would refuse is a test that proves nothing:
+//   shop_line_matched_needs_regular / shop_line_quantity_sane          [008]
+//   pipeline_command_kind_known   kind   in ('command','outbox')       [009]
+//   pipeline_command_status_known status in ('pending','running','done','failed','retired')
 //
 // NOT a Postgres emulator and not trying to be. An unrecognised statement is an
 // ERROR, so a test cannot pass by silently running a query nobody modelled.
@@ -39,6 +46,17 @@ const SHOP_COLUMNS = [
 function nowIso() { return '2026-08-03T09:00:00.000Z'; }
 
 function clone(row) { return row === null || row === undefined ? row : { ...row }; }
+
+/** The real writer stringifies jsonb parameters and casts them; a reader gets
+ *  back what Postgres would return, so the fake parses on the way in. */
+function asJson(value) {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'string') {
+    try { return JSON.parse(value); } catch { return null; }
+  }
+  return typeof value === 'object' ? value : null;
+}
+
 function rows(list) { return { rows: list.map(clone), rowCount: list.length }; }
 function none() { return { rows: [], rowCount: 0 }; }
 
@@ -75,6 +93,7 @@ export function createFakeDatabase(seed = {}) {
     shop_line: [],
     browser_build_request: [],
     pending_action: [],
+    pipeline_command: [],
     households: [{ id: 1, name: 'test-household', display_name: 'Test Household' }],
     shopping_lists: [],
     shopping_list_items: [],
@@ -102,6 +121,52 @@ export function createFakeClient(store, options = {}) {
   const { db, id } = store;
   const log = [];
   let failNext = options.failNext || null;
+
+  const PIPELINE_COMMAND_KINDS = ['command', 'outbox'];
+  const PIPELINE_COMMAND_STATUSES = ['pending', 'running', 'done', 'failed', 'retired'];
+
+  /** Migration 009's two CHECK constraints. A test must not be able to write a
+   *  kind or a status the live database would reject. */
+  function assertPipelineCommandChecks(row) {
+    if (!PIPELINE_COMMAND_KINDS.includes(row.kind)) {
+      throw new Error(`fakePg: CHECK pipeline_command_kind_known violated (kind = "${row.kind}")`);
+    }
+    if (!PIPELINE_COMMAND_STATUSES.includes(row.status)) {
+      throw new Error(`fakePg: CHECK pipeline_command_status_known violated (status = "${row.status}")`);
+    }
+  }
+
+  /**
+   * INSERT ... ON CONFLICT (idempotency_key) DO NOTHING.
+   *
+   * pipeline_command_idem_uniq is TOTAL - it covers finished rows too - so a
+   * second insert of a key that a DONE row already holds writes nothing. That
+   * is the exact behaviour store.recordLedgerEntry's generation exists to cope
+   * with, and modelling it faithfully is what makes the test meaningful.
+   */
+  function insertPipelineCommand(spec) {
+    const row = {
+      shop_id: spec.shop_id ?? null,
+      kind: spec.kind,
+      command: spec.command,
+      args: asJson(spec.args) || {},
+      idempotency_key: spec.idempotency_key,
+      status: spec.status || 'pending',
+      attempts: 0,
+      last_error: null,
+      result: asJson(spec.result),
+      created_at: spec.created_at || nowIso(),
+      updated_at: spec.updated_at || nowIso(),
+    };
+    assertPipelineCommandChecks(row);
+    if (typeof row.idempotency_key !== 'string' || row.idempotency_key === '') {
+      throw new Error('fakePg: NOT NULL violation on pipeline_command.idempotency_key');
+    }
+    if (db.pipeline_command.some((c) => c.idempotency_key === row.idempotency_key)) return none();
+    const created = { id: id('pipeline_command'), ...row };
+    db.pipeline_command.push(created);
+    return rows([created]);
+  }
 
   const handlers = [
     // ── transaction markers ────────────────────────────────────────────────
@@ -156,9 +221,10 @@ export function createFakeClient(store, options = {}) {
       rows(db.shop.filter((s) => s.shop_ref === p[0]).sort((a, b) => a.id - b.id))],
     [/FROM asdair\.shop\s+WHERE status NOT IN/i, (sql, p) => {
       const consumable = Array.isArray(p[0]) ? p[0] : [];
-      const withWork = new Set(db.pending_action
-        .filter((a) => a.status === 'pending' && a.shop_id !== null && consumable.includes(a.action_type))
-        .map((a) => String(a.shop_id)));
+      const withWork = new Set(db.pipeline_command
+        .filter((c) => c.status === 'pending' && c.kind === 'command' && c.shop_id !== null
+          && consumable.includes(c.command))
+        .map((c) => String(c.shop_id)));
       return rows(db.shop
         .filter((s) => !['RECONCILED', 'CANCELLED'].includes(s.status) || withWork.has(String(s.id)))
         .sort((a, b) => a.id - b.id));
@@ -260,7 +326,81 @@ export function createFakeClient(store, options = {}) {
     [/FROM asdair\.browser_build_request WHERE id = \$1/i, (sql, p) =>
       rows(db.browser_build_request.filter((b) => String(b.id) === String(p[0])))],
 
-    // ── asdair.pending_action (the command ledger + the outbox) ────────────
+    // ── asdair.pipeline_command (migration 009 - THE MACHINE LEDGER) ───────
+    // The command ledger, the resume bookkeeping and the outbox. Its UNIQUE
+    // index is TOTAL (not partial like pending_action's), which is precisely
+    // why store.recordLedgerEntry has to carry a generation - and why that
+    // generation must be exercised against a real index rather than a mock.
+    [/^INSERT INTO asdair\.pipeline_command \(shop_id, kind, command, args, idempotency_key, status\) VALUES/i,
+      (sql, p) => insertPipelineCommand({
+        shop_id: p[0] ?? null, kind: p[1], command: p[2], args: p[3],
+        idempotency_key: p[4], status: 'pending',
+      })],
+
+    // The backfill's insert: carries the migrated status, provenance and the
+    // original timestamps, and refuses to run twice for the same source row.
+    [/^INSERT INTO asdair\.pipeline_command \(shop_id, kind, command, args, idempotency_key, status, result, created_at, updated_at\)\s*SELECT/i,
+      (sql, p) => {
+        const alreadyMigrated = db.pipeline_command.some(
+          (c) => asJson(c.result) && String(asJson(c.result).migrated_from_pending_action ?? '') === String(p[9]),
+        );
+        if (alreadyMigrated) return none();
+        return insertPipelineCommand({
+          shop_id: p[0] ?? null, kind: p[1], command: p[2], args: p[3],
+          idempotency_key: p[4], status: p[5], result: p[6],
+          created_at: p[7], updated_at: p[8],
+        });
+      }],
+
+    [/^UPDATE asdair\.pipeline_command\s+SET status = \$1/i, (sql, p) => {
+      const live = Array.isArray(p[4]) ? p[4] : ['pending', 'running'];
+      const target = db.pipeline_command.find((c) => String(c.id) === String(p[3]) && live.includes(c.status));
+      if (!target) return none();
+      assertPipelineCommandChecks({ ...target, status: p[0] });
+      target.status = p[0];
+      // `result = coalesce(result,'{}') || $2::jsonb` - a jsonb MERGE, not a
+      // replace, so provenance written by the backfill survives a resolution.
+      target.result = { ...(asJson(target.result) || {}), ...(asJson(p[1]) || {}) };
+      if (p[0] === 'failed') target.last_error = p[2];
+      target.attempts = Number(target.attempts || 0) + 1;
+      target.updated_at = nowIso();
+      return rows([target]);
+    }],
+
+    [/FROM asdair\.pipeline_command WHERE idempotency_key = \$1/i, (sql, p) =>
+      rows(db.pipeline_command.filter((c) => c.idempotency_key === p[0]))],
+
+    [/count\(\*\)::int AS n FROM asdair\.pipeline_command\s+WHERE args->>'ledger_key' = \$1 AND status = ANY\(\$2\)/i, (sql, p) => {
+      const statuses = Array.isArray(p[1]) ? p[1] : [];
+      return rows([{
+        n: db.pipeline_command.filter((c) => (asJson(c.args) || {}).ledger_key === p[0]
+          && statuses.includes(c.status)).length,
+      }]);
+    }],
+
+    [/FROM asdair\.pipeline_command\s+WHERE shop_id = \$1 AND kind = 'command' AND status = 'pending'/i, (sql, p) =>
+      rows(db.pipeline_command.filter((c) => String(c.shop_id) === String(p[0])
+        && c.kind === 'command' && c.status === 'pending').sort((a, b) => a.id - b.id))],
+
+    [/^SELECT DISTINCT command FROM asdair\.pipeline_command\s+WHERE shop_id = \$1 AND kind = 'command'/i, (sql, p) => {
+      const seen = new Set(db.pipeline_command.filter((c) => String(c.shop_id) === String(p[0])
+        && c.kind === 'command').map((c) => c.command));
+      return rows([...seen].map((command) => ({ command })));
+    }],
+
+    [/FROM asdair\.pipeline_command\s+WHERE status = 'pending' AND kind = 'outbox' AND shop_id = \$1/i, (sql, p) =>
+      rows(db.pipeline_command.filter((c) => c.status === 'pending' && c.kind === 'outbox'
+        && String(c.shop_id) === String(p[0])).sort((a, b) => a.id - b.id))],
+
+    [/FROM asdair\.pipeline_command\s+WHERE status = 'pending' AND kind = 'outbox'/i, () =>
+      rows(db.pipeline_command.filter((c) => c.status === 'pending' && c.kind === 'outbox')
+        .sort((a, b) => a.id - b.id))],
+
+    // The backfill's preflight: "is migration 009 actually applied here?"
+    [/^SELECT to_regclass\('asdair\.pipeline_command'\)/i, () =>
+      rows([{ table_name: 'asdair.pipeline_command' }])],
+
+    // ── asdair.pending_action (HUMAN ACTIONS - and the legacy ledger rows) ──
     [/^INSERT INTO asdair\.pending_action \(/i, (sql, params) => {
       const row = insertRow(sql, 'asdair.pending_action', params);
       // pending_action_key_uniq - PARTIAL: only while pending.
@@ -303,6 +443,22 @@ export function createFakeClient(store, options = {}) {
     [/FROM asdair\.pending_action WHERE household_id = \$1 AND status = 'pending'/i, (sql, p) =>
       rows(db.pending_action.filter((a) => String(a.household_id) === String(p[0]) && a.status === 'pending')
         .sort((a, b) => a.id - b.id))],
+
+    // ── the backfill's two statements over the legacy ledger rows ──────────
+    [/FROM asdair\.pending_action\s+WHERE action_type LIKE \$1 OR action_type LIKE \$2/i, (sql, p) => {
+      const prefixes = [String(p[0]).replace('%', ''), String(p[1]).replace('%', '')];
+      return rows(db.pending_action
+        .filter((a) => prefixes.some((pre) => String(a.action_type).startsWith(pre)))
+        .sort((a, b) => a.id - b.id));
+    }],
+    [/^UPDATE asdair\.pending_action\s+SET status = 'abandoned'/i, (sql, p) => {
+      const target = db.pending_action.find((a) => String(a.id) === String(p[1]) && a.status === 'pending');
+      if (!target) return none();
+      target.status = 'abandoned';
+      target.note = target.note ? `${target.note} | ${p[0]}` : p[0];
+      target.resolved_at = target.resolved_at || nowIso();
+      return rows([{ id: target.id }]);
+    }],
 
     // ── asdair.shop_line (migration 008 - the durable interpretation) ──────
     // UNIQUE (shop_id, line_no), plus the two CHECKs that matter: a `matched`

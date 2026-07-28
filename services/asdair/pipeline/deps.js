@@ -98,9 +98,18 @@ async function realReadQuery(sql, params) {
 }
 
 /**
- * The ONE write path this module opens for a table shopStore does not own:
- * asdair.shop_line (migration 008). Every statement it carries is built in
- * shopLines.js from a column allowlist, and there is no DELETE among them.
+ * The write path this module opens for the two tables shopStore does not own:
+ *
+ *   asdair.shop_line        migration 008 - the durable interpretation. Every
+ *                           statement is built in shopLines.js from a column
+ *                           allowlist.
+ *   asdair.pipeline_command migration 009 - the MACHINE ledger (commands,
+ *                           resume state, outbox), which since 009 is a
+ *                           different table from asdair.pending_action, the
+ *                           list of things WARWICK must do. Every statement is
+ *                           a named constant in store.js.
+ *
+ * There is no DELETE among them, and neither table is written anywhere else.
  */
 async function realWriteQuery(sql, params) {
   const client = await getWritePool().connect();

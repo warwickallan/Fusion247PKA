@@ -27,6 +27,11 @@ import { questionKeyFor } from './keys.js';
 
 const REF = 'SHOP-2026-08-03';
 
+/** The MACHINE ledger (migration 009). Every command and every queued card lives
+ *  here; asdair.pending_action holds Warwick's genuine to-dos and nothing else. */
+const ledger = (h, kind, name) =>
+  h.db.pipeline_command.filter((c) => c.kind === kind && c.command === name);
+
 /** The real bot modules, wired to fakes. Nothing is stubbed that matters. */
 async function makeBot({ resolveCandidate = null, resolveQuestionByMessage = null } = {}) {
   const router = await import('../bot/inboundRouter.js');
@@ -149,7 +154,7 @@ test('THE JOIN: a button tap the receiver ignores still becomes a command', asyn
   });
 
   assert.equal(report.taps.routed, 1);
-  assert.equal(h.db.pending_action.filter((a) => a.action_type === `cmd:${COMMANDS.BUILD_SHOP}`).length, 1);
+  assert.equal(ledger(h, 'command', COMMANDS.BUILD_SHOP).length, 1);
   assert.equal(bot.answered.length, 1, 'a tap that is never answered looks to Warwick like the bot died');
   assert.equal(bot.answered[0].text, 'Got it');
   // And the SAME pass advanced the shop on the strength of that tap.
@@ -169,17 +174,15 @@ test('a repeated tap is answered honestly rather than acted on twice', async () 
   assert.equal(h.db.shop_event.filter((e) => e.to_status === 'CANCELLED').length, 1);
 
   // And nothing is left nagging: a command issued against a shop that has since
-  // finished is retired with a reason, not left "pending" in the household's
-  // outstanding actions forever.
-  const stillPending = h.db.pending_action.filter(
-    (a) => a.action_type === `cmd:${COMMANDS.CANCEL_SHOP}` && a.status === 'pending',
-  );
+  // finished is RETIRED with a reason, not left "pending" in the machine ledger
+  // forever holding that generation of the command open.
+  const stillPending = ledger(h, 'command', COMMANDS.CANCEL_SHOP).filter((c) => c.status === 'pending');
   assert.equal(stillPending.length, 0, 'a dead command was left outstanding against a finished week');
-  const abandoned = h.db.pending_action.filter(
-    (a) => a.action_type === `cmd:${COMMANDS.CANCEL_SHOP}` && a.status === 'abandoned',
-  );
-  assert.equal(abandoned.length, 1);
-  assert.match(abandoned[0].note, /already CANCELLED/);
+  const retired = ledger(h, 'command', COMMANDS.CANCEL_SHOP).filter((c) => c.status === 'retired');
+  assert.equal(retired.length, 1);
+  assert.match(retired[0].result.note, /already CANCELLED/);
+  assert.equal(h.db.pending_action.length, 0,
+    'the whole cancel round trip must not put a single row in the household outstanding-actions list');
 });
 
 test('a LATCH command is never abandoned - it is a permanent fact about the week', async () => {
@@ -190,9 +193,9 @@ test('a LATCH command is never abandoned - it is a permanent fact about the week
   await runOnce(h.deps, { householdId: HOUSEHOLD_ID, intake: makeIntake([]) });   // -> CANCELLED
   await runOnce(h.deps, { householdId: HOUSEHOLD_ID, intake: makeIntake([]) });   // housekeeping
 
-  const latch = h.db.pending_action.find((a) => a.action_type === `cmd:${COMMANDS.CONFIRM_INTERPRETATION}`);
+  const latch = ledger(h, 'command', COMMANDS.CONFIRM_INTERPRETATION)[0];
   assert.equal(latch.status, 'pending', 'a latch was retired - the record of a human decision was erased');
-  const receive = h.db.pending_action.find((a) => a.action_type === `cmd:${COMMANDS.RECEIVE_LIST}`);
+  const receive = ledger(h, 'command', COMMANDS.RECEIVE_LIST)[0];
   assert.equal(receive.status, 'pending', 'the provenance of the week was retired');
 });
 
@@ -228,7 +231,7 @@ test('a queued card is rendered, sent, and only THEN resolved', async () => {
   assert.equal(bot.sent[0].chatId, '555', 'the card must go to the chat the list came from');
   assert.match(bot.sent[0].message.text, /Plan ready/);
   assert.ok(bot.sent[0].message.reply_markup.inline_keyboard.length > 0);
-  assert.equal(h.db.pending_action.filter((a) => a.action_type === 'msg:plan_ready' && a.status === 'pending').length, 0);
+  assert.equal(ledger(h, 'outbox', 'plan_ready').filter((c) => c.status === 'pending').length, 0);
 });
 
 test('a send that FAILS leaves the card queued - a lost failure card is a silent stall', async () => {
@@ -241,7 +244,7 @@ test('a send that FAILS leaves the card queued - a lost failure card is a silent
   await runOnce(h.deps, { householdId: HOUSEHOLD_ID, intake: makeIntake([]), bot });
   const failed = await runOnce(h.deps, { householdId: HOUSEHOLD_ID, intake: makeIntake([]), bot });
   assert.equal(failed.outbox.failed.length, 1);
-  assert.equal(h.db.pending_action.filter((a) => a.action_type === 'msg:plan_ready' && a.status === 'pending').length, 1);
+  assert.equal(ledger(h, 'outbox', 'plan_ready').filter((c) => c.status === 'pending').length, 1);
 
   // A later pass, once Telegram is back, sends it exactly once.
   const working = await makeBot();
@@ -263,9 +266,9 @@ test('an unrenderable card is abandoned with a reason, never retried forever', a
   });
   const bot = await makeBot();
   await drainOutbox(h.deps, { bot });
-  const row = h.db.pending_action.find((a) => a.action_type === 'msg:not_a_real_card');
-  assert.equal(row.status, 'abandoned');
-  assert.match(row.note, /no renderer/);
+  const row = ledger(h, 'outbox', 'not_a_real_card')[0];
+  assert.equal(row.status, 'retired');
+  assert.match(row.result.note, /no renderer/);
 });
 
 // =====================================================================

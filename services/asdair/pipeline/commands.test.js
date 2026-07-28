@@ -37,7 +37,14 @@ async function receive(h, overrides = {}) {
   }, h.deps);
 }
 
-const commandRows = (h, name) => h.db.pending_action.filter((a) => a.action_type === `cmd:${name}`);
+// THE MACHINE LEDGER, NOT THE HUMAN'S LIST. Since migration 009 a command is a
+// row in asdair.pipeline_command; asdair.pending_action holds genuine household
+// to-dos only. `ledgerRows` reads the ledger, and `humanRows` reads the list -
+// so a test can assert on BOTH and catch a command that leaked into the wrong
+// one, which is exactly the defect this separation exists to remove.
+const ledgerRows = (h, name, kind = 'command') =>
+  h.db.pipeline_command.filter((c) => c.kind === kind && c.command === name);
+const commandRows = ledgerRows;
 
 // =====================================================================
 // A REDELIVERED MESSAGE
@@ -253,7 +260,7 @@ test('every command records WHO asked - an unattributed durable intent is refuse
     await assert.rejects(() => fn({ shopRef: REF, actor: '   ' }, h.deps), /actor/);
   }
   await commands.buildShop({ shopRef: REF, actor: 'cockpit:warwick' }, h.deps);
-  assert.equal(commandRows(h, COMMANDS.BUILD_SHOP)[0].payload.actor, 'cockpit:warwick');
+  assert.equal(commandRows(h, COMMANDS.BUILD_SHOP)[0].args.actor, 'cockpit:warwick');
 });
 
 test('a command naming a shop that does not exist is refused by name', async () => {
@@ -267,9 +274,11 @@ test('a command naming a shop that does not exist is refused by name', async () 
 test('getStatus writes NOTHING - looking is not an intent', async () => {
   const h = makeHarness();
   await receive(h);
-  const before = h.db.pending_action.length;
+  const beforeLedger = h.db.pipeline_command.length;
+  const beforeHuman = h.db.pending_action.length;
   const status = await commands.getStatus({ shopRef: REF }, h.deps);
-  assert.equal(h.db.pending_action.length, before, 'a read wrote a durable row');
+  assert.equal(h.db.pipeline_command.length, beforeLedger, 'a read wrote a durable ledger row');
+  assert.equal(h.db.pending_action.length, beforeHuman, 'a read wrote a row into the household action list');
   assert.equal(status.status.unknown_means_unknown, true, 'the unknown-means-unknown contract must survive');
   assert.equal(status.pipeline.next_step, 'wait:build_command');
 });
@@ -293,5 +302,5 @@ test('submitConfirmation retains the raw receipt VERBATIM the moment it arrives'
   await receive(h);
   const raw = 'Your ASDA order\n2 x Arla semi skimmed 4pt  3.50\nOrder total 3.50';
   await commands.submitConfirmation({ shopRef: REF, actor: ACTOR, rawText: raw }, h.deps);
-  assert.equal(commandRows(h, COMMANDS.SUBMIT_CONFIRMATION)[0].payload.raw_text, raw);
+  assert.equal(commandRows(h, COMMANDS.SUBMIT_CONFIRMATION)[0].args.raw_text, raw);
 });

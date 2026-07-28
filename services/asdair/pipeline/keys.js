@@ -19,51 +19,166 @@
 import { createHash } from 'node:crypto';
 
 /**
- * The `action_type` prefixes this pipeline writes into asdair.pending_action.
+ * ── THE MACHINE LEDGER AND THE HUMAN LIST ARE TWO DIFFERENT THINGS ──────────
  *
- * WHY pending_action AND NOT A NEW TABLE: migration 006 already gives us a
- * durable, household-scoped record with EXACTLY the idempotency we need -
- * `pending_action_key_uniq` is unique on (household_id, action_type, action_key)
- * WHERE status = 'pending'. So "record this command durably, and let a repeat of
- * the same command adopt the existing one" is one INSERT ... ON CONFLICT DO
- * NOTHING, decided by the database rather than by this code. Adding a table
- * would mean owning a migration in a folder this work package must not modify.
+ * Until migration 009 the pipeline kept its command / resume / outbox
+ * bookkeeping in `asdair.pending_action`, namespaced `cmd:` and `msg:`. That
+ * table is what the Cockpit and the Telegram status card surface to Warwick as
+ * OUTSTANDING ACTIONS - so internal plumbing read as things HE had to do.
+ * Filtering it out in the UI was explicitly rejected: that hides the symptom and
+ * leaves the confusion in the data. So the two concepts now have two homes:
  *
- * The prefixes keep the three populations separable, because
- * shopStatus.outstanding_actions surfaces pending_action rows to a human as
- * "things that must never be forgotten":
+ *   asdair.pipeline_command  the MACHINE ledger - commands, resume state, outbox
+ *   asdair.pending_action    GENUINE HUMAN ACTIONS ONLY, e.g. "add Wall's to
+ *                            ASDA Favourites"
  *
- *   cmd:<name>   a durable COMMAND awaiting the runner
- *   msg:<kind>   a durable OUTBOUND MESSAGE awaiting the sender (the outbox)
- *   (anything else) a genuine household to-do, e.g. 'add_favourite'
+ * Nothing the pipeline does for its own bookkeeping writes to pending_action
+ * ever again. store.js reads it in exactly one place (listHouseholdActions) and
+ * writes it nowhere.
  *
- * `isPipelineActionType` exists so a surface (the cockpit, the status card) can
- * filter pipeline plumbing out of the human's outstanding-actions list.
+ * ── THE LEGACY PREFIXES, KEPT ON PURPOSE ────────────────────────────────────
+ * `cmd:` / `msg:` survive here as LEGACY MARKERS, for exactly two jobs:
+ *
+ *   1. migrate-command-ledger.js identifies the rows it must move.
+ *   2. listHouseholdActions still filters them, so that between deploying this
+ *      code and running the backfill Warwick is not shown plumbing that is
+ *      already historical.
+ *
+ * NOTHING PRODUCES THEM ANY MORE. The two builders that used to mint a pipeline
+ * row's pending_action action_type have been DELETED, not merely left unused:
+ * there is no way left to spell one, which is what makes the separation
+ * structural rather than a convention. invariants.test.js asserts their absence
+ * over the source of every shipping module.
  */
-export const COMMAND_PREFIX = 'cmd:';
-export const OUTBOX_PREFIX = 'msg:';
+export const LEGACY_COMMAND_PREFIX = 'cmd:';
+export const LEGACY_OUTBOX_PREFIX = 'msg:';
 
-/** PURE. True when an action_type is pipeline plumbing rather than a household to-do. */
+/** PURE. True when an action_type is LEGACY pipeline plumbing rather than a
+ *  household to-do. Only pre-migration rows can satisfy this. */
 export function isPipelineActionType(actionType) {
   const t = String(actionType ?? '');
-  return t.startsWith(COMMAND_PREFIX) || t.startsWith(OUTBOX_PREFIX);
+  return t.startsWith(LEGACY_COMMAND_PREFIX) || t.startsWith(LEGACY_OUTBOX_PREFIX);
 }
 
-/** PURE. The durable action_type for a command. */
-export function commandActionType(name) {
-  return `${COMMAND_PREFIX}${requireName(name, 'command name')}`;
-}
+/**
+ * The two populations `asdair.pipeline_command.kind` distinguishes, matching
+ * migration 009's `pipeline_command_kind_known` CHECK exactly.
+ */
+export const LEDGER_KINDS = Object.freeze({ COMMAND: 'command', OUTBOX: 'outbox' });
 
-/** PURE. The durable action_type for an outbound message. */
-export function outboxActionType(kind) {
-  return `${OUTBOX_PREFIX}${requireName(kind, 'message kind')}`;
-}
+/** The statuses migration 009's `pipeline_command_status_known` CHECK allows. */
+export const LEDGER_STATUSES = Object.freeze(['pending', 'running', 'done', 'failed', 'retired']);
+
+/** A ledger row in one of these statuses can never be acted on again, so its
+ *  generation is spent and the next issue of the same command mints a new one. */
+export const LEDGER_TERMINAL_STATUSES = Object.freeze(['done', 'failed', 'retired']);
+
+/**
+ * The character that separates a ledger family from its generation.
+ *
+ * It must not occur inside any component of the family key, or the split would
+ * be ambiguous and two different families could share an idempotency key. Every
+ * component is checked (`requireKeyComponent`) rather than assumed: the
+ * discriminators that reach here include NORMALISED item text and Telegram
+ * source ids, and a key builder that silently accepted a stray separator would
+ * merge two commands into one.
+ */
+export const GENERATION_SEPARATOR = '#';
 
 function requireName(value, label) {
   if (typeof value !== 'string' || value.trim() === '') {
     throw new Error(`keys: ${label} is required (a non-empty string)`);
   }
   return value.trim();
+}
+
+function requireKeyComponent(value, label) {
+  const v = requireName(value, label);
+  if (v.includes(GENERATION_SEPARATOR)) {
+    throw new Error(`keys: ${label} may not contain "${GENERATION_SEPARATOR}" - it separates a ledger family from its generation`);
+  }
+  return v;
+}
+
+/**
+ * PURE. The FAMILY key for one logical unit of machine bookkeeping.
+ *
+ * "The same command" means the same kind, the same household, the same command
+ * (or message kind) and the same action key. Everything that repeats - a
+ * double-tapped button, a redelivered Telegram update, a second runner pass over
+ * the same milestone - produces the same family key.
+ *
+ * It is stored verbatim on the row (`args.ledger_key`) as well as forming the
+ * prefix of `idempotency_key`, so the family a row belongs to is readable
+ * directly off the row and does not have to be reconstructed by parsing.
+ */
+export function ledgerFamilyKey({ kind, householdId, name, key }) {
+  const k = requireKeyComponent(kind, 'ledger kind');
+  if (!Object.values(LEDGER_KINDS).includes(k)) {
+    throw new Error(`keys: ledger kind must be one of ${Object.values(LEDGER_KINDS).join(', ')}, got "${k}"`);
+  }
+  return [
+    k,
+    requireKeyComponent(String(householdId ?? ''), 'householdId'),
+    requireKeyComponent(name, k === LEDGER_KINDS.OUTBOX ? 'message kind' : 'command name'),
+    requireKeyComponent(key, 'action key'),
+  ].join(':');
+}
+
+/**
+ * PURE. The value written to `asdair.pipeline_command.idempotency_key`, which
+ * carries migration 009's UNIQUE index and therefore IS the guarantee.
+ *
+ * ── WHY A GENERATION, AND WHY IT IS NOT A COUNTER ───────────────────────────
+ * Migration 006's index was PARTIAL - unique on (household_id, action_type,
+ * action_key) WHERE status = 'pending'. So a repeat while the command was
+ * outstanding adopted it, and a repeat AFTER it had been consumed legitimately
+ * started a new one. That second half is not a detail: "ask for the basket
+ * again after a pause" and "retry a shop that failed twice" are the CONSUME
+ * contract in commandNames.js, and a globally-unique key alone would silently
+ * refuse both.
+ *
+ * Migration 009's index is TOTAL, so the generation restores the missing half.
+ * It is NOT a counter and NOT a clock: it is derived from durable state - the
+ * number of rows of this family that are already terminal - so two racing taps
+ * compute the SAME key and the UNIQUE INDEX, not this code, decides which of
+ * them wrote. See store.recordLedgerEntry for the full argument.
+ */
+export function ledgerIdempotencyKey(family, generation) {
+  const g = Number(generation);
+  if (!Number.isInteger(g) || g < 0) {
+    throw new Error(`keys: ledger generation must be a non-negative integer, got ${String(generation)}`);
+  }
+  return `${requireName(family, 'ledger family key')}${GENERATION_SEPARATOR}${g}`;
+}
+
+/**
+ * PURE. The idempotency key for one row CARRIED OVER from the legacy
+ * pending_action ledger, keyed on the source row's own id.
+ *
+ * That is what makes the backfill re-runnable without a marker table or a
+ * check-then-act: running it twice produces the same key twice, and the second
+ * INSERT is refused by the same UNIQUE index that refuses a double tap. The
+ * `legacy` prefix on the generation cannot collide with a minted integer
+ * generation, so a migrated history never blocks a future issue of the command.
+ */
+export function legacyLedgerIdempotencyKey(family, pendingActionId) {
+  const id = String(pendingActionId ?? '').trim();
+  if (id === '' || !/^\d+$/.test(id)) {
+    throw new Error(`keys: a legacy ledger key needs the numeric asdair.pending_action id, got "${String(pendingActionId)}"`);
+  }
+  return `${requireName(family, 'ledger family key')}${GENERATION_SEPARATOR}legacy${id}`;
+}
+
+/** PURE. Split an idempotency key back into its family and its generation. The
+ *  exact inverse of the two builders above, so a test can prove the round trip. */
+export function parseLedgerIdempotencyKey(idempotencyKey) {
+  const s = requireName(idempotencyKey, 'idempotencyKey');
+  const at = s.lastIndexOf(GENERATION_SEPARATOR);
+  if (at <= 0 || at === s.length - 1) {
+    throw new Error(`keys: "${s}" is not a ledger idempotency key (<family>${GENERATION_SEPARATOR}<generation>)`);
+  }
+  return { family: s.slice(0, at), generation: s.slice(at + 1) };
 }
 
 /**
@@ -125,11 +240,10 @@ export function questionKeyFor(itemName) {
 }
 
 /**
- * PURE. The durable command key.
+ * PURE. The durable command key - the `key` half of a ledger family.
  *
- * Scoped by shop_ref because the unique index is (household_id, action_type,
- * action_key) and one household runs one shop per week: without the ref, this
- * week's "build the basket" would collide with last week's.
+ * Scoped by shop_ref because one household runs one shop per week: without the
+ * ref, this week's "build the basket" would collide with last week's.
  *
  * `discriminator` is for commands that can legitimately be outstanding more than
  * once at a time for one shop - correcting two different lines, or answering two

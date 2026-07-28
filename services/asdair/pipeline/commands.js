@@ -421,7 +421,7 @@ export async function cancelShop(spec, deps) {
  *
  * Writes nothing - not even a command row. Looking is not an intent to be
  * advanced, and a durable "somebody checked the status" row would fill the
- * household's outstanding-actions list with noise.
+ * machine ledger with noise the runner would then have to retire.
  *
  * Every null in the projection means GENUINELY UNKNOWN and the caller must say
  * "unknown" - never zero, never a guess. That contract belongs to

@@ -587,9 +587,10 @@ export async function runPipeline(handle, deps) {
     // HOUSEKEEPING ON A FINISHED WEEK. A command issued against a shop that has
     // since reconciled or been cancelled can never be consumed - the stage
     // table will not act on a terminal shop - so without this it would sit
-    // "pending" in the household's outstanding-actions list forever, and a
-    // repeatedly-tapped button would add one more every time. Abandoned with a
-    // reason, never silently dropped.
+    // "pending" in the machine ledger forever, holding that generation of the
+    // command open. Retired with a reason, never silently dropped. (It never
+    // reaches the household's outstanding-actions list at all: since migration
+    // 009 the machine ledger and the human list are different tables.)
     const abandoned = next.step === STEPS.DONE
       ? await abandonOutstanding(deps, snapshot)
       : [];

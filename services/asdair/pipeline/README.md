@@ -14,7 +14,7 @@ Cockpit both drive through the **same commands**.
 
 ```
                 Telegram  ─┐
-                            ├──►  commands.js  ──►  asdair.pending_action  (the durable ledger)
+                            ├──►  commands.js  ──►  asdair.pipeline_command  (the MACHINE ledger)
                 Cockpit   ─┘            │
                                         │  records intent. NEVER advances the state machine.
                                         ▼
@@ -35,12 +35,13 @@ Cockpit both drive through the **same commands**.
 | `stages.js` | **PURE.** The stage table, and `decideNextStep(snapshot)` — the one next legal step, from durable state. |
 | `runPipeline.js` | **The resumable advancer.** Reads a snapshot, takes exactly ONE step, returns. |
 | `runtime.js` | **The loop.** `--once` / `--watch`. A deterministic worker, not an LLM daemon. |
-| `store.js` | Every read the pipeline makes, and the command/outbox ledger over `asdair.pending_action`. |
+| `store.js` | Every read the pipeline makes, and the command/outbox ledger over `asdair.pipeline_command`. |
 | `shopLines.js` | The durable interpretation (`asdair.shop_line`, migration 008). The one table this folder writes. |
-| `keys.js` | **PURE.** Every key idempotency rests on — question keys, command keys, intent keys. |
+| `keys.js` | **PURE.** Every key idempotency rests on — question keys, ledger keys, intent keys. |
+| `migrate-command-ledger.js` | The one-off, **idempotent, re-runnable** backfill that moves pre-009 `cmd:`/`msg:` rows off `asdair.pending_action`. Dry run by default. |
 | `telegramAdapter.js` | **PURE.** One routed Telegram intent → one call on the command surface. No logic of its own. |
 | `deps.js` | The wiring. Real components by default, fully injectable — which is how the suite runs offline. |
-| `*.test.js`, `test/` | `node --test`, **114 tests, fully offline.** No database, no network, no model, no credentials file. |
+| `*.test.js`, `test/` | `node --test`, **149 tests, fully offline.** No database, no network, no model, no credentials file. |
 
 ESM, zero runtime dependencies of its own (`pg` arrives transitively, lazily). Node ≥ 18.
 
@@ -248,30 +249,86 @@ finished week's record.
 |---|---|---|
 | `asdair.shop`, `shop_event`, `shop_question`, `browser_build_request`, `pending_action` | `services/asdair/shop/shopStore.js` | **that module only** |
 | `asdair.shop_line` | **this folder** (`shopLines.js`) — migration 008 arrived for this stage and has no other owner | `shopLines.js` |
+| `asdair.pipeline_command` | **this folder** (`store.js`) — migration 009 arrived for this stage and has no other owner | `store.js` |
 | `asdair.shopping_lists`, `shopping_list_items` | `services/control-plane/wp-d-proof/asdairCommands.mjs` | that module, via `add_list_item` |
 | `asdair.order_confirmation*` | `services/asdair/reconcile/recordConfirmation.js` | that module |
 | `asdair.regulars` (aliases) | `services/asdair/outcome/updateRegulars.js` | that module, at reconcile |
 
 `invariants.test.js` asserts that the only `INSERT`/`UPDATE` naming a table in this folder's source is
-`asdair.shop_line`. There is **no `DELETE`, `TRUNCATE` or `DROP`** anywhere here, also asserted.
+`asdair.shop_line` or `asdair.pipeline_command`. There is **no `DELETE`, `TRUNCATE` or `DROP`** anywhere
+here, also asserted.
 
-### The command ledger lives in `asdair.pending_action`
+### The machine ledger is NOT the household's to-do list
 
-Migration 006 already provides a durable, household-scoped record whose unique index is exactly the
-idempotency a command surface needs — `(household_id, action_type, action_key)` **where status =
-'pending'**. So "record this command; if the same one is already outstanding, adopt it" is one
-`INSERT … ON CONFLICT DO NOTHING`, **decided by the database** rather than by a check-then-insert.
+`asdair.pending_action` is what the Cockpit and the Telegram status card surface to Warwick as
+**OUTSTANDING ACTIONS** — *"things that must never be forgotten"*, like **"add Wall's to ASDA
+Favourites"**. Until migration 009 the pipeline kept its own command / resume / outbox bookkeeping in
+that same table, namespaced `cmd:` and `msg:`, so **machine plumbing read as chores he had to do**.
 
-**The cost, stated plainly:** `shopStatus.outstanding_actions` surfaces `pending_action` rows to a human
-as *"things that must never be forgotten"*. Pipeline rows are namespaced `cmd:` and `msg:`, and
-`keys.isPipelineActionType` / `store.listHouseholdActions` filter them out — **any surface showing
-outstanding actions to Warwick must use that filter**, or his list will fill with plumbing. A dedicated
-`asdair.pipeline_command` table would be cleaner and is the obvious migration-009 candidate.
+Filtering it in the UI was **explicitly rejected**: that hides the symptom and leaves the confusion in
+the data. Two concepts, two homes:
+
+| Table | Holds | Shown to Warwick |
+|---|---|---|
+| `asdair.pipeline_command` | commands, resume state, the outbox | **never** |
+| `asdair.pending_action` | genuine household actions | **yes** |
+
+`store.js` reads `pending_action` in exactly one place (`listHouseholdActions`) and **writes it
+nowhere** — there is no code path left that can, and the builders that used to spell a `cmd:`/`msg:`
+action_type have been deleted rather than left unused. `invariants.test.js` asserts all of that over
+the source; `commandLedger.test.js` runs a whole lifecycle and asserts the table stays empty.
+
+#### Where the idempotency now lives — and why a *generation*
+
+```
+pipeline_command_idem_uniq   UNIQUE (idempotency_key)          -- TOTAL
+pending_action_key_uniq      UNIQUE (household_id, action_type, action_key) WHERE status='pending'
+```
+
+Migration 006's index was **partial**, and two behaviours fell out of that shape — **both
+load-bearing**:
+
+* a repeat **while the command is outstanding** adopts the existing row (a double-tapped button is a
+  no-op); and
+* a repeat **after the command has been consumed** starts a new one — the `CONSUME` contract:
+  *"ask for the basket again after a pause"*, *"retry a shop that failed twice"*.
+
+Migration 009's index is **total**. Reusing the old key would have kept the first and silently
+destroyed the second. So the key carries a **generation**, derived from durable state — the number of
+rows in that family already terminal — never from a counter or a clock:
+
+```
+idempotency_key = <kind>:<household>:<command>:<action key>#<generation>
+                  command:1:requestBasketBuild:SHOP-2026-08-03#0
+```
+
+While a generation is live every repeat computes the **same** key, so the **UNIQUE index** refuses the
+second insert — the database decides the duplicate, not a check-then-insert. Once it is resolved the
+count has moved on and the next request is genuinely new work. If the generation is taken between the
+count and the insert, `store.recordLedgerEntry` re-derives rather than hand back a finished row.
 
 A command issued against a week that has since finished is **retired with a reason** rather than left
-pending forever (`runPipeline.abandonOutstanding`). Latch commands — `receiveList`,
-`confirmInterpretation`, `answerQuestion` — are never retired: they are permanent facts about the week,
-and abandoning them would erase the record rather than tidy it.
+pending forever (`runPipeline.abandonOutstanding`) — otherwise it would hold that generation open.
+Latch commands — `receiveList`, `confirmInterpretation`, `answerQuestion` — are never retired: they are
+permanent facts about the week, and abandoning them would erase the record rather than tidy it.
+
+#### Carrying the pre-009 rows across
+
+```bash
+node --env-file=<env> migrate-command-ledger.js            # DRY RUN — writes nothing
+node --env-file=<env> migrate-command-ledger.js --apply    # carries them over
+```
+
+Every legacy `cmd:`/`msg:` row is **copied** into `asdair.pipeline_command` with its status, payload,
+original timestamps and a pointer back (`result.migrated_from_pending_action`), and every one that was
+still `pending` is then **retired** in place (`status = 'abandoned'`, original note kept, pointer
+appended). Nothing is deleted; nothing is left able to be misread as a chore. Rows that were already
+`done`/`abandoned` are copied but left alone — no surface ever showed them.
+
+Idempotent and re-runnable: the carry-over is `INSERT … WHERE NOT EXISTS (…already migrated…) ON
+CONFLICT (idempotency_key) DO NOTHING`, and the retire is `WHERE id = $ AND status = 'pending'`.
+**Run it with the runtime loop stopped** — a runtime minting new generations underneath the backfill
+would be racing it for the same numbers.
 
 ---
 

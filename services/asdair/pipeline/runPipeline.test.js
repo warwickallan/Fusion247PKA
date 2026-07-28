@@ -216,13 +216,15 @@ test('a milestone card is queued at most ONCE, however many times the milestone 
   await receiveText(h);
   await commands.buildShop({ shopRef: REF, actor: ACTOR }, h.deps);
   await drain(h);
-  const planCards = h.db.pending_action.filter((a) => a.action_type === 'msg:plan_ready');
+  const planCards = h.db.pipeline_command.filter((c) => c.kind === 'outbox' && c.command === 'plan_ready');
   assert.equal(planCards.length, 1);
+  assert.equal(h.db.pending_action.length, 0,
+    'a queued card is machine bookkeeping - it must never reach the household outstanding-actions list');
 
   // Re-enter the milestone: answer nothing, force a re-plan, advance again.
   h.db.shop[0].status = 'PROCESSING';
   await runPipeline(HANDLE, h.deps);
-  assert.equal(h.db.pending_action.filter((a) => a.action_type === 'msg:plan_ready').length, 1,
+  assert.equal(h.db.pipeline_command.filter((c) => c.kind === 'outbox' && c.command === 'plan_ready').length, 1,
     'the same card was queued twice - Warwick would be notified twice for one event');
 });
 
@@ -313,8 +315,10 @@ test('A FAILURE IS VISIBLE: the shop says FAILED, keeps its error, and a card is
   assert.equal(h.db.shop[0].status, 'FAILED');
   assert.match(h.db.shop[0].last_error, /vision gateway refused/);
   assert.equal(h.db.shop_event.filter((e) => e.event_type === 'failure').length, 1);
-  assert.equal(h.db.pending_action.filter((a) => a.action_type === 'msg:failure').length, 1,
+  assert.equal(h.db.pipeline_command.filter((c) => c.kind === 'outbox' && c.command === 'failure').length, 1,
     'a shop that stalls silently is worse than one that fails loudly');
+  assert.equal(h.db.pending_action.length, 0,
+    'a failure card is the pipeline telling Warwick something, not a chore it is giving him');
 });
 
 test('a human confirmation on an interpreted line SURVIVES a later re-read', async () => {

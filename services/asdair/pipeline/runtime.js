@@ -185,7 +185,7 @@ export async function routeTaps(deps, { updates, bot, log = () => {} } = {}) {
 /** PHASE 2 - advance every shop that is still moving, by exactly one step -
  *  plus any finished shop still carrying a command that must be retired. */
 export async function advanceAll(deps, { log = () => {} } = {}) {
-  const shops = await store.listActiveShops(deps, store.CONSUMABLE_COMMAND_TYPES);
+  const shops = await store.listActiveShops(deps, store.CONSUMABLE_COMMANDS);
   const results = [];
   for (const shop of shops) {
     try {
