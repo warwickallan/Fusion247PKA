@@ -51,7 +51,65 @@ or without this slash command.
    VlogOps/story signals, and the canonical session-log path. If the write
    fails, the canonical log stands — re-read before retrying, and report the
    mirror as pending rather than double-writing.
-7. **Sign off as Larry**, confirming the session log's path (and the ClickUp
+7. **LARRY SELF-IMPROVEMENT REVIEW.** (Added by Warwick, 2026-07-28 — mandatory,
+   not optional.) Before signing off, run a deliberate lessons-learned pass. This
+   is **not** a summary of what was built. It answers one question:
+
+   > *"What has current Larry learned about his own reasoning, delegation,
+   > execution and build method that would make future Larry faster, more
+   > accurate and more reliable?"*
+
+   **Review the whole session for:** Warwick's corrections and where he had to
+   restore the original product intent · assumptions treated as fact ·
+   conclusions over-generalised beyond what an experiment proved · defects
+   caught by tests/workers/reviewers rather than by review · knowledge that
+   lived only in session context · decompositions that made work easier ·
+   delegation that helped or created integration risk · the same false
+   assumption made by two workers (a missing shared contract) · an experiment
+   that resolved uncertainty faster than more reasoning · scope creep that
+   obscured the outcome · confusion between **code readiness, product
+   acceptance and operational activation** · any moment a current
+   implementation limitation was allowed to redefine the North Star.
+
+   **Extract the transferable lesson, not the incident.**
+   Weak: *"the subagent could not access Chrome."*
+   Useful: *"do not generalise a limitation of one execution mechanism into a
+   product limitation — state exactly what the experiment proved, separate
+   observation from inference, and test the intended deployment mechanism
+   before changing the product design."*
+
+   **Keep only lessons that are** transferable, likely to recur, material to
+   correctness/speed/quality, not already in canonical doctrine, and specific
+   enough to change behaviour. **Prefer a few strong lessons to a diary.** Do
+   not preserve task state, commit hashes, chronology, or "test carefully".
+
+   **Classify each:** OPERATING HEURISTIC · PREFLIGHT CHECK · INVARIANT ·
+   DELEGATION · INTEGRATION · EVIDENCE · PRODUCT · RECOVERY · QUALITY.
+
+   **Promote each into the smallest correct canonical location** on the
+   guaranteed-load path (`CLAUDE.md` → `MEMORY.md` → root `AGENTS.md` →
+   `Team/agent-index.md` → Larry's contract and SOPs). **Never create an orphan
+   lessons file future Larry won't automatically read.** Dedupe first: if the
+   rule already exists, **strengthen it rather than duplicating**, and where new
+   evidence disproves an old rule, **revise or withdraw it** rather than
+   appending a contradiction beneath it.
+
+   **Memory alone is not the fix.** A durable lesson normally needs canonical
+   doctrine, an executable code constraint, a regression test, a schema
+   constraint, CI coverage, a preflight check, or a clearer agent boundary.
+   Say plainly whether each lesson is enforced by **prose only** or by
+   **executable protection**.
+
+   Report the pass under a **LARRY LESSONS LEARNED** heading, each entry as:
+   **LESSON** (plain English) · **TRIGGER** (what exposed it) · **CHANGE MADE**
+   (where it became permanent) · **FUTURE EFFECT** · **STATUS** (PROMOTED /
+   EXISTING RULE STRENGTHENED / NO DURABLE CHANGE NEEDED / DEFERRED with
+   reason). Also report lessons rejected as too task-specific, any contradiction
+   found in existing doctrine, and whether the guaranteed-load path was updated.
+
+   **Keep it proportionate — this pass must not become another build.**
+
+8. **Sign off as Larry**, confirming the session log's path (and the ClickUp
    mirror's status) and summarizing what was closed out, in plain language.
 
 Do not invent new behavior here — this command is a convenience trigger for
