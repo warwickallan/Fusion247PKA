@@ -128,9 +128,29 @@ Per your standing ruling: a deliberate separate pass, not a side-effect. Zero un
 
 ---
 
-## BLOCKED
+## RESOLVED after Warwick's final rulings (2026-07-28 morning)
 
-### PR #77 — needs your click
+**PR #77 was merged**, under an explicit ruling and an exact-head guard.
+
+| | |
+|---|---|
+| Authorised head | `2c69b6d212387ebd4808fef0dfb5d7a63a927f04` — re-verified as the live head before merging |
+| Merge commit / `origin/main` | `6939aee071e42953c3c19d653a390675adb6ab9f` |
+| Merged at | 2026-07-28T07:10:10Z |
+| CI on the resulting **main**, at its exact SHA | `build-002-tests` **success**, `secret-scan` **success**; 7 check-runs success; combined status `success` |
+
+**The doctrine is now genuinely on `main`** — `Team/Larry - Orchestrator/AGENTS.md` §8a at line 131,
+with the root `AGENTS.md` pointer, plus `persistCapture.mjs` and its tests. A fresh Larry loads it.
+
+Rulings 3 and 4 (the `notify-snapshot-consumers.yml` remedy, and off-machine capture persistence)
+were **recorded, not implemented**, in `Deliverables/BACKLOG.md`. Capture persistence stays
+**commit-only**; the checked-out branch is not auto-pushed.
+
+The section below is retained as the record of what was blocked overnight and why.
+
+## BLOCKED (overnight — since resolved above)
+
+### PR #77 — needed Warwick's click
 
 **Contains overnight items 4 and 5** (the doctrine and the capture persistence).
 
