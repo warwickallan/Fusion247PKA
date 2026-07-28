@@ -1,0 +1,17 @@
+{
+  "name": "asdair-intake",
+  "version": "0.1.0",
+  "private": true,
+  "description": "IDEA-012 AsdAIr intake: the committed, tested ShopperBot receiver (Telegram text/photo -> a resolvePayload-shaped payload + a unique sourceId). Never transcribes, never orders, never touches a database.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "main": "shopperIntake.js",
+  "scripts": {
+    "test": "node --test",
+    "fetch": "node fetch-shopper-list.js",
+    "dry-run": "node fetch-shopper-list.js --dry-run"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
