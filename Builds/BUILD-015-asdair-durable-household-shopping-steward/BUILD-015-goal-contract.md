@@ -158,3 +158,32 @@ confirmation → reconciliation → permanent learning for next week.
 
 The verdict wording **READY — TELEGRAM-CONTROLLED, DURABLE, SUPERVISED ASDAIR** may only be used after live
 acceptance passes and PR #82 is merged.
+
+---
+
+## The north star — and why Stage 1 is not a detour from it
+
+**Warwick's target (restated 2026-07-28): send Mum's list to ShopperBot and have the shopping sorted, without
+disturbing him or Larry while other work is in flight.**
+
+Stage 1 is deliberately the supervised foundation, but it is **daemon-shaped by construction** — becoming that
+target is a change of *who runs one step*, not a rewrite:
+
+- **Channel-neutral commands.** Telegram, Cockpit and any future scheduler invoke the SAME
+  `services/asdair/pipeline/commands.js`. Nothing important lives in a callback handler.
+- **Durable state, not session state.** Every stage reads its input from Postgres and writes its result there.
+  The pipeline advances from durable state alone and never assumes the previous step ran in this process.
+- **Deterministic core.** The normaliser, planner, identity resolver and reconciler need no model at all. Only
+  vision transcription and bounded fuzzy assistance do, and those are one-shot calls through the existing
+  gateway.
+- **Resumable and idempotent.** Restart, redelivery and repeated taps are already no-ops by structural
+  constraint, which is exactly what an unattended runner requires.
+
+So the unattended path already exists for: intake, interpretation, planning, question-raising, recording,
+reconciliation and learning. **The one genuinely supervised step is building the trolley in the live ASDA
+session** — a singleton holding real money, with no public API — plus checkout and payment, which stay Warwick's
+permanently.
+
+**The honest gap to close for the north star** is therefore narrow and nameable: an unattended basket-build
+runner that claims `asdair.browser_build_request` and drives ASDA, still stopping at checkout-ready. That is
+Stage 2c and it stays deferred until Stage 1 is proven live — but nothing in Stage 1 needs undoing to get there.
