@@ -100,6 +100,27 @@ or without this slash command.
    Say plainly whether each lesson is enforced by **prose only** or by
    **executable protection**.
 
+   **ENFORCEMENT VERIFICATION — mandatory, per Warwick 2026-07-29.** For every
+   lesson promoted this session, verify it changed **an executable template, a
+   gate, a test, a schema, or a guaranteed-load procedure** — somewhere prose
+   alone could not be skipped. Name the artefact and the change. A lesson that
+   produced only prose is **not promoted**; it is recorded, and it must say so
+   plainly rather than being counted as closed.
+
+   Two failures in one session prove why. A correct delegation rule sat in
+   Larry's own contract, was read at session start, and was ignored for roughly
+   forty sequential tool calls — nothing made it fire at the point of action.
+   Separately, a hire Warwick had approved was never instantiated, so the
+   capability defaulted back to Larry; the recommendation existed, the
+   specialist did not. **Both were documented. Neither was enforced.** This is
+   the same failure [[GL-007-human-facing-writing-conventions]] names: a rule
+   consulted at onboarding and never at the moment of action is the same as no
+   rule.
+
+   Ask the question directly, per lesson: *"what would now physically stop this
+   happening again, and where is it?"* If the honest answer is "I would
+   remember", the lesson is not yet enforced.
+
    Report the pass under a **LARRY LESSONS LEARNED** heading, each entry as:
    **LESSON** (plain English) · **TRIGGER** (what exposed it) · **CHANGE MADE**
    (where it became permanent) · **FUTURE EFFECT** · **STATUS** (PROMOTED /
