@@ -286,7 +286,9 @@ test('labelFor never returns an empty label', () => {
 test('NO SECRET can reach rendered output: a token-shaped value passed into every renderer never appears', () => {
   // A realistic bot-token shape. If a renderer ever reached for the environment,
   // or echoed an unexpected field, this would catch it.
-  const TOKEN = '1234567890:AAF-thisIsNotARealTokenItIsATestFixture';
+  // Shaped to NOT match the repo secret-scan's Telegram pattern - see the note
+  // on the same fixture in sendShopperMessage.test.js.
+  const TOKEN = '1234567890:TESTFIXTURE-not-a-real-telegram-token';
   const originalEnv = process.env.SHOPPER_BOT_TOKEN;
   process.env.SHOPPER_BOT_TOKEN = TOKEN;
   try {

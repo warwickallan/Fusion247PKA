@@ -16,7 +16,12 @@ import {
 import { renderReceipt } from './renderMessages.js';
 
 // An obviously-fake token in the real shape. Never a real credential.
-const FAKE_TOKEN = '1234567890:AAF-thisIsNotARealTokenItIsATestFixture';
+// Deliberately does NOT match the repo secret-scan's Telegram pattern
+// ([0-9]{6,}:AA[A-Za-z0-9_-]{30,}) - the body must not begin "AA". A scanner
+// cannot tell a fake token from a real one by shape, and it is right not to
+// try, so the fixture is shaped to be unmistakably not-a-token while still
+// exercising maskToken (which splits on the first colon).
+const FAKE_TOKEN = '1234567890:TESTFIXTURE-not-a-real-telegram-token';
 const REF = 'shop-2026-07-28';
 
 /** A fake fetch that records every call and replies ok. */
@@ -50,7 +55,7 @@ test('maskToken keeps only the bot-id prefix; the secret body never survives', (
   assert.equal(maskToken(''), '(unset)');
   assert.equal(maskToken(undefined), '(unset)');
   assert.equal(maskToken('nocolonhere'), '***masked***');
-  assert.ok(!maskToken(FAKE_TOKEN).includes('AAF-'));
+  assert.ok(!maskToken(FAKE_TOKEN).includes('TESTFIXTURE'));
 });
 
 test('maskTokenIn scrubs every occurrence of the token from a diagnostic string', () => {
