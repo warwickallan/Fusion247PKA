@@ -465,7 +465,9 @@ test('handleAsdairTap hands a TYPED reply back unresolved — matching words to 
 // ── secret hygiene ───────────────────────────────────────────────────────────
 
 test('NO token can leak into a result, a refusal, an error or the console', async () => {
-  const TOKEN = '1234567890:AAH-thisIsAFakeShopperBotTokenValue_do_not_use';
+  // Must NOT match the repo secret-scan's Telegram pattern
+  // ([0-9]{6,}:AA[A-Za-z0-9_-]{30,}) - the body must not begin "AA".
+  const TOKEN = '1234567890:TESTFIXTURE-not-a-real-telegram-token';
   const seen = [];
   const write = (chunk) => { seen.push(String(chunk)); return true; };
   const realOut = process.stdout.write;
@@ -498,7 +500,7 @@ test('NO token can leak into a result, a refusal, an error or the console', asyn
 
   const blob = JSON.stringify(results);
   assert.ok(!blob.includes(TOKEN), 'the bot token reached a returned result');
-  assert.ok(!blob.includes('AAH-thisIsAFakeShopperBotTokenValue'), 'the token body reached a returned result');
+  assert.ok(!blob.includes('TESTFIXTURE'), 'the token body reached a returned result');
   assert.equal(seen.length, 0, `these modules must not print anything: ${seen.join('')}`);
   // The resolve still succeeded even though every Telegram call failed.
   assert.equal(results[0].ok, true);

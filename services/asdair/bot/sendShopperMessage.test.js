@@ -62,7 +62,7 @@ test('maskTokenIn scrubs every occurrence of the token from a diagnostic string'
   const leaky = `GET https://api.telegram.org/bot${FAKE_TOKEN}/sendMessage failed (token ${FAKE_TOKEN})`;
   const masked = maskTokenIn(leaky, FAKE_TOKEN);
   assert.ok(!masked.includes(FAKE_TOKEN));
-  assert.ok(!masked.includes('AAF-thisIsNot'));
+  assert.ok(!masked.includes('TESTFIXTURE'));
 });
 
 test('describe() is log-safe: it NEVER returns the real token', () => {
@@ -126,7 +126,7 @@ test('NO TOKEN CAN ESCAPE IN AN ERROR: every failure path is masked', async () =
     assert.ok(caught, 'expected a failure');
     const surface = `${caught.message}\n${caught.stack}`;
     assert.ok(!surface.includes(FAKE_TOKEN), `token leaked: ${caught.message}`);
-    assert.ok(!surface.includes('AAF-thisIsNot'), `token body leaked: ${caught.message}`);
+    assert.ok(!surface.includes('TESTFIXTURE'), `token body leaked: ${caught.message}`);
   }
 });
 
@@ -150,7 +150,7 @@ test('NOTHING logs: the sender writes nothing to stdout/stderr on success or on 
   }
   const all = written.join('');
   assert.ok(!all.includes(FAKE_TOKEN), 'a token reached a stream');
-  assert.ok(!all.includes('AAF-thisIsNot'), 'a token body reached a stream');
+  assert.ok(!all.includes('TESTFIXTURE'), 'a token body reached a stream');
 });
 
 // ── the three methods ────────────────────────────────────────────────────────

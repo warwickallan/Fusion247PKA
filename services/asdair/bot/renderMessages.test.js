@@ -296,7 +296,7 @@ test('NO SECRET can reach rendered output: a token-shaped value passed into ever
       const out = render(SAMPLES[name]);
       const serialised = JSON.stringify(out);
       assert.ok(!serialised.includes(TOKEN), `${name} leaked a token-shaped value`);
-      assert.ok(!/AAF-thisIsNot/.test(serialised), `${name} leaked a token body`);
+      assert.ok(!/TESTFIXTURE/.test(serialised), `${name} leaked a token body`);
       assert.ok(!/SHOPPER_BOT_TOKEN/.test(serialised), `${name} leaked a secret env NAME`);
       assert.ok(!/bot\d+:/.test(serialised), `${name} leaked a bot API path`);
     }
