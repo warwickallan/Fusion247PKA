@@ -1,0 +1,19 @@
+{
+  "name": "asdair-browser-runner",
+  "version": "0.1.0",
+  "private": true,
+  "description": "BUILD-015 AsdAIr Stage 1 - the bounded, supervised ASDA browser runner. Drives a VISIBLE dedicated Chrome profile over the Chrome DevTools Protocol against exactly one claimed asdair.browser_build_request, under a single-writer lease with a heartbeat and a bounded expiry. Pauses, resumes, hands the browser to a human, and stops at basket-ready. Never checks out, never pays, never books or changes a delivery slot, never enters credentials, never enables or accepts a substitute.",
+  "license": "UNLICENSED",
+  "type": "commonjs",
+  "main": "runner.js",
+  "scripts": {
+    "test": "node --test",
+    "status": "node runnerctl.cjs status"
+  },
+  "dependencies": {
+    "pg": "^8.11.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
