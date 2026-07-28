@@ -231,6 +231,73 @@ function regularDisplayName(reg) {
   return normaliseTerm(name).indexOf(normaliseTerm(brand)) === 0 ? name : brand + ' ' + name;
 }
 
+// ---------------------------------------------------------------------
+// regularCandidates(line, regulars, household) -> [{ name, price, reason, score }]
+//
+// SUGGESTION ONLY, for a needs_decision line that `rankAlternatives` could not
+// help with. Exact alias matching (matchRegular) has already failed by the time
+// this runs, so this is the deliberately LOOSER pass: partial WORD OVERLAP
+// against every regular's name and aliases.
+//
+// It never chooses and never sets matched_product -- rule 6's "never
+// auto-substitute" is untouched. It exists to keep rule 6's OTHER clause:
+// "with any alternatives surfaced for a human". Without it a held line was
+// handed back with an empty queue while the answer sat in `regulars`.
+//
+// Ranking: proportion of the line's own words that the candidate covers, so
+// "washing up liquid" ranks "Fairy Max Power Washing Up Liquid 545ML" top.
+// Household-scoped rows outrank global ones at equal score, mirroring
+// rankAlternatives. Bounded to TOP_N.
+// ---------------------------------------------------------------------
+function regularCandidates(line, regulars, household) {
+  const list = Array.isArray(regulars) ? regulars : [];
+  const term = normaliseTerm(line && line.item_name);
+  if (term === '') return [];
+
+  const words = term.split(' ').filter(function (w) { return w.length > 2; });
+  if (words.length === 0) return [];
+
+  const scored = [];
+  list.forEach(function (r) {
+    if (!r || r.active === false) return;
+    if (!inHouseholdScope(r, household)) return;
+
+    // Score against the best of the regular's own name and each alias.
+    // A WHOLE-WORD hit scores full; a mere substring hit scores half. Without
+    // this, "bread" ranks "ASDA Shortbread Fingers" level with "Warburtons ...
+    // White Bread" -- technically a match, useless as a suggestion.
+    let best = 0;
+    regularAliases(r).forEach(function (alias) {
+      const hay = ' ' + alias + ' ';
+      let hit = 0;
+      words.forEach(function (w) {
+        if (hay.indexOf(' ' + w + ' ') !== -1 || hay.indexOf(' ' + w) !== -1) hit += 1;
+        else if (hay.indexOf(w) !== -1) hit += 0.5;
+      });
+      const score = hit / words.length;
+      if (score > best) best = score;
+    });
+    if (best === 0) return;
+
+    const scopedBonus = (r.household_id !== null && r.household_id !== undefined
+      && sameHousehold(r.household_id, household)) ? 0.3 : 0;
+
+    scored.push({
+      name: regularDisplayName(r),
+      price: null,                                  // regulars carry no price column
+      reason: 'partial match in regulars'
+        + (r.asda_product_id ? ' (asda_product_id ' + r.asda_product_id + ')' : ''),
+      score: Number((best + scopedBonus).toFixed(3))
+    });
+  });
+
+  scored.sort(function (a, b) {
+    if (b.score !== a.score) return b.score - a.score;
+    return a.name < b.name ? -1 : (a.name > b.name ? 1 : 0);   // stable, deterministic
+  });
+  return scored.slice(0, TOP_N);
+}
+
 function matchRegular(item, regulars, household) {
   const list = Array.isArray(regulars) ? regulars : [];
   const term = normaliseTerm(item && item.item_name);
@@ -771,9 +838,19 @@ function planBasket(input) {
     // (matchedProduct above is left exactly as resolved -- original or rule-
     // mapped, or null). Only needs_decision lines get ranked candidates; every
     // other status carries an empty array so the output shape stays consistent.
-    const rankedAlternatives = status === 'needs_decision'
-      ? rankAlternatives(line, products, household)
-      : [];
+    // TQA-PR73-005: rankAlternatives consults `products` (a small mapping table)
+    // and needs a resolvable category, which an unmatched free-text line does
+    // not have -- so held lines shipped an EMPTY queue precisely where
+    // `regulars` holds the answers. Rule 6 has two clauses: never substitute
+    // AND surface alternatives. This keeps the second one. It still never
+    // CHOOSES -- suggestions only, the human decides.
+    let rankedAlternatives = [];
+    if (status === 'needs_decision') {
+      rankedAlternatives = rankAlternatives(line, products, household);
+      if (rankedAlternatives.length === 0) {
+        rankedAlternatives = regularCandidates(line, regulars, household);
+      }
+    }
 
     // planned_qty: only 'add' lines put units in the basket.
     const plannedQty = status === 'add' ? qty : 0;

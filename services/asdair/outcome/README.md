@@ -11,6 +11,7 @@ writer into that folder would erode the guarantee that a planning bug physically
 |---|---|
 | `buildOutcome.js` | **Pure.** Plan + reconcile record → the `order` and `events` rows to write. No DB, network, fs, clock or randomness. |
 | `recordShopOutcome.js` | Writes one shop: order + its events, in a single transaction. |
+| `record-shop.js` | **The runtime caller.** `node --env-file=<env> record-shop.js --file shop.json [--dry-run]` - records a completed shop and persists its decisions. Validates everything before opening a connection; `--dry-run` writes nothing. Each decision is its own transaction, so one bad answer cannot roll back a shop already recorded. |
 | `promoteDecision.js` | Records a decision and, where its provenance proves the instruction was explicit, promotes it into a durable rule with a `promoted_rule_id` back-link. |
 
 ## Why the loop exists
@@ -103,5 +104,5 @@ Full record: `Builds/BUILD-015-asdair-durable-household-shopping-steward/ACCEPTA
 
 - `asdair.rules.source_document_id` exists but is still never written, so a promoted rule carries no provenance
   pointer of its own (the *decision* does). Follow-up.
-- Nothing calls these writers from a runtime path yet — closing the loop in practice needs the shop run to invoke
+- ~~Nothing calls these writers from a runtime path yet~~ **CLOSED (TQA-PR73-006):** `record-shop.js` is the committed caller — closing the loop in practice needs the shop run to invoke
   them. See [[SOP-021-run-the-weekly-asdair-shop]] steps 5 and 6.
