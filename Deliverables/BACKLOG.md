@@ -14,6 +14,30 @@ chasing a tangent mid-flow (see the "challenge context-diluting requests" rule).
   (Directus only uses ADMIN_PASSWORD to create the admin, which already exists), but stale — refresh it if any
   re-provisioning tooling ever needs the admin password again.
 
+## 🚦 Warwick rulings recorded 2026-07-28 (decided, NOT to be implemented tonight)
+
+- **[MED] `notify-snapshot-consumers.yml` must not remain permanently red by design.** Found during the
+  estate-hygiene pass by applying the new CI doctrine (`Team/Larry - Orchestrator/AGENTS.md` §8a): its last
+  result on `main` was `failure` at `76fcc7f8`, **2026-07-10** — eighteen days invisible, because the workflow
+  only fires when `Expansions/` changes and so had dropped out of every recent run listing. The failure is
+  *documented and intentional*: the workflow fail-fasts until the `MYPKA_SYNC_TOKEN` and `MYPKA_SOURCE_REPO`
+  repo secrets exist, and it changes nothing in either repo meanwhile.
+  **Warwick's ruling (2026-07-28):** a permanent red-by-design is not acceptable state. **Do not configure or
+  invent secrets.** The next maintenance action is either (a) disable its automatic trigger, or (b) make missing
+  configuration report an explicit **successful NOT-CONFIGURED / NOT-RUN** state — while **retaining manual
+  dispatch** and the documented prerequisites in the workflow header. **Not to be implemented tonight.**
+  Rationale: a red that is expected trains everyone to ignore red, which is the exact failure §8a exists to stop.
+
+- **[MED] Dedicated off-machine capture persistence — a future deliberate design decision.** `persistCapture.mjs`
+  (landed 2026-07-28, PR #77) makes generated captures durable by **committing** the note and its immutable `_raw`
+  evidence, which removes the loose-untracked failure mode that stranded two captures. **Warwick's ruling
+  (2026-07-28): persistence remains COMMIT-ONLY for now — do NOT auto-push the currently checked-out branch.**
+  Pushing would mean choosing a branch and a moment on the caller's behalf, mid-work, which is uncertain
+  repository semantics. Off-machine durability therefore still relies on the branch's normal push/PR flow.
+  The open design question, to be taken deliberately rather than inferred: **which ref, and when** — e.g. a
+  dedicated captures ref, a scheduled sync, or a non-git store. Note `pending-warwick-review` stays the human
+  acceptance gate regardless: **stored/durable != approved/canonical.**
+
 ## 🔧 Operational-truth debt (recorded separately — NOT idea-engine scope)
 - **[MED] Stale Fusion self-model tables.** `cockpit.build` (last updated 2026-07-22) + `cockpit.overall_state`
   (2026-07-21) are **hand-maintained and days stale** — they don't reflect the cockpit lift-out or the
