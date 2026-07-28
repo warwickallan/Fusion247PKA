@@ -102,7 +102,10 @@ Full record: `Builds/BUILD-015-asdair-durable-household-shopping-steward/ACCEPTA
 
 ## Known gaps
 
-- `asdair.rules.source_document_id` exists but is still never written, so a promoted rule carries no provenance
-  pointer of its own (the *decision* does). Follow-up.
-- ~~Nothing calls these writers from a runtime path yet~~ **CLOSED (TQA-PR73-006):** `record-shop.js` is the committed caller — closing the loop in practice needs the shop run to invoke
-  them. See [[SOP-021-run-the-weekly-asdair-shop]] steps 5 and 6.
+- ** has no governed writer.** `asdair_rw` holds no write on it, so the commonest learning of
+  all - "this list name means that product", i.e. a new `aka` alias - cannot be persisted through this path.
+  Until that exists, alias coverage improves only by hand, and a fresh instance re-asks the same questions.
+  **This is the highest-value remaining gap.**
+- **No `loadLastOrder`.** SOP-021 makes the previous order a required planning input, but nothing loads it, so
+  rotation rules ("a different variant each week") are structurally unimplementable - the same
+  documented-implemented-dead class as standing rule 7.
