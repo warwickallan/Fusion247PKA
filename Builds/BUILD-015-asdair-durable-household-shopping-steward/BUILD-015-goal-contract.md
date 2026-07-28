@@ -128,3 +128,33 @@ implemented and dead. Do not claim budget flagging works until a price source ex
 Also deferred: 70 of 91 regulars carry no `asda_product_id` (name-matching only, lower confidence) · schema drift
 on `previously_ordered` and `command_request` · the browser drive stays with Larry until the Chrome-connector
 tool-binding question is settled on its own.
+
+---
+
+## Stage 1 scope — Warwick's ruling, 2026-07-28
+
+The Stage 2a/2b split proposed in `Deliverables/2026-07-28-asdair-stage2-telegram-and-daemon-assessment.md` was
+**overruled in scope**: what that report called Stage 2a and Stage 2b are **REQUIRED parts of BUILD-015 Stage 1**.
+
+**In scope, and required.** A narrow background Telegram receiver and a deterministic queue worker are ordinary
+product runtime — without them ShopperBot does not function. Likewise the question loop, Telegram status, the
+supervised browser-build request, order-confirmation ingestion and reconciliation, and automatic outcome closure.
+One-shot vision/model calls through the existing Fusion model gateway are permitted for transcription.
+
+**Deferred (Stage 2c), and NOT to be built.** A persistent external-LLM AsdAIr daemon; a fully autonomous
+planning daemon; an unattended ASDA browser; automated checkout; automated payment.
+
+**The permanently human-controlled actions** — unchanged and not negotiable: the supervised live ASDA browser
+session, checkout, and payment.
+
+**Identity.** This increment is **BUILD-015 AsdAIr — Stage 1**. IDEA-012 remains provenance only. **PR #82 is the
+single integration PR** for all remaining Stage 1 behaviour — no second BUILD, no second IDEA lifecycle, no
+parallel recovery branch, no separate ShopperBot architecture programme.
+
+**Completion bar.** Stage 1 is NOT complete while ShopperBot is merely a receiver, or while Larry must manually
+stitch scripts together. The finished experience is: Telegram list → receipt → buttons → transcription → durable
+list → planning → Telegram questions → supervised basket build → visible status → human checkout → order
+confirmation → reconciliation → permanent learning for next week.
+
+The verdict wording **READY — TELEGRAM-CONTROLLED, DURABLE, SUPERVISED ASDAIR** may only be used after live
+acceptance passes and PR #82 is merged.
