@@ -3,6 +3,29 @@
 The single place we park things so they don't derail the current build. Larry logs here rather than
 chasing a tangent mid-flow (see the "challenge context-diluting requests" rule). Newest first.
 
+## 🫱 HELD BY LARRY — items with no other owner (created 2026-07-29)
+
+**Why this exists.** Two rulings created gaps where an item could sit with nobody holding it, and Nolan
+caught both while encoding them:
+
+1. **Escalated service defects.** Mack escalates a defect; Larry must turn it into a Work Order; Warwick
+   must authorise it. Nothing said what happens to a defect nobody picks up — so the service stays broken
+   and everyone believes it is someone else's.
+2. **First live start.** Keel is barred from touching anything live, so he can only prove restart and
+   recovery against a throwaway target. That is *builder evidence, not operational acceptance*. Someone
+   still has to perform the first live start, and it is neither Keel's nor Mack's. Left as "a Warwick gate
+   performed by Larry", services would accumulate in a **built, evidenced, never started** state with no
+   owner — structurally the same defect as (1).
+
+**The rule: nothing sits between "raised" and "authorised" without a line here.** An item leaves this list
+in exactly two ways — it becomes an authorised Work Order, or it is explicitly closed as won't-fix with a
+reason. There is no third state, and "Larry is holding it in his head" is not holding it: a held item that
+exists only in a session's context does not survive that context ending.
+
+| # | Item | Type | Raised | Waiting on |
+|---|---|---|---|---|
+| 1 | **CI can go green having run zero tests.** `node --test "<glob-that-matches-nothing>"` **exits 0 with zero executed tests** — verified in an empty directory, 2026-07-29. Nine workflows run `node --test`; `control-plane-tests.yml` documents a fail-on-0-executed-subtests guard, but whether the other eight carry an equivalent is **unverified**. If they don't, a mis-wired suite reports success having proven nothing, which defeats every proof discipline we have. (Related, already known from W01 and in SOP-022: `node --test <directory>` is outright broken on Node v22.18.0 here — `MODULE_NOT_FOUND`.) | Defect — engineering | 2026-07-29 | Larry to raise as a Work Order (audit all 9 workflows for a zero-subtest guard) |
+
 ## 🐛 Bugs
 - **[HIGH] Live YouTube capture still says "knowledge note pending — I'll write it next session" (manual).**
   Reported 2026-07-25 (Warwick sent a YT vid, no card/learn happened). The automatic Cairn → learn-worker →

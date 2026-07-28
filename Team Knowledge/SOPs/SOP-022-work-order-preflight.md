@@ -12,6 +12,7 @@ Across Work Orders W01 and W02, **Larry supplied several incorrect assumptions**
 | Defect | What Larry asserted | Reality |
 |---|---|---|
 | Broken definition-of-done | `node --test youtube/` was the acceptance command | That form fails on this machine's Node — repo-wide, not caused by the change |
+| **Acceptance command that passes on nothing** (found 2026-07-29) | a `node --test "<glob>"` invocation treated as proof | On Node v22.18.0 here, **a glob that matches no files exits 0 having run zero tests.** A typo'd or stale path reports success. This is worse than the row above: a broken command fails loudly, a vacuous one goes green |
 | Wrong env var | writers should read `ASDAIR_DB_URL` | That variable is contractually **SELECT-only**, specifically so a bug *cannot* write |
 | Wrong datastore | (implicit) one database | There are **two**; `CONTROL_PLANE_DEV_DATABASE_URL` does not contain the `asdair` schema |
 
@@ -30,6 +31,20 @@ Before writing any implementation, verify the order against observable reality:
 2. **Commands** — do the referenced commands actually run here? Run the acceptance command *before* trusting it as
    a gate. If it fails, establish whether it fails for an untouched neighbour too, which distinguishes "my change
    broke it" from "this order is wrong."
+
+   **2a. A command that can succeed without doing anything is not a gate.** An exit code of 0 is not evidence on
+   its own — confirm the command actually *executed the work it claims to prove*. For a test command that means
+   reading a **non-zero count of executed tests/subtests** out of the runner's own output, not inferring it from
+   the exit code. **Treat "0 executed" as FAILURE, never as a pass**, and say the count in the return.
+
+   Known live defects on this estate's Node (v22.18.0), both confirmed by execution:
+   - `node --test <dir>` fails with `MODULE_NOT_FOUND`.
+   - `node --test "<glob matching nothing>"` **exits 0 having run zero tests.**
+
+   So a stale, misspelled or wrongly-rooted path in a Work Order's `required_evidence` produces a clean green
+   that proves nothing. Prefer an explicit file list, or a runner that reports counts and fails on zero — the
+   pattern already used in this estate's CI. If the order's acceptance command cannot be shown to have executed
+   anything, that is a defect **in the order**: report it, and do not accept its green.
 3. **Environment variables** — do they mean what the order claims? Check the authoritative contract for the
    variable, not just its name.
 4. **Datastore, schema and environment** — **establish which actual database/schema/environment the job refers
@@ -49,6 +64,7 @@ Before writing any implementation, verify the order against observable reality:
   the code, and report it. Do not silently invent a workaround.
 
 **Never:**
+- accept an exit code as proof without confirming that work was actually executed;
 - game an acceptance criterion to make it pass;
 - silently rewrite Larry's intent;
 - work around a contradiction without reporting it;
