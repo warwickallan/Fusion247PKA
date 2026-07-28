@@ -23,6 +23,16 @@ logged. Three new items were worked out and then forgotten. Next week would have
 
 That is the whole reason BUILD-015 exists. **So this week: record it.**
 
+> **2026-07-28 update — the 2026-07-27 learning WAS recovered and is now in the database.** 20 harvested ASDA
+> product IDs (coverage 21/91 → 41/97), 6 genuinely-new items (Wall's 4-pack, Milky Way + Mars large multipacks,
+> TRESemmé blue shampoo, black pepper, loratadine), and 5 alias sets including `chips` → ASDA Crispy Skin-On
+> Fries. It was recovered from a session transcript, which worked exactly once and is not a method. **Record as
+> you go from now on.**
+>
+> Still outstanding from that shop: the **order + decisions** were NOT written, because only Warwick knows what
+> was finally checked out (the basket was left checkout-ready at GBP 111.75 and he completed it). Do not invent
+> that record.
+
 ```
 cd services/asdair/outcome
 node --env-file=C:/.fusion247/asdair.env record-shop.js --file shop.json --dry-run   # validate first
@@ -52,8 +62,13 @@ When the shop is done, before the context is lost, get these into durable state 
 
 All real, all named, none a safety failure. Ranked by value:
 
-1. **No governed writer for `asdair.regulars`.** `asdair_rw` has no write on it, so alias learning — the
-   commonest kind — cannot persist through the governed path. **Highest-value remaining work.**
+1. ~~**No governed writer for `asdair.regulars`.**~~ **CLOSED 2026-07-28.** Use
+   `services/asdair/outcome/update-regulars.js` (`--dry-run` first). `upsertRegular` for a new item (adopts an
+   existing same-named regular rather than duplicating), `enrichRegular` for aliases/product IDs (`add_aka`
+   merges, so prior aliases are never lost). It cannot delete, retire, rename or re-home a regular — the grant
+   in `db/005_asdair_rw_grants.sql` enforces that in the database, not just in code.
+   **New in the same pass:** `services/asdair/intake/fetch-shopper-list.js` is the committed ShopperBot
+   receiver — do NOT hand-roll a `getUpdates` snippet again.
 2. **Alias matching is exact-string.** `"yazoo strawberry"` misses the alias `"strawberry yazoo"` on word order
    alone. Measured resolution over the household's own history: **52%**. Order-insensitive matching plus alias
    coverage is the fix. (Suggestions now fall back to partial word overlap, so held lines at least surface

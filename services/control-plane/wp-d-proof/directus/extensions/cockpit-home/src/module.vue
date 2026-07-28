@@ -86,6 +86,36 @@
           </div>
         </section>
 
+        <!-- ===== APPS (L2) -> one app -> its own workspace (L3) ===== -->
+        <!-- A first-class area, not a corner of somebody else's screen. Apps
+             lists the things Fusion actually runs for Warwick; Asdair sits
+             beneath it and opens its own full Details workspace. -->
+        <section v-else-if="area === 'apps'" class="pane">
+          <header class="p-h">
+            <h1>Apps</h1>
+            <span v-if="app" class="count">{{ appLabel }}</span>
+            <button v-if="app" class="act sm" @click="app = null">← All apps</button>
+          </header>
+
+          <div v-if="appError" class="item red">
+            <div class="i-main">
+              <div class="i-title">The Asdair workspace could not be shown</div>
+              <div class="i-why">{{ appError }}</div>
+            </div>
+            <div class="i-act"><button class="act sm" @click="appError = null">Try again</button></div>
+          </div>
+
+          <template v-else-if="app === 'asdair'">
+            <asdair-workspace />
+          </template>
+
+          <div v-else class="tiles">
+            <button v-for="a in apps" :key="a.key" class="tile" :class="a.tone" @click="openApp(a.key)">
+              <span class="t-num">{{ a.icon }}</span><span class="t-lbl">{{ a.label }}</span><span class="t-desc">{{ a.desc }}</span>
+            </button>
+          </div>
+        </section>
+
         <!-- ===== BRAIN ===== -->
         <section v-else-if="area === 'brain'" class="pane">
           <header class="p-h"><h1>Brain</h1><div class="tabs"><a :href="reportUrl" target="_blank" rel="noopener" class="tab-link">Report ↗</a><a :href="graphUrl" target="_blank" rel="noopener" class="tab-link">Galaxy ↗</a></div></header>
@@ -122,20 +152,29 @@
 
 <script>
 import { useApi } from '@directus/extensions-sdk';
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onErrorCaptured } from 'vue';
+import AsdairWorkspace from './asdairWorkspace.vue';
 
 export default {
+  components: { AsdairWorkspace },
   setup() {
     const reportUrl = 'http://100.101.240.85:8701';
     const graphUrl = 'http://100.101.240.85:8700';
     const areas = [
       { key: 'home', label: 'Home', icon: '🏠' },
       { key: 'attention', label: 'Attention', icon: '🔔' },
+      { key: 'apps', label: 'Apps', icon: '🧩' },
       { key: 'outputs', label: 'Outputs', icon: '📤' },
       { key: 'brain', label: 'Brain', icon: '🧠' },
       { key: 'system', label: 'System', icon: '🛠' },
     ];
+    // Apps are the things Fusion RUNS for Warwick, each with its own workspace.
+    const apps = [
+      { key: 'asdair', label: 'Asdair', icon: '🛒', desc: 'the weekly shop, end to end', tone: 'green' },
+    ];
     const area = ref('home');
+    const app = ref(null);
+    const appError = ref(null);
     const detail = ref(null);
     const busy = ref(false);
     const attention = ref([]);
@@ -180,6 +219,9 @@ export default {
       if (itemsAdded.value) t.push({ num: itemsAdded.value, label: 'Items added', desc: 'to your lists', tone: 'green', area: 'outputs' });
       if (jobsFound.value) t.push({ num: jobsFound.value, label: 'Jobs found', desc: 'worth a look', tone: 'green', area: 'outputs' });
       if (wins.value.length) t.push({ num: wins.value.length, label: 'Recent wins', desc: 'just finished', tone: 'green', area: 'system' });
+      // Always present: Apps is a place, not a count. The number of apps is a
+      // real, measured figure, so it is safe to show even at 1.
+      t.push({ num: apps.length, label: 'Apps', desc: 'Asdair and friends', tone: 'blue', area: 'apps' });
       t.push({ num: live.value.learned ?? '—', label: 'Brain', desc: 'sources learned', tone: 'grey', area: 'brain' });
       return t;
     });
@@ -189,8 +231,22 @@ export default {
     const oneLine = (t) => { if (!t) return ''; const s = String(t).split('\n')[0]; return s.length > 130 ? s.slice(0, 127) + '…' : s; };
     const ago = (ts) => { if (!ts) return ''; const d = (Date.now() - new Date(ts).getTime()) / 60000; if (d < 60) return `${Math.max(1, Math.round(d))}m`; if (d < 1440) return `${Math.round(d / 60)}h`; return `${Math.round(d / 1440)}d`; };
 
-    const go = (k) => { detail.value = null; area.value = k; };
+    const go = (k) => { detail.value = null; if (k !== 'apps') app.value = null; area.value = k; };
     const open = (item, kind) => { detail.value = { ...item, _kind: kind }; };
+    const openApp = (k) => { appError.value = null; app.value = k; };
+    const appLabel = computed(() => {
+      const hit = apps.find((a) => a.key === app.value);
+      return hit ? hit.label : '';
+    });
+
+    // A crash inside an app workspace must cost that ONE panel, not the whole
+    // cockpit. Returning false stops the error propagating to Directus, which
+    // would otherwise unmount the module and leave Warwick with a blank screen.
+    onErrorCaptured((e) => {
+      appError.value = (e && e.message) || 'unexpected error';
+      app.value = null;
+      return false;
+    });
 
     async function doAction(item, ax) {
       busy.value = true; item._error = null;
@@ -219,10 +275,10 @@ export default {
     }
     onMounted(load);
 
-    return { areas, area, detail, busy, attention, outputs, builds, learned, wins, live, reportUrl, graphUrl,
+    return { areas, area, apps, app, appError, appLabel, detail, busy, attention, outputs, builds, learned, wins, live, reportUrl, graphUrl,
       blocked, decisions, suggestions, makeBetter, tiles, statusTone, statusLine,
       lifeAttn, buildAttn, toneOf, kindOf,
-      catLabel, moduleLabel, oneLine, ago, go, open, doAction };
+      catLabel, moduleLabel, oneLine, ago, go, open, openApp, doAction };
   },
 };
 </script>

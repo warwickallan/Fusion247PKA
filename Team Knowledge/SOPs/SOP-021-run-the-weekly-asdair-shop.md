@@ -53,14 +53,58 @@ from the dev bot and the Tower bot. **Never cross the tokens.**
   store, never in this repo and never in SQL (`asdair.credentials_ref` is an audit pointer, not a value).
 - Intake polls `getUpdates` and downloads any photo attachments.
 
+**Use the committed receiver — do NOT hand-roll one.** `services/asdair/intake/fetch-shopper-list.js` (module:
+`shopperIntake.js`) is the intake, added 2026-07-28. It fetches, filters to the allowed senders, picks the
+largest photo, downloads it, persists the update offset atomically **outside the repo**, and emits a payload in
+exactly the shape `services/hub/shopper/shopperRoute.mjs` accepts — with a `sourceId` that scopes the downstream
+idempotency keys. `--dry-run` fetches nothing and writes no state.
+
+> Until 2026-07-28 this receiver was re-written into a session scratchpad **every single week** and thrown away.
+> That is why it now lives in Git with 21 offline tests. If you find yourself about to write a `getUpdates`
+> snippet, stop — you are recreating the exact defect this SOP exists to prevent.
+
+It deliberately **does not transcribe** (that is the vision step below) and holds the offset on genuine failure
+so a list can never be silently consumed and lost.
+
 > **CONCURRENCY HAZARD — do not ignore.** `getUpdates` is a single-consumer, destructive-ack protocol with no
 > lock or lease. Its entire safety argument is *"nothing else polls this token."* **A second concurrent poller
 > breaks that by existing** — the realistic failure is a shopping list silently consumed and permanently lost,
 > with no error surfaced. Exactly one process may poll the shopper token at a time. If another lane needs the
 > request, it must be handed the payload, not given the token.
 
-**Handwritten lists:** transcription is done by vision, in-context — there is no separate OCR service. Transcribe
-**every** line to structured items, then normalise via `services/asdair/skill/listNormaliser.js`. Dedupe repeat
+### ⚠️ THE CATALOGUE-GROUNDING INVARIANT — never interpret a list without loading the catalogue first
+
+**Load the household's catalogue BEFORE interpreting any photographed list.** Active regulars, aliases, ASDA
+product IDs, brands, categories, typical quantities, standing rules and the previous completed order are
+**required INPUTS to reading the list** — not merely outputs to update afterwards. Supabase is the operational
+authority; where the old Google Doc survives it is provenance/fallback only and must never override newer
+Supabase state. Never build a second catalogue for transcription.
+
+The job is **not** "read handwriting and invent a product name". It is *"given this household's known products
+and aliases, which of them does each mark refer to?"* Use `services/asdair/interpret/` — `loadCatalogue.js`,
+then `groundedPrompt.js`, then `resolveByCatalogue.js` for identity.
+
+**Measured 2026-07-28, same photo and same model, grounding the only change:** open-ended read *Gourmet cat food*
+as "gourmet coffee", *Dreamies cheese* as "camomile cheese", *Weetabix Protein* as "beefs protein", *Wall's* as
+"waffles", and **invented a line that was not on the page**. Grounded, every one of those read correctly and
+nothing was invented; deterministic matching then resolved **28/31 lines (90%)** against a previously measured
+**52%**. An earlier verdict that "the vision model is unfit" was therefore **wrong and is withdrawn** — the
+defect was missing catalogue context. Do not reinstate that conclusion without re-running the grounded
+comparison. Equally, do not claim the model alone is accurate: the catalogue does much of the work, and the
+product is the combined system.
+
+**The authority boundary:** the model READS and RANKS · the catalogue DETERMINES IDENTITY · the human resolves
+genuine ambiguity · confirmed outcomes ENRICH ALIASES for next week. The model returns a candidate **id**, never
+a product name; canonical names are looked up from our own rows. If nothing genuinely fits, the answer is
+`unmatched_new_item` — never the least-bad catalogue item.
+
+**Both arcs of the cycle are mandatory.** Writing new items/aliases/product IDs back each week is what grounds
+next week's reading. Skip the write-back and the read degrades against a stale catalogue — which is exactly what
+happened when the 2026-07-27 shop learned three new items in-session and persisted none of them. It appeared to
+work only because a session's own context was holding the catalogue; that is not durability.
+
+**Handwritten lists:** interpretation is grounded vision (above) — there is no separate OCR service. Interpret
+**every** line, then normalise via `services/asdair/skill/listNormaliser.js`. Dedupe repeat
 sends of the same list, and ignore anything from a sender outside the allowlist. Store the photo reference and the
 raw transcription on the `asdair.shopping_lists` row, so a later dispute about "was that on the list?" is settled
 by the record rather than by memory.
@@ -181,6 +225,28 @@ each answer. Use `services/asdair/outcome/promoteDecision.js`.
 - An item found missing from the regulars catalogue becomes a `regulars` row, not a note.
 - Provenance is preserved by the back-link — we can always see *why* a rule exists.
 
+> **NOTHING LIVES PERMANENTLY IN A SCRATCHPAD.** Working files are fine *during* a shop. **When the basket is
+> deemed checkout-ready, everything still in a scratchpad that matters must be made permanent** — the order, new
+> regulars, aliases, harvested ASDA product IDs, rotation history, pending favourite actions. A shop that ends
+> with knowledge in a temp directory has taught the household nothing, and next week starts from zero. This is
+> the same failure as the missing write-back arc above, wearing a different hat.
+
+**The regulars half of the learning has a writer as of 2026-07-28** — use
+`services/asdair/outcome/update-regulars.js` (`--dry-run` first, every time). Two operations and nothing else:
+
+| Operation | Use it for |
+|---|---|
+| `upsertRegular` | A genuinely new item found mid-shop. Safe to re-run: an existing regular with the same normalised name is **adopted**, never duplicated (a duplicate would make the planner treat that term as AMBIGUOUS and break it every week). |
+| `enrichRegular` | An alias (`add_aka`, which **merges** — prior aliases are never lost), a harvested `asda_product_id`/`asda_url`, brand, typical qty, substitutes flag. |
+
+It **cannot** delete, retire, rename or re-home a regular — not by flag, not by argument. The database grant
+enforces that independently of the code (`db/005_asdair_rw_grants.sql`).
+
+> **Harvest product IDs while you shop — they are only obtainable there.** Every ASDA product URL carries its id
+> (`/groceries/product/<category>/<slug>/<ID>`), and the accessibility tree you already read for the bulk tick
+> pass is full of them. Capturing them as you go took coverage from 21/91 to 41/97 in one shop. An item with an
+> id resolves by id next week instead of by name.
+
 ## 7. Confirm
 
 Ping back through the shopper bot. Warwick reviews and completes any purchase himself. Two standard messages,
@@ -248,7 +314,21 @@ If that fails, the loop is open again regardless of what files exist.
 - **The ASDA session is a singleton** — one profile, one login, one live trolley holding real money. It cannot be
   worktree-isolated or run concurrently.
 - **Fully hands-off is descoped** (Warwick, 2026-07-21): a human logs in. One shop per week.
-- Some regulars still lack captured ASDA product IDs, so those resolve by name rather than by ID.
+- Some regulars still lack captured ASDA product IDs, so those resolve by name rather than by ID. **56 of 97 as
+  at 2026-07-28** (was 70 of 91 — one shop's harvesting closed 20 of them). Keep harvesting.
+- **Nothing drains the intent queue.** `services/control-plane/wp-d-proof/asdair-worker.mjs` is built and tested
+  but is **not running and not scheduled** (verified 2026-07-28). So a list arriving on Telegram becomes
+  `add_list_item` intents in `asdair.command_request` that sit there until a worker is run by hand. Wiring it to
+  run unattended needs Warwick's go-ahead, because it means something unsupervised starts touching household data.
+- **Rule 7 (the GBP 120-150 budget band) is structurally inoperative** — no price column exists anywhere in the
+  schema, so `budget_flag` is permanently `unknown`. Any budget observation in a shop report is a *human* one.
+  Do not claim the system flagged it.
+- **Alias matching is exact-string**, so word order alone defeats it (`"yazoo strawberry"` misses the stored
+  alias `"strawberry yazoo"`). Measured resolution over the household's own history was **52%**. Tonight's alias
+  additions raise coverage but not the matching algorithm; order-insensitive matching remains the real fix.
+- **`map` directives can resolve to prose.** Rule 23 maps `sure male` to *"Sure Men Anti-Perspirant Deodorant
+  (blue variant)"* — an instruction, not a product — and the planner treats it as confidently matched. Watch for
+  it when driving.
 
 ## References
 

@@ -1,0 +1,20 @@
+{
+  "name": "asdair-pipeline-runtime",
+  "version": "0.1.0",
+  "private": true,
+  "description": "BUILD-015 AsdAIr Stage 1 - the supervised runtime: the single-poller lock, the Windows logon-recovery task, and the machine-readable health surface. Launches services/asdair/pipeline/runtime.js; never edits it. Cannot check out, pay, book a slot or enter a password.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "main": "ensure-asdair-runtime.mjs",
+  "scripts": {
+    "test": "node --test",
+    "status": "node asdair-status.mjs",
+    "prove": "node proof/run-proofs.mjs"
+  },
+  "dependencies": {
+    "pg": "^8.11.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

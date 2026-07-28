@@ -1,0 +1,20 @@
+{
+  "name": "asdair-pipeline",
+  "version": "0.1.0",
+  "private": true,
+  "description": "BUILD-015 AsdAIr Stage 1 - THE KEYSTONE. The channel-neutral, idempotent, resumable workflow that joins the AsdAIr components into one supervised weekly shop. Telegram and the Cockpit drive the SAME commands; a deterministic runner advances every shop from durable state alone. Never books a slot, never checks out, never pays.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "main": "commands.js",
+  "scripts": {
+    "test": "node --test",
+    "once": "node runtime.js --once",
+    "watch": "node runtime.js --watch"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "pg": "^8.22.0"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "name": "asdair-bot",
+  "version": "0.1.0",
+  "private": true,
+  "description": "BUILD-015 AsdAIr control surface: the ShopperBot message catalogue, the asd: callback wire format, the inbound intent router, the question render contract (what a card displayed, so a tapped index cannot be misresolved after a re-render) and the outbound sender. Renders, routes and resolves only — never plans, never drives a browser, never checks out and never pays, and opens no database connection of its own (the store is injected). Zero dependencies; never polls Telegram (services/asdair/intake/ is the only consumer of that stream).",
+  "license": "UNLICENSED",
+  "type": "module",
+  "main": "renderMessages.js",
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

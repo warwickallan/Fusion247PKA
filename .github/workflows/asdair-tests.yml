@@ -83,6 +83,57 @@ jobs:
         working-directory: services/asdair/outcome
         run: node --test
 
+      # BUILD-015 Stage 1 modules. All five are dependency-free at TEST time -
+      # pg is lazily required by the writers and every test uses a fake client,
+      # an injected HTTP client or an injected model, so nothing here connects
+      # to a database, to Telegram or to a model gateway. Each is a separate
+      # step so a failure names the module that broke rather than "asdair".
+      #
+      # These were NOT in CI when they were built, which is exactly how a green
+      # pipeline starts lying: the suites existed and passed locally while CI
+      # silently covered only skill/ and outcome/.
+      - name: Run the ShopperBot intake receiver suite (offline)
+        working-directory: services/asdair/intake
+        run: node --test
+
+      - name: Run the shop state store + status projection suite (offline)
+        working-directory: services/asdair/shop
+        run: node --test
+
+      - name: Run the ShopperBot control surface suite (offline)
+        working-directory: services/asdair/bot
+        run: node --test
+
+      - name: Run the vision transcription suite (offline, injected model)
+        working-directory: services/asdair/transcribe
+        run: node --test
+
+      - name: Run the order reconciliation suite (offline, fake pg client)
+        working-directory: services/asdair/reconcile
+        run: node --test
+
+      # THE CATALOGUE-GROUNDING INVARIANT. This suite is the guard against
+      # silently regressing to open-ended transcription - the method that read
+      # "Gourmet cat food" as "gourmet coffee" and invented a line that was not
+      # on the page. It asserts the catalogue is loaded BEFORE any model call,
+      # that the model is asked for candidate IDs rather than product names, and
+      # that each known reading maps to its correct live regular id.
+      - name: Run the catalogue-grounding invariant suite (offline)
+        working-directory: services/asdair/interpret
+        run: node --test
+
+      - name: Run the cockpit read-API suite (offline, SELECT-only assertions)
+        working-directory: services/asdair/cockpit-api
+        run: node --test
+
+      # THE KEYSTONE. Runs the REAL shopStore/shopperRoute/planner/resolveByCatalogue
+      # against an in-memory pg carrying migration 006 and 008's ACTUAL unique
+      # indexes and CHECKs, so a duplicate is refused by the same mechanism
+      # Postgres uses rather than by a mock told to say no.
+      - name: Run the pipeline orchestrator suite (offline)
+        working-directory: services/asdair/pipeline
+        run: node --test
+
   integration:
     runs-on: ubuntu-latest
     defaults:
