@@ -25,7 +25,8 @@ Three clean layers:
 
 2. **`data.js` - read-only Postgres adapter.**
    `loadList(listDate, household)`, `loadRules()`, `loadProducts()`,
-   `loadRegulars(household)`, `loadBudget(household)`. **SELECT statements only**
+   `loadRegulars(household)`, `loadBudget(household)`,
+   `loadLastOrder(household)`. **SELECT statements only**
    - no INSERT / UPDATE / DELETE / DDL anywhere. Every query runs inside a
    `BEGIN TRANSACTION READ ONLY` so the database itself rejects any accidental
    write.
@@ -148,6 +149,53 @@ faithful to the live table. Its `household_id` is **NOT NULL** - unlike
 `products` and `budget_settings` there is no global regular - so
 `loadRegulars` requires a named household and throws rather than silently
 returning an empty set.
+
+### The last order, and rotation ("a different variant each week")
+
+`SOP-021` makes the PREVIOUS order a **required** planning input: some regulars
+rotate deliberately, and rotation cannot be resolved without knowing what the
+last shop actually contained. Nothing loaded it, so every rotation rule was
+structurally unimplementable - the same "documented, implemented, dead" class as
+standing rule 7. Two additive pieces close that:
+
+- **`loadLastOrder(household)`** (adapter, SELECT only) returns
+  `{ household_id, order, lines }` for the most recent COMPLETED order, or
+  `null` when the household has never completed one (a first shop must not
+  crash). Each purchased line carries the item name, the matched product, the
+  quantity ACTUALLY added, and the `asdair.regulars` row it resolves to, so a
+  caller can reason in regulars rather than free text. Two regulars answering
+  the same name is ambiguous: no id is chosen (rule 6 discipline).
+  - **COMPLETED means `orders.total_added IS NOT NULL`** - the outcome recorder
+    wrote back reconciled totals for the run. It CANNOT mean `checked_out`: that
+    column is false by construction (rule 8), so it would match nothing forever.
+  - **MOST RECENT means `COALESCE(run_at, created_at) DESC, id DESC`** -
+    `run_at` is the truth when known, but the clock-free outcome builder leaves
+    it NULL when the run did not say when it happened, so `created_at` (NOT NULL,
+    defaulted) is the fallback and `id DESC` the deterministic tie-break.
+
+- **`planBasket({ ..., lastOrder, rotation })`** and the pure exported helper
+  **`chooseRotatedVariant({ candidates, lastOrder, itemName, fixedProduct })`**.
+  Both new inputs are OPTIONAL: with neither supplied, planning is byte-for-byte
+  what it was. A rotation instruction targets a line the same way a rule does
+  (`match_term` / `match_category`, household scope, `active`); candidates are
+  the instruction's own list, or every active in-scope regular answering the
+  line's term. The choice is deterministic - a stable ring ordered by name,
+  anchored on the variant the last order leant on most (largest `added_qty`),
+  then the next eligible variant round the ring. No clock, no randomness.
+
+  **It never guesses.** The line becomes `needs_decision`, carrying a question,
+  when there are no candidates, when every candidate was in the last order (the
+  ring is exhausted - it will not silently repeat), or when a `map` rule FIXES
+  the variant while an instruction says vary it. **That last conflict is live and
+  real** (rules fix the men's deodorant variant while the decision log says
+  rotate it) and it is Warwick's to settle, not the planner's.
+
+  **What is NOT here:** a database carrier for the rotation instruction.
+  `asdair.rules.directive` is CHECK-constrained to `info | exclude |
+  needs_decision | map`, so a `rotate` directive cannot be stored without a
+  migration, which is outside this layer. Until that lands the instruction must
+  be passed in by the caller. The mechanism is live and tested; the row that
+  would trigger it from live data is the remaining half.
 
 ## Run the CLI (live acceptance)
 

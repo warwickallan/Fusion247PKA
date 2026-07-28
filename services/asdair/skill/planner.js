@@ -298,16 +298,27 @@ function regularCandidates(line, regulars, household) {
   return scored.slice(0, TOP_N);
 }
 
-function matchRegular(item, regulars, household) {
+// EVERY active, in-scope regular whose name or `aka` alias answers to this
+// line's term. Extracted verbatim from matchRegular (which now calls it) so the
+// rotation path can see the WHOLE candidate set -- rotation exists precisely
+// because several variants legitimately answer the same shorthand -- without a
+// second, drifting copy of the ACTIVE + household-scope filter.
+function regularHits(item, regulars, household) {
   const list = Array.isArray(regulars) ? regulars : [];
   const term = normaliseTerm(item && item.item_name);
-  if (term === '') return { regular: null, ambiguous: false };
-
-  const hits = list.filter(function (r) {
+  if (term === '') return [];
+  return list.filter(function (r) {
     if (!r || r.active === false) return false;             // only ACTIVE rows
     if (!inHouseholdScope(r, household)) return false;      // no cross-household leak
     return regularAliases(r).indexOf(term) !== -1;           // name or aka alias
   });
+}
+
+function matchRegular(item, regulars, household) {
+  const term = normaliseTerm(item && item.item_name);
+  if (term === '') return { regular: null, ambiguous: false };
+
+  const hits = regularHits(item, regulars, household);
 
   const scoped = hits.filter(function (r) {
     return r.household_id !== null && r.household_id !== undefined
@@ -323,6 +334,258 @@ function matchRegular(item, regulars, household) {
   if (global.length > 1) return { regular: global[0], ambiguous: true };
 
   return { regular: null, ambiguous: false };
+}
+
+// ---------------------------------------------------------------------
+// ROTATION -- "a different variant each week"
+//
+// SOP-021 step 2 makes THE LAST ORDER a REQUIRED planning input, because some
+// regulars rotate deliberately and rotation cannot be resolved without knowing
+// what the previous shop actually contained. Until now nothing loaded it and
+// planBasket had no parameter for it, so every rotation rule was structurally
+// unimplementable: the rulebook said rotate, the planner had no idea what was
+// bought last week. data.js loadLastOrder() supplies the history; this decides.
+//
+// ADDITIVE AND INERT BY DEFAULT. With no `rotation` instruction on the input,
+// none of this runs and planBasket behaves exactly as before.
+//
+// STILL PURE AND DETERMINISTIC: the choice is made from a stably-ordered ring of
+// candidates. No randomness, no clock, no I/O. Same inputs -> same variant.
+//
+// IT NEVER GUESSES. Where rotation cannot be decided SAFELY the line becomes
+// needs_decision carrying a question for the human:
+//   * no candidates to rotate between;
+//   * every candidate was bought last time (the ring is exhausted) -- rather
+//     than silently repeating last week's variant;
+//   * a `map` directive rule FIXES the variant while a rotation instruction
+//     says vary it. That conflict is REAL in the live rulebook (rules fix the
+//     men's deodorant variant while the decision log says rotate it) and is
+//     Warwick's to resolve, not the planner's. It surfaces as a question.
+// This is standing rule 6's discipline applied to rotation: never substitute,
+// never pick for the human, always surface the options.
+// ---------------------------------------------------------------------
+
+// A rotation candidate, normalised. Accepts a plain product-name string, a
+// `{ name }` object, or a whole `asdair.regulars` row (the common case -- the
+// variants that answer one shorthand ARE regulars). Returns null when there is
+// nothing usable to name.
+function normaliseRotationCandidate(candidate) {
+  if (candidate === null || candidate === undefined) return null;
+
+  if (typeof candidate === 'string') {
+    const plain = candidate.trim();
+    if (plain === '') return null;
+    return { name: plain, key: normaliseTerm(plain), regular_id: null, aliases: [normaliseTerm(plain)] };
+  }
+  if (typeof candidate !== 'object') return null;
+
+  // regularDisplayName prepends the brand when the row carries one, so a
+  // rotated line names the actual thing to buy, exactly like a regulars match.
+  const named = (candidate.name !== undefined && candidate.name !== null && String(candidate.name).trim() !== '')
+    ? regularDisplayName(candidate)
+    : ((candidate.matched_product !== undefined && candidate.matched_product !== null)
+      ? String(candidate.matched_product).trim()
+      : null);
+  if (named === null || named === '') return null;
+
+  const id = (candidate.regular_id !== undefined && candidate.regular_id !== null)
+    ? candidate.regular_id
+    : ((candidate.id !== undefined && candidate.id !== null) ? candidate.id : null);
+
+  const aliases = regularAliases(candidate);
+  const key = normaliseTerm(named);
+  if (aliases.indexOf(key) === -1) aliases.push(key);
+
+  return { name: named, key: key, regular_id: id, aliases: aliases };
+}
+
+// Stable ring order: normalised name, then id. Deterministic and independent of
+// the order the candidates arrived in.
+function compareRotationCandidates(a, b) {
+  if (a.key < b.key) return -1;
+  if (a.key > b.key) return 1;
+  return compareProductIds(a.regular_id, b.regular_id);
+}
+
+// Was this candidate bought in the previous order, and how many units?
+//
+// Identification is deliberately STRICT: the regular id when both sides carry
+// one, else the previous line's MATCHED PRODUCT name. The household's own
+// shorthand (item_name) is only consulted when that line recorded no product
+// name at all, because a shorthand like "male deodorant" is shared by every
+// variant and cannot identify one. When the shorthand IS all there is, every
+// candidate it names counts as bought -- which exhausts the ring and asks the
+// human, the safe direction (the unsafe one is re-buying last week's variant).
+function candidateBoughtLast(candidate, lines) {
+  let bought = false;
+  let qty = 0;
+  (Array.isArray(lines) ? lines : []).forEach(function (l) {
+    if (!l) return;
+    let hit = false;
+    const idMatch = candidate.regular_id !== null && candidate.regular_id !== undefined
+      && l.regular_id !== null && l.regular_id !== undefined
+      && String(candidate.regular_id) === String(l.regular_id);
+    if (idMatch) {
+      hit = true;
+    } else {
+      const productKey = normaliseTerm(l.matched_product);
+      if (productKey !== '') {
+        hit = (productKey === candidate.key);
+      } else {
+        const itemKey = normaliseTerm(l.item_name);
+        hit = itemKey !== '' && (itemKey === candidate.key || candidate.aliases.indexOf(itemKey) !== -1);
+      }
+    }
+    if (hit) {
+      bought = true;
+      const n = Number(l.added_qty);
+      if (Number.isFinite(n) && n > 0) qty += Math.trunc(n);
+    }
+  });
+  return { bought: bought, qty: qty };
+}
+
+function rotationDecision(status, chosen, previous, reason, message, flags) {
+  return {
+    status: status,                                  // 'rotated' | 'needs_decision'
+    chosen: chosen,                                  // { name, regular_id } | null
+    previous: previous,                              // what the last order held
+    reason: reason,                                  // machine-readable cause
+    note: status === 'rotated' ? message : null,     // for the plan's note
+    question: status === 'rotated' ? null : message, // what to ask the human
+    flags: flags
+  };
+}
+
+// Human-readable "Sure Quantum Dry x3, Bright Bouquet x1" for a note.
+function describePrevious(previous) {
+  return previous.map(function (p) {
+    return p.qty > 0 ? (p.name + ' x' + p.qty) : p.name;
+  }).join(', ');
+}
+
+// ---------------------------------------------------------------------
+// chooseRotatedVariant({ candidates, lastOrder, itemName, fixedProduct })
+//   -> { status, chosen, previous, reason, note, question, flags }
+//
+// PURE. Picks a variant DIFFERENT from the one bought last time, or refuses.
+// ---------------------------------------------------------------------
+function chooseRotatedVariant(input) {
+  const args = input || {};
+  const lastOrder = args.lastOrder || null;
+  const itemName = (args.itemName === null || args.itemName === undefined) ? '' : String(args.itemName);
+  const fixedRaw = args.fixedProduct;
+  const fixedProduct = (fixedRaw === null || fixedRaw === undefined || String(fixedRaw).trim() === '')
+    ? null
+    : String(fixedRaw).trim();
+
+  // Build the stable ring: normalised, de-duplicated, deterministically ordered.
+  const ring = [];
+  (Array.isArray(args.candidates) ? args.candidates : []).forEach(function (c) {
+    const cand = normaliseRotationCandidate(c);
+    if (!cand) return;
+    for (let i = 0; i < ring.length; i++) {
+      if (ring[i].key === cand.key) return;
+    }
+    ring.push(cand);
+  });
+  ring.sort(compareRotationCandidates);
+
+  // A fixed variant and an instruction to vary it cannot both hold. Warwick's
+  // call, not the planner's -- ask, do not resolve.
+  if (fixedProduct !== null) {
+    return rotationDecision('needs_decision', null, [], 'fixed_variant_conflict',
+      'rotation conflict: a map rule fixes this line to "' + fixedProduct
+        + '" while a rotation instruction says vary it each week. Both are live and they disagree,'
+        + ' so the planner will not choose. Which one applies?',
+      ['rotation conflict', 'rotation needs decision', 'never auto-substitute']);
+  }
+
+  if (ring.length === 0) {
+    return rotationDecision('needs_decision', null, [], 'no_candidates',
+      'rotation was asked for' + (itemName ? ' on "' + itemName + '"' : '')
+        + ' but no variants are known to rotate between. Which variants should alternate?',
+      ['no rotation candidates', 'rotation needs decision', 'never auto-substitute']);
+  }
+
+  // What the previous order actually held, per candidate.
+  const lines = (lastOrder && Array.isArray(lastOrder.lines)) ? lastOrder.lines : [];
+  const previous = [];
+  ring.forEach(function (cand) {
+    const seen = candidateBoughtLast(cand, lines);
+    if (seen.bought) {
+      previous.push({ name: cand.name, key: cand.key, regular_id: cand.regular_id, qty: seen.qty });
+    }
+  });
+
+  const eligible = ring.filter(function (cand) {
+    return !previous.some(function (p) { return p.key === cand.key; });
+  });
+
+  // Every known variant was bought last time. Repeating one silently would
+  // break the rotation the household asked for, and picking "the least recent"
+  // needs history this input does not carry -- so ask.
+  if (eligible.length === 0) {
+    return rotationDecision('needs_decision', null, previous, 'rotation_exhausted',
+      'rotation cannot pick a different variant: every known variant was in the last order ('
+        + describePrevious(previous) + '). Which should it be this week, or should more variants be added?',
+      ['rotation exhausted', 'rotation needs decision', 'never auto-substitute']);
+  }
+
+  // Anchor on the variant the household actually leant on last week -- the
+  // largest quantity added, ties broken by ring order -- then take the next
+  // eligible variant round the ring. With no anchor there is no constraint to
+  // satisfy, so the first eligible candidate is taken; every member of the ring
+  // is a variant the household already approved, so this is a deterministic
+  // starting point rather than a guess.
+  let anchor = null;
+  previous.forEach(function (p) {
+    if (anchor === null || p.qty > anchor.qty) anchor = p;
+  });
+
+  let chosen = null;
+  if (anchor !== null) {
+    let start = 0;
+    for (let i = 0; i < ring.length; i++) {
+      if (ring[i].key === anchor.key) { start = i; break; }
+    }
+    for (let step = 1; step <= ring.length && chosen === null; step++) {
+      const cand = ring[(start + step) % ring.length];
+      if (eligible.indexOf(cand) !== -1) chosen = cand;
+    }
+  }
+  if (chosen === null) chosen = eligible[0];
+
+  const flags = ['rotated from last order'];
+  let note;
+  if (previous.length > 0) {
+    note = 'rotated to a different variant; the last order held ' + describePrevious(previous);
+  } else {
+    pushFlag(flags, 'no previous purchase to rotate from');
+    note = lastOrder
+      ? 'rotated: the last order held none of these variants, so the first in stable order was taken'
+      : 'rotated: no previous order was supplied, so the first variant in stable order was taken';
+  }
+
+  return rotationDecision('rotated',
+    { name: chosen.name, regular_id: chosen.regular_id },
+    previous, 'rotated', note, flags);
+}
+
+// Does a rotation instruction apply to this line? Mirrors ruleAppliesToItem's
+// household scope and term/category targeting. A TARGET-LESS instruction never
+// applies -- the same Finding-6 discipline that stops a target-less directive
+// blanket-matching (and rewriting) every line on the list.
+function rotationApplies(instruction, item, product, household) {
+  if (!instruction || instruction.active === false) return false;
+  if (instruction.household_id !== null && instruction.household_id !== undefined) {
+    if (!sameHousehold(instruction.household_id, household)) return false;
+  }
+  const term = normaliseTerm(item.item_name);
+  const cat = product && product.category ? normaliseTerm(product.category) : normaliseTerm(item.category);
+  if (normaliseTerm(instruction.match_term) !== '') return normaliseTerm(instruction.match_term) === term;
+  if (normaliseTerm(instruction.match_category) !== '') return normaliseTerm(instruction.match_category) === cat;
+  return false;
 }
 
 // Compare two product ids for a DETERMINISTIC tie-break: numeric when both
@@ -648,6 +911,16 @@ function planBasket(input) {
   const regulars = args.regulars;   // household Regulars: an ARGUMENT, no I/O here
   const budget = args.budget || null;
 
+  // OPTIONAL, ADDITIVE rotation inputs (SOP-021 step 2). `lastOrder` is what
+  // data.js loadLastOrder() returns -- the previous shop, so "a different
+  // variant each week" is decidable at all. `rotation` is the structured
+  // instruction set saying WHICH lines rotate (and, optionally, between which
+  // variants); like `rules` and `regulars` it is an ARGUMENT, never loaded here.
+  // With both absent -- the default -- nothing below changes and planBasket
+  // behaves exactly as it did before.
+  const lastOrder = args.lastOrder || null;
+  const rotations = Array.isArray(args.rotation) ? args.rotation : [];
+
   // Active household: explicit override, else derived from the budget row.
   const household = (args.household !== undefined && args.household !== null)
     ? args.household
@@ -672,10 +945,17 @@ function planBasket(input) {
       return ruleAppliesToItem(r, line, match.product, household);
     });
 
+    // Standing 'exclude' directives for this line. Read here (rather than at the
+    // status chain below, where it is used) only so the rotation block can skip
+    // a line that is never going in the basket at all.
+    const standingExcludes = applicable.filter(function (r) { return r.directive === 'exclude'; });
+
     // 'map' directive can set / override the matched product (rule 9).
+    let mappedByRule = false;
     applicable.forEach(function (r) {
       if (r.directive === 'map' && r.matched_product) {
         matchedProduct = r.matched_product;
+        mappedByRule = true;
         pushFlag(flags, 'product mapped by rule');
         if (r.note) note = note ? (note + '; ' + r.note) : r.note;
       }
@@ -715,6 +995,49 @@ function planBasket(input) {
       }
     }
 
+    // Rotation (SOP-021 step 2): "a different variant each week". ENTIRELY
+    // INERT unless the caller supplied a `rotation` instruction that targets
+    // this line, so the default path is byte-for-byte what it was before.
+    //
+    // Skipped for a line that is excluded (standing or one-week) -- it is never
+    // going in the basket, so which variant it would have been is noise -- and
+    // for a scope mismatch, which is already failing safe to a human.
+    //
+    // CANDIDATES: the instruction's own explicit variant list when it carries
+    // one, otherwise every ACTIVE, in-scope regular that answers this line's
+    // term. That second source is the real case: several variants legitimately
+    // share one shorthand, which today makes the line an AMBIGUOUS regulars
+    // match. A rotation instruction is exactly the household's answer to that
+    // ambiguity, so a successful rotation clears it -- and only then.
+    let rotationNeedsDecision = false;
+    if (rotations.length > 0 && !scopeMismatch && standingExcludes.length === 0 && !line.excluded_this_week) {
+      const instruction = rotations.find(function (r) {
+        return rotationApplies(r, line, match.product, household);
+      });
+      if (instruction) {
+        const explicit = Array.isArray(instruction.candidates) && instruction.candidates.length > 0;
+        const candidates = explicit ? instruction.candidates : regularHits(line, regulars, household);
+        const outcome = chooseRotatedVariant({
+          candidates: candidates,
+          lastOrder: lastOrder,
+          itemName: line.item_name,
+          // A `map` rule fixing this line's product while an instruction says
+          // rotate it is a REAL conflict in the rulebook and Warwick's to
+          // settle. Passing it here makes the planner ask instead of resolve.
+          fixedProduct: mappedByRule ? matchedProduct : null
+        });
+        outcome.flags.forEach(function (f) { pushFlag(flags, f); });
+        if (outcome.status === 'rotated') {
+          matchedProduct = outcome.chosen.name;
+          regularAmbiguous = false;   // rotation is what the household uses to resolve this
+          if (outcome.note) note = note ? (note + '; ' + outcome.note) : outcome.note;
+        } else {
+          rotationNeedsDecision = true;
+          if (outcome.question) note = note ? (note + '; ' + outcome.question) : outcome.question;
+        }
+      }
+    }
+
     // ---- status resolution -----------------------------------------------
     // Precedence: standing exclude > one-week exclude > needs_decision > add.
     //
@@ -730,8 +1053,6 @@ function planBasket(input) {
     // one-week on this list. planned_qty stays 0 for BOTH; neither is ever
     // added, and the never-substitute / never-checkout guarantees are unchanged.
     let status = 'add';
-
-    const standingExcludes = applicable.filter(function (r) { return r.directive === 'exclude'; });
 
     if (standingExcludes.length > 0) {
       status = 'excluded';
@@ -769,6 +1090,14 @@ function planBasket(input) {
     } else if (applicable.some(function (r) { return r.directive === 'needs_decision'; })) {
       status = 'needs_decision';
       pushFlag(flags, 'flagged by rule');
+      pushFlag(flags, 'never auto-substitute');
+    } else if (rotationNeedsDecision) {
+      // Rotation could not be decided SAFELY (no candidates / the ring is
+      // exhausted / a `map` rule fixes the variant while an instruction says
+      // vary it). The cause flags and the question for the human were already
+      // attached above; the line is held, never guessed at. Ranked candidates
+      // are surfaced below exactly as for any other held line.
+      status = 'needs_decision';
       pushFlag(flags, 'never auto-substitute');
     } else if (ambiguous || regularAmbiguous) {
       // Rule 6: cannot be confidently matched -> human decision. This covers
@@ -936,6 +1265,7 @@ function planBasket(input) {
 module.exports = {
   planBasket: planBasket,
   rankAlternatives: rankAlternatives,   // suggestion-only alternative ranker (rule 6)
+  chooseRotatedVariant: chooseRotatedVariant,   // pure rotation decision (SOP-021 step 2)
   // exported for unit tests of the pure helpers
   _internal: {
     normaliseTerm: normaliseTerm,
@@ -944,8 +1274,12 @@ module.exports = {
     matchRegular: matchRegular,
     regularAliases: regularAliases,
     regularDisplayName: regularDisplayName,
+    regularHits: regularHits,
     dedupeList: dedupeList,
     rankAlternatives: rankAlternatives,
-    inHouseholdScope: inHouseholdScope
+    inHouseholdScope: inHouseholdScope,
+    normaliseRotationCandidate: normaliseRotationCandidate,
+    candidateBoughtLast: candidateBoughtLast,
+    rotationApplies: rotationApplies
   }
 };
