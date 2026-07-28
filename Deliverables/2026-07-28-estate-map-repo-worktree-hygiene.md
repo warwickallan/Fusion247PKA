@@ -150,10 +150,20 @@ branches (`agent-count`, `good-morning`, `idea-002-scaffold-fit`, `ws-004-team-r
 
 ### PRs
 
-**Exactly one is open: #72** — BUILD-002 executable structural gate for the YouTube knowledge note
+> **Correction (later the same night).** This section originally said "exactly one is open: #72".
+> **Wrong — there were two.** The survey used `gh pr list --state all --limit 40`, which silently
+> truncated below #36 and hid **PR #24** (draft, WS-004 team retro, opened 2026-07-10). Its head
+> branch `claude/ws-004-team-retro-recovery` was already in the unmerged/retain set, so nothing was
+> put at risk — but the count was stated more confidently than the evidence supported. Verified
+> properly with `gh pr list --state open --limit 200`. A third, **PR #77**, was opened later that
+> night for the doctrine + capture-persistence work.
+
+**Open: #72** — BUILD-002 executable structural gate for the YouTube knowledge note
 (IDEA-017 Experiment 0). Its `gateway` check is red **for the pre-existing `main` failure described
 above, not for anything #72 did** — it adds two files under `services/hub/youtube/` and touches the
 gateway nowhere. Once the fixture fix lands on `main`, #72 should go green on a re-run.
+
+**Open: #24** — draft, WS-004 team retro, from 2026-07-10. Untouched; long-lived draft.
 
 All other PRs #36–#75 are MERGED, except **#43 CLOSED** (superseded by #54).
 
