@@ -77,14 +77,17 @@ Then classify each item:
 
 **These are leads, not facts. Every one may have moved.**
 
-1. **The doctrine and the AsdAIr governance artefacts are committed on `idea-016/idea-engine`, not `main`.**
-   This is the single most important thing to check first. A fresh Larry opening this folder gets them *because
-   the working tree sits on that branch* — but they are absent from `main`, so any worktree branched from `main`
-   cannot see them. That is exactly how the AsdAIr behavioural acceptance ran against a tree with no specialist
-   contract and no `SOP-021`. **Getting these onto `main` is a merge decision for Warwick, not a cleanup action.**
-2. **BUILD-015 / AsdAIr** — durability repair, verdict recorded as **NOT READY autonomous / READY supervised**.
-   See `Builds/BUILD-015-.../ACCEPTANCE-AND-EVIDENCE.md`. Its branch carries real, reviewed, CI-green work and
-   named unblocking items. **Class A. Do not tidy it away.**
+1. **RESOLVED at session close — doctrine is now ON MAIN.** It was committed only on `idea-016/idea-engine`
+   and, worse, **unpushed** until the final minutes; twelve commits existed on one machine and nowhere else.
+   Merged to main via PR #74 (main `1cb73e8`). **Verify it rather than trust this line:** `SOP-021`, `SOP-022`,
+   the Asdair contract and the reconciled iron rule should all be present on `origin/main`. If any is missing,
+   that is your first and most important finding.
+2. **BUILD-015 / AsdAIr — PR #73 is OPEN and deliberately UNMERGED.** Final exact-head Codex verdict was
+   `request_changes`, so Warwick's merge condition (READY + green CI) was not met and the merge was withheld.
+   Two HIGHs remain and they map onto Warwick's own supervised bar: unmatched items ship an EMPTY alternatives
+   queue, and NO RUNTIME PATH invokes the outcome/learning writers. Full record in
+   `Builds/BUILD-015-.../ACCEPTANCE-AND-EVIDENCE.md`. The branch carries real, reviewed, CI-green work.
+   **Class A. Do not tidy it away, and do NOT merge it to make the estate look finished.**
 3. **Several worktrees predate tonight** and may hold uncommitted work from earlier builds. Two sampled earlier in
    the session were dirty, one sitting on deleted CI workflow files. **Treat every dirty tree as class C until
    proven otherwise.**

@@ -1,0 +1,41 @@
+{
+  "source_url": "https://www.youtube.com/watch?v=fg0_0M8kZ8g",
+  "video_id": "fg0_0M8kZ8g",
+  "captured_at": "2026-07-25T02:10:22+00:00",
+  "title": "Turn ANY File into LLM Knowledge in SECONDS",
+  "channel": "Cole Medin",
+  "published_date": "2025-10-02",
+  "duration_seconds": 1280,
+  "user_note": "BUILD-002 WP2 auto-detect",
+  "transcript_status": "extracted",
+  "transcript_source": "auto_captions",
+  "language": "English (auto-generated)",
+  "language_code": "en",
+  "segment_count": 617,
+  "error_category": null,
+  "error_detail": null,
+  "retry_recommendation": null,
+  "tool_versions": {
+    "python": "3.13.6",
+    "youtube-transcript-api": "1.2.4",
+    "yt-dlp": "2026.7.4"
+  },
+  "routing": {
+    "fusion_review_status": "pending_cairn",
+    "assigned_agent": "youtubair",
+    "next_agent": "cairn",
+    "legacy_review_status": "pending_categorisair",
+    "legacy_next_agent": "categorisair",
+    "note": "Cairn has absorbed the legacy CategorisAIr role; legacy_* are aliases only."
+  },
+  "handoff": null,
+  "output_dir": "out\\auto\\2026-07-25__turn-any-file-into-llm-knowledge-in-seconds__fg0_0M8kZ8g",
+  "files": [
+    "TubeAIR Report - turn-any-file-into-llm-knowledge-in-seconds - fg0_0M8kZ8g.md",
+    "manifest.json"
+  ],
+  "idea": "IDEA-013",
+  "project_id": "F247-YT-INGRESS-001",
+  "build": "TubeAIR",
+  "schema_version": 2
+}
