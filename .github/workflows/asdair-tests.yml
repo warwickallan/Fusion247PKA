@@ -122,6 +122,10 @@ jobs:
         working-directory: services/asdair/interpret
         run: node --test
 
+      - name: Run the cockpit read-API suite (offline, SELECT-only assertions)
+        working-directory: services/asdair/cockpit-api
+        run: node --test
+
   integration:
     runs-on: ubuntu-latest
     defaults:
