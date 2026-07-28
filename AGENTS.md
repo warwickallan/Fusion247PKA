@@ -270,6 +270,7 @@ Rules:
 
 - **Same-model review is not independent review, and the report must say so.** SOP-018 is a skill, not a permanent agent — any agent can run it, and it is genuinely useful even when the reviewer is the same model/session that authored the change under review. But that combination must be labeled plainly in the report: "Same-model review — not independently verified." A material migration or build claim is only treated as verified once a genuinely separate reviewer (a different model, runtime, or session — Warwick himself, or an external instance) has actually reviewed it.
 - **A clean task board is not completeness evidence.** Neither is a closed-task count, nor a same-model reviewer finding nothing wrong from memory. Source-grounded acceptance evidence is required for any migration/build-completion claim.
+- **An absent CI run is not a passing CI run.** CI has three states — PASS (the required workflow ran **against the exact SHA** and passed), FAIL, and NOT RUN / UNKNOWN (path-filtered out, never executed, `skipped`, or not tied to that SHA). Only PASS is green; NOT RUN is never PASS. Never claim a branch is green from the absence of a red run in `gh run list`. Full doctrine, with the incident that established it, in `Team/Larry - Orchestrator/AGENTS.md` §8a "CI truth is exact-head evidence".
 
 ## Fusion 247 Handbook Currency Triggers (LLM-agnostic)
 

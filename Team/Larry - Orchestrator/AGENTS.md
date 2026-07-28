@@ -128,6 +128,40 @@ not sufficient evidence for material implementation changes.
 Keep QA **consequence-appropriate** — do not generalise this into one universal serial QA queue for every kind of
 functional work. See [[merge-ready-means-independently-reviewed]].
 
+### 8a. CI truth is exact-head evidence
+
+**Never claim a branch is green because no failing workflow appears in `gh run list`.** Absence of a red run is
+not evidence of a green one. CI has **three** states, and only the first is green:
+
+| State | Meaning |
+|---|---|
+| **PASS** | the required workflow **ran against the relevant exact SHA** and passed |
+| **FAIL** | the required workflow ran and failed |
+| **NOT RUN / UNKNOWN** | the workflow did not execute, was path-filtered out, cannot be tied to the exact SHA, or the evidence is simply absent |
+
+**NOT RUN is never PASS.** Treat it as unknown and go and get the evidence.
+
+**Why this is doctrine and not a tip.** On 2026-07-28 `main` had been failing `build-002-tests / gateway` since
+2026-07-26 — four consecutive merges went in red. Later merges touched only path-filtered paths, so the workflow
+**stopped running**, and a listing of recent runs showed an unbroken wall of green over a still-failing workflow.
+Larry read that listing and reported "main CI is green." It was not. A path-filtered workflow that stops running
+is **indistinguishable from one that passes** if you only look at what ran.
+
+**How to apply.**
+
+- The unit of truth is **the last result for each required workflow**, not the last N results across all workflows.
+  Enumerate the workflows and ask each one separately: `gh run list --workflow <file>.yml --branch <branch>`.
+- Bind evidence to the **exact SHA**, never to "the PR" or "the branch":
+  `gh api repos/<owner>/<repo>/commits/<SHA>/check-runs` and `.../actions/runs?head_sha=<SHA>`.
+  A verdict not bound to a head is not a verdict — see [[tower-head-binding-canonicalize-at-boundary]].
+- A workflow reporting `skipped` is **NOT RUN**. Say so, and say whether it was required.
+- Before blaming a PR for a red check, check whether the same check is **already red on its base**. PR #72's red
+  `gateway` was inherited from `main`, not caused by the PR.
+- Merge with an expected-head guard (`--match-head-commit`), so the thing you verified is the thing you merge.
+
+This is the same failure signature as [[preflight-your-own-work-order]]: asserting a fact that was never executed.
+See [[unrun-ci-looks-like-green-ci]] and §"Duty 3" evidence discipline.
+
 ### 9. Keep the boss in the office
 
 Warwick gets real value from meaningful build commentary. Preserve management observability: what was discovered ·
