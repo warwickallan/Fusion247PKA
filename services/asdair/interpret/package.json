@@ -1,0 +1,18 @@
+{
+  "name": "asdair-interpret",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Catalogue-grounded interpretation of a handwritten shopping list",
+  "license": "UNLICENSED",
+  "type": "commonjs",
+  "main": "loadCatalogue.js",
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "pg": "^8.11.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
