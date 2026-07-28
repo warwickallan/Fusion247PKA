@@ -1,17 +1,22 @@
 /* Fusion247 Cockpit — the Warwick-facing surface. Reads /api/state (the spine, via cp_directus),
    files decisions to /api/decide (governed intents + surface lifecycle). Depth ladder, Life/Build
    lanes, decision lifecycle (accept/decline/defer + Archive + Later), readable outputs. No build step. */
-const { createApp, ref, computed, onMounted } = Vue;
+const { createApp, ref, computed, onMounted, nextTick } = Vue;
 
 const REPORT = 'http://100.101.240.85:8701';
 const GRAPH = 'http://100.101.240.85:8700';
 const AREAS = [
   { key: 'home', label: 'Home', icon: '🏠' },
+  { key: 'apps', label: 'Apps', icon: '🧩' },
   { key: 'ideas', label: 'Ideas', icon: '💡' },
   { key: 'brain', label: 'Brain', icon: '🧠' },
   { key: 'outputs', label: 'Outputs', icon: '📤' },
   { key: 'system', label: 'System', icon: '🛠' },
 ];
+// Apps = the things Fusion RUNS for Warwick, each with its own workspace. The registry is the SSOT
+// (public/apps.js) — adding an app is one entry there, never an edit in three places in this file.
+/** @type {ReadonlyArray<{key:string,label:string,desc:string,icon:string,tone:string,probe:boolean,views:ReadonlyArray<{key:string,label:string,blurb:string}>,about:ReadonlyArray<string>,offline:string}>} */
+const APPS = (typeof window !== 'undefined' && Array.isArray(window.FUSION_APPS)) ? window.FUSION_APPS : [];
 
 const kindOf = (it) => it.kind || 'suggestion';
 const catLabel = (it) => ({ blocked: 'Blocked by you', decision: 'Decision', suggestion: 'Suggestion' }[kindOf(it)] || 'Output');
@@ -180,6 +185,9 @@ createApp({
 
     const tiles = computed(() => {
       const t = [];
+      // Apps is a PLACE, not a count — but the number of registered apps is a real measured figure,
+      // so it is safe to show even at 1. First tile: Warwick has asked twice where his app lives.
+      t.push({ num: APPS.length, label: 'Apps', desc: 'things Fusion runs for you', tone: 'blue', area: 'apps' });
       t.push({ num: suggestions.value.length, label: 'Ideas', desc: 'brain & cash', tone: 'blue', area: 'ideas' });
       t.push({ num: outputs.value.length, label: 'Outputs', desc: 'made for you', tone: 'green', area: 'outputs' });
       t.push({ num: state.value.ingestedCount ?? '—', label: 'Brain', desc: 'sources ingested', tone: 'grey', area: 'brain' });
@@ -187,7 +195,65 @@ createApp({
       return t;
     });
 
-    const go = (k) => { detail.value = null; area.value = k; };
+    // ---- Apps > <App> > <view> ---------------------------------------------------------------
+    // Three levels, all driven by the registry: the grid of apps, one app's own workspace, and a
+    // view inside it. An app is a dashboard within the dashboard, not a flat panel.
+    const appKey = ref(null);      // null = showing the grid
+    const appViewKey = ref(null);  // null = the app's first view
+    /** @type {import('vue').Ref<Record<string,{state:'checking'|'up'|'down'|'none',detail:string,at?:number}>>} */
+    const appStatus = ref({});
+    const currentApp = computed(() => APPS.find((a) => a.key === appKey.value) || null);
+    const currentView = computed(() => {
+      const a = currentApp.value; if (!a) return null;
+      return a.views.find((v) => v.key === appViewKey.value) || a.views[0];
+    });
+    const statusOf = (a) => (a && appStatus.value[a.key]) || { state: a && a.probe ? 'checking' : 'none', detail: '' };
+    // Colour follows the MEASURED state, never the app's identity colour — a tile must not read as
+    // healthy just because it is pretty. Its own tone is earned only once its service has answered.
+    const appTone = (a) => ({ up: a.tone, down: 'amber', checking: 'grey', none: 'grey' }[statusOf(a).state] || 'grey');
+    const appStatusLine = (a) => ({ up: 'running', down: 'not running', none: 'no service to check' }[statusOf(a).state] || 'checking…');
+    const setStatus = (key, v) => { appStatus.value = { ...appStatus.value, [key]: v }; };
+    async function probeApp(a) {
+      if (!a) return;
+      if (!a.probe) { setStatus(a.key, { state: 'none', detail: 'No backing service is registered for this app.' }); return; }
+      setStatus(a.key, { state: 'checking', detail: '' });
+      try {
+        const r = await fetch('/api/app-status?app=' + encodeURIComponent(a.key), { cache: 'no-store' });
+        const d = await r.json();
+        const state = d && (d.state === 'up' || d.state === 'none') ? d.state : 'down';
+        setStatus(a.key, { state, detail: (d && d.detail) || '', at: Date.now() });
+      } catch (e) {
+        // The COCKPIT couldn't be asked — say that, rather than pronouncing on the app itself.
+        setStatus(a.key, { state: 'down', detail: 'The cockpit could not be asked whether this app is running.', at: Date.now() });
+      }
+    }
+    const probeAll = () => { for (const a of APPS) probeApp(a); };
+
+    // FOCUS MUST BE MOVED ON EVERY LEVEL TRANSITION (WCAG 2.4.3). Crossing a level destroys the
+    // control that was focused — the tile, the breadcrumb, the back chevron are all inside a v-if —
+    // and the browser then drops focus on <body>, restarting a keyboard user at the top of the page.
+    // Going IN lands on the workspace heading (announces the new context); coming OUT lands back on
+    // the tile you came from (returns you where you were). Switching views inside an app is left
+    // alone deliberately: that button survives, so moving focus would be the rude thing to do.
+    async function focusSel(sel) {
+      await nextTick();
+      const el = document.querySelector(sel);
+      if (el) el.focus();
+      return !!el;
+    }
+    const openApp = (k) => { appViewKey.value = null; appKey.value = k; probeApp(APPS.find((a) => a.key === k)); focusSel('#app-workspace-h'); };
+    // `from` is the app we are leaving, so focus can return to its tile. When we are not leaving an
+    // app (a plain area switch) the selector matches nothing and focus is left exactly where it is.
+    const closeApp = () => {
+      const was = appKey.value;
+      appKey.value = null; appViewKey.value = null;
+      if (was) focusSel('[data-app-tile="' + was + '"]');
+    };
+    const goView = (k) => { appViewKey.value = k; };
+
+    // Leaving an area always drops you back to the Apps GRID — tapping "Apps" while already inside
+    // an app must go somewhere, not silently do nothing. The breadcrumb is the way back in.
+    const go = (k) => { detail.value = null; closeApp(); area.value = k; if (k === 'apps') probeAll(); };
     const open = (item, as) => { detail.value = { ...item, _as: as }; };
     const closeDetail = () => { detail.value = null; };
 
@@ -279,7 +345,8 @@ createApp({
     };
 
     return {
-      AREAS, state, area, detail, busy, loading, loadErr,
+      AREAS, APPS, appKey, appViewKey, currentApp, currentView, statusOf, appTone, appStatusLine, probeApp, openApp, closeApp, goView,
+      state, area, detail, busy, loading, loadErr,
       kindOf, catLabel, moduleLabel, oneLine, ago, terse, impactStars, outputTitle, humanValue, humanPoints, spinOf, mdToHtml, notifyMark, build, housekeeping, host, when,
       deliverables, openDeliverable, openBrief, copyDoc, downloadDoc, downloadTranscript, download, copyText,
       attn, deferred, archived, blocked, decisions, suggestions, needsYou, ideaCat, ideasBrain, ideasCash, latest, toneOf,
@@ -290,7 +357,7 @@ createApp({
   },
   template: `
 <div class="app">
-  <nav class="nav">
+  <nav class="nav" aria-label="Main">
     <button v-for="a in AREAS" :key="a.key" class="nav-btn" :class="{on: area===a.key}" @click="go(a.key)">
       <span class="nav-ico">{{ a.icon }}</span><span class="nav-lbl">{{ a.label }}</span>
       <span v-if="a.key==='home' && needsYou.length" class="nav-badge">{{ needsYou.length }}</span>
@@ -335,6 +402,75 @@ createApp({
             <span class="chev">›</span>
           </div>
         </div>
+      </section>
+
+      <!-- APPS — the things Fusion RUNS for Warwick. Apps > <App> > <view>: an app opens into its own
+           workspace with its own internal navigation, not a flat panel. Every level is driven by the
+           registry in /apps.js, so adding the next app is one entry there — not three edits here. -->
+      <section v-else-if="area==='apps'" class="pane apps-pane">
+
+        <!-- L1 — the grid of apps -->
+        <template v-if="!currentApp">
+          <header class="p-h"><h1>Apps</h1><span class="count">{{ APPS.length }}</span></header>
+          <p class="app-blurb">The things Fusion runs for you. Each one opens into its own workspace.</p>
+          <div v-if="!APPS.length" class="empty big">No apps registered yet.</div>
+          <div v-else class="tiles">
+            <button v-for="a in APPS" :key="a.key" class="tile" :class="appTone(a)" :data-app-tile="a.key" @click="openApp(a.key)">
+              <span class="t-num" aria-hidden="true">{{ a.icon }}</span>
+              <span class="t-lbl">{{ a.label }}</span>
+              <span class="t-desc">{{ a.desc }}</span>
+              <span class="app-pill" :class="statusOf(a).state">{{ appStatusLine(a) }}</span>
+            </button>
+          </div>
+        </template>
+
+        <!-- L2/L3 — one app's own workspace -->
+        <template v-else>
+          <nav class="crumbs" aria-label="Breadcrumb">
+            <button class="crumb" @click="closeApp()">Apps</button>
+            <span class="crumb-sep" aria-hidden="true">›</span>
+            <button class="crumb" @click="goView(currentApp.views[0].key)">{{ currentApp.label }}</button>
+            <span class="crumb-sep" aria-hidden="true">›</span>
+            <span class="crumb on" aria-current="page">{{ currentView.label }}</span>
+          </nav>
+
+          <header class="p-h">
+            <button class="back app-back" @click="closeApp()" aria-label="Back to all apps">‹</button>
+            <!-- tabindex=-1 so focus can be MOVED here on entry; it is never in the tab order. -->
+            <h1 id="app-workspace-h" tabindex="-1">{{ currentApp.label }}</h1><span class="lane-sub">{{ currentApp.desc }}</span>
+          </header>
+
+          <!-- Availability, measured. Never assumed, never dressed up. -->
+          <div class="app-status" :class="statusOf(currentApp).state" role="status" aria-live="polite">
+            <span class="as-dot" aria-hidden="true"></span>
+            <div class="as-body"><b>{{ appStatusLine(currentApp) }}</b><span v-if="statusOf(currentApp).detail"> — {{ statusOf(currentApp).detail }}</span></div>
+            <button v-if="currentApp.probe" class="act" @click="probeApp(currentApp)">Check again</button>
+          </div>
+
+          <!-- The app's OWN navigation — the dashboard within the dashboard -->
+          <nav class="app-nav" :aria-label="currentApp.label + ' sections'">
+            <button v-for="v in currentApp.views" :key="v.key" class="app-nav-btn" :class="{on: v.key===currentView.key}"
+              :aria-current="v.key===currentView.key ? 'page' : null" @click="goView(v.key)">{{ v.label }}</button>
+          </nav>
+
+          <div class="app-view">
+            <p v-if="currentView.blurb" class="app-blurb">{{ currentView.blurb }}</p>
+
+            <!-- About = facts about the app itself, true whether or not its service is running. -->
+            <ul v-if="currentApp.about.length && currentView.key==='about'" class="read">
+              <li v-for="(f,i) in currentApp.about" :key="i">{{ f }}</li>
+            </ul>
+
+            <!-- Every other view needs the service. No service, no data — and no invented data. -->
+            <template v-else>
+              <div v-if="statusOf(currentApp).state==='checking'" class="empty big">Checking whether {{ currentApp.label }} is running…</div>
+              <div v-else-if="statusOf(currentApp).state==='up'" class="empty big">
+                {{ currentApp.label }} is answering, but this view is not wired to it yet — so nothing is shown here, and nothing is being made up.
+              </div>
+              <div v-else class="empty big">{{ currentApp.offline }}</div>
+            </template>
+          </div>
+        </template>
       </section>
 
       <!-- IDEAS — Transfer-Intelligence candidates, SPIN-first (Situation leads; tech detail behind Details) -->

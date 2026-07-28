@@ -150,6 +150,43 @@ async function apiSourceBrief(video) {
   return { ok: true, video, title: r.title, noted: r.noted, text };
 }
 
+// ---- Apps: is an app's backing service actually answering? ----------------------------------
+// The Apps area must never claim an app is available because a tile looks healthy. The BROWSER may
+// only name an app KEY; this table is the only place a host:port lives, so the surface can never
+// point this server at an arbitrary host. Presentation for the same key lives in public/apps.js —
+// the two share the key and nothing else.
+const APP_SERVICES = {
+  asdair: { url: 'http://127.0.0.1:8710/asdair/health', label: 'AsdAIr’s read service' },
+};
+// node's fetch buries the real reason under a generic TypeError, and "TypeError" tells Warwick
+// nothing. Dig out the cause and say what actually happened, in words.
+function whyDown(e) {
+  const code = String((e && ((e.cause && e.cause.code) || e.code || e.name)) || 'unreachable');
+  return { ECONNREFUSED: 'nothing is listening there', ENOTFOUND: 'that address does not resolve',
+    EHOSTUNREACH: 'that host is unreachable', ECONNRESET: 'the connection was reset',
+    TimeoutError: 'it did not answer in time', AbortError: 'it did not answer in time' }[code] || code;
+}
+// Answers up / down / none. Never throws, never 500s, never guesses: a service that does not answer
+// is reported as not answering, with the reason, and the UI shows unknown rather than a fake figure.
+async function apiAppStatus(key) {
+  // OWN properties only. A plain object literal inherits from Object.prototype, so ?app=constructor
+  // (or toString, valueOf...) would walk the chain, sail past this guard and get reported as a real
+  // app that is "down" — with "undefined" in the copy. An app we do not know about is not down: it
+  // does not exist. That is the same distinction as "not running" vs "empty", and it has to hold here
+  // too. The key is never echoed back either; it came from the browser and means nothing to us.
+  const svc = Object.hasOwn(APP_SERVICES, String(key || '')) ? APP_SERVICES[String(key)] : null;
+  if (!svc) return { ok: true, app: null, state: 'none', detail: 'No backing service is registered for this app.' };
+  const host = (() => { try { return new URL(svc.url).host; } catch { return 'its configured address'; } })();
+  try {
+    const r = await fetch(svc.url, { signal: AbortSignal.timeout(1500), headers: { accept: 'application/json' } });
+    if (!r.ok) return { ok: true, app: key, state: 'down', detail: `${svc.label} answered HTTP ${r.status} on ${host}.` };
+    const body = await r.json().catch(() => null);
+    return { ok: true, app: key, state: 'up', detail: `${svc.label} is answering on ${host}.`, service: body && body.service ? String(body.service) : null };
+  } catch (e) {
+    return { ok: true, app: key, state: 'down', detail: `${svc.label} is not answering on ${host} — ${whyDown(e)}.` };
+  }
+}
+
 // Deliverables = produced docs (Pax reports etc.) living in the repo's Deliverables/ folder — the synced
 // "things for Warwick to read". Listed newest-first with a human title from the first H1.
 function listDeliverables() {
@@ -194,6 +231,7 @@ const server = http.createServer(async (req, res) => {
     if (req.url.startsWith('/api/transcript')) { const v = new URL(req.url, 'http://x').searchParams.get('video'); return j(res, 200, await apiTranscript(v)); }
     if (req.url.startsWith('/api/source-brief')) { const v = new URL(req.url, 'http://x').searchParams.get('video'); return j(res, 200, await apiSourceBrief(v)); }
     if (req.url.startsWith('/api/deliverable')) { const f = new URL(req.url, 'http://x').searchParams.get('file'); return j(res, 200, await apiDeliverable(f)); }
+    if (req.url.startsWith('/api/app-status')) { const a = new URL(req.url, 'http://x').searchParams.get('app'); return j(res, 200, await apiAppStatus(a)); }
     if (req.url.startsWith('/api/mine') && req.method === 'POST') {
       let raw = ''; req.on('data', (d) => { raw += d; if (raw.length > 1e4) req.destroy(); });
       req.on('end', () => {
