@@ -137,8 +137,13 @@ Per your standing ruling: a deliberate separate pass, not a side-effect. Zero un
 | | |
 |---|---|
 | Branch | `hygiene/2026-07-28-doctrine-and-capture-persistence` |
-| Exact head | `a22bd1879ab2de9def3310a7447a3d6e245afa3a` |
-| CI at that exact SHA | `build-002-tests` **success**, `secret-scan` **success**; `hub` green with the 8 new tests |
+| Code head (items 4 + 5) | `a22bd1879ab2de9def3310a7447a3d6e245afa3a` — `build-002-tests` **success**, `secret-scan` **success**, `hub` green with the 8 new tests |
+| Head after this report was committed | advances by the docs commit; CI re-verified green at each new head |
+
+> Adding this report to the branch moves the head, so any SHA written here is stale the moment it is
+> written — which is the doctrine's own point. **Verify the tip before merging**, do not trust this
+> table's SHA:
+> `gh api "repos/warwickallan/Fusion247PKA/commits/$(gh pr view 77 --json headRefOid -q .headRefOid)/check-runs"`
 
 **Blocked, not failed.** My authority granted merge on **PR #76 only** and explicitly barred merging
 unrelated PRs, so I stopped. **It matters that this lands:** until it is on `main`, a fresh Larry does
