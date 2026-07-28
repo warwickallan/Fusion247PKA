@@ -1,0 +1,18 @@
+{
+  "name": "asdair-reconcile",
+  "version": "0.1.0",
+  "private": true,
+  "description": "BUILD-015 AsdAIr order reconciliation: pure parseConfirmation + pure reconcile + the ONLY writer for asdair.order_confirmation / order_confirmation_line. Kept out of skill/, which is read-only by contract.",
+  "license": "UNLICENSED",
+  "type": "commonjs",
+  "main": "parseConfirmation.js",
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "pg": "^8.11.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
