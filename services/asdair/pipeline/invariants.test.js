@@ -368,19 +368,93 @@ test('NEVER DELETES: no module here emits a DELETE, TRUNCATE or DROP', () => {
   }
 });
 
-test('this work package owns ONE folder: it emits SQL for asdair.shop_line and reads everything else', () => {
-  // The only tables this pipeline WRITES directly are shop_line (migration 008,
-  // which arrived for exactly this stage and has no other owner). Everything
-  // else is written through the component that owns it.
+test('this work package owns ONE folder: it emits SQL for shop_line and pipeline_command, and reads everything else', () => {
+  // The only tables this pipeline WRITES directly are the two that arrived for
+  // exactly this stage and have no other owner:
+  //   asdair.shop_line        migration 008 - the durable interpretation
+  //   asdair.pipeline_command migration 009 - the machine ledger
+  // Everything else is written through the component that owns it.
+  const OWNED = ['asdair.shop_line', 'asdair.pipeline_command'];
   const writers = shippingFiles()
+    // The backfill is the ONE deliberate exception - retiring the legacy
+    // pending_action rows IS its job, and the test below governs it instead.
+    .filter((f) => path.basename(f) !== 'migrate-command-ledger.js')
     .map((f) => ({ f, src: read(f) }))
     .filter(({ src }) => /INSERT INTO|UPDATE asdair\./i.test(src));
   for (const { f, src } of writers) {
     const tables = [...src.matchAll(/(?:INSERT INTO|UPDATE)\s+(asdair\.\w+)/gi)].map((m) => m[1]);
     for (const t of tables) {
-      assert.equal(t, 'asdair.shop_line',
+      assert.ok(OWNED.includes(t),
         `${path.basename(f)} writes ${t} directly instead of through the component that owns it`);
     }
+  }
+});
+
+// =====================================================================
+// THE SEPARATION OF THE MACHINE LEDGER FROM THE HUMAN'S LIST
+//
+// asdair.pending_action is what the Cockpit and the Telegram status card show
+// Warwick as OUTSTANDING ACTIONS. Since migration 009 the pipeline keeps its
+// own bookkeeping in asdair.pipeline_command, and NOTHING it does for itself
+// may write to pending_action again.
+//
+// Filtering it in the UI was explicitly rejected as a fix, so these are the
+// proofs that the defect is gone from the DATA rather than hidden in a view.
+// The behavioural half lives in commandLedger.test.js; this is the structural
+// half, and structural absence is only provable by looking at the source.
+// =====================================================================
+
+test('SEPARATION (structural): no shipping module can write asdair.pending_action at all', () => {
+  for (const file of shippingFiles()) {
+    // The backfill is the ONE deliberate exception; the next test governs
+    // exactly what it is allowed to do to that table.
+    if (path.basename(file) === 'migrate-command-ledger.js') continue;
+    const src = read(file);
+    assert.doesNotMatch(src, /INSERT\s+INTO\s+asdair\.pending_action/i,
+      `${path.basename(file)} inserts into asdair.pending_action - the household's list is not the pipeline's ledger`);
+    assert.doesNotMatch(src, /UPDATE\s+asdair\.pending_action/i,
+      `${path.basename(file)} updates asdair.pending_action`);
+    // The two shopStore entry points that reach that table are the only other
+    // door into it, and no pipeline module may call either.
+    assert.doesNotMatch(src, /addPendingAction|resolvePendingAction/,
+      `${path.basename(file)} calls shopStore's pending_action writer`);
+  }
+});
+
+test('SEPARATION (structural): the backfill may only RETIRE legacy rows - it can neither create nor delete one', () => {
+  const src = read(path.join(HERE, 'migrate-command-ledger.js'));
+  assert.doesNotMatch(src, /INSERT\s+INTO\s+asdair\.pending_action/i,
+    'the backfill creates rows in the household action list');
+  assert.doesNotMatch(src, /DELETE\s+FROM/i, 'the backfill deletes - the legacy rows are history, not litter');
+  const updates = [...src.matchAll(/UPDATE\s+asdair\.pending_action[\s\S]{0,400}?(?=`)/gi)].map((m) => m[0]);
+  assert.equal(updates.length, 1, 'the backfill touches asdair.pending_action in more than one statement');
+  assert.match(updates[0], /SET status = 'abandoned'/, 'the backfill does something other than retire');
+  assert.match(updates[0], /WHERE id = \$2 AND status = 'pending'/,
+    'the backfill must only retire rows that are still PENDING, and must be a no-op on a re-run');
+  assert.match(updates[0], /note = coalesce\(note \|\| ' \| ', ''\) \|\| \$1/,
+    'the backfill must APPEND its pointer, never overwrite the original note');
+});
+
+test('SEPARATION (structural): store.js names pending_action in exactly one statement, and it is a SELECT', () => {
+  const src = read(path.join(HERE, 'store.js'));
+  const statements = [...src.matchAll(/(SELECT|INSERT INTO|UPDATE|DELETE FROM)[\s\S]{0,400}?asdair\.pending_action/gi)]
+    .map((m) => m[1].toUpperCase());
+  assert.deepEqual(statements, ['SELECT'],
+    'store.js must touch asdair.pending_action exactly once, to READ the household\'s genuine actions');
+});
+
+test('SEPARATION (structural): there is no way left to spell a pipeline pending_action row', () => {
+  // `commandActionType` / `outboxActionType` produced the `cmd:` / `msg:`
+  // action_types. They are GONE, not merely unused: a key that cannot be built
+  // cannot be written by a future edit that forgets why.
+  const keys = read(path.join(HERE, 'keys.js'));
+  assert.doesNotMatch(keys, /export function commandActionType/,
+    'commandActionType still exists - a pipeline action_type can still be spelled');
+  assert.doesNotMatch(keys, /export function outboxActionType/,
+    'outboxActionType still exists - a pipeline action_type can still be spelled');
+  for (const file of shippingFiles()) {
+    assert.doesNotMatch(read(file), /commandActionType|outboxActionType/,
+      `${path.basename(file)} still builds a pending_action action_type for pipeline plumbing`);
   }
 });
 

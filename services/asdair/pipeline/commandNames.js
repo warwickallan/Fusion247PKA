@@ -55,8 +55,8 @@ export const COMMAND_NAMES = Object.freeze(Object.values(COMMANDS));
  *
  * `durable:false` marks the one read-only command. getStatus answers from the
  * status projection and writes nothing at all - recording a durable "somebody
- * looked at the status" row would fill the household's outstanding-actions list
- * with noise, and looking is not an intent to be advanced.
+ * looked at the status" row would fill the machine ledger with noise the runner
+ * would then have to retire, and looking is not an intent to be advanced.
  *
  * `perLine`/`perQuestion` mark the two commands that may legitimately be
  * outstanding more than once at a time for one shop, and therefore carry a
