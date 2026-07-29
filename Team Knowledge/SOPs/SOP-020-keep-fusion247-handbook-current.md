@@ -9,7 +9,7 @@
   - a shared operating page's subject matter changes (a new specialist hired, a new platform/integration added, a governance/delivery rule changes, a new decision/reversal/lesson worth recording);
   - a BUILD/PR merges that a Handbook capability page describes (e.g. Fusion Health, VlogOps) — **newly accepted functionality**;
   - a Foundry IDEA is promoted, parked, or rejected;
-  - an open Tier-1 recommendation/direction-decision referenced from a Handbook page (e.g. AsdAIr, CareerAIr) is approved, amended, or declined by Warwick.
+  - an open Tier-1 recommendation/direction-decision referenced from a Handbook page (e.g. AsdAIr, or a withheld private capability) is approved, amended, or declined by Warwick.
 - **References:** ClickUp `Fusion 247 Handbook` doc (`2kxuxw3a-812`) — `01 — Handbook Maintenance Contract`, `01A — Initial Handbook Population Brief`, `99 — Capability Page Template`, `11 — Handbook Population Tracker`; [[SOP-018-independent-change-qa]] (the same-model-review honesty rule applies to any Handbook update claiming a page is now COMPLETE); [[SOP-019-fusion-delivery-tracking]] (the delivery-tracking discipline this SOP's evidence is drawn from).
 
 ## Why this exists
@@ -30,7 +30,7 @@ The Handbook's own Maintenance Contract (ClickUp `01`) already establishes that 
 
 ## What this SOP does not do
 
-- It does not authorize a new Handbook population batch, a new capability page, or work on any unresolved decision (e.g. AsdAIr, CareerAIr) — those still require their own Warwick-authorized process.
+- It does not authorize a new Handbook population batch, a new capability page, or work on any unresolved decision (e.g. AsdAIr, or a withheld private capability) — those still require their own Warwick-authorized process.
 - It does not replace independent review — a Handbook page correction is still subject to the same PASS / PASS WITH CORRECTIONS review discipline used during the initial population.
 - It does not touch code, Builds, Foundry ideas, or agent contracts — only the ClickUp Handbook and its own tracker.
 

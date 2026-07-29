@@ -20,7 +20,7 @@ _Last rebuilt: 2026-07-28T09:48:00Z_
 - [[tsk-2026-07-16-001-exact-sha-review-gate-automation]] — Idea: Exact-SHA Review Gate Automation (Corpus Reconciliation Pipeline) — assignee: unassigned — created 2026-07-16
 
 ### Priority 4 — low
-- [[tsk-2026-07-10-004-careerair-migration-direction-decision]] — Direction decision: CareerAIR migration scope — assignee: unassigned — created 2026-07-10 — deprioritized 2026-07-11
+- [[tsk-2026-07-10-004-private-capability-migration-direction-decision]] — Direction decision: migration scope for a withheld private capability — assignee: unassigned — created 2026-07-10 — deprioritized 2026-07-11 — REDACTED for privacy 2026-07-29
 - [[tsk-2026-07-10-005-asdair-retained-external-recommendation]] — Recommendation: AsdAIr automation stays retained-external; project knowledge may enter PKM/My Life/Projects — assignee: unassigned — created 2026-07-10 — deprioritized 2026-07-11
 
 ## In progress (0)

@@ -83,7 +83,7 @@ it hunts mechanisms that map onto a Fusion *component*. "Build a public reputati
 doors" is not a component-transfer — it is a strategic/career theme — so Arc's lens slides right past it, exactly as
 it would slide past any theme that isn't a neat mechanism→target mapping. A **Source-Intelligence** step reading for
 *"what did this say"* would have retained it as a first-class theme (and it is arguably the single most Warwick-
-relevant vein: Fusion builds → VlogOps → X proof-of-work → authority → CareerAIr → relationships → revenue).
+relevant vein: Fusion builds → VlogOps → X proof-of-work → authority → a withheld private capability → relationships → revenue).
 
 ## 7. Why only 3 Arc atoms (secondary, real, but NOT the primary problem)
 

@@ -78,7 +78,7 @@ This task does not attempt to resolve any of the items below. It exists to hold 
 - **New, per [[2026-07-12-client-delivery-operational-schema-evaluation]] (IDEA-003 evaluation, `tsk-2026-07-12-001`):** whether to authorize a scoped Register Item write-and-verification metadata addition (`created_by`/`review_status`/`reviewed_by`/`reviewed_date`, or a standalone entity) — the evaluation's recommended smallest-useful-next-proof, closing GL-006's own already-documented "Known gaps" #1. Its precondition (a synthetic/real engagement to test against) is now satisfied — see the resolved item above — but the decision itself remains tracked separately as GitHub issue #17, **not yet authorized**.
 
 **Explicitly not blockers (roadmap or external-input-blocked, tracked for completeness only, not chased here):**
-CareerAIR (`tsk-2026-07-10-004`), AsdAIr (`tsk-2026-07-10-005`), TubeAIR capture adapter, ICOR course-note adapter + business-domain naming, ClickUp/Withings/calendar connectors, raw ChatGPT export + WS-002 import (blocked on Warwick exporting the material).
+the withheld capability (`tsk-2026-07-10-004`), AsdAIr (`tsk-2026-07-10-005`), TubeAIR capture adapter, ICOR course-note adapter + business-domain naming, ClickUp/Withings/calendar connectors, raw ChatGPT export + WS-002 import (blocked on Warwick exporting the material).
 
 ## Success criteria
 
