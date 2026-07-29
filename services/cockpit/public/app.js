@@ -394,6 +394,24 @@ createApp({
           </button>
         </div>
 
+        <!-- Parked & declined — the two places a decision you postponed can be found again. ABOVE
+             Latest deliberately: a surface where you still owe yourself a decision outranks a
+             passive feed. Both rows render unconditionally; a destination that only exists while
+             it is non-empty cannot be learned, which is how Archive became unreachable. -->
+        <div class="grp" style="margin-top:20px">
+          <h2>🗂 Parked &amp; declined</h2>
+          <div class="item grey" role="button" tabindex="0" :aria-label="'Later — ' + deferred.length + ' parked'"
+               @click="go('later')" @keydown.enter="go('later')" @keydown.space.prevent="go('later')">
+            <div class="i-main"><div class="i-eyebrow">Parked · not dropped</div><div class="i-title">Later</div></div>
+            <span class="count">{{ deferred.length }}</span><span class="chev" aria-hidden="true">›</span>
+          </div>
+          <div class="item grey" role="button" tabindex="0" :aria-label="'Archive — ' + archived.length + ' declined'"
+               @click="go('archive')" @keydown.enter="go('archive')" @keydown.space.prevent="go('archive')">
+            <div class="i-main"><div class="i-eyebrow">Declined · not deleted</div><div class="i-title">Archive</div></div>
+            <span class="count">{{ archived.length }}</span><span class="chev" aria-hidden="true">›</span>
+          </div>
+        </div>
+
         <!-- Latest: recent activity, under the tiles -->
         <div class="grp" style="margin-top:20px" v-if="latest.length">
           <h2>🕑 Latest</h2>
@@ -554,7 +572,7 @@ createApp({
         <div class="tiles">
           <button class="tile grey"><span class="t-num">{{ state.ingestedCount ?? '—' }}</span><span class="t-lbl">Ingested</span><span class="t-desc">sources processed</span></button>
           <button class="tile green" @click="go('outputs')"><span class="t-num">{{ outputs.length }}</span><span class="t-lbl">Insights</span><span class="t-desc">so-what for you</span></button>
-          <button class="tile blue" @click="go('attention')"><span class="t-num">{{ suggestions.length }}</span><span class="t-lbl">Make better</span><span class="t-desc">brain ideas</span></button>
+          <button class="tile blue" @click="go('ideas')"><span class="t-num">{{ suggestions.length }}</span><span class="t-lbl">Make better</span><span class="t-desc">brain ideas</span></button>
           <button class="tile grey" title="graph merges I'm holding — not something you need to action"><span class="t-num">{{ housekeeping }}</span><span class="t-lbl">Housekeeping</span><span class="t-desc">graph Qs I'm holding</span></button>
         </div>
         <div class="tiles" style="margin-top:12px">
@@ -572,9 +590,24 @@ createApp({
         </div>
       </section>
 
+      <!-- LATER (deferred items — parked by you, and kept). Items render as plain .item.grey on the
+           neutral --park rail: NOT .item.deferred. The fade is how a deferred card is marked when it
+           sits among live ones; in a lane where everything is deferred it signals nothing and only
+           costs contrast (GL-003 D-18). Restore is decide(it,'reopen') — the same action and the same
+           word as Archive, because two words for one action is a third vocabulary the user must learn. -->
+      <section v-else-if="area==='later'" class="pane">
+        <header class="p-h"><button class="back" style="padding:0;margin-right:4px" @click="go('home')">‹</button><h1>Later</h1><span class="count">{{ deferred.length }}</span></header>
+        <p class="empty" v-if="!deferred.length">Nothing parked — nothing waiting for a second look.</p>
+        <p class="empty" v-else>Parked, not dropped. Everything here stays until you bring it back — nothing expires and nothing resurfaces on its own.</p>
+        <div v-for="it in deferred" :key="it.id" class="item grey">
+          <div class="i-main" @click="open(it,'attention')"><div class="i-eyebrow">Later · {{ moduleLabel(it.source_module) }}</div><div class="i-title">{{ it.title }}</div></div>
+          <div class="i-act"><button class="act" :disabled="busy" @click.stop="decide(it,'reopen')">Bring back</button></div>
+        </div>
+      </section>
+
       <!-- ARCHIVE (declined items — change your mind here) -->
       <section v-else-if="area==='archive'" class="pane">
-        <header class="p-h"><button class="back" style="padding:0;margin-right:4px" @click="go('attention')">‹</button><h1>Archive</h1><span class="count">{{ archived.length }}</span></header>
+        <header class="p-h"><button class="back" style="padding:0;margin-right:4px" @click="go('home')">‹</button><h1>Archive</h1><span class="count">{{ archived.length }}</span></header>
         <p class="empty" v-if="!archived.length">Nothing declined — nothing to change your mind about.</p>
         <div v-for="it in archived" :key="it.id" class="item grey">
           <div class="i-main" @click="open(it,'attention')"><div class="i-eyebrow">Declined · {{ moduleLabel(it.source_module) }}</div><div class="i-title">{{ it.title }}</div></div>
