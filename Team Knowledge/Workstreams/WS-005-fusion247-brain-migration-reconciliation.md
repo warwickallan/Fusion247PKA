@@ -113,7 +113,7 @@ BUILD-000 (Fusion247 Brain semantic merge assurance, the frozen 84-source pack) 
 - **Final Bundle-8 totals:** 39 findings — 28 verified-already-present, 1 implemented-now, 8 defunct/no-further-action, 1 routed-to-foundry, 1 routed-to-build, 0 requires-warwick-decision. Full detail: [[2026-07-15-build-000-bundle-8-direct-audit]].
 - **Ledger:** [[2026-07-15-build-000-frozen-pack-reconciliation-ledger]] — 84 rows, 84 unique Copy IDs, mechanically verified.
 - **Telegram/TubeAIR lineage:** recorded against the existing IDEA-002 page (`https://app.clickup.com/90121891946/docs/2kxuxw3a-812/2kxuxw3a-3352` §10), completed externally by Warwick, independently verified present by Fable.
-- **CareerAIR, AsdAIr, Bellrock/Client Delivery material:** routed to their respective future Ideas/Builds (Foundry ideas, issue #17/BUILD-003), not claimed implemented.
+- **A withheld private capability, AsdAIr, Bellrock/Client Delivery material:** routed to their respective future Ideas/Builds (Foundry ideas, issue #17/BUILD-003), not claimed implemented.
 - **Closure statement:** `FUSION247 BRAIN CORPUS RECONCILED — EVERY AUTHORISED SOURCE ACCOUNTED FOR AND ITS USEFUL MEANING ASSIMILATED OR EXPLICITLY DISPOSITIONED.`
 
 This closes the confirmed merge blocker this Workstream existed to resolve for the frozen pack. WS-005's method remains available for any future reconciliation pass against newer Fusion247 Brain content — closing this pass does not retire the Workstream.

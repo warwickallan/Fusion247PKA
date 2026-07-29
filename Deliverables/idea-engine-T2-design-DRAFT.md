@@ -29,7 +29,7 @@ frame-specific self-kill calibration. Branches never see each other.
 3. **Operational-leverage / Warwick-reality** (absorbs actionable UX) — indexed on Warwick's live toil/next-action
    ("kill a manual step," "blind spot"); un-clever but high-Impact. B: manual-steps + priorities + Impact lens.
 4. **Commercial / cash-opportunity** — external value; routes Specialist→Warwick direct. Different objective
-   entirely; internal frames under-surface it. B: Cash priorities, Bellrock/monetisation, CareerAIr/Scout.
+   entirely; internal frames under-surface it. B: Cash priorities, Bellrock/monetisation, a withheld private capability/Scout.
 5. **Cross-domain / weird-but-defensible** — the high-novelty long tail ("≥1 idea none of us spotted"); optimises
    distance-under-defensibility (inverse of frame 1). B: **deliberately minimal** (starve relevance cues, lowers
    contamination). Self-kill = **harshest** (the fixture-4 garbage risk lives here).

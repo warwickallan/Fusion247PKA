@@ -12,7 +12,7 @@ note: NOT Honcho-derived truth. A hand-distilled seed for the Transfer-Specialis
 
 **Right-now priorities (2026-07):** land the idea/Transfer-Intelligence engine (this experiment) · the Brain's north
 star = proactive "you nearly missed this" OUTPUTS, not graph curation · the Cockpit is the front door (just merged) ·
-CareerAIr + an outbound Scout come later · make Fusion earn its keep (Cash) and eventually not need Bellrock.
+A withheld private capability + an outbound Scout come later · make Fusion earn its keep (Cash) and eventually not need Bellrock.
 
 **Strong preferences (how Warwick wants things built):** build TO THE GOAL, slice only to prove — never ship the
 slice as the goal · future-proof/scalable unless cost-prohibitive · minimise token cost AND Warwick-attention cost ·

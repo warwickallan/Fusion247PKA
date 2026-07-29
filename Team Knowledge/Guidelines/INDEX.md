@@ -19,8 +19,9 @@ Filename pattern: `GL-NNN-<title>.md`.
 | GL-009 | [[GL-009-public-private-knowledge-boundary]] | Public/private boundary for keeping Team Knowledge architecture publishable while local/private PKM context remains out of public commit history unless Warwick explicitly approves exact publication. |
 | GL-010 | [[GL-010-warwick-knowledge-value-profile]] | Structure, stewardship, expiry, promotion, intake valuation, and retrieval rules for Warwick's private/local Knowledge Value Profile and About Warwick / Current Context view. |
 | GL-011 | [[GL-011-immutable-source-retention]] | Top-level immutable raw-source store and register semantics for general PKM/team intake, including duplicate, recapture, supersession, adapter, and public/private payload rules. |
+| GL-012 | [[GL-012-secrets-store-access-boundary]] | **Binds every agent, subagent and ephemeral worker.** `C:\.fusion247\**` denied by default; access (read AND write) only to one `C:/.fusion247/private/<project>/**` subtree explicitly declared in a Work Order's `file_surface`, implying nothing adjacent; credential material forbidden everywhere including inside an allowed subtree; no worker judges whether a file "looks sensitive"; scanner coverage with a deliberate preflight/handback asymmetry; and the record of two earlier boundaries that failed in opposite directions. Sibling to GL-009 — that one governs what leaves for the public repo, this one governs access to the off-repo secrets store. |
 
-*Reserved:* none. Next free Guideline slot is GL-012.
+*Reserved:* none. Next free Guideline slot is GL-013.
 
 ## When to write a new Guideline
 

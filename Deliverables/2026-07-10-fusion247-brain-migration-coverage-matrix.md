@@ -97,7 +97,7 @@ Capabilities the source registers imply exist but where I could not find direct 
 
 Capabilities still genuinely live and load-bearing in Fusion247 Brain that myPKA has no equivalent for, and that are not `retained-as-source` by deliberate choice (i.e., real gaps, not intentional exclusions):
 
-- **CareerAIR** (row 36) — active status, three working SOPs, real application history (Dragonfly IT Resources, Evaluagent, others visible in the session log). This is a live, actively-used system with no myPKA presence at all.
+- **A private personal capability** (row 36) — active status, three working SOPs, and real usage history. This is a live, actively-used system with no myPKA presence at all. *(Identifying details withdrawn 2026-07-29 under Warwick's absolute ruling that no personal-capability specifics belong in the public repository. The named counterparties removed here were real third parties; the record's meaning — that the capability is live and in genuine use — is unchanged.)*
 - **AsdAIr** (row 37) — active, weekly-cadence household automation with real order history.
 - **The general CategorisAIr source-triage function** (row 13) — F247's "Hermes transcript" pilot and the broader source-classification registry represent ongoing infrastructure with no myPKA equivalent.
 - **F247 Anti-AI Writing Source Pack** (row 39) — actively referenced doctrine with a documented real incident behind it (see §Anti-pattern below).
