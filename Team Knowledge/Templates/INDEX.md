@@ -37,6 +37,19 @@ Structurally separate from the eight PKM templates above — these back `Client 
 | [[Templates/work-package]] | Work Package | `Client Delivery/<engagement-slug>/Work Packages/<engagement-slug>-wp-<NNN>-<slug>.md` |
 | [[Templates/register-item]] | Register Item (risk/issue/change/decision) | `Client Delivery/<engagement-slug>/Risk-Issue-Change-Decision Register/<engagement-slug>-reg-<NNN>.md` |
 
+### Delegation templates
+
+Not a PKM or Client Delivery entity — this one backs the team's own operating machinery. It is the
+canonical shape of a bounded Work Order, and the reason it lives here rather than inside a specialist's
+contract is that a template owned by one reader drifts from every other reader.
+
+| Template | Artefact | Goes under |
+|---|---|---|
+| [[Templates/work-order]] | Work Order (bounded dispatch to a specialist) | `Builds/<BUILD-ID>/Work Packages/<wp-slug>.md`, or `Deliverables/YYYY-MM-DD-<slug>-work-order.md` when standalone |
+
+The lifecycle it enforces — `DRAFT → WORKER READ-BACK → LARRY ACCEPTS OR AMENDS → ISSUED → RUNNING` — is
+mandatory, and the procedure that runs against it is [[SOP-022-work-order-preflight]].
+
 ## Rules these templates follow
 
 - Frontmatter field names match the SQLite column names in [[SOP-002-convert-mypka-to-sqlite]] for the eight PKM templates. The three Client Delivery templates are not (yet) part of the SQLite mirror — see [[GL-006-client-delivery-frontmatter-conventions]] §"Does this feed the SQLite mirror?".

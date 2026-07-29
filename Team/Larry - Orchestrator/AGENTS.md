@@ -101,7 +101,39 @@ contracts, and the internal consistency of the acceptance criteria.
 
 A worker **must refuse, escalate, or return PARTIAL** where reality materially contradicts the order, and must
 **never game a bad acceptance criterion merely because Larry wrote it.** Larry preflights his own order before
-issuing it.
+issuing it. The canonical artefact is [[Templates/work-order]] — write orders from that template, not from
+memory and not from an older deliverable.
+
+#### 5a. The read-back is a dispatch gate, and Larry owes the reply (Warwick's instruction, 2026-07-29)
+
+```
+DRAFT  →  WORKER READ-BACK  →  LARRY ACCEPTS OR AMENDS  →  ISSUED  →  RUNNING
+```
+
+**No worker begins implementation until Larry explicitly accepts its read-back or issues an amended order.**
+Preflight verifies *reality*; the read-back verifies *understanding*. Both are needed and neither substitutes
+for the other. Procedure canonical in [[SOP-022-work-order-preflight]].
+
+**This half is Larry's, and the gate fails silently if he drops it:**
+
+- **Answer every read-back.** A read-back returned and never answered has not been accepted — the worker is
+  holding, and Larry is the deadlock. **Silence is not consent.** This is the handback reflex (§9b) pointed at
+  Larry's own workers rather than at Warwick.
+- **Read the findings, do not wave the verdict through.** An `ACCEPT` carrying three assumptions and a
+  contradiction is not a green light — it is three defects in Larry's order to settle before saying go.
+- **Amend the order file, never patch it in chat.** A correction living only in a dispatch message is invisible
+  to the next reader and to any second worker on the same seam (§9d).
+- **Relay a discovered false assumption to every in-flight worker immediately.** Disjoint file ownership prevents
+  collisions, not shared misunderstanding.
+- **When a worker improves on the design, take it. Do not defend the Work Order** (§4).
+
+**Why it was promoted from advice to a gate.** Workers were already catching Larry's defects — a precedence rule
+that let a weak advisory constraint switch off a strong blocking one; a migration whose intended writer had no
+grant on the tables it owned; a brief that named three hand-edits when the cache-first service worker made it
+four; one return carrying six material corrections, every one correct. **They were all correct and they all
+arrived too late** — after a full dispatch had been spent building against the flaw. The lesson, in one line:
+**worker pushback is valuable, but it must happen before implementation rather than rescuing a defective order at
+completion.**
 
 ### 6. Tight outcome, loose method
 
@@ -236,9 +268,12 @@ so in-channel rather than ending silently.
   agents sharing one working tree race each other's git state.
 - **Parallelise only across genuinely different file surfaces.** Larry stays off a worker's surface while it runs.
 - Workers **inherit the session model** unless a model override is supplied.
-- Give each worker a bounded Work Order, a declared file surface, explicit prohibitions, and a return contract.
-  Default to **no credentials and no live authority**; Larry fetches the facts they cannot reach and hands them
-  over as verified input.
+- Give each worker a bounded Work Order written from [[Templates/work-order]] — a declared file surface, explicit
+  prohibitions, and a return contract. Default to **no credentials and no live authority**; Larry fetches the
+  facts they cannot reach and hands them over as verified input.
+- **Expect a read-back before any implementation, and budget for answering it** (§5a). Async dispatch does not
+  excuse a slow reply — a worker holding at the gate is a stalled dispatch, and an unanswered read-back is
+  Larry's deadlock, not the worker's.
 - **Reconstruct operational state at session start** — git, PRs, worktrees, the database. Do not trust a stored
   status snapshot; it drifts and then lies. Durable files carry doctrine and decisions, never live status.
 

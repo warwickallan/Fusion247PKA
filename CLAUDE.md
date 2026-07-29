@@ -50,6 +50,21 @@ Specialists are bound as Claude Code subagents at `.claude/agents/<slug>.md` —
 
 When a request needs a role no current specialist covers, the answer is never "no" — it is "let's hire them through Nolan" per `Team Knowledge/SOPs/SOP-001-how-to-add-a-new-specialist.md`.
 
+## Private surfaces and the secrets store (MANDATORY — read before any private-surface work)
+
+**The rule is `Team Knowledge/Guidelines/GL-012-secrets-store-access-boundary.md`. It is the SSOT — this is a pointer, not a copy.** Load GL-012 *before* dispatching or performing any work that touches `C:\.fusion247\**`.
+
+Six obligations, non-negotiable:
+
+1. **Load GL-012 first.** `C:\.fusion247\**` is denied by default; access is one exact `C:\.fusion247\private\<project>\**` subtree and nothing else — not the root, not siblings, not parents.
+2. **Every Work Order declares `private_surface`**, mandatory even when `none`. It is a template envelope field; a missing mandatory field is under-specification and the worker returns `REFUSE` at read-back.
+3. **Refuse ambiguous or undeclared access.** Never infer a surface from context. Inference at a refuse-or-build fork produces both false refusals and a gate that quietly fails to fire.
+4. **The private canonical master is the durable source** — never a live shim, never session memory. A shim is a copy; when the two disagree, the master wins and the shim is the defect.
+5. **Verify master/live synchronisation and bootstrap restoration whenever either changes.** A shim fixed only in the live clone silently reverts on the next fresh clone, taking a corrected security rule with it. This has already happened once.
+6. **Accept scanner evidence only for the exact declared surface, and only when output is redacted.** A repo-wide green says nothing about a private surface, and a scanner that echoes matched lines into a return message is an exfiltration path.
+
+Enforcement lives where it can bite, not here: the Work Order gate (`Team Knowledge/Templates/work-order.md`, `Team Knowledge/SOPs/SOP-022-work-order-preflight.md`), the scanner's `--surface` mode and its three-way exit code, and the bootstrap restoration test.
+
 ## Hard rules that constrain edits here
 
 - **Never modify, rename, or replace any `AGENTS.md`** (root or per-specialist), and never rename/delete scaffold folders or files without explicit approval.
