@@ -8,16 +8,23 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execSync, spawn } from 'node:child_process';
 import { q, w } from './db.mjs';
+import { privateAppsResponse, privateAppsStartupLine } from './private-apps.mjs';
+// Static serving — including the overlay route — lives in static.mjs so a gate can EXECUTE it.
+// It cannot be executed from here: this file imports db.mjs, which opens a live write pool on load.
+import { serveStatic, staticCtx } from './static.mjs';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
-// Serves from ./public by default; COCKPIT_PUB points a throwaway instance at a STAGING copy so cockpit UI
-// changes can be render-checked (node services/cockpit/render-check.mjs) BEFORE they replace the live assets.
-const PUB = path.resolve(process.env.COCKPIT_PUB || path.join(DIR, 'public')); // resolve so the startsWith() guard matches regardless of slash style
+// The serving context — which directory is served, and which tree the overlay must stay out of —
+// is built by ONE constructor in static.mjs (and COCKPIT_PUB is handled there). Not assembled here
+// as an object literal: `pub` is the containment root and `repoRoot` is not, they are the same type
+// and sat adjacent, and transposing them serves the whole repository over the tailnet. A single
+// constructor removes the call site where that mistake was possible, and the gate executes it.
+const STATIC = staticCtx(DIR, process.env);
 const REPO = path.resolve(DIR, '..', '..');
 const TK = path.join(REPO, 'Team Knowledge');
 const PORT = Number(process.env.COCKPIT_PORT || 8090);
 const BIND = process.env.COCKPIT_BIND || '127.0.0.1'; // localhost; Tailscale serve exposes it tailnet-only over HTTPS (matches Directus)
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml', '.ico': 'image/x-icon' };
+// MIME moved to static.mjs with the serving code that uses it — it had no other reader here.
 
 // Build identity so the app can show "you're on the latest" and tell itself apart from Directus/old URLs.
 let SHA = 'dev'; try { SHA = execSync('git rev-parse --short HEAD', { cwd: DIR }).toString().trim(); } catch { /* not a repo */ }
@@ -208,18 +215,6 @@ async function apiDeliverable(file) {
   try { return { ok: true, file: safe, text: fs.readFileSync(fp, 'utf8') }; } catch { return { ok: false, error: 'document missing' }; }
 }
 
-function serveStatic(req, res) {
-  let rel = decodeURIComponent(req.url.split('?')[0]);
-  if (rel === '/' || rel === '') rel = '/index.html';
-  const fp = path.join(PUB, path.normalize(rel).replace(/^(\.\.[/\\])+/, ''));
-  if (!fp.startsWith(PUB)) { res.writeHead(403); return res.end('forbidden'); }
-  fs.readFile(fp, (err, buf) => {
-    if (err) { res.writeHead(404); return res.end('not found'); }
-    res.writeHead(200, { 'content-type': MIME[path.extname(fp)] || 'application/octet-stream', 'cache-control': 'no-cache' });
-    res.end(buf);
-  });
-}
-
 const server = http.createServer(async (req, res) => {
   try {
     if (req.url.startsWith('/api/state')) return j(res, 200, await apiState());
@@ -290,8 +285,16 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     if (req.url.startsWith('/api/health')) return j(res, 200, { status: 'ok', build: BUILD });
-    return serveStatic(req, res);
+    return serveStatic(req, res, STATIC);
   } catch (e) { j(res, 500, { ok: false, error: e.message }); }
 });
 
-server.listen(PORT, BIND, () => console.log(`Fusion247 Cockpit on http://${BIND}:${PORT} (tailnet-private)`));
+server.listen(PORT, BIND, () => {
+  console.log(`Fusion247 Cockpit on http://${BIND}:${PORT} (tailnet-private)`);
+  // Say once, out loud, what the overlay actually resolved to. A misconfigured path serves exactly
+  // what "no overlay" serves, so without this line a typo is indistinguishable from switching it
+  // off — and the surface you were expecting just never appears. The verdict is printed; the path
+  // never is, because where an overlay lives can itself say what it is for.
+  const line = privateAppsStartupLine(privateAppsResponse(process.env, REPO));
+  console[line.level](line.message);
+});

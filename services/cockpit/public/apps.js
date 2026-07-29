@@ -15,6 +15,26 @@
                  name an app KEY, never a URL, so this registry can't point the server at an
                  arbitrary host. The two files share exactly one thing: the key. Not duplication.
 
+   THE LOCAL OVERLAY, and what it is for. A registry entry is a label, a blurb and a lane, and it is
+   the only way an app gets a cockpit surface — so "give this thing a surface" and "write down what
+   this thing is" are currently the same edit. The overlay separates them: `/private-apps.js` is an
+   OPTIONAL local registry that server.mjs reads from a path OUTSIDE this repository
+   (COCKPIT_PRIVATE_APPS), absent by default and then serving empty. It publishes
+   window.FUSION_PRIVATE_APPS in exactly the AppEntry shape below and its entries are merged here
+   under the same normalisation. The public registry always wins a key collision: an overlay may ADD
+   an app, never rewrite one.
+
+   It is a generic extension point, and that is the whole of the claim. It does not make this file,
+   this directory or this repository quiet about anything else, and nothing here should be read as
+   saying it does — see the note in services/cockpit/private-apps.mjs.
+
+   MODULES vs APPS. An app is a PLACE. A module is the thing a ROW came from (`source_module` on an
+   attention item or an output) — every app is one, plus a few producers that are not places you can
+   visit. The module registry is DERIVED from both lists below, so a module's human name and its
+   Home lane (Life vs Build) are registry fields, never a second map in app.js. That is what makes
+   the extension point reach the whole surface: without it, "add an app" still means editing a label
+   map and a lane set in app.js, and an overlay could add a tile but never a correctly-labelled row.
+
    HONESTY RULE (non-negotiable). The cockpit reports whether an app's service ANSWERED, measured
    at the moment it asked. It never assumes "up", never shows a placeholder figure, and never
    invents a number. Unknown is a first-class value and prints as "checking…" or "not running".
@@ -46,6 +66,19 @@
  * @property {AppView[]} [views]        Internal navigation. Defaults to a single Overview.
  * @property {string[]} [about]         Facts safe to show with the service down (no live data).
  * @property {string}  [offline]        What to tell Warwick when the service does not answer.
+ * @property {string}  [moduleLabel]    How this key prints as a ROW source. Defaults to `label`.
+ * @property {Lane}    [lane]           Which Home lane its rows sit in. Defaults to 'build'.
+ *
+ * @typedef {'life'|'build'} Lane
+ *
+ * @typedef {Object} ModuleEntry        A producer of rows that is NOT a place you can visit.
+ * @property {string}  key              Matches `source_module` on an attention item or output.
+ * @property {string}  label            How it prints on a row's eyebrow.
+ * @property {Lane}    [lane]           Defaults to 'build'.
+ *
+ * @typedef {Object} Module             What window.FUSION_MODULES maps each key to.
+ * @property {string} label
+ * @property {Lane} lane
  *
  * @typedef {Object} NormalisedApp      What window.FUSION_APPS actually contains — every field
  *                                      present and frozen, so the UI never guards for undefined.
@@ -71,6 +104,10 @@ const APPS = [
     // It has a read service (services/asdair/cockpit-api, GET /asdair/health). Whether it is
     // RUNNING is measured, never assumed — as of this build it is not deployed.
     probe: true,
+    // Its ROWS print as "Shopping" — Warwick's word for the job — while the app tile keeps its own
+    // name. Two module keys ('shopping' and this one) deliberately share one human name.
+    moduleLabel: 'Shopping',
+    lane: 'life',
     views: [
       { key: 'overview', label: 'Overview', blurb: 'Where this week’s shop has got to, and anything waiting on you.' },
       { key: 'details', label: 'Details', blurb: 'Every line on the list — what it was read as, what it matched in the household catalogue, and the evidence behind the match.' },
@@ -101,6 +138,23 @@ const APPS = [
   // ───────────────────────────────────────────────────────────────────────────────────────────
 ];
 
+/* Row producers that are NOT places. Every app above is also a module (see buildModules); these are
+   the ones with no workspace to visit. Adding an app does not mean adding a line here. */
+/** @type {ModuleEntry[]} */
+const MODULES = [
+  { key: 'brain', label: 'Brain' },
+  { key: 'builds', label: 'Builds' },
+  { key: 'shopping', label: 'Shopping', lane: 'life' },
+];
+
+/* EVERY key this public tree publishes — apps and module-only producers alike. This is the set an
+   overlay may not claim. It has to be both lists: a key that appears only in MODULES is still a
+   published key, and leaving it out of the collision set is exactly how an overlay got to rewrite
+   one. Built once here so there is a single answer to "is this key already ours". */
+const PUBLIC_KEYS = new Set(
+  MODULES.map((m) => String(m.key)).concat(APPS.map((a) => String(a.key))),
+);
+
 const TONES = ['green', 'blue', 'amber', 'grey', 'red'];
 
 /**
@@ -128,7 +182,77 @@ function normaliseApp(a) {
   });
 }
 
+/**
+ * Entries contributed by the optional local overlay (window.FUSION_PRIVATE_APPS, published by
+ * /private-apps.js). Local data still gets validated: an entry needs a key and a label to be an
+ * app at all, and a key already claimed by the public registry is DROPPED. The overlay's job is to
+ * add a place the public tree must not name — not to silently redress one that is already here.
+ *
+ * THE COLLISION SET IS EVERY PUBLISHED KEY, apps AND modules. An earlier revision seeded it from
+ * APPS alone, which left the module-only keys unguarded: an overlay entry for one of them passed
+ * this filter, and then — because buildModules applies apps AFTER modules — quietly overwrote the
+ * published label and lane. It was found by executing it, not by reading it, and the test that
+ * should have caught it asserted against APPS[0], the one key that happened to BE protected.
+ * @param {typeof globalThis} w
+ * @returns {AppEntry[]}
+ */
+function overlayApps(w) {
+  const raw = (w && Array.isArray(w.FUSION_PRIVATE_APPS)) ? w.FUSION_PRIVATE_APPS : [];
+  const taken = new Set(PUBLIC_KEYS);
+  const out = [];
+  for (const e of raw) {
+    if (!e || typeof e !== 'object') continue;
+    const key = String(e.key || '').trim();
+    if (!key || taken.has(key)) continue;
+    if (!String(e.label || '').trim()) continue;
+    taken.add(key);
+    out.push(e);
+  }
+  return out;
+}
+
+/**
+ * Derive the module registry from the non-place producers PLUS every app.
+ *
+ * Three passes, and the third is guarded. The public lists may overwrite each other freely — this
+ * tree is internally consistent and a genuine public collision should be visible, not silently
+ * resolved. The overlay pass may only fill keys nobody has claimed.
+ *
+ * Two barriers now stand between an overlay and a published module: the collision set in
+ * overlayApps, and this guard. The collision set is the load-bearing one — remove it and an overlay
+ * entry reaches FUSION_APPS as a new app. This guard is what stops it also rewriting the published
+ * module's label and lane on the way through, and it is only reached when the first barrier is
+ * gone. Stated that way because it is what the mutation runs actually showed: removing this guard
+ * alone changes nothing observable, so "either alone would have been enough" would have been a
+ * claim the tests do not support.
+ *
+ * Null-prototype so a lookup can only ever return something that was registered — `MODULE['toString']`
+ * is undefined here, not a function, and the caller needs no hasOwnProperty dance. `k in reg` is
+ * therefore an honest "was this registered", with no inherited keys to lie about.
+ * @param {ModuleEntry[]} mods
+ * @param {AppEntry[]} apps
+ * @param {AppEntry[]} overlay
+ * @returns {Record<string, Module>}
+ */
+function buildModules(mods, apps, overlay) {
+  const reg = Object.create(null);
+  const add = (key, label, lane, guarded) => {
+    const k = String(key || '').trim();
+    if (!k) return;
+    if (guarded && k in reg) return;
+    reg[k] = Object.freeze({ label: String(label || k), lane: lane === 'life' ? 'life' : 'build' });
+  };
+  for (const m of mods) add(m.key, m.label, m.lane, false);
+  for (const a of apps) add(a.key, a.moduleLabel || a.label, a.lane, false);
+  for (const o of overlay) add(o.key, o.moduleLabel || o.label, o.lane, true);
+  return reg;
+}
+
+const OVERLAY_APPS = overlayApps(window);
+
 /** @type {ReadonlyArray<NormalisedApp>} */
-window.FUSION_APPS = Object.freeze(APPS.map(normaliseApp));
+window.FUSION_APPS = Object.freeze(APPS.concat(OVERLAY_APPS).map(normaliseApp));
+/** @type {Readonly<Record<string, Module>>} */
+window.FUSION_MODULES = Object.freeze(buildModules(MODULES, APPS, OVERLAY_APPS));
 
 }(window));
