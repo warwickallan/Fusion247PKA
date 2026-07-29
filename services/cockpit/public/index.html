@@ -18,6 +18,10 @@
 <body>
   <div id="app"></div>
   <script src="/vendor/vue.global.prod.js"></script>
+  <!-- Optional LOCAL app overlay. Served by the server from a file OUTSIDE this repository, empty
+       by default, never cached and never in the service-worker shell (services/cockpit/private-apps.mjs).
+       It publishes window.FUSION_PRIVATE_APPS and so MUST load before apps.js merges it. -->
+  <script src="/private-apps.js"></script>
   <!-- The apps registry publishes window.FUSION_APPS and MUST load before app.js reads it. -->
   <script src="/apps.js"></script>
   <script src="/app.js"></script>

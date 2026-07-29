@@ -17,10 +17,25 @@ const AREAS = [
 // (public/apps.js) — adding an app is one entry there, never an edit in three places in this file.
 /** @type {ReadonlyArray<{key:string,label:string,desc:string,icon:string,tone:string,probe:boolean,views:ReadonlyArray<{key:string,label:string,blurb:string}>,about:ReadonlyArray<string>,offline:string}>} */
 const APPS = (typeof window !== 'undefined' && Array.isArray(window.FUSION_APPS)) ? window.FUSION_APPS : [];
+// How a ROW's source_module prints, and which Home lane it sits in, comes from the same registry.
+// Deliberately NOT a map in this file: a hardcoded list is a second place every module has to be
+// named, and this file is the public one. Unregistered keys fall back to the raw key — honest, and
+// it means a module the public tree does not know about still renders rather than vanishing.
+//
+// INTENDED DEGRADATION, recorded so nobody "fixes" it back. This change removed a module key from
+// the public registry along with its label and its lane. Rows carrying that key therefore now print
+// the RAW KEY and sit in the Build lane, where they used to print a proper name and sit in Life.
+// That is not a regression to repair by re-adding the entry — the entry is what the overlay exists
+// to hold. Restoring the label and the lane is done by supplying an overlay entry for that key
+// (see services/cockpit/private-apps.mjs), never by putting it back in the list below.
+// Consequence worth stating plainly: with no overlay loaded, the surface is not byte-identical to
+// the previous build wherever such rows exist. It is identical everywhere else.
+/** @type {Readonly<Record<string,{label:string,lane:'life'|'build'}>>} */
+const MODULE = (typeof window !== 'undefined' && window.FUSION_MODULES) ? window.FUSION_MODULES : Object.create(null);
 
 const kindOf = (it) => it.kind || 'suggestion';
 const catLabel = (it) => ({ blocked: 'Blocked by you', decision: 'Decision', suggestion: 'Suggestion' }[kindOf(it)] || 'Output');
-const moduleLabel = (m) => ({ brain: 'Brain', shopping: 'Shopping', asdair: 'Shopping', builds: 'Builds', careerair: 'CareerAIr' }[m] || m || '');
+const moduleLabel = (m) => { const r = MODULE[m]; return (r && r.label) || m || ''; };
 const oneLine = (t) => { if (!t) return ''; const s = String(t).split('\n')[0]; return s.length > 130 ? s.slice(0, 127) + '…' : s; };
 const ago = (ts) => { if (!ts) return ''; const d = (Date.now() - new Date(ts).getTime()) / 60000; if (d < 60) return `${Math.max(1, Math.round(d))}m`; if (d < 1440) return `${Math.round(d / 60)}h`; return `${Math.round(d / 1440)}d`; };
 
@@ -149,8 +164,10 @@ createApp({
     const tiSpin = (it) => (it && it.spin && typeof it.spin === 'object' ? it.spin : {});
     const tiStars = (it) => '★'.repeat(Math.max(1, Math.min(5, Number((it.nvfi || {}).impact) || 3)));
 
-    const LIFE = new Set(['shopping', 'asdair', 'careerair']);
-    const laneOf = (it) => (LIFE.has(it.source_module) ? 'life' : 'build');
+    // Life vs Build is a registry field (public/apps.js), not a set here. Anything unregistered is
+    // Build — the lane that says "Fusion is working on it", which is the safe default for a row
+    // whose producer this tree has never heard of.
+    const laneOf = (it) => ((MODULE[it.source_module] || {}).lane === 'life' ? 'life' : 'build');
     const toneOf = (it) => ({ blocked: 'red', decision: 'amber', suggestion: 'blue' }[kindOf(it)] || 'blue');
     const kRank = { blocked: 0, decision: 1, suggestion: 2 };
     const byKind = (a, b) => (kRank[kindOf(a)] ?? 9) - (kRank[kindOf(b)] ?? 9);
@@ -167,7 +184,6 @@ createApp({
     const itemsAdded = computed(() => outputs.value
       .filter((o) => o.source_module === 'shopping' && o.source_type === 'items_added')
       .reduce((n, o) => { const m = String(o.title || '').match(/^\s*(\d+)/); return n + (m ? Number(m[1]) : 1); }, 0));
-    const jobsFound = computed(() => outputs.value.filter((o) => o.source_module === 'careerair').length);
     const wins = computed(() => state.value.wins || []);
     const builds = computed(() => state.value.builds || []);
     // Latest = a merged, time-sorted feed of recent activity (under the Home tiles).
@@ -351,7 +367,7 @@ createApp({
       deliverables, openDeliverable, openBrief, copyDoc, downloadDoc, downloadTranscript, download, copyText,
       attn, deferred, archived, blocked, decisions, suggestions, needsYou, ideaCat, ideasBrain, ideasCash, latest, toneOf,
       tiBrain, tiCash, tiSpin, tiStars, mine, ideaDecide, opps, opportunityDecide, synthesise, synthing, synthMsg,
-      outputs, newOutputs, itemsAdded, jobsFound, wins, builds,
+      outputs, newOutputs, itemsAdded, wins, builds,
       statusTone, statusLine, tiles, go, open, closeDetail, decide, copyTranscript, primaryAction, sourceStatus, load, REPORT, GRAPH,
     };
   },

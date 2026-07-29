@@ -1,0 +1,42 @@
+name: cockpit-private-apps
+
+# Proves the cockpit's local app-overlay mechanism: the path controls in private-apps.mjs, the
+# single-canonicalisation route, and the add-only registry merge in public/apps.js.
+# services/cockpit/private-apps-check.mjs is the executor and carries the reasoning.
+#
+# SCOPE, stated plainly: this gate checks that the extension point WORKS and that its controls hold.
+# It makes no claim about names appearing anywhere in this repository, and it must not be cited as
+# though it did. An earlier revision scanned for a name and reported clean, which was true within
+# its own directory and worthless outside it.
+#
+# DELIBERATELY NO `paths:` FILTER. A path-filtered workflow that stops running disappears from
+# `gh run list` entirely, and an absent run is indistinguishable from a green one at a glance —
+# this estate has already been burned by exactly that.
+#
+# Pure Node, no browser, no database, no credentials. The two browser gates (render-check.mjs,
+# nav-check.mjs) need Edge and stay local.
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  private-apps:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # Exits non-zero on a failure AND on a vacuous run (zero assertions executed). The Windows
+      # case-folding rules are asserted here too — the platform is a parameter rather than a
+      # `process.platform` branch, so this ubuntu runner proves the behaviour that actually ships
+      # rather than only the one it happens to run under.
+      - name: Private-app overlay mechanism and controls
+        run: node services/cockpit/private-apps-check.mjs
