@@ -173,8 +173,14 @@ export function resolvePrivateAppsPath(env, repoRoot, opts = {}) {
   const platform = opts.platform || process.platform;
   const raw = String((env && env[PRIVATE_APPS_ENV]) || '').trim();
   if (!raw) return { path: '', verdict: 'unset' };
-  if (!path.isAbsolute(raw)) return { path: '', verdict: 'not-absolute' };
+  // UNC is tested BEFORE absoluteness, and the order is the whole point. `\\host\share\x` is a
+  // UNC path on any reading, but only Windows calls it ABSOLUTE — on posix a backslash is an
+  // ordinary filename character, so `isAbsolute` was false and this returned 'not-absolute',
+  // meaning the UNC branch never executed on the platform CI runs. The path was still refused, so
+  // no behaviour was ever wrong; the REASON was, and the assertion that checked the reason failed
+  // on ubuntu while passing here. Refusing on shape first makes the verdict identical on both.
   if (/^[\\/]{2}/.test(raw)) return { path: '', verdict: 'unc' };
+  if (!path.isAbsolute(raw)) return { path: '', verdict: 'not-absolute' };
 
   const abs = real(path.resolve(raw));
   const root = fold(real(path.resolve(repoRoot)), platform);

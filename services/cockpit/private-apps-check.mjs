@@ -38,11 +38,19 @@ const REPO = resolve(HERE, '..', '..');
 
 let ran = 0;
 const failures = [];
+const skipped = [];
 /** @param {string} what @param {boolean} cond @param {string} [detail] */
 function assert(what, cond, detail) {
   ran += 1;
   if (!cond) failures.push(detail ? `${what} — ${detail}` : what);
 }
+/**
+ * Declare an assertion deliberately not run HERE, with the reason. Counted and printed, never
+ * silently absent: a gate that quietly drops assertions on one platform reports a number that means
+ * something different depending on where it ran, which is worse than reporting a smaller number.
+ * @param {string} what @param {string} why
+ */
+function skip(what, why) { skipped.push(`${what} — ${why}`); }
 
 const box = mkdtempSync(join(tmpdir(), 'cockpit-overlay-'));
 try {
@@ -59,8 +67,18 @@ try {
   assert('the empty body is valid JS that declares nothing', /^\/\*[^*]*\*\/\s*$/.test(EMPTY_BODY));
 
   assert('a relative path is refused', at('some/local/overlay.js').state === 'not-absolute');
-  assert('a UNC path is refused', at('\\\\host\\share\\overlay.js').state === 'unc');
-  assert('a forward-slash UNC path is refused', at('//host/share/overlay.js').state === 'unc');
+  // UNC, asserted under BOTH platform rules. This is the assertion that passed on Windows and
+  // failed on ubuntu for three review rounds: `\\host\share\x` is only ABSOLUTE on Windows, so on
+  // posix the absoluteness check answered first and the verdict was 'not-absolute'. It is now
+  // decided on SHAPE before absoluteness, which makes the property real on every platform rather
+  // than real on one and inert on the other. Asserting it under both rules is what proves that.
+  for (const platform of ['win32', 'linux']) {
+    assert(`[${platform}] a UNC path is refused`, at('\\\\host\\share\\overlay.js', { platform }).state === 'unc',
+      at('\\\\host\\share\\overlay.js', { platform }).state);
+    assert(`[${platform}] a forward-slash UNC path is refused`, at('//host/share/overlay.js', { platform }).state === 'unc',
+      at('//host/share/overlay.js', { platform }).state);
+    assert(`[${platform}] a UNC path yields no readable path`, at('\\\\host\\share\\overlay.js', { platform }).body === EMPTY_BODY);
+  }
 
   // The control that matters most: an overlay inside the working tree is one `git add -A` from
   // being committed, which is the exact outcome the mechanism exists to prevent.
@@ -117,8 +135,13 @@ try {
   assert('a SIBLING whose name merely starts with the root is NOT refused as in-repo',
     atRoot(join(box, 'repo-backup', 'overlay.js'), sibRoot).verdict === 'ok',
     atRoot(join(box, 'repo-backup', 'overlay.js'), sibRoot).verdict);
+  // The filesystem root is spelled differently per platform but the property is identical: a root
+  // that is a prefix of every path must not swallow every path. The INPUT is platform-selected —
+  // `C:\` here, `/` on posix — and both genuinely exercise the boundary, because without `+ sep` a
+  // bare startsWith makes every absolute path look in-repo under either spelling. This is a
+  // platform-specific input to a platform-independent rule, not a platform-specific assertion.
   const driveRoot = process.platform === 'win32' ? resolve(box).slice(0, 3) : '/';
-  assert('a drive-root repoRoot does not swallow the whole drive',
+  assert(`a filesystem-root repoRoot (${driveRoot}) does not swallow the whole filesystem`,
     atRoot(outside, driveRoot).verdict === 'ok', `${driveRoot} -> ${atRoot(outside, driveRoot).verdict}`);
 
   const missing = at(join(box, 'not-there.js'));
@@ -448,13 +471,22 @@ try {
 }
 
 // ---- verdict ---------------------------------------------------------------------------------
+// The platform is printed on EVERY run, pass or fail. This gate passed 241/241 on Windows and
+// failed 1/241 on ubuntu for three review rounds, and nothing in the output said which platform had
+// produced the number — so two runs that disagreed looked like the same evidence. Any skips are
+// listed with their reason, so a count is only ever comparable to a count from the same list.
+const where = `${process.platform}, node ${process.versions.node}`;
+if (skipped.length) {
+  console.log(`ℹ  ${skipped.length} assertion(s) skipped on ${process.platform}:`);
+  for (const s of skipped) console.log('   ·', s);
+}
 if (ran === 0) {
-  console.error('❌ PRIVATE-APPS FAILED — zero assertions executed. A gate that asserts nothing cannot pass.');
+  console.error(`❌ PRIVATE-APPS FAILED [${where}] — zero assertions executed. A gate that asserts nothing cannot pass.`);
   process.exit(1);
 }
 if (failures.length) {
-  console.error(`❌ PRIVATE-APPS FAILED — ${failures.length} of ${ran} assertions failed:`);
+  console.error(`❌ PRIVATE-APPS FAILED [${where}] — ${failures.length} of ${ran} assertions failed:`);
   for (const f of failures) console.error('   ·', f);
   process.exit(1);
 }
-console.log(`✅ PRIVATE-APPS PASSED — ${ran} assertions executed, 0 failed (path controls, route, registry, wiring).`);
+console.log(`✅ PRIVATE-APPS PASSED [${where}] — ${ran} assertions executed, ${skipped.length} skipped, 0 failed (path controls, route, registry, wiring).`);
