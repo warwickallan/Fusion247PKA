@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<!-- Cockpit contrast PROOF harness. Loads the REAL styles.css and reports what the CASCADE actually
+     delivers via getComputedStyle — not what the source order suggests. This exists because the D-12
+     dark-mode override is a specificity trap: a media query adds no specificity, so an override placed
+     above the rule it targets renders wrong while LOOKING right. Source order cannot be inferred; it
+     must be measured. Drive it with:
+       node services/cockpit/a11y-probe.mjs
+     Served from services/cockpit/ (NOT from public/) so it never reaches the cockpit's web root. -->
+<html>
+<head>
+<meta charset="utf-8">
+<title>cockpit contrast probe</title>
+<link rel="stylesheet" href="public/styles.css">
+<style>
+  /* Harness only — deterministic surfaces so the backdrop of each sample is unambiguous. */
+  .surface { padding:10px; margin:0; }
+  .s-panel { background:var(--panel); }
+  .s-bg    { background:var(--bg); }
+  .s-panel2{ background:var(--panel2); }
+  #out { font-family:monospace; white-space:pre; font-size:12px; }
+</style>
+</head>
+<body>
+<div id="samples">
+  <div class="surface s-panel">
+    <span class="nav-btn" id="t-navbtn">nav</span>
+    <span class="t-desc" id="t-tdesc">desc</span>
+    <span class="i-why" id="t-iwhy">why</span>
+    <span class="fresh" id="t-fresh">2h</span>
+    <span class="opp-atom" id="t-oppatom">atom</span>
+    <span class="d-eyebrow" id="t-deyebrow">EYEBROW</span>
+    <span class="chev" id="t-chev">&rsaquo;</span>
+    <span class="i-eyebrow decision" id="t-decision">DECISION</span>
+    <span class="i-eyebrow blocked" id="t-blocked">BLOCKED</span>
+    <span class="nav-badge" id="t-navbadge">3</span>
+    <span class="opp-conflict" id="t-oppconflict">conflict</span>
+    <button class="act accept" id="t-accept">Accept</button>
+  </div>
+  <div class="surface s-bg">
+    <span class="empty" id="t-empty">nothing here</span>
+    <span class="lane-sub" id="t-lanesub">sub</span>
+    <span class="crumb-sep" id="t-crumbsep">&rsaquo;</span>
+  </div>
+  <div class="surface s-panel2">
+    <details class="tech" open><summary id="t-techsummary">TECHNICAL</summary></details>
+    <span class="mono" id="t-mono">mono</span>
+  </div>
+  <div class="surface s-bg">
+    <div class="load-err" id="t-loaderr">something broke</div>
+  </div>
+  <div class="surface s-panel">
+    <span class="chip ok" id="t-chipok">ok</span>
+    <span class="chip block" id="t-chipblock">blocked</span>
+  </div>
+  <!-- D-18 probe: .item.deferred sets opacity:.7 on the WHOLE card, which flattens every descendant
+       over --bg. It sits on the page canvas, so the surface here is s-bg, matching the real app. -->
+  <div class="surface s-bg">
+    <div class="item deferred" id="t-deferred">
+      <div class="i-main">
+        <div class="i-eyebrow blocked" id="t-def-eyebrow">BLOCKED</div>
+        <div class="i-title" id="t-def-title">a deferred item</div>
+        <div class="i-why" id="t-def-why">why this matters</div>
+      </div>
+      <div class="i-side"><span class="fresh" id="t-def-fresh">2h</span></div>
+    </div>
+  </div>
+</div>
+<div id="out">pending</div>
+<script>
+const parseRGB = (s) => s.match(/\d+(\.\d+)?/g).map(Number).slice(0, 3);
+const lum = (rgb) => {
+  const [r, g, b] = rgb.map((v) => { const s = v / 255; return s <= 0.04045 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4); });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+const ratio = (a, b) => { const la = lum(a), lb = lum(b); return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05); };
+const hex = (rgb) => '#' + rgb.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('');
+
+const painted = (el) => {
+  const bc = getComputedStyle(el).backgroundColor;
+  return bc && !/rgba\(0, 0, 0, 0\)|transparent/.test(bc) ? parseRGB(bc) : null;
+};
+const composite = (fg, bg, a) => fg.map((v, i) => a * v + (1 - a) * bg[i]);
+
+/* What a user actually sees, accounting for CSS opacity on ANCESTORS.
+   `opacity` renders an element's whole subtree into a layer and composites that layer over the
+   backdrop. So for text inside `.item.deferred{opacity:.7}` BOTH the text and the card background
+   shift toward the page canvas. Reading getComputedStyle(el).color alone silently misses this —
+   which is exactly how an opacity-composited defect stays invisible to a token-level audit.
+   Nested opacity multiplies: inner layer flattens over its own card first, then the card flattens. */
+function measure(el) {
+  // P = nearest ancestor-or-self that paints a background; alphaInner = opacities strictly below P.
+  let P = el, alphaInner = 1, Bp = painted(el);
+  if (!Bp) {
+    alphaInner = Number(getComputedStyle(el).opacity);
+    P = el.parentElement;
+    while (P && !(Bp = painted(P))) { alphaInner *= Number(getComputedStyle(P).opacity); P = P.parentElement; }
+  }
+  if (!Bp) { Bp = [255, 255, 255]; P = document.body; }
+
+  // alphaOuter = opacity of P and everything above it; S = the surface P is composited onto.
+  let alphaOuter = Number(getComputedStyle(P).opacity), S = null, q = P.parentElement;
+  while (q) { if (!S && (S = painted(q))) { /* found the outer surface */ } else if (!S) alphaOuter *= Number(getComputedStyle(q).opacity); q = q.parentElement; }
+  if (!S) S = [255, 255, 255];
+
+  let fg = parseRGB(getComputedStyle(el).color);
+  fg = composite(fg, Bp, alphaInner);                       // text flattens over its own card
+  const bgFinal = composite(Bp, S, alphaOuter);             // card flattens over the canvas
+  const fgFinal = composite(fg, S, alphaOuter);
+  return { fg: fgFinal, bg: bgFinal, alpha: Math.round(alphaInner * alphaOuter * 1000) / 1000 };
+}
+
+const CASES = [
+  ['D-4  .nav-btn', 't-navbtn'], ['D-1  .t-desc', 't-tdesc'], ['D-5  .i-why', 't-iwhy'],
+  ['D-7  .fresh', 't-fresh'], ['D-6  .opp-atom', 't-oppatom'], ['D-8  .d-eyebrow', 't-deyebrow'],
+  ['D-2  .empty', 't-empty'], ['D-3  .lane-sub', 't-lanesub'],
+  ['D-9  .tech summary', 't-techsummary'], ['D-10 .mono', 't-mono'],
+  ['keep .chev (ornament)', 't-chev'], ['keep .crumb-sep (ornament)', 't-crumbsep'],
+  ['D-16 .i-eyebrow.decision', 't-decision'], ['     .i-eyebrow.blocked', 't-blocked'],
+  ['D-11 .act.accept', 't-accept'], ['D-13 .opp-conflict', 't-oppconflict'],
+  ['D-14 .chip.ok', 't-chipok'], ['D-15 .chip.block', 't-chipblock'],
+  ['D-12 .nav-badge', 't-navbadge'], ['D-12 .load-err', 't-loaderr'],
+  ['D-18 deferred .i-title', 't-def-title'], ['D-18 deferred .i-why', 't-def-why'],
+  ['D-18 deferred .fresh', 't-def-fresh'], ['D-18 deferred .i-eyebrow.blocked', 't-def-eyebrow'],
+];
+
+const scheme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+const lines = ['SCHEME=' + scheme];
+for (const [label, id] of CASES) {
+  const el = document.getElementById(id);
+  const { fg, bg, alpha } = measure(el);
+  const declared = getComputedStyle(el).color;
+  const r = Math.round(ratio(fg, bg) * 100) / 100;
+  lines.push([label.padEnd(32), 'declared=' + hex(parseRGB(declared)), 'seen=' + hex(fg), 'on=' + hex(bg),
+              'a=' + alpha, 'ratio=' + r.toFixed(2),
+              r >= 4.5 ? 'PASS' : (r >= 3 ? 'PASS-nontext-only' : 'FAIL')].join(' '));
+}
+document.getElementById('out').textContent = lines.join('\n');
+</script>
+</body>
+</html>
