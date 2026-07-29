@@ -32,7 +32,7 @@ button { font-family:inherit; }
 
 /* Bottom nav (phone) */
 .nav { position:fixed; bottom:0; left:0; right:0; display:flex; justify-content:space-around; background:var(--panel); border-top:1px solid var(--hair); padding:6px 4px calc(6px + env(safe-area-inset-bottom)); z-index:6; }
-.nav-btn { flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; background:none; border:none; border-radius:10px; padding:7px 4px; color:var(--ink3); cursor:pointer; position:relative; }
+.nav-btn { flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; background:none; border:none; border-radius:10px; padding:7px 4px; color:var(--ink2); cursor:pointer; position:relative; }
 .nav-btn.on { color:var(--accent-ink); }
 .nav-ico { font-size:20px; line-height:1; } .nav-lbl { font-size:10.5px; font-weight:600; }
 .nav-badge { position:absolute; top:2px; right:calc(50% - 22px); background:var(--stop); color:#fff; font-size:9px; font-weight:800; padding:1px 5px; border-radius:9px; }
@@ -46,7 +46,7 @@ button { font-family:inherit; }
 .tile.red{border-left-color:var(--stop);} .tile.green{border-left-color:var(--ok);} .tile.blue{border-left-color:var(--accent);} .tile.amber{border-left-color:var(--warn);} .tile.grey{border-left-color:var(--park);}
 .t-num { font-family:var(--mono); font-weight:700; font-size:32px; line-height:1; }
 .tile.red .t-num{color:var(--stop);} .tile.green .t-num{color:var(--ok);} .tile.blue .t-num{color:var(--accent);} .tile.amber .t-num{color:var(--warn);}
-.t-lbl { font-size:15px; font-weight:700; margin-top:6px; } .t-desc { font-size:12px; color:var(--ink3); }
+.t-lbl { font-size:15px; font-weight:700; margin-top:6px; } .t-desc { font-size:12px; color:var(--ink2); }
 
 /* ---- Apps: the grid, then one app's own workspace (Apps > App > view) ----
    Built from the existing tokens only — no new colour is introduced here. An app's availability is
@@ -78,18 +78,14 @@ button { font-family:inherit; }
   font-weight:650; color:var(--ink2); cursor:pointer; }
 .app-nav-btn:hover { border-color:var(--hair); }
 .app-nav-btn.on { background:var(--accent-w); color:var(--accent-ink); }
-/* The "why there's nothing here" message is the whole point of the view when a service is down, so
-   it gets readable contrast (--ink3 on --bg is 3.3:1). Scoped to .app-view — the shared .empty is
-   used across the app and its colour is Iris's call, not a change to make in passing. */
+/* The scoped --ink2 overrides that used to live here (.app-view .empty / .app-view .empty.big, and
+   .apps-pane .lane-sub / .apps-pane .t-desc) are GONE — deliberately. They were local mitigations of
+   a token-level defect: --ink3 was being used for text a user must read. That root cause is now fixed
+   at source (GL-003 D-1…D-10), so .empty, .lane-sub and .t-desc are --ink2 everywhere and these rules
+   became no-ops. A dead scoped override is worse than none: it is how the next person concludes the
+   global token is unsafe and forks it again. */
 .app-view { padding-top:2px; }
-.app-view .empty, .app-view .empty.big { color:var(--ink2); }
 .app-view .read li { margin:6px 0; }
-
-/* Informative text in this area, lifted to --ink2 for the 4.5:1 floor: --ink3 gives 3.36:1 light /
-   4.21:1 dark on .lane-sub and 3.80:1 / 3.72:1 on .t-desc. SCOPED to .apps-pane on purpose — the
-   same shortfall exists globally on shared classes, and that root cause is Iris's to fix in GL-003,
-   not something to change from underneath the rest of the app in passing. .tile is NOT forked. */
-.apps-pane .lane-sub, .apps-pane .t-desc { color:var(--ink2); }
 
 /* The back chevron: .back is padding:0 0 12px and the glyph is narrow, so it rendered 5x19 CSS px —
    under WCAG 2.2 SC 2.5.8 (24x24) on both axes. Specificity beats .back, which is defined later. */
@@ -111,19 +107,25 @@ button { font-family:inherit; }
 .grp { margin-bottom:22px; }
 .grp h2 { display:flex; align-items:baseline; gap:9px; font-size:14px; color:var(--ink); font-weight:800; margin-bottom:11px; }
 .g-count { font-family:var(--mono); font-size:11px; font-weight:700; background:var(--accent-w); color:var(--accent-ink); padding:1px 8px; border-radius:20px; }
-.lane-sub { font-size:11px; color:var(--ink3); font-weight:500; }
-.empty { color:var(--ink3); font-size:14px; padding:6px 2px; } .empty.big { padding:34px 6px; text-align:center; font-size:15px; }
+.lane-sub { font-size:11px; color:var(--ink2); font-weight:500; }
+.empty { color:var(--ink2); font-size:14px; padding:6px 2px; } .empty.big { padding:34px 6px; text-align:center; font-size:15px; }
 .load-err { margin:10px 14px; padding:11px 14px; border-radius:11px; background:var(--stop,#c0392b); color:#fff; font-size:13px; font-weight:700; text-align:center; cursor:pointer; }
 /* Mason Opportunities — synthesised build theses, richer than a flat idea card */
 .item.opp { flex-direction:column; align-items:stretch; }
 .opp-body { font-size:12.5px; color:var(--ink2); display:flex; flex-direction:column; gap:5px; margin-top:9px; line-height:1.45; }
 .opp-body > div b { color:var(--ink); font-weight:700; }
 .opp-body details { margin:2px 0; } .opp-body summary { cursor:pointer; color:var(--accent); font-weight:600; font-size:12px; }
-.opp-atom { font-size:11.5px; color:var(--ink3); padding:3px 0 3px 8px; border-left:2px solid var(--hair); margin-top:3px; }
+.opp-atom { font-size:11.5px; color:var(--ink2); padding:3px 0 3px 8px; border-left:2px solid var(--hair); margin-top:3px; }
 .opp .i-act { margin-top:10px; flex-wrap:wrap; gap:7px; }
 .opp-body .mono { font-family:var(--mono); font-size:11px; }
 .opp-disp { display:inline-block; margin-left:7px; padding:1px 7px; border-radius:20px; background:var(--accent-w); color:var(--accent-ink); font-weight:700; font-size:10.5px; }
-.opp-conflict { display:inline-block; margin-left:7px; padding:1px 7px; border-radius:20px; background:var(--warn,#e08a1e); color:#fff; font-weight:700; font-size:10.5px; }
+/* D-13: was #fff on --warn — 4.23 light / 2.17 dark, failing BOTH schemes at 10.5px bold (not large
+   text). No white-on-fill or ink-on-fill option clears 4.5 in light (--ink on --warn is 3.88, --bg on
+   --warn 3.73), so the fill is demoted to the tint: --ink2 on --warn-w is 6.40 / 6.16. The 1px --warn
+   ring keeps the amber signal (3.63 / 6.25 — above the 3:1 non-text floor) so the badge still reads as
+   a warning at a glance. The off-token #e08a1e fallback is dropped: as a fallback for a TINT it would
+   render a saturated amber behind --ink2, which is a bug, not a safety net. */
+.opp-conflict { display:inline-block; margin-left:7px; padding:1px 7px; border-radius:20px; background:var(--warn-w); color:var(--ink2); box-shadow:inset 0 0 0 1px var(--warn); font-weight:700; font-size:10.5px; }
 /* long lanes (deliverables / transcripts) scroll instead of getting capped — shows ~5, scrolls for the rest */
 .lane-scroll { max-height:360px; overflow-y:auto; overflow-x:hidden; padding-right:5px; margin-right:-5px; overscroll-behavior:contain; }
 .lane-scroll::-webkit-scrollbar { width:8px; }
@@ -135,24 +137,47 @@ button { font-family:inherit; }
 .item.deferred { opacity:.7; }
 .i-main { flex:1; min-width:0; cursor:pointer; }
 .i-eyebrow { font-family:var(--mono); font-size:9.5px; letter-spacing:.08em; text-transform:uppercase; font-weight:700; margin-bottom:3px; opacity:.85; }
-.i-eyebrow.decision{color:var(--warn);} .i-eyebrow.suggestion{color:var(--accent-ink);} .i-eyebrow.blocked{color:var(--stop);}
+/* D-16: .decision was --warn on --panel — 4.23 light, under the floor at 9.5px. It is now --ink2
+   (7.47 / 7.37). The amber is NOT lost: a decision item renders .item.amber, whose 4px --warn
+   border-left rail measures 4.23 / 7.47 against --panel — comfortably over the 3:1 non-text floor
+   that governs a state indicator. The state colour moved from the word to the rail, where the
+   colour was always doing the signalling anyway, and the word "DECISION" still carries the meaning. */
+.i-eyebrow.decision{color:var(--ink2);} .i-eyebrow.suggestion{color:var(--accent-ink);} .i-eyebrow.blocked{color:var(--stop);}
 .i-title { font-size:15px; font-weight:650; letter-spacing:-.01em; }
-.i-why { font-size:12.5px; color:var(--ink3); margin-top:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.i-side { display:flex; align-items:center; gap:8px; } .chev { color:var(--ink3); font-size:22px; } .fresh { font-family:var(--mono); font-size:11px; color:var(--ink3); }
+.i-why { font-size:12.5px; color:var(--ink2); margin-top:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+/* .chev keeps --ink3 on purpose: it is a `›` affordance glyph whose meaning is fully carried by the
+   row it sits on. That is what --ink3 is FOR (GL-003 §2a). .fresh is informative text, so it lifts. */
+.i-side { display:flex; align-items:center; gap:8px; } .chev { color:var(--ink3); font-size:22px; } .fresh { font-family:var(--mono); font-size:11px; color:var(--ink2); }
 
 /* Decision lifecycle buttons */
 .i-act { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
 .act { font-weight:650; font-size:12.5px; padding:7px 12px; border-radius:9px; border:1px solid var(--hair); background:var(--panel2); color:var(--ink); cursor:pointer; }
 .act:hover { border-color:var(--accent); } .act:disabled { opacity:.5; }
-.act.accept { background:var(--ok); color:#fff; border-color:var(--ok); }
+/* D-11, the worst pairing in the system: #fff on --ok was 3.49 light / 2.00 dark on the PRIMARY
+   confirm button. Both routes were measured, not estimated:
+     keep the solid fill, per-scheme ink  → --ink on --ok 4.70 light, --bg on --ok 9.18 dark
+     demote to the tint                   → --ink on --ok-w 14.39 light / 11.77 dark
+   4.70 clears 4.5 by 0.20. That margin is not worth having: any future nudge to --ok silently
+   re-opens the defect, and it needs a second per-scheme rule to hold at all. The tint is taken.
+   TRADE, stated plainly: Accept loses its solid-green fill and reads as a tinted button rather
+   than a filled one. Weight is held instead by the --ok border (3.49 / 8.11 on --panel, over the
+   3:1 non-text floor) and font-weight 650. Iris owns whether that demotion is acceptable; the
+   honest alternative is an --ok-ink token, which is parked for her. */
+.act.accept { background:var(--ok-w); color:var(--ink); border-color:var(--ok); }
 .act.decline { color:var(--stop); } .act.defer { color:var(--ink2); }
-.done-pill { font-size:12.5px; font-weight:700; color:var(--ok); background:var(--ok-w); padding:6px 11px; border-radius:8px; }
+/* D-14: was --ok on --ok-w (3.06 light). The tint carries the tone, --ink2 carries the words. */
+.done-pill { font-size:12.5px; font-weight:700; color:var(--ink2); background:var(--ok-w); padding:6px 11px; border-radius:8px; }
 .err { color:var(--stop); font-size:12px; }
 .notify-dot { font-size:12px; opacity:.7; }
 
 /* System chips */
 .chip { display:inline-flex; align-items:center; gap:6px; font-family:var(--mono); font-size:11px; font-weight:600; padding:4px 9px; border-radius:20px; }
-.chip .d{width:7px;height:7px;border-radius:50%;} .chip.block{background:var(--stop-w);color:var(--stop);} .chip.block .d{background:var(--stop);} .chip.ok{background:var(--ok-w);color:var(--ok);} .chip.ok .d{background:var(--ok);} .chip.prog{background:var(--accent-w);color:var(--accent-ink);} .chip.prog .d{background:var(--accent);}
+/* D-14 / D-15: chip TEXT is --ink2 on every tint (6.55/6.30 on --ok-w, 6.16/7.02 on --stop-w) —
+   the signal colour was failing as text in light (--ok on --ok-w 3.06, --stop on --stop-w 4.14).
+   The .d dot KEEPS the signal colour: it is a non-text state mark on its own tint, governed by the
+   3:1 floor, which it clears (3.06 / 6.93 and 4.14 / 5.05). .chip.prog was already correct —
+   --accent-ink on --accent-w is 6.64 / 8.23 — and is the pattern the other two now follow. */
+.chip .d{width:7px;height:7px;border-radius:50%;} .chip.block{background:var(--stop-w);color:var(--ink2);} .chip.block .d{background:var(--stop);} .chip.ok{background:var(--ok-w);color:var(--ink2);} .chip.ok .d{background:var(--ok);} .chip.prog{background:var(--accent-w);color:var(--accent-ink);} .chip.prog .d{background:var(--accent);}
 
 /* ---- Detail overlay (L3 / L4) ---- */
 .sheet { position:fixed; inset:0; background:rgba(6,10,16,.5); display:flex; align-items:flex-end; justify-content:center; z-index:20; animation:fade .15s ease; }
@@ -160,7 +185,7 @@ button { font-family:inherit; }
 .back { background:none; border:none; color:var(--accent-ink); font-weight:700; cursor:pointer; font-size:14px; padding:0 0 12px; }
 /* Detail-sheet Back stays reachable even when the read is long (was scrolling out of reach → felt like a dead-end) */
 .sheet-card .back { position:sticky; top:0; z-index:3; background:var(--panel); margin:-20px -20px 6px; padding:16px 20px 10px; box-shadow:0 1px 0 var(--hair); }
-.d-eyebrow { font-family:var(--mono); font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink3); }
+.d-eyebrow { font-family:var(--mono); font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink2); }
 .sheet-card h1 { font-size:21px; letter-spacing:-.02em; margin:6px 0 12px; text-wrap:balance; }
 .d-reason { font-size:15px; color:var(--ink2); line-height:1.6; white-space:pre-line; margin-bottom:16px; }
 .d-actions { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin:18px 0; }
@@ -168,8 +193,8 @@ button { font-family:inherit; }
 .read { font-size:15px; line-height:1.65; color:var(--ink); } .read h1,.read h2,.read h3,.read h4{ margin:18px 0 8px; text-wrap:balance; } .read h1{font-size:20px;} .read h2{font-size:18px;} .read h3{font-size:15px;} .read h4{font-size:14px;} .read p{margin:8px 0;} .read ul{margin:8px 0; padding-left:20px;} .read li{margin:3px 0;} .read code{font-family:var(--mono); font-size:12.5px; background:var(--panel2); padding:1px 5px; border-radius:5px;}
 .read a{color:var(--accent-ink);} .read pre{background:var(--panel2); padding:12px; border-radius:8px; overflow-x:auto; font-family:var(--mono); font-size:12px; white-space:pre-wrap; word-break:break-word; margin:10px 0;} .read blockquote{border-left:3px solid var(--hair); padding-left:12px; color:var(--ink2); margin:10px 0;}
 .tech { margin-top:16px; border:1px solid var(--hair); border-radius:10px; background:var(--panel2); }
-.tech summary { cursor:pointer; padding:11px 14px; font-family:var(--mono); font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--ink3); }
-.tech-body { padding:0 14px 14px; } .mono { font-family:var(--mono); font-size:11px; color:var(--ink3); white-space:pre-wrap; word-break:break-word; }
+.tech summary { cursor:pointer; padding:11px 14px; font-family:var(--mono); font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--ink2); }
+.tech-body { padding:0 14px 14px; } .mono { font-family:var(--mono); font-size:11px; color:var(--ink2); white-space:pre-wrap; word-break:break-word; }
 
 /* ---- Tier 2: laptop / desktop — left rail, wider ---- */
 @media (min-width:780px) {
@@ -186,3 +211,21 @@ button { font-family:inherit; }
 @media (min-width:1180px) { .tiles { grid-template-columns:repeat(4,1fr); } }
 @media (min-width:1560px) { .main { max-width:1640px; } .tiles { grid-template-columns:repeat(6,1fr); } .two-col { display:grid; grid-template-columns:1fr 1fr; gap:24px; align-items:start; } }
 @media (prefers-reduced-motion: reduce) { .pane,.sheet { animation:none; } .tile:active { transform:none; } }
+
+/* ---- D-12 · per-scheme ink on the --stop fill. MUST STAY LAST IN THIS FILE. ----
+   #fff on --stop is 5.02 in light (fine) but 3.06 in dark, because --stop LIGHTENS from #c1453c to
+   #ee6a5f in dark while the text stays white. This is the classic light-only-tested defect: the same
+   declaration passes in one scheme and fails in the other, so it cannot be fixed in the base rule —
+   it needs a per-scheme override. In dark the ink flips to --bg (#0f151d) on --stop, measuring 5.99.
+   No new token: --bg is simply the darkest thing the palette already has.
+
+   WHY THIS BLOCK IS AT THE BOTTOM OF THE FILE, and why moving it is a silent regression:
+   a media query contributes NOTHING to specificity. `.nav-badge` (L38) and `.load-err` are both
+   single-class selectors setting color:#fff, and the existing dark block at L12 sits ABOVE them.
+   An override placed in that block would tie on specificity and LOSE on source order — the CSS
+   would look correct and render wrong. This block must stay after every rule it overrides.
+   Verified by measuring getComputedStyle in headless dark mode, not by reading source order. */
+@media (prefers-color-scheme: dark) {
+  .nav-badge { color:var(--bg); }
+  .load-err { color:var(--bg); }
+}
