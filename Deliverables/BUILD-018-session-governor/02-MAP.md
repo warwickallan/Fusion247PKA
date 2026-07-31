@@ -193,12 +193,12 @@ A threshold over an `unknown` input does not fire; it contributes a `BLIND` reas
 | ID | Fog | Type | Resolution |
 |---|---|---|---|
 | ~~F-1~~ | ~~Does the live statusLine payload on **this** machine actually contain `context_window.*` and `rate_limits.*` with the documented names?~~ | PROTOTYPE | **RESOLVED 2026-07-31 — yes, both present with documented names; see §2 and `evidence/T-01-statusline-schema.md`. Bonus: several undocumented fields also observed (`exceeds_200k_tokens`, `remaining_percentage`, etc.) and `context_window_size` proven as 1M on this account.** |
-| **F-2** | Where should the ephemeral session-health store live? `C:\.fusion247\**` is deny-by-default under GL-012 and would need a declared private surface. | **RESEARCH** → then Warwick if contested | T-02 |
+| ~~F-2~~ | ~~Where should the ephemeral session-health store live?~~ | RESEARCH | **RESOLVED 2026-07-31 — `~/.mypka/governor/health/<projectKey>/<sessionId>.json`, override via `MYPKA_GOVERNOR_HEALTH_DIR`. Outside GL-012's scope (secrets store + private-app session logs, neither of which this is) and outside any git working tree. See `tickets/T-02-session-health-store.md`.** |
 | ~~F-3~~ | ~~What does `/close-session` actually do; what seams exist?~~ | RESEARCH | **RESOLVED 2026-07-31 — see §3 AD-12/AD-13 and §11.** |
 | **F-4** | Are the proposed thresholds right? | **PROTOTYPE → dogfood** | T-08, then tune |
 | **F-5** | How is "a new substantial item" detected from a prompt, well enough to block it without false positives? | **PROTOTYPE** | T-06 |
 | **F-6** | What is the right bounded-override design (token? expiry? logged?) | **WARWICK** | Q-2 |
-| **F-7** | How are active workers detected reliably? `isSidechain` exists in the transcript, but background-agent liveness may need the task/agent surface. | **RESEARCH** | T-07 |
+| **F-7** | How are active workers detected reliably? `isSidechain` exists in the transcript, but background-agent liveness may need the task/agent surface. | **RESEARCH — still open.** T-07 shipped a best-effort Windows process-command-line matcher (`tools/governor/worktree-recon.mjs`), not a resolution: it has a confirmed blind spot (a process whose command line embeds another worktree's path as literal text can self-match). A durable answer needs a session/task registry, not command-line text. | T-07 (partial), still fog for T-10 |
 | **F-8** | Does Project ManagAIr impose any adapter shape we should honour now rather than retrofit? | **WARWICK** | Q-3 |
 
 ## 6. Questions only Warwick can settle
@@ -218,11 +218,11 @@ A threshold over an `unknown` input does not fire; it contributes a `BLIND` reas
 ## 7. DEPENDENCIES (blocking relationships)
 
 ```
-T-01 (prove payload) ──┬──► T-03 (sampler) ──► T-04 (evaluator) ──┬──► T-05 (status display)
-                       │                                          ├──► T-06 (RED preflight)
-T-02 (state location) ─┴──► T-03                                  └──► T-08 (dogfood)
-T-09 (programme state schema) ──► T-10 (/rotate-session) ──► T-11 (reorientation hook) ──► T-08
-T-07 (worker/worktree recon) ──► T-10
+T-01 ✅──┬──► T-03 (sampler, NOW UNLOCKED) ──► T-04 (evaluator) ──┬──► T-05 (status display)
+        │                                                        ├──► T-06 (RED preflight)
+T-02 ✅─┴──► T-03                                                 └──► T-08 (dogfood)
+T-09 (programme state schema, Opus, never blocked) ──► T-10 (/rotate-session) ──► T-11 ──► T-08
+T-07 ✅ (worktree side; F-7 live-worker detection still open) ──► T-10
 ```
 
 **External dependency, live:** GL-012 §6a is **not in this worktree** — it exists only on
@@ -236,8 +236,10 @@ installs it into the primary checkout's untracked settings file — otherwise it
 
 ## 8. FRONTIER — takable right now
 
-**T-02, T-07, T-09.** T-01 resolved 2026-07-31 (see §5 write-back). Everything else remains
-behind a dependency — T-03 needs both T-01 (done) and T-02 (open).
+**T-03, T-09.** T-01, T-02, T-07 all resolved 2026-07-31 (see §10 write-back). T-03 is
+now newly unlocked — both its dependencies (T-01, T-02) are done. T-09 was never
+dependency-blocked; it is Opus-flagged and has been deferred behind the Sonnet tickets
+by choice, not by the dependency graph.
 
 ---
 
@@ -248,12 +250,12 @@ Model column: Opus only where architectural judgement is materially valuable.
 | ID | Ticket | Model | Depends | Acceptance | Mutation test |
 |---|---|---|---|---|---|
 | **T-01** | ~~**Prove the live statusLine payload.**~~ **RESOLVED 2026-07-31.** | **Sonnet** | — | ✅ met — `evidence/T-01-statusline-schema.md`; every §2 field marked | n/a (evidence-gathering ticket) |
-| **T-02** | Decide + implement the session-health store location and atomic write (temp+rename). | Sonnet | — | Store path settled with GL-012 reasoning written down; concurrent writes never yield a torn file | Kill mid-write → reader still gets last good state, never a partial parse |
+| **T-02** | ~~Decide + implement the session-health store location and atomic write.~~ **RESOLVED 2026-07-31.** | Sonnet | — | ✅ met — `~/.mypka/governor/health/**`, GL-012 reasoning in `tickets/T-02-*.md`; 8/8 tests | ✅ passing — kill-mid-write + 12-real-process concurrent-write, both proven |
 | **T-03** | Sampler: statusLine script → health sample. Fast, idempotent, kill-tolerant. | Sonnet | T-01,T-02 | Sample written on every assistant message; <100ms | Feed malformed/empty stdin → writes nothing, exits 0, never corrupts the store |
 | **T-04** | **Pure evaluator** — `evaluate(signals) → verdict`. All five states, distinct exit codes, missing-field semantics. | **Opus** | T-03 | Full state-space unit tests incl. every `unknown` combination | **Delete the state file → asserts BLIND, not GREEN** (INV-1). Assert non-zero count of signals actually examined. |
 | **T-05** | Status-line display: render verdict compactly. | Sonnet | T-04 | Renders all five states; degrades gracefully | Evaluator throws → line still renders, shows BLIND |
 | **T-06** | RED preflight block via `UserPromptSubmit`. **Fails open.** Bounded override. | **Opus** | T-04, Q-2 | Blocks at RED with reason + override; rotation/read-only prompts always pass | **Hook throws / times out → prompt proceeds** (INV-2). Verify by forcing an exception. |
-| **T-07** | Worker + worktree reconciliation: enumerate live workers, unintegrated outputs, all worktrees with owner/branch/status/disposition. | Sonnet | — | Reports the 20 known worktrees with disposition; never deletes anything | Inject a fake dirty worktree → appears as unreconciled |
+| **T-07** | ~~Worker + worktree reconciliation.~~ **RESOLVED 2026-07-31** (worktree side; F-7 live-worker detection remains open fog — best-effort only). | Sonnet | — | ✅ met — 22 worktrees reported (`evidence/T-07-*.md`); never-deletes enforced by source-scan test; 12/12 tests | ✅ passing — pure + **real-git** dirty-worktree mutation, both proven |
 | **T-08** | **Live dogfood rotation** (M4). | **Opus** (judgement) | T-04,T-10,T-11 | A real rotation, then a fresh session completes a ticket with zero re-briefing | Remove the banked state → fresh session must *notice* and say so, not proceed blind |
 | **T-09** | Programme-state schema + writer (durable, git). | **Opus** | — | Schema captures intent, decisions, worker outputs, branches/PRs/worktrees, exact next action | Stale-vs-HEAD detection: move HEAD → state flagged stale |
 | **T-10** | `/rotate-session` command: bank + **verify safety** + emit `/clear` instruction. Must not invoke close-session. | **Opus** | T-07,T-09 | Refuses with the precise obstacle when unsafe | **Dirty tree / unpushed commit / live worker → refuses.** Assert it can actually say no. |
@@ -278,6 +280,8 @@ Append one line per resolved ticket. **A resolution not written back here did no
 | 2026-07-31 | Phase 1 | Map, contract, estate created. Telemetry surface proven to [DOC]+version level; live payload still unproven (F-1). | T-01, T-02, T-09, T-07 |
 | 2026-07-31 | F-3 | **RESOLVED.** close-session steps 1–3 are the rotation subset; 4–7 are end-of-programme (AD-13). `fusion-brief/session-handoff.md` is the existing handoff contract to derive, not replace (AD-12). Eight reusable seams catalogued in §11. | Sharpens T-09, T-10, T-11 |
 | 2026-07-31 | T-01 | **RESOLVED.** Real statusLine payload captured on this machine via a temporary capture command installed in the primary checkout's `settings.local.json` (backed up, installed, triggered, restored, diff-proven byte-identical). Both `context_window.*` and `rate_limits.*` present with documented names; `context_window_size` observed as `1000000` (1M, not 200k) — confirms thresholds must be percentage-based (already AD-4's design). `pr.*`, `worktree.*`, `workspace.git_worktree` all ABSENT in this capture, expected per the ticket's own caveats (no open PR; not a `--worktree` session). Several undocumented fields also observed and catalogued: `session_name`, `output_style.name`, `exceeds_200k_tokens`, `fast_mode`, `thinking.enabled`, `context_window.total_output_tokens`/`remaining_percentage`, `workspace.current_dir`/`project_dir`. Capture script kept at `tools/capture-statusline.mjs` for T-03 reuse. Full schema: `evidence/T-01-statusline-schema.md`. | T-02, T-07, T-09 remain frontier; T-03 still needs T-02 |
+| 2026-07-31 | T-02 | **RESOLVED.** Session-health store decided and implemented: `~/.mypka/governor/health/<projectKey>/<sessionId>.json`, override via `MYPKA_GOVERNOR_HEALTH_DIR`. Confirmed out of GL-012's scope (secrets store + private-app session logs per §6a — this is neither) after reading the settled §6a text directly from `95c265d`. Atomic temp+rename write, per-writer-unique temp names. `tools/governor/health-store.mjs` + `health-store.test.mjs`, 8/8 passing including a 12-real-process concurrent-write mutation test and a kill-mid-write simulation. | T-03 (now unlocked jointly with T-01) |
+| 2026-07-31 | T-07 | **RESOLVED (worktree side).** `tools/governor/worktree-recon.mjs` enumerates all 22 worktrees (20 baseline + primary + this build's own) with disposition; never deletes (enforced by a source-scan test). Live-worker detection remains best-effort — F-7 stays open fog, not resolved. **Bug found by running against the real estate, not by unit tests**: naive substring matching let the primary checkout falsely claim sibling worktrees' (`-governor`/`-audit`/`-tower`/`-w01`) live workers because `"C:/Fusion247PKA"` is a literal prefix of their paths; fixed with a path-boundary check, regression test added, re-run to confirm the fix changed real output. 12/12 tests passing including a real-git dirty-worktree mutation. Full result: `evidence/T-07-worktree-reconciliation.md`. | T-10 partially de-risked (worktree recon available); F-7 still blocks a durable live-worker signal |
 
 ---
 
