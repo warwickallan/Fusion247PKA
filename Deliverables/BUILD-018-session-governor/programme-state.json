@@ -16,15 +16,15 @@
     "at": "2026-07-31",
     "by_model": "Opus",
     "session_id": null,
-    "head_sha": "1ca7561119adb1aa525684f22756e4cd513e8cff",
+    "head_sha": "db8d90d48a0deea6598cebbec1cc5b9f2912db45",
     "governor_version": "T-09/schema-v1"
   },
   "repository": {
     "primary_checkout": "C:/Fusion247PKA",
-    "worktree": "C:/Fusion247PKA-governor",
+    "worktree": "C:\\Fusion247PKA-governor",
     "branch": "build-018/session-governor",
     "base_sha": "ef96a3327f896e025731769c72157fd722daa02f",
-    "head_sha": "1ca7561119adb1aa525684f22756e4cd513e8cff",
+    "head_sha": "db8d90d48a0deea6598cebbec1cc5b9f2912db45",
     "clean": true,
     "unpushed_commits": 0,
     "upstream": "origin/build-018/session-governor"
@@ -344,7 +344,7 @@
   "branches": [
     {
       "name": "build-018/session-governor",
-      "head": "1ca7561119adb1aa525684f22756e4cd513e8cff",
+      "head": "db8d90d48a0deea6598cebbec1cc5b9f2912db45",
       "upstream": "origin/build-018/session-governor",
       "ahead": 0,
       "behind": null,
@@ -353,7 +353,7 @@
     },
     {
       "name": "main",
-      "head": null,
+      "head": "de92306911e7cbe8828d5652ed9f7f21fd99593e",
       "upstream": "origin/main",
       "ahead": 1,
       "behind": null,
@@ -374,20 +374,29 @@
     {
       "number": null,
       "url": null,
-      "title": "Recovery handoff (GL-012 section 6a + cockpit private-API proxy)",
+      "title": null,
       "state": "none",
-      "branch": "recovery/2026-07-31-governor-abort-handoff",
-      "head": "95c265de729e26114b1e1eb7dc7d8630502aca1d",
-      "note": "Not opened, and this build is explicitly forbidden to open or merge it."
+      "branch": "build-018/session-governor",
+      "head": null,
+      "note": "No PR found for this branch"
     },
     {
       "number": null,
       "url": null,
-      "title": "BUILD-018 session governor",
+      "title": null,
       "state": "none",
-      "branch": "build-018/session-governor",
-      "head": "c9df07782b3de210b123e0b508c9c4ba234187ec",
-      "note": "No PR opened for this build yet; opening one is out of scope for the current session."
+      "branch": "main",
+      "head": null,
+      "note": "No PR found for this branch"
+    },
+    {
+      "number": null,
+      "url": null,
+      "title": null,
+      "state": "none",
+      "branch": "recovery/2026-07-31-governor-abort-handoff",
+      "head": null,
+      "note": "No PR found for this branch"
     }
   ],
   "worktrees": [
@@ -610,7 +619,7 @@
     {
       "path": "C:/Fusion247PKA-governor",
       "branch": "build-018/session-governor",
-      "head": "1ca7561119adb1aa525684f22756e4cd513e8cff",
+      "head": "db8d90d48a0deea6598cebbec1cc5b9f2912db45",
       "dirty": false,
       "unpushedCount": 0,
       "classification": "active-build",
@@ -643,17 +652,8 @@
   ],
   "safe_boundary": {
     "at_boundary": true,
-    "reason": "T-03 and T-13 both complete as wholes in one commit each, run in parallel, and no ticket is split across this rotation point. The build worktree (C:/Fusion247PKA-governor) is clean and pushed at 1ca7561...  Other worktrees were not re-scanned this banking (out of this session's declared scope — no audit of the primary checkout or other worktrees); their entries below are carried over from T-09's original snapshot and are stale, not re-verified.",
-    "obstacles": [
-      {
-        "kind": "live-worker",
-        "detail": "The primary checkout reports live node PIDs, but F-7 makes this best-effort only — process-command-line matching cannot distinguish a governor worker from any other node process. Treat as unknown, not as a confirmed live worker."
-      },
-      {
-        "kind": "dirty-tree",
-        "detail": "C:/Fusion247PKA is dirty with six untracked Team Knowledge/Sources Cairn intake files. Pre-existing, out of this build’s scope, and explicitly protected by the commission."
-      }
-    ],
+    "reason": "Verified by /rotate-session: 4 safety checks ran and found no obstacle. Tree clean, no unpushed commits, no live worker detected in this worktree.",
+    "obstacles": [],
     "verified_at": "2026-07-31"
   },
   "resumption": {
