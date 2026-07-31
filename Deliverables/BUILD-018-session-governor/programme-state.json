@@ -751,8 +751,8 @@
     },
     {
       "label": "Tests",
-      "path": "tools/governor/",
-      "how_to_read": "node --test tools/governor/"
+      "path": "tools/governor/*.test.mjs",
+      "how_to_read": "node --test \"tools/governor/*.test.mjs\" — use the glob; the bare directory form fails."
     }
   ],
   "privacy": {

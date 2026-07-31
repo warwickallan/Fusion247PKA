@@ -90,7 +90,7 @@ Implement the two newly takable Sonnet tickets, then return to Opus for the rota
 - **statusLine capture** — `tools/capture-statusline.mjs` — Kept from T-01 for T-03 to reuse.
 - **GL-012 section 6a (settled ruling, NOT on this branch)** — `Team Knowledge/Guidelines/GL-012-secrets-store-access-boundary.md` — git show 95c265d:"Team Knowledge/Guidelines/GL-012-secrets-store-access-boundary.md"
 - **Ding Warwick on handback** — `larry-ding.mjs (private surface, permission-allowlisted)` — Message is read from a FILE, not argv.
-- **Tests** — `tools/governor/` — node --test tools/governor/
+- **Tests** — `tools/governor/*.test.mjs` — node --test "tools/governor/*.test.mjs" — use the glob; the bare directory form fails.
 
 ## How to resume
 
