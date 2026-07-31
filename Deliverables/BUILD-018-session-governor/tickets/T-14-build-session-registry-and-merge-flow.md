@@ -2,12 +2,17 @@
 ticket: T-14
 build: BUILD-018
 title: "Build-session registry/launcher, automatic programme PR, exact-head QA binding, single merge decision"
-state: frontier
+state: resolved
 model: Opus
 depends_on: [T-10, T-11]
-resolved: null
+resolved: 2026-07-31
 private_surface: none
 ---
+
+> **RESOLVED 2026-07-31.** All four deliverables shipped; see `02-MAP.md` §10 for the
+> full write-back, including the three bounds that remain **open** and were not
+> counted as closed. Interface contract: `../T-14-CONTRACT.md`. Decisions recorded
+> as AD-22..AD-25.
 
 # T-14 — From "a rotation works" to "a build runs itself"
 

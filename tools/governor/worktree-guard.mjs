@@ -404,14 +404,19 @@ export function buildDenyReason({ toolName, comparison, canonical, classificatio
 // for it again on every Write would tax the whole session for an answer this
 // gate does not use.
 
-export function findCanonical({
-  cwd,
-  estateRoots = [],
-  execFile = execFileSync,
-  readdir = readdirSync,
-  read = readFileSync,
-  exists = existsSync,
-} = {}) {
+// ESTATE-ROOT DISCOVERY — extracted so it has exactly ONE implementation.
+// Every probe is asked `git worktree list --porcelain`; the union of the answers,
+// normalised and de-duplicated case-insensitively (Windows), IS the estate as far
+// as any governor component is concerned. A probe that is not a repository, or
+// that git cannot answer for, is skipped silently — another probe may still find
+// the estate, and a discovery step that threw would make one bad path fatal.
+//
+// Extracted for BUILD-018 T-14 (`build-registry.mjs`), which needs the same root
+// set but must ENUMERATE every programme rather than collapse to one. Behaviour
+// here is unchanged from findCanonical's original inline loop; a second copy in
+// the registry would have been a second source of truth for what "the estate"
+// means, and a drift test only reports divergence — it does not prevent it.
+export function discoverWorktreeRoots({ probes = [], execFile = execFileSync } = {}) {
   const roots = [];
   const seen = new Set();
   const addRoot = (p) => {
@@ -422,7 +427,7 @@ export function findCanonical({
     }
   };
 
-  for (const probe of [cwd, ...estateRoots]) {
+  for (const probe of probes) {
     if (!probe) continue;
     try {
       const out = execFile('git', ['-C', probe, 'worktree', 'list', '--porcelain'], {
@@ -436,6 +441,19 @@ export function findCanonical({
       // probe may still find the estate.
     }
   }
+
+  return roots;
+}
+
+export function findCanonical({
+  cwd,
+  estateRoots = [],
+  execFile = execFileSync,
+  readdir = readdirSync,
+  read = readFileSync,
+  exists = existsSync,
+} = {}) {
+  const roots = discoverWorktreeRoots({ probes: [cwd, ...estateRoots], execFile });
 
   const found = [];
   for (const root of roots) {
