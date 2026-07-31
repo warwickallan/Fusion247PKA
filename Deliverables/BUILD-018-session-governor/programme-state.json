@@ -244,6 +244,22 @@
         "live proof: resolveBuild('governor') resolved correctly from C:\\, outside any git repository"
       ],
       "note": "AD-22..AD-25 recorded. Three bounds left open, not counted as closed: T-11 foreign-cwd bound only half-closed; head-pushed reads a remote-tracking ref nothing here refreshes; registry only sees builds that have banked state."
+    },
+    {
+      "id": "T-15",
+      "title": "Post-clear model selection gate — verify the selected model before releasing implementation",
+      "state": "resolved",
+      "model": "Opus",
+      "depends_on": [
+        "T-11"
+      ],
+      "resolved": "2026-07-31",
+      "evidence": [
+        "tools/governor/model-gate.mjs",
+        "tools/governor/model-gate.test.mjs",
+        "tools/governor/reorient.mjs"
+      ],
+      "note": "Closes the live defect: bank recommended Opus, session was visibly Auto, reorientation did not present the model recommendation before anything else, and implementation reconnaissance began before the model was verified. tools/governor/model-gate.mjs: pure core (resolveCurrentModel/evaluateModelGate/renderCompactGate/isAutoLabel/normaliseModelFamily) + one impure composition function (applyModelGate) + a CLI (`node model-gate.mjs check --state <path> --session <id>`) for the post-selection recheck. Composed additively onto reorient.mjs's runHook (3-line diff: one import, one wrapping call) WITHOUT modifying the pure reorient() function itself — reorient.test.mjs's existing 34/34 tests pass byte-for-byte unmodified, proven by git diff showing zero changes to that file. Verified structurally sound by an independent agent (not the original author) before landing: applyModelGate is a true no-op whenever the underlying reorient() result does not already permit implementation (covers WRONG_WORKTREE/FAILED/MISSING/CORRUPT/AMBIGUOUS/SKIPPED), and there is no circular import between model-gate.mjs and reorient.mjs. Fail-closed to UNKNOWN per requirement 6, recorded honestly as new fog (map F-9): the only real signal available (health-store model.id/display_name) reports the RESOLVED concrete model, not confirmed to distinguish \"Auto resolved here\" from \"explicitly pinned\" — a label containing \"auto\" is treated as a confirmed block; absence of any fresh session-matched sample is UNKNOWN, never a pass. 27/27 new tests (model-gate.test.mjs) covering AUTO, UNKNOWN (explicit INV-1 assertion), explicit MISMATCH/MATCH, stale-past and stale-future samples, cross-session samples, the exact 6-line compact format (regex-checked), the true no-op property, the AD-5 10,000-char cap under a synthetic oversized context (proves the ORIGINAL brief truncates, never the gate banner), distinct EXIT_CODEs per STATUS, and a full live acceptance test using REAL modules against a REAL scratch git estate and REAL health-store temp dir: bank -> blocked with no sample via the real runHook -> real writeHealthSample simulating model selection -> MATCH via the real CLI run as an actual subprocess (not an in-process call). Known, honestly-stated gap: T-03's sampler remains unwired from the live statusLine command (deliberately deferred at T-03, unchanged here), so the acceptance test writes the sample directly, mirroring T-12's synthetic-adapter precedent — this proves the gate mechanism, not full production wiring; wiring the sampler live remains a separate, not-yet-authorised step. 447/447 suite-wide, zero regressions."
     }
   ],
   "blockers": [
@@ -338,6 +354,22 @@
       "owner": "larry",
       "blocks": [],
       "recommendation": "Every hook ticket must also ship an idempotent activation step that installs into the primary checkout’s untracked settings file."
+    },
+    {
+      "id": "D-1",
+      "kind": "defect",
+      "summary": "T-04's implementation model provenance is UNKNOWN. It was built while this session's visible model selector read Auto, not the Opus the bank recommended, and no per-turn model attribution was captured at the time (that capability did not exist yet — T-15, resolved immediately after, exists to close exactly this hole for every future ticket). T-04's code, tests (34/34, including the full 64-combination sweep) and write-back are PRESERVED EXACTLY AS LANDED — this is not a defect in T-04 itself and it is not to be rebuilt on this basis alone.",
+      "owner": "larry",
+      "blocks": [],
+      "recommendation": "T-04 requires independent QA current at its exact head (commit 85edcf76205ecf375985c30445f37c31cd37e146) before BUILD-018 merges. This is not a new mechanism: the existing T-14 merge-readiness gate (independent-review check, tools/governor/merge-readiness.mjs) already requires ALL tickets in this programme to hold a current QA approval at the exact integrated head before merge-readiness can report ready — T-04 is not exempt from that gate, and this entry exists so the SPECIFIC reason (unverified build-time model, not a code defect) is recorded rather than only the generic requirement."
+    },
+    {
+      "id": "D-2",
+      "kind": "defect",
+      "summary": "This session dispatched generic 'general-purpose'/'Plan' ephemeral agents for T-15's design and implementation instead of routing through the named specialist team (Team/agent-index.md) — specifically Keel (Implementation Engineer, owns authorised Work Orders) and Silas (Database Architect, owns schema/data-integrity judgement, relevant to the delegation ledger's own schema). Warwick corrected this mid-session: the routing SSOT is the named specialist team, and an ephemeral worker is disposable runtime beneath a named discipline, not an anonymous substitute for it. T-15 itself is preserved as landed — verified independently (447/447 suite, real acceptance test, no regressions) — this defect is about PROCESS provenance, the same class of concern as D-1, not a code defect in T-15.",
+      "owner": "larry",
+      "blocks": [],
+      "recommendation": "Every future implementation dispatch in this build routes through Keel via a proper Work Order (Team Knowledge/Templates/work-order.md, SOP-022: DRAFT -> WORKER READ-BACK -> LARRY ACCEPTS OR AMENDS -> ISSUED -> RUNNING), schema/data-integrity design decisions route through Silas first. Nolan is auditing why the existing specialists were bypassed this session and reviewing the in-flight delegation-enforcement mechanism so it itself checks for a fitting named specialist before generic delegation can satisfy it."
     }
   ],
   "model_recommendation": {
@@ -688,28 +720,29 @@
     "verified_at": "2026-07-31"
   },
   "resumption": {
-    "focus": "T-04 (the pure evaluator) landed 2026-07-31 -- all five states, distinct exit codes, full missing-field semantics, 34/34 tests including a 64-combination state-space sweep. This unblocked T-05, T-06 and T-12 simultaneously; T-08 (the dogfood, M4) also now has T-04 satisfied but still needs T-10/T-11 (both already resolved) so it is technically unlocked too -- the map's own wave order (section 9) places T-08 in Wave 5, AFTER T-05/T-06/T-12, so it is deliberately not chosen as the next action yet: dogfooding a rotation is more meaningful once the pieces that consume evaluate() actually exist.",
-    "next_action": "Implement T-05, the status-line display: render the evaluate() verdict compactly wherever Warwick's live status line is surfaced. Acceptance (map section 9): renders all five states (GREEN/AMBER/RED/RECOVERY/BLIND); degrades gracefully. Mutation test named by the map: if the evaluator throws, the line still renders and shows BLIND -- never a crash, never a silently blank line (same INV-1 spirit as sampler.mjs's own 'a statusLine command must never surface a crash to the UI'). Read tools/governor/evaluator.mjs's verdict shape ({state, exitCode, reasons, unknownSignals, examinedSignals, advice}) and tools/governor/sampler.mjs (the existing statusLine-to-signals precedent) before starting. T-05 does not need a live adapter wired into the real statusLine command to be complete -- T-03's sampler was deliberately left unwired for the same reason (production activation under a read-back gate this dispatch may not carry); confirm with Warwick before wiring anything into the primary checkout's live settings.",
+    "focus": "T-15 (post-clear model selection gate) landed 2026-07-31, closing the live defect this correction was opened over. A second, related correction is in flight in parallel: a mechanical delegation-enforcement gate (delegation ledger + substantial-work threshold on direct Write/Edit/MultiEdit/mutating-Bash calls, composed the same additive way onto worktree-guard.mjs) is being implemented by a dispatched agent and will be integrated as its own ticket once it lands and is reviewed — it is NOT yet resolved as of this banking. T-04's write-back log entry now also carries a new D-1 blocker recording that its implementation-model provenance is unknown (built under Auto, not the recommended Opus) and requires independent QA at its exact head before merge — T-04 itself is unchanged, preserved exactly as landed. Frontier reverts to the pre-T-15 set (T-05/T-06/T-08/T-12); T-05 remains the chosen next action per the map's own wave order.",
+    "next_action": "Implement T-05, the status-line display: render the evaluate() verdict compactly wherever Warwick's live status line is surfaced. Acceptance (map section 9): renders all five states (GREEN/AMBER/RED/RECOVERY/BLIND); degrades gracefully. Mutation test named by the map: if the evaluator throws, the line still renders and shows BLIND. Read tools/governor/evaluator.mjs 's verdict shape and tools/governor/sampler.mjs before starting. NOTE: per the now-standing operating model, this ticket is a delegation candidate, not automatically Larry's own — consider dispatching it to an agent rather than implementing it directly, and if a not-yet-landed delegation-enforcement gate is active by the time this session resumes, direct implementation of this ticket will be mechanically gated in the same way.",
     "ticket": "T-05",
     "worktree": "C:/Fusion247PKA-governor",
     "branch": "build-018/session-governor",
     "read_first": [
-      "Deliverables/BUILD-018-session-governor/02-MAP.md - the live execution SSOT for architecture/decisions/fog (AD-17: tickets[] is the execution-state SSOT; the map is the navigation projection)",
-      "Deliverables/BUILD-018-session-governor/01-GOAL-CONTRACT.md - the product SSOT; it wins over any ticket",
-      "tools/governor/evaluator.mjs - the T-04 verdict shape T-05 renders; pure, zero fs/git knowledge (AD-11)",
-      "tools/governor/programme-state.mjs - resolveTicket/deriveResumption/resolveTicketAndAdvance/applyTicketResolution are the ONLY sanctioned way to resolve a ticket or re-point resumption; hand-editing tickets[] or resumption.* directly is the exact dual-write failure the 2026-08-01 correction fixed"
+      "Deliverables/BUILD-018-session-governor/02-MAP.md - the live execution SSOT (AD-17)",
+      "Deliverables/BUILD-018-session-governor/01-GOAL-CONTRACT.md - the product SSOT; wins over any ticket",
+      "tools/governor/model-gate.mjs - T-15, the post-clear model gate now composed into reorientation",
+      "tools/governor/evaluator.mjs - the T-04 verdict shape T-05 renders",
+      "tools/governor/programme-state.mjs - resolveTicket/deriveResumption/resolveTicketAndAdvance/applyTicketResolution are the ONLY sanctioned way to resolve a ticket or re-point resumption"
     ],
     "do_not": [
       "Do not hand-edit tickets[].state, resumption.*, or 02-MAP.md's GOVERNOR:STATUS block directly — use resolveTicketAndAdvance / applyTicketResolution.",
       "Do not open or merge the recovery PR (recovery/2026-07-31-governor-abort-handoff at 95c265d).",
       "Do not alter local main.",
-      "Do not create the BUILD-018 PR yet - explicitly deferred by Warwick, and merge-readiness itself is not yet true (T-06/T-08/T-12 still open).",
+      "Do not create the BUILD-018 PR yet - merge-readiness is not yet true, and T-04 now carries an explicit unresolved QA blocker (D-1) besides.",
       "Do not modify, move or delete the six Cairn intake files under Team Knowledge/Sources/.",
       "Do not delete or clean any pre-existing worktree without first proving owner, branch, status and disposition.",
       "Do not run /close-session, and do not start the VlogOps product build.",
       "Do not re-litigate the settled decisions in 02-MAP.md section 3.",
       "Do not read GL-012 from this working tree - it is the pre-ruling text. Use git show 95c265d.",
-      "Do not wire the sampler or a new statusLine command into the primary checkout without Warwick confirming — T-03 deliberately left this unwired for the same reason."
+      "Do not implement a delegable ticket directly without first stating a delegation plan — this is now the standing operating model (see CLAUDE.md), not just a T-15-session correction."
     ]
   },
   "locked_decisions": [

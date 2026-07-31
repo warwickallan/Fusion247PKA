@@ -47,6 +47,7 @@ import {
   buildDenyReason,
   LOCATION,
 } from './worktree-guard.mjs';
+import { applyModelGate } from './model-gate.mjs';
 
 // AD-5. A hard contract from the host, not a preference.
 export const CONTEXT_CAP = 10000;
@@ -705,9 +706,14 @@ export function runHook(raw, opts = {}) {
     });
     return { verdict: VERDICT.FAILED, context: b.text, brief: b };
   }
-  const { source, cwd } = parsed.payload;
+  const { source, cwd, session_id: sessionId } = parsed.payload;
+  const { modelGate: modelGateOpts, ...reorientOpts } = opts;
   try {
-    return reorient({ source, cwd: cwd || opts.cwd || process.cwd(), ...opts });
+    const result = reorient({ source, cwd: cwd || opts.cwd || process.cwd(), ...reorientOpts });
+    // T-15 — a bounded, additive layer on top of an otherwise-untouched reorient()
+    // result. A no-op unless reorient() already says implementation is permitted; see
+    // model-gate.mjs's own header for why this composes here rather than merging in.
+    return applyModelGate(result, { sessionId, ...modelGateOpts });
   } catch (err) {
     const b = renderProblemBrief(VERDICT.FAILED, {
       detail: `The reorientation hook threw: ${err.message}`,
