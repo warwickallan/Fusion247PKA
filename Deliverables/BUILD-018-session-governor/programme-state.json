@@ -260,6 +260,16 @@
         "tools/governor/reorient.mjs"
       ],
       "note": "Closes the live defect: bank recommended Opus, session was visibly Auto, reorientation did not present the model recommendation before anything else, and implementation reconnaissance began before the model was verified. tools/governor/model-gate.mjs: pure core (resolveCurrentModel/evaluateModelGate/renderCompactGate/isAutoLabel/normaliseModelFamily) + one impure composition function (applyModelGate) + a CLI (`node model-gate.mjs check --state <path> --session <id>`) for the post-selection recheck. Composed additively onto reorient.mjs's runHook (3-line diff: one import, one wrapping call) WITHOUT modifying the pure reorient() function itself — reorient.test.mjs's existing 34/34 tests pass byte-for-byte unmodified, proven by git diff showing zero changes to that file. Verified structurally sound by an independent agent (not the original author) before landing: applyModelGate is a true no-op whenever the underlying reorient() result does not already permit implementation (covers WRONG_WORKTREE/FAILED/MISSING/CORRUPT/AMBIGUOUS/SKIPPED), and there is no circular import between model-gate.mjs and reorient.mjs. Fail-closed to UNKNOWN per requirement 6, recorded honestly as new fog (map F-9): the only real signal available (health-store model.id/display_name) reports the RESOLVED concrete model, not confirmed to distinguish \"Auto resolved here\" from \"explicitly pinned\" — a label containing \"auto\" is treated as a confirmed block; absence of any fresh session-matched sample is UNKNOWN, never a pass. 27/27 new tests (model-gate.test.mjs) covering AUTO, UNKNOWN (explicit INV-1 assertion), explicit MISMATCH/MATCH, stale-past and stale-future samples, cross-session samples, the exact 6-line compact format (regex-checked), the true no-op property, the AD-5 10,000-char cap under a synthetic oversized context (proves the ORIGINAL brief truncates, never the gate banner), distinct EXIT_CODEs per STATUS, and a full live acceptance test using REAL modules against a REAL scratch git estate and REAL health-store temp dir: bank -> blocked with no sample via the real runHook -> real writeHealthSample simulating model selection -> MATCH via the real CLI run as an actual subprocess (not an in-process call). Known, honestly-stated gap: T-03's sampler remains unwired from the live statusLine command (deliberately deferred at T-03, unchanged here), so the acceptance test writes the sample directly, mirroring T-12's synthetic-adapter precedent — this proves the gate mechanism, not full production wiring; wiring the sampler live remains a separate, not-yet-authorised step. 447/447 suite-wide, zero regressions."
+    },
+    {
+      "id": "T-16",
+      "title": "Mechanical delegation-enforcement gate — delegation ledger + substantial-work threshold, specialist-match verification against Team/agent-index.md",
+      "state": "frontier",
+      "model": "Opus",
+      "depends_on": [],
+      "resolved": null,
+      "evidence": [],
+      "note": "Added mid-programme after Warwick caught this session bypassing the named specialist team (generic ephemeral agents used for design + implementation instead of Keel/Silas). Design by Larry, hardened by Nolan's audit (governing_specialist/specialist_match fields), schema owned by Silas, implementation under a proper Keel Work Order with read-back gate. Not yet resolved."
     }
   ],
   "blockers": [
@@ -370,6 +380,14 @@
       "owner": "larry",
       "blocks": [],
       "recommendation": "Every future implementation dispatch in this build routes through Keel via a proper Work Order (Team Knowledge/Templates/work-order.md, SOP-022: DRAFT -> WORKER READ-BACK -> LARRY ACCEPTS OR AMENDS -> ISSUED -> RUNNING), schema/data-integrity design decisions route through Silas first. Nolan is auditing why the existing specialists were bypassed this session and reviewing the in-flight delegation-enforcement mechanism so it itself checks for a fitting named specialist before generic delegation can satisfy it."
+    },
+    {
+      "id": "D-3",
+      "kind": "defect",
+      "summary": "This session's FULL history (T-01 through T-14, and initially T-15/T-16) was built without ANY Work Order or Keel involvement, despite tools/governor/ being explicitly named in Keel's own contract as in-scope — confirmed by Nolan's audit. This is the standing pattern for the entire BUILD-018 programme, not a single-session lapse.",
+      "owner": "larry",
+      "blocks": [],
+      "recommendation": "Per Warwick's explicit ruling (2026-07-31): do NOT reopen or rebuild T-01 through T-14 on this basis alone. Preserve sound completed work. The existing merge-readiness independent-review gate (tools/governor/merge-readiness.mjs) already requires QA current at the exact head for every ticket before merge, regardless of build provenance — that generic requirement stands for all of them; D-1 records the T-04-specific reason. Going forward (T-16 onward), implementation routes through Keel via a proper Work Order; Larry's routing cheatsheet (Team/Larry - Orchestrator/AGENTS.md) is being corrected to make this the default rather than an easily-bypassed option."
     }
   ],
   "model_recommendation": {

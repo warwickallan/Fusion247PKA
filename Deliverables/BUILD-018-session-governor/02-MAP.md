@@ -263,7 +263,7 @@ installs it into the primary checkout's untracked settings file — otherwise it
 **Phase:** Phase 2 — bounded implementation
 
 **Completed (11):** T-01, T-02, T-03, T-04, T-07, T-09, T-10, T-11, T-13, T-14, T-15
-**Frontier — takable now (4):** T-05 [Sonnet], T-06 [Opus], T-08 [Opus], T-12 [Sonnet]
+**Frontier — takable now (5):** T-05 [Sonnet], T-06 [Opus], T-08 [Opus], T-12 [Sonnet], T-16 [Opus]
 **Resumption:** T-05 — model Sonnet
 
 _Machine-rendered from `programme-state.json` `tickets[]` — the execution-state SSOT (AD-17). Regenerated on every ticket resolution; the ticket-index table (§9) and the write-back log (§10) remain the human narrative record._
@@ -280,6 +280,21 @@ rotation is more meaningful once the pieces that consume `evaluate()` actually e
 **T-05 is the chosen next action**, not a fake-automated pick — `deriveResumption` refuses to
 auto-select among four frontier tickets, exactly as designed. The rotation half of this build
 is complete; the **advice** half has now started with the pure evaluator core in place.
+
+**Operating-model correction, mid-programme (new blocker D-3, ticket T-16 opened).** Nolan's
+audit (dispatched over D-2) found this session's routing bypass was not an isolated lapse:
+**T-01 through T-14 — the entire programme to date — were built without any Work Order or
+Keel involvement**, despite `tools/governor/` being named explicitly in Keel's own contract as
+in-scope. Root cause: Larry's routing cheatsheet (`Team/Larry - Orchestrator/AGENTS.md`) was
+never updated for Keel or five other specialists hired since the original bundle — a real,
+six-for-six SOP-001 process gap, not a one-off. **Warwick's explicit ruling: do not reopen or
+rebuild T-01–T-14 over this.** Sound completed work is preserved; the existing merge-readiness
+independent-review gate already requires QA current at the exact head for every ticket before
+merge, regardless of build provenance. Going forward, T-16 (a mechanical delegation-enforcement
+gate — ledger + threshold + specialist-match verification against `Team/agent-index.md`) is
+being implemented under a proper accepted Keel Work Order, with Silas owning the ledger schema
+and Nolan correcting the stale routing cheatsheet directly (Warwick's explicit approval,
+2026-07-31, to edit that `AGENTS.md`).
 
 **The rotation loop is now CLOSED.** T-10 banks, pushes and writes the canonical handoff;
 T-11 gets it into the fresh session automatically via `SessionStart(source="clear")` →
@@ -322,6 +337,7 @@ Model column: Opus only where architectural judgement is materially valuable.
 | **T-10** | ~~`/rotate-session` command: bank + **verify safety** + emit `/clear` instruction.~~ **RESOLVED 2026-07-31.** | **Opus** | T-07 ✅,T-09 ✅,T-13 ✅ | ✅ met — `tools/governor/rotate-session.mjs` + `.claude/commands/rotate-session.md`; refuses with the precise obstacle; AD-14 proven on real git; 31/31 tests | ✅ passing — **real-git** dirty tree / unpushed commit / live worker all refuse *and* commit nothing; plus BLIND paths and a failing push |
 | **T-11** | ~~Reorientation: `SessionStart(source=clear)` → `additionalContext` pointer brief, ≤10,000 chars — **plus** canonical-location verification and the committed `PreToolUse` wrong-worktree deny gate.~~ **RESOLVED 2026-07-31.** | **Opus** | T-09 ✅,T-10 ✅ | ✅ met — `tools/governor/reorient.mjs`, `worktree-guard.mjs`, `install-hooks.mjs`; real-estate proof both ways (canonical → oriented at 6,928 chars; primary checkout → WRONG WORKTREE at 8,214); hooks live and idempotent; 84/84 ticket tests, 223/223 suite | ✅ passing — oversized state truncates *safely*, announces it, and never drops the next action **or** the refusal banner; **write aimed at the correct absolute path still DENIED** from the wrong worktree; unknown location denies, guard-throws defers |
 | **T-12** | Portability: extract the estate adapter; run the core against a synthetic estate. | Sonnet | T-04 | Core has zero myPKA paths | Synthetic adapter with all-unknown signals → BLIND |
+| **T-16** | **Mechanical delegation-enforcement gate** — delegation ledger (Silas-owned schema) + substantial-work threshold on direct Write/Edit/MultiEdit/mutating-Bash, composed additively onto `worktree-guard.mjs`'s PreToolUse pattern; a checkpoint must name a `governing_specialist` and record `specialist_match` against `Team/agent-index.md` — a generic dispatch cannot satisfy the gate where a named specialist fits. Added mid-programme after this session bypassed Keel/Silas for T-15's own design and implementation (see D-2, D-3). | **Opus** | — | Implemented under an accepted Keel Work Order (SOP-022); real test coverage incl. fail-open on internal error, threshold/reset behaviour, specialist-match logic | Ledger read/write forced to throw → ALLOW, never DENY (discipline gate, not a safety-critical one) |
 | **T-15** | ~~**Post-clear model selection gate** — verify the selected model before releasing implementation, added mid-programme after a live defect (bank recommended Opus, session was Auto, implementation began unverified).~~ **RESOLVED 2026-07-31.** | **Opus** | T-11 ✅ | ✅ met — `tools/governor/model-gate.mjs` composed additively onto `reorient.mjs`'s `runHook`; 27/27 tests incl. a real CLI-subprocess acceptance test | ✅ passing — no session-matched sample → `UNKNOWN`, blocks (INV-1 applied to model verification); `applyModelGate` is a true no-op when the underlying `reorient()` result doesn't already permit implementation |
 | **T-13** | ~~**Programme-state collector** — gather the live estate (git, `worktree-recon`, `gh`) into a document that passes `validateProgrammeState`.~~ **RESOLVED 2026-07-31.** | Sonnet | T-07,T-09 | ✅ met — `tools/governor/collect-state.mjs`; real-estate acceptance test (run against this repo, merged, validated) — 18/18 tests | ✅ passing — all three specified failures (no `gh`, unreadable worktree, git error) proven to land in `unknown`, never an empty list or a zero |
 | **T-14** | ~~**Build-session registry/launcher by build NAME** + automatic programme-PR create/update at merge readiness + **exact-head QA binding** + present Warwick only the final merge decision.~~ **RESOLVED 2026-07-31.** | **Opus** | T-10 ✅,T-11 ✅ | ✅ met — `build-registry.mjs`, `qa-binding.mjs`, `merge-readiness.mjs`, `programme-pr.mjs`, `.claude/commands/build.md`; **proven live from `C:\` outside any repository**: `resolveBuild('governor')` returned the right worktree/branch/ticket, and every field was derived from a fresh re-read of the state file, not from the index. 133 new tests; **356/356** suite-wide | ✅ passing — head moved after review → verdict **SUPERSEDED**, does not carry forward (real git, 3 commits); unknown/abbreviated head → `UNKNOWN_HEAD`, never a prefix match; index made to lie → resolver returned the **re-read** location; `'merge'` injected into the allowed action set → 3 tests red. **16 deliberate mutations across the three modules, every one caught, all modules restored byte-identical** |
