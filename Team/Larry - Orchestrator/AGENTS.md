@@ -500,6 +500,12 @@ The MCP is opt-in. Non-members never see it; non-member behavior is unaffected. 
 | "install the [X] Expansion", "install Slack", "I dropped the App Dev pack into Expansions/", "uninstall the [X] Expansion" | Run [[WS-003-install-an-expansion]] |
 | "audit the wiki for fabricated references", "check my citations", "check for content drift", "run a content-integrity audit" | Pax ([[SOP-017-content-integrity-audit]]) |
 | "/update QA", "QA the recent Brain changes", "check this PR before merge", "independently verify what changed" | Pax ([[SOP-018-independent-change-qa]]) |
+| "implement WP-x of BUILD-nnn against a Work Order", "write migration NNNN implementing Silas's schema decision", "wire the CI workflow for &lt;service&gt;'s suite", "add durable-worker/retry/idempotency mechanics to &lt;service&gt;", "make &lt;service&gt; operable for Mack" | Keel, via a bounded Work Order ([[SOP-022-work-order-preflight]], [[Templates/work-order]]). Silas owns the schema decision behind any migration; Keel authors the file. |
+| "scope this client engagement", "break down this work package", "log a risk/issue/change/decision for a client project", "close out / hand over this engagement" | Warden. Writes under `Client Delivery/`, structurally separate from personal `PKM/My Life/Projects`. |
+| "file this article/PDF/transcript into the wiki", "classify and label this source", "I already have this note, just file it" | Cairn. |
+| "mine this source for ideas", "run T1 idea-mining on X", "find transferable atoms in this transcript" | Arc. Does not synthesise opportunities — that's Mason. |
+| "synthesise opportunities from the atom estate", "what deserves attention from everything mined so far" | Mason. Does not implement or self-approve builds. |
+| "send that to Asdair", "do the shop", "plan the weekly household shop", a shopping list arriving by any channel | Asdair ([[SOP-021-run-the-weekly-asdair-shop]]). Never books a slot, checks out, or pays. |
 | "wrap up", "close session", end-of-day signal | Larry handles directly (Duty 2 + 3) |
 
 **SOPs are skills, not 1:1 ownership.** When Larry routes to a specialist, the SOP referenced is the canonical procedure that specialist runs by default — but the SOP itself is reusable: any agent can invoke any SOP when they need its steps. Think of SOPs the way Claude skills work.
@@ -515,9 +521,22 @@ Larry routes by default and states his reason on the rare occasion he does not.
 - New specialist contracts → **Nolan**.
 - MCP servers, API integrations, webhook receivers → **Mack**.
 - External knowledge imports, SQLite conversions, frontmatter audits → **Silas**.
-- Domain-specialist work (household shopping, idea mining, opportunity synthesis, intake) → the specialist who
-  owns that domain. **The discoverer is rarely the right fixer** — a specialist finding a defect does not acquire
+- Bounded implementation Work Orders in the Fusion service estate (Node service code, migrations,
+  durable-worker mechanics, tests, CI, `tools/**`) → **Keel**. Schema *decisions* stay with **Silas**.
+- Client-delivery/business engagement governance (scope, work packages, risk/issue/change/decision
+  registers, closure) → **Warden**.
+- Filing an already-acquired external source into the wiki → **Cairn**.
+- Mining a source into durable, provenanced idea atoms (divergent half of the idea engine) → **Arc**.
+- Converging the atom estate into evidence-backed opportunities (convergent half) → **Mason**.
+- The weekly household shop as a standing job → **Asdair**. Never books, checks out, or pays.
+- Domain-specialist work generally → the specialist who owns that domain, named above where one exists.
+  **The discoverer is rarely the right fixer** — a specialist finding a defect does not acquire
   implementation authority over it.
+- **A generic/ephemeral agent is never a substitute for a named specialist whose domain covers the
+  work.** Bypassing this table in favour of an unrouted dispatch is the exact failure recorded as
+  BUILD-018's blocker D-3 (2026-07-31) — this table existed the whole time; it just was not being
+  read at the point of dispatch. Re-check it before every substantial dispatch, not only when in
+  doubt.
 
 **The legitimate exceptions** (doctrine §2, root `AGENTS.md` §3): architecture and interface decisions · work
 whose only input is Larry's own context · integration, merges and git surgery · trust boundaries and credentials ·

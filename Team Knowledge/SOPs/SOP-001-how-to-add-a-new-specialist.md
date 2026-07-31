@@ -131,17 +131,68 @@ Use any existing shim (`.claude/agents/silas.md`, `.claude/agents/penn.md`, etc.
 
 Edit [[Team/agent-index]]. Add a row with the specialist's name, role, folder link, and the user input patterns that should route to them.
 
-### 7. Update relevant Workstreams (Nolan)
+### 7. Draft the routing-cheatsheet update for Larry's own contract (Nolan) — mandatory, not optional
+
+**`Team/agent-index.md` (step 6) is the roster of truth. It is not the file Larry actually pattern-matches
+against at dispatch time.** That file is `Team/Larry - Orchestrator/AGENTS.md`, specifically its "Routing
+cheatsheet" table and its "What Larry routes rather than does" list. A specialist can be fully and
+correctly registered in the index and still be structurally invisible to Larry's routing judgement, because
+nothing re-derives a dispatch decision from the index on every turn.
+
+**This is not a hypothetical risk.** Confirmed live on 2026-07-31: six specialists (Warden, Cairn, Arc,
+Mason, Asdair, Keel) were all present and correct in the index and absent from both structures in Larry's
+own contract. It was the direct mechanism behind a real dispatch bypass — Keel's own contract names
+`tools/**` as a declared part of his domain, and a bounded implementation job there was still routed to a
+generic worker because Larry's routing surface had no row for Keel at all.
+
+Draft, as plain text — do not write it into the file yet (see step 9 for why):
+
+- one row for the **"Routing cheatsheet"** table: the input patterns that should route to this specialist,
+  in the same shape as the existing rows;
+- one line for the **"What Larry routes rather than does"** list: the specialist's name and the category of
+  work they own, in the same shape as the existing entries.
+
+**Why drafting is separate from writing here, unlike steps 4-6 above.** `Team/Larry - Orchestrator/AGENTS.md`
+is an existing specialist's `AGENTS.md`. The standing hard rule — "Never modify, rename, or replace any
+`AGENTS.md`... without explicit approval" — applies to it exactly as it would to any other specialist's
+contract. Nolan prepares the exact rows as a ready-to-apply proposal; the write happens only once Warwick
+has explicitly signed off on those specific rows, obtained separately from the general "confirm with the
+user" pass in step 9, because the AGENTS.md hard rule is stricter than ordinary hire confirmation.
+
+### 8. Update relevant Workstreams (Nolan)
 
 If the new specialist takes part in a recurring orchestration, edit the matching Workstream in `Team Knowledge/Workstreams/` to mention them via `[[wikilinks]]`. Do not duplicate the AGENTS.md content into the Workstream.
 
-### 8. Confirm with the user (Nolan -> Larry -> user)
+### 9. Confirm with the user (Nolan -> Larry -> user)
 
-Show the user the draft AGENTS.md, the draft `.claude/agents/<slug>.md` shim, and the updated agent-index, with a one-line summary of what Pax's research surfaced. Make changes only after they approve.
+Show the user the draft AGENTS.md, the draft `.claude/agents/<slug>.md` shim, the updated agent-index, and
+the drafted routing-cheatsheet rows from step 7 — with a one-line summary of what Pax's research surfaced.
+Make changes only after they approve. **The routing-cheatsheet rows carry their own explicit approval
+gate** (step 7's AGENTS.md hard-rule note): they are not written into `Team/Larry - Orchestrator/AGENTS.md`
+until that specific sign-off is given, even if the rest of the hire is approved in the same pass.
 
-### 9. Log the hire (Larry)
+### 10. Log the hire (Larry)
 
-Larry writes a line in the next session log: "Hired <Name> as <Role> after research from Pax. Brief at `[[<research-deliverable-slug>]]`. Contract at `[[Team/<Name> - <Role>/AGENTS]]`. Shim at `.claude/agents/<slug>.md`." This becomes part of the team's persistent memory.
+Larry writes a line in the next session log: "Hired <Name> as <Role> after research from Pax. Brief at
+`[[<research-deliverable-slug>]]`. Contract at `[[Team/<Name> - <Role>/AGENTS]]`. Shim at
+`.claude/agents/<slug>.md`. Routing cheatsheet: updated / pending Warwick approval." This becomes part of
+the team's persistent memory. **A hire is not complete while the cheatsheet update sits at "pending"** —
+the log entry is the place that fact stays visible until it closes.
+
+## Definition of done — a hire is not complete until every line is checked
+
+- [ ] Pax's research brief exists at `Deliverables/YYYY-MM-DD-<role-slug>-hire-research.md`.
+- [ ] `Team/<Name> - <Role>/AGENTS.md` drafted per step 4.
+- [ ] Host subagent shim(s) drafted per step 5 for every host that can truthfully perform the role.
+- [ ] Row added to `Team/agent-index.md` (step 6).
+- [ ] Routing-cheatsheet rows for `Team/Larry - Orchestrator/AGENTS.md` **drafted** per step 7.
+- [ ] Relevant Workstreams updated per step 8, or explicitly not applicable.
+- [ ] User confirmation obtained per step 9, **and** Warwick's explicit sign-off on the cheatsheet rows
+      specifically obtained and the rows actually written into `Team/Larry - Orchestrator/AGENTS.md`.
+- [ ] Hire logged per step 10, with the cheatsheet line showing "updated," not "pending."
+
+**A hire that stops after the agent-index row (step 6) is incomplete, not merely light on polish.** The
+specialist exists on paper and is invisible to routing until step 7's rows are approved and written.
 
 ## Common mistakes to avoid
 
@@ -154,4 +205,8 @@ Larry writes a line in the next session log: "Hired <Name> as <Role> after resea
 - Duplicating naming rules inside the new AGENTS.md. Link to [[GL-001-file-naming-conventions]] instead.
 - Naming the folder with a different separator than other specialists. Always: space, hyphen, space.
 - Forgetting to add the row to [[Team/agent-index]]. Larry's routing will skip an unlisted specialist.
+- **Stopping at the agent-index row and treating the hire as routing-complete.** The index is the roster;
+  `Team/Larry - Orchestrator/AGENTS.md`'s Routing cheatsheet and "What Larry routes rather than does" list
+  are what Larry actually dispatches against, and they need their own drafted rows (step 7), their own
+  Warwick approval, and their own confirmed write (step 9) before the hire is done.
 - Writing the AGENTS.md in the user's voice instead of as a contract. The file is for the LLM, not the reader.
