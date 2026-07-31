@@ -9,14 +9,14 @@
   },
   "phase": {
     "current": "Phase 2 — bounded implementation",
-    "summary": "Phase 1 (Opus architecture) is complete and settled: 13 architecture decisions, the map, the goal contract and the estate record are written. Phase 2 is implementing the seven components against that architecture. T-01 (live statusLine payload proven on this machine), T-02 (session-health store, atomic write) and T-07 (worktree reconciliation) are resolved, tested and pushed. T-09 has now defined the durable programme-state schema this document is an instance of — the machine-readable SSOT that /rotate-session banks and fresh-session reorientation reads, rendering Team Knowledge/fusion-brief/session-handoff.md rather than competing with it.",
+    "summary": "Phase 1 (Opus architecture) is complete and settled: 13 architecture decisions, the map, the goal contract and the estate record are written. Phase 2 is implementing the seven components against that architecture. T-01, T-02, T-07 and T-09 resolved earlier; this banking adds T-03 (sampler: statusLine payload to written health sample) and T-13 (programme-state collector: live git/worktree-recon/gh output mapped onto the T-09 schema), both Sonnet-tier and run in parallel since they share no file. T-04 (evaluator) is now unlocked; T-10 (/rotate-session) now has every dependency in its depends_on list resolved (T-07, T-09, T-13) — it is fully unlocked and is the next Opus-tier item.",
     "started": "2026-07-31"
   },
   "banked": {
     "at": "2026-07-31",
     "by_model": "Opus",
     "session_id": null,
-    "head_sha": "c9df07782b3de210b123e0b508c9c4ba234187ec",
+    "head_sha": "1ca7561119adb1aa525684f22756e4cd513e8cff",
     "governor_version": "T-09/schema-v1"
   },
   "repository": {
@@ -24,7 +24,7 @@
     "worktree": "C:/Fusion247PKA-governor",
     "branch": "build-018/session-governor",
     "base_sha": "ef96a3327f896e025731769c72157fd722daa02f",
-    "head_sha": "c9df07782b3de210b123e0b508c9c4ba234187ec",
+    "head_sha": "1ca7561119adb1aa525684f22756e4cd513e8cff",
     "clean": true,
     "unpushed_commits": 0,
     "upstream": "origin/build-018/session-governor"
@@ -58,20 +58,24 @@
     {
       "id": "T-03",
       "title": "Sampler: statusLine script to health sample",
-      "state": "frontier",
+      "state": "resolved",
       "model": "Sonnet",
       "depends_on": [
         "T-01",
         "T-02"
       ],
-      "resolved": null,
-      "evidence": [],
-      "note": "Reuse tools/capture-statusline.mjs from T-01. Must be fast, idempotent and kill-tolerant."
+      "resolved": "2026-07-31",
+      "evidence": [
+        "tools/governor/sampler.mjs",
+        "tools/governor/sampler.test.mjs",
+        "Deliverables/BUILD-018-session-governor/tickets/T-03-sampler.md"
+      ],
+      "note": "25/25 tests, including a real health-store mutation test (malformed stdin after a good sample never corrupts it) and a real child-process CLI test. Not yet wired into the primary checkout's statusLine setting — deliberately deferred, see ticket handback."
     },
     {
       "id": "T-04",
       "title": "Pure evaluator: evaluate(signals) to verdict",
-      "state": "blocked",
+      "state": "frontier",
       "model": "Opus",
       "depends_on": [
         "T-03"
@@ -152,11 +156,12 @@
       "model": "Opus",
       "depends_on": [
         "T-07",
-        "T-09"
+        "T-09",
+        "T-13"
       ],
       "resolved": null,
       "evidence": [],
-      "note": "Must be able to REFUSE with the precise obstacle. Must not invoke close-session (INV-4)."
+      "note": "Must be able to REFUSE with the precise obstacle. Must not invoke close-session (INV-4). Now FULLY UNLOCKED: every dependency (T-07, T-09, T-13) is resolved."
     },
     {
       "id": "T-11",
@@ -186,15 +191,19 @@
     {
       "id": "T-13",
       "title": "Programme-state collector: gather the live estate into a valid state document",
-      "state": "frontier",
+      "state": "resolved",
       "model": "Sonnet",
       "depends_on": [
         "T-07",
         "T-09"
       ],
-      "resolved": null,
-      "evidence": [],
-      "note": "Mechanical adapter work split out of T-10 by T-09: map git + worktree-recon + gh output onto the schema, declare everything it could not gather in `unknown`. Leaves T-10 to own only judgement (refuse-or-proceed)."
+      "resolved": "2026-07-31",
+      "evidence": [
+        "tools/governor/collect-state.mjs",
+        "tools/governor/collect-state.test.mjs",
+        "Deliverables/BUILD-018-session-governor/tickets/T-13-programme-state-collector.md"
+      ],
+      "note": "18/18 tests, including a real-estate acceptance test (collectEstateState run against this actual repository, merged onto the T-09 fixture, validates clean) and three source-failure mutation tests (no gh, unreadable worktree, git error), each proven to land its field in `unknown` rather than an empty list or a zero. Collects repository/worktrees/branches/pull_requests only — workers stays programme-tracked (see AD-16); branches.behind is permanently unknown by design (see AD-15)."
     }
   ],
   "blockers": [
@@ -296,9 +305,9 @@
     }
   ],
   "model_recommendation": {
-    "model": "Sonnet",
+    "model": "Opus",
     "effort": null,
-    "rationale": "Both remaining Sonnet-tier frontier tickets are now takable and are mechanical: T-03 (sampler over an already-proven payload, with an existing capture script to reuse) and T-13 (collector mapping already-written git/worktree output onto an already-validated schema). Neither requires architectural judgement — the architecture is settled in 02-MAP.md section 3 and the schema is now fixed. Spend Opus on T-10 (refuse-or-proceed judgement) and T-04 (state-space design) once T-03 and T-13 land."
+    "rationale": "Both Sonnet-tier frontier tickets (T-03, T-13) landed this banking, 106/106 governor tests passing. The remaining frontier is Opus-tier judgement: T-04 (pure evaluator state-space design) and T-10 (/rotate-session refuse-or-proceed judgement, now with every dependency resolved). Neither is mechanical adapter work — spend Opus on both."
   },
   "workers": [
     {
@@ -312,12 +321,25 @@
       "evidence": [
         "Deliverables/BUILD-018-session-governor/02-MAP.md"
       ]
+    },
+    {
+      "id": "t-03-t-13-implementation",
+      "kind": "subagent",
+      "status": "completed",
+      "ticket": "T-03",
+      "dispatched": "2026-07-31",
+      "worktree": "C:/Fusion247PKA-governor",
+      "expected_output": "Sampler + programme-state collector, both Sonnet-tier, run in parallel (no shared files)",
+      "evidence": [
+        "tools/governor/sampler.mjs",
+        "tools/governor/collect-state.mjs"
+      ]
     }
   ],
   "branches": [
     {
       "name": "build-018/session-governor",
-      "head": "c9df07782b3de210b123e0b508c9c4ba234187ec",
+      "head": "1ca7561119adb1aa525684f22756e4cd513e8cff",
       "upstream": "origin/build-018/session-governor",
       "ahead": 0,
       "behind": null,
@@ -583,8 +605,8 @@
     {
       "path": "C:/Fusion247PKA-governor",
       "branch": "build-018/session-governor",
-      "head": "c9df07782b3de210b123e0b508c9c4ba234187ec",
-      "dirty": true,
+      "head": "1ca7561119adb1aa525684f22756e4cd513e8cff",
+      "dirty": false,
       "unpushedCount": 0,
       "classification": "active-build",
       "disposition": "in-progress-owned",
@@ -616,7 +638,7 @@
   ],
   "safe_boundary": {
     "at_boundary": true,
-    "reason": "T-09 completes as a whole: schema, validator, writer, renderer, fixtures and tests all land in one commit, and no ticket is split across the rotation. The build worktree is otherwise clean and pushed; every other worktree is either reconciled-clean or is the primary checkout carrying six untracked Cairn intake files that this build is forbidden to touch.",
+    "reason": "T-03 and T-13 both complete as wholes in one commit each, run in parallel, and no ticket is split across this rotation point. The build worktree (C:/Fusion247PKA-governor) is clean and pushed at 1ca7561...  Other worktrees were not re-scanned this banking (out of this session's declared scope — no audit of the primary checkout or other worktrees); their entries below are carried over from T-09's original snapshot and are stale, not re-verified.",
     "obstacles": [
       {
         "kind": "live-worker",
@@ -630,25 +652,26 @@
     "verified_at": "2026-07-31"
   },
   "resumption": {
-    "focus": "Implement the two newly takable Sonnet tickets, then return to Opus for the rotation command. T-03 turns the proven statusLine payload into a written health sample; T-13 turns live git and worktree output into a valid programme-state document. Together they leave T-10 (/rotate-session) owning only judgement — whether the estate is safe to rotate — rather than also owning data collection.",
-    "next_action": "Dispatch T-03 (sampler) to a Sonnet worker with a read-back gate, using tools/capture-statusline.mjs from T-01 and writeHealthSample from T-02. T-13 (collector) may be dispatched in parallel: it touches different files (tools/governor/collect-state.mjs) and shares no file with T-03.",
-    "ticket": "T-03",
+    "focus": "T-03 and T-13 both landed (106/106 governor tests). T-04 (pure evaluator) and T-10 (/rotate-session) are the remaining frontier, both Opus-tier judgement rather than mechanical adapter work. T-10 now has every declared dependency resolved (T-07, T-09, T-13) — it is fully unlocked.",
+    "next_action": "Proceed directly to T-10 (/rotate-session: bank, verify safety, emit the /clear instruction) as Opus. Honour AD-14 (compare against the banking commit's PARENT, not raw HEAD) and INV-4 (must not invoke close-session). T-04 (pure evaluator) is also unlocked and may run alongside if it does not compete for Larry's attention with T-10's judgement work.",
+    "ticket": "T-10",
     "worktree": "C:/Fusion247PKA-governor",
     "branch": "build-018/session-governor",
     "read_first": [
-      "Deliverables/BUILD-018-session-governor/02-MAP.md — the SSOT: architecture, 13 settled decisions, fog, frontier, ticket index",
+      "Deliverables/BUILD-018-session-governor/02-MAP.md — the SSOT: architecture, settled decisions, fog, frontier, ticket index",
       "Deliverables/BUILD-018-session-governor/01-GOAL-CONTRACT.md — the outcome and the 7 invariants; it wins over any ticket",
-      "Deliverables/BUILD-018-session-governor/00-ESTATE.md — isolation record and two live dependencies",
-      "tools/governor/programme-state.schema.json — the durable state contract T-13 must satisfy"
+      "tools/governor/programme-state.mjs — readProgrammeState/writeProgrammeState/evaluateFreshness, all of which T-10 builds on directly",
+      "tools/governor/collect-state.mjs — T-13's collector, ready for T-10 to call for the estate-derived fields"
     ],
     "do_not": [
       "Do not open or merge the recovery PR (recovery/2026-07-31-governor-abort-handoff at 95c265d).",
-      "Do not alter local main (de92306, one commit ahead of origin/main, unpushed).",
+      "Do not alter local main.",
       "Do not modify, move or delete the six Cairn intake files under Team Knowledge/Sources/.",
-      "Do not delete or clean any of the 20 pre-existing worktrees without first proving owner, branch, status and disposition.",
+      "Do not delete or clean any pre-existing worktree without first proving owner, branch, status and disposition.",
       "Do not run /close-session, and do not start the VlogOps product build.",
-      "Do not re-litigate the 13 settled decisions in 02-MAP.md section 3.",
-      "Do not read GL-012 from this working tree — it is the pre-ruling text. Use git show 95c265d."
+      "Do not re-litigate the settled decisions in 02-MAP.md section 3.",
+      "Do not read GL-012 from this working tree — it is the pre-ruling text. Use git show 95c265d.",
+      "Do not naively compare banked.head_sha against live HEAD without excluding the banking commit itself (AD-14)."
     ]
   },
   "locked_decisions": [
@@ -706,6 +729,16 @@
       "id": "AD-14",
       "decision": "Durable programme state lives at <programme.home>/programme-state.json — with the programme, on the programme’s branch — and banked.head_sha records the head the state DESCRIBES, i.e. the parent of the commit that carries the state file.",
       "why": "A file cannot contain its own commit’s SHA. State banked on a feature branch describes commits that exist only on that branch, so parking it on main would make it lie the moment the branch advanced. Consumers comparing against live HEAD must exclude the banking commit itself."
+    },
+    {
+      "id": "AD-15",
+      "decision": "The programme-state collector (T-13) never performs a git fetch, so branches.behind is permanently unknown under it.",
+      "why": "A trustworthy behind-count needs fresh remote-tracking refs, and a collector must not have side effects on the repository it is reporting on. Matches this document's own pre-existing branches.behind unknown declaration from T-09."
+    },
+    {
+      "id": "AD-16",
+      "decision": "T-13 collects repository, worktrees, branches and pull_requests only. workers is never scanned or synthesised by the collector.",
+      "why": "Which subagent was dispatched, for which ticket, with what expected output, is programme knowledge the dispatching session holds — not something git, worktree-recon or gh can answer. F-7 already establishes live-worker detection is best-effort; inventing worker entries from an OS process scan would manufacture false precision under a field whose entire schema purpose (T-09's D-2) is refusing to let a guessed collection read as ground truth."
     }
   ],
   "runtime_pointers": [
@@ -738,6 +771,16 @@
       "label": "statusLine capture",
       "path": "tools/capture-statusline.mjs",
       "how_to_read": "Kept from T-01 for T-03 to reuse."
+    },
+    {
+      "label": "Sampler",
+      "path": "tools/governor/sampler.mjs",
+      "how_to_read": "sampleFromStdin(raw, opts) — pure parse/extract, one impure write via T-02's writeHealthSample. Not yet wired as the primary checkout's live statusLine command; production activation is deferred (see T-03 handback)."
+    },
+    {
+      "label": "Programme-state collector",
+      "path": "tools/governor/collect-state.mjs",
+      "how_to_read": "collectEstateState({repoPath, branchSpecs, ghRepo, ...}) returns {repository, worktrees, branches, pull_requests, unknown}; mergeEstateIntoState(base, estate) folds it into a full document. T-10 builds directly on this for its estate-derived fields."
     },
     {
       "label": "GL-012 section 6a (settled ruling, NOT on this branch)",
