@@ -1,0 +1,779 @@
+{
+  "schema_version": 1,
+  "programme": {
+    "id": "BUILD-018",
+    "title": "Larry Session Governor and Context-Rotation Layer",
+    "home": "Deliverables/BUILD-018-session-governor",
+    "status": "active",
+    "commissioned": "2026-07-31"
+  },
+  "phase": {
+    "current": "Phase 2 — bounded implementation",
+    "summary": "Phase 1 (Opus architecture) is complete and settled: 13 architecture decisions, the map, the goal contract and the estate record are written. Phase 2 is implementing the seven components against that architecture. T-01 (live statusLine payload proven on this machine), T-02 (session-health store, atomic write) and T-07 (worktree reconciliation) are resolved, tested and pushed. T-09 has now defined the durable programme-state schema this document is an instance of — the machine-readable SSOT that /rotate-session banks and fresh-session reorientation reads, rendering Team Knowledge/fusion-brief/session-handoff.md rather than competing with it.",
+    "started": "2026-07-31"
+  },
+  "banked": {
+    "at": "2026-07-31",
+    "by_model": "Opus",
+    "session_id": null,
+    "head_sha": "c9df07782b3de210b123e0b508c9c4ba234187ec",
+    "governor_version": "T-09/schema-v1"
+  },
+  "repository": {
+    "primary_checkout": "C:/Fusion247PKA",
+    "worktree": "C:/Fusion247PKA-governor",
+    "branch": "build-018/session-governor",
+    "base_sha": "ef96a3327f896e025731769c72157fd722daa02f",
+    "head_sha": "c9df07782b3de210b123e0b508c9c4ba234187ec",
+    "clean": true,
+    "unpushed_commits": 0,
+    "upstream": "origin/build-018/session-governor"
+  },
+  "tickets": [
+    {
+      "id": "T-01",
+      "title": "Prove the live statusLine payload on this machine",
+      "state": "resolved",
+      "model": "Sonnet",
+      "depends_on": [],
+      "resolved": "2026-07-31",
+      "evidence": [
+        "Deliverables/BUILD-018-session-governor/evidence/T-01-statusline-schema.md"
+      ],
+      "note": "context_window_size observed as 1000000 — thresholds must stay percentage-based."
+    },
+    {
+      "id": "T-02",
+      "title": "Session-health store location and atomic write",
+      "state": "resolved",
+      "model": "Sonnet",
+      "depends_on": [],
+      "resolved": "2026-07-31",
+      "evidence": [
+        "tools/governor/health-store.mjs",
+        "tools/governor/health-store.test.mjs"
+      ],
+      "note": "~/.mypka/governor/health/<projectKey>/<sessionId>.json; 8/8 tests including a 12-process concurrent-write mutation test."
+    },
+    {
+      "id": "T-03",
+      "title": "Sampler: statusLine script to health sample",
+      "state": "frontier",
+      "model": "Sonnet",
+      "depends_on": [
+        "T-01",
+        "T-02"
+      ],
+      "resolved": null,
+      "evidence": [],
+      "note": "Reuse tools/capture-statusline.mjs from T-01. Must be fast, idempotent and kill-tolerant."
+    },
+    {
+      "id": "T-04",
+      "title": "Pure evaluator: evaluate(signals) to verdict",
+      "state": "blocked",
+      "model": "Opus",
+      "depends_on": [
+        "T-03"
+      ],
+      "resolved": null,
+      "evidence": [],
+      "note": "Mutation test: delete the state file, assert BLIND not GREEN (INV-1)."
+    },
+    {
+      "id": "T-05",
+      "title": "Status-line display of the verdict",
+      "state": "blocked",
+      "model": "Sonnet",
+      "depends_on": [
+        "T-04"
+      ],
+      "resolved": null,
+      "evidence": [],
+      "note": null
+    },
+    {
+      "id": "T-06",
+      "title": "RED preflight block via UserPromptSubmit, fails open",
+      "state": "blocked",
+      "model": "Opus",
+      "depends_on": [
+        "T-04"
+      ],
+      "resolved": null,
+      "evidence": [],
+      "note": "Also gated on Q-2 (bounded override design)."
+    },
+    {
+      "id": "T-07",
+      "title": "Worker and worktree reconciliation",
+      "state": "resolved",
+      "model": "Sonnet",
+      "depends_on": [],
+      "resolved": "2026-07-31",
+      "evidence": [
+        "tools/governor/worktree-recon.mjs",
+        "Deliverables/BUILD-018-session-governor/evidence/T-07-worktree-reconciliation.md"
+      ],
+      "note": "Worktree side only; live-worker detection is best-effort (F-7 remains open)."
+    },
+    {
+      "id": "T-08",
+      "title": "Live dogfood rotation (M4)",
+      "state": "blocked",
+      "model": "Opus",
+      "depends_on": [
+        "T-04",
+        "T-10",
+        "T-11"
+      ],
+      "resolved": null,
+      "evidence": [],
+      "note": "The real acceptance test."
+    },
+    {
+      "id": "T-09",
+      "title": "Programme-state schema, validator and writer",
+      "state": "resolved",
+      "model": "Opus",
+      "depends_on": [],
+      "resolved": "2026-07-31",
+      "evidence": [
+        "tools/governor/programme-state.schema.json",
+        "tools/governor/programme-state.mjs",
+        "Deliverables/BUILD-018-session-governor/evidence/T-09-programme-state.md"
+      ],
+      "note": "This document is an instance of that schema."
+    },
+    {
+      "id": "T-10",
+      "title": "/rotate-session: bank, verify safety, emit the /clear instruction",
+      "state": "frontier",
+      "model": "Opus",
+      "depends_on": [
+        "T-07",
+        "T-09"
+      ],
+      "resolved": null,
+      "evidence": [],
+      "note": "Must be able to REFUSE with the precise obstacle. Must not invoke close-session (INV-4)."
+    },
+    {
+      "id": "T-11",
+      "title": "Reorientation: SessionStart(source=clear) pointer brief, 10k cap",
+      "state": "blocked",
+      "model": "Opus",
+      "depends_on": [
+        "T-09",
+        "T-10"
+      ],
+      "resolved": null,
+      "evidence": [],
+      "note": null
+    },
+    {
+      "id": "T-12",
+      "title": "Portability: extract the estate adapter",
+      "state": "blocked",
+      "model": "Sonnet",
+      "depends_on": [
+        "T-04"
+      ],
+      "resolved": null,
+      "evidence": [],
+      "note": null
+    },
+    {
+      "id": "T-13",
+      "title": "Programme-state collector: gather the live estate into a valid state document",
+      "state": "frontier",
+      "model": "Sonnet",
+      "depends_on": [
+        "T-07",
+        "T-09"
+      ],
+      "resolved": null,
+      "evidence": [],
+      "note": "Mechanical adapter work split out of T-10 by T-09: map git + worktree-recon + gh output onto the schema, declare everything it could not gather in `unknown`. Leaves T-10 to own only judgement (refuse-or-proceed)."
+    }
+  ],
+  "blockers": [
+    {
+      "id": "F-4",
+      "kind": "fog",
+      "summary": "Are the proposed health thresholds right? Resolvable only by dogfood.",
+      "owner": "research",
+      "blocks": [
+        "T-08"
+      ],
+      "recommendation": "Ship the hypothesis thresholds, tune from T-08."
+    },
+    {
+      "id": "F-5",
+      "kind": "fog",
+      "summary": "How is \"a new substantial item\" detected from a prompt well enough to block it without false positives?",
+      "owner": "research",
+      "blocks": [
+        "T-06"
+      ],
+      "recommendation": "Prototype in T-06; fail open on any doubt (INV-2)."
+    },
+    {
+      "id": "F-7",
+      "kind": "fog",
+      "summary": "Reliable live-worker detection. T-07 shipped a best-effort Windows command-line matcher with a confirmed blind spot; a durable answer needs a session/task registry, not command-line text.",
+      "owner": "research",
+      "blocks": [
+        "T-10"
+      ],
+      "recommendation": "T-10 must treat worker liveness as `unknown`-capable, never as a confident zero."
+    },
+    {
+      "id": "Q-2",
+      "kind": "question",
+      "summary": "Bounded override design at RED: advisory only, one-word override, or an override that expires after N prompts?",
+      "owner": "warwick",
+      "blocks": [
+        "T-06"
+      ],
+      "recommendation": "Expires after N prompts — advisory will be ignored, one-word becomes a reflex."
+    },
+    {
+      "id": "Q-3",
+      "kind": "question",
+      "summary": "Project ManagAIr portability: design the adapter boundary now or extract later?",
+      "owner": "warwick",
+      "blocks": [
+        "T-12"
+      ],
+      "recommendation": "Design the boundary now — it is nearly free under AD-11."
+    },
+    {
+      "id": "Q-4",
+      "kind": "question",
+      "summary": "May rotation auto-commit banked state, or always use Larry’s standing push authority?",
+      "owner": "warwick",
+      "blocks": [
+        "T-10"
+      ],
+      "recommendation": "Use the standing authority; add no new mechanism."
+    },
+    {
+      "id": "Q-5",
+      "kind": "defect",
+      "summary": ".claude/settings.local.json:199 fires a SessionStart hook at services/control-plane/tower-loop/ensure-watcher.mjs, which does not exist. Every session start runs a hook against a missing file.",
+      "owner": "warwick",
+      "blocks": [
+        "T-11"
+      ],
+      "recommendation": "Decide repair / remove / work around before adding a Governor SessionStart hook beside it. Repair itself is Tower’s, and Tower is PARKED."
+    },
+    {
+      "id": "Q-1",
+      "kind": "question",
+      "summary": "Is BUILD-018 the right identifier, given it was commissioned directly and has no Foundry IDEA-018?",
+      "owner": "warwick",
+      "blocks": [],
+      "recommendation": "Larry’s call unless Warwick objects; recorded in 00-ESTATE.md."
+    },
+    {
+      "id": "X-1",
+      "kind": "external",
+      "summary": "GL-012 section 6a is NOT on this branch. Reading GL-012 from this worktree returns the PRE-ruling text and will cause a settled conflict to be re-escalated.",
+      "owner": "larry",
+      "blocks": [],
+      "recommendation": "Read it with: git show 95c265d:\"Team Knowledge/Guidelines/GL-012-secrets-store-access-boundary.md\""
+    },
+    {
+      "id": "X-2",
+      "kind": "external",
+      "summary": ".claude/settings.local.json is globally gitignored, so hook wiring cannot be delivered by git. A ticket that \"adds a hook\" by editing a file in this worktree ships nothing.",
+      "owner": "larry",
+      "blocks": [
+        "T-11"
+      ],
+      "recommendation": "Every hook ticket must also ship an idempotent activation step that installs into the primary checkout’s untracked settings file."
+    }
+  ],
+  "model_recommendation": {
+    "model": "Sonnet",
+    "effort": null,
+    "rationale": "Both remaining Sonnet-tier frontier tickets are now takable and are mechanical: T-03 (sampler over an already-proven payload, with an existing capture script to reuse) and T-13 (collector mapping already-written git/worktree output onto an already-validated schema). Neither requires architectural judgement — the architecture is settled in 02-MAP.md section 3 and the schema is now fixed. Spend Opus on T-10 (refuse-or-proceed judgement) and T-04 (state-space design) once T-03 and T-13 land."
+  },
+  "workers": [
+    {
+      "id": "phase-1-research-x3",
+      "kind": "subagent",
+      "status": "completed",
+      "ticket": null,
+      "dispatched": "2026-07-31",
+      "worktree": "C:/Fusion247PKA-governor",
+      "expected_output": "Telemetry surface, Wayfinder method, close-session seams",
+      "evidence": [
+        "Deliverables/BUILD-018-session-governor/02-MAP.md"
+      ]
+    }
+  ],
+  "branches": [
+    {
+      "name": "build-018/session-governor",
+      "head": "c9df07782b3de210b123e0b508c9c4ba234187ec",
+      "upstream": "origin/build-018/session-governor",
+      "ahead": 0,
+      "behind": null,
+      "role": "build",
+      "note": "This programme. The only branch this build may write to."
+    },
+    {
+      "name": "main",
+      "head": null,
+      "upstream": "origin/main",
+      "ahead": 1,
+      "behind": null,
+      "role": "protected",
+      "note": "Local main is at de92306, one commit ahead of origin/main and unpushed. MUST NOT be altered by this build."
+    },
+    {
+      "name": "recovery/2026-07-31-governor-abort-handoff",
+      "head": "95c265de729e26114b1e1eb7dc7d8630502aca1d",
+      "upstream": null,
+      "ahead": null,
+      "behind": null,
+      "role": "recovery",
+      "note": "Carries the settled GL-012 section 6a ruling. Read-only for this build; its PR must not be opened or merged."
+    }
+  ],
+  "pull_requests": [
+    {
+      "number": null,
+      "url": null,
+      "title": "Recovery handoff (GL-012 section 6a + cockpit private-API proxy)",
+      "state": "none",
+      "branch": "recovery/2026-07-31-governor-abort-handoff",
+      "head": "95c265de729e26114b1e1eb7dc7d8630502aca1d",
+      "note": "Not opened, and this build is explicitly forbidden to open or merge it."
+    },
+    {
+      "number": null,
+      "url": null,
+      "title": "BUILD-018 session governor",
+      "state": "none",
+      "branch": "build-018/session-governor",
+      "head": "c9df07782b3de210b123e0b508c9c4ba234187ec",
+      "note": "No PR opened for this build yet; opening one is out of scope for the current session."
+    }
+  ],
+  "worktrees": [
+    {
+      "path": "C:/Fusion247PKA",
+      "branch": "recovery/2026-07-31-governor-abort-handoff",
+      "head": "95c265de729e26114b1e1eb7dc7d8630502aca1d",
+      "dirty": true,
+      "unpushedCount": 0,
+      "classification": "primary-checkout",
+      "disposition": "unreconciled-dirty",
+      "liveWorkerPids": [
+        24244,
+        9336,
+        31012,
+        35444,
+        25472,
+        36196
+      ],
+      "protected": true
+    },
+    {
+      "path": "C:/Fusion247PKA/.claude/worktrees/agent-a183841aed5508d75",
+      "branch": "build-015/shop-state-store",
+      "head": "acd3512fb68bcc30a11bf375a3dcf3adfbc38502",
+      "dirty": false,
+      "unpushedCount": null,
+      "classification": "baseline-agent-worktree",
+      "disposition": "reconciled-clean",
+      "liveWorkerPids": [],
+      "protected": true
+    },
+    {
+      "path": "C:/Fusion247PKA/.claude/worktrees/agent-a1de057d3d6be03ce",
+      "branch": "build-015/command-ledger-separation",
+      "head": "585dc1fd0919d76c513e1d5a93ef8b43499325b0",
+      "dirty": false,
+      "unpushedCount": null,
+      "classification": "baseline-agent-worktree",
+      "disposition": "reconciled-clean",
+      "liveWorkerPids": [],
+      "protected": true
+    },
+    {
+      "path": "C:/Fusion247PKA/.claude/worktrees/agent-a327ccbf3c0bdc834",
+      "branch": "worktree-agent-a327ccbf3c0bdc834",
+      "head": "bdfc8e8eaf18633e8aa68dc23b2f293fb6fd774b",
+      "dirty": false,
+      "unpushedCount": null,
+      "classification": "baseline-agent-worktree",
+      "disposition": "reconciled-clean",
+      "liveWorkerPids": [],
+      "protected": true
+    },
+    {
+      "path": "C:/Fusion247PKA/.claude/worktrees/agent-a581487916213d18c",
+      "branch": "idea-012/asdair-intake-and-regulars-writers",
+      "head": "b267385fc735a5b7e9df0e44b79104d444141dd0",
+      "dirty": false,
+      "unpushedCount": null,
+      "classification": "baseline-agent-worktree",
+      "disposition": "reconciled-clean",
+      "liveWorkerPids": [],
+      "protected": true
+    },
+    {
+      "path": "C:/Fusion247PKA/.claude/worktrees/agent-a666860dfc983057f",
+      "branch": "worktree-agent-a666860dfc983057f",
+      "head": "3521522335e298168183288958528da65be4183c",
+      "dirty": false,
+      "unpushedCount": null,
+      "classification": "baseline-agent-worktree",
+      "disposition": "reconciled-clean",
+      "liveWorkerPids": [],
+      "protected": true
+    },
+    {
+      "path": "C:/Fusion247PKA/.claude/worktrees/agent-a7094ab1c2f0f7847",
+      "branch": "build-015/runtime-recovery",
+      "head": "ee1809ab2d3be6b52df10d0badd81cf75a07b748",
+      "dirty": false,
+      "unpushedCount": 0,
+      "classification": "baseline-agent-worktree",
+      "disposition": "reconciled-clean",
+      "liveWorkerPids": [],
+      "protected": true
+    },
+    {
+      "path": "C:/Fusion247PKA/.claude/worktrees/agent-a70ec3bf95b1cdb08",
+      "branch": "build-015/order-reconciliation",
+      "head": "3ace58c72002e499f296f3adf34fc0b38b35bd2b",
+      "dirty": false,
+      "unpushedCount": null,
+      "classification": "baseline-agent-worktree",
+      "disposition": "reconciled-clean",
+      "liveWorkerPids": [],
+      "protected": true
+    },
+    {
+      "path": "C:/Fusion247PKA/.claude/worktrees/agent-a83c3ddb791e452b9",
+      "branch": "build-015/vision-transcription",
+      "head": "c516b7cd5e3908f2b5796350040873c349eb386b",
+      "dirty": false,
+      "unpushedCount": null,
+      "classification": "baseline-agent-worktree",
+      "disposition": "reconciled-clean",
+      "liveWorkerPids": [],
+      "protected": true
+    },
+    {
+      "path": "C:/Fusion247PKA/.claude/worktrees/agent-a890ba1b9f7229167",
+      "branch": "build-015/pipeline-orchestrator",
+      "head": "712b2be4bb3d4ecd0c27fc14890d3401c7aa2739",
+      "dirty": false,
+      "unpushedCount": null,
+      "classification": "baseline-agent-worktree",
+      "disposition": "reconciled-clean",
+      "liveWorkerPids": [],
+      "protected": true
+    },
+    {
+      "path": "C:/Fusion247PKA/.claude/worktrees/agent-aaaa3ee64e21a47e1",
+      "branch": "build-015/question-button-persistence",
+      "head": "7f9c39db84d02692f9fa7dd3645adb1c690f08c9",
+      "dirty": false,
+      "unpushedCount": null,
+      "classification": "baseline-agent-worktree",
+      "disposition": "reconciled-clean",
+      "liveWorkerPids": [],
+      "protected": true
+    },
+    {
+      "path": "C:/Fusion247PKA/.claude/worktrees/agent-ab982aa6ed22738a2",
+      "branch": "idea-012/asdair-shopper-intake-receiver",
+      "head": "ee8476e3827a063b6ca9e5527f2346e495318ead",
+      "dirty": false,
+      "unpushedCount": null,
+      "classification": "baseline-agent-worktree",
+      "disposition": "reconciled-clean",
+      "liveWorkerPids": [],
+      "protected": true
+    },
+    {
+      "path": "C:/Fusion247PKA/.claude/worktrees/agent-abbf3b1a96f26d5ca",
+      "branch": "build-015/shopperbot-control-surface",
+      "head": "58da74fbe55ffc67d2138a5e094e8d6baa620571",
+      "dirty": false,
+      "unpushedCount": null,
+      "classification": "baseline-agent-worktree",
+      "disposition": "reconciled-clean",
+      "liveWorkerPids": [],
+      "protected": true
+    },
+    {
+      "path": "C:/Fusion247PKA/.claude/worktrees/agent-ac938d4466bb42a3b",
+      "branch": "build-015/cockpit-asdair-app",
+      "head": "f0b9bb2c2343c9f078b610affde2105659507439",
+      "dirty": false,
+      "unpushedCount": 0,
+      "classification": "baseline-agent-worktree",
+      "disposition": "reconciled-clean",
+      "liveWorkerPids": [],
+      "protected": true
+    },
+    {
+      "path": "C:/Fusion247PKA/.claude/worktrees/agent-ae6ffd94c23fd115a",
+      "branch": "worktree-agent-ae6ffd94c23fd115a",
+      "head": "6624c9960c0e0ed013fb9ef919040b33ad00b1ee",
+      "dirty": false,
+      "unpushedCount": null,
+      "classification": "baseline-agent-worktree",
+      "disposition": "reconciled-clean",
+      "liveWorkerPids": [],
+      "protected": true
+    },
+    {
+      "path": "C:/Fusion247PKA/.claude/worktrees/agent-af2af244f0112fe53",
+      "branch": "build-015/browser-runner",
+      "head": "6d3273b429b7b6d374d941636855dcc76b006e6b",
+      "dirty": false,
+      "unpushedCount": 0,
+      "classification": "baseline-agent-worktree",
+      "disposition": "reconciled-clean",
+      "liveWorkerPids": [],
+      "protected": true
+    },
+    {
+      "path": "C:/Fusion247PKA/.claude/worktrees/agent-af69ebb565829ee34",
+      "branch": "worktree-agent-af69ebb565829ee34",
+      "head": "9256abf96489159b2cdaefa994c0b21708c69f81",
+      "dirty": true,
+      "unpushedCount": null,
+      "classification": "baseline-agent-worktree",
+      "disposition": "unreconciled-dirty",
+      "liveWorkerPids": [],
+      "protected": true
+    },
+    {
+      "path": "C:/Fusion247PKA/.claude/worktrees/agent-af992fbb02877d635",
+      "branch": "build-015/load-last-order",
+      "head": "ec5a843946a901bd40dbcb218d4c7fd1192d4740",
+      "dirty": false,
+      "unpushedCount": null,
+      "classification": "baseline-agent-worktree",
+      "disposition": "reconciled-clean",
+      "liveWorkerPids": [],
+      "protected": true
+    },
+    {
+      "path": "C:/Fusion247PKA-audit",
+      "branch": "audit/de-mypka-extraction-20260728",
+      "head": "c5160a9eddfafe15c2a889b2d4de79e6585620fd",
+      "dirty": false,
+      "unpushedCount": 0,
+      "classification": "baseline-named-worktree",
+      "disposition": "reconciled-clean",
+      "liveWorkerPids": [],
+      "protected": true
+    },
+    {
+      "path": "C:/Fusion247PKA-governor",
+      "branch": "build-018/session-governor",
+      "head": "c9df07782b3de210b123e0b508c9c4ba234187ec",
+      "dirty": true,
+      "unpushedCount": 0,
+      "classification": "active-build",
+      "disposition": "in-progress-owned",
+      "liveWorkerPids": [],
+      "protected": false
+    },
+    {
+      "path": "C:/Fusion247PKA-tower",
+      "branch": "build-014/tower-recovery",
+      "head": "3c08e450d3617da1de43f11f0c33f3c2a483036b",
+      "dirty": false,
+      "unpushedCount": 0,
+      "classification": "baseline-named-worktree",
+      "disposition": "reconciled-clean",
+      "liveWorkerPids": [],
+      "protected": true
+    },
+    {
+      "path": "C:/Fusion247PKA-w01",
+      "branch": "idea-017/w01-note-structure-validator",
+      "head": "013a8de1c08bf57e735db913272bb36f5c77c259",
+      "dirty": false,
+      "unpushedCount": 0,
+      "classification": "baseline-named-worktree",
+      "disposition": "reconciled-clean",
+      "liveWorkerPids": [],
+      "protected": true
+    }
+  ],
+  "safe_boundary": {
+    "at_boundary": true,
+    "reason": "T-09 completes as a whole: schema, validator, writer, renderer, fixtures and tests all land in one commit, and no ticket is split across the rotation. The build worktree is otherwise clean and pushed; every other worktree is either reconciled-clean or is the primary checkout carrying six untracked Cairn intake files that this build is forbidden to touch.",
+    "obstacles": [
+      {
+        "kind": "live-worker",
+        "detail": "The primary checkout reports live node PIDs, but F-7 makes this best-effort only — process-command-line matching cannot distinguish a governor worker from any other node process. Treat as unknown, not as a confirmed live worker."
+      },
+      {
+        "kind": "dirty-tree",
+        "detail": "C:/Fusion247PKA is dirty with six untracked Team Knowledge/Sources Cairn intake files. Pre-existing, out of this build’s scope, and explicitly protected by the commission."
+      }
+    ],
+    "verified_at": "2026-07-31"
+  },
+  "resumption": {
+    "focus": "Implement the two newly takable Sonnet tickets, then return to Opus for the rotation command. T-03 turns the proven statusLine payload into a written health sample; T-13 turns live git and worktree output into a valid programme-state document. Together they leave T-10 (/rotate-session) owning only judgement — whether the estate is safe to rotate — rather than also owning data collection.",
+    "next_action": "Dispatch T-03 (sampler) to a Sonnet worker with a read-back gate, using tools/capture-statusline.mjs from T-01 and writeHealthSample from T-02. T-13 (collector) may be dispatched in parallel: it touches different files (tools/governor/collect-state.mjs) and shares no file with T-03.",
+    "ticket": "T-03",
+    "worktree": "C:/Fusion247PKA-governor",
+    "branch": "build-018/session-governor",
+    "read_first": [
+      "Deliverables/BUILD-018-session-governor/02-MAP.md — the SSOT: architecture, 13 settled decisions, fog, frontier, ticket index",
+      "Deliverables/BUILD-018-session-governor/01-GOAL-CONTRACT.md — the outcome and the 7 invariants; it wins over any ticket",
+      "Deliverables/BUILD-018-session-governor/00-ESTATE.md — isolation record and two live dependencies",
+      "tools/governor/programme-state.schema.json — the durable state contract T-13 must satisfy"
+    ],
+    "do_not": [
+      "Do not open or merge the recovery PR (recovery/2026-07-31-governor-abort-handoff at 95c265d).",
+      "Do not alter local main (de92306, one commit ahead of origin/main, unpushed).",
+      "Do not modify, move or delete the six Cairn intake files under Team Knowledge/Sources/.",
+      "Do not delete or clean any of the 20 pre-existing worktrees without first proving owner, branch, status and disposition.",
+      "Do not run /close-session, and do not start the VlogOps product build.",
+      "Do not re-litigate the 13 settled decisions in 02-MAP.md section 3.",
+      "Do not read GL-012 from this working tree — it is the pre-ruling text. Use git show 95c265d."
+    ]
+  },
+  "locked_decisions": [
+    {
+      "id": "AD-1",
+      "decision": "statusLine is the primary telemetry source; the transcript is corroboration only, and must always be tail-read.",
+      "why": "statusLine is a documented, stable contract; the transcript format is explicitly internal and version-fragile, and several local transcripts are 30-40 MB."
+    },
+    {
+      "id": "AD-2",
+      "decision": "Two separate stores: session health (ephemeral, machine-local) and programme state (durable, git-versioned).",
+      "why": "Different lifetimes and audiences. Conflating them is how banked state gets lost."
+    },
+    {
+      "id": "AD-3",
+      "decision": "BLIND is a first-class state with its own exit code. Unreadable telemetry is never GREEN.",
+      "why": "INV-1, and the direct lesson of the 2026-07-29 controls that reported success over ground they never examined."
+    },
+    {
+      "id": "AD-4",
+      "decision": "Compaction is counted by the PreCompact hook, never inferred from the transcript.",
+      "why": "A local probe found zero reliable transcript markers for compaction."
+    },
+    {
+      "id": "AD-5",
+      "decision": "Reorientation rides SessionStart(source=\"clear\") to additionalContext, capped at 10,000 characters, so the injected brief is a POINTER document and not the state itself.",
+      "why": "The cap makes a full state dump impossible."
+    },
+    {
+      "id": "AD-6",
+      "decision": "The RED preflight block fails OPEN.",
+      "why": "INV-2. A governor that traps Warwick in his own session is a worse defect than one that misses a rotation."
+    },
+    {
+      "id": "AD-8",
+      "decision": "The map lives in git as markdown, not in an issue tracker.",
+      "why": "Subagents get no MCP tools, so a tracker-hosted map is unreadable by the very workers who need it."
+    },
+    {
+      "id": "AD-11",
+      "decision": "The evaluator core is pure: evaluate(signals) to verdict, with zero filesystem, git or myPKA knowledge. Adapters gather signals.",
+      "why": "Portability, and it makes the state space unit-testable without an estate."
+    },
+    {
+      "id": "AD-12",
+      "decision": "The Governor DERIVES Team Knowledge/fusion-brief/session-handoff.md; it never invents a rival handoff file.",
+      "why": "That file already declares itself as consumed by the next Larry session. A parallel handoff would create two competing SSOTs — the exact defect this build exists to prevent."
+    },
+    {
+      "id": "AD-13",
+      "decision": "/rotate-session inherits close-session steps 1-3 only. Steps 4-7 (Librarian pass, graduation, ClickUp mirror, self-improvement review) are end-of-programme and must never run on a rotation.",
+      "why": "INV-4. A rotation that costs what a close costs will not get used, and an unused governor is worse than none."
+    },
+    {
+      "id": "AD-14",
+      "decision": "Durable programme state lives at <programme.home>/programme-state.json — with the programme, on the programme’s branch — and banked.head_sha records the head the state DESCRIBES, i.e. the parent of the commit that carries the state file.",
+      "why": "A file cannot contain its own commit’s SHA. State banked on a feature branch describes commits that exist only on that branch, so parking it on main would make it lie the moment the branch advanced. Consumers comparing against live HEAD must exclude the banking commit itself."
+    }
+  ],
+  "runtime_pointers": [
+    {
+      "label": "The map (SSOT)",
+      "path": "Deliverables/BUILD-018-session-governor/02-MAP.md",
+      "how_to_read": "On branch build-018/session-governor. From another checkout: git show build-018/session-governor:\"Deliverables/BUILD-018-session-governor/02-MAP.md\""
+    },
+    {
+      "label": "Durable programme state",
+      "path": "Deliverables/BUILD-018-session-governor/programme-state.json",
+      "how_to_read": "Validate before trusting: node -e \"import('./tools/governor/programme-state.mjs').then(m=>console.log(m.readProgrammeState('Deliverables/BUILD-018-session-governor/programme-state.json')))\""
+    },
+    {
+      "label": "State schema",
+      "path": "tools/governor/programme-state.schema.json",
+      "how_to_read": "Interpreted directly by the validator in tools/governor/programme-state.mjs — it is the single source of the constraints, not a description of them."
+    },
+    {
+      "label": "Session-health store",
+      "path": "tools/governor/health-store.mjs",
+      "how_to_read": "Default root ~/.mypka/governor/health/<projectKey>/<sessionId>.json; override with MYPKA_GOVERNOR_HEALTH_DIR."
+    },
+    {
+      "label": "Worktree reconciliation",
+      "path": "tools/governor/worktree-recon.mjs",
+      "how_to_read": "reconcile({repoPath, primaryPath, buildPaths}) returns every worktree with classification, disposition and best-effort live worker PIDs."
+    },
+    {
+      "label": "statusLine capture",
+      "path": "tools/capture-statusline.mjs",
+      "how_to_read": "Kept from T-01 for T-03 to reuse."
+    },
+    {
+      "label": "GL-012 section 6a (settled ruling, NOT on this branch)",
+      "path": "Team Knowledge/Guidelines/GL-012-secrets-store-access-boundary.md",
+      "how_to_read": "git show 95c265d:\"Team Knowledge/Guidelines/GL-012-secrets-store-access-boundary.md\""
+    },
+    {
+      "label": "Ding Warwick on handback",
+      "path": "larry-ding.mjs (private surface, permission-allowlisted)",
+      "how_to_read": "Message is read from a FILE, not argv."
+    },
+    {
+      "label": "Tests",
+      "path": "tools/governor/",
+      "how_to_read": "node --test tools/governor/"
+    }
+  ],
+  "privacy": {
+    "private_surface": "none",
+    "private_record": null,
+    "redactions": [
+      "banked.session_id withheld — session identifiers and transcript paths were redacted throughout T-01 evidence and stay redacted here."
+    ]
+  },
+  "unknown": [
+    {
+      "path": "workers",
+      "why": "Only completed Phase 1 research agents are recorded. Live worker detection is best-effort under F-7 and cannot confirm the ABSENCE of a running worker, so this list is not an enumeration."
+    },
+    {
+      "path": "pull_requests",
+      "why": "The GitHub PR surface was not queried during this banking. The two entries are locally known facts, not an enumeration of open PRs."
+    },
+    {
+      "path": "branches.behind",
+      "why": "No fetch was performed during this banking, so behind-counts against the remotes were not computed."
+    }
+  ]
+}

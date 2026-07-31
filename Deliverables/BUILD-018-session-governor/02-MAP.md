@@ -156,6 +156,7 @@ see AD-5.
 | **AD-10** | **`/rotate-session` ≠ `/close-session`.** Rotate banks + verifies + emits the brief. It must not write a programme session log, run a Librarian pass, or sign off. | INV-4. Conflating them makes routine rotation expensive, and an expensive rotation will not get used. |
 | **AD-11** | **Evaluator core is pure** — `evaluate(signals) → verdict`, zero filesystem/git/myPKA knowledge. Adapters gather signals. | Portability to Project ManagAIr, and it makes the state space unit-testable without an estate. |
 | **AD-12** | **The Governor writes to the EXISTING `Team Knowledge/fusion-brief/session-handoff.md`, not a new location.** | It already exists, already declares `owner_intent: consumed by the next Larry session`, and already carries "Locked decisions (do NOT re-litigate)". Inventing a parallel handoff file would create two competing SSOTs — the exact defect this build exists to prevent. **Its being 4 days stale is the problem statement, not a reason to bypass it:** it is hand-curated, and its own frontmatter calls that a stopgap. The Governor's job is to *derive* it. |
+| **AD-14** | **Durable programme state lives at `<programme.home>/programme-state.json`** — with the programme, on the programme's branch — and **`banked.head_sha` records the head the state DESCRIBES, i.e. the *parent* of the commit that carries the state file.** | A build's state describes commits that exist only on its branch; parking it estate-wide would make it lie the moment the branch advanced. And **a file cannot contain its own commit's SHA** — banking writes the state, *then* commits it, and no amend-and-restamp escapes that (the amend changes the SHA again). **T-10 must therefore compare against the banking commit's parent**; a naive `HEAD !== banked.head_sha` check reports every freshly banked state as stale, firing RECOVERY on every rotation and training Warwick to ignore it. Discovered by generating the live document, not by reasoning about it (T-09). |
 | **AD-13** | **Rotate inherits `close-session` steps 1–3 only** (sweep open items, fix coverage window, write a log entry of `type: mid-session-insight`). It must NOT inherit steps 4–7: Librarian pass, graduation, ClickUp mirror, or the Larry self-improvement review. | Established by reading the actual command. Step 7 is by far the heaviest and is explicitly end-of-programme. A rotation that costs what a close costs will not get used, and an unused governor is worse than none. |
 
 ---
@@ -218,12 +219,21 @@ A threshold over an `unknown` input does not fire; it contributes a `BLIND` reas
 ## 7. DEPENDENCIES (blocking relationships)
 
 ```
-T-01 ✅──┬──► T-03 (sampler, NOW UNLOCKED) ──► T-04 (evaluator) ──┬──► T-05 (status display)
-        │                                                        ├──► T-06 (RED preflight)
-T-02 ✅─┴──► T-03                                                 └──► T-08 (dogfood)
-T-09 (programme state schema, Opus, never blocked) ──► T-10 (/rotate-session) ──► T-11 ──► T-08
-T-07 ✅ (worktree side; F-7 live-worker detection still open) ──► T-10
+T-01 ✅──┬──► T-03 (sampler, UNLOCKED, Sonnet) ──► T-04 (evaluator) ──┬──► T-05 (status display)
+        │                                                            ├──► T-06 (RED preflight)
+T-02 ✅─┴──► T-03                                                     ├──► T-12 (portability)
+                                                                     └──► T-08 (dogfood)
+T-09 ✅──┬──► T-13 (state collector, UNLOCKED, Sonnet) ──► T-10 (/rotate-session, Opus)
+T-07 ✅──┘                                                     │
+         (F-7 live-worker detection still open)                └──► T-11 ──► T-08
+T-09 ✅────────────────────────────────────────────────────────────► T-11
 ```
+
+**T-13 is new, split out of T-10 by T-09.** Mapping live git / `worktree-recon` / `gh` output
+onto a now-fixed, validated schema is mechanical; deciding whether the estate is *safe to
+rotate* is judgement. Keeping both inside T-10 would have spent Opus on adapter plumbing.
+T-10 may proceed without T-13 (it can collect inline), but should not — the split is what
+keeps T-10 Opus-worthy.
 
 **External dependency, live:** GL-012 §6a is **not in this worktree** — it exists only on
 `recovery/...` at `95c265d`. Any ticket touching privacy or log placement must read it via
@@ -236,10 +246,16 @@ installs it into the primary checkout's untracked settings file — otherwise it
 
 ## 8. FRONTIER — takable right now
 
-**T-03, T-09.** T-01, T-02, T-07 all resolved 2026-07-31 (see §10 write-back). T-03 is
-now newly unlocked — both its dependencies (T-01, T-02) are done. T-09 was never
-dependency-blocked; it is Opus-flagged and has been deferred behind the Sonnet tickets
-by choice, not by the dependency graph.
+**T-03 (Sonnet), T-13 (Sonnet), T-10 (Opus).** T-01, T-02, T-07, T-09 all resolved
+2026-07-31 (see §10 write-back).
+
+**The Sonnet implementation frontier is T-03 and T-13**, and they are safely parallel — they
+share no file (`tools/governor/sampler.mjs` vs `tools/governor/collect-state.mjs`) and no
+git state beyond the branch. T-10 is Opus and should wait for T-13.
+
+The frontier is no longer only a hand-maintained list: `frontierTickets()` in
+`tools/governor/programme-state.mjs` computes it from `programme-state.json`, and the
+validator **rejects** a ticket that claims `frontier` while a dependency is unresolved.
 
 ---
 
@@ -257,17 +273,19 @@ Model column: Opus only where architectural judgement is materially valuable.
 | **T-06** | RED preflight block via `UserPromptSubmit`. **Fails open.** Bounded override. | **Opus** | T-04, Q-2 | Blocks at RED with reason + override; rotation/read-only prompts always pass | **Hook throws / times out → prompt proceeds** (INV-2). Verify by forcing an exception. |
 | **T-07** | ~~Worker + worktree reconciliation.~~ **RESOLVED 2026-07-31** (worktree side; F-7 live-worker detection remains open fog — best-effort only). | Sonnet | — | ✅ met — 22 worktrees reported (`evidence/T-07-*.md`); never-deletes enforced by source-scan test; 12/12 tests | ✅ passing — pure + **real-git** dirty-worktree mutation, both proven |
 | **T-08** | **Live dogfood rotation** (M4). | **Opus** (judgement) | T-04,T-10,T-11 | A real rotation, then a fresh session completes a ticket with zero re-briefing | Remove the banked state → fresh session must *notice* and say so, not proceed blind |
-| **T-09** | Programme-state schema + writer (durable, git). | **Opus** | — | Schema captures intent, decisions, worker outputs, branches/PRs/worktrees, exact next action | Stale-vs-HEAD detection: move HEAD → state flagged stale |
-| **T-10** | `/rotate-session` command: bank + **verify safety** + emit `/clear` instruction. Must not invoke close-session. | **Opus** | T-07,T-09 | Refuses with the precise obstacle when unsafe | **Dirty tree / unpushed commit / live worker → refuses.** Assert it can actually say no. |
+| **T-09** | ~~Programme-state schema + writer (durable, git).~~ **RESOLVED 2026-07-31.** | **Opus** | — | ✅ met — schema, validator, writer, renderer; every required field asserted present **and required**; validated against the real estate (1,075 checks over BUILD-018's own live state) | ✅ passing — **real-git** move-HEAD stale detection with a positive control; plus all six rules individually disabled and proven to go red (`evidence/T-09-programme-state.md` §3) |
+| **T-10** | `/rotate-session` command: bank + **verify safety** + emit `/clear` instruction. Must not invoke close-session. **Must honour AD-14** — compare against the banking commit's *parent*. | **Opus** | T-07,T-09,(T-13) | Refuses with the precise obstacle when unsafe | **Dirty tree / unpushed commit / live worker → refuses.** Assert it can actually say no. |
 | **T-11** | Reorientation: `SessionStart(source=clear)` → `additionalContext` pointer brief, ≤10,000 chars. | **Opus** | T-09,T-10 | Fresh session oriented; brief provably under cap | Oversized state → brief truncates *safely* and says it truncated, never silently drops the next action |
 | **T-12** | Portability: extract the estate adapter; run the core against a synthetic estate. | Sonnet | T-04 | Core has zero myPKA paths | Synthetic adapter with all-unknown signals → BLIND |
+| **T-13** | **Programme-state collector** — gather the live estate (git, `worktree-recon`, `gh`) into a document that passes `validateProgrammeState`. **New, split out of T-10 by T-09.** | Sonnet | T-07,T-09 | Produces a valid state document from the real estate; everything it could not gather is declared in `unknown` **with a reason** | **Make each source fail in turn** (no `gh`, unreadable worktree, git error) → the field lands in `unknown`, never as an empty list or a zero |
 
 ### Dependency order (waves)
 
-1. **Wave 1 (parallel):** T-01, T-02, T-09, T-07
-2. **Wave 2:** T-03 → T-04
-3. **Wave 3 (parallel):** T-05, T-06, T-10, T-12
-4. **Wave 4:** T-11 → **T-08 (dogfood)**
+1. **Wave 1 (parallel):** T-01 ✅, T-02 ✅, T-09 ✅, T-07 ✅
+2. **Wave 2 (parallel, Sonnet):** **T-03**, **T-13** — different files, safe to run together
+3. **Wave 3:** T-04 (needs T-03) · T-10 (needs T-13)
+4. **Wave 4 (parallel):** T-05, T-06, T-12, T-11
+5. **Wave 5:** **T-08 (dogfood)**
 
 ---
 
@@ -281,6 +299,7 @@ Append one line per resolved ticket. **A resolution not written back here did no
 | 2026-07-31 | F-3 | **RESOLVED.** close-session steps 1–3 are the rotation subset; 4–7 are end-of-programme (AD-13). `fusion-brief/session-handoff.md` is the existing handoff contract to derive, not replace (AD-12). Eight reusable seams catalogued in §11. | Sharpens T-09, T-10, T-11 |
 | 2026-07-31 | T-01 | **RESOLVED.** Real statusLine payload captured on this machine via a temporary capture command installed in the primary checkout's `settings.local.json` (backed up, installed, triggered, restored, diff-proven byte-identical). Both `context_window.*` and `rate_limits.*` present with documented names; `context_window_size` observed as `1000000` (1M, not 200k) — confirms thresholds must be percentage-based (already AD-4's design). `pr.*`, `worktree.*`, `workspace.git_worktree` all ABSENT in this capture, expected per the ticket's own caveats (no open PR; not a `--worktree` session). Several undocumented fields also observed and catalogued: `session_name`, `output_style.name`, `exceeds_200k_tokens`, `fast_mode`, `thinking.enabled`, `context_window.total_output_tokens`/`remaining_percentage`, `workspace.current_dir`/`project_dir`. Capture script kept at `tools/capture-statusline.mjs` for T-03 reuse. Full schema: `evidence/T-01-statusline-schema.md`. | T-02, T-07, T-09 remain frontier; T-03 still needs T-02 |
 | 2026-07-31 | T-02 | **RESOLVED.** Session-health store decided and implemented: `~/.mypka/governor/health/<projectKey>/<sessionId>.json`, override via `MYPKA_GOVERNOR_HEALTH_DIR`. Confirmed out of GL-012's scope (secrets store + private-app session logs per §6a — this is neither) after reading the settled §6a text directly from `95c265d`. Atomic temp+rename write, per-writer-unique temp names. `tools/governor/health-store.mjs` + `health-store.test.mjs`, 8/8 passing including a 12-real-process concurrent-write mutation test and a kill-mid-write simulation. | T-03 (now unlocked jointly with T-01) |
+| 2026-07-31 | T-09 | **RESOLVED.** Durable programme-state contract defined and implemented: `tools/governor/programme-state.schema.json` (18 required top-level fields) + `programme-state.mjs` (schema-interpreting validator, privacy guard, consistency checks, freshness, derived views, atomic write, handoff renderer) + 43 tests, all passing; 63/63 across the whole governor suite. **Location AD-14**: state lives with the programme on the programme's branch, and `banked.head_sha` is the head the state *describes* — a file cannot contain its own commit's SHA, so **T-10 must compare against the banking commit's parent** or RECOVERY fires on every rotation. Completed work and the frontier are **derived** from one `tickets[]` list, and the validator now rejects a ticket claiming `frontier` over an unresolved dependency — §8's "computed, not set by hand" is now literally enforced. An **empty collection is a positive assertion of "there are none"**; anything not gathered must be declared in `unknown` *with a reason*, which is what stops F-7's best-effort worker detection from reading as "nothing is running". AD-12 compatibility proven, not asserted: the renderer reproduces `session-handoff.md`'s frontmatter, H1 and five H2 sections in order (asserted), and the real file was **not** overwritten — the render is proven into `evidence/`. Privacy (INV-6/GL-012) enforced by three machine checks with a positive control proving a private build is still bankable. Validated against the **real** estate: BUILD-018's own live `programme-state.json`, 1,075 checks, 22 worktrees from T-07's `reconcile()`. All six controls individually disabled and proven to go red. | **T-13 (new, Sonnet)** — collector split out of T-10; **T-10** now unblocked (Opus); **T-11** partially unblocked (still needs T-10) |
 | 2026-07-31 | T-07 | **RESOLVED (worktree side).** `tools/governor/worktree-recon.mjs` enumerates all 22 worktrees (20 baseline + primary + this build's own) with disposition; never deletes (enforced by a source-scan test). Live-worker detection remains best-effort — F-7 stays open fog, not resolved. **Bug found by running against the real estate, not by unit tests**: naive substring matching let the primary checkout falsely claim sibling worktrees' (`-governor`/`-audit`/`-tower`/`-w01`) live workers because `"C:/Fusion247PKA"` is a literal prefix of their paths; fixed with a path-boundary check, regression test added, re-run to confirm the fix changed real output. 12/12 tests passing including a real-git dirty-worktree mutation. Full result: `evidence/T-07-worktree-reconciliation.md`. | T-10 partially de-risked (worktree recon available); F-7 still blocks a durable live-worker signal |
 
 ---
@@ -294,6 +313,9 @@ Append one line per resolved ticket. **A resolution not written back here did no
 | Stop-hook stdin reader | `services/control-plane/tower-loop/bridge-ingest.mjs:120-137` | working, tested pattern for parsing hook stdin and locating `transcript_path` — copy this, don't reinvent |
 | Stop hook slot | `.claude/settings.local.json:183-192` | post-turn health sampling |
 | **Handoff contract** | `Team Knowledge/fusion-brief/session-handoff.md` | the file the Governor derives (AD-12) |
+| **Programme-state contract** | `tools/governor/programme-state.schema.json` | the durable state schema. The validator *interprets this file* — it is the single source of the constraints, not a description of them, and it throws on any keyword it does not implement |
+| **State validator / writer / renderer** | `tools/governor/programme-state.mjs` | `validateProgrammeState`, `writeProgrammeState` (fails closed), `readProgrammeState`, `evaluateFreshness`, `frontierTickets`, `renderSessionHandoff`. T-10, T-11 and T-13 all build on this — do not reimplement any of it |
+| **State fixtures** | `tools/governor/fixtures/programme-state.*.json` | a valid base and a private-surface build. Break exactly one thing in the base for any new mutation test |
 | Notification | `C:\.fusion247\larry-ding.mjs` — message read from a **file**, not argv; already permission-allowlisted | ding Warwick when rotation is advised |
 | Command frontmatter | `.claude/commands/*.md` — exactly `name` / `description` / `user_invocable: true` | `/rotate-session` must match this convention |
 | Session-log schema | `Team Knowledge/session-logs/_template.md` — `type` enum already includes `mid-session-insight` | a rotation entry uses that type, **not** `close-session` |
