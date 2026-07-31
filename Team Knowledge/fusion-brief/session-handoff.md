@@ -12,23 +12,29 @@ owner_intent: consumed by the next Larry session. Regenerate on every rotation; 
 
 Phase 1 (Opus architecture) is complete and settled. Phase 2 is implementing the seven components against it. T-01, T-02, T-07, T-09, T-03, T-13 and T-10 resolved earlier; this banking adds T-11, which CLOSES THE ROTATION LOOP and turns the canonical location into an enforced control. A cleared session now reorients itself automatically from banked state (pointer brief, hard 10,000-char cap), verifies its actual cwd, repository root, branch and HEAD against that state before any implementation, and is refused Write/Edit/MultiEdit/NotebookEdit and mutating Bash by a committed PreToolUse gate whenever it is in the wrong place - absolute-path luck is explicitly not a control. Both hooks are activated by a committed idempotent installer, which also reconciled the long-dangling ensure-watcher SessionStart hook. T-14 (build-session registry/launcher by name, automatic programme PR, exact-head QA binding, single merge decision) is now THE next action; T-04 (evaluator) remains independently takable.
 
-Branch `build-018/session-governor` in worktree `C:/Fusion247PKA-governor`, HEAD `92b4d3df023017cfb80357302119838b32ac0321` (base `ef96a3327f896e025731769c72157fd722daa02f`). Banked by Opus at 2026-07-31.
+Branch `build-018/session-governor` in worktree `C:/Fusion247PKA-governor`, HEAD `6f31544f2c3fdda0a77f1b36b16fc29c4e3d3dc3` (base `ef96a3327f896e025731769c72157fd722daa02f`). Banked by Sonnet 5 at 2026-07-31.
 
-**Completed (9):**
+**Completed (12):**
 - **T-01** — Prove the live statusLine payload on this machine _(resolved 2026-07-31)_
 - **T-02** — Session-health store location and atomic write _(resolved 2026-07-31)_
 - **T-03** — Sampler: statusLine script to health sample _(resolved 2026-07-31)_
+- **T-04** — Pure evaluator: evaluate(signals) to verdict _(resolved 2026-07-31)_
 - **T-07** — Worker and worktree reconciliation _(resolved 2026-07-31)_
 - **T-09** — Programme-state schema, validator and writer _(resolved 2026-07-31)_
 - **T-10** — /rotate-session: bank, verify safety, emit the /clear instruction _(resolved 2026-07-31)_
 - **T-11** — Reorientation on /clear, canonical-location verification, and the wrong-worktree deny gate _(resolved 2026-07-31)_
 - **T-13** — Programme-state collector: gather the live estate into a valid state document _(resolved 2026-07-31)_
 - **T-14** — Build-session registry/launcher by build name, automatic programme PR at merge readiness, exact-head QA binding, single merge decision _(resolved 2026-07-31)_
+- **T-15** — Post-clear model selection gate — verify the selected model before releasing implementation _(resolved 2026-07-31)_
+- **T-16** — Mechanical delegation-enforcement gate — delegation ledger + substantial-work threshold, specialist-match verification against Team/agent-index.md _(resolved 2026-07-31)_
 
-**Frontier — takable now (1):**
-- **T-04** [Opus] — Pure evaluator: evaluate(signals) to verdict
+**Frontier — takable now (4):**
+- **T-05** [Sonnet] — Status-line display of the verdict
+- **T-06** [Opus] — RED preflight block via UserPromptSubmit, fails open
+- **T-08** [Opus] — Live dogfood rotation (M4)
+- **T-12** [Sonnet] — Portability: extract the estate adapter
 
-**Blockers (10):**
+**Blockers (13):**
 - **F-4** (fog, owner: research) — Are the proposed health thresholds right? Resolvable only by dogfood. _Recommendation: Ship the hypothesis thresholds, tune from T-08._
 - **F-5** (fog, owner: research) — How is "a new substantial item" detected from a prompt well enough to block it without false positives? _Recommendation: Prototype in T-06; fail open on any doubt (INV-2)._
 - **F-7** (fog, owner: research) — Reliable live-worker detection. T-07 shipped a best-effort Windows command-line matcher with a confirmed blind spot; a durable answer needs a session/task registry, not command-line text. _Recommendation: T-10 must treat worker liveness as `unknown`-capable, never as a confident zero._
@@ -39,6 +45,9 @@ Branch `build-018/session-governor` in worktree `C:/Fusion247PKA-governor`, HEAD
 - **Q-1** (question, owner: warwick) — Is BUILD-018 the right identifier, given it was commissioned directly and has no Foundry IDEA-018? _Recommendation: Larry’s call unless Warwick objects; recorded in 00-ESTATE.md._
 - **X-1** (external, owner: larry) — GL-012 section 6a is NOT on this branch. Reading GL-012 from this worktree returns the PRE-ruling text and will cause a settled conflict to be re-escalated. _Recommendation: Read it with: git show 95c265d:"Team Knowledge/Guidelines/GL-012-secrets-store-access-boundary.md"_
 - **X-2** (external, owner: larry) — RESOLVED 2026-07-31 by T-11. settings.local.json remains gitignored, so hook wiring still cannot travel by git - the answer is that the BEHAVIOUR travels and only the ACTIVATION touches the untracked file. tools/governor/install-hooks.mjs is committed, idempotent, reviewable and re-runnable on any machine, and ships both hooks (SessionStart reorientation + PreToolUse deny gate) in one run. _Recommendation: Every hook ticket must also ship an idempotent activation step that installs into the primary checkout’s untracked settings file._
+- **D-1** (defect, owner: larry) — T-04's implementation model provenance is UNKNOWN. It was built while this session's visible model selector read Auto, not the Opus the bank recommended, and no per-turn model attribution was captured at the time (that capability did not exist yet — T-15, resolved immediately after, exists to close exactly this hole for every future ticket). T-04's code, tests (34/34, including the full 64-combination sweep) and write-back are PRESERVED EXACTLY AS LANDED — this is not a defect in T-04 itself and it is not to be rebuilt on this basis alone. _Recommendation: T-04 requires independent QA current at its exact head (commit 85edcf76205ecf375985c30445f37c31cd37e146) before BUILD-018 merges. This is not a new mechanism: the existing T-14 merge-readiness gate (independent-review check, tools/governor/merge-readiness.mjs) already requires ALL tickets in this programme to hold a current QA approval at the exact integrated head before merge-readiness can report ready — T-04 is not exempt from that gate, and this entry exists so the SPECIFIC reason (unverified build-time model, not a code defect) is recorded rather than only the generic requirement._
+- **D-2** (defect, owner: larry) — This session dispatched generic 'general-purpose'/'Plan' ephemeral agents for T-15's design and implementation instead of routing through the named specialist team (Team/agent-index.md) — specifically Keel (Implementation Engineer, owns authorised Work Orders) and Silas (Database Architect, owns schema/data-integrity judgement, relevant to the delegation ledger's own schema). Warwick corrected this mid-session: the routing SSOT is the named specialist team, and an ephemeral worker is disposable runtime beneath a named discipline, not an anonymous substitute for it. T-15 itself is preserved as landed — verified independently (447/447 suite, real acceptance test, no regressions) — this defect is about PROCESS provenance, the same class of concern as D-1, not a code defect in T-15. _Recommendation: Every future implementation dispatch in this build routes through Keel via a proper Work Order (Team Knowledge/Templates/work-order.md, SOP-022: DRAFT -> WORKER READ-BACK -> LARRY ACCEPTS OR AMENDS -> ISSUED -> RUNNING), schema/data-integrity design decisions route through Silas first. Nolan is auditing why the existing specialists were bypassed this session and reviewing the in-flight delegation-enforcement mechanism so it itself checks for a fitting named specialist before generic delegation can satisfy it._
+- **D-3** (defect, owner: larry) — This session's FULL history (T-01 through T-14, and initially T-15/T-16) was built without ANY Work Order or Keel involvement, despite tools/governor/ being explicitly named in Keel's own contract as in-scope — confirmed by Nolan's audit. This is the standing pattern for the entire BUILD-018 programme, not a single-session lapse. _Recommendation: Per Warwick's explicit ruling (2026-07-31): do NOT reopen or rebuild T-01 through T-14 on this basis alone. Preserve sound completed work. The existing merge-readiness independent-review gate (tools/governor/merge-readiness.mjs) already requires QA current at the exact head for every ticket before merge, regardless of build provenance — that generic requirement stands for all of them; D-1 records the T-04-specific reason. Going forward (T-16 onward), implementation routes through Keel via a proper Work Order; Larry's routing cheatsheet (Team/Larry - Orchestrator/AGENTS.md) is being corrected to make this the default rather than an easily-bypassed option._
 
 **Safe boundary:** yes — Verified by /rotate-session: 5 safety checks ran and found no obstacle. Tree clean, no unpushed commits, no live worker detected in this worktree.
 
@@ -47,14 +56,12 @@ Branch `build-018/session-governor` in worktree `C:/Fusion247PKA-governor`, HEAD
 - t-03-t-13-implementation — subagent, **completed** (T-03)
 
 **Branches:**
-- `build-018/session-governor` (build) @ 92b4d3df023017cfb80357302119838b32ac0321 — This programme. The only branch this build may write to.
+- `build-018/session-governor` (build) @ 6f31544f2c3fdda0a77f1b36b16fc29c4e3d3dc3 — This programme. The only branch this build may write to.
 - `main` (protected) @ de92306911e7cbe8828d5652ed9f7f21fd99593e — Local main is at de92306, one commit ahead of origin/main and unpushed. MUST NOT be altered by this build.
 - `recovery/2026-07-31-governor-abort-handoff` (recovery) @ 95c265de729e26114b1e1eb7dc7d8630502aca1d — Carries the settled GL-012 section 6a ruling. Read-only for this build; its PR must not be opened or merged.
 
 **Pull requests:**
-- (unnumbered)  — **none** — No PR found for this branch
-- (unnumbered)  — **none** — No PR found for this branch
-- (unnumbered)  — **none** — No PR found for this branch
+- _(none recorded)_
 
 **Worktrees (22):** 2 unreconciled, 0 unreadable.
 
@@ -65,9 +72,9 @@ Branch `build-018/session-governor` in worktree `C:/Fusion247PKA-governor`, HEAD
 
 ## What the NEXT session is about
 
-T-14 landed 2026-07-31 and is now resolved in BOTH the ledger and the map (this correction fixes a dual-write staleness incident where the map alone claimed it). The rotation half of BUILD-018 is complete. T-04 (the pure evaluator) is now the entire frontier and the sole gate on the advice half of this build.
+The operating-model correction opened this session (generic-agent bypass of the named specialist team, caught by Warwick) is now closed: routing cheatsheet fixed (Team/Larry - Orchestrator/AGENTS.md), SOP-001 fixed, and T-16 (the mechanical enforcement gate) implemented under a proper Keel Work Order with Silas-owned schema. D-1 (T-04 provenance), D-2 (this session's routing bypass) and D-3 (the programme-wide pattern back to T-01) all stay recorded, not retroactively erased -- Warwick's explicit ruling was to record and correct going forward, not reopen T-01 through T-14. Frontier reverts to the pre-correction set (T-05/T-06/T-08/T-12); T-05 remains the chosen next action.
 
-**Model recommendation: Opus** — T-04 is now the ENTIRE frontier: the pure evaluator that everything else in the advice half of this build (T-05, T-06, T-12) depends on directly, and the last outstanding dependency for T-08, the live dogfood that is this build's real acceptance test (M4).
+**Model recommendation: Sonnet** — T-05 is the only ticket the computed frontier names as takable.
 
 ## Locked decisions (durable — do NOT re-litigate)
 
@@ -109,23 +116,28 @@ T-14 landed 2026-07-31 and is now resolved in BOTH the ledger and the map (this 
 
 **Work in `C:/Fusion247PKA-governor` on branch `build-018/session-governor`.**
 
-**THE EXACT NEXT ACTION:** Implement T-04, the pure evaluator: evaluate(signals) -> verdict, covering all five states (GREEN/AMBER/RED/RECOVERY/BLIND), each with its own distinct exit code, and the missing-field semantics the map already settled (an ABSENT field is unknown, never 0 — a threshold over an unknown input contributes a BLIND reason instead of firing). AD-11: the evaluator core must be PURE — zero filesystem, git or myPKA knowledge; adapters gather signals separately, so the core is unit-testable without an estate and portable to Project ManagAIr later. Mutation test named by the map (T-09 row): delete the state file -> assert BLIND, never GREEN (INV-1); assert a non-zero count of signals actually examined (INV-5). Read 02-MAP.md section 4 (the proposed health model and its hypothesis thresholds, F-4 — ship them, tune from dogfood, do not re-derive them from scratch) and the T-04 row in section 9 before starting. T-04 unlocks T-05, T-06 and T-12 directly, and is the last outstanding dependency for T-08 — the live dogfood rotation that is this build's REAL acceptance test (M4). (ticket T-04)
+**THE EXACT NEXT ACTION:** Implement T-05, the status-line display: render the evaluate() verdict compactly wherever Warwick's live status line is surfaced. Acceptance (map section 9): renders all five states (GREEN/AMBER/RED/RECOVERY/BLIND); degrades gracefully. Mutation test named by the map: if the evaluator throws, the line still renders and shows BLIND. IMPORTANT: per the now-corrected operating model, this is a Keel-domain implementation ticket (tools/governor/** is explicitly in Keel's contract) -- route it through a proper Work Order (Team Knowledge/Templates/work-order.md, SOP-022), not direct implementation. Note the same harness gap T-16 hit: "keel" may not be a directly-dispatchable subagent_type this session -- check first, and if still absent, route via the general-purpose runtime instructed to operate under Keel's actual contract, exactly as T-16 did, rather than silently reverting to unrouted direct implementation. (ticket T-05)
 
 **Read first:**
-- Deliverables/BUILD-018-session-governor/02-MAP.md - the live execution SSOT for architecture/decisions/fog (AD-17, corrected 2026-08-01: tickets[] is now the execution-STATE SSOT; the map is the navigation projection)
-- Deliverables/BUILD-018-session-governor/01-GOAL-CONTRACT.md - the product SSOT; it wins over any ticket
-- tools/governor/programme-state.mjs - resolveTicket/deriveResumption/resolveTicketAndAdvance/applyTicketResolution are the ONLY sanctioned way to resolve a ticket or re-point resumption; hand-editing tickets[] or resumption.* directly is the exact dual-write failure this correction fixed
-- tools/governor/rotate-session.mjs - assessRotationSafety now refuses with a stale-execution-state obstacle (STALE_EXECUTION_STATE) if the map and ledger ever disagree again
+- Deliverables/BUILD-018-session-governor/02-MAP.md - the live execution SSOT (AD-17)
+- Deliverables/BUILD-018-session-governor/01-GOAL-CONTRACT.md - the product SSOT; wins over any ticket
+- Team/Larry - Orchestrator/AGENTS.md - the corrected routing cheatsheet; re-check it before any substantial dispatch, not only when in doubt
+- Team/agent-index.md - the routing SSOT for which named specialist owns which domain
+- tools/governor/delegation-gate.mjs - T-16, the mechanical gate now composed into worktree-guard.mjs's PreToolUse pattern
+- tools/governor/evaluator.mjs - the T-04 verdict shape T-05 renders
+- tools/governor/programme-state.mjs - resolveTicket/deriveResumption/resolveTicketAndAdvance/applyTicketResolution are the ONLY sanctioned way to resolve a ticket or re-point resumption
 
 **Do NOT:**
 - Do not hand-edit tickets[].state, resumption.*, or 02-MAP.md's GOVERNOR:STATUS block directly — use resolveTicketAndAdvance / applyTicketResolution.
 - Do not open or merge the recovery PR (recovery/2026-07-31-governor-abort-handoff at 95c265d).
 - Do not alter local main.
-- Do not create the BUILD-018 PR yet - explicitly deferred by Warwick, and merge-readiness itself is not yet true (T-04/T-05/T-06/T-08/T-12 still open).
+- Do not create the BUILD-018 PR yet - merge-readiness is not yet true, and T-04/T-16 both carry recorded blockers (D-1, D-2/D-3) awaiting independent QA before merge.
 - Do not modify, move or delete the six Cairn intake files under Team Knowledge/Sources/.
 - Do not delete or clean any pre-existing worktree without first proving owner, branch, status and disposition.
 - Do not run /close-session, and do not start the VlogOps product build.
 - Do not re-litigate the settled decisions in 02-MAP.md section 3.
 - Do not read GL-012 from this working tree - it is the pre-ruling text. Use git show 95c265d.
+- Do not reopen or rebuild T-01 through T-14 over the routing-provenance finding (D-3) — Warwick's explicit ruling.
+- Do not implement a delegable ticket directly without first stating a delegation plan and checking Team/Larry - Orchestrator/AGENTS.md's routing cheatsheet — this is the standing operating model now, not a one-session correction.
 
 _This handoff is derived. 3 field(s) were not established at banking — see above._

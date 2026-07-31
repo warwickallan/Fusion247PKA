@@ -14,9 +14,9 @@
   },
   "banked": {
     "at": "2026-07-31",
-    "by_model": "Opus",
+    "by_model": "Sonnet 5",
     "session_id": null,
-    "head_sha": "92b4d3df023017cfb80357302119838b32ac0321",
+    "head_sha": "6f31544f2c3fdda0a77f1b36b16fc29c4e3d3dc3",
     "governor_version": "T-09/schema-v1"
   },
   "repository": {
@@ -24,7 +24,7 @@
     "worktree": "C:/Fusion247PKA-governor",
     "branch": "build-018/session-governor",
     "base_sha": "ef96a3327f896e025731769c72157fd722daa02f",
-    "head_sha": "92b4d3df023017cfb80357302119838b32ac0321",
+    "head_sha": "6f31544f2c3fdda0a77f1b36b16fc29c4e3d3dc3",
     "clean": true,
     "unpushed_commits": 0,
     "upstream": "origin/build-018/session-governor"
@@ -430,7 +430,7 @@
   "branches": [
     {
       "name": "build-018/session-governor",
-      "head": "92b4d3df023017cfb80357302119838b32ac0321",
+      "head": "6f31544f2c3fdda0a77f1b36b16fc29c4e3d3dc3",
       "upstream": "origin/build-018/session-governor",
       "ahead": 0,
       "behind": null,
@@ -456,35 +456,7 @@
       "note": "Carries the settled GL-012 section 6a ruling. Read-only for this build; its PR must not be opened or merged."
     }
   ],
-  "pull_requests": [
-    {
-      "number": null,
-      "url": null,
-      "title": null,
-      "state": "none",
-      "branch": "build-018/session-governor",
-      "head": null,
-      "note": "No PR found for this branch"
-    },
-    {
-      "number": null,
-      "url": null,
-      "title": null,
-      "state": "none",
-      "branch": "main",
-      "head": null,
-      "note": "No PR found for this branch"
-    },
-    {
-      "number": null,
-      "url": null,
-      "title": null,
-      "state": "none",
-      "branch": "recovery/2026-07-31-governor-abort-handoff",
-      "head": null,
-      "note": "No PR found for this branch"
-    }
-  ],
+  "pull_requests": [],
   "worktrees": [
     {
       "path": "C:/Fusion247PKA",
@@ -705,7 +677,7 @@
     {
       "path": "C:/Fusion247PKA-governor",
       "branch": "build-018/session-governor",
-      "head": "92b4d3df023017cfb80357302119838b32ac0321",
+      "head": "6f31544f2c3fdda0a77f1b36b16fc29c4e3d3dc3",
       "dirty": false,
       "unpushedCount": 0,
       "classification": "active-build",
