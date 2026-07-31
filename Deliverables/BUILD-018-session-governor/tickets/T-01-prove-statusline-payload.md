@@ -4,7 +4,8 @@ type: work-order
 build: BUILD-018
 ticket: T-01
 ticket_type: prototype
-status: ready
+status: resolved
+resolved: 2026-07-31
 model: Sonnet
 private_surface: none
 worktree: C:/Fusion247PKA-governor
@@ -84,20 +85,46 @@ committed.
 
 ## 6. Acceptance criteria
 
-- [ ] A real payload was captured on this machine (not synthesised, not doc-derived).
-- [ ] `Deliverables/BUILD-018-session-governor/evidence/T-01-statusline-schema.md` exists, listing
+- [x] A real payload was captured on this machine (not synthesised, not doc-derived).
+- [x] `Deliverables/BUILD-018-session-governor/evidence/T-01-statusline-schema.md` exists, listing
       every observed dotted key path + type, values redacted.
-- [ ] Every row of `02-MAP.md` §2 is marked **OBSERVED** or **ABSENT**. No row left at `[DOC]`.
-- [ ] These are called out explicitly, each OBSERVED or ABSENT:
+- [x] Every row of `02-MAP.md` §2 is marked **OBSERVED** or **ABSENT**. No row left at `[DOC]`.
+- [x] These are called out explicitly, each OBSERVED or ABSENT:
       `context_window.used_percentage` · `context_window.context_window_size` ·
       `context_window.current_usage` · `rate_limits.five_hour.used_percentage` ·
       `rate_limits.five_hour.resets_at` · `rate_limits.seven_day.*` · `model.id` · `effort.level` ·
       `session_id` · `transcript_path` · `pr.*` · `worktree.*` · `workspace.git_worktree`
-- [ ] `settings.local.json` is byte-identical to its pre-ticket state (show the diff proving it).
-- [ ] The capture script is left in the worktree under `tools/` as a reusable probe — it becomes the
+- [x] `settings.local.json` is byte-identical to its pre-ticket state (show the diff proving it).
+- [x] The capture script is left in the worktree under `tools/` as a reusable probe — it becomes the
       basis for T-03's sampler.
-- [ ] Nothing outside `C:/Fusion247PKA-governor` is modified, except the temporary and fully-reverted
+- [x] Nothing outside `C:/Fusion247PKA-governor` is modified, except the temporary and fully-reverted
       `settings.local.json` change.
+
+## 10. Resolution — 2026-07-31
+
+**Outcome met — see `evidence/T-01-statusline-schema.md` for full detail.**
+
+Explicitly authorised by Warwick (this order's §0 read-back surfaced a real conflict between
+this ticket's method and the dispatching session's top-level "do not modify C:/Fusion247PKA"
+boundary; Warwick approved the bounded backup→install→trigger→restore→diff-prove sequence
+and nothing beyond it).
+
+Both `context_window.*` and `rate_limits.*` observed present with documented names.
+`context_window_size` observed as `1000000` (1M, not 200k) on this account — confirms
+percentage-based thresholds (already the design) are the right call. `pr.*`, `worktree.*`,
+`workspace.git_worktree` all ABSENT in this capture — expected per §7's own caveats (no open
+PR; session was the main checkout, not a `--worktree` launch), not evidence they never appear.
+
+Several fields not in `02-MAP.md` §2 at all were also observed: `session_name`,
+`output_style.name`, `exceeds_200k_tokens`, `fast_mode`, `thinking.enabled`,
+`context_window.total_output_tokens`/`remaining_percentage`, `workspace.current_dir`/
+`project_dir`. Catalogued in the evidence file; map §2 updated to include them.
+
+`settings.local.json` restoration proven byte-identical by both empty `diff` and matching
+`md5sum` (`70032e2039a9a0c664a6b693fb9f2229`) against the pre-edit checksum.
+
+Capture script retained at `tools/capture-statusline.mjs` (kill-tolerant, temp+rename) for
+T-03 to build on.
 
 ## 7. Known caveats to expect (do not treat these as failures)
 

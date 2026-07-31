@@ -69,21 +69,32 @@ version gate (`rate_limits` 2.1.132+, `prompt_id` 2.1.196+, boolean frontmatter 
 
 ### statusLine stdin payload — the primary source
 
+**PROVEN locally by T-01, 2026-07-31**: one real payload captured on this machine (see
+`evidence/T-01-statusline-schema.md` for the full redacted schema and captured-value
+verdicts). Every row below is now OBSERVED or ABSENT — no row is [DOC]-only.
+
 | Field | Serves | Evidence |
 |---|---|---|
-| `context_window.used_percentage` | live context usage | [DOC] input-only; **excludes output tokens** |
-| `context_window.total_input_tokens` | usage | [DOC] current context, not cumulative |
-| `context_window.context_window_size` | 200k vs 1M denominator | [DOC] |
-| `context_window.current_usage.{input,output,cache_creation,cache_read}_tokens` | growth | [DOC] **`null` before 1st API call and after `/compact`** |
-| `rate_limits.five_hour.{used_percentage,resets_at}` | 5h plan delta | [DOC] Pro/Max only, after 1st response, **may be absent** |
-| `rate_limits.seven_day.{used_percentage,resets_at}` | 7d plan delta | [DOC] same caveats |
-| `model.id`, `model.display_name` | model boundary | [DOC] |
-| `effort.level` | effort boundary | [DOC] absent if unsupported |
-| `session_id`, `transcript_path`, `version` | identity | [DOC] |
-| `workspace.git_worktree`, `workspace.repo.{host,owner,name}` | estate | [DOC] absent in main worktree / outside git |
-| `pr.{number,url,review_state}` | PR state | [DOC] present only while an open PR is found |
-| `worktree.{name,path,branch}` | worktree | [DOC] `--worktree` sessions only |
-| `cost.{total_cost_usd,total_duration_ms,...}` | effort proxy | [DOC] resets to $0 on `/clear` |
+| `context_window.used_percentage` | live context usage | **OBSERVED** — input-only; excludes output tokens |
+| `context_window.total_input_tokens` | usage | **OBSERVED** — current context, not cumulative |
+| `context_window.context_window_size` | 200k vs 1M denominator | **OBSERVED** — `1000000` on this account (**1M, not 200k** — thresholds must stay percentage-based, never hardcoded) |
+| `context_window.current_usage.{input,output,cache_creation,cache_read}_tokens` | growth | **OBSERVED-nonnull** in this capture (mid-session, not pre-first-call); the documented pre-1st-call/post-`/compact` `null` state was not exercised — do not read that as "null never happens" |
+| `rate_limits.five_hour.{used_percentage,resets_at}` | 5h plan delta | **OBSERVED** on this Pro/Max-tier machine |
+| `rate_limits.seven_day.{used_percentage,resets_at}` | 7d plan delta | **OBSERVED** |
+| `model.id`, `model.display_name` | model boundary | **OBSERVED** |
+| `effort.level` | effort boundary | **OBSERVED** |
+| `session_id`, `transcript_path`, `version` | identity | **OBSERVED** (session_id/transcript_path redacted per §5) |
+| `workspace.git_worktree`, `workspace.repo.{host,owner,name}` | estate | `workspace.git_worktree` **ABSENT** (not observed — this capture's session was the main checkout, not a `--worktree` launch, so absence is expected per the ticket's caveats, not evidence it never appears); `workspace.repo.{host,owner,name}` **OBSERVED** (redacted) |
+| `pr.{number,url,review_state}` | PR state | **ABSENT** — not observed in this capture (no open PR found for this session; expected, not evidence of non-existence) |
+| `worktree.{name,path,branch}` | worktree | **ABSENT** — not observed in this capture (session was not a `--worktree` launch; expected) |
+| `cost.{total_cost_usd,total_duration_ms,...}` | effort proxy | **OBSERVED** (`total_cost_usd`, `total_duration_ms`, `total_api_duration_ms`, `total_lines_added`, `total_lines_removed`; value redacted per §5) |
+
+**Undocumented fields also OBSERVED in the same capture — not previously in this table**:
+`session_name` (string, auto-generated session title), `output_style.name`,
+`exceeds_200k_tokens` (boolean), `fast_mode` (boolean), `thinking.enabled` (boolean),
+`context_window.total_output_tokens`, `context_window.remaining_percentage` (ready-made
+evaluator inputs), `workspace.current_dir`, `workspace.project_dir`, `cwd`, `prompt_id`. Full
+detail in the evidence file.
 
 **Refresh cadence** [DOC]: session start, each new assistant message, after `/compact`, on permission
 or vim mode change, plus optional `refreshInterval` (min 1s). Debounced 300ms; in-flight scripts are
@@ -181,7 +192,7 @@ A threshold over an `unknown` input does not fire; it contributes a `BLIND` reas
 
 | ID | Fog | Type | Resolution |
 |---|---|---|---|
-| **F-1** | Does the live statusLine payload on **this** machine actually contain `context_window.*` and `rate_limits.*` with the documented names? All field evidence is [DOC] + version inference — **not yet observed here**. | **PROTOTYPE** | T-01 |
+| ~~F-1~~ | ~~Does the live statusLine payload on **this** machine actually contain `context_window.*` and `rate_limits.*` with the documented names?~~ | PROTOTYPE | **RESOLVED 2026-07-31 — yes, both present with documented names; see §2 and `evidence/T-01-statusline-schema.md`. Bonus: several undocumented fields also observed (`exceeds_200k_tokens`, `remaining_percentage`, etc.) and `context_window_size` proven as 1M on this account.** |
 | **F-2** | Where should the ephemeral session-health store live? `C:\.fusion247\**` is deny-by-default under GL-012 and would need a declared private surface. | **RESEARCH** → then Warwick if contested | T-02 |
 | ~~F-3~~ | ~~What does `/close-session` actually do; what seams exist?~~ | RESEARCH | **RESOLVED 2026-07-31 — see §3 AD-12/AD-13 and §11.** |
 | **F-4** | Are the proposed thresholds right? | **PROTOTYPE → dogfood** | T-08, then tune |
@@ -225,9 +236,8 @@ installs it into the primary checkout's untracked settings file — otherwise it
 
 ## 8. FRONTIER — takable right now
 
-**T-01, T-02, T-09.** Everything else is behind a dependency.
-
-**T-01 is the first Sonnet ticket.**
+**T-02, T-07, T-09.** T-01 resolved 2026-07-31 (see §5 write-back). Everything else remains
+behind a dependency — T-03 needs both T-01 (done) and T-02 (open).
 
 ---
 
@@ -237,7 +247,7 @@ Model column: Opus only where architectural judgement is materially valuable.
 
 | ID | Ticket | Model | Depends | Acceptance | Mutation test |
 |---|---|---|---|---|---|
-| **T-01** | **Prove the live statusLine payload.** Install a capture statusLine, record ONE real payload, redact, commit the observed schema. **If documented fields are absent: STOP and report — do not redesign.** | **Sonnet** | — | A real payload's key-set is committed; every field in §2 marked OBSERVED or ABSENT | n/a (this *is* the evidence-gathering ticket) |
+| **T-01** | ~~**Prove the live statusLine payload.**~~ **RESOLVED 2026-07-31.** | **Sonnet** | — | ✅ met — `evidence/T-01-statusline-schema.md`; every §2 field marked | n/a (evidence-gathering ticket) |
 | **T-02** | Decide + implement the session-health store location and atomic write (temp+rename). | Sonnet | — | Store path settled with GL-012 reasoning written down; concurrent writes never yield a torn file | Kill mid-write → reader still gets last good state, never a partial parse |
 | **T-03** | Sampler: statusLine script → health sample. Fast, idempotent, kill-tolerant. | Sonnet | T-01,T-02 | Sample written on every assistant message; <100ms | Feed malformed/empty stdin → writes nothing, exits 0, never corrupts the store |
 | **T-04** | **Pure evaluator** — `evaluate(signals) → verdict`. All five states, distinct exit codes, missing-field semantics. | **Opus** | T-03 | Full state-space unit tests incl. every `unknown` combination | **Delete the state file → asserts BLIND, not GREEN** (INV-1). Assert non-zero count of signals actually examined. |
@@ -267,6 +277,7 @@ Append one line per resolved ticket. **A resolution not written back here did no
 |---|---|---|---|
 | 2026-07-31 | Phase 1 | Map, contract, estate created. Telemetry surface proven to [DOC]+version level; live payload still unproven (F-1). | T-01, T-02, T-09, T-07 |
 | 2026-07-31 | F-3 | **RESOLVED.** close-session steps 1–3 are the rotation subset; 4–7 are end-of-programme (AD-13). `fusion-brief/session-handoff.md` is the existing handoff contract to derive, not replace (AD-12). Eight reusable seams catalogued in §11. | Sharpens T-09, T-10, T-11 |
+| 2026-07-31 | T-01 | **RESOLVED.** Real statusLine payload captured on this machine via a temporary capture command installed in the primary checkout's `settings.local.json` (backed up, installed, triggered, restored, diff-proven byte-identical). Both `context_window.*` and `rate_limits.*` present with documented names; `context_window_size` observed as `1000000` (1M, not 200k) — confirms thresholds must be percentage-based (already AD-4's design). `pr.*`, `worktree.*`, `workspace.git_worktree` all ABSENT in this capture, expected per the ticket's own caveats (no open PR; not a `--worktree` session). Several undocumented fields also observed and catalogued: `session_name`, `output_style.name`, `exceeds_200k_tokens`, `fast_mode`, `thinking.enabled`, `context_window.total_output_tokens`/`remaining_percentage`, `workspace.current_dir`/`project_dir`. Capture script kept at `tools/capture-statusline.mjs` for T-03 reuse. Full schema: `evidence/T-01-statusline-schema.md`. | T-02, T-07, T-09 remain frontier; T-03 still needs T-02 |
 
 ---
 
