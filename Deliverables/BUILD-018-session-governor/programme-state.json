@@ -75,19 +75,22 @@
     {
       "id": "T-04",
       "title": "Pure evaluator: evaluate(signals) to verdict",
-      "state": "frontier",
+      "state": "resolved",
       "model": "Opus",
       "depends_on": [
         "T-03"
       ],
-      "resolved": null,
-      "evidence": [],
-      "note": "Mutation test: delete the state file, assert BLIND not GREEN (INV-1)."
+      "resolved": "2026-07-31",
+      "evidence": [
+        "tools/governor/evaluator.mjs",
+        "tools/governor/evaluator.test.mjs"
+      ],
+      "note": "34/34 ticket tests, including a full 64-combination power-set sweep over the 6-signal vocabulary (contextUsedPercentage, rateLimitFiveHourUsedPercentage, growthProjectedRedBeforeCompletion, compactions, bankedStateStale, safeBoundary) asserting the verdict shape stays valid and BLIND fires iff contextUsedPercentage is absent, for every combination. 420/420 suite-wide, no regressions. AD-11 purity: zero filesystem/git/myPKA imports (evaluate(signals) takes a plain object only). Priority BLIND > RECOVERY > RED > AMBER > GREEN, five distinct exit codes (0-4). Missing-field semantics: only contextUsedPercentage is required; every other absent signal is unknown, skipped, and never escalates to BLIND on its own. Judgement call recorded: section 4's states table defines RECOVERY as authoritative-state-already-lost and places it OFF the main axis, while the adjacent threshold bullets describe compaction count as an AMBER/RED FLOOR on that axis -- the two do not fully agree. This implementation takes the states table as authoritative: any compaction (>=1) this session, or a banked state known stale vs live git HEAD, resolves to RECOVERY outright (outranking RED), not merely a floor -- because INV-3 says degraded in-context memory is not something a low context percentage should be able to mask. safeBoundary modulates advice text only ('rotate now' vs 'reach a safe boundary urgently' vs unknown), never the state itself, per section 4's explicit instruction."
     },
     {
       "id": "T-05",
       "title": "Status-line display of the verdict",
-      "state": "blocked",
+      "state": "frontier",
       "model": "Sonnet",
       "depends_on": [
         "T-04"
@@ -99,7 +102,7 @@
     {
       "id": "T-06",
       "title": "RED preflight block via UserPromptSubmit, fails open",
-      "state": "blocked",
+      "state": "frontier",
       "model": "Opus",
       "depends_on": [
         "T-04"
@@ -124,7 +127,7 @@
     {
       "id": "T-08",
       "title": "Live dogfood rotation (M4)",
-      "state": "blocked",
+      "state": "frontier",
       "model": "Opus",
       "depends_on": [
         "T-04",
@@ -193,7 +196,7 @@
     {
       "id": "T-12",
       "title": "Portability: extract the estate adapter",
-      "state": "blocked",
+      "state": "frontier",
       "model": "Sonnet",
       "depends_on": [
         "T-04"
@@ -338,9 +341,9 @@
     }
   ],
   "model_recommendation": {
-    "model": "Opus",
+    "model": "Sonnet",
     "effort": null,
-    "rationale": "T-04 is now the ENTIRE frontier: the pure evaluator that everything else in the advice half of this build (T-05, T-06, T-12) depends on directly, and the last outstanding dependency for T-08, the live dogfood that is this build's real acceptance test (M4)."
+    "rationale": "T-05 is the only ticket the computed frontier names as takable."
   },
   "workers": [
     {
@@ -685,27 +688,28 @@
     "verified_at": "2026-07-31"
   },
   "resumption": {
-    "focus": "T-14 landed 2026-07-31 and is now resolved in BOTH the ledger and the map (this correction fixes a dual-write staleness incident where the map alone claimed it). The rotation half of BUILD-018 is complete. T-04 (the pure evaluator) is now the entire frontier and the sole gate on the advice half of this build.",
-    "next_action": "Implement T-04, the pure evaluator: evaluate(signals) -> verdict, covering all five states (GREEN/AMBER/RED/RECOVERY/BLIND), each with its own distinct exit code, and the missing-field semantics the map already settled (an ABSENT field is unknown, never 0 — a threshold over an unknown input contributes a BLIND reason instead of firing). AD-11: the evaluator core must be PURE — zero filesystem, git or myPKA knowledge; adapters gather signals separately, so the core is unit-testable without an estate and portable to Project ManagAIr later. Mutation test named by the map (T-09 row): delete the state file -> assert BLIND, never GREEN (INV-1); assert a non-zero count of signals actually examined (INV-5). Read 02-MAP.md section 4 (the proposed health model and its hypothesis thresholds, F-4 — ship them, tune from dogfood, do not re-derive them from scratch) and the T-04 row in section 9 before starting. T-04 unlocks T-05, T-06 and T-12 directly, and is the last outstanding dependency for T-08 — the live dogfood rotation that is this build's REAL acceptance test (M4).",
-    "ticket": "T-04",
+    "focus": "T-04 (the pure evaluator) landed 2026-07-31 -- all five states, distinct exit codes, full missing-field semantics, 34/34 tests including a 64-combination state-space sweep. This unblocked T-05, T-06 and T-12 simultaneously; T-08 (the dogfood, M4) also now has T-04 satisfied but still needs T-10/T-11 (both already resolved) so it is technically unlocked too -- the map's own wave order (section 9) places T-08 in Wave 5, AFTER T-05/T-06/T-12, so it is deliberately not chosen as the next action yet: dogfooding a rotation is more meaningful once the pieces that consume evaluate() actually exist.",
+    "next_action": "Implement T-05, the status-line display: render the evaluate() verdict compactly wherever Warwick's live status line is surfaced. Acceptance (map section 9): renders all five states (GREEN/AMBER/RED/RECOVERY/BLIND); degrades gracefully. Mutation test named by the map: if the evaluator throws, the line still renders and shows BLIND -- never a crash, never a silently blank line (same INV-1 spirit as sampler.mjs's own 'a statusLine command must never surface a crash to the UI'). Read tools/governor/evaluator.mjs's verdict shape ({state, exitCode, reasons, unknownSignals, examinedSignals, advice}) and tools/governor/sampler.mjs (the existing statusLine-to-signals precedent) before starting. T-05 does not need a live adapter wired into the real statusLine command to be complete -- T-03's sampler was deliberately left unwired for the same reason (production activation under a read-back gate this dispatch may not carry); confirm with Warwick before wiring anything into the primary checkout's live settings.",
+    "ticket": "T-05",
     "worktree": "C:/Fusion247PKA-governor",
     "branch": "build-018/session-governor",
     "read_first": [
-      "Deliverables/BUILD-018-session-governor/02-MAP.md - the live execution SSOT for architecture/decisions/fog (AD-17, corrected 2026-08-01: tickets[] is now the execution-STATE SSOT; the map is the navigation projection)",
+      "Deliverables/BUILD-018-session-governor/02-MAP.md - the live execution SSOT for architecture/decisions/fog (AD-17: tickets[] is the execution-state SSOT; the map is the navigation projection)",
       "Deliverables/BUILD-018-session-governor/01-GOAL-CONTRACT.md - the product SSOT; it wins over any ticket",
-      "tools/governor/programme-state.mjs - resolveTicket/deriveResumption/resolveTicketAndAdvance/applyTicketResolution are the ONLY sanctioned way to resolve a ticket or re-point resumption; hand-editing tickets[] or resumption.* directly is the exact dual-write failure this correction fixed",
-      "tools/governor/rotate-session.mjs - assessRotationSafety now refuses with a stale-execution-state obstacle (STALE_EXECUTION_STATE) if the map and ledger ever disagree again"
+      "tools/governor/evaluator.mjs - the T-04 verdict shape T-05 renders; pure, zero fs/git knowledge (AD-11)",
+      "tools/governor/programme-state.mjs - resolveTicket/deriveResumption/resolveTicketAndAdvance/applyTicketResolution are the ONLY sanctioned way to resolve a ticket or re-point resumption; hand-editing tickets[] or resumption.* directly is the exact dual-write failure the 2026-08-01 correction fixed"
     ],
     "do_not": [
       "Do not hand-edit tickets[].state, resumption.*, or 02-MAP.md's GOVERNOR:STATUS block directly — use resolveTicketAndAdvance / applyTicketResolution.",
       "Do not open or merge the recovery PR (recovery/2026-07-31-governor-abort-handoff at 95c265d).",
       "Do not alter local main.",
-      "Do not create the BUILD-018 PR yet - explicitly deferred by Warwick, and merge-readiness itself is not yet true (T-04/T-05/T-06/T-08/T-12 still open).",
+      "Do not create the BUILD-018 PR yet - explicitly deferred by Warwick, and merge-readiness itself is not yet true (T-06/T-08/T-12 still open).",
       "Do not modify, move or delete the six Cairn intake files under Team Knowledge/Sources/.",
       "Do not delete or clean any pre-existing worktree without first proving owner, branch, status and disposition.",
       "Do not run /close-session, and do not start the VlogOps product build.",
       "Do not re-litigate the settled decisions in 02-MAP.md section 3.",
-      "Do not read GL-012 from this working tree - it is the pre-ruling text. Use git show 95c265d."
+      "Do not read GL-012 from this working tree - it is the pre-ruling text. Use git show 95c265d.",
+      "Do not wire the sampler or a new statusLine command into the primary checkout without Warwick confirming — T-03 deliberately left this unwired for the same reason."
     ]
   },
   "locked_decisions": [
