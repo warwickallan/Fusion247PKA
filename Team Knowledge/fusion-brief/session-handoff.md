@@ -12,9 +12,9 @@ owner_intent: consumed by the next Larry session. Regenerate on every rotation; 
 
 Phase 1 (Opus architecture) is complete and settled. Phase 2 is implementing the seven components against it. T-01, T-02, T-07, T-09, T-03, T-13 and T-10 resolved earlier; this banking adds T-11, which CLOSES THE ROTATION LOOP and turns the canonical location into an enforced control. A cleared session now reorients itself automatically from banked state (pointer brief, hard 10,000-char cap), verifies its actual cwd, repository root, branch and HEAD against that state before any implementation, and is refused Write/Edit/MultiEdit/NotebookEdit and mutating Bash by a committed PreToolUse gate whenever it is in the wrong place - absolute-path luck is explicitly not a control. Both hooks are activated by a committed idempotent installer, which also reconciled the long-dangling ensure-watcher SessionStart hook. T-14 (build-session registry/launcher by name, automatic programme PR, exact-head QA binding, single merge decision) is now THE next action; T-04 (evaluator) remains independently takable.
 
-Branch `build-018/session-governor` in worktree `C:/Fusion247PKA-governor`, HEAD `c4febeaa9ebd3fa632035a906cc2d8a2143bedde` (base `ef96a3327f896e025731769c72157fd722daa02f`). Banked by Opus at 2026-07-31.
+Branch `build-018/session-governor` in worktree `C:/Fusion247PKA-governor`, HEAD `92b4d3df023017cfb80357302119838b32ac0321` (base `ef96a3327f896e025731769c72157fd722daa02f`). Banked by Opus at 2026-07-31.
 
-**Completed (8):**
+**Completed (9):**
 - **T-01** — Prove the live statusLine payload on this machine _(resolved 2026-07-31)_
 - **T-02** — Session-health store location and atomic write _(resolved 2026-07-31)_
 - **T-03** — Sampler: statusLine script to health sample _(resolved 2026-07-31)_
@@ -23,10 +23,10 @@ Branch `build-018/session-governor` in worktree `C:/Fusion247PKA-governor`, HEAD
 - **T-10** — /rotate-session: bank, verify safety, emit the /clear instruction _(resolved 2026-07-31)_
 - **T-11** — Reorientation on /clear, canonical-location verification, and the wrong-worktree deny gate _(resolved 2026-07-31)_
 - **T-13** — Programme-state collector: gather the live estate into a valid state document _(resolved 2026-07-31)_
+- **T-14** — Build-session registry/launcher by build name, automatic programme PR at merge readiness, exact-head QA binding, single merge decision _(resolved 2026-07-31)_
 
-**Frontier — takable now (2):**
+**Frontier — takable now (1):**
 - **T-04** [Opus] — Pure evaluator: evaluate(signals) to verdict
-- **T-14** [Opus] — Build-session registry/launcher by build name, automatic programme PR at merge readiness, exact-head QA binding, single merge decision
 
 **Blockers (10):**
 - **F-4** (fog, owner: research) — Are the proposed health thresholds right? Resolvable only by dogfood. _Recommendation: Ship the hypothesis thresholds, tune from T-08._
@@ -40,14 +40,14 @@ Branch `build-018/session-governor` in worktree `C:/Fusion247PKA-governor`, HEAD
 - **X-1** (external, owner: larry) — GL-012 section 6a is NOT on this branch. Reading GL-012 from this worktree returns the PRE-ruling text and will cause a settled conflict to be re-escalated. _Recommendation: Read it with: git show 95c265d:"Team Knowledge/Guidelines/GL-012-secrets-store-access-boundary.md"_
 - **X-2** (external, owner: larry) — RESOLVED 2026-07-31 by T-11. settings.local.json remains gitignored, so hook wiring still cannot travel by git - the answer is that the BEHAVIOUR travels and only the ACTIVATION touches the untracked file. tools/governor/install-hooks.mjs is committed, idempotent, reviewable and re-runnable on any machine, and ships both hooks (SessionStart reorientation + PreToolUse deny gate) in one run. _Recommendation: Every hook ticket must also ship an idempotent activation step that installs into the primary checkout’s untracked settings file._
 
-**Safe boundary:** yes — Verified by /rotate-session: 4 safety checks ran and found no obstacle. Tree clean, no unpushed commits, no live worker detected in this worktree.
+**Safe boundary:** yes — Verified by /rotate-session: 5 safety checks ran and found no obstacle. Tree clean, no unpushed commits, no live worker detected in this worktree.
 
 **Workers (2):**
 - phase-1-research-x3 — subagent, **completed**
 - t-03-t-13-implementation — subagent, **completed** (T-03)
 
 **Branches:**
-- `build-018/session-governor` (build) @ c4febeaa9ebd3fa632035a906cc2d8a2143bedde — This programme. The only branch this build may write to.
+- `build-018/session-governor` (build) @ 92b4d3df023017cfb80357302119838b32ac0321 — This programme. The only branch this build may write to.
 - `main` (protected) @ de92306911e7cbe8828d5652ed9f7f21fd99593e — Local main is at de92306, one commit ahead of origin/main and unpushed. MUST NOT be altered by this build.
 - `recovery/2026-07-31-governor-abort-handoff` (recovery) @ 95c265de729e26114b1e1eb7dc7d8630502aca1d — Carries the settled GL-012 section 6a ruling. Read-only for this build; its PR must not be opened or merged.
 
@@ -65,9 +65,9 @@ Branch `build-018/session-governor` in worktree `C:/Fusion247PKA-governor`, HEAD
 
 ## What the NEXT session is about
 
-T-11 landed: the rotation loop is CLOSED and the canonical location is now enforced, not merely documented. /clear rotates context inside the same build session; SessionStart(source=clear) finds and validates the banked state and injects a bounded pointer brief; the session's real cwd/repo-root/branch/HEAD are compared against that state; a mismatch produces a loud WRONG WORKTREE result and a committed PreToolUse gate refuses every mutating tool until it is corrected. Proven on the real estate both ways, and 223/223 governor tests pass. What is NOT yet true: Warwick still cannot simply name a build and be put in the right place, the programme PR is not created automatically, and review verdicts are not yet bound to the exact reviewed head.
+T-14 landed 2026-07-31 and is now resolved in BOTH the ledger and the map (this correction fixes a dual-write staleness incident where the map alone claimed it). The rotation half of BUILD-018 is complete. T-04 (the pure evaluator) is now the entire frontier and the sole gate on the advice half of this build.
 
-**Model recommendation: Opus** — T-14 is the next action and is Opus-tier: a registry that decides which build a session belongs to, a merge-readiness predicate that must be checkable rather than felt, and an exact-head QA binding that must fail closed are all judgement calls where a plausible-looking wrong answer is expensive and quiet. T-04 (evaluator state-space) is also Opus and independent.
+**Model recommendation: Opus** — T-04 is now the ENTIRE frontier: the pure evaluator that everything else in the advice half of this build (T-05, T-06, T-12) depends on directly, and the last outstanding dependency for T-08, the live dogfood that is this build's real acceptance test (M4).
 
 ## Locked decisions (durable — do NOT re-litigate)
 
@@ -109,27 +109,23 @@ T-11 landed: the rotation loop is CLOSED and the canonical location is now enfor
 
 **Work in `C:/Fusion247PKA-governor` on branch `build-018/session-governor`.**
 
-**THE EXACT NEXT ACTION:** Implement T-14 as Opus: (1) a human-friendly build-session registry/launcher keyed on the build NAME (a projection under AD-17, generated from banked state, never hand-authored) that puts a session in the right worktree/branch or reports precisely why it cannot - and which properly closes T-11's recorded bound that a session in a wholly unrelated repository cannot discover the estate; (2) automatic create/update of the programme PR at merge readiness, by Larry not Warwick (AD-20), idempotent, against a DEFINED checkable predicate (all in-scope tickets resolved with evidence, suite green, tree clean, local HEAD == remote head, independent review complete) - and it must never merge; (3) exact-head QA binding, keying every verdict on the full (repo, branch, canonical SHA) tuple, canonicalised once at the boundary, marking a verdict SUPERSEDED when the head moves and failing closed on an unknown head; (4) present Warwick only the final merge decision. Read tickets/T-14-build-session-registry-and-merge-flow.md for the full specification and the out-of-scope list. Do NOT change the T-11 gate semantics (AD-18/AD-19). T-04 (pure evaluator, Opus) is independently takable if T-14 is deferred. (ticket T-14)
+**THE EXACT NEXT ACTION:** Implement T-04, the pure evaluator: evaluate(signals) -> verdict, covering all five states (GREEN/AMBER/RED/RECOVERY/BLIND), each with its own distinct exit code, and the missing-field semantics the map already settled (an ABSENT field is unknown, never 0 — a threshold over an unknown input contributes a BLIND reason instead of firing). AD-11: the evaluator core must be PURE — zero filesystem, git or myPKA knowledge; adapters gather signals separately, so the core is unit-testable without an estate and portable to Project ManagAIr later. Mutation test named by the map (T-09 row): delete the state file -> assert BLIND, never GREEN (INV-1); assert a non-zero count of signals actually examined (INV-5). Read 02-MAP.md section 4 (the proposed health model and its hypothesis thresholds, F-4 — ship them, tune from dogfood, do not re-derive them from scratch) and the T-04 row in section 9 before starting. T-04 unlocks T-05, T-06 and T-12 directly, and is the last outstanding dependency for T-08 — the live dogfood rotation that is this build's REAL acceptance test (M4). (ticket T-04)
 
 **Read first:**
-- Deliverables/BUILD-018-session-governor/02-MAP.md - the live execution SSOT: architecture, settled decisions (now AD-1..AD-21), fog, frontier, write-back log
-- Deliverables/BUILD-018-session-governor/01-GOAL-CONTRACT.md - the product SSOT: the outcome and the 7 invariants; it wins over any ticket (AD-17)
-- Deliverables/BUILD-018-session-governor/tickets/T-14-build-session-registry-and-merge-flow.md - the full T-14 specification, including what is deliberately out of scope
-- tools/governor/worktree-guard.mjs - the shared location comparison AND the PreToolUse gate; AD-18/AD-19 live here, do not change their semantics
-- tools/governor/reorient.mjs - the SessionStart brief; it consumes the same comparison, which is why the two can never disagree
-- tools/governor/install-hooks.mjs - how both hooks are activated idempotently; re-run it from the primary checkout after BUILD-018 merges to re-point the commands
+- Deliverables/BUILD-018-session-governor/02-MAP.md - the live execution SSOT for architecture/decisions/fog (AD-17, corrected 2026-08-01: tickets[] is now the execution-STATE SSOT; the map is the navigation projection)
+- Deliverables/BUILD-018-session-governor/01-GOAL-CONTRACT.md - the product SSOT; it wins over any ticket
+- tools/governor/programme-state.mjs - resolveTicket/deriveResumption/resolveTicketAndAdvance/applyTicketResolution are the ONLY sanctioned way to resolve a ticket or re-point resumption; hand-editing tickets[] or resumption.* directly is the exact dual-write failure this correction fixed
+- tools/governor/rotate-session.mjs - assessRotationSafety now refuses with a stale-execution-state obstacle (STALE_EXECUTION_STATE) if the map and ledger ever disagree again
 
 **Do NOT:**
+- Do not hand-edit tickets[].state, resumption.*, or 02-MAP.md's GOVERNOR:STATUS block directly — use resolveTicketAndAdvance / applyTicketResolution.
 - Do not open or merge the recovery PR (recovery/2026-07-31-governor-abort-handoff at 95c265d).
 - Do not alter local main.
-- Do not create the BUILD-018 PR yet - it was explicitly deferred by Warwick on 2026-07-31.
+- Do not create the BUILD-018 PR yet - explicitly deferred by Warwick, and merge-readiness itself is not yet true (T-04/T-05/T-06/T-08/T-12 still open).
 - Do not modify, move or delete the six Cairn intake files under Team Knowledge/Sources/.
 - Do not delete or clean any pre-existing worktree without first proving owner, branch, status and disposition.
 - Do not run /close-session, and do not start the VlogOps product build.
 - Do not re-litigate the settled decisions in 02-MAP.md section 3.
 - Do not read GL-012 from this working tree - it is the pre-ruling text. Use git show 95c265d.
-- Do not naively compare banked.head_sha against live HEAD without excluding the banking commit itself (AD-14).
-- Do not change the deny-gate semantics settled in AD-18 and AD-19 while implementing T-14.
-- Do not ask Warwick to run git commands, choose a branch, or manage a worktree - Larry owns the whole git lifecycle (AD-20).
 
 _This handoff is derived. 3 field(s) were not established at banking — see above._
