@@ -282,13 +282,13 @@
     },
     {
       "id": "T-17",
-      "title": "Mechanical escalation gate — refuse a Warwick escalation that a safe no-action default already resolves",
+      "title": "Git-lifecycle escalation gate — refuse an escalation offering Warwick a decision AD-20 assigns to Larry",
       "state": "frontier",
       "model": "Opus",
       "depends_on": [],
       "resolved": null,
       "evidence": [],
-      "note": "Added mid-programme after Warwick caught this session escalating a COSMETIC commit-metadata typo (a stray @ in a subject line) via AskUserQuestion, offering a force-push/history-rewrite to fix it. Ruled an acceptance failure: a harmless no-action option preserved correctness, so it was never a Warwick decision, and asking manufactured a pause. See D-4 and AD-26. The control must govern AskUserQuestion as well as ordinary stopping — Warwick's explicit reasoning: a Stop hook alone is insufficient if Larry can manufacture a pause by asking an unnecessary question. Not yet implemented."
+      "note": "Added mid-programme after Warwick ruled a cosmetic-typo escalation an acceptance failure (D-4, AD-26). RE-SCOPED at Keel's CLARIFY read-back (WO-2026-07-31-03, amended): the original framing asked the gate to decide whether a defect was 'cosmetic', which Keel correctly identified as semantic in disguise — there is no enumerable signal for it, and a caller-supplied field asserting it would be self-attestation by the very actor who wants to escalate (a hope, not a control, in delegation-gate.mjs's own words). Re-grounded on AD-20 instead: the git lifecycle is Larry's, never Warwick's, so offering Warwick a force-push/history-rewrite choice is categorically wrong REGARDLESS of whether the defect behind it is cosmetic — no judgement step remains. NARROWNESS ACCEPTED KNOWINGLY, per Keel's honest answer to a direct question: this is a point-fix for one mechanically-detectable shape, NOT general AD-26 enforcement. AD-26's other categories (typos, wording, formatting, naming, ticket boundaries, completed workers, ordinary routing) have no enumerable signal, remain UNENFORCED, and still depend on Larry observing AD-26 unaided — the ticket requires that limit be stated in the module header and evidence doc rather than implied away."
     }
   ],
   "blockers": [
