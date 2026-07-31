@@ -283,12 +283,27 @@
     {
       "id": "T-17",
       "title": "Git-lifecycle escalation gate — refuse an escalation offering Warwick a decision AD-20 assigns to Larry",
-      "state": "frontier",
+      "state": "resolved",
       "model": "Opus",
+      "depends_on": [],
+      "resolved": "2026-08-01",
+      "evidence": [
+        "tools/governor/escalation-gate.mjs",
+        "tools/governor/escalation-gate.test.mjs",
+        "Deliverables/BUILD-018-session-governor/evidence/T-17-escalation-gate.md",
+        "Deliverables/BUILD-018-session-governor/tickets/T-17-escalation-gate-work-order.md"
+      ],
+      "note": "Built by Keel under WO-2026-07-31-03, which was AMENDED mid-flight after Keel returned CLARIFY (not ACCEPT) and was right twice: 'is the defect cosmetic' has no mechanical signal, and a caller-supplied field asserting it is self-attestation by the very actor who wants to escalate. Re-grounded on AD-20 - the git lifecycle is Larry's, never Warwick's - which removes the judgement step entirely. 60 new tests, 588/588 suite-wide. INDEPENDENTLY VERIFIED BY LARRY BY ADVERSARIAL PROBE, not by re-reading the builder's tests: the REAL D-4 question shape (verbatim options, 'Leave it' vs 'Amend + force-push') classified REFUSED citing AD-20, with no cosmetic input supplied; three genuinely-warranted escalations (merge decision, spend, irreversible live action) all ALLOWED, never wrongly blocked; five malformed inputs (null/undefined/string/empty-object/number) all UNCLASSIFIABLE, none threw, none refused; the closed-enum escape hatch cleared the refusal for 'unsafe-repository-state' while an arbitrary string ('because I said so') did NOT - the hatch cannot be talked past. worktree-guard.mjs and delegation-gate.mjs byte-unmodified (git diff empty, 27/27 and 60/60). Secret scan re-run: exit 0, 3/3 declared files. COVERAGE STATED HONESTLY AND REQUIRED BY AC6: this detects ONE mechanically-decidable shape and does NOT enforce AD-26 generally - typos, wording, formatting, naming, ticket boundaries, completed workers and ordinary routing have no enumerable signal and remain UNENFORCED, still resting on Larry observing AD-26 unaided. Narrowness accepted knowingly after Keel answered a direct question about it plainly. NOT ACTIVATED: install-hooks.mjs untouched, so the gate has no live effect until a separately-authorised activation step; the unproven AskUserQuestion PreToolUse payload shape is recorded as fog for that step. Larry's verification of this ticket is ALSO what surfaced D-5, a real measured concurrency defect pre-existing in T-02/T-16, which is not a defect in T-17."
+    },
+    {
+      "id": "T-18",
+      "title": "Windows-safe atomic write: retry the rename, and never orphan a temp file",
+      "state": "frontier",
+      "model": "Sonnet",
       "depends_on": [],
       "resolved": null,
       "evidence": [],
-      "note": "Added mid-programme after Warwick ruled a cosmetic-typo escalation an acceptance failure (D-4, AD-26). RE-SCOPED at Keel's CLARIFY read-back (WO-2026-07-31-03, amended): the original framing asked the gate to decide whether a defect was 'cosmetic', which Keel correctly identified as semantic in disguise — there is no enumerable signal for it, and a caller-supplied field asserting it would be self-attestation by the very actor who wants to escalate (a hope, not a control, in delegation-gate.mjs's own words). Re-grounded on AD-20 instead: the git lifecycle is Larry's, never Warwick's, so offering Warwick a force-push/history-rewrite choice is categorically wrong REGARDLESS of whether the defect behind it is cosmetic — no judgement step remains. NARROWNESS ACCEPTED KNOWINGLY, per Keel's honest answer to a direct question: this is a point-fix for one mechanically-detectable shape, NOT general AD-26 enforcement. AD-26's other categories (typos, wording, formatting, naming, ticket boundaries, completed workers, ordinary routing) have no enumerable signal, remain UNENFORCED, and still depend on Larry observing AD-26 unaided — the ticket requires that limit be stated in the module header and evidence doc rather than implied away."
+      "note": "Found by Larry's independent verification of T-17 (2026-08-01), NOT by the ticket's own tests. See D-5. Fixes a SHARED defect in health-store.mjs (T-02) and delegation-gate.mjs (T-16): both do writeFileSync(tmp) then renameSync(tmp, target) with no retry, and on Windows a rename onto an existing target throws EPERM when another process holds it. MEASURED: health-store 21/48 writer processes failed under 16 concurrent processes; delegation-gate's own concurrency test fails roughly 2 runs in 5 in isolation. Secondary defect: every failed rename ORPHANS its temp file permanently (21 observed, cleaned by hand). Scope: bounded retry with backoff on EPERM/EBUSY/EACCES, temp-file cleanup in a finally, and a concurrency proof that asserts a NON-ZERO success count rather than only the absence of tearing."
     }
   ],
   "blockers": [
@@ -415,12 +430,22 @@
       "owner": "larry",
       "blocks": [],
       "recommendation": "Implement T-17, the mechanical escalation gate, per AD-26. The rule: when a harmless no-action option preserves correctness and avoids additional risk, take it automatically. Never escalate typos, wording, formatting, naming, cosmetic metadata, ticket boundaries, completed workers, or ordinary routing choices; never offer a force-push or history rewrite merely to improve cosmetic metadata. Escalate ONLY for a genuine product decision, material scope change, unavoidable permission, spend, irreversible live action, unsafe repository state, or the final merge decision. The gate must cover AskUserQuestion, not only ordinary stopping."
+    },
+    {
+      "id": "D-5",
+      "kind": "defect",
+      "summary": "The estate's atomic-write primitive is not concurrency-safe on Windows, and T-02's evidence overstates what it proved. health-store.mjs (T-02) and delegation-gate.mjs (T-16) both write a unique temp file then renameSync onto the target with NO retry. On Windows that rename throws EPERM when another process holds the target. MEASURED by Larry on 2026-08-01, not inferred: health-store failed 21 of 48 writer processes under 16 concurrent processes (44%); delegation-gate's own CONCURRENCY test (N concurrent appender processes never produce a torn or corrupt ledger file) fails roughly 2 runs in 5 when run in isolation - the builder reported it as a one-off flake, but it reproduces. T-02's note cites a 12-process concurrent-write mutation test as proof; what that test actually established is that the file is never TORN (true - rename is all-or-nothing), NOT that concurrent writers succeed. They frequently do not. This is the state-what-was-PROVEN-not-what-it-implies failure mode, and the full-suite green (588/588) hides it because the failure is probabilistic and the suite happened to pass. SECONDARY: a failed rename orphans its temp file permanently - 21 accumulated in the real health store during the probe and had to be removed by hand.",
+      "owner": "larry",
+      "blocks": [
+        "T-18"
+      ],
+      "recommendation": "Fix in T-18: bounded retry with backoff on EPERM/EBUSY/EACCES around the rename, temp-file cleanup in a finally so a failure never orphans, applied to the ONE shared primitive rather than copy-pasted into two modules. The concurrency proof must assert a non-zero SUCCESS count, not merely the absence of tearing - a test that passes when every writer fails is the exact vacuous-green shape AD-24 already refuses elsewhere. DIRECTION OF HARM IS SAFE BUT NOT NIL, and this is why it is a defect rather than a curiosity: a lost health sample degrades to BLIND/stale (AD-3, safe) and a lost delegation checkpoint undercounts toward a MISSED deny (discipline gate, bounded) - but T-03's sampler is intended to run on EVERY assistant message from the live statusLine, which is precisely the high-concurrency path this primitive fails on, so the real-world hit rate rises sharply the moment that wiring is activated."
     }
   ],
   "model_recommendation": {
-    "model": "Opus",
+    "model": "Sonnet",
     "effort": null,
-    "rationale": "T-17 is the standing correction to a defect Warwick raised directly and asked to be made durable; it precedes the ordinary frontier. Opus-tier because the refuse-or-allow predicate is a genuine judgement-design problem with a known false-positive hazard (over-blocking legitimate escalation), the same class that made T-16 Opus."
+    "rationale": "T-18 fixes a MEASURED correctness defect (D-5) in already-landed code that the full suite's green hides because the failure is probabilistic. Sonnet-tier: the fix is well-understood (retry plus cleanup) and the judgement was already done in the diagnosis. It precedes T-12 because T-12 would otherwise extract the broken primitive into the portability boundary."
   },
   "workers": [
     {
@@ -737,9 +762,9 @@
     "verified_at": "2026-07-31"
   },
   "resumption": {
-    "focus": "Warwick ruled Larry's escalation of a cosmetic commit-metadata typo an ACCEPTANCE FAILURE (D-4) and required the durable control, not a one-off correction: AD-26 is now a locked decision and T-17 implements it mechanically. The pushed commit a570b73 stays exactly as it is — explicitly not to be reopened or rewritten. T-05 landed and is verified. Ordinary frontier behind T-17 is T-06/T-08/T-12.",
-    "next_action": "Implement T-17, the mechanical escalation gate, per AD-26 and D-4. Refuse/flag an escalation that a safe no-action default already resolves, covering the ASK surface (AskUserQuestion) and not only ordinary stopping. Follow T-16's delegation-gate precedent: compose additively onto the existing PreToolUse pattern in worktree-guard.mjs, do NOT modify worktree-guard.mjs itself, and FAIL OPEN on any internal gate error — this is a discipline gate, not a safety-critical one, and a gate that blocks a legitimate escalation is a worse defect than one that misses a needless question (the AD-6/INV-2 posture). The hard design problem, to be named honestly as fog rather than guessed past: classifying 'cosmetic/safely-defaultable' vs 'genuine product decision' from a question's text is the same class of judgement problem as T-16's deferred domain-matching — prefer a mechanical, enumerable signal over a semantic one, and where no mechanical signal exists, ALLOW and record rather than block. This is a Keel-domain ticket (tools/governor/**): route it through a proper Work Order (Team Knowledge/Templates/work-order.md, SOP-022) with a read-back gate, exactly as T-16 and T-05 were.",
-    "ticket": "T-17",
+    "focus": "T-17 landed and was independently verified by adversarial probe. That verification surfaced D-5: health-store.mjs (T-02) and delegation-gate.mjs (T-16) share an atomic-write primitive that is NOT concurrency-safe on Windows - measured at 21/48 writer processes failing under 16-way concurrency, with orphaned temp files as a secondary leak. T-18 is registered to fix it and is the next action, ahead of T-12.",
+    "next_action": "Implement T-18 (see D-5): make the estate's atomic write concurrency-safe on Windows. Bounded retry with backoff on EPERM/EBUSY/EACCES around the rename, temp-file cleanup in a finally so no failure orphans a file, and fix the ONE shared primitive rather than patching two modules independently. The concurrency proof MUST assert a non-zero success count, not merely the absence of tearing. Keel-domain (tools/governor/**): route via a proper Work Order with a read-back gate. Take T-18 before T-12: T-12 extracts the portability adapter over these very modules, and extracting a known-broken primitive would copy the defect into the adapter boundary.",
+    "ticket": "T-18",
     "worktree": "C:/Fusion247PKA-governor",
     "branch": "build-018/session-governor",
     "read_first": [
