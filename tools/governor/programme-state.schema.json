@@ -240,7 +240,7 @@
             "properties": {
               "kind": {
                 "type": "string",
-                "enum": ["dirty-tree", "unpushed-commits", "live-worker", "split-item", "unreadable", "other"]
+                "enum": ["dirty-tree", "unpushed-commits", "live-worker", "split-item", "unreadable", "stale-execution-state", "other"]
               },
               "detail": { "type": "string", "minLength": 1 }
             }

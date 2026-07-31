@@ -222,17 +222,25 @@
     {
       "id": "T-14",
       "title": "Build-session registry/launcher by build name, automatic programme PR at merge readiness, exact-head QA binding, single merge decision",
-      "state": "frontier",
+      "state": "resolved",
       "model": "Opus",
       "depends_on": [
         "T-10",
         "T-11"
       ],
-      "resolved": null,
+      "resolved": "2026-07-31",
       "evidence": [
-        "Deliverables/BUILD-018-session-governor/tickets/T-14-build-session-registry-and-merge-flow.md"
+        "tools/governor/build-registry.mjs + build-registry.test.mjs (25 tests)",
+        "tools/governor/qa-binding.mjs + qa-binding.test.mjs (38 tests)",
+        "tools/governor/merge-readiness.mjs + merge-readiness.test.mjs (35 tests)",
+        "tools/governor/programme-pr.mjs + programme-pr.test.mjs (35 tests)",
+        ".claude/commands/build.md",
+        "Deliverables/BUILD-018-session-governor/T-14-CONTRACT.md (frozen interface + 9 read-back amendments)",
+        "commit c4febeaa9ebd3fa632035a906cc2d8a2143bedde — \"BUILD-018 T-14: a build that runs itself, and an index that cannot lie\" (pushed, local==remote at time of commit)",
+        "suite: 356/356 governor tests passing at integration (133 new)",
+        "live proof: resolveBuild('governor') resolved correctly from C:\\, outside any git repository"
       ],
-      "note": "Specified by T-11, deliberately NOT implemented inside it. Four deliverables: (1) a registry/launcher keyed on the build NAME so Warwick names a build and nothing else; (2) Larry creates/updates the programme PR at merge readiness, idempotently, against a defined checkable predicate - never merges; (3) every QA verdict bound to the exact reviewed (repo, branch, SHA) and marked superseded when the head moves; (4) Warwick sees only the final merge decision. Also the proper home for T-11's recorded --estate discovery bound."
+      "note": "AD-22..AD-25 recorded. Three bounds left open, not counted as closed: T-11 foreign-cwd bound only half-closed; head-pushed reads a remote-tracking ref nothing here refreshes; registry only sees builds that have banked state."
     }
   ],
   "blockers": [
@@ -332,7 +340,7 @@
   "model_recommendation": {
     "model": "Opus",
     "effort": null,
-    "rationale": "T-14 is the next action and is Opus-tier: a registry that decides which build a session belongs to, a merge-readiness predicate that must be checkable rather than felt, and an exact-head QA binding that must fail closed are all judgement calls where a plausible-looking wrong answer is expensive and quiet. T-04 (evaluator state-space) is also Opus and independent."
+    "rationale": "T-04 is now the ENTIRE frontier: the pure evaluator that everything else in the advice half of this build (T-05, T-06, T-12) depends on directly, and the last outstanding dependency for T-08, the live dogfood that is this build's real acceptance test (M4)."
   },
   "workers": [
     {
@@ -677,31 +685,27 @@
     "verified_at": "2026-07-31"
   },
   "resumption": {
-    "focus": "T-11 landed: the rotation loop is CLOSED and the canonical location is now enforced, not merely documented. /clear rotates context inside the same build session; SessionStart(source=clear) finds and validates the banked state and injects a bounded pointer brief; the session's real cwd/repo-root/branch/HEAD are compared against that state; a mismatch produces a loud WRONG WORKTREE result and a committed PreToolUse gate refuses every mutating tool until it is corrected. Proven on the real estate both ways, and 223/223 governor tests pass. What is NOT yet true: Warwick still cannot simply name a build and be put in the right place, the programme PR is not created automatically, and review verdicts are not yet bound to the exact reviewed head.",
-    "next_action": "Implement T-14 as Opus: (1) a human-friendly build-session registry/launcher keyed on the build NAME (a projection under AD-17, generated from banked state, never hand-authored) that puts a session in the right worktree/branch or reports precisely why it cannot - and which properly closes T-11's recorded bound that a session in a wholly unrelated repository cannot discover the estate; (2) automatic create/update of the programme PR at merge readiness, by Larry not Warwick (AD-20), idempotent, against a DEFINED checkable predicate (all in-scope tickets resolved with evidence, suite green, tree clean, local HEAD == remote head, independent review complete) - and it must never merge; (3) exact-head QA binding, keying every verdict on the full (repo, branch, canonical SHA) tuple, canonicalised once at the boundary, marking a verdict SUPERSEDED when the head moves and failing closed on an unknown head; (4) present Warwick only the final merge decision. Read tickets/T-14-build-session-registry-and-merge-flow.md for the full specification and the out-of-scope list. Do NOT change the T-11 gate semantics (AD-18/AD-19). T-04 (pure evaluator, Opus) is independently takable if T-14 is deferred.",
-    "ticket": "T-14",
+    "focus": "T-14 landed 2026-07-31 and is now resolved in BOTH the ledger and the map (this correction fixes a dual-write staleness incident where the map alone claimed it). The rotation half of BUILD-018 is complete. T-04 (the pure evaluator) is now the entire frontier and the sole gate on the advice half of this build.",
+    "next_action": "Implement T-04, the pure evaluator: evaluate(signals) -> verdict, covering all five states (GREEN/AMBER/RED/RECOVERY/BLIND), each with its own distinct exit code, and the missing-field semantics the map already settled (an ABSENT field is unknown, never 0 — a threshold over an unknown input contributes a BLIND reason instead of firing). AD-11: the evaluator core must be PURE — zero filesystem, git or myPKA knowledge; adapters gather signals separately, so the core is unit-testable without an estate and portable to Project ManagAIr later. Mutation test named by the map (T-09 row): delete the state file -> assert BLIND, never GREEN (INV-1); assert a non-zero count of signals actually examined (INV-5). Read 02-MAP.md section 4 (the proposed health model and its hypothesis thresholds, F-4 — ship them, tune from dogfood, do not re-derive them from scratch) and the T-04 row in section 9 before starting. T-04 unlocks T-05, T-06 and T-12 directly, and is the last outstanding dependency for T-08 — the live dogfood rotation that is this build's REAL acceptance test (M4).",
+    "ticket": "T-04",
     "worktree": "C:/Fusion247PKA-governor",
     "branch": "build-018/session-governor",
     "read_first": [
-      "Deliverables/BUILD-018-session-governor/02-MAP.md - the live execution SSOT: architecture, settled decisions (now AD-1..AD-21), fog, frontier, write-back log",
-      "Deliverables/BUILD-018-session-governor/01-GOAL-CONTRACT.md - the product SSOT: the outcome and the 7 invariants; it wins over any ticket (AD-17)",
-      "Deliverables/BUILD-018-session-governor/tickets/T-14-build-session-registry-and-merge-flow.md - the full T-14 specification, including what is deliberately out of scope",
-      "tools/governor/worktree-guard.mjs - the shared location comparison AND the PreToolUse gate; AD-18/AD-19 live here, do not change their semantics",
-      "tools/governor/reorient.mjs - the SessionStart brief; it consumes the same comparison, which is why the two can never disagree",
-      "tools/governor/install-hooks.mjs - how both hooks are activated idempotently; re-run it from the primary checkout after BUILD-018 merges to re-point the commands"
+      "Deliverables/BUILD-018-session-governor/02-MAP.md - the live execution SSOT for architecture/decisions/fog (AD-17, corrected 2026-08-01: tickets[] is now the execution-STATE SSOT; the map is the navigation projection)",
+      "Deliverables/BUILD-018-session-governor/01-GOAL-CONTRACT.md - the product SSOT; it wins over any ticket",
+      "tools/governor/programme-state.mjs - resolveTicket/deriveResumption/resolveTicketAndAdvance/applyTicketResolution are the ONLY sanctioned way to resolve a ticket or re-point resumption; hand-editing tickets[] or resumption.* directly is the exact dual-write failure this correction fixed",
+      "tools/governor/rotate-session.mjs - assessRotationSafety now refuses with a stale-execution-state obstacle (STALE_EXECUTION_STATE) if the map and ledger ever disagree again"
     ],
     "do_not": [
+      "Do not hand-edit tickets[].state, resumption.*, or 02-MAP.md's GOVERNOR:STATUS block directly — use resolveTicketAndAdvance / applyTicketResolution.",
       "Do not open or merge the recovery PR (recovery/2026-07-31-governor-abort-handoff at 95c265d).",
       "Do not alter local main.",
-      "Do not create the BUILD-018 PR yet - it was explicitly deferred by Warwick on 2026-07-31.",
+      "Do not create the BUILD-018 PR yet - explicitly deferred by Warwick, and merge-readiness itself is not yet true (T-04/T-05/T-06/T-08/T-12 still open).",
       "Do not modify, move or delete the six Cairn intake files under Team Knowledge/Sources/.",
       "Do not delete or clean any pre-existing worktree without first proving owner, branch, status and disposition.",
       "Do not run /close-session, and do not start the VlogOps product build.",
       "Do not re-litigate the settled decisions in 02-MAP.md section 3.",
-      "Do not read GL-012 from this working tree - it is the pre-ruling text. Use git show 95c265d.",
-      "Do not naively compare banked.head_sha against live HEAD without excluding the banking commit itself (AD-14).",
-      "Do not change the deny-gate semantics settled in AD-18 and AD-19 while implementing T-14.",
-      "Do not ask Warwick to run git commands, choose a branch, or manage a worktree - Larry owns the whole git lifecycle (AD-20)."
+      "Do not read GL-012 from this working tree - it is the pre-ruling text. Use git show 95c265d."
     ]
   },
   "locked_decisions": [

@@ -25,6 +25,15 @@ import {
   sessionHandoffPath,
   HANDOFF_SECTIONS,
   COLLECTION_FIELDS,
+  resolveTicket,
+  deriveResumption,
+  resolveTicketAndAdvance,
+  MAP_STATUS_MARKERS,
+  renderMapStatusBlock,
+  updateMapStatusBlock,
+  extractMapTicketMarkers,
+  checkExecutionProjectionAgreement,
+  applyTicketResolution,
 } from './programme-state.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -536,4 +545,277 @@ test('the real repository still has the handoff file this renderer targets', () 
   // becomes "create a rival file". Catch that here rather than at rotation time.
   const repoRoot = join(__dirname, '..', '..');
   assert.ok(existsSync(sessionHandoffPath(repoRoot)), 'session-handoff.md is missing — AD-12 target moved');
+});
+
+// ---------------------------------------------------------------------------
+// resolveTicket / deriveResumption / resolveTicketAndAdvance — THE canonical
+// write-back (fix for the 2026-07-31 T-14 incident: a ticket resolved in the
+// map's narrative but never in tickets[], so the next rotation banked a
+// resumption pointer that contradicted work already done).
+// ---------------------------------------------------------------------------
+
+test('resolveTicket: marks the ticket resolved, attaches evidence and date, leaves siblings untouched', () => {
+  const next = resolveTicket(base(), { id: 'T-02', resolvedDate: '2026-02-01', evidence: ['ev/T-02.md'] });
+  const t02 = next.tickets.find((t) => t.id === 'T-02');
+  assert.equal(t02.state, 'resolved');
+  assert.equal(t02.resolved, '2026-02-01');
+  assert.deepEqual(t02.evidence, ['ev/T-02.md']);
+  assert.equal(next.tickets.find((t) => t.id === 'T-01').state, 'resolved', 'T-01 was already resolved and must stay so');
+});
+
+test('resolveTicket: promotes a newly-unblocked sibling from blocked to frontier (T-03 depends on T-02)', () => {
+  const next = resolveTicket(base(), { id: 'T-02', resolvedDate: '2026-02-01', evidence: ['ev/T-02.md'] });
+  assert.equal(next.tickets.find((t) => t.id === 'T-03').state, 'frontier');
+});
+
+test('MUTATION: resolveTicket refuses an unknown ticket id', () => {
+  assert.throws(() => resolveTicket(base(), { id: 'T-999', resolvedDate: '2026-02-01', evidence: ['x'] }), /no ticket "T-999"/);
+});
+
+test('MUTATION: resolveTicket refuses empty evidence — a resolution with no evidence is the exact AD-24 defect, one layer earlier', () => {
+  assert.throws(() => resolveTicket(base(), { id: 'T-02', resolvedDate: '2026-02-01', evidence: [] }), /evidence must be a non-empty array/);
+  assert.throws(() => resolveTicket(base(), { id: 'T-02', resolvedDate: '2026-02-01' }), /evidence must be a non-empty array/);
+});
+
+test('MUTATION: resolveTicket refuses a missing resolvedDate', () => {
+  assert.throws(() => resolveTicket(base(), { id: 'T-02', evidence: ['x'] }), /resolvedDate is required/);
+});
+
+test('deriveResumption: a single frontier ticket is auto-selected, no override needed', () => {
+  const resolved = resolveTicket(base(), { id: 'T-02', resolvedDate: '2026-02-01', evidence: ['ev/T-02.md'] });
+  // T-03 is now the sole frontier ticket (T-02 resolved, its only dependency).
+  const next = deriveResumption(resolved, {});
+  assert.equal(next.resumption.ticket, 'T-03');
+  assert.equal(next.model_recommendation.model, 'Opus'); // T-03's own model in the fixture
+});
+
+test('MUTATION: deriveResumption refuses an explicit override that is not actually on the computed frontier', () => {
+  assert.throws(
+    () => deriveResumption(base(), { nextTicket: 'T-03' }), // T-03 is still blocked in the base fixture
+    /is NOT on the computed frontier/
+  );
+});
+
+test('MUTATION: deriveResumption refuses to guess among MULTIPLE frontier tickets — a judgement call, not automatable', () => {
+  const state = base();
+  // Make T-03 independently takable too, so there are two frontier tickets at once.
+  state.tickets = state.tickets.map((t) => (t.id === 'T-03' ? { ...t, depends_on: [] } : t));
+  assert.throws(() => deriveResumption(state, {}), /judgement call this function will not fake-automate/);
+  // An explicit override among the two DOES work:
+  const next = deriveResumption(state, { nextTicket: 'T-02', nextActionText: 'do T-02', model: 'Sonnet' });
+  assert.equal(next.resumption.ticket, 'T-02');
+});
+
+test('deriveResumption: an exhausted frontier (0 tickets) names no ticket and says so', () => {
+  const state = base();
+  state.tickets = state.tickets.map((t) => ({ ...t, state: 'resolved', resolved: '2026-01-01', evidence: ['x'] }));
+  const next = deriveResumption(state, {});
+  assert.equal(next.resumption.ticket, null);
+  assert.match(next.resumption.next_action, /No ticket is currently on the frontier/);
+});
+
+test('resolveTicketAndAdvance: the one bounded atomic function — resolves, advances resumption, validates', () => {
+  const { state: next, examined } = resolveTicketAndAdvance(base(), {
+    resolve: { id: 'T-02', resolvedDate: '2026-02-01', evidence: ['ev/T-02.md'] },
+    resumption: {},
+  });
+  assert.ok(examined > 0);
+  assert.equal(validateProgrammeState(next).ok, true, 'the result must itself be bankable');
+  assert.equal(next.resumption.ticket, 'T-03');
+  assert.equal(completedTickets(next).map((t) => t.id).sort().join(','), 'T-01,T-02');
+  assert.equal(frontierTickets(next).map((t) => t.id).join(','), 'T-03');
+});
+
+test('MUTATION: resolveTicketAndAdvance refuses (throws) rather than returning an unbankable document', () => {
+  // Resolve T-02 but then override resumption onto a ticket NOT on the (now-recomputed) frontier.
+  assert.throws(
+    () => resolveTicketAndAdvance(base(), {
+      resolve: { id: 'T-02', resolvedDate: '2026-02-01', evidence: ['ev/T-02.md'] },
+      resumption: { nextTicket: 'T-01' }, // already resolved, never frontier
+    }),
+    /NOT on the computed frontier/
+  );
+});
+
+// ---------------------------------------------------------------------------
+// The generated map status block
+// ---------------------------------------------------------------------------
+
+test('renderMapStatusBlock: names phase, completed, frontier and resumption from the document alone', () => {
+  const block = renderMapStatusBlock(base());
+  assert.match(block, /Completed \(1\):\*\* T-01/);
+  assert.match(block, /Frontier — takable now \(1\):\*\* T-02 \[Sonnet\]/);
+  assert.match(block, /Resumption:\*\*\s*T-02/);
+});
+
+test('updateMapStatusBlock: replaces exactly the marked region, leaving the rest of the map untouched', () => {
+  const mapText = [
+    '# Map', '', 'before text stays', '',
+    MAP_STATUS_MARKERS.begin, 'stale content', MAP_STATUS_MARKERS.end,
+    '', 'after text stays',
+  ].join('\n');
+  const updated = updateMapStatusBlock(mapText, base());
+  assert.match(updated, /before text stays/);
+  assert.match(updated, /after text stays/);
+  assert.doesNotMatch(updated, /stale content/);
+  assert.match(updated, /Frontier — takable now \(1\):\*\* T-02/);
+});
+
+test('MUTATION: updateMapStatusBlock refuses to guess when the markers are missing, rather than inserting the block somewhere arbitrary', () => {
+  assert.throws(() => updateMapStatusBlock('# a map with no markers at all', base()), /markers not found/);
+});
+
+test('MUTATION: updateMapStatusBlock refuses when the markers are present but out of order', () => {
+  const backwards = `${MAP_STATUS_MARKERS.end}\nstuff\n${MAP_STATUS_MARKERS.begin}`;
+  assert.throws(() => updateMapStatusBlock(backwards, base()), /markers not found \(or out of order\)/);
+});
+
+// ---------------------------------------------------------------------------
+// checkExecutionProjectionAgreement — the STALE_EXECUTION_STATE check itself
+// ---------------------------------------------------------------------------
+
+test('extractMapTicketMarkers: reads the ~~title~~ **RESOLVED** convention, and only that convention', () => {
+  const text = [
+    '| **T-01** | ~~**First**~~ **RESOLVED 2026-01-01.** |',
+    '| **T-02** | **Second** — frontier |',
+  ].join('\n');
+  const markers = extractMapTicketMarkers(text);
+  assert.equal(markers.get('T-01'), 'resolved');
+  assert.equal(markers.get('T-02'), 'not-resolved');
+  assert.equal(markers.has('T-03'), false);
+});
+
+test('extractMapTicketMarkers: the FIRST row for a ticket id wins over a later duplicate', () => {
+  const text = [
+    '| **T-01** | ~~**First**~~ **RESOLVED 2026-01-01.** |',
+    '| **T-01** | **duplicate row, should never happen, must not override** |',
+  ].join('\n');
+  assert.equal(extractMapTicketMarkers(text).get('T-01'), 'resolved');
+});
+
+test('checkExecutionProjectionAgreement: agreement on every ticket in the table', () => {
+  const text = [
+    '| **T-01** | ~~**t**~~ **RESOLVED 2026-01-01.** |',
+    '| **T-02** | **t** — frontier |',
+    '| **T-03** | **t** |',
+  ].join('\n');
+  const r = checkExecutionProjectionAgreement(base(), text);
+  assert.equal(r.ok, true);
+  assert.equal(r.disagreements.length, 0);
+  assert.ok(r.checked > 0, 'INV-5: must assert a non-zero count of tickets actually compared');
+});
+
+test('MUTATION (THE T-14 INCIDENT): map claims a ticket resolved that the ledger still calls frontier', () => {
+  const text = [
+    '| **T-01** | ~~**t**~~ **RESOLVED 2026-01-01.** |',
+    '| **T-02** | ~~**t**~~ **RESOLVED 2026-08-01.** |', // map says resolved; ledger's T-02 is 'frontier'
+    '| **T-03** | **t** |',
+  ].join('\n');
+  const r = checkExecutionProjectionAgreement(base(), text);
+  assert.equal(r.ok, false);
+  assert.deepEqual(r.disagreements, [{ id: 'T-02', mapClaims: 'resolved', ledgerClaims: 'frontier' }]);
+});
+
+test('MUTATION (reverse direction): ledger says resolved, map row shows no resolved marker', () => {
+  const text = [
+    '| **T-01** | **t** — no marker, but the ledger already calls this resolved |',
+    '| **T-02** | **t** — frontier |',
+    '| **T-03** | **t** |',
+  ].join('\n');
+  const r = checkExecutionProjectionAgreement(base(), text);
+  assert.equal(r.ok, false);
+  assert.deepEqual(r.disagreements, [{ id: 'T-01', mapClaims: 'not-resolved', ledgerClaims: 'resolved' }]);
+});
+
+test('a ticket with no row in the map at all is out of this check\'s scope — never a silent pass, never a false alarm', () => {
+  const r = checkExecutionProjectionAgreement(base(), '# a map with no ticket-index table');
+  assert.equal(r.ok, true);
+  assert.equal(r.checked, 0, 'nothing was found to compare, and that must be visible, not disguised as agreement');
+});
+
+// ---------------------------------------------------------------------------
+// applyTicketResolution — the impure atomic entrypoint: writes BOTH files, or
+// neither. This is the function that removes the dual-write failure for real.
+// ---------------------------------------------------------------------------
+
+test('applyTicketResolution: resolves the ticket AND regenerates the map status block, atomically', () => {
+  const dir = freshDir();
+  try {
+    const statePath = join(dir, 'programme-state.json');
+    const mapPath = join(dir, '02-MAP.md');
+    writeFileSync(statePath, JSON.stringify(base(), null, 2));
+    writeFileSync(
+      mapPath,
+      ['# Map', MAP_STATUS_MARKERS.begin, 'stale', MAP_STATUS_MARKERS.end, ''].join('\n')
+    );
+
+    const { state } = applyTicketResolution({
+      statePath,
+      mapPath,
+      resolve: { id: 'T-02', resolvedDate: '2026-02-01', evidence: ['ev/T-02.md'] },
+      resumption: {},
+    });
+
+    assert.equal(state.resumption.ticket, 'T-03');
+    const rereadState = readProgrammeState(statePath);
+    assert.equal(rereadState.ok, true);
+    assert.equal(rereadState.data.tickets.find((t) => t.id === 'T-02').state, 'resolved');
+
+    const rereadMap = readFileSync(mapPath, 'utf8');
+    assert.match(rereadMap, /Frontier — takable now \(1\):\*\* T-03/);
+    assert.doesNotMatch(rereadMap, /stale/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('MUTATION: applyTicketResolution writes NEITHER file when the resolution would be invalid', () => {
+  const dir = freshDir();
+  try {
+    const statePath = join(dir, 'programme-state.json');
+    const mapPath = join(dir, '02-MAP.md');
+    const originalStateText = JSON.stringify(base(), null, 2);
+    const originalMapText = ['# Map', MAP_STATUS_MARKERS.begin, 'stale', MAP_STATUS_MARKERS.end, ''].join('\n');
+    writeFileSync(statePath, originalStateText);
+    writeFileSync(mapPath, originalMapText);
+
+    assert.throws(() =>
+      applyTicketResolution({
+        statePath,
+        mapPath,
+        resolve: { id: 'T-999', resolvedDate: '2026-02-01', evidence: ['x'] }, // unknown ticket
+        resumption: {},
+      })
+    );
+
+    // Neither file was touched — atomicity across the two writes.
+    assert.equal(readFileSync(statePath, 'utf8'), originalStateText);
+    assert.equal(readFileSync(mapPath, 'utf8'), originalMapText);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('MUTATION: applyTicketResolution throws if the map has no GOVERNOR:STATUS markers, and writes neither file', () => {
+  const dir = freshDir();
+  try {
+    const statePath = join(dir, 'programme-state.json');
+    const mapPath = join(dir, '02-MAP.md');
+    const originalStateText = JSON.stringify(base(), null, 2);
+    writeFileSync(statePath, originalStateText);
+    writeFileSync(mapPath, '# a map with no markers');
+
+    assert.throws(() =>
+      applyTicketResolution({
+        statePath,
+        mapPath,
+        resolve: { id: 'T-02', resolvedDate: '2026-02-01', evidence: ['ev/T-02.md'] },
+        resumption: {},
+      }),
+      /markers not found/
+    );
+    assert.equal(readFileSync(statePath, 'utf8'), originalStateText, 'state must not be written if the map write would fail');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

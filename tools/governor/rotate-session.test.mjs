@@ -15,7 +15,12 @@ import {
   normaliseSeparators,
   EXIT,
 } from './rotate-session.mjs';
-import { readProgrammeState, HANDOFF_SECTIONS } from './programme-state.mjs';
+import {
+  readProgrammeState,
+  HANDOFF_SECTIONS,
+  MAP_STATUS_MARKERS,
+  applyTicketResolution,
+} from './programme-state.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const FIXTURE_PATH = join(__dirname, 'fixtures', 'programme-state.minimal.json');
@@ -245,6 +250,29 @@ test('INV-7: the module never shells out to /clear', () => {
 // REAL-GIT end-to-end: scratch repo with a real origin, real commits, real push
 // ---------------------------------------------------------------------------
 
+// Mirrors the ~~**title**~~ **RESOLVED** convention 02-MAP.md itself uses, so
+// checkExecutionProjectionAgreement() (exercised for real inside rotateSession)
+// reads this the same way it reads the genuine map.
+function scratchMapText(extraRows = []) {
+  return [
+    '# Synthetic map',
+    '',
+    '## 8. FRONTIER',
+    '',
+    MAP_STATUS_MARKERS.begin,
+    '(placeholder — replaced by the generated block on the first write-back)',
+    MAP_STATUS_MARKERS.end,
+    '',
+    '## 9. TICKET INDEX',
+    '',
+    '| **T-01** | ~~**First synthetic ticket**~~ **RESOLVED 2026-01-01.** |',
+    '| **T-02** | **Unlocked by T-01** — frontier |',
+    '| **T-03** | **Still blocked by T-02** |',
+    ...extraRows,
+    '',
+  ].join('\n');
+}
+
 function makeScratchRepo() {
   const root = mkdtempSync(join(tmpdir(), 'governor-rotate-'));
   const origin = join(root, 'origin.git');
@@ -269,6 +297,11 @@ function makeScratchRepo() {
   state.repository.worktree = work;
   state.repository.primary_checkout = work;
   writeFileSync(join(programmeHome, 'programme-state.json'), JSON.stringify(state, null, 2) + '\n');
+
+  // A minimal map that AGREES with the fixture's ticket ledger (T-01 resolved,
+  // T-02/T-03 not) — the projection-agreement check now reads this on every real
+  // rotation, so a scratch repo without one would refuse every existing test.
+  writeFileSync(join(programmeHome, '02-MAP.md'), scratchMapText());
 
   git(work, ['add', '-A']);
   git(work, ['commit', '-m', 'initial']);
@@ -542,6 +575,150 @@ test('MUTATION: a push failure is reported, never silently claimed as a successf
     assert.equal(result.status, 'banked-not-pushed');
     assert.notEqual(result.exitCode, EXIT.ROTATED);
     assert.match(result.reason, /remote rejected/);
+  } finally {
+    rmSync(repo.root, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// STALE_EXECUTION_STATE — the T-14 incident (2026-07-31), and its permanent fix
+// ---------------------------------------------------------------------------
+// Larry resolved T-14 in 02-MAP.md's narrative but never in programme-state.json's
+// tickets[], and the very next /rotate-session banked a resumption pointer telling
+// the fresh session to redo already-finished work. This section reproduces that
+// exact incident against assessRotationSafety directly (pure), then end-to-end
+// against real git: rotation refuses and banks nothing while the two documents
+// disagree; ONE canonical write-back (applyTicketResolution) resolves the ticket
+// in both places atomically; rotation then succeeds and names the correct sole
+// next action.
+
+const AGREEING_MAP = () =>
+  ['# map', '', '## 9', '', '| **T-01** | ~~**t**~~ **RESOLVED 2026-01-01.** |', '| **T-02** | **t** — frontier |', '| **T-03** | **t** |', ''].join('\n');
+
+test('assess: map and ledger agreeing on every ticket is not an obstacle', () => {
+  const tickets = loadFixture().tickets;
+  const r = assessRotationSafety(safeEstate('C:/wt'), { programmeWorktree: 'C:/wt', tickets, mapText: AGREEING_MAP() });
+  assert.equal(r.safe, true);
+  assert.deepEqual(r.obstacles, []);
+});
+
+test('MUTATION (the T-14 incident, reproduced directly): map claims resolved, ledger still says frontier -> STALE_EXECUTION_STATE', () => {
+  const tickets = loadFixture().tickets; // T-02 is 'frontier' in the ledger
+  const staleMap = [
+    '# map', '', '## 9', '',
+    '| **T-01** | ~~**t**~~ **RESOLVED 2026-01-01.** |',
+    '| **T-02** | ~~**t**~~ **RESOLVED 2026-08-01.** |', // <-- map claims T-02 resolved; ledger disagrees
+    '| **T-03** | **t** |', '',
+  ].join('\n');
+  const r = assessRotationSafety(safeEstate('C:/wt'), { programmeWorktree: 'C:/wt', tickets, mapText: staleMap });
+  assert.equal(r.safe, false);
+  const o = r.obstacles.find((x) => x.kind === 'stale-execution-state');
+  assert.ok(o, 'expected a stale-execution-state obstacle');
+  assert.match(o.detail, /STALE_EXECUTION_STATE/);
+  assert.match(o.detail, /T-02/);
+  assert.match(o.detail, /map says resolved/);
+  assert.match(o.detail, /ledger says frontier/);
+});
+
+test('MUTATION (the reverse direction): ledger says resolved, map row shows no resolved marker -> STALE_EXECUTION_STATE', () => {
+  const tickets = loadFixture().tickets;
+  const laggingMap = [
+    '# map', '', '## 9', '',
+    '| **T-01** | **t** — still shown as open |', // <-- ledger says T-01 resolved; map row has no marker
+    '| **T-02** | **t** — frontier |',
+    '| **T-03** | **t** |', '',
+  ].join('\n');
+  const r = assessRotationSafety(safeEstate('C:/wt'), { programmeWorktree: 'C:/wt', tickets, mapText: laggingMap });
+  assert.equal(r.safe, false);
+  const o = r.obstacles.find((x) => x.kind === 'stale-execution-state');
+  assert.ok(o);
+  assert.match(o.detail, /T-01/);
+  assert.match(o.detail, /map says not-resolved/);
+  assert.match(o.detail, /ledger says resolved/);
+});
+
+test('a ticket absent from the map table is not asserted either way (out of scope, not a silent pass)', () => {
+  const tickets = loadFixture().tickets;
+  const noTableMap = '# map with no ticket-index table at all\n';
+  const r = assessRotationSafety(safeEstate('C:/wt'), { programmeWorktree: 'C:/wt', tickets, mapText: noTableMap });
+  assert.equal(r.safe, true, 'nothing to compare against is not the same as a contradiction');
+});
+
+test('the check is skipped (not an obstacle) when the caller supplies neither tickets nor mapText — an explicit opt-out, not a silent gap in the real path', () => {
+  const r = assessRotationSafety(safeEstate('C:/wt'), { programmeWorktree: 'C:/wt' });
+  assert.equal(r.safe, true);
+});
+
+test('END-TO-END REGRESSION: the T-14 incident, reproduced against real git, refused, fixed, then succeeds naming the sole next action', () => {
+  const repo = makeScratchRepo();
+  try {
+    // --- Reproduce the incident ---
+    // Hand-edit the map the way a session write-back-to-narrative-only would: mark
+    // T-02 resolved in the table WITHOUT touching programme-state.json's tickets[].
+    const brokenMap = scratchMapText([]).replace(
+      '| **T-02** | **Unlocked by T-01** — frontier |',
+      '| **T-02** | ~~**Unlocked by T-01**~~ **RESOLVED 2026-08-01.** |'
+    );
+    writeFileSync(join(repo.programmeHome, '02-MAP.md'), brokenMap);
+
+    const refused = rotateSession({
+      programmeHome: repo.programmeHome,
+      repoRoot: repo.work,
+      branch: 'master',
+      bankedBy: 'Opus',
+      reconcileFn: scratchReconcile(repo.work),
+    });
+    assert.equal(refused.status, 'refused', JSON.stringify(refused));
+    assert.ok(refused.assessment.obstacles.some((o) => o.kind === 'stale-execution-state'));
+    assert.match(refused.assessment.obstacles.find((o) => o.kind === 'stale-execution-state').detail, /T-02/);
+
+    // Nothing was banked: the state file on disk is still the original (T-02 frontier).
+    const stillOriginal = readProgrammeState(join(repo.programmeHome, 'programme-state.json'));
+    assert.equal(stillOriginal.data.tickets.find((t) => t.id === 'T-02').state, 'frontier');
+    // Nothing was committed: the working tree still shows the hand-edited map as a
+    // local, uncommitted change (rotation wrote no commit on top of it).
+    const statusAfterRefusal = execFileSync('git', ['-C', repo.work, 'status', '--porcelain'], { encoding: 'utf8' });
+    assert.match(statusAfterRefusal, /02-MAP\.md/);
+
+    // --- The fix: ONE canonical write-back resolves T-02 in both documents ---
+    applyTicketResolution({
+      statePath: join(repo.programmeHome, 'programme-state.json'),
+      mapPath: join(repo.programmeHome, '02-MAP.md'),
+      resolve: { id: 'T-02', resolvedDate: '2026-08-01', evidence: ['evidence/T-02.md'] },
+      resumption: {
+        nextActionText: 'Implement T-03, the only remaining ticket.',
+        model: 'Opus',
+      },
+    });
+
+    const fixed = readProgrammeState(join(repo.programmeHome, 'programme-state.json'));
+    assert.equal(fixed.ok, true, JSON.stringify(fixed.errors));
+    assert.equal(fixed.data.tickets.find((t) => t.id === 'T-02').state, 'resolved');
+    // T-03 depends on T-02 and is now the sole frontier ticket.
+    assert.equal(fixed.data.resumption.ticket, 'T-03');
+
+    const fixedMap = readFileSync(join(repo.programmeHome, '02-MAP.md'), 'utf8');
+    assert.match(fixedMap, /T-03/); // the regenerated status block names the new frontier
+
+    // Commit the fix (a real session would do this before rotating again).
+    repo.git(repo.work, ['add', '-A']);
+    repo.git(repo.work, ['commit', '-m', 'fix: resolve T-02 in the canonical ledger']);
+    repo.git(repo.work, ['push']);
+
+    // --- Rotation now succeeds, and names T-03 as the sole next action ---
+    const rotated = rotateSession({
+      programmeHome: repo.programmeHome,
+      repoRoot: repo.work,
+      branch: 'master',
+      bankedBy: 'Opus',
+      bankedAt: '2026-08-01',
+      reconcileFn: scratchReconcile(repo.work),
+    });
+    assert.equal(rotated.status, 'rotated', JSON.stringify(rotated));
+    const banked = readProgrammeState(rotated.statePath);
+    assert.equal(banked.data.resumption.ticket, 'T-03');
+    assert.equal(banked.data.tickets.find((t) => t.id === 'T-02').state, 'resolved');
+    assert.match(rotated.message, /T-03/);
   } finally {
     rmSync(repo.root, { recursive: true, force: true });
   }

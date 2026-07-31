@@ -356,6 +356,243 @@ export function frontierForModel(state, model) {
 }
 
 // ---------------------------------------------------------------------------
+// Ticket resolution + resumption selection — THE canonical write-back
+// ---------------------------------------------------------------------------
+// Fix for the 2026-07-31 T-14 incident: a ticket was declared resolved in
+// 02-MAP.md's human narrative but never resolved in THIS document, so the very
+// next /rotate-session banked a resumption pointer telling the fresh session to
+// redo already-finished work. `tickets[]` in this document is now the EXECUTION-
+// STATE SSOT (AD-17, corrected) — the map projects it; it no longer asserts
+// ticket status on its own authority. These three functions are the only
+// sanctioned way to move a ticket from frontier to resolved and to re-point
+// resumption: hand-editing `tickets[].state` or `resumption.*` directly is the
+// dual-write failure this exists to remove.
+
+export function resolveTicket(state, { id, resolvedDate, evidence, note = null } = {}) {
+  if (!id) throw new TypeError('resolveTicket: id is required');
+  if (!resolvedDate) throw new TypeError(`resolveTicket(${id}): resolvedDate is required`);
+  if (!Array.isArray(evidence) || evidence.length === 0) {
+    throw new TypeError(
+      `resolveTicket(${id}): evidence must be a non-empty array. A resolution with no evidence is exactly ` +
+      `what merge-readiness's tickets-resolved-with-evidence check exists to catch (AD-24) — refusing one layer ` +
+      `earlier, at the point of authorship, rather than only downstream at the merge gate.`
+    );
+  }
+
+  const tickets = state?.tickets || [];
+  const idx = tickets.findIndex((t) => t.id === id);
+  if (idx === -1) {
+    throw new Error(`resolveTicket: no ticket "${id}" in this document — cannot resolve a ticket that does not exist`);
+  }
+
+  const nextTickets = tickets.slice();
+  nextTickets[idx] = {
+    ...tickets[idx],
+    state: 'resolved',
+    resolved: resolvedDate,
+    evidence: [...evidence],
+    note: note ?? tickets[idx].note ?? null,
+  };
+
+  // Resolving one ticket can unblock others. validateConsistency (T-09) already
+  // enforces that a `blocked` ticket whose every dependency is resolved "belongs
+  // on the frontier" — so leaving a newly-unblocked ticket's own `state` field at
+  // `blocked` would make THIS function hand back a document that fails its own
+  // validation one line later. Promote it here, deterministically, rather than
+  // asking every caller to remember to.
+  const byId = new Map(nextTickets.map((t) => [t.id, t]));
+  for (let i = 0; i < nextTickets.length; i++) {
+    const t = nextTickets[i];
+    if (t.state !== 'blocked') continue;
+    const allResolved = (t.depends_on || []).every((d) => byId.get(d)?.state === 'resolved');
+    if (allResolved) nextTickets[i] = { ...t, state: 'frontier' };
+  }
+
+  return { ...state, tickets: nextTickets };
+}
+
+// Picking which frontier ticket becomes THE next action is a genuine judgement
+// call when more than one is takable — the map's own history (T-04 and T-14 both
+// sat on the frontier at once, and choosing T-14 first was a considered call, not
+// an arbitrary one) is why this refuses to fake-automate that choice. It DOES
+// automate the mechanical, unambiguous cases: a single frontier ticket, or an
+// exhausted frontier — and it always validates an explicit override against the
+// COMPUTED frontier, so a caller can never name a resumption ticket the ledger
+// itself would immediately contradict.
+export function deriveResumption(state, {
+  nextTicket,
+  nextActionText,
+  model,
+  effort = null,
+  rationale,
+  focus,
+  readFirst,
+  doNot,
+} = {}) {
+  const frontier = frontierTickets(state);
+  const byId = new Map(frontier.map((t) => [t.id, t]));
+
+  let chosen = null;
+  if (nextTicket) {
+    if (!byId.has(nextTicket)) {
+      throw new Error(
+        `deriveResumption: "${nextTicket}" was named as the next ticket but is NOT on the computed frontier ` +
+        `(frontier is: ${frontier.map((t) => t.id).join(', ') || '(empty)'}) — refusing rather than banking a ` +
+        `resumption pointer the ledger itself would immediately contradict.`
+      );
+    }
+    chosen = byId.get(nextTicket);
+  } else if (frontier.length === 1) {
+    chosen = frontier[0];
+  } else if (frontier.length === 0) {
+    chosen = null;
+  } else {
+    throw new Error(
+      `deriveResumption: ${frontier.length} tickets are on the frontier (${frontier.map((t) => t.id).join(', ')}) ` +
+      `and none was named explicitly — choosing among them is a judgement call this function will not fake-automate. ` +
+      `Pass { nextTicket } naming which one is THE next action.`
+    );
+  }
+
+  const resolvedModel = model || chosen?.model || 'unknown';
+  const resolvedNextAction =
+    nextActionText ||
+    (chosen
+      ? `${chosen.title} (ticket ${chosen.id}).`
+      : 'No ticket is currently on the frontier. Consult 02-MAP.md §5 (fog) and §6 (blockers) for what remains open.');
+  const resolvedRationale =
+    rationale ||
+    (chosen
+      ? `${chosen.id} is the only ticket the computed frontier names as takable.`
+      : 'The frontier is empty; no ticket-driven model recommendation applies.');
+
+  return {
+    ...state,
+    resumption: {
+      ...state.resumption,
+      focus: focus ?? state.resumption.focus,
+      next_action: resolvedNextAction,
+      ticket: chosen ? chosen.id : null,
+      read_first: readFirst ?? state.resumption.read_first,
+      do_not: doNot ?? state.resumption.do_not,
+    },
+    model_recommendation: {
+      model: resolvedModel,
+      effort,
+      rationale: resolvedRationale,
+    },
+  };
+}
+
+// THE one bounded write-back function (pure half): resolves the ticket, attaches
+// its evidence, derives the frontier and picks the exact resumption ticket/model/
+// action, then validates the result — refusing (throwing) rather than returning a
+// document that would fail `writeProgrammeState` anyway. Completed work and the
+// frontier are never stored fields to keep in sync; they are computed views
+// (`completedTickets`/`frontierTickets`), so "deriving" them costs nothing here.
+export function resolveTicketAndAdvance(state, { resolve, resumption = {} } = {}) {
+  if (!resolve) throw new TypeError('resolveTicketAndAdvance: { resolve } is required');
+  let next = resolveTicket(state, resolve);
+  next = deriveResumption(next, resumption);
+  const validation = validateProgrammeState(next);
+  if (!validation.ok) {
+    const err = new Error(
+      `resolveTicketAndAdvance(${resolve.id}): the resulting programme state is invalid (${validation.errors.length} error(s)):\n  - ` +
+      validation.errors.join('\n  - ')
+    );
+    err.errors = validation.errors;
+    throw err;
+  }
+  return { state: next, examined: validation.examined };
+}
+
+// ---------------------------------------------------------------------------
+// The generated map status block — §8's Frontier/Completed summary, rendered
+// from this document rather than hand-edited a second time (AD-17 correction).
+// The rest of 02-MAP.md (architecture, decisions, fog, the ticket-index prose,
+// the write-back log) stays human-authored; only the block between these two
+// markers is machine-owned.
+// ---------------------------------------------------------------------------
+
+export const MAP_STATUS_MARKERS = {
+  begin: '<!-- GOVERNOR:STATUS:BEGIN — generated from programme-state.json; do not hand-edit between the markers -->',
+  end: '<!-- GOVERNOR:STATUS:END -->',
+};
+
+export function renderMapStatusBlock(state) {
+  const done = completedTickets(state);
+  const frontier = frontierTickets(state);
+  const lines = [
+    `**Phase:** ${state.phase.current}`,
+    '',
+    `**Completed (${done.length}):** ${done.length ? done.map((t) => t.id).join(', ') : '(none)'}`,
+    `**Frontier — takable now (${frontier.length}):** ${
+      frontier.length ? frontier.map((t) => `${t.id} [${t.model}]`).join(', ') : '(none — see §5/§6 for what remains open)'
+    }`,
+    `**Resumption:** ${state.resumption.ticket ? state.resumption.ticket : '(none named)'} — model ${state.model_recommendation.model}`,
+    '',
+    '_Machine-rendered from `programme-state.json` `tickets[]` — the execution-state SSOT (AD-17). ' +
+      'Regenerated on every ticket resolution; the ticket-index table (§9) and the write-back log (§10) remain the human narrative record._',
+  ];
+  return lines.join('\n');
+}
+
+export function updateMapStatusBlock(mapText, state) {
+  const beginIdx = mapText.indexOf(MAP_STATUS_MARKERS.begin);
+  const endIdx = mapText.indexOf(MAP_STATUS_MARKERS.end);
+  if (beginIdx === -1 || endIdx === -1 || endIdx < beginIdx) {
+    throw new Error(
+      'updateMapStatusBlock: GOVERNOR:STATUS markers not found (or out of order) in the map — refusing to guess ' +
+      'where the generated block belongs rather than inserting one somewhere arbitrary.'
+    );
+  }
+  const before = mapText.slice(0, beginIdx + MAP_STATUS_MARKERS.begin.length);
+  const after = mapText.slice(endIdx);
+  return `${before}\n\n${renderMapStatusBlock(state)}\n\n${after}`;
+}
+
+// ---------------------------------------------------------------------------
+// Execution-projection agreement — catches the T-14 incident BEFORE it bites
+// ---------------------------------------------------------------------------
+// The map's §9 ticket-index table marks a resolved ticket with a strikethrough
+// title followed by a bold "RESOLVED" — the exact convention already in use
+// throughout 02-MAP.md. This check parses that ONE convention and compares it
+// against `tickets[].state`; it does not, and does not claim to, verify the rest
+// of the map's narrative (decisions, fog, prose accuracy stay human-reviewed).
+// A ticket whose row cannot be found in the map at all is not asserted either
+// way — out of this check's stated scope, not a silent pass.
+
+const MAP_TICKET_ROW_RE = /^\|\s*\*\*(T-\d+[a-z]?)\*\*\s*\|(.*)$/gm;
+const MAP_RESOLVED_MARKER_RE = /~~[\s\S]*?~~\s*\*\*RESOLVED\b/i;
+
+export function extractMapTicketMarkers(mapText) {
+  const markers = new Map();
+  for (const m of String(mapText || '').matchAll(MAP_TICKET_ROW_RE)) {
+    const id = m[1];
+    if (markers.has(id)) continue; // first row for an id wins; a duplicate never overrides
+    markers.set(id, MAP_RESOLVED_MARKER_RE.test(m[2]) ? 'resolved' : 'not-resolved');
+  }
+  return markers;
+}
+
+export function checkExecutionProjectionAgreement(state, mapText) {
+  const markers = extractMapTicketMarkers(mapText);
+  const disagreements = [];
+  let checked = 0;
+  for (const t of state?.tickets || []) {
+    const mapClaim = markers.get(t.id);
+    if (mapClaim === undefined) continue; // not in the table — out of scope, not asserted
+    checked += 1;
+    const ledgerResolved = t.state === 'resolved';
+    const mapResolved = mapClaim === 'resolved';
+    if (ledgerResolved !== mapResolved) {
+      disagreements.push({ id: t.id, mapClaims: mapClaim, ledgerClaims: t.state });
+    }
+  }
+  return { ok: disagreements.length === 0, disagreements, checked };
+}
+
+// ---------------------------------------------------------------------------
 // Read / write
 // ---------------------------------------------------------------------------
 
@@ -392,6 +629,47 @@ export function writeProgrammeState(state, filePath) {
   writeFileSync(tmpPath, JSON.stringify(state, null, 2) + '\n');
   renameSync(tmpPath, filePath);
   return { path: filePath, examined: validation.examined };
+}
+
+function atomicWriteText(filePath, text, writeFile = writeFileSync) {
+  mkdirSync(dirname(filePath), { recursive: true });
+  const tmpPath = `${filePath}.tmp-${process.pid}-${crypto.randomBytes(4).toString('hex')}`;
+  writeFile(tmpPath, text);
+  renameSync(tmpPath, filePath);
+}
+
+// ---------------------------------------------------------------------------
+// THE atomic write-back entrypoint (impure half) — removes the dual-write
+// failure permanently. Everything is computed and validated BEFORE either file
+// is touched: resolveTicketAndAdvance already throws on an invalid result, and
+// updateMapStatusBlock already throws if the map's markers are missing, so a
+// failure at any step leaves BOTH files exactly as they were. Only once both
+// new contents exist in memory does this write state, then the map.
+// ---------------------------------------------------------------------------
+
+export function applyTicketResolution({
+  statePath,
+  mapPath,
+  resolve,
+  resumption = {},
+  readFile = readFileSync,
+  writeFile = writeFileSync,
+} = {}) {
+  const existing = readProgrammeState(statePath);
+  if (!existing.ok) {
+    throw new Error(`applyTicketResolution: durable state at ${statePath} is ${existing.reason} — refusing to resolve a ticket against it`);
+  }
+
+  const mapText = readFile(mapPath, 'utf8');
+
+  // Compute BOTH new documents before writing either.
+  const { state: nextState } = resolveTicketAndAdvance(existing.data, { resolve, resumption });
+  const nextMapText = updateMapStatusBlock(mapText, nextState);
+
+  writeProgrammeState(nextState, statePath);
+  atomicWriteText(mapPath, nextMapText, writeFile);
+
+  return { state: nextState, statePath, mapPath };
 }
 
 // ---------------------------------------------------------------------------

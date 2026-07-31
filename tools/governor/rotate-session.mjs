@@ -32,8 +32,8 @@
 // single rotation — training Warwick to ignore it.
 
 import { execFileSync } from 'node:child_process';
-import { writeFileSync, mkdirSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { writeFileSync, readFileSync, mkdirSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 
 import {
@@ -44,6 +44,7 @@ import {
   renderSessionHandoff,
   sessionHandoffPath,
   frontierTickets,
+  checkExecutionProjectionAgreement,
 } from './programme-state.mjs';
 import { collectEstateState, mergeEstateIntoState } from './collect-state.mjs';
 
@@ -63,7 +64,7 @@ export const EXIT = {
 
 export const SAFETY_CRITICAL_UNKNOWNS = new Set(['repository.head_sha', 'worktrees']);
 
-export function assessRotationSafety(estate, { programmeWorktree, excludePids = [] } = {}) {
+export function assessRotationSafety(estate, { programmeWorktree, excludePids = [], tickets = null, mapText = null } = {}) {
   const obstacles = [];
   let checked = 0;
 
@@ -134,6 +135,32 @@ export function assessRotationSafety(estate, { programmeWorktree, excludePids = 
       obstacles.push({
         kind: 'unreadable',
         detail: `${u.path} could not be gathered: ${u.why}`,
+      });
+    }
+  }
+
+  // STALE_EXECUTION_STATE — the 2026-07-31 T-14 incident, made structurally
+  // impossible to repeat: 02-MAP.md's §9 table asserted a ticket resolved while
+  // `tickets[]` (the execution-state SSOT, AD-17) still called it frontier, and
+  // the very next rotation banked a resumption pointer that contradicted work
+  // already done. `tickets` and `mapText` are both optional here so unit tests of
+  // THIS function in isolation are never forced to supply a map fixture; the real
+  // path (`rotateSession()` below) always reads the real map and always passes
+  // both, so the check is never silently skipped in production.
+  if (Array.isArray(tickets) && typeof mapText === 'string') {
+    checked += 1;
+    const agreement = checkExecutionProjectionAgreement({ tickets }, mapText);
+    if (!agreement.ok) {
+      obstacles.push({
+        kind: 'stale-execution-state',
+        detail:
+          `STALE_EXECUTION_STATE: the map (02-MAP.md) and the ticket ledger (programme-state.json) ` +
+          `disagree about ${agreement.disagreements.length} ticket(s) — ` +
+          agreement.disagreements
+            .map((d) => `${d.id} (map says ${d.mapClaims}, ledger says ${d.ledgerClaims})`)
+            .join('; ') +
+          `. Resolve the disagreement with the canonical write-back (resolveTicketAndAdvance / ` +
+          `applyTicketResolution in programme-state.mjs) before rotating — never by hand-editing either file.`,
       });
     }
   }
@@ -265,11 +292,14 @@ export function rotateSession({
   execFile = execFileSync,
   reconcileFn,
   writeFile = writeFileSync,
+  mapPath,
+  readFile = readFileSync,
 } = {}) {
   repoRoot = normaliseSeparators(repoRoot);
   primaryCheckout = normaliseSeparators(primaryCheckout);
   primaryPath = normaliseSeparators(primaryPath);
   const statePath = programmeStatePath(programmeHome);
+  const resolvedMapPath = mapPath || join(programmeHome, '02-MAP.md');
 
   // 1. Read the durable base document (programme knowledge the estate cannot supply).
   const existing = readProgrammeState(statePath);
@@ -282,6 +312,22 @@ export function rotateSession({
     };
   }
   const base = existing.data;
+
+  // 1a. Read the Wayfinder map for the STALE_EXECUTION_STATE check (AD-17). Every
+  // uncertainty here resolves toward refusing (D-6, matching every other check in
+  // this module): an unreadable map means agreement with the ticket ledger cannot
+  // be verified, so rotation refuses rather than banking blind. This is a REAL
+  // obstacle folded in below, not silently skipped.
+  let mapText = null;
+  let mapReadObstacle = null;
+  try {
+    mapText = readFile(resolvedMapPath, 'utf8');
+  } catch (err) {
+    mapReadObstacle = {
+      kind: 'unreadable',
+      detail: `The Wayfinder map at ${resolvedMapPath} could not be read (${String(err.message || err).split('\n')[0]}) — execution-projection agreement with the ticket ledger cannot be verified, so rotation refuses rather than banking blind.`,
+    };
+  }
 
   // 2. Collect the live estate (T-13).
   const branchSpecs = (base.branches || []).map((b) => ({
@@ -308,7 +354,14 @@ export function rotateSession({
   const assessment = assessRotationSafety(estate, {
     programmeWorktree: repoRoot,
     excludePids,
+    tickets: base.tickets,
+    mapText,
   });
+  if (mapReadObstacle) {
+    assessment.obstacles = [...assessment.obstacles, mapReadObstacle];
+    assessment.safe = false;
+    assessment.checked += 1;
+  }
 
   if (!assessment.safe) {
     return {
