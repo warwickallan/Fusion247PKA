@@ -16,15 +16,15 @@
     "at": "2026-07-31",
     "by_model": "Opus",
     "session_id": null,
-    "head_sha": "db8d90d48a0deea6598cebbec1cc5b9f2912db45",
+    "head_sha": "8cfe7d19ddf8fcf9b7d86930802f9655991b6d9f",
     "governor_version": "T-09/schema-v1"
   },
   "repository": {
     "primary_checkout": "C:/Fusion247PKA",
-    "worktree": "C:\\Fusion247PKA-governor",
+    "worktree": "C:/Fusion247PKA-governor",
     "branch": "build-018/session-governor",
     "base_sha": "ef96a3327f896e025731769c72157fd722daa02f",
-    "head_sha": "db8d90d48a0deea6598cebbec1cc5b9f2912db45",
+    "head_sha": "8cfe7d19ddf8fcf9b7d86930802f9655991b6d9f",
     "clean": true,
     "unpushed_commits": 0,
     "upstream": "origin/build-018/session-governor"
@@ -344,7 +344,7 @@
   "branches": [
     {
       "name": "build-018/session-governor",
-      "head": "db8d90d48a0deea6598cebbec1cc5b9f2912db45",
+      "head": "8cfe7d19ddf8fcf9b7d86930802f9655991b6d9f",
       "upstream": "origin/build-018/session-governor",
       "ahead": 0,
       "behind": null,
@@ -619,7 +619,7 @@
     {
       "path": "C:/Fusion247PKA-governor",
       "branch": "build-018/session-governor",
-      "head": "db8d90d48a0deea6598cebbec1cc5b9f2912db45",
+      "head": "8cfe7d19ddf8fcf9b7d86930802f9655991b6d9f",
       "dirty": false,
       "unpushedCount": 0,
       "classification": "active-build",

@@ -12,7 +12,7 @@ owner_intent: consumed by the next Larry session. Regenerate on every rotation; 
 
 Phase 1 (Opus architecture) is complete and settled. Phase 2 is implementing the seven components against it. T-01, T-02, T-07, T-09, T-03 and T-13 resolved earlier; this banking adds T-10 (/rotate-session) — the banking half of the rotation loop now works end to end: it collects and validates the live state, REFUSES with a precise obstacle when the estate is unsafe (proven on real git for dirty tree, unpushed commit and live worker, each also asserting nothing was committed), and when safe banks, pushes, writes the canonical derived handoff and prints the exact /clear command. It does not invoke /close-session, ClickUp or Drive — enforced by invocation-shape controls, not a substring ban. T-11 (reorientation) is now THE next action: until it lands, the fresh Larry must still be pointed at the handoff by hand, which is the re-briefing this build exists to remove.
 
-Branch `build-018/session-governor` in worktree `C:\Fusion247PKA-governor`, HEAD `db8d90d48a0deea6598cebbec1cc5b9f2912db45` (base `ef96a3327f896e025731769c72157fd722daa02f`). Banked by Opus at 2026-07-31.
+Branch `build-018/session-governor` in worktree `C:/Fusion247PKA-governor`, HEAD `8cfe7d19ddf8fcf9b7d86930802f9655991b6d9f` (base `ef96a3327f896e025731769c72157fd722daa02f`). Banked by Opus at 2026-07-31.
 
 **Completed (7):**
 - **T-01** — Prove the live statusLine payload on this machine _(resolved 2026-07-31)_
@@ -46,7 +46,7 @@ Branch `build-018/session-governor` in worktree `C:\Fusion247PKA-governor`, HEAD
 - t-03-t-13-implementation — subagent, **completed** (T-03)
 
 **Branches:**
-- `build-018/session-governor` (build) @ db8d90d48a0deea6598cebbec1cc5b9f2912db45 — This programme. The only branch this build may write to.
+- `build-018/session-governor` (build) @ 8cfe7d19ddf8fcf9b7d86930802f9655991b6d9f — This programme. The only branch this build may write to.
 - `main` (protected) @ de92306911e7cbe8828d5652ed9f7f21fd99593e — Local main is at de92306, one commit ahead of origin/main and unpushed. MUST NOT be altered by this build.
 - `recovery/2026-07-31-governor-abort-handoff` (recovery) @ 95c265de729e26114b1e1eb7dc7d8630502aca1d — Carries the settled GL-012 section 6a ruling. Read-only for this build; its PR must not be opened or merged.
 
