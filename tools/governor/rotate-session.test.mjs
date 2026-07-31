@@ -12,6 +12,7 @@ import {
   rotateSession,
   renderClearInstruction,
   renderRefusal,
+  normaliseSeparators,
   EXIT,
 } from './rotate-session.mjs';
 import { readProgrammeState, HANDOFF_SECTIONS } from './programme-state.mjs';
@@ -484,6 +485,36 @@ test('dry run does the whole judgement and writes NOTHING', () => {
     const headAfter = execFileSync('git', ['-C', repo.work, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
     assert.equal(headAfter, headBefore);
     assert.equal(existsSync(join(repo.work, 'Team Knowledge', 'fusion-brief', 'session-handoff.md')), false);
+  } finally {
+    rmSync(repo.root, { recursive: true, force: true });
+  }
+});
+
+test('the banked document never mixes path separators — a Windows resolve() path is normalised', () => {
+  assert.equal(normaliseSeparators('C:\\Fusion247PKA-governor'), 'C:/Fusion247PKA-governor');
+  assert.equal(normaliseSeparators('C:/already/forward/'), 'C:/already/forward');
+  assert.equal(normaliseSeparators(null), null);
+});
+
+test('REGRESSION (real git): repository.worktree in the banked document uses forward slashes, matching every other path', () => {
+  const repo = makeScratchRepo();
+  try {
+    const result = rotateSession({
+      programmeHome: repo.programmeHome,
+      repoRoot: repo.work.replace(/\//g, '\\'), // simulate a Windows resolve() path
+      branch: 'master',
+      bankedBy: 'Opus',
+      bankedAt: '2026-07-31',
+      reconcileFn: scratchReconcile(repo.work),
+    });
+    assert.equal(result.status, 'rotated', JSON.stringify(result));
+    const banked = readProgrammeState(result.statePath);
+    assert.equal(banked.ok, true);
+    assert.equal(
+      banked.data.repository.worktree.includes('\\'),
+      false,
+      'repository.worktree must not carry backslashes — T-11 compares it against resumption.worktree'
+    );
   } finally {
     rmSync(repo.root, { recursive: true, force: true });
   }

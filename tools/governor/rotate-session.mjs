@@ -145,6 +145,16 @@ function normalise(p) {
   return p ? String(p).replace(/\\/g, '/').toLowerCase().replace(/\/+$/, '') : p;
 }
 
+// Path SEPARATORS are normalised for the banked document (case is not — these are
+// display/identity values a human reads, not comparison keys). Node's resolve()
+// yields backslashes on Windows while every path already in the schema uses forward
+// slashes; mixing the two inside one document means a consumer comparing
+// `repository.worktree` against `resumption.worktree` finds them unequal for a purely
+// cosmetic reason. T-11 does exactly that comparison.
+export function normaliseSeparators(p) {
+  return typeof p === 'string' ? p.replace(/\\/g, '/').replace(/\/+$/, '') : p;
+}
+
 // ---------------------------------------------------------------------------
 // AD-14 — the comparison every consumer of banked.head_sha must use
 // ---------------------------------------------------------------------------
@@ -256,6 +266,9 @@ export function rotateSession({
   reconcileFn,
   writeFile = writeFileSync,
 } = {}) {
+  repoRoot = normaliseSeparators(repoRoot);
+  primaryCheckout = normaliseSeparators(primaryCheckout);
+  primaryPath = normaliseSeparators(primaryPath);
   const statePath = programmeStatePath(programmeHome);
 
   // 1. Read the durable base document (programme knowledge the estate cannot supply).
