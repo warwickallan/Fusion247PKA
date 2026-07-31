@@ -9,7 +9,7 @@
   },
   "phase": {
     "current": "Phase 2 — bounded implementation",
-    "summary": "Phase 1 (Opus architecture) is complete and settled: 13 architecture decisions, the map, the goal contract and the estate record are written. Phase 2 is implementing the seven components against that architecture. T-01, T-02, T-07 and T-09 resolved earlier; this banking adds T-03 (sampler: statusLine payload to written health sample) and T-13 (programme-state collector: live git/worktree-recon/gh output mapped onto the T-09 schema), both Sonnet-tier and run in parallel since they share no file. T-04 (evaluator) is now unlocked; T-10 (/rotate-session) now has every dependency in its depends_on list resolved (T-07, T-09, T-13) — it is fully unlocked and is the next Opus-tier item.",
+    "summary": "Phase 1 (Opus architecture) is complete and settled. Phase 2 is implementing the seven components against it. T-01, T-02, T-07, T-09, T-03 and T-13 resolved earlier; this banking adds T-10 (/rotate-session) — the banking half of the rotation loop now works end to end: it collects and validates the live state, REFUSES with a precise obstacle when the estate is unsafe (proven on real git for dirty tree, unpushed commit and live worker, each also asserting nothing was committed), and when safe banks, pushes, writes the canonical derived handoff and prints the exact /clear command. It does not invoke /close-session, ClickUp or Drive — enforced by invocation-shape controls, not a substring ban. T-11 (reorientation) is now THE next action: until it lands, the fresh Larry must still be pointed at the handoff by hand, which is the re-briefing this build exists to remove.",
     "started": "2026-07-31"
   },
   "banked": {
@@ -152,21 +152,26 @@
     {
       "id": "T-10",
       "title": "/rotate-session: bank, verify safety, emit the /clear instruction",
-      "state": "frontier",
+      "state": "resolved",
       "model": "Opus",
       "depends_on": [
         "T-07",
         "T-09",
         "T-13"
       ],
-      "resolved": null,
-      "evidence": [],
-      "note": "Must be able to REFUSE with the precise obstacle. Must not invoke close-session (INV-4). Now FULLY UNLOCKED: every dependency (T-07, T-09, T-13) is resolved."
+      "resolved": "2026-07-31",
+      "evidence": [
+        "tools/governor/rotate-session.mjs",
+        "tools/governor/rotate-session.test.mjs",
+        ".claude/commands/rotate-session.md",
+        "Deliverables/BUILD-018-session-governor/tickets/T-10-rotate-session.md"
+      ],
+      "note": "31/31 tests. Fails CLOSED (unknown is never safe). AD-14 implemented as exported isBankingCommit() and proven on real git — T-11 MUST use it rather than a raw HEAD comparison. Refused correctly against the real estate during its own implementation."
     },
     {
       "id": "T-11",
       "title": "Reorientation: SessionStart(source=clear) pointer brief, 10k cap",
-      "state": "blocked",
+      "state": "frontier",
       "model": "Opus",
       "depends_on": [
         "T-09",
@@ -174,7 +179,7 @@
       ],
       "resolved": null,
       "evidence": [],
-      "note": null
+      "note": "THE NEXT ACTION. Closes the rotation loop: T-10 banks and writes the handoff, T-11 gets it into the fresh session automatically. Must use isBankingCommit() from rotate-session.mjs for staleness, never a raw HEAD comparison (AD-14). Two live constraints already recorded: X-2 (settings.local.json is gitignored, so a hook ticket must ship an idempotent activation step or it ships nothing) and Q-5 (a broken ensure-watcher.mjs SessionStart hook already fires every session — decide its fate before adding a Governor hook beside it)."
     },
     {
       "id": "T-12",
@@ -307,7 +312,7 @@
   "model_recommendation": {
     "model": "Opus",
     "effort": null,
-    "rationale": "Both Sonnet-tier frontier tickets (T-03, T-13) landed this banking, 106/106 governor tests passing. The remaining frontier is Opus-tier judgement: T-04 (pure evaluator state-space design) and T-10 (/rotate-session refuse-or-proceed judgement, now with every dependency resolved). Neither is mechanical adapter work — spend Opus on both."
+    "rationale": "T-11 (reorientation) is the next action and is Opus-tier: it must decide what survives a 10,000-character cap, and getting that wrong silently drops the next action — the single field the whole build exists to carry across a rotation. It also has to resolve two live constraints (X-2 hook-delivery, Q-5 the already-broken sibling SessionStart hook) that are judgement calls, not mechanics. T-04 (evaluator state-space) is also Opus and independent."
   },
   "workers": [
     {
@@ -652,16 +657,17 @@
     "verified_at": "2026-07-31"
   },
   "resumption": {
-    "focus": "T-03 and T-13 both landed (106/106 governor tests). T-04 (pure evaluator) and T-10 (/rotate-session) are the remaining frontier, both Opus-tier judgement rather than mechanical adapter work. T-10 now has every declared dependency resolved (T-07, T-09, T-13) — it is fully unlocked.",
-    "next_action": "Proceed directly to T-10 (/rotate-session: bank, verify safety, emit the /clear instruction) as Opus. Honour AD-14 (compare against the banking commit's PARENT, not raw HEAD) and INV-4 (must not invoke close-session). T-04 (pure evaluator) is also unlocked and may run alongside if it does not compete for Larry's attention with T-10's judgement work.",
-    "ticket": "T-10",
+    "focus": "T-10 landed: the rotation banks, refuses when unsafe, writes the canonical handoff and prints the /clear instruction (137/137 governor tests). The loop is half closed — state gets OUT of a dying session reliably, but does not yet get INTO the fresh one automatically.",
+    "next_action": "Implement T-11 (reorientation) as Opus: SessionStart(source=\"clear\") -> hookSpecificOutput.additionalContext, a POINTER brief under the hard 10,000-character cap (AD-5). Use isBankingCommit() from tools/governor/rotate-session.mjs for staleness — never a raw HEAD comparison (AD-14). Settle X-2 (settings.local.json is gitignored, so ship an idempotent activation step or the ticket ships nothing) and Q-5 (the already-broken ensure-watcher.mjs SessionStart hook fires every session; decide repair/remove/work-around before adding a Governor hook beside it). Mutation test: oversized state must truncate SAFELY and say it truncated, never silently drop the next action.",
+    "ticket": "T-11",
     "worktree": "C:/Fusion247PKA-governor",
     "branch": "build-018/session-governor",
     "read_first": [
       "Deliverables/BUILD-018-session-governor/02-MAP.md — the SSOT: architecture, settled decisions, fog, frontier, ticket index",
       "Deliverables/BUILD-018-session-governor/01-GOAL-CONTRACT.md — the outcome and the 7 invariants; it wins over any ticket",
-      "tools/governor/programme-state.mjs — readProgrammeState/writeProgrammeState/evaluateFreshness, all of which T-10 builds on directly",
-      "tools/governor/collect-state.mjs — T-13's collector, ready for T-10 to call for the estate-derived fields"
+      "tools/governor/rotate-session.mjs — T-10: isBankingCommit() is the AD-14 comparison T-11 must use; renderClearInstruction shows what a handoff already carries",
+      "tools/governor/programme-state.mjs — renderSessionHandoff() already derives the full handoff; T-11's brief is a POINTER to it, not a second copy",
+      "Deliverables/BUILD-018-session-governor/02-MAP.md §12 — the broken ensure-watcher.mjs SessionStart hook T-11 must decide about (Q-5)"
     ],
     "do_not": [
       "Do not open or merge the recovery PR (recovery/2026-07-31-governor-abort-handoff at 95c265d).",
@@ -776,6 +782,11 @@
       "label": "Sampler",
       "path": "tools/governor/sampler.mjs",
       "how_to_read": "sampleFromStdin(raw, opts) — pure parse/extract, one impure write via T-02's writeHealthSample. Not yet wired as the primary checkout's live statusLine command; production activation is deferred (see T-03 handback)."
+    },
+    {
+      "label": "Rotation (/rotate-session)",
+      "path": "tools/governor/rotate-session.mjs",
+      "how_to_read": "node tools/governor/rotate-session.mjs --model <model> [--gh-repo owner/name] [--dry-run]. Exit 0 rotated, 1 refused, 2 BLIND. isBankingCommit({headSha, bankedHeadSha, headParentSha}) is the AD-14 staleness comparison — never use a raw HEAD !== banked.head_sha."
     },
     {
       "label": "Programme-state collector",
