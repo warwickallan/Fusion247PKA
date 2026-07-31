@@ -35,11 +35,19 @@ export const HOOK_EVENT = 'SessionStart';
 export const GUARD_EVENT = 'PreToolUse';
 export const GOVERNOR_MARKER = 'tools/governor/reorient.mjs';
 export const GUARD_MARKER = 'tools/governor/worktree-guard.mjs';
+export const DELEGATION_MARKER = 'tools/governor/delegation-gate.mjs';
 
 // The tools the PreToolUse guard adjudicates. Read-only tools are deliberately
 // absent: a misplaced session must still be able to diagnose itself, and a guard
 // that blocks Read would make its own deny message unactionable.
 export const GUARD_MATCHER = 'Write|Edit|MultiEdit|NotebookEdit|Bash';
+
+// The Task-dispatch observer matches only subagent dispatch (mechanism 1 of the
+// delegation gate). The substantial-work threshold gate (mechanism 2) is
+// deliberately narrower than GUARD_MATCHER above — it does not govern
+// NotebookEdit — so it gets its own matcher rather than reusing GUARD_MATCHER.
+export const DELEGATION_OBSERVER_MATCHER = 'Task';
+export const DELEGATION_GATE_MATCHER = 'Write|Edit|MultiEdit|Bash';
 
 export function settingsPath(checkout) {
   return join(checkout, '.claude', 'settings.local.json');
@@ -63,6 +71,20 @@ export function guardHookCommand(scriptPath, estate) {
   return estate ? `${base} --estate ${String(estate).replace(/\\/g, '/')}` : base;
 }
 
+// The delegation observer and gate need the estate root for the exact same
+// reason the worktree guard does: they must be able to resolve the active
+// programme (and, for the gate, the current ticket) from a session that may
+// have started in a checkout that knows nothing about the build.
+export function delegationObserverHookCommand(scriptPath, estate) {
+  const base = `node ${String(scriptPath).replace(/\\/g, '/')} observe`;
+  return estate ? `${base} --estate ${String(estate).replace(/\\/g, '/')}` : base;
+}
+
+export function delegationGateHookCommand(scriptPath, estate) {
+  const base = `node ${String(scriptPath).replace(/\\/g, '/')} check`;
+  return estate ? `${base} --estate ${String(estate).replace(/\\/g, '/')}` : base;
+}
+
 export function isGovernorHook(hook) {
   return typeof hook?.command === 'string' && hook.command.includes(GOVERNOR_MARKER);
 }
@@ -71,12 +93,38 @@ export function isGuardHook(hook) {
   return typeof hook?.command === 'string' && hook.command.includes(GUARD_MARKER);
 }
 
-// Derive the guard script from the reorientation script: they are siblings by
-// construction, so a caller that names one has named both. This keeps every
-// existing single-script call site working while shipping two hooks.
+// The observer (`... delegation-gate.mjs observe ...`) and the gate
+// (`... delegation-gate.mjs check ...`) point at the SAME script with
+// different subcommands, so DELEGATION_MARKER alone cannot tell them apart —
+// each predicate also requires its own subcommand token.
+export function isDelegationObserverHook(hook) {
+  return (
+    typeof hook?.command === 'string' &&
+    hook.command.includes(DELEGATION_MARKER) &&
+    /\bobserve\b/.test(hook.command)
+  );
+}
+
+export function isDelegationGateHook(hook) {
+  return (
+    typeof hook?.command === 'string' &&
+    hook.command.includes(DELEGATION_MARKER) &&
+    /\bcheck\b/.test(hook.command)
+  );
+}
+
+// Derive the guard/delegation scripts from the reorientation script: all are
+// siblings by construction, so a caller that names one has named all of them.
+// This keeps every existing single-script call site working while shipping
+// more hooks from the one script argument.
 export function guardScriptFor(scriptPath) {
   const p = String(scriptPath).replace(/\\/g, '/');
   return p.endsWith('reorient.mjs') ? p.replace(/reorient\.mjs$/, 'worktree-guard.mjs') : null;
+}
+
+export function delegationScriptFor(scriptPath) {
+  const p = String(scriptPath).replace(/\\/g, '/');
+  return p.endsWith('reorient.mjs') ? p.replace(/reorient\.mjs$/, 'delegation-gate.mjs') : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -108,7 +156,7 @@ export function danglingTargets(command, { exists = existsSync, cwd } = {}) {
 
 export function planSettings(
   settings,
-  { scriptPath, guardPath, estate, exists = existsSync, cwd, prune = true } = {}
+  { scriptPath, guardPath, delegationPath, estate, exists = existsSync, cwd, prune = true } = {}
 ) {
   const next = JSON.parse(JSON.stringify(settings ?? {}));
   const report = { installed: false, replaced: false, pruned: [], kept: 0, examined: 0, events: {} };
@@ -118,10 +166,20 @@ export function planSettings(
   const command = governorHookCommand(scriptPath);
   const resolvedGuard = guardPath ?? guardScriptFor(scriptPath);
   const guardCommand = resolvedGuard ? guardHookCommand(resolvedGuard, estate) : null;
+  const resolvedDelegation = delegationPath ?? delegationScriptFor(scriptPath);
+  const delegationObserveCommand = resolvedDelegation
+    ? delegationObserverHookCommand(resolvedDelegation, estate)
+    : null;
+  const delegationCheckCommand = resolvedDelegation
+    ? delegationGateHookCommand(resolvedDelegation, estate)
+    : null;
 
   // Requirement 9 — both halves of the durable behaviour are installed together.
   // Shipping the brief without the gate would leave a session that is TOLD it is
-  // misplaced and still perfectly able to write anyway.
+  // misplaced and still perfectly able to write anyway. The delegation observer
+  // and gate ship the same way: additive, and together — recording dispatches
+  // with nothing to reset them against would be inert, and gating direct calls
+  // with no way to observe a dispatch would make every ticket un-clearable.
   const managed = [
     { event: HOOK_EVENT, matcher: 'clear', command, is: isGovernorHook, key: 'governor' },
   ];
@@ -134,31 +192,69 @@ export function planSettings(
       key: 'guard',
     });
   }
+  if (delegationObserveCommand) {
+    managed.push({
+      event: GUARD_EVENT,
+      matcher: DELEGATION_OBSERVER_MATCHER,
+      command: delegationObserveCommand,
+      is: isDelegationObserverHook,
+      key: 'delegationObserver',
+    });
+  }
+  if (delegationCheckCommand) {
+    managed.push({
+      event: GUARD_EVENT,
+      matcher: DELEGATION_GATE_MATCHER,
+      command: delegationCheckCommand,
+      is: isDelegationGateHook,
+      key: 'delegationGate',
+    });
+  }
 
+  // Group specs by event and scan each event's PRE-EXISTING groups exactly
+  // ONCE, checking every hook against every spec for that event in the same
+  // pass. This matters now that more than one spec can share an event (guard,
+  // delegationObserver and delegationGate all sit on PreToolUse): scanning
+  // per-spec instead — the way this loop worked when there was only ever one
+  // spec per event — would have each LATER spec re-examine the group an
+  // EARLIER spec just pushed this run, inflating `examined`/`kept` for hooks
+  // already accounted for. A single pass over a snapshot taken before any
+  // spec's own hook is added avoids that inflation entirely, and is provably
+  // equivalent to the old behaviour when an event has exactly one spec.
+  const specsByEvent = new Map();
   for (const spec of managed) {
     if (!Array.isArray(next.hooks[spec.event])) next.hooks[spec.event] = [];
-    const state = { installed: false, replaced: false, added: false };
+    if (!specsByEvent.has(spec.event)) specsByEvent.set(spec.event, []);
+    specsByEvent.get(spec.event).push(spec);
+  }
 
-    for (const group of next.hooks[spec.event]) {
+  for (const [event, specs] of specsByEvent) {
+    const states = new Map(specs.map((spec) => [spec, { installed: false, replaced: false, added: false }]));
+    const originalGroups = next.hooks[event].slice();
+
+    for (const group of originalGroups) {
       if (!Array.isArray(group?.hooks)) continue;
       const surviving = [];
       for (const hook of group.hooks) {
         report.examined += 1;
 
-        if (spec.is(hook)) {
+        const matchedSpec = specs.find((spec) => spec.is(hook));
+        if (matchedSpec) {
           // Idempotent: exactly one of each, always re-pointed at the current script.
-          if (hook.command !== spec.command) {
+          const state = states.get(matchedSpec);
+          if (hook.command !== matchedSpec.command) {
             state.replaced = true;
             report.replaced = true;
-            hook.command = spec.command;
+            hook.command = matchedSpec.command;
           }
           state.installed = true;
           surviving.push(hook);
           continue;
         }
 
-        // A governor-managed hook is never pruned by the sibling rule, even when
-        // its script is not yet on disk (fresh clone, install-before-build).
+        // A governor-managed hook (for THIS event or any other) is never
+        // pruned by the sibling rule, even when its script is not yet on
+        // disk (fresh clone, install-before-build).
         if (managed.some((m) => m.is(hook))) {
           report.kept += 1;
           surviving.push(hook);
@@ -167,7 +263,7 @@ export function planSettings(
 
         const dangling = prune ? danglingTargets(hook?.command, { exists, cwd }) : [];
         if (dangling.length) {
-          report.pruned.push({ event: spec.event, command: hook.command, missing: dangling });
+          report.pruned.push({ event, command: hook.command, missing: dangling });
           continue; // dropped
         }
 
@@ -177,24 +273,26 @@ export function planSettings(
       group.hooks = surviving;
     }
 
-    if (!state.installed) {
-      // Own group, with a matcher: SessionStart fires only on /clear, PreToolUse
-      // only on the mutating tools. The in-script guards are the testable ones;
-      // the matchers keep the hooks off everything unrelated.
-      next.hooks[spec.event].push({
-        matcher: spec.matcher,
-        hooks: [{ type: 'command', command: spec.command }],
-      });
-      state.installed = true;
-      state.added = true;
-      report.added = true;
+    for (const spec of specs) {
+      const state = states.get(spec);
+      if (!state.installed) {
+        // Own group, with a matcher: SessionStart fires only on /clear, PreToolUse
+        // only on the tools each spec governs. The in-script guards are the
+        // testable ones; the matchers keep the hooks off everything unrelated.
+        next.hooks[event].push({
+          matcher: spec.matcher,
+          hooks: [{ type: 'command', command: spec.command }],
+        });
+        state.installed = true;
+        state.added = true;
+        report.added = true;
+      }
+      report.events[spec.key] = { ...state, event: spec.event, command: spec.command };
+      report.installed = true;
     }
-
-    report.events[spec.key] = { ...state, event: spec.event, command: spec.command };
-    report.installed = true;
   }
 
-  return { settings: next, report, command, guardCommand };
+  return { settings: next, report, command, guardCommand, delegationObserveCommand, delegationCheckCommand };
 }
 
 // ---------------------------------------------------------------------------
@@ -205,6 +303,7 @@ export function installHooks({
   checkout,
   scriptPath,
   guardPath,
+  delegationPath,
   estate,
   check = false,
   prune = true,
@@ -231,9 +330,17 @@ export function installHooks({
     return { ok: false, reason: 'unparseable-settings', path, detail: err.message };
   }
 
-  const { settings: next, report, command, guardCommand } = planSettings(settings, {
+  const {
+    settings: next,
+    report,
+    command,
+    guardCommand,
+    delegationObserveCommand,
+    delegationCheckCommand,
+  } = planSettings(settings, {
     scriptPath,
     guardPath,
+    delegationPath,
     estate: estate ?? checkout,
     exists,
     cwd: checkout,
@@ -243,19 +350,21 @@ export function installHooks({
   const serialised = JSON.stringify(next, null, 2) + '\n';
   const changed = serialised !== raw;
 
+  const base = { path, report, command, guardCommand, delegationObserveCommand, delegationCheckCommand };
+
   if (check) {
-    return { ok: true, checked: true, changed, path, report, command, guardCommand };
+    return { ok: true, checked: true, changed, ...base };
   }
 
   if (!changed) {
-    return { ok: true, changed: false, path, report, command, guardCommand, backup: null };
+    return { ok: true, changed: false, ...base, backup: null };
   }
 
   const backup = `${path}.bak-${new Date().toISOString().replace(/[:.]/g, '-')}`;
   copy(path, backup);
   write(path, serialised);
 
-  return { ok: true, changed: true, path, report, command, guardCommand, backup };
+  return { ok: true, changed: true, ...base, backup };
 }
 
 export function renderReport(result) {
@@ -281,7 +390,11 @@ export function renderReport(result) {
     `  ${HOOK_EVENT} (reorientation on /clear): ${describe(ev.governor)}`,
     `    ${result.command}`,
     `  ${GUARD_EVENT} (wrong-worktree deny gate): ${describe(ev.guard)}`,
-    `    ${result.guardCommand || '(no guard script could be derived — NOT installed)'}`
+    `    ${result.guardCommand || '(no guard script could be derived — NOT installed)'}`,
+    `  ${GUARD_EVENT} (delegation-dispatch observer): ${describe(ev.delegationObserver)}`,
+    `    ${result.delegationObserveCommand || '(no delegation script could be derived — NOT installed)'}`,
+    `  ${GUARD_EVENT} (substantial-work threshold gate): ${describe(ev.delegationGate)}`,
+    `    ${result.delegationCheckCommand || '(no delegation script could be derived — NOT installed)'}`
   );
   if (result.report.pruned.length) {
     lines.push('', `  PRUNED ${result.report.pruned.length} hook(s) whose target script does not exist (Q-5):`);
@@ -313,6 +426,7 @@ function parseArgs(argv) {
     else if (argv[i] === '--checkout') args.checkout = argv[++i];
     else if (argv[i] === '--script') args.script = argv[++i];
     else if (argv[i] === '--guard') args.guard = argv[++i];
+    else if (argv[i] === '--delegation') args.delegation = argv[++i];
     else if (argv[i] === '--estate') args.estate = argv[++i];
   }
   return args;
@@ -332,8 +446,10 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     checkout,
     scriptPath: String(scriptPath).replace(/\\/g, '/'),
     guardPath: args.guard ? String(args.guard).replace(/\\/g, '/') : undefined,
-    // The guard is pointed at the primary checkout so it can enumerate every
-    // worktree in the estate from a session that started anywhere.
+    delegationPath: args.delegation ? String(args.delegation).replace(/\\/g, '/') : undefined,
+    // The guard (and the delegation observer/gate, which need the same estate
+    // enumeration to resolve the active programme) is pointed at the primary
+    // checkout so it can find the build from a session that started anywhere.
     estate: args.estate || checkout,
     check: args.check,
     prune: args.prune,

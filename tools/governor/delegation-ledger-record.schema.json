@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mypka.local/schemas/governor/delegation-ledger-record/1",
+  "title": "BUILD-018 Governor — delegation ledger record (v1)",
+  "description": "One line of a per-ticket JSONL delegation ledger at ~/.mypka/governor/delegation/<projectKey>/<ticket>.jsonl (MYPKA_GOVERNOR_DELEGATION_DIR overrides the root). Every record is independently self-describing and independently valid or invalid — a ledger is a sequence of these, one per line, in file-append order (oldest first). A record failing this schema is INVALID: it must be skipped on read, and must never be trusted as a checkpoint or counted as a direct call.",
+  "oneOf": [
+    { "$ref": "#/$defs/task" },
+    { "$ref": "#/$defs/justify" },
+    { "$ref": "#/$defs/directCall" }
+  ],
+  "$defs": {
+    "task": {
+      "description": "A Task-tool dispatch was observed (mechanism 1 — pure observation, never denies). A checkpoint record: resets the direct-call count for this ticket to zero.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version", "ts", "session_id", "ticket", "kind",
+        "subagent_type", "description", "governing_specialist", "specialist_match"
+      ],
+      "properties": {
+        "schema_version": { "const": 1 },
+        "ts": { "type": "string", "minLength": 1, "description": "ISO 8601. Audit/display only — never used for checkpoint ordering (see decision §3)." },
+        "session_id": { "type": ["string", "null"] },
+        "ticket": { "type": "string", "minLength": 1 },
+        "kind": { "const": "task" },
+        "subagent_type": { "type": ["string", "null"] },
+        "description": { "type": ["string", "null"] },
+        "governing_specialist": {
+          "type": ["string", "null"],
+          "description": "null iff specialist_match is \"unchecked\"; otherwise the specialist slug (see decision §4c)."
+        },
+        "specialist_match": {
+          "type": "string",
+          "enum": ["declared", "no-fit-declared", "unchecked"],
+          "description": "declared = subagent_type exactly matches a .claude/agents/*.md slug. no-fit-declared = reserved; not machine-populated in v1 (see decision §4a). unchecked = no match, or the roster could not be read — never defaulted to \"declared\"."
+        }
+      }
+    },
+    "justify": {
+      "description": "Larry asserted, via the `justify` CLI, that direct work is non-delegable (mechanism 3). A checkpoint record: resets the direct-call count for this ticket to zero.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "ts", "session_id", "ticket", "kind", "reason", "note", "governing_specialist"],
+      "properties": {
+        "schema_version": { "const": 1 },
+        "ts": { "type": "string", "minLength": 1 },
+        "session_id": { "type": ["string", "null"] },
+        "ticket": { "type": "string", "minLength": 1 },
+        "kind": { "const": "justify" },
+        "reason": {
+          "type": "string",
+          "enum": ["architecture", "integration", "safety", "judgement", "git-lifecycle", "emergency"]
+        },
+        "note": { "type": ["string", "null"] },
+        "governing_specialist": { "const": "larry" }
+      }
+    },
+    "directCall": {
+      "description": "A guarded tool call (Write/Edit/MultiEdit/mutating Bash) was allowed and counted toward the threshold (mechanism 2). Not a checkpoint — never resets the count.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "ts", "session_id", "ticket", "kind", "tool_name"],
+      "properties": {
+        "schema_version": { "const": 1 },
+        "ts": { "type": "string", "minLength": 1 },
+        "session_id": { "type": ["string", "null"] },
+        "ticket": { "type": "string", "minLength": 1 },
+        "kind": { "const": "direct-call" },
+        "tool_name": { "type": "string", "enum": ["Write", "Edit", "MultiEdit", "Bash"] }
+      }
+    }
+  }
+}

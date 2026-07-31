@@ -11,8 +11,13 @@ import {
   governorHookCommand,
   guardHookCommand,
   guardScriptFor,
+  delegationObserverHookCommand,
+  delegationGateHookCommand,
+  delegationScriptFor,
   isGovernorHook,
   isGuardHook,
+  isDelegationObserverHook,
+  isDelegationGateHook,
   hookTargets,
   danglingTargets,
   planSettings,
@@ -21,8 +26,11 @@ import {
   HOOK_EVENT,
   GUARD_EVENT,
   GUARD_MATCHER,
+  DELEGATION_OBSERVER_MATCHER,
+  DELEGATION_GATE_MATCHER,
   GOVERNOR_MARKER,
   GUARD_MARKER,
+  DELEGATION_MARKER,
 } from './install-hooks.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -453,6 +461,154 @@ test('REQUIREMENT 8: the real settings shape reconciles — dangling ensure-watc
     assert.deepEqual(second.report.pruned, [], 'nothing left to prune');
     assert.equal(second.backup, null);
     assert.equal(readFileSync(settingsPath(c.root), 'utf8'), settled, 'byte-identical');
+  } finally {
+    c.cleanup();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Delegation ledger + substantial-work threshold gate — wired in as a
+// third/composed entry on the SAME PreToolUse pattern worktree-guard's own
+// gate already uses, without touching worktree-guard.mjs itself.
+// ---------------------------------------------------------------------------
+
+test('delegationScriptFor derives the sibling, and refuses to guess from an unrelated path', () => {
+  assert.equal(delegationScriptFor('C:/x/tools/governor/reorient.mjs'), 'C:/x/tools/governor/delegation-gate.mjs');
+  assert.equal(delegationScriptFor('C:\\x\\tools\\governor\\reorient.mjs'), 'C:/x/tools/governor/delegation-gate.mjs');
+  assert.equal(delegationScriptFor('C:/x/something-else.mjs'), null, 'no guess, no delegation gate');
+  assert.equal(delegationObserverHookCommand('C:/d.mjs', 'C:/estate'), 'node C:/d.mjs observe --estate C:/estate');
+  assert.equal(delegationObserverHookCommand('C:/d.mjs', null), 'node C:/d.mjs observe');
+  assert.equal(delegationGateHookCommand('C:/d.mjs', 'C:/estate'), 'node C:/d.mjs check --estate C:/estate');
+  assert.equal(delegationGateHookCommand('C:/d.mjs', null), 'node C:/d.mjs check');
+});
+
+test('isDelegationObserverHook and isDelegationGateHook tell the two subcommands of the SAME script apart', () => {
+  const observer = { command: 'node C:/x/tools/governor/delegation-gate.mjs observe --estate C:/estate' };
+  const gate = { command: 'node C:/x/tools/governor/delegation-gate.mjs check --estate C:/estate' };
+  assert.equal(isDelegationObserverHook(observer), true);
+  assert.equal(isDelegationObserverHook(gate), false);
+  assert.equal(isDelegationGateHook(gate), true);
+  assert.equal(isDelegationGateHook(observer), false);
+  assert.ok(observer.command.includes(DELEGATION_MARKER) && gate.command.includes(DELEGATION_MARKER));
+});
+
+test('one install ships ALL FOUR governor hooks: SessionStart brief, wrong-worktree gate, delegation observer, delegation threshold gate', () => {
+  const c = makeCheckout();
+  try {
+    const r = installHooks({ checkout: c.root, scriptPath: SCRIPT });
+    const doc = JSON.parse(readFileSync(settingsPath(c.root), 'utf8'));
+
+    const observerHooks = hooksFor(doc, GUARD_EVENT).filter(isDelegationObserverHook);
+    assert.equal(observerHooks.length, 1, 'exactly one delegation observer hook');
+    assert.ok(observerHooks[0].command.includes('observe'));
+    assert.ok(observerHooks[0].command.includes('--estate'));
+
+    const gateHooks = hooksFor(doc, GUARD_EVENT).filter(isDelegationGateHook);
+    assert.equal(gateHooks.length, 1, 'exactly one delegation threshold gate hook');
+    assert.ok(gateHooks[0].command.includes('check'));
+    assert.ok(gateHooks[0].command.includes('--estate'));
+
+    const observerGroup = doc.hooks[GUARD_EVENT].find((g) => (g.hooks || []).some(isDelegationObserverHook));
+    assert.equal(observerGroup.matcher, DELEGATION_OBSERVER_MATCHER);
+
+    const gateGroup = doc.hooks[GUARD_EVENT].find((g) => (g.hooks || []).some(isDelegationGateHook));
+    assert.equal(gateGroup.matcher, DELEGATION_GATE_MATCHER);
+    assert.ok(!DELEGATION_GATE_MATCHER.split('|').includes('NotebookEdit'), 'the threshold gate must NOT govern NotebookEdit');
+    for (const tool of ['Write', 'Edit', 'MultiEdit', 'Bash']) {
+      assert.ok(DELEGATION_GATE_MATCHER.split('|').includes(tool));
+    }
+
+    // worktree-guard's own gate is still installed too — this is additive, not a replacement.
+    assert.equal(hooksFor(doc, GUARD_EVENT).filter(isGuardHook).length, 1);
+    assert.equal(hooksFor(doc, HOOK_EVENT).filter(isGovernorHook).length, 1);
+
+    assert.equal(r.report.events.delegationObserver.added, true);
+    assert.equal(r.report.events.delegationGate.added, true);
+  } finally {
+    c.cleanup();
+  }
+});
+
+test('X-2: installing all four hooks is idempotent — the second and third runs write nothing', () => {
+  const c = makeCheckout();
+  try {
+    assert.equal(installHooks({ checkout: c.root, scriptPath: SCRIPT }).changed, true);
+    const after = readFileSync(settingsPath(c.root), 'utf8');
+    assert.equal(installHooks({ checkout: c.root, scriptPath: SCRIPT }).changed, false);
+    assert.equal(installHooks({ checkout: c.root, scriptPath: SCRIPT }).changed, false);
+    assert.equal(readFileSync(settingsPath(c.root), 'utf8'), after, 'byte-identical');
+  } finally {
+    c.cleanup();
+  }
+});
+
+test('MUTATION: the delegation observer and gate hooks are never pruned by the Q-5 rule, even before delegation-gate.mjs exists on disk', () => {
+  const c = makeCheckout();
+  try {
+    const nowhere = 'C:/definitely/not/here/tools/governor/reorient.mjs';
+    const r = installHooks({ checkout: c.root, scriptPath: nowhere });
+    const doc = JSON.parse(readFileSync(settingsPath(c.root), 'utf8'));
+    assert.equal(hooksFor(doc, GUARD_EVENT).filter(isDelegationObserverHook).length, 1);
+    assert.equal(hooksFor(doc, GUARD_EVENT).filter(isDelegationGateHook).length, 1);
+    assert.ok(
+      !r.report.pruned.some((p) => p.command.includes(DELEGATION_MARKER)),
+      'the delegation hooks must never prune themselves — a fresh clone installs before it builds'
+    );
+
+    installHooks({ checkout: c.root, scriptPath: nowhere });
+    const again = JSON.parse(readFileSync(settingsPath(c.root), 'utf8'));
+    assert.equal(hooksFor(again, GUARD_EVENT).filter(isDelegationObserverHook).length, 1);
+    assert.equal(hooksFor(again, GUARD_EVENT).filter(isDelegationGateHook).length, 1);
+  } finally {
+    c.cleanup();
+  }
+});
+
+test('REPORT INTEGRITY: a single unrelated PreToolUse hook is examined exactly ONCE, even though three specs (guard, delegation observer, delegation gate) share that event', () => {
+  // This pins the fix that made multiple specs safely share one event: before
+  // it, each spec re-scanned every group already pushed by an earlier spec
+  // THIS run, inflating `examined`/`kept` for hooks that were already
+  // accounted for. Proven here with a genuinely pre-existing, unrelated
+  // PreToolUse hook that has nothing to do with any governor spec.
+  const c = makeCheckout({
+    settings: {
+      hooks: {
+        [GUARD_EVENT]: [{ hooks: [{ type: 'command', command: 'node REPLACE_ME/services/real-hook.mjs' }] }],
+      },
+    },
+  });
+  try {
+    const raw = readFileSync(settingsPath(c.root), 'utf8').replace(/REPLACE_ME/g, c.root.replace(/\\/g, '/'));
+    writeFileSync(settingsPath(c.root), raw);
+
+    const r = installHooks({ checkout: c.root, scriptPath: SCRIPT });
+    assert.equal(
+      r.report.examined,
+      1,
+      'the one pre-existing PreToolUse hook must be counted exactly once, not once per spec sharing the event'
+    );
+    assert.equal(r.report.kept, 1);
+    assert.deepEqual(r.report.pruned, []);
+
+    const doc = JSON.parse(readFileSync(settingsPath(c.root), 'utf8'));
+    assert.ok(
+      hooksFor(doc, GUARD_EVENT).some((h) => h.command.includes('real-hook.mjs')),
+      'the unrelated existing hook must still survive, exactly once'
+    );
+  } finally {
+    c.cleanup();
+  }
+});
+
+test('the report names the delegation hooks in renderReport output', () => {
+  const c = makeCheckout();
+  try {
+    const r = installHooks({ checkout: c.root, scriptPath: SCRIPT });
+    const text = renderReport(r);
+    assert.match(text, /delegation-dispatch observer/);
+    assert.match(text, /substantial-work threshold gate/);
+    assert.match(text, /delegation-gate\.mjs observe/);
+    assert.match(text, /delegation-gate\.mjs check/);
   } finally {
     c.cleanup();
   }
