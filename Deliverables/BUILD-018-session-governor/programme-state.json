@@ -90,14 +90,18 @@
     {
       "id": "T-05",
       "title": "Status-line display of the verdict",
-      "state": "frontier",
+      "state": "resolved",
       "model": "Sonnet",
       "depends_on": [
         "T-04"
       ],
-      "resolved": null,
-      "evidence": [],
-      "note": null
+      "resolved": "2026-07-31",
+      "evidence": [
+        "tools/governor/status-line.mjs",
+        "tools/governor/status-line.test.mjs",
+        "Deliverables/BUILD-018-session-governor/evidence/T-05-status-line.md"
+      ],
+      "note": "renderStatusLine (pure, AD-11) + computeStatusLine (one impure composition wrapper, injectable evaluateFn). 14/14 ticket tests, 528/528 suite-wide (was 514/514). Mutation test named by the map (evaluate() throws -> line still renders, shows BLIND) proven both for a thrown Error and a thrown non-Error value. Independently re-verified by Larry: tests re-run (14/14, 528/528), secret scan re-run (--surface, exit 0, 3/3 declared files, 0 secrets), commit diff reconciled (3 files, 0 outside file_surface). Built under Work Order WO-2026-07-31-02, read-back ACCEPTed before implementation (Deliverables/BUILD-018-session-governor/tickets/T-05-status-line-work-order.md). Deliberately not wired into the live statusLine command (T-03 precedent) and does not gather live signals (T-12 scope)."
     },
     {
       "id": "T-06",
@@ -398,7 +402,7 @@
   "model_recommendation": {
     "model": "Sonnet",
     "effort": null,
-    "rationale": "T-05 is the only ticket the computed frontier names as takable."
+    "rationale": "T-12 chosen over T-06 by Larry's judgement (deriveResumption refuses to auto-select among 3 frontier tickets: T-06, T-08, T-12). T-08 (dogfood) stays deliberately last per the map's own wave order (Wave 5, after T-05/T-06/T-12 land). Between T-06 and T-12, T-12 carries no open prototyping fog and Larry's own Q-3 recommendation already favours proceeding now; T-06 depends on F-5 (unresolved prompt-detection prototype) and Q-2 (unresolved override-design question) before Opus-tier architectural judgement is well-spent."
   },
   "workers": [
     {
@@ -715,9 +719,9 @@
     "verified_at": "2026-07-31"
   },
   "resumption": {
-    "focus": "The operating-model correction opened this session (generic-agent bypass of the named specialist team, caught by Warwick) is now closed: routing cheatsheet fixed (Team/Larry - Orchestrator/AGENTS.md), SOP-001 fixed, and T-16 (the mechanical enforcement gate) implemented under a proper Keel Work Order with Silas-owned schema. D-1 (T-04 provenance), D-2 (this session's routing bypass) and D-3 (the programme-wide pattern back to T-01) all stay recorded, not retroactively erased -- Warwick's explicit ruling was to record and correct going forward, not reopen T-01 through T-14. Frontier reverts to the pre-correction set (T-05/T-06/T-08/T-12); T-05 remains the chosen next action.",
-    "next_action": "Implement T-05, the status-line display: render the evaluate() verdict compactly wherever Warwick's live status line is surfaced. Acceptance (map section 9): renders all five states (GREEN/AMBER/RED/RECOVERY/BLIND); degrades gracefully. Mutation test named by the map: if the evaluator throws, the line still renders and shows BLIND. IMPORTANT: per the now-corrected operating model, this is a Keel-domain implementation ticket (tools/governor/** is explicitly in Keel's contract) -- route it through a proper Work Order (Team Knowledge/Templates/work-order.md, SOP-022), not direct implementation. Note the same harness gap T-16 hit: \"keel\" may not be a directly-dispatchable subagent_type this session -- check first, and if still absent, route via the general-purpose runtime instructed to operate under Keel's actual contract, exactly as T-16 did, rather than silently reverting to unrouted direct implementation.",
-    "ticket": "T-05",
+    "focus": "T-05 landed (status-line renderer, independently verified). Frontier is now T-06/T-08/T-12; Larry chose T-12 as the next action over T-06 -- both remaining tickets carry an open Warwick question (Q-2 for T-06, Q-3 for T-12) that stays unresolved either way. T-08 (dogfood) deliberately deferred to last per the map's wave order.",
+    "next_action": "Implement T-12, the portability adapter extraction: prove the evaluator core (tools/governor/evaluator.mjs) and its consumers (status-line.mjs) have zero myPKA-specific paths by running them against a synthetic estate adapter with an all-unknown signal set, asserting the result is BLIND. This is a Keel-domain ticket (tools/governor/**) -- route it through a proper Work Order (Team Knowledge/Templates/work-order.md, SOP-022), not direct implementation. Larry's judgement call between T-06 and T-12 (both were on the post-T-05 frontier): T-12 chosen because it is Sonnet-tier, Larry's own recorded recommendation on Q-3 already favours designing the adapter boundary now ('nearly free' -- AD-11), and it has no open prototyping fog blocking it (unlike T-06, which needs F-5's prompt-detection prototype and Q-2's override-design answer, both still open, before an Opus-tier RED-preflight design is well-founded). T-06 remains fully available and is not deprioritised structurally -- Warwick can redirect to it at any time; Q-2 and Q-3 both remain open and unresolved for Warwick, this is Larry choosing WHICH unresolved-fog ticket to attempt next, not resolving the fog itself.",
+    "ticket": "T-12",
     "worktree": "C:/Fusion247PKA-governor",
     "branch": "build-018/session-governor",
     "read_first": [
