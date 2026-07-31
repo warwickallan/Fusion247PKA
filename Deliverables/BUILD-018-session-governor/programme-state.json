@@ -264,12 +264,17 @@
     {
       "id": "T-16",
       "title": "Mechanical delegation-enforcement gate — delegation ledger + substantial-work threshold, specialist-match verification against Team/agent-index.md",
-      "state": "frontier",
+      "state": "resolved",
       "model": "Opus",
       "depends_on": [],
-      "resolved": null,
-      "evidence": [],
-      "note": "Added mid-programme after Warwick caught this session bypassing the named specialist team (generic ephemeral agents used for design + implementation instead of Keel/Silas). Design by Larry, hardened by Nolan's audit (governing_specialist/specialist_match fields), schema owned by Silas, implementation under a proper Keel Work Order with read-back gate. Not yet resolved."
+      "resolved": "2026-07-31",
+      "evidence": [
+        "tools/governor/delegation-gate.mjs",
+        "tools/governor/delegation-gate.test.mjs",
+        "tools/governor/delegation-ledger-record.schema.json",
+        "Deliverables/BUILD-018-session-governor/decisions/D-delegation-ledger-schema.md"
+      ],
+      "note": "Closes D-2/D-3: the mechanical delegation-enforcement gate is implemented under a proper Work Order (WO-2026-07-31-01), read-back gated, ACCEPT verdict, following the operating-model correction this session opened. Routed through Keel's actual written contract (Team/Keel - Implementation Engineer/AGENTS.md) via the general-purpose runtime, since the harness does not expose \"keel\" as a directly dispatchable subagent type this session despite the shim being committed -- a live infrastructure gap, flagged, not silently worked around. Schema owned by Silas (Deliverables/BUILD-018-session-governor/decisions/D-delegation-ledger-schema.md): discriminated union by kind (task/justify/direct-call), schema_version const, JSONL over qa-binding.mjs's JSON-array pattern (fault isolation per bad line beats one-corrupt-byte-kills-the-document), full-content atomic rewrite reusing health-store.mjs's primitive (rejected raw OS append -- Windows has no equivalently proven atomicity guarantee), physical line order for checkpoint counting (never a ts re-sort -- ts can tie or run backwards on a clock step, file position cannot), governing_specialist/specialist_match on task records (mechanical exact-match against .claude/agents/*.md slugs only -- domain-matching against Team/agent-index.md's free text is a judgement problem, explicitly deferred, reserved as \"no-fit-declared\" but not v1-populated), corrupt-line handling that surfaces skips rather than swallowing them ({records, skipped, path}). Silas's review also caught and corrected a real bug in the original draft's reasoning: the file-header claimed a lost checkpoint record \"cannot\" cause a wrongful DENY, which conflates the gate's fail-open error-handling path with a silently-successful-but-undercounting read -- fixed, accepted as bounded self-healing residual risk (one avoidable DENY, immediately visible, one-command recovery via justify), not mitigated with locking. tools/governor/delegation-gate.mjs (926 lines) + delegation-gate.test.mjs (60/60, up from the unauthorised draft's 34) + delegation-ledger-record.schema.json (new) + install-hooks.mjs/install-hooks.test.mjs wiring (pre-existing working-tree state, verified correct and idempotent, not modified further). worktree-guard.mjs untouched -- 27/27 before and after, byte-identical git diff, same composition discipline as T-14/T-15. Fail-open preserved: any internal gate error (unresolvable ticket, unreadable/unwritable ledger, worktree-guard throwing) still ALLOWs, never DENYs -- a discipline gate, not a safety-critical one. Full suite 514/514, independently re-run and confirmed by Larry (not just the builder's self-report). Secret-scan clean, 5/5 declared files, exit 0. Explicitly labelled by the builder: \"Builder self-test evidence -- NOT independent review\" -- SOP-018 independent QA has not run over this diff, same standing requirement as every other ticket in this programme before merge (merge-readiness's independent-review check), not a new gap specific to T-16."
     }
   ],
   "blockers": [
@@ -738,15 +743,17 @@
     "verified_at": "2026-07-31"
   },
   "resumption": {
-    "focus": "T-15 (post-clear model selection gate) landed 2026-07-31, closing the live defect this correction was opened over. A second, related correction is in flight in parallel: a mechanical delegation-enforcement gate (delegation ledger + substantial-work threshold on direct Write/Edit/MultiEdit/mutating-Bash calls, composed the same additive way onto worktree-guard.mjs) is being implemented by a dispatched agent and will be integrated as its own ticket once it lands and is reviewed — it is NOT yet resolved as of this banking. T-04's write-back log entry now also carries a new D-1 blocker recording that its implementation-model provenance is unknown (built under Auto, not the recommended Opus) and requires independent QA at its exact head before merge — T-04 itself is unchanged, preserved exactly as landed. Frontier reverts to the pre-T-15 set (T-05/T-06/T-08/T-12); T-05 remains the chosen next action per the map's own wave order.",
-    "next_action": "Implement T-05, the status-line display: render the evaluate() verdict compactly wherever Warwick's live status line is surfaced. Acceptance (map section 9): renders all five states (GREEN/AMBER/RED/RECOVERY/BLIND); degrades gracefully. Mutation test named by the map: if the evaluator throws, the line still renders and shows BLIND. Read tools/governor/evaluator.mjs 's verdict shape and tools/governor/sampler.mjs before starting. NOTE: per the now-standing operating model, this ticket is a delegation candidate, not automatically Larry's own — consider dispatching it to an agent rather than implementing it directly, and if a not-yet-landed delegation-enforcement gate is active by the time this session resumes, direct implementation of this ticket will be mechanically gated in the same way.",
+    "focus": "The operating-model correction opened this session (generic-agent bypass of the named specialist team, caught by Warwick) is now closed: routing cheatsheet fixed (Team/Larry - Orchestrator/AGENTS.md), SOP-001 fixed, and T-16 (the mechanical enforcement gate) implemented under a proper Keel Work Order with Silas-owned schema. D-1 (T-04 provenance), D-2 (this session's routing bypass) and D-3 (the programme-wide pattern back to T-01) all stay recorded, not retroactively erased -- Warwick's explicit ruling was to record and correct going forward, not reopen T-01 through T-14. Frontier reverts to the pre-correction set (T-05/T-06/T-08/T-12); T-05 remains the chosen next action.",
+    "next_action": "Implement T-05, the status-line display: render the evaluate() verdict compactly wherever Warwick's live status line is surfaced. Acceptance (map section 9): renders all five states (GREEN/AMBER/RED/RECOVERY/BLIND); degrades gracefully. Mutation test named by the map: if the evaluator throws, the line still renders and shows BLIND. IMPORTANT: per the now-corrected operating model, this is a Keel-domain implementation ticket (tools/governor/** is explicitly in Keel's contract) -- route it through a proper Work Order (Team Knowledge/Templates/work-order.md, SOP-022), not direct implementation. Note the same harness gap T-16 hit: \"keel\" may not be a directly-dispatchable subagent_type this session -- check first, and if still absent, route via the general-purpose runtime instructed to operate under Keel's actual contract, exactly as T-16 did, rather than silently reverting to unrouted direct implementation.",
     "ticket": "T-05",
     "worktree": "C:/Fusion247PKA-governor",
     "branch": "build-018/session-governor",
     "read_first": [
       "Deliverables/BUILD-018-session-governor/02-MAP.md - the live execution SSOT (AD-17)",
       "Deliverables/BUILD-018-session-governor/01-GOAL-CONTRACT.md - the product SSOT; wins over any ticket",
-      "tools/governor/model-gate.mjs - T-15, the post-clear model gate now composed into reorientation",
+      "Team/Larry - Orchestrator/AGENTS.md - the corrected routing cheatsheet; re-check it before any substantial dispatch, not only when in doubt",
+      "Team/agent-index.md - the routing SSOT for which named specialist owns which domain",
+      "tools/governor/delegation-gate.mjs - T-16, the mechanical gate now composed into worktree-guard.mjs's PreToolUse pattern",
       "tools/governor/evaluator.mjs - the T-04 verdict shape T-05 renders",
       "tools/governor/programme-state.mjs - resolveTicket/deriveResumption/resolveTicketAndAdvance/applyTicketResolution are the ONLY sanctioned way to resolve a ticket or re-point resumption"
     ],
@@ -754,13 +761,14 @@
       "Do not hand-edit tickets[].state, resumption.*, or 02-MAP.md's GOVERNOR:STATUS block directly — use resolveTicketAndAdvance / applyTicketResolution.",
       "Do not open or merge the recovery PR (recovery/2026-07-31-governor-abort-handoff at 95c265d).",
       "Do not alter local main.",
-      "Do not create the BUILD-018 PR yet - merge-readiness is not yet true, and T-04 now carries an explicit unresolved QA blocker (D-1) besides.",
+      "Do not create the BUILD-018 PR yet - merge-readiness is not yet true, and T-04/T-16 both carry recorded blockers (D-1, D-2/D-3) awaiting independent QA before merge.",
       "Do not modify, move or delete the six Cairn intake files under Team Knowledge/Sources/.",
       "Do not delete or clean any pre-existing worktree without first proving owner, branch, status and disposition.",
       "Do not run /close-session, and do not start the VlogOps product build.",
       "Do not re-litigate the settled decisions in 02-MAP.md section 3.",
       "Do not read GL-012 from this working tree - it is the pre-ruling text. Use git show 95c265d.",
-      "Do not implement a delegable ticket directly without first stating a delegation plan — this is now the standing operating model (see CLAUDE.md), not just a T-15-session correction."
+      "Do not reopen or rebuild T-01 through T-14 over the routing-provenance finding (D-3) — Warwick's explicit ruling.",
+      "Do not implement a delegable ticket directly without first stating a delegation plan and checking Team/Larry - Orchestrator/AGENTS.md's routing cheatsheet — this is the standing operating model now, not a one-session correction."
     ]
   },
   "locked_decisions": [
