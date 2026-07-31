@@ -304,6 +304,18 @@
       "resolved": null,
       "evidence": [],
       "note": "Found by Larry's independent verification of T-17 (2026-08-01), NOT by the ticket's own tests. See D-5. Fixes a SHARED defect in health-store.mjs (T-02) and delegation-gate.mjs (T-16): both do writeFileSync(tmp) then renameSync(tmp, target) with no retry, and on Windows a rename onto an existing target throws EPERM when another process holds it. MEASURED: health-store 21/48 writer processes failed under 16 concurrent processes; delegation-gate's own concurrency test fails roughly 2 runs in 5 in isolation. Secondary defect: every failed rename ORPHANS its temp file permanently (21 observed, cleaned by hand). Scope: bounded retry with backoff on EPERM/EBUSY/EACCES, temp-file cleanup in a finally, and a concurrency proof that asserts a NON-ZERO success count rather than only the absence of tearing."
+    },
+    {
+      "id": "T-19",
+      "title": "Adopt the shared atomic write in the remaining three sites, and correct the false concurrency comment",
+      "state": "blocked",
+      "model": "Sonnet",
+      "depends_on": [
+        "T-18"
+      ],
+      "resolved": null,
+      "evidence": [],
+      "note": "Found by Keel's T-18 read-back (WO-2026-08-01-01, contradiction C4), verified by Larry. The unretried writeFileSync+renameSync pattern exists at FIVE sites, not two. T-18 fixes the two concurrent-path callers (health-store.mjs, delegation-gate.mjs) and deliberately does NOT sprawl into the rest. This ticket adopts the T-18 primitive in the remaining three: build-registry.mjs:275, programme-state.mjs:630 AND :638 (the banking / write-back path), qa-binding.mjs:288. ALSO corrects a FALSE COMMENT that has already propagated by citation: qa-binding.mjs:282-284 asserts 'two concurrent writers never interleave. Same recipe as health-store.mjs and writeProgrammeState' -- the interleave claim is true but irrelevant, and it reads as a concurrency-safety guarantee the code does not provide (the writers do not interleave, they FAIL). health-store.mjs's own header carries the same overclaim. Blocked on T-18 because there is no shared primitive to adopt until it exists."
     }
   ],
   "blockers": [
@@ -440,6 +452,16 @@
         "T-18"
       ],
       "recommendation": "Fix in T-18: bounded retry with backoff on EPERM/EBUSY/EACCES around the rename, temp-file cleanup in a finally so a failure never orphans, applied to the ONE shared primitive rather than copy-pasted into two modules. The concurrency proof must assert a non-zero SUCCESS count, not merely the absence of tearing - a test that passes when every writer fails is the exact vacuous-green shape AD-24 already refuses elsewhere. DIRECTION OF HARM IS SAFE BUT NOT NIL, and this is why it is a defect rather than a curiosity: a lost health sample degrades to BLIND/stale (AD-3, safe) and a lost delegation checkpoint undercounts toward a MISSED deny (discipline gate, bounded) - but T-03's sampler is intended to run on EVERY assistant message from the live statusLine, which is precisely the high-concurrency path this primitive fails on, so the real-world hit rate rises sharply the moment that wiring is activated."
+    },
+    {
+      "id": "D-6",
+      "kind": "defect",
+      "summary": "A false concurrency-safety claim has propagated across three modules BY CITATION. qa-binding.mjs:282-284 states: 'A write killed mid-flight leaves the previous good file untouched; two concurrent writers never interleave. Same recipe as health-store.mjs and writeProgrammeState.' The non-interleaving half is true and the durability half is true, but together they read as a concurrency-safety guarantee the code does not provide - concurrent writers do not interleave, they FAIL with EPERM (see D-5, measured). health-store.mjs's header carries the same overclaim, and qa-binding.mjs explicitly cites it and writeProgrammeState as precedent, which is how one module's overstated comment became three modules' shared belief. This is a documentation defect with real consequence: it is the reason the pattern was copied forward unexamined into build-registry.mjs, programme-state.mjs and qa-binding.mjs.",
+      "owner": "larry",
+      "blocks": [
+        "T-19"
+      ],
+      "recommendation": "Correct the comments in T-19 alongside adopting the shared primitive. State what is actually true: the write is atomic (never torn, never partially visible) and durable against a mid-flight kill, and separately state whether concurrent writers SUCCEED - which after T-18 they do, by bounded retry, and before T-18 they frequently did not. Do not simply delete the comments; an absent claim invites the next author to re-derive the same wrong one. This is the estate's 'state what was PROVEN, not what it implies' rule applied to a code comment."
     }
   ],
   "model_recommendation": {
