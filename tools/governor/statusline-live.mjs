@@ -24,6 +24,7 @@ import { parseStdinPayload, sampleFromStdin } from './sampler.mjs';
 import { evaluate, STATE } from './evaluator.mjs';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
 
@@ -41,24 +42,51 @@ function advice(state) {
   }
 }
 
-// The recommended next model comes from the banked programme state — the same
-// value /rotate-session writes and the reorientation brief reads. Found from the
-// session's own cwd so this works in any build's worktree; absent is fine.
-function recommendedModel(cwd) {
+// AC6 — the recommended next model comes from the banked programme state of the
+// ACTIVE build. It used to come from whichever `Deliverables/*` directory the
+// filesystem enumerated FIRST, which is alphabetical order dressed up as a
+// decision: the moment a second build exists, this line confidently recommends
+// another programme's model, and Warwick has no way to tell from the footer
+// which build answered.
+//
+// The selection rule is `programme.status === "active"` — the SAME rule
+// reorient.mjs already applies to the same documents, deliberately, so the
+// status line and the reorientation brief can never disagree about which build
+// is running.
+//
+// Zero active, or MORE THAN ONE active, renders NOTHING. A wrong model is worse
+// than an absent one: absent invites a look at the state, wrong invites acting
+// on it. `null` here means "not established", never "none" (INV-1). The `UNSET`
+// predicate and the footer grammar are Silas's (D-D) and are NOT decided here.
+export function recommendedModel(
+  cwd,
+  { readdir = readdirSync, read = readFileSync, exists = existsSync } = {}
+) {
   try {
     const deliverables = join(cwd || process.cwd(), 'Deliverables');
-    if (!existsSync(deliverables)) return null;
-    for (const entry of readdirSync(deliverables)) {
+    if (!exists(deliverables)) return null;
+    const active = [];
+    for (const entry of readdir(deliverables)) {
       const p = join(deliverables, entry, 'programme-state.json');
-      if (!existsSync(p)) continue;
-      const doc = JSON.parse(readFileSync(p, 'utf8'));
+      if (!exists(p)) continue;
+      let doc;
+      try {
+        doc = JSON.parse(read(p, 'utf8'));
+      } catch {
+        // An unparseable state file is not an active build, and must not be
+        // able to suppress a sibling that IS readable.
+        continue;
+      }
+      if (doc?.programme?.status !== 'active') continue;
       const m = doc?.model_recommendation?.model;
-      if (typeof m === 'string' && m.length) return m;
+      if (typeof m === 'string' && m.length) active.push(m);
     }
+    // Exactly one active build, or nothing at all. Never a guess.
+    return active.length === 1 ? active[0] : null;
   } catch {
-    // A missing/rotten/unreadable state file must never break the status line.
+    // A missing/rotten/unreadable state directory must never break the line.
+    return null;
   }
-  return null;
 }
 
 function readStdin() {
@@ -97,12 +125,20 @@ function main() {
   return `⟦GOV⟧ ${parts.join(' · ')}`;
 }
 
-let line;
-try {
-  line = main();
-} catch (err) {
-  // Absolute last resort: still print, still exit 0.
-  line = `⟦GOV⟧ ctx -- · BLIND · KEEP GOING? (governor error: ${err?.message || err})`;
+// Run ONLY when executed directly. Without this guard the module printed a line
+// and called `process.exit(0)` at IMPORT time, which made it impossible to test
+// — importing it from a test killed the test runner. Every other module in
+// tools/governor/ already uses this exact entrypoint guard; this one is now
+// consistent with them, and the CLI behaviour when actually invoked is
+// unchanged (one line on stdout, always exit 0).
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  let line;
+  try {
+    line = main();
+  } catch (err) {
+    // Absolute last resort: still print, still exit 0.
+    line = `⟦GOV⟧ ctx -- · BLIND · KEEP GOING? (governor error: ${err?.message || err})`;
+  }
+  process.stdout.write(`${line}\n`);
+  process.exit(0);
 }
-process.stdout.write(`${line}\n`);
-process.exit(0);

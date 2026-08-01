@@ -67,6 +67,63 @@ export const VERDICT = {
 };
 
 // ---------------------------------------------------------------------------
+// SessionStart source policy — Silas's decision D-B §B-2 (2026-08-01)
+// ---------------------------------------------------------------------------
+// SPEC AMENDMENT (WO-2026-08-01-01, AC1). This REPLACES the former
+// `source !== 'clear'` guard, which made reorientation unreachable on `startup`
+// and `resume` — two of the three real ways a build is re-entered, and the two
+// with the emptiest context. That guard and the installer's `matcher: 'clear'`
+// were two independent gates; widening either alone ships nothing, which is why
+// install-hooks.mjs drops its SessionStart matcher in the same change.
+//
+// An UNRECOGNISED source falls through to the MOST informative brief, never to
+// silence: an over-informative brief wastes a few hundred characters, an absent
+// one loses the build. Unknown is never absent (INV-1).
+export const BRIEF_MODE = { FULL: 'full', DELTA: 'delta' };
+
+export const SOURCE_POLICY = {
+  clear: {
+    mode: BRIEF_MODE.FULL,
+    headline: 'This context was CLEARED. Nothing of the previous session survives in context.',
+  },
+  startup: {
+    mode: BRIEF_MODE.FULL,
+    headline: 'This is a FRESH session. Nothing has been established in this context yet.',
+  },
+  compact: {
+    mode: BRIEF_MODE.FULL,
+    headline:
+      'RECOVERY — this context was COMPACTED. Treat in-context memory as a lossy summary, ' +
+      'not as evidence; re-read from disk before acting on anything you think you remember.',
+  },
+  resume: {
+    mode: BRIEF_MODE.DELTA,
+    headline:
+      'This session was RESUMED, so your restored transcript already carries the history. ' +
+      'Only the delta is below. Your restored history may PREDATE the banked state — ' +
+      'durable state on disk wins over anything in the transcript.',
+  },
+};
+
+// Returns the rendering policy for a SessionStart source. Never returns null:
+// an unrecognised or absent source is reported as such and still gets a brief.
+export function briefModeFor(source) {
+  const known = Object.prototype.hasOwnProperty.call(SOURCE_POLICY, source)
+    ? SOURCE_POLICY[source]
+    : null;
+  if (known) return { ...known, source, recognised: true };
+  const shown = source === undefined || source === null ? '(absent)' : JSON.stringify(source);
+  return {
+    mode: BRIEF_MODE.FULL,
+    recognised: false,
+    source,
+    headline:
+      `UNRECOGNISED SessionStart source ${shown} — this governor does not know this entry ` +
+      'path, so it is giving you the FULL brief rather than guessing. Report the value above.',
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Hook input — pure, never throws
 // ---------------------------------------------------------------------------
 
@@ -387,7 +444,19 @@ export function renderLocationSection(canonical, comparison) {
 
 export function renderOrientationBrief(
   state,
-  { statePath, worktree, freshness, canonical, location, facts, cap = CONTEXT_CAP }
+  {
+    statePath,
+    worktree,
+    freshness,
+    canonical,
+    location,
+    facts,
+    cap = CONTEXT_CAP,
+    // D-B §B-2: the source decides the HEADLINE and the SECTION SET, nothing
+    // else. Defaulting to `clear` keeps every existing caller's behaviour
+    // byte-identical, so this parameter adds a mode rather than changing one.
+    sourceMode = briefModeFor('clear'),
+  }
 ) {
   const p = state.programme;
   const r = state.resumption;
@@ -406,6 +475,39 @@ export function renderOrientationBrief(
     : '✅ Banked state is FRESH against live git (AD-14 banking-commit comparison).';
 
   const locationSection = renderLocationSection(canonical, location);
+
+  // D-B §B-2 — `resume` gets a SHORT DELTA. The restored transcript already
+  // carries the history, so a full brief would spend context re-stating what is
+  // already in it. Everything a resumed session cannot obtain from its own
+  // transcript is here; everything else is a path.
+  if (sourceMode.mode === BRIEF_MODE.DELTA) {
+    const deltaSections = [];
+    if (locationSection) deltaSections.push(locationSection);
+    deltaSections.push({
+      name: 'delta',
+      required: true,
+      body: [
+        fence(`RESUMED — ${p.id} (delta only)`),
+        '',
+        sourceMode.headline,
+        '',
+        status,
+        '',
+        `  branch   : ${r.branch}`,
+        `  banked   : head ${String(state.banked.head_sha).slice(0, 7)} at ${state.banked.at}`,
+        `  ticket   : ${r.ticket || '(none named)'}`,
+        '',
+        '>>> THE EXACT NEXT ACTION <<<',
+        nextAction.text,
+        '',
+        `  durable state : ${statePath}`,
+      ].join('\n'),
+    });
+    const deltaAssembled = assembleBrief(deltaSections, { cap });
+    if (nextAction.truncated) deltaAssembled.fieldTruncations = ['resumption.next_action'];
+    return deltaAssembled;
+  }
+
   const sections = [];
   if (locationSection) sections.push(locationSection);
   sections.push(
@@ -415,8 +517,9 @@ export function renderOrientationBrief(
       body: [
         fence(`RESUMING ${p.id} — ${p.title}`),
         '',
-        `This context was cleared. The BUILD-018 Session Governor injected this brief automatically;`,
-        `nobody needs to re-brief you. It is a POINTER document — the full state is on disk.`,
+        sourceMode.headline,
+        `The BUILD-018 Session Governor injected this brief automatically; nobody needs to`,
+        `re-brief you. It is a POINTER document — the full state is on disk.`,
         '',
         status,
         '',
@@ -543,11 +646,9 @@ export function reorient({
   cap = CONTEXT_CAP,
   factsFn = gitFacts,
 } = {}) {
-  // Bounded: this fires on /clear only. Every other SessionStart source is a
-  // session that already has (or is about to restore) its own context.
-  if (source !== 'clear') {
-    return { verdict: VERDICT.SKIPPED, context: null, reason: `source=${source ?? '(absent)'} is not "clear"` };
-  }
+  // D-B §B-2 — EVERY source reorients. The source selects the brief's shape,
+  // it no longer decides whether there is a brief at all. See SOURCE_POLICY.
+  const sourceMode = briefModeFor(source);
 
   const worktrees = listWorktrees(cwd, execFile);
   if (worktrees === null) {
@@ -560,6 +661,15 @@ export function reorient({
 
   const files = discoverStateFiles(worktrees, { readdir });
   if (files.length === 0) {
+    // NOT CHANGED BY WO-2026-08-01-01, deliberately. Silas's D-B §B-3 re-purposes
+    // SKIPPED to this case and would have this return nothing at all — but that
+    // is justified there by D-C, "the hook now runs machine-wide", and D-C has
+    // NOT landed: this hook is still installed in ONE project scope, so a
+    // session that finds no banked state here is a real fault and not the noise
+    // B-3 is protecting Warwick from. Silencing it now would also reverse the
+    // deliberate control in reorient.test.mjs ("a LOUD missing brief, not
+    // silence") with no acceptance criterion asking for it. Land B-3 in the WP
+    // that lands D-C, and amend that control in the same change.
     const b = renderProblemBrief(VERDICT.MISSING, {
       detail: `Searched ${worktrees.length} worktree(s) for Deliverables/*/programme-state.json and found none.`,
       cap,
@@ -643,6 +753,7 @@ export function reorient({
     location,
     facts,
     cap,
+    sourceMode,
   });
 
   // Corrupt siblings are surfaced even on the happy path — a state file that
@@ -669,6 +780,7 @@ export function reorient({
     verdict,
     context,
     brief: b,
+    sourceMode,
     state: chosen.state,
     statePath: chosen.path,
     worktree: chosen.worktree,

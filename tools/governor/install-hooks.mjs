@@ -36,6 +36,28 @@ export const GUARD_EVENT = 'PreToolUse';
 export const GOVERNOR_MARKER = 'tools/governor/reorient.mjs';
 export const GUARD_MARKER = 'tools/governor/worktree-guard.mjs';
 export const DELEGATION_MARKER = 'tools/governor/delegation-gate.mjs';
+export const STATUSLINE_MARKER = 'tools/governor/statusline-live.mjs';
+
+// AC3 — hooks are SNAPSHOTTED at Claude Code process launch. Nolan established
+// this by observation: a hook deleted from settings at 17:05:08Z was still
+// firing at 21:39Z, and one `claude.exe` started before an install has served
+// every session since. So a hook change written by this installer is INERT
+// until Claude Code is fully restarted, and nothing used to say so — which made
+// a successful install indistinguishable from a no-op to the person running it.
+// `statusLine` is read live and is exempt; that asymmetry is stated, not hidden.
+export const RESTART_NOTICE = [
+  '  ⚠️  RESTART REQUIRED — THIS CHANGE IS NOT LIVE YET.',
+  '',
+  '      Claude Code reads `hooks` ONCE, at process launch, and holds that',
+  '      snapshot for the life of the process. Every session served by an',
+  '      already-running Claude Code will keep using the OLD hooks, however',
+  '      many times you re-run this installer.',
+  '',
+  '      Quit Claude Code COMPLETELY (not just this session) and start it',
+  '      again. Until you do, treat the hook changes above as not applied.',
+  '',
+  '      (`statusLine` is exempt — it is read live and takes effect at once.)',
+].join('\n');
 
 // The tools the PreToolUse guard adjudicates. Read-only tools are deliberately
 // absent: a misplaced session must still be able to diagnose itself, and a guard
@@ -127,6 +149,28 @@ export function delegationScriptFor(scriptPath) {
   return p.endsWith('reorient.mjs') ? p.replace(/reorient\.mjs$/, 'delegation-gate.mjs') : null;
 }
 
+// AC4 — `statusLine` is the ONE governor surface that currently works, and it
+// was reproducible from nothing but Warwick's untracked machine config: this
+// installer contained zero occurrences of `statusLine`, so a merge or a second
+// machine would have silently lost it. It is derived from the same sibling rule
+// as the guard and the delegation scripts, so a caller that names one names all.
+//
+// Note it is NOT a hook. `statusLine` is read LIVE by Claude Code, whereas hooks
+// are snapshotted at process launch — which is exactly why installing it takes
+// effect immediately while installing a hook does not (see RESTART_NOTICE).
+export function statuslineScriptFor(scriptPath) {
+  const p = String(scriptPath).replace(/\\/g, '/');
+  return p.endsWith('reorient.mjs') ? p.replace(/reorient\.mjs$/, 'statusline-live.mjs') : null;
+}
+
+export function statusLineCommand(scriptPath) {
+  return `node ${String(scriptPath).replace(/\\/g, '/')}`;
+}
+
+export function isGovernorStatusLine(statusLine) {
+  return typeof statusLine?.command === 'string' && statusLine.command.includes(STATUSLINE_MARKER);
+}
+
 // ---------------------------------------------------------------------------
 // Q-5 — dangling-target detection
 // ---------------------------------------------------------------------------
@@ -156,10 +200,32 @@ export function danglingTargets(command, { exists = existsSync, cwd } = {}) {
 
 export function planSettings(
   settings,
-  { scriptPath, guardPath, delegationPath, estate, exists = existsSync, cwd, prune = true } = {}
+  {
+    scriptPath,
+    guardPath,
+    delegationPath,
+    statuslinePath,
+    estate,
+    exists = existsSync,
+    cwd,
+    prune = true,
+  } = {}
 ) {
   const next = JSON.parse(JSON.stringify(settings ?? {}));
-  const report = { installed: false, replaced: false, pruned: [], kept: 0, examined: 0, events: {} };
+  const report = {
+    installed: false,
+    replaced: false,
+    pruned: [],
+    kept: 0,
+    examined: 0,
+    events: {},
+    // AC5 — `pruned: []` alone cannot distinguish "examined every target and
+    // found none missing" from "never looked". `pruneChecked` records which of
+    // those actually happened, so the report can never claim ground it did not
+    // examine. See renderReport.
+    pruneChecked: prune,
+    statusLine: null,
+  };
 
   if (!next.hooks || typeof next.hooks !== 'object') next.hooks = {};
 
@@ -180,8 +246,16 @@ export function planSettings(
   // and gate ship the same way: additive, and together — recording dispatches
   // with nothing to reset them against would be inert, and gating direct calls
   // with no way to observe a dispatch would make every ticket un-clearable.
+  // SPEC AMENDMENT (WO-2026-08-01-01 AC2, Silas D-B §B-1): the SessionStart
+  // entry carries NO matcher key at all — not `''`, not `'*'`. A matcher-less
+  // entry is proven to fire on `startup`, whereas any matcher that ENUMERATES
+  // sources means an unknown FUTURE source silently matches nothing, which is
+  // the same class of defect as the one being repaired. `matcher: 'clear'` here
+  // previously made reorientation unreachable on `startup` and `resume`.
+  // Filtering now lives in reorient.mjs's SOURCE_POLICY, where an unrecognised
+  // source falls through to a defined default instead of to silence.
   const managed = [
-    { event: HOOK_EVENT, matcher: 'clear', command, is: isGovernorHook, key: 'governor' },
+    { event: HOOK_EVENT, matcher: undefined, command, is: isGovernorHook, key: 'governor' },
   ];
   if (guardCommand) {
     managed.push({
@@ -276,11 +350,15 @@ export function planSettings(
     for (const spec of specs) {
       const state = states.get(spec);
       if (!state.installed) {
-        // Own group, with a matcher: SessionStart fires only on /clear, PreToolUse
-        // only on the tools each spec governs. The in-script guards are the
-        // testable ones; the matchers keep the hooks off everything unrelated.
+        // Own group. PreToolUse specs carry a matcher naming the tools they
+        // govern; the SessionStart spec deliberately carries NONE, so the key is
+        // OMITTED rather than written as undefined/'' — `JSON.stringify` would
+        // drop an undefined value anyway, but an explicit omission is what a
+        // reviewer reading the settings file needs to see. The in-script guards
+        // are the testable ones; a matcher only keeps a hook off things it must
+        // never see.
         next.hooks[event].push({
-          matcher: spec.matcher,
+          ...(spec.matcher === undefined ? {} : { matcher: spec.matcher }),
           hooks: [{ type: 'command', command: spec.command }],
         });
         state.installed = true;
@@ -292,7 +370,45 @@ export function planSettings(
     }
   }
 
-  return { settings: next, report, command, guardCommand, delegationObserveCommand, delegationCheckCommand };
+  // AC4 — statusLine, managed idempotently alongside the hooks. It lives at the
+  // TOP LEVEL of settings, not under `hooks`, so it cannot go through the loop
+  // above. Absent script → nothing is written and the report says so; this
+  // installer never invents a command it could not derive.
+  const resolvedStatusline = statuslinePath ?? statuslineScriptFor(scriptPath);
+  const statusLineCmd = resolvedStatusline ? statusLineCommand(resolvedStatusline) : null;
+  if (!statusLineCmd) {
+    report.statusLine = { state: 'not-installed', command: null };
+  } else {
+    const current = next.statusLine;
+    if (!current || typeof current !== 'object') {
+      next.statusLine = { type: 'command', command: statusLineCmd };
+      report.statusLine = { state: 'added', command: statusLineCmd };
+      report.added = true;
+    } else if (current.command !== statusLineCmd) {
+      // Re-point ONLY a governor status line. A third-party statusLine is
+      // somebody else's configuration and is left exactly as found — reported,
+      // never overwritten.
+      if (isGovernorStatusLine(current)) {
+        next.statusLine = { ...current, type: current.type ?? 'command', command: statusLineCmd };
+        report.statusLine = { state: 're-pointed', command: statusLineCmd, was: current.command };
+        report.replaced = true;
+      } else {
+        report.statusLine = { state: 'foreign-left-alone', command: statusLineCmd, was: current.command };
+      }
+    } else {
+      report.statusLine = { state: 'unchanged', command: statusLineCmd };
+    }
+  }
+
+  return {
+    settings: next,
+    report,
+    command,
+    guardCommand,
+    delegationObserveCommand,
+    delegationCheckCommand,
+    statusLineCommand: statusLineCmd,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -304,6 +420,7 @@ export function installHooks({
   scriptPath,
   guardPath,
   delegationPath,
+  statuslinePath,
   estate,
   check = false,
   prune = true,
@@ -337,10 +454,12 @@ export function installHooks({
     guardCommand,
     delegationObserveCommand,
     delegationCheckCommand,
+    statusLineCommand: statusLineCmd,
   } = planSettings(settings, {
     scriptPath,
     guardPath,
     delegationPath,
+    statuslinePath,
     estate: estate ?? checkout,
     exists,
     cwd: checkout,
@@ -350,7 +469,15 @@ export function installHooks({
   const serialised = JSON.stringify(next, null, 2) + '\n';
   const changed = serialised !== raw;
 
-  const base = { path, report, command, guardCommand, delegationObserveCommand, delegationCheckCommand };
+  const base = {
+    path,
+    report,
+    command,
+    guardCommand,
+    delegationObserveCommand,
+    delegationCheckCommand,
+    statusLineCommand: statusLineCmd,
+  };
 
   if (check) {
     return { ok: true, checked: true, changed, ...base };
@@ -382,12 +509,23 @@ export function renderReport(result) {
     `  kept     : ${result.report.kept}`,
   ];
 
-  const describe = (e) =>
-    !e ? 'NOT INSTALLED' : e.added ? 'ADDED' : e.replaced ? 'RE-POINTED' : 'already present, unchanged';
+  // AC5 — in CHECK mode a bare "ADDED" reads as "your settings are behind, sync
+  // them", when what it actually means is "re-running would ACTIVATE something
+  // that is deliberately not live". Nolan hit exactly that: `--check` reported
+  // two delegation hooks as ADDED, and re-running would have silently switched
+  // on a gate that was built but intentionally never wired. The check-mode
+  // wording therefore describes a PROPOSAL, never a deficit.
+  const checking = !!result.checked;
+  const describe = (e) => {
+    if (!e) return 'NOT INSTALLED';
+    if (e.added) return checking ? 'NOT LIVE — would be ADDED (newly activated)' : 'ADDED';
+    if (e.replaced) return checking ? 'LIVE but points elsewhere — would be RE-POINTED' : 'RE-POINTED';
+    return 'already present, unchanged';
+  };
   const ev = result.report.events || {};
   lines.push(
     '',
-    `  ${HOOK_EVENT} (reorientation on /clear): ${describe(ev.governor)}`,
+    `  ${HOOK_EVENT} (reorientation, every source — no matcher): ${describe(ev.governor)}`,
     `    ${result.command}`,
     `  ${GUARD_EVENT} (wrong-worktree deny gate): ${describe(ev.guard)}`,
     `    ${result.guardCommand || '(no guard script could be derived — NOT installed)'}`,
@@ -396,6 +534,29 @@ export function renderReport(result) {
     `  ${GUARD_EVENT} (substantial-work threshold gate): ${describe(ev.delegationGate)}`,
     `    ${result.delegationCheckCommand || '(no delegation script could be derived — NOT installed)'}`
   );
+  // AC4 — say what happened to statusLine. It is the surface Warwick can
+  // actually see, so "nothing was said about it" is indistinguishable from
+  // "it is not managed", which is the state this criterion exists to end.
+  const sl = result.report.statusLine;
+  const slText = !sl
+    ? 'not evaluated'
+    : sl.state === 'added'
+      ? checking ? 'NOT LIVE — would be ADDED' : 'ADDED'
+      : sl.state === 're-pointed'
+        ? checking ? `LIVE but points elsewhere — would be RE-POINTED (was: ${sl.was})` : `RE-POINTED (was: ${sl.was})`
+        : sl.state === 'foreign-left-alone'
+          ? `LEFT ALONE — a non-governor statusLine is already configured (${sl.was}). Not overwritten.`
+          : sl.state === 'not-installed'
+            ? 'NOT INSTALLED — no statusline script could be derived from the script path'
+            : 'already present, unchanged';
+  lines.push('', `  statusLine (live governor line): ${slText}`, `    ${result.statusLineCommand || '(none)'}`);
+
+  // AC5 — the pruner's report must describe the ground it ACTUALLY examined.
+  // The previous wording printed "none (every existing hook target exists)"
+  // whenever the pruned list was empty — including under `--no-prune`, where
+  // `danglingTargets` is short-circuited and NO target is ever checked. That is
+  // a control reporting on ground it never looked at, which is worse than no
+  // control: an absent check invites caution, a lying one invites confidence.
   if (result.report.pruned.length) {
     lines.push('', `  PRUNED ${result.report.pruned.length} hook(s) whose target script does not exist (Q-5):`);
     for (const p of result.report.pruned) {
@@ -403,13 +564,37 @@ export function renderReport(result) {
       lines.push(`      missing: ${p.missing.join(', ')}`);
     }
     lines.push('', '  These are recoverable from the backup below and from this ticket\'s evidence file.');
+  } else if (result.report.pruneChecked) {
+    lines.push(
+      '',
+      `  pruned   : none — CHECKED the target of all ${result.report.examined} examined hook(s); every one exists.`
+    );
   } else {
-    lines.push('  pruned   : none (every existing hook target exists)');
+    lines.push(
+      '',
+      '  pruned   : NOT CHECKED — --no-prune was given, so no hook target was tested.',
+      '             This is NOT a statement that every target exists.',
+      '             A dangling hook would not have been detected by this run.'
+    );
   }
+
   lines.push('');
-  lines.push(result.checked
-    ? (result.changed ? '  RESULT: settings are OUT OF DATE — re-run without --check to apply.' : '  RESULT: settings are already correct. Nothing to do.')
-    : (result.changed ? `  RESULT: written. Backup: ${result.backup}` : '  RESULT: already correct. Nothing written.'));
+  if (result.checked) {
+    lines.push(
+      result.changed
+        ? '  RESULT: this installer\'s managed set DIFFERS from the live settings (see each line above).\n' +
+          '          Nothing was written. Re-running WITHOUT --check would apply every difference\n' +
+          '          shown — including newly ACTIVATING anything marked "would be ADDED", which is\n' +
+          '          a change to what runs, not a catch-up to a state you already had.'
+        : '  RESULT: already correct — the live settings match this installer\'s managed set. Nothing to do.'
+    );
+  } else {
+    lines.push(
+      result.changed ? `  RESULT: written. Backup: ${result.backup}` : '  RESULT: already correct. Nothing written.'
+    );
+    // AC3 — fires on a run that CHANGED something, and only then.
+    if (result.changed) lines.push('', RESTART_NOTICE);
+  }
   lines.push('='.repeat(72), '');
   return lines.join('\n');
 }
@@ -427,6 +612,7 @@ function parseArgs(argv) {
     else if (argv[i] === '--script') args.script = argv[++i];
     else if (argv[i] === '--guard') args.guard = argv[++i];
     else if (argv[i] === '--delegation') args.delegation = argv[++i];
+    else if (argv[i] === '--statusline') args.statusline = argv[++i];
     else if (argv[i] === '--estate') args.estate = argv[++i];
   }
   return args;
@@ -447,6 +633,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     scriptPath: String(scriptPath).replace(/\\/g, '/'),
     guardPath: args.guard ? String(args.guard).replace(/\\/g, '/') : undefined,
     delegationPath: args.delegation ? String(args.delegation).replace(/\\/g, '/') : undefined,
+    statuslinePath: args.statusline ? String(args.statusline).replace(/\\/g, '/') : undefined,
     // The guard (and the delegation observer/gate, which need the same estate
     // enumeration to resolve the active programme) is pointed at the primary
     // checkout so it can find the build from a session that started anywhere.
