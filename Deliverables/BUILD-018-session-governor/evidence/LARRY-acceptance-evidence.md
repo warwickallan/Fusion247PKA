@@ -153,6 +153,34 @@ full restart.
 Fresh **processes** do read current settings — Larry's probe confirmed that — so the fresh-session
 half is provable without Warwick. Only his own running session needs the restart.
 
+## The constitution is REACHABLE at the moment it must bind — **PROVEN**
+
+Nolan's criterion 1 was the hardest to satisfy and the easiest to assert falsely: *no clause may
+depend on a hook, a memory file, programme-state prose, or this branch surviving.* Hooks are proven
+**not** reliably loaded (they bind at process launch). `CLAUDE.md` is proven loaded — so the test is
+whether a session with **no conversation history at all** can answer from the constitution alone.
+
+Executed after merging WP-2: a fresh `claude -p` process in the governor worktree, told to use **no
+tools** and answer from its instructions only.
+
+| Asked | Answered |
+|---|---|
+| How many lines does the reorientation banner have? | **Four** — identity + build + model · branch/worktree verification · next action · named specialists |
+| List the seven legitimate interruption code names | `product-decision`, `permission`, `spend`, `irreversible-live-action`, **`unsafe-repository-state`**, `rotation-required`, `merge-decision` |
+| Who owns the git lifecycle? | **Larry** — branches, worktrees, commits, pushes, PR lifecycle, cleanup. Warwick never operates Git |
+
+Three things this establishes beyond "the file exists":
+
+1. **The constitution binds with zero conversation history and no hook installed** — which is the
+   whole claim, and the one that survives `/clear`, a fresh session, and this branch being deleted.
+2. **It answered *four* lines**, not five. That is the DT-2 fix — the audit's live three-way
+   contradiction, which would have fired on the first reply of every fresh session — landing in a
+   real session's behaviour rather than only in the diff.
+3. **It answered `unsafe-repository-state`**, not `unsafe-state`. The token now matches the literal
+   frozen in `escalation-gate.mjs`, so the constitution and the gate that reads Larry's own text
+   agree. That correction travelled from an audit finding, through the author, through Silas's build
+   spec, into a live session's answer.
+
 ## A7 — Larry continues rather than stopping at an internal boundary — **PENDING**
 
 The mechanism is proven to exist (see `LARRY-hook-contract-probe.md` §2: a `Stop` hook returning
