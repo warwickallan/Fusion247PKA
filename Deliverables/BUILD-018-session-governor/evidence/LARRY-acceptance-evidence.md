@@ -354,6 +354,28 @@ with the reason, not just the instruction.
 (`CLAUDE.md` + two `Team/` files vs `tools/governor/*` modified vs `tools/governor/*` new), so no
 textual conflict is expected. That is a prediction, not a result — run the merges and check.
 
+## Scope note — where the controller engages, and where it deliberately does not
+
+Two more payloads, because this decides how the live restart must be read:
+
+| cwd | Result |
+|---|---|
+| `C:/Fusion247PKA` (primary checkout — carries no BUILD-018 state) | **allow** |
+| `C:/Fusion247PKA-governor`, with `background_tasks: [{running}]` | **block** |
+
+**The controller only engages where a programme resolves.** A session started in the primary checkout
+has no active build to continue, so allowing is correct, not a failure. If Warwick restarts and lands
+there, the execution controller will do nothing at all — **that is the design, and it must not be read
+as the mechanism being broken.**
+
+The second row is the one Warwick asked for by name: a worker still running is **not** a handback
+reason, and the controller keeps the turn going rather than letting it end. `background_tasks` makes
+that decidable rather than a guess.
+
+This is also the honest limit of the mechanical half. The constitution binds in every session because
+`CLAUDE.md` is loaded in every session; the controller binds only where it can resolve a build. That
+asymmetry is clause 7 working as written — *hooks enforce the constitution, they never carry it.*
+
 ## Standing caveat on everything above
 
 The whole probe estate ran headless (`claude -p`). Whether `Stop` and `SessionStart` behave
