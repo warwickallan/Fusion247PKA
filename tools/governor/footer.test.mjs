@@ -651,36 +651,138 @@ test('U-a: an unknown live location, or no Deliverables directory at all, is UNS
   );
 });
 
-test('D-M5: the state as banked TODAY renders next: UNSET — asserted against the REAL file', () => {
-  // COUPLING NOTE, deliberate and accepted at read-back: this test reads the live
-  // repository file rather than a fixture, because Silas's D-M5 says "assert against the
-  // real file, not a fixture" — the point is to catch the case where what is actually
-  // banked would render a stale recommendation. It will need updating the day a state is
-  // banked carrying all three new properties AND an open ticket, which is the intended
-  // signal, not a failure of the test.
-  assert.equal(realState.resumption.next_action_kind, undefined, 'next_action_kind is absent today (U-b)');
-  assert.equal(realState.model_recommendation.for_ticket, undefined, 'for_ticket is absent today (U-d)');
-  assert.equal(realState.model_recommendation.computed_at_head, undefined, 'computed_at_head is absent today (U-e)');
+// ---------------------------------------------------------------------------
+// D-M5 — the live-ledger case, asserted as AGREEMENT rather than as an outcome
+// ---------------------------------------------------------------------------
+// Re-derives U-b..U-f from the document BY HAND, without calling the code under test,
+// so the assertion has two independent routes to the same answer and fails only when
+// they disagree. Deliberately not a copy of `nextModelFor`: it reads the raw fields and
+// applies D-4's conditions literally, in D-4's short-circuit order, so that a predicate
+// which silently stopped checking one of them would diverge here.
+function evaluateUConditions(doc) {
+  const resumption = doc.resumption ?? {};
+  const rec = doc.model_recommendation ?? {};
+  const banked = doc.banked ?? {};
+  const tickets = Array.isArray(doc.tickets) ? doc.tickets : [];
+  const ticket = tickets.find((t) => t && t.id === resumption.ticket);
 
+  const ordered = [
+    ['U-b', resumption.next_action_kind === 'action', UNSET_REASON.NEXT_ACTION_KIND],
+    ['U-c', typeof rec.model === 'string' && rec.model !== 'unknown' && rec.model !== 'any', UNSET_REASON.MODEL_UNKNOWN],
+    ['grammar', NEXT_MODELS.includes(rec.model), UNSET_REASON.MODEL_NOT_IN_GRAMMAR],
+    ['U-d', typeof rec.for_ticket === 'string' && rec.for_ticket.length > 0
+      && typeof resumption.ticket === 'string' && resumption.ticket.length > 0
+      && rec.for_ticket === resumption.ticket, UNSET_REASON.FOR_TICKET_MISMATCH],
+    ['U-e', typeof rec.computed_at_head === 'string' && rec.computed_at_head.length > 0
+      && typeof banked.head_sha === 'string' && banked.head_sha.length > 0
+      && rec.computed_at_head === banked.head_sha, UNSET_REASON.HEAD_MISMATCH],
+    ['U-f', Boolean(ticket) && ticket.state !== 'resolved', UNSET_REASON.TICKET_UNRESOLVED_MISSING],
+  ];
+
+  const firstFailure = ordered.find(([, holds]) => !holds) ?? null;
+  return { ordered, allHold: firstFailure === null, firstFailure };
+}
+
+// Runs the predicate over one document placed ALONE in a temp Deliverables tree, so
+// U-a's "exactly one match" is satisfied by construction, then asserts agreement.
+function assertPredicateAgreement(doc, label) {
   const root = tmp();
   try {
-    const dir = join(root, 'BUILD-018-session-governor');
+    const dir = join(root, 'BUILD-under-test');
     mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, 'programme-state.json'), readFileSync(REAL_STATE_PATH));
+    writeFileSync(join(dir, 'programme-state.json'), JSON.stringify(doc, null, 2));
 
     const r = nextModelFor({
-      worktreePath: realState.resumption.worktree,
-      worktreeBranch: realState.resumption.branch,
+      worktreePath: doc.resumption.worktree,
+      worktreeBranch: doc.resumption.branch,
       deliverablesDir: root,
     });
-    assert.equal(r.next, NEXT_UNSET, 'today\'s banked state must render UNSET');
-    assert.equal(r.unsetReason, UNSET_REASON.NEXT_ACTION_KIND, 'and it must be by ABSENCE, not by any text heuristic');
+    const { allHold, firstFailure, ordered } = evaluateUConditions(doc);
 
-    // The model name it WOULD have rendered under the old unguarded behaviour.
-    assert.equal(realState.model_recommendation.model, 'Sonnet');
+    // INV-5: assert a non-zero count of conditions actually evaluated.
+    assert.equal(ordered.length, 6, `${label}: all six U-conditions must be evaluated`);
+
+    if (allHold) {
+      assert.equal(r.unset, false, `${label}: all six hold, so a model must render (got ${r.unsetReason})`);
+      assert.equal(r.next, doc.model_recommendation.model, `${label}: the rendered model must be the banked one`);
+      assert.ok(NEXT_MODELS.includes(r.next), `${label}: and it must be renderable in the grammar`);
+    } else {
+      const [name, , expectedReason] = firstFailure;
+      assert.equal(r.unset, true, `${label}: ${name} fails, so the result must be UNSET`);
+      assert.equal(r.next, NEXT_UNSET, `${label}: UNSET must render as the literal UNSET`);
+      assert.equal(r.unsetReason, expectedReason, `${label}: the reason must name the condition that actually failed (${name})`);
+    }
+    return { r, allHold, firstFailure };
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+}
+
+test('D-M5: over the REAL banked state, nextModelFor AGREES with the six U-conditions', () => {
+  // COUPLING NOTE — rewritten 2026-08-01, and the reason matters more than the change.
+  //
+  // This test reads the LIVE repository file, per Silas's D-M5 ("assert against the real
+  // file, not a fixture"): the value is in exercising the predicate against what is
+  // genuinely banked, rather than against a hand-built document that can quietly drift
+  // into agreeing with the code it is meant to check.
+  //
+  // It previously asserted a fixed OUTCOME — "today's banked state renders UNSET". True
+  // when written, false within the hour, because the banked state was then deliberately
+  // grounded (`next_action_kind`, `for_ticket` and `computed_at_head` were filled in) so
+  // the footer could render a real recommendation. The test fired correctly: it caught a
+  // real change, not a regression. But a fixed outcome re-arms the same trap every time
+  // the ledger legitimately moves, and re-pinning it to "renders Opus" would only point
+  // the trap the other way.
+  //
+  // So it now asserts AGREEMENT: the six U-conditions are re-derived independently and
+  // the predicate must match them — a model name iff all six hold, UNSET otherwise, with
+  // the reason naming the condition that actually failed. That keeps the live-ledger
+  // coupling this test exists for, and drops the coupling to one moment in the ledger's
+  // life. DO NOT re-pin this to a literal model name or a literal UNSET.
+  //
+  // The "by ABSENCE, not by any text heuristic" proof deliberately does NOT live here.
+  // It is in the fixture-based U-condition test above, which strips each of the three
+  // properties in turn and asserts the matching `unsetReason`. Kept there on purpose: in
+  // this file an ordinary ledger edit could silence it, which is exactly what happened.
+  assertPredicateAgreement(realState, 'real banked state');
+});
+
+test('D-M5: the agreement holds under BOTH ledger states — ungrounded and grounded', () => {
+  // The durability proof, and what makes this follow-up evidence rather than a hope.
+  //
+  // This worktree's branch point predates the commit that grounded the banked state, so
+  // the live file HERE still has the three properties absent. The test above therefore
+  // exercises only the UNSET branch locally, and the model-renders branch would go
+  // unexercised until the merged head. Constructing both states explicitly proves the
+  // harness is state-independent rather than merely passing today — in either direction.
+  const ungrounded = JSON.parse(JSON.stringify(realState));
+  delete ungrounded.resumption.next_action_kind;
+  delete ungrounded.model_recommendation.for_ticket;
+  delete ungrounded.model_recommendation.computed_at_head;
+
+  const a = assertPredicateAgreement(ungrounded, 'ungrounded ledger');
+  assert.equal(a.allHold, false, 'the ungrounded state must not render a model');
+  assert.equal(a.r.next, NEXT_UNSET);
+  assert.equal(a.r.unsetReason, UNSET_REASON.NEXT_ACTION_KIND, 'and it must fail at U-b, by absence');
+
+  // Grounded the way a real banking grounds it: the recommendation tied to the ticket it
+  // was computed for, and to the pointer it was computed at.
+  const grounded = JSON.parse(JSON.stringify(realState));
+  const openTicket = grounded.tickets.find((t) => t.state !== 'resolved');
+  assert.ok(openTicket, 'the fixture needs at least one unresolved ticket');
+  grounded.resumption.ticket = openTicket.id;
+  grounded.resumption.next_action_kind = 'action';
+  grounded.model_recommendation.model = 'Opus';
+  grounded.model_recommendation.for_ticket = openTicket.id;
+  grounded.model_recommendation.computed_at_head = grounded.banked.head_sha;
+
+  const b = assertPredicateAgreement(grounded, 'grounded ledger');
+  assert.equal(b.allHold, true, 'the grounded state must satisfy all six conditions');
+  assert.equal(b.r.next, 'Opus', 'and must render the banked model name');
+
+  // Both branches of the agreement assertion were exercised at least once, whichever way
+  // the live ledger happens to sit when this runs.
+  assert.notEqual(a.allHold, b.allHold, 'both branches exercised');
 });
 
 test('D-M7: v1 documents with and without the three new properties BOTH validate; the one without renders UNSET', () => {
