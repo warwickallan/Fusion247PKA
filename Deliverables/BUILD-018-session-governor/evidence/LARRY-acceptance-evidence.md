@@ -131,6 +131,38 @@ visible so it need never cause a handback). The controller implementing it is in
 
 ---
 
+---
+
+# T-23 — the integration sequence, written down so it need not be re-derived
+
+Larry-retained (integration, merges, git surgery). Order matters in two places and both are recorded
+with the reason, not just the instruction.
+
+1. **Merge WP-3 (`build-018/wp3-footer-and-controller`) first.** It creates `footer.mjs`.
+2. **Then WP-1 (`build-018/wp1-recovery-and-installer`).** Disjoint from WP-3 by construction: WP-3
+   creates new files, WP-1 modifies `reorient.mjs` / `install-hooks.mjs` / `statusline-live.mjs`.
+3. **Then WP-2 (`build-018/wp2-constitution`) — never before step 1.** `CLAUDE.md` § "Governor
+   advice" points at `tools/governor/footer.mjs`, and the constitution's own startup step 4 requires
+   every named path to exist. Merging it first would make the constitution fail its own test on day
+   one. Its surface (`CLAUDE.md`, Larry's `AGENTS.md`, `agent-index.md`) touches neither of the
+   others, so the ordering is a correctness constraint, not a conflict one.
+4. **Wire, which is Larry's and was deliberately kept out of every Work Order:** `install-hooks.mjs`
+   gains the `Stop` controller entry and `statusline-live.mjs` imports `footer.mjs`. Both files are
+   WP-1's surface, so this happens *after* WP-1 lands, never in parallel with it.
+5. **Run the installer.** Expect it to switch the delegation gate on (verified safe above). If it
+   denies during integration, that is the system working: `justify --reason integration` or
+   `--reason git-lifecycle`, both of which are T-23's legitimate reasons under the iron rule.
+6. **Prove what can be proven without Warwick:** a fresh `claude -p` process reads current settings,
+   so `SessionStart source=startup` producing a real brief is provable here.
+7. **Then, and only then, the single human action:** a full Claude Code quit and relaunch. Hooks bind
+   at process launch, so nothing installed can be observed firing in a running session. Prepare
+   everything first and ask once.
+8. **Nolan inspects this file** before Outcome A is called complete.
+
+**Merge-order verification already executed:** the three branches' file sets are disjoint
+(`CLAUDE.md` + two `Team/` files vs `tools/governor/*` modified vs `tools/governor/*` new), so no
+textual conflict is expected. That is a prediction, not a result — run the merges and check.
+
 ## Standing caveat on everything above
 
 The whole probe estate ran headless (`claude -p`). Whether `Stop` and `SessionStart` behave
