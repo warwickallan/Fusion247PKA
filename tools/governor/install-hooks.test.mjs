@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import {
   settingsPath,
@@ -28,8 +28,13 @@ import {
   planSettings,
   installHooks,
   renderReport,
+  stopControllerScriptFor,
+  stopHookCommand,
+  isStopControllerHook,
   HOOK_EVENT,
   GUARD_EVENT,
+  STOP_EVENT,
+  STOP_MARKER,
   GUARD_MATCHER,
   DELEGATION_OBSERVER_MATCHER,
   DELEGATION_GATE_MATCHER,
@@ -899,6 +904,261 @@ test('AC5: --check never writes, whatever it reports', () => {
     const before = readFileSync(settingsPath(c.root), 'utf8');
     installHooks({ checkout: c.root, scriptPath: SCRIPT, check: true });
     assert.equal(readFileSync(settingsPath(c.root), 'utf8'), before, '--check is read-only (INV-7)');
+  } finally {
+    c.cleanup();
+  }
+});
+
+// ===========================================================================
+// WP-5 / AC1 — the execution controller joins the managed set, ADDITIVELY
+// ===========================================================================
+// D-C C-6's composed table. The Stop entry is ADDED beside the two pre-existing
+// non-Governor entries; U2 proved multiple Stop matcher groups all fire and that
+// a sibling's stray stdout does not suppress another hook's decision, so nothing
+// needs moving, reordering or removing.
+
+// The real shape of Warwick's machine, reduced to what this criterion is about:
+// Tower's `Stop` hook and the capture-gateway `SessionStart` hook, both
+// non-Governor, both of which must come through untouched.
+function makeRealShapedCheckout({ towerTargetExists = true } = {}) {
+  const root = mkdtempSync(join(tmpdir(), 'governor-hooks-real-'));
+  mkdirSync(join(root, '.claude'), { recursive: true });
+  mkdirSync(join(root, 'services'), { recursive: true });
+  const fwd = root.replace(/\\/g, '/');
+  writeFileSync(join(root, 'services', 'ensure-capture-gateway.mjs'), '// exists\n');
+  const towerTarget = towerTargetExists
+    ? `${fwd}/services/bridge-ingest.mjs`
+    : `${fwd}/services/GONE/bridge-ingest.mjs`;
+  if (towerTargetExists) writeFileSync(join(root, 'services', 'bridge-ingest.mjs'), '// exists\n');
+
+  const towerCommand = `node --env-file=C:/.fusion247/control-plane-dev.env ${towerTarget}`;
+  const gatewayCommand = `node ${fwd}/services/ensure-capture-gateway.mjs`;
+
+  writeFileSync(
+    settingsPath(root),
+    JSON.stringify(
+      {
+        permissions: { allow: ['Bash(git status)'] },
+        hooks: {
+          [STOP_EVENT]: [{ matcher: '', hooks: [{ type: 'command', command: towerCommand }] }],
+          [HOOK_EVENT]: [{ hooks: [{ type: 'command', command: gatewayCommand }] }],
+        },
+      },
+      null,
+      2
+    ) + '\n'
+  );
+  return { root, towerCommand, gatewayCommand, cleanup: () => rmSync(root, { recursive: true, force: true }) };
+}
+
+const stopCommandsOf = (doc) => (doc.hooks?.[STOP_EVENT] ?? []).flatMap((g) => g.hooks.map((h) => h.command));
+
+test('AC1: the sibling rule derives the stop-controller from the reorientation script', () => {
+  assert.equal(stopControllerScriptFor(SCRIPT), 'C:/Fusion247PKA-governor/tools/governor/stop-controller.mjs');
+  assert.equal(stopControllerScriptFor('C:/x/something-else.mjs'), null, 'and never invents one');
+});
+
+test("AC1: the Stop command is D-C C-6's, verbatim, including --estate", () => {
+  const script = 'C:/gov/tools/governor/stop-controller.mjs';
+  const cmd = stopHookCommand(script, 'C:/Estate');
+  assert.equal(cmd, `node ${script} --estate C:/Estate`);
+  assert.equal(stopHookCommand(script), `node ${script}`);
+  assert.ok(isStopControllerHook({ command: cmd }));
+  assert.ok(!isStopControllerHook({ command: 'node C:/gov/reorient.mjs' }), 'and never matches a sibling');
+  assert.ok(cmd.includes(STOP_MARKER));
+});
+
+test('AC1: the Stop entry is INSTALLED, with no matcher key at all', () => {
+  const c = makeRealShapedCheckout();
+  try {
+    const r = installHooks({ checkout: c.root, scriptPath: SCRIPT });
+    const doc = JSON.parse(readFileSync(settingsPath(c.root), 'utf8'));
+    const governorGroup = doc.hooks[STOP_EVENT].find((g) => g.hooks.some((h) => isStopControllerHook(h)));
+    assert.ok(governorGroup, 'the execution controller must be present on Stop');
+    assert.ok(
+      !Object.prototype.hasOwnProperty.call(governorGroup, 'matcher'),
+      'the key is OMITTED, not written as "" or "*" — a matcher-less entry is what fires on every stop'
+    );
+    assert.equal(r.report.events.stopController.added, true);
+  } finally {
+    c.cleanup();
+  }
+});
+
+test('AC1: the pre-existing Tower Stop hook and capture-gateway SessionStart hook survive UNTOUCHED', () => {
+  const c = makeRealShapedCheckout();
+  try {
+    installHooks({ checkout: c.root, scriptPath: SCRIPT });
+    const doc = JSON.parse(readFileSync(settingsPath(c.root), 'utf8'));
+
+    const stops = stopCommandsOf(doc);
+    assert.ok(stops.includes(c.towerCommand), 'Tower\'s hook must survive byte-identically');
+    assert.equal(doc.hooks[STOP_EVENT][0].hooks[0].command, c.towerCommand, 'and must not be REORDERED');
+    assert.equal(doc.hooks[STOP_EVENT][0].matcher, '', 'nor have its own matcher rewritten');
+    assert.ok(stops.some((cmd) => cmd.includes(STOP_MARKER)), 'the governor sits beside it, not instead of it');
+
+    const sessions = hooksFor(doc, HOOK_EVENT).map((h) => h.command);
+    assert.ok(sessions.includes(c.gatewayCommand), 'the capture-gateway hook must survive too');
+  } finally {
+    c.cleanup();
+  }
+});
+
+test('AC1: a DANGLING Tower-shaped Stop hook is NOT pruned — the governor adds to Stop, never deletes from it', () => {
+  // THE case this exemption exists for. D-C C-6: the Tower hook "must not be
+  // moved, must not be reordered, and must not be removed". Before WP-5 the
+  // governor managed no Stop hook, so the Q-5 prune rule never reached that
+  // event; adding the controller without the exemption would have made the
+  // installer DELETE the very hook it was being changed to sit beside.
+  const c = makeRealShapedCheckout({ towerTargetExists: false });
+  try {
+    const r = installHooks({ checkout: c.root, scriptPath: SCRIPT });
+    const doc = JSON.parse(readFileSync(settingsPath(c.root), 'utf8'));
+    assert.ok(stopCommandsOf(doc).includes(c.towerCommand), 'a dangling Tower hook must STILL survive');
+    assert.equal(
+      r.report.pruned.filter((p) => p.event === STOP_EVENT).length,
+      0,
+      'nothing may ever be pruned from Stop'
+    );
+    assert.ok(r.report.pruneSkipped > 0, 'and the report must record that it was examined but not target-tested');
+    assert.ok(r.report.pruneExemptEvents.includes(STOP_EVENT));
+  } finally {
+    c.cleanup();
+  }
+});
+
+test('AC1 REPORT INTEGRITY: with an exempt event present, the report never claims to have checked ALL examined hooks', () => {
+  // The AC5 principle applied to the new exemption: a control that reports on
+  // ground it did not examine is worse than no control.
+  const c = makeRealShapedCheckout({ towerTargetExists: false });
+  try {
+    const text = renderReport(installHooks({ checkout: c.root, scriptPath: SCRIPT }));
+    assert.doesNotMatch(text, /CHECKED the target of all/, 'it did NOT check all of them');
+    assert.match(text, /CHECKED the target of \d+ of \d+ examined hook\(s\)/);
+    assert.match(text, /NOT target-tested/);
+    assert.match(text, /never deletes from them/);
+    // And it must never assert "every one exists" on the strength of a check
+    // that examined nothing — a vacuous truth reads as a real assurance.
+    if (/CHECKED the target of 0 of/.test(text)) {
+      assert.doesNotMatch(text, /every one exists/, 'zero checked cannot support "every one exists"');
+      assert.match(text, /i\.e\. NONE of them/);
+    }
+  } finally {
+    c.cleanup();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// AC6 MUTATION for AC1 — the exemption is made to FAIL
+// ---------------------------------------------------------------------------
+// INV-5: a control is not evidence until it has been made to fail. The test above
+// would pass just as happily if the exemption did nothing and the hook survived
+// for some unrelated reason. This flips `prunable` to true in a copy of the
+// module and proves the SAME fixture then loses Tower's hook.
+
+test('AC6 MUTATION (AC1): flip the Stop spec to prunable and the dangling Tower hook IS deleted', async () => {
+  const src = readFileSync(INSTALL_SRC, 'utf8').replace(/\r\n/g, '\n');
+  const from = "      key: 'stopController',\n      prunable: false,";
+  assert.ok(src.includes(from), 'mutation precondition failed — the Stop spec no longer reads as expected');
+  const mutantPath = join(__dirname, `.mutant-install-hooks-${process.pid}.mjs`);
+  writeFileSync(mutantPath, src.replace(from, "      key: 'stopController',\n      prunable: true,"));
+
+  const c = makeRealShapedCheckout({ towerTargetExists: false });
+  try {
+    const mutant = await import(pathToFileURL(mutantPath).href);
+    const r = mutant.installHooks({ checkout: c.root, scriptPath: SCRIPT });
+    const doc = JSON.parse(readFileSync(settingsPath(c.root), 'utf8'));
+
+    assert.ok(
+      !stopCommandsOf(doc).includes(c.towerCommand),
+      'MUTANT: without the exemption the Tower hook must be destroyed — if it survives here, ' +
+        'the exemption is not what is protecting it and the control above proves nothing'
+    );
+    assert.equal(r.report.pruned.filter((p) => p.event === STOP_EVENT).length, 1);
+  } finally {
+    rmSync(mutantPath, { force: true });
+    c.cleanup();
+  }
+});
+
+// ===========================================================================
+// WP-5 / AC2 — idempotence, and re-pointing rather than duplicating
+// ===========================================================================
+
+test('AC2: a second run is BYTE-IDENTICAL and reports no change', () => {
+  const c = makeRealShapedCheckout();
+  try {
+    const first = installHooks({ checkout: c.root, scriptPath: SCRIPT });
+    assert.equal(first.changed, true, 'precondition: the first run must install something');
+    const settled = readFileSync(settingsPath(c.root), 'utf8');
+
+    const second = installHooks({ checkout: c.root, scriptPath: SCRIPT });
+    assert.equal(second.changed, false, 'a second run must be a no-op');
+    assert.equal(readFileSync(settingsPath(c.root), 'utf8'), settled, 'and byte-identical');
+    assert.equal(second.report.events.stopController.added, false, 'not re-added');
+    assert.equal(second.report.events.stopController.replaced, false, 'and not re-pointed');
+  } finally {
+    c.cleanup();
+  }
+});
+
+test('AC2: a STALE Stop entry is RE-POINTED, never duplicated', () => {
+  const c = makeRealShapedCheckout();
+  try {
+    // Seed a governor Stop hook pointing at an old checkout, exactly what a
+    // merge or a moved worktree produces.
+    const doc = JSON.parse(readFileSync(settingsPath(c.root), 'utf8'));
+    doc.hooks[STOP_EVENT].push({
+      hooks: [{ type: 'command', command: 'node C:/OLD-CHECKOUT/tools/governor/stop-controller.mjs --estate C:/OLD' }],
+    });
+    writeFileSync(settingsPath(c.root), JSON.stringify(doc, null, 2) + '\n');
+
+    const r = installHooks({ checkout: c.root, scriptPath: SCRIPT });
+    const after = JSON.parse(readFileSync(settingsPath(c.root), 'utf8'));
+    const governorStops = stopCommandsOf(after).filter((cmd) => cmd.includes(STOP_MARKER));
+
+    assert.equal(governorStops.length, 1, 'exactly ONE governor Stop hook — never a duplicate');
+    assert.ok(!governorStops[0].includes('OLD-CHECKOUT'), 'and it points at the current script');
+    assert.equal(governorStops[0], r.stopCommand);
+    assert.equal(r.report.events.stopController.replaced, true, 're-pointed, not added');
+    assert.ok(stopCommandsOf(after).includes(c.towerCommand), 'while Tower is still untouched');
+
+    // ...and re-pointing is itself idempotent.
+    const settled = readFileSync(settingsPath(c.root), 'utf8');
+    installHooks({ checkout: c.root, scriptPath: SCRIPT });
+    assert.equal(readFileSync(settingsPath(c.root), 'utf8'), settled);
+  } finally {
+    c.cleanup();
+  }
+});
+
+test('AC2: a fresh install onto an EMPTY settings file works and stays idempotent', () => {
+  // "A fixture with an existing (possibly {}) settings file is the correct shape
+  // for a fresh install" — the installer refuses to create the file itself.
+  const root = mkdtempSync(join(tmpdir(), 'governor-hooks-fresh-'));
+  mkdirSync(join(root, '.claude'), { recursive: true });
+  writeFileSync(settingsPath(root), '{}\n');
+  try {
+    const first = installHooks({ checkout: root, scriptPath: SCRIPT });
+    assert.equal(first.ok, true);
+    const doc = JSON.parse(readFileSync(settingsPath(root), 'utf8'));
+    assert.ok(stopCommandsOf(doc).some((cmd) => cmd.includes(STOP_MARKER)));
+
+    const settled = readFileSync(settingsPath(root), 'utf8');
+    const second = installHooks({ checkout: root, scriptPath: SCRIPT });
+    assert.equal(second.changed, false);
+    assert.equal(readFileSync(settingsPath(root), 'utf8'), settled);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('AC1: the report names the Stop entry, so an install cannot be silent about it', () => {
+  const c = makeRealShapedCheckout();
+  try {
+    const text = renderReport(installHooks({ checkout: c.root, scriptPath: SCRIPT }));
+    assert.match(text, /Stop \(execution controller\)/);
+    assert.match(text, /stop-controller\.mjs/);
   } finally {
     c.cleanup();
   }

@@ -33,10 +33,12 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 
 export const HOOK_EVENT = 'SessionStart';
 export const GUARD_EVENT = 'PreToolUse';
+export const STOP_EVENT = 'Stop';
 export const GOVERNOR_MARKER = 'tools/governor/reorient.mjs';
 export const GUARD_MARKER = 'tools/governor/worktree-guard.mjs';
 export const DELEGATION_MARKER = 'tools/governor/delegation-gate.mjs';
 export const STATUSLINE_MARKER = 'tools/governor/statusline-live.mjs';
+export const STOP_MARKER = 'tools/governor/stop-controller.mjs';
 
 // AC3 — hooks are SNAPSHOTTED at Claude Code process launch. Nolan established
 // this by observation: a hook deleted from settings at 17:05:08Z was still
@@ -107,8 +109,28 @@ export function delegationGateHookCommand(scriptPath, estate) {
   return estate ? `${base} --estate ${String(estate).replace(/\\/g, '/')}` : base;
 }
 
+// WP-5 / D-C C-6 — the execution controller (D-A), wired as a `Stop` hook.
+//
+// The `--estate` argument is emitted VERBATIM from D-C C-6's composed table,
+// which is the binding decision. State plainly what it does today, because an
+// inert flag that LOOKS meaningful is its own defect: `stop-controller.mjs`
+// parses NO argv at all — it has no argument parser, and `process.argv` is
+// touched there only by its entrypoint guard. It resolves the active programme
+// from the Stop payload's own `cwd`, because A-7 forbids any `git` invocation on
+// the Stop path and the payload carries no branch. So this flag is currently
+// IGNORED by the script it is passed to, and is emitted for fidelity to the
+// governing decision and for forward compatibility, not because it is read.
+export function stopHookCommand(scriptPath, estate) {
+  const base = `node ${String(scriptPath).replace(/\\/g, '/')}`;
+  return estate ? `${base} --estate ${String(estate).replace(/\\/g, '/')}` : base;
+}
+
 export function isGovernorHook(hook) {
   return typeof hook?.command === 'string' && hook.command.includes(GOVERNOR_MARKER);
+}
+
+export function isStopControllerHook(hook) {
+  return typeof hook?.command === 'string' && hook.command.includes(STOP_MARKER);
 }
 
 export function isGuardHook(hook) {
@@ -147,6 +169,11 @@ export function guardScriptFor(scriptPath) {
 export function delegationScriptFor(scriptPath) {
   const p = String(scriptPath).replace(/\\/g, '/');
   return p.endsWith('reorient.mjs') ? p.replace(/reorient\.mjs$/, 'delegation-gate.mjs') : null;
+}
+
+export function stopControllerScriptFor(scriptPath) {
+  const p = String(scriptPath).replace(/\\/g, '/');
+  return p.endsWith('reorient.mjs') ? p.replace(/reorient\.mjs$/, 'stop-controller.mjs') : null;
 }
 
 // AC4 — `statusLine` is the ONE governor surface that currently works, and it
@@ -205,6 +232,7 @@ export function planSettings(
     guardPath,
     delegationPath,
     statuslinePath,
+    stopPath,
     estate,
     exists = existsSync,
     cwd,
@@ -224,6 +252,14 @@ export function planSettings(
     // those actually happened, so the report can never claim ground it did not
     // examine. See renderReport.
     pruneChecked: prune,
+    // WP-5 — `pruneChecked` is now necessary but no longer SUFFICIENT, because
+    // pruning is scoped per-event (see `prunable` below). These two count the
+    // hooks whose targets were ACTUALLY tested and those examined on an exempt
+    // event and therefore never tested, so the report can still state the exact
+    // ground it covered rather than borrowing `examined` as a proxy for it.
+    pruneTested: 0,
+    pruneSkipped: 0,
+    pruneExemptEvents: [],
     statusLine: null,
   };
 
@@ -239,6 +275,8 @@ export function planSettings(
   const delegationCheckCommand = resolvedDelegation
     ? delegationGateHookCommand(resolvedDelegation, estate)
     : null;
+  const resolvedStop = stopPath ?? stopControllerScriptFor(scriptPath);
+  const stopCommand = resolvedStop ? stopHookCommand(resolvedStop, estate) : null;
 
   // Requirement 9 — both halves of the durable behaviour are installed together.
   // Shipping the brief without the gate would leave a session that is TOLD it is
@@ -254,8 +292,12 @@ export function planSettings(
   // previously made reorientation unreachable on `startup` and `resume`.
   // Filtering now lives in reorient.mjs's SOURCE_POLICY, where an unrecognised
   // source falls through to a defined default instead of to silence.
+  // `prunable` scopes the Q-5 dangling-target rule to the events it was actually
+  // justified for. It defaults to TRUE and is set FALSE only where adding a spec
+  // would otherwise drag a brand-new event into the pruner's reach. See the
+  // `Stop` spec below for the case that forced it.
   const managed = [
-    { event: HOOK_EVENT, matcher: undefined, command, is: isGovernorHook, key: 'governor' },
+    { event: HOOK_EVENT, matcher: undefined, command, is: isGovernorHook, key: 'governor', prunable: true },
   ];
   if (guardCommand) {
     managed.push({
@@ -264,6 +306,7 @@ export function planSettings(
       command: guardCommand,
       is: isGuardHook,
       key: 'guard',
+      prunable: true,
     });
   }
   if (delegationObserveCommand) {
@@ -273,6 +316,7 @@ export function planSettings(
       command: delegationObserveCommand,
       is: isDelegationObserverHook,
       key: 'delegationObserver',
+      prunable: true,
     });
   }
   if (delegationCheckCommand) {
@@ -282,6 +326,40 @@ export function planSettings(
       command: delegationCheckCommand,
       is: isDelegationGateHook,
       key: 'delegationGate',
+      prunable: true,
+    });
+  }
+  // WP-5 / D-C C-6 — the execution controller. ADDITIVE, and `prunable: false`.
+  //
+  // WHY IT IS EXEMPT FROM PRUNING, because this is the whole point and a later
+  // reader will otherwise "simplify" it away:
+  //
+  // The Q-5 prune rule was justified for exactly one thing — a dangling
+  // `ensure-watcher.mjs` SessionStart hook (see this file's header). It is
+  // applied per-event, over the events the Governor manages. Before this spec
+  // existed the Governor managed no `Stop` hook, so `Stop` was never in the
+  // pruner's reach — two tests assert precisely that, one of them using a fixture
+  // whose `Stop` command is a Tower-shaped `bridge-ingest.mjs` at a path that
+  // does not exist.
+  //
+  // Adding this spec without the exemption would therefore have made the
+  // installer DELETE a dangling Tower `Stop` hook the first time it ran — the one
+  // hook D-C C-6 says in terms "must not be moved, must not be reordered, and
+  // must not be removed", and which AC1 requires to survive untouched. The
+  // installer would have destroyed the thing it was being changed to sit beside.
+  //
+  // Today Tower's target exists, so nothing changes; the exemption removes a
+  // FUTURE silent deletion, which is exactly when nobody would be watching.
+  // Pruning stays available on the events Q-5 argued for, and gains no new
+  // destructive edge that no decision asked for.
+  if (stopCommand) {
+    managed.push({
+      event: STOP_EVENT,
+      matcher: undefined,
+      command: stopCommand,
+      is: isStopControllerHook,
+      key: 'stopController',
+      prunable: false,
     });
   }
 
@@ -305,6 +383,11 @@ export function planSettings(
   for (const [event, specs] of specsByEvent) {
     const states = new Map(specs.map((spec) => [spec, { installed: false, replaced: false, added: false }]));
     const originalGroups = next.hooks[event].slice();
+    // An event is prunable only if EVERY spec on it says so. Unanimity rather
+    // than majority: one spec asserting "do not delete other people's hooks on
+    // this event" must not be outvoted into deleting them.
+    const eventPrunable = prune && specs.every((spec) => spec.prunable !== false);
+    if (prune && !eventPrunable) report.pruneExemptEvents.push(event);
 
     for (const group of originalGroups) {
       if (!Array.isArray(group?.hooks)) continue;
@@ -335,7 +418,18 @@ export function planSettings(
           continue;
         }
 
-        const dangling = prune ? danglingTargets(hook?.command, { exists, cwd }) : [];
+        if (!eventPrunable) {
+          // Examined (it was compared against every spec above) but its target
+          // was never tested. Counted separately so the report cannot later
+          // claim to have checked ground it deliberately left alone.
+          report.pruneSkipped += 1;
+          report.kept += 1;
+          surviving.push(hook);
+          continue;
+        }
+
+        report.pruneTested += 1;
+        const dangling = danglingTargets(hook?.command, { exists, cwd });
         if (dangling.length) {
           report.pruned.push({ event, command: hook.command, missing: dangling });
           continue; // dropped
@@ -407,6 +501,7 @@ export function planSettings(
     guardCommand,
     delegationObserveCommand,
     delegationCheckCommand,
+    stopCommand,
     statusLineCommand: statusLineCmd,
   };
 }
@@ -421,6 +516,7 @@ export function installHooks({
   guardPath,
   delegationPath,
   statuslinePath,
+  stopPath,
   estate,
   check = false,
   prune = true,
@@ -454,12 +550,14 @@ export function installHooks({
     guardCommand,
     delegationObserveCommand,
     delegationCheckCommand,
+    stopCommand,
     statusLineCommand: statusLineCmd,
   } = planSettings(settings, {
     scriptPath,
     guardPath,
     delegationPath,
     statuslinePath,
+    stopPath,
     estate: estate ?? checkout,
     exists,
     cwd: checkout,
@@ -476,6 +574,7 @@ export function installHooks({
     guardCommand,
     delegationObserveCommand,
     delegationCheckCommand,
+    stopCommand,
     statusLineCommand: statusLineCmd,
   };
 
@@ -532,7 +631,9 @@ export function renderReport(result) {
     `  ${GUARD_EVENT} (delegation-dispatch observer): ${describe(ev.delegationObserver)}`,
     `    ${result.delegationObserveCommand || '(no delegation script could be derived — NOT installed)'}`,
     `  ${GUARD_EVENT} (substantial-work threshold gate): ${describe(ev.delegationGate)}`,
-    `    ${result.delegationCheckCommand || '(no delegation script could be derived — NOT installed)'}`
+    `    ${result.delegationCheckCommand || '(no delegation script could be derived — NOT installed)'}`,
+    `  ${STOP_EVENT} (execution controller): ${describe(ev.stopController)}`,
+    `    ${result.stopCommand || '(no stop-controller script could be derived — NOT installed)'}`
   );
   // AC4 — say what happened to statusLine. It is the surface Warwick can
   // actually see, so "nothing was said about it" is indistinguishable from
@@ -565,10 +666,31 @@ export function renderReport(result) {
     }
     lines.push('', '  These are recoverable from the backup below and from this ticket\'s evidence file.');
   } else if (result.report.pruneChecked) {
-    lines.push(
-      '',
-      `  pruned   : none — CHECKED the target of all ${result.report.examined} examined hook(s); every one exists.`
-    );
+    // WP-5 — `examined` and "target-checked" are no longer the same set, because
+    // pruning is now scoped per-event. Saying "all N examined" when N includes
+    // hooks on an EXEMPT event would be the same class of lie the --no-prune
+    // branch below exists to prevent: a control describing ground it left alone.
+    const skipped = result.report.pruneSkipped || 0;
+    const tested = result.report.pruneTested || 0;
+    if (skipped === 0) {
+      lines.push(
+        '',
+        `  pruned   : none — CHECKED the target of all ${result.report.examined} examined hook(s); every one exists.`
+      );
+    } else {
+      lines.push(
+        '',
+        // "every one exists" is only sayable about targets actually tested. With
+        // `tested === 0` it is a VACUOUS truth, and a vacuous truth in a coverage
+        // report reads exactly like a real assurance — the defect this whole
+        // branch exists to avoid. So the clause is omitted there.
+        `  pruned   : none — CHECKED the target of ${tested} of ${result.report.examined} examined hook(s)` +
+          (tested > 0 ? '; every one exists.' : ' — i.e. NONE of them.'),
+        `             ${skipped} hook(s) on ${(result.report.pruneExemptEvents || []).join(', ')} were NOT target-tested:`,
+        '             the governor adds to those events but never deletes from them,',
+        '             so a dangling hook there would not have been detected by this run.'
+      );
+    }
   } else {
     lines.push(
       '',
@@ -613,6 +735,7 @@ function parseArgs(argv) {
     else if (argv[i] === '--guard') args.guard = argv[++i];
     else if (argv[i] === '--delegation') args.delegation = argv[++i];
     else if (argv[i] === '--statusline') args.statusline = argv[++i];
+    else if (argv[i] === '--stop') args.stop = argv[++i];
     else if (argv[i] === '--estate') args.estate = argv[++i];
   }
   return args;
@@ -634,6 +757,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     guardPath: args.guard ? String(args.guard).replace(/\\/g, '/') : undefined,
     delegationPath: args.delegation ? String(args.delegation).replace(/\\/g, '/') : undefined,
     statuslinePath: args.statusline ? String(args.statusline).replace(/\\/g, '/') : undefined,
+    stopPath: args.stop ? String(args.stop).replace(/\\/g, '/') : undefined,
     // The guard (and the delegation observer/gate, which need the same estate
     // enumeration to resolve the active programme) is pointed at the primary
     // checkout so it can find the build from a session that started anywhere.
