@@ -260,6 +260,13 @@ export function planSettings(
     pruneTested: 0,
     pruneSkipped: 0,
     pruneExemptEvents: [],
+    // WP-6 — a pre-existing governor hook can differ from its managed spec on
+    // more than its command, and only the command was ever compared. The MATCHER
+    // is the other axis, and nothing looked at it: a stale `matcher: "clear"`
+    // survived every successful install while the report said "already present,
+    // unchanged". This records that the matcher WAS compared, so the report can
+    // never again be silent about a difference it never examined.
+    matcherNormalised: false,
     statusLine: null,
   };
 
@@ -381,7 +388,12 @@ export function planSettings(
   }
 
   for (const [event, specs] of specsByEvent) {
-    const states = new Map(specs.map((spec) => [spec, { installed: false, replaced: false, added: false }]));
+    const states = new Map(
+      specs.map((spec) => [
+        spec,
+        { installed: false, replaced: false, added: false, matcherNormalised: false, matcherExtracted: false },
+      ])
+    );
     const originalGroups = next.hooks[event].slice();
     // An event is prunable only if EVERY spec on it says so. Unanimity rather
     // than majority: one spec asserting "do not delete other people's hooks on
@@ -439,6 +451,95 @@ export function planSettings(
         surviving.push(hook);
       }
       group.hooks = surviving;
+    }
+
+    // -----------------------------------------------------------------------
+    // WP-6 — MATCHER reconciliation
+    // -----------------------------------------------------------------------
+    // The scan above reconciles a pre-existing governor hook on ONE axis: its
+    // command. Nothing compared the matcher, so an entry written under an older
+    // spec kept that spec's matcher forever while the report printed "already
+    // present, unchanged". That is exactly how a live `matcher: "clear"` survived
+    // WP-1: reorientation stayed unreachable on `startup` and `resume` even after
+    // a restart, and a successful install said nothing about it. A control
+    // reporting success over ground it never examined.
+    //
+    // The matcher belongs to the enclosing GROUP, never to the hook, so this
+    // cannot be done hook-by-hook — writing `matcher` onto a hook object would
+    // put a key where Claude Code never reads it and report a normalisation that
+    // changed nothing, which is this defect re-created by its own repair. Two
+    // cases, and the split IS the safety argument:
+    //
+    //   EXCLUSIVE — every surviving hook in the group is ours AND they all match
+    //     the SAME single spec. No other hook depends on this group's matcher, so
+    //     it is normalised IN PLACE, preserving the group's position and order.
+    //     This is the live case: the real SessionStart group holds the
+    //     reorientation hook alone.
+    //
+    //   SHARED — anything else. Rewriting the matcher here would rewrite it for a
+    //     sibling that never asked for it, including a foreign one; the suite
+    //     already asserts of Tower's `Stop` group "nor have its own matcher
+    //     rewritten". So the governor hook is EXTRACTED and re-added below in its
+    //     own correctly-matched group, and the group it shared is left exactly as
+    //     found. This is also what makes three specs with three different matchers
+    //     on one `PreToolUse` event representable at all.
+    //
+    // Nothing here deletes a group. A group emptied by extraction is left behind
+    // exactly as the pruner already leaves one: adding a group-deletion edge is a
+    // destructive behaviour no decision asked for, which is the mistake WP-5's
+    // `Stop` exemption exists to prevent.
+    const hasMatcherKey = (g) => Object.prototype.hasOwnProperty.call(g, 'matcher');
+    // Exact comparison: key-absent, `''` and `'*'` are three DIFFERENT states and
+    // none of them equals "no matcher". A spec carrying no matcher is satisfied
+    // only by the key being absent.
+    const matcherAgrees = (g, spec) =>
+      spec.matcher === undefined ? !hasMatcherKey(g) : hasMatcherKey(g) && g.matcher === spec.matcher;
+    const noteNormalised = (spec, group, extracted) => {
+      const state = states.get(spec);
+      state.matcherNormalised = true;
+      if (extracted) state.matcherExtracted = true;
+      state.matcherWasPresent = hasMatcherKey(group);
+      state.matcherWas = hasMatcherKey(group) ? group.matcher : undefined;
+      state.matcherNow = spec.matcher;
+      report.matcherNormalised = true;
+    };
+
+    const correctlyHosted = new Set();
+    for (const group of next.hooks[event]) {
+      if (!Array.isArray(group?.hooks)) continue;
+      const ours = group.hooks.map((hook) => specs.find((spec) => spec.is(hook)));
+      if (!ours.some(Boolean)) continue;
+
+      const distinct = [...new Set(ours.filter(Boolean))];
+      if (distinct.length === 1 && ours.every(Boolean)) {
+        const spec = distinct[0];
+        if (!matcherAgrees(group, spec)) {
+          noteNormalised(spec, group, false); // reads the OLD matcher — call before mutating
+          if (spec.matcher === undefined) delete group.matcher;
+          else group.matcher = spec.matcher;
+        }
+        correctlyHosted.add(spec);
+        continue;
+      }
+
+      const keep = [];
+      group.hooks.forEach((hook, i) => {
+        const spec = ours[i];
+        if (!spec || matcherAgrees(group, spec)) {
+          if (spec) correctlyHosted.add(spec);
+          keep.push(hook);
+          return;
+        }
+        noteNormalised(spec, group, true); // dropped here; re-added correctly matched below
+      });
+      group.hooks = keep;
+    }
+
+    for (const spec of specs) {
+      const state = states.get(spec);
+      // Extracted from every group that held it, so it is no longer installed
+      // anywhere and the re-add path below must put it back.
+      if (state.installed && state.matcherExtracted && !correctlyHosted.has(spec)) state.installed = false;
     }
 
     for (const spec of specs) {
@@ -617,23 +718,65 @@ export function renderReport(result) {
   const checking = !!result.checked;
   const describe = (e) => {
     if (!e) return 'NOT INSTALLED';
+    // WP-6 — a matcher normalisation is neither an ADD nor a RE-POINT and must
+    // never be reported as either. It is checked FIRST because an EXTRACTED hook
+    // travels through the add path (it is re-added in a correctly-matched group),
+    // and describing a move as "newly activated" would be a fresh instance of the
+    // exact defect this criterion exists to end.
+    if (e.matcherNormalised) {
+      const moved = e.matcherExtracted ? ' (moved to its own group)' : '';
+      const also = e.replaced ? ', and RE-POINTED' : '';
+      return checking
+        ? `LIVE but differs from the managed spec — its MATCHER would be NORMALISED${moved}${also}`
+        : `MATCHER NORMALISED${moved}${also}`;
+    }
     if (e.added) return checking ? 'NOT LIVE — would be ADDED (newly activated)' : 'ADDED';
     if (e.replaced) return checking ? 'LIVE but points elsewhere — would be RE-POINTED' : 'RE-POINTED';
     return 'already present, unchanged';
   };
   const ev = result.report.events || {};
+  // AC2 — a normalisation gets its own visible line naming the OLD and the NEW
+  // value. "Something changed" without saying WHAT changed is how the previous
+  // report managed to be technically true and practically useless.
+  const matcherText = (present, value) => (present ? JSON.stringify(value) : 'no matcher (key absent)');
+  const row = (label, e, cmd, fallback) => {
+    const out = [`  ${label}: ${describe(e)}`, `    ${cmd || fallback}`];
+    if (e && e.matcherNormalised) {
+      out.push(
+        `      matcher: ${matcherText(e.matcherWasPresent, e.matcherWas)} → ` +
+          matcherText(e.matcherNow !== undefined, e.matcherNow) +
+          (e.matcherExtracted ? ' — extracted into its own group; the group it shared was left untouched' : '')
+      );
+    }
+    return out;
+  };
   lines.push(
     '',
-    `  ${HOOK_EVENT} (reorientation, every source — no matcher): ${describe(ev.governor)}`,
-    `    ${result.command}`,
-    `  ${GUARD_EVENT} (wrong-worktree deny gate): ${describe(ev.guard)}`,
-    `    ${result.guardCommand || '(no guard script could be derived — NOT installed)'}`,
-    `  ${GUARD_EVENT} (delegation-dispatch observer): ${describe(ev.delegationObserver)}`,
-    `    ${result.delegationObserveCommand || '(no delegation script could be derived — NOT installed)'}`,
-    `  ${GUARD_EVENT} (substantial-work threshold gate): ${describe(ev.delegationGate)}`,
-    `    ${result.delegationCheckCommand || '(no delegation script could be derived — NOT installed)'}`,
-    `  ${STOP_EVENT} (execution controller): ${describe(ev.stopController)}`,
-    `    ${result.stopCommand || '(no stop-controller script could be derived — NOT installed)'}`
+    ...row(`${HOOK_EVENT} (reorientation, every source — no matcher)`, ev.governor, result.command, ''),
+    ...row(
+      `${GUARD_EVENT} (wrong-worktree deny gate)`,
+      ev.guard,
+      result.guardCommand,
+      '(no guard script could be derived — NOT installed)'
+    ),
+    ...row(
+      `${GUARD_EVENT} (delegation-dispatch observer)`,
+      ev.delegationObserver,
+      result.delegationObserveCommand,
+      '(no delegation script could be derived — NOT installed)'
+    ),
+    ...row(
+      `${GUARD_EVENT} (substantial-work threshold gate)`,
+      ev.delegationGate,
+      result.delegationCheckCommand,
+      '(no delegation script could be derived — NOT installed)'
+    ),
+    ...row(
+      `${STOP_EVENT} (execution controller)`,
+      ev.stopController,
+      result.stopCommand,
+      '(no stop-controller script could be derived — NOT installed)'
+    )
   );
   // AC4 — say what happened to statusLine. It is the surface Warwick can
   // actually see, so "nothing was said about it" is indistinguishable from
