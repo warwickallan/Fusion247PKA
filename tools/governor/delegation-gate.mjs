@@ -98,20 +98,13 @@
 // tolerate in either direction, and it is the one health-store's own
 // precedent is built to prevent.
 
-import {
-  readFileSync,
-  writeFileSync,
-  renameSync,
-  mkdirSync,
-  existsSync,
-  readdirSync,
-} from 'node:fs';
-import { dirname, join } from 'node:path';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import os from 'node:os';
-import crypto from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 
 import { projectKeyFor } from './health-store.mjs';
+import { atomicWriteFileSync } from './atomic-write.mjs';
 import {
   findCanonical,
   liveLocation,
@@ -351,8 +344,13 @@ export function delegationLedgerPath(ticket, opts = {}) {
 }
 
 // ---------------------------------------------------------------------------
-// Ledger I/O — atomic temp-file+rename (health-store.mjs's pattern, reused),
-// with every fs call injectable so the fail-open mutation tests can force a
+// Ledger I/O — atomic temp-file+rename via the ONE shared primitive in
+// atomic-write.mjs (T-18), which health-store.mjs also calls. It was previously
+// this module's own copy of that pattern; the duplication had already drifted a
+// false "concurrent writers never interleave" claim into a third module, which
+// is why it is now extracted rather than patched in two places.
+//
+// Every fs call stays injectable so the fail-open mutation tests can force a
 // throw without needing OS-level permission trickery.
 // ---------------------------------------------------------------------------
 
@@ -393,29 +391,42 @@ export function readLedger(ticket, opts = {}) {
   return { records, skipped, path: filePath };
 }
 
+// The temp-file+rename mechanics, the retry policy and the temp cleanup all live
+// in atomic-write.mjs (T-18) — this function owns only the read-modify-write that
+// produces the bytes.
+//
+// The payload is passed as a PRODUCER, and that is load-bearing rather than
+// stylistic. This is a read-modify-write: the content depends on what is in the
+// file AT THE MOMENT OF THE ATTEMPT. Retrying by replaying a snapshot taken
+// before the backoff would let a record another writer landed during that
+// backoff be discarded by this writer's later successful rename — turning "lose
+// my one record" into "lose several", which points the WRONG WAY against this
+// module's fail-direction doctrine, where a lost checkpoint undercounts toward a
+// MISSED deny. Re-deriving per attempt keeps the loss window as small as the
+// original single-shot write's, while actually succeeding.
+//
+// Lost updates are still possible and still the SAFE direction — see the file
+// header. Nothing here promises otherwise.
 function atomicAppendRecord(filePath, record, opts = {}) {
-  const {
-    readFile = readFileSync,
-    writeFile = writeFileSync,
-    renameFile = renameSync,
-    mkdir = mkdirSync,
-    existsFn = existsSync,
-  } = opts;
-  mkdir(dirname(filePath), { recursive: true });
-  let existing = '';
-  if (existsFn(filePath)) {
-    try {
-      existing = readFile(filePath, 'utf8');
-    } catch {
-      existing = '';
-    }
-  }
+  const { readFile = readFileSync, existsFn = existsSync, writeFile, renameFile, mkdir } = opts;
   const line = JSON.stringify(record);
-  const next = existing.length && !existing.endsWith('\n') ? `${existing}\n${line}\n` : `${existing}${line}\n`;
-  const tmpPath = `${filePath}.tmp-${process.pid}-${crypto.randomBytes(4).toString('hex')}`;
-  writeFile(tmpPath, next);
-  renameFile(tmpPath, filePath);
-  return filePath;
+
+  const producePayload = () => {
+    let existing = '';
+    if (existsFn(filePath)) {
+      try {
+        existing = readFile(filePath, 'utf8');
+      } catch {
+        existing = '';
+      }
+    }
+    return existing.length && !existing.endsWith('\n') ? `${existing}\n${line}\n` : `${existing}${line}\n`;
+  };
+
+  // Forwarded EXPLICITLY, never by spreading `opts`: this bag also carries
+  // ledger options (`envOverride`, `cwd`, `homeDir`, `readFile`, `existsFn`)
+  // that must never be reinterpreted as atomic-write injections.
+  return atomicWriteFileSync(filePath, producePayload, { writeFile, renameFile, mkdir });
 }
 
 // Validated BEFORE any I/O (decision §5's "applied both on write... a record
