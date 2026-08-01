@@ -130,6 +130,22 @@ This is the same class as the controls recorded in [[a-control-is-not-evidence-u
 a check that reports success over ground it never examined. The acceptance test must assert that a
 `startup` payload produces an actual **brief**, not merely that a hook was invoked.
 
+## 5b. User-scope vs project-scope hook merging — ATTEMPTED, NOT SETTLED
+
+Probed by pointing `CLAUDE_CONFIG_DIR` at a synthetic home carrying its own `Stop` hook, alongside
+the project's. The run aborted at `Not logged in · Please run /login` — an isolated config dir has no
+credentials. The only way to complete it would be to copy Warwick's real credential file into a temp
+directory, which is a trust boundary not worth crossing for this question.
+
+**Recorded as UNKNOWN, and deliberately NOT escalated, because it does not block:** Nolan's audit
+established that project-scope hooks from the primary checkout are already active in every worktree,
+and that user scope currently carries no hooks at all. The installer's existing target is therefore
+a scope proven to work. The question would only become live if a future design wanted user-scope
+hooks.
+
+Settling test, if it ever matters: add one no-op `Stop` hook to `~/.claude/settings.json`, restart
+Claude Code fully, and check whether both hooks appear in a single `stop_hook_summary.hookInfos`.
+
 ## 6. What this evidence does NOT establish
 
 - Whether `Stop` fires identically in the interactive TUI and in Remote Control web/Android. Every
