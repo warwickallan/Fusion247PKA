@@ -181,6 +181,33 @@ Three things this establishes beyond "the file exists":
    agree. That correction travelled from an audit finding, through the author, through Silas's build
    spec, into a live session's answer.
 
+## A5 follow-up — the LIVE estate now reorients instead of refusing — **PROVEN**
+
+Same command that refused earlier, re-run on the **live** estate (six copies of BUILD-018's state
+across `-governor` and `wo-01`…`wo-05`) after WP-4 merged:
+
+```
+REORIENTED — BUILD-018
+Location: verified
+Next ticket: T-23
+Recommended model: Opus
+```
+
+1036 characters against the 10,000 cap. The refusal is gone, the correct copy won, and the ticket
+named is the one actually banked. This is the live estate, not a fixture.
+
+**And it confirmed T-25 on the real path.** The collapse *happened* — six copies resolved to one —
+but the brief carries no `COLLAPSED` section, because `applyModelGate` substitutes a compact render
+when a model switch is owed. Keel reported this out-of-surface from a fixture run; here it is on the
+live path. **Correctness is unaffected; visibility is.** Registered as T-25, `planned`, not started.
+
+**One thing to know before the restart test.** The brief reported `Current model: UNKNOWN — no
+health sample has been recorded for this session yet`, and gated implementation behind a model
+selection. That is an artefact of the probe using a synthetic session id: in a real session the
+status line writes a sample on its first render, so the gate should see the model and release. It is
+worth watching for at the live proof, because a gate that stays `UNKNOWN` would ask Warwick for
+something the constitution's closed list does not include.
+
 ## A7 — Larry continues rather than stopping at an internal boundary — **PENDING**
 
 The mechanism is proven to exist (see `LARRY-hook-contract-probe.md` §2: a `Stop` hook returning
