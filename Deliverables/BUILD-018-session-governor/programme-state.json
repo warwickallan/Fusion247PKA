@@ -403,6 +403,16 @@
       "model": "Sonnet",
       "depends_on": [],
       "note": "Reported by Keel out-of-surface during WP-4. In the real hook path applyModelGate substitutes a compact render when a model switch is owed, and on the end-to-end run the session received REORIENTED plus the next ticket but NOT the COLLAPSED section. The resolution stays correct and the refusal stays gone, so this is a visibility gap rather than a correctness one - M3 is fully delivered only on the unsubstituted path. model-gate.mjs was outside WP-4 surface. NOT started: scope is Warwick's to open."
+    },
+    {
+      "id": "T-26",
+      "title": "Finish the installer against D-C C-8: scope, live verification, and the remaining managed rows",
+      "state": "planned",
+      "model": "Opus",
+      "depends_on": [
+        "T-23"
+      ],
+      "note": "Reported out-of-surface by Keel during WP-5, and registered rather than smuggled into that WP. Four unbuilt items from Silas D-C C-8, none of which had an acceptance criterion anywhere: (1) SCOPE - the composed table says user scope for every Governor row, but install-hooks.mjs only ever writes <checkout>/.claude/settings.local.json, i.e. project scope. Silas's reason for wanting user scope is real and load-bearing: hooks bind to the LAUNCHING directory, so project-scope wiring evaporates the first time Warwick launches from elsewhere. Needs --scope user|project plus CLAUDE_CONFIG_DIR. (2) --verify-live with its three-valued exit code asserting a non-zero examined count - Nolan's standard is that a plan ending at INSTALLED rather than OBSERVED FIRING is not finished. (3) --check truthfulness beyond what WP-1 fixed. (4) the PreToolUse|AskUserQuestion escalation-gate.mjs row is absent from the managed set although the module exists and is tested. NOT started: this is post-integration work and its scope is Warwick's to open."
     }
   ],
   "blockers": [
