@@ -76,6 +76,35 @@ with the new grammar.
 
 ---
 
+## Pre-integration check — what running the installer will switch ON — **VERIFIED SAFE**
+
+Nolan's audit found that `install-hooks.mjs --check` reproduces a **superset** of the live state: it
+silently activates T-16's delegation observer and gate, which have never fired. Silas ruled the
+superset a *reporting* fix only — the managed set is not to be altered — so **wiring the hooks will
+switch that gate on.** That had to be understood before integration rather than discovered during it.
+
+Executed:
+
+- A single `Write` with no delegation recorded → **allow** (no output, exit 0). It does not block on
+  first contact.
+- `DENY_THRESHOLD = 3` over `Write | Edit | MultiEdit | Bash`, counted per ticket since the last
+  checkpoint.
+
+**So integration work would have been blocked at the fourth write** — on T-23, which is
+Larry-retained integration by design. That is the trap class this build exists to avoid, so the
+escape matters more than the threshold.
+
+The escape is reachable by Larry alone, needs nothing from Warwick, and is exactly right:
+1. dispatching a subagent records a checkpoint and resets the count to zero; or
+2. `delegation-gate.mjs justify --reason <architecture|integration|safety|judgement|git-lifecycle|emergency> --ticket <id> --note "…"`.
+
+`integration` and `git-lifecycle` are precisely T-23's legitimate reasons under the iron rule's
+stated exceptions. **The gate is therefore safe to wire and is behaving as designed** — it does not
+forbid Larry working, it forbids Larry working *silently*, which is the actual rule.
+
+Recorded here so integration does not rediscover it, and so a fresh Larry meeting a deny message
+recognises it as the system working rather than a fault.
+
 ## A1 — health visible where Warwick works (web / Android) — **PENDING**
 
 The terminal status line is confirmed live and sampling correctly, but Warwick has stated plainly
