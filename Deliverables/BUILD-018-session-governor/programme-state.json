@@ -13,10 +13,10 @@
     "started": "2026-07-31"
   },
   "banked": {
-    "at": "2026-07-31",
-    "by_model": "Sonnet 5",
+    "at": "2026-08-01",
+    "by_model": "Sonnet",
     "session_id": null,
-    "head_sha": "6f31544f2c3fdda0a77f1b36b16fc29c4e3d3dc3",
+    "head_sha": "e9ae77a9d766753ba2acba6f666bab9ddd8f36a3",
     "governor_version": "T-09/schema-v1"
   },
   "repository": {
@@ -24,7 +24,7 @@
     "worktree": "C:/Fusion247PKA-governor",
     "branch": "build-018/session-governor",
     "base_sha": "ef96a3327f896e025731769c72157fd722daa02f",
-    "head_sha": "6f31544f2c3fdda0a77f1b36b16fc29c4e3d3dc3",
+    "head_sha": "e9ae77a9d766753ba2acba6f666bab9ddd8f36a3",
     "clean": true,
     "unpushed_commits": 0,
     "upstream": "origin/build-018/session-governor"
@@ -504,7 +504,7 @@
   "branches": [
     {
       "name": "build-018/session-governor",
-      "head": "6f31544f2c3fdda0a77f1b36b16fc29c4e3d3dc3",
+      "head": "e9ae77a9d766753ba2acba6f666bab9ddd8f36a3",
       "upstream": "origin/build-018/session-governor",
       "ahead": 0,
       "behind": null,
@@ -751,7 +751,7 @@
     {
       "path": "C:/Fusion247PKA-governor",
       "branch": "build-018/session-governor",
-      "head": "6f31544f2c3fdda0a77f1b36b16fc29c4e3d3dc3",
+      "head": "e9ae77a9d766753ba2acba6f666bab9ddd8f36a3",
       "dirty": false,
       "unpushedCount": 0,
       "classification": "active-build",
@@ -786,7 +786,7 @@
     "at_boundary": true,
     "reason": "Verified by /rotate-session: 5 safety checks ran and found no obstacle. Tree clean, no unpushed commits, no live worker detected in this worktree.",
     "obstacles": [],
-    "verified_at": "2026-07-31"
+    "verified_at": "2026-08-01"
   },
   "resumption": {
     "focus": "T-18 landed: the orphaned-temp-file leak is fixed outright (0 orphans vs a 7-orphan baseline, independently verified by Larry), and the retry substantially reduces writer failure - but under sustained reader contention writers still fail, which Keel disclosed plainly and Larry's harsher probe confirmed. Scope is now FROZEN by Warwick. The build has 15 of 19 tickets resolved and a 607-test suite, but almost none of it is wired to produce anything Warwick can see: statusLine is unset, no health sample has ever been written, and only reorient + worktree-guard are live.",
