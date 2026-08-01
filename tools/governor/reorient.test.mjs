@@ -21,6 +21,9 @@ import {
   gitFacts,
   CONTEXT_CAP,
   VERDICT,
+  briefModeFor,
+  BRIEF_MODE,
+  SOURCE_POLICY,
 } from './reorient.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -93,13 +96,36 @@ test('parseHookInput: malformed and empty input never throw', () => {
 // Bounded firing
 // ---------------------------------------------------------------------------
 
-test('reorient: only fires on source=clear; every other source is skipped silently', () => {
-  for (const source of ['startup', 'resume', 'compact', 'fork', undefined]) {
-    const r = reorient({ source, cwd: 'C:/nowhere' });
-    assert.equal(r.verdict, VERDICT.SKIPPED);
-    assert.equal(r.context, null, 'a skipped source must inject nothing');
-    assert.equal(toHookOutput(r), null);
+// SPEC AMENDMENT (WO-2026-08-01-01 AC1, Silas D-B §B-2, authorised by Larry
+// 2026-08-01). This test previously asserted the OPPOSITE — that every source
+// but `clear` was skipped silently. That was the DEFECT, not the requirement:
+// `startup` and `resume` are two of the three real ways a build is re-entered,
+// and they carry the emptiest context. The requirement changed; this is not a
+// test edited to fit the code.
+test('reorient: EVERY source is dispatched — none is skipped for being unrecognised', () => {
+  for (const source of ['clear', 'startup', 'resume', 'compact', 'fork', undefined]) {
+    const mode = briefModeFor(source);
+    assert.ok(mode, `source ${String(source)} must resolve to a brief mode`);
+    assert.ok(
+      mode.mode === BRIEF_MODE.FULL || mode.mode === BRIEF_MODE.DELTA,
+      'every source must map to a real brief mode, never to silence'
+    );
+    assert.ok(mode.headline.length > 0, 'every source must carry a headline');
   }
+  assert.equal(briefModeFor('clear').mode, BRIEF_MODE.FULL);
+  assert.equal(briefModeFor('startup').mode, BRIEF_MODE.FULL);
+  assert.equal(briefModeFor('compact').mode, BRIEF_MODE.FULL);
+  assert.equal(briefModeFor('resume').mode, BRIEF_MODE.DELTA);
+  // An unknown source falls through to the MOST informative brief, not to
+  // silence — an over-informative brief costs a few hundred characters, an
+  // absent one loses the build.
+  assert.equal(briefModeFor('fork').recognised, false);
+  assert.equal(briefModeFor('fork').mode, BRIEF_MODE.FULL);
+  assert.equal(briefModeFor(undefined).recognised, false);
+  assert.equal(briefModeFor(undefined).mode, BRIEF_MODE.FULL);
+  assert.match(briefModeFor('fork').headline, /UNRECOGNISED/);
+  assert.match(briefModeFor('fork').headline, /"fork"/, 'must name the value it did not recognise');
+  assert.match(briefModeFor(undefined).headline, /\(absent\)/);
 });
 
 // ---------------------------------------------------------------------------
@@ -257,6 +283,141 @@ test('assembleBrief: a brief that already fits is untouched and announces nothin
 });
 
 // ---------------------------------------------------------------------------
+// AC1 — a RENDERED BRIEF on every entry path (Silas D-B §B-2, mutations B-M1..4)
+// ---------------------------------------------------------------------------
+// These assert on the CONTENT of the brief, never on the fact that reorient()
+// was called or that the verdict is not SKIPPED. Per D-B §B-2 note 4 an
+// invocation-shaped assertion is insufficient and must not be written: it would
+// pass while the behaviour stayed broken, which is exactly the false-control
+// failure this estate has already been burned by.
+
+// The three facts a re-entering session cannot obtain without the brief.
+function assertCarriesTheEssentials(text, e) {
+  assert.match(text, /branch\s+:/, 'brief must carry the branch');
+  assert.match(text, /banked\s+:/, 'brief must carry the banked head');
+  assert.match(text, /THE EXACT NEXT ACTION/, 'brief must carry the next action');
+  assert.ok(
+    text.includes(String(e.baseSha).slice(0, 7)),
+    'brief must carry the actual banked head sha, not a placeholder'
+  );
+}
+
+test('AC1/B-M1: source=startup renders a FULL brief carrying head, branch and next action', () => {
+  const e = makeEstate();
+  try {
+    const r = reorient({ source: 'startup', cwd: e.root });
+    assert.ok(r.context && r.context.length > 0, 'a fresh session must receive a brief');
+    assert.notEqual(r.verdict, VERDICT.SKIPPED);
+    assertCarriesTheEssentials(r.context, e);
+    assert.match(r.context, /FRESH session/, 'must name the entry path');
+    assert.ok(toHookOutput(r), 'the brief must reach the session');
+  } finally {
+    e.cleanup();
+  }
+});
+
+test('AC1: source=clear still renders a FULL brief, and still says the context was cleared', () => {
+  const e = makeEstate();
+  try {
+    const r = reorient({ source: 'clear', cwd: e.root });
+    assertCarriesTheEssentials(r.context, e);
+    assert.match(r.context, /CLEARED/, 'the pre-existing /clear behaviour is preserved');
+  } finally {
+    e.cleanup();
+  }
+});
+
+test('AC1/B-M2: source=resume renders a SHORT DELTA, strictly shorter than the full brief', () => {
+  const e = makeEstate();
+  try {
+    const full = reorient({ source: 'startup', cwd: e.root });
+    const delta = reorient({ source: 'resume', cwd: e.root });
+    assert.ok(delta.context && delta.context.length > 0, 'a resumed session must still be told the delta');
+    // Strictly shorter — the whole point of the delta is that it does not spend
+    // context re-stating what the restored transcript already carries.
+    assert.ok(
+      delta.context.length < full.context.length,
+      `resume brief (${delta.context.length}) must be strictly shorter than full (${full.context.length})`
+    );
+    // But it must still carry what a resumed session CANNOT get from its own
+    // transcript: where the durable truth is now.
+    assert.match(delta.context, /branch\s+:/);
+    assert.match(delta.context, /banked\s+:/);
+    assert.match(delta.context, /THE EXACT NEXT ACTION/);
+    assert.match(delta.context, /durable state on disk wins/i,
+      'a resumed session must be told its restored history may predate the banked state');
+  } finally {
+    e.cleanup();
+  }
+});
+
+test('AC1/B-M3: source=compact renders a FULL brief headlined RECOVERY', () => {
+  const e = makeEstate();
+  try {
+    const r = reorient({ source: 'compact', cwd: e.root });
+    assertCarriesTheEssentials(r.context, e);
+    assert.match(r.context, /RECOVERY/, 'a compacted context is the evaluator RECOVERY state');
+    assert.match(r.context, /lossy summary/, 'and must say why its own memory is not evidence');
+  } finally {
+    e.cleanup();
+  }
+});
+
+test('AC1/B-M4: an unrecognised or absent source renders a FULL brief that NAMES the value', () => {
+  const e = makeEstate();
+  try {
+    const odd = reorient({ source: 'banana', cwd: e.root });
+    assertCarriesTheEssentials(odd.context, e);
+    assert.match(odd.context, /UNRECOGNISED/);
+    assert.match(odd.context, /"banana"/, 'must name the unrecognised value so it can be reported');
+
+    const absent = reorient({ cwd: e.root });
+    assertCarriesTheEssentials(absent.context, e);
+    assert.match(absent.context, /UNRECOGNISED/);
+    assert.match(absent.context, /\(absent\)/, 'an absent source is "absent", never silently treated as known');
+  } finally {
+    e.cleanup();
+  }
+});
+
+test('AC1 MUTATION: restoring the old source guard makes the startup proof FAIL', () => {
+  // The control that proves the AC1 tests above can actually fail. The old
+  // behaviour was `if (source !== 'clear') return SKIPPED` — reproduced here
+  // exactly, and asserted to be incompatible with what AC1 requires.
+  const oldGuard = (source) =>
+    source !== 'clear' ? { verdict: VERDICT.SKIPPED, context: null } : { verdict: VERDICT.ORIENTED, context: 'x' };
+
+  const underOldGuard = oldGuard('startup');
+  assert.equal(underOldGuard.context, null, 'the old guard produced no brief for startup — the defect');
+
+  const e = makeEstate();
+  try {
+    const now = reorient({ source: 'startup', cwd: e.root });
+    assert.notEqual(now.context, null, 'the repaired code must produce what the old guard suppressed');
+    assert.ok(
+      now.context.length > 0 && underOldGuard.context === null,
+      'AC1 is exactly the difference between these two'
+    );
+  } finally {
+    e.cleanup();
+  }
+});
+
+// Every source in the policy must be reachable through the real dispatcher.
+test('AC1: no SOURCE_POLICY entry is unreachable or silent', () => {
+  const e = makeEstate();
+  try {
+    for (const source of Object.keys(SOURCE_POLICY)) {
+      const r = reorient({ source, cwd: e.root });
+      assert.ok(r.context && r.context.length > 0, `source=${source} must render a brief`);
+      assert.equal(r.sourceMode.source, source);
+    }
+  } finally {
+    e.cleanup();
+  }
+});
+
+// ---------------------------------------------------------------------------
 // Loud failure — INV-1
 // ---------------------------------------------------------------------------
 
@@ -404,10 +565,14 @@ test('MUTATION: malformed stdin produces a FAILED brief that admits nothing was 
   assert.match(r.context, /No state was inspected/);
 });
 
-test('runHook: a non-clear source injects nothing', () => {
+// SPEC AMENDMENT (WO-2026-08-01-01 AC1). Previously asserted that `startup`
+// injected nothing — the defect. A fresh session must now be reoriented, and a
+// source is never the reason a brief is withheld.
+test('runHook: a fresh-session source is dispatched, never skipped for its source', () => {
   const r = runHook(JSON.stringify({ source: 'startup', cwd: 'C:/x' }));
-  assert.equal(r.verdict, VERDICT.SKIPPED);
-  assert.equal(toHookOutput(r), null);
+  assert.notEqual(r.verdict, VERDICT.SKIPPED, 'startup must not be skipped for being startup');
+  assert.ok(r.context && r.context.length > 0, 'a fresh session must be told something');
+  assert.ok(toHookOutput(r), 'and that something must reach the session as hook output');
 });
 
 test('MUTATION: an internal throw becomes a FAILED brief, never an exception', () => {
@@ -455,12 +620,41 @@ test('REAL PROCESS: empty stdin exits 0 and does not crash the session start', (
   assert.match(JSON.parse(out).hookSpecificOutput.additionalContext, /could not read its input/);
 });
 
-test('REAL PROCESS: a non-clear source writes NOTHING to stdout', () => {
-  const out = execFileSync('node', [REORIENT_SRC], {
-    input: JSON.stringify({ source: 'startup', cwd: process.cwd() }),
-    encoding: 'utf8',
-  });
-  assert.equal(out.trim(), '', 'a non-clear session start must inject no context at all');
+// SPEC AMENDMENT (WO-2026-08-01-01 AC1) — and the strongest available proof of
+// it. This previously asserted that a `startup` session start wrote NOTHING;
+// that was the whole defect, end to end. It now drives the REAL script as a
+// REAL child process, over a REAL SessionStart payload, and asserts on the
+// CONTENT of what the session would actually receive. An assertion that the
+// hook was invoked, or that the verdict is not SKIPPED, would be insufficient
+// here — it would pass while the behaviour stayed broken (D-B §B-2 note 4).
+// Driven against a FIXTURE estate, not the developer's own checkout: the live
+// estate has several worktrees each carrying a copy of the same programme
+// state, so `process.cwd()` here resolves to AMBIGUOUS and the result would
+// depend on how many worktrees happen to exist on the machine. A fixture makes
+// the proof deterministic without weakening it — it is still the real script,
+// as a real child process, over a real SessionStart payload.
+test('REAL PROCESS: a fresh (startup) session start emits a RENDERED BRIEF on stdout', () => {
+  const e = makeEstate();
+  try {
+    const out = execFileSync('node', [REORIENT_SRC], {
+      input: JSON.stringify({ source: 'startup', cwd: e.root }),
+      encoding: 'utf8',
+    });
+    // THE defect, end to end: this produced an EMPTY stdout before AC1.
+    assert.ok(out.trim().length > 0, 'a fresh session start must inject context, not silence');
+    const ctx = JSON.parse(out).hookSpecificOutput.additionalContext;
+    assert.ok(ctx && ctx.length > 0, 'additionalContext must be a non-empty brief');
+    // T-15's model gate composes ON TOP of the brief in the real hook path and
+    // may substitute its own compact render when a model switch is owed. That
+    // layer is pre-existing and out of scope here, so this asserts the content
+    // the session receives EITHER WAY — the build it is resuming and where it
+    // is up to. The unsubstituted full brief is asserted directly, against the
+    // same render path, in the AC1/B-M1..B-M4 tests above.
+    assert.match(ctx, /BUILD-TEST/, 'the session must be told which build it is resuming');
+    assert.match(ctx, /T-02/, 'and the ticket it is resuming at');
+  } finally {
+    e.cleanup();
+  }
 });
 
 // ---------------------------------------------------------------------------

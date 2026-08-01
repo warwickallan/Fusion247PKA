@@ -8,6 +8,11 @@ import { fileURLToPath } from 'node:url';
 
 import {
   settingsPath,
+  statuslineScriptFor,
+  statusLineCommand,
+  isGovernorStatusLine,
+  RESTART_NOTICE,
+  STATUSLINE_MARKER,
   governorHookCommand,
   guardHookCommand,
   guardScriptFor,
@@ -153,12 +158,61 @@ test('the governor hook itself is never pruned, even before its script exists on
 // X-2 — idempotent activation
 // ---------------------------------------------------------------------------
 
-test('X-2: installing into a settings file with no hooks at all creates the structure', () => {
+// SPEC AMENDMENT (WO-2026-08-01-01 AC2, Silas D-B §B-1, authorised by Larry
+// 2026-08-01). This previously asserted `matcher === 'clear'` with the message
+// "must only fire on /clear" — which WAS the defect: it made reorientation
+// unreachable on `startup` and `resume`. The requirement changed; this is not a
+// test edited to fit the code.
+test('X-2/AC2: installing into a settings file with no hooks at all creates the structure', () => {
   const { settings: next, report } = planSettings({}, { scriptPath: SCRIPT, cwd: '/tmp' });
   assert.equal(report.added, true);
   assert.equal(next.hooks[HOOK_EVENT].length, 1);
-  assert.equal(next.hooks[HOOK_EVENT][0].matcher, 'clear', 'must only fire on /clear');
   assert.equal(next.hooks[HOOK_EVENT][0].hooks[0].command, governorHookCommand(SCRIPT));
+});
+
+test('AC2: the SessionStart entry carries NO matcher key at all — not "", not "*"', () => {
+  const { settings: next } = planSettings({}, { scriptPath: SCRIPT, cwd: '/tmp' });
+  const group = next.hooks[HOOK_EVENT][0];
+  // The KEY must be ABSENT, not merely falsy: any matcher that enumerates
+  // sources means an unknown future source silently matches nothing, which is
+  // the defect class being repaired. Checked on the SERIALISED form too,
+  // because that is what Claude Code actually reads.
+  assert.ok(
+    !Object.prototype.hasOwnProperty.call(group, 'matcher'),
+    'the SessionStart group must not carry a matcher key'
+  );
+  const onDisk = JSON.parse(JSON.stringify(next));
+  assert.ok(
+    !Object.prototype.hasOwnProperty.call(onDisk.hooks[HOOK_EVENT][0], 'matcher'),
+    'and it must still be absent once serialised to settings.local.json'
+  );
+  assert.notEqual(group.matcher, 'clear', 'the old clear-only matcher must be gone');
+  assert.notEqual(group.matcher, '*');
+  assert.notEqual(group.matcher, '');
+});
+
+test('AC2 MUTATION: the old clear-only shape is detectable by the AC2 predicate', () => {
+  // Proves the AC2 assertion can actually fail: construct the OLD shape by hand
+  // and show it trips the exact predicate AC2 relies on.
+  const old = { matcher: 'clear', hooks: [{ type: 'command', command: governorHookCommand(SCRIPT) }] };
+  assert.ok(
+    Object.prototype.hasOwnProperty.call(old, 'matcher'),
+    'the old shape HAS a matcher key — which is what AC2 now forbids'
+  );
+  const { settings: next } = planSettings({}, { scriptPath: SCRIPT, cwd: '/tmp' });
+  assert.notDeepEqual(next.hooks[HOOK_EVENT][0], old, 'the installed shape must not be the old shape');
+});
+
+test('AC2: PreToolUse specs KEEP their matchers — the change is scoped to SessionStart', () => {
+  const { settings: next } = planSettings({}, { scriptPath: SCRIPT, cwd: '/tmp' });
+  const groups = (next.hooks[GUARD_EVENT] || []).filter((g) => Object.prototype.hasOwnProperty.call(g, 'matcher'));
+  assert.ok(groups.length > 0, 'the PreToolUse specs must still be installed with matchers');
+  for (const g of groups) {
+    assert.ok(
+      typeof g.matcher === 'string' && g.matcher.length > 0,
+      'a PreToolUse hook must stay scoped to the tools it governs'
+    );
+  }
 });
 
 test('X-2: install is IDEMPOTENT — the second run writes nothing', () => {
@@ -609,6 +663,242 @@ test('the report names the delegation hooks in renderReport output', () => {
     assert.match(text, /substantial-work threshold gate/);
     assert.match(text, /delegation-gate\.mjs observe/);
     assert.match(text, /delegation-gate\.mjs check/);
+  } finally {
+    c.cleanup();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// AC3 — the restart notice: a hook change is INERT until Claude Code restarts
+// ---------------------------------------------------------------------------
+// Nolan established by observation that hooks are snapshotted at process launch
+// (a hook deleted at 17:05:08Z still fired at 21:39Z). So an install that says
+// "written" and nothing else is indistinguishable, to the person running it,
+// from an install that took effect. Both directions are tested.
+
+test('AC3: a run that CHANGED something emits the restart notice, unmissably', () => {
+  const c = makeCheckout();
+  try {
+    const r = installHooks({ checkout: c.root, scriptPath: SCRIPT });
+    assert.equal(r.changed, true, 'precondition: this run must actually change something');
+    const text = renderReport(r);
+    assert.match(text, /RESTART REQUIRED/, 'a changing run must say the change is not live yet');
+    assert.match(text, /NOT LIVE YET/);
+    assert.match(text, /Quit Claude Code COMPLETELY/, 'and say exactly what to do about it');
+    assert.ok(text.includes(RESTART_NOTICE), 'the full notice must be present, not a fragment');
+  } finally {
+    c.cleanup();
+  }
+});
+
+test('AC3: a run that changed NOTHING must not emit the restart notice', () => {
+  const c = makeCheckout();
+  try {
+    installHooks({ checkout: c.root, scriptPath: SCRIPT });
+    const second = installHooks({ checkout: c.root, scriptPath: SCRIPT });
+    assert.equal(second.changed, false, 'precondition: the second run must be a no-op');
+    const text = renderReport(second);
+    assert.doesNotMatch(text, /RESTART REQUIRED/, 'a no-op must not cry wolf about restarting');
+    assert.ok(!text.includes(RESTART_NOTICE));
+    assert.match(text, /Nothing written/);
+  } finally {
+    c.cleanup();
+  }
+});
+
+test('AC3 MUTATION: the notice test can fail — changed and unchanged runs differ', () => {
+  const c = makeCheckout();
+  try {
+    const changed = renderReport(installHooks({ checkout: c.root, scriptPath: SCRIPT }));
+    const unchanged = renderReport(installHooks({ checkout: c.root, scriptPath: SCRIPT }));
+    assert.ok(changed.includes('RESTART REQUIRED'));
+    assert.ok(!unchanged.includes('RESTART REQUIRED'));
+    assert.notEqual(changed, unchanged, 'the two directions must be distinguishable');
+  } finally {
+    c.cleanup();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// AC4 — statusLine is part of the managed set
+// ---------------------------------------------------------------------------
+// Before this, install-hooks.mjs contained ZERO occurrences of `statusLine`, so
+// the one governor surface that actually works existed only in Warwick's
+// untracked machine config and would not survive a merge or another machine.
+
+test('AC4: statusLine is derived from the same sibling rule as the other scripts', () => {
+  assert.equal(statuslineScriptFor(SCRIPT), 'C:/Fusion247PKA-governor/tools/governor/statusline-live.mjs');
+  // A path that is not the reorientation script derives nothing — this
+  // installer never invents a command it could not derive.
+  assert.equal(statuslineScriptFor('C:/x/tools/governor/evaluator.mjs'), null);
+  assert.match(statusLineCommand(statuslineScriptFor(SCRIPT)), /^node /);
+  assert.ok(statusLineCommand(statuslineScriptFor(SCRIPT)).includes(STATUSLINE_MARKER));
+});
+
+test('AC4: a FRESH install reproduces statusLine from nothing', () => {
+  const { settings: next, report } = planSettings({}, { scriptPath: SCRIPT, cwd: '/tmp' });
+  assert.equal(report.statusLine.state, 'added');
+  assert.equal(next.statusLine.type, 'command');
+  assert.ok(isGovernorStatusLine(next.statusLine), 'the installed statusLine must be the governor one');
+  assert.ok(
+    next.statusLine.command.includes(STATUSLINE_MARKER),
+    'and must point at statusline-live.mjs, not at some other script'
+  );
+});
+
+test('AC4: statusLine installation is IDEMPOTENT', () => {
+  const c = makeCheckout();
+  try {
+    const first = installHooks({ checkout: c.root, scriptPath: SCRIPT });
+    assert.equal(first.report.statusLine.state, 'added');
+    const after = readFileSync(settingsPath(c.root), 'utf8');
+    const second = installHooks({ checkout: c.root, scriptPath: SCRIPT });
+    assert.equal(second.report.statusLine.state, 'unchanged');
+    assert.equal(second.changed, false);
+    assert.equal(readFileSync(settingsPath(c.root), 'utf8'), after, 'byte-identical on re-run');
+  } finally {
+    c.cleanup();
+  }
+});
+
+test('AC4: a governor statusLine pointing at the wrong worktree is RE-POINTED', () => {
+  const stale = { type: 'command', command: 'node C:/Some-Old-Worktree/tools/governor/statusline-live.mjs' };
+  const { settings: next, report } = planSettings({ statusLine: stale }, { scriptPath: SCRIPT, cwd: '/tmp' });
+  assert.equal(report.statusLine.state, 're-pointed');
+  assert.equal(report.statusLine.was, stale.command);
+  assert.ok(next.statusLine.command.includes('Fusion247PKA-governor'));
+});
+
+test('AC4: a THIRD-PARTY statusLine is reported and left exactly as found', () => {
+  const foreign = { type: 'command', command: 'node C:/somebody-elses/prompt.mjs' };
+  const { settings: next, report } = planSettings({ statusLine: foreign }, { scriptPath: SCRIPT, cwd: '/tmp' });
+  assert.equal(report.statusLine.state, 'foreign-left-alone');
+  assert.deepEqual(next.statusLine, foreign, 'somebody elses configuration is never overwritten');
+});
+
+test('AC4: renderReport says what happened to statusLine', () => {
+  const c = makeCheckout();
+  try {
+    const text = renderReport(installHooks({ checkout: c.root, scriptPath: SCRIPT }));
+    assert.match(text, /statusLine \(live governor line\)/);
+    assert.match(text, /statusline-live\.mjs/);
+  } finally {
+    c.cleanup();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// AC5 — the report may never describe ground it did not examine
+// ---------------------------------------------------------------------------
+
+test('AC5: with a dangling hook present, the report never says "pruned: none"', () => {
+  // The literal AC5 case. NOTE: this passes against the pre-existing pruner
+  // too — it is a REGRESSION test, not the repair. The repair is the
+  // --no-prune case below, which is where the report was actually lying.
+  const c = makeCheckout(); // makeCheckout seeds a hook whose target is missing
+  try {
+    const r = installHooks({ checkout: c.root, scriptPath: SCRIPT });
+    assert.ok(r.report.pruned.length > 0, 'precondition: the fixture must contain a prunable hook');
+    const text = renderReport(r);
+    assert.match(text, /PRUNED 1 hook\(s\)/);
+    assert.doesNotMatch(text, /pruned {3}: none/, 'must not claim none while one was pruned');
+    assert.match(text, /missing-hook\.mjs/, 'and must name the dangling target');
+  } finally {
+    c.cleanup();
+  }
+});
+
+test('AC5 REPAIR: --no-prune must NOT claim "every existing hook target exists"', () => {
+  // THE defect. planSettings short-circuits danglingTargets when prune=false,
+  // so `pruned` is empty for a reason that has nothing to do with the targets
+  // being present — yet the report used to print
+  // "pruned : none (every existing hook target exists)" regardless. That is a
+  // control reporting on ground it never examined, which is worse than no
+  // control: an absent check invites caution, a lying one invites confidence.
+  const c = makeCheckout(); // contains a hook whose target does NOT exist
+  try {
+    const r = installHooks({ checkout: c.root, scriptPath: SCRIPT, prune: false });
+    assert.equal(r.report.pruned.length, 0, 'precondition: --no-prune prunes nothing');
+    assert.equal(r.report.pruneChecked, false, 'and records that it never checked');
+    const text = renderReport(r);
+    assert.match(text, /NOT CHECKED/, 'the report must say the question was never asked');
+    assert.doesNotMatch(
+      text,
+      /every existing hook target exists/,
+      'it must NEVER assert that every target exists when it never looked'
+    );
+    assert.match(text, /would not have been detected/, 'and must say what the run cannot tell you');
+  } finally {
+    c.cleanup();
+  }
+});
+
+test('AC5 MUTATION: the checked and unchecked reports are genuinely different', () => {
+  // Makes the control above fail-able: if the two paths ever render the same
+  // text again, the distinction this criterion exists to enforce is gone.
+  const a = makeCheckout();
+  const b = makeCheckout();
+  try {
+    const checked = renderReport(installHooks({ checkout: a.root, scriptPath: SCRIPT, prune: true }));
+    const unchecked = renderReport(installHooks({ checkout: b.root, scriptPath: SCRIPT, prune: false }));
+    assert.ok(unchecked.includes('NOT CHECKED'));
+    assert.ok(!checked.includes('NOT CHECKED'));
+    assert.notEqual(checked, unchecked);
+  } finally {
+    a.cleanup();
+    b.cleanup();
+  }
+});
+
+test('AC5: a clean surface says what it CHECKED, not merely that nothing was found', () => {
+  const c = makeCheckout({
+    settings: {
+      hooks: {
+        [HOOK_EVENT]: [{ hooks: [{ type: 'command', command: 'node C:/definitely/real.mjs' }] }],
+      },
+    },
+  });
+  try {
+    const r = installHooks({ checkout: c.root, scriptPath: SCRIPT, exists: () => true });
+    assert.equal(r.report.pruned.length, 0);
+    assert.equal(r.report.pruneChecked, true);
+    const text = renderReport(r);
+    assert.match(
+      text,
+      /CHECKED the target of all \d+ examined hook\(s\)/,
+      'a clean result must state the ground it covered, not just its outcome'
+    );
+  } finally {
+    c.cleanup();
+  }
+});
+
+test('AC5: --check describes a PROPOSAL, never a deficit in the live settings', () => {
+  // Nolan's finding: --check reported two delegation hooks as "ADDED" beside
+  // "settings are OUT OF DATE", which reads as "you are behind, sync up" when
+  // it actually means "re-running would newly ACTIVATE a gate that was
+  // deliberately never wired".
+  const c = makeCheckout();
+  try {
+    const r = installHooks({ checkout: c.root, scriptPath: SCRIPT, check: true });
+    assert.equal(r.checked, true);
+    assert.equal(r.changed, true, 'precondition: the check must find differences');
+    const text = renderReport(r);
+    assert.match(text, /would be ADDED \(newly activated\)/, 'must frame an addition as an activation');
+    assert.doesNotMatch(text, /OUT OF DATE/, 'must not imply the live settings are merely behind');
+    assert.match(text, /a change to what runs, not a catch-up/);
+    assert.match(text, /Nothing was written/);
+  } finally {
+    c.cleanup();
+  }
+});
+
+test('AC5: --check never writes, whatever it reports', () => {
+  const c = makeCheckout();
+  try {
+    const before = readFileSync(settingsPath(c.root), 'utf8');
+    installHooks({ checkout: c.root, scriptPath: SCRIPT, check: true });
+    assert.equal(readFileSync(settingsPath(c.root), 'utf8'), before, '--check is read-only (INV-7)');
   } finally {
     c.cleanup();
   }
