@@ -114,6 +114,16 @@ services/asdair/db/*seed*.sql
 services/asdair/**/*.local.*
 .decision-card-*
 
+# --- Claude Code local settings backups (BUILD-018) ---
+# `.claude/settings.local.json` is already ignored, but the Governor's installer
+# writes a timestamped backup beside it on every changed run, and those were NOT
+# covered — they showed as untracked, so a `git add -A` would have committed live
+# machine settings into a PUBLIC repository. Those files carry absolute machine
+# paths and at least one argument referencing the private secrets store.
+# Found by Nolan's final acceptance audit, 2026-08-01.
+.claude/settings.local.json.bak-*
+.claude/settings.json.bak-*
+
 # --- transient worktrees + build output (local only) ---
 .claude/worktrees/
 .wt-campaign-codex-review/
