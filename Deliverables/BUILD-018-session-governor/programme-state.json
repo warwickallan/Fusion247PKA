@@ -343,10 +343,17 @@
     {
       "id": "T-21",
       "title": "The standing operating constitution, durably placed in the authoritative sources",
-      "state": "frontier",
+      "state": "resolved",
       "model": "Opus",
       "depends_on": [],
-      "note": "WO-2026-08-01-02 (WP-2). Authored by Nolan because Keel is contractually forbidden CLAUDE.md/AGENTS.md/Team/**. Independent audit returned NOT YET MERGEABLE; five fixes issued."
+      "note": "Authored by Nolan (Keel is contractually forbidden CLAUDE.md/AGENTS.md/Team/**). Independently audited TWICE by a separate Nolan instance. Pass 1: NOT YET MERGEABLE - found a BINDING WARWICK DECISION silently dropped (AD-26 material scope change substituted by rotation-required, count unchanged so the loss was invisible), a token mismatch against the frozen ESCAPE_HATCH_REASONS literal, and startup step 3 reproducing the naive file-count scan build-registry.mjs documents as the trap that disarmed the T-11 guard. Pass 2: a three-way contradiction placing the footer both inside the banner and as the reply final line, firing on the first output of every fresh session; and the author disclosed that its own deletion test is grep-based, so it proves absence of a repeated STRING not a repeated FACT - it had twice reported one-home-per-fact over a paraphrase four lines away. All closed. Merged only after footer.mjs existed, because CLAUDE.md references it and startup step 4 requires named paths to exist; verified post-merge that all three referenced paths resolve.",
+      "resolved": "2026-08-01",
+      "evidence": [
+        "CLAUDE.md",
+        "Team/Larry - Orchestrator/AGENTS.md",
+        "Team/agent-index.md",
+        "Deliverables/BUILD-018-session-governor/audit/NOLAN-03-constitution-audit.md"
+      ]
     },
     {
       "id": "T-22",
