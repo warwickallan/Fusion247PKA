@@ -1,0 +1,105 @@
+name: governor-tests
+
+# CI for BUILD-018, the Larry Session Governor (tools/governor/**).
+#
+# WHY THIS EXISTS. Keel's WP-1 preflight reported that no workflow referenced
+# tools/governor at all: the suite was builder-run only, so nothing enforced it on
+# merge. The standing bar in this estate is that "proven" means EXECUTED IN CI, and a
+# builder's own green is explicitly untrusted by default.
+#
+# WINDOWS-LATEST ON PURPOSE. The Governor runs on Warwick's Windows machine, and part
+# of what it tests is a genuinely Windows-specific phenomenon: the atomic-write retry
+# exists because a concurrent READER holding the target across a rename raises EPERM on
+# Windows. Running this suite only on Linux would be testing a platform the product is
+# never deployed to, and would report success over ground it never examined.
+#
+# THE GLOB FORM IS REQUIRED. `node --test tools/governor/` (directory form) fails with
+# MODULE_NOT_FOUND on this codebase; the glob form is the one that works. That is a
+# recorded finding, not a preference.
+#
+# THE EXECUTED-COUNT ASSERTION IS THE POINT. A suite that runs zero tests exits 0 and
+# looks identical to a suite that passes. This job therefore fails when the reported
+# pass count is not a positive integer, so "did not run" can never be mistaken for
+# "healthy" — the same rule the Governor's own evaluator applies to BLIND vs GREEN.
+#
+# The path filter includes this file, so a change to the workflow itself always
+# re-runs it. A path-filtered workflow that quietly stops running is indistinguishable
+# from one that passes.
+
+on:
+  push:
+    paths:
+      - 'tools/governor/**'
+      - '.github/workflows/governor-tests.yml'
+  pull_request:
+    paths:
+      - 'tools/governor/**'
+      - '.github/workflows/governor-tests.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: State what this job does NOT cover
+        shell: bash
+        run: |
+          echo "NOT COVERED BY CI — two suites are excluded because they assert against the"
+          echo "REAL local estate (multi-worktree layout, banked programme state, live git):"
+          echo "  collect-state.test.mjs   — collectEstateState against the real repository"
+          echo "  reorient.test.mjs        — REAL ESTATE / REAL GIT orientation"
+          echo "(model-gate.test.mjs was a third exclusion until 2026-08-01, when the model gate"
+          echo " was RETIRED and its suite deleted. The exclusion went with it: a grep -v naming"
+          echo " a file that no longer exists is a filter nobody can tell is doing nothing.)"
+          echo "They pass on Warwick's machine and cannot pass on a single-branch runner."
+          echo "Their pure tests are excluded with them; that is a real coverage gap, recorded"
+          echo "as a finding rather than hidden by a skip. A skipped test is NOT a passing test."
+
+      - name: Run the portable governor suites and assert they actually executed
+        shell: bash
+        run: |
+          set -o pipefail
+          # Explicit exclusion, not a silent skip: the two estate-coupled suites are
+          # named above and in the commit that added this job. Everything else must be
+          # green. The proper fix is for those suites to build a synthetic estate, which
+          # rotate-session.test.mjs already does — so there is precedent, not a blocker.
+          FILES=$(ls tools/governor/*.test.mjs \
+            | grep -v 'collect-state.test.mjs' \
+            | grep -v 'reorient.test.mjs')
+          echo "running:"; echo "$FILES"
+          node --test $FILES 2>&1 | tee suite.log
+          status=$?
+
+          # `node --test` reports totals in a TAP summary. Extract the pass count and
+          # require it to be a positive integer. An empty or zero count means the
+          # suite did not run, which is a FAILURE and never a pass.
+          passed=$(grep -E '^# pass [0-9]+$' suite.log | tail -1 | awk '{print $3}')
+          failed=$(grep -E '^# fail [0-9]+$' suite.log | tail -1 | awk '{print $3}')
+
+          echo "executed-pass=${passed:-<absent>} executed-fail=${failed:-<absent>}"
+
+          if [ -z "$passed" ]; then
+            echo "::error::NOT RUN — no '# pass N' line found. A suite whose execution cannot be established is not a passing suite."
+            exit 1
+          fi
+          if [ "$passed" -le 0 ]; then
+            echo "::error::NOT RUN — zero subtests executed. Exit 0 over an empty suite is not evidence."
+            exit 1
+          fi
+          if [ "${failed:-1}" -ne 0 ]; then
+            echo "::error::FAILED — ${failed} failing test(s)."
+            exit 1
+          fi
+
+          echo "OK — ${passed} tests executed and passed."
+          exit $status

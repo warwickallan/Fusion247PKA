@@ -1,0 +1,689 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import {
+  normalisePath,
+  samePath,
+  isInside,
+  canonicalFromState,
+  liveLocation,
+  compareLocation,
+  classifyBashSegment,
+  classifyBashCommand,
+  splitBashSegments,
+  decide,
+  guard,
+  runHook,
+  toHookOutput,
+  findCanonical,
+  buildDenyReason,
+  LOCATION,
+  DECISION,
+  GUARDED_TOOLS,
+} from './worktree-guard.mjs';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const FIXTURE_PATH = join(__dirname, 'fixtures', 'programme-state.minimal.json');
+const GUARD_SRC = join(__dirname, 'worktree-guard.mjs');
+
+function loadFixture() {
+  return JSON.parse(readFileSync(FIXTURE_PATH, 'utf8'));
+}
+
+// A real estate: a real git repo (the CANONICAL worktree) plus a second real
+// worktree on another branch (the WRONG place to be working from). Everything
+// below that claims to prove a location rule proves it against real git.
+function makeEstate({ programme = 'BUILD-TEST', canonicalBranch = 'build-x/canonical' } = {}) {
+  const root = mkdtempSync(join(tmpdir(), 'governor-guard-'));
+  const repo = join(root, 'primary');
+  mkdirSync(repo, { recursive: true });
+  execFileSync('git', ['-C', repo, 'init', '-q', '-b', canonicalBranch]);
+  execFileSync('git', ['-C', repo, 'config', 'user.email', 'test@example.com']);
+  execFileSync('git', ['-C', repo, 'config', 'user.name', 'Test']);
+
+  // Ask git where it thinks the repo is: on Windows the temp path git reports can
+  // differ in case/short-name from the one mkdtemp handed back, and a test that
+  // compared the wrong two strings would "prove" a bug that does not exist.
+  const canonicalWorktree = execFileSync('git', ['-C', repo, 'rev-parse', '--show-toplevel'], {
+    encoding: 'utf8',
+  })
+    .trim()
+    .replace(/\\/g, '/');
+
+  // Seed FIRST, and cut the wrong worktree from the seed commit, so the wrong
+  // worktree has no Deliverables of its own. That is the realistic shape: the
+  // place you end up by mistake is usually main, which does not carry the
+  // in-flight build's state file.
+  writeFileSync(join(repo, 'seed.txt'), 'seed\n');
+  execFileSync('git', ['-C', repo, 'add', '.']);
+  execFileSync('git', ['-C', repo, 'commit', '-q', '-m', 'seed']);
+  const seedSha = execFileSync('git', ['-C', repo, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+
+  const other = join(root, 'other');
+  execFileSync('git', ['-C', repo, 'worktree', 'add', '-q', '-b', 'some/other-branch', other, seedSha]);
+  const otherWorktree = execFileSync('git', ['-C', other, 'rev-parse', '--show-toplevel'], {
+    encoding: 'utf8',
+  })
+    .trim()
+    .replace(/\\/g, '/');
+
+  const home = join(repo, 'Deliverables', programme);
+  mkdirSync(home, { recursive: true });
+
+  const doc = loadFixture();
+  doc.programme.id = programme;
+  doc.programme.status = 'active';
+  doc.programme.home = `Deliverables/${programme}`;
+  doc.repository.worktree = canonicalWorktree;
+  doc.repository.branch = canonicalBranch;
+  doc.resumption.worktree = canonicalWorktree;
+  doc.resumption.branch = canonicalBranch;
+
+  const statePath = join(home, 'programme-state.json');
+  writeFileSync(statePath, JSON.stringify(doc, null, 2) + '\n');
+  execFileSync('git', ['-C', repo, 'add', '.']);
+  execFileSync('git', ['-C', repo, 'commit', '-q', '-m', 'bank']);
+  const headSha = execFileSync('git', ['-C', repo, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+
+  return {
+    root,
+    repo,
+    seedSha,
+    canonicalWorktree,
+    canonicalBranch,
+    other,
+    otherWorktree,
+    statePath,
+    headSha,
+    doc,
+    cleanup: () => {
+      try {
+        rmSync(root, { recursive: true, force: true });
+      } catch {
+        /* Windows sometimes holds the worktree lock briefly; the temp dir is disposable */
+      }
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Path comparison — the foundation. Get this wrong and every verdict is noise.
+// ---------------------------------------------------------------------------
+
+test('path comparison is separator- and case-insensitive, and never matches by prefix accident', () => {
+  assert.equal(normalisePath('C:\\Fusion247PKA-governor\\'), 'C:/Fusion247PKA-governor');
+  assert.equal(samePath('C:\\Fusion247PKA', 'c:/fusion247pka'), true);
+  assert.equal(samePath('C:/Fusion247PKA', 'C:/Fusion247PKA-governor'), false);
+
+  assert.equal(isInside('C:/repo/tools/governor', 'C:/repo'), true);
+  assert.equal(isInside('C:/repo', 'C:/repo'), true);
+  assert.equal(
+    isInside('C:/repo-governor', 'C:/repo'),
+    false,
+    'a sibling that merely SHARES A PREFIX is not inside — this is the exact pair this build lives with'
+  );
+  assert.equal(samePath(null, 'C:/x'), false);
+  assert.equal(isInside(undefined, undefined), false);
+});
+
+// ---------------------------------------------------------------------------
+// Canonical extraction
+// ---------------------------------------------------------------------------
+
+test('canonicalFromState prefers resumption, falls back to repository, and refuses to be partial', () => {
+  const s = loadFixture();
+  const c = canonicalFromState(s, 'C:/x/programme-state.json');
+  assert.equal(c.worktree, 'C:/Synthetic-build');
+  assert.equal(c.branch, 'build-999/synthetic');
+
+  const fallback = JSON.parse(JSON.stringify(s));
+  delete fallback.resumption.worktree;
+  delete fallback.resumption.branch;
+  const f = canonicalFromState(fallback, 'C:/x');
+  assert.equal(f.worktree, 'C:/Synthetic-build', 'repository.worktree is the fallback');
+  assert.equal(f.branch, 'build-999/synthetic');
+
+  const broken = JSON.parse(JSON.stringify(s));
+  delete broken.resumption.branch;
+  delete broken.repository.branch;
+  assert.equal(canonicalFromState(broken, 'C:/x'), null, 'half a canonical location is not a canonical location');
+  assert.equal(canonicalFromState(null), null);
+});
+
+// ---------------------------------------------------------------------------
+// Requirement 4 — the comparison, against REAL git
+// ---------------------------------------------------------------------------
+
+test('REAL GIT: the canonical worktree compares as ALIGNED on all three fields', () => {
+  const e = makeEstate();
+  try {
+    const canonical = canonicalFromState(e.doc, e.statePath);
+    const live = liveLocation({ cwd: e.canonicalWorktree });
+    assert.equal(live.repoRoot.toLowerCase(), e.canonicalWorktree.toLowerCase());
+    assert.equal(live.branch, e.canonicalBranch);
+    assert.equal(live.headSha, e.headSha);
+
+    const cmp = compareLocation(canonical, live);
+    assert.equal(cmp.verdict, LOCATION.ALIGNED);
+    assert.deepEqual(cmp.mismatches, []);
+    assert.ok(cmp.checked >= 3, 'cwd, repository root and branch must each actually be checked');
+  } finally {
+    e.cleanup();
+  }
+});
+
+test('REAL GIT: a different worktree on a different branch is WRONG_WORKTREE, naming both fields', () => {
+  const e = makeEstate();
+  try {
+    const canonical = canonicalFromState(e.doc, e.statePath);
+    const cmp = compareLocation(canonical, liveLocation({ cwd: e.otherWorktree }));
+
+    assert.equal(cmp.verdict, LOCATION.WRONG_WORKTREE);
+    const fields = cmp.mismatches.map((m) => m.field).sort();
+    assert.deepEqual(fields, ['branch', 'cwd', 'repository root'].sort());
+    assert.equal(cmp.mismatches.find((m) => m.field === 'branch').actual, 'some/other-branch');
+  } finally {
+    e.cleanup();
+  }
+});
+
+test('AD-19 (fail CLOSED): a location that cannot be read is UNESTABLISHED, never ALIGNED', () => {
+  const canonical = canonicalFromState(loadFixture(), 'C:/x');
+  const cmp = compareLocation(canonical, {
+    cwd: null,
+    repoRoot: null,
+    branch: null,
+    headSha: null,
+    gitError: 'not a git repository',
+  });
+  assert.equal(cmp.verdict, LOCATION.UNESTABLISHED);
+  assert.notEqual(cmp.verdict, LOCATION.ALIGNED);
+  assert.equal(cmp.mismatches.length, 3, 'every unknown field must be recorded, not skipped');
+
+  // And the real thing: a directory that is not a repository at all.
+  const dir = mkdtempSync(join(tmpdir(), 'governor-notrepo-'));
+  try {
+    const live = liveLocation({ cwd: dir });
+    assert.equal(live.repoRoot, null);
+    assert.ok(live.gitError, 'the git failure must be recorded, not swallowed');
+    assert.notEqual(compareLocation(canonical, live).verdict, LOCATION.ALIGNED);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('AD-18 (MUTATION): a MOVED HEAD is reported but NEVER denies — otherwise the first commit blocks the session', () => {
+  const e = makeEstate();
+  try {
+    const canonical = canonicalFromState(e.doc, e.statePath);
+    canonical.bankedHeadSha = '0'.repeat(40); // banked head is nothing like the live one
+
+    const cmp = compareLocation(canonical, liveLocation({ cwd: e.canonicalWorktree }));
+    assert.equal(cmp.headMoved, true, 'the divergence must be visible');
+    assert.equal(cmp.verdict, LOCATION.ALIGNED, 'but it is NOT a location mismatch');
+    assert.deepEqual(cmp.mismatches, []);
+
+    const d = decide({ toolName: 'Write', toolInput: {}, comparison: { ...cmp, live: {} }, canonical });
+    assert.equal(d.decision, DECISION.DEFER, 'a moved HEAD must not deny a write');
+  } finally {
+    e.cleanup();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Bash classification — what may still run while misaligned
+// ---------------------------------------------------------------------------
+
+test('classifyBashSegment: mutating git operations are recognised as mutating', () => {
+  for (const cmd of [
+    'git commit -m "x"',
+    'git push origin main',
+    'git checkout other-branch',
+    'git switch main',
+    'git merge feature',
+    'git rebase main',
+    'git reset --hard HEAD~1',
+    'git add .',
+    'git clean -fd',
+    'git stash push -m x',
+    'git worktree add ../x',
+    'git branch -D doomed',
+    'git config user.name Someone',
+    'git -C C:/elsewhere commit -m sneaky',
+  ]) {
+    assert.equal(classifyBashSegment(cmd), 'mutating', `${cmd} must be mutating`);
+  }
+});
+
+test('classifyBashSegment: read-only inspection stays possible while misaligned', () => {
+  for (const cmd of [
+    'git status --porcelain',
+    'git log --oneline -5',
+    'git rev-parse HEAD',
+    'git diff --stat',
+    'git worktree list',
+    'git branch --show-current',
+    'git config --get user.name',
+    'git stash list',
+    'ls -la tools/governor',
+    'pwd',
+    'cat package.json',
+    'grep -n foo bar.mjs',
+    'node --version',
+    'git status 2>/dev/null',
+    'git log 2>&1',
+    'sed -n 1,20p file.txt',
+  ]) {
+    assert.equal(classifyBashSegment(cmd), 'read-only', `${cmd} must stay permitted`);
+  }
+});
+
+test('classifyBashSegment: writes disguised as not-git are still writes', () => {
+  assert.equal(classifyBashSegment('echo hi > file.txt'), 'mutating', 'redirection writes');
+  assert.equal(classifyBashSegment('cat a >> b'), 'mutating');
+  assert.equal(classifyBashSegment('sed -i s/a/b/ file'), 'mutating', 'in-place edit');
+  assert.equal(classifyBashSegment('rm -rf build'), 'unknown', 'not on the read-only list → denied');
+  assert.equal(classifyBashSegment('node build.mjs'), 'unknown', 'a script can write anything');
+  assert.equal(classifyBashSegment('npm install'), 'unknown');
+  assert.equal(classifyBashSegment('git $(echo commit)'), 'unknown', 'substitution can hide anything');
+  assert.equal(classifyBashSegment('FOO=bar git status'), 'read-only', 'env prefixes are not the command');
+});
+
+test('MUTATION: one mutating segment poisons the whole pipeline', () => {
+  const c = classifyBashCommand('git status && git commit -m x');
+  assert.equal(c.kind, 'mutating', 'a chain is only as read-only as its worst link');
+  assert.equal(splitBashSegments('a && b || c ; d | e').length, 5);
+  assert.equal(classifyBashCommand('git status && ls').kind, 'read-only');
+  assert.equal(classifyBashCommand('').kind, 'unknown', 'nothing to classify is not permission');
+  assert.equal(classifyBashCommand(undefined).kind, 'unknown');
+});
+
+// ---------------------------------------------------------------------------
+// Requirement 6 — the deny gate
+// ---------------------------------------------------------------------------
+
+function misalignedComparison(canonical, live) {
+  return { ...compareLocation(canonical, live), live };
+}
+
+test('REQUIREMENT 6: Write, Edit, MultiEdit and NotebookEdit are all DENIED under mismatch', () => {
+  const e = makeEstate();
+  try {
+    const canonical = canonicalFromState(e.doc, e.statePath);
+    const comparison = misalignedComparison(canonical, liveLocation({ cwd: e.otherWorktree }));
+
+    for (const toolName of ['Write', 'Edit', 'MultiEdit', 'NotebookEdit']) {
+      const d = decide({ toolName, toolInput: { file_path: 'anything.mjs' }, comparison, canonical });
+      assert.equal(d.decision, DECISION.DENY, `${toolName} must be denied`);
+      assert.match(d.reason, /WRONG WORKTREE/);
+    }
+  } finally {
+    e.cleanup();
+  }
+});
+
+test('REQUIREMENT 6: mutating Bash is DENIED under mismatch; read-only Bash still runs', () => {
+  const e = makeEstate();
+  try {
+    const canonical = canonicalFromState(e.doc, e.statePath);
+    const comparison = misalignedComparison(canonical, liveLocation({ cwd: e.otherWorktree }));
+
+    const denied = decide({ toolName: 'Bash', toolInput: { command: 'git commit -m "wrong place"' }, comparison, canonical });
+    assert.equal(denied.decision, DECISION.DENY);
+    assert.equal(denied.classification, 'mutating');
+
+    const unknown = decide({ toolName: 'Bash', toolInput: { command: 'node write-something.mjs' }, comparison, canonical });
+    assert.equal(unknown.decision, DECISION.DENY, 'unknown fails CLOSED under mismatch');
+
+    const allowed = decide({ toolName: 'Bash', toolInput: { command: 'git status' }, comparison, canonical });
+    assert.equal(allowed.decision, DECISION.DEFER, 'diagnosis must remain possible or the deny is unactionable');
+  } finally {
+    e.cleanup();
+  }
+});
+
+test('MUTATION: ABSOLUTE-PATH LUCK IS NOT A CONTROL — a write aimed INTO the canonical worktree is denied just as hard', () => {
+  const e = makeEstate();
+  try {
+    const canonical = canonicalFromState(e.doc, e.statePath);
+    const comparison = misalignedComparison(canonical, liveLocation({ cwd: e.otherWorktree }));
+
+    const d = decide({
+      toolName: 'Write',
+      // The path is perfect. The session is not.
+      toolInput: { file_path: `${e.canonicalWorktree}/tools/governor/something.mjs` },
+      comparison,
+      canonical,
+    });
+    assert.equal(d.decision, DECISION.DENY, 'the gate keys on the SESSION, never on the target path');
+    assert.match(d.reason, /Absolute paths are NOT a workaround/);
+  } finally {
+    e.cleanup();
+  }
+});
+
+test('the gate is silent when the session is in the right place, and never touches read-only tools', () => {
+  const e = makeEstate();
+  try {
+    const canonical = canonicalFromState(e.doc, e.statePath);
+    const aligned = misalignedComparison(canonical, liveLocation({ cwd: e.canonicalWorktree }));
+    assert.equal(aligned.verdict, LOCATION.ALIGNED);
+
+    for (const toolName of GUARDED_TOOLS) {
+      const d = decide({ toolName, toolInput: { command: 'git commit -m ok' }, comparison: aligned, canonical });
+      assert.equal(d.decision, DECISION.DEFER, `${toolName} must be untouched when aligned`);
+    }
+
+    const wrong = misalignedComparison(canonical, liveLocation({ cwd: e.otherWorktree }));
+    for (const toolName of ['Read', 'Grep', 'Glob', 'Task', 'EnterWorktree']) {
+      assert.equal(
+        decide({ toolName, toolInput: {}, comparison: wrong, canonical }).decision,
+        DECISION.DEFER,
+        `${toolName} must stay available — it is how the session diagnoses and recovers`
+      );
+    }
+  } finally {
+    e.cleanup();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Requirement 7 — the recovery protocol is IN the refusal
+// ---------------------------------------------------------------------------
+
+test('REQUIREMENT 7: the deny message carries the whole EnterWorktree protocol, verbatim', () => {
+  const e = makeEstate();
+  try {
+    const canonical = canonicalFromState(e.doc, e.statePath);
+    const comparison = misalignedComparison(canonical, liveLocation({ cwd: e.otherWorktree }));
+    const reason = buildDenyReason({ toolName: 'Write', comparison, canonical });
+
+    assert.match(reason, /Larry calls EnterWorktree with path: /, 'Larry initiates it');
+    assert.match(
+      reason,
+      /Larry performs this AUTOMATICALLY; Warwick does nothing/,
+      'the DEFAULT is the silent in-process auto-route, not an announce-and-wait'
+    );
+    assert.match(reason, /routes the session INTO the canonical checkout in-process/);
+    assert.match(reason, /needs no\n\s*relaunch/, 'no relaunch is required for the default path');
+    assert.ok(
+      reason.includes('"Approve the pending EnterWorktree request in the local Claude terminal"'),
+      'the exact fallback sentence is still carried, word for word'
+    );
+    assert.match(reason, /FALLBACK — ONLY if EnterWorktree actually BLOCKS/, 'announce-and-wait is demoted to a fallback');
+    assert.match(reason, /then waits/);
+    assert.match(reason, /must NOT ask Warwick to relaunch, to open a terminal in a particular folder,/);
+    assert.match(reason, /or to run git/);
+    assert.match(reason, /NO IMPLEMENTATION IS PERMITTED/);
+
+    // And it must show BOTH locations, or the reader cannot tell what is wrong.
+    assert.ok(reason.includes(e.canonicalWorktree), 'names where it should be');
+    assert.ok(reason.includes(e.otherWorktree), 'names where it is');
+    assert.ok(reason.includes('some/other-branch'), 'names the wrong branch');
+  } finally {
+    e.cleanup();
+  }
+});
+
+// Warwick's standing ruling (2026-08-01): Warwick must never manage repository
+// folders, worktrees or session launch locations. The deny reason must therefore
+// lead with the SILENT AUTO-ROUTE and must never instruct Warwick to relaunch,
+// quit, or open a terminal in a folder as the PRIMARY recovery. Made to fail: the
+// mutant that reinstates "quit and relaunch" as step 1 turns this RED.
+test('CONTROL: the deny reason auto-routes via EnterWorktree and never tells Warwick to relaunch/quit/open a folder', () => {
+  const e = makeEstate();
+  try {
+    const canonical = canonicalFromState(e.doc, e.statePath);
+    const comparison = misalignedComparison(canonical, liveLocation({ cwd: e.otherWorktree }));
+    const reason = buildDenyReason({ toolName: 'Write', comparison, canonical });
+
+    // (a) the EnterWorktree auto-route IS the primary step, and it is Larry's, not Warwick's.
+    const autoRouteIdx = reason.indexOf('1. Larry calls EnterWorktree with path:');
+    assert.ok(autoRouteIdx !== -1, 'the EnterWorktree auto-route is step 1');
+    assert.match(reason, /performs this AUTOMATICALLY; Warwick does nothing/);
+
+    // (b) no directive putting a session-lifecycle chore on Warwick as the primary path.
+    assert.ok(!/\brelaunch\b/i.test(reason.slice(0, autoRouteIdx)), 'nothing tells Warwick to relaunch before the auto-route');
+    assert.ok(!/quit Claude Code/i.test(reason), 'never asks Warwick to quit Claude Code');
+    assert.match(reason, /must NOT ask Warwick to relaunch, to open a terminal in a particular folder,/);
+    // Every "relaunch" occurrence is non-instructional: the "needs no relaunch"
+    // reassurance and the explicit prohibition. Any OTHER relaunch phrase (e.g. the
+    // old "quit and relaunch" primary) makes this RED.
+    const strippedReason = reason
+      .replace(/needs no\s+relaunch/gi, '')
+      .replace(/must NOT ask Warwick to relaunch/gi, '');
+    assert.ok(!/relaunch/i.test(strippedReason), 'relaunch appears only as reassurance or prohibition, never as an instruction');
+  } finally {
+    e.cleanup();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// AD-19 — fail OPEN where failing closed would brick the machine
+// ---------------------------------------------------------------------------
+
+test('AD-19 (fail OPEN): no active programme means the guard has no opinion at all', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'governor-empty-'));
+  try {
+    execFileSync('git', ['-C', dir, 'init', '-q', '-b', 'main']);
+    const r = guard({ tool_name: 'Write', tool_input: { file_path: 'x' }, cwd: dir });
+    assert.equal(r.decision, DECISION.DEFER);
+    assert.match(r.reason, /no active programme/i);
+    assert.equal(toHookOutput(r), null, 'defer must emit NOTHING, so the normal permission flow is untouched');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('AD-19 (fail OPEN): two active programmes are not adjudicated by the guard', () => {
+  const e = makeEstate();
+  try {
+    // A second active programme in the same worktree.
+    const second = join(e.repo, 'Deliverables', 'BUILD-OTHER');
+    mkdirSync(second, { recursive: true });
+    const doc = JSON.parse(JSON.stringify(e.doc));
+    doc.programme.id = 'BUILD-OTHER';
+    writeFileSync(join(second, 'programme-state.json'), JSON.stringify(doc, null, 2));
+
+    const found = findCanonical({ cwd: e.otherWorktree });
+    assert.equal(found.canonical, null);
+    assert.match(found.reason, /2 active programmes/);
+    assert.equal(found.candidates.length, 2, 'both must be reported, neither guessed');
+
+    const r = guard({ tool_name: 'Write', tool_input: {}, cwd: e.otherWorktree });
+    assert.equal(r.decision, DECISION.DEFER, 'ambiguity must not block work; reorient shouts about it instead');
+  } finally {
+    e.cleanup();
+  }
+});
+
+test('AD-19 (fail OPEN): unreadable input and internal throws both defer, never trap the session', () => {
+  for (const bad of ['', '   ', '{not json', 'null', '[]', '"a string"']) {
+    const r = runHook(bad);
+    assert.equal(r.decision, DECISION.DEFER, `${JSON.stringify(bad)} must defer`);
+    assert.equal(toHookOutput(r), null);
+  }
+
+  const exploding = () => {
+    throw new Error('git exploded');
+  };
+  const r = runHook(JSON.stringify({ tool_name: 'Write', tool_input: {}, cwd: 'C:/x' }), {
+    execFile: exploding,
+    readdir: () => {
+      throw new Error('fs exploded');
+    },
+  });
+  assert.equal(r.decision, DECISION.DEFER, 'a broken guard must not become a total work stoppage');
+});
+
+test('MUTATION: an ARRAY payload is refused as malformed, not read as an object with undefined fields', () => {
+  // The regression: `typeof [] === "object"`, so a naive check lets an array
+  // through, `tool_name` reads as undefined, and a malformed payload becomes a
+  // silent DEFER that looks identical to a healthy one.
+  const r = runHook('[]');
+  assert.equal(r.decision, DECISION.DEFER);
+  assert.match(r.reason, /not a JSON object/, 'it must say WHY it deferred, not merely defer');
+  assert.match(runHook('[{"tool_name":"Write"}]').reason, /not a JSON object/);
+});
+
+// ---------------------------------------------------------------------------
+// Discovery
+// ---------------------------------------------------------------------------
+
+test('REAL GIT: findCanonical locates the programme from a SIBLING worktree, and from an unrelated cwd via --estate', () => {
+  const e = makeEstate();
+  try {
+    const fromSibling = findCanonical({ cwd: e.otherWorktree });
+    assert.equal(fromSibling.canonical.worktree.toLowerCase(), e.canonicalWorktree.toLowerCase());
+    assert.equal(fromSibling.canonical.branch, e.canonicalBranch);
+
+    const stranger = mkdtempSync(join(tmpdir(), 'governor-stranger-'));
+    try {
+      assert.equal(
+        findCanonical({ cwd: stranger }).canonical,
+        null,
+        'from a non-repository with no estate hint, the guard genuinely cannot know'
+      );
+      const rescued = findCanonical({ cwd: stranger, estateRoots: [e.repo] });
+      assert.ok(rescued.canonical, '--estate is what makes the guard work from anywhere');
+      assert.equal(rescued.canonical.branch, e.canonicalBranch);
+    } finally {
+      rmSync(stranger, { recursive: true, force: true });
+    }
+  } finally {
+    e.cleanup();
+  }
+});
+
+test('MUTATION: the SAME programme checked out in two worktrees is ONE programme, not an ambiguity', () => {
+  // The defect this pins: a programme-state file is a tracked file, so every
+  // worktree carrying that branch — and main itself, once the build merges —
+  // holds a copy. Counting FILES rather than PROGRAMMES would report one build
+  // as two and make the guard stand down on the very estate it was built for.
+  const e = makeEstate();
+  try {
+    const twin = join(e.other, 'Deliverables', 'BUILD-TEST');
+    mkdirSync(twin, { recursive: true });
+    writeFileSync(join(twin, 'programme-state.json'), readFileSync(e.statePath, 'utf8'));
+
+    const found = findCanonical({ cwd: e.otherWorktree });
+    assert.ok(found.canonical, 'two copies of one programme must still resolve to one canonical location');
+    assert.equal(found.canonical.worktree.toLowerCase(), e.canonicalWorktree.toLowerCase());
+    assert.equal(found.candidates.length, 1, 'deduplicated by programme identity, not by path');
+
+    // And the gate must still fire from the wrong worktree.
+    const r = guard({ tool_name: 'Write', tool_input: {}, cwd: e.otherWorktree });
+    assert.equal(r.decision, DECISION.DENY, 'the duplicate copy must not disarm the guard');
+  } finally {
+    e.cleanup();
+  }
+});
+
+test('a corrupt state file does not become a machine-wide block', () => {
+  const e = makeEstate();
+  try {
+    writeFileSync(e.statePath, '{ not json at all');
+    const found = findCanonical({ cwd: e.canonicalWorktree });
+    assert.equal(found.canonical, null);
+    const r = guard({ tool_name: 'Write', tool_input: {}, cwd: e.canonicalWorktree });
+    assert.equal(r.decision, DECISION.DEFER, 'reorient reports corruption loudly; the guard must not brick the estate over it');
+  } finally {
+    e.cleanup();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// The whole gate, end to end, as a REAL PROCESS
+// ---------------------------------------------------------------------------
+
+function runGuardCli(payload, args = []) {
+  const out = execFileSync(process.execPath, [GUARD_SRC, ...args], {
+    input: typeof payload === 'string' ? payload : JSON.stringify(payload),
+    encoding: 'utf8',
+  });
+  return out;
+}
+
+test('REAL PROCESS: from the WRONG worktree the CLI emits a PreToolUse deny and exits 0', () => {
+  const e = makeEstate();
+  try {
+    const out = runGuardCli({
+      hook_event_name: 'PreToolUse',
+      tool_name: 'Write',
+      tool_input: { file_path: `${e.canonicalWorktree}/tools/governor/x.mjs`, content: 'x' },
+      cwd: e.otherWorktree,
+    });
+    const doc = JSON.parse(out);
+    assert.equal(doc.hookSpecificOutput.hookEventName, 'PreToolUse');
+    assert.equal(doc.hookSpecificOutput.permissionDecision, 'deny');
+    assert.match(doc.hookSpecificOutput.permissionDecisionReason, /WRONG WORKTREE/);
+    assert.match(
+      doc.hookSpecificOutput.permissionDecisionReason,
+      /Approve the pending EnterWorktree request in the local Claude terminal/
+    );
+  } finally {
+    e.cleanup();
+  }
+});
+
+test('REAL PROCESS: from the CANONICAL worktree the CLI writes nothing and exits 0', () => {
+  const e = makeEstate();
+  try {
+    const out = runGuardCli({
+      tool_name: 'Write',
+      tool_input: { file_path: 'x.mjs', content: 'x' },
+      cwd: e.canonicalWorktree,
+    });
+    assert.equal(out.trim(), '', 'no output means "no opinion" — the session proceeds normally');
+  } finally {
+    e.cleanup();
+  }
+});
+
+test('REAL PROCESS: mutating Bash from the wrong worktree is denied; read-only Bash is not', () => {
+  const e = makeEstate();
+  try {
+    const denied = JSON.parse(
+      runGuardCli({ tool_name: 'Bash', tool_input: { command: 'git commit -m x' }, cwd: e.otherWorktree })
+    );
+    assert.equal(denied.hookSpecificOutput.permissionDecision, 'deny');
+
+    const allowed = runGuardCli({
+      tool_name: 'Bash',
+      tool_input: { command: 'git status --porcelain' },
+      cwd: e.otherWorktree,
+    });
+    assert.equal(allowed.trim(), '');
+  } finally {
+    e.cleanup();
+  }
+});
+
+test('REAL PROCESS: garbage and empty stdin exit 0 and block nothing (INV-2)', () => {
+  assert.equal(runGuardCli('not json at all').trim(), '');
+  assert.equal(runGuardCli('').trim(), '');
+  assert.equal(runGuardCli('[]').trim(), '');
+});
+
+test('REAL PROCESS: --estate lets the guard fire from a checkout that knows nothing about the build', () => {
+  const e = makeEstate();
+  const stranger = mkdtempSync(join(tmpdir(), 'governor-stranger-cli-'));
+  try {
+    execFileSync('git', ['-C', stranger, 'init', '-q', '-b', 'main']);
+    const bare = runGuardCli({ tool_name: 'Write', tool_input: {}, cwd: stranger });
+    assert.equal(bare.trim(), '', 'without the hint it cannot know, and says nothing');
+
+    const withEstate = runGuardCli({ tool_name: 'Write', tool_input: {}, cwd: stranger }, ['--estate', e.repo]);
+    const doc = JSON.parse(withEstate);
+    assert.equal(doc.hookSpecificOutput.permissionDecision, 'deny');
+    assert.match(doc.hookSpecificOutput.permissionDecisionReason, /WRONG WORKTREE/);
+  } finally {
+    rmSync(stranger, { recursive: true, force: true });
+    e.cleanup();
+  }
+});

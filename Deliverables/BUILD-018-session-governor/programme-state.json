@@ -1,0 +1,1096 @@
+{
+  "schema_version": 1,
+  "programme": {
+    "id": "BUILD-018",
+    "title": "Larry Session Governor and Context-Rotation Layer",
+    "home": "Deliverables/BUILD-018-session-governor",
+    "status": "complete",
+    "commissioned": "2026-07-31"
+  },
+  "phase": {
+    "current": "Closed — cut and closed 2026-08-01",
+    "summary": "BUILD-018 is CLOSED. Warwick accepted the Larry/Pax adversarial diagnosis (Deliverables/2026-08-01-pax-build-018-process-diagnosis.md): good engineering pointed at the wrong target — he asked for six answers on a screen and received 22 modules and 767 tests he could not read from his phone. He then ruled ONE bounded cut-and-close pass. RETAINED (14 modules): durable state, consistency checking, fresh-session and /clear reorientation, automatic routing, wrong-location protection, honest context health, durable operating instructions, safe autonomous continuation. REMOVED (8 modules, ~4,400 lines + tests): the model gate, the delegation gate, the escalation gate, the Governor-specific registry/PR/merge/QA machinery, and the superseded status-line renderer. The footer no longer asserts KEEP GOING or a model before a next task is known — it renders TASK UNKNOWN — while CLEAR NOW is never withheld, because running out of context is a fact about the session rather than about the task. The real user journey was proven end to end from Warwick's actual entry point before closure.",
+    "started": "2026-07-31"
+  },
+  "banked": {
+    "at": "2026-08-01",
+    "by_model": "Opus",
+    "session_id": null,
+    "head_sha": "a97ba1d15202a6a5166f03aa623173055825eabb",
+    "governor_version": "T-09/schema-v1"
+  },
+  "repository": {
+    "primary_checkout": "C:/Fusion247PKA",
+    "worktree": "C:/Fusion247PKA-governor",
+    "branch": "build-018/session-governor",
+    "base_sha": "ef96a3327f896e025731769c72157fd722daa02f",
+    "head_sha": "8b30233799a52eb0eec19af83be0ea83a0704824",
+    "clean": true,
+    "unpushed_commits": 0,
+    "upstream": "origin/build-018/session-governor"
+  },
+  "tickets": [
+    {
+      "id": "T-01",
+      "title": "Prove the live statusLine payload on this machine",
+      "state": "resolved",
+      "model": "Sonnet",
+      "depends_on": [],
+      "resolved": "2026-07-31",
+      "evidence": [
+        "Deliverables/BUILD-018-session-governor/evidence/T-01-statusline-schema.md"
+      ],
+      "note": "context_window_size observed as 1000000 — thresholds must stay percentage-based."
+    },
+    {
+      "id": "T-02",
+      "title": "Session-health store location and atomic write",
+      "state": "resolved",
+      "model": "Sonnet",
+      "depends_on": [],
+      "resolved": "2026-07-31",
+      "evidence": [
+        "tools/governor/health-store.mjs",
+        "tools/governor/health-store.test.mjs"
+      ],
+      "note": "~/.mypka/governor/health/<projectKey>/<sessionId>.json; 8/8 tests including a 12-process concurrent-write mutation test."
+    },
+    {
+      "id": "T-03",
+      "title": "Sampler: statusLine script to health sample",
+      "state": "resolved",
+      "model": "Sonnet",
+      "depends_on": [
+        "T-01",
+        "T-02"
+      ],
+      "resolved": "2026-07-31",
+      "evidence": [
+        "tools/governor/sampler.mjs",
+        "tools/governor/sampler.test.mjs",
+        "Deliverables/BUILD-018-session-governor/tickets/T-03-sampler.md"
+      ],
+      "note": "25/25 tests, including a real health-store mutation test (malformed stdin after a good sample never corrupts it) and a real child-process CLI test. Not yet wired into the primary checkout's statusLine setting — deliberately deferred, see ticket handback."
+    },
+    {
+      "id": "T-04",
+      "title": "Pure evaluator: evaluate(signals) to verdict",
+      "state": "resolved",
+      "model": "Opus",
+      "depends_on": [
+        "T-03"
+      ],
+      "resolved": "2026-07-31",
+      "evidence": [
+        "tools/governor/evaluator.mjs",
+        "tools/governor/evaluator.test.mjs"
+      ],
+      "note": "34/34 ticket tests, including a full 64-combination power-set sweep over the 6-signal vocabulary (contextUsedPercentage, rateLimitFiveHourUsedPercentage, growthProjectedRedBeforeCompletion, compactions, bankedStateStale, safeBoundary) asserting the verdict shape stays valid and BLIND fires iff contextUsedPercentage is absent, for every combination. 420/420 suite-wide, no regressions. AD-11 purity: zero filesystem/git/myPKA imports (evaluate(signals) takes a plain object only). Priority BLIND > RECOVERY > RED > AMBER > GREEN, five distinct exit codes (0-4). Missing-field semantics: only contextUsedPercentage is required; every other absent signal is unknown, skipped, and never escalates to BLIND on its own. Judgement call recorded: section 4's states table defines RECOVERY as authoritative-state-already-lost and places it OFF the main axis, while the adjacent threshold bullets describe compaction count as an AMBER/RED FLOOR on that axis -- the two do not fully agree. This implementation takes the states table as authoritative: any compaction (>=1) this session, or a banked state known stale vs live git HEAD, resolves to RECOVERY outright (outranking RED), not merely a floor -- because INV-3 says degraded in-context memory is not something a low context percentage should be able to mask. safeBoundary modulates advice text only ('rotate now' vs 'reach a safe boundary urgently' vs unknown), never the state itself, per section 4's explicit instruction."
+    },
+    {
+      "id": "T-05",
+      "title": "Status-line display of the verdict",
+      "state": "resolved",
+      "model": "Sonnet",
+      "depends_on": [
+        "T-04"
+      ],
+      "resolved": "2026-07-31",
+      "evidence": [
+        "REMOVED at closure: tools/governor/status-line.mjs (superseded by footer.mjs; two rival renderers on one surface was itself the SSOT defect)",
+        "tools/governor/status-line.mjs",
+        "tools/governor/status-line.test.mjs",
+        "Deliverables/BUILD-018-session-governor/evidence/T-05-status-line.md"
+      ],
+      "note": "CUT 2026-08-01 (Warwick's ruling on the accepted Larry/Pax diagnosis) — the artefact this ticket delivered has been REMOVED from the codebase as disproportionate to the commission. The ticket is left `resolved` because the work genuinely was done, tested and landed; what changed is that the deliverable was withdrawn, not that the work failed. ORIGINAL NOTE FOLLOWS: renderStatusLine (pure, AD-11) + computeStatusLine (one impure composition wrapper, injectable evaluateFn). 14/14 ticket tests, 528/528 suite-wide (was 514/514). Mutation test named by the map (evaluate() throws -> line still renders, shows BLIND) proven both for a thrown Error and a thrown non-Error value. Independently re-verified by Larry: tests re-run (14/14, 528/528), secret scan re-run (--surface, exit 0, 3/3 declared files, 0 secrets), commit diff reconciled (3 files, 0 outside file_surface). Built under Work Order WO-2026-07-31-02, read-back ACCEPTed before implementation (Deliverables/BUILD-018-session-governor/tickets/T-05-status-line-work-order.md). Deliberately not wired into the live statusLine command (T-03 precedent) and does not gather live signals (T-12 scope)."
+    },
+    {
+      "id": "T-06",
+      "title": "RED preflight block via UserPromptSubmit, fails open",
+      "state": "frontier",
+      "model": "Opus",
+      "depends_on": [
+        "T-04"
+      ],
+      "resolved": null,
+      "evidence": [],
+      "note": "NOT BUILT, and now moot: the RED preflight block was a further control on Larry's own behaviour, the class Warwick's ruling withdrew. Q-2 (bounded override design) is closed unanswered with it. PRIOR NOTE: Also gated on Q-2 (bounded override design)."
+    },
+    {
+      "id": "T-07",
+      "title": "Worker and worktree reconciliation",
+      "state": "resolved",
+      "model": "Sonnet",
+      "depends_on": [],
+      "resolved": "2026-07-31",
+      "evidence": [
+        "tools/governor/worktree-recon.mjs",
+        "Deliverables/BUILD-018-session-governor/evidence/T-07-worktree-reconciliation.md"
+      ],
+      "note": "Worktree side only; live-worker detection is best-effort (F-7 remains open)."
+    },
+    {
+      "id": "T-08",
+      "title": "Live dogfood rotation (M4)",
+      "state": "frontier",
+      "model": "Opus",
+      "depends_on": [
+        "T-04",
+        "T-10",
+        "T-11"
+      ],
+      "resolved": null,
+      "evidence": [],
+      "note": "SUPERSEDED. \"Live dogfood rotation\" was the Goal Contract's real acceptance test and was scheduled last — Pax's M1 names that as the master root cause of the whole overrun. It was executed at closure instead, as a seven-point live journey proof from Warwick's actual entry point. See Deliverables/BUILD-018-session-governor/evidence/CLOSURE-journey-proof.md. PRIOR NOTE: The real acceptance test."
+    },
+    {
+      "id": "T-09",
+      "title": "Programme-state schema, validator and writer",
+      "state": "resolved",
+      "model": "Opus",
+      "depends_on": [],
+      "resolved": "2026-07-31",
+      "evidence": [
+        "tools/governor/programme-state.schema.json",
+        "tools/governor/programme-state.mjs",
+        "Deliverables/BUILD-018-session-governor/evidence/T-09-programme-state.md"
+      ],
+      "note": "This document is an instance of that schema."
+    },
+    {
+      "id": "T-10",
+      "title": "/rotate-session: bank, verify safety, emit the /clear instruction",
+      "state": "resolved",
+      "model": "Opus",
+      "depends_on": [
+        "T-07",
+        "T-09",
+        "T-13"
+      ],
+      "resolved": "2026-07-31",
+      "evidence": [
+        "tools/governor/rotate-session.mjs",
+        "tools/governor/rotate-session.test.mjs",
+        ".claude/commands/rotate-session.md",
+        "Deliverables/BUILD-018-session-governor/tickets/T-10-rotate-session.md"
+      ],
+      "note": "31/31 tests. Fails CLOSED (unknown is never safe). AD-14 implemented as exported isBankingCommit() and proven on real git — T-11 MUST use it rather than a raw HEAD comparison. Refused correctly against the real estate during its own implementation."
+    },
+    {
+      "id": "T-11",
+      "title": "Reorientation on /clear, canonical-location verification, and the wrong-worktree deny gate",
+      "state": "resolved",
+      "model": "Opus",
+      "depends_on": [
+        "T-09",
+        "T-10"
+      ],
+      "resolved": "2026-07-31",
+      "evidence": [
+        "tools/governor/reorient.mjs",
+        "tools/governor/reorient.test.mjs",
+        "tools/governor/worktree-guard.mjs",
+        "tools/governor/worktree-guard.test.mjs",
+        "tools/governor/install-hooks.mjs",
+        "tools/governor/install-hooks.test.mjs",
+        "Deliverables/BUILD-018-session-governor/tickets/T-11-reorientation-and-worktree-guard.md",
+        "Deliverables/BUILD-018-session-governor/evidence/T-11-reorientation-and-guard.md"
+      ],
+      "note": "84/84 ticket tests, 223/223 suite. Proven on the REAL estate both ways: canonical worktree -> oriented (6,928 chars, under the 10,000 cap); primary checkout -> WRONG WORKTREE (8,214 chars) with the banner ABOVE the next action, and live Write plus git commit both denied while git status still ran. The brief and the PreToolUse gate share one comparison module, so the brief cannot say \"aligned\" while the gate denies. New decisions AD-18 (gate keys on cwd/repo-root/branch only; HEAD reported, never denies), AD-19 (unknown location + known canonical -> DENY; no programme or guard-throws -> ALLOW), AD-20 (Larry owns the whole git lifecycle), AD-21 (verbatim EnterWorktree recovery protocol, embedded in the refusal). Q-5 reconciled and X-2 settled. Two real defects caught by tests: git rev-parse --abbrev-ref is sticky (live HEAD would have been silently wrong), and one programme has many state-file copies across worktrees (counting files disarmed the guard). Known bound: from a wholly unrelated repository the guard cannot discover the estate - mitigated by --estate, closed properly by T-14."
+    },
+    {
+      "id": "T-12",
+      "title": "Portability: extract the estate adapter",
+      "state": "frontier",
+      "model": "Sonnet",
+      "depends_on": [
+        "T-04"
+      ],
+      "resolved": null,
+      "evidence": [],
+      "note": "NOT BUILT. Portability/estate-adapter extraction was never commissioned by Warwick and traces to no line of the Goal Contract. Closed unbuilt rather than carried as a permanent open ticket. Q-3 closes with it. PRIOR NOTE: (none)"
+    },
+    {
+      "id": "T-13",
+      "title": "Programme-state collector: gather the live estate into a valid state document",
+      "state": "resolved",
+      "model": "Sonnet",
+      "depends_on": [
+        "T-07",
+        "T-09"
+      ],
+      "resolved": "2026-07-31",
+      "evidence": [
+        "tools/governor/collect-state.mjs",
+        "tools/governor/collect-state.test.mjs",
+        "Deliverables/BUILD-018-session-governor/tickets/T-13-programme-state-collector.md"
+      ],
+      "note": "18/18 tests, including a real-estate acceptance test (collectEstateState run against this actual repository, merged onto the T-09 fixture, validates clean) and three source-failure mutation tests (no gh, unreadable worktree, git error), each proven to land its field in `unknown` rather than an empty list or a zero. Collects repository/worktrees/branches/pull_requests only — workers stays programme-tracked (see AD-16); branches.behind is permanently unknown by design (see AD-15)."
+    },
+    {
+      "id": "T-14",
+      "title": "Build-session registry/launcher by build name, automatic programme PR at merge readiness, exact-head QA binding, single merge decision",
+      "state": "resolved",
+      "model": "Opus",
+      "depends_on": [
+        "T-10",
+        "T-11"
+      ],
+      "resolved": "2026-07-31",
+      "evidence": [
+        "REMOVED at closure: build-registry.mjs, qa-binding.mjs, merge-readiness.mjs, programme-pr.mjs (Governor-specific registry/PR/merge/QA machinery)",
+        "tools/governor/build-registry.mjs + build-registry.test.mjs (25 tests)",
+        "tools/governor/qa-binding.mjs + qa-binding.test.mjs (38 tests)",
+        "tools/governor/merge-readiness.mjs + merge-readiness.test.mjs (35 tests)",
+        "tools/governor/programme-pr.mjs + programme-pr.test.mjs (35 tests)",
+        ".claude/commands/build.md",
+        "Deliverables/BUILD-018-session-governor/T-14-CONTRACT.md (frozen interface + 9 read-back amendments)",
+        "commit c4febeaa9ebd3fa632035a906cc2d8a2143bedde — \"BUILD-018 T-14: a build that runs itself, and an index that cannot lie\" (pushed, local==remote at time of commit)",
+        "suite: 356/356 governor tests passing at integration (133 new)",
+        "live proof: resolveBuild('governor') resolved correctly from C:\\, outside any git repository"
+      ],
+      "note": "CUT 2026-08-01 (Warwick's ruling on the accepted Larry/Pax diagnosis) — the artefact this ticket delivered has been REMOVED from the codebase as disproportionate to the commission. The ticket is left `resolved` because the work genuinely was done, tested and landed; what changed is that the deliverable was withdrawn, not that the work failed. ORIGINAL NOTE FOLLOWS: AD-22..AD-25 recorded. Three bounds left open, not counted as closed: T-11 foreign-cwd bound only half-closed; head-pushed reads a remote-tracking ref nothing here refreshes; registry only sees builds that have banked state."
+    },
+    {
+      "id": "T-15",
+      "title": "Post-clear model selection gate — verify the selected model before releasing implementation",
+      "state": "resolved",
+      "model": "Opus",
+      "depends_on": [
+        "T-11"
+      ],
+      "resolved": "2026-07-31",
+      "evidence": [
+        "REMOVED at closure: model-gate.mjs (the post-clear model gate)",
+        "tools/governor/model-gate.mjs",
+        "tools/governor/model-gate.test.mjs",
+        "tools/governor/reorient.mjs"
+      ],
+      "note": "CUT 2026-08-01 (Warwick's ruling on the accepted Larry/Pax diagnosis) — the artefact this ticket delivered has been REMOVED from the codebase as disproportionate to the commission. The ticket is left `resolved` because the work genuinely was done, tested and landed; what changed is that the deliverable was withdrawn, not that the work failed. ORIGINAL NOTE FOLLOWS: Closes the live defect: bank recommended Opus, session was visibly Auto, reorientation did not present the model recommendation before anything else, and implementation reconnaissance began before the model was verified. tools/governor/model-gate.mjs: pure core (resolveCurrentModel/evaluateModelGate/renderCompactGate/isAutoLabel/normaliseModelFamily) + one impure composition function (applyModelGate) + a CLI (`node model-gate.mjs check --state <path> --session <id>`) for the post-selection recheck. Composed additively onto reorient.mjs's runHook (3-line diff: one import, one wrapping call) WITHOUT modifying the pure reorient() function itself — reorient.test.mjs's existing 34/34 tests pass byte-for-byte unmodified, proven by git diff showing zero changes to that file. Verified structurally sound by an independent agent (not the original author) before landing: applyModelGate is a true no-op whenever the underlying reorient() result does not already permit implementation (covers WRONG_WORKTREE/FAILED/MISSING/CORRUPT/AMBIGUOUS/SKIPPED), and there is no circular import between model-gate.mjs and reorient.mjs. Fail-closed to UNKNOWN per requirement 6, recorded honestly as new fog (map F-9): the only real signal available (health-store model.id/display_name) reports the RESOLVED concrete model, not confirmed to distinguish \"Auto resolved here\" from \"explicitly pinned\" — a label containing \"auto\" is treated as a confirmed block; absence of any fresh session-matched sample is UNKNOWN, never a pass. 27/27 new tests (model-gate.test.mjs) covering AUTO, UNKNOWN (explicit INV-1 assertion), explicit MISMATCH/MATCH, stale-past and stale-future samples, cross-session samples, the exact 6-line compact format (regex-checked), the true no-op property, the AD-5 10,000-char cap under a synthetic oversized context (proves the ORIGINAL brief truncates, never the gate banner), distinct EXIT_CODEs per STATUS, and a full live acceptance test using REAL modules against a REAL scratch git estate and REAL health-store temp dir: bank -> blocked with no sample via the real runHook -> real writeHealthSample simulating model selection -> MATCH via the real CLI run as an actual subprocess (not an in-process call). Known, honestly-stated gap: T-03's sampler remains unwired from the live statusLine command (deliberately deferred at T-03, unchanged here), so the acceptance test writes the sample directly, mirroring T-12's synthetic-adapter precedent — this proves the gate mechanism, not full production wiring; wiring the sampler live remains a separate, not-yet-authorised step. 447/447 suite-wide, zero regressions."
+    },
+    {
+      "id": "T-16",
+      "title": "Mechanical delegation-enforcement gate — delegation ledger + substantial-work threshold, specialist-match verification against Team/agent-index.md",
+      "state": "resolved",
+      "model": "Opus",
+      "depends_on": [],
+      "resolved": "2026-07-31",
+      "evidence": [
+        "REMOVED at closure: delegation-gate.mjs + delegation-ledger-record.schema.json (the mechanical delegation gate)",
+        "tools/governor/delegation-gate.mjs",
+        "tools/governor/delegation-gate.test.mjs",
+        "tools/governor/delegation-ledger-record.schema.json",
+        "Deliverables/BUILD-018-session-governor/decisions/D-delegation-ledger-schema.md"
+      ],
+      "note": "CUT 2026-08-01 (Warwick's ruling on the accepted Larry/Pax diagnosis) — the artefact this ticket delivered has been REMOVED from the codebase as disproportionate to the commission. The ticket is left `resolved` because the work genuinely was done, tested and landed; what changed is that the deliverable was withdrawn, not that the work failed. ORIGINAL NOTE FOLLOWS: Closes D-2/D-3: the mechanical delegation-enforcement gate is implemented under a proper Work Order (WO-2026-07-31-01), read-back gated, ACCEPT verdict, following the operating-model correction this session opened. Routed through Keel's actual written contract (Team/Keel - Implementation Engineer/AGENTS.md) via the general-purpose runtime, since the harness does not expose \"keel\" as a directly dispatchable subagent type this session despite the shim being committed -- a live infrastructure gap, flagged, not silently worked around. Schema owned by Silas (Deliverables/BUILD-018-session-governor/decisions/D-delegation-ledger-schema.md): discriminated union by kind (task/justify/direct-call), schema_version const, JSONL over qa-binding.mjs's JSON-array pattern (fault isolation per bad line beats one-corrupt-byte-kills-the-document), full-content atomic rewrite reusing health-store.mjs's primitive (rejected raw OS append -- Windows has no equivalently proven atomicity guarantee), physical line order for checkpoint counting (never a ts re-sort -- ts can tie or run backwards on a clock step, file position cannot), governing_specialist/specialist_match on task records (mechanical exact-match against .claude/agents/*.md slugs only -- domain-matching against Team/agent-index.md's free text is a judgement problem, explicitly deferred, reserved as \"no-fit-declared\" but not v1-populated), corrupt-line handling that surfaces skips rather than swallowing them ({records, skipped, path}). Silas's review also caught and corrected a real bug in the original draft's reasoning: the file-header claimed a lost checkpoint record \"cannot\" cause a wrongful DENY, which conflates the gate's fail-open error-handling path with a silently-successful-but-undercounting read -- fixed, accepted as bounded self-healing residual risk (one avoidable DENY, immediately visible, one-command recovery via justify), not mitigated with locking. tools/governor/delegation-gate.mjs (926 lines) + delegation-gate.test.mjs (60/60, up from the unauthorised draft's 34) + delegation-ledger-record.schema.json (new) + install-hooks.mjs/install-hooks.test.mjs wiring (pre-existing working-tree state, verified correct and idempotent, not modified further). worktree-guard.mjs untouched -- 27/27 before and after, byte-identical git diff, same composition discipline as T-14/T-15. Fail-open preserved: any internal gate error (unresolvable ticket, unreadable/unwritable ledger, worktree-guard throwing) still ALLOWs, never DENYs -- a discipline gate, not a safety-critical one. Full suite 514/514, independently re-run and confirmed by Larry (not just the builder's self-report). Secret-scan clean, 5/5 declared files, exit 0. Explicitly labelled by the builder: \"Builder self-test evidence -- NOT independent review\" -- SOP-018 independent QA has not run over this diff, same standing requirement as every other ticket in this programme before merge (merge-readiness's independent-review check), not a new gap specific to T-16."
+    },
+    {
+      "id": "T-17",
+      "title": "Git-lifecycle escalation gate — refuse an escalation offering Warwick a decision AD-20 assigns to Larry",
+      "state": "resolved",
+      "model": "Opus",
+      "depends_on": [],
+      "resolved": "2026-08-01",
+      "evidence": [
+        "REMOVED at closure: escalation-gate.mjs (the git-lifecycle escalation gate; never activated)",
+        "tools/governor/escalation-gate.mjs",
+        "tools/governor/escalation-gate.test.mjs",
+        "Deliverables/BUILD-018-session-governor/evidence/T-17-escalation-gate.md",
+        "Deliverables/BUILD-018-session-governor/tickets/T-17-escalation-gate-work-order.md"
+      ],
+      "note": "CUT 2026-08-01 (Warwick's ruling on the accepted Larry/Pax diagnosis) — the artefact this ticket delivered has been REMOVED from the codebase as disproportionate to the commission. The ticket is left `resolved` because the work genuinely was done, tested and landed; what changed is that the deliverable was withdrawn, not that the work failed. ORIGINAL NOTE FOLLOWS: Built by Keel under WO-2026-07-31-03, which was AMENDED mid-flight after Keel returned CLARIFY (not ACCEPT) and was right twice: 'is the defect cosmetic' has no mechanical signal, and a caller-supplied field asserting it is self-attestation by the very actor who wants to escalate. Re-grounded on AD-20 - the git lifecycle is Larry's, never Warwick's - which removes the judgement step entirely. 60 new tests, 588/588 suite-wide. INDEPENDENTLY VERIFIED BY LARRY BY ADVERSARIAL PROBE, not by re-reading the builder's tests: the REAL D-4 question shape (verbatim options, 'Leave it' vs 'Amend + force-push') classified REFUSED citing AD-20, with no cosmetic input supplied; three genuinely-warranted escalations (merge decision, spend, irreversible live action) all ALLOWED, never wrongly blocked; five malformed inputs (null/undefined/string/empty-object/number) all UNCLASSIFIABLE, none threw, none refused; the closed-enum escape hatch cleared the refusal for 'unsafe-repository-state' while an arbitrary string ('because I said so') did NOT - the hatch cannot be talked past. worktree-guard.mjs and delegation-gate.mjs byte-unmodified (git diff empty, 27/27 and 60/60). Secret scan re-run: exit 0, 3/3 declared files. COVERAGE STATED HONESTLY AND REQUIRED BY AC6: this detects ONE mechanically-decidable shape and does NOT enforce AD-26 generally - typos, wording, formatting, naming, ticket boundaries, completed workers and ordinary routing have no enumerable signal and remain UNENFORCED, still resting on Larry observing AD-26 unaided. Narrowness accepted knowingly after Keel answered a direct question about it plainly. NOT ACTIVATED: install-hooks.mjs untouched, so the gate has no live effect until a separately-authorised activation step; the unproven AskUserQuestion PreToolUse payload shape is recorded as fog for that step. Larry's verification of this ticket is ALSO what surfaced D-5, a real measured concurrency defect pre-existing in T-02/T-16, which is not a defect in T-17."
+    },
+    {
+      "id": "T-18",
+      "title": "Windows-safe atomic write: retry the rename, and never orphan a temp file",
+      "state": "resolved",
+      "model": "Sonnet",
+      "depends_on": [],
+      "resolved": "2026-08-01",
+      "evidence": [
+        "tools/governor/atomic-write.mjs",
+        "tools/governor/atomic-write.test.mjs",
+        "Deliverables/BUILD-018-session-governor/evidence/T-18-windows-safe-atomic-write.md",
+        "Deliverables/BUILD-018-session-governor/tickets/T-18-windows-safe-atomic-write-work-order.md"
+      ],
+      "note": "Built by Keel under WO-2026-08-01-01, AMENDED after Keel returned CLARIFY and caught that Larry's own load-bearing criterion (AC4, 'assert a non-zero success count') was SATISFIABLE BY THE UNFIXED CODE - measured 47 of 48 writers succeeding against the broken writeHealthSample, so the test would have gone green on the defect it existed to catch. AC4 was rewritten to successCount === N with reader contention and a made-to-fail control. Keel also corrected the mechanism: EPERM is driven by a concurrent READER holding the target across the rename, not writer-vs-writer, which is why delegation-gate (reads every call) was flakier than health-store (never reads). One shared primitive tools/governor/atomic-write.mjs with exported policy (RETRYABLE_ERROR_CODES EPERM/EBUSY/EACCES, MAX_ATTEMPTS 5, RETRY_BUDGET_MS 250, BACKOFF_MS 10/20/40/80, BACKOFF_JITTER 0.5 - jitter added for a MEASURED reason, an unjittered lockstep retry was a thundering herd of the module's own making). delegation-gate passes a payload PRODUCER re-invoked per attempt (M1: replaying a stale snapshot would let a later rename discard another writer's records, converting lose-one into lose-several); health-store passes a constant. 19 new tests, 607/607 suite-wide. Both protected test files BYTE-UNMODIFIED and absent from the commit. delegation-gate.test.mjs 8/8 consecutive runs (was 9 pass / 3 fail over 12); health-store.test.mjs 6/6 (was 5/6). Secret scan exit 0 over the declared surface. INDEPENDENTLY VERIFIED BY LARRY with his own reader-contended probe against the real module, and the result is MIXED and recorded as such: ORPHANED TEMP FILES ARE FIXED - 0 orphans against a 7-orphan baseline on the same shape - but under CONTINUOUS reader hammering (16 readers in a tight loop for 2.5s, harsher than Keel's 25-read burst) 13 of 16 writer processes STILL FAIL. KEEL DISCLOSED THIS LIMIT PLAINLY rather than letting the green imply otherwise ('writers still fail 2-6 of 16 even with the retry; no policy inside the ceiling can fix that'), and Larry's probe confirms it is real and is worse at higher intensity. The 250ms ceiling was LARRY'S constraint (M2/M3, set because a PreToolUse hook that blocks longer is a gate in the way, AD-19) and Keel correctly refused to raise it unilaterally. SO WHAT T-18 ACTUALLY DELIVERS: the orphan leak is closed outright; the retry substantially reduces but does NOT eliminate writer failure under sustained reader contention. Both callers still fail SAFE on a lost write (health sample -> BLIND/stale per AD-3; delegation checkpoint -> undercount toward a missed deny). DEFERRED, NOT IMPLEMENTED, per Warwick's scope freeze 2026-08-01: (a) the residual high-contention failure band, which needs either a wider budget than a hook can afford or a different mechanism than retry; (b) T-19/D-6, the three remaining unretried sites (build-registry.mjs:275, programme-state.mjs:630 and :638, qa-binding.mjs:288) and the false 'never interleave' comment that propagated by citation; (c) Keel's reported contradiction between AC4 clause 5 (orphans non-zero on the failure variant) and AC3 (zero orphans on every path) - clause 5 was written against pre-fix behaviour that AC3 abolishes; Keel satisfied the intent with two variants and did NOT amend the criterion itself. POSIX behaviour unproven - this is a Windows phenomenon."
+    },
+    {
+      "id": "T-19",
+      "title": "Adopt the shared atomic write in the remaining three sites, and correct the false concurrency comment",
+      "state": "frontier",
+      "model": "Sonnet",
+      "depends_on": [
+        "T-18"
+      ],
+      "resolved": null,
+      "evidence": [],
+      "note": "PARTIALLY MOOT. Of the three remaining unretried atomic-write sites, TWO (build-registry.mjs, qa-binding.mjs) no longer exist. Only programme-state.mjs remains, on the banking path, single-writer in practice. Closed as not-worth-doing rather than carried. PRIOR NOTE: Found by Keel's T-18 read-back (WO-2026-08-01-01, contradiction C4), verified by Larry. The unretried writeFileSync+renameSync pattern exists at FIVE sites, not two. T-18 fixes the two concurrent-path callers (health-store.mjs, delegation-gate.mjs) and deliberately does NOT sprawl into the rest. This ticket adopts the T-18 primitive in the remaining three: build-registry.mjs:275, programme-state.mjs:630 AND :638 (the banking / write-back path), qa-binding.mjs:288. ALSO corrects a FALSE COMMENT that has already propagated by citation: qa-binding.mjs:282-284 asserts 'two concurrent writers never interleave. Same recipe as health-store.mjs and writeProgrammeState' -- the interleave claim is true but irrelevant, and it reads as a concurrency-safety guarantee the code does not provide (the writers do not interleave, they FAIL). health-store.mjs's own header carries the same overclaim. Blocked on T-18 because there is no shared primitive to adopt until it exists."
+    },
+    {
+      "id": "T-20",
+      "title": "Recovery source coverage, installer honesty, and the model-recommendation source",
+      "state": "resolved",
+      "model": "Opus",
+      "depends_on": [],
+      "note": "PARTIAL by Keel's own verdict and correctly so: D-B B-3 was built then REVERTED because its justification depends on D-C, which has not landed, and it would have deleted a control asserting a LOUD missing brief rather than silence. 645/645 (baseline 607). Both load-bearing controls made to fail: re-inserting the source guard turned 8 tests red including an end-to-end real-process proof; restoring the dishonest prune line turned 3 red. Merged at c9ebef4. Larry then ran the real hook and confirmed reorientation FIRES on source=startup - and it exposed WP-4.",
+      "resolved": "2026-08-01",
+      "evidence": [
+        "tools/governor/reorient.mjs",
+        "tools/governor/reorient.test.mjs",
+        "tools/governor/install-hooks.mjs",
+        "tools/governor/install-hooks.test.mjs",
+        "tools/governor/statusline-live.mjs",
+        "tools/governor/statusline-live.test.mjs",
+        "Deliverables/BUILD-018-session-governor/tickets/WP-1-recovery-and-installer-work-order.md"
+      ]
+    },
+    {
+      "id": "T-21",
+      "title": "The standing operating constitution, durably placed in the authoritative sources",
+      "state": "resolved",
+      "model": "Opus",
+      "depends_on": [],
+      "note": "Authored by Nolan (Keel is contractually forbidden CLAUDE.md/AGENTS.md/Team/**). Independently audited TWICE by a separate Nolan instance. Pass 1: NOT YET MERGEABLE - found a BINDING WARWICK DECISION silently dropped (AD-26 material scope change substituted by rotation-required, count unchanged so the loss was invisible), a token mismatch against the frozen ESCAPE_HATCH_REASONS literal, and startup step 3 reproducing the naive file-count scan build-registry.mjs documents as the trap that disarmed the T-11 guard. Pass 2: a three-way contradiction placing the footer both inside the banner and as the reply final line, firing on the first output of every fresh session; and the author disclosed that its own deletion test is grep-based, so it proves absence of a repeated STRING not a repeated FACT - it had twice reported one-home-per-fact over a paraphrase four lines away. All closed. Merged only after footer.mjs existed, because CLAUDE.md references it and startup step 4 requires named paths to exist; verified post-merge that all three referenced paths resolve.",
+      "resolved": "2026-08-01",
+      "evidence": [
+        "CLAUDE.md",
+        "Team/Larry - Orchestrator/AGENTS.md",
+        "Team/agent-index.md",
+        "Deliverables/BUILD-018-session-governor/audit/NOLAN-03-constitution-audit.md"
+      ]
+    },
+    {
+      "id": "T-22",
+      "title": "Governor footer contract and the execution controller",
+      "state": "resolved",
+      "model": "Opus",
+      "depends_on": [],
+      "note": "COMPLETED. 712/712 at the integrated head. Keel found the most important defect in its OWN work: the transcript scan dropped the first line unconditionally as probably-partial from the 64KB window, but when the file is smaller than the window nothing is cut - so GOVERNOR OFF, Warwick's only escape from a blocking controller, was discarded on a short transcript. That is a fresh session from a phone, exactly when he would reach for it. The anti-loop property is STRUCTURAL not counted: stop_hook_active is read before any file is opened, so at most one block per turn. No footer at all ALLOWS, mutation-proven. A four-point leak of next_action into the injected reason turned exactly one test red. HANDBACK_CODES is asserted against the IMPORTED frozen literal rather than a re-typed string. DISCLOSED INV-5 GAP: the rewritten D-M5 agreement assertion is not itself mutation-tested, because that needs footer.mjs which was out of surface; follow-up dispatched.",
+      "resolved": "2026-08-01",
+      "evidence": [
+        "tools/governor/footer.mjs",
+        "tools/governor/footer.test.mjs",
+        "tools/governor/stop-controller.mjs",
+        "tools/governor/stop-controller.test.mjs"
+      ]
+    },
+    {
+      "id": "T-23",
+      "title": "Integrate WP-1..3, wire the hooks, and prove the live journey",
+      "state": "resolved",
+      "model": "Opus",
+      "depends_on": [
+        "T-20",
+        "T-21",
+        "T-22",
+        "T-24"
+      ],
+      "note": "Integration COMPLETE. Seven work packages merged (WP-1..WP-7), 780/780 at the integrated head, CI green at exact head a97ba1d. Installer run for real into BOTH checkouts. Fresh-session reorientation proven live in a real process, from a directory containing no BUILD-018 files. Wrong-worktree deny and location-verified both reproduced. Execution controller safety proven across 17 payloads by Nolan including four corrupt-state classes - it could not construct a path where it blocks and keeps blocking. NOT complete: three of Warwick's seven acceptance items are BLOCKED ON A HUMAN ACTION (a full Claude Code restart), because hooks bind at process launch. MERGE PRECONDITION recorded in resumption.do_not.",
+      "resolved": "2026-08-01",
+      "evidence": [
+        "Deliverables/BUILD-018-session-governor/evidence/LARRY-acceptance-evidence.md",
+        "Deliverables/BUILD-018-session-governor/audit/NOLAN-04-final-acceptance.md",
+        ".github/workflows/governor-tests.yml",
+        ".gitignore"
+      ]
+    },
+    {
+      "id": "T-24",
+      "title": "Collapse duplicate programme copies during reorientation",
+      "state": "resolved",
+      "model": "Opus",
+      "depends_on": [],
+      "note": "COMPLETED. 653/653 in-branch, 720/720 integrated. Before/after on identical fixture ground: the same estate that produced \"4 programmes report status active\" now produces a brief. KEEL OVERRULED LARRY ON THE SELECTION RULE AND WAS RIGHT - Larry's cwd-preference steer would have selected the STALE copy for a session started in a worker worktree, the exact harm it existed to prevent, and would have let a misplaced session pick the state that then compares ALIGNED, one control disarming another. Self-consistency wins instead. The collapse is LOUD: an undroppable brief section names copies found, disagreements, which won and why. Both mutations proven red, with M2 leaving its negative control green to show it hits the disagreement guard specifically.",
+      "resolved": "2026-08-01",
+      "evidence": [
+        "tools/governor/reorient.mjs",
+        "tools/governor/reorient.test.mjs"
+      ]
+    },
+    {
+      "id": "T-25",
+      "title": "The model gate can hide the collapse notice from Warwick",
+      "state": "planned",
+      "model": "Sonnet",
+      "depends_on": [],
+      "note": "MOOT. The defect was that the model gate could hide the duplicate-collapse notice. The model gate is gone, so the notice can no longer be hidden by it. Closed without work. PRIOR NOTE: Reported by Keel out-of-surface during WP-4. In the real hook path applyModelGate substitutes a compact render when a model switch is owed, and on the end-to-end run the session received REORIENTED plus the next ticket but NOT the COLLAPSED section. The resolution stays correct and the refusal stays gone, so this is a visibility gap rather than a correctness one - M3 is fully delivered only on the unsubstituted path. model-gate.mjs was outside WP-4 surface. NOT started: scope is Warwick's to open."
+    },
+    {
+      "id": "T-26",
+      "title": "Finish the installer against D-C C-8: scope, live verification, and the remaining managed rows",
+      "state": "planned",
+      "model": "Opus",
+      "depends_on": [
+        "T-23"
+      ],
+      "note": "PARTIALLY MOOT, and the honest residue is recorded rather than carried as a ticket: the installer still writes PROJECT scope only, and still has no --verify-live mode that observes a hook actually firing. Both are real, both are disclosed in CLAUDE.md § \"Mechanical enforcement\", and neither is a Governor-specific control that the ruling withdrew. Not carried as an open ticket because BUILD-018 is closed; if the installer misbehaves, that is the trigger to open a small piece of work, not a programme. PRIOR NOTE: Reported out-of-surface by Keel during WP-5, and registered rather than smuggled into that WP. Four unbuilt items from Silas D-C C-8, none of which had an acceptance criterion anywhere: (1) SCOPE - the composed table says user scope for every Governor row, but install-hooks.mjs only ever writes <checkout>/.claude/settings.local.json, i.e. project scope. Silas's reason for wanting user scope is real and load-bearing: hooks bind to the LAUNCHING directory, so project-scope wiring evaporates the first time Warwick launches from elsewhere. Needs --scope user|project plus CLAUDE_CONFIG_DIR. (2) --verify-live with its three-valued exit code asserting a non-zero examined count - Nolan's standard is that a plan ending at INSTALLED rather than OBSERVED FIRING is not finished. (3) --check truthfulness beyond what WP-1 fixed. (4) the PreToolUse|AskUserQuestion escalation-gate.mjs row is absent from the managed set although the module exists and is tested. NOT started: this is post-integration work and its scope is Warwick's to open. ADDED 2026-08-01 (Keel, WP-6 preflight, proven by execution): the EVENT axis is uncompared too. A governor reorient.mjs hook placed under Stop is matched by isGovernorHook inside managed.some(), counted as kept, and SURVIVES ON THE WRONG EVENT indefinitely while the SessionStart spec installs alongside it. Same class as the WP-6 matcher defect - a managed-spec field that nothing compares - on a third axis. The installer reconciles the COMMAND (always), the MATCHER (after WP-6), and NOT the event."
+    }
+  ],
+  "blockers": [
+    {
+      "id": "F-4",
+      "kind": "fog",
+      "summary": "Are the proposed health thresholds right? Resolvable only by dogfood.",
+      "owner": "research",
+      "blocks": [
+        "T-08"
+      ],
+      "recommendation": "Ship the hypothesis thresholds, tune from T-08."
+    },
+    {
+      "id": "F-5",
+      "kind": "fog",
+      "summary": "How is \"a new substantial item\" detected from a prompt well enough to block it without false positives?",
+      "owner": "research",
+      "blocks": [
+        "T-06"
+      ],
+      "recommendation": "Prototype in T-06; fail open on any doubt (INV-2)."
+    },
+    {
+      "id": "F-7",
+      "kind": "fog",
+      "summary": "Reliable live-worker detection. T-07 shipped a best-effort Windows command-line matcher with a confirmed blind spot; a durable answer needs a session/task registry, not command-line text.",
+      "owner": "research",
+      "blocks": [
+        "T-10"
+      ],
+      "recommendation": "T-10 must treat worker liveness as `unknown`-capable, never as a confident zero."
+    },
+    {
+      "id": "Q-2",
+      "kind": "question",
+      "summary": "Bounded override design at RED: advisory only, one-word override, or an override that expires after N prompts?",
+      "owner": "warwick",
+      "blocks": [
+        "T-06"
+      ],
+      "recommendation": "Expires after N prompts — advisory will be ignored, one-word becomes a reflex."
+    },
+    {
+      "id": "Q-3",
+      "kind": "question",
+      "summary": "Project ManagAIr portability: design the adapter boundary now or extract later?",
+      "owner": "warwick",
+      "blocks": [
+        "T-12"
+      ],
+      "recommendation": "Design the boundary now — it is nearly free under AD-11."
+    },
+    {
+      "id": "Q-4",
+      "kind": "question",
+      "summary": "May rotation auto-commit banked state, or always use Larry’s standing push authority?",
+      "owner": "warwick",
+      "blocks": [
+        "T-10"
+      ],
+      "recommendation": "Use the standing authority; add no new mechanism."
+    },
+    {
+      "id": "Q-5",
+      "kind": "defect",
+      "summary": "RESOLVED 2026-07-31 by T-11. The dangling ensure-watcher.mjs SessionStart hook was RECONCILED, not stacked beside: install-hooks.mjs prunes SessionStart hooks whose target script does not exist, a rule that cannot over-reach (proven by mutation test), reports and backs up everything it removes, and exempts governor-managed hooks. Applied live to C:/Fusion247PKA/.claude/settings.local.json (backup .bak-2026-07-31T17-05-08-981Z); the working ensure-capture-gateway sibling was kept and Stop was untouched. Two further runs reported \"already correct. Nothing written.\" - idempotent, proven.",
+      "owner": "larry",
+      "blocks": [],
+      "recommendation": "Decide repair / remove / work around before adding a Governor SessionStart hook beside it. Repair itself is Tower’s, and Tower is PARKED."
+    },
+    {
+      "id": "Q-1",
+      "kind": "question",
+      "summary": "Is BUILD-018 the right identifier, given it was commissioned directly and has no Foundry IDEA-018?",
+      "owner": "warwick",
+      "blocks": [],
+      "recommendation": "Larry’s call unless Warwick objects; recorded in 00-ESTATE.md."
+    },
+    {
+      "id": "X-1",
+      "kind": "external",
+      "summary": "GL-012 section 6a is NOT on this branch. Reading GL-012 from this worktree returns the PRE-ruling text and will cause a settled conflict to be re-escalated.",
+      "owner": "larry",
+      "blocks": [],
+      "recommendation": "Read it with: git show 95c265d:\"Team Knowledge/Guidelines/GL-012-secrets-store-access-boundary.md\""
+    },
+    {
+      "id": "X-2",
+      "kind": "external",
+      "summary": "RESOLVED 2026-07-31 by T-11. settings.local.json remains gitignored, so hook wiring still cannot travel by git - the answer is that the BEHAVIOUR travels and only the ACTIVATION touches the untracked file. tools/governor/install-hooks.mjs is committed, idempotent, reviewable and re-runnable on any machine, and ships both hooks (SessionStart reorientation + PreToolUse deny gate) in one run.",
+      "owner": "larry",
+      "blocks": [],
+      "recommendation": "Every hook ticket must also ship an idempotent activation step that installs into the primary checkout’s untracked settings file."
+    },
+    {
+      "id": "D-1",
+      "kind": "defect",
+      "summary": "T-04's implementation model provenance is UNKNOWN. It was built while this session's visible model selector read Auto, not the Opus the bank recommended, and no per-turn model attribution was captured at the time (that capability did not exist yet — T-15, resolved immediately after, exists to close exactly this hole for every future ticket). T-04's code, tests (34/34, including the full 64-combination sweep) and write-back are PRESERVED EXACTLY AS LANDED — this is not a defect in T-04 itself and it is not to be rebuilt on this basis alone.",
+      "owner": "larry",
+      "blocks": [],
+      "recommendation": "T-04 requires independent QA current at its exact head (commit 85edcf76205ecf375985c30445f37c31cd37e146) before BUILD-018 merges. This is not a new mechanism: the existing T-14 merge-readiness gate (independent-review check, tools/governor/merge-readiness.mjs) already requires ALL tickets in this programme to hold a current QA approval at the exact integrated head before merge-readiness can report ready — T-04 is not exempt from that gate, and this entry exists so the SPECIFIC reason (unverified build-time model, not a code defect) is recorded rather than only the generic requirement. [SUPERSEDED 2026-08-01: this recommendation rested on the merge-readiness gate, which has been REMOVED by Warwick's cut. There is now NO mechanical pre-merge QA gate. Warwick authorised the merge of the retained spine explicitly and in full knowledge of the cut; the obligation is therefore discharged by his decision, NOT by a control. Recorded so no future reader believes a gate enforced it.]"
+    },
+    {
+      "id": "D-2",
+      "kind": "defect",
+      "summary": "This session dispatched generic 'general-purpose'/'Plan' ephemeral agents for T-15's design and implementation instead of routing through the named specialist team (Team/agent-index.md) — specifically Keel (Implementation Engineer, owns authorised Work Orders) and Silas (Database Architect, owns schema/data-integrity judgement, relevant to the delegation ledger's own schema). Warwick corrected this mid-session: the routing SSOT is the named specialist team, and an ephemeral worker is disposable runtime beneath a named discipline, not an anonymous substitute for it. T-15 itself is preserved as landed — verified independently (447/447 suite, real acceptance test, no regressions) — this defect is about PROCESS provenance, the same class of concern as D-1, not a code defect in T-15.",
+      "owner": "larry",
+      "blocks": [],
+      "recommendation": "Every future implementation dispatch in this build routes through Keel via a proper Work Order (Team Knowledge/Templates/work-order.md, SOP-022: DRAFT -> WORKER READ-BACK -> LARRY ACCEPTS OR AMENDS -> ISSUED -> RUNNING), schema/data-integrity design decisions route through Silas first. Nolan is auditing why the existing specialists were bypassed this session and reviewing the in-flight delegation-enforcement mechanism so it itself checks for a fitting named specialist before generic delegation can satisfy it. [2026-08-01: the MECHANICAL delegation gate is removed. The DOCTRINE is not repealed — it lives in Team/Larry - Orchestrator/AGENTS.md §9e as a self-applied test.]"
+    },
+    {
+      "id": "D-3",
+      "kind": "defect",
+      "summary": "This session's FULL history (T-01 through T-14, and initially T-15/T-16) was built without ANY Work Order or Keel involvement, despite tools/governor/ being explicitly named in Keel's own contract as in-scope — confirmed by Nolan's audit. This is the standing pattern for the entire BUILD-018 programme, not a single-session lapse.",
+      "owner": "larry",
+      "blocks": [],
+      "recommendation": "Per Warwick's explicit ruling (2026-07-31): do NOT reopen or rebuild T-01 through T-14 on this basis alone. Preserve sound completed work. The existing merge-readiness independent-review gate (tools/governor/merge-readiness.mjs) already requires QA current at the exact head for every ticket before merge, regardless of build provenance — that generic requirement stands for all of them; D-1 records the T-04-specific reason. Going forward (T-16 onward), implementation routes through Keel via a proper Work Order; Larry's routing cheatsheet (Team/Larry - Orchestrator/AGENTS.md) is being corrected to make this the default rather than an easily-bypassed option. [SUPERSEDED 2026-08-01: this recommendation rested on the merge-readiness gate, which has been REMOVED by Warwick's cut. There is now NO mechanical pre-merge QA gate. Warwick authorised the merge of the retained spine explicitly and in full knowledge of the cut; the obligation is therefore discharged by his decision, NOT by a control. Recorded so no future reader believes a gate enforced it.]"
+    },
+    {
+      "id": "D-4",
+      "kind": "defect",
+      "summary": "Larry escalated a COSMETIC defect to Warwick instead of taking the safe no-action default. After T-05's write-back commit landed and pushed correctly, Larry noticed a stray '@' in the commit SUBJECT (PowerShell here-string syntax used in a Bash call) and raised an AskUserQuestion offering to amend + force-push already-pushed history to fix it. The commit's CONTENT, the write-back and the pushed state were all correct — only the message text was malformed. Warwick ruled this an acceptance failure in Wayfinder terms: a cosmetic metadata defect, where leaving already-pushed history intact is safe, is not a Warwick decision. The required default was to leave it unchanged, record it as cosmetic, and continue. The pushed commit (a570b73) is NOT to be reopened or rewritten.",
+      "owner": "larry",
+      "blocks": [],
+      "recommendation": "Implement T-17, the mechanical escalation gate, per AD-26. The rule: when a harmless no-action option preserves correctness and avoids additional risk, take it automatically. Never escalate typos, wording, formatting, naming, cosmetic metadata, ticket boundaries, completed workers, or ordinary routing choices; never offer a force-push or history rewrite merely to improve cosmetic metadata. Escalate ONLY for a genuine product decision, material scope change, unavoidable permission, spend, irreversible live action, unsafe repository state, or the final merge decision. The gate must cover AskUserQuestion, not only ordinary stopping."
+    },
+    {
+      "id": "D-5",
+      "kind": "defect",
+      "summary": "The estate's atomic-write primitive is not concurrency-safe on Windows, and T-02's evidence overstates what it proved. health-store.mjs (T-02) and delegation-gate.mjs (T-16) both write a unique temp file then renameSync onto the target with NO retry. On Windows that rename throws EPERM when another process holds the target. MEASURED by Larry on 2026-08-01, not inferred: health-store failed 21 of 48 writer processes under 16 concurrent processes (44%); delegation-gate's own CONCURRENCY test (N concurrent appender processes never produce a torn or corrupt ledger file) fails roughly 2 runs in 5 when run in isolation - the builder reported it as a one-off flake, but it reproduces. T-02's note cites a 12-process concurrent-write mutation test as proof; what that test actually established is that the file is never TORN (true - rename is all-or-nothing), NOT that concurrent writers succeed. They frequently do not. This is the state-what-was-PROVEN-not-what-it-implies failure mode, and the full-suite green (588/588) hides it because the failure is probabilistic and the suite happened to pass. SECONDARY: a failed rename orphans its temp file permanently - 21 accumulated in the real health store during the probe and had to be removed by hand.",
+      "owner": "larry",
+      "blocks": [
+        "T-18"
+      ],
+      "recommendation": "Fix in T-18: bounded retry with backoff on EPERM/EBUSY/EACCES around the rename, temp-file cleanup in a finally so a failure never orphans, applied to the ONE shared primitive rather than copy-pasted into two modules. The concurrency proof must assert a non-zero SUCCESS count, not merely the absence of tearing - a test that passes when every writer fails is the exact vacuous-green shape AD-24 already refuses elsewhere. DIRECTION OF HARM IS SAFE BUT NOT NIL, and this is why it is a defect rather than a curiosity: a lost health sample degrades to BLIND/stale (AD-3, safe) and a lost delegation checkpoint undercounts toward a MISSED deny (discipline gate, bounded) - but T-03's sampler is intended to run on EVERY assistant message from the live statusLine, which is precisely the high-concurrency path this primitive fails on, so the real-world hit rate rises sharply the moment that wiring is activated."
+    },
+    {
+      "id": "D-6",
+      "kind": "defect",
+      "summary": "A false concurrency-safety claim has propagated across three modules BY CITATION. qa-binding.mjs:282-284 states: 'A write killed mid-flight leaves the previous good file untouched; two concurrent writers never interleave. Same recipe as health-store.mjs and writeProgrammeState.' The non-interleaving half is true and the durability half is true, but together they read as a concurrency-safety guarantee the code does not provide - concurrent writers do not interleave, they FAIL with EPERM (see D-5, measured). health-store.mjs's header carries the same overclaim, and qa-binding.mjs explicitly cites it and writeProgrammeState as precedent, which is how one module's overstated comment became three modules' shared belief. This is a documentation defect with real consequence: it is the reason the pattern was copied forward unexamined into build-registry.mjs, programme-state.mjs and qa-binding.mjs.",
+      "owner": "larry",
+      "blocks": [
+        "T-19"
+      ],
+      "recommendation": "Correct the comments in T-19 alongside adopting the shared primitive. State what is actually true: the write is atomic (never torn, never partially visible) and durable against a mid-flight kill, and separately state whether concurrent writers SUCCEED - which after T-18 they do, by bounded retry, and before T-18 they frequently did not. Do not simply delete the comments; an absent claim invites the next author to re-derive the same wrong one. This is the estate's 'state what was PROVEN, not what it implies' rule applied to a code comment. [2026-08-01: two of the three modules carrying the false comment (qa-binding.mjs, build-registry.mjs) have been REMOVED, taking the comment with them. health-store.mjs's header was already corrected under T-18. The propagation is closed by deletion.]"
+    }
+  ],
+  "model_recommendation": {
+    "model": "unknown",
+    "effort": null,
+    "rationale": "BUILD-018 is closed and there is no next action inside it. Per Warwick's ruling, context and model advice are given AFTER the next requirement is understood, not banked in advance. This deliberately renders the footer's next-model field UNSET and its advice TASK UNKNOWN, which is the honest reading for a closed programme.",
+    "for_ticket": null,
+    "computed_at_head": null
+  },
+  "workers": [
+    {
+      "id": "phase-1-research-x3",
+      "kind": "subagent",
+      "status": "completed",
+      "ticket": null,
+      "dispatched": "2026-07-31",
+      "worktree": "C:/Fusion247PKA-governor",
+      "expected_output": "Telemetry surface, Wayfinder method, close-session seams",
+      "evidence": [
+        "Deliverables/BUILD-018-session-governor/02-MAP.md"
+      ]
+    },
+    {
+      "id": "t-03-t-13-implementation",
+      "kind": "subagent",
+      "status": "completed",
+      "ticket": "T-03",
+      "dispatched": "2026-07-31",
+      "worktree": "C:/Fusion247PKA-governor",
+      "expected_output": "Sampler + programme-state collector, both Sonnet-tier, run in parallel (no shared files)",
+      "evidence": [
+        "tools/governor/sampler.mjs",
+        "tools/governor/collect-state.mjs"
+      ]
+    }
+  ],
+  "branches": [
+    {
+      "name": "build-018/session-governor",
+      "head": "8b30233799a52eb0eec19af83be0ea83a0704824",
+      "upstream": "origin/build-018/session-governor",
+      "ahead": 0,
+      "behind": null,
+      "role": "build",
+      "note": "This programme. The only branch this build may write to."
+    },
+    {
+      "name": "main",
+      "head": "de92306911e7cbe8828d5652ed9f7f21fd99593e",
+      "upstream": "origin/main",
+      "ahead": 1,
+      "behind": null,
+      "role": "protected",
+      "note": "Local main is at de92306, one commit ahead of origin/main and unpushed. MUST NOT be altered by this build."
+    },
+    {
+      "name": "recovery/2026-07-31-governor-abort-handoff",
+      "head": "95c265de729e26114b1e1eb7dc7d8630502aca1d",
+      "upstream": null,
+      "ahead": null,
+      "behind": null,
+      "role": "recovery",
+      "note": "Carries the settled GL-012 section 6a ruling. Read-only for this build; its PR must not be opened or merged."
+    }
+  ],
+  "pull_requests": [],
+  "worktrees": [
+    {
+      "path": "C:/Fusion247PKA",
+      "branch": "recovery/2026-07-31-governor-abort-handoff",
+      "head": "95c265de729e26114b1e1eb7dc7d8630502aca1d",
+      "dirty": true,
+      "unpushedCount": 0,
+      "classification": "primary-checkout",
+      "disposition": "unreconciled-dirty",
+      "liveWorkerPids": [
+        24244,
+        9336,
+        31012,
+        35444,
+        25472,
+        36196
+      ],
+      "protected": true
+    },
+    {
+      "path": "C:/Fusion247PKA/.claude/worktrees/agent-a183841aed5508d75",
+      "branch": "build-015/shop-state-store",
+      "head": "acd3512fb68bcc30a11bf375a3dcf3adfbc38502",
+      "dirty": false,
+      "unpushedCount": null,
+      "classification": "baseline-agent-worktree",
+      "disposition": "reconciled-clean",
+      "liveWorkerPids": [],
+      "protected": true
+    },
+    {
+      "path": "C:/Fusion247PKA/.claude/worktrees/agent-a1de057d3d6be03ce",
+      "branch": "build-015/command-ledger-separation",
+      "head": "585dc1fd0919d76c513e1d5a93ef8b43499325b0",
+      "dirty": false,
+      "unpushedCount": null,
+      "classification": "baseline-agent-worktree",
+      "disposition": "reconciled-clean",
+      "liveWorkerPids": [],
+      "protected": true
+    },
+    {
+      "path": "C:/Fusion247PKA/.claude/worktrees/agent-a327ccbf3c0bdc834",
+      "branch": "worktree-agent-a327ccbf3c0bdc834",
+      "head": "bdfc8e8eaf18633e8aa68dc23b2f293fb6fd774b",
+      "dirty": false,
+      "unpushedCount": null,
+      "classification": "baseline-agent-worktree",
+      "disposition": "reconciled-clean",
+      "liveWorkerPids": [],
+      "protected": true
+    },
+    {
+      "path": "C:/Fusion247PKA/.claude/worktrees/agent-a581487916213d18c",
+      "branch": "idea-012/asdair-intake-and-regulars-writers",
+      "head": "b267385fc735a5b7e9df0e44b79104d444141dd0",
+      "dirty": false,
+      "unpushedCount": null,
+      "classification": "baseline-agent-worktree",
+      "disposition": "reconciled-clean",
+      "liveWorkerPids": [],
+      "protected": true
+    },
+    {
+      "path": "C:/Fusion247PKA/.claude/worktrees/agent-a666860dfc983057f",
+      "branch": "worktree-agent-a666860dfc983057f",
+      "head": "3521522335e298168183288958528da65be4183c",
+      "dirty": false,
+      "unpushedCount": null,
+      "classification": "baseline-agent-worktree",
+      "disposition": "reconciled-clean",
+      "liveWorkerPids": [],
+      "protected": true
+    },
+    {
+      "path": "C:/Fusion247PKA/.claude/worktrees/agent-a7094ab1c2f0f7847",
+      "branch": "build-015/runtime-recovery",
+      "head": "ee1809ab2d3be6b52df10d0badd81cf75a07b748",
+      "dirty": false,
+      "unpushedCount": 0,
+      "classification": "baseline-agent-worktree",
+      "disposition": "reconciled-clean",
+      "liveWorkerPids": [],
+      "protected": true
+    },
+    {
+      "path": "C:/Fusion247PKA/.claude/worktrees/agent-a70ec3bf95b1cdb08",
+      "branch": "build-015/order-reconciliation",
+      "head": "3ace58c72002e499f296f3adf34fc0b38b35bd2b",
+      "dirty": false,
+      "unpushedCount": null,
+      "classification": "baseline-agent-worktree",
+      "disposition": "reconciled-clean",
+      "liveWorkerPids": [],
+      "protected": true
+    },
+    {
+      "path": "C:/Fusion247PKA/.claude/worktrees/agent-a83c3ddb791e452b9",
+      "branch": "build-015/vision-transcription",
+      "head": "c516b7cd5e3908f2b5796350040873c349eb386b",
+      "dirty": false,
+      "unpushedCount": null,
+      "classification": "baseline-agent-worktree",
+      "disposition": "reconciled-clean",
+      "liveWorkerPids": [],
+      "protected": true
+    },
+    {
+      "path": "C:/Fusion247PKA/.claude/worktrees/agent-a890ba1b9f7229167",
+      "branch": "build-015/pipeline-orchestrator",
+      "head": "712b2be4bb3d4ecd0c27fc14890d3401c7aa2739",
+      "dirty": false,
+      "unpushedCount": null,
+      "classification": "baseline-agent-worktree",
+      "disposition": "reconciled-clean",
+      "liveWorkerPids": [],
+      "protected": true
+    },
+    {
+      "path": "C:/Fusion247PKA/.claude/worktrees/agent-aaaa3ee64e21a47e1",
+      "branch": "build-015/question-button-persistence",
+      "head": "7f9c39db84d02692f9fa7dd3645adb1c690f08c9",
+      "dirty": false,
+      "unpushedCount": null,
+      "classification": "baseline-agent-worktree",
+      "disposition": "reconciled-clean",
+      "liveWorkerPids": [],
+      "protected": true
+    },
+    {
+      "path": "C:/Fusion247PKA/.claude/worktrees/agent-ab982aa6ed22738a2",
+      "branch": "idea-012/asdair-shopper-intake-receiver",
+      "head": "ee8476e3827a063b6ca9e5527f2346e495318ead",
+      "dirty": false,
+      "unpushedCount": null,
+      "classification": "baseline-agent-worktree",
+      "disposition": "reconciled-clean",
+      "liveWorkerPids": [],
+      "protected": true
+    },
+    {
+      "path": "C:/Fusion247PKA/.claude/worktrees/agent-abbf3b1a96f26d5ca",
+      "branch": "build-015/shopperbot-control-surface",
+      "head": "58da74fbe55ffc67d2138a5e094e8d6baa620571",
+      "dirty": false,
+      "unpushedCount": null,
+      "classification": "baseline-agent-worktree",
+      "disposition": "reconciled-clean",
+      "liveWorkerPids": [],
+      "protected": true
+    },
+    {
+      "path": "C:/Fusion247PKA/.claude/worktrees/agent-ac938d4466bb42a3b",
+      "branch": "build-015/cockpit-asdair-app",
+      "head": "f0b9bb2c2343c9f078b610affde2105659507439",
+      "dirty": false,
+      "unpushedCount": 0,
+      "classification": "baseline-agent-worktree",
+      "disposition": "reconciled-clean",
+      "liveWorkerPids": [],
+      "protected": true
+    },
+    {
+      "path": "C:/Fusion247PKA/.claude/worktrees/agent-ae6ffd94c23fd115a",
+      "branch": "worktree-agent-ae6ffd94c23fd115a",
+      "head": "6624c9960c0e0ed013fb9ef919040b33ad00b1ee",
+      "dirty": false,
+      "unpushedCount": null,
+      "classification": "baseline-agent-worktree",
+      "disposition": "reconciled-clean",
+      "liveWorkerPids": [],
+      "protected": true
+    },
+    {
+      "path": "C:/Fusion247PKA/.claude/worktrees/agent-af2af244f0112fe53",
+      "branch": "build-015/browser-runner",
+      "head": "6d3273b429b7b6d374d941636855dcc76b006e6b",
+      "dirty": false,
+      "unpushedCount": 0,
+      "classification": "baseline-agent-worktree",
+      "disposition": "reconciled-clean",
+      "liveWorkerPids": [],
+      "protected": true
+    },
+    {
+      "path": "C:/Fusion247PKA/.claude/worktrees/agent-af69ebb565829ee34",
+      "branch": "worktree-agent-af69ebb565829ee34",
+      "head": "9256abf96489159b2cdaefa994c0b21708c69f81",
+      "dirty": true,
+      "unpushedCount": null,
+      "classification": "baseline-agent-worktree",
+      "disposition": "unreconciled-dirty",
+      "liveWorkerPids": [],
+      "protected": true
+    },
+    {
+      "path": "C:/Fusion247PKA/.claude/worktrees/agent-af992fbb02877d635",
+      "branch": "build-015/load-last-order",
+      "head": "ec5a843946a901bd40dbcb218d4c7fd1192d4740",
+      "dirty": false,
+      "unpushedCount": null,
+      "classification": "baseline-agent-worktree",
+      "disposition": "reconciled-clean",
+      "liveWorkerPids": [],
+      "protected": true
+    },
+    {
+      "path": "C:/Fusion247PKA-audit",
+      "branch": "audit/de-mypka-extraction-20260728",
+      "head": "c5160a9eddfafe15c2a889b2d4de79e6585620fd",
+      "dirty": false,
+      "unpushedCount": 0,
+      "classification": "baseline-named-worktree",
+      "disposition": "reconciled-clean",
+      "liveWorkerPids": [],
+      "protected": true
+    },
+    {
+      "path": "C:/Fusion247PKA-governor",
+      "branch": "build-018/session-governor",
+      "head": "8b30233799a52eb0eec19af83be0ea83a0704824",
+      "dirty": false,
+      "unpushedCount": 0,
+      "classification": "active-build",
+      "disposition": "in-progress-owned",
+      "liveWorkerPids": [],
+      "protected": false
+    },
+    {
+      "path": "C:/Fusion247PKA-tower",
+      "branch": "build-014/tower-recovery",
+      "head": "3c08e450d3617da1de43f11f0c33f3c2a483036b",
+      "dirty": false,
+      "unpushedCount": 0,
+      "classification": "baseline-named-worktree",
+      "disposition": "reconciled-clean",
+      "liveWorkerPids": [],
+      "protected": true
+    },
+    {
+      "path": "C:/Fusion247PKA-w01",
+      "branch": "idea-017/w01-note-structure-validator",
+      "head": "013a8de1c08bf57e735db913272bb36f5c77c259",
+      "dirty": false,
+      "unpushedCount": 0,
+      "classification": "baseline-named-worktree",
+      "disposition": "reconciled-clean",
+      "liveWorkerPids": [],
+      "protected": true
+    }
+  ],
+  "safe_boundary": {
+    "at_boundary": true,
+    "reason": "Verified by /rotate-session: 5 safety checks ran and found no obstacle. Tree clean, no unpushed commits, no live worker detected in this worktree.",
+    "obstacles": [],
+    "verified_at": "2026-08-01"
+  },
+  "resumption": {
+    "focus": "BUILD-018 is CLOSED — cut and closed 2026-08-01. Nothing here is in flight and nothing is owed. Do not resume it, do not reopen its tickets, and do not treat its remaining unbuilt items as a backlog. The next authorised work is the VlogOps Wayfinder PLANNING-ONLY trial (see CLAUDE.md § \"Wayfinder\"), which must stop at clarity and must not begin implementation until Warwick accepts the plan.",
+    "next_action": "None inside BUILD-018. If a fresh session lands here, the correct action is to confirm the programme is closed and ask Warwick what he wants next — then advise on context and model.",
+    "ticket": null,
+    "worktree": "C:/Fusion247PKA",
+    "branch": "main",
+    "read_first": [
+      "Deliverables/2026-08-01-pax-build-018-process-diagnosis.md - the accepted diagnosis; the reason this build was cut",
+      "Deliverables/BUILD-018-session-governor/evidence/CLOSURE-journey-proof.md - what was actually proven at closure, and what was not",
+      "CLAUDE.md - the operating constitution, reconciled to the post-cut estate"
+    ],
+    "do_not": [
+      "Do not reopen BUILD-018 or rebuild any removed module without a fresh decision from Warwick.",
+      "Do not reintroduce a control on Larry's own judgement (model gate, delegation gate, escalation gate). Warwick withdrew that whole class; the doctrines survive as self-applied rules in Team/Larry - Orchestrator/AGENTS.md.",
+      "Do not use Wayfinder as an execution tracker. It is planning-only and stops at clarity.",
+      "Do not treat the closed programme's unbuilt tickets (T-06, T-12, T-19, T-26) as a backlog."
+    ],
+    "next_action_kind": "hold"
+  },
+  "locked_decisions": [
+    {
+      "id": "AD-1",
+      "decision": "statusLine is the primary telemetry source; the transcript is corroboration only, and must always be tail-read.",
+      "why": "statusLine is a documented, stable contract; the transcript format is explicitly internal and version-fragile, and several local transcripts are 30-40 MB."
+    },
+    {
+      "id": "AD-2",
+      "decision": "Two separate stores: session health (ephemeral, machine-local) and programme state (durable, git-versioned).",
+      "why": "Different lifetimes and audiences. Conflating them is how banked state gets lost."
+    },
+    {
+      "id": "AD-3",
+      "decision": "BLIND is a first-class state with its own exit code. Unreadable telemetry is never GREEN.",
+      "why": "INV-1, and the direct lesson of the 2026-07-29 controls that reported success over ground they never examined."
+    },
+    {
+      "id": "AD-4",
+      "decision": "Compaction is counted by the PreCompact hook, never inferred from the transcript.",
+      "why": "A local probe found zero reliable transcript markers for compaction."
+    },
+    {
+      "id": "AD-5",
+      "decision": "Reorientation rides SessionStart(source=\"clear\") to additionalContext, capped at 10,000 characters, so the injected brief is a POINTER document and not the state itself.",
+      "why": "The cap makes a full state dump impossible."
+    },
+    {
+      "id": "AD-6",
+      "decision": "The RED preflight block fails OPEN.",
+      "why": "INV-2. A governor that traps Warwick in his own session is a worse defect than one that misses a rotation."
+    },
+    {
+      "id": "AD-8",
+      "decision": "The map lives in git as markdown, not in an issue tracker.",
+      "why": "Subagents get no MCP tools, so a tracker-hosted map is unreadable by the very workers who need it."
+    },
+    {
+      "id": "AD-11",
+      "decision": "The evaluator core is pure: evaluate(signals) to verdict, with zero filesystem, git or myPKA knowledge. Adapters gather signals.",
+      "why": "Portability, and it makes the state space unit-testable without an estate."
+    },
+    {
+      "id": "AD-12",
+      "decision": "The Governor DERIVES Team Knowledge/fusion-brief/session-handoff.md; it never invents a rival handoff file.",
+      "why": "That file already declares itself as consumed by the next Larry session. A parallel handoff would create two competing SSOTs — the exact defect this build exists to prevent."
+    },
+    {
+      "id": "AD-13",
+      "decision": "/rotate-session inherits close-session steps 1-3 only. Steps 4-7 (Librarian pass, graduation, ClickUp mirror, self-improvement review) are end-of-programme and must never run on a rotation.",
+      "why": "INV-4. A rotation that costs what a close costs will not get used, and an unused governor is worse than none."
+    },
+    {
+      "id": "AD-14",
+      "decision": "Durable programme state lives at <programme.home>/programme-state.json — with the programme, on the programme’s branch — and banked.head_sha records the head the state DESCRIBES, i.e. the parent of the commit that carries the state file.",
+      "why": "A file cannot contain its own commit’s SHA. State banked on a feature branch describes commits that exist only on that branch, so parking it on main would make it lie the moment the branch advanced. Consumers comparing against live HEAD must exclude the banking commit itself."
+    },
+    {
+      "id": "AD-15",
+      "decision": "The programme-state collector (T-13) never performs a git fetch, so branches.behind is permanently unknown under it.",
+      "why": "A trustworthy behind-count needs fresh remote-tracking refs, and a collector must not have side effects on the repository it is reporting on. Matches this document's own pre-existing branches.behind unknown declaration from T-09."
+    },
+    {
+      "id": "AD-16",
+      "decision": "T-13 collects repository, worktrees, branches and pull_requests only. workers is never scanned or synthesised by the collector.",
+      "why": "Which subagent was dispatched, for which ticket, with what expected output, is programme knowledge the dispatching session holds — not something git, worktree-recon or gh can answer. F-7 already establishes live-worker detection is best-effort; inventing worker entries from an OS process scan would manufacture false precision under a field whose entire schema purpose (T-09's D-2) is refusing to let a guessed collection read as ground truth."
+    },
+    {
+      "id": "AD-17",
+      "decision": "THE ARTEFACT HIERARCHY (settled 2026-07-31, CORRECTED 2026-08-01 after the T-14 dual-write incident, binding). (1) The Goal / Build Contract (01-GOAL-CONTRACT.md) is the PRODUCT SSOT — outcome, invariants, scope. (2) programme-state.json's tickets[] is the EXECUTION-STATE SSOT — which tickets are resolved, what the frontier is, and what resumption points to are facts of THIS document alone; resolveTicket / deriveResumption / resolveTicketAndAdvance / applyTicketResolution in tools/governor/programme-state.mjs are the only sanctioned way to change them. (3) The Wayfinder map (02-MAP.md) is the HUMAN-READABLE NAVIGATION / DECISION PROJECTION — architecture, settled decisions, fog, the ticket-index narrative and the write-back log stay hand-authored, but it NO LONGER ASSERTS TICKET STATUS on its own authority: the GOVERNOR:STATUS block in §8 is machine-rendered from the ledger, and /rotate-session refuses with STALE_EXECUTION_STATE if the two ever disagree. (4) The Implementation Plan is the INITIAL ROUTE ONLY — context, never prescription; superseded by the map the moment execution diverges. (5) programme-state.json as a whole and Team Knowledge/fusion-brief/session-handoff.md are GENERATED PROJECTIONS of the execution-state SSOT — never hand-authored, never a rival source; a disagreement between a projection and its source is a defect in the projection. (6) Before merge, enduring BUILD-018 records GRADUATE into Builds/BUILD-018-session-governor/; evidence may remain under Deliverables/.",
+      "why": "Resolves the \"which file wins\" question that a rotation makes acute: a fresh Larry reads several artefacts and must know their rank without asking. ORIGINALLY THIS AD NAMED THE MAP ITSELF AS AN \"EXECUTION SSOT\" — the exact ambiguity that caused the incident: T-14 was declared resolved in the map narrative while tickets[] still called it frontier, and the next /rotate-session banked a resumption pointer telling the fresh session to redo finished work. Splitting execution-state SSOT (2) from navigation projection (3) removes the ambiguity structurally: one place ticket status lives, one function allowed to change it, one automated check that refuses to bank a disagreement. Refines AD-9 (map-over-tickets, which is about ticket SPECS not ticket STATUS, and is unaffected) and generalises AD-12 (the handoff is derived, never invented)."
+    },
+    {
+      "id": "AD-18",
+      "decision": "The wrong-worktree gate keys on cwd, repository root and branch ONLY. HEAD is compared and REPORTED, but never denies.",
+      "why": "The moment a session makes its first legitimate commit, its HEAD diverges from banked.head_sha. A gate keyed on HEAD would block the session for having succeeded, and would be switched off within the hour. Location is a precondition; head movement is normal progress, and staleness already has its own channel (AD-14)."
+    },
+    {
+      "id": "AD-19",
+      "decision": "Two unknowns, two directions. (a) Cannot establish where we are while a canonical location IS known -> DENY (unknown is never aligned). (b) No active programme found at all, or the guard itself throws -> ALLOW.",
+      "why": "Failing closed everywhere would let one guard bug become a total work stoppage on a machine running 22 worktrees; failing open everywhere would make the gate decorative. The split puts the strictness exactly where a canonical location exists to be violated. Threat model is first-party mistakes, not a malicious operator. Both directions are proven by test - an untested fail-direction is an assumption, not a control."
+    },
+    {
+      "id": "AD-20",
+      "decision": "Warwick never manages branches, worktrees, commits, pushes or PR creation. Larry owns the complete Git lifecycle. Warwick's standing gate is merge-to-main, plus decisions that are genuinely his.",
+      "why": "Recorded as a decision rather than left as a habit because the failure it prevents is silent: a Larry that asks Warwick to \"just run git checkout\" has converted an orchestration failure into Warwick's problem, and the ask looks helpful in the moment. Printed in every reorientation brief and every refusal, so a fresh session inherits it without being told."
+    },
+    {
+      "id": "AD-21",
+      "decision": "The EnterWorktree recovery protocol (default = SILENT AUTO-ROUTE; corrected 2026-08-01). When a session is in the wrong worktree, Larry AUTO-ROUTES himself into the canonical checkout by calling EnterWorktree, silently and in-process. It needs no relaunch and, on observed Remote Control use, no approval prompt. ONLY if EnterWorktree actually BLOCKS on an approval invisible to Remote Control does Larry say, once and verbatim: \"Approve the pending EnterWorktree request in the local Claude terminal\", then wait. Larry never asks Warwick to relaunch, to open a terminal in a particular folder, or to run git — Warwick must never manage repository folders, worktrees or session launch locations (Warwick's standing ruling, 2026-08-01).",
+      "why": "Learned live on 2026-07-31: a pending approval invisible to the remote side reads as the assistant hanging, and five minutes vanished — which is the whole reason the fallback line still exists. CORRECTED 2026-08-01 against live evidence: EnterWorktree into the canonical worktree succeeded through Remote Control with ZERO approval prompt, so announce-and-wait is a FALLBACK, not the default; the default is the silent auto-route. The protocol is embedded verbatim in the deny message and the brief rather than only in this map, because at the moment it is needed nobody is reading the map — the refusal is the only thing on screen."
+    },
+    {
+      "id": "AD-26",
+      "decision": "THE ESCALATION RULE (settled 2026-07-31 by Warwick, binding). When a harmless no-action option preserves correctness and avoids additional risk, Larry takes it AUTOMATICALLY and does not ask. Larry must NOT escalate: typos, wording, formatting, naming, cosmetic metadata, ticket boundaries, completed workers, ordinary routing choices, or anything else Larry can safely resolve — and must never offer Warwick a force-push or history-rewrite choice merely to improve cosmetic metadata. Larry escalates ONLY for: a genuine product decision, a material scope change, an unavoidable permission, spend, an irreversible live action, an unsafe repository state, or the final merge decision. This governs AskUserQuestion exactly as it governs ordinary stopping.",
+      "why": "An unnecessary escalation is not a neutral courtesy — it is an acceptance failure that costs Warwick's scarce attention and stalls autonomous execution, which is the whole outcome BUILD-018 exists to protect. Warwick's own reasoning for making it mechanical rather than advisory: a Stop hook alone is insufficient, because Larry can manufacture a pause by asking an unnecessary question — so the control must bind the ASK surface, not just the stop surface. Recorded as a decision rather than left as judgement because the failure is silent and looks virtuous in the moment: an unnecessary question reads as diligence, which is exactly why it recurs. The live instance (D-4) had Larry offering to rewrite correct, already-pushed history to fix a stray character in a commit subject."
+    }
+  ],
+  "runtime_pointers": [
+    {
+      "label": "The map (SSOT)",
+      "path": "Deliverables/BUILD-018-session-governor/02-MAP.md",
+      "how_to_read": "On branch build-018/session-governor. From another checkout: git show build-018/session-governor:\"Deliverables/BUILD-018-session-governor/02-MAP.md\""
+    },
+    {
+      "label": "Durable programme state",
+      "path": "Deliverables/BUILD-018-session-governor/programme-state.json",
+      "how_to_read": "Validate before trusting: node -e \"import('./tools/governor/programme-state.mjs').then(m=>console.log(m.readProgrammeState('Deliverables/BUILD-018-session-governor/programme-state.json')))\""
+    },
+    {
+      "label": "State schema",
+      "path": "tools/governor/programme-state.schema.json",
+      "how_to_read": "Interpreted directly by the validator in tools/governor/programme-state.mjs — it is the single source of the constraints, not a description of them."
+    },
+    {
+      "label": "Session-health store",
+      "path": "tools/governor/health-store.mjs",
+      "how_to_read": "Default root ~/.mypka/governor/health/<projectKey>/<sessionId>.json; override with MYPKA_GOVERNOR_HEALTH_DIR."
+    },
+    {
+      "label": "Worktree reconciliation",
+      "path": "tools/governor/worktree-recon.mjs",
+      "how_to_read": "reconcile({repoPath, primaryPath, buildPaths}) returns every worktree with classification, disposition and best-effort live worker PIDs."
+    },
+    {
+      "label": "statusLine capture",
+      "path": "tools/capture-statusline.mjs",
+      "how_to_read": "Kept from T-01 for T-03 to reuse."
+    },
+    {
+      "label": "Sampler",
+      "path": "tools/governor/sampler.mjs",
+      "how_to_read": "sampleFromStdin(raw, opts) — pure parse/extract, one impure write via T-02's writeHealthSample. Not yet wired as the primary checkout's live statusLine command; production activation is deferred (see T-03 handback)."
+    },
+    {
+      "label": "Rotation (/rotate-session)",
+      "path": "tools/governor/rotate-session.mjs",
+      "how_to_read": "node tools/governor/rotate-session.mjs --model <model> [--gh-repo owner/name] [--dry-run]. Exit 0 rotated, 1 refused, 2 BLIND. isBankingCommit({headSha, bankedHeadSha, headParentSha}) is the AD-14 staleness comparison — never use a raw HEAD !== banked.head_sha."
+    },
+    {
+      "label": "Programme-state collector",
+      "path": "tools/governor/collect-state.mjs",
+      "how_to_read": "collectEstateState({repoPath, branchSpecs, ghRepo, ...}) returns {repository, worktrees, branches, pull_requests, unknown}; mergeEstateIntoState(base, estate) folds it into a full document. T-10 builds directly on this for its estate-derived fields."
+    },
+    {
+      "label": "GL-012 section 6a (settled ruling, NOT on this branch)",
+      "path": "Team Knowledge/Guidelines/GL-012-secrets-store-access-boundary.md",
+      "how_to_read": "git show 95c265d:\"Team Knowledge/Guidelines/GL-012-secrets-store-access-boundary.md\""
+    },
+    {
+      "label": "Ding Warwick on handback",
+      "path": "larry-ding.mjs (private surface, permission-allowlisted)",
+      "how_to_read": "Message is read from a FILE, not argv."
+    },
+    {
+      "label": "Tests",
+      "path": "tools/governor/*.test.mjs",
+      "how_to_read": "node --test \"tools/governor/*.test.mjs\" — use the glob; the bare directory form fails."
+    }
+  ],
+  "privacy": {
+    "private_surface": "none",
+    "private_record": null,
+    "redactions": [
+      "banked.session_id withheld — session identifiers and transcript paths were redacted throughout T-01 evidence and stay redacted here."
+    ]
+  },
+  "unknown": [
+    {
+      "path": "workers",
+      "why": "Only completed Phase 1 research agents are recorded. Live worker detection is best-effort under F-7 and cannot confirm the ABSENCE of a running worker, so this list is not an enumeration."
+    },
+    {
+      "path": "pull_requests",
+      "why": "The GitHub PR surface was not queried during this banking. The two entries are locally known facts, not an enumeration of open PRs."
+    },
+    {
+      "path": "branches.behind",
+      "why": "No fetch was performed during this banking, so behind-counts against the remotes were not computed."
+    }
+  ]
+}
