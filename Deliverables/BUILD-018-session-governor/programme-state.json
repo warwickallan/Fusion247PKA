@@ -569,9 +569,9 @@
     }
   ],
   "model_recommendation": {
-    "model": "Opus",
+    "model": "Sonnet",
     "effort": null,
-    "rationale": "Live acceptance judgement after the restart, and the merge decision that follows it.",
+    "rationale": "Admin/publishing only (get deliverables onto the Cockpit). Switch back to Opus ONLY when Warwick rules on the diagnosis and redesign work begins — he will say so.",
     "for_ticket": "T-08",
     "computed_at_head": "a97ba1d15202a6a5166f03aa623173055825eabb"
   },
@@ -890,8 +890,8 @@
     "verified_at": "2026-08-01"
   },
   "resumption": {
-    "focus": "Make the Governor produce something Warwick can actually see, and make the operating model survive /clear and a genuinely fresh session.",
-    "next_action": "If this session is not already in C:/Fusion247PKA-governor, Larry auto-routes there via EnterWorktree (silent, in-process, no Warwick action — no relaunch, no folder to open, no git). Then complete a frontier ticket unaided: a fresh session, started from the normal entry point, resuming and doing real work with zero re-briefing IS the M4 acceptance (T-08 live dogfood rotation). The auto-route mechanics live in the wrong-worktree RECOVERY block of the reorientation brief and the PreToolUse deny reason, not here.",
+    "focus": "BUILD-018 is paused. The Larry+Pax diagnosis found the build was good engineering pointed at the wrong target: Warwick asked for six answers on a screen and got 22 modules and 767 tests he cannot read from his phone. Awaiting his decision. Do not build.",
+    "next_action": "STOP — DO NOT RESUME IMPLEMENTATION. BUILD-018 is PAUSED pending Warwick's decision on the Larry+Pax diagnosis (published 2026-08-01, artifact + Deliverables/2026-08-01-pax-build-018-process-diagnosis.md, commit 9000444). Warwick has NOT accepted the recommendation; building anything further on BUILD-018 without his ruling is out of scope. THE ONE OPEN ADMIN TASK: Warwick receives all deliverables via the myPKA Cockpit — the Pax report was committed to this branch and sent as a file, but did NOT appear on his Cockpit dashboard as it normally would. Find out why and get it there. That is Sonnet-tier admin work. ALSO OUTSTANDING (Warwick's ruling, do not lose): the governor must PROACTIVELY advise rotation at the moment context is nearly maxed — \"bank, clear, switch model\" — instead of appending a passive context percentage to every reply. That advice belongs at the START of work once a requirement is understood, never as a sign-off. Warwick called this \"the whole point of everything this was supposed to be\".",
     "ticket": "T-08",
     "worktree": "C:/Fusion247PKA-governor",
     "branch": "build-018/session-governor",
