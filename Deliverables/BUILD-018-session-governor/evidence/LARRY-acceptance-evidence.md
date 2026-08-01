@@ -233,6 +233,44 @@ asks him for two things where his acceptance says he types only `continue`. Veri
 whether the gate releases as expected; if it does not, the wording needs softening, because asking
 for a model selection is not one of the seven legitimate interruptions.
 
+## The installer was run for real — and running it found a blocking defect
+
+Larry ran `install-hooks.mjs --checkout C:/Fusion247PKA` against the live settings (backed up first).
+It is the first time this installer has ever been run for real against an estate that already had a
+governor hook installed.
+
+**What it did correctly:** added the `Stop` execution controller · added `statusLine` · **left Tower's
+`bridge-ingest.mjs` Stop hook and `ensure-capture-gateway.mjs` untouched** · printed the
+`RESTART REQUIRED` notice · and reported the prune coverage honestly, including that one `Stop` hook
+was *not* target-tested because the governor never deletes from that event.
+
+**What it got wrong, and it is blocking.** The pre-existing reorientation entry survived as:
+
+```json
+{ "matcher": "clear",
+  "hooks": [ { "type": "command", "command": "node …/tools/governor/reorient.mjs" } ] }
+```
+
+reported as **"already present, unchanged"**.
+
+WP-1 made that hook matcher-less so it fires on `startup`, `clear` and `resume`, and its tests prove a
+**fresh** install writes no matcher. Nothing tested the **pre-existing-entry** path. The installer
+recognises the hook by its command marker and never compares the matcher, so on every estate that
+already had it installed — **including the one Warwick actually runs** — reorientation stays
+`/clear`-only after a restart, while the installer says it succeeded.
+
+**This is the estate's recurring failure shape** — a control reporting success over ground it never
+examined — and it would have made the upcoming restart prove nothing: the hook would have fired only
+on `/clear`, the fresh-session path would still have been dead, and the green report would have hidden
+it. Registered and dispatched as WP-6.
+
+Two things worth keeping from this:
+- **Running the thing found what 754 green tests did not**, for the second time today. The first was
+  the six-copies refusal.
+- **The installer's own honesty fixes are what made it findable.** The `RESTART REQUIRED` notice and
+  the "would be ADDED (newly activated)" wording meant the report could be read against reality
+  instead of taken on trust.
+
 ## A7 — Larry continues rather than stopping at an internal boundary — **PENDING**
 
 The mechanism is proven to exist (see `LARRY-hook-contract-probe.md` §2: a `Stop` hook returning
