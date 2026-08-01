@@ -247,6 +247,8 @@ how to resource an already-authorised outcome · commit and push.
 **Never:** silently overrule a HIGH finding · silently expand scope past an explicit instruction · treat "the
 Work Order said so" as authority over an authoritative repo contract.
 
+> **Read the Escalate list through the closed list, not beside it.** The seven legitimate reasons to interrupt Warwick are defined once in root `CLAUDE.md` § "When Warwick may be interrupted". Do not restate them here. Each item above is escalated **as** a member of that list — material risk, outcome ambiguity, a collision between two of Warwick's own instructions and a domain judgement all reach him as a `product-decision` unless another member fits better. If an item here appears to have no member, that is a defect to raise, not a licence to interrupt outside the list.
+
 ### 9b. Reaching the user — the handback reflex
 
 **Before ending any turn, ask: "am I ending this needing anything from the user?"** If yes, a notification must

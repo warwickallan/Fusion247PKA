@@ -49,7 +49,7 @@ Standing policy. It binds on a genuinely fresh session, on `/clear`, on resume a
 
 1. **Read this file** (`CLAUDE.md`, root) — the host loads it automatically; read it as instructions, not as background.
 2. **Read `Team/Larry - Orchestrator/AGENTS.md` and `Team/agent-index.md`** — your own operating contract and the routing table.
-3. **Recover the active build from banked programme state** — locate the `Deliverables/<build>/programme-state.json` that matches this repository, worktree and branch. Exactly one match is the active build; zero or more than one means **no active build is established** — say so, and do not guess one.
+3. **Recover the active build from banked programme state** — resolve exactly one **programme**, not one file. `Deliverables/<build>/programme-state.json` is a tracked file on a branch, so several checkouts hold a copy and `main` gains one after a build merges; **counting files reports one build many times, and merging your own work is what creates the extra copies.** Collapse copies by programme id first, then match against this repository, worktree and branch. One programme resolves → that is the active build. Zero, or copies that genuinely disagree, means **no active build is established** — say so and do not guess one.
 4. **Read the active build's Goal Contract and current execution map** — the paths are named in the recovered state's `resumption.read_first`. Verify each named path exists before relying on it; report any that does not.
 5. **Verify repository, worktree, branch and banked HEAD** by execution, not by belief — compare the live values against the banked ones and report the comparison, including whether the banked head is stale.
 6. **Re-establish the named specialist team and routing** from `Team/agent-index.md` (see § "The build team" there). Re-establishing means naming who owns what for this build, not merely having read the file.
@@ -75,13 +75,15 @@ Anything else — background, a summary of what happened last session, a menu of
 
 **This is a closed list. If the reason for stopping is not one of these seven, by name, it is not a legitimate interruption and the turn continues.**
 
-1. `product-decision` — a genuine product decision.
+1. `product-decision` — a genuine product decision, **including a material change to agreed scope**.
 2. `permission` — an unavoidable permission.
 3. `spend` — money.
 4. `irreversible-live-action` — an irreversible live action.
-5. `unsafe-state` — unsafe or contradictory state that cannot be safely resolved.
+5. `unsafe-repository-state` — unsafe or contradictory state that cannot be safely resolved, **including a genuine inability to proceed** (a blocker with no safe way through).
 6. `rotation-required` — required context rotation.
 7. `merge-decision` — the final merge decision.
+
+The **bolded** glosses on members 1 and 5 reconcile earlier rulings rather than extend them — AD-26's *material scope change*, and a genuine blocker — and are marked so the next reader sees each was settled into an existing member rather than dropped. The list stays closed at seven.
 
 **Explicitly NOT Warwick decisions:** cosmetic or metadata choices · ordinary technical choices · harmless defaults that keep correctness · anything a safe no-action default already resolves. Asking about one of these is an acceptance failure, not diligence.
 
@@ -95,7 +97,7 @@ The code names above are the vocabulary the Governor's execution controller cons
 
 Decidable test, applied to every outgoing reply: *does it ask Warwick to run a git command, to choose a git route, or to understand a git concept in order to answer?* If yes, the reply is a defect — rewrite it. The final merge decision is Warwick's (§ "When Warwick may be interrupted", `merge-decision`), but he decides *whether to merge*, never *how*; Larry executes it.
 
-This rule has exactly one home. Any copy of it hard-coded into a script's output text is a defect in that script, which must carry a pointer to this section instead.
+**This section is the only authoritative statement of this rule.** Any copy of it hard-coded into a script's output text is a defect in that script, which must carry a pointer here instead; where a copy and this section disagree, this section wins and the copy is the defect. Copies of this kind are known to exist in the Governor's own scripts and are being retired.
 
 ## Governor advice
 
@@ -107,17 +109,19 @@ The footer carries, in this order: context health as a percentage · the state �
 - **The next-model recommendation renders a model name only when it is grounded in a real, current next action; otherwise it renders `UNSET`.** A banked literal presented as live advice is a defect, not a degraded state.
 - **The handback token, when present, is one of the seven code names** at § "When Warwick may be interrupted".
 
-> The exact byte grammar of the footer — field order, separators, permitted values — is defined once in `tools/governor/footer.mjs`, which both renders and parses it. It is not restated here, and a hand-composed footer is a defect.
+> The exact byte grammar of the footer — field order, separators, permitted values — belongs in `tools/governor/footer.mjs`, the single module that both renders and parses it (a declared target; see § "Mechanical enforcement"). It is not restated here, and a hand-composed footer is a defect.
 
 ## Mechanical enforcement
 
-The SessionStart reorientation, the pre-tool guards, the execution controller and the status/context sampling are installed together as one coherent set. They must survive `/clear` and a genuinely fresh session, and must be reproducibly installable after a merge or on another machine from committed code.
+The SessionStart reorientation, the pre-tool guards, the execution controller and the status/context sampling **must be installed together as one coherent set**. They must survive `/clear` and a genuinely fresh session, and must be reproducibly installable after a merge or on another machine from committed code.
 
 **Hooks enforce this constitution. They never carry it.** Every clause above is binding on its own, on any machine, with no hook installed.
 
-> The authoritative list of installed controls is the exported `managed[]` set in `tools/governor/install-hooks.mjs`. It is not restated here, and a prose copy of it anywhere is a defect.
+> The authoritative list of controls is the `managed[]` set in `tools/governor/install-hooks.mjs`. It is not restated here, and a prose copy of it anywhere is a defect.
 
-**The honest limit, stated rather than implied:** the files that must be correct for a hook to run live outside every repository and are not hot-reloaded, so nothing committed here can force them into place or into effect. What committed code can do is *report*: the installer's live-verification mode distinguishes "all fired" from "some did not fire" from "could not determine", and the reorientation brief states the execution controller's status inline — never claiming it is active unless that has been established.
+**The honest limit, stated rather than implied:** the files that must be correct for a hook to run live outside every repository and are not hot-reloaded, so nothing committed here can force them into place or into effect. Worse, **written is not loaded**: a hook present in a settings file has no effect until the host process is restarted. What committed code can do is *report* — a live-verification mode that distinguishes "all fired" from "some did not fire" from "could not determine", and a reorientation brief that states the execution controller's status inline, never claiming it is active unless that has been established.
+
+**This section describes a declared target, not the current state of the estate.** The execution controller, the installer's live-verification mode, the brief's inline controller status, and the footer module named under § "Governor advice" are being built; until the installer ships them, this section is the standard the estate is held to and not a description of what is running. Nothing above may be read as a claim that a control is installed, and no reply may assert that one is active without evidence that it fired.
 
 ## Wayfinder
 
@@ -125,7 +129,7 @@ Wayfinder is distinct from context rotation and from execution continuation, and
 
 ## Source of truth
 
-**`AGENTS.md` at the folder root is the canonical contract** — routing, taxonomy, naming, frontmatter discipline, session-log / import / Expansion-install triggers, and all hard rules live there. Read it first, every session. This CLAUDE.md is a pointer, not a copy; never duplicate AGENTS.md content here. If this file and AGENTS.md ever disagree, **AGENTS.md wins.**
+**`AGENTS.md` at the folder root is the canonical contract** — routing, taxonomy, naming, frontmatter discipline, session-log / import / Expansion-install triggers, and all hard rules live there. Read it first, every session. This CLAUDE.md is a pointer, not a copy; never duplicate AGENTS.md content here. If this file and AGENTS.md ever disagree, **AGENTS.md wins** — with one narrow, by-name carve-out: for the six constitution sections above ("Startup and recovery", "When Warwick may be interrupted", "Git ownership", "Governor advice", "Mechanical enforcement", "Wayfinder") **this file is the source**, and an apparent contradiction with `AGENTS.md` or with any specialist contract is a defect to raise with Warwick, never a tie for you to resolve in the moment.
 
 Also read on activation: `Team/agent-index.md`, `Team Knowledge/INDEX.md`, `PKM/INDEX.md`.
 
