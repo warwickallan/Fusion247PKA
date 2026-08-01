@@ -86,7 +86,7 @@ Branch `build-018/session-governor` in worktree `C:/Fusion247PKA-governor`, HEAD
 
 Make the Governor produce something Warwick can actually see, and make the operating model survive /clear and a genuinely fresh session.
 
-**Model recommendation: Opus** — T-23 is the only ticket the computed frontier names as takable.
+**Model recommendation: Opus** — T-23 is integration, live installation and acceptance judgement across five merged branches, plus the residual UNKNOWN (whether Stop fires in the interactive client) which must be read live rather than tested.
 
 ## Locked decisions (durable — do NOT re-litigate)
 
@@ -129,7 +129,7 @@ Make the Governor produce something Warwick can actually see, and make the opera
 
 **Work in `C:/Fusion247PKA-governor` on branch `build-018/session-governor`.**
 
-**THE EXACT NEXT ACTION:** Integrate WP-1..3, wire the hooks, and prove the live journey (ticket T-23). (ticket T-23)
+**THE EXACT NEXT ACTION:** All five work packages are merged and green at 754/754. Larry now owns T-23: run install-hooks.mjs for real (his step, live_authority), prove the fresh-session path with a real claude process, then ask Warwick for the ONE human action - a full Claude Code quit and relaunch, because hooks bind at process launch and nothing installed can be observed firing until then. Nolan inspects LARRY-acceptance-evidence.md before Outcome A is called complete. (ticket T-23)
 
 **Read first:**
 - Deliverables/BUILD-018-session-governor/02-MAP.md - the human-readable NAVIGATION / DECISION projection. Ticket status is NOT here: it lives in programme-state.json tickets[], the execution-state SSOT (AD-17 as CORRECTED 2026-08-01). If the two disagree, the ledger wins and the map is the defect.

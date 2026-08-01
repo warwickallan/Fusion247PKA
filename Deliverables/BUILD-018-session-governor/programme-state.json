@@ -16,7 +16,7 @@
     "at": "2026-08-01",
     "by_model": "Opus",
     "session_id": null,
-    "head_sha": "69dfcb2faba37a6db30b0eae9a243dace2015307",
+    "head_sha": "f4cfd046beb88fd48c0d70d9fece7c451878f7cc",
     "governor_version": "T-09/schema-v1"
   },
   "repository": {
@@ -564,7 +564,9 @@
   "model_recommendation": {
     "model": "Opus",
     "effort": null,
-    "rationale": "T-23 is the only ticket the computed frontier names as takable."
+    "rationale": "T-23 is integration, live installation and acceptance judgement across five merged branches, plus the residual UNKNOWN (whether Stop fires in the interactive client) which must be read live rather than tested.",
+    "for_ticket": "T-23",
+    "computed_at_head": "f4cfd046beb88fd48c0d70d9fece7c451878f7cc"
   },
   "workers": [
     {
@@ -882,7 +884,7 @@
   },
   "resumption": {
     "focus": "Make the Governor produce something Warwick can actually see, and make the operating model survive /clear and a genuinely fresh session.",
-    "next_action": "Integrate WP-1..3, wire the hooks, and prove the live journey (ticket T-23).",
+    "next_action": "All five work packages are merged and green at 754/754. Larry now owns T-23: run install-hooks.mjs for real (his step, live_authority), prove the fresh-session path with a real claude process, then ask Warwick for the ONE human action - a full Claude Code quit and relaunch, because hooks bind at process launch and nothing installed can be observed firing until then. Nolan inspects LARRY-acceptance-evidence.md before Outcome A is called complete.",
     "ticket": "T-23",
     "worktree": "C:/Fusion247PKA-governor",
     "branch": "build-018/session-governor",
