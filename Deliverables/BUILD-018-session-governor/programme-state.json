@@ -351,10 +351,17 @@
     {
       "id": "T-22",
       "title": "Governor footer contract and the execution controller",
-      "state": "frontier",
+      "state": "resolved",
       "model": "Opus",
       "depends_on": [],
-      "note": "WO-2026-08-01-03 (WP-3). Keel proved the UNSET predicate was unreachable without three optional schema properties, now shipped."
+      "note": "COMPLETED. 712/712 at the integrated head. Keel found the most important defect in its OWN work: the transcript scan dropped the first line unconditionally as probably-partial from the 64KB window, but when the file is smaller than the window nothing is cut - so GOVERNOR OFF, Warwick's only escape from a blocking controller, was discarded on a short transcript. That is a fresh session from a phone, exactly when he would reach for it. The anti-loop property is STRUCTURAL not counted: stop_hook_active is read before any file is opened, so at most one block per turn. No footer at all ALLOWS, mutation-proven. A four-point leak of next_action into the injected reason turned exactly one test red. HANDBACK_CODES is asserted against the IMPORTED frozen literal rather than a re-typed string. DISCLOSED INV-5 GAP: the rewritten D-M5 agreement assertion is not itself mutation-tested, because that needs footer.mjs which was out of surface; follow-up dispatched.",
+      "resolved": "2026-08-01",
+      "evidence": [
+        "tools/governor/footer.mjs",
+        "tools/governor/footer.test.mjs",
+        "tools/governor/stop-controller.mjs",
+        "tools/governor/stop-controller.test.mjs"
+      ]
     },
     {
       "id": "T-23",
@@ -527,7 +534,7 @@
   "model_recommendation": {
     "model": "Opus",
     "effort": null,
-    "rationale": "T-22 is the only ticket the computed frontier names as takable."
+    "rationale": "T-24 is the only ticket the computed frontier names as takable."
   },
   "workers": [
     {
@@ -845,8 +852,8 @@
   },
   "resumption": {
     "focus": "Make the Governor produce something Warwick can actually see, and make the operating model survive /clear and a genuinely fresh session.",
-    "next_action": "Governor footer contract and the execution controller (ticket T-22).",
-    "ticket": "T-22",
+    "next_action": "Collapse duplicate programme copies during reorientation (ticket T-24).",
+    "ticket": "T-24",
     "worktree": "C:/Fusion247PKA-governor",
     "branch": "build-018/session-governor",
     "read_first": [
