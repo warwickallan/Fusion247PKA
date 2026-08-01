@@ -38,6 +38,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 
+import { readContinuityBrief } from './continuity.mjs';
 import { readProgrammeState, frontierTickets } from './programme-state.mjs';
 import { isBankingCommit, normaliseSeparators } from './rotate-session.mjs';
 import {
@@ -1137,20 +1138,17 @@ export function runHook(raw, opts = {}) {
 // governor could ever see. Two things a session-start MUST also do, wired here
 // in the live path so reorient()'s tested surface stays byte-identical:
 //
-//   1. sweepOpenDeliverables — surface recent top-level Deliverables/*.md that
-//      look like they are AWAITING A DECISION, which the BUILD-* recovery cannot.
-//   2. honchoBrief — actually consult Honcho (the "knows-Warwick" memory layer
-//      Warwick pays for) EVERY session start, not never. Reads the key from the
-//      secrets store itself because the hook launches with no --env-file.
+//   1. readContinuityBrief (from continuity.mjs) — read the AUTHORITATIVE current
+//      focus from Honcho EVERY session start. This is the source of truth for
+//      what Warwick is doing; continuity.mjs owns the single Honcho read path.
+//   2. sweepOpenDeliverables — a FALLBACK that surfaces recent top-level
+//      Deliverables/*.md the BUILD-* recovery cannot see. Never the focus source.
 //
 // Both fail OPEN and are time-bounded: a session start is never blocked or
-// crashed by a slow network or a missing file (INV-2). Each returns a short
-// string appended below the programme brief.
+// crashed by a slow network or a missing file (INV-2).
 // ---------------------------------------------------------------------------
 
 const ESTATE_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const HONCHO_ENV = 'C:/.fusion247/honcho.env';
-const HONCHO_TIMEOUT_MS = 8000;
 const DELIVERABLE_WINDOW_DAYS = 21;
 const DECISION_MARKER =
   /nothing (will|would) be built|awaiting (your|a) |until you accept|your call|needs? (a )?(decision|your )|accept (this|a) plan|what i need:|waiting on you|before any building/i;
@@ -1198,69 +1196,6 @@ export function sweepOpenDeliverables(root = ESTATE_ROOT, now = Date.now()) {
   return lines.join('\n');
 }
 
-function loadHonchoEnv() {
-  if (process.env.HONCHO_API_KEY) return true;
-  let text;
-  try {
-    text = readFileSync(HONCHO_ENV, 'utf8');
-  } catch {
-    return false;
-  }
-  for (const line of text.split(/\r?\n/)) {
-    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
-    if (!m) continue;
-    let v = m[2].trim();
-    if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) v = v.slice(1, -1);
-    if (!process.env[m[1]]) process.env[m[1]] = v;
-  }
-  return !!process.env.HONCHO_API_KEY;
-}
-
-function extractHonchoAnswer(ans) {
-  if (typeof ans === 'string') return ans;
-  if (ans && typeof ans === 'object') {
-    for (const k of ['content', 'answer', 'message', 'response', 'text']) {
-      if (typeof ans[k] === 'string' && ans[k].trim()) return ans[k];
-    }
-    return JSON.stringify(ans).slice(0, 1200);
-  }
-  return String(ans ?? '');
-}
-
-export async function honchoBrief(timeoutMs = HONCHO_TIMEOUT_MS) {
-  if (!loadHonchoEnv()) {
-    return `⟦GOV⟧ HONCHO: not consulted — no key at ${HONCHO_ENV}. The memory layer is UNWIRED this session; do not assume cross-session recall.`;
-  }
-  const ws = process.env.HONCHO_WORKSPACE || 'Fusion247';
-  const key = process.env.HONCHO_API_KEY;
-  const query =
-    "Orient Larry for a brand-new work session. In 5 short bullets: what is Warwick currently focused on, what is he waiting on or frustrated by, what did he most recently ask for, and what should Larry pick up first? Be concrete.";
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-  try {
-    const r = await fetch(`https://api.honcho.dev/v3/workspaces/${ws}/peers/warwick/chat`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query }),
-      signal: ctrl.signal,
-    });
-    if (!r.ok) {
-      const t = await r.text().catch(() => '');
-      return `⟦GOV⟧ HONCHO: consulted but errored (${r.status}: ${t.slice(0, 120)}). No memory brief this session.`;
-    }
-    const ct = r.headers.get('content-type') || '';
-    const ans = ct.includes('json') ? await r.json() : await r.text();
-    const answer = extractHonchoAnswer(ans).trim();
-    if (!answer) return '⟦GOV⟧ HONCHO: consulted — no conclusions yet for Warwick (cold peer or nothing written).';
-    return `⟦GOV⟧ HONCHO — what the memory layer knows about Warwick right now:\n${answer.slice(0, 2400)}`;
-  } catch (err) {
-    const why = err.name === 'AbortError' ? `timed out after ${timeoutMs}ms` : err.message;
-    return `⟦GOV⟧ HONCHO: not reachable this session (${why}). Cross-session recall is UNAVAILABLE — say so, do not fake it.`;
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
 // ---------------------------------------------------------------------------
 // CLI — installed as a SessionStart hook. ALWAYS exits 0 (INV-2).
 // ---------------------------------------------------------------------------
@@ -1297,16 +1232,20 @@ async function main() {
   // brief. Each is independently guarded: a failure in either NEVER breaks the
   // programme reorientation the tested core produced (INV-2).
   const extras = [];
+  // Honcho continuity is the AUTHORITATIVE current-focus source and is read first.
+  try {
+    extras.push(await readContinuityBrief());
+  } catch (err) {
+    extras.push(`⟦GOV⟧ HONCHO CONTINUITY: brief failed hard (${err.message}).`);
+  }
+  // The loose-Deliverables sweep is a FALLBACK only — never the source of truth
+  // for current focus (Warwick's ruling). It surfaces files the programme
+  // recovery cannot see, but Honcho above holds the explicit focus.
   try {
     const sweep = sweepOpenDeliverables();
-    if (sweep) extras.push(sweep);
+    if (sweep) extras.push('(fallback, not the source of truth for focus)\n' + sweep);
   } catch (err) {
     extras.push(`⟦GOV⟧ OPEN DELIVERABLES: sweep failed (${err.message}).`);
-  }
-  try {
-    extras.push(await honchoBrief());
-  } catch (err) {
-    extras.push(`⟦GOV⟧ HONCHO: brief failed hard (${err.message}).`);
   }
 
   const out = toHookOutput(result) || {
