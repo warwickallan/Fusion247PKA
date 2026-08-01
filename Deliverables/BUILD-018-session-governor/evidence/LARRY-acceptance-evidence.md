@@ -271,7 +271,50 @@ Two things worth keeping from this:
   the "would be ADDED (newly activated)" wording meant the report could be read against reality
   instead of taken on trust.
 
-## A7 — Larry continues rather than stopping at an internal boundary — **PENDING**
+## A7 — Larry continues rather than stopping at an internal boundary — **SCRIPT PROVEN / LIVE PENDING**
+
+Seven payloads through the real `stop-controller.mjs`, against the real banked state:
+
+| # | Input | Expected | Observed |
+|---|---|---|---|
+| 1 | footer ending `· CONTINUE` | **block** | **block** |
+| 2 | **no footer at all** | **allow** | **allow** |
+| 3 | `stop_hook_active: true` | allow (anti-loop) | **allow** |
+| 4 | footer ending `· HANDBACK:merge-decision` | allow | **allow** |
+| 5 | malformed input (`not json`) | allow (fail open) | **allow** |
+| 6 | block reason inspected | must carry the escape | see below |
+| 7 | `GOVERNOR OFF` in Warwick's own message | **allow** | **allow** |
+
+Rows 2, 3, 5 and 7 are the ones that matter. **INV-2 says the governor must never trap Warwick**, and
+each of those is a distinct way it could: forgetting the footer, a re-entrant fire, a malformed
+payload, and a deliberate override. All four let the turn end.
+
+The block reason, verbatim:
+
+```
+GOVERNOR: this turn does not look like a legitimate handback point, so it was not allowed to end.
+Programme BUILD-018 still has an open next action on ticket T-23 (branch build-018/session-governor).
+Read the banked state at …\programme-state.json and carry on with the work it names.
+If you genuinely need Warwick, end your reply with a footer whose control token is HANDBACK:<code>,
+using one of: product-decision, permission, spend, irreversible-live-action, unsafe-repository-state,
+rotation-required, merge-decision.
+To stop the governor for this session, reply with: GOVERNOR OFF
+```
+
+Three properties are visible in that text and each was a deliberate decision:
+- It names the **live** ticket and branch, read from banked state — not a compiled-in constant.
+- It lists the **seven** codes, and they match the constitution's closed list, including the
+  corrected `unsafe-repository-state`.
+- **It prints the escape verbatim, inside the refusal itself.** At the moment the escape is needed
+  nobody is reading a map, and Warwick is on a phone with no access to the settings file, the
+  terminal or the process. If the only way out were on the machine he is away from, the gate would be
+  a trap by construction.
+
+**Why this is not yet a full pass.** The controller is installed but **inert until Claude Code
+restarts** — hooks bind at process launch. Everything above is the script proven at the seam;
+whether `Stop` fires identically in the interactive client remains the design's residual UNKNOWN. If
+it never fires, the controller degrades to instruction-only continuation: the constitution still
+binds, the footer still renders, and no session is trapped.
 
 The mechanism is proven to exist (see `LARRY-hook-contract-probe.md` §2: a `Stop` hook returning
 `{"decision":"block"}` genuinely forces continuation, and `background_tasks` makes a running worker
