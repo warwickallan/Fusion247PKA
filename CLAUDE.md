@@ -53,7 +53,7 @@ Standing policy. It binds on a genuinely fresh session, on `/clear`, on resume a
 4. **Read the active build's Goal Contract and current execution map** — the paths are named in the recovered state's `resumption.read_first`. Verify each named path exists before relying on it; report any that does not.
 5. **Verify repository, worktree, branch and banked HEAD** by execution, not by belief — compare the live values against the banked ones and report the comparison, including whether the banked head is stale.
 6. **Re-establish the named specialist team and routing** from `Team/agent-index.md` (see § "The build team" there). Re-establishing means naming who owns what for this build, not merely having read the file.
-7. **Determine the exact next useful action and the model appropriate to it.** If the recovered state does not ground a real, current next action, the correct output is that none is established — never a plausible-looking guess.
+7. **Determine the exact next useful action.** If the recovered state does not ground a real, current next action, the correct output is that none is established — never a plausible-looking guess. **Model and context advice are NOT part of this step.** They are owed only once Warwick's next requirement is understood, and at that point they are owed proactively — see § "Governor advice".
 8. **Determine whether any genuine Warwick-only interruption exists** — membership in the closed list at § "When Warwick may be interrupted", by name. If none is present, none exists.
 9. **Emit ONE concise reorientation banner, then continue autonomously.** One banner, at the top of the first reply. Not a briefing, not a plan for approval.
 
@@ -78,7 +78,7 @@ Anything else — background, a summary of what happened last session, a menu of
 2. `permission` — an unavoidable permission.
 3. `spend` — money.
 4. `irreversible-live-action` — an irreversible live action.
-5. `unsafe-repository-state` — unsafe or contradictory state that cannot be safely resolved, **including a genuine inability to proceed** (a blocker with no safe way through; the canonical case is required-but-unavailable). *The name is inherited from the frozen `ESCAPE_HATCH_REASONS` enum in `tools/governor/escalation-gate.mjs` and is deliberately not renamed, because that literal is load-bearing in shipped code — the member is broader than "repository" suggests, and this gloss, not the name, is its scope.*
+5. `unsafe-repository-state` — unsafe or contradictory state that cannot be safely resolved, **including a genuine inability to proceed** (a blocker with no safe way through; the canonical case is required-but-unavailable). *This gloss, not the name, is its scope: the member is broader than "repository" suggests. The name is load-bearing in shipped code — `tools/governor/footer.mjs` holds a frozen `HANDBACK_CODES` literal mirroring these seven one-for-one, refuses to emit a code outside it, never parses one as a handback, and the execution controller imports that literal. Renaming a member here is a code change, not an edit.*
 6. `rotation-required` — required context rotation.
 7. `merge-decision` — the final merge decision.
 
@@ -102,13 +102,16 @@ Decidable test, applied to every outgoing reply: *does it ask Warwick to run a g
 
 **Every reply ends with a `⟦GOV⟧` footer as its final line.** It exists because Warwick works on the claude.ai web and Android clients, where a terminal status line is invisible; a footer inside the message stream is the only Governor output that reaches him there.
 
-The footer carries context health as a percentage, the state, the KEEP GOING / CLEAR NOW advice, the next-model recommendation and the continue-or-handback control token. Three rules bind its content:
+The footer carries context health as a percentage, the state, the continue-or-rotate advice, the next-model recommendation and the continue-or-handback control token. Four rules bind its content:
 
 - **Context health and the advice come from live telemetry.** If the telemetry cannot be read, the footer says so (`BLIND`) and reports no numbers. It never renders a healthy state it did not measure.
 - **The next-model recommendation renders a model name only when it is grounded in a real, current next action; otherwise it renders `UNSET`.** A banked literal presented as live advice is a defect, not a degraded state.
+- **Advice comes after Warwick's next requirement is understood, never before it** (Warwick, 2026-08-01). "Keep going" is a claim that the current context is fit for a purpose; with no established next action there is no purpose to be fit for and the claim has no truth-maker, so the advice field renders its explicit *not-yet-known* value rather than a supported-looking guess. **The one thing never withheld this way is the advice to rotate**: running out of context is a fact about the session, not about the task, and a quiet footer must never cost Warwick his session.
 - **The handback token, when present, is one of the seven code names** at § "When Warwick may be interrupted".
 
-> The exact byte grammar of the footer — field order, separators, permitted values — belongs in `tools/governor/footer.mjs`, the single module that both renders and parses it (a declared target; see § "Mechanical enforcement"). It is not restated here, and a hand-composed footer is a defect.
+**Once the next requirement IS understood, the advice is owed proactively, in-channel** — whether the current context is suitable for the work, whether it should be banked and cleared first, and which model should handle it. Waiting to be asked is the same defect as answering before knowing.
+
+> The exact byte grammar of the footer — field order, separators, permitted values — belongs in `tools/governor/footer.mjs`, the single module that both renders and parses it. It is not restated here, and a hand-composed footer is a defect.
 
 ## Mechanical enforcement
 
@@ -116,15 +119,24 @@ The SessionStart reorientation, the pre-tool guards, the execution controller an
 
 **Hooks enforce this constitution. They never carry it.** Every clause above is binding on its own, on any machine, with no hook installed.
 
-> The authoritative list of controls is the `managed[]` set in `tools/governor/install-hooks.mjs`. It is not restated here, and a prose copy of it anywhere is a defect.
+> The authoritative list of controls is the `managed[]` set in `tools/governor/install-hooks.mjs`, and the authoritative list of **retired** ones is `RETIRED_MARKERS` in the same file — a control is retired when the installer actively removes it from settings, not when its spec is dropped or its file deleted. Neither is restated here, and a prose copy of either anywhere is a defect.
 
 **The honest limit, stated rather than implied:** the files that must be correct for a hook to run live outside every repository and are not hot-reloaded, so nothing committed here can force them into place or into effect. Worse, **written is not loaded**: a hook present in a settings file has no effect until the host process is restarted. What committed code can do is *report* — a live-verification mode that distinguishes "all fired" from "some did not fire" from "could not determine", and a reorientation brief that states the execution controller's status inline, never claiming it is active unless that has been established.
 
-**This section describes a declared target, not the current state of the estate.** The execution controller, the installer's live-verification mode, the brief's inline controller status, and the footer module named under § "Governor advice" are being built; until the installer ships them, this section is the standard the estate is held to and not a description of what is running. Nothing above may be read as a claim that a control is installed, and no reply may assert that one is active without evidence that it fired.
+**Two of the four things this section named as pending are now built; two are not.** Verified at the post-cut head, 2026-08-01. The **execution controller** is built — `tools/governor/stop-controller.mjs`, installed on `Stop` and exempt from pruning — and so is the **footer module** named under § "Governor advice": `tools/governor/footer.mjs` renders, parses, and has a CLI producer. The **installer's live-verification mode** is *not* built: `--check` compares settings against the managed spec, which is a configuration check and establishes nothing about whether a hook ever fired. The **brief's inline controller status** is *not* built either: `reorient.mjs` does not report it.
+
+**Built is not running.** Nothing above may be read as a claim that a control is installed on this machine, and no reply may assert that one is active without evidence that it fired.
 
 ## Wayfinder
 
-Wayfinder is distinct from context rotation and from execution continuation, and is **research-only and NOT in force** until Warwick accepts it. Nothing in this file depends on it.
+**Wayfinder is a PLANNING tool and it STOPS AT CLARITY.** It resolves genuine uncertainty about a route and publishes the resulting plan. It is not an execution tracker, not a ticket system, and not a governance layer over a build — using it as one is precisely the error that produced BUILD-018 (`Deliverables/2026-08-01-pax-build-018-process-diagnosis.md` §1). It is also distinct from context rotation and from execution continuation, and nothing else in this file depends on it.
+
+**In force as of 2026-08-01, and bounded: ONE planning-only trial, on VlogOps.** The boundary is the trial:
+
+- Resolve the genuine uncertainty. Publish the plan where Warwick can see it.
+- **Stop mapping the moment the route is clear.** No remaining fog means the map is finished, not that more tickets are owed. If nothing is uncertain, do not chart a map at all.
+- **Do not begin implementation until Warwick accepts the plan.** His acceptance is a `product-decision` (§ "When Warwick may be interrupted").
+- Nothing outside VlogOps adopts Wayfinder on the strength of this trial.
 
 ## Source of truth
 

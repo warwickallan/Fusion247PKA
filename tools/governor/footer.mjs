@@ -87,16 +87,19 @@ export const SEP = ' · ';
 //
 // `unsafe-repository-state` — NOT `unsafe-state`. Silas's §D-2 grammar block carries the
 // wrong token (its `CODE` production and its A-3 list both say `unsafe-state`), and the
-// decision document is the stale copy. The authority is the already-shipped, frozen
-// literal in `escalation-gate.mjs`: `ESCAPE_HATCH_REASONS = Object.freeze([
-// 'unsafe-repository-state' ])`, which that module also applies to Larry's own text as
-// `/\[AD-26:unsafe-repository-state\]/i`. `unsafe-state` appears nowhere in `tools/`.
-// Had this shipped as written, the footer would have emitted a code matching neither the
-// frozen enum nor the constitution, and the parser and the escalation gate would have
-// disagreed about the single token that decides whether Larry may end a turn.
-// footer.test.mjs asserts this membership against the imported literal rather than
-// against a string typed here, so the two cannot drift apart again. Do not "correct"
-// this back.
+// decision document is the stale copy. `unsafe-state` appears nowhere in `tools/`. Had
+// this shipped as written, the footer would have emitted a code matching neither the
+// constitution nor the parser, and the two would have disagreed about the single token
+// that decides whether Larry may end a turn. Do not "correct" this back.
+//
+// PROVENANCE CORRECTED 2026-08-01. This note used to cite `escalation-gate.mjs`'s frozen
+// `ESCAPE_HATCH_REASONS` as "the authority" for the token. That module was RETIRED by
+// Warwick's cut-and-close ruling and no longer exists, so the citation pointed at
+// nothing — while the same comment instructed the next reader not to change it, which
+// would have preserved the dangling reference indefinitely. THIS list is now the
+// machine-readable authority, and root CLAUDE.md § "When Warwick may be interrupted" is
+// the human one; `stop-controller.mjs` imports this literal rather than re-typing it, so
+// the two still cannot drift apart. Found by Nolan's post-cut constitution audit.
 export const HANDBACK_CODES = Object.freeze([
   'product-decision',
   'permission',
@@ -109,12 +112,32 @@ export const HANDBACK_CODES = Object.freeze([
 
 export const FOOTER_STATES = Object.freeze(['GREEN', 'AMBER', 'RED', 'RECOVERY', 'BLIND']);
 
+// TASK_UNKNOWN added 2026-08-01 by Warwick's cut-and-close ruling: "unsupported
+// KEEP/CLEAR/model claims appended before a next task is known" were named as
+// anti-goal, and "context and model advice must happen AFTER you have understood
+// Warwick's next requirement."
+//
+// KEEP GOING is a claim about FITNESS FOR A PURPOSE. With no established next
+// action there is no purpose to be fit for, so the claim has no truth-maker — it
+// is exactly the "banked literal presented as live advice" defect D-4 already
+// refuses for the model field, applied to the advice field. TASK UNKNOWN says the
+// honest thing instead: telemetry is being read, but no advice is owed yet.
+//
+// CLEAR NOW is NOT suppressed this way — see `adviceFor` for why. Running out of
+// context is a fact about the SESSION, not about the task, and INV-2 forbids a
+// change that could let Warwick sail into a wall while the footer stays quiet.
 export const ADVICE = Object.freeze({
   KEEP_GOING: 'KEEP GOING',
   CLEAR_NOW: 'CLEAR NOW',
   UNSURE: 'KEEP GOING?',
+  TASK_UNKNOWN: 'TASK UNKNOWN',
 });
-export const ADVICE_VALUES = Object.freeze([ADVICE.KEEP_GOING, ADVICE.CLEAR_NOW, ADVICE.UNSURE]);
+export const ADVICE_VALUES = Object.freeze([
+  ADVICE.KEEP_GOING,
+  ADVICE.CLEAR_NOW,
+  ADVICE.UNSURE,
+  ADVICE.TASK_UNKNOWN,
+]);
 
 // D-2's NEXT production. This is narrower than D-4's U-c (which only excludes `unknown`
 // and `any`), and the grammar wins where they meet: a `model_recommendation.model` of
@@ -184,6 +207,44 @@ export function adviceForState(state) {
     default:
       return ADVICE.UNSURE;
   }
+}
+
+/**
+ * adviceFor(state, { taskKnown }) — the advice actually rendered.
+ *
+ * `adviceForState` above is retained UNCHANGED and still answers the narrower question
+ * it always answered ("what does this health state mean on its own"). This function is
+ * the one the footer uses, and it adds the second input Warwick's ruling requires: is
+ * there an established next action for the advice to be ABOUT?
+ *
+ * ONLY THE CONFIDENT CLAIM IS SUPPRESSED. A later reader will want to "tidy" the
+ * asymmetry away; it is the whole point, and the first draft of this function got it
+ * wrong in a way footer.test.mjs caught:
+ *
+ *   KEEP GOING (from GREEN/AMBER) IS suppressed. It is a claim that the current context
+ *   is FIT to continue, and fitness is relative to a purpose. With no known next action
+ *   there is no purpose, so the claim has no truth-maker — asserting it anyway is the
+ *   "state what was proven, not what it implies" failure in miniature.
+ *
+ *   CLEAR NOW is NEVER suppressed. RED and RECOVERY are facts about the SESSION —
+ *   context nearly spent, or in-context memory already degraded. True whether or not a
+ *   task is known, and the two states where staying quiet costs Warwick the session.
+ *   INV-2 (never trap Warwick) outranks tidiness.
+ *
+ *   KEEP GOING? (from BLIND) is NEVER suppressed either, and this is the correction.
+ *   The first draft folded it into TASK UNKNOWN, which is wrong: BLIND means the
+ *   telemetry could not be read, and INV-1 says a governor that stops measuring must
+ *   become LOUDER, not quieter. Replacing the sensor-failure signal with an unrelated
+ *   one about task knowledge makes it quieter in exactly the field a human reads first.
+ *   The two unknowns are different facts and both deserve to survive: the STATE field
+ *   still carries BLIND, and the ADVICE field still carries its question mark.
+ *
+ * So TASK UNKNOWN replaces exactly one thing — an unearned "yes, carry on".
+ */
+export function adviceFor(state, { taskKnown = true } = {}) {
+  const base = adviceForState(state);
+  if (base !== ADVICE.KEEP_GOING) return base;
+  return taskKnown ? base : ADVICE.TASK_UNKNOWN;
 }
 
 // ---------------------------------------------------------------------------
@@ -330,10 +391,19 @@ const HANDBACK_TOKEN = '[A-Za-z0-9][A-Za-z0-9._-]*';
 const FOOTER_RE = new RegExp(
   `^${GOV_OPEN}GOV${GOV_CLOSE} ctx (~)?(?:(0|[1-9][0-9]?|100)%|--)` +
   `${SEP}(${FOOTER_STATES.join('|')})` +
-  // Longest-first: "KEEP GOING?" must be offered before "KEEP GOING", otherwise the
-  // shorter alternative matches and leaves a stray "?" to fail the following separator.
-  // Backtracking would recover, but relying on it is a trap for the next editor.
-  `${SEP}(KEEP GOING\\?|KEEP GOING|CLEAR NOW)` +
+  // DERIVED from ADVICE_VALUES, not hand-listed. The alternation used to be a literal
+  // copy of the vocabulary, which meant adding a member (TASK UNKNOWN did exactly this)
+  // silently desynced the parser from the renderer while every existing test stayed
+  // green — the renderer would emit a value the parser could not read back. One source,
+  // sorted longest-first and regex-escaped, removes that trap rather than documenting it.
+  //
+  // Longest-first still matters for the same reason the old comment gave: "KEEP GOING?"
+  // must be offered before "KEEP GOING", or the shorter alternative matches and leaves a
+  // stray "?" to fail the following separator.
+  `${SEP}(${ADVICE_VALUES.slice()
+    .sort((a, b) => b.length - a.length)
+    .map((v) => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .join('|')})` +
   `${SEP}next: (${[...NEXT_MODELS, NEXT_UNSET].join('|')})` +
   `${SEP}(${CONTROL_CONTINUE}|${HANDBACK_PREFIX}(?:${HANDBACK_TOKEN}))$`
 );
@@ -440,6 +510,17 @@ export function deriveFooterFields({
   next = NEXT_UNSET,
   control = CONTROL_CONTINUE,
   evaluateFn = evaluate,
+  // Is there an established next action for the advice to be ABOUT? Defaults to the
+  // D-4 predicate's own answer rather than to `true`: `next` is already UNSET exactly
+  // when no grounded, current next action exists, so reusing it avoids inventing a
+  // SECOND rival notion of "do we know what we are doing" that could disagree with the
+  // first. A caller with better information may still pass this explicitly.
+  //
+  // The imprecision is one-directional and deliberately so: `next` is also UNSET when a
+  // task IS known but its recommended model has no footer representation, which makes
+  // this read TASK UNKNOWN slightly too often. That errs toward withholding a claim we
+  // cannot fully support, which is the direction this whole change exists to move in.
+  taskKnown = next !== NEXT_UNSET,
 } = {}) {
   // `approximate` is deliberately forced false on every BLIND path. The grammar permits
   // `ctx ~--`, and the parser round-trips it, but "approximately unknown" is not a fact
@@ -450,7 +531,7 @@ export function deriveFooterFields({
       percent: null,
       approximate: false,
       state: STATE.BLIND,
-      advice: adviceForState(STATE.BLIND),
+      advice: adviceFor(STATE.BLIND, { taskKnown }),
       next,
       control,
     },
@@ -518,7 +599,7 @@ export function deriveFooterFields({
       percent,
       approximate: sample.approximate === true,
       state,
-      advice: adviceForState(state),
+      advice: adviceFor(state, { taskKnown }),
       next,
       control,
     },

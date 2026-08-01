@@ -39,6 +39,7 @@ import {
   parseControl,
   handback,
   adviceForState,
+  adviceFor,
   deriveFooterFields,
   nextModelFor,
   resolveHealthSample,
@@ -48,9 +49,17 @@ import {
   CLI_EXIT,
 } from './footer.mjs';
 
-// Imported ONLY to pin the shared vocabulary against drift — see the frozen-literal test
-// below. Nothing else in this suite depends on the escalation gate.
-import { ESCAPE_HATCH_REASONS } from './escalation-gate.mjs';
+// The drift guard below used to import `ESCAPE_HATCH_REASONS` from
+// `escalation-gate.mjs`. That module was RETIRED on 2026-08-01, so the pin was
+// re-aimed rather than removed: it now reads the CONSTITUTION itself, which is
+// where the seven code names are defined and from which the retired enum was
+// derived in the first place. The property being protected is unchanged and is the
+// whole point — the expected value must come from OUTSIDE the source under test,
+// because a test that re-types the string can drift in lockstep with the bug it
+// exists to catch.
+// Derived from this file's own location, not from `process.cwd()`: the pin must
+// resolve identically however the runner is invoked.
+const CONSTITUTION_PATH = join(fileURLToPath(new URL('../..', import.meta.url)), 'CLAUDE.md');
 
 const REAL_STATE_PATH = join(
   process.cwd(),
@@ -150,22 +159,40 @@ test('AC1: HANDBACK_CODES is the closed seven of constitution clause 4', () => {
   assert.throws(() => handback('banana'), TypeError);
 });
 
-test('the shared vocabulary is pinned to escalation-gate\'s FROZEN literal, not to a string typed here', () => {
-  // The drift guard. Silas's §D-2 grammar block said `unsafe-state`; the already-shipped
-  // frozen enum says `unsafe-repository-state`, and `escalation-gate.mjs` matches that
-  // exact spelling against Larry's own text. A footer emitting the other spelling would
-  // have produced a token matching neither the enum nor the constitution — the parser and
-  // the gate silently disagreeing about the one token that decides whether a turn may end.
+test('the shared vocabulary is pinned to the CONSTITUTION\'s own text, not to a string typed here', () => {
+  // The drift guard. Silas's §D-2 grammar block said `unsafe-state`; the shipped
+  // vocabulary says `unsafe-repository-state`. A footer emitting the other spelling
+  // would produce a token matching neither the parser nor the constitution — the two
+  // silently disagreeing about the one token that decides whether a turn may end.
   //
-  // Asserting against the IMPORTED constant rather than a literal is the whole point:
-  // a test that re-types the string can drift in lockstep with the bug it is meant to
-  // catch, which is how the spec came to hold a token no code had ever used.
-  assert.equal(ESCAPE_HATCH_REASONS.length, 1);
-  const frozen = ESCAPE_HATCH_REASONS[0];
+  // The pin used to be `escalation-gate.mjs`'s frozen enum. That module retired on
+  // 2026-08-01, so the pin moved UP to the source that enum was itself derived from:
+  // CLAUDE.md § "When Warwick may be interrupted". Reading the expected values from
+  // outside this module is the whole point — a test that re-types the string can
+  // drift in lockstep with the bug it is meant to catch, which is how the spec came
+  // to hold a token no code had ever used.
+  const constitution = readFileSync(CONSTITUTION_PATH, 'utf8');
   assert.ok(
-    HANDBACK_CODES.includes(frozen),
-    `HANDBACK_CODES must contain escalation-gate's frozen ${JSON.stringify(frozen)}`
+    constitution.includes('When Warwick may be interrupted'),
+    'precondition: the constitution section this pin reads must actually be present'
   );
+
+  // Extract the code names from the numbered closed list, mechanically. If the
+  // extraction finds nothing, the assertion below on its LENGTH fails loudly rather
+  // than passing vacuously over an empty set.
+  const section = constitution.split('## When Warwick may be interrupted')[1] ?? '';
+  const declared = [...section.matchAll(/^\d+\.\s+`([a-z-]+)`/gm)].map((m) => m[1]);
+  assert.equal(declared.length, 7, 'the constitution must still declare exactly seven code names');
+
+  for (const code of declared) {
+    assert.ok(
+      HANDBACK_CODES.includes(code),
+      `HANDBACK_CODES must contain the constitution's ${JSON.stringify(code)}`
+    );
+  }
+  assert.deepEqual([...HANDBACK_CODES].sort(), [...declared].sort(), 'no extras, no omissions');
+  assert.ok(declared.includes('unsafe-repository-state'), 'the load-bearing spelling is the long one');
+
   // And the wrong spelling must be absent, so a future edit cannot quietly add it back
   // alongside the right one.
   assert.ok(!HANDBACK_CODES.includes('unsafe-state'), 'the spec\'s stale token must not reappear');
@@ -896,6 +923,45 @@ test('D-M9: the five states render five pairwise-distinct lines, with the CORREC
   assert.equal(adviceForState(undefined), ADVICE.UNSURE);
 });
 
+// Warwick's cut-and-close ruling, 2026-08-01: no KEEP GOING before a next task is known.
+// The first implementation of `adviceFor` suppressed BLIND's question mark too, which
+// made a broken sensor QUIETER and violated INV-1. That regression is pinned here, in
+// both directions, so it cannot come back as a "tidy-up".
+test('adviceFor withholds only the unearned "carry on" — never the safety or sensor signals', () => {
+  let checked = 0;
+
+  // Suppressed: the confident fitness claim, and only it.
+  for (const state of ['GREEN', 'AMBER']) {
+    assert.equal(adviceFor(state, { taskKnown: true }), ADVICE.KEEP_GOING, `${state} with a task`);
+    assert.equal(adviceFor(state, { taskKnown: false }), ADVICE.TASK_UNKNOWN, `${state} with no task`);
+    checked += 2;
+  }
+
+  // NEVER suppressed: running out of context is a fact about the session (INV-2).
+  for (const state of ['RED', 'RECOVERY']) {
+    assert.equal(adviceFor(state, { taskKnown: false }), ADVICE.CLEAR_NOW, `${state} must still say CLEAR NOW`);
+    assert.equal(adviceFor(state, { taskKnown: true }), ADVICE.CLEAR_NOW);
+    checked += 2;
+  }
+
+  // NEVER suppressed: a governor that stops measuring must get LOUDER, not quieter (INV-1).
+  assert.equal(adviceFor('BLIND', { taskKnown: false }), ADVICE.UNSURE, 'BLIND keeps its question mark');
+  assert.equal(adviceFor('BLIND', { taskKnown: true }), ADVICE.UNSURE);
+  // An unrecognised state degrades to the question, never to TASK UNKNOWN and never to
+  // reassurance — the same fail-safe `adviceForState` already guarantees.
+  assert.equal(adviceFor('PURPLE', { taskKnown: false }), ADVICE.UNSURE);
+  checked += 3;
+
+  // Default is permissive-but-honest: callers that say nothing get the old behaviour,
+  // so an un-updated caller cannot silently start emitting TASK UNKNOWN everywhere.
+  assert.equal(adviceFor('GREEN'), ADVICE.KEEP_GOING);
+  checked += 1;
+
+  assert.equal(checked, 12, 'every branch of the rule was exercised');
+  // TASK UNKNOWN must be in the rendered grammar, or the renderer would throw on it.
+  assert.ok(ADVICE_VALUES.includes(ADVICE.TASK_UNKNOWN));
+});
+
 // ===========================================================================
 // The impure edges
 // ===========================================================================
@@ -1285,7 +1351,13 @@ test('WP-7 AC5: parseFooter accepts EVERY line the CLI can emit — all states x
         const parsed = parseFooter(r.stdout);
         assert.equal(parsed.ok, true, `state=${state} control=${control}: parseFooter REJECTED ${JSON.stringify(r.stdout)}`);
         assert.equal(parsed.fields.state, state);
-        assert.equal(parsed.fields.advice, adviceForState(state));
+        // `adviceFor`, not `adviceForState`. These runs stub the location to a repo with
+        // no banked programme, so `next` is UNSET and no next action is established —
+        // `taskKnown: false` is a property of the INPUTS here, not something read back
+        // out of the output, so this stays an independent expectation rather than a
+        // tautology. GREEN/AMBER therefore render TASK UNKNOWN; CLEAR NOW and the BLIND
+        // question mark are never suppressed (see `adviceFor`'s contract).
+        assert.equal(parsed.fields.advice, adviceFor(state, { taskKnown: false }));
         assert.equal(parsed.fields.control, control);
         assert.equal(parsed.controlRecognised, true, 'the CLI can only ever emit a recognised token');
         assert.equal(r.stdout.split('\n').length, 2);
@@ -1343,12 +1415,16 @@ test('WP-7 AC5: the CLI line is byte-identical to renderFooter over the same fie
       locationFn: stubLocation('C:/repo', 'main'),
       envOverride: store,
     });
+    // TASK UNKNOWN, not KEEP GOING: the stubbed location has no banked programme, so
+    // `next` is UNSET and there is no established next action for a "carry on" to be
+    // about. The literal below is spelled out in full rather than composed, so this
+    // test still pins the exact bytes and would catch a separator or ordering drift.
     const expected = renderFooter({
-      percent: 18, approximate: false, state: 'GREEN', advice: ADVICE.KEEP_GOING,
+      percent: 18, approximate: false, state: 'GREEN', advice: ADVICE.TASK_UNKNOWN,
       next: NEXT_UNSET, control: 'HANDBACK:spend',
     });
     assert.equal(r.stdout, `${expected}\n`);
-    assert.equal(r.stdout.trimEnd(), '⟦GOV⟧ ctx 18% · GREEN · KEEP GOING · next: UNSET · HANDBACK:spend');
+    assert.equal(r.stdout.trimEnd(), '⟦GOV⟧ ctx 18% · GREEN · TASK UNKNOWN · next: UNSET · HANDBACK:spend');
   } finally {
     rmSync(store, { recursive: true, force: true });
   }

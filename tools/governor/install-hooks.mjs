@@ -36,7 +36,29 @@ export const GUARD_EVENT = 'PreToolUse';
 export const STOP_EVENT = 'Stop';
 export const GOVERNOR_MARKER = 'tools/governor/reorient.mjs';
 export const GUARD_MARKER = 'tools/governor/worktree-guard.mjs';
-export const DELEGATION_MARKER = 'tools/governor/delegation-gate.mjs';
+// RETIRED 2026-08-01 by Warwick's cut-and-close ruling on the accepted Larry/Pax
+// diagnosis. These controls regulated Larry's own judgement rather than protecting
+// an artefact, and Pax measured the result: ~1,440 lines of gate code for near-zero
+// live enforcement, while the delegation gate additionally blocked read-only
+// commands in normal use.
+//
+// This is a RETIREMENT list, not merely an absence from `managed[]`. Dropping a spec
+// only stops the installer ADDING a hook — it leaves every already-installed copy
+// running on Warwick's machine forever. Anything whose command matches one of these
+// markers is actively REMOVED from a governor-managed event on every install, and
+// that removal does not depend on the script being missing from disk: a control is
+// retired when the installer takes it out, not when its file happens to be absent.
+export const RETIRED_MARKERS = Object.freeze([
+  'tools/governor/delegation-gate.mjs',
+  'tools/governor/model-gate.mjs',
+  'tools/governor/escalation-gate.mjs',
+]);
+
+export function isRetiredHook(hook) {
+  if (!hook || typeof hook.command !== 'string') return false;
+  const c = hook.command.replace(/\\/g, '/');
+  return RETIRED_MARKERS.some((m) => c.includes(m));
+}
 export const STATUSLINE_MARKER = 'tools/governor/statusline-live.mjs';
 export const STOP_MARKER = 'tools/governor/stop-controller.mjs';
 
@@ -66,13 +88,6 @@ export const RESTART_NOTICE = [
 // that blocks Read would make its own deny message unactionable.
 export const GUARD_MATCHER = 'Write|Edit|MultiEdit|NotebookEdit|Bash';
 
-// The Task-dispatch observer matches only subagent dispatch (mechanism 1 of the
-// delegation gate). The substantial-work threshold gate (mechanism 2) is
-// deliberately narrower than GUARD_MATCHER above — it does not govern
-// NotebookEdit — so it gets its own matcher rather than reusing GUARD_MATCHER.
-export const DELEGATION_OBSERVER_MATCHER = 'Task';
-export const DELEGATION_GATE_MATCHER = 'Write|Edit|MultiEdit|Bash';
-
 export function settingsPath(checkout) {
   return join(checkout, '.claude', 'settings.local.json');
 }
@@ -92,20 +107,6 @@ export function governorHookCommand(scriptPath) {
 // about the build — which is precisely the case the guard exists for.
 export function guardHookCommand(scriptPath, estate) {
   const base = `node ${String(scriptPath).replace(/\\/g, '/')}`;
-  return estate ? `${base} --estate ${String(estate).replace(/\\/g, '/')}` : base;
-}
-
-// The delegation observer and gate need the estate root for the exact same
-// reason the worktree guard does: they must be able to resolve the active
-// programme (and, for the gate, the current ticket) from a session that may
-// have started in a checkout that knows nothing about the build.
-export function delegationObserverHookCommand(scriptPath, estate) {
-  const base = `node ${String(scriptPath).replace(/\\/g, '/')} observe`;
-  return estate ? `${base} --estate ${String(estate).replace(/\\/g, '/')}` : base;
-}
-
-export function delegationGateHookCommand(scriptPath, estate) {
-  const base = `node ${String(scriptPath).replace(/\\/g, '/')} check`;
   return estate ? `${base} --estate ${String(estate).replace(/\\/g, '/')}` : base;
 }
 
@@ -137,38 +138,13 @@ export function isGuardHook(hook) {
   return typeof hook?.command === 'string' && hook.command.includes(GUARD_MARKER);
 }
 
-// The observer (`... delegation-gate.mjs observe ...`) and the gate
-// (`... delegation-gate.mjs check ...`) point at the SAME script with
-// different subcommands, so DELEGATION_MARKER alone cannot tell them apart —
-// each predicate also requires its own subcommand token.
-export function isDelegationObserverHook(hook) {
-  return (
-    typeof hook?.command === 'string' &&
-    hook.command.includes(DELEGATION_MARKER) &&
-    /\bobserve\b/.test(hook.command)
-  );
-}
-
-export function isDelegationGateHook(hook) {
-  return (
-    typeof hook?.command === 'string' &&
-    hook.command.includes(DELEGATION_MARKER) &&
-    /\bcheck\b/.test(hook.command)
-  );
-}
-
-// Derive the guard/delegation scripts from the reorientation script: all are
-// siblings by construction, so a caller that names one has named all of them.
-// This keeps every existing single-script call site working while shipping
-// more hooks from the one script argument.
+// Derive the sibling scripts from the reorientation script: all are siblings by
+// construction, so a caller that names one has named all of them. This keeps every
+// existing single-script call site working while shipping more hooks from the one
+// script argument.
 export function guardScriptFor(scriptPath) {
   const p = String(scriptPath).replace(/\\/g, '/');
   return p.endsWith('reorient.mjs') ? p.replace(/reorient\.mjs$/, 'worktree-guard.mjs') : null;
-}
-
-export function delegationScriptFor(scriptPath) {
-  const p = String(scriptPath).replace(/\\/g, '/');
-  return p.endsWith('reorient.mjs') ? p.replace(/reorient\.mjs$/, 'delegation-gate.mjs') : null;
 }
 
 export function stopControllerScriptFor(scriptPath) {
@@ -180,7 +156,7 @@ export function stopControllerScriptFor(scriptPath) {
 // was reproducible from nothing but Warwick's untracked machine config: this
 // installer contained zero occurrences of `statusLine`, so a merge or a second
 // machine would have silently lost it. It is derived from the same sibling rule
-// as the guard and the delegation scripts, so a caller that names one names all.
+// as the guard and the stop controller, so a caller that names one names all.
 //
 // Note it is NOT a hook. `statusLine` is read LIVE by Claude Code, whereas hooks
 // are snapshotted at process launch — which is exactly why installing it takes
@@ -230,7 +206,6 @@ export function planSettings(
   {
     scriptPath,
     guardPath,
-    delegationPath,
     statuslinePath,
     stopPath,
     estate,
@@ -244,6 +219,11 @@ export function planSettings(
     installed: false,
     replaced: false,
     pruned: [],
+    // Hooks removed because their control was RETIRED (see RETIRED_MARKERS). Kept
+    // separate from `pruned` on purpose: pruning removes a hook whose target went
+    // missing (an accident to be tidied), retirement removes one deliberately
+    // withdrawn. Collapsing them would hide a policy decision inside housekeeping.
+    retired: [],
     kept: 0,
     examined: 0,
     events: {},
@@ -275,22 +255,16 @@ export function planSettings(
   const command = governorHookCommand(scriptPath);
   const resolvedGuard = guardPath ?? guardScriptFor(scriptPath);
   const guardCommand = resolvedGuard ? guardHookCommand(resolvedGuard, estate) : null;
-  const resolvedDelegation = delegationPath ?? delegationScriptFor(scriptPath);
-  const delegationObserveCommand = resolvedDelegation
-    ? delegationObserverHookCommand(resolvedDelegation, estate)
-    : null;
-  const delegationCheckCommand = resolvedDelegation
-    ? delegationGateHookCommand(resolvedDelegation, estate)
-    : null;
+  // The delegation observer/gate commands used to be built here. Retired 2026-08-01 —
+  // see RETIRED_MARKERS. The `delegationPath` parameter and the `--delegation` CLI flag
+  // went with them: an accepted-and-ignored parameter is an invitation to a caller that
+  // would then be silently doing nothing, and no caller in this repository passed one.
   const resolvedStop = stopPath ?? stopControllerScriptFor(scriptPath);
   const stopCommand = resolvedStop ? stopHookCommand(resolvedStop, estate) : null;
 
   // Requirement 9 — both halves of the durable behaviour are installed together.
   // Shipping the brief without the gate would leave a session that is TOLD it is
-  // misplaced and still perfectly able to write anyway. The delegation observer
-  // and gate ship the same way: additive, and together — recording dispatches
-  // with nothing to reset them against would be inert, and gating direct calls
-  // with no way to observe a dispatch would make every ticket un-clearable.
+  // misplaced and still perfectly able to write anyway.
   // SPEC AMENDMENT (WO-2026-08-01-01 AC2, Silas D-B §B-1): the SessionStart
   // entry carries NO matcher key at all — not `''`, not `'*'`. A matcher-less
   // entry is proven to fire on `startup`, whereas any matcher that ENUMERATES
@@ -316,26 +290,10 @@ export function planSettings(
       prunable: true,
     });
   }
-  if (delegationObserveCommand) {
-    managed.push({
-      event: GUARD_EVENT,
-      matcher: DELEGATION_OBSERVER_MATCHER,
-      command: delegationObserveCommand,
-      is: isDelegationObserverHook,
-      key: 'delegationObserver',
-      prunable: true,
-    });
-  }
-  if (delegationCheckCommand) {
-    managed.push({
-      event: GUARD_EVENT,
-      matcher: DELEGATION_GATE_MATCHER,
-      command: delegationCheckCommand,
-      is: isDelegationGateHook,
-      key: 'delegationGate',
-      prunable: true,
-    });
-  }
+  // The delegation observer and gate specs used to sit here, both on GUARD_EVENT.
+  // Retired 2026-08-01 — see RETIRED_MARKERS, which also REMOVES any copy already
+  // installed on this machine rather than merely declining to add a new one.
+  //
   // WP-5 / D-C C-6 — the execution controller. ADDITIVE, and `prunable: false`.
   //
   // WHY IT IS EXEMPT FROM PRUNING, because this is the whole point and a later
@@ -372,14 +330,15 @@ export function planSettings(
 
   // Group specs by event and scan each event's PRE-EXISTING groups exactly
   // ONCE, checking every hook against every spec for that event in the same
-  // pass. This matters now that more than one spec can share an event (guard,
-  // delegationObserver and delegationGate all sit on PreToolUse): scanning
-  // per-spec instead — the way this loop worked when there was only ever one
-  // spec per event — would have each LATER spec re-examine the group an
-  // EARLIER spec just pushed this run, inflating `examined`/`kept` for hooks
-  // already accounted for. A single pass over a snapshot taken before any
-  // spec's own hook is added avoids that inflation entirely, and is provably
-  // equivalent to the old behaviour when an event has exactly one spec.
+  // pass. It was written when three specs shared `PreToolUse` (guard plus the two
+  // delegation specs retired 2026-08-01), because scanning per-spec instead — the
+  // way this loop worked when there was only ever one spec per event — would have
+  // each LATER spec re-examine the group an EARLIER spec just pushed this run,
+  // inflating `examined`/`kept` for hooks already accounted for. Today every event
+  // hosts exactly one spec again and the single pass is provably equivalent to the
+  // old behaviour; it is KEPT rather than unwound because the inflation bug returns
+  // the moment a second spec is added to any event, and the suite still pins the
+  // examined-exactly-once property.
   const specsByEvent = new Map();
   for (const spec of managed) {
     if (!Array.isArray(next.hooks[spec.event])) next.hooks[spec.event] = [];
@@ -406,6 +365,14 @@ export function planSettings(
       const surviving = [];
       for (const hook of group.hooks) {
         report.examined += 1;
+
+        // Retirement is tested FIRST, before the managed and prune paths. A retired
+        // control must not be rescued by the "governor-managed hooks are never
+        // pruned" exemption below, and must not need a missing target to be removed.
+        if (isRetiredHook(hook)) {
+          report.retired.push({ event, command: hook.command });
+          continue; // dropped
+        }
 
         const matchedSpec = specs.find((spec) => spec.is(hook));
         if (matchedSpec) {
@@ -600,8 +567,6 @@ export function planSettings(
     report,
     command,
     guardCommand,
-    delegationObserveCommand,
-    delegationCheckCommand,
     stopCommand,
     statusLineCommand: statusLineCmd,
   };
@@ -615,7 +580,6 @@ export function installHooks({
   checkout,
   scriptPath,
   guardPath,
-  delegationPath,
   statuslinePath,
   stopPath,
   estate,
@@ -649,14 +613,11 @@ export function installHooks({
     report,
     command,
     guardCommand,
-    delegationObserveCommand,
-    delegationCheckCommand,
     stopCommand,
     statusLineCommand: statusLineCmd,
   } = planSettings(settings, {
     scriptPath,
     guardPath,
-    delegationPath,
     statuslinePath,
     stopPath,
     estate: estate ?? checkout,
@@ -673,8 +634,6 @@ export function installHooks({
     report,
     command,
     guardCommand,
-    delegationObserveCommand,
-    delegationCheckCommand,
     stopCommand,
     statusLineCommand: statusLineCmd,
   };
@@ -760,18 +719,6 @@ export function renderReport(result) {
       '(no guard script could be derived — NOT installed)'
     ),
     ...row(
-      `${GUARD_EVENT} (delegation-dispatch observer)`,
-      ev.delegationObserver,
-      result.delegationObserveCommand,
-      '(no delegation script could be derived — NOT installed)'
-    ),
-    ...row(
-      `${GUARD_EVENT} (substantial-work threshold gate)`,
-      ev.delegationGate,
-      result.delegationCheckCommand,
-      '(no delegation script could be derived — NOT installed)'
-    ),
-    ...row(
       `${STOP_EVENT} (execution controller)`,
       ev.stopController,
       result.stopCommand,
@@ -801,6 +748,30 @@ export function renderReport(result) {
   // `danglingTargets` is short-circuited and NO target is ever checked. That is
   // a control reporting on ground it never looked at, which is worse than no
   // control: an absent check invites caution, a lying one invites confidence.
+  // Retirement is DESTRUCTIVE and must never be silent. The pruner already has this
+  // property ("the report names what was pruned, so nothing disappears silently");
+  // retirement removes hooks the pruner would specifically REFUSE to touch — their
+  // targets may exist, and they were governor-managed — so without this block a run
+  // could delete two live hooks from Warwick's settings and report only "examined: 2,
+  // kept: 0". It gets its OWN block rather than joining `pruned`, for the same reason
+  // the report fields are separate: pruning tidies an accident, retirement withdraws a
+  // control, and a policy decision must not hide inside housekeeping.
+  const retired = result.report.retired || [];
+  if (retired.length) {
+    lines.push(
+      '',
+      `  RETIRED ${retired.length} hook(s) — these controls were WITHDRAWN, and any already-installed`,
+      '  copy is removed on every install (it would otherwise keep running forever):'
+    );
+    for (const r of retired) lines.push(`    - [${r.event}] ${r.command}`);
+    lines.push(
+      '',
+      checking
+        ? '  Nothing was written. Re-running WITHOUT --check would REMOVE the hook(s) above.'
+        : '  These are recoverable from the backup below.'
+    );
+  }
+
   if (result.report.pruned.length) {
     lines.push('', `  PRUNED ${result.report.pruned.length} hook(s) whose target script does not exist (Q-5):`);
     for (const p of result.report.pruned) {
@@ -876,7 +847,6 @@ function parseArgs(argv) {
     else if (argv[i] === '--checkout') args.checkout = argv[++i];
     else if (argv[i] === '--script') args.script = argv[++i];
     else if (argv[i] === '--guard') args.guard = argv[++i];
-    else if (argv[i] === '--delegation') args.delegation = argv[++i];
     else if (argv[i] === '--statusline') args.statusline = argv[++i];
     else if (argv[i] === '--stop') args.stop = argv[++i];
     else if (argv[i] === '--estate') args.estate = argv[++i];
@@ -898,12 +868,11 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     checkout,
     scriptPath: String(scriptPath).replace(/\\/g, '/'),
     guardPath: args.guard ? String(args.guard).replace(/\\/g, '/') : undefined,
-    delegationPath: args.delegation ? String(args.delegation).replace(/\\/g, '/') : undefined,
     statuslinePath: args.statusline ? String(args.statusline).replace(/\\/g, '/') : undefined,
     stopPath: args.stop ? String(args.stop).replace(/\\/g, '/') : undefined,
-    // The guard (and the delegation observer/gate, which need the same estate
-    // enumeration to resolve the active programme) is pointed at the primary
-    // checkout so it can find the build from a session that started anywhere.
+    // The guard is pointed at the primary checkout so it can find the build from a
+    // session that started anywhere — it needs the estate enumeration to resolve the
+    // active programme, and the session's own cwd is not reliably inside the estate.
     estate: args.estate || checkout,
     check: args.check,
     prune: args.prune,

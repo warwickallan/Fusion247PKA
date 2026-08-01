@@ -16,13 +16,8 @@ import {
   governorHookCommand,
   guardHookCommand,
   guardScriptFor,
-  delegationObserverHookCommand,
-  delegationGateHookCommand,
-  delegationScriptFor,
   isGovernorHook,
   isGuardHook,
-  isDelegationObserverHook,
-  isDelegationGateHook,
   hookTargets,
   danglingTargets,
   planSettings,
@@ -36,11 +31,10 @@ import {
   STOP_EVENT,
   STOP_MARKER,
   GUARD_MATCHER,
-  DELEGATION_OBSERVER_MATCHER,
-  DELEGATION_GATE_MATCHER,
   GOVERNOR_MARKER,
   GUARD_MARKER,
-  DELEGATION_MARKER,
+  RETIRED_MARKERS,
+  isRetiredHook,
 } from './install-hooks.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -526,69 +520,225 @@ test('REQUIREMENT 8: the real settings shape reconciles — dangling ensure-watc
 });
 
 // ---------------------------------------------------------------------------
-// Delegation ledger + substantial-work threshold gate — wired in as a
-// third/composed entry on the SAME PreToolUse pattern worktree-guard's own
-// gate already uses, without touching worktree-guard.mjs itself.
+// RETIREMENT — the delegation observer, the delegation threshold gate, the model
+// gate and the escalation gate were cut on 2026-08-01 (Warwick's cut-and-close
+// ruling on the accepted Larry/Pax diagnosis).
+// ---------------------------------------------------------------------------
+// The tests that exercised those modules went with them. What is proven HERE is
+// the property that replaced them, and it is the one that actually matters on
+// Warwick's machine: dropping a spec from `managed[]` only stops the installer
+// ADDING a hook — an already-installed copy would otherwise keep running forever,
+// pointed at a script that no longer exists. So retirement must be an ACTIVE
+// removal, and it must not depend on the target being missing from disk.
 // ---------------------------------------------------------------------------
 
-test('delegationScriptFor derives the sibling, and refuses to guess from an unrelated path', () => {
-  assert.equal(delegationScriptFor('C:/x/tools/governor/reorient.mjs'), 'C:/x/tools/governor/delegation-gate.mjs');
-  assert.equal(delegationScriptFor('C:\\x\\tools\\governor\\reorient.mjs'), 'C:/x/tools/governor/delegation-gate.mjs');
-  assert.equal(delegationScriptFor('C:/x/something-else.mjs'), null, 'no guess, no delegation gate');
-  assert.equal(delegationObserverHookCommand('C:/d.mjs', 'C:/estate'), 'node C:/d.mjs observe --estate C:/estate');
-  assert.equal(delegationObserverHookCommand('C:/d.mjs', null), 'node C:/d.mjs observe');
-  assert.equal(delegationGateHookCommand('C:/d.mjs', 'C:/estate'), 'node C:/d.mjs check --estate C:/estate');
-  assert.equal(delegationGateHookCommand('C:/d.mjs', null), 'node C:/d.mjs check');
+// A settings document carrying BOTH already-installed delegation-gate variants
+// (`observe` and `check`) on PreToolUse, exactly as `install-hooks.mjs` used to
+// write them, beside an unrelated third-party hook that must survive untouched.
+function settingsWithInstalledDelegationHooks(root) {
+  const fwd = root.replace(/\\/g, '/');
+  return {
+    hooks: {
+      [GUARD_EVENT]: [
+        {
+          matcher: 'Task',
+          hooks: [
+            { type: 'command', command: `node ${fwd}/tools/governor/delegation-gate.mjs observe --estate ${fwd}` },
+          ],
+        },
+        {
+          matcher: 'Write|Edit|MultiEdit|Bash',
+          hooks: [
+            { type: 'command', command: `node ${fwd}/tools/governor/delegation-gate.mjs check --estate ${fwd}` },
+            { type: 'command', command: `node ${fwd}/services/real-hook.mjs` },
+          ],
+        },
+      ],
+    },
+  };
+}
+
+test('RETIRED_MARKERS names exactly the cut controls, and isRetiredHook matches on the SCRIPT, not on a subcommand', () => {
+  assert.deepEqual([...RETIRED_MARKERS].sort(), [
+    'tools/governor/delegation-gate.mjs',
+    'tools/governor/escalation-gate.mjs',
+    'tools/governor/model-gate.mjs',
+  ]);
+  assert.ok(Object.isFrozen(RETIRED_MARKERS), 'the retirement list must not be mutable at runtime');
+
+  // BOTH subcommands of the one script are retired — matching on the script path
+  // is what makes that true without enumerating every argv shape it ever had.
+  assert.equal(isRetiredHook({ command: 'node C:/x/tools/governor/delegation-gate.mjs observe --estate C:/e' }), true);
+  assert.equal(isRetiredHook({ command: 'node C:/x/tools/governor/delegation-gate.mjs check --estate C:/e' }), true);
+  // Backslashes are normalised: a settings file written on Windows must not escape.
+  assert.equal(isRetiredHook({ command: 'node C:\\x\\tools\\governor\\model-gate.mjs' }), true);
+  assert.equal(isRetiredHook({ command: 'node C:/x/tools/governor/escalation-gate.mjs' }), true);
+
+  // And it must not over-reach onto anything retained, or onto malformed input.
+  assert.equal(isRetiredHook({ command: 'node C:/x/tools/governor/worktree-guard.mjs' }), false);
+  assert.equal(isRetiredHook({ command: 'node C:/x/tools/governor/reorient.mjs' }), false);
+  assert.equal(isRetiredHook({ command: 'node C:/x/tools/governor/stop-controller.mjs' }), false);
+  assert.equal(isRetiredHook(null), false);
+  assert.equal(isRetiredHook({}), false);
+  assert.equal(isRetiredHook({ command: 42 }), false);
 });
 
-test('isDelegationObserverHook and isDelegationGateHook tell the two subcommands of the SAME script apart', () => {
-  const observer = { command: 'node C:/x/tools/governor/delegation-gate.mjs observe --estate C:/estate' };
-  const gate = { command: 'node C:/x/tools/governor/delegation-gate.mjs check --estate C:/estate' };
-  assert.equal(isDelegationObserverHook(observer), true);
-  assert.equal(isDelegationObserverHook(gate), false);
-  assert.equal(isDelegationGateHook(gate), true);
-  assert.equal(isDelegationGateHook(observer), false);
-  assert.ok(observer.command.includes(DELEGATION_MARKER) && gate.command.includes(DELEGATION_MARKER));
-});
-
-test('one install ships ALL FOUR governor hooks: SessionStart brief, wrong-worktree gate, delegation observer, delegation threshold gate', () => {
-  const c = makeCheckout();
+test('MADE TO FAIL: an ALREADY-INSTALLED delegation-gate hook (both observe and check) is REMOVED and recorded in report.retired', () => {
+  const c = makeCheckout({ settings: { hooks: {} } });
   try {
+    writeFileSync(settingsPath(c.root), JSON.stringify(settingsWithInstalledDelegationHooks(c.root), null, 2) + '\n');
+
+    // BEFORE — establish the ground rather than assuming it. Both variants really
+    // are installed; a test that never saw them present proves nothing about their
+    // removal.
+    const before = JSON.parse(readFileSync(settingsPath(c.root), 'utf8'));
+    const beforeHooks = hooksFor(before, GUARD_EVENT);
+    const beforeRetired = beforeHooks.filter(isRetiredHook);
+    assert.equal(beforeRetired.length, 2, 'precondition: TWO retired hooks are installed');
+    assert.equal(beforeRetired.filter((h) => h.command.includes(' observe ')).length, 1);
+    assert.equal(beforeRetired.filter((h) => h.command.includes(' check ')).length, 1);
+
     const r = installHooks({ checkout: c.root, scriptPath: SCRIPT });
-    const doc = JSON.parse(readFileSync(settingsPath(c.root), 'utf8'));
 
-    const observerHooks = hooksFor(doc, GUARD_EVENT).filter(isDelegationObserverHook);
-    assert.equal(observerHooks.length, 1, 'exactly one delegation observer hook');
-    assert.ok(observerHooks[0].command.includes('observe'));
-    assert.ok(observerHooks[0].command.includes('--estate'));
+    // AFTER — both are gone from the settings actually written to disk.
+    const after = JSON.parse(readFileSync(settingsPath(c.root), 'utf8'));
+    const afterHooks = hooksFor(after, GUARD_EVENT);
+    assert.equal(afterHooks.filter(isRetiredHook).length, 0, 'no retired hook may survive an install');
+    assert.ok(
+      !JSON.stringify(after).includes('delegation-gate.mjs'),
+      'and no trace of the retired script may remain anywhere in the document'
+    );
 
-    const gateHooks = hooksFor(doc, GUARD_EVENT).filter(isDelegationGateHook);
-    assert.equal(gateHooks.length, 1, 'exactly one delegation threshold gate hook');
-    assert.ok(gateHooks[0].command.includes('check'));
-    assert.ok(gateHooks[0].command.includes('--estate'));
-
-    const observerGroup = doc.hooks[GUARD_EVENT].find((g) => (g.hooks || []).some(isDelegationObserverHook));
-    assert.equal(observerGroup.matcher, DELEGATION_OBSERVER_MATCHER);
-
-    const gateGroup = doc.hooks[GUARD_EVENT].find((g) => (g.hooks || []).some(isDelegationGateHook));
-    assert.equal(gateGroup.matcher, DELEGATION_GATE_MATCHER);
-    assert.ok(!DELEGATION_GATE_MATCHER.split('|').includes('NotebookEdit'), 'the threshold gate must NOT govern NotebookEdit');
-    for (const tool of ['Write', 'Edit', 'MultiEdit', 'Bash']) {
-      assert.ok(DELEGATION_GATE_MATCHER.split('|').includes(tool));
+    // The removal is REPORTED, not silent, and is kept out of `pruned` — pruning
+    // tidies an accident, retirement withdraws a control, and collapsing the two
+    // would hide a policy decision inside housekeeping.
+    assert.equal(r.report.retired.length, 2, 'both retired hooks must be recorded');
+    for (const entry of r.report.retired) {
+      assert.equal(entry.event, GUARD_EVENT);
+      assert.ok(entry.command.includes('delegation-gate.mjs'));
     }
+    assert.ok(
+      !r.report.pruned.some((p) => p.command.includes('delegation-gate.mjs')),
+      'a retired hook is retired, never reported as pruned'
+    );
 
-    // worktree-guard's own gate is still installed too — this is additive, not a replacement.
-    assert.equal(hooksFor(doc, GUARD_EVENT).filter(isGuardHook).length, 1);
-    assert.equal(hooksFor(doc, HOOK_EVENT).filter(isGovernorHook).length, 1);
-
-    assert.equal(r.report.events.delegationObserver.added, true);
-    assert.equal(r.report.events.delegationGate.added, true);
+    // Non-destructive to everything else: the unrelated third-party hook and both
+    // retained governor hooks are present.
+    assert.ok(
+      afterHooks.some((h) => h.command.includes('real-hook.mjs')),
+      'an unrelated hook sharing the group must survive retirement'
+    );
+    assert.equal(hooksFor(after, GUARD_EVENT).filter(isGuardHook).length, 1);
+    assert.equal(hooksFor(after, HOOK_EVENT).filter(isGovernorHook).length, 1);
   } finally {
     c.cleanup();
   }
 });
 
-test('X-2: installing all four hooks is idempotent — the second and third runs write nothing', () => {
+test('retirement does NOT depend on the retired script being missing from disk', () => {
+  // The whole point: a control is retired when the installer takes it out, not
+  // when its file happens to be absent. `exists: () => true` makes every target
+  // present, which disarms the Q-5 pruner completely — so anything removed here
+  // was removed by the retirement rule and by nothing else.
+  const c = makeCheckout({ settings: { hooks: {} } });
+  try {
+    writeFileSync(settingsPath(c.root), JSON.stringify(settingsWithInstalledDelegationHooks(c.root), null, 2) + '\n');
+    const r = installHooks({ checkout: c.root, scriptPath: SCRIPT, exists: () => true });
+    assert.deepEqual(r.report.pruned, [], 'precondition: the pruner must find nothing to do');
+    assert.equal(r.report.retired.length, 2, 'and retirement must still have removed both');
+    const after = JSON.parse(readFileSync(settingsPath(c.root), 'utf8'));
+    assert.equal(hooksFor(after, GUARD_EVENT).filter(isRetiredHook).length, 0);
+  } finally {
+    c.cleanup();
+  }
+});
+
+test('retirement is idempotent and settles: a second install finds nothing left to retire and writes nothing', () => {
+  const c = makeCheckout({ settings: { hooks: {} } });
+  try {
+    writeFileSync(settingsPath(c.root), JSON.stringify(settingsWithInstalledDelegationHooks(c.root), null, 2) + '\n');
+    assert.equal(installHooks({ checkout: c.root, scriptPath: SCRIPT }).report.retired.length, 2);
+    const settled = readFileSync(settingsPath(c.root), 'utf8');
+
+    const second = installHooks({ checkout: c.root, scriptPath: SCRIPT });
+    assert.deepEqual(second.report.retired, [], 'nothing left to retire');
+    assert.equal(second.changed, false);
+    assert.equal(readFileSync(settingsPath(c.root), 'utf8'), settled, 'byte-identical');
+  } finally {
+    c.cleanup();
+  }
+});
+
+test('a RETIREMENT is never silent — renderReport names every hook it removed, in both modes', () => {
+  // Found by running the CLI end-to-end against a settings file that already had
+  // both delegation hooks installed: two live hooks were deleted and the report
+  // said only "examined: 2, kept: 0". The pruner has had a "nothing disappears
+  // silently" guarantee since Q-5; retirement removes hooks the pruner would
+  // specifically REFUSE to touch, so it needs its own.
+  const c = makeCheckout({ settings: { hooks: {} } });
+  try {
+    writeFileSync(settingsPath(c.root), JSON.stringify(settingsWithInstalledDelegationHooks(c.root), null, 2) + '\n');
+
+    // --check FIRST, so nothing is written and the proposal wording is under test.
+    const proposal = renderReport(installHooks({ checkout: c.root, scriptPath: SCRIPT, check: true }));
+    assert.match(proposal, /RETIRED 2 hook\(s\)/, 'a check must disclose what a real run would remove');
+    assert.match(proposal, /would REMOVE the hook\(s\) above/);
+    assert.match(proposal, /delegation-gate\.mjs observe/, 'and name them exactly, not by count alone');
+    assert.match(proposal, /delegation-gate\.mjs check/);
+
+    const applied = renderReport(installHooks({ checkout: c.root, scriptPath: SCRIPT }));
+    assert.match(applied, /RETIRED 2 hook\(s\)/);
+    assert.match(applied, /WITHDRAWN/);
+    assert.match(applied, /delegation-gate\.mjs observe/);
+    assert.match(applied, /delegation-gate\.mjs check/);
+    assert.match(applied, /recoverable from the backup/, 'a destructive step must say how to undo it');
+
+    // A retired hook must not be laundered through the pruner's own block.
+    assert.doesNotMatch(applied, /PRUNED \d+ hook\(s\)/);
+  } finally {
+    c.cleanup();
+  }
+});
+
+test('MUTATION (retirement must not over-reach): with no retired hook present, report.retired is empty and nothing is removed', () => {
+  const c = makeCheckout();
+  try {
+    const r = installHooks({ checkout: c.root, scriptPath: SCRIPT });
+    assert.deepEqual(r.report.retired, [], 'a rule that retires a retained hook is over-reaching');
+    const doc = JSON.parse(readFileSync(settingsPath(c.root), 'utf8'));
+    assert.equal(hooksFor(doc, HOOK_EVENT).filter(isGovernorHook).length, 1);
+    assert.equal(hooksFor(doc, GUARD_EVENT).filter(isGuardHook).length, 1);
+    assert.equal(hooksFor(doc, STOP_EVENT).filter(isStopControllerHook).length, 1);
+  } finally {
+    c.cleanup();
+  }
+});
+
+test('the RETAINED managed set is exactly three hooks: SessionStart brief, wrong-worktree gate, Stop execution controller', () => {
+  const c = makeCheckout();
+  try {
+    const r = installHooks({ checkout: c.root, scriptPath: SCRIPT });
+    const doc = JSON.parse(readFileSync(settingsPath(c.root), 'utf8'));
+
+    assert.equal(hooksFor(doc, HOOK_EVENT).filter(isGovernorHook).length, 1);
+    assert.equal(hooksFor(doc, GUARD_EVENT).filter(isGuardHook).length, 1);
+    assert.equal(hooksFor(doc, STOP_EVENT).filter(isStopControllerHook).length, 1);
+
+    const guardGroup = doc.hooks[GUARD_EVENT].find((g) => (g.hooks || []).some(isGuardHook));
+    assert.equal(guardGroup.matcher, GUARD_MATCHER);
+
+    // The managed set has exactly these three keys — a fourth appearing without a
+    // decision behind it is the drift this assertion exists to catch.
+    assert.deepEqual(Object.keys(r.report.events).sort(), ['governor', 'guard', 'stopController']);
+    assert.equal(r.report.events.governor.added, true);
+    assert.equal(r.report.events.guard.added, true);
+    assert.equal(r.report.events.stopController.added, true);
+  } finally {
+    c.cleanup();
+  }
+});
+
+test('X-2: installing the retained hooks is idempotent — the second and third runs write nothing', () => {
   const c = makeCheckout();
   try {
     assert.equal(installHooks({ checkout: c.root, scriptPath: SCRIPT }).changed, true);
@@ -601,34 +751,46 @@ test('X-2: installing all four hooks is idempotent — the second and third runs
   }
 });
 
-test('MUTATION: the delegation observer and gate hooks are never pruned by the Q-5 rule, even before delegation-gate.mjs exists on disk', () => {
+test('MUTATION: a SECOND install over a nowhere-script path is still stable — the retained hooks never prune themselves', () => {
+  // The delegation half of this proof retired with its module; the retained half
+  // is the one that mattered, and it is asserted directly here rather than left
+  // resting on the sibling test above. A fresh clone installs BEFORE it builds, so
+  // every managed script is legitimately absent on the first run.
   const c = makeCheckout();
   try {
     const nowhere = 'C:/definitely/not/here/tools/governor/reorient.mjs';
     const r = installHooks({ checkout: c.root, scriptPath: nowhere });
     const doc = JSON.parse(readFileSync(settingsPath(c.root), 'utf8'));
-    assert.equal(hooksFor(doc, GUARD_EVENT).filter(isDelegationObserverHook).length, 1);
-    assert.equal(hooksFor(doc, GUARD_EVENT).filter(isDelegationGateHook).length, 1);
+    assert.equal(hooksFor(doc, HOOK_EVENT).filter(isGovernorHook).length, 1);
+    assert.equal(hooksFor(doc, GUARD_EVENT).filter(isGuardHook).length, 1);
+    assert.equal(hooksFor(doc, STOP_EVENT).filter(isStopControllerHook).length, 1);
     assert.ok(
-      !r.report.pruned.some((p) => p.command.includes(DELEGATION_MARKER)),
-      'the delegation hooks must never prune themselves — a fresh clone installs before it builds'
+      !r.report.pruned.some(
+        (p) =>
+          p.command.includes(GOVERNOR_MARKER) || p.command.includes(GUARD_MARKER) || p.command.includes(STOP_MARKER)
+      ),
+      'the governor must never prune itself — a fresh clone installs before it builds'
     );
 
     installHooks({ checkout: c.root, scriptPath: nowhere });
     const again = JSON.parse(readFileSync(settingsPath(c.root), 'utf8'));
-    assert.equal(hooksFor(again, GUARD_EVENT).filter(isDelegationObserverHook).length, 1);
-    assert.equal(hooksFor(again, GUARD_EVENT).filter(isDelegationGateHook).length, 1);
+    assert.equal(hooksFor(again, HOOK_EVENT).filter(isGovernorHook).length, 1);
+    assert.equal(hooksFor(again, GUARD_EVENT).filter(isGuardHook).length, 1);
+    assert.equal(hooksFor(again, STOP_EVENT).filter(isStopControllerHook).length, 1);
   } finally {
     c.cleanup();
   }
 });
 
-test('REPORT INTEGRITY: a single unrelated PreToolUse hook is examined exactly ONCE, even though three specs (guard, delegation observer, delegation gate) share that event', () => {
+test('REPORT INTEGRITY: a single unrelated PreToolUse hook is examined exactly ONCE, never once per spec sharing that event', () => {
   // This pins the fix that made multiple specs safely share one event: before
   // it, each spec re-scanned every group already pushed by an earlier spec
   // THIS run, inflating `examined`/`kept` for hooks that were already
-  // accounted for. Proven here with a genuinely pre-existing, unrelated
-  // PreToolUse hook that has nothing to do with any governor spec.
+  // accounted for. It was written when three specs shared PreToolUse; two of
+  // them retired on 2026-08-01, so the property is no longer under load TODAY —
+  // and it is kept precisely because the inflation returns the moment a second
+  // spec is added back to any event. Proven with a genuinely pre-existing,
+  // unrelated PreToolUse hook that has nothing to do with any governor spec.
   const c = makeCheckout({
     settings: {
       hooks: {
@@ -659,15 +821,28 @@ test('REPORT INTEGRITY: a single unrelated PreToolUse hook is examined exactly O
   }
 });
 
-test('the report names the delegation hooks in renderReport output', () => {
+test('renderReport names every RETAINED hook and no retired one', () => {
+  // The positive half is the original assertion, re-aimed at the retained set: a
+  // managed hook the report never mentions is a control nobody can see. The
+  // negative half is the new one, and it is the load-bearing one — a report row
+  // for a hook the installer no longer writes would tell Warwick a retired gate
+  // is live, which is worse than saying nothing.
   const c = makeCheckout();
   try {
     const r = installHooks({ checkout: c.root, scriptPath: SCRIPT });
     const text = renderReport(r);
-    assert.match(text, /delegation-dispatch observer/);
-    assert.match(text, /substantial-work threshold gate/);
-    assert.match(text, /delegation-gate\.mjs observe/);
-    assert.match(text, /delegation-gate\.mjs check/);
+    assert.match(text, /reorientation, every source/);
+    assert.match(text, /wrong-worktree deny gate/);
+    assert.match(text, /execution controller/);
+    assert.match(text, /reorient\.mjs/);
+    assert.match(text, /worktree-guard\.mjs/);
+    assert.match(text, /stop-controller\.mjs/);
+
+    assert.doesNotMatch(text, /delegation/i, 'a retired control must not appear in the installer report');
+    assert.doesNotMatch(text, /substantial-work threshold gate/);
+    for (const marker of RETIRED_MARKERS) {
+      assert.ok(!text.includes(marker), `retired ${marker} must not be named as if it were installed`);
+    }
   } finally {
     c.cleanup();
   }

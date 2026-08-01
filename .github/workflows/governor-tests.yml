@@ -54,11 +54,13 @@ jobs:
       - name: State what this job does NOT cover
         shell: bash
         run: |
-          echo "NOT COVERED BY CI — three suites are excluded because they assert against the"
+          echo "NOT COVERED BY CI — two suites are excluded because they assert against the"
           echo "REAL local estate (multi-worktree layout, banked programme state, live git):"
           echo "  collect-state.test.mjs   — collectEstateState against the real repository"
-          echo "  model-gate.test.mjs      — LIVE ACCEPTANCE against an observed health sample"
           echo "  reorient.test.mjs        — REAL ESTATE / REAL GIT orientation"
+          echo "(model-gate.test.mjs was a third exclusion until 2026-08-01, when the model gate"
+          echo " was RETIRED and its suite deleted. The exclusion went with it: a grep -v naming"
+          echo " a file that no longer exists is a filter nobody can tell is doing nothing.)"
           echo "They pass on Warwick's machine and cannot pass on a single-branch runner."
           echo "Their pure tests are excluded with them; that is a real coverage gap, recorded"
           echo "as a finding rather than hidden by a skip. A skipped test is NOT a passing test."
@@ -67,13 +69,12 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          # Explicit exclusion, not a silent skip: the three estate-coupled suites are
+          # Explicit exclusion, not a silent skip: the two estate-coupled suites are
           # named above and in the commit that added this job. Everything else must be
           # green. The proper fix is for those suites to build a synthetic estate, which
           # rotate-session.test.mjs already does — so there is precedent, not a blocker.
           FILES=$(ls tools/governor/*.test.mjs \
             | grep -v 'collect-state.test.mjs' \
-            | grep -v 'model-gate.test.mjs' \
             | grep -v 'reorient.test.mjs')
           echo "running:"; echo "$FILES"
           node --test $FILES 2>&1 | tee suite.log

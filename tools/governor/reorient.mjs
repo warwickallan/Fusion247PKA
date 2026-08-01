@@ -46,10 +46,17 @@ import {
   compareLocation,
   buildDenyReason,
   isInside,
+  samePath,
   LOCATION,
 } from './worktree-guard.mjs';
-import { collapseCopies } from './build-registry.mjs';
-import { applyModelGate } from './model-gate.mjs';
+
+// CUT-AND-CLOSE 2026-08-01 (Warwick's ruling, on the accepted Larry/Pax diagnosis).
+// `collapseCopies` used to live in `build-registry.mjs` and is inlined here because
+// this module is now its ONLY caller. The registry/launcher/PR/merge machinery that
+// surrounded it was removed as disproportionate to the commission; the duplicate-copy
+// collapse itself is RETAINED — it is consistency checking, part of the durable spine,
+// and it is what stops a fresh session resuming from a stale copy of one programme.
+// The model gate (`applyModelGate`) was removed outright by the same ruling.
 
 // AD-5. A hard contract from the host, not a preference.
 export const CONTEXT_CAP = 10000;
@@ -360,6 +367,53 @@ export function toRegistryEntry(candidate) {
     state_path: normaliseSeparators(candidate.path) || String(candidate.path ?? ''),
     candidate,
   };
+}
+
+// Collapse the copies of one programme. Deterministic: each group is ordered by
+// state_path before any choice is made, so two runs over the same estate cannot
+// produce two different results.
+//
+// INLINED 2026-08-01 from the removed `build-registry.mjs`, UNCHANGED in behaviour.
+// The selection rule is deliberately self-consistency (does the copy sit inside the
+// worktree it names as canonical), NOT "prefer the copy nearest the current cwd" —
+// a cwd preference would select the STALE copy for a session started in a worker
+// worktree, which is the exact harm this exists to prevent.
+export function collapseCopies(copies) {
+  const byId = new Map();
+  for (const c of copies) {
+    const key = String(c.id).toLowerCase();
+    if (!byId.has(key)) byId.set(key, []);
+    byId.get(key).push(c);
+  }
+
+  const entries = [];
+  for (const group of byId.values()) {
+    group.sort((a, b) => a.state_path.localeCompare(b.state_path));
+    if (group.length === 1) {
+      entries.push(group[0]);
+      continue;
+    }
+    const selfConsistent = group.filter((c) => isInside(c.state_path, c.worktree));
+    if (selfConsistent.length === 1) {
+      entries.push(selfConsistent[0]);
+      continue;
+    }
+    const agreed = group.every(
+      (c) => samePath(c.worktree, group[0].worktree) && c.branch === group[0].branch
+    );
+    if (agreed) {
+      entries.push(selfConsistent.length > 1 ? selfConsistent[0] : group[0]);
+      continue;
+    }
+    // Genuinely contradictory copies of one programme. Keep them all: the
+    // resolver must refuse and name the disagreement, not pick a winner.
+    for (const c of group) entries.push(c);
+  }
+
+  entries.sort(
+    (a, b) => String(a.id).localeCompare(String(b.id)) || a.state_path.localeCompare(b.state_path)
+  );
+  return entries;
 }
 
 export function collapseProgrammes(active) {
@@ -1057,14 +1111,14 @@ export function runHook(raw, opts = {}) {
     });
     return { verdict: VERDICT.FAILED, context: b.text, brief: b };
   }
-  const { source, cwd, session_id: sessionId } = parsed.payload;
-  const { modelGate: modelGateOpts, ...reorientOpts } = opts;
+  const { source, cwd } = parsed.payload;
+  // CUT 2026-08-01: the T-15 model gate used to wrap this result and could WITHHOLD
+  // reorientation until a model was verified. It is gone. Reorientation now always
+  // returns what it found. Model advice belongs AFTER the next requirement is
+  // understood, not as a precondition on a session that has not yet been briefed.
+  const { modelGate: _removedModelGateOpts, ...reorientOpts } = opts;
   try {
-    const result = reorient({ source, cwd: cwd || opts.cwd || process.cwd(), ...reorientOpts });
-    // T-15 — a bounded, additive layer on top of an otherwise-untouched reorient()
-    // result. A no-op unless reorient() already says implementation is permitted; see
-    // model-gate.mjs's own header for why this composes here rather than merging in.
-    return applyModelGate(result, { sessionId, ...modelGateOpts });
+    return reorient({ source, cwd: cwd || opts.cwd || process.cwd(), ...reorientOpts });
   } catch (err) {
     const b = renderProblemBrief(VERDICT.FAILED, {
       detail: `The reorientation hook threw: ${err.message}`,

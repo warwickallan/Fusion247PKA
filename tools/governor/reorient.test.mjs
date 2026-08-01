@@ -26,6 +26,7 @@ import {
   SOURCE_POLICY,
   copyFingerprint,
   toRegistryEntry,
+  collapseCopies,
   collapseProgrammes,
 } from './reorient.mjs';
 import { isInside } from './worktree-guard.mjs';
@@ -582,6 +583,93 @@ test('toRegistryEntry: takes the RECORDED canonical worktree, never the one the 
     false,
     'an off-branch copy must be able to read as NOT self-consistent'
   );
+});
+
+// ---------------------------------------------------------------------------
+// T-24 — `collapseCopies` itself
+// ---------------------------------------------------------------------------
+// This function was INLINED into reorient.mjs on 2026-08-01 from the retired
+// `build-registry.mjs`, and its own direct test retired with that module's suite.
+// The behaviour did not retire: it is the retained spine's answer to "a tracked
+// programme-state.json is copied into every checkout on the branch, and merging
+// to main makes another", so it is re-proven here, at its new home, against the
+// exported function rather than only through `collapseProgrammes`.
+test('collapseCopies keeps the self-consistent copy, and keeps BOTH when copies genuinely disagree', () => {
+  const agreeing = [
+    { id: 'BUILD-701', worktree: 'C:/estate/alpha', branch: 'b/alpha', state_path: 'C:/estate/primary/Deliverables/x/programme-state.json' },
+    { id: 'BUILD-701', worktree: 'C:/estate/alpha', branch: 'b/alpha', state_path: 'C:/estate/alpha/Deliverables/x/programme-state.json' },
+  ];
+  const collapsed = collapseCopies(agreeing);
+  assert.equal(collapsed.length, 1, 'one programme is one entry however many checkouts hold its state');
+  assert.equal(
+    collapsed[0].state_path,
+    'C:/estate/alpha/Deliverables/x/programme-state.json',
+    'the copy sitting INSIDE the worktree it names as canonical is the live one'
+  );
+
+  const disagreeing = [
+    { id: 'BUILD-701', worktree: 'C:/estate/old', branch: 'b/old', state_path: 'C:/estate/primary/Deliverables/x/programme-state.json' },
+    { id: 'BUILD-701', worktree: 'C:/estate/new', branch: 'b/new', state_path: 'C:/estate/other/Deliverables/x/programme-state.json' },
+  ];
+  assert.equal(
+    collapseCopies(disagreeing).length,
+    2,
+    'a genuine disagreement is preserved for the resolver to refuse over — never silently picked'
+  );
+});
+
+test('collapseCopies: grouping is by programme ID and is case-insensitive; unrelated programmes are never merged', () => {
+  // The trap this exists for: counting FILES reported one build as several active
+  // programmes. Identity is the id, not the path — and two DIFFERENT builds must
+  // still come back as two, or the collapse would disarm the ambiguity refusal.
+  const mixed = [
+    { id: 'BUILD-701', worktree: 'C:/estate/alpha', branch: 'b/alpha', state_path: 'C:/estate/alpha/Deliverables/x/programme-state.json' },
+    { id: 'build-701', worktree: 'C:/estate/alpha', branch: 'b/alpha', state_path: 'C:/estate/primary/Deliverables/x/programme-state.json' },
+    { id: 'BUILD-702', worktree: 'C:/estate/beta', branch: 'b/beta', state_path: 'C:/estate/beta/Deliverables/y/programme-state.json' },
+  ];
+  const out = collapseCopies(mixed);
+  assert.equal(out.length, 2, 'two programmes, not three files and not one');
+  assert.deepEqual(out.map((e) => e.id).sort(), ['BUILD-701', 'BUILD-702']);
+});
+
+test('collapseCopies is DETERMINISTIC: input order cannot change which copy wins', () => {
+  // Two runs over the same estate must not produce two different resumption
+  // pointers. `discoverStateFiles` walks the filesystem, whose order is not
+  // guaranteed, so this is a real input the caller cannot control.
+  const copies = [
+    { id: 'BUILD-703', worktree: 'C:/estate/a', branch: 'b/a', state_path: 'C:/estate/z/Deliverables/x/programme-state.json' },
+    { id: 'BUILD-703', worktree: 'C:/estate/a', branch: 'b/a', state_path: 'C:/estate/a/Deliverables/x/programme-state.json' },
+    { id: 'BUILD-703', worktree: 'C:/estate/a', branch: 'b/a', state_path: 'C:/estate/m/Deliverables/x/programme-state.json' },
+  ];
+  const forward = collapseCopies(copies);
+  const reversed = collapseCopies([...copies].reverse());
+  assert.deepEqual(
+    forward.map((e) => e.state_path),
+    reversed.map((e) => e.state_path),
+    'reversing the discovery order must not change the answer'
+  );
+  assert.equal(forward.length, 1);
+  assert.equal(forward[0].state_path, 'C:/estate/a/Deliverables/x/programme-state.json');
+});
+
+test('MUTATION: with NO self-consistent copy, agreeing copies still collapse but disagreeing ones are ALL kept', () => {
+  // The branch that decides between "resolve it" and "refuse over it" when the
+  // self-consistency discriminator finds nothing to prefer. If this collapsed a
+  // genuine disagreement, the governor would hand a session a pointer it had no
+  // grounds to choose — the exact harm the refusal exists to prevent.
+  const noneInside = [
+    { id: 'BUILD-704', worktree: 'C:/estate/home', branch: 'b/h', state_path: 'C:/estate/one/Deliverables/x/programme-state.json' },
+    { id: 'BUILD-704', worktree: 'C:/estate/home', branch: 'b/h', state_path: 'C:/estate/two/Deliverables/x/programme-state.json' },
+  ];
+  assert.equal(noneInside.every((c) => !isInside(c.state_path, c.worktree)), true, 'precondition: none is self-consistent');
+  assert.equal(collapseCopies(noneInside).length, 1, 'copies that AGREE about the location collapse to one');
+
+  // Same shape, but the branch differs — location agreement is worktree AND branch.
+  const branchDiffers = [
+    { id: 'BUILD-705', worktree: 'C:/estate/home', branch: 'b/h', state_path: 'C:/estate/one/Deliverables/x/programme-state.json' },
+    { id: 'BUILD-705', worktree: 'C:/estate/home', branch: 'b/OTHER', state_path: 'C:/estate/two/Deliverables/x/programme-state.json' },
+  ];
+  assert.equal(collapseCopies(branchDiffers).length, 2, 'a differing BRANCH is a disagreement, not a duplicate');
 });
 
 test('collapseProgrammes: groups by programme id, so N checkouts of one build survive as ONE', () => {

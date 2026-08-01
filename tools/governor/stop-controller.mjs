@@ -112,7 +112,8 @@ export const OUTCOME = Object.freeze({
 // switch and the per-session markers under `disabled/`), because a test that redirects
 // one and not the other is a test that writes into Warwick's real `~/.mypka`. That is a
 // hard boundary on this Work Order, not a preference. Same convention as
-// `MYPKA_GOVERNOR_HEALTH_DIR` and `MYPKA_GOVERNOR_DELEGATION_DIR`.
+// `MYPKA_GOVERNOR_HEALTH_DIR`. (This also named `MYPKA_GOVERNOR_DELEGATION_DIR` until
+// 2026-08-01, when the delegation gate that owned it was retired.)
 
 export function governorDisableRoot({
   homeDir = os.homedir(),
