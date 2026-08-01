@@ -111,8 +111,38 @@ The terminal status line is confirmed live and sampling correctly, but Warwick h
 that it does not satisfy acceptance — he works on claude.ai web and Android, where it is invisible.
 The in-message footer is the surface that counts, and it is being built.
 
-## A4 — `/clear` reorients — **PENDING (blocked on a restart, not on code)**
-## A5 — a genuinely fresh session recovers — **PENDING**
+## A4 — `/clear` reorients — **CODE DONE / LIVE PENDING (blocked on a restart, not on code)**
+## A5 — a genuinely fresh session recovers — **CODE DONE, AND ONE LAYER PROVEN LIVE**
+
+WP-1 landed at `c9ebef4` (645 tests, 645 pass; baseline 607). Both layers of the defect are closed:
+the `SessionStart` entry now carries **no `matcher` key at all** (Silas's B-1, probe-proven), and
+`reorient.mjs` branches internally on `source` instead of refusing everything but `clear`.
+
+Larry then ran the **real hook**, not its tests:
+
+```
+{"hook_event_name":"SessionStart","source":"startup", …}  →  node tools/governor/reorient.mjs
+```
+
+**It fired.** For the first time in this build's history, a `startup` payload produced output rather
+than `SKIPPED`. That is A5's mechanism proven at the script layer.
+
+**And running it immediately exposed a defect its tests could not.** The output was a refusal:
+*"MORE THAN ONE ACTIVE PROGRAMME"*, listing **BUILD-018 four times** — once per checkout
+(`-governor`, `-wo-01`, `-wo-02`, `-wo-03`). Those are not four programmes; they are one programme
+in four working trees. The refusal is correct and the grouping is wrong, so reorientation is unusable
+in precisely the situation the Governor exists for. `build-registry.mjs:172` already solves this with
+`collapseCopies`; `reorient.mjs` groups by state-file path. Registered as **T-24** and dispatched.
+
+Two things worth keeping from that:
+- **Running the thing is not the same as running its tests.** 645 green did not catch it; one real
+  invocation did.
+- **Deleting the worker worktrees would have hidden it, not fixed it.** The constitution's own
+  startup step 3 names why: merging this build to main is itself what creates the second copy.
+
+The remaining blocker for both A4 and A5 is unchanged and is not code: **hooks bind at Claude Code
+process launch.** Fresh *processes* do read current settings, so the fresh-session half stays provable
+here; only Warwick's running session needs the restart.
 
 Both are blocked by the same fact, and it is worth stating once: **hooks bind at Claude Code process
 launch.** Nolan proved it — a hook deleted from settings at 17:05:08Z still fired at 21:39Z, and one
