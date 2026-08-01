@@ -752,10 +752,17 @@ test('REAL GIT: the CLI refreshes, resolves, and uses a distinct exit code for e
 
 test('.claude/commands/build.md exists and matches the command frontmatter convention', () => {
   const raw = readFileSync(COMMAND_FILE, 'utf8');
-  const fm = raw.match(/^---\n([\s\S]*?)\n---/);
+  // Line-ending-agnostic on purpose. This repo has core.autocrlf=true and no
+  // .gitattributes, so `.claude/commands/build.md` checks out with CRLF in any
+  // fresh clone or worktree while the git blob stays LF. An `\n`-only regex
+  // therefore failed on every fresh Windows worktree and passed only where the
+  // file had been written directly — an environmental false negative that says
+  // nothing about the convention being asserted, which is that frontmatter is
+  // present and carries the expected keys.
+  const fm = raw.match(/^---\r?\n([\s\S]*?)\r?\n---/);
   assert.ok(fm, 'build.md opens with frontmatter');
   const keys = fm[1]
-    .split('\n')
+    .split(/\r?\n/)
     .filter(Boolean)
     .map((l) => l.split(':')[0].trim());
   assert.deepEqual(keys, ['name', 'description', 'user_invocable']);
