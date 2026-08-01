@@ -31,12 +31,14 @@ Where the way is already clear (native permissions over a homemade gate; surgica
 | Phase | What | Reversible? | Gate to proceed |
 |---|---|---|---|
 | **0** | This plan on git | yes | Warwick + GPT review the route |
-| **1** | **Probe F1** in project-local settings: prove (a) protected/dangerous git (push/merge protected main, force-push, delete-unique, commit-unrelated) is denied silently for everyone, and (b) a spawned proof/recovery/review process **cannot mutate git** while primary Larry keeps routine git. **If unprovable → report FAILED and return the evidence. No behavioural fallback.** | yes (local settings) | Both proven to fire, or FAILED |
+| **1** | **Probe F1** in project-local settings: prove (a) protected/dangerous git (push/merge protected main, force-push, delete-unique, commit-unrelated) is denied silently for everyone, and (b) a spawned proof/recovery/review process **cannot mutate git** while primary Larry keeps routine git. **If unprovable → report FAILED and return the evidence. No behavioural fallback.** | yes (local settings — backed up + restore route recorded first) | Both proven to fire, or FAILED |
 | **2** | **Resolve remaining duty ownership.** Git stays with Larry (no orphan). Session-logs + continuity-update remain Larry's (he keeps Write). **Regrowth cap (GPT):** resolve these using existing native or already-built routes wherever possible; any NEW mechanism requires separate evidence that no existing route can satisfy the need. No casual new subsystem. | yes (config) | No duty orphaned; no new subsystem without evidence |
 | **3** | **Prove F2** — the full continuity journey: a normal session auto-captures true final state → persists → a fresh session recovers *that update*. Until this passes, `continuity.mjs` = **KEEP PROVISIONALLY** and rotation + fallback recovery are **NOT deleted**. | yes | The automatic write/read journey passes once, live |
 | **4** | **Run Warwick's acceptance test** (F3): one realistic delegated task, auto mode; Larry stays available and delegates; specialist implements + tests; count every prompt Warwick receives; **mutation-test the gates** (attempt a denied action, confirm blocked). One avoidable prompt → FAILED, fix the map. | yes | Zero avoidable prompts + gates proven to fire |
 | **5** | **Only after 1–4 pass:** prepare the BUILD-018 teardown + `CLAUDE.md` thinning + memory active/historical split as a **reviewable diff on a branch** (nothing landed). Un-park Tower enough for a **bounded Codex review of that REAL diff, run twice, repeatable** (Decision C). Warwick sees the diff and the review. Tower does NOT block the harmless local probes (1–4); it reviews the actual teardown before it lands. | diff prepared, not yet landed | Tower/Codex reviewed the real teardown diff, twice |
-| **6** | **Only after the diff is reviewed and the local journey passed in front of Warwick:** integrate the teardown; then harden to managed settings (machine-wide). | integration + machine-wide = last | Diff reviewed + journey passed |
+| **6** | **Only after the diff is reviewed and the local journey passed in front of Warwick:** integrate the teardown; then harden to managed settings (machine-wide). | integration + machine-wide = last; managed file backed up + restore route recorded first | Diff reviewed + journey passed |
+
+**Config reversibility (MANDATORY — Warwick, 2026-08-02).** Git restores committed code, but `.claude/settings.local.json` is **gitignored** and managed settings live **outside the repo**. So before Phase 1 edits local settings, or Phase 6 writes managed settings, that phase MUST first: (1) copy the current file to a **timestamped backup**, and (2) record the **exact one-command restore route** (path + command) in the phase's evidence, *before* the change. Live machine configuration must be as reversible as the code — restored by a recorded command, never reconstructed after the fact. This gap (config not travelling with git) has bitten before.
 
 ## 4. Decisions — corrected (A–D + git + rule 5)
 
@@ -64,6 +66,7 @@ Where the way is already clear (native permissions over a homemade gate; surgica
 11. **Rule 5 narrowed** from "genuine complexity" to "material route uncertainty that must be resolved before safe execution" — so it can't become the next compliance monster.
 12. **Tower/Codex moved BEFORE the deletion lands** (Phase 5), reviewing the real teardown diff — not after it (was Phase 6).
 13. **Phase 2 regrowth-capped:** existing routes first; any new mechanism needs evidence no existing route suffices.
+14. **Config reversibility made explicit (Warwick, 2026-08-02):** before editing gitignored `.claude/settings.local.json` or out-of-repo managed settings, preserve the previous file (timestamped) and record the exact restore route first. Live config must be as reversible as code — git does not cover these files.
 
 ## 6. Where this stops (Wayfinder discipline)
 
