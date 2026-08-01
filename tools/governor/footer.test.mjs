@@ -13,13 +13,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import {
   GOV_MARKER,
   SEP,
   HANDBACK_CODES,
+  HANDBACK_PREFIX,
   FOOTER_STATES,
   ADVICE,
   ADVICE_VALUES,
@@ -40,6 +43,9 @@ import {
   nextModelFor,
   resolveHealthSample,
   computeFooterLine,
+  parseCliArgs,
+  runCli,
+  CLI_EXIT,
 } from './footer.mjs';
 
 // Imported ONLY to pin the shared vocabulary against drift — see the frozen-literal test
@@ -957,5 +963,393 @@ test('computeFooterLine always returns a GRAMMATICAL line, even with everything 
   } finally {
     rmSync(dir, { recursive: true, force: true });
     rmSync(deliverables, { recursive: true, force: true });
+  }
+});
+
+// ===========================================================================
+// WP-7 — THE PRODUCER (the CLI)
+// ===========================================================================
+// Nolan's finding: `footer.mjs` had no CLI, so the only way to produce the footer the
+// constitution demands on every reply was to type it by hand — which the same clause
+// calls a defect. These proofs cover the entrypoint that closes that, and AC5 below is
+// the one that matters: it is what makes drift between the producer and the checker
+// impossible, and it is the test AC6's mutation is required to turn red.
+
+const FOOTER_MODULE_PATH = fileURLToPath(new URL('./footer.mjs', import.meta.url));
+
+// A store containing one sample, ready to be pointed at by MYPKA_GOVERNOR_HEALTH_DIR or
+// by the `envOverride` injection. `used` is the only knob most tests need.
+function storeWith(sessionId, overrides = {}) {
+  const dir = tmp();
+  writeFileSync(join(dir, `${sessionId}.json`), JSON.stringify({
+    schema_version: 1,
+    sampled_at: new Date().toISOString(),
+    session_id: sessionId,
+    context_window: { used_percentage: 18 },
+    ...overrides,
+  }));
+  return dir;
+}
+
+// A location that needs no git and no repository — `runCli` only ever asks for
+// `{ repoRoot, branch }`, so a stub is the whole seam.
+const stubLocation = (repoRoot, branch) => () => ({ repoRoot, branch });
+
+// ---------------------------------------------------------------------------
+// AC1 — importing the module must execute NOTHING
+// ---------------------------------------------------------------------------
+
+test('WP-7 AC1: importing footer.mjs writes nothing, prints nothing, and does not exit', () => {
+  const dir = tmp();
+  try {
+    const marker = join(dir, 'marker.txt');
+    const importer = join(dir, 'importer.mjs');
+    // The marker is what stops this test passing for the wrong reason. Empty stdout on
+    // its own would also be produced by an import that silently FAILED, so the child
+    // proves the import genuinely completed by writing what it found — to a FILE, never
+    // to stdout, because stdout is the thing under test.
+    writeFileSync(importer, [
+      "import { writeFileSync } from 'node:fs';",
+      `const mod = await import(${JSON.stringify(pathToFileURL(FOOTER_MODULE_PATH).href)});`,
+      `writeFileSync(${JSON.stringify(marker)}, typeof mod.runCli + ':' + typeof mod.renderFooter);`,
+    ].join('\n'));
+
+    const r = spawnSync(process.execPath, [importer], { encoding: 'utf8' });
+
+    assert.equal(readFileSync(marker, 'utf8'), 'function:function', 'the import must actually have happened');
+    assert.equal(r.stdout, '', `importing printed to stdout: ${JSON.stringify(r.stdout)}`);
+    assert.equal(r.stderr, '', `importing printed to stderr: ${JSON.stringify(r.stderr)}`);
+    assert.equal(r.status, 0, 'importing must not exit non-zero');
+
+    // The guard is what makes that true, and it must be the house one — `process.argv[1]`
+    // compared as a file URL. Asserted against the SOURCE so that deleting the guard
+    // cannot leave this suite green on the strength of the behavioural check alone.
+    const src = readFileSync(FOOTER_MODULE_PATH, 'utf8');
+    assert.ok(
+      src.includes('if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href)'),
+      'the CLI must be behind the house import.meta.url entrypoint guard'
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// AC2 — one line, one newline, exit 0, everything resolved by the CLI itself
+// ---------------------------------------------------------------------------
+
+test('WP-7 AC2: with no arguments the CLI resolves everything and emits exactly one line', () => {
+  const store = storeWith('sess-1');
+  // A repo root with a real Deliverables/ inside it: the CLI derives `deliverablesDir` as
+  // <repoRoot>/Deliverables, so this exercises the derivation rather than bypassing it.
+  const root = mkdtempSync(join(tmpdir(), 'gov-cli-repo-'));
+  try {
+    mkdirSync(join(root, 'Deliverables'), { recursive: true });
+    writeStateFixture(join(root, 'Deliverables'), 'BUILD-cli', (d) => satisfyAll(d, { worktree: root, branch: 'feat/cli' }));
+
+    const r = runCli([], { locationFn: stubLocation(root, 'feat/cli'), envOverride: store });
+
+    assert.equal(r.exitCode, CLI_EXIT.OK);
+    assert.equal(r.stderr, '');
+    assert.equal(r.stdout.split('\n').length, 2, 'exactly one line and one trailing newline');
+    assert.equal(r.stdout.endsWith('\n'), true);
+    assert.equal(r.stdout.includes('\r'), false, 'no carriage return — the parser rejects trailing whitespace');
+
+    const parsed = parseFooter(r.stdout);
+    assert.equal(parsed.ok, true, `unparseable: ${JSON.stringify(r.stdout)}`);
+    // Everything resolved by the CLI: the newest sample (hence `~`), the state from the
+    // D-3 ladder, and the model from nextModelFor over the matching programme.
+    assert.equal(parsed.fields.percent, 18);
+    assert.equal(parsed.fields.approximate, true, 'no --session means the newest sample, which is approximate');
+    assert.equal(parsed.fields.state, 'GREEN');
+    assert.equal(parsed.fields.advice, ADVICE.KEEP_GOING);
+    assert.equal(parsed.fields.next, 'Sonnet', 'next: comes from nextModelFor over the matching programme');
+    assert.equal(parsed.fields.control, CONTROL_CONTINUE);
+    assert.equal(r.stdout.trimEnd(), '⟦GOV⟧ ctx ~18% · GREEN · KEEP GOING · next: Sonnet · CONTINUE');
+  } finally {
+    rmSync(store, { recursive: true, force: true });
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('WP-7 AC2: --session reads the EXACT sample, and drops the ~ approximate flag', () => {
+  const store = tmp();
+  try {
+    writeFileSync(join(store, 'mine.json'), JSON.stringify({
+      schema_version: 1, sampled_at: new Date().toISOString(), session_id: 'mine',
+      context_window: { used_percentage: 71 },
+    }));
+    writeFileSync(join(store, 'theirs.json'), JSON.stringify({
+      schema_version: 1, sampled_at: new Date().toISOString(), session_id: 'theirs',
+      context_window: { used_percentage: 4 },
+    }));
+
+    const r = runCli(['--session', 'mine'], {
+      locationFn: stubLocation(null, null),
+      envOverride: store,
+    });
+    const parsed = parseFooter(r.stdout);
+    assert.equal(parsed.ok, true);
+    assert.equal(parsed.fields.percent, 71, 'the named session, not whichever file is newest');
+    assert.equal(parsed.fields.approximate, false, 'an exact session read is never approximate');
+  } finally {
+    rmSync(store, { recursive: true, force: true });
+  }
+});
+
+test('WP-7 AC2: the REAL entrypoint, spawned as a process, prints one line and exits 0', () => {
+  const store = storeWith('spawned', { context_window: { used_percentage: 33 } });
+  try {
+    // The actual command Larry runs. `runCli` is unit-tested above; this proves the
+    // guard, the stream writes and the exit code are wired to it.
+    const r = spawnSync(process.execPath, [FOOTER_MODULE_PATH, '--session', 'spawned'], {
+      encoding: 'utf8',
+      env: { ...process.env, MYPKA_GOVERNOR_HEALTH_DIR: store },
+    });
+    assert.equal(r.status, 0, `stderr: ${r.stderr}`);
+    assert.equal(r.stderr, '');
+    assert.equal(r.stdout.split('\n').length, 2);
+    const parsed = parseFooter(r.stdout);
+    assert.equal(parsed.ok, true, `unparseable: ${JSON.stringify(r.stdout)}`);
+    assert.equal(parsed.fields.percent, 33);
+  } finally {
+    rmSync(store, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// AC3 — the control token, checked by MEMBERSHIP against the frozen const
+// ---------------------------------------------------------------------------
+
+test('WP-7 AC3: CONTINUE is the default, and every one of the seven codes is accepted', () => {
+  assert.deepEqual(parseCliArgs([]), { ok: true, sessionId: null, control: CONTROL_CONTINUE });
+  assert.deepEqual(parseCliArgs(['--control', 'CONTINUE']), { ok: true, sessionId: null, control: 'CONTINUE' });
+
+  // Driven off the imported const, never a list typed here — the same discipline the
+  // module itself follows, and the reason a vocabulary change cannot pass silently.
+  assert.equal(HANDBACK_CODES.length, 7);
+  for (const code of HANDBACK_CODES) {
+    const token = `${HANDBACK_PREFIX}${code}`;
+    const args = parseCliArgs(['--control', token]);
+    assert.equal(args.ok, true, `rejected a legitimate code: ${code}`);
+    assert.equal(args.control, token);
+  }
+});
+
+test('WP-7 AC3: an unrecognised control token EXITS NON-ZERO, names the seven, and prints NO footer', () => {
+  // The load-bearing half. A bad token that rendered a footer anyway would emit
+  // CONTINUE, silently disabling the controller while looking installed.
+  for (const bad of ['HANDBACK:banana', 'HANDBACK:', 'banana', 'continue', 'CONTINUE ', 'HANDBACK:merge decision']) {
+    const r = runCli(['--control', bad], { locationFn: stubLocation('C:/repo', 'main') });
+    assert.equal(r.exitCode, CLI_EXIT.USAGE, `${JSON.stringify(bad)} should be a usage failure`);
+    assert.notEqual(r.exitCode, 0);
+    assert.equal(r.stdout, '', `a rejected token must emit NO footer — got ${JSON.stringify(r.stdout)}`);
+    assert.ok(r.stderr.includes(bad) || r.stderr.includes(JSON.stringify(bad)), 'the message must name what was rejected');
+    for (const code of HANDBACK_CODES) {
+      assert.ok(r.stderr.includes(code), `the message must name the seven — missing ${code}`);
+    }
+  }
+});
+
+test('WP-7 AC3: malformed arguments are usage failures, never a silently wrong footer', () => {
+  const cases = [
+    ['--session'],                    // flag with no value
+    ['--control'],                    // flag with no value
+    ['--session', '--control', 'CONTINUE'], // a flag is not a value
+    ['--verbose'],                    // unknown flag
+    ['sess-1'],                       // bare positional
+    ['--session', ''],                // empty value
+  ];
+  for (const argv of cases) {
+    const r = runCli(argv, { locationFn: stubLocation('C:/repo', 'main') });
+    assert.equal(r.exitCode, CLI_EXIT.USAGE, `${JSON.stringify(argv)} should be a usage failure`);
+    assert.equal(r.stdout, '', `${JSON.stringify(argv)} must emit no footer`);
+    assert.ok(r.stderr.includes('usage:'), 'a usage failure must say how to invoke it');
+  }
+});
+
+test('WP-7 AC3: the spawned entrypoint really exits non-zero on a bad code', () => {
+  const r = spawnSync(process.execPath, [FOOTER_MODULE_PATH, '--control', 'HANDBACK:banana'], { encoding: 'utf8' });
+  assert.notEqual(r.status, 0, 'a bad handback code must fail the process, not just the function');
+  assert.equal(r.stdout, '');
+  for (const code of HANDBACK_CODES) assert.ok(r.stderr.includes(code));
+});
+
+// ---------------------------------------------------------------------------
+// AC4 — never throws; a hostile world still produces a parseable line at exit 0
+// ---------------------------------------------------------------------------
+
+test('WP-7 AC4: every hostile input yields a valid BLIND line and exit 0', () => {
+  const dirs = [];
+  const store = (name, contents) => {
+    const d = tmp();
+    dirs.push(d);
+    if (contents !== undefined) writeFileSync(join(d, `${name}.json`), contents);
+    return d;
+  };
+
+  try {
+    const sampledAt = new Date().toISOString();
+    const cases = [
+      ['store missing entirely', ['--session', 'x'], { envOverride: join(tmpdir(), 'gov-cli-absent-xyz') }],
+      ['store present but empty', [], { envOverride: store('unused') }],
+      ['corrupt JSON', ['--session', 'bad'], { envOverride: store('bad', '{ this is not json') }],
+      ['truncated JSON', ['--session', 'bad'], { envOverride: store('bad', '{"schema_version":') }],
+      ['unrecognised schema', ['--session', 'bad'], { envOverride: store('bad', JSON.stringify({ schema_version: 99, sampled_at: sampledAt, session_id: 'bad', context_window: { used_percentage: 18 } })) }],
+      ['absent context_window', ['--session', 'bad'], { envOverride: store('bad', JSON.stringify({ schema_version: 1, sampled_at: sampledAt, session_id: 'bad' })) }],
+      ['percentage as a STRING', ['--session', 'bad'], { envOverride: store('bad', JSON.stringify({ schema_version: 1, sampled_at: sampledAt, session_id: 'bad', context_window: { used_percentage: '42' } })) }],
+      ['unparseable sampled_at', ['--session', 'bad'], { envOverride: store('bad', JSON.stringify({ schema_version: 1, sampled_at: 'whenever', session_id: 'bad', context_window: { used_percentage: 18 } })) }],
+      ['percentage out of grammar range', ['--session', 'bad'], { envOverride: store('bad', JSON.stringify({ schema_version: 1, sampled_at: sampledAt, session_id: 'bad', context_window: { used_percentage: 4000 } })) }],
+      ['sample belongs to another session', ['--session', 'mine'], { envOverride: store('mine', JSON.stringify({ schema_version: 1, sampled_at: sampledAt, session_id: 'someone-else', context_window: { used_percentage: 18 } })) }],
+      ['the evaluator throws', ['--session', 'ok'], { envOverride: store('ok', JSON.stringify({ schema_version: 1, sampled_at: sampledAt, session_id: 'ok', context_window: { used_percentage: 18 } })), evaluateFn: () => { throw new Error('boom'); } }],
+      ['the location resolver throws', [], { envOverride: join(tmpdir(), 'gov-cli-absent-xyz'), locationFn: () => { throw new Error('git exploded'); } }],
+      ['the location resolver returns nothing', [], { envOverride: join(tmpdir(), 'gov-cli-absent-xyz'), locationFn: () => undefined }],
+      ['the store read throws', [], { envOverride: join(tmpdir(), 'gov-cli-absent-xyz'), listDir: () => { throw new Error('EPERM'); } }],
+    ];
+
+    for (const [label, argv, deps] of cases) {
+      const r = runCli(argv, { locationFn: stubLocation('C:/repo', 'main'), ...deps });
+      assert.equal(r.exitCode, 0, `${label}: must exit 0`);
+      assert.equal(r.stderr, '', `${label}: an environment failure is not a usage failure`);
+      const parsed = parseFooter(r.stdout);
+      assert.equal(parsed.ok, true, `${label}: unparseable line ${JSON.stringify(r.stdout)}`);
+      assert.equal(parsed.fields.state, 'BLIND', `${label}: unreadable telemetry must be BLIND`);
+      assert.equal(parsed.fields.percent, null, `${label}: BLIND never reports a number`);
+      assert.equal(parsed.fields.advice, ADVICE.UNSURE, `${label}: BLIND is KEEP GOING?, never CLEAR NOW and never KEEP GOING`);
+      assert.notEqual(parsed.fields.state, 'GREEN', `${label}: INV-1 — BLIND is never GREEN`);
+    }
+  } finally {
+    for (const d of dirs) rmSync(d, { recursive: true, force: true });
+  }
+});
+
+test('WP-7 AC4: NO PROGRAMME means next: UNSET — it does NOT mean BLIND', () => {
+  // The corrected AC4 (raised at read-back, ruled by Larry). D-3 decides `state` from
+  // TELEMETRY; D-4 decides `next:` from PROGRAMME STATE. Rendering BLIND because no
+  // programme matched would have the footer claim it could not read telemetry it read
+  // perfectly well — a FALSE BLIND, the mirror of the false GREEN INV-1 forbids. This
+  // test pins the two ladders apart so nobody later "fixes" one into the other.
+  const store = storeWith('sess-1');
+  try {
+    const r = runCli(['--session', 'sess-1'], {
+      locationFn: stubLocation('C:/nowhere-in-particular', 'some/branch'),
+      envOverride: store,
+    });
+    const parsed = parseFooter(r.stdout);
+    assert.equal(r.exitCode, 0);
+    assert.equal(parsed.ok, true);
+    assert.equal(parsed.fields.next, NEXT_UNSET, 'no matching programme -> UNSET');
+    assert.equal(parsed.fields.state, 'GREEN', 'and the state still comes from the telemetry that WAS readable');
+    assert.equal(parsed.fields.percent, 18, 'a readable percentage is reported, not suppressed');
+    assert.notEqual(parsed.fields.state, 'BLIND', 'an absent programme must NEVER render BLIND');
+  } finally {
+    rmSync(store, { recursive: true, force: true });
+  }
+});
+
+test('WP-7 AC4: a handback requested by Larry survives a total telemetry failure', () => {
+  // Resetting to CONTINUE on the degraded path would silently discard a handback — the
+  // one direction in which failing "safe" traps nobody but loses the decision.
+  const r = runCli(['--control', `${HANDBACK_PREFIX}rotation-required`], {
+    locationFn: stubLocation(null, null),
+    envOverride: join(tmpdir(), 'gov-cli-absent-xyz'),
+  });
+  const parsed = parseFooter(r.stdout);
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.fields.state, 'BLIND');
+  assert.equal(parsed.fields.control, 'HANDBACK:rotation-required');
+  assert.equal(parsed.handbackCode, 'rotation-required');
+});
+
+// ---------------------------------------------------------------------------
+// AC5 — THE ROUND TRIP. This is what makes producer/checker drift impossible.
+// ---------------------------------------------------------------------------
+
+test('WP-7 AC5: parseFooter accepts EVERY line the CLI can emit — all states x all controls', () => {
+  const controls = [CONTROL_CONTINUE, ...HANDBACK_CODES.map((c) => `${HANDBACK_PREFIX}${c}`)];
+  assert.equal(controls.length, 8, 'CONTINUE plus the seven codes');
+
+  const store = storeWith('sess-1');
+  const missing = join(tmpdir(), 'gov-cli-absent-xyz');
+  let checked = 0;
+  try {
+    for (const state of FOOTER_STATES) {
+      for (const control of controls) {
+        // A readable sample, with the state forced across the whole vocabulary.
+        const r = runCli(['--session', 'sess-1', '--control', control], {
+          locationFn: stubLocation('C:/repo', 'main'),
+          envOverride: store,
+          evaluateFn: () => ({ state }),
+        });
+        assert.equal(r.exitCode, 0);
+        const parsed = parseFooter(r.stdout);
+        assert.equal(parsed.ok, true, `state=${state} control=${control}: parseFooter REJECTED ${JSON.stringify(r.stdout)}`);
+        assert.equal(parsed.fields.state, state);
+        assert.equal(parsed.fields.advice, adviceForState(state));
+        assert.equal(parsed.fields.control, control);
+        assert.equal(parsed.controlRecognised, true, 'the CLI can only ever emit a recognised token');
+        assert.equal(r.stdout.split('\n').length, 2);
+        checked += 1;
+
+        // ...and the same combination on the fully degraded path.
+        const blind = runCli(['--control', control], {
+          locationFn: stubLocation(null, null),
+          envOverride: missing,
+        });
+        const blindParsed = parseFooter(blind.stdout);
+        assert.equal(blindParsed.ok, true, `BLIND control=${control}: parseFooter REJECTED ${JSON.stringify(blind.stdout)}`);
+        assert.equal(blindParsed.fields.control, control);
+        assert.equal(blindParsed.fields.percent, null);
+        checked += 1;
+      }
+    }
+
+    // Percentage boundaries, both approximate flags — the remaining axes of the grammar.
+    for (const used of [0, 1, 99, 100, 18.4, 18.5]) {
+      const boundary = tmp();
+      try {
+        writeFileSync(join(boundary, 'b.json'), JSON.stringify({
+          schema_version: 1, sampled_at: new Date().toISOString(), session_id: 'b',
+          context_window: { used_percentage: used },
+        }));
+        for (const argv of [['--session', 'b'], []]) {
+          const r = runCli(argv, { locationFn: stubLocation('C:/repo', 'main'), envOverride: boundary });
+          const parsed = parseFooter(r.stdout);
+          assert.equal(parsed.ok, true, `used=${used} argv=${JSON.stringify(argv)}: ${JSON.stringify(r.stdout)}`);
+          assert.equal(parsed.fields.percent, Math.round(used));
+          assert.equal(parsed.fields.approximate, argv.length === 0, 'the ~ tracks whether the session was confirmed');
+          checked += 1;
+        }
+      } finally {
+        rmSync(boundary, { recursive: true, force: true });
+      }
+    }
+
+    // A control that has never been made to fail is not evidence (INV-5). Assert the
+    // count so a mutation that stops the loop executing cannot pass as a green.
+    assert.equal(checked, FOOTER_STATES.length * controls.length * 2 + 12);
+    assert.ok(checked > 0, 'the round-trip must actually have been exercised');
+  } finally {
+    rmSync(store, { recursive: true, force: true });
+  }
+});
+
+test('WP-7 AC5: the CLI line is byte-identical to renderFooter over the same fields', () => {
+  // The producer and the checker are the same code, and this is the assertion that says
+  // so: no separator, no spacing and no field order can drift into the CLI path alone.
+  const store = storeWith('sess-1');
+  try {
+    const r = runCli(['--session', 'sess-1', '--control', `${HANDBACK_PREFIX}spend`], {
+      locationFn: stubLocation('C:/repo', 'main'),
+      envOverride: store,
+    });
+    const expected = renderFooter({
+      percent: 18, approximate: false, state: 'GREEN', advice: ADVICE.KEEP_GOING,
+      next: NEXT_UNSET, control: 'HANDBACK:spend',
+    });
+    assert.equal(r.stdout, `${expected}\n`);
+    assert.equal(r.stdout.trimEnd(), '⟦GOV⟧ ctx 18% · GREEN · KEEP GOING · next: UNSET · HANDBACK:spend');
+  } finally {
+    rmSync(store, { recursive: true, force: true });
   }
 });
