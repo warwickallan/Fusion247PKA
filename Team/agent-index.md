@@ -23,6 +23,23 @@ Routing table for the team. Twelve specialists ship in the **v3.0.0 all-in-one**
 | Asdair | Household Shopping Steward | [[Team/Asdair - Household Shopping Steward/AGENTS]] | The weekly household shop as a standing job: "send that to Asdair", "do the shop", a shopping list arriving by any channel, planning a basket against the durable rulebook/Regulars, the needs-decision queue, the reconcile checklist, and recording + learning from what was actually bought. Default owner of [[SOP-021-run-the-weekly-asdair-shop]]. Durable function, disposable runtime — orients from committed files + `asdair` Postgres state, never from memory. Boundaries: does NOT drive the live browser (Larry holds it), NEVER books a slot, checks out or pays (Warwick's gate, absolute), never auto-substitutes, never touches schema or `services/**`, never handles a credential. Hired 2026-07-27. |
 | Keel | Implementation Engineer | [[Team/Keel - Implementation Engineer/AGENTS]] | Implementing an AUTHORISED Work Order in the Fusion service estate — Node service code, forward-only Postgres migrations, durable-worker mechanics (leases, idempotency, retry/backoff, dead-letter, outbox), executable test suites, a service's CI workflow, and runtime data access (queries, transactions, connection lifecycle). Permanent contract, disposable instances: one instance per Work Order, bounded to a declared `file_surface`, `credential_scope: none`, `live_authority: none`. **Returns a WORK ORDER READ-BACK and holds — it does not begin implementing until Larry explicitly accepts the read-back or issues an amended order** ([[SOP-022-work-order-preflight]], [[Templates/work-order]]). Preflights every order against observable reality and refuses an under-specified one rather than guessing; reports out-of-scope findings instead of fixing them. Also owns **operational readiness** of the services it builds — startup/shutdown behaviour, health endpoints, useful logging, restart-and-recovery *design*, configuration, launcher hooks, operational acceptance evidence, and the runbook Mack operates from (Warwick's boundary ruling, 2026-07-28: "Keel delivers a service that Mack can operate without Keel present"). Boundaries: UI stays with Felix; external connections and the *operation* of released services (supervision, monitoring, recovery *execution*, incident handling) stay with Mack; schema *decisions* stay with Silas (Keel authors the migration file implementing them, and stops rather than redesigning when a decision proves unworkable); the security gate stays with Vex; visual QA stays with Vera; research stays with Pax; architecture, integration, PR and merge stay with Larry (merge is Warwick's). Never merges, pushes, opens PRs, touches live services or credentials, edits contracts/SOPs, or certifies its own work as merge-ready — its tests are untrusted by default and every return is labelled builder self-test evidence. Hired 2026-07-28; see [[2026-07-27-nolan-engineering-hire-recommendation]] and [[2026-07-27-pax-delegation-failure-modes]]. |
 
+## The build team — standing roles on any active build
+
+Standing policy. On any active build these roles are assigned by default, and step 6 of the startup sequence in root `CLAUDE.md` means naming them for the build in hand:
+
+| Role on the build | Specialist |
+|---|---|
+| Orchestrates and integrates | **Larry** |
+| Independently audits | **Nolan** |
+| Owns architecture, durable state and integrity decisions | **Silas** |
+| Implements, through the Work Order process | **Keel** |
+| Researches | **Pax** |
+| Everything else | routed per the table above |
+
+Decidable test: for any piece of work on an active build, this table names an owner. Engaging someone other than the default, or retaining the work, is a **stated** choice with a reason — never a silent one.
+
+> Larry's duty to route rather than absorb is defined in Team/Larry - Orchestrator/AGENTS.md §9e. This file answers who owns what, not whether to delegate.
+
 ## Bootstrap rule
 
 If this table shrinks below 3 rows, Larry switches to Bootstrap Mode and prompts the user to hire replacements via Nolan.
