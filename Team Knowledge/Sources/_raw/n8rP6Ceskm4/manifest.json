@@ -1,0 +1,41 @@
+{
+  "source_url": "https://www.youtube.com/watch?v=n8rP6Ceskm4",
+  "video_id": "n8rP6Ceskm4",
+  "captured_at": "2026-08-01T02:03:05+00:00",
+  "title": "Cut LLM cost by 95%, replace ElevenLabs, and 10 top GitHub repos",
+  "channel": "The Next New Thing",
+  "published_date": "2026-06-05",
+  "duration_seconds": 2123,
+  "user_note": "BUILD-002 WP2 auto-detect",
+  "transcript_status": "extracted",
+  "transcript_source": "auto_captions",
+  "language": "English (auto-generated)",
+  "language_code": "en",
+  "segment_count": 1123,
+  "error_category": null,
+  "error_detail": null,
+  "retry_recommendation": null,
+  "tool_versions": {
+    "python": "3.13.6",
+    "youtube-transcript-api": "1.2.4",
+    "yt-dlp": "2026.7.4"
+  },
+  "routing": {
+    "fusion_review_status": "pending_cairn",
+    "assigned_agent": "youtubair",
+    "next_agent": "cairn",
+    "legacy_review_status": "pending_categorisair",
+    "legacy_next_agent": "categorisair",
+    "note": "Cairn has absorbed the legacy CategorisAIr role; legacy_* are aliases only."
+  },
+  "handoff": null,
+  "output_dir": "out\\auto\\2026-08-01__cut-llm-cost-by-95-replace-elevenlabs-and-10-top-github-repo__n8rP6Ceskm4",
+  "files": [
+    "TubeAIR Report - cut-llm-cost-by-95-replace-elevenlabs-and-10-top-github-repo - n8rP6Ceskm4.md",
+    "manifest.json"
+  ],
+  "idea": "IDEA-013",
+  "project_id": "F247-YT-INGRESS-001",
+  "build": "TubeAIR",
+  "schema_version": 2
+}
