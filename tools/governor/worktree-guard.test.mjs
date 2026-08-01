@@ -404,21 +404,60 @@ test('REQUIREMENT 7: the deny message carries the whole EnterWorktree protocol, 
     const reason = buildDenyReason({ toolName: 'Write', comparison, canonical });
 
     assert.match(reason, /Larry calls EnterWorktree with path: /, 'Larry initiates it');
+    assert.match(
+      reason,
+      /Larry performs this AUTOMATICALLY; Warwick does nothing/,
+      'the DEFAULT is the silent in-process auto-route, not an announce-and-wait'
+    );
+    assert.match(reason, /routes the session INTO the canonical checkout in-process/);
+    assert.match(reason, /needs no\n\s*relaunch/, 'no relaunch is required for the default path');
     assert.ok(
       reason.includes('"Approve the pending EnterWorktree request in the local Claude terminal"'),
-      'the exact sentence Warwick must be told, word for word'
+      'the exact fallback sentence is still carried, word for word'
     );
-    assert.match(reason, /approval prompt may appear ONLY in the local/, 'the Remote Control caveat');
-    assert.match(reason, /Larry waits for the approval/);
-    assert.match(reason, /must NOT spin silently/);
-    assert.match(reason, /must NOT continue via absolute paths/);
-    assert.match(reason, /must NOT ask Warwick to run git commands/);
+    assert.match(reason, /FALLBACK — ONLY if EnterWorktree actually BLOCKS/, 'announce-and-wait is demoted to a fallback');
+    assert.match(reason, /then waits/);
+    assert.match(reason, /must NOT ask Warwick to relaunch, to open a terminal in a particular folder,/);
+    assert.match(reason, /or to run git/);
     assert.match(reason, /NO IMPLEMENTATION IS PERMITTED/);
 
     // And it must show BOTH locations, or the reader cannot tell what is wrong.
     assert.ok(reason.includes(e.canonicalWorktree), 'names where it should be');
     assert.ok(reason.includes(e.otherWorktree), 'names where it is');
     assert.ok(reason.includes('some/other-branch'), 'names the wrong branch');
+  } finally {
+    e.cleanup();
+  }
+});
+
+// Warwick's standing ruling (2026-08-01): Warwick must never manage repository
+// folders, worktrees or session launch locations. The deny reason must therefore
+// lead with the SILENT AUTO-ROUTE and must never instruct Warwick to relaunch,
+// quit, or open a terminal in a folder as the PRIMARY recovery. Made to fail: the
+// mutant that reinstates "quit and relaunch" as step 1 turns this RED.
+test('CONTROL: the deny reason auto-routes via EnterWorktree and never tells Warwick to relaunch/quit/open a folder', () => {
+  const e = makeEstate();
+  try {
+    const canonical = canonicalFromState(e.doc, e.statePath);
+    const comparison = misalignedComparison(canonical, liveLocation({ cwd: e.otherWorktree }));
+    const reason = buildDenyReason({ toolName: 'Write', comparison, canonical });
+
+    // (a) the EnterWorktree auto-route IS the primary step, and it is Larry's, not Warwick's.
+    const autoRouteIdx = reason.indexOf('1. Larry calls EnterWorktree with path:');
+    assert.ok(autoRouteIdx !== -1, 'the EnterWorktree auto-route is step 1');
+    assert.match(reason, /performs this AUTOMATICALLY; Warwick does nothing/);
+
+    // (b) no directive putting a session-lifecycle chore on Warwick as the primary path.
+    assert.ok(!/\brelaunch\b/i.test(reason.slice(0, autoRouteIdx)), 'nothing tells Warwick to relaunch before the auto-route');
+    assert.ok(!/quit Claude Code/i.test(reason), 'never asks Warwick to quit Claude Code');
+    assert.match(reason, /must NOT ask Warwick to relaunch, to open a terminal in a particular folder,/);
+    // Every "relaunch" occurrence is non-instructional: the "needs no relaunch"
+    // reassurance and the explicit prohibition. Any OTHER relaunch phrase (e.g. the
+    // old "quit and relaunch" primary) makes this RED.
+    const strippedReason = reason
+      .replace(/needs no\s+relaunch/gi, '')
+      .replace(/must NOT ask Warwick to relaunch/gi, '');
+    assert.ok(!/relaunch/i.test(strippedReason), 'relaunch appears only as reassurance or prohibition, never as an instruction');
   } finally {
     e.cleanup();
   }

@@ -562,15 +562,17 @@ export function renderLaunch(resolution, { liveCwd = null } = {}) {
     } else {
       lines.push(
         '',
-        'A MOVE IS REQUIRED — Larry performs it, Warwick does not (AD-20):',
+        'A MOVE IS REQUIRED — Larry performs it AUTOMATICALLY; Warwick does nothing (AD-20):',
         `  1. Larry calls EnterWorktree with path: ${loc.worktree}`,
-        '  2. Under Remote Control the approval prompt may appear ONLY in the local',
-        '     Claude terminal. Larry must IMMEDIATELY tell Warwick, in these words:',
+        '     This routes the session INTO the canonical checkout in-process. It needs no',
+        '     relaunch, and in observed Remote Control use it needed no approval prompt.',
+        '  2. Larry re-verifies cwd, repository root and branch, then continues the work.',
+        '',
+        '  FALLBACK — ONLY if EnterWorktree actually BLOCKS on an approval that Warwick',
+        '  cannot see from Remote Control: Larry says this once, verbatim, then waits —',
         `     "${AD21_LINE}"`,
-        '  3. Larry waits for the approval. No silent spinning, and no absolute-path',
-        '     workaround — writing into the right files from the wrong repository',
-        '     state is the exact failure the T-11 gate exists to stop.',
-        '  4. After entry, re-verify cwd, repository root and branch before writing.',
+        '  Larry must NOT ask Warwick to relaunch, to open a terminal in a particular folder,',
+        '  or to run git.',
         '',
         'Nothing here is for Warwick to do. Larry owns the complete lifecycle.'
       );

@@ -667,10 +667,24 @@ test('REAL GIT: a launch that needs a move carries the AD-21 protocol verbatim; 
     assert.equal(resolution.status, RESOLVE.OK);
 
     const away = renderLaunch(resolution, { liveCwd: estate.beta });
+    // The local-terminal line is still carried verbatim — but now as the FALLBACK.
     assert.match(away, /Approve the pending EnterWorktree request in the local Claude terminal/);
     assert.match(away, /Larry calls EnterWorktree with path: /);
     assert.ok(away.includes(estate.alpha), 'the destination is stated');
     assert.match(away, /T-02/, 'the next ticket travels with the launch');
+
+    // CONTROL (Warwick's 2026-08-01 ruling): the DEFAULT is the silent auto-route
+    // and nothing tells Warwick to relaunch/quit/manage a folder. Made to fail: a
+    // mutant restoring "quit and relaunch" as the primary move turns this RED.
+    const autoRouteIdx = away.indexOf('1. Larry calls EnterWorktree with path:');
+    assert.ok(autoRouteIdx !== -1, 'the EnterWorktree auto-route is step 1');
+    assert.match(away, /Larry performs it AUTOMATICALLY; Warwick does nothing/);
+    assert.match(away, /FALLBACK — ONLY if EnterWorktree actually BLOCKS/);
+    assert.ok(!/quit Claude Code/i.test(away), 'never asks Warwick to quit Claude Code');
+    const strippedAway = away
+      .replace(/needs no\s+relaunch/gi, '')
+      .replace(/must NOT ask Warwick to relaunch/gi, '');
+    assert.ok(!/relaunch/i.test(strippedAway), 'relaunch appears only as reassurance or prohibition, never as an instruction');
 
     const inside = renderLaunch(resolution, { liveCwd: join(estate.alpha, 'tools') });
     assert.match(inside, /ALREADY in the canonical worktree/);

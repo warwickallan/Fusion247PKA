@@ -382,15 +382,17 @@ export function buildDenyReason({ toolName, comparison, canonical, classificatio
     'session rooted somewhere else is exactly the failure this guard exists to stop —',
     'the files may be right while the branch and HEAD the work lands on are wrong.',
     '',
-    'RECOVERY — Larry performs this, Warwick does not:',
+    'RECOVERY — Larry performs this AUTOMATICALLY; Warwick does nothing:',
     `  1. Larry calls EnterWorktree with path: ${canonical?.worktree}`,
-    '  2. Under Remote Control the approval prompt may appear ONLY in the local',
-    '     Claude terminal. Larry must IMMEDIATELY tell Warwick, in these words:',
+    '     This routes the session INTO the canonical checkout in-process. It needs no',
+    '     relaunch, and in observed Remote Control use it needed no approval prompt.',
+    '  2. Larry re-verifies cwd, repository root, branch and HEAD, then continues the work.',
+    '',
+    '  FALLBACK — ONLY if EnterWorktree actually BLOCKS on an approval that Warwick',
+    '  cannot see from Remote Control: Larry says this once, verbatim, then waits —',
     '     "Approve the pending EnterWorktree request in the local Claude terminal"',
-    '  3. Larry waits for the approval.',
-    '     Larry must NOT spin silently, must NOT continue via absolute paths, and',
-    '     must NOT ask Warwick to run git commands. Larry owns the git lifecycle.',
-    '  4. After entry, re-verify cwd, repository root, branch and HEAD before writing.'
+    '  Larry must NOT ask Warwick to relaunch, to open a terminal in a particular folder,',
+    '  or to run git. Larry owns the complete git lifecycle (AD-20).'
   );
 
   return lines.join('\n');

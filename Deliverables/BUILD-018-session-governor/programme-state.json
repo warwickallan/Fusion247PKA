@@ -891,7 +891,7 @@
   },
   "resumption": {
     "focus": "Make the Governor produce something Warwick can actually see, and make the operating model survive /clear and a genuinely fresh session.",
-    "next_action": "Warwick performs the ONE human action: quit Claude Code COMPLETELY and relaunch, then /clear and type continue. Hooks bind at process launch, so the /clear path, the PreToolUse guards and the Stop execution controller cannot be observed firing until then - they are installed in both checkouts and inert. That observation is T-08 (live dogfood rotation, M4), which remains open and is the only route to calling Outcome A complete rather than honestly partial.",
+    "next_action": "If this session is not already in C:/Fusion247PKA-governor, Larry auto-routes there via EnterWorktree (silent, in-process, no Warwick action — no relaunch, no folder to open, no git). Then complete a frontier ticket unaided: a fresh session, started from the normal entry point, resuming and doing real work with zero re-briefing IS the M4 acceptance (T-08 live dogfood rotation). The auto-route mechanics live in the wrong-worktree RECOVERY block of the reorientation brief and the PreToolUse deny reason, not here.",
     "ticket": "T-08",
     "worktree": "C:/Fusion247PKA-governor",
     "branch": "build-018/session-governor",
@@ -1008,8 +1008,8 @@
     },
     {
       "id": "AD-21",
-      "decision": "The EnterWorktree recovery protocol. Larry initiates it. Under Remote Control the approval may appear ONLY in the local terminal, so Larry must IMMEDIATELY say, verbatim: \"Approve the pending EnterWorktree request in the local Claude terminal\", then wait. Larry must NOT spin silently, must NOT continue via absolute paths, and must NOT ask Warwick to run git commands.",
-      "why": "Learned live on 2026-07-31: a pending approval invisible to the remote side reads as the assistant hanging, and five minutes vanished. The protocol is embedded verbatim in the deny message and in the brief rather than only in the map, because at the moment it is needed nobody is reading the map - the refusal is the only thing on screen."
+      "decision": "The EnterWorktree recovery protocol (default = SILENT AUTO-ROUTE; corrected 2026-08-01). When a session is in the wrong worktree, Larry AUTO-ROUTES himself into the canonical checkout by calling EnterWorktree, silently and in-process. It needs no relaunch and, on observed Remote Control use, no approval prompt. ONLY if EnterWorktree actually BLOCKS on an approval invisible to Remote Control does Larry say, once and verbatim: \"Approve the pending EnterWorktree request in the local Claude terminal\", then wait. Larry never asks Warwick to relaunch, to open a terminal in a particular folder, or to run git — Warwick must never manage repository folders, worktrees or session launch locations (Warwick's standing ruling, 2026-08-01).",
+      "why": "Learned live on 2026-07-31: a pending approval invisible to the remote side reads as the assistant hanging, and five minutes vanished — which is the whole reason the fallback line still exists. CORRECTED 2026-08-01 against live evidence: EnterWorktree into the canonical worktree succeeded through Remote Control with ZERO approval prompt, so announce-and-wait is a FALLBACK, not the default; the default is the silent auto-route. The protocol is embedded verbatim in the deny message and the brief rather than only in this map, because at the moment it is needed nobody is reading the map — the refusal is the only thing on screen."
     },
     {
       "id": "AD-26",

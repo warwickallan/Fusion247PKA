@@ -1027,10 +1027,18 @@ test('REQUIREMENT 5 (MUTATION, REAL GIT): reorienting from the WRONG worktree re
     assert.match(r.context, /NO IMPLEMENTATION IS PERMITTED/);
 
     // Requirement 7 — the recovery protocol, verbatim, in the brief itself.
+    // Default is the SILENT AUTO-ROUTE; the local-terminal line is now the fallback.
     assert.ok(r.context.includes('"Approve the pending EnterWorktree request in the local Claude terminal"'));
     assert.match(r.context, /Larry calls EnterWorktree with path: /);
-    assert.match(r.context, /must NOT spin silently/);
-    assert.match(r.context, /must NOT ask Warwick to run git commands/);
+    assert.match(r.context, /performs this AUTOMATICALLY; Warwick does nothing/);
+    assert.match(r.context, /FALLBACK — ONLY if EnterWorktree actually BLOCKS/);
+    assert.match(r.context, /must NOT ask Warwick to relaunch, to open a terminal in a particular folder,/);
+    // The corrected brief must not tell Warwick to relaunch or quit as the recovery.
+    assert.ok(!/quit Claude Code/i.test(r.context), 'the brief never asks Warwick to quit Claude Code');
+    const strippedCtx = r.context
+      .replace(/needs no\s+relaunch/gi, '')
+      .replace(/must NOT ask Warwick to relaunch/gi, '');
+    assert.ok(!/relaunch/i.test(strippedCtx), 'relaunch appears only as reassurance or prohibition, never as an instruction');
 
     // ORDER is part of the control: a reader who meets the next action first
     // starts working before learning it may not.
