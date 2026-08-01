@@ -129,7 +129,7 @@ checking, never text judgement (`escalation-gate.mjs` AC2 precedent):
 
 ```
 product-decision · permission · spend · irreversible-live-action
-· unsafe-state · rotation-required · merge-decision
+· unsafe-repository-state · rotation-required · merge-decision
 ```
 
 These are constitution clause 4's seven legitimate interruptions, one-for-one. A declared handback with
@@ -563,7 +563,7 @@ ADVICE    := "KEEP GOING" | "CLEAR NOW" | "KEEP GOING?"
 NEXT      := "next:" SP ( "Opus" | "Sonnet" | "Haiku" | "UNSET" )
 CTRL      := "CONTINUE" | "HANDBACK:" CODE
 CODE      := "product-decision" | "permission" | "spend"
-           | "irreversible-live-action" | "unsafe-state"
+           | "irreversible-live-action" | "unsafe-repository-state"
            | "rotation-required" | "merge-decision"
 ```
 

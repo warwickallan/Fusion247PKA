@@ -7,8 +7,9 @@ status: complete
 created: 2026-08-01
 audited_commit: f582611 (branch build-018/wp2-constitution, worktree C:/Fusion247PKA-wo-02)
 audited_base: 3ec562a
+recheck_commit: 1077a8b (same branch and worktree)
 private_surface: none
-verdict: NOT YET — merge-blocking defects at clause 4
+verdict: pass 1 — NOT YET (merge-blocking defects at clause 4) · pass 2 (re-check of 1077a8b) — MERGEABLE, subject to one one-line fix and one precondition on the parallel work
 ---
 
 # BUILD-018 WP-2 — Independent audit of the operating constitution
@@ -484,3 +485,236 @@ this one, and nothing in `C:/Fusion247PKA-wo-02` was written. No mutating git co
 run. `private_surface: none` — no access to `C:\.fusion247\**` was required or taken; the
 exposure ruling in §4 rests only on the two path literals already visible in `CLAUDE.md`
 and on file-name-only `git grep -l` output.*
+
+---
+---
+
+# PASS 2 — RE-CHECK of commit `1077a8b`
+
+Same read-only posture, same prohibitions. `git diff f582611` first, then the clause-4,
+§9a, banner and clause-6 regions read whole. Every verdict below is from execution, not
+from the author's report or Larry's summary.
+
+## R1. Are the five genuinely closed?
+
+| # | Finding | Closed? |
+|---|---|---|
+| 1 | `unsafe-state` → `unsafe-repository-state` | **CLOSED in the constitution — but see N1: the same defect is now live in the `footer.mjs` build spec** |
+| 2 | Material scope change restored | **CLOSED, and soundly** |
+| 3 | §9a cross-reference | **CLOSED, substance untouched** |
+| 4 | Clause 1 step 3 collapses by programme id | **CLOSED, and better than I asked for** |
+| 5 | Member 5 gloss + precedence carve-out | **Carve-out CLOSED and stronger than proposed; gloss closed in meaning, see R2** |
+
+**1 — `unsafe-repository-state`.** `CLAUDE.md:82` now carries the literal frozen at
+`escalation-gate.mjs:170`. `git grep -n "unsafe-state"` returns **zero hits in `tools/`**
+and zero in the three constitution files. Closed at the surface I audited.
+
+**2 — material scope change.** `CLAUDE.md:78`: *"a genuine product decision, **including a
+material change to agreed scope**"*. This is the right shape and not a fudge: a material
+change to agreed scope **is** a product decision, so the gloss is a clarifying instance of
+member 1, not a second idea smuggled in. Decidability survives — *"has the agreed scope
+materially changed?"* is answerable yes/no. AD-26 is satisfied and the list stays at seven.
+
+**3 — §9a.** The pointer is at `AGENTS.md:250`, placed after the Never list. I diffed §9a
+itself: the Escalate, Decide-personally and Never lines are **byte-identical** to
+`f582611`. Substance untouched, as claimed.
+
+**4 — clause 1 step 3.** `CLAUDE.md:52` collapses by programme id first, then matches — and
+it goes further than my fix by naming the sting in-line (*"merging your own work is what
+creates the extra copies"*) and by distinguishing zero from *"copies that genuinely
+disagree"*, which is `build-registry.mjs`'s actual refuse-rather-than-pick behaviour rather
+than my cruder "exactly one programme". This is better than what I proposed. Closed.
+
+**5 — the carve-out.** `CLAUDE.md:132` names all six sections; I verified each string
+matches a real heading. It is also **stronger than what I proposed**: it extends to *"or
+with any specialist contract"*, which closes the route I had flagged as the live half of
+the hole (root `AGENTS.md:121` → Larry's §"Operating doctrine" → §9a). Root `AGENTS.md`
+untouched, constitution not moved. Closed.
+
+*One residual, low severity:* the carve-out protects the six **`CLAUDE.md`** sections. Clause
+2b and clause 3 live in `Team/Larry - Orchestrator/AGENTS.md` §9e, which is not one of the
+six, so a future root-`AGENTS.md` sentence contradicting §9e is not covered. Root
+`AGENTS.md` §3 already carries the compatible iron rule, so nothing is broken today. Worth
+one clause if it is ever cheap; not worth an edit now.
+
+## R2. Does the closed list still bind? — member 1 sound, member 5's *name* is the defect
+
+**Member 1 is not elastic.** Two ideas would mean two independent membership tests. There
+is one: a material change to agreed scope is a proper subset of a product decision. Bind
+intact.
+
+**Member 5's meaning is not a catch-all either, and I want to be precise about why**, because
+the obvious reading is that *"a blocker with no safe way through"* is exactly the kind of
+phrase that swallows everything. It does not, and the reason is that it interlocks with
+`CLAUDE.md:88`: *"anything a safe no-action default already resolves"* is explicitly NOT a
+Warwick decision. So the boundary is decidable — **if a safe default exists, there is no
+blocker and no member.** The two clauses constrain each other. Bind intact.
+
+**But the code name no longer describes the member, and that is a real defect — one my own
+two recommendations created between them.** Fix 1 made the name *narrower* and explicitly
+repository-scoped (`unsafe-repository-state`). Fix 5 made the meaning *wider* and not
+repository-scoped at all. They pull in opposite directions and landed in the same commit.
+I should have seen the interaction and did not.
+
+It bites concretely. The canonical blocker in this estate — *required-but-unavailable*, e.g.
+an independent reviewer that cannot be reached when merge-readiness requires one — is not a
+repository state in any sense. Both `CLAUDE.md:76` and §9e instruct membership checking
+**"by name"**, and a Larry scanning the names for that situation will not stop at
+`unsafe-repository-state`. `escalation-gate.mjs:422-424` reinforces the narrow reading with
+a repository-scoped worked example (*"e.g. a secret committed to pushed…"*).
+
+*Smallest fix — one parenthetical, no code, keeps the frozen literal:* on member 5, note
+that the code name is inherited from the frozen enum in `escalation-gate.mjs` and is
+**broader than the word *repository* suggests**. That reconciles the name to the meaning at
+the only place a reader checks membership.
+
+## R3. The §9a mapping — sound; it neither widens nor narrows, but `product-decision` is
+now the residual member and the blockquote does not say so
+
+`AGENTS.md:250`. Judged item by item against §9a's Escalate list:
+
+| §9a item | Maps to | Sound? |
+|---|---|---|
+| merge-to-main | `merge-decision` | exact |
+| money and payment gates | `spend` | exact |
+| irreversible or outward-facing · consequential external action | `irreversible-live-action` | exact |
+| minting credentials | `permission` / `irreversible-live-action` | fine — *"unless another member fits better"* carries it |
+| genuine outcome ambiguity | `product-decision` | sound — ambiguity about the outcome is a product question by definition |
+| a real collision between two of Warwick's own instructions | `product-decision` | sound — only Warwick resolves his own collision, and §9a's *"name it plainly; never quietly pick one"* survives intact |
+| domain judgements | `product-decision` | acceptable — §9a's *"record both readings, encode neither, set a safe interim default"* still governs conduct |
+| **material risk** | `product-decision` | **weakest fit.** A material risk is not a product decision; it is a risk. It reaches Warwick either way, so nothing is lost operationally — but this is the item that makes `product-decision` look like a bucket |
+
+**Does it widen?** No, and this is the property that decides it: the mapping relates two
+**closed** sets to each other. It adds no new escalation reason, so the escalation surface
+is exactly §9a ∪ the seven, unchanged from before the pass. Only the vocabulary moved.
+
+**Does it narrow?** Yes — deliberately and correctly. §9a is now read *through* the closed
+list rather than beside it, which is the subordination I asked for and is consistent with
+the new carve-out making `CLAUDE.md` the source for clause 4.
+
+**What the blockquote leaves implicit.** `product-decision` is now the **residual member** —
+four heterogeneous §9a items land there. That is structurally *right*; a closed list without
+a residual is unusable, because the first unmapped case breaks it. But the blockquote does
+not say so, leaving the reader to infer it from four worked examples.
+
+**One circularity, low severity, worth naming.** The closing sentence — *"If an item here
+appears to have no member, that is a defect to raise, not a licence to interrupt outside the
+list"* — forbids the act it prescribes: raising a defect *with Warwick* is itself an
+interruption. In practice it resolves through the residual, which is why **naming
+`product-decision` as the residual would repair both this and the implicitness above in one
+clause.** Optional; not a blocker.
+
+## R4. The reconciliation note — provenance only, with one deletable sentence
+
+`CLAUDE.md:86`. Deletion test applied to each of its three parts:
+
+- *"AD-26's material scope change, and a genuine blocker"* — **provenance.** Naming what a
+  provenance note is provenance *for* is a reference, not a second home. Passes.
+- *"marked so the next reader sees each was settled into an existing member rather than
+  dropped"* — **unique fact**, and a genuinely useful one: it is what stops the next reader
+  repeating my pass-1 investigation. Passes.
+- *"The list stays closed at seven."* — **duplicate.** `CLAUDE.md:76` already says *"This is
+  a closed list… one of these seven."* Delete this sentence and nothing is lost.
+
+So: **provenance only, with one restated sentence.** The author's first version was caught
+by its own grep; this version is clean except for that one line, which no grep would catch
+because it is a paraphrase, not a repeated string. Trivial severity, but it is the same
+shape the author was watching for.
+
+*Divergence risk, inherent to provenance notes:* if anyone later edits member 1 or 5's
+gloss, `:86` will still assert the reconciliation happened. Acceptable.
+
+## R5. My own deletion test — run independently, two failures found
+
+I ran criterion 4 myself across the three files rather than reading any table. **Passing:**
+the seven live only in `CLAUDE.md` (§9a, §9e and `:92` all point, none restates); the
+non-boundaries only in §9e; the build team only in `agent-index.md`; *"hooks enforce, never
+carry"* once; the honest limit once. Clause 5's rewording at `:100` genuinely passes — it is
+now the rule plus the defect classification, true both before and after the two hard-coded
+copies are retired, exactly as claimed.
+
+**Two failures, both new. Neither was in my pass-1 report — I did not run the deletion test
+then, and Larry was right to make me run it now.**
+
+**DT-1 — footer field order has two homes.** `CLAUDE.md:106` states the order — *"context
+health as a percentage · the state · the KEEP GOING / CLEAR NOW advice · the next-model
+recommendation · the continue-or-handback control token"* — and `:112` declares that **field
+order** belongs in `footer.mjs`. I checked `:106` against the grammar at
+`D-governor-constitution-and-continuation.md:556`:
+
+```
+FOOTER := "⟦GOV⟧" SP CTX SEP STATE SEP ADVICE SEP NEXT SEP CTRL
+```
+
+Five fields, identical sequence. `:106` is a faithful duplicate of a fact the next line sends
+elsewhere. *Smallest fix: `:106` → "The footer carries these fields:" — drop "in this
+order". Two words.*
+
+**DT-2 — the banner and the footer contradict each other on position. This is the one I
+would fix before merge.** Three statements that cannot all hold on a first reply:
+
+- `:58` — *"One banner, at the top of the first reply."*
+- `:68` — banner **line 5** is *"The `⟦GOV⟧` footer line, verbatim"*.
+- `:104` — *"Every reply **ends** with a `⟦GOV⟧` footer as its **final line**."*
+
+Either the footer appears twice (once near the top inside the banner, once at the end), or
+the banner is not at the top, or the footer is not final. It also fails the deletion test in
+the same place: delete banner row 5 and no fact is lost, because `:104` already requires the
+footer on every reply.
+
+This is **pre-existing at `f582611` — I missed it** — and survives `1077a8b`. It matters more
+than DT-1 because startup step 9 is executed literally on every fresh session, so a fresh
+Larry hits the contradiction on its very first output. *Smallest fix: delete row 5, and
+change `:60`'s parenthetical to "(four lines; the footer follows the banner as the reply's
+final line, per § 'Governor advice')". One row plus one parenthetical.*
+
+## R6. Anything newly broken by the fixes?
+
+**Nothing broken.** Two things newly *exposed*, one of them important.
+
+**N1 — the `footer.mjs` build spec still says `unsafe-state`. Highest priority in this
+re-check, and it is not a `CLAUDE.md` edit at all.** `git grep -n "unsafe-state"` returns
+exactly two tracked hits, both in the accepted design record:
+
+- `decisions/D-governor-constitution-and-continuation.md:566` — inside the **formal grammar
+  block**, the `CODE` production: `| "irreversible-live-action" | "unsafe-state"`
+- `decisions/D-governor-constitution-and-continuation.md:132` — the same seven in prose
+
+That grammar block is the build input for `footer.mjs` — the very module Larry is gating the
+merge on, and the module `CLAUDE.md:112` names as the single renderer *and parser* of the
+footer. A builder working from it will emit `HANDBACK_CODES` containing `unsafe-state`, which
+matches neither the constitution (`:82`) nor the frozen `ESCAPE_HATCH_REASONS`. The pass-1
+defect is closed where I audited it and open where it will be consumed.
+
+*Action for Larry, before `footer.mjs` is written:* correct `D-…:566` and `:132`, **or** state
+the literal explicitly in the `footer.mjs` Work Order. The second is sufficient and cheaper;
+the first also stops the next reader building from a stale spec.
+
+**N2 — member 5's name/meaning mismatch** (R2). An artefact of my own two recommendations
+landing in one commit. I own it; the fix is one parenthetical.
+
+## R7. Merge verdict — pass 2
+
+**Mergeable now**, on two conditions, neither of which is a doctrine defect:
+
+1. **Take DT-2** in this commit — one row plus one parenthetical. It is a live instruction
+   contradiction that fires on the first reply of every fresh session, which is precisely the
+   moment clause 1 exists to govern.
+2. **Carry N1 into the `footer.mjs` work** as an explicit Work Order line. Larry already
+   controls the merge order; this just makes sure the fix survives the handoff.
+
+DT-1 and the member-5 name parenthetical are cheap and I would take them, but I would not
+block on either.
+
+**All three of my pass-1 merge-blockers are genuinely closed, not merely edited** — I checked
+each against the code rather than the report: the frozen enum for fix 1, AD-26's wording for
+fix 2, and a byte-level diff of §9a for fix 3. Two of the five fixes came back **better than
+what I proposed** (step 3's disagreement case, and the carve-out's extension to specialist
+contracts). The constitution is now internally coherent, honest about what is built versus
+declared, and — the property that decides it — binding on its own with no hook installed.
+
+---
+
+*Nolan — independent re-check, 2026-08-01, commit `1077a8b`. Read-only: the only file
+modified in either pass is this one; nothing in `C:/Fusion247PKA-wo-02` was written and no
+mutating git command was run. `private_surface: none`.*
