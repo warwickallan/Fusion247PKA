@@ -298,17 +298,22 @@
     {
       "id": "T-18",
       "title": "Windows-safe atomic write: retry the rename, and never orphan a temp file",
-      "state": "frontier",
+      "state": "resolved",
       "model": "Sonnet",
       "depends_on": [],
-      "resolved": null,
-      "evidence": [],
-      "note": "Found by Larry's independent verification of T-17 (2026-08-01), NOT by the ticket's own tests. See D-5. Fixes a SHARED defect in health-store.mjs (T-02) and delegation-gate.mjs (T-16): both do writeFileSync(tmp) then renameSync(tmp, target) with no retry, and on Windows a rename onto an existing target throws EPERM when another process holds it. MEASURED: health-store 21/48 writer processes failed under 16 concurrent processes; delegation-gate's own concurrency test fails roughly 2 runs in 5 in isolation. Secondary defect: every failed rename ORPHANS its temp file permanently (21 observed, cleaned by hand). Scope: bounded retry with backoff on EPERM/EBUSY/EACCES, temp-file cleanup in a finally, and a concurrency proof that asserts a NON-ZERO success count rather than only the absence of tearing."
+      "resolved": "2026-08-01",
+      "evidence": [
+        "tools/governor/atomic-write.mjs",
+        "tools/governor/atomic-write.test.mjs",
+        "Deliverables/BUILD-018-session-governor/evidence/T-18-windows-safe-atomic-write.md",
+        "Deliverables/BUILD-018-session-governor/tickets/T-18-windows-safe-atomic-write-work-order.md"
+      ],
+      "note": "Built by Keel under WO-2026-08-01-01, AMENDED after Keel returned CLARIFY and caught that Larry's own load-bearing criterion (AC4, 'assert a non-zero success count') was SATISFIABLE BY THE UNFIXED CODE - measured 47 of 48 writers succeeding against the broken writeHealthSample, so the test would have gone green on the defect it existed to catch. AC4 was rewritten to successCount === N with reader contention and a made-to-fail control. Keel also corrected the mechanism: EPERM is driven by a concurrent READER holding the target across the rename, not writer-vs-writer, which is why delegation-gate (reads every call) was flakier than health-store (never reads). One shared primitive tools/governor/atomic-write.mjs with exported policy (RETRYABLE_ERROR_CODES EPERM/EBUSY/EACCES, MAX_ATTEMPTS 5, RETRY_BUDGET_MS 250, BACKOFF_MS 10/20/40/80, BACKOFF_JITTER 0.5 - jitter added for a MEASURED reason, an unjittered lockstep retry was a thundering herd of the module's own making). delegation-gate passes a payload PRODUCER re-invoked per attempt (M1: replaying a stale snapshot would let a later rename discard another writer's records, converting lose-one into lose-several); health-store passes a constant. 19 new tests, 607/607 suite-wide. Both protected test files BYTE-UNMODIFIED and absent from the commit. delegation-gate.test.mjs 8/8 consecutive runs (was 9 pass / 3 fail over 12); health-store.test.mjs 6/6 (was 5/6). Secret scan exit 0 over the declared surface. INDEPENDENTLY VERIFIED BY LARRY with his own reader-contended probe against the real module, and the result is MIXED and recorded as such: ORPHANED TEMP FILES ARE FIXED - 0 orphans against a 7-orphan baseline on the same shape - but under CONTINUOUS reader hammering (16 readers in a tight loop for 2.5s, harsher than Keel's 25-read burst) 13 of 16 writer processes STILL FAIL. KEEL DISCLOSED THIS LIMIT PLAINLY rather than letting the green imply otherwise ('writers still fail 2-6 of 16 even with the retry; no policy inside the ceiling can fix that'), and Larry's probe confirms it is real and is worse at higher intensity. The 250ms ceiling was LARRY'S constraint (M2/M3, set because a PreToolUse hook that blocks longer is a gate in the way, AD-19) and Keel correctly refused to raise it unilaterally. SO WHAT T-18 ACTUALLY DELIVERS: the orphan leak is closed outright; the retry substantially reduces but does NOT eliminate writer failure under sustained reader contention. Both callers still fail SAFE on a lost write (health sample -> BLIND/stale per AD-3; delegation checkpoint -> undercount toward a missed deny). DEFERRED, NOT IMPLEMENTED, per Warwick's scope freeze 2026-08-01: (a) the residual high-contention failure band, which needs either a wider budget than a hook can afford or a different mechanism than retry; (b) T-19/D-6, the three remaining unretried sites (build-registry.mjs:275, programme-state.mjs:630 and :638, qa-binding.mjs:288) and the false 'never interleave' comment that propagated by citation; (c) Keel's reported contradiction between AC4 clause 5 (orphans non-zero on the failure variant) and AC3 (zero orphans on every path) - clause 5 was written against pre-fix behaviour that AC3 abolishes; Keel satisfied the intent with two variants and did NOT amend the criterion itself. POSIX behaviour unproven - this is a Windows phenomenon."
     },
     {
       "id": "T-19",
       "title": "Adopt the shared atomic write in the remaining three sites, and correct the false concurrency comment",
-      "state": "blocked",
+      "state": "frontier",
       "model": "Sonnet",
       "depends_on": [
         "T-18"
@@ -467,7 +472,7 @@
   "model_recommendation": {
     "model": "Sonnet",
     "effort": null,
-    "rationale": "T-18 fixes a MEASURED correctness defect (D-5) in already-landed code that the full suite's green hides because the failure is probabilistic. Sonnet-tier: the fix is well-understood (retry plus cleanup) and the judgement was already done in the diagnosis. It precedes T-12 because T-12 would otherwise extract the broken primitive into the portability boundary."
+    "rationale": "T-12 is named only because deriveResumption requires a frontier ticket; it is NOT an instruction to start it. Scope is frozen pending Warwick's decision on the visible-output gap."
   },
   "workers": [
     {
@@ -784,9 +789,9 @@
     "verified_at": "2026-07-31"
   },
   "resumption": {
-    "focus": "T-17 landed and was independently verified by adversarial probe. That verification surfaced D-5: health-store.mjs (T-02) and delegation-gate.mjs (T-16) share an atomic-write primitive that is NOT concurrency-safe on Windows - measured at 21/48 writer processes failing under 16-way concurrency, with orphaned temp files as a secondary leak. T-18 is registered to fix it and is the next action, ahead of T-12.",
-    "next_action": "Implement T-18 (see D-5): make the estate's atomic write concurrency-safe on Windows. Bounded retry with backoff on EPERM/EBUSY/EACCES around the rename, temp-file cleanup in a finally so no failure orphans a file, and fix the ONE shared primitive rather than patching two modules independently. The concurrency proof MUST assert a non-zero success count, not merely the absence of tearing. Keel-domain (tools/governor/**): route via a proper Work Order with a read-back gate. Take T-18 before T-12: T-12 extracts the portability adapter over these very modules, and extracting a known-broken primitive would copy the defect into the adapter boundary.",
-    "ticket": "T-18",
+    "focus": "T-18 landed: the orphaned-temp-file leak is fixed outright (0 orphans vs a 7-orphan baseline, independently verified by Larry), and the retry substantially reduces writer failure - but under sustained reader contention writers still fail, which Keel disclosed plainly and Larry's harsher probe confirmed. Scope is now FROZEN by Warwick. The build has 15 of 19 tickets resolved and a 607-test suite, but almost none of it is wired to produce anything Warwick can see: statusLine is unset, no health sample has ever been written, and only reorient + worktree-guard are live.",
+    "next_action": "SCOPE FROZEN BY WARWICK 2026-08-01: do NOT start T-12, T-19, T-06 or T-08, and do NOT create further defect, governance or hardening tickets. BUILD-018 stopped deliberately after T-18 for a reckoning about what the build has actually delivered to Warwick versus what it has built. THE STANDING FINDING A FRESH SESSION MUST NOT LOSE: the Governor produces NOTHING VISIBLE to Warwick today. statusLine is NOT SET in C:/Fusion247PKA/.claude/settings.local.json, so T-03's sampler never runs, so ZERO health samples have ever been written to ~/.mypka/governor/health/**, so T-04's evaluator has no input and T-05's status line renders nothing live. Only two governor pieces are actually live, both from T-11: SessionStart reorient.mjs and PreToolUse worktree-guard.mjs. The delegation gate (T-16) and escalation gate (T-17) are built, tested and NOT wired. Context health, rotation advice and next-model recommendation are therefore NOT visibly produced from telemetry - the model recommendation a fresh session sees comes from THIS BANKED FILE, not from measurement. The next action is Warwick's decision on that gap, not another ticket.",
+    "ticket": "T-12",
     "worktree": "C:/Fusion247PKA-governor",
     "branch": "build-018/session-governor",
     "read_first": [
