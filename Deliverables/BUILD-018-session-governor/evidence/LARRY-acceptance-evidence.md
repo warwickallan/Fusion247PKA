@@ -208,6 +208,31 @@ status line writes a sample on its first render, so the gate should see the mode
 worth watching for at the live proof, because a gate that stays `UNKNOWN` would ask Warwick for
 something the constitution's closed list does not include.
 
+## Both entry paths verified live, after estate cleanup
+
+The four finished worker worktrees were removed — **after proving each had zero unmerged commits and
+a clean tree**, which is the standing bar for touching a worktree. The twenty pre-existing worktrees
+(`.claude/worktrees/agent-*`, `-audit`, `-tower`, `-w01`) are **untouched**: they are baseline
+evidence, not cleanup permission. Two state copies remain.
+
+| `SessionStart.source` | Result |
+|---|---|
+| `startup` | `REORIENTED — BUILD-018 · Location: verified · Next ticket: T-23 · Recommended model: Opus` (1028 chars) |
+| `clear` | identical |
+
+Note the cleanup was **not** what fixed reorientation — WP-4 was. The estate had six copies when it
+first resolved. Cleanup only reduces the noise; the class fix is what makes it survive the merge to
+main, which creates a second copy by construction.
+
+**Watch item for the live proof, recorded rather than resolved.** The brief ends with
+*"Current model: UNKNOWN … Action: select Opus in the model selector, then send `continue`."* The
+`UNKNOWN` is structural, not a bug: at `SessionStart` the new session has not yet rendered a status
+line, so no health sample can exist for it yet. The flow still works — Warwick types `continue`, the
+status line renders, a sample is written, and the gate releases on the first check — but the wording
+asks him for two things where his acceptance says he types only `continue`. Verify at the live proof
+whether the gate releases as expected; if it does not, the wording needs softening, because asking
+for a model selection is not one of the seven legitimate interruptions.
+
 ## A7 — Larry continues rather than stopping at an internal boundary — **PENDING**
 
 The mechanism is proven to exist (see `LARRY-hook-contract-probe.md` §2: a `Stop` hook returning
