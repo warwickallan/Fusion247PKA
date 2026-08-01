@@ -325,10 +325,20 @@
     {
       "id": "T-20",
       "title": "Recovery source coverage, installer honesty, and the model-recommendation source",
-      "state": "frontier",
+      "state": "resolved",
       "model": "Opus",
       "depends_on": [],
-      "note": "WO-2026-08-01-01 (WP-1). Amended after Keel CLARIFY caught Larry generalising a 607/607 baseline from his own worktree."
+      "note": "PARTIAL by Keel's own verdict and correctly so: D-B B-3 was built then REVERTED because its justification depends on D-C, which has not landed, and it would have deleted a control asserting a LOUD missing brief rather than silence. 645/645 (baseline 607). Both load-bearing controls made to fail: re-inserting the source guard turned 8 tests red including an end-to-end real-process proof; restoring the dishonest prune line turned 3 red. Merged at c9ebef4. Larry then ran the real hook and confirmed reorientation FIRES on source=startup - and it exposed WP-4.",
+      "resolved": "2026-08-01",
+      "evidence": [
+        "tools/governor/reorient.mjs",
+        "tools/governor/reorient.test.mjs",
+        "tools/governor/install-hooks.mjs",
+        "tools/governor/install-hooks.test.mjs",
+        "tools/governor/statusline-live.mjs",
+        "tools/governor/statusline-live.test.mjs",
+        "Deliverables/BUILD-018-session-governor/tickets/WP-1-recovery-and-installer-work-order.md"
+      ]
     },
     {
       "id": "T-21",
@@ -354,9 +364,18 @@
       "depends_on": [
         "T-20",
         "T-21",
-        "T-22"
+        "T-22",
+        "T-24"
       ],
       "note": "Larry-retained integration. WP-2 must NOT merge before WP-3: CLAUDE.md references tools/governor/footer.mjs and the constitution own startup step 4 requires every named path to exist."
+    },
+    {
+      "id": "T-24",
+      "title": "Collapse duplicate programme copies during reorientation",
+      "state": "frontier",
+      "model": "Opus",
+      "depends_on": [],
+      "note": "WO-2026-08-01-04 (WP-4). Found by Larry running the real hook after merging WP-1: reorientation fires on startup and then refuses, listing ONE programme four times, once per checkout. build-registry.mjs already solves this at :172 with collapseCopies; reorient.mjs groups by state-file path instead. Contradicts the constitution being merged, whose startup step 3 requires resolving exactly one PROGRAMME and names the sting - merging this build to main is itself what creates the second copy."
     }
   ],
   "blockers": [
@@ -508,9 +527,7 @@
   "model_recommendation": {
     "model": "Opus",
     "effort": null,
-    "rationale": "Integration and live acceptance across four branches; the residual UNKNOWN must be read live.",
-    "for_ticket": "T-22",
-    "computed_at_head": "69dfcb2faba37a6db30b0eae9a243dace2015307"
+    "rationale": "T-22 is the only ticket the computed frontier names as takable."
   },
   "workers": [
     {
@@ -828,7 +845,7 @@
   },
   "resumption": {
     "focus": "Make the Governor produce something Warwick can actually see, and make the operating model survive /clear and a genuinely fresh session.",
-    "next_action": "Three work packages are building in parallel under accepted read-backs: T-20 (recovery + installer), T-21 (constitution — authored, independently audited, five fixes in flight), T-22 (footer + execution controller). Larry owns integration as T-23 and must NOT merge T-21 before T-22, because CLAUDE.md references tools/governor/footer.mjs and the constitution own startup step 4 requires every named path to exist. After integration one step needs Warwick exactly once: a FULL Claude Code restart, because hooks bind at process launch and nothing installed can be observed firing until then.",
+    "next_action": "Governor footer contract and the execution controller (ticket T-22).",
     "ticket": "T-22",
     "worktree": "C:/Fusion247PKA-governor",
     "branch": "build-018/session-governor",

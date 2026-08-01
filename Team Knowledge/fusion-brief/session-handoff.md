@@ -14,7 +14,7 @@ Phase 1 (Opus architecture) is complete and settled. Phase 2 is implementing the
 
 Branch `build-018/session-governor` in worktree `C:/Fusion247PKA-governor`, HEAD `8b30233799a52eb0eec19af83be0ea83a0704824` (base `ef96a3327f896e025731769c72157fd722daa02f`). Banked by Opus at 2026-08-01.
 
-**Completed (15):**
+**Completed (16):**
 - **T-01** — Prove the live statusLine payload on this machine _(resolved 2026-07-31)_
 - **T-02** — Session-health store location and atomic write _(resolved 2026-07-31)_
 - **T-03** — Sampler: statusLine script to health sample _(resolved 2026-07-31)_
@@ -30,15 +30,16 @@ Branch `build-018/session-governor` in worktree `C:/Fusion247PKA-governor`, HEAD
 - **T-16** — Mechanical delegation-enforcement gate — delegation ledger + substantial-work threshold, specialist-match verification against Team/agent-index.md _(resolved 2026-07-31)_
 - **T-17** — Git-lifecycle escalation gate — refuse an escalation offering Warwick a decision AD-20 assigns to Larry _(resolved 2026-08-01)_
 - **T-18** — Windows-safe atomic write: retry the rename, and never orphan a temp file _(resolved 2026-08-01)_
+- **T-20** — Recovery source coverage, installer honesty, and the model-recommendation source _(resolved 2026-08-01)_
 
 **Frontier — takable now (7):**
 - **T-06** [Opus] — RED preflight block via UserPromptSubmit, fails open
 - **T-08** [Opus] — Live dogfood rotation (M4)
 - **T-12** [Sonnet] — Portability: extract the estate adapter
 - **T-19** [Sonnet] — Adopt the shared atomic write in the remaining three sites, and correct the false concurrency comment
-- **T-20** [Opus] — Recovery source coverage, installer honesty, and the model-recommendation source
 - **T-21** [Opus] — The standing operating constitution, durably placed in the authoritative sources
 - **T-22** [Opus] — Governor footer contract and the execution controller
+- **T-24** [Opus] — Collapse duplicate programme copies during reorientation
 
 **Blockers (16):**
 - **F-4** (fog, owner: research) — Are the proposed health thresholds right? Resolvable only by dogfood. _Recommendation: Ship the hypothesis thresholds, tune from T-08._
@@ -83,7 +84,7 @@ Branch `build-018/session-governor` in worktree `C:/Fusion247PKA-governor`, HEAD
 
 Make the Governor produce something Warwick can actually see, and make the operating model survive /clear and a genuinely fresh session.
 
-**Model recommendation: Opus** — Integration and live acceptance across four branches; the residual UNKNOWN must be read live.
+**Model recommendation: Opus** — T-22 is the only ticket the computed frontier names as takable.
 
 ## Locked decisions (durable — do NOT re-litigate)
 
@@ -126,7 +127,7 @@ Make the Governor produce something Warwick can actually see, and make the opera
 
 **Work in `C:/Fusion247PKA-governor` on branch `build-018/session-governor`.**
 
-**THE EXACT NEXT ACTION:** Three work packages are building in parallel under accepted read-backs: T-20 (recovery + installer), T-21 (constitution — authored, independently audited, five fixes in flight), T-22 (footer + execution controller). Larry owns integration as T-23 and must NOT merge T-21 before T-22, because CLAUDE.md references tools/governor/footer.mjs and the constitution own startup step 4 requires every named path to exist. After integration one step needs Warwick exactly once: a FULL Claude Code restart, because hooks bind at process launch and nothing installed can be observed firing until then. (ticket T-22)
+**THE EXACT NEXT ACTION:** Governor footer contract and the execution controller (ticket T-22). (ticket T-22)
 
 **Read first:**
 - Deliverables/BUILD-018-session-governor/02-MAP.md - the human-readable NAVIGATION / DECISION projection. Ticket status is NOT here: it lives in programme-state.json tickets[], the execution-state SSOT (AD-17 as CORRECTED 2026-08-01). If the two disagree, the ledger wins and the map is the defect.
