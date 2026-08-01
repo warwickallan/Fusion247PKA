@@ -12,7 +12,7 @@ owner_intent: consumed by the next Larry session. Regenerate on every rotation; 
 
 Phase 1 (Opus architecture) is complete and settled. Phase 2 is implementing the seven components against it. T-01, T-02, T-07, T-09, T-03, T-13 and T-10 resolved earlier; this banking adds T-11, which CLOSES THE ROTATION LOOP and turns the canonical location into an enforced control. A cleared session now reorients itself automatically from banked state (pointer brief, hard 10,000-char cap), verifies its actual cwd, repository root, branch and HEAD against that state before any implementation, and is refused Write/Edit/MultiEdit/NotebookEdit and mutating Bash by a committed PreToolUse gate whenever it is in the wrong place - absolute-path luck is explicitly not a control. Both hooks are activated by a committed idempotent installer, which also reconciled the long-dangling ensure-watcher SessionStart hook. T-14 (build-session registry/launcher by name, automatic programme PR, exact-head QA binding, single merge decision) is now THE next action; T-04 (evaluator) remains independently takable.
 
-Branch `build-018/session-governor` in worktree `C:/Fusion247PKA-governor`, HEAD `e9ae77a9d766753ba2acba6f666bab9ddd8f36a3` (base `ef96a3327f896e025731769c72157fd722daa02f`). Banked by Sonnet at 2026-08-01.
+Branch `build-018/session-governor` in worktree `C:/Fusion247PKA-governor`, HEAD `8b30233799a52eb0eec19af83be0ea83a0704824` (base `ef96a3327f896e025731769c72157fd722daa02f`). Banked by Sonnet at 2026-08-01.
 
 **Completed (15):**
 - **T-01** — Prove the live statusLine payload on this machine _(resolved 2026-07-31)_
@@ -62,7 +62,7 @@ Branch `build-018/session-governor` in worktree `C:/Fusion247PKA-governor`, HEAD
 - t-03-t-13-implementation — subagent, **completed** (T-03)
 
 **Branches:**
-- `build-018/session-governor` (build) @ e9ae77a9d766753ba2acba6f666bab9ddd8f36a3 — This programme. The only branch this build may write to.
+- `build-018/session-governor` (build) @ 8b30233799a52eb0eec19af83be0ea83a0704824 — This programme. The only branch this build may write to.
 - `main` (protected) @ de92306911e7cbe8828d5652ed9f7f21fd99593e — Local main is at de92306, one commit ahead of origin/main and unpushed. MUST NOT be altered by this build.
 - `recovery/2026-07-31-governor-abort-handoff` (recovery) @ 95c265de729e26114b1e1eb7dc7d8630502aca1d — Carries the settled GL-012 section 6a ruling. Read-only for this build; its PR must not be opened or merged.
 
