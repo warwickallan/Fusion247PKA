@@ -45,8 +45,10 @@ import {
   liveLocation,
   compareLocation,
   buildDenyReason,
+  isInside,
   LOCATION,
 } from './worktree-guard.mjs';
+import { collapseCopies } from './build-registry.mjs';
 import { applyModelGate } from './model-gate.mjs';
 
 // AD-5. A hard contract from the host, not a preference.
@@ -283,6 +285,156 @@ export function assessBankedFreshness(state, facts) {
 }
 
 // ---------------------------------------------------------------------------
+// ONE PROGRAMME, MANY CHECKOUTS (WO-2026-08-01-04)
+// ---------------------------------------------------------------------------
+// THE DEFECT THIS CLOSES. Discovery groups by state-file PATH, so a build that is
+// checked out five times reports five "active programmes" and reorientation
+// refuses as AMBIGUOUS — in exactly the situation the governor exists for. They
+// are not five programmes. They are one programme, five checkouts.
+//
+// This is not a new trap and it does not get a new solution. build-registry.mjs
+// hit it first, documents it in its own header, and solves it in
+// `collapseCopies()`. That function is imported UNMODIFIED and is the only thing
+// that decides which copy wins. Re-implementing its selection here would give the
+// estate two rules for one question, which is how they drift apart.
+//
+// AND IT RECURS PERMANENTLY. `programme-state.json` is a tracked file on a branch,
+// so merging this very build to `main` creates another copy. Deleting the worker
+// worktrees would hide today's instance and change nothing about the class.
+//
+// WHY THERE IS A LAYER AROUND collapseCopies, AND WHY IT MUST NOT BE "SIMPLIFIED"
+// INTO IT (deliberate; Larry's ruling on F1, 2026-08-01)
+// -----------------------------------------------------------------------------
+// `collapseCopies`'s disagreement test is `samePath(worktree) && branch ===`. It
+// never reads `resumption.ticket` or `banked.head_sha`. That is right for the
+// registry, which indexes LOCATIONS — but reorientation hands a session a
+// RESUMPTION POINTER, and two copies can agree perfectly about where the build
+// lives while disagreeing about where it is up to. Resuming from the stale one
+// costs a whole session, which is the incident this build exists to prevent. So
+// the ticket/head_sha check lives HERE, layered on top. Folding it back into
+// `collapseCopies` would re-open that gap in the half of the estate that only
+// needs locations; deleting it re-opens it here.
+//
+// THE PRECEDENCE RULE — self-consistency wins, and only then does the guard fire
+// -----------------------------------------------------------------------------
+// A copy that sits INSIDE the worktree it names as canonical is the live one; an
+// off-branch copy is an older banking of the same programme (build-registry.mjs
+// documents this rationale, and the live estate demonstrates it — four worker
+// checkouts carrying an older ticket than the canonical worktree's copy). Where
+// self-consistency singles out one copy, it resolves the disagreement, and the
+// collapse is reported LOUDLY in the brief rather than swallowed. Where it does
+// NOT single one out and the copies disagree, there is no principled way to
+// choose and the governor refuses — a wrong pointer is worse than a refusal.
+//
+// WHAT DELIBERATELY IS *NOT* AN INPUT: the session's own `cwd`.
+// Preferring the copy whose worktree matches `cwd` was considered and rejected on
+// safety grounds. It selects the STALE copy for a session starting in a worker
+// worktree — inverting its own purpose — and, structurally, `reorient` already
+// owns an INDEPENDENT control for the cwd question (`WRONG_WORKTREE`, via
+// `compareLocation`). Making `cwd` a SELECTION input would let a session in the
+// wrong place select the copy that then compares ALIGNED: one control silently
+// disarming the other. Reorientation's job is to say where the build LIVES, not
+// to ratify where the session already is.
+
+// The pair that decides whether two copies of one programme genuinely disagree:
+// which ticket is next, and which head the state describes. Location is
+// deliberately excluded — `collapseCopies` already owns that comparison.
+export function copyFingerprint(state) {
+  const ticket = state?.resumption?.ticket || '(no ticket)';
+  const head = state?.banked?.head_sha || '(unknown head)';
+  return `${ticket}::${head}`;
+}
+
+// Adapt a discovered candidate to the entry shape `collapseCopies` consumes.
+// `worktree` is the RECORDED canonical worktree from the state document — the
+// same source build-registry's own `entryFrom` uses — never the worktree the file
+// happened to be found in. Using the found path would make `isInside` true for
+// every copy, so the self-consistency discriminator could never fail: a control
+// that cannot fail is not a control.
+export function toRegistryEntry(candidate) {
+  const canonical = canonicalFromState(candidate.state, candidate.path);
+  return {
+    id: candidate.state?.programme?.id ?? null,
+    worktree: canonical?.worktree ?? null,
+    branch: canonical?.branch ?? null,
+    state_path: normaliseSeparators(candidate.path) || String(candidate.path ?? ''),
+    candidate,
+  };
+}
+
+export function collapseProgrammes(active) {
+  const entries = (active || []).map(toRegistryEntry);
+  const survivors = collapseCopies(entries);
+
+  // Group by the SAME key collapseCopies groups by, so the report describes the
+  // set it actually chose from rather than a second opinion about it.
+  const groups = new Map();
+  for (const e of entries) {
+    const key = String(e.id).toLowerCase();
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(e);
+  }
+
+  const reports = survivors.map((winner) => {
+    const group = groups.get(String(winner.id).toLowerCase()) || [winner];
+    const others = group.filter((c) => c !== winner);
+    const winnerPrint = copyFingerprint(winner.candidate.state);
+    const disagreeing = others.filter((c) => copyFingerprint(c.candidate.state) !== winnerPrint);
+    const selfConsistent = group.filter((c) => isInside(c.state_path, c.worktree));
+
+    let reason;
+    let resolved = true;
+    if (group.length === 1) {
+      reason = 'single';
+    } else if (selfConsistent.length === 1 && selfConsistent[0] === winner) {
+      reason = 'self-consistent';
+    } else if (disagreeing.length === 0) {
+      reason = 'identical';
+    } else {
+      reason = 'contested';
+      resolved = false;
+    }
+
+    return {
+      id: winner.id,
+      copies: group.length,
+      collapsed: group.length - 1,
+      chosen: winner.state_path,
+      reason,
+      resolved,
+      disagreeing: disagreeing.map((c) => ({
+        path: c.state_path,
+        ticket: c.candidate.state?.resumption?.ticket || null,
+        headSha: c.candidate.state?.banked?.head_sha || null,
+      })),
+      group,
+      winner,
+    };
+  });
+
+  return { entries, survivors, reports };
+}
+
+// The report as it leaves reorient(): the audit trail, without the internal
+// object graph.
+function publicReport(r) {
+  if (!r) return null;
+  const { group, winner, ...rest } = r;
+  return rest;
+}
+
+function candidateLine(entry) {
+  const st = entry.candidate.state;
+  return {
+    id: st?.programme?.id,
+    title: st?.programme?.title,
+    path: entry.state_path,
+    worktree: entry.candidate.worktree,
+    next: st?.resumption?.ticket || String(st?.resumption?.next_action || '').slice(0, 120),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Safe truncation (the T-11 mutation test)
 // ---------------------------------------------------------------------------
 // Sections are emitted in priority order. `required: true` sections are NEVER
@@ -442,6 +594,54 @@ export function renderLocationSection(canonical, comparison) {
   };
 }
 
+// The collapse must be VISIBLE, or "not silently collapsed" has no testable
+// meaning and a fresh Larry cannot tell a healthy resolution from a swallowed
+// contest. `required: true` on purpose: dropping this section under cap pressure
+// would be the silence it exists to prevent.
+export function renderCollapseSection(collapse) {
+  if (!collapse || !(collapse.copies > 1)) return null;
+
+  const why =
+    {
+      'self-consistent':
+        'it is the ONLY copy sitting inside the worktree it names as canonical — the others are ' +
+        'off-branch checkouts carrying an older banking of the same programme',
+      identical:
+        'every copy records the same resumption ticket and the same banked head, so there was ' +
+        'nothing to choose between them',
+    }[collapse.reason] || 'collapsed by programme id';
+
+  const lines = [
+    fence(`ONE PROGRAMME, ${collapse.copies} CHECKOUTS — COLLAPSED`),
+    '',
+    `  ${collapse.copies} copies of ${collapse.id} were found across the estate. That is ONE`,
+    `  programme checked out ${collapse.copies} times, not ${collapse.copies} programmes.`,
+    '',
+    `    chosen    : ${collapse.chosen}`,
+    `    because   : ${why}`,
+    `    collapsed : ${collapse.collapsed} other copy(ies)`,
+    `    disagreed : ${collapse.disagreeing.length} of them recorded a DIFFERENT ticket or banked head`,
+  ];
+
+  if (collapse.disagreeing.length) {
+    const shown = collapse.disagreeing.slice(0, 5);
+    for (const d of shown) {
+      lines.push(
+        `                - ${d.path} (ticket ${d.ticket || '(none)'}, banked ${String(d.headSha || 'unknown').slice(0, 7)})`
+      );
+    }
+    if (collapse.disagreeing.length > shown.length) {
+      lines.push(`                - … and ${collapse.disagreeing.length - shown.length} more`);
+    }
+    lines.push('');
+    lines.push('  Those were OVERRULED as older bankings — not merged, not reconciled. If one of');
+    lines.push('  them is in fact the current state, the copy chosen above is WRONG: re-bank from');
+    lines.push('  the canonical worktree before acting on the next action.');
+  }
+
+  return { name: 'collapse', required: true, body: lines.join('\n') };
+}
+
 export function renderOrientationBrief(
   state,
   {
@@ -451,6 +651,7 @@ export function renderOrientationBrief(
     canonical,
     location,
     facts,
+    collapse = null,
     cap = CONTEXT_CAP,
     // D-B §B-2: the source decides the HEADLINE and the SECTION SET, nothing
     // else. Defaulting to `clear` keeps every existing caller's behaviour
@@ -475,6 +676,7 @@ export function renderOrientationBrief(
     : '✅ Banked state is FRESH against live git (AD-14 banking-commit comparison).';
 
   const locationSection = renderLocationSection(canonical, location);
+  const collapseSection = renderCollapseSection(collapse);
 
   // D-B §B-2 — `resume` gets a SHORT DELTA. The restored transcript already
   // carries the history, so a full brief would spend context re-stating what is
@@ -483,6 +685,7 @@ export function renderOrientationBrief(
   if (sourceMode.mode === BRIEF_MODE.DELTA) {
     const deltaSections = [];
     if (locationSection) deltaSections.push(locationSection);
+    if (collapseSection) deltaSections.push(collapseSection);
     deltaSections.push({
       name: 'delta',
       required: true,
@@ -560,6 +763,8 @@ export function renderOrientationBrief(
       ].join('\n'),
     }
   );
+
+  if (collapseSection) sections.push(collapseSection);
 
   if (freshness.warnings.length) {
     sections.push({
@@ -718,22 +923,54 @@ export function reorient({
     return { verdict, context: b.text, brief: b, corrupt: bad };
   }
 
-  if (active.length > 1) {
+  // Collapse duplicate CHECKOUTS of one programme before counting programmes.
+  // The refusal below is preserved for the two cases where it is still correct:
+  // genuinely different programme ids, and copies of one id that disagree with no
+  // principled way to choose. A fix that always resolves has deleted this control
+  // rather than repaired it.
+  const { survivors, reports } = collapseProgrammes(active);
+
+  if (survivors.length > 1) {
     const b = renderProblemBrief(VERDICT.AMBIGUOUS, {
-      detail: `${active.length} programmes report status "active". The governor will not guess which one this session resumes.`,
-      candidates: active.map((g) => ({
-        id: g.state.programme.id,
-        title: g.state.programme.title,
-        path: g.path,
-        worktree: g.worktree,
-        next: g.state.resumption.ticket || g.state.resumption.next_action.slice(0, 120),
-      })),
+      detail:
+        `${survivors.length} distinct active programmes remain after collapsing duplicate ` +
+        `checkouts by programme id (${active.length} state file(s) found across the estate). ` +
+        'The governor will not guess which one this session resumes.',
+      candidates: survivors.map(candidateLine),
       cap,
     });
-    return { verdict: VERDICT.AMBIGUOUS, context: b.text, brief: b, candidates: active };
+    return {
+      verdict: VERDICT.AMBIGUOUS,
+      context: b.text,
+      brief: b,
+      candidates: survivors.map((s) => s.candidate),
+      collapse: reports.map(publicReport),
+    };
   }
 
-  const chosen = active[0];
+  const report = reports[0];
+
+  if (!report.resolved) {
+    const b = renderProblemBrief(VERDICT.AMBIGUOUS, {
+      detail:
+        `${report.copies} copies of ${report.id} were found across the estate. They are ONE ` +
+        'programme, not several — but they DISAGREE about where it is up to (resumption ticket ' +
+        'and/or banked head), and no copy sits inside the worktree it names as canonical, so ' +
+        'there is no principled way to tell which is current. Resuming from a stale pointer ' +
+        'costs a whole session, so the governor refuses rather than picking one.',
+      candidates: report.group.map(candidateLine),
+      cap,
+    });
+    return {
+      verdict: VERDICT.AMBIGUOUS,
+      context: b.text,
+      brief: b,
+      candidates: report.group.map((c) => c.candidate),
+      collapse: [publicReport(report)],
+    };
+  }
+
+  const chosen = report.winner.candidate;
   const facts = { ...factsFn(chosen.worktree, execFile), worktreePath: chosen.worktree };
   const freshness = assessBankedFreshness(chosen.state, facts);
 
@@ -752,6 +989,7 @@ export function reorient({
     canonical,
     location,
     facts,
+    collapse: publicReport(report),
     cap,
     sourceMode,
   });
@@ -790,6 +1028,7 @@ export function reorient({
     live,
     implementationPermitted: !misplaced,
     corrupt: bad,
+    collapse: publicReport(report),
   };
 }
 
