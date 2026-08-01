@@ -69,14 +69,53 @@ Three of these decide the whole design:
 `permission_mode` is also present, which lets the controller behave differently under a restricted
 mode instead of blocking blindly.
 
-## 4. What this evidence does NOT establish
+## 4. Multiple `Stop` hooks compose — the pre-existing Tower hook is not a blocker
 
-- Whether `Stop` fires identically in the interactive TUI and in Remote Control web/Android. The
-  probe ran headless (`claude -p`). **UNKNOWN** — settled only by a live interactive run.
-- Whether a second, pre-existing `Stop` hook (the Tower `bridge-ingest.mjs` entry) composes safely
-  with a blocking Governor `Stop` hook. **UNKNOWN** — Silas rules on composition; it needs its own
-  live test before it is trusted.
-- Whether `SessionStart` `source` takes values beyond `startup` and `clear` on this version
-  (`resume`, `compact`). Not probed.
+The estate already carries a non-Governor `Stop` hook (Tower's `bridge-ingest.mjs`). Whether a
+*blocking* Governor hook could coexist with it was the design's largest open question, so it was
+executed rather than assumed.
 
-Absence of a probe is not evidence of a behaviour. These three stay UNKNOWN until executed.
+Probe: two separate `Stop` matcher groups — a **sibling** that only writes a side-effect file and
+prints stray non-JSON text to stdout (deliberately imitating a real ingest script), and the
+**Governor** hook returning `{"decision":"block",…}`. One turn produced:
+
+| hook | invocations |
+|---|---|
+| SessionStart marker | 1 |
+| sibling `Stop` | **3** |
+| Governor `Stop` | **3** |
+
+Governor blocked twice, allowed the third; final assistant message `CONTINUED-2`.
+
+Established:
+
+1. Multiple `Stop` matcher groups are **additive** — all fire on every stop; none overrides another.
+2. A sibling hook writing **stray non-JSON to stdout does not corrupt or suppress** another hook's
+   `{"decision":"block"}`.
+3. The block counter is the hook's own on-disk state; the host does not deduplicate or serialise
+   decisions.
+
+**Consequence:** the Governor `Stop` entry may simply be ADDED. The Tower hook does not need to be
+removed, reordered, or repaired — which matters, because Tower is PARKED and out of scope.
+
+## 5. `SessionStart` sources observed on this version
+
+| source | how it was produced | observed |
+|---|---|---|
+| `startup` | fresh `claude -p` process | yes |
+| `resume` | `claude -c -p` | yes |
+| `clear` | `/clear` (documented; the currently-installed matcher) | not probed here |
+| `compact` | post-compaction | not probed |
+
+A matcher of `clear` alone therefore misses **at least** `startup` and `resume` — two of the three
+ways Warwick actually re-enters a build.
+
+## 6. What this evidence does NOT establish
+
+- Whether `Stop` fires identically in the interactive TUI and in Remote Control web/Android. Every
+  probe here ran headless (`claude -p`). **UNKNOWN** — settled only by a live interactive run.
+  Design consequence: a `Stop` hook that never fires must degrade to *instruction-only
+  continuation*, never to a broken session.
+- Whether `SessionStart` emits `compact`, and whether reorientation is wanted on that source at all.
+
+Absence of a probe is not evidence of a behaviour. These stay UNKNOWN until executed.
