@@ -110,6 +110,26 @@ removed, reordered, or repaired — which matters, because Tower is PARKED and o
 A matcher of `clear` alone therefore misses **at least** `startup` and `resume` — two of the three
 ways Warwick actually re-enters a build.
 
+### 5a. The defect is TWO layers deep, not one
+
+Read `tools/governor/reorient.mjs:546-549`:
+
+```js
+// Bounded: this fires on /clear only. Every other SessionStart source is a
+if (source !== 'clear') {
+  return { verdict: VERDICT.SKIPPED, context: null, reason: `source=${source ?? '(absent)'} is not "clear"` };
+}
+```
+
+The **script itself** refuses every source but `clear`, independently of how the hook is matched.
+So widening the installed matcher alone would change nothing — the hook would fire and the script
+would immediately return `SKIPPED`. Both layers have to change together, and any test that only
+asserts the matcher would pass while the behaviour stayed broken.
+
+This is the same class as the controls recorded in [[a-control-is-not-evidence-until-made-to-fail]]:
+a check that reports success over ground it never examined. The acceptance test must assert that a
+`startup` payload produces an actual **brief**, not merely that a hook was invoked.
+
 ## 6. What this evidence does NOT establish
 
 - Whether `Stop` fires identically in the interactive TUI and in Remote Control web/Android. Every
