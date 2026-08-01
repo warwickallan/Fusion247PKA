@@ -14,9 +14,9 @@
   },
   "banked": {
     "at": "2026-08-01",
-    "by_model": "Sonnet",
+    "by_model": "Opus",
     "session_id": null,
-    "head_sha": "8b30233799a52eb0eec19af83be0ea83a0704824",
+    "head_sha": "69dfcb2faba37a6db30b0eae9a243dace2015307",
     "governor_version": "T-09/schema-v1"
   },
   "repository": {
@@ -321,6 +321,42 @@
       "resolved": null,
       "evidence": [],
       "note": "Found by Keel's T-18 read-back (WO-2026-08-01-01, contradiction C4), verified by Larry. The unretried writeFileSync+renameSync pattern exists at FIVE sites, not two. T-18 fixes the two concurrent-path callers (health-store.mjs, delegation-gate.mjs) and deliberately does NOT sprawl into the rest. This ticket adopts the T-18 primitive in the remaining three: build-registry.mjs:275, programme-state.mjs:630 AND :638 (the banking / write-back path), qa-binding.mjs:288. ALSO corrects a FALSE COMMENT that has already propagated by citation: qa-binding.mjs:282-284 asserts 'two concurrent writers never interleave. Same recipe as health-store.mjs and writeProgrammeState' -- the interleave claim is true but irrelevant, and it reads as a concurrency-safety guarantee the code does not provide (the writers do not interleave, they FAIL). health-store.mjs's own header carries the same overclaim. Blocked on T-18 because there is no shared primitive to adopt until it exists."
+    },
+    {
+      "id": "T-20",
+      "title": "Recovery source coverage, installer honesty, and the model-recommendation source",
+      "state": "frontier",
+      "model": "Opus",
+      "depends_on": [],
+      "note": "WO-2026-08-01-01 (WP-1). Amended after Keel CLARIFY caught Larry generalising a 607/607 baseline from his own worktree."
+    },
+    {
+      "id": "T-21",
+      "title": "The standing operating constitution, durably placed in the authoritative sources",
+      "state": "frontier",
+      "model": "Opus",
+      "depends_on": [],
+      "note": "WO-2026-08-01-02 (WP-2). Authored by Nolan because Keel is contractually forbidden CLAUDE.md/AGENTS.md/Team/**. Independent audit returned NOT YET MERGEABLE; five fixes issued."
+    },
+    {
+      "id": "T-22",
+      "title": "Governor footer contract and the execution controller",
+      "state": "frontier",
+      "model": "Opus",
+      "depends_on": [],
+      "note": "WO-2026-08-01-03 (WP-3). Keel proved the UNSET predicate was unreachable without three optional schema properties, now shipped."
+    },
+    {
+      "id": "T-23",
+      "title": "Integrate WP-1..3, wire the hooks, and prove the live journey",
+      "state": "blocked",
+      "model": "Opus",
+      "depends_on": [
+        "T-20",
+        "T-21",
+        "T-22"
+      ],
+      "note": "Larry-retained integration. WP-2 must NOT merge before WP-3: CLAUDE.md references tools/governor/footer.mjs and the constitution own startup step 4 requires every named path to exist."
     }
   ],
   "blockers": [
@@ -470,9 +506,11 @@
     }
   ],
   "model_recommendation": {
-    "model": "Sonnet",
+    "model": "Opus",
     "effort": null,
-    "rationale": "T-12 is named only because deriveResumption requires a frontier ticket; it is NOT an instruction to start it. Scope is frozen pending Warwick's decision on the visible-output gap."
+    "rationale": "Integration and live acceptance across four branches; the residual UNKNOWN must be read live.",
+    "for_ticket": "T-22",
+    "computed_at_head": "69dfcb2faba37a6db30b0eae9a243dace2015307"
   },
   "workers": [
     {
@@ -789,9 +827,9 @@
     "verified_at": "2026-08-01"
   },
   "resumption": {
-    "focus": "T-18 landed: the orphaned-temp-file leak is fixed outright (0 orphans vs a 7-orphan baseline, independently verified by Larry), and the retry substantially reduces writer failure - but under sustained reader contention writers still fail, which Keel disclosed plainly and Larry's harsher probe confirmed. Scope is now FROZEN by Warwick. The build has 15 of 19 tickets resolved and a 607-test suite, but almost none of it is wired to produce anything Warwick can see: statusLine is unset, no health sample has ever been written, and only reorient + worktree-guard are live.",
-    "next_action": "SCOPE FROZEN BY WARWICK 2026-08-01: do NOT start T-12, T-19, T-06 or T-08, and do NOT create further defect, governance or hardening tickets. BUILD-018 stopped deliberately after T-18 for a reckoning about what the build has actually delivered to Warwick versus what it has built. THE STANDING FINDING A FRESH SESSION MUST NOT LOSE: the Governor produces NOTHING VISIBLE to Warwick today. statusLine is NOT SET in C:/Fusion247PKA/.claude/settings.local.json, so T-03's sampler never runs, so ZERO health samples have ever been written to ~/.mypka/governor/health/**, so T-04's evaluator has no input and T-05's status line renders nothing live. Only two governor pieces are actually live, both from T-11: SessionStart reorient.mjs and PreToolUse worktree-guard.mjs. The delegation gate (T-16) and escalation gate (T-17) are built, tested and NOT wired. Context health, rotation advice and next-model recommendation are therefore NOT visibly produced from telemetry - the model recommendation a fresh session sees comes from THIS BANKED FILE, not from measurement. The next action is Warwick's decision on that gap, not another ticket.",
-    "ticket": "T-12",
+    "focus": "Make the Governor produce something Warwick can actually see, and make the operating model survive /clear and a genuinely fresh session.",
+    "next_action": "Three work packages are building in parallel under accepted read-backs: T-20 (recovery + installer), T-21 (constitution — authored, independently audited, five fixes in flight), T-22 (footer + execution controller). Larry owns integration as T-23 and must NOT merge T-21 before T-22, because CLAUDE.md references tools/governor/footer.mjs and the constitution own startup step 4 requires every named path to exist. After integration one step needs Warwick exactly once: a FULL Claude Code restart, because hooks bind at process launch and nothing installed can be observed firing until then.",
+    "ticket": "T-22",
     "worktree": "C:/Fusion247PKA-governor",
     "branch": "build-018/session-governor",
     "read_first": [
@@ -815,7 +853,8 @@
       "Do not read GL-012 from this working tree - it is the pre-ruling text. Use git show 95c265d.",
       "Do not reopen or rebuild T-01 through T-14 over the routing-provenance finding (D-3) — Warwick's explicit ruling.",
       "Do not implement a delegable ticket directly without first stating a delegation plan and checking Team/Larry - Orchestrator/AGENTS.md's routing cheatsheet — this is the standing operating model now, not a one-session correction."
-    ]
+    ],
+    "next_action_kind": "action"
   },
   "locked_decisions": [
     {

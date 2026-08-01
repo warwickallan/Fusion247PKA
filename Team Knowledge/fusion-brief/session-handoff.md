@@ -12,7 +12,7 @@ owner_intent: consumed by the next Larry session. Regenerate on every rotation; 
 
 Phase 1 (Opus architecture) is complete and settled. Phase 2 is implementing the seven components against it. T-01, T-02, T-07, T-09, T-03, T-13 and T-10 resolved earlier; this banking adds T-11, which CLOSES THE ROTATION LOOP and turns the canonical location into an enforced control. A cleared session now reorients itself automatically from banked state (pointer brief, hard 10,000-char cap), verifies its actual cwd, repository root, branch and HEAD against that state before any implementation, and is refused Write/Edit/MultiEdit/NotebookEdit and mutating Bash by a committed PreToolUse gate whenever it is in the wrong place - absolute-path luck is explicitly not a control. Both hooks are activated by a committed idempotent installer, which also reconciled the long-dangling ensure-watcher SessionStart hook. T-14 (build-session registry/launcher by name, automatic programme PR, exact-head QA binding, single merge decision) is now THE next action; T-04 (evaluator) remains independently takable.
 
-Branch `build-018/session-governor` in worktree `C:/Fusion247PKA-governor`, HEAD `8b30233799a52eb0eec19af83be0ea83a0704824` (base `ef96a3327f896e025731769c72157fd722daa02f`). Banked by Sonnet at 2026-08-01.
+Branch `build-018/session-governor` in worktree `C:/Fusion247PKA-governor`, HEAD `8b30233799a52eb0eec19af83be0ea83a0704824` (base `ef96a3327f896e025731769c72157fd722daa02f`). Banked by Opus at 2026-08-01.
 
 **Completed (15):**
 - **T-01** — Prove the live statusLine payload on this machine _(resolved 2026-07-31)_
@@ -31,11 +31,14 @@ Branch `build-018/session-governor` in worktree `C:/Fusion247PKA-governor`, HEAD
 - **T-17** — Git-lifecycle escalation gate — refuse an escalation offering Warwick a decision AD-20 assigns to Larry _(resolved 2026-08-01)_
 - **T-18** — Windows-safe atomic write: retry the rename, and never orphan a temp file _(resolved 2026-08-01)_
 
-**Frontier — takable now (4):**
+**Frontier — takable now (7):**
 - **T-06** [Opus] — RED preflight block via UserPromptSubmit, fails open
 - **T-08** [Opus] — Live dogfood rotation (M4)
 - **T-12** [Sonnet] — Portability: extract the estate adapter
 - **T-19** [Sonnet] — Adopt the shared atomic write in the remaining three sites, and correct the false concurrency comment
+- **T-20** [Opus] — Recovery source coverage, installer honesty, and the model-recommendation source
+- **T-21** [Opus] — The standing operating constitution, durably placed in the authoritative sources
+- **T-22** [Opus] — Governor footer contract and the execution controller
 
 **Blockers (16):**
 - **F-4** (fog, owner: research) — Are the proposed health thresholds right? Resolvable only by dogfood. _Recommendation: Ship the hypothesis thresholds, tune from T-08._
@@ -78,9 +81,9 @@ Branch `build-018/session-governor` in worktree `C:/Fusion247PKA-governor`, HEAD
 
 ## What the NEXT session is about
 
-T-18 landed: the orphaned-temp-file leak is fixed outright (0 orphans vs a 7-orphan baseline, independently verified by Larry), and the retry substantially reduces writer failure - but under sustained reader contention writers still fail, which Keel disclosed plainly and Larry's harsher probe confirmed. Scope is now FROZEN by Warwick. The build has 15 of 19 tickets resolved and a 607-test suite, but almost none of it is wired to produce anything Warwick can see: statusLine is unset, no health sample has ever been written, and only reorient + worktree-guard are live.
+Make the Governor produce something Warwick can actually see, and make the operating model survive /clear and a genuinely fresh session.
 
-**Model recommendation: Sonnet** — T-12 is named only because deriveResumption requires a frontier ticket; it is NOT an instruction to start it. Scope is frozen pending Warwick's decision on the visible-output gap.
+**Model recommendation: Opus** — Integration and live acceptance across four branches; the residual UNKNOWN must be read live.
 
 ## Locked decisions (durable — do NOT re-litigate)
 
@@ -123,7 +126,7 @@ T-18 landed: the orphaned-temp-file leak is fixed outright (0 orphans vs a 7-orp
 
 **Work in `C:/Fusion247PKA-governor` on branch `build-018/session-governor`.**
 
-**THE EXACT NEXT ACTION:** SCOPE FROZEN BY WARWICK 2026-08-01: do NOT start T-12, T-19, T-06 or T-08, and do NOT create further defect, governance or hardening tickets. BUILD-018 stopped deliberately after T-18 for a reckoning about what the build has actually delivered to Warwick versus what it has built. THE STANDING FINDING A FRESH SESSION MUST NOT LOSE: the Governor produces NOTHING VISIBLE to Warwick today. statusLine is NOT SET in C:/Fusion247PKA/.claude/settings.local.json, so T-03's sampler never runs, so ZERO health samples have ever been written to ~/.mypka/governor/health/**, so T-04's evaluator has no input and T-05's status line renders nothing live. Only two governor pieces are actually live, both from T-11: SessionStart reorient.mjs and PreToolUse worktree-guard.mjs. The delegation gate (T-16) and escalation gate (T-17) are built, tested and NOT wired. Context health, rotation advice and next-model recommendation are therefore NOT visibly produced from telemetry - the model recommendation a fresh session sees comes from THIS BANKED FILE, not from measurement. The next action is Warwick's decision on that gap, not another ticket. (ticket T-12)
+**THE EXACT NEXT ACTION:** Three work packages are building in parallel under accepted read-backs: T-20 (recovery + installer), T-21 (constitution — authored, independently audited, five fixes in flight), T-22 (footer + execution controller). Larry owns integration as T-23 and must NOT merge T-21 before T-22, because CLAUDE.md references tools/governor/footer.mjs and the constitution own startup step 4 requires every named path to exist. After integration one step needs Warwick exactly once: a FULL Claude Code restart, because hooks bind at process launch and nothing installed can be observed firing until then. (ticket T-22)
 
 **Read first:**
 - Deliverables/BUILD-018-session-governor/02-MAP.md - the human-readable NAVIGATION / DECISION projection. Ticket status is NOT here: it lives in programme-state.json tickets[], the execution-state SSOT (AD-17 as CORRECTED 2026-08-01). If the two disagree, the ledger wins and the map is the defect.
