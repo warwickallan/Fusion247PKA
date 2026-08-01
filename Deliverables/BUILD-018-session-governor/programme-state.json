@@ -9,7 +9,7 @@
   },
   "phase": {
     "current": "Closed — cut and closed 2026-08-01",
-    "summary": "BUILD-018 is CLOSED. Warwick accepted the Larry/Pax adversarial diagnosis (Deliverables/2026-08-01-pax-build-018-process-diagnosis.md): good engineering pointed at the wrong target — he asked for six answers on a screen and received 22 modules and 767 tests he could not read from his phone. He then ruled ONE bounded cut-and-close pass. RETAINED (14 modules): durable state, consistency checking, fresh-session and /clear reorientation, automatic routing, wrong-location protection, honest context health, durable operating instructions, safe autonomous continuation. REMOVED (8 modules, ~4,400 lines + tests): the model gate, the delegation gate, the escalation gate, the Governor-specific registry/PR/merge/QA machinery, and the superseded status-line renderer. The footer no longer asserts KEEP GOING or a model before a next task is known — it renders TASK UNKNOWN — while CLEAR NOW is never withheld, because running out of context is a fact about the session rather than about the task. The real user journey was proven end to end from Warwick's actual entry point before closure.",
+    "summary": "BUILD-018 is CLOSED. Warwick accepted the Larry/Pax adversarial diagnosis (Deliverables/2026-08-01-pax-build-018-process-diagnosis.md): good engineering pointed at the wrong target — he asked for six answers on a screen and received 22 modules and 767 tests he could not read from his phone. He then ruled ONE bounded cut-and-close pass. RETAINED (14 modules): durable state, consistency checking, fresh-session and /clear reorientation, automatic routing, wrong-location protection, honest context health, durable operating instructions, safe autonomous continuation. REMOVED (8 modules, ~4,400 lines + tests): the model gate, the delegation gate, the escalation gate, the Governor-specific registry/PR/merge/QA machinery, and the superseded status-line renderer. The footer no longer asserts KEEP GOING or a model before a next task is known — it renders TASK UNKNOWN — while CLEAR NOW is never withheld, because running out of context is a fact about the session rather than about the task. The real user journey was proven end to end from Warwick's actual entry point before closure. CLOSURE HYGIENE 2026-08-01: the build's temporary worktree (C:/Fusion247PKA-governor) was deregistered and its branch build-018/session-governor deleted local and remote after verifying 0 unique commits vs main. This record's repository/branches/worktrees fields have been re-pointed at the primary checkout on main so nothing here names a path that no longer exists; 1 stale worktree entry were dropped from the banking-time snapshot.",
     "started": "2026-07-31"
   },
   "banked": {
@@ -21,13 +21,13 @@
   },
   "repository": {
     "primary_checkout": "C:/Fusion247PKA",
-    "worktree": "C:/Fusion247PKA-governor",
-    "branch": "build-018/session-governor",
+    "worktree": "C:/Fusion247PKA",
+    "branch": "main",
     "base_sha": "ef96a3327f896e025731769c72157fd722daa02f",
-    "head_sha": "8b30233799a52eb0eec19af83be0ea83a0704824",
+    "head_sha": "cdbdd8e7ca73613bf35013cd92ab8c750fe40acf",
     "clean": true,
     "unpushed_commits": 0,
-    "upstream": "origin/build-018/session-governor"
+    "upstream": "origin/main"
   },
   "tickets": [
     {
@@ -611,20 +611,20 @@
     {
       "name": "build-018/session-governor",
       "head": "8b30233799a52eb0eec19af83be0ea83a0704824",
-      "upstream": "origin/build-018/session-governor",
+      "upstream": null,
       "ahead": 0,
       "behind": null,
       "role": "build",
-      "note": "This programme. The only branch this build may write to."
+      "note": "MERGED to main and DELETED 2026-08-01, local and remote, after verifying 0 unique commits vs main. Recorded here as history — this branch no longer exists."
     },
     {
       "name": "main",
-      "head": "de92306911e7cbe8828d5652ed9f7f21fd99593e",
+      "head": "cdbdd8e7ca73613bf35013cd92ab8c750fe40acf",
       "upstream": "origin/main",
-      "ahead": 1,
+      "ahead": 0,
       "behind": null,
       "role": "protected",
-      "note": "Local main is at de92306, one commit ahead of origin/main and unpushed. MUST NOT be altered by this build."
+      "note": "Carries the merged BUILD-018 spine."
     },
     {
       "name": "recovery/2026-07-31-governor-abort-handoff",
@@ -640,20 +640,13 @@
   "worktrees": [
     {
       "path": "C:/Fusion247PKA",
-      "branch": "recovery/2026-07-31-governor-abort-handoff",
-      "head": "95c265de729e26114b1e1eb7dc7d8630502aca1d",
+      "branch": "main",
+      "head": "cdbdd8e7ca73613bf35013cd92ab8c750fe40acf",
       "dirty": true,
       "unpushedCount": 0,
       "classification": "primary-checkout",
       "disposition": "unreconciled-dirty",
-      "liveWorkerPids": [
-        24244,
-        9336,
-        31012,
-        35444,
-        25472,
-        36196
-      ],
+      "liveWorkerPids": [],
       "protected": true
     },
     {
@@ -853,17 +846,6 @@
       "disposition": "reconciled-clean",
       "liveWorkerPids": [],
       "protected": true
-    },
-    {
-      "path": "C:/Fusion247PKA-governor",
-      "branch": "build-018/session-governor",
-      "head": "8b30233799a52eb0eec19af83be0ea83a0704824",
-      "dirty": false,
-      "unpushedCount": 0,
-      "classification": "active-build",
-      "disposition": "in-progress-owned",
-      "liveWorkerPids": [],
-      "protected": false
     },
     {
       "path": "C:/Fusion247PKA-tower",
