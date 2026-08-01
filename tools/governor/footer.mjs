@@ -641,6 +641,7 @@ export function nextModelFor({
   // would make every ordinary commit destroy the recommendation; this asserts internal
   // coherence AT BANKING TIME. Staleness against live git has its own channel
   // (bankedStateStale -> RECOVERY).
+  // Comparing to live git HEAD would also drag child_process onto the Stop path (A-7).
   if (
     typeof rec.computed_at_head !== 'string' || rec.computed_at_head.length === 0 ||
     typeof banked.head_sha !== 'string' || banked.head_sha.length === 0 ||

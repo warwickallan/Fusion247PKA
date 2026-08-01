@@ -755,6 +755,35 @@ test('D-M5: the agreement holds under BOTH ledger states — ungrounded and grou
   // exercises only the UNSET branch locally, and the model-renders branch would go
   // unexercised until the merged head. Constructing both states explicitly proves the
   // harness is state-independent rather than merely passing today — in either direction.
+  //
+  // ---------------------------------------------------------------------------
+  // DO NOT DELETE THE GROUNDED CASE AS REDUNDANT. It is the only observer of U-e.
+  // ---------------------------------------------------------------------------
+  // Established by mutation on 2026-08-01, not by argument. U-e was changed to compare
+  // `computed_at_head` against LIVE GIT HEAD instead of `banked.head_sha` — the defect
+  // Silas explicitly warned about, which would make every ordinary commit destroy the
+  // recommendation. Result:
+  //
+  //   * the live-file D-M5 test above  -> STILL PASSED
+  //   * the grounded case below        -> went red
+  //
+  // The reason is that the predicate short-circuits: whenever the banked state lacks
+  // `next_action_kind`, it returns at U-b and NEVER EVALUATES U-e at all. So for any
+  // ungrounded ledger — which is what this worktree has, and what the repository had for
+  // most of this build — a U-e defect is completely unobservable from the real file. The
+  // grounded case is the only place in this suite where all six conditions hold and U-e
+  // is reachable.
+  //
+  // This case was originally written for a different reason (proving the harness works
+  // at a merged head this worktree cannot reach). It turned out to be load-bearing for
+  // U-e coverage, which nobody designed it for. Deleting it as "just a duplicate fixture"
+  // would silently reopen a gap that no other test in this file can see.
+  //
+  // Worth knowing too: the live-HEAD mutation also required importing `child_process`
+  // into footer.mjs — and footer.mjs is imported by stop-controller.mjs, where A-7
+  // forbids git on the Stop path. So that defect is not merely wrong about which SHA to
+  // compare; it drags a subprocess spawn onto the hot path of the control that decides
+  // whether Larry may end a turn.
   const ungrounded = JSON.parse(JSON.stringify(realState));
   delete ungrounded.resumption.next_action_kind;
   delete ungrounded.model_recommendation.for_ticket;
