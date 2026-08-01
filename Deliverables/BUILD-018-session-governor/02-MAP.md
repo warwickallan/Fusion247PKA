@@ -263,9 +263,9 @@ installs it into the primary checkout's untracked settings file — otherwise it
 
 **Phase:** Phase 2 — bounded implementation
 
-**Completed (19):** T-01, T-02, T-03, T-04, T-05, T-07, T-09, T-10, T-11, T-13, T-14, T-15, T-16, T-17, T-18, T-20, T-21, T-22, T-24
-**Frontier — takable now (5):** T-06 [Opus], T-08 [Opus], T-12 [Sonnet], T-19 [Sonnet], T-23 [Opus]
-**Resumption:** T-23 — model Opus
+**Completed (20):** T-01, T-02, T-03, T-04, T-05, T-07, T-09, T-10, T-11, T-13, T-14, T-15, T-16, T-17, T-18, T-20, T-21, T-22, T-23, T-24
+**Frontier — takable now (6):** T-06 [Opus], T-08 [Opus], T-12 [Sonnet], T-19 [Sonnet], T-25 [Sonnet], T-26 [Opus]
+**Resumption:** T-08 — model Opus
 
 _Machine-rendered from `programme-state.json` `tickets[]` — the execution-state SSOT (AD-17). Regenerated on every ticket resolution; the ticket-index table (§9) and the write-back log (§10) remain the human narrative record._
 

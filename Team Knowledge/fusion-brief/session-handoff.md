@@ -14,7 +14,7 @@ Phase 1 (Opus architecture) is complete and settled. Phase 2 is implementing the
 
 Branch `build-018/session-governor` in worktree `C:/Fusion247PKA-governor`, HEAD `8b30233799a52eb0eec19af83be0ea83a0704824` (base `ef96a3327f896e025731769c72157fd722daa02f`). Banked by Opus at 2026-08-01.
 
-**Completed (19):**
+**Completed (20):**
 - **T-01** — Prove the live statusLine payload on this machine _(resolved 2026-07-31)_
 - **T-02** — Session-health store location and atomic write _(resolved 2026-07-31)_
 - **T-03** — Sampler: statusLine script to health sample _(resolved 2026-07-31)_
@@ -33,6 +33,7 @@ Branch `build-018/session-governor` in worktree `C:/Fusion247PKA-governor`, HEAD
 - **T-20** — Recovery source coverage, installer honesty, and the model-recommendation source _(resolved 2026-08-01)_
 - **T-21** — The standing operating constitution, durably placed in the authoritative sources _(resolved 2026-08-01)_
 - **T-22** — Governor footer contract and the execution controller _(resolved 2026-08-01)_
+- **T-23** — Integrate WP-1..3, wire the hooks, and prove the live journey _(resolved 2026-08-01)_
 - **T-24** — Collapse duplicate programme copies during reorientation _(resolved 2026-08-01)_
 
 **Frontier — takable now (6):**
@@ -40,8 +41,8 @@ Branch `build-018/session-governor` in worktree `C:/Fusion247PKA-governor`, HEAD
 - **T-08** [Opus] — Live dogfood rotation (M4)
 - **T-12** [Sonnet] — Portability: extract the estate adapter
 - **T-19** [Sonnet] — Adopt the shared atomic write in the remaining three sites, and correct the false concurrency comment
-- **T-23** [Opus] — Integrate WP-1..3, wire the hooks, and prove the live journey
 - **T-25** [Sonnet] — The model gate can hide the collapse notice from Warwick
+- **T-26** [Opus] — Finish the installer against D-C C-8: scope, live verification, and the remaining managed rows
 
 **Blockers (16):**
 - **F-4** (fog, owner: research) — Are the proposed health thresholds right? Resolvable only by dogfood. _Recommendation: Ship the hypothesis thresholds, tune from T-08._
@@ -86,7 +87,7 @@ Branch `build-018/session-governor` in worktree `C:/Fusion247PKA-governor`, HEAD
 
 Make the Governor produce something Warwick can actually see, and make the operating model survive /clear and a genuinely fresh session.
 
-**Model recommendation: Opus** — Final acceptance judgement and the live restart proof.
+**Model recommendation: Opus** — Live acceptance judgement after the restart, and the merge decision that follows it.
 
 ## Locked decisions (durable — do NOT re-litigate)
 
@@ -129,7 +130,7 @@ Make the Governor produce something Warwick can actually see, and make the opera
 
 **Work in `C:/Fusion247PKA-governor` on branch `build-018/session-governor`.**
 
-**THE EXACT NEXT ACTION:** Outcome A is built, merged and green at 767/767, and the fresh-session path is PROVEN LIVE. Remaining: Nolan inspects LARRY-acceptance-evidence.md independently, then Warwick performs the ONE human action - a full Claude Code quit and relaunch - so the /clear path and the Stop controller can be observed firing in his own session. Hooks bind at process launch; nothing installed can be observed until then. (ticket T-23)
+**THE EXACT NEXT ACTION:** Warwick performs the ONE human action: quit Claude Code COMPLETELY and relaunch, then /clear and type continue. Hooks bind at process launch, so the /clear path, the PreToolUse guards and the Stop execution controller cannot be observed firing until then - they are installed in both checkouts and inert. That observation is T-08 (live dogfood rotation, M4), which remains open and is the only route to calling Outcome A complete rather than honestly partial. (ticket T-08)
 
 **Read first:**
 - Deliverables/BUILD-018-session-governor/02-MAP.md - the human-readable NAVIGATION / DECISION projection. Ticket status is NOT here: it lives in programme-state.json tickets[], the execution-state SSOT (AD-17 as CORRECTED 2026-08-01). If the two disagree, the ledger wins and the map is the defect.
