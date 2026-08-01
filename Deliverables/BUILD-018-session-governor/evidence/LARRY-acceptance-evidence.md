@@ -142,6 +142,28 @@ Four things are proven at once, in one real process:
 building, where it lives, and what to do next, with no re-briefing.** That is the outcome the Goal
 Contract calls M4 and names as the real acceptance test.
 
+### The positive case, and an honest limit it exposed
+
+A second fresh process, this time **inside** the canonical worktree, tools forbidden:
+
+> 1. **BUILD-018, next ticket T-23**
+> 2. **Location: verified**
+> 3. *"No BUILD-018 team roster in injected context — cannot name them without reading `Team/agent-index.md`"*
+
+Rows 1 and 2 complete the pair: the same hook reports **wrong worktree** from the wrong place and
+**verified** from the right one, so the gate discriminates rather than always firing.
+
+**Row 3 is the useful one and it is recorded rather than smoothed over.** The reorientation brief does
+**not** carry the specialist roster, and the fresh session said so plainly instead of inventing names.
+That is correct by design — the brief is a pointer document under a hard 10,000-character cap, and the
+constitution's startup **step 2** instructs Larry to *read* `Team/agent-index.md` rather than expect it
+injected. The probe forbade tools, so it could not.
+
+**But state the limit exactly:** what is proven is that a fresh Larry is *told to* re-establish the
+team, not that it *has*. Warwick's requirement 6 is satisfied by the constitution being loaded and the
+brief pointing at the index — both proven separately — and not by anything in the injected context
+itself. A reviewer should treat requirement 6 as **PROVEN-BY-INSTRUCTION**, not PROVEN-BY-OBSERVATION.
+
 ## A4 — `/clear` reorients — **CODE DONE / LIVE PENDING (blocked on Warwick's restart, not on code)**
 
 Same hook, same code path, same matcher — `clear` was verified at the script seam and `startup` is now
