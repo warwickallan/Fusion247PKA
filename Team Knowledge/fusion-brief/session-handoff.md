@@ -141,6 +141,7 @@ Make the Governor produce something Warwick can actually see, and make the opera
 - tools/governor/programme-state.mjs - resolveTicket/deriveResumption/resolveTicketAndAdvance/applyTicketResolution are the ONLY sanctioned way to resolve a ticket or re-point resumption
 
 **Do NOT:**
+- MERGE PRECONDITION (Nolan NOLAN-04): do NOT merge BUILD-018 to main without re-running the installer from the PRIMARY checkout afterwards. All six live controls resolve to C:/Fusion247PKA-governor/tools/governor/* - the WORKTREE - because install-hooks.mjs derives paths from where the installer lives. Removing the worktree at merge strands all six at once. They fail open so nobody is trapped, but the governor dies SILENTLY, which is the class INV-1 forbids arriving through a door INV-1 does not watch. Remedy: node tools/governor/install-hooks.mjs --checkout C:/Fusion247PKA, then a FULL Claude Code restart.
 - Do not hand-edit tickets[].state, resumption.*, or 02-MAP.md's GOVERNOR:STATUS block directly — use resolveTicketAndAdvance / applyTicketResolution.
 - Do not open or merge the recovery PR (recovery/2026-07-31-governor-abort-handoff at 95c265d).
 - Do not alter local main.

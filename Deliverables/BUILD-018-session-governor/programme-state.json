@@ -16,7 +16,7 @@
     "at": "2026-08-01",
     "by_model": "Opus",
     "session_id": null,
-    "head_sha": "1e3a1b31ae055d5e607b681dc4b581b7638e3ffe",
+    "head_sha": "1c47f51105792e66506cefde8f15f1572121cb21",
     "governor_version": "T-09/schema-v1"
   },
   "repository": {
@@ -566,7 +566,7 @@
     "effort": null,
     "rationale": "Final acceptance judgement and the live restart proof.",
     "for_ticket": "T-23",
-    "computed_at_head": "1e3a1b31ae055d5e607b681dc4b581b7638e3ffe"
+    "computed_at_head": "1c47f51105792e66506cefde8f15f1572121cb21"
   },
   "workers": [
     {
@@ -898,6 +898,7 @@
       "tools/governor/programme-state.mjs - resolveTicket/deriveResumption/resolveTicketAndAdvance/applyTicketResolution are the ONLY sanctioned way to resolve a ticket or re-point resumption"
     ],
     "do_not": [
+      "MERGE PRECONDITION (Nolan NOLAN-04): do NOT merge BUILD-018 to main without re-running the installer from the PRIMARY checkout afterwards. All six live controls resolve to C:/Fusion247PKA-governor/tools/governor/* - the WORKTREE - because install-hooks.mjs derives paths from where the installer lives. Removing the worktree at merge strands all six at once. They fail open so nobody is trapped, but the governor dies SILENTLY, which is the class INV-1 forbids arriving through a door INV-1 does not watch. Remedy: node tools/governor/install-hooks.mjs --checkout C:/Fusion247PKA, then a FULL Claude Code restart.",
       "Do not hand-edit tickets[].state, resumption.*, or 02-MAP.md's GOVERNOR:STATUS block directly — use resolveTicketAndAdvance / applyTicketResolution.",
       "Do not open or merge the recovery PR (recovery/2026-07-31-governor-abort-handoff at 95c265d).",
       "Do not alter local main.",

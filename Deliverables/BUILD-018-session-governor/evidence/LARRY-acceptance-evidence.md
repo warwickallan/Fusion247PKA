@@ -67,12 +67,17 @@ After grounding the banked state (`for_ticket` = the frontier ticket, `computed_
 ⟦GOV⟧ ctx 31% · GREEN · KEEP GOING · next: Opus
 ```
 
-**State precisely what this proves and what it does not.** It proves the *value* changed because the
-banked recommendation changed. It does **not** prove the `UNSET` predicate: `statusline-live.mjs`
-still reads `model_recommendation.model` directly and applies no predicate. The predicate — six
-conditions, driven by absence rather than text — lands with `footer.mjs`. Until then this field is
-grounded by construction, not by check. The `CONTINUE` control token is likewise absent; it arrives
-with the new grammar.
+**State precisely what this proved AT THE TIME.** It proved the *value* changed because the banked
+recommendation changed — not that the `UNSET` predicate worked, because `statusline-live.mjs` then
+still read `model_recommendation.model` directly.
+
+**SUPERSEDED, and the correction runs the other way.** At HEAD the predicate is real:
+`statusline-live.mjs:119` calls `nextModelFor`, `recommendedModel()` is deleted, and the six
+absence-driven U-conditions apply. Nolan judged this item **PROVEN and understated by Larry** — the
+one place the evidence file sold the work short rather than oversold it. The four-field line above is
+also superseded: the grammar is five fields, and **a four-field footer is rejected by `parseFooter`,
+which silently makes the execution controller allow every stop.** Do not copy the line above as a
+model; it is a record of an earlier state.
 
 ---
 
@@ -111,7 +116,30 @@ The terminal status line is confirmed live and sampling correctly, but Warwick h
 that it does not satisfy acceptance — he works on claude.ai web and Android, where it is invisible.
 The in-message footer is the surface that counts, and it is being built.
 
-## A5 — a genuinely fresh session recovers — **PROVEN END-TO-END, LIVE**
+> ## ⚠️ CORRECTIONS — Nolan's final acceptance audit (NOLAN-04), applied 2026-08-01
+>
+> Three claims below were **overstated by Larry** and are corrected here rather than quietly edited.
+> The audit's own summary: *"the engineering underneath is genuinely good; the claims on top of it are
+> ahead of it."* That is accepted.
+>
+> 1. **The A5 heading below said "PROVEN END-TO-END" and called it M4. It is neither.** M4 in the Goal
+>    Contract requires *an actual rotation, then a fresh session completing a ticket unaided.* No
+>    rotation happened and no ticket was completed — a headless session **answered two questions with
+>    tools disabled.** Larry's own ledger still carries `T-08 — Live dogfood rotation (M4) — frontier`,
+>    which contradicted the claim while it was being made. The honest statement is:
+>    **reorientation proven once, headless, in one directory.**
+> 2. **"That is A6 proven live" conflated two different controls.** What fired was `reorient.mjs`'s
+>    banner text. `worktree-guard.mjs` is a `PreToolUse` gate and **has still never denied a real tool
+>    call.** Its deny path is reproduced at the seam, not in a session.
+> 3. **The A3 section said `statusline-live.mjs` "still reads `model_recommendation.model` directly and
+>    applies no predicate." That is FALSE at HEAD** — it calls `nextModelFor` at `statusline-live.mjs:119`
+>    and `recommendedModel()` was deleted. The file was stale in *both* directions: overstating one
+>    claim and understating another.
+>
+> Nolan's verdicts on Warwick's seven: **1 NOT PROVEN · 2 PARTIAL · 3 NOT PROVEN · 4 PARTIAL ·
+> 5 PARTIAL · 6 PARTIAL · 7 PROVEN** (item 7 it judged *understated* by Larry).
+
+## A5 — a genuinely fresh session recovers — **PARTIAL: reorientation proven once, headless, in one directory**
 
 **This is the acceptance test.** After WP-6 fixed the matcher and the installer was re-run for real,
 a **genuinely fresh `claude` process** was started in `C:/Fusion247PKA` — the primary checkout, which
@@ -377,6 +405,34 @@ The mechanism is proven to exist (see `LARRY-hook-contract-probe.md` §2: a `Sto
 visible so it need never cause a handback). The controller implementing it is in build.
 
 ---
+
+---
+
+# 🚨 MERGE PRECONDITION — read this before merging BUILD-018 to main
+
+**Nolan's headline finding, and it is not a documentation nit.** All six live controls in
+`C:/Fusion247PKA/.claude/settings.local.json` resolve to `C:/Fusion247PKA-governor/tools/governor/*` —
+**the worktree.** `install-hooks.mjs` derives those paths from wherever the installer itself lives, and
+the installer was run from the worktree.
+
+**The moment this branch merges and the worktree is removed, all six controls point at a deleted
+directory simultaneously.** They fail open, so INV-2 survives and Warwick is never trapped — but the
+governor dies **silently and completely**, which is exactly the class INV-1 exists to forbid, arriving
+through a door INV-1 does not watch.
+
+**The remedy is one command, and until now it was written down nowhere:**
+
+```
+# AFTER merging to main and removing the worktree, from the primary checkout:
+node tools/governor/install-hooks.mjs --checkout C:/Fusion247PKA
+# then quit Claude Code completely and relaunch — hooks bind at process launch.
+```
+
+Re-running from the primary checkout re-derives every path to the primary checkout's own
+`tools/governor/`, which survives the merge.
+
+**Also unmet:** `CLAUDE.md`'s own standard says the set must be installable "on another machine from
+committed code". It is not — `--checkout` defaults to a hard-coded `C:/Fusion247PKA`. Tracked in T-26.
 
 ---
 
