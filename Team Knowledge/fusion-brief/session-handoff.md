@@ -86,7 +86,7 @@ Branch `build-018/session-governor` in worktree `C:/Fusion247PKA-governor`, HEAD
 
 Make the Governor produce something Warwick can actually see, and make the operating model survive /clear and a genuinely fresh session.
 
-**Model recommendation: Opus** — T-23 is integration, live installation and acceptance judgement across five merged branches, plus the residual UNKNOWN (whether Stop fires in the interactive client) which must be read live rather than tested.
+**Model recommendation: Opus** — Final acceptance judgement and the live restart proof.
 
 ## Locked decisions (durable — do NOT re-litigate)
 
@@ -129,7 +129,7 @@ Make the Governor produce something Warwick can actually see, and make the opera
 
 **Work in `C:/Fusion247PKA-governor` on branch `build-018/session-governor`.**
 
-**THE EXACT NEXT ACTION:** All five work packages are merged and green at 754/754. Larry now owns T-23: run install-hooks.mjs for real (his step, live_authority), prove the fresh-session path with a real claude process, then ask Warwick for the ONE human action - a full Claude Code quit and relaunch, because hooks bind at process launch and nothing installed can be observed firing until then. Nolan inspects LARRY-acceptance-evidence.md before Outcome A is called complete. (ticket T-23)
+**THE EXACT NEXT ACTION:** Outcome A is built, merged and green at 767/767, and the fresh-session path is PROVEN LIVE. Remaining: Nolan inspects LARRY-acceptance-evidence.md independently, then Warwick performs the ONE human action - a full Claude Code quit and relaunch - so the /clear path and the Stop controller can be observed firing in his own session. Hooks bind at process launch; nothing installed can be observed until then. (ticket T-23)
 
 **Read first:**
 - Deliverables/BUILD-018-session-governor/02-MAP.md - the human-readable NAVIGATION / DECISION projection. Ticket status is NOT here: it lives in programme-state.json tickets[], the execution-state SSOT (AD-17 as CORRECTED 2026-08-01). If the two disagree, the ledger wins and the map is the defect.

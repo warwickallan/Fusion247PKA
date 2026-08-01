@@ -111,8 +111,42 @@ The terminal status line is confirmed live and sampling correctly, but Warwick h
 that it does not satisfy acceptance — he works on claude.ai web and Android, where it is invisible.
 The in-message footer is the surface that counts, and it is being built.
 
-## A4 — `/clear` reorients — **CODE DONE / LIVE PENDING (blocked on a restart, not on code)**
-## A5 — a genuinely fresh session recovers — **CODE DONE, AND ONE LAYER PROVEN LIVE**
+## A5 — a genuinely fresh session recovers — **PROVEN END-TO-END, LIVE**
+
+**This is the acceptance test.** After WP-6 fixed the matcher and the installer was re-run for real,
+a **genuinely fresh `claude` process** was started in `C:/Fusion247PKA` — the primary checkout, which
+contains **no BUILD-018 files whatsoever** — with no conversation history, and told to use no tools
+and answer from injected context only.
+
+It answered:
+
+> **(1) BUILD-018, next ticket T-23** — run install-hooks.mjs for real, prove the fresh-session path
+> with a real Claude process, then ask Warwick for a full quit+relaunch (hooks bind at process launch).
+>
+> **(2) ⚠️ WRONG WORKTREE** — this session is in `C:/Fusion247PKA` (branch `recovery/2026-07-31`),
+> but the canonical worktree for BUILD-018 is `C:/Fusion247PKA-governor`
+> (branch `build-018/session-governor`). No implementation is permitted from here.
+> Recovery: Larry must call `EnterWorktree` …
+
+Four things are proven at once, in one real process:
+
+1. **`SessionStart` fired on `source: startup`** — the entry path that had never once worked.
+2. **Reorientation injected the brief**, and it carried the *live* build, the *live* ticket, and the
+   *live* next action — into a directory that contains none of that on disk.
+3. **The location gate fired** and correctly refused implementation from the wrong worktree, naming
+   the canonical one and the recovery. That is **A6 proven live**, not just at the script seam.
+4. **It came from banked state, not from files** — the primary checkout has no
+   `Deliverables/BUILD-018-*` at all, so there was nothing to read.
+
+**Warwick can now open a brand-new session anywhere on this machine and Larry will know what he is
+building, where it lives, and what to do next, with no re-briefing.** That is the outcome the Goal
+Contract calls M4 and names as the real acceptance test.
+
+## A4 — `/clear` reorients — **CODE DONE / LIVE PENDING (blocked on Warwick's restart, not on code)**
+
+Same hook, same code path, same matcher — `clear` was verified at the script seam and `startup` is now
+proven live. What cannot be shown here is Warwick's **own running session**, because its hook table
+was snapshotted at process launch, before any of this existed.
 
 WP-1 landed at `c9ebef4` (645 tests, 645 pass; baseline 607). Both layers of the defect are closed:
 the `SessionStart` entry now carries **no `matcher` key at all** (Silas's B-1, probe-proven), and
