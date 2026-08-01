@@ -24,7 +24,11 @@ import {
   briefModeFor,
   BRIEF_MODE,
   SOURCE_POLICY,
+  copyFingerprint,
+  toRegistryEntry,
+  collapseProgrammes,
 } from './reorient.mjs';
+import { isInside } from './worktree-guard.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const FIXTURE_PATH = join(__dirname, 'fixtures', 'programme-state.minimal.json');
@@ -490,6 +494,296 @@ test('MUTATION: two active programmes are reported as AMBIGUOUS, both named, nei
     assert.match(r.context, /BUILD-BBB/);
     assert.match(r.context, /will not guess/);
   } finally {
+    e.cleanup();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// ONE PROGRAMME, MANY CHECKOUTS — WO-2026-08-01-04
+// ---------------------------------------------------------------------------
+// The observed defect: the real hook, run on the real estate, reported BUILD-018
+// FOUR times — once per worktree — and refused as AMBIGUOUS. Those were one
+// programme and four checkouts. Refusing to guess is right; presenting one
+// programme as four candidates is not.
+//
+// AC2 is the load-bearing half of this ticket and these tests are built around
+// that: a change that makes the guard always resolve has DELETED a control, not
+// repaired one. So every "it now resolves" test below is paired with a case that
+// must still refuse, and both halves are mutation-tested.
+
+// A second real git checkout of the SAME programme, cut from the BANKING commit so
+// it genuinely carries its own copy of programme-state.json — which is what makes
+// this class recur: the state file is tracked, so every checkout has one and
+// `main` gains one the moment this build merges.
+function addCheckout(estate, programme, name, branch) {
+  const path = join(estate.root, '..', `${name}-${Math.abs(hashish(estate.root + name))}`);
+  execFileSync('git', ['-C', estate.root, 'worktree', 'add', '-q', '-b', branch, path, estate.bankingSha]);
+  const real = execFileSync('git', ['-C', path, 'rev-parse', '--show-toplevel'], { encoding: 'utf8' })
+    .trim()
+    .replace(/\\/g, '/');
+  return {
+    path: real,
+    statePath: join(real, 'Deliverables', programme, 'programme-state.json'),
+    remove: () => {
+      try {
+        execFileSync('git', ['-C', estate.root, 'worktree', 'remove', '--force', path]);
+      } catch { /* the estate may already be gone — it is a temp dir */ }
+      try {
+        rmSync(path, { recursive: true, force: true });
+      } catch { /* already gone */ }
+    },
+  };
+}
+
+function patchState(statePath, mutate) {
+  const doc = JSON.parse(readFileSync(statePath, 'utf8'));
+  mutate(doc);
+  writeFileSync(statePath, JSON.stringify(doc, null, 2) + '\n');
+  return doc;
+}
+
+test('copyFingerprint: a copy disagrees on a different TICKET or a different BANKED HEAD', () => {
+  const base = { resumption: { ticket: 'T-1' }, banked: { head_sha: 'aaaaaaa' } };
+  assert.equal(
+    copyFingerprint(base),
+    copyFingerprint({ resumption: { ticket: 'T-1' }, banked: { head_sha: 'aaaaaaa' } })
+  );
+  assert.notEqual(
+    copyFingerprint(base),
+    copyFingerprint({ resumption: { ticket: 'T-2' }, banked: { head_sha: 'aaaaaaa' } }),
+    'a different resumption ticket is a disagreement'
+  );
+  assert.notEqual(
+    copyFingerprint(base),
+    copyFingerprint({ resumption: { ticket: 'T-1' }, banked: { head_sha: 'bbbbbbb' } }),
+    'a different banked head is a disagreement'
+  );
+});
+
+// A control that cannot fail is not a control. If the entry took the worktree the
+// file was FOUND in, `isInside` would be true for every copy and self-consistency
+// could never discriminate — so this pins the source of that field.
+test('toRegistryEntry: takes the RECORDED canonical worktree, never the one the file was found in', () => {
+  const state = loadFixture();
+  state.programme.id = 'BUILD-Z';
+  state.resumption.worktree = 'C:/canonical-home';
+  state.resumption.branch = 'build/z';
+
+  const entry = toRegistryEntry({
+    worktree: 'C:/somewhere-else',
+    path: 'C:/somewhere-else/Deliverables/BUILD-Z/programme-state.json',
+    state,
+  });
+
+  assert.equal(entry.worktree, 'C:/canonical-home', 'the RECORDED worktree, not the found one');
+  assert.equal(entry.branch, 'build/z');
+  assert.equal(
+    isInside(entry.state_path, entry.worktree),
+    false,
+    'an off-branch copy must be able to read as NOT self-consistent'
+  );
+});
+
+test('collapseProgrammes: groups by programme id, so N checkouts of one build survive as ONE', () => {
+  const mk = (id, worktree, path, ticket) => {
+    const state = loadFixture();
+    state.programme.id = id;
+    state.resumption.worktree = worktree;
+    state.resumption.branch = 'build/x';
+    state.resumption.ticket = ticket;
+    return { worktree, path, state };
+  };
+
+  const { survivors, reports } = collapseProgrammes([
+    mk('BUILD-M', 'C:/home', 'C:/home/Deliverables/BUILD-M/programme-state.json', 'T-9'),
+    mk('BUILD-M', 'C:/home', 'C:/copy-a/Deliverables/BUILD-M/programme-state.json', 'T-1'),
+    mk('BUILD-M', 'C:/home', 'C:/copy-b/Deliverables/BUILD-M/programme-state.json', 'T-1'),
+  ]);
+
+  assert.equal(survivors.length, 1, 'three checkouts of one programme are ONE programme');
+  assert.equal(reports[0].copies, 3);
+  assert.equal(reports[0].collapsed, 2);
+  assert.equal(reports[0].reason, 'self-consistent');
+  assert.equal(reports[0].resolved, true);
+  assert.equal(reports[0].chosen, 'C:/home/Deliverables/BUILD-M/programme-state.json');
+  assert.equal(reports[0].disagreeing.length, 2);
+});
+
+test('AC1 (REAL GIT): one programme with FOUR checkouts collapses to one and ORIENTS — the live-estate shape', () => {
+  const e = makeEstate({ programme: 'BUILD-COPIES' });
+  const checkouts = [
+    addCheckout(e, 'BUILD-COPIES', 'wo-a', 'build/wo-a'),
+    addCheckout(e, 'BUILD-COPIES', 'wo-b', 'build/wo-b'),
+    addCheckout(e, 'BUILD-COPIES', 'wo-c', 'build/wo-c'),
+  ];
+  try {
+    // Exactly the shape of the live estate at the time this was written: the
+    // worker checkouts carry an OLDER banking of the same programme — an older
+    // ticket and an older head — than the copy in the canonical worktree.
+    for (const c of checkouts) {
+      patchState(c.statePath, (d) => {
+        d.resumption.ticket = 'T-OLD';
+        d.banked.head_sha = '0'.repeat(40);
+      });
+    }
+
+    const r = reorient({ source: 'startup', cwd: e.root });
+
+    assert.equal(
+      r.verdict,
+      VERDICT.ORIENTED,
+      `expected a normal brief, got ${r.verdict}: ${r.context?.slice(0, 400)}`
+    );
+    assert.doesNotMatch(
+      r.context,
+      /MORE THAN ONE ACTIVE PROGRAMME/,
+      'THE defect: one programme in four checkouts must not present as four programmes'
+    );
+    assert.ok(
+      r.statePath.toLowerCase().startsWith(e.root.replace(/\\/g, '/').toLowerCase()),
+      `the canonical copy must win, got ${r.statePath}`
+    );
+
+    // AC3 / M3 — the collapse is VISIBLE, not merely correct. Without this a fresh
+    // Larry cannot tell a healthy resolution from a swallowed contest.
+    assert.equal(r.collapse.copies, 4);
+    assert.equal(r.collapse.collapsed, 3);
+    assert.equal(r.collapse.reason, 'self-consistent');
+    assert.equal(r.collapse.disagreeing.length, 3);
+    assert.match(r.context, /ONE PROGRAMME, 4 CHECKOUTS — COLLAPSED/);
+    assert.match(r.context, /4 copies of BUILD-COPIES/);
+    assert.match(r.context, /collapsed : 3 other copy\(ies\)/);
+    assert.match(r.context, /disagreed : 3 of them recorded a DIFFERENT ticket or banked head/);
+    assert.match(r.context, /T-OLD/, 'the overruled copies must be named, not swallowed');
+    assert.match(r.context, /OVERRULED as older bankings/);
+    assert.ok(r.context.length <= CONTEXT_CAP);
+  } finally {
+    for (const c of checkouts) c.remove();
+    e.cleanup();
+  }
+});
+
+test('AC2 (REAL GIT, MUTATION): collapsing checkouts does NOT swallow a real contest between DIFFERENT programmes', () => {
+  const e = makeEstate({ programme: 'BUILD-ONE' });
+  const c = addCheckout(e, 'BUILD-ONE', 'wo-x', 'build/wo-x');
+  try {
+    // A genuinely different programme, alongside a duplicated checkout of the
+    // first. Collapsing must remove the duplicate and leave the contest standing.
+    const home2 = join(e.root, 'Deliverables', 'BUILD-TWO');
+    mkdirSync(home2, { recursive: true });
+    const doc2 = JSON.parse(readFileSync(e.statePath, 'utf8'));
+    doc2.programme.id = 'BUILD-TWO';
+    doc2.programme.home = 'Deliverables/BUILD-TWO';
+    writeFileSync(join(home2, 'programme-state.json'), JSON.stringify(doc2, null, 2));
+
+    const r = reorient({ source: 'startup', cwd: e.root });
+
+    assert.equal(r.verdict, VERDICT.AMBIGUOUS, 'two DIFFERENT programmes must still refuse');
+    assert.match(r.context, /BUILD-ONE/);
+    assert.match(r.context, /BUILD-TWO/);
+    assert.match(r.context, /will not guess/);
+    assert.match(r.context, /distinct active programmes remain after collapsing/);
+    assert.equal(r.candidates.length, 2, 'the duplicate checkout must be gone, the contest intact');
+  } finally {
+    c.remove();
+    e.cleanup();
+  }
+});
+
+test('AC3 (REAL GIT, MUTATION): copies of ONE programme that genuinely DISAGREE are refused, never silently collapsed', () => {
+  const e = makeEstate({ programme: 'BUILD-SPLIT' });
+  const c = addCheckout(e, 'BUILD-SPLIT', 'wo-y', 'build/wo-y');
+  try {
+    // Neither copy sits inside the worktree it names as canonical, so the
+    // self-consistency precedence cannot resolve this — and the two disagree about
+    // where the programme is up to. There is no principled winner, and picking
+    // "whichever sorts first" would hand a fresh session a stale pointer.
+    const phantom = `${e.root.replace(/\\/g, '/')}-no-such-worktree`;
+    patchState(e.statePath, (d) => {
+      d.resumption.worktree = phantom;
+      d.repository.worktree = phantom;
+    });
+    patchState(c.statePath, (d) => {
+      d.resumption.worktree = phantom;
+      d.repository.worktree = phantom;
+      d.resumption.ticket = 'T-DIFFERENT';
+      d.banked.head_sha = '1'.repeat(40);
+    });
+
+    const r = reorient({ source: 'startup', cwd: e.root });
+
+    assert.equal(r.verdict, VERDICT.AMBIGUOUS, 'a genuine disagreement must refuse, not pick');
+    assert.match(r.context, /DISAGREE about where it is up to/);
+    assert.match(r.context, /no principled way/);
+    assert.match(r.context, /T-DIFFERENT/, 'both readings must be named so a human can choose');
+    assert.equal(r.collapse[0].reason, 'contested');
+    assert.equal(r.collapse[0].resolved, false);
+  } finally {
+    c.remove();
+    e.cleanup();
+  }
+});
+
+test('AC3 (negative control): with no self-consistent winner but IDENTICAL copies, the guard does NOT fire', () => {
+  const e = makeEstate({ programme: 'BUILD-SAME' });
+  const c = addCheckout(e, 'BUILD-SAME', 'wo-z', 'build/wo-z');
+  try {
+    // Same setup as the test above, minus the disagreement. This pins WHAT the AC3
+    // guard reacts to: copies that genuinely differ — not merely the absence of a
+    // self-consistent copy. Without this, over-refusal would pass unnoticed.
+    const phantom = `${e.root.replace(/\\/g, '/')}-no-such-worktree`;
+    for (const p of [e.statePath, c.statePath]) {
+      patchState(p, (d) => {
+        d.resumption.worktree = phantom;
+        d.repository.worktree = phantom;
+      });
+    }
+
+    const r = reorient({ source: 'startup', cwd: e.root });
+
+    assert.notEqual(r.verdict, VERDICT.AMBIGUOUS, 'identical copies are not a contest');
+    assert.equal(r.collapse.reason, 'identical');
+    assert.equal(r.collapse.resolved, true);
+    assert.match(r.context, /nothing to choose between them/);
+  } finally {
+    c.remove();
+    e.cleanup();
+  }
+});
+
+test('REAL PROCESS (AC1): the real hook over a multi-checkout fixture emits a BRIEF, not an AMBIGUOUS refusal', () => {
+  const e = makeEstate({ programme: 'BUILD-E2E' });
+  const checkouts = [
+    addCheckout(e, 'BUILD-E2E', 'e2e-a', 'build/e2e-a'),
+    addCheckout(e, 'BUILD-E2E', 'e2e-b', 'build/e2e-b'),
+  ];
+  try {
+    for (const c of checkouts) {
+      patchState(c.statePath, (d) => {
+        d.resumption.ticket = 'T-STALE';
+        d.banked.head_sha = '0'.repeat(40);
+      });
+    }
+
+    const out = execFileSync('node', [REORIENT_SRC], {
+      input: JSON.stringify({ source: 'startup', cwd: e.root }),
+      encoding: 'utf8',
+    });
+
+    assert.ok(out.trim().length > 0, 'a fresh session start must inject context, not silence');
+    const ctx = JSON.parse(out).hookSpecificOutput.additionalContext;
+    // T-15's model gate composes on top of the brief in the real hook path and may
+    // substitute a compact render, so this asserts only what the session receives
+    // EITHER WAY — same discipline as the AC1 process test below. The full
+    // collapse section is asserted directly, against the same render path, above.
+    assert.doesNotMatch(
+      ctx,
+      /MORE THAN ONE ACTIVE PROGRAMME/,
+      'THE defect, end to end: three checkouts of one build must not refuse as three programmes'
+    );
+    assert.match(ctx, /BUILD-E2E/, 'the session must be told which build it is resuming');
+  } finally {
+    for (const c of checkouts) c.remove();
     e.cleanup();
   }
 });
