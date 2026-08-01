@@ -373,7 +373,7 @@
     {
       "id": "T-23",
       "title": "Integrate WP-1..3, wire the hooks, and prove the live journey",
-      "state": "blocked",
+      "state": "frontier",
       "model": "Opus",
       "depends_on": [
         "T-20",
@@ -386,10 +386,23 @@
     {
       "id": "T-24",
       "title": "Collapse duplicate programme copies during reorientation",
-      "state": "frontier",
+      "state": "resolved",
       "model": "Opus",
       "depends_on": [],
-      "note": "WO-2026-08-01-04 (WP-4). Found by Larry running the real hook after merging WP-1: reorientation fires on startup and then refuses, listing ONE programme four times, once per checkout. build-registry.mjs already solves this at :172 with collapseCopies; reorient.mjs groups by state-file path instead. Contradicts the constitution being merged, whose startup step 3 requires resolving exactly one PROGRAMME and names the sting - merging this build to main is itself what creates the second copy."
+      "note": "COMPLETED. 653/653 in-branch, 720/720 integrated. Before/after on identical fixture ground: the same estate that produced \"4 programmes report status active\" now produces a brief. KEEL OVERRULED LARRY ON THE SELECTION RULE AND WAS RIGHT - Larry's cwd-preference steer would have selected the STALE copy for a session started in a worker worktree, the exact harm it existed to prevent, and would have let a misplaced session pick the state that then compares ALIGNED, one control disarming another. Self-consistency wins instead. The collapse is LOUD: an undroppable brief section names copies found, disagreements, which won and why. Both mutations proven red, with M2 leaving its negative control green to show it hits the disagreement guard specifically.",
+      "resolved": "2026-08-01",
+      "evidence": [
+        "tools/governor/reorient.mjs",
+        "tools/governor/reorient.test.mjs"
+      ]
+    },
+    {
+      "id": "T-25",
+      "title": "The model gate can hide the collapse notice from Warwick",
+      "state": "planned",
+      "model": "Sonnet",
+      "depends_on": [],
+      "note": "Reported by Keel out-of-surface during WP-4. In the real hook path applyModelGate substitutes a compact render when a model switch is owed, and on the end-to-end run the session received REORIENTED plus the next ticket but NOT the COLLAPSED section. The resolution stays correct and the refusal stays gone, so this is a visibility gap rather than a correctness one - M3 is fully delivered only on the unsubstituted path. model-gate.mjs was outside WP-4 surface. NOT started: scope is Warwick's to open."
     }
   ],
   "blockers": [
@@ -541,7 +554,7 @@
   "model_recommendation": {
     "model": "Opus",
     "effort": null,
-    "rationale": "T-24 is the only ticket the computed frontier names as takable."
+    "rationale": "T-23 is the only ticket the computed frontier names as takable."
   },
   "workers": [
     {
@@ -859,8 +872,8 @@
   },
   "resumption": {
     "focus": "Make the Governor produce something Warwick can actually see, and make the operating model survive /clear and a genuinely fresh session.",
-    "next_action": "Collapse duplicate programme copies during reorientation (ticket T-24).",
-    "ticket": "T-24",
+    "next_action": "Integrate WP-1..3, wire the hooks, and prove the live journey (ticket T-23).",
+    "ticket": "T-23",
     "worktree": "C:/Fusion247PKA-governor",
     "branch": "build-018/session-governor",
     "read_first": [
