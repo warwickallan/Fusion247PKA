@@ -1,0 +1,41 @@
+{
+  "source_url": "https://www.youtube.com/watch?v=Kcpq4ugob2U",
+  "video_id": "Kcpq4ugob2U",
+  "captured_at": "2026-08-01T16:25:01+00:00",
+  "title": "Free ChatGPT Is Dead. The $200 Subscription PANIC.",
+  "channel": "The Infographics Show",
+  "published_date": "2026-05-25",
+  "duration_seconds": 997,
+  "user_note": "BUILD-002 WP2 auto-detect",
+  "transcript_status": "extracted",
+  "transcript_source": "manual_captions",
+  "language": "English",
+  "language_code": "en",
+  "segment_count": 205,
+  "error_category": null,
+  "error_detail": null,
+  "retry_recommendation": null,
+  "tool_versions": {
+    "python": "3.13.6",
+    "youtube-transcript-api": "1.2.4",
+    "yt-dlp": "2026.7.4"
+  },
+  "routing": {
+    "fusion_review_status": "pending_cairn",
+    "assigned_agent": "youtubair",
+    "next_agent": "cairn",
+    "legacy_review_status": "pending_categorisair",
+    "legacy_next_agent": "categorisair",
+    "note": "Cairn has absorbed the legacy CategorisAIr role; legacy_* are aliases only."
+  },
+  "handoff": null,
+  "output_dir": "out\\auto\\2026-08-01__free-chatgpt-is-dead-the-200-subscription-panic__Kcpq4ugob2U",
+  "files": [
+    "TubeAIR Report - free-chatgpt-is-dead-the-200-subscription-panic - Kcpq4ugob2U.md",
+    "manifest.json"
+  ],
+  "idea": "IDEA-013",
+  "project_id": "F247-YT-INGRESS-001",
+  "build": "TubeAIR",
+  "schema_version": 2
+}
