@@ -1163,3 +1163,361 @@ test('AC1: the report names the Stop entry, so an install cannot be silent about
     c.cleanup();
   }
 });
+
+// ===========================================================================
+// WP-6 — the MATCHER is reconciled, not merely the command
+// ===========================================================================
+// THE DEFECT, and why it matters more than its size: WP-1 made the SessionStart
+// spec matcher-less, and its tests proved that a FRESH install writes no matcher.
+// Nothing tested the PRE-EXISTING-ENTRY path. So on every machine that already
+// had a governor hook — including the one Warwick actually runs — the stale
+// `matcher: "clear"` survived a successful install, reorientation stayed
+// unreachable on `startup` and `resume`, and the installer printed
+// "already present, unchanged" over it. 754 tests were green while it was true.
+// It was found only by running the installer for real.
+//
+// The matcher lives on the enclosing GROUP, never on the hook, which is why
+// every test below asserts on group shape rather than on hook shape.
+
+const SS = HOOK_EVENT;
+
+// The live defect, byte-for-byte: a governor SessionStart entry carrying the old
+// `clear` matcher, with the CORRECT command (so the command axis is already
+// reconciled and cannot be what fixes it).
+function makeStaleMatcherCheckout() {
+  const root = mkdtempSync(join(tmpdir(), 'governor-hooks-stale-'));
+  mkdirSync(join(root, '.claude'), { recursive: true });
+  writeFileSync(
+    settingsPath(root),
+    JSON.stringify(
+      { hooks: { [SS]: [{ matcher: 'clear', hooks: [{ type: 'command', command: governorHookCommand(SCRIPT) }] }] } },
+      null,
+      2
+    ) + '\n'
+  );
+  return { root, cleanup: () => rmSync(root, { recursive: true, force: true }) };
+}
+
+const ssGroupWithGovernor = (doc) => (doc.hooks?.[SS] || []).find((g) => (g.hooks || []).some(isGovernorHook));
+
+test('WP-6 AC1: the LIVE defect — a stale `clear` matcher on an existing governor hook is REMOVED', () => {
+  const c = makeStaleMatcherCheckout();
+  try {
+    const before = JSON.parse(readFileSync(settingsPath(c.root), 'utf8'));
+    assert.equal(before.hooks[SS][0].matcher, 'clear', 'precondition: the fixture must carry the stale matcher');
+    assert.equal(
+      before.hooks[SS][0].hooks[0].command,
+      governorHookCommand(SCRIPT),
+      'precondition: the COMMAND is already correct, so only the matcher can be at fault'
+    );
+
+    const r = installHooks({ checkout: c.root, scriptPath: SCRIPT });
+    const after = JSON.parse(readFileSync(settingsPath(c.root), 'utf8'));
+    const group = ssGroupWithGovernor(after);
+
+    assert.ok(group, 'the reorientation hook must still be installed');
+    assert.ok(
+      !Object.prototype.hasOwnProperty.call(group, 'matcher'),
+      'the stale matcher KEY must be gone, not merely set to something else'
+    );
+    assert.equal(r.report.events.governor.matcherNormalised, true, 'and the report must record that it changed');
+    assert.equal(r.report.events.governor.matcherWas, 'clear');
+    assert.equal(r.report.events.governor.matcherNow, undefined);
+    assert.equal(r.report.matcherNormalised, true);
+    assert.equal(r.report.events.governor.added, false, 'it was neither newly added...');
+    assert.equal(r.report.events.governor.replaced, false, '...nor re-pointed — the command never moved');
+  } finally {
+    c.cleanup();
+  }
+});
+
+test('WP-6 AC2: the report tells the truth — never "already present, unchanged" over a normalisation', () => {
+  const c = makeStaleMatcherCheckout();
+  try {
+    const r = installHooks({ checkout: c.root, scriptPath: SCRIPT });
+    const text = renderReport(r);
+    const line = text.split('\n').find((l) => l.includes(`${SS} (reorientation`));
+
+    assert.doesNotMatch(line, /already present, unchanged/, 'the exact lie this criterion exists to end');
+    assert.match(line, /MATCHER NORMALISED/);
+    // AC2 — its own visible line, naming BOTH values. "Something changed" without
+    // saying what changed is how the old report was true and useless at once.
+    assert.match(text, /matcher: "clear" → no matcher \(key absent\)/);
+  } finally {
+    c.cleanup();
+  }
+});
+
+test('WP-6 AC2: a genuinely identical hook STILL reports "already present, unchanged"', () => {
+  // The other half of AC2. A report that shouted about every run would be just as
+  // useless as one that stayed silent, and would train the reader to ignore it.
+  const c = makeStaleMatcherCheckout();
+  try {
+    installHooks({ checkout: c.root, scriptPath: SCRIPT }); // settles everything
+    const second = installHooks({ checkout: c.root, scriptPath: SCRIPT });
+    const line = renderReport(second)
+      .split('\n')
+      .find((l) => l.includes(`${SS} (reorientation`));
+
+    assert.match(line, /already present, unchanged/);
+    assert.equal(second.report.matcherNormalised, false);
+    assert.doesNotMatch(renderReport(second), /matcher: .* → /, 'and no old→new line when nothing moved');
+  } finally {
+    c.cleanup();
+  }
+});
+
+test('WP-6 AC4: normalising once then re-running is BYTE-IDENTICAL and reports changed:false', () => {
+  const c = makeStaleMatcherCheckout();
+  try {
+    const first = installHooks({ checkout: c.root, scriptPath: SCRIPT });
+    assert.equal(first.changed, true, 'precondition: the first run must actually normalise something');
+    const settled = readFileSync(settingsPath(c.root), 'utf8');
+
+    const second = installHooks({ checkout: c.root, scriptPath: SCRIPT });
+    assert.equal(second.changed, false, 'a normalisation must not re-fire forever');
+    assert.equal(readFileSync(settingsPath(c.root), 'utf8'), settled, 'and the file must be byte-identical');
+    assert.equal(second.report.events.governor.matcherNormalised, false);
+  } finally {
+    c.cleanup();
+  }
+});
+
+test('WP-6 AC1 INVERSE: a spec that HAS a matcher normalises a live entry that differs', () => {
+  // The mirror case. The SessionStart spec removes a key; a PreToolUse spec must
+  // equally be able to CORRECT one, or the reconciliation is only half a rule.
+  const guard = guardHookCommand(guardScriptFor(SCRIPT), 'C:/Estate');
+  const settings = { hooks: { [GUARD_EVENT]: [{ matcher: 'Bash', hooks: [{ type: 'command', command: guard }] }] } };
+  const { settings: next, report } = planSettings(settings, { scriptPath: SCRIPT, estate: 'C:/Estate', cwd: '/tmp' });
+
+  const group = next.hooks[GUARD_EVENT].find((g) => (g.hooks || []).some(isGuardHook));
+  assert.equal(group.matcher, GUARD_MATCHER, 'the narrow live matcher must be widened to the managed spec');
+  assert.equal(report.events.guard.matcherNormalised, true);
+  assert.equal(report.events.guard.matcherWas, 'Bash');
+  assert.equal(report.events.guard.matcherNow, GUARD_MATCHER);
+  assert.equal(report.events.guard.added, false, 'normalised in place, not re-added as a duplicate');
+  assert.equal(
+    next.hooks[GUARD_EVENT].filter((g) => (g.hooks || []).some(isGuardHook)).length,
+    1,
+    'and exactly one guard group survives'
+  );
+});
+
+test('WP-6 AC1 INVERSE: a spec that has a matcher SETS one that is missing entirely', () => {
+  const guard = guardHookCommand(guardScriptFor(SCRIPT), 'C:/Estate');
+  const settings = { hooks: { [GUARD_EVENT]: [{ hooks: [{ type: 'command', command: guard }] }] } };
+  const { settings: next, report } = planSettings(settings, { scriptPath: SCRIPT, estate: 'C:/Estate', cwd: '/tmp' });
+
+  const group = next.hooks[GUARD_EVENT].find((g) => (g.hooks || []).some(isGuardHook));
+  assert.equal(group.matcher, GUARD_MATCHER, 'an absent matcher on a spec that needs one is itself a difference');
+  assert.equal(report.events.guard.matcherNormalised, true);
+  assert.equal(report.events.guard.matcherWasPresent, false);
+});
+
+test('WP-6 AC1: comparison is EXACT — "" and "*" are not "no matcher" and are both removed', () => {
+  // WP-1's spec comment says the entry carries no matcher key "not '', not '*'".
+  // A comparison that treated either as equivalent to absent would leave the live
+  // file in a shape the spec explicitly forbids while reporting success.
+  for (const stale of ['', '*']) {
+    const settings = {
+      hooks: { [SS]: [{ matcher: stale, hooks: [{ type: 'command', command: governorHookCommand(SCRIPT) }] }] },
+    };
+    const { settings: next, report } = planSettings(settings, { scriptPath: SCRIPT, cwd: '/tmp' });
+    const group = ssGroupWithGovernor(next);
+    assert.ok(
+      !Object.prototype.hasOwnProperty.call(group, 'matcher'),
+      `a matcher of ${JSON.stringify(stale)} must be removed, not accepted as equivalent to absent`
+    );
+    assert.equal(report.events.governor.matcherNormalised, true);
+    assert.equal(report.events.governor.matcherWas, stale);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// WP-6 AC3 — still additive, still non-destructive
+// ---------------------------------------------------------------------------
+
+test('WP-6 AC3: a SHARED group is never matcher-rewritten — the governor hook is EXTRACTED instead', () => {
+  // The reason the rule is per-group-with-an-ownership-test rather than a blanket
+  // in-place mutation. Rewriting this group's matcher would silently re-scope a
+  // foreign hook that never asked for it.
+  const foreign = 'node C:/somebody-elses/keeper.mjs';
+  const settings = {
+    hooks: {
+      [SS]: [
+        {
+          matcher: 'clear',
+          hooks: [
+            { type: 'command', command: governorHookCommand(SCRIPT) },
+            { type: 'command', command: foreign },
+          ],
+        },
+      ],
+    },
+  };
+  // `exists: () => true` keeps the pruner out of it: this test is about the
+  // matcher rule, and a foreign hook deleted for a dangling target would prove
+  // nothing about it.
+  const { settings: next, report } = planSettings(settings, { scriptPath: SCRIPT, cwd: '/tmp', exists: () => true });
+
+  const shared = next.hooks[SS][0];
+  assert.equal(shared.matcher, 'clear', "the foreign hook's group keeps its own matcher, untouched");
+  assert.deepEqual(
+    shared.hooks.map((h) => h.command),
+    [foreign],
+    'the foreign hook survives exactly as found'
+  );
+
+  const governorGroup = next.hooks[SS].find((g) => (g.hooks || []).some(isGovernorHook));
+  assert.notEqual(governorGroup, shared, 'the governor hook moved OUT of the shared group');
+  assert.ok(
+    !Object.prototype.hasOwnProperty.call(governorGroup, 'matcher'),
+    'and into a group carrying the managed spec — here, no matcher at all'
+  );
+  assert.equal(report.events.governor.matcherNormalised, true);
+  assert.equal(report.events.governor.matcherExtracted, true);
+});
+
+test('WP-6 AC2: an EXTRACTION is reported as a move, never as a new activation', () => {
+  // An extracted hook travels through the add path, so without care the report
+  // would call a move "ADDED (newly activated)" — a fresh instance of exactly the
+  // defect this WP exists to end, in a new place.
+  const c = makeCheckout(); // seeds services/real-hook.mjs, whose target EXISTS
+  try {
+    const foreign = `node ${c.root.replace(/\\/g, '/')}/services/real-hook.mjs`;
+    writeFileSync(
+      settingsPath(c.root),
+      JSON.stringify(
+        {
+          hooks: {
+            [SS]: [
+              {
+                matcher: 'clear',
+                hooks: [
+                  { type: 'command', command: governorHookCommand(SCRIPT) },
+                  { type: 'command', command: foreign },
+                ],
+              },
+            ],
+          },
+        },
+        null,
+        2
+      ) + '\n'
+    );
+
+    const r = installHooks({ checkout: c.root, scriptPath: SCRIPT });
+    const text = renderReport(r);
+    const line = text.split('\n').find((l) => l.includes(`${SS} (reorientation`));
+
+    assert.match(line, /MATCHER NORMALISED \(moved to its own group\)/);
+    assert.doesNotMatch(line, /newly activated/, 'a move is not an activation');
+    assert.doesNotMatch(line, /already present, unchanged/);
+    assert.match(text, /extracted into its own group; the group it shared was left untouched/);
+
+    const doc = JSON.parse(readFileSync(settingsPath(c.root), 'utf8'));
+    assert.equal(doc.hooks[SS][0].matcher, 'clear', "the foreign group's matcher is still its own");
+    assert.deepEqual(doc.hooks[SS][0].hooks.map((h) => h.command), [foreign]);
+    assert.equal(
+      (doc.hooks[SS] || []).filter((g) => (g.hooks || []).some(isGovernorHook)).length,
+      1,
+      'exactly ONE governor SessionStart group — an extraction must never duplicate'
+    );
+  } finally {
+    c.cleanup();
+  }
+});
+
+test('WP-6 AC3: non-governor hooks and the Stop exemption are untouched by matcher reconciliation', () => {
+  // The two things WP-5 fought for, re-asserted against THIS change: Tower's Stop
+  // hook (matcher "", dangling target) and the capture-gateway SessionStart hook.
+  const c = makeRealShapedCheckout({ towerTargetExists: false });
+  try {
+    const r = installHooks({ checkout: c.root, scriptPath: SCRIPT });
+    const doc = JSON.parse(readFileSync(settingsPath(c.root), 'utf8'));
+
+    assert.equal(doc.hooks[STOP_EVENT][0].matcher, '', "Tower's own matcher must NOT be rewritten");
+    assert.equal(doc.hooks[STOP_EVENT][0].hooks[0].command, c.towerCommand, 'nor its command, nor its position');
+    assert.ok(stopCommandsOf(doc).includes(c.towerCommand), 'and a DANGLING Tower hook still survives');
+    assert.equal(r.report.pruned.filter((p) => p.event === STOP_EVENT).length, 0, 'nothing pruned from Stop');
+    assert.ok(hooksFor(doc, HOOK_EVENT).some((h) => h.command === c.gatewayCommand), 'the gateway hook survives');
+
+    const gatewayGroup = (doc.hooks[HOOK_EVENT] || []).find((g) =>
+      (g.hooks || []).some((h) => h.command === c.gatewayCommand)
+    );
+    assert.ok(
+      !Object.prototype.hasOwnProperty.call(gatewayGroup, 'matcher'),
+      "a foreign group's matcher state is left exactly as found"
+    );
+  } finally {
+    c.cleanup();
+  }
+});
+
+test('WP-6 AC3: normalisation never deletes a group, even one it empties', () => {
+  // A4, held deliberately. Introducing group deletion would add a destructive
+  // edge no decision asked for — the precise mistake WP-5's Stop exemption exists
+  // to prevent. An emptied group is left behind, exactly as the pruner leaves one.
+  const settings = {
+    hooks: { [SS]: [{ matcher: 'clear', hooks: [{ type: 'command', command: governorHookCommand(SCRIPT) }] }] },
+  };
+  const { settings: next } = planSettings(settings, { scriptPath: SCRIPT, cwd: '/tmp' });
+  assert.equal(next.hooks[SS].length, 1, 'the exclusive case normalises IN PLACE — no group is added or removed');
+});
+
+test('WP-6: --check reports a matcher normalisation as a PROPOSAL and writes nothing', () => {
+  const c = makeStaleMatcherCheckout();
+  try {
+    const before = readFileSync(settingsPath(c.root), 'utf8');
+    const r = installHooks({ checkout: c.root, scriptPath: SCRIPT, check: true });
+    const text = renderReport(r);
+
+    assert.equal(readFileSync(settingsPath(c.root), 'utf8'), before, '--check is read-only (INV-7)');
+    assert.match(text, /its MATCHER would be NORMALISED/);
+    assert.doesNotMatch(text, /already present, unchanged.*\n.*reorient/, 'and never calls the difference no difference');
+  } finally {
+    c.cleanup();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// WP-6 AC5 — THE MUTATION. INV-5: a control is not evidence until made to fail.
+// ---------------------------------------------------------------------------
+// This is the criterion that matters. The defect existed precisely because
+// nothing exercised the pre-existing-entry path, so a test that passes for some
+// unrelated reason would leave the estate exactly where it started. This disables
+// the matcher COMPARISON in a copy of the module and proves the same fixture then
+// keeps its stale `clear` matcher and reports "already present, unchanged".
+
+test('WP-6 AC5 MUTATION: disable the matcher comparison and the stale `clear` matcher SURVIVES', async () => {
+  const src = readFileSync(INSTALL_SRC, 'utf8').replace(/\r\n/g, '\n');
+  const from =
+    '      spec.matcher === undefined ? !hasMatcherKey(g) : hasMatcherKey(g) && g.matcher === spec.matcher;';
+  assert.ok(src.includes(from), 'mutation precondition failed — the matcher comparison no longer reads as expected');
+  const mutantPath = join(__dirname, `.mutant-wp6-install-hooks-${process.pid}.mjs`);
+  writeFileSync(mutantPath, src.replace(from, '      true; // MUTANT: matcher comparison disabled'));
+
+  const c = makeStaleMatcherCheckout();
+  try {
+    const mutant = await import(pathToFileURL(mutantPath).href);
+    const r = mutant.installHooks({ checkout: c.root, scriptPath: SCRIPT });
+    const doc = JSON.parse(readFileSync(settingsPath(c.root), 'utf8'));
+    const group = (doc.hooks[SS] || []).find((g) => (g.hooks || []).some((h) => h.command.includes(GOVERNOR_MARKER)));
+
+    assert.equal(
+      group.matcher,
+      'clear',
+      'MUTANT: without the comparison the stale matcher must survive — if it is normalised here, ' +
+        'the comparison is not what is fixing it and the tests above prove nothing'
+    );
+    assert.equal(r.report.matcherNormalised, false, 'MUTANT: and the installer must not claim it normalised anything');
+    assert.match(
+      mutant.renderReport(r).split('\n').find((l) => l.includes(`${SS} (reorientation`)),
+      /already present, unchanged/,
+      'MUTANT: reproducing the exact false report this WP was raised to end'
+    );
+  } finally {
+    rmSync(mutantPath, { force: true });
+    c.cleanup();
+  }
+});
