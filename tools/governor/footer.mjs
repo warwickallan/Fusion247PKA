@@ -54,8 +54,11 @@
 
 import { readdirSync, existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { evaluate, STATE } from './evaluator.mjs';
-import { samePath } from './worktree-guard.mjs';
+// `liveLocation` is used ONLY by the CLI at the foot of this file, never on any imported
+// path. See the A-7 note there before concluding that this module shells out to git.
+import { samePath, liveLocation } from './worktree-guard.mjs';
 import { readProgrammeState } from './programme-state.mjs';
 import { readHealthSample, healthStoreDir } from './health-store.mjs';
 
@@ -799,4 +802,207 @@ export function computeFooterLine({
       control: CONTROL_CONTINUE,
     });
   }
+}
+
+// ---------------------------------------------------------------------------
+// THE PRODUCER — a CLI entrypoint (BUILD-018 WP-7)
+// ---------------------------------------------------------------------------
+// WHY THIS EXISTS. Root CLAUDE.md § "Governor advice" requires every reply to end with a
+// `⟦GOV⟧` footer AND states that a hand-composed footer is a defect. Until this block,
+// those two clauses could not both be satisfied: this module exported functions only, and
+// its two consumers were `statusline-live.mjs` (a terminal status line, which Warwick
+// cannot see — he works on claude.ai web and Android) and `stop-controller.mjs`'s parser.
+// So the only available producer was a human typing the bytes, which is the forbidden one.
+// Nolan's final acceptance audit: "the footer has no producer."
+//
+// The risk is not tidiness. A hand-composed footer one field short is REJECTED by
+// `parseFooter`, and B6 treats "no valid footer" as ALLOW — so the execution controller
+// silently permits every stop and a governor that has stopped governing looks EXACTLY
+// like one that works. One generator removes that failure mode by construction: the line
+// Larry emits and the line the controller checks come out of the same code.
+//
+// ---------------------------------------------------------------------------
+// TWO EXIT CLASSES, and the split is load-bearing (Larry's ruling, WP-7 read-back)
+// ---------------------------------------------------------------------------
+//   * USAGE errors — an unknown flag, a missing value, an unrecognised `--control`
+//     token — write to STDERR, exit NON-ZERO, and print NOTHING on stdout. Emitting a
+//     footer for a mistyped handback code is the one thing this must never do: a bad
+//     token that silently rendered CONTINUE would disable the controller while looking
+//     installed. Refusing loudly is the whole point.
+//   * ENVIRONMENT failures — missing store, unreadable sample, corrupt JSON, absent
+//     fields, no matching programme — print a valid BLIND/UNSET line and exit 0. Same
+//     contract as the status line, for the same reason: an absent governor is
+//     indistinguishable from a healthy one, so there is no input for which this prints
+//     nothing.
+//
+// ---------------------------------------------------------------------------
+// BLIND AND UNSET ARE INDEPENDENT LADDERS — do not "fix" one into the other
+// ---------------------------------------------------------------------------
+// D-3 (`deriveFooterFields`) decides `state` from TELEMETRY. D-4 (`nextModelFor`) decides
+// `next:` from PROGRAMME STATE. A missing or non-matching programme therefore yields
+// `next: UNSET` and says NOTHING about the state — the line can be, and routinely is,
+// `GREEN` with `next: UNSET`. Rendering BLIND because no programme matched would have the
+// footer claim it could not read telemetry it read perfectly well: a FALSE BLIND, the
+// exact mirror of the false GREEN INV-1 exists to forbid, and it would nudge Warwick
+// toward rotating on the strength of a fact about a JSON file. WP-7's original AC4 said
+// "no programme -> BLIND"; it was raised at read-back and corrected. Leave the two ladders
+// separate.
+
+export const CLI_EXIT = Object.freeze({ OK: 0, USAGE: 2 });
+
+export const CLI_USAGE =
+  'usage: node tools/governor/footer.mjs [--session <id>] [--control CONTINUE|HANDBACK:<code>]';
+
+function usageFailure(message) {
+  return { exitCode: CLI_EXIT.USAGE, stdout: '', stderr: `footer: ${message}\n${CLI_USAGE}\n` };
+}
+
+/**
+ * parseCliArgs(argv) -> { ok: true, sessionId, control } | { ok: false, error }
+ *
+ * Separated from `runCli` so the argument grammar is testable without touching disk.
+ *
+ * The `--control` value is validated by MEMBERSHIP against `HANDBACK_CODES` — the frozen
+ * const this module already owns, read directly rather than re-typed. A second list of
+ * seven strings anywhere is the drift this whole module exists to prevent, and the
+ * constitution's own § "When Warwick may be interrupted" is the source of that const.
+ */
+export function parseCliArgs(argv = []) {
+  let sessionId = null;
+  let control = CONTROL_CONTINUE;
+
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i];
+    if (arg !== '--session' && arg !== '--control') {
+      return { ok: false, error: `unrecognised argument ${JSON.stringify(arg)}` };
+    }
+    const value = argv[i + 1];
+    // A value that is absent, empty, or itself a flag is a MISSING value, not a value.
+    // `--session --control CONTINUE` must fail loudly rather than silently reading
+    // "--control" as a session id and then reporting BLIND about a session nobody has.
+    if (typeof value !== 'string' || value.length === 0 || value.startsWith('--')) {
+      return { ok: false, error: `${arg} requires a value` };
+    }
+    i += 1;
+    if (arg === '--session') sessionId = value;
+    else control = value;
+  }
+
+  if (parseControl(control).kind === 'unrecognised') {
+    return {
+      ok: false,
+      error:
+        `--control must be ${CONTROL_CONTINUE} or ${HANDBACK_PREFIX}<code>, where <code> is ` +
+        `one of: ${HANDBACK_CODES.join(', ')} — got ${JSON.stringify(control)}`,
+    };
+  }
+
+  return { ok: true, sessionId, control };
+}
+
+/**
+ * runCli(argv, deps) -> { exitCode, stdout, stderr }
+ *
+ * Returns the streams rather than writing them (model-gate.mjs's shape), so the whole
+ * entrypoint is unit-testable without spawning a process and without any test needing to
+ * capture stdout.
+ *
+ * Everything is resolved here — nothing is passed in on the command line beyond the two
+ * optional flags:
+ *   * the health sample, from the store: the exact one when `--session <id>` is given,
+ *     otherwise the NEWEST for this project (which sets the `~` approximate flag);
+ *   * `state` / `advice`, via the D-3 degradation ladder;
+ *   * `next:`, via `nextModelFor` over the programme state of THIS worktree and branch.
+ *
+ * A-7 — AND WHY THERE IS A `git` CALL REACHABLE FROM THIS FILE (Larry's ruling, WP-7).
+ * A-7 forbids `git` ON THE STOP PATH, not in the file. `stop-controller.mjs` reaches this
+ * module by IMPORT, and an import executes nothing here: `liveLocation` is only ever
+ * called from inside `runCli`, which only runs under the `import.meta.url` guard at the
+ * foot of this file. That is exactly how `worktree-guard.mjs` already imports
+ * `execFileSync` without calling it at import time. The alternative — hand-parsing
+ * `.git/HEAD` — would be a SECOND branch-resolution implementation in an estate that
+ * already has one, and SSOT says one. The AC1 proof (a child process that imports this
+ * module and is asserted to produce empty stdout at exit 0) is what keeps that claim
+ * checkable rather than asserted.
+ */
+export function runCli(argv = [], {
+  cwd = process.cwd(),
+  locationFn = liveLocation,
+  // Forwarded EXPLICITLY to computeFooterLine below, never by spreading this bag — the
+  // same rule and the same reason as computeFooterLine's own injection note.
+  now,
+  homeDir,
+  envOverride,
+  readState,
+  readSample,
+  dirFor,
+  listDir,
+  existsFn,
+  statFn,
+  evaluateFn,
+} = {}) {
+  const args = parseCliArgs(argv);
+  if (!args.ok) return usageFailure(args.error);
+
+  let line;
+  try {
+    // Never throws by contract; every field is independently nullable, and an unknown
+    // location can only push `next:` toward UNSET, which is the safe side.
+    const loc = locationFn({ cwd }) ?? {};
+    const worktreePath = typeof loc.repoRoot === 'string' && loc.repoRoot.length ? loc.repoRoot : null;
+
+    line = computeFooterLine({
+      sessionId: args.sessionId,
+      worktreePath,
+      worktreeBranch: typeof loc.branch === 'string' && loc.branch.length ? loc.branch : null,
+      deliverablesDir: worktreePath ? join(worktreePath, 'Deliverables') : null,
+      cwd,
+      homeDir,
+      envOverride,
+      now,
+      control: args.control,
+      readState,
+      readSample,
+      dirFor,
+      listDir,
+      existsFn,
+      statFn,
+      evaluateFn,
+    });
+  } catch {
+    // Belt and braces. `computeFooterLine` and `liveLocation` both promise not to throw,
+    // but "always prints a parseable line" is a contract this entrypoint owes on its own
+    // account rather than one it borrows. This second layer cannot itself throw: every
+    // field below is a frozen const, and `args.control` was already validated by
+    // membership above — so `renderFooter`'s strict checks are all satisfied by
+    // construction. The requested control token is PRESERVED rather than reset to
+    // CONTINUE: a handback Larry asked for must not be silently discarded by a telemetry
+    // failure.
+    line = renderFooter({
+      percent: null,
+      approximate: false,
+      state: STATE.BLIND,
+      advice: ADVICE.UNSURE,
+      next: NEXT_UNSET,
+      control: args.control,
+    });
+  }
+
+  return { exitCode: CLI_EXIT.OK, stdout: `${line}\n`, stderr: '' };
+}
+
+// Run ONLY when executed directly — the entrypoint guard every other module in
+// tools/governor/ uses. Importing this module must execute NOTHING: it sits on the Stop
+// path via `stop-controller.mjs`, and a module that printed or exited at import time would
+// take the controller down with it.
+//
+// `process.exitCode` rather than `process.exit()`: an explicit exit can truncate a pending
+// stdout write on a Windows pipe, and a truncated footer is precisely the four-field line
+// this whole Work Package exists to make impossible. Setting the code lets Node drain and
+// leave on its own.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const { exitCode, stdout, stderr } = runCli(process.argv.slice(2));
+  if (stderr) process.stderr.write(stderr);
+  if (stdout) process.stdout.write(stdout);
+  process.exitCode = exitCode;
 }
