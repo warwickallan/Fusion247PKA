@@ -57,7 +57,7 @@ Standing policy. It binds on a genuinely fresh session, on `/clear`, on resume a
 8. **Determine whether any genuine Warwick-only interruption exists** — membership in the closed list at § "When Warwick may be interrupted", by name. If none is present, none exists.
 9. **Emit ONE concise reorientation banner, then continue autonomously.** One banner, at the top of the first reply. Not a briefing, not a plan for approval.
 
-**The banner carries exactly these items and nothing else** (four lines, plus the footer as its final line):
+**The banner is four lines, and carries exactly these items and nothing else:**
 
 | Line | Content |
 |---|---|
@@ -65,9 +65,8 @@ Standing policy. It binds on a genuinely fresh session, on `/clear`, on resume a
 | 2 | Canonical branch and worktree verification result (step 5) |
 | 3 | The exact next action (step 7), or that none is established |
 | 4 | The named specialists being engaged for it (step 6) |
-| 5 | **The `⟦GOV⟧` footer line, verbatim** — see § "Governor advice" |
 
-The footer is where context health, the advice, the next-model recommendation and the continue-or-handback decision live. **The banner never restates them in its own words** — one fact, one rendering. The banner's own lines never restate anything the footer already carries; the only reason line 1 names the current model is that the footer grammar has no field for it.
+**The footer is not part of the banner.** It terminates the reply containing the banner exactly as it terminates every other reply — see § "Governor advice". Context health, the advice, the next-model recommendation and the continue-or-handback decision live there and **the banner never restates them in its own words** — one fact, one rendering. The only reason line 1 names the current model is that the footer has no field for it.
 
 Anything else — background, a summary of what happened last session, a menu of options — does not belong in the banner.
 
@@ -79,11 +78,11 @@ Anything else — background, a summary of what happened last session, a menu of
 2. `permission` — an unavoidable permission.
 3. `spend` — money.
 4. `irreversible-live-action` — an irreversible live action.
-5. `unsafe-repository-state` — unsafe or contradictory state that cannot be safely resolved, **including a genuine inability to proceed** (a blocker with no safe way through).
+5. `unsafe-repository-state` — unsafe or contradictory state that cannot be safely resolved, **including a genuine inability to proceed** (a blocker with no safe way through; the canonical case is required-but-unavailable). *The name is inherited from the frozen `ESCAPE_HATCH_REASONS` enum in `tools/governor/escalation-gate.mjs` and is deliberately not renamed, because that literal is load-bearing in shipped code — the member is broader than "repository" suggests, and this gloss, not the name, is its scope.*
 6. `rotation-required` — required context rotation.
 7. `merge-decision` — the final merge decision.
 
-The **bolded** glosses on members 1 and 5 reconcile earlier rulings rather than extend them — AD-26's *material scope change*, and a genuine blocker — and are marked so the next reader sees each was settled into an existing member rather than dropped. The list stays closed at seven.
+The **bolded** glosses on members 1 and 5 reconcile earlier rulings rather than extend them — AD-26's *material scope change*, and a genuine blocker — and are marked so the next reader sees each was settled into an existing member rather than dropped.
 
 **Explicitly NOT Warwick decisions:** cosmetic or metadata choices · ordinary technical choices · harmless defaults that keep correctness · anything a safe no-action default already resolves. Asking about one of these is an acceptance failure, not diligence.
 
@@ -103,7 +102,7 @@ Decidable test, applied to every outgoing reply: *does it ask Warwick to run a g
 
 **Every reply ends with a `⟦GOV⟧` footer as its final line.** It exists because Warwick works on the claude.ai web and Android clients, where a terminal status line is invisible; a footer inside the message stream is the only Governor output that reaches him there.
 
-The footer carries, in this order: context health as a percentage · the state · the KEEP GOING / CLEAR NOW advice · the next-model recommendation · the continue-or-handback control token. Three rules bind its content:
+The footer carries context health as a percentage, the state, the KEEP GOING / CLEAR NOW advice, the next-model recommendation and the continue-or-handback control token. Three rules bind its content:
 
 - **Context health and the advice come from live telemetry.** If the telemetry cannot be read, the footer says so (`BLIND`) and reports no numbers. It never renders a healthy state it did not measure.
 - **The next-model recommendation renders a model name only when it is grounded in a real, current next action; otherwise it renders `UNSET`.** A banked literal presented as live advice is a defect, not a degraded state.

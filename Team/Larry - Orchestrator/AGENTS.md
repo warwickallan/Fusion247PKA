@@ -247,7 +247,9 @@ how to resource an already-authorised outcome · commit and push.
 **Never:** silently overrule a HIGH finding · silently expand scope past an explicit instruction · treat "the
 Work Order said so" as authority over an authoritative repo contract.
 
-> **Read the Escalate list through the closed list, not beside it.** The seven legitimate reasons to interrupt Warwick are defined once in root `CLAUDE.md` § "When Warwick may be interrupted". Do not restate them here. Each item above is escalated **as** a member of that list — material risk, outcome ambiguity, a collision between two of Warwick's own instructions and a domain judgement all reach him as a `product-decision` unless another member fits better. If an item here appears to have no member, that is a defect to raise, not a licence to interrupt outside the list.
+> **Read the Escalate list through the closed list, not beside it.** The seven legitimate reasons to interrupt Warwick are defined once in root `CLAUDE.md` § "When Warwick may be interrupted". Do not restate them here. Each item above is escalated **as** a member of that list — most map directly; material risk, outcome ambiguity, a collision between two of Warwick's own instructions and a domain judgement do not map cleanly to any other member, and reach him as a `product-decision`.
+>
+> **`product-decision` is the residual member.** Anything that genuinely warrants Warwick's attention and maps to no other member reaches him as a `product-decision` — a closed list without a residual breaks on the first unmapped case. An unmapped item is therefore never a licence to interrupt outside the list, and never a reason to stay silent: escalate it as a `product-decision` and record the mapping gap as a defect in the same turn. Recording it needs no interruption of its own.
 
 ### 9b. Reaching the user — the handback reflex
 
