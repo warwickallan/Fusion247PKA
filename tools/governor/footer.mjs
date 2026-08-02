@@ -336,16 +336,45 @@ export function parseControl(control) {
 // in the producer, fidelity in the codec.
 export const TOKENS_GRAIN = 100;
 
-/** True when `n` is a token count this grammar can render EXACTLY. */
+/**
+ * True when `n` is a token count this grammar can render EXACTLY — and, the stronger
+ * half and the one this predicate used to get wrong, READ BACK exactly.
+ *
+ * BOUNDED AT `Number.MAX_SAFE_INTEGER` (WO-OR-10). The grain alone is not sufficient
+ * for the D-M10 identity, because `parseTokens` reconstructs `whole * 1000 + frac *
+ * TOKENS_GRAIN` and that arithmetic stops being exact above 2^53. Two failure classes
+ * were reachable from the old, unbounded predicate, and the quiet one is the reason
+ * this bound exists:
+ *
+ *   LOSSY (silent). `100000000000001200` was accepted, rendered `100000000000001.2k`,
+ *   and parsed back as `100000000000001180`. The line was grammatical, `ok` was true,
+ *   and the number had changed. A footer that reports a plausible wrong figure is worse
+ *   than one that reports nothing — it is INV-1's false GREEN wearing a token count.
+ *
+ *   UNGRAMMATICAL (loud). At and above 1e24, `String(whole)` switches to exponent
+ *   notation (`1.00663296e+21k`) and `parseFooter` rejects the whole line.
+ *
+ * WHY `Number.MAX_SAFE_INTEGER` AND NOT A DOMAIN CAP. A "no real context window exceeds
+ * N tokens" rule would be a MEANING judgement, and this module keeps meaning in the
+ * producer and fidelity in the codec (see the TOKENS_GRAIN note above). The safe-integer
+ * bound is a fidelity bound: it is precisely where the arithmetic below stops being
+ * exact, so the rule has the same shape as the defect. It is also exact BY CONSTRUCTION
+ * rather than by sampling — inside it, `whole * 1000 <= n < 2^53` so the reconstruction
+ * is exact integer arithmetic, and `whole < 1e21` so `String` never goes exponential.
+ *
+ * `Number.isSafeInteger` rather than `Number.isInteger` plus a hand-written comparison:
+ * it subsumes the integer check and names the property instead of a magic constant.
+ */
 export function isRenderableTokens(n) {
-  return typeof n === 'number' && Number.isInteger(n) && n >= 0 && n % TOKENS_GRAIN === 0;
+  return typeof n === 'number' && Number.isSafeInteger(n) && n >= 0 && n % TOKENS_GRAIN === 0;
 }
 
 /** 72600 -> "72.6k"  ·  190000 -> "190k"  ·  900 -> "0.9k"  ·  0 -> "0k" */
 export function formatTokens(n) {
   if (!isRenderableTokens(n)) {
     throw new TypeError(
-      `tokens must be a non-negative integer multiple of ${TOKENS_GRAIN} — got ${JSON.stringify(n)}`
+      `tokens must be a non-negative SAFE-INTEGER multiple of ${TOKENS_GRAIN} ` +
+      `(<= ${Number.MAX_SAFE_INTEGER}) — got ${JSON.stringify(n)}`
     );
   }
   // Integer arithmetic throughout: no float division, so no 72.60000000000001.
@@ -362,10 +391,27 @@ export function parseTokens(text) {
   return Number(m[1]) * 1000 + Number(m[2] ?? 0) * TOKENS_GRAIN;
 }
 
-/** Round a raw count onto the grain so the renderer will accept it. */
+/**
+ * Round a raw count onto the grain so the renderer will accept it, or `null` when no
+ * such value exists.
+ *
+ * THE CONTRACT IS NOW ENFORCED RATHER THAN ASSERTED (WO-OR-10). This function claimed
+ * to produce something `renderFooter` accepts and did not: above roughly 1e23 the
+ * nearest double is not a multiple of the grain, so `Math.round(n / GRAIN) * GRAIN`
+ * handed the rounded value straight back and the strict renderer THREW on it. That is
+ * the exact mirror of the F1 defect — there the renderer accepted what the parser could
+ * not represent, here the producer emitted what the renderer would not accept.
+ *
+ * The result is therefore checked against `isRenderableTokens` rather than assumed to
+ * satisfy it, which makes the two functions agree BY CONSTRUCTION instead of by
+ * coincidence. Checking the RESULT and not the argument is load-bearing: a count just
+ * inside the safe range can round UP across the bound (`Number.MAX_SAFE_INTEGER` does
+ * exactly that), so a guard on the input would leak the one case it was written for.
+ */
 export function toRenderableTokens(n) {
   if (typeof n !== 'number' || !Number.isFinite(n) || n < 0) return null;
-  return Math.round(n / TOKENS_GRAIN) * TOKENS_GRAIN;
+  const rounded = Math.round(n / TOKENS_GRAIN) * TOKENS_GRAIN;
+  return isRenderableTokens(rounded) ? rounded : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -400,9 +446,26 @@ function requireMember(value, allowed, label) {
  *   usedTokens only                       ->  `ctx 72.6k`
  *   neither                               ->  `ctx --`
  *
- * `windowTokens` without BOTH a percent and a usedTokens is unrenderable and THROWS
- * rather than being quietly dropped: a denominator with nothing to divide is a caller
- * bug, and silently discarding it would hide the bug behind a plausible line.
+ * Those four shapes are the WHOLE of the representable space, and the field set has one
+ * more combination than that. Both unrepresentable combinations THROW:
+ *
+ *   windowTokens without BOTH a percent and a usedTokens — a denominator with nothing
+ *   to divide is a caller bug, and silently discarding it would hide the bug behind a
+ *   plausible line.
+ *
+ *   percent + usedTokens with NO windowTokens (WO-OR-10, Codex F1) — the numerator has
+ *   nowhere to go, because the parenthesised pair is emitted only alongside a
+ *   denominator. This used to render `ctx 38%` and DROP the 72.6k silently, so
+ *   `parseFooter(renderFooter(x)).fields.usedTokens` came back `null` and the D3
+ *   round-trip identity was false for that shape.
+ *
+ * The repair is deliberately a NARROWING of the accepted domain rather than a widening
+ * of the grammar. Encoding the numerator in that shape would need a fifth CTX
+ * production, and a footer grammar that grows a shape to accommodate a caller nobody
+ * has is a worse trade than a caller being told it asked for something unrepresentable.
+ * Refuse-what-you-cannot-represent is already this module's character: strict renderer,
+ * degrading producer. No caller is affected — no path through `deriveFooterFields`
+ * emits this shape, verified by sweeping the producer across its telemetry range.
  *
  * Every field is always emitted. D-2 is explicit that absence is expressed by a VALUE
  * (`--`, `UNSET`) and never by a missing segment, so that a parser never has to guess
@@ -427,25 +490,46 @@ export function renderFooter(fields) {
     control,
   } = fields;
 
-  if (percent !== null && percent !== undefined) {
+  // The three presence facts the CTX shape rules are written in terms of. Named once
+  // (WO-OR-10) rather than re-spelled as `x !== null && x !== undefined` at each of the
+  // six places that needed them: the F1 gap was precisely a MISSING combination of these
+  // three, and a rule set you cannot read at a glance is one whose gaps you cannot see.
+  const hasPercent = percent !== null && percent !== undefined;
+  const hasUsed = usedTokens !== null && usedTokens !== undefined;
+  const hasWindow = windowTokens !== null && windowTokens !== undefined;
+
+  if (hasPercent) {
     if (typeof percent !== 'number' || !Number.isInteger(percent) || percent < 0 || percent > 100) {
       throw new TypeError(`percent must be an integer 0..100 or null — got ${JSON.stringify(percent)}`);
     }
   }
-  if (usedTokens !== null && usedTokens !== undefined && !isRenderableTokens(usedTokens)) {
+  if (hasUsed && !isRenderableTokens(usedTokens)) {
     throw new TypeError(
-      `usedTokens must be a non-negative integer multiple of ${TOKENS_GRAIN} or null — got ${JSON.stringify(usedTokens)}`
+      `usedTokens must be a non-negative safe-integer multiple of ${TOKENS_GRAIN} ` +
+      `(<= ${Number.MAX_SAFE_INTEGER}) or null — got ${JSON.stringify(usedTokens)}`
     );
   }
-  if (windowTokens !== null && windowTokens !== undefined) {
+  if (hasWindow) {
     if (!isRenderableTokens(windowTokens) || windowTokens === 0) {
       throw new TypeError(
-        `windowTokens must be a positive integer multiple of ${TOKENS_GRAIN} or null — got ${JSON.stringify(windowTokens)}`
+        `windowTokens must be a positive safe-integer multiple of ${TOKENS_GRAIN} ` +
+        `(<= ${Number.MAX_SAFE_INTEGER}) or null — got ${JSON.stringify(windowTokens)}`
       );
     }
-    if (percent === null || percent === undefined || usedTokens === null || usedTokens === undefined) {
+    if (!hasPercent || !hasUsed) {
       throw new TypeError('windowTokens requires both percent and usedTokens — a denominator with nothing to divide is a caller bug');
     }
+  }
+  // WO-OR-10 / Codex F1. The converse of the check above, and the one that was missing:
+  // a numerator beside a percent has no representation WITHOUT a denominator, so the
+  // four CTX shapes rendered `ctx <percent>%` and dropped it. A silently discarded field
+  // is worse than a refused one — it yields a footer that parses cleanly and disagrees
+  // with the fields it was rendered from.
+  if (hasPercent && hasUsed && !hasWindow) {
+    throw new TypeError(
+      'percent with usedTokens requires windowTokens — the numerator has no representation ' +
+      'in the bare percent shape and would be silently dropped'
+    );
   }
   if (typeof approximate !== 'boolean') {
     throw new TypeError(`approximate must be a boolean — got ${JSON.stringify(approximate)}`);
@@ -462,14 +546,16 @@ export function renderFooter(fields) {
     );
   }
 
+  // The four shapes, and by this point they are exhaustive over what survived
+  // validation: `hasPercent && hasUsed && !hasWindow` was refused above, so the
+  // `hasPercent` branch can only be the pair form or the bare percent form.
   const tilde = approximate ? '~' : '';
   let value;
-  if (percent !== null && percent !== undefined) {
-    value =
-      windowTokens !== null && windowTokens !== undefined
-        ? `${percent}% (${formatTokens(usedTokens)}/${formatTokens(windowTokens)})`
-        : `${percent}%`;
-  } else if (usedTokens !== null && usedTokens !== undefined) {
+  if (hasPercent) {
+    value = hasWindow
+      ? `${percent}% (${formatTokens(usedTokens)}/${formatTokens(windowTokens)})`
+      : `${percent}%`;
+  } else if (hasUsed) {
     value = formatTokens(usedTokens);
   } else {
     value = '--';

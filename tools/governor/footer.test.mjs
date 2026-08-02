@@ -256,6 +256,10 @@ test('D-M10: parseFooter(renderFooter(x)).fields === x for EVERY field combinati
     { percent: null, usedTokens: 0, windowTokens: null },      // ctx 0k
     { percent: null, usedTokens: 900, windowTokens: null },    // ctx 0.9k
     { percent: null, usedTokens: 72600, windowTokens: null },  // ctx 72.6k
+    // WO-OR-10: the largest count the codec is faithful over, carried through the FULL
+    // combination sweep rather than only through its own boundary test — the boundary
+    // has to survive every state, advice, next and control too, not just the happy one.
+    { percent: null, usedTokens: 9007199254740900, windowTokens: null },
     { percent: 21, usedTokens: 210800, windowTokens: 1000000 }, // ctx 21% (210.8k/1000k)
     { percent: 36, usedTokens: 72600, windowTokens: 200000 },
   ];
@@ -335,6 +339,215 @@ test('WO-OR-05: a denominator with nothing to divide is REFUSED, never silently 
   assert.throws(() => renderFooter({ ...base, percent: 38, usedTokens: null, windowTokens: 190000 }), TypeError);
   assert.throws(() => renderFooter({ ...base, percent: null, usedTokens: 72600, windowTokens: 190000 }), TypeError);
   assert.throws(() => renderFooter({ ...base, percent: 38, usedTokens: 72600, windowTokens: 0 }), TypeError);
+});
+
+// ---------------------------------------------------------------------------
+// WO-OR-10 — THE ACCEPTED DOMAIN AND THE REPRESENTABLE DOMAIN MUST AGREE
+// ---------------------------------------------------------------------------
+// D3 states `parseFooter(renderFooter(x)) === x` as a criterion. It did not hold. Three
+// defects, ONE principle — refuse what cannot be represented — and none of them was a
+// live rendering bug: no path through `deriveFooterFields` reaches any of the three
+// (verified by sweeping the producer over 1,080 realistic telemetry combinations, 0
+// hits). They are defects in a CODEC that other code calls, and that is why they are
+// worth closing.
+//
+//   F1  renderFooter accepted `percent` + `usedTokens` with a null `windowTokens` and
+//       silently DROPPED the numerator, because the parenthesised pair is emitted only
+//       when a denominator is present. Found by Codex; rated ACTIVE by Codex and
+//       correctly re-rated LATENT by Larry against execution.
+//   F2  `isRenderableTokens` accepted counts beyond `Number.MAX_SAFE_INTEGER`, where
+//       the format/parse pair is no longer exact. Codex claimed this and named `1e24`;
+//       Larry's probe showed `1e24` is REJECTED for an unrelated reason and recorded
+//       F2 as disproven. Both point-checks were right; the generalisation was not.
+//   §4  `toRenderableTokens` — the MIRROR of F1: the PRODUCER emitting what the
+//       renderer refuses, despite documenting itself as doing the opposite.
+//
+// THE BOUNDARY, stated once: the codec is faithful over exactly the non-negative
+// multiples of TOKENS_GRAIN that are SAFE INTEGERS. Below that bound the round-trip is
+// exact BY CONSTRUCTION — `whole * 1000` stays inside 2^53 so the reconstruction is
+// exact arithmetic, and `whole < 1e21` so `String` never reaches exponent notation.
+// Above it, survival is incidental. That is a FIDELITY bound, not a plausibility bound;
+// a "no real window exceeds N tokens" rule would be a meaning judgement, and this
+// module keeps meaning in the producer and fidelity in the codec.
+
+test('WO-OR-10 F1: percent + usedTokens with NO windowTokens is REFUSED, not silently dropped', () => {
+  // The exact case Codex reported, pinned as the literal field object it filed.
+  // Before this repair it returned "⟦GOV⟧ ctx 38% · GREEN · KEEP GOING · next: UNSET ·
+  // CONTINUE" and `parseFooter(...).fields.usedTokens` came back `null`, not 72600.
+  const reported = {
+    percent: 38, usedTokens: 72600, windowTokens: null, approximate: false,
+    state: 'GREEN', advice: ADVICE.KEEP_GOING, next: NEXT_UNSET, control: CONTROL_CONTINUE,
+  };
+  assert.throws(() => renderFooter(reported), TypeError, 'the numerator must not be silently discarded');
+
+  // The zero edge and the boundary percent, so the refusal is not keyed to one value.
+  const base = { approximate: false, state: 'GREEN', advice: ADVICE.KEEP_GOING, next: NEXT_UNSET, control: CONTROL_CONTINUE };
+  assert.throws(() => renderFooter({ ...base, percent: 0, usedTokens: 0, windowTokens: null }), TypeError);
+  assert.throws(() => renderFooter({ ...base, percent: 100, usedTokens: 900, windowTokens: null }), TypeError);
+
+  // CONTROL — the three shapes that REMAIN legal must still render and still round-trip,
+  // or this test would pass just as well against a renderer that refused everything.
+  for (const ctx of [
+    { percent: 38, usedTokens: null, windowTokens: null },
+    { percent: null, usedTokens: 72600, windowTokens: null },
+    { percent: 38, usedTokens: 72600, windowTokens: 190000 },
+  ]) {
+    const fields = { ...base, ...ctx };
+    const parsed = parseFooter(renderFooter(fields));
+    assert.equal(parsed.ok, true, `the legal shape ${JSON.stringify(ctx)} must still render`);
+    assert.deepEqual(parsed.fields, fields);
+  }
+});
+
+test('WO-OR-10: the CTX shape space is TOTAL — every combination either round-trips or is refused', () => {
+  // A curated list of shapes can only SAMPLE the space; the F1 gap survived years of a
+  // curated list. This enumerates the space instead, so a combination that renders a
+  // line it cannot read back has nowhere to hide.
+  //
+  // The expectation is an INDEPENDENT restatement of D-2's four shapes, not something
+  // read back out of the module under test — otherwise the test would agree with the
+  // code by construction and could never fail.
+  const percents = [null, 0, 38, 100];
+  const useds = [null, 0, 900, 72600];
+  const windows = [null, 190000];
+
+  // Representable iff a denominator appears with BOTH a percent and a numerator, and a
+  // numerator never appears beside a percent without one.
+  const representable = (p, u, w) =>
+    w === null ? !(p !== null && u !== null) : (p !== null && u !== null);
+
+  const base = { approximate: false, state: 'GREEN', advice: ADVICE.KEEP_GOING, next: NEXT_UNSET, control: CONTROL_CONTINUE };
+  let accepted = 0;
+  let refused = 0;
+  for (const percent of percents) {
+    for (const usedTokens of useds) {
+      for (const windowTokens of windows) {
+        const fields = { percent, usedTokens, windowTokens, ...base };
+        if (representable(percent, usedTokens, windowTokens)) {
+          const parsed = parseFooter(renderFooter(fields));
+          assert.equal(parsed.ok, true, `unparseable: ${JSON.stringify(fields)}`);
+          assert.deepEqual(parsed.fields, fields, `round-trip lost data for ${JSON.stringify(fields)}`);
+          accepted += 1;
+        } else {
+          assert.throws(() => renderFooter(fields), TypeError, `must be refused: ${JSON.stringify(fields)}`);
+          refused += 1;
+        }
+      }
+    }
+  }
+  // INV-5: assert the executed counts against the product of the dimensions, so a loop
+  // whose bounds silently collapsed cannot report a clean pass over nothing.
+  assert.equal(accepted + refused, percents.length * useds.length * windows.length);
+  assert.equal(accepted, 16);
+  assert.equal(refused, 16);
+  assert.ok(refused > 0, 'a partition with nothing on the refused side would prove nothing');
+});
+
+test('WO-OR-10 F2: the token codec is bounded at MAX_SAFE_INTEGER, and the LOSSY value is pinned', () => {
+  // THIS VALUE IS THE ONE THAT MATTERS, and it is pinned as a literal rather than
+  // computed because it is the number that would have reached Warwick as a plausible
+  // lie. It is not a crash and not an ugly line: it rendered, it PARSED, `ok` was true,
+  // and the count that came back was different from the count that went in.
+  const LOSSY = 100000000000001200;
+  assert.ok(LOSSY > Number.MAX_SAFE_INTEGER, 'precondition: outside safe integer arithmetic');
+  assert.equal(LOSSY % TOKENS_GRAIN, 0, 'precondition: it IS on the grain, so only the bound can refuse it');
+  assert.equal(isRenderableTokens(LOSSY), false, 'the codec must refuse what it cannot read back');
+  assert.throws(() => formatTokens(LOSSY), TypeError);
+  assert.throws(
+    () => renderFooter({
+      percent: null, usedTokens: LOSSY, windowTokens: null, approximate: false,
+      state: 'BLIND', advice: ADVICE.UNSURE, next: NEXT_UNSET, control: CONTROL_CONTINUE,
+    }),
+    TypeError
+  );
+
+  // WHY it must be refused, DEMONSTRATED rather than asserted. The text below is built
+  // from the grammar's own production, not from the module's internals, so it stays a
+  // real proof that this magnitude cannot survive the trip.
+  const text = `${Math.floor(LOSSY / 1000)}.${(LOSSY / TOKENS_GRAIN) % 10}k`;
+  assert.match(text, /^[0-9]+\.[0-9]k$/, 'the old renderer emitted a perfectly GRAMMATICAL line');
+  assert.notEqual(parseTokens(text), LOSSY, 'and it read back a DIFFERENT number — the silent failure');
+
+  // Class B, the louder one: at and above 1e24 the whole number goes exponential and
+  // the line stops parsing altogether. Refused now for the same reason.
+  const EXPONENT = 1006632960000000000000000;
+  assert.equal(EXPONENT % TOKENS_GRAIN, 0, 'precondition: on the grain');
+  assert.ok(EXPONENT > Number.MAX_SAFE_INTEGER);
+  assert.equal(isRenderableTokens(EXPONENT), false);
+  assert.match(String(Math.floor(EXPONENT / 1000)), /e\+/, 'the old renderer would have emitted exponent notation');
+
+  // Codex named `1e24`. It is rejected, but for an UNRELATED reason — the nearest
+  // double is not a multiple of the grain — which is exactly why probing it looked like
+  // a disproof. Recorded so nobody re-runs that probe and re-reaches the wrong verdict.
+  assert.notEqual(1e24 % TOKENS_GRAIN, 0, 'the double nearest 1e24 is not on the grain');
+  assert.equal(isRenderableTokens(1e24), false);
+
+  // THE BOUNDARY ITSELF, from both sides, so it cannot drift unnoticed.
+  const LARGEST = 9007199254740900;
+  assert.ok(LARGEST <= Number.MAX_SAFE_INTEGER, 'the largest multiple of the grain inside safe range');
+  assert.equal(isRenderableTokens(LARGEST), true, 'the largest faithful value must still be ACCEPTED');
+  assert.equal(parseTokens(formatTokens(LARGEST)), LARGEST, 'and it must round-trip EXACTLY');
+  assert.equal(
+    isRenderableTokens(LARGEST + TOKENS_GRAIN), false,
+    'and the very next value on the grain must not — the bound is here, not somewhere nearby'
+  );
+
+  // The whole legal range still round-trips: this is the half that stops the bound
+  // being "fixed" by simply refusing more.
+  let exact = 0;
+  for (const n of [0, 100, 900, 1000, 72600, 190000, 1e6, 1e9, 1e12, 1e15, 9e15, LARGEST]) {
+    assert.equal(isRenderableTokens(n), true, `${n} must remain accepted`);
+    assert.equal(parseTokens(formatTokens(n)), n, `${n} must round-trip exactly`);
+    exact += 1;
+  }
+  assert.equal(exact, 12);
+});
+
+test('WO-OR-10: toRenderableTokens can never hand the renderer a value it refuses', () => {
+  // THE MIRROR DEFECT. F1 is the renderer accepting what the parser cannot represent;
+  // this is the PRODUCER emitting what the renderer refuses. The function documents
+  // itself as rounding a raw count "onto the grain so the renderer will accept it", and
+  // above ~1e23 it did not: the nearest double is not a multiple of the grain, so the
+  // rounded result came straight back out and `renderFooter` threw on it.
+  //
+  // Asserted as a PROPERTY over the input domain rather than at the four magnitudes
+  // that happened to fail — the next failing magnitude is not something a list can
+  // anticipate, which is the whole reason the original list-shaped check missed this.
+  let checked = 0;
+  let produced = 0;
+  const raws = [
+    0, 1, 49, 50, 99, 100, 151, 72_601, 72_651, 111_019, 210_781,
+    1e6, 1e12, 1e15, 9e15, 9007199254740900, Number.MAX_SAFE_INTEGER,
+    1e16, 1e17, 100000000000001200, 1e21, 1e22, 1e23, 1e24, 1e25, 1.5e24,
+    -1, -100, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY,
+  ];
+  for (const raw of raws) {
+    const out = toRenderableTokens(raw);
+    checked += 1;
+    if (out === null) continue;
+    produced += 1;
+    assert.equal(isRenderableTokens(out), true, `toRenderableTokens(${raw}) = ${out}, which the renderer REFUSES`);
+    // ...and it is renderable end to end, not merely predicate-clean.
+    assert.equal(parseTokens(formatTokens(out)), out, `toRenderableTokens(${raw}) = ${out} does not round-trip`);
+  }
+  assert.equal(checked, raws.length);
+  assert.ok(produced > 0, 'a run where everything returned null would prove nothing');
+
+  // The specific escapes, named so the regression cannot come back quietly.
+  for (const raw of [1e23, 1e24, 1e25, 1.5e24]) {
+    assert.equal(toRenderableTokens(raw), null, `${raw} must be refused, not rounded into an unrenderable value`);
+  }
+  // ROUNDING UP ACROSS THE BOUND is the subtle one: the input is inside safe range and
+  // the ROUNDED value is not, so the check has to be on the result, never the argument.
+  assert.equal(toRenderableTokens(Number.MAX_SAFE_INTEGER), null, 'rounding up must not cross the bound unnoticed');
+
+  // ...and the ordinary producer-side rounding this whole ladder depends on is UNCHANGED.
+  assert.equal(toRenderableTokens(72_601), 72_600);
+  assert.equal(toRenderableTokens(72_651), 72_700);
+  assert.equal(toRenderableTokens(0), 0);
+  assert.equal(toRenderableTokens(9_007_199_254_740_900), 9_007_199_254_740_900);
+  assert.equal(toRenderableTokens(-1), null);
+  assert.equal(toRenderableTokens(Number.NaN), null);
 });
 
 test('WO-OR-05: `next:` carries MODEL AND EFFORT, and both vocabularies are closed', () => {
