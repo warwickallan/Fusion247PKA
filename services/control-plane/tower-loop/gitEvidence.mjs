@@ -15,25 +15,72 @@ import { spawn as nodeSpawn } from 'node:child_process';
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 // Bound the staged diff so a huge PR cannot blow the Codex context. Truncation is flagged.
-const MAX_DIFF_BYTES = 60_000;
+//
+// The name says BYTES and it is now enforced in bytes. It previously bounded `String.length`
+// — UTF-16 CODE UNITS — so a diff of 64,003 real bytes was recorded as 60,045 and the
+// truncation notice understated the unseen remainder by 6.2%. A cap that lies about its own
+// unit is bad; a durable RECORD that understates how much the reviewer did not see is worse,
+// because the packet is transient and the record is not. The cap value is unchanged.
+export const MAX_DIFF_BYTES = 60_000;
+
+/**
+ * Largest cut index <= max that does NOT land inside a multibyte UTF-8 sequence.
+ *
+ * Cutting at an arbitrary byte can leave a lead byte with its continuation bytes shorn off;
+ * decoding that yields U+FFFD, i.e. the cap itself would corrupt the final character of every
+ * truncated diff. Continuation bytes are 0b10xxxxxx, so walking back while the byte AT the cut
+ * is a continuation byte lands on the lead byte of the sequence that would have been split —
+ * cutting before it is always safe. ASCII and an aligned boundary cut at `max` exactly.
+ */
+export function utf8SafeCut(buf, max) {
+  if (buf.length <= max) return buf.length;
+  let cut = max;
+  while (cut > 0 && (buf[cut] & 0xC0) === 0x80) cut -= 1;
+  return cut;
+}
+
+function toBuffer(chunks) {
+  return Buffer.concat(chunks.map((c) => (Buffer.isBuffer(c) ? c : Buffer.from(String(c), 'utf8'))));
+}
 
 function run(cmd, args, { cwd, timeoutMs = DEFAULT_TIMEOUT_MS, spawn = nodeSpawn } = {}) {
   return new Promise((resolve) => {
-    let stdout = '';
-    let stderr = '';
+    // Chunks accumulate as BYTES and are decoded EXACTLY ONCE, at the end.
+    //
+    // The previous form (`stdout += d.toString()`) decoded every chunk independently. A
+    // multibyte UTF-8 sequence straddling a chunk boundary is then decoded as two invalid
+    // fragments, each becoming U+FFFD — silently altering diff content that a reviewer
+    // afterwards judges as if it were git's own output. Node delivers a pipe in multiple
+    // chunks once output passes the 64KB high-water mark, and this estate's diffs are both
+    // multibyte-bearing and larger than that, so the boundary is crossed routinely. It had
+    // NOT manifested on any diff measured to date — where the boundaries happen to fall is
+    // luck, not design. One decode over the concatenated bytes removes the class outright.
+    const outChunks = [];
+    const errChunks = [];
     let done = false;
-    const finish = (r) => { if (!done) { done = true; resolve(r); } };
+    const settle = ({ ok, code, stderrOverride = null }) => {
+      if (done) return;
+      done = true;
+      const outBuf = toBuffer(outChunks);
+      resolve({
+        ok,
+        code,
+        stdout: outBuf.toString('utf8'),
+        stdoutBytes: outBuf,
+        stderr: stderrOverride ?? toBuffer(errChunks).toString('utf8'),
+      });
+    };
     let child;
     try {
       child = spawn(cmd, args, { cwd, shell: false });
     } catch (e) {
-      return finish({ ok: false, code: -1, stdout: '', stderr: String(e?.message ?? e) });
+      return settle({ ok: false, code: -1, stderrOverride: String(e?.message ?? e) });
     }
-    const timer = setTimeout(() => { try { child.kill('SIGKILL'); } catch { /* ignore */ } finish({ ok: false, code: -2, stdout, stderr: `timed out after ${timeoutMs}ms` }); }, timeoutMs);
-    child.stdout?.on('data', (d) => { stdout += d.toString(); });
-    child.stderr?.on('data', (d) => { stderr += d.toString(); });
-    child.on('error', (e) => { clearTimeout(timer); finish({ ok: false, code: -1, stdout, stderr: String(e?.message ?? e) }); });
-    child.on('close', (code) => { clearTimeout(timer); finish({ ok: code === 0, code, stdout, stderr }); });
+    const timer = setTimeout(() => { try { child.kill('SIGKILL'); } catch { /* ignore */ } settle({ ok: false, code: -2, stderrOverride: `timed out after ${timeoutMs}ms` }); }, timeoutMs);
+    child.stdout?.on('data', (d) => { outChunks.push(d); });
+    child.stderr?.on('data', (d) => { errChunks.push(d); });
+    child.on('error', (e) => { clearTimeout(timer); settle({ ok: false, code: -1, stderrOverride: String(e?.message ?? e) }); });
+    child.on('close', (code) => { clearTimeout(timer); settle({ ok: code === 0, code }); });
   });
 }
 
@@ -66,6 +113,10 @@ export async function gatherGitEvidence({ cwd, repo = null, branch = null, baseS
     resolved: false, blocker: null,
     repo, branch, base_sha: null, head_sha: null, diff_range: null,
     changed_files: [], diff_text: null, diff_truncated: false,
+    // Both counts are REAL UTF-8 BYTES. `diff_bytes` is what was delivered, `diff_total_bytes`
+    // what git produced; equal unless truncated. They exist so the durable record can state
+    // the size of the gap instead of implying there isn't one.
+    diff_bytes: 0, diff_total_bytes: 0,
     scoped_to: pathspec.length ? paths.slice() : null,
     ci_checks: null, ci_source: 'unavailable',
     collected_at: new Date().toISOString(),
@@ -115,12 +166,18 @@ export async function gatherGitEvidence({ cwd, repo = null, branch = null, baseS
     ev.blocker = `unable to collect unified diff for ${ev.diff_range}: ${String(diffRes.stderr).trim().slice(0, 200)}`;
     return ev;
   }
-  let diff = diffRes.stdout;
-  if (diff.length > MAX_DIFF_BYTES) {
-    diff = `${diff.slice(0, MAX_DIFF_BYTES)}\n… [diff truncated at ${MAX_DIFF_BYTES} bytes of ${diffRes.stdout.length}] …`;
+  // The cap is applied to the raw BYTES git produced, at a cut that cannot split a character.
+  const diffBytes = diffRes.stdoutBytes ?? Buffer.from(String(diffRes.stdout), 'utf8');
+  ev.diff_total_bytes = diffBytes.length;
+  if (diffBytes.length > MAX_DIFF_BYTES) {
+    const cut = utf8SafeCut(diffBytes, MAX_DIFF_BYTES);
+    ev.diff_bytes = cut;
     ev.diff_truncated = true;
+    ev.diff_text = `${diffBytes.subarray(0, cut).toString('utf8')}\n… [diff truncated at ${cut} bytes (cap ${MAX_DIFF_BYTES}) of ${diffBytes.length} bytes] …`;
+  } else {
+    ev.diff_bytes = diffBytes.length;
+    ev.diff_text = diffBytes.toString('utf8');
   }
-  ev.diff_text = diff;
 
   // CI conclusions via gh — best-effort (an absent/unauth gh is honestly 'unavailable').
   if (prNumber != null) {
