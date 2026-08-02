@@ -1767,3 +1767,189 @@ test('WO-OR-08 SEAM: the WRAPPER CONTRACT is pinned — a bare sample is silentl
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// ===========================================================================
+// WO-OR-13 — INV-1: A VALUE THE GRAMMAR CANNOT REPRESENT MAY NEVER BE GRADED
+// ===========================================================================
+//
+// The range check ran AFTER `Math.round`, so it tested the DISPLAY form and not the
+// value being judged. `Math.round` is round-half-UP, which folds [-0.5, 0) onto `-0`
+// (and `-0 < 0` is FALSE) and (100, 100.5) onto 100 — so both bands walked past the
+// guard. Every case in the LOW band below rendered `ctx 0% · GREEN`: telemetry the
+// grammar explicitly rejects, wearing the most reassuring state the footer can emit.
+//
+// THE TWO HALVES ARE GRADED SEPARATELY AND DELIBERATELY. The low band is INV-1 proper
+// — a false GREEN. The high band graded RED, which breaches the same rule (no graded
+// state from an unrepresentable input) but is NOT a false GREEN, and letting one claim
+// carry both would overstate what was found. The bands are asymmetric because the
+// rounding is.
+
+const OOR = BLIND_REASON.PERCENTAGE_OUT_OF_RANGE;
+
+test('WO-OR-13 INV-1: an out-of-grammar percentage is BLIND, never graded — including the band Math.round hid', () => {
+  const cases = [
+    // --- THE LOW BAND: these rendered `ctx 0% · GREEN` before the fix. INV-1 proper. ---
+    { what: 'low band: -0.4 rounded to -0, and -0 < 0 is false', pct: -0.4, band: 'low' },
+    { what: 'low band: -0.5, the round-half-up edge that slips through', pct: -0.5, band: 'low' },
+    // --- THE HIGH BAND: these rendered `ctx 100% · RED`. Graded, not GREEN. ---
+    { what: 'high band: 100.4 rounds down into range', pct: 100.4, band: 'high' },
+    { what: 'high band: 100.49, the last value that rounds down', pct: 100.49, band: 'high' },
+    // --- CONTROLS: already caught before the fix. Their REASON must not have moved. ---
+    { what: 'control: -0.6 rounds to -1', pct: -0.6, band: 'was-caught' },
+    { what: 'control: -1', pct: -1, band: 'was-caught' },
+    { what: 'control: 100.5 rounds UP to 101 — the asymmetry, stated', pct: 100.5, band: 'was-caught' },
+    { what: 'control: 140, the pin that already existed', pct: 140, band: 'was-caught' },
+  ];
+
+  let checked = 0;
+  const bands = new Set();
+  for (const c of cases) {
+    const r = deriveFooterFields({
+      sample: goodSample({ context_window: { used_percentage: c.pct } }),
+      knownSessionId: 'session-a',
+    });
+    assert.equal(r.blind, true, `${c.what}: must be BLIND`);
+    // The SPECIFIC rung, not merely "it went BLIND" — a collapsed ladder would pass the
+    // line above and tell the next investigator nothing about what caught it.
+    assert.equal(r.blindReason, OOR, `${c.what}: blindReason`);
+    assert.equal(r.fields.state, 'BLIND', `${c.what}: state`);
+    assert.notEqual(r.fields.state, 'GREEN', `${c.what}: INV-1 — BLIND is never GREEN`);
+    assert.equal(r.fields.percent, null, `${c.what}: the number must be SUPPRESSED`);
+    assert.ok(
+      renderFooter(r.fields).startsWith('⟦GOV⟧ ctx -- · BLIND · KEEP GOING?'),
+      `${c.what}: rendered line`
+    );
+    bands.add(c.band);
+    checked += 1;
+  }
+  assert.equal(checked, cases.length, 'a run that executed no case would prove nothing');
+  assert.equal(bands.size, 3, 'both breached bands AND the already-caught controls must be exercised');
+
+  // THE DIVISION PATH REACHES THE SAME RUNG. The transcript route computes `used` rather
+  // than reading it, so it needs its own proof that the repair is not statusLine-only.
+  // 200800/200000 = 100.4% — both inputs raw, finite and grain-aligned, so nothing else
+  // on the ladder can be the thing that caught it.
+  const divided = f3Derive({ used: 200_800, window: 200_000 });
+  assert.equal(divided.blind, true, 'the divided high band must be BLIND too');
+  assert.equal(divided.blindReason, OOR);
+  assert.equal(divided.fields.percent, null);
+  // ...and a divided percentage far out of range was ALWAYS caught. Control.
+  assert.equal(f3Derive({ used: 300_000, window: 200_000 }).blindReason, OOR);
+});
+
+test('WO-OR-13: the BLIND ladder still distinguishes its rungs — nine reasons, none collapsed', () => {
+  // INV-5. The repair narrowed ONE rung; a repair that widened it into its neighbours
+  // would still make every INV-1 assertion above pass. This asserts the class, not an
+  // instance: each rung fires on its own trigger AND the reasons stay mutually distinct.
+  // `now` is taken from the clock rather than pinned to a literal date, because
+  // `goodSample()` stamps `sampled_at` with the REAL current time. A fixed `now` makes
+  // freshness depend on what time of day the suite runs — which it did, and the
+  // `evaluator threw` rung reported `sample-stale` instead. Every offset below is
+  // relative, so the only thing this test asserts is the ladder.
+  const now = Date.now();
+  const at = (ms) => new Date(now - ms).toISOString();
+
+  const rungs = [
+    ['unreadable sample', { sample: { ok: false, reason: 'missing' } }, BLIND_REASON.SAMPLE_UNREADABLE],
+    ['schema', { sample: goodSample({ schema_version: 2 }) }, BLIND_REASON.SCHEMA_UNRECOGNISED],
+    ['no usage at all', { sample: goodSample({ context_window: {} }) }, BLIND_REASON.PERCENTAGE_ABSENT],
+    ['sampled_at', { sample: goodSample({ sampled_at: 'not-a-date' }) }, BLIND_REASON.SAMPLED_AT_UNPARSEABLE],
+    ['foreign session', { sample: goodSample({ session_id: 'someone-else' }) }, BLIND_REASON.SESSION_MISMATCH],
+    ['stale', { sample: goodSample({ sampled_at: at(STALE_AFTER_MS + 1000) }) }, BLIND_REASON.STALE],
+    ['evaluator threw', { sample: goodSample(), evaluateFn: () => { throw new Error('boom'); } }, BLIND_REASON.EVALUATOR_THREW],
+    ['out of range', { sample: goodSample({ context_window: { used_percentage: -0.4 } }) }, OOR],
+    [
+      'window size unknown',
+      { sample: goodSample({ context_window: { used_tokens: 72_600 } }) },
+      BLIND_REASON.WINDOW_SIZE_UNKNOWN,
+    ],
+  ];
+
+  const seen = [];
+  for (const [what, opts, expected] of rungs) {
+    const r = deriveFooterFields({ knownSessionId: 'session-a', now, ...opts });
+    assert.equal(r.blind, true, `${what}: must be BLIND`);
+    assert.equal(r.blindReason, expected, `${what}: must report ITS OWN reason`);
+    seen.push(r.blindReason);
+  }
+  assert.equal(seen.length, rungs.length, 'a loop that executed nothing would prove nothing');
+  assert.equal(new Set(seen).size, rungs.length, 'two rungs reporting the same reason IS a collapse');
+});
+
+test('WO-OR-13: `percent` is never NEGATIVE ZERO — asserted with Object.is, because the suite is loose', () => {
+  // WHY Object.is AND NOT assert.equal. `-0 == 0` and `assert.deepEqual(-0, 0)` both
+  // PASS, so every existing percent assertion in this file is structurally blind to
+  // this. A loose test here would go green against the broken code and prove nothing.
+  //
+  // `used === -0` legitimately survives the range guard — -0 IS zero and 0% is in the
+  // grammar — but `Math.round(-0)` is `-0`, which `renderFooter` accepts and emits as
+  // `0%` while `parseFooter` reads back `+0`. That makes D-M10's round-trip identity
+  // FALSE for a value the renderer accepts: the same class as the F1 defect WO-OR-10
+  // closed. Normalised in the producer; asserted here at both ends.
+  const routes = [
+    ['reported directly', deriveFooterFields({
+      sample: goodSample({ context_window: { used_percentage: -0 } }),
+      knownSessionId: 'session-a',
+    })],
+    ['divided from a -0 numerator', f3Derive({ used: -0, window: 200_000 })],
+  ];
+
+  let checked = 0;
+  for (const [what, r] of routes) {
+    assert.equal(r.blind, false, `${what}: -0 is zero, so it must still GRADE`);
+    assert.equal(r.fields.state, 'GREEN', `${what}: state`);
+    assert.ok(Object.is(r.fields.percent, 0), `${what}: percent must be +0, got ${Object.is(r.fields.percent, -0) ? '-0' : r.fields.percent}`);
+    assert.ok(!Object.is(r.fields.percent, -0), `${what}: percent must not be -0`);
+
+    // D-M10, at the exact field that broke it, with the comparison that can see it.
+    const parsed = parseFooter(renderFooter(r.fields));
+    assert.equal(parsed.ok, true, `${what}: must parse`);
+    assert.ok(
+      Object.is(parsed.fields.percent, r.fields.percent),
+      `${what}: parseFooter(renderFooter(x)).percent must be IDENTICAL to x.percent, not merely equal`
+    );
+    checked += 1;
+  }
+  assert.equal(checked, routes.length, 'a run that executed no route would prove nothing');
+});
+
+test('WO-OR-13: in-range telemetry does not move — same percent, same state, same bytes', () => {
+  // THE REGRESSION THIS FIX COULD HAVE CAUSED. Moving the range decision onto the raw
+  // value is only correct if it changes NOTHING inside the domain, thresholds included.
+  const cases = [
+    { pct: 0, percent: 0, state: 'GREEN' },
+    { pct: 0.4, percent: 0, state: 'GREEN' },
+    { pct: 0.5, percent: 1, state: 'GREEN' },
+    { pct: 18, percent: 18, state: 'GREEN' },
+    { pct: 54.9, percent: 55, state: 'GREEN' },   // rounds UP across the label, grades below it
+    { pct: 55, percent: 55, state: 'AMBER' },
+    { pct: 74.9, percent: 75, state: 'AMBER' },   // the WO-OR-12 shape: number 75, grade AMBER
+    { pct: 75, percent: 75, state: 'RED' },
+    { pct: 99.5, percent: 100, state: 'RED' },
+    { pct: 100, percent: 100, state: 'RED' },
+  ];
+
+  let checked = 0;
+  for (const c of cases) {
+    const r = deriveFooterFields({
+      sample: goodSample({ context_window: { used_percentage: c.pct } }),
+      knownSessionId: 'session-a',
+    });
+    assert.equal(r.blind, false, `${c.pct}%: must NOT be BLIND`);
+    assert.equal(r.blindReason, null, `${c.pct}%: no reason`);
+    assert.equal(r.fields.percent, c.percent, `${c.pct}%: percent`);
+    assert.equal(r.fields.state, c.state, `${c.pct}%: state`);
+    checked += 1;
+  }
+  assert.equal(checked, cases.length, 'a run that executed no case would prove nothing');
+
+  // Byte pins at both ends of the domain, so a change to the CTX field or the separators
+  // cannot hide behind the field-level assertions above.
+  const line = (pct) => renderFooter(deriveFooterFields({
+    sample: goodSample({ context_window: { used_percentage: pct } }),
+    knownSessionId: 'session-a',
+  }).fields);
+  assert.equal(line(0), '⟦GOV⟧ ctx 0% · GREEN · TASK UNKNOWN · next: UNSET · CONTINUE');
+  assert.equal(line(18), '⟦GOV⟧ ctx 18% · GREEN · TASK UNKNOWN · next: UNSET · CONTINUE');
+  assert.equal(line(100), '⟦GOV⟧ ctx 100% · RED · CLEAR NOW · next: UNSET · CONTINUE');
+});
