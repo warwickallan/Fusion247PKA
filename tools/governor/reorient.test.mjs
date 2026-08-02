@@ -1149,6 +1149,69 @@ test('WO-OR-17 / ADDENDUM: a provenance probe that cannot answer says so rather 
   }
 });
 
+// ---------------------------------------------------------------------------
+// TQA-003 / TQA-004 — Codex repairs final run 2 (BLOCKS_CURRENT_MERGE both)
+// ---------------------------------------------------------------------------
+
+test('TQA-003: a measured directory cwd must NOT claim session enterability', () => {
+  // TYPE ≠ ENTERABILITY. The path is shown; the limit is stated on the same line.
+  // A bare path under "executed, not assumed" was the upgrade Codex correctly blocked.
+  const rendered = renderLocationSection({
+    worktreePath: 'C:/x', resolvedPath: 'C:/x', resolvedKind: 'directory',
+    cwdFailure: null, cwdFailureCode: null,
+    gitReadable: true, repoRoot: 'C:/x', linkedWorktree: false,
+    headSha: 'abc', branch: 'main', symbolicBranch: 'main', detached: false,
+    symbolicRefFailure: null, symbolicRefStatus: null, symbolicRefCode: null,
+    dirty: false, unpushed: 0, upstreamRef: 'origin/main', upstreamSha: 'abc',
+    upstreamState: 'tracked',
+  });
+  assert.match(rendered, /C:\/x/, 'the measured path is still shown');
+  assert.match(rendered, /directory type measured/, 'WHAT was measured is named');
+  assert.match(rendered, /enterability NOT established/,
+    'THE DEFECT: type must never silently upgrade into "the session is here"');
+  // CONTROL: an unreadable path still does not pretend to be measured.
+  const denied = renderLocationSection({
+    worktreePath: 'C:/locked', resolvedPath: null, resolvedKind: null,
+    cwdFailure: 'unreadable', cwdFailureCode: 'EPERM',
+    gitReadable: false, repoRoot: null, linkedWorktree: null,
+    headSha: null, branch: null, symbolicBranch: null, detached: null,
+    symbolicRefFailure: null, symbolicRefStatus: null, symbolicRefCode: null,
+    dirty: null, unpushed: null, upstreamRef: null, upstreamSha: null,
+    upstreamState: 'unreadable',
+  });
+  assert.doesNotMatch(denied, /directory type measured/,
+    'CONTROL: the type limit only applies where type was measured');
+});
+
+test('TQA-004: a deliverables list truncated by the display cap must say so', () => {
+  // Nine recent files → eight shown + one disclosed. Silent slice was the defect.
+  const files = Array.from({ length: 9 }, (_, i) => ({
+    name: `d${i}.md`,
+    body: `# Doc ${i}\n`,
+    ageDays: i, // 0 is newest after sort-by-mtime desc
+  }));
+  const e = makeEstate(files);
+  try {
+    const out = sweepOpenDeliverables(e.root, Date.now());
+    assert.match(out, /OPEN DELIVERABLES/, 'CONTROL: the section rendered');
+    assert.match(out, /display cap 8/, 'the cap is named so a reader can check the count');
+    assert.match(out, /1 more recent deliverable\(s\) not shown/,
+      'THE DEFECT: readable rows omitted by the cap must be disclosed, not silently dropped');
+    assert.match(out, /NOT complete/, 'and the list does not pretend to be whole');
+    // CONTROL: eight or fewer must NOT cry incompleteness about the cap.
+    const e8 = makeEstate(files.slice(0, 8));
+    try {
+      const out8 = sweepOpenDeliverables(e8.root, Date.now());
+      assert.doesNotMatch(out8, /display cap|not shown/,
+        'CONTROL: a full-or-under list must not claim truncation');
+    } finally {
+      e8.cleanup();
+    }
+  } finally {
+    e.cleanup();
+  }
+});
+
 // ===========================================================================
 // THE STRENGTHENED PIN — the enumeration's OWN PREDICATE, made executable
 // ===========================================================================

@@ -507,10 +507,20 @@ function show(v) {
 //                       nothing. A true value can still carry an unearned claim.
 function renderCwd(facts, cwdClaimedByHost) {
   if (facts.resolvedPath) {
-    if (cwdClaimedByHost) return facts.resolvedPath;
+    // TQA-003 (Codex repairs final run 2, BLOCKS_CURRENT_MERGE). TYPE is not ENTERABILITY.
+    // realpath + isDirectory establishes that a directory exists at this path. It does NOT
+    // establish that the session process can enter it. readdir measures listability (strictly
+    // stronger than traverse); process.chdir is the true enterability test and MUTATES the
+    // hook process, which INV-2 forbids. So the line states exactly what was measured — a
+    // directory on disk — and NEVER upgrades that into "this is where the session is" without
+    // the limit. A bare path under "executed, not assumed" was that upgrade.
+    const typeLimit =
+      ' (directory type measured; session enterability NOT established)';
+    if (cwdClaimedByHost) return `${facts.resolvedPath}${typeLimit}`;
     return (
       `${facts.resolvedPath} (UNCLAIMED — the host supplied no cwd, so this is the hook ` +
-      "process's own working directory, not a location this session claimed)"
+      "process's own working directory, not a location this session claimed;" +
+      ' directory type measured, enterability NOT established)'
     );
   }
   const claimed = facts.worktreePath;
@@ -790,7 +800,12 @@ export function sweepOpenDeliverables(root = ESTATE_ROOT, now = Date.now(), io =
     return null;
   }
   rows.sort((a, b) => b.mtimeMs - a.mtimeMs);
-  const top = rows.slice(0, 8);
+  // Display cap — intentional, not a failure. TQA-004 (Codex repairs final run 2): when the
+  // list is truncated, the reader MUST be told. A silent slice is incompleteness wearing the
+  // costume of a complete answer — the same defect class as an unreadable file dropped
+  // without a tell (WO-OR-14). The cap itself is not the defect; silence about it is.
+  const DISPLAY_CAP = 8;
+  const top = rows.slice(0, DISPLAY_CAP);
   const lines = ['⟦GOV⟧ OPEN DELIVERABLES (loose, not BUILD-* — nothing else surfaces these):'];
   for (const r of top) {
     const flag = r.awaits ? '  ⟵ AWAITS YOUR DECISION' : '';
@@ -811,6 +826,14 @@ export function sweepOpenDeliverables(root = ESTATE_ROOT, now = Date.now(), io =
   // the whole answer — which is exactly how a silently dropped file becomes invisible.
   if (unreadable) {
     lines.push(`  ${unreadable} file(s) could not be read and are NOT represented in this list.`);
+  }
+  // TQA-004. Readable rows omitted by the display cap are incompleteness of a different
+  // kind from unreadable ones — both must be disclosed, neither may masquerade as the full set.
+  if (rows.length > DISPLAY_CAP) {
+    lines.push(
+      `  … and ${rows.length - DISPLAY_CAP} more recent deliverable(s) not shown ` +
+      `(display cap ${DISPLAY_CAP}) — this list is NOT complete.`
+    );
   }
   return lines.join('\n');
 }
