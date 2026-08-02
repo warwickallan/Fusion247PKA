@@ -851,10 +851,47 @@ export function deriveFooterFields({
   // The percentage, from the ONLY two honest sources: one the sample reported directly
   // (the statusLine path), or one DIVIDED from a real numerator by an authoritative
   // denominator (the transcript path). Never from a model -> window guess.
+  //
+  // ---------------------------------------------------------------------------
+  // WO-OR-12 / Codex F3 — A DISPLAY TRANSFORM MUST NEVER FEED THE ARITHMETIC
+  // ---------------------------------------------------------------------------
+  // This division used to read `(usedTokens / windowTokens) * 100`. Both of those have
+  // been through `toRenderableTokens`, which rounds onto `TOKENS_GRAIN` for the DISPLAY
+  // codec — so the single most load-bearing number this module emits was computed from
+  // two values that exist only in order to be rendered. It divides the RAW numerator by
+  // the RAW denominator now. Display rounded, divide raw.
+  //
+  // THE MAGNITUDE ARGUMENT FOR LEAVING IT ALONE WAS TESTED AND IS FALSE — recorded here
+  // because it is what makes this a real repair rather than a purity exercise. The
+  // defence was that real windows are 200000 or 1000000, both exact multiples of the
+  // grain, so the denominator is unaffected and a numerator error of at most 50 tokens
+  // sits far below the integer percent actually rendered. The first two clauses are
+  // true. The conclusion is not: swept across every used-token value in a 200000 window,
+  // 4996 of 200001 (2.498%) render a DIFFERENT integer percent, and 100 of them cross an
+  // evaluator threshold and change the STATE. `used_tokens: 149950` graded RED · CLEAR
+  // NOW off a numerator rounded up to exactly 75.000%, where the true figure is 74.975%
+  // and the honest grade is AMBER. A governor telling Warwick to rotate on the strength
+  // of a rounding artefact is the class of false reading INV-1 exists to forbid.
+  // "Correct because the inputs are usually big enough" is TQA-001's shape — correct by
+  // luck of environment, and it reads green right up until it does not.
+  //
+  // EVERY GUARD THE ROUNDED VALUES WERE SUBJECT TO STILL GATES THIS DIVISION, and that
+  // is the half worth reading twice: moving arithmetic upstream of a check is the
+  // obvious way to fix this defect and introduce a worse one. `usedTokens !== null`
+  // establishes that `usedTokensRaw` passed `isFiniteNumber` and is non-negative;
+  // `windowTokens !== null` establishes that `windowRaw` passed `isFiniteNumber` AND
+  // `> 0`. So no NaN, no division by zero and no negative numerator is reachable here,
+  // and the representability rungs below still fire exactly as they did.
+  //
+  // The `usedTokens !== null` conjunct is DELIBERATELY explicit even though rung 3 above
+  // already guarantees it (reaching this line with a non-finite `reportedPct` is only
+  // possible when `usedTokens` is non-null). It changes no behaviour. It states the
+  // precondition of the raw division AT the raw division, instead of leaving it inherited
+  // from a guard forty lines away that a later edit could move.
   const used = isFiniteNumber(reportedPct)
     ? reportedPct
-    : windowTokens !== null
-      ? (usedTokens / windowTokens) * 100
+    : usedTokens !== null && windowTokens !== null
+      ? (usedTokensRaw / windowRaw) * 100
       : null;
 
   // Rung 7. A real number we cannot grade. Both token fields are carried into the

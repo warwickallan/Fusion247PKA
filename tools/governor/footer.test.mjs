@@ -550,6 +550,204 @@ test('WO-OR-10: toRenderableTokens can never hand the renderer a value it refuse
   assert.equal(toRenderableTokens(Number.NaN), null);
 });
 
+// ---------------------------------------------------------------------------
+// WO-OR-12 / Codex F3 — a DISPLAY transform must never feed the ARITHMETIC
+// ---------------------------------------------------------------------------
+// `toRenderableTokens` rounds a raw count onto TOKENS_GRAIN so the DISPLAY codec can
+// render it exactly. The ladder then divided those two already-rounded values to produce
+// the percentage — so the most load-bearing number this module emits was computed from
+// two values that exist only in order to be rendered.
+//
+// THE REACHABILITY DEFENCE WAS TESTED AND IS FALSE, which is why these tests pin
+// realistic magnitudes and not only Codex's 149-token example. The argument for leaving
+// it alone was that real windows are 200000 or 1000000 — both exact multiples of the
+// grain, so the denominator is untouched — and that a numerator error of at most 50
+// tokens is far below the integer percent actually rendered. Both premises are true and
+// the conclusion is wrong: across every used-token value in a 200000 window, 4996 of
+// 200001 (2.498%) render a DIFFERENT integer percent, and 100 of them cross an evaluator
+// threshold and change the STATE. The rows below are drawn from that sweep.
+//
+// The percent is the LESS dangerous half. A grade computed off a rounded numerator can
+// tell Warwick to rotate when the true figure does not: `used_tokens: 149950` in a 200000
+// window rounds to exactly 75.000% and grades RED · CLEAR NOW, where the truth is 74.975%
+// and AMBER. Same rendered percent, different instruction.
+
+const F3_AT = '2026-08-02T12:00:00.000Z';
+const F3_NOW = Date.parse(F3_AT) + 1000; // fresh, so staleness is never the reason
+
+// The TRANSCRIPT path — a raw numerator and denominator with NO reported percentage. It
+// is the only path that divides; a sample carrying `used_percentage` short-circuits above.
+function f3Sample({ used, window: windowSize, percentage = null }) {
+  return {
+    ok: true,
+    approximate: false,
+    data: {
+      schema_version: 1,
+      sampled_at: F3_AT,
+      session_id: 'f3',
+      source: 'transcript',
+      context_window: {
+        used_percentage: percentage,
+        used_tokens: used,
+        context_window_size: windowSize,
+      },
+    },
+  };
+}
+
+const f3Derive = (opts) =>
+  deriveFooterFields({ sample: f3Sample(opts), knownSessionId: 'f3', now: F3_NOW });
+
+test('WO-OR-12 F3: the percentage comes from the RAW numerator and denominator, never the display-rounded pair', () => {
+  // Every row FAILS against the pre-fix code. That is what makes this evidence rather
+  // than decoration — a test that never failed proves only that it was written.
+  const cases = [
+    {
+      what: "Codex's own case — a numerator that rounds away to ZERO",
+      used: 49, window: 149,
+      percent: 33, // true 32.885%; the old arithmetic divided 0/100 and rendered 0%
+      state: 'GREEN',
+    },
+    {
+      what: 'a REALISTIC 200k window — the rendered percent is a full point wrong',
+      used: 950, window: 200_000,
+      percent: 0, // true 0.475%; the old arithmetic divided 1000/200000 -> 0.5% -> 1%
+      state: 'GREEN',
+    },
+    {
+      what: 'a REALISTIC 200k window at the RED threshold — the STATE is wrong, not the number',
+      used: 149_950, window: 200_000,
+      percent: 75, // rounds to 75 either way: the percent field HIDES this one entirely
+      state: 'AMBER', // true 74.975%; the old arithmetic hit exactly 75.000% and graded RED
+    },
+    {
+      what: 'a REALISTIC 200k window at the AMBER threshold',
+      used: 109_950, window: 200_000,
+      percent: 55,
+      state: 'GREEN', // true 54.975%; the old arithmetic hit exactly 55.000% and graded AMBER
+    },
+    {
+      what: 'the same defect in a 1M window',
+      used: 549_950, window: 1_000_000,
+      percent: 55,
+      state: 'GREEN', // true 54.995%; the old arithmetic hit exactly 55.000%
+    },
+  ];
+
+  let checked = 0;
+  for (const c of cases) {
+    const { fields, blind } = f3Derive({ used: c.used, window: c.window });
+    assert.equal(blind, false, `${c.what}: must not be BLIND`);
+    assert.equal(fields.percent, c.percent, `${c.what}: percent`);
+    assert.equal(fields.state, c.state, `${c.what}: state`);
+
+    // Asserted as the PROPERTY as well as the literal, so a future edit cannot satisfy
+    // the four literals above by some other route.
+    assert.equal(
+      fields.percent,
+      Math.round((c.used / c.window) * 100),
+      `${c.what}: percent must be the RAW quotient, rounded once at the end`
+    );
+    checked += 1;
+  }
+  assert.equal(checked, cases.length, 'a run that executed no case would prove nothing');
+
+  // The readings that already AGREED must still agree — this fix is not licensed to move
+  // anything else. Both values are exercised end to end elsewhere in this file.
+  assert.equal(f3Derive({ used: 210_781, window: 1_000_000 }).fields.percent, 21);
+  assert.equal(f3Derive({ used: 111_019, window: 1_000_000 }).fields.percent, 11);
+
+  // A sample that REPORTS a percentage still short-circuits to it untouched, raw tokens
+  // present or not. The statusLine path never divided and must not start.
+  assert.equal(f3Derive({ used: 950, window: 200_000, percentage: 42 }).fields.percent, 42);
+});
+
+test('WO-OR-12: the RENDERED token fields are still grain-aligned, and the codec still round-trips', () => {
+  // THE REGRESSION THIS FIX COULD HAVE CAUSED. "Divide raw" must never become "render
+  // raw": grain alignment is what makes `parseFooter(renderFooter(x)).fields` deep-equal
+  // `x` (D-M10) for the token fields, and it was hard-won in WO-OR-10.
+  const cases = [
+    { used: 49, window: 149 },
+    { used: 950, window: 200_000 },
+    { used: 149_950, window: 200_000 },
+    { used: 91_234, window: 200_000 },
+    { used: 210_781, window: 1_000_000 },
+  ];
+
+  let checked = 0;
+  for (const { used, window: windowSize } of cases) {
+    const { fields } = f3Derive({ used, window: windowSize });
+
+    // Still DISPLAY-ROUNDED, and still exactly what the display codec produces.
+    assert.equal(fields.usedTokens, toRenderableTokens(used), `usedTokens for ${used}`);
+    assert.equal(fields.windowTokens, toRenderableTokens(windowSize), `windowTokens for ${windowSize}`);
+    assert.equal(isRenderableTokens(fields.usedTokens), true, `usedTokens for ${used} must be renderable`);
+    assert.equal(isRenderableTokens(fields.windowTokens), true, `windowTokens for ${windowSize} must be renderable`);
+    assert.equal(fields.usedTokens % TOKENS_GRAIN, 0, `usedTokens for ${used} must be grain-aligned`);
+    assert.equal(fields.windowTokens % TOKENS_GRAIN, 0, `windowTokens for ${windowSize} must be grain-aligned`);
+
+    // D-M10, end to end, for the field set the ladder actually produced.
+    const line = renderFooter(fields);
+    const parsed = parseFooter(line);
+    assert.equal(parsed.ok, true, `${line} must parse`);
+    assert.deepEqual(parsed.fields, fields, `${line} must round-trip exactly`);
+    checked += 1;
+  }
+  assert.equal(checked, cases.length, 'a run that executed no case would prove nothing');
+
+  // The whole change in one assertion: the value RENDERED is not the value DIVIDED. If
+  // these ever coincide for a raw count off the grain, the display transform has crept
+  // back into the arithmetic and F3 is open again.
+  const { fields } = f3Derive({ used: 950, window: 200_000 });
+  assert.equal(fields.usedTokens, 1000, 'the rendered numerator is rounded ONTO the grain');
+  assert.notEqual(fields.usedTokens, 950, '...and is therefore NOT the raw count');
+  assert.equal(fields.percent, 0, '...while the percentage came from the raw 950, not from the rendered 1000');
+});
+
+test('WO-OR-12: dividing the RAW values did not move the arithmetic past a single guard', () => {
+  // The obvious way to fix F3 is to reach for the raws BEFORE the checks the rounded
+  // values were subject to — trading a rounding error for a NaN, an Infinity, a division
+  // by zero or a negative percentage reaching the grammar. That would be a worse defect
+  // than the one being repaired, so every rung is pinned here as UNCHANGED.
+  const blindCases = [
+    { what: 'a zero denominator', used: 500, window: 0, reason: BLIND_REASON.WINDOW_SIZE_UNKNOWN },
+    { what: 'a negative denominator', used: 500, window: -200_000, reason: BLIND_REASON.WINDOW_SIZE_UNKNOWN },
+    { what: 'a NaN denominator', used: 500, window: Number.NaN, reason: BLIND_REASON.WINDOW_SIZE_UNKNOWN },
+    { what: 'an infinite denominator', used: 500, window: Number.POSITIVE_INFINITY, reason: BLIND_REASON.WINDOW_SIZE_UNKNOWN },
+    { what: 'a STRING denominator', used: 500, window: '200000', reason: BLIND_REASON.WINDOW_SIZE_UNKNOWN },
+    { what: 'an absent denominator', used: 500, window: null, reason: BLIND_REASON.WINDOW_SIZE_UNKNOWN },
+    { what: 'an unrepresentable denominator', used: 500, window: 1e24, reason: BLIND_REASON.WINDOW_SIZE_UNKNOWN },
+    { what: 'a negative numerator', used: -5, window: 200_000, reason: BLIND_REASON.PERCENTAGE_ABSENT },
+    { what: 'a NaN numerator', used: Number.NaN, window: 200_000, reason: BLIND_REASON.PERCENTAGE_ABSENT },
+    { what: 'an infinite numerator', used: Number.POSITIVE_INFINITY, window: 200_000, reason: BLIND_REASON.PERCENTAGE_ABSENT },
+    { what: 'a STRING numerator', used: '42', window: 200_000, reason: BLIND_REASON.PERCENTAGE_ABSENT },
+    { what: 'an absent numerator', used: null, window: 200_000, reason: BLIND_REASON.PERCENTAGE_ABSENT },
+  ];
+
+  let checked = 0;
+  for (const c of blindCases) {
+    const { fields, blind, blindReason } = f3Derive({ used: c.used, window: c.window });
+    assert.equal(blind, true, `${c.what} must be BLIND`);
+    assert.equal(blindReason, c.reason, `${c.what} must report the SAME rung as before the fix`);
+    assert.equal(fields.percent, null, `${c.what} must render NO percentage`);
+    assert.equal(fields.state, 'BLIND', `${c.what}: state`);
+
+    // ...and the line is still grammatical, carrying no arithmetic wreckage.
+    const line = renderFooter(fields);
+    assert.equal(parseFooter(line).ok, true, `${c.what}: ${line} must parse`);
+    assert.doesNotMatch(line, /NaN|Infinity|-[0-9]/, `${c.what}: ${line} must carry no wreckage`);
+    checked += 1;
+  }
+  assert.equal(checked, blindCases.length, 'a run that executed no case would prove nothing');
+
+  // The boundary that is deliberately NOT blind: a zero numerator over a real denominator
+  // is a true 0%, and must stay a real graded reading rather than being swept in above.
+  const zero = f3Derive({ used: 0, window: 200_000 });
+  assert.equal(zero.blind, false, 'a zero numerator is a READING, not a failure');
+  assert.equal(zero.fields.percent, 0);
+  assert.equal(zero.fields.state, 'GREEN');
+});
+
 test('WO-OR-05: `next:` carries MODEL AND EFFORT, and both vocabularies are closed', () => {
   assert.deepEqual(NEXT_MODELS, ['Opus', 'Sonnet', 'Haiku']);
   assert.deepEqual(NEXT_EFFORTS, ['low', 'medium', 'high', 'xhigh', 'max']);
