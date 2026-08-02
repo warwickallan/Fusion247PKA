@@ -256,14 +256,33 @@ export function newestAssistantUsage(text) {
   return null;
 }
 
+// A recorded model id carrying a parenthesised VARIANT, e.g. `<base>[<variant>]`. The
+// shape is matched generically and no particular variant is named: pinning the one
+// variant this estate happens to run today would silently fail to protect against the
+// next one, and the whole defect below is a namespace problem, not a value problem.
+const VARIANT_SUFFIXED_ID = /^(.+)\[[^\]]+\]$/;
+
 /**
- * resolveWindowTokens({ modelId, ... }) -> { tokens: number|null, source: string|null }
+ * variantBaseOf(id) -> string|null
+ *
+ * The base of a variant-suffixed id, or null when the id carries no variant. Pure.
+ */
+export function variantBaseOf(id) {
+  if (typeof id !== 'string') return null;
+  const m = VARIANT_SUFFIXED_ID.exec(id);
+  return m ? m[1] : null;
+}
+
+const NO_WINDOW = Object.freeze({ tokens: null, source: null });
+
+/**
+ * resolveWindowTokens({ modelId, usedTokens, ... }) -> { tokens: number|null, source: string|null }
  *
  * THE DENOMINATOR, AND THE ONLY TWO WAYS IT MAY BE OBTAINED (ruled, WO-OR-05):
  *
  *   1. `CLAUDE_CONTEXT_WINDOW` — an explicit statement by the operator.
- *   2. A statusLine-observed `context_window_size` WHOSE RECORDED MODEL ID MATCHES the
- *      live session's model id.
+ *   2. A statusLine-observed `context_window_size` whose recorded model id matches the
+ *      live session's model id AND is not ambiguous — see the three guards below.
  *
  * Never a model -> window lookup table. Never a cross-model value: a 1M-context session
  * observed yesterday says nothing about a 200k-context session running now, and using it
@@ -271,11 +290,44 @@ export function newestAssistantUsage(text) {
  * When the live model id is unknown, rule 2 cannot fire at all — an unmatched value is
  * exactly the cross-model risk the rule exists to exclude.
  *
+ * WHY RULE 2 NEEDED REPAIRING (WO-OR-08). Matching on the id was necessary and not
+ * sufficient, because THE IDS COME FROM TWO DIFFERENT NAMESPACES. A statusLine payload
+ * records a variant-suffixed id for a 1M-context session; the transcript's own
+ * `message.model` reports the BARE base id with no suffix. So a transcript-sourced sample
+ * for a 1M session could never match its own 1M observation, and instead matched a
+ * same-named 200k observation from an unrelated session — rendering a real 1M session at
+ * roughly five times its true percentage, in a footer that graded it AMBER and advised
+ * rotation. Observed live on this estate, twice.
+ *
+ * The repair is that a denominator must be ESTABLISHED, not merely matched. Three guards,
+ * each catching a shape the others do not:
+ *
+ *   (a) DISAGREEMENT. Matched observations that disagree on the size settle nothing.
+ *       The previous rule took the most RECENT of them, which is a guess about which
+ *       session a sample belongs to dressed up as a rule — recency says nothing about
+ *       which window is the LIVE session's.
+ *   (b) VARIANT AMBIGUITY. A bare id is ambiguous when a variant-suffixed sibling of the
+ *       same base has also been observed, because the transcript cannot tell us which of
+ *       the two namespaces this session is in. This is the guard that catches the live
+ *       defect; (a) alone does not, because the two entries never had the same id.
+ *       Asymmetric on purpose: a variant-suffixed LIVE id is already specific, so it is
+ *       not widened by the existence of a bare sibling.
+ *   (c) SELF-CONTRADICTION. A window smaller than the numerator it is about to divide is
+ *       disproven by that numerator. Cheap, and it is the ONLY guard that also applies to
+ *       rule 1 — an operator can typo an explicit value too.
+ *
+ * Deliberately NOT done: stripping the variant suffix to force a match. That makes BOTH
+ * entries match and deepens the ambiguity instead of resolving it.
+ *
+ * `usedTokens` is optional and is used only by guard (c). Passing nothing disables that
+ * guard and leaves (a) and (b) fully in force.
+ *
  * Returns the provenance beside the number so nothing downstream has to guess where a
  * denominator came from. Never throws.
  */
 export function resolveWindowTokens({
   modelId = null,
+  usedTokens = null,
   env = process.env,
   storeOpts = {},
   dirFor = healthStoreDir,
@@ -283,19 +335,32 @@ export function resolveWindowTokens({
   readFile = readFileSync,
   existsFn = existsSync,
 } = {}) {
+  // Guard (c), stated once and applied to whichever rule produces a candidate.
+  const numerator =
+    typeof usedTokens === 'number' && Number.isFinite(usedTokens) && usedTokens >= 0
+      ? usedTokens
+      : null;
+  const coherent = (size) => numerator === null || numerator <= size;
+
   // 1 — the explicit operator statement.
   const declared = Number(env?.CLAUDE_CONTEXT_WINDOW);
   if (Number.isFinite(declared) && declared > 0) {
-    return { tokens: declared, source: 'env:CLAUDE_CONTEXT_WINDOW' };
+    return coherent(declared)
+      ? { tokens: declared, source: 'env:CLAUDE_CONTEXT_WINDOW' }
+      : NO_WINDOW;
   }
 
   // 2 — a statusLine observation, model-matched. No live model id, no rule 2.
-  if (typeof modelId !== 'string' || modelId.length === 0) return { tokens: null, source: null };
+  if (typeof modelId !== 'string' || modelId.length === 0) return NO_WINDOW;
 
   try {
     const dir = dirFor(storeOpts);
-    if (!existsFn(dir)) return { tokens: null, source: null };
-    let best = null;
+    if (!existsFn(dir)) return NO_WINDOW;
+
+    // Every DISTINCT window size observed per recorded model id. A set rather than a
+    // most-recent winner, because the question is no longer "which is newest" but
+    // "do the observations agree at all".
+    const sizesById = new Map();
     for (const name of listDir(dir)) {
       if (typeof name !== 'string' || !name.endsWith('.json')) continue;
       let data;
@@ -305,19 +370,35 @@ export function resolveWindowTokens({
         continue;
       }
       if (!data || data.source !== SOURCE_STATUSLINE) continue;
-      if (data.model?.id !== modelId) continue; // the match rule, applied mechanically
+      const id = data.model?.id;
+      if (typeof id !== 'string' || id.length === 0) continue;
       const size = data.context_window?.context_window_size;
       if (typeof size !== 'number' || !Number.isFinite(size) || size <= 0) continue;
-      const at = Date.parse(data.sampled_at ?? '');
-      const rank = Number.isFinite(at) ? at : -Infinity;
-      if (!best || rank > best.rank) best = { rank, size };
+      if (!sizesById.has(id)) sizesById.set(id, new Set());
+      sizesById.get(id).add(size);
     }
-    if (best) return { tokens: best.size, source: 'statusline-observed' };
+
+    const matched = sizesById.get(modelId);
+    if (!matched || matched.size === 0) return NO_WINDOW;
+
+    // (a) matched observations must AGREE.
+    if (matched.size > 1) return NO_WINDOW;
+
+    // (b) a BARE id is ambiguous while a variant-suffixed sibling of it exists.
+    if (variantBaseOf(modelId) === null) {
+      for (const id of sizesById.keys()) {
+        if (id !== modelId && variantBaseOf(id) === modelId) return NO_WINDOW;
+      }
+    }
+
+    const [size] = matched;
+    if (!coherent(size)) return NO_WINDOW; // (c)
+    return { tokens: size, source: 'statusline-observed' };
   } catch {
     // A store we cannot read yields no denominator. That is the safe side: the footer
     // renders a bare token count rather than a percentage over a guessed window.
   }
-  return { tokens: null, source: null };
+  return NO_WINDOW;
 }
 
 /**
@@ -347,7 +428,10 @@ export function extractTranscriptSample({
   const sid = (typeof sessionId === 'string' && sessionId.length ? sessionId : found.sessionId) || null;
   if (!sid) return null;
 
-  const window = windowResolver({ modelId: found.modelId, env, storeOpts });
+  // The numerator is passed to the resolver so guard (c) can refuse a denominator that
+  // this very sample already disproves. Resolving the window in ignorance of the count it
+  // is about to divide was how a window smaller than its own numerator survived.
+  const window = windowResolver({ modelId: found.modelId, usedTokens, env, storeOpts });
 
   return {
     schema_version: SAMPLE_SCHEMA_VERSION,

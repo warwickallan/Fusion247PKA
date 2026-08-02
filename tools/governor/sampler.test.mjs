@@ -18,6 +18,7 @@ import {
   sumUsedTokens,
   newestAssistantUsage,
   resolveWindowTokens,
+  variantBaseOf,
   extractTranscriptSample,
   sampleFromTranscript,
 } from './sampler.mjs';
@@ -499,9 +500,203 @@ test('DENOMINATOR: a statusLine observation counts ONLY when the model id matche
     }));
     assert.equal(resolveWindowTokens({ modelId: 'claude-sonnet-5', env: {}, storeOpts }).tokens, null);
 
-    // Newest matching observation wins.
+    // INVERTED BY WO-OR-08, ON LARRY'S EXPLICIT WORD — DO NOT "RESTORE" THIS.
+    //
+    // This assertion USED TO READ:
+    //     // Newest matching observation wins.
+    //     assert.equal(resolveWindowTokens({ modelId: 'claude-opus-5', ... }).tokens, 200000);
+    //
+    // It was green, and it encoded the defect. `a.json` and `c.json` carry the SAME model
+    // id and DISAGREE about the window; "newest wins" resolved that by picking the most
+    // recent, which is a guess about which session a stored sample belongs to dressed up
+    // as a rule. Recency says nothing about which window is the LIVE session's — the two
+    // observations may both be from other sessions entirely. Disagreement settles nothing,
+    // so the honest answer is no denominator at all, and the footer degrades to a bare
+    // token count with state BLIND rather than rendering a confident wrong percentage.
+    //
+    // Guard (a) in resolveWindowTokens. Reverting this assertion re-opens the defect.
     writeFileSync(join(dir, 'c.json'), JSON.stringify(observed('claude-opus-5', 200000, '2026-08-02T09:00:00Z')));
-    assert.equal(resolveWindowTokens({ modelId: 'claude-opus-5', env: {}, storeOpts }).tokens, 200000);
+    assert.deepEqual(
+      resolveWindowTokens({ modelId: 'claude-opus-5', env: {}, storeOpts }),
+      { tokens: null, source: null },
+      'matched observations that DISAGREE on the size establish nothing'
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// WO-OR-08 — the denominator must be ESTABLISHED, not merely matched.
+//
+// The defect these cover was observed LIVE on this estate, twice, and it survived a
+// fully green suite because every existing denominator test used a store in which the
+// recorded ids all came from ONE namespace. They do not in reality: a statusLine payload
+// records a variant-suffixed id for a 1M-context session while the transcript's own
+// `message.model` reports the bare base id. The store shape below is the real one.
+// ---------------------------------------------------------------------------
+
+/** One statusLine observation, in the shape the real store holds. */
+function observedWindow(id, size, at) {
+  return {
+    schema_version: 1,
+    sampled_at: at,
+    session_id: `s-${id}-${size}`,
+    source: SOURCE_STATUSLINE,
+    model: { id },
+    context_window: { context_window_size: size },
+  };
+}
+
+test('WO-OR-08 guard (b): a BARE model id is AMBIGUOUS while a variant-suffixed sibling exists', () => {
+  // THE LIVE DEFECT, reproduced from the real store's actual contents. A 1M session is
+  // recorded under a variant-suffixed id; an unrelated 200k session under the bare id.
+  // The transcript reports the BARE id, so the old rule matched the 200k entry and
+  // rendered a 1M session at ~5x its true percentage — graded AMBER, advising rotation.
+  const dir = tempHealthDir();
+  const storeOpts = { envOverride: dir };
+  try {
+    writeFileSync(join(dir, 'a.json'), JSON.stringify(observedWindow('claude-opus-5[1m]', 1000000, '2026-08-01T00:49:52Z')));
+    writeFileSync(join(dir, 'b.json'), JSON.stringify(observedWindow('claude-opus-5', 200000, '2026-08-01T00:49:56Z')));
+
+    assert.deepEqual(
+      resolveWindowTokens({ modelId: 'claude-opus-5', env: {}, storeOpts }),
+      { tokens: null, source: null },
+      'the bare id cannot be told apart from its variant sibling, so NO denominator'
+    );
+
+    // MUTATION, in-test: with the variant sibling absent the SAME bare id resolves
+    // normally. This is what proves guard (b) is doing the work rather than the function
+    // having simply become incapable of returning a number.
+    rmSync(join(dir, 'a.json'));
+    assert.deepEqual(
+      resolveWindowTokens({ modelId: 'claude-opus-5', env: {}, storeOpts }),
+      { tokens: 200000, source: 'statusline-observed' },
+      'remove the ambiguity and the denominator comes back'
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('WO-OR-08 guard (b) is ASYMMETRIC: a variant-suffixed LIVE id is already specific', () => {
+  // A bare sibling must NOT widen a suffixed id. The suffixed id names its namespace
+  // exactly; refusing it too would make the guard fire on the one case it need not.
+  const dir = tempHealthDir();
+  const storeOpts = { envOverride: dir };
+  try {
+    writeFileSync(join(dir, 'a.json'), JSON.stringify(observedWindow('claude-opus-5[1m]', 1000000, '2026-08-01T00:49:52Z')));
+    writeFileSync(join(dir, 'b.json'), JSON.stringify(observedWindow('claude-opus-5', 200000, '2026-08-01T00:49:56Z')));
+    assert.deepEqual(
+      resolveWindowTokens({ modelId: 'claude-opus-5[1m]', env: {}, storeOpts }),
+      { tokens: 1000000, source: 'statusline-observed' }
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('WO-OR-08 guard (c): a window SMALLER than its own numerator is disproven and refused', () => {
+  // The blatant shape, and the only one the map's proposed fix would have caught. Also
+  // the ONE guard that applies to the explicit operator statement — a human can typo a
+  // value too, and an env var is not evidence that survives contradiction.
+  const dir = tempHealthDir();
+  const storeOpts = { envOverride: dir };
+  try {
+    writeFileSync(join(dir, 'a.json'), JSON.stringify(observedWindow('m', 200000, '2026-08-02T00:00:00Z')));
+
+    assert.deepEqual(
+      resolveWindowTokens({ modelId: 'm', usedTokens: 408169, env: {}, storeOpts }),
+      { tokens: null, source: null },
+      'a store observation cannot be smaller than the count it must divide'
+    );
+    assert.deepEqual(
+      resolveWindowTokens({ modelId: 'm', usedTokens: 408169, env: { CLAUDE_CONTEXT_WINDOW: '200000' }, storeOpts }),
+      { tokens: null, source: null },
+      'and neither can an explicitly declared one'
+    );
+
+    // MUTATION: the SAME store and env with a coherent numerator still resolve. Guard (c)
+    // must be sensitive to the numerator, not simply hostile to everything.
+    assert.equal(resolveWindowTokens({ modelId: 'm', usedTokens: 111019, env: {}, storeOpts }).tokens, 200000);
+    assert.equal(resolveWindowTokens({ modelId: 'm', usedTokens: 200000, env: {}, storeOpts }).tokens, 200000, 'exactly full is coherent');
+    assert.equal(resolveWindowTokens({ modelId: 'm', env: {}, storeOpts }).tokens, 200000, 'no numerator supplied disables (c) only');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('WO-OR-08 POSITIVE CONTROL: the honest cases still get a denominator', () => {
+  // THE TEST THAT STOPS THE "FIX" BEING `return null`. Three guards that only ever
+  // subtract would satisfy every assertion above while destroying the feature, so the
+  // cases that must STILL resolve are pinned explicitly.
+  const dir = tempHealthDir();
+  const storeOpts = { envOverride: dir };
+  try {
+    // 1. An explicit operator statement, always.
+    assert.deepEqual(resolveWindowTokens({ modelId: 'anything', env: { CLAUDE_CONTEXT_WINDOW: '1000000' }, storeOpts }), {
+      tokens: 1000000,
+      source: 'env:CLAUDE_CONTEXT_WINDOW',
+    });
+
+    // 2. A single unambiguous observation.
+    writeFileSync(join(dir, 'a.json'), JSON.stringify(observedWindow('solo', 200000, '2026-08-02T00:00:00Z')));
+    assert.deepEqual(resolveWindowTokens({ modelId: 'solo', env: {}, storeOpts }), {
+      tokens: 200000,
+      source: 'statusline-observed',
+    });
+
+    // 3. SEVERAL observations that AGREE. Agreement is not ambiguity, and refusing here
+    //    would make the footer BLIND for every ordinary repeat-observed session.
+    writeFileSync(join(dir, 'b.json'), JSON.stringify(observedWindow('solo', 200000, '2026-08-02T01:00:00Z')));
+    writeFileSync(join(dir, 'c.json'), JSON.stringify(observedWindow('solo', 200000, '2026-08-02T02:00:00Z')));
+    assert.deepEqual(resolveWindowTokens({ modelId: 'solo', env: {}, storeOpts }), {
+      tokens: 200000,
+      source: 'statusline-observed',
+    });
+
+    // 4. An unrelated model's ambiguity is NOT contagious.
+    writeFileSync(join(dir, 'd.json'), JSON.stringify(observedWindow('other[1m]', 1000000, '2026-08-02T00:00:00Z')));
+    writeFileSync(join(dir, 'e.json'), JSON.stringify(observedWindow('other', 200000, '2026-08-02T00:00:00Z')));
+    assert.equal(resolveWindowTokens({ modelId: 'other', env: {}, storeOpts }).tokens, null, 'other IS ambiguous');
+    assert.equal(resolveWindowTokens({ modelId: 'solo', env: {}, storeOpts }).tokens, 200000, 'solo is NOT');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('WO-OR-08: variantBaseOf recognises the SHAPE, and names no particular variant', () => {
+  assert.equal(variantBaseOf('claude-opus-5[1m]'), 'claude-opus-5');
+  assert.equal(variantBaseOf('claude-opus-4-8[1m]'), 'claude-opus-4-8');
+  assert.equal(variantBaseOf('x[anything-at-all]'), 'x');
+  assert.equal(variantBaseOf('claude-opus-5'), null, 'a bare id has no base');
+  assert.equal(variantBaseOf('[1m]'), null, 'a suffix with no base is not a variant id');
+  assert.equal(variantBaseOf('x[]'), null, 'an empty variant is not a variant');
+  assert.equal(variantBaseOf('x[1m'), null, 'unterminated');
+  assert.equal(variantBaseOf(null), null);
+  assert.equal(variantBaseOf(42), null);
+});
+
+test('WO-OR-08 END TO END: the real store shape yields a TRUE numerator and NO false percentage', () => {
+  // The whole defect, end to end, through the function the Stop hook actually calls.
+  const dir = tempHealthDir();
+  const storeOpts = { envOverride: dir };
+  try {
+    writeFileSync(join(dir, 'a.json'), JSON.stringify(observedWindow('claude-opus-5[1m]', 1000000, '2026-08-01T00:49:52Z')));
+    writeFileSync(join(dir, 'b.json'), JSON.stringify(observedWindow('claude-opus-5', 200000, '2026-08-01T00:49:56Z')));
+    const p = writeTranscript(dir, [assistantLine({ usage: { input_tokens: 111019 }, sessionId: 'live' })]);
+
+    const r = sampleFromTranscript(JSON.stringify({ session_id: 'live', transcript_path: p }), {
+      sampledAt: '2026-08-02T05:22:31.045Z',
+      storeOpts,
+      env: {},
+    });
+
+    assert.equal(r.written, true, r.reason);
+    assert.equal(r.sample.context_window.used_tokens, 111019, 'the numerator is real and survives');
+    assert.equal(r.sample.context_window.context_window_size, null, 'and NO denominator is borrowed');
+    assert.equal(r.sample.context_window.context_window_source, null);
+    assert.equal(r.sample.context_window.used_percentage, null, 'so no percentage is invented');
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

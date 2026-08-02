@@ -53,6 +53,10 @@ import {
   runCli,
   CLI_EXIT,
 } from './footer.mjs';
+// WO-OR-08: the seam block at the foot of this file drives a REAL sampler output into
+// the ladder. Every other test here builds its inputs by hand, which is exactly how a
+// denominator from the wrong namespace crossed this boundary through a green suite.
+import { extractTranscriptSample, SOURCE_STATUSLINE } from './sampler.mjs';
 
 // The drift guard below used to import `ESCAPE_HATCH_REASONS` from
 // `escalation-gate.mjs`. That module was RETIRED on 2026-08-01, so the pin was
@@ -1154,5 +1158,178 @@ test('WP-7 AC5: the CLI line is byte-identical to renderFooter over the same fie
     assert.equal(r.stdout.trimEnd(), '⟦GOV⟧ ctx 18% · GREEN · TASK UNKNOWN · next: UNSET · HANDBACK:spend');
   } finally {
     rmSync(store, { recursive: true, force: true });
+  }
+});
+
+// ===========================================================================
+// WO-OR-08 — THE SEAM: extractTranscriptSample -> deriveFooterFields -> renderFooter
+// ===========================================================================
+//
+// WHY THIS BLOCK EXISTS. Every test above this line drives the ladder and the renderer
+// from SYNTHETIC fields — `goodSample()` and the 46,080-combination round-trip both
+// build their inputs by hand. Nothing drove a REAL `extractTranscriptSample` output
+// across into `deriveFooterFields`. That gap is not academic: it is precisely why a
+// denominator from the wrong namespace rendered a 1M-context session at roughly five
+// times its true percentage, graded AMBER, advising rotation — through a green suite.
+//
+// A round-trip over invented fields proves the CODEC. It cannot prove that the two
+// halves agree about what they are exchanging. These tests cross that seam.
+//
+// FIXTURES ONLY. No live machine transcript and no live health store is read here, so
+// this passes in CI and in a fresh worktree. The store contents below are modelled on
+// the real ones, but they are written by this test.
+
+/** A statusLine observation, in the shape the real health store holds. */
+function seamObservation(id, size, at) {
+  return JSON.stringify({
+    schema_version: 1,
+    sampled_at: at,
+    session_id: `obs-${id}-${size}`,
+    source: SOURCE_STATUSLINE,
+    model: { id },
+    context_window: { context_window_size: size },
+  });
+}
+
+/** A one-line JSONL transcript carrying a single assistant usage block. */
+function seamTranscript(dir, { usedTokens, model }) {
+  const p = join(dir, 'transcript.jsonl');
+  writeFileSync(p, JSON.stringify({
+    type: 'assistant',
+    sessionId: 'seam-session',
+    effort: 'high',
+    message: { model, usage: { input_tokens: usedTokens } },
+  }) + '\n');
+  return p;
+}
+
+const SEAM_AT = '2026-08-02T05:22:31.045Z';
+const SEAM_NOW = Date.parse(SEAM_AT) + 1000; // fresh, so staleness is never the reason
+
+/** The seam, walked exactly as the Stop hook and the footer do. */
+function walkSeam(dir, { model, usedTokens }) {
+  const sample = extractTranscriptSample({
+    transcriptPath: seamTranscript(dir, { usedTokens, model }),
+    sessionId: 'seam-session',
+    sampledAt: SEAM_AT,
+    env: {},
+    storeOpts: { envOverride: dir },
+  });
+  // THE WRAPPER. `deriveFooterFields` consumes a health-store READ RESULT, not a bare
+  // sample. See the contract test below for why this line is load-bearing.
+  const derived = deriveFooterFields({
+    sample: { ok: true, approximate: false, data: sample },
+    knownSessionId: 'seam-session',
+    now: SEAM_NOW,
+  });
+  return { sample, derived, line: renderFooter(derived.fields) };
+}
+
+test('WO-OR-08 SEAM: an ambiguous store yields a TRUE token count and NO graded percentage', () => {
+  // THE REGRESSION. The store holds a 1M observation under a variant-suffixed id and an
+  // unrelated 200k observation under the bare id; the transcript reports the BARE id.
+  // Before the repair this rendered a confident percentage over the borrowed 200k window
+  // for a session that was actually about a tenth used, and GRADED it. The number
+  // Warwick reads must now be true or absent, never wrong.
+  const dir = tmp();
+  try {
+    writeFileSync(join(dir, 'a.json'), seamObservation('claude-opus-5[1m]', 1000000, '2026-08-01T00:49:52Z'));
+    writeFileSync(join(dir, 'b.json'), seamObservation('claude-opus-5', 200000, '2026-08-01T00:49:56Z'));
+
+    const { sample, derived, line } = walkSeam(dir, { model: 'claude-opus-5', usedTokens: 111019 });
+
+    // The sampler's half of the seam.
+    assert.equal(sample.context_window.used_tokens, 111019, 'the numerator is real');
+    assert.equal(sample.context_window.context_window_size, null, 'and no denominator was established');
+
+    // The footer's half.
+    assert.equal(derived.blind, true);
+    assert.equal(derived.blindReason, BLIND_REASON.WINDOW_SIZE_UNKNOWN);
+    assert.equal(derived.fields.percent, null, 'NO percentage is rendered');
+    assert.equal(derived.fields.usedTokens, 111000, 'but the real count still reaches Warwick');
+    assert.equal(derived.fields.state, 'BLIND');
+
+    // The bytes. Pinned as a literal, and pinned NEGATIVELY against the exact lie.
+    // `KEEP GOING?` — not `TASK UNKNOWN` — is correct and deliberate here: BLIND is a
+    // SENSOR-failure signal and `adviceFor` never suppresses it, because a governor that
+    // stops measuring must get louder, not quieter (INV-1).
+    assert.equal(line, '⟦GOV⟧ ctx 111k · BLIND · KEEP GOING? · next: UNSET · CONTINUE');
+    assert.doesNotMatch(line, /\d+%/, 'no percentage may appear in this line at all');
+    assert.doesNotMatch(line, /AMBER/, 'and it must never be GRADED off a borrowed window');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('WO-OR-08 SEAM: an UNAMBIGUOUS store renders a real, graded percentage end to end', () => {
+  // The positive control for the seam. If the repair had simply made the footer
+  // permanently BLIND, the test above would still pass and this one would fail.
+  const dir = tmp();
+  try {
+    writeFileSync(join(dir, 'a.json'), seamObservation('claude-opus-5', 1000000, '2026-08-01T00:49:52Z'));
+
+    const { sample, derived, line } = walkSeam(dir, { model: 'claude-opus-5', usedTokens: 111019 });
+
+    assert.equal(sample.context_window.context_window_size, 1000000, 'the denominator IS established');
+    assert.equal(sample.context_window.context_window_source, 'statusline-observed');
+    assert.equal(derived.blind, false);
+    assert.equal(derived.fields.percent, 11, 'the TRUE figure, not the one the old rule produced');
+    assert.equal(derived.fields.state, 'GREEN');
+    assert.equal(line, '⟦GOV⟧ ctx 11% (111k/1000k) · GREEN · TASK UNKNOWN · next: UNSET · CONTINUE');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('WO-OR-08 SEAM: the WRAPPER CONTRACT is pinned — a bare sample is silently indistinguishable from telemetry loss', () => {
+  // THE SHAPE HAZARD, made executable.
+  //
+  // `deriveFooterFields` consumes `{ ok: true, data: <sample> }` — a health-store READ
+  // RESULT. `extractTranscriptSample` returns the BARE sample. Hand the bare sample
+  // straight over and the ladder's first rung rejects it as unreadable, producing a
+  // perfectly ordinary BLIND footer whose reason is `sample-missing-or-unreadable` —
+  // byte-identical to what a total telemetry failure produces. A caller that gets this
+  // wrong gets NO signal: no throw, no distinct reason, no different line.
+  //
+  // DECIDED (WO-OR-08, Larry concurring): pin the contract HERE rather than make the
+  // boundary refuse loudly. Refusing loudly would mean a new `BLIND_REASON` member and a
+  // rung in `deriveFooterFields` — a change to footer.mjs, outside this Work Order's
+  // file surface — and it sits awkwardly against that function's never-throws,
+  // always-returns-a-grammatical-line invariant. The follow-up is recorded in the
+  // handback. Until it lands, THIS test is the control.
+  const dir = tmp();
+  try {
+    writeFileSync(join(dir, 'a.json'), seamObservation('claude-opus-5', 1000000, '2026-08-01T00:49:52Z'));
+    const sample = extractTranscriptSample({
+      transcriptPath: seamTranscript(dir, { usedTokens: 111019, model: 'claude-opus-5' }),
+      sessionId: 'seam-session',
+      sampledAt: SEAM_AT,
+      env: {},
+      storeOpts: { envOverride: dir },
+    });
+    assert.ok(sample && sample.context_window.used_tokens === 111019, 'the sample itself is good');
+
+    const args = { knownSessionId: 'seam-session', now: SEAM_NOW };
+    const wrapped = deriveFooterFields({ sample: { ok: true, approximate: false, data: sample }, ...args });
+    const bare = deriveFooterFields({ sample, ...args });
+    const absent = deriveFooterFields({ sample: null, ...args });
+
+    // 1. The CORRECT shape works, and is the contract every caller must use.
+    assert.equal(wrapped.blind, false);
+    assert.equal(wrapped.fields.percent, 11);
+    assert.equal(wrapped.blindReason, null);
+
+    // 2. The WRONG shape fails, and fails INVISIBLY. This is the hazard, asserted rather
+    //    than described: identical reason AND identical rendered bytes to no telemetry.
+    assert.equal(bare.blind, true);
+    assert.equal(bare.blindReason, BLIND_REASON.SAMPLE_UNREADABLE);
+    assert.deepEqual(bare.fields, absent.fields);
+    assert.equal(bare.blindReason, absent.blindReason);
+    assert.equal(renderFooter(bare.fields), renderFooter(absent.fields));
+
+    // 3. And the two shapes genuinely differ, so this test cannot pass vacuously.
+    assert.notEqual(renderFooter(wrapped.fields), renderFooter(bare.fields));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
 });
