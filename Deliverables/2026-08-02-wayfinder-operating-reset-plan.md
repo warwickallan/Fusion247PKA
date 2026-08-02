@@ -76,6 +76,43 @@ Ordered after PR #86's body turned out to be *a summary of* the Larry↔Codex ex
 
 **Why row 17 got it wrong:** `larry-ding.mjs` reads `process.env` and correctly failed; I generalised that one script's failure into "the ding cannot fire", and then declined to look further because the credentials sat behind GL-012. Declining to self-authorise was right. **Concluding the channel was unavailable was not** — the sanctioned path never needed my authorisation at all. **Third instance in one session of a live mechanism going uncalled** (ding, then the PR, then this), which makes it a pattern rather than an accident: see [[compensating-habits-decay-silently]]. Every one was found by Warwick noticing silence, never by the system reporting it.
 
+## 🔻 HANDOVER TO GROK — 2026-08-02, ordered by Warwick. READ THIS FIRST.
+
+**Larry's autonomous execution is STOPPED. Phase 5 is NOT complete and Phase 6 has NOT begun. Nothing has been merged to `main`.**
+
+| | |
+|---|---|
+| repository | `C:\Fusion247PKA` |
+| branch | `operating-reset/teardown` |
+| **pushed HEAD** | **`4b66fc663a8a1c2492a9f7ed9e7cf275c54a7cb6`** |
+| local == remote | yes — 0 unpushed |
+| primary working tree | clean of Phase-5 work; 4 pre-existing untracked files under `Team Knowledge/Sources/` predate this session and are unrelated |
+| suite at HEAD | **257/257** all-eight; **221/221** CI-shaped (seven files) |
+| CI | green and EXECUTED on `windows-latest` |
+| visible record | draft PR #86 — **Warwick-visible evidence, NOT machine-readable reviewer input** |
+
+**ACCEPTED, VERIFIED AND PUSHED — WO-OR-11 … WO-OR-16.** Each built in its own dedicated worktree, read-back gated, committed by Larry not the worker, and every reported number independently re-run by Larry before merge.
+
+**WO-OR-17 — INTERRUPTED, NOT FAILED ON MERIT. Its work is PRESERVED AND UNVERIFIED.**
+- worker: Keel. Terminated mid-build by an **API weekly-limit cutoff**, immediately before producing its proof section. Not a refusal, not a defect, not an abandonment.
+- worktree: **`C:\Fusion247PKA-wt\wo-or-17`** · branch `wo-or-17/soft-erases-cause` · at base `5dafb35` · **0 commits**
+- state: `tools/governor/reorient.mjs` and `reorient.test.mjs` **MODIFIED AND UNCOMMITTED** — 802 insertions, 29 deletions
+- **NOT verified, NOT reviewed, NOT merged, NOT pushed. DO NOT overwrite this worktree.** No mutation proof, no suite re-run, no byte-identity check exists for it. Treat as untrusted until re-proven.
+- what it was fixing: `soft()` at `reorient.mjs:156` returns `null` for a MEASURED ABSENCE and `null` for a PROBE FAILURE identically, across **12** call sites, so the distinction the module exists to preserve is destroyed beneath the fields. Confirmed second site: `main()`'s stdin `catch { raw = '' }`. Plus an unborn-branch case where a MEASURED branch name renders `(unknown)`, and an addendum (Larry-confirmed, live at HEAD) that the deliverables sweep follows symlinks and renders outside content as `Deliverables/<name>.md`.
+
+**REMAINING PHASE 5 GATE — exactly this, nothing more:**
+1. WO-OR-17's outcome landed and independently verified.
+2. `footer.mjs` — final gating **run 2** (run 1 done: one finding, now fixed by WO-OR-16 at `4b66fc6`).
+3. `reorient.mjs` **repairs** range (`2aac7d9..HEAD`) — 2 clean runs.
+4. `reorient.mjs` **decoupling** range (`a989e68..2aac7d9`) — 1 more run. Run 1 gated CLEAN on the decoupling itself; its two findings were one already-fixed defect and the new symlink one.
+5. All runs must report `truncated=false`.
+
+**THE SINGLE NEXT ACTION FOR GROK:** decide the disposition of the preserved WO-OR-17 worktree — re-verify and land it, or discard it and re-issue the order — **before** running any further gating, because it modifies `reorient.mjs`, which two of the four remaining gate runs cover.
+
+**Standing limits that must be restated, never implied:** `reorient.mjs` gates in TWO range packets because its whole diff is 80,945 bytes against a 60,000-byte cap, so **no single reviewer sees the complete final file**. `reorient.test.mjs` (excluded from CI) and `footer.test.mjs` both exceed the cap and get **no independent read at all**. `footer.mjs` sits at 59,550 of 60,000 — **450 bytes** — and is effectively closed to further change. `continuity.mjs` and `continuity-derive.mjs` have no tests whatsoever. `worktree-guard.mjs` is INERT by decision, reported not repaired.
+
+**Do not delete any `C:\Fusion247PKA-wt\wo-or-*` worktree or branch.** WO-OR-11…16 are merged but retained; WO-OR-17 holds the only unbanked work in the estate.
+
 ## Phase status (durable — the tracker; update ONLY at a phase boundary: PASS / PARTIAL / FAILED + evidence)
 
 - **Phase 0 — plan on git — PASS** (Warwick reviewing live).
