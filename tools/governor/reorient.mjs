@@ -506,6 +506,27 @@ function show(v) {
   return String(v);
 }
 
+// TQA-009 (Codex repairs run 6). `dirty === undefined` was treated as falsy and rendered
+// `clean` — an unmeasured state wearing a factual costume. Clean is earned only by
+// `=== false`. The same strictness applies to HEAD: absence is never a value.
+function renderDirty(facts) {
+  if (facts.dirty === true) return 'DIRTY — uncommitted changes present';
+  if (facts.dirty === false) return 'clean';
+  // TQA-008 partial: when git itself could not be read, say so rather than a bare unknown.
+  if (facts.gitReadable === false) {
+    return '(unknown — git could not be read here, so working-tree state is NOT established)';
+  }
+  return '(unknown)';
+}
+
+function renderHead(facts) {
+  if (facts.headSha) return String(facts.headSha);
+  if (facts.gitReadable === false) {
+    return '(unknown — git could not be read here)';
+  }
+  return '(unknown)';
+}
+
 // WO-OR-11. How the cwd line reports itself.
 //
 // Three outcomes, and keeping them three is the point of the exercise. A single
@@ -596,7 +617,11 @@ function renderCwd(facts, cwdClaimedByHost) {
 // was measured, and the kind of checkout is measured too rather than left to the reader to
 // infer from a path that looks unfamiliar.
 function renderToplevel(facts) {
-  if (facts.repoRoot === null || facts.repoRoot === undefined) return '(unknown)';
+  if (facts.repoRoot === null || facts.repoRoot === undefined) {
+    // TQA-008: bare (unknown) hid whether git itself was unreadable.
+    if (facts.gitReadable === false) return '(unknown — git could not be read here)';
+    return '(unknown)';
+  }
   if (facts.linkedWorktree === true) return `${facts.repoRoot} (LINKED worktree)`;
   if (facts.linkedWorktree === false) return `${facts.repoRoot} (primary checkout)`;
   // The probe did not answer. Say nothing rather than guess a kind.
@@ -658,8 +683,8 @@ export function renderLocationSection(facts, { cwdClaimedByHost = true } = {}) {
     `  cwd          : ${renderCwd(facts, cwdClaimedByHost)}`,
     `  worktree root: ${renderToplevel(facts)}`,
     `  branch       : ${renderBranch(facts)}`,
-    `  HEAD         : ${show(facts.headSha)}`,
-    `  working tree : ${facts.dirty === null ? '(unknown)' : facts.dirty ? 'DIRTY — uncommitted changes present' : 'clean'}`,
+    `  HEAD         : ${renderHead(facts)}`,
+    `  working tree : ${renderDirty(facts)}`,
   ];
   if (facts.upstreamRef) {
     lines.push(`  upstream     : ${facts.upstreamRef} @ ${show(facts.upstreamSha)}`);

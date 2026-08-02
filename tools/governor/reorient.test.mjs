@@ -1337,11 +1337,13 @@ const FIELD_STATES = {
   HEAD: [
     ['measured', f({})],
     ['could not tell', f({ headSha: null })],
+    ['git unreadable', f({ headSha: null, gitReadable: false })],
   ],
   'working tree': [
     ['measured clean', f({ dirty: false })],
     ['measured dirty', f({ dirty: true })],
     ['could not tell', f({ dirty: null })],
+    ['git unreadable', f({ dirty: null, gitReadable: false })],
   ],
   upstream: [
     ['measured, tracked', f({})],
