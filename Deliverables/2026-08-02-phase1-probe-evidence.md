@@ -76,6 +76,27 @@ Full brief: [`2026-08-02-pax-claude-code-deny-vs-subagents.md`](2026-08-02-pax-c
 
 **Plain reading against the plan's gate:** on the mechanism the plan actually specified (native `deny` + PreToolUse), **F1b FAILS — documented-impossible.** The objective is not dead only because one untried native primitive remains (allowlist-at-launch), which is a *different* mechanism and therefore a route decision, not a behavioural fallback.
 
+## UPDATE 2 — F1b IS achievable. Proven ×2 by live scratch test (the `--agent` main-agent-definition lever)
+
+Warwick chose "chase allowlist-at-launch." Done — via headless `claude -p` scratch runs (`claude` 2.1.220), no `--dangerously-skip-permissions` (tools pre-allowed via `--allowedTools`), judged by **file existence**, not model narration.
+
+Three levers tested for the "thin main / capable specialist" asymmetry:
+
+| Lever | Result | Evidence |
+|---|---|---|
+| `permissions.deny` (session-wide) | **Fails** — caps subagents too | Pax/#54898 (documented) |
+| `--tools "Read,Task"` (session available toolset) | **Fails** — caps subagents too | scratch run: main AND writer both had no Write; `main-wrote.txt` + `sub-wrote.txt` both ABSENT |
+| **`--agent thin-main`** (main-agent *definition* tools list) | **WORKS** | scratch run ×2: `main-wrote.txt` **ABSENT** (thin-main has only `Read,Task`), `sub-wrote.txt` **EXISTS** = `SUB_DID_THIS` (writer subagent retained Write) |
+
+**Conclusion:** the session-wide levers (`deny`, `--tools`) cap every agent equally; the **main-agent definition** restricts *only the main agent*, while Task-dispatched subagents run under their own `tools:` grants. So thin-Larry-with-capable-specialists is achievable by launching with a `thin-larry` agent (or the `agent` setting) whose tools omit Edit/Write/arbitrary-Bash and include only `Read`, `Task`, and a **narrow continuity/git-routine route** — no `deny` needed for the asymmetry, no self-lockout, and delegation works (the Task dispatch ran fine under pre-allowed permissions).
+
+### Final F1 verdict
+
+- **F1a — bounded git safely: ACHIEVABLE.** Dangerous git (push/merge protected main, force-push, unique-branch delete) denied **uniformly for all** via session-wide `deny` (proven to bind live); routine git stays with Larry because it simply isn't denied; a proof/recovery `claude -p` subprocess can be shaped read-only via its own launch config (same `--agent`/`--disallowedTools` levers). Uniform-deny needs no asymmetry, so it is clean.
+- **F1b — mechanical thin-Larry: ACHIEVABLE (PROVEN ×2).** Via a `thin-larry` main-agent definition. The narrow log/continuity route is expressible in that agent's tools list — a Phase-2 design detail, not a blocker.
+
+**Both F1a and F1b now have proven native mechanisms.** The plan's Decision B named "native agent permissions + MCP permission rules + PreToolUse" — the working primitive turned out to be **native agent permissions (the main-agent definition)**, which the plan listed but didn't identify as *the* lever; `deny` and PreToolUse (its other two) can't do the asymmetry.
+
 ## The decision this hands back to Warwick
 
-The plan's chosen mechanism for thin-Larry is documented-impossible. Delegation itself is fine. So the route needs a `product-decision`: pursue the one remaining native mechanism (prove allowlist-at-launch in a scratch session), or treat F1b-as-mechanical as failed and re-decide the operating model. Options in the reply.
+Phase 1 is **PROVEN** (not FAILED): thin-Larry + capable specialists + bounded git are all natively achievable, no exotic hacks, no self-lockout, delegation intact. Adoption is now a real `product-decision` because it changes **how the session is launched** (bind the `thin-larry` agent at start — the one restart the plan always anticipated) and needs the thin-larry agent's exact tools list (Read, Task, + the narrow continuity/git-routine route) designed. Options in the reply.
