@@ -3,6 +3,7 @@
 ## START / RESUME HERE — ordered by Warwick
 
 - This Git Wayfinder is the sole route and source of truth.
+- **On a fresh resume, BEFORE using any tool or doing any work, visibly state: (1) this recovered map path, (2) the goal, (3) the current phase and gate, (4) the next action. THEN open this map and continue.**
 - Read the current phase, gate and evidence before acting.
 - Honcho points here; it does not replace this map.
 - Do not create a todo list, parallel tracker or replacement plan.
@@ -15,8 +16,8 @@
 - **Phase 0 — plan on git — PASS** (Warwick reviewing live).
 - **Phase 1 — F1a bounded git + F1b thin-Larry edit asymmetry — PASS.** Restricted Larry blocked from editing while a specialist performed + reversed the edit (objective file checks). Evidence: `Deliverables/2026-08-02-phases-2-4-evidence.md`.
 - **Phase 2 — duty ownership under restriction — PASS.** Git + continuity via Larry's Bash routes; session-logs via delegation; no general Write retained.
-- **Phase 3 — F2 automatic continuity journey — PASS.** Session-end auto-derive → Honcho → fresh session recovered it (ACME-TEAL-42 write→fresh-read round trip). Fix: recursion guard + SessionEnd `timeout:120`, commit `bb88771`.
-- **Phase 4 — F3 acceptance test — PARTIAL (not yet PASS).** Realistic task fully delegated under thin-Larry; specialist implemented + tested (5/5 pass, assertions mutation-checked). One avoidable prompt found: `node --test <file>` is not allow-listed. Remedy per this plan: fix the map (add a `node --test` prefix allow-rule), re-run to zero avoidable prompts, then mutation-test the F1a dangerous-git gate. Evidence: this session; `out/phase4-demo/`.
+- **Phase 3 — F2 automatic continuity journey — PASS.** Session-end auto-derive → Honcho → fresh session recovered it (ACME-TEAL-42 write→fresh-read round trip). Fix: recursion guard + SessionEnd `timeout:120`, commit `bb88771`. **Automatic staple PROVEN:** a fresh session that opens this map auto-derives a Honcho packet carrying this exact git path with no manual `set` (proven, packet session `c9ee48cd`). **Visible orient-first on resume PROVEN:** with the START/RESUME orient-first rule + the injected Honcho brief, a real thin-Larry session (real tools) given only `continue` visibly states map path + goal + phase/gate + next action BEFORE any tool call, then opens the map (proven — main session `e23be9af`; its first assistant message is the orientation, no tool_use precedes it).
+- **Phase 4 — F3 acceptance test — PARTIAL (Part 1 PASS; Part 2 pending).** Part 1 PASS: realistic task fully delegated under thin-Larry, specialist implemented + tested (5/5, assertions mutation-checked), and after fixing the map (added `Bash(node --test:*)` allow-rule) the re-run had **zero prompts reaching Warwick**. Part 2 remaining: mutation-test that a denied gate actually fires (F1a dangerous-git deny → force-push BLOCKED) in an isolated scratch repo. Evidence: this session; `out/phase4-demo/`.
 - **Phase 5 — teardown diff + bounded Codex review (twice) — pending.**
 - **Phase 6 — integrate, then managed-settings hardening — pending.**
 
