@@ -10,6 +10,27 @@
 - Update this map only at meaningful phase boundaries: PASS, PARTIAL or FAILED, with an evidence pointer.
 - Continue autonomously until completion or a genuine Warwick-only blocker.
 - Before any clear, restart or handoff, ensure Honcho contains this exact path, current phase/gate and next action.
+- **Tangents go in "SHIT TO DO" below. Do not chase them.** See the rule there — it binds even when the tangent comes from Warwick.
+
+## SHIT TO DO — parked tangents (Warwick's rule, 2026-08-02)
+
+**THE RULE.** When Warwick drags Larry off-plan mid-build — and he will, and he knows he does — **the tangent gets written here and the plan continues.** Larry names the current focus, parks the item, and tells him to be patient. They get worked at the **end**, not the moment they are mentioned.
+
+This is not Larry being unhelpful. An interrupted build is how BUILD-018 happened: a request amplified into maintenance, then into a programme. The cost of a tangent is never the tangent, it is the loss of the thread. **Warwick has explicitly asked to be told to wait** — so doing it is compliance, not insubordination.
+
+*Origin: Warwick deliberately tested this with a CareerAIR tangent at 05:40 on 2026-08-02, to see whether Larry would "run off like a Labrador after a tennis ball." Larry chased it for eight tool calls before flagging the dilution. Hence a written rule instead of an instinct.*
+
+| # | Parked item | Why it is not now |
+|---|---|---|
+| 1 | **CareerAIR intake has no consumer.** Serving layer is genuinely healthy (bot + cockpit API up 3.4 days under `MyPKA-Local-Services-Live`). The gap is downstream: nothing drains the inbox and nothing reports its depth, so a backlog accumulates **silently**. First move is visibility — a scheduled count that dings "N waiting, oldest X days" — not automation. Backlog size NOT established (API up, guessed routes all 404; needs `src/cockpit/server.mjs`). Whether to auto-run the fit gate on new intake is a `product-decision`. | Not Phase 5 |
+| 2 | **Honcho `listMessages` pagination.** Returns ≤50 even at `size:500` and may exclude the newest once a session exceeds 50 packets, so `readLatest` can surface a stale packet. Recovery still holds because the packet carries the git-map pointer and the map is authority. Known since Phase 3. | Known follow-up, not a Phase 5 gate |
+| 3 | **Two Pax adopts**, both one sentence, both awaiting Warwick: a handback should carry *the options and what changes under each*; and one extra fresh read-back round when a read-back returns material defects, then stop. | Awaiting Warwick |
+| 4 | **Formalise phase-boundary Codex review** — Warwick's own insight that a Wayfinder gate *is* a claim plus acceptance criteria, which is exactly `reviewDiff.mjs --claim`. Binds the reviewer to an event instead of Larry's memory. | Awaiting Warwick |
+| 5 | **GPT's proposed Codex instruction changes.** Worth taking, but split across two files (the Larry-binding half does not belong in the reviewer's prompt) and pin "material findings" to `required_disposition: BLOCKS_CURRENT_MERGE` so it is decidable. Note the `PASS/PARTIAL/FAILED` vocabulary is not in `CODEX_RESULT_SCHEMA`. | Awaiting Warwick |
+| 6 | **Record the Cairn intake note as OVERRULED.** Its "what this means for Fusion247" section recommends behaviour-validation contracts — YAML spec → registry → monitoring agent → scheduler, i.e. validator → store → registry. That is the BUILD-018 growth path arriving pre-blessed. Guardrails held; the overrule should be written down. | Not Phase 5 |
+| 7 | **`reorient.test.mjs` may now be CI-safe** (Keel's observation): after the teardown it no longer needs the multi-worktree estate or banked state. Currently still excluded. | Post-integration |
+| 8 | **`continuity.mjs` / `continuity-derive.mjs` have no tests at all** — two of the ten survivors. Stated as a limitation in the CI job's own output. | Deliberately out of tonight's scope |
+
 
 ## Phase status (durable — the tracker; update ONLY at a phase boundary: PASS / PARTIAL / FAILED + evidence)
 
