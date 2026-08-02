@@ -59,6 +59,14 @@ compares it to the claim. Codex sees the real code, not a summary of it.
 - **Read · review · report only.** Codex takes NO corrective action, makes NO write,
   NO merge, NO deploy, NO scope change, NO credential/account action without Warwick.
   It fixes nothing; it reports.
+- **Proportional bar (Warwick, Phase 6).** This estate is a personal hobby brain, not a
+  bank/hospital/weapons system. Grade for: normal and realistically reachable paths;
+  data-loss prevention; secrets not exposed; recovery; active failures fail safe; named
+  acceptance criteria. Prefer `required_disposition: BLOCKS_CURRENT_MERGE` only when a
+  finding is ACTIVE, in-scope, and would break those. LOW/LATENT/theoretical/hostile-input
+  /enterprise-compliance edge cases should be documented, not used to block a hobby merge.
+  Orchestrator-side: max three Codex calls per gate (initial / after real BLOCKS fix /
+  final) — never a fourth.
 
 ## Inputs (pointers the Tower stages per turn)
 

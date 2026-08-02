@@ -22,6 +22,7 @@ This is not Larry being unhelpful. An interrupted build is how BUILD-018 happene
 
 | # | Parked item | Why it is not now |
 |---|---|---|
+| 20 | **Codex review budget — BINDING (Warwick, Phase 6).** Max **three** Codex executions per review gate (initial / after real BLOCKS fix / final). Never a fourth. Only `required_disposition: BLOCKS_CURRENT_MERGE` + ACTIVE + in-scope findings may extend current execution; else park once in SHIT TO DO and continue. Proportional bar for a personal hobby brain: normal reachable paths, data-loss prevention, secrets, recovery, fail-safe, named acceptance criteria — not bank/hospital/hostile multi-tenant hardening. No new counter/DB/wrapper to enforce this; written rule first. | Graduated into `CLAUDE.md` + Tower QA skill at Phase 6 close |
 | 1 | **CareerAIR intake has no consumer.** Serving layer is genuinely healthy (bot + cockpit API up 3.4 days under `MyPKA-Local-Services-Live`). The gap is downstream: nothing drains the inbox and nothing reports its depth, so a backlog accumulates **silently**. First move is visibility — a scheduled count that dings "N waiting, oldest X days" — not automation. Backlog size NOT established (API up, guessed routes all 404; needs `src/cockpit/server.mjs`). Whether to auto-run the fit gate on new intake is a `product-decision`. | Not Phase 5 |
 | 2 | **Honcho `listMessages` pagination.** Returns ≤50 even at `size:500` and may exclude the newest once a session exceeds 50 packets, so `readLatest` can surface a stale packet. Recovery still holds because the packet carries the git-map pointer and the map is authority. Known since Phase 3. | Known follow-up, not a Phase 5 gate |
 | 3 | **Two Pax adopts**, both one sentence, both awaiting Warwick: a handback should carry *the options and what changes under each*; and one extra fresh read-back round when a read-back returns material defects, then stop. | Awaiting Warwick |
@@ -76,42 +77,36 @@ Ordered after PR #86's body turned out to be *a summary of* the Larry↔Codex ex
 
 **Why row 17 got it wrong:** `larry-ding.mjs` reads `process.env` and correctly failed; I generalised that one script's failure into "the ding cannot fire", and then declined to look further because the credentials sat behind GL-012. Declining to self-authorise was right. **Concluding the channel was unavailable was not** — the sanctioned path never needed my authorisation at all. **Third instance in one session of a live mechanism going uncalled** (ding, then the PR, then this), which makes it a pattern rather than an accident: see [[compensating-habits-decay-silently]]. Every one was found by Warwick noticing silence, never by the system reporting it.
 
-## 🔻 PHASE 5 GATE CLOSED — 2026-08-02 (Grok handover completion)
+## 🔻 OPERATING RESET CLOSED — Phase 6 PASS (2026-08-02)
 
-**Phase 5 independent-review gate is PASS with restated limits. Phase 6 has NOT begun. Nothing has been merged to `main`.**
-
-Cross-provider takeover completed the interrupted Phase 5 only. Codex remained the independent reviewer via `reviewDiff.mjs` (not replaced).
+**Phases 0–6 complete. PR #86 merged. Managed-settings deny floor installed. Codex budget rule graduated.**
 
 | | |
 |---|---|
 | repository | `C:\Fusion247PKA` |
-| branch | `operating-reset/teardown` |
-| **pushed HEAD** | **`8189d321978a175fecd3456c420f4d0b489701d9`** (Phase 5 PASS evidence bank + map pin) |
-| suite at HEAD | **53/53** reorient; **221/221** CI-shaped seven; **274/274** all-eight |
-| visible record | draft PR #86 — Warwick-visible evidence, NOT machine-readable reviewer input |
+| **main (merge commit)** | **`1ecedb5db06289433fade76056e473f7f4d5f90b`** |
+| reviewed PR head | `e040496b5104d3f736011810ee3d2c5504091887` (ancestor of main) |
+| suite on main | **53/53** reorient; **221/221** CI-shaped; **274/274** all-eight |
+| GitHub @ merge SHA | **green** (governor, control-plane, secret-scan, cockpit) |
+| Codex calls in Phase 6 | **ZERO** |
+| evidence | [[Deliverables/2026-08-02-phase6-evidence]] |
 
-### Gate results (all `truncated=false`)
+### Managed settings
 
-| Scope | Range | Claim | Result |
-|---|---|---|---|
-| footer.mjs | `a989e68..HEAD` | `claim-scope-footer-v5` | **approve** run 2 (run 1 fixed by WO-OR-16) — `codex-final-footer-run2.txt` |
-| reorient repairs | `2aac7d9..HEAD` | `claim-scope-reorient-repairs-v9` | **approve ×2** — `codex-final-reorient-repairs-run9.txt`, `run10.txt` |
-| reorient decoupling | `a989e68..2aac7d9` | `claim-scope-reorient-decoupling-v2` | **C1–C3 pass** run 1 and run 2; run 2 residual W3 is instrument limit (deleted `rotate-session` helper not in scoped packet) — adjudicated non-blocking for decoupling purpose |
+- **Path:** `C:\Program Files\ClaudeCode\managed-settings.json` (F1a deny floor only).
+- **Backup note (no prior file):** `C:\Users\Buggly\.claude\config-backups\managed-settings.json.bak-PHASE6-2026-08-02T16-33-15`
+- **Restore:** `Remove-Item -Force 'C:\Program Files\ClaudeCode\managed-settings.json'`
+- **Project mirror (proven live bind):** `.claude/settings.local.json` same deny; restore from `.claude/settings.local.json.bak-PHASE6-2026-08-02T16-33-15`
 
-### WO-OR-17 — LANDED
+### Phase 5 gate (accepted) — truncated=false throughout
 
-Preserved worktree re-verified (initial 48/50; completion fix for DETACHED wording on probe failure + exit-128 vs ENOENT distinction). Merged as `4aedd01` / `b7f3563`. Subsequent Codex findings TQA-003…011 fixed on the teardown branch and gated.
+footer approve · reorient repairs approve ×2 · decoupling C1–C3 accepted · WO-OR-17 landed.
 
-### Standing limits (restate, never imply)
+### Standing limits (still true on main)
 
-- **No single reviewer sees complete final `reorient.mjs`** — split into decoupling + repairs packets (cap 60k).
-- **`reorient.test.mjs` and `footer.test.mjs`** exceed the cap → **no independent test read**.
-- **`continuity.mjs` / `continuity-derive.mjs`** have **no tests**.
-- **`worktree-guard.mjs` is INERT** by decision, reported not repaired.
-- **PR #86 is human-visible only** — no automated PR→reviewer disposition feed (row 19 parked).
-- **Deletions** remain mechanically verified (16 gone, ten survivors, zero imports of deleted modules).
+Split reorient packets; test files over cap ungated; continuity untested; worktree-guard inert; PR was human-visible only.
 
-**Next action:** Phase 6 — integrate only after Warwick merge-decision; then managed-settings hardening. Do not start Phase 6 without Warwick.
+**Next normal product action:** whatever Warwick chooses outside this reset — SHIT TO DO remains parked (do not chase).
 
 ## Phase status (durable — the tracker; update ONLY at a phase boundary: PASS / PARTIAL / FAILED + evidence)
 
@@ -144,7 +139,7 @@ Preserved worktree re-verified (initial 48/50; completion fix for DETACHED wordi
 
 - **Phase 5 (original decision record) — NOT STARTED (decision recorded 2026-08-02; execute on next resume; no Phase 5 code/teardown/review changes were made in the recording session).**
   - **Decision (Warwick):** Phase 5 will prepare the **full review candidate — including proposed CLAUDE.md and footer changes** — as one reviewable branch diff; **preserve the proven continuity behaviour until any replacement is runtime-proven**; make the **`Deliverables/`-sweep trade-off explicit** (that sweep, and programme-state recovery, are performed by `reorient.mjs` and are lost when it is retired); and obtain **independent Codex/Tower review before integration**. Integrate nothing until Warwick decides. **Footer / Decision D — KEEP + REPAIR, NOT bin** (Warwick 2026-08-02: the ⟦GOV⟧ block is useful and correctly placed): the review candidate **preserves** the footer's useful signal — state, continue/rotate advice, and a **model-AND-effort recommendation for the phase ahead** (the governor must advise both model and effort for the next phase, not just a model) — and **repairs** the context-% indicator, which is BLIND because its only data source is the terminal `statusLine` (`statusline-live.mjs`) that never runs on Warwick's web/Android clients → re-source it client-independently (e.g. token count from the transcript/session, sampled by a hook that fires everywhere). Trim only genuine per-reply telemetry noise. Do NOT modify any `AGENTS.md` (hard rule). Resume per ledger `2026-08-01-reset-inventory-keep-bin-reallocate.md` §C/§F under these constraints.
-- **Phase 6 — integrate, then managed-settings hardening — pending.**
+- **Phase 6 — integrate, then managed-settings hardening — PASS (2026-08-02).** PR #86 merged at `1ecedb5` (reviewed head `e040496`). Local 274/274; GitHub green at merge SHA. Managed deny floor at `C:\Program Files\ClaudeCode\managed-settings.json` + project settings.local mirror. Live proofs: force-push denied before execution; thin-larry no Write; specialist Write via Task; reorient exit 0. Codex calls: 0. Evidence: `Deliverables/2026-08-02-phase6-evidence.md`. Codex budget rule graduated into CLAUDE.md + Tower QA skill.
 
 _2026-08-02. **The single canonical route.** Supersedes the joint proposal (false runtime premise) and folds in the corrected reset inventory + GPT's review of 2026-08-01. Reviewable on git by Warwick and GPT. **Nothing here is executed** — this is a plan, and it stops at clarity._
 
