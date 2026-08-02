@@ -77,7 +77,14 @@ Ordered after PR #86's body turned out to be *a summary of* the Larry↔Codex ex
 
 **Why row 17 got it wrong:** `larry-ding.mjs` reads `process.env` and correctly failed; I generalised that one script's failure into "the ding cannot fire", and then declined to look further because the credentials sat behind GL-012. Declining to self-authorise was right. **Concluding the channel was unavailable was not** — the sanctioned path never needed my authorisation at all. **Third instance in one session of a live mechanism going uncalled** (ding, then the PR, then this), which makes it a pattern rather than an accident: see [[compensating-habits-decay-silently]]. Every one was found by Warwick noticing silence, never by the system reporting it.
 
-## 🔻 OPERATING RESET CLOSED — Phase 6 PASS (2026-08-02)
+## 🔻 STATUS — Phase 6 PASS; Phase 7 SHIT TO DO closeout IN PROGRESS (2026-08-02)
+
+> **CORRECTED BY WARWICK, 2026-08-02.** This section previously read *"OPERATING RESET CLOSED"*. That was wrong,
+> and the correction is worth stating rather than silently editing: **the reset is not closed while its SHIT TO DO
+> list remains unresolved.** The list exists so tangents could be *deferred* during the build and *actioned* at the
+> end — deferred, not discarded. Declaring closure with 21 parked rows still parked converts "we will come back to
+> this" into "we never did", which is the precise mechanism by which a deferral list becomes a graveyard and stops
+> being trusted the next time Larry says "park it". **Phase 7 is that closeout.** See the disposition ledger below.
 
 **Phases 0–6 complete. PR #86 merged. Managed-settings deny floor installed. Codex budget rule graduated.**
 
@@ -106,7 +113,137 @@ footer approve · reorient repairs approve ×2 · decoupling C1–C3 accepted ·
 
 Split reorient packets; test files over cap ungated; continuity untested; worktree-guard inert; PR was human-visible only.
 
-**Next normal product action:** whatever Warwick chooses outside this reset — SHIT TO DO remains parked (do not chase).
+**Next normal product action:** whatever Warwick chooses outside this reset — *after* Phase 7 below closes the parked list.
+
+## Phase 7 — SHIT TO DO closeout (2026-08-02)
+
+**This section is the AUTHORITATIVE disposition ledger. The SHIT TO DO table above is retained as the evidence
+bank** — it carries the original findings, the traced line numbers and the reasoning, and none of that is
+duplicated here. Read a row there for *what was found*; read it here for *what happened to it*.
+
+**The bar.** Every row receives one of four durable dispositions, and **no row may remain an ambiguous parked
+tangent**. That is the whole point: an item that is neither done, nor decided, nor promoted, nor explicitly
+closed is indistinguishable from one that was forgotten.
+
+| Disposition | Count | Meaning |
+|---|---|---|
+| **COMPLETE NOW** | **8** | Executed and verified inside this closeout. |
+| **DECISION NOW** | **1** | Warwick's product decision obtained, recorded, and acted on. |
+| **PROMOTE** | **2** | Genuinely a separate future build. Given a durable named home with outcome, boundary, owner and exact next action — then **removed from this reset's active backlog**. |
+| **CLOSED / SUPERSEDED** | **10** | Stale, duplicate, withdrawn, or already completed. Recorded accurately, including the ones that turned out to be *my* defect rather than the code's. |
+| | **21** | **Total — every row in the table above, none unaccounted for.** |
+
+*(Counts corrected by Warwick, 2026-08-02. My first tally said 7 and 8 against lists that held 8 and 10 —
+the lists were right and the numbers beside them were wrong. A miscounted ledger is exactly the failure this
+ledger exists to prevent, so the correction is recorded rather than quietly applied.)*
+
+### The ledger — all 21 rows
+
+| Row | Subject (one line) | Disposition | Where it landed |
+|---|---|---|---|
+| 1 | CareerAIR intake has no consumer; backlog grows silently | **PROMOTE** | `Deliverables/BACKLOG.md` #8 — visibility first, `private_surface` must be declared |
+| 2 | Honcho `listMessages` pagination — `readLatest` can return a stale packet | **COMPLETE NOW** | WO-OR-18 outcome 1 |
+| 3 | Two Pax adopts awaiting Warwick | **DECISION NOW** | **Both ADOPTED** — written into `CLAUDE.md` |
+| 4 | Formalise phase-boundary Codex review | **CLOSED / SUPERSEDED** | See the note below — superseded in substance, with a named residual |
+| 5 | GPT's proposed Codex instruction changes | **CLOSED / SUPERSEDED** | Satisfied verbatim by the binding Codex budget rule in `CLAUDE.md` |
+| 6 | Cairn intake note recommends the BUILD-018 growth path | **COMPLETE NOW** | OVERRULED banner written into the note itself |
+| 7 | `reorient.test.mjs` may now be CI-safe | **COMPLETE NOW** | WO-OR-18 outcome 6 |
+| 8 | `continuity.mjs` / `continuity-derive.mjs` have no tests at all | **COMPLETE NOW** | WO-OR-18 outcome 2 |
+| 9 | `gatherGitEvidence` had no pathspec support | **CLOSED** | Already done at `468d0c8` (Phase 5) |
+| 10 | Context denominator guard insufficient — cross-namespace model id | **CLOSED** | Fixed by WO-OR-09 **by deletion**: cross-session inference removed entirely (Phase 5 step 0c) |
+| 11 | `deriveFooterFields` cannot render from a transcript sample | **CLOSED / WITHDRAWN** | Not a defect — my own wrong property access, three times. Real residual folded into WO-OR-08 and delivered |
+| 12 | Test suite writes into Warwick's LIVE telemetry store | **COMPLETE NOW** | WO-OR-18 outcome 3 |
+| 13 | Context-% on web/Android — true-count-only | **CLOSED** | Warwick ruling, already in force and verified |
+| 13a | Decision D's premise may not be satisfiable | **CLOSED / SUPERSEDED** | Superseded by row 13's ruling |
+| 14 | `MAX_DIFF_BYTES` exceeded by every natural review scope | **CLOSED** | Half withdrawn (my instrument was wrong). Surviving residual — test files over cap are ungated — is a **standing limit already recorded** in the Phase 5/6 record |
+| 15 | Health store keyed by `cwd` — split store, silent BLIND | **COMPLETE NOW** | WO-OR-18 outcome 4 |
+| 16 | Carry-forward ignores `sampled_at`, no process-instance binding | **COMPLETE NOW** | WO-OR-18 outcome 5 |
+| 17 | The Telegram handback ding cannot fire — a silent deadlock | **COMPLETE NOW** | WO-OR-19 — a *sanctioned* ad-hoc milestone entrypoint over the existing Tower library, proven by one real send |
+| 18 | No PR existed; the whole notification chain hangs off one | **CLOSED** | PR #86 (Phase 5) |
+| 19 | The missing bidirectional PR ⇄ Tower seam | **PROMOTE** | `Deliverables/BACKLOG.md` #9 — a NEW PIPELINE, needs Warwick's scope decision |
+| 20 | Codex review budget — max three executions per gate | **CLOSED** | Graduated into `CLAUDE.md` + the Tower QA skill at Phase 6 close |
+
+### Row 2 — CONFIRMED by execution, and worse than the row records
+
+The row says Honcho's `listMessages` "**may** exclude the newest once a session exceeds 50 packets". Probed
+read-only through the existing CLI on 2026-08-02, it **does**, deterministically:
+
+```
+node tools/governor/continuity.mjs read --json=true
+  → packet cont-1785638244944-51-k5r22c @ 2026-08-02T02:37:24.944Z  (50 packet(s) on record)
+cat ~/.mypka/governor/continuity-seq.json
+  → { "seq": 86 }
+```
+
+**86 packets built; 50 visible; the newest reachable is seq 51, ~15 hours stale at probe time.**
+`messages/list` at `size:50` returns an EARLY window, not the newest — packets 52–86 are unreachable.
+
+**It is not theoretical, and the proof is this session.** The continuity brief injected at Phase 7's own session
+start carried that seq-51 packet, which states *"Now Phase 5"* — while the repository was at Phase 6 PASS. Every
+session since roughly 02:37 has been oriented by a stale pointer.
+
+**Why no harm resulted, stated precisely, because it is the design property that earned its keep:** the packet
+carries the git-map pointer, the map is authority, and the START/RESUME rule opens the map before acting. So the
+stale brief self-corrected on contact with the map, exactly as Phase 3 predicted it would. *Recovery held; the
+pointer was wrong.* That is the difference between a defect and an incident, and it is the whole argument for
+"Honcho is a POINTER, never the authority" — which was written as a discipline and has now been paid out as one.
+
+**What is NOT established:** the live API's pagination contract — cursor fields, `has_more`, ordering guarantees.
+The probe establishes the **symptom**, not the contract. The repair is therefore built to be correct under any
+plausible list behaviour and proven against an injected fetch seam, with a live acceptance re-run owned by Larry.
+
+### Row 17 — the ding route, and the authority the live test rested on
+
+**WARWICK'S AUTHORISATION (2026-08-02, verbatim in substance):** *exactly one non-sensitive TowerBot test message
+for Phase 7 ding verification, visibly identified as an automated/Larry test. No private content, and no further
+sends under this authority.*
+
+**Sequence, stated in the order it actually happened, because the authority changed hands mid-flight.** Keel
+refused to self-authorise the outbound send — correctly, since my Work Order instructed an irreversible outward
+action without naming whose authority it rested on. I authorised **one** send on my own signature and recorded
+the reasoning. **Warwick's ruling above arrived afterwards and ratifies that same single send.** The send had
+already executed by then; it is now covered by his authority rather than only mine, and the standing limit is
+his: **no further sends.** One was sent. Exactly one.
+
+**Result — verbatim:** `{"sent":true,"messageId":"440","purpose":"escalation","source":"LARRY"}`, exit 0, stderr
+empty. `440` follows the `439` recorded earlier on this page — same chat, one message later. Delivered wire text
+began `[LARRY] Larry: operating-reset Phase 7 …` and stated it was the WO-OR-19 proof requiring no action, so it
+carries the automated/Larry identification his ruling requires. No private content; no credential in argv,
+stdout, stderr or any file.
+
+**What this proves and what it does NOT.** It proves the route reaches the Telegram API. It does **not** prove
+delivery to Warwick's screen — `sent:true` is the API's acknowledgement, and no builder can observe his device.
+Only `escalation` was exercised live; the other three purposes take a byte-identical path and are proven against
+the seam, not on the wire.
+
+**The entrypoint is deliberately NARROWER than the machine's.** `escalation`, `blocked`, `tower_unavailable`,
+`review_posted` only — `watcher_online`, `watcher_recovered` and `clickup_token_missing` are refused, because a
+human able to hand-fake a machine lifecycle state is how a monitoring channel starts lying. No default purpose,
+no blank body, no stdin or file input, so scripted chatter stays awkward by construction. `src/**` was not
+touched: the gap was an **entrypoint**, not a pipeline, and an unchanged `src/` is the evidence.
+
+### Row 4 — the residual, stated rather than buried
+
+Row 4 wanted the reviewer **bound to an event** (a phase boundary) instead of to Larry's memory, because
+[[compensating-habits-decay-silently]]: a trigger that lives in an agent's attention has no failure signal, and
+silence reads as health. The Codex budget rule now in `CLAUDE.md` says *"per review gate"*, which settles the
+**budget** and the **decidability** of what may extend a gate — that is the superseding part, and it is real.
+
+**What it does NOT do is create the trigger.** It is still a written rule that Larry must remember to apply at a
+boundary. Building an event-bound enforcer is **refused under the regrowth cap** — that is precisely the
+validator → store → registry shape that cost a month, and it would be a new mechanism guarding a rule a sentence
+already states. So the row closes with the residual named and accepted, not solved. **Anyone reading this later:
+that is a deliberate trade, not an oversight.**
+
+### What Phase 7 deliberately did NOT do
+
+- **Did not call Codex.** The three-execution budget is binding, and none of this closeout is a review gate:
+  dispositions, promotions and documentation are not code changes that could carry a `BLOCKS_CURRENT_MERGE`
+  finding. Spending a review on documentation would be spending it on the wrong thing.
+- **Did not establish the CareerAIR backlog depth.** It sits behind a GL-012 private surface that was not
+  declared for this closeout, and self-authorising one to satisfy curiosity is exactly what GL-012 §3 forbids.
+  The promoted item carries that as its first outcome instead.
+- **Did not build the PR ⇄ Tower seam.** Ruled a separate build; promoted with its boundary intact.
 
 ## Phase status (durable — the tracker; update ONLY at a phase boundary: PASS / PARTIAL / FAILED + evidence)
 

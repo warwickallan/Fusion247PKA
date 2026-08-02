@@ -132,3 +132,15 @@ Team Knowledge/.obsidian/workspace.json
 
 # --- Codex local tooling ---
 .codex/
+
+# --- repo-root scratchpad (local only) ---
+# Session working files: throwaway writer scripts, probe output, half-finished
+# experiments. It showed as untracked through the whole operating reset, which
+# means every `git add -A` was one keystroke away from committing them.
+#
+# It also held `scratchpad/tower-notify.mjs` — the home-made Telegram wrapper
+# that was RULED OUT OF ORDER (a bespoke caller is a prohibited third route; the
+# sanctioned entrypoint is `services/tower-baton/bin/`). Ignoring the directory
+# is not what retires that script; the ruling did. This just stops a prohibited
+# pattern being published as though it were an example to copy.
+scratchpad/

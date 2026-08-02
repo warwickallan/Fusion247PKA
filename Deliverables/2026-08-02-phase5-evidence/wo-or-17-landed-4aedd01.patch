@@ -1,0 +1,1120 @@
+From 4aedd016f82d2adf8b4b99c767457ef2df65846d Mon Sep 17 00:00:00 2001
+From: Warwick Allan <301310055+warwickallan@users.noreply.github.com>
+Date: Sun, 2 Aug 2026 14:58:23 +0100
+Subject: [PATCH] WO-OR-17: soft() preserves failure cause; no collapse of
+ probe worlds
+
+Keel's interrupted build completed and independently verified on handover.
+soft() keeps the cause beside a null value so MEASURED ABSENCE and PROBE
+FAILURE no longer render identically (TQA-001 cwd, TQA-002 symbolic-ref).
+Also: unborn-branch uses measured symbolic-ref; deliverables sweep labels
+symlink provenance; stdin read failure is not empty stdin.
+
+Completion fix (Grok handover): branch render must not say DETACHED when
+the probe failed, and exit-128 vs ENOENT must render as distinct lines.
+
+Suite: 50/50 reorient; 268/268 all-eight in worktree.
+---
+ tools/governor/reorient.mjs      | 326 ++++++++++++++++--
+ tools/governor/reorient.test.mjs | 567 ++++++++++++++++++++++++++++++-
+ 2 files changed, 861 insertions(+), 32 deletions(-)
+
+diff --git a/tools/governor/reorient.mjs b/tools/governor/reorient.mjs
+index 962750b..e460c5c 100644
+--- a/tools/governor/reorient.mjs
++++ b/tools/governor/reorient.mjs
+@@ -41,7 +41,7 @@
+ // is reported as such and the others still render.
+ 
+ import { execFileSync } from 'node:child_process';
+-import { readdirSync, readFileSync, statSync, realpathSync } from 'node:fs';
++import { readdirSync, readFileSync, statSync, lstatSync, realpathSync } from 'node:fs';
+ import { join, dirname } from 'node:path';
+ import { pathToFileURL, fileURLToPath } from 'node:url';
+ 
+@@ -136,7 +136,37 @@ export function parseHookInput(raw) {
+ // because a partial answer must never read as a whole one: `unpushed: null` means "there
+ // is no upstream, or git would not say", and it is a different claim from `unpushed: 0`.
+ 
+-export function gitFacts(worktreePath, execFile = execFileSync) {
++// WO-OR-17. The default filesystem for the location probes, injectable. This mirrors the
++// sweep's `DEFAULT_SWEEP_IO` exactly ÔÇö it is this module's EXISTING idiom rather than new
++// machinery ÔÇö and it exists for the identical reason WO-OR-14 gave: an unreadable-directory
++// failure cannot be induced deterministically on every machine, and a proof that cannot be
++// made to fail is not a proof. Every injected test is PAIRED with a control asserting these
++// defaults read the real disk, so the seam can never end up testing a fiction.
++export const DEFAULT_GIT_IO = { realpathSync: (p) => realpathSync.native(p), statSync };
++
++// WO-OR-17 / TQA-001. WHY A PATH PROBE'S FAILURE IS CLASSIFIED RATHER THAN COLLAPSED.
++//
++// "The filesystem answered and there is nothing there" and "the probe could not answer" are
++// different claims, and only the first entitles anyone to say a directory does not exist.
++// The exception carries which one it was; `soft()` used to throw it away.
++//
++//   'absent'      ENOENT / ENOTDIR ÔÇö a MEASUREMENT. The filesystem answered.
++//   'not-a-path'  the argument was never a path, so nothing on disk was consulted at all.
++//   'unreadable'  EPERM / EACCES / ELOOP / anything else carrying an errno ÔÇö the path may
++//                 exist perfectly well and the probe was REFUSED. Verified on this estate:
++//                 an ACL-denied directory raises EPERM from `realpathSync.native` while
++//                 `statSync` still reports `isDirectory() === true`, so rendering that as
++//                 "no such directory on disk" was flatly false.
++//   'unknown'     the throw carried no code at all. Never upgraded into a claim about disk.
++export function classifyPathFailure(err) {
++  const code = err && typeof err === 'object' ? err.code : undefined;
++  if (code === 'ENOENT' || code === 'ENOTDIR') return 'absent';
++  if (code === 'ERR_INVALID_ARG_TYPE' || code === 'ERR_INVALID_ARG_VALUE') return 'not-a-path';
++  if (typeof code === 'string') return 'unreadable';
++  return 'unknown';
++}
++
++export function gitFacts(worktreePath, execFile = execFileSync, io = DEFAULT_GIT_IO) {
+   const run = (args) =>
+     execFile('git', ['-C', worktreePath, ...args], {
+       encoding: 'utf8',
+@@ -152,10 +182,32 @@ export function gitFacts(worktreePath, execFile = execFileSync) {
+     })
+       .toString()
+       .trim();
+-  const soft = (fn) => {
++  // WO-OR-17. THE DEFECT UNDERNEATH THE PREVIOUS THREE ROUNDS, AND WHY THEY KEPT FINDING
++  // "another instance".
++  //
++  // `soft()` was `try { return fn(); } catch { return null; }` across TWELVE call sites, and
++  // it returned the SAME null for "I measured, and the answer is nothing" as for "the probe
++  // could not answer". The one distinction this whole module exists to preserve was
++  // destroyed in a shared helper BEFORE any field existed, and every field downstream
++  // inherited it. The renderer was then left to reconstruct a distinction that had already
++  // been thrown away ÔÇö and did so by guessing: an existing-but-unreadable directory rendered
++  // as "no such directory on disk" (TQA-001), and ANY symbolic-ref failure rendered as proof
++  // of detachment (TQA-002). Those were never two defects seen in two fields; they are one
++  // defect seen twice, which is why fixing instances never converged.
++  //
++  // This is a NARROWING of the lie, not a mechanism. The VALUE channel is untouched ÔÇö null
++  // still means "no value", every field is still independently nullable, and no caller of
++  // this object changes shape. What is added is that the CAUSE is kept beside the value
++  // instead of discarded, and only the two derivations that were guessing ever read it.
++  const causes = Object.create(null);
++  const soft = (name, fn) => {
+     try {
+       return fn();
+-    } catch {
++    } catch (err) {
++      // `?? { code: 'unknown' }` because `throw null` is legal and would otherwise make a
++      // recorded cause indistinguishable from no cause at all ÔÇö the same collapse, one
++      // level down, inside the very helper closing it.
++      causes[name] = err ?? { code: 'unknown' };
+       return null;
+     }
+   };
+@@ -173,37 +225,110 @@ export function gitFacts(worktreePath, execFile = execFileSync) {
+   // established location beneath "executed, not assumed". Existence was the weaker
+   // question all along; the heading claims a DIRECTORY, so directory-ness is measured and
+   // the outcomes are kept apart instead of collapsed into one truthy string.
+-  const resolved = soft(() => {
+-    const real = realpathSync.native(worktreePath);
+-    const st = statSync(real);
++  //
++  // WO-OR-17 measured what this establishes and, just as importantly, what it does NOT.
++  // `statSync(...).isDirectory()` establishes TYPE. It does not establish ENTERABILITY, and
++  // the two genuinely come apart: with only Read-Data denied, `realpathSync.native` and
++  // `statSync` both succeed and report a directory while `readdirSync` raises EPERM. No
++  // probe is added for it, and the reason is that no honest one exists here. `readdirSync`
++  // measures LISTABILITY, which is strictly stronger than the TRAVERSE a working directory
++  // actually needs, so adopting it would replace one false claim with a different false
++  // claim pointing the other way ÔÇö the exact trade WO-OR-11 refused when it declined to
++  // delete the field. `process.chdir()` is the only true test and it MUTATES the hook
++  // process, which INV-2 forbids. So the claim is TYPE, and the limit is stated rather than
++  // papered over: a directory whose contents cannot be listed still renders as an
++  // established cwd, because type was measured and listability was not.
++  const resolved = soft('resolved', () => {
++    const real = io.realpathSync(worktreePath);
++    const st = io.statSync(real);
+     return {
+       path: normaliseSeparators(real),
+       kind: st.isDirectory() ? 'directory' : st.isFile() ? 'file' : 'other',
+     };
+   });
+-
+-  const gitReadable = soft(() => (run(['rev-parse', '--git-dir']), true)) === true;
+-  const repoRoot = soft(() => normaliseSeparators(run(['rev-parse', '--show-toplevel'])));
+-  const headSha = soft(() => run(['rev-parse', 'HEAD']));
+-  const branch = soft(() => run(['rev-parse', '--abbrev-ref', 'HEAD']));
++  // WO-OR-17 / TQA-001. WHY the path has no value, carried from the point of measurement to
++  // the rendered line rather than inferred downstream from its absence.
++  const cwdFailure = resolved ? null : classifyPathFailure(causes.resolved);
++  // The errno itself, for the reader. Only the CODE ÔÇö never the message, which carries
++  // stacks and paths and is the noise WO-OR-14 removed from this surface.
++  const cwdFailureCode =
++    !resolved && causes.resolved && typeof causes.resolved.code === 'string'
++      ? causes.resolved.code
++      : null;
++
++  const gitReadable = soft('gitReadable', () => (run(['rev-parse', '--git-dir']), true)) === true;
++  const repoRoot = soft('repoRoot', () => normaliseSeparators(run(['rev-parse', '--show-toplevel'])));
++  const headSha = soft('headSha', () => run(['rev-parse', 'HEAD']));
++  const branch = soft('branch', () => run(['rev-parse', '--abbrev-ref', 'HEAD']));
+ 
+   // WO-OR-14. `--abbrev-ref HEAD` prints the LITERAL STRING "HEAD" when HEAD is detached,
+   // and the block rendered that as though it were a branch name. Matching on that string
+   // would be reading a tell rather than taking a measurement, so the state is probed
+   // directly: `symbolic-ref -q` returns the branch when HEAD is attached and exits
+   // non-zero, silently, when it is not.
+-  const symbolicBranch = soft(() => run(['symbolic-ref', '-q', '--short', 'HEAD']));
++  const symbolicBranch = soft('symbolicBranch', () => run(['symbolic-ref', '-q', '--short', 'HEAD']));
+   // TWO measurements, not one flag reused. If HEAD does not resolve at all ÔÇö an unborn
+   // branch, or git unavailable ÔÇö then nothing can be concluded about attachment, so this
+-  // is null rather than false. Only a resolvable HEAD with no symbolic ref is detached.
+-  const detached = headSha === null ? null : symbolicBranch === null;
++  // is null rather than false.
++  //
++  // WO-OR-17 / TQA-002. `symbolicBranch === null` was treated as PROOF OF DETACHMENT, so a
++  // probe that could not answer produced the confident sentence "(DETACHED ÔÇö HEAD is not on
++  // a branch)". That is the same defect as TQA-001 wearing a different field: `soft()`
++  // handed the renderer one null for two different worlds and the derivation guessed which.
++  //
++  // The cause settles it, and it settles it MECHANICALLY rather than by judgement. Verified
++  // by execution on this estate:
++  //
++  //     detached HEAD    symbolic-ref -q --short HEAD  ->  exit status 1     <- the ANSWER
++  //     not a repository  symbolic-ref ...             ->  exit status 128
++  //     git not on PATH   spawn                        ->  no status, code ENOENT
++  //
++  // `-q` exits 1 for exactly one reason: HEAD is not a symbolic ref. That IS the measured
++  // detached response, and nothing else is. Any other failure leaves this null ÔÇö not false,
++  // because "the probe broke" is not evidence that HEAD is attached either.
++  const detached =
++    headSha === null
++      ? null
++      : symbolicBranch !== null
++        ? false
++        : causes.symbolicBranch?.status === 1
++          ? true
++          : null;
++  // WO-OR-17 completion (Grok handover). WHY the symbolic-ref probe has no value ÔÇö the same
++  // cause-preservation pattern as cwdFailure. Without this, exit 128 and ENOENT both left
++  // detached=null and the renderer had one line for two worlds; worse, that line still said
++  // "DETACHED HEAD" in the prose of the unverified branch case, so a failed probe still
++  // *mentioned* the confident diagnosis it was no longer allowed to claim.
++  //
++  //   null            probe answered (value is in symbolicBranch) or was never attempted
++  //   'fatal'         git ran and exited non-1 (e.g. 128 ÔÇö not a repo / corrupt ref)
++  //   'unavailable'   spawn/system failure with a code (ENOENT = git not on PATH)
++  //   'unknown'       throw carried neither status nor code
++  // status===1 is measured detachment and lives in `detached`, not here.
++  const symbolicRefFailure = (() => {
++    if (symbolicBranch !== null) return null;
++    const err = causes.symbolicBranch;
++    if (!err) return null;
++    if (err.status === 1) return null; // measured detached ÔÇö carried by `detached`
++    if (typeof err.status === 'number') return 'fatal';
++    if (typeof err.code === 'string') return 'unavailable';
++    return 'unknown';
++  })();
++  const symbolicRefStatus =
++    symbolicRefFailure === 'fatal' && typeof causes.symbolicBranch?.status === 'number'
++      ? causes.symbolicBranch.status
++      : null;
++  const symbolicRefCode =
++    symbolicRefFailure === 'unavailable' && typeof causes.symbolicBranch?.code === 'string'
++      ? causes.symbolicBranch.code
++      : null;
+ 
+   // WO-OR-14. Whether this is the primary checkout or a LINKED worktree, measured by
+   // `--git-dir` differing from `--git-common-dir` rather than by pattern-matching a path.
+   // In an estate running twenty-odd worktrees, "which checkout am I in" is precisely the
+   // question this block exists to answer. null when the probe cannot run, and it then
+   // renders nothing at all rather than guessing either way.
+-  const linkedWorktree = soft(() => {
++  const linkedWorktree = soft('linkedWorktree', () => {
+     const [gitDir, commonDir] = run([
+       'rev-parse', '--path-format=absolute', '--git-dir', '--git-common-dir',
+     ]).split('\n');
+@@ -211,16 +336,16 @@ export function gitFacts(worktreePath, execFile = execFileSync) {
+     return normaliseSeparators(gitDir.trim()) !== normaliseSeparators(commonDir.trim());
+   });
+ 
+-  const dirty = soft(() => run(['status', '--porcelain']).length > 0);
+-  const unpushed = soft(() => {
++  const dirty = soft('dirty', () => run(['status', '--porcelain']).length > 0);
++  const unpushed = soft('unpushed', () => {
+     const parsed = parseInt(run(['rev-list', '--count', '@{u}..HEAD']), 10);
+     return Number.isNaN(parsed) ? null : parsed;
+   });
+   // The CURRENT pushed head, read live from the remote-tracking ref ÔÇö not whatever was
+   // pushed at some point in the past. A resuming session needs to know what is actually
+   // durable on the remote right now.
+-  const upstreamRef = soft(() => run(['rev-parse', '--abbrev-ref', '@{u}']));
+-  const upstreamSha = soft(() => run(['rev-parse', '@{u}']));
++  const upstreamRef = soft('upstreamRef', () => run(['rev-parse', '--abbrev-ref', '@{u}']));
++  const upstreamSha = soft('upstreamSha', () => run(['rev-parse', '@{u}']));
+ 
+   // WO-OR-14. THE DEFECT WO-OR-11 INTRODUCED WHILE CLOSING ANOTHER ONE.
+   //
+@@ -254,7 +379,7 @@ export function gitFacts(worktreePath, execFile = execFileSync) {
+       // ref does not match. That difference is what makes "no upstream is configured" a
+       // MEASUREMENT rather than merely the absence of one, which is exactly what the old
+       // `gitReadable` gate could not express.
+-      const row = soft(() =>
++      const row = soft('forEachRef', () =>
+         run([
+           'for-each-ref',
+           '--format=%(refname:short)|%(upstream:short)',
+@@ -297,6 +422,17 @@ export function gitFacts(worktreePath, execFile = execFileSync) {
+     // "that is a file, not a directory" are different diagnoses and point at different
+     // mistakes. null means it did not resolve at all.
+     resolvedKind: resolved ? resolved.kind : null,
++    // WO-OR-17 / TQA-001. WHY it has no value, not merely THAT it has none. null when the
++    // path resolved; otherwise 'absent' (measured ÔÇö the filesystem answered and there is
++    // nothing there), 'unreadable' (the probe was refused; the path may exist perfectly
++    // well), 'not-a-path' (nothing on disk was consulted at all), or 'unknown'.
++    //
++    // This field is the whole repair in one line: without it the renderer had a single null
++    // for four different worlds and picked the most confident of them.
++    cwdFailure,
++    // The errno, for the reader. The CODE only ÔÇö never the message, which carries stacks and
++    // paths and is precisely the noise WO-OR-14 took off this surface.
++    cwdFailureCode,
+     // WO-OR-11. Whether git ANSWERED here at all, as its own measurement.
+     //
+     // `soft()` returns null both when a git call fails and when git legitimately reports
+@@ -317,7 +453,23 @@ export function gitFacts(worktreePath, execFile = execFileSync) {
+     linkedWorktree,
+     headSha,
+     branch,
++    // WO-OR-17. EXPOSED because it was already MEASURED and was being thrown away.
++    //
++    // On an unborn branch (`git init`, no commit yet) git answers:
++    //     rev-parse HEAD               -> exit 128   so `branch` is null
++    //     rev-parse --abbrev-ref HEAD  -> exit 128   so `branch` is null
++    //     symbolic-ref -q --short HEAD -> "main"     MEASURED, and then discarded
++    // and the block printed `branch : (unknown)` while holding the answer. Every defect in
++    // this sequence so far has been the block claiming MORE than it measured; this one
++    // claims LESS, which is the same dishonesty inverted and is invisible to anyone looking
++    // only for overclaims. The four-state test does not care which direction it fails in.
++    symbolicBranch,
+     detached,
++    // WO-OR-17 completion. Cause of a null symbolicBranch that is NOT measured detachment.
++    // null when the probe answered or when status===1 (that case is `detached === true`).
++    symbolicRefFailure,
++    symbolicRefStatus,
++    symbolicRefCode,
+     dirty,
+     unpushed,
+     upstreamRef,
+@@ -375,6 +527,28 @@ function renderCwd(facts, cwdClaimedByHost) {
+   if (claimed === null || claimed === undefined || claimed === '') {
+     return '(UNVERIFIED ÔÇö no path was supplied)';
+   }
++  // WO-OR-17 / TQA-001. THE DEFECT: every remaining failure fell into the line below, so an
++  // existing directory the probe was REFUSED read as a confident claim that it does not
++  // exist. "I measured, and there is nothing" and "I could not look" are not the same
++  // sentence, and only the first of them is about the disk. The cause now arrives here from
++  // the point of measurement instead of being guessed from the absence of a value.
++  if (facts.cwdFailure === 'unreadable') {
++    const why = facts.cwdFailureCode ? ` (${facts.cwdFailureCode})` : '';
++    return (
++      `(UNVERIFIED ÔÇö host reported ${asShown}; that path could NOT BE READ${why} ÔÇö ` +
++      'this is NOT a claim that it does not exist)'
++    );
++  }
++  if (facts.cwdFailure === 'not-a-path') {
++    return `(UNVERIFIED ÔÇö host reported ${asShown}; that is not a path, so nothing on disk was consulted)`;
++  }
++  if (facts.cwdFailure === 'unknown') {
++    return (
++      `(UNVERIFIED ÔÇö host reported ${asShown}; the probe failed and gave no reason ÔÇö ` +
++      'this is NOT a claim that it does not exist)'
++    );
++  }
++  // Reached only on a MEASURED absence ÔÇö ENOENT or ENOTDIR, i.e. the filesystem answered.
+   return `(UNVERIFIED ÔÇö host reported ${asShown}; no such directory on disk)`;
+ }
+ 
+@@ -401,11 +575,38 @@ function renderBranch(facts) {
+   if (facts.detached === true) {
+     return `(DETACHED ÔÇö HEAD is not on a branch${facts.headSha ? `, it is commit ${facts.headSha}` : ''})`;
+   }
+-  if (facts.branch === null || facts.branch === undefined) return '(unknown)';
++  if (facts.branch === null || facts.branch === undefined) {
++    // WO-OR-17. `symbolic-ref` may have answered when `rev-parse` could not ÔÇö the unborn
++    // branch is exactly that state. Rendering "(unknown)" over a name the module is holding
++    // is the four-state test failing downwards: a MEASUREMENT reported as "I could not
++    // tell". What is claimed here is only what was measured ÔÇö HEAD points at this branch ÔÇö
++    // and specifically NOT that any commit exists on it, because none was resolved.
++    if (facts.symbolicBranch) {
++      return `${facts.symbolicBranch} (MEASURED by symbolic-ref; no commit resolved on it)`;
++    }
++    return '(unknown)';
++  }
+   if (facts.branch === 'HEAD') {
+-    // Reaching here means git said "HEAD" and the detached probe did NOT confirm it. The
+-    // honest answer is that this was not established, never the bare string.
+-    return '(UNVERIFIED ÔÇö git returned the literal "HEAD", which is what a DETACHED HEAD returns, and the detached probe did not answer)';
++    // Reaching here means git said "HEAD" and the detached probe did NOT confirm it.
++    // Never name the unconfirmed diagnosis: the word DETACHED in this line was still a
++    // confident sentence wearing an UNVERIFIED coat (TQA-002 residual on the unfinished WO).
++    // Distinguish fatal vs unavailable so two different probe failures cannot collapse
++    // into one rendered line (PIN LAYER 2).
++    if (facts.symbolicRefFailure === 'fatal') {
++      const st = facts.symbolicRefStatus != null ? ` (exit ${facts.symbolicRefStatus})` : '';
++      return (
++        `(UNVERIFIED ÔÇö git returned the literal "HEAD"; symbolic-ref failed fatally${st}, ` +
++        'so attachment is not established)'
++      );
++    }
++    if (facts.symbolicRefFailure === 'unavailable') {
++      const c = facts.symbolicRefCode ? ` (${facts.symbolicRefCode})` : '';
++      return (
++        `(UNVERIFIED ÔÇö git returned the literal "HEAD"; symbolic-ref could not run${c}, ` +
++        'so attachment is not established)'
++      );
++    }
++    return '(UNVERIFIED ÔÇö git returned the literal "HEAD"; attachment is not established)';
+   }
+   return String(facts.branch);
+ }
+@@ -484,7 +685,11 @@ const DECISION_MARKER =
+ // induced deterministically on Windows, and a proof that cannot be made to fail is not a
+ // proof. The suite pairs every injected test with a control asserting these defaults read
+ // the real disk, so the seam can never end up testing a fiction.
+-const DEFAULT_SWEEP_IO = { readdirSync, statSync, readFileSync };
++// WO-OR-17 added `lstatSync` and `realpathSync`. `statSync` FOLLOWS a symlink, so a link at
++// `Deliverables/linked.md` pointing outside the swept root was read, reported, and labelled
++// `Deliverables/linked.md` ÔÇö a claim about WHERE THE CONTENT CAME FROM that was never
++// measured. `lstat` sees the link itself; `realpath` says where it actually goes.
++const DEFAULT_SWEEP_IO = { readdirSync, statSync, readFileSync, lstatSync, realpathSync };
+ 
+ export function sweepOpenDeliverables(root = ESTATE_ROOT, now = Date.now(), io = DEFAULT_SWEEP_IO) {
+   const dir = join(root, 'Deliverables');
+@@ -518,9 +723,41 @@ export function sweepOpenDeliverables(root = ESTATE_ROOT, now = Date.now(), io =
+   // file outside the 21-day window are legitimate EXCLUSIONS, not failures, and inflating
+   // the count with them would cry wolf on a healthy estate.
+   let unreadable = 0;
++  // WO-OR-17. The swept root, RESOLVED, so containment below compares two real paths rather
++  // than one real path against one claimed path ÔÇö the same mistake in miniature.
++  let dirReal = null;
++  try {
++    dirReal = normaliseSeparators(io.realpathSync(dir));
++  } catch {
++    dirReal = null;
++  }
+   for (const name of names) {
+     if (!name.toLowerCase().endsWith('.md')) continue; // top-level *.md only
+     const full = join(dir, name);
++    // WO-OR-17. WHERE THE CONTENT ACTUALLY IS ÔÇö measured, because the row's
++    // `Deliverables/<name>` label is a claim about exactly that and nothing ever checked it.
++    // `statSync` FOLLOWS a symlink, so a link pointing outside the swept root was read,
++    // reported, and labelled as though it lived here. That is this sequence's defect class
++    // applied to a path instead of a git fact: a claim rendered without a measurement.
++    //
++    // NOT security machinery, and deliberately not. The link is still followed and the file
++    // is still shown ÔÇö dropping it would trade a false label for a silent omission, which is
++    // the failure F4b closed one level down. What changes is that the label stops lying.
++    let provenance = 'unverified';
++    let realPath = null;
++    try {
++      if (!io.lstatSync(full).isSymbolicLink()) {
++        provenance = 'inside';
++      } else {
++        realPath = normaliseSeparators(io.realpathSync(full));
++        if (!dirReal) provenance = 'unverified';
++        else provenance = realPath === dirReal || realPath.startsWith(`${dirReal}/`) ? 'inside' : 'outside';
++      }
++    } catch {
++      // The probe could not answer. That is NOT "it is fine" ÔÇö same rule as everywhere else
++      // in this module, which is the point of fixing the shared helper rather than a field.
++      provenance = 'unverified';
++    }
+     let st;
+     try {
+       st = io.statSync(full);
+@@ -538,7 +775,7 @@ export function sweepOpenDeliverables(root = ESTATE_ROOT, now = Date.now(), io =
+     }
+     const h1 = (head.match(/^#\s+(.+)$/m) || [])[1]?.trim() || name.replace(/\.md$/, '');
+     const awaits = DECISION_MARKER.test(head);
+-    rows.push({ name, title: h1, mtimeMs: st.mtimeMs, awaits });
++    rows.push({ name, title: h1, mtimeMs: st.mtimeMs, awaits, provenance, realPath });
+   }
+   if (!rows.length) {
+     // WO-OR-14. Nothing to show ÔÇö but WHY there is nothing to show is the whole question.
+@@ -557,7 +794,16 @@ export function sweepOpenDeliverables(root = ESTATE_ROOT, now = Date.now(), io =
+   const lines = ['ÔƒªGOVÔƒº OPEN DELIVERABLES (loose, not BUILD-* ÔÇö nothing else surfaces these):'];
+   for (const r of top) {
+     const flag = r.awaits ? '  ÔƒÁ AWAITS YOUR DECISION' : '';
+-    lines.push(`  ÔÇó ${r.title} ÔÇö Deliverables/${r.name}${flag}`);
++    // WO-OR-17. `Deliverables/<name>` is a provenance claim. It is now made plainly only
++    // where provenance was measured and held; otherwise the reader is told what is actually
++    // known, on the same line, rather than being left with a label that reads as settled.
++    const where =
++      r.provenance === 'outside'
++        ? `  ÔƒÁ CONTENT IS NOT IN Deliverables/ ÔÇö it resolves to ${r.realPath}`
++        : r.provenance === 'unverified'
++          ? '  ÔƒÁ provenance NOT established ÔÇö this path may not be where the content is'
++          : '';
++    lines.push(`  ÔÇó ${r.title} ÔÇö Deliverables/${r.name}${flag}${where}`);
+   }
+   const pending = top.filter((r) => r.awaits).length;
+   if (pending) lines.push(`  ${pending} deliverable(s) appear to be waiting on Warwick ÔÇö treat as a pending product-decision handback.`);
+@@ -594,6 +840,7 @@ export function buildBrief(raw, {
+   facts = null,
+   factsFn = gitFacts,
+   sweepFn = sweepOpenDeliverables,
++  stdinError = null,
+ } = {}) {
+   const parsed = parseHookInput(raw);
+   const policy = briefModeFor(parsed.payload?.source);
+@@ -620,6 +867,21 @@ export function buildBrief(raw, {
+ 
+   const sections = [`ÔƒªGOVÔƒº SESSION START ÔÇö ${policy.headline}`];
+ 
++  // WO-OR-17. THE SECOND SITE OF THE SAME DEFECT, found by sweeping for the SHAPE rather
++  // than for more instances of the first one.
++  //
++  // `main()` read stdin inside `try { ... } catch { raw = ''; }`, so a READ FAILURE became
++  // byte-identical to genuinely empty stdin ÔÇö after which `parseHookInput` reported the
++  // MEASURED absence "empty stdin" about a payload it never saw. Identical to `soft()`: a
++  // probe failure wearing the costume of a measurement, one layer above the git probes.
++  if (stdinError !== null && stdinError !== undefined) {
++    sections.push(
++      'ÔƒªGOVÔƒº HOOK INPUT: NOT READ ÔÇö stdin could not be read ' +
++        `(${(stdinError && stdinError.code) || 'no reason given'}). Everything below was ` +
++        'produced from an EMPTY payload, which is NOT a report that the host sent nothing.'
++    );
++  }
++
+   try {
+     const f = facts ?? factsFn(where);
+     const rendered = renderLocationSection(f, { cwdClaimedByHost });
+@@ -644,17 +906,21 @@ export function buildBrief(raw, {
+ 
+ async function main() {
+   let raw = '';
++  // WO-OR-17. The cause is CAPTURED rather than swallowed, so "stdin could not be read" and
++  // "the host sent nothing" stop being the same empty string. See `buildBrief`.
++  let stdinError = null;
+   try {
+     const chunks = [];
+     for await (const chunk of process.stdin) chunks.push(chunk);
+     raw = Buffer.concat(chunks).toString('utf8');
+-  } catch {
++  } catch (err) {
++    stdinError = err ?? { code: 'unknown' };
+     raw = '';
+   }
+ 
+   let body;
+   try {
+-    body = buildBrief(raw);
++    body = buildBrief(raw, { stdinError });
+   } catch (err) {
+     body = `ÔƒªGOVÔƒº SESSION START: reorientation failed hard (${err.message}). Orient by hand.`;
+   }
+diff --git a/tools/governor/reorient.test.mjs b/tools/governor/reorient.test.mjs
+index 3deb267..db31165 100644
+--- a/tools/governor/reorient.test.mjs
++++ b/tools/governor/reorient.test.mjs
+@@ -35,7 +35,7 @@ import test from 'node:test';
+ import assert from 'node:assert/strict';
+ import {
+   mkdtempSync, mkdirSync, writeFileSync, rmSync, utimesSync, realpathSync,
+-  readdirSync, statSync, readFileSync,
++  readdirSync, statSync, readFileSync, lstatSync, symlinkSync,
+ } from 'node:fs';
+ import { execFileSync, spawnSync } from 'node:child_process';
+ import { tmpdir } from 'node:os';
+@@ -50,6 +50,8 @@ import {
+   briefModeFor,
+   toHookOutput,
+   normaliseSeparators,
++  classifyPathFailure,
++  DEFAULT_GIT_IO,
+   BRIEF_MODE,
+ } from './reorient.mjs';
+ 
+@@ -60,7 +62,11 @@ function tmp(prefix = 'governor-reorient-') {
+ // The real filesystem, used to build PARTIAL injections for the sweep: a fake that failed
+ // on everything would prove only that a total failure is handled. The interesting case ÔÇö
+ // and the one that was silently dropping files ÔÇö is ONE unreadable file among readable ones.
+-const realIo = { readdirSync, statSync, readFileSync };
++// WO-OR-17 added lstatSync/realpathSync. The sweep now MEASURES where a row's content
++// actually is, because `Deliverables/<name>` is a provenance claim and `statSync` FOLLOWS a
++// symlink. A fixture omitting them would render "provenance NOT established" on every row
++// and quietly stop exercising the real path.
++const realIo = { readdirSync, statSync, readFileSync, lstatSync, realpathSync };
+ 
+ /** A scratch estate root carrying `Deliverables/<name>` files with controlled mtimes. */
+ function makeEstate(files) {
+@@ -702,6 +708,7 @@ test('WO-OR-14 / F4b: an unreadable FILE among readable ones is disclosed, so a
+   ]);
+   try {
+     const io = {
++      ...realIo,
+       readdirSync: (d) => realIo.readdirSync(d),
+       statSync: (p) => realIo.statSync(p),
+       readFileSync: (p, enc) => {
+@@ -787,6 +794,562 @@ test('WO-OR-14 / Q4: failing git probes emit NOTHING on stderr ÔÇö a live hook m
+   }
+ });
+ 
++// ===========================================================================
++// WO-OR-17 ÔÇö THE HOLE IN THE ENUMERATION: FAILURE CAUSE WAS NEVER A DIMENSION
++// ===========================================================================
++// WHAT WO-OR-14's ENUMERATION GOT WRONG, stated precisely, because "we enumerated and still
++// missed something" is only useful if the miss is diagnosable.
++//
++// WO-OR-14 enumerated over FIELDS ├ù FOUR STATES and pinned the field set. Independent review
++// then found two HIGH defects INSIDE that boundary ÔÇö an existing-but-unreadable directory
++// rendering as "no such directory on disk", and any symbolic-ref failure rendering as
++// "(DETACHED)". Both were inside the covered domain, so the enumeration had a hole rather
++// than the luck having run out.
++//
++// The hole: the enumeration modelled failure PER FIELD, and the collapse happened BENEATH
++// the fields. `soft()` ÔÇö twelve call sites, ONE helper ÔÇö returned the same null for "I
++// measured, and the answer is nothing" as for "the probe could not answer". The distinction
++// was destroyed before any field existed; the renderer was then asked to reconstruct it and
++// guessed. That is why three rounds each found "another instance": they were one instance
++// seen through different fields.
++//
++// THE ENUMERATION IS THEREFORE EXTENDED BY AN AXIS, not by more rows:
++//
++//     FIELD  ├ù  {measured ┬À nothing claimed ┬À claimed and it did not check out ┬À could not tell}
++//            ├ù  CAUSE {the probe answered "nothing" ┬À the probe could not answer ┬À which reason}
++//
++// and the DOMAIN BOUNDARY gains one clause: the sweep section's rendered rows make a
++// PROVENANCE claim (`Deliverables/<name>` says where the content is), so provenance is
++// covered too. That was the third finding, and it was outside the old boundary by omission
++// rather than by decision.
++//
++// EVERY TEST BELOW IS MUTATION-PROVEN: each was run against the UNFIXED module at HEAD and
++// observed to FAIL before the repair landed.
++
++/**
++ * A fake `git` for `gitFacts`'s existing execFile seam. Keyed on the arguments AFTER the
++ * `-C <path>` pair that `run()` prepends.
++ *
++ * Used rather than a real repository for ONE case only ÔÇö a `symbolic-ref` failure that is
++ * not detachment ÔÇö because that condition cannot be induced on demand from real git, and
++ * hoping for it is not a proof. Every injected world here is PAIRED with a control below
++ * that reads the real thing.
++ */
++function fakeGit(table) {
++  return (cmd, argv) => {
++    const key = argv.slice(2).join(' ');
++    for (const [prefix, resp] of table) {
++      if (key === prefix || key.startsWith(`${prefix} `)) {
++        return typeof resp === 'function' ? resp() : resp;
++      }
++    }
++    throw Object.assign(new Error(`fatal: unhandled probe ${key}`), { status: 128 });
++  };
++}
++
++const gitFails = (status) => () => {
++  throw Object.assign(new Error('fatal'), status === null ? { code: 'ENOENT' } : { status });
++};
++
++/** A readable repository whose `symbolic-ref` probe answers however the caller says. */
++function worldWithSymbolicRef(symbolicRefResponse, abbrevRef = 'HEAD') {
++  return fakeGit([
++    ['rev-parse --git-dir', '.git'],
++    ['rev-parse --show-toplevel', 'C:/x'],
++    ['rev-parse --path-format=absolute --git-dir --git-common-dir', 'C:/x/.git\nC:/x/.git'],
++    ['rev-parse --abbrev-ref HEAD', abbrevRef],
++    ['rev-parse --abbrev-ref @{u}', gitFails(128)],
++    ['rev-parse @{u}', gitFails(128)],
++    ['rev-parse HEAD', 'a'.repeat(40)],
++    ['symbolic-ref -q --short HEAD', symbolicRefResponse],
++    ['status --porcelain', ''],
++    ['rev-list --count @{u}..HEAD', gitFails(128)],
++  ]);
++}
++
++// ---------------------------------------------------------------------------
++// TQA-001 ÔÇö an existing directory that cannot be read is not a nonexistent one
++// ---------------------------------------------------------------------------
++
++test('WO-OR-17 / TQA-001: a path probe that was REFUSED must not render as a measured absence', () => {
++  const denied = (code) => ({
++    realpathSync: () => { throw Object.assign(new Error('nope'), { code }); },
++    statSync,
++  });
++
++  const unreadable = gitFacts('C:/locked', gitFails(128), denied('EPERM'));
++  assert.equal(unreadable.cwdFailure, 'unreadable', 'the CAUSE survives to the facts object');
++  assert.equal(unreadable.cwdFailureCode, 'EPERM');
++  const renderedUnreadable = renderLocationSection(unreadable);
++  assert.doesNotMatch(
++    renderedUnreadable, /no such directory on disk/,
++    'THE DEFECT: a directory the probe was refused was reported as one that does not exist'
++  );
++  assert.match(renderedUnreadable, /could NOT BE READ \(EPERM\)/, 'the reader is told the actual reason');
++  assert.match(renderedUnreadable, /NOT a claim that it does not exist/);
++
++  // CONTROL, and it is what makes the assertions above mean anything: a MEASURED absence
++  // still gets the confident sentence. Without this the repair could have traded a false
++  // claim for a blanket refusal to claim ÔÇö the trade WO-OR-11 explicitly declined.
++  const absent = gitFacts('C:/nope', gitFails(128), denied('ENOENT'));
++  assert.equal(absent.cwdFailure, 'absent', 'ENOENT is the filesystem ANSWERING');
++  assert.match(renderLocationSection(absent), /no such directory on disk/);
++
++  // The discriminator is the CAUSE, not the failure: both probes failed identically.
++  assert.notEqual(
++    renderedUnreadable.split('\n')[1], renderLocationSection(absent).split('\n')[1],
++    'two different causes must not render the same line'
++  );
++});
++
++test('WO-OR-17 / SEAM CONTROL: the location probes DEFAULT to the real filesystem', () => {
++  // REQUIRED pairing for every injected test above. An injected-only proof establishes that
++  // the injection works and says nothing about the module's real behaviour. Same guard the
++  // sweep's seam already carries.
++  const here = gitFacts(process.cwd()); // no io argument at all
++  assert.equal(here.resolvedPath, normaliseSeparators(realpathSync.native(process.cwd())),
++    'the default io resolved this very directory off real disk');
++  assert.equal(here.cwdFailure, null, 'a real, readable directory has no failure cause');
++
++  const fictional = gitFacts('C:/TOTALLY/FICTIONAL/PATH');
++  assert.equal(fictional.cwdFailure, 'absent', 'and a real ENOENT off real disk classifies as absent');
++  assert.equal(DEFAULT_GIT_IO.statSync, statSync, 'the default really is node:fs, not a stand-in');
++});
++
++test('WO-OR-17 / TQA-001 REAL: an ACL-denied directory on actual disk, with a LOUD control', () => {
++  // The real thing, not a model of it. The injected test above is deterministic everywhere;
++  // this one proves the real filesystem genuinely produces that cause class ÔÇö and it FAILS
++  // LOUDLY if the environment cannot produce the condition rather than skipping, because a
++  // test that silently cannot run is a test that always passes.
++  const user = process.env.USERNAME || process.env.USER;
++  const dir = tmp('wo-or-17-acl-');
++  const locked = join(dir, 'locked');
++  mkdirSync(locked);
++  let denied = false;
++  try {
++    try {
++      execFileSync('icacls', [locked, '/deny', `${user}:(OI)(CI)(RX)`], { stdio: 'ignore' });
++      denied = true;
++    } catch (err) {
++      assert.fail(`CONTROL: could not apply a deny ACE, so this proof could not run at all (${err.code || err.message}). This is NOT a pass.`);
++    }
++
++    // CONTROL: the condition genuinely exists. If the ACE did not bite, everything below
++    // would pass for the wrong reason.
++    let probeErr = null;
++    try { realpathSync.native(locked); } catch (err) { probeErr = err; }
++    assert.notEqual(probeErr, null, 'CONTROL: the deny ACE did not bite ÔÇö the environment did not produce the condition');
++    assert.notEqual(probeErr.code, 'ENOENT', 'CONTROL: the directory must EXIST and be unreadable, not be missing');
++    assert.equal(statSync(locked).isDirectory(), true,
++      'CONTROL: statSync still reports a DIRECTORY ÔÇö which is exactly why "it does not exist" was false');
++
++    const facts = gitFacts(locked); // default io: the real filesystem
++    assert.equal(facts.cwdFailure, 'unreadable');
++    const rendered = renderLocationSection(facts);
++    assert.doesNotMatch(rendered, /no such directory on disk/, 'THE DEFECT, on real disk');
++    assert.match(rendered, /could NOT BE READ/);
++  } finally {
++    if (denied) {
++      try { execFileSync('icacls', [locked, '/remove:d', user], { stdio: 'ignore' }); } catch { /* best effort */ }
++    }
++    rmSync(dir, { recursive: true, force: true });
++  }
++});
++
++test('WO-OR-17 / classifyPathFailure: the cause classes are pinned, including the no-code case', () => {
++  assert.equal(classifyPathFailure({ code: 'ENOENT' }), 'absent');
++  assert.equal(classifyPathFailure({ code: 'ENOTDIR' }), 'absent');
++  assert.equal(classifyPathFailure({ code: 'EPERM' }), 'unreadable');
++  assert.equal(classifyPathFailure({ code: 'EACCES' }), 'unreadable');
++  assert.equal(classifyPathFailure({ code: 'ERR_INVALID_ARG_TYPE' }), 'not-a-path');
++  // A throw carrying no code is never upgraded into a claim about the disk.
++  assert.equal(classifyPathFailure(new Error('bare')), 'unknown');
++  assert.equal(classifyPathFailure(null), 'unknown');
++  assert.equal(classifyPathFailure(undefined), 'unknown');
++});
++
++// ---------------------------------------------------------------------------
++// TQA-002 ÔÇö DETACHED is claimed only for the measured detached response
++// ---------------------------------------------------------------------------
++
++test('WO-OR-17 / TQA-002: a symbolic-ref probe that FAILED must not render as proof of detachment', () => {
++  const dir = tmp('wo-or-17-detach-');
++  try {
++    // Exit 128 is a fatal ÔÇö not a repository, a bad path, a corrupt ref store. It says
++    // NOTHING about attachment, and the old derivation read it as proof.
++    const broken = gitFacts(dir, worldWithSymbolicRef(gitFails(128)));
++    assert.equal(broken.detached, null, 'the probe could not answer, so nothing is concluded');
++    const renderedBroken = renderLocationSection(broken);
++    assert.doesNotMatch(
++      renderedBroken, /DETACHED/,
++      'THE DEFECT: a probe that failed for an unknown reason produced a confident sentence'
++    );
++    assert.notEqual(broken.upstreamState, 'detached', 'and the upstream line does not inherit it either');
++
++    // A spawn failure carries no exit status at all ÔÇö also not an answer.
++    const noGit = gitFacts(dir, worldWithSymbolicRef(gitFails(null)));
++    assert.equal(noGit.detached, null);
++    assert.doesNotMatch(renderLocationSection(noGit), /DETACHED/);
++
++    // CONTROL / THE PAIR: the SAME world, failing with the one status that IS the answer.
++    // Without this the test would be satisfied by code that never claims detachment at all,
++    // which would be a blind spot rather than a repair.
++    const detached = gitFacts(dir, worldWithSymbolicRef(gitFails(1)));
++    assert.equal(detached.detached, true, 'exit 1 from symbolic-ref -q IS the measured detached answer');
++    assert.match(renderLocationSection(detached), /DETACHED ÔÇö HEAD is not on a branch/);
++    assert.match(renderLocationSection(detached), /NOT a claim that nothing is pushed/);
++  } finally {
++    rmSync(dir, { recursive: true, force: true });
++  }
++});
++
++test('WO-OR-17 / ANTI-FICTION CONTROL: REAL git signals detachment with exit status 1, and a real detached HEAD still renders DETACHED', () => {
++  // This is the test that stops the injections above from being a model of my own beliefs.
++  // The whole repair rests on "status 1 means detached, anything else means the probe did
++  // not answer". If that is wrong about real git, every assertion above is worthless.
++  const r = scratchRepo('wo-or-17-real-detached-');
++  try {
++    r.git('checkout', '-q', '--detach', 'HEAD~1');
++
++    let realErr = null;
++    try {
++      execFileSync('git', ['-C', r.root, 'symbolic-ref', '-q', '--short', 'HEAD'],
++        { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
++    } catch (err) {
++      realErr = err;
++    }
++    assert.notEqual(realErr, null, 'CONTROL: real git must FAIL this probe on a detached HEAD');
++    assert.equal(realErr.status, 1,
++      'CONTROL: real git uses exit status 1 for "HEAD is not a symbolic ref" ÔÇö the injected fixtures model the real thing');
++
++    // And the genuine case did not regress while the inferred one was being closed.
++    const facts = gitFacts(r.root);
++    assert.equal(facts.detached, true, 'REAL detached HEAD, default execFile, real filesystem');
++    assert.match(renderLocationSection(facts), /DETACHED/);
++    assert.doesNotMatch(renderLocationSection(facts), /nothing here is pushed/);
++  } finally {
++    r.cleanup();
++  }
++});
++
++// ---------------------------------------------------------------------------
++// C1 ÔÇö the four-state test failing DOWNWARDS: a measurement reported as unknown
++// ---------------------------------------------------------------------------
++
++test('WO-OR-17 / C1: an unborn branch renders the MEASURED branch name, not "(unknown)"', () => {
++  // Every defect in this sequence so far was the block claiming MORE than it measured. This
++  // one claims LESS ÔÇö `symbolic-ref` answered "main" and the block printed "(unknown)" ÔÇö
++  // which is the same dishonesty inverted and is invisible to anyone hunting overclaims.
++  const root = normaliseSeparators(realpathSync.native(mkdtempSync(join(tmpdir(), 'wo-or-17-unborn-'))));
++  try {
++    execFileSync('git', ['-C', root, 'init', '-q', '-b', 'main', '.'], { stdio: 'ignore' });
++    const facts = gitFacts(root);
++
++    // CONTROL: this really is the unborn state ÔÇö git answers one probe and not the other.
++    assert.equal(facts.symbolicBranch, 'main', 'CONTROL: symbolic-ref MEASURED a branch name');
++    assert.equal(facts.headSha, null, 'CONTROL: and there is no commit for rev-parse to resolve');
++    assert.equal(facts.branch, null);
++    assert.equal(facts.detached, null, 'no head resolves, so attachment is not concluded either way');
++
++    const rendered = renderLocationSection(facts);
++    assert.doesNotMatch(
++      rendered, /^ {2}branch {7}: \(unknown\)$/m,
++      'THE DEFECT: a measured branch name was discarded and reported as "I could not tell"'
++    );
++    assert.match(rendered, /^ {2}branch {7}: main \(MEASURED by symbolic-ref; no commit resolved on it\)$/m);
++    // And it must not overclaim in the other direction while fixing this one.
++    assert.doesNotMatch(rendered, /DETACHED/, 'an unborn branch is not a detached HEAD');
++  } finally {
++    rmSync(root, { recursive: true, force: true });
++  }
++});
++
++// ---------------------------------------------------------------------------
++// C3 ÔÇö the SECOND site of the same defect, found by sweeping for the shape
++// ---------------------------------------------------------------------------
++
++test('WO-OR-17 / C3: stdin that COULD NOT BE READ is not stdin that was empty', () => {
++  // `main()` caught the stdin read failure and set `raw = ''`, after which parseHookInput
++  // reported the MEASURED absence "empty stdin" about a payload it never saw. Identical in
++  // shape to soft(), one layer above the git probes.
++  const body = buildBrief('', {
++    stdinError: Object.assign(new Error('read failed'), { code: 'EIO' }),
++    sweepFn: () => null,
++  });
++  assert.match(body, /HOOK INPUT: NOT READ/, 'THE DEFECT: a read failure was indistinguishable from empty stdin');
++  assert.match(body, /EIO/, 'the reason is stated, not merely the failure');
++  assert.match(body, /NOT a report that the host sent nothing/);
++  assert.match(body, /WHERE THIS SESSION IS/, 'and the rest of the brief still renders (INV-2)');
++
++  // CONTROL: genuinely empty stdin carries no such line. Without this the assertions above
++  // would be satisfied by a module printing the caveat unconditionally.
++  const genuinelyEmpty = buildBrief('', { sweepFn: () => null });
++  assert.doesNotMatch(genuinelyEmpty, /HOOK INPUT: NOT READ/,
++    'CONTROL: an empty payload that WAS read must not be reported as unread');
++});
++
++// ---------------------------------------------------------------------------
++// ADDENDUM ÔÇö the sweep's rendered path is a PROVENANCE claim
++// ---------------------------------------------------------------------------
++
++test('WO-OR-17 / ADDENDUM: a symlinked deliverable does not claim to live in Deliverables/', () => {
++  // `statSync` FOLLOWS a symlink, so a link at Deliverables/linked.md was read, reported and
++  // labelled `Deliverables/linked.md` ÔÇö a claim about where the content is that nothing ever
++  // measured. This sequence's defect class applied to a path instead of a git fact.
++  const root = tmp('wo-or-17-symlink-');
++  mkdirSync(join(root, 'Deliverables'));
++  mkdirSync(join(root, 'outside'));
++  const target = join(root, 'outside', 'elsewhere.md');
++  writeFileSync(target, '# Lives outside\n\nNothing will be built until you accept this plan.\n');
++  writeFileSync(join(root, 'Deliverables', 'genuine.md'), '# Genuinely here\n');
++
++  let linked = false;
++  try {
++    try {
++      symlinkSync(target, join(root, 'Deliverables', 'linked.md'), 'file');
++      linked = true;
++    } catch (err) {
++      // Windows may require Developer Mode or elevation. NEVER a silent skip: a proof that
++      // cannot run is not a proof that passed.
++      assert.fail(`CONTROL: could not create a symlink, so this proof could not run at all (${err.code || err.message}). This is NOT a pass.`);
++    }
++    assert.equal(linked, true);
++
++    const out = sweepOpenDeliverables(root, Date.now());
++    // CONTROL: the sweep genuinely found both files, or the assertions below prove nothing.
++    assert.match(out, /Genuinely here/, 'CONTROL: the healthy row is present');
++    assert.match(out, /Lives outside/, 'the linked file is still SHOWN ÔÇö dropping it would trade a false label for a silent omission');
++
++    const linkedRow = out.split('\n').find((l) => l.includes('linked.md'));
++    assert.ok(linkedRow, 'CONTROL: the linked row rendered at all');
++    assert.match(linkedRow, /CONTENT IS NOT IN Deliverables\//,
++      'THE DEFECT: the row claimed the content lived in Deliverables/ and it did not');
++    assert.match(linkedRow, /elsewhere\.md/, 'and the reader is told where it actually resolves');
++
++    // CONTROL: a genuine in-directory file carries NO provenance caveat. Without this the
++    // assertions above would be satisfied by a module that caveats every row.
++    const genuineRow = out.split('\n').find((l) => l.includes('genuine.md'));
++    assert.doesNotMatch(genuineRow, /CONTENT IS NOT IN|provenance NOT established/,
++      'CONTROL: an ordinary file must not be caveated');
++  } finally {
++    rmSync(root, { recursive: true, force: true });
++  }
++});
++
++test('WO-OR-17 / ADDENDUM: a provenance probe that cannot answer says so rather than passing the row as clean', () => {
++  const e = makeEstate([{ name: 'a.md', body: '# A file\n', ageDays: 0 }]);
++  try {
++    const io = { ...realIo, lstatSync: () => { throw Object.assign(new Error('nope'), { code: 'EPERM' }); } };
++    const out = sweepOpenDeliverables(e.root, Date.now(), io);
++    assert.match(out, /provenance NOT established/,
++      'an unanswerable probe must not render as a settled path ÔÇö the whole rule of this module');
++    assert.match(out, /A file/, 'and the row is still shown');
++  } finally {
++    e.cleanup();
++  }
++});
++
++// ===========================================================================
++// THE STRENGTHENED PIN ÔÇö the enumeration's OWN PREDICATE, made executable
++// ===========================================================================
++// WO-OR-14's pin catches a field being ADDED or RENAMED. It cannot catch TWO STATES
++// COLLAPSING INTO ONE RENDERING, which is the actual defect class of this entire sequence ÔÇö
++// the original cwd echo, TQA-001, TQA-002 and the unborn-branch case are all that shape.
++//
++// The enumeration's predicate is one sentence: ANY TWO DISTINGUISHABLE STATES OF A FIELD MUST
++// RENDER DIFFERENTLY. That is asserted directly below, in two layers, and the layers are not
++// interchangeable:
++//
++//   LAYER 1 (renderer)  fact-state -> line. Catches a renderer that collapses two facts.
++//                       Would have caught TQA-001 and the unborn-branch case.
++//   LAYER 2 (world)     world -> gitFacts -> line. Catches a DERIVATION that collapses two
++//                       worlds into one fact before the renderer ever sees them. This is the
++//                       layer that catches TQA-002, and layer 1 provably cannot: the
++//                       `detached` collapse happened inside gitFacts, not in renderBranch.
++//
++// Stated plainly because a mechanism believed to guard something it does not is worse than
++// no mechanism: LAYER 1 ALONE WOULD NOT HAVE CAUGHT TQA-002. Both layers are required, and
++// the pair is what makes the claim "the class is closed" mechanical rather than asserted.
++
++const HEALTHY_FACTS = {
++  worktreePath: 'C:/x', resolvedPath: 'C:/x', resolvedKind: 'directory',
++  cwdFailure: null, cwdFailureCode: null,
++  gitReadable: true, repoRoot: 'C:/x', linkedWorktree: false,
++  headSha: 'abc123', branch: 'main', symbolicBranch: 'main', detached: false,
++  symbolicRefFailure: null, symbolicRefStatus: null, symbolicRefCode: null,
++  dirty: false, unpushed: 0, upstreamRef: 'origin/main', upstreamSha: 'abc123',
++  upstreamState: 'tracked',
++};
++
++const f = (over) => ({ ...HEALTHY_FACTS, ...over });
++
++/** The rendered value of one label, or null when that line did not render. */
++function lineFor(rendered, field) {
++  const m = rendered.match(new RegExp(`^ {2}${field.padEnd(13)}: (.*)$`, 'm'));
++  return m ? m[1] : null;
++}
++
++// THE STATE TABLE. A literal held in this file and deliberately NOT derived from the renderer
++// it checks ÔÇö a table computed from the thing it validates certifies itself.
++const FIELD_STATES = {
++  cwd: [
++    ['measured', f({})],
++    ['measured but UNCLAIMED by the host', f({}), { cwdClaimedByHost: false }],
++    ['nothing was claimed', f({ worktreePath: null, resolvedPath: null, resolvedKind: null, cwdFailure: 'not-a-path' })],
++    ['claimed; measured absent', f({ worktreePath: 'C:/nope', resolvedPath: null, resolvedKind: null, cwdFailure: 'absent' })],
++    ['claimed; probe REFUSED', f({ worktreePath: 'C:/locked', resolvedPath: null, resolvedKind: null, cwdFailure: 'unreadable', cwdFailureCode: 'EPERM' })],
++    ['claimed; probe failed, no reason', f({ worktreePath: 'C:/odd', resolvedPath: null, resolvedKind: null, cwdFailure: 'unknown' })],
++    ['claimed; it is a FILE', f({ worktreePath: 'C:/f.md', resolvedPath: null, resolvedKind: 'file', cwdFailure: null })],
++    ['claimed; it exists but is neither', f({ worktreePath: 'C:/pipe', resolvedPath: null, resolvedKind: 'other', cwdFailure: null })],
++    ['claimed; not a path at all', f({ worktreePath: 7, resolvedPath: null, resolvedKind: null, cwdFailure: 'not-a-path' })],
++  ],
++  'worktree root': [
++    ['measured, primary checkout', f({ linkedWorktree: false })],
++    ['measured, LINKED worktree', f({ linkedWorktree: true })],
++    ['measured, kind not established', f({ linkedWorktree: null })],
++    ['could not tell', f({ repoRoot: null })],
++  ],
++  branch: [
++    ['measured', f({})],
++    ['MEASURED detached', f({ detached: true, symbolicBranch: null })],
++    ['unborn ÔÇö symbolic-ref answered, rev-parse did not', f({ branch: null, headSha: null, detached: null })],
++    // Two distinct probe failures ÔÇö must not collapse (PIN LAYER 2 also checks via gitFacts).
++    ['literal HEAD; symbolic-ref failed fatally', f({ branch: 'HEAD', symbolicBranch: null, detached: null, symbolicRefFailure: 'fatal', symbolicRefStatus: 128 })],
++    ['literal HEAD; symbolic-ref could not run', f({ branch: 'HEAD', symbolicBranch: null, detached: null, symbolicRefFailure: 'unavailable', symbolicRefCode: 'ENOENT' })],
++    ['literal HEAD; attachment unknown', f({ branch: 'HEAD', symbolicBranch: null, detached: null, symbolicRefFailure: 'unknown' })],
++    ['could not tell', f({ branch: null, symbolicBranch: null, detached: null })],
++  ],
++  HEAD: [
++    ['measured', f({})],
++    ['could not tell', f({ headSha: null })],
++  ],
++  'working tree': [
++    ['measured clean', f({ dirty: false })],
++    ['measured dirty', f({ dirty: true })],
++    ['could not tell', f({ dirty: null })],
++  ],
++  upstream: [
++    ['measured, tracked', f({})],
++    ['MEASURED none configured', f({ upstreamRef: null, upstreamSha: null, upstreamState: 'none-configured' })],
++    ['detached, so nothing tracks', f({ upstreamRef: null, upstreamSha: null, upstreamState: 'detached', detached: true })],
++    ['git unreadable', f({ upstreamRef: null, upstreamSha: null, upstreamState: 'unreadable', gitReadable: false })],
++    ['probes ran and did not settle it', f({ upstreamRef: null, upstreamSha: null, upstreamState: 'unknown' })],
++  ],
++  unpushed: [
++    ['measured zero', f({ unpushed: 0 })],
++    ['measured non-zero', f({ unpushed: 3 })],
++    ['could not tell', f({ unpushed: null })],
++  ],
++};
++
++test('WO-OR-17 / PIN LAYER 1: no two states of a field may render the same line', () => {
++  // The four-state test, executable. Collapse any two states ÔÇö which is what every defect in
++  // this sequence did ÔÇö and this names both states and the line they share.
++  let compared = 0;
++  for (const [field, states] of Object.entries(FIELD_STATES)) {
++    const seen = new Map();
++    for (const [label, facts, opts] of states) {
++      const line = lineFor(renderLocationSection(facts, opts ?? {}), field);
++      assert.notEqual(line, null, `CONTROL: field "${field}" did not render at all for state "${label}"`);
++      if (seen.has(line)) {
++        assert.fail(
++          `COLLAPSE ÔÇö field "${field}" renders IDENTICALLY for "${seen.get(line)}" and "${label}":\n    ${line}`
++        );
++      }
++      seen.set(line, label);
++      compared += 1;
++    }
++  }
++  // CONTROL: the loop actually did work. A table that silently emptied would pass vacuously.
++  assert.ok(compared >= 30, `CONTROL: expected the table to exercise 30+ states, got ${compared}`);
++});
++
++test('WO-OR-17 / PIN LAYER 1: the state table covers EXACTLY the enumerated fields', () => {
++  // This ties the two pins together. Add a field to the block and WO-OR-14's pin goes RED;
++  // add it to the enumeration without saying how its states differ and this one does. Neither
++  // list is derived from the renderer, so neither can certify itself.
++  assert.deepEqual(
++    Object.keys(FIELD_STATES).sort(), [...ENUMERATED_LOCATION_FIELDS].sort(),
++    'every enumerated field must carry a state table, and vice versa'
++  );
++  for (const [field, states] of Object.entries(FIELD_STATES)) {
++    assert.ok(states.length >= 2, `field "${field}" needs at least two states or it pins nothing`);
++  }
++});
++
++test('WO-OR-17 / PIN LAYER 2: no two WORLDS may collapse into one rendered line', () => {
++  // The layer that catches TQA-002, and the one layer 1 cannot supply: these run the real
++  // derivation in `gitFacts` rather than handing it a fact object. Under the unfixed module
++  // the first two rows below produce the SAME branch line, which is exactly the finding.
++  const dir = tmp('wo-or-17-pin2-');
++  try {
++    const worlds = [
++      ['symbolic-ref says DETACHED (exit 1)', gitFacts(dir, worldWithSymbolicRef(gitFails(1)))],
++      ['symbolic-ref FAILED fatally (exit 128)', gitFacts(dir, worldWithSymbolicRef(gitFails(128)))],
++      ['symbolic-ref could not run at all (ENOENT)', gitFacts(dir, worldWithSymbolicRef(gitFails(null)))],
++      // abbrev-ref must agree with symbolic-ref: real attached HEAD never returns the
++      // literal "HEAD" from --abbrev-ref while symbolic-ref still names a branch.
++      ['on a branch', gitFacts(dir, worldWithSymbolicRef(() => 'main', 'main'))],
++    ];
++    const seen = new Map();
++    for (const [label, facts] of worlds) {
++      const line = lineFor(renderLocationSection(facts), 'branch');
++      assert.notEqual(line, null, `CONTROL: no branch line for world "${label}"`);
++      if (seen.has(line)) {
++        assert.fail(`COLLAPSE ÔÇö worlds "${seen.get(line)}" and "${label}" both render:\n    ${line}`);
++      }
++      seen.set(line, label);
++    }
++
++    // And the same at the filesystem end, where TQA-001 lived.
++    const io = (code) => ({ realpathSync: () => { throw Object.assign(new Error('x'), { code }); }, statSync });
++    const cwdWorlds = [
++      ['filesystem answered: nothing there', gitFacts('C:/nope', gitFails(128), io('ENOENT'))],
++      ['filesystem REFUSED the probe', gitFacts('C:/nope', gitFails(128), io('EPERM'))],
++      ['probe threw with no reason', gitFacts('C:/nope', gitFails(128), io(undefined))],
++    ];
++    const seenCwd = new Map();
++    for (const [label, facts] of cwdWorlds) {
++      const line = lineFor(renderLocationSection(facts), 'cwd');
++      if (seenCwd.has(line)) {
++        assert.fail(`COLLAPSE ÔÇö cwd worlds "${seenCwd.get(label)}" and "${label}" both render:\n    ${line}`);
++      }
++      seenCwd.set(line, label);
++    }
++    assert.equal(seenCwd.size, 3, 'CONTROL: three distinct cwd worlds were compared');
++  } finally {
++    rmSync(dir, { recursive: true, force: true });
++  }
++});
++
++test('WO-OR-17 / INV-2: the reshaped helper and the new seam still cannot break a session', () => {
++  // Twelve call sites changed shape. This is the row most at risk, so it is asserted over
++  // every hostile input at once, including a hostile io.
++  const dir = tmp('wo-or-17-inv2-');
++  const file = join(dir, 'a-file');
++  writeFileSync(file, 'x');
++  const hostileIo = [
++    undefined,
++    {},
++    { realpathSync: () => { throw new Error('boom'); }, statSync: () => { throw new Error('boom'); } },
++    { realpathSync: () => null, statSync: () => null },
++  ];
++  try {
++    for (const hostile of [undefined, null, '', false, 0, 7, true, {}, [], 'C:/TOTALLY/FICTIONAL/PATH', file, dir]) {
++      for (const io of hostileIo) {
++        assert.doesNotThrow(
++          () => renderLocationSection(gitFacts(hostile, gitFails(128), io ?? undefined)),
++          `gitFacts/render threw on ${JSON.stringify(hostile)} with io ${JSON.stringify(io && Object.keys(io))}`
++        );
++      }
++    }
++    assert.doesNotThrow(() => buildBrief('{}', { stdinError: null, sweepFn: () => null }));
++    assert.doesNotThrow(() => buildBrief('{}', { stdinError: 'a string, not an Error', sweepFn: () => null }));
++  } finally {
++    rmSync(dir, { recursive: true, force: true });
++  }
++});
++
+ // ===========================================================================
+ // PRESERVED BEHAVIOUR 2 ÔÇö the Honcho continuity brief passthrough
+ // ===========================================================================
+-- 
+2.51.0.windows.2
+
