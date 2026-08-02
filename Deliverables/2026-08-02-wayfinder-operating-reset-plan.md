@@ -125,11 +125,32 @@ duplicated here. Read a row there for *what was found*; read it here for *what h
 tangent**. That is the whole point: an item that is neither done, nor decided, nor promoted, nor explicitly
 closed is indistinguishable from one that was forgotten.
 
+> ## 🔴 AUTHORITY CORRECTION — WARWICK, 2026-08-02. READ THIS BEFORE THE LEDGER.
+>
+> **Larry was not authorised to decide which rows were promoted rather than completed. He may RECOMMEND a
+> disposition; he may not make that product decision.** The SHIT TO DO list existed to *defer* tangents during
+> the build and *return them to Warwick at the end*, so that **Warwick** decides what is fixed now, promoted,
+> rejected or deferred. Larry did both halves — recommended and decided — which quietly converted a deferral
+> list into his own disposition authority. That is the failure mode the list was built to prevent, arriving
+> from the inside.
+>
+> **It is worth naming precisely why this was not obvious:** every individual promotion was defensible on its
+> merits, and two of them were argued from real evidence. A defensible decision made by the wrong person is
+> still the wrong person deciding — the error is in the *authority*, not the *judgement*, and a good argument
+> is exactly what makes that hard to notice.
+>
+> **Warwick's decision: rows 2 and 19 are NOT deferred. Both return to ACTIVE Phase 7 scope.** The operating
+> reset does not close and PR #87 does not merge until both are completed and **live-proven**. A fail-loud
+> fallback is useful but does **not** satisfy completion. Row 1 (CareerAIR) remains promoted — do not chase it.
+>
+> **Every disposition below is therefore a RECOMMENDATION until Warwick rules on it.**
+
 | Disposition | Count | Meaning |
 |---|---|---|
 | **COMPLETE NOW** | **7** | Executed and verified inside this closeout. |
+| **ACTIVE PHASE 7** | **2** | **Returned to scope by Warwick.** Rows 2 and 19 — must be completed and live-proven before the reset can close. |
 | **DECISION NOW** | **1** | Warwick's product decision obtained, recorded, and acted on. |
-| **PROMOTE** | **3** | Genuinely a separate future build. Given a durable named home with outcome, boundary, owner and exact next action — then **removed from this reset's active backlog**. |
+| **PROMOTE (ratified)** | **1** | A separate future build, with a durable named home — and **Warwick's agreement that it is deferred**. |
 | **CLOSED / SUPERSEDED** | **10** | Stale, duplicate, withdrawn, or already completed. Recorded accurately, including the ones that turned out to be *my* defect rather than the code's. |
 | | **21** | **Total — every row in the table above, none unaccounted for.** |
 
@@ -143,7 +164,7 @@ acceptance test does not stay in the completed column because the ledger was alr
 | Row | Subject (one line) | Disposition | Where it landed |
 |---|---|---|---|
 | 1 | CareerAIR intake has no consumer; backlog grows silently | **PROMOTE** | `Deliverables/BACKLOG.md` #8 — visibility first, `private_surface` must be declared |
-| 2 | Honcho `listMessages` pagination — `readLatest` returns a stale packet | **PROMOTE** | WO-OR-18 landed the loud-failure mitigation (proven); reaching the newest packet **failed its live test** → `BACKLOG.md` #10 |
+| 2 | Honcho `listMessages` pagination — `readLatest` returns a stale packet | 🔴 **ACTIVE PHASE 7** | *(was: my unilateral PROMOTE — overturned)* WO-OR-18's loud-failure mitigation stands but **does not satisfy completion**. Required: establish Honcho's real `messages/list` contract, implement the smallest correct repair, and **live-prove** — write a uniquely identifiable packet, read it back as newest, then a **genuinely fresh session** must reorient from it with the correct map pointer and phase. |
 | 3 | Two Pax adopts awaiting Warwick | **DECISION NOW** | **Both ADOPTED** — written into `CLAUDE.md` |
 | 4 | Formalise phase-boundary Codex review | **CLOSED / SUPERSEDED** | See the note below — superseded in substance, with a named residual |
 | 5 | GPT's proposed Codex instruction changes | **CLOSED / SUPERSEDED** | Satisfied verbatim by the binding Codex budget rule in `CLAUDE.md` |
@@ -161,7 +182,7 @@ acceptance test does not stay in the completed column because the ledger was alr
 | 16 | Carry-forward ignores `sampled_at`, no process-instance binding | **COMPLETE NOW** | WO-OR-18 outcome 5 |
 | 17 | The Telegram handback ding cannot fire — a silent deadlock | **COMPLETE NOW** | WO-OR-19 — a *sanctioned* ad-hoc milestone entrypoint over the existing Tower library, proven by one real send |
 | 18 | No PR existed; the whole notification chain hangs off one | **CLOSED** | PR #86 (Phase 5) |
-| 19 | The missing bidirectional PR ⇄ Tower seam | **PROMOTE** | `Deliverables/BACKLOG.md` #9 — a NEW PIPELINE, needs Warwick's scope decision |
+| 19 | The missing bidirectional PR ⇄ Tower seam | 🔴 **ACTIVE PHASE 7** | *(was: my unilateral PROMOTE — overturned)* Warwick has now GIVEN the scope decision I said it needed: **build it.** Smallest end-to-end seam — ingest the comment body, bind it to the exact PR + head SHA, persist provenance, make it the `larry_response`/disposition input, fail closed on an undisposed required finding, reject a stale comment against a newer head. **Keep Postgres; no SQLite; no hand-carry; no unrelated framework.** |
 | 20 | Codex review budget — max three executions per gate | **CLOSED** | Graduated into `CLAUDE.md` + the Tower QA skill at Phase 6 close |
 
 ### Row 2 — CONFIRMED by execution, and worse than the row records
@@ -222,7 +243,46 @@ API blameless and the whole finding wrong. It is ruled out by the module's own d
 **35 packets exist on Honcho and cannot be reached through this path.** *Measured through the mechanism that
 records the fact, not inferred from the one that raised the suspicion.*
 
-**Disposition therefore corrected from COMPLETE NOW to PROMOTE.** What landed is real, proven and worth keeping —
+#### ✅ ROW 2 — COMPLETE AND LIVE-PROVEN (2026-08-02, WO-OR-21)
+
+**Root cause, established by Pax against official documentation and the vendor's own generated client:
+`page`, `size` and `reverse` are QUERY-STRING parameters. The request body model accepts exactly one
+property, `filters`.** Our code put all three in the **body**, so the server discarded them in **silence** and
+applied its defaults — `page=1, size=50, reverse=false`, oldest-first. One fact explains every symptom:
+the 50-item window, the fifteen-hour-old "newest", and page 2 returning an identical window.
+`readLatest` was sorting the **wrong fifty packets** correctly.
+
+**Two of our own "established facts" were misreadings of the same silence.** 50 was the **default, not a cap**
+— the documented maximum is 100, and we never hit a limit because we never sent a size. And `size=500` in the
+query string returns **HTTP 422, not a clamped 50**, so code written on the "it clamps" belief would have
+failed in a way we had not predicted.
+
+> **THE TRANSFERABLE LESSON: a parameter in the wrong LOCATION is indistinguishable from a server ignoring
+> you.** No 400, no warning — just plausible, default-shaped data. WO-OR-18's repeat-detection guard was the
+> only thing that caught it, and it correctly diagnosed *"identical window"* while we mis-attributed the cause
+> to a wrong field **name**. Being wrong about the cause while right about the symptom is the expensive kind.
+
+**THE LIVE PROOF — all five of Warwick's requirements, executed in order:**
+
+| # | Requirement | Result |
+|---|---|---|
+| 1 | A uniquely identifiable new packet is delivered | `cont-1785693113365-88-pn6ju1`, marker `PHASE7-LIVEPROOF-KN6J2N` |
+| 2 | It is read back as the NEWEST packet | ✅ `87 packet(s) read over 1 page(s)` — was 50 over 2 — and **zero** incompleteness warnings |
+| 3 | A genuinely fresh session is started | ✅ a separate `claude -p` process with its own SessionStart hook |
+| 4 | Reorientation uses that newest packet | ✅ it echoed `PHASE7-LIVEPROOF-KN6J2N` **verbatim** from its injected context |
+| 5 | The map pointer and phase/next action are correct | ✅ correct map path, "Phase 7 — SHIT TO DO closeout; rows 2 and 19 returned to ACTIVE scope", correct next action |
+
+**The fail-loud fallback was NOT accepted as completion**, per Warwick's ruling — it is retained, and it is now
+silent on the normal path, which is the only state in which a warning means anything.
+
+**A second defect of the SAME CLASS was found during the proof and is NOT fixed** (recorded, not disposed of):
+`continuity.mjs write --focus` **silently ignores the flag** when the stored state already has a focus — it is
+only a fallback (`continuity.mjs:610`), and `--next`, `--objective` etc. are not consulted by `write` at all.
+The first proof attempt therefore delivered a *new packet id carrying stale content*, which read as success.
+The correct route is `set` then `write`. **An accepted-then-discarded parameter, exactly like the bug above.**
+
+**Disposition therefore corrected from COMPLETE NOW to PROMOTE.** *(SUPERSEDED — see the live proof above;
+Warwick overturned the deferral and the row is now complete. Retained for the record.)* What landed is real, proven and worth keeping —
 a silent stale pointer is now a loud one, and the loudness was mutation-tested. What did not land is the ability
 to read the newest packet, and that is blocked on an external unknown (Honcho's actual list-API contract), which
 makes it separate work rather than an unfinished repair. Residual promoted to `Deliverables/BACKLOG.md` **#10**.
