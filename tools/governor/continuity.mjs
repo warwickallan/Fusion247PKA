@@ -235,57 +235,104 @@ export async function writeContinuity(state, opts = {}) {
 
 // ---- public: read ----------------------------------------------------------
 
-// ---- listing: correct under an UNESTABLISHED pagination contract -----------
+// ---- listing: the DOCUMENTED v3 pagination contract ------------------------
 //
-// WO-OR-18. This used to be ONE request for `{size: 50}`, and it silently returned an
-// EARLY window rather than the newest messages. Measured against the live store on
-// 2026-08-02 (Larry's probe, supplied to this Work Order as an input — not measured by
-// the author of this code, see "WHAT IS NOT ESTABLISHED"): 86 packets had been built,
-// `readLatest` could see 50, and the newest it could reach was seq 51, timestamped some
-// fifteen hours earlier. Packets 52-86 were unreachable through this path.
+// WO-OR-18 walked the list DEFENSIVELY because nobody had established this API's pagination
+// contract. WO-OR-21 replaces that guesswork: the contract is now documented and
+// cross-confirmed against the vendor's own generated client — see
+// Deliverables/2026-08-02-pax-honcho-messages-list-contract.md.
 //
-// The consequence was not academic. That stale packet was injected into a live session's
-// continuity brief and named the wrong programme phase. Recovery held only because the
-// packet carries the git-map pointer and the map is the authority — the pointer itself
-// was wrong. A read path that returns an old answer with no indication that it is old is
-// the precise failure this module was built to end.
+// THE DEFECT, IN ONE LINE: `page`, `size` and `reverse` are QUERY-STRING parameters. This
+// code put them in the BODY, and the request body model accepts exactly one property —
+// `filters`. So the server discarded them in silence and applied its own defaults:
+// page=1, size=50, reverse=false, OLDEST FIRST. No 400, no warning, just plausible
+// default-shaped data.
 //
-// WHAT IS NOT ESTABLISHED, AND IS THEREFORE NOT ASSUMED HERE. Nobody has established this
-// API's pagination CONTRACT: not its cursor fields, not `has_more`, not whether a `page`
-// field is accepted at all, not its ordering guarantee. Only the SYMPTOM above was
-// measured. `services/obsidiwikai/src/clients/honcho.mjs` talks to the same host but
-// never calls `messages/list`, so the estate holds no second witness either.
+// That one fact explains every symptom at once: the 50-item window (the DEFAULT, never a
+// cap), the newest reachable packet being some fifteen hours old (oldest-first, so the far
+// end of page 1 was seq 51 of 86), and page 2 returning an identical window (an ignored
+// `page` re-serves page 1). The consequence was not academic — that stale packet was
+// injected into a live session's continuity brief and named the wrong programme phase.
 //
-// So this walks the list UNDER UNCERTAINTY, and the design rule is that every plausible
-// server behaviour has to land somewhere safe rather than somewhere clever:
+// WHY IT SURVIVED, AND WHAT THE SUITE NOW DOES ABOUT IT: a parameter in the wrong LOCATION is
+// indistinguishable from a server that ignores you. Both return plausible data. So the tests
+// assert the request SHAPE — page/size/reverse in the query string, nothing pagination-shaped
+// in the body — and not merely the packet that comes back. A test that checked only the
+// returned packet would have passed against the broken code too.
 //
-//   * server honours `page`          -> pages are walked to exhaustion; the newest is found.
+// THE CONTRACT THIS IS BUILT TO:
+//   * POST .../v3/workspaces/{ws}/sessions/{session}/messages/list?reverse=true&size=100&page=1
+//     with body {}. Use /v3 — the SDK docs list the operation under /v2 and ONLY the prefix
+//     differs; if a request 404s, check the prefix first.
+//   * Envelope {items, total, page, size, pages}. NO cursor, NO has_more, no continuation
+//     token. A walk terminates on `page >= pages`, which is known after the FIRST response.
+//   * `size` default 50, MAXIMUM 100. 50 was never a cap — we never sent a size. size > 100
+//     is HTTP 422, NOT a clamped 50, so it is refused here before it is ever sent.
+//   * reverse=false -> order_by(Message.id ASC) over a monotonic BigInteger identity, i.e.
+//     genuinely chronological. reverse=true is newest-first, which is what this path wants.
+//
+// WHAT IS STILL NOT ESTABLISHED, AND IS THEREFORE NOT ASSUMED: rate limits (NOT FOUND in any
+// official source — unknown, not unlimited), and whether the deployed server matches the
+// `main` branch that was read. The defensive branches below are therefore KEPT rather than
+// deleted. They now cost one comparison on a path that normally terminates on the first
+// response, and each still lands somewhere safe:
+//
+//   * server reports `pages`         -> the walk terminates on page >= pages. THE NORMAL PATH.
+//   * server omits `pages`           -> fall back to short-page / repeat detection.
 //   * server IGNORES `page` and re-serves the identical window
-//                                    -> the repeat-detection guard stops after the second
-//                                       request; page 1 is kept and `complete: false` is
-//                                       reported. No worse than the old behaviour, and it
-//                                       says so instead of looking finished.
-//   * server REJECTS the extra field -> the follow-up request throws, page 1 is already in
-//                                       hand, so it is kept and reported incomplete. Only a
-//                                       failure on the FIRST page is a real Honcho failure,
-//                                       and that still propagates to the caller.
-//   * server is cursor-based         -> a cursor field, if the response offers one, is
-//                                       echoed back on the next request.
-//   * server returns newest-first    -> harmless. `readLatest` sorts regardless.
+//                                    -> the repeat guard stops after the second request and
+//                                       reports `complete: false` instead of looking finished.
+//   * a LATER page fails             -> everything already read is kept, `complete: false`.
+//                                       A FIRST-page failure is a real Honcho failure and
+//                                       still propagates to the caller.
+//   * server offers a cursor         -> echoed back by the walker. INERT against the real
+//                                       transport: the documented contract has no cursor
+//                                       parameter, so fetchMessagePage never sends one.
+//   * server returns oldest-first    -> harmless. `readLatest` sorts regardless (see below).
 //
-// `size` stays at 50 because 50 is the number the server was MEASURED to return, and the
-// map records `size: 500` being capped to the same 50. Asking for more buys nothing and
-// would be a request shape nobody has ever observed this server answer.
-const LIST_PAGE_SIZE = 50;
-const MAX_LIST_PAGES = 40; // 2,000 packets. A bound, not a belief about the store's size.
+// `complete: false` must stay REACHABLE and must stop firing on the normal path. Both halves
+// matter: a read path that can only report success is how the original defect hid, and a
+// warning that fires every time is one nobody reads.
+const LIST_PAGE_SIZE = 100; // the DOCUMENTED MAXIMUM; today's 86 packets fit in ONE request
+const MAX_PAGE_SIZE = 100;  // hard ceiling. 101+ is a 422 from fastapi_pagination, not a clamp
+const LIST_REVERSE = true;  // newest-first: this path wants the newest packet, not the oldest
+const MAX_LIST_PAGES = 40;  // 4,000 messages. A bound, not a belief about the store's size.
 
-// The ONE place in the read path that touches the network. Injectable so the suite can
-// drive every branch enumerated above without a network call and without a credential.
-async function fetchMessagePage({ page, cursor }) {
-  const body = { size: LIST_PAGE_SIZE };
-  if (page > 1) body.page = page;
-  if (cursor != null) body.cursor = cursor;
-  return hf(`/workspaces/{ws}/sessions/${SESSION}/messages/list`, { method: 'POST', body });
+/**
+ * The ONE place in the read path that touches the network.
+ *
+ * `request` is injectable (defaulting to `hf`) so the suite can assert the EXACT (path,
+ * options) pair this builds, with no network call and without entering the credential path.
+ * That injection is the control for this Work Order's defect: asserting on a pure
+ * request-builder would prove the builder correct without proving this function USES it, and
+ * "the right value computed somewhere it is never used" is the precise shape of the bug being
+ * fixed here.
+ *
+ * `hf()` concatenates the path into the URL verbatim and substitutes only the `{ws}` token,
+ * so a query string travels unchanged. It needed no modification to carry these.
+ */
+export async function fetchMessagePage({
+  page = 1,
+  size = LIST_PAGE_SIZE,
+  reverse = LIST_REVERSE,
+  request = hf,
+} = {}) {
+  // Refuse an out-of-range size BEFORE sending it. The server answers an over-limit size with
+  // 422 rather than clamping, so code written on the "it clamps" assumption fails differently
+  // than expected. Loudly here beats mysteriously there.
+  if (!Number.isInteger(size) || size < 1 || size > MAX_PAGE_SIZE) {
+    throw new Error(`continuity: size must be an integer 1..${MAX_PAGE_SIZE} (got ${size}); the server answers an over-limit size with HTTP 422, it does NOT clamp`);
+  }
+  // `page` is 1-based; page=0 is a 422 (minimum: 1).
+  if (!Number.isInteger(page) || page < 1) {
+    throw new Error(`continuity: page must be an integer >= 1 (got ${page}); page is 1-based and page=0 is a 422`);
+  }
+  // QUERY STRING — this is the whole fix. Field order mirrors the documented call so the two
+  // can be compared literally.
+  const qs = new URLSearchParams({ reverse: String(!!reverse), size: String(size), page: String(page) });
+  // BODY — the model accepts exactly one property, `filters`. `{}` is valid and is what the
+  // documented call sends. NOTHING pagination-shaped may go here.
+  return request(`/workspaces/{ws}/sessions/${SESSION}/messages/list?${qs}`, { method: 'POST', body: {} });
 }
 
 function cursorFrom(res) {
@@ -313,8 +360,19 @@ function itemKey(it, index) {
  * there was nothing left — a repeated window, a rejected follow-up request, or the page
  * cap. It is reported rather than smoothed over: a truncated read that presents itself as
  * complete is the same class of defect as the stale packet above.
+ *
+ * WO-OR-21: the NORMAL termination is now `page >= pages`, read from the documented
+ * envelope. With reverse=true and size=100 that is one request for any session up to 100
+ * messages, and it stays correct as the session grows past that. The walk still runs to the
+ * end rather than stopping at the newest packet, because `complete` is only an honest signal
+ * if the walk was actually attempted, and `count` is only accurate if every page was read.
  */
-export async function listAllMessages({ fetchPage = fetchMessagePage, maxPages = MAX_LIST_PAGES } = {}) {
+export async function listAllMessages({
+  fetchPage = fetchMessagePage,
+  maxPages = MAX_LIST_PAGES,
+  size = LIST_PAGE_SIZE,
+  reverse = LIST_REVERSE,
+} = {}) {
   const items = [];
   const seen = new Set();
   let cursor = null;
@@ -324,7 +382,7 @@ export async function listAllMessages({ fetchPage = fetchMessagePage, maxPages =
   for (let page = 1; page <= maxPages; page++) {
     let res;
     try {
-      res = await fetchPage({ page, cursor });
+      res = await fetchPage({ page, cursor, size, reverse });
     } catch (e) {
       // A FIRST-page failure is a genuine Honcho failure and the caller must hear it.
       // A LATER-page failure means this server does not accept the follow-up shape; we
@@ -352,11 +410,24 @@ export async function listAllMessages({ fetchPage = fetchMessagePage, maxPages =
     // new on a page means there is nothing more to get.
     if (added === 0) break;
 
+    // THE DOCUMENTED TERMINATION, and the one that fires on the normal path. `pages` is
+    // authoritative and is present on the very first response, so the loop bound is known
+    // after one call — no cursor, no short-page inference, no repeat-detection needed. When
+    // the server supplies it, it decides, and the fallbacks below are not consulted.
+    const totalPages = Number.isInteger(res?.pages) ? res.pages : null;
+    if (totalPages !== null) {
+      if (page >= totalPages) complete = true;
+      if (complete) break;
+      continue;
+    }
+
+    // ---- FALLBACKS, for a response that carries no `pages` --------------------
     cursor = cursorFrom(res);
 
     // A short page is the conventional end-of-list signal, and it is the only positive
-    // "there is no more" this code is willing to act on.
-    if (batch.length < LIST_PAGE_SIZE && cursor == null) { complete = true; break; }
+    // "there is no more" this code is willing to act on. Compared against the size actually
+    // REQUESTED, not a module constant — the walker owns the size it asked for.
+    if (batch.length < size && cursor == null) { complete = true; break; }
   }
 
   return { items, pages, complete };
@@ -380,6 +451,13 @@ function parsePacketFromContent(content) {
 // below was always correct and was never the defect — it was being handed the wrong fifty
 // packets to sort. `complete` is passed through so a caller can say when the newest packet
 // is only the newest of a truncated read.
+//
+// WO-OR-21: the request now asks for newest-first, so the newest packet arrives on page 1 —
+// and the sort below is KEPT anyway, deliberately. It is not a workaround for an unknown
+// server order: it is this module's own invariant, it costs one comparison over a list this
+// size, and `reverse=true` and a defensive sort cannot disagree about which packet is newest.
+// The sort is also what settles the two ties the server knows nothing about (equal
+// timestamps -> higher seq; equal seq -> live beats backfill).
 export async function readLatest(opts = {}) {
   const { items, pages, complete } = await listAllMessages(opts);
   const packets = items.map((it) => parsePacketFromContent(it.content)).filter((p) => p && p.kind === 'continuity');
@@ -395,9 +473,15 @@ export async function readLatest(opts = {}) {
 
 // Rendered brief for the SessionStart hook. Never throws: an unreachable Honcho
 // yields an HONEST unavailable note plus the local cached state if present.
-export async function readContinuityBrief() {
+//
+// WO-OR-21: `opts` is forwarded to readLatest so the suite can prove the ⚠️ INCOMPLETE line
+// both FIRES when the walk is genuinely truncated and STAYS SILENT on the normal path.
+// Default `{}` — the hook's behaviour is byte-for-byte what it was. Without this the
+// user-visible half of the incompleteness signal could only be asserted by reaching the
+// network, which no test here may do.
+export async function readContinuityBrief(opts = {}) {
   try {
-    const r = await readLatest();
+    const r = await readLatest(opts);
     if (!r) {
       return '⟦GOV⟧ HONCHO CONTINUITY: reachable, but NO continuity packet stored yet. This is the authoritative source of current focus; until one is written, focus is genuinely unknown.';
     }
