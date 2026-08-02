@@ -1,0 +1,124 @@
+repo:  C:/Fusion247PKA
+range: 2aac7d9..8e8ee599fc40b2c38084afd6a4bb27857064550d
+claim: Deliverables/2026-08-02-phase5-evidence/claim-scope-reorient-repairs-v2.json
+scope  : tools/governor/reorient.mjs
+branch : operating-reset/teardown
+
+ÔöÇÔöÇ GIT EVIDENCE (real, read-only) ÔöÇÔöÇ
+resolved=true diff_range=2aac7d9a2d6584fc7d993fc21f5428f649c847d0..8e8ee599fc40b2c38084afd6a4bb27857064550d
+changed_files=["tools/governor/reorient.mjs"]
+diff bytes=44067 of 44067 (real UTF-8 bytes) truncated=false
+packet diff_range=2aac7d9a2d6584fc7d993fc21f5428f649c847d0..8e8ee599fc40b2c38084afd6a4bb27857064550d -- tools/governor/reorient.mjs
+packet scoped_to=["tools/governor/reorient.mjs"] wp_id=null
+
+ÔöÇÔöÇ REAL CODEX MERGE REVIEW (Tower QA skill over the staged diff + the REAL claim) ÔöÇÔöÇ
+ok=true blocked=false model=openai-codex-exec
+{
+  "status": "ok",
+  "verdict": "request_changes",
+  "summary": "Reviewed the staged reorient.mjs repair diff at 8e8ee599fc40b2c38084afd6a4bb27857064550d against Y1ÔÇôY5 and Z1ÔÇôZ3. TQA-001 and TQA-002 are addressed: probe causes are preserved, only symbolic-ref status 1 proves detachment, and other failures render without a false detached diagnosis. Two active honesty gaps remain: cwd directory type is presented as an established session location without measuring enterability, and lists truncated to eight deliverables do not disclose that omission.",
+  "claims_verified": [
+    {
+      "claim": "soft() now preserves probe failure causes instead of collapsing every exception to null.",
+      "status": "confirmed",
+      "evidence": "soft(name, fn) records err in causes[name], including a sentinel for throw null, before returning null."
+    },
+    {
+      "claim": "Detached HEAD is asserted only when symbolic-ref exits with status 1.",
+      "status": "confirmed",
+      "evidence": "detached becomes true only through causes.symbolicBranch?.status === 1; exit 128, ENOENT, and unknown failures leave it null."
+    },
+    {
+      "claim": "The cwd repair establishes a directory the session can actually be in.",
+      "status": "refuted",
+      "evidence": "The code checks realpathSync plus statSync(...).isDirectory(), but explicitly declines an enterability probe and still renders resolvedPath as an established cwd."
+    },
+    {
+      "claim": "The deliverables sweep always marks a rendered list when it is incomplete.",
+      "status": "refuted",
+      "evidence": "rows.slice(0, 8) silently omits every additional readable in-scope row; only unreadable-file omissions are disclosed."
+    }
+  ],
+  "acceptance_results": [
+    {
+      "acceptance_row_id": "Y1",
+      "result": "fail",
+      "rationale": "A directory can resolve and pass isDirectory() while the session cannot enter/traverse it. The renderer nevertheless presents it as established.",
+      "evidence": "gitFacts sets resolvedPath whenever resolved.kind === 'directory'; renderCwd returns that path as fact. The added comment itself acknowledges that TYPE does not establish ENTERABILITY."
+    },
+    {
+      "acceptance_row_id": "Y2",
+      "result": "pass",
+      "rationale": "The confident no-upstream sentence is reachable only from upstreamState === 'none-configured', which requires a measured symbolic branch and a matching existing branch ref whose upstream field is empty.",
+      "evidence": "upstreamState uses upstreamRef, detached, symbolicBranch, and for-each-ref; empty/missing rows and probe failures become unknown. Detached and unreadable states have separate renderings."
+    },
+    {
+      "acceptance_row_id": "Y3",
+      "result": "pass",
+      "rationale": "Within the location block, the repaired cwd, branch, and upstream paths visibly distinguish measured values, absent/unclaimed input, invalid claims, and unresolved probes where those states apply.",
+      "evidence": "renderCwd uses UNCLAIMED/UNVERIFIED diagnoses; renderBranch separates detached, unborn, fatal, unavailable, and unresolved states; upstream rendering separates tracked, none-configured, detached, unreadable, and unknown."
+    },
+    {
+      "acceptance_row_id": "Y4",
+      "result": "fail",
+      "rationale": "The failure model omits the state 'resolved directory but not enterable' and therefore upgrades a weaker type measurement into the stronger location claim.",
+      "evidence": "resolvedPath is populated solely from realpathSync and statSync().isDirectory(); no state represents traversal/enterability failure."
+    },
+    {
+      "acceptance_row_id": "Y5",
+      "result": "fail",
+      "rationale": "Unreadable directory and file states are distinguished from an empty result, but a readable result containing more than eight rows is silently incomplete.",
+      "evidence": "const top = rows.slice(0, 8) truncates the list; no line reports rows.length - top.length. The incompleteness notice covers only unreadable files."
+    },
+    {
+      "acceptance_row_id": "Z1",
+      "result": "pass",
+      "rationale": "The added production filesystem and git probes are contained by local catches or by buildBrief/main fallbacks; no staged probe failure visibly escapes the hook path.",
+      "evidence": "soft captures git failures; cwd rendering is wrapped in buildBrief; sweep catches directory and per-file failures; main catches buildBrief failure and emits fallback text."
+    },
+    {
+      "acceptance_row_id": "Z2",
+      "result": "fail",
+      "rationale": "A path is rendered as a factual cwd from directory type alone even though the code has not measured that the session can actually occupy it.",
+      "evidence": "renderCwd returns facts.resolvedPath without qualification when cwdClaimedByHost is true, despite the source comment admitting enterability was not established."
+    },
+    {
+      "acceptance_row_id": "Z3",
+      "result": "fail",
+      "rationale": "The heading and closing honesty claims are too strong while cwd can be based on an incomplete measurement and a deliverables list can be silently truncated.",
+      "evidence": "The block says 'executed, not assumed' and 'These are facts', but resolvedPath establishes only type; the sweep displays top eight rows without disclosing additional omitted rows."
+    }
+  ],
+  "prior_finding_results": [
+    {
+      "finding_id": "TQA-001",
+      "status": "addressed",
+      "rationale": "Filesystem failures now retain their causes and render absent, unreadable, invalid-argument, and unknown outcomes separately; unreadable no longer becomes 'no such directory'."
+    },
+    {
+      "finding_id": "TQA-002",
+      "status": "addressed",
+      "rationale": "Only symbolic-ref status 1 proves detachment. Fatal, unavailable, and unknown probe failures remain unverified and do not use DETACHED wording in renderBranch."
+    }
+  ],
+  "findings": [
+    {
+      "id": "TQA-003",
+      "technical_impact": "HIGH",
+      "reachability": "ACTIVE",
+      "required_disposition": "BLOCKS_CURRENT_MERGE",
+      "assumed_deployment_baseline": "SessionStart receives a host-supplied path that resolves to a directory but lacks the traversal/enter permission required to use it as cwd.",
+      "evidence": "gitFacts assigns resolvedPath after only realpathSync and statSync(...).isDirectory(); renderCwd then prints it unqualified beneath 'WHERE THIS SESSION IS (executed, not assumed)'. The implementation comments expressly concede that enterability is not measured.",
+      "required_correction": "Do not render directory type as an established session cwd. Add a non-mutating measurement that supports the precise claim, or weaken the rendered claim so it states only that the supplied path resolved to a directory and that session enterability was not established."
+    },
+    {
+      "id": "TQA-004",
+      "technical_impact": "MEDIUM",
+      "reachability": "ACTIVE",
+      "required_disposition": "BLOCKS_CURRENT_MERGE",
+      "assumed_deployment_baseline": "Deliverables contains more than eight readable, recent, in-scope Markdown files.",
+      "evidence": "sweepOpenDeliverables computes top = rows.slice(0, 8) and renders only top. It reports unreadable omissions but never reports readable rows omitted by the eight-row cap.",
+      "required_correction": "When rows.length exceeds top.length, append an explicit incompleteness line giving the number of additional readable in-scope rows not shown, or render the complete list."
+    }
+  ]
+}

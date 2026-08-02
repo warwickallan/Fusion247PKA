@@ -1,0 +1,129 @@
+repo:  C:/Fusion247PKA
+range: 2aac7d9..1088f57aef67a8d953dc333430ac16789d9d6108
+claim: Deliverables/2026-08-02-phase5-evidence/claim-scope-reorient-repairs-v5.json
+scope  : tools/governor/reorient.mjs
+branch : operating-reset/teardown
+
+ÔöÇÔöÇ GIT EVIDENCE (real, read-only) ÔöÇÔöÇ
+resolved=true diff_range=2aac7d9a2d6584fc7d993fc21f5428f649c847d0..1088f57aef67a8d953dc333430ac16789d9d6108
+changed_files=["tools/governor/reorient.mjs"]
+diff bytes=47595 of 47595 (real UTF-8 bytes) truncated=false
+packet diff_range=2aac7d9a2d6584fc7d993fc21f5428f649c847d0..1088f57aef67a8d953dc333430ac16789d9d6108 -- tools/governor/reorient.mjs
+packet scoped_to=["tools/governor/reorient.mjs"] wp_id=null
+
+ÔöÇÔöÇ REAL CODEX MERGE REVIEW (Tower QA skill over the staged diff + the REAL claim) ÔöÇÔöÇ
+ok=true blocked=false model=openai-codex-exec
+{
+  "status": "ok",
+  "verdict": "request_changes",
+  "summary": "The disclosed TQA-001 through TQA-006 repairs are supported by the staged diff, including occupation-gated cwd rendering and the corrected no-upstream wording. One material completeness hole remains in the sweep provenance model: it checks only whether the final file is a symlink, so a symlinked/junction Deliverables directory can cause externally stored content to be labelled as inside Deliverables. This fails Y4 and Z2 and blocks the current merge.",
+  "claims_verified": [
+    {
+      "claim": "A bare cwd path is rendered only after hook-process occupation is measured.",
+      "status": "confirmed",
+      "evidence": "renderCwd returns a bare resolvedPath only when cwdOccupiedByHook === true; false/null receive qualified wording."
+    },
+    {
+      "claim": "Empty upstream configuration no longer claims that nothing is pushed.",
+      "status": "confirmed",
+      "evidence": "upstreamState === 'none-configured' renders '(no upstream configured ÔÇö pushed status NOT established)'."
+    },
+    {
+      "claim": "The failure-state enumeration is complete for every rendered field.",
+      "status": "refuted",
+      "evidence": "sweepOpenDeliverables treats every non-symbolic final file as provenance='inside' without detecting a symlink/junction in the Deliverables directory or another parent component."
+    },
+    {
+      "claim": "Every newly added filesystem and git probe degrades without escaping as an exception.",
+      "status": "confirmed",
+      "evidence": "git probes use soft(); cwd occupation is wrapped; sweep directory, provenance, stat and read probes are caught; buildBrief and main retain outer fail-safe catches."
+    }
+  ],
+  "acceptance_results": [
+    {
+      "acceptance_row_id": "Y1",
+      "result": "pass",
+      "rationale": "Directory type alone cannot produce an unqualified session location; absent, empty, non-string, file, other, unreadable, unoccupied and occupation-unknown cases have distinct qualified renderings. The revised heading limits itself to probes and line-specific measurements.",
+      "evidence": "tools/governor/reorient.mjs renderCwd and renderLocationSection: bare resolvedPath requires cwdOccupiedByHook === true; all other resolved paths state their measurement limit."
+    },
+    {
+      "acceptance_row_id": "Y2",
+      "result": "pass",
+      "rationale": "No-upstream, detached, unreadable and unresolved states render separately, and none-configured expressly withholds any push-status conclusion.",
+      "evidence": "tools/governor/reorient.mjs upstreamState derivation and renderLocationSection upstream branches."
+    },
+    {
+      "acceptance_row_id": "Y3",
+      "result": "pass",
+      "rationale": "For the repaired cwd, branch, upstream and sweep surfaces, measured results, absent claims, rejected claims and indeterminate probes are visibly distinguished where those states apply.",
+      "evidence": "renderCwd uses UNCLAIMED/UNVERIFIED/measured wording; renderBranch separates measured detachment from fatal/unavailable/unknown; upstream rendering separates tracked/none-configured/detached/unreadable/unknown."
+    },
+    {
+      "acceptance_row_id": "Y4",
+      "result": "fail",
+      "rationale": "The enumeration omits parent-component indirection. A regular file reached through a Deliverables directory symlink or Windows junction is classified as inside even though its content may reside outside the intended directory.",
+      "evidence": "tools/governor/reorient.mjs sweepOpenDeliverables provenance block: `if (!io.lstatSync(full).isSymbolicLink()) { provenance = 'inside'; }` validates only the leaf."
+    },
+    {
+      "acceptance_row_id": "Y5",
+      "result": "pass",
+      "rationale": "Unreadable directory, unreadable files, empty result and display-cap truncation produce distinguishable outcomes; incomplete rendered lists disclose both unreadable omissions and cap omissions.",
+      "evidence": "sweepOpenDeliverables returns NOT SWEPT for directory-read failure, NOT SWEPT IN FULL when all candidates fail, appends unreadable counts to partial lists, and appends a display-cap incompleteness line."
+    },
+    {
+      "acceptance_row_id": "Z1",
+      "result": "pass",
+      "rationale": "The added probes are locally guarded and the existing buildBrief/main fallbacks prevent their errors from escaping the hook path.",
+      "evidence": "soft() wraps git and cwd probes; sweep probe operations use try/catch; buildBrief and main retain hard-failure render fallbacks."
+    },
+    {
+      "acceptance_row_id": "Z2",
+      "result": "fail",
+      "rationale": "A leaf file beneath a symlinked/junction Deliverables directory can be confidently rendered as `Deliverables/<name>` with provenance treated as inside although parent provenance was never measured.",
+      "evidence": "sweepOpenDeliverables assigns provenance='inside' solely from leaf lstatSync(full).isSymbolicLink() === false."
+    }
+  ],
+  "prior_finding_results": [
+    {
+      "finding_id": "TQA-001",
+      "status": "addressed",
+      "rationale": "cwd probe causes are retained and unreadable/unknown failures no longer render as measured absence."
+    },
+    {
+      "finding_id": "TQA-002",
+      "status": "addressed",
+      "rationale": "Detachment is asserted only for symbolic-ref status 1; fatal, unavailable and unknown failures have non-detached wording."
+    },
+    {
+      "finding_id": "TQA-003",
+      "status": "addressed",
+      "rationale": "Directory type without measured occupation receives qualified wording rather than a bare session location."
+    },
+    {
+      "finding_id": "TQA-004",
+      "status": "addressed",
+      "rationale": "Rows omitted by the eight-entry display cap are explicitly counted and the list is labelled incomplete."
+    },
+    {
+      "finding_id": "TQA-005",
+      "status": "addressed",
+      "rationale": "The occupation probe gates bare cwd rendering and the heading no longer overclaims session location."
+    },
+    {
+      "finding_id": "TQA-006",
+      "status": "addressed",
+      "rationale": "none-configured now states only that no upstream is configured and explicitly says pushed status is not established."
+    }
+  ],
+  "findings": [
+    {
+      "id": "TQA-007",
+      "technical_impact": "HIGH",
+      "reachability": "ACTIVE",
+      "required_disposition": "BLOCKS_CURRENT_MERGE",
+      "assumed_deployment_baseline": "SessionStart hook running on supported local filesystems, including Windows where directory junctions are ordinary and filesystem links may redirect Deliverables outside its apparent parent.",
+      "evidence": "In tools/governor/reorient.mjs sweepOpenDeliverables, the provenance branch sets `provenance = 'inside'` whenever `lstatSync(full).isSymbolicLink()` is false. It never lstat/resolves and validates the Deliverables directory or intervening parent components. Concrete input: `Deliverables` is a junction or directory symlink to an external directory containing a regular recent `.md` file; the leaf lstat is not a symlink, so the row is rendered as settled `Deliverables/<name>`.",
+      "required_correction": "Measure provenance using resolved directory and leaf paths against an independently established intended estate root, accounting for directory symlinks/junctions and parent-component indirection. If that cannot be established, render provenance as unverified rather than inside."
+    }
+  ]
+}

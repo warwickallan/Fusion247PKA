@@ -1,0 +1,119 @@
+repo:  C:/Fusion247PKA
+range: 2aac7d9..8c9e42544e46277758917eeb1d48dc096b742775
+claim: Deliverables/2026-08-02-phase5-evidence/claim-scope-reorient-repairs-v3.json
+scope  : tools/governor/reorient.mjs
+branch : operating-reset/teardown
+
+ÔöÇÔöÇ GIT EVIDENCE (real, read-only) ÔöÇÔöÇ
+resolved=true diff_range=2aac7d9a2d6584fc7d993fc21f5428f649c847d0..8c9e42544e46277758917eeb1d48dc096b742775
+changed_files=["tools/governor/reorient.mjs"]
+diff bytes=45747 of 45747 (real UTF-8 bytes) truncated=false
+packet diff_range=2aac7d9a2d6584fc7d993fc21f5428f649c847d0..8c9e42544e46277758917eeb1d48dc096b742775 -- tools/governor/reorient.mjs
+packet scoped_to=["tools/governor/reorient.mjs"] wp_id=null
+
+ÔöÇÔöÇ REAL CODEX MERGE REVIEW (Tower QA skill over the staged diff + the REAL claim) ÔöÇÔöÇ
+ok=true blocked=false model=openai-codex-exec
+{
+  "status": "ok",
+  "verdict": "request_changes",
+  "summary": "The upstream, failure-cause, detached-HEAD, and sweep repairs are supported by the staged diff. However, the cwd repair deliberately measures only directory type while Y1 requires establishing a directory the session can actually occupy; the result is still presented beneath ÔÇ£WHERE THIS SESSION IS (executed, not assumed)ÔÇØ. This fails Y1 and Z2 and blocks the current merge.",
+  "claims_verified": [
+    {
+      "claim": "TQA-001 was fixed by preserving and classifying cwd probe failures.",
+      "status": "confirmed",
+      "evidence": "soft(name, fn) retains exceptions in causes; classifyPathFailure distinguishes absent, not-a-path, unreadable, and unknown; renderCwd gives distinct explanations."
+    },
+    {
+      "claim": "TQA-002 was fixed by treating only symbolic-ref status 1 as measured detachment.",
+      "status": "confirmed",
+      "evidence": "detached becomes true only when causes.symbolicBranch?.status === 1; fatal, unavailable, and unknown failures render without asserting detachment."
+    },
+    {
+      "claim": "TQA-003 was fixed by weakening the displayed cwd claim to directory type only.",
+      "status": "confirmed",
+      "evidence": "renderCwd appends ÔÇ£directory type measured; session enterability NOT establishedÔÇØ to every resolved directory."
+    },
+    {
+      "claim": "TQA-004 was fixed by disclosing rows omitted by the display cap.",
+      "status": "confirmed",
+      "evidence": "When rows.length > DISPLAY_CAP, sweepOpenDeliverables appends the omitted count, cap, and ÔÇ£this list is NOT completeÔÇØ."
+    }
+  ],
+  "acceptance_results": [
+    {
+      "acceptance_row_id": "Y1",
+      "result": "fail",
+      "rationale": "The implementation explicitly declines to establish session enterability, although Y1 requires a directory the session can be in.",
+      "evidence": "gitFacts uses realpathSync plus statSync(...).isDirectory(); renderCwd states ÔÇ£session enterability NOT establishedÔÇØ. A directory lacking traversal permission is a concrete input that can pass the type probe without being enterable."
+    },
+    {
+      "acceptance_row_id": "Y2",
+      "result": "pass",
+      "rationale": "The confident no-upstream sentence is reachable only through the measured none-configured state.",
+      "evidence": "upstreamState becomes none-configured only after symbolicBranch is measured and for-each-ref returns a nonempty row ending in ÔÇ£|ÔÇØ; detached, unreadable, and unsettled probes have separate render branches."
+    },
+    {
+      "acceptance_row_id": "Y3",
+      "result": "pass",
+      "rationale": "The changed renderers visibly distinguish measured values, absent host claims, invalid claims, and unresolved probes.",
+      "evidence": "renderCwd has separate measured, UNCLAIMED, FILE/other, absent, unreadable, not-a-path, and unknown forms; renderBranch and upstream rendering similarly separate measured and unresolved states."
+    },
+    {
+      "acceptance_row_id": "Y4",
+      "result": "pass",
+      "rationale": "No additional material failure-class hole was established from the staged implementation beyond the expressly disclosed cwd enterability limitation captured under Y1.",
+      "evidence": "Probe causes are retained and mapped to explicit fallback states; upstream and symbolic-ref derivations fail closed instead of deriving facts from null values."
+    },
+    {
+      "acceptance_row_id": "Y5",
+      "result": "pass",
+      "rationale": "Unreadable directories, unreadable files, empty results, and truncated readable results render distinctly.",
+      "evidence": "Non-ENOENT directory failures return NOT SWEPT; per-file failures increment unreadable; a clean empty result returns null; unreadable and display-cap omissions append explicit incompleteness lines."
+    },
+    {
+      "acceptance_row_id": "Z1",
+      "result": "pass",
+      "rationale": "Added filesystem and git probes are contained by local catches or the buildBrief/main fallback path, so no added probe is shown escaping the hook.",
+      "evidence": "soft captures git failures; sweep probes are caught; buildBrief catches facts and sweep failures; main catches buildBrief failures and emits a fallback body."
+    },
+    {
+      "acceptance_row_id": "Z2",
+      "result": "fail",
+      "rationale": "A resolved directory is still placed under the factual ÔÇ£WHERE THIS SESSION ISÔÇØ heading even though the implementation expressly did not measure whether the session can occupy it.",
+      "evidence": "renderLocationSection retains ÔÇ£WHERE THIS SESSION IS (executed, not assumed)ÔÇØ; renderCwd simultaneously admits ÔÇ£session enterability NOT establishedÔÇØ."
+    }
+  ],
+  "prior_finding_results": [
+    {
+      "finding_id": "TQA-001",
+      "status": "addressed",
+      "rationale": "Unreadable cwd failures no longer collapse into measured absence."
+    },
+    {
+      "finding_id": "TQA-002",
+      "status": "addressed",
+      "rationale": "Only symbolic-ref exit status 1 establishes detachment; other failures remain unverified."
+    },
+    {
+      "finding_id": "TQA-003",
+      "status": "addressed",
+      "rationale": "The prior bare-path overclaim was removed and the enterability limitation is now explicit, although the stronger Y1 acceptance criterion remains unmet."
+    },
+    {
+      "finding_id": "TQA-004",
+      "status": "addressed",
+      "rationale": "Readable rows omitted by the eight-row display cap are now explicitly counted and disclosed."
+    }
+  ],
+  "findings": [
+    {
+      "id": "TQA-005",
+      "technical_impact": "HIGH",
+      "reachability": "ACTIVE",
+      "required_disposition": "BLOCKS_CURRENT_MERGE",
+      "assumed_deployment_baseline": "SessionStart hook running on ordinary supported filesystems where directory type and traversal/enterability permissions can differ.",
+      "evidence": "gitFacts establishes only realpath resolution and statSync(...).isDirectory(). renderCwd explicitly says enterability is not established, yet renderLocationSection places the value under ÔÇ£WHERE THIS SESSION IS (executed, not assumed)ÔÇØ. A directory whose traversal permission is denied is a concrete counterexample.",
+      "required_correction": "Either add a non-destructive measurement that satisfies the approved Y1 enterability criterion, or obtain WarwickÔÇÖs approval to change Y1 and relabel the enclosing heading so it claims only the directory type actually measured."
+    }
+  ]
+}
