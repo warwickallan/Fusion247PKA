@@ -1,5 +1,25 @@
 # Wayfinder plan — the operating reset
 
+## START / RESUME HERE — ordered by Warwick
+
+- This Git Wayfinder is the sole route and source of truth.
+- Read the current phase, gate and evidence before acting.
+- Honcho points here; it does not replace this map.
+- Do not create a todo list, parallel tracker or replacement plan.
+- Update this map only at meaningful phase boundaries: PASS, PARTIAL or FAILED, with an evidence pointer.
+- Continue autonomously until completion or a genuine Warwick-only blocker.
+- Before any clear, restart or handoff, ensure Honcho contains this exact path, current phase/gate and next action.
+
+## Phase status (durable — the tracker; update ONLY at a phase boundary: PASS / PARTIAL / FAILED + evidence)
+
+- **Phase 0 — plan on git — PASS** (Warwick reviewing live).
+- **Phase 1 — F1a bounded git + F1b thin-Larry edit asymmetry — PASS.** Restricted Larry blocked from editing while a specialist performed + reversed the edit (objective file checks). Evidence: `Deliverables/2026-08-02-phases-2-4-evidence.md`.
+- **Phase 2 — duty ownership under restriction — PASS.** Git + continuity via Larry's Bash routes; session-logs via delegation; no general Write retained.
+- **Phase 3 — F2 automatic continuity journey — PASS.** Session-end auto-derive → Honcho → fresh session recovered it (ACME-TEAL-42 write→fresh-read round trip). Fix: recursion guard + SessionEnd `timeout:120`, commit `bb88771`.
+- **Phase 4 — F3 acceptance test — PARTIAL (not yet PASS).** Realistic task fully delegated under thin-Larry; specialist implemented + tested (5/5 pass, assertions mutation-checked). One avoidable prompt found: `node --test <file>` is not allow-listed. Remedy per this plan: fix the map (add a `node --test` prefix allow-rule), re-run to zero avoidable prompts, then mutation-test the F1a dangerous-git gate. Evidence: this session; `out/phase4-demo/`.
+- **Phase 5 — teardown diff + bounded Codex review (twice) — pending.**
+- **Phase 6 — integrate, then managed-settings hardening — pending.**
+
 _2026-08-02. **The single canonical route.** Supersedes the joint proposal (false runtime premise) and folds in the corrected reset inventory + GPT's review of 2026-08-01. Reviewable on git by Warwick and GPT. **Nothing here is executed** — this is a plan, and it stops at clarity._
 
 **Rule 5 (new, Warwick 2026-08-02; scope narrowed after GPT review):** use Wayfinder **only when there is material route uncertainty that must be resolved before safe execution.** NOT for routine or already-understood work — otherwise "complexity" becomes an excuse to plan everything, and VlogOps needs a Wayfinder plan to decide whether it needs a Wayfinder plan. This document is the first application, and a live test of whether Wayfinder actually works.
