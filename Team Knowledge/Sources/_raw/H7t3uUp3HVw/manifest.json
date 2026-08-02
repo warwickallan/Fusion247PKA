@@ -1,0 +1,41 @@
+{
+  "source_url": "https://www.youtube.com/watch?v=H7t3uUp3HVw",
+  "video_id": "H7t3uUp3HVw",
+  "captured_at": "2026-08-02T08:45:51+00:00",
+  "title": "Anthropic Just Fixed Graph Engineering's Greatest Flaw",
+  "channel": "AI LABS",
+  "published_date": "2026-07-29",
+  "duration_seconds": 847,
+  "user_note": "BUILD-002 WP2 auto-detect",
+  "transcript_status": "extracted",
+  "transcript_source": "auto_captions",
+  "language": "English (auto-generated)",
+  "language_code": "en",
+  "segment_count": 441,
+  "error_category": null,
+  "error_detail": null,
+  "retry_recommendation": null,
+  "tool_versions": {
+    "python": "3.13.6",
+    "youtube-transcript-api": "1.2.4",
+    "yt-dlp": "2026.7.4"
+  },
+  "routing": {
+    "fusion_review_status": "pending_cairn",
+    "assigned_agent": "youtubair",
+    "next_agent": "cairn",
+    "legacy_review_status": "pending_categorisair",
+    "legacy_next_agent": "categorisair",
+    "note": "Cairn has absorbed the legacy CategorisAIr role; legacy_* are aliases only."
+  },
+  "handoff": null,
+  "output_dir": "out\\auto\\2026-08-02__anthropic-just-fixed-graph-engineerings-greatest-flaw__H7t3uUp3HVw",
+  "files": [
+    "TubeAIR Report - anthropic-just-fixed-graph-engineerings-greatest-flaw - H7t3uUp3HVw.md",
+    "manifest.json"
+  ],
+  "idea": "IDEA-013",
+  "project_id": "F247-YT-INGRESS-001",
+  "build": "TubeAIR",
+  "schema_version": 2
+}

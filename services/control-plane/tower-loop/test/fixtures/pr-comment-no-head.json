@@ -1,0 +1,12 @@
+{
+  "_comment": "WO-OR-22 fixture — a comment with dispositions but NO `@tower head:` directive. Fully static (no substitution). Ingest must REFUSE it: a comment that does not state the head it was written against cannot be bound to one, and binding it to a head the author never saw is exactly the defect this seam prevents.",
+  "action": "created",
+  "repository": { "full_name": "warwickallan/Fusion247PKA" },
+  "issue": { "number": 87 },
+  "comment": {
+    "id": 2200000003,
+    "user": { "login": "warwickallan" },
+    "created_at": "2026-08-02T13:00:00Z",
+    "body": "@tower finding 11111111-1111-1111-1111-111111111111: addressed — trust me, it's fine.\n"
+  }
+}

@@ -5,8 +5,18 @@ name: governor-tests
 # NARROWED 2026-08-02 by WO-OR-05, the operating-reset Phase 5 teardown. Eight modules and
 # their suites were deleted (stop-controller, install-hooks, rotate-session, collect-state,
 # worktree-recon, programme-state, plus the programme-state schema and fixtures). Ten
-# modules survive; eight of them have suites. This job runs seven of those eight — see the
-# exclusion note below for the one it does not, and why.
+# modules survive.
+#
+# WIDENED 2026-08-02 by WO-OR-18, the Phase 7 closeout. This job now runs ALL TEN suites
+# and excludes nothing. Two of the ten modules had no suite at all (continuity.mjs,
+# continuity-derive.mjs) and now have one; reorient.test.mjs was the single exclusion and
+# its stated reason — that it asserted against a multi-worktree estate and banked programme
+# state — was removed by the very teardown above.
+#
+# UNPROVEN AT THE TIME OF WRITING, AND SAID SO DELIBERATELY: the author of this change ran
+# all ten suites on the Windows development machine, not on a fresh windows-latest runner,
+# and had no authority to push. The first CI run IS the proof of this widening. The two
+# places it is most likely to bite are named in the risk note beside the run step.
 #
 # WHY THIS EXISTS. Keel's WP-1 preflight reported that no workflow referenced
 # tools/governor at all: the suite was builder-run only, so nothing enforced it on
@@ -60,50 +70,116 @@ jobs:
       - name: State what this job does NOT cover
         shell: bash
         run: |
-          echo "NOT COVERED BY CI — ONE suite is excluded:"
-          echo "  reorient.test.mjs        — asserts against real git in the working checkout"
+          echo "NOT COVERED BY CI — NOTHING IS EXCLUDED ANY MORE."
+          echo "Every *.test.mjs under tools/governor/ runs in this job."
           echo ""
-          echo "TWO EXCLUSIONS WERE REMOVED RATHER THAN LEFT IN PLACE:"
+          echo "THREE EXCLUSIONS WERE REMOVED RATHER THAN LEFT IN PLACE:"
           echo "  collect-state.test.mjs   — the module and its suite were DELETED (WO-OR-05)."
           echo "  model-gate.test.mjs      — deleted when the model gate was retired, 2026-08-01."
+          echo "  reorient.test.mjs        — INCLUDED from WO-OR-18. It was excluded because it"
+          echo "                             asserted against a multi-worktree estate and banked"
+          echo "                             programme state; the Phase 5 teardown deleted both,"
+          echo "                             so the reason it carried no longer exists."
           echo "A 'grep -v' naming a file that no longer exists is a filter nobody can tell is"
           echo "doing nothing, so each exclusion is removed when its subject is."
           echo ""
-          echo "TWO OF THE TEN SURVIVING MODULES HAVE NO SUITE AT ALL, and neither a green here"
-          echo "nor the count below says anything about them:"
-          echo "  continuity.mjs           — the Honcho read/write path and the Stop hook"
-          echo "  continuity-derive.mjs    — the SessionEnd derivation"
-          echo "That is a real coverage gap, recorded as a finding rather than hidden."
-          echo "A skipped test is NOT a passing test, and an untested module is not a tested one."
+          echo "EVERY SURVIVING MODULE NOW HAS A SUITE. The two that did not — continuity.mjs"
+          echo "(the Honcho read/write path and the Stop hook) and continuity-derive.mjs (the"
+          echo "SessionEnd derivation) — gained one in WO-OR-18, and both run here."
+          echo ""
+          echo "WHAT A GREEN HERE STILL DOES NOT SAY:"
+          echo "  - continuity.mjs is exercised through an INJECTED fetch seam. The LIVE Honcho"
+          echo "    pagination contract (cursor fields, has_more, ordering guarantees) is NOT"
+          echo "    established by this job, and has never been established by anyone — only the"
+          echo "    symptom was measured. The code is built to be correct under that uncertainty."
+          echo "  - continuity-derive.mjs's deriveState() runs with the LLM call STUBBED."
+          echo "    No 'claude -p' invocation is exercised anywhere in this job."
+          echo "A skipped test is NOT a passing test, and an untested path is not a tested one."
 
-      - name: Run the portable governor suites and assert they actually executed
+      # THE WO-OR-18 PREDICTION, NOW SCORED AGAINST A REAL RUN (WO-OR-20, 2026-08-02).
+      # The note this replaces was written before the job had ever executed on a runner, so
+      # that a red run would be READ rather than rediscovered. It has now run. An unscored
+      # prediction is worse than no prediction, because a guess left alone ages into a fact,
+      # so both risks are settled here with their outcome.
+      #
+      #   RISK 1 — DETACHED HEAD from actions/checkout@v4.  DID NOT BITE. NOW EXECUTED.
+      #     Predicted: gitFacts(process.cwd()) asserts a 40-char headSha, a string branch and
+      #     gitReadable === true, all three BELIEVED to survive detachment because
+      #     `--abbrev-ref HEAD` returns the literal "HEAD", which is a string. That belief is
+      #     now executed on windows-latest and held: all three passed, and 52 of the 53
+      #     reorient tests passed on a fresh runner.
+      #
+      #   RISK 2 — the real deny ACE.  BIT, EXACTLY AS PREDICTED.
+      #     Observed: `not ok 205 - WO-OR-17 / TQA-001 REAL ...`, failing on
+      #     'CONTROL: the deny ACE did not bite — the environment did not produce the
+      #     condition'. The runner account holds an ADMINISTRATOR TOKEN, which bypasses a
+      #     deny ACE by design. So the environment cannot host the condition, and the product
+      #     is not defective: one assertion had been answering two different questions.
+      #
+      #     REPAIRED IN WO-OR-20, AND NOT BY RE-EXCLUDING THE FILE. The old note ended "the
+      #     fix is a defect in the test's environmental assumption — not a licence to
+      #     re-exclude the file quietly", and that is what was honoured. The test now decides
+      #     by OBSERVING whether a deny ACE restrains the process (icacls + node:fs only —
+      #     never the module under test, never an env-var sniff) and reports a third outcome,
+      #     NOT APPLICABLE: a pass carrying a marker, counted below against a literal ceiling
+      #     and re-emitted as an annotation. On a future NON-ADMIN runner the test starts
+      #     running for real, with no edit and nobody's permission. Nothing is excluded and
+      #     nothing is skipped — `--test-skip-pattern` was available and was deliberately not
+      #     used, because a test name that vanishes from the run is precisely the quiet
+      #     re-exclusion the old note forbade.
+      #
+      #   WHAT A GREEN HERE NOW PROVES, AND WHAT IT DOES NOT. It proves the deterministic
+      #   cause-classification is correct, and that the runner was ASKED the capability
+      #   question and answered no. It does NOT prove that a real ACL-denied directory on
+      #   real disk is handled correctly — that ground is examined only where a deny ACE
+      #   actually restrains the process, which today means Warwick's machine. The marker
+      #   exists so that limitation is visible on the run page instead of hiding inside a
+      #   green.
+      - name: Run the governor suites and assert they actually executed
         shell: bash
         run: |
           set -o pipefail
-          # ONE explicit exclusion, not a silent skip, and it is named above. Everything
-          # else must be green.
-          FILES=$(ls tools/governor/*.test.mjs | grep -v 'reorient.test.mjs')
+          # No exclusions. If one is ever needed again, name it HERE and in the block
+          # above — a silent skip is indistinguishable from a pass.
+          FILES=$(ls tools/governor/*.test.mjs)
           echo "running:"; echo "$FILES"
 
           # A DELETION MUST NOT BE ABLE TO LOOK LIKE A PASS. The executed-count assertion
           # below catches a suite that ran nothing, but not a narrowing that quietly
-          # dropped whole FILES — seven green files and four green files both print a
+          # dropped whole FILES — ten green files and four green files both print a
           # positive pass count. So the file count is asserted too, against a literal held
           # here rather than derived from the glob that produced it.
-          expected=7
+          #
+          # 7 -> 10 at WO-OR-18: reorient.test.mjs is no longer excluded (+1), and
+          # continuity.test.mjs / continuity-derive.test.mjs are new (+2).
+          expected=10
           actual=$(echo "$FILES" | grep -c 'test.mjs')
           if [ "$actual" -ne "$expected" ]; then
             echo "::error::SUITE SET CHANGED — expected ${expected} test files, found ${actual}. If a suite was legitimately added or deleted, update this literal in the same commit."
             exit 1
           fi
+          # THE DEAD FAILURE BRANCH, REPAIRED (WO-OR-20). `shell: bash` runs
+          # `bash --noprofile --norc -eo pipefail {0}`, so `-e` was ALREADY on before this
+          # script's first line and the `set -o pipefail` above is redundant. A failing
+          # suite therefore aborted the step at the `node --test` pipeline, and EVERY
+          # diagnostic below it — including the `::error::FAILED — N failing test(s)`
+          # annotation this job was built to print — was unreachable exactly when it was
+          # needed. Nothing was unsafe (the step still exited non-zero), but the loud
+          # message has never once printed: the first red run of this job emitted raw TAP
+          # and no annotation at all. That is the same defect class as the test WO-OR-20
+          # repairs, one layer up: a control that cannot report over the ground it exists
+          # to report on. Every counting grep below therefore carries `|| true`, because
+          # under `-e` a zero-match grep would kill an otherwise green step.
+          set +e
           node --test $FILES 2>&1 | tee suite.log
-          status=$?
+          status=${PIPESTATUS[0]}
+          set -e
 
           # `node --test` reports totals in a TAP summary. Extract the pass count and
           # require it to be a positive integer. An empty or zero count means the
           # suite did not run, which is a FAILURE and never a pass.
-          passed=$(grep -E '^# pass [0-9]+$' suite.log | tail -1 | awk '{print $3}')
-          failed=$(grep -E '^# fail [0-9]+$' suite.log | tail -1 | awk '{print $3}')
+          passed=$(grep -E '^# pass [0-9]+$' suite.log | tail -1 | awk '{print $3}' || true)
+          failed=$(grep -E '^# fail [0-9]+$' suite.log | tail -1 | awk '{print $3}' || true)
 
           echo "executed-pass=${passed:-<absent>} executed-fail=${failed:-<absent>}"
 
@@ -116,9 +192,39 @@ jobs:
             exit 1
           fi
           if [ "${failed:-1}" -ne 0 ]; then
-            echo "::error::FAILED — ${failed} failing test(s)."
+            echo "::error::FAILED — ${failed} failing test(s). See the TAP output above for the failing subtest names."
             exit 1
           fi
 
-          echo "OK — ${passed} tests executed and passed."
+          # THE THIRD OUTCOME, COUNTED AGAINST A LITERAL CEILING (WO-OR-20).
+          # A test can end three ways — passed, failed, or THE ENVIRONMENT COULD NOT HOST
+          # THE CONDITION IT NEEDS. The third is reported as a pass carrying a marker,
+          # because `--test-skip-pattern` and `t.skip()` both make the test NAME vanish or
+          # scroll past, and this job's own rule is that a silent skip is indistinguishable
+          # from a pass. Two things stop it being silent:
+          #   1. every marker line is re-emitted as a ::warning:: ANNOTATION, which lands on
+          #      the run summary page rather than three hundred lines into a log; and
+          #   2. the COUNT is asserted against a literal held right here, exactly like
+          #      expected=10 above, so this state cannot spread from one test to five
+          #      without someone raising this number in the same commit.
+          #
+          # A CEILING, NOT AN EQUALITY, AND THE DIFFERENCE IS THE WHOLE POINT. `-eq 1` would
+          # go RED on the day the outcome we actually want arrives — a non-admin runner
+          # where the ACL test genuinely runs for real and the count correctly drops to 0.
+          # A guard that punishes success gets deleted, and then nothing is watching at all.
+          max_notapplicable=1
+          notapplicable=$(grep -c 'GOVERNOR-TEST-NOT-APPLICABLE:' suite.log || true)
+          grep 'GOVERNOR-TEST-NOT-APPLICABLE' suite.log 2>/dev/null | sed 's/^# *//' | while IFS= read -r line; do
+            echo "::warning title=NOT APPLICABLE on this runner::${line}"
+          done || true
+          if [ "$notapplicable" -gt "$max_notapplicable" ]; then
+            echo "::error::NOT-APPLICABLE SPREAD — ${notapplicable} test(s) report that this environment cannot host their condition; the ceiling is ${max_notapplicable}. A green run now covers less ground than it used to. Name the new one and raise this literal deliberately, or fix the test."
+            exit 1
+          fi
+
+          if [ "$notapplicable" -gt 0 ]; then
+            echo "OK — ${passed} tests executed and passed, BUT ${notapplicable} of them did NOT examine their subject on this runner (ceiling ${max_notapplicable}). See the annotations above."
+          else
+            echo "OK — ${passed} tests executed and passed, and none reported NOT APPLICABLE."
+          fi
           exit $status

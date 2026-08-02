@@ -71,13 +71,26 @@ export function extractConversation(transcriptPath, { maxMsgs = MAX_MSGS } = {})
 
 // ---- LLM derive -----------------------------------------------------------
 
-export function deriveState(conversation, { model = DERIVE_MODEL, timeoutMs = 120000 } = {}) {
+// `spawnFn` is INJECTED, defaulting to the real thing (WO-OR-18). This follows the
+// estate's existing injection style — `footer.mjs` takes readSample/dirFor/listDir/
+// existsFn/statFn, `sampler.mjs` takes writer/readSample/windowResolver — and it is here
+// for one reason: the shape guard below is the control that stops a malformed derive from
+// wiping a good continuity state, and it cannot be exercised at all without deciding what
+// the model returns. The alternative is invoking a real LLM per assertion, which is
+// non-deterministic, costs money, and would make this suite depend on the network.
+//
+// NOT to be confused with a STORE seam. This module's persistence path deliberately has
+// no override: its tests redirect the home directory instead, because a seam added purely
+// so a test can reach a file is a new mechanism, and the regrowth cap applies to test
+// affordances exactly as it applies to product code. A default parameter matching the
+// module's own siblings is not that.
+export function deriveState(conversation, { model = DERIVE_MODEL, timeoutMs = 120000, spawnFn = spawnSync } = {}) {
   // The derive is itself a `claude -p` session; if it runs in a repo whose settings
   // wire this module as a SessionEnd hook, that inner session's end would re-invoke
   // this module -> unbounded recursion. Mark the inner process so the guard in main()
   // makes it a no-op. (SessionEnd fires in headless `claude -p` — verified — so the
   // guard is load-bearing, not defensive.)
-  const res = spawnSync('claude', ['-p', DERIVE_PROMPT, '--model', model, '--max-turns', '1'], {
+  const res = spawnFn('claude', ['-p', DERIVE_PROMPT, '--model', model, '--max-turns', '1'], {
     input: conversation, encoding: 'utf8', timeout: timeoutMs, windowsHide: true,
     env: { ...process.env, CONTINUITY_DERIVE_ACTIVE: '1' },
   });

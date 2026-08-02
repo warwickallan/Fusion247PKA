@@ -1,0 +1,12 @@
+{
+  "_comment": "WO-OR-22 fixture — a STALE comment. Its head directive is a real canonical 40-hex SHA that is deliberately NOT the turn's current head, so ingest must reject it and apply none of its dispositions.",
+  "action": "created",
+  "repository": { "full_name": "warwickallan/Fusion247PKA" },
+  "issue": { "number": 87 },
+  "comment": {
+    "id": 2200000002,
+    "user": { "login": "warwickallan" },
+    "created_at": "2026-08-02T11:00:00Z",
+    "body": "Reviewed this earlier — all clear from my side.\n\n@tower head: ffffffffffffffffffffffffffffffffffffffff\n@tower finding __FINDING_A__: addressed — looked fine when I read it.\n@tower finding __FINDING_B__: addressed — this one too.\n"
+  }
+}

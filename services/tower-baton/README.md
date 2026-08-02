@@ -67,6 +67,96 @@ it as JSON. Re-entrant (a restarted Larry resumes without duplicates). On timeou
 posts an honest `TOWER_UNAVAILABLE`, alerts Telegram, and exits **4 = HALT** (Larry
 stops QA-dependent work).
 
+### Ad-hoc milestone (the sanctioned one-off ding)
+
+```
+node bin/notify-milestone.js --purpose escalation --body "one sentence" --source LARRY
+```
+
+**What it is for.** Sending a single milestone when the watcher is not running — a
+handback is owed, a route is blocked, a verdict needs eyes. It is the **only**
+sanctioned way to emit an ad-hoc milestone; a bespoke caller written for the occasion
+is not. It drives the same `runtimeConfig` + `telegramNotifier` the watcher uses, so it
+needs **no Postgres, no ClickUp and no terminal session** — the loader resolves
+`TELEGRAM_BOT_TOKEN` and `AUTHORISED_TELEGRAM_USER_ID` by NAME from the secret store.
+No credential is accepted on the command line, and none is ever printed.
+
+**Vocabulary — closed, and narrower than the library's.** Available here:
+
+| Purpose | Use it when |
+| --- | --- |
+| `escalation` | a decision or handback is owed |
+| `blocked` | fail-closed; something must be cleared before work continues |
+| `tower_unavailable` | the QA route stopped; dependent work must HALT |
+| `review_posted` | a verdict is waiting to be read |
+
+`watcher_online`, `watcher_recovered` and `clickup_token_missing` are **refused here** —
+they are states the watcher observes about *itself*, and a human able to hand-fake them
+is how a monitoring channel starts lying. Rejections say which of the two problems it
+is: *"not a milestone"* (not in the vocabulary at all) or *"not available to this
+entrypoint"* (a real milestone, machine-only).
+
+**The ⟦GOV⟧ footer is appended automatically — by EVENT, never by memory.**
+
+Root `CLAUDE.md` makes the footer event-driven: it appears when Warwick has something to
+act on, and never as a per-reply staple. This command binds that to the milestone class
+instead of to an agent remembering:
+
+| Class | Purposes | Footer |
+| --- | --- | --- |
+| **handback** | `escalation`, `blocked` | **appended** — he must act |
+| **routine** | `review_posted`, `tower_unavailable` | **not appended** — a footer on a message that requires nothing of him manufactures the exact interruption it exists to prevent |
+
+The line is rendered by `tools/governor/footer.mjs` (`computeFooterLine`) and never
+hand-composed: a hand-built footer one field short parses as *no* footer, which reads
+exactly like a healthy reply. It goes **last**, after a blank line, because
+`extractFooterLine` reads the final line and no other. Wire text: `[LARRY] <body>`, blank
+line, footer.
+
+```
+node bin/notify-milestone.js --purpose escalation --body "one sentence" --source LARRY --handback merge-decision
+```
+
+- `--handback <code>` is **optional** and accepted only on `escalation`/`blocked`. The
+  codes are `footer.mjs`'s frozen `HANDBACK_CODES` — the constitution's seven legitimate
+  interruptions. An unrecognised code, or one passed with a routine purpose, is a **usage
+  error (exit 2, nothing loaded, nothing sent)**; it is never coerced into `CONTINUE`.
+- Omit it and the footer keeps `footer.mjs`'s own default control token. No code is
+  invented here.
+- **The footer can never cost a send.** If the renderer throws, the message goes out
+  without a footer and exits 0 — a governor line is not worth a lost handback.
+- **`BLIND` is a correct outcome, not a failure.** Missing or unreadable telemetry still
+  renders a footer, saying `BLIND` rather than a state it did not measure. It is never
+  suppressed: that would make the governor quietest exactly when it stopped measuring, and
+  would withhold the one advice that is never withheld — rotate.
+- **Known limitation — no session id exists in a CLI process, and no flag invents one.**
+  The health sample resolves by `resolveHealthSample` rule 2: the newest sample under the
+  **cwd-derived** project key, marked approximate (the `~` in `ctx ~NN%`). Run from a
+  worktree, or any directory whose key holds no samples, the line honestly reads `ctx --`
+  · `BLIND`. An honest approximate marker beats a flag nobody will pass.
+
+**What it does NOT do.**
+
+- **Not a console.** Routine progress has no purpose it can be sent under, by design.
+- **No dedup, so RE-RUNNING RESENDS.** It deliberately keeps no state: the watcher's
+  dedup store lives in the secrets store, and sharing that namespace would let an ad-hoc
+  `escalation` silently suppress a real one. Send once, on purpose.
+- **No retry, no queue, no scheduling.** One process, one attempt, one answer.
+- **No inbound polling, no ClickUp, no Codex, no merge.** Outbound `sendMessage` only.
+- **Does not read the body from stdin or a file.** `--body` on the command line only.
+
+**Exit codes — a send that did not happen never exits 0.**
+
+| Exit | Meaning |
+| --- | --- |
+| `0` | sent. `{"sent":true,"messageId":"…"}` on **stdout**, nothing on stderr |
+| `1` | **NOT SENT** — config fail-closed, notifier not ready, dropped, deduped, or the send failed. Reason on stderr, **nothing on stdout** |
+| `2` | usage error — bad/missing purpose, empty body, unknown source. Nothing was loaded and nothing was sent |
+
+There is no output on any failure path that reads as success. That is the point of the
+command: a silent failure and a quiet channel are indistinguishable to the person
+waiting, so this one is never silent.
+
 ## Durable state / lockfile / logs (all outside the repo)
 
 - **State (cache):** `C:\.fusion247\tower-baton-state.json` — answered `checkpoint_id`s,

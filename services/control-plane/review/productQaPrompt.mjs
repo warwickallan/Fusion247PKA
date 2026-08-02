@@ -216,6 +216,19 @@ export function loadProductQaPrompt({
       '    the merge: only a BLOCKS_CURRENT_MERGE finding (or a failed acceptance) blocks; an improvement',
       '    (NOTE_ONLY / TRACKED_FOLLOWUP) never blocks (reviewer-classification amendment, above).',
       '',
+      '  · THE BAR FOR BLOCKS_CURRENT_MERGE (Warwick, 2026-08-02). Assign it ONLY to a finding that is',
+      '    ACTIVE, REACHABLE and IN SCOPE, and that threatens one of: the stated outcome · safety ·',
+      '    data loss or corruption · secrets · recovery · a NAMED acceptance criterion. Nothing else may',
+      '    block a merge or cause another review round. Everything else — theoretical, latent,',
+      '    out-of-scope, stylistic, defence-in-depth, or a real improvement that no criterion asked for —',
+      '    is REPORTED ONCE as TRACKED_FOLLOWUP or NOTE_ONLY and creates no work automatically.',
+      '    Say it plainly and move on; do not restate it in a later round to force action.',
+      '    A finding OUTSIDE the reviewed scope is reported, never blocking: it was not built here.',
+      '    Judge against the claim as written. If the claim itself is wrong or incomplete, say THAT —',
+      '    a defective claim is a real BLOCKS_CURRENT_MERGE finding; an unrequested improvement is not.',
+      '    Proportional bar: this is a personal, first-party hobby estate. Review it for fitness under',
+      '    normal first-party use, NOT as a hostile multi-tenant or adversarial target.',
+      '',
     ].join('\n');
   }
 

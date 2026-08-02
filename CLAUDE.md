@@ -57,6 +57,10 @@ These are the operating core. Everything else in this file serves them.
 
 **Codex budget (Warwick, Phase 6 — binding).** Max **three** Codex executions per review gate: (1) initial, (2) after immediate correction of genuine `BLOCKS_CURRENT_MERGE` findings, (3) final confirmation. **Never a fourth.** Only findings that are ACTIVE, in-scope, and `required_disposition: BLOCKS_CURRENT_MERGE` may extend current execution; everything else is parked once (SHIT TO DO) and the route continues. Proportional bar for this personal hobby brain: normal/reachable paths, data-loss prevention, secrets, recovery, fail-safe, named acceptance criteria — not bank/hospital/hostile multi-tenant hardening. Prefer the existing `reviewDiff.mjs` route; do **not** build a new counter, store, or governance wrapper to enforce this number.
 
+**A Codex finding must NEVER create a Work Order automatically** (Warwick, 2026-08-02). Raise one only when the finding is an **ACTIVE, in-scope `BLOCKS_CURRENT_MERGE` issue requiring material implementation**, or when **Warwick explicitly authorises it as separate work**. A tiny fix stays **inside the current Work Order**. A non-blocker is **reported once for Warwick's decision** — reporting it is mine, deciding its fate is his. **Never** raise a Work Order for a theoretical risk, an investigation, documentation tidy-up, test housekeeping, a duplicate symptom, or optional hardening. *A finding is an observation, not an instruction; treating every one as work is how a review gate turns into a programme.*
+
+**At any Wayfinder phase boundary whose gate requires independent review, derive the review claim from that recorded gate and run it within the three-pass budget** (Warwick, 2026-08-02). The gate already states the claim and its acceptance criteria — that is what `reviewDiff.mjs --claim` takes, so no new machinery is owed. Binds the review to the boundary rather than to my recollection of it.
+
 **Regrowth cap — the lesson that cost the most.** If the response to any of these four rules is to *build* something, the diagnosis was rejected. BUILD-018 grew a validator → store → parser → registry around rules it never once enforced. Prefer an existing route; a new mechanism must earn its place with evidence that no existing route suffices.
 
 ## When Warwick may be interrupted
@@ -72,6 +76,8 @@ These are the operating core. Everything else in this file serves them.
 7. `merge-decision` — the final merge decision.
 
 **These names are load-bearing in shipped code.** `tools/governor/footer.mjs` holds a frozen `HANDBACK_CODES` literal mirroring them one-for-one and refuses to emit or parse anything outside it. Renaming a member here is a code change, not an edit.
+
+**When a handback asks Warwick to choose, state the realistic options, what changes under each, and the recommended option** (Warwick, 2026-08-02). Proportional and brief. **Do not manufacture options where no genuine decision exists** — that turns the habit into the padding it was meant to replace.
 
 **Explicitly NOT Warwick decisions:** cosmetic or metadata choices · ordinary technical choices · harmless defaults that keep correctness · anything a safe no-action default already resolves. Asking about one of these is an acceptance failure, not diligence.
 
@@ -126,6 +132,8 @@ Also read on activation: `Team/agent-index.md`, `Team Knowledge/INDEX.md`, `PKM/
 Specialists are bound as subagents at `.claude/agents/<slug>.md` — thin shims pointing to the canonical contract at `Team/<Name> - <Role>/AGENTS.md`, never copies. Dispatch via the `Agent` tool with `subagent_type: <slug>`; several can run in parallel from one message.
 
 **Every Work Order opens with a READ-BACK** — the worker restates the outcome, its plan, what the order failed to settle, and what looks wrong — *before* acting. Then the method is free, bound to the goal rather than the steps. Read-back catches misunderstanding, which preflight does not.
+
+**When a read-back finds a material defect in a Work Order, amend it and allow ONE additional fresh read-back** (Warwick, 2026-08-02). After that, proceed — unless an unresolved ACTIVE, in-scope blocker remains. **Non-blocking observations are parked, not looped on.**
 
 When a request needs a role no specialist covers, the answer is never "no" — it is "let's hire them through Nolan" per `Team Knowledge/SOPs/SOP-001-how-to-add-a-new-specialist.md`. Who owns what is defined once in `Team/agent-index.md`.
 

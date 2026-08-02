@@ -36,10 +36,10 @@
 // The sample it writes is what lets `sampler.resolveWindowTokens` refuse a cross-model
 // context-window size, and that is asserted below.
 
-import { test } from 'node:test';
+import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -79,7 +79,37 @@ function realShapedPayload(overrides = {}) {
   };
 }
 
-const run = (input) => execFileSync('node', [STATUSLINE_SRC], { input, encoding: 'utf8' });
+// ---------------------------------------------------------------------------
+// WO-OR-18 — THIS SUITE MUST NOT WRITE INTO WARWICK'S LIVE TELEMETRY STORE
+// ---------------------------------------------------------------------------
+// It used to. `run()` spawned the real statusLine CLI with no
+// MYPKA_GOVERNOR_HEALTH_DIR, so `main()` -> `sampleFromStdin(raw)` wrote through the
+// DEFAULT store root and every execution of this suite created two files under
+// ~/.mypka/governor/health/C--Fusion247PKA/:
+//
+//   f944fae7-0000-0000-0000-000000000000.json  (from realShapedPayload, carrying a
+//                                               foreign worktree.name "x" and branch
+//                                               "build-018/session-governor")
+//   s.json                                     (from the HOSTILE_INPUTS fixture
+//                                               `{"session_id":"s"}`)
+//
+// WHY THIS IS A DEFECT AND NOT UNTIDINESS. That store is the one `footer.mjs` reads for
+// its DENOMINATOR. Neither file happened to carry a `context_window_size`, so neither was
+// yet manufacturing a false percentage — but the suite was one fixture field away from
+// planting an observation that would be indistinguishable from a real one. A test harness
+// that can write the input of the control it is testing is not a test harness.
+//
+// The fix is the seam that already exists for exactly this: every child process this file
+// spawns is given MYPKA_GOVERNOR_HEALTH_DIR pointing at a throwaway directory.
+// `CHILD_ENV` is applied to EVERY spawn in this file rather than only to the two that are
+// known to write today, because the next test added here would otherwise silently re-open
+// the hole — and it would look exactly like the last one did.
+const SCRATCH_STORE = tmp('governor-statusline-store-');
+const CHILD_ENV = { ...process.env, MYPKA_GOVERNOR_HEALTH_DIR: SCRATCH_STORE };
+
+after(() => rmSync(SCRATCH_STORE, { recursive: true, force: true }));
+
+const run = (input) => execFileSync('node', [STATUSLINE_SRC], { input, encoding: 'utf8', env: CHILD_ENV });
 
 const firstLine = (out) => out.split('\n').filter((l) => l.length > 0)[0];
 
@@ -186,6 +216,46 @@ test('WO-OR-05: the sample this surface writes carries the DENOMINATOR and its m
   }
 });
 // ===========================================================================
+// WO-OR-18 — the spawned CLI's writes are CONTAINED
+// ===========================================================================
+
+test('WO-OR-18: the spawned CLI writes its sample into the SCRATCH store', () => {
+  // The recurrence guard for the live-store pollution. Asserting the redirect WORKS is
+  // what turns `CHILD_ENV` from a convention into a checked property: delete the `env:`
+  // from `run()` and this test goes red instead of the store quietly filling up again.
+  const payload = realShapedPayload();
+  run(JSON.stringify(payload));
+  assert.equal(
+    existsSync(join(SCRATCH_STORE, `${payload.session_id}.json`)),
+    true,
+    'the child must have written HERE — if this fails, find out where it wrote instead before assuming it wrote nowhere'
+  );
+});
+
+test('WO-OR-18 MUTATION: MYPKA_GOVERNOR_HEALTH_DIR is what steers the write, not luck', () => {
+  // Makes the test above fail-able. It would pass just as happily if the CLI wrote to
+  // BOTH the scratch dir and the default root, or if the scratch file were left over from
+  // an earlier test. So: a SECOND, empty directory, and the same payload must land in
+  // that one instead — which can only be true if the environment variable is load-bearing.
+  const other = tmp('governor-statusline-store-2-');
+  try {
+    assert.deepEqual(readdirSync(other), [], 'CONTROL: the second store starts empty');
+    const payload = realShapedPayload({ session_id: 'wo-or-18-redirect-probe' });
+    execFileSync('node', [STATUSLINE_SRC], {
+      input: JSON.stringify(payload),
+      encoding: 'utf8',
+      env: { ...process.env, MYPKA_GOVERNOR_HEALTH_DIR: other },
+    });
+    assert.deepEqual(readdirSync(other), ['wo-or-18-redirect-probe.json'],
+      'the sample follows the variable');
+    assert.equal(existsSync(join(SCRATCH_STORE, 'wo-or-18-redirect-probe.json')), false,
+      'and it did NOT also land in the suite-wide scratch store');
+  } finally {
+    rmSync(other, { recursive: true, force: true });
+  }
+});
+
+// ===========================================================================
 // AC5 — never throws, always exits 0, always exactly one line
 // ===========================================================================
 
@@ -286,7 +356,7 @@ const FORCE_THROW = [
 test('AC6 MUTATION (AC5): with lineFor throwing, the net still prints one valid footer and exits 0', () => {
   const m = mutantOf([FORCE_THROW], 'net-intact-');
   try {
-    const lines = execFileSync('node', [m.path], { input: '{}', encoding: 'utf8' })
+    const lines = execFileSync('node', [m.path], { input: '{}', encoding: 'utf8', env: CHILD_ENV })
       .split('\n')
       .filter((l) => l.length > 0);
     assert.equal(lines.length, 1);
@@ -308,7 +378,7 @@ test('AC6 MUTATION (AC5): REMOVE the net and the same input FAILS — proving th
   try {
     let failed = false;
     try {
-      execFileSync('node', [m.path], { input: '{}', encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
+      execFileSync('node', [m.path], { input: '{}', encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], env: CHILD_ENV });
     } catch (err) {
       failed = true;
       assert.notEqual(err.status, 0, 'the unprotected mutant must exit non-zero');
@@ -330,7 +400,7 @@ test('REAL PROCESS: importing the module does NOT execute it', () => {
   const out = execFileSync(
     'node',
     ['-e', `import(${JSON.stringify(pathToFileURL(STATUSLINE_SRC).href)}).then(() => console.log('IMPORTED-CLEANLY'))`],
-    { encoding: 'utf8' }
+    { encoding: 'utf8', env: CHILD_ENV }
   );
   assert.match(out, /IMPORTED-CLEANLY/);
   assert.doesNotMatch(out, /⟦GOV⟧/, 'importing must not print a status line');
