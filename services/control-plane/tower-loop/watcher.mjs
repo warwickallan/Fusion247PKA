@@ -20,12 +20,15 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
 import pg from 'pg';
-import { applySchema, applyWatcherSchema, applyHoldSchema } from './apply.mjs';
+import { applySchema, applyWatcherSchema, applyHoldSchema, applyCommentSchema } from './apply.mjs';
 import {
   loadActivePrompt,
   reconstructTurn,
   VERDICT_TO_STATE,
 } from './loop.mjs';
+// WO-OR-22: finding carry-forward + the disposition gate now live in findings.mjs so the gate
+// is the code the REAL review round runs, not a parallel module nothing calls.
+import { loadOpenFindings, checkFindingDispositions, buildStagedInput } from './findings.mjs';
 import { runSupervisor, runMergeReview } from './supervisorCodex.mjs';
 import { gatherGitEvidence } from './gitEvidence.mjs';
 import { detectMergeClass } from './mergeClass.mjs';
@@ -99,14 +102,8 @@ export async function openFinding(pool, { buildRef = 'BUILD-014', openedTurnId =
   return rows[0];
 }
 
-async function loadOpenFindings(pool, buildRef) {
-  const { rows } = await pool.query(
-    `select id, build_ref, description, state, created_at
-       from tower.finding where build_ref = $1 and state = 'open' order by created_at asc`,
-    [buildRef],
-  );
-  return rows;
-}
+// loadOpenFindings moved to findings.mjs (WO-OR-22) — it is now imported above, alongside the
+// disposition gate that consumes it.
 
 // ── lease / claim (exactly-once, restart-safe) ───────────────────────────────
 async function reclaimStale(pool) {
@@ -284,18 +281,38 @@ export async function processTurn(pool, turnId, deps = REAL_DEPS) {
 
   // Finding carry-forward — inject the build's OPEN findings so Codex must account for each.
   const openFindings = await loadOpenFindings(pool, buildRef);
-  let stagedInput = baseText;
-  if (openFindings.length > 0) {
-    stagedInput = [
-      baseText,
-      `## Open findings for ${buildRef} — MUST be accounted for`,
-      `These findings are still OPEN from earlier reviews. If Larry's response silently drops`,
-      `any of them without resolving it, do NOT continue — correct or block, and carry it`,
-      `forward. Never let a finding silently disappear.`,
-      ...openFindings.map((f) => `- [finding ${f.id}] (${f.state}) ${f.description}`),
-      ``,
-    ].join('\n');
+
+  // WO-OR-22 — THE DISPOSITION GATE. Every PRIOR open finding must carry a disposition, judged
+  // at THIS round's head. Otherwise the round is REJECTED here, BEFORE any reviewer is invoked
+  // (so no Codex is spent on a round that cannot be trusted) and the rejection is persisted as
+  // the turn's review so it is durable, idempotent on replay, and visible on Telegram.
+  const gate = checkFindingDispositions(openFindings, { currentTurnId: turnId, headSha: turnRow.head_sha });
+  if (!gate.ok) {
+    const r = {
+      status: 'gate_blocked', verdict: 'block', warwick_needed: true,
+      aligned: null, over_engineering: null, drifting: null, administering: null,
+      next_action: 'Dispose every prior open finding in a PR comment at the current head, then re-run.',
+      summary: `Review round REJECTED — ${gate.errors.length} finding-disposition problem(s): ${gate.errors.join(' | ')}`,
+    };
+    await pool.query(
+      `insert into tower.supervisor_review
+         (turn_id, reviewer, verdict, warwick_needed, next_action, summary, raw_output)
+       values ($1, 'tower_findings_gate', $2, true, $3, $4, $5)
+       on conflict (turn_id) do nothing`,
+      [turnId, r.verdict, r.next_action, r.summary, JSON.stringify(r)],
+    );
+    const gateState = VERDICT_TO_STATE[r.verdict] ?? 'blocked';
+    await pool.query(`update tower.turn set state = $2, lease_owner = null, updated_at = now() where id = $1`, [turnId, gateState]);
+    const gateNotifications = await fireTriggers(pool, {
+      turnId, buildRef, turnSeq, nextState: gateState, r, blocked: false, goalComplete,
+      notifyFn: doNotify, merge: null, larryResponse: turnRow.larry_response,
+    });
+    log('review_round_rejected', { turnId, required: gate.required, disposed: gate.disposed, errors: gate.errors.length });
+    return { turnId, reused: false, gateBlocked: true, gateErrors: gate.errors, verdict: r.verdict, state: gateState, notifications: gateNotifications };
   }
+
+  // Dispositions reach the packet straight from the DB — nothing is hand-carried in.
+  const stagedInput = buildStagedInput(baseText, buildRef, openFindings);
   const packetHash = sha256(stagedInput);
 
   // (f) DELIVERY review: REAL Codex reviews the staged (reconstructed + findings) turn under
@@ -444,6 +461,7 @@ export async function runWatcher() {
   await applySchema(DB_URL);
   await applyWatcherSchema(DB_URL);
   await applyHoldSchema(DB_URL);
+  await applyCommentSchema(DB_URL);
 
   const pool = new pg.Pool({ connectionString: DB_URL, max: 6 });
   const deps = await resolveDeps();
