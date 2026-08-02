@@ -114,12 +114,23 @@ It carries context health, state, continue-or-rotate advice, a **model *and* eff
 
 ## Wayfinder
 
-**Wayfinder is a PLANNING tool and it STOPS AT CLARITY.** It resolves genuine uncertainty about a route and publishes the plan where Warwick can see it. It is not an execution tracker, not a ticket system, and not a governance layer — using it as one is exactly the error that produced BUILD-018.
+> **EVERY FUSION247 BUILD REQUIRES A DURABLE WAYFINDER IMPLEMENTATION PLAN BEFORE IMPLEMENTATION BEGINS.** (Warwick, 2026-08-02 — a product and governance decision, binding.)
 
-- Use it **only when there is material route uncertainty that must be resolved before safe execution.** Not for routine or already-understood work.
-- **Stop mapping the moment the route is clear.** No remaining fog means the map is finished, not that more tickets are owed.
+**There is no "understood work" exception, no thin-map bypass, and no option for the builder to decide that mapping is unnecessary.** The *depth* of investigation inside a map may reflect the actual complexity and fog; the *existence* of the map is mandatory for every build. **No Wayfinder implementation plan means no build. Ever.**
+
+This supersedes the earlier trigger test ("use it only when there is material route uncertainty"), which let Larry judge a build understood and skip the record. The reason for the change: product detail, dependencies, human gates, cross-build interfaces and recovery context were disappearing between sessions, or being rediscovered after implementation had already started.
+
+**The Wayfinder plan is the durable implementation and orientation record in Git. It must capture the complete outcome, not merely the uncertain destination integrations.** A map covering only the foggy parts is not a Wayfinder plan.
+
+Every map must carry: the goal contract and North Star · current reality and verified assets · the system map and product boundaries · known decisions · unresolved fog and contradictions · human dependencies and the point each is required · security, permissions, ownership and recovery boundaries · acceptance evidence · the execution route · the current frontier and next useful action · parked and non-goal work · resumable state after `/clear` or a fresh session.
+
+- **Begin with live reconnaissance.** Verify the real state before planning new setup, and **record contradictions rather than silently overwriting one source.**
+- **Copy the startup/orientation block verbatim** from the proven map (`Deliverables/2026-08-02-wayfinder-operating-reset-plan.md`) so a fresh Larry, Honcho, the watcher and Tower all orient identically. It is not to be reworded.
+- **Map outcomes, dependencies, interfaces and evidence — not every file.** Larry chooses implementation detail and adapts the route as evidence changes. A file-by-file IKEA manual is a different failure from a missing map, and still a failure.
 - Update a map only at a phase boundary — PASS, PARTIAL or FAILED, with an evidence pointer.
 - Do not begin implementation until Warwick accepts the plan (a `product-decision`).
+
+**What Wayfinder still is NOT:** an execution tracker, a ticket system, or a governance layer. Using it as one is exactly the error that produced BUILD-018, and a mandatory map is not a licence to grow one. The map is a *record*, and it stops at the point where further detail would be invention rather than route.
 
 ## Source of truth
 

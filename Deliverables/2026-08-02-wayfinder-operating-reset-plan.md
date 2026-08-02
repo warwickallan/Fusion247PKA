@@ -543,6 +543,8 @@ _2026-08-02. **The single canonical route.** Supersedes the joint proposal (fals
 
 **Rule 5 (new, Warwick 2026-08-02; scope narrowed after GPT review):** use Wayfinder **only when there is material route uncertainty that must be resolved before safe execution.** NOT for routine or already-understood work — otherwise "complexity" becomes an excuse to plan everything, and VlogOps needs a Wayfinder plan to decide whether it needs a Wayfinder plan. This document is the first application, and a live test of whether Wayfinder actually works.
 
+> ⚠️ **RULE 5 IS SUPERSEDED — Warwick, 2026-08-02, later the same day.** Every Fusion247 BUILD now requires a durable Wayfinder implementation plan before implementation begins: no "understood work" exception, no thin-map bypass, no builder discretion. Depth may reflect fog; the map itself is mandatory. **`CLAUDE.md` § Wayfinder is the source** — read it there, not here. Retained above as the record of what was decided at the time and why it changed. *(This closed reset is not reopened by the note.)*
+
 ---
 
 ## 1. What is now KNOWN (was the fog; now resolved by verification)
