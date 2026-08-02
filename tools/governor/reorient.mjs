@@ -41,7 +41,7 @@
 // is reported as such and the others still render.
 
 import { execFileSync } from 'node:child_process';
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync, realpathSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 
@@ -147,7 +147,40 @@ export function gitFacts(worktreePath, execFile = execFileSync) {
     }
   };
   return {
+    // WHAT THE CALLER CLAIMED. Preserved verbatim and NEVER rendered as an established
+    // location on its own — see `resolvedPath` immediately below and `renderLocationSection`.
     worktreePath: normaliseSeparators(worktreePath),
+    // WO-OR-11. THE MEASUREMENT `worktreePath` never had. Every other field in this object
+    // comes from executing git; `worktreePath` alone was the caller's own argument handed
+    // straight back, and it was then printed under a heading reading "executed, not
+    // assumed". That heading was a claim the value had not earned.
+    //
+    // `realpathSync.native` earns it, and it is the right probe rather than an existence
+    // check: it returns the TRUE ON-DISK CASING, so a host-supplied `c:/Fusion247PKA` comes
+    // back as `C:/Fusion247PKA` and stops disagreeing with the `repoRoot` that git measured.
+    // That disagreement was the fingerprint of one value being supplied and the other
+    // measured; resolving the path removes the CAUSE rather than hiding the tell.
+    //
+    // WHY NOT SIMPLY DELETE OR RELABEL THE FIELD (the other route offered): the
+    // cwd-versus-repo-root comparison is HOW a wrong-location session becomes visible to a
+    // human reading the brief. Dropping the field to stop it lying would trade a lie for a
+    // blind spot. One syscall makes it true instead.
+    //
+    // null means NOT ESTABLISHED — the path does not exist, is unreadable, or was not a
+    // string at all. It never falls back to the claimed value.
+    resolvedPath: soft(() => normaliseSeparators(realpathSync.native(worktreePath))),
+    // WO-OR-11. Whether git ANSWERED here at all, as its own measurement.
+    //
+    // `soft()` returns null both when a git call fails and when git legitimately reports
+    // nothing, which made "git could not run" and "this branch tracks nothing" the same
+    // value — and the renderer turned that single null into the confident sentence
+    // "nothing here is pushed". This flag is what separates them.
+    //
+    // It is the one field here that is deliberately NOT nullable, and that is consistent
+    // with the invariant above rather than an exception to it: it records whether a
+    // measurement was possible, so "we could not tell" IS "not established" — false. It
+    // fails closed, which is the direction that cannot manufacture a reassuring claim.
+    gitReadable: soft(() => (run(['rev-parse', '--git-dir']), true)) === true,
     repoRoot: soft(() => normaliseSeparators(run(['rev-parse', '--show-toplevel']))),
     headSha: soft(() => run(['rev-parse', 'HEAD'])),
     branch: soft(() => run(['rev-parse', '--abbrev-ref', 'HEAD'])),
@@ -169,11 +202,36 @@ function show(v) {
   return String(v);
 }
 
+// WO-OR-11. How the cwd line reports itself.
+//
+// Three outcomes, and keeping them three is the point of the exercise. A single
+// "(unknown)" for the last two would be honest about the failure while HIDING that the
+// host asserted a path at all — and the asserted value is the most useful diagnostic
+// there is when a session has been started in the wrong place.
+//
+//   measured      -> the resolved, true-cased path. This one is a fact.
+//   nothing said  -> the host supplied no cwd. Nobody claimed anything.
+//   claimed, bad  -> the host supplied a path that does not exist on disk. Something WAS
+//                    claimed and it did not check out, which is a different and much more
+//                    interesting failure than silence.
+function renderCwd(facts) {
+  if (facts.resolvedPath) return facts.resolvedPath;
+  const claimed = facts.worktreePath;
+  if (claimed === null || claimed === undefined || claimed === '') {
+    return '(UNVERIFIED — no path was supplied)';
+  }
+  // A non-string reaches here because `normaliseSeparators` passes it through unchanged
+  // and a truthy non-string then sails on as if it were a location. Quoting it makes it
+  // visibly not-a-path rather than letting `String(7)` render as `7`.
+  const asShown = typeof claimed === 'string' ? claimed : JSON.stringify(claimed);
+  return `(UNVERIFIED — host reported ${asShown}; no such directory on disk)`;
+}
+
 export function renderLocationSection(facts) {
   if (!facts) return null;
   const lines = [
     '⟦GOV⟧ WHERE THIS SESSION IS (executed, not assumed):',
-    `  cwd          : ${show(facts.worktreePath)}`,
+    `  cwd          : ${renderCwd(facts)}`,
     `  repo root    : ${show(facts.repoRoot)}`,
     `  branch       : ${show(facts.branch)}`,
     `  HEAD         : ${show(facts.headSha)}`,
@@ -184,8 +242,20 @@ export function renderLocationSection(facts) {
     lines.push(
       `  unpushed     : ${facts.unpushed === null ? '(unknown)' : `${facts.unpushed} commit(s) ahead of upstream`}`
     );
-  } else {
+  } else if (facts.gitReadable) {
+    // git ANSWERED and reported no upstream. The confident sentence is earned here, and
+    // only here.
     lines.push('  upstream     : (none tracked — nothing here is pushed)');
+  } else {
+    // WO-OR-11. git never ran, so the module has measured nothing about what is pushed.
+    // This branch used to fall into the sentence above, which meant a session on an
+    // unreadable path was told "nothing here is pushed" — a claim about the remote
+    // derived from a git call that never happened. Stating the reason matters as much as
+    // withholding the claim: a bare "(unknown)" invites the reader to assume the branch
+    // is simply untracked.
+    lines.push(
+      '  upstream     : (unknown — git could not be read here, so this is NOT a claim that nothing is pushed)'
+    );
   }
   // Stated because its ABSENCE is a change a reader could otherwise mistake for a pass.
   lines.push(

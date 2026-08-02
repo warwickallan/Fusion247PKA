@@ -33,7 +33,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, utimesSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, utimesSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -223,19 +223,190 @@ test('LOCATION: no ALIGNED verdict is offered, and the brief SAYS SO', () => {
 });
 
 test('LOCATION: a dirty tree and an untracked upstream are both reported, not silently omitted', () => {
+  // FIXTURE AMENDED BY WO-OR-11, and the reason is worth stating: this fixture used to
+  // omit `gitReadable` and still assert the confident "nothing here is pushed" sentence.
+  // That is no longer enough to justify the sentence, because the sentence is now only
+  // earned when git actually ANSWERED. The requirement changed, so the fixture changed —
+  // the assertion below is untouched and still has to hold.
+  //
+  // This test is HALF of a pair and must never be allowed to absorb the other half: it
+  // proves the GENUINE no-upstream case still says so. Its sibling
+  // ("UPSTREAM: git-unreadable ...") proves the unreadable case does NOT. Collapsing the
+  // two would re-open exactly the defect WO-OR-11 closed.
   const dirty = renderLocationSection({
-    worktreePath: 'C:/x', repoRoot: 'C:/x', branch: 'b', headSha: 'abc',
+    worktreePath: 'C:/x', resolvedPath: 'C:/x', gitReadable: true,
+    repoRoot: 'C:/x', branch: 'b', headSha: 'abc',
     dirty: true, unpushed: null, upstreamRef: null, upstreamSha: null,
   });
   assert.match(dirty, /DIRTY — uncommitted changes present/);
   assert.match(dirty, /\(none tracked — nothing here is pushed\)/);
 
   const ahead = renderLocationSection({
-    worktreePath: 'C:/x', repoRoot: 'C:/x', branch: 'b', headSha: 'abc',
+    worktreePath: 'C:/x', resolvedPath: 'C:/x', gitReadable: true,
+    repoRoot: 'C:/x', branch: 'b', headSha: 'abc',
     dirty: false, unpushed: 3, upstreamRef: 'origin/b', upstreamSha: 'def',
   });
   assert.match(ahead, /working tree : clean/);
   assert.match(ahead, /3 commit\(s\) ahead of upstream/);
+});
+
+// ===========================================================================
+// WO-OR-11 — THE LOCATION BLOCK MUST NOT ASSERT MORE THAN IT MEASURED
+// ===========================================================================
+// The block is headed "(executed, not assumed)" and closes with "These are facts". Two
+// fields did not earn that, and a third case rendered a non-path as one:
+//
+//   DEFECT 1  `cwd` was the CALLER'S OWN ARGUMENT handed straight back. Every other field
+//             came from a real git call; this one was echoed and then printed under a
+//             heading claiming it had been executed. Fingerprint on the live estate: the
+//             harness supplies `c:/Fusion247PKA` (lowercase drive) while `git rev-parse`
+//             returns `C:/Fusion247PKA` — two lines of the same block disagreeing is what
+//             one-supplied-one-measured looks like from the outside.
+//   DEFECT 2  `upstream: (none tracked — nothing here is pushed)` was printed whenever
+//             `upstreamRef` was falsy. `soft()` returns null when git FAILS, so "git could
+//             not run at all" and "this branch genuinely tracks nothing" collapsed into one
+//             confident sentence. The module's own comment (see gitFacts) already forbade
+//             this: "`unpushed: null` means 'there is no upstream, or git would not say',
+//             and it is a different claim from `unpushed: 0`."
+//   FINDING A `where` is never type-checked and `normaliseSeparators` passes a non-string
+//             through, so `{"cwd":7}` rendered `cwd : 7` beneath the same heading.
+//
+// EVERY TEST BELOW IS MUTATION-PROVEN: each one was run against the UNFIXED module and
+// observed to FAIL before the repair landed. A test that never failed is not evidence.
+//
+// The trap that shaped them: a POSITIVE-case test ("a real cwd renders") passes against
+// the broken code too, because the broken code prints the path it was handed. Such a test
+// proves nothing. So these target only the DISCRIMINATING cases — where an echo and a
+// measurement produce different output.
+
+test('WO-OR-11 / DEFECT 1: cwd is MEASURED on disk — proven by recovering the TRUE CASING', () => {
+  // The discriminator. An echo returns exactly what it was given; a measurement returns
+  // what the filesystem says. Feed a deliberately mis-cased path: only a real resolution
+  // can produce the true casing back.
+  const trueCase = normaliseSeparators(realpathSync.native(process.cwd()));
+  const misCased = trueCase.toLowerCase();
+
+  // CONTROL — without this the test could silently become a no-op on a path that is
+  // already all-lowercase, or on a case-sensitive filesystem, and would then pass for the
+  // wrong reason. If this estate ever stops satisfying the precondition, this FAILS LOUDLY
+  // rather than quietly proving nothing.
+  assert.notEqual(misCased, trueCase, 'CONTROL: the cwd must be mixed-case or this test proves nothing');
+  assert.equal(
+    normaliseSeparators(realpathSync.native(misCased)), trueCase,
+    'CONTROL: the filesystem must be case-insensitive here or this test proves nothing'
+  );
+
+  const facts = gitFacts(misCased);
+  assert.equal(facts.resolvedPath, trueCase, 'cwd must be RESOLVED, not echoed');
+  assert.notEqual(facts.resolvedPath, misCased, 'an echo would have returned the input unchanged');
+  assert.equal(facts.worktreePath, misCased, 'what the host CLAIMED is still preserved, unaltered');
+
+  const rendered = renderLocationSection(facts);
+  assert.match(rendered, new RegExp(`cwd\\s+: ${trueCase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`),
+    'the block renders the measured value');
+});
+
+test('WO-OR-11 / DEFECT 1: an unresolvable cwd renders UNVERIFIED and still shows WHAT WAS CLAIMED', () => {
+  // The live reproduction. A bare "(unknown)" would be honest about the failure but would
+  // HIDE that the harness asserted a path at all — and the asserted value is the single
+  // most useful diagnostic when a session is in the wrong place.
+  const failing = () => { throw new Error('git is not available'); };
+  const facts = gitFacts('C:/TOTALLY/FICTIONAL/PATH', failing);
+  assert.equal(facts.resolvedPath, null, 'a path that does not exist resolves to null');
+
+  const rendered = renderLocationSection(facts);
+  assert.match(rendered, /UNVERIFIED/, 'the reader must see that this was not established');
+  assert.match(rendered, /C:\/TOTALLY\/FICTIONAL\/PATH/, 'the claim itself is still surfaced');
+  assert.doesNotMatch(
+    rendered, /^ {2}cwd {10}: C:\/TOTALLY\/FICTIONAL\/PATH$/m,
+    'THE DEFECT: an unmeasured path must never render as a plain established value'
+  );
+});
+
+test('WO-OR-11 / DEFECT 1: "nobody said" is distinguishable from "claimed, and it did not check out"', () => {
+  // Two different failures that must not read alike. One is the harness sending nothing;
+  // the other is the harness asserting something false. Collapsing them loses the tell.
+  const nothingSaid = renderLocationSection({ worktreePath: null, resolvedPath: null, gitReadable: false });
+  const claimedBad = renderLocationSection({
+    worktreePath: 'C:/TOTALLY/FICTIONAL/PATH', resolvedPath: null, gitReadable: false,
+  });
+
+  assert.match(nothingSaid, /no path was supplied/);
+  assert.doesNotMatch(nothingSaid, /host reported/, 'nothing was reported, so nothing may be quoted');
+  assert.match(claimedBad, /host reported/);
+  assert.match(claimedBad, /C:\/TOTALLY\/FICTIONAL\/PATH/);
+  assert.notEqual(
+    nothingSaid.split('\n')[1], claimedBad.split('\n')[1],
+    'the two cases must render differently or the distinction is lost'
+  );
+});
+
+test('WO-OR-11 / FINDING A: a NON-STRING cwd from the harness never renders as a path', () => {
+  // Neither Codex nor Larry named this one. `normaliseSeparators(7)` returns 7 unchanged
+  // (pinned by the helper test at the foot of this file), 7 is truthy, so it sailed
+  // through as a location and printed as `cwd : 7` under "executed, not assumed".
+  for (const hostile of [7, true, { a: 1 }, ['C:/x']]) {
+    const body = buildBrief(JSON.stringify({ source: 'startup', cwd: hostile }), { sweepFn: () => null });
+    assert.match(body, /UNVERIFIED/, `a ${typeof hostile} cwd must be reported as unverified`);
+    assert.doesNotMatch(
+      body, /^ {2}cwd {10}: (7|true|\[object Object\]|C:\/x)$/m,
+      'THE DEFECT: a non-string must never render as an established path'
+    );
+  }
+});
+
+test('WO-OR-11 / DEFECT 2: git-unreadable must NOT claim that nothing is pushed', () => {
+  // The other half of the pair guarded in "a dirty tree and an untracked upstream ...".
+  // `soft()` collapses "git threw" and "no upstream configured" into the same null, so the
+  // renderer needs an independent signal for whether git ANSWERED at all.
+  const unreadable = renderLocationSection({
+    worktreePath: 'C:/x', resolvedPath: null, gitReadable: false,
+    repoRoot: null, branch: null, headSha: null, dirty: null,
+    unpushed: null, upstreamRef: null, upstreamSha: null,
+  });
+  assert.doesNotMatch(
+    unreadable, /nothing here is pushed/,
+    'THE DEFECT: git never ran, so this is not a claim the module is entitled to make'
+  );
+  assert.match(unreadable, /git could not be read/, 'the reason must be stated, not left blank');
+});
+
+test('WO-OR-11 / DEFECT 2: gitReadable is MEASURED, and is independent of whether the path exists', () => {
+  // Proves the two probes are genuinely separate measurements rather than one flag reused.
+  // A real directory that is not a repository is the case that separates them: it EXISTS
+  // (so cwd resolves) but git cannot answer (so no upstream claim may be made).
+  const real = gitFacts(process.cwd());
+  assert.equal(real.gitReadable, true, 'this worktree is a real repository');
+  assert.notEqual(real.resolvedPath, null);
+
+  const notARepo = mkdtempSync(join(tmpdir(), 'wo-or-11-notarepo-'));
+  try {
+    const facts = gitFacts(notARepo);
+    assert.notEqual(facts.resolvedPath, null, 'the directory genuinely exists');
+    assert.equal(facts.gitReadable, false, 'but git cannot answer here');
+    const rendered = renderLocationSection(facts);
+    assert.doesNotMatch(rendered, /nothing here is pushed/);
+    assert.match(rendered, /git could not be read/);
+  } finally {
+    rmSync(notARepo, { recursive: true, force: true });
+  }
+});
+
+test('WO-OR-11 / INTEGRATION: the live fictional-path probe asserts nothing it did not measure', () => {
+  // End to end, through the exact shape the harness sends. `parsed.payload.cwd` is a
+  // TOP-LEVEL key — a probe that nests it one level deeper exercises the fallback to
+  // process.cwd() and silently proves nothing, which is how this defect survived a first
+  // look. This asserts against the real shape.
+  const body = buildBrief(
+    JSON.stringify({ hook_event_name: 'SessionStart', source: 'startup', cwd: 'C:/TOTALLY/FICTIONAL/PATH' }),
+    { sweepFn: () => null }
+  );
+  // CONTROL: the payload really did reach the location section rather than falling back.
+  assert.match(body, /C:\/TOTALLY\/FICTIONAL\/PATH/, 'CONTROL: the top-level cwd key was read');
+  assert.match(body, /WHERE THIS SESSION IS \(executed, not assumed\)/, 'the honesty claim is NOT deleted');
+  assert.match(body, /UNVERIFIED/);
+  assert.doesNotMatch(body, /nothing here is pushed/, 'git never ran on this path');
+  assert.match(body, /These are facts/, 'the closing claim survives — it is now earned, not softened');
 });
 
 // ===========================================================================
