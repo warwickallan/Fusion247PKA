@@ -43,6 +43,21 @@ This is not Larry being unhelpful. An interrupted build is how BUILD-018 happene
 | 9 | ~~**`gatherGitEvidence` has no pathspec support**~~ — **DONE, `468d0c8`.** Was: no pathspec, so a review could not be scoped and any diff over `MAX_DIFF_BYTES` (60k) truncated silently — which is what blocked the Phase 5 gate. Now: `paths` applied to **both** git calls so `changed_files` and `diff_text` always describe the same set, `scoped_to` recorded, unscoped proven byte-identical (12 files / 60046 bytes / `truncated=true`), scoped proven untruncated (1 file / 47367 bytes), 214/214 still pass. | **CLOSED** — but see the Phase 5 record: the remaining blocker is a claim/evidence *scope* mismatch, not this |
 
 
+## REVIEW VISIBILITY PROTOCOL (Warwick, 2026-08-02 — binding from the next review round)
+
+Ordered after PR #86's body turned out to be *a summary of* the Larry↔Codex exchange rather than the exchange itself. **The PR body stays the summary; the committed transcripts stay the raw evidence; the exchange itself now happens in PR comments.**
+
+1. **Post Codex's VERBATIM structured verdict as a PR comment, against the EXACT reviewed SHA.** Not paraphrased, not summarised — the structured result as returned. The SHA must be stated, because a verdict without the commit it judged is unfalsifiable.
+2. **Respond in that PR, finding-by-finding.** Every finding gets an explicit disposition and a reason — including the ones that turn out to be *my* claim's defect rather than the code's, which so far is 3 of 5.
+3. **The next Codex round MUST READ those responses.** This is not a habit, it is a mechanism: `reviewClassification.mjs:95` is **fail-closed** — a review that leaves a prior open finding with no `prior_finding_results` disposition is REJECTED (`no silent carry-over`), and `productQaPrompt.mjs:195` stages each prior open finding with *"you MUST state a prior_finding_results status: addressed / remains_open / unrelated"*. ⚠️ **`reviewDiff.mjs` does NOT stage prior findings** — it is a bare one-shot reviewer. Until that gap is closed, prior findings + my responses are carried into the next round **inside the claim's `brief_excerpt`**, which is an existing route and needs no new mechanism.
+4. **Telegram visibility uses the EXISTING Tower service path only.** Never move credentials into Larry's session; never ask Warwick for them.
+
+## TELEGRAM — SOLVED, and row 17's remedy was WRONG
+
+`services/tower-baton/src/runtimeConfig.js::loadRuntimeConfig` is **session-independent** and loads its own secrets; `telegramNotifier.js::createMilestoneNotifier(...).notifyMilestone({purpose, logicalSource, body, checkpointId})` delivers. Proven live 2026-08-02: `{"sent": true, "messageId": "439"}` for `purpose: 'review_posted'`, `logicalSource: 'CODEX'`. **No credential entered Larry's environment, argv or output.** Milestone vocabulary is closed (`watcher_online`, `watcher_recovered`, `review_posted`, `escalation`, `blocked`, `tower_unavailable`, `clickup_token_missing`) — it is deliberately *"MILESTONES, NOT A CONSOLE"*, so routine progress must NOT be pushed here.
+
+**Why row 17 got it wrong:** `larry-ding.mjs` reads `process.env` and correctly failed; I generalised that one script's failure into "the ding cannot fire", and then declined to look further because the credentials sat behind GL-012. Declining to self-authorise was right. **Concluding the channel was unavailable was not** — the sanctioned path never needed my authorisation at all. **Third instance in one session of a live mechanism going uncalled** (ding, then the PR, then this), which makes it a pattern rather than an accident: see [[compensating-habits-decay-silently]]. Every one was found by Warwick noticing silence, never by the system reporting it.
+
 ## Phase status (durable — the tracker; update ONLY at a phase boundary: PASS / PARTIAL / FAILED + evidence)
 
 - **Phase 0 — plan on git — PASS** (Warwick reviewing live).
