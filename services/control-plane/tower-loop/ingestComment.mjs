@@ -11,6 +11,9 @@
 //   node ingestComment.mjs --payload test/fixtures/pr-comment-dispositions.json
 //   node ingestComment.mjs --payload <file> --json      (machine-readable result on stdout)
 //
+// WO-TW-01: the store is SQLite (better-sqlite3, WAL) at TOWER_SQLITE_PATH. `pool` is the
+// pg-shaped handle from db.mjs; the CLI opens the default store itself.
+//
 // THE COMMENT GRAMMAR — directives a human (or Larry) writes in an ordinary PR comment:
 //
 //   @tower head: <40-char lower-case sha>
@@ -26,8 +29,8 @@
 
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import pg from 'pg';
-import { applySchema, applyWatcherSchema, applyCommentSchema } from './apply.mjs';
+import { openDb } from './db.mjs';
+import { applyAll } from './apply.mjs';
 import { FINDING_DISPOSITIONS } from './findings.mjs';
 
 const CANONICAL_SHA = /^[0-9a-f]{40}$/;
@@ -134,11 +137,11 @@ export async function ingestPrComment(pool, payload, { turnId: explicitTurnId = 
   let turn = null;
   if (explicitTurnId) {
     turn = (await pool.query(
-      `select id, head_sha, repo, pr_number, build_ref from tower.turn where id = $1`, [explicitTurnId])).rows[0] ?? null;
+      `select id, head_sha, repo, pr_number, build_ref from tower.turn where id = ?`, [explicitTurnId])).rows[0] ?? null;
   } else {
     turn = (await pool.query(
       `select id, head_sha, repo, pr_number, build_ref from tower.turn
-        where repo = $1 and pr_number = $2 order by seq desc limit 1`, [n.repo, n.prNumber])).rows[0] ?? null;
+        where repo = ? and pr_number = ? order by seq desc limit 1`, [n.repo, n.prNumber])).rows[0] ?? null;
   }
   if (!turn) {
     throw new IngestRejection(`no tower.turn found for ${n.repo} PR #${n.prNumber} — nothing to bind the comment to`);
@@ -167,12 +170,12 @@ export async function ingestPrComment(pool, payload, { turnId: explicitTurnId = 
   for (const d of parsed.dispositions) {
     const upd = await pool.query(
       `update tower.finding
-          set disposition = $2, disposition_rationale = $3, disposition_source = 'pr_comment',
-              disposition_comment_id = $4, disposition_head_sha = $5, disposition_at = now(),
+          set disposition = ?, disposition_rationale = ?, disposition_source = 'pr_comment',
+              disposition_comment_id = ?, disposition_head_sha = ?, disposition_at = now(),
               updated_at = now()
-        where id = $1 and state = 'open'
+        where id = ? and state = 'open'
         returning id`,
-      [d.findingId, d.status, d.rationale, row.id, parsed.headSha],
+      [d.status, d.rationale, row.id, parsed.headSha, d.findingId],
     );
     if (upd.rowCount === 1) appliedCount += 1;
     else skipped.push(`${d.findingId} (no open tower.finding with that id)`);
@@ -188,14 +191,14 @@ async function insertComment(pool, n, headSha, turnId, applied, rejectedReason) 
   const ins = await pool.query(
     `insert into tower.pr_comment
        (turn_id, source, repo, pr_number, head_sha, comment_id, author, body, received_at, applied, rejected_reason)
-     values ($1, 'github_pr_comment', $2, $3, $4, $5, $6, $7, $8, $9, $10)
+     values (?, 'github_pr_comment', ?, ?, ?, ?, ?, ?, ?, ?, ?)
      on conflict (source, comment_id) do nothing
      returning id, applied`,
     [turnId, n.repo, n.prNumber, headSha, n.commentId, n.author, n.body, n.receivedAt, applied, rejectedReason],
   );
   if (ins.rows.length > 0) return { ...ins.rows[0], deduped: false };
   const existing = await pool.query(
-    `select id, applied from tower.pr_comment where source = 'github_pr_comment' and comment_id = $1`, [n.commentId]);
+    `select id, applied from tower.pr_comment where source = 'github_pr_comment' and comment_id = ?`, [n.commentId]);
   return { ...existing.rows[0], deduped: true };
 }
 
@@ -210,11 +213,9 @@ if (import.meta.url === `file://${process.argv[1]}` || process.argv[1] === fileU
   (async () => {
     const file = arg('payload');
     if (!file) throw new Error('usage: node ingestComment.mjs --payload <payload.json> [--turn <turn-id>] [--json]');
-    const url = process.env.CONTROL_PLANE_DEV_DATABASE_URL;
-    if (!url) throw new Error('CONTROL_PLANE_DEV_DATABASE_URL is not set — point it at a throwaway local Postgres.');
     const payload = JSON.parse(fs.readFileSync(file, 'utf8'));
-    await applySchema(url); await applyWatcherSchema(url); await applyCommentSchema(url);
-    const pool = new pg.Pool({ connectionString: url });
+    const pool = openDb();
+    await applyAll(pool);
     try {
       const res = await ingestPrComment(pool, payload, { turnId: arg('turn', null) });
       if (process.argv.includes('--json')) { console.log(JSON.stringify(res, null, 2)); }

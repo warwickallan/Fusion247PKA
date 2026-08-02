@@ -1,4 +1,5 @@
 // BUILD-014 Tower supervisor loop — seed the active supervisor prompt.
+// WO-TW-01: the store is SQLite (better-sqlite3, WAL), not Postgres.
 //
 // Seeds prompts/supervisor-prompt.md as tower.supervisor_prompt v1, active=true,
 // content_hash=sha256(content), approved_by='ai-authored-unapproved'. Idempotent by
@@ -18,64 +19,59 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
-import pg from 'pg';
+import { openDb } from './db.mjs';
+import { applyAll } from './apply.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-export async function seedPrompt(databaseUrl = process.env.CONTROL_PLANE_DEV_DATABASE_URL) {
-  if (!databaseUrl) throw new Error('CONTROL_PLANE_DEV_DATABASE_URL is not set — point it at the throwaway local Postgres (or Supabase DEV).');
+/**
+ * @param {ReturnType<import('./db.mjs').openDb>} db an open Tower store handle.
+ */
+export async function seedPrompt(db) {
   const promptPath = path.join(__dirname, 'prompts', 'supervisor-prompt.md');
   const content = fs.readFileSync(promptPath, 'utf8');
   const contentHash = createHash('sha256').update(content, 'utf8').digest('hex');
 
-  const pool = new pg.Pool({ connectionString: databaseUrl });
-  const client = await pool.connect();
-  try {
-    await client.query('begin');
-
-    // If this exact content is already stored, just make sure it is the active one.
-    const existing = await client.query(
-      `select id, version from tower.supervisor_prompt where content_hash = $1 limit 1`,
+  // One write transaction: deactivate-then-activate must never be observable half-done, because
+  // the single-active unique index would reject the intermediate state from another writer.
+  const row = await db.immediate((q) => {
+    const existing = q(
+      `select id, version from tower.supervisor_prompt where content_hash = ? limit 1`,
       [contentHash],
     );
 
-    let row;
     if (existing.rows.length > 0) {
-      // Deactivate everything, then activate this one (single-active index safe within tx).
-      await client.query(`update tower.supervisor_prompt set active = false where active = true`);
-      const upd = await client.query(
-        `update tower.supervisor_prompt set active = true where id = $1
+      q(`update tower.supervisor_prompt set active = 0 where active = 1`);
+      return q(
+        `update tower.supervisor_prompt set active = 1 where id = ?
          returning id, version, content_hash, active, approved_by`,
         [existing.rows[0].id],
-      );
-      row = upd.rows[0];
-    } else {
-      // Next version number = max+1 (v1 on an empty table).
-      const maxRes = await client.query(`select coalesce(max(version), 0) as maxv from tower.supervisor_prompt`);
-      const nextVersion = Number(maxRes.rows[0].maxv) + 1;
-      await client.query(`update tower.supervisor_prompt set active = false where active = true`);
-      const ins = await client.query(
-        `insert into tower.supervisor_prompt (version, content, content_hash, active, approved_by)
-         values ($1, $2, $3, true, 'ai-authored-unapproved')
-         returning id, version, content_hash, active, approved_by`,
-        [nextVersion, content, contentHash],
-      );
-      row = ins.rows[0];
+      ).rows[0];
     }
 
-    await client.query('commit');
-    return { promptPath, ...row };
-  } catch (e) {
-    await client.query('rollback');
-    throw e;
-  } finally {
-    client.release();
-    await pool.end();
-  }
+    // Next version number = max+1 (v1 on an empty table).
+    const maxRes = q(`select coalesce(max(version), 0) as maxv from tower.supervisor_prompt`);
+    const nextVersion = Number(maxRes.rows[0].maxv) + 1;
+    q(`update tower.supervisor_prompt set active = 0 where active = 1`);
+    return q(
+      `insert into tower.supervisor_prompt (version, content, content_hash, active, approved_by)
+       values (?, ?, ?, 1, 'ai-authored-unapproved')
+       returning id, version, content_hash, active, approved_by`,
+      [nextVersion, content, contentHash],
+    ).rows[0];
+  });
+
+  return { promptPath, ...row };
 }
 
 if (import.meta.url === `file://${process.argv[1]}` || process.argv[1] === fileURLToPath(import.meta.url)) {
-  seedPrompt()
+  (async () => {
+    const db = openDb();
+    try {
+      await applyAll(db);
+      return await seedPrompt(db);
+    } finally { await db.end(); }
+  })()
     .then((r) => { console.log(`[seed] active supervisor prompt v${r.version} (${r.content_hash.slice(0, 12)}…) approved_by=${r.approved_by} id=${r.id}`); process.exit(0); })
     .catch((e) => { console.error(`[seed] FAILED: ${e.message}`); process.exit(1); });
 }

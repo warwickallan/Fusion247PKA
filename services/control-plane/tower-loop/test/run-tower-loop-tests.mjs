@@ -1,8 +1,9 @@
 // BUILD-014 Tower supervisor loop — CI ACCEPTANCE with DETERMINISTIC test doubles (FIX 3+4).
 //
-// Executes the REAL loop + watcher (spawned as child processes) against an ISOLATED Postgres,
+// Executes the REAL loop + watcher (spawned as child processes) against an ISOLATED SQLite store,
 // with a fake reviewer (canned verdicts, no Codex) and a fake Telegram transport (no network),
-// injected via env. It proves — on the exact PR head, no external services — that:
+// injected via env. It proves — on the exact PR head, no external services, NO DATABASE SERVER —
+// that:
 //
 //   T1  ingest → claim → process → verdict → notify           (the core auto-supervision path)
 //   T2  notification dedup                                     (no duplicate Telegram per turn/reason)
@@ -12,19 +13,26 @@
 //   T6  merge-class routing — fail-closed BLOCK                (unresolvable evidence → blocked)
 //   T7  exactly-once during a long run + concurrent watcher    (FIX 4: one review, one notification)
 //
-// FAIL-ON-0-SUBTESTS: if zero subtests execute (e.g. DB never reached) the runner exits 1 —
-// an all-skipped run can NOT go green. Real Codex / Telegram / Supabase acceptance is separate
+// FAIL-ON-0-SUBTESTS: if zero subtests execute (e.g. the store was never reached) the runner
+// exits 1 — an all-skipped run can NOT go green. Real Codex / Telegram acceptance is separate
 // (accept.mjs, run by Warwick). Nothing here fakes a real-Codex claim.
 //
-//   CONTROL_PLANE_DEV_DATABASE_URL=postgres://... node test/run-tower-loop-tests.mjs
-//   (CI: DATABASE_URL is used if CONTROL_PLANE_DEV_DATABASE_URL is unset.)
+// WO-TW-01 — THE STORE IS SQLite AND THE SUITE PROVISIONS ITS OWN. A fresh temp file per run IS
+// the clean slate, so the old `drop schema if exists tower cascade` has no counterpart and needs
+// none. There is no server to start, no connection string to supply and nothing to set up:
+//
+//   node test/run-tower-loop-tests.mjs
+//
+// The spawned watcher children are pointed at the SAME temp file via TOWER_SQLITE_PATH, which is
+// what makes T3/T4/T7 real cross-PROCESS proofs rather than in-process theatre.
 
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import pg from 'pg';
+import { openDb } from '../db.mjs';
 import { applySchema, applyWatcherSchema, applyCommentSchema } from '../apply.mjs';
 import { seedPrompt } from '../seed.mjs';
 import { ingestTurn } from '../loop.mjs';
@@ -41,7 +49,11 @@ import { notify } from '../notify.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const LOOP_DIR = path.resolve(__dirname, '..');
-const DB_URL = process.env.CONTROL_PLANE_DEV_DATABASE_URL || process.env.DATABASE_URL;
+
+// One throwaway store per run, in the OS temp dir — never the repo, never ~/.mypka/tower (which is
+// where the REAL watcher's durable state lives and must not be trampled by a test).
+const TMP_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'tower-loop-ci-'));
+const DB_PATH = path.join(TMP_DIR, 'tower.db');
 
 const DOUBLES_ENV = {
   TOWER_REVIEWER_MODULE: path.join(__dirname, 'doubles', 'fakeReviewer.mjs'),
@@ -59,10 +71,10 @@ const TERMINAL = new Set(['reviewed', 'acted', 'blocked', 'awaiting_warwick', 'c
 function spawnWatcher(watcherId, extraEnv = {}) {
   const child = spawn(process.execPath, ['watcher.mjs'], {
     cwd: LOOP_DIR,
-    // watcher.mjs reads ONLY CONTROL_PLANE_DEV_DATABASE_URL; the harness resolves DB_URL from
-    // either CONTROL_PLANE_DEV_DATABASE_URL or DATABASE_URL (CI sets the latter), so propagate
-    // the resolved value to the child explicitly — otherwise CI-spawned watchers FATAL "unset".
-    env: { ...process.env, ...DOUBLES_ENV, CONTROL_PLANE_DEV_DATABASE_URL: DB_URL, WATCHER_ID: watcherId, WATCHER_POLL_MS: '400', WATCHER_LEASE_SECONDS: '20', ...extraEnv },
+    // watcher.mjs opens TOWER_SQLITE_PATH (falling back to ~/.mypka/tower/tower.db). Point the
+    // child at THIS run's throwaway store explicitly — otherwise a spawned watcher would happily
+    // and silently operate on the real durable one.
+    env: { ...process.env, ...DOUBLES_ENV, TOWER_SQLITE_PATH: DB_PATH, WATCHER_ID: watcherId, WATCHER_POLL_MS: '400', WATCHER_LEASE_SECONDS: '20', ...extraEnv },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   const tag = `[${watcherId}]`;
@@ -78,17 +90,21 @@ async function waitForProcessed(pool, turnId, timeoutMs = 60000) {
   while (Date.now() - start < timeoutMs) {
     const { rows } = await pool.query(
       `select t.state, (select count(*) from tower.supervisor_review r where r.turn_id = t.id) reviews
-         from tower.turn t where t.id = $1`, [turnId]);
+         from tower.turn t where t.id = ?`, [turnId]);
     if (rows.length && TERMINAL.has(rows[0].state) && Number(rows[0].reviews) >= 1) return rows[0].state;
     await sleep(300);
   }
   throw new Error(`timed out waiting for turn ${turnId} to be processed`);
 }
+// `, rowid asc` throughout: the SQLite store keeps ISO-8601 timestamps to MILLISECOND resolution,
+// so rows written back-to-back can share a created_at where microsecond Postgres ones could not.
+// rowid is insertion order, so this preserves the ordering these assertions always relied on
+// rather than leaving it to an unstable sort.
 async function reviewsFor(pool, turnId) {
-  return (await pool.query(`select id, verdict, prompts_applied, merge_review, model_id from tower.supervisor_review where turn_id = $1 order by created_at asc`, [turnId])).rows;
+  return (await pool.query(`select id, verdict, prompts_applied, merge_review, model_id from tower.supervisor_review where turn_id = ? order by created_at asc, rowid asc`, [turnId])).rows;
 }
 async function notesFor(pool, turnId) {
-  return (await pool.query(`select reason, state from tower.notification where turn_id = $1 order by created_at asc`, [turnId])).rows;
+  return (await pool.query(`select reason, state from tower.notification where turn_id = ? order by created_at asc, rowid asc`, [turnId])).rows;
 }
 
 // ── tiny harness (fail-on-0-subtests) ─────────────────────────────────────────
@@ -101,22 +117,17 @@ async function test(name, fn) {
 }
 
 async function main() {
-  if (!DB_URL) throw new Error('CONTROL_PLANE_DEV_DATABASE_URL / DATABASE_URL is not set — point at an isolated Postgres.');
-
-  // Clean, isolated slate.
-  const admin = new pg.Pool({ connectionString: DB_URL });
-  await admin.query('drop schema if exists tower cascade');
-  await admin.end();
-  await applySchema(DB_URL);
-  await applyWatcherSchema(DB_URL);
-  await applyCommentSchema(DB_URL);   // WO-OR-22 comment seam
-  await seedPrompt(DB_URL);
-
-  const pool = new pg.Pool({ connectionString: DB_URL, max: 6 });
+  // Clean, isolated slate: a brand-new store file. Nothing to drop, because nothing pre-exists.
+  const pool = openDb(DB_PATH);
+  console.log(`[tower-loop-tests] throwaway SQLite store: ${pool.path}`);
+  await applySchema(pool);
+  await applyWatcherSchema(pool);
+  await applyCommentSchema(pool);   // WO-OR-22 comment seam
+  await seedPrompt(pool);
 
   // Assert the truthful approval label came through (FIX 1a).
   await test('FIX1a — active prompt approved_by is truthful (not warwick)', async () => {
-    const { rows } = await pool.query(`select approved_by from tower.supervisor_prompt where active = true limit 1`);
+    const { rows } = await pool.query(`select approved_by from tower.supervisor_prompt where active = 1 limit 1`);
     assert.equal(rows[0].approved_by, 'ai-authored-unapproved');
   });
 
@@ -165,13 +176,13 @@ async function main() {
     const { rows } = await pool.query(
       `insert into tower.turn (build_ref, instruction, larry_response, state, lease_owner,
                                lease_deadline_at, kind, repo, pr_number, head_sha)
-       values ($1,$2,$3,'claimed','wo22-inproc', now() + interval '1 day','ordinary',$4,$5,$6)
+       values (?,?,?,'claimed','wo22-inproc', now_plus_seconds(86400),'ordinary',?,?,?)
        returning id, seq`,
       [buildRef, instruction, larryResponse, REPO, PR, headSha]);
     return rows[0];
   }
   const stagedInputFor = async (turnId) => (await pool.query(
-    `select staged_input, reviewer, verdict, summary from tower.supervisor_review where turn_id=$1`, [turnId])).rows[0];
+    `select staged_input, reviewer, verdict, summary from tower.supervisor_review where turn_id=?`, [turnId])).rows[0];
 
   await test('W1 — tower.git_sha DOMAIN refuses a non-canonical head (DB constraint, not a runtime if)', async () => {
     const bad = ['abc1234', 'A1B2C3D4E5F60718293A4B5C6D7E8F9012345678', `${HEAD_A}0`, ''];
@@ -179,14 +190,14 @@ async function main() {
       await assert.rejects(
         () => pool.query(
           `insert into tower.pr_comment (repo, pr_number, head_sha, comment_id, author, body, received_at, applied)
-           values ($1,$2,$3,$4,'x','y', now(), true)`, [REPO, PR, b, Math.floor(Math.random() * 1e12)]),
+           values (?,?,?,?,'x','y', now(), 1)`, [REPO, PR, b, Math.floor(Math.random() * 1e12)]),
         /git_sha_canonical_chk|invalid input value/i,
         `non-canonical head "${b}" must be refused by the database`);
     }
     // …and the canonical one is accepted.
     const ok = await pool.query(
       `insert into tower.pr_comment (repo, pr_number, head_sha, comment_id, author, body, received_at, applied)
-       values ($1,$2,$3,$4,'x','y', now(), true) returning id`, [REPO, PR, HEAD_A, 999000001]);
+       values (?,?,?,?,'x','y', now(), 1) returning id`, [REPO, PR, HEAD_A, 999000001]);
     assert.equal(ok.rowCount, 1, 'a canonical 40-hex head is accepted');
   });
 
@@ -195,14 +206,14 @@ async function main() {
     await assert.rejects(
       () => pool.query(
         `update tower.finding set disposition='addressed', disposition_rationale='r',
-            disposition_source='pr_comment', disposition_head_sha=$2, disposition_at=now()
-          where id=$1`, [f.id, HEAD_A]),
+            disposition_source='pr_comment', disposition_head_sha=?, disposition_at=now()
+          where id=?`, [HEAD_A, f.id]),
       /finding_disposition_provenance_chk/,
       'a pr_comment-sourced disposition MUST name the comment it came from');
     // A disposition with no head binding is refused too (completeness CHECK).
     await assert.rejects(
       () => pool.query(
-        `update tower.finding set disposition='addressed', disposition_source='manual', disposition_at=now() where id=$1`, [f.id]),
+        `update tower.finding set disposition='addressed', disposition_source='manual', disposition_at=now() where id=?`, [f.id]),
       /finding_disposition_complete_chk/,
       'a disposition with no head binding is refused');
   });
@@ -214,7 +225,7 @@ async function main() {
       () => ingestPrComment(pool, fixture('pr-comment-no-head.json')),
       /carries no `@tower head/,
       'ingest refuses a comment that does not state its head');
-    const { rows } = await pool.query(`select count(*)::int c from tower.pr_comment where comment_id = 2200000003`);
+    const { rows } = await pool.query(`select count(*) c from tower.pr_comment where comment_id = 2200000003`);
     assert.equal(rows[0].c, 0, 'nothing persisted for an unbindable comment');
   });
 
@@ -235,7 +246,7 @@ async function main() {
     assert.equal(rows.length, 1, 'the rejected comment IS persisted (a dropped comment must not look like one that never arrived)');
     assert.equal(rows[0].applied, false);
     assert.ok(rows[0].rejected_reason, 'rejection reason recorded');
-    const f = await pool.query(`select disposition from tower.finding where id in ($1,$2)`, [fA.id, fB.id]);
+    const f = await pool.query(`select disposition from tower.finding where id in (?,?)`, [fA.id, fB.id]);
     assert.ok(f.rows.every((r) => r.disposition === null), 'findings were NOT touched by the stale comment');
     assert.ok(t.id, 'turn created');
   });
@@ -260,7 +271,7 @@ async function main() {
 
     const rows = (await pool.query(
       `select id, disposition, disposition_source, disposition_comment_id, disposition_head_sha, disposition_rationale
-         from tower.finding where id in ($1,$2) order by created_at`, [fA.id, fB.id])).rows;
+         from tower.finding where id in (?,?) order by created_at, rowid`, [fA.id, fB.id])).rows;
     assert.equal(rows[0].disposition, 'addressed');
     assert.equal(rows[1].disposition, 'remains_open');
     for (const r of rows) {
@@ -272,7 +283,7 @@ async function main() {
     // Idempotent redelivery: the same provider comment cannot double-apply.
     const again = await ingestPrComment(pool, payload);
     assert.equal(again.deduped, true, 'redelivered comment is an idempotent no-op');
-    assert.equal((await pool.query(`select count(*)::int c from tower.pr_comment where comment_id=2200000001`)).rows[0].c, 1);
+    assert.equal((await pool.query(`select count(*) c from tower.pr_comment where comment_id=2200000001`)).rows[0].c, 1);
   });
 
   await test('W4 — the NEXT review round receives those dispositions AUTOMATICALLY from the database', async () => {
@@ -309,7 +320,7 @@ async function main() {
     assert.ok(res.gateErrors.some((e) => /no silent carry-over/.test(e)), 'mirrors reviewClassification.mjs wording');
     const rev = await stagedInputFor(g2.id);
     assert.equal(rev.reviewer, 'tower_findings_gate', 'the rejection is durably attributed to the gate');
-    assert.equal((await pool.query(`select state from tower.turn where id=$1`, [g2.id])).rows[0].state, 'blocked');
+    assert.equal((await pool.query(`select state from tower.turn where id=?`, [g2.id])).rows[0].state, 'blocked');
   });
 
   await test('W6 — a disposition recorded at an OLDER head is STALE at a newer head → round REJECTED', async () => {
@@ -365,10 +376,10 @@ async function main() {
     assert.equal(r.outcome, 'refused_head_mismatch', 'a body head that disagrees with the API head is refused');
     assert.equal(r.bodyHeadSha, HEAD_A); assert.equal(r.apiHeadSha, HEAD_B);
     assert.equal((await pool.query(
-      `select count(*)::int c from tower.pr_comment where comment_id = 5159709639`)).rows[0].c, 0,
+      `select count(*) c from tower.pr_comment where comment_id = 5159709639`)).rows[0].c, 0,
       'NOTHING is persisted for a comment the API contradicts — it never reaches ingest');
     assert.equal((await pool.query(
-      `select disposition from tower.finding where id = $1`, [fresh.id])).rows[0].disposition, null,
+      `select disposition from tower.finding where id = ?`, [fresh.id])).rows[0].disposition, null,
       'and no finding was touched');
   });
 
@@ -401,7 +412,7 @@ async function main() {
     assert.ok(c.body.includes('WOOR24-LIVE-F924F3'), 'the uniquely identifiable body is persisted verbatim');
     const rows = (await pool.query(
       `select disposition, disposition_source, disposition_comment_id, disposition_head_sha
-         from tower.finding where id in ($1,$2) order by created_at`, [pA.id, pB.id])).rows;
+         from tower.finding where id in (?,?) order by created_at, rowid`, [pA.id, pB.id])).rows;
     assert.deepEqual(rows.map((x) => x.disposition), ['addressed', 'remains_open']);
     for (const x of rows) {
       assert.equal(x.disposition_source, 'pr_comment');
@@ -413,10 +424,10 @@ async function main() {
   await test('P3 — polling TWICE is a no-op: re-seeing the same comment neither duplicates nor errors', async () => {
     // A poller re-sees every comment on every run. This is the property that makes that safe, and
     // it is WO-OR-22's (source, comment_id) constraint doing the work — not poller-side memory.
-    const before = (await pool.query(`select count(*)::int c from tower.pr_comment where comment_id = 5159709639`)).rows[0].c;
+    const before = (await pool.query(`select count(*) c from tower.pr_comment where comment_id = 5159709639`)).rows[0].c;
     assert.equal(before, 1, 'precondition: P2 ingested it exactly once');
     const disposedBefore = (await pool.query(
-      `select count(*)::int c from tower.finding where disposition_comment_id =
+      `select count(*) c from tower.finding where disposition_comment_id =
          (select id from tower.pr_comment where comment_id = 5159709639)`)).rows[0].c;
 
     const gh = makeFakeGh({ headSha: HEAD_A, comments: ghComments({ __HEAD_SHA__: HEAD_A, __FINDING_A__: pA.id, __FINDING_B__: pB.id }) });
@@ -424,10 +435,10 @@ async function main() {
 
     assert.equal(res.results[0].outcome, 'deduped', 'the second poll is an idempotent no-op, not an error');
     assert.equal((await pool.query(
-      `select count(*)::int c from tower.pr_comment where comment_id = 5159709639`)).rows[0].c, 1,
+      `select count(*) c from tower.pr_comment where comment_id = 5159709639`)).rows[0].c, 1,
       'still exactly ONE row for the provider comment');
     assert.equal((await pool.query(
-      `select count(*)::int c from tower.finding where disposition_comment_id =
+      `select count(*) c from tower.finding where disposition_comment_id =
          (select id from tower.pr_comment where comment_id = 5159709639)`)).rows[0].c, disposedBefore,
       'and no disposition was rewritten');
   });
@@ -451,7 +462,7 @@ async function main() {
     const row = (await pool.query(`select applied, rejected_reason from tower.pr_comment where comment_id = 5159709777`)).rows[0];
     assert.equal(row.applied, false, 'persisted as NOT applied — a dropped comment must not look like one that never arrived');
     assert.ok(row.rejected_reason, 'rejection reason recorded');
-    assert.equal((await pool.query(`select disposition from tower.finding where id = $1`, [sA.id])).rows[0].disposition, null,
+    assert.equal((await pool.query(`select disposition from tower.finding where id = ?`, [sA.id])).rows[0].disposition, null,
       'the finding was NOT disposed by a stale comment');
   });
 
@@ -571,7 +582,7 @@ async function main() {
     // Simulate a crashed watcher: a turn stuck in 'claimed' with an already-expired lease.
     const ins = await pool.query(
       `insert into tower.turn (build_ref, instruction, larry_response, state, lease_owner, lease_deadline_at)
-       values ('BUILD-014', $1, $2, 'claimed', 'dead-watcher', now() - interval '1 hour') returning id`,
+       values ('BUILD-014', ?, ?, 'claimed', 'dead-watcher', now_plus_seconds(-3600)) returning id`,
       ['Warwick: status?', 'Larry: everything is on track, status update.']);
     const turnId = ins.rows[0].id;
     const w3 = spawnWatcher('ci-w3');
@@ -608,6 +619,8 @@ async function main() {
   });
 
   await pool.end();
+  // The throwaway store has served its purpose; leave nothing behind.
+  try { fs.rmSync(TMP_DIR, { recursive: true, force: true }); } catch { /* best effort */ }
 
   // ── report ──
   console.log(`\n${'═'.repeat(70)}\nTOWER-LOOP CI DOUBLES SUITE\n${'═'.repeat(70)}`);

@@ -9,17 +9,25 @@
 //   (reuse the proven path) → mark final → heartbeat → sleep(poll) → repeat.
 //
 // Turns ARRIVE via ingestTurn() (loop.mjs) as state='pending'. The watcher is the only thing
-// that processes them. Exactly-once is guaranteed by a durable lease + FOR UPDATE SKIP LOCKED
-// and by refusing to re-run Codex when a turn already has a supervisor_review.
+// that processes them. Exactly-once is guaranteed by a durable lease taken inside a single
+// BEGIN IMMEDIATE write transaction, and by refusing to re-run Codex when a turn already has a
+// supervisor_review.
 //
-//   CONTROL_PLANE_DEV_DATABASE_URL=postgres://... node watcher.mjs
+// WO-TW-01 — the store is SQLite (better-sqlite3, WAL) at TOWER_SQLITE_PATH, not Postgres. The
+// exactly-once claim used to lean on `FOR UPDATE SKIP LOCKED`, which SQLite does not have. It now
+// leans on SQLite's single-writer guarantee instead: BEGIN IMMEDIATE takes the write lock before
+// the candidate row is even read, and the UPDATE re-asserts `state='pending'` in its WHERE clause,
+// so two watchers racing for the same turn cannot both win. The guarantee is the same one and it
+// still holds ACROSS PROCESSES, which is what T7 exercises.
+//
+//   TOWER_SQLITE_PATH=/path/to/tower.db node watcher.mjs
 
 import os from 'node:os';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
-import pg from 'pg';
+import { openDb, isBusyError } from './db.mjs';
 import { applySchema, applyWatcherSchema, applyHoldSchema, applyCommentSchema } from './apply.mjs';
 import {
   loadActivePrompt,
@@ -36,7 +44,6 @@ import { notify, composeMessage, composeLarryMessage } from './notify.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const DB_URL = process.env.CONTROL_PLANE_DEV_DATABASE_URL;
 const WATCHER_ID = process.env.WATCHER_ID || `${os.hostname()}#${process.pid}`;
 const POLL_MS = Number(process.env.WATCHER_POLL_MS || 1500);
 const LEASE_SECONDS = Number(process.env.WATCHER_LEASE_SECONDS || 30);
@@ -96,7 +103,7 @@ function log(evt, extra = {}) {
 export async function openFinding(pool, { buildRef = 'BUILD-014', openedTurnId = null, description }) {
   const { rows } = await pool.query(
     `insert into tower.finding (build_ref, opened_turn_id, description, state)
-     values ($1, $2, $3, 'open') returning id, build_ref, state`,
+     values (?, ?, ?, 'open') returning id, build_ref, state`,
     [buildRef, openedTurnId, description],
   );
   return rows[0];
@@ -107,34 +114,55 @@ export async function openFinding(pool, { buildRef = 'BUILD-014', openedTurnId =
 
 // ── lease / claim (exactly-once, restart-safe) ───────────────────────────────
 async function reclaimStale(pool) {
-  const { rows } = await pool.query(
-    `update tower.turn
-        set state = 'pending', lease_owner = null, lease_deadline_at = null, updated_at = now()
-      where state = 'claimed' and lease_deadline_at is not null and lease_deadline_at < now()
-      returning id`,
-  );
-  if (rows.length) log('reclaimed_stale', { count: rows.length });
-  return rows.length;
+  try {
+    const { rows } = await pool.query(
+      `update tower.turn
+          set state = 'pending', lease_owner = null, lease_deadline_at = null, updated_at = now()
+        where state = 'claimed' and lease_deadline_at is not null and lease_deadline_at < now()
+        returning id`,
+    );
+    if (rows.length) log('reclaimed_stale', { count: rows.length });
+    return rows.length;
+  } catch (e) {
+    // Another watcher holds the write lock for longer than busy_timeout. Nothing is lost: the
+    // stale lease is still stale on the next poll. Crashing the watcher over write contention
+    // would be strictly worse than waiting one poll interval.
+    if (isBusyError(e)) { log('reclaim_busy'); return 0; }
+    throw e;
+  }
 }
 
 async function claimOne(pool) {
-  // Atomic single-row claim: pick the oldest pending turn, skipping rows another worker holds.
-  const { rows } = await pool.query(
-    `update tower.turn t
-        set state = 'claimed', lease_owner = $1,
-            lease_deadline_at = now() + make_interval(secs => $2), updated_at = now()
-       from (
-         select id from tower.turn
-          where state = 'pending'
-          order by seq
-          for update skip locked
-          limit 1
-       ) s
-      where t.id = s.id
-      returning t.id, t.seq, t.build_ref, t.goal_complete`,
-    [WATCHER_ID, LEASE_SECONDS],
-  );
-  return rows[0] ?? null;
+  // Atomic single-row claim. ONE write transaction, taken with BEGIN IMMEDIATE so the write lock
+  // is held from before the candidate is read until after the claim is committed — the SQLite
+  // equivalent of the `FOR UPDATE SKIP LOCKED` this used to do, and equally exactly-once across
+  // processes. The `and state = 'pending'` in the UPDATE is the second half of the guarantee:
+  // even if the read were somehow stale, the write refuses a turn someone else already took.
+  //
+  // ORDERING IS PRESERVED: `order by seq` picks the OLDEST pending turn, exactly as before. `seq`
+  // is the autoincrement rowid alias, so it is still strictly insertion-ordered.
+  try {
+    return await pool.immediate((q) => {
+      const candidate = q(
+        `select id from tower.turn where state = 'pending' order by seq limit 1`,
+      ).rows[0];
+      if (!candidate) return null;
+      const { rows } = q(
+        `update tower.turn
+            set state = 'claimed', lease_owner = ?,
+                lease_deadline_at = now_plus_seconds(?), updated_at = now()
+          where id = ? and state = 'pending'
+          returning id, seq, build_ref, goal_complete`,
+        [WATCHER_ID, LEASE_SECONDS, candidate.id],
+      );
+      return rows[0] ?? null;
+    });
+  } catch (e) {
+    // A concurrent watcher held the write lock past busy_timeout. Claim nothing this round and
+    // let the next poll try again — the turn stays 'pending' and is not lost.
+    if (isBusyError(e)) { log('claim_busy'); return null; }
+    throw e;
+  }
 }
 
 // ── notification triggers (proven delivery policy + FIX 1 merge-class QA gate) ─
@@ -173,7 +201,7 @@ async function fireTriggers(pool, { turnId, buildRef, turnSeq, nextState, r, blo
     reason = 'codex_block_or_redirect'; warwickNeeded = mergeNotApprove || r.warwick_needed === true;
     summary = `${r.summary}${mergeLine}`;
   } else if (goalComplete === true) {
-    await pool.query(`update tower.turn set state = 'complete', updated_at = now() where id = $1`, [turnId]);
+    await pool.query(`update tower.turn set state = 'complete', updated_at = now() where id = ?`, [turnId]);
     reason = 'goal_complete'; state = 'complete'; summary = `Goal complete — ${r.summary}`;
   }
 
@@ -201,9 +229,9 @@ function startLeaseRenewer(pool, turnId) {
     try {
       const res = await pool.query(
         `update tower.turn
-            set lease_deadline_at = now() + make_interval(secs => $2), updated_at = now()
-          where id = $1 and lease_owner = $3 and state = 'claimed'`,
-        [turnId, LEASE_SECONDS, WATCHER_ID],
+            set lease_deadline_at = now_plus_seconds(?), updated_at = now()
+          where id = ? and lease_owner = ? and state = 'claimed'`,
+        [LEASE_SECONDS, turnId, WATCHER_ID],
       );
       if (res.rowCount > 0) log('lease_renewed', { turnId });
     } catch (e) {
@@ -232,7 +260,7 @@ function mergeFlagsFrom(mergeReview) {
  * and (idempotently) fires notifications. A MERGE-CLASS turn (FIX 1) ALSO runs the APPROVED
  * Tower QA skill against REAL Git evidence and records both prompts + their fingerprints.
  *
- * @param {import('pg').Pool} pool
+ * @param {ReturnType<import('./db.mjs').openDb>} pool
  * @param {string} turnId
  * @param {object} [deps]  injectable { runSupervisor, runMergeReview, gatherGitEvidence, notify }
  */
@@ -246,12 +274,12 @@ export async function processTurn(pool, turnId, deps = REAL_DEPS) {
   const prompt = await loadActivePrompt(pool);
   const bindRes = await pool.query(
     `update tower.turn
-        set prompt_id = coalesce(prompt_id, $2),
-            prompt_version = coalesce(prompt_version, $3),
-            prompt_hash = coalesce(prompt_hash, $4)
-      where id = $1
+        set prompt_id = coalesce(prompt_id, ?),
+            prompt_version = coalesce(prompt_version, ?),
+            prompt_hash = coalesce(prompt_hash, ?)
+      where id = ?
       returning build_ref, seq, goal_complete, kind, pr_number, repo, base_sha, head_sha, larry_response`,
-    [turnId, prompt.id, prompt.version, prompt.content_hash],
+    [prompt.id, prompt.version, prompt.content_hash, turnId],
   );
   const turnRow = bindRes.rows[0];
   const { build_ref: buildRef, seq: turnSeq, goal_complete: goalComplete } = turnRow;
@@ -260,7 +288,7 @@ export async function processTurn(pool, turnId, deps = REAL_DEPS) {
   const existing = await pool.query(
     `select verdict, warwick_needed, next_action, summary, aligned, over_engineering,
             drifting, administering, raw_output, merge_review
-       from tower.supervisor_review where turn_id = $1 order by created_at asc limit 1`,
+       from tower.supervisor_review where turn_id = ? order by created_at asc, rowid asc limit 1`,
     [turnId],
   );
   if (existing.rows.length > 0) {
@@ -269,7 +297,7 @@ export async function processTurn(pool, turnId, deps = REAL_DEPS) {
     const blocked = r.status === 'blocked';
     const merge = mergeFlagsFrom(rr.merge_review);
     const nextState = VERDICT_TO_STATE[r.verdict] ?? 'reviewed';
-    await pool.query(`update tower.turn set state = $2, updated_at = now() where id = $1`, [turnId, nextState]);
+    await pool.query(`update tower.turn set state = ?, updated_at = now() where id = ?`, [nextState, turnId]);
     const notifications = await fireTriggers(pool, { turnId, buildRef, turnSeq, nextState, r, blocked, goalComplete, notifyFn: doNotify, merge, larryResponse: turnRow.larry_response });
     log('processed_idempotent', { turnId, verdict: r.verdict, state: nextState, mergeClass: !!merge });
     return { turnId, reused: true, verdict: r.verdict, state: nextState, notifications };
@@ -297,12 +325,12 @@ export async function processTurn(pool, turnId, deps = REAL_DEPS) {
     await pool.query(
       `insert into tower.supervisor_review
          (turn_id, reviewer, verdict, warwick_needed, next_action, summary, raw_output)
-       values ($1, 'tower_findings_gate', $2, true, $3, $4, $5)
+       values (?, 'tower_findings_gate', ?, 1, ?, ?, ?)
        on conflict (turn_id) do nothing`,
       [turnId, r.verdict, r.next_action, r.summary, JSON.stringify(r)],
     );
     const gateState = VERDICT_TO_STATE[r.verdict] ?? 'blocked';
-    await pool.query(`update tower.turn set state = $2, lease_owner = null, updated_at = now() where id = $1`, [turnId, gateState]);
+    await pool.query(`update tower.turn set state = ?, lease_owner = null, updated_at = now() where id = ?`, [gateState, turnId]);
     const gateNotifications = await fireTriggers(pool, {
       turnId, buildRef, turnSeq, nextState: gateState, r, blocked: false, goalComplete,
       notifyFn: doNotify, merge: null, larryResponse: turnRow.larry_response,
@@ -373,7 +401,7 @@ export async function processTurn(pool, turnId, deps = REAL_DEPS) {
        (turn_id, reviewer, model_id, packet_hash, staged_input, aligned, over_engineering,
         drifting, administering, next_action, warwick_needed, verdict, summary, raw_output,
         prompts_applied, merge_review)
-     values ($1, 'gpt_codex', $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+     values (?, 'gpt_codex', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      on conflict (turn_id) do nothing
      returning id`,
     [
@@ -389,20 +417,20 @@ export async function processTurn(pool, turnId, deps = REAL_DEPS) {
     log('review_insert_conflict_reuse', { turnId });
     const win = await pool.query(
       `select verdict, warwick_needed, next_action, summary, raw_output, merge_review
-         from tower.supervisor_review where turn_id = $1 limit 1`, [turnId],
+         from tower.supervisor_review where turn_id = ? limit 1`, [turnId],
     );
     const wr = win.rows[0];
     const rWin = wr.raw_output ?? wr;
     const mergeWin = mergeFlagsFrom(wr.merge_review);
     const stateWin = VERDICT_TO_STATE[rWin.verdict] ?? 'reviewed';
-    await pool.query(`update tower.turn set state = $2, updated_at = now() where id = $1`, [turnId, stateWin]);
+    await pool.query(`update tower.turn set state = ?, updated_at = now() where id = ?`, [stateWin, turnId]);
     const notifications = await fireTriggers(pool, { turnId, buildRef, turnSeq, nextState: stateWin, r: rWin, blocked: rWin.status === 'blocked', goalComplete, notifyFn: doNotify, merge: mergeWin, larryResponse: turnRow.larry_response });
     return { turnId, reused: true, verdict: rWin.verdict, state: stateWin, notifications };
   }
 
   // (h) set turn.state from the verdict.
   const nextState = VERDICT_TO_STATE[r.verdict] ?? 'reviewed';
-  await pool.query(`update tower.turn set state = $2, lease_owner = null, updated_at = now() where id = $1`, [turnId, nextState]);
+  await pool.query(`update tower.turn set state = ?, lease_owner = null, updated_at = now() where id = ?`, [nextState, turnId]);
 
   // (h cont.) auto-Telegram on the trigger conditions (idempotent), incl. the merge-class gate.
   const notifications = await fireTriggers(pool, { turnId, buildRef, turnSeq, nextState, r, blocked: sup.blocked, goalComplete, notifyFn: doNotify, merge: mergeFlags, larryResponse: turnRow.larry_response });
@@ -443,27 +471,33 @@ function buildMergePacket({ turnRow, evidence, buildRef, larryClaim, openFinding
 }
 
 async function heartbeat(pool, lastTurnId, state) {
-  await pool.query(
-    `insert into tower.watcher_heartbeat (watcher_id, last_beat, last_turn_id, state)
-     values ($1, now(), $2, $3)
-     on conflict (watcher_id) do update
-       set last_beat = now(), last_turn_id = excluded.last_turn_id, state = excluded.state`,
-    [WATCHER_ID, lastTurnId ?? null, state],
-  );
+  try {
+    await pool.query(
+      `insert into tower.watcher_heartbeat (watcher_id, last_beat, last_turn_id, state)
+       values (?, now(), ?, ?)
+       on conflict (watcher_id) do update
+         set last_beat = now(), last_turn_id = excluded.last_turn_id, state = excluded.state`,
+      [WATCHER_ID, lastTurnId ?? null, state],
+    );
+  } catch (e) {
+    // A heartbeat is an aliveness signal, not a correctness one. Losing one to write contention
+    // must never take the watcher down with it — the next loop writes another.
+    if (isBusyError(e)) { log('heartbeat_busy'); return; }
+    throw e;
+  }
 }
 
 function sleep(ms) { return new Promise((res) => setTimeout(res, ms)); }
 
 export async function runWatcher() {
-  if (!DB_URL) throw new Error('CONTROL_PLANE_DEV_DATABASE_URL is not set.');
+  // Self-sufficient boot: open the durable store and ensure every schema exists (idempotent).
+  const pool = openDb();
+  await applySchema(pool);
+  await applyWatcherSchema(pool);
+  await applyHoldSchema(pool);
+  await applyCommentSchema(pool);
+  log('store_open', { path: pool.path });
 
-  // Self-sufficient boot: ensure both schemas exist (idempotent).
-  await applySchema(DB_URL);
-  await applyWatcherSchema(DB_URL);
-  await applyHoldSchema(DB_URL);
-  await applyCommentSchema(DB_URL);
-
-  const pool = new pg.Pool({ connectionString: DB_URL, max: 6 });
   const deps = await resolveDeps();
   let stopping = false;
   let lastTurnId = null;

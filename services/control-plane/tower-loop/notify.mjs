@@ -9,6 +9,9 @@
 // not-sent (telegram_ok=false) with the reason — the loop never fabricates a delivery.
 //
 // Node 22 has global fetch; no dependency added.
+//
+// WO-TW-01: the store is SQLite (better-sqlite3, WAL). `pool` is the pg-shaped handle from
+// db.mjs; the (turn_id, reason) dedup index does the same work it always did.
 
 export const NOTIFY_REASONS = Object.freeze([
   'warwick_input_required',
@@ -29,7 +32,7 @@ function maskToken(token) {
 /**
  * Send one automatic Watcher Telegram and record the real result.
  *
- * @param {import('pg').Pool} pool
+ * @param {ReturnType<import('./db.mjs').openDb>} pool
  * @param {object} args
  * @param {string} args.turnId
  * @param {string} args.reason   one of NOTIFY_REASONS
@@ -53,7 +56,7 @@ export async function notify(pool, { turnId, reason, state, message }) {
   // do NOT create a duplicate row. Only the winner of the insert POSTs to Telegram.
   const claim = await pool.query(
     `insert into tower.notification (turn_id, reason, state, message, telegram_ok)
-     values ($1, $2, $3, $4, false)
+     values (?, ?, ?, ?, 0)
      on conflict (turn_id, reason) do nothing
      returning id`,
     [turnId, reason, state, stored],
@@ -96,8 +99,8 @@ export async function notify(pool, { turnId, reason, state, message }) {
 
   // Record the REAL delivery result onto the row we already claimed.
   await pool.query(
-    `update tower.notification set telegram_ok = $2, telegram_message_id = $3 where id = $1`,
-    [notificationId, telegramOk, telegramMessageId],
+    `update tower.notification set telegram_ok = ?, telegram_message_id = ? where id = ?`,
+    [telegramOk, telegramMessageId, notificationId],
   );
 
   return { notificationId, deduped: false, telegram_ok: telegramOk, telegram_message_id: telegramMessageId, detail, sent: parts.length };

@@ -39,8 +39,8 @@
 
 import { execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import pg from 'pg';
-import { applySchema, applyWatcherSchema, applyCommentSchema } from './apply.mjs';
+import { openDb } from './db.mjs';
+import { applyAll } from './apply.mjs';
 import { ingestPrComment, parseCommentBody } from './ingestComment.mjs';
 
 const CANONICAL_SHA = /^[0-9a-f]{40}$/;
@@ -200,10 +200,8 @@ if (import.meta.url === `file://${process.argv[1]}` || process.argv[1] === fileU
     const repo = arg('repo');
     const prNumber = Number(arg('pr'));
     if (!repo || !prNumber) throw new Error('usage: node pollPrComments.mjs --repo <owner/name> --pr <n> [--marker <substring>] [--json]');
-    const url = process.env.CONTROL_PLANE_DEV_DATABASE_URL;
-    if (!url) throw new Error('CONTROL_PLANE_DEV_DATABASE_URL is not set — point it at a throwaway local Postgres.');
-    await applySchema(url); await applyWatcherSchema(url); await applyCommentSchema(url);
-    const pool = new pg.Pool({ connectionString: url });
+    const pool = openDb();
+    await applyAll(pool);
     try {
       const res = await pollPrComments(pool, { repo, prNumber, marker: arg('marker', null) });
       if (process.argv.includes('--json')) { console.log(JSON.stringify(res, null, 2)); }

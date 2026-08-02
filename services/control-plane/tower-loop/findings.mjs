@@ -20,13 +20,21 @@ export const FINDING_DISPOSITIONS = Object.freeze(['addressed', 'remains_open', 
 
 /** Load a build's OPEN findings, now carrying their disposition columns. Ordering is stable
  *  (created_at asc) so the staged input is byte-identical across restarts — the property the
- *  packet_hash audit depends on. */
+ *  packet_hash audit depends on.
+ *
+ *  WO-TW-01 — the `, rowid asc` tiebreaker is NOT decoration. On Postgres `now()` had microsecond
+ *  resolution, so two findings opened back-to-back could not share a timestamp. The SQLite store
+ *  keeps ISO-8601 text to MILLISECOND resolution, so they routinely can — and SQLite's sort is not
+ *  required to be stable, which would make "stable ordering" a coin-flip exactly where the
+ *  packet_hash audit depends on it. rowid is insertion order, so this RESTORES the guarantee the
+ *  comment above claims rather than adding a new one. */
 export async function loadOpenFindings(pool, buildRef) {
   const { rows } = await pool.query(
     `select id, build_ref, description, state, created_at, opened_turn_id,
             disposition, disposition_rationale, disposition_source,
             disposition_comment_id, disposition_head_sha, disposition_at
-       from tower.finding where build_ref = $1 and state = 'open' order by created_at asc`,
+       from tower.finding where build_ref = ? and state = 'open'
+      order by created_at asc, rowid asc`,
     [buildRef],
   );
   return rows;
