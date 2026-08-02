@@ -67,6 +67,57 @@ it as JSON. Re-entrant (a restarted Larry resumes without duplicates). On timeou
 posts an honest `TOWER_UNAVAILABLE`, alerts Telegram, and exits **4 = HALT** (Larry
 stops QA-dependent work).
 
+### Ad-hoc milestone (the sanctioned one-off ding)
+
+```
+node bin/notify-milestone.js --purpose escalation --body "one sentence" --source LARRY
+```
+
+**What it is for.** Sending a single milestone when the watcher is not running — a
+handback is owed, a route is blocked, a verdict needs eyes. It is the **only**
+sanctioned way to emit an ad-hoc milestone; a bespoke caller written for the occasion
+is not. It drives the same `runtimeConfig` + `telegramNotifier` the watcher uses, so it
+needs **no Postgres, no ClickUp and no terminal session** — the loader resolves
+`TELEGRAM_BOT_TOKEN` and `AUTHORISED_TELEGRAM_USER_ID` by NAME from the secret store.
+No credential is accepted on the command line, and none is ever printed.
+
+**Vocabulary — closed, and narrower than the library's.** Available here:
+
+| Purpose | Use it when |
+| --- | --- |
+| `escalation` | a decision or handback is owed |
+| `blocked` | fail-closed; something must be cleared before work continues |
+| `tower_unavailable` | the QA route stopped; dependent work must HALT |
+| `review_posted` | a verdict is waiting to be read |
+
+`watcher_online`, `watcher_recovered` and `clickup_token_missing` are **refused here** —
+they are states the watcher observes about *itself*, and a human able to hand-fake them
+is how a monitoring channel starts lying. Rejections say which of the two problems it
+is: *"not a milestone"* (not in the vocabulary at all) or *"not available to this
+entrypoint"* (a real milestone, machine-only).
+
+**What it does NOT do.**
+
+- **Not a console.** Routine progress has no purpose it can be sent under, by design.
+- **No dedup, so RE-RUNNING RESENDS.** It deliberately keeps no state: the watcher's
+  dedup store lives in the secrets store, and sharing that namespace would let an ad-hoc
+  `escalation` silently suppress a real one. Send once, on purpose.
+- **No retry, no queue, no scheduling.** One process, one attempt, one answer.
+- **No inbound polling, no ClickUp, no Codex, no merge.** Outbound `sendMessage` only.
+- **Does not read the body from stdin or a file.** `--body` on the command line only.
+
+**Exit codes — a send that did not happen never exits 0.**
+
+| Exit | Meaning |
+| --- | --- |
+| `0` | sent. `{"sent":true,"messageId":"…"}` on **stdout**, nothing on stderr |
+| `1` | **NOT SENT** — config fail-closed, notifier not ready, dropped, deduped, or the send failed. Reason on stderr, **nothing on stdout** |
+| `2` | usage error — bad/missing purpose, empty body, unknown source. Nothing was loaded and nothing was sent |
+
+There is no output on any failure path that reads as success. That is the point of the
+command: a silent failure and a quiet channel are indistinguishable to the person
+waiting, so this one is never silent.
+
 ## Durable state / lockfile / logs (all outside the repo)
 
 - **State (cache):** `C:\.fusion247\tower-baton-state.json` — answered `checkpoint_id`s,
