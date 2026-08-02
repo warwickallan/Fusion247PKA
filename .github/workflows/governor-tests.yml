@@ -5,8 +5,18 @@ name: governor-tests
 # NARROWED 2026-08-02 by WO-OR-05, the operating-reset Phase 5 teardown. Eight modules and
 # their suites were deleted (stop-controller, install-hooks, rotate-session, collect-state,
 # worktree-recon, programme-state, plus the programme-state schema and fixtures). Ten
-# modules survive; eight of them have suites. This job runs seven of those eight — see the
-# exclusion note below for the one it does not, and why.
+# modules survive.
+#
+# WIDENED 2026-08-02 by WO-OR-18, the Phase 7 closeout. This job now runs ALL TEN suites
+# and excludes nothing. Two of the ten modules had no suite at all (continuity.mjs,
+# continuity-derive.mjs) and now have one; reorient.test.mjs was the single exclusion and
+# its stated reason — that it asserted against a multi-worktree estate and banked programme
+# state — was removed by the very teardown above.
+#
+# UNPROVEN AT THE TIME OF WRITING, AND SAID SO DELIBERATELY: the author of this change ran
+# all ten suites on the Windows development machine, not on a fresh windows-latest runner,
+# and had no authority to push. The first CI run IS the proof of this widening. The two
+# places it is most likely to bite are named in the risk note beside the run step.
 #
 # WHY THIS EXISTS. Keel's WP-1 preflight reported that no workflow referenced
 # tools/governor at all: the suite was builder-run only, so nothing enforced it on
@@ -60,37 +70,65 @@ jobs:
       - name: State what this job does NOT cover
         shell: bash
         run: |
-          echo "NOT COVERED BY CI — ONE suite is excluded:"
-          echo "  reorient.test.mjs        — asserts against real git in the working checkout"
+          echo "NOT COVERED BY CI — NOTHING IS EXCLUDED ANY MORE."
+          echo "Every *.test.mjs under tools/governor/ runs in this job."
           echo ""
-          echo "TWO EXCLUSIONS WERE REMOVED RATHER THAN LEFT IN PLACE:"
+          echo "THREE EXCLUSIONS WERE REMOVED RATHER THAN LEFT IN PLACE:"
           echo "  collect-state.test.mjs   — the module and its suite were DELETED (WO-OR-05)."
           echo "  model-gate.test.mjs      — deleted when the model gate was retired, 2026-08-01."
+          echo "  reorient.test.mjs        — INCLUDED from WO-OR-18. It was excluded because it"
+          echo "                             asserted against a multi-worktree estate and banked"
+          echo "                             programme state; the Phase 5 teardown deleted both,"
+          echo "                             so the reason it carried no longer exists."
           echo "A 'grep -v' naming a file that no longer exists is a filter nobody can tell is"
           echo "doing nothing, so each exclusion is removed when its subject is."
           echo ""
-          echo "TWO OF THE TEN SURVIVING MODULES HAVE NO SUITE AT ALL, and neither a green here"
-          echo "nor the count below says anything about them:"
-          echo "  continuity.mjs           — the Honcho read/write path and the Stop hook"
-          echo "  continuity-derive.mjs    — the SessionEnd derivation"
-          echo "That is a real coverage gap, recorded as a finding rather than hidden."
-          echo "A skipped test is NOT a passing test, and an untested module is not a tested one."
+          echo "EVERY SURVIVING MODULE NOW HAS A SUITE. The two that did not — continuity.mjs"
+          echo "(the Honcho read/write path and the Stop hook) and continuity-derive.mjs (the"
+          echo "SessionEnd derivation) — gained one in WO-OR-18, and both run here."
+          echo ""
+          echo "WHAT A GREEN HERE STILL DOES NOT SAY:"
+          echo "  - continuity.mjs is exercised through an INJECTED fetch seam. The LIVE Honcho"
+          echo "    pagination contract (cursor fields, has_more, ordering guarantees) is NOT"
+          echo "    established by this job, and has never been established by anyone — only the"
+          echo "    symptom was measured. The code is built to be correct under that uncertainty."
+          echo "  - continuity-derive.mjs's deriveState() runs with the LLM call STUBBED."
+          echo "    No 'claude -p' invocation is exercised anywhere in this job."
+          echo "A skipped test is NOT a passing test, and an untested path is not a tested one."
 
-      - name: Run the portable governor suites and assert they actually executed
+      # RISK NOTE FOR THE FIRST RUN AFTER WO-OR-18 — written as a prediction, so that a red
+      # run is read rather than rediscovered. reorient.test.mjs asserts against REAL git in
+      # the checkout, and a fresh GitHub checkout is not a developer machine. The two most
+      # likely places it bites:
+      #   1. actions/checkout@v4 leaves a DETACHED HEAD. Tests at reorient.test.mjs:229,
+      #      :241 and :410 call gitFacts(process.cwd()) and assert a 40-char headSha, a
+      #      string branch, and gitReadable === true. All three are believed to survive
+      #      detachment (`--abbrev-ref HEAD` returns the literal "HEAD", which is a string)
+      #      — believed, not executed on a runner.
+      #   2. reorient.test.mjs:930 applies a real deny ACE with icacls and FAILS LOUDLY
+      #      rather than skipping if the ACE does not bite. The runner account is a local
+      #      administrator, and administrator token behaviour against a deny ACE is the
+      #      untested variable.
+      # If this job goes red on either, the fix is a defect in the test's environmental
+      # assumption — not a licence to re-exclude the file quietly.
+      - name: Run the governor suites and assert they actually executed
         shell: bash
         run: |
           set -o pipefail
-          # ONE explicit exclusion, not a silent skip, and it is named above. Everything
-          # else must be green.
-          FILES=$(ls tools/governor/*.test.mjs | grep -v 'reorient.test.mjs')
+          # No exclusions. If one is ever needed again, name it HERE and in the block
+          # above — a silent skip is indistinguishable from a pass.
+          FILES=$(ls tools/governor/*.test.mjs)
           echo "running:"; echo "$FILES"
 
           # A DELETION MUST NOT BE ABLE TO LOOK LIKE A PASS. The executed-count assertion
           # below catches a suite that ran nothing, but not a narrowing that quietly
-          # dropped whole FILES — seven green files and four green files both print a
+          # dropped whole FILES — ten green files and four green files both print a
           # positive pass count. So the file count is asserted too, against a literal held
           # here rather than derived from the glob that produced it.
-          expected=7
+          #
+          # 7 -> 10 at WO-OR-18: reorient.test.mjs is no longer excluded (+1), and
+          # continuity.test.mjs / continuity-derive.test.mjs are new (+2).
+          expected=10
           actual=$(echo "$FILES" | grep -c 'test.mjs')
           if [ "$actual" -ne "$expected" ]; then
             echo "::error::SUITE SET CHANGED — expected ${expected} test files, found ${actual}. If a suite was legitimately added or deleted, update this literal in the same commit."
