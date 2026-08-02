@@ -1,0 +1,113 @@
+repo:  C:/Fusion247PKA
+range: a989e68d95e01b7f6dc13955d796950f6a8a02a5..2aac7d9
+claim: Deliverables/2026-08-02-phase5-evidence/claim-scope-reorient-decoupling.json
+scope  : tools/governor/reorient.mjs
+branch : operating-reset/teardown
+
+── GIT EVIDENCE (real, read-only) ──
+resolved=true diff_range=a989e68d95e01b7f6dc13955d796950f6a8a02a5..2aac7d9a2d6584fc7d993fc21f5428f649c847d0
+changed_files=["tools/governor/reorient.mjs"]
+diff bytes=59376 of 59376 (real UTF-8 bytes) truncated=false
+packet diff_range=a989e68d95e01b7f6dc13955d796950f6a8a02a5..2aac7d9a2d6584fc7d993fc21f5428f649c847d0 -- tools/governor/reorient.mjs
+packet scoped_to=["tools/governor/reorient.mjs"] wp_id=null
+
+── REAL CODEX MERGE REVIEW (Tower QA skill over the staged diff + the REAL claim) ──
+ok=true blocked=false model=openai-codex-exec
+{
+  "status": "ok",
+  "verdict": "request_changes",
+  "summary": "The decoupling is structurally clean: deleted-module imports are gone, the three preserved behaviours remain reachable from the live hook, and no hidden programme-state dependency remains. However, fail-open handling is silent for a missing Deliverables directory and unreadable deliverable files, contrary to Z1; the sweep can also follow a top-level .md symlink and report a target outside Deliverables. Corrections are required before merge.",
+  "claims_verified": [
+    {
+      "claim": "reorient.mjs no longer imports programme-state.mjs or rotate-session.mjs.",
+      "status": "confirmed",
+      "evidence": "The staged imports retain only continuity.mjs; both deleted-module imports are removed."
+    },
+    {
+      "claim": "The deliverables sweep, Honcho continuity passthrough, and live git facts remain wired into hook output.",
+      "status": "confirmed",
+      "evidence": "buildBrief invokes factsFn and sweepFn; main invokes readContinuityBrief and passes body plus continuity through toHookOutput."
+    },
+    {
+      "claim": "Exactly normaliseSeparators was carried across; isBankingCommit and its consumer were removed.",
+      "status": "confirmed",
+      "evidence": "The diff adds normaliseSeparators only; isBankingCommit, assessBankedFreshness, and the other programme recovery machinery are deleted."
+    },
+    {
+      "claim": "The hook reports all specified recoverable absences and always exits successfully.",
+      "status": "refuted",
+      "evidence": "sweepOpenDeliverables catches readdirSync, statSync, and readFileSync failures by returning null or continuing; buildBrief emits no Deliverables status when the result is null."
+    }
+  ],
+  "acceptance_results": [
+    {
+      "acceptance_row_id": "C1",
+      "result": "pass",
+      "rationale": "No runtime import of either deleted module survives.",
+      "evidence": "Imports of ./programme-state.mjs and ./rotate-session.mjs are deleted; only ./continuity.mjs remains locally imported."
+    },
+    {
+      "acceptance_row_id": "C2",
+      "result": "pass",
+      "rationale": "All three preserved behaviours are reachable from the executable main path and contribute to additionalContext.",
+      "evidence": "main → buildBrief → factsFn/gitFacts and sweepFn/sweepOpenDeliverables; main separately awaits readContinuityBrief; their results are combined in toHookOutput."
+    },
+    {
+      "acceptance_row_id": "C3",
+      "result": "pass",
+      "rationale": "Only normaliseSeparators is carried over, it has live callers, and isBankingCommit was not retained.",
+      "evidence": "normaliseSeparators is called by gitFacts and buildBrief; the removed freshness path and isBankingCommit references do not survive."
+    },
+    {
+      "acceptance_row_id": "Z1",
+      "result": "fail",
+      "rationale": "Exceptions are contained and main sets exitCode 0, but a missing Deliverables directory or unreadable file is silently omitted rather than reported as an absence.",
+      "evidence": "sweepOpenDeliverables catches directory failure with `return null` and file failures with `continue`; buildBrief only appends a sweep section when `sweep` is truthy."
+    },
+    {
+      "acceptance_row_id": "W1",
+      "result": "fail",
+      "rationale": "The sweep remains reachable, but its specified visibility guarantee is broken for unavailable input because absence is indistinguishable from having nothing to report.",
+      "evidence": "A null sweep produces no OPEN DELIVERABLES section in buildBrief."
+    },
+    {
+      "acceptance_row_id": "W2",
+      "result": "fail",
+      "rationale": "Unreadable matching files are missed silently, and statSync follows symlinks, allowing a top-level .md symlink to an external regular file to be reported as a Deliverables plan.",
+      "evidence": "File stat/read catches use `continue`; `statSync(full).isFile()` follows symbolic links and no lstat or realpath containment check is performed."
+    },
+    {
+      "acceptance_row_id": "W3",
+      "result": "pass",
+      "rationale": "The inlined helper is behaviourally identical to the removed form shown in the diff, including mixed separators, UNC-style prefixes, and trailing-separator removal.",
+      "evidence": "The replacement remains `typeof p === 'string' ? p.replace(/\\\\/g, '/').replace(/\\/+$/, '') : p`."
+    },
+    {
+      "acceptance_row_id": "W4",
+      "result": "pass",
+      "rationale": "No operative programme-state coupling remains; references are explanatory comments describing removed behaviour, not runtime assumptions.",
+      "evidence": "Programme discovery, state reading, freshness assessment, canonical comparison, and associated imports are deleted."
+    }
+  ],
+  "prior_finding_results": [],
+  "findings": [
+    {
+      "id": "TQA-001",
+      "technical_impact": "HIGH",
+      "reachability": "ACTIVE",
+      "required_disposition": "BLOCKS_CURRENT_MERGE",
+      "assumed_deployment_baseline": "The SessionStart hook runs against ordinary local filesystems where Deliverables may be absent or individual entries may become unreadable.",
+      "evidence": "In sweepOpenDeliverables, readdirSync failure returns null and statSync/readFileSync failures continue. In buildBrief, a falsy sweep adds no status section, violating Z1's required reported absence.",
+      "required_correction": "Return structured sweep status or an explicit diagnostic string for a missing/unreadable Deliverables directory and unreadable matching entries, then ensure buildBrief always renders that status without throwing."
+    },
+    {
+      "id": "TQA-002",
+      "technical_impact": "MEDIUM",
+      "reachability": "LATENT",
+      "required_disposition": "BLOCKS_CURRENT_MERGE",
+      "assumed_deployment_baseline": "Deliverables can contain filesystem symlinks or junction-like entries on supported developer machines.",
+      "evidence": "sweepOpenDeliverables uses statSync, which follows a top-level .md symlink, and performs no lstat or resolved-path containment validation before reading and reporting it.",
+      "required_correction": "Define the intended symlink policy and enforce it: normally reject symbolic links with lstatSync, or resolve and verify the target remains inside Deliverables before reading/reporting it."
+    }
+  ]
+}
