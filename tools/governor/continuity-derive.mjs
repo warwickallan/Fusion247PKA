@@ -72,8 +72,14 @@ export function extractConversation(transcriptPath, { maxMsgs = MAX_MSGS } = {})
 // ---- LLM derive -----------------------------------------------------------
 
 export function deriveState(conversation, { model = DERIVE_MODEL, timeoutMs = 120000 } = {}) {
+  // The derive is itself a `claude -p` session; if it runs in a repo whose settings
+  // wire this module as a SessionEnd hook, that inner session's end would re-invoke
+  // this module -> unbounded recursion. Mark the inner process so the guard in main()
+  // makes it a no-op. (SessionEnd fires in headless `claude -p` — verified — so the
+  // guard is load-bearing, not defensive.)
   const res = spawnSync('claude', ['-p', DERIVE_PROMPT, '--model', model, '--max-turns', '1'], {
     input: conversation, encoding: 'utf8', timeout: timeoutMs, windowsHide: true,
+    env: { ...process.env, CONTINUITY_DERIVE_ACTIVE: '1' },
   });
   if (res.status !== 0 || !res.stdout) {
     throw new Error(`derive LLM call failed (status ${res.status}): ${(res.stderr || '').slice(0, 200)}`);
@@ -96,6 +102,14 @@ function readStdinPayload() {
 }
 
 async function main() {
+  // Recursion guard: this module's own derive call is a `claude -p` session whose
+  // SessionEnd would re-enter here. deriveState() sets CONTINUITY_DERIVE_ACTIVE=1 on
+  // that inner process, so a nested invocation is a safe no-op. Without this, a live
+  // SessionEnd wiring fork-bombs on every session close.
+  if (process.env.CONTINUITY_DERIVE_ACTIVE === '1') {
+    process.stdout.write('continuity-derive: nested derive session, skipping (recursion guard)\n');
+    return 0;
+  }
   const argv = process.argv.slice(2);
   const dryRun = argv.includes('--dry-run');
   const tArg = (() => { const i = argv.indexOf('--transcript'); return i >= 0 ? argv[i + 1] : null; })();
