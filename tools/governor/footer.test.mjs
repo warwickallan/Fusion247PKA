@@ -407,14 +407,26 @@ test('WO-OR-10: the CTX shape space is TOTAL — every combination either round-
   // The expectation is an INDEPENDENT restatement of D-2's four shapes, not something
   // read back out of the module under test — otherwise the test would agree with the
   // code by construction and could never fail.
-  const percents = [null, 0, 38, 100];
-  const useds = [null, 0, 900, 72600];
+  //
+  // `-0` ADDED TO BOTH NUMERIC DIMENSIONS BY WO-OR-16, and this is where that defect
+  // should have been caught. The sweep's COMPARISON was never the gap — this file imports
+  // `node:assert/strict`, where `deepEqual` IS `deepStrictEqual` and already distinguishes
+  // -0 from +0. The gap was the DOMAIN: -0 was never among the values swept, so the
+  // strictest comparison in the world had nothing to compare. A totality test is only
+  // total over the values it is given.
+  const percents = [null, -0, 0, 38, 100];
+  const useds = [null, -0, 0, 900, 72600];
   const windows = [null, 190000];
 
-  // Representable iff a denominator appears with BOTH a percent and a numerator, and a
-  // numerator never appears beside a percent without one.
+  // Representable iff a denominator appears with BOTH a percent and a numerator, a
+  // numerator never appears beside a percent without one, and NEITHER number is a signed
+  // zero — `-0` renders as the byte "0" and reads back as `+0`, so it is a value the
+  // grammar cannot carry back to its caller. Still an independent restatement of the
+  // requirement; nothing here is read out of the module under test.
+  const isNegZero = (n) => Object.is(n, -0);
   const representable = (p, u, w) =>
-    w === null ? !(p !== null && u !== null) : (p !== null && u !== null);
+    !isNegZero(p) && !isNegZero(u) &&
+    (w === null ? !(p !== null && u !== null) : (p !== null && u !== null));
 
   const base = { approximate: false, state: 'GREEN', advice: ADVICE.KEEP_GOING, next: NEXT_UNSET, control: CONTROL_CONTINUE };
   let accepted = 0;
@@ -438,8 +450,12 @@ test('WO-OR-10: the CTX shape space is TOTAL — every combination either round-
   // INV-5: assert the executed counts against the product of the dimensions, so a loop
   // whose bounds silently collapsed cannot report a clean pass over nothing.
   assert.equal(accepted + refused, percents.length * useds.length * windows.length);
+  // 50 combinations, not 32 (WO-OR-16 widened the domain by one value per numeric
+  // dimension). The accepted side is UNCHANGED at 16 — every shape that round-tripped
+  // before still does — and all 18 new combinations land on the refused side, which is
+  // what "narrow the accepted domain, never widen the grammar" means when counted.
   assert.equal(accepted, 16);
-  assert.equal(refused, 16);
+  assert.equal(refused, 34);
   assert.ok(refused > 0, 'a partition with nothing on the refused side would prove nothing');
 });
 
@@ -1952,4 +1968,197 @@ test('WO-OR-13: in-range telemetry does not move — same percent, same state, s
   assert.equal(line(0), '⟦GOV⟧ ctx 0% · GREEN · TASK UNKNOWN · next: UNSET · CONTINUE');
   assert.equal(line(18), '⟦GOV⟧ ctx 18% · GREEN · TASK UNKNOWN · next: UNSET · CONTINUE');
   assert.equal(line(100), '⟦GOV⟧ ctx 100% · RED · CLEAR NOW · next: UNSET · CONTINUE');
+});
+
+// ===========================================================================
+// WO-OR-16 — THE RENDERER'S OWN DOMAIN STILL ADMITTED A VALUE IT CANNOT READ BACK
+// ===========================================================================
+//
+// `-0` satisfies EVERY numeric check `renderFooter` makes: it IS an integer, `-0 < 0` is
+// FALSE, and it is a safe-integer multiple of the grain. And `String(-0)` is `"0"`, so it
+// renders as an ordinary zero and `parseFooter` reads it back as `+0`. D3's round-trip
+// identity is therefore FALSE for a value the renderer ACCEPTED — the same class as
+// WO-OR-10's F1, and closed the same way: NARROW the accepted domain to the representable
+// one, never widen the grammar.
+//
+// WHY REFUSED AND NOT NORMALISED — the alternative was considered and is UNSOUND, not
+// merely less tidy. Normalising inside the renderer is a NO-OP ON THE OUTPUT, because
+// `String(-0)` is already `"0"`: the emitted bytes are identical either way, for every
+// input in this grammar. And it cannot make the reported assertion true, because
+// `Object.is(x.percent, parseFooter(renderFooter(x)).fields.percent)` compares the
+// CALLER's object, which still holds -0. Under normalisation the only writable assertion
+// is `Object.is(parsed.percent, 0)` — which PASSES against the unrepaired code. Refusal is
+// the only route with a test that can go red.
+//
+// TWO FIELDS, NOT ONE, AND THE UNREPORTED ONE IS THE WORSE OF THE TWO.
+//   percent    — the reported case, and RENDERER-ONLY: `deriveFooterFields` has normalised
+//                it since WO-OR-13 (`Math.round(used) + 0`), so no producer path reaches
+//                it. That normalisation is NOT made redundant by this repair — it is now
+//                what stops the strict renderer THROWING on an honest 0% reading, which
+//                `computeFooterLine` would answer with a FALSE BLIND.
+//   usedTokens — NOT reported, and REACHABLE FROM THE LIVE PRODUCER. `JSON.parse("-0")` is
+//                -0, `toRenderableTokens(-0)` returned -0, and nothing normalised it — so a
+//                sample carrying `used_tokens: -0` put -0 into the rendered field set and
+//                broke the identity through the real path, not just the codec's. Repaired
+//                on BOTH sides: the codec refuses it, and the producer normalises it rather
+//                than returning null, which would have degraded a real zero-token reading
+//                into BLIND — trading this defect for a worse one.
+//   windowTokens — ALREADY SAFE and pinned below so it stays that way: the existing
+//                `windowTokens === 0` guard catches -0, because `-0 === 0` is true.
+
+test('WO-OR-16: the SUITE ITSELF can see a signed zero — the harness property every assertion below rests on', () => {
+  // A control that cannot distinguish the thing it exists to check is not a control. Every
+  // -0 assertion in this file is worthless if the import at the top of the file changes:
+  // plain `node:assert` has a LOOSE `deepEqual`/`equal` that treat -0 and +0 as equal, and
+  // the whole class would go silently untested while every test stayed green.
+  //
+  // Pinned here as an executed fact because it was got WRONG during this Work Order: the
+  // sweep above was reported as "blind by construction" on the strength of a probe run
+  // against plain `node:assert`, when this file imports `node:assert/strict`, where
+  // `deepEqual` IS `deepStrictEqual`. The comparison was never the gap; the swept DOMAIN
+  // was. A claim about a control that was not checked against the control actually in use
+  // is the same error in miniature as the defect this file exists to close.
+  assert.throws(() => assert.equal(-0, 0), 'assert.equal must distinguish -0 from +0');
+  assert.throws(() => assert.deepEqual({ p: -0 }, { p: 0 }), 'assert.deepEqual must distinguish -0 from +0');
+  // ...and it must still accept the ordinary case, or the two lines above would be
+  // satisfied by an assert that rejected everything.
+  assert.equal(0, 0);
+  assert.deepEqual({ p: 0 }, { p: 0 });
+});
+
+test('WO-OR-16: renderFooter REFUSES -0 in percent AND usedTokens, so D3 holds over the WHOLE accepted domain', () => {
+  const base = {
+    approximate: false, state: 'GREEN', advice: ADVICE.KEEP_GOING,
+    next: NEXT_UNSET, control: CONTROL_CONTINUE,
+  };
+
+  // THE DEFECT. Every row here RENDERED before the repair:
+  //   percent: -0     -> '⟦GOV⟧ ctx 0% · ...'   and parsed back as +0
+  //   usedTokens: -0  -> '⟦GOV⟧ ctx 0k · ...'   and parsed back as +0
+  const refused = [
+    ['percent, bare shape', { ...base, percent: -0, usedTokens: null, windowTokens: null }],
+    ['usedTokens, bare shape', { ...base, percent: null, usedTokens: -0, windowTokens: null }],
+    // The pair shape too, so the refusal is not keyed to one CTX production.
+    ['percent, pair shape', { ...base, percent: -0, usedTokens: 72_600, windowTokens: 200_000 }],
+    ['usedTokens, pair shape', { ...base, percent: 36, usedTokens: -0, windowTokens: 200_000 }],
+    // CONTROL for a guard that already held: `windowTokens === 0` catches -0 because
+    // `-0 === 0`. Pinned so a later edit cannot lose it without a red test.
+    ['windowTokens (already refused before this repair)', { ...base, percent: 0, usedTokens: 0, windowTokens: -0 }],
+  ];
+
+  let refusals = 0;
+  for (const [what, fields] of refused) {
+    assert.throws(() => renderFooter(fields), TypeError, `${what}: -0 must be REFUSED, never rendered`);
+    refusals += 1;
+  }
+  assert.equal(refusals, refused.length, 'a run that refused nothing would prove nothing');
+
+  // THE MESSAGE MUST NAME WHAT IT REJECTED. `JSON.stringify(-0)` is "0", so folding this
+  // into the generic range message would report `got 0` — a rejection that misreports its
+  // own subject, which is this same defect wearing a different hat.
+  assert.throws(
+    () => renderFooter({ ...base, percent: -0, usedTokens: null, windowTokens: null }),
+    (err) => err instanceof TypeError && /negative zero/.test(err.message) && !/got 0/.test(err.message),
+    'the percent refusal must say it refused NEGATIVE ZERO'
+  );
+  assert.throws(
+    () => renderFooter({ ...base, percent: null, usedTokens: -0, windowTokens: null }),
+    (err) => err instanceof TypeError && /-0|negative zero/.test(err.message),
+    'the usedTokens refusal must name the signed zero too'
+  );
+
+  // CONTROLS — `+0` must STILL render and STILL round-trip. Without these the test would
+  // pass just as well against a renderer that had learned to refuse every zero, which
+  // would be a worse defect than the one being fixed.
+  const accepted = [
+    ['percent +0', { ...base, percent: 0, usedTokens: null, windowTokens: null }],
+    ['usedTokens +0', { ...base, percent: null, usedTokens: 0, windowTokens: null }],
+    ['both zero, pair shape', { ...base, percent: 0, usedTokens: 0, windowTokens: 200_000 }],
+  ];
+  let round_trips = 0;
+  for (const [what, fields] of accepted) {
+    const parsed = parseFooter(renderFooter(fields));
+    assert.equal(parsed.ok, true, `${what}: must still render and parse`);
+    assert.deepEqual(parsed.fields, fields, `${what}: round trip`);
+    // Stated with Object.is as well, so this evidence does not depend on the reader
+    // knowing which `assert` module the file imported.
+    assert.ok(Object.is(parsed.fields.percent, fields.percent), `${what}: percent identity`);
+    assert.ok(Object.is(parsed.fields.usedTokens, fields.usedTokens), `${what}: usedTokens identity`);
+    round_trips += 1;
+  }
+  assert.equal(round_trips, accepted.length);
+  assert.ok(refusals > 0 && round_trips > 0, 'a partition with an empty side proves nothing');
+
+  // THE BYTES OF THE ZERO CASES ARE UNCHANGED, pinned as literals held outside the module
+  // that produces them. `0%` and `0k` are exactly what -0 used to render, which is why the
+  // defect was invisible — so these are the two lines a wrong repair would move.
+  assert.equal(
+    renderFooter({ ...base, percent: 0, usedTokens: null, windowTokens: null }),
+    '⟦GOV⟧ ctx 0% · GREEN · KEEP GOING · next: UNSET · CONTINUE'
+  );
+  assert.equal(
+    renderFooter({ ...base, percent: null, usedTokens: 0, windowTokens: null }),
+    '⟦GOV⟧ ctx 0k · GREEN · KEEP GOING · next: UNSET · CONTINUE'
+  );
+});
+
+test('WO-OR-16: the PRODUCER normalises -0 rather than degrading it — on the token path as well as the percent path', () => {
+  // The codec half above is only safe because the producer half holds. These two are a
+  // pair: refuse in the codec, normalise in the producer. Break either and the other turns
+  // into a defect — a strict renderer with a -0-emitting producer yields a FALSE BLIND.
+
+  // 1. THE PREDICATE. `isRenderableTokens` promises values it can render AND read back
+  //    exactly; -0 is not one of them.
+  assert.equal(isRenderableTokens(-0), false, '-0 is not a renderable token count');
+  assert.equal(isRenderableTokens(0), true, '+0 still is — the control');
+
+  // 2. THE PRODUCER-SIDE ROUNDER must return +0, NOT -0 and NOT null. Returning null would
+  //    push an honest zero-token reading onto the PERCENTAGE_ABSENT rung and render BLIND.
+  assert.ok(Object.is(toRenderableTokens(-0), 0), 'toRenderableTokens(-0) must be +0');
+  assert.notEqual(toRenderableTokens(-0), null, 'a real zero reading must not degrade to null');
+  assert.ok(Object.is(toRenderableTokens(0), 0));
+  assert.ok(Object.is(toRenderableTokens(49), 0), 'the ordinary rounds-to-zero case must be unmoved');
+
+  // 3. THE LIVE PATH. `JSON.parse('-0')` is -0, which is how a sample can carry one at all.
+  //    Before this repair the ladder put -0 straight into `fields.usedTokens`.
+  const negZeroTokens = JSON.parse('-0');
+  assert.ok(Object.is(negZeroTokens, -0), 'the fixture must really be a signed zero');
+  const r = deriveFooterFields({
+    sample: {
+      ok: true,
+      approximate: false,
+      data: {
+        schema_version: 1,
+        sampled_at: new Date().toISOString(),
+        session_id: 'session-a',
+        context_window: { used_tokens: negZeroTokens },
+      },
+    },
+    knownSessionId: 'session-a',
+  });
+  // Still the honest rung — a numerator with no denominator cannot be graded — and NOT
+  // the absent-usage rung, which is what a null would have produced.
+  assert.equal(r.blindReason, BLIND_REASON.WINDOW_SIZE_UNKNOWN, 'the reading is real, just ungradeable');
+  assert.ok(Object.is(r.fields.usedTokens, 0), 'the producer must emit +0');
+  assert.ok(!Object.is(r.fields.usedTokens, -0), 'the producer must not emit -0');
+  const line = renderFooter(r.fields);
+  assert.equal(line, '⟦GOV⟧ ctx 0k · BLIND · KEEP GOING? · next: UNSET · CONTINUE');
+  assert.ok(Object.is(parseFooter(line).fields.usedTokens, r.fields.usedTokens), 'D3 through the live path');
+
+  // 4. THE PERCENT PATH — WO-OR-13's `+ 0` is now LOAD-BEARING, not redundant, and this is
+  //    the assertion that says why. The producer emits +0, and had it emitted -0 the strict
+  //    renderer would now REFUSE the field set, which `computeFooterLine` answers with a
+  //    BLIND line for a perfectly healthy 0% reading. WO-OR-13's own test is untouched;
+  //    this states the coupling that repair now carries.
+  const pct = deriveFooterFields({
+    sample: goodSample({ context_window: { used_percentage: -0 } }),
+    knownSessionId: 'session-a',
+  });
+  assert.ok(Object.is(pct.fields.percent, 0), 'the producer must still normalise the percent');
+  assert.equal(renderFooter(pct.fields), '⟦GOV⟧ ctx 0% · GREEN · TASK UNKNOWN · next: UNSET · CONTINUE');
+  assert.throws(
+    () => renderFooter({ ...pct.fields, percent: -0 }),
+    TypeError,
+    'and WITHOUT that normalisation the renderer would now refuse it — which is why the producer guard must stay'
+  );
 });

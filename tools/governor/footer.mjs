@@ -364,9 +364,12 @@ export const TOKENS_GRAIN = 100;
  *
  * `Number.isSafeInteger` rather than `Number.isInteger` plus a hand-written comparison:
  * it subsumes the integer check and names the property instead of a magic constant.
+ *
+ * `-0` is EXCLUDED (WO-OR-16): it formats to "0k" and reads back as `+0`, failing the
+ * READ-BACK half above. See the negative-zero guard in `renderFooter`.
  */
 export function isRenderableTokens(n) {
-  return typeof n === 'number' && Number.isSafeInteger(n) && n >= 0 && n % TOKENS_GRAIN === 0;
+  return typeof n === 'number' && Number.isSafeInteger(n) && n >= 0 && n % TOKENS_GRAIN === 0 && !Object.is(n, -0);
 }
 
 /** 72600 -> "72.6k"  ·  190000 -> "190k"  ·  900 -> "0.9k"  ·  0 -> "0k" */
@@ -410,7 +413,9 @@ export function parseTokens(text) {
  */
 export function toRenderableTokens(n) {
   if (typeof n !== 'number' || !Number.isFinite(n) || n < 0) return null;
-  const rounded = Math.round(n / TOKENS_GRAIN) * TOKENS_GRAIN;
+  // `+ 0` normalises -0 (WO-OR-16): the codec refuses it, and returning null instead would
+  // degrade a real zero-token reading into BLIND. Meaning in the producer.
+  const rounded = Math.round(n / TOKENS_GRAIN) * TOKENS_GRAIN + 0;
   return isRenderableTokens(rounded) ? rounded : null;
 }
 
@@ -499,6 +504,13 @@ export function renderFooter(fields) {
   const hasWindow = windowTokens !== null && windowTokens !== undefined;
 
   if (hasPercent) {
+    // WO-OR-16. `-0` walks every check below (it IS an integer; `-0 < 0` is FALSE), renders
+    // as the byte "0" and reads back as `+0` — D3 false for a value this codec ACCEPTED, the
+    // F1 class closed the same way. Refused, not normalised, and given its own message
+    // because `JSON.stringify(-0)` is "0". Full argument: footer.test.mjs § WO-OR-16.
+    if (Object.is(percent, -0)) {
+      throw new TypeError('percent must not be negative zero — it renders 0% and reads back +0');
+    }
     if (typeof percent !== 'number' || !Number.isInteger(percent) || percent < 0 || percent > 100) {
       throw new TypeError(`percent must be an integer 0..100 or null — got ${JSON.stringify(percent)}`);
     }
@@ -506,7 +518,8 @@ export function renderFooter(fields) {
   if (hasUsed && !isRenderableTokens(usedTokens)) {
     throw new TypeError(
       `usedTokens must be a non-negative safe-integer multiple of ${TOKENS_GRAIN} ` +
-      `(<= ${Number.MAX_SAFE_INTEGER}) or null — got ${JSON.stringify(usedTokens)}`
+      `(<= ${Number.MAX_SAFE_INTEGER}), never -0, or null — ` +
+      `got ${Object.is(usedTokens, -0) ? '-0' : JSON.stringify(usedTokens)}`
     );
   }
   if (hasWindow) {
