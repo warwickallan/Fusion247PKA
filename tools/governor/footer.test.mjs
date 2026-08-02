@@ -1162,15 +1162,24 @@ test('WP-7 AC5: the CLI line is byte-identical to renderFooter over the same fie
 });
 
 // ===========================================================================
-// WO-OR-08 — THE SEAM: extractTranscriptSample -> deriveFooterFields -> renderFooter
+// THE SEAM: extractTranscriptSample -> deriveFooterFields -> renderFooter
+// (added WO-OR-08; re-aimed WO-OR-09)
 // ===========================================================================
 //
 // WHY THIS BLOCK EXISTS. Every test above this line drives the ladder and the renderer
 // from SYNTHETIC fields — `goodSample()` and the 46,080-combination round-trip both
 // build their inputs by hand. Nothing drove a REAL `extractTranscriptSample` output
 // across into `deriveFooterFields`. That gap is not academic: it is precisely why a
-// denominator from the wrong namespace rendered a 1M-context session at roughly five
-// times its true percentage, graded AMBER, advising rotation — through a green suite.
+// borrowed denominator rendered a 1M-context session at roughly five times its true
+// percentage, graded AMBER, advising rotation — through a green suite.
+//
+// RE-AIMED BY WO-OR-09. These tests originally pinned the VARIANT-AMBIGUITY repair, so
+// their fixtures were keyed by model id and their negative case needed two conflicting
+// namespaces to fire. Codex TQA-001 established that the ambiguity was a symptom: the
+// unsound part was inferring this session's window from ANY other session's observation,
+// which fired just as readily on an unambiguous store. The fixtures below are therefore
+// keyed by SESSION ID, and the negative case is now the harder one — a single stranger's
+// observation with nothing to contradict it.
 //
 // A round-trip over invented fields proves the CODEC. It cannot prove that the two
 // halves agree about what they are exchanging. These tests cross that seam.
@@ -1179,16 +1188,25 @@ test('WP-7 AC5: the CLI line is byte-identical to renderFooter over the same fie
 // this passes in CI and in a fresh worktree. The store contents below are modelled on
 // the real ones, but they are written by this test.
 
-/** A statusLine observation, in the shape the real health store holds. */
-function seamObservation(id, size, at) {
-  return JSON.stringify({
+/**
+ * A statusLine observation, in the shape the real health store holds: one file per
+ * session, NAMED for the session that made it.
+ *
+ * WO-OR-09 re-keyed these fixtures. They used to be filed under `obs-<modelId>-<size>`
+ * and matched to the live session by MODEL ID, which is the inference Codex TQA-001
+ * disproved — agreement between observations establishes store consistency, not
+ * live-session identity. The session id is now the only linkage, so the fixture writes
+ * the file the resolver will actually look for.
+ */
+function writeSeamObservation(dir, sessionId, size, { modelId = 'claude-opus-5', at = '2026-08-01T00:49:52Z' } = {}) {
+  writeFileSync(join(dir, `${sessionId}.json`), JSON.stringify({
     schema_version: 1,
     sampled_at: at,
-    session_id: `obs-${id}-${size}`,
+    session_id: sessionId,
     source: SOURCE_STATUSLINE,
-    model: { id },
+    model: { id: modelId },
     context_window: { context_window_size: size },
-  });
+  }));
 }
 
 /** A one-line JSONL transcript carrying a single assistant usage block. */
@@ -1225,16 +1243,19 @@ function walkSeam(dir, { model, usedTokens }) {
   return { sample, derived, line: renderFooter(derived.fields) };
 }
 
-test('WO-OR-08 SEAM: an ambiguous store yields a TRUE token count and NO graded percentage', () => {
-  // THE REGRESSION. The store holds a 1M observation under a variant-suffixed id and an
-  // unrelated 200k observation under the bare id; the transcript reports the BARE id.
-  // Before the repair this rendered a confident percentage over the borrowed 200k window
-  // for a session that was actually about a tenth used, and GRADED it. The number
-  // Warwick reads must now be true or absent, never wrong.
+test('WO-OR-09 SEAM: a store holding only OTHER sessions yields a TRUE token count and NO graded percentage', () => {
+  // THE REGRESSION, RE-AIMED BY WO-OR-09. It used to demonstrate variant AMBIGUITY: a 1M
+  // observation under a variant-suffixed id beside a 200k one under the bare id. Codex
+  // TQA-001 showed the ambiguity was never the defect — the CROSS-SESSION INFERENCE was,
+  // and it fired just as happily on the unambiguous store below, where a single 200k
+  // observation belonging to a stranger has nothing to contradict it.
+  //
+  // So the fixture is now the harder case, not the easier one: ONE observation, no
+  // sibling, no disagreement, numerator comfortably inside it. Every WO-OR-08 guard stays
+  // silent here. The number Warwick reads must still be true or absent, never wrong.
   const dir = tmp();
   try {
-    writeFileSync(join(dir, 'a.json'), seamObservation('claude-opus-5[1m]', 1000000, '2026-08-01T00:49:52Z'));
-    writeFileSync(join(dir, 'b.json'), seamObservation('claude-opus-5', 200000, '2026-08-01T00:49:56Z'));
+    writeSeamObservation(dir, 'a-different-session', 200000, { at: '2026-08-01T00:49:56Z' });
 
     const { sample, derived, line } = walkSeam(dir, { model: 'claude-opus-5', usedTokens: 111019 });
 
@@ -1261,12 +1282,14 @@ test('WO-OR-08 SEAM: an ambiguous store yields a TRUE token count and NO graded 
   }
 });
 
-test('WO-OR-08 SEAM: an UNAMBIGUOUS store renders a real, graded percentage end to end', () => {
-  // The positive control for the seam. If the repair had simply made the footer
-  // permanently BLIND, the test above would still pass and this one would fail.
+test('WO-OR-09 SEAM: this session\'s OWN observation renders a real, graded percentage end to end', () => {
+  // The positive control for the seam, and the one that keeps the feature honest: if the
+  // repair had simply made the footer permanently BLIND, the test above would still pass
+  // and this one would fail. This is the terminal case — statusLine observed THIS
+  // session's window, so the percentage Warwick reads is real and may be graded.
   const dir = tmp();
   try {
-    writeFileSync(join(dir, 'a.json'), seamObservation('claude-opus-5', 1000000, '2026-08-01T00:49:52Z'));
+    writeSeamObservation(dir, 'seam-session', 1000000);
 
     const { sample, derived, line } = walkSeam(dir, { model: 'claude-opus-5', usedTokens: 111019 });
 
@@ -1299,7 +1322,7 @@ test('WO-OR-08 SEAM: the WRAPPER CONTRACT is pinned — a bare sample is silentl
   // handback. Until it lands, THIS test is the control.
   const dir = tmp();
   try {
-    writeFileSync(join(dir, 'a.json'), seamObservation('claude-opus-5', 1000000, '2026-08-01T00:49:52Z'));
+    writeSeamObservation(dir, 'seam-session', 1000000);
     const sample = extractTranscriptSample({
       transcriptPath: seamTranscript(dir, { usedTokens: 111019, model: 'claude-opus-5' }),
       sessionId: 'seam-session',

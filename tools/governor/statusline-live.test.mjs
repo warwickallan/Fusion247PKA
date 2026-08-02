@@ -164,16 +164,23 @@ test('WO-OR-05: the sample this surface writes carries the DENOMINATOR and its m
     assert.equal(written.context_window.context_window_size, 1000000, 'the denominator');
     assert.equal(written.model.id, 'claude-opus-5', 'and the model it belongs to');
 
-    // And it is genuinely usable as a denominator, model-matched.
-    assert.deepEqual(resolveWindowTokens({ modelId: 'claude-opus-5', env: {}, storeOpts: { envOverride: dir } }), {
-      tokens: 1000000,
-      source: 'statusline-observed',
-    });
-    // MUTATION: the same observation under a different model id must be REFUSED.
-    assert.deepEqual(resolveWindowTokens({ modelId: 'claude-something-else', env: {}, storeOpts: { envOverride: dir } }), {
-      tokens: null,
-      source: null,
-    });
+    // And it is genuinely usable as a denominator — for the session that observed it.
+    //
+    // RE-AIMED BY WO-OR-09. This used to assert a MODEL-MATCHED lookup, and its mutation
+    // used to be "the same observation under a different model id is refused". Codex
+    // TQA-001 established that matching on the model id was never evidence about the live
+    // session: agreement between observations establishes store consistency, not
+    // live-session identity. The resolver now reads this session's own record and nothing
+    // else, so the control is aimed at the thing that now carries the meaning.
+    assert.deepEqual(
+      resolveWindowTokens({ sessionId: payload.session_id, env: {}, storeOpts: { envOverride: dir } }),
+      { tokens: 1000000, source: 'statusline-observed' }
+    );
+    // MUTATION: the same observation, asked for by a DIFFERENT session, must be REFUSED.
+    assert.deepEqual(
+      resolveWindowTokens({ sessionId: 'some-other-session', env: {}, storeOpts: { envOverride: dir } }),
+      { tokens: null, source: null }
+    );
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

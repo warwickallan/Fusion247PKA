@@ -18,7 +18,8 @@ import {
   sumUsedTokens,
   newestAssistantUsage,
   resolveWindowTokens,
-  variantBaseOf,
+  WINDOW_SOURCE_ENV,
+  WINDOW_SOURCE_OBSERVED,
   extractTranscriptSample,
   sampleFromTranscript,
 } from './sampler.mjs';
@@ -454,236 +455,319 @@ test('TRANSCRIPT: the tail read is BOUNDED — a huge transcript is not read who
 // ---------------------------------------------------------------------------
 
 test('DENOMINATOR: an explicit CLAUDE_CONTEXT_WINDOW is authoritative', () => {
-  assert.deepEqual(resolveWindowTokens({ modelId: 'm', env: { CLAUDE_CONTEXT_WINDOW: '1000000' } }), {
+  assert.deepEqual(resolveWindowTokens({ sessionId: 'any', env: { CLAUDE_CONTEXT_WINDOW: '1000000' } }), {
     tokens: 1000000,
-    source: 'env:CLAUDE_CONTEXT_WINDOW',
+    source: WINDOW_SOURCE_ENV,
   });
   // Garbage in the variable is not a denominator.
   for (const bad of ['', 'lots', '0', '-1']) {
-    assert.equal(resolveWindowTokens({ modelId: null, env: { CLAUDE_CONTEXT_WINDOW: bad } }).tokens, null, bad);
-  }
-});
-
-test('DENOMINATOR: a statusLine observation counts ONLY when the model id matches', () => {
-  const dir = tempHealthDir();
-  const storeOpts = { envOverride: dir };
-  const observed = (id, size, at) => ({
-    schema_version: 1,
-    sampled_at: at,
-    session_id: `s-${id}-${size}`,
-    source: SOURCE_STATUSLINE,
-    model: { id },
-    context_window: { context_window_size: size },
-  });
-  try {
-    writeFileSync(join(dir, 'a.json'), JSON.stringify(observed('claude-opus-5', 1000000, '2026-08-02T00:00:00Z')));
-    assert.deepEqual(resolveWindowTokens({ modelId: 'claude-opus-5', env: {}, storeOpts }), {
-      tokens: 1000000,
-      source: 'statusline-observed',
-    });
-
-    // THE RULE THAT MATTERS. This estate runs 1M-context and 200k-context sessions of
-    // DIFFERENT models; borrowing across them renders a percentage wrong by a factor of
-    // five while looking authoritative.
-    assert.deepEqual(resolveWindowTokens({ modelId: 'claude-haiku-9', env: {}, storeOpts }), {
-      tokens: null,
-      source: null,
-    });
-
-    // An unknown live model cannot match anything, so rule 2 cannot fire at all.
-    assert.equal(resolveWindowTokens({ modelId: null, env: {}, storeOpts }).tokens, null);
-
-    // A TRANSCRIPT-sourced sample is never a denominator source — it never observed one.
-    writeFileSync(join(dir, 'b.json'), JSON.stringify({
-      ...observed('claude-sonnet-5', 500000, '2026-08-02T00:00:00Z'),
-      source: SOURCE_TRANSCRIPT,
-    }));
-    assert.equal(resolveWindowTokens({ modelId: 'claude-sonnet-5', env: {}, storeOpts }).tokens, null);
-
-    // INVERTED BY WO-OR-08, ON LARRY'S EXPLICIT WORD — DO NOT "RESTORE" THIS.
-    //
-    // This assertion USED TO READ:
-    //     // Newest matching observation wins.
-    //     assert.equal(resolveWindowTokens({ modelId: 'claude-opus-5', ... }).tokens, 200000);
-    //
-    // It was green, and it encoded the defect. `a.json` and `c.json` carry the SAME model
-    // id and DISAGREE about the window; "newest wins" resolved that by picking the most
-    // recent, which is a guess about which session a stored sample belongs to dressed up
-    // as a rule. Recency says nothing about which window is the LIVE session's — the two
-    // observations may both be from other sessions entirely. Disagreement settles nothing,
-    // so the honest answer is no denominator at all, and the footer degrades to a bare
-    // token count with state BLIND rather than rendering a confident wrong percentage.
-    //
-    // Guard (a) in resolveWindowTokens. Reverting this assertion re-opens the defect.
-    writeFileSync(join(dir, 'c.json'), JSON.stringify(observed('claude-opus-5', 200000, '2026-08-02T09:00:00Z')));
-    assert.deepEqual(
-      resolveWindowTokens({ modelId: 'claude-opus-5', env: {}, storeOpts }),
-      { tokens: null, source: null },
-      'matched observations that DISAGREE on the size establish nothing'
-    );
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
+    assert.equal(resolveWindowTokens({ sessionId: null, env: { CLAUDE_CONTEXT_WINDOW: bad } }).tokens, null, bad);
   }
 });
 
 // ---------------------------------------------------------------------------
-// WO-OR-08 — the denominator must be ESTABLISHED, not merely matched.
+// WO-OR-09 — a denominator must be ESTABLISHED FOR THE LIVE SESSION.
 //
-// The defect these cover was observed LIVE on this estate, twice, and it survived a
-// fully green suite because every existing denominator test used a store in which the
-// recorded ids all came from ONE namespace. They do not in reality: a statusLine payload
-// records a variant-suffixed id for a 1M-context session while the transcript's own
-// `message.model` reports the bare base id. The store shape below is the real one.
+// WO-OR-08 tried to make a cross-session model-id match trustworthy by guarding it.
+// Codex TQA-001 showed the guards only fire when the store HAPPENS to hold the
+// disproving entry: one bare-id observation with no variant sibling and a 1M session
+// still borrowed a 200k window. Agreement between observations establishes store
+// consistency, not live-session identity — so the cross-session rule is GONE rather
+// than guarded again, and with it guards (a) and (b) and `variantBaseOf`.
+//
+// The store below is written in the shape the real one holds: one file per session,
+// NAMED for that session, which is the only linkage that means anything here.
 // ---------------------------------------------------------------------------
 
-/** One statusLine observation, in the shape the real store holds. */
-function observedWindow(id, size, at) {
-  return {
+/** One statusLine observation, filed under the session that made it. */
+function writeObservation(dir, sessionId, size, { at = '2026-08-02T00:00:00Z', modelId = 'some-model' } = {}) {
+  writeFileSync(join(dir, `${sessionId}.json`), JSON.stringify({
     schema_version: 1,
     sampled_at: at,
-    session_id: `s-${id}-${size}`,
+    session_id: sessionId,
     source: SOURCE_STATUSLINE,
-    model: { id },
+    model: { id: modelId },
     context_window: { context_window_size: size },
-  };
+  }));
 }
 
-test('WO-OR-08 guard (b): a BARE model id is AMBIGUOUS while a variant-suffixed sibling exists', () => {
-  // THE LIVE DEFECT, reproduced from the real store's actual contents. A 1M session is
-  // recorded under a variant-suffixed id; an unrelated 200k session under the bare id.
-  // The transcript reports the BARE id, so the old rule matched the 200k entry and
-  // rendered a 1M session at ~5x its true percentage — graded AMBER, advising rotation.
+/** A transcript sample, as the Stop hook leaves it once it has overwritten the above. */
+function writeCarriedForward(dir, sessionId, size, source, { usedTokens = 1 } = {}) {
+  writeFileSync(join(dir, `${sessionId}.json`), JSON.stringify({
+    schema_version: 1,
+    sampled_at: '2026-08-02T01:00:00Z',
+    session_id: sessionId,
+    source: SOURCE_TRANSCRIPT,
+    model: { id: 'some-model' },
+    context_window: {
+      context_window_size: size,
+      context_window_source: source,
+      used_tokens: usedTokens,
+    },
+  }));
+}
+
+test('WO-OR-09 REGRESSION (Codex TQA-001 / X1): ONE bare-id observation, NO sibling, is still not this session', () => {
+  // THE EXACT SCENARIO THE WO-OR-08 REPAIR LEFT OPEN, and the reason that repair was
+  // insufficient rather than wrong. The store holds a single 200k observation recorded by
+  // SOME OTHER session under the bare model id. No variant sibling exists, so guard (b)
+  // never fires; the observations do not disagree, so guard (a) never fires; 91164 fits
+  // inside 200000, so guard (c) never fires. All three guards stay silent and the old
+  // rule handed a 1M session a 200k denominator — a confident five-times-wrong figure, on
+  // a fresh machine or simply before the variant session had ever been observed.
+  //
+  // Under the same-session rule there is nothing to decide: `live-1m-session` has no
+  // record of its own, so no denominator exists. Reverting to any cross-session match
+  // re-opens TQA-001 and this assertion is what stops it.
   const dir = tempHealthDir();
   const storeOpts = { envOverride: dir };
   try {
-    writeFileSync(join(dir, 'a.json'), JSON.stringify(observedWindow('claude-opus-5[1m]', 1000000, '2026-08-01T00:49:52Z')));
-    writeFileSync(join(dir, 'b.json'), JSON.stringify(observedWindow('claude-opus-5', 200000, '2026-08-01T00:49:56Z')));
+    writeObservation(dir, 'some-other-200k-session', 200000, { modelId: 'claude-opus-5' });
 
     assert.deepEqual(
-      resolveWindowTokens({ modelId: 'claude-opus-5', env: {}, storeOpts }),
+      resolveWindowTokens({ sessionId: 'live-1m-session', usedTokens: 91164, env: {}, storeOpts }),
       { tokens: null, source: null },
-      'the bare id cannot be told apart from its variant sibling, so NO denominator'
+      'another session\'s observation is not evidence about this one, however unambiguous it looks'
     );
 
-    // MUTATION, in-test: with the variant sibling absent the SAME bare id resolves
-    // normally. This is what proves guard (b) is doing the work rather than the function
-    // having simply become incapable of returning a number.
-    rmSync(join(dir, 'a.json'));
+    // MUTATION, in-test: file the SAME observation under the LIVE session's id and it
+    // resolves immediately. This proves the refusal above is about identity, not about
+    // the function having become incapable of returning a number.
+    writeObservation(dir, 'live-1m-session', 1000000, { modelId: 'claude-opus-5' });
     assert.deepEqual(
-      resolveWindowTokens({ modelId: 'claude-opus-5', env: {}, storeOpts }),
-      { tokens: 200000, source: 'statusline-observed' },
-      'remove the ambiguity and the denominator comes back'
+      resolveWindowTokens({ sessionId: 'live-1m-session', usedTokens: 91164, env: {}, storeOpts }),
+      { tokens: 1000000, source: WINDOW_SOURCE_OBSERVED },
+      'and the session\'s OWN observation is authoritative for it'
     );
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 });
 
-test('WO-OR-08 guard (b) is ASYMMETRIC: a variant-suffixed LIVE id is already specific', () => {
-  // A bare sibling must NOT widen a suffixed id. The suffixed id names its namespace
-  // exactly; refusing it too would make the guard fire on the one case it need not.
+test('WO-OR-09: the store is never ENUMERATED — a hundred other sessions establish nothing', () => {
+  // The property, not one example of it. The old rule scanned every file in the store;
+  // no quantity of other sessions' records can now produce a denominator, so no future
+  // "but they all agree" reasoning can creep back in.
   const dir = tempHealthDir();
   const storeOpts = { envOverride: dir };
   try {
-    writeFileSync(join(dir, 'a.json'), JSON.stringify(observedWindow('claude-opus-5[1m]', 1000000, '2026-08-01T00:49:52Z')));
-    writeFileSync(join(dir, 'b.json'), JSON.stringify(observedWindow('claude-opus-5', 200000, '2026-08-01T00:49:56Z')));
-    assert.deepEqual(
-      resolveWindowTokens({ modelId: 'claude-opus-5[1m]', env: {}, storeOpts }),
-      { tokens: 1000000, source: 'statusline-observed' }
+    for (let i = 0; i < 100; i += 1) writeObservation(dir, `bystander-${i}`, 200000);
+    assert.equal(
+      resolveWindowTokens({ sessionId: 'live', usedTokens: 1000, env: {}, storeOpts }).tokens,
+      null,
+      'unanimous agreement among strangers is still not this session'
+    );
+    assert.equal(
+      resolveWindowTokens({ sessionId: 'bystander-7', usedTokens: 1000, env: {}, storeOpts }).tokens,
+      200000,
+      'while any one of them resolves for ITSELF'
     );
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 });
 
-test('WO-OR-08 guard (c): a window SMALLER than its own numerator is disproven and refused', () => {
-  // The blatant shape, and the only one the map's proposed fix would have caught. Also
-  // the ONE guard that applies to the explicit operator statement — a human can typo a
-  // value too, and an env var is not evidence that survives contradiction.
+test('WO-OR-09: no session id means the store is NOT CONSULTED AT ALL', () => {
+  // Asserted against the CALL, not merely against the answer. Without the spy this test
+  // passes for the wrong reason: `readHealthSample` throws on a non-string key, the
+  // resolver's catch turns that into NO_WINDOW, and deleting the guard entirely would
+  // leave the returned value unchanged — a mutation that survives, which is a test that
+  // is not testing. Pinning "never asked" makes the guard's removal detectable.
   const dir = tempHealthDir();
   const storeOpts = { envOverride: dir };
   try {
-    writeFileSync(join(dir, 'a.json'), JSON.stringify(observedWindow('m', 200000, '2026-08-02T00:00:00Z')));
+    writeObservation(dir, 'live', 200000);
+    for (const bad of [null, undefined, '', 42, {}]) {
+      let consulted = 0;
+      const readSample = (...args) => {
+        consulted += 1;
+        return readHealthSample(...args);
+      };
+      const label = String(bad);
+      assert.equal(
+        resolveWindowTokens({ sessionId: bad, env: {}, storeOpts, readSample }).tokens,
+        null,
+        label
+      );
+      assert.equal(consulted, 0, `an unusable session id must not reach the store (${label})`);
+    }
+
+    // CONTROL: a usable id does consult it, and does resolve. Without this the assertion
+    // above would be satisfied by a resolver that never reads the store at all.
+    let consulted = 0;
+    const readSample = (...args) => {
+      consulted += 1;
+      return readHealthSample(...args);
+    };
+    assert.equal(resolveWindowTokens({ sessionId: 'live', env: {}, storeOpts, readSample }).tokens, 200000);
+    assert.equal(consulted, 1, 'exactly one record is read — the store is never enumerated');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('WO-OR-09 CARRY-FORWARD: the observation survives the transcript write that overwrites it', () => {
+  // WHY THIS CASE EXISTS AT ALL. The health store is one file per session and every write
+  // REPLACES it, so the turn-end transcript write clobbers the statusLine sample that
+  // observed the window. Verified against health-store.mjs, which stringifies the whole
+  // sample over the previous file. Accept only the direct observation and a terminal
+  // session goes BLIND after its first turn, flickering back on the next statusLine
+  // render — so a transcript sample that CARRIED the observation forward counts too.
+  const dir = tempHealthDir();
+  const storeOpts = { envOverride: dir };
+  try {
+    writeCarriedForward(dir, 'live', 1000000, WINDOW_SOURCE_OBSERVED);
+    assert.deepEqual(
+      resolveWindowTokens({ sessionId: 'live', usedTokens: 91164, env: {}, storeOpts }),
+      { tokens: 1000000, source: WINDOW_SOURCE_OBSERVED },
+      'a carried-forward observation is still this session\'s own observation'
+    );
+
+    // An env-sourced value is NOT carried. Rule 1 re-reads the variable on every call, so
+    // carrying it buys nothing — and it would keep an operator's declaration rendering
+    // after the operator withdrew it, which is false authority in a different costume.
+    writeCarriedForward(dir, 'live', 1000000, WINDOW_SOURCE_ENV);
+    assert.deepEqual(
+      resolveWindowTokens({ sessionId: 'live', usedTokens: 91164, env: {}, storeOpts }),
+      { tokens: null, source: null },
+      'a withdrawn CLAUDE_CONTEXT_WINDOW must not keep rendering from the store'
+    );
+    // ...and while it is still declared, rule 1 supplies it live, so nothing is lost.
+    assert.deepEqual(
+      resolveWindowTokens({ sessionId: 'live', usedTokens: 91164, env: { CLAUDE_CONTEXT_WINDOW: '1000000' }, storeOpts }),
+      { tokens: 1000000, source: WINDOW_SOURCE_ENV }
+    );
+
+    // A transcript sample carrying NO window is not a source either.
+    writeCarriedForward(dir, 'live', null, null);
+    assert.equal(resolveWindowTokens({ sessionId: 'live', env: {}, storeOpts }).tokens, null);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('WO-OR-09 guard (d) IDENTITY: a record whose own session_id disagrees is refused', () => {
+  // The file is KEYED by session id, so this is normally tautological — which is exactly
+  // why it is asserted rather than assumed. Identity is the single invariant the whole
+  // function now rests on; a store that contradicts its own filename establishes nothing.
+  const dir = tempHealthDir();
+  const storeOpts = { envOverride: dir };
+  try {
+    writeFileSync(join(dir, 'live.json'), JSON.stringify({
+      schema_version: 1,
+      sampled_at: '2026-08-02T00:00:00Z',
+      session_id: 'someone-else',
+      source: SOURCE_STATUSLINE,
+      model: { id: 'm' },
+      context_window: { context_window_size: 200000 },
+    }));
+    assert.deepEqual(
+      resolveWindowTokens({ sessionId: 'live', env: {}, storeOpts }),
+      { tokens: null, source: null },
+      'the filename says one session and the contents say another — that is not evidence'
+    );
+
+    // MUTATION: make the two agree and the same record resolves.
+    writeObservation(dir, 'live', 200000);
+    assert.equal(resolveWindowTokens({ sessionId: 'live', env: {}, storeOpts }).tokens, 200000);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('WO-OR-09 guard (c): a window SMALLER than its own numerator is disproven and refused', () => {
+  // SURVIVES WO-OR-09 ON ITS OWN MERITS. Unlike (a) and (b) this is not an inference about
+  // which session a record belongs to — it is arithmetic, and it is the ONE guard that
+  // also binds the explicit operator statement, because a human can typo a value too.
+  const dir = tempHealthDir();
+  const storeOpts = { envOverride: dir };
+  try {
+    writeObservation(dir, 'live', 200000);
 
     assert.deepEqual(
-      resolveWindowTokens({ modelId: 'm', usedTokens: 408169, env: {}, storeOpts }),
+      resolveWindowTokens({ sessionId: 'live', usedTokens: 408169, env: {}, storeOpts }),
       { tokens: null, source: null },
-      'a store observation cannot be smaller than the count it must divide'
+      'this session\'s own observation cannot be smaller than the count it must divide'
     );
     assert.deepEqual(
-      resolveWindowTokens({ modelId: 'm', usedTokens: 408169, env: { CLAUDE_CONTEXT_WINDOW: '200000' }, storeOpts }),
+      resolveWindowTokens({ sessionId: 'live', usedTokens: 408169, env: { CLAUDE_CONTEXT_WINDOW: '200000' }, storeOpts }),
       { tokens: null, source: null },
       'and neither can an explicitly declared one'
     );
 
     // MUTATION: the SAME store and env with a coherent numerator still resolve. Guard (c)
     // must be sensitive to the numerator, not simply hostile to everything.
-    assert.equal(resolveWindowTokens({ modelId: 'm', usedTokens: 111019, env: {}, storeOpts }).tokens, 200000);
-    assert.equal(resolveWindowTokens({ modelId: 'm', usedTokens: 200000, env: {}, storeOpts }).tokens, 200000, 'exactly full is coherent');
-    assert.equal(resolveWindowTokens({ modelId: 'm', env: {}, storeOpts }).tokens, 200000, 'no numerator supplied disables (c) only');
+    assert.equal(resolveWindowTokens({ sessionId: 'live', usedTokens: 111019, env: {}, storeOpts }).tokens, 200000);
+    assert.equal(resolveWindowTokens({ sessionId: 'live', usedTokens: 200000, env: {}, storeOpts }).tokens, 200000, 'exactly full is coherent');
+    assert.equal(resolveWindowTokens({ sessionId: 'live', env: {}, storeOpts }).tokens, 200000, 'no numerator supplied disables (c) only');
+
+    // And guard (c) also binds a CARRIED-FORWARD value, not just a fresh observation.
+    writeCarriedForward(dir, 'live', 200000, WINDOW_SOURCE_OBSERVED);
+    assert.equal(resolveWindowTokens({ sessionId: 'live', usedTokens: 408169, env: {}, storeOpts }).tokens, null);
+    assert.equal(resolveWindowTokens({ sessionId: 'live', usedTokens: 111019, env: {}, storeOpts }).tokens, 200000);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 });
 
-test('WO-OR-08 POSITIVE CONTROL: the honest cases still get a denominator', () => {
-  // THE TEST THAT STOPS THE "FIX" BEING `return null`. Three guards that only ever
-  // subtract would satisfy every assertion above while destroying the feature, so the
-  // cases that must STILL resolve are pinned explicitly.
+test('WO-OR-09 POSITIVE CONTROL: the honest cases still get a denominator', () => {
+  // THE TEST THAT STOPS THE "FIX" BEING `return null`. A rule that only ever subtracts
+  // would satisfy every assertion above while destroying the feature, so each case that
+  // must STILL resolve is pinned explicitly. If this test ever goes red, the percentage
+  // has been removed rather than repaired.
   const dir = tempHealthDir();
   const storeOpts = { envOverride: dir };
   try {
-    // 1. An explicit operator statement, always.
-    assert.deepEqual(resolveWindowTokens({ modelId: 'anything', env: { CLAUDE_CONTEXT_WINDOW: '1000000' }, storeOpts }), {
+    // 1. An explicit operator statement, whatever the store says.
+    assert.deepEqual(resolveWindowTokens({ sessionId: 'anything', env: { CLAUDE_CONTEXT_WINDOW: '1000000' }, storeOpts }), {
       tokens: 1000000,
-      source: 'env:CLAUDE_CONTEXT_WINDOW',
+      source: WINDOW_SOURCE_ENV,
     });
 
-    // 2. A single unambiguous observation.
-    writeFileSync(join(dir, 'a.json'), JSON.stringify(observedWindow('solo', 200000, '2026-08-02T00:00:00Z')));
-    assert.deepEqual(resolveWindowTokens({ modelId: 'solo', env: {}, storeOpts }), {
+    // 2. This session's own statusLine observation — the terminal case.
+    writeObservation(dir, 'live', 200000);
+    assert.deepEqual(resolveWindowTokens({ sessionId: 'live', env: {}, storeOpts }), {
       tokens: 200000,
-      source: 'statusline-observed',
+      source: WINDOW_SOURCE_OBSERVED,
     });
 
-    // 3. SEVERAL observations that AGREE. Agreement is not ambiguity, and refusing here
-    //    would make the footer BLIND for every ordinary repeat-observed session.
-    writeFileSync(join(dir, 'b.json'), JSON.stringify(observedWindow('solo', 200000, '2026-08-02T01:00:00Z')));
-    writeFileSync(join(dir, 'c.json'), JSON.stringify(observedWindow('solo', 200000, '2026-08-02T02:00:00Z')));
-    assert.deepEqual(resolveWindowTokens({ modelId: 'solo', env: {}, storeOpts }), {
+    // 3. The same session after a turn end has overwritten that sample — the case that
+    //    keeps a terminal percentage alive across turns rather than for one turn only.
+    writeCarriedForward(dir, 'live', 200000, WINDOW_SOURCE_OBSERVED);
+    assert.deepEqual(resolveWindowTokens({ sessionId: 'live', env: {}, storeOpts }), {
       tokens: 200000,
-      source: 'statusline-observed',
+      source: WINDOW_SOURCE_OBSERVED,
     });
 
-    // 4. An unrelated model's ambiguity is NOT contagious.
-    writeFileSync(join(dir, 'd.json'), JSON.stringify(observedWindow('other[1m]', 1000000, '2026-08-02T00:00:00Z')));
-    writeFileSync(join(dir, 'e.json'), JSON.stringify(observedWindow('other', 200000, '2026-08-02T00:00:00Z')));
-    assert.equal(resolveWindowTokens({ modelId: 'other', env: {}, storeOpts }).tokens, null, 'other IS ambiguous');
-    assert.equal(resolveWindowTokens({ modelId: 'solo', env: {}, storeOpts }).tokens, 200000, 'solo is NOT');
+    // 4. A neighbouring session's records neither help nor harm.
+    writeObservation(dir, 'neighbour', 1000000);
+    assert.equal(resolveWindowTokens({ sessionId: 'live', env: {}, storeOpts }).tokens, 200000, 'unaffected');
+    assert.equal(resolveWindowTokens({ sessionId: 'neighbour', env: {}, storeOpts }).tokens, 1000000, 'and it resolves for itself');
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 });
 
-test('WO-OR-08: variantBaseOf recognises the SHAPE, and names no particular variant', () => {
-  assert.equal(variantBaseOf('claude-opus-5[1m]'), 'claude-opus-5');
-  assert.equal(variantBaseOf('claude-opus-4-8[1m]'), 'claude-opus-4-8');
-  assert.equal(variantBaseOf('x[anything-at-all]'), 'x');
-  assert.equal(variantBaseOf('claude-opus-5'), null, 'a bare id has no base');
-  assert.equal(variantBaseOf('[1m]'), null, 'a suffix with no base is not a variant id');
-  assert.equal(variantBaseOf('x[]'), null, 'an empty variant is not a variant');
-  assert.equal(variantBaseOf('x[1m'), null, 'unterminated');
-  assert.equal(variantBaseOf(null), null);
-  assert.equal(variantBaseOf(42), null);
-});
-
-test('WO-OR-08 END TO END: the real store shape yields a TRUE numerator and NO false percentage', () => {
-  // The whole defect, end to end, through the function the Stop hook actually calls.
+test('WO-OR-09 END TO END: the real store shape yields a TRUE numerator and NO false percentage', () => {
+  // The whole defect, end to end, through the function the Stop hook actually calls —
+  // including that `extractTranscriptSample` resolves the window only AFTER it knows the
+  // session id, which is now load-bearing rather than incidental ordering.
+  //
+  // THIS IS THE RED-PROOF FOR TQA-001, and it is deliberately routed through
+  // `sampleFromTranscript` rather than the resolver. The resolver's SIGNATURE changed
+  // (`modelId` out, `sessionId` in), so a unit-level test of the new rule would pass
+  // against the old code for the wrong reason — the old function would simply ignore an
+  // argument it never had. `sampleFromTranscript` takes identical arguments in both
+  // versions, so the two can be compared on the same real situation.
+  //
+  // The store below holds ONE bare-id 200k observation and NO variant sibling — X1
+  // exactly. Guard (b) cannot fire without the sibling, guard (a) cannot fire without a
+  // disagreement, and 111019 fits inside 200000 so guard (c) cannot fire either. Against
+  // the WO-OR-08 code this yields context_window_size 200000 and this test goes red.
   const dir = tempHealthDir();
   const storeOpts = { envOverride: dir };
   try {
-    writeFileSync(join(dir, 'a.json'), JSON.stringify(observedWindow('claude-opus-5[1m]', 1000000, '2026-08-01T00:49:52Z')));
-    writeFileSync(join(dir, 'b.json'), JSON.stringify(observedWindow('claude-opus-5', 200000, '2026-08-01T00:49:56Z')));
+    writeObservation(dir, 'other-200k-session', 200000, { modelId: 'claude-opus-5' });
     const p = writeTranscript(dir, [assistantLine({ usage: { input_tokens: 111019 }, sessionId: 'live' })]);
 
     const r = sampleFromTranscript(JSON.stringify({ session_id: 'live', transcript_path: p }), {
@@ -697,6 +781,28 @@ test('WO-OR-08 END TO END: the real store shape yields a TRUE numerator and NO f
     assert.equal(r.sample.context_window.context_window_size, null, 'and NO denominator is borrowed');
     assert.equal(r.sample.context_window.context_window_source, null);
     assert.equal(r.sample.context_window.used_percentage, null, 'so no percentage is invented');
+
+    // POSITIVE CONTROL on the same path: give the LIVE session an observation of its own
+    // and the very same call produces a denominator, provenance attached.
+    writeObservation(dir, 'live', 1000000);
+    const ok = sampleFromTranscript(JSON.stringify({ session_id: 'live', transcript_path: p }), {
+      sampledAt: '2026-08-02T05:22:31.045Z',
+      storeOpts,
+      env: {},
+    });
+    assert.equal(ok.sample.context_window.context_window_size, 1000000);
+    assert.equal(ok.sample.context_window.context_window_source, WINDOW_SOURCE_OBSERVED);
+
+    // And the written sample CARRIES it, so the next turn is not blind — the overwrite
+    // this store performs is exactly why that matters.
+    const back = readHealthSample('live', { envOverride: dir });
+    assert.equal(back.data.source, SOURCE_TRANSCRIPT, 'the statusLine sample has indeed been overwritten');
+    assert.equal(back.data.context_window.context_window_size, 1000000, 'and the observation survived it');
+    assert.equal(
+      resolveWindowTokens({ sessionId: 'live', usedTokens: 111019, env: {}, storeOpts }).tokens,
+      1000000,
+      'so the NEXT turn still resolves'
+    );
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

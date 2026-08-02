@@ -19,10 +19,9 @@
 // governor that stops measuring must not also break the thing it measures (INV-2's
 // spirit applied to the sampler, even though the sampler itself isn't a blocking hook).
 
-import { openSync, fstatSync, readSync, closeSync, readdirSync, readFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { openSync, fstatSync, readSync, closeSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
-import { writeHealthSample, healthStoreDir } from './health-store.mjs';
+import { writeHealthSample, readHealthSample } from './health-store.mjs';
 
 export const SAMPLE_SCHEMA_VERSION = 1;
 
@@ -256,84 +255,96 @@ export function newestAssistantUsage(text) {
   return null;
 }
 
-// A recorded model id carrying a parenthesised VARIANT, e.g. `<base>[<variant>]`. The
-// shape is matched generically and no particular variant is named: pinning the one
-// variant this estate happens to run today would silently fail to protect against the
-// next one, and the whole defect below is a namespace problem, not a value problem.
-const VARIANT_SUFFIXED_ID = /^(.+)\[[^\]]+\]$/;
-
-/**
- * variantBaseOf(id) -> string|null
- *
- * The base of a variant-suffixed id, or null when the id carries no variant. Pure.
- */
-export function variantBaseOf(id) {
-  if (typeof id !== 'string') return null;
-  const m = VARIANT_SUFFIXED_ID.exec(id);
-  return m ? m[1] : null;
-}
+// The two provenances a denominator may carry, named once rather than spelled inline.
+// `WINDOW_SOURCE_OBSERVED` is both PRODUCED and CHECKED by the resolver below — a
+// transcript sample carries it forward across the store's last-write-wins overwrite, and
+// the next call reads it back — so the write site and the read site must be the same
+// value, not two string literals that can drift apart.
+export const WINDOW_SOURCE_ENV = 'env:CLAUDE_CONTEXT_WINDOW';
+export const WINDOW_SOURCE_OBSERVED = 'statusline-observed';
 
 const NO_WINDOW = Object.freeze({ tokens: null, source: null });
 
 /**
- * resolveWindowTokens({ modelId, usedTokens, ... }) -> { tokens: number|null, source: string|null }
+ * resolveWindowTokens({ sessionId, usedTokens, ... }) -> { tokens: number|null, source: string|null }
  *
- * THE DENOMINATOR, AND THE ONLY TWO WAYS IT MAY BE OBTAINED (ruled, WO-OR-05):
+ * THE DENOMINATOR, AND THE ONLY TWO WAYS IT MAY BE OBTAINED:
  *
- *   1. `CLAUDE_CONTEXT_WINDOW` — an explicit statement by the operator.
- *   2. A statusLine-observed `context_window_size` whose recorded model id matches the
- *      live session's model id AND is not ambiguous — see the three guards below.
+ *   1. `CLAUDE_CONTEXT_WINDOW` — an explicit statement by the operator, re-read live on
+ *      every call and therefore never stored or carried anywhere.
+ *   2. A window ESTABLISHED FOR THIS SESSION — read from this session's own health-store
+ *      record, `<sessionId>.json`, and from nothing else. The store is never enumerated.
  *
- * Never a model -> window lookup table. Never a cross-model value: a 1M-context session
- * observed yesterday says nothing about a 200k-context session running now, and using it
- * would render a percentage that is wrong by a factor of five while looking authoritative.
- * When the live model id is unknown, rule 2 cannot fire at all — an unmatched value is
- * exactly the cross-model risk the rule exists to exclude.
+ * WHY THERE IS NO CROSS-SESSION RULE ANY MORE (WO-OR-09, closing Codex TQA-001).
  *
- * WHY RULE 2 NEEDED REPAIRING (WO-OR-08). Matching on the id was necessary and not
- * sufficient, because THE IDS COME FROM TWO DIFFERENT NAMESPACES. A statusLine payload
- * records a variant-suffixed id for a 1M-context session; the transcript's own
- * `message.model` reports the BARE base id with no suffix. So a transcript-sourced sample
- * for a 1M session could never match its own 1M observation, and instead matched a
- * same-named 200k observation from an unrelated session — rendering a real 1M session at
- * roughly five times its true percentage, in a footer that graded it AMBER and advised
- * rotation. Observed live on this estate, twice.
+ * Every earlier version of rule 2 enumerated the whole store and tied stored samples to
+ * the live session BY MODEL ID. WO-OR-08 added two guards to make that match wrong less
+ * often: refusing matched observations that disagreed on the size, and refusing a bare id
+ * while a variant-suffixed sibling of it existed. An independent review then proved the
+ * obvious thing about a heuristic — it only fires when the disproving entry HAPPENS to be
+ * in the store. With one bare-id observation present and no sibling, a 1M session still
+ * borrowed a 200k window and still rendered a confident five-times-wrong percentage. On a
+ * fresh machine, or simply before the variant session had ever been observed, the repair
+ * bought nothing at all.
  *
- * The repair is that a denominator must be ESTABLISHED, not merely matched. Three guards,
- * each catching a shape the others do not:
+ * The principle the guards were missing: AGREEMENT BETWEEN OBSERVATIONS ESTABLISHES STORE
+ * CONSISTENCY, NOT LIVE-SESSION IDENTITY. Nothing links a transcript sample to another
+ * session's statusLine observation, so every cross-session inference — by matching, by
+ * agreement, by recency, by variant analysis — is a guess about which session a stored
+ * sample belonged to. The repair is therefore not a third guard. It is to stop guessing:
+ * the session id is the one thing that genuinely links the two halves of this telemetry,
+ * so it is the only thing rule 2 uses. `modelId` is not a parameter of this function any
+ * more, and a model -> window lookup table remains forbidden outright.
  *
- *   (a) DISAGREEMENT. Matched observations that disagree on the size settle nothing.
- *       The previous rule took the most RECENT of them, which is a guess about which
- *       session a sample belongs to dressed up as a rule — recency says nothing about
- *       which window is the LIVE session's.
- *   (b) VARIANT AMBIGUITY. A bare id is ambiguous when a variant-suffixed sibling of the
- *       same base has also been observed, because the transcript cannot tell us which of
- *       the two namespaces this session is in. This is the guard that catches the live
- *       defect; (a) alone does not, because the two entries never had the same id.
- *       Asymmetric on purpose: a variant-suffixed LIVE id is already specific, so it is
- *       not widened by the existence of a bare sibling.
+ * WHAT THIS SESSION'S RECORD MAY BE, and why it takes two cases rather than one. The
+ * store holds ONE FILE PER SESSION and every write REPLACES it, so the turn-end
+ * transcript write clobbers the statusLine sample that observed the window. After that
+ * the observation survives only as the `context_window_size` / `context_window_source`
+ * the transcript sample carried forward. Accepting only a direct observation would send a
+ * terminal session BLIND after its first turn and flicker it back on the next statusLine
+ * render, so both are accepted:
+ *
+ *   - a `statusLine` sample -> this session's own direct observation of its window;
+ *   - a `transcript` sample recording `WINDOW_SOURCE_OBSERVED` -> that same observation,
+ *     carried forward across the overwrite.
+ *
+ * An `env:`-sourced value is deliberately NOT carried forward. Rule 1 re-reads the
+ * variable on every call, so carrying it buys nothing — and it would keep an operator's
+ * declaration rendering after the operator had withdrawn it, which is the same false
+ * authority this whole rule exists to remove, wearing a different costume.
+ *
+ * GUARDS. Of WO-OR-08's three, (a) DISAGREEMENT and (b) VARIANT AMBIGUITY are DELETED
+ * ALONG WITH THE RULE THEY SERVED, and `variantBaseOf` went with them: one session has
+ * exactly one record, so there is nothing for observations to disagree about and no
+ * sibling to be ambiguous with. Retaining them as belt-and-braces would leave heuristics
+ * standing guard over a rule that no longer exists. Two survive, and neither is an
+ * inference about provenance:
+ *
  *   (c) SELF-CONTRADICTION. A window smaller than the numerator it is about to divide is
- *       disproven by that numerator. Cheap, and it is the ONLY guard that also applies to
- *       rule 1 — an operator can typo an explicit value too.
+ *       disproven by that numerator. Arithmetic, not inference — and the only guard that
+ *       also binds rule 1, because an operator can typo an explicit value too.
+ *   (d) IDENTITY. The record's own `session_id` must equal the one asked for. The file is
+ *       keyed by session id so this is normally tautological; it costs one comparison,
+ *       and it is the exact invariant the whole function now rests on, so it is asserted
+ *       rather than assumed.
  *
- * Deliberately NOT done: stripping the variant suffix to force a match. That makes BOTH
- * entries match and deepens the ambiguity instead of resolving it.
+ * KNOWN RESIDUAL, stated rather than guarded (WO-OR-09, Larry concurring). A mid-session
+ * model change can alter the window, leaving this session's own earlier observation
+ * stale. No model-compatibility check is applied here, for two reasons: the statusLine and
+ * transcript id namespaces differ, so such a check would fire on exactly the large-context
+ * sessions it was meant to protect; and rule 2 can only ever have data on a terminal,
+ * where statusLine re-renders continuously and corrects the record within moments.
  *
  * `usedTokens` is optional and is used only by guard (c). Passing nothing disables that
- * guard and leaves (a) and (b) fully in force.
- *
- * Returns the provenance beside the number so nothing downstream has to guess where a
- * denominator came from. Never throws.
+ * guard alone. Returns the provenance beside the number so nothing downstream has to guess
+ * where a denominator came from. Never throws.
  */
 export function resolveWindowTokens({
-  modelId = null,
+  sessionId = null,
   usedTokens = null,
   env = process.env,
   storeOpts = {},
-  dirFor = healthStoreDir,
-  listDir = readdirSync,
-  readFile = readFileSync,
-  existsFn = existsSync,
+  readSample = readHealthSample,
 } = {}) {
   // Guard (c), stated once and applied to whichever rule produces a candidate.
   const numerator =
@@ -345,55 +356,33 @@ export function resolveWindowTokens({
   // 1 — the explicit operator statement.
   const declared = Number(env?.CLAUDE_CONTEXT_WINDOW);
   if (Number.isFinite(declared) && declared > 0) {
-    return coherent(declared)
-      ? { tokens: declared, source: 'env:CLAUDE_CONTEXT_WINDOW' }
-      : NO_WINDOW;
+    return coherent(declared) ? { tokens: declared, source: WINDOW_SOURCE_ENV } : NO_WINDOW;
   }
 
-  // 2 — a statusLine observation, model-matched. No live model id, no rule 2.
-  if (typeof modelId !== 'string' || modelId.length === 0) return NO_WINDOW;
+  // 2 — this session's own record, and no other. No session id, no rule 2: there is
+  // nothing to establish identity against, and an unidentified sample is precisely the
+  // cross-session guess this function no longer makes.
+  if (typeof sessionId !== 'string' || sessionId.length === 0) return NO_WINDOW;
 
   try {
-    const dir = dirFor(storeOpts);
-    if (!existsFn(dir)) return NO_WINDOW;
+    const read = readSample(sessionId, storeOpts);
+    if (!read || read.ok !== true || !read.data) return NO_WINDOW;
+    const data = read.data;
 
-    // Every DISTINCT window size observed per recorded model id. A set rather than a
-    // most-recent winner, because the question is no longer "which is newest" but
-    // "do the observations agree at all".
-    const sizesById = new Map();
-    for (const name of listDir(dir)) {
-      if (typeof name !== 'string' || !name.endsWith('.json')) continue;
-      let data;
-      try {
-        data = JSON.parse(readFile(join(dir, name), 'utf8'));
-      } catch {
-        continue;
-      }
-      if (!data || data.source !== SOURCE_STATUSLINE) continue;
-      const id = data.model?.id;
-      if (typeof id !== 'string' || id.length === 0) continue;
-      const size = data.context_window?.context_window_size;
-      if (typeof size !== 'number' || !Number.isFinite(size) || size <= 0) continue;
-      if (!sizesById.has(id)) sizesById.set(id, new Set());
-      sizesById.get(id).add(size);
-    }
+    // (d) identity.
+    if (data.session_id !== sessionId) return NO_WINDOW;
 
-    const matched = sizesById.get(modelId);
-    if (!matched || matched.size === 0) return NO_WINDOW;
+    const directlyObserved = data.source === SOURCE_STATUSLINE;
+    const carriedForward =
+      data.source === SOURCE_TRANSCRIPT &&
+      data.context_window?.context_window_source === WINDOW_SOURCE_OBSERVED;
+    if (!directlyObserved && !carriedForward) return NO_WINDOW;
 
-    // (a) matched observations must AGREE.
-    if (matched.size > 1) return NO_WINDOW;
+    const size = data.context_window?.context_window_size;
+    if (typeof size !== 'number' || !Number.isFinite(size) || size <= 0) return NO_WINDOW;
 
-    // (b) a BARE id is ambiguous while a variant-suffixed sibling of it exists.
-    if (variantBaseOf(modelId) === null) {
-      for (const id of sizesById.keys()) {
-        if (id !== modelId && variantBaseOf(id) === modelId) return NO_WINDOW;
-      }
-    }
-
-    const [size] = matched;
     if (!coherent(size)) return NO_WINDOW; // (c)
-    return { tokens: size, source: 'statusline-observed' };
+    return { tokens: size, source: WINDOW_SOURCE_OBSERVED };
   } catch {
     // A store we cannot read yields no denominator. That is the safe side: the footer
     // renders a bare token count rather than a percentage over a guessed window.
@@ -428,10 +417,14 @@ export function extractTranscriptSample({
   const sid = (typeof sessionId === 'string' && sessionId.length ? sessionId : found.sessionId) || null;
   if (!sid) return null;
 
-  // The numerator is passed to the resolver so guard (c) can refuse a denominator that
-  // this very sample already disproves. Resolving the window in ignorance of the count it
-  // is about to divide was how a window smaller than its own numerator survived.
-  const window = windowResolver({ modelId: found.modelId, usedTokens, env, storeOpts });
+  // RESOLVED AFTER `sid` IS KNOWN, AND THAT ORDERING IS NOW LOAD-BEARING (WO-OR-09). The
+  // session id is the denominator's only route to this session's own record, so a
+  // resolver called before `sid` exists could not use rule 2 at all.
+  //
+  // The numerator is passed too, so guard (c) can refuse a denominator that this very
+  // sample already disproves. Resolving the window in ignorance of the count it is about
+  // to divide was how a window smaller than its own numerator survived.
+  const window = windowResolver({ sessionId: sid, usedTokens, env, storeOpts });
 
   return {
     schema_version: SAMPLE_SCHEMA_VERSION,
