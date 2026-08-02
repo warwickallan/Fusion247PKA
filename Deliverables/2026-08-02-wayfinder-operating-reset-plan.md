@@ -80,6 +80,10 @@ Ordered after PR #86's body turned out to be *a summary of* the Larry↔Codex ex
 
 **Larry's autonomous execution is STOPPED. Phase 5 is NOT complete and Phase 6 has NOT begun. Nothing has been merged to `main`.**
 
+> ⚠️ **THE INJECTED HONCHO BRIEF WILL BE STALE. IGNORE IT AND TRUST THIS FILE.**
+> The handover packet was written successfully (`cont-1785676208088-65-jts4xh`, `ok:true`), but `readLatest` still returns the packet from **02:37** — this session passed 50 packets and hit the known pagination defect in SHIT TO DO row 2 (`listMessages` returns ≤50 even at `size:500` and can exclude the newest). **Verified by reading it back, not assumed.**
+> So a fresh session will be told the next action is *"create branch `operating-reset/teardown`, surgically remove BUILD-018 components, thin CLAUDE.md"* — **all of which is already done and pushed.** Acting on that brief would redo completed work. This is exactly why the git map is the authority and Honcho is only a pointer.
+
 | | |
 |---|---|
 | repository | `C:\Fusion247PKA` |
