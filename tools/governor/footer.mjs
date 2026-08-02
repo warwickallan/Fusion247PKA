@@ -901,13 +901,43 @@ export function deriveFooterFields({
     return blind(BLIND_REASON.WINDOW_SIZE_UNKNOWN, { usedTokens, windowTokens: null });
   }
 
-  const percent = Math.round(used);
-  if (percent < 0 || percent > 100) {
-    // Out of the grammar's range. Clamping would render a number the sample did not
-    // support; BLIND says "I cannot represent this", which is the honest answer and the
-    // one INV-1 asks for.
+  // ---------------------------------------------------------------------------
+  // WO-OR-13 / INV-1 — THE RANGE DECISION IS MADE ON `used`, NOT ON ITS DISPLAY FORM
+  // ---------------------------------------------------------------------------
+  // This used to check `Math.round(used)`, which asked whether the DISPLAY was in range
+  // rather than the value being judged. `Math.round` is round-half-UP, so it folded
+  // [-0.5, 0) onto `-0` — and `-0 < 0` is FALSE — and (100, 100.5) onto 100. Both bands
+  // walked past the guard: `used_percentage: -0.4` rendered `ctx 0% · GREEN`, telemetry
+  // the grammar explicitly rejects wearing the most reassuring state the footer can
+  // emit. The band is asymmetric because the rounding is; the low side was the false
+  // GREEN, the high side graded RED off an input with no representation.
+  //
+  // NEVER MOVE THIS CHECK BACK AFTER THE ROUNDING. `used` feeds a THRESHOLD, and a step
+  // function converts an arbitrarily small input error into a maximal output change at
+  // the boundary — so "the rounding error is tiny" is the wrong instrument wherever a
+  // value meets a cutoff. Swept the module for the same shape: schema equality,
+  // `windowRaw > 0`, staleness and the evaluator's 55/75 all already test raw values.
+  // This rung was the only instance.
+  //
+  // Negated conjunction rather than `used < 0 || used > 100` so it fails CLOSED: a NaN
+  // lands on BLIND instead of passing two false comparisons into the evaluator.
+  if (!(used >= 0 && used <= 100)) {
+    // Clamping would render a number the sample did not support; BLIND says "I cannot
+    // represent this", which is the honest answer and the one INV-1 asks for.
     return blind(BLIND_REASON.PERCENTAGE_OUT_OF_RANGE);
   }
+
+  // `+ 0` IS LOAD-BEARING — it normalises the one negative zero that survives the guard.
+  // `used === -0` passes above, and rightly (-0 IS zero, and 0% is in the grammar), but
+  // `Math.round(-0)` is `-0`, which `renderFooter` accepts and emits as `0%` while
+  // `parseFooter` reads back `+0`. D-M10's `parseFooter(renderFooter(x)).fields`
+  // identity is therefore FALSE for a value the renderer accepts — the same class as
+  // the F1 defect WO-OR-10 closed. The suite cannot see it loosely (`-0 == 0`, and
+  // `deepEqual` agrees), so its proof asserts with `Object.is`. Normalised in the
+  // PRODUCER rather than by tightening the renderer: meaning in the producer, fidelity
+  // in the codec, and no survey exists of what a stricter renderer would break in its
+  // callers. `-0 + 0` is `+0`; every other value is unchanged.
+  const percent = Math.round(used) + 0;
 
   let verdict;
   try {
