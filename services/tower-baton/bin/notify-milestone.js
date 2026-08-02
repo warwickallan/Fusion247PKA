@@ -34,14 +34,48 @@
 // loader resolves its own secrets by NAME and masks them; the notifier scrubs the bot
 // token from every error path. Nothing on stdout or stderr carries a value.
 //
+// THE ⟦GOV⟧ FOOTER IS BOUND TO THE EVENT, NOT TO ANYONE'S MEMORY (WO-OR-25). Root
+// CLAUDE.md makes the footer EVENT-DRIVEN: it appears when Warwick has something to act
+// on, and NEVER as a per-reply staple. Through the whole Phase 7 closeout it was never
+// emitted, including when a `merge-decision` handback was owed — the renderer existed,
+// was tested and green, and the trigger lived in an agent's attention, where silence
+// reads exactly like nothing to say. So this entrypoint appends it MECHANICALLY:
+//   * HANDBACK-CLASS (escalation, blocked) -> footer appended. Warwick must act.
+//   * ROUTINE (review_posted, tower_unavailable) -> nothing appended. A footer on a
+//     message that requires nothing of him manufactures the exact interruption it exists
+//     to prevent, which is the staple CLAUDE.md forbids.
+// The line is RENDERED BY tools/governor/footer.mjs and never hand-composed here: the
+// byte grammar lives in that module, a hand-built line is a defect by definition, and a
+// footer one field short parses as "no footer" — indistinguishable from a healthy reply.
+//
+// AND IT CAN NEVER COST A SEND. Every footer failure degrades to "no footer, message
+// still sent, exit 0". A governor line is not worth a lost handback. Two outcomes are
+// deliberately DIFFERENT and must not be collapsed into one:
+//   * telemetry missing/unreadable -> `computeFooterLine` renders a valid BLIND line and
+//     the footer IS appended. BLIND is a correct outcome, not a failure; suppressing it
+//     would make the governor quietest exactly when it stopped measuring, and would take
+//     the one piece of advice CLAUDE.md never withholds — rotate — with it.
+//   * the footer path THROWS -> no footer, message sent anyway.
+//
+// USAGE ERRORS STAY LOUD. An unrecognised `--handback` code, or one supplied alongside a
+// routine purpose, is exit 2 with nothing loaded and nothing sent — never a quiet
+// fallback to CONTINUE. A mistyped code silently rendering the wrong control token is the
+// silent-discard family this entrypoint already refuses everywhere else.
+//
+// NO SESSION ID EXISTS IN A CLI PROCESS, and no flag invents one. The sample therefore
+// resolves by `resolveHealthSample` rule 2 — the newest sample under the cwd-derived
+// project key, `approximate: true`, which is the `~` in `ctx ~NN%`. Run from a worktree
+// with no samples under its key, the line is honestly `ctx --` · BLIND.
+//
 // Usage:
-//   node bin/notify-milestone.js --purpose escalation --body "..." [--source LARRY] [--checkpoint-id <id>]
+//   node bin/notify-milestone.js --purpose escalation --body "..." [--source LARRY] [--checkpoint-id <id>] [--handback <code>]
 
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { loadRuntimeConfig } from '../src/runtimeConfig.js';
 import { createMilestoneNotifier, MILESTONES, LOGICAL_SOURCES } from '../src/telegramNotifier.js';
+import { computeFooterLine, handback, isHandbackCode, HANDBACK_CODES } from '../../../tools/governor/footer.mjs';
 
 // The subset of the closed milestone vocabulary a HUMAN may emit from this entrypoint.
 // A strict subset of MILESTONES — never a superset, and never a new name.
@@ -55,17 +89,24 @@ export const CLI_PURPOSES = Object.freeze([
 // Machine-only lifecycle milestones: real MILESTONES, refused to a human caller.
 export const MACHINE_ONLY_PURPOSES = Object.freeze(MILESTONES.filter((p) => !CLI_PURPOSES.includes(p)));
 
+// WHICH MILESTONES MEAN "WARWICK MUST ACT" — the whole footer decision, as data.
+// A strict subset of CLI_PURPOSES; everything else here is ROUTINE and gets no footer.
+export const HANDBACK_PURPOSES = Object.freeze(['escalation', 'blocked']);
+export const ROUTINE_PURPOSES = Object.freeze(CLI_PURPOSES.filter((p) => !HANDBACK_PURPOSES.includes(p)));
+
 // Deliberately NOT REQUIRED_FOR_WATCHER: this entrypoint needs no ClickUp credential.
 export const REQUIRED_FOR_NOTIFY = Object.freeze(['TELEGRAM_BOT_TOKEN', 'AUTHORISED_TELEGRAM_USER_ID']);
 
 export const DEFAULT_SOURCE = 'TOWER';
 
 export const USAGE = [
-  'usage: node bin/notify-milestone.js --purpose <name> --body "<text>" [--source <name>] [--checkpoint-id <id>]',
+  'usage: node bin/notify-milestone.js --purpose <name> --body "<text>" [--source <name>] [--checkpoint-id <id>] [--handback <code>]',
   `  --purpose        REQUIRED, no default. One of: ${CLI_PURPOSES.join(', ')}`,
   `  --body           REQUIRED. The message text. Not read from stdin or from a file.`,
   `  --source         optional, default ${DEFAULT_SOURCE}. One of: ${LOGICAL_SOURCES.join(', ')}`,
   '  --checkpoint-id  optional. Correlation id only; this entrypoint keeps no dedup state.',
+  `  --handback       optional, ${HANDBACK_PURPOSES.join('/')} only. The ⟦GOV⟧ control code: ${HANDBACK_CODES.join(', ')}.`,
+  '                   Absent leaves footer.mjs its own default control token; it is never guessed here.',
 ].join('\n');
 
 function argValue(argv, name) {
@@ -84,6 +125,7 @@ export function parseArgs(argv = []) {
   const body = argValue(argv, '--body');
   const source = argValue(argv, '--source') ?? DEFAULT_SOURCE;
   const checkpointId = argValue(argv, '--checkpoint-id') ?? '';
+  const handbackCode = argValue(argv, '--handback');
 
   if (!purpose) {
     return { error: `--purpose is required and has NO default. Available to this entrypoint: ${CLI_PURPOSES.join(', ')}` };
@@ -100,7 +142,43 @@ export function parseArgs(argv = []) {
   if (!LOGICAL_SOURCES.includes(source)) {
     return { error: `--source "${source}" is not a logical source. One of: ${LOGICAL_SOURCES.join(', ')}` };
   }
-  return { purpose, body, source, checkpointId };
+  // `HANDBACK_CODES` is a FROZEN literal in footer.mjs mirroring the constitution's seven
+  // legitimate interruptions. Membership-checked, never coerced: an unrecognised code is a
+  // usage error here, not a footer that quietly renders CONTINUE.
+  if (handbackCode !== null) {
+    if (!isHandbackCode(handbackCode)) {
+      return { error: `--handback "${handbackCode}" is not a handback code. One of: ${HANDBACK_CODES.join(', ')}` };
+    }
+    if (!HANDBACK_PURPOSES.includes(purpose)) {
+      return { error: `--handback is only meaningful on a handback-class purpose (${HANDBACK_PURPOSES.join(', ')}). "${purpose}" is ROUTINE and its message carries no footer, so the code would be silently discarded.` };
+    }
+  }
+  return { purpose, body, source, checkpointId, handbackCode };
+}
+
+/**
+ * The whole footer decision, in one place: WHICH milestones get a footer, and what a
+ * footer failure costs (nothing). Pure apart from the injected renderer.
+ *
+ * Returns the body to send — unchanged for a routine purpose, or `body` + blank line +
+ * the rendered line for a handback-class one. The footer is LAST because
+ * `extractFooterLine` reads the final line of a message and nothing else.
+ */
+export function bodyWithFooter({ purpose, body, handbackCode = null, footerImpl = computeFooterLine } = {}) {
+  if (!HANDBACK_PURPOSES.includes(purpose)) return body;
+  try {
+    // `handback()` throws on an unrecognised code — unreachable from the CLI (parseArgs
+    // rejected it already) and deliberately still inside the try, because a caller using
+    // this function directly must lose the footer, never the message.
+    const control = handbackCode ? handback(handbackCode) : undefined;
+    const line = footerImpl(control === undefined ? {} : { control });
+    if (typeof line !== 'string' || line.trim() === '') return body;
+    return `${body}\n\n${line}`;
+  } catch {
+    // A footer is never worth a lost handback. No stderr noise either: this path is not a
+    // send failure, and this command's stderr means NOT SENT.
+    return body;
+  }
 }
 
 /**
@@ -119,6 +197,8 @@ export function parseArgs(argv = []) {
  * @param {object} args.stderr            a writable with .write() (process.stderr)
  * @param {function} [args.loadConfigImpl] injectable loader (tests pass a fake)
  * @param {function} [args.notifierFactory] injectable notifier factory (tests pass a fake)
+ * @param {function} [args.footerImpl]     injectable ⟦GOV⟧ renderer (tests pass the real
+ *                                         one with a pinned store, or a throwing seam)
  */
 export async function runNotify({
   argv = [],
@@ -127,6 +207,7 @@ export async function runNotify({
   stderr = process.stderr,
   loadConfigImpl = loadRuntimeConfig,
   notifierFactory = createMilestoneNotifier,
+  footerImpl = computeFooterLine,
 } = {}) {
   const out = (s) => { stdout.write(`${s}\n`); };
   const err = (s) => { stderr.write(`${s}\n`); };
@@ -150,7 +231,9 @@ export async function runNotify({
   const result = await notifier.notifyMilestone({
     purpose: parsed.purpose,
     logicalSource: parsed.source,
-    body: parsed.body,
+    // The event binding. Handback-class -> the rendered ⟦GOV⟧ line rides along; routine ->
+    // untouched. It cannot throw and it cannot stop the send.
+    body: bodyWithFooter({ purpose: parsed.purpose, body: parsed.body, handbackCode: parsed.handbackCode, footerImpl }),
     checkpointId: parsed.checkpointId,
   });
 

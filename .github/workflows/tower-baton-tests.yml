@@ -14,10 +14,12 @@ on:
   push:
     paths:
       - 'services/tower-baton/**'
+      - 'tools/governor/footer.mjs'
       - '.github/workflows/tower-baton-tests.yml'
   pull_request:
     paths:
       - 'services/tower-baton/**'
+      - 'tools/governor/footer.mjs'
       - '.github/workflows/tower-baton-tests.yml'
 
 permissions:

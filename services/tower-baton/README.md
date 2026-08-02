@@ -96,6 +96,45 @@ is how a monitoring channel starts lying. Rejections say which of the two proble
 is: *"not a milestone"* (not in the vocabulary at all) or *"not available to this
 entrypoint"* (a real milestone, machine-only).
 
+**The ⟦GOV⟧ footer is appended automatically — by EVENT, never by memory.**
+
+Root `CLAUDE.md` makes the footer event-driven: it appears when Warwick has something to
+act on, and never as a per-reply staple. This command binds that to the milestone class
+instead of to an agent remembering:
+
+| Class | Purposes | Footer |
+| --- | --- | --- |
+| **handback** | `escalation`, `blocked` | **appended** — he must act |
+| **routine** | `review_posted`, `tower_unavailable` | **not appended** — a footer on a message that requires nothing of him manufactures the exact interruption it exists to prevent |
+
+The line is rendered by `tools/governor/footer.mjs` (`computeFooterLine`) and never
+hand-composed: a hand-built footer one field short parses as *no* footer, which reads
+exactly like a healthy reply. It goes **last**, after a blank line, because
+`extractFooterLine` reads the final line and no other. Wire text: `[LARRY] <body>`, blank
+line, footer.
+
+```
+node bin/notify-milestone.js --purpose escalation --body "one sentence" --source LARRY --handback merge-decision
+```
+
+- `--handback <code>` is **optional** and accepted only on `escalation`/`blocked`. The
+  codes are `footer.mjs`'s frozen `HANDBACK_CODES` — the constitution's seven legitimate
+  interruptions. An unrecognised code, or one passed with a routine purpose, is a **usage
+  error (exit 2, nothing loaded, nothing sent)**; it is never coerced into `CONTINUE`.
+- Omit it and the footer keeps `footer.mjs`'s own default control token. No code is
+  invented here.
+- **The footer can never cost a send.** If the renderer throws, the message goes out
+  without a footer and exits 0 — a governor line is not worth a lost handback.
+- **`BLIND` is a correct outcome, not a failure.** Missing or unreadable telemetry still
+  renders a footer, saying `BLIND` rather than a state it did not measure. It is never
+  suppressed: that would make the governor quietest exactly when it stopped measuring, and
+  would withhold the one advice that is never withheld — rotate.
+- **Known limitation — no session id exists in a CLI process, and no flag invents one.**
+  The health sample resolves by `resolveHealthSample` rule 2: the newest sample under the
+  **cwd-derived** project key, marked approximate (the `~` in `ctx ~NN%`). Run from a
+  worktree, or any directory whose key holds no samples, the line honestly reads `ctx --`
+  · `BLIND`. An honest approximate marker beats a flag nobody will pass.
+
 **What it does NOT do.**
 
 - **Not a console.** Routine progress has no purpose it can be sent under, by design.
