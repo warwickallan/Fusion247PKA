@@ -54,6 +54,11 @@ const RESTRICTED = /\b(health|medical|diagnos|salary|wage|bellrock|password|secr
 const FIELD_CAP = 600;
 const LIST_CAP = 8;
 
+// The exact text substituted for a field the privacy scrub withholds. Held ONCE because the
+// CLI now reports which SUPPLIED fields were withheld (WO-OR-23), and a second copy of this
+// string would let the report drift away from the thing it reports on without anyone noticing.
+const WITHHELD_MARK = '[withheld: restricted per privacy rules]';
+
 // ---- small durable helpers -------------------------------------------------
 
 function ensureDir() {
@@ -149,7 +154,7 @@ function scrub(value) {
     return { clean, hit: anyHit };
   }
   const s = capField(value);
-  if (RESTRICTED.test(s)) return { clean: '[withheld: restricted per privacy rules]', hit: true };
+  if (RESTRICTED.test(s)) return { clean: WITHHELD_MARK, hit: true };
   return { clean: s, hit: false };
 }
 
@@ -554,6 +559,130 @@ function parseArgs(argv) {
 
 function asList(v) { return v === undefined ? undefined : (Array.isArray(v) ? v : [v]); }
 
+// ---- WO-OR-23: `write`'s argument contract ---------------------------------
+//
+// THE DEFECT THIS CLOSES. `write` used to consult exactly three of the flags it was handed:
+// --session, --backfill, and --focus — the last only as a FALLBACK, applied when stored state
+// had NO focus. Every other flag was parsed and dropped. A live run passing
+// `--focus X --next Y --objective Z` therefore returned {"ok":true} with a fresh packet id,
+// exit 0, while delivering the OLD stored focus. Three arguments discarded, and not one word
+// about it anywhere in the output.
+//
+// It is the same defect class as the pagination bug above — a parameter accepted and silently
+// ignored, producing plausible, correctly-shaped output. There it was Honcho doing it to us;
+// here it was us doing it to ourselves. THE FAILURE IS NOT THE WRONG VALUE, IT IS THE ABSENCE
+// OF A SIGNAL. So the rule is total: every flag on a `write` either changes what is delivered,
+// or stops the command. Nothing in between, and nothing decided quietly.
+//
+// VOCABULARY — one name per field on this path. `write` accepts the CANONICAL state field
+// names, which are exactly `set`'s, because `write` delivers the state `set` maintains.
+// `backfill` composes a synthetic packet from scratch and keeps its own, different vocabulary.
+// The two are deliberately NOT merged: aliasing them would change `backfill`'s contract and
+// give one field two names inside one command. A backfill-style name handed to `write` is
+// REFUSED with a pointer to the canonical one — helpful, but never silently accepted.
+const WRITE_SCALAR_FIELDS = ['focus', 'immediate_objective', 'warwick_last_request', 'next_action', 'notes'];
+const WRITE_LIST_FIELDS = ['accepted_decisions', 'completed', 'blockers'];
+// Control flags: they steer the delivery rather than carrying state. Unchanged here, and
+// deliberately exempt from the value checks below — `--backfill true` legitimately carries
+// the literal string 'true'.
+const WRITE_CONTROL_FLAGS = ['session', 'backfill'];
+// `backfill`'s flag names -> the canonical name. Used ONLY to make a refusal helpful; this is
+// not an alias table and nothing reads it to accept an argument.
+const BACKFILL_FLAG_HINT = {
+  next: 'next_action', objective: 'immediate_objective', request: 'warwick_last_request',
+  decision: 'accepted_decisions', blocker: 'blockers',
+};
+
+/**
+ * Decide what an explicit `write` can honour — BEFORE anything is persisted or delivered.
+ *
+ * Pure, and returns { patch, supplied, rejected }. A non-empty `rejected` means the command
+ * must stop: nothing sent, nothing saved, non-zero exit. Two of the three rejection reasons
+ * exist because THE FIX WOULD OTHERWISE MANUFACTURE A FRESH INSTANCE OF THE DEFECT IT
+ * REPAIRS:
+ *
+ *   - `parseArgs` gives a flag with no value the literal string 'true'. Before this change a
+ *     valueless `--focus` was harmlessly ignored; now that supplied arguments WIN, it would
+ *     have quietly overridden the focus with the word "true".
+ *   - `parseArgs` accumulates a repeated flag into an array. A repeated single-value field
+ *     would have delivered an array where a string belongs.
+ *
+ * Both are refused by name rather than guessed at. `parseArgs` itself is untouched: `read
+ * --json` and `backfill` depend on its current behaviour, and this Work Order owns `write`.
+ */
+function planWriteArgs(a) {
+  const patch = {};
+  const supplied = [];
+  const rejected = [];
+  for (const [k, v] of Object.entries(a)) {
+    if (k === '_') continue;                       // positionals, not flags
+    if (WRITE_CONTROL_FLAGS.includes(k)) continue; // handled by the delivery path, not state
+    const isScalar = WRITE_SCALAR_FIELDS.includes(k);
+    const isList = WRITE_LIST_FIELDS.includes(k);
+    if (!isScalar && !isList) {
+      rejected.push({ flag: k, why: 'unknown', hint: BACKFILL_FLAG_HINT[k] || null });
+      continue;
+    }
+    if (isScalar && Array.isArray(v)) {
+      rejected.push({ flag: k, why: 'repeated', count: v.length });
+      continue;
+    }
+    const values = Array.isArray(v) ? v : [v];
+    if (values.some((x) => x === 'true')) {
+      rejected.push({ flag: k, why: 'valueless' });
+      continue;
+    }
+    patch[k] = isList ? values : v;
+    supplied.push(k);
+  }
+  supplied.sort();
+  return { patch, supplied, rejected };
+}
+
+// The operator-visible refusal. It names every offending flag and what to use instead — a
+// message that only said "bad arguments" would be the silence this Work Order exists to end,
+// one level quieter.
+function renderWriteRejections(rejected) {
+  const accepted = [...WRITE_SCALAR_FIELDS, ...WRITE_LIST_FIELDS, ...WRITE_CONTROL_FLAGS];
+  const lines = [
+    `continuity write: REFUSED — ${rejected.length} supplied argument(s) cannot be honoured.`,
+    'NOTHING was delivered to Honcho and local state was NOT changed.',
+  ];
+  for (const r of rejected) {
+    if (r.why === 'unknown') {
+      lines.push(r.hint
+        ? `  --${r.flag}: not a \`write\` flag — did you mean --${r.hint}? (--${r.flag} is \`backfill\`'s name for that field; the two commands' vocabularies are deliberately separate.)`
+        : `  --${r.flag}: not a \`write\` flag.`);
+    } else if (r.why === 'repeated') {
+      lines.push(`  --${r.flag}: supplied ${r.count} times, but it is a single-value field. The repeatable fields are --${WRITE_LIST_FIELDS.join(', --')}.`);
+    } else {
+      lines.push(`  --${r.flag}: supplied without a value. A flag with no value parses as the literal string "true", which would have become the delivered value.`);
+    }
+  }
+  lines.push(`accepted by \`write\`: --${accepted.join(' --')}`);
+  lines.push('exit 2 = bad usage, nothing sent. exit 3 = delivery failed. exit 0 = delivered.');
+  return lines.join('\n') + '\n';
+}
+
+// What the operator is told about a SUCCESSFUL write. `overrode` and `state_persisted` make the
+// durable effect visible rather than inferred; `withheld` and `truncated` are how an operator
+// learns that a supplied value did not survive the privacy scrub or the field caps intact.
+// A value altered on the way to the wire and not reported would be this same defect wearing a
+// smaller hat.
+function writeReport(plan, packet) {
+  const withheld = [];
+  const truncated = [];
+  for (const f of plan.supplied) {
+    const given = plan.patch[f];
+    const sent = packet ? packet[f] : undefined;
+    const sentValues = Array.isArray(sent) ? sent : [sent];
+    if (sentValues.some((x) => x === WITHHELD_MARK)) withheld.push(f);
+    if (Array.isArray(given) && Array.isArray(sent) && sent.length < given.length) truncated.push(f);
+    else if (typeof sent === 'string' && sent.length === FIELD_CAP && sent.endsWith('…')) truncated.push(f);
+  }
+  return { overrode: plan.supplied, state_persisted: plan.supplied.length > 0, withheld, truncated };
+}
+
 async function cli() {
   const argv = process.argv.slice(2);
   const cmd = argv[0] || 'read';
@@ -573,6 +702,20 @@ async function cli() {
   }
 
   if (cmd === 'write' || cmd === 'stop') {
+    // WO-OR-23. Validate an explicit `write`'s arguments FIRST — before stdin, before the
+    // health sample, before state is loaded, and long before anything is delivered. A refusal
+    // must leave the machine exactly as it found it, so there is no half-applied write to
+    // reason about afterwards.
+    //
+    // SCOPED TO `write` ON PURPOSE. `stop` is a Stop hook: it fires on every turn-end, it is
+    // invoked with no flags, and a hook that exits non-zero ends Warwick's turn with an error.
+    // Its behaviour here is byte-for-byte what it was.
+    const writeArgs = cmd === 'write' ? planWriteArgs(a) : null;
+    if (writeArgs && writeArgs.rejected.length) {
+      process.stderr.write(renderWriteRejections(writeArgs.rejected));
+      return 2;
+    }
+
     // 'stop' is a Stop hook and always gets JSON piped on stdin; 'write' is manual
     // and must never block waiting for stdin that will not come.
     //
@@ -606,8 +749,26 @@ async function cli() {
       } catch { /* never break the boundary hook */ }
     }
 
-    const state = loadState();
-    if (!state.focus && cmd === 'write' && a.focus) state.focus = a.focus; // convenience
+    // WO-OR-23. THE LINE THAT USED TO BE HERE WAS THE DEFECT:
+    //
+    //     if (!state.focus && cmd === 'write' && a.focus) state.focus = a.focus; // convenience
+    //
+    // `--focus` was a FALLBACK, applied only when stored state had none. Stored state normally
+    // has one, so the stored value won and the supplied value vanished — silently, with ok:true.
+    //
+    // Now an explicitly supplied argument OVERRIDES the stored value, and it does so THROUGH
+    // `saveState` — the same patch route `set` already uses. Warwick's requirement is that
+    // supplied arguments "override stored VALUES", and packet-only would not have met it: `stop`
+    // fires per turn, reloads STATE_FILE and delivers the OLD focus with a NEWER timestamp, so
+    // latest-wins would bury the operator's override within a turn or two. An override reverted
+    // by a background hook minutes later is this same false success in a slower costume, and
+    // harder to catch, because the CLI output would have been true at the moment it printed.
+    //
+    // Persist happens BEFORE delivery and is not conditional on it: an unreachable Honcho must
+    // not discard the operator's explicit instruction, and STATE_FILE is exactly what the
+    // brief falls back to when Honcho cannot be read.
+    let state = loadState();
+    if (writeArgs && writeArgs.supplied.length) state = saveState(writeArgs.patch);
 
     // Stop fires per turn. Dedupe so an unchanged (state, session) is written ONCE
     // per session — every turn-end would otherwise spam Honcho. A new session or a
@@ -629,7 +790,9 @@ async function cli() {
     }
 
     const r = await writeContinuity(state, { reason: 'write', sessionId, backfill: a.backfill === 'true' });
-    process.stdout.write(JSON.stringify({ command: 'write', ...summ(r) }, null, 2) + '\n');
+    // The report rides in the SAME object the operator already reads. A durable effect that
+    // has to be inferred from a separate command is not visible.
+    process.stdout.write(JSON.stringify({ command: 'write', ...summ(r), ...writeReport(writeArgs, r.packet) }, null, 2) + '\n');
     return r.ok ? 0 : 3;
   }
 

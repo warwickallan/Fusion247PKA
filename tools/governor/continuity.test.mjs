@@ -22,7 +22,8 @@
 
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, existsSync, readdirSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, readdirSync, readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
@@ -49,6 +50,7 @@ after(() => {
   if (REAL_HOME === undefined) delete process.env.HOME;
   else process.env.HOME = REAL_HOME;
   rmSync(SANDBOX_HOME, { recursive: true, force: true });
+  for (const h of CLI_HOMES) rmSync(h, { recursive: true, force: true });
 });
 
 // ---------------------------------------------------------------------------
@@ -652,6 +654,349 @@ test('CONTAINMENT: every write this suite makes landed in the SANDBOX, not the r
   const files = readdirSync(dir).sort();
   assert.ok(files.includes('continuity-seq.json'), `seq file must be in the sandbox — found: ${files}`);
   assert.ok(files.includes('continuity.json'), `state file must be in the sandbox — found: ${files}`);
+});
+
+// ---------------------------------------------------------------------------
+// WO-OR-23 — `write` must honour its arguments, or stop
+// ---------------------------------------------------------------------------
+//
+// THE DEFECT. `write --focus NEW` returned {"ok":true} with a fresh packet id and exit 0
+// while delivering the OLD stored focus: `--focus` was a FALLBACK applied only to an empty
+// stored focus, and --next/--objective/--request/--decision/--completed/--blocker/--notes
+// were not consulted by `write` at all. Same class as the pagination bug above — a parameter
+// accepted and silently discarded, producing plausible, correctly-shaped output.
+//
+// WHY THESE TESTS DRIVE THE REAL CLI IN A CHILD PROCESS RATHER THAN A HELPER.
+// The defect was never in a computation; it was that a correctly-computed value never reached
+// the wire. "The right value computed somewhere it is never used" is the precise shape of the
+// bug, so every assertion below is made on the BYTES HANDED TO `deliver()` and on the process
+// EXIT CODE — never on a helper's return value. A unit test of the argument planner would
+// have proved the planner correct and the product still broken.
+//
+// AND WHY IT IS SAFE. Two boundaries are respected, both by construction:
+//   * NO NETWORK. `globalThis.fetch` is replaced in the child before the module loads, via a
+//     data: URL passed to `--import`. Nothing reaches api.honcho.dev. If the stub ever failed
+//     to install, the import would abort the child and every test here would fail loudly
+//     rather than quietly dial out.
+//   * NO CREDENTIAL READ. `loadHonchoEnv()` returns at its first line when HONCHO_API_KEY is
+//     already set, so a DUMMY key stops it opening C:/.fusion247/honcho.env — credential
+//     material in a deny-by-default store (GL-012). A test that opened it would be a boundary
+//     violation wearing a test's clothes.
+// Each child also gets its own throwaway HOME, so no CLI test touches the real continuity
+// store, this suite's own sandbox, or another test's state.
+
+const CLI_HOMES = [];
+const CLI_MODULE = join(import.meta.dirname, 'continuity.mjs');
+const FETCH_STUB = 'data:text/javascript,' + encodeURIComponent(`
+  import { appendFileSync } from 'node:fs';
+  const capture = process.env.CONTINUITY_TEST_CAPTURE;
+  globalThis.fetch = async (url, opts) => {
+    const body = opts && opts.body ? JSON.parse(opts.body) : null;
+    if (capture && body && Array.isArray(body.messages)) {
+      appendFileSync(capture, body.messages[0].content + '\\n@@PACKET@@\\n', 'utf8');
+    }
+    return new Response(JSON.stringify([{ id: 'stub-message-id' }]), {
+      status: 200, headers: { 'content-type': 'application/json' },
+    });
+  };
+`);
+
+function cliHome() {
+  const home = mkdtempSync(join(tmpdir(), 'governor-continuity-cli-'));
+  CLI_HOMES.push(home);
+  return home;
+}
+
+// Run the real CLI. Returns the exit code, both streams, EVERY packet the transport was
+// handed (parsed out of the fenced JSON block `renderContent` emits), and the on-disk state
+// file — which is how "did this persist?" is answered by looking, not by believing.
+function runCli(home, args, { stdin = '' } = {}) {
+  const capture = join(home, 'delivered.log');
+  const res = spawnSync(process.execPath, ['--import', FETCH_STUB, CLI_MODULE, ...args], {
+    encoding: 'utf8',
+    input: stdin,
+    env: {
+      ...process.env,
+      HOME: home,
+      USERPROFILE: home,
+      HONCHO_API_KEY: 'dummy-key-this-is-not-a-credential',
+      HONCHO_WORKSPACE: 'wo-or-23-test-workspace',
+      CONTINUITY_TEST_CAPTURE: capture,
+    },
+  });
+  const raw = existsSync(capture) ? readFileSync(capture, 'utf8') : '';
+  const delivered = [...raw.matchAll(/```json\s*([\s\S]*?)```/g)].map((m) => JSON.parse(m[1].trim()));
+  const stateFile = join(home, '.mypka', 'governor', 'continuity.json');
+  return {
+    status: res.status,
+    stdout: res.stdout || '',
+    stderr: res.stderr || '',
+    delivered,
+    packet: delivered.length ? delivered[delivered.length - 1] : null,
+    state: existsSync(stateFile) ? JSON.parse(readFileSync(stateFile, 'utf8')) : null,
+    report: (() => { try { return JSON.parse(res.stdout); } catch { return null; } })(),
+  };
+}
+
+// The stored state every override test starts from: NON-EMPTY in every field, because the
+// defect only bit when there was something to be beaten. A fixture with an empty focus is
+// precisely the fixture that made the old `--focus` fallback look like it worked.
+function seedState(home) {
+  const r = runCli(home, [
+    'set',
+    '--focus', 'OLD-STORED-FOCUS',
+    '--immediate_objective', 'OLD-OBJECTIVE',
+    '--warwick_last_request', 'OLD-REQUEST',
+    '--next_action', 'OLD-NEXT-ACTION',
+    '--notes', 'OLD-NOTES',
+    '--accepted_decisions', 'OLD-DECISION',
+    '--completed', 'OLD-COMPLETED',
+    '--blockers', 'OLD-BLOCKER',
+  ]);
+  assert.equal(r.status, 0, 'CONTROL: the seed itself must succeed, or nothing below means anything');
+  assert.equal(r.state.focus, 'OLD-STORED-FOCUS', 'CONTROL: stored focus is NON-EMPTY, which is the condition the defect needed');
+  return r;
+}
+
+test('WO-OR-23 OVERRIDE: a supplied --focus BEATS a non-empty stored focus — the regression that bit', async () => {
+  // THE ONE THAT WENT RED UNDER THE FALLBACK-ONLY MUTATION. With a stored focus present the
+  // old code kept it and discarded the flag, returning ok:true over a stale packet.
+  const home = cliHome();
+  seedState(home);
+
+  const r = runCli(home, ['write', '--focus', 'NEW-MARKER-OVERRIDE']);
+
+  assert.equal(r.status, 0, `write must succeed: ${r.stderr}`);
+  assert.equal(r.delivered.length, 1, 'CONTROL: exactly one packet reached the transport — an undelivered write proves nothing');
+  assert.equal(r.packet.focus, 'NEW-MARKER-OVERRIDE', 'THE DEFECT: this delivered OLD-STORED-FOCUS while reporting ok:true');
+  assert.notEqual(r.packet.focus, 'OLD-STORED-FOCUS');
+});
+
+test('WO-OR-23 ENUMERATION: every argument `write` accepts reaches the delivered packet', async () => {
+  // ENUMERATED, NOT SPOT-CHECKED, and that is the whole discipline here: the defect survived
+  // because --focus LOOKED like it worked (it did, on empty state), so one happy-path test
+  // would have passed. All ten accepted arguments are supplied at once over a fully populated
+  // OLD state, which also proves no field clobbers another on the way through.
+  const home = cliHome();
+  seedState(home);
+
+  const r = runCli(home, [
+    'write',
+    '--focus', 'NEW-FOCUS',
+    '--immediate_objective', 'NEW-OBJECTIVE',
+    '--warwick_last_request', 'NEW-REQUEST',
+    '--next_action', 'NEW-NEXT-ACTION',
+    '--notes', 'NEW-NOTES',
+    '--accepted_decisions', 'NEW-DECISION-1',
+    '--accepted_decisions', 'NEW-DECISION-2',
+    '--completed', 'NEW-COMPLETED',
+    '--blockers', 'NEW-BLOCKER',
+    '--session', 'NEW-SESSION-ID',
+    '--backfill', 'true',
+  ]);
+
+  assert.equal(r.status, 0, `write must succeed: ${r.stderr}`);
+  const p = r.packet;
+  assert.ok(p, 'CONTROL: a packet was delivered');
+
+  // 8 state fields...
+  assert.equal(p.focus, 'NEW-FOCUS');
+  assert.equal(p.immediate_objective, 'NEW-OBJECTIVE');
+  assert.equal(p.warwick_last_request, 'NEW-REQUEST');
+  assert.equal(p.next_action, 'NEW-NEXT-ACTION');
+  assert.equal(p.notes, 'NEW-NOTES');
+  assert.deepEqual(p.accepted_decisions, ['NEW-DECISION-1', 'NEW-DECISION-2'], 'a repeatable field accumulates rather than overwriting itself');
+  assert.deepEqual(p.completed, ['NEW-COMPLETED']);
+  assert.deepEqual(p.blockers, ['NEW-BLOCKER']);
+  // ...and the 2 control flags, which are arguments too and must not be forgotten.
+  assert.equal(p.session_id, 'NEW-SESSION-ID');
+  assert.equal(p.backfill, true);
+
+  // Nothing from the seed may survive anywhere in the packet. This catches a field that was
+  // merged into state but read from the wrong place on the way out.
+  assert.doesNotMatch(JSON.stringify(p), /OLD-/, 'no stored value may leak into a fully-overridden packet');
+
+  // And the output enumerates the same eight back to the operator.
+  assert.deepEqual(
+    r.report.overrode,
+    ['accepted_decisions', 'blockers', 'completed', 'focus', 'immediate_objective', 'next_action', 'notes', 'warwick_last_request'],
+  );
+});
+
+test('WO-OR-23 PERSIST: an override reaches STATE_FILE, so the next turn-end cannot bury it', async () => {
+  // Warwick's requirement is that supplied arguments override stored VALUES. Packet-only
+  // would not have met it: `stop` fires per turn, reloads STATE_FILE and delivers the OLD
+  // focus with a NEWER timestamp, and latest-wins would bury the override within a turn.
+  // So the durable half is asserted on disk, and then re-read through a second, argument-free
+  // write — the same path a hook takes.
+  const home = cliHome();
+  seedState(home);
+
+  const first = runCli(home, ['write', '--focus', 'PERSISTED-MARKER', '--next_action', 'PERSISTED-NEXT']);
+  assert.equal(first.status, 0);
+  assert.equal(first.state.focus, 'PERSISTED-MARKER', 'the durable store was updated, not just the packet');
+  assert.equal(first.state.next_action, 'PERSISTED-NEXT');
+  assert.equal(first.report.state_persisted, true, 'and the operator is TOLD the durable effect happened');
+
+  const later = runCli(home, ['write']);
+  assert.equal(later.status, 0);
+  assert.equal(later.packet.focus, 'PERSISTED-MARKER', 'a later argument-free write — as a hook makes — delivers the override, not the old value');
+  assert.deepEqual(later.report.overrode, [], 'and it correctly reports overriding nothing');
+  assert.equal(later.report.state_persisted, false);
+});
+
+test('WO-OR-23 FALLBACK PRESERVED: unsupplied arguments still come from stored state', async () => {
+  // The existing behaviour that must NOT break. Overriding one field must not blank the rest.
+  const home = cliHome();
+  seedState(home);
+
+  const r = runCli(home, ['write', '--focus', 'ONLY-FOCUS-CHANGED']);
+
+  assert.equal(r.status, 0);
+  assert.equal(r.packet.focus, 'ONLY-FOCUS-CHANGED');
+  assert.equal(r.packet.next_action, 'OLD-NEXT-ACTION', 'an unsupplied field still falls back to stored state');
+  assert.equal(r.packet.immediate_objective, 'OLD-OBJECTIVE');
+  assert.deepEqual(r.packet.blockers, ['OLD-BLOCKER']);
+  assert.equal(r.state.next_action, 'OLD-NEXT-ACTION', 'and an unsupplied field is not disturbed on disk either');
+});
+
+test('WO-OR-23 REJECT: a `backfill`-style flag exits NON-ZERO, names itself, and points at the canonical name', async () => {
+  // These five are exactly the flags that were discarded in silence. `backfill` keeps them;
+  // `write` refuses them rather than aliasing them, because merging the two vocabularies
+  // would change `backfill`'s contract and give one field two names inside one command.
+  const cases = [
+    ['next', 'next_action'],
+    ['objective', 'immediate_objective'],
+    ['request', 'warwick_last_request'],
+    ['decision', 'accepted_decisions'],
+    ['blocker', 'blockers'],
+  ];
+  for (const [bad, canonical] of cases) {
+    const home = cliHome();
+    seedState(home);
+    const r = runCli(home, ['write', `--${bad}`, 'SOME-VALUE']);
+
+    assert.equal(r.status, 2, `--${bad} must exit non-zero (2 = bad usage), got ${r.status}`);
+    assert.ok(r.stderr.includes(`--${bad}:`), `the message must NAME the offending flag; got: ${r.stderr}`);
+    assert.ok(r.stderr.includes(`--${canonical}`), `and point at the canonical name --${canonical}; got: ${r.stderr}`);
+    assert.equal(r.delivered.length, 0, 'NOTHING may be delivered on a refusal');
+    assert.equal(r.state.focus, 'OLD-STORED-FOCUS', 'and stored state must be untouched');
+  }
+});
+
+test('WO-OR-23 REJECT: an unknown flag exits NON-ZERO and lists what `write` does accept', async () => {
+  const home = cliHome();
+  seedState(home);
+
+  const r = runCli(home, ['write', '--focsu', 'typo-value']);
+
+  assert.equal(r.status, 2);
+  assert.ok(r.stderr.includes('--focsu: not a `write` flag'), `got: ${r.stderr}`);
+  assert.ok(r.stderr.includes('accepted by `write`:'), 'the refusal tells the operator what IS accepted');
+  assert.equal(r.delivered.length, 0);
+  assert.equal(r.state.focus, 'OLD-STORED-FOCUS');
+});
+
+test('WO-OR-23 REJECT: a flag supplied WITHOUT A VALUE is refused — the defect this fix would otherwise have CREATED', async () => {
+  // `parseArgs` gives a valueless flag the literal string 'true'. Before this change a bare
+  // `--focus` was harmlessly ignored; now that supplied arguments WIN, it would have quietly
+  // overridden the focus with the word "true" — a fresh instance of the very defect being
+  // repaired. The two shapes that produce it are both covered: a trailing flag, and a flag
+  // immediately followed by another flag.
+  for (const args of [['write', '--focus'], ['write', '--focus', '--next_action', 'X']]) {
+    const home = cliHome();
+    seedState(home);
+    const r = runCli(home, args);
+
+    assert.equal(r.status, 2, `${args.join(' ')} must exit non-zero`);
+    assert.ok(r.stderr.includes('--focus: supplied without a value'), `got: ${r.stderr}`);
+    assert.equal(r.delivered.length, 0);
+    assert.equal(r.state.focus, 'OLD-STORED-FOCUS', 'the word "true" must never reach the durable focus');
+  }
+});
+
+test('WO-OR-23 REJECT: a repeated single-value flag is refused, while the LIST fields stay repeatable', async () => {
+  // Both halves in one test on purpose: refusing repetition everywhere would silently break
+  // the three fields that are meant to accumulate, and that would be a worse defect than the
+  // one being fixed.
+  const home = cliHome();
+  seedState(home);
+  const bad = runCli(home, ['write', '--focus', 'A', '--focus', 'B']);
+  assert.equal(bad.status, 2);
+  assert.ok(bad.stderr.includes('--focus: supplied 2 times'), `got: ${bad.stderr}`);
+  assert.equal(bad.delivered.length, 0);
+  assert.equal(bad.state.focus, 'OLD-STORED-FOCUS');
+
+  const good = runCli(home, ['write', '--completed', 'A', '--completed', 'B', '--blockers', 'C']);
+  assert.equal(good.status, 0, `a repeated LIST field must still be accepted: ${good.stderr}`);
+  assert.deepEqual(good.packet.completed, ['A', 'B']);
+  assert.deepEqual(good.packet.blockers, ['C']);
+});
+
+test('WO-OR-23 ATOMIC REFUSAL: one bad flag stops the whole command — no partial write, no partial persist', async () => {
+  // A refusal that had already applied the good half would leave the operator reasoning about
+  // a state nobody described. Nothing is applied unless everything can be.
+  const home = cliHome();
+  seedState(home);
+
+  const r = runCli(home, ['write', '--focus', 'WOULD-HAVE-APPLIED', '--next', 'THE-BAD-ONE']);
+
+  assert.equal(r.status, 2);
+  assert.equal(r.delivered.length, 0, 'nothing delivered');
+  assert.equal(r.state.focus, 'OLD-STORED-FOCUS', 'and the acceptable flag was NOT applied either');
+  assert.ok(r.stderr.includes('local state was NOT changed'), 'and the output says so plainly');
+});
+
+test('WO-OR-23 REPORT: a supplied value WITHHELD by the privacy scrub is named in the output', async () => {
+  // The scrub is not weakened — a supplied field goes through RESTRICTED exactly as stored
+  // state does. But a value that was accepted, persisted, and then withheld on the way to the
+  // wire must not look identical to one that was delivered, or this is the same silence again.
+  const home = cliHome();
+  seedState(home);
+
+  const r = runCli(home, ['write', '--focus', 'discussing a medical appointment', '--notes', 'ordinary text']);
+
+  assert.equal(r.status, 0);
+  assert.equal(r.packet.focus, '[withheld: restricted per privacy rules]', 'the scrub still fires');
+  assert.equal(r.packet.sensitivity, 'restricted');
+  assert.equal(r.packet.notes, 'ordinary text', 'and only the offending field is withheld');
+  assert.deepEqual(r.report.withheld, ['focus'], 'the operator is TOLD which supplied field was withheld');
+  assert.ok(r.report.overrode.includes('focus'), 'it was still an override — withheld is not the same as ignored');
+});
+
+test('WO-OR-23 REPORT: a supplied value cut by FIELD_CAP or LIST_CAP is named as truncated', async () => {
+  // Caps are not weakened either. Same reasoning as withholding: silently shortening what was
+  // handed in is a quieter version of discarding it.
+  const home = cliHome();
+  seedState(home);
+
+  const r = runCli(home, [
+    'write',
+    '--notes', 'x'.repeat(5000),
+    ...Array.from({ length: 12 }, (_, i) => ['--completed', `item-${i}`]).flat(),
+    '--focus', 'short and fine',
+  ]);
+
+  assert.equal(r.status, 0);
+  assert.equal(r.packet.notes.length, 600, 'FIELD_CAP still applies');
+  assert.equal(r.packet.completed.length, 8, 'LIST_CAP still applies');
+  assert.deepEqual(r.report.truncated.sort(), ['completed', 'notes'], 'and both truncations are reported');
+  assert.equal(r.report.withheld.length, 0, 'truncation is not withholding — the two are reported separately');
+});
+
+test('WO-OR-23 SCOPE: the new validation cannot break the Stop hook — `stop` with a stray flag still exits 0', async () => {
+  // `stop` fires at every turn-end. A hook that exits non-zero ends Warwick's turn with an
+  // error, so the strict argument contract is deliberately scoped to `write` alone. This test
+  // is what stops a later tidy-up "harmonising" the two and taking the session down with it.
+  const home = cliHome();
+  seedState(home);
+
+  const r = runCli(home, ['stop', '--next', 'a flag stop does not know'], { stdin: '{"session_id":"sess-scope-test"}' });
+
+  assert.equal(r.status, 0, 'a boundary hook must never signal failure via exit code');
+  assert.equal(r.delivered.length, 1, 'and it still delivers the stored state');
+  assert.equal(r.packet.focus, 'OLD-STORED-FOCUS');
+  assert.equal(r.packet.reason, 'stop');
 });
 
 test('CONTAINMENT MUTATION: the redirect is what steers it — the module resolves its store under the sandbox', async () => {
