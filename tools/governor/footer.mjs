@@ -857,8 +857,35 @@ export function deriveFooterFields({
     return blind(BLIND_REASON.SESSION_MISMATCH);
   }
 
+  // ---------------------------------------------------------------------------
+  // THE STALE RUNG CARRIES THE NUMERATOR TOO — the defect CLASS, not one instance
+  // ---------------------------------------------------------------------------
+  // This used to `return blind(BLIND_REASON.STALE)` bare, which DISCARDED a real,
+  // measured `used_tokens` the sample was holding, and rendered `ctx --`. Observed
+  // live 2026-08-02: a sample carrying `used_tokens: 258933` aged past 20 minutes
+  // mid-turn and the footer went to `ctx --` — no number at all — while the very
+  // same missing information one rung lower (rung 7, WINDOW_SIZE_UNKNOWN) is
+  // deliberately rendered as `ctx 259k · BLIND`.
+  //
+  // Two rungs, the same question ("we cannot GRADE this, do we still know the
+  // count?"), two different answers. WO-OR-09 fixed the instance it was pointed at
+  // and left the class open — inspection finding one case is not the same as
+  // enumerating them. The rungs that can hold a real numerator are exactly:
+  // STALE (this one) and WINDOW_SIZE_UNKNOWN (rung 7). SESSION_MISMATCH must NOT
+  // carry it — another session's count is not a fact about this one — and the
+  // rungs above simply have no numerator to carry.
+  //
+  // `state` stays BLIND, so nothing is graded off an old reading. What Warwick gets
+  // is a true measurement with no grade instead of a blank where a number existed.
+  //
+  // `windowTokens` is forced to null exactly as rung 7 does, and that is NOT tidiness:
+  // `renderFooter` throws `windowTokens requires both percent and usedTokens — a
+  // denominator with nothing to divide is a caller bug`. Carrying the window here was
+  // the first attempt at this fix and the suite caught it. A denominator with no
+  // percentage beside it is the display half of the exact false-confidence this module
+  // exists to prevent.
   if (now - sampledAt > STALE_AFTER_MS) {
-    return blind(BLIND_REASON.STALE);
+    return blind(BLIND_REASON.STALE, { usedTokens, windowTokens: null });
   }
 
   // The percentage, from the ONLY two honest sources: one the sample reported directly

@@ -906,8 +906,45 @@ test('D-M2/D-M3: 21 minutes old is BLIND with numbers suppressed; 19 minutes old
   const stale = goodSample({ sampled_at: new Date(now - 21 * 60 * 1000).toISOString() });
   const staleResult = deriveFooterFields({ sample: stale, knownSessionId: 'session-a', now });
   assert.equal(staleResult.fields.state, 'BLIND');
-  assert.equal(staleResult.fields.percent, null, 'D-M2: the numbers must be SUPPRESSED, not merely flagged');
+  assert.equal(staleResult.fields.percent, null, 'D-M2: the GRADED number must be SUPPRESSED, not merely flagged');
   assert.equal(staleResult.blindReason, BLIND_REASON.STALE);
+  // ...but the RAW COUNT survives. D-M2 exists to stop a stale PERCENTAGE being
+  // presented as current; it never required throwing away a true measurement.
+  // Observed live 2026-08-02: a sample holding `used_tokens: 258933` aged past 20
+  // minutes mid-turn and the footer rendered `ctx --` — no number at all — which is
+  // neither real information nor an honest unavailable state. Warwick's own ruling
+  // is true-count-only when the denominator is not established; this rung was
+  // discarding the numerator that ruling exists to keep.
+  //
+  // Enumerated, not spot-checked: the rungs that can hold a real numerator are exactly
+  // STALE and WINDOW_SIZE_UNKNOWN. Both must carry it; SESSION_MISMATCH must not.
+  const withTokens = (extra) => goodSample({
+    sampled_at: new Date(now - 21 * 60 * 1000).toISOString(),
+    context_window: { used_tokens: 250000, context_window_size: 1000000 },
+    ...extra,
+  });
+
+  const staleWithTokens = deriveFooterFields({ sample: withTokens(), knownSessionId: 'session-a', now });
+  assert.equal(staleWithTokens.blindReason, BLIND_REASON.STALE);
+  assert.equal(staleWithTokens.fields.state, 'BLIND', 'still ungraded');
+  assert.equal(staleWithTokens.fields.percent, null, 'still no stale percentage');
+  assert.equal(staleWithTokens.fields.usedTokens, 250000, 'a stale sample still carries its TRUE token count');
+  assert.equal(
+    staleWithTokens.fields.windowTokens, null,
+    'but NOT the window — renderFooter rejects a denominator with no percentage beside it, ' +
+    'and carrying it was the first attempt at this fix'
+  );
+
+  // The regression this pins: `ctx --` when a real measurement was in hand.
+  assert.match(renderFooter(staleWithTokens.fields), /ctx 250k · BLIND/);
+
+  // ...and the boundary of the class. Another session's count is not a fact about
+  // this one, so SESSION_MISMATCH stays bare no matter how many tokens it holds.
+  const otherSession = deriveFooterFields({
+    sample: withTokens({ session_id: 'session-b' }), knownSessionId: 'session-a', now,
+  });
+  assert.equal(otherSession.blindReason, BLIND_REASON.SESSION_MISMATCH);
+  assert.equal(otherSession.fields.usedTokens, null, 'a FOREIGN session\'s count must never be carried');
 
   const fresh = goodSample({ sampled_at: new Date(now - 19 * 60 * 1000).toISOString() });
   const freshResult = deriveFooterFields({ sample: fresh, knownSessionId: 'session-a', now });

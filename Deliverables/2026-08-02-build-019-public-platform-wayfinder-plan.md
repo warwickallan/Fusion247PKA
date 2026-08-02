@@ -31,6 +31,8 @@ This is not Larry being unhelpful. An interrupted build is how BUILD-018 happene
 | 1 | **`Builds/INDEX.md` says BUILD-002's live proof is "pending"** — it passed 2026-07-17. Noticed during the BUILD-019 promotion, unrelated to it. Also `BUILD-010-fusion-tower/` exists on disk but has no INDEX row. | Record tidy-up, not BUILD-019 |
 | 2 | **`main` on `warwickallan/fusion247-web` has no branch protection** (verified: `gh api .../branches/main/protection` → 404 "Branch not protected"). Not a defect today — the repo is empty and Larry is the only committer. Becomes real once the site is live and Vercel auto-deploys `main` to the canonical domain. | Decide at Phase 3, when `main` starts deploying real content |
 | 3 | **Honcho `listMessages` pagination** returns ≤50 even at `size:500`; a session over 50 packets can surface a stale packet via `readLatest`. Carried over from the operating reset, still open. Recovery holds because the packet carries this map's path and the map is authority. | Known follow-up, inherited, not a BUILD-019 gate |
+| 4 | 🟠 **THE WATCHER CANNOT BE REACHED FROM A PR — unattended review-loop operation is NOT CERTIFIED.** Bounded proof attempted on PR #90 and failed for an architectural reason: `tower-watch.js:113` watches a **ClickUp control task** (`TOWER_CLICKUP_TASK_ID`) and `checkpoint.js` says *"two blocks travel through one ClickUp comment thread"*; GitHub is evidence only, never input. The task id is not in this session's environment, the durable state file does not record it, and the only baton thread in the workspace is **`869e6859d`, CLOSED historical BUILD-010 dev proof** (last touched 2026-07-21). The watcher itself is alive (PID 38820, 14h, 68.6s CPU) and has real historical verdicts in `tower-baton-state.json`. **This is the operating-reset's parked row 19 (PR ⇄ Tower seam), not a new fault.** Next sensible action, when Warwick authorises it: either build the row-19 ingest so a PR comment becomes a checkpoint, or stand up a live BUILD-019 ClickUp control thread and export `TOWER_CLICKUP_TASK_ID` where the watcher can see it. **Neither is authorised now.** | **Manual review route (`reviewDiff.mjs --claim`) is proven and sufficient. The watcher is not to become a programme before the website exists.** |
+| 5 | 🟠 **The footer goes BLIND mid-turn because nothing re-samples during a long working turn.** Fixed tonight: the STALE rung now carries the true token count, so Warwick sees `ctx 258.9k · BLIND` instead of `ctx --`. **The deeper cause is untouched** — the transcript sample is written on a hook, `STALE_AFTER_MS` is 20 minutes, so any turn longer than that renders a count that is true-as-of-sample-time with **no staleness marker in the line**. Warwick cannot tell a 30-second-old count from a 25-minute-old one. Next sensible action: either re-sample at render time from the transcript, or surface age in the line. The latter changes the frozen byte grammar in `footer.mjs`, so it is a deliberate decision, not a tweak. | Honest and useful now; **no further Governor expansion is authorised** (Warwick, beyond WO-OR-25) |
 
 ---
 
@@ -42,9 +44,11 @@ This is not Larry being unhelpful. An interrupted build is how BUILD-018 happene
 | **Promoted from** | IDEA-019 (Foundry), on Warwick's explicit instruction 2026-08-02 |
 | **Promoted at** | Fusion247PKA `7163a32` (`origin/main`) |
 | **Branch** | `build-019-public-platform-wayfinder` |
-| **Current phase** | Phase 0 — promotion and mapping: **COMPLETE** |
-| **Current gate** | Warwick's acceptance of this plan (`product-decision`) |
-| **Exact next action** | On acceptance: begin **Phase 1 — website skeleton in the existing `warwickallan/fusion247-web` repo**. Nothing external, nothing paid, no account touched. |
+| **Current phase** | Phase 0 — promotion and mapping: **COMPLETE**. Plan **ACCEPTED IN SUBSTANCE by Warwick, 2026-08-02**, with five bounded corrections since applied. |
+| **Current gate** | None outstanding. Phase 1 is authorised. |
+| **Exact next action** | **Phase 1 — website skeleton in the EXISTING `warwickallan/fusion247-web` repo and EXISTING `fusion247-web` Vercel project.** Initialise Next.js + TypeScript + Tailwind, add CI, and turn the canonical-domain 404 into a real page. Nothing external, nothing paid, no account touched. |
+| **Model for Phase 1** | **Routine implementation / lower-cost model** — bounded Work Order to Keel. Not Opus-high; the stack and the target are both settled. |
+| **Review route** | **Manual: `reviewDiff.mjs --claim`, claim derived from the Phase 1 gate, inside the three-execution Codex budget.** The watcher cannot be reached from a PR — SHIT TO DO #4. |
 
 **No implementation has begun.** This map and the promotion record are the only artefacts produced so far.
 
@@ -107,6 +111,24 @@ Larry may refine navigation and information architecture where UX genuinely impr
 
 - **Fusion247 business pages:** credible, plain-English, useful, lightly humorous, suitable for owner-managed SMEs — *not generic AI consultancy sludge*.
 - **ShAits and GAiggles:** personality-led, irreverent, entertaining, technically accurate.
+
+### UX intent — design principles, not component instructions
+
+Derived from the Tom Solid / myICOR reference model, which the Foundry addendum records as a **useful non-authoritative design precedent**. The lesson it carries is that the MVP does not need revolutionary frontend technology — it needs **strong information architecture, narrative flow and reusable content components**.
+
+The site should have these qualities:
+
+- a **strong narrative homepage** rather than a generic brochure;
+- clear **visual sections or chapters**, with rhythm and numbering where it helps;
+- **confident navigation** — sticky/dropdown where it earns its place;
+- useful **cards, selectors and content surfaces**;
+- **visible articles and video content**, not buried behind a blog link;
+- **dated proof and examples**, and testimonials later when they exist;
+- **repeated but appropriate calls to action** — present, not nagging;
+- **FAQs where genuinely useful**, expandable;
+- a coherent **progression: problem → method → proof → services and products → contact**.
+
+**These are product and experience principles. They are not mandatory components, files or a layout.** Larry retains authority over implementation, and **use the principles, not a clone** — copying myICOR's structure would produce someone else's site wearing Fusion247's name. Where a principle fights the SME audience or the editorial tone, the audience wins.
 
 ### X identity
 
@@ -194,10 +216,11 @@ Executed 2026-08-02 ~19:55 UTC from `C:/Fusion247PKA` @ `7163a32`. **Every row b
 | `www.fusion247.uk` | 308 → canonical (was wrongly Production, corrected) | **308** → `https://www.fusion247.co.uk/` | ✅ MATCHES — correction held |
 | `www.fusion247.ai` | 308 → canonical | **308** → `https://www.fusion247.co.uk/` | ✅ MATCHES |
 | SSL on canonical | automatic | `Strict-Transport-Security: max-age=63072000` present | ✅ MATCHES |
-| YouTube channel | creation started; identity review pending, ≤24h | **NOT VERIFIED — no session access** | 🔴 **FOG F1** |
-| X `@Fusion247AI` | account created | **NOT VERIFIED — no session access** | 🔴 **FOG F2** |
-| X developer app | planned, not proven | **NOT VERIFIED** | 🔴 **FOG F2** |
-| HeyGen account/plan/avatar | needs verification | **NOT VERIFIED** | 🔴 **FOG F3** |
+| YouTube channel | creation started; identity review pending | **Warwick confirms: created as far as currently possible; review STILL PENDING** | 🟠 **F1** — recheck only at Phase 5 or on Warwick's word |
+| X `@Fusion247AI` | account created | **Warwick confirms: account ready** | ✅ **CONFIRMED** — not unknown |
+| X developer app | planned, not proven | **Warwick confirms: developer setup recorded in the handover** | ✅ **EXISTS** — runtime auth + publish path is what remains (F2) |
+| X credential file | recorded at `C:\fusion247\.env keys\` | **that root does not exist**; real path was `C:\.fusion247\.env keys\` — record was missing a leading dot. **Moved to the governed surface** | ✅ **RESOLVED** (F4) |
+| HeyGen account/plan/avatar | needs verification | Warwick investigating later tonight | 🟢 **F3** — later dependency, blocks nothing to Phase 6 |
 | BUILD-019 / IDEA-019 in this repo | — | **zero references** before this branch | ✅ nothing previously promoted |
 
 **Conclusion: the recorded baseline is accurate everywhere it could be checked.** Domains, DNS, repository and Vercel project are real and correctly configured. **Do not recreate any of them.** The remaining unknowns are all *external accounts Larry cannot see from here*, which is precisely the human-dependency column.
@@ -208,47 +231,62 @@ Executed 2026-08-02 ~19:55 UTC from `C:/Fusion247PKA` @ `7163a32`. **Every row b
 
 Fog is what this map exists to resolve. Each item states what is unknown, why it matters, how it gets resolved, and what may proceed while it is open.
 
-### 🔴 F1 — YouTube channel state
+> **CORRECTED 2026-08-02 on Warwick's answers.** The handover already carried identities, handles and setup detail that the first draft of this section wrongly listed as unknown. **Do not re-ask what is already answered.** F1–F4 below now record the *actual* position; only the genuinely open parts remain fog.
 
-**Unknown:** whether the `Human in the Poop` identity review cleared, whether the channel exists and is manageable, which handle was granted (`@humaninthepoop` or a name-preserving fallback), and whether phone verification is done (needed for long uploads, custom thumbnails, live).
-**Why it matters:** the video destination is one third of the North Star. It also carries a **duplication hazard** — the recorded instruction was *do not retry, do not create duplicate channels, do not open another Google account while the review is pending*.
-**Resolution:** Warwick reports the current status once. **Larry must not restart setup blindly.**
-**While open:** everything in Phases 1–3 proceeds.
+### 🟢 F0 — Website assets: NOT FOG. Proceed in the existing assets
 
-### 🔴 F2 — X account and developer integration
+Repository, Vercel project and all domains are **ready and verified** (§5). Build inside them. **Recreate nothing.** This is closed and is recorded here only so a fresh session does not reopen it.
 
-**Unknown:** account access/2FA/recovery state; whether the developer app exists; whether OAuth 2.0 flow completes; whether the *hosted* X MCP can create ordinary posts at all.
-**Why it matters:** the recorded architecture says the **direct X API is the durable production boundary**, and explicitly that the hosted MCP documentation *does not list ordinary post creation*, so it must not be assumed to satisfy the publishing path. Browser automation is an emergency manual fallback only.
-**Resolution:** verify against **current official X documentation at implementation time** — all endpoints, scopes, pricing and product-plan assumptions in the source pack are explicitly implementation-time verification items and can change.
-**While open:** Phases 1–3 proceed; the X adapter is designed against the receipt contract with a manual fallback.
+### 🟠 F1 — YouTube: channel started, identity review still pending
 
-### 🔴 F3 — HeyGen entitlement
+**Position (Warwick, 2026-08-02):** `Human in the Poop` creation has been completed **as far as is currently possible**. The YouTube identity review is **still pending**. All intended names and handles are already in the handover — channel `Human in the Poop`, preferred handle `@humaninthepoop`, name-preserving fallbacks `@humaninthepoop247` / `@humaninthepoopai`.
 
-**Unknown:** current account/plan, API entitlement, avatar and voice rights, synthetic-media disclosure obligations, cost for a short proof *and* for later 9–12 minute content, retention/deletion controls, callback/polling and download behaviour.
-**Why it matters:** it gates the media proof and carries **spend**, which is a Warwick gate.
-**Resolution:** preflight the live account before any render. Cost-controlled short intro only.
-**While open:** everything else proceeds. A media proof is late-phase by design.
+**Standing instruction: do not retry, do not duplicate the channel, do not create another Google account.**
 
-### 🔴 F4 — Secrets location is outside the governed boundary *(the one that actually blocks a worker)*
+**Still genuinely unknown:** the review outcome, the granted handle, and phone-verification state (which gates long uploads, custom thumbnails and live).
 
-**The contradiction, stated exactly:** Brand doc §18 records the X developer credentials at
+**Resolution:** recheck **only** when Phase 5 genuinely needs it, or when Warwick reports the review has cleared. Not before — a speculative recheck is how a duplicate channel gets created.
+**While open:** Phases 1–4 proceed in full.
+
+### 🟠 F2 — X: account and app CONFIRMED; the runtime path is what remains
+
+**Position (Warwick, 2026-08-02): treat account and app existence as CONFIRMED, not unknown.** The Fusion247 account is ready, handle **`@Fusion247AI`**, and the developer setup and its details are recorded in the handover.
+
+**What remains to prove, during the appropriate phase, is narrower than "does X work":**
+- the **governed runtime authorization** — the one-time OAuth flow, with tokens held server-side as secrets;
+- the **real publish path and its receipt** — a genuine post, a stored `external_id`, `canonical_url`, timestamp and outcome.
+
+**Standing constraints, unchanged:** direct X API is the durable production boundary; the hosted X MCP is an optional operator/research surface whose documentation does **not** list ordinary post creation, so it must not be assumed to satisfy the publishing path; browser automation is emergency manual fallback only; publishing stays human-approved. Endpoints, scopes and pricing remain **implementation-time verification items** against current official documentation.
+
+**No credential value is to be exposed, echoed, logged or reproduced — here or anywhere.**
+**While open:** Phases 1–4 proceed.
+
+### 🟢 F3 — HeyGen: a later human dependency, deliberately not now
+
+**Position (Warwick, 2026-08-02):** Warwick will investigate the account, plan, API entitlement, avatar/voice and cost **later tonight**.
+
+**It does not block Phases 1–6.** Keep it as a later human dependency and do not preflight it speculatively. It carries spend, so it stays a gate whenever it does arrive.
+
+### ✅ F4 — Secrets location: RESOLVED AND EXECUTED
+
+**What the contradiction actually was:** Brand doc §18 recorded the credentials at `C:\fusion247\.env keys\…` — a root that **does not exist on this machine**. The real path was `C:\.fusion247\.env keys\…`. **The recorded path was missing its leading dot.** A one-character error in the record, not a boundary breach — the file had been inside the governed root the whole time, just not under `private/<project>/`.
+
+**Warwick selected the governed location.** Executed 2026-08-02:
 
 ```
-C:\fusion247\.env keys\X Fusion247 Public Platform.env.txt
+C:\.fusion247\.env keys\X Fusion247 Public Platform.env.txt
+      →  C:\.fusion247\private\fusion247-web\X Fusion247 Public Platform.env.txt
 ```
 
-`GL-012-secrets-store-access-boundary` governs `C:\.fusion247\**` — **a different root** (leading dot) — is deny-by-default, and permits exactly one shape: `C:\.fusion247\private\<project>\**`. The recorded path is neither that root nor that shape.
+Verified: **816 bytes before and after**, filename preserved exactly, old location cleared, destination directory created. **The contents were never read, displayed, copied or logged** — only the byte count and modification time were compared.
 
-GL-012 rule 3 forbids inferring a surface from context, and rule 2 makes `private_surface` a **mandatory** field on every Work Order. So **any Work Order touching X publishing returns `REFUSE` at read-back until this is declared.** That is correct behaviour, not an obstacle to route around.
+**The `.env.txt` extension is deliberate Warwick naming convention and must be used as found. Do not "fix" it.**
 
-**Larry has not touched, listed or probed that path.**
-
-**Resolution — a genuine Warwick decision, two clean options:**
-- **(a)** Warwick confirms `C:\fusion247\.env keys\**` as an explicitly declared private surface for BUILD-019, and it is written into GL-012 as a named exception; or
-- **(b)** the file moves under `C:\.fusion247\private\fusion247-web\`, which needs no rule change and matches every other private surface on this machine.
-**Recommended: (b)** — it removes the exception rather than documenting one, and the existing runtime already resolves that root (`--env-file=C:/.fusion247/*.env` is how every live service on this machine is started).
-**Note also:** the `.env.txt` extension is *deliberate Warwick naming convention*, not a mistake. It must be used as found and **not renamed**.
-**While open:** everything except X credential wiring proceeds.
+> ### 📌 DECLARED PRIVATE SURFACE FOR BUILD-019
+> ```
+> private_surface: C:\.fusion247\private\fusion247-web\**
+> ```
+> **This is the value every BUILD-019 Work Order touching X credentials must name.** It satisfies GL-012 without an exception: correct root, correct `private/<project>/**` shape. Work Orders that touch nothing private still declare `private_surface: none` — the field is mandatory either way.
 
 ### 🟠 F5 — Repository visibility
 
@@ -315,12 +353,12 @@ Per Foundry `08.1`, every promoted build carries this. **"While waiting" is the 
 | GitHub access to `fusion247-web` | Larry | **READY** | Phase 1 | `gh` authenticated as `warwickallan`; repo metadata read live | — | — |
 | Vercel project access | Warwick/Larry | Project confirmed live externally; console access unverified | Phase 3 | A deploy from `main` renders the real site at the canonical domain | Phases 1–2 build and test locally | Only if a deploy does not appear |
 | Domain / DNS authority | Warwick | **COMPLETE — verified live** | Phase 3 verify | All 6 hostnames resolve as recorded (§5) | — | Only if canonical routing breaks |
-| **YouTube review status + channel handle** | **Warwick** | **PENDING (F1)** | Phase 4 | Channel visible and manageable in Studio; handle recorded | Phases 1–3 in full | **Ask once.** Do not retry or duplicate. |
-| YouTube phone verification / permissions | Warwick | Unknown | Phase 4 (long upload, custom thumbnail, API) | Studio shows verified status and ownership | Adapter built against contract + manual fallback | With F1, one ask |
-| **Secrets surface declaration (F4)** | **Warwick** | **UNRESOLVED — blocks at read-back** | Phase 5 (X wiring) | A declared `private_surface` a Work Order can name | Everything except X credential wiring | **Ask once, with the two options** |
-| X `@Fusion247AI` account access | Warwick | Created; access/2FA/recovery unverified | Phase 5 | Login + 2FA + recovery confirmed | Adapter + fixtures | With F2 |
-| X developer app / OAuth | Warwick + Larry | Planned, not proven | Phase 5 | App configured to current official docs; token flow completes | Adapter against receipt contract | On spend or scope surprise |
-| **HeyGen account / avatar / voice / plan** | **Warwick** | **Needs verification (F3)** | Phase 6 | Authorised avatar+voice, plan and API entitlement proven; cost known | All prior phases | **Before any spend** |
+| **YouTube review status + channel handle** | **Warwick** | **Created as far as possible; review STILL PENDING (F1)** | Phase 5 | Channel visible and manageable in Studio; granted handle recorded | Phases 1–4 in full | **Recheck only at Phase 5 or on Warwick's word.** Never retry or duplicate. |
+| YouTube phone verification / permissions | Warwick | Unknown | Phase 5 (long upload, custom thumbnail, API) | Studio shows verified status and ownership | Adapter built against contract + manual fallback | With F1 |
+| **Secrets surface** | Warwick | ✅ **RESOLVED** — `C:\.fusion247\private\fusion247-web\**` declared; file moved and verified | Phase 6 | The declared surface, named in the Work Order | — | None — closed |
+| X `@Fusion247AI` account | Warwick | ✅ **CONFIRMED ready** | Phase 6 | Account confirmed by Warwick | — | None |
+| X developer app / OAuth | Warwick + Larry | App exists; **governed runtime authorization + publish/receipt path unproven (F2)** | Phase 6 | One-time OAuth completes server-side; a real post returns a durable receipt | Adapter + fixtures against the receipt contract | On spend or scope surprise |
+| **HeyGen account / avatar / voice / plan** | **Warwick** | Investigating later tonight (F3) | Phase 7 | Authorised avatar+voice, plan and API entitlement proven; cost known | **Everything through Phase 6** | **Before any spend** |
 | Brand visual direction | Warwick | Partial | Phase 2 polish | One approved initial visual direction | Build on GL-003 tokens; Iris can propose | Only if the direction is rejected |
 | **Public launch approval** | **Warwick** | **NOT granted by setup alone** | Phase 7 | Explicit launch/publication decision | Everything up to launch | **Hard gate** |
 | Any recurring spend | Warwick | Not granted | Any paid step | Explicit approval | Free paths first | **Hard gate** |
@@ -357,16 +395,30 @@ BUILD-019 is accepted when **all** of the following are true and evidenced. Numb
 
 Each phase ends at a real evidence gate. **Phases 1–3 need nothing from Warwick and cost nothing** — that is deliberate, so the human gates never sit on the critical path.
 
-| Phase | Outcome | Gate / evidence | Blocked by |
-|---|---|---|---|
-| **0** | Promotion + this map | ✅ Complete; Warwick accepts the plan | — |
-| **1** | **Website skeleton live.** Next.js + TypeScript + Tailwind initialised in the existing repo; CI; the 404 becomes a real page at the canonical domain. | Canonical domain returns **200** with real content; CI green on the exact head SHA | Nothing |
-| **2** | **Full information architecture + content model.** All top-level routes, the ShAits and GAiggles area, the Human in the Poop landing/archive, MDX content pipeline, stable URLs. | Every route in §2 renders; content is portable and rebuildable from source | Nothing |
-| **3** | **Deployment behaviour understood and documented.** Preview vs production, branch behaviour, rollback, and the operations runbook. | Documented + demonstrated preview→production promotion and a rollback | Nothing |
-| **4** | **Publication contract + website adapter.** Accepts a versioned Publication Package, publishes an article deterministically, returns a receipt. Idempotency and reconciliation proven against **synthetic fixtures**. | Duplicate submission proven harmless; restart mid-publish recovers | Nothing — fixtures, not VlogOps |
-| **5** | **YouTube adapter + channel configuration.** | Channel owned/recoverable; upload path proven (Private); receipt stored | **F1** (Warwick) |
-| **6** | **X adapter.** Developer app to current official docs, least-privilege scopes, human-approved publish, receipt. | One approved post published; receipt durable; no credential exposure | **F2 + F4** (Warwick) |
-| **7** | **Media proof + launch.** Cost-controlled HeyGen intro → YouTube (Private) with disclosure → companion article → approved X post → receipts for all three. | The three publication outputs from one approved package | **F3** + `merge-decision` + public launch approval |
+| Phase | Outcome | Gate / evidence | Model / capability required | Blocked by |
+|---|---|---|---|---|
+| **0** | Promotion + this map | ✅ Complete; Warwick accepts the plan | **Senior reasoning (Opus-high)** + **Warwick decision** — cross-system synthesis and a governance change | — |
+| **1** | **Website skeleton live.** Next.js + TypeScript + Tailwind initialised in the existing repo; CI; the 404 becomes a real page at the canonical domain. | Canonical domain returns **200** with real content; CI green on the exact head SHA | **Routine implementation / lower-cost model.** Standard framework scaffolding on a known stack — Keel with a bounded Work Order. No architecture decisions left open. | Nothing |
+| **2** | **Full information architecture + content model.** All top-level routes, the ShAits and GAiggles area, the Human in the Poop landing/archive, MDX content pipeline, stable URLs. | Every route in §2 renders; content is portable and rebuildable from source | **Mixed.** Content model and URL/versioning design: **senior reasoning** (they are hard to change later). Route and component build-out: **routine**. Visual/UX pass: Felix + Vera, with Iris on tokens. | Nothing |
+| **3** | **Deployment behaviour understood and documented.** Preview vs production, branch behaviour, rollback, and the operations runbook. | Documented + demonstrated preview→production promotion and a rollback | **Routine implementation**, plus **Warwick decision** on branch protection (SHIT TO DO #2) once `main` auto-deploys. | Nothing |
+| **4** | **Publication contract + website adapter.** Accepts a versioned Publication Package, publishes an article deterministically, returns a receipt. Idempotency and reconciliation proven against **synthetic fixtures**. | Duplicate submission proven harmless; restart mid-publish recovers | **Senior reasoning (Opus-high)** for the contract, idempotency and reconciliation design — this is the interface VlogOps inherits and the expensive thing to get wrong. **Independent review** before it is called done. | Nothing — fixtures, not VlogOps |
+| **5** | **YouTube adapter + channel configuration.** | Channel owned/recoverable; upload path proven (Private); receipt stored | **Routine implementation** for the adapter; **senior reasoning** for ownership/recovery and disclosure design; **Warwick decision** on channel state and any visibility change. | **F1** (Warwick) |
+| **6** | **X adapter.** Governed runtime authorization, least-privilege scopes, human-approved publish, receipt. | One approved post published; receipt durable; no credential exposure | **Senior reasoning (Opus-high)** — credential handling and a live external write. **Independent review mandatory** (Codex) before any real post. **Warwick decision** on scopes and spend. | **F2** (Warwick) |
+| **7** | **Media proof + launch.** Cost-controlled HeyGen intro → YouTube (Private) with disclosure → companion article → approved X post → receipts for all three. | The three publication outputs from one approved package | **Warwick decision** throughout — spend, likeness/voice, and public launch. Execution itself is **routine**; the judgement is entirely his. | **F3** + `merge-decision` + public launch approval |
+
+**Do not default to the most expensive model.** Phases 1, 3 and most of 2 and 5 are ordinary implementation on a known stack and should be worked by a lower-cost model under a bounded Work Order. Opus-high is reserved for the places where a wrong decision is expensive to reverse: the publication contract (4), credentials and live external writes (6), and cross-system synthesis (0).
+
+### Phase-boundary reporting — standing, not on request
+
+**At every phase boundary the report to Warwick states, in this order:**
+
+1. **phase outcome and evidence** (an artefact or command output, not a summary);
+2. **PASS, PARTIAL or FAILED**;
+3. **the next phase**;
+4. **the model recommended for that next phase**;
+5. **any genuine Warwick gate**.
+
+This is part of the normal Wayfinder handback. **It must not depend on Warwick remembering to ask** — a reporting habit that lives only in Larry's attention has no failure signal, and its silence reads exactly like health.
 
 **Sequencing rationale.** The website carries no external dependency and no spend, so it goes first and produces visible value immediately. Adapters are built against the **receipt contract with manual fallbacks**, so a pending account never blocks the code. Anything that costs money or touches a live public surface is last and individually gated.
 
@@ -398,16 +450,30 @@ Two independent executions:
 1. `node services/tower-baton/bin/preflight.js` → **`[TOWER preflight] READY`**, secret store present, `clickupReady: true`, `telegramReady: true`, tokens masked in the output. (Recorded redacted here, per GL-012.)
 2. `node services/tower-baton/bin/notify-milestone.js --purpose escalation --handback product-decision` → **`{"sent":true,"messageId":"442"}`** — a real Telegram message delivered to Warwick, with the ⟦GOV⟧ footer rendered by `footer.mjs`. The notification path is not merely configured; it carried traffic this session.
 
-### The watcher — 🟠 **RUNNING AND CONFIGURED; NOT PROVEN END-TO-END ON THIS BUILD**
+### The watcher — 🟠 **ALIVE, BUT NOT REACHABLE FROM A PR. UNATTENDED REVIEW-LOOP OPERATION IS NOT CERTIFIED.**
 
-- `bin\tower-watch.js` is running as **PID 38820**, started **2026-08-02 05:26:20**, ~14h uptime, **68.6s CPU accrued** (so it is polling, not parked), `Responding: True`.
-- It reads its configuration from the same store `preflight.js` just proved READY, and it is cross-build by construction — keyed on `build_id`/`wp_id`/`brief_ref`, so it serves any build rather than one.
+One bounded round-trip was attempted on PR #90, as ordered. **It could not be performed, and the reason is architectural rather than a fault.**
 
-**What is NOT proven:** that it picks up and answers a `[LARRY → TOWER]` checkpoint **for BUILD-019 specifically**. That requires a PR thread with a real checkpoint on it, which did not exist until this branch. **Process liveness is not the same claim as loop liveness**, and I will not report the stronger claim from the weaker evidence.
+**What was executed and observed:**
 
-**How it closes:** the first Phase 1 review posts a real checkpoint to the BUILD-019 PR. If the watcher answers, this row becomes ✅ with the reply as evidence. If it does not, that is a blocker to raise before Phase 1 closes — **not** something to discover at Phase 7.
+1. `bin\tower-watch.js` is running — **PID 38820**, started 2026-08-02 05:26:20, ~14h uptime, **68.6s CPU accrued**, `Responding: True`. It is polling, not parked.
+2. It has genuinely answered checkpoints before. `C:\.fusion247\tower-baton-state.json` holds real verdicts — e.g. `BUILD-010-ACCEPT-0001` → `verdict: CORRECTIONS_REQUIRED`, with a `reviewed_head` SHA and a `prompt_fingerprint`. **The loop has worked.**
+3. **But the watcher does not read GitHub PRs.** `bin/tower-watch.js:113` takes `TOWER_CLICKUP_TASK_ID` and `src/checkpoint.js` states it plainly: *"Two blocks travel through one ClickUp comment thread."* GitHub is used only as **evidence** (branch, head SHA, diff, CI) — never as the input surface. **PR #90 is not a surface the watcher can see.**
+4. `TOWER_CLICKUP_TASK_ID` is not present in this session's environment — it lives in the environment of the process launched 14 hours ago — and the durable state file does not record it.
+5. Searching ClickUp for the control task returns exactly one baton thread: **`869e6859d` — "[CLOSED — HISTORICAL DEV PROOF] BUILD-010 Baton / ClickUp QA thread"**, status **complete**, last touched 2026-07-21. **There is no live control thread, for BUILD-019 or anything else.**
 
-**Honest verdict on readiness overall: 2 of 3 proven LIVE AND CONNECTED; the watcher is proven ALIVE but not proven WIRED TO THIS BUILD.** Under the standing rule that a recorded limit must move the verdict, this build is **ready to execute Phase 1**, and is **not** yet certified for unattended review-loop operation.
+**This is a previously-recorded gap, not a discovery.** The operating-reset map's SHIT TO DO **row 19** parked exactly this: *"THE MISSING BIDIRECTIONAL SEAM: PR ⇄ Tower. A FEATURE TO BUILD LATER — explicitly NOT during Phase 5."* The instruction to prove the watcher via a PR rests on a seam that was deliberately never built.
+
+**Verdict, stated at the strength the evidence supports:**
+- the watcher **detected the BUILD-019 checkpoint** — ❌ **no.** No checkpoint could be posted, because there is no live thread and PR #90 is not an input surface.
+- it **responded through the intended review loop** — ❌ **no.**
+- it **produced durable evidence referenceable from this Wayfinder** — ❌ **no** for BUILD-019. The only durable evidence is historical, for BUILD-010.
+
+**→ Parked in SHIT TO DO #4. Unattended review-loop operation is NOT CERTIFIED for BUILD-019.**
+
+**The build proceeds using the available manual review route** — `reviewDiff.mjs --claim`, with the claim derived from the phase gate, inside the three-execution Codex budget. That route is proven and needs no watcher. **The watcher is not to become a programme before the website exists.**
+
+**Overall readiness: 2 of 3 proven LIVE AND CONNECTED. Phase 1 is safe to execute; the review loop is manual until row 19 is built, and building it is not authorised now.**
 
 ---
 
@@ -427,16 +493,16 @@ It is a **hypothesis about route, not law**. It gets corrected at phase boundari
 
 ## Phase status (durable — the tracker; update ONLY at a phase boundary: PASS / PARTIAL / FAILED + evidence)
 
-| Phase | Status | Evidence |
-|---|---|---|
-| 0 — Promotion + Wayfinder map | ✅ **PASS** | This map @ `build-019-public-platform-wayfinder`; `Builds/BUILD-019-fusion247-public-platform/`; live recon §5 |
-| 1 — Website skeleton live | ⬜ NOT STARTED | — |
-| 2 — Information architecture + content model | ⬜ NOT STARTED | — |
-| 3 — Deployment behaviour + runbook | ⬜ NOT STARTED | — |
-| 4 — Publication contract + website adapter | ⬜ NOT STARTED | — |
-| 5 — YouTube adapter | ⬜ BLOCKED (F1) | — |
-| 6 — X adapter | ⬜ BLOCKED (F2, F4) | — |
-| 7 — Media proof + launch | ⬜ BLOCKED (F3, launch approval) | — |
+| Phase | Status | Model for this phase | Evidence |
+|---|---|---|---|
+| 0 — Promotion + Wayfinder map | ✅ **PASS** | Opus-high + Warwick | This map @ `build-019-public-platform-wayfinder`; `Builds/BUILD-019-fusion247-public-platform/`; live recon §5; Warwick accepted in substance 2026-08-02 |
+| 1 — Website skeleton live | ⬜ **NOT STARTED — the frontier** | **Routine / lower-cost** | — |
+| 2 — Information architecture + content model | ⬜ NOT STARTED | Mixed (senior for the content model) | — |
+| 3 — Deployment behaviour + runbook | ⬜ NOT STARTED | Routine | — |
+| 4 — Publication contract + website adapter | ⬜ NOT STARTED | **Opus-high + independent review** | — |
+| 5 — YouTube adapter | ⬜ BLOCKED (F1) | Routine + senior for ownership/recovery | — |
+| 6 — X adapter | ⬜ BLOCKED (F2) | **Opus-high + mandatory independent review** | — |
+| 7 — Media proof + launch | ⬜ BLOCKED (F3, launch approval) | Warwick decision throughout | — |
 
 ---
 
