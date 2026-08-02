@@ -1,0 +1,119 @@
+repo:  C:/Fusion247PKA
+range: 2aac7d9..HEAD
+claim: Deliverables/2026-08-02-phase5-evidence/claim-scope-reorient-repairs.json
+scope  : tools/governor/reorient.mjs
+branch : operating-reset/teardown
+
+── GIT EVIDENCE (real, read-only) ──
+resolved=true diff_range=2aac7d9a2d6584fc7d993fc21f5428f649c847d0..5dafb354abb31521c8e8da2e65a2a0b900c070b3
+changed_files=["tools/governor/reorient.mjs"]
+diff bytes=26590 of 26590 (real UTF-8 bytes) truncated=false
+packet diff_range=2aac7d9a2d6584fc7d993fc21f5428f649c847d0..5dafb354abb31521c8e8da2e65a2a0b900c070b3 -- tools/governor/reorient.mjs
+packet scoped_to=["tools/governor/reorient.mjs"] wp_id=null
+
+── REAL CODEX MERGE REVIEW (Tower QA skill over the staged diff + the REAL claim) ──
+ok=true blocked=false model=openai-codex-exec
+{
+  "status": "ok",
+  "verdict": "request_changes",
+  "summary": "The repair materially improves upstream and sweep honesty, but two probe-model defects remain. Directory existence/type does not establish that the process can enter the cwd, and a failed symbolic-ref probe is still classified as detached HEAD. These failures also collapse 'invalid' and 'could not tell' states, so the executed-facts claim is not yet consistently earned.",
+  "claims_verified": [
+    {
+      "claim": "The exact staged head and base..head diff were supplied for tools/governor/reorient.mjs.",
+      "status": "confirmed",
+      "evidence": "The bounded packet includes head 5dafb354abb31521c8e8da2e65a2a0b900c070b3 and the staged diff from base 2aac7d9a2d6584fc7d993fc21f5428f649c847d0."
+    },
+    {
+      "claim": "The confident no-upstream sentence is restricted to upstreamState === 'none-configured'.",
+      "status": "confirmed",
+      "evidence": "renderLocationSection emits '(none tracked — nothing here is pushed)' only in the explicit none-configured branch."
+    },
+    {
+      "claim": "The repairs completely distinguish measured, unclaimed, invalid, and unknown states.",
+      "status": "refuted",
+      "evidence": "realpathSync/statSync failures all become resolved=null; renderCwd consequently reports an unreadable existing directory as 'no such directory on disk', identical to a nonexistent path."
+    },
+    {
+      "claim": "Every added probe degrades without throwing from the SessionStart hook.",
+      "status": "confirmed",
+      "evidence": "Filesystem and git probes are wrapped by soft() or surrounding try/catch paths; sweep filesystem operations also catch failures and return diagnostic text."
+    }
+  ],
+  "acceptance_results": [
+    {
+      "acceptance_row_id": "Y1",
+      "result": "fail",
+      "rationale": "The cwd repair proves resolution and directory type, but not that the session process can enter the directory.",
+      "evidence": "gitFacts uses realpathSync.native followed by statSync(...).isDirectory(); it never attempts an equivalent of chdir/access with execute/traverse permission. A real directory lacking traversal permission can pass the type check while being unusable as cwd."
+    },
+    {
+      "acceptance_row_id": "Y2",
+      "result": "fail",
+      "rationale": "A symbolic-ref probe failure is still treated as positive evidence of detachment.",
+      "evidence": "detached is assigned `headSha === null ? null : symbolicBranch === null`; soft() maps every symbolic-ref error—not only the expected detached exit—to null."
+    },
+    {
+      "acceptance_row_id": "Y3",
+      "result": "fail",
+      "rationale": "Invalid and indeterminate cwd measurements can render identically.",
+      "evidence": "Both nonexistent and unreadable existing paths produce resolved=null/resolvedKind=null and render as 'no such directory on disk'."
+    },
+    {
+      "acceptance_row_id": "Y4",
+      "result": "fail",
+      "rationale": "The failure enumeration omits permission/probe-error distinctions for cwd and symbolic-ref.",
+      "evidence": "soft() erases filesystem error codes and symbolic-ref failure causes before state classification."
+    },
+    {
+      "acceptance_row_id": "Y5",
+      "result": "pass",
+      "rationale": "Directory-read failure, per-file incompleteness, and a genuinely empty readable sweep have distinct outcomes.",
+      "evidence": "Non-ENOENT readdir failure renders NOT SWEPT; unreadable files render NOT SWEPT IN FULL or an incompleteness line; a complete empty sweep returns null."
+    },
+    {
+      "acceptance_row_id": "Z1",
+      "result": "pass",
+      "rationale": "The added filesystem/git probes are guarded and degrade to nullable facts or diagnostic output.",
+      "evidence": "gitFacts uses soft(); sweepOpenDeliverables catches directory, stat, and file-read failures; buildBrief catches facts/render failures."
+    },
+    {
+      "acceptance_row_id": "Z2",
+      "result": "fail",
+      "rationale": "The hook can confidently report conclusions not established by the actual probe outcome.",
+      "evidence": "An unreadable cwd is reported as nonexistent, and an unexpected symbolic-ref failure is reported as detached."
+    },
+    {
+      "acceptance_row_id": "Z3",
+      "result": "fail",
+      "rationale": "The 'executed, not assumed' and 'These are facts' language remains too strong while probe failures are converted into specific factual diagnoses.",
+      "evidence": "renderCwd states 'no such directory on disk' without distinguishing lookup failure; renderBranch states DETACHED whenever symbolicBranch is null and HEAD resolves."
+    },
+    {
+      "acceptance_row_id": "W1",
+      "result": "fail",
+      "rationale": "The repair introduces new confident misclassification paths through over-broad null handling.",
+      "evidence": "All symbolic-ref exceptions map to detached=true, while all cwd resolution/stat exceptions map to a nonexistent-directory rendering."
+    }
+  ],
+  "prior_finding_results": [],
+  "findings": [
+    {
+      "id": "TQA-001",
+      "technical_impact": "HIGH",
+      "reachability": "ACTIVE",
+      "required_disposition": "BLOCKS_CURRENT_MERGE",
+      "assumed_deployment_baseline": "reorient.mjs runs as the live SessionStart hook on filesystems where directory traversal or metadata probes may fail independently.",
+      "evidence": "`realpathSync.native(worktreePath)` plus `statSync(real).isDirectory()` establishes type only. Any exception is collapsed by soft() to null, after which renderCwd says 'no such directory on disk'.",
+      "required_correction": "Use a probe that establishes cwd enterability, or explicitly render directory-type success separately from enterability. Preserve filesystem failure/permission state so an unreadable existing path renders as unknown/unreadable rather than nonexistent."
+    },
+    {
+      "id": "TQA-002",
+      "technical_impact": "HIGH",
+      "reachability": "ACTIVE",
+      "required_disposition": "BLOCKS_CURRENT_MERGE",
+      "assumed_deployment_baseline": "Git probes may fail for reasons other than their expected semantic negative result, including permissions, executable failure, repository races, or injected/test execution errors.",
+      "evidence": "`const symbolicBranch = soft(...)` followed by `const detached = headSha === null ? null : symbolicBranch === null` treats every symbolic-ref failure as proof of detachment.",
+      "required_correction": "Preserve the symbolic-ref exit/result classification. Mark detached only for the specific measured detached response; map unexpected probe failures to unknown and render them without a confident detached claim."
+    }
+  ]
+}
