@@ -328,6 +328,37 @@ const NO_WINDOW = Object.freeze({ tokens: null, source: null });
  *       and it is the exact invariant the whole function now rests on, so it is asserted
  *       rather than assumed.
  *
+ * ---------------------------------------------------------------------------------
+ * THE INVARIANT CARRY-FORWARD DEPENDS ON — written at the point of dependence
+ * (WO-OR-18, closing Codex TQA-003). READ THIS BEFORE CHANGING THE CARRY-FORWARD BRANCH.
+ * ---------------------------------------------------------------------------------
+ * Rule 2 accepts a stored `context_window_size` on the strength of exactly one thing:
+ * that the `session_id` it was filed under is the live session's own. That is not a
+ * property of this function. It is an assumption about the RUNTIME, and it is stated here
+ * rather than left for a future reader to infer from the fact that nobody checked it:
+ *
+ *   ASSUMED: a Claude Code session id is unique per session and is not reused by a later
+ *   process. Nothing in this module verifies that, and nothing here can — the id is
+ *   supplied by the host.
+ *
+ * WHAT BREAKS IF THAT IS EVER FALSE. A record surviving from an earlier process under a
+ * reused id would be read as this session's own observation and its denominator carried
+ * into a percentage this session never observed. It would look exactly like a legitimate
+ * carry-forward, because carry-forward IS "trust the record filed under my id".
+ *
+ * WHY NO FRESHNESS CHECK IS ADDED HERE — a decision, not an oversight. The risk is
+ * LOW/LATENT; it is already partly covered, because `footer.mjs`'s ladder refuses a
+ * sample older than `STALE_AFTER_MS` (twenty minutes) and the denominator rides on that
+ * same sample; and the obvious remedy is worse than the disease. Any rule that rejects an
+ * older record on age alone also rejects the legitimate RESUMED session — which is
+ * precisely the case carry-forward exists to serve, and which is indistinguishable from a
+ * reused id from inside this function. So the invariant is documented and no mechanism is
+ * built. A guard against a latent risk that breaks a real path is a net loss.
+ *
+ * `sampled_at` is deliberately NOT consulted here. That is not a gap for the next reader
+ * to close: the staleness judgement belongs to the footer ladder, which owns it for the
+ * whole sample. Duplicating it here would give one fact two owners, and two owners drift.
+ *
  * KNOWN RESIDUAL, stated rather than guarded (WO-OR-09, Larry concurring). A mid-session
  * model change can alter the window, leaving this session's own earlier observation
  * stale. No model-compatibility check is applied here, for two reasons: the statusLine and

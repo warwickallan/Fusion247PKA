@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, writeFileSync, readFileSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, readFileSync, mkdirSync, utimesSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { spawn } from 'node:child_process';
@@ -141,4 +141,155 @@ test('mutation: N concurrent writer processes never produce a torn file', async 
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+// ===========================================================================
+// WO-OR-18 — the SPLIT-STORE hazard (Codex TQA-002)
+// ===========================================================================
+// One session's statusLine and its own Stop hook can run from different checkouts of this
+// same repository, landing their records under different `cwd`-derived project keys. The
+// reader then found nothing and the footer went BLIND while a valid observation for that
+// exact session sat one directory away.
+//
+// Every test below passes `envOverride: ''` — an EXPLICIT "no override" rather than
+// letting the parameter default to `process.env.MYPKA_GOVERNOR_HEALTH_DIR`. Otherwise an
+// ambient variable on whatever machine runs this suite would silently redirect these
+// tests and they would pass without exercising the project-key layout at all.
+
+const CWD_A = 'C:\\Fusion247PKA';
+const CWD_B = 'C:\\Fusion247PKA-governor';
+const CWD_C = 'C:\\Fusion247PKA-wt-wo-or-99';
+
+function fakeHome() {
+  const home = mkdtempSync(join(tmpdir(), 'governor-health-home-'));
+  return {
+    home,
+    optsFor: (cwd) => ({ cwd, homeDir: home, envOverride: '' }),
+    cleanup: () => rmSync(home, { recursive: true, force: true }),
+  };
+}
+
+test('WO-OR-18: a KNOWN session id resolves across project keys — the split store no longer blinds it', () => {
+  const h = fakeHome();
+  try {
+    const sample = { session_id: 'split-1', context_window: { context_window_size: 1000000 } };
+    // Written from checkout A, as that checkout's statusLine would.
+    writeHealthSample('split-1', sample, h.optsFor(CWD_A));
+
+    // CONTROL: the two checkouts genuinely resolve to different directories. Without this
+    // the test could pass because nothing was ever split.
+    assert.notEqual(
+      healthStoreDir(h.optsFor(CWD_A)),
+      healthStoreDir(h.optsFor(CWD_B)),
+      'CONTROL: the hazard requires two distinct project keys'
+    );
+
+    // Read from checkout B, as the Stop hook or footer in another worktree would.
+    const read = readHealthSample('split-1', h.optsFor(CWD_B));
+    assert.equal(read.ok, true, 'THE DEFECT: this returned {ok:false, missing} and the footer went BLIND');
+    assert.equal(read.data.context_window.context_window_size, 1000000);
+    assert.equal(read.resolvedAcrossProjectKey, true, 'and it reports that it had to look elsewhere');
+  } finally {
+    h.cleanup();
+  }
+});
+
+test('WO-OR-18 MUTATION: the cross-key sweep is IDENTITY, not filename — a mismatched record is refused', () => {
+  // Makes the test above fail-able, and pins the one invariant the sweep rests on. A
+  // sweep that trusted the filename would hand back another session's telemetry, which is
+  // strictly worse than the BLIND it replaced.
+  const h = fakeHome();
+  try {
+    const dirA = healthStoreDir(h.optsFor(CWD_A));
+    mkdirSync(dirA, { recursive: true });
+    // A file NAMED for our session, whose contents belong to someone else.
+    writeFileSync(
+      join(dirA, 'split-2.json'),
+      JSON.stringify({ session_id: 'somebody-elses-session', context_window: { context_window_size: 200000 } })
+    );
+
+    const read = readHealthSample('split-2', h.optsFor(CWD_B));
+    assert.equal(read.ok, false, 'a record that does not claim this session id must NOT be adopted');
+    assert.equal(read.reason, 'missing');
+
+    // CONTROL: the sweep really did run and really did examine that directory — otherwise
+    // the refusal above would prove nothing at all. Correct the id and it is found.
+    writeHealthSample('split-2', { session_id: 'split-2', ok: true }, h.optsFor(CWD_A));
+    assert.equal(readHealthSample('split-2', h.optsFor(CWD_B)).ok, true, 'CONTROL: the sweep reaches this directory');
+  } finally {
+    h.cleanup();
+  }
+});
+
+test('WO-OR-18: the CURRENT checkout wins when it has its own record', () => {
+  // The sweep is a fallback on a MISS, never a preference. A co-located record is this
+  // session's own most recent write and must not be displaced by a foreign key's copy.
+  const h = fakeHome();
+  try {
+    writeHealthSample('split-3', { session_id: 'split-3', where: 'A' }, h.optsFor(CWD_A));
+    writeHealthSample('split-3', { session_id: 'split-3', where: 'B' }, h.optsFor(CWD_B));
+    assert.equal(readHealthSample('split-3', h.optsFor(CWD_B)).data.where, 'B');
+    assert.equal(readHealthSample('split-3', h.optsFor(CWD_A)).data.where, 'A');
+  } finally {
+    h.cleanup();
+  }
+});
+
+test('WO-OR-18: with several foreign records for one session id, the NEWEST is taken', () => {
+  const h = fakeHome();
+  try {
+    writeHealthSample('split-4', { session_id: 'split-4', where: 'A' }, h.optsFor(CWD_A));
+    writeHealthSample('split-4', { session_id: 'split-4', where: 'C' }, h.optsFor(CWD_C));
+    // Pin the mtimes rather than relying on write order and filesystem timestamp
+    // granularity — a race here would make this test flaky and its verdict meaningless.
+    const older = new Date(Date.now() - 60_000);
+    const newer = new Date();
+    utimesSync(healthFilePath('split-4', h.optsFor(CWD_A)), older, older);
+    utimesSync(healthFilePath('split-4', h.optsFor(CWD_C)), newer, newer);
+    assert.equal(readHealthSample('split-4', h.optsFor(CWD_B)).data.where, 'C');
+
+    // MUTATION: flip which one is newer. The answer must follow the mtime, not whatever
+    // order the filesystem happens to list the directories in.
+    utimesSync(healthFilePath('split-4', h.optsFor(CWD_A)), newer, newer);
+    utimesSync(healthFilePath('split-4', h.optsFor(CWD_C)), older, older);
+    assert.equal(readHealthSample('split-4', h.optsFor(CWD_B)).data.where, 'A');
+  } finally {
+    h.cleanup();
+  }
+});
+
+test('WO-OR-18: MYPKA_GOVERNOR_HEALTH_DIR still pins ONE directory and is never swept past', () => {
+  // The portability seam (Q-3/T-12) and outcome 3's test containment both rest on this:
+  // an explicitly pinned root IS the whole store, so it has no siblings by construction.
+  // If the sweep ignored the override, a redirected test store would start resolving
+  // records out of the real one — the pollution problem running backwards.
+  const h = fakeHome();
+  const pinned = freshDir();
+  try {
+    writeHealthSample('split-5', { session_id: 'split-5', where: 'home-rooted-store' }, h.optsFor(CWD_A));
+    const read = readHealthSample('split-5', { envOverride: pinned, homeDir: h.home, cwd: CWD_B });
+    assert.equal(read.ok, false, 'a pinned store must not reach into the home-rooted store');
+    assert.equal(read.reason, 'missing');
+  } finally {
+    rmSync(pinned, { recursive: true, force: true });
+    h.cleanup();
+  }
+});
+
+test('WO-OR-18: the store is STILL project-keyed — the unknown-session fallback stays scoped', () => {
+  // The invariant that stopped this repair from becoming a regression. `footer.mjs`'s
+  // `resolveHealthSample` rule 2 enumerates this directory to pick the newest sample when
+  // the session id is UNKNOWN, returning `approximate: true`. That path has only
+  // SIMILARITY to go on, so its blast radius must stay one project. Flattening the store
+  // would have let it reach into an unrelated repository's sessions — this machine's
+  // store carries a `C--ClaudeJobs` key. Identity may cross that boundary; similarity may
+  // not. Pinned to the literal layout so a future flattening cannot pass silently.
+  assert.equal(
+    healthStoreDir({ cwd: CWD_A, homeDir: 'H', envOverride: '' }),
+    join('H', '.mypka', 'governor', 'health', 'C--Fusion247PKA')
+  );
+  assert.notEqual(
+    healthStoreDir({ cwd: CWD_A, homeDir: 'H', envOverride: '' }),
+    healthStoreDir({ cwd: CWD_B, homeDir: 'H', envOverride: '' })
+  );
 });

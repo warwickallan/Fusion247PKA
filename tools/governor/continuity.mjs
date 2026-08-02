@@ -235,9 +235,135 @@ export async function writeContinuity(state, opts = {}) {
 
 // ---- public: read ----------------------------------------------------------
 
-async function listMessages() {
-  const res = await hf(`/workspaces/{ws}/sessions/${SESSION}/messages/list`, { method: 'POST', body: { size: 50 } });
-  return Array.isArray(res?.items) ? res.items : [];
+// ---- listing: correct under an UNESTABLISHED pagination contract -----------
+//
+// WO-OR-18. This used to be ONE request for `{size: 50}`, and it silently returned an
+// EARLY window rather than the newest messages. Measured against the live store on
+// 2026-08-02 (Larry's probe, supplied to this Work Order as an input — not measured by
+// the author of this code, see "WHAT IS NOT ESTABLISHED"): 86 packets had been built,
+// `readLatest` could see 50, and the newest it could reach was seq 51, timestamped some
+// fifteen hours earlier. Packets 52-86 were unreachable through this path.
+//
+// The consequence was not academic. That stale packet was injected into a live session's
+// continuity brief and named the wrong programme phase. Recovery held only because the
+// packet carries the git-map pointer and the map is the authority — the pointer itself
+// was wrong. A read path that returns an old answer with no indication that it is old is
+// the precise failure this module was built to end.
+//
+// WHAT IS NOT ESTABLISHED, AND IS THEREFORE NOT ASSUMED HERE. Nobody has established this
+// API's pagination CONTRACT: not its cursor fields, not `has_more`, not whether a `page`
+// field is accepted at all, not its ordering guarantee. Only the SYMPTOM above was
+// measured. `services/obsidiwikai/src/clients/honcho.mjs` talks to the same host but
+// never calls `messages/list`, so the estate holds no second witness either.
+//
+// So this walks the list UNDER UNCERTAINTY, and the design rule is that every plausible
+// server behaviour has to land somewhere safe rather than somewhere clever:
+//
+//   * server honours `page`          -> pages are walked to exhaustion; the newest is found.
+//   * server IGNORES `page` and re-serves the identical window
+//                                    -> the repeat-detection guard stops after the second
+//                                       request; page 1 is kept and `complete: false` is
+//                                       reported. No worse than the old behaviour, and it
+//                                       says so instead of looking finished.
+//   * server REJECTS the extra field -> the follow-up request throws, page 1 is already in
+//                                       hand, so it is kept and reported incomplete. Only a
+//                                       failure on the FIRST page is a real Honcho failure,
+//                                       and that still propagates to the caller.
+//   * server is cursor-based         -> a cursor field, if the response offers one, is
+//                                       echoed back on the next request.
+//   * server returns newest-first    -> harmless. `readLatest` sorts regardless.
+//
+// `size` stays at 50 because 50 is the number the server was MEASURED to return, and the
+// map records `size: 500` being capped to the same 50. Asking for more buys nothing and
+// would be a request shape nobody has ever observed this server answer.
+const LIST_PAGE_SIZE = 50;
+const MAX_LIST_PAGES = 40; // 2,000 packets. A bound, not a belief about the store's size.
+
+// The ONE place in the read path that touches the network. Injectable so the suite can
+// drive every branch enumerated above without a network call and without a credential.
+async function fetchMessagePage({ page, cursor }) {
+  const body = { size: LIST_PAGE_SIZE };
+  if (page > 1) body.page = page;
+  if (cursor != null) body.cursor = cursor;
+  return hf(`/workspaces/{ws}/sessions/${SESSION}/messages/list`, { method: 'POST', body });
+}
+
+function cursorFrom(res) {
+  if (!res || typeof res !== 'object') return null;
+  for (const k of ['next_cursor', 'nextCursor', 'cursor', 'next']) {
+    const v = res[k];
+    if (typeof v === 'string' && v.length) return v;
+    if (typeof v === 'number') return v;
+  }
+  return null;
+}
+
+function itemKey(it, index) {
+  if (it && typeof it === 'object') {
+    if (typeof it.id === 'string' || typeof it.id === 'number') return `id:${it.id}`;
+    return `c:${JSON.stringify(it.content ?? '')}:${JSON.stringify(it.metadata ?? '')}`;
+  }
+  return `i:${index}:${JSON.stringify(it)}`;
+}
+
+/**
+ * listAllMessages(opts) -> { items, pages, complete }
+ *
+ * `complete: false` means the walk stopped for a reason OTHER than the server indicating
+ * there was nothing left — a repeated window, a rejected follow-up request, or the page
+ * cap. It is reported rather than smoothed over: a truncated read that presents itself as
+ * complete is the same class of defect as the stale packet above.
+ */
+export async function listAllMessages({ fetchPage = fetchMessagePage, maxPages = MAX_LIST_PAGES } = {}) {
+  const items = [];
+  const seen = new Set();
+  let cursor = null;
+  let pages = 0;
+  let complete = false;
+
+  for (let page = 1; page <= maxPages; page++) {
+    let res;
+    try {
+      res = await fetchPage({ page, cursor });
+    } catch (e) {
+      // A FIRST-page failure is a genuine Honcho failure and the caller must hear it.
+      // A LATER-page failure means this server does not accept the follow-up shape; we
+      // already hold everything the old single-request path would have returned.
+      if (page === 1) throw e;
+      break;
+    }
+    pages = page;
+
+    const batch = Array.isArray(res?.items) ? res.items : (Array.isArray(res) ? res : []);
+    if (!batch.length) { complete = true; break; }
+
+    let added = 0;
+    for (let i = 0; i < batch.length; i++) {
+      const k = itemKey(batch[i], i);
+      if (seen.has(k)) continue;
+      seen.add(k);
+      items.push(batch[i]);
+      added++;
+    }
+
+    // THE TERMINATION GUARD THAT MAKES THE REST SAFE. A server that ignores the
+    // pagination field re-serves the identical window indefinitely; without this the loop
+    // would run to the cap on every single call, turning one request into forty. Nothing
+    // new on a page means there is nothing more to get.
+    if (added === 0) break;
+
+    cursor = cursorFrom(res);
+
+    // A short page is the conventional end-of-list signal, and it is the only positive
+    // "there is no more" this code is willing to act on.
+    if (batch.length < LIST_PAGE_SIZE && cursor == null) { complete = true; break; }
+  }
+
+  return { items, pages, complete };
+}
+
+async function listMessages(opts) {
+  return (await listAllMessages(opts)).items;
 }
 
 function parsePacketFromContent(content) {
@@ -249,8 +375,13 @@ function parsePacketFromContent(content) {
 // Return the newest continuity packet, preferring live (non-backfill) over
 // backfill when timestamps tie. This is the EXACT path a fresh session's
 // reorientation uses. Throws on Honcho failure so the caller reports honestly.
-export async function readLatest() {
-  const items = await listMessages();
+//
+// WO-OR-18: it now reads EVERY page it can reach, not the first fifty messages. The sort
+// below was always correct and was never the defect — it was being handed the wrong fifty
+// packets to sort. `complete` is passed through so a caller can say when the newest packet
+// is only the newest of a truncated read.
+export async function readLatest(opts = {}) {
+  const { items, pages, complete } = await listAllMessages(opts);
   const packets = items.map((it) => parsePacketFromContent(it.content)).filter((p) => p && p.kind === 'continuity');
   if (!packets.length) return null;
   packets.sort((a, b) => {
@@ -259,7 +390,7 @@ export async function readLatest() {
     if ((b.seq || 0) !== (a.seq || 0)) return (b.seq || 0) - (a.seq || 0);
     return (a.backfill === b.backfill) ? 0 : (a.backfill ? 1 : -1); // live before backfill on a tie
   });
-  return { latest: packets[0], count: packets.length };
+  return { latest: packets[0], count: packets.length, pages, complete };
 }
 
 // Rendered brief for the SessionStart hook. Never throws: an unreachable Honcho
@@ -281,7 +412,14 @@ export async function readContinuityBrief() {
       fmtList('completed', p.completed),
       fmtList('unresolved blockers/decisions', p.blockers),
       p.notes ? `  • notes: ${p.notes}` : null,
-      `  • packet ${p.id} @ ${p.ts}${p.backfill ? ' [BACKFILL]' : ''} (${r.count} packet(s) on record)`,
+      `  • packet ${p.id} @ ${p.ts}${p.backfill ? ' [BACKFILL]' : ''} (${r.count} packet(s) read over ${r.pages} page(s))`,
+      // WO-OR-18. An incomplete read may have missed a NEWER packet, and the whole point
+      // of this brief is that it is authoritative. If the walk stopped early, the brief
+      // must not present its answer as the last word. Silence here would recreate the
+      // exact defect that made this session's brief name the wrong phase.
+      r.complete === false
+        ? '  ⚠️ PAGINATION INCOMPLETE — the message list could not be walked to the end, so a NEWER packet may exist and be unread. Treat this focus as possibly stale and prefer the git map.'
+        : null,
       '  This is the source of truth for what Warwick is doing. Do NOT present an unrelated project menu and do NOT ask Warwick to re-explain — the focus is known.',
     ].filter(Boolean);
     return lines.join('\n');
