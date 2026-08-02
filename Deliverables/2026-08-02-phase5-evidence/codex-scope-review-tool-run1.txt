@@ -1,0 +1,132 @@
+repo:  C:/Fusion247PKA
+range: a989e68d95e01b7f6dc13955d796950f6a8a02a5..HEAD
+claim: Deliverables/2026-08-02-phase5-evidence/claim-scope-review-tool.json
+scope  : services/control-plane/tower-loop/
+branch : operating-reset/teardown
+
+── GIT EVIDENCE (real, read-only) ──
+resolved=true diff_range=a989e68d95e01b7f6dc13955d796950f6a8a02a5..8f56408bd85eb1e5a505972ec0e4f76e7a5c2698
+changed_files=["services/control-plane/tower-loop/gitEvidence.mjs","services/control-plane/tower-loop/reviewDiff.mjs"]
+diff bytes=11124 truncated=false
+
+── REAL CODEX MERGE REVIEW (Tower QA skill over the staged diff + the REAL claim) ──
+ok=true blocked=false model=openai-codex-exec
+{
+  "status": "ok",
+  "verdict": "request_changes",
+  "summary": "Reviewed exact head 8f56408bd85eb1e5a505972ec0e4f76e7a5c2698 against the staged T1–T6/W1–W4 brief. The pathspec reaches both Git calls and evidence failures close correctly, but the instrument can silently alter UTF-8 diff content and can present a scoped subset as the complete base..head range. Those defects undermine prior verdicts produced by this measuring tool.",
+  "claims_verified": [
+    {
+      "claim": "The pathspec is applied to both changed-files and unified-diff Git calls.",
+      "status": "confirmed",
+      "evidence": "gitEvidence.mjs:105 and gitEvidence.mjs:113 append the same pathspec."
+    },
+    {
+      "claim": "Diff truncation is always disclosed without silent content alteration.",
+      "status": "refuted",
+      "evidence": "gitEvidence.mjs:28 appends d.toString() independently for each stdout chunk. A multibyte UTF-8 character split across chunks is replaced/corrupted without setting diff_truncated. Lines 119–124 also measure UTF-16 code units, not bytes."
+    },
+    {
+      "claim": "Everything beyond the five claim fields comes from Git evidence and cannot be author-controlled.",
+      "status": "refuted",
+      "evidence": "reviewDiff.mjs:86 accepts caller-controlled --paths; lines 101–105 use it to select evidence, while lines 122–136 omit evidence.scoped_to from the review packet."
+    },
+    {
+      "claim": "Missing or empty required claim content exits non-zero before review.",
+      "status": "partial",
+      "evidence": "reviewDiff.mjs:61–77 reject missing files, malformed JSON, and empty summary/brief_excerpt. checkpoint_id, build_id, and brief_ref remain optional/defaulted at lines 123–133 despite being described as the five claim fields."
+    }
+  ],
+  "acceptance_results": [
+    {
+      "acceptance_row_id": "T1",
+      "result": "fail",
+      "rationale": "Content can be silently altered before truncation logic sees it, and MAX_DIFF_BYTES is enforced using string length rather than bytes.",
+      "evidence": "gitEvidence.mjs:28,119–124."
+    },
+    {
+      "acceptance_row_id": "T2",
+      "result": "pass",
+      "rationale": "The same normalized pathspec is appended to both Git diff invocations, including empty and non-matching scopes.",
+      "evidence": "gitEvidence.mjs:70,105,113."
+    },
+    {
+      "acceptance_row_id": "T3",
+      "result": "pass",
+      "rationale": "Unresolvable head/base and failed name/diff calls return resolved=false; reviewDiff exits non-zero for unresolved or empty evidence.",
+      "evidence": "gitEvidence.mjs:84–117; reviewDiff.mjs:113–114."
+    },
+    {
+      "acceptance_row_id": "T4",
+      "result": "pass",
+      "rationale": "Missing claim files, malformed JSON, absent fields, non-string values, and whitespace-only summary/brief_excerpt all terminate before runMergeReview.",
+      "evidence": "reviewDiff.mjs:61–77; review invocation begins at line 139."
+    },
+    {
+      "acceptance_row_id": "T5",
+      "result": "fail",
+      "rationale": "The caller can control --paths and therefore which real evidence reaches the reviewer, but the resulting packet does not disclose scoped_to.",
+      "evidence": "reviewDiff.mjs:86,101–105,122–136."
+    },
+    {
+      "acceptance_row_id": "T6",
+      "result": "fail",
+      "rationale": "A scoped packet reports the full resolved SHA range without recording that only selected paths were delivered; the printed byte count is also JavaScript string length, not encoded bytes.",
+      "evidence": "reviewDiff.mjs:109–111,127–136; gitEvidence.mjs:119–124."
+    },
+    {
+      "acceptance_row_id": "W1",
+      "result": "fail",
+      "rationale": "Concrete input: a diff containing a multibyte character whose UTF-8 bytes straddle two stdout data events. Per-chunk d.toString() replaces the split sequence, so the reviewer receives altered content while diff_truncated remains false.",
+      "evidence": "gitEvidence.mjs:28."
+    },
+    {
+      "acceptance_row_id": "W2",
+      "result": "fail",
+      "rationale": "Yes. A caller-selected pathspec can still exceed the cap; reviewDiff merely prints a warning and invokes review anyway. The structured packet flags truncation, but silent pre-cap UTF-8 corruption remains possible.",
+      "evidence": "reviewDiff.mjs:115–120; gitEvidence.mjs:28,119–124."
+    },
+    {
+      "acceptance_row_id": "W3",
+      "result": "fail",
+      "rationale": "Yes. With --paths, the tool can exit zero after reviewing only a subset while packet.diff_range still identifies the entire base..head range and scoped_to is omitted.",
+      "evidence": "reviewDiff.mjs:101–105,122–147."
+    },
+    {
+      "acceptance_row_id": "W4",
+      "result": "partial",
+      "rationale": "Binary and rename evidence remains sourced from Git and the identical pathspec reaches both calls, but the staged W4 criterion is truncated after “Binary files, file renames,” so its complete required assertion is unavailable.",
+      "evidence": "Staged brief excerpt; gitEvidence.mjs:105,113."
+    }
+  ],
+  "prior_finding_results": [],
+  "findings": [
+    {
+      "id": "TQA-TOOL-001",
+      "technical_impact": "HIGH",
+      "reachability": "ACTIVE",
+      "required_disposition": "BLOCKS_CURRENT_MERGE",
+      "assumed_deployment_baseline": "Tower review tool processes arbitrary repository diffs, including non-ASCII source and documentation.",
+      "evidence": "gitEvidence.mjs:28 decodes each stdout chunk independently; lines 119–124 call UTF-16 string length a byte cap/count.",
+      "required_correction": "Collect stdout as Buffers or use one streaming StringDecoder, enforce the cap with Buffer.byteLength/byte-safe slicing, and test multibyte sequences split across chunks."
+    },
+    {
+      "id": "TQA-TOOL-002",
+      "technical_impact": "HIGH",
+      "reachability": "ACTIVE",
+      "required_disposition": "BLOCKS_CURRENT_MERGE",
+      "assumed_deployment_baseline": "Authors or automation may invoke reviewDiff.mjs with --paths for scoped reviews.",
+      "evidence": "reviewDiff.mjs:86 and 101–105 accept caller-selected scope; packet construction at lines 122–136 drops evidence.scoped_to while retaining the full diff_range.",
+      "required_correction": "Include normalized scoped_to in the immutable packet and require the approved claim to declare the identical scope; fail closed on mismatch. Render the reviewed range explicitly as scoped rather than implying the full base..head diff was delivered."
+    },
+    {
+      "id": "TQA-TOOL-003",
+      "technical_impact": "MEDIUM",
+      "reachability": "ACTIVE",
+      "required_disposition": "BLOCKS_CURRENT_MERGE",
+      "assumed_deployment_baseline": "Durable checkpoints require all declared identity fields even when no WP exists.",
+      "evidence": "reviewDiff.mjs:123–133 defaults checkpoint_id/build_id/brief_ref and omits wp_id entirely, despite the contract describing five supplied claim fields and mandatory record hygiene.",
+      "required_correction": "Validate checkpoint_id, build_id, and brief_ref as non-empty strings; carry an explicit nullable wp_id; reject absent required record fields rather than inventing defaults."
+    }
+  ]
+}
