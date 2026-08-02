@@ -50,11 +50,23 @@ function run(cmd, args, { cwd, timeoutMs = DEFAULT_TIMEOUT_MS, spawn = nodeSpawn
  * @param {Function} [args.spawn]    injectable spawn (tests).
  * @returns {Promise<object>} evidence packet (see fields below). `resolved` false ⇒ caller BLOCKS.
  */
-export async function gatherGitEvidence({ cwd, repo = null, branch = null, baseSha = null, headSha = null, prNumber = null, spawn = nodeSpawn } = {}) {
+export async function gatherGitEvidence({ cwd, repo = null, branch = null, baseSha = null, headSha = null, prNumber = null, paths = [], spawn = nodeSpawn } = {}) {
+  // `paths` (optional pathspec) exists because MAX_DIFF_BYTES silently truncates a large
+  // range, and a truncated diff yields a verdict that does not cover the whole change —
+  // a false green wearing a pass. Observed 2026-08-02: a 16-file DELETION produced
+  // `approve` on 20/20 rows over a truncated diff, because a deletion puts the full text
+  // of every deleted file into the diff. Scoping the range is the honest remedy; raising
+  // the cap only moves the cliff.
+  // It is applied to BOTH the --name-only call and the unified diff, so `changed_files`
+  // and `diff_text` always describe the same set. Applying it to one and not the other
+  // would produce a packet that quietly lies about its own coverage.
+  // Empty (the default) is the previous behaviour exactly.
+  const pathspec = Array.isArray(paths) && paths.length ? ['--', ...paths] : [];
   const ev = {
     resolved: false, blocker: null,
     repo, branch, base_sha: null, head_sha: null, diff_range: null,
     changed_files: [], diff_text: null, diff_truncated: false,
+    scoped_to: pathspec.length ? paths.slice() : null,
     ci_checks: null, ci_source: 'unavailable',
     collected_at: new Date().toISOString(),
   };
@@ -90,7 +102,7 @@ export async function gatherGitEvidence({ cwd, repo = null, branch = null, baseS
   ev.diff_range = `${ev.base_sha}..${ev.head_sha}`;
 
   // Changed files (fail-closed).
-  const namesRes = await g(['diff', '--name-only', ev.diff_range]);
+  const namesRes = await g(['diff', '--name-only', ev.diff_range, ...pathspec]);
   if (!namesRes.ok) {
     ev.blocker = `diff range unresolvable (${ev.diff_range}): ${String(namesRes.stderr).trim().slice(0, 200)}`;
     return ev;
@@ -98,7 +110,7 @@ export async function gatherGitEvidence({ cwd, repo = null, branch = null, baseS
   ev.changed_files = namesRes.stdout.split(/\r?\n/).filter(Boolean);
 
   // Unified diff (bounded). No context bloat; bounded bytes; truncation flagged.
-  const diffRes = await g(['diff', '--no-color', ev.diff_range]);
+  const diffRes = await g(['diff', '--no-color', ev.diff_range, ...pathspec]);
   if (!diffRes.ok) {
     ev.blocker = `unable to collect unified diff for ${ev.diff_range}: ${String(diffRes.stderr).trim().slice(0, 200)}`;
     return ev;

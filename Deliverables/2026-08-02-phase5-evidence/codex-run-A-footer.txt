@@ -1,0 +1,196 @@
+repo:  c:/Fusion247PKA
+range: 4ab1e47..d7f8874
+claim: Deliverables/2026-08-02-phase5-evidence/claim-teardown.json
+scope  : tools/governor/footer.mjs
+
+── GIT EVIDENCE (real, read-only) ──
+resolved=true diff_range=4ab1e47c3ffc97cede309e95b20346253b0a28e1..d7f8874fb2d685936c0b6cb1cabaa4633b8e164e
+changed_files=["tools/governor/footer.mjs"]
+diff bytes=47367 truncated=false
+
+── REAL CODEX MERGE REVIEW (Tower QA skill over the staged diff + the REAL claim) ──
+ok=true blocked=false model=openai-codex-exec
+{
+  "status": "ok",
+  "verdict": "comment",
+  "summary": "BLOCKED: the staged packet contains only tools/governor/footer.mjs, while most acceptance criteria concern deleted files, reorient behaviour/tests, continuity wiring, workflow coverage, and the surviving module set. The footer changes largely align with C4 and D1–D6, but the packet is insufficient for a fail-closed verdict on the complete teardown. The checkpoint metadata is also incomplete: branch is unknown and wp_id is absent.",
+  "claims_verified": [
+    {
+      "claim": "footer.mjs no longer imports programme-state.mjs.",
+      "status": "confirmed",
+      "evidence": "The staged diff removes readProgrammeState and all programme-state-dependent functions."
+    },
+    {
+      "claim": "next is caller-supplied, defaults to UNSET, and programme-shaped recommendation logic is deleted.",
+      "status": "confirmed",
+      "evidence": "computeFooterLine now accepts next = NEXT_UNSET; nextModelFor and UNSET_REASON are removed."
+    },
+    {
+      "claim": "Footer grammar is MODEL/EFFORT with the required frozen vocabularies.",
+      "status": "confirmed",
+      "evidence": "NEXT_MODELS, NEXT_EFFORTS, and derived NEXT_VALUES implement Opus|Sonnet|Haiku over low|medium|high|xhigh|max, plus bare UNSET."
+    },
+    {
+      "claim": "HANDBACK_CODES is unchanged.",
+      "status": "confirmed",
+      "evidence": "The staged hunk shows no member changes to the seven-element literal."
+    },
+    {
+      "claim": "The complete governor teardown satisfies all stated acceptance criteria.",
+      "status": "unverifiable",
+      "evidence": "Only footer.mjs is present in the staged diff; the other claimed file deletions, modifications, tests, fixtures, workflow changes, and wiring are absent."
+    }
+  ],
+  "acceptance_results": [
+    {
+      "acceptance_row_id": "B1",
+      "result": "blocked",
+      "rationale": "The required deletions cannot be checked from a footer-only diff.",
+      "evidence": "No deletion patches or file-tree evidence were staged."
+    },
+    {
+      "acceptance_row_id": "B2",
+      "result": "blocked",
+      "rationale": "The complete ten-file survivor set cannot be established.",
+      "evidence": "Only tools/governor/footer.mjs is shown."
+    },
+    {
+      "acceptance_row_id": "B3",
+      "result": "blocked",
+      "rationale": "References across all surviving governor files cannot be searched or inspected.",
+      "evidence": "The packet supplies no full-tree search result or survivor diffs."
+    },
+    {
+      "acceptance_row_id": "C1",
+      "result": "blocked",
+      "rationale": "reorient.mjs is absent from the staged evidence.",
+      "evidence": "changed_files lists only tools/governor/footer.mjs."
+    },
+    {
+      "acceptance_row_id": "C2",
+      "result": "blocked",
+      "rationale": "The three preserved reorient behaviours cannot be verified.",
+      "evidence": "Neither reorient.mjs nor its executed tests are included."
+    },
+    {
+      "acceptance_row_id": "C3",
+      "result": "blocked",
+      "rationale": "Inlining choices in reorient.mjs cannot be inspected.",
+      "evidence": "No reorient.mjs diff was staged."
+    },
+    {
+      "acceptance_row_id": "C4",
+      "result": "pass",
+      "rationale": "The programme-state import and its consumers are removed from footer.mjs.",
+      "evidence": "The diff deletes import { readProgrammeState } and removes nextModelFor/listProgrammeStatePaths."
+    },
+    {
+      "acceptance_row_id": "D1",
+      "result": "pass",
+      "rationale": "next is caller-supplied with an UNSET default; nextModelFor and UNSET_REASON are deleted.",
+      "evidence": "computeFooterLine({ next = NEXT_UNSET }) and the corresponding deletion hunks."
+    },
+    {
+      "acceptance_row_id": "D2",
+      "result": "pass",
+      "rationale": "The required grammar and frozen vocabularies are implemented from one derived value set.",
+      "evidence": "NEXT_MODELS, NEXT_EFFORTS, NEXT_VALUES, renderFooter membership checking, and FOOTER_RE derivation."
+    },
+    {
+      "acceptance_row_id": "D3",
+      "result": "partial",
+      "rationale": "The codec is structurally designed for identity, but executed round-trip evidence is absent.",
+      "evidence": "renderFooter and parseFooter carry percent, usedTokens, windowTokens, approximate, state, advice, next, and control symmetrically; no test output is staged."
+    },
+    {
+      "acceptance_row_id": "D4",
+      "result": "pass",
+      "rationale": "The seven handback codes retain their exact spelling in the shown hunk.",
+      "evidence": "HANDBACK_CODES remains product-decision, permission, destructive-or-irreversible, credential-or-account-action, merge-or-deploy, unresolved-blocker, and final-acceptance."
+    },
+    {
+      "acceptance_row_id": "D5",
+      "result": "blocked",
+      "rationale": "footer.mjs avoids a model/window lookup table, but the actual sample producer and authoritative-null behaviour are not staged.",
+      "evidence": "The footer consumes used_tokens and context_window_size without a lookup; sampler/continuity changes are absent."
+    },
+    {
+      "acceptance_row_id": "D6",
+      "result": "pass",
+      "rationale": "The renderer emits an absolute token count without a denominator and a percentage only when reported or derivable from both token values.",
+      "evidence": "renderFooter's CTX branches and deriveFooterFields' used calculation."
+    },
+    {
+      "acceptance_row_id": "D7",
+      "result": "blocked",
+      "rationale": "Continuity hook registration and writeHealthSample reuse cannot be verified.",
+      "evidence": "continuity.mjs and health sample producer changes are absent."
+    },
+    {
+      "acceptance_row_id": "E1",
+      "result": "blocked",
+      "rationale": "No reorient tests or execution evidence are staged.",
+      "evidence": "The packet contains only footer.mjs."
+    },
+    {
+      "acceptance_row_id": "E2",
+      "result": "blocked",
+      "rationale": "The claimed mutation runs cannot be verified.",
+      "evidence": "No mutation commands, outputs, or relevant test patches are supplied."
+    },
+    {
+      "acceptance_row_id": "E3",
+      "result": "blocked",
+      "rationale": "Reported counts are claims without measured output or test manifests.",
+      "evidence": "The checkpoint states 496 before and 214 after, but supplies no execution evidence."
+    },
+    {
+      "acceptance_row_id": "E4",
+      "result": "blocked",
+      "rationale": "governor-tests.yml is not present in the staged diff.",
+      "evidence": "No workflow patch or exact survivor matrix is supplied."
+    },
+    {
+      "acceptance_row_id": "F1",
+      "result": "pass",
+      "rationale": "The checkpoint explicitly reports worktree-guard.mjs as inert and deliberately unrepaired.",
+      "evidence": "Checkpoint summary: it 'was demonstrated to be INERT' and was 'NOT repaired'."
+    },
+    {
+      "acceptance_row_id": "F2",
+      "result": "partial",
+      "rationale": "The checkpoint states the continuity stop wiring is not proven end-to-end, but does not explicitly report that both continuity.mjs and continuity-derive.mjs have no tests.",
+      "evidence": "The limitation names stop wiring and sampleFromTranscript coverage, not the required no-tests status for both files."
+    }
+  ],
+  "prior_finding_results": [],
+  "findings": [
+    {
+      "id": "TQA-001",
+      "technical_impact": "HIGH",
+      "reachability": "ACTIVE",
+      "required_disposition": "BLOCKS_CURRENT_MERGE",
+      "assumed_deployment_baseline": "Acceptance requires verification of the complete base..head teardown before merge or final acceptance.",
+      "evidence": "The packet declares changed_files: tools/governor/footer.mjs and supplies only that patch, while B1–C3, D5, D7, and E1–E4 depend on other files and executed evidence.",
+      "required_correction": "Restage the complete 4ab1e47..d7f8874 diff, including deletion status, reorient/continuity/sampler/tests/workflow changes, plus measured test and mutation outputs."
+    },
+    {
+      "id": "TQA-002",
+      "technical_impact": "MEDIUM",
+      "reachability": "ACTIVE",
+      "required_disposition": "BLOCKS_CURRENT_MERGE",
+      "assumed_deployment_baseline": "Tower review packets must contain complete and consistent checkpoint metadata.",
+      "evidence": "wp_id is '(none)' and branch is '(unknown)', contrary to the mandatory record-hygiene fields in the governing checklist.",
+      "required_correction": "Provide the resolved branch and the applicable WP identifier, or an explicit approved N/A rationale for each."
+    },
+    {
+      "id": "TQA-003",
+      "technical_impact": "LOW",
+      "reachability": "ACTIVE",
+      "required_disposition": "BLOCKS_CURRENT_MERGE",
+      "assumed_deployment_baseline": "F2 requires the absence of tests for both continuity modules to be stated as a limitation.",
+      "evidence": "The checkpoint reports unproven end-to-end continuity wiring but does not explicitly state that continuity.mjs and continuity-derive.mjs have no tests.",
+      "required_correction": "Add the explicit F2 limitation to the checkpoint."
+    }
+  ]
+}

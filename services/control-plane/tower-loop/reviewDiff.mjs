@@ -85,14 +85,31 @@ async function main() {
   // wearing a pass. Observed 2026-08-02: the Phase 5 range returned `approve` with 20/20
   // rows over a TRUNCATED diff, because deleting 16 files puts the full text of every
   // deleted file into the diff.
-  // A --paths flag was drafted to scope the range and then REMOVED: gatherGitEvidence
-  // accepts no pathspec, so the option would have been silently ignored — an option that
-  // does nothing while appearing to work is the exact defect class this module exists to
-  // catch. Adding pathspec support belongs in gitEvidence.mjs and is parked in the
-  // Wayfinder's SHIT TO DO rather than bolted on here.
-  // Until then: WATCH FOR THE TRUNCATION WARNING BELOW and treat any verdict carrying it
-  // as incomplete, whatever it says.
-  const evidence = await gatherGitEvidence({ cwd: repoDir, headSha: headRef, baseSha: baseRef });
+  // --paths scopes the range so a large change can be reviewed WITHOUT truncation. It was
+  // briefly drafted, then removed on finding gatherGitEvidence had no pathspec (an option
+  // that silently does nothing is the same defect class this module exists to catch), and
+  // is restored here only now that gitEvidence.mjs genuinely supports it and the
+  // unscoped path is proven byte-identical to before.
+  // Scoping is a promise you owe the reader: whatever you exclude MUST be verified another
+  // way and SAID OUT LOUD. Truncation is still flagged loudly below, because a scoped diff
+  // can overflow too.
+  const paths = arg('paths');
+  // Resolve the branch rather than leaving it '(unknown)'. Codex flagged this as a
+  // record-hygiene defect (TQA-002) and it was right: a review packet that cannot say
+  // which branch it reviewed is not a durable record, however good the verdict.
+  let branch = arg('branch') ?? null;
+  if (!branch) {
+    try {
+      const { execFileSync } = await import('node:child_process');
+      branch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: repoDir, encoding: 'utf8' }).trim() || null;
+    } catch { branch = null; }
+  }
+  const evidence = await gatherGitEvidence({
+    cwd: repoDir, headSha: headRef, baseSha: baseRef, branch,
+    ...(paths ? { paths: paths.split(',').map((p) => p.trim()).filter(Boolean) } : {}),
+  });
+  if (paths) console.log(`scope  : ${paths}`);
+  console.log(`branch : ${branch ?? '(unresolved)'}`);
   console.log(`\n── GIT EVIDENCE (real, read-only) ──`);
   console.log(`resolved=${evidence.resolved} diff_range=${evidence.diff_range}`);
   console.log(`changed_files=${JSON.stringify(evidence.changed_files)}`);
