@@ -127,22 +127,23 @@ closed is indistinguishable from one that was forgotten.
 
 | Disposition | Count | Meaning |
 |---|---|---|
-| **COMPLETE NOW** | **8** | Executed and verified inside this closeout. |
+| **COMPLETE NOW** | **7** | Executed and verified inside this closeout. |
 | **DECISION NOW** | **1** | Warwick's product decision obtained, recorded, and acted on. |
-| **PROMOTE** | **2** | Genuinely a separate future build. Given a durable named home with outcome, boundary, owner and exact next action — then **removed from this reset's active backlog**. |
+| **PROMOTE** | **3** | Genuinely a separate future build. Given a durable named home with outcome, boundary, owner and exact next action — then **removed from this reset's active backlog**. |
 | **CLOSED / SUPERSEDED** | **10** | Stale, duplicate, withdrawn, or already completed. Recorded accurately, including the ones that turned out to be *my* defect rather than the code's. |
 | | **21** | **Total — every row in the table above, none unaccounted for.** |
 
-*(Counts corrected by Warwick, 2026-08-02. My first tally said 7 and 8 against lists that held 8 and 10 —
-the lists were right and the numbers beside them were wrong. A miscounted ledger is exactly the failure this
-ledger exists to prevent, so the correction is recorded rather than quietly applied.)*
+*(Counts corrected by Warwick, 2026-08-02: my first tally said 7 and 8 against lists that held 8 and 10 — the
+lists were right and the numbers beside them were wrong. Then corrected again by EVIDENCE, not arithmetic: the
+live acceptance test moved **row 2 from COMPLETE NOW to PROMOTE**, so 8/2 became 7/3. A row that fails its own
+acceptance test does not stay in the completed column because the ledger was already written.)*
 
 ### The ledger — all 21 rows
 
 | Row | Subject (one line) | Disposition | Where it landed |
 |---|---|---|---|
 | 1 | CareerAIR intake has no consumer; backlog grows silently | **PROMOTE** | `Deliverables/BACKLOG.md` #8 — visibility first, `private_surface` must be declared |
-| 2 | Honcho `listMessages` pagination — `readLatest` can return a stale packet | **COMPLETE NOW** | WO-OR-18 outcome 1 |
+| 2 | Honcho `listMessages` pagination — `readLatest` returns a stale packet | **PROMOTE** | WO-OR-18 landed the loud-failure mitigation (proven); reaching the newest packet **failed its live test** → `BACKLOG.md` #10 |
 | 3 | Two Pax adopts awaiting Warwick | **DECISION NOW** | **Both ADOPTED** — written into `CLAUDE.md` |
 | 4 | Formalise phase-boundary Codex review | **CLOSED / SUPERSEDED** | See the note below — superseded in substance, with a named residual |
 | 5 | GPT's proposed Codex instruction changes | **CLOSED / SUPERSEDED** | Satisfied verbatim by the binding Codex budget rule in `CLAUDE.md` |
@@ -191,6 +192,40 @@ pointer was wrong.* That is the difference between a defect and an incident, and
 **What is NOT established:** the live API's pagination contract — cursor fields, `has_more`, ordering guarantees.
 The probe establishes the **symptom**, not the contract. The repair is therefore built to be correct under any
 plausible list behaviour and proven against an injected fetch seam, with a live acceptance re-run owned by Larry.
+
+#### The live acceptance test — RUN, and it did NOT reach the newest packet
+
+```
+node tools/governor/continuity.mjs read          (WITH the WO-OR-18 fix in place)
+  → packet cont-1785638244944-51-k5r22c @ 2026-08-02T02:37:24.944Z
+    (50 packet(s) read over 2 page(s))
+  → ⚠️ PAGINATION INCOMPLETE — the message list could not be walked to the end, so a NEWER
+    packet may exist and be unread. Treat this focus as possibly stale and prefer the git map.
+```
+
+**So row 2 is NOT closed.** The server does not honour the paging attempt: the walk stopped at the repeat-detection
+guard after the second request, kept page 1, and reported `complete: false`. That is precisely the floor the build
+predicted for the ignores-`page` case — *"no worse than the old behaviour, and it says so instead of looking
+finished."* **What was repaired is the SILENCE, not the staleness.**
+
+**The alternative explanation was checked and is DISPROVEN — this nearly went in as a wrong diagnosis.** Before
+blaming the server, the obvious rival was that only 50 packets were ever *delivered*, with the local counter at 86
+because `nextSeq()` increments on every packet BUILT, including any that failed to send. That would have made the
+API blameless and the whole finding wrong. It is ruled out by the module's own delivery-confirmation marker:
+`continuity-last.json` is written **only** inside `if (r.ok)` — after a *successful* Honcho delivery — and it holds
+
+```
+{ "id": "cont-1785688114467-86-qyiv9", "at": "2026-08-02T16:28:37.498Z" }
+```
+
+**seq 86, confirmed delivered at 16:28 today.** Seq 86 is on the server. `readLatest` returns seq 51 from 02:37.
+**35 packets exist on Honcho and cannot be reached through this path.** *Measured through the mechanism that
+records the fact, not inferred from the one that raised the suspicion.*
+
+**Disposition therefore corrected from COMPLETE NOW to PROMOTE.** What landed is real, proven and worth keeping —
+a silent stale pointer is now a loud one, and the loudness was mutation-tested. What did not land is the ability
+to read the newest packet, and that is blocked on an external unknown (Honcho's actual list-API contract), which
+makes it separate work rather than an unfinished repair. Residual promoted to `Deliverables/BACKLOG.md` **#10**.
 
 ### Row 17 — the ding route, and the authority the live test rested on
 
