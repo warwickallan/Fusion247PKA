@@ -31,6 +31,9 @@ import { ingestTurn } from '../loop.mjs';
 import { detectMergeClass } from '../mergeClass.mjs';
 // WO-OR-22 — the PR-comment ⇄ Tower seam.
 import { ingestPrComment, parseCommentBody } from '../ingestComment.mjs';
+// WO-OR-24 — the GitHub → Tower first hop, driven through an injected `gh` seam (no network).
+import { pollPrComments, assertReadOnlyArgs } from '../pollPrComments.mjs';
+import { makeFakeGh } from './doubles/fakeGh.mjs';
 import { checkFindingDispositions } from '../findings.mjs';
 import { openFinding, processTurn } from '../watcher.mjs';
 import { runSupervisor as fakeRunSupervisor, runMergeReview as fakeRunMergeReview } from './doubles/fakeReviewer.mjs';
@@ -331,6 +334,152 @@ async function main() {
     assert.equal(checkFindingDispositions([good], { currentTurnId: 'T9', headSha: HEAD_B }).ok, false, 'older-head disposition is stale');
     assert.equal(checkFindingDispositions([good], { currentTurnId: 'T9', headSha: null }).ok, true, 'no round head ⇒ head comparison skipped (stated limitation)');
     assert.equal(checkFindingDispositions([{ ...base, disposition: 'bogus', disposition_head_sha: HEAD_A }], { currentTurnId: 'T9', headSha: HEAD_A }).ok, false, 'off-vocabulary disposition refused');
+  });
+
+  // ══════════════════════════════════════════════════════════════════════════════
+  // WO-OR-24 — THE FIRST HOP. A real GitHub comment reaching the ingest path above.
+  //
+  // Driven through an INJECTED `gh` seam so the suite needs no network and no gh binary. The
+  // LIVE journey is proved separately, against the real API, and is not simulated here — these
+  // subtests prove the SEAM's behaviour, which is the part that must hold on every run.
+  // ══════════════════════════════════════════════════════════════════════════════
+  const ghComments = (subs) => fixture('gh-pr-comments.json', subs).comments;
+
+  await test('P1 — the head SHA comes from the GitHub API, and a body directive that disagrees is REFUSED before ingest', async () => {
+    // The comment is honest about a head; the API says the PR is at a DIFFERENT head. Under the
+    // accepted design the body directive is what a comment is BOUND to — so if nothing validated
+    // it, a typed SHA would be the only authority. This is that validation.
+    const fresh = await openFinding(pool, { buildRef: 'BUILD-WO24', description: 'p1 probe' });
+    const gh = makeFakeGh({
+      headSha: HEAD_B,                                     // what GitHub really says
+      comments: ghComments({ __HEAD_SHA__: HEAD_A, __FINDING_A__: fresh.id, __FINDING_B__: fresh.id }),
+    });
+    const res = await pollPrComments(pool, { repo: REPO, prNumber: PR, gh });
+
+    assert.equal(res.apiHeadSha, HEAD_B, 'the poller reports the API head, not the body head');
+    // The head was ASKED FOR, over the wire — not derived from the comment. Observable, not asserted.
+    assert.ok(gh.calls.some((c) => c === `repos/${REPO}/pulls/${PR} --jq .head.sha`),
+      `the PR head was fetched from the API (calls: ${JSON.stringify(gh.calls)})`);
+
+    const r = res.results.find((x) => x.commentId === 5159709639);
+    assert.equal(r.outcome, 'refused_head_mismatch', 'a body head that disagrees with the API head is refused');
+    assert.equal(r.bodyHeadSha, HEAD_A); assert.equal(r.apiHeadSha, HEAD_B);
+    assert.equal((await pool.query(
+      `select count(*)::int c from tower.pr_comment where comment_id = 5159709639`)).rows[0].c, 0,
+      'NOTHING is persisted for a comment the API contradicts — it never reaches ingest');
+    assert.equal((await pool.query(
+      `select disposition from tower.finding where id = $1`, [fresh.id])).rows[0].disposition, null,
+      'and no finding was touched');
+  });
+
+  // Shared by P2 and P3: P3 must re-poll the SAME comment carrying the SAME finding ids, because
+  // that is what "the poller re-sees it on the next run" actually means.
+  const pollTurn = await inertTurn({ buildRef: 'BUILD-WO24', headSha: HEAD_A,
+    instruction: 'Warwick: WO-OR-24 round.', larryResponse: 'Larry: poller wired.' });
+  const pA = await openFinding(pool, { buildRef: 'BUILD-WO24', openedTurnId: pollTurn.id, description: 'head is trusted from the body' });
+  const pB = await openFinding(pool, { buildRef: 'BUILD-WO24', openedTurnId: pollTurn.id, description: 'poller is not a webhook' });
+
+  await test('P2 — a real-shaped comment list reaches the EXISTING ingest path with no hand-built payload, and non-@tower chatter is ignored', async () => {
+    const gh = makeFakeGh({
+      headSha: HEAD_A,                                     // API and body agree
+      comments: ghComments({ __HEAD_SHA__: HEAD_A, __FINDING_A__: pA.id, __FINDING_B__: pB.id }),
+    });
+    const res = await pollPrComments(pool, { repo: REPO, prNumber: PR, gh });
+
+    assert.equal(res.scanned, 2, 'both comments on the PR were read');
+    assert.equal(res.candidates, 1, 'ordinary chatter carrying no @tower directive is ignored');
+    const r = res.results[0];
+    assert.equal(r.outcome, 'applied');
+    assert.equal(r.headSha, HEAD_A, 'bound to the head the API confirmed');
+    assert.equal(r.turnId, pollTurn.id);
+    assert.equal(r.applied_count, 2, 'both dispositions written by the EXISTING ingest path');
+
+    const c = (await pool.query(`select * from tower.pr_comment where comment_id = 5159709639`)).rows[0];
+    assert.equal(c.source, 'github_pr_comment');
+    assert.equal(c.author, 'warwickallan');
+    assert.equal(c.head_sha, HEAD_A);
+    assert.ok(c.body.includes('WOOR24-LIVE-F924F3'), 'the uniquely identifiable body is persisted verbatim');
+    const rows = (await pool.query(
+      `select disposition, disposition_source, disposition_comment_id, disposition_head_sha
+         from tower.finding where id in ($1,$2) order by created_at`, [pA.id, pB.id])).rows;
+    assert.deepEqual(rows.map((x) => x.disposition), ['addressed', 'remains_open']);
+    for (const x of rows) {
+      assert.equal(x.disposition_source, 'pr_comment');
+      assert.equal(x.disposition_comment_id, c.id);
+      assert.equal(x.disposition_head_sha, HEAD_A);
+    }
+  });
+
+  await test('P3 — polling TWICE is a no-op: re-seeing the same comment neither duplicates nor errors', async () => {
+    // A poller re-sees every comment on every run. This is the property that makes that safe, and
+    // it is WO-OR-22's (source, comment_id) constraint doing the work — not poller-side memory.
+    const before = (await pool.query(`select count(*)::int c from tower.pr_comment where comment_id = 5159709639`)).rows[0].c;
+    assert.equal(before, 1, 'precondition: P2 ingested it exactly once');
+    const disposedBefore = (await pool.query(
+      `select count(*)::int c from tower.finding where disposition_comment_id =
+         (select id from tower.pr_comment where comment_id = 5159709639)`)).rows[0].c;
+
+    const gh = makeFakeGh({ headSha: HEAD_A, comments: ghComments({ __HEAD_SHA__: HEAD_A, __FINDING_A__: pA.id, __FINDING_B__: pB.id }) });
+    const res = await pollPrComments(pool, { repo: REPO, prNumber: PR, gh });
+
+    assert.equal(res.results[0].outcome, 'deduped', 'the second poll is an idempotent no-op, not an error');
+    assert.equal((await pool.query(
+      `select count(*)::int c from tower.pr_comment where comment_id = 5159709639`)).rows[0].c, 1,
+      'still exactly ONE row for the provider comment');
+    assert.equal((await pool.query(
+      `select count(*)::int c from tower.finding where disposition_comment_id =
+         (select id from tower.pr_comment where comment_id = 5159709639)`)).rows[0].c, disposedBefore,
+      'and no disposition was rewritten');
+  });
+
+  await test('P4 — a STALE comment is rejected: the turn has moved on, nothing is applied, the rejection is persisted', async () => {
+    // Real-world staleness: the comment is truthful about the PR head (layer 1 passes), but the
+    // turn it lands against is at a different head. Layer 2 — the ACCEPTED stale check — fires.
+    const staleTurn = await inertTurn({ buildRef: 'BUILD-WO24-STALE', headSha: HEAD_B,
+      instruction: 'Warwick: the work moved on.', larryResponse: 'Larry: new head pushed.' });
+    const sA = await openFinding(pool, { buildRef: 'BUILD-WO24-STALE', openedTurnId: staleTurn.id, description: 'must not be disposed by a stale comment' });
+    // A DIFFERENT provider comment id: the unique constraint means one comment cannot demonstrate
+    // both branches in one database. The live proof uses the SAME real comment in a separate DB.
+    const comments = ghComments({ __HEAD_SHA__: HEAD_A, __FINDING_A__: sA.id, __FINDING_B__: sA.id })
+      .map((c) => (c.id === 5159709639 ? { ...c, id: 5159709777 } : c));
+    const gh = makeFakeGh({ headSha: HEAD_A, comments });   // API agrees with the body: layer 1 passes
+    const res = await pollPrComments(pool, { repo: REPO, prNumber: PR, gh });
+
+    const r = res.results.find((x) => x.commentId === 5159709777);
+    assert.equal(r.outcome, 'rejected_stale', 'the ingest stale check rejected it');
+    assert.match(r.reason, /stale comment: written against head/, 'the reason names the mismatch');
+    const row = (await pool.query(`select applied, rejected_reason from tower.pr_comment where comment_id = 5159709777`)).rows[0];
+    assert.equal(row.applied, false, 'persisted as NOT applied — a dropped comment must not look like one that never arrived');
+    assert.ok(row.rejected_reason, 'rejection reason recorded');
+    assert.equal((await pool.query(`select disposition from tower.finding where id = $1`, [sA.id])).rows[0].disposition, null,
+      'the finding was NOT disposed by a stale comment');
+  });
+
+  await test('P5 — the gh seam is READ-ONLY: a mutating invocation is refused, and the poller never builds one', async () => {
+    for (const bad of [['repos/x/y/issues/1/comments', '-X', 'POST'], ['repos/x/y/issues/1/comments', '--method', 'POST'],
+      ['repos/x/y/issues/1/comments', '-f', 'body=hi'], ['repos/x/y/issues/1/comments', '--raw-field', 'body=hi']]) {
+      assert.throws(() => assertReadOnlyArgs(bad), /non-read-only gh invocation/,
+        `a write-shaped argv must be refused: ${bad.join(' ')}`);
+    }
+    assert.deepEqual(assertReadOnlyArgs(['repos/x/y/pulls/1', '--jq', '.head.sha']),
+      ['repos/x/y/pulls/1', '--jq', '.head.sha'], 'a read argv passes through unchanged');
+    // And every argv the poller actually produced during P1–P4 was a read.
+    const gh = makeFakeGh({ headSha: HEAD_A, comments: [] });
+    await pollPrComments(pool, { repo: REPO, prNumber: PR, gh });
+    for (const c of gh.calls) assert.doesNotThrow(() => assertReadOnlyArgs(c.split(' ')), `poller argv must be read-only: ${c}`);
+  });
+
+  await test('P6 — a malformed API head is REFUSED outright: the poller never falls back to the body', async () => {
+    // The failure that would quietly undo P1: if the API call fails or returns junk, the tempting
+    // repair is "use the body head instead". That must be impossible, not merely discouraged.
+    const badHead = makeFakeGh({ headSha: 'not-a-sha', comments: ghComments({ __HEAD_SHA__: HEAD_A, __FINDING_A__: 'x', __FINDING_B__: 'y' }) });
+    await assert.rejects(() => pollPrComments(pool, { repo: REPO, prNumber: PR, gh: badHead }),
+      /not a canonical 40-hex/, 'a non-canonical API head aborts the whole poll');
+    const failing = makeFakeGh({ headSha: HEAD_A, failHead: 'gh api rate limit exceeded', comments: [] });
+    await assert.rejects(() => pollPrComments(pool, { repo: REPO, prNumber: PR, gh: failing }),
+      /rate limit exceeded/, 'an API failure aborts rather than degrading to the body head');
+    assert.equal(failing.calls.filter((c) => c.includes('/issues/')).length, 0,
+      'comments are not even fetched when the head could not be established');
   });
 
   // ── one long-lived watcher for T1/T2/T5/T6 ──
