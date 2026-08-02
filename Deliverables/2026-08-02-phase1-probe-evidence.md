@@ -55,6 +55,27 @@ The auto-mode **classifier** (a live, adaptive guard sitting *above* the declara
 
 This denies Edit/Write **only** to the throwaway gitignored probe dir `out/phase1-asym/` — it restricts nothing real. It could not be removed this session (classifier locked settings writes after the probe). It clears trivially next session (fresh classifier state) via Edit, or now via the restore command above. Probe files under `out/phase1-asym/` are gitignored throwaways.
 
+## UPDATE — Pax research resolved the asymmetry from the docs (supersedes the "BLOCKED" rows above)
+
+Full brief: [`2026-08-02-pax-claude-code-deny-vs-subagents.md`](2026-08-02-pax-claude-code-deny-vs-subagents.md). Two corrections to the findings above, both now **DOCUMENTED** rather than blocked/inferred:
+
+1. **Delegation is NOT broken — the earlier "delegation blocked" read was too strong.** A normal research dispatch (Pax) succeeded in this same session. The classifier discriminates by *shape*: it gates Task dispatch on the task description (v2.1.178+) and blocks probe-shaped/repeated-block patterns, but permits ordinary work delegation. My two blocked dispatches were both transparently permission-probe-shaped; that's why they bounced.
+
+2. **F1b's asymmetry via `permissions.deny` is DOCUMENTED-IMPOSSIBLE, not just untested.** `permissions.deny` is **session-wide**: it applies to subagents, is evaluated *before* a subagent's `tools:` allowlist, and wins ("denylist takes precedence over allowlist," in every mode incl. bypassPermissions). Reproduced across 5 subagents in GitHub #54898 — a subagent declaring `Write` still could not write under a project-level deny. **A deny that thins Larry thins every specialist equally.** And **PreToolUse cannot build a per-caller rule** — there is no `agent_type` in the hook's stdin (#54898). So both native mechanisms named in the plan's Decision B fail to produce the split.
+
+### Revised F1 verdict
+
+| Leg | Revised status |
+|---|---|
+| Deny binds live, scoped to Larry's Edit/Bash | **PROVEN** (unchanged) |
+| F1a — protected-git gating mechanism | **PROVEN** (same live-deny) |
+| F1a — proof subprocess read-only | **Distinct case:** the historical break was a `claude -p` *separate process*, not a Task subagent; achievable via that subprocess's own restricted launch config, **unproven** |
+| F1b — thin-Larry-with-capable-specialist via `deny` | **DOCUMENTED-IMPOSSIBLE** (session-wide deny) |
+| F1b — via PreToolUse per-caller rule | **DOCUMENTED-IMPOSSIBLE** (no `agent_type` in hook stdin) |
+| F1b — via **allowlist-at-launch** (thin the main session's *granted* tools, subagents granted more, no deny) | **INFERRED-POSSIBLE, undocumented, UNPROVEN** — the one native hope left |
+
+**Plain reading against the plan's gate:** on the mechanism the plan actually specified (native `deny` + PreToolUse), **F1b FAILS — documented-impossible.** The objective is not dead only because one untried native primitive remains (allowlist-at-launch), which is a *different* mechanism and therefore a route decision, not a behavioural fallback.
+
 ## The decision this hands back to Warwick
 
-The route can only progress with a choice on **how the thin-Larry boundary gets installed and how it coexists with delegation**, because a running auto-mode session provably cannot self-install it and — in the probed state — could not delegate. Options for Warwick, framed as a `product-decision` / `unsafe-repository-state` handback. See the reply for the shortlist.
+The plan's chosen mechanism for thin-Larry is documented-impossible. Delegation itself is fine. So the route needs a `product-decision`: pursue the one remaining native mechanism (prove allowlist-at-launch in a scratch session), or treat F1b-as-mechanical as failed and re-decide the operating model. Options in the reply.
