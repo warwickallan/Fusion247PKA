@@ -767,35 +767,41 @@ export function sweepOpenDeliverables(root = ESTATE_ROOT, now = Date.now(), io =
   // file outside the 21-day window are legitimate EXCLUSIONS, not failures, and inflating
   // the count with them would cry wolf on a healthy estate.
   let unreadable = 0;
-  // WO-OR-17. The swept root, RESOLVED, so containment below compares two real paths rather
-  // than one real path against one claimed path — the same mistake in miniature.
-  let dirReal = null;
+  // TQA-007 (Codex repairs run 5). Provenance is containment under the estate's claimed
+  // Deliverables path, measured via realpath of the LEAF against realpath of the ESTATE
+  // ROOT plus the logical "Deliverables/" segment — NOT against realpath(Deliverables)
+  // alone, and NOT via leaf-is-symlink alone.
+  //
+  // Why leaf-is-symlink was incomplete: if Deliverables itself is a junction or directory
+  // symlink to an external tree, every regular file under it has lstat isSymbolicLink=false
+  // and was labelled "inside" while the content lived outside the estate. Comparing against
+  // realpath(Deliverables) makes the same mistake: both the dir and the file resolve into
+  // the external tree, so containment holds and the label still lies.
+  //
+  // Against estate root: a redirected Deliverables puts file realpaths outside
+  // `<estateReal>/Deliverables/…`, so they render outside. A leaf symlink to outside does
+  // the same. A genuine in-tree file matches. Probe failure stays unverified.
+  let estateReal = null;
   try {
-    dirReal = normaliseSeparators(io.realpathSync(dir));
+    estateReal = normaliseSeparators(io.realpathSync(root));
   } catch {
-    dirReal = null;
+    estateReal = null;
   }
+  const expectedPrefix = estateReal ? `${estateReal}/Deliverables` : null;
   for (const name of names) {
     if (!name.toLowerCase().endsWith('.md')) continue; // top-level *.md only
     const full = join(dir, name);
-    // WO-OR-17. WHERE THE CONTENT ACTUALLY IS — measured, because the row's
-    // `Deliverables/<name>` label is a claim about exactly that and nothing ever checked it.
-    // `statSync` FOLLOWS a symlink, so a link pointing outside the swept root was read,
-    // reported, and labelled as though it lived here. That is this sequence's defect class
-    // applied to a path instead of a git fact: a claim rendered without a measurement.
-    //
-    // NOT security machinery, and deliberately not. The link is still followed and the file
-    // is still shown — dropping it would trade a false label for a silent omission, which is
-    // the failure F4b closed one level down. What changes is that the label stops lying.
     let provenance = 'unverified';
     let realPath = null;
     try {
-      if (!io.lstatSync(full).isSymbolicLink()) {
-        provenance = 'inside';
+      realPath = normaliseSeparators(io.realpathSync(full));
+      if (!expectedPrefix || !realPath) {
+        provenance = 'unverified';
       } else {
-        realPath = normaliseSeparators(io.realpathSync(full));
-        if (!dirReal) provenance = 'unverified';
-        else provenance = realPath === dirReal || realPath.startsWith(`${dirReal}/`) ? 'inside' : 'outside';
+        // Case-insensitive containment on win32 — the estate is Windows-primary.
+        const a = process.platform === 'win32' ? realPath.toLowerCase() : realPath;
+        const p = process.platform === 'win32' ? expectedPrefix.toLowerCase() : expectedPrefix;
+        provenance = a === p || a.startsWith(`${p}/`) ? 'inside' : 'outside';
       }
     } catch {
       // The probe could not answer. That is NOT "it is fine" — same rule as everywhere else

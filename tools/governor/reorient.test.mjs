@@ -1142,7 +1142,17 @@ test('WO-OR-17 / ADDENDUM: a symlinked deliverable does not claim to live in Del
 test('WO-OR-17 / ADDENDUM: a provenance probe that cannot answer says so rather than passing the row as clean', () => {
   const e = makeEstate([{ name: 'a.md', body: '# A file\n', ageDays: 0 }]);
   try {
-    const io = { ...realIo, lstatSync: () => { throw Object.assign(new Error('nope'), { code: 'EPERM' }); } };
+    // TQA-007: provenance is realpath containment, not leaf lstat. Fail realpath of the leaf.
+    const io = {
+      ...realIo,
+      realpathSync: (p) => {
+        const n = normaliseSeparators(String(p));
+        if (n.endsWith('/a.md') || n.endsWith('\\a.md')) {
+          throw Object.assign(new Error('nope'), { code: 'EPERM' });
+        }
+        return realpathSync(p);
+      },
+    };
     const out = sweepOpenDeliverables(e.root, Date.now(), io);
     assert.match(out, /provenance NOT established/,
       'an unanswerable probe must not render as a settled path — the whole rule of this module');
@@ -1190,6 +1200,36 @@ test('TQA-003/005: bare cwd path is earned only when occupation is measured', ()
     assert.match(renderLocationSection(facts), new RegExp(`cwd\\s+: ${normaliseSeparators(realpathSync.native(dir)).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`, 'm'));
   } finally {
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('TQA-007: a Deliverables directory redirect must not label external content as inside', () => {
+  // Estate root realpath + /Deliverables is the claimed prefix. A leaf whose realpath
+  // falls outside that prefix is outside — even when the leaf itself is not a symlink
+  // (the junction/redirect case Codex named).
+  const e = makeEstate([{ name: 'genuine.md', body: '# Genuinely here\n', ageDays: 0 }]);
+  try {
+    const estateReal = normaliseSeparators(realpathSync(e.root));
+    const io = {
+      ...realIo,
+      realpathSync: (p) => {
+        const n = normaliseSeparators(String(p));
+        if (n.endsWith('/elsewhere.md') || n.includes('/outside/')) {
+          return `${estateReal}/../outside-tree/elsewhere.md`.replace(/\/\.\.\//, '/');
+        }
+        // Force a path outside the estate for the "redirected" leaf while still reading the real file via stat.
+        if (n.endsWith('/genuine.md')) {
+          return 'C:/totally/external/elsewhere.md';
+        }
+        return realpathSync(p);
+      },
+    };
+    const out = sweepOpenDeliverables(e.root, Date.now(), io);
+    assert.match(out, /CONTENT IS NOT IN Deliverables\//,
+      'THE DEFECT: content whose realpath is outside the estate Deliverables prefix must not render as inside');
+    assert.match(out, /elsewhere\.md|external/, 'reader is told where it actually resolves');
+  } finally {
+    e.cleanup();
   }
 });
 
