@@ -164,7 +164,7 @@ acceptance test does not stay in the completed column because the ledger was alr
 | Row | Subject (one line) | Disposition | Where it landed |
 |---|---|---|---|
 | 1 | CareerAIR intake has no consumer; backlog grows silently | **PROMOTE** | `Deliverables/BACKLOG.md` #8 — visibility first, `private_surface` must be declared |
-| 2 | Honcho `listMessages` pagination — `readLatest` returns a stale packet | 🔴 **ACTIVE PHASE 7** | *(was: my unilateral PROMOTE — overturned)* WO-OR-18's loud-failure mitigation stands but **does not satisfy completion**. Required: establish Honcho's real `messages/list` contract, implement the smallest correct repair, and **live-prove** — write a uniquely identifiable packet, read it back as newest, then a **genuinely fresh session** must reorient from it with the correct map pointer and phase. |
+| 2 | Honcho `listMessages` pagination — `readLatest` returns a stale packet | ✅ **COMPLETE — LIVE-PROVEN** (WO-OR-21) | *(was: my unilateral PROMOTE — overturned)* WO-OR-18's loud-failure mitigation stands but **does not satisfy completion**. Required: establish Honcho's real `messages/list` contract, implement the smallest correct repair, and **live-prove** — write a uniquely identifiable packet, read it back as newest, then a **genuinely fresh session** must reorient from it with the correct map pointer and phase. |
 | 3 | Two Pax adopts awaiting Warwick | **DECISION NOW** | **Both ADOPTED** — written into `CLAUDE.md` |
 | 4 | Formalise phase-boundary Codex review | **CLOSED / SUPERSEDED** | See the note below — superseded in substance, with a named residual |
 | 5 | GPT's proposed Codex instruction changes | **CLOSED / SUPERSEDED** | Satisfied verbatim by the binding Codex budget rule in `CLAUDE.md` |
@@ -182,8 +182,40 @@ acceptance test does not stay in the completed column because the ledger was alr
 | 16 | Carry-forward ignores `sampled_at`, no process-instance binding | **COMPLETE NOW** | WO-OR-18 outcome 5 |
 | 17 | The Telegram handback ding cannot fire — a silent deadlock | **COMPLETE NOW** | WO-OR-19 — a *sanctioned* ad-hoc milestone entrypoint over the existing Tower library, proven by one real send |
 | 18 | No PR existed; the whole notification chain hangs off one | **CLOSED** | PR #86 (Phase 5) |
-| 19 | The missing bidirectional PR ⇄ Tower seam | 🔴 **ACTIVE PHASE 7** | *(was: my unilateral PROMOTE — overturned)* Warwick has now GIVEN the scope decision I said it needed: **build it.** Smallest end-to-end seam — ingest the comment body, bind it to the exact PR + head SHA, persist provenance, make it the `larry_response`/disposition input, fail closed on an undisposed required finding, reject a stale comment against a newer head. **Keep Postgres; no SQLite; no hand-carry; no unrelated framework.** |
+| 2b | `write` silently ignores supplied args — a FALSE SUCCESS in the same seam | 🔴 **ACTIVE PHASE 7** | Found during row 2's live proof; **Warwick disposed it COMPLETE NOW**, not Larry. `write --focus` is a fallback only (`continuity.mjs:610`); other flags unread. Returned `ok:true` + a new packet id while delivering stale content. → WO-OR-23 |
+| 19 | The missing bidirectional PR ⇄ Tower seam | ✅ **COMPLETE — LIVE-PROVEN** (WO-OR-22) | *(was: my unilateral PROMOTE — overturned)* Warwick has now GIVEN the scope decision I said it needed: **build it.** Smallest end-to-end seam — ingest the comment body, bind it to the exact PR + head SHA, persist provenance, make it the `larry_response`/disposition input, fail closed on an undisposed required finding, reject a stale comment against a newer head. **Keep Postgres; no SQLite; no hand-carry; no unrelated framework.** |
 | 20 | Codex review budget — max three executions per gate | **CLOSED** | Graduated into `CLAUDE.md` + the Tower QA skill at Phase 6 close |
+
+### Row 19 — COMPLETE and LIVE-PROVEN (WO-OR-22)
+
+**A framing correction came first, and it changed what got built.** Row 19 named `eventIntake.js` as *the*
+seam. Reconnaissance found the estate is **three non-communicating schemas** — `ftw.*`, `ops.*`, `tower.*` —
+sharing no tables and no code. `eventIntake.js` sits in a subsystem with **no live listener at all**, and the
+column a comment body would occupy carries an explicit *"DO NOT WEAKEN: sanitised pointers ONLY"* prohibition.
+Building there would have contradicted a reviewed security decision in order to satisfy a mis-traced
+diagnosis. The seam was built in `tower.*`, where `larry_response`, `loadOpenFindings`, the `pr_number` /
+`head_sha` columns and `mergeCheck` already live.
+
+**Live proof — re-run by Larry on his own throwaway cluster (PostgreSQL 17.4, torn down, port released), not
+taken from the handback: `exit 0, executed=18, failures=0`.** All five of Warwick's requirements pass by name:
+
+| Requirement | Test |
+|---|---|
+| Comment with explicit dispositions ingested + persisted | W2 — body **verbatim**, 430 bytes = 430 bytes |
+| Exact-SHA binding | W1 — `tower.git_sha` domain refuses short, upper-case, 41-char, empty |
+| Next round receives dispositions **automatically from Postgres** | W4 — real `watcher.mjs`, not hand-carried |
+| Stale comment rejected | W3 — applies nothing, rejection persisted with reason |
+| Missing disposition rejected | W5 — fail-closed, **zero reviewer invocations** |
+
+Provenance is structural (`finding_disposition_provenance_chk`), so an ingested disposition and a hand-typed
+one are distinguishable **in the data** rather than by trusting a label.
+
+**Limits, stated not implied.** No live GitHub webhook reaches this and none was built — the proof establishes
+that a payload *shaped like* an `issue_comment` delivery is ingested correctly, and nothing about a real
+delivery arriving. **The head guarantee is one-sided:** the comment side is structurally canonical, but
+`tower.turn.head_sha` remains lax `text`, because two currently-green tests deliberately seed
+`'aaaa1111bbbb2222'` and `'UNRESOLVABLE'`. Pre-existing, out of scope, unfixed — *editing passing tests to fit
+a new constraint is how a suite becomes decoration.*
 
 ### Row 2 — CONFIRMED by execution, and worse than the row records
 
