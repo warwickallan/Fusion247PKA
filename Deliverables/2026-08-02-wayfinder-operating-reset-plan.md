@@ -182,11 +182,51 @@ acceptance test does not stay in the completed column because the ledger was alr
 | 16 | Carry-forward ignores `sampled_at`, no process-instance binding | **COMPLETE NOW** | WO-OR-18 outcome 5 |
 | 17 | The Telegram handback ding cannot fire — a silent deadlock | **COMPLETE NOW** | WO-OR-19 — a *sanctioned* ad-hoc milestone entrypoint over the existing Tower library, proven by one real send |
 | 18 | No PR existed; the whole notification chain hangs off one | **CLOSED** | PR #86 (Phase 5) |
-| 2b | `write` silently ignores supplied args — a FALSE SUCCESS in the same seam | 🔴 **ACTIVE PHASE 7** | Found during row 2's live proof; **Warwick disposed it COMPLETE NOW**, not Larry. `write --focus` is a fallback only (`continuity.mjs:610`); other flags unread. Returned `ok:true` + a new packet id while delivering stale content. → WO-OR-23 |
-| 19 | The missing bidirectional PR ⇄ Tower seam | ✅ **COMPLETE — LIVE-PROVEN** (WO-OR-22) | *(was: my unilateral PROMOTE — overturned)* Warwick has now GIVEN the scope decision I said it needed: **build it.** Smallest end-to-end seam — ingest the comment body, bind it to the exact PR + head SHA, persist provenance, make it the `larry_response`/disposition input, fail closed on an undisposed required finding, reject a stale comment against a newer head. **Keep Postgres; no SQLite; no hand-carry; no unrelated framework.** |
+| 2b | `write` silently ignores supplied args — a FALSE SUCCESS in the same seam | ✅ **COMPLETE — LIVE-PROVEN** (WO-OR-23). Supplied args now override stored state and persist; four rejection classes exit 2. Live: an old stored focus was overridden by `--focus`, delivered, and read back as the newest packet (seq 93, marker `PHASE7-WRITEOVERRIDE-95C160`, old marker gone). Suite 346→358; the fallback-only mutation reddens 7 subtests. | Found during row 2's live proof; **Warwick disposed it COMPLETE NOW**, not Larry. `write --focus` is a fallback only (`continuity.mjs:610`); other flags unread. Returned `ok:true` + a new packet id while delivering stale content. → WO-OR-23 |
+| 19 | The missing bidirectional PR ⇄ Tower seam | 🔴 **PARTIAL — ACTIVE** | WO-OR-22 proven from an `issue_comment`-shaped payload **onward**; the **first hop is still missing**. Larry marked this COMPLETE having written the gap himself — corrected by Warwick. → WO-OR-24 | *(was: my unilateral PROMOTE — overturned)* Warwick has now GIVEN the scope decision I said it needed: **build it.** Smallest end-to-end seam — ingest the comment body, bind it to the exact PR + head SHA, persist provenance, make it the `larry_response`/disposition input, fail closed on an undisposed required finding, reject a stale comment against a newer head. **Keep Postgres; no SQLite; no hand-carry; no unrelated framework.** |
 | 20 | Codex review budget — max three executions per gate | **CLOSED** | Graduated into `CLAUDE.md` + the Tower QA skill at Phase 6 close |
 
-### Row 19 — COMPLETE and LIVE-PROVEN (WO-OR-22)
+### The silent-discard family — THREE instances, one week, one estate
+
+Reported once, for Warwick's decision — **not actioned, and no Work Order raised.**
+
+| # | Where | What it did | State |
+|---|---|---|---|
+| 1 | Honcho `messages/list` | `page`/`size`/`reverse` sent in the **body**; the API reads the **query string**. Silently served defaults. | FIXED (WO-OR-21) |
+| 2 | `continuity.mjs write` | `--focus` a fallback only; `--next`/`--objective` never read. Returned `ok:true` + a new packet id carrying **stale content**. | FIXED (WO-OR-23) |
+| 3 | `continuity.mjs read --json=true` | `parseArgs` does not split `key=value`, so the key becomes `json=true`. **Silently prints the human brief instead of JSON.** | **REPORTED, NOT FIXED** |
+
+**Instance 3 is the one to sit with: it is a command Larry RAN during row 2's live proof and WROTE INTO THIS MAP.**
+The proof still held — only because the grep happened to match the human brief — but the command was doing
+something other than what was asked, and nobody noticed for hours. *(The stale command in this document is
+corrected to `read --json`; the underlying defect is not touched.)*
+
+**Also reported, not fixed:** `set` and `backfill` have **no argument validation at all** — `backfill --focsu X`
+exits 0 delivering a null focus. Same family, different commands, deliberately left alone under "smallest
+repair", because changing their contracts is not a repair.
+
+**The pattern, stated once so it is not rediscovered a fourth time:** *an argument in the wrong shape, wrong
+place or wrong name is indistinguishable from one that was honoured.* No error, no warning, exit 0, and output
+that looks exactly right. Every instance was caught by checking the **content**, never by checking the exit code.
+
+### Row 19 — PARTIAL (WARWICK CORRECTION, 2026-08-02)
+
+> 🔴 **Larry marked this COMPLETE and it is not.** The required outcome is that a response **actually written
+> in a GitHub PR comment** becomes machine-readable input to the next review round. **A synthetic payload does
+> not satisfy the live journey.** No live listener, webhook or supported poller delivers a real comment to the
+> ingest path, so the **first hop does not exist**.
+>
+> **The damning part is not the miscall, it is that Larry wrote the gap himself** — the WO-OR-22 record says,
+> in his own words, *"no live GitHub webhook reaches this and I did not build one"* — and then set the row to
+> COMPLETE in the same pass. **A limitation recorded but not allowed to move the verdict is worse than one
+> that was missed**, because it proves the evidence was in hand and the conclusion was reached anyway. Second
+> occurrence in this closeout: row 2 did the same and was caught only by its own acceptance test.
+>
+> **What IS accepted and must NOT be reopened:** everything from an `issue_comment`-shaped payload onward —
+> the Postgres schema, the SHA domain, provenance, the disposition feed and the fail-closed gate, all proven
+> at 18/18 on an independent cluster. → **WO-OR-24 builds only the missing first hop.**
+
+### Row 19 — the accepted half (WO-OR-22)
 
 **A framing correction came first, and it changed what got built.** Row 19 named `eventIntake.js` as *the*
 seam. Reconnaissance found the estate is **three non-communicating schemas** — `ftw.*`, `ops.*`, `tower.*` —
@@ -223,7 +263,7 @@ The row says Honcho's `listMessages` "**may** exclude the newest once a session 
 read-only through the existing CLI on 2026-08-02, it **does**, deterministically:
 
 ```
-node tools/governor/continuity.mjs read --json=true
+node tools/governor/continuity.mjs read --json
   → packet cont-1785638244944-51-k5r22c @ 2026-08-02T02:37:24.944Z  (50 packet(s) on record)
 cat ~/.mypka/governor/continuity-seq.json
   → { "seq": 86 }
