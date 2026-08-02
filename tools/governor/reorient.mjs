@@ -633,9 +633,40 @@ function renderToplevel(facts) {
 // from a branch actually called HEAD, and the state it really signals is the one worth
 // knowing. `detached` is measured by `symbolic-ref`, so this renders a state rather than
 // a string that happens to look like one.
+function symbolicRefFailureWhy(facts) {
+  if (facts.symbolicRefFailure === 'fatal') {
+    return facts.symbolicRefStatus != null
+      ? `failed fatally (exit ${facts.symbolicRefStatus})`
+      : 'failed fatally';
+  }
+  if (facts.symbolicRefFailure === 'unavailable') {
+    return facts.symbolicRefCode
+      ? `could not run (${facts.symbolicRefCode})`
+      : 'could not run';
+  }
+  if (facts.symbolicRefFailure) return 'probe did not answer';
+  return null;
+}
+
 function renderBranch(facts) {
   if (facts.detached === true) {
     return `(DETACHED — HEAD is not on a branch${facts.headSha ? `, it is commit ${facts.headSha}` : ''})`;
+  }
+  // TQA-010 (Codex repairs run 8). A failed attachment probe must never be hidden behind a
+  // confident rev-parse branch string. Only the HEAD arm used to consult symbolicRefFailure;
+  // any other non-null branch fell through to String(branch) and silently claimed attachment.
+  const attachWhy = symbolicRefFailureWhy(facts);
+  if (attachWhy) {
+    if (facts.branch === 'HEAD') {
+      return (
+        `(UNVERIFIED — git returned the literal "HEAD"; symbolic-ref ${attachWhy}, ` +
+        'so attachment is not established)'
+      );
+    }
+    if (facts.branch !== null && facts.branch !== undefined) {
+      return `${facts.branch} (UNVERIFIED attachment — symbolic-ref ${attachWhy})`;
+    }
+    return `(unknown — symbolic-ref ${attachWhy})`;
   }
   if (facts.branch === null || facts.branch === undefined) {
     // WO-OR-17. `symbolic-ref` may have answered when `rev-parse` could not — the unborn
@@ -649,25 +680,8 @@ function renderBranch(facts) {
     return '(unknown)';
   }
   if (facts.branch === 'HEAD') {
-    // Reaching here means git said "HEAD" and the detached probe did NOT confirm it.
-    // Never name the unconfirmed diagnosis: the word DETACHED in this line was still a
-    // confident sentence wearing an UNVERIFIED coat (TQA-002 residual on the unfinished WO).
-    // Distinguish fatal vs unavailable so two different probe failures cannot collapse
-    // into one rendered line (PIN LAYER 2).
-    if (facts.symbolicRefFailure === 'fatal') {
-      const st = facts.symbolicRefStatus != null ? ` (exit ${facts.symbolicRefStatus})` : '';
-      return (
-        `(UNVERIFIED — git returned the literal "HEAD"; symbolic-ref failed fatally${st}, ` +
-        'so attachment is not established)'
-      );
-    }
-    if (facts.symbolicRefFailure === 'unavailable') {
-      const c = facts.symbolicRefCode ? ` (${facts.symbolicRefCode})` : '';
-      return (
-        `(UNVERIFIED — git returned the literal "HEAD"; symbolic-ref could not run${c}, ` +
-        'so attachment is not established)'
-      );
-    }
+    // Attachment probe did not fail (no symbolicRefFailure) but also did not confirm
+    // detachment. Honest: not established.
     return '(UNVERIFIED — git returned the literal "HEAD"; attachment is not established)';
   }
   return String(facts.branch);
@@ -862,7 +876,14 @@ export function sweepOpenDeliverables(root = ESTATE_ROOT, now = Date.now(), io =
         'This is NOT a report that there is nothing open.'
       );
     }
-    return null;
+    // TQA-011 (Codex repairs run 8). ENOENT still returns null above (no Deliverables/ at
+    // all). A completed sweep with zero in-scope rows is a different measurement and must
+    // not share that silence — otherwise "swept; none open" and "section omitted" are
+    // indistinguishable to the reader.
+    return (
+      '⟦GOV⟧ OPEN DELIVERABLES: swept — none open (no top-level *.md in the last ' +
+      `${DELIVERABLE_WINDOW_DAYS} days).`
+    );
   }
   rows.sort((a, b) => b.mtimeMs - a.mtimeMs);
   // Display cap — intentional, not a failure. TQA-004 (Codex repairs final run 2): when the

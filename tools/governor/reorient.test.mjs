@@ -148,11 +148,12 @@ test('SWEEP MUTATION: break the sweep and this suite goes RED — the criterion 
     assert.match(healthy, /A live deliverable/, 'CONTROL — the healthy sweep must find the live file');
 
     // MUTATION 1 — the window. Slide `now` a year forward and everything falls outside.
-    assert.equal(
-      sweepOpenDeliverables(e.root, Date.now() + 365 * 86_400_000),
-      null,
-      'nothing inside the window must yield null, not an empty-looking success'
-    );
+    // TQA-011: a completed empty sweep is an explicit "swept — none open", NOT null
+    // (null is reserved for "no Deliverables/ directory at all" — ENOENT).
+    const emptyWindow = sweepOpenDeliverables(e.root, Date.now() + 365 * 86_400_000);
+    assert.match(emptyWindow, /swept — none open/,
+      'nothing inside the window must yield the explicit empty-sweep line, not a silent null');
+    assert.doesNotMatch(emptyWindow, /A live deliverable/, 'and must not still list the live file');
 
     // MUTATION 2 — the root. Point it somewhere with no Deliverables/ at all.
     assert.equal(sweepOpenDeliverables(join(e.root, 'nope'), Date.now()), null);
@@ -174,7 +175,13 @@ test('SWEEP: an unreadable or absent Deliverables directory is null, never a thr
   assert.equal(sweepOpenDeliverables(join(tmpdir(), 'definitely-not-here-9f3a'), Date.now()), null);
   const empty = makeEstate([]);
   try {
-    assert.equal(sweepOpenDeliverables(empty.root, Date.now()), null, 'an EMPTY Deliverables/ is null');
+    // TQA-011: empty Deliverables/ is a completed sweep with zero rows — explicit message,
+    // distinct from ENOENT (absent directory → null).
+    assert.match(
+      sweepOpenDeliverables(empty.root, Date.now()),
+      /swept — none open/,
+      'an EMPTY Deliverables/ is an explicit empty sweep, not silence'
+    );
   } finally {
     empty.cleanup();
   }
@@ -211,7 +218,8 @@ test('LOCATION: every fact is INDEPENDENTLY nullable — a partial answer never 
   assert.equal(facts.worktreePath, 'C:/anywhere', 'the path asked about is still reported');
 
   const rendered = renderLocationSection(facts);
-  assert.match(rendered, /\(unknown\)/);
+  // Git-unreadable paths now say so explicitly (TQA-008) rather than bare "(unknown)".
+  assert.match(rendered, /unknown/);
   assert.doesNotMatch(rendered, /working tree : clean/, 'unknown cleanliness must not render as clean');
 });
 
