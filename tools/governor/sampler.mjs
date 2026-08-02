@@ -226,11 +226,21 @@ export function sumUsedTokens(usage) {
 }
 
 /**
- * newestAssistantUsage(text) -> { usage, modelId, effort, sessionId }|null
+ * newestAssistantUsage(text) -> { usage, modelId, effort, sessionId, timestamp }|null
  *
  * Scans the JSONL BACKWARDS and stops at the first assistant message carrying usage —
  * the newest one. Unparseable lines are skipped, never fatal: a transcript is an
  * append-only log written by another process and may well end mid-write.
+ *
+ * `timestamp` ADDED (WO-GF-01) — the message's own ISO time, or null when the line does
+ * not carry one. It is returned rather than left to the caller's clock because a count
+ * read out of a transcript is true AS OF THAT MESSAGE and not as of the moment somebody
+ * happened to read the file. `footer.refreshSampleFromTranscript` uses it as the
+ * refreshed sample's `sampled_at`, which is what keeps the footer's staleness rung
+ * working on a session that has genuinely stopped: stamping the read time instead would
+ * make every count look fresh forever, defeating the very rung it sits next to. Nothing
+ * on the Stop path is affected — `extractTranscriptSample` still takes its `sampledAt`
+ * from its caller.
  */
 export function newestAssistantUsage(text) {
   if (typeof text !== 'string' || text.length === 0) return null;
@@ -250,6 +260,7 @@ export function newestAssistantUsage(text) {
       modelId: typeof obj.message.model === 'string' ? obj.message.model : null,
       effort: typeof obj.effort === 'string' ? obj.effort : null,
       sessionId: typeof obj.sessionId === 'string' ? obj.sessionId : null,
+      timestamp: typeof obj.timestamp === 'string' ? obj.timestamp : null,
     };
   }
   return null;
@@ -462,6 +473,18 @@ export function extractTranscriptSample({
     sampled_at: sampledAt,
     session_id: sid,
     source: SOURCE_TRANSCRIPT,
+    // WO-GF-01 — WHERE THIS COUNT CAME FROM, so it can be re-read when it is READ rather
+    // than only when it was written. The sample is produced at a turn boundary and
+    // nothing re-samples during a long turn, so by the time the footer renders it the
+    // count can be half an hour old with nothing in the line to say so. Recording the
+    // path is what lets `footer.refreshSampleFromTranscript` go back to the source.
+    //
+    // ADDITIVE AND DELIBERATELY UNVERSIONED. `SAMPLE_SCHEMA_VERSION` is NOT bumped: the
+    // footer's ladder treats any version other than 1 as an unrecognised schema, so a
+    // bump would blind every sample already on disk across the estate — a worse outcome
+    // than the defect being fixed here. A sample written before this change simply has
+    // no path, and the refresh declines rather than degrading anything.
+    transcript_path: typeof transcriptPath === 'string' && transcriptPath.length > 0 ? transcriptPath : null,
     version: null,
     model: { id: found.modelId, display_name: null },
     effort: { level: found.effort },

@@ -49,6 +49,7 @@ import { sampleFromStdin, resolveWindowTokens } from './sampler.mjs';
 import {
   parseFooter,
   renderFooter,
+  adviceFor,
   NEXT_UNSET,
   NEXT_MODELS,
   CONTROL_CONTINUE,
@@ -293,28 +294,46 @@ test('AC5: lineFor itself never throws on any hostile input', () => {
   }
 });
 
-test('AC5: BLIND is never rendered as GREEN (INV-1)', () => {
+test('AC5: BLIND is never rendered as GREEN (INV-1) — and never carries graded advice', () => {
   const parsed = parseFooter(lineFor('{}'));
   assert.equal(parsed.fields.state, STATE.BLIND);
-  assert.equal(parsed.fields.advice, ADVICE.UNSURE, 'unknown telemetry must not read as healthy');
+  // Warwick 2026-08-02. This asserted `ADVICE.UNSURE` ("KEEP GOING?"), which was encoding
+  // the defect: a state meaning "I could not grade this" paired with a recommendation
+  // derived from a grade, reading on a phone as a hedged yes. The INV-1 property this
+  // test exists for is unchanged and now stated at full strength — not merely "not
+  // GREEN", but carrying no graded advice at all.
+  assert.equal(parsed.fields.advice, ADVICE.NO_ADVICE, 'unknown telemetry must not advise at all');
+  for (const graded of [ADVICE.KEEP_GOING, ADVICE.CLEAR_NOW, ADVICE.UNSURE, ADVICE.TASK_UNKNOWN]) {
+    assert.notEqual(parsed.fields.advice, graded, `BLIND must never advise ${graded}`);
+  }
   assert.equal(parsed.fields.percent, null);
 });
 
 test('AC5: the last-resort literal is byte-identical to what the renderer would produce', () => {
   // The one hand-written copy of the grammar in the module, pinned to a literal
   // held OUTSIDE the source it checks, so the copy cannot silently drift.
+  //
+  // STRENGTHENED 2026-08-02. The advice was restated here as a second literal
+  // (`ADVICE.UNSURE`), so the pin compared one hand-written value against another and
+  // stayed green while BOTH carried the retired value — it could only ever catch a typo,
+  // never a vocabulary change. It now DERIVES the advice from the single mapping every
+  // other surface reads, which makes this the drift-guard for the module's unreachable
+  // layer-2 fallback as well: change what BLIND advises anywhere, and this goes red.
   assert.equal(
     LAST_RESORT_LINE,
     renderFooter({
       percent: null,
       approximate: false,
       state: STATE.BLIND,
-      advice: ADVICE.UNSURE,
+      advice: adviceFor(STATE.BLIND),
       next: NEXT_UNSET,
       control: CONTROL_CONTINUE,
     })
   );
   assert.equal(parseFooter(LAST_RESORT_LINE).ok, true);
+  // And it carries the ruling explicitly, so a reader of this file sees the requirement
+  // rather than only its consequence.
+  assert.equal(parseFooter(LAST_RESORT_LINE).fields.advice, ADVICE.NO_ADVICE);
 });
 
 test('AC5: safeLine degrades to a valid footer even when the input is hostile', () => {

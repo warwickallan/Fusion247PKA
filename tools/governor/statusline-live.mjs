@@ -67,9 +67,9 @@ import { parseStdinPayload, sampleFromStdin, extractHealthSample } from './sampl
 import {
   deriveFooterFields,
   renderFooter,
+  adviceFor,
   CONTROL_CONTINUE,
   NEXT_UNSET,
-  ADVICE,
 } from './footer.mjs';
 import { STATE } from './evaluator.mjs';
 import { readFileSync } from 'node:fs';
@@ -164,7 +164,13 @@ function main() {
 // ITSELF is broken and layer 2 cannot run. It is pinned by a test asserting it is
 // byte-identical to what `renderFooter` produces for those exact fields — a
 // literal held outside the code it checks, so the copy cannot silently drift.
-export const LAST_RESORT_LINE = '⟦GOV⟧ ctx -- · BLIND · KEEP GOING? · next: UNSET · CONTINUE';
+//
+// UPDATED 2026-08-02 (Warwick's ruling: BLIND must not pair with graded advice). Both
+// fallbacks below said `KEEP GOING?`, which is the retired value — so the two paths that
+// fire when everything else has already failed would have emitted precisely the pairing
+// the ruling forbids, at the moment it is least likely to be noticed and most likely to
+// mislead. A defect class survives its own fix by hiding in the branch nobody reaches.
+export const LAST_RESORT_LINE = '⟦GOV⟧ ctx -- · BLIND · NO ADVICE · next: UNSET · CONTINUE';
 
 export function safeLine(raw, opts) {
   try {
@@ -175,7 +181,12 @@ export function safeLine(raw, opts) {
         percent: null,
         approximate: false,
         state: STATE.BLIND,
-        advice: ADVICE.UNSURE,
+        // DERIVED, not hand-picked. This branch is unreachable from outside the module
+        // (`lineFor` degrades rather than throwing), so no test can force it — and a
+        // literal that nothing can execute is exactly where a stale value survives a
+        // vocabulary change. Reading the shared mapping means this line cannot disagree
+        // with the ladder about what BLIND advises, whatever that answer becomes next.
+        advice: adviceFor(STATE.BLIND),
         next: NEXT_UNSET,
         control: CONTROL_CONTINUE,
       });
