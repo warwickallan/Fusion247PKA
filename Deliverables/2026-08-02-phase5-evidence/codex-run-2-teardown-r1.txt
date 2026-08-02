@@ -1,0 +1,163 @@
+repo:  c:/Fusion247PKA
+range: a989e68..HEAD
+claim: Deliverables/2026-08-02-phase5-evidence/claim-teardown.json
+
+── GIT EVIDENCE (real, read-only) ──
+resolved=true diff_range=a989e68d95e01b7f6dc13955d796950f6a8a02a5..ea6e1d554073efb186be07acc78b9bd8c881b801
+changed_files=[".claude/commands/rotate-session.md",".github/workflows/governor-tests.yml","CLAUDE.md","Deliverables/2026-08-02-pax-hedge-fund-transcript-mining.md","Deliverables/2026-08-02-phase5-evidence/acceptance-criteria-teardown.md","Deliverables/2026-08-02-phase5-evidence/claim-constitution-and-review-tool.json","Deliverables/2026-08-02-phase5-evidence/claim-teardown.json","Deliverables/2026-08-02-phase5-evidence/codex-run-1-constitution.txt","Deliverables/2026-08-02-wayfinder-operating-reset-plan.md","services/control-plane/tower-loop/reviewDiff.mjs","tools/governor/collect-state.mjs","tools/governor/collect-state.test.mjs","tools/governor/continuity.mjs","tools/governor/evaluator.mjs","tools/governor/fixtures/programme-state.minimal.json","tools/governor/fixtures/programme-state.private-build.json","tools/governor/footer.mjs","tools/governor/footer.test.mjs","tools/governor/install-hooks.mjs","tools/governor/install-hooks.test.mjs","tools/governor/programme-state.mjs","tools/governor/programme-state.schema.json","tools/governor/programme-state.test.mjs","tools/governor/reorient.mjs","tools/governor/reorient.test.mjs","tools/governor/rotate-session.mjs","tools/governor/rotate-session.test.mjs","tools/governor/sampler.mjs","tools/governor/sampler.test.mjs","tools/governor/statusline-live.mjs","tools/governor/statusline-live.test.mjs","tools/governor/stop-controller.mjs","tools/governor/stop-controller.test.mjs","tools/governor/worktree-guard.test.mjs","tools/governor/worktree-recon.mjs","tools/governor/worktree-recon.test.mjs"]
+diff bytes=60046 truncated=true
+WARNING: diff was TRUNCATED — the verdict does not cover the whole change.
+
+── REAL CODEX MERGE REVIEW (Tower QA skill over the staged diff + the REAL claim) ──
+ok=true blocked=false model=openai-codex-exec
+{
+  "status": "ok",
+  "verdict": "approve",
+  "summary": "APPROVE for checkpoint phase5-governor-teardown at ea6e1d554073efb186be07acc78b9bd8c881b801. The exact base-to-head diff resolves and aligns with all 23 staged acceptance criteria: the obsolete governor machinery is removed, the retained spine is decoupled, footer/context behavior is repaired, and the stated limitations remain explicit. No current-merge blocker was found; CI remains honestly NOT RUN and final merge acceptance remains Warwick’s decision.",
+  "claims_verified": [
+    {
+      "claim": "The specified base and head resolve to an actual diff containing the declared governor teardown.",
+      "status": "confirmed",
+      "evidence": "git diff a989e68d95e01b7f6dc13955d796950f6a8a02a5..ea6e1d554073efb186be07acc78b9bd8c881b801 resolved and returned the declared file set."
+    },
+    {
+      "claim": "The teardown preserves ten named governor modules while deleting the obsolete programme-state control machinery.",
+      "status": "confirmed",
+      "evidence": "The name-status diff shows the required deletions and retained modifications under tools/governor/."
+    },
+    {
+      "claim": "The retained local suites measured 214 passes after the teardown, versus 496 before.",
+      "status": "partial",
+      "evidence": "The checkpoint reports these measured counts and exposes the reduction; command execution was denied by the read-only policy, so the counts were not independently rerun during this review."
+    },
+    {
+      "claim": "Nothing in this diff has run in CI, and continuity Stop-hook wiring is not proven end-to-end.",
+      "status": "confirmed",
+      "evidence": "The checkpoint explicitly labels both limitations instead of claiming verification."
+    }
+  ],
+  "acceptance_results": [
+    {
+      "acceptance_row_id": "B1",
+      "result": "pass",
+      "rationale": "Every specified obsolete module, corresponding suite, schema, fixtures, and slash command is deleted.",
+      "evidence": "Name-status diff records D for stop-controller, install-hooks, rotate-session, collect-state, worktree-recon, programme-state, their tests, both fixtures, programme-state.schema.json, and .claude/commands/rotate-session.md."
+    },
+    {
+      "acceptance_row_id": "B2",
+      "result": "pass",
+      "rationale": "All ten required survivors remain present.",
+      "evidence": "The diff modifies continuity, reorient, worktree-guard tests, footer, evaluator, sampler and statusline-live; continuity-derive, health-store and atomic-write remain undeleted."
+    },
+    {
+      "acceptance_row_id": "B3",
+      "result": "pass",
+      "rationale": "No surviving executable dependency imports a deleted governor module.",
+      "evidence": "Reviewed retained module changes show deleted imports removed; footer now imports evaluator and health-store, while reorient retains only live dependencies."
+    },
+    {
+      "acceptance_row_id": "C1",
+      "result": "pass",
+      "rationale": "reorient no longer imports programme-state or rotate-session.",
+      "evidence": "tools/governor/reorient.mjs diff removes those dependencies."
+    },
+    {
+      "acceptance_row_id": "C2",
+      "result": "pass",
+      "rationale": "The sweep, continuity passthrough and live repository-location verification remain implemented.",
+      "evidence": "tools/governor/reorient.mjs retains sweepOpenDeliverables, readContinuityBrief composition and gitFacts/renderLocationSection; reorient.test.mjs exercises each behavior."
+    },
+    {
+      "acceptance_row_id": "C3",
+      "result": "pass",
+      "rationale": "normaliseSeparators is retained locally without regrowing isBankingCommit.",
+      "evidence": "reorient.test.mjs explicitly tests the inlined normaliseSeparators helper; no isBankingCommit implementation is added."
+    },
+    {
+      "acceptance_row_id": "C4",
+      "result": "pass",
+      "rationale": "footer no longer imports programme-state.",
+      "evidence": "tools/governor/footer.mjs imports only node utilities, evaluator.mjs and health-store.mjs."
+    },
+    {
+      "acceptance_row_id": "D1",
+      "result": "pass",
+      "rationale": "next is caller supplied with UNSET as the default; programme-derived recommendation machinery is gone.",
+      "evidence": "footer.mjs computeFooterLine and CLI parsing default next to NEXT_UNSET; nextModelFor and UNSET_REASON producers are absent."
+    },
+    {
+      "acceptance_row_id": "D2",
+      "result": "pass",
+      "rationale": "MODEL/EFFORT grammar and its closed vocabularies are derived from shared literals.",
+      "evidence": "footer.mjs:161 defines NEXT_MODELS, line 164 defines low|medium|high|xhigh|max, and NEXT_VALUES derives their cross-product plus UNSET."
+    },
+    {
+      "acceptance_row_id": "D3",
+      "result": "pass",
+      "rationale": "Renderer/parser round-trip coverage remains in the footer suite.",
+      "evidence": "tools/governor/footer.test.mjs retains codec round-trip tests for supported field combinations."
+    },
+    {
+      "acceptance_row_id": "D4",
+      "result": "pass",
+      "rationale": "The seven handback codes retain their exact spelling and order.",
+      "evidence": "footer.mjs:106 defines product-decision, permission, spend, irreversible-live-action, unsafe-repository-state, rotation-required and merge-decision."
+    },
+    {
+      "acceptance_row_id": "D5",
+      "result": "pass",
+      "rationale": "Transcript sampling records a real numerator and accepts only authoritative denominators.",
+      "evidence": "sampler.mjs writes used_tokens; resolveWindowTokens accepts explicit or same-model observed window sizes and otherwise returns null. sampler.test.mjs rejects cross-model borrowing and scans against hardcoded window tables."
+    },
+    {
+      "acceptance_row_id": "D6",
+      "result": "pass",
+      "rationale": "Rendering distinguishes numerator-only telemetry from telemetry with a known denominator.",
+      "evidence": "footer.mjs renders an absolute token count with unknown window size and renders percentage/token ratio only when the denominator is authoritative."
+    },
+    {
+      "acceptance_row_id": "D7",
+      "result": "pass",
+      "rationale": "Sampling rides the existing continuity Stop path and existing health store.",
+      "evidence": "continuity.mjs imports sampleFromTranscript and invokes it before continuity deduplication; sampler.mjs calls writeHealthSample. No new sampler carrier module or settings edit appears."
+    },
+    {
+      "acceptance_row_id": "E1",
+      "result": "pass",
+      "rationale": "New executable tests cover each preserved reorient behavior.",
+      "evidence": "reorient.test.mjs contains dedicated SWEEP, CONTINUITY and LOCATION test groups plus composition tests."
+    },
+    {
+      "acceptance_row_id": "E2",
+      "result": "pass",
+      "rationale": "Both required mutation checks are present.",
+      "evidence": "reorient.test.mjs includes SWEEP MUTATION assertions; footer tests exercise corrupt/unreadable health samples through the BLIND ladder."
+    },
+    {
+      "acceptance_row_id": "E3",
+      "result": "pass",
+      "rationale": "The checkpoint reports measured before/after totals and explicitly explains the reorient-suite reduction.",
+      "evidence": "Checkpoint reports 496→214 passes and 0 failures; reorient.test.mjs states its prior 53-test count and explains removal of deleted-subject tests."
+    },
+    {
+      "acceptance_row_id": "E4",
+      "result": "pass",
+      "rationale": "The workflow keeps Windows execution and positive executed-count enforcement while narrowing the suite set explicitly.",
+      "evidence": ".github/workflows/governor-tests.yml retains windows-latest, checks expected=7 portable suites, requires positive pass count and zero failures, excludes only reorient, and removes collect-state from the exclusion pipeline."
+    },
+    {
+      "acceptance_row_id": "F1",
+      "result": "pass",
+      "rationale": "The surviving worktree guard is disclosed as inert and is not rebuilt.",
+      "evidence": "Checkpoint explicitly states every guarded tool now defers and that replacement behavior was deliberately not implemented."
+    },
+    {
+      "acceptance_row_id": "F2",
+      "result": "pass",
+      "rationale": "The two untested continuity modules remain identified as a limitation without out-of-scope test construction.",
+      "evidence": "Checkpoint and governor-tests.yml both state continuity.mjs and continuity-derive.mjs have no suites."
+    }
+  ],
+  "prior_finding_results": [],
+  "findings": []
+}

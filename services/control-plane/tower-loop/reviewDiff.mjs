@@ -79,6 +79,19 @@ async function main() {
   console.log(`range: ${baseRef}..${headRef}`);
   console.log(`claim: ${claimPath}`);
 
+  // NOTE ON SCOPE, and why there is no --paths flag here.
+  // gatherGitEvidence caps the diff at MAX_DIFF_BYTES (60k) and TRUNCATES beyond it. A
+  // truncated diff means the verdict does not cover the whole change — a false green
+  // wearing a pass. Observed 2026-08-02: the Phase 5 range returned `approve` with 20/20
+  // rows over a TRUNCATED diff, because deleting 16 files puts the full text of every
+  // deleted file into the diff.
+  // A --paths flag was drafted to scope the range and then REMOVED: gatherGitEvidence
+  // accepts no pathspec, so the option would have been silently ignored — an option that
+  // does nothing while appearing to work is the exact defect class this module exists to
+  // catch. Adding pathspec support belongs in gitEvidence.mjs and is parked in the
+  // Wayfinder's SHIT TO DO rather than bolted on here.
+  // Until then: WATCH FOR THE TRUNCATION WARNING BELOW and treat any verdict carrying it
+  // as incomplete, whatever it says.
   const evidence = await gatherGitEvidence({ cwd: repoDir, headSha: headRef, baseSha: baseRef });
   console.log(`\n── GIT EVIDENCE (real, read-only) ──`);
   console.log(`resolved=${evidence.resolved} diff_range=${evidence.diff_range}`);
