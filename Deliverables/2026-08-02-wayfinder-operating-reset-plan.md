@@ -156,6 +156,32 @@ closed is indistinguishable from one that was forgotten.
 > *The general hazard, worth keeping: any action Larry takes through Warwick's credentials is indistinguishable
 > from Warwick acting, in every downstream record. Attribution is not authority.*
 
+### The ⟦GOV⟧ footer — repaired, with an ACCEPTED RESIDUAL (Warwick, 2026-08-02)
+
+**It never appeared once during this entire closeout, including while a `merge-decision` handback was owed.**
+`CLAUDE.md` says event-driven; a stale memory said "every response"; **having two rules meant I followed
+neither.** And the deeper cause is not the contradiction: I *considered* the footer, told myself "a
+hand-composed footer is a defect", and wrote prose instead of **running the renderer — which existed, was
+tested, and was green in CI.** Reasoning your way around a working mechanism is indistinguishable from
+forgetting it, and produces the same silence. Fourth instance in this build of a live mechanism going uncalled.
+
+**Repaired, minimally:** the stale memory is corrected and deleted; the sanctioned notify entrypoint now
+renders the footer **itself** for handback-class milestones (`escalation`, `blocked`) and **not** for routine
+ones (`review_posted`, `tower_unavailable`) — bound to an **event** rather than to my memory. Rendered output
+for reference:
+
+```
+⟦GOV⟧ ctx 457.1k · BLIND · KEEP GOING? · next: Sonnet/medium · HANDBACK:merge-decision
+```
+
+`BLIND` there is **correct** and is row 13's ruling working: no authoritative window size for this session, so
+it shows a true absolute count and refuses to invent a percentage.
+
+> 🟠 **ACCEPTED RESIDUAL, Warwick's ruling: the automated behaviour is UNOBSERVED LIVE.** He explicitly
+> declined another session-rotation or fresh-process acceptance exercise. **It will be observed at the first
+> genuine VlogOps handback. If it fails there, it goes immediately into that build's SHIT TO DO for correction
+> before VlogOps closes.** Recorded here so the next session inherits the obligation rather than the assumption.
+
 ### What is NOT closed, stated plainly
 
 1. **`main` is NOT updated and Larry cannot update it** — a direct push to `main` is **denied by the Phase 6 permission layer**, which is the control working. The merge is Warwick's `merge-decision`.
