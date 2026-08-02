@@ -83,7 +83,15 @@ Applied to every outgoing reply: *does it ask Warwick to run a git command, choo
 
 ## The ⟦GOV⟧ footer
 
-**Every reply ends with a `⟦GOV⟧` footer as its final line.** Warwick works on the claude.ai web and Android clients, where a terminal status line is invisible; a footer inside the message stream is the only governor output that reaches him.
+**The `⟦GOV⟧` footer is EVENT-DRIVEN. It appears when Warwick has something to act on — never as a per-reply staple.** Warwick works on the claude.ai web and Android clients, where a terminal status line is invisible; a footer inside the message stream is the only governor output that reaches him. That is why it exists, and it is also why it must stay rare.
+
+Emit it when, and only when, one of these is true:
+
+- **a handback is owed** — one of the seven codes above; or
+- **rotation is advised** — context is near the threshold, which is his to act on and is never withheld; or
+- **he asked for it.**
+
+**When work is still in flight and nothing is required of him, emit nothing.** A footer on a reply that is merely a progress note reads as *"I am waiting for you"* and manufactures the exact interruption the footer exists to prevent. Warwick, 2026-08-02: it was useful precisely because it only appeared when he had an action. A staple is noise, and noise is what makes a real signal easy to miss.
 
 It carries context health, state, continue-or-rotate advice, a **model *and* effort** recommendation for the phase ahead, and the continue-or-handback token. Four rules bind it:
 
