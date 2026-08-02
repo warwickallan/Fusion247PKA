@@ -17,9 +17,23 @@
 // THE COMMENT GRAMMAR — directives a human (or Larry) writes in an ordinary PR comment:
 //
 //   @tower head: <40-char lower-case sha>
+//   @tower checkpoint: <BUILD-REF>                        (WO-TW-02)
 //   @tower finding <finding-uuid>: addressed — <rationale>
 //   @tower finding <finding-uuid>: remains_open — <rationale>
 //   @tower finding <finding-uuid>: unrelated — <rationale>
+//
+// WO-TW-02 — THE CHECKPOINT DIRECTIVE, and why it lives HERE. `@tower checkpoint:` is the
+// explicit marker that makes a comment a review checkpoint: the watcher's poll step creates the
+// `tower.turn` for it before ingest, so a real PR comment can start a review round with no human
+// running a command. It is deliberately part of THIS grammar rather than a parallel syntax — one
+// channel with two grammars is how the next reader gets it wrong. It is also why the parser had
+// to learn it rather than merely tolerate it: the `unrecognised @tower directive` branch below
+// makes ANY unknown `@tower` line malformed, and a malformed directive REFUSES the whole comment.
+// Before this change, writing `@tower checkpoint:` would have got the comment thrown away.
+//
+// A CHECKPOINT IS NOT SELF-EXECUTING. Parsing it here only reports that the marker is present.
+// Nothing in this module creates a turn; see pollPrComments.mjs. A comment WITHOUT the marker
+// can never conjure a review round, which is the whole point of requiring an explicit one.
 //
 // The HEAD DIRECTIVE IS MANDATORY and is what the comment is bound to. It is taken from the
 // BODY rather than the payload envelope on purpose: it records the head the author actually
@@ -39,14 +53,18 @@ const HEAD_RE = /^\s*@tower\s+head\s*:\s*([0-9a-fA-F]{40})\s*$/;
 // is optional at the parse layer and required at the apply layer, so a malformed line is
 // reported as malformed rather than silently becoming a disposition with no reason.
 const FINDING_RE = /^\s*@tower\s+finding\s+([0-9a-fA-F-]{8,40})\s*:\s*([a-z_]+)\s*(?:[—:-]\s*(.*))?$/i;
+// WO-TW-02. The build ref is OPTIONAL in the grammar but is how a checkpoint binds to a build:
+// without it, ingestTurn falls back to TOWER_BUILD_REF or 'UNCLASSIFIED' and never guesses.
+const CHECKPOINT_RE = /^\s*@tower\s+checkpoint\s*(?::\s*([A-Za-z0-9][A-Za-z0-9._-]*))?\s*$/i;
 
-/** Extract the head directive and the finding dispositions from a comment body.
- *  Never throws: malformed lines are reported, not discarded silently. */
+/** Extract the head directive, the checkpoint marker and the finding dispositions from a comment
+ *  body. Never throws: malformed lines are reported, not discarded silently. */
 export function parseCommentBody(body) {
   const lines = String(body ?? '').split(/\r?\n/);
   const dispositions = [];
   const malformed = [];
   let headSha = null;
+  let checkpoint = null;
 
   for (const line of lines) {
     const h = line.match(HEAD_RE);
@@ -57,6 +75,18 @@ export function parseCommentBody(body) {
       if (!CANONICAL_SHA.test(raw)) malformed.push(`head directive is not a canonical lower-case 40-hex SHA: ${raw}`);
       else if (headSha && headSha !== raw) malformed.push(`conflicting head directives: ${headSha} vs ${raw}`);
       else headSha = raw;
+      continue;
+    }
+    const cp = line.match(CHECKPOINT_RE);
+    if (cp) {
+      const buildRef = cp[1] ? String(cp[1]).trim() : null;
+      // Two checkpoint markers naming DIFFERENT builds is ambiguous, and a checkpoint that has to
+      // be guessed is exactly the thing this marker exists to make explicit. Refuse, do not pick.
+      if (checkpoint && checkpoint.buildRef !== buildRef) {
+        malformed.push(`conflicting checkpoint directives: ${checkpoint.buildRef ?? '(no build ref)'} vs ${buildRef ?? '(no build ref)'}`);
+      } else {
+        checkpoint = { buildRef };
+      }
       continue;
     }
     const f = line.match(FINDING_RE);
@@ -77,7 +107,7 @@ export function parseCommentBody(body) {
     }
     if (/^\s*@tower\b/.test(line)) malformed.push(`unrecognised @tower directive: ${line.trim().slice(0, 100)}`);
   }
-  return { headSha, dispositions, malformed };
+  return { headSha, checkpoint, dispositions, malformed };
 }
 
 /** Normalise a GitHub issue_comment-shaped payload into the fields the seam binds on. */

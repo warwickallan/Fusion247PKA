@@ -53,35 +53,28 @@ Looks good overall — two things from the last round.
 ## Running the proof
 
 Nothing below touches a live service, a real GitHub PR, Codex, or Telegram. Every external party is a
-local double. It needs `initdb`/`pg_ctl`/`psql` on PATH and `node_modules` installed under
-`services/control-plane/`.
+local double. It needs `node_modules` installed under `services/control-plane/` — and **no database
+server**.
 
-### 1. Stand up a throwaway cluster
+### 1. Point at a throwaway store
 
-Put the data directory **outside the repo** — a cluster inside a git worktree is one `git clean` away
-from destroying itself.
+Since WO-TW-01 the store is a single WAL SQLite file at `TOWER_SQLITE_PATH`, defaulting to
+`~/.mypka/tower/tower.db`. There is no cluster to start and no connection string to export. Put a
+throwaway one **outside the repo** — a store inside a git worktree is one `git clean` away from
+destroying itself, and the default path is the REAL watcher's durable state, which a rehearsal must
+never trample.
 
 ```bash
-CL=/tmp/tower-proof            # any path outside the checkout
-PORT=55432                     # any free port
-initdb -D "$CL/data" -U wo22 -A trust --encoding=UTF8 --no-locale
-pg_ctl -D "$CL/data" -o "-p $PORT -c listen_addresses=127.0.0.1" -w -l "$CL/server.log" start
-createdb -h 127.0.0.1 -p $PORT -U wo22 towerloop
-export CONTROL_PLANE_DEV_DATABASE_URL="postgres://wo22@127.0.0.1:$PORT/towerloop"
+export TOWER_SQLITE_PATH="$(mktemp -d)/tower.db"
 ```
 
-`-A trust` on a localhost-only throwaway keeps any password off disk. Tear down with
-`pg_ctl -D "$CL/data" stop` and delete `$CL`.
-
-> Do **not** use `wp-d-proof/provision.mjs` for this. Despite its header it drops and rebuilds the
-> `ops` schema, applies two `ops` migrations, seeds synthetic rows into `public.*`, and writes a
-> plaintext password to `.runtime/runtime.json`. None of that is wanted here.
+Tear down by deleting the directory.
 
 ### 2. Apply the schema
 
 ```bash
 cd services/control-plane/tower-loop
-node apply.mjs      # base + watcher + hold + comment deltas, all idempotent
+node apply.mjs      # base + watcher + hold + comment + verdict-post deltas, all idempotent
 node seed.mjs       # the active supervisor prompt (required before any round)
 ```
 
@@ -118,16 +111,19 @@ finding ids are database-generated uuids — substitute your own before running.
 Start the watcher in another terminal. It claims any `pending` turn and processes it:
 
 ```bash
-CONTROL_PLANE_DEV_DATABASE_URL=... \
+TOWER_SQLITE_PATH=... \
 TOWER_REVIEWER_MODULE=$PWD/test/doubles/fakeReviewer.mjs \
 TOWER_GIT_EVIDENCE_MODULE=$PWD/test/doubles/fakeGitEvidence.mjs \
 TOWER_NOTIFY_TRANSPORT=none \
+TOWER_PR_POLL=off \
 node watcher.mjs
 ```
 
 The two `*_MODULE` doubles replace Codex and git evidence with canned, offline stand-ins;
 `TOWER_NOTIFY_TRANSPORT=none` replaces Telegram. **Drop all three and it calls the real ones** —
-which is a live action, and not something this runbook authorises.
+which is a live action, and not something this runbook authorises. `TOWER_PR_POLL=off` AND
+`TOWER_PR_WRITEBACK=off` stop the watcher reaching for the real `gh` during a rehearsal — you need
+BOTH, for the reason set out under "When the write fails" below.
 
 Then read the exact text that reached the reviewer:
 
@@ -142,9 +138,12 @@ the gap: everything from an `issue_comment`-shaped payload onward was proven, an
 one. `pollPrComments.mjs` is the missing step and nothing more.
 
 ```bash
-CONTROL_PLANE_DEV_DATABASE_URL=... \
+TOWER_SQLITE_PATH=... \
 node pollPrComments.mjs --repo warwickallan/Fusion247PKA --pr 87 [--marker <substring>] [--json]
 ```
+
+> Since WO-TW-02 you do **not** have to run this by hand — the watcher runs it for you. The CLI
+> remains for one-shot diagnosis. See "The automatic trigger" below.
 
 It asks GitHub two questions through `gh api` and hands the answer to `ingestPrComment` unaltered:
 
@@ -157,7 +156,7 @@ It asks GitHub two questions through `gh api` and hands the answer to `ingestPrC
 ignored entirely.
 
 **Exit codes:** `0` every candidate applied or already-ingested · `2` at least one refused or
-rejected · `1` the poll itself could not run (bad repo/PR, API failure, no `CONTROL_PLANE_DEV_DATABASE_URL`).
+rejected · `1` the poll itself could not run (bad repo/PR, API failure, unreadable store).
 
 ### It is a POLLER, not a webhook — and that distinction is the point
 
@@ -200,9 +199,134 @@ already seen**, on purpose: that would be a second source of truth waiting to di
 
 ### Recovering it
 
-There is no daemon and no state to corrupt: it is a one-shot command. If it fails, read the exit code
-above, fix the cause, and run it again — a repeat run cannot double-apply. If `gh` is not
+There is no state to corrupt. As a one-shot command: read the exit code above, fix the cause, and run
+it again — a repeat run cannot double-apply. Inside the watcher, a failed poll round is logged and
+retried on the next interval, and a persistent failure raises an alarm (below). If `gh` is not
 authenticated (`gh auth status`), that is a Mack task, not a code change.
+
+## The automatic trigger (WO-TW-02)
+
+**The gap this closes was stated in this file's own words: *"Something must still invoke the
+poller."*** Everything above was real and proven, and none of it ever ran unless a human typed it.
+
+The watcher's loop now has one more step. That is the whole feature — no scheduler, no second
+process, no new table.
+
+```
+poll PR comments  →  reclaim stale leases  →  claim ONE pending turn  →  process  →  heartbeat  →  sleep
+└── every TOWER_PR_POLL_MS (default 60s), not every 1.5s: GitHub is not asked at loop speed
+```
+
+### A checkpoint comment opens its own review round
+
+`ingestPrComment` resolves the turn a comment answers and **throws** when there is none. So an
+automatic poll on its own would have refused every real comment unless somebody had already created
+the turn by hand — which is exactly the manual prerequisite that made the journey not unattended.
+
+A comment carrying an **explicit `@tower checkpoint:` marker** now creates its turn, in the poll
+step, before ingest:
+
+```
+Shipped WP-3. Tests green, CI clean.
+
+@tower checkpoint: BUILD-019
+@tower head: c1d2e3f405162738495a6b7c8d9e0f1122334455
+```
+
+- **Only the explicit marker does this.** A stray PR comment can never conjure a review round: with
+  no marker there is no turn, and the pre-existing refusal stands untouched.
+- **The head is still the API's.** The turn is created at the head `repos/<repo>/pulls/<n>` reports,
+  and the comment only got this far because layer 1 already validated its body directive against it.
+  A typed SHA remains a declaration, never authority.
+- **Idempotence belongs to the database, not to this code.** The turn carries a deterministic
+  `session_turn_key` of `pr-checkpoint:<repo>#<pr>@<comment_id>`, and the partial unique index
+  `tower.turn_session_turn_key_uniq` is what refuses the second insert. Re-polling — or restarting
+  mid-round — cannot duplicate a round, because no application state carries the guarantee.
+- **Editing the comment re-binds to the same round** (GitHub keeps the comment id). Posting a *new*
+  checkpoint comment is how you ask for a new round.
+- The build ref comes from the marker. Omit it and the turn falls back to `TOWER_BUILD_REF` or
+  `UNCLASSIFIED` — it is never guessed from prose.
+
+### Which PRs get polled
+
+Derived from the store, so there is no list to maintain and nothing to go stale: the distinct
+`(repo, pr_number)` of turns that are **not `complete`**, most recent first, capped at 5 per round.
+A turn that is `reviewed`/`blocked`/`awaiting_warwick` is *precisely* the one waiting for a
+disposition comment, so polling deliberately continues there.
+
+**The bootstrap, and it is a genuine limitation of a store-derived rule:** with an empty store there
+are no targets, so the very first checkpoint on a PR Tower has never seen is not discoverable. One
+variable fixes that and is the only configuration this feature has:
+
+```
+TOWER_PR_SEED=warwickallan/Fusion247PKA#90       # comma-separate for more than one
+```
+
+Once a turn exists for that PR the store-derived rule takes over and the seed is redundant.
+
+### When it fails
+
+A poll failure never takes the turn loop down — GitHub being briefly unreachable is not a reason to
+stop supervising turns already in the store. It is logged as `pr_poll_failed`, and after **3
+consecutive rounds in which every target failed** a `tower_failure` TowerBot message fires naming
+the cause. It fires **once per failure streak**: not every round (spam gets ignored) and not never
+(silence from this watcher is indistinguishable from "nothing to review").
+
+### The build ref is validated, and a bad one is visible
+
+`classifyBuildRef` enforces `/^BUILD-\d{3}$/` and never guesses. A marker of `@tower checkpoint:
+BUILD-TYPO` therefore opens the round as **`UNCLASSIFIED`** — which is correct fail-safe behaviour
+and also a trap, because that round's findings then carry forward against a build nobody is
+watching. `ensureCheckpointTurn` returns `buildRefRequested` and `buildRefHonoured` so the mismatch
+is reported rather than silent. **Check the poll log if a checkpoint lands on the wrong build.**
+
+## The verdict goes back ONTO the PR (WO-TW-02)
+
+`postVerdict.mjs`. After a round is reviewed, the verdict is posted as a PR comment on the same
+`(repo, pr_number)` the turn is bound to — so someone reading the pull request sees the review,
+not a checkpoint followed by silence.
+
+### It is a SEPARATE module with a SEPARATE seam, and that is the design
+
+`pollPrComments.mjs` is read-only *structurally*: `assertReadOnlyArgs` throws on `-X`, `--method`,
+`-f`, `-F`, `--field`, `--raw-field` and `--input`. **That guard is not relaxed, bypassed or made
+conditional to add writing.** The poller reads; `postVerdict.mjs` writes; they share no seam.
+
+The two guards are deliberate mirrors:
+
+| Module | Guard | Shape |
+|---|---|---|
+| `pollPrComments.mjs` | `assertReadOnlyArgs` | **denylist** — forbids a category of mutation |
+| `postVerdict.mjs` | `assertCommentPostArgs` | **allowlist** — permits exactly `--method POST repos/<o>/<n>/issues/<pr>/comments -f body=…` and nothing else, not even one extra argument |
+
+A writer is the wrong place for a denylist: it would only forbid the mutations somebody thought of.
+
+### Not posting twice
+
+`tower.pr_verdict_post.post_key` is `pr-verdict:review:<review_id>` and **UNIQUE**. The claim row is
+INSERTed *before* GitHub is called, and only a caller that wins that insert may post — the same
+claim-then-send shape `notify()` uses for Telegram. A restart mid-sweep cannot double-post, because
+the guarantee is not held in the process.
+
+**The one window a key alone cannot close** is a crash after GitHub accepted the comment but before
+`posted = 1` was written. Every body therefore ends with an invisible
+`<!-- tower-verdict-key: … -->` marker, and a RETRY (`attempts > 0`) reads the PR's comments looking
+for it before posting again. That is the only reason the writer is handed a reader.
+
+### When the write fails
+
+Fail-closed: the row keeps `posted = 0` with `last_error` set, so **nothing anywhere records the
+round as answered on the PR**, and the sweep retries it on the next poll interval. After **3
+consecutive failed sweeps** a `tower_failure` TowerBot message fires — once per streak — saying
+reviews are not reaching the pull request.
+
+`TOWER_PR_WRITEBACK=off` disables posting entirely (rehearsals, a second watcher, CI).
+
+> ⚠️ **A rehearsal must set BOTH `TOWER_PR_POLL=off` AND `TOWER_PR_WRITEBACK=off`.** The verdict
+> sweep is global by design — it has to be, or a failed post would never be retried — so disabling
+> only the poll still lets a watcher post the verdict of any turn in its store that carries a
+> repo and PR number. This was found the hard way: the test suite's own watchers reached the real
+> `gh` and attempted a real POST against a PR that did not exist.
 
 ## What a rejection looks like
 
@@ -235,26 +359,133 @@ indistinguishable from one that never arrived.
 To clear a rejection, post a new comment at the **current** head disposing every open finding, ingest
 it, and re-run the round.
 
+## RUNBOOK — operating the watcher
+
+Everything here is Mack's, and none of it requires reading the source.
+
+### Start
+
+```bash
+node --env-file=<your TowerBot env file> services/control-plane/tower-loop/run-watcher.mjs
+```
+
+It stops any watcher already running, starts a new detached one, and prints the pid, the store path,
+the log path and whether notifications and the PR poll are on.
+
+**The launcher reads no secret file of its own.** It validates that `TELEGRAM_BOT_TOKEN` and
+`AUTHORISED_TELEGRAM_USER_ID` are present **in its own environment** and refuses to start otherwise,
+naming the missing variable. Supplying them is an operations task; the code never sees where they
+live. To start deliberately without TowerBot, set `TOWER_NOTIFY_TRANSPORT=none`.
+
+> This is a behaviour change (WO-TW-02). Launching with a bare environment now **fails** where it
+> used to silently work by loading files under `C:\.fusion247\`. A launcher that silently works on
+> wrong configuration is how an estate ends up believing a control is live when it is inert.
+
+### Stop
+
+```powershell
+Get-CimInstance Win32_Process -Filter "Name='node.exe'" |
+  Where-Object { $_.CommandLine -like '*tower-loop*watcher.mjs*' } |
+  ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
+```
+
+The watcher also handles `SIGINT`/`SIGTERM`: it finishes the turn in flight, logs
+`watcher_down_clean` and exits.
+
+### Restart
+
+Just run the start command again — it is single-instance by construction. **A restart is safe by
+design and needs no cleanup:** an in-flight turn's lease expires and is reclaimed
+(`reclaimed_stale`), a turn that already has a review is never re-reviewed, and a checkpoint comment
+re-seen after restart re-finds its existing round rather than opening a second one.
+
+### Where state lives
+
+| What | Where |
+|---|---|
+| Durable store (all `tower.*` tables, incl. `pr_verdict_post`) | `~/.mypka/tower/tower.db` — override with `TOWER_SQLITE_PATH` |
+| Log | `~/.mypka/tower/logs/watcher.log` |
+
+**Never point either at a worktree, a temp directory or a scratchpad.** A daemon pinned to
+disposable storage loses its durable state silently.
+
+### How to tell it is alive
+
+```bash
+# 0. verdicts that have not reached the PR (should normally be empty)
+sqlite3 ~/.mypka/tower/tower.db "select post_key, repo, pr_number, attempts, last_error from tower.pr_verdict_post where posted = 0;"
+
+# 1. the process
+powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter \"Name='node.exe'\" | Where-Object { \$_.CommandLine -like '*tower-loop*watcher.mjs*' } | Select-Object ProcessId"
+
+# 2. its own heartbeat — the authoritative answer, written by the loop itself
+sqlite3 ~/.mypka/tower/tower.db "select watcher_id, last_beat, state from tower.watcher_heartbeat order by last_beat desc;"
+
+# 3. the log tail
+tail -n 40 ~/.mypka/tower/logs/watcher.log
+```
+
+A healthy watcher writes a heartbeat every loop (~3s as launched) and logs `pr_poll_ok` or
+`pr_poll_no_targets` every `TOWER_PR_POLL_MS`. **A heartbeat older than a minute means it is not
+running, whatever the process list says** — trust the heartbeat over the pid.
+
+### What a failure looks like
+
+| Log event | Meaning | Action |
+|---|---|---|
+| `watcher_crash` | the loop threw; a `tower_failure` TowerBot message is sent, then it exits `1` | read the log, fix, restart |
+| `pr_poll_failed` | one target failed this round (usually `gh`) | none if isolated; it retries |
+| `pr_poll_round_failed` | every target failed this round | watch the `consecutive` count |
+| **`pr_poll_alarm_fired`** | **3 consecutive failed rounds — TowerBot has been told Tower is no longer seeing PR checkpoints** | check `gh auth status` and network |
+| `pr_poll_alarm_failed` | the alarm itself could not be delivered | **investigate immediately** — the loud path is deaf |
+| `pr_verdict_queued` | a completed round's verdict is claimed for posting | none |
+| `pr_verdict_posted` | the verdict is now a comment on the PR | none |
+| `pr_post_failed` | a verdict could not be posted; it stays `posted=0` and is retried | watch the `consecutive` count |
+| **`pr_post_alarm_fired`** | **3 consecutive failed sweeps — reviews are NOT reaching the PR** | check `gh auth status` and that the token still has write scope |
+| `pr_post_alarm_failed` | the write-back alarm could not be delivered | **investigate immediately** |
+| `reclaim_busy` / `claim_busy` | write contention, self-correcting | none unless persistent |
+| `store_open` | normal boot; shows the store path actually opened | confirm it is the intended one |
+
+**Silence is not health.** No log lines at all means the process is gone, not that nothing is
+happening.
+
 ## Tests
 
 ```bash
-node test/run-tower-loop-tests.mjs      # needs CONTROL_PLANE_DEV_DATABASE_URL
+node test/run-tower-loop-tests.mjs      # no database server, no network, no gh binary
 ```
 
-Fails loudly on **zero executed subtests** — a DB-gated run that skips everything is never a pass.
+Fails loudly on **zero executed subtests** — a run that skips everything is never a pass.
 `W1`–`W8` cover the comment seam; `P1`–`P6` cover the GitHub → Tower first hop; `T0`–`T7` are the
-pre-existing watcher acceptance tests. **24 subtests.**
+pre-existing watcher acceptance tests; `A1`–`A16` plus `A-unit` cover the WO-TW-02 automatic
+trigger, the verdict write-back and the chained disposition journey. **41 subtests.**
 
-`P1`–`P6` drive the `gh` boundary through an **injected seam** (`test/doubles/fakeGh.mjs`), so the
-suite needs no network and no `gh` binary. The double refuses any endpoint it does not model — a
-permissive double would answer an argv the real seam rejects, and then the suite proves something
-about the double rather than about the code.
+`P1`–`P6` and `A1`–`A9` drive the `gh` boundary through an **injected seam**
+(`test/doubles/fakeGh.mjs`, and `test/doubles/fakeGhModule.mjs` for a spawned watcher), so the suite
+needs no network and no `gh` binary. The double refuses any endpoint it does not model — a permissive
+double would answer an argv the real seam rejects, and then the suite proves something about the
+double rather than about the code.
 
+> ⚠️ **NOTHING UNDER `test/` HAS A MAIN GUARD — IMPORTING ANY OF IT RUNS IT.** `prove-hold.mjs`
+> connects to a live database on import. `classifyBuild.test.mjs`, `notify.test.mjs` and
+> `reviewTooling.test.mjs` register `node:test` cases at import. `run-tower-loop-tests.mjs` is a
+> script. Spawn them; never import them. (`run-watcher.mjs` used to share this shape and had the
+> worst version of it — it is now guarded, and A10 proves it.)
 ## Known limits
 
-- **A POLLER IS NOT A WEBHOOK.** `pollPrComments.mjs` closes the "no hand-built payload" gap and
-  nothing wider. **Push-delivery is unproven** — no live listener, no inbound ingress, and no
-  evidence that GitHub can reach this code unprompted. Something must still invoke the poller.
+- **A POLLER IS STILL NOT A WEBHOOK.** WO-TW-02 closed *"something must still invoke the poller"* —
+  the watcher now invokes it, unprompted, forever. It did **not** make delivery a push. There is no
+  live listener and no inbound ingress; **GitHub cannot reach this code**, and detection is bounded
+  by `TOWER_PR_POLL_MS`. Cite it as "polled automatically", never as "webhook".
+- **THE RESPONSE DOES NOT GO BACK ONTO THE PR.** The review reaches TowerBot and the store. Nothing
+  in this subsystem writes to GitHub — `assertReadOnlyArgs` structurally forbids the poller from
+  doing so, deliberately. A verdict appearing as a PR comment would need a write path that does not
+  exist here.
+- **The store-derived poll cannot bootstrap itself.** No turn for a PR means no target means no
+  poll. The first checkpoint on an unknown PR needs `TOWER_PR_SEED`; after that the store takes over.
+- **A checkpoint marker on a PR whose head has moved is refused, not queued.** Layer 1 compares the
+  body head to the API head; if the PR advanced between writing and polling, the comment is
+  `refused_head_mismatch` and **no round opens**. Re-post at the current head.
 - **Layer 1 rejects before layer 2 can fire.** Because the poller refuses a comment whose body head
   disagrees with the API head, a genuinely stale comment written against an *older* head is stopped
   at layer 1 (`refused_head_mismatch`, nothing persisted) rather than reaching

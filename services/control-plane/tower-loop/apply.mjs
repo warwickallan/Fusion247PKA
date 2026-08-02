@@ -3,9 +3,9 @@
 //
 // Each function takes an OPEN store handle from db.mjs and applies one schema file to it. The
 // files are `create ... if not exists` throughout, so re-running is safe — watcher.mjs re-applies
-// all four on every boot.
+// all five on every boot.
 //
-//   node apply.mjs            (applies all four to TOWER_SQLITE_PATH / ~/.mypka/tower/tower.db)
+//   node apply.mjs            (applies all five to TOWER_SQLITE_PATH / ~/.mypka/tower/tower.db)
 //
 // THE SIGNATURE CHANGED AND IT FAILS LOUDLY. These functions used to take a `postgres://` URL.
 // They now take a handle, and a string argument is REFUSED with a message that says so rather
@@ -58,14 +58,23 @@ export async function applyHoldSchema(db) {
   return applyFile(db, 'applyHoldSchema', 'hold_schema.sql');
 }
 
-/** Apply all four, in dependency order. The order matters: tower.finding (watcher) declares a
- *  foreign key onto tower.pr_comment (comment), and the hold index needs tower.turn (base). */
+/** Apply the PR verdict write-back delta (db/post_schema.sql). Idempotent; adds
+ *  tower.pr_verdict_post and its UNIQUE post_key, which is what makes posting a verdict to a PR
+ *  idempotent across process death rather than only within one run (WO-TW-02). */
+export async function applyPostSchema(db) {
+  return applyFile(db, 'applyPostSchema', 'post_schema.sql');
+}
+
+/** Apply all five, in dependency order. The order matters: tower.finding (watcher) declares a
+ *  foreign key onto tower.pr_comment (comment), the hold index needs tower.turn (base), and
+ *  tower.pr_verdict_post references tower.supervisor_review (base). */
 export async function applyAll(db) {
   const base = await applySchema(db);
   const watcher = await applyWatcherSchema(db);
   const hold = await applyHoldSchema(db);
   const comment = await applyCommentSchema(db);
-  return { base, watcher, hold, comment };
+  const post = await applyPostSchema(db);
+  return { base, watcher, hold, comment, post };
 }
 
 if (import.meta.url === `file://${process.argv[1]}` || process.argv[1] === fileURLToPath(import.meta.url)) {
@@ -78,6 +87,7 @@ if (import.meta.url === `file://${process.argv[1]}` || process.argv[1] === fileU
       console.log(`[apply] watcher delta applied (idempotent) from ${r.watcher.sqlPath}`);
       console.log(`[apply] hold delta applied (idempotent) from ${r.hold.sqlPath}`);
       console.log(`[apply] comment seam delta applied (idempotent) from ${r.comment.sqlPath}`);
+      console.log(`[apply] verdict write-back delta applied (idempotent) from ${r.post.sqlPath}`);
     } finally { await db.end(); }
   })()
     .then(() => process.exit(0))

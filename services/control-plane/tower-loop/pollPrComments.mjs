@@ -37,11 +37,35 @@
 //   Layer 1 catches a comment that misdescribes the PR. Layer 2 catches a comment that is honest
 //   about a head the work has since moved past. Both fail closed; neither applies anything.
 
+// WO-TW-02 — THE CHECKPOINT HOP, and the refusal it removes.
+//
+//   `ingestPrComment` resolves the turn a comment answers and THROWS when there is none:
+//   "no tower.turn found for <repo> PR #<n> — nothing to bind the comment to". So before this
+//   change, an automatic poll of a real PR refused every real comment unless a human had already
+//   created the turn by hand. That manual prerequisite is what made the journey not unattended.
+//
+//   A comment carrying an explicit `@tower checkpoint:` marker now CREATES its turn, here, before
+//   ingest. Two boundaries make that safe and neither may be softened:
+//
+//     - ONLY an explicit marker. A stray PR comment must never conjure a review round. No
+//       marker → no turn → the pre-existing refusal stands, unchanged.
+//     - The head is STILL the API's. The checkpoint turn is created at `apiHeadSha`, and the
+//       comment only gets that far because layer 1 already validated its body directive against
+//       it. A typed SHA remains a declaration, never authority.
+//
+//   IDEMPOTENCE IS THE DATABASE'S, NOT THIS MODULE'S. The turn carries a deterministic
+//   `session_turn_key` derived from (repo, pr, comment_id), and `tower.turn_session_turn_key_uniq`
+//   — a partial UNIQUE INDEX — is what refuses the second insert. Re-polling the same checkpoint
+//   therefore cannot duplicate a turn even if this process restarts mid-round, because no
+//   application state carries the guarantee. That is the difference between idempotent and
+//   "idempotent until something crashes at the wrong moment".
+
 import { execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { openDb } from './db.mjs';
 import { applyAll } from './apply.mjs';
 import { ingestPrComment, parseCommentBody } from './ingestComment.mjs';
+import { ingestTurn } from './loop.mjs';
 
 const CANONICAL_SHA = /^[0-9a-f]{40}$/;
 const REPO_RE = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/;
@@ -119,6 +143,63 @@ export function toIngestPayload({ repo, prNumber, comment }) {
 }
 
 /**
+ * The DURABLE idempotency key for a checkpoint turn.
+ *
+ * Deterministic in (repo, pr, comment_id) and nothing else — not the body, not the head, not the
+ * time. Editing a checkpoint comment on GitHub keeps its id, so an edit re-binds to the SAME turn
+ * rather than opening a second review round; posting a NEW comment is how you ask for a new one.
+ */
+export function checkpointTurnKey({ repo, prNumber, commentId }) {
+  return `pr-checkpoint:${repo}#${Number(prNumber)}@${Number(commentId)}`;
+}
+
+/**
+ * Create — or re-find — the review turn for one explicit checkpoint comment.
+ *
+ * All six required bindings are durable after this call:
+ *   repository, PR number and head SHA   → tower.turn.{repo, pr_number, head_sha}
+ *   build reference                      → tower.turn.build_ref
+ *   durable idempotency key              → tower.turn.session_turn_key (UNIQUE, partial index)
+ *   checkpoint comment id                → encoded in that key, and additionally recorded on
+ *                                          tower.pr_comment.comment_id ↔ turn_id when the same
+ *                                          comment is ingested moments later in this same round.
+ *
+ * `kind` is left 'ordinary' ON PURPOSE. `detectMergeClass` already treats a response mentioning a
+ * checkpoint/PR/completion as merge-class by heuristic (mergeClass.mjs COMPLETION_PATTERNS
+ * includes /\bcheckpoint\b/), and that classifier is already tested. Declaring 'merge_review'
+ * here would hard-code a routing decision that existing, proven code already makes.
+ */
+export async function ensureCheckpointTurn(pool, { repo, prNumber, headSha, comment, buildRef = null }) {
+  const commentId = Number(comment?.id);
+  if (!Number.isInteger(commentId)) throw new Error('checkpoint comment has no usable id');
+  const author = comment?.user?.login ?? '(unknown)';
+  const sessionTurnKey = checkpointTurnKey({ repo, prNumber, commentId });
+
+  const turn = await ingestTurn(pool, {
+    // The instruction is Tower's side of the dialogue: what this round is being asked to do.
+    instruction: `PR checkpoint — ${repo} PR #${prNumber} at head ${headSha} `
+      + `(comment ${commentId} by ${author}). Review this checkpoint against the diff at that head.`,
+    // Larry's side is the comment, VERBATIM. Same discipline as tower.pr_comment.body: the
+    // reviewer must see what was actually written, not a summary of it.
+    larryResponse: String(comment?.body ?? ''),
+    // `undefined` (not null) so classifyBuildRef falls through to TOWER_BUILD_REF / UNCLASSIFIED
+    // rather than treating an absent marker ref as an explicit one.
+    buildRef: buildRef ?? undefined,
+    kind: 'ordinary',
+    prNumber, repo, headSha, baseSha: null,
+    sessionTurnKey,
+  });
+
+  // WHETHER THE MARKER'S BUILD REF WAS ACTUALLY HONOURED — reported, never silently swallowed.
+  // classifyBuildRef enforces /^BUILD-\d{3}$/ and falls back to UNCLASSIFIED for anything else.
+  // Never guessing is correct. Doing it SILENTLY is not: a typo'd marker opens a round on a
+  // build nobody is watching, and that round's findings then carry forward against it. This cost
+  // a debugging round when a test used 'BUILD-A15' and the gate quietly failed to fire.
+  const buildRefHonoured = buildRef === null || turn.build_ref === buildRef;
+  return { ...turn, sessionTurnKey, buildRefRequested: buildRef, buildRefHonoured };
+}
+
+/**
  * POLL one PR and ingest every @tower comment on it.
  *
  * Idempotent by construction: it re-sees the same comments on every run, and re-ingesting is a
@@ -161,22 +242,50 @@ export async function pollPrComments(pool, { repo, prNumber, gh = ghCliReader, m
       continue;
     }
 
-    // 4. Hand the untouched comment to the ACCEPTED ingest path. No second write path into the
+    // 4. CHECKPOINT (WO-TW-02): an explicit marker creates/re-finds its turn BEFORE ingest, so
+    //    the comment has something to bind to. Order matters — ingest resolves the turn by
+    //    (repo, pr_number) newest-first, so the checkpoint comment binds to the turn it just
+    //    opened. Without a marker this is skipped entirely and nothing is created.
+    let checkpoint = null;
+    if (parsed.checkpoint) {
+      try {
+        const t = await ensureCheckpointTurn(pool, {
+          repo, prNumber, headSha: apiHeadSha, comment, buildRef: parsed.checkpoint.buildRef,
+        });
+        checkpoint = {
+          turnId: t.id, turnSeq: t.seq, buildRef: t.build_ref,
+          buildRefRequested: t.buildRefRequested, buildRefHonoured: t.buildRefHonoured,
+          sessionTurnKey: t.sessionTurnKey, created: t.deduped !== true,
+        };
+      } catch (e) {
+        // Fail closed and LOUD: a checkpoint that could not open its round must not fall through
+        // and be ingested against some older turn as if it were an ordinary comment.
+        results.push({ ...base, outcome: 'refused_checkpoint', reason: e.message });
+        continue;
+      }
+    }
+
+    // 5. Hand the untouched comment to the ACCEPTED ingest path. No second write path into the
     //    tables exists, by design.
     const payload = toIngestPayload({ repo, prNumber, comment });
     try {
       const res = await ingestPrComment(pool, payload);
-      if (res.deduped) results.push({ ...base, outcome: 'deduped', commentRowId: res.commentRowId, headSha: res.headSha });
-      else if (res.applied) results.push({ ...base, outcome: 'applied', commentRowId: res.commentRowId,
+      if (res.deduped) results.push({ ...base, checkpoint, outcome: 'deduped', commentRowId: res.commentRowId, headSha: res.headSha });
+      else if (res.applied) results.push({ ...base, checkpoint, outcome: 'applied', commentRowId: res.commentRowId,
         turnId: res.turnId, headSha: res.headSha, applied_count: res.applied_count, skipped: res.skipped });
-      else results.push({ ...base, outcome: 'rejected_stale', commentRowId: res.commentRowId,
+      else results.push({ ...base, checkpoint, outcome: 'rejected_stale', commentRowId: res.commentRowId,
         turnId: res.turnId, headSha: res.headSha, reason: res.reason });
     } catch (e) {
-      results.push({ ...base, outcome: 'refused_ingest', reason: e.message });
+      results.push({ ...base, checkpoint, outcome: 'refused_ingest', reason: e.message });
     }
   }
 
-  return { repo, prNumber, apiHeadSha, scanned: all.length, candidates: candidates.length, results };
+  return {
+    repo, prNumber, apiHeadSha,
+    scanned: all.length, candidates: candidates.length,
+    checkpointsCreated: results.filter((r) => r.checkpoint?.created === true).length,
+    results,
+  };
 }
 
 function assertRepo(repo) {
@@ -210,6 +319,7 @@ if (import.meta.url === `file://${process.argv[1]}` || process.argv[1] === fileU
         console.log(`[poll] ${res.scanned} comment(s) on the PR, ${res.candidates} carrying @tower directives`);
         for (const r of res.results) {
           console.log(`[poll] comment ${r.commentId} by ${r.author} → ${r.outcome.toUpperCase()}`
+            + (r.checkpoint ? ` [checkpoint ${r.checkpoint.created ? 'OPENED' : 'already open'} turn ${r.checkpoint.turnId} ${r.checkpoint.buildRef}]` : '')
             + (r.applied_count !== undefined ? ` (dispositions applied: ${r.applied_count})` : '')
             + (r.reason ? ` — ${r.reason}` : ''));
         }

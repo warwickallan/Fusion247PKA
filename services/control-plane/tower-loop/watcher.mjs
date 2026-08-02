@@ -5,11 +5,22 @@
 // apply verdict → auto-Telegram). It adds nothing that the acceptance proof does not require.
 //
 // One process, one loop, forever until SIGINT:
-//   reclaim stale leases → claim ONE pending turn (exactly-once, restart-safe) → process it
-//   (reuse the proven path) → mark final → heartbeat → sleep(poll) → repeat.
+//   poll PR comments (WO-TW-02, on its own slower interval) → reclaim stale leases → claim ONE
+//   pending turn (exactly-once, restart-safe) → process it (reuse the proven path) → mark final
+//   → heartbeat → sleep(poll) → repeat.
 //
-// Turns ARRIVE via ingestTurn() (loop.mjs) as state='pending'. The watcher is the only thing
-// that processes them. Exactly-once is guaranteed by a durable lease taken inside a single
+// WO-TW-02 — THE AUTOMATIC TRIGGER, which is one loop step and deliberately nothing more.
+// The subsystem's own README said it plainly: "Something must still invoke the poller."
+// `pollPrComments.mjs` was a real, proven GitHub→ingest hop that only ever ran because a human
+// typed it. This loop is now that something. No scheduler, no second process, no new store: a
+// second interval on the loop that was already running forever.
+//
+//   Turns still ARRIVE via ingestTurn() (loop.mjs) as state='pending' — but they no longer arrive
+//   ONLY by hand. A PR comment carrying an explicit `@tower checkpoint:` marker now opens its own
+//   turn inside the poll step (see pollPrComments.ensureCheckpointTurn), idempotently, keyed in
+//   the database. A comment WITHOUT that marker cannot create anything.
+//
+// The watcher is still the only thing that PROCESSES turns. Exactly-once is guaranteed by a durable lease taken inside a single
 // BEGIN IMMEDIATE write transaction, and by refusing to re-run Codex when a turn already has a
 // supervisor_review.
 //
@@ -28,7 +39,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
 import { openDb, isBusyError } from './db.mjs';
-import { applySchema, applyWatcherSchema, applyHoldSchema, applyCommentSchema } from './apply.mjs';
+import { applySchema, applyWatcherSchema, applyHoldSchema, applyCommentSchema, applyPostSchema } from './apply.mjs';
 import {
   loadActivePrompt,
   reconstructTurn,
@@ -41,12 +52,39 @@ import { runSupervisor, runMergeReview } from './supervisorCodex.mjs';
 import { gatherGitEvidence } from './gitEvidence.mjs';
 import { detectMergeClass } from './mergeClass.mjs';
 import { notify, composeMessage, composeLarryMessage } from './notify.mjs';
+// WO-TW-02 — the automatic trigger. The poller was already real and already proven; the only
+// thing missing was something that ran it without a human. That something is the loop below.
+import { pollPrComments, ghCliReader } from './pollPrComments.mjs';
+// WO-TW-02 — the other half of Warwick's condition: the verdict goes back ONTO the PR. A
+// SEPARATE module with a SEPARATE seam; the poller stays structurally read-only.
+import { queueVerdictForTurn, postPendingVerdicts, ghCliWriter } from './postVerdict.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const WATCHER_ID = process.env.WATCHER_ID || `${os.hostname()}#${process.pid}`;
 const POLL_MS = Number(process.env.WATCHER_POLL_MS || 1500);
 const LEASE_SECONDS = Number(process.env.WATCHER_LEASE_SECONDS || 30);
+
+// ── WO-TW-02: the PR-comment poll step ───────────────────────────────────────
+// Deliberately NOT a scheduler. A second interval on the existing loop, three constants, and a
+// consecutive-failure count. If that reads as underwhelming, good: the gap was "something must
+// still invoke the poller", and anything larger than this is solving a problem nobody has.
+const PR_POLL_ENABLED = process.env.TOWER_PR_POLL !== 'off';
+// The turn loop runs every POLL_MS (1.5s default). GitHub must not be asked that often, so the
+// poll has its own, much slower interval. 60s is the smallest value that is obviously polite.
+const PR_POLL_MS = Number(process.env.TOWER_PR_POLL_MS || 60000);
+// A LITERAL, not config: how many CONSECUTIVE all-failed poll rounds before the alarm fires. Held
+// here rather than in env so a misconfigured deployment cannot quietly raise it to infinity —
+// which is how a loud failure becomes a silent one.
+const PR_POLL_FAIL_ESCALATE_AFTER = 3;
+// Also a literal. Bounds how many PRs one round can ask GitHub about, so an old store full of
+// stale turns cannot turn a poll into a rate-limit incident.
+const PR_POLL_MAX_TARGETS = 5;
+// The verdict write-back. Same shape and same literal threshold as the poll: a persistent
+// inability to WRITE to the PR is exactly as serious as a persistent inability to read it,
+// because in both cases the loop looks healthy while the human on the PR sees nothing.
+const PR_WRITEBACK_ENABLED = process.env.TOWER_PR_WRITEBACK !== 'off';
+const PR_POST_FAIL_ESCALATE_AFTER = 3;
 
 // Repo root (…/services/control-plane/tower-loop → up 3) + the APPROVED Tower QA skill used
 // on merge-class turns. Both overridable via env for tests / relocated checkouts.
@@ -71,12 +109,122 @@ async function resolveDeps() {
     gitMod = await import(pathToFileURL(path.resolve(process.env.TOWER_GIT_EVIDENCE_MODULE)).href);
     log('git_evidence_double_loaded', { module: process.env.TOWER_GIT_EVIDENCE_MODULE });
   }
+  // WO-TW-02: the `gh` seam, injected the same way as the other two so the trigger is provable
+  // with no network and no gh binary. Drop the var and it is the real `gh api` reader.
+  let ghMod = {};
+  if (process.env.TOWER_GH_MODULE) {
+    ghMod = await import(pathToFileURL(path.resolve(process.env.TOWER_GH_MODULE)).href);
+    log('gh_double_loaded', { module: process.env.TOWER_GH_MODULE });
+  }
   return {
     runSupervisor: reviewerMod.runSupervisor ?? runSupervisor,
     runMergeReview: reviewerMod.runMergeReview ?? runMergeReview,
     gatherGitEvidence: gitMod.gatherGitEvidence ?? gatherGitEvidence,
+    gh: ghMod.ghCliReader ?? ghCliReader,
+    // Same env var, DIFFERENT export. The reader and the writer are two seams and the double has
+    // to supply them separately, exactly as the code does — a double that merged them would let
+    // the suite pass over a design the real modules do not have.
+    ghWriter: ghMod.ghCliWriter ?? ghCliWriter,
     notify,
   };
+}
+
+/**
+ * WO-TW-02 — send any verdicts that are claimed but not yet on the PR.
+ *
+ * Returns counts; never throws. Escalation of a persistent failure is the caller's, so that the
+ * decision to be loud lives in one place next to the poll's identical decision.
+ */
+export async function postRound(pool, deps) {
+  try {
+    return await postPendingVerdicts(pool, { writer: deps.ghWriter, reader: deps.gh });
+  } catch (e) {
+    const msg = String(e?.message ?? e);
+    log('pr_post_sweep_failed', { error: msg });
+    return { pending: 1, posted: 0, failed: 1, skipped: 0, errors: [{ postKey: '(sweep)', repo: '-', pr: 0, error: msg }] };
+  }
+}
+
+// ── WO-TW-02: poll targets, derived from the store ───────────────────────────
+/**
+ * Which PRs this watcher should ask GitHub about, right now.
+ *
+ * Derived from the store rather than configured, on purpose: a configured list is a second source
+ * of truth that goes stale the moment a PR closes, and it would have to be maintained by whoever
+ * operates the watcher. Tower already knows which PRs it cares about — they are the ones its own
+ * non-complete turns point at.
+ *
+ * `state <> 'complete'` is the right cut and is not the same as the suite's TERMINAL set: a turn
+ * that has been reviewed/blocked/awaiting_warwick is PRECISELY the one waiting for Larry to
+ * dispose its findings in a PR comment. Stopping the poll there would switch the loop off at the
+ * exact moment it is needed.
+ *
+ * BOOTSTRAP NOTE, and it is load-bearing: a store with no turns yields no targets, so the very
+ * first checkpoint on a PR Tower has never seen is NOT discoverable this way. See TOWER_PR_SEED.
+ */
+export async function pollTargets(pool, { limit = PR_POLL_MAX_TARGETS } = {}) {
+  const { rows } = await pool.query(
+    `select repo, pr_number, max(seq) as seq
+       from tower.turn
+      where repo is not null and pr_number is not null and state <> 'complete'
+      group by repo, pr_number
+      order by seq desc
+      limit ?`,
+    [limit],
+  );
+  const targets = rows.map((r) => ({ repo: String(r.repo), prNumber: Number(r.pr_number) }));
+
+  // The bootstrap seed: one `owner/name#pr` (or a comma-separated few) this watcher should poll
+  // even with no turn pointing at it yet. Without it the store-derived rule cannot bootstrap —
+  // no turn means no target, no target means no poll, no poll means the first checkpoint is never
+  // seen, and the automatic journey would only ever work on a PR that was already known.
+  const seeds = String(process.env.TOWER_PR_SEED ?? '')
+    .split(',').map((s) => s.trim()).filter(Boolean)
+    .map((s) => {
+      const m = /^([A-Za-z0-9._-]+\/[A-Za-z0-9._-]+)#(\d+)$/.exec(s);
+      return m ? { repo: m[1], prNumber: Number(m[2]) } : null;
+    })
+    .filter(Boolean);
+
+  const seen = new Set(targets.map((t) => `${t.repo}#${t.prNumber}`));
+  for (const s of seeds) {
+    const k = `${s.repo}#${s.prNumber}`;
+    if (!seen.has(k)) { targets.push(s); seen.add(k); }
+  }
+  return targets;
+}
+
+/**
+ * ONE poll round: ask GitHub about every target, hand every @tower comment to the existing
+ * ingest, and let an explicit checkpoint open its own turn.
+ *
+ * Returns counts rather than throwing. A poll failure must never take the turn loop down with it:
+ * GitHub being briefly unreachable is not a reason to stop supervising turns that are already in
+ * the store. Escalation of a PERSISTENT failure is the caller's job, and it is not optional —
+ * see runWatcher.
+ */
+export async function pollRound(pool, deps) {
+  const targets = await pollTargets(pool);
+  if (targets.length === 0) { log('pr_poll_no_targets'); return { targets: 0, ok: 0, failed: 0, errors: [] }; }
+
+  let ok = 0;
+  const errors = [];
+  for (const { repo, prNumber } of targets) {
+    try {
+      const res = await pollPrComments(pool, { repo, prNumber, gh: deps.gh });
+      ok += 1;
+      log('pr_poll_ok', {
+        repo, pr: prNumber, head: res.apiHeadSha, scanned: res.scanned,
+        candidates: res.candidates, checkpointsCreated: res.checkpointsCreated,
+        outcomes: res.results.map((r) => r.outcome),
+      });
+    } catch (e) {
+      const msg = String(e?.message ?? e);
+      errors.push({ repo, pr: prNumber, error: msg });
+      log('pr_poll_failed', { repo, pr: prNumber, error: msg });
+    }
+  }
+  return { targets: targets.length, ok, failed: errors.length, errors };
 }
 
 /** Load the APPROVED Tower QA skill (governing prompt) + its sha256 fingerprint. Fail-closed:
@@ -496,20 +644,123 @@ export async function runWatcher() {
   await applyWatcherSchema(pool);
   await applyHoldSchema(pool);
   await applyCommentSchema(pool);
+  await applyPostSchema(pool);
   log('store_open', { path: pool.path });
 
   const deps = await resolveDeps();
   let stopping = false;
   let lastTurnId = null;
+  // WO-TW-02 poll-step state. In-process on purpose: it is scheduling and alerting state, not
+  // durable state. A restart re-polls, which is safe (the DB owns idempotence) and re-arms the
+  // alarm, which is correct — a fresh process has no standing to stay quiet about GitHub.
+  let nextPrPollAt = 0;                 // 0 = poll on the very first iteration
+  let consecutivePollFailures = 0;
+  let consecutivePostFailures = 0;
+
+  // WO-TW-02 — the write-back sweep, shared by both call sites (after a turn is processed, and
+  // once per poll round so a failed post is retried without waiting for the next turn).
+  const sweepVerdicts = async () => {
+    if (!PR_WRITEBACK_ENABLED) return;
+    const r = await postRound(pool, deps);
+    if (r.pending === 0) return;
+    if (r.posted > 0 || r.skipped > 0) log('pr_verdict_posted', { posted: r.posted, alreadyOnPr: r.skipped, pending: r.pending });
+    if (r.failed > 0 && r.posted === 0) {
+      consecutivePostFailures += 1;
+      log('pr_post_failed', {
+        consecutive: consecutivePostFailures, escalateAfter: PR_POST_FAIL_ESCALATE_AFTER,
+        errors: r.errors.map((e) => `${e.repo}#${e.pr}: ${e.error}`),
+      });
+      // FAIL-CLOSED AND LOUD. The verdict row stays posted=0, so nothing anywhere claims the
+      // round was answered on the PR — and once the streak reaches the threshold, TowerBot is
+      // told, once, that reviews are no longer reaching the pull request.
+      if (consecutivePostFailures === PR_POST_FAIL_ESCALATE_AFTER) {
+        const detail = r.errors.map((e) => `${e.repo}#${e.pr}: ${e.error}`).join(' | ').slice(0, 300);
+        try {
+          await deps.notify(pool, {
+            turnId: null, reason: 'tower_failure', state: 'post_failing',
+            message: composeMessage({
+              buildRef: 'BUILD-014', turnSeq: '?', turnId: null, state: 'post_failing', verdict: null,
+              summary: `Watcher ${WATCHER_ID}: ${PR_POST_FAIL_ESCALATE_AFTER} consecutive verdict posts FAILED — `
+                + `reviews are NOT reaching the pull request. ${detail}`,
+              nextAction: 'Check `gh auth status` and that the token still carries write scope on the repo.',
+              warwickNeeded: true,
+            }),
+          });
+          log('pr_post_alarm_fired', { consecutive: consecutivePostFailures });
+        } catch (e) {
+          log('pr_post_alarm_failed', { error: String(e?.message ?? e) });
+        }
+      }
+    } else if (r.posted > 0 || r.skipped > 0) {
+      if (consecutivePostFailures > 0) log('pr_post_recovered', { after: consecutivePostFailures });
+      consecutivePostFailures = 0;
+    }
+  };
 
   const onSignal = () => { stopping = true; log('signal_stop'); };
   process.on('SIGINT', onSignal);
   process.on('SIGTERM', onSignal);
 
-  log('watcher_up', { pollMs: POLL_MS, leaseSeconds: LEASE_SECONDS });
+  log('watcher_up', {
+    pollMs: POLL_MS, leaseSeconds: LEASE_SECONDS,
+    prPoll: PR_POLL_ENABLED ? `every ${PR_POLL_MS}ms` : 'off',
+    prWriteback: PR_WRITEBACK_ENABLED ? 'on' : 'off',
+  });
 
   try {
     while (!stopping) {
+      // ── WO-TW-02: the automatic trigger. This is the whole feature: the already-running
+      // watcher asks GitHub, on its own schedule, with nobody typing a command.
+      if (PR_POLL_ENABLED && Date.now() >= nextPrPollAt) {
+        nextPrPollAt = Date.now() + PR_POLL_MS;
+        let round = null;
+        try {
+          round = await pollRound(pool, deps);
+        } catch (e) {
+          // pollTargets itself failed (the store, not GitHub). Treat as a failed round rather
+          // than crashing the turn loop; a store that is truly gone will fail the next query too.
+          round = { targets: 1, ok: 0, failed: 1, errors: [{ repo: '(targets)', pr: 0, error: String(e?.message ?? e) }] };
+          log('pr_poll_targets_failed', { error: String(e?.message ?? e) });
+        }
+
+        // A round counts as failed only when it had targets and NONE of them succeeded. A round
+        // with no targets is not a failure — it is an idle watcher with nothing to watch, and
+        // alarming on it would train whoever reads TowerBot to ignore the alarm.
+        const roundFailed = round.targets > 0 && round.ok === 0;
+        if (roundFailed) {
+          consecutivePollFailures += 1;
+          log('pr_poll_round_failed', { consecutive: consecutivePollFailures, escalateAfter: PR_POLL_FAIL_ESCALATE_AFTER });
+          // FIRE ONCE per failure streak, exactly at the threshold. Not every round (that is
+          // spam, and spam is ignored) and not never (that is silence, and silence reads as
+          // "nothing to review" — the failure mode this whole subsystem exists to prevent).
+          if (consecutivePollFailures === PR_POLL_FAIL_ESCALATE_AFTER) {
+            const detail = round.errors.map((e) => `${e.repo}#${e.pr}: ${e.error}`).join(' | ').slice(0, 300);
+            try {
+              await deps.notify(pool, {
+                turnId: null, reason: 'tower_failure', state: 'poll_failing',
+                message: composeMessage({
+                  buildRef: 'BUILD-014', turnSeq: '?', turnId: null, state: 'poll_failing',
+                  verdict: null,
+                  summary: `Watcher ${WATCHER_ID}: ${PR_POLL_FAIL_ESCALATE_AFTER} consecutive PR-comment poll rounds FAILED — `
+                    + `Tower is no longer seeing PR checkpoints. ${detail}`,
+                  nextAction: 'Check `gh auth status` and network reachability on the watcher host.',
+                  warwickNeeded: true,
+                }),
+              });
+              log('pr_poll_alarm_fired', { consecutive: consecutivePollFailures });
+            } catch (e) {
+              log('pr_poll_alarm_failed', { error: String(e?.message ?? e) });
+            }
+          }
+        } else if (round.targets > 0) {
+          if (consecutivePollFailures > 0) log('pr_poll_recovered', { after: consecutivePollFailures });
+          consecutivePollFailures = 0;
+        }
+
+        // Retry anything that failed to reach the PR earlier, on the same cadence.
+        await sweepVerdicts();
+      }
+
       await reclaimStale(pool);
       const claimed = await claimOne(pool);
       if (claimed) {
@@ -521,6 +772,18 @@ export async function runWatcher() {
         try {
           const res = await processTurn(pool, claimed.id, deps);
           lastTurnId = res.turnId;
+          // WO-TW-02 — the verdict goes back onto the PR. CLAIMED here (durably, keyed on the
+          // review) and SENT by the sweep, so a send failure leaves a retryable record rather
+          // than a round that quietly never answered.
+          if (PR_WRITEBACK_ENABLED) {
+            try {
+              const q = await queueVerdictForTurn(pool, res.turnId);
+              if (q?.claimed) log('pr_verdict_queued', { turnId: res.turnId, postKey: q.postKey });
+            } catch (e) {
+              log('pr_verdict_queue_failed', { turnId: res.turnId, error: String(e?.message ?? e) });
+            }
+            await sweepVerdicts();
+          }
         } finally {
           stopRenew();
         }

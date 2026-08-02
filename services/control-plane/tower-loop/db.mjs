@@ -44,11 +44,17 @@ export const SQL_NOW = "strftime('%Y-%m-%dT%H:%M:%fZ','now')";
  * asserted by the enumeration below: no name appears in two tables with two different types.
  *   supervisor_prompt.active · turn.goal_complete · notification.telegram_ok ·
  *   supervisor_review.{aligned,over_engineering,drifting,administering,warwick_needed} ·
- *   pr_comment.applied
+ *   pr_comment.applied · pr_verdict_post.posted (WO-TW-02)
+ *
+ * WO-TW-02 note, because this is the exact trap the header warns about: `posted` was added to
+ * tower.pr_verdict_post and NOT added here, and the read came back as `1`. Under assert/strict
+ * `1 !== true`, so a test caught it — but a caller writing `if (row.posted)` would have been
+ * silently correct, and a caller writing `row.posted === false` silently wrong. Adding a boolean
+ * column to this schema without adding its NAME here is a quiet false green waiting to happen.
  */
 const BOOLEAN_COLUMNS = new Set([
   'active', 'goal_complete', 'telegram_ok', 'aligned', 'over_engineering',
-  'drifting', 'administering', 'warwick_needed', 'applied',
+  'drifting', 'administering', 'warwick_needed', 'applied', 'posted',
 ]);
 
 /** Columns whose Postgres type is `timestamptz`. Stored as ISO-8601 TEXT, rehydrated to `Date`. */
