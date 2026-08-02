@@ -66,24 +66,168 @@ function packet({ seq, ts, backfill = false, focus = `focus-${seq}`, id = `cont-
   return { schema: 1, kind: 'continuity', id, ts, seq, backfill, focus, next_action: `next-${seq}` };
 }
 
-// A server that pages properly: `page` is honoured, 50 per page.
-function pagingServer(packets, { pageSize = 50 } = {}) {
+// A server that behaves like the DOCUMENTED one (WO-OR-21): it honours the `size` it is
+// asked for, honours `page`, honours `reverse`, and returns the real five-field envelope
+// {items, total, page, size, pages}.
+//
+// BEFORE WO-OR-21 this fixture served a fixed 50 per page and returned {items} alone — it
+// modelled a server nobody had established. It now models the contract in
+// Deliverables/2026-08-02-pax-honcho-messages-list-contract.md. That is why several call
+// counts below moved: the client asks for 100 now, so fewer round trips are needed for the
+// same fixture. Every such change is listed in the handback with its before, after and reason.
+function pagingServer(packets, { pageSize = null } = {}) {
   const calls = [];
-  const fetchPage = async ({ page, cursor }) => {
-    calls.push({ page, cursor });
-    const start = (page - 1) * pageSize;
-    return { items: packets.slice(start, start + pageSize).map((p) => msg(p)) };
+  const fetchPage = async ({ page, cursor, size, reverse }) => {
+    calls.push({ page, cursor, size, reverse });
+    const eff = pageSize ?? size ?? 50;
+    const ordered = reverse ? [...packets].slice().reverse() : packets;
+    const start = (page - 1) * eff;
+    return {
+      items: ordered.slice(start, start + eff).map((p) => msg(p)),
+      total: packets.length,
+      page,
+      size: eff,
+      pages: Math.ceil(packets.length / eff),
+    };
   };
   return { fetchPage, calls };
 }
 
+// A transport spy standing where `hf()` stands. It records the exact (path, options) pair
+// `fetchMessagePage` produces and answers with an empty documented envelope. Nothing here
+// reaches the network and nothing enters loadHonchoEnv().
+function transportSpy(response = { items: [], total: 0, page: 1, size: 100, pages: 0 }) {
+  const sent = [];
+  const request = async (path, opts) => { sent.push({ path, opts }); return response; };
+  return { request, sent };
+}
+
 // ---------------------------------------------------------------------------
-// THE DEFECT — a session holding more than one page
+// THE REQUEST SHAPE — the entire defect, asserted directly (WO-OR-21)
+// ---------------------------------------------------------------------------
+// `page`, `size` and `reverse` are QUERY-STRING parameters. The request body model accepts
+// exactly one property, `filters`. Sending them in the body made the server discard them in
+// silence and apply its own defaults (page=1, size=50, reverse=false, oldest-first) — no 400,
+// no warning, just plausible default-shaped data.
+//
+// THIS IS WHY THESE TESTS ASSERT THE REQUEST AND NOT THE RESPONSE. A parameter in the wrong
+// LOCATION is indistinguishable from a server that ignores you, so a test that only checked
+// the returned packet would have passed against the broken code. These are the assertions
+// that must go red when the mutation moves the fields back into the body.
+
+test('REQUEST SHAPE: the default request is byte-for-byte the documented call', async () => {
+  const { request, sent } = transportSpy();
+  await continuity.fetchMessagePage({ request });
+
+  assert.equal(sent.length, 1, 'exactly one request was built');
+  // The literal is held HERE, in the test, not derived from the module it checks — a
+  // constant compared against itself proves nothing.
+  assert.equal(
+    sent[0].path,
+    '/workspaces/{ws}/sessions/larry-continuity/messages/list?reverse=true&size=100&page=1',
+    'this string is what Pax documented; compare it to the brief character by character'
+  );
+  assert.equal(continuity.CONTINUITY_SESSION, 'larry-continuity', 'and the session in that path is the real one');
+  assert.equal(sent[0].opts.method, 'POST');
+});
+
+test('REQUEST SHAPE: page/size/reverse are in the QUERY STRING, parsed rather than string-matched', async () => {
+  const { request, sent } = transportSpy();
+  await continuity.fetchMessagePage({ page: 3, request });
+
+  const [route, qs] = sent[0].path.split('?');
+  assert.equal(route, '/workspaces/{ws}/sessions/larry-continuity/messages/list');
+  assert.ok(qs, 'THE DEFECT: there was no query string at all — every field was in the body');
+
+  const q = new URLSearchParams(qs);
+  assert.equal(q.get('reverse'), 'true', 'newest-first, or readLatest is handed the oldest window');
+  assert.equal(q.get('size'), '100', 'the documented MAXIMUM; 50 was only ever the default');
+  assert.equal(q.get('page'), '3', 'and `page` is honoured rather than silently dropped');
+});
+
+test('REQUEST SHAPE: the BODY carries no pagination field — the model accepts only `filters`', async () => {
+  const { request, sent } = transportSpy();
+  await continuity.fetchMessagePage({ page: 2, request });
+
+  const body = sent[0].opts.body;
+  assert.ok(body && typeof body === 'object', 'a body is still sent');
+  for (const forbidden of ['page', 'size', 'reverse', 'cursor', 'offset', 'limit', 'order', 'sort']) {
+    assert.equal(
+      Object.prototype.hasOwnProperty.call(body, forbidden), false,
+      `THE DEFECT: \`${forbidden}\` in the body is discarded in silence — the server never says so`
+    );
+  }
+  assert.deepEqual(
+    Object.keys(body).filter((k) => k !== 'filters'), [],
+    'the body model has exactly one property, `filters`; anything else is dropped'
+  );
+});
+
+test('REQUEST SHAPE: the walker drives the same builder — size and reverse reach the transport', async () => {
+  // Proves the query string is not merely computed correctly in isolation but is what an
+  // actual readLatest() call produces. "The right value computed somewhere it is never used"
+  // is the shape of the bug being fixed, so the two halves are joined here.
+  const { request, sent } = transportSpy({
+    items: [msg(packet({ seq: 1, ts: '2026-08-01T00:00:01.000Z' }))], total: 1, page: 1, size: 100, pages: 1,
+  });
+  const r = await continuity.readLatest({ fetchPage: (args) => continuity.fetchMessagePage({ ...args, request }) });
+
+  assert.equal(r.latest.seq, 1);
+  assert.equal(sent.length, 1);
+  const q = new URLSearchParams(sent[0].path.split('?')[1]);
+  assert.equal(q.get('reverse'), 'true');
+  assert.equal(q.get('size'), '100');
+  assert.equal(q.get('page'), '1');
+});
+
+test('SIZE GUARD: over 100 is REFUSED before anything is sent — 422, not a clamp', async () => {
+  // The old code read `size: 500 -> 50` as a server-side clamp. It was not: the body was
+  // being discarded and the default applied. Sent as a query parameter, 500 is an HTTP 422.
+  // Code written on the "it clamps" assumption fails differently than expected.
+  const { request, sent } = transportSpy();
+  await assert.rejects(
+    () => continuity.fetchMessagePage({ size: 500, request }),
+    /size must be an integer 1\.\.100/,
+  );
+  assert.equal(sent.length, 0, 'and nothing was put on the wire');
+});
+
+test('SIZE GUARD: the boundary is swept, not spot-checked — 1 and 100 pass, 0 and 101 do not', async () => {
+  // A guard tested only at 500 would also pass if it were written `> 400`. The interesting
+  // values are the ones either side of the limit.
+  for (const ok of [1, 100]) {
+    const { request, sent } = transportSpy();
+    await continuity.fetchMessagePage({ size: ok, request });
+    assert.equal(new URLSearchParams(sent[0].path.split('?')[1]).get('size'), String(ok), `size=${ok} must be allowed`);
+  }
+  for (const bad of [0, 101, -1, 1.5, '100', NaN]) {
+    const { request, sent } = transportSpy();
+    await assert.rejects(() => continuity.fetchMessagePage({ size: bad, request }), /size must be an integer/, `size=${String(bad)} must be refused`);
+    assert.equal(sent.length, 0);
+  }
+});
+
+test('PAGE GUARD: page is 1-based — page 0 is refused rather than sent as a 422', async () => {
+  const { request, sent } = transportSpy();
+  await assert.rejects(() => continuity.fetchMessagePage({ page: 0, request }), /page must be an integer >= 1/);
+  assert.equal(sent.length, 0);
+});
+
+// ---------------------------------------------------------------------------
+// THE DEFECT — the newest packet is returned, not an early window
 // ---------------------------------------------------------------------------
 
-test('readLatest returns the genuinely newest packet when the session holds MORE than one page', async () => {
-  // The live shape at the time this was found: 86 packets, 50 per page, and the old
-  // single-request path could reach no further than seq 51 — roughly fifteen hours stale.
+test('readLatest returns the genuinely newest packet — 86 packets, ONE request at size 100', async () => {
+  // The live shape when this was found: 86 packets, and the old path could reach no further
+  // than seq 51 — roughly fifteen hours stale.
+  //
+  // WO-OR-21 CHANGED THE ARITHMETIC, NOT THE GUARANTEE. Under the documented contract the
+  // client asks for size=100, so all 86 arrive in ONE response and `pages` is 1. Previously
+  // this fixture served 50 a page and the walk took two requests.
+  //   calls.length   2 -> 1
+  //   calls[].page   [1, 2] -> [1]
+  // The guarantee under test — the NEWEST packet is returned and every packet is read — is
+  // unchanged, and the multi-page walk keeps its own dedicated proof in the next test.
   const packets = [];
   for (let seq = 1; seq <= 86; seq++) {
     packets.push(packet({ seq, ts: new Date(Date.UTC(2026, 7, 1, 0, 0, seq)).toISOString() }));
@@ -93,28 +237,103 @@ test('readLatest returns the genuinely newest packet when the session holds MORE
   const r = await continuity.readLatest({ fetchPage });
 
   assert.equal(r.latest.seq, 86, 'THE DEFECT: this returned seq 51, an early window presented as the newest');
-  assert.equal(r.count, 86, 'every packet was read, not just the first page');
+  assert.equal(r.count, 86, 'every packet was read');
   assert.equal(r.complete, true);
-  // 86 packets at 50 a page is one FULL page then a SHORT one, and a short page is the
-  // end of the list — so two requests, not three. (This assertion originally said three:
-  // the author's arithmetic was wrong, not the code's. Recorded because a test quietly
-  // adjusted to match the code is indistinguishable from one that was always right.)
-  assert.equal(calls.length, 2, 'one full page, then the short page that ends the walk');
-  assert.deepEqual(calls.map((c) => c.page), [1, 2]);
+  assert.equal(calls.length, 1, '86 fits inside one size=100 page, so one request is the whole read');
+  assert.deepEqual(calls.map((c) => c.page), [1]);
+  assert.equal(calls[0].size, 100, 'and it asked for 100, which is what makes one request enough');
+  assert.equal(calls[0].reverse, true);
+});
+
+test('MULTI-PAGE: a session PAST 100 is walked to `pages` and the newest is still returned', async () => {
+  // ADDED at WO-OR-21. Today's 86 packets fit in a single request, so without this the
+  // walker becomes untested at the exact moment it becomes correct. 250 packets at size 100
+  // is 3 pages, and termination is `page >= pages` from the envelope.
+  const packets = [];
+  for (let seq = 1; seq <= 250; seq++) {
+    packets.push(packet({ seq, ts: new Date(Date.UTC(2026, 7, 1, 0, 0, 0, seq)).toISOString() }));
+  }
+  const { fetchPage, calls } = pagingServer(packets);
+
+  const r = await continuity.readLatest({ fetchPage });
+
+  assert.equal(r.latest.seq, 250, 'the newest packet in the store, not the newest of page 1');
+  assert.equal(r.count, 250, 'all three pages were read');
+  assert.equal(r.complete, true, 'and the walk finished for a POSITIVE reason: page >= pages');
+  assert.equal(calls.length, 3, 'ceil(250/100) — no more, and crucially no fewer');
+  assert.deepEqual(calls.map((c) => c.page), [1, 2, 3], 'page is incremented and honoured');
+  assert.equal(r.pages, 3);
+});
+
+test('TERMINATION: `page >= pages` ends the walk with no wasted probe, even on an EXACT page multiple', async () => {
+  // This is the test that pins the documented termination rule specifically, and it exists
+  // because mutation M5 (deleting the `pages` branch) left the MULTI-PAGE test green: at 250
+  // packets the final page is short, so the fallback rescued it and the rule under test was
+  // never the thing being measured.
+  //
+  // 200 packets at size 100 is exactly 2 full pages. Nothing is short, no cursor is offered,
+  // and the repeat guard cannot fire. `pages` is the ONLY signal that page 2 is the last one.
+  // Without it the walker must ask for a page 3 that does not exist — so the third call is
+  // the tell, and asserting there are only two is what makes the rule load-bearing.
+  const packets = [];
+  for (let seq = 1; seq <= 200; seq++) {
+    packets.push(packet({ seq, ts: new Date(Date.UTC(2026, 7, 6, 0, 0, 0, seq)).toISOString() }));
+  }
+  const { fetchPage, calls } = pagingServer(packets);
+
+  const r = await continuity.readLatest({ fetchPage });
+
+  assert.equal(r.latest.seq, 200);
+  assert.equal(r.count, 200);
+  assert.equal(r.complete, true);
+  assert.equal(calls.length, 2, 'ceil(200/100) = 2, and `pages` is the only thing that says so');
+  assert.deepEqual(calls.map((c) => c.page), [1, 2], 'no speculative page 3');
+});
+
+test('MULTI-PAGE MUTATION: against a server that IGNORES `reverse`, only the full walk finds the newest', async () => {
+  // Without this, "the newest is returned" would also pass trivially, because reverse=true
+  // puts the newest on page 1 by design. So the mutation removes that comfort: this server
+  // hands back oldest-first whatever it is asked, which is exactly the hedge the defensive
+  // sort and the full walk exist for. Page 1 then tops out at seq 100 and the answer is only
+  // correct if pages 2 and 3 were genuinely fetched.
+  const packets = [];
+  for (let seq = 1; seq <= 250; seq++) {
+    packets.push(packet({ seq, ts: new Date(Date.UTC(2026, 7, 1, 0, 0, 0, seq)).toISOString() }));
+  }
+  const oldestFirstAlways = async ({ page, size }) => ({
+    items: packets.slice((page - 1) * size, page * size).map((p) => msg(p)),
+    total: packets.length, page, size, pages: Math.ceil(packets.length / size),
+  });
+
+  const truncated = await continuity.readLatest({ fetchPage: oldestFirstAlways, maxPages: 1 });
+  assert.equal(truncated.latest.seq, 100, 'page 1 alone tops out at seq 100 — the stale answer');
+  assert.equal(truncated.complete, false, 'and a truncated read must say so rather than look finished');
+
+  const full = await continuity.readLatest({ fetchPage: oldestFirstAlways });
+  assert.equal(full.latest.seq, 250, 'the full walk plus the defensive sort recover the genuinely newest');
+  assert.equal(full.complete, true);
 });
 
 test('MUTATION: a single-page read of the same store returns the STALE packet — the defect, reproduced', async () => {
-  // Makes the test above fail-able by reproducing the OLD behaviour against the identical
-  // fixture. If pagination silently stopped working, the test above would go red and this
-  // one would still pass, so the pair distinguishes "fixed" from "fixture is too easy".
+  // Makes the tests above fail-able by reproducing the OLD behaviour against the same
+  // fixture. If pagination silently stopped working, those would go red and this one would
+  // still pass, so the pair distinguishes "fixed" from "fixture is too easy".
+  //
+  // WO-OR-21: the fixture now returns the documented envelope declaring `pages: 2`, so the
+  // truncation is visible to the walker and `complete: false` became assertable. That
+  // assertion is ADDED, not relaxed.
   const packets = [];
   for (let seq = 1; seq <= 86; seq++) {
     packets.push(packet({ seq, ts: new Date(Date.UTC(2026, 7, 1, 0, 0, seq)).toISOString() }));
   }
-  const onePageOnly = async ({ page }) => ({ items: page === 1 ? packets.slice(0, 50).map((p) => msg(p)) : [] });
+  const onePageOnly = async ({ page }) => ({
+    items: page === 1 ? packets.slice(0, 50).map((p) => msg(p)) : [],
+    total: 86, page, size: 50, pages: 2,
+  });
   const stale = await continuity.readLatest({ fetchPage: onePageOnly, maxPages: 1 });
   assert.equal(stale.latest.seq, 50, 'the old path could not see past its first window');
   assert.notEqual(stale.latest.seq, 86, 'and that is exactly why a live session read a fifteen-hour-old focus');
+  assert.equal(stale.complete, false, 'a read that stopped short of `pages` is not complete');
 });
 
 test('readLatest walks a session that fits in ONE page without a wasted second request', async () => {
@@ -123,38 +342,45 @@ test('readLatest walks a session that fits in ONE page without a wasted second r
   const r = await continuity.readLatest({ fetchPage });
   assert.equal(r.latest.seq, 2);
   assert.equal(r.complete, true);
-  assert.equal(calls.length, 1, 'a short page is the end of the list; asking again would be noise');
+  assert.equal(calls.length, 1, 'page >= pages on the first response; asking again would be noise');
 });
 
 // ---------------------------------------------------------------------------
-// CORRECT UNDER AN UNESTABLISHED CONTRACT — every plausible server behaviour
+// THE DEFENSIVE BRANCHES — kept, because two things are still NOT established
 // ---------------------------------------------------------------------------
-// Nobody has established this API's pagination contract. So each branch the code
-// enumerates gets a server that behaves that way, and each must land somewhere SAFE.
+// The pagination contract is now documented and cross-confirmed. Two things are not: the
+// API's rate limits (NOT FOUND in any official source — unknown, not unlimited), and whether
+// the deployed server matches the `main` branch that was read. So each branch the code still
+// carries gets a server that behaves that way, and each must land somewhere SAFE.
+//
+// These servers return no `pages` field, which is what puts the code on its fallback path.
+// A "full window" is 100 here rather than 50 because the client now ASKS for 100; a 50-item
+// response to a size=100 request is a legitimately short final page, not a stuck server.
+// (fixture size 50 -> 100, and the count assertions with it: 50 -> 100.)
 
 test('a server that IGNORES `page` and re-serves one window terminates, and reports incomplete', async () => {
   // Without the repeat-detection guard this loops to the page cap on every call, turning
   // one request into forty against a live API. The answer must also not claim to be whole.
   const packets = [];
-  for (let seq = 1; seq <= 50; seq++) packets.push(packet({ seq, ts: `2026-08-01T00:00:${String(seq % 60).padStart(2, '0')}.000Z` }));
+  for (let seq = 1; seq <= 100; seq++) packets.push(packet({ seq, ts: new Date(Date.UTC(2026, 7, 1, 0, 0, seq)).toISOString() }));
   let calls = 0;
   const stuck = async () => { calls++; return { items: packets.map((p) => msg(p)) }; };
 
   const r = await continuity.readLatest({ fetchPage: stuck });
   assert.equal(calls, 2, 'one request, one confirmation that nothing new is coming — then stop');
   assert.equal(r.complete, false, 'and it must NOT present a truncated read as the last word');
-  assert.equal(r.count, 50);
+  assert.equal(r.count, 100);
 });
 
 test('a server that REJECTS the follow-up request keeps page 1 rather than losing everything', async () => {
   const packets = [];
-  for (let seq = 1; seq <= 50; seq++) packets.push(packet({ seq, ts: `2026-08-01T01:00:${String(seq % 60).padStart(2, '0')}.000Z` }));
+  for (let seq = 1; seq <= 100; seq++) packets.push(packet({ seq, ts: new Date(Date.UTC(2026, 7, 1, 1, 0, seq)).toISOString() }));
   const rejectsPage2 = async ({ page }) => {
     if (page > 1) throw new Error('honcho POST /messages/list -> 422: unexpected field "page"');
     return { items: packets.map((p) => msg(p)) };
   };
   const r = await continuity.readLatest({ fetchPage: rejectsPage2 });
-  assert.equal(r.count, 50, 'degrades to exactly the old behaviour, never to nothing');
+  assert.equal(r.count, 100, 'degrades to exactly the old behaviour, never to nothing');
   assert.equal(r.complete, false);
 });
 
@@ -200,14 +426,64 @@ test('a server returning a BARE ARRAY rather than {items} is still read', async 
 
 test('the page walk is BOUNDED — a server that never repeats and never ends cannot spin forever', async () => {
   let calls = 0;
-  const endless = async ({ page }) => {
+  const endless = async ({ page, size }) => {
     calls++;
-    // 50 fresh packets every time, so the repeat guard never fires. Only the cap stops it.
-    return { items: Array.from({ length: 50 }, (_, i) => msg(packet({ seq: page * 1000 + i, ts: new Date(Date.UTC(2026, 7, 2, 0, 0, i)).toISOString() }), `m-${page}-${i}`)) };
+    // A FULL page of fresh packets every time, so neither the repeat guard nor the
+    // short-page rule fires. Only the cap stops it. (fixture 50 -> `size`, i.e. 100: a
+    // 50-item answer to a size=100 request would now legitimately read as a short final page.)
+    return { items: Array.from({ length: size }, (_, i) => msg(packet({ seq: page * 1000 + i, ts: new Date(Date.UTC(2026, 7, 2, 0, 0, i)).toISOString() }), `m-${page}-${i}`)) };
   };
   const r = await continuity.listAllMessages({ fetchPage: endless });
   assert.equal(calls, 40, 'MAX_LIST_PAGES is the backstop');
   assert.equal(r.complete, false, 'hitting the cap is not completion');
+});
+
+test('INCOMPLETENESS SIGNAL: a session that outgrows the page cap is reported incomplete, not truncated in silence', async () => {
+  // The documented-contract version of the cap case, and the reason `complete` still earns
+  // its keep now that the contract is known: a server can honestly declare more pages than
+  // the walk is willing to make. 4,100 messages at size 100 is 41 pages against a cap of 40.
+  const big = async ({ page, size }) => ({
+    items: Array.from({ length: size }, (_, i) => msg(packet({ seq: page * 1000 + i, ts: new Date(Date.UTC(2026, 7, 3, 0, 0, i)).toISOString() }), `b-${page}-${i}`)),
+    total: 4100, page, size, pages: 41,
+  });
+  const r = await continuity.listAllMessages({ fetchPage: big });
+  assert.equal(r.pages, 40, 'it walked to its own bound');
+  assert.equal(r.complete, false, 'and 40 of a declared 41 is NOT complete');
+});
+
+test('INCOMPLETENESS SIGNAL: it does NOT fire on the normal path — a warning that always fires is one nobody reads', async () => {
+  const packets = [];
+  for (let seq = 1; seq <= 86; seq++) packets.push(packet({ seq, ts: new Date(Date.UTC(2026, 7, 4, 0, 0, seq)).toISOString() }));
+  const { fetchPage } = pagingServer(packets);
+  const r = await continuity.readLatest({ fetchPage });
+  assert.equal(r.complete, true, 'the ordinary case must be silent, or the signal is worthless');
+});
+
+test('THE BRIEF: the ⚠️ PAGINATION INCOMPLETE warning reaches the session that reads it', async () => {
+  // The user-visible half of the signal. `complete: false` inside readLatest is only useful
+  // if it survives into the text a fresh session actually sees, and that text is the whole
+  // reason this module exists.
+  const packets = [];
+  for (let seq = 1; seq <= 86; seq++) packets.push(packet({ seq, ts: new Date(Date.UTC(2026, 7, 5, 0, 0, seq)).toISOString() }));
+  const truncated = async ({ page }) => ({
+    items: page === 1 ? packets.slice(0, 50).map((p) => msg(p)) : [],
+    total: 86, page, size: 50, pages: 2,
+  });
+  const brief = await continuity.readContinuityBrief({ fetchPage: truncated, maxPages: 1 });
+  assert.match(brief, /PAGINATION INCOMPLETE/, 'a truncated read must announce itself in the brief');
+  assert.match(brief, /prefer the git map/);
+});
+
+test('THE BRIEF MUTATION: on a complete read the warning is ABSENT and the newest focus is presented', async () => {
+  // Makes the test above fail-able: a brief that always carried the warning would pass it
+  // while telling every session to distrust a perfectly good packet.
+  const packets = [];
+  for (let seq = 1; seq <= 86; seq++) packets.push(packet({ seq, ts: new Date(Date.UTC(2026, 7, 5, 1, 0, seq)).toISOString() }));
+  const { fetchPage } = pagingServer(packets);
+  const brief = await continuity.readContinuityBrief({ fetchPage });
+  assert.doesNotMatch(brief, /PAGINATION INCOMPLETE/, 'the ordinary case must be clean');
+  assert.match(brief, /focus-86/, 'and it must carry the NEWEST focus, not an earlier one');
+  assert.doesNotMatch(brief, /focus-51\b/, 'seq 51 was the stale answer the old path returned');
 });
 
 test('an empty session returns null rather than throwing', async () => {
