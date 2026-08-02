@@ -86,7 +86,7 @@ Cross-provider takeover completed the interrupted Phase 5 only. Codex remained t
 |---|---|
 | repository | `C:\Fusion247PKA` |
 | branch | `operating-reset/teardown` |
-| **pushed HEAD** | **`b37c0efe12ff49db8c42152dfacb32ac471ba94d`** (evidence bank may sit slightly ahead) |
+| **pushed HEAD** | **`60699ddc89464d579fdcbe338db288f290124040`** |
 | suite at HEAD | **53/53** reorient; **221/221** CI-shaped seven; **274/274** all-eight |
 | visible record | draft PR #86 — Warwick-visible evidence, NOT machine-readable reviewer input |
 
