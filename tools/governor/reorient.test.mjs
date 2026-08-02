@@ -927,29 +927,99 @@ test('WO-OR-17 / SEAM CONTROL: the location probes DEFAULT to the real filesyste
   assert.equal(DEFAULT_GIT_IO.statSync, statSync, 'the default really is node:fs, not a stand-in');
 });
 
-test('WO-OR-17 / TQA-001 REAL: an ACL-denied directory on actual disk, with a LOUD control', () => {
+// ---------------------------------------------------------------------------
+// NOT APPLICABLE — the THIRD outcome, added by WO-OR-20
+// ---------------------------------------------------------------------------
+// A test can end three ways, not two: it passed, it failed, or THE ENVIRONMENT COULD NOT
+// HOST THE CONDITION IT NEEDS. Collapsing the third into the second is the defect WO-OR-20
+// repairs. Collapsing it into the first is the defect that made the loud control necessary
+// in the first place. Both collapses lie, in opposite directions, and the estate has paid
+// for each of them.
+//
+// WHY THIS IS NOT `t.skip()`. A skip renders as an ordinary `ok N - name # SKIP` that
+// scrolls past with three hundred other green lines. This job's own workflow states the
+// rule it would break: a silent skip is indistinguishable from a pass. So not-applicable is
+// a PASSING test carrying a marker that is greppable, counted in CI against a literal
+// ceiling, and re-emitted by the workflow step as a GitHub annotation on the run page.
+// "Did not run" gets its own signal, distinct from both pass and fail.
+//
+// WHY THE WORKFLOW EMITS THE ANNOTATION AND NOT THIS FILE — MEASURED, NOT ASSUMED.
+// `node --test` prefixes EVERY in-test output channel with "# " under the TAP reporter:
+// console.log, process.stderr and t.diagnostic alike. A `::warning::` written from in here
+// would therefore arrive as `# ::warning::...` and GitHub would never parse it — an
+// invisible annotation that everyone believes is loud. That is this repo's most expensive
+// recurring defect (a control reporting on ground it never examined) reappearing one level
+// down, in the reporting layer. So: the test prints a marker, the workflow makes it loud.
+// TWO TOKENS, AND THE SPLIT IS LOAD-BEARING. `...APPLICABLE:` is emitted exactly ONCE per
+// not-applicable test, so `grep -c` on it counts TESTS and the workflow can assert that
+// count against a literal ceiling. `...APPLICABLE-WHY:` carries the prose and may repeat.
+// One token doing both jobs would make the CI count silently depend on how many sentences
+// the helper happens to print, which is the kind of coupling that turns a guard into a
+// number nobody trusts.
+const NOT_APPLICABLE_MARKER = 'GOVERNOR-TEST-NOT-APPLICABLE';
+
+function notApplicable(t, reason) {
+  t.diagnostic(`${NOT_APPLICABLE_MARKER}: ${t.name}`);
+  t.diagnostic(`${NOT_APPLICABLE_MARKER}-WHY: ${reason}`);
+  t.diagnostic(`${NOT_APPLICABLE_MARKER}-WHY: this test PASSED WITHOUT EXAMINING ITS SUBJECT. That is not the same as the subject being correct.`);
+}
+
+test('WO-OR-17 / TQA-001 REAL: an ACL-denied directory on actual disk, with a LOUD control', (t) => {
   // The real thing, not a model of it. The injected test above is deterministic everywhere;
-  // this one proves the real filesystem genuinely produces that cause class — and it FAILS
-  // LOUDLY if the environment cannot produce the condition rather than skipping, because a
-  // test that silently cannot run is a test that always passes.
+  // this one proves the real filesystem genuinely produces that cause class.
+  //
+  // WO-OR-20 SPLITS THE SINGLE QUESTION THIS TEST USED TO ASK INTO TWO, because one
+  // assertion was answering both and they have opposite meanings:
+  //   "the product mishandled a genuinely unreadable directory" -> a REAL defect, still RED
+  //   "a deny ACE cannot restrain this process at all"          -> NOT APPLICABLE, loud, not red
+  // Measured on a real runner, not predicted: GitHub's windows-latest account holds an
+  // administrator token that bypasses a deny ACE by design, so the old single assertion
+  // reported a product defect that did not exist. A permanently-red job that everyone knows
+  // to ignore is worth less than no job at all.
+  //
+  // THE BRANCH IS DECIDED BY OBSERVING THE CAPABILITY, NOT BY SNIFFING THE ENVIRONMENT.
+  // There is deliberately no CI / GITHUB_ACTIONS / administrator-SID check here. The
+  // question asked is the capability itself — "did a deny ACE actually restrain me?" —
+  // using only icacls and node:fs. A branch keyed to an env var is a branch nobody ever
+  // re-tests; this one degrades correctly on any machine, and on a future non-admin runner
+  // the test simply starts running for real with no edit and no permission from anyone.
+  //
+  // AND CRITICALLY, THE BRANCH NEVER CONSULTS THE MODULE UNDER TEST. gitFacts,
+  // classifyPathFailure and renderLocationSection are reached only AFTER the environment has
+  // been established as capable, so no regression in the product can route execution into
+  // the quiet path. That property is what stops this being a silent-skip hole with extra
+  // steps, and it is the thing to re-check if anyone ever edits this test.
   const user = process.env.USERNAME || process.env.USER;
   const dir = tmp('wo-or-17-acl-');
   const locked = join(dir, 'locked');
   mkdirSync(locked);
   let denied = false;
   try {
+    let applyErr = null;
     try {
       execFileSync('icacls', [locked, '/deny', `${user}:(OI)(CI)(RX)`], { stdio: 'ignore' });
       denied = true;
-    } catch (err) {
-      assert.fail(`CONTROL: could not apply a deny ACE, so this proof could not run at all (${err.code || err.message}). This is NOT a pass.`);
-    }
+    } catch (err) { applyErr = err; }
 
-    // CONTROL: the condition genuinely exists. If the ACE did not bite, everything below
-    // would pass for the wrong reason.
+    // THE CAPABILITY PROBE. Real disk, real fs call, no product code anywhere in it.
     let probeErr = null;
     try { realpathSync.native(locked); } catch (err) { probeErr = err; }
-    assert.notEqual(probeErr, null, 'CONTROL: the deny ACE did not bite — the environment did not produce the condition');
+
+    // Both arms below are the SAME question — can this environment host the condition? —
+    // so they share one outcome. "icacls refused to apply the ACE" and "the ACE applied and
+    // did nothing" differ only in where the environment stopped being able to help.
+    if (applyErr) {
+      notApplicable(t, `icacls could not apply a deny ACE at all (${applyErr.code || applyErr.message}), so the condition could never be created here`);
+      return;
+    }
+    if (probeErr === null) {
+      notApplicable(t, 'a deny ACE was applied and did NOT restrain this process — an administrator token bypasses it by design, so an unreadable-but-existing directory cannot be produced here');
+      return;
+    }
+
+    // PAST THIS LINE THE ENVIRONMENT IS ESTABLISHED AS CAPABLE, so every failure below is a
+    // REAL defect in the product and stays loud. These assertions are byte-for-byte what
+    // ran before WO-OR-20; nothing here was relaxed.
     assert.notEqual(probeErr.code, 'ENOENT', 'CONTROL: the directory must EXIST and be unreadable, not be missing');
     assert.equal(statSync(locked).isDirectory(), true,
       'CONTROL: statSync still reports a DIRECTORY — which is exactly why "it does not exist" was false');
