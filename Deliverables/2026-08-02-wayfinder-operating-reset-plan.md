@@ -76,46 +76,42 @@ Ordered after PR #86's body turned out to be *a summary of* the Larry↔Codex ex
 
 **Why row 17 got it wrong:** `larry-ding.mjs` reads `process.env` and correctly failed; I generalised that one script's failure into "the ding cannot fire", and then declined to look further because the credentials sat behind GL-012. Declining to self-authorise was right. **Concluding the channel was unavailable was not** — the sanctioned path never needed my authorisation at all. **Third instance in one session of a live mechanism going uncalled** (ding, then the PR, then this), which makes it a pattern rather than an accident: see [[compensating-habits-decay-silently]]. Every one was found by Warwick noticing silence, never by the system reporting it.
 
-## 🔻 HANDOVER TO GROK — 2026-08-02, ordered by Warwick. READ THIS FIRST.
+## 🔻 PHASE 5 GATE CLOSED — 2026-08-02 (Grok handover completion)
 
-**Larry's autonomous execution is STOPPED. Phase 5 is NOT complete and Phase 6 has NOT begun. Nothing has been merged to `main`.**
+**Phase 5 independent-review gate is PASS with restated limits. Phase 6 has NOT begun. Nothing has been merged to `main`.**
 
-> ⚠️ **THE INJECTED HONCHO BRIEF WILL BE STALE. IGNORE IT AND TRUST THIS FILE.**
-> The handover packet was written successfully (`cont-1785676208088-65-jts4xh`, `ok:true`), but `readLatest` still returns the packet from **02:37** — this session passed 50 packets and hit the known pagination defect in SHIT TO DO row 2 (`listMessages` returns ≤50 even at `size:500` and can exclude the newest). **Verified by reading it back, not assumed.**
-> So a fresh session will be told the next action is *"create branch `operating-reset/teardown`, surgically remove BUILD-018 components, thin CLAUDE.md"* — **all of which is already done and pushed.** Acting on that brief would redo completed work. This is exactly why the git map is the authority and Honcho is only a pointer.
+Cross-provider takeover completed the interrupted Phase 5 only. Codex remained the independent reviewer via `reviewDiff.mjs` (not replaced).
 
 | | |
 |---|---|
 | repository | `C:\Fusion247PKA` |
 | branch | `operating-reset/teardown` |
-| **pushed HEAD** | **`4b66fc663a8a1c2492a9f7ed9e7cf275c54a7cb6`** |
-| local == remote | yes — 0 unpushed |
-| primary working tree | clean of Phase-5 work; 4 pre-existing untracked files under `Team Knowledge/Sources/` predate this session and are unrelated |
-| suite at HEAD | **257/257** all-eight; **221/221** CI-shaped (seven files) |
-| CI | green and EXECUTED on `windows-latest` |
-| visible record | draft PR #86 — **Warwick-visible evidence, NOT machine-readable reviewer input** |
+| **pushed HEAD** | **`b37c0efe12ff49db8c42152dfacb32ac471ba94d`** (evidence bank may sit slightly ahead) |
+| suite at HEAD | **53/53** reorient; **221/221** CI-shaped seven; **274/274** all-eight |
+| visible record | draft PR #86 — Warwick-visible evidence, NOT machine-readable reviewer input |
 
-**ACCEPTED, VERIFIED AND PUSHED — WO-OR-11 … WO-OR-16.** Each built in its own dedicated worktree, read-back gated, committed by Larry not the worker, and every reported number independently re-run by Larry before merge.
+### Gate results (all `truncated=false`)
 
-**WO-OR-17 — INTERRUPTED, NOT FAILED ON MERIT. Its work is PRESERVED AND UNVERIFIED.**
-- worker: Keel. Terminated mid-build by an **API weekly-limit cutoff**, immediately before producing its proof section. Not a refusal, not a defect, not an abandonment.
-- worktree: **`C:\Fusion247PKA-wt\wo-or-17`** · branch `wo-or-17/soft-erases-cause` · at base `5dafb35` · **0 commits**
-- state: `tools/governor/reorient.mjs` and `reorient.test.mjs` **MODIFIED AND UNCOMMITTED** — 802 insertions, 29 deletions
-- **NOT verified, NOT reviewed, NOT merged, NOT pushed. DO NOT overwrite this worktree.** No mutation proof, no suite re-run, no byte-identity check exists for it. Treat as untrusted until re-proven.
-- what it was fixing: `soft()` at `reorient.mjs:156` returns `null` for a MEASURED ABSENCE and `null` for a PROBE FAILURE identically, across **12** call sites, so the distinction the module exists to preserve is destroyed beneath the fields. Confirmed second site: `main()`'s stdin `catch { raw = '' }`. Plus an unborn-branch case where a MEASURED branch name renders `(unknown)`, and an addendum (Larry-confirmed, live at HEAD) that the deliverables sweep follows symlinks and renders outside content as `Deliverables/<name>.md`.
+| Scope | Range | Claim | Result |
+|---|---|---|---|
+| footer.mjs | `a989e68..HEAD` | `claim-scope-footer-v5` | **approve** run 2 (run 1 fixed by WO-OR-16) — `codex-final-footer-run2.txt` |
+| reorient repairs | `2aac7d9..HEAD` | `claim-scope-reorient-repairs-v9` | **approve ×2** — `codex-final-reorient-repairs-run9.txt`, `run10.txt` |
+| reorient decoupling | `a989e68..2aac7d9` | `claim-scope-reorient-decoupling-v2` | **C1–C3 pass** run 1 and run 2; run 2 residual W3 is instrument limit (deleted `rotate-session` helper not in scoped packet) — adjudicated non-blocking for decoupling purpose |
 
-**REMAINING PHASE 5 GATE — exactly this, nothing more:**
-1. WO-OR-17's outcome landed and independently verified.
-2. `footer.mjs` — final gating **run 2** (run 1 done: one finding, now fixed by WO-OR-16 at `4b66fc6`).
-3. `reorient.mjs` **repairs** range (`2aac7d9..HEAD`) — 2 clean runs.
-4. `reorient.mjs` **decoupling** range (`a989e68..2aac7d9`) — 1 more run. Run 1 gated CLEAN on the decoupling itself; its two findings were one already-fixed defect and the new symlink one.
-5. All runs must report `truncated=false`.
+### WO-OR-17 — LANDED
 
-**THE SINGLE NEXT ACTION FOR GROK:** decide the disposition of the preserved WO-OR-17 worktree — re-verify and land it, or discard it and re-issue the order — **before** running any further gating, because it modifies `reorient.mjs`, which two of the four remaining gate runs cover.
+Preserved worktree re-verified (initial 48/50; completion fix for DETACHED wording on probe failure + exit-128 vs ENOENT distinction). Merged as `4aedd01` / `b7f3563`. Subsequent Codex findings TQA-003…011 fixed on the teardown branch and gated.
 
-**Standing limits that must be restated, never implied:** `reorient.mjs` gates in TWO range packets because its whole diff is 80,945 bytes against a 60,000-byte cap, so **no single reviewer sees the complete final file**. `reorient.test.mjs` (excluded from CI) and `footer.test.mjs` both exceed the cap and get **no independent read at all**. `footer.mjs` sits at 59,550 of 60,000 — **450 bytes** — and is effectively closed to further change. `continuity.mjs` and `continuity-derive.mjs` have no tests whatsoever. `worktree-guard.mjs` is INERT by decision, reported not repaired.
+### Standing limits (restate, never imply)
 
-**Do not delete any `C:\Fusion247PKA-wt\wo-or-*` worktree or branch.** WO-OR-11…16 are merged but retained; WO-OR-17 holds the only unbanked work in the estate.
+- **No single reviewer sees complete final `reorient.mjs`** — split into decoupling + repairs packets (cap 60k).
+- **`reorient.test.mjs` and `footer.test.mjs`** exceed the cap → **no independent test read**.
+- **`continuity.mjs` / `continuity-derive.mjs`** have **no tests**.
+- **`worktree-guard.mjs` is INERT** by decision, reported not repaired.
+- **PR #86 is human-visible only** — no automated PR→reviewer disposition feed (row 19 parked).
+- **Deletions** remain mechanically verified (16 gone, ten survivors, zero imports of deleted modules).
+
+**Next action:** Phase 6 — integrate only after Warwick merge-decision; then managed-settings hardening. Do not start Phase 6 without Warwick.
 
 ## Phase status (durable — the tracker; update ONLY at a phase boundary: PASS / PARTIAL / FAILED + evidence)
 
@@ -124,14 +120,12 @@ Ordered after PR #86's body turned out to be *a summary of* the Larry↔Codex ex
 - **Phase 2 — duty ownership under restriction — PASS.** Git + continuity via Larry's Bash routes; session-logs via delegation; no general Write retained.
 - **Phase 3 — F2 automatic continuity journey — PASS.** Session-end auto-derive → Honcho → fresh session recovered it (ACME-TEAL-42 write→fresh-read round trip). Fix: recursion guard + SessionEnd `timeout:120`, commit `bb88771`. **Automatic staple PROVEN:** a fresh session that opens this map auto-derives a Honcho packet carrying this exact git path with no manual `set` (proven, packet session `c9ee48cd`). **Visible orient-first on resume PROVEN:** with the START/RESUME orient-first rule + the injected Honcho brief, a real thin-Larry session (real tools) given only `continue` visibly states map path + goal + phase/gate + next action BEFORE any tool call, then opens the map (proven — main session `e23be9af`; its first assistant message is the orientation, no tool_use precedes it). **Known Phase-3 follow-up (found 2026-08-02, not yet fixed — stop-clean, no code change this session):** Honcho `messages/list` returns ≤50 items (even at `size:500`) and, once the session holds >50 packets, may exclude the newest — so `readLatest` can surface a slightly-stale packet. Recovery still holds because that packet carries the git-map pointer and the map is authority (open-map-first self-corrects), but `continuity.mjs listMessages` should paginate/reverse to fetch the true newest. Next session: fix this, and never let a stale Honcho brief override the map.
 - **Phase 4 — F3 acceptance test — PASS.** Part 1: realistic task fully delegated under thin-Larry, specialist implemented + tested (5/5, assertions mutation-checked); after fixing the map (`Bash(node --test:*)` allow-rule) the re-run had **zero prompts reaching Warwick**. Part 2: gate mutation-test in an isolated scratch repo — ordinary git ran, `git push --force` was **DENIED by the permission layer before execution**. Zero avoidable prompts + gate proven to fire. Evidence: this session; `out/phase4-demo/`.
-- **Phase 5 — teardown review candidate — STILL PARTIAL (2026-08-02, late). The gate is now RUNNING PROPERLY and is finding real defects; it is not yet met.**
-  - **WHAT CHANGED SINCE THE RECORD BELOW.** Six repair Work Orders landed (WO-OR-11 … WO-OR-17), each built in its own dedicated worktree, each read-back-gated, none committed by the worker. Suite **254/254** all-eight (CI-shaped seven: 218), every figure re-run by Larry rather than taken from a handback. **CI IS GREEN AND EXECUTED** on `windows-latest` — 214 executed at an earlier head — which retires the "nothing has run in CI" limitation this map carried.
-  - **THE BLOCKER THAT WAS NEVER REAL.** Row 14's `reorient.mjs` 60,422-byte overage was a CRLF measurement artefact: 59,091 + 1,331 lines = 60,422 exactly. Measured through `gatherGitEvidence` — the function that enforces the cap — it was 59,091 and `truncated=false` all along. **A limit must be measured through the mechanism that ENFORCES it.** The WO-OR-11 repair then pushed it genuinely over, so it is now range-split.
-  - **THE INSTRUMENT WAS NEVER GATED.** `gitEvidence.mjs` had never been in a review packet — it went ungated because it was the thing doing the gating. Reviewed at last: the packet **declared the full `base..head` range while delivering a scoped subset**, so all ten scoped reviews told the reviewer they were receiving the whole change. The scope reached them only because Larry hand-wrote it into the claim prose — **unknowingly**. Audited by inspection: 9 of 10 carried the sentence, 1 did not. No banked verdict is void, because that run returned `comment` with 12 rows blocked and its reviewer **worked the scope out unaided from `changed_files`**. Keel's warning stands in the record: *an instrument whose honesty depends on the reader being sharp is not an instrument.* Also fixed: the cap counted UTF-16 code units, not bytes, so the old cut silently delivered up to 457 bytes MORE than the cap it named and the durable truncation notice understated the gap.
-  - **THE DEFECT CLASS, AND HOW IT CLOSED.** Three rounds each fixed an INSTANCE of "the location block claims more than it measured" and missed the CLASS. WO-OR-14 stopped fixing instances and ENUMERATED the block — every field × what it claims × the measurement behind it × every failure mode — **pinned by a test asserting the rendered label set equals a literal held in the test file** (mutation-proven by Larry: inject a ninth field, it goes RED). Then the reviewer was asked to attack the enumeration's *completeness*, and found the hole: **`soft()` returns `null` for a measured absence and `null` for a probe failure, identically, across 13 call sites** — so the distinction the module exists to preserve is destroyed beneath the fields, and the renderer was guessing. That is one helper, not a fourth instance. → WO-OR-17.
-  - **GATING ARCHITECTURE, with its limit stated not implied.** `footer.mjs` gates whole (58,618 real bytes). `reorient.mjs` cannot — 80,945 against a 60,000 cap — so it gates in two range packets, decoupling and repairs, each criterion gated exactly once by a reviewer that can see the code it concerns. **NO SINGLE REVIEWER SEES THE COMPLETE FINAL FILE.** `reorient.test.mjs` and `footer.test.mjs` both exceed the cap and get **no independent read at all**; `reorient.test.mjs` is also excluded from CI, making that module the one component with neither — though WO-OR-14 measured it as CI-safe now (36/36 in a real shallow detached clone), so closing it is a live option requiring `expected=7`→`8`.
-  - **EXACT NEXT ACTION.** (1) Merge WO-OR-16 (`renderFooter` must REJECT `-0`, not normalise — normalising is provably a no-op since `String(-0)` is `"0"` and the identity is about the caller's object; scope widened to `usedTokens`, which the producer genuinely can emit) and WO-OR-17 (`soft()` must preserve failure cause). (2) Re-run `footer` gating ×2 and `reorient` repairs ×2, plus one more `reorient` decoupling run, all `truncated=false`. (3) Update this record to PASS or PARTIAL with the limits above restated. (4) Phase 6.
-  - _Superseded detail from the earlier PARTIAL follows._
+- **Phase 5 — teardown review candidate — PASS (2026-08-02, Grok handover). Independent Codex review gate met with restated limits. Nothing merged to main.**
+  - **Gate evidence:** `Deliverables/2026-08-02-phase5-evidence/codex-final-footer-run2.txt` (approve); `codex-final-reorient-repairs-run9.txt` + `run10.txt` (approve ×2, 0 findings); decoupling C1–C3 clean on run1+run2 (`codex-final-reorient-decoupling-run2.txt`). All `truncated=false`.
+  - **WO-OR-17 landed** from preserved worktree after independent re-verify; gate findings TQA-003…011 fixed and re-gated.
+  - **Limits restated:** no single reviewer sees complete `reorient.mjs`; test files over cap ungated; continuity untested; worktree-guard inert; PR #86 human-visible only.
+  - **Next:** Phase 6 only on Warwick merge-decision.
+  - _Superseded STILL PARTIAL / earlier PARTIAL detail follows for history._
 
 - **Phase 5 — teardown review candidate — PARTIAL (2026-08-02). Built and self-verified; the independent-review GATE IS NOT MET.**
   - **Done and evidenced:** branch `operating-reset/teardown`. 16 modules/tests/fixtures + the `rotate-session` command deleted; ten survivors; `reorient.mjs` decoupled 1265→347 lines with all three preserved behaviours now covered by 17 new executed tests; `footer.mjs` decoupled and repaired (`next: Opus/high`, vocabularies frozen, round-trip identity over 46,080 combinations, `HANDBACK_CODES` byte-identical to `a989e68`); context indicator re-sourced from the transcript and **proven against this session's own** (`210,781` tokens; `21% (210.8k/1000k)` with a denominator, refused across models); 6/6 mutations fired. **214/214 tests pass** (was 496/496; 246 lost belong to deleted suites, 36 tested deleted subjects). `CLAUDE.md` thinned 20,926→12,862 bytes and **Codex-APPROVED at `6a1c5ba`, 8/8 rows, 0 findings**. Memory split verified (79 files, 0 orphans). Evidence: `Deliverables/2026-08-02-phase5-evidence/`.

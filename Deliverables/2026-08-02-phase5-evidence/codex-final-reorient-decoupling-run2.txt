@@ -1,0 +1,127 @@
+repo:  C:/Fusion247PKA
+range: a989e68..2aac7d9
+claim: Deliverables/2026-08-02-phase5-evidence/claim-scope-reorient-decoupling-v2.json
+scope  : tools/governor/reorient.mjs
+branch : operating-reset/teardown
+
+ÔöÇÔöÇ GIT EVIDENCE (real, read-only) ÔöÇÔöÇ
+resolved=true diff_range=a989e68d95e01b7f6dc13955d796950f6a8a02a5..2aac7d9a2d6584fc7d993fc21f5428f649c847d0
+changed_files=["tools/governor/reorient.mjs"]
+diff bytes=59376 of 59376 (real UTF-8 bytes) truncated=false
+packet diff_range=a989e68d95e01b7f6dc13955d796950f6a8a02a5..2aac7d9a2d6584fc7d993fc21f5428f649c847d0 -- tools/governor/reorient.mjs
+packet scoped_to=["tools/governor/reorient.mjs"] wp_id=null
+
+ÔöÇÔöÇ REAL CODEX MERGE REVIEW (Tower QA skill over the staged diff + the REAL claim) ÔöÇÔöÇ
+ok=true blocked=false model=openai-codex-exec
+{
+  "status": "ok",
+  "verdict": "comment",
+  "summary": "BLOCKED: the staged diff supports C1ÔÇôC3 and shows all three retained behaviours reaching the shipped hook output. However, W3 is truncated and the deleted helperÔÇÖs original implementation is not included, so behavioural equivalenceÔÇöespecially for UNC pathsÔÇöcannot be verified fail-closed. Previously disclosed sweep defects remain open at this intermediate SHA but are explicitly assigned to packet 2 and do not independently block this decoupling review.",
+  "claims_verified": [
+    {
+      "claim": "reorient.mjs no longer depends on programme-state.mjs or rotate-session.mjs.",
+      "status": "confirmed",
+      "evidence": "Both imports are removed; no references to their exported programme-state or banking functions remain in the staged diff."
+    },
+    {
+      "claim": "The deliverables sweep, Honcho continuity passthrough, and live Git facts remain reachable in the SessionStart output.",
+      "status": "confirmed",
+      "evidence": "main() calls buildBrief(); buildBrief() calls factsFn() and sweepFn(); main() calls readContinuityBrief(); their results are combined and passed through toHookOutput()."
+    },
+    {
+      "claim": "Exactly normaliseSeparators was carried into reorient.mjs, while isBankingCommit and its consumer were removed.",
+      "status": "confirmed",
+      "evidence": "The diff adds only normaliseSeparators from rotate-session.mjs and deletes assessBankedFreshness plus all isBankingCommit usage."
+    }
+  ],
+  "acceptance_results": [
+    {
+      "acceptance_row_id": "SCOPE",
+      "result": "pass",
+      "rationale": "Review is confined to the stated file and decoupling range; disclosed later-repaired location and sweep defects are not treated as new decoupling blockers.",
+      "evidence": "The staged diff changes only tools/governor/reorient.mjs in a989e68d..2aac7d9a."
+    },
+    {
+      "acceptance_row_id": "C1",
+      "result": "pass",
+      "rationale": "Both deleted-module imports are gone.",
+      "evidence": "Imports from ./programme-state.mjs and ./rotate-session.mjs are deleted."
+    },
+    {
+      "acceptance_row_id": "C2a",
+      "result": "pass",
+      "rationale": "The loose-deliverables sweep remains on the live output path.",
+      "evidence": "main() ÔåÆ buildBrief(raw) ÔåÆ sweepFn(); the returned section is included in body and emitted via toHookOutput()."
+    },
+    {
+      "acceptance_row_id": "C2b",
+      "result": "pass",
+      "rationale": "The Honcho continuity brief remains an awaited passthrough on every CLI execution.",
+      "evidence": "main() awaits readContinuityBrief(), appends continuity to body, and emits the combined string."
+    },
+    {
+      "acceptance_row_id": "C2c",
+      "result": "pass",
+      "rationale": "Repository, worktree, branch, and HEAD facts are obtained through real Git calls and rendered into output.",
+      "evidence": "gitFacts() executes rev-parse/status/rev-list commands; buildBrief() calls factsFn(where); renderLocationSection() renders the results."
+    },
+    {
+      "acceptance_row_id": "C3",
+      "result": "pass",
+      "rationale": "Only normaliseSeparators is visibly carried over; banking and programme-state helpers and their consumers are deleted.",
+      "evidence": "One helper definition is added; isBankingCommit, assessBankedFreshness, and programme recovery code are removed."
+    },
+    {
+      "acceptance_row_id": "Z1",
+      "result": "partial",
+      "rationale": "Top-level and per-section guards preserve exit-0/no-throw operation, and failed Git/continuity calls become reported unknown/failure text. Missing/unreadable deliverables handling remains silent at this SHA, but that disclosed prior defect is assigned to packet 2.",
+      "evidence": "main(), buildBrief(), gitFacts(), and continuity handling use catches; process.exitCode is set to 0. sweepOpenDeliverables catches directory/stat/read failures without reporting them."
+    },
+    {
+      "acceptance_row_id": "W1",
+      "result": "pass",
+      "rationale": "No additional loss of the three explicitly preserved behaviours is evident; each reaches the hook envelope.",
+      "evidence": "main()/buildBrief() composition wires Git facts, sweep results, and continuity into additionalContext."
+    },
+    {
+      "acceptance_row_id": "W2",
+      "result": "partial",
+      "rationale": "Known missing-directory, unreadable-entry, and symlink-honesty defects remain in this intermediate range. They are disclosed prior findings assigned to packet 2; no additional sweep defect introduced specifically by the decoupling is evident.",
+      "evidence": "The sweep still catches and skips stat/read failures and follows statSync() results; the packet states these are repaired in 2aac7d9..HEAD."
+    },
+    {
+      "acceptance_row_id": "W3",
+      "result": "blocked",
+      "rationale": "The criterion is truncated after ÔÇ£UNC pathÔÇØ, and the original rotate-session.mjs helper implementation is absent, so exact behavioural equivalence at all dependent use sites cannot be established from this packet.",
+      "evidence": "The staged diff shows the new helper body and the removed import, but not the prior helper definition; the supplied W3 text is incomplete."
+    }
+  ],
+  "prior_finding_results": [
+    {
+      "finding_id": "run1-sweep-missing-directory-silence",
+      "status": "remains_open",
+      "rationale": "Still present at exact head 2aac7d9, explicitly out of scope here and assigned to the repairs packet."
+    },
+    {
+      "finding_id": "run1-sweep-unreadable-file-skip",
+      "status": "remains_open",
+      "rationale": "Still present at this intermediate head, explicitly assigned to packet 2 rather than silently accepted."
+    },
+    {
+      "finding_id": "run1-sweep-symlink-outside-mislabelling",
+      "status": "remains_open",
+      "rationale": "Still present at this intermediate head, disclosed and assigned to packet 2."
+    }
+  ],
+  "findings": [
+    {
+      "id": "F1-W3-INSUFFICIENT-EVIDENCE",
+      "technical_impact": "MEDIUM",
+      "reachability": "LATENT",
+      "required_disposition": "BLOCKS_CURRENT_MERGE",
+      "assumed_deployment_baseline": "Exact intermediate commit 2aac7d9a2d6584fc7d993fc21f5428f649c847d0, assessed only over a989e68d95e01b7f6dc13955d796950f6a8a02a5..2aac7d9a2d6584fc7d993fc21f5428f649c847d0 for tools/governor/reorient.mjs.",
+      "evidence": "W3 is incomplete and the prior rotate-session.mjs implementation is not staged, preventing comparison of separator and UNC-path semantics.",
+      "required_correction": "Restage the complete W3 wording plus the base-sha implementation of normaliseSeparators, or provide an exact base-file evidence pointer that resolves in the review environment."
+    }
+  ]
+}
