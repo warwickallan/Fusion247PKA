@@ -47,6 +47,7 @@ import {
   adviceForState,
   adviceFor,
   deriveFooterFields,
+  refreshSampleFromTranscript,
   resolveHealthSample,
   computeFooterLine,
   parseCliArgs,
@@ -879,8 +880,8 @@ test('D-M1: sample missing / truncated / `{` / used_percentage "42" — all BLIN
     assert.equal(f.state, 'BLIND', `${label} must be BLIND`);
     assert.notEqual(f.state, 'GREEN');
     assert.equal(f.percent, null, `${label} must render ctx --`);
-    assert.equal(f.advice, ADVICE.UNSURE);
-    assert.ok(renderFooter(f).startsWith('⟦GOV⟧ ctx -- · BLIND · KEEP GOING?'));
+    assert.equal(f.advice, ADVICE.NO_ADVICE);
+    assert.ok(renderFooter(f).startsWith('⟦GOV⟧ ctx -- · BLIND · NO ADVICE'));
     examined += 1;
   }
   assert.equal(examined, 4);
@@ -906,8 +907,45 @@ test('D-M2/D-M3: 21 minutes old is BLIND with numbers suppressed; 19 minutes old
   const stale = goodSample({ sampled_at: new Date(now - 21 * 60 * 1000).toISOString() });
   const staleResult = deriveFooterFields({ sample: stale, knownSessionId: 'session-a', now });
   assert.equal(staleResult.fields.state, 'BLIND');
-  assert.equal(staleResult.fields.percent, null, 'D-M2: the numbers must be SUPPRESSED, not merely flagged');
+  assert.equal(staleResult.fields.percent, null, 'D-M2: the GRADED number must be SUPPRESSED, not merely flagged');
   assert.equal(staleResult.blindReason, BLIND_REASON.STALE);
+  // ...but the RAW COUNT survives. D-M2 exists to stop a stale PERCENTAGE being
+  // presented as current; it never required throwing away a true measurement.
+  // Observed live 2026-08-02: a sample holding `used_tokens: 258933` aged past 20
+  // minutes mid-turn and the footer rendered `ctx --` — no number at all — which is
+  // neither real information nor an honest unavailable state. Warwick's own ruling
+  // is true-count-only when the denominator is not established; this rung was
+  // discarding the numerator that ruling exists to keep.
+  //
+  // Enumerated, not spot-checked: the rungs that can hold a real numerator are exactly
+  // STALE and WINDOW_SIZE_UNKNOWN. Both must carry it; SESSION_MISMATCH must not.
+  const withTokens = (extra) => goodSample({
+    sampled_at: new Date(now - 21 * 60 * 1000).toISOString(),
+    context_window: { used_tokens: 250000, context_window_size: 1000000 },
+    ...extra,
+  });
+
+  const staleWithTokens = deriveFooterFields({ sample: withTokens(), knownSessionId: 'session-a', now });
+  assert.equal(staleWithTokens.blindReason, BLIND_REASON.STALE);
+  assert.equal(staleWithTokens.fields.state, 'BLIND', 'still ungraded');
+  assert.equal(staleWithTokens.fields.percent, null, 'still no stale percentage');
+  assert.equal(staleWithTokens.fields.usedTokens, 250000, 'a stale sample still carries its TRUE token count');
+  assert.equal(
+    staleWithTokens.fields.windowTokens, null,
+    'but NOT the window — renderFooter rejects a denominator with no percentage beside it, ' +
+    'and carrying it was the first attempt at this fix'
+  );
+
+  // The regression this pins: `ctx --` when a real measurement was in hand.
+  assert.match(renderFooter(staleWithTokens.fields), /ctx 250k · BLIND/);
+
+  // ...and the boundary of the class. Another session's count is not a fact about
+  // this one, so SESSION_MISMATCH stays bare no matter how many tokens it holds.
+  const otherSession = deriveFooterFields({
+    sample: withTokens({ session_id: 'session-b' }), knownSessionId: 'session-a', now,
+  });
+  assert.equal(otherSession.blindReason, BLIND_REASON.SESSION_MISMATCH);
+  assert.equal(otherSession.fields.usedTokens, null, 'a FOREIGN session\'s count must never be carried');
 
   const fresh = goodSample({ sampled_at: new Date(now - 19 * 60 * 1000).toISOString() });
   const freshResult = deriveFooterFields({ sample: fresh, knownSessionId: 'session-a', now });
@@ -1020,7 +1058,11 @@ test('D-M9: the five states render five pairwise-distinct lines, with the CORREC
     AMBER: ADVICE.KEEP_GOING,
     RED: ADVICE.CLEAR_NOW,
     RECOVERY: ADVICE.CLEAR_NOW,
-    BLIND: ADVICE.UNSURE,
+    // Warwick 2026-08-02: BLIND must render advice UNAVAILABLE, not a graded
+    // recommendation. This row said ADVICE.UNSURE ("KEEP GOING?") and was encoding the
+    // defect — the state that means "I could not grade this" was paired with a hedged
+    // yes derived from a grade.
+    BLIND: ADVICE.NO_ADVICE,
   };
   let checked = 0;
   for (const state of FOOTER_STATES) {
@@ -1030,11 +1072,18 @@ test('D-M9: the five states render five pairwise-distinct lines, with the CORREC
   }
   assert.equal(checked, 5);
 
-  // BLIND must never advise CLEAR NOW: unknown telemetry must not FORCE a rotation.
-  assert.notEqual(adviceForState('BLIND'), ADVICE.CLEAR_NOW);
-  // ...and an unknown state degrades to the question, never to reassurance.
-  assert.equal(adviceForState('PURPLE'), ADVICE.UNSURE);
-  assert.equal(adviceForState(undefined), ADVICE.UNSURE);
+  // WARWICK'S RULING, 2026-08-02, as the closed statement rather than one example:
+  // BLIND may pair with NOTHING that is derived from a grade. CLEAR NOW was already
+  // forbidden (unknown telemetry must not FORCE a rotation); KEEP GOING and its hedged
+  // form were the half that was wrong, because a state meaning "I could not grade this"
+  // cannot then offer a recommendation premised on the grade.
+  assert.equal(adviceForState('BLIND'), ADVICE.NO_ADVICE);
+  for (const graded of [ADVICE.CLEAR_NOW, ADVICE.KEEP_GOING, ADVICE.UNSURE, ADVICE.TASK_UNKNOWN]) {
+    assert.notEqual(adviceForState('BLIND'), graded, `BLIND must never advise ${graded}`);
+  }
+  // ...and an unknown state is ungraded too, so it degrades the same way.
+  assert.equal(adviceForState('PURPLE'), ADVICE.NO_ADVICE);
+  assert.equal(adviceForState(undefined), ADVICE.NO_ADVICE);
 });
 
 // Warwick's cut-and-close ruling, 2026-08-01: no KEEP GOING before a next task is known.
@@ -1058,12 +1107,15 @@ test('adviceFor withholds only the unearned "carry on" — never the safety or s
     checked += 2;
   }
 
-  // NEVER suppressed: a governor that stops measuring must get LOUDER, not quieter (INV-1).
-  assert.equal(adviceFor('BLIND', { taskKnown: false }), ADVICE.UNSURE, 'BLIND keeps its question mark');
-  assert.equal(adviceFor('BLIND', { taskKnown: true }), ADVICE.UNSURE);
-  // An unrecognised state degrades to the question, never to TASK UNKNOWN and never to
-  // reassurance — the same fail-safe `adviceForState` already guarantees.
-  assert.equal(adviceFor('PURPLE', { taskKnown: false }), ADVICE.UNSURE);
+  // NEVER suppressed: a governor that stops measuring must get LOUDER, not quieter
+  // (INV-1). The signal is now NO ADVICE rather than a question mark — the same
+  // never-suppressed sensor signal, saying outright what the question mark only implied.
+  assert.equal(adviceFor('BLIND', { taskKnown: false }), ADVICE.NO_ADVICE, 'BLIND keeps its own signal');
+  assert.equal(adviceFor('BLIND', { taskKnown: true }), ADVICE.NO_ADVICE);
+  assert.notEqual(adviceFor('BLIND', { taskKnown: false }), ADVICE.TASK_UNKNOWN, 'and it is NOT folded into task knowledge');
+  // An unrecognised state is ungraded, so it degrades the same way — never to TASK
+  // UNKNOWN and never to reassurance.
+  assert.equal(adviceFor('PURPLE', { taskKnown: false }), ADVICE.NO_ADVICE);
   checked += 3;
 
   // Default is permissive-but-honest: callers that say nothing get the old behaviour,
@@ -1120,7 +1172,7 @@ test('computeFooterLine always returns a GRAMMATICAL line, even with everything 
     envOverride: join(tmpdir(), 'nope-xyz'),
   });
   assert.equal(parseFooter(line).ok, true, 'a broken world must still produce a parseable footer');
-  assert.equal(line, '⟦GOV⟧ ctx -- · BLIND · KEEP GOING? · next: UNSET · CONTINUE');
+  assert.equal(line, '⟦GOV⟧ ctx -- · BLIND · NO ADVICE · next: UNSET · CONTINUE');
 
   // And the happy path composes end to end. `next` is now an INPUT rather than something
   // read out of a scratch programme-state fixture, which is why this no longer builds a
@@ -1165,7 +1217,7 @@ test('computeFooterLine always returns a GRAMMATICAL line, even with everything 
       context_window: { used_percentage: null, used_tokens: 210_781, context_window_size: null },
     }));
     const bare = computeFooterLine({ sessionId: 's3', envOverride: dir, next: 'Opus/high' });
-    assert.equal(bare, '⟦GOV⟧ ctx 210.8k · BLIND · KEEP GOING? · next: Opus/high · CONTINUE');
+    assert.equal(bare, '⟦GOV⟧ ctx 210.8k · BLIND · NO ADVICE · next: Opus/high · CONTINUE');
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -1439,7 +1491,7 @@ test('WP-7 AC4: every hostile input yields a valid BLIND line and exit 0', () =>
       assert.equal(parsed.ok, true, `${label}: unparseable line ${JSON.stringify(r.stdout)}`);
       assert.equal(parsed.fields.state, 'BLIND', `${label}: unreadable telemetry must be BLIND`);
       assert.equal(parsed.fields.percent, null, `${label}: BLIND never reports a number`);
-      assert.equal(parsed.fields.advice, ADVICE.UNSURE, `${label}: BLIND is KEEP GOING?, never CLEAR NOW and never KEEP GOING`);
+      assert.equal(parsed.fields.advice, ADVICE.NO_ADVICE, `${label}: BLIND is NO ADVICE, never CLEAR NOW and never KEEP GOING`);
       assert.notEqual(parsed.fields.state, 'GREEN', `${label}: INV-1 — BLIND is never GREEN`);
     }
   } finally {
@@ -1698,10 +1750,11 @@ test('WO-OR-09 SEAM: a store holding only OTHER sessions yields a TRUE token cou
     assert.equal(derived.fields.state, 'BLIND');
 
     // The bytes. Pinned as a literal, and pinned NEGATIVELY against the exact lie.
-    // `KEEP GOING?` — not `TASK UNKNOWN` — is correct and deliberate here: BLIND is a
+    // `NO ADVICE` — not `TASK UNKNOWN` — is correct and deliberate here: BLIND is a
     // SENSOR-failure signal and `adviceFor` never suppresses it, because a governor that
-    // stops measuring must get louder, not quieter (INV-1).
-    assert.equal(line, '⟦GOV⟧ ctx 111k · BLIND · KEEP GOING? · next: UNSET · CONTINUE');
+    // stops measuring must get louder, not quieter (INV-1). It read `KEEP GOING?` until
+    // Warwick's 2026-08-02 ruling; the reasoning is unchanged, the value is not.
+    assert.equal(line, '⟦GOV⟧ ctx 111k · BLIND · NO ADVICE · next: UNSET · CONTINUE');
     assert.doesNotMatch(line, /\d+%/, 'no percentage may appear in this line at all');
     assert.doesNotMatch(line, /AMBER/, 'and it must never be GRADED off a borrowed window');
   } finally {
@@ -1832,7 +1885,7 @@ test('WO-OR-13 INV-1: an out-of-grammar percentage is BLIND, never graded — in
     assert.notEqual(r.fields.state, 'GREEN', `${c.what}: INV-1 — BLIND is never GREEN`);
     assert.equal(r.fields.percent, null, `${c.what}: the number must be SUPPRESSED`);
     assert.ok(
-      renderFooter(r.fields).startsWith('⟦GOV⟧ ctx -- · BLIND · KEEP GOING?'),
+      renderFooter(r.fields).startsWith('⟦GOV⟧ ctx -- · BLIND · NO ADVICE'),
       `${c.what}: rendered line`
     );
     bands.add(c.band);
@@ -2142,7 +2195,7 @@ test('WO-OR-16: the PRODUCER normalises -0 rather than degrading it — on the t
   assert.ok(Object.is(r.fields.usedTokens, 0), 'the producer must emit +0');
   assert.ok(!Object.is(r.fields.usedTokens, -0), 'the producer must not emit -0');
   const line = renderFooter(r.fields);
-  assert.equal(line, '⟦GOV⟧ ctx 0k · BLIND · KEEP GOING? · next: UNSET · CONTINUE');
+  assert.equal(line, '⟦GOV⟧ ctx 0k · BLIND · NO ADVICE · next: UNSET · CONTINUE');
   assert.ok(Object.is(parseFooter(line).fields.usedTokens, r.fields.usedTokens), 'D3 through the live path');
 
   // 4. THE PERCENT PATH — WO-OR-13's `+ 0` is now LOAD-BEARING, not redundant, and this is
@@ -2161,4 +2214,431 @@ test('WO-OR-16: the PRODUCER normalises -0 rather than degrading it — on the t
     TypeError,
     'and WITHOUT that normalisation the renderer would now refuse it — which is why the producer guard must stay'
   );
+});
+
+// ===========================================================================
+// WO-GF-01 — THE COUNT IS FRESH AT RENDER TIME, OR HONESTLY OLD
+// ===========================================================================
+//
+// THE DEFECT. Samples are written at TURN BOUNDARIES and nothing re-samples during a long
+// turn, so the footer rendered a count that was true as of its sample time with nothing in
+// the line to say how old it was. Observed live 2026-08-02: `ctx 258.9k · BLIND` off a
+// sample twenty-four minutes old. A true number and a misleading line.
+//
+// WHY THESE TESTS CARE SO MUCH ABOUT A SINGLE NUMBER. On this estate the denominator is
+// usually not established, so the ladder sits on WINDOW_SIZE_UNKNOWN permanently — no
+// percentage, state BLIND — and the raw count is the ENTIRE payload of the line.
+//
+// EVERY TEST BELOW ASSERTS ITS OWN CONTROL. A freshness test that only checks the fresh
+// number passes just as happily when the refresh never ran and the stored number happened
+// to match, so each case here pins the value the OTHER path would have produced and
+// asserts the two differ. That is the difference between a proof and a coincidence.
+
+/** A transcript line in the real shape, with the fields the refresh actually reads. */
+function gfLine({ sessionId = 'gf-session', at, tokens }) {
+  return JSON.stringify({
+    type: 'assistant',
+    sessionId,
+    timestamp: at,
+    effort: 'high',
+    message: { model: 'claude-opus-5', usage: { input_tokens: tokens } },
+  });
+}
+
+function gfTranscript(dir, lines, name = 'gf-transcript.jsonl') {
+  const p = join(dir, name);
+  writeFileSync(p, `${lines.join('\n')}\n`);
+  return p;
+}
+
+/** A stored TRANSCRIPT-sourced sample, in the shape `sampler.extractTranscriptSample` writes. */
+function gfStored({ at, tokens, sessionId = 'gf-session', transcriptPath = null, window = null }) {
+  return {
+    ok: true,
+    approximate: false,
+    data: {
+      schema_version: 1,
+      sampled_at: at,
+      session_id: sessionId,
+      source: 'transcript',
+      transcript_path: transcriptPath,
+      context_window: {
+        used_percentage: null,
+        used_tokens: tokens,
+        context_window_size: window,
+        context_window_source: null,
+      },
+    },
+  };
+}
+
+const GF_NOW = Date.parse('2026-08-02T21:30:00.000Z');
+const gfAt = (msAgo) => new Date(GF_NOW - msAgo).toISOString();
+
+test('WO-GF-01: a stale STORED count is replaced by the live transcript count, dated by the MESSAGE', () => {
+  const dir = tmp();
+  try {
+    // The exact live shape: the last turn ended 25 minutes ago and wrote 100k; the
+    // transcript has been appended throughout this turn and now stands at 300k.
+    const p = gfTranscript(dir, [
+      gfLine({ at: gfAt(25 * 60 * 1000), tokens: 100_000 }),
+      gfLine({ at: gfAt(30 * 1000), tokens: 300_000 }),
+    ]);
+    const stored = gfStored({ at: gfAt(25 * 60 * 1000), tokens: 100_000, transcriptPath: p });
+
+    // THE CONTROL FIRST — what the old behaviour produces, so this test cannot pass by
+    // accident. Identical sample, minus only the path the refresh needs.
+    const unrefreshed = gfStored({ at: gfAt(25 * 60 * 1000), tokens: 100_000 });
+    const before = deriveFooterFields({ sample: unrefreshed, knownSessionId: 'gf-session', now: GF_NOW });
+    assert.equal(before.blindReason, BLIND_REASON.STALE, 'without the refresh the sample is STALE');
+    assert.equal(before.fields.usedTokens, 100_000, 'and Warwick reads a 25-minute-old number');
+
+    // THE REPAIR.
+    const refreshed = refreshSampleFromTranscript(stored);
+    assert.equal(refreshed.refreshedFromTranscript, true, 'the re-read actually happened');
+    assert.equal(refreshed.data.context_window.used_tokens, 300_000, 'the LIVE count');
+    assert.equal(
+      refreshed.data.sampled_at, gfAt(30 * 1000),
+      'dated by the MESSAGE it was read from, never by the clock of whoever read it'
+    );
+
+    const after = deriveFooterFields({ sample: refreshed, knownSessionId: 'gf-session', now: GF_NOW });
+    assert.equal(after.blindReason, BLIND_REASON.WINDOW_SIZE_UNKNOWN, 'no longer stale — just ungraded');
+    assert.equal(after.fields.usedTokens, 300_000);
+    assert.equal(after.fields.percent, null, 'and STILL no invented percentage');
+    assert.equal(after.fields.state, 'BLIND', 'a fresh count is still ungraded without a denominator');
+    assert.equal(renderFooter(after.fields), '⟦GOV⟧ ctx 300k · BLIND · NO ADVICE · next: UNSET · CONTINUE');
+
+    // The two paths genuinely differ — the assertion that makes the pair a proof.
+    assert.notEqual(renderFooter(after.fields), renderFooter(before.fields));
+    assert.doesNotMatch(renderFooter(after.fields), /ctx --/, 'and never `ctx --` with a real measurement in hand');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('WO-GF-01: a session that has genuinely STOPPED still reads STALE — and still carries its count', () => {
+  // THE LIE THIS FORBIDS, and the reason `sampled_at` is the message\'s time and not
+  // `now`: a refresh that stamped the read time would mark every count fresh forever and
+  // silently disable the staleness rung it sits beside. Here the newest message is 40
+  // minutes old — newer than the stored sample, so the refresh DOES run — and the age it
+  // carries is the truth about a session nobody is using.
+  const dir = tmp();
+  try {
+    const p = gfTranscript(dir, [gfLine({ at: gfAt(40 * 60 * 1000), tokens: 260_000 })]);
+    const stored = gfStored({ at: gfAt(45 * 60 * 1000), tokens: 250_000, transcriptPath: p });
+
+    const refreshed = refreshSampleFromTranscript(stored);
+    assert.equal(refreshed.refreshedFromTranscript, true, 'the refresh ran — this is not the decline case');
+    assert.equal(refreshed.data.sampled_at, gfAt(40 * 60 * 1000), 'and it is dated 40 minutes ago, not now');
+
+    const derived = deriveFooterFields({ sample: refreshed, knownSessionId: 'gf-session', now: GF_NOW });
+    assert.equal(derived.blindReason, BLIND_REASON.STALE, 'still STALE, because it genuinely is');
+    assert.equal(derived.fields.usedTokens, 260_000, 'and the true count still reaches Warwick');
+    assert.equal(derived.fields.percent, null);
+    assert.match(renderFooter(derived.fields), /ctx 260k · BLIND/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('WO-GF-01: the refresh REFUSES a foreign transcript, a backwards one, and a sample with no path', () => {
+  const dir = tmp();
+  try {
+    const fresh = gfAt(30 * 1000);
+    const stored = (over) => gfStored({ at: gfAt(25 * 60 * 1000), tokens: 100_000, ...over });
+    let examined = 0;
+
+    // 1. IDENTITY. The transcript names ANOTHER session — the one thing the whole ladder
+    //    exists to prevent. `SESSION_MISMATCH` refuses this downstream; the refresh must
+    //    refuse it upstream too, because a mismatched count copied into THIS session's
+    //    sample would arrive wearing this session's id and never reach that rung.
+    const foreign = gfTranscript(dir, [gfLine({ sessionId: 'someone-else', at: fresh, tokens: 999_000 })], 'foreign.jsonl');
+    const r1 = refreshSampleFromTranscript(stored({ transcriptPath: foreign }));
+    assert.equal(r1.refreshedFromTranscript, undefined, 'a foreign transcript must not refresh anything');
+    assert.equal(r1.data.context_window.used_tokens, 100_000, "and another session's count must never appear");
+    examined += 1;
+
+    // 2. AN UNIDENTIFIED transcript line is not an identity match either — absence of a
+    //    contradiction is not evidence of agreement.
+    const anon = gfTranscript(dir, [JSON.stringify({
+      type: 'assistant', timestamp: fresh, message: { model: 'm', usage: { input_tokens: 999_000 } },
+    })], 'anon.jsonl');
+    assert.equal(refreshSampleFromTranscript(stored({ transcriptPath: anon })).refreshedFromTranscript, undefined);
+    examined += 1;
+
+    // 3. NEVER BACKWARDS. The tail read is bounded, and one multi-megabyte tool result can
+    //    push the genuinely newest message out of the window — measured on this machine.
+    //    The refresh must then decline, not backdate a newer stored reading.
+    const older = gfTranscript(dir, [gfLine({ at: gfAt(50 * 60 * 1000), tokens: 40_000 })], 'older.jsonl');
+    const r3 = refreshSampleFromTranscript(stored({ transcriptPath: older }));
+    assert.equal(r3.refreshedFromTranscript, undefined, 'an older message must never replace a newer sample');
+    assert.equal(r3.data.context_window.used_tokens, 100_000);
+    assert.equal(r3.data.sampled_at, gfAt(25 * 60 * 1000), 'and the sample must not be backdated');
+    examined += 1;
+
+    // 4. A message with NO timestamp cannot be dated honestly, so it is not used.
+    const undated = gfTranscript(dir, [JSON.stringify({
+      type: 'assistant', sessionId: 'gf-session', message: { model: 'm', usage: { input_tokens: 999_000 } },
+    })], 'undated.jsonl');
+    assert.equal(refreshSampleFromTranscript(stored({ transcriptPath: undated })).refreshedFromTranscript, undefined);
+    examined += 1;
+
+    // 5. NO PATH — every sample written before this change. The refresh declines and the
+    //    caller gets back the very object it passed, so the old behaviour is preserved by
+    //    identity rather than by reconstruction.
+    const noPath = stored({});
+    assert.equal(refreshSampleFromTranscript(noPath), noPath, 'the same object, untouched');
+    examined += 1;
+
+    // 6. NOT A TRANSCRIPT SAMPLE. A statusLine sample carries no transcript path and its
+    //    numerator is not what this reads.
+    const statusLine = { ...noPath, data: { ...noPath.data, source: SOURCE_STATUSLINE, transcript_path: gfTranscript(dir, [gfLine({ at: fresh, tokens: 999_000 })], 'sl.jsonl') } };
+    assert.equal(refreshSampleFromTranscript(statusLine), statusLine);
+    examined += 1;
+
+    // 7. Unreadable telemetry stays unreadable — never an exception on this path.
+    const missing = stored({ transcriptPath: join(dir, 'does-not-exist.jsonl') });
+    assert.equal(refreshSampleFromTranscript(missing), missing);
+    assert.equal(refreshSampleFromTranscript(null), null);
+    assert.equal(refreshSampleFromTranscript({ ok: false, approximate: false }).refreshedFromTranscript, undefined);
+    examined += 1;
+
+    assert.equal(examined, 7, 'every refusal in the class was exercised');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('WO-GF-01 END TO END: computeFooterLine renders the LIVE count off a stale store', () => {
+  // The wiring, through the real store and a real file — the path
+  // `services/tower-baton/bin/notify-milestone.js` uses when it appends a footer to a
+  // handback notification. Every check above operates on the function in isolation; this
+  // one proves the composition actually calls it.
+  const dir = tmp();
+  try {
+    const p = gfTranscript(dir, [
+      gfLine({ sessionId: 'gf-live', at: gfAt(24 * 60 * 1000), tokens: 258_900 }),
+      gfLine({ sessionId: 'gf-live', at: gfAt(20 * 1000), tokens: 411_300 }),
+    ]);
+    const stale = gfStored({ at: gfAt(24 * 60 * 1000), tokens: 258_900, sessionId: 'gf-live', transcriptPath: p });
+    writeFileSync(join(dir, 'gf-live.json'), JSON.stringify(stale.data));
+
+    const line = computeFooterLine({ sessionId: 'gf-live', envOverride: dir, now: GF_NOW, next: 'Opus/high' });
+    assert.equal(line, '⟦GOV⟧ ctx 411.3k · BLIND · NO ADVICE · next: Opus/high · CONTINUE');
+
+    // The control: the same store with the path stripped is what shipped before, and it
+    // is a DIFFERENT line — 24 minutes old, with nothing saying so.
+    writeFileSync(join(dir, 'gf-live.json'), JSON.stringify({ ...stale.data, transcript_path: null }));
+    const old = computeFooterLine({ sessionId: 'gf-live', envOverride: dir, now: GF_NOW, next: 'Opus/high' });
+    assert.equal(old, '⟦GOV⟧ ctx 258.9k · BLIND · NO ADVICE · next: Opus/high · CONTINUE');
+    assert.notEqual(line, old, 'the refresh is what moves the line, not the fixture');
+
+    // And the whole line still round-trips through the grammar it never changed.
+    assert.equal(parseFooter(line).ok, true);
+    assert.equal(parseFooter(line).fields.usedTokens, 411_300);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('WO-GF-01 SEAM: the REAL sampler writes the path, and the REAL refresh reads it back', () => {
+  // Every WO-GF-01 test above builds its stored sample BY HAND, which cannot prove that
+  // the two modules agree about what they are exchanging — a typo in the field name on
+  // either side would leave all of them green while the feature was inert on the machine.
+  // This walks the actual seam: `sampler.extractTranscriptSample` writes the sample at a
+  // turn boundary, the transcript then grows during the next turn, and
+  // `refreshSampleFromTranscript` goes back to the source it recorded.
+  const dir = tmp();
+  try {
+    const p = join(dir, 'seam-gf.jsonl');
+    const turnEnd = gfAt(25 * 60 * 1000);
+    const midTurn = gfAt(15 * 1000);
+    writeFileSync(p, `${gfLine({ sessionId: 'seam-gf', at: turnEnd, tokens: 120_000 })}\n`);
+
+    // 1. The Stop hook's half, run for real.
+    const stored = extractTranscriptSample({
+      transcriptPath: p, sessionId: 'seam-gf', sampledAt: turnEnd, env: {}, storeOpts: { envOverride: dir },
+    });
+    assert.equal(stored.transcript_path, p, 'the sampler records WHERE the count came from');
+    assert.equal(stored.context_window.used_tokens, 120_000);
+
+    // 2. The turn runs long; the transcript grows. Nothing re-samples.
+    writeFileSync(p, `${gfLine({ sessionId: 'seam-gf', at: turnEnd, tokens: 120_000 })}\n${gfLine({ sessionId: 'seam-gf', at: midTurn, tokens: 333_300 })}\n`);
+
+    // 3. The footer's half, run for real, on the wrapper shape it actually consumes.
+    const wrapped = { ok: true, approximate: false, data: stored };
+    const before = deriveFooterFields({ sample: wrapped, knownSessionId: 'seam-gf', now: GF_NOW });
+    assert.equal(before.blindReason, BLIND_REASON.STALE, 'the control: the stored sample IS stale by now');
+
+    const after = deriveFooterFields({
+      sample: refreshSampleFromTranscript(wrapped), knownSessionId: 'seam-gf', now: GF_NOW,
+    });
+    assert.equal(after.blindReason, BLIND_REASON.WINDOW_SIZE_UNKNOWN, 'and the refreshed one is not');
+    assert.equal(after.fields.usedTokens, 333_300, 'the count Warwick reads is the one from thirty seconds ago');
+    assert.equal(renderFooter(after.fields), '⟦GOV⟧ ctx 333.3k · BLIND · NO ADVICE · next: UNSET · CONTINUE');
+    assert.notEqual(renderFooter(after.fields), renderFooter(before.fields));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('WO-GF-01: `~` survives onto a BLIND rung that carries a NUMBER, and only there', () => {
+  // The defect the STALE repair widened. `blind()` forced `approximate: false` on every
+  // rung, which was right while BLIND meant `ctx --` — "approximately unknown" is not a
+  // fact about anything. Two rungs now carry a real measurement, and for those the flag
+  // means something precise: this sample's session could not be confirmed as mine. Live
+  // case, not hypothetical — the footer CLI without `--session` reads the newest sample
+  // for the project key and marks it approximate.
+  const approx = (over) => ({ ...gfStored({ at: gfAt(25 * 60 * 1000), tokens: 250_000, ...over }), approximate: true });
+
+  // 1. STALE, with a number -> `~`.
+  const stale = deriveFooterFields({ sample: approx({}), knownSessionId: 'gf-session', now: GF_NOW });
+  assert.equal(stale.blindReason, BLIND_REASON.STALE);
+  assert.equal(stale.fields.approximate, true, 'an unconfirmed count must carry its qualifier');
+  assert.equal(renderFooter(stale.fields), '⟦GOV⟧ ctx ~250k · BLIND · NO ADVICE · next: UNSET · CONTINUE');
+
+  // 2. WINDOW_SIZE_UNKNOWN, with a number -> `~`. Same rule, the other numeric rung.
+  const rung7 = deriveFooterFields({ sample: approx({ at: gfAt(1000) }), knownSessionId: 'gf-session', now: GF_NOW });
+  assert.equal(rung7.blindReason, BLIND_REASON.WINDOW_SIZE_UNKNOWN);
+  assert.equal(rung7.fields.approximate, true);
+  assert.match(renderFooter(rung7.fields), /ctx ~250k/);
+
+  // 3. NO NUMBER -> NO `~`. The original judgement stands wherever it still applies:
+  //    `ctx ~--` remains unreachable from the ladder.
+  const unreadable = deriveFooterFields({ sample: { ok: false, approximate: true }, now: GF_NOW });
+  assert.equal(unreadable.blindReason, BLIND_REASON.SAMPLE_UNREADABLE);
+  assert.equal(unreadable.fields.approximate, false, 'approximately unknown is not a fact about anything');
+  assert.equal(renderFooter(unreadable.fields), '⟦GOV⟧ ctx -- · BLIND · NO ADVICE · next: UNSET · CONTINUE');
+
+  // 4. SESSION_MISMATCH carries no number by construction, so it can never carry the `~`
+  //    either — the boundary of the class, asserted rather than assumed.
+  const foreign = deriveFooterFields({ sample: approx({ sessionId: 'someone-else' }), knownSessionId: 'gf-session', now: GF_NOW });
+  assert.equal(foreign.blindReason, BLIND_REASON.SESSION_MISMATCH);
+  assert.equal(foreign.fields.usedTokens, null);
+  assert.equal(foreign.fields.approximate, false);
+
+  // 5. A CONFIRMED sample never gains a `~` it did not earn — the control that stops this
+  //    test passing off a flag hardcoded true.
+  const confirmed = deriveFooterFields({
+    sample: gfStored({ at: gfAt(25 * 60 * 1000), tokens: 250_000 }),
+    knownSessionId: 'gf-session', now: GF_NOW,
+  });
+  assert.equal(confirmed.fields.approximate, false);
+  assert.match(renderFooter(confirmed.fields), /ctx 250k/);
+
+  // 6. And it round-trips: the `~` is grammar, not decoration.
+  assert.equal(parseFooter(renderFooter(stale.fields)).fields.approximate, true);
+});
+
+// ===========================================================================
+// WARWICK 2026-08-02 — BLIND MAY NOT CARRY A GRADE-DERIVED RECOMMENDATION
+// ===========================================================================
+//
+// THE RULING, verbatim: "The footer must not pair BLIND with KEEP GOING or CLEAR NOW.
+// BLIND must render advice unavailable while still showing the truthful absolute count."
+//
+// THE DEFECT. `BLIND` means "I could not grade this". Every other member of the advice
+// vocabulary is a recommendation DERIVED from a grade. Pairing them had the footer
+// withhold the judgement and then offer advice premised on the judgement it had just
+// withheld — and `KEEP GOING?` reads on a phone as a hedged yes, which is the reassurance
+// BLIND exists to refuse. Same class as `ctx --` over a real measurement: a field
+// asserting more than the evidence supports.
+//
+// ENUMERATED, NOT SPOT-CHECKED. Inspection has no completion condition — "I checked a
+// couple of BLIND cases and they looked right" is how a class stays open. Every rung the
+// ladder can reach is walked here, and the test asserts a non-zero executed count so it
+// cannot go green on an empty loop.
+
+test('WARWICK: every BLIND rung renders NO ADVICE — never KEEP GOING, CLEAR NOW or a hedge', () => {
+  const at = (ms) => new Date(GF_NOW - ms).toISOString();
+  const pct = (over) => ({
+    ok: true, approximate: false,
+    data: { schema_version: 1, sampled_at: at(1000), session_id: 'w-session', context_window: { used_percentage: 18 }, ...over },
+  });
+
+  // Every rung of D-3's ladder, by its BLIND_REASON, and whether it carries a count.
+  const rungs = [
+    ['sample unreadable', { sample: { ok: false, approximate: false } }, BLIND_REASON.SAMPLE_UNREADABLE, null],
+    ['schema unrecognised', { sample: pct({ schema_version: 2 }) }, BLIND_REASON.SCHEMA_UNRECOGNISED, null],
+    ['no usage at all', { sample: pct({ context_window: {} }) }, BLIND_REASON.PERCENTAGE_ABSENT, null],
+    ['sampled_at unparseable', { sample: pct({ sampled_at: 'not a date' }) }, BLIND_REASON.SAMPLED_AT_UNPARSEABLE, null],
+    ['session mismatch', { sample: pct({ session_id: 'someone-else' }) }, BLIND_REASON.SESSION_MISMATCH, null],
+    ['percentage out of range', { sample: pct({ context_window: { used_percentage: 140 } }) }, BLIND_REASON.PERCENTAGE_OUT_OF_RANGE, null],
+    ['evaluator threw', { sample: pct(), evaluateFn: () => { throw new Error('boom'); } }, BLIND_REASON.EVALUATOR_THREW, null],
+    // The two that carry a real measurement — the half of the ruling that says the count
+    // must SURVIVE the advice being withheld.
+    ['stale, with a count', { sample: gfStored({ at: at(25 * 60 * 1000), tokens: 250_000, sessionId: 'w-session' }) }, BLIND_REASON.STALE, 250_000],
+    ['window unknown, with a count', { sample: gfStored({ at: at(1000), tokens: 461_800, sessionId: 'w-session' }) }, BLIND_REASON.WINDOW_SIZE_UNKNOWN, 461_800],
+  ];
+
+  const GRADED = [ADVICE.KEEP_GOING, ADVICE.CLEAR_NOW, ADVICE.UNSURE, ADVICE.TASK_UNKNOWN];
+  let examined = 0;
+
+  for (const [label, args, reason, tokens] of rungs) {
+    // `taskKnown` is forced BOTH ways: the TASK UNKNOWN suppression must not be able to
+    // reach into a BLIND line from either direction.
+    for (const next of [NEXT_UNSET, 'Opus/high']) {
+      const r = deriveFooterFields({ knownSessionId: 'w-session', now: GF_NOW, next, ...args });
+      assert.equal(r.fields.state, 'BLIND', `${label}: must be BLIND`);
+      assert.equal(r.blindReason, reason, `${label}: on the expected rung`);
+      assert.equal(r.fields.advice, ADVICE.NO_ADVICE, `${label}: advice must be unavailable`);
+      for (const graded of GRADED) {
+        assert.notEqual(r.fields.advice, graded, `${label}: BLIND must never advise ${graded}`);
+      }
+      const line = renderFooter(r.fields);
+      assert.match(line, / · BLIND · NO ADVICE · /, `${label}: the rendered bytes`);
+      assert.doesNotMatch(line, /KEEP GOING|CLEAR NOW|TASK UNKNOWN/, `${label}: no graded advice anywhere in the line`);
+
+      // THE OTHER HALF OF THE RULING: the truthful absolute count still renders.
+      assert.equal(r.fields.usedTokens, tokens, `${label}: the count is unaffected by the grade being absent`);
+      if (tokens !== null) {
+        assert.match(line, new RegExp(`ctx ${(tokens / 1000).toString().replace('.', '\\.')}k`), `${label}: and it reaches the line`);
+      }
+      // And the line is still readable by the grammar's own parser — the value is in
+      // ADVICE_VALUES, so the derived alternation in FOOTER_RE accepts it.
+      const parsed = parseFooter(line);
+      assert.equal(parsed.ok, true, `${label}: must round-trip`);
+      assert.equal(parsed.fields.advice, ADVICE.NO_ADVICE);
+      examined += 1;
+    }
+  }
+  assert.equal(examined, 18, 'every rung was walked in both task-knowledge directions');
+
+  // THE CONTROL — the graded states are untouched, so this test cannot pass by the
+  // advice field having been flattened for everyone.
+  assert.equal(adviceFor('GREEN', { taskKnown: true }), ADVICE.KEEP_GOING);
+  assert.equal(adviceFor('AMBER', { taskKnown: true }), ADVICE.KEEP_GOING);
+  assert.equal(adviceFor('GREEN', { taskKnown: false }), ADVICE.TASK_UNKNOWN);
+  assert.equal(adviceFor('RED', { taskKnown: false }), ADVICE.CLEAR_NOW);
+  assert.equal(adviceFor('RECOVERY', { taskKnown: true }), ADVICE.CLEAR_NOW);
+
+  const green = deriveFooterFields({ sample: pct(), knownSessionId: 'w-session', now: GF_NOW, next: 'Opus/high' });
+  assert.equal(renderFooter(green.fields), '⟦GOV⟧ ctx 18% · GREEN · KEEP GOING · next: Opus/high · CONTINUE');
+});
+
+test('WARWICK: `KEEP GOING?` is RETIRED, not deleted — the parser still reads lines already sent', () => {
+  // A grammar in circulation cannot drop a value it has emitted. Transcripts, Telegram
+  // notifications sent by tower-baton and the session record all hold lines carrying
+  // `KEEP GOING?`, and a parser that rejects its own history is a worse defect than the
+  // one this change fixes — `parseFooter` failing means "no footer", which B6 treats as
+  // ALLOW. So the member stays readable and simply has no producer.
+  const historical = '⟦GOV⟧ ctx 258.9k · BLIND · KEEP GOING? · next: UNSET · CONTINUE';
+  const parsed = parseFooter(historical);
+  assert.equal(parsed.ok, true, 'a line this estate has already sent must still parse');
+  assert.equal(parsed.fields.advice, ADVICE.UNSURE);
+  assert.equal(renderFooter(parsed.fields), historical, 'and it still round-trips exactly');
+
+  // ...but NOTHING PRODUCES IT any more. The producer is the whole ladder: sweep every
+  // state through both entry points and assert the retired value never comes back.
+  let checked = 0;
+  for (const state of FOOTER_STATES) {
+    assert.notEqual(adviceForState(state), ADVICE.UNSURE, `${state} must not produce the retired value`);
+    for (const taskKnown of [true, false]) {
+      assert.notEqual(adviceFor(state, { taskKnown }), ADVICE.UNSURE);
+      checked += 1;
+    }
+  }
+  assert.equal(checked, FOOTER_STATES.length * 2);
+  assert.equal(checked, 10, 'five states, both task-knowledge directions');
 });

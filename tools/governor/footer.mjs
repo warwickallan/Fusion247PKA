@@ -51,12 +51,25 @@
 // was the one reachable `git` call) and the `programme-state.mjs` import, so the only
 // modules left below are the evaluator and the health store, neither of which executes
 // anything at import time or shells out at all.
+//
+// `sampler.mjs` JOINED THAT LIST (WO-GF-01) and is held to the same bar: it shells out to
+// nothing, executes nothing at import (its CLI block is behind the same entrypoint guard
+// every module here uses), imports no new dependency, and does not import this module
+// back. What it brings is the three functions that already know how to read a token count
+// out of a transcript — reused rather than re-implemented, because a second copy of that
+// logic here is exactly the drift this module exists to refuse.
 
 import { readdirSync, existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { evaluate, STATE } from './evaluator.mjs';
 import { readHealthSample, healthStoreDir } from './health-store.mjs';
+import {
+  readTranscriptTail,
+  newestAssistantUsage,
+  sumUsedTokens,
+  SOURCE_TRANSCRIPT,
+} from './sampler.mjs';
 
 // ---------------------------------------------------------------------------
 // The vocabulary — closed sets, membership-checked, never text-judged
@@ -129,17 +142,43 @@ export const FOOTER_STATES = Object.freeze(['GREEN', 'AMBER', 'RED', 'RECOVERY',
 // CLEAR NOW is NOT suppressed this way — see `adviceFor` for why. Running out of
 // context is a fact about the SESSION, not about the task, and INV-2 forbids a
 // change that could let Warwick sail into a wall while the footer stays quiet.
+// NO_ADVICE added 2026-08-02 by Warwick's ruling: "the footer must not pair BLIND with
+// KEEP GOING or CLEAR NOW. BLIND must render advice unavailable while still showing the
+// truthful absolute count."
+//
+// The defect it closes is the same class as `ctx --` over a real measurement, one field
+// to the right. `BLIND` says "I could not grade this"; every other member of this
+// vocabulary is a recommendation DERIVED from a grade. Pairing them withheld the
+// judgement and then offered advice premised on the judgement just withheld —
+// `KEEP GOING?` reads to a human as "probably fine, carry on", which is precisely the
+// claim BLIND exists to refuse. `CLEAR NOW` beside BLIND would be worse: a rotation
+// instruction with nothing behind it.
+//
+// WHY `NO ADVICE` AND NOT `UNGRADED` OR `ADVICE UNAVAILABLE`. Two words, the register of
+// `TASK UNKNOWN` (a state of knowledge, not an instruction), and readable at a glance on
+// a phone, which is where Warwick actually reads this line. `UNGRADED` restates what the
+// STATE field one segment to the left already says; `ADVICE UNAVAILABLE` says the same
+// thing in twice the width of a field whose position already tells you it is the advice.
+//
+// `UNSURE` ("KEEP GOING?") IS RETAINED IN THE VOCABULARY AND NO LONGER PRODUCED. Deleting
+// it would be a REMOVAL from a grammar that is already in circulation: `parseFooter` must
+// still read back the lines this estate has already emitted — in transcripts, in Telegram
+// notifications sent by tower-baton, in the session record — and a parser that rejects
+// its own history is a worse defect than the one being fixed. Nothing emits it now; the
+// members below are what the renderer may be handed, not what the producer chooses.
 export const ADVICE = Object.freeze({
   KEEP_GOING: 'KEEP GOING',
   CLEAR_NOW: 'CLEAR NOW',
   UNSURE: 'KEEP GOING?',
   TASK_UNKNOWN: 'TASK UNKNOWN',
+  NO_ADVICE: 'NO ADVICE',
 });
 export const ADVICE_VALUES = Object.freeze([
   ADVICE.KEEP_GOING,
   ADVICE.CLEAR_NOW,
   ADVICE.UNSURE,
   ADVICE.TASK_UNKNOWN,
+  ADVICE.NO_ADVICE,
 ]);
 
 // D-2's NEXT production. This is narrower than D-4's U-c (which only excludes `unknown`
@@ -215,11 +254,24 @@ export const BLIND_REASON = Object.freeze({
 // ---------------------------------------------------------------------------
 // Pure: advice
 // ---------------------------------------------------------------------------
-// Mirrors `statusline-live.mjs`'s existing mapping exactly, so the two surfaces cannot
-// disagree about what a state means. BLIND is deliberately "KEEP GOING?" and not
-// "CLEAR NOW": unknown telemetry must never FORCE a rotation (that would let a broken
-// sensor cost Warwick his session), but it must never read as healthy either — the
-// question mark is the whole distinction (AD-3 / INV-1).
+// One mapping for every surface, so two of them cannot disagree about what a state means.
+//
+// BLIND YIELDS `NO ADVICE` (Warwick, 2026-08-02). It used to yield `KEEP GOING?`, and the
+// reasoning recorded here was half right: unknown telemetry must never FORCE a rotation —
+// a broken sensor must not cost Warwick his session — and it must never read as healthy
+// either. The old answer satisfied the first and FAILED the second. A question mark is
+// not a refusal to advise; on a phone `KEEP GOING?` reads as a hedged yes, which is a
+// grade-derived claim from a state that exists to say no grade was possible.
+//
+// `NO ADVICE` satisfies both halves properly: it forces nothing, and it asserts nothing.
+// AD-3 / INV-1 are honoured more exactly than before, not relaxed — BLIND still never
+// renders as anything a reader could mistake for healthy, and the loudness INV-1 asks for
+// now lives in a field that says outright that the governor cannot answer.
+//
+// THE `default` BRANCH MOVES WITH IT, and for the same reason rather than for symmetry: a
+// state outside this vocabulary is a state nothing has graded, so advice derived from it
+// would be derived from nothing. (`deriveFooterFields` already converts an unrecognised
+// verdict state to BLIND, so this branch is defence in depth, not a live path.)
 
 export function adviceForState(state) {
   switch (state) {
@@ -230,9 +282,9 @@ export function adviceForState(state) {
     case STATE.AMBER:
       return ADVICE.KEEP_GOING;
     case STATE.BLIND:
-      return ADVICE.UNSURE;
+      return ADVICE.NO_ADVICE;
     default:
-      return ADVICE.UNSURE;
+      return ADVICE.NO_ADVICE;
   }
 }
 
@@ -258,15 +310,21 @@ export function adviceForState(state) {
  *   task is known, and the two states where staying quiet costs Warwick the session.
  *   INV-2 (never trap Warwick) outranks tidiness.
  *
- *   KEEP GOING? (from BLIND) is NEVER suppressed either, and this is the correction.
- *   The first draft folded it into TASK UNKNOWN, which is wrong: BLIND means the
- *   telemetry could not be read, and INV-1 says a governor that stops measuring must
- *   become LOUDER, not quieter. Replacing the sensor-failure signal with an unrelated
- *   one about task knowledge makes it quieter in exactly the field a human reads first.
- *   The two unknowns are different facts and both deserve to survive: the STATE field
- *   still carries BLIND, and the ADVICE field still carries its question mark.
+ *   NO ADVICE (from BLIND) is NEVER suppressed either, and this is the correction — it
+ *   was `KEEP GOING?` until Warwick's 2026-08-02 ruling and the argument is unchanged by
+ *   the rename. The first draft folded it into TASK UNKNOWN, which is wrong: BLIND means
+ *   the telemetry could not be read, and INV-1 says a governor that stops measuring must
+ *   become LOUDER, not quieter. Replacing the sensor-failure signal with an unrelated one
+ *   about task knowledge makes it quieter in exactly the field a human reads first. The
+ *   two unknowns are different facts and both deserve to survive: the STATE field still
+ *   carries BLIND, and the ADVICE field still says outright that no advice is available.
  *
  * So TASK UNKNOWN replaces exactly one thing — an unearned "yes, carry on".
+ *
+ * THE STRUCTURE ALSO CARRIES WARWICK'S RULING WITHOUT A SECOND GUARD. Only the KEEP GOING
+ * branch is reachable past the early return, so BLIND can never leave this function as
+ * KEEP GOING, as CLEAR NOW, or as TASK UNKNOWN — it returns `adviceForState`'s answer
+ * directly, and that answer is NO ADVICE.
  */
 export function adviceFor(state, { taskKnown = true } = {}) {
   const base = adviceForState(state);
@@ -439,7 +497,7 @@ function requireMember(value, allowed, label) {
  *   approximate: boolean — the D-3 `~`, meaning "this sample's session could not be
  *                confirmed as mine"
  *   state:       GREEN | AMBER | RED | RECOVERY | BLIND
- *   advice:      KEEP GOING | CLEAR NOW | KEEP GOING? | TASK UNKNOWN
+ *   advice:      KEEP GOING | CLEAR NOW | KEEP GOING? | TASK UNKNOWN | NO ADVICE
  *   next:        <Model>/<effort> | UNSET
  *   control:     CONTINUE | HANDBACK:<code>
  * }
@@ -803,25 +861,41 @@ export function deriveFooterFields({
   // cannot fully support, which is the direction this whole change exists to move in.
   taskKnown = next !== NEXT_UNSET,
 } = {}) {
-  // `approximate` is deliberately forced false on every BLIND path. The grammar permits
-  // `ctx ~--`, and the parser round-trips it, but "approximately unknown" is not a fact
-  // about anything — so the ladder never emits it even though the renderer would accept
-  // it. Grammar fidelity in the codec, meaning in the producer.
-  const blind = (blindReason, ctx = {}) => ({
-    fields: {
-      percent: null,
-      usedTokens: null,
-      windowTokens: null,
-      ...ctx,
-      approximate: false,
-      state: STATE.BLIND,
-      advice: adviceFor(STATE.BLIND, { taskKnown }),
-      next,
-      control,
-    },
-    blind: true,
-    blindReason,
-  });
+  // ---------------------------------------------------------------------------
+  // `~` QUALIFIES A NUMBER — so it survives exactly where a number does (WO-GF-01)
+  // ---------------------------------------------------------------------------
+  // This used to force `approximate: false` on EVERY blind path, and the reasoning given
+  // was right when it was written: the grammar permits `ctx ~--`, and the parser
+  // round-trips it, but "approximately unknown" is not a fact about anything.
+  //
+  // THAT REASONING IS SUPERSEDED BY THERE BEING A NUMBER TO QUALIFY. Two blind rungs now
+  // carry a real measurement — WINDOW_SIZE_UNKNOWN (WO-OR-05) and STALE (2026-08-02) —
+  // and the `~` means one precise thing: "this sample's session could not be confirmed as
+  // mine." That is a live case, not a hypothetical: the footer CLI invoked without
+  // `--session` resolves the NEWEST sample for the project key and marks it approximate,
+  // and this machine's store holds several sessions at once. Rendering that count as a
+  // bare `ctx 259k` states it more strongly than the evidence supports; `ctx ~259k` is
+  // the same number with its one caveat attached.
+  //
+  // The flag is therefore tied to the NUMERATOR and not to the rung: no number, no
+  // qualifier, so `ctx ~--` remains unreachable and the original judgement stands
+  // wherever it still applies. SESSION_MISMATCH carries no number by construction (it
+  // must never carry another session's count) and so can never carry the `~` either.
+  const blind = (blindReason, ctx = {}) => {
+    const ctxFields = { percent: null, usedTokens: null, windowTokens: null, ...ctx };
+    return {
+      fields: {
+        ...ctxFields,
+        approximate: ctxFields.usedTokens !== null && sample?.approximate === true,
+        state: STATE.BLIND,
+        advice: adviceFor(STATE.BLIND, { taskKnown }),
+        next,
+        control,
+      },
+      blind: true,
+      blindReason,
+    };
+  };
 
   if (!sample || sample.ok !== true || !sample.data || typeof sample.data !== 'object') {
     return blind(BLIND_REASON.SAMPLE_UNREADABLE);
@@ -857,8 +931,35 @@ export function deriveFooterFields({
     return blind(BLIND_REASON.SESSION_MISMATCH);
   }
 
+  // ---------------------------------------------------------------------------
+  // THE STALE RUNG CARRIES THE NUMERATOR TOO — the defect CLASS, not one instance
+  // ---------------------------------------------------------------------------
+  // This used to `return blind(BLIND_REASON.STALE)` bare, which DISCARDED a real,
+  // measured `used_tokens` the sample was holding, and rendered `ctx --`. Observed
+  // live 2026-08-02: a sample carrying `used_tokens: 258933` aged past 20 minutes
+  // mid-turn and the footer went to `ctx --` — no number at all — while the very
+  // same missing information one rung lower (rung 7, WINDOW_SIZE_UNKNOWN) is
+  // deliberately rendered as `ctx 259k · BLIND`.
+  //
+  // Two rungs, the same question ("we cannot GRADE this, do we still know the
+  // count?"), two different answers. WO-OR-09 fixed the instance it was pointed at
+  // and left the class open — inspection finding one case is not the same as
+  // enumerating them. The rungs that can hold a real numerator are exactly:
+  // STALE (this one) and WINDOW_SIZE_UNKNOWN (rung 7). SESSION_MISMATCH must NOT
+  // carry it — another session's count is not a fact about this one — and the
+  // rungs above simply have no numerator to carry.
+  //
+  // `state` stays BLIND, so nothing is graded off an old reading. What Warwick gets
+  // is a true measurement with no grade instead of a blank where a number existed.
+  //
+  // `windowTokens` is forced to null exactly as rung 7 does, and that is NOT tidiness:
+  // `renderFooter` throws `windowTokens requires both percent and usedTokens — a
+  // denominator with nothing to divide is a caller bug`. Carrying the window here was
+  // the first attempt at this fix and the suite caught it. A denominator with no
+  // percentage beside it is the display half of the exact false-confidence this module
+  // exists to prevent.
   if (now - sampledAt > STALE_AFTER_MS) {
-    return blind(BLIND_REASON.STALE);
+    return blind(BLIND_REASON.STALE, { usedTokens, windowTokens: null });
   }
 
   // The percentage, from the ONLY two honest sources: one the sample reported directly
@@ -1071,6 +1172,119 @@ export function resolveHealthSample({
 }
 
 // ---------------------------------------------------------------------------
+// Impure: make the count FRESH AT RENDER TIME (WO-GF-01)
+// ---------------------------------------------------------------------------
+// THE DEFECT. A health sample is written at a TURN BOUNDARY — by the Stop hook via
+// `sampler.sampleFromTranscript`, or by the statusLine — and nothing re-samples during a
+// long working turn. So on any turn longer than `STALE_AFTER_MS` the footer rendered a
+// count that was true as of its sample time with NOTHING in the line to say how old it
+// was: a 30-second-old count and a 25-minute-old one looked identical. Observed live
+// 2026-08-02 at 24 minutes.
+//
+// This matters more here than it sounds. On this estate the denominator is usually not
+// established (every recent sample for this project key carries
+// `context_window_size: null`), so the footer sits on the WINDOW_SIZE_UNKNOWN rung
+// permanently — no percentage, state BLIND — and the raw count is the ENTIRE payload of
+// the line. Its freshness is not a refinement of the feature; it is the feature.
+//
+// THE REPAIR IS TO REMOVE THE STALENESS, NOT TO LABEL IT. The transcript is appended
+// throughout a turn (measured at six seconds old mid-turn on this machine), and the
+// sample now records the path it was read from, so the count can simply be re-read at the
+// moment it is rendered. Nothing is added to the byte grammar, nothing new is scheduled,
+// cached or configured, and no new module exists: this reuses `sampler.mjs`'s existing
+// tail reader and its usage arithmetic, and on failure returns the caller's own sample
+// unchanged so the behaviour degrades to exactly what it was before.
+//
+// FOUR REFUSALS, and each one is why this cannot quietly make things worse:
+//
+//   IDENTITY, NEVER INFERENCE. The transcript's newest assistant message must name the
+//   SAME session the sample does. A transcript is just a file path; without this check a
+//   stale or hand-edited path could put another session's count on this session's line,
+//   which is the one thing the whole ladder is built to prevent. Matching ids is the same
+//   principle `resolveWindowTokens` settled in WO-OR-09: identity may cross a boundary
+//   that similarity may not.
+//
+//   NEVER GO BACKWARDS. The tail read is bounded at `TRANSCRIPT_TAIL_BYTES`, and a single
+//   multi-megabyte tool result can push the genuinely newest assistant message out of
+//   that window — observed on this machine, where the "newest" message found was five
+//   minutes behind the file's own mtime. Without this check the refresh could REPLACE a
+//   newer stored count with an older one and backdate the sample. A refresh that can make
+//   the reading worse is not a repair.
+//
+//   THE MESSAGE'S OWN TIME, NEVER `now`. `sampled_at` becomes the timestamp of the
+//   message the count was read from. Stamping the read time would mark every count fresh
+//   forever and silently disable the STALE rung — the same class of lie as a stale count
+//   presented as current, in the opposite direction. Taking the message's time instead
+//   composes with that rung rather than defeating it: a session that has genuinely
+//   stopped still reads STALE, and still carries its true count.
+//
+//   TRANSCRIPT SAMPLES ONLY. A statusLine sample's numerator is not what this reads, and
+//   it carries no transcript path, so this declines rather than guessing one.
+//
+// Never throws. Every failure path returns the sample it was given.
+
+/**
+ * refreshSampleFromTranscript(sample, deps) -> sample
+ *
+ * `sample` is a health-store READ RESULT (`{ ok, data, approximate }`), the same shape
+ * `deriveFooterFields` consumes — not a bare sample. Returns a NEW read result carrying a
+ * fresher `used_tokens` and `sampled_at`, or the original object untouched.
+ *
+ * `refreshedFromTranscript: true` is set on a refreshed result so a caller — and a test —
+ * can tell that the re-read actually happened, rather than inferring it from a number
+ * that might have come out either way. INV-5's rule applied to a new path: a control that
+ * cannot say what it did cannot be made to fail convincingly.
+ */
+export function refreshSampleFromTranscript(sample, {
+  readTail = readTranscriptTail,
+  findUsage = newestAssistantUsage,
+  sumTokens = sumUsedTokens,
+} = {}) {
+  if (!sample || sample.ok !== true || !sample.data || typeof sample.data !== 'object') return sample;
+  const data = sample.data;
+  if (data.source !== SOURCE_TRANSCRIPT) return sample;
+
+  const path = data.transcript_path;
+  if (typeof path !== 'string' || path.length === 0) return sample;
+
+  let found;
+  try {
+    found = findUsage(readTail(path));
+  } catch {
+    return sample;
+  }
+  if (!found) return sample;
+
+  // IDENTITY. Both sides must state a session id and they must agree.
+  if (typeof found.sessionId !== 'string' || found.sessionId.length === 0) return sample;
+  if (found.sessionId !== data.session_id) return sample;
+
+  // THE MESSAGE'S OWN TIME. Unusable time, no refresh — a count with no honest as-of is
+  // worth less than a count whose age the existing ladder already judges correctly.
+  const at = typeof found.timestamp === 'string' ? Date.parse(found.timestamp) : NaN;
+  if (!Number.isFinite(at)) return sample;
+
+  // NEVER GO BACKWARDS. An unparseable stored `sampled_at` cannot be compared, and the
+  // ladder rejects it anyway (SAMPLED_AT_UNPARSEABLE), so a real timestamp is an
+  // improvement on it and the refresh proceeds.
+  const storedAt = typeof data.sampled_at === 'string' ? Date.parse(data.sampled_at) : NaN;
+  if (Number.isFinite(storedAt) && at <= storedAt) return sample;
+
+  const usedTokens = sumTokens(found.usage);
+  if (typeof usedTokens !== 'number' || !Number.isFinite(usedTokens)) return sample;
+
+  return {
+    ...sample,
+    data: {
+      ...data,
+      sampled_at: found.timestamp,
+      context_window: { ...data.context_window, used_tokens: usedTokens },
+    },
+    refreshedFromTranscript: true,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Impure: the one composition function
 // ---------------------------------------------------------------------------
 
@@ -1118,6 +1332,17 @@ export function computeFooterLine({
   } catch {
     sample = { ok: false, approximate: false };
   }
+
+  // WO-GF-01. The stored sample was written at a turn boundary; this is render time, and
+  // the transcript has moved on since. Re-read the count from its own source so the line
+  // states what is true NOW rather than what was true when the last turn ended. Declines
+  // on every failure and returns the stored sample unchanged, so nothing here can make
+  // the line worse than it was — including the `catch`, which exists because this
+  // function owes its caller a line under all conditions and that promise is not one it
+  // gets to borrow from a callee.
+  try {
+    sample = refreshSampleFromTranscript(sample);
+  } catch { /* the stored sample stands */ }
 
   const { fields } = deriveFooterFields({
     sample,

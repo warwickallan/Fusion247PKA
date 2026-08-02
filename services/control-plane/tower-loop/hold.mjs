@@ -5,6 +5,8 @@
 // explicitly returns a held row to 'pending'. Both operations are idempotent: re-holding a held row
 // only refreshes its hold metadata; releasing a non-held row is a no-op. Substantive turn content
 // (instruction, larry_response, seq, build_ref, timestamps other than updated_at) is never changed.
+//
+// WO-TW-01: the store is SQLite (better-sqlite3, WAL). `pool` is the pg-shaped handle from db.mjs.
 
 // Hold a turn. Only a pending / claimed / already-held row may be held (never a reviewed/final row).
 // Returns { id, state } of the held row, or null if it was not in a holdable state.
@@ -13,11 +15,11 @@ export async function holdTurn(pool, id, { heldBy, reason, until = null } = {}) 
   const { rows } = await pool.query(
     `update tower.turn
         set state = 'held', lease_owner = null, lease_deadline_at = null,
-            held_at = coalesce(held_at, now()), held_by = $2, hold_reason = $3, hold_until = $4,
+            held_at = coalesce(held_at, now()), held_by = ?, hold_reason = ?, hold_until = ?,
             updated_at = now()
-      where id = $1 and state in ('pending', 'claimed', 'held')
+      where id = ? and state in ('pending', 'claimed', 'held')
       returning id, state`,
-    [id, heldBy, reason ?? null, until]);
+    [heldBy, reason ?? null, until, id]);
   return rows[0] ?? null;
 }
 
@@ -28,7 +30,7 @@ export async function releaseTurn(pool, id) {
     `update tower.turn
         set state = 'pending', held_at = null, held_by = null, hold_reason = null, hold_until = null,
             lease_owner = null, lease_deadline_at = null, updated_at = now()
-      where id = $1 and state = 'held'`,
+      where id = ? and state = 'held'`,
     [id]);
   return rowCount > 0;
 }

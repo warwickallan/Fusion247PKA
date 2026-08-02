@@ -12,6 +12,8 @@
 //       Telegram via notify().
 //
 // Tower stages everything durably; Codex never touches the DB or holds any secret.
+//
+// WO-TW-01: the store is SQLite (better-sqlite3, WAL). `pool` is the pg-shaped handle from db.mjs.
 
 import { createHash } from 'node:crypto';
 import { runSupervisor } from './supervisorCodex.mjs';
@@ -57,7 +59,7 @@ export function serializeReconstructedTurn({ turn, prompt }) {
  * prompt is intentionally NOT bound here — the watcher binds the ACTIVE prompt at process
  * time (load-prompt-FIRST stays a property of processing, not of arrival).
  *
- * @param {import('pg').Pool} pool
+ * @param {ReturnType<import('./db.mjs').openDb>} pool
  * @param {object} input
  * @param {string}  input.instruction    what Warwick/Tower asked
  * @param {string} [input.larryResponse] Larry's response / proposed action
@@ -88,7 +90,7 @@ export async function ingestTurn(pool, {
     `insert into tower.turn
        (build_ref, instruction, larry_response, state, goal_complete,
         kind, pr_number, repo, base_sha, head_sha, session_turn_key)
-     values ($1, $2, $3, 'pending', $4, $5, $6, $7, $8, $9, $10)
+     values (?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?)
      on conflict (session_turn_key) where session_turn_key is not null do nothing
      returning id, seq, build_ref, state, created_at, kind`,
     [classifiedRef, instruction, larryResponse, goalComplete === true,
@@ -99,7 +101,7 @@ export async function ingestTurn(pool, {
   // Lost the insert to an existing key — return the pre-existing turn (idempotent, no dup).
   const existing = await pool.query(
     `select id, seq, build_ref, state, created_at, kind
-       from tower.turn where session_turn_key = $1`,
+       from tower.turn where session_turn_key = ?`,
     [sessionTurnKey],
   );
   return { ...existing.rows[0], deduped: true };
@@ -110,7 +112,7 @@ export async function loadActivePrompt(pool) {
   const { rows } = await pool.query(
     `select id, version, content, content_hash, active, approved_by, created_at
        from tower.supervisor_prompt
-      where active = true
+      where active = 1
       limit 1`,
   );
   if (rows.length === 0) throw new Error('no ACTIVE supervisor prompt in tower.supervisor_prompt — seed one first');
@@ -123,7 +125,7 @@ export async function reconstructTurn(pool, turnId) {
   const turnRes = await pool.query(
     `select id, seq, build_ref, prompt_id, prompt_version, prompt_hash,
             instruction, larry_response, state, created_at, updated_at
-       from tower.turn where id = $1`,
+       from tower.turn where id = ?`,
     [turnId],
   );
   if (turnRes.rows.length === 0) throw new Error(`turn ${turnId} not found`);
@@ -131,21 +133,24 @@ export async function reconstructTurn(pool, turnId) {
 
   const promptRes = await pool.query(
     `select id, version, content, content_hash, active, approved_by, created_at
-       from tower.supervisor_prompt where id = $1`,
+       from tower.supervisor_prompt where id = ?`,
     [turn.prompt_id],
   );
   const prompt = promptRes.rows[0] ?? null;
 
+  // `, rowid asc` — millisecond-resolution timestamps can tie in SQLite where microsecond
+  // Postgres ones could not; rowid is insertion order, so this keeps the ordering these callers
+  // already relied on. Same reasoning as findings.mjs loadOpenFindings.
   const reviewRes = await pool.query(
     `select id, reviewer, model_id, packet_hash, aligned, over_engineering, drifting,
             administering, next_action, warwick_needed, verdict, summary, raw_output, created_at
-       from tower.supervisor_review where turn_id = $1 order by created_at asc`,
+       from tower.supervisor_review where turn_id = ? order by created_at asc, rowid asc`,
     [turnId],
   );
 
   const notifRes = await pool.query(
     `select id, reason, state, message, telegram_ok, telegram_message_id, created_at
-       from tower.notification where turn_id = $1 order by created_at asc`,
+       from tower.notification where turn_id = ? order by created_at asc, rowid asc`,
     [turnId],
   );
 
@@ -165,7 +170,7 @@ export async function reconstructTurn(pool, turnId) {
 /**
  * Run one full durable supervisor turn.
  *
- * @param {import('pg').Pool} pool
+ * @param {ReturnType<import('./db.mjs').openDb>} pool
  * @param {object} input
  * @param {string} input.instruction    what Warwick/Tower asked
  * @param {string} input.larryResponse  Larry's response / proposed action
@@ -184,7 +189,7 @@ export async function runTurn(pool, { instruction, larryResponse }, opts = {}) {
   // (b/c/d) insert the turn row, binding the prompt id/version/hash used for this turn.
   const insertRes = await pool.query(
     `insert into tower.turn (prompt_id, prompt_version, prompt_hash, instruction, larry_response, state)
-     values ($1, $2, $3, $4, $5, 'open')
+     values (?, ?, ?, ?, ?, 'open')
      returning id, seq, build_ref, created_at`,
     [prompt.id, prompt.version, prompt.content_hash, instruction, larryResponse],
   );
@@ -207,7 +212,7 @@ export async function runTurn(pool, { instruction, larryResponse }, opts = {}) {
     `insert into tower.supervisor_review
        (turn_id, reviewer, model_id, packet_hash, aligned, over_engineering, drifting,
         administering, next_action, warwick_needed, verdict, summary, raw_output)
-     values ($1, 'gpt_codex', $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+     values (?, 'gpt_codex', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       turnId, sup.modelId ?? null, packetHash,
       r.aligned, r.over_engineering, r.drifting, r.administering,
@@ -219,8 +224,8 @@ export async function runTurn(pool, { instruction, larryResponse }, opts = {}) {
   // (h) set turn.state from the verdict.
   const nextState = VERDICT_TO_STATE[r.verdict] ?? 'reviewed';
   await pool.query(
-    `update tower.turn set state = $2, updated_at = now() where id = $1`,
-    [turnId, nextState],
+    `update tower.turn set state = ?, updated_at = now() where id = ?`,
+    [nextState, turnId],
   );
 
   // (h cont.) fire the automatic Watcher Telegram on the trigger conditions.
@@ -255,7 +260,7 @@ export async function runTurn(pool, { instruction, larryResponse }, opts = {}) {
 
   // goal_complete: caller-signalled.
   if (opts.goalComplete === true) {
-    await pool.query(`update tower.turn set state = 'complete', updated_at = now() where id = $1`, [turnId]);
+    await pool.query(`update tower.turn set state = 'complete', updated_at = now() where id = ?`, [turnId]);
     notifications.push(await doNotify(pool, {
       turnId, reason: 'goal_complete', state: 'complete',
       message: composeMessage({ ...baseMsg, state: 'complete', summary: `Goal complete — ${r.summary}` }),

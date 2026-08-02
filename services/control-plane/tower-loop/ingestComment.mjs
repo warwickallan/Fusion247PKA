@@ -11,12 +11,29 @@
 //   node ingestComment.mjs --payload test/fixtures/pr-comment-dispositions.json
 //   node ingestComment.mjs --payload <file> --json      (machine-readable result on stdout)
 //
+// WO-TW-01: the store is SQLite (better-sqlite3, WAL) at TOWER_SQLITE_PATH. `pool` is the
+// pg-shaped handle from db.mjs; the CLI opens the default store itself.
+//
 // THE COMMENT GRAMMAR — directives a human (or Larry) writes in an ordinary PR comment:
 //
 //   @tower head: <40-char lower-case sha>
+//   @tower checkpoint: <BUILD-REF>                        (WO-TW-02)
 //   @tower finding <finding-uuid>: addressed — <rationale>
 //   @tower finding <finding-uuid>: remains_open — <rationale>
 //   @tower finding <finding-uuid>: unrelated — <rationale>
+//
+// WO-TW-02 — THE CHECKPOINT DIRECTIVE, and why it lives HERE. `@tower checkpoint:` is the
+// explicit marker that makes a comment a review checkpoint: the watcher's poll step creates the
+// `tower.turn` for it before ingest, so a real PR comment can start a review round with no human
+// running a command. It is deliberately part of THIS grammar rather than a parallel syntax — one
+// channel with two grammars is how the next reader gets it wrong. It is also why the parser had
+// to learn it rather than merely tolerate it: the `unrecognised @tower directive` branch below
+// makes ANY unknown `@tower` line malformed, and a malformed directive REFUSES the whole comment.
+// Before this change, writing `@tower checkpoint:` would have got the comment thrown away.
+//
+// A CHECKPOINT IS NOT SELF-EXECUTING. Parsing it here only reports that the marker is present.
+// Nothing in this module creates a turn; see pollPrComments.mjs. A comment WITHOUT the marker
+// can never conjure a review round, which is the whole point of requiring an explicit one.
 //
 // The HEAD DIRECTIVE IS MANDATORY and is what the comment is bound to. It is taken from the
 // BODY rather than the payload envelope on purpose: it records the head the author actually
@@ -26,8 +43,8 @@
 
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import pg from 'pg';
-import { applySchema, applyWatcherSchema, applyCommentSchema } from './apply.mjs';
+import { openDb } from './db.mjs';
+import { applyAll } from './apply.mjs';
 import { FINDING_DISPOSITIONS } from './findings.mjs';
 
 const CANONICAL_SHA = /^[0-9a-f]{40}$/;
@@ -36,14 +53,18 @@ const HEAD_RE = /^\s*@tower\s+head\s*:\s*([0-9a-fA-F]{40})\s*$/;
 // is optional at the parse layer and required at the apply layer, so a malformed line is
 // reported as malformed rather than silently becoming a disposition with no reason.
 const FINDING_RE = /^\s*@tower\s+finding\s+([0-9a-fA-F-]{8,40})\s*:\s*([a-z_]+)\s*(?:[—:-]\s*(.*))?$/i;
+// WO-TW-02. The build ref is OPTIONAL in the grammar but is how a checkpoint binds to a build:
+// without it, ingestTurn falls back to TOWER_BUILD_REF or 'UNCLASSIFIED' and never guesses.
+const CHECKPOINT_RE = /^\s*@tower\s+checkpoint\s*(?::\s*([A-Za-z0-9][A-Za-z0-9._-]*))?\s*$/i;
 
-/** Extract the head directive and the finding dispositions from a comment body.
- *  Never throws: malformed lines are reported, not discarded silently. */
+/** Extract the head directive, the checkpoint marker and the finding dispositions from a comment
+ *  body. Never throws: malformed lines are reported, not discarded silently. */
 export function parseCommentBody(body) {
   const lines = String(body ?? '').split(/\r?\n/);
   const dispositions = [];
   const malformed = [];
   let headSha = null;
+  let checkpoint = null;
 
   for (const line of lines) {
     const h = line.match(HEAD_RE);
@@ -54,6 +75,18 @@ export function parseCommentBody(body) {
       if (!CANONICAL_SHA.test(raw)) malformed.push(`head directive is not a canonical lower-case 40-hex SHA: ${raw}`);
       else if (headSha && headSha !== raw) malformed.push(`conflicting head directives: ${headSha} vs ${raw}`);
       else headSha = raw;
+      continue;
+    }
+    const cp = line.match(CHECKPOINT_RE);
+    if (cp) {
+      const buildRef = cp[1] ? String(cp[1]).trim() : null;
+      // Two checkpoint markers naming DIFFERENT builds is ambiguous, and a checkpoint that has to
+      // be guessed is exactly the thing this marker exists to make explicit. Refuse, do not pick.
+      if (checkpoint && checkpoint.buildRef !== buildRef) {
+        malformed.push(`conflicting checkpoint directives: ${checkpoint.buildRef ?? '(no build ref)'} vs ${buildRef ?? '(no build ref)'}`);
+      } else {
+        checkpoint = { buildRef };
+      }
       continue;
     }
     const f = line.match(FINDING_RE);
@@ -74,7 +107,7 @@ export function parseCommentBody(body) {
     }
     if (/^\s*@tower\b/.test(line)) malformed.push(`unrecognised @tower directive: ${line.trim().slice(0, 100)}`);
   }
-  return { headSha, dispositions, malformed };
+  return { headSha, checkpoint, dispositions, malformed };
 }
 
 /** Normalise a GitHub issue_comment-shaped payload into the fields the seam binds on. */
@@ -134,11 +167,11 @@ export async function ingestPrComment(pool, payload, { turnId: explicitTurnId = 
   let turn = null;
   if (explicitTurnId) {
     turn = (await pool.query(
-      `select id, head_sha, repo, pr_number, build_ref from tower.turn where id = $1`, [explicitTurnId])).rows[0] ?? null;
+      `select id, head_sha, repo, pr_number, build_ref from tower.turn where id = ?`, [explicitTurnId])).rows[0] ?? null;
   } else {
     turn = (await pool.query(
       `select id, head_sha, repo, pr_number, build_ref from tower.turn
-        where repo = $1 and pr_number = $2 order by seq desc limit 1`, [n.repo, n.prNumber])).rows[0] ?? null;
+        where repo = ? and pr_number = ? order by seq desc limit 1`, [n.repo, n.prNumber])).rows[0] ?? null;
   }
   if (!turn) {
     throw new IngestRejection(`no tower.turn found for ${n.repo} PR #${n.prNumber} — nothing to bind the comment to`);
@@ -167,12 +200,12 @@ export async function ingestPrComment(pool, payload, { turnId: explicitTurnId = 
   for (const d of parsed.dispositions) {
     const upd = await pool.query(
       `update tower.finding
-          set disposition = $2, disposition_rationale = $3, disposition_source = 'pr_comment',
-              disposition_comment_id = $4, disposition_head_sha = $5, disposition_at = now(),
+          set disposition = ?, disposition_rationale = ?, disposition_source = 'pr_comment',
+              disposition_comment_id = ?, disposition_head_sha = ?, disposition_at = now(),
               updated_at = now()
-        where id = $1 and state = 'open'
+        where id = ? and state = 'open'
         returning id`,
-      [d.findingId, d.status, d.rationale, row.id, parsed.headSha],
+      [d.status, d.rationale, row.id, parsed.headSha, d.findingId],
     );
     if (upd.rowCount === 1) appliedCount += 1;
     else skipped.push(`${d.findingId} (no open tower.finding with that id)`);
@@ -188,14 +221,14 @@ async function insertComment(pool, n, headSha, turnId, applied, rejectedReason) 
   const ins = await pool.query(
     `insert into tower.pr_comment
        (turn_id, source, repo, pr_number, head_sha, comment_id, author, body, received_at, applied, rejected_reason)
-     values ($1, 'github_pr_comment', $2, $3, $4, $5, $6, $7, $8, $9, $10)
+     values (?, 'github_pr_comment', ?, ?, ?, ?, ?, ?, ?, ?, ?)
      on conflict (source, comment_id) do nothing
      returning id, applied`,
     [turnId, n.repo, n.prNumber, headSha, n.commentId, n.author, n.body, n.receivedAt, applied, rejectedReason],
   );
   if (ins.rows.length > 0) return { ...ins.rows[0], deduped: false };
   const existing = await pool.query(
-    `select id, applied from tower.pr_comment where source = 'github_pr_comment' and comment_id = $1`, [n.commentId]);
+    `select id, applied from tower.pr_comment where source = 'github_pr_comment' and comment_id = ?`, [n.commentId]);
   return { ...existing.rows[0], deduped: true };
 }
 
@@ -210,11 +243,9 @@ if (import.meta.url === `file://${process.argv[1]}` || process.argv[1] === fileU
   (async () => {
     const file = arg('payload');
     if (!file) throw new Error('usage: node ingestComment.mjs --payload <payload.json> [--turn <turn-id>] [--json]');
-    const url = process.env.CONTROL_PLANE_DEV_DATABASE_URL;
-    if (!url) throw new Error('CONTROL_PLANE_DEV_DATABASE_URL is not set — point it at a throwaway local Postgres.');
     const payload = JSON.parse(fs.readFileSync(file, 'utf8'));
-    await applySchema(url); await applyWatcherSchema(url); await applyCommentSchema(url);
-    const pool = new pg.Pool({ connectionString: url });
+    const pool = openDb();
+    await applyAll(pool);
     try {
       const res = await ingestPrComment(pool, payload, { turnId: arg('turn', null) });
       if (process.argv.includes('--json')) { console.log(JSON.stringify(res, null, 2)); }
