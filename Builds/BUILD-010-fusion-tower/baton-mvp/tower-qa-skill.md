@@ -9,7 +9,7 @@ artifact: tower-qa-skill
 status: approved
 proof_run_authorised: false
 standing_use_ratified: true
-version: 1
+version: 2
 owner: Warwick
 reviewer: Codex (gpt_codex, provider openai-codex)
 run_authorized_by: Warwick — overnight authorization BUILD-010-TOWER-BATON-RECOVERY-OVERNIGHT-0001 (2026-07-18) commissioned this skill (modelled on his independent-QA standard, code-build vocabulary, "like Mack and Claude QA") and authorized the live proof to run under it. `proof_run_authorised: true` = cleared for the bounded proof run.
@@ -67,6 +67,15 @@ compares it to the claim. Codex sees the real code, not a summary of it.
   /enterprise-compliance edge cases should be documented, not used to block a hobby merge.
   Orchestrator-side: max three Codex calls per gate (initial / after real BLOCKS fix /
   final) — never a fourth.
+- **Only a qualifying finding may block OR trigger another round (Warwick, 2026-08-02).**
+  To block a merge or cause a further review round, a finding must be ACTIVE, REACHABLE and
+  IN SCOPE, and threaten one of: the stated outcome · safety · data · secrets · recovery ·
+  a NAMED acceptance criterion. **Everything else is REPORTED ONCE and creates no work
+  automatically** — say it plainly, then move on. Do not re-raise a non-qualifying finding
+  in a later round to force action; a repeated note is still a note. A finding OUTSIDE the
+  reviewed scope is reported, never blocking — it was not built here. Judge against the
+  claim as written: if the CLAIM is wrong or incomplete, that IS a qualifying finding; an
+  improvement nobody asked for is not.
 
 ## Inputs (pointers the Tower stages per turn)
 
