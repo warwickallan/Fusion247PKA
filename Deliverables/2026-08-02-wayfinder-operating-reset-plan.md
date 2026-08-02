@@ -125,7 +125,30 @@ duplicated here. Read a row there for *what was found*; read it here for *what h
 tangent**. That is the whole point: an item that is neither done, nor decided, nor promoted, nor explicitly
 closed is indistinguishable from one that was forgotten.
 
-## ⚖️ PHASE 7 VERDICT — PASS on the work; the merge is Warwick's
+## ✅ OPERATING RESET — **CLOSED** (2026-08-02, on Warwick's explicit approval)
+
+**Phase 7 PASS. PR #87 MERGED to `main` at `4a3d20c`. PR #88 (record correction, docs only) merged at `6d7a6c2`.**
+
+| | |
+|---|---|
+| `main` | **`6d7a6c2`** — clean, pushed, all Phase 7 work landed |
+| rows disposed | **22 / 22** |
+| Honcho newest-packet retrieval | **PASS — live-proven** (fresh session echoed the marker verbatim) |
+| PR ⇄ Tower round-trip | **PASS — live-proven** (real comment → ingest → next round → stale rejected) |
+| WO-OR-20 (reorient into CI) | **COMPLETE** |
+| CI at the merged head | **six workflows green** |
+| Codex executions | **ZERO** |
+| ratified promotion | **CareerAIR intake visibility** — the one deferral Warwick agreed |
+| Honcho closure packet | `cont-1785698069390-95-vsjyll`, **written and read back as newest**, marker `PHASE7-CLOSED-4DB7D0` |
+
+**The one carried obligation, inherited deliberately rather than assumed away:** the ⟦GOV⟧ footer now renders
+automatically on the handback path, but **its automated live behaviour is UNOBSERVED**. Warwick declined a
+further acceptance exercise. **Observe it at the first genuine VlogOps handback; if it fails there, park it in
+that build's SHIT TO DO before VlogOps closes.**
+
+**Do not reopen this reset.** What follows is the record of how it closed.
+
+## ⚖️ PHASE 7 VERDICT — PASS on the work (merge subsequently approved and completed)
 
 **All 22 rows disposed. Rows 2, 2b and 19 live-proven against real services. CI green on all six workflows.**
 
