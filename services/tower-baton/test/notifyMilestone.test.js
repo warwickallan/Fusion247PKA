@@ -13,8 +13,12 @@ import { randomUUID } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { runNotify, parseArgs, CLI_PURPOSES, MACHINE_ONLY_PURPOSES, REQUIRED_FOR_NOTIFY } from '../bin/notify-milestone.js';
+import {
+  runNotify, parseArgs, bodyWithFooter,
+  CLI_PURPOSES, MACHINE_ONLY_PURPOSES, REQUIRED_FOR_NOTIFY, HANDBACK_PURPOSES, ROUTINE_PURPOSES,
+} from '../bin/notify-milestone.js';
 import { MILESTONES } from '../src/telegramNotifier.js';
+import { computeFooterLine, parseFooter, GOV_MARKER, HANDBACK_CODES } from '../../../tools/governor/footer.mjs';
 
 const SERVICE_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CLI = path.join(SERVICE_DIR, 'bin', 'notify-milestone.js');
@@ -63,10 +67,44 @@ function fakeNotifier(result = { sent: true, messageId: '999' }) {
   return { rec, factory };
 }
 
-async function run(argv, { loader = fakeLoader(), notifier = fakeNotifier() } = {}) {
+async function run(argv, { loader = fakeLoader(), notifier = fakeNotifier(), footer } = {}) {
   const io = capture();
-  const code = await runNotify({ argv, env: {}, stdout: io.stdout, stderr: io.stderr, loadConfigImpl: loader.impl, notifierFactory: notifier.factory });
-  return { code, io, loader, notifier };
+  const opts = { argv, env: {}, stdout: io.stdout, stderr: io.stderr, loadConfigImpl: loader.impl, notifierFactory: notifier.factory };
+  // Omitted, not passed as undefined: a test that says nothing about the footer must
+  // exercise the REAL default renderer, exactly as the shipped command does.
+  if (footer) opts.footerImpl = footer.impl;
+  const code = await runNotify(opts);
+  return { code, io, loader, notifier, footer };
+}
+
+// ---------------------------------------------------------------- the ⟦GOV⟧ footer seam
+//
+// The renderer is REAL in every test below except the throwing one. The seam records that
+// it was invoked and pins the health store to an EMPTY directory, so the line is
+// deterministic (BLIND) without faking the bytes — a footer proven only against a stub
+// renderer would prove the stub, not the footer.
+
+function emptyStoreDir() {
+  const dir = path.join(os.tmpdir(), `fusion-health-${randomUUID()}`);
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+function realFooter({ storeDir = emptyStoreDir() } = {}) {
+  const rec = { calls: 0, args: null, storeDir };
+  return { rec, impl: (opts) => { rec.calls += 1; rec.args = opts; return computeFooterLine({ ...opts, envOverride: storeDir }); } };
+}
+
+function throwingFooter(message = 'renderer exploded') {
+  const rec = { calls: 0, args: null };
+  return { rec, impl: (opts) => { rec.calls += 1; rec.args = opts; throw new Error(message); } };
+}
+
+/** The footer line of a sent body, or null when the body carries none. */
+function footerOf(body) {
+  const lines = String(body ?? '').split('\n');
+  const last = lines[lines.length - 1];
+  return last.startsWith(GOV_MARKER) ? last : null;
 }
 
 // ---------------------------------------------------------------- vocabulary
@@ -84,7 +122,13 @@ test('a valid purpose is ACCEPTED and sent', async () => {
   assert.equal(notifier.rec.notifyCalls, 1);
   assert.equal(notifier.rec.notifyArgs.purpose, 'escalation');
   assert.equal(notifier.rec.notifyArgs.logicalSource, 'LARRY');
-  assert.equal(notifier.rec.notifyArgs.body, 'a real escalation');
+  // UPDATED BY WO-OR-25, and deliberately not weakened. `escalation` is HANDBACK-CLASS, so
+  // the body now carries the rendered ⟦GOV⟧ line — the behaviour that Work Order exists to
+  // install. The old `body === 'a real escalation'` asserted the pre-WO-OR-25 contract; the
+  // pair below asserts the new one just as tightly: the message survives untouched at the
+  // head, and what follows is a footer the grammar's own parser accepts.
+  assert.equal(notifier.rec.notifyArgs.body.startsWith('a real escalation'), true);
+  assert.equal(parseFooter(footerOf(notifier.rec.notifyArgs.body)).ok, true);
   assert.deepEqual(JSON.parse(io.outText), { sent: true, messageId: '999', purpose: 'escalation', source: 'LARRY' });
   assert.equal(io.errText, '');
 });
@@ -347,6 +391,166 @@ test('SPAWN — fail-closed when TELEGRAM_BOT_TOKEN is absent: exit 1, honest st
   assert.match(r.stderr, /NOT SENT/);
   assert.match(r.stderr, /TELEGRAM_BOT_TOKEN/);
   assert.equal(r.stderr.includes(CANARY), false, 'no token value on stderr');
+});
+
+// ---------------------------------------------------------------- the ⟦GOV⟧ footer (WO-OR-25)
+//
+// Root CLAUDE.md: the footer is EVENT-DRIVEN — it appears when Warwick has something to
+// act on and NEVER as a per-reply staple. Both halves are proofs. The ABSENCE test is the
+// one that matters most: a footer that appears everywhere is the defect the constitution
+// names, and only that test can fail on it.
+
+test('the two classes partition the entrypoint vocabulary — no purpose is in both or neither', () => {
+  assert.deepEqual([...HANDBACK_PURPOSES], ['escalation', 'blocked']);
+  assert.deepEqual([...ROUTINE_PURPOSES], ['review_posted', 'tower_unavailable']);
+  for (const p of CLI_PURPOSES) {
+    assert.equal(HANDBACK_PURPOSES.includes(p) !== ROUTINE_PURPOSES.includes(p), true, `${p} must be in exactly one class`);
+  }
+  assert.equal(HANDBACK_PURPOSES.length + ROUTINE_PURPOSES.length, CLI_PURPOSES.length);
+});
+
+test('TEST 1 — a HANDBACK-class purpose INVOKES the renderer and the footer reaches the transport', async () => {
+  for (const purpose of HANDBACK_PURPOSES) {
+    const footer = realFooter();
+    const notifier = fakeNotifier();
+    const { code } = await run(['--purpose', purpose, '--body', 'a decision is owed', '--handback', 'merge-decision'], { notifier, footer });
+
+    assert.equal(code, 0, `${purpose} must still send`);
+    assert.equal(footer.rec.calls, 1, `${purpose}: the renderer was actually invoked`);
+    assert.equal(notifier.rec.notifyCalls, 1);
+
+    const body = notifier.rec.notifyArgs.body;
+    assert.equal(body.includes(GOV_MARKER), true, `${purpose}: the ⟦GOV⟧ marker is in the body handed to the transport`);
+    assert.equal(body.startsWith('a decision is owed'), true, 'the message itself is untouched and comes first');
+
+    // Rendered by footer.mjs, not hand-composed: it must satisfy that module's own parser.
+    const line = footerOf(body);
+    assert.notEqual(line, null, 'the footer is the FINAL line — extractFooterLine reads no other');
+    const parsed = parseFooter(line);
+    assert.equal(parsed.ok, true, `the footer must parse against its own grammar: ${line}`);
+    assert.equal(parsed.handbackCode, 'merge-decision', 'the caller-supplied code is the control token');
+    assert.equal(parsed.controlRecognised, true);
+  }
+});
+
+test('TEST 1b — the DEFAULT renderer is wired: no seam injected, and a real footer still appears', async () => {
+  // The seam above could pass while the shipped default was never connected. This test
+  // injects nothing, so it exercises `computeFooterLine` exactly as the command does.
+  const notifier = fakeNotifier();
+  const { code } = await run(['--purpose', 'escalation', '--body', 'wired by default'], { notifier });
+  assert.equal(code, 0);
+  const line = footerOf(notifier.rec.notifyArgs.body);
+  assert.notEqual(line, null, 'the real default renderer produced a footer');
+  assert.equal(parseFooter(line).ok, true, `the default renderer emits a grammatical line: ${line}`);
+});
+
+test('TEST 2 — a ROUTINE purpose does NOT: the ⟦GOV⟧ marker is ABSENT and the renderer is never called', async () => {
+  for (const purpose of ROUTINE_PURPOSES) {
+    const footer = realFooter();
+    const notifier = fakeNotifier();
+    const { code } = await run(['--purpose', purpose, '--body', 'informational only'], { notifier, footer });
+
+    assert.equal(code, 0, `${purpose} must still send`);
+    assert.equal(notifier.rec.notifyCalls, 1);
+    const body = notifier.rec.notifyArgs.body;
+    assert.equal(body, 'informational only', `${purpose}: the body is handed over UNCHANGED`);
+    assert.equal(body.includes(GOV_MARKER), false, `${purpose}: a footer here is the staple CLAUDE.md forbids`);
+    assert.equal(footerOf(body), null);
+    assert.equal(footer.rec.calls, 0, `${purpose}: the renderer must not even be invoked`);
+  }
+});
+
+test('TEST 3a — a MISSING/unreadable health sample still sends, exit 0, with a BLIND footer PRESENT', async () => {
+  // BLIND is a correct outcome, not a failure. Suppressing the footer when telemetry
+  // cannot be read would make the governor quietest exactly when it stopped measuring,
+  // and would withhold the one advice CLAUDE.md never withholds.
+  const missing = path.join(os.tmpdir(), `fusion-health-absent-${randomUUID()}`);
+  assert.equal(fs.existsSync(missing), false, 'the store must genuinely not exist');
+  const footer = realFooter({ storeDir: missing });
+  const notifier = fakeNotifier();
+
+  const { code, io } = await run(['--purpose', 'escalation', '--body', 'no telemetry here'], { notifier, footer });
+
+  assert.equal(code, 0, 'a missing sample must never cost the send');
+  assert.equal(notifier.rec.notifyCalls, 1);
+  const line = footerOf(notifier.rec.notifyArgs.body);
+  assert.notEqual(line, null, 'the footer is PRESENT');
+  const parsed = parseFooter(line);
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.fields.state, 'BLIND', 'unreadable telemetry renders BLIND, never a state it did not measure');
+  assert.equal(io.errText, '', 'a BLIND footer is not an error condition');
+});
+
+test('TEST 3b — a THROWING footer path still sends, exit 0, footer ABSENT (a governor line is never worth a lost handback)', async () => {
+  const footer = throwingFooter();
+  const notifier = fakeNotifier();
+
+  const { code, io } = await run(['--purpose', 'escalation', '--body', 'the handback itself'], { notifier, footer });
+
+  assert.equal(footer.rec.calls, 1, 'the renderer was reached and did throw');
+  assert.equal(code, 0, 'the message still sends');
+  assert.equal(notifier.rec.notifyCalls, 1, 'the transport was still called');
+  assert.equal(notifier.rec.notifyArgs.body, 'the handback itself', 'the body is the message alone');
+  assert.equal(notifier.rec.notifyArgs.body.includes(GOV_MARKER), false);
+  assert.deepEqual(JSON.parse(io.outText), { sent: true, messageId: '999', purpose: 'escalation', source: 'TOWER' });
+});
+
+test('a handback purpose with NO --handback keeps footer.mjs\'s own control token — no code is invented here', async () => {
+  const footer = realFooter();
+  const notifier = fakeNotifier();
+  const { code } = await run(['--purpose', 'blocked', '--body', 'blocked, code unstated'], { notifier, footer });
+  assert.equal(code, 0);
+  assert.equal('control' in (footer.rec.args ?? {}), false, 'no control key is passed, so the module keeps its default');
+  const parsed = parseFooter(footerOf(notifier.rec.notifyArgs.body));
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.fields.control, 'CONTINUE', "footer.mjs's own default, not a guess made here");
+  assert.equal(parsed.handbackCode, null);
+});
+
+test('an UNRECOGNISED --handback code is a USAGE error — exit 2, nothing loaded, nothing sent, no coerced CONTINUE', async () => {
+  const loader = fakeLoader();
+  const notifier = fakeNotifier();
+  const footer = realFooter();
+  const { code, io } = await run(['--purpose', 'escalation', '--body', 'x', '--handback', 'merge_decision'], { loader, notifier, footer });
+  assert.equal(code, 2);
+  assert.match(io.errText, /is not a handback code/);
+  for (const c of HANDBACK_CODES) assert.match(io.errText, new RegExp(c));
+  assert.equal(io.outText, '', 'nothing on stdout that could read as success');
+  assert.equal(loader.rec.calls, 0, 'no secret load on a rejected code');
+  assert.equal(notifier.rec.notifyCalls, 0);
+  assert.equal(footer.rec.calls, 0);
+});
+
+test('--handback on a ROUTINE purpose is a USAGE error, not a silently discarded code', async () => {
+  for (const purpose of ROUTINE_PURPOSES) {
+    const notifier = fakeNotifier();
+    const { code, io } = await run(['--purpose', purpose, '--body', 'x', '--handback', 'permission'], { notifier });
+    assert.equal(code, 2, `${purpose} + --handback must be refused`);
+    assert.match(io.errText, /only meaningful on a handback-class purpose/);
+    assert.equal(notifier.rec.notifyCalls, 0);
+    assert.equal(io.outText, '');
+  }
+  // …and every valid code is accepted on a handback-class purpose.
+  for (const c of HANDBACK_CODES) {
+    assert.equal(parseArgs(['--purpose', 'escalation', '--body', 'x', '--handback', c]).error, undefined, `${c} must be accepted`);
+  }
+  assert.equal(parseArgs(['--purpose', 'escalation', '--body', 'x']).handbackCode, null, 'absent stays absent — never defaulted to a code');
+});
+
+test('bodyWithFooter puts the footer LAST, separated by a blank line, and never mutates a routine body', () => {
+  const store = emptyStoreDir();
+  const impl = (opts) => computeFooterLine({ ...opts, envOverride: store });
+  const out = bodyWithFooter({ purpose: 'escalation', body: 'line one\nline two', handbackCode: 'permission', footerImpl: impl });
+  const lines = out.split('\n');
+  assert.equal(lines[0], 'line one');
+  assert.equal(lines[1], 'line two');
+  assert.equal(lines[2], '', 'a blank line separates the message from the governor line');
+  assert.equal(parseFooter(lines[3]).handbackCode, 'permission');
+  assert.equal(lines.length, 4, 'nothing after the footer — it must be the final line');
+  assert.equal(bodyWithFooter({ purpose: 'review_posted', body: 'untouched', footerImpl: impl }), 'untouched');
+  // A renderer returning something ungrammatical or empty loses the footer, not the message.
+  assert.equal(bodyWithFooter({ purpose: 'escalation', body: 'kept', footerImpl: () => '' }), 'kept');
+  assert.equal(bodyWithFooter({ purpose: 'escalation', body: 'kept', footerImpl: () => null }), 'kept');
 });
 
 test('SPAWN — a rejected purpose exits 2 and never reaches the transport', () => {
