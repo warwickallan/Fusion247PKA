@@ -427,7 +427,8 @@ test('WO-OR-11 / INTEGRATION: the live fictional-path probe asserts nothing it d
   );
   // CONTROL: the payload really did reach the location section rather than falling back.
   assert.match(body, /C:\/TOTALLY\/FICTIONAL\/PATH/, 'CONTROL: the top-level cwd key was read');
-  assert.match(body, /WHERE THIS SESSION IS \(executed, not assumed\)/, 'the honesty claim is NOT deleted');
+  assert.match(body, /SESSION LOCATION PROBES \(executed; each line states what was measured\)/,
+    'the honesty framing is NOT deleted — it is restated so the heading cannot overclaim');
   assert.match(body, /UNVERIFIED/);
   assert.doesNotMatch(body, /nothing here is pushed/, 'git never ran on this path');
   assert.match(body, /These are facts/, 'the closing claim survives — it is now earned, not softened');
@@ -1079,7 +1080,7 @@ test('WO-OR-17 / C3: stdin that COULD NOT BE READ is not stdin that was empty', 
   assert.match(body, /HOOK INPUT: NOT READ/, 'THE DEFECT: a read failure was indistinguishable from empty stdin');
   assert.match(body, /EIO/, 'the reason is stated, not merely the failure');
   assert.match(body, /NOT a report that the host sent nothing/);
-  assert.match(body, /WHERE THIS SESSION IS/, 'and the rest of the brief still renders (INV-2)');
+  assert.match(body, /SESSION LOCATION PROBES/, 'and the rest of the brief still renders (INV-2)');
 
   // CONTROL: genuinely empty stdin carries no such line. Without this the assertions above
   // would be satisfied by a module printing the caveat unconditionally.
@@ -1153,10 +1154,8 @@ test('WO-OR-17 / ADDENDUM: a provenance probe that cannot answer says so rather 
 // TQA-003 / TQA-004 — Codex repairs final run 2 (BLOCKS_CURRENT_MERGE both)
 // ---------------------------------------------------------------------------
 
-test('TQA-003: a measured directory cwd must NOT claim session enterability', () => {
-  // TYPE ≠ ENTERABILITY. The path is shown; the limit is stated on the same line.
-  // A bare path under "executed, not assumed" was the upgrade Codex correctly blocked.
-  const rendered = renderLocationSection({
+test('TQA-003/005: bare cwd path is earned only when occupation is measured', () => {
+  const base = {
     worktreePath: 'C:/x', resolvedPath: 'C:/x', resolvedKind: 'directory',
     cwdFailure: null, cwdFailureCode: null,
     gitReadable: true, repoRoot: 'C:/x', linkedWorktree: false,
@@ -1164,23 +1163,32 @@ test('TQA-003: a measured directory cwd must NOT claim session enterability', ()
     symbolicRefFailure: null, symbolicRefStatus: null, symbolicRefCode: null,
     dirty: false, unpushed: 0, upstreamRef: 'origin/main', upstreamSha: 'abc',
     upstreamState: 'tracked',
-  });
-  assert.match(rendered, /C:\/x/, 'the measured path is still shown');
-  assert.match(rendered, /directory type measured/, 'WHAT was measured is named');
-  assert.match(rendered, /enterability NOT established/,
-    'THE DEFECT: type must never silently upgrade into "the session is here"');
-  // CONTROL: an unreadable path still does not pretend to be measured.
-  const denied = renderLocationSection({
-    worktreePath: 'C:/locked', resolvedPath: null, resolvedKind: null,
-    cwdFailure: 'unreadable', cwdFailureCode: 'EPERM',
-    gitReadable: false, repoRoot: null, linkedWorktree: null,
-    headSha: null, branch: null, symbolicBranch: null, detached: null,
-    symbolicRefFailure: null, symbolicRefStatus: null, symbolicRefCode: null,
-    dirty: null, unpushed: null, upstreamRef: null, upstreamSha: null,
-    upstreamState: 'unreadable',
-  });
-  assert.doesNotMatch(denied, /directory type measured/,
-    'CONTROL: the type limit only applies where type was measured');
+  };
+  // Occupation measured → bare path.
+  const occupied = renderLocationSection({ ...base, cwdOccupiedByHook: true });
+  assert.match(occupied, /cwd\s+: C:\/x\s*$/m, 'occupation earns the bare path');
+  assert.doesNotMatch(occupied, /enterability NOT established/);
+  // Type only → limit stated; never a bare path.
+  const typeOnly = renderLocationSection({ ...base, cwdOccupiedByHook: null });
+  assert.match(typeOnly, /directory type measured/, 'WHAT was measured is named');
+  assert.match(typeOnly, /enterability NOT established/,
+    'THE DEFECT: type must never silently upgrade into session location');
+  // Heading must not overclaim relative to any line.
+  assert.match(typeOnly, /SESSION LOCATION PROBES \(executed; each line states what was measured\)/);
+  // CONTROL: real occupation via injected getProcessCwd.
+  const dir = tmp('tqa-005-occ-');
+  try {
+    const facts = gitFacts(dir, gitFails(128), {
+      realpathSync: (p) => realpathSync.native(p),
+      statSync,
+      getProcessCwd: () => dir,
+    });
+    // gitFails(128) makes all git probes fail; location still measures cwd.
+    assert.equal(facts.cwdOccupiedByHook, true, 'hook process in dir → occupation measured');
+    assert.match(renderLocationSection(facts), new RegExp(`cwd\\s+: ${normaliseSeparators(realpathSync.native(dir)).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`, 'm'));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('TQA-004: a deliverables list truncated by the display cap must say so', () => {
@@ -1236,7 +1244,7 @@ test('TQA-004: a deliverables list truncated by the display cap must say so', ()
 
 const HEALTHY_FACTS = {
   worktreePath: 'C:/x', resolvedPath: 'C:/x', resolvedKind: 'directory',
-  cwdFailure: null, cwdFailureCode: null,
+  cwdFailure: null, cwdFailureCode: null, cwdOccupiedByHook: true,
   gitReadable: true, repoRoot: 'C:/x', linkedWorktree: false,
   headSha: 'abc123', branch: 'main', symbolicBranch: 'main', detached: false,
   symbolicRefFailure: null, symbolicRefStatus: null, symbolicRefCode: null,
@@ -1256,15 +1264,17 @@ function lineFor(rendered, field) {
 // it checks — a table computed from the thing it validates certifies itself.
 const FIELD_STATES = {
   cwd: [
-    ['measured', f({})],
+    ['measured occupation — bare path earned', f({})],
+    ['type only — occupation not established', f({ cwdOccupiedByHook: null })],
+    ['type only — hook process elsewhere', f({ cwdOccupiedByHook: false })],
     ['measured but UNCLAIMED by the host', f({}), { cwdClaimedByHost: false }],
-    ['nothing was claimed', f({ worktreePath: null, resolvedPath: null, resolvedKind: null, cwdFailure: 'not-a-path' })],
-    ['claimed; measured absent', f({ worktreePath: 'C:/nope', resolvedPath: null, resolvedKind: null, cwdFailure: 'absent' })],
-    ['claimed; probe REFUSED', f({ worktreePath: 'C:/locked', resolvedPath: null, resolvedKind: null, cwdFailure: 'unreadable', cwdFailureCode: 'EPERM' })],
-    ['claimed; probe failed, no reason', f({ worktreePath: 'C:/odd', resolvedPath: null, resolvedKind: null, cwdFailure: 'unknown' })],
-    ['claimed; it is a FILE', f({ worktreePath: 'C:/f.md', resolvedPath: null, resolvedKind: 'file', cwdFailure: null })],
-    ['claimed; it exists but is neither', f({ worktreePath: 'C:/pipe', resolvedPath: null, resolvedKind: 'other', cwdFailure: null })],
-    ['claimed; not a path at all', f({ worktreePath: 7, resolvedPath: null, resolvedKind: null, cwdFailure: 'not-a-path' })],
+    ['nothing was claimed', f({ worktreePath: null, resolvedPath: null, resolvedKind: null, cwdFailure: 'not-a-path', cwdOccupiedByHook: null })],
+    ['claimed; measured absent', f({ worktreePath: 'C:/nope', resolvedPath: null, resolvedKind: null, cwdFailure: 'absent', cwdOccupiedByHook: null })],
+    ['claimed; probe REFUSED', f({ worktreePath: 'C:/locked', resolvedPath: null, resolvedKind: null, cwdFailure: 'unreadable', cwdFailureCode: 'EPERM', cwdOccupiedByHook: null })],
+    ['claimed; probe failed, no reason', f({ worktreePath: 'C:/odd', resolvedPath: null, resolvedKind: null, cwdFailure: 'unknown', cwdOccupiedByHook: null })],
+    ['claimed; it is a FILE', f({ worktreePath: 'C:/f.md', resolvedPath: null, resolvedKind: 'file', cwdFailure: null, cwdOccupiedByHook: null })],
+    ['claimed; it exists but is neither', f({ worktreePath: 'C:/pipe', resolvedPath: null, resolvedKind: 'other', cwdFailure: null, cwdOccupiedByHook: null })],
+    ['claimed; not a path at all', f({ worktreePath: 7, resolvedPath: null, resolvedKind: null, cwdFailure: 'not-a-path', cwdOccupiedByHook: null })],
   ],
   'worktree root': [
     ['measured, primary checkout', f({ linkedWorktree: false })],
@@ -1426,7 +1436,7 @@ test('CONTINUITY: the brief is passed through VERBATIM — this module adds no i
   const composed = `${buildBrief('{}')}\n\n${await Promise.resolve(brief)}`;
   assert.ok(composed.includes(brief), 'the brief must survive composition byte-for-byte');
   assert.ok(
-    composed.indexOf('WHERE THIS SESSION IS') < composed.indexOf('HONCHO CONTINUITY'),
+    composed.indexOf('SESSION LOCATION PROBES') < composed.indexOf('HONCHO CONTINUITY'),
     'location first, then the authoritative focus'
   );
 });
@@ -1457,7 +1467,7 @@ test('BRIEF: all three sections compose into one SessionStart payload', () => {
       sweepFn: () => sweepOpenDeliverables(e.root, Date.now()),
     });
     assert.match(body, /SESSION START — This is a FRESH session/);
-    assert.match(body, /WHERE THIS SESSION IS/);
+    assert.match(body, /SESSION LOCATION PROBES/);
     assert.match(body, /A live deliverable/);
     assert.match(body, /fallback, not the source of truth for focus/,
       'the sweep must never be presented as the current focus');
@@ -1475,7 +1485,7 @@ test('BRIEF: one failing section never suppresses the others (INV-2)', () => {
 
   const sweepBroken = buildBrief('{}', { sweepFn: boom });
   assert.match(sweepBroken, /OPEN DELIVERABLES: sweep failed \(deliberate\)/);
-  assert.match(sweepBroken, /WHERE THIS SESSION IS/, 'the location section still renders');
+  assert.match(sweepBroken, /SESSION LOCATION PROBES/, 'the location section still renders');
 
   const factsBroken = buildBrief('{}', { factsFn: boom, sweepFn: () => null });
   assert.match(factsBroken, /WHERE THIS SESSION IS: could not be established \(deliberate\)/);

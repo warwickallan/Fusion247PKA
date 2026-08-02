@@ -142,7 +142,14 @@ export function parseHookInput(raw) {
 // failure cannot be induced deterministically on every machine, and a proof that cannot be
 // made to fail is not a proof. Every injected test is PAIRED with a control asserting these
 // defaults read the real disk, so the seam can never end up testing a fiction.
-export const DEFAULT_GIT_IO = { realpathSync: (p) => realpathSync.native(p), statSync };
+export const DEFAULT_GIT_IO = {
+  realpathSync: (p) => realpathSync.native(p),
+  statSync,
+  // TQA-005. Non-mutating occupation probe: if THIS process is already in the resolved
+  // directory, the session (at least the hook process) can be there — measured. chdir is
+  // forbidden (INV-2); access(X_OK) is meaningless on Windows; readdir is listability.
+  getProcessCwd: () => process.cwd(),
+};
 
 // WO-OR-17 / TQA-001. WHY A PATH PROBE'S FAILURE IS CLASSIFIED RATHER THAN COLLAPSED.
 //
@@ -255,6 +262,19 @@ export function gitFacts(worktreePath, execFile = execFileSync, io = DEFAULT_GIT
     !resolved && causes.resolved && typeof causes.resolved.code === 'string'
       ? causes.resolved.code
       : null;
+  // TQA-005 (Codex repairs run 3). ENTERABILITY without mutation.
+  //
+  // Directory TYPE (realpath + isDirectory) does not prove the session can occupy the path.
+  // The only non-mutating positive proof available here: the hook process is ALREADY in that
+  // directory. If realpath(process.cwd()) equals the resolved path, occupation is measured
+  // and the bare path is earned. If not, we hold only type and must not claim session location.
+  // null = could not measure occupation (probe failed, or type was never established).
+  const cwdOccupiedByHook = (() => {
+    if (!resolved || resolved.kind !== 'directory') return null;
+    const proc = soft('processCwd', () => normaliseSeparators(io.realpathSync(io.getProcessCwd())));
+    if (proc === null) return null;
+    return proc === resolved.path;
+  })();
 
   const gitReadable = soft('gitReadable', () => (run(['rev-parse', '--git-dir']), true)) === true;
   const repoRoot = soft('repoRoot', () => normaliseSeparators(run(['rev-parse', '--show-toplevel'])));
@@ -433,6 +453,9 @@ export function gitFacts(worktreePath, execFile = execFileSync, io = DEFAULT_GIT
     // The errno, for the reader. The CODE only — never the message, which carries stacks and
     // paths and is precisely the noise WO-OR-14 took off this surface.
     cwdFailureCode,
+    // TQA-005. true when the hook process is measured to occupy resolvedPath; false when
+    // type was established but the process is elsewhere; null when occupation was not measured.
+    cwdOccupiedByHook,
     // WO-OR-11. Whether git ANSWERED here at all, as its own measurement.
     //
     // `soft()` returns null both when a git call fails and when git legitimately reports
@@ -507,20 +530,24 @@ function show(v) {
 //                       nothing. A true value can still carry an unearned claim.
 function renderCwd(facts, cwdClaimedByHost) {
   if (facts.resolvedPath) {
-    // TQA-003 (Codex repairs final run 2, BLOCKS_CURRENT_MERGE). TYPE is not ENTERABILITY.
-    // realpath + isDirectory establishes that a directory exists at this path. It does NOT
-    // establish that the session process can enter it. readdir measures listability (strictly
-    // stronger than traverse); process.chdir is the true enterability test and MUTATES the
-    // hook process, which INV-2 forbids. So the line states exactly what was measured — a
-    // directory on disk — and NEVER upgrades that into "this is where the session is" without
-    // the limit. A bare path under "executed, not assumed" was that upgrade.
-    const typeLimit =
-      ' (directory type measured; session enterability NOT established)';
-    if (cwdClaimedByHost) return `${facts.resolvedPath}${typeLimit}`;
+    // TQA-003 / TQA-005. Bare path is EARNED only when occupation is measured
+    // (cwdOccupiedByHook === true). Directory type alone never upgrades into "session is here".
+    const occupied = facts.cwdOccupiedByHook === true;
+    if (cwdClaimedByHost) {
+      if (occupied) return facts.resolvedPath;
+      return (
+        `${facts.resolvedPath} (directory type measured; session enterability NOT established` +
+        (facts.cwdOccupiedByHook === false
+          ? ' — hook process is not in this directory)'
+          : ')')
+      );
+    }
     return (
       `${facts.resolvedPath} (UNCLAIMED — the host supplied no cwd, so this is the hook ` +
       "process's own working directory, not a location this session claimed;" +
-      ' directory type measured, enterability NOT established)'
+      (occupied
+        ? ' occupation measured for the hook process)'
+        : ' directory type measured, enterability NOT established)')
     );
   }
   const claimed = facts.worktreePath;
@@ -623,8 +650,11 @@ function renderBranch(facts) {
 
 export function renderLocationSection(facts, { cwdClaimedByHost = true } = {}) {
   if (!facts) return null;
+  // TQA-005. The heading used to say "WHERE THIS SESSION IS (executed, not assumed)" which
+  // overclaimed relative to any line that could only report directory type. Each line now
+  // states its own measurement; the heading must not promise more than they deliver.
   const lines = [
-    '⟦GOV⟧ WHERE THIS SESSION IS (executed, not assumed):',
+    '⟦GOV⟧ SESSION LOCATION PROBES (executed; each line states what was measured):',
     `  cwd          : ${renderCwd(facts, cwdClaimedByHost)}`,
     `  worktree root: ${renderToplevel(facts)}`,
     `  branch       : ${renderBranch(facts)}`,
