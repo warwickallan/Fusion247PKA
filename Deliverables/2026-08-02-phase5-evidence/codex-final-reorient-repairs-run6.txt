@@ -1,0 +1,143 @@
+repo:  C:/Fusion247PKA
+range: 2aac7d9..56ba6fdae224db29b1186f350b48d4982cc6519e
+claim: Deliverables/2026-08-02-phase5-evidence/claim-scope-reorient-repairs-v6.json
+scope  : tools/governor/reorient.mjs
+branch : operating-reset/teardown
+
+ÔöÇÔöÇ GIT EVIDENCE (real, read-only) ÔöÇÔöÇ
+resolved=true diff_range=2aac7d9a2d6584fc7d993fc21f5428f649c847d0..56ba6fdae224db29b1186f350b48d4982cc6519e
+changed_files=["tools/governor/reorient.mjs"]
+diff bytes=47975 of 47975 (real UTF-8 bytes) truncated=false
+packet diff_range=2aac7d9a2d6584fc7d993fc21f5428f649c847d0..56ba6fdae224db29b1186f350b48d4982cc6519e -- tools/governor/reorient.mjs
+packet scoped_to=["tools/governor/reorient.mjs"] wp_id=null
+
+ÔöÇÔöÇ REAL CODEX MERGE REVIEW (Tower QA skill over the staged diff + the REAL claim) ÔöÇÔöÇ
+ok=true blocked=false model=openai-codex-exec
+{
+  "status": "ok",
+  "verdict": "request_changes",
+  "summary": "The cwd, upstream, sweep-completeness, and provenance repairs are present in the staged diff, and prior findings TQA-001 through TQA-007 appear addressed. However, the four-state model remains incomplete: most Git probes still discard failure causes at rendering time, and an omitted `dirty` measurement renders as the factual state `clean`. These fail Y3, Y4, and Z2 and block the current merge.",
+  "claims_verified": [
+    {
+      "claim": "TQA-007 provenance repair uses realpath containment beneath the estate-root Deliverables path.",
+      "status": "confirmed",
+      "evidence": "`sweepOpenDeliverables()` resolves the estate root and each leaf, then requires containment beneath `${estateReal}/Deliverables/`; outside and unverified provenance are visibly disclosed."
+    },
+    {
+      "claim": "An empty upstream configuration no longer claims that nothing is pushed.",
+      "status": "confirmed",
+      "evidence": "`renderLocationSection()` renders `no upstream configured ÔÇö pushed status NOT established` for `upstreamState === 'none-configured'`."
+    },
+    {
+      "claim": "The renderer preserves four distinguishable states for every field.",
+      "status": "refuted",
+      "evidence": "`gitReadable`, `repoRoot`, `headSha`, `dirty`, and other probes still reduce materially different failures to `false` or `null`; their renderers do not receive the preserved `causes` information."
+    },
+    {
+      "claim": "The hook never reports an unmeasured state from a default or missing value.",
+      "status": "refuted",
+      "evidence": "The working-tree renderer treats every value other than `null` and truthyÔÇöincluding `undefined`ÔÇöas `clean`."
+    }
+  ],
+  "acceptance_results": [
+    {
+      "acceptance_row_id": "Y1",
+      "result": "pass",
+      "rationale": "A bare cwd is emitted only when hook-process occupation is positively measured. Files, other node types, absent paths, unreadable paths, empty values, non-string values, false/null occupation, and unclaimed cwd receive qualified output.",
+      "evidence": "`cwdOccupiedByHook` compares resolved process cwd with the resolved target; `renderCwd()` requires `=== true` for a bare path and the heading is weakened to `SESSION LOCATION PROBES`."
+    },
+    {
+      "acceptance_row_id": "Y2",
+      "result": "pass",
+      "rationale": "No configured upstream, detached HEAD, unreadable Git, and unsettled probes render distinct qualified statements without inferring remote push status.",
+      "evidence": "The `none-configured` arm explicitly says pushed status is not established; the other `upstreamState` arms remain separately worded."
+    },
+    {
+      "acceptance_row_id": "Y3",
+      "result": "fail",
+      "rationale": "Four-state distinguishability is not implemented for every rendered field. Several Git probes collapse non-repository/fatal failures, unavailable Git, and unknown failures to identical `null` or `false` output.",
+      "evidence": "`soft()` records causes, but only cwd and symbolic-ref derivations consume them. For example, `repoRoot`, `headSha`, and `dirty` discard their cause at rendering; `rev-parse` exit 128 and spawn ENOENT therefore render identically."
+    },
+    {
+      "acceptance_row_id": "Y4",
+      "result": "fail",
+      "rationale": "The enumeration's failure model is incomplete because it does not account for missing fields or the distinct causes of most Git probe failures.",
+      "evidence": "`working tree` maps `dirty: undefined` to `clean`; other Git fields map multiple failure classes to `(unknown)`. A literal label-set pin cannot detect either semantic hole."
+    },
+    {
+      "acceptance_row_id": "Y5",
+      "result": "pass",
+      "rationale": "Directory-read failure, per-file unreadability, a genuinely empty sweep, and display-cap truncation are distinguishable.",
+      "evidence": "Non-ENOENT directory failures return `NOT SWEPT`; unreadable files are counted and disclosed; an empty readable result returns null; lists beyond eight rows explicitly state that they are incomplete."
+    },
+    {
+      "acceptance_row_id": "Z1",
+      "result": "pass",
+      "rationale": "Added filesystem and Git probes are caught locally, while `buildBrief()` and `main()` provide outer fail-safe rendering and preserve exit-zero behavior.",
+      "evidence": "Probe calls are wrapped through `soft()` or local try/catch; sweep failures return diagnostic text; `main()` catches `buildBrief()` failure."
+    },
+    {
+      "acceptance_row_id": "Z2",
+      "result": "fail",
+      "rationale": "A missing measurement can still be rendered as fact from a falsy default.",
+      "evidence": "`facts.dirty === null ? '(unknown)' : facts.dirty ? 'DIRTY...' : 'clean'` renders `undefined` as `clean`, although no clean-state measurement exists."
+    }
+  ],
+  "prior_finding_results": [
+    {
+      "finding_id": "TQA-001",
+      "status": "addressed",
+      "rationale": "cwd failures retain and visibly distinguish absent, unreadable, invalid-argument, and unknown causes."
+    },
+    {
+      "finding_id": "TQA-002",
+      "status": "addressed",
+      "rationale": "Detachment is asserted only for symbolic-ref exit status 1; fatal and unavailable probe failures are separately rendered without asserting detachment."
+    },
+    {
+      "finding_id": "TQA-003",
+      "status": "addressed",
+      "rationale": "Directory type alone no longer earns an unqualified session-location path."
+    },
+    {
+      "finding_id": "TQA-004",
+      "status": "addressed",
+      "rationale": "Display-cap omissions are explicitly counted and the rendered list is labelled incomplete."
+    },
+    {
+      "finding_id": "TQA-005",
+      "status": "addressed",
+      "rationale": "The occupation probe gates bare cwd rendering and the block heading no longer overclaims session location."
+    },
+    {
+      "finding_id": "TQA-006",
+      "status": "addressed",
+      "rationale": "No-upstream output now limits itself to the measured configuration fact."
+    },
+    {
+      "finding_id": "TQA-007",
+      "status": "addressed",
+      "rationale": "Leaf realpath is checked against the real estate-root Deliverables namespace, catching both redirected Deliverables directories and redirected leaves."
+    }
+  ],
+  "findings": [
+    {
+      "id": "TQA-008",
+      "technical_impact": "HIGH",
+      "reachability": "ACTIVE",
+      "required_disposition": "BLOCKS_CURRENT_MERGE",
+      "assumed_deployment_baseline": "SessionStart hook using the normal `gitFacts()` path in a non-repository, with Git unavailable, or with a Git probe failing unexpectedly.",
+      "evidence": "Although `soft()` records all causes, renderers consume cause data only for cwd and symbolic-ref. `repoRoot`, `headSha`, `dirty`, and related fields therefore render fatal exit 128, spawn ENOENT, and unknown exceptions identically.",
+      "required_correction": "Carry and render the relevant outcome class for every displayed Git field so measured absence/failure, no claim, rejected claim, and inability to tell remain human-distinguishable."
+    },
+    {
+      "id": "TQA-009",
+      "technical_impact": "HIGH",
+      "reachability": "ACTIVE",
+      "required_disposition": "BLOCKS_CURRENT_MERGE",
+      "assumed_deployment_baseline": "Any caller of exported `renderLocationSection()`, or `buildBrief()` using its supported injected `facts` seam, supplies a partial or forward-version-skewed fact object.",
+      "evidence": "The working-tree expression treats `dirty === undefined` as falsy and renders `clean`; only exactly `null` produces `(unknown)`.",
+      "required_correction": "Render `clean` only for `dirty === false`, `DIRTY` only for `dirty === true`, and every absent or invalid value as explicitly unmeasured/unknown."
+    }
+  ]
+}

@@ -1,0 +1,156 @@
+repo:  C:/Fusion247PKA
+range: a989e68d95e01b7f6dc13955d796950f6a8a02a5..HEAD
+claim: Deliverables/2026-08-02-phase5-evidence/claim-scope-footer.json
+scope  : tools/governor/footer.mjs
+branch : operating-reset/teardown
+
+── GIT EVIDENCE (real, read-only) ──
+resolved=true diff_range=a989e68d95e01b7f6dc13955d796950f6a8a02a5..2660554be731a3cec8adb865962ee6342b81008d
+changed_files=["tools/governor/footer.mjs"]
+diff bytes=47367 truncated=false
+
+── REAL CODEX MERGE REVIEW (Tower QA skill over the staged diff + the REAL claim) ──
+ok=true blocked=false model=openai-codex-exec
+{
+  "status": "ok",
+  "verdict": "request_changes",
+  "summary": "The scoped diff satisfies the decoupling, frozen-vocabulary, handback-code, degradation-order, and fail-safe requirements. Two acceptance defects remain: bare percentages can be rendered without numerator/denominator evidence, contrary to D6, and the token codec accepts sufficiently large numbers that it renders in exponential notation, which its parser rejects. Both affect explicit acceptance criteria and block this checkpoint.",
+  "claims_verified": [
+    {
+      "claim": "footer.mjs no longer imports programme-state.mjs.",
+      "status": "confirmed",
+      "evidence": "The diff removes the readProgrammeState import and all programme-state lookup paths."
+    },
+    {
+      "claim": "next is caller-supplied, defaults to UNSET, and programme-shaped derivation was deleted.",
+      "status": "confirmed",
+      "evidence": "computeFooterLine now accepts next = NEXT_UNSET; nextModelFor and UNSET_REASON are removed."
+    },
+    {
+      "claim": "Model and effort vocabularies are frozen and shared by renderer and parser.",
+      "status": "confirmed",
+      "evidence": "NEXT_MODELS and NEXT_EFFORTS are Object.freeze literals; NEXT_VALUES derives their cross-product and is used by renderFooter and FOOTER_RE."
+    },
+    {
+      "claim": "HANDBACK_CODES is unchanged from the base.",
+      "status": "confirmed",
+      "evidence": "The staged hunk changes only surrounding comments; no HANDBACK_CODES member line is added, removed, or altered."
+    },
+    {
+      "claim": "The ladder never grades missing, unreadable, stale, or foreign-session telemetry.",
+      "status": "confirmed",
+      "evidence": "All corresponding early returns use blind(...), and SESSION_MISMATCH precedes STALE."
+    },
+    {
+      "claim": "A percentage is rendered only when numerator and denominator are known.",
+      "status": "refuted",
+      "evidence": "deriveFooterFields accepts reportedPct independently; renderFooter explicitly supports and emits the percent-only shape `${percent}%` when windowTokens is null."
+    },
+    {
+      "claim": "parseFooter(renderFooter(x)) is an identity for every accepted render input.",
+      "status": "refuted",
+      "evidence": "isRenderableTokens lacks a safe/range bound. A sufficiently large accepted number can stringify through formatTokens in exponent notation, while TOK_P/parseTokens accept decimal digits only."
+    }
+  ],
+  "acceptance_results": [
+    {
+      "acceptance_row_id": "C4",
+      "result": "pass",
+      "rationale": "The programme-state dependency is removed.",
+      "evidence": "The import of readProgrammeState and all uses of it are deleted."
+    },
+    {
+      "acceptance_row_id": "D1",
+      "result": "pass",
+      "rationale": "next is now caller input with an UNSET default; the obsolete derivation and reason vocabulary are deleted.",
+      "evidence": "computeFooterLine({ next = NEXT_UNSET }); removal of nextModelFor and UNSET_REASON."
+    },
+    {
+      "acceptance_row_id": "D2",
+      "result": "pass",
+      "rationale": "The MODEL/EFFORT grammar and exact effort vocabulary are implemented from frozen literals shared by renderer and parser.",
+      "evidence": "NEXT_MODELS, NEXT_EFFORTS, NEXT_VALUES; requireMember(next, NEXT_VALUES); FOOTER_RE derives its next alternation from NEXT_VALUES."
+    },
+    {
+      "acceptance_row_id": "D3",
+      "result": "fail",
+      "rationale": "Round-trip identity is not guaranteed over the full input domain accepted by renderFooter.",
+      "evidence": "isRenderableTokens accepts non-safe, extremely large integers; formatTokens may emit exponent notation, but TOK_P and parseTokens reject exponent notation."
+    },
+    {
+      "acceptance_row_id": "D4",
+      "result": "pass",
+      "rationale": "The seven-code literal is untouched by this diff.",
+      "evidence": "Only comments around HANDBACK_CODES change in the staged diff."
+    },
+    {
+      "acceptance_row_id": "D6",
+      "result": "fail",
+      "rationale": "The implementation still permits a percentage when numerator and denominator are absent, contrary to the criterion's ONLY condition.",
+      "evidence": "reportedPct can independently determine used; showTokens may remain false; renderFooter then emits the percent-only `${percent}%` form."
+    },
+    {
+      "acceptance_row_id": "Z1",
+      "result": "pass",
+      "rationale": "No identified path grades unreadable, absent, stale, or foreign telemetry.",
+      "evidence": "SAMPLE_UNREADABLE, schema/usage failures, SESSION_MISMATCH, and STALE all return BLIND before evaluation."
+    },
+    {
+      "acceptance_row_id": "Z2",
+      "result": "pass",
+      "rationale": "The composed footer path degrades to a grammatical BLIND footer when computation or rendering fails.",
+      "evidence": "computeFooterLine and runCli wrap the fallible paths and return renderFooter with fixed BLIND/UNSET/CONTINUE fields."
+    },
+    {
+      "acceptance_row_id": "Z3",
+      "result": "pass",
+      "rationale": "Session mismatch outranks staleness.",
+      "evidence": "deriveFooterFields checks knownSessionId mismatch before the STALE branch."
+    },
+    {
+      "acceptance_row_id": "W1",
+      "result": "pass",
+      "rationale": "No concrete input was found that reaches GREEN/AMBER/RED without a finite percentage supported directly by telemetry or derived from its numerator and denominator.",
+      "evidence": "Evaluation occurs only after used is established from reportedPct or usedTokens/windowTokens; numerator-only data returns WINDOW_SIZE_UNKNOWN/BLIND."
+    },
+    {
+      "acceptance_row_id": "W2",
+      "result": "fail",
+      "rationale": "A boundary input can produce a footer that the parser rejects.",
+      "evidence": "For sufficiently large token numbers accepted by isRenderableTokens, JavaScript number stringification can use exponent notation; the parser's TOK_P permits only digits with an optional single decimal."
+    },
+    {
+      "acceptance_row_id": "W3",
+      "result": "pass",
+      "rationale": "No percentage is calculated from an inferred or externally guessed denominator.",
+      "evidence": "The division path uses only data.context_window.context_window_size after finite/positive validation."
+    },
+    {
+      "acceptance_row_id": "W4",
+      "result": "pass",
+      "rationale": "No permitted vocabulary member can inject separators or create parser ambiguity.",
+      "evidence": "Closed vocabularies are regex-escaped; token, percentage, and control productions exclude the separator grammar; the regex is anchored."
+    }
+  ],
+  "prior_finding_results": [],
+  "findings": [
+    {
+      "id": "TQA-001",
+      "technical_impact": "HIGH",
+      "reachability": "ACTIVE",
+      "required_disposition": "BLOCKS_CURRENT_MERGE",
+      "assumed_deployment_baseline": "First-party footer callers may provide status-line samples containing used_percentage without token counts or context_window_size, as explicitly supported by the new code.",
+      "evidence": "deriveFooterFields chooses reportedPct whenever finite, even if usedTokens/windowTokens are null; renderFooter deliberately renders a percent-only CTX form. This violates D6's requirement that percentages appear only when both numerator and denominator are known.",
+      "required_correction": "Remove or reject the percent-only production for derived output. Emit a percentage only when authoritative usedTokens and windowTokens are both present; otherwise render the true absolute count when available or `--`."
+    },
+    {
+      "id": "TQA-002",
+      "technical_impact": "MEDIUM",
+      "reachability": "LATENT",
+      "required_disposition": "BLOCKS_CURRENT_MERGE",
+      "assumed_deployment_baseline": "The exported codec is callable with arbitrary JavaScript numbers satisfying its documented validation, not solely today's ordinary context-window sizes.",
+      "evidence": "isRenderableTokens checks integer, non-negative, and grain only. formatTokens can stringify a sufficiently large quotient using exponent notation, while TOK_P and parseTokens accept only `[0-9]+` decimal notation, breaking D3/W2.",
+      "required_correction": "Bound token inputs to a safe, parser-representable range, preferably requiring Number.isSafeInteger and an explicit maximum, or extend formatting/parsing with an exact representation that preserves round-trip identity. Add boundary tests at the accepted maximum and immediately above it."
+    }
+  ]
+}

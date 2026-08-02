@@ -1,0 +1,163 @@
+repo:  C:/Fusion247PKA
+range: 2aac7d9..e16701f30c07d0b92ba850fdfd429ae0e14effee
+claim: Deliverables/2026-08-02-phase5-evidence/claim-scope-reorient-repairs-v8.json
+scope  : tools/governor/reorient.mjs
+branch : operating-reset/teardown
+
+ÔöÇÔöÇ GIT EVIDENCE (real, read-only) ÔöÇÔöÇ
+resolved=true diff_range=2aac7d9a2d6584fc7d993fc21f5428f649c847d0..e16701f30c07d0b92ba850fdfd429ae0e14effee
+changed_files=["tools/governor/reorient.mjs"]
+diff bytes=49170 of 49170 (real UTF-8 bytes) truncated=false
+packet diff_range=2aac7d9a2d6584fc7d993fc21f5428f649c847d0..e16701f30c07d0b92ba850fdfd429ae0e14effee -- tools/governor/reorient.mjs
+packet scoped_to=["tools/governor/reorient.mjs"] wp_id=null
+
+ÔöÇÔöÇ REAL CODEX MERGE REVIEW (Tower QA skill over the staged diff + the REAL claim) ÔöÇÔöÇ
+ok=true blocked=false model=openai-codex-exec
+{
+  "status": "ok",
+  "verdict": "request_changes",
+  "summary": "The repairs substantially improve fail-closed reporting, but the staged implementation still fails Y3/Y4/Z2 for branch-attachment probe failures and Y5 because an empty successful sweep is indistinguishable from no sweep output. Z3 cannot be assessed because its acceptance text is truncated in the supplied packet.",
+  "claims_verified": [
+    {
+      "claim": "TQA-001..007 and TQA-009 are fixed in this repair range.",
+      "status": "confirmed",
+      "evidence": "The diff preserves cwd failure causes, limits detachment to symbolic-ref status 1, qualifies cwd occupation, discloses display truncation, narrows upstream claims, measures provenance by realpath containment, and renders clean only for dirty === false."
+    },
+    {
+      "claim": "TQA-008 is addressed within the stated four-state design bound.",
+      "status": "refuted",
+      "evidence": "renderBranch() returns String(facts.branch) for a non-HEAD branch even when symbolicRefFailure records that the attachment probe failed, so probe-failed attachment is not human-visible."
+    },
+    {
+      "claim": "The reorientation tests pass 53/53.",
+      "status": "unverifiable",
+      "evidence": "The test file and test execution evidence are explicitly outside this bounded packet."
+    }
+  ],
+  "acceptance_results": [
+    {
+      "acceptance_row_id": "Y1",
+      "result": "pass",
+      "rationale": "The repair validates realpath and directory type, preserves invalid/unreadable causes, and only renders an unqualified cwd when hook occupation is measured.",
+      "evidence": "gitFacts(): resolved/cwdFailure/cwdOccupiedByHook; renderCwd()."
+    },
+    {
+      "acceptance_row_id": "Y2",
+      "result": "pass",
+      "rationale": "The no-upstream message is reachable only from upstreamState === 'none-configured', established by an attached symbolic branch whose exact ref exists with an empty upstream field.",
+      "evidence": "upstreamState derivation and renderLocationSection() none-configured arm."
+    },
+    {
+      "acceptance_row_id": "Y3",
+      "result": "fail",
+      "rationale": "Branch attachment does not always distinguish measured attachment from a failed symbolic-ref probe.",
+      "evidence": "renderBranch() handles symbolicRefFailure only when facts.branch === 'HEAD'; any other non-null branch falls through to String(facts.branch)."
+    },
+    {
+      "acceptance_row_id": "Y4",
+      "result": "fail",
+      "rationale": "The enumeration omits the state where rev-parse supplies a branch name but the dedicated symbolic-ref attachment probe fails.",
+      "evidence": "gitFacts() records symbolicRefFailure, but renderBranch() suppresses it for non-HEAD branch values."
+    },
+    {
+      "acceptance_row_id": "Y5",
+      "result": "fail",
+      "rationale": "Unreadable directory/file and incomplete-list states are disclosed, but a genuinely successful empty sweep returns null and produces no human-visible indication that the sweep completed with zero results.",
+      "evidence": "sweepOpenDeliverables(): `if (!rows.length) ... return null`; ENOENT also returns null."
+    },
+    {
+      "acceptance_row_id": "Z1",
+      "result": "pass",
+      "rationale": "Added filesystem/git/stdin probes are guarded and main retains a final buildBrief fallback; no added normal input path visibly forces a non-zero exit.",
+      "evidence": "soft(), sweep try/catch blocks, stdinError capture, and main() outer try/catch."
+    },
+    {
+      "acceptance_row_id": "Z2",
+      "result": "fail",
+      "rationale": "A branch name can be rendered as an attachment fact while the dedicated attachment probe is recorded as failed.",
+      "evidence": "renderBranch() final `return String(facts.branch)` ignores symbolicRefFailure unless branch equals literal HEAD."
+    },
+    {
+      "acceptance_row_id": "Z3",
+      "result": "blocked",
+      "rationale": "The supplied criterion ends at `Z3. The honesty claims themselves ÔÇö the heading 'S`, so its required claim and expected result are unavailable.",
+      "evidence": "Truncated brief_excerpt in the bounded packet."
+    }
+  ],
+  "prior_finding_results": [
+    {
+      "finding_id": "TQA-001",
+      "status": "addressed",
+      "rationale": "cwd absence, invalid input, unreadability and unknown failure are preserved and rendered separately."
+    },
+    {
+      "finding_id": "TQA-002",
+      "status": "addressed",
+      "rationale": "Detached is derived only from symbolic-ref status 1; other failures remain null."
+    },
+    {
+      "finding_id": "TQA-003",
+      "status": "addressed",
+      "rationale": "The heading no longer asserts session location, and bare cwd requires measured occupation."
+    },
+    {
+      "finding_id": "TQA-004",
+      "status": "addressed",
+      "rationale": "Display-cap omissions are explicitly counted and marked incomplete."
+    },
+    {
+      "finding_id": "TQA-005",
+      "status": "addressed",
+      "rationale": "cwd occupation is separately measured through the hook process's real cwd."
+    },
+    {
+      "finding_id": "TQA-006",
+      "status": "addressed",
+      "rationale": "No configured upstream no longer claims that nothing is pushed."
+    },
+    {
+      "finding_id": "TQA-007",
+      "status": "addressed",
+      "rationale": "Leaf provenance is checked against the real estate-root Deliverables boundary."
+    },
+    {
+      "finding_id": "TQA-008",
+      "status": "remains_open",
+      "rationale": "A failed symbolic-ref attachment probe is hidden when rev-parse returned a non-HEAD branch name."
+    },
+    {
+      "finding_id": "TQA-009",
+      "status": "addressed",
+      "rationale": "Only dirty === false renders clean."
+    }
+  ],
+  "findings": [
+    {
+      "id": "TQA-010",
+      "technical_impact": "MEDIUM",
+      "reachability": "ACTIVE",
+      "required_disposition": "BLOCKS_CURRENT_MERGE",
+      "assumed_deployment_baseline": "The hook runs at session start against live repositories where sequential git probes can fail independently.",
+      "evidence": "renderBranch() consults symbolicRefFailure only inside the `facts.branch === 'HEAD'` arm; otherwise it returns the branch string unqualified.",
+      "required_correction": "When symbolicRefFailure is present, render attachment as unverified regardless of the rev-parse branch string, or formally establish and document why that independent result proves attachment."
+    },
+    {
+      "id": "TQA-011",
+      "technical_impact": "MEDIUM",
+      "reachability": "ACTIVE",
+      "required_disposition": "BLOCKS_CURRENT_MERGE",
+      "assumed_deployment_baseline": "A successful Deliverables scan may legitimately find no in-scope recent Markdown files.",
+      "evidence": "sweepOpenDeliverables() returns null both for ENOENT and for a completed scan with zero rows and zero unreadable files.",
+      "required_correction": "Return a compact explicit successful-zero-results message so readers can distinguish 'swept; none found' from absence of sweep output."
+    },
+    {
+      "id": "TQA-012",
+      "technical_impact": "LOW",
+      "reachability": "ACTIVE",
+      "required_disposition": "BLOCKS_CURRENT_MERGE",
+      "assumed_deployment_baseline": "Every staged acceptance criterion must receive an evidence-based disposition before the checkpoint can proceed.",
+      "evidence": "Z3 is truncated mid-sentence in brief_excerpt.",
+      "required_correction": "Restage the complete Z3 criterion and rerun the bounded review."
+    }
+  ]
+}

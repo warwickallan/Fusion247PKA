@@ -1,0 +1,144 @@
+repo:  C:/Fusion247PKA
+range: 2aac7d9..b37c0efe12ff49db8c42152dfacb32ac471ba94d
+claim: Deliverables/2026-08-02-phase5-evidence/claim-scope-reorient-repairs-v9.json
+scope  : tools/governor/reorient.mjs
+branch : operating-reset/teardown
+
+ÔöÇÔöÇ GIT EVIDENCE (real, read-only) ÔöÇÔöÇ
+resolved=true diff_range=2aac7d9a2d6584fc7d993fc21f5428f649c847d0..b37c0efe12ff49db8c42152dfacb32ac471ba94d
+changed_files=["tools/governor/reorient.mjs"]
+diff bytes=49983 of 49983 (real UTF-8 bytes) truncated=false
+packet diff_range=2aac7d9a2d6584fc7d993fc21f5428f649c847d0..b37c0efe12ff49db8c42152dfacb32ac471ba94d -- tools/governor/reorient.mjs
+packet scoped_to=["tools/governor/reorient.mjs"] wp_id=null
+
+ÔöÇÔöÇ REAL CODEX MERGE REVIEW (Tower QA skill over the staged diff + the REAL claim) ÔöÇÔöÇ
+ok=true blocked=false model=openai-codex-exec
+{
+  "status": "ok",
+  "verdict": "approve",
+  "summary": "The staged repair diff satisfies Y1ÔÇôY5 and Z1ÔÇôZ2. The repaired rendering consistently distinguishes measured facts from absent, invalid, or unavailable measurements; upstream absence is no longer confused with push status; and sweep incompleteness is explicit. No merge-blocking non-conformance was found in the scoped file and range.",
+  "claims_verified": [
+    {
+      "claim": "TQA-001 through TQA-011 are fixed or addressed in the scoped repair diff.",
+      "status": "confirmed",
+      "evidence": "The diff adds cause-preserving probes, strict renderers, measured upstream states, attachment-failure handling, provenance reporting, incomplete-sweep notices, and an explicit successful-empty-sweep result."
+    },
+    {
+      "claim": "The hook always exits 0.",
+      "status": "partial",
+      "evidence": "Every newly added filesystem, Git, sweep, and stdin probe is caught or guarded, and buildBrief/main retain hard-failure fallback rendering. The staged excerpt does not include the unchanged final invocation/output code, so absolute process-exit behavior is not independently re-proven here."
+    },
+    {
+      "claim": "53/53 tests pass.",
+      "status": "unverifiable",
+      "evidence": "The approved scope explicitly excludes reorient.test.mjs and instructs the reviewer not to infer missing tests from that exclusion; no executable test result is included in the staged evidence."
+    },
+    {
+      "claim": "The staged evidence is not truncated.",
+      "status": "confirmed",
+      "evidence": "The supplied diff contains the complete scoped changes from imports through main() for tools/governor/reorient.mjs, with no truncation marker in the staged patch."
+    }
+  ],
+  "acceptance_results": [
+    {
+      "acceptance_row_id": "Y1",
+      "result": "pass",
+      "rationale": "A bare established cwd is rendered only when a real directory resolves and the hook process is measured to occupy it. Other valid directories, files, non-path values, absent paths, and unreadable paths render qualified or unverified states.",
+      "evidence": "gitFacts computes resolvedKind and cwdOccupiedByHook; renderCwd requires cwdOccupiedByHook === true for an unqualified path and separately reports file, other, absent, unreadable, not-a-path, and unknown failures."
+    },
+    {
+      "acceptance_row_id": "Y2",
+      "result": "pass",
+      "rationale": "No state renders the former claim that nothing is pushed. An attached branch reaches no-upstream only after for-each-ref returns the exact branch row with an empty upstream field; detached and failed probes remain distinguishable.",
+      "evidence": "upstreamState derives none-configured only from symbolicBranch plus a successful non-empty row ending in '|'. renderLocationSection says 'no upstream configured ÔÇö pushed status NOT established' and has separate detached, unreadable, and unknown arms."
+    },
+    {
+      "acceptance_row_id": "Y3",
+      "result": "pass",
+      "rationale": "Measured, absent/nothing-claimed, invalid, and could-not-tell states are human-visible across cwd, attachment, HEAD, dirty state, worktree root, and upstream reporting.",
+      "evidence": "renderCwd, renderBranch, renderHead, renderDirty, renderToplevel, and the upstream-state switch use strict null/boolean/cause checks rather than truthy defaults."
+    },
+    {
+      "acceptance_row_id": "Y4",
+      "result": "pass",
+      "rationale": "The enumeration accounts for the material failure families introduced or exposed by these probes without upgrading probe failure into a fact. No concrete unmodelled path that renders a stronger factual claim was found.",
+      "evidence": "causes preserves per-probe errors; cwdFailure and symbolicRefFailure classify causal states; nullable value fields render unknown; upstreamState fails closed; sweep provenance failures render unverified."
+    },
+    {
+      "acceptance_row_id": "Y5",
+      "result": "pass",
+      "rationale": "A missing directory, unreadable directory, unreadable file, successful empty sweep, provenance uncertainty, and display truncation are visibly distinct.",
+      "evidence": "ENOENT returns null; other readdir errors return NOT SWEPT; unreadable files increment and disclose unreadable; zero rows return 'swept ÔÇö none open'; unreadable and display-cap omissions are appended to rendered lists."
+    },
+    {
+      "acceptance_row_id": "Z1",
+      "result": "pass",
+      "rationale": "All added filesystem, Git, sweep, and stdin probes degrade through caught failures, nullable results, or fallback text instead of escaping through the boot hook.",
+      "evidence": "soft catches Git/probe failures; sweep wraps directory, realpath, stat, and read operations; main captures stdin errors; buildBrief and main retain enclosing fallback catches."
+    },
+    {
+      "acceptance_row_id": "Z2",
+      "result": "pass",
+      "rationale": "No reviewed field is rendered as a measured fact from a default or swallowed failure. Defaults are either identified as unclaimed, rendered unknown/unverified, or accompanied by the exact limited measurement made.",
+      "evidence": "cwdClaimedByHost prevents fallback cwd from masquerading as host input; strict dirty/head rendering avoids falsy defaults; attachment and upstream facts require dedicated probe states; incomplete sweep and provenance uncertainty are disclosed."
+    }
+  ],
+  "prior_finding_results": [
+    {
+      "finding_id": "TQA-001",
+      "status": "addressed",
+      "rationale": "Filesystem refusal is preserved as unreadable rather than rendered as measured absence."
+    },
+    {
+      "finding_id": "TQA-002",
+      "status": "addressed",
+      "rationale": "Only symbolic-ref exit status 1 establishes detachment; other failures remain unverified."
+    },
+    {
+      "finding_id": "TQA-003",
+      "status": "addressed",
+      "rationale": "Directory type alone no longer earns an unqualified session-location claim."
+    },
+    {
+      "finding_id": "TQA-004",
+      "status": "addressed",
+      "rationale": "Rows omitted by the display cap are explicitly counted and disclosed."
+    },
+    {
+      "finding_id": "TQA-005",
+      "status": "addressed",
+      "rationale": "A non-mutating process-cwd comparison is required for the positive occupation claim."
+    },
+    {
+      "finding_id": "TQA-006",
+      "status": "addressed",
+      "rationale": "No configured upstream is no longer presented as proof that nothing was pushed."
+    },
+    {
+      "finding_id": "TQA-007",
+      "status": "addressed",
+      "rationale": "Leaf provenance is measured against the real estate-root Deliverables boundary, including redirected directories."
+    },
+    {
+      "finding_id": "TQA-008",
+      "status": "addressed",
+      "rationale": "Value-field probe failures render could-not-tell states without overclaiming; subclass consolidation remains within the approved design bound."
+    },
+    {
+      "finding_id": "TQA-009",
+      "status": "addressed",
+      "rationale": "Dirty state requires strict true or false; undefined/null cannot render as clean."
+    },
+    {
+      "finding_id": "TQA-010",
+      "status": "addressed",
+      "rationale": "Any branch string is qualified when symbolic-ref attachment probing failed, not only the literal HEAD value."
+    },
+    {
+      "finding_id": "TQA-011",
+      "status": "addressed",
+      "rationale": "A successful zero-result sweep now renders an explicit swept-none-open result, distinct from ENOENT silence."
+    }
+  ],
+  "findings": []
+}

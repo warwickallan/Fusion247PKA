@@ -1,0 +1,146 @@
+repo:  C:/Fusion247PKA
+range: a989e68d95e01b7f6dc13955d796950f6a8a02a5..HEAD
+claim: Deliverables/2026-08-02-phase5-evidence/claim-scope-sampler-v2.json
+scope  : tools/governor/sampler.mjs,tools/governor/sampler.test.mjs
+branch : operating-reset/teardown
+
+── GIT EVIDENCE (real, read-only) ──
+resolved=true diff_range=a989e68d95e01b7f6dc13955d796950f6a8a02a5..c476e7bf63f1f2373d1051c1fa27178187110316
+changed_files=["tools/governor/sampler.mjs","tools/governor/sampler.test.mjs"]
+diff bytes=47402 truncated=false
+
+── REAL CODEX MERGE REVIEW (Tower QA skill over the staged diff + the REAL claim) ──
+ok=true blocked=false model=openai-codex-exec
+{
+  "status": "ok",
+  "verdict": "approve",
+  "summary": "The staged diff satisfies H1–H8 and closes TQA-001 by removing cross-session/model inference and resolving only an explicit operator value or the live session’s own record. The positive, negative, identity, coherence, carry-forward, and end-to-end tests materially cover the claimed behaviour. Two latent availability/provenance edge cases remain for session-ID reuse/stale records and differing working-directory store roots; neither contradicts the approved acceptance criteria under the stated first-party baseline.",
+  "claims_verified": [
+    {
+      "claim": "Cross-session inference is deleted rather than constrained.",
+      "status": "confirmed",
+      "evidence": "resolveWindowTokens has no modelId parameter, calls readSample exactly once with sessionId, and contains no store enumeration, observation grouping, or cross-session comparison."
+    },
+    {
+      "claim": "Only an explicit operator declaration or the live session’s own record can provide a denominator.",
+      "status": "confirmed",
+      "evidence": "The resolver first checks env.CLAUDE_CONTEXT_WINDOW, then requires a non-empty sessionId and reads readSample(sessionId, storeOpts); all other routes return NO_WINDOW."
+    },
+    {
+      "claim": "Identity and self-contradiction guards bind the required routes.",
+      "status": "confirmed",
+      "evidence": "The code rejects data.session_id !== sessionId. coherent(declared) guards the explicit route, while coherent(size) guards direct and carried records."
+    },
+    {
+      "claim": "Only statusline-observed values are carried forward.",
+      "status": "confirmed",
+      "evidence": "carriedForward requires transcript source plus context_window_source === WINDOW_SOURCE_OBSERVED; the tests explicitly reject WINDOW_SOURCE_ENV after withdrawal."
+    },
+    {
+      "claim": "The feature remains reachable for all three H7 cases.",
+      "status": "confirmed",
+      "evidence": "The positive-control and end-to-end tests cover explicit env declaration, the live session’s direct statusLine observation, and the carried value after transcript overwrite."
+    }
+  ],
+  "acceptance_results": [
+    {
+      "acceptance_row_id": "H1",
+      "result": "pass",
+      "rationale": "Cross-session inference is absent from the implementation.",
+      "evidence": "resolveWindowTokens omits modelId and performs one keyed readSample(sessionId) call; no directory enumeration, grouping, or cross-session comparison appears."
+    },
+    {
+      "acceptance_row_id": "H2",
+      "result": "pass",
+      "rationale": "Exactly the two authorized denominator routes remain.",
+      "evidence": "Route 1 reads CLAUDE_CONTEXT_WINDOW live; route 2 reads only the record keyed by the supplied live sessionId."
+    },
+    {
+      "acceptance_row_id": "H3",
+      "result": "pass",
+      "rationale": "The record’s internal identity is explicitly checked.",
+      "evidence": "if (data.session_id !== sessionId) return NO_WINDOW; covered by the guard-(d) identity test."
+    },
+    {
+      "acceptance_row_id": "H4",
+      "result": "pass",
+      "rationale": "Self-contradiction protection survives and covers both routes.",
+      "evidence": "coherent(declared) protects the explicit route and coherent(size) protects direct/carried records; tests exercise both with usedTokens 408169 over a 200000 window."
+    },
+    {
+      "acceptance_row_id": "H5",
+      "result": "pass",
+      "rationale": "The obsolete disagreement/variant mechanisms are not retained in the reviewed source.",
+      "evidence": "The resolver contains neither observation disagreement logic nor variantBaseOf/model-variant matching; comments explain their removal."
+    },
+    {
+      "acceptance_row_id": "H6",
+      "result": "pass",
+      "rationale": "Carry-forward is restricted to statusline-observed provenance.",
+      "evidence": "A transcript record is accepted only when context_window_source equals WINDOW_SOURCE_OBSERVED; the test rejects WINDOW_SOURCE_ENV and confirms a still-live env declaration resolves through route 1."
+    },
+    {
+      "acceptance_row_id": "H7",
+      "result": "pass",
+      "rationale": "The repair does not collapse to null-everywhere.",
+      "evidence": "WO-OR-09 POSITIVE CONTROL covers explicit declaration, direct same-session observation, and statusline-observed carry-forward; the end-to-end sampleFromTranscript test also proves overwrite continuity."
+    },
+    {
+      "acceptance_row_id": "H8",
+      "result": "pass",
+      "rationale": "The TQA-001 case yields no denominator.",
+      "evidence": "Tests place a 200000 observation under another session and request the live 1M session; both resolver-level and sampleFromTranscript paths assert null denominator."
+    },
+    {
+      "acceptance_row_id": "Y1",
+      "result": "pass",
+      "rationale": "No ordinary supported input returns another session’s denominator. A forged or stale same-ID record could pass, but under the stated trusted first-party baseline that is a latent identity-lifecycle risk rather than a present alternate inference route.",
+      "evidence": "The only stored route requires keyed lookup, matching internal session_id, accepted source/provenance, valid size, and arithmetic coherence."
+    },
+    {
+      "acceptance_row_id": "Y2",
+      "result": "pass",
+      "rationale": "A realistic uncovered configuration can lose the denominator when statusLine has not populated the same store root, but it fails safely to a token count without a percentage and does not invalidate H7.",
+      "evidence": "Missing same-session data causes NO_WINDOW; no fallback borrows another session’s value."
+    },
+    {
+      "acceptance_row_id": "Y3",
+      "result": "pass",
+      "rationale": "Carry-forward can preserve a stale value if a session ID is reused or an old same-ID file survives; provenance-field disagreement itself is rejected unless it falsely claims statusline-observed. This is a latent lifecycle concern, not a scoped acceptance failure.",
+      "evidence": "Acceptance depends on session_id, transcript source, and WINDOW_SOURCE_OBSERVED, with no timestamp freshness or session-incarnation check."
+    },
+    {
+      "acceptance_row_id": "Y4",
+      "result": "pass",
+      "rationale": "Different working-directory-derived store roots make the observation unavailable rather than causing cross-session leakage.",
+      "evidence": "The resolver reads only through the supplied storeOpts and returns NO_WINDOW when the live session record is absent."
+    }
+  ],
+  "prior_finding_results": [
+    {
+      "finding_id": "TQA-001",
+      "status": "addressed",
+      "rationale": "The model-ID/cross-session inference responsible for the false 200k denominator is removed, and regression tests reproduce the one-bare-ID/no-sibling case through both the resolver and the Stop-hook path."
+    }
+  ],
+  "findings": [
+    {
+      "id": "TQA-OBS-002",
+      "technical_impact": "LOW",
+      "reachability": "LATENT",
+      "required_disposition": "TRACKED_FOLLOWUP",
+      "assumed_deployment_baseline": "First-party personal system; health-store writers are trusted; session IDs are normally unique and store files may persist across process lifetimes.",
+      "evidence": "A carried transcript record is accepted using matching session_id and statusline-observed provenance without freshness or session-incarnation validation. Reuse of a session ID with a stale file could therefore reuse an earlier process’s denominator.",
+      "required_correction": "Track whether session IDs can be reused in the actual host. If reuse is possible, bind carried records to a trustworthy session incarnation or freshness signal without restoring model-based inference."
+    },
+    {
+      "id": "TQA-OBS-003",
+      "technical_impact": "LOW",
+      "reachability": "LATENT",
+      "required_disposition": "TRACKED_FOLLOWUP",
+      "assumed_deployment_baseline": "statusLine and Stop hook may be launched with different working directories while the store root is derived from working directory.",
+      "evidence": "The same-session resolver has no cross-root discovery. If the two paths supply different store roots, the Stop hook cannot see the statusLine observation and safely returns NO_WINDOW.",
+      "required_correction": "Verify the real host launches both paths with the same resolved store root; if not, configure a stable shared root rather than adding cross-session inference."
+    }
+  ]
+}

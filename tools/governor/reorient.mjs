@@ -1,94 +1,68 @@
-// Reorientation — SessionStart(source="clear") → additionalContext (BUILD-018 T-11)
+#!/usr/bin/env node
+// SESSION-START REORIENTATION (BUILD-018 T-11, NARROWED by WO-OR-05 2026-08-02).
 //
-// The half of the rotation loop that gets banked state INTO the fresh session.
-// T-10 banks, pushes and renders the handoff; without T-11 a human still has to
-// point the fresh Larry at that handoff by hand — which is precisely the
-// re-briefing this build exists to remove (goal contract, capability 5).
+// ---------------------------------------------------------------------------
+// WHAT THIS MODULE IS NOW, AND WHAT IT STOPPED BEING
+// ---------------------------------------------------------------------------
+// It used to be a BUILD-* programme recovery engine: it walked every worktree in the
+// estate looking for `Deliverables/*/programme-state.json`, collapsed multiple checkouts
+// of one programme, adjudicated disagreeing copies, assessed banked-head freshness
+// against the banking commit, and rendered a resumption ticket. All of that is deleted.
+// Programme state no longer exists in this estate, so on every real session that machinery
+// had exactly one output — "NO BANKED PROGRAMME STATE FOUND" — which is a lot of code to
+// print one sentence nobody can act on.
 //
-// WHAT THIS EMITS (AD-5)
-// ----------------------
-// A POINTER BRIEF, not the state. `hookSpecificOutput.additionalContext` is
-// capped at 10,000 characters, so a full state dump is impossible by
-// construction. The brief carries only what must not be re-derived — programme,
-// phase, EXACT next action, ticket, model, worktree, branch, frontier, do-nots —
-// plus the paths to read for everything else.
+// THREE BEHAVIOURS SURVIVE, and they are the reason the module survives at all:
 //
-// LOUD, NEVER SILENT (INV-1)
-// --------------------------
-// Missing, stale, corrupt or ambiguous state each produce their OWN brief saying
-// so in the first line. A fresh Larry that receives no signal cannot tell "there
-// is nothing to resume" from "the governor broke", so this module never returns
-// nothing: silence is the one output it is not allowed to have.
+//   1. THE LOOSE-`Deliverables/` SWEEP. Recent top-level `Deliverables/*.md` that no
+//      programme file describes, with the ones that appear to be waiting on Warwick
+//      flagged. This is the behaviour that caught the VlogOps plan a fresh session had
+//      no other way of seeing, and it has no replacement anywhere in the estate.
+//   2. THE HONCHO CONTINUITY BRIEF. `continuity.mjs` owns the single read path; this
+//      module calls it and passes the result through. It is the AUTHORITATIVE source of
+//      current focus — the sweep is a fallback and must never be mistaken for it.
+//   3. REPOSITORY / WORKTREE / BRANCH VERIFICATION. Where this session actually is, read
+//      by EXECUTING git rather than by believing anything.
 //
-// NEVER TRAPS (INV-2)
-// -------------------
-// SessionStart cannot block a prompt, but it can still break a session start by
-// throwing. Every path is wrapped; the CLI always exits 0; an internal failure
-// becomes a brief that says the governor failed, never an exception.
+// ---------------------------------------------------------------------------
+// ONE HONEST CHANGE IN KIND TO (3), STATED RATHER THAN SMUGGLED
+// ---------------------------------------------------------------------------
+// Verification used to be a COMPARISON: live location versus the canonical location
+// recorded in banked programme state, producing ALIGNED or a WRONG WORKTREE alarm. With
+// no banked state there is no canonical location to compare against, so what survives is
+// the REPORT — cwd, repository root, branch, HEAD, working-tree cleanliness, unpushed
+// count and upstream — with no verdict attached. Every fact below is still executed and
+// still true; there is simply nothing left to be right or wrong relative to. Anyone
+// reading this brief expecting an alignment verdict should know it is gone rather than
+// assume a silent ALIGNED.
 //
-// AD-14 — staleness is isBankingCommit(), never a raw comparison
-// --------------------------------------------------------------
-// `banked.head_sha` is the head the state DESCRIBES: the parent of the commit
-// carrying the state file. A naive `HEAD !== banked.head_sha` reports every
-// freshly banked state as stale, so every rotation would open with a false
-// RECOVERY warning and Warwick would learn to ignore it.
+// INV-2 THROUGHOUT: this is a SessionStart hook. It always exits 0, it never blocks a
+// session, and every section fails open independently — a section that cannot be produced
+// is reported as such and the others still render.
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync, lstatSync, realpathSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 
 import { readContinuityBrief } from './continuity.mjs';
-import { readProgrammeState, frontierTickets } from './programme-state.mjs';
-import { isBankingCommit, normaliseSeparators } from './rotate-session.mjs';
-import {
-  canonicalFromState,
-  liveLocation,
-  compareLocation,
-  buildDenyReason,
-  isInside,
-  samePath,
-  LOCATION,
-} from './worktree-guard.mjs';
 
-// CUT-AND-CLOSE 2026-08-01 (Warwick's ruling, on the accepted Larry/Pax diagnosis).
-// `collapseCopies` used to live in `build-registry.mjs` and is inlined here because
-// this module is now its ONLY caller. The registry/launcher/PR/merge machinery that
-// surrounded it was removed as disproportionate to the commission; the duplicate-copy
-// collapse itself is RETAINED — it is consistency checking, part of the durable spine,
-// and it is what stops a fresh session resuming from a stale copy of one programme.
-// The model gate (`applyModelGate`) was removed outright by the same ruling.
-
-// AD-5. A hard contract from the host, not a preference.
-export const CONTEXT_CAP = 10000;
-
-// Distinct outcomes so "found nothing" can never be confused with "did not look"
-// (INV-1). The CLI still exits 0 for all of them — this is the brief's verdict,
-// not the process's exit code.
-export const VERDICT = {
-  ORIENTED: 'oriented',
-  WRONG_WORKTREE: 'wrong-worktree',
-  STALE: 'stale',
-  MISSING: 'missing',
-  CORRUPT: 'corrupt',
-  AMBIGUOUS: 'ambiguous',
-  FAILED: 'failed',
-  SKIPPED: 'skipped',
-};
+// INLINED from the deleted `rotate-session.mjs` (WO-OR-05). Four lines, one caller, and
+// keeping a module alive to export them would have been the tail wagging the dog.
+//
+// Its sibling `isBankingCommit` was NOT inlined: its only consumer here was the
+// banked-freshness assessment, which went with the programme state. Inlining a helper
+// whose sole consumer has been deleted would re-grow the corpse this Work Order removed.
+export function normaliseSeparators(p) {
+  return typeof p === 'string' ? p.replace(/\\/g, '/').replace(/\/+$/, '') : p;
+}
 
 // ---------------------------------------------------------------------------
 // SessionStart source policy — Silas's decision D-B §B-2 (2026-08-01)
 // ---------------------------------------------------------------------------
-// SPEC AMENDMENT (WO-2026-08-01-01, AC1). This REPLACES the former
-// `source !== 'clear'` guard, which made reorientation unreachable on `startup`
-// and `resume` — two of the three real ways a build is re-entered, and the two
-// with the emptiest context. That guard and the installer's `matcher: 'clear'`
-// were two independent gates; widening either alone ships nothing, which is why
-// install-hooks.mjs drops its SessionStart matcher in the same change.
-//
 // An UNRECOGNISED source falls through to the MOST informative brief, never to
 // silence: an over-informative brief wastes a few hundred characters, an absent
-// one loses the build. Unknown is never absent (INV-1).
+// one loses the session. Unknown is never absent (INV-1).
 export const BRIEF_MODE = { FULL: 'full', DELTA: 'delta' };
 
 export const SOURCE_POLICY = {
@@ -110,7 +84,7 @@ export const SOURCE_POLICY = {
     mode: BRIEF_MODE.DELTA,
     headline:
       'This session was RESUMED, so your restored transcript already carries the history. ' +
-      'Only the delta is below. Your restored history may PREDATE the banked state — ' +
+      'Only the delta is below. Your restored history may PREDATE durable state on disk — ' +
       'durable state on disk wins over anything in the transcript.',
   },
 };
@@ -156,1044 +130,883 @@ export function parseHookInput(raw) {
 }
 
 // ---------------------------------------------------------------------------
-// Discovery — find banked programme state ACROSS the estate
+// PRESERVED BEHAVIOUR 3 — repository / worktree / branch verification
 // ---------------------------------------------------------------------------
-// The fresh session starts in the primary checkout, but a build's state lives
-// with the build on the build's branch (AD-14) — i.e. in a different worktree
-// entirely. So discovery walks `git worktree list`, which is ground truth, rather
-// than trusting any recorded path. A recorded path that disagrees with where the
-// file actually is would be exactly the kind of stale pointer this build exists
-// to eliminate.
+// Injectable and fails soft, field by field. Every field is INDEPENDENTLY nullable
+// because a partial answer must never read as a whole one: `unpushed: null` means "there
+// is no upstream, or git would not say", and it is a different claim from `unpushed: 0`.
 
-export function listWorktrees(repoPath, execFile = execFileSync) {
-  try {
-    const out = execFile('git', ['-C', repoPath, 'worktree', 'list', '--porcelain'], {
-      encoding: 'utf8',
-    });
-    return out
-      .split('\n')
-      .filter((l) => l.startsWith('worktree '))
-      .map((l) => normaliseSeparators(l.slice('worktree '.length).trim()))
-      .filter(Boolean);
-  } catch {
-    return null; // unknown, never an empty list (T-09's D-2 rule)
-  }
+// WO-OR-17. The default filesystem for the location probes, injectable. This mirrors the
+// sweep's `DEFAULT_SWEEP_IO` exactly — it is this module's EXISTING idiom rather than new
+// machinery — and it exists for the identical reason WO-OR-14 gave: an unreadable-directory
+// failure cannot be induced deterministically on every machine, and a proof that cannot be
+// made to fail is not a proof. Every injected test is PAIRED with a control asserting these
+// defaults read the real disk, so the seam can never end up testing a fiction.
+export const DEFAULT_GIT_IO = {
+  realpathSync: (p) => realpathSync.native(p),
+  statSync,
+  // TQA-005. Non-mutating occupation probe: if THIS process is already in the resolved
+  // directory, the session (at least the hook process) can be there — measured. chdir is
+  // forbidden (INV-2); access(X_OK) is meaningless on Windows; readdir is listability.
+  getProcessCwd: () => process.cwd(),
+};
+
+// WO-OR-17 / TQA-001. WHY A PATH PROBE'S FAILURE IS CLASSIFIED RATHER THAN COLLAPSED.
+//
+// "The filesystem answered and there is nothing there" and "the probe could not answer" are
+// different claims, and only the first entitles anyone to say a directory does not exist.
+// The exception carries which one it was; `soft()` used to throw it away.
+//
+//   'absent'      ENOENT / ENOTDIR — a MEASUREMENT. The filesystem answered.
+//   'not-a-path'  the argument was never a path, so nothing on disk was consulted at all.
+//   'unreadable'  EPERM / EACCES / ELOOP / anything else carrying an errno — the path may
+//                 exist perfectly well and the probe was REFUSED. Verified on this estate:
+//                 an ACL-denied directory raises EPERM from `realpathSync.native` while
+//                 `statSync` still reports `isDirectory() === true`, so rendering that as
+//                 "no such directory on disk" was flatly false.
+//   'unknown'     the throw carried no code at all. Never upgraded into a claim about disk.
+export function classifyPathFailure(err) {
+  const code = err && typeof err === 'object' ? err.code : undefined;
+  if (code === 'ENOENT' || code === 'ENOTDIR') return 'absent';
+  if (code === 'ERR_INVALID_ARG_TYPE' || code === 'ERR_INVALID_ARG_VALUE') return 'not-a-path';
+  if (typeof code === 'string') return 'unreadable';
+  return 'unknown';
 }
 
-export function discoverStateFiles(worktreePaths, { readdir = readdirSync } = {}) {
-  const found = [];
-  for (const wt of worktreePaths || []) {
-    const deliverables = join(wt, 'Deliverables');
-    let entries;
-    try {
-      entries = readdir(deliverables, { withFileTypes: true });
-    } catch {
-      continue; // no Deliverables here, or unreadable — not an error, just not a hit
-    }
-    for (const e of entries) {
-      if (!e.isDirectory()) continue;
-      const candidate = join(deliverables, e.name, 'programme-state.json');
-      if (existsSync(candidate)) {
-        found.push({ worktree: wt, path: normaliseSeparators(candidate) });
-      }
-    }
-  }
-  return found;
-}
-
-// ---------------------------------------------------------------------------
-// Git facts for one programme's worktree — injectable, fails soft
-// ---------------------------------------------------------------------------
-
-export function gitFacts(worktreePath, execFile = execFileSync) {
+export function gitFacts(worktreePath, execFile = execFileSync, io = DEFAULT_GIT_IO) {
   const run = (args) =>
-    execFile('git', ['-C', worktreePath, ...args], { encoding: 'utf8' }).toString().trim();
-  const soft = (fn) => {
+    execFile('git', ['-C', worktreePath, ...args], {
+      encoding: 'utf8',
+      // WO-OR-14. `execFileSync` INHERITS stderr unless told otherwise, so every failing
+      // probe below wrote a raw `fatal:` line straight into a LIVE SessionStart path — a
+      // single file-as-cwd probe emitted eight of them, and this revision adds more probes.
+      // Each of those failures is ALREADY represented honestly in the rendered block as
+      // `(unknown)` or `UNVERIFIED`, so the stderr carried no information a reader uses.
+      // Suppressing it hides no signal; it removes noise from the one surface Warwick
+      // actually reads. stdin is `ignore` so no probe can ever block waiting on input at
+      // session start.
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
+      .toString()
+      .trim();
+  // WO-OR-17. THE DEFECT UNDERNEATH THE PREVIOUS THREE ROUNDS, AND WHY THEY KEPT FINDING
+  // "another instance".
+  //
+  // `soft()` was `try { return fn(); } catch { return null; }` across TWELVE call sites, and
+  // it returned the SAME null for "I measured, and the answer is nothing" as for "the probe
+  // could not answer". The one distinction this whole module exists to preserve was
+  // destroyed in a shared helper BEFORE any field existed, and every field downstream
+  // inherited it. The renderer was then left to reconstruct a distinction that had already
+  // been thrown away — and did so by guessing: an existing-but-unreadable directory rendered
+  // as "no such directory on disk" (TQA-001), and ANY symbolic-ref failure rendered as proof
+  // of detachment (TQA-002). Those were never two defects seen in two fields; they are one
+  // defect seen twice, which is why fixing instances never converged.
+  //
+  // This is a NARROWING of the lie, not a mechanism. The VALUE channel is untouched — null
+  // still means "no value", every field is still independently nullable, and no caller of
+  // this object changes shape. What is added is that the CAUSE is kept beside the value
+  // instead of discarded, and only the two derivations that were guessing ever read it.
+  const causes = Object.create(null);
+  const soft = (name, fn) => {
     try {
       return fn();
-    } catch {
+    } catch (err) {
+      // `?? { code: 'unknown' }` because `throw null` is legal and would otherwise make a
+      // recorded cause indistinguishable from no cause at all — the same collapse, one
+      // level down, inside the very helper closing it.
+      causes[name] = err ?? { code: 'unknown' };
       return null;
     }
   };
-  return {
-    headSha: soft(() => run(['rev-parse', 'HEAD'])),
-    headParentSha: soft(() => run(['rev-parse', 'HEAD^'])),
-    branch: soft(() => run(['rev-parse', '--abbrev-ref', 'HEAD'])),
-    dirty: soft(() => {
-      const s = run(['status', '--porcelain']);
-      return s.length > 0;
-    }),
-    unpushed: soft(() => {
-      const n = run(['rev-list', '--count', '@{u}..HEAD']);
-      const parsed = parseInt(n, 10);
-      return Number.isNaN(parsed) ? null : parsed;
-    }),
-    // The CURRENT pushed head, read live from the remote-tracking ref — not the
-    // head that happened to be pushed when the state was banked. A resuming
-    // session needs to know what is actually durable on the remote right now.
-    upstreamRef: soft(() => run(['rev-parse', '--abbrev-ref', '@{u}'])),
-    upstreamSha: soft(() => run(['rev-parse', '@{u}'])),
-  };
-}
 
-// ---------------------------------------------------------------------------
-// Staleness — AD-14. Unknown is stale, never fresh.
-// ---------------------------------------------------------------------------
+  // WO-OR-14. The values are computed BEFORE the returned object rather than inside it,
+  // because two of them are now DERIVED from others — `detached` from the head and
+  // symbolic-ref probes, `upstreamState` from `detached` and the branch. Deriving one
+  // answer from another is only honest when every input is itself a measurement, so each
+  // input is named here and each stays independently nullable exactly as before.
 
-export function assessBankedFreshness(state, facts) {
-  const warnings = [];
-  let checked = 0;
-  const banked = state?.banked?.head_sha;
-
-  checked += 1;
-  let stale = false;
-  if (!banked || banked === 'unknown') {
-    stale = true;
-    warnings.push('banked head_sha is unknown — freshness cannot be established, so this state is treated as STALE.');
-  } else if (!facts?.headSha) {
-    stale = true;
-    warnings.push('live git HEAD could not be read — freshness cannot be established, so this state is treated as STALE.');
-  } else if (
-    !isBankingCommit({
-      headSha: facts.headSha,
-      bankedHeadSha: banked,
-      headParentSha: facts.headParentSha,
-    })
-  ) {
-    stale = true;
-    warnings.push(
-      `HEAD has moved since banking: banked ${banked.slice(0, 7)}, live HEAD ${facts.headSha.slice(0, 7)}` +
-        `${facts.headParentSha ? ` (parent ${facts.headParentSha.slice(0, 7)})` : ''}. ` +
-        'Commits exist that the banked state does not describe — re-read the map before trusting the next action.'
-    );
-  }
-
-  checked += 1;
-  if (facts?.dirty === true) {
-    warnings.push('The programme worktree is DIRTY — uncommitted work exists that the banked state does not describe.');
-  } else if (facts?.dirty === null || facts?.dirty === undefined) {
-    warnings.push('Working-tree cleanliness could not be determined — unknown is not clean.');
-  }
-
-  checked += 1;
-  if (typeof facts?.unpushed === 'number' && facts.unpushed > 0) {
-    warnings.push(`${facts.unpushed} unpushed commit(s) in the programme worktree — the banked state is not durable on the remote.`);
-  } else if (facts?.unpushed === null || facts?.unpushed === undefined) {
-    warnings.push('Unpushed-commit count could not be determined — unknown is never zero.');
-  }
-
-  checked += 1;
-  const recorded = normaliseSeparators(state?.repository?.worktree);
-  const live = normaliseSeparators(facts?.worktreePath);
-  if (recorded && live && recorded.toLowerCase() !== live.toLowerCase()) {
-    warnings.push(`Recorded worktree (${recorded}) is not where this state was found (${live}) — trust the live path.`);
-  }
-
-  return { stale, warnings, checked };
-}
-
-// ---------------------------------------------------------------------------
-// ONE PROGRAMME, MANY CHECKOUTS (WO-2026-08-01-04)
-// ---------------------------------------------------------------------------
-// THE DEFECT THIS CLOSES. Discovery groups by state-file PATH, so a build that is
-// checked out five times reports five "active programmes" and reorientation
-// refuses as AMBIGUOUS — in exactly the situation the governor exists for. They
-// are not five programmes. They are one programme, five checkouts.
-//
-// This is not a new trap and it does not get a new solution. build-registry.mjs
-// hit it first, documents it in its own header, and solves it in
-// `collapseCopies()`. That function is imported UNMODIFIED and is the only thing
-// that decides which copy wins. Re-implementing its selection here would give the
-// estate two rules for one question, which is how they drift apart.
-//
-// AND IT RECURS PERMANENTLY. `programme-state.json` is a tracked file on a branch,
-// so merging this very build to `main` creates another copy. Deleting the worker
-// worktrees would hide today's instance and change nothing about the class.
-//
-// WHY THERE IS A LAYER AROUND collapseCopies, AND WHY IT MUST NOT BE "SIMPLIFIED"
-// INTO IT (deliberate; Larry's ruling on F1, 2026-08-01)
-// -----------------------------------------------------------------------------
-// `collapseCopies`'s disagreement test is `samePath(worktree) && branch ===`. It
-// never reads `resumption.ticket` or `banked.head_sha`. That is right for the
-// registry, which indexes LOCATIONS — but reorientation hands a session a
-// RESUMPTION POINTER, and two copies can agree perfectly about where the build
-// lives while disagreeing about where it is up to. Resuming from the stale one
-// costs a whole session, which is the incident this build exists to prevent. So
-// the ticket/head_sha check lives HERE, layered on top. Folding it back into
-// `collapseCopies` would re-open that gap in the half of the estate that only
-// needs locations; deleting it re-opens it here.
-//
-// THE PRECEDENCE RULE — self-consistency wins, and only then does the guard fire
-// -----------------------------------------------------------------------------
-// A copy that sits INSIDE the worktree it names as canonical is the live one; an
-// off-branch copy is an older banking of the same programme (build-registry.mjs
-// documents this rationale, and the live estate demonstrates it — four worker
-// checkouts carrying an older ticket than the canonical worktree's copy). Where
-// self-consistency singles out one copy, it resolves the disagreement, and the
-// collapse is reported LOUDLY in the brief rather than swallowed. Where it does
-// NOT single one out and the copies disagree, there is no principled way to
-// choose and the governor refuses — a wrong pointer is worse than a refusal.
-//
-// WHAT DELIBERATELY IS *NOT* AN INPUT: the session's own `cwd`.
-// Preferring the copy whose worktree matches `cwd` was considered and rejected on
-// safety grounds. It selects the STALE copy for a session starting in a worker
-// worktree — inverting its own purpose — and, structurally, `reorient` already
-// owns an INDEPENDENT control for the cwd question (`WRONG_WORKTREE`, via
-// `compareLocation`). Making `cwd` a SELECTION input would let a session in the
-// wrong place select the copy that then compares ALIGNED: one control silently
-// disarming the other. Reorientation's job is to say where the build LIVES, not
-// to ratify where the session already is.
-
-// The pair that decides whether two copies of one programme genuinely disagree:
-// which ticket is next, and which head the state describes. Location is
-// deliberately excluded — `collapseCopies` already owns that comparison.
-export function copyFingerprint(state) {
-  const ticket = state?.resumption?.ticket || '(no ticket)';
-  const head = state?.banked?.head_sha || '(unknown head)';
-  return `${ticket}::${head}`;
-}
-
-// Adapt a discovered candidate to the entry shape `collapseCopies` consumes.
-// `worktree` is the RECORDED canonical worktree from the state document — the
-// same source build-registry's own `entryFrom` uses — never the worktree the file
-// happened to be found in. Using the found path would make `isInside` true for
-// every copy, so the self-consistency discriminator could never fail: a control
-// that cannot fail is not a control.
-export function toRegistryEntry(candidate) {
-  const canonical = canonicalFromState(candidate.state, candidate.path);
-  return {
-    id: candidate.state?.programme?.id ?? null,
-    worktree: canonical?.worktree ?? null,
-    branch: canonical?.branch ?? null,
-    state_path: normaliseSeparators(candidate.path) || String(candidate.path ?? ''),
-    candidate,
-  };
-}
-
-// Collapse the copies of one programme. Deterministic: each group is ordered by
-// state_path before any choice is made, so two runs over the same estate cannot
-// produce two different results.
-//
-// INLINED 2026-08-01 from the removed `build-registry.mjs`, UNCHANGED in behaviour.
-// The selection rule is deliberately self-consistency (does the copy sit inside the
-// worktree it names as canonical), NOT "prefer the copy nearest the current cwd" —
-// a cwd preference would select the STALE copy for a session started in a worker
-// worktree, which is the exact harm this exists to prevent.
-export function collapseCopies(copies) {
-  const byId = new Map();
-  for (const c of copies) {
-    const key = String(c.id).toLowerCase();
-    if (!byId.has(key)) byId.set(key, []);
-    byId.get(key).push(c);
-  }
-
-  const entries = [];
-  for (const group of byId.values()) {
-    group.sort((a, b) => a.state_path.localeCompare(b.state_path));
-    if (group.length === 1) {
-      entries.push(group[0]);
-      continue;
-    }
-    const selfConsistent = group.filter((c) => isInside(c.state_path, c.worktree));
-    if (selfConsistent.length === 1) {
-      entries.push(selfConsistent[0]);
-      continue;
-    }
-    const agreed = group.every(
-      (c) => samePath(c.worktree, group[0].worktree) && c.branch === group[0].branch
-    );
-    if (agreed) {
-      entries.push(selfConsistent.length > 1 ? selfConsistent[0] : group[0]);
-      continue;
-    }
-    // Genuinely contradictory copies of one programme. Keep them all: the
-    // resolver must refuse and name the disagreement, not pick a winner.
-    for (const c of group) entries.push(c);
-  }
-
-  entries.sort(
-    (a, b) => String(a.id).localeCompare(String(b.id)) || a.state_path.localeCompare(b.state_path)
-  );
-  return entries;
-}
-
-export function collapseProgrammes(active) {
-  const entries = (active || []).map(toRegistryEntry);
-  const survivors = collapseCopies(entries);
-
-  // Group by the SAME key collapseCopies groups by, so the report describes the
-  // set it actually chose from rather than a second opinion about it.
-  const groups = new Map();
-  for (const e of entries) {
-    const key = String(e.id).toLowerCase();
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(e);
-  }
-
-  const reports = survivors.map((winner) => {
-    const group = groups.get(String(winner.id).toLowerCase()) || [winner];
-    const others = group.filter((c) => c !== winner);
-    const winnerPrint = copyFingerprint(winner.candidate.state);
-    const disagreeing = others.filter((c) => copyFingerprint(c.candidate.state) !== winnerPrint);
-    const selfConsistent = group.filter((c) => isInside(c.state_path, c.worktree));
-
-    let reason;
-    let resolved = true;
-    if (group.length === 1) {
-      reason = 'single';
-    } else if (selfConsistent.length === 1 && selfConsistent[0] === winner) {
-      reason = 'self-consistent';
-    } else if (disagreeing.length === 0) {
-      reason = 'identical';
-    } else {
-      reason = 'contested';
-      resolved = false;
-    }
-
+  // ---- cwd: resolved, true-cased, AND established to be a directory ----
+  // WO-OR-11 earned the true on-disk casing with `realpathSync.native`. But RESOLVING a
+  // path and establishing that A SESSION CAN BE IN IT are different claims, and a regular
+  // FILE resolves perfectly well — `cwd : C:/Fusion247PKA/CLAUDE.md` rendered as an
+  // established location beneath "executed, not assumed". Existence was the weaker
+  // question all along; the heading claims a DIRECTORY, so directory-ness is measured and
+  // the outcomes are kept apart instead of collapsed into one truthy string.
+  //
+  // WO-OR-17 measured what this establishes and, just as importantly, what it does NOT.
+  // `statSync(...).isDirectory()` establishes TYPE. It does not establish ENTERABILITY, and
+  // the two genuinely come apart: with only Read-Data denied, `realpathSync.native` and
+  // `statSync` both succeed and report a directory while `readdirSync` raises EPERM. No
+  // probe is added for it, and the reason is that no honest one exists here. `readdirSync`
+  // measures LISTABILITY, which is strictly stronger than the TRAVERSE a working directory
+  // actually needs, so adopting it would replace one false claim with a different false
+  // claim pointing the other way — the exact trade WO-OR-11 refused when it declined to
+  // delete the field. `process.chdir()` is the only true test and it MUTATES the hook
+  // process, which INV-2 forbids. So the claim is TYPE, and the limit is stated rather than
+  // papered over: a directory whose contents cannot be listed still renders as an
+  // established cwd, because type was measured and listability was not.
+  const resolved = soft('resolved', () => {
+    const real = io.realpathSync(worktreePath);
+    const st = io.statSync(real);
     return {
-      id: winner.id,
-      copies: group.length,
-      collapsed: group.length - 1,
-      chosen: winner.state_path,
-      reason,
-      resolved,
-      disagreeing: disagreeing.map((c) => ({
-        path: c.state_path,
-        ticket: c.candidate.state?.resumption?.ticket || null,
-        headSha: c.candidate.state?.banked?.head_sha || null,
-      })),
-      group,
-      winner,
+      path: normaliseSeparators(real),
+      kind: st.isDirectory() ? 'directory' : st.isFile() ? 'file' : 'other',
     };
   });
+  // WO-OR-17 / TQA-001. WHY the path has no value, carried from the point of measurement to
+  // the rendered line rather than inferred downstream from its absence.
+  const cwdFailure = resolved ? null : classifyPathFailure(causes.resolved);
+  // The errno itself, for the reader. Only the CODE — never the message, which carries
+  // stacks and paths and is the noise WO-OR-14 removed from this surface.
+  const cwdFailureCode =
+    !resolved && causes.resolved && typeof causes.resolved.code === 'string'
+      ? causes.resolved.code
+      : null;
+  // TQA-005 (Codex repairs run 3). ENTERABILITY without mutation.
+  //
+  // Directory TYPE (realpath + isDirectory) does not prove the session can occupy the path.
+  // The only non-mutating positive proof available here: the hook process is ALREADY in that
+  // directory. If realpath(process.cwd()) equals the resolved path, occupation is measured
+  // and the bare path is earned. If not, we hold only type and must not claim session location.
+  // null = could not measure occupation (probe failed, or type was never established).
+  const cwdOccupiedByHook = (() => {
+    if (!resolved || resolved.kind !== 'directory') return null;
+    const proc = soft('processCwd', () => normaliseSeparators(io.realpathSync(io.getProcessCwd())));
+    if (proc === null) return null;
+    return proc === resolved.path;
+  })();
 
-  return { entries, survivors, reports };
-}
+  const gitReadable = soft('gitReadable', () => (run(['rev-parse', '--git-dir']), true)) === true;
+  const repoRoot = soft('repoRoot', () => normaliseSeparators(run(['rev-parse', '--show-toplevel'])));
+  const headSha = soft('headSha', () => run(['rev-parse', 'HEAD']));
+  const branch = soft('branch', () => run(['rev-parse', '--abbrev-ref', 'HEAD']));
 
-// The report as it leaves reorient(): the audit trail, without the internal
-// object graph.
-function publicReport(r) {
-  if (!r) return null;
-  const { group, winner, ...rest } = r;
-  return rest;
-}
+  // WO-OR-14. `--abbrev-ref HEAD` prints the LITERAL STRING "HEAD" when HEAD is detached,
+  // and the block rendered that as though it were a branch name. Matching on that string
+  // would be reading a tell rather than taking a measurement, so the state is probed
+  // directly: `symbolic-ref -q` returns the branch when HEAD is attached and exits
+  // non-zero, silently, when it is not.
+  const symbolicBranch = soft('symbolicBranch', () => run(['symbolic-ref', '-q', '--short', 'HEAD']));
+  // TWO measurements, not one flag reused. If HEAD does not resolve at all — an unborn
+  // branch, or git unavailable — then nothing can be concluded about attachment, so this
+  // is null rather than false.
+  //
+  // WO-OR-17 / TQA-002. `symbolicBranch === null` was treated as PROOF OF DETACHMENT, so a
+  // probe that could not answer produced the confident sentence "(DETACHED — HEAD is not on
+  // a branch)". That is the same defect as TQA-001 wearing a different field: `soft()`
+  // handed the renderer one null for two different worlds and the derivation guessed which.
+  //
+  // The cause settles it, and it settles it MECHANICALLY rather than by judgement. Verified
+  // by execution on this estate:
+  //
+  //     detached HEAD    symbolic-ref -q --short HEAD  ->  exit status 1     <- the ANSWER
+  //     not a repository  symbolic-ref ...             ->  exit status 128
+  //     git not on PATH   spawn                        ->  no status, code ENOENT
+  //
+  // `-q` exits 1 for exactly one reason: HEAD is not a symbolic ref. That IS the measured
+  // detached response, and nothing else is. Any other failure leaves this null — not false,
+  // because "the probe broke" is not evidence that HEAD is attached either.
+  const detached =
+    headSha === null
+      ? null
+      : symbolicBranch !== null
+        ? false
+        : causes.symbolicBranch?.status === 1
+          ? true
+          : null;
+  // WO-OR-17 completion (Grok handover). WHY the symbolic-ref probe has no value — the same
+  // cause-preservation pattern as cwdFailure. Without this, exit 128 and ENOENT both left
+  // detached=null and the renderer had one line for two worlds; worse, that line still said
+  // "DETACHED HEAD" in the prose of the unverified branch case, so a failed probe still
+  // *mentioned* the confident diagnosis it was no longer allowed to claim.
+  //
+  //   null            probe answered (value is in symbolicBranch) or was never attempted
+  //   'fatal'         git ran and exited non-1 (e.g. 128 — not a repo / corrupt ref)
+  //   'unavailable'   spawn/system failure with a code (ENOENT = git not on PATH)
+  //   'unknown'       throw carried neither status nor code
+  // status===1 is measured detachment and lives in `detached`, not here.
+  const symbolicRefFailure = (() => {
+    if (symbolicBranch !== null) return null;
+    const err = causes.symbolicBranch;
+    if (!err) return null;
+    if (err.status === 1) return null; // measured detached — carried by `detached`
+    if (typeof err.status === 'number') return 'fatal';
+    if (typeof err.code === 'string') return 'unavailable';
+    return 'unknown';
+  })();
+  const symbolicRefStatus =
+    symbolicRefFailure === 'fatal' && typeof causes.symbolicBranch?.status === 'number'
+      ? causes.symbolicBranch.status
+      : null;
+  const symbolicRefCode =
+    symbolicRefFailure === 'unavailable' && typeof causes.symbolicBranch?.code === 'string'
+      ? causes.symbolicBranch.code
+      : null;
 
-function candidateLine(entry) {
-  const st = entry.candidate.state;
+  // WO-OR-14. Whether this is the primary checkout or a LINKED worktree, measured by
+  // `--git-dir` differing from `--git-common-dir` rather than by pattern-matching a path.
+  // In an estate running twenty-odd worktrees, "which checkout am I in" is precisely the
+  // question this block exists to answer. null when the probe cannot run, and it then
+  // renders nothing at all rather than guessing either way.
+  const linkedWorktree = soft('linkedWorktree', () => {
+    const [gitDir, commonDir] = run([
+      'rev-parse', '--path-format=absolute', '--git-dir', '--git-common-dir',
+    ]).split('\n');
+    if (!gitDir || !commonDir) return null;
+    return normaliseSeparators(gitDir.trim()) !== normaliseSeparators(commonDir.trim());
+  });
+
+  const dirty = soft('dirty', () => run(['status', '--porcelain']).length > 0);
+  const unpushed = soft('unpushed', () => {
+    const parsed = parseInt(run(['rev-list', '--count', '@{u}..HEAD']), 10);
+    return Number.isNaN(parsed) ? null : parsed;
+  });
+  // The CURRENT pushed head, read live from the remote-tracking ref — not whatever was
+  // pushed at some point in the past. A resuming session needs to know what is actually
+  // durable on the remote right now.
+  const upstreamRef = soft('upstreamRef', () => run(['rev-parse', '--abbrev-ref', '@{u}']));
+  const upstreamSha = soft('upstreamSha', () => run(['rev-parse', '@{u}']));
+
+  // WO-OR-14. THE DEFECT WO-OR-11 INTRODUCED WHILE CLOSING ANOTHER ONE.
+  //
+  // WO-OR-11 gated the sentence "nothing here is pushed" on `gitReadable`, which comes from
+  // `rev-parse --git-dir`. But the UPSTREAM probe fails INDEPENDENTLY of general git
+  // readability, and a DETACHED HEAD is an entirely ordinary state that separates them:
+  //
+  //     git rev-parse --git-dir            -> .git    (so gitReadable === true)
+  //     git rev-parse --abbrev-ref @{u}    -> fatal: HEAD does not point to a branch
+  //
+  // On a detached HEAD the commit may well BE pushed, so that sentence was flatly false —
+  // and `actions/checkout` produces exactly this state on every CI run. `gitReadable` was
+  // never too coarse a THRESHOLD; it was the wrong QUESTION. It asks "did any git command
+  // work here" and was made to answer "is this branch pushed".
+  //
+  // So the upstream answer now carries its own measured state, each value reached by a
+  // probe that can mean only one thing:
+  //
+  //   'tracked'          @{u} answered, or for-each-ref found an upstream
+  //   'none-configured'  the branch ref EXISTS and its upstream field is empty — measured
+  //   'detached'         HEAD resolves and is not a symbolic ref, so no branch tracks anything
+  //   'unreadable'       git could not answer here at all
+  //   'unknown'          the probes ran and did not settle it — never a confident sentence
+  const upstreamState = (() => {
+    if (!gitReadable) return 'unreadable';
+    if (upstreamRef) return 'tracked';
+    if (detached === true) return 'detached';
+    if (symbolicBranch) {
+      // `for-each-ref` exits 0 and prints `<name>|<upstream>` for a ref that exists, with
+      // an EMPTY second half when nothing is tracked — and prints NOTHING AT ALL when the
+      // ref does not match. That difference is what makes "no upstream is configured" a
+      // MEASUREMENT rather than merely the absence of one, which is exactly what the old
+      // `gitReadable` gate could not express.
+      const row = soft('forEachRef', () =>
+        run([
+          'for-each-ref',
+          '--format=%(refname:short)|%(upstream:short)',
+          `refs/heads/${symbolicBranch}`,
+        ])
+      );
+      if (row === null || row === '') return 'unknown';
+      return row.endsWith('|') ? 'none-configured' : 'tracked';
+    }
+    return 'unknown';
+  })();
+
   return {
-    id: st?.programme?.id,
-    title: st?.programme?.title,
-    path: entry.state_path,
-    worktree: entry.candidate.worktree,
-    next: st?.resumption?.ticket || String(st?.resumption?.next_action || '').slice(0, 120),
+    // WHAT THE CALLER CLAIMED. Preserved verbatim and NEVER rendered as an established
+    // location on its own — see `resolvedPath` immediately below and `renderLocationSection`.
+    worktreePath: normaliseSeparators(worktreePath),
+    // WO-OR-11. THE MEASUREMENT `worktreePath` never had. Every other field in this object
+    // comes from executing git; `worktreePath` alone was the caller's own argument handed
+    // straight back, and it was then printed under a heading reading "executed, not
+    // assumed". That heading was a claim the value had not earned.
+    //
+    // `realpathSync.native` earns it, and it is the right probe rather than an existence
+    // check: it returns the TRUE ON-DISK CASING, so a host-supplied `c:/Fusion247PKA` comes
+    // back as `C:/Fusion247PKA` and stops disagreeing with the `repoRoot` that git measured.
+    // That disagreement was the fingerprint of one value being supplied and the other
+    // measured; resolving the path removes the CAUSE rather than hiding the tell.
+    //
+    // WHY NOT SIMPLY DELETE OR RELABEL THE FIELD (the other route offered): the
+    // cwd-versus-repo-root comparison is HOW a wrong-location session becomes visible to a
+    // human reading the brief. Dropping the field to stop it lying would trade a lie for a
+    // blind spot. One syscall makes it true instead.
+    //
+    // null means NOT ESTABLISHED — the path does not exist, is unreadable, is not a
+    // directory, or was not a string at all. It never falls back to the claimed value.
+    // WO-OR-14 narrowed it: a non-null `resolvedPath` now means "a DIRECTORY was
+    // established here", which is the claim the heading actually makes.
+    resolvedPath: resolved && resolved.kind === 'directory' ? resolved.path : null,
+    // WO-OR-14. WHAT IT ACTUALLY RESOLVED TO, kept separately so the reader can be told
+    // WHY a path failed rather than only that it did. "There is no such directory" and
+    // "that is a file, not a directory" are different diagnoses and point at different
+    // mistakes. null means it did not resolve at all.
+    resolvedKind: resolved ? resolved.kind : null,
+    // WO-OR-17 / TQA-001. WHY it has no value, not merely THAT it has none. null when the
+    // path resolved; otherwise 'absent' (measured — the filesystem answered and there is
+    // nothing there), 'unreadable' (the probe was refused; the path may exist perfectly
+    // well), 'not-a-path' (nothing on disk was consulted at all), or 'unknown'.
+    //
+    // This field is the whole repair in one line: without it the renderer had a single null
+    // for four different worlds and picked the most confident of them.
+    cwdFailure,
+    // The errno, for the reader. The CODE only — never the message, which carries stacks and
+    // paths and is precisely the noise WO-OR-14 took off this surface.
+    cwdFailureCode,
+    // TQA-005. true when the hook process is measured to occupy resolvedPath; false when
+    // type was established but the process is elsewhere; null when occupation was not measured.
+    cwdOccupiedByHook,
+    // WO-OR-11. Whether git ANSWERED here at all, as its own measurement.
+    //
+    // `soft()` returns null both when a git call fails and when git legitimately reports
+    // nothing, which made "git could not run" and "this branch tracks nothing" the same
+    // value — and the renderer turned that single null into the confident sentence
+    // "nothing here is pushed". This flag is what separates them.
+    //
+    // It is the one field here that is deliberately NOT nullable, and that is consistent
+    // with the invariant above rather than an exception to it: it records whether a
+    // measurement was possible, so "we could not tell" IS "not established" — false. It
+    // fails closed, which is the direction that cannot manufacture a reassuring claim.
+    //
+    // WO-OR-14 REMOVED ITS SECOND JOB. It no longer gates the upstream sentence; that is
+    // `upstreamState`'s, measured by upstream probes rather than by this one. A flag that
+    // answers a question it never asked is the whole shape of the defect being closed here.
+    gitReadable,
+    repoRoot,
+    linkedWorktree,
+    headSha,
+    branch,
+    // WO-OR-17. EXPOSED because it was already MEASURED and was being thrown away.
+    //
+    // On an unborn branch (`git init`, no commit yet) git answers:
+    //     rev-parse HEAD               -> exit 128   so `branch` is null
+    //     rev-parse --abbrev-ref HEAD  -> exit 128   so `branch` is null
+    //     symbolic-ref -q --short HEAD -> "main"     MEASURED, and then discarded
+    // and the block printed `branch : (unknown)` while holding the answer. Every defect in
+    // this sequence so far has been the block claiming MORE than it measured; this one
+    // claims LESS, which is the same dishonesty inverted and is invisible to anyone looking
+    // only for overclaims. The four-state test does not care which direction it fails in.
+    symbolicBranch,
+    detached,
+    // WO-OR-17 completion. Cause of a null symbolicBranch that is NOT measured detachment.
+    // null when the probe answered or when status===1 (that case is `detached === true`).
+    symbolicRefFailure,
+    symbolicRefStatus,
+    symbolicRefCode,
+    dirty,
+    unpushed,
+    upstreamRef,
+    upstreamSha,
+    upstreamState,
   };
 }
 
-// ---------------------------------------------------------------------------
-// Safe truncation (the T-11 mutation test)
-// ---------------------------------------------------------------------------
-// Sections are emitted in priority order. `required: true` sections are NEVER
-// dropped; optional sections are dropped from the LOWEST priority upward until
-// the brief fits. Every drop is recorded and rendered as a loud notice, so the
-// brief can never quietly become smaller than the truth.
+function show(v) {
+  if (v === null || v === undefined) return '(unknown)';
+  return String(v);
+}
+
+// TQA-009 (Codex repairs run 6). `dirty === undefined` was treated as falsy and rendered
+// `clean` — an unmeasured state wearing a factual costume. Clean is earned only by
+// `=== false`. The same strictness applies to HEAD: absence is never a value.
+function renderDirty(facts) {
+  if (facts.dirty === true) return 'DIRTY — uncommitted changes present';
+  if (facts.dirty === false) return 'clean';
+  // TQA-008 partial: when git itself could not be read, say so rather than a bare unknown.
+  if (facts.gitReadable === false) {
+    return '(unknown — git could not be read here, so working-tree state is NOT established)';
+  }
+  return '(unknown)';
+}
+
+function renderHead(facts) {
+  if (facts.headSha) return String(facts.headSha);
+  if (facts.gitReadable === false) {
+    return '(unknown — git could not be read here)';
+  }
+  return '(unknown)';
+}
+
+// WO-OR-11. How the cwd line reports itself.
 //
-// If the required core alone still exceeds the cap, the long free-text fields
-// inside it are hard-truncated with an explicit marker naming where to read the
-// full text. What is never permitted is the brief silently omitting the next
-// action — the single field the whole build exists to carry across a rotation.
-
-export function truncateField(text, limit, sourcePath) {
-  if (typeof text !== 'string' || text.length <= limit) return { text, truncated: false };
-  const marker = `… [TRUNCATED — read the full text in ${sourcePath}]`;
-  const keep = Math.max(0, limit - marker.length);
-  return { text: text.slice(0, keep) + marker, truncated: true };
-}
-
-export function assembleBrief(sections, { cap = CONTEXT_CAP } = {}) {
-  const dropped = [];
-  let live = sections.slice();
-
-  const render = (list) => list.map((s) => s.body).join('\n\n');
-
-  // Drop optional sections from the end (lowest priority) until it fits.
-  while (render(live).length > cap) {
-    let idx = -1;
-    for (let i = live.length - 1; i >= 0; i--) {
-      if (!live[i].required) {
-        idx = i;
-        break;
-      }
-    }
-    if (idx === -1) break; // only required sections left
-    dropped.push(live[idx].name);
-    live = live.filter((_, i) => i !== idx);
-  }
-
-  let text = render(live);
-
-  if (dropped.length) {
-    const notice =
-      `\n\n⚠️ BRIEF TRUNCATED to fit the ${cap}-character SessionStart cap. ` +
-      `${dropped.length} section(s) omitted: ${dropped.join(', ')}. ` +
-      `They were NOT empty — read them in the programme state and map named above.`;
-    // The notice itself is required, so make room for it rather than exceeding.
-    if ((text + notice).length > cap) {
-      text = text.slice(0, Math.max(0, cap - notice.length));
-    }
-    text += notice;
-  }
-
-  return { text, dropped, fits: text.length <= cap, length: text.length };
-}
-
-// ---------------------------------------------------------------------------
-// The briefs
-// ---------------------------------------------------------------------------
-
-function fence(title) {
-  return `${'='.repeat(4)} ${title} ${'='.repeat(Math.max(4, 66 - title.length))}`;
-}
-
-export function renderProblemBrief(verdict, { detail, candidates = [], cap = CONTEXT_CAP }) {
-  const headline = {
-    [VERDICT.MISSING]: 'BUILD GOVERNOR: NO BANKED PROGRAMME STATE FOUND',
-    [VERDICT.CORRUPT]: 'BUILD GOVERNOR: BANKED PROGRAMME STATE IS UNUSABLE',
-    [VERDICT.AMBIGUOUS]: 'BUILD GOVERNOR: MORE THAN ONE ACTIVE PROGRAMME — PICK ONE',
-    [VERDICT.FAILED]: 'BUILD GOVERNOR: REORIENTATION FAILED',
-  }[verdict] || 'BUILD GOVERNOR: PROBLEM';
-
-  const guidance = {
-    [VERDICT.MISSING]:
-      'Do NOT assume there is nothing in flight. This says the governor looked and found no valid state — ' +
-      'not that no build is running. Before starting anything, check `git worktree list` and read any ' +
-      'Deliverables/<BUILD-*>/02-MAP.md you find.',
-    [VERDICT.CORRUPT]:
-      'The state file exists but does not validate. Treat in-context memory as untrustworthy (RECOVERY): ' +
-      'read the map directly, and repair the state with tools/governor/programme-state.mjs before banking again.',
-    [VERDICT.AMBIGUOUS]:
-      'Several active programmes were found. The governor will not guess which one this session resumes — ' +
-      'choose from the list below and read that programme\'s map first.',
-    [VERDICT.FAILED]:
-      'The governor itself errored. Nothing here is trustworthy — reorient by hand from the programme map. ' +
-      'This message exists so the failure is visible rather than looking like a clean session.',
-  }[verdict] || '';
-
-  const sections = [
-    {
-      name: 'headline',
-      required: true,
-      body: [fence(headline), '', detail || '(no detail recorded)', '', guidance].join('\n'),
-    },
-  ];
-
-  if (candidates.length) {
-    sections.push({
-      name: 'candidates',
-      required: false,
-      body: [
-        fence('CANDIDATES'),
-        '',
-        ...candidates.map(
-          (c, i) =>
-            `  ${i + 1}. ${c.id || '(unidentified)'} — ${c.title || ''}\n` +
-            `     state    : ${c.path}\n` +
-            `     worktree : ${c.worktree}\n` +
-            (c.next ? `     next     : ${c.next}\n` : '') +
-            (c.problem ? `     PROBLEM  : ${c.problem}\n` : '')
-        ),
-      ].join('\n'),
-    });
-  }
-
-  return assembleBrief(sections, { cap });
-}
-
-// Requirement 5 — a location mismatch is the LOUDEST thing in the brief, sits
-// ABOVE the next action, and states plainly that implementation is not permitted.
-// A fresh Larry that reads "here is your next ticket" before it reads "you are in
-// the wrong repository" will start work; ordering is part of the control.
-export function renderLocationSection(canonical, comparison) {
-  if (!canonical || !comparison) return null;
-
-  if (comparison.verdict === LOCATION.ALIGNED) {
-    return {
-      name: 'location',
-      required: true,
-      body: [
-        fence('LOCATION VERIFIED'),
-        '',
-        `  ✅ cwd, repository root and branch all match the canonical programme location.`,
-        `     worktree : ${canonical.worktree}`,
-        `     branch   : ${canonical.branch}`,
-        `     HEAD     : ${comparison.live?.headSha || '(unknown)'}${
-          comparison.headMoved === true ? '  (moved since banking — see STATE HEALTH)' : ''
-        }`,
-        `  Implementation is permitted. ${comparison.checked} location check(s) ran.`,
-      ].join('\n'),
-    };
-  }
-
-  return {
-    name: 'location',
-    required: true,
-    body: buildDenyReason({ toolName: 'ANY WRITE', comparison, canonical }).replace(
-      '🚨 WRONG WORKTREE — the BUILD-018 Session Governor blocked this tool call.',
-      [
-        '🚨🚨🚨 WRONG WORKTREE — STOP. DO NOT IMPLEMENT ANYTHING. 🚨🚨🚨',
-        '',
-        'This session is NOT in the canonical worktree/branch for the active build.',
-        'A committed PreToolUse guard will refuse Write, Edit, MultiEdit and mutating',
-        'Bash until this is corrected, so attempting the work will simply fail.',
-      ].join('\n')
-    ),
-  };
-}
-
-// The collapse must be VISIBLE, or "not silently collapsed" has no testable
-// meaning and a fresh Larry cannot tell a healthy resolution from a swallowed
-// contest. `required: true` on purpose: dropping this section under cap pressure
-// would be the silence it exists to prevent.
-export function renderCollapseSection(collapse) {
-  if (!collapse || !(collapse.copies > 1)) return null;
-
-  const why =
-    {
-      'self-consistent':
-        'it is the ONLY copy sitting inside the worktree it names as canonical — the others are ' +
-        'off-branch checkouts carrying an older banking of the same programme',
-      identical:
-        'every copy records the same resumption ticket and the same banked head, so there was ' +
-        'nothing to choose between them',
-    }[collapse.reason] || 'collapsed by programme id';
-
-  const lines = [
-    fence(`ONE PROGRAMME, ${collapse.copies} CHECKOUTS — COLLAPSED`),
-    '',
-    `  ${collapse.copies} copies of ${collapse.id} were found across the estate. That is ONE`,
-    `  programme checked out ${collapse.copies} times, not ${collapse.copies} programmes.`,
-    '',
-    `    chosen    : ${collapse.chosen}`,
-    `    because   : ${why}`,
-    `    collapsed : ${collapse.collapsed} other copy(ies)`,
-    `    disagreed : ${collapse.disagreeing.length} of them recorded a DIFFERENT ticket or banked head`,
-  ];
-
-  if (collapse.disagreeing.length) {
-    const shown = collapse.disagreeing.slice(0, 5);
-    for (const d of shown) {
-      lines.push(
-        `                - ${d.path} (ticket ${d.ticket || '(none)'}, banked ${String(d.headSha || 'unknown').slice(0, 7)})`
+// Three outcomes, and keeping them three is the point of the exercise. A single
+// "(unknown)" for the last two would be honest about the failure while HIDING that the
+// host asserted a path at all — and the asserted value is the most useful diagnostic
+// there is when a session has been started in the wrong place.
+//
+//   measured      -> the resolved, true-cased path. This one is a fact.
+//   nothing said  -> the host supplied no cwd. Nobody claimed anything.
+//   claimed, bad  -> the host supplied a path that does not exist on disk. Something WAS
+//                    claimed and it did not check out, which is a different and much more
+//                    interesting failure than silence.
+//
+// WO-OR-14 SPLIT "claimed, bad" INTO THE DIAGNOSES IT WAS HIDING, and added the state the
+// four-state test showed was missing entirely:
+//
+//   claimed a FILE   -> it resolved, so the old probe passed it; but a file is not a place
+//                       a session can be in, and the heading claims one that is.
+//   nothing claimed, -> the host said nothing and the module fell back to its OWN process
+//   showing our own     directory. The PATH is measured and true; the HEADING — "where
+//                       this session is" — is not, because the only authority on that said
+//                       nothing. A true value can still carry an unearned claim.
+function renderCwd(facts, cwdClaimedByHost) {
+  if (facts.resolvedPath) {
+    // TQA-003 / TQA-005. Bare path is EARNED only when occupation is measured
+    // (cwdOccupiedByHook === true). Directory type alone never upgrades into "session is here".
+    const occupied = facts.cwdOccupiedByHook === true;
+    if (cwdClaimedByHost) {
+      if (occupied) return facts.resolvedPath;
+      return (
+        `${facts.resolvedPath} (directory type measured; session enterability NOT established` +
+        (facts.cwdOccupiedByHook === false
+          ? ' — hook process is not in this directory)'
+          : ')')
       );
     }
-    if (collapse.disagreeing.length > shown.length) {
-      lines.push(`                - … and ${collapse.disagreeing.length - shown.length} more`);
-    }
-    lines.push('');
-    lines.push('  Those were OVERRULED as older bankings — not merged, not reconciled. If one of');
-    lines.push('  them is in fact the current state, the copy chosen above is WRONG: re-bank from');
-    lines.push('  the canonical worktree before acting on the next action.');
+    return (
+      `${facts.resolvedPath} (UNCLAIMED — the host supplied no cwd, so this is the hook ` +
+      "process's own working directory, not a location this session claimed;" +
+      (occupied
+        ? ' occupation measured for the hook process)'
+        : ' directory type measured, enterability NOT established)')
+    );
   }
-
-  return { name: 'collapse', required: true, body: lines.join('\n') };
+  const claimed = facts.worktreePath;
+  // A non-string reaches here because `normaliseSeparators` passes it through unchanged
+  // and a truthy non-string then sails on as if it were a location. Quoting it makes it
+  // visibly not-a-path rather than letting `String(7)` render as `7`.
+  const asShown = typeof claimed === 'string' ? claimed : JSON.stringify(claimed);
+  if (facts.resolvedKind === 'file') {
+    return `(UNVERIFIED — host reported ${asShown}; that path is a FILE, not a directory a session can be in)`;
+  }
+  if (facts.resolvedKind === 'other') {
+    return `(UNVERIFIED — host reported ${asShown}; that path exists but is not a directory)`;
+  }
+  if (claimed === null || claimed === undefined || claimed === '') {
+    return '(UNVERIFIED — no path was supplied)';
+  }
+  // WO-OR-17 / TQA-001. THE DEFECT: every remaining failure fell into the line below, so an
+  // existing directory the probe was REFUSED read as a confident claim that it does not
+  // exist. "I measured, and there is nothing" and "I could not look" are not the same
+  // sentence, and only the first of them is about the disk. The cause now arrives here from
+  // the point of measurement instead of being guessed from the absence of a value.
+  if (facts.cwdFailure === 'unreadable') {
+    const why = facts.cwdFailureCode ? ` (${facts.cwdFailureCode})` : '';
+    return (
+      `(UNVERIFIED — host reported ${asShown}; that path could NOT BE READ${why} — ` +
+      'this is NOT a claim that it does not exist)'
+    );
+  }
+  if (facts.cwdFailure === 'not-a-path') {
+    return `(UNVERIFIED — host reported ${asShown}; that is not a path, so nothing on disk was consulted)`;
+  }
+  if (facts.cwdFailure === 'unknown') {
+    return (
+      `(UNVERIFIED — host reported ${asShown}; the probe failed and gave no reason — ` +
+      'this is NOT a claim that it does not exist)'
+    );
+  }
+  // Reached only on a MEASURED absence — ENOENT or ENOTDIR, i.e. the filesystem answered.
+  return `(UNVERIFIED — host reported ${asShown}; no such directory on disk)`;
 }
 
-export function renderOrientationBrief(
-  state,
-  {
-    statePath,
-    worktree,
-    freshness,
-    canonical,
-    location,
-    facts,
-    collapse = null,
-    cap = CONTEXT_CAP,
-    // D-B §B-2: the source decides the HEADLINE and the SECTION SET, nothing
-    // else. Defaulting to `clear` keeps every existing caller's behaviour
-    // byte-identical, so this parameter adds a mode rather than changing one.
-    sourceMode = briefModeFor('clear'),
+// WO-OR-14. `--show-toplevel` returns the root of the CURRENT WORKING TREE, which in a
+// linked worktree is not the repository root at all. The old label "repo root" therefore
+// printed a sentence its measurement did not back — and in an estate that is mostly linked
+// worktrees it overclaimed on the COMMON case, not an edge one. The label now names what
+// was measured, and the kind of checkout is measured too rather than left to the reader to
+// infer from a path that looks unfamiliar.
+function renderToplevel(facts) {
+  if (facts.repoRoot === null || facts.repoRoot === undefined) {
+    // TQA-008: bare (unknown) hid whether git itself was unreadable.
+    if (facts.gitReadable === false) return '(unknown — git could not be read here)';
+    return '(unknown)';
   }
-) {
-  const p = state.programme;
-  const r = state.resumption;
-  const m = state.model_recommendation;
-  const frontier = frontierTickets(state);
-  const done = (state.tickets || []).filter((t) => t.state === 'resolved');
+  if (facts.linkedWorktree === true) return `${facts.repoRoot} (LINKED worktree)`;
+  if (facts.linkedWorktree === false) return `${facts.repoRoot} (primary checkout)`;
+  // The probe did not answer. Say nothing rather than guess a kind.
+  return String(facts.repoRoot);
+}
 
-  // The next action is the one field that must survive at any cost. It gets a
-  // generous but bounded allowance; if it exceeds that it is truncated WITH a
-  // pointer, never dropped.
-  const nextAction = truncateField(r.next_action, 2400, statePath);
-  const focus = truncateField(r.focus, 1200, statePath);
-
-  const status = freshness.stale
-    ? '⚠️ BANKED STATE IS STALE — treat in-context memory as unreliable (RECOVERY) and re-read the map before acting.'
-    : '✅ Banked state is FRESH against live git (AD-14 banking-commit comparison).';
-
-  const locationSection = renderLocationSection(canonical, location);
-  const collapseSection = renderCollapseSection(collapse);
-
-  // D-B §B-2 — `resume` gets a SHORT DELTA. The restored transcript already
-  // carries the history, so a full brief would spend context re-stating what is
-  // already in it. Everything a resumed session cannot obtain from its own
-  // transcript is here; everything else is a path.
-  if (sourceMode.mode === BRIEF_MODE.DELTA) {
-    const deltaSections = [];
-    if (locationSection) deltaSections.push(locationSection);
-    if (collapseSection) deltaSections.push(collapseSection);
-    deltaSections.push({
-      name: 'delta',
-      required: true,
-      body: [
-        fence(`RESUMED — ${p.id} (delta only)`),
-        '',
-        sourceMode.headline,
-        '',
-        status,
-        '',
-        `  branch   : ${r.branch}`,
-        `  banked   : head ${String(state.banked.head_sha).slice(0, 7)} at ${state.banked.at}`,
-        `  ticket   : ${r.ticket || '(none named)'}`,
-        '',
-        '>>> THE EXACT NEXT ACTION <<<',
-        nextAction.text,
-        '',
-        `  durable state : ${statePath}`,
-      ].join('\n'),
-    });
-    const deltaAssembled = assembleBrief(deltaSections, { cap });
-    if (nextAction.truncated) deltaAssembled.fieldTruncations = ['resumption.next_action'];
-    return deltaAssembled;
+// WO-OR-14. `rev-parse --abbrev-ref HEAD` returns the literal string "HEAD" on a detached
+// HEAD, which this line rendered as if it were a branch name — a reader cannot tell it
+// from a branch actually called HEAD, and the state it really signals is the one worth
+// knowing. `detached` is measured by `symbolic-ref`, so this renders a state rather than
+// a string that happens to look like one.
+function symbolicRefFailureWhy(facts) {
+  if (facts.symbolicRefFailure === 'fatal') {
+    return facts.symbolicRefStatus != null
+      ? `failed fatally (exit ${facts.symbolicRefStatus})`
+      : 'failed fatally';
   }
+  if (facts.symbolicRefFailure === 'unavailable') {
+    return facts.symbolicRefCode
+      ? `could not run (${facts.symbolicRefCode})`
+      : 'could not run';
+  }
+  if (facts.symbolicRefFailure) return 'probe did not answer';
+  return null;
+}
 
-  const sections = [];
-  if (locationSection) sections.push(locationSection);
-  sections.push(
-    {
-      name: 'core',
-      required: true,
-      body: [
-        fence(`RESUMING ${p.id} — ${p.title}`),
-        '',
-        sourceMode.headline,
-        `The BUILD-018 Session Governor injected this brief automatically; nobody needs to`,
-        `re-brief you. It is a POINTER document — the full state is on disk.`,
-        '',
-        status,
-        '',
-        `  phase    : ${state.phase.current}`,
-        `  worktree : ${worktree}`,
-        `  branch   : ${r.branch}`,
-        `  ticket   : ${r.ticket || '(none named)'}`,
-        `  model    : ${m.model}${m.effort ? ` (effort: ${m.effort})` : ''}`,
-        `  banked   : ${state.banked.at} by ${state.banked.by_model}, head ${String(state.banked.head_sha).slice(0, 7)}`,
-        `  pushed   : ${
-          facts?.upstreamSha
-            ? `${facts.upstreamRef || state.repository?.upstream || '(upstream)'} @ ${facts.upstreamSha.slice(0, 7)}${
-                typeof facts.unpushed === 'number' && facts.unpushed > 0
-                  ? ` — ${facts.unpushed} local commit(s) NOT pushed`
-                  : ' — local HEAD is pushed'
-              }`
-            : `${state.repository?.upstream || '(unknown upstream)'} @ (current pushed head could not be read — do not assume it is pushed)`
-        }`,
-        `  progress : ${done.length} ticket(s) resolved, ${frontier.length} on the frontier`,
-        '',
-        '>>> THE EXACT NEXT ACTION <<<',
-        nextAction.text,
-        '',
-        `Where the truth lives (read these, do not re-derive them):`,
-        `  durable state : ${statePath}`,
-        `  map (SSOT)    : Deliverables/${p.home.split('/').pop()}/02-MAP.md   [live execution SSOT]`,
-        `  goal contract : Deliverables/${p.home.split('/').pop()}/01-GOAL-CONTRACT.md   [product SSOT — wins over any ticket]`,
-        `  handoff       : Team Knowledge/fusion-brief/session-handoff.md   [generated projection]`,
-        `  (all four are on branch ${r.branch}, in ${worktree})`,
-        '',
-        'ARTEFACT RANK (AD-17): goal contract > map > implementation plan > generated',
-        'projections (programme-state.json, session-handoff.md). A projection that',
-        'disagrees with its source is a defect in the projection.',
-        '',
-        'GIT LIFECYCLE IS LARRY\'S (AD-20): Warwick never manages branches, worktrees,',
-        'commits, pushes or PR creation. Do not ask him to run git. Do not ask him to',
-        'choose the route. Ask him only for decisions that are genuinely his.',
-      ].join('\n'),
+function renderBranch(facts) {
+  if (facts.detached === true) {
+    return `(DETACHED — HEAD is not on a branch${facts.headSha ? `, it is commit ${facts.headSha}` : ''})`;
+  }
+  // TQA-010 (Codex repairs run 8). A failed attachment probe must never be hidden behind a
+  // confident rev-parse branch string. Only the HEAD arm used to consult symbolicRefFailure;
+  // any other non-null branch fell through to String(branch) and silently claimed attachment.
+  const attachWhy = symbolicRefFailureWhy(facts);
+  if (attachWhy) {
+    if (facts.branch === 'HEAD') {
+      return (
+        `(UNVERIFIED — git returned the literal "HEAD"; symbolic-ref ${attachWhy}, ` +
+        'so attachment is not established)'
+      );
     }
+    if (facts.branch !== null && facts.branch !== undefined) {
+      return `${facts.branch} (UNVERIFIED attachment — symbolic-ref ${attachWhy})`;
+    }
+    return `(unknown — symbolic-ref ${attachWhy})`;
+  }
+  if (facts.branch === null || facts.branch === undefined) {
+    // WO-OR-17. `symbolic-ref` may have answered when `rev-parse` could not — the unborn
+    // branch is exactly that state. Rendering "(unknown)" over a name the module is holding
+    // is the four-state test failing downwards: a MEASUREMENT reported as "I could not
+    // tell". What is claimed here is only what was measured — HEAD points at this branch —
+    // and specifically NOT that any commit exists on it, because none was resolved.
+    if (facts.symbolicBranch) {
+      return `${facts.symbolicBranch} (MEASURED by symbolic-ref; no commit resolved on it)`;
+    }
+    return '(unknown)';
+  }
+  if (facts.branch === 'HEAD') {
+    // Attachment probe did not fail (no symbolicRefFailure) but also did not confirm
+    // detachment. Honest: not established.
+    return '(UNVERIFIED — git returned the literal "HEAD"; attachment is not established)';
+  }
+  return String(facts.branch);
+}
+
+export function renderLocationSection(facts, { cwdClaimedByHost = true } = {}) {
+  if (!facts) return null;
+  // TQA-005. The heading used to say "WHERE THIS SESSION IS (executed, not assumed)" which
+  // overclaimed relative to any line that could only report directory type. Each line now
+  // states its own measurement; the heading must not promise more than they deliver.
+  const lines = [
+    '⟦GOV⟧ SESSION LOCATION PROBES (executed; each line states what was measured):',
+    `  cwd          : ${renderCwd(facts, cwdClaimedByHost)}`,
+    `  worktree root: ${renderToplevel(facts)}`,
+    `  branch       : ${renderBranch(facts)}`,
+    `  HEAD         : ${renderHead(facts)}`,
+    `  working tree : ${renderDirty(facts)}`,
+  ];
+  if (facts.upstreamRef) {
+    lines.push(`  upstream     : ${facts.upstreamRef} @ ${show(facts.upstreamSha)}`);
+    lines.push(
+      `  unpushed     : ${facts.unpushed === null ? '(unknown)' : `${facts.unpushed} commit(s) ahead of upstream`}`
+    );
+  } else if (facts.upstreamState === 'none-configured') {
+    // TQA-006 (Codex repairs run 4). Measured fact: the attached branch's upstream field
+    // is empty. That is NOT a measurement of remote push status — a branch can be pushed
+    // without having @{u} configured (no remote, reconfigured remote, push without -u).
+    // The old sentence "nothing here is pushed" was the same defect class as the rest of
+    // this sequence: a stronger claim than the probe earned. State only what was measured.
+    lines.push(
+      '  upstream     : (no upstream configured — pushed status NOT established)'
+    );
+  } else if (facts.upstreamState === 'detached') {
+    lines.push(
+      '  upstream     : (unknown — HEAD is DETACHED, so no branch is tracking anything here; this is NOT a claim that nothing is pushed)'
+    );
+  } else if (facts.upstreamState === 'unreadable' || !facts.gitReadable) {
+    // WO-OR-11. git never ran, so the module has measured nothing about what is pushed.
+    // This branch used to fall into the sentence above, which meant a session on an
+    // unreadable path was told "nothing here is pushed" — a claim about the remote
+    // derived from a git call that never happened. Stating the reason matters as much as
+    // withholding the claim: a bare "(unknown)" invites the reader to assume the branch
+    // is simply untracked.
+    lines.push(
+      '  upstream     : (unknown — git could not be read here, so this is NOT a claim that nothing is pushed)'
+    );
+  } else {
+    // WO-OR-14. The probes ran and did not settle it. This arm FAILS CLOSED on purpose:
+    // any fact object that does not carry a measured `upstreamState` lands here rather
+    // than inheriting the confident sentence, so a future caller cannot re-open the defect
+    // simply by omitting the field.
+    lines.push(
+      '  upstream     : (unknown — the upstream probe did not answer, so this is NOT a claim that nothing is pushed)'
+    );
+  }
+  // Stated because its ABSENCE is a change a reader could otherwise mistake for a pass.
+  lines.push(
+    '  No alignment verdict is offered: with no banked programme state there is no canonical'
   );
-
-  if (collapseSection) sections.push(collapseSection);
-
-  if (freshness.warnings.length) {
-    sections.push({
-      name: 'freshness-warnings',
-      required: true,
-      body: [fence('STATE HEALTH'), '', ...freshness.warnings.map((w) => `  ! ${w}`)].join('\n'),
-    });
-  }
-
-  sections.push({
-    name: 'frontier',
-    required: false,
-    body: [
-      fence('FRONTIER — takable right now'),
-      '',
-      ...(frontier.length
-        ? frontier.map((t) => `  ${t.id} [${t.model}] — ${t.title}`)
-        : ['  (none — every remaining ticket is blocked)']),
-    ].join('\n'),
-  });
-
-  sections.push({
-    name: 'do-not',
-    required: false,
-    body: [fence('DO NOT'), '', ...(r.do_not || []).map((d) => `  ✗ ${d}`)].join('\n'),
-  });
-
-  sections.push({
-    name: 'read-first',
-    required: false,
-    body: [fence('READ FIRST'), '', ...(r.read_first || []).map((d) => `  → ${d}`)].join('\n'),
-  });
-
-  sections.push({
-    name: 'focus',
-    required: false,
-    body: [fence('WHERE WE GOT TO'), '', focus.text].join('\n'),
-  });
-
-  const openBlockers = (state.blockers || []).filter((b) => (b.blocks || []).length > 0);
-  sections.push({
-    name: 'blockers',
-    required: false,
-    body: [
-      fence('OPEN BLOCKERS'),
-      '',
-      ...(openBlockers.length
-        ? openBlockers.map((b) => `  ${b.id} (${b.kind}, owner ${b.owner}) blocks ${b.blocks.join(', ')} — ${b.summary}`)
-        : ['  (none)']),
-    ].join('\n'),
-  });
-
-  if ((state.unknown || []).length) {
-    sections.push({
-      name: 'not-established',
-      required: false,
-      body: [
-        fence('NOT ESTABLISHED AT BANKING — do not read as "none"'),
-        '',
-        ...state.unknown.map((u) => `  ? ${u.path} — ${u.why}`),
-      ].join('\n'),
-    });
-  }
-
-  const assembled = assembleBrief(sections, { cap });
-  if (nextAction.truncated || focus.truncated) {
-    assembled.fieldTruncations = [
-      ...(nextAction.truncated ? ['resumption.next_action'] : []),
-      ...(focus.truncated ? ['resumption.focus'] : []),
-    ];
-  }
-  return assembled;
+  lines.push('  location to compare against. These are facts, not an approval to implement.');
+  return lines.join('\n');
 }
 
 // ---------------------------------------------------------------------------
-// The reorientation itself
+// PRESERVED BEHAVIOUR 1 — the loose-`Deliverables/` sweep
 // ---------------------------------------------------------------------------
-
-export function reorient({
-  source,
-  cwd,
-  execFile = execFileSync,
-  readdir = readdirSync,
-  cap = CONTEXT_CAP,
-  factsFn = gitFacts,
-} = {}) {
-  // D-B §B-2 — EVERY source reorients. The source selects the brief's shape,
-  // it no longer decides whether there is a brief at all. See SOURCE_POLICY.
-  const sourceMode = briefModeFor(source);
-
-  const worktrees = listWorktrees(cwd, execFile);
-  if (worktrees === null) {
-    const b = renderProblemBrief(VERDICT.FAILED, {
-      detail: `\`git worktree list\` failed in ${cwd}, so the estate could not be searched for banked state.`,
-      cap,
-    });
-    return { verdict: VERDICT.FAILED, context: b.text, brief: b };
-  }
-
-  const files = discoverStateFiles(worktrees, { readdir });
-  if (files.length === 0) {
-    // NOT CHANGED BY WO-2026-08-01-01, deliberately. Silas's D-B §B-3 re-purposes
-    // SKIPPED to this case and would have this return nothing at all — but that
-    // is justified there by D-C, "the hook now runs machine-wide", and D-C has
-    // NOT landed: this hook is still installed in ONE project scope, so a
-    // session that finds no banked state here is a real fault and not the noise
-    // B-3 is protecting Warwick from. Silencing it now would also reverse the
-    // deliberate control in reorient.test.mjs ("a LOUD missing brief, not
-    // silence") with no acceptance criterion asking for it. Land B-3 in the WP
-    // that lands D-C, and amend that control in the same change.
-    const b = renderProblemBrief(VERDICT.MISSING, {
-      detail: `Searched ${worktrees.length} worktree(s) for Deliverables/*/programme-state.json and found none.`,
-      cap,
-    });
-    return { verdict: VERDICT.MISSING, context: b.text, brief: b, searched: worktrees.length };
-  }
-
-  // Read and validate every candidate. A file that fails validation is reported,
-  // never skipped — a corrupt state that reads as "no programme" is the silent
-  // failure mode this build exists to kill.
-  const good = [];
-  const bad = [];
-  for (const f of files) {
-    const read = readProgrammeState(f.path);
-    if (!read.ok) {
-      bad.push({
-        path: f.path,
-        worktree: f.worktree,
-        problem: `${read.reason}${read.errors ? `: ${read.errors.slice(0, 2).join('; ')}` : ''}${read.error ? `: ${read.error}` : ''}`,
-      });
-    } else {
-      good.push({ ...f, state: read.data });
-    }
-  }
-
-  const active = good.filter((g) => g.state.programme.status === 'active');
-
-  if (active.length === 0) {
-    const verdict = bad.length ? VERDICT.CORRUPT : VERDICT.MISSING;
-    const b = renderProblemBrief(verdict, {
-      detail: bad.length
-        ? `${bad.length} programme-state file(s) were found but NONE validated, and no active programme could be read.`
-        : `${good.length} programme-state file(s) validated, but none has status "active".`,
-      candidates: [
-        ...bad.map((x) => ({ path: x.path, worktree: x.worktree, problem: x.problem })),
-        ...good.map((g) => ({
-          id: g.state.programme.id,
-          title: g.state.programme.title,
-          path: g.path,
-          worktree: g.worktree,
-          problem: `status is "${g.state.programme.status}", not "active"`,
-        })),
-      ],
-      cap,
-    });
-    return { verdict, context: b.text, brief: b, corrupt: bad };
-  }
-
-  // Collapse duplicate CHECKOUTS of one programme before counting programmes.
-  // The refusal below is preserved for the two cases where it is still correct:
-  // genuinely different programme ids, and copies of one id that disagree with no
-  // principled way to choose. A fix that always resolves has deleted this control
-  // rather than repaired it.
-  const { survivors, reports } = collapseProgrammes(active);
-
-  if (survivors.length > 1) {
-    const b = renderProblemBrief(VERDICT.AMBIGUOUS, {
-      detail:
-        `${survivors.length} distinct active programmes remain after collapsing duplicate ` +
-        `checkouts by programme id (${active.length} state file(s) found across the estate). ` +
-        'The governor will not guess which one this session resumes.',
-      candidates: survivors.map(candidateLine),
-      cap,
-    });
-    return {
-      verdict: VERDICT.AMBIGUOUS,
-      context: b.text,
-      brief: b,
-      candidates: survivors.map((s) => s.candidate),
-      collapse: reports.map(publicReport),
-    };
-  }
-
-  const report = reports[0];
-
-  if (!report.resolved) {
-    const b = renderProblemBrief(VERDICT.AMBIGUOUS, {
-      detail:
-        `${report.copies} copies of ${report.id} were found across the estate. They are ONE ` +
-        'programme, not several — but they DISAGREE about where it is up to (resumption ticket ' +
-        'and/or banked head), and no copy sits inside the worktree it names as canonical, so ' +
-        'there is no principled way to tell which is current. Resuming from a stale pointer ' +
-        'costs a whole session, so the governor refuses rather than picking one.',
-      candidates: report.group.map(candidateLine),
-      cap,
-    });
-    return {
-      verdict: VERDICT.AMBIGUOUS,
-      context: b.text,
-      brief: b,
-      candidates: report.group.map((c) => c.candidate),
-      collapse: [publicReport(report)],
-    };
-  }
-
-  const chosen = report.winner.candidate;
-  const facts = { ...factsFn(chosen.worktree, execFile), worktreePath: chosen.worktree };
-  const freshness = assessBankedFreshness(chosen.state, facts);
-
-  // Requirement 4 — before ANY implementation, compare this session's actual cwd,
-  // repository root, branch and HEAD against the banked programme state. This is
-  // the same comparison the PreToolUse guard makes, from the same module, so the
-  // brief can never say "aligned" while the gate is denying (or the reverse).
-  const canonical = canonicalFromState(chosen.state, chosen.path);
-  const live = liveLocation({ cwd, execFile });
-  const location = canonical ? { ...compareLocation(canonical, live), live } : null;
-
-  const b = renderOrientationBrief(chosen.state, {
-    statePath: chosen.path,
-    worktree: chosen.worktree,
-    freshness,
-    canonical,
-    location,
-    facts,
-    collapse: publicReport(report),
-    cap,
-    sourceMode,
-  });
-
-  // Corrupt siblings are surfaced even on the happy path — a state file that
-  // cannot be read is a defect somebody must see, not noise to swallow.
-  let context = b.text;
-  if (bad.length) {
-    const note =
-      `\n\n⚠️ ${bad.length} other programme-state file(s) failed validation and were ignored: ` +
-      bad.map((x) => `${x.path} (${x.problem})`).join('; ');
-    if ((context + note).length <= cap) context += note;
-  }
-
-  // Precedence: a location mismatch outranks staleness. Stale state means
-  // "re-read before trusting"; wrong worktree means "do not implement at all",
-  // and the stronger of the two must be what the caller sees.
-  const misplaced = location && location.verdict !== LOCATION.ALIGNED;
-  const verdict = misplaced
-    ? VERDICT.WRONG_WORKTREE
-    : freshness.stale
-      ? VERDICT.STALE
-      : VERDICT.ORIENTED;
-
-  return {
-    verdict,
-    context,
-    brief: b,
-    sourceMode,
-    state: chosen.state,
-    statePath: chosen.path,
-    worktree: chosen.worktree,
-    freshness,
-    canonical,
-    location,
-    live,
-    implementationPermitted: !misplaced,
-    corrupt: bad,
-    collapse: publicReport(report),
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Hook envelope
-// ---------------------------------------------------------------------------
-
-export function toHookOutput(result) {
-  if (!result || !result.context) return null;
-  return {
-    hookSpecificOutput: {
-      hookEventName: 'SessionStart',
-      additionalContext: result.context,
-    },
-  };
-}
-
-export function runHook(raw, opts = {}) {
-  const parsed = parseHookInput(raw);
-  if (!parsed.ok) {
-    // A hook that cannot read its own input must say so, not vanish. But it also
-    // must not claim a verdict about state it never looked at.
-    const b = renderProblemBrief(VERDICT.FAILED, {
-      detail: `The reorientation hook could not read its input (${parsed.reason}). No state was inspected.`,
-      cap: opts.cap ?? CONTEXT_CAP,
-    });
-    return { verdict: VERDICT.FAILED, context: b.text, brief: b };
-  }
-  const { source, cwd } = parsed.payload;
-  // CUT 2026-08-01: the T-15 model gate used to wrap this result and could WITHHOLD
-  // reorientation until a model was verified. It is gone. Reorientation now always
-  // returns what it found. Model advice belongs AFTER the next requirement is
-  // understood, not as a precondition on a session that has not yet been briefed.
-  const { modelGate: _removedModelGateOpts, ...reorientOpts } = opts;
-  try {
-    return reorient({ source, cwd: cwd || opts.cwd || process.cwd(), ...reorientOpts });
-  } catch (err) {
-    const b = renderProblemBrief(VERDICT.FAILED, {
-      detail: `The reorientation hook threw: ${err.message}`,
-      cap: opts.cap ?? CONTEXT_CAP,
-    });
-    return { verdict: VERDICT.FAILED, context: b.text, brief: b, error: err.message };
-  }
-}
-
-// ---------------------------------------------------------------------------
-// LIVE-HOOK AUGMENTATION (added 2026-08-01, Warwick's direct instruction).
+// Carried through this narrowing UNCHANGED in behaviour. It surfaces recent top-level
+// `Deliverables/*.md` that the deleted programme recovery could never see — the failure
+// that let a fresh session miss the VlogOps plan entirely — and flags the ones whose text
+// reads as waiting on Warwick.
 //
-// The pure reorient() above recovers ONLY BUILD-* programme-state. That is why
-// a fresh session reported "no active build / no next action" and missed the
-// VlogOps Wayfinder plan — a loose Deliverables/*.md with no programme file the
-// governor could ever see. Two things a session-start MUST also do, wired here
-// in the live path so reorient()'s tested surface stays byte-identical:
-//
-//   1. readContinuityBrief (from continuity.mjs) — read the AUTHORITATIVE current
-//      focus from Honcho EVERY session start. This is the source of truth for
-//      what Warwick is doing; continuity.mjs owns the single Honcho read path.
-//   2. sweepOpenDeliverables — a FALLBACK that surfaces recent top-level
-//      Deliverables/*.md the BUILD-* recovery cannot see. Never the focus source.
-//
-// Both fail OPEN and are time-bounded: a session start is never blocked or
-// crashed by a slow network or a missing file (INV-2).
-// ---------------------------------------------------------------------------
+// It is a FALLBACK and never the source of truth for current focus (Warwick's ruling);
+// Honcho holds the explicit focus. The rendering says so on its own line, because a
+// reader who takes this list as the focus will work on the wrong thing.
 
 const ESTATE_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const DELIVERABLE_WINDOW_DAYS = 21;
 const DECISION_MARKER =
   /nothing (will|would) be built|awaiting (your|a) |until you accept|your call|needs? (a )?(decision|your )|accept (this|a) plan|what i need:|waiting on you|before any building/i;
 
-export function sweepOpenDeliverables(root = ESTATE_ROOT, now = Date.now()) {
+// WO-OR-14. The default filesystem, injectable. This is the module's EXISTING idiom —
+// `gitFacts(path, execFile = execFileSync)` and `buildBrief({ factsFn, sweepFn })` already
+// do exactly this — not new machinery. It exists because a per-file read failure cannot be
+// induced deterministically on Windows, and a proof that cannot be made to fail is not a
+// proof. The suite pairs every injected test with a control asserting these defaults read
+// the real disk, so the seam can never end up testing a fiction.
+// WO-OR-17 added `lstatSync` and `realpathSync`. `statSync` FOLLOWS a symlink, so a link at
+// `Deliverables/linked.md` pointing outside the swept root was read, reported, and labelled
+// `Deliverables/linked.md` — a claim about WHERE THE CONTENT CAME FROM that was never
+// measured. `lstat` sees the link itself; `realpath` says where it actually goes.
+const DEFAULT_SWEEP_IO = { readdirSync, statSync, readFileSync, lstatSync, realpathSync };
+
+export function sweepOpenDeliverables(root = ESTATE_ROOT, now = Date.now(), io = DEFAULT_SWEEP_IO) {
   const dir = join(root, 'Deliverables');
   let names;
   try {
-    names = readdirSync(dir);
-  } catch {
-    return null; // no Deliverables folder — nothing to sweep, never an error
+    names = io.readdirSync(dir);
+  } catch (err) {
+    // WO-OR-14. ENOENT is the ONE honest silence: there is no `Deliverables/` here at all,
+    // so there is genuinely nothing to sweep and nothing to say.
+    //
+    // EVERY OTHER failure means something IS there and could not be read — a file where the
+    // directory should be, a permissions refusal, a traversal error. Returning null for
+    // those made "I swept and there is nothing open" and "I could not look" render
+    // BYTE-IDENTICALLY, because `buildBrief` then omits the section entirely. That is the
+    // same silence-reads-as-health failure this whole module exists to prevent, sitting
+    // inside the module itself.
+    if (err && err.code === 'ENOENT') return null;
+    return (
+      '⟦GOV⟧ OPEN DELIVERABLES: NOT SWEPT — Deliverables/ could not be read ' +
+      `(${err?.code || err?.message || 'unknown error'}). ` +
+      'This is NOT a report that there is nothing open.'
+    );
   }
   const cutoff = now - DELIVERABLE_WINDOW_DAYS * 86400_000;
   const rows = [];
+  // WO-OR-14. Files that could not be READ, counted so the omission can be stated. This is
+  // the same defect one level down: a per-file failure was silently `continue`d, so a
+  // rendered list could be quietly incomplete with nothing to tell the reader so.
+  //
+  // Note what is deliberately NOT counted here: a non-file (a directory named `*.md`) and a
+  // file outside the 21-day window are legitimate EXCLUSIONS, not failures, and inflating
+  // the count with them would cry wolf on a healthy estate.
+  let unreadable = 0;
+  // TQA-007 (Codex repairs run 5). Provenance is containment under the estate's claimed
+  // Deliverables path, measured via realpath of the LEAF against realpath of the ESTATE
+  // ROOT plus the logical "Deliverables/" segment — NOT against realpath(Deliverables)
+  // alone, and NOT via leaf-is-symlink alone.
+  //
+  // Why leaf-is-symlink was incomplete: if Deliverables itself is a junction or directory
+  // symlink to an external tree, every regular file under it has lstat isSymbolicLink=false
+  // and was labelled "inside" while the content lived outside the estate. Comparing against
+  // realpath(Deliverables) makes the same mistake: both the dir and the file resolve into
+  // the external tree, so containment holds and the label still lies.
+  //
+  // Against estate root: a redirected Deliverables puts file realpaths outside
+  // `<estateReal>/Deliverables/…`, so they render outside. A leaf symlink to outside does
+  // the same. A genuine in-tree file matches. Probe failure stays unverified.
+  let estateReal = null;
+  try {
+    estateReal = normaliseSeparators(io.realpathSync(root));
+  } catch {
+    estateReal = null;
+  }
+  const expectedPrefix = estateReal ? `${estateReal}/Deliverables` : null;
   for (const name of names) {
-    if (!name.toLowerCase().endsWith('.md')) continue; // top-level *.md only; BUILD-*/ dirs are the governor's job
+    if (!name.toLowerCase().endsWith('.md')) continue; // top-level *.md only
     const full = join(dir, name);
+    let provenance = 'unverified';
+    let realPath = null;
+    try {
+      realPath = normaliseSeparators(io.realpathSync(full));
+      if (!expectedPrefix || !realPath) {
+        provenance = 'unverified';
+      } else {
+        // Case-insensitive containment on win32 — the estate is Windows-primary.
+        const a = process.platform === 'win32' ? realPath.toLowerCase() : realPath;
+        const p = process.platform === 'win32' ? expectedPrefix.toLowerCase() : expectedPrefix;
+        provenance = a === p || a.startsWith(`${p}/`) ? 'inside' : 'outside';
+      }
+    } catch {
+      // The probe could not answer. That is NOT "it is fine" — same rule as everywhere else
+      // in this module, which is the point of fixing the shared helper rather than a field.
+      provenance = 'unverified';
+    }
     let st;
     try {
-      st = statSync(full);
+      st = io.statSync(full);
     } catch {
+      unreadable += 1;
       continue;
     }
     if (!st.isFile() || st.mtimeMs < cutoff) continue;
     let head = '';
     try {
-      head = readFileSync(full, 'utf8').slice(0, 6000);
+      head = io.readFileSync(full, 'utf8').slice(0, 6000);
     } catch {
+      unreadable += 1;
       continue;
     }
     const h1 = (head.match(/^#\s+(.+)$/m) || [])[1]?.trim() || name.replace(/\.md$/, '');
     const awaits = DECISION_MARKER.test(head);
-    rows.push({ name, title: h1, mtimeMs: st.mtimeMs, awaits });
+    rows.push({ name, title: h1, mtimeMs: st.mtimeMs, awaits, provenance, realPath });
   }
-  if (!rows.length) return null;
+  if (!rows.length) {
+    // WO-OR-14. Nothing to show — but WHY there is nothing to show is the whole question.
+    // If files were unreadable, "nothing open" would be a claim the sweep did not earn.
+    if (unreadable) {
+      return (
+        `⟦GOV⟧ OPEN DELIVERABLES: NOT SWEPT IN FULL — ${unreadable} file(s) in Deliverables/ ` +
+        'could not be read, and nothing else was in scope. ' +
+        'This is NOT a report that there is nothing open.'
+      );
+    }
+    // TQA-011 (Codex repairs run 8). ENOENT still returns null above (no Deliverables/ at
+    // all). A completed sweep with zero in-scope rows is a different measurement and must
+    // not share that silence — otherwise "swept; none open" and "section omitted" are
+    // indistinguishable to the reader.
+    return (
+      '⟦GOV⟧ OPEN DELIVERABLES: swept — none open (no top-level *.md in the last ' +
+      `${DELIVERABLE_WINDOW_DAYS} days).`
+    );
+  }
   rows.sort((a, b) => b.mtimeMs - a.mtimeMs);
-  const top = rows.slice(0, 8);
-  const lines = ['⟦GOV⟧ OPEN DELIVERABLES (loose, not BUILD-* — the governor cannot recover these):'];
+  // Display cap — intentional, not a failure. TQA-004 (Codex repairs final run 2): when the
+  // list is truncated, the reader MUST be told. A silent slice is incompleteness wearing the
+  // costume of a complete answer — the same defect class as an unreadable file dropped
+  // without a tell (WO-OR-14). The cap itself is not the defect; silence about it is.
+  const DISPLAY_CAP = 8;
+  const top = rows.slice(0, DISPLAY_CAP);
+  const lines = ['⟦GOV⟧ OPEN DELIVERABLES (loose, not BUILD-* — nothing else surfaces these):'];
   for (const r of top) {
     const flag = r.awaits ? '  ⟵ AWAITS YOUR DECISION' : '';
-    lines.push(`  • ${r.title} — Deliverables/${r.name}${flag}`);
+    // WO-OR-17. `Deliverables/<name>` is a provenance claim. It is now made plainly only
+    // where provenance was measured and held; otherwise the reader is told what is actually
+    // known, on the same line, rather than being left with a label that reads as settled.
+    const where =
+      r.provenance === 'outside'
+        ? `  ⟵ CONTENT IS NOT IN Deliverables/ — it resolves to ${r.realPath}`
+        : r.provenance === 'unverified'
+          ? '  ⟵ provenance NOT established — this path may not be where the content is'
+          : '';
+    lines.push(`  • ${r.title} — Deliverables/${r.name}${flag}${where}`);
   }
   const pending = top.filter((r) => r.awaits).length;
   if (pending) lines.push(`  ${pending} deliverable(s) appear to be waiting on Warwick — treat as a pending product-decision handback.`);
+  // WO-OR-14. A list that is SHOWN must say when it is incomplete, or a reader takes it as
+  // the whole answer — which is exactly how a silently dropped file becomes invisible.
+  if (unreadable) {
+    lines.push(`  ${unreadable} file(s) could not be read and are NOT represented in this list.`);
+  }
+  // TQA-004. Readable rows omitted by the display cap are incompleteness of a different
+  // kind from unreadable ones — both must be disclosed, neither may masquerade as the full set.
+  if (rows.length > DISPLAY_CAP) {
+    lines.push(
+      `  … and ${rows.length - DISPLAY_CAP} more recent deliverable(s) not shown ` +
+      `(display cap ${DISPLAY_CAP}) — this list is NOT complete.`
+    );
+  }
   return lines.join('\n');
+}
+
+// ---------------------------------------------------------------------------
+// Composition
+// ---------------------------------------------------------------------------
+
+export function toHookOutput(additionalContext) {
+  return {
+    hookSpecificOutput: {
+      hookEventName: 'SessionStart',
+      additionalContext: additionalContext || '',
+    },
+  };
+}
+
+/**
+ * buildBrief(raw, deps) -> string
+ *
+ * The three surviving sections, each guarded independently so one failure cannot
+ * suppress the others. Synchronous half only — the Honcho brief is async and is appended
+ * by `main()`, which keeps this function testable with no network and no clock.
+ */
+export function buildBrief(raw, {
+  cwd = process.cwd(),
+  facts = null,
+  factsFn = gitFacts,
+  sweepFn = sweepOpenDeliverables,
+  stdinError = null,
+} = {}) {
+  const parsed = parseHookInput(raw);
+  const policy = briefModeFor(parsed.payload?.source);
+
+  // WO-OR-14. WHETHER THE HOST SAID ANYTHING AT ALL about where this session is.
+  //
+  // The old `normaliseSeparators(payload.cwd) || normaliseSeparators(cwd)` let an absent,
+  // empty or falsy value fall silently through to the HOOK'S OWN process directory, which
+  // then rendered beneath a heading reading "WHERE THIS SESSION IS". The path was measured
+  // and true; the claim was not, because the only authority on the session's location had
+  // said nothing and the module substituted its own with no tell. A true value can still
+  // carry an unearned claim — that is the whole lesson of this sequence.
+  //
+  // A falsy-but-PRESENT value (`false`, `0`) is a CLAIM THAT FAILED, not silence, and is
+  // preserved as one so the reader sees what the host actually sent. The old `||` erased
+  // that distinction too.
+  const claimedCwd = parsed.payload?.cwd;
+  const cwdClaimedByHost = !(
+    claimedCwd === undefined ||
+    claimedCwd === null ||
+    (typeof claimedCwd === 'string' && claimedCwd.trim() === '')
+  );
+  const where = cwdClaimedByHost ? normaliseSeparators(claimedCwd) : normaliseSeparators(cwd);
+
+  const sections = [`⟦GOV⟧ SESSION START — ${policy.headline}`];
+
+  // WO-OR-17. THE SECOND SITE OF THE SAME DEFECT, found by sweeping for the SHAPE rather
+  // than for more instances of the first one.
+  //
+  // `main()` read stdin inside `try { ... } catch { raw = ''; }`, so a READ FAILURE became
+  // byte-identical to genuinely empty stdin — after which `parseHookInput` reported the
+  // MEASURED absence "empty stdin" about a payload it never saw. Identical to `soft()`: a
+  // probe failure wearing the costume of a measurement, one layer above the git probes.
+  if (stdinError !== null && stdinError !== undefined) {
+    sections.push(
+      '⟦GOV⟧ HOOK INPUT: NOT READ — stdin could not be read ' +
+        `(${(stdinError && stdinError.code) || 'no reason given'}). Everything below was ` +
+        'produced from an EMPTY payload, which is NOT a report that the host sent nothing.'
+    );
+  }
+
+  try {
+    const f = facts ?? factsFn(where);
+    const rendered = renderLocationSection(f, { cwdClaimedByHost });
+    if (rendered) sections.push(rendered);
+  } catch (err) {
+    sections.push(`⟦GOV⟧ WHERE THIS SESSION IS: could not be established (${err.message}).`);
+  }
+
+  try {
+    const sweep = sweepFn();
+    if (sweep) sections.push('(fallback, not the source of truth for focus)\n' + sweep);
+  } catch (err) {
+    sections.push(`⟦GOV⟧ OPEN DELIVERABLES: sweep failed (${err.message}).`);
+  }
+
+  return sections.join('\n\n');
 }
 
 // ---------------------------------------------------------------------------
@@ -1202,61 +1015,38 @@ export function sweepOpenDeliverables(root = ESTATE_ROOT, now = Date.now()) {
 
 async function main() {
   let raw = '';
+  // WO-OR-17. The cause is CAPTURED rather than swallowed, so "stdin could not be read" and
+  // "the host sent nothing" stop being the same empty string. See `buildBrief`.
+  let stdinError = null;
   try {
     const chunks = [];
     for await (const chunk of process.stdin) chunks.push(chunk);
     raw = Buffer.concat(chunks).toString('utf8');
-  } catch {
+  } catch (err) {
+    stdinError = err ?? { code: 'unknown' };
     raw = '';
   }
 
-  let result;
+  let body;
   try {
-    result = runHook(raw);
+    body = buildBrief(raw, { stdinError });
   } catch (err) {
-    // Belt and braces: runHook already catches, but a governor that crashes the
-    // session start would be a worse defect than one that says nothing useful.
-    process.stdout.write(
-      JSON.stringify({
-        hookSpecificOutput: {
-          hookEventName: 'SessionStart',
-          additionalContext: `BUILD GOVERNOR: reorientation failed hard (${err.message}). Reorient by hand from the programme map.`,
-        },
-      })
-    );
-    process.exitCode = 0;
-    return;
+    body = `⟦GOV⟧ SESSION START: reorientation failed hard (${err.message}). Orient by hand.`;
   }
 
-  // LIVE-HOOK AUGMENTATION — append the loose-deliverables sweep and the Honcho
-  // brief. Each is independently guarded: a failure in either NEVER breaks the
-  // programme reorientation the tested core produced (INV-2).
-  const extras = [];
-  // Honcho continuity is the AUTHORITATIVE current-focus source and is read first.
+  // PRESERVED BEHAVIOUR 2 — the Honcho continuity brief, read EVERY session start.
+  // `continuity.mjs` owns the single read path; this is a passthrough and adds no
+  // interpretation. It is read LAST in code and placed FIRST in nothing: it is the
+  // authoritative focus, so it is appended where a reader will reach it after knowing
+  // where they are. It fails open — a slow or unreachable Honcho never blocks a session.
+  let continuity;
   try {
-    extras.push(await readContinuityBrief());
+    continuity = await readContinuityBrief();
   } catch (err) {
-    extras.push(`⟦GOV⟧ HONCHO CONTINUITY: brief failed hard (${err.message}).`);
-  }
-  // The loose-Deliverables sweep is a FALLBACK only — never the source of truth
-  // for current focus (Warwick's ruling). It surfaces files the programme
-  // recovery cannot see, but Honcho above holds the explicit focus.
-  try {
-    const sweep = sweepOpenDeliverables();
-    if (sweep) extras.push('(fallback, not the source of truth for focus)\n' + sweep);
-  } catch (err) {
-    extras.push(`⟦GOV⟧ OPEN DELIVERABLES: sweep failed (${err.message}).`);
+    continuity = `⟦GOV⟧ HONCHO CONTINUITY: brief failed hard (${err.message}).`;
   }
 
-  const out = toHookOutput(result) || {
-    hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: '' },
-  };
-  if (extras.length) {
-    const joined = extras.join('\n\n');
-    out.hookSpecificOutput.additionalContext =
-      (out.hookSpecificOutput.additionalContext || '') + '\n\n' + joined;
-  }
-  process.stdout.write(JSON.stringify(out));
+  process.stdout.write(JSON.stringify(toHookOutput(`${body}\n\n${continuity}`)));
   process.exitCode = 0;
 }
 

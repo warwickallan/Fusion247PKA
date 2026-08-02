@@ -40,8 +40,9 @@ export const STATE = Object.freeze({
   BLIND: 'BLIND',
 });
 
-// Distinct exit codes so "did not run" can never be mistaken for "healthy" (INV-1),
-// mirroring the EXIT convention already established by rotate-session.mjs (T-10).
+// Distinct exit codes so "did not run" can never be mistaken for "healthy" (INV-1).
+// This used to cite rotate-session.mjs as the module that established the convention;
+// that module was deleted by WO-OR-05, and the convention stands on its own.
 export const EXIT_CODE = Object.freeze({
   [STATE.GREEN]: 0,
   [STATE.AMBER]: 1,

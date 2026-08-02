@@ -1,0 +1,112 @@
+repo:  C:/Fusion247PKA
+range: a989e68d95e01b7f6dc13955d796950f6a8a02a5..HEAD
+claim: Deliverables/2026-08-02-phase5-evidence/claim-scope-footer-v3.json
+scope  : tools/governor/footer.mjs
+branch : operating-reset/teardown
+
+── GIT EVIDENCE (real, read-only) ──
+resolved=true diff_range=a989e68d95e01b7f6dc13955d796950f6a8a02a5..2aac7d9a2d6584fc7d993fc21f5428f649c847d0
+changed_files=["tools/governor/footer.mjs"]
+diff bytes=52713 truncated=false
+
+── REAL CODEX MERGE REVIEW (Tower QA skill over the staged diff + the REAL claim) ──
+ok=true blocked=false model=openai-codex-exec
+{
+  "status": "ok",
+  "verdict": "request_changes",
+  "summary": "C4, D1-D4, and D8 conform, and both hand-carried prior findings are addressed. D6 fails because the derived percentage is calculated from display-rounded token values rather than the authoritative raw numerator and denominator; this can produce a materially false percentage. No CI result was claimed or treated as passing.",
+  "claims_verified": [
+    {
+      "claim": "footer.mjs no longer imports programme-state.mjs.",
+      "status": "confirmed",
+      "evidence": "The staged diff removes the readProgrammeState import and all uses of programme state."
+    },
+    {
+      "claim": "next is caller-supplied and defaults to UNSET; nextModelFor and UNSET_REASON are deleted.",
+      "status": "confirmed",
+      "evidence": "computeFooterLine accepts next = NEXT_UNSET; nextModelFor and the exported UNSET_REASON object are removed."
+    },
+    {
+      "claim": "The model/effort grammar and parser vocabulary cannot drift.",
+      "status": "confirmed",
+      "evidence": "NEXT_MODELS and NEXT_EFFORTS are frozen; NEXT_VALUES is their derived cross-product plus UNSET; renderFooter and FOOTER_RE both consume NEXT_VALUES."
+    },
+    {
+      "claim": "The token codec is faithful over the isRenderableTokens domain.",
+      "status": "confirmed",
+      "evidence": "isRenderableTokens restricts inputs to non-negative safe integers divisible by 100. formatTokens and parseTokens reconstruct those values using safe integer arithmetic."
+    },
+    {
+      "claim": "A divided percentage uses the real numerator and authoritative denominator.",
+      "status": "refuted",
+      "evidence": "deriveFooterFields first rounds both raw counts with toRenderableTokens, then computes `(usedTokens / windowTokens) * 100`; the calculation therefore does not necessarily use the actual supplied values."
+    }
+  ],
+  "acceptance_results": [
+    {
+      "acceptance_row_id": "C4",
+      "result": "pass",
+      "rationale": "The programme-state dependency is removed.",
+      "evidence": "The import of readProgrammeState and all programme-state reading logic are deleted."
+    },
+    {
+      "acceptance_row_id": "D1",
+      "result": "pass",
+      "rationale": "next is now caller-supplied with an UNSET default, and the programme-shaped derivation machinery is deleted.",
+      "evidence": "computeFooterLine declares `next = NEXT_UNSET`; nextModelFor and UNSET_REASON are removed."
+    },
+    {
+      "acceptance_row_id": "D2",
+      "result": "pass",
+      "rationale": "MODEL/EFFORT and bare UNSET are enforced from shared frozen vocabularies.",
+      "evidence": "NEXT_MODELS, NEXT_EFFORTS, and derived NEXT_VALUES feed both requireMember in renderFooter and the anchored FOOTER_RE."
+    },
+    {
+      "acceptance_row_id": "D3",
+      "result": "pass",
+      "rationale": "All four representable CTX shapes retain their fields, while the two lossy/unrepresentable combinations throw.",
+      "evidence": "renderFooter rejects windowTokens without both companions and rejects percent+usedTokens without windowTokens; parseFooter reconstructs percent, usedTokens, and windowTokens."
+    },
+    {
+      "acceptance_row_id": "D4",
+      "result": "pass",
+      "rationale": "The seven handback codes and their spelling are unchanged by the staged diff.",
+      "evidence": "HANDBACK_CODES remains product-decision, permission, credential, destructive-action, unexpected-cost, scope-change, and user-requested."
+    },
+    {
+      "acceptance_row_id": "D6",
+      "result": "fail",
+      "rationale": "A computed percentage can be based on rounded display values rather than the real numerator and denominator, violating the no-fabrication rule.",
+      "evidence": "`usedTokensRaw` and `windowRaw` are converted through toRenderableTokens before `used = (usedTokens / windowTokens) * 100`. Concrete accepted telemetry: used_tokens=49 and context_window_size=149 becomes 0/100 and renders 0%, although the real ratio is about 32.9%."
+    },
+    {
+      "acceptance_row_id": "D8",
+      "result": "pass",
+      "rationale": "The narrowed accepted token domain round-trips exactly.",
+      "evidence": "isRenderableTokens requires Number.isSafeInteger and divisibility by 100; formatTokens emits integer-thousand plus one decimal, and parseTokens reverses that representation within safe-integer arithmetic."
+    }
+  ],
+  "prior_finding_results": [
+    {
+      "finding_id": "F1",
+      "status": "addressed",
+      "rationale": "percent+usedTokens without windowTokens now throws instead of silently dropping usedTokens."
+    },
+    {
+      "finding_id": "F2",
+      "status": "addressed",
+      "rationale": "The codec domain is narrowed to safe integers, and toRenderableTokens validates its rounded result before returning it."
+    }
+  ],
+  "findings": [
+    {
+      "id": "F3",
+      "technical_impact": "HIGH",
+      "reachability": "ACTIVE",
+      "required_disposition": "BLOCKS_CURRENT_MERGE",
+      "assumed_deployment_baseline": "deriveFooterFields may receive finite authoritative token counts that are not exact multiples of TOKENS_GRAIN; no upstream contract in the staged acceptance criteria guarantees grain alignment.",
+      "evidence": "In deriveFooterFields, raw counts are rounded by toRenderableTokens and those rounded values are then used for division. For used_tokens=49 and context_window_size=149, the implementation derives 0%, not the true approximately 32.9%.",
+      "required_correction": "Calculate the percentage from validated raw authoritative numerator and denominator. Round token values only for the displayed token codec, and add coverage using a concrete pair where grain rounding changes the resulting percentage."
+    }
+  ]
+}

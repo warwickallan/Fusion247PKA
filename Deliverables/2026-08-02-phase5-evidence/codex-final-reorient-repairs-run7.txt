@@ -1,0 +1,153 @@
+repo:  C:/Fusion247PKA
+range: 2aac7d9..bb0604f8b93716de96e0c775aff91414894f51a0
+claim: Deliverables/2026-08-02-phase5-evidence/claim-scope-reorient-repairs-v7.json
+scope  : tools/governor/reorient.mjs
+branch : operating-reset/teardown
+
+ÔöÇÔöÇ GIT EVIDENCE (real, read-only) ÔöÇÔöÇ
+resolved=true diff_range=2aac7d9a2d6584fc7d993fc21f5428f649c847d0..bb0604f8b93716de96e0c775aff91414894f51a0
+changed_files=["tools/governor/reorient.mjs"]
+diff bytes=49170 of 49170 (real UTF-8 bytes) truncated=false
+packet diff_range=2aac7d9a2d6584fc7d993fc21f5428f649c847d0..bb0604f8b93716de96e0c775aff91414894f51a0 -- tools/governor/reorient.mjs
+packet scoped_to=["tools/governor/reorient.mjs"] wp_id=null
+
+ÔöÇÔöÇ REAL CODEX MERGE REVIEW (Tower QA skill over the staged diff + the REAL claim) ÔöÇÔöÇ
+ok=true blocked=false model=openai-codex-exec
+{
+  "status": "ok",
+  "verdict": "comment",
+  "summary": "BLOCKED. The staged diff resolves and materially addresses Y1, Y2, Y5, Z1, and prior findings TQA-001ÔÇô007/009. However, Y3/Y4 still fail because several independently failed Git measurements collapse to the same human-visible ÔÇ£(unknown)ÔÇØ state, leaving TQA-008 open. The staged Z2 criterion is truncated to ÔÇ£THE HOOKÔÇØ, so its acceptance requirement cannot be determined fail-closed.",
+  "claims_verified": [
+    {
+      "claim": "Bare cwd paths are rendered only after measured hook-process occupation.",
+      "status": "confirmed",
+      "evidence": "renderCwd returns a bare resolvedPath only when cwdOccupiedByHook === true; false/null add explicit qualification."
+    },
+    {
+      "claim": "No-upstream configuration no longer claims that nothing is pushed.",
+      "status": "confirmed",
+      "evidence": "upstreamState === 'none-configured' renders ÔÇ£pushed status NOT establishedÔÇØ."
+    },
+    {
+      "claim": "All fields expose the required four states distinctly to a human reader.",
+      "status": "refuted",
+      "evidence": "renderHead, renderDirty, and renderBranch still emit bare ÔÇ£(unknown)ÔÇØ for multiple distinct probe outcomes whenever gitReadable is true."
+    },
+    {
+      "claim": "The hook never throws and always exits zero.",
+      "status": "partial",
+      "evidence": "Added filesystem/Git probes are caught or wrapped by soft(), sweep failures are rendered, and main catches buildBrief failures. The supplied diff supports Z1, but the separate staged Z2 requirement is incomplete."
+    }
+  ],
+  "acceptance_results": [
+    {
+      "acceptance_row_id": "Y1",
+      "result": "pass",
+      "rationale": "Only measured occupation earns an unqualified cwd path; file, other type, unreadable, empty, non-string, false occupation, and unknown occupation are qualified distinctly.",
+      "evidence": "tools/governor/reorient.mjs: renderCwd; cwdOccupiedByHook derivation."
+    },
+    {
+      "acceptance_row_id": "Y2",
+      "result": "pass",
+      "rationale": "Empty upstream configuration states only the measured configuration fact and explicitly withholds pushed status. Detached, unreadable, and unsettled states use separate text.",
+      "evidence": "tools/governor/reorient.mjs: upstreamState derivation and upstream rendering branches."
+    },
+    {
+      "acceptance_row_id": "Y3",
+      "result": "fail",
+      "rationale": "The four-state distinction is not human-visible for every field. Distinct failed or unmeasured HEAD, dirty, and branch probes can render identically as ÔÇ£(unknown)ÔÇØ.",
+      "evidence": "tools/governor/reorient.mjs: renderHead, renderDirty, and renderBranch."
+    },
+    {
+      "acceptance_row_id": "Y4",
+      "result": "fail",
+      "rationale": "The failure model remains incomplete at rendering level: per-probe causes are retained by soft() but are not surfaced for several fields when the coarse gitReadable probe succeeded.",
+      "evidence": "A successful rev-parse --git-dir followed by failed status, rev-parse HEAD, or branch probes produces bare ÔÇ£(unknown)ÔÇØ output."
+    },
+    {
+      "acceptance_row_id": "Y5",
+      "result": "pass",
+      "rationale": "Unreadable directory and per-file failures render explicit NOT SWEPT/incomplete disclosures; genuinely empty readable results return no list; display-cap truncation is disclosed.",
+      "evidence": "tools/governor/reorient.mjs: sweepOpenDeliverables error handling, unreadable counter, and DISPLAY_CAP disclosure."
+    },
+    {
+      "acceptance_row_id": "Z1",
+      "result": "pass",
+      "rationale": "The added boot-path probes degrade through soft(), local try/catch blocks, buildBrief containment, or main's hard-failure message rather than escaping as exceptions.",
+      "evidence": "tools/governor/reorient.mjs: soft(), sweepOpenDeliverables, buildBrief, and main."
+    },
+    {
+      "acceptance_row_id": "Z2",
+      "result": "blocked",
+      "rationale": "The staged brief contains only ÔÇ£Z2. THE HOOKÔÇØ with no testable requirement. Fail-closed review cannot infer the missing criterion.",
+      "evidence": "Provided brief_excerpt terminates immediately after the Z2 heading."
+    }
+  ],
+  "prior_finding_results": [
+    {
+      "finding_id": "TQA-001",
+      "status": "addressed",
+      "rationale": "cwd failures retain and render absent, unreadable, not-a-path, and unknown causes separately."
+    },
+    {
+      "finding_id": "TQA-002",
+      "status": "addressed",
+      "rationale": "Detachment is asserted only for symbolic-ref status 1; other failures avoid a DETACHED diagnosis."
+    },
+    {
+      "finding_id": "TQA-003",
+      "status": "addressed",
+      "rationale": "Directory type alone no longer renders as an unqualified session location."
+    },
+    {
+      "finding_id": "TQA-004",
+      "status": "addressed",
+      "rationale": "Rows omitted by the display cap are explicitly counted and disclosed."
+    },
+    {
+      "finding_id": "TQA-005",
+      "status": "addressed",
+      "rationale": "Occupation is measured using resolved process cwd, and the heading no longer overclaims session location."
+    },
+    {
+      "finding_id": "TQA-006",
+      "status": "addressed",
+      "rationale": "No-upstream rendering explicitly says pushed status is not established."
+    },
+    {
+      "finding_id": "TQA-007",
+      "status": "addressed",
+      "rationale": "Leaf realpaths are checked against the resolved estate-root/Deliverables boundary, including redirected parent directories."
+    },
+    {
+      "finding_id": "TQA-008",
+      "status": "remains_open",
+      "rationale": "Cause-aware wording was added only for selected coarse git-unreadable cases; several field-specific failures still collapse to bare ÔÇ£(unknown)ÔÇØ."
+    },
+    {
+      "finding_id": "TQA-009",
+      "status": "addressed",
+      "rationale": "Clean and DIRTY now require strict false and true respectively; undefined/null render unknown."
+    }
+  ],
+  "findings": [
+    {
+      "id": "TQA-008",
+      "technical_impact": "HIGH",
+      "reachability": "ACTIVE",
+      "required_disposition": "BLOCKS_CURRENT_MERGE",
+      "assumed_deployment_baseline": "SessionStart hook operating in a readable Git repository where an individual Git probe fails independently.",
+      "evidence": "renderHead returns ÔÇ£(unknown)ÔÇØ when headSha is absent but gitReadable is true; renderDirty does likewise for dirty null/undefined; renderBranch discards symbolicRefFailure details when branch is null rather than literal HEAD.",
+      "required_correction": "Carry and render field-specific measurement states/causes for HEAD, working-tree state, branch, worktree kind, and other nullable Git fields so measured absence, no claim, contradicted claim, and probe failure remain human-distinguishable."
+    },
+    {
+      "id": "TQA-010",
+      "technical_impact": "HIGH",
+      "reachability": "ACTIVE",
+      "required_disposition": "BLOCKS_CURRENT_MERGE",
+      "assumed_deployment_baseline": "This bounded packet is the authoritative acceptance contract for the review.",
+      "evidence": "The brief excerpt ends at ÔÇ£Z2. THE HOOKÔÇØ and supplies no predicate, expected behavior, or evidence requirement.",
+      "required_correction": "Restage the complete Z2 acceptance criterion and rerun the bounded review; do not infer or silently omit it."
+    }
+  ]
+}

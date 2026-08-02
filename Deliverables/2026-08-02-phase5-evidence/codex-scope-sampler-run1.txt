@@ -1,0 +1,144 @@
+repo:  C:/Fusion247PKA
+range: a989e68d95e01b7f6dc13955d796950f6a8a02a5..HEAD
+claim: Deliverables/2026-08-02-phase5-evidence/claim-scope-sampler.json
+scope  : tools/governor/sampler.mjs,tools/governor/sampler.test.mjs
+branch : operating-reset/teardown
+
+── GIT EVIDENCE (real, read-only) ──
+resolved=true diff_range=a989e68d95e01b7f6dc13955d796950f6a8a02a5..d9c196936c02bae448f5ad9560631a46114dfee0
+changed_files=["tools/governor/sampler.mjs","tools/governor/sampler.test.mjs"]
+diff bytes=41068 truncated=false
+
+── REAL CODEX MERGE REVIEW (Tower QA skill over the staged diff + the REAL claim) ──
+ok=true blocked=false model=openai-codex-exec
+{
+  "status": "ok",
+  "verdict": "request_changes",
+  "summary": "The denominator repair is materially improved, but it does not prove that a returned observation is authoritative for the live session: a lone or consistently wrong bare-ID observation still resolves. The staged tests also violate the no-literal-variant criterion and never cross the sampler-to-footer derivation-and-rendering seam. Corrections are required before merge.",
+  "claims_verified": [
+    {
+      "claim": "The sample carries real used_tokens and refuses a denominator smaller than its numerator.",
+      "status": "confirmed",
+      "evidence": "tools/governor/sampler.mjs: extractTranscriptSample sums usage, passes usedTokens into resolveWindowTokens, and guard (c) rejects incoherent explicit or observed windows."
+    },
+    {
+      "claim": "Bare/variant ambiguity is guarded asymmetrically.",
+      "status": "confirmed",
+      "evidence": "tools/governor/sampler.mjs: variantBaseOf(modelId) is checked only for bare live IDs; variant-suffixed live IDs retain exact matching."
+    },
+    {
+      "claim": "A returned observation is established for the live session.",
+      "status": "refuted",
+      "evidence": "tools/governor/sampler.mjs: a single matching bare-ID observation—or several agreeing ones—returns a denominator when no variant sibling has yet been recorded, although the live transcript may still represent an unobserved variant namespace."
+    },
+    {
+      "claim": "The new tests cross from real sampler output through footer field derivation and rendering.",
+      "status": "refuted",
+      "evidence": "tools/governor/sampler.test.mjs exercises sampleFromTranscript and stored sample fields, but the staged diff contains no footer derivation or renderer invocation/assertion."
+    }
+  ],
+  "acceptance_results": [
+    {
+      "acceptance_row_id": "D5",
+      "result": "pass",
+      "rationale": "The transcript path calculates used_tokens from real usage fields and emits a null denominator unless the resolver accepts an explicit or observed value. No model-to-window lookup table appears in the staged production code.",
+      "evidence": "tools/governor/sampler.mjs: sumUsedTokens, resolveWindowTokens, and extractTranscriptSample."
+    },
+    {
+      "acceptance_row_id": "D6",
+      "result": "partial",
+      "rationale": "The sampler correctly leaves percentage fields null without a denominator and carries both numbers when one resolves, but the staged tests do not prove the required rendered absolute-count/percentage behavior.",
+      "evidence": "tools/governor/sampler.test.mjs: transcript tests assert sample fields only; no footer renderer is invoked."
+    },
+    {
+      "acceptance_row_id": "D7",
+      "result": "not_applicable",
+      "rationale": "Continuity hook registration and settings are outside this explicitly two-file scoped packet.",
+      "evidence": "The staged diff changes only tools/governor/sampler.mjs and tools/governor/sampler.test.mjs."
+    },
+    {
+      "acceptance_row_id": "G1",
+      "result": "fail",
+      "rationale": "Matching plus agreement does not establish that an observation belongs to the live session. A bare live ID resolves from a lone bare observation whenever its variant-suffixed sibling has not yet been observed.",
+      "evidence": "tools/governor/sampler.mjs: resolveWindowTokens returns the sole matched size after guards (a) and (b); guard (b) depends on a sibling already existing in sizesById."
+    },
+    {
+      "acceptance_row_id": "G2",
+      "result": "pass",
+      "rationale": "Guard (b) catches a bare ID with an observed variant-suffixed sibling and is asymmetric for a variant-suffixed live ID.",
+      "evidence": "tools/governor/sampler.mjs: variantBaseOf(modelId) branch; sampler.test.mjs: guard-(b) ambiguity and asymmetric tests."
+    },
+    {
+      "acceptance_row_id": "G3",
+      "result": "fail",
+      "rationale": "Production matching is generic and does not strip suffixes, but the scoped test file repeatedly names a concrete variant literal despite the criterion explicitly forbidding literals anywhere.",
+      "evidence": "tools/governor/sampler.test.mjs contains repeated concrete IDs such as claude-opus-5[1m] and other [1m] literals."
+    },
+    {
+      "acceptance_row_id": "G4",
+      "result": "pass",
+      "rationale": "Positive controls cover explicit declaration, one observation, several agreeing observations, exact variant-suffixed matching, and isolation from another model's ambiguity.",
+      "evidence": "tools/governor/sampler.test.mjs: WO-OR-08 POSITIVE CONTROL and asymmetric guard-(b) tests."
+    },
+    {
+      "acceptance_row_id": "G5",
+      "result": "pass",
+      "rationale": "Guard (c) is applied through coherent() before returning either the explicit-operator or observation candidate.",
+      "evidence": "tools/governor/sampler.mjs: declared-window branch and matched-size branch both call coherent; corresponding tests cover both routes."
+    },
+    {
+      "acceptance_row_id": "G6",
+      "result": "fail",
+      "rationale": "The test reaches a real sampler output but stops at sample fields/storage. It never passes those fields through footer derivation and the renderer, so the required seam remains untested.",
+      "evidence": "tools/governor/sampler.test.mjs imports sampler and health-store APIs only; staged tests contain no footer derivation or rendering call."
+    },
+    {
+      "acceptance_row_id": "X1",
+      "result": "fail",
+      "rationale": "Yes. A bare live ID with one unrelated bare-ID observation and no recorded variant sibling returns that unrelated denominator.",
+      "evidence": "tools/governor/sampler.mjs: sizesById.get(modelId) followed by matched.size===1 and absence-based sibling guard."
+    },
+    {
+      "acceptance_row_id": "X2",
+      "result": "pass",
+      "rationale": "No realistic blanket-unreachability case is demonstrated; explicit declarations and unambiguous observations remain reachable, including exact variant IDs.",
+      "evidence": "tools/governor/sampler.test.mjs positive-control and asymmetric tests."
+    },
+    {
+      "acceptance_row_id": "X3",
+      "result": "fail",
+      "rationale": "Yes. Several bare-ID observations may agree on 200k while the live transcript's bare ID represents an unobserved 1M variant session; agreement establishes store consistency, not live-session identity.",
+      "evidence": "tools/governor/sampler.mjs has no session-level linkage between transcript samples and statusLine observations."
+    }
+  ],
+  "prior_finding_results": [],
+  "findings": [
+    {
+      "id": "TQA-001",
+      "technical_impact": "HIGH",
+      "reachability": "ACTIVE",
+      "required_disposition": "BLOCKS_CURRENT_MERGE",
+      "assumed_deployment_baseline": "Mixed context-window variants share a bare transcript model ID, and the health store may not yet contain the live variant-suffixed observation.",
+      "evidence": "resolveWindowTokens accepts one or several agreeing bare-ID observations when no variant sibling is present; no session identity binds an observation to the live transcript. This leaves the original false-denominator class reachable (G1/X1/X3).",
+      "required_correction": "Require affirmative evidence tying an observed denominator to the live session/namespace, or return {tokens:null, source:null}; add a regression fixture for the unobserved-variant case."
+    },
+    {
+      "id": "TQA-002",
+      "technical_impact": "MEDIUM",
+      "reachability": "ACTIVE",
+      "required_disposition": "BLOCKS_CURRENT_MERGE",
+      "assumed_deployment_baseline": "The acceptance criterion applies to both scoped files, including tests and comments.",
+      "evidence": "tools/governor/sampler.test.mjs repeatedly embeds the concrete variant literal [1m], contrary to G3's explicit prohibition.",
+      "required_correction": "Replace concrete variant values with generic fixture values that test the base[variant] shape without naming a real variant literal."
+    },
+    {
+      "id": "TQA-003",
+      "technical_impact": "HIGH",
+      "reachability": "ACTIVE",
+      "required_disposition": "BLOCKS_CURRENT_MERGE",
+      "assumed_deployment_baseline": "The footer derives display fields and renders independently from sampler persistence, as described by G6.",
+      "evidence": "The staged end-to-end tests terminate at sampleFromTranscript/readHealthSample and assert stored fields; none invokes footer field derivation or rendering.",
+      "required_correction": "Add a fixture-driven executed test that feeds real sampler output through footer field derivation and the renderer, asserting absolute count without a denominator and percentage only with an established denominator."
+    }
+  ]
+}

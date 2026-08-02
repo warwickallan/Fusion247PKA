@@ -1,9 +1,11 @@
 // The Governor footer — ONE renderer, ONE parser, ONE vocabulary (BUILD-018 WP-3, D-D).
 //
-// This module owns the `⟦GOV⟧` line end-to-end: the byte grammar (D-2), the
-// degradation ladder that decides what it says (D-3), and the `UNSET` predicate that
-// decides whether a model name may appear at all (D-4). `stop-controller.mjs` and the
-// live status line both import from here. Nothing re-implements the grammar — that is
+// This module owns the `⟦GOV⟧` line end-to-end: the byte grammar (D-2) and the
+// degradation ladder that decides what it says (D-3). The `UNSET` predicate that used to
+// decide whether a model name may appear (D-4) was deleted by WO-OR-05 along with the
+// programme state it read; `next:` is a caller-supplied input now, and carries an EFFORT
+// as well as a model. `statusline-live.mjs` imports from here (`stop-controller.mjs` did
+// too, until the same Work Order deleted it). Nothing re-implements the grammar — that is
 // the whole point of the module (Silas D-1): a footer produced by one actor and checked
 // by another is only a contract if both go through the same code. Two hand-written
 // copies are a convention, and conventions drift.
@@ -26,8 +28,8 @@
 // ---------------------------------------------------------------------------
 // `status-line.mjs` degrades rather than throws, and that is right for it: it renders a
 // human-facing line from a verdict object and a wrong line there is merely ugly. This
-// module is different, because its output is CONSUMED — `stop-controller.mjs` parses the
-// footer and acts on the control token. So the two halves take opposite postures:
+// module is different, because its output is CONSUMED: the footer is parsed and its
+// control token acted on. So the two halves take opposite postures:
 //
 //   * `renderFooter` is STRICT and THROWS on any field outside the grammar. Coercing a
 //     bad field into something renderable would emit a plausible-but-wrong footer, and a
@@ -44,22 +46,16 @@
 // ---------------------------------------------------------------------------
 // IMPORT COST, because this sits on the Stop path
 // ---------------------------------------------------------------------------
-// A-7 forbids any `git` invocation in the Stop path. Nothing here shells out, and none
-// of the four modules imported below executes anything at import time —
-// `worktree-guard.mjs` imports `execFileSync` but only calls it inside functions this
-// module never touches. `samePath` is imported rather than copied because path equality
-// that disagrees with the rest of the estate is exactly the bug that produces a
-// permanent false WRONG WORKTREE (worktree-guard.mjs's own note), and SSOT says one
-// implementation.
+// A-7 forbids any `git` invocation in the Stop path. That now holds STRUCTURALLY rather
+// than by argument: WO-OR-05 removed the `worktree-guard.mjs` import (whose `liveLocation`
+// was the one reachable `git` call) and the `programme-state.mjs` import, so the only
+// modules left below are the evaluator and the health store, neither of which executes
+// anything at import time or shells out at all.
 
 import { readdirSync, existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { evaluate, STATE } from './evaluator.mjs';
-// `liveLocation` is used ONLY by the CLI at the foot of this file, never on any imported
-// path. See the A-7 note there before concluding that this module shells out to git.
-import { samePath, liveLocation } from './worktree-guard.mjs';
-import { readProgrammeState } from './programme-state.mjs';
 import { readHealthSample, healthStoreDir } from './health-store.mjs';
 
 // ---------------------------------------------------------------------------
@@ -98,8 +94,15 @@ export const SEP = ' · ';
 // nothing — while the same comment instructed the next reader not to change it, which
 // would have preserved the dangling reference indefinitely. THIS list is now the
 // machine-readable authority, and root CLAUDE.md § "When Warwick may be interrupted" is
-// the human one; `stop-controller.mjs` imports this literal rather than re-typing it, so
-// the two still cannot drift apart. Found by Nolan's post-cut constitution audit.
+// the human one. Found by Nolan's post-cut constitution audit.
+//
+// THE DRIFT GUARD THIS NOTE USED TO CLAIM NO LONGER EXISTS — stated rather than left to
+// be discovered. It said `stop-controller.mjs` imports this literal instead of re-typing
+// it, "so the two still cannot drift apart". WO-OR-05 deleted `stop-controller.mjs`, so
+// this const now has NO importing consumer, and nothing mechanical ties it to the
+// constitution. The seven members and their exact spelling remain load-bearing and are
+// deliberately unchanged by that Work Order; what changed is that only a reader enforces
+// them. Re-pointing this comment at another module would be worse than saying so.
 export const HANDBACK_CODES = Object.freeze([
   'product-decision',
   'permission',
@@ -140,11 +143,33 @@ export const ADVICE_VALUES = Object.freeze([
 ]);
 
 // D-2's NEXT production. This is narrower than D-4's U-c (which only excludes `unknown`
-// and `any`), and the grammar wins where they meet: a `model_recommendation.model` of
-// "GPT-5" satisfies U-c but has no representation in the footer, so it renders UNSET.
-// Stated explicitly because it is a real constraint D-4 does not mention.
+// and `any`), and the grammar wins where they meet: a recommendation of "GPT-5" has no
+// representation in the footer, so it renders UNSET.
+//
+// ---------------------------------------------------------------------------
+// NEXT NOW CARRIES MODEL **AND** EFFORT (operating-reset Phase 5, WO-OR-05)
+// ---------------------------------------------------------------------------
+// `next: Opus` answered half the question. The harness runs five effort levels and the
+// transcript records the one in force, so a recommendation that names a model and stays
+// silent on effort is under-specified advice about the phase ahead — Warwick still has
+// to guess the half that changes cost and latency most.
+//
+// The production is `MODEL "/" EFFORT`, with `UNSET` still bare. Both vocabularies are
+// frozen literals, and BOTH the renderer and `FOOTER_RE` derive from `NEXT_VALUES`
+// below — hand-listing the alternation is exactly the drift that let `TASK UNKNOWN` be
+// added to the renderer while the parser silently could not read it back.
 export const NEXT_MODELS = Object.freeze(['Opus', 'Sonnet', 'Haiku']);
+// Five, not three. The harness genuinely has all five and the transcript carries an
+// `effort` field, so a three-value list would be wrong on contact with reality.
+export const NEXT_EFFORTS = Object.freeze(['low', 'medium', 'high', 'xhigh', 'max']);
 export const NEXT_UNSET = 'UNSET';
+
+// The complete closed set of renderable `next:` values — the cross-product plus UNSET.
+// DERIVED, never hand-listed, for the reason above.
+export const NEXT_VALUES = Object.freeze([
+  ...NEXT_MODELS.flatMap((m) => NEXT_EFFORTS.map((e) => `${m}/${e}`)),
+  NEXT_UNSET,
+]);
 
 export const CONTROL_CONTINUE = 'CONTINUE';
 export const HANDBACK_PREFIX = 'HANDBACK:';
@@ -164,26 +189,28 @@ export const HEALTH_SCHEMA_VERSION = 1;
 export const BLIND_REASON = Object.freeze({
   SAMPLE_UNREADABLE: 'sample-missing-or-unreadable',
   SCHEMA_UNRECOGNISED: 'sample-schema-unrecognised',
-  PERCENTAGE_ABSENT: 'context-percentage-absent-or-non-finite',
+  // WIDENED (WO-OR-05): a sample is now usable if it carries EITHER a percentage or a
+  // raw token count, so this rung only fires when it carries neither.
+  PERCENTAGE_ABSENT: 'context-usage-absent-or-non-finite',
   PERCENTAGE_OUT_OF_RANGE: 'context-percentage-out-of-grammar-range',
   SAMPLED_AT_UNPARSEABLE: 'sampled-at-absent-or-unparseable',
   SESSION_MISMATCH: 'sample-belongs-to-another-session',
   STALE: 'sample-stale',
   EVALUATOR_THREW: 'evaluator-threw',
+  // NEW (WO-OR-05). Tokens are known, the window size is not, so the number is real but
+  // it CANNOT BE CLASSIFIED. See the note on `deriveFooterFields` for why this stays
+  // BLIND rather than being graded into GREEN/AMBER/RED off a guessed denominator.
+  WINDOW_SIZE_UNKNOWN: 'context-window-size-not-authoritatively-known',
 });
 
-// Why `next:` is UNSET. Same reasoning as BLIND_REASON.
-export const UNSET_REASON = Object.freeze({
-  LOCATION_UNKNOWN: 'live-worktree-path-or-branch-unknown',
-  NO_MATCHING_PROGRAMME: 'no-programme-state-matches-this-session',
-  AMBIGUOUS_PROGRAMME: 'more-than-one-programme-state-matches-this-session',
-  NEXT_ACTION_KIND: 'resumption.next_action_kind is not "action"',
-  MODEL_UNKNOWN: 'model_recommendation.model is unknown/any',
-  MODEL_NOT_IN_GRAMMAR: 'model_recommendation.model has no footer representation',
-  FOR_TICKET_MISMATCH: 'model_recommendation.for_ticket does not match resumption.ticket',
-  HEAD_MISMATCH: 'model_recommendation.computed_at_head does not match banked.head_sha',
-  TICKET_UNRESOLVED_MISSING: 'resumption.ticket names no unresolved ticket in tickets[]',
-});
+// `UNSET_REASON` was DELETED here by WO-OR-05, together with `nextModelFor`, its sole
+// producer. Every one of its nine members named a property of banked BUILD-* programme
+// state (`resumption.next_action_kind`, `model_recommendation.for_ticket`,
+// `banked.head_sha`, …), and programme state no longer exists in this estate. A reason
+// enum whose only producer has been deleted is a corpse, not an interface: nothing can
+// ever emit one of those strings again, so keeping them would leave a reviewer looking
+// for a code path that is not there. `next:` is now an INPUT (see `deriveFooterFields`),
+// and its absence has exactly one meaning — nobody supplied a grounded recommendation.
 
 // ---------------------------------------------------------------------------
 // Pure: advice
@@ -281,6 +308,118 @@ export function parseControl(control) {
 }
 
 // ---------------------------------------------------------------------------
+// Pure: the token production (WO-OR-05)
+// ---------------------------------------------------------------------------
+// WHY THE FOOTER GREW AN ABSOLUTE NUMBER AT ALL.
+//
+// The percentage has exactly one honest source: a used-token count DIVIDED BY the
+// context window size. The transcript JSONL — the only telemetry that reaches Warwick's
+// web and Android clients — carries the numerator and NOT the denominator. Verified by
+// reading real transcripts: the newest assistant message's `usage` gives
+// input/cache-creation/cache-read/output tokens, and no field anywhere states the window
+// size.
+//
+// The tempting fix is a model -> window lookup table. It is forbidden here, by ruling:
+// this very estate runs 1M-context and 200k-context sessions of the SAME model, so such
+// a table renders a confidently wrong percentage — a false reading manufactured by a
+// control that was never told the size of the thing it measures.
+//
+// So the footer reports what it knows. `ctx 72.6k` is a true absolute number; it is
+// strictly more useful than `ctx --` and strictly more honest than a fabricated `38%`.
+// When a denominator IS authoritatively known the line carries both: `ctx 38% (72.6k/190k)`.
+//
+// GRAIN. Tokens render to one decimal of a thousand, so the renderer requires a value
+// that is already a multiple of `TOKENS_GRAIN`. That is not fussiness — it is what makes
+// `parseFooter(renderFooter(x)).fields` deep-equal `x` (D-M10) for the token fields.
+// Rounding inside the renderer would silently break that identity; rounding in the
+// PRODUCER keeps the codec exact. Same split as everywhere else in this module: meaning
+// in the producer, fidelity in the codec.
+export const TOKENS_GRAIN = 100;
+
+/**
+ * True when `n` is a token count this grammar can render EXACTLY — and, the stronger
+ * half and the one this predicate used to get wrong, READ BACK exactly.
+ *
+ * BOUNDED AT `Number.MAX_SAFE_INTEGER` (WO-OR-10). The grain alone is not sufficient
+ * for the D-M10 identity, because `parseTokens` reconstructs `whole * 1000 + frac *
+ * TOKENS_GRAIN` and that arithmetic stops being exact above 2^53. Two failure classes
+ * were reachable from the old, unbounded predicate, and the quiet one is the reason
+ * this bound exists:
+ *
+ *   LOSSY (silent). `100000000000001200` was accepted, rendered `100000000000001.2k`,
+ *   and parsed back as `100000000000001180`. The line was grammatical, `ok` was true,
+ *   and the number had changed. A footer that reports a plausible wrong figure is worse
+ *   than one that reports nothing — it is INV-1's false GREEN wearing a token count.
+ *
+ *   UNGRAMMATICAL (loud). At and above 1e24, `String(whole)` switches to exponent
+ *   notation (`1.00663296e+21k`) and `parseFooter` rejects the whole line.
+ *
+ * WHY `Number.MAX_SAFE_INTEGER` AND NOT A DOMAIN CAP. A "no real context window exceeds
+ * N tokens" rule would be a MEANING judgement, and this module keeps meaning in the
+ * producer and fidelity in the codec (see the TOKENS_GRAIN note above). The safe-integer
+ * bound is a fidelity bound: it is precisely where the arithmetic below stops being
+ * exact, so the rule has the same shape as the defect. It is also exact BY CONSTRUCTION
+ * rather than by sampling — inside it, `whole * 1000 <= n < 2^53` so the reconstruction
+ * is exact integer arithmetic, and `whole < 1e21` so `String` never goes exponential.
+ *
+ * `Number.isSafeInteger` rather than `Number.isInteger` plus a hand-written comparison:
+ * it subsumes the integer check and names the property instead of a magic constant.
+ *
+ * `-0` is EXCLUDED (WO-OR-16): it formats to "0k" and reads back as `+0`, failing the
+ * READ-BACK half above. See the negative-zero guard in `renderFooter`.
+ */
+export function isRenderableTokens(n) {
+  return typeof n === 'number' && Number.isSafeInteger(n) && n >= 0 && n % TOKENS_GRAIN === 0 && !Object.is(n, -0);
+}
+
+/** 72600 -> "72.6k"  ·  190000 -> "190k"  ·  900 -> "0.9k"  ·  0 -> "0k" */
+export function formatTokens(n) {
+  if (!isRenderableTokens(n)) {
+    throw new TypeError(
+      `tokens must be a non-negative SAFE-INTEGER multiple of ${TOKENS_GRAIN} ` +
+      `(<= ${Number.MAX_SAFE_INTEGER}) — got ${JSON.stringify(n)}`
+    );
+  }
+  // Integer arithmetic throughout: no float division, so no 72.60000000000001.
+  const tenths = n / TOKENS_GRAIN;
+  const whole = Math.floor(tenths / 10);
+  const frac = tenths % 10;
+  return frac === 0 ? `${whole}k` : `${whole}.${frac}k`;
+}
+
+/** "72.6k" -> 72600. Exact inverse of `formatTokens` over its whole range. */
+export function parseTokens(text) {
+  const m = /^([0-9]+)(?:\.([0-9]))?k$/.exec(text ?? '');
+  if (!m) return null;
+  return Number(m[1]) * 1000 + Number(m[2] ?? 0) * TOKENS_GRAIN;
+}
+
+/**
+ * Round a raw count onto the grain so the renderer will accept it, or `null` when no
+ * such value exists.
+ *
+ * THE CONTRACT IS NOW ENFORCED RATHER THAN ASSERTED (WO-OR-10). This function claimed
+ * to produce something `renderFooter` accepts and did not: above roughly 1e23 the
+ * nearest double is not a multiple of the grain, so `Math.round(n / GRAIN) * GRAIN`
+ * handed the rounded value straight back and the strict renderer THREW on it. That is
+ * the exact mirror of the F1 defect — there the renderer accepted what the parser could
+ * not represent, here the producer emitted what the renderer would not accept.
+ *
+ * The result is therefore checked against `isRenderableTokens` rather than assumed to
+ * satisfy it, which makes the two functions agree BY CONSTRUCTION instead of by
+ * coincidence. Checking the RESULT and not the argument is load-bearing: a count just
+ * inside the safe range can round UP across the bound (`Number.MAX_SAFE_INTEGER` does
+ * exactly that), so a guard on the input would leak the one case it was written for.
+ */
+export function toRenderableTokens(n) {
+  if (typeof n !== 'number' || !Number.isFinite(n) || n < 0) return null;
+  // `+ 0` normalises -0 (WO-OR-16): the codec refuses it, and returning null instead would
+  // degrade a real zero-token reading into BLIND. Meaning in the producer.
+  const rounded = Math.round(n / TOKENS_GRAIN) * TOKENS_GRAIN + 0;
+  return isRenderableTokens(rounded) ? rounded : null;
+}
+
+// ---------------------------------------------------------------------------
 // Pure: render
 // ---------------------------------------------------------------------------
 
@@ -294,14 +433,44 @@ function requireMember(value, allowed, label) {
  * renderFooter(fields) -> string  (no trailing newline; the caller owns line framing)
  *
  * fields = {
- *   percent:     integer 0..100, or null for "--"
+ *   percent:     integer 0..100, or null
+ *   usedTokens:  non-negative integer multiple of TOKENS_GRAIN, or null
+ *   windowTokens: positive integer multiple of TOKENS_GRAIN, or null
  *   approximate: boolean — the D-3 `~`, meaning "this sample's session could not be
  *                confirmed as mine"
  *   state:       GREEN | AMBER | RED | RECOVERY | BLIND
- *   advice:      KEEP GOING | CLEAR NOW | KEEP GOING?
- *   next:        Opus | Sonnet | Haiku | UNSET
+ *   advice:      KEEP GOING | CLEAR NOW | KEEP GOING? | TASK UNKNOWN
+ *   next:        <Model>/<effort> | UNSET
  *   control:     CONTINUE | HANDBACK:<code>
  * }
+ *
+ * The CTX field has four shapes and they are total over the field set:
+ *
+ *   percent + usedTokens + windowTokens   ->  `ctx 38% (72.6k/190k)`
+ *   percent only                          ->  `ctx 38%`
+ *   usedTokens only                       ->  `ctx 72.6k`
+ *   neither                               ->  `ctx --`
+ *
+ * Those four shapes are the WHOLE of the representable space, and the field set has one
+ * more combination than that. Both unrepresentable combinations THROW:
+ *
+ *   windowTokens without BOTH a percent and a usedTokens — a denominator with nothing
+ *   to divide is a caller bug, and silently discarding it would hide the bug behind a
+ *   plausible line.
+ *
+ *   percent + usedTokens with NO windowTokens (WO-OR-10, Codex F1) — the numerator has
+ *   nowhere to go, because the parenthesised pair is emitted only alongside a
+ *   denominator. This used to render `ctx 38%` and DROP the 72.6k silently, so
+ *   `parseFooter(renderFooter(x)).fields.usedTokens` came back `null` and the D3
+ *   round-trip identity was false for that shape.
+ *
+ * The repair is deliberately a NARROWING of the accepted domain rather than a widening
+ * of the grammar. Encoding the numerator in that shape would need a fifth CTX
+ * production, and a footer grammar that grows a shape to accommodate a caller nobody
+ * has is a worse trade than a caller being told it asked for something unrepresentable.
+ * Refuse-what-you-cannot-represent is already this module's character: strict renderer,
+ * degrading producer. No caller is affected — no path through `deriveFooterFields`
+ * emits this shape, verified by sweeping the producer across its telemetry range.
  *
  * Every field is always emitted. D-2 is explicit that absence is expressed by a VALUE
  * (`--`, `UNSET`) and never by a missing segment, so that a parser never has to guess
@@ -315,19 +484,72 @@ export function renderFooter(fields) {
   if (!fields || typeof fields !== 'object') {
     throw new TypeError('renderFooter requires a fields object');
   }
-  const { percent, approximate = false, state, advice, next, control } = fields;
+  const {
+    percent,
+    usedTokens = null,
+    windowTokens = null,
+    approximate = false,
+    state,
+    advice,
+    next,
+    control,
+  } = fields;
 
-  if (percent !== null && percent !== undefined) {
+  // The three presence facts the CTX shape rules are written in terms of. Named once
+  // (WO-OR-10) rather than re-spelled as `x !== null && x !== undefined` at each of the
+  // six places that needed them: the F1 gap was precisely a MISSING combination of these
+  // three, and a rule set you cannot read at a glance is one whose gaps you cannot see.
+  const hasPercent = percent !== null && percent !== undefined;
+  const hasUsed = usedTokens !== null && usedTokens !== undefined;
+  const hasWindow = windowTokens !== null && windowTokens !== undefined;
+
+  if (hasPercent) {
+    // WO-OR-16. `-0` walks every check below (it IS an integer; `-0 < 0` is FALSE), renders
+    // as the byte "0" and reads back as `+0` — D3 false for a value this codec ACCEPTED, the
+    // F1 class closed the same way. Refused, not normalised, and given its own message
+    // because `JSON.stringify(-0)` is "0". Full argument: footer.test.mjs § WO-OR-16.
+    if (Object.is(percent, -0)) {
+      throw new TypeError('percent must not be negative zero — it renders 0% and reads back +0');
+    }
     if (typeof percent !== 'number' || !Number.isInteger(percent) || percent < 0 || percent > 100) {
       throw new TypeError(`percent must be an integer 0..100 or null — got ${JSON.stringify(percent)}`);
     }
+  }
+  if (hasUsed && !isRenderableTokens(usedTokens)) {
+    throw new TypeError(
+      `usedTokens must be a non-negative safe-integer multiple of ${TOKENS_GRAIN} ` +
+      `(<= ${Number.MAX_SAFE_INTEGER}), never -0, or null — ` +
+      `got ${Object.is(usedTokens, -0) ? '-0' : JSON.stringify(usedTokens)}`
+    );
+  }
+  if (hasWindow) {
+    if (!isRenderableTokens(windowTokens) || windowTokens === 0) {
+      throw new TypeError(
+        `windowTokens must be a positive safe-integer multiple of ${TOKENS_GRAIN} ` +
+        `(<= ${Number.MAX_SAFE_INTEGER}) or null — got ${JSON.stringify(windowTokens)}`
+      );
+    }
+    if (!hasPercent || !hasUsed) {
+      throw new TypeError('windowTokens requires both percent and usedTokens — a denominator with nothing to divide is a caller bug');
+    }
+  }
+  // WO-OR-10 / Codex F1. The converse of the check above, and the one that was missing:
+  // a numerator beside a percent has no representation WITHOUT a denominator, so the
+  // four CTX shapes rendered `ctx <percent>%` and dropped it. A silently discarded field
+  // is worse than a refused one — it yields a footer that parses cleanly and disagrees
+  // with the fields it was rendered from.
+  if (hasPercent && hasUsed && !hasWindow) {
+    throw new TypeError(
+      'percent with usedTokens requires windowTokens — the numerator has no representation ' +
+      'in the bare percent shape and would be silently dropped'
+    );
   }
   if (typeof approximate !== 'boolean') {
     throw new TypeError(`approximate must be a boolean — got ${JSON.stringify(approximate)}`);
   }
   requireMember(state, FOOTER_STATES, 'state');
   requireMember(advice, ADVICE_VALUES, 'advice');
-  requireMember(next, [...NEXT_MODELS, NEXT_UNSET], 'next');
+  requireMember(next, NEXT_VALUES, 'next');
 
   const parsedControl = parseControl(control);
   if (parsedControl.kind === 'unrecognised') {
@@ -337,8 +559,20 @@ export function renderFooter(fields) {
     );
   }
 
+  // The four shapes, and by this point they are exhaustive over what survived
+  // validation: `hasPercent && hasUsed && !hasWindow` was refused above, so the
+  // `hasPercent` branch can only be the pair form or the bare percent form.
   const tilde = approximate ? '~' : '';
-  const value = percent === null || percent === undefined ? '--' : `${percent}%`;
+  let value;
+  if (hasPercent) {
+    value = hasWindow
+      ? `${percent}% (${formatTokens(usedTokens)}/${formatTokens(windowTokens)})`
+      : `${percent}%`;
+  } else if (hasUsed) {
+    value = formatTokens(usedTokens);
+  } else {
+    value = '--';
+  }
 
   // Five fields, four separators. The marker is followed by a PLAIN SPACE (D-2's
   // `FOOTER := "⟦GOV⟧" SP CTX ...`), not by SEP — that first space is the one place the
@@ -388,8 +622,25 @@ export function renderFooter(fields) {
 // `parseFooter(renderFooter(x)).fields` round-trip identity stays exact.
 
 const HANDBACK_TOKEN = '[A-Za-z0-9][A-Za-z0-9._-]*';
+
+// The two CTX sub-productions, written once and shared by every alternative below so the
+// four shapes cannot drift apart. INT is D-2's original `0 | [1-9][0-9]? | 100` — spelled
+// out rather than range-checked afterwards, so "007%" is a PARSE failure and never a
+// value that quietly normalises to 7. TOK is the WO-OR-05 token production, at most one
+// decimal place, matching `formatTokens` exactly.
+const INT_P = '(?:0|[1-9][0-9]?|100)';
+const TOK_P = '(?:[0-9]+(?:\\.[0-9])?k)';
+
+// Longest alternative FIRST. `38% (72.6k/190k)` and `38%` share a prefix, and offering
+// the short one first would match `38%` and then fail on the following separator.
+const CTX_P =
+  `(?:(${INT_P})% \\((${TOK_P})/(${TOK_P})\\)` +
+  `|(${INT_P})%` +
+  `|(${TOK_P})` +
+  `|--)`;
+
 const FOOTER_RE = new RegExp(
-  `^${GOV_OPEN}GOV${GOV_CLOSE} ctx (~)?(?:(0|[1-9][0-9]?|100)%|--)` +
+  `^${GOV_OPEN}GOV${GOV_CLOSE} ctx (~)?${CTX_P}` +
   `${SEP}(${FOOTER_STATES.join('|')})` +
   // DERIVED from ADVICE_VALUES, not hand-listed. The alternation used to be a literal
   // copy of the vocabulary, which meant adding a member (TASK UNKNOWN did exactly this)
@@ -404,7 +655,13 @@ const FOOTER_RE = new RegExp(
     .sort((a, b) => b.length - a.length)
     .map((v) => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
     .join('|')})` +
-  `${SEP}next: (${[...NEXT_MODELS, NEXT_UNSET].join('|')})` +
+  // DERIVED from NEXT_VALUES, sorted longest-first, for the same reason the advice
+  // alternation is: the renderer and the parser must read one vocabulary or a member
+  // added to one silently becomes unreadable by the other.
+  `${SEP}next: (${NEXT_VALUES.slice()
+    .sort((a, b) => b.length - a.length)
+    .map((v) => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .join('|')})` +
   `${SEP}(${CONTROL_CONTINUE}|${HANDBACK_PREFIX}(?:${HANDBACK_TOKEN}))$`
 );
 
@@ -416,7 +673,7 @@ const FOOTER_RE = new RegExp(
  * emitted by every writer. It does NOT accept trailing spaces or tabs: D-2 forbids
  * trailing whitespace, and unlike a newline that is a difference a human can see.
  *
- * `fields` carries exactly the six round-trippable keys and nothing else, so
+ * `fields` carries exactly the eight round-trippable keys and nothing else, so
  * `parseFooter(renderFooter(x)).fields` deep-equals `x` (D-M10). Recognition of the
  * handback code is reported alongside — see the note above the regex.
  */
@@ -427,12 +684,20 @@ export function parseFooter(line) {
   const m = FOOTER_RE.exec(candidate);
   if (!m) return { ok: false, reason: 'does-not-match-grammar' };
 
-  const [, tilde, intPart, state, advice, next, control] = m;
+  const [, tilde, pBoth, usedBoth, windowBoth, pOnly, usedOnly, state, advice, next, control] = m;
   const parsedControl = parseControl(control);
+
+  // Exactly one of the three CTX alternatives can have matched (or none, for `--`), so
+  // these coalesces are unambiguous rather than a priority order.
+  const intPart = pBoth ?? pOnly;
+  const usedPart = usedBoth ?? usedOnly;
+
   return {
     ok: true,
     fields: {
       percent: intPart === undefined ? null : Number(intPart),
+      usedTokens: usedPart === undefined ? null : parseTokens(usedPart),
+      windowTokens: windowBoth === undefined ? null : parseTokens(windowBoth),
       approximate: tilde === '~',
       state,
       advice,
@@ -488,10 +753,26 @@ const isFiniteNumber = (v) => typeof v === 'number' && Number.isFinite(v);
  *
  *   1. sample missing / unreadable / not JSON      -> BLIND
  *   2. schema_version unrecognised                 -> BLIND
- *   3. used_percentage absent or non-finite        -> BLIND
+ *   3. NEITHER used_percentage NOR used_tokens     -> BLIND
  *   4. sampled_at absent or unparseable            -> BLIND
  *   5. sample.session_id != known session id       -> BLIND   <-- BEFORE staleness
  *   6. now - sampled_at > 20 min                   -> BLIND, numbers suppressed
+ *   7. tokens known, window size NOT known         -> BLIND state, REAL number rendered
+ *
+ * RUNG 3 WIDENED, AND RUNG 7 ADDED (WO-OR-05). Rung 3 used to demand a percentage, which
+ * is why the footer read BLIND for Warwick on every client: the percentage's only source
+ * was the terminal statusLine, which does not run on claude.ai web or Android. A sample
+ * carrying a raw token count is now enough to say something true.
+ *
+ * WHY RUNG 7 IS STILL `BLIND` — a deliberate, reported judgement, not an oversight.
+ * `state` is a CLASSIFICATION (GREEN/AMBER/RED come from thresholds on a percentage) and
+ * a token count with no denominator cannot be classified: 72.6k is comfortable in a 1M
+ * window and nearly fatal in an 80k one. Grading it would require inventing the very
+ * denominator this build refuses to invent, and would produce a GREEN that no telemetry
+ * supports — INV-1's false GREEN, arrived at by the back door. So the CTX field carries
+ * the real number and the STATE field honestly says "I cannot grade this". The defect
+ * that was actually reported — that Warwick sees no number at all on his clients — is
+ * repaired; the classification is not fabricated to go with it.
  *
  * D-3 lists staleness before the session check but then rules that the session check
  * "outranks staleness". Both orders produce BLIND, so the ranking is only observable in
@@ -526,9 +807,12 @@ export function deriveFooterFields({
   // `ctx ~--`, and the parser round-trips it, but "approximately unknown" is not a fact
   // about anything — so the ladder never emits it even though the renderer would accept
   // it. Grammar fidelity in the codec, meaning in the producer.
-  const blind = (blindReason) => ({
+  const blind = (blindReason, ctx = {}) => ({
     fields: {
       percent: null,
+      usedTokens: null,
+      windowTokens: null,
+      ...ctx,
       approximate: false,
       state: STATE.BLIND,
       advice: adviceFor(STATE.BLIND, { taskKnown }),
@@ -548,10 +832,18 @@ export function deriveFooterFields({
     return blind(BLIND_REASON.SCHEMA_UNRECOGNISED);
   }
 
-  const used = data.context_window?.used_percentage;
-  if (!isFiniteNumber(used)) {
-    // Catches absent, null, NaN, Infinity — and the string "42", which is D-M1's fourth
-    // mutation and the one a looser `!= null` check would have let through as GREEN.
+  // `isFiniteNumber` catches absent, null, NaN, Infinity — and the string "42", which is
+  // D-M1's fourth mutation and the one a looser `!= null` check would have let through
+  // as GREEN. Applied to every one of the three numbers below, not just the percentage.
+  const reportedPct = data.context_window?.used_percentage;
+  const usedTokensRaw = data.context_window?.used_tokens;
+  const windowRaw = data.context_window?.context_window_size;
+
+  const usedTokens = isFiniteNumber(usedTokensRaw) ? toRenderableTokens(usedTokensRaw) : null;
+  const windowTokens =
+    isFiniteNumber(windowRaw) && windowRaw > 0 ? toRenderableTokens(windowRaw) : null;
+
+  if (!isFiniteNumber(reportedPct) && usedTokens === null) {
     return blind(BLIND_REASON.PERCENTAGE_ABSENT);
   }
 
@@ -569,13 +861,96 @@ export function deriveFooterFields({
     return blind(BLIND_REASON.STALE);
   }
 
-  const percent = Math.round(used);
-  if (percent < 0 || percent > 100) {
-    // Out of the grammar's range. Clamping would render a number the sample did not
-    // support; BLIND says "I cannot represent this", which is the honest answer and the
-    // one INV-1 asks for.
+  // The percentage, from the ONLY two honest sources: one the sample reported directly
+  // (the statusLine path), or one DIVIDED from a real numerator by an authoritative
+  // denominator (the transcript path). Never from a model -> window guess.
+  //
+  // ---------------------------------------------------------------------------
+  // WO-OR-12 / Codex F3 — A DISPLAY TRANSFORM MUST NEVER FEED THE ARITHMETIC
+  // ---------------------------------------------------------------------------
+  // This division used to read `(usedTokens / windowTokens) * 100`. Both of those have
+  // been through `toRenderableTokens`, which rounds onto `TOKENS_GRAIN` for the DISPLAY
+  // codec — so the single most load-bearing number this module emits was computed from
+  // two values that exist only in order to be rendered. It divides the RAW numerator by
+  // the RAW denominator now. Display rounded, divide raw.
+  //
+  // THE MAGNITUDE ARGUMENT FOR LEAVING IT ALONE WAS TESTED AND IS FALSE — recorded here
+  // because it is what makes this a real repair rather than a purity exercise. The
+  // defence was that real windows are 200000 or 1000000, both exact multiples of the
+  // grain, so the denominator is unaffected and a numerator error of at most 50 tokens
+  // sits far below the integer percent actually rendered. The first two clauses are
+  // true. The conclusion is not: swept across every used-token value in a 200000 window,
+  // 4996 of 200001 (2.498%) render a DIFFERENT integer percent, and 100 of them cross an
+  // evaluator threshold and change the STATE. `used_tokens: 149950` graded RED · CLEAR
+  // NOW off a numerator rounded up to exactly 75.000%, where the true figure is 74.975%
+  // and the honest grade is AMBER. A governor telling Warwick to rotate on the strength
+  // of a rounding artefact is the class of false reading INV-1 exists to forbid.
+  // "Correct because the inputs are usually big enough" is TQA-001's shape — correct by
+  // luck of environment, and it reads green right up until it does not.
+  //
+  // EVERY GUARD THE ROUNDED VALUES WERE SUBJECT TO STILL GATES THIS DIVISION, and that
+  // is the half worth reading twice: moving arithmetic upstream of a check is the
+  // obvious way to fix this defect and introduce a worse one. `usedTokens !== null`
+  // establishes that `usedTokensRaw` passed `isFiniteNumber` and is non-negative;
+  // `windowTokens !== null` establishes that `windowRaw` passed `isFiniteNumber` AND
+  // `> 0`. So no NaN, no division by zero and no negative numerator is reachable here,
+  // and the representability rungs below still fire exactly as they did.
+  //
+  // The `usedTokens !== null` conjunct is DELIBERATELY explicit even though rung 3 above
+  // already guarantees it (reaching this line with a non-finite `reportedPct` is only
+  // possible when `usedTokens` is non-null). It changes no behaviour. It states the
+  // precondition of the raw division AT the raw division, instead of leaving it inherited
+  // from a guard forty lines away that a later edit could move.
+  const used = isFiniteNumber(reportedPct)
+    ? reportedPct
+    : usedTokens !== null && windowTokens !== null
+      ? (usedTokensRaw / windowRaw) * 100
+      : null;
+
+  // Rung 7. A real number we cannot grade. Both token fields are carried into the
+  // fields, so `renderFooter` emits `ctx 72.6k` instead of the `ctx --` Warwick used to
+  // get — while `state` stays BLIND because nothing here can classify it.
+  if (used === null) {
+    return blind(BLIND_REASON.WINDOW_SIZE_UNKNOWN, { usedTokens, windowTokens: null });
+  }
+
+  // ---------------------------------------------------------------------------
+  // WO-OR-13 / INV-1 — THE RANGE DECISION IS MADE ON `used`, NOT ON ITS DISPLAY FORM
+  // ---------------------------------------------------------------------------
+  // This used to check `Math.round(used)`, which asked whether the DISPLAY was in range
+  // rather than the value being judged. `Math.round` is round-half-UP, so it folded
+  // [-0.5, 0) onto `-0` — and `-0 < 0` is FALSE — and (100, 100.5) onto 100. Both bands
+  // walked past the guard: `used_percentage: -0.4` rendered `ctx 0% · GREEN`, telemetry
+  // the grammar explicitly rejects wearing the most reassuring state the footer can
+  // emit. The band is asymmetric because the rounding is; the low side was the false
+  // GREEN, the high side graded RED off an input with no representation.
+  //
+  // NEVER MOVE THIS CHECK BACK AFTER THE ROUNDING. `used` feeds a THRESHOLD, and a step
+  // function converts an arbitrarily small input error into a maximal output change at
+  // the boundary — so "the rounding error is tiny" is the wrong instrument wherever a
+  // value meets a cutoff. Swept the module for the same shape: schema equality,
+  // `windowRaw > 0`, staleness and the evaluator's 55/75 all already test raw values.
+  // This rung was the only instance.
+  //
+  // Negated conjunction rather than `used < 0 || used > 100` so it fails CLOSED: a NaN
+  // lands on BLIND instead of passing two false comparisons into the evaluator.
+  if (!(used >= 0 && used <= 100)) {
+    // Clamping would render a number the sample did not support; BLIND says "I cannot
+    // represent this", which is the honest answer and the one INV-1 asks for.
     return blind(BLIND_REASON.PERCENTAGE_OUT_OF_RANGE);
   }
+
+  // `+ 0` IS LOAD-BEARING — it normalises the one negative zero that survives the guard.
+  // `used === -0` passes above, and rightly (-0 IS zero, and 0% is in the grammar), but
+  // `Math.round(-0)` is `-0`, which `renderFooter` accepts and emits as `0%` while
+  // `parseFooter` reads back `+0`. D-M10's `parseFooter(renderFooter(x)).fields`
+  // identity is therefore FALSE for a value the renderer accepts — the same class as
+  // the F1 defect WO-OR-10 closed. The suite cannot see it loosely (`-0 == 0`, and
+  // `deepEqual` agrees), so its proof asserts with `Object.is`. Normalised in the
+  // PRODUCER rather than by tightening the renderer: meaning in the producer, fidelity
+  // in the codec, and no survey exists of what a stricter renderer would break in its
+  // callers. `-0 + 0` is `+0`; every other value is unchanged.
+  const percent = Math.round(used) + 0;
 
   let verdict;
   try {
@@ -594,9 +969,16 @@ export function deriveFooterFields({
   const state = FOOTER_STATES.includes(verdict?.state) ? verdict.state : null;
   if (state === null) return blind(BLIND_REASON.EVALUATOR_THREW);
 
+  // The parenthetical `(72.6k/190k)` is emitted ONLY when BOTH numbers are real. A
+  // percentage the sample reported directly, with no token counts behind it, still
+  // renders as the bare `ctx 38%` it always did.
+  const showTokens = usedTokens !== null && windowTokens !== null;
+
   return {
     fields: {
       percent,
+      usedTokens: showTokens ? usedTokens : null,
+      windowTokens: showTokens ? windowTokens : null,
       approximate: sample.approximate === true,
       state,
       advice: adviceFor(state, { taskKnown }),
@@ -609,139 +991,20 @@ export function deriveFooterFields({
 }
 
 // ---------------------------------------------------------------------------
-// Pure-ish: the D-4 UNSET predicate
+// `nextModelFor` and `listProgrammeStatePaths` were DELETED here by WO-OR-05.
 // ---------------------------------------------------------------------------
-// Driven by ABSENCE, not by text matching. This is the load-bearing property of the
-// whole predicate and it is why there is no keyword scan anywhere in this function: a
-// heuristic over `next_action` prose ("does this sentence sound like a hold?") is
-// exactly the caller-supplied self-attestation `escalation-gate.mjs` was re-grounded to
-// avoid. Absence of provenance is a FACT. "This looks like an action" is a judgement by
-// the actor who wants the answer to be yes.
+// D-4 decided `next:` by reading banked BUILD-* programme state off disk and checking
+// six coherence conditions against it. Programme state no longer exists in this estate,
+// so that predicate had exactly one possible answer — UNSET — for every input, forever.
+// A predicate that cannot return anything else is not a predicate, and the five
+// programme-shaped `UNSET_REASON` members it produced went with it (see that const).
 //
-// Every filesystem call is injectable so the mutation tests can drive zero-match,
-// one-match and ambiguous-match estates without an estate, and without ever touching
-// Warwick's real tree.
-
-function listProgrammeStatePaths(deliverablesDir, { listDir, existsFn }) {
-  if (!deliverablesDir || !existsFn(deliverablesDir)) return [];
-  let entries;
-  try {
-    entries = listDir(deliverablesDir);
-  } catch {
-    return [];
-  }
-  const paths = [];
-  for (const entry of entries) {
-    const name = typeof entry === 'string' ? entry : entry?.name;
-    if (typeof name !== 'string') continue;
-    const p = join(deliverablesDir, name, 'programme-state.json');
-    try {
-      if (existsFn(p)) paths.push(p);
-    } catch {
-      // An unreadable directory entry is one fewer candidate, never a throw. Fewer
-      // candidates can only ever move the answer toward UNSET, which is the safe side.
-    }
-  }
-  return paths;
-}
-
-/**
- * nextModelFor({ worktreePath, worktreeBranch, deliverablesDir, ... })
- *   -> { next, unset, unsetReason, statePath }
- *
- * U-a also closes the defect Nolan recorded as D-N3: `statusline-live.mjs`'s
- * `recommendedModel()` returns the FIRST `Deliverables/*` state file it finds rather
- * than the ACTIVE build's, so on a machine carrying more than one build it renders
- * another programme's recommendation with complete confidence. Matching on
- * (branch, worktree) against the live sample fixes it with no git call and no registry
- * lookup, because the live status-line payload already carries `worktree.path` and
- * `worktree.branch` — verified against a real sample, where `payload.cwd` and
- * `payload.workspace.current_dir` are BOTH absent.
- */
-export function nextModelFor({
-  worktreePath = null,
-  worktreeBranch = null,
-  deliverablesDir = null,
-  readState = readProgrammeState,
-  listDir = readdirSync,
-  existsFn = existsSync,
-} = {}) {
-  const unset = (unsetReason, statePath = null) => ({
-    next: NEXT_UNSET,
-    unset: true,
-    unsetReason,
-    statePath,
-  });
-
-  if (typeof worktreePath !== 'string' || worktreePath.length === 0) return unset(UNSET_REASON.LOCATION_UNKNOWN);
-  if (typeof worktreeBranch !== 'string' || worktreeBranch.length === 0) return unset(UNSET_REASON.LOCATION_UNKNOWN);
-
-  // U-a: exactly one state file that VALIDATES and matches this session.
-  const matches = [];
-  for (const path of listProgrammeStatePaths(deliverablesDir, { listDir, existsFn })) {
-    let result;
-    try {
-      result = readState(path);
-    } catch {
-      continue; // an unreadable state file is not a match; it is not an error either
-    }
-    if (!result || result.ok !== true || !result.data) continue; // does not validate
-    const r = result.data.resumption;
-    if (!r || typeof r !== 'object') continue;
-    if (r.branch !== worktreeBranch) continue;
-    if (!samePath(r.worktree, worktreePath)) continue;
-    matches.push({ path, state: result.data });
-  }
-
-  if (matches.length === 0) return unset(UNSET_REASON.NO_MATCHING_PROGRAMME);
-  if (matches.length > 1) return unset(UNSET_REASON.AMBIGUOUS_PROGRAMME);
-
-  const { path, state } = matches[0];
-  const resumption = state.resumption ?? {};
-  const rec = state.model_recommendation ?? {};
-  const banked = state.banked ?? {};
-
-  // U-b — absent, "hold" and "unknown" all fall through to UNSET.
-  if (resumption.next_action_kind !== 'action') return unset(UNSET_REASON.NEXT_ACTION_KIND, path);
-
-  // U-c
-  const model = rec.model;
-  if (typeof model !== 'string' || model === 'unknown' || model === 'any') {
-    return unset(UNSET_REASON.MODEL_UNKNOWN, path);
-  }
-  // The grammar constraint D-4 does not state — see NEXT_MODELS above.
-  if (!NEXT_MODELS.includes(model)) return unset(UNSET_REASON.MODEL_NOT_IN_GRAMMAR, path);
-
-  // U-d — both non-null AND equal.
-  if (
-    typeof rec.for_ticket !== 'string' || rec.for_ticket.length === 0 ||
-    typeof resumption.ticket !== 'string' || resumption.ticket.length === 0 ||
-    rec.for_ticket !== resumption.ticket
-  ) {
-    return unset(UNSET_REASON.FOR_TICKET_MISMATCH, path);
-  }
-
-  // U-e — compared to `banked.head_sha`, NEVER to live git HEAD. Comparing to live HEAD
-  // would make every ordinary commit destroy the recommendation; this asserts internal
-  // coherence AT BANKING TIME. Staleness against live git has its own channel
-  // (bankedStateStale -> RECOVERY).
-  // Comparing to live git HEAD would also drag child_process onto the Stop path (A-7).
-  if (
-    typeof rec.computed_at_head !== 'string' || rec.computed_at_head.length === 0 ||
-    typeof banked.head_sha !== 'string' || banked.head_sha.length === 0 ||
-    rec.computed_at_head !== banked.head_sha
-  ) {
-    return unset(UNSET_REASON.HEAD_MISMATCH, path);
-  }
-
-  // U-f — referential integrity: the ticket must exist and must not be resolved.
-  const tickets = Array.isArray(state.tickets) ? state.tickets : [];
-  const ticket = tickets.find((t) => t && t.id === resumption.ticket);
-  if (!ticket || ticket.state === 'resolved') return unset(UNSET_REASON.TICKET_UNRESOLVED_MISSING, path);
-
-  return { next: model, unset: false, unsetReason: null, statePath: path };
-}
-
+// `next:` is therefore an INPUT now, defaulted to UNSET and supplied by the one actor
+// that still knows the next action. That is not a weakening of D-4: the constitution
+// requires that a model renders ONLY when grounded in a real, current next action, and
+// the grounding check has moved to the only place that can still perform it. What D-4
+// forbade — a banked literal presented as live advice — remains impossible, because
+// there is no longer any banked literal to present.
 // ---------------------------------------------------------------------------
 // Impure: resolve which health sample to read (D-3's resolution order)
 // ---------------------------------------------------------------------------
@@ -814,10 +1077,15 @@ export function resolveHealthSample({
 /**
  * computeFooterLine(opts) -> string
  *
- * The full path: resolve a sample -> run the ladder -> run the UNSET predicate -> render.
- * Mirrors `status-line.mjs`'s single-impure-composition shape (AD-11): everything above
- * this function is independently unit-testable without an estate, and this is the only
- * place that touches disk.
+ * The full path: resolve a sample -> run the ladder -> render. Mirrors
+ * `status-line.mjs`'s single-impure-composition shape (AD-11): everything above this
+ * function is independently unit-testable without an estate, and this is the only place
+ * that touches disk.
+ *
+ * `next` is an INPUT (WO-OR-05) rather than something derived here — see the note where
+ * `nextModelFor` used to live. An unrecognised value is coerced to UNSET rather than
+ * throwing: this function's contract is that it always returns a grammatical line, and a
+ * caller's bad recommendation must not be able to silence the footer entirely.
  *
  * Never throws. A footer that cannot be computed is still a footer — BLIND, UNSET,
  * CONTINUE — because the alternative is no visible line at all, and an absent governor
@@ -825,19 +1093,16 @@ export function resolveHealthSample({
  */
 export function computeFooterLine({
   sessionId = null,
-  worktreePath = null,
-  worktreeBranch = null,
-  deliverablesDir = null,
   cwd = process.cwd(),
   homeDir,
   envOverride,
   now = Date.now(),
+  next = NEXT_UNSET,
   control = CONTROL_CONTINUE,
   // Injections, forwarded EXPLICITLY below and never by spreading this bag —
   // delegation-gate.mjs's rule, and for its reason: one opts object serving three
-  // different callees lets a key meant for the state reader be silently reinterpreted
-  // as a filesystem injection by the sample resolver.
-  readState,
+  // different callees lets a key meant for one callee be silently reinterpreted as a
+  // filesystem injection by the sample resolver.
   readSample,
   dirFor,
   listDir,
@@ -845,12 +1110,7 @@ export function computeFooterLine({
   statFn,
   evaluateFn,
 } = {}) {
-  let next = NEXT_UNSET;
-  try {
-    next = nextModelFor({ worktreePath, worktreeBranch, deliverablesDir, readState, listDir, existsFn }).next;
-  } catch {
-    next = NEXT_UNSET;
-  }
+  const nextValue = NEXT_VALUES.includes(next) ? next : NEXT_UNSET;
 
   let sample;
   try {
@@ -863,7 +1123,7 @@ export function computeFooterLine({
     sample,
     knownSessionId: sessionId,
     now,
-    next,
+    next: nextValue,
     control,
     evaluateFn,
   });
@@ -876,6 +1136,8 @@ export function computeFooterLine({
     // throwing into a status line or a Stop hook.
     return renderFooter({
       percent: null,
+      usedTokens: null,
+      windowTokens: null,
       approximate: false,
       state: STATE.BLIND,
       advice: ADVICE.UNSURE,
@@ -891,8 +1153,9 @@ export function computeFooterLine({
 // WHY THIS EXISTS. Root CLAUDE.md § "Governor advice" requires every reply to end with a
 // `⟦GOV⟧` footer AND states that a hand-composed footer is a defect. Until this block,
 // those two clauses could not both be satisfied: this module exported functions only, and
-// its two consumers were `statusline-live.mjs` (a terminal status line, which Warwick
-// cannot see — he works on claude.ai web and Android) and `stop-controller.mjs`'s parser.
+// its consumers were `statusline-live.mjs` (a terminal status line, which Warwick cannot
+// see — he works on claude.ai web and Android) and a Stop-path parser that WO-OR-05 has
+// since deleted.
 // So the only available producer was a human typing the bytes, which is the forbidden one.
 // Nolan's final acceptance audit: "the footer has no producer."
 //
@@ -919,42 +1182,54 @@ export function computeFooterLine({
 // ---------------------------------------------------------------------------
 // BLIND AND UNSET ARE INDEPENDENT LADDERS — do not "fix" one into the other
 // ---------------------------------------------------------------------------
-// D-3 (`deriveFooterFields`) decides `state` from TELEMETRY. D-4 (`nextModelFor`) decides
-// `next:` from PROGRAMME STATE. A missing or non-matching programme therefore yields
-// `next: UNSET` and says NOTHING about the state — the line can be, and routinely is,
-// `GREEN` with `next: UNSET`. Rendering BLIND because no programme matched would have the
+// `deriveFooterFields` decides `state` from TELEMETRY. `next:` is supplied by the caller
+// and says NOTHING about the state — the line can be, and routinely is, `GREEN` with
+// `next: UNSET`. Rendering BLIND because no recommendation was supplied would have the
 // footer claim it could not read telemetry it read perfectly well: a FALSE BLIND, the
 // exact mirror of the false GREEN INV-1 exists to forbid, and it would nudge Warwick
-// toward rotating on the strength of a fact about a JSON file. WP-7's original AC4 said
-// "no programme -> BLIND"; it was raised at read-back and corrected. Leave the two ladders
-// separate.
+// toward rotating on the strength of a missing command-line flag. WP-7's original AC4
+// said "no programme -> BLIND"; it was raised at read-back and corrected. The ladders
+// stay separate, and they stay separate now that `next:` comes from a flag rather than
+// from a file.
 
 export const CLI_EXIT = Object.freeze({ OK: 0, USAGE: 2 });
 
 export const CLI_USAGE =
-  'usage: node tools/governor/footer.mjs [--session <id>] [--control CONTINUE|HANDBACK:<code>]';
+  'usage: node tools/governor/footer.mjs [--session <id>] [--next <Model>/<effort>|UNSET] ' +
+  '[--control CONTINUE|HANDBACK:<code>]';
 
 function usageFailure(message) {
   return { exitCode: CLI_EXIT.USAGE, stdout: '', stderr: `footer: ${message}\n${CLI_USAGE}\n` };
 }
 
 /**
- * parseCliArgs(argv) -> { ok: true, sessionId, control } | { ok: false, error }
+ * parseCliArgs(argv) -> { ok: true, sessionId, next, control } | { ok: false, error }
  *
  * Separated from `runCli` so the argument grammar is testable without touching disk.
  *
- * The `--control` value is validated by MEMBERSHIP against `HANDBACK_CODES` — the frozen
- * const this module already owns, read directly rather than re-typed. A second list of
- * seven strings anywhere is the drift this whole module exists to prevent, and the
- * constitution's own § "When Warwick may be interrupted" is the source of that const.
+ * Both `--control` and `--next` are validated by MEMBERSHIP against the frozen consts
+ * this module already owns, read directly rather than re-typed. A second list of seven
+ * codes — or of sixteen next-values — anywhere is the drift this whole module exists to
+ * prevent, and the constitution's own § "When Warwick may be interrupted" is the source
+ * of `HANDBACK_CODES`.
+ *
+ * `--next` is validated STRICTLY at the CLI boundary even though `computeFooterLine`
+ * coerces an unrecognised value to UNSET. The two are not in tension and the split is the
+ * same one `--control` already makes: a MISTYPED flag from a human must fail loudly
+ * (silently rendering UNSET would look identical to "no recommendation was available",
+ * so a typo would be indistinguishable from an honest absence), while a bad value
+ * arriving through the programmatic API must still yield a grammatical line.
  */
 export function parseCliArgs(argv = []) {
   let sessionId = null;
+  let next = NEXT_UNSET;
   let control = CONTROL_CONTINUE;
+
+  const FLAGS = ['--session', '--next', '--control'];
 
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
-    if (arg !== '--session' && arg !== '--control') {
+    if (!FLAGS.includes(arg)) {
       return { ok: false, error: `unrecognised argument ${JSON.stringify(arg)}` };
     }
     const value = argv[i + 1];
@@ -966,7 +1241,18 @@ export function parseCliArgs(argv = []) {
     }
     i += 1;
     if (arg === '--session') sessionId = value;
+    else if (arg === '--next') next = value;
     else control = value;
+  }
+
+  if (!NEXT_VALUES.includes(next)) {
+    return {
+      ok: false,
+      error:
+        `--next must be <Model>/<effort> or ${NEXT_UNSET}, where <Model> is one of ` +
+        `${NEXT_MODELS.join(', ')} and <effort> is one of ${NEXT_EFFORTS.join(', ')} — ` +
+        `got ${JSON.stringify(next)}`,
+    };
   }
 
   if (parseControl(control).kind === 'unrecognised') {
@@ -978,7 +1264,7 @@ export function parseCliArgs(argv = []) {
     };
   }
 
-  return { ok: true, sessionId, control };
+  return { ok: true, sessionId, next, control };
 }
 
 /**
@@ -988,33 +1274,28 @@ export function parseCliArgs(argv = []) {
  * entrypoint is unit-testable without spawning a process and without any test needing to
  * capture stdout.
  *
- * Everything is resolved here — nothing is passed in on the command line beyond the two
+ * Everything is resolved here — nothing is passed in on the command line beyond the three
  * optional flags:
  *   * the health sample, from the store: the exact one when `--session <id>` is given,
  *     otherwise the NEWEST for this project (which sets the `~` approximate flag);
- *   * `state` / `advice`, via the D-3 degradation ladder;
- *   * `next:`, via `nextModelFor` over the programme state of THIS worktree and branch.
+ *   * `state` / `advice`, via the degradation ladder;
+ *   * `next:`, straight from `--next`, defaulting to UNSET.
  *
- * A-7 — AND WHY THERE IS A `git` CALL REACHABLE FROM THIS FILE (Larry's ruling, WP-7).
- * A-7 forbids `git` ON THE STOP PATH, not in the file. `stop-controller.mjs` reaches this
- * module by IMPORT, and an import executes nothing here: `liveLocation` is only ever
- * called from inside `runCli`, which only runs under the `import.meta.url` guard at the
- * foot of this file. That is exactly how `worktree-guard.mjs` already imports
- * `execFileSync` without calling it at import time. The alternative — hand-parsing
- * `.git/HEAD` — would be a SECOND branch-resolution implementation in an estate that
- * already has one, and SSOT says one. The AC1 proof (a child process that imports this
- * module and is asserted to produce empty stdout at exit 0) is what keeps that claim
- * checkable rather than asserted.
+ * A-7 IS NOW SATISFIED OUTRIGHT RATHER THAN BY ARGUMENT (WO-OR-05). This file used to
+ * call `liveLocation` here — a real `git` invocation, reachable from a module that sits
+ * on the Stop path — and carried a long note explaining why that was acceptable because
+ * an import executes nothing. The location was only ever needed to match a worktree and
+ * branch against banked programme state, and there is no banked programme state any
+ * more. So the call is GONE, along with the import that made it possible, and the
+ * property A-7 asks for is now structural instead of argued.
  */
 export function runCli(argv = [], {
   cwd = process.cwd(),
-  locationFn = liveLocation,
   // Forwarded EXPLICITLY to computeFooterLine below, never by spreading this bag — the
   // same rule and the same reason as computeFooterLine's own injection note.
   now,
   homeDir,
   envOverride,
-  readState,
   readSample,
   dirFor,
   listDir,
@@ -1027,22 +1308,14 @@ export function runCli(argv = [], {
 
   let line;
   try {
-    // Never throws by contract; every field is independently nullable, and an unknown
-    // location can only push `next:` toward UNSET, which is the safe side.
-    const loc = locationFn({ cwd }) ?? {};
-    const worktreePath = typeof loc.repoRoot === 'string' && loc.repoRoot.length ? loc.repoRoot : null;
-
     line = computeFooterLine({
       sessionId: args.sessionId,
-      worktreePath,
-      worktreeBranch: typeof loc.branch === 'string' && loc.branch.length ? loc.branch : null,
-      deliverablesDir: worktreePath ? join(worktreePath, 'Deliverables') : null,
       cwd,
       homeDir,
       envOverride,
       now,
+      next: args.next,
       control: args.control,
-      readState,
       readSample,
       dirFor,
       listDir,
@@ -1061,6 +1334,8 @@ export function runCli(argv = [], {
     // failure.
     line = renderFooter({
       percent: null,
+      usedTokens: null,
+      windowTokens: null,
       approximate: false,
       state: STATE.BLIND,
       advice: ADVICE.UNSURE,
@@ -1073,9 +1348,9 @@ export function runCli(argv = [], {
 }
 
 // Run ONLY when executed directly — the entrypoint guard every other module in
-// tools/governor/ uses. Importing this module must execute NOTHING: it sits on the Stop
-// path via `stop-controller.mjs`, and a module that printed or exited at import time would
-// take the controller down with it.
+// tools/governor/ uses. Importing this module must execute NOTHING: it is imported by
+// hooks that run on the Stop path, and a module that printed or exited at import time
+// would take its importer down with it.
 //
 // `process.exitCode` rather than `process.exit()`: an explicit exit can truncate a pending
 // stdout write on a Windows pipe, and a truncated footer is precisely the four-field line

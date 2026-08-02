@@ -1,0 +1,129 @@
+repo:  C:/Fusion247PKA
+range: a989e68d95e01b7f6dc13955d796950f6a8a02a5..HEAD
+claim: Deliverables/2026-08-02-phase5-evidence/claim-scope-footer.json
+scope  : tools/governor/footer.mjs
+branch : operating-reset/teardown
+
+── GIT EVIDENCE (real, read-only) ──
+resolved=true diff_range=a989e68d95e01b7f6dc13955d796950f6a8a02a5..2660554be731a3cec8adb865962ee6342b81008d
+changed_files=["tools/governor/footer.mjs"]
+diff bytes=47367 truncated=false
+
+── REAL CODEX MERGE REVIEW (Tower QA skill over the staged diff + the REAL claim) ──
+ok=true blocked=false model=openai-codex-exec
+{
+  "status": "ok",
+  "verdict": "request_changes",
+  "summary": "The exact staged diff satisfies the decoupling, vocabulary, handback-code, telemetry-safety, non-throwing, and precedence criteria. Two codec acceptance gaps remain: render/parse loses a permitted usedTokens value when percent is present without windowTokens, and the token codec fails for renderable values whose formatted quotient uses exponent notation.",
+  "claims_verified": [
+    {
+      "claim": "The review is bound to head 2660554be731a3cec8adb865962ee6342b81008d and base a989e68d95e01b7f6dc13955d796950f6a8a02a5.",
+      "status": "confirmed",
+      "evidence": "The staged packet supplies the exact SHA pair and complete footer.mjs diff."
+    },
+    {
+      "claim": "footer.mjs removes its programme-state dependency and makes next caller-supplied.",
+      "status": "confirmed",
+      "evidence": "The imports, nextModelFor, listProgrammeStatePaths, and UNSET_REASON are deleted; computeFooterLine accepts next = NEXT_UNSET."
+    },
+    {
+      "claim": "The staged implementation meets every acceptance criterion.",
+      "status": "refuted",
+      "evidence": "D3 and D8 have concrete counterexamples described in findings F1 and F2."
+    }
+  ],
+  "acceptance_results": [
+    {
+      "acceptance_row_id": "C4",
+      "result": "pass",
+      "rationale": "footer.mjs no longer imports programme-state.mjs.",
+      "evidence": "The diff removes `import { readProgrammeState } from './programme-state.mjs'` and all associated usage."
+    },
+    {
+      "acceptance_row_id": "D1",
+      "result": "pass",
+      "rationale": "next is caller-supplied with an UNSET default; nextModelFor and the programme-shaped UNSET_REASON object are removed.",
+      "evidence": "computeFooterLine declares `next = NEXT_UNSET`; the nextModelFor/listProgrammeStatePaths implementation and UNSET_REASON export are deleted."
+    },
+    {
+      "acceptance_row_id": "D2",
+      "result": "pass",
+      "rationale": "The grammar is MODEL/EFFORT, with both closed vocabularies frozen and the renderer/parser sharing their derived cross-product.",
+      "evidence": "NEXT_MODELS and NEXT_EFFORTS are Object.freeze literals; NEXT_VALUES derives their cross-product plus UNSET; renderFooter and FOOTER_RE both consume NEXT_VALUES."
+    },
+    {
+      "acceptance_row_id": "D3",
+      "result": "fail",
+      "rationale": "Round-trip identity does not hold for every field object accepted by renderFooter.",
+      "evidence": "At footer.mjs renderFooter, `{percent:38, usedTokens:72600, windowTokens:null, ...}` is accepted but renders only `ctx 38%`; parseFooter consequently returns `usedTokens:null`, not 72600."
+    },
+    {
+      "acceptance_row_id": "D4",
+      "result": "pass",
+      "rationale": "HANDBACK_CODES is unchanged in the staged diff.",
+      "evidence": "The array remains seven members with no added, removed, or modified member lines; only its surrounding commentary changes."
+    },
+    {
+      "acceptance_row_id": "D6",
+      "result": "pass",
+      "rationale": "The ladder accepts a directly reported percentage without requiring token counts and only divides when real token and authoritative-window values exist. With neither percentage nor usable numerator it remains BLIND.",
+      "evidence": "`used` selects finite reportedPct first, otherwise divides usedTokens/windowTokens, otherwise returns WINDOW_SIZE_UNKNOWN with BLIND state."
+    },
+    {
+      "acceptance_row_id": "D8",
+      "result": "fail",
+      "rationale": "The codec does not round-trip across the full domain accepted by isRenderableTokens.",
+      "evidence": "Concrete counterexample: `1e24` is a non-negative integer multiple of 100, so isRenderableTokens accepts it. formatTokens computes `whole = 1e21`, stringifies that as `1e+21`, and returns `1e+21k`; parseTokens rejects exponent notation under `/^([0-9]+)(?:\\.([0-9]))?k$/`."
+    },
+    {
+      "acceptance_row_id": "Z1",
+      "result": "pass",
+      "rationale": "No unreadable, unrecognised, absent, foreign-session, stale, ungradable, or evaluator-failure path reaches a graded state.",
+      "evidence": "All such ladder exits call blind(); token-only telemetry without a denominator also returns WINDOW_SIZE_UNKNOWN/BLIND."
+    },
+    {
+      "acceptance_row_id": "Z2",
+      "result": "pass",
+      "rationale": "The composition catches sample resolution and derivation/rendering failures and returns a grammatical BLIND fallback.",
+      "evidence": "computeFooterLine wraps resolution and derive/render; its catch calls renderFooter with a complete valid BLIND/UNSET/CONTINUE field set. runCli has an additional grammatical fallback."
+    },
+    {
+      "acceptance_row_id": "Z3",
+      "result": "pass",
+      "rationale": "Session mismatch is evaluated before staleness and suppresses the foreign numbers.",
+      "evidence": "deriveFooterFields checks knownSessionId mismatch before the sampledAt age check and returns blind(SESSION_MISMATCH)."
+    }
+  ],
+  "prior_finding_results": [
+    {
+      "finding_id": "prior-d6-percent-only-form",
+      "status": "addressed",
+      "rationale": "The corrected criterion explicitly permits a directly reported used_percentage, and the diff preserves that value without inventing a denominator."
+    },
+    {
+      "finding_id": "prior-d8-large-value-exponent-risk",
+      "status": "remains_open",
+      "rationale": "Execution through 1e22 does not cover the failure threshold. At 1e24, formatTokens produces `1e+21k`, which the decimal-only parser rejects."
+    }
+  ],
+  "findings": [
+    {
+      "id": "F1",
+      "technical_impact": "MEDIUM",
+      "reachability": "ACTIVE",
+      "required_disposition": "BLOCKS_CURRENT_MERGE",
+      "assumed_deployment_baseline": "renderFooter is a public codec boundary and any field combination it accepts belongs to the claimed round-trip domain.",
+      "evidence": "footer.mjs renderFooter validates percent and usedTokens independently and only requires both when windowTokens is present. Its percent branch omits usedTokens unless windowTokens exists; parseFooter cannot reconstruct the omitted value.",
+      "required_correction": "Either reject percent+usedTokens without windowTokens as outside the grammar or encode usedTokens in that shape; then prove parseFooter(renderFooter(x)).fields deep-equals x for every accepted shape."
+    },
+    {
+      "id": "F2",
+      "technical_impact": "LOW",
+      "reachability": "LATENT",
+      "required_disposition": "BLOCKS_CURRENT_MERGE",
+      "assumed_deployment_baseline": "D8 claims the entire JavaScript-number domain accepted by isRenderableTokens, even though real context counts are far smaller.",
+      "evidence": "`1e24` passes the current non-negative/integer/grain predicate; formatTokens returns `1e+21k`, while parseTokens accepts digits plus an optional single decimal only.",
+      "required_correction": "Bound isRenderableTokens to a domain whose formatted whole component never uses exponent notation, or extend the codec so every accepted value has an exact parseable representation; add the concrete 1e24 boundary case."
+    }
+  ]
+}

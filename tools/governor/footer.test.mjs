@@ -1,9 +1,9 @@
 // Proofs for footer.mjs (BUILD-018 WP-3, D-D).
 //
 // Covers Silas's D-M1..D-M11. D-M12 (`deriveResumption` must not carry a `hold`
-// forward) is NOT here and is not silently dropped: `deriveResumption` lives in
-// programme-state.mjs, outside this Work Order's file_surface. Raised at read-back,
-// and Larry is carrying it as an explicitly deferred row.
+// forward) is CLOSED rather than deferred: `deriveResumption` lived in
+// programme-state.mjs, which WO-OR-05 deleted along with the programme state it read.
+// The deferred row it was carried as is closed by the deletion, not by a proof.
 //
 // INV-5 governs the shape of this file: several tests below MUTATE the module's own
 // inputs to prove the assertion goes red, because a control that has never been made to
@@ -27,11 +27,17 @@ import {
   ADVICE,
   ADVICE_VALUES,
   NEXT_MODELS,
+  NEXT_EFFORTS,
+  NEXT_VALUES,
   NEXT_UNSET,
+  TOKENS_GRAIN,
+  isRenderableTokens,
+  formatTokens,
+  parseTokens,
+  toRenderableTokens,
   CONTROL_CONTINUE,
   STALE_AFTER_MS,
   BLIND_REASON,
-  UNSET_REASON,
   renderFooter,
   parseFooter,
   parseFooterFromMessage,
@@ -41,13 +47,16 @@ import {
   adviceForState,
   adviceFor,
   deriveFooterFields,
-  nextModelFor,
   resolveHealthSample,
   computeFooterLine,
   parseCliArgs,
   runCli,
   CLI_EXIT,
 } from './footer.mjs';
+// WO-OR-08: the seam block at the foot of this file drives a REAL sampler output into
+// the ladder. Every other test here builds its inputs by hand, which is exactly how a
+// denominator from the wrong namespace crossed this boundary through a green suite.
+import { extractTranscriptSample, SOURCE_STATUSLINE } from './sampler.mjs';
 
 // The drift guard below used to import `ESCAPE_HATCH_REASONS` from
 // `escalation-gate.mjs`. That module was RETIRED on 2026-08-01, so the pin was
@@ -114,7 +123,7 @@ test('AC1: the separator is exactly U+0020 U+00B7 U+0020, and the marker U+27E6/
   // And the rendered line really uses it — not a lookalike the source happens to hold.
   const line = renderFooter({
     percent: 0, approximate: false, state: 'RED', advice: ADVICE.CLEAR_NOW,
-    next: 'Opus', control: CONTROL_CONTINUE,
+    next: 'Opus/high', control: CONTROL_CONTINUE,
   });
   assert.equal(line.split(SEP).length, 5, 'five fields joined by exactly four separators');
   assert.ok(!line.includes('\u2022'), 'not a bullet');
@@ -132,7 +141,7 @@ test('AC1: no field is EVER omitted — absence is a value (-- / UNSET), never a
   // The load-bearing property: a parser must never have to guess which field it is
   // looking at. Every one of the 5 segments is non-empty in every combination.
   for (const state of FOOTER_STATES) {
-    for (const next of [...NEXT_MODELS, NEXT_UNSET]) {
+    for (const next of NEXT_VALUES) {
       for (const percent of [null, 0, 7, 100]) {
         const l = renderFooter({
           percent, approximate: false, state, advice: adviceForState(state), next,
@@ -230,19 +239,41 @@ test('AC1: renderFooter is STRICT — it throws rather than emit an out-of-gramm
 // ---------------------------------------------------------------------------
 
 test('D-M10: parseFooter(renderFooter(x)).fields === x for EVERY field combination', () => {
-  const percents = [null, 0, 1, 9, 10, 42, 99, 100];
+  // WIDENED by WO-OR-05, not weakened: the field set grew from six keys to eight (the
+  // token numerator and denominator), and `next` grew from 4 values to 16. Every
+  // combination is still enumerated exhaustively and the executed count is still
+  // asserted against the product of the dimensions, so a loop whose bounds silently
+  // collapsed would still be caught.
+  //
+  // The CTX field has four SHAPES and they are not independent of each other — a
+  // denominator with no numerator is not renderable — so the shapes are enumerated as
+  // triples rather than as three free dimensions.
+  const ctxShapes = [
+    { percent: null, usedTokens: null, windowTokens: null },   // ctx --
+    { percent: 0, usedTokens: null, windowTokens: null },      // ctx 0%
+    { percent: 42, usedTokens: null, windowTokens: null },     // ctx 42%
+    { percent: 100, usedTokens: null, windowTokens: null },
+    { percent: null, usedTokens: 0, windowTokens: null },      // ctx 0k
+    { percent: null, usedTokens: 900, windowTokens: null },    // ctx 0.9k
+    { percent: null, usedTokens: 72600, windowTokens: null },  // ctx 72.6k
+    // WO-OR-10: the largest count the codec is faithful over, carried through the FULL
+    // combination sweep rather than only through its own boundary test — the boundary
+    // has to survive every state, advice, next and control too, not just the happy one.
+    { percent: null, usedTokens: 9007199254740900, windowTokens: null },
+    { percent: 21, usedTokens: 210800, windowTokens: 1000000 }, // ctx 21% (210.8k/1000k)
+    { percent: 36, usedTokens: 72600, windowTokens: 200000 },
+  ];
   const approximates = [false, true];
-  const nexts = [...NEXT_MODELS, NEXT_UNSET];
   const controls = [CONTROL_CONTINUE, ...HANDBACK_CODES.map((c) => `HANDBACK:${c}`)];
 
   let combos = 0;
-  for (const percent of percents) {
+  for (const ctx of ctxShapes) {
     for (const approximate of approximates) {
       for (const state of FOOTER_STATES) {
         for (const advice of ADVICE_VALUES) {
-          for (const next of nexts) {
+          for (const next of NEXT_VALUES) {
             for (const control of controls) {
-              const fields = { percent, approximate, state, advice, next, control };
+              const fields = { ...ctx, approximate, state, advice, next, control };
               const parsed = parseFooter(renderFooter(fields));
               assert.equal(parsed.ok, true, `failed to parse ${JSON.stringify(fields)}`);
               assert.deepEqual(parsed.fields, fields);
@@ -255,10 +286,503 @@ test('D-M10: parseFooter(renderFooter(x)).fields === x for EVERY field combinati
   }
   // INV-5: assert a non-zero count of things actually examined. A loop whose bounds
   // silently became empty would otherwise report a clean pass over nothing.
-  assert.equal(combos, percents.length * 2 * FOOTER_STATES.length * ADVICE_VALUES.length * nexts.length * controls.length);
+  assert.equal(
+    combos,
+    ctxShapes.length * approximates.length * FOOTER_STATES.length * ADVICE_VALUES.length *
+      NEXT_VALUES.length * controls.length
+  );
   assert.ok(combos > 0);
 });
 
+test('WO-OR-05: the four CTX shapes render the exact bytes ruled for them', () => {
+  // The bytes Warwick reads. Pinned as literals held OUTSIDE the module that produces
+  // them, so a change to the renderer cannot quietly redefine what "correct" means.
+  const base = { approximate: false, state: 'GREEN', advice: ADVICE.KEEP_GOING, next: 'Opus/high', control: CONTROL_CONTINUE };
+  const cases = [
+    [{ percent: null, usedTokens: null, windowTokens: null }, '⟦GOV⟧ ctx -- · GREEN · KEEP GOING · next: Opus/high · CONTINUE'],
+    [{ percent: 38, usedTokens: null, windowTokens: null }, '⟦GOV⟧ ctx 38% · GREEN · KEEP GOING · next: Opus/high · CONTINUE'],
+    [{ percent: null, usedTokens: 72600, windowTokens: null }, '⟦GOV⟧ ctx 72.6k · GREEN · KEEP GOING · next: Opus/high · CONTINUE'],
+    [{ percent: 38, usedTokens: 72600, windowTokens: 190000 }, '⟦GOV⟧ ctx 38% (72.6k/190k) · GREEN · KEEP GOING · next: Opus/high · CONTINUE'],
+  ];
+  for (const [ctx, expected] of cases) {
+    assert.equal(renderFooter({ ...base, ...ctx }), expected);
+  }
+  assert.equal(cases.length, 4);
+});
+
+test('WO-OR-05: the token codec is EXACT over its whole grain, both directions', () => {
+  // D-M10 identity depends on this being exact, not approximate. Rounding inside the
+  // renderer would break the round-trip silently, so the renderer REFUSES an
+  // off-grain value and the producer is the one that rounds.
+  const pairs = [[0, '0k'], [100, '0.1k'], [900, '0.9k'], [1000, '1k'], [72600, '72.6k'], [190000, '190k'], [1000000, '1000k']];
+  for (const [n, text] of pairs) {
+    assert.equal(formatTokens(n), text, `format ${n}`);
+    assert.equal(parseTokens(text), n, `parse ${text}`);
+  }
+  assert.equal(pairs.length, 7);
+
+  // MUTATION: an off-grain count is REFUSED by the renderer rather than rounded.
+  assert.equal(isRenderableTokens(72_601), false);
+  assert.throws(() => formatTokens(72_601), TypeError);
+  assert.throws(() => renderFooter({ percent: null, usedTokens: 72_601, windowTokens: null, state: 'GREEN', advice: ADVICE.KEEP_GOING, next: NEXT_UNSET, control: CONTROL_CONTINUE }), TypeError);
+  // and the producer-side rounding puts it back on the grain.
+  assert.equal(toRenderableTokens(72_601), 72_600);
+  assert.equal(toRenderableTokens(72_651), 72_700);
+  assert.equal(toRenderableTokens(-1), null);
+  assert.equal(toRenderableTokens(Number.NaN), null);
+  assert.equal(TOKENS_GRAIN, 100);
+});
+
+test('WO-OR-05: a denominator with nothing to divide is REFUSED, never silently dropped', () => {
+  const base = { approximate: false, state: 'GREEN', advice: ADVICE.KEEP_GOING, next: NEXT_UNSET, control: CONTROL_CONTINUE };
+  assert.throws(() => renderFooter({ ...base, percent: null, usedTokens: null, windowTokens: 190000 }), TypeError);
+  assert.throws(() => renderFooter({ ...base, percent: 38, usedTokens: null, windowTokens: 190000 }), TypeError);
+  assert.throws(() => renderFooter({ ...base, percent: null, usedTokens: 72600, windowTokens: 190000 }), TypeError);
+  assert.throws(() => renderFooter({ ...base, percent: 38, usedTokens: 72600, windowTokens: 0 }), TypeError);
+});
+
+// ---------------------------------------------------------------------------
+// WO-OR-10 — THE ACCEPTED DOMAIN AND THE REPRESENTABLE DOMAIN MUST AGREE
+// ---------------------------------------------------------------------------
+// D3 states `parseFooter(renderFooter(x)) === x` as a criterion. It did not hold. Three
+// defects, ONE principle — refuse what cannot be represented — and none of them was a
+// live rendering bug: no path through `deriveFooterFields` reaches any of the three
+// (verified by sweeping the producer over 1,080 realistic telemetry combinations, 0
+// hits). They are defects in a CODEC that other code calls, and that is why they are
+// worth closing.
+//
+//   F1  renderFooter accepted `percent` + `usedTokens` with a null `windowTokens` and
+//       silently DROPPED the numerator, because the parenthesised pair is emitted only
+//       when a denominator is present. Found by Codex; rated ACTIVE by Codex and
+//       correctly re-rated LATENT by Larry against execution.
+//   F2  `isRenderableTokens` accepted counts beyond `Number.MAX_SAFE_INTEGER`, where
+//       the format/parse pair is no longer exact. Codex claimed this and named `1e24`;
+//       Larry's probe showed `1e24` is REJECTED for an unrelated reason and recorded
+//       F2 as disproven. Both point-checks were right; the generalisation was not.
+//   §4  `toRenderableTokens` — the MIRROR of F1: the PRODUCER emitting what the
+//       renderer refuses, despite documenting itself as doing the opposite.
+//
+// THE BOUNDARY, stated once: the codec is faithful over exactly the non-negative
+// multiples of TOKENS_GRAIN that are SAFE INTEGERS. Below that bound the round-trip is
+// exact BY CONSTRUCTION — `whole * 1000` stays inside 2^53 so the reconstruction is
+// exact arithmetic, and `whole < 1e21` so `String` never reaches exponent notation.
+// Above it, survival is incidental. That is a FIDELITY bound, not a plausibility bound;
+// a "no real window exceeds N tokens" rule would be a meaning judgement, and this
+// module keeps meaning in the producer and fidelity in the codec.
+
+test('WO-OR-10 F1: percent + usedTokens with NO windowTokens is REFUSED, not silently dropped', () => {
+  // The exact case Codex reported, pinned as the literal field object it filed.
+  // Before this repair it returned "⟦GOV⟧ ctx 38% · GREEN · KEEP GOING · next: UNSET ·
+  // CONTINUE" and `parseFooter(...).fields.usedTokens` came back `null`, not 72600.
+  const reported = {
+    percent: 38, usedTokens: 72600, windowTokens: null, approximate: false,
+    state: 'GREEN', advice: ADVICE.KEEP_GOING, next: NEXT_UNSET, control: CONTROL_CONTINUE,
+  };
+  assert.throws(() => renderFooter(reported), TypeError, 'the numerator must not be silently discarded');
+
+  // The zero edge and the boundary percent, so the refusal is not keyed to one value.
+  const base = { approximate: false, state: 'GREEN', advice: ADVICE.KEEP_GOING, next: NEXT_UNSET, control: CONTROL_CONTINUE };
+  assert.throws(() => renderFooter({ ...base, percent: 0, usedTokens: 0, windowTokens: null }), TypeError);
+  assert.throws(() => renderFooter({ ...base, percent: 100, usedTokens: 900, windowTokens: null }), TypeError);
+
+  // CONTROL — the three shapes that REMAIN legal must still render and still round-trip,
+  // or this test would pass just as well against a renderer that refused everything.
+  for (const ctx of [
+    { percent: 38, usedTokens: null, windowTokens: null },
+    { percent: null, usedTokens: 72600, windowTokens: null },
+    { percent: 38, usedTokens: 72600, windowTokens: 190000 },
+  ]) {
+    const fields = { ...base, ...ctx };
+    const parsed = parseFooter(renderFooter(fields));
+    assert.equal(parsed.ok, true, `the legal shape ${JSON.stringify(ctx)} must still render`);
+    assert.deepEqual(parsed.fields, fields);
+  }
+});
+
+test('WO-OR-10: the CTX shape space is TOTAL — every combination either round-trips or is refused', () => {
+  // A curated list of shapes can only SAMPLE the space; the F1 gap survived years of a
+  // curated list. This enumerates the space instead, so a combination that renders a
+  // line it cannot read back has nowhere to hide.
+  //
+  // The expectation is an INDEPENDENT restatement of D-2's four shapes, not something
+  // read back out of the module under test — otherwise the test would agree with the
+  // code by construction and could never fail.
+  //
+  // `-0` ADDED TO BOTH NUMERIC DIMENSIONS BY WO-OR-16, and this is where that defect
+  // should have been caught. The sweep's COMPARISON was never the gap — this file imports
+  // `node:assert/strict`, where `deepEqual` IS `deepStrictEqual` and already distinguishes
+  // -0 from +0. The gap was the DOMAIN: -0 was never among the values swept, so the
+  // strictest comparison in the world had nothing to compare. A totality test is only
+  // total over the values it is given.
+  const percents = [null, -0, 0, 38, 100];
+  const useds = [null, -0, 0, 900, 72600];
+  const windows = [null, 190000];
+
+  // Representable iff a denominator appears with BOTH a percent and a numerator, a
+  // numerator never appears beside a percent without one, and NEITHER number is a signed
+  // zero — `-0` renders as the byte "0" and reads back as `+0`, so it is a value the
+  // grammar cannot carry back to its caller. Still an independent restatement of the
+  // requirement; nothing here is read out of the module under test.
+  const isNegZero = (n) => Object.is(n, -0);
+  const representable = (p, u, w) =>
+    !isNegZero(p) && !isNegZero(u) &&
+    (w === null ? !(p !== null && u !== null) : (p !== null && u !== null));
+
+  const base = { approximate: false, state: 'GREEN', advice: ADVICE.KEEP_GOING, next: NEXT_UNSET, control: CONTROL_CONTINUE };
+  let accepted = 0;
+  let refused = 0;
+  for (const percent of percents) {
+    for (const usedTokens of useds) {
+      for (const windowTokens of windows) {
+        const fields = { percent, usedTokens, windowTokens, ...base };
+        if (representable(percent, usedTokens, windowTokens)) {
+          const parsed = parseFooter(renderFooter(fields));
+          assert.equal(parsed.ok, true, `unparseable: ${JSON.stringify(fields)}`);
+          assert.deepEqual(parsed.fields, fields, `round-trip lost data for ${JSON.stringify(fields)}`);
+          accepted += 1;
+        } else {
+          assert.throws(() => renderFooter(fields), TypeError, `must be refused: ${JSON.stringify(fields)}`);
+          refused += 1;
+        }
+      }
+    }
+  }
+  // INV-5: assert the executed counts against the product of the dimensions, so a loop
+  // whose bounds silently collapsed cannot report a clean pass over nothing.
+  assert.equal(accepted + refused, percents.length * useds.length * windows.length);
+  // 50 combinations, not 32 (WO-OR-16 widened the domain by one value per numeric
+  // dimension). The accepted side is UNCHANGED at 16 — every shape that round-tripped
+  // before still does — and all 18 new combinations land on the refused side, which is
+  // what "narrow the accepted domain, never widen the grammar" means when counted.
+  assert.equal(accepted, 16);
+  assert.equal(refused, 34);
+  assert.ok(refused > 0, 'a partition with nothing on the refused side would prove nothing');
+});
+
+test('WO-OR-10 F2: the token codec is bounded at MAX_SAFE_INTEGER, and the LOSSY value is pinned', () => {
+  // THIS VALUE IS THE ONE THAT MATTERS, and it is pinned as a literal rather than
+  // computed because it is the number that would have reached Warwick as a plausible
+  // lie. It is not a crash and not an ugly line: it rendered, it PARSED, `ok` was true,
+  // and the count that came back was different from the count that went in.
+  const LOSSY = 100000000000001200;
+  assert.ok(LOSSY > Number.MAX_SAFE_INTEGER, 'precondition: outside safe integer arithmetic');
+  assert.equal(LOSSY % TOKENS_GRAIN, 0, 'precondition: it IS on the grain, so only the bound can refuse it');
+  assert.equal(isRenderableTokens(LOSSY), false, 'the codec must refuse what it cannot read back');
+  assert.throws(() => formatTokens(LOSSY), TypeError);
+  assert.throws(
+    () => renderFooter({
+      percent: null, usedTokens: LOSSY, windowTokens: null, approximate: false,
+      state: 'BLIND', advice: ADVICE.UNSURE, next: NEXT_UNSET, control: CONTROL_CONTINUE,
+    }),
+    TypeError
+  );
+
+  // WHY it must be refused, DEMONSTRATED rather than asserted. The text below is built
+  // from the grammar's own production, not from the module's internals, so it stays a
+  // real proof that this magnitude cannot survive the trip.
+  const text = `${Math.floor(LOSSY / 1000)}.${(LOSSY / TOKENS_GRAIN) % 10}k`;
+  assert.match(text, /^[0-9]+\.[0-9]k$/, 'the old renderer emitted a perfectly GRAMMATICAL line');
+  assert.notEqual(parseTokens(text), LOSSY, 'and it read back a DIFFERENT number — the silent failure');
+
+  // Class B, the louder one: at and above 1e24 the whole number goes exponential and
+  // the line stops parsing altogether. Refused now for the same reason.
+  const EXPONENT = 1006632960000000000000000;
+  assert.equal(EXPONENT % TOKENS_GRAIN, 0, 'precondition: on the grain');
+  assert.ok(EXPONENT > Number.MAX_SAFE_INTEGER);
+  assert.equal(isRenderableTokens(EXPONENT), false);
+  assert.match(String(Math.floor(EXPONENT / 1000)), /e\+/, 'the old renderer would have emitted exponent notation');
+
+  // Codex named `1e24`. It is rejected, but for an UNRELATED reason — the nearest
+  // double is not a multiple of the grain — which is exactly why probing it looked like
+  // a disproof. Recorded so nobody re-runs that probe and re-reaches the wrong verdict.
+  assert.notEqual(1e24 % TOKENS_GRAIN, 0, 'the double nearest 1e24 is not on the grain');
+  assert.equal(isRenderableTokens(1e24), false);
+
+  // THE BOUNDARY ITSELF, from both sides, so it cannot drift unnoticed.
+  const LARGEST = 9007199254740900;
+  assert.ok(LARGEST <= Number.MAX_SAFE_INTEGER, 'the largest multiple of the grain inside safe range');
+  assert.equal(isRenderableTokens(LARGEST), true, 'the largest faithful value must still be ACCEPTED');
+  assert.equal(parseTokens(formatTokens(LARGEST)), LARGEST, 'and it must round-trip EXACTLY');
+  assert.equal(
+    isRenderableTokens(LARGEST + TOKENS_GRAIN), false,
+    'and the very next value on the grain must not — the bound is here, not somewhere nearby'
+  );
+
+  // The whole legal range still round-trips: this is the half that stops the bound
+  // being "fixed" by simply refusing more.
+  let exact = 0;
+  for (const n of [0, 100, 900, 1000, 72600, 190000, 1e6, 1e9, 1e12, 1e15, 9e15, LARGEST]) {
+    assert.equal(isRenderableTokens(n), true, `${n} must remain accepted`);
+    assert.equal(parseTokens(formatTokens(n)), n, `${n} must round-trip exactly`);
+    exact += 1;
+  }
+  assert.equal(exact, 12);
+});
+
+test('WO-OR-10: toRenderableTokens can never hand the renderer a value it refuses', () => {
+  // THE MIRROR DEFECT. F1 is the renderer accepting what the parser cannot represent;
+  // this is the PRODUCER emitting what the renderer refuses. The function documents
+  // itself as rounding a raw count "onto the grain so the renderer will accept it", and
+  // above ~1e23 it did not: the nearest double is not a multiple of the grain, so the
+  // rounded result came straight back out and `renderFooter` threw on it.
+  //
+  // Asserted as a PROPERTY over the input domain rather than at the four magnitudes
+  // that happened to fail — the next failing magnitude is not something a list can
+  // anticipate, which is the whole reason the original list-shaped check missed this.
+  let checked = 0;
+  let produced = 0;
+  const raws = [
+    0, 1, 49, 50, 99, 100, 151, 72_601, 72_651, 111_019, 210_781,
+    1e6, 1e12, 1e15, 9e15, 9007199254740900, Number.MAX_SAFE_INTEGER,
+    1e16, 1e17, 100000000000001200, 1e21, 1e22, 1e23, 1e24, 1e25, 1.5e24,
+    -1, -100, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY,
+  ];
+  for (const raw of raws) {
+    const out = toRenderableTokens(raw);
+    checked += 1;
+    if (out === null) continue;
+    produced += 1;
+    assert.equal(isRenderableTokens(out), true, `toRenderableTokens(${raw}) = ${out}, which the renderer REFUSES`);
+    // ...and it is renderable end to end, not merely predicate-clean.
+    assert.equal(parseTokens(formatTokens(out)), out, `toRenderableTokens(${raw}) = ${out} does not round-trip`);
+  }
+  assert.equal(checked, raws.length);
+  assert.ok(produced > 0, 'a run where everything returned null would prove nothing');
+
+  // The specific escapes, named so the regression cannot come back quietly.
+  for (const raw of [1e23, 1e24, 1e25, 1.5e24]) {
+    assert.equal(toRenderableTokens(raw), null, `${raw} must be refused, not rounded into an unrenderable value`);
+  }
+  // ROUNDING UP ACROSS THE BOUND is the subtle one: the input is inside safe range and
+  // the ROUNDED value is not, so the check has to be on the result, never the argument.
+  assert.equal(toRenderableTokens(Number.MAX_SAFE_INTEGER), null, 'rounding up must not cross the bound unnoticed');
+
+  // ...and the ordinary producer-side rounding this whole ladder depends on is UNCHANGED.
+  assert.equal(toRenderableTokens(72_601), 72_600);
+  assert.equal(toRenderableTokens(72_651), 72_700);
+  assert.equal(toRenderableTokens(0), 0);
+  assert.equal(toRenderableTokens(9_007_199_254_740_900), 9_007_199_254_740_900);
+  assert.equal(toRenderableTokens(-1), null);
+  assert.equal(toRenderableTokens(Number.NaN), null);
+});
+
+// ---------------------------------------------------------------------------
+// WO-OR-12 / Codex F3 — a DISPLAY transform must never feed the ARITHMETIC
+// ---------------------------------------------------------------------------
+// `toRenderableTokens` rounds a raw count onto TOKENS_GRAIN so the DISPLAY codec can
+// render it exactly. The ladder then divided those two already-rounded values to produce
+// the percentage — so the most load-bearing number this module emits was computed from
+// two values that exist only in order to be rendered.
+//
+// THE REACHABILITY DEFENCE WAS TESTED AND IS FALSE, which is why these tests pin
+// realistic magnitudes and not only Codex's 149-token example. The argument for leaving
+// it alone was that real windows are 200000 or 1000000 — both exact multiples of the
+// grain, so the denominator is untouched — and that a numerator error of at most 50
+// tokens is far below the integer percent actually rendered. Both premises are true and
+// the conclusion is wrong: across every used-token value in a 200000 window, 4996 of
+// 200001 (2.498%) render a DIFFERENT integer percent, and 100 of them cross an evaluator
+// threshold and change the STATE. The rows below are drawn from that sweep.
+//
+// The percent is the LESS dangerous half. A grade computed off a rounded numerator can
+// tell Warwick to rotate when the true figure does not: `used_tokens: 149950` in a 200000
+// window rounds to exactly 75.000% and grades RED · CLEAR NOW, where the truth is 74.975%
+// and AMBER. Same rendered percent, different instruction.
+
+const F3_AT = '2026-08-02T12:00:00.000Z';
+const F3_NOW = Date.parse(F3_AT) + 1000; // fresh, so staleness is never the reason
+
+// The TRANSCRIPT path — a raw numerator and denominator with NO reported percentage. It
+// is the only path that divides; a sample carrying `used_percentage` short-circuits above.
+function f3Sample({ used, window: windowSize, percentage = null }) {
+  return {
+    ok: true,
+    approximate: false,
+    data: {
+      schema_version: 1,
+      sampled_at: F3_AT,
+      session_id: 'f3',
+      source: 'transcript',
+      context_window: {
+        used_percentage: percentage,
+        used_tokens: used,
+        context_window_size: windowSize,
+      },
+    },
+  };
+}
+
+const f3Derive = (opts) =>
+  deriveFooterFields({ sample: f3Sample(opts), knownSessionId: 'f3', now: F3_NOW });
+
+test('WO-OR-12 F3: the percentage comes from the RAW numerator and denominator, never the display-rounded pair', () => {
+  // Every row FAILS against the pre-fix code. That is what makes this evidence rather
+  // than decoration — a test that never failed proves only that it was written.
+  const cases = [
+    {
+      what: "Codex's own case — a numerator that rounds away to ZERO",
+      used: 49, window: 149,
+      percent: 33, // true 32.885%; the old arithmetic divided 0/100 and rendered 0%
+      state: 'GREEN',
+    },
+    {
+      what: 'a REALISTIC 200k window — the rendered percent is a full point wrong',
+      used: 950, window: 200_000,
+      percent: 0, // true 0.475%; the old arithmetic divided 1000/200000 -> 0.5% -> 1%
+      state: 'GREEN',
+    },
+    {
+      what: 'a REALISTIC 200k window at the RED threshold — the STATE is wrong, not the number',
+      used: 149_950, window: 200_000,
+      percent: 75, // rounds to 75 either way: the percent field HIDES this one entirely
+      state: 'AMBER', // true 74.975%; the old arithmetic hit exactly 75.000% and graded RED
+    },
+    {
+      what: 'a REALISTIC 200k window at the AMBER threshold',
+      used: 109_950, window: 200_000,
+      percent: 55,
+      state: 'GREEN', // true 54.975%; the old arithmetic hit exactly 55.000% and graded AMBER
+    },
+    {
+      what: 'the same defect in a 1M window',
+      used: 549_950, window: 1_000_000,
+      percent: 55,
+      state: 'GREEN', // true 54.995%; the old arithmetic hit exactly 55.000%
+    },
+  ];
+
+  let checked = 0;
+  for (const c of cases) {
+    const { fields, blind } = f3Derive({ used: c.used, window: c.window });
+    assert.equal(blind, false, `${c.what}: must not be BLIND`);
+    assert.equal(fields.percent, c.percent, `${c.what}: percent`);
+    assert.equal(fields.state, c.state, `${c.what}: state`);
+
+    // Asserted as the PROPERTY as well as the literal, so a future edit cannot satisfy
+    // the four literals above by some other route.
+    assert.equal(
+      fields.percent,
+      Math.round((c.used / c.window) * 100),
+      `${c.what}: percent must be the RAW quotient, rounded once at the end`
+    );
+    checked += 1;
+  }
+  assert.equal(checked, cases.length, 'a run that executed no case would prove nothing');
+
+  // The readings that already AGREED must still agree — this fix is not licensed to move
+  // anything else. Both values are exercised end to end elsewhere in this file.
+  assert.equal(f3Derive({ used: 210_781, window: 1_000_000 }).fields.percent, 21);
+  assert.equal(f3Derive({ used: 111_019, window: 1_000_000 }).fields.percent, 11);
+
+  // A sample that REPORTS a percentage still short-circuits to it untouched, raw tokens
+  // present or not. The statusLine path never divided and must not start.
+  assert.equal(f3Derive({ used: 950, window: 200_000, percentage: 42 }).fields.percent, 42);
+});
+
+test('WO-OR-12: the RENDERED token fields are still grain-aligned, and the codec still round-trips', () => {
+  // THE REGRESSION THIS FIX COULD HAVE CAUSED. "Divide raw" must never become "render
+  // raw": grain alignment is what makes `parseFooter(renderFooter(x)).fields` deep-equal
+  // `x` (D-M10) for the token fields, and it was hard-won in WO-OR-10.
+  const cases = [
+    { used: 49, window: 149 },
+    { used: 950, window: 200_000 },
+    { used: 149_950, window: 200_000 },
+    { used: 91_234, window: 200_000 },
+    { used: 210_781, window: 1_000_000 },
+  ];
+
+  let checked = 0;
+  for (const { used, window: windowSize } of cases) {
+    const { fields } = f3Derive({ used, window: windowSize });
+
+    // Still DISPLAY-ROUNDED, and still exactly what the display codec produces.
+    assert.equal(fields.usedTokens, toRenderableTokens(used), `usedTokens for ${used}`);
+    assert.equal(fields.windowTokens, toRenderableTokens(windowSize), `windowTokens for ${windowSize}`);
+    assert.equal(isRenderableTokens(fields.usedTokens), true, `usedTokens for ${used} must be renderable`);
+    assert.equal(isRenderableTokens(fields.windowTokens), true, `windowTokens for ${windowSize} must be renderable`);
+    assert.equal(fields.usedTokens % TOKENS_GRAIN, 0, `usedTokens for ${used} must be grain-aligned`);
+    assert.equal(fields.windowTokens % TOKENS_GRAIN, 0, `windowTokens for ${windowSize} must be grain-aligned`);
+
+    // D-M10, end to end, for the field set the ladder actually produced.
+    const line = renderFooter(fields);
+    const parsed = parseFooter(line);
+    assert.equal(parsed.ok, true, `${line} must parse`);
+    assert.deepEqual(parsed.fields, fields, `${line} must round-trip exactly`);
+    checked += 1;
+  }
+  assert.equal(checked, cases.length, 'a run that executed no case would prove nothing');
+
+  // The whole change in one assertion: the value RENDERED is not the value DIVIDED. If
+  // these ever coincide for a raw count off the grain, the display transform has crept
+  // back into the arithmetic and F3 is open again.
+  const { fields } = f3Derive({ used: 950, window: 200_000 });
+  assert.equal(fields.usedTokens, 1000, 'the rendered numerator is rounded ONTO the grain');
+  assert.notEqual(fields.usedTokens, 950, '...and is therefore NOT the raw count');
+  assert.equal(fields.percent, 0, '...while the percentage came from the raw 950, not from the rendered 1000');
+});
+
+test('WO-OR-12: dividing the RAW values did not move the arithmetic past a single guard', () => {
+  // The obvious way to fix F3 is to reach for the raws BEFORE the checks the rounded
+  // values were subject to — trading a rounding error for a NaN, an Infinity, a division
+  // by zero or a negative percentage reaching the grammar. That would be a worse defect
+  // than the one being repaired, so every rung is pinned here as UNCHANGED.
+  const blindCases = [
+    { what: 'a zero denominator', used: 500, window: 0, reason: BLIND_REASON.WINDOW_SIZE_UNKNOWN },
+    { what: 'a negative denominator', used: 500, window: -200_000, reason: BLIND_REASON.WINDOW_SIZE_UNKNOWN },
+    { what: 'a NaN denominator', used: 500, window: Number.NaN, reason: BLIND_REASON.WINDOW_SIZE_UNKNOWN },
+    { what: 'an infinite denominator', used: 500, window: Number.POSITIVE_INFINITY, reason: BLIND_REASON.WINDOW_SIZE_UNKNOWN },
+    { what: 'a STRING denominator', used: 500, window: '200000', reason: BLIND_REASON.WINDOW_SIZE_UNKNOWN },
+    { what: 'an absent denominator', used: 500, window: null, reason: BLIND_REASON.WINDOW_SIZE_UNKNOWN },
+    { what: 'an unrepresentable denominator', used: 500, window: 1e24, reason: BLIND_REASON.WINDOW_SIZE_UNKNOWN },
+    { what: 'a negative numerator', used: -5, window: 200_000, reason: BLIND_REASON.PERCENTAGE_ABSENT },
+    { what: 'a NaN numerator', used: Number.NaN, window: 200_000, reason: BLIND_REASON.PERCENTAGE_ABSENT },
+    { what: 'an infinite numerator', used: Number.POSITIVE_INFINITY, window: 200_000, reason: BLIND_REASON.PERCENTAGE_ABSENT },
+    { what: 'a STRING numerator', used: '42', window: 200_000, reason: BLIND_REASON.PERCENTAGE_ABSENT },
+    { what: 'an absent numerator', used: null, window: 200_000, reason: BLIND_REASON.PERCENTAGE_ABSENT },
+  ];
+
+  let checked = 0;
+  for (const c of blindCases) {
+    const { fields, blind, blindReason } = f3Derive({ used: c.used, window: c.window });
+    assert.equal(blind, true, `${c.what} must be BLIND`);
+    assert.equal(blindReason, c.reason, `${c.what} must report the SAME rung as before the fix`);
+    assert.equal(fields.percent, null, `${c.what} must render NO percentage`);
+    assert.equal(fields.state, 'BLIND', `${c.what}: state`);
+
+    // ...and the line is still grammatical, carrying no arithmetic wreckage.
+    const line = renderFooter(fields);
+    assert.equal(parseFooter(line).ok, true, `${c.what}: ${line} must parse`);
+    assert.doesNotMatch(line, /NaN|Infinity|-[0-9]/, `${c.what}: ${line} must carry no wreckage`);
+    checked += 1;
+  }
+  assert.equal(checked, blindCases.length, 'a run that executed no case would prove nothing');
+
+  // The boundary that is deliberately NOT blind: a zero numerator over a real denominator
+  // is a true 0%, and must stay a real graded reading rather than being swept in above.
+  const zero = f3Derive({ used: 0, window: 200_000 });
+  assert.equal(zero.blind, false, 'a zero numerator is a READING, not a failure');
+  assert.equal(zero.fields.percent, 0);
+  assert.equal(zero.fields.state, 'GREEN');
+});
+
+test('WO-OR-05: `next:` carries MODEL AND EFFORT, and both vocabularies are closed', () => {
+  assert.deepEqual(NEXT_MODELS, ['Opus', 'Sonnet', 'Haiku']);
+  assert.deepEqual(NEXT_EFFORTS, ['low', 'medium', 'high', 'xhigh', 'max']);
+  // DERIVED, not hand-listed — 3 x 5 + UNSET.
+  assert.equal(NEXT_VALUES.length, NEXT_MODELS.length * NEXT_EFFORTS.length + 1);
+  assert.ok(NEXT_VALUES.includes(NEXT_UNSET));
+
+  // MUTATION: the BARE model form is no longer grammatical, in EITHER direction. This
+  // is the assertion that proves the effort half is required rather than decorative.
+  const bare = `${GOV_MARKER} ctx 38%${SEP}GREEN${SEP}KEEP GOING${SEP}next: Opus${SEP}CONTINUE`;
+  assert.equal(parseFooter(bare).ok, false, 'the parser must reject a model with no effort');
+  assert.throws(
+    () => renderFooter({ percent: 38, state: 'GREEN', advice: ADVICE.KEEP_GOING, next: 'Opus', control: CONTROL_CONTINUE }),
+    TypeError,
+    'and the renderer must refuse to emit one'
+  );
+  // An effort outside the closed five is refused too.
+  assert.throws(() => renderFooter({ percent: 38, state: 'GREEN', advice: ADVICE.KEEP_GOING, next: 'Opus/turbo', control: CONTROL_CONTINUE }), TypeError);
+});
 // ---------------------------------------------------------------------------
 // D-M11 — the parser rejects near-misses
 // ---------------------------------------------------------------------------
@@ -453,438 +977,28 @@ test('MUTATION (INV-5): the ladder\'s BLIND guarantee can be made to fail', () =
 // ===========================================================================
 // AC3 / D-4 — the UNSET predicate, driven by ABSENCE
 // ===========================================================================
-
-// Base fixture: the REAL banked document, so the predicate is exercised against a
-// document shape that genuinely validates rather than one invented to suit it.
-const realState = JSON.parse(readFileSync(REAL_STATE_PATH, 'utf8'));
-
-function writeStateFixture(root, buildName, mutate) {
-  const doc = JSON.parse(JSON.stringify(realState));
-  mutate(doc);
-  const dir = join(root, buildName);
-  mkdirSync(dir, { recursive: true });
-  const path = join(dir, 'programme-state.json');
-  writeFileSync(path, JSON.stringify(doc, null, 2));
-  return path;
-}
-
-// All six U-conditions satisfied.
-function satisfyAll(doc, { worktree, branch }) {
-  doc.resumption.worktree = worktree;
-  doc.resumption.branch = branch;
-  doc.resumption.ticket = 'T-12';
-  doc.resumption.next_action_kind = 'action';
-  doc.model_recommendation.model = 'Sonnet';
-  doc.model_recommendation.for_ticket = 'T-12';
-  doc.model_recommendation.computed_at_head = doc.banked.head_sha;
-  const t = doc.tickets.find((x) => x.id === 'T-12');
-  t.state = 'frontier';
-}
-
-test('D-M6: with all six U-conditions satisfied, the model name renders', () => {
-  const root = tmp();
-  try {
-    writeStateFixture(root, 'BUILD-018-x', (d) => satisfyAll(d, { worktree: 'C:/repo', branch: 'feat/x' }));
-    const r = nextModelFor({ worktreePath: 'C:/repo', worktreeBranch: 'feat/x', deliverablesDir: root });
-    assert.equal(r.unset, false, `expected a model, got UNSET (${r.unsetReason})`);
-    assert.equal(r.next, 'Sonnet');
-
-    // ...and it really reaches the rendered line.
-    const line = renderFooter({
-      percent: 18, approximate: false, state: 'GREEN', advice: ADVICE.KEEP_GOING,
-      next: r.next, control: CONTROL_CONTINUE,
-    });
-    assert.ok(line.includes('· next: Sonnet ·'));
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-  }
-});
-
-test('AC3: EACH U-condition, violated ALONE, forces UNSET — and by ABSENCE, not text matching', () => {
-  const violations = [
-    ['U-b next_action_kind absent', (d) => { delete d.resumption.next_action_kind; }, UNSET_REASON.NEXT_ACTION_KIND],
-    ['U-b next_action_kind = hold', (d) => { d.resumption.next_action_kind = 'hold'; }, UNSET_REASON.NEXT_ACTION_KIND],
-    ['U-b next_action_kind = unknown', (d) => { d.resumption.next_action_kind = 'unknown'; }, UNSET_REASON.NEXT_ACTION_KIND],
-    ['U-c model = unknown', (d) => { d.model_recommendation.model = 'unknown'; }, UNSET_REASON.MODEL_UNKNOWN],
-    ['U-c model = any', (d) => { d.model_recommendation.model = 'any'; }, UNSET_REASON.MODEL_UNKNOWN],
-    ['U-d for_ticket absent', (d) => { delete d.model_recommendation.for_ticket; }, UNSET_REASON.FOR_TICKET_MISMATCH],
-    ['U-d for_ticket null', (d) => { d.model_recommendation.for_ticket = null; }, UNSET_REASON.FOR_TICKET_MISMATCH],
-    ['U-d for_ticket names a different ticket', (d) => { d.model_recommendation.for_ticket = 'T-11'; }, UNSET_REASON.FOR_TICKET_MISMATCH],
-    ['U-e computed_at_head absent', (d) => { delete d.model_recommendation.computed_at_head; }, UNSET_REASON.HEAD_MISMATCH],
-    ['U-e computed_at_head is a DIFFERENT sha', (d) => { d.model_recommendation.computed_at_head = 'b'.repeat(40); }, UNSET_REASON.HEAD_MISMATCH],
-    // `resolved` also needs a resolved DATE, or the document fails consistency validation
-    // and never reaches U-f at all — so the fixture sets both. Without the date this row
-    // passed for the wrong reason (rejected as invalid, not as a resolved ticket), which
-    // is exactly the kind of false green INV-5 is aimed at.
-    ['U-f ticket resolved', (d) => {
-      const t = d.tickets.find((x) => x.id === 'T-12');
-      t.state = 'resolved';
-      t.resolved = '2026-08-01';
-    }, UNSET_REASON.TICKET_UNRESOLVED_MISSING],
-    ['U-f ticket absent from tickets[]', (d) => { d.tickets = d.tickets.filter((x) => x.id !== 'T-12'); }, UNSET_REASON.TICKET_UNRESOLVED_MISSING],
-  ];
-
-  let examined = 0;
-  for (const [label, mutate, expectedReason] of violations) {
-    const root = tmp();
-    try {
-      writeStateFixture(root, 'BUILD-018-x', (d) => {
-        satisfyAll(d, { worktree: 'C:/repo', branch: 'feat/x' });
-        mutate(d);
-      });
-      const r = nextModelFor({ worktreePath: 'C:/repo', worktreeBranch: 'feat/x', deliverablesDir: root });
-      assert.equal(r.unset, true, `${label} must force UNSET`);
-      assert.equal(r.next, NEXT_UNSET);
-      assert.equal(r.unsetReason, expectedReason, `${label}: wrong reason`);
-      examined += 1;
-    } finally {
-      rmSync(root, { recursive: true, force: true });
-    }
-  }
-  assert.equal(examined, 12, 'every violation must have been executed');
-});
-
-test('the grammar guard on the model name fires — proven with an injected reader, because the schema makes it unreachable from disk', () => {
-  // `programme-state.schema.json` pins `model_recommendation.model` to the enum
-  // ["Opus","Sonnet","Haiku","any","unknown"]. U-c removes "any" and "unknown", so every
-  // model that survives validation is already renderable and this guard cannot fire via
-  // any document on disk — a second independent layer, exactly like the null-model case.
-  //
-  // It is kept and tested anyway, because `nextModelFor` accepts an injected `readState`
-  // and its result feeds the STRICT renderer: without the guard, a caller supplying a
-  // state by some other route would produce a model name that `renderFooter` refuses,
-  // turning a recoverable UNSET into a throw. Exercised here where it can actually fire,
-  // rather than asserted where it cannot.
-  const fabricated = JSON.parse(JSON.stringify(realState));
-  fabricated.resumption.worktree = 'C:/repo';
-  fabricated.resumption.branch = 'feat/x';
-  fabricated.resumption.ticket = 'T-12';
-  fabricated.resumption.next_action_kind = 'action';
-  fabricated.model_recommendation.model = 'Gemini';
-  fabricated.model_recommendation.for_ticket = 'T-12';
-  fabricated.model_recommendation.computed_at_head = fabricated.banked.head_sha;
-  fabricated.tickets.find((x) => x.id === 'T-12').state = 'frontier';
-
-  const r = nextModelFor({
-    worktreePath: 'C:/repo',
-    worktreeBranch: 'feat/x',
-    deliverablesDir: 'C:/anywhere',
-    existsFn: () => true,
-    listDir: () => ['BUILD-fake'],
-    readState: () => ({ ok: true, data: fabricated }),
-  });
-  assert.equal(r.next, NEXT_UNSET);
-  assert.equal(r.unsetReason, UNSET_REASON.MODEL_NOT_IN_GRAMMAR);
-
-  // The guard is load-bearing: without it, this is what would have reached the renderer.
-  assert.throws(() => renderFooter({
-    percent: 1, approximate: false, state: 'GREEN', advice: ADVICE.KEEP_GOING,
-    next: 'Gemini', control: CONTROL_CONTINUE,
-  }), TypeError);
-});
-
-test('U-c: a NULL model is rejected one layer earlier — by the schema — so it never reaches the predicate', () => {
-  // Recorded rather than assumed. `model_recommendation.model` is `type: string` with no
-  // null branch, so a document carrying null does not VALIDATE and is therefore not a
-  // match at all (U-a), never reaching U-c. Two independent layers reject it, which is
-  // the wanted shape; the note exists so a future reader does not "fix" U-c to handle a
-  // case the schema already makes unreachable.
-  const root = tmp();
-  try {
-    writeStateFixture(root, 'BUILD-018-x', (d) => {
-      satisfyAll(d, { worktree: 'C:/repo', branch: 'feat/x' });
-      d.model_recommendation.model = null;
-    });
-    const r = nextModelFor({ worktreePath: 'C:/repo', worktreeBranch: 'feat/x', deliverablesDir: root });
-    assert.equal(r.unset, true);
-    assert.equal(r.unsetReason, UNSET_REASON.NO_MATCHING_PROGRAMME, 'rejected by validation, not by U-c');
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-  }
-});
-
-test('U-a: the ACTIVE build is selected — not simply the first Deliverables/* found (Nolan D-N3)', () => {
-  const root = tmp();
-  try {
-    // 'AAA-other' sorts first and would win under the old first-match behaviour.
-    writeStateFixture(root, 'AAA-other-build', (d) => {
-      satisfyAll(d, { worktree: 'C:/somewhere-else', branch: 'other/branch' });
-      d.model_recommendation.model = 'Opus';
-    });
-    writeStateFixture(root, 'ZZZ-active-build', (d) => {
-      satisfyAll(d, { worktree: 'C:/repo', branch: 'feat/x' });
-      d.model_recommendation.model = 'Haiku';
-    });
-
-    const r = nextModelFor({ worktreePath: 'C:/repo', worktreeBranch: 'feat/x', deliverablesDir: root });
-    assert.equal(r.next, 'Haiku', 'must pick the build matching THIS session, not the first on disk');
-    assert.ok(r.statePath.includes('ZZZ-active-build'));
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-  }
-});
-
-test('U-a: path matching is Windows-correct — case and slash direction must not fork the answer', () => {
-  const root = tmp();
-  try {
-    writeStateFixture(root, 'BUILD-018-x', (d) => satisfyAll(d, { worktree: 'C:/Repo/Sub', branch: 'feat/x' }));
-    assert.equal(nextModelFor({ worktreePath: 'c:\\repo\\sub', worktreeBranch: 'feat/x', deliverablesDir: root }).next, 'Sonnet');
-    assert.equal(nextModelFor({ worktreePath: 'C:/Repo/Sub/', worktreeBranch: 'feat/x', deliverablesDir: root }).next, 'Sonnet');
-    // A genuinely different directory must NOT match.
-    assert.equal(nextModelFor({ worktreePath: 'C:/Repo/Sub-other', worktreeBranch: 'feat/x', deliverablesDir: root }).unset, true);
-    // Right worktree, wrong branch.
-    assert.equal(nextModelFor({ worktreePath: 'C:/Repo/Sub', worktreeBranch: 'feat/other', deliverablesDir: root }).unsetReason, UNSET_REASON.NO_MATCHING_PROGRAMME);
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-  }
-});
-
-test('D-M8: TWO state files matching the live session is UNSET (ambiguous), never the first', () => {
-  const root = tmp();
-  try {
-    writeStateFixture(root, 'BUILD-A', (d) => { satisfyAll(d, { worktree: 'C:/repo', branch: 'feat/x' }); d.model_recommendation.model = 'Opus'; });
-    writeStateFixture(root, 'BUILD-B', (d) => { satisfyAll(d, { worktree: 'C:/repo', branch: 'feat/x' }); d.model_recommendation.model = 'Haiku'; });
-
-    const r = nextModelFor({ worktreePath: 'C:/repo', worktreeBranch: 'feat/x', deliverablesDir: root });
-    assert.equal(r.next, NEXT_UNSET);
-    assert.equal(r.unsetReason, UNSET_REASON.AMBIGUOUS_PROGRAMME);
-    assert.notEqual(r.next, 'Opus', 'must not silently take the first');
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-  }
-});
-
-test('U-a: a state file that does NOT validate is not a match, and never throws', () => {
-  const root = tmp();
-  try {
-    const dir = join(root, 'BUILD-broken');
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, 'programme-state.json'), '{ not json at all');
-    const r = nextModelFor({ worktreePath: 'C:/repo', worktreeBranch: 'feat/x', deliverablesDir: root });
-    assert.equal(r.unsetReason, UNSET_REASON.NO_MATCHING_PROGRAMME);
-
-    // A reader that throws outright must also be survivable.
-    const r2 = nextModelFor({
-      worktreePath: 'C:/repo', worktreeBranch: 'feat/x', deliverablesDir: root,
-      readState: () => { throw new Error('boom'); },
-    });
-    assert.equal(r2.unset, true);
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-  }
-});
-
-test('U-a: an unknown live location, or no Deliverables directory at all, is UNSET not a throw', () => {
-  assert.equal(nextModelFor().unsetReason, UNSET_REASON.LOCATION_UNKNOWN);
-  assert.equal(nextModelFor({ worktreePath: 'C:/repo' }).unsetReason, UNSET_REASON.LOCATION_UNKNOWN);
-  assert.equal(nextModelFor({ worktreePath: 'C:/repo', worktreeBranch: 'b' }).unsetReason, UNSET_REASON.NO_MATCHING_PROGRAMME);
-  assert.equal(
-    nextModelFor({ worktreePath: 'C:/repo', worktreeBranch: 'b', deliverablesDir: join(tmpdir(), 'definitely-not-here-xyz') }).unsetReason,
-    UNSET_REASON.NO_MATCHING_PROGRAMME
-  );
-});
-
-// ---------------------------------------------------------------------------
-// D-M5 — the live-ledger case, asserted as AGREEMENT rather than as an outcome
-// ---------------------------------------------------------------------------
-// Re-derives U-b..U-f from the document BY HAND, without calling the code under test,
-// so the assertion has two independent routes to the same answer and fails only when
-// they disagree. Deliberately not a copy of `nextModelFor`: it reads the raw fields and
-// applies D-4's conditions literally, in D-4's short-circuit order, so that a predicate
-// which silently stopped checking one of them would diverge here.
-function evaluateUConditions(doc) {
-  const resumption = doc.resumption ?? {};
-  const rec = doc.model_recommendation ?? {};
-  const banked = doc.banked ?? {};
-  const tickets = Array.isArray(doc.tickets) ? doc.tickets : [];
-  const ticket = tickets.find((t) => t && t.id === resumption.ticket);
-
-  const ordered = [
-    ['U-b', resumption.next_action_kind === 'action', UNSET_REASON.NEXT_ACTION_KIND],
-    ['U-c', typeof rec.model === 'string' && rec.model !== 'unknown' && rec.model !== 'any', UNSET_REASON.MODEL_UNKNOWN],
-    ['grammar', NEXT_MODELS.includes(rec.model), UNSET_REASON.MODEL_NOT_IN_GRAMMAR],
-    ['U-d', typeof rec.for_ticket === 'string' && rec.for_ticket.length > 0
-      && typeof resumption.ticket === 'string' && resumption.ticket.length > 0
-      && rec.for_ticket === resumption.ticket, UNSET_REASON.FOR_TICKET_MISMATCH],
-    ['U-e', typeof rec.computed_at_head === 'string' && rec.computed_at_head.length > 0
-      && typeof banked.head_sha === 'string' && banked.head_sha.length > 0
-      && rec.computed_at_head === banked.head_sha, UNSET_REASON.HEAD_MISMATCH],
-    ['U-f', Boolean(ticket) && ticket.state !== 'resolved', UNSET_REASON.TICKET_UNRESOLVED_MISSING],
-  ];
-
-  const firstFailure = ordered.find(([, holds]) => !holds) ?? null;
-  return { ordered, allHold: firstFailure === null, firstFailure };
-}
-
-// Runs the predicate over one document placed ALONE in a temp Deliverables tree, so
-// U-a's "exactly one match" is satisfied by construction, then asserts agreement.
-function assertPredicateAgreement(doc, label) {
-  const root = tmp();
-  try {
-    const dir = join(root, 'BUILD-under-test');
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, 'programme-state.json'), JSON.stringify(doc, null, 2));
-
-    const r = nextModelFor({
-      worktreePath: doc.resumption.worktree,
-      worktreeBranch: doc.resumption.branch,
-      deliverablesDir: root,
-    });
-    const { allHold, firstFailure, ordered } = evaluateUConditions(doc);
-
-    // INV-5: assert a non-zero count of conditions actually evaluated.
-    assert.equal(ordered.length, 6, `${label}: all six U-conditions must be evaluated`);
-
-    if (allHold) {
-      assert.equal(r.unset, false, `${label}: all six hold, so a model must render (got ${r.unsetReason})`);
-      assert.equal(r.next, doc.model_recommendation.model, `${label}: the rendered model must be the banked one`);
-      assert.ok(NEXT_MODELS.includes(r.next), `${label}: and it must be renderable in the grammar`);
-    } else {
-      const [name, , expectedReason] = firstFailure;
-      assert.equal(r.unset, true, `${label}: ${name} fails, so the result must be UNSET`);
-      assert.equal(r.next, NEXT_UNSET, `${label}: UNSET must render as the literal UNSET`);
-      assert.equal(r.unsetReason, expectedReason, `${label}: the reason must name the condition that actually failed (${name})`);
-    }
-    return { r, allHold, firstFailure };
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-  }
-}
-
-test('D-M5: over the REAL banked state, nextModelFor AGREES with the six U-conditions', () => {
-  // COUPLING NOTE — rewritten 2026-08-01, and the reason matters more than the change.
-  //
-  // This test reads the LIVE repository file, per Silas's D-M5 ("assert against the real
-  // file, not a fixture"): the value is in exercising the predicate against what is
-  // genuinely banked, rather than against a hand-built document that can quietly drift
-  // into agreeing with the code it is meant to check.
-  //
-  // It previously asserted a fixed OUTCOME — "today's banked state renders UNSET". True
-  // when written, false within the hour, because the banked state was then deliberately
-  // grounded (`next_action_kind`, `for_ticket` and `computed_at_head` were filled in) so
-  // the footer could render a real recommendation. The test fired correctly: it caught a
-  // real change, not a regression. But a fixed outcome re-arms the same trap every time
-  // the ledger legitimately moves, and re-pinning it to "renders Opus" would only point
-  // the trap the other way.
-  //
-  // So it now asserts AGREEMENT: the six U-conditions are re-derived independently and
-  // the predicate must match them — a model name iff all six hold, UNSET otherwise, with
-  // the reason naming the condition that actually failed. That keeps the live-ledger
-  // coupling this test exists for, and drops the coupling to one moment in the ledger's
-  // life. DO NOT re-pin this to a literal model name or a literal UNSET.
-  //
-  // The "by ABSENCE, not by any text heuristic" proof deliberately does NOT live here.
-  // It is in the fixture-based U-condition test above, which strips each of the three
-  // properties in turn and asserts the matching `unsetReason`. Kept there on purpose: in
-  // this file an ordinary ledger edit could silence it, which is exactly what happened.
-  assertPredicateAgreement(realState, 'real banked state');
-});
-
-test('D-M5: the agreement holds under BOTH ledger states — ungrounded and grounded', () => {
-  // The durability proof, and what makes this follow-up evidence rather than a hope.
-  //
-  // This worktree's branch point predates the commit that grounded the banked state, so
-  // the live file HERE still has the three properties absent. The test above therefore
-  // exercises only the UNSET branch locally, and the model-renders branch would go
-  // unexercised until the merged head. Constructing both states explicitly proves the
-  // harness is state-independent rather than merely passing today — in either direction.
-  //
-  // ---------------------------------------------------------------------------
-  // DO NOT DELETE THE GROUNDED CASE AS REDUNDANT. It is the only observer of U-e.
-  // ---------------------------------------------------------------------------
-  // Established by mutation on 2026-08-01, not by argument. U-e was changed to compare
-  // `computed_at_head` against LIVE GIT HEAD instead of `banked.head_sha` — the defect
-  // Silas explicitly warned about, which would make every ordinary commit destroy the
-  // recommendation. Result:
-  //
-  //   * the live-file D-M5 test above  -> STILL PASSED
-  //   * the grounded case below        -> went red
-  //
-  // The reason is that the predicate short-circuits: whenever the banked state lacks
-  // `next_action_kind`, it returns at U-b and NEVER EVALUATES U-e at all. So for any
-  // ungrounded ledger — which is what this worktree has, and what the repository had for
-  // most of this build — a U-e defect is completely unobservable from the real file. The
-  // grounded case is the only place in this suite where all six conditions hold and U-e
-  // is reachable.
-  //
-  // This case was originally written for a different reason (proving the harness works
-  // at a merged head this worktree cannot reach). It turned out to be load-bearing for
-  // U-e coverage, which nobody designed it for. Deleting it as "just a duplicate fixture"
-  // would silently reopen a gap that no other test in this file can see.
-  //
-  // Worth knowing too: the live-HEAD mutation also required importing `child_process`
-  // into footer.mjs — and footer.mjs is imported by stop-controller.mjs, where A-7
-  // forbids git on the Stop path. So that defect is not merely wrong about which SHA to
-  // compare; it drags a subprocess spawn onto the hot path of the control that decides
-  // whether Larry may end a turn.
-  const ungrounded = JSON.parse(JSON.stringify(realState));
-  delete ungrounded.resumption.next_action_kind;
-  delete ungrounded.model_recommendation.for_ticket;
-  delete ungrounded.model_recommendation.computed_at_head;
-
-  const a = assertPredicateAgreement(ungrounded, 'ungrounded ledger');
-  assert.equal(a.allHold, false, 'the ungrounded state must not render a model');
-  assert.equal(a.r.next, NEXT_UNSET);
-  assert.equal(a.r.unsetReason, UNSET_REASON.NEXT_ACTION_KIND, 'and it must fail at U-b, by absence');
-
-  // Grounded the way a real banking grounds it: the recommendation tied to the ticket it
-  // was computed for, and to the pointer it was computed at.
-  const grounded = JSON.parse(JSON.stringify(realState));
-  const openTicket = grounded.tickets.find((t) => t.state !== 'resolved');
-  assert.ok(openTicket, 'the fixture needs at least one unresolved ticket');
-  grounded.resumption.ticket = openTicket.id;
-  grounded.resumption.next_action_kind = 'action';
-  grounded.model_recommendation.model = 'Opus';
-  grounded.model_recommendation.for_ticket = openTicket.id;
-  grounded.model_recommendation.computed_at_head = grounded.banked.head_sha;
-
-  const b = assertPredicateAgreement(grounded, 'grounded ledger');
-  assert.equal(b.allHold, true, 'the grounded state must satisfy all six conditions');
-  assert.equal(b.r.next, 'Opus', 'and must render the banked model name');
-
-  // Both branches of the agreement assertion were exercised at least once, whichever way
-  // the live ledger happens to sit when this runs.
-  assert.notEqual(a.allHold, b.allHold, 'both branches exercised');
-});
-
-test('D-M7: v1 documents with and without the three new properties BOTH validate; the one without renders UNSET', () => {
-  const root = tmp();
-  try {
-    const withoutPath = writeStateFixture(root, 'BUILD-without', (d) => {
-      d.resumption.worktree = 'C:/repo';
-      d.resumption.branch = 'feat/x';
-      delete d.resumption.next_action_kind;
-      delete d.model_recommendation.for_ticket;
-      delete d.model_recommendation.computed_at_head;
-    });
-    const withPath = writeStateFixture(root, 'BUILD-with', (d) => satisfyAll(d, { worktree: 'C:/other', branch: 'feat/y' }));
-
-    // Both must VALIDATE — the schema addition is non-breaking, so schema_version stays 1.
-    const withoutDoc = JSON.parse(readFileSync(withoutPath, 'utf8'));
-    const withDoc = JSON.parse(readFileSync(withPath, 'utf8'));
-    assert.equal(withoutDoc.schema_version, 1);
-    assert.equal(withDoc.schema_version, 1);
-    assert.equal(nextModelFor({ worktreePath: 'C:/other', worktreeBranch: 'feat/y', deliverablesDir: root }).next, 'Sonnet',
-      'the document WITH the properties must validate and be usable');
-
-    // The one without renders UNSET.
-    const r = nextModelFor({ worktreePath: 'C:/repo', worktreeBranch: 'feat/x', deliverablesDir: root });
-    assert.equal(r.next, NEXT_UNSET);
-    assert.equal(r.unsetReason, UNSET_REASON.NEXT_ACTION_KIND);
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-  }
-});
-
+// THE D-4 / `nextModelFor` SECTION WAS DELETED HERE BY WO-OR-05
 // ===========================================================================
-// D-M9 — five distinct lines, plus the assertion that can actually fail
-// ===========================================================================
-
+// Roughly a dozen tests lived here. Every one of them built a scratch worktree
+// carrying `Deliverables/<id>/programme-state.json`, then asserted that one of six
+// U-conditions did or did not let a model name reach the footer. Both the predicate
+// and the programme state are deleted, so there is no weakened version of these tests
+// that still means something — the subject of the assertions is gone.
+//
+// THE COUNT DROPS AND THAT IS NOT A REGRESSION HIDDEN IN A DIFF: this file falls by
+// about a dozen tests and the fall is reported as measured. Deleting tests for deleted
+// behaviour is legitimate; deleting them quietly is not.
+//
+// What the section actually protected — that a model must never be presented as live
+// advice unless it is grounded in a real, current next action — is now structural. A
+// recommendation cannot come from a stale file because no file supplies it; it comes
+// from a caller who knows the next action, and `--next` is validated by membership at
+// the CLI boundary. That boundary IS tested, under WP-7 AC3 below.
 test('D-M9: the five states render five pairwise-distinct lines, with the CORRECT advice for each', () => {
   const lines = FOOTER_STATES.map((state) =>
     renderFooter({
       percent: 42, approximate: false, state, advice: adviceForState(state),
-      next: 'Sonnet', control: CONTROL_CONTINUE,
+      next: 'Sonnet/medium', control: CONTROL_CONTINUE,
     })
   );
 
@@ -1008,9 +1122,10 @@ test('computeFooterLine always returns a GRAMMATICAL line, even with everything 
   assert.equal(parseFooter(line).ok, true, 'a broken world must still produce a parseable footer');
   assert.equal(line, '⟦GOV⟧ ctx -- · BLIND · KEEP GOING? · next: UNSET · CONTINUE');
 
-  // And the happy path composes end to end.
+  // And the happy path composes end to end. `next` is now an INPUT rather than something
+  // read out of a scratch programme-state fixture, which is why this no longer builds a
+  // Deliverables tree — there is nothing left on disk for it to read.
   const dir = tmp();
-  const deliverables = tmp();
   try {
     writeFileSync(join(dir, 's1.json'), JSON.stringify({
       schema_version: 1,
@@ -1018,17 +1133,41 @@ test('computeFooterLine always returns a GRAMMATICAL line, even with everything 
       session_id: 's1',
       context_window: { used_percentage: 18 },
     }));
-    writeStateFixture(deliverables, 'BUILD-live', (d) => satisfyAll(d, { worktree: 'C:/repo', branch: 'feat/x' }));
 
-    const good = computeFooterLine({
-      sessionId: 's1', worktreePath: 'C:/repo', worktreeBranch: 'feat/x',
-      deliverablesDir: deliverables, envOverride: dir,
-    });
-    assert.equal(good, '⟦GOV⟧ ctx 18% · GREEN · KEEP GOING · next: Sonnet · CONTINUE');
+    const good = computeFooterLine({ sessionId: 's1', envOverride: dir, next: 'Sonnet/medium' });
+    assert.equal(good, '⟦GOV⟧ ctx 18% · GREEN · KEEP GOING · next: Sonnet/medium · CONTINUE');
     assert.equal(parseFooter(good).ok, true);
+
+    // WO-OR-05: a caller passing an out-of-grammar recommendation gets UNSET rather than
+    // a throw or a silenced footer. The CLI is the layer that refuses a typo loudly (see
+    // WP-7 AC3); the programmatic path must always return a grammatical line.
+    const coerced = computeFooterLine({ sessionId: 's1', envOverride: dir, next: 'GPT-5' });
+    assert.equal(coerced, '⟦GOV⟧ ctx 18% · GREEN · TASK UNKNOWN · next: UNSET · CONTINUE');
+
+    // And the end-to-end TOKEN path — the shape Warwick actually gets on web/Android.
+    writeFileSync(join(dir, 's2.json'), JSON.stringify({
+      schema_version: 1,
+      sampled_at: new Date().toISOString(),
+      session_id: 's2',
+      source: 'transcript',
+      context_window: { used_percentage: null, used_tokens: 210_781, context_window_size: 1_000_000 },
+    }));
+    const tokens = computeFooterLine({ sessionId: 's2', envOverride: dir, next: 'Opus/high' });
+    assert.equal(tokens, '⟦GOV⟧ ctx 21% (210.8k/1000k) · GREEN · KEEP GOING · next: Opus/high · CONTINUE');
+
+    // Numerator only: a REAL number and an honest BLIND, never `--` and never a graded
+    // state over a denominator nobody supplied.
+    writeFileSync(join(dir, 's3.json'), JSON.stringify({
+      schema_version: 1,
+      sampled_at: new Date().toISOString(),
+      session_id: 's3',
+      source: 'transcript',
+      context_window: { used_percentage: null, used_tokens: 210_781, context_window_size: null },
+    }));
+    const bare = computeFooterLine({ sessionId: 's3', envOverride: dir, next: 'Opus/high' });
+    assert.equal(bare, '⟦GOV⟧ ctx 210.8k · BLIND · KEEP GOING? · next: Opus/high · CONTINUE');
   } finally {
     rmSync(dir, { recursive: true, force: true });
-    rmSync(deliverables, { recursive: true, force: true });
   }
 });
 
@@ -1106,14 +1245,8 @@ test('WP-7 AC1: importing footer.mjs writes nothing, prints nothing, and does no
 
 test('WP-7 AC2: with no arguments the CLI resolves everything and emits exactly one line', () => {
   const store = storeWith('sess-1');
-  // A repo root with a real Deliverables/ inside it: the CLI derives `deliverablesDir` as
-  // <repoRoot>/Deliverables, so this exercises the derivation rather than bypassing it.
-  const root = mkdtempSync(join(tmpdir(), 'gov-cli-repo-'));
   try {
-    mkdirSync(join(root, 'Deliverables'), { recursive: true });
-    writeStateFixture(join(root, 'Deliverables'), 'BUILD-cli', (d) => satisfyAll(d, { worktree: root, branch: 'feat/cli' }));
-
-    const r = runCli([], { locationFn: stubLocation(root, 'feat/cli'), envOverride: store });
+    const r = runCli([], { envOverride: store });
 
     assert.equal(r.exitCode, CLI_EXIT.OK);
     assert.equal(r.stderr, '');
@@ -1123,18 +1256,43 @@ test('WP-7 AC2: with no arguments the CLI resolves everything and emits exactly 
 
     const parsed = parseFooter(r.stdout);
     assert.equal(parsed.ok, true, `unparseable: ${JSON.stringify(r.stdout)}`);
-    // Everything resolved by the CLI: the newest sample (hence `~`), the state from the
-    // D-3 ladder, and the model from nextModelFor over the matching programme.
+    // Everything resolved by the CLI: the newest sample (hence `~`) and the state from the
+    // degradation ladder. `next:` is UNSET because none was supplied — WO-OR-05 deleted
+    // the programme-state lookup that used to answer it, and the CLI no longer shells out
+    // to git to find a worktree to match against.
     assert.equal(parsed.fields.percent, 18);
     assert.equal(parsed.fields.approximate, true, 'no --session means the newest sample, which is approximate');
     assert.equal(parsed.fields.state, 'GREEN');
-    assert.equal(parsed.fields.advice, ADVICE.KEEP_GOING);
-    assert.equal(parsed.fields.next, 'Sonnet', 'next: comes from nextModelFor over the matching programme');
+    assert.equal(parsed.fields.next, NEXT_UNSET);
     assert.equal(parsed.fields.control, CONTROL_CONTINUE);
-    assert.equal(r.stdout.trimEnd(), '⟦GOV⟧ ctx ~18% · GREEN · KEEP GOING · next: Sonnet · CONTINUE');
+    assert.equal(r.stdout.trimEnd(), '⟦GOV⟧ ctx ~18% · GREEN · TASK UNKNOWN · next: UNSET · CONTINUE');
+
+    // WO-OR-05: --next is what puts a recommendation on the line, and it carries EFFORT.
+    const withNext = runCli(['--next', 'Opus/xhigh'], { envOverride: store });
+    assert.equal(withNext.exitCode, CLI_EXIT.OK);
+    assert.equal(
+      withNext.stdout.trimEnd(),
+      '⟦GOV⟧ ctx ~18% · GREEN · KEEP GOING · next: Opus/xhigh · CONTINUE',
+      'and supplying one flips the advice off TASK UNKNOWN, because now there is a purpose to be fit for'
+    );
   } finally {
     rmSync(store, { recursive: true, force: true });
-    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('WP-7 AC3: a MISTYPED --next fails loudly and prints no footer', () => {
+  // The split that matters: the programmatic API coerces an unknown value to UNSET so a
+  // line is always produced, but a human typo at the CLI must NOT silently render UNSET —
+  // that would be indistinguishable from an honest "no recommendation available".
+  for (const bad of ['Opus', 'opus/high', 'Opus/turbo', 'GPT-5', 'Opus/']) {
+    const r = runCli(['--next', bad]);
+    assert.equal(r.exitCode, CLI_EXIT.USAGE, `--next ${bad} must be a usage failure`);
+    assert.equal(r.stdout, '', 'no footer on a usage failure');
+    assert.match(r.stderr, /--next must be/);
+  }
+  // Control: every legal value is accepted, so the check above is not simply refusing all.
+  for (const good of NEXT_VALUES) {
+    assert.equal(runCli(['--next', good], { envOverride: tmp() }).exitCode, CLI_EXIT.OK, good);
   }
 });
 
@@ -1188,8 +1346,8 @@ test('WP-7 AC2: the REAL entrypoint, spawned as a process, prints one line and e
 // ---------------------------------------------------------------------------
 
 test('WP-7 AC3: CONTINUE is the default, and every one of the seven codes is accepted', () => {
-  assert.deepEqual(parseCliArgs([]), { ok: true, sessionId: null, control: CONTROL_CONTINUE });
-  assert.deepEqual(parseCliArgs(['--control', 'CONTINUE']), { ok: true, sessionId: null, control: 'CONTINUE' });
+  assert.deepEqual(parseCliArgs([]), { ok: true, sessionId: null, next: NEXT_UNSET, control: CONTROL_CONTINUE });
+  assert.deepEqual(parseCliArgs(['--control', 'CONTINUE']), { ok: true, sessionId: null, next: NEXT_UNSET, control: 'CONTINUE' });
 
   // Driven off the imported const, never a list typed here — the same discipline the
   // module itself follows, and the reason a vocabulary change cannot pass silently.
@@ -1428,4 +1586,579 @@ test('WP-7 AC5: the CLI line is byte-identical to renderFooter over the same fie
   } finally {
     rmSync(store, { recursive: true, force: true });
   }
+});
+
+// ===========================================================================
+// THE SEAM: extractTranscriptSample -> deriveFooterFields -> renderFooter
+// (added WO-OR-08; re-aimed WO-OR-09)
+// ===========================================================================
+//
+// WHY THIS BLOCK EXISTS. Every test above this line drives the ladder and the renderer
+// from SYNTHETIC fields — `goodSample()` and the 46,080-combination round-trip both
+// build their inputs by hand. Nothing drove a REAL `extractTranscriptSample` output
+// across into `deriveFooterFields`. That gap is not academic: it is precisely why a
+// borrowed denominator rendered a 1M-context session at roughly five times its true
+// percentage, graded AMBER, advising rotation — through a green suite.
+//
+// RE-AIMED BY WO-OR-09. These tests originally pinned the VARIANT-AMBIGUITY repair, so
+// their fixtures were keyed by model id and their negative case needed two conflicting
+// namespaces to fire. Codex TQA-001 established that the ambiguity was a symptom: the
+// unsound part was inferring this session's window from ANY other session's observation,
+// which fired just as readily on an unambiguous store. The fixtures below are therefore
+// keyed by SESSION ID, and the negative case is now the harder one — a single stranger's
+// observation with nothing to contradict it.
+//
+// A round-trip over invented fields proves the CODEC. It cannot prove that the two
+// halves agree about what they are exchanging. These tests cross that seam.
+//
+// FIXTURES ONLY. No live machine transcript and no live health store is read here, so
+// this passes in CI and in a fresh worktree. The store contents below are modelled on
+// the real ones, but they are written by this test.
+
+/**
+ * A statusLine observation, in the shape the real health store holds: one file per
+ * session, NAMED for the session that made it.
+ *
+ * WO-OR-09 re-keyed these fixtures. They used to be filed under `obs-<modelId>-<size>`
+ * and matched to the live session by MODEL ID, which is the inference Codex TQA-001
+ * disproved — agreement between observations establishes store consistency, not
+ * live-session identity. The session id is now the only linkage, so the fixture writes
+ * the file the resolver will actually look for.
+ */
+function writeSeamObservation(dir, sessionId, size, { modelId = 'claude-opus-5', at = '2026-08-01T00:49:52Z' } = {}) {
+  writeFileSync(join(dir, `${sessionId}.json`), JSON.stringify({
+    schema_version: 1,
+    sampled_at: at,
+    session_id: sessionId,
+    source: SOURCE_STATUSLINE,
+    model: { id: modelId },
+    context_window: { context_window_size: size },
+  }));
+}
+
+/** A one-line JSONL transcript carrying a single assistant usage block. */
+function seamTranscript(dir, { usedTokens, model }) {
+  const p = join(dir, 'transcript.jsonl');
+  writeFileSync(p, JSON.stringify({
+    type: 'assistant',
+    sessionId: 'seam-session',
+    effort: 'high',
+    message: { model, usage: { input_tokens: usedTokens } },
+  }) + '\n');
+  return p;
+}
+
+const SEAM_AT = '2026-08-02T05:22:31.045Z';
+const SEAM_NOW = Date.parse(SEAM_AT) + 1000; // fresh, so staleness is never the reason
+
+/** The seam, walked exactly as the Stop hook and the footer do. */
+function walkSeam(dir, { model, usedTokens }) {
+  const sample = extractTranscriptSample({
+    transcriptPath: seamTranscript(dir, { usedTokens, model }),
+    sessionId: 'seam-session',
+    sampledAt: SEAM_AT,
+    env: {},
+    storeOpts: { envOverride: dir },
+  });
+  // THE WRAPPER. `deriveFooterFields` consumes a health-store READ RESULT, not a bare
+  // sample. See the contract test below for why this line is load-bearing.
+  const derived = deriveFooterFields({
+    sample: { ok: true, approximate: false, data: sample },
+    knownSessionId: 'seam-session',
+    now: SEAM_NOW,
+  });
+  return { sample, derived, line: renderFooter(derived.fields) };
+}
+
+test('WO-OR-09 SEAM: a store holding only OTHER sessions yields a TRUE token count and NO graded percentage', () => {
+  // THE REGRESSION, RE-AIMED BY WO-OR-09. It used to demonstrate variant AMBIGUITY: a 1M
+  // observation under a variant-suffixed id beside a 200k one under the bare id. Codex
+  // TQA-001 showed the ambiguity was never the defect — the CROSS-SESSION INFERENCE was,
+  // and it fired just as happily on the unambiguous store below, where a single 200k
+  // observation belonging to a stranger has nothing to contradict it.
+  //
+  // So the fixture is now the harder case, not the easier one: ONE observation, no
+  // sibling, no disagreement, numerator comfortably inside it. Every WO-OR-08 guard stays
+  // silent here. The number Warwick reads must still be true or absent, never wrong.
+  const dir = tmp();
+  try {
+    writeSeamObservation(dir, 'a-different-session', 200000, { at: '2026-08-01T00:49:56Z' });
+
+    const { sample, derived, line } = walkSeam(dir, { model: 'claude-opus-5', usedTokens: 111019 });
+
+    // The sampler's half of the seam.
+    assert.equal(sample.context_window.used_tokens, 111019, 'the numerator is real');
+    assert.equal(sample.context_window.context_window_size, null, 'and no denominator was established');
+
+    // The footer's half.
+    assert.equal(derived.blind, true);
+    assert.equal(derived.blindReason, BLIND_REASON.WINDOW_SIZE_UNKNOWN);
+    assert.equal(derived.fields.percent, null, 'NO percentage is rendered');
+    assert.equal(derived.fields.usedTokens, 111000, 'but the real count still reaches Warwick');
+    assert.equal(derived.fields.state, 'BLIND');
+
+    // The bytes. Pinned as a literal, and pinned NEGATIVELY against the exact lie.
+    // `KEEP GOING?` — not `TASK UNKNOWN` — is correct and deliberate here: BLIND is a
+    // SENSOR-failure signal and `adviceFor` never suppresses it, because a governor that
+    // stops measuring must get louder, not quieter (INV-1).
+    assert.equal(line, '⟦GOV⟧ ctx 111k · BLIND · KEEP GOING? · next: UNSET · CONTINUE');
+    assert.doesNotMatch(line, /\d+%/, 'no percentage may appear in this line at all');
+    assert.doesNotMatch(line, /AMBER/, 'and it must never be GRADED off a borrowed window');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('WO-OR-09 SEAM: this session\'s OWN observation renders a real, graded percentage end to end', () => {
+  // The positive control for the seam, and the one that keeps the feature honest: if the
+  // repair had simply made the footer permanently BLIND, the test above would still pass
+  // and this one would fail. This is the terminal case — statusLine observed THIS
+  // session's window, so the percentage Warwick reads is real and may be graded.
+  const dir = tmp();
+  try {
+    writeSeamObservation(dir, 'seam-session', 1000000);
+
+    const { sample, derived, line } = walkSeam(dir, { model: 'claude-opus-5', usedTokens: 111019 });
+
+    assert.equal(sample.context_window.context_window_size, 1000000, 'the denominator IS established');
+    assert.equal(sample.context_window.context_window_source, 'statusline-observed');
+    assert.equal(derived.blind, false);
+    assert.equal(derived.fields.percent, 11, 'the TRUE figure, not the one the old rule produced');
+    assert.equal(derived.fields.state, 'GREEN');
+    assert.equal(line, '⟦GOV⟧ ctx 11% (111k/1000k) · GREEN · TASK UNKNOWN · next: UNSET · CONTINUE');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('WO-OR-08 SEAM: the WRAPPER CONTRACT is pinned — a bare sample is silently indistinguishable from telemetry loss', () => {
+  // THE SHAPE HAZARD, made executable.
+  //
+  // `deriveFooterFields` consumes `{ ok: true, data: <sample> }` — a health-store READ
+  // RESULT. `extractTranscriptSample` returns the BARE sample. Hand the bare sample
+  // straight over and the ladder's first rung rejects it as unreadable, producing a
+  // perfectly ordinary BLIND footer whose reason is `sample-missing-or-unreadable` —
+  // byte-identical to what a total telemetry failure produces. A caller that gets this
+  // wrong gets NO signal: no throw, no distinct reason, no different line.
+  //
+  // DECIDED (WO-OR-08, Larry concurring): pin the contract HERE rather than make the
+  // boundary refuse loudly. Refusing loudly would mean a new `BLIND_REASON` member and a
+  // rung in `deriveFooterFields` — a change to footer.mjs, outside this Work Order's
+  // file surface — and it sits awkwardly against that function's never-throws,
+  // always-returns-a-grammatical-line invariant. The follow-up is recorded in the
+  // handback. Until it lands, THIS test is the control.
+  const dir = tmp();
+  try {
+    writeSeamObservation(dir, 'seam-session', 1000000);
+    const sample = extractTranscriptSample({
+      transcriptPath: seamTranscript(dir, { usedTokens: 111019, model: 'claude-opus-5' }),
+      sessionId: 'seam-session',
+      sampledAt: SEAM_AT,
+      env: {},
+      storeOpts: { envOverride: dir },
+    });
+    assert.ok(sample && sample.context_window.used_tokens === 111019, 'the sample itself is good');
+
+    const args = { knownSessionId: 'seam-session', now: SEAM_NOW };
+    const wrapped = deriveFooterFields({ sample: { ok: true, approximate: false, data: sample }, ...args });
+    const bare = deriveFooterFields({ sample, ...args });
+    const absent = deriveFooterFields({ sample: null, ...args });
+
+    // 1. The CORRECT shape works, and is the contract every caller must use.
+    assert.equal(wrapped.blind, false);
+    assert.equal(wrapped.fields.percent, 11);
+    assert.equal(wrapped.blindReason, null);
+
+    // 2. The WRONG shape fails, and fails INVISIBLY. This is the hazard, asserted rather
+    //    than described: identical reason AND identical rendered bytes to no telemetry.
+    assert.equal(bare.blind, true);
+    assert.equal(bare.blindReason, BLIND_REASON.SAMPLE_UNREADABLE);
+    assert.deepEqual(bare.fields, absent.fields);
+    assert.equal(bare.blindReason, absent.blindReason);
+    assert.equal(renderFooter(bare.fields), renderFooter(absent.fields));
+
+    // 3. And the two shapes genuinely differ, so this test cannot pass vacuously.
+    assert.notEqual(renderFooter(wrapped.fields), renderFooter(bare.fields));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ===========================================================================
+// WO-OR-13 — INV-1: A VALUE THE GRAMMAR CANNOT REPRESENT MAY NEVER BE GRADED
+// ===========================================================================
+//
+// The range check ran AFTER `Math.round`, so it tested the DISPLAY form and not the
+// value being judged. `Math.round` is round-half-UP, which folds [-0.5, 0) onto `-0`
+// (and `-0 < 0` is FALSE) and (100, 100.5) onto 100 — so both bands walked past the
+// guard. Every case in the LOW band below rendered `ctx 0% · GREEN`: telemetry the
+// grammar explicitly rejects, wearing the most reassuring state the footer can emit.
+//
+// THE TWO HALVES ARE GRADED SEPARATELY AND DELIBERATELY. The low band is INV-1 proper
+// — a false GREEN. The high band graded RED, which breaches the same rule (no graded
+// state from an unrepresentable input) but is NOT a false GREEN, and letting one claim
+// carry both would overstate what was found. The bands are asymmetric because the
+// rounding is.
+
+const OOR = BLIND_REASON.PERCENTAGE_OUT_OF_RANGE;
+
+test('WO-OR-13 INV-1: an out-of-grammar percentage is BLIND, never graded — including the band Math.round hid', () => {
+  const cases = [
+    // --- THE LOW BAND: these rendered `ctx 0% · GREEN` before the fix. INV-1 proper. ---
+    { what: 'low band: -0.4 rounded to -0, and -0 < 0 is false', pct: -0.4, band: 'low' },
+    { what: 'low band: -0.5, the round-half-up edge that slips through', pct: -0.5, band: 'low' },
+    // --- THE HIGH BAND: these rendered `ctx 100% · RED`. Graded, not GREEN. ---
+    { what: 'high band: 100.4 rounds down into range', pct: 100.4, band: 'high' },
+    { what: 'high band: 100.49, the last value that rounds down', pct: 100.49, band: 'high' },
+    // --- CONTROLS: already caught before the fix. Their REASON must not have moved. ---
+    { what: 'control: -0.6 rounds to -1', pct: -0.6, band: 'was-caught' },
+    { what: 'control: -1', pct: -1, band: 'was-caught' },
+    { what: 'control: 100.5 rounds UP to 101 — the asymmetry, stated', pct: 100.5, band: 'was-caught' },
+    { what: 'control: 140, the pin that already existed', pct: 140, band: 'was-caught' },
+  ];
+
+  let checked = 0;
+  const bands = new Set();
+  for (const c of cases) {
+    const r = deriveFooterFields({
+      sample: goodSample({ context_window: { used_percentage: c.pct } }),
+      knownSessionId: 'session-a',
+    });
+    assert.equal(r.blind, true, `${c.what}: must be BLIND`);
+    // The SPECIFIC rung, not merely "it went BLIND" — a collapsed ladder would pass the
+    // line above and tell the next investigator nothing about what caught it.
+    assert.equal(r.blindReason, OOR, `${c.what}: blindReason`);
+    assert.equal(r.fields.state, 'BLIND', `${c.what}: state`);
+    assert.notEqual(r.fields.state, 'GREEN', `${c.what}: INV-1 — BLIND is never GREEN`);
+    assert.equal(r.fields.percent, null, `${c.what}: the number must be SUPPRESSED`);
+    assert.ok(
+      renderFooter(r.fields).startsWith('⟦GOV⟧ ctx -- · BLIND · KEEP GOING?'),
+      `${c.what}: rendered line`
+    );
+    bands.add(c.band);
+    checked += 1;
+  }
+  assert.equal(checked, cases.length, 'a run that executed no case would prove nothing');
+  assert.equal(bands.size, 3, 'both breached bands AND the already-caught controls must be exercised');
+
+  // THE DIVISION PATH REACHES THE SAME RUNG. The transcript route computes `used` rather
+  // than reading it, so it needs its own proof that the repair is not statusLine-only.
+  // 200800/200000 = 100.4% — both inputs raw, finite and grain-aligned, so nothing else
+  // on the ladder can be the thing that caught it.
+  const divided = f3Derive({ used: 200_800, window: 200_000 });
+  assert.equal(divided.blind, true, 'the divided high band must be BLIND too');
+  assert.equal(divided.blindReason, OOR);
+  assert.equal(divided.fields.percent, null);
+  // ...and a divided percentage far out of range was ALWAYS caught. Control.
+  assert.equal(f3Derive({ used: 300_000, window: 200_000 }).blindReason, OOR);
+});
+
+test('WO-OR-13: the BLIND ladder still distinguishes its rungs — nine reasons, none collapsed', () => {
+  // INV-5. The repair narrowed ONE rung; a repair that widened it into its neighbours
+  // would still make every INV-1 assertion above pass. This asserts the class, not an
+  // instance: each rung fires on its own trigger AND the reasons stay mutually distinct.
+  // `now` is taken from the clock rather than pinned to a literal date, because
+  // `goodSample()` stamps `sampled_at` with the REAL current time. A fixed `now` makes
+  // freshness depend on what time of day the suite runs — which it did, and the
+  // `evaluator threw` rung reported `sample-stale` instead. Every offset below is
+  // relative, so the only thing this test asserts is the ladder.
+  const now = Date.now();
+  const at = (ms) => new Date(now - ms).toISOString();
+
+  const rungs = [
+    ['unreadable sample', { sample: { ok: false, reason: 'missing' } }, BLIND_REASON.SAMPLE_UNREADABLE],
+    ['schema', { sample: goodSample({ schema_version: 2 }) }, BLIND_REASON.SCHEMA_UNRECOGNISED],
+    ['no usage at all', { sample: goodSample({ context_window: {} }) }, BLIND_REASON.PERCENTAGE_ABSENT],
+    ['sampled_at', { sample: goodSample({ sampled_at: 'not-a-date' }) }, BLIND_REASON.SAMPLED_AT_UNPARSEABLE],
+    ['foreign session', { sample: goodSample({ session_id: 'someone-else' }) }, BLIND_REASON.SESSION_MISMATCH],
+    ['stale', { sample: goodSample({ sampled_at: at(STALE_AFTER_MS + 1000) }) }, BLIND_REASON.STALE],
+    ['evaluator threw', { sample: goodSample(), evaluateFn: () => { throw new Error('boom'); } }, BLIND_REASON.EVALUATOR_THREW],
+    ['out of range', { sample: goodSample({ context_window: { used_percentage: -0.4 } }) }, OOR],
+    [
+      'window size unknown',
+      { sample: goodSample({ context_window: { used_tokens: 72_600 } }) },
+      BLIND_REASON.WINDOW_SIZE_UNKNOWN,
+    ],
+  ];
+
+  const seen = [];
+  for (const [what, opts, expected] of rungs) {
+    const r = deriveFooterFields({ knownSessionId: 'session-a', now, ...opts });
+    assert.equal(r.blind, true, `${what}: must be BLIND`);
+    assert.equal(r.blindReason, expected, `${what}: must report ITS OWN reason`);
+    seen.push(r.blindReason);
+  }
+  assert.equal(seen.length, rungs.length, 'a loop that executed nothing would prove nothing');
+  assert.equal(new Set(seen).size, rungs.length, 'two rungs reporting the same reason IS a collapse');
+});
+
+test('WO-OR-13: `percent` is never NEGATIVE ZERO — asserted with Object.is, because the suite is loose', () => {
+  // WHY Object.is AND NOT assert.equal. `-0 == 0` and `assert.deepEqual(-0, 0)` both
+  // PASS, so every existing percent assertion in this file is structurally blind to
+  // this. A loose test here would go green against the broken code and prove nothing.
+  //
+  // `used === -0` legitimately survives the range guard — -0 IS zero and 0% is in the
+  // grammar — but `Math.round(-0)` is `-0`, which `renderFooter` accepts and emits as
+  // `0%` while `parseFooter` reads back `+0`. That makes D-M10's round-trip identity
+  // FALSE for a value the renderer accepts: the same class as the F1 defect WO-OR-10
+  // closed. Normalised in the producer; asserted here at both ends.
+  const routes = [
+    ['reported directly', deriveFooterFields({
+      sample: goodSample({ context_window: { used_percentage: -0 } }),
+      knownSessionId: 'session-a',
+    })],
+    ['divided from a -0 numerator', f3Derive({ used: -0, window: 200_000 })],
+  ];
+
+  let checked = 0;
+  for (const [what, r] of routes) {
+    assert.equal(r.blind, false, `${what}: -0 is zero, so it must still GRADE`);
+    assert.equal(r.fields.state, 'GREEN', `${what}: state`);
+    assert.ok(Object.is(r.fields.percent, 0), `${what}: percent must be +0, got ${Object.is(r.fields.percent, -0) ? '-0' : r.fields.percent}`);
+    assert.ok(!Object.is(r.fields.percent, -0), `${what}: percent must not be -0`);
+
+    // D-M10, at the exact field that broke it, with the comparison that can see it.
+    const parsed = parseFooter(renderFooter(r.fields));
+    assert.equal(parsed.ok, true, `${what}: must parse`);
+    assert.ok(
+      Object.is(parsed.fields.percent, r.fields.percent),
+      `${what}: parseFooter(renderFooter(x)).percent must be IDENTICAL to x.percent, not merely equal`
+    );
+    checked += 1;
+  }
+  assert.equal(checked, routes.length, 'a run that executed no route would prove nothing');
+});
+
+test('WO-OR-13: in-range telemetry does not move — same percent, same state, same bytes', () => {
+  // THE REGRESSION THIS FIX COULD HAVE CAUSED. Moving the range decision onto the raw
+  // value is only correct if it changes NOTHING inside the domain, thresholds included.
+  const cases = [
+    { pct: 0, percent: 0, state: 'GREEN' },
+    { pct: 0.4, percent: 0, state: 'GREEN' },
+    { pct: 0.5, percent: 1, state: 'GREEN' },
+    { pct: 18, percent: 18, state: 'GREEN' },
+    { pct: 54.9, percent: 55, state: 'GREEN' },   // rounds UP across the label, grades below it
+    { pct: 55, percent: 55, state: 'AMBER' },
+    { pct: 74.9, percent: 75, state: 'AMBER' },   // the WO-OR-12 shape: number 75, grade AMBER
+    { pct: 75, percent: 75, state: 'RED' },
+    { pct: 99.5, percent: 100, state: 'RED' },
+    { pct: 100, percent: 100, state: 'RED' },
+  ];
+
+  let checked = 0;
+  for (const c of cases) {
+    const r = deriveFooterFields({
+      sample: goodSample({ context_window: { used_percentage: c.pct } }),
+      knownSessionId: 'session-a',
+    });
+    assert.equal(r.blind, false, `${c.pct}%: must NOT be BLIND`);
+    assert.equal(r.blindReason, null, `${c.pct}%: no reason`);
+    assert.equal(r.fields.percent, c.percent, `${c.pct}%: percent`);
+    assert.equal(r.fields.state, c.state, `${c.pct}%: state`);
+    checked += 1;
+  }
+  assert.equal(checked, cases.length, 'a run that executed no case would prove nothing');
+
+  // Byte pins at both ends of the domain, so a change to the CTX field or the separators
+  // cannot hide behind the field-level assertions above.
+  const line = (pct) => renderFooter(deriveFooterFields({
+    sample: goodSample({ context_window: { used_percentage: pct } }),
+    knownSessionId: 'session-a',
+  }).fields);
+  assert.equal(line(0), '⟦GOV⟧ ctx 0% · GREEN · TASK UNKNOWN · next: UNSET · CONTINUE');
+  assert.equal(line(18), '⟦GOV⟧ ctx 18% · GREEN · TASK UNKNOWN · next: UNSET · CONTINUE');
+  assert.equal(line(100), '⟦GOV⟧ ctx 100% · RED · CLEAR NOW · next: UNSET · CONTINUE');
+});
+
+// ===========================================================================
+// WO-OR-16 — THE RENDERER'S OWN DOMAIN STILL ADMITTED A VALUE IT CANNOT READ BACK
+// ===========================================================================
+//
+// `-0` satisfies EVERY numeric check `renderFooter` makes: it IS an integer, `-0 < 0` is
+// FALSE, and it is a safe-integer multiple of the grain. And `String(-0)` is `"0"`, so it
+// renders as an ordinary zero and `parseFooter` reads it back as `+0`. D3's round-trip
+// identity is therefore FALSE for a value the renderer ACCEPTED — the same class as
+// WO-OR-10's F1, and closed the same way: NARROW the accepted domain to the representable
+// one, never widen the grammar.
+//
+// WHY REFUSED AND NOT NORMALISED — the alternative was considered and is UNSOUND, not
+// merely less tidy. Normalising inside the renderer is a NO-OP ON THE OUTPUT, because
+// `String(-0)` is already `"0"`: the emitted bytes are identical either way, for every
+// input in this grammar. And it cannot make the reported assertion true, because
+// `Object.is(x.percent, parseFooter(renderFooter(x)).fields.percent)` compares the
+// CALLER's object, which still holds -0. Under normalisation the only writable assertion
+// is `Object.is(parsed.percent, 0)` — which PASSES against the unrepaired code. Refusal is
+// the only route with a test that can go red.
+//
+// TWO FIELDS, NOT ONE, AND THE UNREPORTED ONE IS THE WORSE OF THE TWO.
+//   percent    — the reported case, and RENDERER-ONLY: `deriveFooterFields` has normalised
+//                it since WO-OR-13 (`Math.round(used) + 0`), so no producer path reaches
+//                it. That normalisation is NOT made redundant by this repair — it is now
+//                what stops the strict renderer THROWING on an honest 0% reading, which
+//                `computeFooterLine` would answer with a FALSE BLIND.
+//   usedTokens — NOT reported, and REACHABLE FROM THE LIVE PRODUCER. `JSON.parse("-0")` is
+//                -0, `toRenderableTokens(-0)` returned -0, and nothing normalised it — so a
+//                sample carrying `used_tokens: -0` put -0 into the rendered field set and
+//                broke the identity through the real path, not just the codec's. Repaired
+//                on BOTH sides: the codec refuses it, and the producer normalises it rather
+//                than returning null, which would have degraded a real zero-token reading
+//                into BLIND — trading this defect for a worse one.
+//   windowTokens — ALREADY SAFE and pinned below so it stays that way: the existing
+//                `windowTokens === 0` guard catches -0, because `-0 === 0` is true.
+
+test('WO-OR-16: the SUITE ITSELF can see a signed zero — the harness property every assertion below rests on', () => {
+  // A control that cannot distinguish the thing it exists to check is not a control. Every
+  // -0 assertion in this file is worthless if the import at the top of the file changes:
+  // plain `node:assert` has a LOOSE `deepEqual`/`equal` that treat -0 and +0 as equal, and
+  // the whole class would go silently untested while every test stayed green.
+  //
+  // Pinned here as an executed fact because it was got WRONG during this Work Order: the
+  // sweep above was reported as "blind by construction" on the strength of a probe run
+  // against plain `node:assert`, when this file imports `node:assert/strict`, where
+  // `deepEqual` IS `deepStrictEqual`. The comparison was never the gap; the swept DOMAIN
+  // was. A claim about a control that was not checked against the control actually in use
+  // is the same error in miniature as the defect this file exists to close.
+  assert.throws(() => assert.equal(-0, 0), 'assert.equal must distinguish -0 from +0');
+  assert.throws(() => assert.deepEqual({ p: -0 }, { p: 0 }), 'assert.deepEqual must distinguish -0 from +0');
+  // ...and it must still accept the ordinary case, or the two lines above would be
+  // satisfied by an assert that rejected everything.
+  assert.equal(0, 0);
+  assert.deepEqual({ p: 0 }, { p: 0 });
+});
+
+test('WO-OR-16: renderFooter REFUSES -0 in percent AND usedTokens, so D3 holds over the WHOLE accepted domain', () => {
+  const base = {
+    approximate: false, state: 'GREEN', advice: ADVICE.KEEP_GOING,
+    next: NEXT_UNSET, control: CONTROL_CONTINUE,
+  };
+
+  // THE DEFECT. Every row here RENDERED before the repair:
+  //   percent: -0     -> '⟦GOV⟧ ctx 0% · ...'   and parsed back as +0
+  //   usedTokens: -0  -> '⟦GOV⟧ ctx 0k · ...'   and parsed back as +0
+  const refused = [
+    ['percent, bare shape', { ...base, percent: -0, usedTokens: null, windowTokens: null }],
+    ['usedTokens, bare shape', { ...base, percent: null, usedTokens: -0, windowTokens: null }],
+    // The pair shape too, so the refusal is not keyed to one CTX production.
+    ['percent, pair shape', { ...base, percent: -0, usedTokens: 72_600, windowTokens: 200_000 }],
+    ['usedTokens, pair shape', { ...base, percent: 36, usedTokens: -0, windowTokens: 200_000 }],
+    // CONTROL for a guard that already held: `windowTokens === 0` catches -0 because
+    // `-0 === 0`. Pinned so a later edit cannot lose it without a red test.
+    ['windowTokens (already refused before this repair)', { ...base, percent: 0, usedTokens: 0, windowTokens: -0 }],
+  ];
+
+  let refusals = 0;
+  for (const [what, fields] of refused) {
+    assert.throws(() => renderFooter(fields), TypeError, `${what}: -0 must be REFUSED, never rendered`);
+    refusals += 1;
+  }
+  assert.equal(refusals, refused.length, 'a run that refused nothing would prove nothing');
+
+  // THE MESSAGE MUST NAME WHAT IT REJECTED. `JSON.stringify(-0)` is "0", so folding this
+  // into the generic range message would report `got 0` — a rejection that misreports its
+  // own subject, which is this same defect wearing a different hat.
+  assert.throws(
+    () => renderFooter({ ...base, percent: -0, usedTokens: null, windowTokens: null }),
+    (err) => err instanceof TypeError && /negative zero/.test(err.message) && !/got 0/.test(err.message),
+    'the percent refusal must say it refused NEGATIVE ZERO'
+  );
+  assert.throws(
+    () => renderFooter({ ...base, percent: null, usedTokens: -0, windowTokens: null }),
+    (err) => err instanceof TypeError && /-0|negative zero/.test(err.message),
+    'the usedTokens refusal must name the signed zero too'
+  );
+
+  // CONTROLS — `+0` must STILL render and STILL round-trip. Without these the test would
+  // pass just as well against a renderer that had learned to refuse every zero, which
+  // would be a worse defect than the one being fixed.
+  const accepted = [
+    ['percent +0', { ...base, percent: 0, usedTokens: null, windowTokens: null }],
+    ['usedTokens +0', { ...base, percent: null, usedTokens: 0, windowTokens: null }],
+    ['both zero, pair shape', { ...base, percent: 0, usedTokens: 0, windowTokens: 200_000 }],
+  ];
+  let round_trips = 0;
+  for (const [what, fields] of accepted) {
+    const parsed = parseFooter(renderFooter(fields));
+    assert.equal(parsed.ok, true, `${what}: must still render and parse`);
+    assert.deepEqual(parsed.fields, fields, `${what}: round trip`);
+    // Stated with Object.is as well, so this evidence does not depend on the reader
+    // knowing which `assert` module the file imported.
+    assert.ok(Object.is(parsed.fields.percent, fields.percent), `${what}: percent identity`);
+    assert.ok(Object.is(parsed.fields.usedTokens, fields.usedTokens), `${what}: usedTokens identity`);
+    round_trips += 1;
+  }
+  assert.equal(round_trips, accepted.length);
+  assert.ok(refusals > 0 && round_trips > 0, 'a partition with an empty side proves nothing');
+
+  // THE BYTES OF THE ZERO CASES ARE UNCHANGED, pinned as literals held outside the module
+  // that produces them. `0%` and `0k` are exactly what -0 used to render, which is why the
+  // defect was invisible — so these are the two lines a wrong repair would move.
+  assert.equal(
+    renderFooter({ ...base, percent: 0, usedTokens: null, windowTokens: null }),
+    '⟦GOV⟧ ctx 0% · GREEN · KEEP GOING · next: UNSET · CONTINUE'
+  );
+  assert.equal(
+    renderFooter({ ...base, percent: null, usedTokens: 0, windowTokens: null }),
+    '⟦GOV⟧ ctx 0k · GREEN · KEEP GOING · next: UNSET · CONTINUE'
+  );
+});
+
+test('WO-OR-16: the PRODUCER normalises -0 rather than degrading it — on the token path as well as the percent path', () => {
+  // The codec half above is only safe because the producer half holds. These two are a
+  // pair: refuse in the codec, normalise in the producer. Break either and the other turns
+  // into a defect — a strict renderer with a -0-emitting producer yields a FALSE BLIND.
+
+  // 1. THE PREDICATE. `isRenderableTokens` promises values it can render AND read back
+  //    exactly; -0 is not one of them.
+  assert.equal(isRenderableTokens(-0), false, '-0 is not a renderable token count');
+  assert.equal(isRenderableTokens(0), true, '+0 still is — the control');
+
+  // 2. THE PRODUCER-SIDE ROUNDER must return +0, NOT -0 and NOT null. Returning null would
+  //    push an honest zero-token reading onto the PERCENTAGE_ABSENT rung and render BLIND.
+  assert.ok(Object.is(toRenderableTokens(-0), 0), 'toRenderableTokens(-0) must be +0');
+  assert.notEqual(toRenderableTokens(-0), null, 'a real zero reading must not degrade to null');
+  assert.ok(Object.is(toRenderableTokens(0), 0));
+  assert.ok(Object.is(toRenderableTokens(49), 0), 'the ordinary rounds-to-zero case must be unmoved');
+
+  // 3. THE LIVE PATH. `JSON.parse('-0')` is -0, which is how a sample can carry one at all.
+  //    Before this repair the ladder put -0 straight into `fields.usedTokens`.
+  const negZeroTokens = JSON.parse('-0');
+  assert.ok(Object.is(negZeroTokens, -0), 'the fixture must really be a signed zero');
+  const r = deriveFooterFields({
+    sample: {
+      ok: true,
+      approximate: false,
+      data: {
+        schema_version: 1,
+        sampled_at: new Date().toISOString(),
+        session_id: 'session-a',
+        context_window: { used_tokens: negZeroTokens },
+      },
+    },
+    knownSessionId: 'session-a',
+  });
+  // Still the honest rung — a numerator with no denominator cannot be graded — and NOT
+  // the absent-usage rung, which is what a null would have produced.
+  assert.equal(r.blindReason, BLIND_REASON.WINDOW_SIZE_UNKNOWN, 'the reading is real, just ungradeable');
+  assert.ok(Object.is(r.fields.usedTokens, 0), 'the producer must emit +0');
+  assert.ok(!Object.is(r.fields.usedTokens, -0), 'the producer must not emit -0');
+  const line = renderFooter(r.fields);
+  assert.equal(line, '⟦GOV⟧ ctx 0k · BLIND · KEEP GOING? · next: UNSET · CONTINUE');
+  assert.ok(Object.is(parseFooter(line).fields.usedTokens, r.fields.usedTokens), 'D3 through the live path');
+
+  // 4. THE PERCENT PATH — WO-OR-13's `+ 0` is now LOAD-BEARING, not redundant, and this is
+  //    the assertion that says why. The producer emits +0, and had it emitted -0 the strict
+  //    renderer would now REFUSE the field set, which `computeFooterLine` answers with a
+  //    BLIND line for a perfectly healthy 0% reading. WO-OR-13's own test is untouched;
+  //    this states the coupling that repair now carries.
+  const pct = deriveFooterFields({
+    sample: goodSample({ context_window: { used_percentage: -0 } }),
+    knownSessionId: 'session-a',
+  });
+  assert.ok(Object.is(pct.fields.percent, 0), 'the producer must still normalise the percent');
+  assert.equal(renderFooter(pct.fields), '⟦GOV⟧ ctx 0% · GREEN · TASK UNKNOWN · next: UNSET · CONTINUE');
+  assert.throws(
+    () => renderFooter({ ...pct.fields, percent: -0 }),
+    TypeError,
+    'and WITHOUT that normalisation the renderer would now refuse it — which is why the producer guard must stay'
+  );
 });

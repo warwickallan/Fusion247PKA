@@ -1,0 +1,124 @@
+repo:  C:/Fusion247PKA
+range: 2aac7d9..66e394b2cb044eaec911edb26e9564a52f55d5df
+claim: Deliverables/2026-08-02-phase5-evidence/claim-scope-reorient-repairs-v4.json
+scope  : tools/governor/reorient.mjs
+branch : operating-reset/teardown
+
+ÔöÇÔöÇ GIT EVIDENCE (real, read-only) ÔöÇÔöÇ
+resolved=true diff_range=2aac7d9a2d6584fc7d993fc21f5428f649c847d0..66e394b2cb044eaec911edb26e9564a52f55d5df
+changed_files=["tools/governor/reorient.mjs"]
+diff bytes=47297 of 47297 (real UTF-8 bytes) truncated=false
+packet diff_range=2aac7d9a2d6584fc7d993fc21f5428f649c847d0..66e394b2cb044eaec911edb26e9564a52f55d5df -- tools/governor/reorient.mjs
+packet scoped_to=["tools/governor/reorient.mjs"] wp_id=null
+
+ÔöÇÔöÇ REAL CODEX MERGE REVIEW (Tower QA skill over the staged diff + the REAL claim) ÔöÇÔöÇ
+ok=true blocked=false model=openai-codex-exec
+{
+  "status": "ok",
+  "verdict": "request_changes",
+  "summary": "The cwd occupation repair, failure-cause preservation, detached-HEAD handling, and incomplete-sweep disclosures are supported by the staged diff. One active upstream defect remains: an attached branch with no configured upstreamÔÇöincluding a repository with no remote configurationÔÇöreaches the confident ÔÇ£nothing here is pushedÔÇØ sentence, although the probes establish only that no upstream is configured.",
+  "claims_verified": [
+    {
+      "claim": "A bare cwd path is rendered only when hook-process occupation is positively measured.",
+      "status": "confirmed",
+      "evidence": "gitFacts sets cwdOccupiedByHook true only when the realpath of process.cwd() equals resolved.path; renderCwd returns a bare resolvedPath only when that value is true."
+    },
+    {
+      "claim": "Symbolic-ref failures no longer automatically imply detached HEAD.",
+      "status": "confirmed",
+      "evidence": "detached becomes true only when causes.symbolicBranch.status === 1; fatal, unavailable, and unknown failures receive distinct UNVERIFIED renderings."
+    },
+    {
+      "claim": "The confident no-upstream sentence is reachable only after proving nothing is pushed.",
+      "status": "refuted",
+      "evidence": "upstreamState becomes none-configured whenever for-each-ref finds the attached branch with an empty upstream field. That proves missing tracking configuration, not absence of an existing pushed remote ref."
+    },
+    {
+      "claim": "Displayed deliverable sweeps disclose unreadable files and display-cap truncation.",
+      "status": "confirmed",
+      "evidence": "sweepOpenDeliverables counts stat/read failures and appends an omission line; rows beyond DISPLAY_CAP produce an explicit NOT complete line."
+    }
+  ],
+  "acceptance_results": [
+    {
+      "acceptance_row_id": "Y1",
+      "result": "pass",
+      "rationale": "Directory type alone produces qualified wording; only measured hook-process occupation earns a bare path. Empty, non-string, absent, unreadable, file, other-type, false-occupation, and unknown-occupation cases are visibly qualified.",
+      "evidence": "gitFacts cwdOccupiedByHook calculation and renderCwd branches in tools/governor/reorient.mjs."
+    },
+    {
+      "acceptance_row_id": "Y2",
+      "result": "fail",
+      "rationale": "The none-configured state is correctly restricted to an attached local branch with an empty upstream field, but that includes the explicitly challenged absent-remote-config state and still renders the stronger claim that nothing is pushed.",
+      "evidence": "upstreamState returns none-configured when for-each-ref output ends with '|'; renderLocationSection then prints '(none tracked ÔÇö nothing here is pushed)'."
+    },
+    {
+      "acceptance_row_id": "Y3",
+      "result": "pass",
+      "rationale": "The repaired cwd, attachment, upstream, and sweep renderings visibly distinguish measured results, absent claims, rejected claims, and probe uncertainty where those states apply.",
+      "evidence": "renderCwd, renderBranch, upstreamState rendering, and sweepOpenDeliverables use distinct MEASURED/UNCLAIMED/UNVERIFIED/unknown or NOT SWEPT wording."
+    },
+    {
+      "acceptance_row_id": "Y4",
+      "result": "fail",
+      "rationale": "The upstream enumeration omits the materially distinct state 'no upstream configured, but pushed status unknown.' It models that state as proof that nothing is pushed, so the failure model remains incomplete.",
+      "evidence": "The none-configured derivation inspects only local branch/upstream configuration; it performs no remote-ref or push-status measurement before rendering 'nothing here is pushed'."
+    },
+    {
+      "acceptance_row_id": "Y5",
+      "result": "pass",
+      "rationale": "Unreadable directory, unreadable in-scope files, genuinely empty results, and display-cap truncation render differently; shown incomplete lists disclose both unreadable omissions and capped rows.",
+      "evidence": "sweepOpenDeliverables returns NOT SWEPT for directory-read failures, NOT SWEPT IN FULL for only-unreadable files, null for genuine emptiness, and explicit omission lines for mixed/capped results."
+    },
+    {
+      "acceptance_row_id": "Z1",
+      "result": "pass",
+      "rationale": "Every newly added filesystem/git probe is wrapped by soft(), a local try/catch, or buildBrief's existing containment. The staged additions degrade to reported uncertainty rather than escaping the hook.",
+      "evidence": "soft wraps realpath, stat, process cwd, git, and for-each-ref probes; sweep probes have local catches; buildBrief catches facts/render and sweep failures."
+    },
+    {
+      "acceptance_row_id": "Z2",
+      "result": "fail",
+      "rationale": "The upstream line reports a pushed-status fact that was not measured. Empty local upstream configuration is insufficient evidence that no corresponding commit or branch has ever been pushed.",
+      "evidence": "none-configured is derived solely from symbolicBranch plus empty %(upstream:short), yet renders 'nothing here is pushed'."
+    }
+  ],
+  "prior_finding_results": [
+    {
+      "finding_id": "TQA-001",
+      "status": "addressed",
+      "rationale": "Filesystem failures retain their cause and unreadable/unknown paths no longer render as measured absence."
+    },
+    {
+      "finding_id": "TQA-002",
+      "status": "addressed",
+      "rationale": "Only symbolic-ref status 1 establishes detachment; other failure classes render without claiming DETACHED."
+    },
+    {
+      "finding_id": "TQA-003",
+      "status": "addressed",
+      "rationale": "A bare cwd requires measured occupation; directory type without occupation is explicitly qualified."
+    },
+    {
+      "finding_id": "TQA-004",
+      "status": "addressed",
+      "rationale": "Rows omitted by the display cap are explicitly counted and the rendered list is labelled incomplete."
+    },
+    {
+      "finding_id": "TQA-005",
+      "status": "addressed",
+      "rationale": "The heading now describes probes rather than asserting session location, and each cwd line states its measurement limit."
+    }
+  ],
+  "findings": [
+    {
+      "id": "TQA-006",
+      "technical_impact": "HIGH",
+      "reachability": "ACTIVE",
+      "required_disposition": "BLOCKS_CURRENT_MERGE",
+      "assumed_deployment_baseline": "The SessionStart hook runs in ordinary attached Git branches, including repositories with no remote or with a remote branch that is not configured as the local branch's upstream.",
+      "evidence": "tools/governor/reorient.mjs: upstreamState maps an attached branch whose for-each-ref row ends with '|' to none-configured; renderLocationSection maps that state to '(none tracked ÔÇö nothing here is pushed)'. No probe checks whether the commit/ref exists remotely. A freshly cloned or locally reconfigured branch with its upstream unset reaches this path even if its commits are already pushed.",
+      "required_correction": "Render only the measured fact, such as '(no upstream configured ÔÇö pushed status unknown)', or add a separate reliable measurement before making any claim that nothing is pushed."
+    }
+  ]
+}

@@ -1,0 +1,125 @@
+repo:  C:/Fusion247PKA
+range: a989e68d95e01b7f6dc13955d796950f6a8a02a5..HEAD
+claim: Deliverables/2026-08-02-phase5-evidence/claim-scope-footer-v4.json
+scope  : tools/governor/footer.mjs
+branch : operating-reset/teardown
+
+── GIT EVIDENCE (real, read-only) ──
+resolved=true diff_range=a989e68d95e01b7f6dc13955d796950f6a8a02a5..5dafb354abb31521c8e8da2e65a2a0b900c070b3
+changed_files=["tools/governor/footer.mjs"]
+diff bytes=58618 of 58618 (real UTF-8 bytes) truncated=false
+packet diff_range=a989e68d95e01b7f6dc13955d796950f6a8a02a5..5dafb354abb31521c8e8da2e65a2a0b900c070b3 -- tools/governor/footer.mjs
+packet scoped_to=["tools/governor/footer.mjs"] wp_id=null
+
+── REAL CODEX MERGE REVIEW (Tower QA skill over the staged diff + the REAL claim) ──
+ok=true blocked=false model=openai-codex-exec
+{
+  "status": "ok",
+  "verdict": "request_changes",
+  "summary": "The staged footer.mjs diff satisfies C4, D1, D2, D4, D6, D8 and Z1, and repairs the four principal prior defects. D3 still fails because renderFooter accepts percent: -0, renders it as 0%, and parseFooter returns +0; the claimed Object.is round-trip identity therefore does not hold across the renderer's accepted domain.",
+  "claims_verified": [
+    {
+      "claim": "The staged diff is scoped to tools/governor/footer.mjs.",
+      "status": "confirmed",
+      "evidence": "The supplied diff contains one file header: tools/governor/footer.mjs."
+    },
+    {
+      "claim": "The review is bound to exact head 5dafb354abb31521c8e8da2e65a2a0b900c070b3.",
+      "status": "partial",
+      "evidence": "The packet names this SHA and supplies the scoped diff, but the commit object was not independently resolved."
+    },
+    {
+      "claim": "CI passed against the exact reviewed head.",
+      "status": "refuted",
+      "evidence": "The checkpoint explicitly states CI has not run against this exact head."
+    }
+  ],
+  "acceptance_results": [
+    {
+      "acceptance_row_id": "C4",
+      "result": "pass",
+      "rationale": "The programme-state dependency is removed.",
+      "evidence": "The readProgrammeState import and the nextModelFor/listProgrammeStatePaths implementation are deleted."
+    },
+    {
+      "acceptance_row_id": "D1",
+      "result": "pass",
+      "rationale": "next is caller-supplied with UNSET default, and the programme-shaped derivation and reason vocabulary are deleted.",
+      "evidence": "computeFooterLine accepts next = NEXT_UNSET; nextModelFor and UNSET_REASON are removed."
+    },
+    {
+      "acceptance_row_id": "D2",
+      "result": "pass",
+      "rationale": "The MODEL/EFFORT grammar is a frozen cross-product shared by renderer validation and parser construction.",
+      "evidence": "NEXT_MODELS, NEXT_EFFORTS and derived frozen NEXT_VALUES feed both requireMember and FOOTER_RE."
+    },
+    {
+      "acceptance_row_id": "D3",
+      "result": "fail",
+      "rationale": "Object.is round-trip identity does not hold for every value renderFooter accepts.",
+      "evidence": "renderFooter accepts percent: -0 because Number.isInteger(-0) is true and the range checks pass; template interpolation emits \"0%\", while parseFooter uses Number(\"0\") and returns +0. Object.is(-0, +0) is false."
+    },
+    {
+      "acceptance_row_id": "D4",
+      "result": "pass",
+      "rationale": "HANDBACK_CODES retains the required seven members and spellings.",
+      "evidence": "product-decision, permission, credential-input, destructive-or-irreversible, financial-cost, merge-or-deploy, and unresolved-blocker are unchanged in the staged hunk."
+    },
+    {
+      "acceptance_row_id": "D6",
+      "result": "pass",
+      "rationale": "Percentages come either directly from reportedPct or from raw numerator and authoritative raw denominator; no guessed denominator is introduced.",
+      "evidence": "used selects reportedPct, otherwise computes (usedTokensRaw / windowRaw) * 100 only after both corresponding representability guards succeed; denominator-absent telemetry remains BLIND with an absolute count."
+    },
+    {
+      "acceptance_row_id": "D8",
+      "result": "pass",
+      "rationale": "The accepted token domain is restricted to non-negative safe integers on the 100-token grain, and result-side validation prevents rounding across the boundary.",
+      "evidence": "isRenderableTokens uses Number.isSafeInteger and grain membership; toRenderableTokens validates rounded; formatTokens/parseTokens use exact integer reconstruction within the safe-integer bound."
+    },
+    {
+      "acceptance_row_id": "Z1",
+      "result": "pass",
+      "rationale": "Unreadable, invalid-schema, absent, foreign, stale, denominator-unknown, and raw out-of-range telemetry cannot reach a graded state through deriveFooterFields.",
+      "evidence": "All such paths return blind(...); the raw percentage range is checked before Math.round, and denominator-unknown token telemetry returns WINDOW_SIZE_UNKNOWN with STATE.BLIND."
+    }
+  ],
+  "prior_finding_results": [
+    {
+      "finding_id": "F1-percent-used-without-window-loss",
+      "status": "addressed",
+      "rationale": "renderFooter now throws for percent plus usedTokens without windowTokens."
+    },
+    {
+      "finding_id": "F2-lossy-token-codec",
+      "status": "addressed",
+      "rationale": "The codec is bounded to safe integers and validates the rounded producer result."
+    },
+    {
+      "finding_id": "F3-display-rounded-threshold-input",
+      "status": "addressed",
+      "rationale": "Percentage division now uses usedTokensRaw/windowRaw rather than display-rounded token values."
+    },
+    {
+      "finding_id": "F4-out-of-range-rounded-before-validation",
+      "status": "addressed",
+      "rationale": "The raw used percentage is range-checked before rounding."
+    },
+    {
+      "finding_id": "F5-negative-zero-round-trip",
+      "status": "remains_open",
+      "rationale": "Producer normalization fixes deriveFooterFields output, but renderFooter still directly accepts -0 and cannot round-trip it under Object.is."
+    }
+  ],
+  "findings": [
+    {
+      "id": "TQA-D3-NEGATIVE-ZERO",
+      "technical_impact": "MEDIUM",
+      "reachability": "ACTIVE",
+      "required_disposition": "BLOCKS_CURRENT_MERGE",
+      "assumed_deployment_baseline": "renderFooter is an exported API whose documented accepted domain is enforced by its own validation, including direct callers outside deriveFooterFields.",
+      "evidence": "In renderFooter, percent: -0 passes Number.isInteger and 0..100 validation, then `${percent}%` produces 0%; parseFooter reconstructs Number(\"0\") as +0, so Object.is(input.percent, parsed.fields.percent) is false.",
+      "required_correction": "Either reject negative zero in renderFooter using Object.is(percent, -0), or normalize it before validation/rendering, then add an Object.is-based direct-renderer round-trip test for percent: -0."
+    }
+  ]
+}

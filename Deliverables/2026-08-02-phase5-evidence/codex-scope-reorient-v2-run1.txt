@@ -1,0 +1,146 @@
+repo:  C:/Fusion247PKA
+range: a989e68d95e01b7f6dc13955d796950f6a8a02a5..HEAD
+claim: Deliverables/2026-08-02-phase5-evidence/claim-scope-reorient-v2.json
+scope  : tools/governor/reorient.mjs
+branch : operating-reset/teardown
+
+── GIT EVIDENCE (real, read-only) ──
+resolved=true diff_range=a989e68d95e01b7f6dc13955d796950f6a8a02a5..e69ea1308e922e28f2784fb2668e274191b64385
+changed_files=["tools/governor/reorient.mjs"]
+diff bytes=60045 truncated=true
+WARNING: diff was TRUNCATED — the verdict does not cover the whole change.
+
+── REAL CODEX MERGE REVIEW (Tower QA skill over the staged diff + the REAL claim) ──
+ok=true blocked=false model=openai-codex-exec
+{
+  "status": "ok",
+  "verdict": "request_changes",
+  "summary": "Exact head e69ea1308e922e28f2784fb2668e274191b64385 resolves and the three core preservation criteria pass. The prior truthfulness defect is not fully closed: upstream-query failures are still converted into the positive claim that nothing is pushed, non-directory cwd values can be presented as measured locations, and deliverables inspection failures remain silent.",
+  "claims_verified": [
+    {
+      "claim": "The exact reviewed head resolves and contains tools/governor/reorient.mjs.",
+      "status": "confirmed",
+      "evidence": "git show e69ea1308e922e28f2784fb2668e274191b64385:tools/governor/reorient.mjs completed successfully."
+    },
+    {
+      "claim": "reorient.mjs no longer imports programme-state.mjs or rotate-session.mjs.",
+      "status": "confirmed",
+      "evidence": "The exact-head imports include continuity.mjs only; neither deleted module is referenced by an import."
+    },
+    {
+      "claim": "The prior location/upstream truthfulness finding was fully repaired.",
+      "status": "refuted",
+      "evidence": "tools/governor/reorient.mjs:183 only proves rev-parse --git-dir succeeded; lines 245-248 interpret any later upstreamRef failure as '(none tracked — nothing here is pushed)'."
+    }
+  ],
+  "acceptance_results": [
+    {
+      "acceptance_row_id": "C1",
+      "result": "pass",
+      "rationale": "Both deleted-module imports are gone.",
+      "evidence": "Exact-head imports at tools/governor/reorient.mjs:42-48."
+    },
+    {
+      "acceptance_row_id": "C2",
+      "result": "pass",
+      "rationale": "All three preserved behaviours are reachable from the shipped CLI path and enter hook output.",
+      "evidence": "main() calls buildBrief(), which invokes gitFacts/renderLocationSection and sweepOpenDeliverables; main() then awaits readContinuityBrief and passes the combined body to toHookOutput at tools/governor/reorient.mjs:336-396."
+    },
+    {
+      "acceptance_row_id": "C3",
+      "result": "pass",
+      "rationale": "normaliseSeparators is the sole carried helper, has live callers, and isBankingCommit is absent.",
+      "evidence": "normaliseSeparators is defined at lines 56-58 and called from gitFacts and buildBrief; no other deleted-module helper remains."
+    },
+    {
+      "acceptance_row_id": "Y1",
+      "result": "fail",
+      "rationale": "An existing regular file supplied as cwd resolves successfully and is rendered as the measured cwd even though it cannot be a working directory. False, empty-string, and root-path values can also be discarded by the fallback expression.",
+      "evidence": "realpathSync.native does not require a directory at line 171; buildBrief uses `normaliseSeparators(parsed.payload?.cwd) || normaliseSeparators(cwd)`."
+    },
+    {
+      "acceptance_row_id": "Y2",
+      "result": "fail",
+      "rationale": "gitReadable only establishes that rev-parse --git-dir succeeded. A subsequent upstream lookup may fail for reasons other than an untracked branch, yet the renderer makes the positive no-push claim.",
+      "evidence": "tools/governor/reorient.mjs:183 and 245-248."
+    },
+    {
+      "acceptance_row_id": "Y3",
+      "result": "partial",
+      "rationale": "Invalid truthy values are visibly labelled UNVERIFIED, but falsy supplied values are replaced by the fallback cwd and an existing non-directory path is displayed as established.",
+      "evidence": "renderCwd distinguishes unresolved truthy claims at lines 210-223, while buildBrief's `||` fallback discards falsy claims."
+    },
+    {
+      "acceptance_row_id": "Z1",
+      "result": "fail",
+      "rationale": "The hook generally catches exceptions, but a missing Deliverables directory or unreadable deliverable produces no diagnostic section, and successful git calls returning empty output render blank labelled fields rather than reported absence.",
+      "evidence": "sweepOpenDeliverables returns null after readdir failure at lines 286-291 and skips read failures at lines 305-309; show() treats empty strings as established at lines 200-203."
+    },
+    {
+      "acceptance_row_id": "Z2",
+      "result": "fail",
+      "rationale": "Upstream absence is still asserted from an upstreamRef failure that was not itself classified, so the module can report an unmeasured remote state.",
+      "evidence": "tools/governor/reorient.mjs:183, 193-194, and 245-248."
+    },
+    {
+      "acceptance_row_id": "W1",
+      "result": "fail",
+      "rationale": "Unreadable directory listings and unreadable candidate files are silently treated like no matching deliverables. Symlinks are followed by statSync, while nested files are deliberately excluded by the stated top-level-only scope.",
+      "evidence": "tools/governor/reorient.mjs:286-309."
+    },
+    {
+      "acceptance_row_id": "W2",
+      "result": "fail",
+      "rationale": "The deliverables behaviour can fail silently: a missing/unreadable Deliverables directory or unreadable matching file returns null/continues, making failure indistinguishable from no deliverables.",
+      "evidence": "tools/governor/reorient.mjs:286-309 and buildBrief only adds the section when sweep is truthy."
+    },
+    {
+      "acceptance_row_id": "W3",
+      "result": "pass",
+      "rationale": "The inlined helper matches the shown prior implementation and handles mixed separators, UNC prefixes, and trailing separators consistently with that implementation.",
+      "evidence": "tools/governor/reorient.mjs:56-58."
+    },
+    {
+      "acceptance_row_id": "W4",
+      "result": "pass",
+      "rationale": "No runtime coupling to programme-state remains in imports, discovery, composition, or CLI execution; remaining mentions are explanatory comments only.",
+      "evidence": "Exact-head module imports continuity.mjs only and the live path operates on cwd, Deliverables/*.md, git, and continuity."
+    }
+  ],
+  "prior_finding_results": [
+    {
+      "finding_id": "F1",
+      "status": "remains_open",
+      "rationale": "The raw nonexistent/non-string rendering cases were improved, but the same truthfulness class remains reachable through non-directory resolved paths and through upstreamRef failures being labelled as an untracked, unpushed branch."
+    }
+  ],
+  "findings": [
+    {
+      "id": "F2",
+      "technical_impact": "HIGH",
+      "reachability": "ACTIVE",
+      "required_disposition": "BLOCKS_CURRENT_MERGE",
+      "assumed_deployment_baseline": "SessionStart hook running against ordinary repositories where git itself works but upstream resolution can fail independently.",
+      "evidence": "tools/governor/reorient.mjs:183 sets gitReadable from rev-parse --git-dir; lines 193-194 separately swallow upstream lookup errors; lines 245-248 then claim '(none tracked — nothing here is pushed)' whenever upstreamRef is absent and gitReadable is true.",
+      "required_correction": "Record the upstream probe outcome separately from general git readability. Emit the no-tracking/no-push statement only when the upstream command specifically establishes an untracked branch; otherwise report upstream as unknown with the probe failure."
+    },
+    {
+      "id": "F3",
+      "technical_impact": "HIGH",
+      "reachability": "ACTIVE",
+      "required_disposition": "BLOCKS_CURRENT_MERGE",
+      "assumed_deployment_baseline": "SessionStart payload may contain a malformed cwd or an existing path that is not a directory.",
+      "evidence": "tools/governor/reorient.mjs:171 accepts any path resolved by realpathSync.native, including a regular file; renderCwd then presents resolvedPath beneath 'executed, not assumed'. The `||` fallback in buildBrief also discards supplied false, empty-string, and root values normalized to empty.",
+      "required_correction": "Validate that the resolved cwd is a directory before treating it as established, and distinguish absent cwd from invalid/falsy supplied cwd without truthiness fallback."
+    },
+    {
+      "id": "F4",
+      "technical_impact": "MEDIUM",
+      "reachability": "ACTIVE",
+      "required_disposition": "BLOCKS_CURRENT_MERGE",
+      "assumed_deployment_baseline": "Deliverables may be missing, unreadable, or contain an unreadable recent Markdown file.",
+      "evidence": "tools/governor/reorient.mjs:286-291 returns null on directory-read failure and lines 305-309 silently skip file-read failures; buildBrief omits the section when the result is null.",
+      "required_correction": "Return a rendered diagnostic outcome distinct from an empty successful sweep, including skipped/unreadable candidate counts where applicable."
+    }
+  ]
+}

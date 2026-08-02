@@ -1,0 +1,85 @@
+repo:  c:/Fusion247PKA
+range: a989e68..6a1c5ba
+claim: Deliverables/2026-08-02-phase5-evidence/claim-constitution-and-review-tool.json
+
+── GIT EVIDENCE (real, read-only) ──
+resolved=true diff_range=a989e68d95e01b7f6dc13955d796950f6a8a02a5..6a1c5ba5281c02065da7463bfca157d1d43295b7
+changed_files=["CLAUDE.md","services/control-plane/tower-loop/reviewDiff.mjs"]
+diff bytes=38003 truncated=false
+
+── REAL CODEX MERGE REVIEW (Tower QA skill over the staged diff + the REAL claim) ──
+ok=true blocked=false model=openai-codex-exec
+{
+  "status": "ok",
+  "verdict": "approve",
+  "summary": "The staged diff satisfies all eight Phase 5 acceptance criteria. CLAUDE.md preserves the activation, interruption-code, and Git-ownership contracts while removing the specified dangling module references; reviewDiff.mjs remains a thin, fail-closed orchestration entry point with claim validation before Codex invocation.",
+  "claims_verified": [
+    {
+      "claim": "CLAUDE.md was thinned while preserving the seven interruption codes, Git ownership rule, and FIRST RUN CHECK.",
+      "status": "confirmed",
+      "evidence": "The resulting CLAUDE.md includes all seven exact code names, the full Git lifecycle ownership statement, and Step 0 directing unactivated clones to ADAPTER-PROMPT.md."
+    },
+    {
+      "claim": "No AGENTS.md file was modified.",
+      "status": "confirmed",
+      "evidence": "The staged changed-files set contains only CLAUDE.md and services/control-plane/tower-loop/reviewDiff.mjs."
+    },
+    {
+      "claim": "reviewDiff.mjs reviews a caller-supplied claim using existing evidence and review components without adding scoring logic.",
+      "status": "confirmed",
+      "evidence": "reviewDiff.mjs imports gatherGitEvidence and runMergeReview, loads the QA skill through fs.readFileSync, and contains no verdict, scoring, or finding-classification implementation."
+    }
+  ],
+  "acceptance_results": [
+    {
+      "acceptance_row_id": "A1",
+      "result": "pass",
+      "rationale": "No prohibited removed-module reference survives in the resulting CLAUDE.md shown by the staged diff.",
+      "evidence": "References to stop-controller.mjs and install-hooks.mjs are deleted; no resulting references appear to rotate-session.mjs, collect-state.mjs, worktree-recon.mjs, or programme-state.*."
+    },
+    {
+      "acceptance_row_id": "A2",
+      "result": "pass",
+      "rationale": "All seven frozen interruption codes survive with exact spelling.",
+      "evidence": "CLAUDE.md lists product-decision, permission, spend, irreversible-live-action, unsafe-repository-state, rotation-required, and merge-decision."
+    },
+    {
+      "acceptance_row_id": "A3",
+      "result": "pass",
+      "rationale": "The Git ownership rule remains explicit and complete.",
+      "evidence": "CLAUDE.md states: “Larry owns the entire git lifecycle” and “Warwick is never asked to operate or to understand Git.”"
+    },
+    {
+      "acceptance_row_id": "A4",
+      "result": "pass",
+      "rationale": "The fresh-clone activation path remains intact.",
+      "evidence": "Step 0 checks for PKM/.user.yaml and directs an unactivated clone to read and execute ADAPTER-PROMPT.md."
+    },
+    {
+      "acceptance_row_id": "A5",
+      "result": "pass",
+      "rationale": "No AGENTS.md appears in the diff.",
+      "evidence": "Changed files are CLAUDE.md and services/control-plane/tower-loop/reviewDiff.mjs only."
+    },
+    {
+      "acceptance_row_id": "A6",
+      "result": "pass",
+      "rationale": "The new entry point delegates evidence gathering and review and reads the QA skill from disk.",
+      "evidence": "reviewDiff.mjs imports gatherGitEvidence at line 40 and runMergeReview at line 41; QA skill content is supplied by fs.readFileSync(QA_SKILL, 'utf8') at line 110."
+    },
+    {
+      "acceptance_row_id": "A7",
+      "result": "pass",
+      "rationale": "Missing, malformed, or materially incomplete claims terminate non-zero before runMergeReview is reached.",
+      "evidence": "Lines 64-78 reject a missing file, JSON parse failure, empty summary, and empty brief_excerpt through die/process.exit; runMergeReview is not called until line 110."
+    },
+    {
+      "acceptance_row_id": "A8",
+      "result": "pass",
+      "rationale": "Author-controlled packet values are limited to the five permitted claim fields; all remaining populated packet fields come from gathered evidence.",
+      "evidence": "Lines 92-107 source checkpoint_id, build_id, summary, brief_ref, and brief_excerpt from claim/defaults, while repo, branch, SHAs, diff range, changed files, diff text, and truncation state come from evidence."
+    }
+  ],
+  "prior_finding_results": [],
+  "findings": []
+}
