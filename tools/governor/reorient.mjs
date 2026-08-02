@@ -667,10 +667,14 @@ export function renderLocationSection(facts, { cwdClaimedByHost = true } = {}) {
       `  unpushed     : ${facts.unpushed === null ? '(unknown)' : `${facts.unpushed} commit(s) ahead of upstream`}`
     );
   } else if (facts.upstreamState === 'none-configured') {
-    // git ANSWERED, the branch ref exists, and its upstream field is empty. The confident
-    // sentence is earned here, and only here. WO-OR-11 put the gate one probe too far away
-    // — `gitReadable` — which let a detached HEAD reach this line.
-    lines.push('  upstream     : (none tracked — nothing here is pushed)');
+    // TQA-006 (Codex repairs run 4). Measured fact: the attached branch's upstream field
+    // is empty. That is NOT a measurement of remote push status — a branch can be pushed
+    // without having @{u} configured (no remote, reconfigured remote, push without -u).
+    // The old sentence "nothing here is pushed" was the same defect class as the rest of
+    // this sequence: a stronger claim than the probe earned. State only what was measured.
+    lines.push(
+      '  upstream     : (no upstream configured — pushed status NOT established)'
+    );
   } else if (facts.upstreamState === 'detached') {
     lines.push(
       '  upstream     : (unknown — HEAD is DETACHED, so no branch is tracking anything here; this is NOT a claim that nothing is pushed)'

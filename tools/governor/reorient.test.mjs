@@ -263,7 +263,7 @@ test('LOCATION: a dirty tree and an untracked upstream are both reported, not si
     upstreamState: 'none-configured',
   });
   assert.match(dirty, /DIRTY — uncommitted changes present/);
-  assert.match(dirty, /\(none tracked — nothing here is pushed\)/);
+  assert.match(dirty, /\(no upstream configured — pushed status NOT established\)/);
 
   const ahead = renderLocationSection({
     worktreePath: 'C:/x', resolvedPath: 'C:/x', gitReadable: true,
@@ -580,7 +580,9 @@ test('WO-OR-14 / F2: an attached branch with NO upstream still earns the confide
     const facts = gitFacts(r.root);
     assert.equal(facts.detached, false, 'this one is on a real branch');
     assert.equal(facts.upstreamState, 'none-configured', 'MEASURED: the branch exists and tracks nothing');
-    assert.match(renderLocationSection(facts), /\(none tracked — nothing here is pushed\)/);
+    assert.match(renderLocationSection(facts), /\(no upstream configured — pushed status NOT established\)/);
+    assert.doesNotMatch(renderLocationSection(facts), /nothing here is pushed/,
+      'TQA-006: empty upstream field must never claim push status');
   } finally {
     r.cleanup();
   }
