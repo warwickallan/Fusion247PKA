@@ -135,6 +135,75 @@ Then read the exact text that reached the reviewer:
 select staged_input from tower.supervisor_review where turn_id = '<turn>';
 ```
 
+## The first hop — a real GitHub comment, no hand-built payload (WO-OR-24)
+
+Step 4 above ingests a **file**. That was the honest state of things after WO-OR-22 and it was also
+the gap: everything from an `issue_comment`-shaped payload onward was proven, and nothing delivered
+one. `pollPrComments.mjs` is the missing step and nothing more.
+
+```bash
+CONTROL_PLANE_DEV_DATABASE_URL=... \
+node pollPrComments.mjs --repo warwickallan/Fusion247PKA --pr 87 [--marker <substring>] [--json]
+```
+
+It asks GitHub two questions through `gh api` and hands the answer to `ingestPrComment` unaltered:
+
+| Call | Why |
+|---|---|
+| `repos/<repo>/pulls/<n> --jq .head.sha` | the PR's **real** head — never a SHA someone typed |
+| `repos/<repo>/issues/<n>/comments --paginate` | every comment; those carrying `@tower` are candidates |
+
+`--marker` narrows to comments containing a given substring. Comments with no `@tower` directive are
+ignored entirely.
+
+**Exit codes:** `0` every candidate applied or already-ingested · `2` at least one refused or
+rejected · `1` the poll itself could not run (bad repo/PR, API failure, no `CONTROL_PLANE_DEV_DATABASE_URL`).
+
+### It is a POLLER, not a webhook — and that distinction is the point
+
+A webhook needs a public listener and inbound ingress; that is a new service and it was not wanted.
+**Nothing here evidences push-delivery.** What it evidences is narrower: bytes that provably
+originated on github.com reach the ingest path with no human constructing a payload. Cite it that way.
+
+### Two head checks, and they are not the same check
+
+```
+layer 1  pollPrComments.mjs   body `@tower head:`  vs  the PR's real head from the API
+layer 2  ingestComment.mjs    body `@tower head:`  vs  the turn's current head   ← the stale check
+```
+
+`ingestComment.mjs` binds a comment to the head named in its **body**, deliberately — that records
+the head the author actually reviewed, and an envelope-supplied head could bind a comment to a head
+its author never saw. **That design is not reopened here.** Layer 1 exists because a typed SHA is not
+on its own evidence of anything: it validates the author's declaration against GitHub, so the typed
+value never becomes authority while still being what gets recorded.
+
+- Layer 1 catches a comment that **misdescribes the PR** → `refused_head_mismatch`, nothing persisted.
+- Layer 2 catches a comment that is **honest about a head the work has moved past** → `rejected_stale`,
+  persisted as `applied=false` with a reason, nothing applied.
+
+Both fail closed. If the API head cannot be established the poll **aborts** — it never falls back to
+the body head, and it does not even fetch the comments.
+
+### Read-only, structurally
+
+`gh` holds its own credential in the OS keyring; this module never reads, prints, passes or stores a
+token, and has no code path that writes to GitHub. The argv is built internally from `repo` and
+`prNumber`, and `assertReadOnlyArgs` refuses any invocation carrying `-X`, `--method`, `-f`, `-F`,
+`--field`, `--raw-field` or `--input`. Two independent reasons the same defect cannot happen.
+
+### Re-running is safe
+
+The poller re-sees every comment on every run. Re-ingest is a no-op via `(source, comment_id)` on
+`tower.pr_comment` — WO-OR-22's constraint doing the work. **The poller keeps no memory of what it has
+already seen**, on purpose: that would be a second source of truth waiting to disagree with the first.
+
+### Recovering it
+
+There is no daemon and no state to corrupt: it is a one-shot command. If it fails, read the exit code
+above, fix the cause, and run it again — a repeat run cannot double-apply. If `gh` is not
+authenticated (`gh auth status`), that is a Mack task, not a code change.
+
 ## What a rejection looks like
 
 A rejected round ends `tower.turn.state = 'blocked'` with a `tower.supervisor_review` row whose
@@ -173,13 +242,28 @@ node test/run-tower-loop-tests.mjs      # needs CONTROL_PLANE_DEV_DATABASE_URL
 ```
 
 Fails loudly on **zero executed subtests** — a DB-gated run that skips everything is never a pass.
-`W1`–`W8` cover the comment seam; `T0`–`T7` are the pre-existing watcher acceptance tests.
+`W1`–`W8` cover the comment seam; `P1`–`P6` cover the GitHub → Tower first hop; `T0`–`T7` are the
+pre-existing watcher acceptance tests. **24 subtests.**
+
+`P1`–`P6` drive the `gh` boundary through an **injected seam** (`test/doubles/fakeGh.mjs`), so the
+suite needs no network and no `gh` binary. The double refuses any endpoint it does not model — a
+permissive double would answer an argv the real seam rejects, and then the suite proves something
+about the double rather than about the code.
 
 ## Known limits
 
-- **There is no live webhook and this does not build one.** The ingest entrypoint is a
-  function/CLI over a payload, driven exactly like `apply.mjs` and `reviewDiff.mjs`. Nothing here
-  evidences that a real GitHub delivery reaches this code.
+- **A POLLER IS NOT A WEBHOOK.** `pollPrComments.mjs` closes the "no hand-built payload" gap and
+  nothing wider. **Push-delivery is unproven** — no live listener, no inbound ingress, and no
+  evidence that GitHub can reach this code unprompted. Something must still invoke the poller.
+- **Layer 1 rejects before layer 2 can fire.** Because the poller refuses a comment whose body head
+  disagrees with the API head, a genuinely stale comment written against an *older* head is stopped
+  at layer 1 (`refused_head_mismatch`, nothing persisted) rather than reaching
+  `ingestComment.mjs`'s stale branch, which would have persisted it as `applied=false` with a
+  reason. Both fail closed and neither applies anything, but **the audit trail differs**: layer 1
+  leaves no `tower.pr_comment` row. Reachable via `ingestComment.mjs --payload` directly, and that
+  is the path `W3` exercises.
+- **The ingest entrypoint still accepts a file** (`ingestComment.mjs --payload`). The poller does not
+  replace it and does not disable it; a hand-built payload remains possible by design.
 - **The head guarantee is one-sided.** `tower.pr_comment.head_sha` and
   `tower.finding.disposition_head_sha` use the `tower.git_sha` domain (canonical lower-case 40-hex,
   enforced by the database). **`tower.turn.head_sha` is plain `text` and is not constrained** — the
