@@ -138,7 +138,20 @@ export function parseHookInput(raw) {
 
 export function gitFacts(worktreePath, execFile = execFileSync) {
   const run = (args) =>
-    execFile('git', ['-C', worktreePath, ...args], { encoding: 'utf8' }).toString().trim();
+    execFile('git', ['-C', worktreePath, ...args], {
+      encoding: 'utf8',
+      // WO-OR-14. `execFileSync` INHERITS stderr unless told otherwise, so every failing
+      // probe below wrote a raw `fatal:` line straight into a LIVE SessionStart path — a
+      // single file-as-cwd probe emitted eight of them, and this revision adds more probes.
+      // Each of those failures is ALREADY represented honestly in the rendered block as
+      // `(unknown)` or `UNVERIFIED`, so the stderr carried no information a reader uses.
+      // Suppressing it hides no signal; it removes noise from the one surface Warwick
+      // actually reads. stdin is `ignore` so no probe can ever block waiting on input at
+      // session start.
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
+      .toString()
+      .trim();
   const soft = (fn) => {
     try {
       return fn();
@@ -146,6 +159,114 @@ export function gitFacts(worktreePath, execFile = execFileSync) {
       return null;
     }
   };
+
+  // WO-OR-14. The values are computed BEFORE the returned object rather than inside it,
+  // because two of them are now DERIVED from others — `detached` from the head and
+  // symbolic-ref probes, `upstreamState` from `detached` and the branch. Deriving one
+  // answer from another is only honest when every input is itself a measurement, so each
+  // input is named here and each stays independently nullable exactly as before.
+
+  // ---- cwd: resolved, true-cased, AND established to be a directory ----
+  // WO-OR-11 earned the true on-disk casing with `realpathSync.native`. But RESOLVING a
+  // path and establishing that A SESSION CAN BE IN IT are different claims, and a regular
+  // FILE resolves perfectly well — `cwd : C:/Fusion247PKA/CLAUDE.md` rendered as an
+  // established location beneath "executed, not assumed". Existence was the weaker
+  // question all along; the heading claims a DIRECTORY, so directory-ness is measured and
+  // the outcomes are kept apart instead of collapsed into one truthy string.
+  const resolved = soft(() => {
+    const real = realpathSync.native(worktreePath);
+    const st = statSync(real);
+    return {
+      path: normaliseSeparators(real),
+      kind: st.isDirectory() ? 'directory' : st.isFile() ? 'file' : 'other',
+    };
+  });
+
+  const gitReadable = soft(() => (run(['rev-parse', '--git-dir']), true)) === true;
+  const repoRoot = soft(() => normaliseSeparators(run(['rev-parse', '--show-toplevel'])));
+  const headSha = soft(() => run(['rev-parse', 'HEAD']));
+  const branch = soft(() => run(['rev-parse', '--abbrev-ref', 'HEAD']));
+
+  // WO-OR-14. `--abbrev-ref HEAD` prints the LITERAL STRING "HEAD" when HEAD is detached,
+  // and the block rendered that as though it were a branch name. Matching on that string
+  // would be reading a tell rather than taking a measurement, so the state is probed
+  // directly: `symbolic-ref -q` returns the branch when HEAD is attached and exits
+  // non-zero, silently, when it is not.
+  const symbolicBranch = soft(() => run(['symbolic-ref', '-q', '--short', 'HEAD']));
+  // TWO measurements, not one flag reused. If HEAD does not resolve at all — an unborn
+  // branch, or git unavailable — then nothing can be concluded about attachment, so this
+  // is null rather than false. Only a resolvable HEAD with no symbolic ref is detached.
+  const detached = headSha === null ? null : symbolicBranch === null;
+
+  // WO-OR-14. Whether this is the primary checkout or a LINKED worktree, measured by
+  // `--git-dir` differing from `--git-common-dir` rather than by pattern-matching a path.
+  // In an estate running twenty-odd worktrees, "which checkout am I in" is precisely the
+  // question this block exists to answer. null when the probe cannot run, and it then
+  // renders nothing at all rather than guessing either way.
+  const linkedWorktree = soft(() => {
+    const [gitDir, commonDir] = run([
+      'rev-parse', '--path-format=absolute', '--git-dir', '--git-common-dir',
+    ]).split('\n');
+    if (!gitDir || !commonDir) return null;
+    return normaliseSeparators(gitDir.trim()) !== normaliseSeparators(commonDir.trim());
+  });
+
+  const dirty = soft(() => run(['status', '--porcelain']).length > 0);
+  const unpushed = soft(() => {
+    const parsed = parseInt(run(['rev-list', '--count', '@{u}..HEAD']), 10);
+    return Number.isNaN(parsed) ? null : parsed;
+  });
+  // The CURRENT pushed head, read live from the remote-tracking ref — not whatever was
+  // pushed at some point in the past. A resuming session needs to know what is actually
+  // durable on the remote right now.
+  const upstreamRef = soft(() => run(['rev-parse', '--abbrev-ref', '@{u}']));
+  const upstreamSha = soft(() => run(['rev-parse', '@{u}']));
+
+  // WO-OR-14. THE DEFECT WO-OR-11 INTRODUCED WHILE CLOSING ANOTHER ONE.
+  //
+  // WO-OR-11 gated the sentence "nothing here is pushed" on `gitReadable`, which comes from
+  // `rev-parse --git-dir`. But the UPSTREAM probe fails INDEPENDENTLY of general git
+  // readability, and a DETACHED HEAD is an entirely ordinary state that separates them:
+  //
+  //     git rev-parse --git-dir            -> .git    (so gitReadable === true)
+  //     git rev-parse --abbrev-ref @{u}    -> fatal: HEAD does not point to a branch
+  //
+  // On a detached HEAD the commit may well BE pushed, so that sentence was flatly false —
+  // and `actions/checkout` produces exactly this state on every CI run. `gitReadable` was
+  // never too coarse a THRESHOLD; it was the wrong QUESTION. It asks "did any git command
+  // work here" and was made to answer "is this branch pushed".
+  //
+  // So the upstream answer now carries its own measured state, each value reached by a
+  // probe that can mean only one thing:
+  //
+  //   'tracked'          @{u} answered, or for-each-ref found an upstream
+  //   'none-configured'  the branch ref EXISTS and its upstream field is empty — measured
+  //   'detached'         HEAD resolves and is not a symbolic ref, so no branch tracks anything
+  //   'unreadable'       git could not answer here at all
+  //   'unknown'          the probes ran and did not settle it — never a confident sentence
+  const upstreamState = (() => {
+    if (!gitReadable) return 'unreadable';
+    if (upstreamRef) return 'tracked';
+    if (detached === true) return 'detached';
+    if (symbolicBranch) {
+      // `for-each-ref` exits 0 and prints `<name>|<upstream>` for a ref that exists, with
+      // an EMPTY second half when nothing is tracked — and prints NOTHING AT ALL when the
+      // ref does not match. That difference is what makes "no upstream is configured" a
+      // MEASUREMENT rather than merely the absence of one, which is exactly what the old
+      // `gitReadable` gate could not express.
+      const row = soft(() =>
+        run([
+          'for-each-ref',
+          '--format=%(refname:short)|%(upstream:short)',
+          `refs/heads/${symbolicBranch}`,
+        ])
+      );
+      if (row === null || row === '') return 'unknown';
+      return row.endsWith('|') ? 'none-configured' : 'tracked';
+    }
+    return 'unknown';
+  })();
+
   return {
     // WHAT THE CALLER CLAIMED. Preserved verbatim and NEVER rendered as an established
     // location on its own — see `resolvedPath` immediately below and `renderLocationSection`.
@@ -166,9 +287,16 @@ export function gitFacts(worktreePath, execFile = execFileSync) {
     // human reading the brief. Dropping the field to stop it lying would trade a lie for a
     // blind spot. One syscall makes it true instead.
     //
-    // null means NOT ESTABLISHED — the path does not exist, is unreadable, or was not a
-    // string at all. It never falls back to the claimed value.
-    resolvedPath: soft(() => normaliseSeparators(realpathSync.native(worktreePath))),
+    // null means NOT ESTABLISHED — the path does not exist, is unreadable, is not a
+    // directory, or was not a string at all. It never falls back to the claimed value.
+    // WO-OR-14 narrowed it: a non-null `resolvedPath` now means "a DIRECTORY was
+    // established here", which is the claim the heading actually makes.
+    resolvedPath: resolved && resolved.kind === 'directory' ? resolved.path : null,
+    // WO-OR-14. WHAT IT ACTUALLY RESOLVED TO, kept separately so the reader can be told
+    // WHY a path failed rather than only that it did. "There is no such directory" and
+    // "that is a file, not a directory" are different diagnoses and point at different
+    // mistakes. null means it did not resolve at all.
+    resolvedKind: resolved ? resolved.kind : null,
     // WO-OR-11. Whether git ANSWERED here at all, as its own measurement.
     //
     // `soft()` returns null both when a git call fails and when git legitimately reports
@@ -180,20 +308,21 @@ export function gitFacts(worktreePath, execFile = execFileSync) {
     // with the invariant above rather than an exception to it: it records whether a
     // measurement was possible, so "we could not tell" IS "not established" — false. It
     // fails closed, which is the direction that cannot manufacture a reassuring claim.
-    gitReadable: soft(() => (run(['rev-parse', '--git-dir']), true)) === true,
-    repoRoot: soft(() => normaliseSeparators(run(['rev-parse', '--show-toplevel']))),
-    headSha: soft(() => run(['rev-parse', 'HEAD'])),
-    branch: soft(() => run(['rev-parse', '--abbrev-ref', 'HEAD'])),
-    dirty: soft(() => run(['status', '--porcelain']).length > 0),
-    unpushed: soft(() => {
-      const parsed = parseInt(run(['rev-list', '--count', '@{u}..HEAD']), 10);
-      return Number.isNaN(parsed) ? null : parsed;
-    }),
-    // The CURRENT pushed head, read live from the remote-tracking ref — not whatever was
-    // pushed at some point in the past. A resuming session needs to know what is actually
-    // durable on the remote right now.
-    upstreamRef: soft(() => run(['rev-parse', '--abbrev-ref', '@{u}'])),
-    upstreamSha: soft(() => run(['rev-parse', '@{u}'])),
+    //
+    // WO-OR-14 REMOVED ITS SECOND JOB. It no longer gates the upstream sentence; that is
+    // `upstreamState`'s, measured by upstream probes rather than by this one. A flag that
+    // answers a question it never asked is the whole shape of the defect being closed here.
+    gitReadable,
+    repoRoot,
+    linkedWorktree,
+    headSha,
+    branch,
+    detached,
+    dirty,
+    unpushed,
+    upstreamRef,
+    upstreamSha,
+    upstreamState,
   };
 }
 
@@ -214,26 +343,80 @@ function show(v) {
 //   claimed, bad  -> the host supplied a path that does not exist on disk. Something WAS
 //                    claimed and it did not check out, which is a different and much more
 //                    interesting failure than silence.
-function renderCwd(facts) {
-  if (facts.resolvedPath) return facts.resolvedPath;
-  const claimed = facts.worktreePath;
-  if (claimed === null || claimed === undefined || claimed === '') {
-    return '(UNVERIFIED — no path was supplied)';
+//
+// WO-OR-14 SPLIT "claimed, bad" INTO THE DIAGNOSES IT WAS HIDING, and added the state the
+// four-state test showed was missing entirely:
+//
+//   claimed a FILE   -> it resolved, so the old probe passed it; but a file is not a place
+//                       a session can be in, and the heading claims one that is.
+//   nothing claimed, -> the host said nothing and the module fell back to its OWN process
+//   showing our own     directory. The PATH is measured and true; the HEADING — "where
+//                       this session is" — is not, because the only authority on that said
+//                       nothing. A true value can still carry an unearned claim.
+function renderCwd(facts, cwdClaimedByHost) {
+  if (facts.resolvedPath) {
+    if (cwdClaimedByHost) return facts.resolvedPath;
+    return (
+      `${facts.resolvedPath} (UNCLAIMED — the host supplied no cwd, so this is the hook ` +
+      "process's own working directory, not a location this session claimed)"
+    );
   }
+  const claimed = facts.worktreePath;
   // A non-string reaches here because `normaliseSeparators` passes it through unchanged
   // and a truthy non-string then sails on as if it were a location. Quoting it makes it
   // visibly not-a-path rather than letting `String(7)` render as `7`.
   const asShown = typeof claimed === 'string' ? claimed : JSON.stringify(claimed);
+  if (facts.resolvedKind === 'file') {
+    return `(UNVERIFIED — host reported ${asShown}; that path is a FILE, not a directory a session can be in)`;
+  }
+  if (facts.resolvedKind === 'other') {
+    return `(UNVERIFIED — host reported ${asShown}; that path exists but is not a directory)`;
+  }
+  if (claimed === null || claimed === undefined || claimed === '') {
+    return '(UNVERIFIED — no path was supplied)';
+  }
   return `(UNVERIFIED — host reported ${asShown}; no such directory on disk)`;
 }
 
-export function renderLocationSection(facts) {
+// WO-OR-14. `--show-toplevel` returns the root of the CURRENT WORKING TREE, which in a
+// linked worktree is not the repository root at all. The old label "repo root" therefore
+// printed a sentence its measurement did not back — and in an estate that is mostly linked
+// worktrees it overclaimed on the COMMON case, not an edge one. The label now names what
+// was measured, and the kind of checkout is measured too rather than left to the reader to
+// infer from a path that looks unfamiliar.
+function renderToplevel(facts) {
+  if (facts.repoRoot === null || facts.repoRoot === undefined) return '(unknown)';
+  if (facts.linkedWorktree === true) return `${facts.repoRoot} (LINKED worktree)`;
+  if (facts.linkedWorktree === false) return `${facts.repoRoot} (primary checkout)`;
+  // The probe did not answer. Say nothing rather than guess a kind.
+  return String(facts.repoRoot);
+}
+
+// WO-OR-14. `rev-parse --abbrev-ref HEAD` returns the literal string "HEAD" on a detached
+// HEAD, which this line rendered as if it were a branch name — a reader cannot tell it
+// from a branch actually called HEAD, and the state it really signals is the one worth
+// knowing. `detached` is measured by `symbolic-ref`, so this renders a state rather than
+// a string that happens to look like one.
+function renderBranch(facts) {
+  if (facts.detached === true) {
+    return `(DETACHED — HEAD is not on a branch${facts.headSha ? `, it is commit ${facts.headSha}` : ''})`;
+  }
+  if (facts.branch === null || facts.branch === undefined) return '(unknown)';
+  if (facts.branch === 'HEAD') {
+    // Reaching here means git said "HEAD" and the detached probe did NOT confirm it. The
+    // honest answer is that this was not established, never the bare string.
+    return '(UNVERIFIED — git returned the literal "HEAD", which is what a DETACHED HEAD returns, and the detached probe did not answer)';
+  }
+  return String(facts.branch);
+}
+
+export function renderLocationSection(facts, { cwdClaimedByHost = true } = {}) {
   if (!facts) return null;
   const lines = [
     '⟦GOV⟧ WHERE THIS SESSION IS (executed, not assumed):',
-    `  cwd          : ${renderCwd(facts)}`,
-    `  repo root    : ${show(facts.repoRoot)}`,
-    `  branch       : ${show(facts.branch)}`,
+    `  cwd          : ${renderCwd(facts, cwdClaimedByHost)}`,
+    `  worktree root: ${renderToplevel(facts)}`,
+    `  branch       : ${renderBranch(facts)}`,
     `  HEAD         : ${show(facts.headSha)}`,
     `  working tree : ${facts.dirty === null ? '(unknown)' : facts.dirty ? 'DIRTY — uncommitted changes present' : 'clean'}`,
   ];
@@ -242,11 +425,16 @@ export function renderLocationSection(facts) {
     lines.push(
       `  unpushed     : ${facts.unpushed === null ? '(unknown)' : `${facts.unpushed} commit(s) ahead of upstream`}`
     );
-  } else if (facts.gitReadable) {
-    // git ANSWERED and reported no upstream. The confident sentence is earned here, and
-    // only here.
+  } else if (facts.upstreamState === 'none-configured') {
+    // git ANSWERED, the branch ref exists, and its upstream field is empty. The confident
+    // sentence is earned here, and only here. WO-OR-11 put the gate one probe too far away
+    // — `gitReadable` — which let a detached HEAD reach this line.
     lines.push('  upstream     : (none tracked — nothing here is pushed)');
-  } else {
+  } else if (facts.upstreamState === 'detached') {
+    lines.push(
+      '  upstream     : (unknown — HEAD is DETACHED, so no branch is tracking anything here; this is NOT a claim that nothing is pushed)'
+    );
+  } else if (facts.upstreamState === 'unreadable' || !facts.gitReadable) {
     // WO-OR-11. git never ran, so the module has measured nothing about what is pushed.
     // This branch used to fall into the sentence above, which meant a session on an
     // unreadable path was told "nothing here is pushed" — a claim about the remote
@@ -255,6 +443,14 @@ export function renderLocationSection(facts) {
     // is simply untracked.
     lines.push(
       '  upstream     : (unknown — git could not be read here, so this is NOT a claim that nothing is pushed)'
+    );
+  } else {
+    // WO-OR-14. The probes ran and did not settle it. This arm FAILS CLOSED on purpose:
+    // any fact object that does not carry a measured `upstreamState` lands here rather
+    // than inheriting the confident sentence, so a future caller cannot re-open the defect
+    // simply by omitting the field.
+    lines.push(
+      '  upstream     : (unknown — the upstream probe did not answer, so this is NOT a claim that nothing is pushed)'
     );
   }
   // Stated because its ABSENCE is a change a reader could otherwise mistake for a pass.
@@ -282,37 +478,80 @@ const DELIVERABLE_WINDOW_DAYS = 21;
 const DECISION_MARKER =
   /nothing (will|would) be built|awaiting (your|a) |until you accept|your call|needs? (a )?(decision|your )|accept (this|a) plan|what i need:|waiting on you|before any building/i;
 
-export function sweepOpenDeliverables(root = ESTATE_ROOT, now = Date.now()) {
+// WO-OR-14. The default filesystem, injectable. This is the module's EXISTING idiom —
+// `gitFacts(path, execFile = execFileSync)` and `buildBrief({ factsFn, sweepFn })` already
+// do exactly this — not new machinery. It exists because a per-file read failure cannot be
+// induced deterministically on Windows, and a proof that cannot be made to fail is not a
+// proof. The suite pairs every injected test with a control asserting these defaults read
+// the real disk, so the seam can never end up testing a fiction.
+const DEFAULT_SWEEP_IO = { readdirSync, statSync, readFileSync };
+
+export function sweepOpenDeliverables(root = ESTATE_ROOT, now = Date.now(), io = DEFAULT_SWEEP_IO) {
   const dir = join(root, 'Deliverables');
   let names;
   try {
-    names = readdirSync(dir);
-  } catch {
-    return null; // no Deliverables folder — nothing to sweep, never an error
+    names = io.readdirSync(dir);
+  } catch (err) {
+    // WO-OR-14. ENOENT is the ONE honest silence: there is no `Deliverables/` here at all,
+    // so there is genuinely nothing to sweep and nothing to say.
+    //
+    // EVERY OTHER failure means something IS there and could not be read — a file where the
+    // directory should be, a permissions refusal, a traversal error. Returning null for
+    // those made "I swept and there is nothing open" and "I could not look" render
+    // BYTE-IDENTICALLY, because `buildBrief` then omits the section entirely. That is the
+    // same silence-reads-as-health failure this whole module exists to prevent, sitting
+    // inside the module itself.
+    if (err && err.code === 'ENOENT') return null;
+    return (
+      '⟦GOV⟧ OPEN DELIVERABLES: NOT SWEPT — Deliverables/ could not be read ' +
+      `(${err?.code || err?.message || 'unknown error'}). ` +
+      'This is NOT a report that there is nothing open.'
+    );
   }
   const cutoff = now - DELIVERABLE_WINDOW_DAYS * 86400_000;
   const rows = [];
+  // WO-OR-14. Files that could not be READ, counted so the omission can be stated. This is
+  // the same defect one level down: a per-file failure was silently `continue`d, so a
+  // rendered list could be quietly incomplete with nothing to tell the reader so.
+  //
+  // Note what is deliberately NOT counted here: a non-file (a directory named `*.md`) and a
+  // file outside the 21-day window are legitimate EXCLUSIONS, not failures, and inflating
+  // the count with them would cry wolf on a healthy estate.
+  let unreadable = 0;
   for (const name of names) {
     if (!name.toLowerCase().endsWith('.md')) continue; // top-level *.md only
     const full = join(dir, name);
     let st;
     try {
-      st = statSync(full);
+      st = io.statSync(full);
     } catch {
+      unreadable += 1;
       continue;
     }
     if (!st.isFile() || st.mtimeMs < cutoff) continue;
     let head = '';
     try {
-      head = readFileSync(full, 'utf8').slice(0, 6000);
+      head = io.readFileSync(full, 'utf8').slice(0, 6000);
     } catch {
+      unreadable += 1;
       continue;
     }
     const h1 = (head.match(/^#\s+(.+)$/m) || [])[1]?.trim() || name.replace(/\.md$/, '');
     const awaits = DECISION_MARKER.test(head);
     rows.push({ name, title: h1, mtimeMs: st.mtimeMs, awaits });
   }
-  if (!rows.length) return null;
+  if (!rows.length) {
+    // WO-OR-14. Nothing to show — but WHY there is nothing to show is the whole question.
+    // If files were unreadable, "nothing open" would be a claim the sweep did not earn.
+    if (unreadable) {
+      return (
+        `⟦GOV⟧ OPEN DELIVERABLES: NOT SWEPT IN FULL — ${unreadable} file(s) in Deliverables/ ` +
+        'could not be read, and nothing else was in scope. ' +
+        'This is NOT a report that there is nothing open.'
+      );
+    }
+    return null;
+  }
   rows.sort((a, b) => b.mtimeMs - a.mtimeMs);
   const top = rows.slice(0, 8);
   const lines = ['⟦GOV⟧ OPEN DELIVERABLES (loose, not BUILD-* — nothing else surfaces these):'];
@@ -322,6 +561,11 @@ export function sweepOpenDeliverables(root = ESTATE_ROOT, now = Date.now()) {
   }
   const pending = top.filter((r) => r.awaits).length;
   if (pending) lines.push(`  ${pending} deliverable(s) appear to be waiting on Warwick — treat as a pending product-decision handback.`);
+  // WO-OR-14. A list that is SHOWN must say when it is incomplete, or a reader takes it as
+  // the whole answer — which is exactly how a silently dropped file becomes invisible.
+  if (unreadable) {
+    lines.push(`  ${unreadable} file(s) could not be read and are NOT represented in this list.`);
+  }
   return lines.join('\n');
 }
 
@@ -353,13 +597,32 @@ export function buildBrief(raw, {
 } = {}) {
   const parsed = parseHookInput(raw);
   const policy = briefModeFor(parsed.payload?.source);
-  const where = normaliseSeparators(parsed.payload?.cwd) || normaliseSeparators(cwd);
+
+  // WO-OR-14. WHETHER THE HOST SAID ANYTHING AT ALL about where this session is.
+  //
+  // The old `normaliseSeparators(payload.cwd) || normaliseSeparators(cwd)` let an absent,
+  // empty or falsy value fall silently through to the HOOK'S OWN process directory, which
+  // then rendered beneath a heading reading "WHERE THIS SESSION IS". The path was measured
+  // and true; the claim was not, because the only authority on the session's location had
+  // said nothing and the module substituted its own with no tell. A true value can still
+  // carry an unearned claim — that is the whole lesson of this sequence.
+  //
+  // A falsy-but-PRESENT value (`false`, `0`) is a CLAIM THAT FAILED, not silence, and is
+  // preserved as one so the reader sees what the host actually sent. The old `||` erased
+  // that distinction too.
+  const claimedCwd = parsed.payload?.cwd;
+  const cwdClaimedByHost = !(
+    claimedCwd === undefined ||
+    claimedCwd === null ||
+    (typeof claimedCwd === 'string' && claimedCwd.trim() === '')
+  );
+  const where = cwdClaimedByHost ? normaliseSeparators(claimedCwd) : normaliseSeparators(cwd);
 
   const sections = [`⟦GOV⟧ SESSION START — ${policy.headline}`];
 
   try {
     const f = facts ?? factsFn(where);
-    const rendered = renderLocationSection(f);
+    const rendered = renderLocationSection(f, { cwdClaimedByHost });
     if (rendered) sections.push(rendered);
   } catch (err) {
     sections.push(`⟦GOV⟧ WHERE THIS SESSION IS: could not be established (${err.message}).`);
