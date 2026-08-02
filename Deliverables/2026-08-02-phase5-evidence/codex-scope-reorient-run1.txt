@@ -1,0 +1,79 @@
+repo:  C:/Fusion247PKA
+range: a989e68d95e01b7f6dc13955d796950f6a8a02a5..HEAD
+claim: Deliverables/2026-08-02-phase5-evidence/claim-scope-reorient.json
+scope  : tools/governor/reorient.mjs
+branch : operating-reset/teardown
+
+── GIT EVIDENCE (real, read-only) ──
+resolved=true diff_range=a989e68d95e01b7f6dc13955d796950f6a8a02a5..2aac7d9a2d6584fc7d993fc21f5428f649c847d0
+changed_files=["tools/governor/reorient.mjs"]
+diff bytes=59091 truncated=false
+
+── REAL CODEX MERGE REVIEW (Tower QA skill over the staged diff + the REAL claim) ──
+ok=true blocked=false model=openai-codex-exec
+{
+  "status": "ok",
+  "verdict": "request_changes",
+  "summary": "C1 and C3 conform, and the loose-deliverables and Honcho paths remain reachable. C2(c) and Z2 fail because the rendered worktree/cwd is taken from hook input or process.cwd(), yet the output labels the whole location block “executed, not assumed”; unlike repo root, branch, and HEAD, that value is not established by a git call.",
+  "claims_verified": [
+    {
+      "claim": "reorient.mjs no longer imports programme-state.mjs or rotate-session.mjs.",
+      "status": "confirmed",
+      "evidence": "The staged import block removes both imports; only continuity.mjs remains as a local module import."
+    },
+    {
+      "claim": "All three preserved behaviours remain reachable in the shipped CLI path.",
+      "status": "partial",
+      "evidence": "main() calls buildBrief(), which calls gitFacts() and sweepOpenDeliverables(), then calls readContinuityBrief() and includes all results in toHookOutput(). However, the worktree value rendered by that path is supplied from parsed cwd/process.cwd(), not verified through git."
+    },
+    {
+      "claim": "Exactly normaliseSeparators was carried over from the deleted modules, with no dead carried helper.",
+      "status": "confirmed",
+      "evidence": "normaliseSeparators is the sole explicitly inlined helper and has live callers in gitFacts() and buildBrief(); isBankingCommit and the other former imported symbols are absent."
+    }
+  ],
+  "acceptance_results": [
+    {
+      "acceptance_row_id": "C1",
+      "result": "pass",
+      "rationale": "Neither deleted module remains imported or referenced as an executable dependency.",
+      "evidence": "Staged import changes remove ./programme-state.mjs and ./rotate-session.mjs."
+    },
+    {
+      "acceptance_row_id": "C2",
+      "result": "fail",
+      "rationale": "The sweep and continuity passthrough are reachable, and repo root/branch/HEAD are measured with git. The claimed worktree verification is not: buildBrief derives where from hook payload cwd or process.cwd(), and gitFacts merely copies that argument into worktreePath.",
+      "evidence": "buildBrief(): `const where = ...parsed.payload?.cwd... || ...cwd`; gitFacts(): `worktreePath: normaliseSeparators(worktreePath)`; renderLocationSection(): labels it `cwd` beneath “executed, not assumed”."
+    },
+    {
+      "acceptance_row_id": "C3",
+      "result": "pass",
+      "rationale": "Only normaliseSeparators was carried across; it is live, and no additional symbol from either deleted module appears in the surviving implementation.",
+      "evidence": "The staged diff defines normaliseSeparators once and calls it from gitFacts() and buildBrief(); isBankingCommit is removed."
+    },
+    {
+      "acceptance_row_id": "Z1",
+      "result": "pass",
+      "rationale": "The specified failure cases degrade to null/absence or an explicit failure message, with independent guards around location, sweep, continuity, and the outer CLI path.",
+      "evidence": "gitFacts() wraps each git call with soft(); sweepOpenDeliverables() catches directory/stat/read failures; buildBrief() catches facts and sweep failures; main() catches buildBrief and readContinuityBrief failures."
+    },
+    {
+      "acceptance_row_id": "Z2",
+      "result": "fail",
+      "rationale": "The hook reports the worktree/cwd inside a block explicitly described as measured, although that field comes from input/default state rather than a real git measurement. This can render a stale or supplied cwd as verified fact.",
+      "evidence": "buildBrief() selects parsed payload cwd or process.cwd(); gitFacts() returns that same argument as worktreePath; renderLocationSection() prints it under `WHERE THIS SESSION IS (executed, not assumed)`."
+    }
+  ],
+  "prior_finding_results": [],
+  "findings": [
+    {
+      "id": "F1-unmeasured-worktree-rendered-as-verified",
+      "technical_impact": "HIGH",
+      "reachability": "ACTIVE",
+      "required_disposition": "BLOCKS_CURRENT_MERGE",
+      "assumed_deployment_baseline": "The SessionStart CLI executes main(), using buildBrief() with ordinary hook input and default gitFacts().",
+      "evidence": "In buildBrief(), `where` comes from `parsed.payload?.cwd` or `process.cwd()`. gitFacts() assigns `worktreePath` directly from that argument, while renderLocationSection() presents it beneath “executed, not assumed”.",
+      "required_correction": "Measure or validate the worktree through git before rendering it as verified—for example, derive the effective worktree from an appropriate git command and fail soft to `(unknown)` on failure—or relabel/remove the unmeasured field so the output makes no verification claim about it."
+    }
+  ]
+}
