@@ -28,11 +28,206 @@ import {
 } from './worktree-guard.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const FIXTURE_PATH = join(__dirname, 'fixtures', 'programme-state.minimal.json');
 const GUARD_SRC = join(__dirname, 'worktree-guard.mjs');
 
+// THE FIXTURE IS INLINED HERE (WO-OR-05), NOT LOADED FROM DISK.
+//
+// `fixtures/programme-state.minimal.json` was deleted with the rest of the programme-
+// state machinery. This suite was its LAST consumer, so the document lives here now,
+// recovered byte-for-byte from the branch point (a989e68) and re-serialised — not
+// retyped, and not trimmed to whatever the current assertions happen to read. Trimming
+// it would silently change what a mutation test mutates.
+//
+// AND IT IS WORTH KNOWING WHY THIS SUITE STILL NEEDS A PROGRAMME STATE AT ALL, because
+// the answer is the module's most important limitation. `worktree-guard.mjs` derives
+// the canonical location by reading `Deliverables/*/programme-state.json` off disk
+// itself. Nothing writes those files any more. So every test below establishes, by
+// construction, a world that no longer occurs — and in the world that DOES occur,
+// `compareLocation` returns NO_PROGRAMME and `decide()` returns DEFER for every guarded
+// tool. The guard is retained by decision; these tests prove it still works GIVEN a
+// programme, not that a programme exists. See the finding reported with this change.
+const MINIMAL_PROGRAMME_STATE = Object.freeze(
+  {
+    "schema_version": 1,
+    "programme": {
+      "id": "BUILD-999",
+      "title": "Synthetic programme (fixture)",
+      "home": "Deliverables/BUILD-999-synthetic",
+      "status": "active",
+      "commissioned": "2026-01-01"
+    },
+    "phase": {
+      "current": "Phase 1 — synthetic",
+      "summary": "A minimal but fully valid programme state, used as the base for mutation tests. Every mutation test starts from this document and breaks exactly one thing.",
+      "started": "2026-01-01"
+    },
+    "banked": {
+      "at": "2026-01-01",
+      "by_model": "Sonnet",
+      "session_id": null,
+      "head_sha": "1111111111111111111111111111111111111111",
+      "governor_version": "fixture"
+    },
+    "repository": {
+      "primary_checkout": "C:/Synthetic",
+      "worktree": "C:/Synthetic-build",
+      "branch": "build-999/synthetic",
+      "base_sha": "0000000000000000000000000000000000000000",
+      "head_sha": "1111111111111111111111111111111111111111",
+      "clean": true,
+      "unpushed_commits": 0,
+      "upstream": "origin/build-999/synthetic"
+    },
+    "tickets": [
+      {
+        "id": "T-01",
+        "title": "First synthetic ticket",
+        "state": "resolved",
+        "model": "Sonnet",
+        "depends_on": [],
+        "resolved": "2026-01-01",
+        "evidence": [
+          "evidence/T-01.md"
+        ],
+        "note": null
+      },
+      {
+        "id": "T-02",
+        "title": "Unlocked by T-01",
+        "state": "frontier",
+        "model": "Sonnet",
+        "depends_on": [
+          "T-01"
+        ],
+        "resolved": null,
+        "evidence": [],
+        "note": null
+      },
+      {
+        "id": "T-03",
+        "title": "Still blocked by T-02",
+        "state": "blocked",
+        "model": "Opus",
+        "depends_on": [
+          "T-02"
+        ],
+        "resolved": null,
+        "evidence": [],
+        "note": null
+      }
+    ],
+    "blockers": [
+      {
+        "id": "Q-1",
+        "kind": "question",
+        "summary": "A synthetic open question only the owner can settle.",
+        "owner": "warwick",
+        "blocks": [
+          "T-03"
+        ],
+        "recommendation": "Pick option (b)."
+      }
+    ],
+    "model_recommendation": {
+      "model": "Sonnet",
+      "effort": null,
+      "rationale": "The only frontier ticket is mechanical."
+    },
+    "workers": [
+      {
+        "id": "w-1",
+        "kind": "subagent",
+        "status": "completed",
+        "ticket": "T-01",
+        "dispatched": "2026-01-01",
+        "worktree": "C:/Synthetic-build",
+        "expected_output": "T-01 implementation",
+        "evidence": [
+          "evidence/T-01.md"
+        ]
+      }
+    ],
+    "branches": [
+      {
+        "name": "build-999/synthetic",
+        "head": "1111111111111111111111111111111111111111",
+        "upstream": "origin/build-999/synthetic",
+        "ahead": 0,
+        "behind": 0,
+        "role": "build",
+        "note": null
+      }
+    ],
+    "pull_requests": [
+      {
+        "number": null,
+        "url": null,
+        "title": "No PR opened yet",
+        "state": "none",
+        "branch": "build-999/synthetic",
+        "head": "1111111111111111111111111111111111111111",
+        "note": null
+      }
+    ],
+    "worktrees": [
+      {
+        "path": "C:/Synthetic-build",
+        "branch": "build-999/synthetic",
+        "head": "1111111111111111111111111111111111111111",
+        "dirty": false,
+        "unpushedCount": 0,
+        "classification": "active-build",
+        "disposition": "in-progress-owned",
+        "liveWorkerPids": [],
+        "protected": false
+      }
+    ],
+    "safe_boundary": {
+      "at_boundary": true,
+      "reason": "T-01 completed as a whole; nothing is split across the rotation.",
+      "obstacles": [],
+      "verified_at": "2026-01-01"
+    },
+    "resumption": {
+      "focus": "Implement T-02, the only ticket on the frontier.",
+      "next_action": "Dispatch T-02 to a Sonnet worker with a read-back gate.",
+      "ticket": "T-02",
+      "worktree": "C:/Synthetic-build",
+      "branch": "build-999/synthetic",
+      "read_first": [
+        "Deliverables/BUILD-999-synthetic/02-MAP.md"
+      ],
+      "do_not": [
+        "Do not alter main."
+      ]
+    },
+    "locked_decisions": [
+      {
+        "id": "AD-1",
+        "decision": "A synthetic settled decision that must not be re-litigated.",
+        "why": "It was settled in Phase 1."
+      }
+    ],
+    "runtime_pointers": [
+      {
+        "label": "The map",
+        "path": "Deliverables/BUILD-999-synthetic/02-MAP.md",
+        "how_to_read": "git show build-999/synthetic:\"Deliverables/BUILD-999-synthetic/02-MAP.md\""
+      }
+    ],
+    "privacy": {
+      "private_surface": "none",
+      "private_record": null,
+      "redactions": []
+    },
+    "unknown": []
+  }
+);
+
 function loadFixture() {
-  return JSON.parse(readFileSync(FIXTURE_PATH, 'utf8'));
+  // A deep copy per call: several tests mutate the document, and a shared frozen
+  // object would either throw or leak one test's mutation into the next.
+  return JSON.parse(JSON.stringify(MINIMAL_PROGRAMME_STATE));
 }
 
 // A real estate: a real git repo (the CANONICAL worktree) plus a second real

@@ -19,10 +19,18 @@
 // governor that stops measuring must not also break the thing it measures (INV-2's
 // spirit applied to the sampler, even though the sampler itself isn't a blocking hook).
 
+import { openSync, fstatSync, readSync, closeSync, readdirSync, readFileSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { writeHealthSample } from './health-store.mjs';
+import { writeHealthSample, healthStoreDir } from './health-store.mjs';
 
 export const SAMPLE_SCHEMA_VERSION = 1;
+
+// Where a sample came from. `statusLine` is the terminal payload (authoritative on the
+// window SIZE, invisible to Warwick); `transcript` is the Stop-hook path (fires on every
+// client including claude.ai web and Android, authoritative on the token COUNT).
+export const SOURCE_STATUSLINE = 'statusLine';
+export const SOURCE_TRANSCRIPT = 'transcript';
 
 function get(obj, path) {
   return path.split('.').reduce(
@@ -71,7 +79,7 @@ export function extractHealthSample(payload, { sampledAt = null } = {}) {
     schema_version: SAMPLE_SCHEMA_VERSION,
     sampled_at: sampledAt,
     session_id: sessionId,
-    source: 'statusLine',
+    source: SOURCE_STATUSLINE,
     version: orNull(payload.version),
     model: {
       id: orNull(get(payload, 'model.id')),
@@ -133,6 +141,282 @@ export function sampleFromStdin(raw, { sampledAt = null, writer = writeHealthSam
     return { written: true, path, sample };
   } catch (err) {
     // Never let a write failure propagate — the sampler must exit 0 regardless.
+    return { written: false, reason: 'write-failed', error: err.message };
+  }
+}
+
+// ===========================================================================
+// THE TRANSCRIPT PATH (WO-OR-05) — the half that actually reaches Warwick
+// ===========================================================================
+//
+// THE DEFECT THIS EXISTS TO FIX. Everything above this line is fed by the terminal
+// `statusLine`, which does not run on claude.ai web or on Android. Warwick works on both.
+// So for him the health store was permanently empty and the `⟦GOV⟧` footer rendered
+// `BLIND` forever — a governor reporting on ground it had never examined.
+//
+// The Stop hook fires on EVERY client and its payload carries `transcript_path`. The
+// transcript's newest assistant message carries a `usage` block. That gives a real token
+// count on every client, from a hook that is already installed.
+//
+// WHAT THIS PATH CANNOT DO, stated plainly rather than papered over: the transcript
+// carries NO context-window size. Verified by reading real transcripts on this machine.
+// So this path produces a true NUMERATOR and, on its own, no percentage. The denominator
+// is resolved separately and only from authoritative sources — see `resolveWindowTokens`.
+// A model -> window lookup table is forbidden: this estate runs 1M-context and
+// 200k-context sessions of the same model, so such a table manufactures a confident lie.
+
+// Read at most this much of the tail. Transcripts reach tens of megabytes (32MB observed
+// on this machine) and this runs on every turn end, so reading the whole file is not an
+// option. The newest assistant message is at the END, and assistant messages are small —
+// the multi-megabyte lines are tool results. If no usage is found in the tail we report
+// that, rather than silently widening the read until something turns up.
+export const TRANSCRIPT_TAIL_BYTES = 2 * 1024 * 1024;
+
+/**
+ * readTranscriptTail(path, maxBytes) -> string
+ *
+ * Never throws. Returns '' on any failure. The first line is dropped whenever the file
+ * was larger than the window, because that line is almost certainly a fragment — parsing
+ * half a JSON object would throw, and a fragment that happened to parse would be worse.
+ */
+export function readTranscriptTail(path, maxBytes = TRANSCRIPT_TAIL_BYTES) {
+  if (typeof path !== 'string' || path.length === 0) return '';
+  let fd;
+  try {
+    fd = openSync(path, 'r');
+    const size = fstatSync(fd).size;
+    const length = Math.min(size, maxBytes);
+    const start = size - length;
+    const buf = Buffer.allocUnsafe(length);
+    readSync(fd, buf, 0, length, start);
+    const text = buf.toString('utf8');
+    return start > 0 ? text.slice(text.indexOf('\n') + 1) : text;
+  } catch {
+    return '';
+  } finally {
+    if (fd !== undefined) {
+      try { closeSync(fd); } catch { /* nothing left to do about it */ }
+    }
+  }
+}
+
+/**
+ * sumUsedTokens(usage) -> number|null
+ *
+ * Everything occupying the context window: fresh input, cache writes, cache reads, and
+ * the model's own output. Cache reads are the dominant term in a long session and
+ * omitting them would under-report by an order of magnitude.
+ *
+ * Returns null when NO field was usable, never 0 — the missing-field rule this module
+ * already applies everywhere else. A zero would read as "an empty context", which is a
+ * very different claim from "I could not measure it".
+ */
+export function sumUsedTokens(usage) {
+  if (!usage || typeof usage !== 'object') return null;
+  const keys = ['input_tokens', 'cache_creation_input_tokens', 'cache_read_input_tokens', 'output_tokens'];
+  let total = 0;
+  let seen = 0;
+  for (const k of keys) {
+    const v = usage[k];
+    if (typeof v === 'number' && Number.isFinite(v) && v >= 0) {
+      total += v;
+      seen += 1;
+    }
+  }
+  return seen === 0 ? null : total;
+}
+
+/**
+ * newestAssistantUsage(text) -> { usage, modelId, effort, sessionId }|null
+ *
+ * Scans the JSONL BACKWARDS and stops at the first assistant message carrying usage —
+ * the newest one. Unparseable lines are skipped, never fatal: a transcript is an
+ * append-only log written by another process and may well end mid-write.
+ */
+export function newestAssistantUsage(text) {
+  if (typeof text !== 'string' || text.length === 0) return null;
+  const lines = text.split('\n');
+  for (let i = lines.length - 1; i >= 0; i -= 1) {
+    const line = lines[i];
+    if (!line || line.charCodeAt(0) !== 123 /* '{' */) continue;
+    let obj;
+    try {
+      obj = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (!obj || obj.type !== 'assistant' || !obj.message || !obj.message.usage) continue;
+    return {
+      usage: obj.message.usage,
+      modelId: typeof obj.message.model === 'string' ? obj.message.model : null,
+      effort: typeof obj.effort === 'string' ? obj.effort : null,
+      sessionId: typeof obj.sessionId === 'string' ? obj.sessionId : null,
+    };
+  }
+  return null;
+}
+
+/**
+ * resolveWindowTokens({ modelId, ... }) -> { tokens: number|null, source: string|null }
+ *
+ * THE DENOMINATOR, AND THE ONLY TWO WAYS IT MAY BE OBTAINED (ruled, WO-OR-05):
+ *
+ *   1. `CLAUDE_CONTEXT_WINDOW` — an explicit statement by the operator.
+ *   2. A statusLine-observed `context_window_size` WHOSE RECORDED MODEL ID MATCHES the
+ *      live session's model id.
+ *
+ * Never a model -> window lookup table. Never a cross-model value: a 1M-context session
+ * observed yesterday says nothing about a 200k-context session running now, and using it
+ * would render a percentage that is wrong by a factor of five while looking authoritative.
+ * When the live model id is unknown, rule 2 cannot fire at all — an unmatched value is
+ * exactly the cross-model risk the rule exists to exclude.
+ *
+ * Returns the provenance beside the number so nothing downstream has to guess where a
+ * denominator came from. Never throws.
+ */
+export function resolveWindowTokens({
+  modelId = null,
+  env = process.env,
+  storeOpts = {},
+  dirFor = healthStoreDir,
+  listDir = readdirSync,
+  readFile = readFileSync,
+  existsFn = existsSync,
+} = {}) {
+  // 1 — the explicit operator statement.
+  const declared = Number(env?.CLAUDE_CONTEXT_WINDOW);
+  if (Number.isFinite(declared) && declared > 0) {
+    return { tokens: declared, source: 'env:CLAUDE_CONTEXT_WINDOW' };
+  }
+
+  // 2 — a statusLine observation, model-matched. No live model id, no rule 2.
+  if (typeof modelId !== 'string' || modelId.length === 0) return { tokens: null, source: null };
+
+  try {
+    const dir = dirFor(storeOpts);
+    if (!existsFn(dir)) return { tokens: null, source: null };
+    let best = null;
+    for (const name of listDir(dir)) {
+      if (typeof name !== 'string' || !name.endsWith('.json')) continue;
+      let data;
+      try {
+        data = JSON.parse(readFile(join(dir, name), 'utf8'));
+      } catch {
+        continue;
+      }
+      if (!data || data.source !== SOURCE_STATUSLINE) continue;
+      if (data.model?.id !== modelId) continue; // the match rule, applied mechanically
+      const size = data.context_window?.context_window_size;
+      if (typeof size !== 'number' || !Number.isFinite(size) || size <= 0) continue;
+      const at = Date.parse(data.sampled_at ?? '');
+      const rank = Number.isFinite(at) ? at : -Infinity;
+      if (!best || rank > best.rank) best = { rank, size };
+    }
+    if (best) return { tokens: best.size, source: 'statusline-observed' };
+  } catch {
+    // A store we cannot read yields no denominator. That is the safe side: the footer
+    // renders a bare token count rather than a percentage over a guessed window.
+  }
+  return { tokens: null, source: null };
+}
+
+/**
+ * extractTranscriptSample({ transcriptPath, sessionId, ... }) -> sample|null
+ *
+ * Pure-ish and never throws. Returns null when there is nothing safe to write —
+ * no session to key on, or no usable usage block.
+ */
+export function extractTranscriptSample({
+  transcriptPath = null,
+  sessionId = null,
+  sampledAt = null,
+  env = process.env,
+  storeOpts = {},
+  readTail = readTranscriptTail,
+  windowResolver = resolveWindowTokens,
+} = {}) {
+  const found = newestAssistantUsage(readTail(transcriptPath));
+  if (!found) return null;
+
+  const usedTokens = sumUsedTokens(found.usage);
+  if (usedTokens === null) return null;
+
+  // The payload's session id wins over the transcript's: the payload is the runtime
+  // telling us which session this hook fired for, while the transcript line is a record
+  // of a message that may predate a resume.
+  const sid = (typeof sessionId === 'string' && sessionId.length ? sessionId : found.sessionId) || null;
+  if (!sid) return null;
+
+  const window = windowResolver({ modelId: found.modelId, env, storeOpts });
+
+  return {
+    schema_version: SAMPLE_SCHEMA_VERSION,
+    sampled_at: sampledAt,
+    session_id: sid,
+    source: SOURCE_TRANSCRIPT,
+    version: null,
+    model: { id: found.modelId, display_name: null },
+    effort: { level: found.effort },
+    context_window: {
+      // No `used_percentage` key is invented here. The footer derives it when — and only
+      // when — a denominator is present.
+      used_percentage: null,
+      remaining_percentage: null,
+      context_window_size: window.tokens,
+      context_window_source: window.source,
+      used_tokens: usedTokens,
+      total_input_tokens: null,
+      total_output_tokens: null,
+      exceeds_200k_tokens: null,
+    },
+    rate_limits: {
+      five_hour: { used_percentage: null, resets_at: null },
+      seven_day: { used_percentage: null, resets_at: null },
+    },
+    workspace: { git_worktree: null },
+    worktree: { name: null, path: null, branch: null },
+    pr: { number: null, url: null, review_state: null },
+  };
+}
+
+/**
+ * sampleFromTranscript(raw, opts) -> { written, ... }
+ *
+ * The one impure step. `raw` is the Stop hook's stdin JSON. Same contract as
+ * `sampleFromStdin`: never throws, and a failure to write is reported rather than raised.
+ * A Stop hook that crashed would end Warwick's turn with an error.
+ */
+export function sampleFromTranscript(raw, {
+  sampledAt = null,
+  writer = writeHealthSample,
+  storeOpts = {},
+  env = process.env,
+  readTail = readTranscriptTail,
+  windowResolver = resolveWindowTokens,
+} = {}) {
+  const payload = parseStdinPayload(raw);
+  if (!payload) return { written: false, reason: 'unreadable-payload' };
+
+  const transcriptPath = payload.transcript_path ?? payload.transcriptPath ?? null;
+  if (typeof transcriptPath !== 'string' || transcriptPath.length === 0) {
+    return { written: false, reason: 'no-transcript-path' };
+  }
+
+  const sample = extractTranscriptSample({
+    transcriptPath,
+    sessionId: payload.session_id ?? payload.sessionId ?? null,
+    sampledAt,
+    env,
+    storeOpts,
+    readTail,
+    windowResolver,
+  });
+  if (!sample) return { written: false, reason: 'no-usable-usage' };
+
+  try {
+    const path = writer(sample.session_id, sample, storeOpts);
+    return { written: true, path, sample };
+  } catch (err) {
     return { written: false, reason: 'write-failed', error: err.message };
   }
 }

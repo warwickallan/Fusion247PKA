@@ -1,9 +1,9 @@
 // Proofs for footer.mjs (BUILD-018 WP-3, D-D).
 //
 // Covers Silas's D-M1..D-M11. D-M12 (`deriveResumption` must not carry a `hold`
-// forward) is NOT here and is not silently dropped: `deriveResumption` lives in
-// programme-state.mjs, outside this Work Order's file_surface. Raised at read-back,
-// and Larry is carrying it as an explicitly deferred row.
+// forward) is CLOSED rather than deferred: `deriveResumption` lived in
+// programme-state.mjs, which WO-OR-05 deleted along with the programme state it read.
+// The deferred row it was carried as is closed by the deletion, not by a proof.
 //
 // INV-5 governs the shape of this file: several tests below MUTATE the module's own
 // inputs to prove the assertion goes red, because a control that has never been made to
@@ -27,11 +27,17 @@ import {
   ADVICE,
   ADVICE_VALUES,
   NEXT_MODELS,
+  NEXT_EFFORTS,
+  NEXT_VALUES,
   NEXT_UNSET,
+  TOKENS_GRAIN,
+  isRenderableTokens,
+  formatTokens,
+  parseTokens,
+  toRenderableTokens,
   CONTROL_CONTINUE,
   STALE_AFTER_MS,
   BLIND_REASON,
-  UNSET_REASON,
   renderFooter,
   parseFooter,
   parseFooterFromMessage,
@@ -41,7 +47,6 @@ import {
   adviceForState,
   adviceFor,
   deriveFooterFields,
-  nextModelFor,
   resolveHealthSample,
   computeFooterLine,
   parseCliArgs,
@@ -114,7 +119,7 @@ test('AC1: the separator is exactly U+0020 U+00B7 U+0020, and the marker U+27E6/
   // And the rendered line really uses it — not a lookalike the source happens to hold.
   const line = renderFooter({
     percent: 0, approximate: false, state: 'RED', advice: ADVICE.CLEAR_NOW,
-    next: 'Opus', control: CONTROL_CONTINUE,
+    next: 'Opus/high', control: CONTROL_CONTINUE,
   });
   assert.equal(line.split(SEP).length, 5, 'five fields joined by exactly four separators');
   assert.ok(!line.includes('\u2022'), 'not a bullet');
@@ -132,7 +137,7 @@ test('AC1: no field is EVER omitted — absence is a value (-- / UNSET), never a
   // The load-bearing property: a parser must never have to guess which field it is
   // looking at. Every one of the 5 segments is non-empty in every combination.
   for (const state of FOOTER_STATES) {
-    for (const next of [...NEXT_MODELS, NEXT_UNSET]) {
+    for (const next of NEXT_VALUES) {
       for (const percent of [null, 0, 7, 100]) {
         const l = renderFooter({
           percent, approximate: false, state, advice: adviceForState(state), next,
@@ -230,19 +235,37 @@ test('AC1: renderFooter is STRICT — it throws rather than emit an out-of-gramm
 // ---------------------------------------------------------------------------
 
 test('D-M10: parseFooter(renderFooter(x)).fields === x for EVERY field combination', () => {
-  const percents = [null, 0, 1, 9, 10, 42, 99, 100];
+  // WIDENED by WO-OR-05, not weakened: the field set grew from six keys to eight (the
+  // token numerator and denominator), and `next` grew from 4 values to 16. Every
+  // combination is still enumerated exhaustively and the executed count is still
+  // asserted against the product of the dimensions, so a loop whose bounds silently
+  // collapsed would still be caught.
+  //
+  // The CTX field has four SHAPES and they are not independent of each other — a
+  // denominator with no numerator is not renderable — so the shapes are enumerated as
+  // triples rather than as three free dimensions.
+  const ctxShapes = [
+    { percent: null, usedTokens: null, windowTokens: null },   // ctx --
+    { percent: 0, usedTokens: null, windowTokens: null },      // ctx 0%
+    { percent: 42, usedTokens: null, windowTokens: null },     // ctx 42%
+    { percent: 100, usedTokens: null, windowTokens: null },
+    { percent: null, usedTokens: 0, windowTokens: null },      // ctx 0k
+    { percent: null, usedTokens: 900, windowTokens: null },    // ctx 0.9k
+    { percent: null, usedTokens: 72600, windowTokens: null },  // ctx 72.6k
+    { percent: 21, usedTokens: 210800, windowTokens: 1000000 }, // ctx 21% (210.8k/1000k)
+    { percent: 36, usedTokens: 72600, windowTokens: 200000 },
+  ];
   const approximates = [false, true];
-  const nexts = [...NEXT_MODELS, NEXT_UNSET];
   const controls = [CONTROL_CONTINUE, ...HANDBACK_CODES.map((c) => `HANDBACK:${c}`)];
 
   let combos = 0;
-  for (const percent of percents) {
+  for (const ctx of ctxShapes) {
     for (const approximate of approximates) {
       for (const state of FOOTER_STATES) {
         for (const advice of ADVICE_VALUES) {
-          for (const next of nexts) {
+          for (const next of NEXT_VALUES) {
             for (const control of controls) {
-              const fields = { percent, approximate, state, advice, next, control };
+              const fields = { ...ctx, approximate, state, advice, next, control };
               const parsed = parseFooter(renderFooter(fields));
               assert.equal(parsed.ok, true, `failed to parse ${JSON.stringify(fields)}`);
               assert.deepEqual(parsed.fields, fields);
@@ -255,10 +278,80 @@ test('D-M10: parseFooter(renderFooter(x)).fields === x for EVERY field combinati
   }
   // INV-5: assert a non-zero count of things actually examined. A loop whose bounds
   // silently became empty would otherwise report a clean pass over nothing.
-  assert.equal(combos, percents.length * 2 * FOOTER_STATES.length * ADVICE_VALUES.length * nexts.length * controls.length);
+  assert.equal(
+    combos,
+    ctxShapes.length * approximates.length * FOOTER_STATES.length * ADVICE_VALUES.length *
+      NEXT_VALUES.length * controls.length
+  );
   assert.ok(combos > 0);
 });
 
+test('WO-OR-05: the four CTX shapes render the exact bytes ruled for them', () => {
+  // The bytes Warwick reads. Pinned as literals held OUTSIDE the module that produces
+  // them, so a change to the renderer cannot quietly redefine what "correct" means.
+  const base = { approximate: false, state: 'GREEN', advice: ADVICE.KEEP_GOING, next: 'Opus/high', control: CONTROL_CONTINUE };
+  const cases = [
+    [{ percent: null, usedTokens: null, windowTokens: null }, '⟦GOV⟧ ctx -- · GREEN · KEEP GOING · next: Opus/high · CONTINUE'],
+    [{ percent: 38, usedTokens: null, windowTokens: null }, '⟦GOV⟧ ctx 38% · GREEN · KEEP GOING · next: Opus/high · CONTINUE'],
+    [{ percent: null, usedTokens: 72600, windowTokens: null }, '⟦GOV⟧ ctx 72.6k · GREEN · KEEP GOING · next: Opus/high · CONTINUE'],
+    [{ percent: 38, usedTokens: 72600, windowTokens: 190000 }, '⟦GOV⟧ ctx 38% (72.6k/190k) · GREEN · KEEP GOING · next: Opus/high · CONTINUE'],
+  ];
+  for (const [ctx, expected] of cases) {
+    assert.equal(renderFooter({ ...base, ...ctx }), expected);
+  }
+  assert.equal(cases.length, 4);
+});
+
+test('WO-OR-05: the token codec is EXACT over its whole grain, both directions', () => {
+  // D-M10 identity depends on this being exact, not approximate. Rounding inside the
+  // renderer would break the round-trip silently, so the renderer REFUSES an
+  // off-grain value and the producer is the one that rounds.
+  const pairs = [[0, '0k'], [100, '0.1k'], [900, '0.9k'], [1000, '1k'], [72600, '72.6k'], [190000, '190k'], [1000000, '1000k']];
+  for (const [n, text] of pairs) {
+    assert.equal(formatTokens(n), text, `format ${n}`);
+    assert.equal(parseTokens(text), n, `parse ${text}`);
+  }
+  assert.equal(pairs.length, 7);
+
+  // MUTATION: an off-grain count is REFUSED by the renderer rather than rounded.
+  assert.equal(isRenderableTokens(72_601), false);
+  assert.throws(() => formatTokens(72_601), TypeError);
+  assert.throws(() => renderFooter({ percent: null, usedTokens: 72_601, windowTokens: null, state: 'GREEN', advice: ADVICE.KEEP_GOING, next: NEXT_UNSET, control: CONTROL_CONTINUE }), TypeError);
+  // and the producer-side rounding puts it back on the grain.
+  assert.equal(toRenderableTokens(72_601), 72_600);
+  assert.equal(toRenderableTokens(72_651), 72_700);
+  assert.equal(toRenderableTokens(-1), null);
+  assert.equal(toRenderableTokens(Number.NaN), null);
+  assert.equal(TOKENS_GRAIN, 100);
+});
+
+test('WO-OR-05: a denominator with nothing to divide is REFUSED, never silently dropped', () => {
+  const base = { approximate: false, state: 'GREEN', advice: ADVICE.KEEP_GOING, next: NEXT_UNSET, control: CONTROL_CONTINUE };
+  assert.throws(() => renderFooter({ ...base, percent: null, usedTokens: null, windowTokens: 190000 }), TypeError);
+  assert.throws(() => renderFooter({ ...base, percent: 38, usedTokens: null, windowTokens: 190000 }), TypeError);
+  assert.throws(() => renderFooter({ ...base, percent: null, usedTokens: 72600, windowTokens: 190000 }), TypeError);
+  assert.throws(() => renderFooter({ ...base, percent: 38, usedTokens: 72600, windowTokens: 0 }), TypeError);
+});
+
+test('WO-OR-05: `next:` carries MODEL AND EFFORT, and both vocabularies are closed', () => {
+  assert.deepEqual(NEXT_MODELS, ['Opus', 'Sonnet', 'Haiku']);
+  assert.deepEqual(NEXT_EFFORTS, ['low', 'medium', 'high', 'xhigh', 'max']);
+  // DERIVED, not hand-listed — 3 x 5 + UNSET.
+  assert.equal(NEXT_VALUES.length, NEXT_MODELS.length * NEXT_EFFORTS.length + 1);
+  assert.ok(NEXT_VALUES.includes(NEXT_UNSET));
+
+  // MUTATION: the BARE model form is no longer grammatical, in EITHER direction. This
+  // is the assertion that proves the effort half is required rather than decorative.
+  const bare = `${GOV_MARKER} ctx 38%${SEP}GREEN${SEP}KEEP GOING${SEP}next: Opus${SEP}CONTINUE`;
+  assert.equal(parseFooter(bare).ok, false, 'the parser must reject a model with no effort');
+  assert.throws(
+    () => renderFooter({ percent: 38, state: 'GREEN', advice: ADVICE.KEEP_GOING, next: 'Opus', control: CONTROL_CONTINUE }),
+    TypeError,
+    'and the renderer must refuse to emit one'
+  );
+  // An effort outside the closed five is refused too.
+  assert.throws(() => renderFooter({ percent: 38, state: 'GREEN', advice: ADVICE.KEEP_GOING, next: 'Opus/turbo', control: CONTROL_CONTINUE }), TypeError);
+});
 // ---------------------------------------------------------------------------
 // D-M11 — the parser rejects near-misses
 // ---------------------------------------------------------------------------
@@ -453,438 +546,28 @@ test('MUTATION (INV-5): the ladder\'s BLIND guarantee can be made to fail', () =
 // ===========================================================================
 // AC3 / D-4 — the UNSET predicate, driven by ABSENCE
 // ===========================================================================
-
-// Base fixture: the REAL banked document, so the predicate is exercised against a
-// document shape that genuinely validates rather than one invented to suit it.
-const realState = JSON.parse(readFileSync(REAL_STATE_PATH, 'utf8'));
-
-function writeStateFixture(root, buildName, mutate) {
-  const doc = JSON.parse(JSON.stringify(realState));
-  mutate(doc);
-  const dir = join(root, buildName);
-  mkdirSync(dir, { recursive: true });
-  const path = join(dir, 'programme-state.json');
-  writeFileSync(path, JSON.stringify(doc, null, 2));
-  return path;
-}
-
-// All six U-conditions satisfied.
-function satisfyAll(doc, { worktree, branch }) {
-  doc.resumption.worktree = worktree;
-  doc.resumption.branch = branch;
-  doc.resumption.ticket = 'T-12';
-  doc.resumption.next_action_kind = 'action';
-  doc.model_recommendation.model = 'Sonnet';
-  doc.model_recommendation.for_ticket = 'T-12';
-  doc.model_recommendation.computed_at_head = doc.banked.head_sha;
-  const t = doc.tickets.find((x) => x.id === 'T-12');
-  t.state = 'frontier';
-}
-
-test('D-M6: with all six U-conditions satisfied, the model name renders', () => {
-  const root = tmp();
-  try {
-    writeStateFixture(root, 'BUILD-018-x', (d) => satisfyAll(d, { worktree: 'C:/repo', branch: 'feat/x' }));
-    const r = nextModelFor({ worktreePath: 'C:/repo', worktreeBranch: 'feat/x', deliverablesDir: root });
-    assert.equal(r.unset, false, `expected a model, got UNSET (${r.unsetReason})`);
-    assert.equal(r.next, 'Sonnet');
-
-    // ...and it really reaches the rendered line.
-    const line = renderFooter({
-      percent: 18, approximate: false, state: 'GREEN', advice: ADVICE.KEEP_GOING,
-      next: r.next, control: CONTROL_CONTINUE,
-    });
-    assert.ok(line.includes('· next: Sonnet ·'));
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-  }
-});
-
-test('AC3: EACH U-condition, violated ALONE, forces UNSET — and by ABSENCE, not text matching', () => {
-  const violations = [
-    ['U-b next_action_kind absent', (d) => { delete d.resumption.next_action_kind; }, UNSET_REASON.NEXT_ACTION_KIND],
-    ['U-b next_action_kind = hold', (d) => { d.resumption.next_action_kind = 'hold'; }, UNSET_REASON.NEXT_ACTION_KIND],
-    ['U-b next_action_kind = unknown', (d) => { d.resumption.next_action_kind = 'unknown'; }, UNSET_REASON.NEXT_ACTION_KIND],
-    ['U-c model = unknown', (d) => { d.model_recommendation.model = 'unknown'; }, UNSET_REASON.MODEL_UNKNOWN],
-    ['U-c model = any', (d) => { d.model_recommendation.model = 'any'; }, UNSET_REASON.MODEL_UNKNOWN],
-    ['U-d for_ticket absent', (d) => { delete d.model_recommendation.for_ticket; }, UNSET_REASON.FOR_TICKET_MISMATCH],
-    ['U-d for_ticket null', (d) => { d.model_recommendation.for_ticket = null; }, UNSET_REASON.FOR_TICKET_MISMATCH],
-    ['U-d for_ticket names a different ticket', (d) => { d.model_recommendation.for_ticket = 'T-11'; }, UNSET_REASON.FOR_TICKET_MISMATCH],
-    ['U-e computed_at_head absent', (d) => { delete d.model_recommendation.computed_at_head; }, UNSET_REASON.HEAD_MISMATCH],
-    ['U-e computed_at_head is a DIFFERENT sha', (d) => { d.model_recommendation.computed_at_head = 'b'.repeat(40); }, UNSET_REASON.HEAD_MISMATCH],
-    // `resolved` also needs a resolved DATE, or the document fails consistency validation
-    // and never reaches U-f at all — so the fixture sets both. Without the date this row
-    // passed for the wrong reason (rejected as invalid, not as a resolved ticket), which
-    // is exactly the kind of false green INV-5 is aimed at.
-    ['U-f ticket resolved', (d) => {
-      const t = d.tickets.find((x) => x.id === 'T-12');
-      t.state = 'resolved';
-      t.resolved = '2026-08-01';
-    }, UNSET_REASON.TICKET_UNRESOLVED_MISSING],
-    ['U-f ticket absent from tickets[]', (d) => { d.tickets = d.tickets.filter((x) => x.id !== 'T-12'); }, UNSET_REASON.TICKET_UNRESOLVED_MISSING],
-  ];
-
-  let examined = 0;
-  for (const [label, mutate, expectedReason] of violations) {
-    const root = tmp();
-    try {
-      writeStateFixture(root, 'BUILD-018-x', (d) => {
-        satisfyAll(d, { worktree: 'C:/repo', branch: 'feat/x' });
-        mutate(d);
-      });
-      const r = nextModelFor({ worktreePath: 'C:/repo', worktreeBranch: 'feat/x', deliverablesDir: root });
-      assert.equal(r.unset, true, `${label} must force UNSET`);
-      assert.equal(r.next, NEXT_UNSET);
-      assert.equal(r.unsetReason, expectedReason, `${label}: wrong reason`);
-      examined += 1;
-    } finally {
-      rmSync(root, { recursive: true, force: true });
-    }
-  }
-  assert.equal(examined, 12, 'every violation must have been executed');
-});
-
-test('the grammar guard on the model name fires — proven with an injected reader, because the schema makes it unreachable from disk', () => {
-  // `programme-state.schema.json` pins `model_recommendation.model` to the enum
-  // ["Opus","Sonnet","Haiku","any","unknown"]. U-c removes "any" and "unknown", so every
-  // model that survives validation is already renderable and this guard cannot fire via
-  // any document on disk — a second independent layer, exactly like the null-model case.
-  //
-  // It is kept and tested anyway, because `nextModelFor` accepts an injected `readState`
-  // and its result feeds the STRICT renderer: without the guard, a caller supplying a
-  // state by some other route would produce a model name that `renderFooter` refuses,
-  // turning a recoverable UNSET into a throw. Exercised here where it can actually fire,
-  // rather than asserted where it cannot.
-  const fabricated = JSON.parse(JSON.stringify(realState));
-  fabricated.resumption.worktree = 'C:/repo';
-  fabricated.resumption.branch = 'feat/x';
-  fabricated.resumption.ticket = 'T-12';
-  fabricated.resumption.next_action_kind = 'action';
-  fabricated.model_recommendation.model = 'Gemini';
-  fabricated.model_recommendation.for_ticket = 'T-12';
-  fabricated.model_recommendation.computed_at_head = fabricated.banked.head_sha;
-  fabricated.tickets.find((x) => x.id === 'T-12').state = 'frontier';
-
-  const r = nextModelFor({
-    worktreePath: 'C:/repo',
-    worktreeBranch: 'feat/x',
-    deliverablesDir: 'C:/anywhere',
-    existsFn: () => true,
-    listDir: () => ['BUILD-fake'],
-    readState: () => ({ ok: true, data: fabricated }),
-  });
-  assert.equal(r.next, NEXT_UNSET);
-  assert.equal(r.unsetReason, UNSET_REASON.MODEL_NOT_IN_GRAMMAR);
-
-  // The guard is load-bearing: without it, this is what would have reached the renderer.
-  assert.throws(() => renderFooter({
-    percent: 1, approximate: false, state: 'GREEN', advice: ADVICE.KEEP_GOING,
-    next: 'Gemini', control: CONTROL_CONTINUE,
-  }), TypeError);
-});
-
-test('U-c: a NULL model is rejected one layer earlier — by the schema — so it never reaches the predicate', () => {
-  // Recorded rather than assumed. `model_recommendation.model` is `type: string` with no
-  // null branch, so a document carrying null does not VALIDATE and is therefore not a
-  // match at all (U-a), never reaching U-c. Two independent layers reject it, which is
-  // the wanted shape; the note exists so a future reader does not "fix" U-c to handle a
-  // case the schema already makes unreachable.
-  const root = tmp();
-  try {
-    writeStateFixture(root, 'BUILD-018-x', (d) => {
-      satisfyAll(d, { worktree: 'C:/repo', branch: 'feat/x' });
-      d.model_recommendation.model = null;
-    });
-    const r = nextModelFor({ worktreePath: 'C:/repo', worktreeBranch: 'feat/x', deliverablesDir: root });
-    assert.equal(r.unset, true);
-    assert.equal(r.unsetReason, UNSET_REASON.NO_MATCHING_PROGRAMME, 'rejected by validation, not by U-c');
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-  }
-});
-
-test('U-a: the ACTIVE build is selected — not simply the first Deliverables/* found (Nolan D-N3)', () => {
-  const root = tmp();
-  try {
-    // 'AAA-other' sorts first and would win under the old first-match behaviour.
-    writeStateFixture(root, 'AAA-other-build', (d) => {
-      satisfyAll(d, { worktree: 'C:/somewhere-else', branch: 'other/branch' });
-      d.model_recommendation.model = 'Opus';
-    });
-    writeStateFixture(root, 'ZZZ-active-build', (d) => {
-      satisfyAll(d, { worktree: 'C:/repo', branch: 'feat/x' });
-      d.model_recommendation.model = 'Haiku';
-    });
-
-    const r = nextModelFor({ worktreePath: 'C:/repo', worktreeBranch: 'feat/x', deliverablesDir: root });
-    assert.equal(r.next, 'Haiku', 'must pick the build matching THIS session, not the first on disk');
-    assert.ok(r.statePath.includes('ZZZ-active-build'));
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-  }
-});
-
-test('U-a: path matching is Windows-correct — case and slash direction must not fork the answer', () => {
-  const root = tmp();
-  try {
-    writeStateFixture(root, 'BUILD-018-x', (d) => satisfyAll(d, { worktree: 'C:/Repo/Sub', branch: 'feat/x' }));
-    assert.equal(nextModelFor({ worktreePath: 'c:\\repo\\sub', worktreeBranch: 'feat/x', deliverablesDir: root }).next, 'Sonnet');
-    assert.equal(nextModelFor({ worktreePath: 'C:/Repo/Sub/', worktreeBranch: 'feat/x', deliverablesDir: root }).next, 'Sonnet');
-    // A genuinely different directory must NOT match.
-    assert.equal(nextModelFor({ worktreePath: 'C:/Repo/Sub-other', worktreeBranch: 'feat/x', deliverablesDir: root }).unset, true);
-    // Right worktree, wrong branch.
-    assert.equal(nextModelFor({ worktreePath: 'C:/Repo/Sub', worktreeBranch: 'feat/other', deliverablesDir: root }).unsetReason, UNSET_REASON.NO_MATCHING_PROGRAMME);
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-  }
-});
-
-test('D-M8: TWO state files matching the live session is UNSET (ambiguous), never the first', () => {
-  const root = tmp();
-  try {
-    writeStateFixture(root, 'BUILD-A', (d) => { satisfyAll(d, { worktree: 'C:/repo', branch: 'feat/x' }); d.model_recommendation.model = 'Opus'; });
-    writeStateFixture(root, 'BUILD-B', (d) => { satisfyAll(d, { worktree: 'C:/repo', branch: 'feat/x' }); d.model_recommendation.model = 'Haiku'; });
-
-    const r = nextModelFor({ worktreePath: 'C:/repo', worktreeBranch: 'feat/x', deliverablesDir: root });
-    assert.equal(r.next, NEXT_UNSET);
-    assert.equal(r.unsetReason, UNSET_REASON.AMBIGUOUS_PROGRAMME);
-    assert.notEqual(r.next, 'Opus', 'must not silently take the first');
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-  }
-});
-
-test('U-a: a state file that does NOT validate is not a match, and never throws', () => {
-  const root = tmp();
-  try {
-    const dir = join(root, 'BUILD-broken');
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, 'programme-state.json'), '{ not json at all');
-    const r = nextModelFor({ worktreePath: 'C:/repo', worktreeBranch: 'feat/x', deliverablesDir: root });
-    assert.equal(r.unsetReason, UNSET_REASON.NO_MATCHING_PROGRAMME);
-
-    // A reader that throws outright must also be survivable.
-    const r2 = nextModelFor({
-      worktreePath: 'C:/repo', worktreeBranch: 'feat/x', deliverablesDir: root,
-      readState: () => { throw new Error('boom'); },
-    });
-    assert.equal(r2.unset, true);
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-  }
-});
-
-test('U-a: an unknown live location, or no Deliverables directory at all, is UNSET not a throw', () => {
-  assert.equal(nextModelFor().unsetReason, UNSET_REASON.LOCATION_UNKNOWN);
-  assert.equal(nextModelFor({ worktreePath: 'C:/repo' }).unsetReason, UNSET_REASON.LOCATION_UNKNOWN);
-  assert.equal(nextModelFor({ worktreePath: 'C:/repo', worktreeBranch: 'b' }).unsetReason, UNSET_REASON.NO_MATCHING_PROGRAMME);
-  assert.equal(
-    nextModelFor({ worktreePath: 'C:/repo', worktreeBranch: 'b', deliverablesDir: join(tmpdir(), 'definitely-not-here-xyz') }).unsetReason,
-    UNSET_REASON.NO_MATCHING_PROGRAMME
-  );
-});
-
-// ---------------------------------------------------------------------------
-// D-M5 — the live-ledger case, asserted as AGREEMENT rather than as an outcome
-// ---------------------------------------------------------------------------
-// Re-derives U-b..U-f from the document BY HAND, without calling the code under test,
-// so the assertion has two independent routes to the same answer and fails only when
-// they disagree. Deliberately not a copy of `nextModelFor`: it reads the raw fields and
-// applies D-4's conditions literally, in D-4's short-circuit order, so that a predicate
-// which silently stopped checking one of them would diverge here.
-function evaluateUConditions(doc) {
-  const resumption = doc.resumption ?? {};
-  const rec = doc.model_recommendation ?? {};
-  const banked = doc.banked ?? {};
-  const tickets = Array.isArray(doc.tickets) ? doc.tickets : [];
-  const ticket = tickets.find((t) => t && t.id === resumption.ticket);
-
-  const ordered = [
-    ['U-b', resumption.next_action_kind === 'action', UNSET_REASON.NEXT_ACTION_KIND],
-    ['U-c', typeof rec.model === 'string' && rec.model !== 'unknown' && rec.model !== 'any', UNSET_REASON.MODEL_UNKNOWN],
-    ['grammar', NEXT_MODELS.includes(rec.model), UNSET_REASON.MODEL_NOT_IN_GRAMMAR],
-    ['U-d', typeof rec.for_ticket === 'string' && rec.for_ticket.length > 0
-      && typeof resumption.ticket === 'string' && resumption.ticket.length > 0
-      && rec.for_ticket === resumption.ticket, UNSET_REASON.FOR_TICKET_MISMATCH],
-    ['U-e', typeof rec.computed_at_head === 'string' && rec.computed_at_head.length > 0
-      && typeof banked.head_sha === 'string' && banked.head_sha.length > 0
-      && rec.computed_at_head === banked.head_sha, UNSET_REASON.HEAD_MISMATCH],
-    ['U-f', Boolean(ticket) && ticket.state !== 'resolved', UNSET_REASON.TICKET_UNRESOLVED_MISSING],
-  ];
-
-  const firstFailure = ordered.find(([, holds]) => !holds) ?? null;
-  return { ordered, allHold: firstFailure === null, firstFailure };
-}
-
-// Runs the predicate over one document placed ALONE in a temp Deliverables tree, so
-// U-a's "exactly one match" is satisfied by construction, then asserts agreement.
-function assertPredicateAgreement(doc, label) {
-  const root = tmp();
-  try {
-    const dir = join(root, 'BUILD-under-test');
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, 'programme-state.json'), JSON.stringify(doc, null, 2));
-
-    const r = nextModelFor({
-      worktreePath: doc.resumption.worktree,
-      worktreeBranch: doc.resumption.branch,
-      deliverablesDir: root,
-    });
-    const { allHold, firstFailure, ordered } = evaluateUConditions(doc);
-
-    // INV-5: assert a non-zero count of conditions actually evaluated.
-    assert.equal(ordered.length, 6, `${label}: all six U-conditions must be evaluated`);
-
-    if (allHold) {
-      assert.equal(r.unset, false, `${label}: all six hold, so a model must render (got ${r.unsetReason})`);
-      assert.equal(r.next, doc.model_recommendation.model, `${label}: the rendered model must be the banked one`);
-      assert.ok(NEXT_MODELS.includes(r.next), `${label}: and it must be renderable in the grammar`);
-    } else {
-      const [name, , expectedReason] = firstFailure;
-      assert.equal(r.unset, true, `${label}: ${name} fails, so the result must be UNSET`);
-      assert.equal(r.next, NEXT_UNSET, `${label}: UNSET must render as the literal UNSET`);
-      assert.equal(r.unsetReason, expectedReason, `${label}: the reason must name the condition that actually failed (${name})`);
-    }
-    return { r, allHold, firstFailure };
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-  }
-}
-
-test('D-M5: over the REAL banked state, nextModelFor AGREES with the six U-conditions', () => {
-  // COUPLING NOTE — rewritten 2026-08-01, and the reason matters more than the change.
-  //
-  // This test reads the LIVE repository file, per Silas's D-M5 ("assert against the real
-  // file, not a fixture"): the value is in exercising the predicate against what is
-  // genuinely banked, rather than against a hand-built document that can quietly drift
-  // into agreeing with the code it is meant to check.
-  //
-  // It previously asserted a fixed OUTCOME — "today's banked state renders UNSET". True
-  // when written, false within the hour, because the banked state was then deliberately
-  // grounded (`next_action_kind`, `for_ticket` and `computed_at_head` were filled in) so
-  // the footer could render a real recommendation. The test fired correctly: it caught a
-  // real change, not a regression. But a fixed outcome re-arms the same trap every time
-  // the ledger legitimately moves, and re-pinning it to "renders Opus" would only point
-  // the trap the other way.
-  //
-  // So it now asserts AGREEMENT: the six U-conditions are re-derived independently and
-  // the predicate must match them — a model name iff all six hold, UNSET otherwise, with
-  // the reason naming the condition that actually failed. That keeps the live-ledger
-  // coupling this test exists for, and drops the coupling to one moment in the ledger's
-  // life. DO NOT re-pin this to a literal model name or a literal UNSET.
-  //
-  // The "by ABSENCE, not by any text heuristic" proof deliberately does NOT live here.
-  // It is in the fixture-based U-condition test above, which strips each of the three
-  // properties in turn and asserts the matching `unsetReason`. Kept there on purpose: in
-  // this file an ordinary ledger edit could silence it, which is exactly what happened.
-  assertPredicateAgreement(realState, 'real banked state');
-});
-
-test('D-M5: the agreement holds under BOTH ledger states — ungrounded and grounded', () => {
-  // The durability proof, and what makes this follow-up evidence rather than a hope.
-  //
-  // This worktree's branch point predates the commit that grounded the banked state, so
-  // the live file HERE still has the three properties absent. The test above therefore
-  // exercises only the UNSET branch locally, and the model-renders branch would go
-  // unexercised until the merged head. Constructing both states explicitly proves the
-  // harness is state-independent rather than merely passing today — in either direction.
-  //
-  // ---------------------------------------------------------------------------
-  // DO NOT DELETE THE GROUNDED CASE AS REDUNDANT. It is the only observer of U-e.
-  // ---------------------------------------------------------------------------
-  // Established by mutation on 2026-08-01, not by argument. U-e was changed to compare
-  // `computed_at_head` against LIVE GIT HEAD instead of `banked.head_sha` — the defect
-  // Silas explicitly warned about, which would make every ordinary commit destroy the
-  // recommendation. Result:
-  //
-  //   * the live-file D-M5 test above  -> STILL PASSED
-  //   * the grounded case below        -> went red
-  //
-  // The reason is that the predicate short-circuits: whenever the banked state lacks
-  // `next_action_kind`, it returns at U-b and NEVER EVALUATES U-e at all. So for any
-  // ungrounded ledger — which is what this worktree has, and what the repository had for
-  // most of this build — a U-e defect is completely unobservable from the real file. The
-  // grounded case is the only place in this suite where all six conditions hold and U-e
-  // is reachable.
-  //
-  // This case was originally written for a different reason (proving the harness works
-  // at a merged head this worktree cannot reach). It turned out to be load-bearing for
-  // U-e coverage, which nobody designed it for. Deleting it as "just a duplicate fixture"
-  // would silently reopen a gap that no other test in this file can see.
-  //
-  // Worth knowing too: the live-HEAD mutation also required importing `child_process`
-  // into footer.mjs — and footer.mjs is imported by stop-controller.mjs, where A-7
-  // forbids git on the Stop path. So that defect is not merely wrong about which SHA to
-  // compare; it drags a subprocess spawn onto the hot path of the control that decides
-  // whether Larry may end a turn.
-  const ungrounded = JSON.parse(JSON.stringify(realState));
-  delete ungrounded.resumption.next_action_kind;
-  delete ungrounded.model_recommendation.for_ticket;
-  delete ungrounded.model_recommendation.computed_at_head;
-
-  const a = assertPredicateAgreement(ungrounded, 'ungrounded ledger');
-  assert.equal(a.allHold, false, 'the ungrounded state must not render a model');
-  assert.equal(a.r.next, NEXT_UNSET);
-  assert.equal(a.r.unsetReason, UNSET_REASON.NEXT_ACTION_KIND, 'and it must fail at U-b, by absence');
-
-  // Grounded the way a real banking grounds it: the recommendation tied to the ticket it
-  // was computed for, and to the pointer it was computed at.
-  const grounded = JSON.parse(JSON.stringify(realState));
-  const openTicket = grounded.tickets.find((t) => t.state !== 'resolved');
-  assert.ok(openTicket, 'the fixture needs at least one unresolved ticket');
-  grounded.resumption.ticket = openTicket.id;
-  grounded.resumption.next_action_kind = 'action';
-  grounded.model_recommendation.model = 'Opus';
-  grounded.model_recommendation.for_ticket = openTicket.id;
-  grounded.model_recommendation.computed_at_head = grounded.banked.head_sha;
-
-  const b = assertPredicateAgreement(grounded, 'grounded ledger');
-  assert.equal(b.allHold, true, 'the grounded state must satisfy all six conditions');
-  assert.equal(b.r.next, 'Opus', 'and must render the banked model name');
-
-  // Both branches of the agreement assertion were exercised at least once, whichever way
-  // the live ledger happens to sit when this runs.
-  assert.notEqual(a.allHold, b.allHold, 'both branches exercised');
-});
-
-test('D-M7: v1 documents with and without the three new properties BOTH validate; the one without renders UNSET', () => {
-  const root = tmp();
-  try {
-    const withoutPath = writeStateFixture(root, 'BUILD-without', (d) => {
-      d.resumption.worktree = 'C:/repo';
-      d.resumption.branch = 'feat/x';
-      delete d.resumption.next_action_kind;
-      delete d.model_recommendation.for_ticket;
-      delete d.model_recommendation.computed_at_head;
-    });
-    const withPath = writeStateFixture(root, 'BUILD-with', (d) => satisfyAll(d, { worktree: 'C:/other', branch: 'feat/y' }));
-
-    // Both must VALIDATE — the schema addition is non-breaking, so schema_version stays 1.
-    const withoutDoc = JSON.parse(readFileSync(withoutPath, 'utf8'));
-    const withDoc = JSON.parse(readFileSync(withPath, 'utf8'));
-    assert.equal(withoutDoc.schema_version, 1);
-    assert.equal(withDoc.schema_version, 1);
-    assert.equal(nextModelFor({ worktreePath: 'C:/other', worktreeBranch: 'feat/y', deliverablesDir: root }).next, 'Sonnet',
-      'the document WITH the properties must validate and be usable');
-
-    // The one without renders UNSET.
-    const r = nextModelFor({ worktreePath: 'C:/repo', worktreeBranch: 'feat/x', deliverablesDir: root });
-    assert.equal(r.next, NEXT_UNSET);
-    assert.equal(r.unsetReason, UNSET_REASON.NEXT_ACTION_KIND);
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-  }
-});
-
+// THE D-4 / `nextModelFor` SECTION WAS DELETED HERE BY WO-OR-05
 // ===========================================================================
-// D-M9 — five distinct lines, plus the assertion that can actually fail
-// ===========================================================================
-
+// Roughly a dozen tests lived here. Every one of them built a scratch worktree
+// carrying `Deliverables/<id>/programme-state.json`, then asserted that one of six
+// U-conditions did or did not let a model name reach the footer. Both the predicate
+// and the programme state are deleted, so there is no weakened version of these tests
+// that still means something — the subject of the assertions is gone.
+//
+// THE COUNT DROPS AND THAT IS NOT A REGRESSION HIDDEN IN A DIFF: this file falls by
+// about a dozen tests and the fall is reported as measured. Deleting tests for deleted
+// behaviour is legitimate; deleting them quietly is not.
+//
+// What the section actually protected — that a model must never be presented as live
+// advice unless it is grounded in a real, current next action — is now structural. A
+// recommendation cannot come from a stale file because no file supplies it; it comes
+// from a caller who knows the next action, and `--next` is validated by membership at
+// the CLI boundary. That boundary IS tested, under WP-7 AC3 below.
 test('D-M9: the five states render five pairwise-distinct lines, with the CORRECT advice for each', () => {
   const lines = FOOTER_STATES.map((state) =>
     renderFooter({
       percent: 42, approximate: false, state, advice: adviceForState(state),
-      next: 'Sonnet', control: CONTROL_CONTINUE,
+      next: 'Sonnet/medium', control: CONTROL_CONTINUE,
     })
   );
 
@@ -1008,9 +691,10 @@ test('computeFooterLine always returns a GRAMMATICAL line, even with everything 
   assert.equal(parseFooter(line).ok, true, 'a broken world must still produce a parseable footer');
   assert.equal(line, '⟦GOV⟧ ctx -- · BLIND · KEEP GOING? · next: UNSET · CONTINUE');
 
-  // And the happy path composes end to end.
+  // And the happy path composes end to end. `next` is now an INPUT rather than something
+  // read out of a scratch programme-state fixture, which is why this no longer builds a
+  // Deliverables tree — there is nothing left on disk for it to read.
   const dir = tmp();
-  const deliverables = tmp();
   try {
     writeFileSync(join(dir, 's1.json'), JSON.stringify({
       schema_version: 1,
@@ -1018,17 +702,41 @@ test('computeFooterLine always returns a GRAMMATICAL line, even with everything 
       session_id: 's1',
       context_window: { used_percentage: 18 },
     }));
-    writeStateFixture(deliverables, 'BUILD-live', (d) => satisfyAll(d, { worktree: 'C:/repo', branch: 'feat/x' }));
 
-    const good = computeFooterLine({
-      sessionId: 's1', worktreePath: 'C:/repo', worktreeBranch: 'feat/x',
-      deliverablesDir: deliverables, envOverride: dir,
-    });
-    assert.equal(good, '⟦GOV⟧ ctx 18% · GREEN · KEEP GOING · next: Sonnet · CONTINUE');
+    const good = computeFooterLine({ sessionId: 's1', envOverride: dir, next: 'Sonnet/medium' });
+    assert.equal(good, '⟦GOV⟧ ctx 18% · GREEN · KEEP GOING · next: Sonnet/medium · CONTINUE');
     assert.equal(parseFooter(good).ok, true);
+
+    // WO-OR-05: a caller passing an out-of-grammar recommendation gets UNSET rather than
+    // a throw or a silenced footer. The CLI is the layer that refuses a typo loudly (see
+    // WP-7 AC3); the programmatic path must always return a grammatical line.
+    const coerced = computeFooterLine({ sessionId: 's1', envOverride: dir, next: 'GPT-5' });
+    assert.equal(coerced, '⟦GOV⟧ ctx 18% · GREEN · TASK UNKNOWN · next: UNSET · CONTINUE');
+
+    // And the end-to-end TOKEN path — the shape Warwick actually gets on web/Android.
+    writeFileSync(join(dir, 's2.json'), JSON.stringify({
+      schema_version: 1,
+      sampled_at: new Date().toISOString(),
+      session_id: 's2',
+      source: 'transcript',
+      context_window: { used_percentage: null, used_tokens: 210_781, context_window_size: 1_000_000 },
+    }));
+    const tokens = computeFooterLine({ sessionId: 's2', envOverride: dir, next: 'Opus/high' });
+    assert.equal(tokens, '⟦GOV⟧ ctx 21% (210.8k/1000k) · GREEN · KEEP GOING · next: Opus/high · CONTINUE');
+
+    // Numerator only: a REAL number and an honest BLIND, never `--` and never a graded
+    // state over a denominator nobody supplied.
+    writeFileSync(join(dir, 's3.json'), JSON.stringify({
+      schema_version: 1,
+      sampled_at: new Date().toISOString(),
+      session_id: 's3',
+      source: 'transcript',
+      context_window: { used_percentage: null, used_tokens: 210_781, context_window_size: null },
+    }));
+    const bare = computeFooterLine({ sessionId: 's3', envOverride: dir, next: 'Opus/high' });
+    assert.equal(bare, '⟦GOV⟧ ctx 210.8k · BLIND · KEEP GOING? · next: Opus/high · CONTINUE');
   } finally {
     rmSync(dir, { recursive: true, force: true });
-    rmSync(deliverables, { recursive: true, force: true });
   }
 });
 
@@ -1106,14 +814,8 @@ test('WP-7 AC1: importing footer.mjs writes nothing, prints nothing, and does no
 
 test('WP-7 AC2: with no arguments the CLI resolves everything and emits exactly one line', () => {
   const store = storeWith('sess-1');
-  // A repo root with a real Deliverables/ inside it: the CLI derives `deliverablesDir` as
-  // <repoRoot>/Deliverables, so this exercises the derivation rather than bypassing it.
-  const root = mkdtempSync(join(tmpdir(), 'gov-cli-repo-'));
   try {
-    mkdirSync(join(root, 'Deliverables'), { recursive: true });
-    writeStateFixture(join(root, 'Deliverables'), 'BUILD-cli', (d) => satisfyAll(d, { worktree: root, branch: 'feat/cli' }));
-
-    const r = runCli([], { locationFn: stubLocation(root, 'feat/cli'), envOverride: store });
+    const r = runCli([], { envOverride: store });
 
     assert.equal(r.exitCode, CLI_EXIT.OK);
     assert.equal(r.stderr, '');
@@ -1123,18 +825,43 @@ test('WP-7 AC2: with no arguments the CLI resolves everything and emits exactly 
 
     const parsed = parseFooter(r.stdout);
     assert.equal(parsed.ok, true, `unparseable: ${JSON.stringify(r.stdout)}`);
-    // Everything resolved by the CLI: the newest sample (hence `~`), the state from the
-    // D-3 ladder, and the model from nextModelFor over the matching programme.
+    // Everything resolved by the CLI: the newest sample (hence `~`) and the state from the
+    // degradation ladder. `next:` is UNSET because none was supplied — WO-OR-05 deleted
+    // the programme-state lookup that used to answer it, and the CLI no longer shells out
+    // to git to find a worktree to match against.
     assert.equal(parsed.fields.percent, 18);
     assert.equal(parsed.fields.approximate, true, 'no --session means the newest sample, which is approximate');
     assert.equal(parsed.fields.state, 'GREEN');
-    assert.equal(parsed.fields.advice, ADVICE.KEEP_GOING);
-    assert.equal(parsed.fields.next, 'Sonnet', 'next: comes from nextModelFor over the matching programme');
+    assert.equal(parsed.fields.next, NEXT_UNSET);
     assert.equal(parsed.fields.control, CONTROL_CONTINUE);
-    assert.equal(r.stdout.trimEnd(), '⟦GOV⟧ ctx ~18% · GREEN · KEEP GOING · next: Sonnet · CONTINUE');
+    assert.equal(r.stdout.trimEnd(), '⟦GOV⟧ ctx ~18% · GREEN · TASK UNKNOWN · next: UNSET · CONTINUE');
+
+    // WO-OR-05: --next is what puts a recommendation on the line, and it carries EFFORT.
+    const withNext = runCli(['--next', 'Opus/xhigh'], { envOverride: store });
+    assert.equal(withNext.exitCode, CLI_EXIT.OK);
+    assert.equal(
+      withNext.stdout.trimEnd(),
+      '⟦GOV⟧ ctx ~18% · GREEN · KEEP GOING · next: Opus/xhigh · CONTINUE',
+      'and supplying one flips the advice off TASK UNKNOWN, because now there is a purpose to be fit for'
+    );
   } finally {
     rmSync(store, { recursive: true, force: true });
-    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('WP-7 AC3: a MISTYPED --next fails loudly and prints no footer', () => {
+  // The split that matters: the programmatic API coerces an unknown value to UNSET so a
+  // line is always produced, but a human typo at the CLI must NOT silently render UNSET —
+  // that would be indistinguishable from an honest "no recommendation available".
+  for (const bad of ['Opus', 'opus/high', 'Opus/turbo', 'GPT-5', 'Opus/']) {
+    const r = runCli(['--next', bad]);
+    assert.equal(r.exitCode, CLI_EXIT.USAGE, `--next ${bad} must be a usage failure`);
+    assert.equal(r.stdout, '', 'no footer on a usage failure');
+    assert.match(r.stderr, /--next must be/);
+  }
+  // Control: every legal value is accepted, so the check above is not simply refusing all.
+  for (const good of NEXT_VALUES) {
+    assert.equal(runCli(['--next', good], { envOverride: tmp() }).exitCode, CLI_EXIT.OK, good);
   }
 });
 
@@ -1188,8 +915,8 @@ test('WP-7 AC2: the REAL entrypoint, spawned as a process, prints one line and e
 // ---------------------------------------------------------------------------
 
 test('WP-7 AC3: CONTINUE is the default, and every one of the seven codes is accepted', () => {
-  assert.deepEqual(parseCliArgs([]), { ok: true, sessionId: null, control: CONTROL_CONTINUE });
-  assert.deepEqual(parseCliArgs(['--control', 'CONTINUE']), { ok: true, sessionId: null, control: 'CONTINUE' });
+  assert.deepEqual(parseCliArgs([]), { ok: true, sessionId: null, next: NEXT_UNSET, control: CONTROL_CONTINUE });
+  assert.deepEqual(parseCliArgs(['--control', 'CONTINUE']), { ok: true, sessionId: null, next: NEXT_UNSET, control: 'CONTINUE' });
 
   // Driven off the imported const, never a list typed here — the same discipline the
   // module itself follows, and the reason a vocabulary change cannot pass silently.

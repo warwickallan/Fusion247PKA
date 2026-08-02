@@ -1,6 +1,12 @@
 name: governor-tests
 
-# CI for BUILD-018, the Larry Session Governor (tools/governor/**).
+# CI for the retained session-governor spine (tools/governor/**).
+#
+# NARROWED 2026-08-02 by WO-OR-05, the operating-reset Phase 5 teardown. Eight modules and
+# their suites were deleted (stop-controller, install-hooks, rotate-session, collect-state,
+# worktree-recon, programme-state, plus the programme-state schema and fixtures). Ten
+# modules survive; eight of them have suites. This job runs seven of those eight — see the
+# exclusion note below for the one it does not, and why.
 #
 # WHY THIS EXISTS. Keel's WP-1 preflight reported that no workflow referenced
 # tools/governor at all: the suite was builder-run only, so nothing enforced it on
@@ -54,29 +60,42 @@ jobs:
       - name: State what this job does NOT cover
         shell: bash
         run: |
-          echo "NOT COVERED BY CI — two suites are excluded because they assert against the"
-          echo "REAL local estate (multi-worktree layout, banked programme state, live git):"
-          echo "  collect-state.test.mjs   — collectEstateState against the real repository"
-          echo "  reorient.test.mjs        — REAL ESTATE / REAL GIT orientation"
-          echo "(model-gate.test.mjs was a third exclusion until 2026-08-01, when the model gate"
-          echo " was RETIRED and its suite deleted. The exclusion went with it: a grep -v naming"
-          echo " a file that no longer exists is a filter nobody can tell is doing nothing.)"
-          echo "They pass on Warwick's machine and cannot pass on a single-branch runner."
-          echo "Their pure tests are excluded with them; that is a real coverage gap, recorded"
-          echo "as a finding rather than hidden by a skip. A skipped test is NOT a passing test."
+          echo "NOT COVERED BY CI — ONE suite is excluded:"
+          echo "  reorient.test.mjs        — asserts against real git in the working checkout"
+          echo ""
+          echo "TWO EXCLUSIONS WERE REMOVED RATHER THAN LEFT IN PLACE:"
+          echo "  collect-state.test.mjs   — the module and its suite were DELETED (WO-OR-05)."
+          echo "  model-gate.test.mjs      — deleted when the model gate was retired, 2026-08-01."
+          echo "A 'grep -v' naming a file that no longer exists is a filter nobody can tell is"
+          echo "doing nothing, so each exclusion is removed when its subject is."
+          echo ""
+          echo "TWO OF THE TEN SURVIVING MODULES HAVE NO SUITE AT ALL, and neither a green here"
+          echo "nor the count below says anything about them:"
+          echo "  continuity.mjs           — the Honcho read/write path and the Stop hook"
+          echo "  continuity-derive.mjs    — the SessionEnd derivation"
+          echo "That is a real coverage gap, recorded as a finding rather than hidden."
+          echo "A skipped test is NOT a passing test, and an untested module is not a tested one."
 
       - name: Run the portable governor suites and assert they actually executed
         shell: bash
         run: |
           set -o pipefail
-          # Explicit exclusion, not a silent skip: the two estate-coupled suites are
-          # named above and in the commit that added this job. Everything else must be
-          # green. The proper fix is for those suites to build a synthetic estate, which
-          # rotate-session.test.mjs already does — so there is precedent, not a blocker.
-          FILES=$(ls tools/governor/*.test.mjs \
-            | grep -v 'collect-state.test.mjs' \
-            | grep -v 'reorient.test.mjs')
+          # ONE explicit exclusion, not a silent skip, and it is named above. Everything
+          # else must be green.
+          FILES=$(ls tools/governor/*.test.mjs | grep -v 'reorient.test.mjs')
           echo "running:"; echo "$FILES"
+
+          # A DELETION MUST NOT BE ABLE TO LOOK LIKE A PASS. The executed-count assertion
+          # below catches a suite that ran nothing, but not a narrowing that quietly
+          # dropped whole FILES — seven green files and four green files both print a
+          # positive pass count. So the file count is asserted too, against a literal held
+          # here rather than derived from the glob that produced it.
+          expected=7
+          actual=$(echo "$FILES" | grep -c 'test.mjs')
+          if [ "$actual" -ne "$expected" ]; then
+            echo "::error::SUITE SET CHANGED — expected ${expected} test files, found ${actual}. If a suite was legitimately added or deleted, update this literal in the same commit."
+            exit 1
+          fi
           node --test $FILES 2>&1 | tee suite.log
           status=$?
 

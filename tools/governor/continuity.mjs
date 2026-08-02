@@ -27,6 +27,12 @@ import { readFileSync, writeFileSync, mkdirSync, renameSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { homedir } from 'node:os';
 import { pathToFileURL, fileURLToPath } from 'node:url';
+// WO-OR-05. This module's `stop` command is ALREADY registered as a Stop hook, and Stop
+// is the one event that fires on every client Warwick uses. Rather than register a second
+// hook — which would mean editing settings this Work Order does not own — the health
+// sample rides along on the hook that is already there. `sampler.mjs` and
+// `health-store.mjs` do the work; nothing new was created to carry it.
+import { sampleFromTranscript } from './sampler.mjs';
 
 const HONCHO_ENV = 'C:/.fusion247/honcho.env';
 const HONCHO_BASE = 'https://api.honcho.dev/v3';
@@ -347,7 +353,37 @@ async function cli() {
   if (cmd === 'write' || cmd === 'stop') {
     // 'stop' is a Stop hook and always gets JSON piped on stdin; 'write' is manual
     // and must never block waiting for stdin that will not come.
-    const sessionId = a.session || (cmd === 'stop' ? readStdinSessionId() : null);
+    //
+    // Read stdin ONCE. fd 0 is not re-readable, and this payload now has two consumers:
+    // the session id below, and the health sample immediately after.
+    const rawStdin = cmd === 'stop' ? readStdinRaw() : '';
+    const sessionId = a.session || (cmd === 'stop' ? sessionIdFrom(rawStdin) : null);
+
+    // WO-OR-05 — the context-health sample, written from the transcript.
+    //
+    // THIS RUNS BEFORE THE DEDUPE BELOW, DELIBERATELY. The continuity dedupe returns
+    // early whenever the semantic state is unchanged for this session, which is the
+    // COMMON case — most turns change nothing. But the health sample is per-turn
+    // telemetry, and the footer treats a sample older than twenty minutes as stale, so a
+    // sample written only when the continuity packet changes would go stale mid-session
+    // and put the footer straight back to BLIND. Sampling first makes the sample
+    // independent of whether Honcho had anything to say.
+    //
+    // Fully guarded and non-fatal: a Stop hook that throws ends Warwick's turn with an
+    // error, and telemetry is never worth that.
+    if (cmd === 'stop') {
+      try {
+        let storeOpts = {};
+        try {
+          const cwd = JSON.parse(rawStdin)?.cwd;
+          // Key the store on the SESSION's cwd, not this hook process's, so the sample
+          // lands under the same project key the footer will look under.
+          if (typeof cwd === 'string' && cwd.length) storeOpts = { cwd };
+        } catch { /* fall back to the default cwd */ }
+        sampleFromTranscript(rawStdin, { sampledAt: new Date().toISOString(), storeOpts });
+      } catch { /* never break the boundary hook */ }
+    }
+
     const state = loadState();
     if (!state.focus && cmd === 'write' && a.focus) state.focus = a.focus; // convenience
 
@@ -410,10 +446,17 @@ function summ(r) {
   return { ok: r.ok, id: r.id, ref: r.ref || null, error: r.error || null };
 }
 
-// Stop hooks receive JSON on stdin carrying session_id. Best-effort, sync, non-blocking.
-function readStdinSessionId() {
+// Stop hooks receive JSON on stdin carrying session_id, cwd and transcript_path.
+// Best-effort, sync, non-blocking. SPLIT from the session-id lookup (WO-OR-05) because
+// fd 0 can only be drained once and the payload now has more than one consumer.
+function readStdinRaw() {
   try {
-    const raw = readFileSync(0, 'utf8');
+    return readFileSync(0, 'utf8');
+  } catch { return ''; }
+}
+
+function sessionIdFrom(raw) {
+  try {
     const j = JSON.parse(raw);
     return j.session_id || j.sessionId || null;
   } catch { return null; }

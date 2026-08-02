@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -11,6 +11,15 @@ import {
   extractHealthSample,
   sampleFromStdin,
   SAMPLE_SCHEMA_VERSION,
+  SOURCE_STATUSLINE,
+  SOURCE_TRANSCRIPT,
+  TRANSCRIPT_TAIL_BYTES,
+  readTranscriptTail,
+  sumUsedTokens,
+  newestAssistantUsage,
+  resolveWindowTokens,
+  extractTranscriptSample,
+  sampleFromTranscript,
 } from './sampler.mjs';
 import { readHealthSample, healthFilePath } from './health-store.mjs';
 
@@ -332,6 +341,256 @@ test('performance: extract + write completes well under 100ms', () => {
     const elapsedMs = Number(process.hrtime.bigint() - start) / 1e6;
     assert.equal(result.written, true);
     assert.ok(elapsedMs < 100, `expected < 100ms, took ${elapsedMs}ms`);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ===========================================================================
+// THE TRANSCRIPT PATH (WO-OR-05) — the half that reaches Warwick
+// ===========================================================================
+// Everything above this line tests the statusLine path, which does not run on claude.ai
+// web or Android. These tests cover the Stop-hook path that does.
+
+/** One JSONL transcript, written to a scratch file. */
+function writeTranscript(dir, lines) {
+  const p = join(dir, 'transcript.jsonl');
+  writeFileSync(p, lines.map((l) => (typeof l === 'string' ? l : JSON.stringify(l))).join('\n') + '\n');
+  return p;
+}
+
+function assistantLine({ usage, model = 'claude-opus-5', effort = 'high', sessionId = 'sess-t' }) {
+  return { type: 'assistant', sessionId, effort, message: { model, usage } };
+}
+
+const REAL_USAGE = {
+  input_tokens: 2,
+  cache_creation_input_tokens: 40041,
+  cache_read_input_tokens: 32559,
+  output_tokens: 475,
+};
+const REAL_USAGE_TOTAL = 2 + 40041 + 32559 + 475; // 73077
+
+test('TRANSCRIPT: used tokens sum input + cache-creation + cache-read + output', () => {
+  // Cache reads DOMINATE in a long session. Omitting them under-reports by an order of
+  // magnitude, which would render a comfortable-looking percentage over a full window.
+  assert.equal(sumUsedTokens(REAL_USAGE), REAL_USAGE_TOTAL);
+
+  // MUTATION: drop the cache-read term and the answer changes materially — proving the
+  // term is load-bearing rather than incidental.
+  const withoutCacheRead = { ...REAL_USAGE, cache_read_input_tokens: undefined };
+  assert.equal(sumUsedTokens(withoutCacheRead), REAL_USAGE_TOTAL - 32559);
+  assert.notEqual(sumUsedTokens(withoutCacheRead), sumUsedTokens(REAL_USAGE));
+});
+
+test('TRANSCRIPT: NO usable field is null, never 0 — absence is not an empty context', () => {
+  assert.equal(sumUsedTokens(null), null);
+  assert.equal(sumUsedTokens({}), null);
+  assert.equal(sumUsedTokens({ input_tokens: 'twelve' }), null, 'a string is not a count');
+  assert.equal(sumUsedTokens({ input_tokens: Number.NaN }), null);
+  assert.equal(sumUsedTokens({ input_tokens: -5 }), null);
+  // But a genuine zero IS zero.
+  assert.equal(sumUsedTokens({ input_tokens: 0 }), 0);
+});
+
+test('TRANSCRIPT: the NEWEST assistant message wins, and junk lines are skipped not fatal', () => {
+  const dir = tempHealthDir();
+  try {
+    const p = writeTranscript(dir, [
+      assistantLine({ usage: { input_tokens: 111 } }),
+      { type: 'user', message: { content: 'hello' } },
+      assistantLine({ usage: { input_tokens: 222 } }),
+      '{ this line is truncated mid-wri',
+      '',
+    ]);
+    const found = newestAssistantUsage(readTranscriptTail(p));
+    assert.equal(sumUsedTokens(found.usage), 222, 'the LAST assistant message, not the first');
+    assert.equal(found.modelId, 'claude-opus-5');
+    assert.equal(found.effort, 'high', 'the effort in force is carried through');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('TRANSCRIPT: a transcript with no assistant usage yields null, and an absent file never throws', () => {
+  const dir = tempHealthDir();
+  try {
+    const p = writeTranscript(dir, [{ type: 'user', message: { content: 'x' } }]);
+    assert.equal(newestAssistantUsage(readTranscriptTail(p)), null);
+    assert.equal(readTranscriptTail(join(dir, 'nope.jsonl')), '', 'a missing file is empty, not a throw');
+    assert.equal(readTranscriptTail(null), '');
+    assert.equal(newestAssistantUsage(''), null);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('TRANSCRIPT: the tail read is BOUNDED — a huge transcript is not read whole', () => {
+  // This runs on EVERY turn end and real transcripts reach tens of megabytes. An
+  // unbounded read would make the Stop hook slower the longer a session ran.
+  const dir = tempHealthDir();
+  try {
+    const filler = JSON.stringify({ type: 'user', message: { content: 'x'.repeat(2000) } });
+    const lines = Array.from({ length: 3000 }, () => filler);
+    lines.push(JSON.stringify(assistantLine({ usage: REAL_USAGE })));
+    const p = writeTranscript(dir, lines);
+
+    const tail = readTranscriptTail(p, 64 * 1024);
+    assert.ok(tail.length <= 64 * 1024, 'the read is capped');
+    assert.ok(tail.length < readFileSync(p, 'utf8').length, 'and genuinely smaller than the file');
+    // The newest usage is still found, because it is at the END.
+    assert.equal(sumUsedTokens(newestAssistantUsage(tail).usage), REAL_USAGE_TOTAL);
+    // The first (partial) line is dropped rather than parsed.
+    assert.equal(tail.startsWith('{'), true, 'the fragment is trimmed to a line boundary');
+    assert.equal(TRANSCRIPT_TAIL_BYTES, 2 * 1024 * 1024);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// THE DENOMINATOR — the rule that keeps the percentage honest
+// ---------------------------------------------------------------------------
+
+test('DENOMINATOR: an explicit CLAUDE_CONTEXT_WINDOW is authoritative', () => {
+  assert.deepEqual(resolveWindowTokens({ modelId: 'm', env: { CLAUDE_CONTEXT_WINDOW: '1000000' } }), {
+    tokens: 1000000,
+    source: 'env:CLAUDE_CONTEXT_WINDOW',
+  });
+  // Garbage in the variable is not a denominator.
+  for (const bad of ['', 'lots', '0', '-1']) {
+    assert.equal(resolveWindowTokens({ modelId: null, env: { CLAUDE_CONTEXT_WINDOW: bad } }).tokens, null, bad);
+  }
+});
+
+test('DENOMINATOR: a statusLine observation counts ONLY when the model id matches', () => {
+  const dir = tempHealthDir();
+  const storeOpts = { envOverride: dir };
+  const observed = (id, size, at) => ({
+    schema_version: 1,
+    sampled_at: at,
+    session_id: `s-${id}-${size}`,
+    source: SOURCE_STATUSLINE,
+    model: { id },
+    context_window: { context_window_size: size },
+  });
+  try {
+    writeFileSync(join(dir, 'a.json'), JSON.stringify(observed('claude-opus-5', 1000000, '2026-08-02T00:00:00Z')));
+    assert.deepEqual(resolveWindowTokens({ modelId: 'claude-opus-5', env: {}, storeOpts }), {
+      tokens: 1000000,
+      source: 'statusline-observed',
+    });
+
+    // THE RULE THAT MATTERS. This estate runs 1M-context and 200k-context sessions of
+    // DIFFERENT models; borrowing across them renders a percentage wrong by a factor of
+    // five while looking authoritative.
+    assert.deepEqual(resolveWindowTokens({ modelId: 'claude-haiku-9', env: {}, storeOpts }), {
+      tokens: null,
+      source: null,
+    });
+
+    // An unknown live model cannot match anything, so rule 2 cannot fire at all.
+    assert.equal(resolveWindowTokens({ modelId: null, env: {}, storeOpts }).tokens, null);
+
+    // A TRANSCRIPT-sourced sample is never a denominator source — it never observed one.
+    writeFileSync(join(dir, 'b.json'), JSON.stringify({
+      ...observed('claude-sonnet-5', 500000, '2026-08-02T00:00:00Z'),
+      source: SOURCE_TRANSCRIPT,
+    }));
+    assert.equal(resolveWindowTokens({ modelId: 'claude-sonnet-5', env: {}, storeOpts }).tokens, null);
+
+    // Newest matching observation wins.
+    writeFileSync(join(dir, 'c.json'), JSON.stringify(observed('claude-opus-5', 200000, '2026-08-02T09:00:00Z')));
+    assert.equal(resolveWindowTokens({ modelId: 'claude-opus-5', env: {}, storeOpts }).tokens, 200000);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('DENOMINATOR MUTATION: there is NO model-to-window table anywhere in the sampler source', () => {
+  // The forbidden fix, asserted against the SOURCE rather than against behaviour, because
+  // a table could be added and still produce correct answers on the machine that wrote
+  // it. The literals below are the two window sizes this estate actually runs.
+  const src = readFileSync(SAMPLER_PATH, 'utf8');
+  const code = src.split('\n').filter((l) => !l.trimStart().startsWith('//')).join('\n');
+  for (const literal of ['200000', '200_000', '1000000', '1_000_000']) {
+    assert.equal(code.includes(literal), false, `a hardcoded window size (${literal}) is forbidden`);
+  }
+  assert.equal(/claude-opus|claude-sonnet|claude-haiku/.test(code), false, 'no model name is keyed on');
+});
+
+// ---------------------------------------------------------------------------
+// End to end
+// ---------------------------------------------------------------------------
+
+test('TRANSCRIPT: a Stop payload produces a written sample with a REAL numerator', () => {
+  const dir = tempHealthDir();
+  try {
+    const p = writeTranscript(dir, [assistantLine({ usage: REAL_USAGE, sessionId: 'from-transcript' })]);
+    const r = sampleFromTranscript(
+      JSON.stringify({ session_id: 'from-payload', transcript_path: p, cwd: 'C:/x' }),
+      { sampledAt: '2026-08-02T05:00:00.000Z', storeOpts: { envOverride: dir }, env: {} }
+    );
+
+    assert.equal(r.written, true, r.reason);
+    assert.equal(r.sample.source, SOURCE_TRANSCRIPT);
+    assert.equal(r.sample.schema_version, SAMPLE_SCHEMA_VERSION, 'the footer reads this version');
+    assert.equal(r.sample.context_window.used_tokens, REAL_USAGE_TOTAL);
+    assert.equal(r.sample.context_window.context_window_size, null, 'no denominator was available');
+    assert.equal(r.sample.context_window.context_window_source, null);
+    assert.equal(r.sample.context_window.used_percentage, null, 'and NO percentage is invented');
+    assert.equal(r.sample.model.id, 'claude-opus-5');
+    assert.equal(r.sample.effort.level, 'high');
+    // The PAYLOAD's session id wins: it is the runtime saying which session fired.
+    assert.equal(r.sample.session_id, 'from-payload');
+
+    const back = readHealthSample('from-payload', { envOverride: dir });
+    assert.equal(back.ok, true);
+    assert.equal(back.data.context_window.used_tokens, REAL_USAGE_TOTAL, 'durably on disk');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('TRANSCRIPT: with a denominator available the sample carries BOTH numbers', () => {
+  const dir = tempHealthDir();
+  try {
+    const p = writeTranscript(dir, [assistantLine({ usage: REAL_USAGE })]);
+    const r = sampleFromTranscript(
+      JSON.stringify({ session_id: 's', transcript_path: p }),
+      { sampledAt: '2026-08-02T05:00:00.000Z', storeOpts: { envOverride: dir }, env: { CLAUDE_CONTEXT_WINDOW: '1000000' } }
+    );
+    assert.equal(r.sample.context_window.used_tokens, REAL_USAGE_TOTAL);
+    assert.equal(r.sample.context_window.context_window_size, 1000000);
+    assert.equal(r.sample.context_window.context_window_source, 'env:CLAUDE_CONTEXT_WINDOW',
+      'the provenance is recorded, so no denominator is unattributable');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('TRANSCRIPT: every hostile input is REPORTED, never thrown — a Stop hook must not crash', () => {
+  // A throw here ends Warwick's turn with an error. Telemetry is never worth that.
+  const dir = tempHealthDir();
+  try {
+    const cases = [
+      ['', 'unreadable-payload'],
+      ['not json', 'unreadable-payload'],
+      ['[]', 'unreadable-payload'],
+      ['{}', 'no-transcript-path'],
+      ['{"transcript_path":""}', 'no-transcript-path'],
+      [JSON.stringify({ session_id: 's', transcript_path: join(dir, 'absent.jsonl') }), 'no-usable-usage'],
+    ];
+    for (const [raw, reason] of cases) {
+      const r = sampleFromTranscript(raw, { storeOpts: { envOverride: dir } });
+      assert.equal(r.written, false, JSON.stringify(raw));
+      assert.equal(r.reason, reason, JSON.stringify(raw));
+    }
+    assert.equal(cases.length, 6);
+
+    // No session to key on anywhere -> nothing safe to write.
+    const p = writeTranscript(dir, [{ type: 'assistant', message: { model: 'm', usage: REAL_USAGE } }]);
+    assert.equal(extractTranscriptSample({ transcriptPath: p, sessionId: null }), null);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

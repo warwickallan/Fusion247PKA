@@ -19,9 +19,22 @@
 //     `UNSET` and never as a missing segment — a five-field line with a dropped
 //     segment is ambiguous to a parser.
 //
-// The REAL intent of the superseded assertions is preserved below and is what
-// actually mattered: a non-active or non-matching build's model must never reach
-// the line. That is still asserted as `doesNotMatch(/Haiku/)`.
+// AMENDED AGAIN 2026-08-02 (WO-OR-05). `nextModelFor` and the banked programme state
+// it read are now DELETED, so every assertion in this file that built a scratch
+// worktree carrying `programme-state.json` and asserted a model reached (or failed to
+// reach) the line was testing behaviour that no longer exists. Those tests are removed
+// rather than adapted: there is no weaker version of them that means anything.
+//
+// What replaced them is a SINGLE, stronger assertion — `next:` on this surface is UNSET
+// unconditionally, because a status line has no knowledge of a next action. That is now
+// a property of the code rather than an outcome of a six-condition predicate, so it is
+// tested as one.
+//
+// `locationFrom` went with them: it existed only to feed `nextModelFor`.
+//
+// THE SURFACE'S PRIMARY JOB IS NOW THE DENOMINATOR OBSERVATION — see the module header.
+// The sample it writes is what lets `sampler.resolveWindowTokens` refuse a cross-model
+// context-window size, and that is asserted below.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -31,11 +44,13 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { locationFrom, lineFor, safeLine, LAST_RESORT_LINE } from './statusline-live.mjs';
+import { lineFor, safeLine, LAST_RESORT_LINE } from './statusline-live.mjs';
+import { sampleFromStdin, resolveWindowTokens } from './sampler.mjs';
 import {
   parseFooter,
   renderFooter,
   NEXT_UNSET,
+  NEXT_MODELS,
   CONTROL_CONTINUE,
   ADVICE,
   GOV_MARKER,
@@ -44,39 +59,8 @@ import { STATE } from './evaluator.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const STATUSLINE_SRC = join(__dirname, 'statusline-live.mjs');
-const MINIMAL_STATE = join(__dirname, 'fixtures', 'programme-state.minimal.json');
-
-// The base document is the REAL minimal fixture, so every state written here
-// genuinely validates rather than being invented to suit the assertion.
-const baseState = JSON.parse(readFileSync(MINIMAL_STATE, 'utf8'));
-
 function tmp(prefix = 'governor-statusline-') {
   return mkdtempSync(join(tmpdir(), prefix));
-}
-
-// A scratch WORKTREE carrying `Deliverables/<id>/programme-state.json` files.
-// `mutate` receives a deep copy of the valid base document.
-function makeWorktree(builds) {
-  const root = tmp();
-  for (const b of builds) {
-    const doc = JSON.parse(JSON.stringify(baseState));
-    b.mutate(doc, root);
-    const dir = join(root, 'Deliverables', b.id);
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, 'programme-state.json'), JSON.stringify(doc, null, 2) + '\n');
-  }
-  return { root, cleanup: () => rmSync(root, { recursive: true, force: true }) };
-}
-
-// All six of D-4's U-conditions satisfied for this (worktree, branch).
-function satisfyAll(doc, { worktree, branch, model }) {
-  doc.resumption.worktree = worktree;
-  doc.resumption.branch = branch;
-  doc.resumption.ticket = 'T-02'; // `frontier` in the base fixture, i.e. unresolved
-  doc.resumption.next_action_kind = 'action';
-  doc.model_recommendation.model = model;
-  doc.model_recommendation.for_ticket = 'T-02';
-  doc.model_recommendation.computed_at_head = doc.banked.head_sha;
 }
 
 // The REAL statusLine payload shape, verified against a live sample under
@@ -137,98 +121,63 @@ test('AC3: `next:` is ALWAYS emitted — absence is the VALUE UNSET, never a mis
   assert.equal(parseFooter(line).fields.next, NEXT_UNSET);
 });
 
-test('AC3: the UNSET predicate genuinely APPLIES here — a state failing U-d renders UNSET', () => {
-  // The live banked state's exact condition today: a model is present, but
-  // `for_ticket` is absent, so the recommendation is no longer grounded.
-  const w = makeWorktree([
-    {
-      id: 'BUILD-777-ungrounded',
-      mutate: (d, root) => {
-        satisfyAll(d, { worktree: root, branch: 'b/x', model: 'Sonnet' });
-        delete d.model_recommendation.for_ticket;
-      },
-    },
-  ]);
-  try {
-    const line = lineFor(JSON.stringify(realShapedPayload({ worktree: { path: w.root, branch: 'b/x' } })));
-    assert.match(line, /next: UNSET/, 'an ungrounded recommendation must not be presented as live advice');
-    assert.doesNotMatch(line, /Sonnet/, 'and the stale literal must not reach the line at all');
-  } finally {
-    w.cleanup();
+test('WO-OR-05: `next:` is UNSET on this surface UNCONDITIONALLY, for every payload', () => {
+  // The predicate that used to be able to return a model is deleted. This asserts the
+  // NEW property directly, over payload shapes that previously produced different
+  // answers, so 'always UNSET' is established rather than assumed from one example.
+  const payloads = [
+    realShapedPayload(),
+    realShapedPayload({ worktree: undefined }),
+    realShapedPayload({ worktree: { path: 'C:/x' } }),
+    realShapedPayload({ worktree: { path: 'C:/x', branch: 'b/y' } }),
+  ];
+  for (const p of payloads) {
+    const line = lineFor(JSON.stringify(p));
+    assert.equal(parseFooter(line).fields.next, NEXT_UNSET, JSON.stringify(p.worktree));
   }
 });
 
-test('AC3: a fully grounded state DOES reach the line — UNSET is not a stuck value', () => {
-  // Without this, every UNSET assertion above would be satisfied by a surface
-  // that can only ever say UNSET, which would prove nothing at all.
-  const w = makeWorktree([
-    {
-      id: 'BUILD-888-grounded',
-      mutate: (d, root) => satisfyAll(d, { worktree: root, branch: 'b/x', model: 'Opus' }),
-    },
-  ]);
-  try {
-    const line = lineFor(JSON.stringify(realShapedPayload({ worktree: { path: w.root, branch: 'b/x' } })));
-    assert.match(line, /· next: Opus ·/, 'a grounded recommendation must render');
-  } finally {
-    w.cleanup();
+test('WO-OR-05 MUTATION: no model name can reach this line at all', () => {
+  // The preserved intent of the deleted suite: a model presented as live advice by a
+  // surface that cannot know the next action is the defect. Asserted against the
+  // vocabulary itself rather than against one hard-coded name, so adding a model to
+  // NEXT_MODELS cannot silently escape this check.
+  const line = lineFor(JSON.stringify(realShapedPayload()));
+  for (const model of NEXT_MODELS) {
+    assert.doesNotMatch(line, new RegExp(model), `${model} must never reach the status line`);
   }
 });
 
-test("PRESERVED INTENT: another programme's model never reaches the line", () => {
-  // The half of the superseded tests that still binds: a build that does not
-  // match this session must never answer for it.
-  const w = makeWorktree([
-    {
-      id: 'BUILD-001-finished',
-      mutate: (d) => satisfyAll(d, { worktree: 'C:/somewhere-else', branch: 'other/branch', model: 'Haiku' }),
-    },
-  ]);
+test('WO-OR-05: the sample this surface writes carries the DENOMINATOR and its model id', () => {
+  // This is why the module was moved from BIN back to KEEP. The transcript path reaches
+  // every client but carries no window size; this payload is the only place the runtime
+  // states one. If this stops being recorded, the percentage becomes unrenderable.
+  const dir = tmp();
   try {
-    const line = lineFor(JSON.stringify(realShapedPayload({ worktree: { path: w.root, branch: 'b/x' } })));
-    assert.doesNotMatch(line, /Haiku/, 'a non-matching build must never reach the line');
-    assert.match(line, /next: UNSET/);
+    const payload = realShapedPayload();
+    payload.context_window.context_window_size = 1000000;
+    sampleFromStdin(JSON.stringify(payload), {
+      sampledAt: new Date().toISOString(),
+      storeOpts: { envOverride: dir },
+    });
+    const written = JSON.parse(readFileSync(join(dir, `${payload.session_id}.json`), 'utf8'));
+    assert.equal(written.context_window.context_window_size, 1000000, 'the denominator');
+    assert.equal(written.model.id, 'claude-opus-5', 'and the model it belongs to');
+
+    // And it is genuinely usable as a denominator, model-matched.
+    assert.deepEqual(resolveWindowTokens({ modelId: 'claude-opus-5', env: {}, storeOpts: { envOverride: dir } }), {
+      tokens: 1000000,
+      source: 'statusline-observed',
+    });
+    // MUTATION: the same observation under a different model id must be REFUSED.
+    assert.deepEqual(resolveWindowTokens({ modelId: 'claude-something-else', env: {}, storeOpts: { envOverride: dir } }), {
+      tokens: null,
+      source: null,
+    });
   } finally {
-    w.cleanup();
+    rmSync(dir, { recursive: true, force: true });
   }
 });
-
-// ===========================================================================
-// AC4 — the payload fields that actually exist
-// ===========================================================================
-
-test('AC4: the location comes from worktree.path / worktree.branch', () => {
-  const loc = locationFrom(realShapedPayload());
-  assert.equal(loc.worktreePath, 'C:/Fusion247PKA-governor');
-  assert.equal(loc.worktreeBranch, 'build-018/session-governor');
-});
-
-test('AC4 MUTATION: the fields the OLD code read are absent from the real payload', () => {
-  // The defect, made visible. The old expression was
-  // `payload?.cwd || payload?.workspace?.current_dir`. Against a real payload
-  // BOTH are undefined, so it fell through to process.cwd() — answering about
-  // whatever directory this process happened to be run in.
-  const real = realShapedPayload();
-  assert.equal(real.cwd, undefined, 'the real payload carries no `cwd`');
-  assert.equal(real.workspace.current_dir, undefined, 'nor `workspace.current_dir`');
-  const oldExpression = real?.cwd || real?.workspace?.current_dir;
-  assert.equal(oldExpression, undefined, 'so the old lookup could only ever fall back');
-
-  // And the new one succeeds on the same payload — the two genuinely differ.
-  assert.notEqual(locationFrom(real).worktreePath, oldExpression);
-});
-
-test('AC4: a payload carrying ONLY the old fields yields NO location, and never a guess', () => {
-  const loc = locationFrom({ cwd: 'C:/anywhere', workspace: { current_dir: 'C:/anywhere' } });
-  assert.equal(loc.worktreePath, null, 'absent is "not established", never a fallback (INV-1)');
-  assert.equal(loc.worktreeBranch, null);
-});
-
-test('AC4: a partial location (path but no branch) is still UNSET — U-a needs both', () => {
-  const line = lineFor(JSON.stringify(realShapedPayload({ worktree: { path: 'C:/x' } })));
-  assert.match(line, /next: UNSET/);
-});
-
 // ===========================================================================
 // AC5 — never throws, always exits 0, always exactly one line
 // ===========================================================================

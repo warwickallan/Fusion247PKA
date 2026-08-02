@@ -11,10 +11,32 @@
 //     -> evaluator.evaluate(signals)                    (T-04, verdict)
 //     -> one compact line on stdout                     (T-05's renderer shape)
 //
-// It answers the three things the build was commissioned to show:
+// ---------------------------------------------------------------------------
+// ITS PRIMARY JOB CHANGED (WO-OR-05, 2026-08-02) — READ THIS BEFORE DELETING IT
+// ---------------------------------------------------------------------------
+// This module was on the teardown's bin list and was moved back to KEEP mid-order. The
+// argument for binning it was sound about its OUTPUT and wrong about its INPUT: a
+// terminal status line is invisible to Warwick, who works on claude.ai web and Android,
+// so as a RENDERER it reaches nobody.
+//
+// But the statusLine stdin payload is the only place the runtime states
+// `context_window.context_window_size` — the DENOMINATOR. The transcript-derived Stop
+// path (see sampler.mjs) reaches every client and carries the numerator only. Delete this
+// file and the percentage becomes permanently unrenderable, leaving the repaired footer
+// stuck at a bare token count forever.
+//
+// So: this is now THE DENOMINATOR OBSERVER first and a renderer second. `sampleFromStdin`
+// below is a live, load-bearing path, not legacy. The sample it writes already records
+// `model.id` beside `context_window_size`, which is exactly what
+// `sampler.resolveWindowTokens` needs to refuse a cross-model denominator — no change was
+// required here to make that rule checkable.
+//
+// It answers:
 //   1. current context usage / health
 //   2. KEEP GOING or CLEAR NOW
-//   3. recommended next model
+// It no longer answers "recommended next model": that came from banked programme state,
+// which WO-OR-05 deleted. `next:` is now supplied by whoever knows the next action, and a
+// status line does not, so this surface always renders `UNSET`.
 //
 // CONTRACT: never throw, always exit 0, always print exactly one line. A
 // statusLine command that crashes or exits non-zero breaks the UI that invokes
@@ -31,37 +53,19 @@
 //
 //   stdin (statusLine JSON)
 //     -> sampler.extractHealthSample   shape the payload as a health sample
-//     -> footer.deriveFooterFields     the D-3 degradation ladder (BLIND is never GREEN)
-//     -> footer.nextModelFor           the D-4 UNSET predicate
-//     -> footer.renderFooter           the D-2 byte grammar
+//     -> footer.deriveFooterFields     the degradation ladder (BLIND is never GREEN)
+//     -> footer.renderFooter           the byte grammar
 //
 // `computeFooterLine` is deliberately NOT used: it re-resolves the sample from
 // the health store on disk, and on this path the fresher payload is already in
 // hand. Reading back what we just wrote would give one fact two sources.
 //
-// TWO BEHAVIOUR CHANGES A REVIEWER SHOULD EXPECT TO SEE, both required:
-//
-//  1. `next:` is ALWAYS emitted. D-2 expresses absence as the VALUE `UNSET`,
-//     never as a missing segment, so a parser never has to guess which field it
-//     is looking at. The old code dropped the segment entirely.
-//  2. The model is resolved by `nextModelFor`, whose rule is far stricter than
-//     the interim `programme.status === "active"` this file used to apply. It
-//     matches the live (worktree, branch) against `resumption`, then requires
-//     `next_action_kind === "action"`, a grammar-representable model, a
-//     `for_ticket` matching `resumption.ticket`, a `computed_at_head` matching
-//     `banked.head_sha`, and an unresolved ticket. A banked literal failing any
-//     of those renders UNSET — which is the POINT of D-4. A stale recommendation
-//     presented as live advice is the defect; UNSET is the correct output, not a
-//     degraded one.
-//
-// The superseded `recommendedModel()` is DELETED rather than left unused: two
-// rival selection rules on one surface is the SSOT defect, and dead code invites
-// a caller.
+// `next:` is ALWAYS emitted. The grammar expresses absence as the VALUE `UNSET`, never as
+// a missing segment, so a parser never has to guess which field it is looking at.
 
 import { parseStdinPayload, sampleFromStdin, extractHealthSample } from './sampler.mjs';
 import {
   deriveFooterFields,
-  nextModelFor,
   renderFooter,
   CONTROL_CONTINUE,
   NEXT_UNSET,
@@ -69,7 +73,6 @@ import {
 } from './footer.mjs';
 import { STATE } from './evaluator.mjs';
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 function readStdin() {
@@ -80,26 +83,13 @@ function readStdin() {
   }
 }
 
-// AC4 — THE PAYLOAD FIELDS THAT ACTUALLY EXIST.
+// `locationFrom` was DELETED here by WO-OR-05. It existed solely to hand a
+// (worktree path, branch) pair to `footer.nextModelFor`, which matched that pair against
+// banked programme state to pick a model. Both the predicate and the programme state are
+// gone, so the accessor had no consumer left — and dead code invites a caller.
 //
-// This replaces `payload?.cwd || payload?.workspace?.current_dir`, which was not
-// merely inelegant: BOTH of those fields are ABSENT from the real statusLine
-// payload, verified against a live sample. `workspace` IS present, but carries
-// only `git_worktree` — a bare directory NAME, not a path. So the old lookup
-// always evaluated to undefined and silently fell back to `process.cwd()`, the
-// directory this PROCESS happens to run in, which is not necessarily the
-// session's worktree. It answered a question nobody asked, confidently.
-//
-// The real payload carries `worktree.path` and `worktree.branch` — exactly the
-// (path, branch) pair `nextModelFor`'s U-a needs, and with no git call.
-export function locationFrom(payload) {
-  const path = payload?.worktree?.path;
-  const branch = payload?.worktree?.branch;
-  return {
-    worktreePath: typeof path === 'string' && path.length ? path : null,
-    worktreeBranch: typeof branch === 'string' && branch.length ? branch : null,
-  };
-}
+// The location facts it read are NOT lost: `sampler.extractHealthSample` still records
+// `worktree.{name,path,branch}` and `workspace.git_worktree` into the sample it writes.
 
 /**
  * lineFor(raw, opts) -> string
@@ -110,20 +100,12 @@ export function locationFrom(payload) {
  */
 export function lineFor(raw, { now = Date.now(), sampledAt = new Date().toISOString() } = {}) {
   const payload = parseStdinPayload(raw) || {};
-  const { worktreePath, worktreeBranch } = locationFrom(payload);
 
-  // D-4. An unknown location cannot ground a recommendation, so it is UNSET —
-  // never a fallback to whatever directory this process was launched in.
-  let next = NEXT_UNSET;
-  try {
-    next = nextModelFor({
-      worktreePath,
-      worktreeBranch,
-      deliverablesDir: worktreePath ? join(worktreePath, 'Deliverables') : null,
-    }).next;
-  } catch {
-    next = NEXT_UNSET;
-  }
+  // ALWAYS UNSET on this surface, and that is a statement rather than a degradation. A
+  // model recommendation is a claim about the NEXT ACTION, and a status line has no
+  // knowledge of one. The constitution's rule — render a model only when grounded in a
+  // real, current next action — is satisfied here by rendering nothing.
+  const next = NEXT_UNSET;
 
   // Reuse the sampler's extraction rather than re-reading the payload by hand:
   // it is already the module that decides how a statusLine payload maps onto a
@@ -143,9 +125,9 @@ export function lineFor(raw, { now = Date.now(), sampledAt = new Date().toISOStr
     now,
     next,
     // A status line is not an assistant message and carries no handback
-    // decision, so the control token is always CONTINUE. Inert here by
-    // construction: stop-controller.mjs parses `last_assistant_message` only and
-    // never reads this surface.
+    // decision, so the control token is always CONTINUE. Nothing has parsed a
+    // control token off this surface since the Stop-path controller was deleted
+    // by WO-OR-05; it is emitted because the grammar requires all five fields.
     control: CONTROL_CONTINUE,
   });
 
