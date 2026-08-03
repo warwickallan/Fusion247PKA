@@ -1297,7 +1297,7 @@ async function main() {
   // completion condition, and this defect survived precisely because "the ones I found" was
   // never the same set as "the ones there are".
 
-  await test('W1 — gitEvidence launches EVERY git/gh child with windowsHide:true (injected spawn)', async () => {
+  await test('WH1 — gitEvidence launches EVERY git/gh child with windowsHide:true (injected spawn)', async () => {
     const calls = [];
     const fakeSpawn = (cmd, args, opts) => {
       calls.push({ cmd, args, opts });
@@ -1320,7 +1320,7 @@ async function main() {
     assert.equal(bare.length, 0, `these launches would pop a console window: ${bare.map((c) => c.cmd).join(', ')}`);
   });
 
-  await test('W2 — the Codex child (and its win32 taskkill reap) are launched windowsHide:true (injected spawn)', async () => {
+  await test('WH2 — the Codex child (and its win32 taskkill reap) are launched windowsHide:true (injected spawn)', async () => {
     // Reaching the spawn needs auth+binary to resolve. Both are pointed at THROWAWAY artefacts:
     // an empty {} in a temp HOME and `node` itself as the "binary". No real credential is read —
     // a test whose pass depended on ~/.codex/auth.json would be both machine-dependent and a
@@ -1374,7 +1374,7 @@ async function main() {
     }
   });
 
-  await test(`W3 — ENUMERATION: all ${TOWER_LOOP_CP_SITES} child_process call sites under tower-loop carry windowsHide:true`, () => {
+  await test(`WH3 — ENUMERATION: all ${TOWER_LOOP_CP_SITES} child_process call sites under tower-loop carry windowsHide:true`, () => {
     const sites = scanChildProcessSites(jsFilesUnder(LOOP_DIR));
     const unparsed = sites.filter((s) => !s.parsed);
     assert.equal(unparsed.length, 0,
@@ -1387,7 +1387,7 @@ async function main() {
       `child_process call-site count moved (found ${sites.length}, pinned ${TOWER_LOOP_CP_SITES}). Review the new/removed site, then update the literal:\n${sites.map((s) => `  ${s.rel}:${s.line} ${s.fn}`).join('\n')}`);
   });
 
-  await test('W4 — CONTROL: the enumeration scanner can actually SEE a bare site (it is not always-green)', () => {
+  await test('WH4 — CONTROL: the enumeration scanner can actually SEE a bare site (it is not always-green)', () => {
     const probe = fs.mkdtempSync(path.join(os.tmpdir(), 'tower-scanprobe-'));
     try {
       // Three shapes at once: a bare launch, a covered launch, and the two things that have
