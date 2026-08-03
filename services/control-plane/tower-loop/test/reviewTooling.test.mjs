@@ -442,7 +442,7 @@ test('the CLI exits non-zero and names the missing field (no Codex call is reach
     let status = 0; let stderr = '';
     try {
       execFileSync(process.execPath, ['reviewDiff.mjs', '--repo', LOOP_DIR, '--base', 'HEAD~1', '--head', 'HEAD', '--claim', claimPath],
-        { cwd: LOOP_DIR, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+        { cwd: LOOP_DIR, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
     } catch (e) {
       status = e.status; stderr = String(e.stderr ?? '');
     }
@@ -464,7 +464,7 @@ test('the CLI refuses a claim/scope disagreement before spending a review', () =
     try {
       execFileSync(process.execPath, ['reviewDiff.mjs', '--repo', LOOP_DIR, '--base', 'HEAD~1', '--head', 'HEAD',
         '--claim', claimPath, '--paths', 'tools/governor/reorient.mjs'],
-        { cwd: LOOP_DIR, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+        { cwd: LOOP_DIR, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
     } catch (e) {
       status = e.status; stderr = String(e.stderr ?? '');
     }
