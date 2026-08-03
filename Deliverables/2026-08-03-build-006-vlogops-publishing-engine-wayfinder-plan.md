@@ -31,23 +31,25 @@ This is not Larry being unhelpful. An interrupted build is how BUILD-018 happene
 | 3 | **IDEA-020 ScoutAIR is unpromoted**, and Content Scout would eventually feed VlogOps seeds. | A later intake source. **Not a BUILD-006 dependency** — the three accepted intake routes do not include it |
 | 4 | **The `Human in the Poop` YouTube identity review is still pending** (BUILD-019 F1). Standing instruction: do not retry, do not duplicate the channel, do not create another Google account. | Recheck only when a phase genuinely needs it, or on Warwick's word |
 | 5 | **Post-publication community capability** — the Foundry addendum records it as a real future boundary spanning Public Platform, ScoutAIR and VlogOps. | Explicitly **not a fourth build** and not in BUILD-006 |
+| 6 | **Honcho silently truncates `notes` at `FIELD_CAP = 600`.** Measured 2026-08-03: a 666-character `notes` was delivered as 600 (599 + `…`), losing 67 characters mid-sentence. `tools/governor/continuity.mjs:139` — `s.slice(0, FIELD_CAP - 1) + '…'`. **The `write` result DID report `"truncated": ["notes"]`, so the control is honest — but the operator only learns *that* it happened, never *what was lost*.** Nothing resumption-critical was lost on that occasion; the casualty was a remedy pointer. **The durable fix is one of: raise the cap for `notes`, or have the writer print the dropped tail so the operator can re-home it. Not a new mechanism — a one-line change to an existing, working module.** ⚠️ **The real hazard is habit, not the cap:** a long `notes` is where a session's loose ends go, so silent loss lands precisely on the things nobody wrote down anywhere else. Prefer the structured fields (`blockers`, `accepted_decisions`, `completed`) — they are capped at `LIST_CAP = 8` **items**, not characters. | Warwick, 2026-08-03. Governor work, not BUILD-006. **No further Governor expansion is authorised** beyond fixing this. Do not build a truncation-reporting subsystem |
 
 ---
 
-## 🔻 STATUS — Phase 0 (promotion + mapping) IN PROGRESS. Phase 1 is the frontier once Warwick accepts this plan.
+## 🔻 STATUS — Phase 0 ✅ PASS (accepted by Warwick). **Phase 1 — seed intake + the durable Content Seed store — IS THE FRONTIER.**
 
 | | |
 |---|---|
-| **Build** | BUILD-006 — VlogOps Publishing Engine |
+| **Build** | BUILD-006 — VlogOps Publishing Engine. **THE ACTIVE BUILD.** |
 | **Promoted from** | IDEA-006 (Foundry), on Warwick's explicit instruction 2026-08-03 |
-| **Programme position** | BUILD-019 Phases 1–3 → **BUILD-006 in full** → BUILD-019 Phase 4 → the real end-to-end acceptance journey. Fixed by Warwick, 2026-08-03. |
-| **Current phase** | Phase 0 — promotion and mapping |
-| **Current gate** | **Warwick accepts this plan** (`product-decision`). Implementation does not begin before that. |
-| **Exact next action** | Warwick reads and accepts or corrects this map. Then **Phase 1 — durable seed intake and the Content Seed store.** |
+| **Programme position** | BUILD-019 Phases 1–3 ✅ done → **BUILD-006 in full ← YOU ARE HERE** → BUILD-019 Phase 4 → the real end-to-end acceptance journey. Fixed by Warwick, 2026-08-03. |
+| **Current phase** | **Phase 1 — seed intake and the durable Content Seed store.** Phase 0 is PASS. |
+| **Current gate** | **All three intake routes land a durable Content Seed with stable identity; kill mid-intake and it recovers; identity survives restart.** (§10, Phase 1 row.) |
+| **Exact next action** | **Dispatch Phase 1 as a bounded Work Order.** Build the Content Seed store and the three intake routes to the detail in §5 — Route 1 *smallest sufficient* evidence bundle · Route 2's five-field promotion contract · Route 3's seed-plus-angle. **Read §6 F3 first: the streams the North Star names are partly dry, so `Deliverables/` and git history are first-class intake, not fallback.** §6 F4 names the orchestration substrates to reuse — **reuse, do not build a second framework.** |
 | **Model for Phase 1** | **Opus-high.** Durable state, identity, provenance and idempotency are the expensive things to get wrong, and everything downstream inherits them. |
 | **Depends on BUILD-019** | Only at Phase 7, and only through a **contract** — see §4. BUILD-006 develops against the accepted Publication Package contract without waiting for BUILD-019 Phases 4–7. |
+| **Open Warwick gates** | None blocking Phase 1. Later: **spend** before any HeyGen render (§6 F1), and the store decision in §6 F4 is **recorded fog to raise, not to settle silently**. |
 
-**No implementation has begun.** This map and the staged canonical source are the only artefacts.
+> **✅ WARWICK ACCEPTED THIS PLAN IN SUBSTANCE, 2026-08-03.** Phase 0 is closed. **Implementation of Phase 1 is authorised and has not begun** — it was deliberately not started in the session that wrote this map. This map and the staged canonical source are the only artefacts so far.
 
 ---
 
@@ -418,8 +420,8 @@ It is a **hypothesis about route, not law**. It gets corrected at phase boundari
 
 | Phase | Status | Model | Evidence |
 |---|---|---|---|
-| 0 — Promotion + Wayfinder map | 🟠 **IN PROGRESS** — awaiting Warwick's acceptance | Opus-high + Warwick | This map; `Builds/BUILD-006-vlogops-publishing-engine/SOURCE-foundry-boundary-decision-2026-08-02.md` staged from Drive `1TxdOJKCY3IRVNyncc1gRGOhW2Qv5F2S2` |
-| 1 — Seed intake + Content Seed store | ⬜ **NOT STARTED — the frontier** | Opus-high | — |
+| 0 — Promotion + Wayfinder map | ✅ **PASS** — **Warwick accepted in substance, 2026-08-03** | Opus-high + Warwick | This map; `Builds/BUILD-006-vlogops-publishing-engine/SOURCE-foundry-boundary-decision-2026-08-02.md` staged from Drive `1TxdOJKCY3IRVNyncc1gRGOhW2Qv5F2S2`; START/RESUME block proven byte-identical (927 bytes, sha256 `2c615931…dc4c51`, `diff` exit 0, mutation-tested exit 1); Pax findings F1–F5 absorbed into §6 |
+| 1 — Seed intake + Content Seed store | ⬜ **NOT STARTED — THE FRONTIER. Authorised; begin here.** | **Opus-high** | — |
 | 2 — Source Compiler | ⬜ NOT STARTED | Opus-high / routine | — |
 | 3 — Scribe + Master Story Package | ⬜ NOT STARTED | Opus-high | — |
 | 4 — Verification | ⬜ NOT STARTED | Opus-high + Codex | — |

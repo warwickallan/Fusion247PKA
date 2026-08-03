@@ -36,7 +36,11 @@ This is not Larry being unhelpful. An interrupted build is how BUILD-018 happene
 
 ---
 
-## 🔻 STATUS — Phase 0 COMPLETE (promotion + map). **Phase 1 is the frontier and is UNPAUSED.**
+## 🔻 STATUS — Phases 0, 1, 2 and 3 ✅ PASS. **BUILD-019 IS PAUSED. The active build is BUILD-006 — do not work here.**
+
+> **If you have arrived at this map looking for the next action, it is not in this file.**
+> **Open `Deliverables/2026-08-03-build-006-vlogops-publishing-engine-wayfinder-plan.md` — BUILD-006 VlogOps Publishing Engine, Phase 1.**
+> BUILD-019 resumes at **Phase 4**, and only after BUILD-006 produces a real Publication Package.
 
 | | |
 |---|---|
@@ -44,18 +48,20 @@ This is not Larry being unhelpful. An interrupted build is how BUILD-018 happene
 | **Promoted from** | IDEA-019 (Foundry), on Warwick's explicit instruction 2026-08-02 |
 | **Promoted at** | Fusion247PKA `7163a32` (`origin/main`) |
 | **Branch** | `build-019-public-platform-wayfinder` |
-| **Current phase** | Phase 0 — promotion and mapping: **COMPLETE**. Plan **ACCEPTED IN SUBSTANCE by Warwick, 2026-08-02**, with five bounded corrections since applied. |
+| **Current phase** | **Phases 0, 1, 2 and 3 are all ✅ PASS.** The plan was accepted in substance by Warwick 2026-08-02, with corrections since applied. **Phase 4 is next and is DEFERRED — see below.** |
 | **⏸️ BUILD STATUS** | **PAUSED AFTER PHASE 3 — deliberately, by Warwick, 2026-08-03.** Phases 1–2 are built; Phase 3 is in progress. **The programme order is now fixed: BUILD-019 Phases 1–3 → BUILD-006 VlogOps in full → BUILD-019 Phase 4 → the real end-to-end acceptance journey.** Phase 4 was specified against a **synthetic fixture**; it resumes instead with a **real producer and a real Publication Package** behind it. That is the whole reason for the reordering. |
 | **Next active phase** | **Phase 4 — publication contract + website adapter. DEFERRED, not abandoned.** It does not begin until BUILD-006 produces a real Publication Package and production flow for it to consume. |
 | **Model for Phase 4 when it resumes** | **Opus-high, with mandatory independent review (Codex).** It is the interface VlogOps inherits and the expensive thing to get wrong. |
 | **The other build** | `Deliverables/2026-08-03-build-006-vlogops-publishing-engine-wayfinder-plan.md` — BUILD-006 VlogOps Publishing Engine. It develops against the §4 contract in this map and does **not** wait for BUILD-019 Phases 4–7. |
-| **Current gate** | **Phase 3: production-READY, not production-published.** The protected Vercel preview is Warwick's review surface; promotion and rollback routes are documented and ready; `main` and the public domain are untouched. |
+| **Current gate** | **NONE — this build is paused and has no open gate of its own.** Phase 3 closed PASS as production-READY, not production-published: the protected Vercel preview is Warwick's review surface, promotion and rollback routes are documented and ready, and `main` and the public domain are untouched. The next gate belongs to BUILD-006. |
 | **⛔ THE LAUNCH GATE** | **Warwick has NOT approved the website copy, the three articles, the rendered visual result, or public launch.** PRs #1 and #2 stay unmerged. **Public production is not the review environment.** Promotion to `www.fusion247.co.uk` is a separate Warwick decision *after* copy and visual approval — a `product-decision` followed by a `merge-decision`, never a technical step. Phase 3's "preview→production" wording **does not override this map's own explicit Warwick launch authority** (§11). |
 | **📐 THE REVIEW LADDER** | **Source → rendered non-production → public promotion only after approval.** *"Authentication failure by an agent is not evidence that the review environment does not exist"* (Warwick, 2026-08-03). The rule and the incident that produced it are recorded ONCE, in **§9.1 of `Deliverables/2026-08-03-build-006-vlogops-publishing-engine-wayfinder-plan.md`** — that is the SSOT and this row is a pointer. It binds this build identically: **the protected preview is the review surface, and an agent's 302 says nothing about whether Warwick can see the site.** |
 | **Model for Phase 1** | **Routine implementation / lower-cost model** — bounded Work Order to Keel. Not Opus-high; the stack and the target are both settled. |
 | **Review route** | **Manual: `reviewDiff.mjs --claim`, claim derived from the Phase 1 gate, inside the three-execution Codex budget.** The watcher cannot be reached from a PR — SHIT TO DO #4. |
 
-**No implementation has begun.** This map and the promotion record are the only artefacts produced so far.
+**Implementation IS under way and is banked.** A working Next.js + TypeScript + Tailwind site exists in `warwickallan/fusion247-web` across three open, unmerged, stacked PRs — **#1** (skeleton, `167d6c2`) → **#2** (16 routes + 3 MDX articles, `9178bd7`) → **#3** (runbook + deployment behaviour, `73f36a8`). CI green on every head SHA. **Nothing is merged and `www.fusion247.co.uk` is still a 404 — deliberately**, pending Warwick's approval of copy, articles and visual result.
+
+> **Two things a fresh session must not undo:** the site is NOT unbuilt, and the 404 is NOT a failure. It is the launch gate holding.
 
 ---
 
