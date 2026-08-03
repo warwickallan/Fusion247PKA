@@ -8,13 +8,43 @@
 // is how "the head SHA came from the API, not the body" becomes an observable fact rather than a
 // claim about the implementation.
 
-export function makeFakeGh({ headSha, comments = [], failHead = null }) {
+// WO-2026-08-03-05 — the double now also models OPEN-PR DISCOVERY, and models it PER REPOSITORY.
+//
+//   openPrs   { "<owner/name>": [n, …] }  or  [n, …] for the single-repo case
+//   byPr      { "<n>": { headSha, comments } }  — per-PR content, so a test can prove that TWO
+//                                                 open PRs each got their OWN round rather than
+//                                                 one PR's comments being served for both.
+//
+// `openPrs` defaults to `null` meaning "this double does not model discovery" and the endpoint is
+// REFUSED, exactly as any other unmodelled endpoint is. It deliberately does NOT default to "every
+// PR is open": a permissive default would let a test that never states what GitHub considers open
+// pass over the very behaviour under change.
+export function makeFakeGh({ headSha, comments = [], failHead = null, openPrs = null, byPr = null }) {
   const calls = [];
+  const forPr = (pr) => {
+    const entry = byPr?.[String(pr)];
+    return { headSha: entry?.headSha ?? headSha, comments: entry?.comments ?? comments };
+  };
   return {
     calls,
     async api(args) {
       calls.push(args.join(' '));
       const [endpoint] = args;
+
+      // Discovery: repos/<owner>/<name>/pulls?state=open&per_page=100
+      const openMatch = /^repos\/([^/]+\/[^/]+)\/pulls\?state=open(&|$)/.exec(endpoint);
+      if (openMatch) {
+        if (openPrs === null) {
+          throw new Error(`fakeGh: refusing open-PR discovery this double does not model: ${endpoint}`);
+        }
+        if (!args.includes('--paginate')) throw new Error(`fakeGh: open-PR discovery must paginate: ${args.join(' ')}`);
+        const jqIdx = args.indexOf('--jq');
+        if (jqIdx === -1 || args[jqIdx + 1] !== '.[].number') {
+          throw new Error(`fakeGh: unexpected open-PR query (expected --jq .[].number): ${args.join(' ')}`);
+        }
+        const list = Array.isArray(openPrs) ? openPrs : (openPrs[openMatch[1]] ?? []);
+        return list.length ? `${list.join('\n')}\n` : '';
+      }
 
       if (/^repos\/[^/]+\/[^/]+\/pulls\/\d+$/.test(endpoint)) {
         if (failHead) throw new Error(failHead);
@@ -22,11 +52,12 @@ export function makeFakeGh({ headSha, comments = [], failHead = null }) {
         if (jqIdx === -1 || args[jqIdx + 1] !== '.head.sha') {
           throw new Error(`fakeGh: unexpected pulls query (expected --jq .head.sha): ${args.join(' ')}`);
         }
-        return `${headSha}\n`;
+        return `${forPr(/\/pulls\/(\d+)$/.exec(endpoint)[1]).headSha}\n`;
       }
 
-      if (/^repos\/[^/]+\/[^/]+\/issues\/\d+\/comments$/.test(endpoint)) {
-        return JSON.stringify(comments);
+      const commentsMatch = /^repos\/[^/]+\/[^/]+\/issues\/(\d+)\/comments$/.exec(endpoint);
+      if (commentsMatch) {
+        return JSON.stringify(forPr(commentsMatch[1]).comments);
       }
 
       throw new Error(`fakeGh: refusing an endpoint this double does not model: ${endpoint}`);

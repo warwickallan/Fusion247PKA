@@ -32,7 +32,14 @@ export const ghCliReader = {
     if (fx.fail) throw new Error(`gh api ${args.join(' ')} failed: ${fx.fail}`);
     // Delegate to the STRICT double, so an endpoint the real seam would never build is refused
     // here too. A permissive double proves things about itself rather than about the code.
-    return makeFakeGh({ headSha: fx.headSha, comments: fx.comments ?? [] }).api(args);
+    //
+    // WO-2026-08-03-05: `openPrs` and `byPr` come from the fixture, so a spawned watcher's OPEN-PR
+    // DISCOVERY is answered from the same re-read-every-call file as everything else — which is
+    // what lets a test merge a PR, or open a new one, mid-run and watch the RUNNING watcher react.
+    return makeFakeGh({
+      headSha: fx.headSha, comments: fx.comments ?? [],
+      openPrs: fx.openPrs ?? null, byPr: fx.byPr ?? null,
+    }).api(args);
   },
 };
 

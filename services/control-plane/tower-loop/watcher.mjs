@@ -36,6 +36,7 @@
 import os from 'node:os';
 import fs from 'node:fs';
 import path from 'node:path';
+import { execFile } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
 import { openDb, isBusyError } from './db.mjs';
@@ -54,7 +55,7 @@ import { detectMergeClass } from './mergeClass.mjs';
 import { notify, composeMessage, composeLarryMessage } from './notify.mjs';
 // WO-TW-02 — the automatic trigger. The poller was already real and already proven; the only
 // thing missing was something that ran it without a human. That something is the loop below.
-import { pollPrComments, ghCliReader } from './pollPrComments.mjs';
+import { pollPrComments, fetchOpenPrs, ghCliReader } from './pollPrComments.mjs';
 // WO-TW-02 — the other half of Warwick's condition: the verdict goes back ONTO the PR. A
 // SEPARATE module with a SEPARATE seam; the poller stays structurally read-only.
 import { queueVerdictForTurn, postPendingVerdicts, ghCliWriter } from './postVerdict.mjs';
@@ -145,53 +146,153 @@ export async function postRound(pool, deps) {
   }
 }
 
-// ── WO-TW-02: poll targets, derived from the store ───────────────────────────
+// ── WO-2026-08-03-05: poll targets, discovered from GITHUB ───────────────────
+const REPO_SLUG_RE = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/;
+
+/**
+ * WHICH REPOSITORY this checkout belongs to, re-derived from the filesystem on every call.
+ *
+ * THE DURABILITY RULE THIS EXISTS TO SATISFY. Anything that lives only in `process.env` at spawn
+ * is lost the moment the process is replaced, and nothing refreshes it. `TOWER_PR_SEED` was
+ * exactly that shape: a launch-time binding, held in no store and no repository, which is why five
+ * rounds of validation passed on a mechanism that kept dying — every test supplied, at test time,
+ * the same binding production supplies once at launch and then never refreshes.
+ *
+ * The checkout's own `origin` remote is not that shape. It is on disk, it survives process death,
+ * and it is re-read every poll round rather than snapshotted at boot. A restarted watcher
+ * therefore re-derives it rather than inheriting it.
+ *
+ * Returns `null` — never throws — when there is no usable remote. Not knowing which repository we
+ * are in is a legitimate state (a detached copy, a tarball); the LOUD handling of "no repositories
+ * at all" belongs one level up, where it can be seen against the other sources.
+ *
+ * @param {object}   [opts]
+ * @param {string}   [opts.cwd]   directory to interrogate; defaults to this checkout's root.
+ * @param {Function} [opts.exec]  injectable child-process runner (tests). Never an env var — a
+ *                                test double selected by the environment would be one more
+ *                                launch-time binding of the kind this function removes.
+ */
+export function detectCheckoutRepo({ cwd = REPO_ROOT, exec = execFile } = {}) {
+  return new Promise((resolve) => {
+    exec('git', ['remote', 'get-url', 'origin'], { cwd, windowsHide: true, timeout: 10000 }, (err, stdout) => {
+      if (err) return resolve(null);
+      const url = String(stdout ?? '').trim();
+      // Both shapes GitHub hands out, with or without the `.git` suffix:
+      //   https://github.com/owner/name.git   git@github.com:owner/name.git
+      const m = /[/:]([A-Za-z0-9._-]+\/[A-Za-z0-9._-]+?)(?:\.git)?$/.exec(url);
+      if (!m || !REPO_SLUG_RE.test(m[1])) return resolve(null);
+      resolve(m[1]);
+    });
+  });
+}
+
+/** Repositories named by TOWER_PR_SEED. RETAINED, but no longer load-bearing: a seed entry now
+ *  contributes only its REPOSITORY, and its PR number has no power at all — that PR is polled if
+ *  and only if GitHub says it is open, exactly like every other. A stale seed can therefore no
+ *  longer pin the watcher to a merged PR, which is what it had been doing. */
+export function seedRepos(env = process.env) {
+  return String(env.TOWER_PR_SEED ?? '')
+    .split(',').map((s) => s.trim()).filter(Boolean)
+    .map((s) => {
+      const m = /^([A-Za-z0-9._-]+\/[A-Za-z0-9._-]+)(?:#\d+)?$/.exec(s);
+      return m ? m[1] : null;
+    })
+    .filter(Boolean);
+}
+
 /**
  * Which PRs this watcher should ask GitHub about, right now.
  *
- * Derived from the store rather than configured, on purpose: a configured list is a second source
- * of truth that goes stale the moment a PR closes, and it would have to be maintained by whoever
- * operates the watcher. Tower already knows which PRs it cares about — they are the ones its own
- * non-complete turns point at.
+ * THE CHANGE, AND WHY THE OLD RULE WAS SELF-EXTINGUISHING. Targets used to be the distinct
+ * `(repo, pr_number)` of turns `where state <> 'complete'`. That made the poll list a function of
+ * WORK-IN-PROGRESS STATE rather than of the repository: a round that completed removed its own PR
+ * from the list, so finishing a review successfully was the same event as going blind to that PR.
+ * A still-open PR could be made invisible by nothing more than Tower having done its job on it,
+ * and a PR nobody had ever opened a turn against was invisible from the start.
  *
- * `state <> 'complete'` is the right cut and is not the same as the suite's TERMINAL set: a turn
- * that has been reviewed/blocked/awaiting_warwick is PRECISELY the one waiting for Larry to
- * dispose its findings in a PR comment. Stopping the poll there would switch the loop off at the
- * exact moment it is needed.
+ *   openness is a fact about GITHUB          → asked of GitHub, every round
+ *   `state <> 'complete'` is a fact about US → kept, but only for RANKING under the cap
  *
- * BOOTSTRAP NOTE, and it is load-bearing: a store with no turns yields no targets, so the very
- * first checkpoint on a PR Tower has never seen is NOT discoverable this way. See TOWER_PR_SEED.
+ * So the cut is: **every open PR on every repository we know about is a target.** A merged or
+ * closed PR is not, whatever the store or the environment says about it.
+ *
+ * WHERE THE REPOSITORIES COME FROM — three sources, and every one of them is durable:
+ *   1. this checkout's `origin` remote        — on disk, re-read every round
+ *   2. every repo named by any turn in the store — in the database, survives restart
+ *   3. `TOWER_PR_SEED`                        — retained as an operator escape hatch for a repo
+ *                                               that is neither of the above
+ * Source 2 deliberately reads ALL turns and NOT `state <> 'complete'`: filtering there would
+ * reintroduce the self-extinguishing bug one level up, since a repo whose every turn had completed
+ * would stop being asked about.
+ *
+ * FAILS LOUD. A discovery failure THROWS, which `runWatcher` already converts into a failed round
+ * and, after three consecutive rounds, into a `tower_failure` alarm. It must never return an empty
+ * list on error: an empty list is what a healthy idle watcher returns, and silence that looks like
+ * health is the failure mode this whole change exists to remove.
  */
-export async function pollTargets(pool, { limit = PR_POLL_MAX_TARGETS } = {}) {
+export async function pollTargets(pool, { gh = ghCliReader, limit = PR_POLL_MAX_TARGETS, detectRepo = detectCheckoutRepo } = {}) {
+  // In-flight rounds, most recently active first. Used ONLY to rank targets under the cap, so a
+  // PR with a review round waiting on a disposition comment is never the one dropped.
   const { rows } = await pool.query(
     `select repo, pr_number, max(seq) as seq
        from tower.turn
       where repo is not null and pr_number is not null and state <> 'complete'
       group by repo, pr_number
-      order by seq desc
-      limit ?`,
-    [limit],
+      order by seq desc`,
   );
-  const targets = rows.map((r) => ({ repo: String(r.repo), prNumber: Number(r.pr_number) }));
+  const inFlight = new Map();
+  for (const r of rows) inFlight.set(`${String(r.repo)}#${Number(r.pr_number)}`, Number(r.seq));
 
-  // The bootstrap seed: one `owner/name#pr` (or a comma-separated few) this watcher should poll
-  // even with no turn pointing at it yet. Without it the store-derived rule cannot bootstrap —
-  // no turn means no target, no target means no poll, no poll means the first checkpoint is never
-  // seen, and the automatic journey would only ever work on a PR that was already known.
-  const seeds = String(process.env.TOWER_PR_SEED ?? '')
-    .split(',').map((s) => s.trim()).filter(Boolean)
-    .map((s) => {
-      const m = /^([A-Za-z0-9._-]+\/[A-Za-z0-9._-]+)#(\d+)$/.exec(s);
-      return m ? { repo: m[1], prNumber: Number(m[2]) } : null;
-    })
-    .filter(Boolean);
+  // Every repo any turn has ever pointed at — no state filter, deliberately (see above).
+  const { rows: repoRows } = await pool.query(
+    `select distinct repo from tower.turn where repo is not null`,
+  );
 
-  const seen = new Set(targets.map((t) => `${t.repo}#${t.prNumber}`));
-  for (const s of seeds) {
-    const k = `${s.repo}#${s.prNumber}`;
-    if (!seen.has(k)) { targets.push(s); seen.add(k); }
+  const repos = [];
+  const addRepo = (r) => { if (r && REPO_SLUG_RE.test(r) && !repos.includes(r)) repos.push(r); };
+  addRepo(await detectRepo());
+  for (const r of repoRows) addRepo(String(r.repo));
+  for (const r of seedRepos()) addRepo(r);
+
+  if (repos.length === 0) {
+    // Distinct from `pr_poll_no_targets`, and the distinction is the point: "there is nothing open
+    // to watch" and "I do not know where to look" are different states and must not share a line.
+    log('pr_poll_no_repos');
+    return [];
   }
-  return targets;
+
+  // ASK GITHUB. Any failure propagates — see the fail-loud note above.
+  const open = [];
+  for (const repo of repos) {
+    const numbers = await fetchOpenPrs(gh, { repo });
+    log('pr_poll_discovery', { repo, open: numbers.length, prs: numbers });
+    for (const prNumber of numbers) open.push({ repo, prNumber });
+  }
+
+  // A PR the store or the seed still points at, which GitHub says is no longer open. Reported
+  // rather than silently dropped: this is the exact transition that used to leave the watcher
+  // polling a corpse, so seeing it happen is worth a log line.
+  const openKeys = new Set(open.map((t) => `${t.repo}#${t.prNumber}`));
+  const dropped = [...inFlight.keys()].filter((k) => !openKeys.has(k));
+  if (dropped.length) log('pr_poll_targets_dropped', { dropped });
+
+  // Rank: in-flight rounds first (most recent), then the rest of the open PRs, newest first.
+  open.sort((a, b) => {
+    const sa = inFlight.get(`${a.repo}#${a.prNumber}`);
+    const sb = inFlight.get(`${b.repo}#${b.prNumber}`);
+    if (sa !== undefined && sb !== undefined) return sb - sa;
+    if (sa !== undefined) return -1;
+    if (sb !== undefined) return 1;
+    return b.prNumber - a.prNumber;
+  });
+
+  if (open.length > limit) {
+    // The cap is real rate-limit protection, but a silent cap is the same defect in a new shape:
+    // a PR that is never polled and never mentioned is invisible for exactly the same reason a
+    // merged target was.
+    log('pr_poll_targets_truncated', { considered: open.length, limit, dropped: open.slice(limit).map((t) => `${t.repo}#${t.prNumber}`) });
+  }
+  return open.slice(0, limit);
 }
 
 /**
@@ -204,7 +305,7 @@ export async function pollTargets(pool, { limit = PR_POLL_MAX_TARGETS } = {}) {
  * see runWatcher.
  */
 export async function pollRound(pool, deps) {
-  const targets = await pollTargets(pool);
+  const targets = await pollTargets(pool, { gh: deps.gh });
   if (targets.length === 0) { log('pr_poll_no_targets'); return { targets: 0, ok: 0, failed: 0, errors: [] }; }
 
   let ok = 0;
@@ -717,8 +818,11 @@ export async function runWatcher() {
         try {
           round = await pollRound(pool, deps);
         } catch (e) {
-          // pollTargets itself failed (the store, not GitHub). Treat as a failed round rather
-          // than crashing the turn loop; a store that is truly gone will fail the next query too.
+          // pollTargets itself failed — the store, OR (since WO-2026-08-03-05) open-PR DISCOVERY.
+          // Counting it as a FAILED round rather than a quiet zero-target round is load-bearing:
+          // discovery that fails silently would return no targets, and no targets is precisely
+          // what a healthy idle watcher looks like. This is the line that keeps a blind watcher
+          // from reading as a calm one, and it feeds the same 3-strike tower_failure alarm.
           round = { targets: 1, ok: 0, failed: 1, errors: [{ repo: '(targets)', pr: 0, error: String(e?.message ?? e) }] };
           log('pr_poll_targets_failed', { error: String(e?.message ?? e) });
         }
