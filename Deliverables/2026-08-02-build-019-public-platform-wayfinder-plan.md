@@ -36,7 +36,7 @@ This is not Larry being unhelpful. An interrupted build is how BUILD-018 happene
 
 ---
 
-## 🔻 STATUS — Phase 0 COMPLETE (promotion + map). Phase 1 is the frontier.
+## 🔻 STATUS — Phase 0 COMPLETE (promotion + map). **Phase 1 is the frontier and is UNPAUSED.**
 
 | | |
 |---|---|
@@ -45,9 +45,12 @@ This is not Larry being unhelpful. An interrupted build is how BUILD-018 happene
 | **Promoted at** | Fusion247PKA `7163a32` (`origin/main`) |
 | **Branch** | `build-019-public-platform-wayfinder` |
 | **Current phase** | Phase 0 — promotion and mapping: **COMPLETE**. Plan **ACCEPTED IN SUBSTANCE by Warwick, 2026-08-02**, with five bounded corrections since applied. |
-| **⏸️ BUILD STATUS** | **PAUSED by Warwick, 2026-08-02.** BUILD-019 feature implementation is stopped until the Tower watcher migration passes both acceptance journeys. **This is not a BUILD-019 blocker** — it is a deliberate ordering decision: the review loop gets fixed before the website is built through it. See `Deliverables/2026-08-02-tower-watcher-github-sqlite-migration-plan.md`. |
-| **Current gate** | Tower watcher migration acceptance. Phase 1 is authorised but **not to start** until that passes. |
-| **Exact next action** | **Not BUILD-019.** Complete the Tower watcher migration first. When it passes: **Phase 1 — website skeleton in the EXISTING `warwickallan/fusion247-web` repo and EXISTING `fusion247-web` Vercel project.** Initialise Next.js + TypeScript + Tailwind, add CI, turn the canonical-domain 404 into a real page. Nothing external, nothing paid, no account touched. |
+| **⏸️ BUILD STATUS** | **PAUSED AFTER PHASE 3 — deliberately, by Warwick, 2026-08-03.** Phases 1–2 are built; Phase 3 is in progress. **The programme order is now fixed: BUILD-019 Phases 1–3 → BUILD-006 VlogOps in full → BUILD-019 Phase 4 → the real end-to-end acceptance journey.** Phase 4 was specified against a **synthetic fixture**; it resumes instead with a **real producer and a real Publication Package** behind it. That is the whole reason for the reordering. |
+| **Next active phase** | **Phase 4 — publication contract + website adapter. DEFERRED, not abandoned.** It does not begin until BUILD-006 produces a real Publication Package and production flow for it to consume. |
+| **Model for Phase 4 when it resumes** | **Opus-high, with mandatory independent review (Codex).** It is the interface VlogOps inherits and the expensive thing to get wrong. |
+| **The other build** | `Deliverables/2026-08-03-build-006-vlogops-publishing-engine-wayfinder-plan.md` — BUILD-006 VlogOps Publishing Engine. It develops against the §4 contract in this map and does **not** wait for BUILD-019 Phases 4–7. |
+| **Current gate** | **Phase 3: production-READY, not production-published.** The protected Vercel preview is Warwick's review surface; promotion and rollback routes are documented and ready; `main` and the public domain are untouched. |
+| **⛔ THE LAUNCH GATE** | **Warwick has NOT approved the website copy, the three articles, the rendered visual result, or public launch.** PRs #1 and #2 stay unmerged. **Public production is not the review environment.** Promotion to `www.fusion247.co.uk` is a separate Warwick decision *after* copy and visual approval — a `product-decision` followed by a `merge-decision`, never a technical step. Phase 3's "preview→production" wording **does not override this map's own explicit Warwick launch authority** (§11). |
 | **Model for Phase 1** | **Routine implementation / lower-cost model** — bounded Work Order to Keel. Not Opus-high; the stack and the target are both settled. |
 | **Review route** | **Manual: `reviewDiff.mjs --claim`, claim derived from the Phase 1 gate, inside the three-execution Codex budget.** The watcher cannot be reached from a PR — SHIT TO DO #4. |
 
@@ -497,10 +500,10 @@ It is a **hypothesis about route, not law**. It gets corrected at phase boundari
 | Phase | Status | Model for this phase | Evidence |
 |---|---|---|---|
 | 0 — Promotion + Wayfinder map | ✅ **PASS** | Opus-high + Warwick | This map @ `build-019-public-platform-wayfinder`; `Builds/BUILD-019-fusion247-public-platform/`; live recon §5; Warwick accepted in substance 2026-08-02 |
-| 1 — Website skeleton live | ⬜ **NOT STARTED — the frontier** | **Routine / lower-cost** | — |
-| 2 — Information architecture + content model | ⬜ NOT STARTED | Mixed (senior for the content model) | — |
-| 3 — Deployment behaviour + runbook | ⬜ NOT STARTED | Routine | — |
-| 4 — Publication contract + website adapter | ⬜ NOT STARTED | **Opus-high + independent review** | — |
+| 1 — Website skeleton | ✅ **PASS (to the PR boundary)** | Routine | `warwickallan/fusion247-web` PR **#1**, head `167d6c2`. CI green, **7 executed subtests**, mutation-tested twice. WO-2026-08-03-01. **Not merged — by design.** |
+| 2 — Information architecture + content model | ✅ **PASS (to the PR boundary)** | Mixed | PR **#2**, head `9178bd7`. **16 site routes + 3 MDX articles**, all 200 locally with own-copy grep; CI green, **29 executed subtests**; 3 mutation tests (copy softened / link to nonexistent route / YouTube link added) each RED then GREEN. Both secret-scan scopes exit 0. WO-2026-08-03-04. |
+| 3 — Deployment readiness + runbook | 🟠 **IN PROGRESS** | Routine | WO-2026-08-03-07. Redefined by Warwick 2026-08-03: **production-READY, not production-published.** Preview `https://fusion247-4hdgh4xj4-fusion247.vercel.app` returns `302 → vercel.com/sso-api` (alive, SSO-protected). Production verified untouched: `www.fusion247.co.uk` **404**, `main` **`9414db1`**. |
+| 4 — Publication contract + website adapter | ⏸️ **DEFERRED — the resumption point** | **Opus-high + mandatory independent review** | Resumes **after BUILD-006 produces a real Publication Package**. Was specified against a synthetic fixture; that is what the reordering fixes. |
 | 5 — YouTube adapter | ⬜ BLOCKED (F1) | Routine + senior for ownership/recovery | — |
 | 6 — X adapter | ⬜ BLOCKED (F2) | **Opus-high + mandatory independent review** | — |
 | 7 — Media proof + launch | ⬜ BLOCKED (F3, launch approval) | Warwick decision throughout | — |

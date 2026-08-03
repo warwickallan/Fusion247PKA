@@ -26,16 +26,29 @@
 
 ---
 
-## 🔻 STATUS — Phase 0 (map) COMPLETE. Phase 1 is the frontier.
+## 🔻 STATUS — Phases 0–2 COMPLETE and MERGED. Phase 3 (Journey A) is the frontier.
+
+> ⚠️ **THIS BLOCK AND THE TRACKER BELOW WERE STALE UNTIL 2026-08-03.** They still said *"Phase 1 is the frontier / NOT STARTED"* while WO-TW-01 and WO-TW-02 were built, committed, merged to `main` and **running**. The map's own rule — update only at a phase boundary — was not honoured at two consecutive boundaries, so the durable record contradicted the repository for a full session. **Recorded rather than quietly overwritten**, per the Wayfinder rule on contradictions. The authority is the repository; this file was the defect.
 
 | | |
 |---|---|
 | **Goal** | One persistent GitHub-polling watcher, backed by SQLite, that closes the review loop with no human invocation |
-| **Branch** | `build-019-public-platform-wayfinder` (the acceptance PR is #90) |
-| **Current phase** | Phase 0 — mapping: **COMPLETE** |
-| **Current gate** | Keel's read-back on WO-TW-01 |
-| **Exact next action** | Dispatch WO-TW-01 to Keel: the SQLite store adapter behind the existing query surface. Read-back first, hold before implementing. |
-| **Model** | **Opus-high** for the store adapter and the trigger design (durable state, exactly-once, restart semantics). Routine for the mechanical call-site migration once the adapter exists. |
+| **Branch** | `build-019-public-platform-wayfinder` — **merged**. PR #90 merged 2026-08-02T23:30:33Z, head `d6dab69` → merge commit `eb975bc`; `origin/main` is now `eb975bc`. |
+| **Current phase** | Phases 0, 1 and 2 **COMPLETE**. Phase 3 — Journey A — **NOT STARTED**. |
+| **Current gate** | **Journey A: one real unattended review round, the nine-step acceptance in §7.** |
+| **Exact next action** | **Journey A cannot run against PR #90 — it is merged and closed.** A live PR is required as the substrate before step 1 can be executed. Settle that, then run the nine steps without manual invocation. |
+| **Model** | **Opus-high** to observe and adjudicate Journey A. The build phases are done. |
+
+### Phase 1–2 landing evidence, measured 2026-08-03 in `C:/Fusion247PKA`
+
+| What | Evidence | How established |
+|---|---|---|
+| WO-TW-01 store adapter exists | `services/control-plane/tower-loop/db.mjs`, header *"WO-TW-01 … the SQLite store handle"*; `db/` holds 5 schema files (`post_schema.sql` added) | read on disk |
+| WO-TW-02 trigger exists | `services/control-plane/tower-loop/run-watcher.mjs`, header *"WO-TW-02: three things about this file changed"*; commit `d6dab69` *"WO-TW-02: the persistent automatic trigger, and the verdict back onto the PR"* | `git log`, file read |
+| Both merged to `main` | `gh pr view 90` → `state: MERGED`, `mergedAt 2026-08-02T23:30:33Z`, `headRefOid d6dab69`, `mergeCommit eb975bce…` | `gh`, executed |
+| The tower-loop watcher is RUNNING | **PID 9616** — `node C:\Fusion247PKA\services\control-plane\tower-loop\watcher.mjs`. The legacy BUILD-010 `bin\tower-watch.js` is **also** still running as **PID 39920** — two watchers, one estate. | `Win32_Process`, executed |
+
+**Scope of this verdict, stated deliberately.** What is proven above is that the code **landed, merged and is running**. The acceptance evidence for WO-TW-01 (`executed=24 failures=0` on SQLite) and WO-TW-02 (kill/recover, no double-processing, mutation-tested alert) is the implementing worker's, recorded in those commits — **it was not re-executed in this session and is not being re-asserted here as if it were.**
 
 ---
 
@@ -79,21 +92,27 @@ The five architectural rulings, binding:
 
 Executed 2026-08-02 at `7163a32`+:
 
+> ⚠️ **MY FIRST FIGURES WERE MEASURED WITH THE WRONG INSTRUMENT — corrected by Keel at read-back, 2026-08-02.** I quoted `grep -ciE 'pg|pool|for update|skip locked'` as "Postgres call-sites". That counts **lines containing those letters**, including prose and comments — not database calls. **This is the fourth time I have published a confident number produced by a proxy rather than by the mechanism that matters.** The corrected table is below; the original method is recorded so the error is legible rather than tidied away.
+
 | Fact | Value | How established |
 |---|---|---|
-| Postgres call-sites, `watcher.mjs` | **42** | `grep -c` on pg/pool/FOR UPDATE/SKIP LOCKED |
-| …`loop.mjs` | 25 | same |
-| …`ingestComment.mjs` | 12 | same |
-| …`pollPrComments.mjs` | 5 | same |
-| …`findings.mjs` | 2 | same |
-| Postgres schema files | 4 — `loop_schema.sql`, `watcher_schema.sql`, `hold_schema.sql`, `comment_schema.sql` | `ls db/` |
-| SQLite anywhere in the repo | **none** | repo-wide grep for `better-sqlite3` / `node:sqlite` / `sqlite3` |
-| Node version | **v22.18.0** | `node -e process.version` |
-| `node:sqlite` | **available, but flagged EXPERIMENTAL** | required it live; emits `ExperimentalWarning` |
-| Existing test suite | 24 subtests (`W1–W8`, `P1–P6`, `T0–T7`), fails loudly on zero executed | README + `test/run-tower-loop-tests.mjs` |
+| Real `.query(` call-sites in the 5 files I named | **32** | Keel, counting actual calls |
+| …of which `pollPrComments.mjs` | **0** — it constructs a pool and hands it to `ingestPrComment` | same |
+| Real `.query(` call-sites, **whole directory** | **112**, plus **16** pool/client construction sites | same |
+| **Minimum migration set** | **10 modules**, not the 5 I named | see below |
+| Modules I missed, all unavoidable | `apply.mjs` (4) — the schema applier, imported by nearly everything · `notify.mjs` (2) — on the watcher path · `seed.mjs` (9) — required before any round, and the only explicit transaction client · `hold.mjs` (2) · `test/run-tower-loop-tests.mjs` (31) — the suite builds its own pool and asserts in raw SQL | same |
+| Postgres-specific constructs in use | **a closed set of 12 classes** — `now()` ×48, `::int` ×11, `jsonb` ×7, `on conflict` ×6, `gen_random_uuid()` ×6, `coalesce` ×5, `interval` ×8, `excluded.` ×2, `~` regex ×1, `generated always as identity` ×1, `array_agg` ×1, `for update skip locked` ×1 | same |
+| **Baseline: existing suite on Postgres** | **`executed=24 failures=0`, ALL PASS, exit 0** — measured today on a throwaway cluster, then torn down | Keel, executed |
+| Suite with no database | exits 1, **0 executed** — fails loudly, as designed | same |
+| Driver | **`better-sqlite3@13.0.2` — SETTLED BY INSTALL.** Prebuilt binary, 6s, no compilation. SQLite 3.53.4, WAL confirmed, `RETURNING` / `ON CONFLICT DO NOTHING` / `UPDATE…LIMIT` / named CHECK / UDFs all verified | same |
+| `node:sqlite` | Works (SQLite 3.50.2) but experimental. **Recorded as a fallback, not chosen** | same |
+| Postgres schema files | 4 in `db/` — **but see G5: `tower.*` is bigger than these four** | `ls db/` |
+| Node version | v22.18.0 | executed |
 | Live legacy watcher | `tower-watch.js` PID 38820, ClickUp-driven, still running | process table |
 
-**The tests are the safety net for this migration** and they are currently Postgres-gated. Keeping them executable is a first-class requirement, not a nicety — a migration whose tests stop running looks identical to one that works.
+**The tests are the safety net for this migration** and they are currently Postgres-gated. Keeping them executable is a first-class requirement, not a nicety — a migration whose tests stop running looks identical to one that works. **The bar is the literal line `executed=24 failures=0`**, reproduced on SQLite.
+
+**One correction to my own regrowth claim, because it was overstated.** `pg` is a **devDependency**, not a runtime dependency. So this migration swaps one declared dependency for another, and swaps pure-JS for native/compiled — **the dependency count does not fall**. The real and worthwhile win is removing the Postgres *server* from the runtime and from the test path. That is a different claim and it is the accurate one.
 
 ---
 
@@ -204,7 +223,9 @@ Already diagnosed and half-done tonight:
 | Phase | Status | Evidence |
 |---|---|---|
 | 0 — Map + record correction | ✅ **PASS** | This map; BUILD-019 SHIT TO DO #4 corrected on the record |
-| 1 — SQLite store adapter | ⬜ **NOT STARTED — the frontier** | — |
-| 2 — Persistent trigger | ⬜ NOT STARTED | — |
-| 3 — Journey A (unattended round) | ⬜ NOT STARTED | — |
+| 1 — SQLite store adapter | ✅ **PASS** — landed and merged | `tower-loop/db.mjs` + 5 `db/*.sql`; in `origin/main` via PR #90 (`eb975bc`). Suite evidence is the worker's, in-commit; not re-executed 2026-08-03. |
+| 2 — Persistent trigger | ✅ **PASS** — landed, merged, running | `run-watcher.mjs` @ `d6dab69`; PID **9616** live. Kill/recover + mutation evidence is the worker's, in-commit; not re-executed 2026-08-03. |
+| 3 — Journey A (unattended round) | 🟠 **NOT STARTED — the frontier, and BLOCKED on its substrate** | Cut short by Warwick's merge override. **PR #90 is merged and closed, so the specified target no longer exists as a live surface.** |
 | 4 — Journey B (footer semantics) | ⬜ NOT STARTED | — |
+
+**Two watchers are running simultaneously** — the tower-loop watcher (PID 9616) and the legacy BUILD-010 ClickUp-driven `bin\tower-watch.js` (PID 39920). Journey A step 9 requires proving **zero ClickUp calls** on the path under test; a second, ClickUp-driven watcher alive on the same estate is a confounder that must be resolved before that step can mean anything.
