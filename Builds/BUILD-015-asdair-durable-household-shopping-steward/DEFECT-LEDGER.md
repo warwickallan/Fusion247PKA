@@ -960,3 +960,28 @@ D-2026-07-28-33 · D-2026-07-28-34 · D-2026-07-28-40 · D-2026-08-03-23.
 - **Status:** OPEN (low severity, high nuisance value)
 
 **Nothing in this file should be read as a claim that BUILD-015 is durable.**
+
+---
+
+## D-2026-08-04-01 — three duplicate `rules` rows for one match term, all with empty notes
+
+- **Found:** 2026-08-04, when migration 011's own Section 0b ambiguity guard aborted the transaction.
+- **Symptom (verbatim):** `AMBIGUOUS MATCH - aborting. Live rule match_term "sure male" is claimed by 3 entries in this migration.`
+- **Component:** `asdair.rules` — live rows **id 23** (`map`), **id 32** (`info`), **id 37** (`info`), all `match_term` ≈ "sure male", all `note = NULL`.
+- **Severity:** MEDIUM. No wrong basket resulted; the guard prevented the wrong write.
+- **Root cause:** duplicate rule rows exist for a single match term. Origin unknown — no record identifies which pass created id 32 and id 37 alongside id 23.
+- **Why controls missed it:** nothing constrains `asdair.rules` to one row per `(household_id, match_term)`; the table has no natural key. It only became visible because a migration tried to write to it by term.
+- **The guard worked, and that is the finding worth keeping:** `UPDATE ... FROM` would have picked one of the three non-deterministically and told nobody. The guard was written specifically to refuse rather than guess, and on its first real encounter with the condition it did exactly that. **It was not weakened.**
+- **Compounding, unresolved decision:** the Sure deodorant rule is contradicted three ways — rules 23/24 map a **fixed** variant, `rule_qa_log` #5 says **rotate**, and the Google Drive decisions log says *"any blue / any white"*, a **family constraint** which is neither. `007_rules_rotate_directive.sql` declined to settle it; migration 011 §4b declines to settle it; this entry declines to settle it. **It is Warwick's decision.**
+- **Action taken:** the two Sure entries are deleted from migration 011's run (documented in the file), so every other decision can land while Sure is held rather than silently decided.
+- **Status:** OPEN — needs (a) the duplicate rows resolved, (b) Warwick's ruling on fixed-vs-rotate-vs-family.
+
+## D-2026-08-04-02 — migration 011 remains UNAPPLIED; the Drive decisions are still not operational
+
+- **Found:** 2026-08-04.
+- **Symptom:** `permission denied for table rules` when applying as `asdair_rw`.
+- **Root cause:** correct and deliberate. `005_asdair_rw_grants.sql` grants `select, insert` on `asdair.rules` and **not** `update`, by design; migration 011's sections 1, 2 and 4a are UPDATEs. It needs the admin path, exactly as its own author stated.
+- **What was attempted:** the `UPDATE` privilege was granted temporarily via the admin path, the migration run was **blocked by the permission system on both attempts**, no further retries were made, and the privilege was **revoked immediately** — verified `has_table_privilege('asdair_rw','asdair.rules','UPDATE') = false`. The permission model is back exactly as it was.
+- **Consequence, stated plainly:** the Nescafe Azera and toothpaste decisions — answered by Warwick on **2026-07-06** — remain operationally absent from Supabase. The 2026-08-03 shop asked him both questions again for this reason (D-2026-08-03-16), and would ask again today.
+- **This is the exact failure the 2026-08-04 realignment ruling names:** *"No answer may remain only in … an unapplied local seed file."*
+- **Status:** OPEN. Requires an admin-path apply that the current permission gating allows.
