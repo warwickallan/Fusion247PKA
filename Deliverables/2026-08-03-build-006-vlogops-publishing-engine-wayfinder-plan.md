@@ -165,6 +165,21 @@ three seed routes
 
 **The Master Story Package is one canonical creative truth with sibling adaptations.** The blog is not a raw transcript; the video and blog cannot drift into unrelated claims.
 
+### The three intake routes, in the detail Phase 1 needs
+
+Carried from the canonical source, because Phase 1 is the frontier and "three routes" alone is not implementable.
+
+**Route 1 — existing records.** Warwick selects a date, period, session, build or journal thread. **VlogOps snapshots the smallest sufficient evidence bundle into its own durable store.** *"Smallest sufficient"* is the design constraint — not everything in range.
+→ **See F3: the streams this route names are partly dry or outside Git.** `Deliverables/` and git history must be first-class here, not fallback.
+
+**Route 2 — promote another Fusion247 output.** Eligible Cockpit outputs expose a **Promote to VlogOps** action. **Promotion creates a durable Content Seed containing: a source snapshot · provenance · privacy state · origin · proposed angle.** Those five fields are the contract for this route.
+
+**Route 3 — Warwick-supplied seed.** Free text, a pasted conversation, an attached document, or a supported URL — **plus the angle or question he wants taken.** The angle is part of the seed, not something inferred from it. The source's own example, kept because it sets the register:
+
+> *Today I thought X was a fucking good idea. GPT and Pax told me it was shite. This is what I missed.*
+
+**All three routes converge on one durable Content Seed with stable identity**, and every one of them snapshots with timestamps, provenance and integrity metadata — see the critical reliability rule in §3.
+
 ### Cockpit
 
 Views: **Seeds · Developing · Awaiting Warwick · Production · Published · Problems.**
@@ -174,37 +189,77 @@ Actions: add seed · promote to VlogOps · approve · request revision · park �
 
 ## 6. FOG — genuinely unresolved, with how each resolves
 
-**Pax was dispatched on 2026-08-03 to resolve F1–F5. Findings are absorbed into this section as they land; anything still marked OPEN is genuinely unresolved and must not be guessed at.**
+**Pax researched F1–F5 on 2026-08-03 and the findings are absorbed below. A later session does not need to repeat this research.** Every figure is dated and sourced. **What is still OPEN is genuinely open and must not be guessed at.**
 
-### 🟠 F1 — HeyGen cost and capability for a 9–12 minute render — **OPEN, and it carries spend**
+### 🔴 F1 — HeyGen — **cost RESOLVED. A new hard blocker found: the script does not fit.**
 
-The acceptance criterion names a 9–12 minute video. Unknown: API availability and plan tier · how long-form is billed · realistic cost per render · maximum duration and whether segmenting is required · rate limits · async callbacks vs polling.
-**Resolves by:** Pax against current official documentation, then Warwick's account/plan reality (BUILD-019 F3 — he said he would investigate).
-**While open:** Phases 1–5 proceed in full. Production orchestration is designed against the contract with a stub renderer.
-**Gate:** any real spend is Warwick's, before it happens.
+**RESOLVED (Pax, official docs, 2026-08-03; two sources reconcile arithmetically):** no subscription tier needed — the API is standalone **pay-as-you-go from $5**, prepaid USD wallet, balance at `GET /v3/users/me`. Billed **per second of output, identical for 720p and 1080p**. Max **30 minutes and 50 scenes per video**, so a 9–12 minute video needs no duration segmenting. **PAYG cap: 10 concurrent jobs**; `429` carries `Retry-After`. Async is well-shaped for us: persistent webhooks or per-request `callback_url` + `callback_id`, events `avatar_video.success`/`.fail`, and **`Heygen-Event-Id` is the documented replay-defence header** — it maps straight onto an idempotent inbound handler.
 
-### 🟠 F2 — YouTube Data API upload constraints — **OPEN**
+**Cost of one 9–12 minute render — and the 4× spread is the gate:**
 
-Unknown: quota cost per insert against the daily quota (i.e. real uploads/day) · whether a newly-created, unverified channel can upload via API at all · the AI/synthetic-media disclosure field · what `privacyStatus: private` permits · required OAuth scopes.
-**Resolves by:** Pax against official documentation; the channel-specific half only when the identity review clears (SHIT TO DO #4).
-**While open:** the adapter is BUILD-019's anyway; BUILD-006 only needs the contract.
+| Engine / avatar type | $/min | 9–12 min |
+|---|---|---|
+| **Avatar III — Digital Twin / Studio** | $1.00 | **$9.02 – $12.02** |
+| Avatar IV / V — Digital Twin | $4.00 | **$36.02 – $48.02** |
 
-### 🟠 F3 — What the Source Compiler can actually read today — **OPEN, and it is Phase 1's dependency**
+**Do not write a single number into a Work Order.** Which applies turns entirely on **which engine Warwick's authorised avatar is bound to** — still unknown, and it is BUILD-019 F3.
 
-Intake route 1 names "Flight Recorder / session / build evidence". Unknown: what those artefacts really are in this repository, their format and stability, and whether the Daily Flight Recorder is Git, Drive or ClickUp. **This decides whether the Source Compiler is a file reader or a connector problem** — a materially different build.
-**Resolves by:** Pax, from the repository, with paths.
-**While open:** Phase 1 designs the seed store and content identity, which are independent of source shape.
+> #### 🔴 THE BLOCKER: **`Script text: Maximum 5,000 characters.`**
+> A 9–12 minute script is **~1,260–1,680 words ≈ 7,200–9,600 characters**, using this estate's own measured spoken rate (`Deliverables/2026-08-01-vlogops-wayfinder-plan.md:48`). **A 9–12 minute script does not fit in 5,000 characters.**
+> **Unresolved: is the limit per VIDEO or per SCENE?** The usage-limits page files it under "Avatar Input"; the v2 `video_inputs[].voice.input_text` shape implies per-scene. That is the difference between *"split the script across scenes in one render"* and *"you cannot render 9–12 minutes in one call."*
+> **Resolved by:** reading the current `POST /v3/videos` request schema, or **one ~$1 Avatar III test render** with a >5,000-character script. **DO NOT GUESS IT.** With 50 scenes allowed per video, per-scene is the likely answer — and "likely" is exactly the word that has cost this estate repeatedly.
 
-### 🟠 F4 — What durable-orchestration machinery already exists to reuse — **OPEN**
+**Assume a retried render is charged again.** Nothing in the docs indicates vendor-side deduplication. **The idempotency must live on our side of the seam** — this is a design constraint on Phase 6, not a footnote.
 
-The estate has leases, idempotency, retry, outbox and a SQLite store built for the Tower loop (`services/control-plane/tower-loop/`). VlogOps needs the same shapes. **The regrowth cap binds: reuse, do not grow a second framework.**
-**Resolves by:** Pax, naming concrete modules and where reuse is forced or awkward.
+### 🟠 F2 — YouTube — **quota RESOLVED and it is a non-issue. The real gate is an audit, not code.**
 
-### 🟠 F5 — ObsidiWikAi's real state as an optional retrieval source — **OPEN**
+**The widely-known numbers are stale.** `videos.insert` no longer costs 1,600 units: it is **1 unit in a dedicated Video Uploads bucket, ~100 calls/day** (changed 2025-12-04; buckets separated 2026-06-01). Uploads no longer compete with reads. **Quota is not a constraint for VlogOps.**
 
-`Deliverables/BACKLOG.md:41` records the LightRAG→graph pipeline as existing but **not wired into live capture**. A live `brain_search` on 2026-08-03 returned `personal_vault_access: false` — world encyclopedia only, personal vault unreachable.
-**Resolves by:** Pax establishing built vs running vs reachable.
-**Binding regardless of the answer:** it is one optional source. **It never becomes a prerequisite.**
+**The actual blocker:** *"All videos uploaded via the `videos.insert` endpoint from unverified API projects created after 28 July 2020 will be restricted to private viewing mode."* Lifting it requires a **YouTube API Services compliance audit** — separate from, and additional to, the channel's identity review. **Consequence: an unaudited project can upload, and the video is permanently locked private — it cannot be made public by API or in Studio.** So the map's "default Private while proving" posture is **free**; going public is gated on an **audit with lead time**, not a code change. That is a Warwick decision to start early, not a research finding.
+
+**Also resolved:** `status.containsSyntheticMedia` (boolean) exists and a realistic HeyGen avatar is squarely in scope · the unverified-channel duration cap is **15 minutes**, so 9–12 minutes is under it · **phone verification is NOT needed for upload length — it IS needed for custom thumbnails**, which the Master Story Package explicitly produces. *(This narrows BUILD-019 F1: the pending review gates the thumbnail and publication, not the upload.)* · `youtube.upload` is least-privilege for upload alone; confirm per-method before fixing the scope set, since `videos.update` and thumbnails likely need broader.
+
+**`privacyStatus: private` is not link-shareable.** If Warwick needs to view a proof render on his phone, **`unlisted` is the correct value**, not `private`.
+
+### 🔴 F3 — Source Compiler — **RESOLVED, and the answer is worse than "file reader or connector"**
+
+**File-reader-shaped, and stable, for:** session logs at `Team Knowledge/session-logs/YYYY/MM/…md` (7-key frontmatter, verified identical five weeks apart; parse `type` permissively — one legacy value is outside the template enum) · `Builds/BUILD-NNN-*/**.md` (freeform, no frontmatter) · `Deliverables/YYYY-MM-DD-*.md`. Close-session entries are contractually required to carry `## VlogOps / story signals` (`AGENTS.md:182`) — **a purpose-built editorial channel already exists in the schema.**
+
+**Connector-shaped, and now unreliable, for:** the **Daily Flight Recorder**, which lives as a **ClickUp Docs page** (`Team Knowledge/session-logs/2026/07/2026-07-15-16-00_larry_…md:47,53`). **Warwick's 2026-08-03 ruling makes ClickUp unreliable, and dispatched specialists have no MCP connectors, so a worker cannot read it at all.**
+
+> #### 🔴 THE FINDING THAT MATTERS MOST: **the named intake streams are dry.**
+> **There are ZERO session logs in `Team Knowledge/session-logs/2026/08/`.** Newest is `2026-07-30-23-16`. Established twice — by directory glob, and independently by a draft this morning that checked *"across all refs via `git log --all --diff-filter=A`"*. **The four most eventful days in this estate's history produced no entry in VlogOps' primary intake stream.**
+>
+> That same draft records the workaround it was forced into: the evidence window was rebuilt *"from git history, `Deliverables/`, the audits and the programme record — **not** from the stream the pipeline is designed around."*
+>
+> **A Source Compiler built against the streams the North Star names would be a compiler with nothing to compile.** The stream that actually carried today's real episode was `Deliverables/` **plus git history** — which is not on the list.
+>
+> **Phase 2 must therefore treat `Deliverables/` and git history as first-class intake, not as fallback.** Whether the session-log gap is a habit failure or a four-day anomaly is **one sentence from Warwick**, and it changes whether Phase 2 also needs to fix the stream or merely read around it.
+
+### 🟠 F4 — Orchestration — **RESOLVED on what exists. The store choice is genuine, recorded fog.**
+
+**Nothing needs building.** The outbox, idempotency-key, lease/claim, attempt-budget and dead-letter shapes exist and are tested **three times over**:
+
+1. **`services/control-plane/worker/` — the generic durable job queue** (Postgres `ops.*`). Closest fit and domain-neutral: `enqueue.mjs` (job + event in one transaction, `idempotency_key` UNIQUE, returns `{job, deduped}`) · `worker.mjs` (`claim_job` with `FOR UPDATE SKIP LOCKED`, completion guarded by `status='leased' AND lease_owner=worker` so a reclaimed worker's effect rolls back) · **a real outbox** with claim-then-send, backoff, dead-letter and a `SendingWatchdog` for crash-mid-send. Has its own suites.
+2. **`services/control-plane/tower-loop/` — SQLite, WAL.** Reusable *shapes* (lease, notification dedup, heartbeat, deterministic turn key, verdict-post outbox with an invisible marker for the crash window) but **every table is `tower.*` and every module is coupled to review turns and PR comments.**
+3. **`services/asdair/pipeline/` — the best *pattern* reference:** guarded transition as mutual exclusion, generation-carrying idempotency keys, command ledger separated from the human to-do list, invariants asserted in tests. Its resumability contract is the doctrine VlogOps needs.
+
+Plus two **directly liftable, zero-dependency** modules: `services/fusion-capture-gateway/src/core/idempotency.js` and `retryPolicy.js`.
+
+> **🟠 STILL FOG — the store, and it has recorded priors on BOTH sides.** The generic queue needs a **Postgres server**, and `CONTROL_PLANE_DEV_DATABASE_URL` is unset in a normal session (`Deliverables/BACKLOG.md:28`). Tower *just removed* Postgres (WO-TW-01, PR #90 → `eb975bc`). But `BACKLOG.md:28` also records Warwick's boundary verbatim: ***"do NOT substitute SQLite for Postgres as a side project."***
+> **This is a real decision with evidence pulling both ways. Record it; do not settle it silently at Phase 1.**
+
+**Also:** neither queue is packaged (`private: true`, no `exports`) — reuse means cross-directory import or copying; there is no shared library boundary today. Two `220_` migrations collide in `db/mypka/` (cosmetic). **No HeyGen or YouTube adapter exists anywhere in the repository** — both are new code, and both are BUILD-019's.
+
+### ✅ F5 — ObsidiWikAi — **RESOLVED, and the answer settles it permanently**
+
+**`personal_vault_access: false` is not a degradation — it is a frozen design constant.** `services/obsidiwikai/src/core/brainAccess.mjs:21-25` declares `RESPONSE_SCOPE = Object.freeze({ knowledge_domain: 'world', surface: 'encyclopedia', personal_vault_access: false })`. **There is no flag to flip.** The Brain is by construction a read-only retrieval surface over **learned external sources** — it was never a route into MyPKA session logs or build evidence, and making it one would be a different build.
+
+**Therefore, stated once so it is never re-litigated:**
+- **For intake route 1 — Warwick's own session and build evidence — ObsidiWikAi is NOT a source at all.** Not today, not with work.
+- **For external corroboration inside a script** — what a video actually said, with citations back to source — it is **available today**, read-only, already wired into Larry's runtime via `.mcp.json`.
+
+The service is live (LightRAG 1.5.4 + Neo4j 5.26) but **unmerged** (draft PR #59) — a governance state, not a runtime one. **The learn pipeline is not running as a daemon** (`BACKLOG.md:39-44`), so new material does not enter the graph automatically. **VlogOps must treat a Brain miss as normal** — with `personal_vault_access: false`, a miss on Warwick's own material is the *expected* answer, not a fault. `C:/.fusion247/lightrag.env` is a **denied private surface** — any Work Order touching it must declare it.
 
 ---
 
@@ -254,6 +309,48 @@ The estate has leases, idempotency, retry, outbox and a SQLite store built for t
 
 ---
 
+## 9.1 THE REVIEW LADDER — how human-facing work gets reviewed (Warwick, 2026-08-03)
+
+**This governs every review stage in this build — Phase 4 verification, Phase 5 approval, Phase 7 publication — and it governs BUILD-019's website equally. It is the rule, stated in Warwick's words:**
+
+> **Human-facing work is reviewed first from source, then from a rendered non-production environment, then promoted publicly only after approval. Authentication failure by an agent is not evidence that the review environment does not exist.**
+
+Three rungs, in order, and none of them is production:
+
+| Rung | Surface | What it is for |
+|---|---|---|
+| **1** | **Source** — the copy, the script, the article, the Master Story Package, in the pull request or the Cockpit | Read the words before anything renders them |
+| **2** | **A rendered non-production environment** — the protected preview | See the thing as a human will see it |
+| **3** | **Public promotion** | **Only after approval. Never as a review step.** |
+
+### Why this is written down here, in this build's map
+
+**Because I got it wrong on 2026-08-03 and the failure was instructive.** A worker's `curl` against the Vercel preview returned `302 → vercel.com/sso-api`. I recorded that correctly as *"no public unauthenticated 200 is possible"* — and then let it become *"the site has never been seen rendering, therefore Phase 3 needs a production deploy to prove itself."*
+
+**That inference was wrong.** The preview existed, rendered and was reachable — by the account owner, logged in. **An agent's inability to authenticate is a fact about the agent, not about the environment.** Warwick had to stop a Work Order that would have published unapproved copy to a live public domain to satisfy a review step that a login would have satisfied.
+
+### And the second half, which matters more
+
+Warwick, 2026-08-03, on what happened next:
+
+> *"He is astonishingly capable when solving a real bounded problem. Then the moment you ask him to make the capability durable, he starts attempting to build the Ministry of Website Observation, complete with constitutional court and a subcommittee for redirects."*
+>
+> *"The durable lesson does not need another programme."*
+>
+> *"The build itself is excellent for a first pass. The process around reviewing it briefly became much stupider than the thing being reviewed."*
+
+**That is the regrowth cap in its most precise form yet, and it is aimed at exactly this section.** The response to getting a review step wrong is **not** a review framework, a promotion gate service, an environment registry or a verification programme. It is the four lines in the table above.
+
+**Binding consequences for BUILD-006:**
+
+- **Phase 4 verification reviews the Master Story Package from source first.** A verifier that cannot read the words has not verified anything, and rendering is not a precondition for reading.
+- **Phase 5's single approval is taken on rung 1 and rung 2 together** — Warwick reads the package and sees it rendered — and **production is downstream of his approval, never a step within it.**
+- **Phase 7 publishes only what has passed both.** A destination adapter is not a preview.
+- **When a check fails, establish which rung failed and why before changing anything.** An auth failure, a 302, a protected URL and a missing environment are four different facts. Treating them as one is how a review step turns into a public deployment.
+- **If the answer to a review problem is to build something, the diagnosis was rejected.** Same rule as everywhere else in this file; it simply gets broken here most often, because review feels like governance and governance is the thing this estate grows when it is anxious.
+
+---
+
 ## 10. Execution route
 
 | Phase | Outcome | Gate / evidence | Model |
@@ -262,10 +359,10 @@ The estate has leases, idempotency, retry, outbox and a SQLite store built for t
 | **1** | **Seed intake + durable Content Seed store.** All three routes. Stable content identity, versioning, immutable snapshots, provenance, privacy state. | A seed from each route lands durably; kill mid-intake and recover; identity survives restart | **Opus-high** — identity and durable state are inherited by everything downstream |
 | **2** | **Source Compiler.** Deterministic acquisition, dedupe, chronology, bounded evidence packs. | A real seed produces a bounded, provenance-complete evidence pack; a connector failure cannot alter an existing run | **Opus-high** for the snapshot/integrity design; **routine** for adapters |
 | **3** | **Scribe + Master Story Package.** Versioned capability contract. Story question → beats → master narrative → script + blog + titles + thumbnail direction + derivatives. | A package a human recognises as Warwick's voice; siblings provably derived from one truth | **Opus-high** — this is the product's creative core |
-| **4** | **Verification.** Independent fact, quotation, privacy, rights, cross-format consistency. Must be able to BLOCK. | Made to fail: a planted factual error, a private detail and a rights gap are each caught and each block | **Opus-high** + **independent review (Codex)** |
-| **5** | **Cockpit + the single approval.** Six views, the normal actions, durable approval state. | Warwick approves once from the Cockpit and production proceeds unattended | **Mixed** — Felix + Vera for UI; senior for approval-state design |
+| **4** | **Verification.** Independent fact, quotation, privacy, rights, cross-format consistency. Must be able to BLOCK. **Reviews from SOURCE — §9.1 rung 1.** | Made to fail: a planted factual error, a private detail and a rights gap are each caught and each block | **Opus-high** + **independent review (Codex)** |
+| **5** | **Cockpit + the single approval.** Six views, the normal actions, durable approval state. **The approval is taken on §9.1 rungs 1 and 2 together — source plus a rendered non-production view. Production is downstream of it, never inside it.** | Warwick approves once from the Cockpit and production proceeds unattended | **Mixed** — Felix + Vera for UI; senior for approval-state design |
 | **6** | **Durable production orchestration.** HeyGen jobs, callbacks/polling, retries, asset versions, idempotency, recovery. | Duplicate submission harmless; killed mid-render recovers; no double-charge | **Opus-high** + **Warwick spend gate** |
-| **7** | **Publication Package + the real end-to-end journey**, through BUILD-019's adapters. | The eleven acceptance criteria in §9 | **Opus-high** + **Warwick decisions throughout** |
+| **7** | **Publication Package + the real end-to-end journey**, through BUILD-019's adapters. **Publishes only what passed both review rungs — §9.1 rung 3.** | The eleven acceptance criteria in §9 | **Opus-high** + **Warwick decisions throughout** |
 
 **Do not default to the most expensive model.** Adapters, Cockpit build-out and routine wiring are ordinary implementation. Opus-high is for durable identity (1), snapshot integrity (2), the creative contract (3), verification (4) and orchestration/recovery (6).
 
