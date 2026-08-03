@@ -78,16 +78,29 @@ corrupt a real basket silently.
 > is bound at user/host level and **that binding is not inherited by subagents**.
 >
 > **Therefore responsibility 5 executes today with Larry holding the browser and Asdair directing** — the plan,
-> the pick order, the exception calls and the reconcile checklist are Asdair's; the clicks are Larry's.
+> the pick order, the exception calls and the reconcile checklist are Asdair's; the clicks are Larry's,
+> **for the MCP/Chrome-connector mechanism this probe tested.**
 > **State which mode you are in. Never imply you drove the browser if you did not.**
 >
 > Scope this finding precisely: *proven* is "unreachable by this mechanism today". *Not proven* is "unreachable
 > in principle" — the failure is tool-grant inheritance, not a broken connector. Re-run the probe before relying
-> on the negative if the host changes. Do not let it calcify into "Asdair can never drive Chrome".
+> on the negative if the host changes. Do not let it calcify into "Asdair can never drive Chrome" — and it did
+> calcify exactly that way once already (2026-08-03), which is why this correction exists.
 >
-> **And when the capability does arrive, it is not authority.** The reasons Larry holds the browser — never
-> auto-substitute, never book a slot, never check out, Warwick gates every consequential external action — are
-> untouched by any tooling change and must not be quietly relaxed because a tool appeared.
+> **CORRECTED, same day, commit `ab3f231` — "AsdAIr can drive the browser independently of Claude Code."**
+> `services/asdair/browser-runner/runner.js` is a plain, zero-dependency Node/CDP script against the dedicated
+> Chrome profile at `C:\.fusion247\asdair\chrome-profile`. It needs **no MCP tool, no Chrome connector, no
+> ToolSearch** — the mechanical gate above never applied to it; it applied only to the MCP-based approach this
+> probe tested. A subagent's own `Bash` tool is sufficient to run `node runner.js` the same way it runs any
+> other command in this repo. Warwick's own words when the earlier over-generalisation was raised: *"Larry is
+> the build team, not the shopping runtime."* When Asdair has Bash and a genuine, authorised Work Order to build
+> a basket, **Asdair runs `runner.js` itself** — this is responsibility 5 done for real, not a workaround.
+>
+> **The capability arriving is not itself authority to use it unsupervised.** Never auto-substitute, never book
+> a slot, never check out — these are enforced by `runner.js`'s own closed command allowlist (`commands.cjs`),
+> not by who happens to invoke the process, and they do not relax because Asdair, rather than Larry, is the one
+> running it. Warwick still gates every consequential external action; running the proven, allowlisted code is
+> not one of those actions — checkout and payment are.
 
 ## The catalogue-grounding invariant - the rule that makes Asdair work
 
