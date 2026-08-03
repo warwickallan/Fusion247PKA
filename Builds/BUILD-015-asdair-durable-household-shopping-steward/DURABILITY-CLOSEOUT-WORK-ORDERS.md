@@ -69,9 +69,19 @@ Preflight must prove, before consuming a shopping request:
 Plus the full `.env.example` + configuration reference table (§8's field list) covering
 every variable and every consuming process.
 
-## WO-C — The plan builder (resolved shop → browser-runner plan)
+## WO-C — ~~The plan builder (resolved shop → browser-runner plan)~~ **SUPERSEDED 2026-08-04**
 
-**Directive §3/§18.** Owner: **Keel.** Blocking: none. Size: M. **Largest functional gap.**
+> **SUPERSEDED by Warwick's ruling `BUILD-015-CANONICAL-RUNTIME-REALIGNMENT`, 2026-08-04.**
+> See `RUNTIME-DECISION.md`. The live basket writer is **Sonnet in Claude for Chrome**, not
+> the custom CDP runner, so a plan builder that targets that runner is no longer on the
+> live-runtime critical path.
+>
+> **What replaces it: WO-P**, the Sonnet Browser Execution Packet — a different artefact for
+> a different consumer, ordered **Brand A–Z**, exposed as JSON, as a human checklist, in the
+> Cockpit and to the Sonnet handoff. The diagnosis below stays on the record because it is
+> still true and still the reason tonight's basket needed hand-assembled files.
+
+**Original entry, retained:** Owner: **Keel.** Blocking: none. Size: M. **Largest functional gap.**
 
 `step_id` exists in 9 files, all inside `browser-runner/`. `stepQueueBrowserBuild` writes
 the request row and never populates `progress.plan`. Tonight's basket came from three
@@ -84,9 +94,20 @@ is false by construction (D-2026-08-03-12).
 - Idempotent `step_id`s; must survive the D-14 re-run trap (new request row, not a reseed).
 - Tests against realistic pg-typed fixtures (string bigints), per D-06's lesson.
 
-## WO-D — Bulk add via the Regulars grid
+## WO-D — ~~Bulk add via the Regulars grid~~ **CANCELLED 2026-08-04**
 
-**Directive §3.** Owner: **Keel**, after WO-C. Size: M. Requires a **product decision** first.
+> **CANCELLED as live-runtime work** by the same ruling. It rested on SOP-021's description
+> of the proven process as a *"tick everything, one bulk Add selected"* operation.
+> **Warwick's correction: the proven process was FAST ORDERED TRAVERSAL, not an assumed
+> one-click bulk operation.** The speed came from Brand A–Z ordering and sequence, not from
+> a bulk control.
+>
+> So this work order was written against a misreading of a document that was itself
+> describing the browser process rather than specifying runner code. Do not document the
+> proven method as mass checkbox selection unless evidence proves that was the action.
+> Cancelled, not deferred — there is nothing here to build.
+
+**Original entry, retained:** Owner: **Keel**, after WO-C. Size: M. Requires a **product decision** first.
 
 Measured: the current one-at-a-time path is ~13s/item, ~25–30s on fallback — 10–20 minutes
 for a 40-line shop, against Warwick's ~5 minutes browser-driving benchmark. SOP-021's
