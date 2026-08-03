@@ -8,6 +8,12 @@
 - **Why this file exists:** this method previously lived ONLY in machine-local Claude memory and a per-session
   scratchpad. It was rebuilt from scratch at least twice, was unversioned and unreviewable, and could not be
   handed to a fresh instance. That is the durability defect this SOP closes.
+- **Companion file (added 2026-08-03):** [[SOP-021a-asdair-live-execution-method]] holds the **mechanical
+  execution reality** — every env var and how to verify it, the DB grant preflight, the four processes, the
+  browser runner's 16-command allowlist and plan contract, the durable-state diagnostics, and every known
+  failure mode from the live run of 2026-08-03. **This file owns the intent and policy; SOP-021a owns the
+  mechanics.** Where the two appear to disagree, SOP-021a §8 records the resolution — the code was read, and
+  the code won.
 
 ## Scope boundary — read before adding anything here
 
@@ -153,6 +159,14 @@ twice**. An answer that only lives in the conversation will be asked again next 
 Warwick logs into ASDA. He is already authenticated; **Larry never enters the account password** (hard rule), and
 cannot open the extension sidebar.
 
+> **⚠️ CORRECTION, 2026-08-03 — the bulk-add method below is NOT a `browser-runner` capability.** The tool names
+> it uses (`scroll_to`, `read_page`, `find`) are Claude-in-Chrome / MCP tools from the superseded "Asdair
+> directs, Larry clicks" operating mode. `services/asdair/browser-runner/` contains **no** bulk, checkbox or
+> sort implementation of any kind — it adds **one item at a time**. Read the block below as a *human-browser*
+> method, still useful when a human drives; **bulk add remains an UNBUILT capability** and would be materially
+> faster than the runner's one-at-a-time route. Full evidence and consequences:
+> [[SOP-021a-asdair-live-execution-method]] §8.1.
+
 **The proven add method — follow it, this was expensive to learn:**
 
 - The **Regulars tab is the only tab with bulk checkboxes and "Add selected to trolley."** Favourites offers
@@ -201,6 +215,14 @@ substitutions and out-of-stock drops flagged. Check the total against the GBP 12
 
 - **untick "Allow substitutions for all"**, and
 - set the **per-item** substitution flag from each product's `substitutes_allowed`.
+
+> **⚠️ WHO DOES THIS, 2026-08-03 — a HUMAN, always.** `browser-runner` **cannot** set either toggle, by design
+> and in three layers: no allowlisted command exists, `guards.DENY_TARGET` refuses any click matching
+> `substitut`, and `forbidden.test.cjs` fails the build if the token appears in executable source at all.
+> "Enabling substitutions" sits on the same forbidden list as checkout and payment. On 2026-08-03 the finished
+> basket was left with **"Allow substitutions for all" ON**, violating standing rule 6, because nothing and
+> nobody closed this gap. **Make it the last action before hand-back, every week.** Detail:
+> [[SOP-021a-asdair-live-execution-method]] §4.
 
 Unticking the global toggle alone is not the whole job — it makes the default safe, but items that are genuinely
 fine to substitute stay durable state in the database, and the per-item settings are how that state reaches the
@@ -279,7 +301,9 @@ or for Larry to make.
 **1. Sort order — BRAND A–Z or plain A–Z?** §4 above says sort A–Z. The database copy said sort **BRAND** A–Z, and
 also that the resolved basket should be output sorted by brand. These may be the same intent loosely worded, or the
 brand sort may be a deliberate refinement that made the single-pass tick reliable. Unknown which. Whoever knows the
-answer should settle it in §4 and delete this entry.
+answer should settle it in §4 and delete this entry. *(2026-08-03: moot for `browser-runner`, which sorts nothing.
+The question only re-acquires meaning if bulk add is ever built — see
+[[SOP-021a-asdair-live-execution-method]] §8.5.)*
 
 **2. SAFETY CONFLICT — "substitute Banana -> Strawberry".** ⚠️ The database copy's resolution step instructed
 *"substitute Banana -> Strawberry"*. This cannot be taken at face value:
@@ -335,9 +359,17 @@ If that fails, the loop is open again regardless of what files exist.
 - **`map` directives can resolve to prose.** Rule 23 maps `sure male` to *"Sure Men Anti-Perspirant Deodorant
   (blue variant)"* — an instruction, not a product — and the planner treats it as confidently matched. Watch for
   it when driving.
+- **No plan builder exists** *(added 2026-08-03)*. `stepQueueBrowserBuild` creates the
+  `asdair.browser_build_request` row but does **not** populate `progress.plan`; nothing in the repo converts
+  resolved `shop_line` rows into a browser-runner plan. On 2026-08-03 it was assembled by hand. Verified by
+  enumeration — `step_id` appears only inside `services/asdair/browser-runner/`. This is the largest remaining
+  gap, and building it is a `product-decision`:
+  [[SOP-021a-asdair-live-execution-method]] §7.6.
 
 ## References
 
+- **Mechanical execution method, preflight, diagnostics and failure modes:
+  [[SOP-021a-asdair-live-execution-method]]**
 - Standing rules + rule model: `services/asdair/skill/README.md`
 - Schema and the loop's tables: `services/asdair/db/001_asdair_schema.sql`
 - Outcome + learning writers: `services/asdair/outcome/`
