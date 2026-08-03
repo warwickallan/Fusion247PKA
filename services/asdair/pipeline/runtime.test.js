@@ -223,14 +223,17 @@ test('a queued card is rendered, sent, and only THEN resolved', async () => {
   await commands.buildShop({ shopRef: REF, actor: 'cockpit:warwick' }, h.deps);
   const bot = await makeBot();
 
+  // The receipt (queued on intake, before a bot existed to send it) is drained
+  // THIS pass, alongside the interpret step - which is exactly the self-heal
+  // this suite proves elsewhere. This test is about plan_ready specifically.
   await runOnce(h.deps, { householdId: HOUSEHOLD_ID, intake: makeIntake([]), bot });  // interpret
   const report = await runOnce(h.deps, { householdId: HOUSEHOLD_ID, intake: makeIntake([]), bot });  // plan + send
 
   assert.equal(report.outbox.sent.length, 1);
-  assert.equal(bot.sent.length, 1);
-  assert.equal(bot.sent[0].chatId, '555', 'the card must go to the chat the list came from');
-  assert.match(bot.sent[0].message.text, /Plan ready/);
-  assert.ok(bot.sent[0].message.reply_markup.inline_keyboard.length > 0);
+  const planMessage = bot.sent.find((s) => /Plan ready/.test(s.message.text));
+  assert.ok(planMessage, 'the plan_ready card was never sent');
+  assert.equal(planMessage.chatId, '555', 'the card must go to the chat the list came from');
+  assert.ok(planMessage.message.reply_markup.inline_keyboard.length > 0);
   assert.equal(ledger(h, 'outbox', 'plan_ready').filter((c) => c.status === 'pending').length, 0);
 });
 
@@ -243,14 +246,34 @@ test('a send that FAILS leaves the card queued - a lost failure card is a silent
 
   await runOnce(h.deps, { householdId: HOUSEHOLD_ID, intake: makeIntake([]), bot });
   const failed = await runOnce(h.deps, { householdId: HOUSEHOLD_ID, intake: makeIntake([]), bot });
-  assert.equal(failed.outbox.failed.length, 1);
+  // TWO cards are stuck behind the same outage: the receipt (queued on intake,
+  // pass 1) and plan_ready (queued this pass). Neither is lost.
+  assert.equal(failed.outbox.failed.length, 2);
   assert.equal(ledger(h, 'outbox', 'plan_ready').filter((c) => c.status === 'pending').length, 1);
+  assert.equal(ledger(h, 'outbox', 'receipt').filter((c) => c.status === 'pending').length, 1);
 
-  // A later pass, once Telegram is back, sends it exactly once.
+  // A later pass, once Telegram is back, sends both exactly once.
   const working = await makeBot();
   const ok = await runOnce(h.deps, { householdId: HOUSEHOLD_ID, intake: makeIntake([]), bot: working });
-  assert.equal(ok.outbox.sent.length, 1);
-  assert.equal(working.sent.length, 1);
+  assert.equal(ok.outbox.sent.length, 2);
+  assert.equal(working.sent.length, 2);
+});
+
+test('THE RECEIPT: a single --watch pass both queues AND sends the card - no restart of the DATA is needed', async () => {
+  const h = makeHarness();
+  const bot = await makeBot();
+  const report = await runOnce(h.deps, {
+    householdId: HOUSEHOLD_ID, intake: makeIntake([textUpdate()]), bot,
+  });
+
+  assert.equal(h.db.shop[0].status, 'RECEIVED');
+  assert.equal(report.outbox.sent.length, 1);
+  assert.equal(bot.sent.length, 1);
+  assert.match(bot.sent[0].message.text, /Shopping list received/);
+  assert.ok(
+    bot.sent[0].message.reply_markup.inline_keyboard.some((row) => row.some((btn) => btn.text === 'Build this shop')),
+    'the receipt must offer the "Build this shop" button - that is the entire point',
+  );
 });
 
 test('an unrenderable card is abandoned with a reason, never retried forever', async () => {

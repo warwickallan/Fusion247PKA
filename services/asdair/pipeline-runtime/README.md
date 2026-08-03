@@ -104,3 +104,35 @@ reasoning is in `RUNTIME-PROOF.md` §9.
 Everything arrives through `node --env-file=`. No file in this folder opens, parses, prints
 or inspects a credentials file; they know env var **names** only. Nothing operational or
 personal is committed — `Fusion247PKA` is a public repo.
+
+## Required configuration — the FULL durable checklist (recorded 2026-08-03)
+
+**Standing rule (Warwick, 2026-08-03): AsdAIr's weekly operation must be completely
+independent of any Claude Code / Larry session. Any model call this product needs is made
+by the product's own code, through `FUSION_GATEWAY_URL`, to a real OpenAI-compatible API —
+never by an interactive AI session standing in for it.** Larry's only legitimate role is
+initial setup and fixing genuine defects — never routine weekly running. If a fresh
+instance ever finds itself "driving" a step of a live weekly shop by hand, that is the
+defect, not a normal state.
+
+This checklist exists because `--preflight` (below) does **not** currently check every var
+a live shop actually needs — three of these were missing for hours on 2026-08-03 and only
+surfaced as a live vision-model failure mid-shop, in front of Warwick, which is exactly the
+failure this checklist exists to prevent recurring. All live in `C:\.fusion247\asdair.env`
+unless noted.
+
+| Var | Checked by `--preflight`? | What breaks without it |
+|---|---|---|
+| `SHOPPER_BOT_TOKEN` | yes | No Telegram intake at all |
+| `ASDAIR_DB_URL` | yes | No planning reads |
+| `ASDAIR_WRITE_DB_URL` | yes | No durable writes |
+| `SHOPPER_ALLOWED_SENDER_IDS` | yes | Default-deny, nothing accepted |
+| `ASDAIR_MEDIA_ROOT` | **no** | Cockpit Details photo evidence silently disabled — `cockpit-api` (a separate process, its own env-file pair) reports `media_root_not_configured` |
+| `FUSION_GATEWAY_URL` | **no** | Every photo list fails at TRANSCRIBING: `no vision-capable gateway configured` |
+| `FUSION_GATEWAY_KEY` | **no** | Gateway reachable but every call 401s |
+| `FUSION_MODEL_VISION` | **no** | Gateway reachable and authenticated but rejects the default alias `fusion.vision` with `Invalid model name` — **this gateway has no such alias registered**; set this to a real model id from `GET {FUSION_GATEWAY_URL}/models` (confirmed working 2026-08-03: `gpt-5-mini`) |
+
+**Open follow-on (parked, not done tonight):** extend `ensure-asdair-runtime.mjs --preflight`
+to check the last four rows too, so a missing var is caught at `--preflight` before a shop
+ever reaches TRANSCRIBING, not discovered live from a failed shop. Tracked for Keel, not
+urgent — the checklist above is the durable record either way.

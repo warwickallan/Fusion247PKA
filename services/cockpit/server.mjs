@@ -5,6 +5,7 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
+import { Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import { execSync, spawn } from 'node:child_process';
 import { q, w } from './db.mjs';
@@ -194,6 +195,39 @@ async function apiAppStatus(key) {
   }
 }
 
+// ---- AsdAIr: the read-only workspace view --------------------------------------------------
+// Two small proxies, same shape as apiAppStatus above: this server is the only thing that may name
+// a host:port, the browser only ever asks a cockpit path. Both proxies are read-only forwards — no
+// mutation, no new intent — and both fail soft: a workspace/media fetch that doesn't answer degrades
+// to an error the UI already knows how to show as "offline", never a crash, never invented data.
+const ASDAIR_ORIGIN = 'http://127.0.0.1:8710';
+async function apiAsdairWorkspace() {
+  try {
+    const r = await fetch(`${ASDAIR_ORIGIN}/asdair/workspace?household=1`, { signal: AbortSignal.timeout(4000), headers: { accept: 'application/json' } });
+    if (!r.ok) return { ok: false, error: `AsdAIr’s read service answered HTTP ${r.status}.` };
+    const body = await r.json().catch(() => null);
+    if (!body || typeof body !== 'object') return { ok: false, error: 'AsdAIr’s read service returned something that was not JSON.' };
+    return body; // upstream already carries its own ok:true/shop/etc — forwarded verbatim, nothing added
+  } catch (e) {
+    return { ok: false, error: `AsdAIr’s read service is not answering — ${whyDown(e)}.` };
+  }
+}
+// The browser can never reach 127.0.0.1:8710 itself — on Warwick's phone that loopback address is the
+// PHONE's own, not this machine's, so the image would silently never load without this proxy. Streams
+// bytes straight through; never buffers the whole image, never guesses a content-type.
+async function proxyAsdairMedia(req, res) {
+  const shop = new URL(req.url, 'http://x').searchParams.get('shop');
+  if (!shop || !/^[0-9]+$/.test(shop)) { res.writeHead(400, { 'content-type': 'text/plain' }); res.end('bad shop id'); return; }
+  try {
+    const r = await fetch(`${ASDAIR_ORIGIN}/asdair/media?shop=${encodeURIComponent(shop)}`, { signal: AbortSignal.timeout(5000) });
+    if (!r.ok || !r.body) { res.writeHead(502, { 'content-type': 'text/plain' }); res.end('AsdAIr’s media is not available right now'); return; }
+    res.writeHead(200, { 'content-type': r.headers.get('content-type') || 'application/octet-stream' });
+    Readable.fromWeb(r.body).pipe(res);
+  } catch (e) {
+    res.writeHead(502, { 'content-type': 'text/plain' }); res.end('AsdAIr’s media proxy failed — ' + whyDown(e));
+  }
+}
+
 // Deliverables = produced docs (Pax reports etc.) living in the repo's Deliverables/ folder — the synced
 // "things for Warwick to read". Listed newest-first with a human title from the first H1.
 function listDeliverables() {
@@ -227,6 +261,8 @@ const server = http.createServer(async (req, res) => {
     if (req.url.startsWith('/api/source-brief')) { const v = new URL(req.url, 'http://x').searchParams.get('video'); return j(res, 200, await apiSourceBrief(v)); }
     if (req.url.startsWith('/api/deliverable')) { const f = new URL(req.url, 'http://x').searchParams.get('file'); return j(res, 200, await apiDeliverable(f)); }
     if (req.url.startsWith('/api/app-status')) { const a = new URL(req.url, 'http://x').searchParams.get('app'); return j(res, 200, await apiAppStatus(a)); }
+    if (req.url.startsWith('/api/asdair/workspace')) return j(res, 200, await apiAsdairWorkspace());
+    if (req.url.startsWith('/api/asdair/media')) return proxyAsdairMedia(req, res);
     if (req.url.startsWith('/api/mine') && req.method === 'POST') {
       let raw = ''; req.on('data', (d) => { raw += d; if (raw.length > 1e4) req.destroy(); });
       req.on('end', () => {

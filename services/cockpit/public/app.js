@@ -257,7 +257,66 @@ createApp({
       if (el) el.focus();
       return !!el;
     }
-    const openApp = (k) => { appViewKey.value = null; appKey.value = k; probeApp(APPS.find((a) => a.key === k)); focusSel('#app-workspace-h'); };
+    // ---- AsdAIr — the first app with real Overview/Details views (not the shared placeholder). ----
+    // Pattern for the NEXT app to imitate: one `<key>Ws` ref holding the raw workspace JSON as-is
+    // (never reshaped), loaded once per openApp() and re-readable by every view of that app, plus a
+    // couple of `<key>...` helper functions kept local to setup() rather than a shared framework —
+    // there is only one app doing this yet, so a generic abstraction would be guessing its own shape.
+    /** @type {import('vue').Ref<null|Record<string,any>>} raw /api/asdair/workspace body, untouched */
+    const asdairWs = ref(null);
+    const asdairWsErr = ref(null);
+    const asdairWsLoading = ref(false);
+    const asdairMediaErr = ref(false);
+    /** Fetch the read-only shop workspace. Never throws; a failure degrades the asdair view to the
+     * SAME offline placeholder every other app uses when its service doesn't answer. */
+    async function loadAsdairWorkspace() {
+      asdairWsLoading.value = true; asdairWsErr.value = null; asdairMediaErr.value = false;
+      try {
+        const r = await fetch('/api/asdair/workspace', { cache: 'no-store' });
+        const d = await r.json();
+        if (!r.ok || !d || d.ok === false) throw new Error((d && d.error) || ('http ' + r.status));
+        asdairWs.value = d;
+      } catch (e) {
+        asdairWsErr.value = e.message || 'failed'; asdairWs.value = null;
+      } finally {
+        asdairWsLoading.value = false;
+      }
+    }
+    const asdairShop = computed(() => (asdairWs.value && asdairWs.value.shop) || null);
+    // The other real shops, shown plainly (they are real historical data) but never mistaken for the
+    // active one — filtered out of the "other shops" list by id, not hidden.
+    const asdairOtherShops = computed(() => {
+      const list = (asdairWs.value && asdairWs.value.shops) || [];
+      const curId = asdairShop.value && asdairShop.value.shop_id;
+      return list.filter((s) => String(s.id) !== String(curId));
+    });
+    // "What's waiting on you" is derived ONLY from fields the API actually reports (failure,
+    // is_terminal, needs_review_display, stage) — never a guessed sentence for a stage we don't have
+    // grounds for. Anything not covered here falls back to the raw stage_label_display, which the
+    // Overview always shows anyway, per the brief: unsure → show the raw label, don't invent English.
+    function asdairWaitingOn(shop) {
+      if (!shop) return '';
+      if (shop.failure) return 'Something went wrong — check Telegram.' + (typeof shop.failure === 'string' ? ' ' + shop.failure : '');
+      if (shop.is_terminal) return `This shop has reached its end (${shop.stage_label_display}) — nothing needed from you.`;
+      if (shop.stage === 'RECEIVED' && shop.needs_review_display === 'yes') return 'Waiting for you to tell AsdAIr to build this shop — reply in Telegram.';
+      if (shop.stage === 'NEEDS_DECISION') return 'Waiting for you — there’s a decision to make in Telegram.';
+      if (shop.needs_review_display === 'yes') return 'Waiting on you — check Telegram for what AsdAIr needs.';
+      return 'AsdAIr is working on it — nothing needed from you right now.';
+    }
+    // The API's own convention is "*_display" fields for anything human-readable (stage_display,
+    // transcript_display, open_count_display…), so a previous-order total most likely follows the
+    // same convention — but its exact key is genuinely unknown from here (history.previous_order's
+    // shape was never specified). Try the plausible names; NEVER fabricate a figure if none match —
+    // fall back to "on file" (a real fact from plan.prior_order_known) rather than a guessed number.
+    function asdairPrevOrderTotal(prev) {
+      if (!prev || typeof prev !== 'object') return null;
+      for (const k of ['total_display', 'basket_total_display', 'order_total_display', 'grand_total_display']) {
+        if (prev[k] != null) return String(prev[k]);
+      }
+      return null;
+    }
+
+    const openApp = (k) => { appViewKey.value = null; appKey.value = k; probeApp(APPS.find((a) => a.key === k)); if (k === 'asdair') loadAsdairWorkspace(); focusSel('#app-workspace-h'); };
     // `from` is the app we are leaving, so focus can return to its tile. When we are not leaving an
     // app (a plain area switch) the selector matches nothing and focus is left exactly where it is.
     const closeApp = () => {
@@ -362,6 +421,7 @@ createApp({
 
     return {
       AREAS, APPS, appKey, appViewKey, currentApp, currentView, statusOf, appTone, appStatusLine, probeApp, openApp, closeApp, goView,
+      asdairWs, asdairWsErr, asdairWsLoading, asdairMediaErr, loadAsdairWorkspace, asdairShop, asdairOtherShops, asdairWaitingOn, asdairPrevOrderTotal,
       state, area, detail, busy, loading, loadErr,
       kindOf, catLabel, moduleLabel, oneLine, ago, terse, impactStars, outputTitle, humanValue, humanPoints, spinOf, mdToHtml, notifyMark, build, housekeeping, host, when,
       deliverables, openDeliverable, openBrief, copyDoc, downloadDoc, downloadTranscript, download, copyText,
@@ -494,6 +554,86 @@ createApp({
             <ul v-if="currentApp.about.length && currentView.key==='about'" class="read">
               <li v-for="(f,i) in currentApp.about" :key="i">{{ f }}</li>
             </ul>
+
+            <!-- AsdAIr: the first app with REAL Overview/Details, once its service answers. Reads the
+                 read-only workspace proxy (server.mjs apiAsdairWorkspace) — never invents a field the
+                 API didn't report; anything of unknown shape goes in the Technical drawer, not guessed
+                 UI. Every other app below is untouched. -->
+            <template v-else-if="currentApp.key==='asdair' && statusOf(currentApp).state==='up'">
+              <div v-if="asdairWsLoading && !asdairWs" class="empty big">Loading AsdAIr’s workspace…</div>
+              <div v-else-if="asdairWsErr || !asdairShop" class="empty big">{{ currentApp.offline }}</div>
+
+              <!-- OVERVIEW -->
+              <div v-else-if="currentView.key==='overview'" class="asdair-view">
+                <div class="app-status up" role="status" aria-live="polite">
+                  <span class="as-dot" aria-hidden="true"></span>
+                  <div class="as-body"><b>{{ asdairShop.stage_label_display }}</b><span> — {{ asdairShop.shop_ref_display }}</span></div>
+                  <button class="act" :disabled="asdairWsLoading" @click="loadAsdairWorkspace()">{{ asdairWsLoading ? '…' : 'Refresh' }}</button>
+                </div>
+                <p class="app-blurb">{{ asdairWaitingOn(asdairShop) }}</p>
+
+                <div class="grp">
+                  <h2>This shop</h2>
+                  <div class="item grey">
+                    <div class="i-main"><div class="i-eyebrow">Lines</div><div class="i-title">{{ asdairShop.lines_summary.resolved_display }} resolved of {{ asdairShop.lines_summary.total_display }} · {{ asdairShop.lines_summary.open_display }} open</div></div>
+                  </div>
+                  <div class="item grey">
+                    <div class="i-main"><div class="i-eyebrow">Questions</div><div class="i-title">{{ (asdairWs.questions && asdairWs.questions.open_count_display) || 'unknown' }} open</div></div>
+                  </div>
+                  <div class="item grey">
+                    <div class="i-main"><div class="i-eyebrow">Previous order</div>
+                      <div class="i-title">{{ asdairPrevOrderTotal(asdairWs.history && asdairWs.history.previous_order) || (asdairWs.plan && asdairWs.plan.prior_order_known ? 'on file — see Technical below' : 'none on file') }}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="grp" v-if="asdairOtherShops.length">
+                  <h2>Other shops<span class="g-count">{{ asdairOtherShops.length }}</span></h2>
+                  <div v-for="s in asdairOtherShops" :key="s.id" class="item grey">
+                    <div class="i-main"><div class="i-eyebrow">{{ s.status }}</div><div class="i-title">{{ s.shop_ref }}</div></div>
+                  </div>
+                </div>
+
+                <details class="tech">
+                  <summary>Technical — previous order, plan, browser, order request</summary>
+                  <div class="tech-body"><div class="mono">{{ JSON.stringify({ history: asdairWs.history, plan: asdairWs.plan, browser: asdairWs.browser, order: asdairWs.order }, null, 2) }}</div></div>
+                </details>
+              </div>
+
+              <!-- DETAILS -->
+              <div v-else class="asdair-view">
+                <div class="grp">
+                  <h2>Evidence</h2>
+                  <img v-if="asdairWs.evidence && asdairWs.evidence.has_media && !asdairMediaErr" class="asdair-photo"
+                    :src="'/api/asdair/media?shop=' + asdairShop.shop_id" :alt="'Photo evidence for ' + asdairShop.shop_ref_display"
+                    @error="asdairMediaErr = true" />
+                  <p v-if="asdairMediaErr" class="err">The photo could not be loaded.</p>
+                  <p v-if="!(asdairWs.evidence && asdairWs.evidence.has_media)" class="empty">No photo evidence on file for this shop.</p>
+                  <p class="app-blurb">Transcript: {{ (asdairWs.evidence && asdairWs.evidence.transcript_display) || 'unknown' }}</p>
+                </div>
+
+                <div class="grp">
+                  <h2>Interpretation<span class="g-count">{{ (asdairWs.interpretation && asdairWs.interpretation.lines && asdairWs.interpretation.lines.length) || 0 }}</span></h2>
+                  <p class="empty" v-if="!asdairWs.interpretation || !asdairWs.interpretation.lines || !asdairWs.interpretation.lines.length">Not interpreted yet.</p>
+                  <div v-else v-for="(ln,i) in asdairWs.interpretation.lines" :key="i" class="item grey">
+                    <div class="i-main"><div class="i-title">{{ ln.raw_display || ln.title || JSON.stringify(ln) }}</div></div>
+                  </div>
+                </div>
+
+                <div class="grp">
+                  <h2>Questions<span class="g-count">{{ (asdairWs.questions && asdairWs.questions.open_count_display) || '0' }}</span></h2>
+                  <p class="empty" v-if="!asdairWs.questions || !asdairWs.questions.items || !asdairWs.questions.items.length">No open questions.</p>
+                  <div v-else v-for="(q,i) in asdairWs.questions.items" :key="i" class="item amber">
+                    <div class="i-main"><div class="i-title">{{ q.text || JSON.stringify(q) }}</div></div>
+                  </div>
+                </div>
+
+                <details class="tech">
+                  <summary>Technical — raw timeline &amp; interpretation</summary>
+                  <div class="tech-body"><div class="mono">{{ JSON.stringify({ timeline: asdairWs.timeline, interpretation: asdairWs.interpretation }, null, 2) }}</div></div>
+                </details>
+              </div>
+            </template>
 
             <!-- Every other view needs the service. No service, no data — and no invented data. -->
             <template v-else>

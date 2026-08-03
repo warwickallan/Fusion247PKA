@@ -1,10 +1,10 @@
 // Fusion247 Cockpit service worker — makes it an installable app (home-screen icon, fullscreen,
 // offline shell). Shell is cache-first; live data (/api/*) is always network-first so the cockpit
 // never shows stale attention/outputs — it just fails soft when off the tailnet.
-// v23: index.html / apps.js / app.js all changed. The shell is cache-first, so an installed PWA
-// keeps serving the old bundle until this string moves — a correct edit that never reaches the
-// device is indistinguishable from no edit at all. Bump it with every shell change.
-const CACHE = 'f247-cockpit-v23';
+// v24: app.js + styles.css changed (real AsdAIr Overview/Details views). The shell is cache-first, so
+// an installed PWA keeps serving the old bundle until this string moves — a correct edit that never
+// reaches the device is indistinguishable from no edit at all. Bump it with every shell change.
+const CACHE = 'f247-cockpit-v24';
 // '/private-apps.js' is DELIBERATELY absent. It is the optional local overlay and must never be
 // baked into a device's cache; it is served no-store and re-fetched every load. Off the tailnet the
 // script simply fails to load and the overlay's surface fails CLOSED, which is the right direction.

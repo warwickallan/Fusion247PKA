@@ -86,6 +86,10 @@ button { font-family:inherit; }
    global token is unsafe and forks it again. */
 .app-view { padding-top:2px; }
 .app-view .read li { margin:6px 0; }
+/* AsdAIr Overview/Details — no new colour tokens, reuses --hair/--panel2 and the existing 13px radius
+   used by .item/.status-line (GL-003 §4 observed progression). */
+.asdair-view { margin-top:2px; }
+.asdair-photo { display:block; max-width:100%; border-radius:13px; border:1px solid var(--hair); background:var(--panel2); margin-bottom:8px; }
 
 /* The back chevron: .back is padding:0 0 12px and the glyph is narrow, so it rendered 5x19 CSS px —
    under WCAG 2.2 SC 2.5.8 (24x24) on both axes. Specificity beats .back, which is defined later. */

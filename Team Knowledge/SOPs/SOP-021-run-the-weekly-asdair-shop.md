@@ -308,9 +308,15 @@ If that fails, the loop is open again regardless of what files exist.
 
 ## Known limitations (honest, as at 2026-07-27)
 
-- **The browser drive is not yet proven from a subagent.** The Claude-for-Chrome connector is not project-scoped
-  in `.mcp.json`, and every existing shim uses a `tools:` allowlist that would exclude it. Until that is settled
-  on its own, the browser step stays with Larry in main context. This is a mechanical unknown, not a preference.
+- ~~The browser drive is not yet proven from a subagent...~~ **SUPERSEDED 2026-07-28, commit `ab3f231`.**
+  This line described one mechanism's limit (a Claude Code subagent does not inherit host MCP tools) and was
+  wrongly generalised into "the browser step needs Larry." **PROVEN otherwise**: `services/asdair/browser-runner/`
+  is a plain, zero-dependency Node/CDP process (`runner.js`) — an independently deployed program, not something
+  any Claude Code agent, subagent, or MCP tool drives or needs to drive. It is started the same way any other
+  service on this machine is started (`node runner.js --request <id>`, same pattern as `pipeline-runtime` and
+  `cockpit-api`) — by a specialist's Bash tool, a scheduled task, or a human, all equally valid. "Asdair directs,
+  Larry clicks" was never a valid permanent operating mode. See the commit message and `RUNNER-PROOF.md` for the
+  decisive experiment. **Do not re-test this** — it is settled.
 - **The ASDA session is a singleton** — one profile, one login, one live trolley holding real money. It cannot be
   worktree-isolated or run concurrently.
 - **Fully hands-off is descoped** (Warwick, 2026-07-21): a human logs in. One shop per week.

@@ -274,10 +274,19 @@ async function stepInterpret(deps, snapshot) {
 export function buildGroundedIntents(lines, { sourceId, listDate, requestedBy }) {
   return lines.map((l, i) => {
     const matched = l.matched_regular_id !== null && l.matched_regular_id !== undefined;
-    const name = matched ? l.canonical_name : String(l.raw_reading || '').trim();
-    if (!name) {
-      throw new Error(`runPipeline: interpreted line ${i + 1} has neither a catalogue match nor a readable raw_reading`);
-    }
+    const readable = String(l.raw_reading || '').trim();
+    // A line with NEITHER a catalogue match NOR anything readable is not
+    // dropped and not guessed at. resolveByCatalogue already says the vision
+    // model genuinely could not read it (status "unreadable", carried into the
+    // `needs review: ...` note below) - so, exactly like any other unresolved
+    // line, it becomes a needs_decision intent rather than a thrown exception.
+    // The item_name is HONEST rather than invented: it names the line so a
+    // human can act on it as a real question, and it is never a
+    // plausible-sounding product name for text nobody could read. "Never
+    // dropped, never guessed at" (the doc comment above) holds for this case
+    // exactly as it already does for the readable-but-unmatched one below.
+    const name = matched ? l.canonical_name
+      : (readable || `Line ${i + 1}: illegible - please tell me what this is`);
     const notes = [];
     if (l.match_basis) notes.push(`matched by ${l.match_basis}`);
     if (!matched) notes.push(`needs review: ${l.status}`);
@@ -576,6 +585,65 @@ async function stepReconcile(deps, snapshot) {
 export async function runPipeline(handle, deps) {
   const snapshot = await store.readSnapshot(deps, handle);
   const shop = snapshot.shop;
+
+  // ── THE RECEIPT CARD, SELF-HEALING ──────────────────────────────────────
+  // Queued the first time (ever) a shop is found at RECEIVED - independent of
+  // whatever step decideNextStep chooses THIS pass, including
+  // AWAIT_BUILD_COMMAND, a wait: step dispatchStep below never reaches. That is
+  // why this lives here as a side effect rather than as a new act: step in
+  // stages.js: it is bookkeeping alongside a pass, not a transition of the
+  // state machine - the same reason failShop (below) enqueues its own failure
+  // card directly rather than through queueMilestoneMessage/messageForTransition,
+  // which are keyed by the transition's `to`.
+  //
+  // outboxEverQueued reads the FULL history (pending or resolved), so a shop
+  // already carrying this card - from this pass, an earlier pass, or a pass
+  // that ran before this check existed - is left alone. That is what recovers
+  // a shop that has been sitting at RECEIVED for real, on its very next pass,
+  // with no restart of the DURABLE STATE and no manual insert: only a restart
+  // of the runner process (to pick up this code) is required, and that is
+  // never this module's job to perform.
+  if (shop.status === 'RECEIVED' && !(await store.outboxEverQueued(deps, shop.id, 'receipt'))) {
+    await store.enqueueMessage(deps, {
+      householdId: shop.household_id,
+      shopId: shop.id,
+      kind: 'receipt',
+      key: outboxKeyFor(shop.shop_ref, 'receipt'),
+      payload: { shopRef: shop.shop_ref, source: shop.source_kind === 'photo' ? 'photo' : 'text' },
+    });
+  }
+
+  // ── THE "READING YOUR LIST" PROGRESS CARD, SELF-HEALING ─────────────────
+  // Before this fix the only outbox messages were the one-time receipt above,
+  // the milestone cards keyed by messageForTransition, and a failure card -
+  // nothing between "Build this shop" and either a real milestone or a crash,
+  // which reads as total silence for however long the vision call takes.
+  //
+  // Queued the first time (ever) a shop is found at TRANSCRIBING - same
+  // self-healing shape as the receipt above, and deliberately NOT wired
+  // through messageForTransition/queueMilestoneMessage: those are keyed per
+  // TRANSITION, not per shop, so a shop that fails during interpretation and
+  // is retried (act:resume -> TRANSCRIBING, exactly SHOP-2026-08-03's own
+  // shape) would transition INTO TRANSCRIBING a second time and, under that
+  // mechanism, could re-mint and re-send an already-sent card. outboxEverQueued
+  // reads the FULL history (pending or resolved), so this card is sent AT MOST
+  // ONCE per shop, ever - "reading your list now" is a fact about a shop's
+  // whole life, not about one pass of the advancer.
+  //
+  // A TEXT shop never visits TRANSCRIBING at all (RECEIVED -> act:interpret
+  // goes straight to PROCESSING - see stages.js), so this is naturally scoped
+  // to the photo path, where the vision call is the actual source of the
+  // silence this card exists to break.
+  if (shop.status === 'TRANSCRIBING' && !(await store.outboxEverQueued(deps, shop.id, 'progress'))) {
+    await store.enqueueMessage(deps, {
+      householdId: shop.household_id,
+      shopId: shop.id,
+      kind: 'progress',
+      key: outboxKeyFor(shop.shop_ref, 'transcribing'),
+      payload: { shopRef: shop.shop_ref, stage: 'reading the photograph of your list against the household catalogue' },
+    });
+  }
+
   const next = decideNextStep(snapshot);
 
   // A legal park. NOT an error, and not something to work around.

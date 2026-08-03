@@ -396,6 +396,13 @@ export function createFakeClient(store, options = {}) {
       rows(db.pipeline_command.filter((c) => c.status === 'pending' && c.kind === 'outbox')
         .sort((a, b) => a.id - b.id))],
 
+    // store.outboxEverQueued - the receipt self-heal's "ever, not merely pending" check.
+    [/^SELECT 1 FROM asdair\.pipeline_command\s+WHERE shop_id = \$1 AND kind = 'outbox' AND command = \$2/i, (sql, p) => {
+      const hit = db.pipeline_command.some((c) => String(c.shop_id) === String(p[0])
+        && c.kind === 'outbox' && c.command === p[1]);
+      return hit ? rows([{ exists: 1 }]) : none();
+    }],
+
     // The backfill's preflight: "is migration 009 actually applied here?"
     [/^SELECT to_regclass\('asdair\.pipeline_command'\)/i, () =>
       rows([{ table_name: 'asdair.pipeline_command' }])],

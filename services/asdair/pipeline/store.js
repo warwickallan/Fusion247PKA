@@ -513,6 +513,27 @@ export async function enqueueMessage(deps, { householdId, shopId, kind, key, pay
   });
 }
 
+/**
+ * True when a message of this KIND has EVER been queued for a shop - pending
+ * or already resolved, from this pass, a pass before it, or a pass that ran
+ * before this very check existed.
+ *
+ * This is deliberately NOT "is one currently pending": a once-per-shop card
+ * (the receipt) must never be asked twice, whether the earlier queue was sent
+ * minutes ago, days ago, or predates the code that queues it - so the read
+ * covers the FULL history of the outbox family, exactly the way
+ * listIssuedCommandNames does for a LATCH command's "ever issued" gate above.
+ */
+export async function outboxEverQueued(deps, shopId, kind) {
+  const res = await deps.readQuery(
+    `SELECT 1 FROM asdair.pipeline_command
+      WHERE shop_id = $1 AND kind = 'outbox' AND command = $2
+      LIMIT 1`,
+    [shopId, kind],
+  );
+  return rowsOf(res).length > 0;
+}
+
 /** Every unsent message, oldest first. */
 export async function listOutbox(deps, { shopId = null } = {}) {
   const sql = shopId === null
