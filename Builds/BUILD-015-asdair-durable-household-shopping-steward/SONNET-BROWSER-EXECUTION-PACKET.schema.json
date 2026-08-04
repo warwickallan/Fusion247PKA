@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fusion247.co.uk/schemas/asdair/sonnet-browser-execution-packet-v1.json",
+  "title": "AsdAIr Sonnet Browser Execution Packet",
+  "description": "The durable handoff artefact between AsdAIr's planning half and Sonnet in Claude for Chrome, which is the Stage 1 live basket writer (see RUNTIME-DECISION.md, Warwick 2026-08-04). Produced by the product itself and stored in Postgres. NO Claude session constructs this by hand - on 2026-08-03 three plan files were hand-assembled, which is the failure this artefact exists to end. Lines MUST be pre-sorted by normalized brand A-Z then canonical product name A-Z, because that is the order Sonnet uses in ASDA and the ordering IS the speed. STATUS: schema only. The producer does not exist yet - WO-P.",
+  "type": "object",
+  "required": ["packet_version", "shop_ref", "generated_at", "expected_distinct_products", "expected_total_units", "lines"],
+  "additionalProperties": false,
+  "properties": {
+    "packet_version": { "const": 1 },
+    "shop_ref": {
+      "type": "string",
+      "pattern": "^SHOP-[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+      "description": "e.g. SHOP-2026-08-03. Scopes every write back to one shop."
+    },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "household_id": { "type": "integer", "minimum": 1 },
+    "sort_contract": {
+      "type": "string",
+      "const": "brand_az_then_product_az",
+      "description": "Declares the order the lines are already in. Present so a consumer can assert it rather than trust it."
+    },
+    "expected_distinct_products": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Reconciliation input (ruling section 3). A matching headline count alone is NOT sufficient proof - identity and quantity are checked per line too."
+    },
+    "expected_total_units": { "type": "integer", "minimum": 0 },
+    "lines": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/line" }
+    },
+    "held": {
+      "type": "array",
+      "description": "Lines deliberately NOT in the basket - ambiguous, out of stock, awaiting a decision, or excluded by rule. Present so nothing is silently dropped.",
+      "items": { "$ref": "#/$defs/heldLine" }
+    }
+  },
+  "$defs": {
+    "line": {
+      "type": "object",
+      "required": ["seq", "original_list_line", "canonical_product_id", "canonical_product_name", "brand", "source_view", "required_quantity", "origin"],
+      "additionalProperties": false,
+      "properties": {
+        "seq": { "type": "integer", "minimum": 1, "description": "Position in the Brand A-Z order. Sonnet works these in order." },
+        "shop_line_no": { "type": "integer", "minimum": 1, "description": "Back-reference to asdair.shop_line." },
+        "original_list_line": { "type": "string", "minLength": 1, "description": "What was actually written on the photograph. Never lost - it becomes the alias on write-back." },
+        "canonical_product_id": { "type": ["integer", "null"], "description": "asdair.regulars.id. NULL only for a newly approved item that has no regulars row yet." },
+        "canonical_product_name": { "type": "string", "minLength": 1, "description": "Looked up from OUR rows, never model prose." },
+        "brand": { "type": ["string", "null"], "description": "Drives the primary sort. NULL sorts last." },
+        "normalized_brand": { "type": ["string", "null"], "description": "Lowercased/trimmed sort key, so the order is reproducible rather than locale-dependent." },
+        "source_view": {
+          "enum": ["regulars", "favourites", "search"],
+          "description": "Where Sonnet finds it. 'search' is permitted ONLY when origin is new_approved - a known item must NEVER be free-searched."
+        },
+        "asda_product_ref": { "type": ["string", "null"], "pattern": "^[0-9]{3,12}$", "description": "ASDA product id. Required when origin is known." },
+        "asda_url": { "type": ["string", "null"], "format": "uri" },
+        "required_quantity": { "type": "integer", "minimum": 1, "maximum": 99, "description": "Never invented. A list line with no written quantity defaults to 1 per the household's own standing rule." },
+        "origin": {
+          "enum": ["known", "new_approved"],
+          "description": "known = already in Regulars/Favourites. new_approved = genuinely new AND approved by Warwick this shop."
+        },
+        "approved_search_term": { "type": ["string", "null"], "description": "Warwick's approved wording. Required when origin is new_approved. NEVER invented by the model." },
+        "substitutes_allowed": { "type": "boolean", "default": false, "description": "Per-product permission. NOTE: no adapter can enforce this automatically - substitution control is a human step before purchase in every runtime. See RUNTIME-DECISION.md." },
+        "applied_rules": {
+          "type": "array",
+          "description": "asdair.rules ids that shaped this line - a multibuy round-up, a rotation, a map. Present so Warwick can see WHY a quantity or variant is what it is, and so a rule that never fires is visible. Directly serves the open defect D-2026-08-04-04.",
+          "items": { "type": "integer" }
+        },
+        "quantity_rationale": { "type": ["string", "null"], "description": "Human-readable, e.g. 'list said 3; rule 37 rounds up to 4 for the any-2-for-X offer, 4th is the female variant'." }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "origin": { "const": "known" } }, "required": ["origin"] },
+          "then": {
+            "required": ["asda_product_ref", "canonical_product_id"],
+            "properties": { "source_view": { "enum": ["regulars", "favourites"] } }
+          }
+        },
+        {
+          "if": { "properties": { "origin": { "const": "new_approved" } }, "required": ["origin"] },
+          "then": { "required": ["approved_search_term"] }
+        }
+      ]
+    },
+    "heldLine": {
+      "type": "object",
+      "required": ["original_list_line", "reason"],
+      "additionalProperties": false,
+      "properties": {
+        "shop_line_no": { "type": "integer", "minimum": 1 },
+        "original_list_line": { "type": "string", "minLength": 1 },
+        "reason": {
+          "enum": ["ambiguous", "awaiting_decision", "excluded_by_rule", "not_stocked", "out_of_stock", "possible_duplicate"],
+          "description": "Never 'substituted' - substitution is not a permitted outcome anywhere in this product."
+        },
+        "detail": { "type": ["string", "null"] },
+        "rule_id": { "type": ["integer", "null"] }
+      }
+    }
+  }
+}
