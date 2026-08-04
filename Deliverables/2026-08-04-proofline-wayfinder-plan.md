@@ -518,9 +518,65 @@ The stale copy's `spawn` calls carry no `windowsHide`, and `git`/`gh` are consol
 
 ---
 
-# 14. PHASE 2 ROUTE — proposed, NOT accepted
+# 14. PHASE 2 ROUTE — **ACCEPTED AND AMENDED by Warwick, 2026-08-05**
 
-**Status: awaiting Warwick's acceptance (`product-decision`). No implementation begins until he accepts.** Written from R-1..R-9, not from §13.3.
+**Status: the `product-decision` handback is DISCHARGED.** Warwick accepted the route and amended it materially. §14.0 records what he decided; the work packages below are revised against it. Written from R-1..R-9, not from §13.3.
+
+## 14.0 Warwick's Phase 2 decision — 2026-08-05
+
+**His scope, in his terms:** *"make Honcho, Tower, the watcher and the DevBot ding shared, dependable myPKA services rather than things tied to a build, worktree or Larry remembering how to start them."*
+
+**His North Star, superseding §13.1 by widening it:** *"wherever Larry starts and whichever build or PR is active, he is accurately oriented by Honcho to the current Wayfinder, Tower is available, Codex can be called, and the real QA conversation is visible to me."*
+
+**Five directions that change the route:**
+
+| # | Direction | Effect |
+|---|---|---|
+| **W-1** | *"Honcho should support the Wayfinder rather than compete with it. A fresh Larry must receive current orientation automatically and must never be confidently sent back to stale work."* | Confirms WP-2B and names the failure mode precisely — the danger is a **confident wrong** orientation, not a blank one. Matches the rotation block's own warning |
+| **W-2** | *"Verify the legacy Tower is genuinely obsolete, then remove it so it cannot restart or confuse the current runtime."* | **SCOPE CHANGE. §13.5 parked legacy retirement OUT of scope** (*"Retiring `tower-baton` is not the goal"*). Warwick has now explicitly authorised removal. §13.5 is amended by §14.0a below. **Verification comes first — removal is conditional on obsolescence being established, not assumed** |
+| **W-3** | *"The current Tower and watcher should be the single shared route and remain available while this laptop stays running. **I do not require reboot or power-cut testing; record that accepted boundary.**"* | **BOUNDARY ACCEPTED — and it MOVES the verdict, it is not a caveat.** See §14.0b. **H-4 is WITHDRAWN** |
+| **W-4** | *"TowerBot to show the actual Codex findings and Larry's actual response to how he is handling them, as a genuine ongoing QA exchange rather than a mirror or one-way notification. That exchange must have one clearly identified durable source of truth."* | **NEW WORK PACKAGE — WP-2E.** This is the largest addition and the least specified by prior reconnaissance. Both halves of the exchange must be durable, and exactly one store must be named as canonical |
+| **W-5** | *"Resolve that split using the quickest, least-token route that leaves one canonical working system. My preference was Supabase, but SQLite appears the better answer for this machine and current architecture unless your live evidence shows otherwise."* | **NEW WORK PACKAGE — WP-2F.** He has stated a preference **and** subordinated it to live evidence. The decision is mine, and it must rest on executed evidence, not on reading |
+
+**Also:** *"The DevBot ding has reached me; make sure it is genuinely event-driven and durable rather than manually triggered in this session."* — sharpens WP-2C. The ding that reached him on 2026-08-04 (`message_id 318`) was **triggered by Larry in-session**, which is exactly what he is ruling out. Config-only remains the boundary; if it stops being config, STOP and report.
+
+**And:** *"Own the route and ordinary technical decisions. Build the product, not another shiny monkey-house floor."* — Decisions A and B (§14.2) revert to me. The regrowth cap is restated in his own words.
+
+### 14.0a Amendment to §13.5 — what is no longer out of scope
+
+**§13.5 still binds in full, EXCEPT:** *"Retiring `tower-baton` is not the goal — it is parked out of scope in the migration plan. Touch it only if it is the minimal way to satisfy N-1."* **That line is SUPERSEDED by W-2.** Removal of the legacy Tower is now an explicit, authorised outcome, conditional on verified obsolescence.
+
+**Everything else in §13.5 stands unchanged** — no new watcher, no new registry, validator, store, control plane, governance wrapper or enforcement counter, no second map, no new BUILD number. W-5 resolves a store split by **removing one of two existing stores**; that is consolidation, not growth, and it is the only store work permitted.
+
+### 14.0b The accepted durability boundary — stated so it cannot be quietly upgraded
+
+**Warwick does not require reboot or power-cut testing.** The recorded bar is: **the current Tower and watcher remain available while this laptop stays running.**
+
+**What this changes, honestly:**
+
+- **N-3's "survives restart" half is WITHDRAWN as an acceptance criterion.** It is not deferred, not caveated, not "proven under a limitation" — it is **not claimed at all**. A recorded limit that leaves the original claim standing is not a discharged limit.
+- **H-4 (a real logon) is WITHDRAWN.** It existed only to prove restart survival.
+- **No document may state or imply that Tower survives a restart, a logon, or a power cut.** If a runbook, README or receipt says so, that is a defect to fix, not a nuance to explain.
+- **This does NOT weaken W-2.** "A legacy watcher cannot return" is still proven **by attempt** — running the legacy start path against the live current runtime and asserting the current one survives. That proof needs no reboot, which is precisely why it survives this boundary.
+- **The residual risk is named, not hidden:** if this laptop reboots, nothing in Phase 2 guarantees Tower comes back. That is an accepted operating cost of Warwick's decision, recorded here once.
+
+### 14.0c Phase 2 success gate — for revised Veritas
+
+**Warwick's words, as the gate:** *"another fresh Larry/worktree is oriented correctly, legacy Tower cannot return, current Tower works across builds and PRs, the real Codex/Larry dialogue appears on TowerBot, and none of it depends on this Larry's context."*
+
+Veritas assesses the **exact integrated head** against these five, each of which must be proven by execution in the real intended context — not by component pass:
+
+| Gate | The proof that counts | Not sufficient |
+|---|---|---|
+| **S-1** | A **fresh Larry, started in a DIFFERENT worktree**, is oriented to *this* map and the *live* frontier — automatically, with no path typed by Warwick | A packet that exists; a correct render in this worktree only |
+| **S-2** | **Legacy Tower cannot return** — proven by *attempting* every enumerated start path against the live current runtime | "We deleted it"; an absence check |
+| **S-3** | **Current Tower works across builds and PRs** — exercised against more than one build/PR context | Working for BUILD-020 only |
+| **S-4** | **The real Codex/Larry dialogue appears on TowerBot** — actual finding content and actual disposition, followable by Warwick, from ONE named durable source | A notification that a review ran; a mirror; a one-way post |
+| **S-5** | **None of it depends on this Larry's context** — it survives this session ending | Anything a running session holds |
+
+**The mandatory Veritas question applies as always:** *«Can Warwick now do the thing this phase promised, in the real intended context?»* **Scope of the verdict is bounded by §14.0b** — restart durability is outside the claim and must not be assessed as a failure or recorded as a pass.
+
+**Warwick's own post-merge fresh-Larry test (§13.2) remains the real acceptance and cannot be self-certified.**
 
 **The organising finding:** three of the four acceptance properties fail for the *same* reason — **every durable install point hardcodes a worktree path**, and the one automated install point (the Startup VBS) points at a stale worktree and actively kills the current runtime. Fixing files inside this worktree satisfies none of them. That is why the route is ordered install-point-first.
 
@@ -531,39 +587,53 @@ The stale copy's `spawn` calls carry no `windowsHide`, and `git`/`gh` are consol
 | **WP-2A** | **The legacy takeover is removed, and proven unable to recur.** `C:\.fusion247\run-tower-cp-watcher.ps1` no longer kills the running watcher and no longer starts from the stale `C:\Fusion247PKA-tower`. Proof is **by attempt**: run the legacy launcher against a live current watcher and assert the current one survives, no second appears, and no console window is created | **N-1** (both halves — legacy takeover *and* terminal flash are the same file) | Keel |
 | **WP-2B** | **A fresh Larry in ANY worktree is oriented to the correct current map and frontier.** Three ordered changes: (1) `buildPacket` emits `map_path` + frontier — without it the pointer render is null by construction (R-7); (2) the pointer render replaces the installed one, which currently claims *"source of truth"* against `CLAUDE.md` #9; (3) registration moves to a **worktree-independent** install point so it applies outside `C:\Fusion247PKA` | **N-2, N-3, N-4** | Keel |
 | **WP-2C** | **The DevBot ding delivers again.** Configuration only, per Warwick's binding boundary. **If it stops being a config change, STOP and report** | — | Keel |
-| **WP-2D** | **The change lands.** PR #94 taken out of draft, Codex reviews the complete integrated change, Warwick decides the merge | **N-4** | Larry (decision) / Keel (execution) |
+| **WP-2D** | **The change lands.** PR #94 taken out of draft, Codex reviews the complete integrated change, Warwick decides the merge | **N-4, S-5** | Larry (decision) / Keel (execution) |
+| **WP-2E** | **TowerBot carries the real QA exchange (W-4).** Actual Codex finding content and Larry's actual disposition of each, followable by Warwick on Telegram, backed by **one named durable source of truth**. Not a mirror, not a one-way notification | **S-4** | Keel |
+| **WP-2F** | **One canonical store (W-5).** The live-Tower/merge-check split resolved by *removing* one of two existing stores, by the quickest least-token route. Consolidation only — no third store | **S-3** | Keel |
 
-## 14.2 The two genuine decisions for Warwick
+**WP-2E and WP-2F are shaped by evidence still in flight** (three read-only investigations dispatched 2026-08-05: the store split, legacy obsolescence, and the QA-exchange path). **Their designs are not settled here and must not be guessed** — this table states the outcome each owes, not its method.
 
-Everything else is an ordinary technical choice and is mine. These two are not.
+## 14.2 Decisions A and B — **resolved by Larry**, per Warwick's *"own the route and ordinary technical decisions"*
 
-**Decision A — where the durable Tower runtime lives.** The current design pins it to a "stable worktree" that has gone stale. Three realistic options:
+**Decision A — where the durable Tower runtime lives: A3, minimally.** Warwick's scope sentence decides it — *"shared, dependable myPKA services rather than things tied to a build, worktree or Larry remembering how to start them."* **A1 (repoint the stale worktree) is ruled out by that sentence**, because it leaves the runtime worktree-tied and free to go stale again exactly as it did. A2 was already ruled out by the launcher's own design note. So the runtime moves to a **machine-level location outside any worktree**.
 
-| Option | What changes | Cost |
-|---|---|---|
-| **A1 — repoint the existing stable worktree (recommended)** | Move `C:\Fusion247PKA-tower` forward to a head that contains the windowsHide fix; leave the Startup VBS structure intact | Smallest. Honours the original design intent (the PS1's own comment explains why it must not point at mutable `main`). Still a worktree, so it can go stale again |
-| **A2 — point at `C:\Fusion247PKA`** | Startup runs from the main checkout | **Not recommended.** This is exactly the defect the PS1 was written to avoid — main switches branches |
-| **A3 — a machine-level runtime outside any worktree** | e.g. `C:\.fusion247\tower-runtime\`, fed by an explicit deploy step | Most durable, and the honest end-state for "shared myPKA infrastructure". But a deploy step is new machinery — it must be weighed against the regrowth cap |
+**The regrowth-cap discipline on A3:** the danger is that "deploy step" grows into a pipeline. It must be a **documented copy with a recorded source SHA** — no scheduler, no watcher-of-the-watcher, no registry. If it starts to need one, that is the signal to stop and report, not to build it.
 
-**Recommendation: A1 now.** It satisfies N-1 and N-3 with no new mechanism. A3 is the better long-term shape and should be a separate, explicit decision rather than smuggled into this phase.
-
-**Decision B — `fix/windows-hide-spawn` (PR #92, 26 sites, open, merged nowhere).** The terminal-flash fix. Either merge it as part of this landing, or carry only the minimal fix WP-2A needs and leave #92 open. **Recommendation: merge it into this change** — it is the same defect class, it is already reviewed enough to be a PR, and leaving it open is how `a100dbf` ended up not being in `main`.
+**Decision B — PR #92 `fix/windows-hide-spawn`: merge it into this change.** Same defect class as the terminal flash; already a reviewed PR; and leaving it open is precisely how `a100dbf` ended up absent from `main`. Carrying a partial fix would leave 26 known sites unfixed and a second PR open indefinitely.
 
 ## 14.3 What this route deliberately does NOT build
 
 Per §13.5 and the regrowth cap: **no new watcher, no registry, no validator, no store, no control plane, no enforcement counter, no second map, no new BUILD number.** N-1's "a legacy watcher must be *unable* to start" is satisfied by **removing the takeover capability**, not by building a guard that polices it. If any WP starts to grow a mechanism, that is the signal the diagnosis was wrong.
 
-## 14.4 New human dependency
+## 14.4 Human dependencies
 
-| # | Dependency | Why it cannot be self-certified | Required at |
-|---|---|---|---|
-| **H-4** | **A real logon (or reboot) performed by Warwick.** The machine has not restarted since 2026-07-21 (R-4). N-3's "survives restart" and WP-2A's proof that the legacy path no longer fires **both require the Startup path to actually run** | No amount of simulation proves a logon-triggered path. This is the same class as H-2 | After WP-2A and WP-2B, before the merge decision |
+| # | Dependency | Status |
+|---|---|---|
+| ~~**H-4**~~ | ~~A real logon (or reboot) performed by Warwick~~ | **WITHDRAWN 2026-08-05 by W-3.** It existed only to prove restart survival, which is no longer claimed (§14.0b). **Removing it removes the claim, not just the test** |
+| **H-5** | **Warwick's post-merge fresh-Larry orientation test** (§13.2) — starting a fresh Larry and seeing whether it orients and carries on | **The real acceptance. Cannot be self-certified.** S-1 is the internal proof; this is his |
+| H-3 | Merge decision | Stands |
 
-H-2 and H-3 stand. Warwick's post-merge fresh-Larry orientation test (§13.2) remains **the real acceptance**, and remains his.
+H-2 is discharged (Phase 1 walkthrough, PASSED).
 
 ## 14.5 Sequence
 
-WP-2B(1) writer → WP-2A → WP-2B(2)(3) install → **H-4 logon** → WP-2C → WP-2D (Codex, then `merge-decision`). WP-2A and WP-2B(1) are independent and can run in parallel in separate worktrees.
+**WP-2F (one canonical store) comes FIRST** — WP-2E's durable source of truth cannot be named while two stores are in contention, and WP-2A's runtime move touches the same connection configuration. Sequencing it last would mean building WP-2E twice.
+
+**WP-2F → WP-2A (legacy verified obsolete, then removed, then attempt-proof) → WP-2B (writer, then render, then worktree-independent install) → WP-2E (the QA exchange) → WP-2C (ding made event-driven) → WP-2D (Codex, then `merge-decision`).**
+
+WP-2B(1) — the `map_path` writer — is independent of everything else and can start in parallel immediately. **WP-2A's removal step is gated on its verification step**; if obsolescence is not established, removal does not proceed and Warwick is told why.
+
+## 14.6 Evidence still owed before implementation begins
+
+Three read-only investigations were dispatched 2026-08-05 and **must land before WP-2A, WP-2E or WP-2F is issued as a Work Order**:
+
+| Investigation | Decides |
+|---|---|
+| The Tower store split — live reads/writes, SQLite contents, whether the Supabase host is reachable at all, every call site | **WP-2F's direction.** Warwick prefers Supabase; the DNS failure logged 2026-07-24 is evidence against it, and evidence decides |
+| Legacy Tower obsolescence — is it running, **every** path by which it could start, what still consumes it, what would break | **Whether WP-2A's removal is authorised at all**, and what "cannot return" must cover |
+| The QA-exchange path — where Codex findings live, where Larry's disposition lives (if anywhere), whether any inbound path exists | **WP-2E's design**, and which store is nominated canonical |
+
+**Also owed and NOT yet verified:** Warwick states Proofline remained available on port 7317 across a complete Claude Code session restart. **That is being verified independently before it is recorded** as a phase fact — it is a durability claim, and this build does not record durability claims it has not executed.
 
 ## 13.4 Landing route — how this reaches main and stops being worktree-local
 
