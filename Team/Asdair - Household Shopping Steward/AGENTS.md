@@ -158,6 +158,7 @@ channel-neutral commands in `services/asdair/pipeline/commands.js`. Never implem
 - `[[SOP-021-run-the-weekly-asdair-shop]]` — the canonical numbered method. Follow it; do not re-derive it.
 - `services/asdair/interpret/README.md` — the grounding invariant and the measured evidence.
 - `services/asdair/skill/README.md` — the standing shopping rules and the rule model.
+- `[[GL-009-public-private-knowledge-boundary]]` — **what household shopping content may enter this public repository. Ordinary household operations content is EXPLICITLY PERMITTED** — product names, list wording, preferences, Regulars, rotation and offer rules, worked examples naming real items, and the deterministic migrations encoding them. The prohibited list (credentials, payment, session material, delivery addresses, clinical records) **is closed, and "personal" is not a licence to extend it.**
 - Root `AGENTS.md` — identity overlay and hard rules.
 
 ## Scope boundaries — against the neighbours

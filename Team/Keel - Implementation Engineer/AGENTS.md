@@ -135,6 +135,8 @@ Work Orders write to a private, non-public location that is not a repo at all (`
   after, and the executed proofs. Say plainly in the return that the surface is not a repo, so no
   git evidence exists — a missing SHA must never look like an omission.
 
+**Two different boundaries, and conflating them has already blocked correct work.** [[GL-012-secrets-store-access-boundary]] governs *access* to the off-repo secrets store; **[[GL-009-public-private-knowledge-boundary]] governs what may enter this public repository** — and its §"Household operations content" makes ordinary household shopping content, **including the deterministic seed and corrective migrations that encode it, explicitly committable**. Its prohibited list is closed; "personal" is not a licence to extend it. **Never refuse to author or commit a migration on inferred privacy grounds** — read GL-009 §"The rule that governs how this rule is read" and, if genuinely unclear, ask Larry one line naming the exact content.
+
 **A `file_surface` under `C:/.fusion247/` is governed by [[GL-012-secrets-store-access-boundary]] —
 deny by default, one explicitly declared project subtree, nothing adjacent to it.**
 `C:/.fusion247/private/<project>/**` is a correct surface; `C:/.fusion247/**` and

@@ -11,14 +11,33 @@
 > §7. That is a historical reasoning document and had already drifted from Keel's contract — the two
 > carried different field lists. This file reconciles them. Do not copy the shape out of §7 again.
 
-## The lifecycle — a Work Order is not issued until a read-back is accepted
+## The lifecycle — a Work Order is not issued until a read-back is accepted, and not closed until Veritas passes
 
 ```
 DRAFT  →  WORKER READ-BACK  →  LARRY ACCEPTS OR AMENDS  →  ISSUED  →  RUNNING
+      →  RETURNED  →  INTEGRATED  →  VERITAS_PENDING
+      →  VERITAS_PASS  →  closed
+         VERITAS_HOLD  →  corrective work, resubmit a NEW exact head
+         VERITAS_FAIL  →  the Work Package stays open, Larry re-plans
 ```
 
 **The worker must not begin implementation until Larry explicitly accepts the read-back, or issues an
 amended Work Order.** This is a gate, not a courtesy.
+
+**The Work Package cannot be recorded as complete without a `VERITAS_PASS` receipt against the exact
+integrated head** (Warwick, `GOVERNANCE-VERITAS-HIRE`, 2026-08-04). The second half of the lifecycle is
+therefore not bookkeeping: `VERITAS_PENDING` is the real state of every returned-and-integrated Work
+Package until [[Team/Veritas - Internal Quality and Truth Assurance/AGENTS]] reviews it, and **Larry may
+not write `closed` from his own assessment.** Before that receipt exists, the maximum permitted statement
+is *«Integrated at "<SHA>" and submitted to Veritas for assurance.»*
+
+**This gate fires after integration and never before implementation.** There is no Veritas pre-inspection
+of a Work Order — the worker's read-back and preflight remain the only gate ahead of the build, and
+challenging a defective order stays the worker's job.
+
+**When Veritas is required but unavailable, the work is BLOCKED, not provisionally passed.** That reaches
+Warwick as `unsafe-repository-state`, whose gloss already covers a genuine inability to proceed. There is
+no bypass.
 
 **The consequence, stated so it bites:** work produced without an accepted read-back **is not accepted
 work.** Larry does not review it, its evidence does not count, and it is returned `REFUSED` on process
@@ -41,7 +60,11 @@ name: <slice title>
 work_order_id: WO-YYYY-MM-DD-nn
 build: BUILD-nnn                  # or `standalone`
 wp_number: WP-n                   # or `n/a`
-status: draft                     # draft | read-back-returned | issued | running | closed
+status: draft                     # draft | read-back-returned | issued | running
+                                  # | returned | integrated | VERITAS_PENDING
+                                  # | VERITAS_PASS | VERITAS_HOLD | VERITAS_FAIL | closed
+                                  # `closed` is reachable ONLY from VERITAS_PASS. Larry does not
+                                  # write it from his own assessment.
 authorised_by: Warwick
 authorised_date: YYYY-MM-DD
 owner: <specialist slug>          # keel | felix | vera | vex | ...
@@ -51,6 +74,15 @@ tags: [build-nnn, wp-n]
 
 # --- scope ---
 outcome: <one sentence — what is true when this is done>
+acceptance_property: <the ONE property whose truth decides this WP, stated so it can be checked
+                      against the repository by someone who was not told the answer>
+integration_owner: larry          # who integrates the returned work and submits the exact head
+veritas_gate: 1                   # 1 = integrated WP · 2 = phase/vertical slice · 3 = documentation
+                                  # and Git truth · `none` ONLY where Warwick has said so explicitly
+document_impact: <NONE — verified> # or the exact list of ACTIVE documents requiring amendment.
+                                  # MANDATORY on every order, including when the answer is none.
+                                  # Larry supplies this list; VERITAS VERIFIES IT INDEPENDENTLY
+                                  # at the gate, after integration — never at issue-time.
 file_surface:                     # the COMPLETE writable set. Nothing else.
   - services/<svc>/src/**
   - services/<svc>/test/**
@@ -83,6 +115,36 @@ runbook_path: <path, required when operational_handoff: mack>
 **On `network: none`:** the host tool grant already withholds `WebFetch`/`WebSearch` from the shims that
 need it withheld. This field documents intent; it is **not** an enforced control. Say that honestly rather
 than implying enforcement.
+
+**On `acceptance_property`** — distinct from the acceptance criteria below it. The criteria list everything
+that must be checked; this field names the **one property whose truth decides whether the outcome exists at
+all.** Write it so a reviewer who was never told the answer can go and check it against the repository. *"The
+planner consumes rule X on the live path"* is an acceptance property. *"Tests pass"* is not — a suite can be
+green over a capability nothing calls.
+
+**On `integration_owner`** — the returned work is not the delivered work. This field names who integrates
+and who submits the exact integrated head to Veritas. It is `larry` by default and by design; a Work Order
+that leaves it blank has not said who owns the seam between this WP and everything around it.
+
+**On `veritas_gate`** — which of the three gates fires when this order's work is integrated. `none` is
+permitted **only** where Warwick has explicitly said so, and the order must record where he said it. A
+missing value is under-specification like any other; it is not an implied `none`.
+
+**On `document_impact` — the contradiction-prevention control, mandatory on every order.** Value it
+`NONE — verified` or list the exact **active** documents requiring amendment. `NONE — verified` is a claim
+that the author went and looked, not a default to leave in place.
+
+It is mandatory for the same reason `private_surface` is: a control that only fires when someone remembers
+it does not fire. The estate's measured failure is not that documents disagree — it is that **a document
+stays quietly wrong after the decision it describes has changed**, and the next fresh instance reads it and
+acts on it. Naming the impact at issue-time is what makes that checkable later.
+
+**Larry supplies the list. [[Team/Veritas - Internal Quality and Truth Assurance/AGENTS]] verifies it
+independently, at the gate, after integration — never at issue-time**, because verifying an order before
+implementation would be exactly the pre-inspection gate Warwick ruled out. **The value of the check is
+entirely in what the list missed**, so Veritas searches the repository for withdrawn wording, superseded
+process steps, stale completion claims and continuation briefs — it does not audit Larry's list against
+itself.
 
 **On `private_surface` — the standing boundary line every order carries.** This field is **mandatory on
 every Work Order, including the overwhelming majority where the answer is `none`.** Omitting it is
@@ -180,6 +242,42 @@ Verdict:
 **A clean read-back is still worth returning.** It tells Larry the order was examined and found sound,
 rather than merely unexamined.
 
+## The integration read-back — returned by Larry when he submits the head, not by the worker
+
+The worker's read-back opens the order; **this one closes it.** It is Larry's, it is written after
+integration, and it is what he hands to Veritas alongside the SHA. It exists because the returned work and
+the integrated work are not the same artefact, and nothing in this template previously asked anyone to say
+so.
+
+```
+INTEGRATION READ-BACK
+
+Work Order:
+Exact integrated head:            <full 40-char SHA — resolved, not assumed>
+Branch:
+Acceptance property, restated:
+What was integrated, in my words:
+What the worker returned that I changed at integration:
+Production callers now wired:
+DOCUMENT IMPACT, as integrated:   <the list, re-derived AFTER the work — not copied from the order>
+What I could not verify:
+Veritas gate requested:           1 | 2 | 3
+```
+
+**Three rules bind it:**
+
+- **Resolve the SHA; never assume it.** A head named from memory is the defect this whole gate exists to
+  catch.
+- **Re-derive `document_impact` after the work, not before.** The issue-time list was a prediction. The
+  integration list is an observation, and where the two differ, the difference is itself worth reporting.
+- **"What I could not verify" is a required line, and `none` must be earned.** Handing Veritas an
+  unqualified submission that later fails on something Larry already suspected is a false completion claim,
+  which is a `FAIL` rather than a `HOLD`.
+
+**Larry's maximum permitted statement between this read-back and the Veritas verdict is
+«Integrated at "<SHA>" and submitted to Veritas for assurance.»** Not "done", not "complete", not "working",
+not "ready".
+
 ## Why this gate exists
 
 The measured failure mode in this estate is **the order, not the work** — see
@@ -194,6 +292,9 @@ not repeated here. The one-line version:
 - [[SOP-022-work-order-preflight]] — the read-back and preflight procedure. Canonical there.
 - [[GL-012-secrets-store-access-boundary]] — canonical for any `file_surface` under `C:/.fusion247/`:
   deny by default, the declared-project-subtree allowlist, and the scanner rules an order must respect.
+- [[Team/Veritas - Internal Quality and Truth Assurance/AGENTS]] — the internal assurance gate this
+  lifecycle ends at. Canonical for the three gates, the assurance dimensions and the three verdicts.
+- [[Templates/veritas-receipt]] — the receipt whose existence is the precondition of `closed`.
 - [[SOP-018-independent-change-qa]] — the independent QA layer a worker's evidence feeds and never replaces.
 - [[GL-001-file-naming-conventions]] — slug and filename rules for the filled Work Order.
 - [[Team/Keel - Implementation Engineer/AGENTS]] — the reference implementation of a Work-Order-bound contract.

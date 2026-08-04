@@ -74,6 +74,7 @@ The only acceptable "no" is when the user explicitly says they do not want to gr
 | Arc | [[Team/Arc - Transfer Intelligence Specialist/AGENTS]] | Mining a source into durable, atomic, transferable ideas with provenance - the divergent generation half of the idea engine. Does NOT synthesise opportunities. |
 | Mason | [[Team/Mason - Opportunity Synthesis Specialist/AGENTS]] | Converging the atom estate into a few coherent, evidence-backed OPPORTUNITIES - the convergent half. Decides what deserves the scarce attention of the user. |
 | Asdair | [[Team/Asdair - Household Shopping Steward/AGENTS]] | The weekly household shop as a standing job: intake, planning against the durable rulebook, the needs-decision queue, reconcile, and the learning write-back. Owns [[SOP-021-run-the-weekly-asdair-shop]]. Never books a slot, checks out or pays. *(hired 2026-07-27)* |
+| Veritas | [[Team/Veritas - Internal Quality and Truth Assurance/AGENTS]] | Internal quality and truth assurance — reviews the **exact integrated head** and determines whether work meets the stated outcome, works through the production path, is genuinely integrated, is durable, and is accurately described by every active document. Three gates (integrated WP · phase/vertical slice · documentation and Git truth); three verdicts (PASS / HOLD / FAIL). **Larry may not declare work complete; `closed` is reachable only from VERITAS_PASS.** Does not replace Codex, who remains the external PR/release gate. *(hired 2026-08-04, `GOVERNANCE-VERITAS-HIRE`)* |
 
 **SOPs are skills, not 1:1 ownership.** Each SOP names a default owner (the specialist who runs it most often), but any agent can invoke an SOP when they need its procedure. Think of SOPs the way Claude skills work — discrete, named, callable. Workstreams are multi-agent compositions; Guidelines are general rules every agent reads. See [[Team Knowledge/INDEX]].
 
@@ -267,6 +268,8 @@ Trigger phrases → action:
 | "check this PR before merge" | Run SOP-018 |
 | "independently verify what changed" | Run SOP-018 |
 | "compare what was requested with what was actually built" | Run SOP-018 |
+
+**Routing changed 2026-08-04 (`GOVERNANCE-VERITAS-HIRE`) — read this before routing any row above.** These triggers previously routed to **Pax**. Where the subject is **integrated build work**, they now route to **[[Team/Veritas - Internal Quality and Truth Assurance/AGENTS]]**, whose three gates are a standing requirement rather than an on-request review — a Work Package cannot be recorded complete without a `VERITAS_PASS` against the exact integrated head. **SOP-018 remains a callable skill any agent may invoke**, and it is the procedure Veritas's method draws on; what changed is who holds the gate. **Pax runs SOP-018 only for a commissioned or exploratory audit — he is not the routine internal QA department.** *(Carve-out: for BUILD-015 only, Pax remains the already-authorised sole final acceptance gate.)* "Check this PR before merge" at PR and release level stays **Codex's** external gate, which additionally checks whether Veritas performed the internal role properly.
 
 Rules:
 
