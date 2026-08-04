@@ -14,7 +14,7 @@
 | **Branch** | `build-020/live-trial` |
 | **Worktree** | `C:\Fusion247PKA-build-020-trial` |
 | **Head when written** | `ca4580298e1c3aad4f922637c3d836854b4af539`, **advanced by the commit that added this block.** `git rev-parse HEAD` is the authority — this map has recorded a stale head three times (C-3, and twice in the Work Order envelope). **Do not trust a SHA in this file over the repository.** |
-| **Upstream** | **NONE CONFIGURED.** 51 commits ahead of `origin/main`. Remote is `https://github.com/warwickallan/Fusion247PKA.git`. |
+| **Upstream** | ~~**NONE CONFIGURED.** 51 commits ahead of `origin/main`.~~ **CORRECTED 2026-08-04 by execution (R-2): upstream IS `origin/build-020/live-trial`, 54 commits ahead, and PR #94 is already open as a DRAFT.** Remote is `https://github.com/warwickallan/Fusion247PKA.git`. |
 | **Phase complete** | **Phase 1 — Proofline. PASSED by Warwick, 2026-08-04**, on his own completed walkthrough. |
 | **Frontier** | **Phase 2 — Honcho and Tower as durable shared myPKA infrastructure.** Not started. The fresh session owns implementation. |
 | **First safe action** | §13 below. Verify reality, then route. **Do not implement before the route exists.** |
@@ -498,9 +498,76 @@ The stale copy's `spawn` calls carry no `windowsHide`, and `git`/`gh` are consol
 - The watcher's PR poll requires an explicit `@tower checkpoint:` marker. It ran ~21 hours across 2026-08-03/04 returning `refused_no_head_directive` on every candidate — **zero turns, zero reviews, zero notifications.**
 - **Last Codex run of any kind: 2026-08-02.** Everything on 2026-08-04 was Veritas, which is internal and is not Codex.
 
+## 13.3a Re-verified reconnaissance — SECOND execution, 2026-08-04, fresh session
+
+**§13.3 warned it was already stale. It was.** Every line below is executed output from this session, with `MSYS_NO_PATHCONV=1` set as the instrument warning requires. Contradictions are recorded here, not silently overwritten.
+
+| # | §13.3 / rotation-block claim | Executed reality | Effect on the route |
+|---|---|---|---|
+| **R-1** | Head `ca45802` | **`25825b1a65341760cb2d85493ab49827820c8fdc`**, tree clean. Two commits further on | None. The map warned its own SHAs are untrustworthy; they were |
+| **R-2** | **"Upstream NONE CONFIGURED, 51 ahead"** | **WRONG. Upstream is `origin/build-020/live-trial`; 54 ahead of `origin/main`; PR #94 is ALREADY OPEN as a DRAFT**, titled *"BUILD-020: Proofline (Warwick PASSED) + Phase 2 route"* | **§13.4 step 1 is already done.** The route starts at step 2, not step 1 |
+| **R-3** | "The only registration is hardcoded to `reorient.mjs`" | **UNDERSTATED. FOUR machine-level entries in `C:\Fusion247PKA\.claude\settings.local.json`, every one hardcoded to `C:/Fusion247PKA/`:** two `SessionStart` hooks (`ensure-capture-gateway.mjs`, then `reorient.mjs`), one `PreToolUse` hook (`worktree-guard.mjs`), and the `statusLine` (`statusline-live.mjs`) | **The install surface for N-3/N-4 is four entries, not one.** Materially widens WP-2B |
+| **R-4** | Startup VBS is the live legacy-takeover risk | **CONFIRMED verbatim — and it is ARMED BUT DORMANT, which is worse than the map implies.** The machine has **not rebooted since 2026-07-21 23:21:22**. Watcher PID 31268 started **2026-08-04 00:47:36** — not at logon. The VBS log last wrote **2026-07-24**. **So the takeover has never yet fired against the current watcher, and it is scheduled to fire at the next logon** | **Raises N-1's priority.** The failure is pending, not past. It also means N-3's "survives restart" is currently **unproven in the strongest possible sense — nothing has been restarted** |
+| **R-5** | *(not in the map)* | The VBS launcher's own watcher **died on 2026-07-24 and could not report it**: last two log lines are `watcher_crash` *"Connection terminated unexpectedly"* then `crash_notify_failed` *"getaddrinfo ENOENT db.iiqstxfqjbrbyplwwsql.supabase.co"* | Evidence that the legacy path fails silently. Strengthens N-1 |
+| **R-6** | "`TOWER_NOTIFY_TRANSPORT=none` at `tower-baton.env:8`" | **CONFIRMED at exactly line 8 — but `run-tower-cp-watcher.ps1` explicitly `Remove-Item Env:TOWER_NOTIFY_TRANSPORT`.** The Startup path *clears* it. The `none` bites only routes that load that env file wholesale | Narrows the ding fix. Still one line, still config-only |
+| **R-7** | Honcho: installed render is wrong; no writer emits `map_path` | **BOTH CONFIRMED.** Installed `continuity.mjs` (main): **0** occurrences of `packetContentHash`/`storedMapPath`/`CONTINUITY POINTER`. This worktree: **9**. `buildPacket` (`continuity.mjs:162`) emits **exactly 8 fields** — no `map_path` — while the pointer render at `:263` reads `p.map_path`, which is therefore **always null** | **N-2 needs the writer changed FIRST, then installed.** Installing the render alone yields a pointer pointing at nothing |
+| **R-8** | continuity.json focus is BUILD-015 | **CONFIRMED byte-for-byte, and unchanged** — `updated_at` still `2026-08-04T06:42:01.586Z`, still zero occurrences of "proofline" or "BUILD-020". Its `next_action` still directs a fresh Larry into BUILD-015 Gate 3 | The misdirection risk in the rotation block is **live and current** |
+| **R-9** | *(not in the map)* | Sibling worktree **`C:\Fusion247PKA-external-repair` sits at the SAME head `25825b1`** on branch `build-020/veritas-focus-redline` | Noted so a later reader does not treat it as divergent work |
+
+**Unchanged and re-confirmed:** `a100dbf` is **not** an ancestor of `origin/main`; `fix/windows-hide-spawn` (`bf52920`) is contained in **no** branch but its own — it is **PR #92, still open**; `C:\Fusion247PKA-tower` is on `build-014/tower-recovery` at `3c08e45`; the current watcher (PID 31268) runs from the **main** worktree; **no** SessionStart hook is registered for this worktree.
+
+---
+
+# 14. PHASE 2 ROUTE — proposed, NOT accepted
+
+**Status: awaiting Warwick's acceptance (`product-decision`). No implementation begins until he accepts.** Written from R-1..R-9, not from §13.3.
+
+**The organising finding:** three of the four acceptance properties fail for the *same* reason — **every durable install point hardcodes a worktree path**, and the one automated install point (the Startup VBS) points at a stale worktree and actively kills the current runtime. Fixing files inside this worktree satisfies none of them. That is why the route is ordered install-point-first.
+
+## 14.1 Work packages
+
+| WP | Outcome | Satisfies | Owner |
+|---|---|---|---|
+| **WP-2A** | **The legacy takeover is removed, and proven unable to recur.** `C:\.fusion247\run-tower-cp-watcher.ps1` no longer kills the running watcher and no longer starts from the stale `C:\Fusion247PKA-tower`. Proof is **by attempt**: run the legacy launcher against a live current watcher and assert the current one survives, no second appears, and no console window is created | **N-1** (both halves — legacy takeover *and* terminal flash are the same file) | Keel |
+| **WP-2B** | **A fresh Larry in ANY worktree is oriented to the correct current map and frontier.** Three ordered changes: (1) `buildPacket` emits `map_path` + frontier — without it the pointer render is null by construction (R-7); (2) the pointer render replaces the installed one, which currently claims *"source of truth"* against `CLAUDE.md` #9; (3) registration moves to a **worktree-independent** install point so it applies outside `C:\Fusion247PKA` | **N-2, N-3, N-4** | Keel |
+| **WP-2C** | **The DevBot ding delivers again.** Configuration only, per Warwick's binding boundary. **If it stops being a config change, STOP and report** | — | Keel |
+| **WP-2D** | **The change lands.** PR #94 taken out of draft, Codex reviews the complete integrated change, Warwick decides the merge | **N-4** | Larry (decision) / Keel (execution) |
+
+## 14.2 The two genuine decisions for Warwick
+
+Everything else is an ordinary technical choice and is mine. These two are not.
+
+**Decision A — where the durable Tower runtime lives.** The current design pins it to a "stable worktree" that has gone stale. Three realistic options:
+
+| Option | What changes | Cost |
+|---|---|---|
+| **A1 — repoint the existing stable worktree (recommended)** | Move `C:\Fusion247PKA-tower` forward to a head that contains the windowsHide fix; leave the Startup VBS structure intact | Smallest. Honours the original design intent (the PS1's own comment explains why it must not point at mutable `main`). Still a worktree, so it can go stale again |
+| **A2 — point at `C:\Fusion247PKA`** | Startup runs from the main checkout | **Not recommended.** This is exactly the defect the PS1 was written to avoid — main switches branches |
+| **A3 — a machine-level runtime outside any worktree** | e.g. `C:\.fusion247\tower-runtime\`, fed by an explicit deploy step | Most durable, and the honest end-state for "shared myPKA infrastructure". But a deploy step is new machinery — it must be weighed against the regrowth cap |
+
+**Recommendation: A1 now.** It satisfies N-1 and N-3 with no new mechanism. A3 is the better long-term shape and should be a separate, explicit decision rather than smuggled into this phase.
+
+**Decision B — `fix/windows-hide-spawn` (PR #92, 26 sites, open, merged nowhere).** The terminal-flash fix. Either merge it as part of this landing, or carry only the minimal fix WP-2A needs and leave #92 open. **Recommendation: merge it into this change** — it is the same defect class, it is already reviewed enough to be a PR, and leaving it open is how `a100dbf` ended up not being in `main`.
+
+## 14.3 What this route deliberately does NOT build
+
+Per §13.5 and the regrowth cap: **no new watcher, no registry, no validator, no store, no control plane, no enforcement counter, no second map, no new BUILD number.** N-1's "a legacy watcher must be *unable* to start" is satisfied by **removing the takeover capability**, not by building a guard that polices it. If any WP starts to grow a mechanism, that is the signal the diagnosis was wrong.
+
+## 14.4 New human dependency
+
+| # | Dependency | Why it cannot be self-certified | Required at |
+|---|---|---|---|
+| **H-4** | **A real logon (or reboot) performed by Warwick.** The machine has not restarted since 2026-07-21 (R-4). N-3's "survives restart" and WP-2A's proof that the legacy path no longer fires **both require the Startup path to actually run** | No amount of simulation proves a logon-triggered path. This is the same class as H-2 | After WP-2A and WP-2B, before the merge decision |
+
+H-2 and H-3 stand. Warwick's post-merge fresh-Larry orientation test (§13.2) remains **the real acceptance**, and remains his.
+
+## 14.5 Sequence
+
+WP-2B(1) writer → WP-2A → WP-2B(2)(3) install → **H-4 logon** → WP-2C → WP-2D (Codex, then `merge-decision`). WP-2A and WP-2B(1) are independent and can run in parallel in separate worktrees.
+
 ## 13.4 Landing route — how this reaches main and stops being worktree-local
 
-1. **`build-020/live-trial` has NO upstream and is 51 commits ahead of `origin/main`.** Push and open the PR **early** — recorded is not visible.
+1. ~~**`build-020/live-trial` has NO upstream and is 51 commits ahead of `origin/main`.** Push and open the PR **early** — recorded is not visible.~~ **SUPERSEDED by R-2, 2026-08-04: already done.** Upstream is `origin/build-020/live-trial`, 54 ahead, and **PR #94 is open as a DRAFT**. The remaining work is taking it out of draft at the right moment — see WP-2D.
 2. **Codex reviews the complete integrated change** via the PR head. Budget: max three executions per gate.
 3. **Warwick decides the merge** (`merge-decision`).
 4. **The machine-level install is the part most likely to be left marooned.** Both live install points hardcode absolute worktree paths — the SessionStart hook (`C:/Fusion247PKA/...`) and the Startup VBS (`C:\Fusion247PKA-tower\...`). **A fix that only edits files inside this worktree changes nothing about either.** N-3 and N-4 are lost by default unless the install point itself is addressed.
@@ -527,5 +594,7 @@ The stale copy's `spawn` calls carry no `windowsHide`, and `git`/`gh` are consol
    - Is a SessionStart hook registered for the worktree you are actually in?
 3. **Record contradictions in this file** rather than overwriting one source.
 4. **Then extend this map** with the Phase 2 route, and get Warwick's acceptance before implementing (`product-decision`).
+
+**✅ STEPS 1–4 DONE, 2026-08-04 (fresh session).** Reconnaissance re-executed and its nine contradictions recorded in **§13.3a**; the Phase 2 route is written in **§14** and is **awaiting Warwick's acceptance**. **The frontier is now §14, not §13.6.** Nothing has been implemented.
 
 **Human dependencies for Phase 2:** Warwick's acceptance of the Phase 2 route · his merge decision · **his fresh-Larry orientation test after merge, which is the real acceptance and cannot be self-certified.**
