@@ -571,7 +571,7 @@ Veritas assesses the **exact integrated head** against these five, each of which
 | **S-1** | A **fresh Larry, started in a DIFFERENT worktree**, is oriented to *this* map and the *live* frontier — automatically, with no path typed by Warwick | A packet that exists; a correct render in this worktree only |
 | **S-2** | **Legacy Tower cannot return** — proven by *attempting* every enumerated start path against the live current runtime | "We deleted it"; an absence check |
 | **S-3** | **Current Tower works across builds and PRs** — exercised against more than one build/PR context | Working for BUILD-020 only |
-| **S-4** | **The real Codex/Larry dialogue appears on TowerBot** — actual finding content and actual disposition, followable by Warwick, from ONE named durable source | A notification that a review ran; a mirror; a one-way post |
+| **S-4** | **The real Codex/Larry dialogue appears on TowerBot** — Codex's **actual finding content**, Larry's **actual rationale prose explaining how he is dealing with it**, and **each subsequent exchange or disposition as a further turn**, all rendered from ONE named durable source **after** the write. *(Sharpened by Warwick 2026-08-05 — see §14.7)* | A notification that a review ran · a mirror · a one-way post · **a disposition ENUM without the rationale text** · **a single digest instead of an ongoing thread** · **a summarisation cap that clips the rationale** |
 | **S-5** | **None of it depends on this Larry's context** — it survives this session ending | Anything a running session holds |
 
 **The mandatory Veritas question applies as always:** *«Can Warwick now do the thing this phase promised, in the real intended context?»* **Scope of the verdict is bounded by §14.0b** — restart durability is outside the claim and must not be assessed as a failure or recorded as a pass.
@@ -671,9 +671,30 @@ Three read-only investigations were dispatched 2026-08-05 and **must land before
 
 **W4's read-back-after-write is the spine of the design.** What Warwick reads is what the database accepted, not what Larry claimed. That is the difference between an exchange and a mirror.
 
-### The decision I am taking — Warwick may overrule it
+### Warwick's clarification, 2026-08-05 — **settled, not a decision I take**
 
-**Warwick replies on GitHub, not on Telegram.** His requirement is that the exchange be *visible* to him — *"show the actual Codex findings and Larry's actual response"*. **Telegram inbound for TowerBot does not exist** (no `getUpdates`, no webhook anywhere in `services/control-plane`) and building it is new code. Reading on Telegram and replying on the PR needs **nothing new built**. If he wants to reply *from Telegram*, that is a real feature and a separate decision — I am not smuggling it in.
+**I framed this as a decision I was taking on his behalf. It was never in question.** Warwick: *"I did not ask to reply to TowerBot from Telegram."* Recording the correction rather than quietly adopting the right answer.
+
+**The settled division of surfaces:**
+
+| Surface | Role |
+|---|---|
+| **GitHub / the PR** | **The control and disposition surface.** Where the review is *operated* — where Larry posts dispositions and where the grammar is parsed and persisted. Unchanged |
+| **TowerBot / Telegram** | **The live visible conversation surface.** Where Warwick *watches* the QA exchange happen. **Not** where he operates it |
+
+**Therefore: no Telegram inbound feature is required, and none will be built.** That **closes the only genuinely-new-code item** the investigation surfaced (no `getUpdates`, no webhook anywhere in `services/control-plane`). **WP-2E is now entirely a wiring job against code that already exists.**
+
+### What TowerBot must actually SHOW — his words, and they are more than a findings list
+
+> *"Codex's actual finding, Larry's actual response explaining how he is dealing with it, and any subsequent exchange or disposition."*
+
+**Three requirements, and the second is the one W1–W4 under-delivered as drafted:**
+
+1. **Codex's actual finding** — the real finding content: id, impact, reachability, required disposition, and the evidence text. Not a count, not a verdict word.
+2. **Larry's actual response explaining how he is dealing with it** — **the `disposition_rationale` TEXT, not the `disposition` enum.** `addressed` alone tells Warwick nothing about *how*. The prose Larry writes when disposing a finding is the substance of his half of the conversation, and it must reach Telegram intact rather than being reduced to a status word.
+3. **Any subsequent exchange or disposition** — this is an **ongoing thread**, not a single post-review digest. A follow-on round, a re-disposition at a new head, a finding that moves from `remains_open` to `addressed` — each is a further turn in the conversation and must appear as one.
+
+**Consequence for W4:** the Telegram echo still renders **from the store after the write** — that is what keeps it an exchange rather than a mirror of Larry's intent — but what it renders is the **rationale prose**, and it fires on **every** disposition event, not once per review. **Truncation is the risk to watch:** `notify.mjs` has an existing summarisation cap, and a cap that clips the rationale would silently destroy exactly the content Warwick asked for. **The cap must be checked against the rationale field before W3/W4 are considered done.**
 
 ### Named as unestablished — not guessed
 
