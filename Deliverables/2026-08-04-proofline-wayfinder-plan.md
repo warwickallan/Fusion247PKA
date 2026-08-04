@@ -1,6 +1,36 @@
-# Proofline — Wayfinder plan
+# BUILD-020 — Wayfinder plan
 
-**Proofline is the proof application inside BUILD-020** (Warwick, 2026-08-04). It is not a separate build and no `BUILD-0NN` number is to be created for it.
+> **This file is the single BUILD-020 Wayfinder map.** Its filename still says `proofline` because it began as the Proofline map on 2026-08-04 and **a file rename would break every pointer to it**; the mismatch is recorded here rather than fixed. **Proofline is BUILD-020's completed proof application** (Warwick, 2026-08-04) — not a separate build, no `BUILD-0NN` of its own. **Do not create a second or competing map** (Warwick, 2026-08-04): the next phase extends this file.
+
+---
+
+## ⟦ROTATION BLOCK⟧ — read this first, then verify every line of it by execution
+
+**Written 2026-08-04 at the rotation boundary. Everything below was true when written and is a claim about the past, not the present.**
+
+| | |
+|---|---|
+| **Map path** | `Deliverables/2026-08-04-proofline-wayfinder-plan.md` — this file. The only BUILD-020 map. |
+| **Branch** | `build-020/live-trial` |
+| **Worktree** | `C:\Fusion247PKA-build-020-trial` |
+| **Head when written** | `ca4580298e1c3aad4f922637c3d836854b4af539`, **advanced by the commit that added this block.** `git rev-parse HEAD` is the authority — this map has recorded a stale head three times (C-3, and twice in the Work Order envelope). **Do not trust a SHA in this file over the repository.** |
+| **Upstream** | **NONE CONFIGURED.** 51 commits ahead of `origin/main`. Remote is `https://github.com/warwickallan/Fusion247PKA.git`. |
+| **Phase complete** | **Phase 1 — Proofline. PASSED by Warwick, 2026-08-04**, on his own completed walkthrough. |
+| **Frontier** | **Phase 2 — Honcho and Tower as durable shared myPKA infrastructure.** Not started. The fresh session owns implementation. |
+| **First safe action** | §13 below. Verify reality, then route. **Do not implement before the route exists.** |
+
+### 🚨 The instrument warning — read before ANY live-state check
+
+**In Git Bash on this machine, MSYS silently mangles `/FLAG` arguments into Windows paths.** `tasklist /FI "IMAGENAME eq node.exe"` became `C:/Program Files/Git/FI` and errored; I read the empty result as *"no processes are running"* and **stated it to Warwick as a fact.** It was wrong. Sixteen node processes were running, including the Tower watcher.
+
+**Always `export MSYS_NO_PATHCONV=1`, or use `//c` / `//FI`.** Re-verified correct form:
+
+```bash
+MSYS_NO_PATHCONV=1 tasklist /FI "IMAGENAME eq node.exe" /FO CSV
+MSYS_NO_PATHCONV=1 cmd.exe /c "…"
+```
+
+This matters more than it looks: **the entire next phase is about proving what is and is not running.** A mangled instrument produces a confident, wrong negative — which is exactly the failure this build already paid for once.
 
 ## START / RESUME HERE — ordered by Warwick
 
@@ -306,8 +336,18 @@ He is not asked to run a git command, choose a git route, or understand a git co
 | 1 — WP-1 | **PARTIAL** — built and integrated; **not** PASS. Veritas `HOLD` with 3 blocking findings. D-1 is a real code defect: `T-3d` failed **4 of 11** full-suite runs | commit `3a32525`, 27 files, 0 outside surface; Veritas receipt below | 2026-08-04 |
 | 2 — Integration | **PARTIAL** — *corrected 2026-08-04, Veritas `D-12`.* **Larry recorded this as `PASS`, which he has no authority to do.** Root `CLAUDE.md`: *"PARTIAL and FAILED are Larry's to record without one; PASS is not."* Veritas's Integration **dimension** passing is not a Phase 2 verdict, and the head it named carries a HOLD. The underlying facts are true and independently verified — the label was not mine to award | integrated head `39a553cb600b7a79d8b4c1845b2bb19e31a2bc69`, tree clean, surface reconciled; corrective head `78c14c8` | 2026-08-04 |
 | 3 — Veritas gate | **HOLD** — 3 blocking, 7 non-blocking. Goal fidelity, design fidelity, functional proof, integration and durability all PASS; test quality, git truth, documentation truth and residual risk HOLD | `Deliverables/2026-08-04-veritas-proofline-wp1-receipt.md`, `receipt_sha256: 745703891a077d6bda21ee57fcae3abc0b298f9708d454908db8b37a29744815`, against `39a553cb` | 2026-08-04 |
-| 4 — Walkthrough + live start | **FAILED** — Warwick's real walkthrough **could not start the application**. Two independent defects, both shipped: **(a)** `RUNBOOK.md` opened with *"From PowerShell:"* and a `.ps1` path; from cmd.exe `.PS1` is absent from `PATHEXT` and has **no registered handler**, so Windows raised the "Select an app" picker and no server started. **(b)** Invoked correctly via `powershell.exe -NoProfile -ExecutionPolicy Bypass -File …`, the script **still failed to parse**: it is UTF-8 without a BOM, Windows PowerShell 5.1 decodes unmarked `.ps1` as ANSI, so the em-dash at line 96 became `â€"` — whose trailing character is a curly quote — and the parser reported *"The string is missing the terminator"*. **The launcher was never valid on his machine.** | Warwick's own report, 2026-08-04; root cause reproduced mechanically by Keel from cmd.exe (`PATHEXT` lacks `.PS1`; `assoc .ps1` → not found; `ftype` → no open command; port 7317 refused) | 2026-08-04 |
-| 5 — Merge | NOT STARTED | — | — |
+| 4a — Walkthrough, **first attempt** | **FAILED — and this record stands.** Warwick: *"The earlier launch failure and subsequent repair remain part of the evidence; the PASS does not erase them."* Warwick's real walkthrough **could not start the application**. Two independent defects, both shipped: **(a)** `RUNBOOK.md` opened with *"From PowerShell:"* and a `.ps1` path; from cmd.exe `.PS1` is absent from `PATHEXT` and has **no registered handler**, so Windows raised the "Select an app" picker and no server started. **(b)** Invoked correctly via `powershell.exe -NoProfile -ExecutionPolicy Bypass -File …`, the script **still failed to parse**: it is UTF-8 without a BOM, Windows PowerShell 5.1 decodes unmarked `.ps1` as ANSI, so the em-dash at line 96 became `â€"` — whose trailing character is a curly quote — and the parser reported *"The string is missing the terminator"*. **The launcher was never valid on his machine.** | Warwick's own report, 2026-08-04; root cause reproduced mechanically by Keel from cmd.exe (`PATHEXT` lacks `.PS1`; `assoc .ps1` → not found; `ftype` → no open command; port 7317 refused) | 2026-08-04 |
+| **4b — Walkthrough, after repair** | **PASS — recorded on Warwick's own authority, 2026-08-04.** *"I have now completed the real Proofline walkthrough. The application opens, I can view and use it, and I PASS and approve the Proofline product phase."* **This is his pass, not mine** — Larry may not record a PASS without a receipt, and does not here. Stated honestly alongside it: the second Veritas pass returned **HOLD on documentation truth only**, discharged at `b4cba53`; all functional dimensions passed. **P-12 and P-13 remain open and are not erased by this pass** | Warwick's completed walkthrough; launcher repaired at `8d130eb`; functional journey proven live by Larry at `ca45802` | 2026-08-04 |
+| 5 — Merge | NOT STARTED — and **not** the next step. Phase 2 lands first; Codex reviews the complete integrated change | — | — |
+
+### 🏁 PHASE 1 — PROOFLINE — CLOSED
+
+**Warwick PASSED and approved the Proofline product phase on 2026-08-04.** What that pass does and does not cover, stated exactly:
+
+- **It covers** the product journey he performed himself: the app opens, he can view and use it, he approves it.
+- **It does not erase** the launch failure (4a) or the repair. Both stay in the evidence at his explicit instruction.
+- **It does not resolve** P-12 (approval notes are durably stored but unreadable through the API) or P-13 (the rendered page was never proven under automation — his walkthrough is what closed that gap, and only for him).
+- **It is not a Veritas PASS.** The gate's last verdict on this scope was HOLD on documentation truth; those three cells were corrected at `b4cba53` and no third pass was authorised.
 
 ### Veritas HOLD — disposition of the three blocking findings
 
@@ -347,6 +387,122 @@ Then `http://127.0.0.1:7317/`. Works from cmd.exe and PowerShell, pasted identic
 
 **Still unproven and still his: the rendered page** (P-13). Earlier HOLD findings D-1..D-4 were discharged at `78c14c8` and re-reviewed; the second Veritas pass returned HOLD only on documentation truth, and those three cells were corrected at `b4cba53`.
 
-**Then, and only after a `VERITAS_PASS`:** Warwick's browser walkthrough and first live start (Phase 4, H-2 — the only route by which G-11 is ever claimed), then the merge decision (Phase 5).
+**Phase 1 is CLOSED — Warwick passed it 2026-08-04.** The frontier has moved. **Go to §13.**
 
-**Resumable state:** branch `build-020/live-trial`, worktree `C:\Fusion247PKA-build-020-trial`. Verify HEAD by execution before trusting any SHA here — v1 of this map got that wrong (C-3).
+**Resumable state:** branch `build-020/live-trial`, worktree `C:\Fusion247PKA-build-020-trial`. Verify HEAD by execution before trusting any SHA here — this map got that wrong three times.
+
+---
+
+# 13. PHASE 2 — Honcho and Tower as durable shared myPKA infrastructure
+
+**Set by Warwick, 2026-08-04, at the rotation boundary. The fresh session owns implementation. Nothing here has been started.**
+
+## 13.1 North Star — his words
+
+> **Honcho and Tower become durable shared myPKA infrastructure rather than branch-local or worktree-local experiments.**
+>
+> *"I need Honcho to orient a fresh Larry to the correct active Wayfinder and frontier across branches and worktrees, without stale instructions and without me reconstructing the build."*
+>
+> *"I need exactly one current Tower runtime that remains online, survives restart, cannot be replaced by a legacy watcher, does not flash terminal windows, and is available for the later Codex merge review."*
+>
+> *"These changes must have a clear route into main and a stable machine-level installation. They must not be left marooned on this trial branch or dependent on this particular worktree."*
+
+## 13.2 Acceptance — **executed reality**, by the revised Veritas contract Warwick is reviewing externally
+
+| # | Property | The bar |
+|---|---|---|
+| **N-1** | Tower remains durably online **and only the current watcher can start** | Not "we removed the old one" — a legacy watcher must be *unable* to take over. Prove by attempting it. |
+| **N-2** | Honcho gives a fresh Larry **the correct current Wayfinder and frontier** | Not a packet that exists — a packet that names *this map* and the *live* frontier. |
+| **N-3** | It works **from a different worktree** and **survives restart** | Both, separately, by execution. |
+| **N-4** | Operational state and landing route are **durable outside Larry's context** | If it only lives in a session, it does not exist. |
+
+**Then:** Codex reviews the complete integrated change for merge. **After merge**, Warwick starts a fresh Larry and tests whether he can orient and carry on. **That test is the real acceptance**, and it is his.
+
+## 13.3 Verified reconnaissance — executed 2026-08-04, and already stale
+
+**This is a snapshot, not the present. Re-verify every line before acting on it** — and read the instrument warning in the rotation block first, because the first attempt at this reconnaissance produced a confidently wrong answer.
+
+### Tower — there are THREE watchers, not two
+
+| Name | Path | State 2026-08-04 |
+|---|---|---|
+| **tower-loop** — the GitHub-driven turn loop | `C:\Fusion247PKA\services\control-plane\tower-loop\watcher.mjs` (launcher `run-watcher.mjs`) | **CURRENT. Running, PID 31268**, from the **main** worktree |
+| **tower-baton** — BUILD-010, ClickUp-driven | `C:\Fusion247PKA\services\tower-baton\bin\tower-watch.js` | **LEGACY, dormant.** Stale lock `C:\.fusion247\tower-baton.lock` names dead PID 39920. **Not formally retired** — the migration plan puts retirement explicitly out of scope |
+| **FusionTowerWatchdog** | `C:\Fusion247PKA\services\fusion-tower\src\watchdog.js` | Different subsystem. `Register-ScheduledTask` block is **commented out**; header says ANNOUNCE-DON'T-LAUNCH. Never registered |
+
+Evidence: `Deliverables/2026-08-02-tower-watcher-github-sqlite-migration-plan.md` (line 69 names the two Tower implementations; line 24 parks retirement); `run-watcher.mjs:3` — *"Starts the CORRECT watcher (NOT the BUILD-010 tower-baton)"*.
+
+**⚠️ That migration plan is stale on facts** — it asserts two watchers running simultaneously at PIDs that no longer exist. Treat it as a decision record, not a state record.
+
+### 🔥 The terminal-flash cause, and the legacy-takeover cause, are the SAME thing
+
+A **Startup-folder shortcut** — invisible to `tasklist`, `schtasks` and `sc query`:
+
+`C:\Users\Buggly\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\mypka-tower-cp-watcher.vbs:4`
+→ runs `C:\.fusion247\run-tower-cp-watcher.ps1` hidden, which:
+
+1. **Kills any running tower-loop watcher** (line 23 — a `Stop-Process` over every `node.exe` whose command line matches `*tower-loop*watcher.mjs*`), then
+2. **starts a stale one from `C:\Fusion247PKA-tower`** (line 7) — a worktree on `build-014/tower-recovery` (`3c08e45`) where the console-hiding fix **`a100dbf` is not an ancestor** and the fixed files do not exist.
+
+The stale copy's `spawn` calls carry no `windowsHide`, and `git`/`gh` are console applications — so a bare spawn from a windowless parent **creates a visible console window**.
+
+**This single file is simultaneously N-1's failure ("a legacy watcher replaces the current one") and the terminal-flash defect.** It is the highest-value target in the phase. Its log last wrote `Jul 24 08:25`, so **whether it currently succeeds at logon is NOT established** — establishing it needs a logon observed.
+
+**Route-into-main facts:** `a100dbf` (*"stop gh/git flashing a console window over Warwick's screen every 30s"*) is an ancestor of both working heads but **NOT of `origin/main`**. Branch `fix/windows-hide-spawn` (`bf52920`, `c575853`) fixes 26 further sites and is **merged nowhere**.
+
+### Honcho — a fresh Larry currently gets NOTHING here
+
+- **Hosted remote service:** `https://api.honcho.dev/v3`, bearer auth. Credentials file `C:\.fusion247\honcho.env` **exists** (values not read, not reported). Workspace/session/peer: `larry-continuity`.
+- **No SessionStart hook is registered for this worktree.** The only registration is `C:\Fusion247PKA\.claude\settings.local.json`, hardcoded to `node C:/Fusion247PKA/tools/governor/reorient.mjs`. **A fresh Larry opened anywhere but the main worktree receives nothing** — which is exactly N-2 and N-3.
+- **The installed render is the wrong one.** `C:\Fusion247PKA\tools\governor\continuity.mjs` has **zero** occurrences of `packetContentHash`, `storedMapPath` or `CONTINUITY POINTER`. It still emits a block headed *"AUTHORITATIVE current focus"* closing *"This is the source of truth for what Warwick is doing"* — which **directly contradicts root `CLAUDE.md` precedence #9**, where the brief is *"a pointer with zero authority."* **A live governance contradiction, not a style problem.** The BUILD-020 pointer render exists **only in this trial worktree**, uninstalled.
+- **No writer emits `map_path`.** `buildPacket` produces exactly eight fields — `focus, immediate_objective, warwick_last_request, accepted_decisions, completed, blockers, next_action, notes`. So even with the pointer render installed, `storedMapPath()` returns null. **N-2 needs a writer change, not just a hook.**
+- **Last local state** `~/.mypka/governor/continuity.json`, updated `2026-08-04T06:42:01.586Z`: focus is **BUILD-015 AsdAIr**. It contains no occurrence of "proofline" or "BUILD-020". Last packet delivered `cont-1785846026092-143-rqjtww` at `2026-08-04T12:20:30.472Z`, seq 143.
+
+### DevBot ding — the small configuration issue is real, and it is one line
+
+- **Delivering path:** `services/control-plane/tower-loop/notify.mjs` — direct Telegram Bot API POST, driven by `watcher.mjs`. Outbox `tower.notification` in `C:\Users\Buggly\.mypka\tower\tower.db`.
+- **Last successful delivery: `2026-08-02T23:37:56.301Z`, Telegram `message_id 457`, ok.** Three rows total, all succeeded, **zero failures, zero dead-letter.**
+- **🎯 `TOWER_NOTIFY_TRANSPORT=none` at `C:\.fusion247\tower-baton.env:8`.** `notify.mjs` then records the row and sends nothing; `run-watcher.mjs` treats it as a deliberate no-Telegram run and **starts anyway with notifications disabled** — i.e. a watcher launched from that env file runs with its failures invisible. Token and chat-id in that file are non-empty.
+- **Do NOT use `services/control-plane/notifier/`.** Its real transport is a stub that throws by construction (`transport.mjs:76-82`); it has never delivered anything. `mypka.db` at the repo root has **no outbox** — it is the PKM store.
+- The Larry→Warwick ding primitive is outside the repo: `C:\.fusion247\larry-ding.mjs` (FusionDevBot), needing `TELEGRAM_BOT_TOKEN` + `AUTHORISED_TELEGRAM_USER_ID` from `fusion-capture-gateway.env`.
+
+**Warwick's boundary, binding:** restore the ding *"where that is genuinely a small configuration issue, but it must not expand this into another sprawling infrastructure programme."* **If it stops being a config change, STOP and report.**
+
+### Codex — for the later merge review
+
+- **`reviewDiff.mjs` needs NO PR.** It reviews any local `base..head` in any repo dir; `--claim` takes a JSON file, fail-closed on `summary`, `brief_excerpt`, `checkpoint_id`, `build_id`, `brief_ref`. Dependencies present on disk: `codex.exe 0.146.0-alpha.3.1` (discovered outside `PATH`, at `%LOCALAPPDATA%\OpenAI\Codex\bin\<hash>\`), `~/.codex/auth.json` (OAuth, `last_refresh 2026-08-01`), and the QA skill file. **Token validity and network are NOT established without a real run.**
+- **`mergeCheck.mjs` is NOT ready.** It requires a PR number *and* a Postgres table `tower.merge_check_run` **which does not exist in the live SQLite store**. It is also the only route that pings TowerBot.
+- The watcher's PR poll requires an explicit `@tower checkpoint:` marker. It ran ~21 hours across 2026-08-03/04 returning `refused_no_head_directive` on every candidate — **zero turns, zero reviews, zero notifications.**
+- **Last Codex run of any kind: 2026-08-02.** Everything on 2026-08-04 was Veritas, which is internal and is not Codex.
+
+## 13.4 Landing route — how this reaches main and stops being worktree-local
+
+1. **`build-020/live-trial` has NO upstream and is 51 commits ahead of `origin/main`.** Push and open the PR **early** — recorded is not visible.
+2. **Codex reviews the complete integrated change** via the PR head. Budget: max three executions per gate.
+3. **Warwick decides the merge** (`merge-decision`).
+4. **The machine-level install is the part most likely to be left marooned.** Both live install points hardcode absolute worktree paths — the SessionStart hook (`C:/Fusion247PKA/...`) and the Startup VBS (`C:\Fusion247PKA-tower\...`). **A fix that only edits files inside this worktree changes nothing about either.** N-3 and N-4 are lost by default unless the install point itself is addressed.
+
+## 13.5 Explicitly OUT of scope — the regrowth cap
+
+**If the response to any requirement here is to build a mechanism, the diagnosis was rejected.** BUILD-018 grew a validator → store → parser → registry around rules it never enforced.
+
+- **No new watcher.** One current implementation exists; the work is making it the *only* one that can start.
+- **No new registry, validator, store, control plane, governance wrapper or enforcement counter.**
+- **No second map, no new BUILD number** (Warwick, explicit).
+- **Retiring `tower-baton` is not the goal** — it is parked out of scope in the migration plan. Touch it only if it is the minimal way to satisfy N-1.
+- **DevBot is configuration only.** See the boundary above.
+
+## 13.6 First safe continuation — for the fresh session
+
+**Do not implement. Route first.** The Wayfinder mandate applies to this phase as it did to Proofline: no map, no build.
+
+1. **Orient**: state the four things, then open this file.
+2. **`export MSYS_NO_PATHCONV=1`** before any live check. Then verify by execution, contradicting this map wherever reality disagrees:
+   - `git rev-parse --abbrev-ref HEAD`, `git rev-parse HEAD`, `git status --porcelain`
+   - `MSYS_NO_PATHCONV=1 tasklist /FI "IMAGENAME eq node.exe" /FO CSV` — is a tower-loop watcher alive, and **from which worktree**?
+   - Does the Startup VBS still exist and still point at `C:\Fusion247PKA-tower`?
+   - Is a SessionStart hook registered for the worktree you are actually in?
+3. **Record contradictions in this file** rather than overwriting one source.
+4. **Then extend this map** with the Phase 2 route, and get Warwick's acceptance before implementing (`product-decision`).
+
+**Human dependencies for Phase 2:** Warwick's acceptance of the Phase 2 route · his merge decision · **his fresh-Larry orientation test after merge, which is the real acceptance and cannot be self-certified.**
