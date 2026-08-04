@@ -5,6 +5,28 @@ the same head rather than left outside the documentation-truth review** (Warwick
 2026-08-04). The last brief was stale at its own commit and instructed a rejected design; that is
 why this one is inside the gate.
 
+> ## ⚠ THIS BRIEF IS UNDER AN OPEN VERITAS HOLD — READ THE RECEIPT FIRST
+>
+> **`Builds/BUILD-015-.../Assurance/veritas-gate3-governance-ecfb04b.md`** — Gate 3 on `ecfb04b`,
+> **HOLD**, 11 defects, 4 HIGH. It found four of its five HIGH findings *outside* the scope I gave it.
+> Corrections applied below where marked; **D-G3-03 and D-G3-04 are NOT fixed** and need Warwick.
+>
+> - **`D-G3-01` HIGH — `NEXT-ASDAIR-SESSION-brief.md` would have sent you to redo completed D1 work.**
+>   Corrected there; **D1 is discharged at `d30beb1`.**
+> - **`D-G3-02` HIGH — `D5` is `0-of-8` discharged, not 1-of-8.** My claim was wrong. Corrected below.
+> - **`D-G3-03` HIGH — `.claude/agents/keel.md:3` still says *"Never merges, pushes, opens PRs"*.**
+>   The contract and the agent index were reconciled; **the shim is what the host actually loads** and
+>   it was not. **OPEN — outside my authorised surface.**
+> - **`D-G3-04` HIGH — `CLAUDE.md:90/:117/:119` still assert the withdrawn "no `Bash`" premise as
+>   fact, contradicting `:56` in the same file.** **OPEN — Warwick barred editing `CLAUDE.md` in this
+>   package.**
+> - `D-G3-05`/`06`/`07`/`11` — corrected below or noted.
+> - **`D-G3-10`, and carry this one:** Veritas's *own* injected `CLAUDE.md` carried the superseded
+>   "BOUND" Rule 4 while the identical blob on disk says "UNBOUND". **A corrected record need not
+>   reach a fresh agent** — which is the assumption every documentation fix here rests on.
+>
+> **A struck line is not a reconciled document. Verify any instruction here against the code.**
+
 ---
 
 ## STARTUP / ORIENTATION — state these four things before any tool call
@@ -32,7 +54,9 @@ integrated head, the maximum permitted statement is:
 > «Integrated at "<SHA>" and submitted to Veritas for assurance.»
 
 **Veritas's first act was to HOLD its own commissioner's work**, finding two HIGH defects behind
-1,599 passing tests. Both are now fixed. Read
+1,599 passing tests. **~~Both are now fixed.~~ CORRECTED (`D-G3-05`) — D1 is fixed at `d30beb1`;
+**D5 is `0-of-8` discharged**. "Both are now fixed" was a false completion claim, written into the
+same document that tells you not to make them.** Read
 `Builds/BUILD-015-.../Assurance/veritas-wp-red-suite-recovery-0f8a1bc.md` and its provenance
 addendum before forming any view of BUILD-015's state.
 
@@ -57,7 +81,9 @@ the procedure. **The target is fewer preventably invalid dispatches, never fewer
   destructive Postgres integration test gated on `ASDAIR_DB_TEST_ALLOW_DESTRUCTIVE`. **Nothing here
   ran against a real database.** An earlier draft of this brief said "1,606 tests, all green",
   which would have hidden them — corrected before submission.
-- **No PR open.** Branch hygiene and the PR are outstanding.
+- ~~**No PR open.**~~ **CORRECTED (`D-G3-06`): FIVE PRs are open estate-wide, including **#91
+  `fix/thin-larry-mcp-grant`** — the branch this very brief flags as a hazard below. No PR is open
+  *for this branch*; that is what I meant and not what I wrote. **Enumerate them before any PR work.**
 - Pre-existing and **not tonight's work, leave alone**: `services/hub/youtube/*.mjs`, a
   `.obsidian` config, a BUILD-018 vlog draft, two Felix session logs.
 
@@ -65,7 +91,9 @@ the procedure. **The target is fewer preventably invalid dispatches, never fewer
 
 ## THE FRONTIER — in this order
 
-1. **Discharge the rest of Veritas D5.** Only `NEXT-ASDAIR-SESSION-brief.md` was reconciled. Still
+1. **Discharge Veritas D5 — `0-of-8`, not 1-of-8 (`D-G3-02`).** ~~Only `NEXT-ASDAIR-SESSION-brief.md`
+   was reconciled.~~ **That brief was reconciled at `be6d1a5` and then went stale again at `d30beb1`,
+   so no class is discharged.** Also discharge **`D-G3-01`…`D-G3-07`** from the Gate 3 receipt. Still
    stale, all **Larry's** (no implementation contract permits these paths):
    `END-TO-END-PROCESS-AUDIT.md` (far wider than two lines — its blocker 1 and blocker 3 are false
    or half-false; the packet **producer** exists, **persistence** does not, so "simply false" would

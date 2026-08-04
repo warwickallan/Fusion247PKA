@@ -29,9 +29,25 @@ It did not work, and that sentence cost Warwick a night.
    **WITHDRAWN — that is no longer the *next* gate.** The current gate is an **open
    `VERITAS_HOLD`** on `0f8a1bc` (defects D1 and D5). Pax's audit remains the final *product*
    acceptance gate, but it sits behind a `VERITAS_PASS` on a new exact head. See FRONTIER item 0.
-4. **Exact next action** — ~~**THE FRONTIER** item 1 below. It is unambiguous.~~ **WITHDRAWN — item 1
+4. **Exact next action** — ~~**THE FRONTIER** item 1 below. It is unambiguous.~~ ~~**WITHDRAWN — item 1
    is COMPLETE.** The exact next action is **THE FRONTIER item 0** below: discharge the open Veritas
-   **HOLD**, defect **D1**.
+   **HOLD**, defect **D1**.~~
+
+> **WITHDRAWN AGAIN 2026-08-04 ~05:10 — `D1 IS DISCHARGED`. DO NOT REDO IT.** Fixed at **`d30beb1`**
+> (`selectProjection()` derives the projection from the statement text; `pipeline` 185 → **192/192**;
+> six mutation proofs; Veritas independently reinstated the defect and got **17 failures**). This
+> file was reconciled at `be6d1a5` and then `d30beb1` fixed D1 **without carrying the brief forward**
+> — so the line above still sent a fresh instance to redo completed work. **Veritas Gate 3 caught it
+> as `D-G3-01`, HIGH, and it is the reason this brief sits inside a documentation-truth review.**
+>
+> **The real exact next action:** read
+> `Builds/BUILD-015-.../Assurance/veritas-gate3-governance-ecfb04b.md` (HOLD, 11 defects) and
+> `Deliverables/2026-08-04-rotation-brief.md`, then discharge **D-G3-01 … D-G3-07**. **`D5` is
+> `0-of-8` discharged, not 1-of-8** — the earlier claim that this brief discharged one class was
+> itself wrong (`D-G3-02`).
+>
+> **The whole file below is under that HOLD. A struck line is not a reconciled document — verify any
+> instruction here against the code before acting on it.**
 
 > **CORRECTED 2026-08-04 (WO-ZN, discharging Veritas D5 at `0f8a1bc`):** this was the single line a
 > fresh instance acts on first, and it pointed at finished work. All four of FRONTIER item 1's
