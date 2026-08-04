@@ -985,3 +985,37 @@ D-2026-07-28-33 · D-2026-07-28-34 · D-2026-07-28-40 · D-2026-08-03-23.
 - **Consequence, stated plainly:** the Nescafe Azera and toothpaste decisions — answered by Warwick on **2026-07-06** — remain operationally absent from Supabase. The 2026-08-03 shop asked him both questions again for this reason (D-2026-08-03-16), and would ask again today.
 - **This is the exact failure the 2026-08-04 realignment ruling names:** *"No answer may remain only in … an unapplied local seed file."*
 - **Status:** OPEN. Requires an admin-path apply that the current permission gating allows.
+
+
+## D-2026-08-04-03 — RETRACTION: "the rules carry no decision content" was FALSE, and I said it to Warwick
+
+- **Found:** 2026-08-04, when Warwick pushed back with the actual rule content from memory.
+- **What I claimed:** that `asdair.rules` held only skeleton rows — right match terms, no recorded decision — because I queried `note` and found it `NULL` on all 40 rows. I told Warwick "the terms are durable, the decisions are not."
+- **The truth:** the decision content lives in **`rule_text`**, which is populated on **39 of 39 active rules**. `note` is a *separate, optional* column. I checked one column, found it empty, and reported a data-loss finding that does not exist.
+- **What was actually there the whole time**, verbatim from 2026-07-21:
+  - **id 36** — *"OFFER RULE: if a multibuy gives >=50% off the EXTRA item(s), buy up to the offer quantity. e.g. Tropicana Smooth OJ 1=£4.28 vs any-2-for-£5 -> buy 2 (2nd is ~72p)"*
+  - **id 37** — *"Sure 'any 2 for £X': round qty UP to an even number to capture every pair; add a FEMALE variant to complete the last pair (Mum 3 male -> add 1 female = 4). Combines with the rotate-variant rule"*
+  - **id 32** — *"Sure male: ROTATE the variant each week - pick DIFFERENT from the previous order"*
+  - **id 38** — the out-of-stock cause of failed adds, already recorded.
+- **`rule_qa_log` is likewise intact** — 5 rows, each with a real question and a real answer, including the Ariel Pods answer (*"best value/wash"*) that I **guessed at during the 2026-08-03 shop** while it sat recorded in the database.
+
+### Consequences of my error, stated plainly
+
+1. **D-2026-08-04-01's "three-way Sure conflict" was largely my own invention.** Rules 32 and 37 are consistent and complete: rotate the male variant weekly, round up to the offer quantity, use a female as the fourth. The "conflict" came from reading stub `note` columns and the Drive doc while ignoring `rule_text`. **Warwick's ruling was never required.** The duplicate-row finding (ids 23/32/37 sharing `match_term`) is still real — but they are complementary rows, not contradictory ones.
+2. **Migration 011's premise is weaker than believed.** It back-fills `note` on rows whose `rule_text` already carries the decision. Useful, not urgent — and *not* the reason Azera and toothpaste were re-asked.
+3. **The real 2026-08-03 defect is worse than "the decisions weren't recorded".** They WERE recorded. Rule 12 says *"Nescafe means Azera only; add only if on offer"* and rule 25 explicitly flags the generic phrasing. The planner asked anyway. **So the failure is in consumption, not storage** — the interpretation path did not apply rules it had.
+
+### Why this is the most important entry in the ledger
+
+Every wrong call I made tonight has the same shape: **query one instrument, believe it, report it as fact.** The bigint Map lookup, the "illegible line", the offset-loss false alarm, and now this. Warwick's own words earlier tonight — *"everything is based on lies and false assumptions until something breaks"* — describes this mechanism exactly, and this entry is the clearest instance because the correct data was one column away and had been there for two weeks.
+
+- **Status:** RETRACTED. `rule_text` is populated; the rulebook is durable.
+- **Real open defect it exposes:** rules exist and are not being consumed by the interpretation path. Tracked as **D-2026-08-04-04**.
+
+## D-2026-08-04-04 — the planner does not apply rules it already holds
+
+- **Severity:** HIGH. This is the live defect behind several of 2026-08-03's questions.
+- **Evidence:** rule 12 (`needs_decision`, *"Nescafe means Azera only; add only if on offer"*) and rule 25 (generic-Nescafe trigger) both existed and were active when the 2026-08-03 shop asked Warwick what "bottle Azera coffee" meant. Rule 32/37 existed when the Ariel and Sure questions were raised. `rule_qa_log` #5 already answered Ariel as *"best value/wash"*.
+- **Root cause:** UNKNOWN — not yet traced. Candidates: `match_term` matching is exact-string and the photographed wording differed; or `rules` are loaded but not consulted before question generation; or the `info` directive (rules 32/36/37/38 are all `info`) is never actioned by the planner at all. **The last of those would mean every multibuy and rotation rule in the system is inert.**
+- **Why controls missed it:** no test asserts "a line covered by an active rule does not become a question."
+- **Status:** OPEN. Trace before building anything new — this may be the single highest-value fix in the build, and it is cheap if the cause is the `info` directive being unhandled.
