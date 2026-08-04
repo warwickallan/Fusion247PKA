@@ -72,15 +72,26 @@
       },
       "allOf": [
         {
+          "$comment": "CORRECTED 2026-08-04. The earlier version used `required` alone, which asserts PRESENCE only - and because these fields are typed nullable, {origin:'known', canonical_product_id:null, asda_product_ref:null} was SCHEMA-VALID. Schema validation therefore did not prove the one property this branch exists to enforce, and would have been trusted as if it did. The `not: {const: null}` clauses close that. A producer must ALSO reject it independently: a schema is a contract, not a substitute for the producer's own guard.",
           "if": { "properties": { "origin": { "const": "known" } }, "required": ["origin"] },
           "then": {
             "required": ["asda_product_ref", "canonical_product_id"],
-            "properties": { "source_view": { "enum": ["regulars", "favourites"] } }
+            "properties": {
+              "source_view": { "enum": ["regulars", "favourites"] },
+              "asda_product_ref": { "type": "string", "not": { "const": null } },
+              "canonical_product_id": { "type": "integer", "not": { "const": null } }
+            }
           }
         },
         {
+          "$comment": "Same correction: an approved search term of null must not satisfy this branch. Warwick's approved wording is the only permitted value, never an invented one and never absent.",
           "if": { "properties": { "origin": { "const": "new_approved" } }, "required": ["origin"] },
-          "then": { "required": ["approved_search_term"] }
+          "then": {
+            "required": ["approved_search_term"],
+            "properties": {
+              "approved_search_term": { "type": "string", "minLength": 1, "not": { "const": null } }
+            }
+          }
         }
       ]
     },
