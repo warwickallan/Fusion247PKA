@@ -1,5 +1,7 @@
 # Proofline — Wayfinder plan
 
+**Proofline is the proof application inside BUILD-020** (Warwick, 2026-08-04). It is not a separate build and no `BUILD-0NN` number is to be created for it.
+
 ## START / RESUME HERE — ordered by Warwick
 
 - This Git Wayfinder is the sole route and source of truth.
@@ -12,241 +14,269 @@
 - Before any clear, restart or handoff, ensure Honcho contains this exact path, current phase/gate and next action.
 - **Tangents go in "SHIT TO DO" below. Do not chase them.** See the rule there — it binds even when the tangent comes from Warwick.
 
+---
+
+## 0. AMENDMENT 1 — the corrections forced by Keel's executed read-back (2026-08-04)
+
+**This is the single plan amendment Warwick authorised.** Version 1 of this map was written before implementation and before any preflight. Keel's read-back (`REFUSE`, class-A — a defect in the order, not in the work) executed probes on this machine and overturned four things. They are recorded here rather than silently overwritten, because a map that hides its own corrections is worth less than one that shows them.
+
+| # | What v1 claimed | What execution proved | Disposition |
+|---|---|---|---|
+| **C-1** | F-1: prove the kill is abrupt "by asserting an un-fsynced write would have been lost" | **False.** A completed `writeSync` lands in the OS page cache, which survives process death. Under `SIGKILL`, fsync and no-fsync are byte-identical. **`SIGKILL` cannot distinguish them — only power loss can.** v1 demanded a proof that does not exist, and the only way to make it "pass" was fabrication | **Replaced** by three separate proofs (§8 T-3a/T-3b/T-3c) |
+| **C-2** | §7: "`services/proofline/.data/` — gitignored" | **False at time of writing.** `git check-ignore -v` matched nothing; no `.data` rule exists in the root `.gitignore`. **Fusion247PKA is a public repository, so Warwick's submitted text was committable** | **Fixed:** `services/proofline/.gitignore` is written as build step 1, before the store can create a single file |
+| **C-3** | §2/§11/§12: HEAD `4a3b873` | Stale. The map recorded HEAD *before* committing itself; its own commit is `d3180118` | **Corrected** throughout. Governance head is now `d3180118e07b0bab3981de92a57c7a320b042163` |
+| **C-4** | F-3: a "small deliberate work step" would make the background transition observable | Measured: a realistic ~1 KB paste processes in **2.451 ms** (64 KB → 7.7 ms; 1 MiB → 120 ms). `processing` is **not** browser-observable at any human polling interval. An artificial delay inserted to make a state visible is **fabricating the evidence for G-3** | **G-3 restated** to the true, provable claim (§1). No artificial delay will be built |
+
+Keel additionally **proved the kill is genuinely abrupt** — no `exit`, `beforeExit` or signal handler runs, verified against a graceful control where the same handler *does* fire — and found two harness traps recorded in §6.
+
+**Also settled by Warwick, 2026-08-04:** the finish level is the **functional route with a clean, usable UI** — not deliberately ugly, and not a design-system deliverable. Felix, Vex and Vera are **not** engaged unless a specific acceptance failure demonstrates one is necessary. Veritas remains at the single already-planned gate.
+
+---
+
 ## SHIT TO DO — parked tangents
 
-Parked here, not chased. Reporting them is Larry's; deciding their fate is Warwick's.
+Parked, not chased. Reporting them is Larry's; deciding their fate is Warwick's.
 
 | # | Item | Why parked |
 |---|---|---|
-| P-1 | Promote Proofline to a `Builds/BUILD-0NN-*` record | It did not come through the Foundry (IDEA-NNN → BUILD-NNN). Inventing a build number would fabricate governance. Warwick's call. |
-| P-2 | Multi-process / multi-worker concurrency | Single local process is the stated shape. Cross-process locking is unbuilt and unneeded. |
-| P-3 | Auth on the HTTP surface | Loopback-only, single user, no credentials. Adding auth is hardening beyond the hobby-brain bar. |
-| P-4 | Cockpit / Expansion integration | Proofline is standalone by request. |
+| P-1 | ~~Promote Proofline to a `Builds/BUILD-0NN` record~~ | **CLOSED by Warwick 2026-08-04** — Proofline is the proof application inside BUILD-020; no new number |
+| P-2 | Multi-process / multi-worker concurrency | Single local process is the stated shape |
+| P-3 | Auth on the HTTP surface | Loopback-only, single user, no credentials |
+| P-4 | Cockpit / Expansion integration | Standalone by request |
+| P-5 | **No `Builds/BUILD-020-*` record exists on disk.** BUILD-020 is currently only a branch and commit-message convention; `git ls-files` and a repo-wide grep both return nothing | Observation, reported once. Creating one is scope growth and is Warwick's call |
+| P-6 | CI workflow (`.github/workflows/**`) for Proofline | Not asked for. Explicitly out of scope |
+| P-7 | `HANDBACK_CODES` in `tools/governor/footer.mjs` has no importing consumer since `stop-controller.mjs` was deleted — only a human reader ties it to CLAUDE.md | Estate-wide, unrelated to Proofline |
 
 ---
 
 ## 1. Goal contract and North Star
 
-**North Star:** Warwick opens a browser on his own machine, submits text under a key he chooses, and can *prove* — not be told — that the work was durably recorded, processed in the background, held for his approval, and survived the process being killed.
+**North Star:** Warwick opens a browser on his own machine, submits text under a key he chooses, and can *prove* — not be told — that the work was durably recorded, processed off the request path, held for his approval, and survived the process being killed.
 
-**The goal contract, as stated, decomposed into eight acceptance properties.** Every one is testable by execution. Nothing here is satisfied by a claim.
-
-| # | Property | Acceptance test |
-|---|---|---|
-| G-1 | Submit text + a unique key from a browser | Real page, real form, real POST |
-| G-2 | Stored **durably** | Survives `SIGKILL` of the process; ack returned only *after* `fsync` |
-| G-3 | Processed **in the background** | Submit returns while state is `queued`; the browser observes `queued → processing → awaiting_approval` |
-| G-4 | Result is **deterministic and structured** | Same text → byte-identical result digest, across keys, across restarts, across machines |
-| G-5 | Status and output visible | Both rendered in the UI and available on the API |
-| G-6 | **Pauses for approval** | Terminal-before-decision state `awaiting_approval`; nothing auto-advances past it |
-| G-7 | Approval **saved** | Decision survives `SIGKILL` + restart |
-| G-8 | **Recovers** if killed and restarted | A job killed mid-`processing` is re-queued on restart and completes; no loss, no duplicate |
-| G-9 | **Never duplicates on repeat key** | Second `POST` with same key creates no second job; returns the existing one |
-| G-10 | No external API, credential, spend or live service | Zero npm dependencies; zero network egress; loopback bind only |
-| G-11 | Keeps working after this chat closes | Plain `node` process + launcher + runbook; nothing depends on Claude Code, an agent, or a session |
-
-**G-11 is the property most often faked.** It is satisfied only by a documented, executed start command that a human runs, with the process outliving this session — not by "it should work".
-
----
-
-## 2. Current reality and verified assets (executed 2026-08-04, not assumed)
-
-| Fact | Value | How verified |
-|---|---|---|
-| Worktree | `C:\Fusion247PKA-build-020-trial` | `git worktree list` |
-| Branch | `build-020/live-trial` | `git rev-parse --abbrev-ref HEAD` |
-| HEAD | `4a3b87306a3731ce65436db159eb5210f9cb8eb9` | `git rev-parse HEAD` |
-| Tree | clean | `git status --porcelain` (empty) |
-| Node | `v22.18.0` | `node --version` |
-| npm | `10.9.3` | `npm --version` |
-| `node:sqlite` | present, emits `ExperimentalWarning` | `require('node:sqlite')` |
-| Existing Proofline | **none**, on any branch | `git log --all -i --grep=proofline` empty; `git ls-files` empty |
-| Estate service convention | `services/<name>/` | `ls services/` — 8 existing services |
-| Governor footer | `tools/governor/footer.mjs` present | `ls -la` |
-
-**No contradictions found between sources.** Nothing was overwritten to reach this table.
+| # | Property | Acceptance test | Provable by WP-1? |
+|---|---|---|---|
+| G-1 | Submit text + a unique key from a browser | Real page served, real POST | **Partly** — page and POST provable headlessly; a real browser is H-2, Warwick's own walkthrough |
+| G-2a | Ack is written only **after** `fsyncSync` returned | Call-**ordering** assertion via an injected `fs` façade | Yes |
+| G-2b | A record acknowledged before an abrupt kill is still there after restart | Real kill, real restart, journal read | Yes |
+| G-2c | The durable write is what makes G-2b true | **Mutation:** swap `writeSync+fsyncSync` for `createWriteStream`, kill, assert the record is **lost** | Yes |
+| G-2d | Survives power loss | — | **NOT CLAIMED.** See F-2 |
+| G-3 | Processed **in the background** — *restated per C-4:* submission does not block on processing | Submit response returns `queued` with `result: null`; the journal's ordered, separately-fsynced records show the HTTP response was emitted before `job.started` | Yes. **`processing` is a journal-observable state, not a UI-observable one** — it lasts ~2.5 ms |
+| G-4 | Result is **deterministic and structured** | Same text → byte-identical `resultSha256`, across keys, across restarts, across processes | Yes for keys/restarts/processes. **"Across machines" is structurally engineered (§5) but NOT proven** — one machine available |
+| G-5 | Status and output visible | Rendered in the UI and available on the API. The UI shows the **durable state timeline** from the journal, so Warwick sees that the job passed through `queued` and `processing` with timestamps even though he could not watch it live | API half yes; UI render is H-2 |
+| G-6 | **Pauses for approval** | `awaiting_approval` never self-advances | Yes |
+| G-7 | Approval **saved** | Decision survives kill + restart | Yes |
+| G-8 | **Recovers** if killed and restarted | Job re-queued on restart and completes exactly once, up to the attempt guard (§5) | Yes |
+| G-9 | **Never duplicates on repeat key** | Second POST creates no second job; journal contains exactly one `job.created` | Yes |
+| G-10 | No external API, credential, spend or live service | Zero npm dependencies; loopback bind asserted. **"Zero network egress" is a negative claim** — proportionate substitute is a static assertion that no `http(s)` client, `fetch`, `dns` or socket-connect call exists in the source. Named as a limitation, never as proof | Partly |
+| G-11 | Keeps working after this chat closes | Launcher + runbook + a detached start Warwick performs | **NOT WP-1's to claim.** First live start is a Warwick gate at Phase 4 |
 
 ---
 
-## 3. System map and product boundaries
+## 2. Current reality (executed 2026-08-04 — corrected per C-3)
+
+| Fact | Value |
+|---|---|
+| Worktree | `C:\Fusion247PKA-build-020-trial` |
+| Branch | `build-020/live-trial` |
+| **Governance head** | **`d3180118e07b0bab3981de92a57c7a320b042163`** |
+| Node / npm | `v22.18.0` / `10.9.3` |
+| `node:sqlite` | present, **experimental** |
+| Existing Proofline | none, on any branch |
+| `node --test` from a service dir | discovers `test/**/*.test.js`; **returns exit 0 on ZERO tests** (`# tests 0`) — a vacuous green. The count must be asserted, not the exit code |
+| `node --test test/` (directory arg) | **fails**, exit 1. Do not use |
+| `scripts/secret-scan.sh --surface <path>` | runs; exit 2 + "NOT SCANNED" when the target does not exist |
+
+---
+
+## 3. System map
 
 ```
 Browser (127.0.0.1:7317)
-  │  static HTML/CSS/JS — no build step, no CDN, no framework
+  │  static HTML/CSS/JS — clean and usable, no build step, no CDN, no framework
   ▼
-node:http server  ── services/proofline/src/server.mjs
-  ├── POST /api/jobs            submit (idempotent on key)
-  ├── GET  /api/jobs            list
-  ├── GET  /api/jobs/:key       detail + result
-  ├── POST /api/jobs/:key/approve
-  ├── POST /api/jobs/:key/reject
-  └── GET  /api/health
-        │
-        ▼
-  Store  ── src/store.mjs      append-only JSONL journal + fsync, replay-on-start
-        │      services/proofline/.data/journal.jsonl   (gitignored)
-        ▼
-  Worker ── src/worker.mjs     in-process loop, epoch-leased, re-queues orphans
-        │
-        ▼
-  Processor ── src/processor.mjs   PURE function of text → structured result
+node:http server  ── src/server.mjs        the §5 HTTP contract
+  ▼
+Store  ── src/store.mjs        append-only JSONL + fsyncSync, replay-on-start,
+  │                            torn-tail tolerant, mid-file corruption fails LOUD
+  │                            services/proofline/.data/journal.jsonl  (gitignored)
+  ▼
+Worker ── src/worker.mjs       startup recovery + periodic scan while live
+  │        src/recovery.mjs    isOrphaned(job, epoch) — INJECTABLE pure predicate
+  ▼
+Processor ── src/processor.mjs + src/canonical.mjs
+             PURE function of text. No I/O, no clock, no locale, no float.
 ```
 
-**In scope:** the loop above, end to end, with executable proof.
-**Out of scope (boundaries, deliberate):** multi-process workers · authentication · remote access · any network call · any database server · any npm dependency · Cockpit integration · a job type beyond the one deterministic text analysis.
+---
+
+## 4. Decisions
+
+| ID | Decision | Reason |
+|---|---|---|
+| D-1 | `services/proofline/` | Estate convention (8 sibling services) |
+| D-2 | **Zero npm dependencies** | An install is a network operation and a future breakage surface. G-10 and G-11 are the same requirement twice |
+| D-3 | **Append-only JSONL + `fsyncSync`**, index rebuilt by replay | Durable, provably append-only, human-inspectable. `node:sqlite` **rejected: experimental** — its API may change under a Node upgrade, which directly threatens G-11 |
+| D-4 | Ack only after `fsync` returns | Persistence is a precondition of an acknowledgement, not a consequence |
+| D-5 | Idempotency on the user's `key`; check-and-append with **no `await` between them** | Node's event loop is single-threaded, so a synchronous critical section is a real guarantee here |
+| **D-6** | **Recovery via process epoch — AMENDED.** The epoch is a **journal-persisted, monotonically increasing integer**, allocated at startup and **fsynced before any job is leased**. Recovery runs **at startup AND periodically while the worker is live** | Keel: unspecified allocation would reintroduce the clock defect D-6 exists to avoid (D-6a). And with one process, "epoch mismatch" and "any `processing` job at startup" are the same set — so at startup the epoch is **not load-bearing** and a no-epoch implementation would still pass. It earns its place only in the live periodic scan, where it is what stops the running worker re-queueing its own in-flight job and processing it twice (D-6b) |
+| **D-6c** | The predicate is an **exported pure function `isOrphaned(job, currentEpoch)` injected into the worker** | §8's mutation test needs a seam. Mutating source text mid-run is fragile and can leave the tree dirty |
+| D-7 | No floats, no timestamps, no locale APIs inside `result` | Float formatting and `localeCompare` both drift across machines; a timestamp destroys G-4 |
+| D-8 | Bind `127.0.0.1` explicitly, port `7317` (`PROOFLINE_PORT` overrides) | Never the default all-interfaces bind |
+| D-9 | Approval is a journal record, not a mutated row | Decision and its ordering both durable and auditable |
+| **D-11** | **Clean, usable UI is inside WP-1**, built by Keel | Warwick, 2026-08-04, explicitly. Bar is *clean and usable*, not a design-system deliverable. Felix is not engaged |
 
 ---
 
-## 4. Decisions — made, with reasons (Larry's, as ordinary technical choices)
+## 5. The contract — settled, no field left to a guess
 
-| ID | Decision | Reason | Rejected alternative |
-|---|---|---|---|
-| D-1 | Location `services/proofline/` | Matches the estate's 8 existing services | Repo root — inconsistent |
-| D-2 | **Zero npm dependencies.** Node stdlib only | `npm install` is a network operation and a future breakage surface. G-10 and G-11 are both served by having nothing to install | Express / better-sqlite3 |
-| D-3 | Storage = **append-only JSONL journal + `fsyncSync`**, index rebuilt by replay on start | Durable, crash-safe, human-inspectable, and the recovery path is *provable* by reading the file. No experimental API | `node:sqlite` — **rejected: experimental**, API may change under a Node upgrade, which directly threatens G-11 |
-| D-4 | Ack the browser **only after `fsync` returns** | Persistence is a precondition of an acknowledgement, not a consequence | Ack-then-write |
-| D-5 | Idempotency key = the user's `key`, checked-and-appended with no `await` between check and write | Node's event loop is single-threaded; a synchronous critical section is a real guarantee here, not a hope | Optimistic insert + dedupe later |
-| D-6 | Recovery via **process epoch**, not wall-clock lease timeout | A clock-based lease is untestable without sleeping and is wrong if the clock moves. Epoch is exact: a `processing` job stamped with a *previous* epoch is by definition orphaned | Heartbeat timestamps |
-| D-7 | Result carries **no floats and no timestamps** | Float formatting drifts across platforms; a timestamp inside the result destroys G-4. Averages are stored integer-scaled (×1000) | Floating-point averages |
-| D-8 | Bind `127.0.0.1` only, port `7317` (`PROOFLINE_PORT` overrides) | No external exposure; explicit loopback, never `0.0.0.0` | Default all-interfaces bind |
-| D-9 | Approval is a **journal record**, not a mutated row | The decision and its ordering are both then durable and auditable | In-place update |
-| D-10 | Retain as a `Deliverables/` + `services/` build, **not** a `BUILD-0NN` record | It did not come through the Foundry. See P-1 | Invent a build number |
+### 5.1 Canonical text handling
 
----
+**The text is hashed exactly as received.** UTF-8 bytes from the request body. **No Unicode normalisation, no CRLF→LF, no trimming.** `sha256("a\r\nb") !== sha256("a\nb")` and `sha256(NFC "é") !== sha256(NFD "é")` — both verified — and that is correct: the digest describes what arrived.
 
-## 5. The shared contract — published BEFORE any parallel work
+The UI **must** post `application/json` so newlines survive transit unchanged.
 
-Disjoint file ownership prevents collisions; it does not prevent shared misunderstanding. This section is the contract every specialist codes against.
+### 5.2 Processor spec — the whole basis of G-4, stated exhaustively
 
-### Job states
+```
+RAW        = the text exactly as received
+CP(s)      = Unicode code points in s          // Array.from(s).length — never .length
+TOKEN_RE   = /[\p{L}\p{N}_']+/gu               // Unicode-aware, locale-INDEPENDENT
+tokens     = RAW.match(TOKEN_RE) ?? []
+lower(t)   = t.toLowerCase()                   // NEVER toLocaleLowerCase
+cmp(a,b)   = a < b ? -1 : a > b ? 1 : 0        // code-unit order. NEVER localeCompare
+
+textSha256         = SHA-256 over the exact received UTF-8 bytes
+chars              = CP(RAW)
+charsNoWhitespace  = CP(RAW.replace(/\s/gu, ''))
+lines              = RAW === '' ? 0 : (count of '\n' in RAW) + 1
+words              = tokens.length
+uniqueWords        = size of Set(tokens.map(lower))
+sentences          = RAW.trim() === '' ? 0 : max(1, matches of /[.!?]+(?=\s|$)/gu)
+paragraphs         = RAW.split(/\n[ \t]*\r?\n/) → blocks containing /\S/ → count
+avgWordLengthMilli = words === 0 ? 0 : trunc( sum(CP(t) for t in tokens) * 1000 / words )
+topTerms           = counts over tokens.map(lower); sort by count DESC, then cmp(term) ASC; first 10
+longestLine        = over RAW.split('\n') with ONE trailing '\r' stripped per line:
+                     the FIRST line of maximal CP length → { index, length }
+                     RAW === '' → { index: 0, length: 0 }
+readingTimeSeconds = ceil(words * 3 / 10)      // exact integer arithmetic for 200 wpm
+```
+
+**Every value is an integer. No float ever reaches JSON.** `avgWordLengthMilli` is explicitly guarded at `words === 0` — without it, `0/0` yields `NaN`, which `JSON.stringify` silently renders as `null` (verified). `'Z'.localeCompare('a')` returns `1` while code-unit compare returns `-1` — opposite orderings on a differently-configured machine, which is why `localeCompare` is banned.
+
+`resultSha256` = SHA-256 of the canonical JSON of `result`: keys sorted ascending by `cmp`, recursively, no whitespace, array order preserved.
+
+### 5.3 Job states
 
 ```
 queued ──▶ processing ──▶ awaiting_approval ──▶ approved
    ▲            │                              └▶ rejected
-   └────────────┘  (crash recovery: epoch mismatch on restart)
+   └────────────┘  recovery: isOrphaned(job, epoch) && attempts < 3
                 │
-                └──▶ failed   (after attempts > 3)
+                └──▶ failed   recovery: isOrphaned(job, epoch) && attempts >= 3
 ```
+
+`attempts` increments **at lease time** (`queued → processing`). **G-8 boundary, stated:** a killed job is re-queued and completes — up to **3 leases**. A job killed during a 3rd attempt becomes `failed` with the reason recorded. `failed` is reachable and testable by killing the same job three times.
 
 `awaiting_approval` **never** self-advances. That is G-6.
 
-### Job object (returned by the API)
+### 5.4 Objects
 
-```jsonc
-{
-  "key":          "string, 1..128 chars, [A-Za-z0-9._:-]+",
-  "textSha256":   "hex64",
-  "textLength":   0,
-  "state":        "queued|processing|awaiting_approval|approved|rejected|failed",
-  "submittedAt":  "ISO-8601",
-  "startedAt":    "ISO-8601|null",
-  "completedAt":  "ISO-8601|null",
-  "decidedAt":    "ISO-8601|null",
-  "attempts":     0,
-  "epoch":        0,
-  "result":       null,          // structured result, or null
-  "resultSha256": "hex64|null",  // digest of canonical JSON of `result`
-  "decision":     null,          // { "verdict": "approved|rejected", "note": "", "at": "ISO-8601" }
-  "error":        null           // { "message": "", "at": "ISO-8601" }
-}
-```
+**Job** (detail endpoint) — as v1, **plus `text`** (resolves F-4: T-3 asserts the text is intact and the UI must show it back).
 
-### Deterministic result object
+**Summary** (list endpoint, no text): `{ key, state, textSha256, textLength, submittedAt, startedAt, completedAt, decidedAt, attempts, resultSha256 }`
 
-Pure function of `text` **only**. Not of the key, not of the time, not of attempt number.
+**Health `counts`**: `{ queued, processing, awaiting_approval, approved, rejected, failed, total }`
 
-```jsonc
-{
-  "version": 1,
-  "textSha256": "hex64",
-  "chars": 0, "charsNoWhitespace": 0,
-  "lines": 0, "words": 0, "sentences": 0, "paragraphs": 0,
-  "uniqueWords": 0,
-  "avgWordLengthMilli": 0,      // integer, length*1000/words, truncated — NO floats
-  "topTerms": [ { "term": "x", "count": 3 } ],   // top 10; ties broken alphabetically ascending
-  "longestLine": { "index": 0, "length": 0 },
-  "readingTimeSeconds": 0       // integer, ceil(words * 60 / 200)
-}
-```
+**Result**: exactly the fields in §5.2, plus `version: 1` and `textSha256`.
 
-`resultSha256` = SHA-256 of `JSON.stringify` over a **key-sorted canonical** form. Two different keys carrying identical text MUST produce identical `resultSha256`. That is the G-4 test.
-
-### HTTP contract
+### 5.5 HTTP contract
 
 | Method | Path | Success | Failure |
 |---|---|---|---|
-| `POST` | `/api/jobs` `{key,text}` | `201 {job}` new · **`200 {job, duplicate:true}` existing key** | `400` invalid key/text · `413` text > 1 MiB |
+| `POST` | `/api/jobs` `{key,text}` | `201 {job}` new · **`200 {job, duplicate:true, textMatches:bool}`** existing | `400` invalid key/text · **`413` text > 1 MiB (1048576 B)** · **`413` body > 2 MiB (2097152 B)** — two distinct limits, distinct messages |
 | `GET` | `/api/jobs` | `200 {jobs:[summary]}` | — |
-| `GET` | `/api/jobs/:key` | `200 {job}` | `404` unknown |
-| `POST` | `/api/jobs/:key/approve` `{note?}` | `200 {job}` | `404` unknown · **`409` not in `awaiting_approval`** |
+| `GET` | `/api/jobs/:key` | `200 {job}` | `404` |
+| `POST` | `/api/jobs/:key/approve` `{note?}` | `200 {job}` | `404` · **`409`** not in `awaiting_approval` |
 | `POST` | `/api/jobs/:key/reject` `{note?}` | `200 {job}` | `404` · `409` |
 | `GET` | `/api/health` | `200 {ok,epoch,uptimeMs,counts}` | — |
 
-The `200 + duplicate:true` on repeat key is G-9 and is **not** an error path. Re-submitting a key with *different* text also returns the original job unchanged — the key is the identity, and silently reprocessing would violate G-9.
+**Two limits, not one** (resolves the v1 self-contradiction): v1 said text ≤ 1 MiB *and* body ≤ 1 MiB, which made a 1 MiB text unacceptable once JSON escaping was added. Body is counted **as bytes arrive**, not after buffering.
+
+**`textMatches`** (resolves F-9): re-submitting a key with *different* text correctly returns the original job unchanged — that is G-9 — but it is a silent data-loss surface. The flag lets the UI say *"this key already exists; the text you just submitted was not stored."*
+
+### 5.6 Journal replay
+
+- A **trailing** partial line (torn by an abrupt kill) is discarded and logged. A single `writeSync` append is not guaranteed atomic.
+- A **mid-file** corrupt line is data loss and **fails loud**. It is never silently skipped.
+- Tested deterministically by synthesising a truncated journal on disk, not by hoping to catch a real tear.
+
+### 5.7 Keys
+
+Charset `[A-Za-z0-9._:-]+`, 1..128 chars. It admits `.` and `..`, and `:` is illegal in a Windows filename. **Keys are never used to construct a filesystem path** — the single-journal design means no key ever becomes one. Stated explicitly so a later change cannot quietly turn this into traversal.
 
 ---
 
-## 6. Unresolved fog
+## 6. Fog — resolved and remaining
 
-Genuinely open. Not padding.
+| # | Status |
+|---|---|
+| F-1 kill abruptness | **RESOLVED by execution.** `process.kill(pid,'SIGKILL')` on win32 → `TerminateProcess`. No `exit`, `beforeExit` or signal handler runs, proven against a control where the same handler fires. Userspace-buffered stream data is destroyed outright. **T-3 is a real crash test.** |
+| **F-1a trap** | The killed child reports **`code=1`, `signal=null`** on win32 — *not* `signal==='SIGKILL'`, not 137. A harness asserting the POSIX shape fails on this machine. |
+| **F-1b trap** | **`SIGTERM` and `SIGINT` are equally abrupt** when delivered via `process.kill` from a parent, and `process.on('SIGKILL')` registers without throwing but never fires. There is **no signal-delivered graceful shutdown path on Windows** — so "graceful shutdown" code would be untestable decoration, and the runbook must say *stop is abrupt, and that is safe by design*. |
+| F-2 fsync→platter | **Out of scope, permanently.** The claim is "fsync returned before ack", never "survives power loss". Recorded so nobody upgrades it later. |
+| F-3 background visibility | **RESOLVED by measurement → C-4.** G-3 restated. No artificial delay. |
+| **F-4 torn journal line** | **NEW, open until built.** §5.6 is the design; the test synthesises the tear. |
 
-| # | Fog | How it gets resolved |
+---
+
+## 7. Security, permissions, ownership, recovery
+
+- **`private_surface: none`.** Nothing touches `C:\.fusion247\**`. GL-012 not engaged.
+- **Credentials: none. Network: loopback only** — explicit host argument.
+- **`services/proofline/.gitignore` is build step 1**, before the store can create a file (C-2). Fusion247PKA is public; Warwick's text must never be committable.
+- Static files served from an **allowlist of known filenames**, never by joining user input to a directory.
+- Input limits per §5.5, counted as bytes arrive.
+- **Recovery boundary:** recovery restores *jobs*, not decisions-in-flight. A decision is atomic — fsynced or it never happened.
+- Larry owns route, sequencing, integration, git lifecycle. Keel executes. Warwick decides merge.
+
+---
+
+## 8. Acceptance evidence — EXECUTED, not asserted
+
+| ID | Test | Proves |
 |---|---|---|
-| F-1 | Windows `SIGKILL` semantics under Node — `process.kill(pid,'SIGKILL')` on win32 maps to `TerminateProcess`. Does it truly skip flush handlers, making the crash test *real*? | WP-1 must prove the kill is abrupt by asserting an un-fsynced write would have been lost — not by assuming |
-| F-2 | Whether `fsyncSync` on NTFS actually reaches the platter or stops at the drive cache | Out of our control and out of scope. The claim we will make is "fsync returned before ack", never "survives power loss". Recorded so nobody upgrades the claim later |
-| F-3 | Browser-observable background transition — is processing fast enough that `queued` is never seen? | WP-1 makes the worker poll interval and a small deliberate work step explicit so the transition is genuinely observable, and the test asserts a non-`awaiting_approval` state is returned by the submit response |
+| T-1 | Same key twice → one job, `200 duplicate:true`, **exactly one `job.created` in the journal bytes** | G-9 |
+| T-2 | Same text under two keys → identical `resultSha256`; restart, reprocess → still identical; empty and whitespace-only text produce integers, never `null` | G-4 |
+| **T-3a** | **Abruptness control:** an exit-handler marker that fires on graceful exit is asserted **absent** after the kill | the kill is a crash, not a stop |
+| **T-3b** | Real spawn → submit → `SIGKILL` mid-`processing` → restart → re-queued → completes; `attempts` incremented; text intact | G-2b, G-8 |
+| **T-3c** | **Mutation:** swap the store's `writeSync+fsyncSync` for `createWriteStream`; kill; assert the record is **LOST**. Restore; assert it survives | G-2c — that the *store* is what makes T-3b true |
+| **T-3d** | Injected `fs` façade records the call sequence; assert `fsyncSync` **returned before** the HTTP response was written | G-2a |
+| T-4 | Approve → `SIGKILL` → restart → decision present and identical | G-7 |
+| T-5 | Approve a `queued` job → `409`, job unchanged | G-6 |
+| **T-6a** | **Mutation:** `isOrphaned` always **false** → job stuck in `processing` forever → test FAILS | recovery predicate is load-bearing |
+| **T-6b** | **Mutation:** `isOrphaned` always **true** → live worker re-queues its own in-flight job and processes it twice → test FAILS | **the failure v1's T-6 could not catch**, and the one that actually breaks G-8 |
+| T-7 | Journal prefix stability across further work | append-only is real |
+| **T-8** | Synthesised truncated journal → clean recovery; synthesised **mid-file** corruption → **loud failure** | §5.6 |
+| **T-9** | Static source assertion: no `http`/`https` client, `fetch`, `dns` or socket-connect in `src/`; bind asserted `127.0.0.1` | G-10, **labelled a limitation, not a proof** |
+
+**Runner gate:** `node --test` from `services/proofline`. **Assert `# tests` ≥ expected AND `# fail 0`** — never the exit code alone, because zero tests returns exit 0 (verified §2).
 
 ---
 
-## 7. Security, permissions, ownership, recovery boundaries
-
-- **`private_surface: none`.** No work package in this build touches `C:\.fusion247\**`. GL-012 is not engaged.
-- **Credentials: none.** No secret is read, written, or required.
-- **Network: loopback only.** `server.listen(port, '127.0.0.1')` — an explicit host argument, never the default.
-- **Static file serving must reject path traversal.** Serve from an allowlist of known filenames, not by joining user input to a directory.
-- **Input limits:** key ≤ 128 chars against a strict charset; body ≤ 1 MiB, enforced by counting bytes as they arrive, not after buffering.
-- **Data at rest:** `services/proofline/.data/` — gitignored. Warwick's submitted text never enters Git. (Fusion247PKA is a public repo.)
-- **Recovery boundary:** recovery restores *jobs*, not decisions-in-flight. A decision is atomic: it is either fsynced or it never happened.
-- **Ownership:** Larry owns route, sequencing, integration, git lifecycle and the merge recommendation. Specialists execute. Warwick decides merge.
-
----
-
-## 8. Acceptance evidence — what must be EXECUTED, not asserted
-
-A control is not evidence until it has been made to fail. Tests T-1..T-7 are the gate; **T-6 is the mutation test that proves T-3 can fail.**
-
-| ID | Test | Proves | Bar |
-|---|---|---|---|
-| T-1 | Submit key `k` twice → one job, second returns `200 duplicate:true`, journal contains exactly one `job.created` for `k` | G-9 | Assert on the **journal bytes**, not just the API response |
-| T-2 | Same text under keys `a` and `b` → identical `resultSha256`; restart; reprocess → still identical | G-4 | Byte equality of the digest |
-| T-3 | Spawn server → submit → `SIGKILL` while state is `processing` → restart → job returns to `queued`, then completes; `attempts` incremented; text intact | G-2, G-8 | Real child process, real kill, real restart |
-| T-4 | Approve → `SIGKILL` → restart → decision present and identical | G-7 | Real kill |
-| T-5 | Approve a `queued` job → `409`; job unchanged | G-6 | Negative test |
-| T-6 | **Mutation:** disable the epoch check in recovery → assert T-3 **FAILS** | T-3 is a real control | Test harness asserts the failure, and asserts a non-zero count of executed tests |
-| T-7 | Journal prefix stability: capture bytes, run more work, assert the original prefix is unchanged | Append-only is real | Byte-prefix comparison |
-
-Plus a **live browser walkthrough**, screenshotted: submit → watch status change → read output → approve → reload → approval still there.
-
-**Every claim in the final report carries its evidence in the same message, or it is labelled BUILT-NOT-VERIFIED.**
-
----
-
-## 9. Execution route
+## 9. Execution route — collapsed per Warwick, 2026-08-04
 
 | Phase | Work package | Owner | Gate |
 |---|---|---|---|
-| 0 | Wayfinder map (this document) | Larry | Warwick accepts the plan — `product-decision` |
-| 1 | **WP-1** — service core: store, worker, processor, recovery, idempotency, HTTP API, functional UI, tests T-1..T-7, launcher, runbook | **Keel** | Read-back accepted; then T-1..T-7 green, executed output pasted |
-| 2 | **WP-2** — UI polish on the working surface (states, output rendering, approval affordance) | **Felix** | Builds only on the WP-1 contract; no API change |
-| 3 | **WP-3** — proportional security pass: loopback bind, traversal, input limits, no-egress check | **Vex** | Findings reported once; only ACTIVE `BLOCKS_CURRENT_MERGE` items become work |
-| 4 | **WP-4** — visual + WCAG 2.2 AA QA | **Vera** | Sign-off |
-| 5 | Integration + live browser walkthrough | Larry (integration), specialist (execution) | Evidence captured |
-| 6 | **Veritas** on the **exact integrated head** | Veritas | `VERITAS_PASS` required before any completion claim |
-| 7 | Merge decision | **Warwick** | `merge-decision` |
+| 0 | Wayfinder map + Amendment 1 | Larry | **ACCEPTED by Warwick 2026-08-04** |
+| 1 | **WP-1** — the whole service: store, worker, processor, recovery, idempotency, HTTP API, **clean usable UI**, tests T-1..T-9, launcher, runbook | **Keel** | T-1..T-9 green with counts asserted; executed output pasted |
+| 2 | Integration at a single head | Larry (decision) / Keel (execution) | — |
+| 3 | **Veritas** on the **exact integrated head** | Veritas | `VERITAS_PASS` required before any completion claim |
+| 4 | Warwick's browser walkthrough + first live start | **Warwick** | H-2 |
+| 5 | Merge decision | **Warwick** | `merge-decision` |
 
-**Parallelism:** WP-2 and WP-3 may run concurrently after WP-1 lands, on disjoint file surfaces, with git serialised by Larry. WP-4 follows WP-2.
+**Felix, Vex and Vera are NOT engaged** unless a specific acceptance failure demonstrates one is necessary (Warwick, 2026-08-04).
 
-**Before Veritas passes the integrated head, the maximum permitted statement about this build is:** «Integrated at "\<SHA\>" and submitted to Veritas for assurance.»
+Before Veritas passes the integrated head, the maximum permitted statement is: «Integrated at "\<SHA\>" and submitted to Veritas for assurance.»
 
 ---
 
@@ -254,33 +284,31 @@ Plus a **live browser walkthrough**, screenshotted: submit → watch status chan
 
 | # | Dependency | Required at |
 |---|---|---|
-| H-1 | Warwick accepts this plan (`product-decision`) | Phase 0 → 1 boundary. **Now.** |
-| H-2 | Warwick's own browser walkthrough — his eyes on the real surface | Phase 5 |
-| H-3 | Warwick's merge decision (`merge-decision`) | Phase 7 |
+| ~~H-1~~ | ~~Warwick accepts the plan~~ | **DONE 2026-08-04** |
+| H-2 | Warwick's browser walkthrough + first live start — his eyes on the real surface. **This is the only route by which G-11 is ever claimed** | Phase 4 |
+| H-3 | Merge decision | Phase 5 |
 
-Nothing else requires him. He is not asked to run a git command, choose a git route, or understand a git concept at any point.
+He is not asked to run a git command, choose a git route, or understand a git concept at any point.
 
 ---
 
-## 11. Phase status (the tracker — update ONLY at a phase boundary: PASS / PARTIAL / FAILED + evidence)
+## 11. Phase status (update ONLY at a phase boundary: PASS / PARTIAL / FAILED + evidence)
 
 | Phase | Status | Evidence | Date |
 |---|---|---|---|
-| 0 — Wayfinder map | **AWAITING WARWICK'S ACCEPTANCE** | this document, at `4a3b873` | 2026-08-04 |
-| 1 — WP-1 service core | NOT STARTED (read-back dispatched) | — | — |
-| 2 — WP-2 UI polish | NOT STARTED | — | — |
-| 3 — WP-3 security | NOT STARTED | — | — |
-| 4 — WP-4 visual QA | NOT STARTED | — | — |
-| 5 — Integration + walkthrough | NOT STARTED | — | — |
-| 6 — Veritas gate | NOT STARTED | — | — |
-| 7 — Merge | NOT STARTED | — | — |
+| 0 — Map + Amendment 1 | **PASS** | this document at `d3180118`; Keel read-back `REFUSE` (class-A) discharged by Amendment 1; Warwick's acceptance 2026-08-04 | 2026-08-04 |
+| 1 — WP-1 | IN PROGRESS | — | — |
+| 2 — Integration | NOT STARTED | — | — |
+| 3 — Veritas gate | NOT STARTED | — | — |
+| 4 — Walkthrough + live start | NOT STARTED | — | — |
+| 5 — Merge | NOT STARTED | — | — |
 
 ---
 
 ## 12. Current frontier and the exact next action
 
-**Frontier:** Phase 0 complete as a document; the plan-acceptance gate is open.
+**Frontier:** Phase 1. WP-1 is issued to Keel against governance head `d3180118e07b0bab3981de92a57c7a320b042163`, Work Order `Deliverables/proofline/WO-2026-08-04-01-proofline-service-core.md`.
 
-**Exact next action:** Warwick accepts, amends or rejects this plan. On acceptance, Larry issues WP-1 to Keel against governance head `4a3b87306a3731ce65436db159eb5210f9cb8eb9` and Keel begins implementation from the read-back already returned.
+**Exact next action:** Keel implements WP-1 in build order (§B of the Work Order), returning executed test output. Larry integrates, then dispatches Veritas against the exact integrated head.
 
-**Resumable state after `/clear` or a fresh session:** everything needed is in this file. Branch `build-020/live-trial`, worktree `C:\Fusion247PKA-build-020-trial`. Verify HEAD by execution before trusting the SHA above.
+**Resumable state:** branch `build-020/live-trial`, worktree `C:\Fusion247PKA-build-020-trial`. Verify HEAD by execution before trusting any SHA here — v1 of this map got that wrong (C-3).
