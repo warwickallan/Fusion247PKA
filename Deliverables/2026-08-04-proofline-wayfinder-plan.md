@@ -819,6 +819,48 @@ Three routes point at *paths* and one is a registered OS object:
 
 ---
 
+## 14.9a 🚨 A SEVENTH start path — the removal order was falsified at read-back (2026-08-05)
+
+**Keel returned `REFUSE` on seven grounds. The one that matters most is a discovery, not an envelope defect.**
+
+### B1 — the acceptance property was FALSE as written
+
+**`services/tower-baton/scripts/start-fusion-tower.ps1`** — documented at `Builds/BUILD-010-fusion-tower/Runtime/recovery.md:58` under the heading **"## 4. Start (canonical launcher — the only method)"**. Its own header states that Claude Code, Codex, foreground testing and the Scheduled Task **all** invoke it, *"or, equivalently, `node bin/tower-watch.js`, which uses the SAME runtimeConfig module. There is no separate startup method."*
+
+**It survives all six removal targets.** It is in the repo and in every worktree and in git history; hard prohibition #3 forbids deleting `services/tower-baton/`; `services/**` was excluded from the order's file surface; and it depends on **none** of the six — not the VBS, not either root `.ps1`, not the scheduled task, not `C:\Fusion247PKA-tower`.
+
+**So after a flawless execution of all six targets, `powershell -File services\tower-baton\scripts\start-fusion-tower.ps1 -TaskId <id>` still starts a legacy Tower watcher.** The order would have produced a proof that **reads as complete and is not** — the exact failure its own *"absence of code is not the bar"* section was written to prevent. **And it must not be closed by attempt-testing: unlike A2–A4, this attempt would SUCCEED.**
+
+**An eighth, same class, lower severity:** `Builds/BUILD-010-fusion-tower/Architecture/tower-host-runbook.md` §3–§4 instructs a human to run `register-tower-service.ps1` (NSSM service) and `register-watchdog-task.ps1`. Both scripts exist and are committed. Never registered — but a documented resurrection procedure is a start path with a human in the loop, which is the order's own logic.
+
+**Larry's proposed closure, for Warwick's decision:** **do not delete — make the legacy entrypoint REFUSE.** A guard in `bin/tower-watch.js` that exits with "tower-baton is retired" closes the path **by making it unable to start**, which is N-1's actual bar, and it is **provable by attempt** in a way deletion is not. Deleting only `scripts/start-fusion-tower.ps1` would *not* close it, because `bin/tower-watch.js` is the real entrypoint. The negative control at `graph-probe.mjs:28` resolves `src/clickupClient.js`, a different file, so it survives either way.
+
+### Four class-A defects — all mine, all checkable before dispatch
+
+| # | Defect | Rule breached |
+|---|---|---|
+| **A1** | I declared **`live_authority: BOUNDED`** | Keel's contract: `none` is *"the only value Keel may act under; any other value is itself a REFUSED condition"*. Not discretionary |
+| **A2** | I put **`Builds/BUILD-010-fusion-tower/Runtime/recovery.md`** in `file_surface`, and `document_impact: owner: keel` | Keel's critical rule 5 names **`Builds/`** in its NEVER-edit list. **A Work Order cannot override a permanent contract.** SOP-022 cites this exact failure as its founding example |
+| **A3** | **`private_surface: C:\.fusion247\` — the secrets root, AGAIN**, the same defect as WO-02 | GL-012 §4. **And it is NOT fixable by redeclaring:** GL-012 §1 permits exactly `C:/.fusion247/private/<project>/**`, while **both target files sit at the ROOT**. There is **no legal declaration that reaches them** |
+| **A4** | Targets 1 and 3 — deleting an OS Startup registration and `Unregister-ScheduledTask` | Keel's critical rule 3: *"NEVER touch a live service, **scheduled task**…"*. The seam is explicit: **Mack registers with the supervisor; deregistration is the same seam.** A Work Order spanning it must name the split, and mine did not |
+
+### B2 / B3 — two more findings worth keeping
+
+- **B2:** the order's required suite evidence **cannot be produced**. `node_modules` exists only in `C:\Fusion247PKA`; a fresh worktree lacks it; installing is a write under `services/**`, excluded as WO-02's surface. **And separately: the repo surface is four markdown files — a markdown edit cannot regress the tower-loop suite.** Requiring it is a control reporting on ground the change never touches, and it couples this verdict to WO-02's in-flight state.
+- **B3 — the two orders are NOT disjoint at the layer the acceptance property is measured.** `tower-loop/test/run-tower-loop-tests.mjs:90` spawns twelve-plus children whose command line is bare `"…\node.exe" watcher.mjs` — **indistinguishable by process name from a resurrected legacy watcher**. Keel observed two such processes appear and vanish during preflight. **Any "no second watcher appeared" assertion can false-positive.** Assert on the **absolute script path and `WATCHER_ID`**, never a name match, and serialise against WO-02's suite runs.
+
+### ⚠️ An unexplained provenance — do not delete until it is explained
+
+**`C:\.fusion247\run-tower-watcher.ps1` was created AND last written `2026-08-02 05:23:53`** — three days ago, and **the same date as the `FusionTowerBatonWatcher` daily trigger's start boundary (`2026-08-02T00:05`)**. By contrast `run-tower-cp-watcher.ps1` is unchanged since 2026-07-22.
+
+**Something set this up on 2026-08-02 and then disabled it.** The investigation did not account for it. **Deletion is not reversible, and this is the one target whose provenance is unknown.**
+
+### Also established at preflight
+
+Three `MyPKA-*` scheduled tasks the earlier investigation never examined — `MyPKA-AsdAIr-Runtime`, `MyPKA-Directus-Live`, `MyPKA-Local-Services-Live` — were checked and **none starts a tower watcher.** Cleared. The 333-service negative and the `Run`-hive negatives were independently re-established. **Keel did not read `run-tower-cp-watcher.ps1` and therefore has not independently confirmed prohibition #1's premise** — it declined because the grant authorising even that read is invalid, which is itself the argument.
+
+---
+
 ## 14.11 Evidence status — §14.6 discharged
 
 All three investigations have landed and their findings are recorded above. **WP-2A, WP-2E and WP-2F may now be issued as Work Orders.** WP-2B(1) is issued and amended (`WO-2026-08-05-01`, Amendment 1) after a correct class-A `REFUSE`.
