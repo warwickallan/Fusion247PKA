@@ -56,7 +56,7 @@ contract_basis:
   - surface: Deliverables/NEXT-SESSION-MISSION-repo-worktree-hygiene.md
     permitted_by: "As above."
   - action: "read-only git and filesystem inspection across the whole primary checkout"
-    permitted_by: "Root AGENTS.md — read-only reconnaissance is unrestricted."
+    permitted_by: "`Team Knowledge/SOPs/SOP-022-work-order-preflight.md` §'Phase 2 — the preflight' (line 121): 'Verify the order against observable reality. Read-only; nothing here writes.' CORRECTED 2026-08-04 (Veritas D-G3-14): this entry previously cited root `AGENTS.md` for a clause that does not exist there — verified absent by grep for `reconnaissance`, `read-only` and `unrestricted`, each returning no match across its 336 lines."
 
 contract_conflicts: none
 

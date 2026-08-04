@@ -2,9 +2,28 @@
 
 **Merged 2026-07-28. PR #82, squash `443cad4b4a806cf6d170fe409f91d1eef14f0501`, at reviewed head `981a054`.**
 
-> **Read this before assuming AsdAIr is running.** The build is complete and merged. The **operational
-> activation is deliberately not done**, by Warwick's decision. Nothing in this system is polling, shopping or
-> touching the household database right now, and that is the intended state.
+> ## ⚠️ THIS FILE DESCRIBES A MERGE EVENT OF 2026-07-28. IT DOES NOT DESCRIBE BUILD-015 TODAY.
+>
+> **Scope of every claim in this document: the state of the repository at PR #82, reviewed head
+> `981a054`, merged 2026-07-28.** It is a historical merge record and is preserved as one.
+>
+> **"Complete" here means one thing only: the Stage 1 scope defined for PR #82 was finished and that
+> PR was merged.** It has never meant that BUILD-015 is complete, and **it does not mean that now.**
+> As at 2026-08-04 BUILD-015 is at **phase 0 of 5**, holds an **open Veritas Gate 3 HOLD**, has **no
+> production caller for the execution packet**, and **has never written a single row to Postgres by
+> the intended journey.** Current position:
+> [`Deliverables/2026-08-04-build-015-asdair-wayfinder-plan.md`](../../Deliverables/2026-08-04-build-015-asdair-wayfinder-plan.md).
+>
+> **Why this banner is here.** The 2026-08-04 resumption precedence block promotes the build record
+> to *"the authority for every BUILD-015 fact"*, which turned this file's dated, scoped completion
+> sentence into an authoritative claim that the build is finished (Veritas `D-G3-17`). **The history
+> is not deleted — it is true about 2026-07-28 — but it must never again be read as a statement
+> about the build's current state.**
+
+> **Read this before assuming AsdAIr is running.** The Stage 1 scope of PR #82 was completed and
+> merged **on 2026-07-28**. The **operational activation is deliberately not done**, by Warwick's
+> decision. Nothing in this system is polling, shopping or touching the household database right
+> now, and that is the intended state.
 
 > **⚠️ SUPERSEDED IN PART, 2026-08-04 — Warwick's ruling `BUILD-015-CANONICAL-RUNTIME-REALIGNMENT`.**
 > **Read [`RUNTIME-DECISION.md`](./RUNTIME-DECISION.md) before using this file as an activation path.**
@@ -26,7 +45,10 @@
 
 ---
 
-## What IS complete and merged
+## What was complete and merged AT PR #82, on 2026-07-28
+
+**Every bullet below is scoped to that merge event and to reviewed head `981a054`. None of it is a
+statement about BUILD-015 today** — see the banner at the top of this file.
 
 - **Codex QA: READY_TO_MERGE** at exact head `981a054` (round 2/3), after its round-1 blocker was fixed and
   delta-reviewed. Its words: *"No merge-blocking fitness-for-purpose defect remains."*

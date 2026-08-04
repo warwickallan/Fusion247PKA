@@ -35,6 +35,8 @@ worker_contract:
 contract_basis:
   - surface: .claude/agents/keel.md
     permitted_by: "Nolan contract §6 'Draft the host subagent shim for every host the team operates in' and the never-list entry 'Ship a hire without the matching host subagent shim(s)' — the Claude Code shim path `.claude/agents/<slug>.md` is named explicitly in both."
+  - surface: .claude/agents/thin-larry.md
+    permitted_by: "Nolan contract §6, as for `keel.md` above — the shim path class is the same. The SPECIFIC opening of this file is Warwick's standing instruction of 2026-08-04 to resolve findings D-G3-01 through D-G3-07 rather than only the files Larry originally listed. ADDED 2026-08-04 by WO-2026-08-04-05: the read-back amendment below put this path into `file_surface` and never added the matching `contract_basis` entry the template mandates (one per surface entry) — pattern 7, 'envelope fields populated but not earned'. PROVENANCE CORRECTION, same date: Warwick's explicit written authorisation named TWO previously barred surfaces, `.claude/agents/keel.md` and root `CLAUDE.md`. `thin-larry.md` was NOT among them. The authority above is genuine but is his separate, weaker standing instruction; earlier wording in WO-2026-08-04-05 attributed it to the stronger one. The grant holds; the attribution did not."
 
 contract_conflicts: none
 
@@ -110,8 +112,18 @@ WO-2026-08-04-03 worker noticing a modified file with no authorising surface. Lo
   instruction for this package is to resolve the findings, not merely the files Larry first listed.
 - **`contract_basis` gains the non-file actions the template requires and this order omitted:**
   read-only `grep`; read-only `git` (`diff`, `log`, `show`, `rev-parse`);
-  `bash scripts/secret-scan.sh --surface …`; and a YAML frontmatter parse. All permitted by root
-  `AGENTS.md` under unrestricted read-only reconnaissance. **No mutating git command is permitted.**
+  `bash scripts/secret-scan.sh --surface …`; and a YAML frontmatter parse. The read-only inspection
+  actions are permitted by **`Team Knowledge/SOPs/SOP-022-work-order-preflight.md` §"Phase 2 — the
+  preflight"** (line 121): *"Verify the order against observable reality. Read-only; nothing here
+  writes."* The secret scan is required evidence per **`Team Knowledge/Templates/work-order.md`
+  §"Body sections"** (line 294). **No mutating git command is permitted.**
+
+  > **CORRECTED 2026-08-04 by `WO-2026-08-04-05` (Veritas `D-G3-14`).** This bullet previously read
+  > *"All permitted by root `AGENTS.md` under unrestricted read-only reconnaissance."* **No such
+  > clause exists in root `AGENTS.md`** — verified absent by grep for `reconnaissance`, `read-only`
+  > and `unrestricted`, each returning **no match** across its 336 lines. The permission was never in
+  > doubt; the attribution was invented. **The grant is unchanged and the citation is now to the
+  > documents that actually carry it.**
 - **AC2 amended.** The routing tail *"Not for … integration/merge (Larry)"* is preserved but
   sharpened to name the **decision** rather than the act, resolving the head-on collision with AC1.
 - **AC3 amended.** The AC6 provenance note goes in the body, beneath the git bullet it explains, not

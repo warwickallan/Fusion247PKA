@@ -53,11 +53,11 @@ contract_basis:
   - surface: Deliverables/NEXT-SESSION-MISSION-repo-worktree-hygiene.md
     permitted_by: "As above."
   - action: "read-only git and filesystem inspection across the primary checkout"
-    permitted_by: "Root `AGENTS.md` — read-only reconnaissance is unrestricted."
+    permitted_by: "`Team Knowledge/SOPs/SOP-022-work-order-preflight.md` §'Phase 2 — the preflight' (line 121): 'Verify the order against observable reality. Read-only; nothing here writes.' CORRECTED 2026-08-04 (Veritas D-G3-14): this entry previously cited root `AGENTS.md` for a clause that does not exist there — verified absent by grep for `reconnaissance`, `read-only` and `unrestricted`, each returning no match across its 336 lines."
   - action: "read-only `gh pr list`"
-    permitted_by: "As above. `network: none` documents intent and is not an enforced control."
+    permitted_by: "As the preceding entry — `SOP-022-work-order-preflight` §'Phase 2 — the preflight'. `network: none` documents intent and is not an enforced control. CORRECTED 2026-08-04 (Veritas D-G3-14, site not named in the receipt): this entry's 'As above' inherited the invented root `AGENTS.md` clause from the entry above it."
   - action: "bash scripts/secret-scan.sh --surface <declared paths>"
-    permitted_by: "Root `AGENTS.md`; required evidence on every order."
+    permitted_by: "`Team Knowledge/Templates/work-order.md` §'Body sections' (line 285), whose Required evidence block names `bash scripts/secret-scan.sh --surface <declared paths>  → exit 0 (exit 2 = NOT SCANNED, not a pass)` at line 294; the command is also named at `SOP-022-work-order-preflight` §'Phase 2 — the preflight' step 9b, line 183. CORRECTED 2026-08-04 (Veritas D-G3-14, site not named in the receipt): this entry previously attributed the required-evidence rule to root `AGENTS.md`, which contains no such rule."
 
 contract_conflicts: none
 
@@ -116,6 +116,16 @@ veritas_findings:
     disposition: already-resolved
     evidence: "Rotation brief pinned to `ecfb04b8b6d5173ffa68b318baf2c3a97c0dd040`."
 ---
+
+> ## ⚠️ THIS ORDER WAS EXECUTED AND RETURNED. READ `## AMENDMENTS` AT THE FOOT BEFORE ACTING ON ANY STATEMENT HERE.
+>
+> **Its text is preserved as the record of what was required when it was issued on 2026-08-04, and
+> is deliberately NOT rewritten to match later events.** One statement it makes has been superseded
+> by something Warwick did afterwards: **§"What this order is" and AC5 say his acceptance of the
+> route is outstanding, and it was — until he authorised the six-phase route later the same day.**
+> The `## AMENDMENTS` section records that supersession, the read-back's `CLARIFY`, and the seven
+> rulings that followed. **Editing an executed order's acceptance criteria to match a later world
+> would falsify the record of what was asked for**, which is why this is a pointer and not a rewrite.
 
 ## What this order is
 
@@ -189,6 +199,8 @@ AC4 — The precedence block is byte-identical across all five files in `Deliver
 
 AC5 — The map states plainly that it is retrospective for completed phases, was written 2026-08-04 at roughly ninety percent, and that **Warwick's acceptance of the route is outstanding as a `product-decision`.**
 
+> **AC5 text preserved verbatim; satisfied as written; SUPERSEDED BY EVENT — see `## AMENDMENTS`.** Warwick authorised the six-phase route later on 2026-08-04. The map now records that authorisation with its provenance instead. **He has still not accepted the map as a document**, which is a different decision.
+
 AC6 — Phase 0 is marked IN PROGRESS. **No phase is marked PASS.** Nothing anywhere records any work package, phase, build, service or journey as complete, operational, durable, ready, accepted, production-safe or closed.
 
 AC7 — No fact appears in both the map and a brief. Every SHA written is a full 40 characters and resolved through `git rev-parse --verify` before writing.
@@ -214,3 +226,53 @@ AC10 — `BUILD-015-STAGE1-continuation-brief.md` and `NEXT-SESSION-MISSION-repo
 - All mutating git operations. Read-only git only; Larry serialises the single writer to this branch. The tree already carries three other uncommitted packages — **touch none of them.**
 - Any live database, credential or network mutation.
 - Re-opening, re-litigating or "improving" the work WO-2026-08-04-01, -02 and -03 landed. If you find a defect in it, **report it; do not fix it.**
+
+## AMENDMENTS
+
+**Written 2026-08-04 by `WO-2026-08-04-05`, discharging Veritas `D-G3-15`.** This order carried no
+`## AMENDMENTS` section at `d63668f` while `wo-g3a`, `-b` and `-c` all did, and Larry's dispatch
+asserted that all four carried one. **It was false for the one order that produced the directive
+map** — the order whose read-back caught six defects, including the `D-G3-01` relocation that then
+shipped as `D-G3-12`.
+
+**Reconstructed from this order's own body and from how the rulings landed in the committed work.
+Nothing here is invented; where a ruling cannot be substantiated from an artefact, that is said.**
+
+### The read-back
+
+**Verdict: `CLARIFY`, zero REFUSE.** The worker (`general-purpose`) returned six material defects
+before implementing. They are enumerated in
+`Builds/BUILD-015-asdair-durable-household-shopping-steward/SHIT-TO-DO.md` §2 and are not duplicated
+here.
+
+### Larry's seven rulings, and where each landed
+
+| # | Ruling | Landed? |
+|---|---|---|
+| 1 | **AC10 relaxed.** It froze `BUILD-015-STAGE1-continuation-brief.md` and `NEXT-SESSION-MISSION-repo-worktree-hygiene.md` to the precedence block alone, while this order's own outcome made their pointer sentences false. Those sentences were permitted to change. | **Yes** — both files carry corrected pointers. |
+| 2 | **AC3's proof scoped.** Precedence entry 1 is a *directory* of fifteen documents, several legitimately imperative, which no grep can discriminate. The proof was scoped to the five `Deliverables/` documents. | **Yes** — Veritas verified the precedence chain at `d63668f`. |
+| 3 | **The brief's competing route removed.** The map's phase table and `NEXT-ASDAIR-SESSION-brief.md`'s twelve-item frontier were the same work in two orderings. The brief became **non-directive**. | **Yes** — `D-G3-07` recorded as properly discharged. |
+| 4 | **`contract_basis` re-cited** away from the invented root `AGENTS.md` clause. | **NO. This is `D-G3-14`.** The ruling was issued in a message and **never written into any artefact**; all four orders still carried the invented clause at `d63668f`, while `SHIT-TO-DO.md` recorded it as remediated. Corrected — in six sites, not four — by `WO-2026-08-04-05`. |
+| 5 | **The brief edit widened.** The order described only the next-action section; §STARTUP / ORIENTATION had also become false. | **Yes.** |
+| 6 | **"All three current maps carry the block" corrected** — it is four by hash, and a fifth wayfinder-named plan carries it not at all. | **Yes.** |
+| 7 | **The AC7/AC10 collision parked.** `NEXT-SESSION-MISSION-repo-worktree-hygiene.md:112` carries a 7-character SHA, which AC7 (every SHA 40 characters) and AC10 (that file changes only by the precedence block) could not both be satisfied on. Parked rather than resolved. | **Yes** — `SHIT-TO-DO.md` §1 row 9. |
+
+### AC5 and §"What this order is" — superseded by an event, NOT rewritten
+
+**AC5 required the map to state that "Warwick's acceptance of the route is outstanding as a
+`product-decision`", and §"What this order is" says the same. Both were TRUE when this order was
+issued, and the worker satisfied AC5 correctly.**
+
+**Warwick authorised the six-phase route on 2026-08-04, after this order was written.** The map now
+records that authorisation, with its provenance and its limits, in the authorisation block at its
+top — which is the single record of it in the estate.
+
+**Neither AC5 nor the body text above has been rewritten, deliberately.** An executed order is a
+record of what was required at the time it was issued; **editing its acceptance criteria to match a
+later world falsifies that record**, which is a worse defect than the contradiction it would remove.
+Larry ruled on this at the `WO-2026-08-04-05` read-back, accepting the worker's objection to his own
+instruction that every statement "must end up saying one thing": **the estate must not contradict
+itself, which is not the same as every document carrying the same words.**
+
+**What Warwick has still NOT done** is read or accept the map as a document. That is a separate
+decision from the route, and it has not been made.

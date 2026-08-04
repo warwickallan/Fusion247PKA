@@ -66,11 +66,35 @@ already passed are described **retrospectively**; phases 0–5 below are the for
 it as though it planned BUILD-015 would be a fiction, and it would be a fiction inside a
 documentation-truth review.
 
-> ### ⚠️ WARWICK'S ACCEPTANCE OF THE ROUTE IS OUTSTANDING — a `product-decision`
+> ### THE ROUTE IS AUTHORISED. THE MAP AS A DOCUMENT IS NOT ACCEPTED. These are different things.
 >
-> **Writing this map was authorised. The route inside it is NOT yet agreed.** Root `CLAUDE.md`
-> §Wayfinder: *"Do not begin implementation until Warwick accepts the plan."* The phase table
-> below is Larry's proposal, and it is the thing to put in front of him.
+> **This is the single record of Warwick's route authorisation in the estate. Everything else that
+> speaks to it defers to this block.**
+>
+> **What happened.** On **2026-08-04**, replying in session to a message containing the six-phase
+> table now at §9, Warwick said: **"Yes I authorise and agree that."** That is an authorisation of
+> **the six-phase route**, and it is real.
+>
+> **What that authorisation rests on, stated so a reader can weigh it.** It was given in
+> conversation. **Nothing in Git recorded it until this line, and this line is Larry's account of
+> it** — attested by Larry, not verifiable from the repository, and not independently reproducible
+> by any reviewer working from the estate alone. Veritas found this authorisation unevidenced at
+> `d63668f` (`D-G3-13`) and **was right to**: it reviews the repository, and the repository was
+> silent. The defect was the estate's silence, not the authorisation.
+>
+> **Residual risk, which only Warwick can close.** This block writes a `product-decision` into the
+> map from a second-hand account of a conversation. **If Larry's recollection is wrong, a false
+> authorisation is now recorded one layer deeper than the contradiction it replaced.** The cheapest
+> closure is Warwick confirming it once in a later session, giving the line a second attestation.
+> **No mechanism is to be built to manage this.**
+>
+> **What Warwick has NOT done, and it is not a technicality.** He authorised the route. **He has
+> not read or accepted this 430-line map as a document.** The map carries far more than §9 — the
+> current reality table, the fog register, the boundaries, the acceptance evidence and the frontier
+> — and none of that has been in front of him. **Do not read "the route is authorised" as "the map
+> is accepted."** A fresh instance must not begin phase 1 work on the strength of a document
+> Warwick has never seen; root `CLAUDE.md` §Wayfinder — *"Do not begin implementation until Warwick
+> accepts the plan"* — is satisfied for the route and **not** for the map.
 
 **Nothing in this map records any work package, phase, build, service or journey as complete,
 operational, durable, ready, accepted, production-safe or closed.** Larry holds no such authority
@@ -108,7 +132,7 @@ model calls go through `FUSION_GATEWAY_URL`.
 |---|---|
 | Branch | `build-015/live-acceptance-recovery-2026-08-03` |
 | HEAD when written | `cd51ac066895985463e88d3933de4e0c1db7c0db` (`git rev-parse HEAD`) |
-| Gate 3 reviewed head | `ecfb04b8b6d5173ffa68b318baf2c3a97c0dd040` — **HOLD** |
+| Gate 3 reviewed heads | **TWO reviews, both HOLD, both receipts committed.** `ecfb04b8b6d5173ffa68b318baf2c3a97c0dd040` (11 defects, 5 HIGH) and then `d63668f653e233a22b5a28b6eb60f5fb84ecce48` (9 defects, 3 HIGH). **The live HOLD is the second.** Enumerate `Builds/BUILD-015-…/Assurance/` rather than trusting this row |
 | Open PR for this branch | **none.** Five PRs open estate-wide; enumerate live, never carry the list forward |
 | Suites | 14 asdair suites, **1,609 tests · 1,606 pass · 0 fail · 3 skipped**, pinned to the head above. **The per-suite split is deliberately carried forward nowhere — it goes stale within a commit. Re-run it, and read the executed count rather than the exit code** |
 | CI | **UNVERIFIABLE OFFLINE.** No CI result is claimed at any head. An absent run is never a passing run |
@@ -199,16 +223,35 @@ source.**
    contract describing nothing live. `UNVERIFIABLE OFFLINE`. Product intent is Warwick's — §7 item 2.
 6. **A `BUILD-002 live proof` test row is recorded as still sitting in a `next_week_draft` list.**
    `UNVERIFIABLE OFFLINE`.
-7. **D-G3-10 — a corrected record may not reach a fresh agent, and there is now a candidate
-   mechanism.** Veritas recorded that the `CLAUDE.md` injected into *its* context carried superseded
-   text while the blob on disk was current. **Observed again 2026-08-04 on the subagent path, with a
-   sharper mechanism: the injected copy matched the file at `HEAD`, not the working tree — the
-   correction on disk was uncommitted and therefore invisible.** If that mechanism holds it means an
-   uncommitted correction reaches no subagent at all. **This is ONE observation with a candidate
-   mechanism, not established host behaviour**, and a single instance does not establish it. **The
-   live-probe criterion is OPEN. Do not record it as solved and do not design a probe** — Nolan
-   specifies one if and when Warwick asks. The behavioural rule this implies for a reader is in the
-   directive brief.
+7. **A corrected record may not reach a fresh agent. UNEXPLAINED — three observations across three
+   sessions, three different relationships to the repository, and no mechanism consistent with all
+   three** (`D-G3-10`, `D-G3-20`, and a third recorded below).
+
+   **Every SHA below is a full 40 characters and was resolved through `git rev-parse --verify`. The
+   two `CLAUDE.md` versions in play are blob `8d865ed166c339208a94a425e1a508115b556c04` (the
+   superseded text) and blob `75a19c4b895a23190f43a20412c156641adbcc4f` (the corrected text).**
+
+   | # | Session | Repository `HEAD` at the time | What the injected `CLAUDE.md` actually was |
+   |---|---|---|---|
+   | 1 | Veritas, round 1 | `ecfb04b8b6d5173ffa68b318baf2c3a97c0dd040` | superseded text, while the on-disk blob was current |
+   | 2 | Veritas, round 2 | `d63668f653e233a22b5a28b6eb60f5fb84ecce48` | blob `8d865ed166c339208a94a425e1a508115b556c04` — **neither `HEAD` nor the working tree**, but the previous commit |
+   | 3 | A dispatched worker, 2026-08-04 | `c9b04cfa3e74b7fb6621f720a0afeca131cfedbb` | blob `8d865ed166c339208a94a425e1a508115b556c04` **again** — while `HEAD:CLAUDE.md` was `75a19c4b895a23190f43a20412c156641adbcc4f`, the on-disk file was `75a19c4b895a23190f43a20412c156641adbcc4f`, **and the previous commit `d63668f653e233a22b5a28b6eb60f5fb84ecce48:CLAUDE.md` was also `75a19c4b895a23190f43a20412c156641adbcc4f`** |
+
+   **Two candidate mechanisms have now been recorded and both are falsified.** "The injected copy
+   matched the file at `HEAD`" is falsified by observations 2 and 3. "It matched the previous
+   commit" — the replacement offered in the `d63668f` receipt — is falsified by observation 3, where
+   the previous commit carried the corrected blob and the injected copy did not. Observation 3
+   matched a blob **four commits back**. **No mechanism is offered here to replace them.** Caching or
+   snapshotting is a hypothesis, not a finding, and re-narrowing this to a third guess is how the
+   first two got written.
+
+   **A real limit on this evidence, not a hedge:** all three observations are **first-person** — an
+   agent reporting the contents of its own injected context — and **none is reproducible from the
+   repository**. A reader working from Git alone cannot confirm any of them.
+
+   **The live-probe criterion is OPEN. Do not record it as solved and DO NOT DESIGN A PROBE** —
+   Nolan specifies one if and when Warwick asks. The behavioural rule this implies for a reader is
+   in the directive brief.
 8. **The proven ASDA basket-building mechanism is thinly evidenced.** `EXPERIMENT-RESULT.md` records
    that a bulk control *exists*; it does not record it used successfully at scale. Warwick's
    first-hand "fast ordered traversal" account is authoritative and the repository does not
@@ -230,8 +273,12 @@ This map owns only *which dependency blocks what, and when*.
 | 6 | Nothing obliges re-reconciling a `.claude/agents/` shim when its wiki contract changes — how `D-G3-03` happened | **Non-blocking.** Needs an `AGENTS.md` edit reserved to Warwick. **No mechanism is to be built** |
 | 7 | `.claude/agents/nolan.md:4` requests `MultiEdit`, which this host does not deliver | **Non-blocking.** Parked in `SHIT-TO-DO.md` |
 
-**Plus the one this map itself creates:** **Warwick's acceptance of the route below is a
-`product-decision` and is outstanding.** It blocks phase 1.
+**Plus the one this map itself creates, and its current state:** the six-phase route below was a
+`product-decision`, and **Warwick authorised it on 2026-08-04** — see the authorisation block at the
+top of this map, which is the single record of it and carries its provenance and its limits.
+**It no longer blocks phase 1.** What still stands between this map and phase 1 is the open Veritas
+Gate 3 HOLD, and — separately — the fact that **Warwick has not read or accepted this map as a
+document**, which is not the same decision and has not been made.
 
 ## 7. SECURITY, PERMISSIONS, OWNERSHIP AND RECOVERY BOUNDARIES
 
@@ -265,13 +312,15 @@ This map owns only *which dependency blocks what, and when*.
 **Canonical record: `Builds/BUILD-015-.../ACCEPTANCE-AND-EVIDENCE.md`. Assurance receipts:
 `Builds/BUILD-015-.../Assurance/`. Neither is restated here.**
 
-Three assurance receipts exist:
+Four assurance receipts exist. **Enumerate the directory rather than trusting this table — it goes
+stale the moment a receipt is committed, and it has done so once already:**
 
 | Receipt | Head reviewed | Verdict |
 |---|---|---|
-| `veritas-wp-red-suite-recovery-0f8a1bcd715ac04833534bf014a15563f3df9dff.md` | `0f8a1bcd715ac04833534bf014a15563f3df9dff` | **HOLD** |
-| its provenance addendum | same | isolation PROVEN, **HOLD stands** |
-| `veritas-gate3-governance-ecfb04b.md` | `ecfb04b8b6d5173ffa68b318baf2c3a97c0dd040` | **HOLD** |
+| `veritas-wp-red-suite-recovery-0f8a1bc.md` | `0f8a1bcd715ac04833534bf014a15563f3df9dff` | **HOLD** |
+| `veritas-wp-red-suite-recovery-0f8a1bc-provenance-addendum.md` | same | isolation PROVEN, **HOLD stands** |
+| `veritas-gate3-governance-ecfb04b.md` | `ecfb04b8b6d5173ffa68b318baf2c3a97c0dd040` | **HOLD** — 11 defects, 5 HIGH |
+| `veritas-gate3-documentation-d63668f.md` | `d63668f653e233a22b5a28b6eb60f5fb84ecce48` | **HOLD** — 9 defects, 3 HIGH. **This is the live one** |
 
 **The finding-level accounting — severities, which findings fell outside the dispatched scope, and
 the disposition of each — is in `Deliverables/NEXT-ASDAIR-SESSION-brief.md` §"THE VERITAS POSITION".
@@ -294,8 +343,10 @@ It is not repeated here. The receipt itself is the register.**
 ## 9. THE EXECUTION ROUTE — phased against the Veritas gates
 
 **Phased against assurance, not narrative progress.** Gate 1 = integrated Work Package · Gate 2 =
-phase or vertical slice · Gate 3 = documentation and Git truth. **This table is the route, and it is
-the thing Warwick has not yet accepted.**
+phase or vertical slice · Gate 3 = documentation and Git truth. **This table is the six-phase route
+Warwick authorised on 2026-08-04** — see the authorisation block at the top of this map for the
+quoted words, the provenance and the limits of that record. **His authorisation covers this table.
+It does not extend to the map as a document, which he has not read.**
 
 | Phase | Outcome | Gate | The question the gate answers | Status |
 |---|---|---|---|---|
@@ -315,12 +366,22 @@ the thing Warwick has not yet accepted.**
 
 ### What sits inside each phase
 
-**Phase 0 — Gate 3, current.** Discharge the Gate 3 HOLD on
-`ecfb04b8b6d5173ffa68b318baf2c3a97c0dd040`. Findings `D-G3-01` through `D-G3-07` are the correction
-set named by the receipt's own next-review trigger; `D-G3-08` through `D-G3-11` are recorded for
-disposition and do not by themselves require a new head. **The receipt is the register of findings —
-there is no findings ledger and none is to be built.** Dispositions live in the `veritas_findings`
-block of the four Work Orders under `Builds/BUILD-015-.../Work Packages/`.
+**Phase 0 — Gate 3, current. Two rounds so far, both HOLD.**
+
+- **Round 1 — `ecfb04b8b6d5173ffa68b318baf2c3a97c0dd040`, HOLD, 11 defects, 5 HIGH.** `D-G3-01`
+  through `D-G3-07` were the correction set; `D-G3-08` through `D-G3-11` were recorded for
+  disposition. Corrected at `d63668f`, and **the receipt records `D-G3-03`, `-04`, `-06`, `-07` and
+  `-11` as genuinely discharged.**
+- **Round 2 — `d63668f653e233a22b5a28b6eb60f5fb84ecce48`, HOLD, 9 defects, 3 HIGH. This is the live
+  HOLD.** Documentation truth FAILED a second time: the sole directive document stated a next action
+  already complete at the head carrying it (`D-G3-12`), a Warwick authorisation was asserted that the
+  estate held no record of (`D-G3-13`), and a remediation was recorded as done that had never been
+  written into the artefacts (`D-G3-14`). `D-G3-15` through `D-G3-20` follow. **All nine are assigned
+  to `WO-2026-08-04-05`.**
+
+**The receipt is the register of findings — there is no findings ledger and none is to be built.**
+Dispositions live in the `veritas_findings` block of the Work Orders under
+`Builds/BUILD-015-.../Work Packages/`.
 
 **Phase 1 — repository/live reconciliation.** The remaining D5 documentation classes: **classes 4–8
 are outstanding; the verified per-class evidence table is in `NEXT-ASDAIR-SESSION-brief.md` §D5** and
@@ -350,24 +411,56 @@ independent review by the same model, never as external verification. Merge-to-m
 
 ## 10. CURRENT FRONTIER AND THE EXACT NEXT ACTION
 
-**Phase 0, IN PROGRESS. Gate: Veritas Gate 3. BUILD-015 holds an open HOLD on
-`ecfb04b8b6d5173ffa68b318baf2c3a97c0dd040`.**
+**Phase 0, IN PROGRESS. Gate: Veritas Gate 3. BUILD-015 holds an open Gate 3 HOLD — two rounds so
+far, the live one against `d63668f653e233a22b5a28b6eb60f5fb84ecce48`. Resolve the current position
+with the discharge test below rather than from this sentence.**
 
 > ### THE EXACT NEXT ACTION
 >
-> **Integrate the four-Work-Order Gate 3 discharge package currently uncommitted in the working
-> tree, then submit that exact integrated head to Veritas for a Gate 3 re-review.** The package is
-> `WO-2026-08-04-01` (Keel host shim), `-02` (root `CLAUDE.md`), `-03` (the four resumption briefs)
-> and `-04` (this map and the re-seated precedence chain), under
-> `Builds/BUILD-015-.../Work Packages/`.
+> **Submit the head that contains this line to Veritas for a Gate 3 re-review, and obtain the
+> receipt that does not exist at it.**
+>
+> **Resolve the head; do not read it from here.** No SHA is written into this block, because the
+> head that carries these words cannot be known while they are being written — that is precisely how
+> the previous two next-actions went stale.
+>
+> ```
+> git rev-parse HEAD          # this is the head to submit
+> ```
+>
+> The submission carries `WO-2026-08-04-05`, which discharges `D-G3-12` through `D-G3-20` from the
+> `d63668f` receipt, on top of the `WO-2026-08-04-01`…`-04` package already committed at `d63668f`.
+>
+> #### The discharge test — run this BEFORE acting, and believe it over this document
+>
+> ```
+> ls Builds/BUILD-015-asdair-durable-household-shopping-steward/Assurance/
+> ```
+>
+> **If that directory holds a receipt naming the head you just resolved, this action is already
+> done and this map is behind the estate. Stop, read that receipt, and take your next action from
+> its verdict** — a `HOLD` names its own correction set, a `PASS` opens phase 1. **If there is no
+> such receipt, the action above is outstanding and is yours.**
+>
+> **Why it is written this way, so it is not "corrected" back.** An action of the form *"integrate
+> the uncommitted package"* is **falsified by the very commit that carries it** — it describes work
+> that the act of shipping it completes. This action is the opposite shape: **the commit creates its
+> subject rather than discharging it.** A receipt for a head cannot exist at that head, so this stays
+> true from the moment it is committed until a reviewer answers it.
+>
+> **The honest limit — this is a detector, not a fix.** Once the receipt exists, this block is stale
+> like any other. The only thing bought is that **the reader can discover that unaided, in one
+> command**, instead of acting on a stale instruction. **Nothing makes a map self-updating, and
+> building something that would is exactly the regrowth the estate has already paid for once.** Do
+> not add one.
 >
 > **Until that receipt exists, the maximum permitted statement is «Integrated at "\<SHA>" and
-> submitted to Veritas for assurance.»** On `VERITAS_PASS`, phase 0 closes and phase 1 begins — but
-> **phase 1 does not begin before Warwick accepts the route in §9**, which is a separate
-> `product-decision` and is also outstanding.
+> submitted to Veritas for assurance.»** Not done, not complete, not ready.
 
-**Do not start phase 1 work before both.** The whole route is sequenced behind a Gate 3 PASS the
-estate does not hold.
+**On `VERITAS_PASS`, phase 0 closes and phase 1 begins.** The six-phase route itself is authorised
+(2026-08-04 — see the authorisation block at the top of this map). **The whole route remains
+sequenced behind a Gate 3 PASS the estate does not hold**, and a fresh instance should note
+separately that **Warwick has not read or accepted this map as a document**.
 
 **This is the only document permitted to state an exact next action.** If another document in
 `Deliverables/` appears to state one, that document is the defect — see the precedence block above.
@@ -406,17 +499,41 @@ exists.**
 1. **Recovered map** — `Deliverables/2026-08-04-build-015-asdair-wayfinder-plan.md` (this file).
 2. **Goal** — `BUILD-015-END-TO-END-RECOVERY`: photograph → ShopperBot → checkout-ready basket, every
    gap closed, integrated, run and proven, with Larry outside the weekly operating path.
-3. **Phase and gate** — **phase 0, IN PROGRESS, Veritas Gate 3**, with an open HOLD on
-   `ecfb04b8b6d5173ffa68b318baf2c3a97c0dd040`.
-4. **Exact next action** — §10 above.
+3. **Phase and gate** — **phase 0, IN PROGRESS, Veritas Gate 3**, with an open HOLD. **Two Gate 3
+   receipts exist and the live HOLD is the later one — enumerate `Assurance/` rather than naming a
+   head from here.**
+4. **Exact next action** — §10 above, **including its discharge test, which tells you whether §10
+   is still outstanding.** Run the test before acting on the action.
 
 **Then verify by execution, not belief:**
 
 ```
-git rev-parse HEAD          # the head above WILL have moved
-git status --porcelain      # four uncommitted packages were in flight on 2026-08-04
+git rev-parse HEAD          # resolve it; every head named in this map WILL have moved
+git status --porcelain      # see the warning below before reading anything into this
 gh pr list --state open     # never carry a PR list forward
+ls Builds/BUILD-015-asdair-durable-household-shopping-steward/Assurance/   # the live gate position
 ```
+
+> #### ⚠️ THE DIRTY WORKING TREE IS NOT A BUILD-015 PACKAGE. DO NOT COMMIT IT AS ONE.
+>
+> `git status --porcelain` in this checkout returns **pre-existing, unrelated entries that belong to
+> no BUILD-015 work package** and have been carried, untouched, across every Gate 3 review. As at
+> 2026-08-04 they are:
+>
+> - `Team Knowledge/.obsidian/community-plugins.json`
+> - `services/asdair/skill/planner.js` — **modified flag only; `git diff --numstat` is empty.** A
+>   CRLF/LF artefact with no content change. Recorded in both Gate 3 receipts.
+> - `services/hub/youtube/persistCapture.mjs`
+> - `services/hub/youtube/watch-captures.mjs`
+> - `Deliverables/2026-08-03-vlog-build-018-the-governor-episode-LARRY-FIRST-DRAFT-UNAPPROVED.md`
+> - two Felix session logs under `Team Knowledge/session-logs/2026/08/`
+>
+> **No total is given here, deliberately.** A count drifts between the moment it is written and the
+> commit that carries it — which is the same mechanism that produced `D-G3-12`. **Identify these by
+> path, and treat anything else the command returns as genuinely new work needing its own
+> attention.** An earlier version of this section glossed the output as *"four uncommitted packages
+> were in flight"*; a fresh instance following it would have committed unrelated files as the Gate 3
+> package.
 
 **Two things that will mislead you if you skip them:**
 

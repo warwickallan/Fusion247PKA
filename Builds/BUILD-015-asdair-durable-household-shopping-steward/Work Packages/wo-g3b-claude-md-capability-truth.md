@@ -31,9 +31,9 @@ worker_contract:
 
 contract_basis:
   - surface: CLAUDE.md
-    permitted_by: "No permanent estate contract owns root `CLAUDE.md`; per `Team Knowledge/Templates/work-order.md` §'On document_impact', cross-document reconciliation defaults to Larry, and Larry has delegated the mutation under Warwick's explicit written authorisation of 2026-08-04 (BUILD-015-AUTONOMOUS-RECOVERY-RESTART §3, D-G3-04), which names `CLAUDE.md:90`, `:117` and `:119` as the surface to reconcile against `:56`."
+    permitted_by: "No permanent estate contract owns root `CLAUDE.md`; per `Team Knowledge/Templates/work-order.md` §'On document_impact' (line 188), 'Default owners: … integrated build records and cross-document reconciliation → **Larry**' (line 196), and Larry has delegated the mutation under Warwick's written instruction of 2026-08-04 carrying the ruling ID `BUILD-015-AUTONOMOUS-RECOVERY-RESTART` §3 (D-G3-04), which names `CLAUDE.md:90`, `:117` and `:119` as the surface to reconcile against `:56`. PROVENANCE, recorded 2026-08-04 per Veritas D-G3-13/D-G3-14: `BUILD-015-AUTONOMOUS-RECOVERY-RESTART` is a Warwick RULING ID, not a document — it exists in session and `grep -rn` across the estate finds it only in citations like this one. The authorisation is real and is attested by Larry; it is NOT verifiable from the repository. Recorded rather than deleted, because deleting a real authorisation to satisfy a grep would be a falsification."
   - action: "read-only git inspection (git diff, git log, git show)"
-    permitted_by: "Root AGENTS.md — read-only reconnaissance is unrestricted; every mutating git operation is withheld from this order by `Explicitly out of scope`."
+    permitted_by: "`Team Knowledge/SOPs/SOP-022-work-order-preflight.md` §'Phase 2 — the preflight' (line 121), which reads in terms: 'Verify the order against observable reality. Read-only; nothing here writes.' Every mutating git operation is withheld from this order by `Explicitly out of scope`. CORRECTED 2026-08-04 (Veritas D-G3-14): this entry previously cited root `AGENTS.md` for a clause that does not exist there — verified absent by grep for `reconnaissance`, `read-only` and `unrestricted`, each returning no match across its 336 lines."
 
 contract_conflicts: none
 

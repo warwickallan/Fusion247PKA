@@ -43,13 +43,27 @@ of them first and must learn from that one which document it is allowed to act o
 ## THE VERITAS POSITION
 
 **The gate verdict and the head it was returned against are recorded once, in the Wayfinder map.
-This section carries the finding-level accounting, which is not repeated there.** Receipt:
-`Builds/BUILD-015-asdair-durable-household-shopping-steward/Assurance/veritas-gate3-governance-ecfb04b.md`
-— **the receipt is the register of findings; there is no findings ledger and none is to be built.**
-**Documentation truth was the dimension that FAILED.** Read the receipt before forming any view of
-BUILD-015's state.
+This section carries the finding-level accounting, which is not repeated there.**
+**The receipts are the register of findings; there is no findings ledger and none is to be built.**
+**Documentation truth is the dimension that has FAILED, twice.** Read the receipts before forming
+any view of BUILD-015's state.
 
-**Of the 11 defects, the HIGH findings are `D-G3-01`, `D-G3-02`, `D-G3-03`, `D-G3-04` and
+> **TWO Gate 3 rounds have now been returned, both HOLD. Enumerate
+> `Builds/BUILD-015-asdair-durable-household-shopping-steward/Assurance/` rather than trusting this
+> section to be current.**
+>
+> | Round | Head reviewed | Verdict | Findings |
+> |---|---|---|---|
+> | 1 | `ecfb04b8b6d5173ffa68b318baf2c3a97c0dd040` | **HOLD** | 11 defects, **5 HIGH** — `D-G3-01`…`-11` |
+> | 2 | `d63668f653e233a22b5a28b6eb60f5fb84ecce48` | **HOLD** | 9 defects, **3 HIGH** — `D-G3-12`…`-20`. **This is the live HOLD.** |
+>
+> Round 1 receipt: `…/Assurance/veritas-gate3-governance-ecfb04b.md`.
+> Round 2 receipt: `…/Assurance/veritas-gate3-documentation-d63668f.md`.
+> **The accounting below is round 1's.** Round 2's findings are dispositioned in
+> `WO-2026-08-04-05`; `D-G3-12`, `D-G3-13` and `D-G3-14` are its HIGH findings, and all three are
+> Larry's, two of them recurrences of failures this package itself documents.
+
+**Of round 1's 11 defects, the HIGH findings are `D-G3-01`, `D-G3-02`, `D-G3-03`, `D-G3-04` and
 `D-G3-05` — five, not four.** `D-G3-06` and `D-G3-07` are MEDIUM; `D-G3-08` through `D-G3-11` are
 LOW.
 
@@ -108,11 +122,28 @@ discharged.** That is the figure Veritas established and Warwick confirmed. An e
 went stale again at `d30beb1cf4a807d4232d3a1ebc51c60784883f0c`, which fixed D1 without carrying the
 brief forward.
 
+**`0-of-8` is the figure AT THAT HEAD and is not the current position — do not quote it as one.**
+Work has landed since, at `d63668f` and after. **No replacement count is asserted here**, because
+none has been established by a receipt: the second Gate 3 receipt
+(`…/Assurance/veritas-gate3-documentation-d63668f.md`) did not re-derive it. For the current
+position read the per-class table below and the Wayfinder map's phase 1, which records classes 4–8
+as the outstanding set.
+
 **Status vocabulary.** `STALE — CONFIRMED PRESENT` means the wrong text is in the file today.
 `NO LONGER TRUE` means the claim is contradicted by code at this head. `UNVERIFIABLE OFFLINE` means
 it needs the live database.
 
-| # | File | The stale claim | Status at `cd51ac0…` | Evidence |
+> **On this table's pin (Veritas `D-G3-19`).** The Status column below was assessed at
+> `cd51ac066895985463e88d3933de4e0c1db7c0db`, and rows reading *"ADDRESSED IN THIS REWRITE"* refer
+> to a rewrite that first exists at `d63668f653e233a22b5a28b6eb60f5fb84ecce48`, the child of that
+> head. **The pin is deliberately left at the head the assessment was made against, and annotated
+> here rather than advanced** — re-pinning it to a newer head would only recreate the same drift one
+> commit later, and would misstate when the work was actually checked. **Read the pin as "assessed
+> at", never as "current at".** The `services/**` tree is object-identical across `cd51ac0`,
+> `d63668f` and the head carrying this line, so nothing in the Evidence column turns on the
+> difference.
+
+| # | File | The stale claim | Status assessed at `cd51ac066895985463e88d3933de4e0c1db7c0db` | Evidence |
 |---|---|---|---|---|
 | 1 | `Deliverables/NEXT-ASDAIR-SESSION-brief.md` | Instructs the **rejected** `deps.js` / `realInterpretPhoto` placement for sanitized grounding evidence | **ADDRESSED IN THIS REWRITE** | The instruction is gone. The placement is now recorded below as one that must never be implemented, with the reason and the correct placement. |
 | 2 | Same file | Stale HEAD, stale suite table, frontier items 1 and 2 described as outstanding when complete | **ADDRESSED, THEN SUPERSEDED** | Fixed in the 2026-08-04 rewrite (HEAD resolved by `git rev-parse`, suites re-run in all fourteen directories, completed items removed rather than struck). This class can no longer recur here: state and route left this file entirely for the Wayfinder map. |
@@ -249,8 +280,11 @@ write), both in `C:/.fusion247/asdair.env`. **Consume the environment, never ins
 - **Do not treat two modules that describe each other correctly as a working seam.** Three seam
   defects were found by execution on 2026-08-03; every one sat between modules that individually
   passed everything they had.
-- **Do not quote a suite count out of this file.** Re-run them. These are pinned to
-  `cd51ac066895985463e88d3933de4e0c1db7c0db` and will go stale.
+- **Do not quote a suite count out of this file.** Re-run them. These counts were **measured at**
+  `cd51ac066895985463e88d3933de4e0c1db7c0db` and are deliberately left pinned there rather than
+  advanced to a newer head — the pin records **when the suites were actually executed**, which is
+  the only thing it can honestly assert. Advancing it would claim a run that did not happen at the
+  newer head. They will go stale; re-run them.
 - **Do not preflight a Work Order only against reality — preflight it against the SIBLING orders.**
   One file was granted to two agents on 2026-08-04. Nothing collided, but only by luck.
 - **Do not widen "private" to mean "anything concerning a household."** GL-009 carries Warwick's
