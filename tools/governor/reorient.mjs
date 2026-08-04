@@ -1001,7 +1001,7 @@ export function buildBrief(raw, {
 
   try {
     const sweep = sweepFn();
-    if (sweep) sections.push('(fallback, not the source of truth for focus)\n' + sweep);
+    if (sweep) sections.push('(fallback — non-directive list)\n' + sweep);
   } catch (err) {
     sections.push(`⟦GOV⟧ OPEN DELIVERABLES: sweep failed (${err.message}).`);
   }

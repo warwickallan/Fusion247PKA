@@ -64,8 +64,8 @@ function msg(packet, id = `m-${packet.id}`) {
   return { id, content: `⟦CONTINUITY⟧ header line\n\`\`\`json\n${JSON.stringify(packet)}\n\`\`\`` };
 }
 
-function packet({ seq, ts, backfill = false, focus = `focus-${seq}`, id = `cont-${seq}` }) {
-  return { schema: 1, kind: 'continuity', id, ts, seq, backfill, focus, next_action: `next-${seq}` };
+function packet({ seq, ts, backfill = false, focus = `focus-${seq}`, id = `cont-${seq}`, map_path = 'Deliverables/2026-08-02-wayfinder-operating-reset-plan.md' }) {
+  return { schema: 1, kind: 'continuity', id, ts, seq, backfill, focus, map_path, next_action: `next-${seq}` };
 }
 
 // A server that behaves like the DOCUMENTED one (WO-OR-21): it honours the `size` it is

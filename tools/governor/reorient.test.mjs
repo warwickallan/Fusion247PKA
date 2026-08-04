@@ -1591,7 +1591,7 @@ test('BRIEF: all three sections compose into one SessionStart payload', () => {
     assert.match(body, /SESSION START — This is a FRESH session/);
     assert.match(body, /SESSION LOCATION PROBES/);
     assert.match(body, /A live deliverable/);
-    assert.match(body, /fallback, not the source of truth for focus/,
+    assert.match(body, /fallback — non-directive list/,
       'the sweep must never be presented as the current focus');
 
     const out = toHookOutput(body);

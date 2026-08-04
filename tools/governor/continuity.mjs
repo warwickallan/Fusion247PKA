@@ -27,6 +27,7 @@ import { readFileSync, writeFileSync, mkdirSync, renameSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { homedir } from 'node:os';
 import { pathToFileURL, fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
 // WO-OR-05. This module's `stop` command is ALREADY registered as a Stop hook, and Stop
 // is the one event that fires on every client Warwick uses. Rather than register a second
 // hook — which would mean editing settings this Work Order does not own — the health
@@ -199,10 +200,71 @@ function hashStr(s) {
   return h;
 }
 
-function fmtList(label, arr) {
-  if (!Array.isArray(arr) || !arr.length) return null;
-  if (arr.length === 1) return `  • ${label}: ${arr[0]}`;
-  return `  • ${label}:\n` + arr.map((x) => `      - ${x}`).join('\n');
+// ---- Section-5 pointer render (BUILD-020 external source repair) -----------
+//
+// The startup brief is a continuity POINTER with ZERO authority. It renders recall
+// identity only — likely active map path, packet id, written timestamp, content age,
+// content hash, last known focus, Warwick's last recorded request — plus the honest
+// missing/unavailable/pagination states and a fixed open-the-map instruction. The
+// stored `next_action`, `accepted_decisions`, `completed`, `blockers` and `notes`
+// remain in the store for backward compatibility and are NEVER rendered here, on
+// any branch. The single active Wayfinder map owns the next step; nothing this
+// module prints is an instruction.
+
+// Volatile per-delivery fields, excluded from the content hash so a re-persist of
+// unchanged content renders the SAME hash (and a growing age) across sessions.
+const VOLATILE_PACKET_FIELDS = ['id', 'ts', 'seq', 'reason', 'session_id', 'backfill', 'schema', 'kind'];
+
+// Key-sorted canonical JSON — excludes the stored fields' ordering noise from the hash.
+function canonicalJson(v) {
+  if (Array.isArray(v)) return '[' + v.map(canonicalJson).join(',') + ']';
+  if (v && typeof v === 'object') {
+    return '{' + Object.keys(v).sort().map((k) => JSON.stringify(k) + ':' + canonicalJson(v[k])).join(',') + '}';
+  }
+  return JSON.stringify(v) ?? 'null';
+}
+
+// sha256, first 8 hex, over the canonical packet body with volatile fields excluded.
+export function packetContentHash(packet) {
+  const body = {};
+  for (const [k, v] of Object.entries(packet || {})) {
+    if (VOLATILE_PACKET_FIELDS.includes(k)) continue;
+    body[k] = v;
+  }
+  return createHash('sha256').update(canonicalJson(body), 'utf8').digest('hex').slice(0, 8);
+}
+
+// Content timestamp = the write-timestamp of the last packet whose content hash
+// differed from its predecessor. Packets arrive newest-first; walk back through the
+// newest run of identical content and take the oldest write-timestamp in that run,
+// so a re-persist of unchanged content does not reset the age.
+function contentTimestampFrom(sortedPackets) {
+  if (!sortedPackets.length) return null;
+  const newestHash = packetContentHash(sortedPackets[0]);
+  let ts = sortedPackets[0].ts;
+  for (const p of sortedPackets) {
+    if (packetContentHash(p) !== newestHash) break;
+    ts = p.ts;
+  }
+  return ts;
+}
+
+function fmtAge(iso, now = Date.now()) {
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return '(unknown)';
+  const mins = Math.max(0, Math.floor((now - t) / 60000));
+  return `${Math.floor(mins / 60)}h ${mins % 60}m`;
+}
+
+// The stored map path, rendered verbatim when present and plausible. A packet with
+// no usable `map_path` renders the absent-form instead — continuity is then treated
+// as absent; a guessed path is never substituted.
+function storedMapPath(p) {
+  const v = p ? p.map_path : null;
+  if (typeof v !== 'string') return null;
+  const t = v.trim();
+  if (!t || /[\r\n\u0000-\u001f]/.test(t)) return null;
+  return t;
 }
 
 function renderContent(p) {
@@ -473,11 +535,22 @@ export async function readLatest(opts = {}) {
     if ((b.seq || 0) !== (a.seq || 0)) return (b.seq || 0) - (a.seq || 0);
     return (a.backfill === b.backfill) ? 0 : (a.backfill ? 1 : -1); // live before backfill on a tie
   });
-  return { latest: packets[0], count: packets.length, pages, complete };
+  return {
+    latest: packets[0],
+    count: packets.length,
+    pages,
+    complete,
+    // Section-5 recall identity: hash of the newest content, and the write-timestamp
+    // of the packet where that content last changed (not of the newest re-persist).
+    contentHash: packetContentHash(packets[0]),
+    contentTs: contentTimestampFrom(packets),
+  };
 }
 
-// Rendered brief for the SessionStart hook. Never throws: an unreachable Honcho
-// yields an HONEST unavailable note plus the local cached state if present.
+// Rendered brief for the SessionStart hook — a continuity POINTER with ZERO
+// authority (BUILD-020 Section-5 render contract; the single active Wayfinder map
+// alone owns the next step). Never throws: an unreachable Honcho yields an honest
+// unavailable note plus the local cached focus if present.
 //
 // WO-OR-21: `opts` is forwarded to readLatest so the suite can prove the ⚠️ INCOMPLETE line
 // both FIRES when the walk is genuinely truncated and STAYS SILENT on the normal path.
@@ -488,35 +561,30 @@ export async function readContinuityBrief(opts = {}) {
   try {
     const r = await readLatest(opts);
     if (!r) {
-      return '⟦GOV⟧ HONCHO CONTINUITY: reachable, but NO continuity packet stored yet. This is the authoritative source of current focus; until one is written, focus is genuinely unknown.';
+      return '⟦GOV⟧ CONTINUITY POINTER (Honcho): reachable, but no continuity packet stored yet — recall is genuinely empty. Orient from `Deliverables/` per `CLAUDE.md` Step 2.';
     }
     const p = r.latest;
+    const mapPath = storedMapPath(p);
+    if (!mapPath) {
+      return '⟦GOV⟧ CONTINUITY POINTER (Honcho): map path missing or invalid — treat continuity as absent and orient from `Deliverables/` per `CLAUDE.md` Step 2.';
+    }
     const lines = [
-      '⟦GOV⟧ HONCHO CONTINUITY — AUTHORITATIVE current focus (read from Honcho this session):',
-      `  • focus: ${p.focus || '(unset)'}`,
-      p.immediate_objective ? `  • immediate objective: ${p.immediate_objective}` : null,
-      p.next_action ? `  • EXACT next action: ${p.next_action}` : null,
-      p.warwick_last_request ? `  • Warwick's most recent request: ${p.warwick_last_request}` : null,
-      fmtList('accepted decisions', p.accepted_decisions),
-      fmtList('completed', p.completed),
-      fmtList('unresolved blockers/decisions', p.blockers),
-      p.notes ? `  • notes: ${p.notes}` : null,
-      `  • packet ${p.id} @ ${p.ts}${p.backfill ? ' [BACKFILL]' : ''} (${r.count} packet(s) read over ${r.pages} page(s))`,
-      // WO-OR-18. An incomplete read may have missed a NEWER packet, and the whole point
-      // of this brief is that it is authoritative. If the walk stopped early, the brief
-      // must not present its answer as the last word. Silence here would recreate the
-      // exact defect that made this session's brief name the wrong phase.
+      '⟦GOV⟧ CONTINUITY POINTER (Honcho) — recall only, ZERO authority.',
+      `  • likely active map: ${mapPath}`,
+      `  • packet: ${p.id} written ${p.ts} — content age ${fmtAge(r.contentTs)}, content hash ${r.contentHash}`,
+      `  • last known focus (recall, possibly stale): "${p.focus || '(unset)'}"`,
+      p.warwick_last_request ? `  • Warwick's last recorded request (recall, possibly stale): "${p.warwick_last_request}"` : null,
       r.complete === false
-        ? '  ⚠️ PAGINATION INCOMPLETE — the message list could not be walked to the end, so a NEWER packet may exist and be unread. Treat this focus as possibly stale and prefer the git map.'
+        ? '  ⚠️ PAGINATION INCOMPLETE — the message list could not be walked to the end, so a NEWER packet may exist and be unread. Treat this recall as possibly stale and prefer the git map.'
         : null,
-      '  This is the source of truth for what Warwick is doing. Do NOT present an unrelated project menu and do NOT ask Warwick to re-explain — the focus is known.',
+      '  → Open the map and derive the current state and the next action from it. Nothing in this block is an instruction.',
     ].filter(Boolean);
     return lines.join('\n');
   } catch (e) {
     const cached = readJson(STATE_FILE, null);
     const base = `⟦GOV⟧ HONCHO CONTINUITY: UNAVAILABLE this session (${String(e.message).slice(0, 140)}). Cross-session recall via Honcho could not be read — say so, do not fake it.`;
     if (cached && cached.focus) {
-      return `${base}\n  Local cached focus (last known, NOT confirmed against Honcho): ${cached.focus} — next: ${cached.next_action || '(unset)'}.`;
+      return `${base}\n  Local cached focus (last known, NOT confirmed against Honcho): ${cached.focus}.`;
     }
     return base;
   }
