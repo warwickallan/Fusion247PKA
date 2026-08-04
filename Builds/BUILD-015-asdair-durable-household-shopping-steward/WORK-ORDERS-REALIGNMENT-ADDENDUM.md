@@ -127,12 +127,12 @@ status:
 | `RUNTIME-DECISION.md`, `CANONICAL-WEEKLY-SHOP-PROCESS.md` | **created** 2026-08-04 |
 | `DURABILITY-CLOSEOUT-WORK-ORDERS.md` (WO-C, WO-D) | **amended** |
 | `DEFECT-LEDGER.md` | **amended** — D-2026-08-04-01/02 added |
-| SOP-021 | **NOT AMENDED** |
-| SOP-021a | **NOT AMENDED** |
-| `Team/Asdair - Household Shopping Steward/AGENTS.md` | **NOT AMENDED** |
-| `services/asdair/browser-runner/README.md` | **NOT AMENDED** |
-| BUILD-015 Goal Contract | **NOT AMENDED** |
-| `ACTIVATION-DEFERRED.md` / continuation records | **NOT AMENDED** |
+| SOP-021 | **amended** 2026-08-04 — header pointer; §4 rewritten to Brand A–Z sequential traversal with the bulk-add description marked superseded; §5 substitution block extended with the Sonnet no-mechanical-enforcement difference; known limitations and references updated. **Open question 1 (sort order) CLOSED: Brand A–Z.** |
+| SOP-021a | **amended** 2026-08-04 — retitled and reframed as the **DEFERRED experimental CDP adapter** reference; §3, §7.6, §8.1, §8.4, §8.5 and the §9 browser-build checklist marked deferred/not-live. Preflight, grants, single-poller, diagnostics and failure modes retained intact. |
+| `Team/Asdair - Household Shopping Steward/AGENTS.md` | **NOT AMENDED — outstanding.** Its 2026-08-03 correction still says *"Asdair runs `runner.js` itself"*, which the 2026-08-04 ruling supersedes. Not amended by Cairn: a per-specialist `AGENTS.md` is outside Cairn's remit (root hard rule, plus Cairn's own contract). **Route to Nolan or perform under Larry's own authority.** Drafted replacement text was handed to Larry on 2026-08-04. |
+| `services/asdair/browser-runner/README.md` | **amended** 2026-08-04 — top-of-file EXPERIMENTAL/DEFERRED banner incl. the live-account testing prohibition; "Running it" carries the same prohibition. Engineering (lease, fencing, idempotent replay, forbidden-op enforcement) documented unchanged and explicitly not disparaged. |
+| BUILD-015 Goal Contract | **amended** 2026-08-04 — banner; *"Larry drives the ASDA browser"* superseded in the acceptance bar; the deferred *"browser drive stays with Larry"* line superseded; north-star gap restated; **open question 2 (sort order) CLOSED: Brand A–Z.** |
+| `ACTIVATION-DEFERRED.md` / continuation records | **amended** 2026-08-04 — banner naming which deferred items the ruling does and does not reach; the merged browser-operation proof left standing but scoped. |
 | decision ledger (WO-F) | **NOT WRITTEN** |
 
 Still to create: `SONNET-BROWSER-EXECUTION-PACKET.schema.json` ·
@@ -169,12 +169,18 @@ further live basket experiment** — prove:
 WO-B (done) ──► WO-Q ──► WO-R ──► WO-P ──► WO-X
                                     └──► WO-S ──► WO-T
 
-WO-V   BLOCKED — needs Warwick's Sure ruling + an admin-path apply
+WO-V   NOT BLOCKED on Warwick — needs only an admin-path apply (see the WO-V entry above)
 WO-U   in progress
 WO-W   continuous
 WO-A, E (done), F, G, H, I, J, K, L, M, N, O — unchanged in the parent file
 ```
 
 **WO-C and WO-D are no longer on this graph.**
+
+> **CONTRADICTION FIXED 2026-08-04.** This sequencing block previously read *"WO-V BLOCKED — needs Warwick's Sure
+> ruling + an admin-path apply"*, which directly contradicted WO-V's own **CORRECTED 2026-08-04** entry above
+> (*"No ruling from Warwick was ever required. Do not ask him again."*). The stale line was the exact hazard the
+> correction exists to prevent — a fresh instance reading the graph rather than the entry would have gone back to
+> Warwick. WO-V needs an admin-path apply and nothing from Warwick.
 
 Nothing here should be read as a claim that BUILD-015 is durable, complete or ready.

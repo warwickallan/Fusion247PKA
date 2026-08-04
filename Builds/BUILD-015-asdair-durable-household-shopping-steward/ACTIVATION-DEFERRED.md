@@ -6,6 +6,24 @@
 > activation is deliberately not done**, by Warwick's decision. Nothing in this system is polling, shopping or
 > touching the household database right now, and that is the intended state.
 
+> **⚠️ SUPERSEDED IN PART, 2026-08-04 — Warwick's ruling `BUILD-015-CANONICAL-RUNTIME-REALIGNMENT`.**
+> **Read [`RUNTIME-DECISION.md`](./RUNTIME-DECISION.md) before using this file as an activation path.**
+>
+> This document describes activating the **CDP browser runtime** as the route to a live shop. **That is no longer
+> the live route.** The Stage 1 live basket writer is **Sonnet in Claude for Chrome**; the runner at
+> `services/asdair/browser-runner/` is experimental, deferred, not the live default, **not a blocker to Stage 1**,
+> and **prohibited from further live-account testing without fresh authority from Warwick.**
+>
+> **Consequently:** deferred item **2** ("Live Telegram → browser → reconciliation acceptance") is no longer a
+> runner acceptance — the equivalent proof now runs **without touching the live ASDA account** (WO-X in
+> [`WORK-ORDERS-REALIGNMENT-ADDENDUM.md`](./WORK-ORDERS-REALIGNMENT-ADDENDUM.md)). The "Activating it" step 1
+> (sign in once, in the dedicated profile) served the runner and is not a prerequisite for the Sonnet path.
+>
+> **What is NOT superseded and still governs:** the intake/runtime activation gating in general — items **1**,
+> **3** and **4**, the `--arm` consume gate, the destructive single-consumer `getUpdates` hazard behind it, every
+> "Known open item carried forward", and every line under "The permanent boundaries". Those are unchanged.
+> Process: [`CANONICAL-WEEKLY-SHOP-PROCESS.md`](./CANONICAL-WEEKLY-SHOP-PROCESS.md).
+
 ---
 
 ## What IS complete and merged
@@ -20,7 +38,9 @@
 - **Independent, visible browser operation PROVEN** — a plain Node/CDP process against a dedicated persistent
   Chrome profile added a Regular by product reference, search-added a non-Regular, used the real +/− stepper,
   read the basket back, and restored the trolley to its exact starting state. No Claude Code, no MCP, no
-  extension, no Playwright.
+  extension, no Playwright. *(**2026-08-04:** the proof stands and is not withdrawn. It proved the runner
+  **can** drive the browser; it never established that it **should** be the live route, and Warwick has now
+  ruled that it is not — see the banner above and `RUNTIME-DECISION.md`.)*
 
 ## What is DEFERRED — accepted follow-on activation, NOT merge blockers
 

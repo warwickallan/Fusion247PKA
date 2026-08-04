@@ -13,6 +13,16 @@ missing for hours and only surfaced as a vision-model failure mid-shop.
 > by the product's own code, through `FUSION_GATEWAY_URL`, to a real OpenAI-compatible API —
 > never by an interactive AI session standing in for it.
 
+> **⚠️ 2026-08-04, ruling `BUILD-015-CANONICAL-RUNTIME-REALIGNMENT`.** The
+> `ASDAIR_CDP_ENDPOINT` / `ASDAIR_CHROME_EXE` / `ASDAIR_CHROME_PROFILE_DIR` /
+> `ASDAIR_RUNNER_ID` / `ASDAIR_RUNNER_STATE_DIR` rows below configure the custom Node/CDP
+> runner at `services/asdair/browser-runner/`, which is now **experimental, deferred, not the
+> live default, and prohibited from further live-account testing without fresh authority from
+> Warwick.** **The live basket writer is Sonnet in Claude for Chrome.** Those rows stay
+> documented and accurate for the deferred adapter; they are not preconditions for a live
+> weekly shop. Canonical:
+> `Builds/BUILD-015-asdair-durable-household-shopping-steward/RUNTIME-DECISION.md`.
+
 ## How to read this
 
 - **Consumed by** — the *process* that reads the variable. This matters more than it looks:

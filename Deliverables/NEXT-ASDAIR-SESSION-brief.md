@@ -1,20 +1,31 @@
 # Next AsdAIr session — brief
 
-**For the Larry who runs next week's shop.** Written 2026-07-28 at the close of the BUILD-015 durability session.
+**~~For the Larry who runs next week's shop.~~** Written 2026-07-28 at the close of the BUILD-015 durability session.
 
 > Reconstruct live state from git, `gh pr list`, and the `asdair` database. Everything below may have moved.
+
+> **⚠️ SUPERSEDED IN PART, 2026-08-04 — Warwick's ruling `BUILD-015-CANONICAL-RUNTIME-REALIGNMENT`.**
+> **Larry does not run the shop and does not drive the ASDA browser.** The Stage 1 live basket writer is
+> **Sonnet in Claude for Chrome**, using the proven **Brand A–Z ordered sequential traversal** — not Larry, not a
+> Claude Code subagent, and not the CDP runner at `services/asdair/browser-runner/` (experimental, deferred, not
+> the live default, and **prohibited from further live-account testing without fresh authority from Warwick**).
+> **Canonical:** `Builds/BUILD-015-asdair-durable-household-shopping-steward/RUNTIME-DECISION.md` and
+> `CANONICAL-WEEKLY-SHOP-PROCESS.md` in the same folder.
+> **The rest of this brief still stands** — the learning-capture priority in §2, the known gaps in §4, and the
+> hard rules in §6 are unchanged and still the highest-value things in it.
 
 ---
 
 ## 1. Do the shop first. It works.
 
 **Do not start by fixing things.** The supervised workflow is the product and it already runs: Warwick drops the
-list, you resolve it against Mum's Regulars, hold what you genuinely don't know, drive the ASDA browser, never
-substitute, never check out.
+list, it is resolved against Mum's Regulars, genuinely unknown items are held and asked, **Sonnet in Claude for
+Chrome builds the basket** *(2026-08-04 — this line previously read "you resolve it… drive the ASDA browser",
+addressed to Larry; superseded, see the banner above)*, never substitute, never check out.
 
 `Team Knowledge/SOPs/SOP-021-run-the-weekly-asdair-shop.md` is the method — **it is on `main` now**, including the
 expensive lessons: the **stepper trap** (typed quantity edits do not persist server-side, use `+`/`−`), never
-infer quantity from price, and that a failed bulk add means **one out-of-stock item rejecting the whole batch**.
+infer quantity from price, and that a failed batch add means **one out-of-stock item rejecting the whole batch**.
 
 ## 2. THE ONE THING THAT MATTERS MOST — capture the learning
 
@@ -86,7 +97,9 @@ All real, all named, none a safety failure. Ranked by value:
 1. **"substitute Banana → Strawberry"** from the superseded method. A legitimate `map`, or a safety bug against
    standing rule 6 and the live hard-excludes? Both readings are recorded in SOP-021, neither encoded. **Interim
    safe default: hold any banana/strawberry line as `needs_decision` and ask.**
-2. **Sort order** — SOP-021 says A–Z; the superseded database copy said BRAND A–Z.
+2. ~~**Sort order** — SOP-021 says A–Z; the superseded database copy said BRAND A–Z.~~ **CLOSED 2026-08-04:
+   BRAND A–Z**, for the ASDA grid ordering and for the execution packet (normalized brand A–Z, then canonical
+   product name A–Z). The superseded database copy was right. Not Warwick's open question any more.
 3. **Data conflicts:** `Arla BOB Semi-Skimmed 2L` (regular 69) is ACTIVE while rule 10 says never buy BOB — and
    rule 10 is `info` with no `match_term`, so nothing enforces it. `milk` resolves correctly today **only because
    regular 69 happens to carry no alias.** Also: rules 23/24 fix the Sure variant while `rule_qa_log` #5 says

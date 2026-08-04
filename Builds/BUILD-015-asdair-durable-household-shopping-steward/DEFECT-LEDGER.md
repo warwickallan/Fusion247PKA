@@ -166,7 +166,13 @@ guessing.
 
 - **Root cause:** SOP-021 §4 documents a Regulars-tab bulk-checkbox flow using `scroll_to`, `read_page`, `find` — **Claude-in-Chrome MCP tool names**, from the operating mode superseded by commit `ab3f231`. `browser-runner/` contains no bulk/checkbox/sort implementation at all.
 - **Measured cost of the actual implementation:** ~13s/item happy path, ~25–30s when `locate_product` falls back to reference-search, +1.5s inter-step. **A 40-line shop is 10–20 minutes of pure runner time.** Warwick's comparison: a browser-driving session does the same shop in ~5 minutes.
-- **Status:** OPEN — bulk add is an unbuilt capability. WO-D.
+- **Status:** ~~OPEN — bulk add is an unbuilt capability. WO-D.~~ **RESOLVED 2026-08-04** by Warwick's ruling
+  `BUILD-015-CANONICAL-RUNTIME-REALIGNMENT`. The finding was right and was then read backwards: the
+  Claude-in-Chrome tool names were evidence that SOP-021 §4 documented the **real, browser-driven process**, not
+  a specification for the runner. **The proven method was Brand A–Z ordered sequential traversal, not a one-click
+  bulk add** — so the capability was never missing, it was misdescribed. **WO-D is CANCELLED as live-runtime
+  work.** SOP-021 §4 amended 2026-08-04; canonical: `RUNTIME-DECISION.md`. Residual honest gap: the repository
+  does not independently corroborate the exact mechanism — capture evidence during the next real shop.
 
 ## D-2026-08-03-18 — Asdair's own contract was stale, and blocked the live shop
 
@@ -332,7 +338,7 @@ The durability gaps that existed when IDEA-012 was promoted to BUILD-015 at `87c
 - **Found:** 2026-07-27, same source as D-06.
 - **Symptom:** `SOP-021` §4 says sort A–Z; the superseded database copy said sort **BRAND** A–Z, and that the resolved basket be output brand-sorted.
 - **Root cause:** UNKNOWN. SOP-021 is explicit: *"These may be the same intent loosely worded, or the brand sort may be a deliberate refinement that made the single-pass tick reliable. Unknown which."*
-- **Status:** OPEN, **downgraded 2026-08-03 to moot** — `browser-runner` sorts nothing. It only re-acquires meaning if bulk add is ever built (WO-D). Recorded as a live contradiction, not resolved.
+- **Status:** ~~OPEN, **downgraded 2026-08-03 to moot** — `browser-runner` sorts nothing. It only re-acquires meaning if bulk add is ever built (WO-D). Recorded as a live contradiction, not resolved.~~ **RESOLVED 2026-08-04: BRAND A–Z**, by Warwick's ruling `BUILD-015-CANONICAL-RUNTIME-REALIGNMENT`. The superseded database copy was right, and it applies to **both** halves the contradiction named — the ASDA grid ordering **and** the resolved output, which sorts by normalized brand A–Z then canonical product name A–Z. **The ordering is the speed.** `CANONICAL-WEEKLY-SHOP-PROCESS.md` §E. Closed in SOP-021, SOP-021a §8.5, the goal contract and `Deliverables/NEXT-ASDAIR-SESSION-brief.md`.
 
 ### D-2026-07-27-08 — the shopper intake route had zero callers, and nothing drained the intent queue
 

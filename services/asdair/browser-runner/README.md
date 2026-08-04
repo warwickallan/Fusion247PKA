@@ -1,5 +1,37 @@
 # BUILD-015 AsdAIr — the supervised ASDA browser runner
 
+> # ⚠️ STATUS 2026-08-04: EXPERIMENTAL / DEFERRED. NOT THE LIVE DEFAULT.
+>
+> **Warwick's ruling `BUILD-015-CANONICAL-RUNTIME-REALIGNMENT`, 2026-08-04.**
+>
+> - This runner is **experimental and deferred**. It is **not the live default** and **does not write Warwick's
+>   weekly basket**.
+> - The **Stage 1 live basket writer is Sonnet in Claude for Chrome**, using the proven Brand A–Z ordered
+>   sequential traversal. Not Larry, not a Claude Code subagent, not this runner.
+> - **This runner is PROHIBITED from further live-account testing without fresh authority from Warwick.**
+> - It is **not a blocker to Stage 1** — Stage 1 acceptance does not depend on it.
+>
+> **It is not deleted and not condemned.** It is retained, its tests kept green, its proofs kept. The engineering
+> documented below is genuinely good and is exactly why it stays on the record: the single-writer lease with
+> fencing, the atomic claim proven against real Postgres with real concurrent processes, idempotent `step_id`
+> replay, and the three-layer forbidden-operation enforcement. Those may well justify revisiting it later.
+>
+> **What the ruling acts on is different and specific:** speed (~13 s per item on the happy path, ~25–30 s on the
+> reference-search fallback, plus ~1.5 s between steps — 10 to 20 minutes of pure runner time for a 40-line shop,
+> before any failure, against a ~5-minute benchmark for the proven process), the **missing plan builder** (nothing
+> in the repository converts a resolved shopping list into a runner plan; every plan on 2026-08-03 was written by
+> hand), and the fact that **it was never the proven process**.
+>
+> **One difference must not be glossed over.** This runner enforces the never-substitute / never-checkout boundary
+> in code that cannot be talked around. **The Sonnet adapter has no such mechanical enforcement** — there the
+> boundary is instruction and supervision. That is a real, honest trade recorded in `RUNTIME-DECISION.md`.
+>
+> **Canonical, read first:**
+> - `Builds/BUILD-015-asdair-durable-household-shopping-steward/RUNTIME-DECISION.md`
+> - `Builds/BUILD-015-asdair-durable-household-shopping-steward/CANONICAL-WEEKLY-SHOP-PROCESS.md`
+> - `Team Knowledge/SOPs/SOP-021-run-the-weekly-asdair-shop.md` (live method)
+> - `Team Knowledge/SOPs/SOP-021a-asdair-live-execution-method.md` (this runner's mechanical reference)
+
 An **event-driven service**, not a daemon and not an agent. It has no model, no judgement and no
 discretion. It claims exactly one durable `asdair.browser_build_request`, executes the explicit,
 allowlisted plan that request carries against a **visible** Chrome profile over the Chrome DevTools
@@ -120,6 +152,10 @@ comes up.
 ---
 
 ## Running it
+
+> **⚠️ 2026-08-04 — NOT AGAINST THE LIVE ASDA ACCOUNT.** This runner is deferred and **prohibited from further
+> live-account testing without fresh authority from Warwick** (`BUILD-015-CANONICAL-RUNTIME-REALIGNMENT`).
+> `--dry-run` and the offline test suite are unaffected and remain the supported ways to exercise it.
 
 Chrome must already be running, **visible**, on the dedicated profile. The runner refuses to drive a
 headless browser — a supervised shop Warwick cannot watch is not supervised.
