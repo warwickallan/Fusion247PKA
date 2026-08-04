@@ -1,5 +1,48 @@
 # WO-2026-08-05-02 — WP-2F: one canonical Tower store (SQLite)
 
+> ## AMENDMENT 1 — 2026-08-05. Keel returned `REFUSE` on five grounds. All five are upheld.
+>
+> **The gravest is mine and is a GL-012 breach:** v1 declared `private_surface: C:\.fusion247\` — **the secrets-store ROOT**. GL-012 permits exactly one `private/<project>/**` subtree, never the root. It was compounded by naming two `.env` files as its purpose, which is credential material that `credential_scope: none` forbids everywhere. **Keel was contract-bound to refuse it and did.** There is no correct subtree to substitute, because **the work needs no access to that store at all** — `getEnvVal()` reads those files at CLI runtime, not the builder. **`private_surface: none`. The credential-presence check is STRUCK.**
+>
+> **The second most serious is a near-miss on spend and an outward action.** v1's evidence section demanded *"a real `mergeCheck` run end-to-end"*. `runMergeCheck` is not offline — it spawns a **real Codex execution** (spend, and a draw on the three-per-gate budget) and POSTs **two Telegram messages to Warwick's phone**. **I nearly authorised spend and an outward notification inside an acceptance criterion.** Resolved in Amendment 1 §C. **Neither is authorised.**
+>
+> Three further grounds upheld: `node_modules/` absent so **no** evidence command could execute · `tower/README.md` required by route step 6 but outside the surface · the `acceptance_property` demanded a write to the live store that `live_authority: none` forbids.
+>
+> **The SQLite decision stands, undisturbed by preflight.** Keel executed the one premise that could have silently sunk it — `INSERT … RETURNING` through the `db.mjs` façade — against the real dependency (better-sqlite3 13.0.2, SQLite 3.53.4, `stmt.reader === true`, row returned). It holds. **One additional fresh read-back is authorised; if Amendment 1 is sound, proceed straight to implementation.**
+
+## Amendment 1 — envelope changes
+
+| Field | Amended value |
+|---|---|
+| **private_surface** | **`none`.** Nothing under `C:\.fusion247\**`. **GL-012 NOT engaged.** The credential-presence check is struck from the order |
+| **file_surface** | v1's list **PLUS**: `services/control-plane/tower/README.md` · `services/control-plane/tower/test/**` · **`services/control-plane/node_modules/**` for install only** (gitignored, never enters the diff) |
+| **install authority** | **`npm ci --offline --ignore-scripts` in `services/control-plane/` is AUTHORISED.** Keel established plain `--offline` fails (better-sqlite3 falls back to node-gyp; no Visual Studio present) while `--ignore-scripts` succeeds in ~1s from cache with **no network**, shipping `prebuilds/win32-x64.node`. **`network: none` still binds for everything else** |
+| **acceptance_property** | **REWRITTEN.** `mergeCheck` runs end-to-end against a **`TOWER_SQLITE_PATH` temp store**, creating and reading `tower.merge_check_run` and `merge_check_message` — **and, separately, `defaultDbPath()` is asserted to resolve to `~/.mypka/tower/tower.db` with the variable unset.** Together these prove it reaches the canonical store **without writing it.** v1's version was unsatisfiable against `live_authority: none` |
+
+## Amendment 1 §C — how the merge-check path is proven, WITHOUT spend and WITHOUT dinging Warwick
+
+**Explicitly forbidden: spawning a Codex execution, and sending any Telegram message.** Keel's analysis is adopted:
+
+- **Seven of the eight SQL statements are reachable fully offline** via the fail-closed and evidence-unresolved branches. **Exercise them through the real code path.**
+- **The single remaining statement** (`update … set status, rounds, head_sha, updated_at=now()`) requires a completed Codex round. **Execute that literal directly against the temp store and LABEL IT as a direct-statement test, not an end-to-end proof.** That labelling is the requirement, not a concession — this estate does not dress a narrower proof as a wider one.
+
+## Amendment 1 — corrections to v1's own facts, from Keel's execution
+
+| v1 said | Reality |
+|---|---|
+| "~24 subtests" | **41 subtests.** The runner is bespoke, prints `executed=N failures=N`, and **already exits 1 on zero executed** — so the `node --test` hazard does **not** apply to that command. It **does** apply to `test:tower-loop-unit` |
+| "`test:tower-loop` is not in the `test` aggregate" | True — **but it IS in CI**: `.github/workflows/control-plane-tests.yml:120`, path-filtered on `services/control-plane/**`. **These changes will trigger it** |
+| "Add `created_at`/`updated_at` to `TIMESTAMP_COLUMNS`" | **Already done** at `db.mjs:61-64`. Route step 2 is a no-op; on current evidence **`db.mjs` needs no change at all** |
+| "`$1` → `?`" summarises the change | **Understates it. Two dialect defects v1 did not name**, both in surface: `tower/merge-check.mjs:193` uses `left(instruction,140)` (Postgres-only → `substr(x,1,140)`), and `ensureSchema` opens `create schema if not exists tower`, which SQLite has no concept of |
+
+## Amendment 1 — three findings RULED, so they are not carried as open questions
+
+1. **`accept.mjs` — leave the code untouched, and EXCLUDE it from the negative assertion.** It is Postgres-only with zero code callers, but two surfaces describe it as *"Real Codex/Telegram/Supabase acceptance — run by Warwick"*. **Scope the "no `pg` on the path" assertion to the two merge-check files only, and say so.** That two documents will then point a human at a store this order designates archive-only is a **documentation-effect finding reported once for Warwick's decision** — not this Work Order's to fix, and not a new Work Order.
+2. **`tower/merge-check.mjs:22` `const REPO = 'C:/Fusion247PKA'` — report, do not change.** Keel is right that it is the same defect class, and right that changing it changes *which repository merge-check reviews*. That is a design decision and it is **out of scope for WP-2F**.
+3. **Keel's framing correction is accepted and matters beyond this order:** the live watcher runs from the **main worktree** on `build-015/live-acceptance-recovery-2026-08-03`. So *"the same store the live watcher uses"* is true of the **file** and false of the **code** — this change reaches the live watcher's checkout only at integration. **Recorded in the map against S-3, because it bounds how that gate may be claimed.**
+
+---
+
 | Field | Value |
 |---|---|
 | **status** | ISSUED |
