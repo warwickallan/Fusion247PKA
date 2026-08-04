@@ -60,7 +60,7 @@ Parked, not chased. Reporting them is Larry's; deciding their fate is Warwick's.
 | G-1 | Submit text + a unique key from a browser | Real page served, real POST | **Partly** — page and POST provable headlessly; a real browser is H-2, Warwick's own walkthrough |
 | G-2a | Ack is written only **after** `fsyncSync` returned | Call-**ordering** assertion via an injected `fs` façade | Yes |
 | G-2b | A record acknowledged before an abrupt kill is still there after restart | Real kill, real restart, journal read | Yes |
-| G-2c | The durable write is what makes G-2b true | **Mutation:** swap `writeSync+fsyncSync` for `createWriteStream`, kill, assert the record is **lost** | Yes |
+| G-2c | The durable write is what makes G-2b true — **NARROWED 2026-08-04 by execution (Veritas D-2)**. The honest claim is: *a writer that returns while the bytes are still in userspace loses an acknowledged record on an abrupt kill.* It is **not** "`createWriteStream` loses data" | **Mutation:** swap `writeSync+fsyncSync` for a **corked** stream, kill, assert the record is **lost**. An **uncorked** stream measured `at ack: ON DISK; after kill: RETAINED` — libuv flushed first, so asserting loss there would be asserting libuv's flush timing, which is not a property of Proofline | Yes, as narrowed |
 | G-2d | Survives power loss | — | **NOT CLAIMED.** See F-2 |
 | G-3 | Processed **in the background** — *restated per C-4:* submission does not block on processing | Submit response returns `queued` with `result: null`; the journal's ordered, separately-fsynced records show the HTTP response was emitted before `job.started` | Yes. **`processing` is a journal-observable state, not a UI-observable one** — it lasts ~2.5 ms |
 | G-4 | Result is **deterministic and structured** | Same text → byte-identical `resultSha256`, across keys, across restarts, across processes | Yes for keys/restarts/processes. **"Across machines" is structurally engineered (§5) but NOT proven** — one machine available |
@@ -251,7 +251,7 @@ Charset `[A-Za-z0-9._:-]+`, 1..128 chars. It admits `.` and `..`, and `:` is ill
 | T-2 | Same text under two keys → identical `resultSha256`; restart, reprocess → still identical; empty and whitespace-only text produce integers, never `null` | G-4 |
 | **T-3a** | **Abruptness control:** an exit-handler marker that fires on graceful exit is asserted **absent** after the kill | the kill is a crash, not a stop |
 | **T-3b** | Real spawn → submit → `SIGKILL` mid-`processing` → restart → re-queued → completes; `attempts` incremented; text intact | G-2b, G-8 |
-| **T-3c** | **Mutation:** swap the store's `writeSync+fsyncSync` for `createWriteStream`; kill; assert the record is **LOST**. Restore; assert it survives | G-2c — that the *store* is what makes T-3b true |
+| **T-3c** | **Mutation (NARROWED, Veritas D-2):** swap the store's `writeSync+fsyncSync` for a **corked** stream; kill; assert the record is **LOST**. Restore; assert it survives. The **uncorked** variant is kept as a reported measurement with **no loss assertion** — it retains the record, and asserting otherwise would assert libuv's flush timing | G-2c as narrowed — that a writer returning with bytes still in userspace loses an acknowledged record |
 | **T-3d** | Injected `fs` façade records the call sequence; assert `fsyncSync` **returned before** the HTTP response was written | G-2a |
 | T-4 | Approve → `SIGKILL` → restart → decision present and identical | G-7 |
 | T-5 | Approve a `queued` job → `409`, job unchanged | G-6 |
@@ -298,19 +298,33 @@ He is not asked to run a git command, choose a git route, or understand a git co
 
 | Phase | Status | Evidence | Date |
 |---|---|---|---|
-| 0 — Map + Amendment 1 | **PASS** | this document at `d3180118`; Keel read-back `REFUSE` (class-A) discharged by Amendment 1; Warwick's acceptance 2026-08-04 | 2026-08-04 |
-| 1 — WP-1 | IN PROGRESS | — | — |
-| 2 — Integration | NOT STARTED | — | — |
-| 3 — Veritas gate | NOT STARTED | — | — |
+| 0 — Map + Amendment 1 | **PASS** — *without a Veritas receipt.* Veritas noted this and declined to escalate: the claim is true, evidenced by Warwick's own acceptance, asserts no capability, and no receipt was suppressed, because the route Warwick accepted places the single gate at Phase 3. **Whether a planning boundary needs a receipt is Warwick's to decide, not mine** | this document at `d3180118`; Keel read-back `REFUSE` (class-A) discharged by Amendment 1; Warwick's acceptance 2026-08-04 | 2026-08-04 |
+| 1 — WP-1 | **PARTIAL** — built and integrated; **not** PASS. Veritas `HOLD` with 3 blocking findings. D-1 is a real code defect: `T-3d` failed **4 of 11** full-suite runs | commit `3a32525`, 27 files, 0 outside surface; Veritas receipt below | 2026-08-04 |
+| 2 — Integration | **PASS** | integrated head `39a553cb600b7a79d8b4c1845b2bb19e31a2bc69`, tree clean, surface reconciled | 2026-08-04 |
+| 3 — Veritas gate | **HOLD** — 3 blocking, 7 non-blocking. Goal fidelity, design fidelity, functional proof, integration and durability all PASS; test quality, git truth, documentation truth and residual risk HOLD | `Deliverables/2026-08-04-veritas-proofline-wp1-receipt.md`, `receipt_sha256: 745703891a077d6bda21ee57fcae3abc0b298f9708d454908db8b37a29744815`, against `39a553cb` | 2026-08-04 |
 | 4 — Walkthrough + live start | NOT STARTED | — | — |
 | 5 — Merge | NOT STARTED | — | — |
+
+### Veritas HOLD — disposition of the three blocking findings
+
+Discharged **inside `WO-2026-08-04-01`**. A finding is an observation, not an instruction; none of these creates a new Work Order.
+
+| ID | Finding | Owner | Disposition |
+|---|---|---|---|
+| **D-1** | Suite flaky at this head. `test/ordering.test.js:92` asserts the *exact* prefix of the event trace; under full-suite load the worker's 100 ms scan lands at index 0 and the assertion fails. `:136` shares the pattern. The narrow G-2a claim (`fsyncSync.return` before the response) held in **every** run — it is the stricter "nothing else happened first" form that races | Keel | Fix the race without weakening the durability claim; prove stability over repeated consecutive full-suite runs |
+| **D-2** | Map §1 G-2c and §8 T-3c stated an acceptance test the evidence disproves | **Larry** | **DONE** — both narrowed to the corked variant above |
+| **D-3** | Map §12 still directed a fresh session to "Keel implements WP-1" | **Larry** | **DONE** — §11 and §12 corrected |
+| D-4 | `RUNBOOK.md` claims the service will *"never contact anything outside your machine"*, while `README.md` correctly lists zero-egress as **not** claimed. The runbook is the document Warwick operates from | Keel | Non-blocking, but it is a claim stronger than its evidence in the operator's own document. Fixed in the same pass |
+| D-8 | The runner gate is an instruction, not a mechanism — `"test": "node --test"` is the exit-code route the map itself calls a vacuous green | — | **Parked. Veritas explicitly does not recommend building one**, and neither do I. Regrowth cap |
 
 ---
 
 ## 12. Current frontier and the exact next action
 
-**Frontier:** Phase 1. WP-1 is issued to Keel against governance head `d3180118e07b0bab3981de92a57c7a320b042163`, Work Order `Deliverables/proofline/WO-2026-08-04-01-proofline-service-core.md`.
+**Frontier:** Phase 3, on a Veritas `HOLD`. **WP-1 is built and integrated at `39a553cb` — do NOT re-implement it.** Work Order `Deliverables/proofline/WO-2026-08-04-01-proofline-service-core.md` remains open for the HOLD disposition above; it is not reissued.
 
-**Exact next action:** Keel implements WP-1 in build order (§B of the Work Order), returning executed test output. Larry integrates, then dispatches Veritas against the exact integrated head.
+**Exact next action:** Keel discharges **D-1** (the `ordering.test.js` race, at `:92` and `:136`) and **D-4** (the `RUNBOOK.md` zero-egress overstatement) inside the existing Work Order, and proves suite stability across repeated consecutive full-suite runs — a single green run is what produced this finding. D-2 and D-3 are already discharged by Larry. Larry then re-dispatches Veritas against the new integrated head, scoped to the blocking findings.
+
+**Then, and only after a `VERITAS_PASS`:** Warwick's browser walkthrough and first live start (Phase 4, H-2 — the only route by which G-11 is ever claimed), then the merge decision (Phase 5).
 
 **Resumable state:** branch `build-020/live-trial`, worktree `C:\Fusion247PKA-build-020-trial`. Verify HEAD by execution before trusting any SHA here — v1 of this map got that wrong (C-3).
