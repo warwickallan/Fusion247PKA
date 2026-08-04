@@ -635,6 +635,173 @@ Three read-only investigations were dispatched 2026-08-05 and **must land before
 
 **Also owed and NOT yet verified:** Warwick states Proofline remained available on port 7317 across a complete Claude Code session restart. **That is being verified independently before it is recorded** as a phase fact — it is a durability claim, and this build does not record durability claims it has not executed.
 
+---
+
+## 14.7 WP-2E design — SETTLED by evidence, 2026-08-05
+
+**The investigation returned a result that changes the work package from a build into a wiring job.** The exchange machinery already exists, is tested, and is connected to nothing.
+
+### What execution established
+
+| Finding | Evidence |
+|---|---|
+| **`tower.finding` holds ZERO rows** — while four real Codex findings sit stored inside `tower.supervisor_review.merge_review` as structured JSON (`TQA-001`, `TQA-002`, `TQA-003`, `TOWER-QA-001`), each with `technical_impact`, `reachability`, `required_disposition`, `evidence`, `required_correction` | Table row counts read from `C:\Users\Buggly\.mypka\tower\tower.db`; finding JSON pasted verbatim from the live row |
+| **`openFinding()` exists and is never called by the live review path** — only by the acceptance harness (`accept.mjs:196`) and tests. **This single uncalled function is the whole gap** | `watcher.mjs:251-259`, call-site enumeration |
+| **A complete disposition schema already exists** on `tower.finding`: `disposition` (checked enum), `disposition_rationale`, `disposition_source`, `disposition_comment_id`, `disposition_head_sha` (40-hex checked), `disposition_at` — with two constraints forcing completeness and forcing a `pr_comment` disposition to name its originating comment row | Schema read from the live DB |
+| **A fail-closed disposition GATE already exists** — an undisposed prior finding, or one disposed at a *different head*, rejects the next review round before any reviewer is invoked | `findings.mjs:66-101` |
+| **Inbound already works — via GitHub, not Telegram.** `pollPrComments.mjs` + `ingestComment.mjs` parse `@tower finding <id>: <disposition> — <why>` and persist with full provenance; head-mismatched comments are stored `applied=false` and never applied | Parser and gate read; grammar already published in every verdict Tower posts |
+| **A disposition-only reply does NOT trigger a new Codex round** — turn creation is gated on a `checkpoint` marker being present | `pollPrComments.mjs:253` |
+| **The PR verdict comment tells the reader to reply `@tower finding <id>: …` while listing no findings and no ids** — the instruction it publishes is literally unfollowable | `postVerdict.mjs:107-127` |
+| **Telegram delivery is real and multi-part already** — `notify.mjs` splits an array into separate sends; three real deliveries with `telegram_ok=1` | `notify.mjs:51,87-95`; rows with `message_id` 453, 455, 457 |
+| **Control-plane Postgres is DEAD on this machine** — `127.0.0.1:5432` connect failed | Executed connection attempt |
+| `services/control-plane/notifier/` throws by construction and has never delivered | `transport.mjs:76-82` — confirmed, set aside |
+
+### The nominated single source of truth
+
+**`tower.db` — `tower.finding` as the exchange ledger, `tower.supervisor_review` as the immutable review record it derives from.** It is the only store that already models **both halves** of the exchange with provenance and head-binding; it is live and written today; it already backs a gate, so it has consequence rather than being a log; and it lives at `~/.mypka/tower/`, **outside any checkout**, which is exactly the durability property Phase 2 is about. Every alternative is dead (Postgres), a surface rather than a store (the PR thread), or new (a file convention).
+
+**Telegram and the PR thread become renderings of it.** That is what answers Warwick's "not a mirror" requirement: one store, two views, and the store is the one with the gate attached.
+
+### The four wires — no new store, no new mechanism
+
+**W1** — after `supervisor_review` persists, loop `merge_review.qa.findings[]` and call the existing `openFinding()`. **This one loop lights up the disposition columns, the ingest parser and the gate simultaneously** — all built, all tested, all currently inert. **Must fail closed if the findings array is absent.**
+**W2** — `composeVerdictComment` lists the findings it already tells the reader to reply about.
+**W3** — `notify.mjs` gains a third message part carrying finding ids and impacts. No transport change.
+**W4** — Larry disposes by posting one PR comment in the existing grammar with **no checkpoint marker**, so no new Codex round fires; Telegram then echoes **the parsed, persisted dispositions read back from the store**.
+
+**W4's read-back-after-write is the spine of the design.** What Warwick reads is what the database accepted, not what Larry claimed. That is the difference between an exchange and a mirror.
+
+### The decision I am taking — Warwick may overrule it
+
+**Warwick replies on GitHub, not on Telegram.** His requirement is that the exchange be *visible* to him — *"show the actual Codex findings and Larry's actual response"*. **Telegram inbound for TowerBot does not exist** (no `getUpdates`, no webhook anywhere in `services/control-plane`) and building it is new code. Reading on Telegram and replying on the PR needs **nothing new built**. If he wants to reply *from Telegram*, that is a real feature and a separate decision — I am not smuggling it in.
+
+### Named as unestablished — not guessed
+
+- Whether `merge_review.qa.findings[]` is **schema-guaranteed or model-dependent** — observed populated in 2 of 2 real reviews, but the validation path was not read. **W1 must fail closed on its absence.**
+- Whether the **currently running watcher (PID 31268) can still send Telegram** — launched with no `--env-file`, may have inherited credentials; last successful send was 2026-08-02. **Needs a live check before W3 is relied on.**
+- **Finding-id mapping** — Codex reused `TQA-001` across reviews and `tower.finding.id` is a generated UUID. How Codex's ref maps to the id Warwick types back is an open design point for W1.
+- Whether Veritas receipts should join this ledger — not investigated, not assumed.
+
+---
+
+## 14.8 WP-2F decision — **SQLite is canonical for Tower.** And two corrections to §13.3a
+
+### ⚠️ First: two things I reported that execution has now overturned
+
+| ID | What I stated | What execution proved | Effect |
+|---|---|---|---|
+| **X-1** | **R-5:** the Tower watcher *"died on 2026-07-24 and could not report it"*, citing `watcher_crash` + `crash_notify_failed` in `C:\.fusion247\logs\tower-control-plane\watcher.log` | **I read the WRONG LOG.** That file belongs to the **stale** launcher. The **live** watcher logs to `C:\Users\Buggly\.mypka\tower\logs\watcher.log` and is healthy — polling PR #90, heartbeat **0.7 seconds old** at time of check. The crash was real but it was the *old* watcher's, not the current one's | R-5 is **withdrawn as a statement about the current runtime**. It remains true of the legacy path |
+| **X-2** | The Supabase/Postgres host was failing DNS (`getaddrinfo ENOENT`), which I offered to Warwick as evidence against Postgres | **FALSE NOW. The host resolves, TCP connects, and the credential authenticates.** `db.iiqstxfqjbrbyplwwsql.supabase.co` → `2a05:d018:a0:6000:...`, **AAAA only, no A record** — the 2026-07-24 `ENOENT` was almost certainly a transient IPv6-only resolution failure, not a dead project. PostgreSQL 17.6, `tower` schema present with 922 turns, 172 reviews, 29 merge-check runs | **The "Supabase is broken" argument is GONE.** The recommendation survives, but on completely different reasoning. **This was the load-bearing fact in what I told Warwick, and it was wrong** |
+
+**X-2 matters more than a corrected detail.** Had the decision been taken on my reasoning rather than on executed evidence, it would have been taken on a false premise and reached the right answer by luck.
+
+### The decision: **SQLite, `C:\Users\Buggly\.mypka\tower\tower.db`, is the single canonical Tower store**
+
+**Not because Postgres is unreachable — it is reachable.** Because:
+
+1. **Only SQLite is alive.** SQLite heartbeat 0.7s old; Postgres heartbeat stale since **2026-07-24**. One is the system, the other is an archive.
+2. **The split is small and was designed to be.** **7 modules are already store-agnostic** (they take `pool` as a parameter); only **3 operational call sites** open Postgres against `tower.*` — `tower-loop/mergeCheck.mjs`, `tower/merge-check.mjs`, `tower-loop/accept.mjs`. `db.mjs` is a pg-shaped façade returning `{rows, rowCount}` precisely so this would be cheap.
+3. **The Codex route Larry is instructed to prefer needs no store at all.** `reviewDiff.mjs` imports no `pg`, no `openDb`, no `DATABASE_URL` — it stages git evidence and prints. That is why nobody has noticed this split since 2026-07-28.
+4. **`~/.mypka/tower/` is outside the repo, outside any worktree, outside `C:\.fusion247\`** — exactly the durability shape Warwick asked for. The previous launcher died because it was pinned to a deleted worktree.
+5. **Warwick's Supabase preference is honoured where it actually matters.** The `cockpit.*` schema — Brain, YouTube capture, attention items, the surfaces he looks at — **stays Supabase-resident and is untouched by this.** Verified: the 8 `cockpit/*.mjs` and `worker/*.mjs` modules contain **zero** references to `tower.*`. **Supabase is not going away.** This decision governs only the Tower watcher's operational store.
+
+### The counter-argument, weighed and rejected — not omitted
+
+**Unifying on Postgres would need ZERO new schema work.** `tower.merge_check_run` and `merge_check_message` already exist there with real DDL and 29 rows of history; SQLite needs new DDL and ~15 hand-rewritten `$n` → `?` literals. **The Postgres route genuinely looks cheaper, and it is the one Warwick's stated preference points at.**
+
+It is rejected because it means **undoing WO-TW-01** — discarding a migration that was built, reviewed, merged and is *currently running* — and **re-introducing a network dependency into a poll loop that today cannot fail on DNS.** The cheaper-looking route is the one that throws away the working system. That is the trade, stated plainly so Warwick can overrule it.
+
+### Known limit — recorded, not dressed up
+
+**Backup is a genuine regression.** `~/.mypka/tower/tower.db` sits on one disk with no replication; Supabase was backed up by Supabase. It does not change the decision — Tower state is reconstructible from the GitHub PRs, and the data that actually matters (`cockpit.*`) stays in Supabase — but it is a real durability loss and is recorded here rather than discovered later.
+
+### The migration route — one Work Order
+
+1. **`db/merge_check_schema.sql`** + `applyMergeCheckSchema(db)` in `apply.mjs`, following the existing five-applier pattern. Two tables, 9 columns each, one FK. **SQLite DDL quirk: the schema qualifier goes on the *index* name, not the table.** Add `created_at`/`updated_at` to `TIMESTAMP_COLUMNS`. **Neither table has a boolean column, so the `BOOLEAN_COLUMNS` trap does not apply — stated explicitly so nobody "fixes" it.**
+2. **Repoint 2 files** — `tower-loop/mergeCheck.mjs` and `tower/merge-check.mjs`: `pg.Pool` → `openDb()`, and `$n` → `?` at ~15 statements. `now()` already exists as a SQLite function. Delete the inline DDL in favour of the applier, and **drop the hard-coded `import pg from 'file:///C:/Fusion247PKA/...'`** while in there — that absolute path is its own latent breakage.
+3. **`accept.mjs` — decide, do not migrate by reflex.** Establish first whether it is on any live route.
+4. **Do NOT migrate the Postgres data.** The migration plan puts it explicitly out of scope. Leave the `tower` schema in Supabase as **read-only history** and document it as such.
+
+### Named as unestablished — and one of these is serious
+
+- **🚨 How the live watcher (PID 31268) was actually launched is NOT ESTABLISHED.** Parent PID 36416 no longer exists. The stale `run-tower-cp-watcher.ps1` is definitively **not** it — wrong path, wrong `WATCHER_ID` format (`YOGA_CP#` vs the live `WARWICK_YOGA#cp#`), logs stop 2026-07-21. **So there is no proven start path for the current Tower runtime.** That is precisely Warwick's *"or Larry remembering how to start them"* failure, and it must be closed by WP-2A rather than assumed away.
+- **`tower.turn` in Postgres has a row from 2026-08-02T21:26**, nine days after its heartbeat stopped. Something wrote it. The writer was not traced.
+- Whether `accept.mjs` and `run-proof.mjs` are on any live or documented route.
+- **The 24-subtest tower-loop suite was not run** (read-only scope) — and `test:tower-loop` is **not** in the `test` aggregate in `package.json`, so a repo-wide `npm test` would not catch a regression in exactly this subsystem. Establish the baseline **before** the migration, not after.
+
+---
+
+## 14.9 WP-2A — legacy obsolescence **ESTABLISHED**. Removal is authorised, and it is six targets, not one
+
+### Obsolescence, proven per implementation
+
+| Implementation | Verdict | Evidence |
+|---|---|---|
+| **tower-loop (CURRENT)** | **LIVE and working.** PID 31268, `WATCHER_ID` `WARWICK_YOGA#cp#1785800856828` — the `run-watcher.mjs` format, and `1785800856828` decodes to its own creation time **2026-08-04 00:47:36**. **So it was started by a manual `run-watcher.mjs`, not by the Startup chain** | Live `pr_poll_ok` on PR #90; parent PID 36416 gone, correctly detached |
+| **tower-baton (BUILD-010)** | **OBSOLETE.** Dead ~46 hours. Lock names PID 39920 — not running. Last log line is a *startup*, not work. Scheduled task `FusionTowerBatonWatcher` is **Disabled — but both triggers remain `enabled=True`**, so re-enabling is a one-command resurrection *and the daily trigger would then fire with no logon* | Lock decoded; `Get-ScheduledTask` output |
+| **FusionTowerWatchdog** | **NEVER REGISTERED — established by enumeration, not by reading the commented-out block.** Absent from a full 19-task non-Microsoft enumeration; **zero of 333 Windows services** match tower/fusion/mypka/node | The negative is established, per the estate's own rule that negative claims require verification |
+| **The stale copy at `C:\Fusion247PKA-tower`** | **Not running — and it is the live hazard.** `watcher.mjs` there is 25,566 bytes / SHA256 `9B788E2F…` against the current 43,513 bytes / `96331F65…`. It is a **linked git worktree**, not a clone | `git worktree` gitdir pointer; byte and digest comparison |
+| **`services/control-plane/tower/merge-check.mjs`** | **A FIFTH "tower" thing I was not tracking.** Not a watcher, one-shot — flagged so it is not mistaken for dead weight during removal | Found by the investigation, not by my reconnaissance |
+
+### The live hazard, now exact
+
+**At the next interactive logon the Startup VBS fires and, in order: (1) force-kills PID 31268 — the current watcher — because the pattern `*tower-loop*watcher.mjs*` matches it; (2) starts the 22-July stale copy against the same live `~/.mypka/tower/tower.db`.** It is not a collision, it is a **takeover: the legacy watcher wins by killing the incumbent first.**
+
+**The machine has not rebooted since 2026-07-21 23:21:22. That is luck, not a control.**
+
+### 🔴 What removal must NOT touch — three traps found before cutting
+
+1. **NEVER execute `run-tower-cp-watcher.ps1` for any reason, including "to test that it fails."** Its `Stop-Process` matches the live watcher. Confirmed by pattern comparison.
+2. **`C:\.fusion247\tower-baton.env` is consumed by the CURRENT Codex-QA route** — `tower-loop/mergeCheck.mjs:142-143` falls back to it for `TELEGRAM_BOT_TOKEN` and `AUTHORISED_TELEGRAM_USER_ID`, as does `tower/merge-check.mjs:8`. **Delete it and TowerBot verdict delivery breaks — silently, because the README calls the mirror best-effort and non-blocking.** Keep the file; remove only the watcher.
+3. **Deleting `services/tower-baton/` breaks a live test control.** `tower-loop/test/doubles/graph-probe.mjs:28` resolves `services/tower-baton/src/clickupClient.js` and exits 4 with `CONTROL_TARGET_MISSING` if absent; it is invoked as `control-trap` by the suite. **That is a negative control going missing — the exact "a control is not evidence until made to fail" failure.** Removing the tower-baton **source tree** is a SEPARATE decision from removing the **watcher**, and is not authorised by W-2.
+
+### The six removal targets — "absence of code" is not enough
+
+Three routes point at *paths* and one is a registered OS object:
+
+1. Delete the Startup VBS `…\Startup\mypka-tower-cp-watcher.vbs` — the only automatic route to the stale copy.
+2. Delete or neutralise `C:\.fusion247\run-tower-cp-watcher.ps1` — **it is documented as *the* launcher** in `Deliverables/2026-07-23-pr58-closure-evidence.md:105`, so a paste from a Deliverable resurrects both the stale path and the kill.
+3. `Unregister-ScheduledTask -TaskName FusionTowerBatonWatcher` — **disabled is reversible; deleted is not.**
+4. Delete `C:\.fusion247\run-tower-watcher.ps1` — the task's action target, independently runnable.
+5. **`git worktree remove`** `C:\Fusion247PKA-tower` — **not a directory delete**; it is a linked worktree of `C:\Fusion247PKA\.git`.
+6. **Correct `Builds/BUILD-010-fusion-tower/Runtime/recovery.md:81,90,91`** — it instructs a human to `schtasks /Create` the legacy watcher back. **A documented resurrection procedure is a start path with a human in the loop.** Also correct `Deliverables/2026-07-28-overnight-estate-closure-report.md:206` and `2026-08-01-pax-reset-challenge.md:61`, which still name `-tower` as the merge-check runtime home. **The main checkout is strictly ahead — `-tower` has no `reviewDiff.mjs` at all — so nothing is lost, but the documents would send the next fresh Larry to the stale tree.**
+
+### The attempt-proof (S-2) — designed, deliberately NOT yet run
+
+**A1** record the live PID and `WATCHER_ID` first; every later step asserts this exact PID still alive at the end — *that assertion is the "did not disturb the runtime" evidence*. **A2** attempt the VBS and the PS1 by absolute path → expect *file not found*. **A3** `schtasks /Query` then `/Run` → expect *cannot find the file*, **not** "task is disabled", which would prove only that it is off. **A4** run the stale `watcher.mjs` path → expect MODULE_NOT_FOUND. **A5** re-enumerate Startup and both `Run` hives → assert zero tower entries. **A6** re-assert A1's PID alive and the log advancing.
+
+**A real logon is the only complete proof of A5, and it is the one that would kill the live watcher if step 1 or 2 were missed.** Under §14.0b Warwick does not require restart testing, so **it is named here as the one residual unproven step rather than quietly skipped.**
+
+### Named as unestablished
+
+- **The VBS firing at logon is inferred from configuration, not observed.** Its presence in an active Startup folder with no `StartupApproved` disable flag is strong — but it is not an observed firing.
+- Why the PS1 has not logged since 2026-07-24 despite an `explorer.exe` restart on 2026-08-04 23:02. **Whether an explorer restart re-runs Startup items on this Windows build is contested and was not tested.** So it cannot be said whether the VBS is *overdue* or *already-run-and-failed*.
+- ClickUp task `869e6859d` state — whether tower-baton left work half-done when it died.
+- `C:\.fusion247\.env keys\tower.env.txt` (87 bytes) exists, is referenced by neither launcher, and was not opened. **Glance before removal.**
+
+---
+
+## 14.10 ✅ Proofline survived a full session restart — **CONFIRMED by independent execution**
+
+**Warwick reported it; it is recorded because it was verified, not because it was reported.**
+
+| Evidence | Value |
+|---|---|
+| Listener | `127.0.0.1:7317 LISTENING`, owning process **PID 38828** |
+| Command / directory | `node bin\proofline.mjs`, from **`C:\Fusion247PKA-build-020-trial\services\proofline`** — this worktree |
+| Health | `HTTP 200` · `{"ok":true,"epoch":1,"uptimeMs":8090444,"counts":{...,"approved":2,"total":2}}` |
+| Uptime | **8,090,444 ms = 2 h 14 m 50 s**, consistent with a 22:03:17 start |
+| **The survival proof** | **The grandparent process (PID 41332) is NOT RUNNING.** The launching process is dead and Proofline is still serving — genuinely orphaned and detached, which is what a survive-the-session claim requires. Live Claude sessions on the box are unrelated to that dead ancestor |
+| Bonus | A `CLOSE_WAIT` peer traced to Chrome's network service — the UI was open in a browser at check time |
+
+**Scope of this claim, stated exactly:** Proofline survived **the Claude Code session that launched it ending**. It has **not** survived a reboot, and under §14.0b that is not claimed. `epoch: 1` confirms it has never restarted and replayed.
+
+---
+
+## 14.11 Evidence status — §14.6 discharged
+
+All three investigations have landed and their findings are recorded above. **WP-2A, WP-2E and WP-2F may now be issued as Work Orders.** WP-2B(1) is issued and amended (`WO-2026-08-05-01`, Amendment 1) after a correct class-A `REFUSE`.
+
 ## 13.4 Landing route — how this reaches main and stops being worktree-local
 
 1. ~~**`build-020/live-trial` has NO upstream and is 51 commits ahead of `origin/main`.** Push and open the PR **early** — recorded is not visible.~~ **SUPERSEDED by R-2, 2026-08-04: already done.** Upstream is `origin/build-020/live-trial`, 54 ahead, and **PR #94 is open as a DRAFT**. The remaining work is taking it out of draft at the right moment — see WP-2D.
