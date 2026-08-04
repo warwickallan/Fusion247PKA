@@ -1,0 +1,8 @@
+# Proofline — data leak precondition, NOT housekeeping.
+#
+# Fusion247PKA is a PUBLIC repository. `.data/` holds the append-only journal,
+# which contains the full text Warwick pastes in. It must never be committable.
+#
+# This file is written BEFORE the store can create a single file (map C-2:
+# `git check-ignore -v` previously matched nothing for this path).
+.data/

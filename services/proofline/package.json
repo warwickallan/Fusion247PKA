@@ -1,0 +1,15 @@
+{
+  "name": "proofline",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "BUILD-020 Proofline — a standalone single-process local service that lets Warwick paste text under a key and PROVE BY EXECUTION that the submission was fsynced before he was acknowledged, that a background worker (not the request thread) processed it, that the analysis is a pure deterministic function of the text, that it stops for his approval, and that a job caught mid-flight by an abrupt kill comes back and finishes exactly once. Zero npm dependencies; Node 22 stdlib only. Loopback bind only; no network egress.",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node bin/proofline.mjs",
+    "test": "node --test",
+    "scan": "bash ../../scripts/secret-scan.sh --surface services/proofline"
+  }
+}
