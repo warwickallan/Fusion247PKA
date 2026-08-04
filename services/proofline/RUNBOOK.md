@@ -175,8 +175,7 @@ The UI polls once a second. If jobs never appear, check `/api/health` first — 
 
 ## What this service will never do
 
-- Contact anything outside your machine. There is no HTTP client, no `fetch`, no DNS lookup and no outbound socket anywhere in its source, and no npm packages are installed.
-- Listen on anything but `127.0.0.1`. The bind address is a constant; no environment variable can widen it.
+- Listen on anything but `127.0.0.1`. The bind address is a constant; no environment variable can widen it, and the running socket's address is checked at runtime (T-9).
 - Advance a job past `awaiting_approval` on its own. That is the whole point of it.
 - Ask you for a credential. It has none and never will.
 
@@ -186,6 +185,7 @@ The UI polls once a second. If jobs never appear, check `/api/health` first — 
 
 | Limit | Detail |
 |---|---|
+| Network egress | **Zero egress is NOT claimed** — it is a negative, and proving it needs a packet capture nobody ran. What *is* proven (T-9) is a source-level assertion — no HTTP client, no `fetch`, no DNS lookup, no outbound socket anywhere in the source, and no npm packages installed — plus the runtime bind check above. Treat it as a strong source assertion, not a measured absence. The README's *"What is deliberately NOT claimed"* table says the same thing. |
 | Power loss | Not survivable, not claimed. `fsync` returned ≠ on the platter. |
 | One process | Running two Prooflines against the same journal is not supported and was never tested. |
 | No authentication | Loopback only, single user. Anyone with an account on this machine can reach it. |
