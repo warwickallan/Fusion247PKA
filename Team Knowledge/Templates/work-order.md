@@ -35,9 +35,11 @@ is *«Integrated at "<SHA>" and submitted to Veritas for assurance.»*
 of a Work Order — the worker's read-back and preflight remain the only gate ahead of the build, and
 challenging a defective order stays the worker's job.
 
-**When Veritas is required but unavailable, the work is BLOCKED, not provisionally passed.** That reaches
-Warwick as `unsafe-repository-state`, whose gloss already covers a genuine inability to proceed. There is
-no bypass.
+**When Veritas is required but unavailable, the affected scope is assurance-BLOCKED, not provisionally
+passed — and unrelated safe work continues.** There is no bypass and no provisional PASS. The exact rule,
+including the two conditions that must BOTH hold before Warwick is interrupted, is canonical in
+[[Team/Veritas - Internal Quality and Truth Assurance/AGENTS]] §"When Veritas is unavailable" and is not
+restated here.
 
 **The consequence, stated so it bites:** work produced without an accepted read-back **is not accepted
 work.** Larry does not review it, its evidence does not count, and it is returned `REFUSED` on process

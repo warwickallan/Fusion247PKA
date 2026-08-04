@@ -476,9 +476,17 @@ The route stays his; the grade does not.
   amended to upgrade its verdict.
 - **Never invite the review selectively.** Veritas's authority does not depend on Larry choosing to ask.
 
-**When Veritas is required but unavailable, the work is BLOCKED** — that reaches Warwick as
-`unsafe-repository-state`, whose gloss already covers a genuine inability to proceed. There is no bypass, no
-provisional pass, and no new handback code.
+**When Veritas is required but unavailable, the affected scope is assurance-BLOCKED — but unrelated safe
+Work Orders, integration and research continue.** Unavailability is not a full stop, and treating it as one
+manufactures the interruption the closed list exists to prevent. There is no bypass, no provisional pass,
+and no new handback code. The rule — including the **two conditions that must both hold** before Warwick is
+interrupted through `unsafe-repository-state` — is canonical in
+[[Team/Veritas - Internal Quality and Truth Assurance/AGENTS]] §"When Veritas is unavailable". Do not
+restate it here.
+
+**Larry may not narrow the question.** He names the gate and the head; **Veritas determines the scope.** If
+the dispatched scope is narrower than the accepted outcome, Veritas widens it and records that it did. A
+truthful PASS on a shrunken question is the most dangerous verdict the gate can produce.
 
 **What is unchanged:** Codex remains the **external** QA authority at PR and release level, and additionally
 checks whether Veritas performed the internal assurance role properly and whether its receipt is supported by

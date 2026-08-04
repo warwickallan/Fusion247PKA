@@ -72,7 +72,10 @@ below.
 
 **Veritas — Internal Quality and Truth Assurance.** *(Added 2026-08-04 by Warwick's order `GOVERNANCE-VERITAS-HIRE`.
 This model is LOCKED against rewriting, not against Warwick changing it; a roles model that omits a mandatory role
-sends every specialist who reads it down a superseded route.)* Determines independently whether integrated work
+sends every specialist who reads it down a superseded route.)* **Structurally separate INTERNAL assurance —
+separate context, no authorship or integration authority, direct repository inspection, an uneditable verdict,
+but the SAME runtime and model. It is not external verification; Codex remains the different-model external
+gate.** Determines, independently of Larry's judgement, whether integrated work
 meets the stated outcome and accepted design, **works through the production path**, is genuinely integrated rather
 than merely implemented in isolation, is durable across restart and recovery, and is accurately represented in Git
 and in every active document. Reviews the **exact integrated head** in a separate context — never a worker branch, a

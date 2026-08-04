@@ -6,6 +6,24 @@
 This is the hire record SOP-001's definition-of-done points at. It exists so a future Nolan does not see a
 missing research artefact and re-run a research pass that was deliberately not run.
 
+## Why a permanent role did not breach the regrowth cap
+
+Recorded because the cap is the estate's most expensive lesson and a new *role* is the one kind of growth
+that can look exempt from it. It is not.
+
+**Warwick, `GOVERNANCE-VERITAS-CORRECTION-01`, 2026-08-04:** *"A permanent role is itself part of the
+operating mechanism and remains subject to the regrowth cap. Veritas earned its place because evidence
+showed that no existing owner or callable procedure provided standing separation between the party
+integrating and narrating work and the party deciding whether that work was true."*
+
+So the test Veritas had to pass was the same one a new validator or store would have to pass — *does an
+existing route already do this?* — and the answer was checked against each candidate rather than assumed:
+**Larry** was the party being separated from; **Codex** is external and fires at PR/release, not during
+delivery; **Pax** is research and was being mis-used as routine QA; **Vera** owns rendered surfaces;
+**SOP-018** is a callable procedure that cannot manufacture independence when the reviewer is grading its
+own work. **No existing owner or procedure supplied standing separation.** That, and not the usefulness of
+the idea, is what earned the role.
+
 ## Why there is no Pax research brief — a determination, not an omission
 
 [[SOP-001-how-to-add-a-new-specialist]] §2 makes a Pax research pass mandatory on every hire, and its stated
@@ -64,6 +82,30 @@ assumed. **A one-line gap statement never meets that bar** — that is the ordin
 - **No handback code added, renamed or removed.** Veritas-unavailable binds to the existing
   `unsafe-repository-state`, whose gloss already covers a genuine inability to proceed. The seven names are
   mirrored in a frozen literal in `tools/governor/footer.mjs`.
+
+## Correction pass — `GOVERNANCE-VERITAS-CORRECTION-01`, 2026-08-04
+
+Warwick ordered an independent challenge of six proposed corrections rather than blind implementation. The
+outcomes worth carrying forward:
+
+- **Three "overbroad standing rules" were reported as having leaked into the governance at `66d40d3`. They
+  had not.** Verified by search across the contract, shim, receipt template and hire record: rule A absent
+  (the contract already stated the compliant form), rule B **zero matches**, rule C matching only a
+  pre-existing 2026-07-12 line on an unrelated subject. The correction was therefore **additive**, and the
+  premise is recorded as tested rather than accepted.
+- **Rule C was REJECTED for the estate.** It governs how Larry handles Warwick repeating a decision —
+  memory-level discipline whose estate analogue already exists, in the place it actually bit:
+  [[GL-009-public-private-knowledge-boundary]] §"The rule that governs how this rule is read". A third
+  statement would have been regrowth and an SSOT breach.
+- **The committed contract forbade the method that makes its own evidence trustworthy.** It declared the two
+  receipt locations Veritas's "complete write surface", while trustworthy evidence requires an isolated
+  export written elsewhere. The first receipt did the right thing (`git archive` to scratchpad) and was
+  therefore out of contract. Fixed by an explicit, bounded carve-out.
+- **A prior integrity argument was withdrawn.** "An uncommitted receipt is visible" was wrong — visible to
+  Larry, and to nobody else. Suppression is now partly closed by Gate 3 enumeration and made tamper-evident
+  by `receipt_sha256`; **the residual hole is recorded rather than papered over.**
+- **`CLAUDE.md` Rule 4 was false and is corrected to `UNBOUND — deliberately, by Warwick`.** A fresh Larry
+  holding `Bash`/`Edit`/`Write` is the expected state, not a failed binding.
 
 ## References
 
