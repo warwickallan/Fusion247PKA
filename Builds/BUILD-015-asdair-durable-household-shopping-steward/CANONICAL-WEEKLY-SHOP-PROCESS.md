@@ -102,9 +102,22 @@ previous decisions · applicable standing rules.
 - **Every answer must be written durably before the shop proceeds.**
 
 On 2026-08-03, eleven questions were raised of which — on inspection — two were known
-products defeated by matching, and two more (Nescafe Azera, toothpaste) had been **answered
-in the Google Drive decisions log on 2026-07-06** and never promoted into Supabase
-(D-2026-08-03-16). Under this process none of those four would be asked.
+products defeated by exact-string matching, and **at least two more were covered by active
+rules that already existed in Supabase**.
+
+> **CORRECTED 2026-08-04.** An earlier version of this paragraph said Nescafe Azera and
+> toothpaste were asked because their decisions lived only in Google Drive and had never been
+> promoted. **That was wrong.** `asdair.rules` id 12 (*"Nescafe means Azera only; add only if
+> on offer"*) and id 25 (the generic-Nescafe trigger) were **both active and populated** at
+> the time, and `rule_qa_log` already carried the Ariel answer (*"best value/wash"*). The
+> content lives in **`rule_text`**, which is populated on 39 of 39 active rules; the earlier
+> claim came from querying the optional `note` column, finding it empty, and concluding the
+> decisions were absent.
+>
+> **The real defect is worse and clearer: the rules were stored and the pipeline did not
+> consume them before generating questions.** Tracked as `DEFECT-LEDGER.md` **D-2026-08-04-04**
+> (HIGH, root cause not yet established) and **WO-Y**. Storage is not the problem;
+> consumption is.
 
 ## E. Prepare the Sonnet Browser execution packet
 
@@ -178,9 +191,16 @@ Supabase state.** Preserve the Drive document as provenance.
 **No answer may remain only in:** Larry's context · a Sonnet conversation · a Google document ·
 a commit message · **an unapplied local seed file.**
 
-> The last one is live right now: `services/asdair/db/011_decisions_log_rule_notes_seed.sql`
-> exists, is correctly gitignored (it carries household rows), and **has not been applied.**
-> Until it is, the Azera and toothpaste decisions remain Drive-only in practice.
+> **CORRECTED 2026-08-04.** An earlier version claimed the unapplied seed migration
+> `011_decisions_log_rule_notes_seed.sql` was why the Azera and toothpaste decisions were not
+> operational. It is not. That migration back-fills the **optional `note`** column on rows
+> whose **`rule_text` already carries the decision**. It remains unapplied and is worth
+> applying for completeness — but it is **not** on the critical path and **not** the cause of
+> any question asked on 2026-08-03. The cause is D-2026-08-04-04: rules that exist and are
+> not consumed.
+>
+> The clause above still binds for **genuinely new** answers — nothing may live only in a
+> session, a Sonnet conversation, a Drive document, a commit message or an unapplied seed.
 
 ---
 
@@ -198,7 +218,7 @@ implementation:
 | B — sanitized evidence of what was supplied to the model | **NO.** Not implemented. |
 | B — exactly one interpretation entry point | **NO.** `interpret-list.js` (CLI) and the pipeline path both exist. |
 | C — order/spelling-tolerant matching | **NO.** Exact-string. This is the open gap that cost two questions on 2026-08-03. |
-| D — previous decisions consulted before asking | **PARTIAL.** Rules exist; many carry `note = null`, and the Drive decisions were never promoted. |
+| D — previous decisions consulted before asking | **NO — demonstrably broken.** The rules and prior answers ARE stored (`rule_text` populated on 39/39 active rules; `rule_qa_log` carries real answers) and the pipeline asked anyway on 2026-08-03. D-2026-08-04-04 / WO-Y. A live candidate cause: rules 32/36/37/38 — every multibuy and rotation rule — carry directive `info`; if the planner does not action `info`, they are all inert. |
 | E — deterministic Brand A–Z execution packet | **NO.** Does not exist. This replaces WO-C. |
 | F — Sonnet as the live basket writer | **Ruled 2026-08-04.** Not yet reflected in the code or the other documents. |
 | G — reconciliation against expected counts | **PARTIAL.** `services/asdair/reconcile/` exists; expected-count inputs do not. |

@@ -92,23 +92,31 @@ operational it must actually work. Status: `COCKPIT-OPERATIONAL-STATUS.md`.
 
 ## WO-V — Apply the Drive decisions, and fix what blocks them
 
-**Ruling §4.** Owner: **Larry** (admin path) + **Warwick** (one decision). Size: S.
-**BLOCKED — needs Warwick.**
+**Ruling §4.** Owner: **Larry** (admin path). Size: S. **DOWNGRADED — NOT blocked on Warwick.**
 
-Migration `011_decisions_log_rule_notes_seed.sql` is written, correct, and **NOT APPLIED**.
-Two things block it, both in the ledger:
+> **CORRECTED 2026-08-04.** This entry previously said it was **BLOCKED needing Warwick's
+> ruling on a three-way Sure conflict.** **That was false and is withdrawn.** Rules **32**
+> (*"ROTATE the variant each week — pick DIFFERENT from the previous order"*) and **37**
+> (*"round qty UP to an even number… add a FEMALE variant to complete the last pair
+> (Mum 3 male → add 1 female = 4). Combines with the rotate-variant rule"*) are
+> **complementary and complete**, and match exactly what Warwick stated independently on
+> 2026-08-04. The "conflict" came from reading stub `note` columns and the Drive doc while
+> ignoring `rule_text`. **No ruling from Warwick was ever required. Do not ask him again.**
 
-- **D-2026-08-04-01** — `asdair.rules` holds **three duplicate rows** for `"sure male"`
-  (ids 23, 32, 37), all `note = NULL`, so the migration's own ambiguity guard correctly
-  refuses to guess which to write. Needs the duplicates resolved, **and Warwick's ruling** on
-  the Sure conflict: fixed variant (rules 23/24) vs rotate (`rule_qa_log` #5) vs
-  "any blue / any white" (the decisions log). Three sources, three answers.
-- **D-2026-08-04-02** — the apply needs the admin path and was blocked by permission gating.
-  A temporary grant was made, both attempts blocked, and the grant **revoked and verified**.
+Migration `011_decisions_log_rule_notes_seed.sql` is written and **NOT APPLIED**. Its real
+status:
 
-Until this lands, the Azera and toothpaste decisions Warwick gave on **2026-07-06** stay
-Drive-only and **will be asked again next week**. This is the ruling's own named failure:
-*"No answer may remain only in … an unapplied local seed file."*
+- It back-fills the **optional `note`** column on rows whose **`rule_text` already carries
+  the decision**. Worth applying for completeness; **not on the critical path**, and **not**
+  the cause of any 2026-08-03 question.
+- **D-2026-08-04-01** — `asdair.rules` genuinely holds **three rows** matching `"sure male"`
+  (ids 23, 32, 37). They are **complementary** — a `map` and two `info` — not contradictory.
+  The migration's ambiguity guard still fires because one entry claims all three, which is
+  correct behaviour for a `note` back-fill. Resolve by scoping per-row, not by a ruling.
+- **D-2026-08-04-02** — the apply needs the admin path; both attempts were blocked by
+  permission gating, and the temporary grant was **revoked and verified**.
+
+**The real work is WO-Y, not this.**
 
 ## WO-W — Amend every superseded document
 
