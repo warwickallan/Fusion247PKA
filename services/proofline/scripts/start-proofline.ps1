@@ -1,8 +1,24 @@
-# start-proofline.ps1 — the canonical Proofline launcher.
+﻿# start-proofline.ps1 - the SECONDARY, PowerShell-only launcher.
+#
+# THE PRIMARY LAUNCHER IS ..\start-proofline.cmd. Use that one unless you have
+# a specific reason not to. It works from Command Prompt AND PowerShell, from
+# any folder, and it does not involve PowerShell at all.
+#
+# THIS FILE WILL NOT RUN FROM COMMAND PROMPT. ".PS1" is not in PATHEXT, so
+# cmd.exe hands it to the shell file-association handler and you get the
+# "Select an app to open this .ps1 file" dialog instead of a server.
+#
+# THIS FILE MUST STAY PURE ASCII, AND IT MUST KEEP ITS UTF-8 BOM.
+# Windows PowerShell 5.1 reads an unmarked .ps1 as ANSI (the system codepage),
+# not UTF-8. A single em-dash on line 96 of an earlier version decoded to a
+# curly closing quote, PowerShell took that as a string terminator, and the
+# whole script failed to parse with "The string is missing the terminator".
+# The BOM makes the encoding explicit; staying ASCII means it cannot recur
+# even if the BOM is ever stripped. Belt and braces, deliberately.
 #
 # This launcher and `node bin/proofline.mjs` are the SAME startup path: the
 # launcher only resolves node, validates the environment and invokes the
-# entrypoint. There is no second way to start the service.
+# entrypoint.
 #
 # There are NO secrets here and none anywhere in Proofline. It has no external
 # dependency to authenticate to, it binds 127.0.0.1 only, and it makes no
@@ -93,6 +109,6 @@ if ($OpenBrowser) {
   } -ArgumentList "http://127.0.0.1:$Port/" | Out-Null
 }
 
-Write-Host "[proofline] starting in the foreground — Ctrl+C stops it"
+Write-Host "[proofline] starting in the foreground - Ctrl+C stops it"
 & node $Entry
 exit $LASTEXITCODE

@@ -14,32 +14,74 @@ Nothing leaves the machine. There are no credentials, no accounts, no external s
 
 ## Starting it
 
-From PowerShell:
+**Paste this one line.** That is the whole command:
 
-```powershell
-cd C:\Fusion247PKA-build-020-trial\services\proofline
-.\scripts\start-proofline.ps1
+```
+C:\Fusion247PKA-build-020-trial\services\proofline\start-proofline.cmd
 ```
 
 Then open **http://127.0.0.1:7317/**.
 
-| What you want | Command |
+You do not need to `cd` anywhere first, and it does not matter which terminal you are in — **Command Prompt and PowerShell both run this exact same line**, unchanged. No `.\`, no `&`, no quotes, no execution policy, no administrator.
+
+The terminal you paste it into then belongs to the service: it prints its log there, and `Ctrl+C` stops it. If you want your terminal back, use `--detached` below.
+
+| What you want | Paste this |
 |---|---|
-| Normal foreground start | `.\scripts\start-proofline.ps1` |
-| A different port | `.\scripts\start-proofline.ps1 -Port 7400` |
-| Run in the background | `.\scripts\start-proofline.ps1 -Detached` |
-| Start and open the page | `.\scripts\start-proofline.ps1 -OpenBrowser` |
+| Normal start | `C:\Fusion247PKA-build-020-trial\services\proofline\start-proofline.cmd` |
+| A different port | `C:\Fusion247PKA-build-020-trial\services\proofline\start-proofline.cmd --port 7400` |
+| Run in the background | `C:\Fusion247PKA-build-020-trial\services\proofline\start-proofline.cmd --detached` |
+| A different journal folder | `C:\Fusion247PKA-build-020-trial\services\proofline\start-proofline.cmd --data-dir D:\proofline-data` |
+| The options, listed | `C:\Fusion247PKA-build-020-trial\services\proofline\start-proofline.cmd --help` |
 
-The launcher and `node bin\proofline.mjs` are the same startup path — the launcher just checks Node and the entrypoint first. There is no second way to start it.
+If you ever move the Proofline folder, the command is still just the full path to `start-proofline.cmd` in its new home — the launcher finds everything else relative to itself.
 
-**It will refuse to start, loudly, if:** Node is missing or older than 22 · the entrypoint is missing · `PROOFLINE_PORT` is not a number in range · the port is already in use · the journal is corrupt mid-file (see *Recovery*).
+**It will refuse to start, loudly and in plain English, if:** Node is missing · Node is older than 22 · the program file is missing · the port is not a usable number · the port is already in use (it tells you which process has it, and how to stop that one) · the journal is corrupt mid-file (see *Recovery*). It always tells you what to do next, and it will not close the window on you before you have read it.
+
+### Why there is a `.cmd`, and why you should not use the `.ps1`
+
+This is worth reading once, because it cost a failed walkthrough.
+
+**`scripts\start-proofline.ps1` cannot be started from a Command Prompt at all.** `.PS1` is not in `PATHEXT`, so `cmd.exe` does not treat it as something to run — it hands the file to Windows' file-association handler, which on this machine has no handler registered for `.ps1`. You get the **"Select an app to open this .ps1 file"** dialog, and no server.
+
+**And a `.ps1` carries an encoding trap.** Windows PowerShell 5.1 reads a `.ps1` that has no byte-order mark as ANSI, not UTF-8. One em-dash in an earlier version of that script decoded into a curly quote, PowerShell read that as the end of a string, and the script failed to parse outright with *"The string is missing the terminator"* — on a line that looks perfectly normal in any editor.
+
+`start-proofline.cmd` avoids both. It runs `node` directly, so PowerShell is never involved, and it is written in **plain ASCII** so no codepage can change what it means.
+
+### The PowerShell script, if you specifically want it
+
+`scripts\start-proofline.ps1` still works **from PowerShell only**, and has been repaired (ASCII plus a byte-order mark). It takes `-Port`, `-Detached`, `-DataDir` and `-OpenBrowser`:
+
+```
+cd C:\Fusion247PKA-build-020-trial\services\proofline
+.\scripts\start-proofline.ps1
+```
+
+Both launchers and `node bin\proofline.mjs` are the same startup path; the launchers only check Node and the entrypoint first, then run that one entrypoint.
 
 ---
 
 ## Stopping it
 
-**Foreground:** `Ctrl+C`.
-**Detached:** `Stop-Process -Id <pid>` — the launcher prints the PID when it starts.
+**In the terminal you started it in:** `Ctrl+C`.
+
+**Started with `--detached`:** the launcher prints the PID when it starts. Paste this, with that number:
+
+```
+taskkill /PID 12345 /F
+```
+
+That works from Command Prompt and PowerShell alike. It stops the service **and** closes the "Proofline" window that was holding it — you do not have to tidy up twice.
+
+`--detached` runs the service in a **separate minimised window titled "Proofline"**. You can close the terminal you launched from and the service keeps running. Closing the "Proofline" window itself stops it, exactly like `Ctrl+C` would.
+
+**If you have lost the PID**, ask Windows which process holds the port:
+
+```
+netstat -ano -p TCP | findstr 7317
+```
+
+The number at the end of the `LISTENING` line is the PID.
 
 ### Stop is ABRUPT on Windows, and that is safe by design
 
@@ -63,9 +105,13 @@ What an abrupt stop *can* leave is a half-written final line in the journal. Tha
 
 ## Checking it is healthy
 
-```powershell
+Paste this in any terminal — Command Prompt or PowerShell, from any folder:
+
+```
 curl.exe http://127.0.0.1:7317/api/health
 ```
+
+(The `.exe` matters in PowerShell, where plain `curl` means something else.)
 
 ```json
 {"ok":true,"epoch":7,"uptimeMs":41233,
@@ -90,11 +136,19 @@ If `curl` returns nothing, the service is not running. If it returns something t
 
 Proofline logs one JSON object per line to standard output.
 
-- **Foreground:** they appear in the console.
-- **Detached:** `services\proofline\.data\proofline.log`, with errors also in `proofline.log.err`.
+- **Started normally:** they appear in the terminal you started it in.
+- **Started with `--detached`:** they go to a file instead.
 
-```powershell
-Get-Content .\.data\proofline.log -Tail 40
+Paste this in any terminal, from any folder:
+
+```
+type C:\Fusion247PKA-build-020-trial\services\proofline\.data\proofline.log
+```
+
+Errors also land in `proofline.log.err` beside it. To see only the end of a long log, PowerShell has `Get-Content <path> -Tail 40`; Command Prompt has no equivalent, so open the file in Notepad instead:
+
+```
+notepad C:\Fusion247PKA-build-020-trial\services\proofline\.data\proofline.log
 ```
 
 Lines you might see, and what to do:
@@ -120,13 +174,17 @@ One append-only JSONL file. Every submission, lease, result and decision is a li
 
 **It contains the full text of everything you paste.** It is covered by `services\proofline\.gitignore` and is never committed to this public repository. If you ever move or copy it, that rule moves with the file, not with you — treat it as personal data.
 
-**To read it:** open it in any text editor, or
+**To read it:** open it in any text editor —
 
-```powershell
-Get-Content .\.data\journal.jsonl -Tail 20
+```
+notepad C:\Fusion247PKA-build-020-trial\services\proofline\.data\journal.jsonl
 ```
 
 **To back it up:** copy the file. That is the whole backup.
+
+```
+copy C:\Fusion247PKA-build-020-trial\services\proofline\.data\journal.jsonl C:\Fusion247PKA-build-020-trial\services\proofline\.data\journal.backup.jsonl
+```
 
 **To start completely fresh:** stop the service, delete (or rename) `.data\journal.jsonl`, start again. Everything is lost; nothing else is affected.
 
@@ -148,12 +206,17 @@ There is no "retry" button. If you want it processed, submit the same text under
 
 Something is already on port 7317 — most likely a Proofline you forgot to stop.
 
-```powershell
-Get-NetTCPConnection -LocalPort 7317 -State Listen | Select-Object OwningProcess
-Get-Process -Id <OwningProcess>
+**The launcher already tells you which process it is and how to stop it**, so you normally do not have to look anything up. It prints a `taskkill /PID <number> /F` line ready to paste.
+
+Before you kill anything, try the page — it may already be running and waiting for you: **http://127.0.0.1:7317/**.
+
+To find it yourself:
+
+```
+netstat -ano -p TCP | findstr 7317
 ```
 
-Stop that process, or start on another port with `-Port`.
+The number at the end of the `LISTENING` line is the PID. Stop it with `taskkill /PID <number> /F`, or leave it alone and start this one elsewhere with `--port 7400`.
 
 ### It will not start: `JournalCorruptError`
 
@@ -163,7 +226,12 @@ This is not the same as a torn last line, which is handled automatically and nev
 
 The message names the exact line number. Options, in order of preference:
 
-1. **Copy the file first** — `Copy-Item .data\journal.jsonl .data\journal.broken.jsonl`. Do this before anything else.
+1. **Copy the file first.** Do this before anything else:
+
+   ```
+   copy C:\Fusion247PKA-build-020-trial\services\proofline\.data\journal.jsonl C:\Fusion247PKA-build-020-trial\services\proofline\.data\journal.broken.jsonl
+   ```
+
 2. Open the journal, look at the named line, and repair it if the damage is obvious (a truncated line, a stray character).
 3. If it cannot be repaired, cut the file at the last good line into a new `journal.jsonl` and keep the broken copy. Everything after the cut is lost.
 
@@ -191,4 +259,5 @@ The UI polls once a second. If jobs never appear, check `/api/health` first — 
 | No authentication | Loopback only, single user. Anyone with an account on this machine can reach it. |
 | Text size | 1 MiB per submission; 2 MiB per request body. |
 | Retries | 3 leases per job, then `failed`. |
-| First live start | Yours. Nobody has run this on your real machine, in your real browser, yet. |
+| First live start | **Yours.** The launch itself has now been run on this machine from a real Command Prompt, and the submit/process/approve journey completed over HTTP. What has *not* happened is anyone using it **in your browser** — that page load is still your first. |
+| Surviving a reboot | Not claimed. `--detached` survives the terminal that launched it; it does not survive a restart or a logout, and Proofline is not registered as a Windows service. |

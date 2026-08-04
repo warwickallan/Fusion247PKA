@@ -16,11 +16,17 @@ To operate it, read [RUNBOOK.md](RUNBOOK.md). This file explains what it is and 
 
 ## Running it
 
-```powershell
-.\scripts\start-proofline.ps1      # then open http://127.0.0.1:7317/
+Paste this one line into any Windows terminal — Command Prompt or PowerShell, from any folder:
+
+```
+C:\Fusion247PKA-build-020-trial\services\proofline\start-proofline.cmd
 ```
 
+Then open **http://127.0.0.1:7317/**.
+
 Zero npm dependencies. Node 22 stdlib only. Nothing to install.
+
+`start-proofline.cmd` is the primary launcher: it invokes `node` directly, so PowerShell, execution policy and `.ps1` file associations are all out of the path. It is deliberately **pure ASCII**, because a `.ps1` with a single em-dash and no byte-order mark is misread as ANSI by Windows PowerShell 5.1 and fails to parse. `scripts\start-proofline.ps1` remains as a PowerShell-only secondary route and **will not run from `cmd.exe` at all**. [RUNBOOK.md](RUNBOOK.md) explains both.
 
 ---
 
@@ -94,11 +100,14 @@ Every value in a result is an **integer**. No float, no timestamp and no locale-
 
 ## How the claims are proven
 
-Run the suite from this directory:
+Run the suite. The `cd` is required — `node --test` discovers tests relative to the working directory:
 
 ```
+cd /d C:\Fusion247PKA-build-020-trial\services\proofline
 node --test
 ```
+
+(`cd /d` is Command Prompt. In PowerShell it is plain `cd`.)
 
 **Assert `# tests` is at least the expected count AND `# fail 0`.** Never the exit code alone — `node --test` exits 0 having run zero tests when its file glob matches nothing.
 
@@ -131,7 +140,7 @@ Each mutation test runs the **same scenario twice** — once with the production
 | **That `processing` is visible in the browser** | It is not. A realistic ~1 KB paste is analysed in about 2.5 ms. `processing` is a **journal-observable** state, not a UI-observable one, and the UI shows it from the durable timeline afterwards. Inserting a delay to make it visible would be fabricating the evidence. |
 | **Determinism across machines** | Structurally engineered for, and every enabling ban is asserted — but only one machine was available, so the property itself is unproven. |
 | **Zero network egress** | A negative claim. What is proven is a static source assertion plus a runtime bind check, not the absence of egress. |
-| **That it keeps working after the session that built it** | The launcher and runbook exist; the first live start is the operator's, and only that establishes it. |
+| **That it keeps working after the session that built it** | Partly evidenced, not claimed outright. `--detached` was started from a shell that was then allowed to exit, and the service kept answering `/api/health` — so it survives the terminal that launched it. It has **not** been shown to survive a reboot, a logout, or being run as a Windows service, and none of those is claimed. The first live start in the operator's own browser is still the operator's. |
 
 ---
 
@@ -140,7 +149,8 @@ Each mutation test runs the **same scenario twice** — once with the production
 | Path | What |
 |---|---|
 | `bin/proofline.mjs` | The only entrypoint |
-| `scripts/start-proofline.ps1` | The launcher — same startup path, plus checks |
+| `start-proofline.cmd` | **The launcher.** Pure ASCII, invokes `node` directly, works from Command Prompt and PowerShell |
+| `scripts/start-proofline.ps1` | Secondary PowerShell-only launcher. ASCII + BOM. Will not run from `cmd.exe` |
 | `src/` | Service code |
 | `public/` | The browser UI — plain HTML/CSS/ES modules |
 | `test/` | The proofs. `test/helpers/harness.mjs` is both the shared utilities and the crash-test child entrypoint |
