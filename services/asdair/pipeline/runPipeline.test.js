@@ -14,12 +14,19 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
 
 import { makeHarness, makeCatalogue, HOUSEHOLD_ID } from './test/harness.js';
 import * as commands from './commands.js';
 import { runPipeline, listDateOf, buildGroundedIntents, planCandidates, assertCatalogueLoaded } from './runPipeline.js';
+import { listQuestions } from './store.js';
 import { STEPS } from './stages.js';
 import { questionKeyFor } from './keys.js';
+
+// The REAL planner, for the one test that wraps deps.planBasket to observe what
+// stepPlan handed it. It still runs the genuine planner - the wrapper watches
+// the seam, it does not replace the behaviour behind it.
+const { planBasket: realPlanBasket } = createRequire(import.meta.url)('../skill/planner.js');
 
 const REF = 'SHOP-2026-08-03';
 const ACTOR = 'telegram:555';
@@ -833,4 +840,178 @@ test('CANDIDATE IDS: a product_alternatives row\'s own `id` can never be mistake
 test('the candidate list is bounded, so a card can never exceed what a phone can show', () => {
   const many = Array.from({ length: 30 }, (_, i) => ({ name: `alt ${i}` }));
   assert.ok(planCandidates({ alternatives: many }, null).length <= 8);
+});
+
+// =====================================================================
+// THE FOUR JOINS (WO-ZI)
+//
+// Every component below was already complete, already tested, and reachable
+// from NOTHING. That is this build's signature defect: `sendQuestionCard` had a
+// full renderer, a full suite and no production caller, which is why Warwick
+// spent 2026-08-03 answering questions by hand.
+//
+// So these tests are written to a specific bar: DELETE THE CALLER AND THIS MUST
+// GO RED. A test that still passes with the wiring removed is not evidence that
+// the wiring exists - it is evidence that the test never looked.
+// =====================================================================
+
+/** A settled decision as asdair.rule_qa_log holds it, and as data.js
+ *  loadRuleQaLog() hands it to the planner. Synthetic; obvious fixture. */
+const PRIOR_ANSWER = {
+  id: 901,
+  asked_on: '2026-07-06',
+  question: 'Which gourmet cat food do you want?',
+  answer: 'the Gourmet cat food one, always',
+  applies_going_forward: true,
+  household_id: HOUSEHOLD_ID,
+  promoted_rule_id: null,
+};
+
+test('JOIN 1 - PRIOR ANSWERS REACH THE PLANNER: an answer given in July is consulted in August', async () => {
+  // The planner is the REAL one. This test does not assert that an object was
+  // forwarded; it asserts the planner ACTED on it, which is the only version of
+  // this claim worth making.
+  let seen = null;
+  let produced = null;
+  const h = makeHarness({
+    planningInputs: {
+      rules: [],
+      products: [],
+      regulars: [...makeCatalogue().regularsById.values()],
+      budget: null,
+      lastOrder: null,
+      priorAnswers: [PRIOR_ANSWER],
+    },
+    depsOverride: {
+      planBasket(input) {
+        seen = input;
+        produced = realPlanBasket(input);
+        return produced;
+      },
+    },
+  });
+  await receiveText(h, '3 gourmet cat food');
+  await commands.buildShop({ shopRef: REF, actor: ACTOR }, h.deps);
+  await runPipeline(HANDLE, h.deps);   // interpret
+  await runPipeline(HANDLE, h.deps);   // plan
+
+  // (a) the rows travelled, and they came from loadPlanningInputs rather than
+  //     from a literal built at the call site.
+  assert.deepEqual(seen.priorAnswers, [PRIOR_ANSWER],
+    'stepPlan did not pass priorAnswers to planBasket - an answered question will be asked again');
+
+  // (b) THE PLANNER CONSUMED THEM. planner.js raises this flag only from
+  //     priorAnswersForLine(), so it cannot appear when the key is absent.
+  const line = produced.items.find((it) => /gourmet/i.test(it.item_name));
+  assert.ok(line, 'the fixture line did not reach the plan at all');
+  assert.ok(
+    (line.flags || []).includes('prior decision on record'),
+    `the planner never saw the prior answer - flags were ${JSON.stringify(line.flags)}`,
+  );
+});
+
+test('JOIN 2 - GROUNDING EVIDENCE: what the model was GIVEN and what it RETURNED is durably recorded, sanitized', async () => {
+  const h = makeHarness({ modelLines: MODEL_LINES });
+  await receivePhoto(h);
+  await commands.buildShop({ shopRef: REF, actor: ACTOR }, h.deps);
+  await runPipeline(HANDLE, h.deps);   // -> TRANSCRIBING
+  await runPipeline(HANDLE, h.deps);   // -> PROCESSING, the interpretation
+
+  const evidence = h.db.pipeline_command.filter((c) => c.command === 'groundingEvidence');
+  assert.equal(evidence.length, 1,
+    'the interpretation left no grounding record - a skipped model call is indistinguishable from a real one');
+  const args = evidence[0].args;
+
+  // What was SUPPLIED.
+  assert.equal(args.catalogue_candidates, 3);
+  assert.ok(args.prompt_chars > 0, 'the prompt size was not recorded, so "grounded" is unfalsifiable');
+  // What came BACK. This number cannot exist unless something answered - which
+  // is the entire reason it is a count and not a flag (D-2026-08-03-04).
+  assert.equal(args.readings_returned, 3);
+  assert.deepEqual(args.line_nos, [1, 2, 3]);
+  assert.deepEqual(args.matched_regular_ids, [11, 12]);
+  assert.equal(args.source_kind, 'photo');
+
+  // SANITIZED: counts and ids only. No product name, no raw reading, no prompt
+  // text, no path to the photograph - anywhere in the stored row.
+  const serialised = JSON.stringify(evidence[0]).toLowerCase();
+  for (const leak of ['gourmet', 'weetabix', 'fruit splits', 'shopper-media', '.jpg']) {
+    assert.ok(!serialised.includes(leak.toLowerCase()),
+      `the grounding record leaked "${leak}" - it must carry counts and ids only`);
+  }
+
+  // ONE SHOT, EVER. The ledger's total unique index, not a read-then-write.
+  await runPipeline(HANDLE, h.deps);
+  assert.equal(h.db.pipeline_command.filter((c) => c.command === 'groundingEvidence').length, 1);
+});
+
+test('JOIN 3 - THE item_name CARRIER: a question knows which item it is about, by id and not by parsing a sentence', async () => {
+  const h = makeHarness({ modelLines: MODEL_LINES });
+  await receivePhoto(h);
+  await commands.buildShop({ shopRef: REF, actor: ACTOR }, h.deps);
+  await runPipeline(HANDLE, h.deps);   // -> TRANSCRIBING
+  await runPipeline(HANDLE, h.deps);   // -> PROCESSING
+  await runPipeline(HANDLE, h.deps);   // -> NEEDS_DECISION, opens the question
+
+  const q = h.db.shop_question[0];
+  assert.ok(q, 'no question was opened, so there is nothing to carry a name');
+  assert.ok(q.list_item_id, 'the question carries no list_item_id - the item name has nothing to travel along');
+
+  // The id points at the RIGHT row, recovered from listItems and not from
+  // plan.items (dedupeList drops it, so taking it from the plan yields null).
+  const item = h.db.shopping_list_items.find((i) => String(i.id) === String(q.list_item_id));
+  assert.ok(item, 'the question points at a list item that does not exist');
+  assert.equal(item.item_name, 'fruit splits');
+
+  // And the JOIN delivers it, alongside the photographed wording - which is the
+  // field the learning loop turns into next week's alias.
+  const joined = await listQuestions(h.deps, h.db.shop[0].id);
+  assert.equal(joined.length, 1);
+  assert.equal(joined[0].item_name, 'fruit splits',
+    'listQuestions returned no item_name, so a card falls back to rendering the whole question sentence');
+  assert.equal(joined[0].photographed_wording, 'fruit splits',
+    'the photographed wording did not travel - the learning loop has no evidence of what was written');
+});
+
+test('JOIN 4 - ANSWER LEARNING: a settled answer becomes a durable rule_qa_log row, once, ever', async () => {
+  const h = makeHarness({ modelLines: MODEL_LINES });
+  await receivePhoto(h);
+  await commands.buildShop({ shopRef: REF, actor: ACTOR }, h.deps);
+  await runPipeline(HANDLE, h.deps);   // -> TRANSCRIBING
+  await runPipeline(HANDLE, h.deps);   // -> PROCESSING
+  await runPipeline(HANDLE, h.deps);   // -> NEEDS_DECISION
+
+  const questionKey = h.db.shop_question[0].question_key;
+  assert.equal((await runPipeline(HANDLE, h.deps)).step, STEPS.AWAIT_ANSWERS);
+
+  await commands.answerQuestion({
+    shopRef: REF, actor: ACTOR, questionKey,
+    answerText: 'Rowntrees Fruit Pastille Split', answerSource: 'button',
+  }, h.deps);
+
+  const replan = await runPipeline(HANDLE, h.deps);   // -> REPLAN
+  assert.equal(replan.step, STEPS.REPLAN);
+  assert.deepEqual(replan.answer_learning.map((l) => l.learned), [true],
+    'the shop re-planned without recording what Warwick answered - the answer dies with the shop');
+
+  // THE DURABLE ROW. This is the one that data.js loadRuleQaLog() reads back as
+  // `priorAnswers`, which JOIN 1 feeds to the planner. The loop closes here.
+  assert.equal(h.db.rule_qa_log.length, 1, 'nothing reached asdair.rule_qa_log');
+  const logged = h.db.rule_qa_log[0];
+  assert.equal(logged.answer, 'Rowntrees Fruit Pastille Split');
+  assert.equal(String(logged.household_id), String(HOUSEHOLD_ID));
+  assert.equal(logged.asked_on, '2026-08-03',
+    'the decision was dated from a clock rather than from the shop it belongs to');
+
+  // EXPLICIT false, never absent and never inferred. The pipeline holds no
+  // human act asserting a standing rule, so no rule may be promoted from it.
+  assert.equal(logged.applies_going_forward, false);
+  assert.equal(logged.promoted_rule_id, null, 'the pipeline promoted a STANDING RULE from a tapped button');
+
+  // ONCE, EVER. rule_qa_log has no idempotency key of its own, so the one-shot
+  // ledger claim is the only thing standing between a re-run and a duplicated
+  // decision in the audit log.
+  await runPipeline(HANDLE, h.deps);
+  await runPipeline(HANDLE, h.deps);
+  assert.equal(h.db.rule_qa_log.length, 1, 'a re-run appended a duplicate decision to the audit log');
 });

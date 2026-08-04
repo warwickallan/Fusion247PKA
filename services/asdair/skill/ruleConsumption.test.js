@@ -520,12 +520,35 @@ test('the global policy row confirms the planner rules it was promoted into', fu
   // Row 1 says: no quantity -> 1, and duplicates dedupe to one line. That is
   // rules 2 and 3, and the planner has always implemented both. A free
   // consistency check between the household's recorded words and the code.
+  //
+  // CORRECTED 2026-08-04 (WO-ZJ). This asserted 3, "a missing quantity defaults
+  // to 1, then sums". The row itself (LIVE_POLICY_ANSWER, verbatim) says only
+  // "Items with no quantity default to 1; duplicate list entries are deduped to
+  // a single line." It says NOTHING about arithmetic -- "then sums" was this
+  // test over-reading Warwick's own recorded words, which is precisely the
+  // inference planner.js:1338 exists to forbid. The row was always right; the
+  // test was misquoting it. Only the ONE written quantity is a statement of
+  // quantity, so the merged line is 2.
   const result = plan([
     { item_name: 'choc yazoo' },                        // no quantity at all
     { item_name: 'choc yazoo', requested_qty: 2 }       // duplicate entry
   ]);
   assert.equal(result.items.length, 1, 'duplicate entries dedupe to a single line');
-  assert.equal(result.items[0].requested_qty, 3, 'a missing quantity defaults to 1, then sums');
+  assert.equal(result.items[0].requested_qty, 2, 'the one written quantity stands; the row says dedupe, never sum');
+});
+
+test('the global policy row: its OTHER half - no quantity anywhere still defaults to 1', function () {
+  // Restores coverage the correction above would otherwise lose. Once the
+  // explicit 2 legitimately wins, that scenario no longer demonstrates the
+  // row's first clause ("Items with no quantity default to 1"), so it is
+  // proven here directly, against a pair of duplicates that state no quantity
+  // at all. Both halves of the household's recorded policy stay checked.
+  const bare = plan([
+    { item_name: 'choc yazoo' },
+    { item_name: 'choc yazoo' }
+  ]);
+  assert.equal(bare.items.length, 1, 'duplicate entries dedupe to a single line');
+  assert.equal(bare.items[0].requested_qty, 1, 'no quantity written anywhere -> 1, never 2');
 });
 
 test('a rule reference is not confused with a quantity or a pack size', function () {

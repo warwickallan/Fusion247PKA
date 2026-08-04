@@ -99,6 +99,12 @@ export function createFakeDatabase(seed = {}) {
     shopping_list_items: [],
     order_confirmation: [],
     order_confirmation_line: [],
+    // asdair.rule_qa_log - the decision log promoteDecision always writes, and
+    // the table skill/data.js loadRuleQaLog() reads back as `priorAnswers`. It
+    // is the whole mechanism by which an answer given this week stops the same
+    // question being asked next week, so the pipeline suite has to be able to
+    // see a row land in it.
+    rule_qa_log: [],
     ...seed,
   };
   const nextId = {};
@@ -276,8 +282,82 @@ export function createFakeClient(store, options = {}) {
       rows(db.shop_question.filter((q) => String(q.id) === String(p[0])))],
     [/count\(\*\)::int AS n FROM asdair\.shop_question WHERE shop_id = \$1 AND status = 'open'/i, (sql, p) =>
       rows([{ n: db.shop_question.filter((q) => String(q.shop_id) === String(p[0]) && q.status === 'open').length }])],
-    [/FROM asdair\.shop_question WHERE shop_id = \$1 ORDER BY id ASC/i, (sql, p) =>
-      rows(db.shop_question.filter((q) => String(q.shop_id) === String(p[0])).sort((a, b) => a.id - b.id))],
+    // store.listQuestions - shop_question LEFT JOINed to the item name carrier.
+    //
+    // The previous handler here answered the FLAT statement listQuestions used to
+    // emit. When that query grew the two LEFT JOINs and the four render-contract
+    // columns, this file was not updated, so the statement fell through to "no
+    // handler" - and queueShopCards catches per shop, so the throw surfaced as
+    // "no question card was queued" rather than as an error. Nothing about the
+    // real query was wrong; its offline counterpart simply did not exist.
+    //
+    // MODELLED AS A REAL LEFT JOIN, not as a convenience lookup:
+    //   * no match on either side yields ONE row with those fields null - which
+    //     is the whole reason both joins are LEFT, so a question whose list item
+    //     has gone still reaches the card;
+    //   * N matches on shop_line yield N rows, exactly as Postgres would. A fake
+    //     that silently collapsed a fan-out would hide a real duplicate.
+    //
+    // The projection is EXPLICIT and lists only the columns the statement
+    // SELECTs. Returning the whole stored row would be the more convenient fake
+    // and would defeat the point: the defect this query fixed was four columns
+    // MISSING from a select list, and a fake that hands back every column
+    // regardless could never fail when one is dropped again.
+    [/FROM asdair\.shop_question q\s+LEFT JOIN asdair\.shopping_list_items li[\s\S]*WHERE q\.shop_id = \$1 ORDER BY q\.id ASC/i, (sql, p) => {
+      const QUESTION_COLUMNS = [
+        'id', 'list_item_id', 'question_key', 'question_text', 'candidates', 'status',
+        'answer_text', 'answer_source', 'card_chat_id', 'card_message_id',
+        'rendered_candidates', 'render_fingerprint', 'render_version', 'callback_index',
+      ];
+      const out = [];
+      db.shop_question
+        .filter((q) => String(q.shop_id) === String(p[0]))
+        .sort((a, b) => a.id - b.id)
+        .forEach((q) => {
+          const projected = {};
+          for (const col of QUESTION_COLUMNS) projected[col] = q[col] === undefined ? null : q[col];
+
+          // li: shopping_list_items.id is the primary key, so at most one.
+          const li = q.list_item_id === null || q.list_item_id === undefined
+            ? null
+            : db.shopping_list_items.find((i) => String(i.id) === String(q.list_item_id)) || null;
+
+          // sl: joined on (list_item_id, shop_id) - no unique index covers that
+          // pair, so it can legitimately fan out.
+          const lines = q.list_item_id === null || q.list_item_id === undefined
+            ? []
+            : db.shop_line.filter((l) => String(l.list_item_id) === String(q.list_item_id)
+              && String(l.shop_id) === String(q.shop_id));
+
+          if (lines.length === 0) {
+            out.push({ ...projected, item_name: li ? li.item_name : null, photographed_wording: null });
+            return;
+          }
+          for (const l of lines) {
+            out.push({
+              ...projected,
+              item_name: li ? li.item_name : null,
+              photographed_wording: l.raw_reading === undefined ? null : l.raw_reading,
+            });
+          }
+        });
+      return rows(out);
+    }],
+
+    // ── asdair.rule_qa_log ─────────────────────────────────────────────────
+    // outcome/promoteDecision.js builds this INSERT from a fixed column list and
+    // writes it for EVERY decision - the `asdair.rules` insert beside it is the
+    // conditional one, gated on applies_going_forward AND on the database's own
+    // provenance verdict. Modelling the log insert (and only it) is therefore
+    // enough to run the real promoteDecision on the answer-learning path the
+    // pipeline takes, where applies_going_forward is an explicit false and no
+    // rule is ever promoted.
+    [/^INSERT INTO asdair\.rule_qa_log \(/i, (sql, params) => {
+      const row = insertRow(sql, 'asdair.rule_qa_log', params);
+      const created = { id: id('rule_qa_log'), promoted_rule_id: null, ...row };
+      db.rule_qa_log.push(created);
+      return rows([{ id: created.id }]);
+    }],
 
     // ── asdair.browser_build_request ───────────────────────────────────────
     [/^INSERT INTO asdair\.browser_build_request \(/i, (sql, p) => {

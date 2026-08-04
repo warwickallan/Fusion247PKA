@@ -157,11 +157,14 @@ async function stepInterpret(deps, snapshot) {
   );
 
   let readings;
+  // The SIZE of the prompt, never the prompt. See recordGroundingEvidence below.
+  let promptChars = null;
   if (shop.source_kind === 'photo') {
     if (!shop.raw_media_path) {
       throw new Error(`runPipeline: shop ${shop.shop_ref} is a photo shop with no raw_media_path - the raw evidence is missing`);
     }
     const prompt = deps.buildGroundedPrompt(catalogue);
+    promptChars = String(prompt).length;
     // ONE SHOT. Not a loop, not a daemon, not a conversation.
     const modelLines = await deps.interpretPhoto({
       catalogue, prompt, imagePath: shop.raw_media_path, householdId: shop.household_id,
@@ -198,6 +201,42 @@ async function stepInterpret(deps, snapshot) {
       ? { status: 'needs_confirmation', matched_regular_id: null, matched_product_name: null }
       : {}),
   }));
+
+  // ── THE GROUNDING RECORD (D-2026-08-03-04) ────────────────────────────────
+  // Written HERE rather than inside deps.interpretPhoto, and that placement is
+  // the point. A caller inside the dependency could never be exercised: every
+  // offline test replaces `deps.interpretPhoto` wholesale, so a record written
+  // in there would be unreachable by any proof and decorative by construction -
+  // which is the exact defect this record exists to detect.
+  //
+  // It is written from what the call RETURNED, after it returned. `readings`
+  // only has a length if something answered; a --dry-run that skipped the model
+  // entirely - the 2026-08-03 failure - cannot produce this row, and that is the
+  // whole reason it is a count rather than a flag.
+  //
+  // SANITIZED: COUNTS AND IDS ONLY. Never a product name, never a raw reading,
+  // never the prompt text, never the photograph. The prompt is measured in
+  // characters. What is stored is the SHAPE of the grounding, which is what
+  // makes the claim checkable, and none of the household's data, which is what
+  // keeps an audit record from becoming a second copy of the shopping list.
+  //
+  // Recorded for BOTH source kinds: `source_kind` distinguishes them, and a
+  // typed list is grounded against the same catalogue by the same code, so
+  // recording only the photo path would leave half the interpretations
+  // unevidenced. One shot ever per shop, on the ledger's total unique index - a
+  // re-run after a crash finds the row already there and writes nothing.
+  await store.recordGroundingEvidence(deps, {
+    shopId: shop.id,
+    householdId: shop.household_id,
+    sourceKind: shop.source_kind,
+    catalogueCandidates: catalogue.candidates.length,
+    promptChars,
+    readingsReturned: readings.length,
+    lineNos: resolved.map((l) => l.line_no),
+    matchedRegularIds: resolved
+      .map((l) => l.matched_regular_id)
+      .filter((v) => v !== null && v !== undefined),
+  });
 
   // ── PERSIST THE INTERPRETATION (migration 008) ────────────────────────────
   // Before the list rows, so a crash between the two leaves the interpretation
@@ -339,6 +378,13 @@ async function stepPlan(deps, snapshot) {
     regulars: inputs.regulars,
     budget: inputs.budget,
     lastOrder: inputs.lastOrder,
+    // THE ANSWERS WARWICK HAS ALREADY GIVEN. asdair.rule_qa_log, read by
+    // data.js loadRuleQaLog() and handed over by loadPlanningInputs. The
+    // planner consults them BEFORE deciding a line needs a human, which is what
+    // stops a question that was settled in July being asked again in August.
+    // Optional and additive inside planBasket: absent, planning is byte-for-byte
+    // what it was, which is precisely why omitting it here was invisible.
+    priorAnswers: inputs.priorAnswers,
     household: shop.household_id,
   });
 
@@ -347,6 +393,25 @@ async function stepPlan(deps, snapshot) {
   const interpreted = await shopLines.listLines(deps, shop.id);
   const byReading = new Map(interpreted.map((l) => [normaliseTerm(l.raw_reading), l]));
 
+  // ── THE DURABLE item_name CARRIER ─────────────────────────────────────────
+  // asdair.shop_question has no column for the item a question is ABOUT, and
+  // question_text is a whole sentence. The name travels by id instead:
+  // shop_question.list_item_id -> shopping_list_items.item_name, which is what
+  // store.listQuestions() LEFT JOINs and what a card renders as its `Item:`.
+  //
+  // The id is recovered from `listItems` - the rows as READ - and never from
+  // plan.items, because dedupeList() builds a fresh object per merged line and
+  // does not carry the shopping_list_items id onto it. Taking it from the plan
+  // would silently bind every question to null.
+  //
+  // Keyed by normaliseTerm, the same normalisation dedupeList used to merge the
+  // lines in the first place, so "the same line" means one thing on both sides.
+  const listItemIdByTerm = new Map();
+  for (const item of listItems) {
+    const term = normaliseTerm(item.item_name);
+    if (term !== '' && !listItemIdByTerm.has(term)) listItemIdByTerm.set(term, item.id);
+  }
+
   const held = plan.items.filter((it) => it.status === 'needs_decision');
   const opened = [];
   for (const line of held) {
@@ -354,6 +419,10 @@ async function stepPlan(deps, snapshot) {
     const res = await deps.shopStore.openQuestion({
       shop_id: shop.id,
       question_key: key,
+      // Null when the plan line answers to no stored list item. The joins are
+      // LEFT for exactly this: a question with no carrier still reaches the
+      // human with a degraded card, and is never dropped.
+      list_item_id: listItemIdByTerm.get(normaliseTerm(line.item_name)) ?? null,
       question_text: `Which product is "${line.item_name}"?`,
       candidates: planCandidates(line, byReading.get(normaliseTerm(line.item_name)) || null),
     });
@@ -425,6 +494,105 @@ export function planCandidates(planLine, interpretedLine) {
     out.push({ label, source: 'planner suggestion (no product id)' });
   }
   return out.slice(0, 8);
+}
+
+/**
+ * RE-PLAN, AND FIRST WRITE THE LEARNING FOR EVERY ANSWER THAT SETTLED IT.
+ *
+ * This step is reached from NEEDS_DECISION with ZERO open questions - i.e. at
+ * the one moment where "Warwick has answered" is durably true and the answers
+ * have not yet been consumed by anything. That is why the write-back lives here
+ * rather than in commands.answerQuestion: an answer arrives one tap at a time
+ * and may arrive twice, but a shop crosses this line once per round of
+ * questions, from state the database is holding rather than from an event.
+ *
+ * outcome/buildAnswerLearning.js and outcome/recordAnswerLearning.js were both
+ * complete, both tested, and had ZERO production callers - so every answer
+ * Warwick has ever given died with the shop that asked for it.
+ *
+ * ── applies_going_forward IS AN EXPLICIT LITERAL false, AND THAT IS THE POINT ─
+ * buildAnswerLearning demands a STRICT boolean and hard-errors on an absent one,
+ * so there is no default to fall into. The pipeline passes `false` because it
+ * holds NO human act asserting a standing rule: a tapped button and a typed
+ * reply both say "this is the one I mean", neither says "and do this every week
+ * from now on". Inferring the second from the first is exactly the ambiguous
+ * inference promoteDecision's provenance guard exists to refuse - see the note
+ * on realRecordLearning in deps.js, which this obeys rather than amends.
+ *
+ * It is NOT a no-op. promoteDecision writes the asdair.rule_qa_log row
+ * unconditionally; only the asdair.rules promotion beside it is gated on the
+ * flag. That log row is what data.js loadRuleQaLog() reads back as
+ * `priorAnswers`, which stepPlan now feeds to the planner - so the loop closes
+ * through the decision log, not through rule promotion. If the command surface
+ * ever grows an explicit "and going forward" act, THAT is what flips this
+ * literal, and nothing else may.
+ *
+ * ── WHY A FAILURE HERE FAILS THE SHOP ──────────────────────────────────────
+ * recordAnswerLearning throws by design and this step does not catch it: the
+ * shop parks FAILED, visibly and resumably, and Warwick is told. Swallowing it
+ * would leave the loop LOOKING wired while the answer quietly evaporated, which
+ * is indistinguishable from the defect being fixed and would only be discovered
+ * next Sunday when he is asked the same question again. The claim row is left
+ * unresolved on the way out, which is precisely how the retry knows to re-run.
+ */
+async function stepReplan(deps, snapshot) {
+  const shop = snapshot.shop;
+  const learned = [];
+
+  for (const q of await store.listQuestions(deps, shop.id)) {
+    if (q.status !== 'answered' && q.status !== 'skipped') continue;
+
+    // The evidence of WHAT was asked about. Read from durable state - the
+    // photographed wording from asdair.shop_line, else the list item's own
+    // name - and NEVER reconstructed from question_text, which is a sentence.
+    // With neither, nothing is claimed and nothing is written: a question that
+    // predates the carrier is reported and left for a later pass, because
+    // inventing the wording would put words in the decision log that nobody
+    // wrote.
+    const wording = q.photographed_wording || q.item_name || null;
+    if (!wording) {
+      learned.push({ question_key: q.question_key, learned: false, reason: 'no durable wording to learn from' });
+      continue;
+    }
+
+    // ONE SHOT, EVER. rule_qa_log has no idempotency key of its own, so a
+    // re-run would append a duplicate decision to the audit log. The database
+    // decides the duplicate, not a read-then-write here.
+    const claim = await store.claimAnswerLearning(deps, {
+      shopId: shop.id, householdId: shop.household_id, questionKey: q.question_key,
+    });
+    if (claim.already) {
+      learned.push({ question_key: q.question_key, learned: false, reason: 'already recorded' });
+      continue;
+    }
+
+    const receipt = await deps.recordAnswerLearning({
+      shop_id: shop.id,
+      household_id: shop.household_id,
+      question_key: q.question_key,
+      question_text: q.question_text,
+      status: q.status,
+      answer_text: q.status === 'skipped' ? null : q.answer_text,
+      answer_source: q.answer_source,
+      photographed_wording: wording,
+      // NO CLOCK. The week the shop belongs to, from its own ref - a retry that
+      // crossed midnight must not date the decision to the following day.
+      asked_on: listDateOf(shop.shop_ref),
+      applies_going_forward: false,
+      // The pipeline resolves no catalogue IDENTITY from an answer. It records
+      // the decision; identity remains the resolver's job and record-shop.js's.
+      resolution: { kind: 'none' },
+    });
+
+    await store.resolveCommand(deps, claim.id, 'done',
+      `answer learning recorded (rule_qa_log ${receipt.log_id})`);
+    learned.push({ question_key: q.question_key, learned: true, log_id: receipt.log_id });
+  }
+
+  const moved = await deps.shopStore.transition(
+    shop.id, 'PROCESSING', 'every question is answered - re-planning with the answers in place',
+  );
+  return { stepped: moved.changed, from: shop.status, to: 'PROCESSING', answer_learning: learned };
 }
 
 /** APPLY CORRECTIONS. A correction is a new durable intent against the same
@@ -751,12 +919,8 @@ async function dispatchStep(deps, snapshot, next) {
       return stepInterpret(deps, snapshot);
     case STEPS.PLAN:
       return stepPlan(deps, snapshot);
-    case STEPS.REPLAN: {
-      const moved = await deps.shopStore.transition(
-        shop.id, 'PROCESSING', 'every question is answered - re-planning with the answers in place',
-      );
-      return { stepped: moved.changed, from: shop.status, to: 'PROCESSING' };
-    }
+    case STEPS.REPLAN:
+      return stepReplan(deps, snapshot);
     case STEPS.QUEUE_BROWSER_BUILD:
       return stepQueueBrowserBuild(deps, snapshot, next.command);
     case STEPS.PAUSE_BUILD:
