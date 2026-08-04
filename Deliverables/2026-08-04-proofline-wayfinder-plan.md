@@ -19,6 +19,29 @@
 | **Frontier** | **Phase 2 — Honcho and Tower as durable shared myPKA infrastructure.** Not started. The fresh session owns implementation. |
 | **First safe action** | §13 below. Verify reality, then route. **Do not implement before the route exists.** |
 
+### ⚠️ RESUMPTION PRECEDENCE — and the active misdirection risk
+
+**Automatic reorientation to this map WILL NOT HAPPEN.** Stated plainly because assuming otherwise is the failure:
+
+1. **No SessionStart hook is registered for this worktree** — the only one is hardcoded to `C:/Fusion247PKA/tools/governor/reorient.mjs`. A fresh Larry opened here receives **no continuity brief at all**.
+2. **If one is opened in the main worktree instead, it receives a brief naming BUILD-015 AsdAIr** — `~/.mypka/governor/continuity.json` was last written `2026-08-04T06:42Z` and contains no occurrence of "proofline" or "BUILD-020".
+3. **`Deliverables/2026-08-04-build-015-asdair-wayfinder-plan.md` declares itself the sole route** and carries its own precedence block. A fresh session that opens it will be told, correctly for BUILD-015, that it is the authority. **It is not the authority for BUILD-020.**
+
+**So the risk is not a blank orientation — it is a confident wrong one.** Fixing that is Phase 2's N-2.
+
+**Precedence for BUILD-020, until N-2 lands:**
+
+| Rank | Source | Authority |
+|---|---|---|
+| 1 | **This file** | **THE BUILD-020 route. The only document that may state the exact next action for BUILD-020.** |
+| 2 | `Deliverables/proofline/WO-2026-08-04-01-*.md` and the two `*-veritas-proofline-*receipt.md` | Evidence and contracts. **Never a route.** |
+| 3 | `Deliverables/2026-08-04-build-015-asdair-wayfinder-plan.md` | **Authoritative for BUILD-015 ONLY. NON-DIRECTIVE here.** Do not take its next action as yours. |
+| 4 | `Builds/` | **No `BUILD-020-*` record exists** (P-5). Its absence is a recorded fact, not a missing file to go and find. |
+| 5 | The Honcho continuity brief | **Pointer with zero authority** (root `CLAUDE.md` #9) — and currently **stale and wrong for BUILD-020**. Verify against this file; never the reverse. |
+
+**Until Phase 2 fixes it, a fresh session is reached by naming this path:**
+`Deliverables/2026-08-04-proofline-wayfinder-plan.md`
+
 ### 🚨 The instrument warning — read before ANY live-state check
 
 **In Git Bash on this machine, MSYS silently mangles `/FLAG` arguments into Windows paths.** `tasklist /FI "IMAGENAME eq node.exe"` became `C:/Program Files/Git/FI` and errored; I read the empty result as *"no processes are running"* and **stated it to Warwick as a fact.** It was wrong. Sixteen node processes were running, including the Tower watcher.
