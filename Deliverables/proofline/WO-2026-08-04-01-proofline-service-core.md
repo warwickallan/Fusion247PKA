@@ -9,7 +9,7 @@
 | `owner` | Keel — Implementation Engineer |
 | `return_to` | Larry |
 | `authorised_by` | Warwick, 2026-08-04 (plan acceptance + "begin implementation") |
-| `governance_head` | `d3180118e07b0bab3981de92a57c7a320b042163` |
+| `governance_head` | **`b4cba53d8e569b3ab09d75dbe39cb1b791c2fb59`** — current as of the launch-journey corrective pass. *(Was `d3180118e07b0bab3981de92a57c7a320b042163` at issue. Corrected 2026-08-04: a stale head in my own envelope, the third instance of that pattern in my documents — recorded rather than quietly updated.)* |
 | `worktree` | `C:\Fusion247PKA-build-020-trial` |
 | `branch` | `build-020/live-trial` |
 | `contract_basis` | `Team/Keel - Implementation Engineer/AGENTS.md` at the governance head |
@@ -42,6 +42,12 @@ Non-negotiable: **assert `# tests` ≥ expected AND `# fail 0`** — never the e
 ## `file_surface`
 
 ```
+services/proofline/start-proofline.cmd   <-- ADDED 2026-08-04 by the launch-journey
+                                             corrective pass. The primary, and only
+                                             documented, way Warwick starts Proofline.
+                                             Invokes node directly: no PowerShell, no
+                                             execution policy, no file association,
+                                             no encoding hazard.
 services/proofline/.gitignore            <-- BUILD STEP 1, before any store write
 services/proofline/package.json
 services/proofline/README.md
