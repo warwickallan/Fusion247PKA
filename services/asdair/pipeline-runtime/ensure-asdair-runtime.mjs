@@ -52,8 +52,10 @@ import {
   acquire, holderStatus, stopHolder, clearLock, inspectPid, isBlocking, sleepSync,
 } from './runtime-lock.mjs';
 import { collect, writeCache, armed } from './asdair-status.mjs';
+import { PG_CONSUMERS } from './runtime-deps.mjs';
 import {
   STATE_DIR, LOG, RUNTIME_ENTRY, RUNTIME_CWD, SELFTEST_ENTRY, HERE,
+  CHROME_DEFAULT_PROFILE_DIR, chromeProfileDir,
 } from './runtime-paths.mjs';
 
 const argv = new Set(process.argv.slice(2));
@@ -210,15 +212,12 @@ export const COLUMN_DENIALS = Object.freeze([
  * Checking only shop/ - which is what this file used to do - was checking a
  * third of the failure.
  */
-export const PG_CONSUMERS = Object.freeze([
-  'shop/shopStore.js',
-  'pipeline/deps.js',
-  'interpret/interpret-list.js',
-  'skill/data.js',
-  'outcome/recordShopOutcome.js',
-  'reconcile/recordConfirmation.js',
-  'browser-runner/store.cjs',
-]);
+// MOVED 2026-08-04 (WO-ZA item 1) to runtime-deps.mjs, and re-exported here so
+// every existing importer and this file's own test suite are unaffected. It had
+// to move because the STATUS surface must probe the same list preflight gates
+// on, and status cannot import this file - this file imports status. Imported
+// at the top of this module; re-exported here to keep the surface identical.
+export { PG_CONSUMERS };
 
 /** Chrome. Neither path was configuration before WO-B - the profile directory
  *  existed only as a comment in browser-runner/cdp.js, which is exactly why it
@@ -227,7 +226,12 @@ export const CHROME_DEFAULT_EXE_CANDIDATES = Object.freeze([
   'C:/Program Files/Google/Chrome/Application/chrome.exe',
   'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe',
 ]);
-export const CHROME_DEFAULT_PROFILE_DIR = 'C:/.fusion247/asdair/chrome-profile';
+// MOVED 2026-08-04 (WO-ZA follow-up) to runtime-paths.mjs, alongside the two
+// other helpers that fall through to the household root, and re-exported here
+// so this module's own test suite is unaffected. It was the third fall-through
+// found by the 5A sweep and the only one left documented rather than guarded;
+// PROOF 10 now resolves it with the other two.
+export { CHROME_DEFAULT_PROFILE_DIR };
 export const DEFAULT_CDP_ENDPOINT = 'http://127.0.0.1:9222';
 
 /** The logon task install-startup-task.ps1 registers. One literal, one place. */
@@ -913,8 +917,10 @@ async function checkChrome(env, deps, add) {
   add('AC8', 'the Chrome executable exists', Boolean(foundExe), BLOCKING,
     foundExe || `no Chrome executable at ${candidates.join(' or ')} - set ASDAIR_CHROME_EXE to the real path`);
 
-  const profile = (typeof env.ASDAIR_CHROME_PROFILE_DIR === 'string' && env.ASDAIR_CHROME_PROFILE_DIR.length > 0)
-    ? env.ASDAIR_CHROME_PROFILE_DIR : CHROME_DEFAULT_PROFILE_DIR;
+  // Resolved through runtime-paths.mjs, so this probe is covered by the same
+  // household-root control as the state dir and the intake offset - rather than
+  // being the one fall-through with a note on it instead of a test.
+  const profile = chromeProfileDir(env);
   const profileOk = deps.existsSync(profile);
   add('AC8', 'the dedicated Chrome profile directory exists', profileOk, BLOCKING,
     profileOk ? profile

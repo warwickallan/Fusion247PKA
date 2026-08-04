@@ -35,6 +35,11 @@
 
 'use strict';
 
+// The ONE tolerant matcher (WO-Y). Pure and zero-dependency, so requiring it
+// keeps this module pure. See termMatch.js for the CONFIDENT / ADVISORY split
+// and why every threshold in it fails towards asking a human.
+const termMatch = require('./termMatch.js');
+
 // ---------------------------------------------------------------------
 // Small pure helpers
 // ---------------------------------------------------------------------
@@ -303,14 +308,31 @@ function regularCandidates(line, regulars, household) {
 // rotation path can see the WHOLE candidate set -- rotation exists precisely
 // because several variants legitimately answer the same shorthand -- without a
 // second, drifting copy of the ACTIVE + household-scope filter.
+// WO-Y: matching here used to be EXACT STRING EQUALITY, which is what turned
+// "2 yazoo choc" (stored alias "choc yazoo") and "Double Glouester cheese"
+// (stored alias "double gloucester") into questions on 2026-08-03.
+//
+// EXACT STILL WINS. The tolerant pass runs ONLY when exact equality found
+// nothing, so no previously-resolving line can change its answer, and it
+// admits ONLY CONFIDENT tiers (termMatch.js) -- an advisory-grade similarity
+// can never establish which product this is.
 function regularHits(item, regulars, household) {
   const list = Array.isArray(regulars) ? regulars : [];
   const term = normaliseTerm(item && item.item_name);
   if (term === '') return [];
-  return list.filter(function (r) {
+
+  const eligible = list.filter(function (r) {
     if (!r || r.active === false) return false;             // only ACTIVE rows
-    if (!inHouseholdScope(r, household)) return false;      // no cross-household leak
+    return inHouseholdScope(r, household);                  // no cross-household leak
+  });
+
+  const exact = eligible.filter(function (r) {
     return regularAliases(r).indexOf(term) !== -1;           // name or aka alias
+  });
+  if (exact.length > 0) return exact;
+
+  return eligible.filter(function (r) {
+    return termMatch.bestMatch(item.item_name, regularAliases(r)).confident === true;
   });
 }
 
@@ -493,9 +515,14 @@ function chooseRotatedVariant(input) {
 
   // A fixed variant and an instruction to vary it cannot both hold. Warwick's
   // call, not the planner's -- ask, do not resolve.
+  // NOTE (WO-Y, 2026-08-04): the CALLER decides whether a fixed variant is a
+  // genuine clash. planBasket now passes one only when two `map` rules name
+  // DIFFERENT products for the same line. A single map plus a rotate is a
+  // refinement and never reaches here - see the mapsDisagree block in
+  // planBasket for the live rules 23/32/37 that forced that correction.
   if (fixedProduct !== null) {
     return rotationDecision('needs_decision', null, [], 'fixed_variant_conflict',
-      'rotation conflict: a map rule fixes this line to "' + fixedProduct
+      'rotation conflict: the rulebook fixes this line to "' + fixedProduct
         + '" while a rotation instruction says vary it each week. Both are live and they disagree,'
         + ' so the planner will not choose. Which one applies?',
       ['rotation conflict', 'rotation needs decision', 'never auto-substitute']);
@@ -581,9 +608,13 @@ function rotationApplies(instruction, item, product, household) {
   if (instruction.household_id !== null && instruction.household_id !== undefined) {
     if (!sameHousehold(instruction.household_id, household)) return false;
   }
-  const term = normaliseTerm(item.item_name);
   const cat = product && product.category ? normaliseTerm(product.category) : normaliseTerm(item.category);
-  if (normaliseTerm(instruction.match_term) !== '') return normaliseTerm(instruction.match_term) === term;
+  // WO-Y: term targeting is tolerant (CONFIDENT tiers only, so a rotation ring
+  // is never seeded off a merely-similar line); category stays exact, as it is
+  // a controlled vocabulary rather than something a human mistypes.
+  if (normaliseTerm(instruction.match_term) !== '') {
+    return termMatch.matchesConfidently(item.item_name, instruction.match_term);
+  }
   if (normaliseTerm(instruction.match_category) !== '') return normaliseTerm(instruction.match_category) === cat;
   return false;
 }
@@ -809,43 +840,520 @@ function hasTarget(rule) {
   return normaliseTerm(rule.match_term) !== '' || normaliseTerm(rule.match_category) !== '';
 }
 
-function ruleAppliesToItem(rule, item, product, household) {
+// ---------------------------------------------------------------------
+// ruleMatchGrade(rule, item, product, household, resolvedName)
+//   -> 'confident' | 'advisory' | null
+//
+// WO-Y. Rule targeting used to be EXACT STRING EQUALITY on match_term, so the
+// live rule 12 (match_term "Nescafe Azera") never fired on the photographed
+// line "bottle Azera coffee" -- and Warwick was asked about his coffee as an
+// UNIDENTIFIED item, with none of the reason he had already recorded on
+// 2026-07-06. Three things change here, all of them narrowing towards asking:
+//
+//   1. match_term is compared with the tolerant matcher, not ==.
+//   2. A rule may also target the RESOLVED PRODUCT NAME, not just the raw line
+//      text. A rule names a product; the household's shorthand for it varies.
+//   3. The result is GRADED. `advisory` (a shared distinctive word, e.g.
+//      "azera") is enough to HOLD a line and attach the rule's reason, and is
+//      NEVER enough to map, exclude, or name a product.
+//
+// The Finding-6 target requirement is untouched: a rule with no match_term and
+// no match_category still matches no line at all.
+// May a rule's match_term be tested against the RESOLVED PRODUCT NAME, as well
+// as against the line the household wrote?
+//
+// Only when the term carries more than one word. A single-word term is a BRAND
+// or a generic ("Nescafe"), and a product name contains its brand by
+// definition -- so a one-word term tested against product names would claim
+// every item in that brand's entire range, permanently.
+//
+// This is exactly the live rule-12 / rule-25 pair. Rule 12's "Nescafe Azera"
+// names a product and may legitimately recognise it however the household
+// wrote the line. Rule 25's "Nescafe" is explicitly the GENERIC-PHRASING
+// trigger: its job is the week the list just says "Nescafe". Letting it also
+// claim a line that already resolved to an Azera would hold that line forever,
+// on top of rule 12 which is already holding it correctly, and would widen a
+// rule well past what the household wrote it for.
+function termIsSpecificEnoughToNameAProduct(matchTerm) {
+  return termMatch.tokensOf(matchTerm).length > 1;
+}
+
+function ruleMatchGrade(rule, item, product, household, resolvedName) {
+  if (!rule) return null;
   if (rule.household_id !== null && rule.household_id !== undefined) {
-    if (!sameHousehold(rule.household_id, household)) return false;
+    if (!sameHousehold(rule.household_id, household)) return null;
   }
-  const term = normaliseTerm(item.item_name);
+
   const cat = product && product.category ? normaliseTerm(product.category) : normaliseTerm(item.category);
+
+  const byTerm = function () {
+    if (!rule.match_term) return null;
+    // The line as written, then the product it resolved to. Strongest wins.
+    const names = [item.item_name];
+    if (resolvedName !== null && resolvedName !== undefined && String(resolvedName).trim() !== ''
+        && termIsSpecificEnoughToNameAProduct(rule.match_term)) {
+      names.push(resolvedName);
+    }
+    let grade = null;
+    names.forEach(function (n) {
+      const m = termMatch.matchTerms(n, rule.match_term);
+      if (m.confident) grade = 'confident';
+      else if (m.tier !== null && grade === null) grade = 'advisory';
+    });
+    return grade;
+  };
+
+  // Category is a controlled vocabulary, not free text a human mistypes, so it
+  // stays EXACT. Loosening it would let one category claim another's lines.
+  const byCategory = function () {
+    if (!rule.match_category) return null;
+    return normaliseTerm(rule.match_category) === cat ? 'confident' : null;
+  };
+
   switch (rule.scope) {
     case 'global':
     case 'household':
       // A target is REQUIRED even at broad scope (Finding 6): match by term
       // when one is given, else by category, else NON-APPLICABLE. A target-less
       // rule at this scope must never blanket-match every line.
-      if (rule.match_term) return normaliseTerm(rule.match_term) === term;
-      if (rule.match_category) return normaliseTerm(rule.match_category) === cat;
-      return false;
+      if (rule.match_term) return byTerm();
+      if (rule.match_category) return byCategory();
+      return null;
     case 'product':
     case 'one_time':
-      return rule.match_term ? normaliseTerm(rule.match_term) === term : false;
+      return rule.match_term ? byTerm() : null;
     case 'category':
-      return rule.match_category ? normaliseTerm(rule.match_category) === cat : false;
+      return rule.match_category ? byCategory() : null;
     default:
-      return false;
+      return null;
   }
+}
+
+// Boolean wrapper kept for callers that only need "does it apply at all", and
+// for the existing tests. CONFIDENT only -- the historic meaning.
+function ruleAppliesToItem(rule, item, product, household) {
+  return ruleMatchGrade(rule, item, product, household, null) === 'confident';
+}
+
+// The human-readable WHY of a rule, for a question card. Preference order is
+// deliberate: `reason` is written to be read by a person, `rule_text` is the
+// household's own words, `note` is the long-form provenance. Something is
+// always better than the silence Warwick got on 2026-08-03.
+function ruleReasonText(rule) {
+  if (!rule) return '';
+  const candidates = [rule.reason, rule.rule_text, rule.note];
+  for (let i = 0; i < candidates.length; i++) {
+    const v = candidates[i];
+    if (v !== null && v !== undefined && String(v).trim() !== '') return String(v).trim();
+  }
+  return '';
 }
 
 function actionableRules(rules) {
   return (Array.isArray(rules) ? rules : []).filter(function (r) {
     // An actionable directive with NO target is ignored (Finding 6): hasTarget()
-    // gates it out here so it can never reach ruleAppliesToItem and rewrite or
-    // exclude every line.
-    return r && r.active !== false && r.directive && r.directive !== 'info' && hasTarget(r);
+    // gates it out here so it can never reach ruleMatchGrade and rewrite or
+    // exclude every line. 'rotate' is excluded too: it is not a status/mapping
+    // directive at all, it is consumed by rotationInstructionsFromRules below.
+    return r && r.active !== false && r.directive
+      && r.directive !== 'info' && r.directive !== 'rotate' && hasTarget(r);
   });
 }
 
 // ---------------------------------------------------------------------
-// Rule 3: dedupe duplicate lines for the same item, summing counts.
+// ADVISORY RULES -- the `info` directive, finally consumed (WO-Y).
+//
+// actionableRules() drops every `info` row, which on the live rulebook means
+// rules 32, 36, 37 and 38: EVERY rotation and EVERY multibuy rule in the
+// system. They have never once fired. The fix is NOT to make `info` actionable
+// -- for most of them `info` is the CORRECT directive and the content simply
+// cannot be executed -- it is to stop throwing them away:
+//
+//   * rule 32 "rotate the Sure variant weekly" -- `info` IS the wrong
+//     directive. The right one is `rotate`, which db/007 already made
+//     storable. That is a DATA change to Warwick's rulebook and is handed back
+//     as SQL, never applied here.
+//   * rules 36 / 37 (multibuy: ">=50% off the extra item", "round up to an even
+//     number for any-2-for-X") -- `info` is CORRECT and must stay. They are
+//     conditional on OFFER and PRICE data that DOES NOT EXIST: there is no
+//     price column on `products` or `regulars` anywhere in the schema, which
+//     is the same reason standing rule 7 is recorded as structurally
+//     inoperative. No evaluator is built here. They are CARRIED to the human.
+//   * rule 38 (out-of-stock is the real cause of an add-to-trolley failure) --
+//     not a planner rule at all; it is guidance for whatever drives the
+//     browser. Carried, not implemented.
+//
+// TARGETED advisories attach to the line they name. GLOBAL ones (match_term
+// AND match_category both null -- live rules 36 and 38) belong to the BASKET,
+// not to any one line, so they surface once in summary.advisories. Attaching a
+// global rule to all forty lines would be noise, and noise is how a real
+// signal gets missed.
+// ---------------------------------------------------------------------
+function isAdvisoryRule(rule) {
+  if (!rule || rule.active === false) return false;
+  // Absent directive defaults to informational, exactly as the README states.
+  const d = rule.directive;
+  return d === undefined || d === null || d === '' || d === 'info';
+}
+
+// Does an ADVISORY (`info`) rule speak about this line?
+//
+// Deliberately SCOPE-INDEPENDENT, unlike ruleMatchGrade. ruleMatchGrade
+// switches on rule.scope and returns null for any value it does not recognise,
+// which is right for a directive that can rewrite or empty a basket -- an
+// unrecognised scope must not be allowed to act. An advisory can do neither:
+// its entire power is attaching the household's own words to a line. Silencing
+// the rulebook because a scope string is unexpected is precisely the failure
+// this Work Order exists to end, so an advisory matches on its target alone.
+//
+// Both grades count here: a shared distinctive word is enough to SAY something
+// to a human. It is never enough to buy anything.
+function advisoryMatchesLine(rule, item, product, household, resolvedName) {
+  if (!rule) return false;
+  if (rule.household_id !== null && rule.household_id !== undefined) {
+    if (!sameHousehold(rule.household_id, household)) return false;
+  }
+  if (normaliseTerm(rule.match_term) !== '') {
+    const names = [item.item_name];
+    if (resolvedName !== null && resolvedName !== undefined && String(resolvedName).trim() !== ''
+        && termIsSpecificEnoughToNameAProduct(rule.match_term)) {
+      names.push(resolvedName);
+    }
+    return names.some(function (n) {
+      return termMatch.matchTerms(n, rule.match_term).tier !== null;
+    });
+  }
+  if (normaliseTerm(rule.match_category) !== '') {
+    const cat = product && product.category ? normaliseTerm(product.category) : normaliseTerm(item.category);
+    return normaliseTerm(rule.match_category) === cat;
+  }
+  return false;
+}
+
+function advisoryRules(rules) {
+  const list = (Array.isArray(rules) ? rules : []).filter(isAdvisoryRule);
+  return {
+    targeted: list.filter(hasTarget),
+    global: list.filter(function (r) { return !hasTarget(r); })
+  };
+}
+
+// ---------------------------------------------------------------------
+// ROTATION FROM THE RULEBOOK (WO-Y).
+//
+// chooseRotatedVariant() and loadLastOrder() have both been built, tested and
+// live for weeks, and rotation has never happened once -- because the only way
+// to trigger it was an `args.rotation` argument that NOTHING in the pipeline
+// passes. The mechanism was reachable only from a test.
+//
+// A `rotate` DIRECTIVE row already carries everything a rotation instruction
+// needs (match_term / match_category, household_id, active) and db/007 already
+// permits the value. Deriving instructions from `rules` therefore makes
+// rotation reachable with NO pipeline change at all: stepPlan() already passes
+// both `rules` and `lastOrder`.
+//
+// An explicitly-passed args.rotation still wins -- it is searched first by
+// planBasket -- so a caller can always override the rulebook.
+// ---------------------------------------------------------------------
+function rotationInstructionsFromRules(rules) {
+  return (Array.isArray(rules) ? rules : []).filter(function (r) {
+    return r && r.active !== false && r.directive === 'rotate' && hasTarget(r);
+  });
+}
+
+// ---------------------------------------------------------------------
+// PRIOR ANSWERS -- asdair.rule_qa_log, which the planner has never read (WO-Y).
+//
+// CANONICAL-WEEKLY-SHOP-PROCESS.md section D: "Previous decisions must be
+// consulted before any question is generated." Five real answers sit in
+// rule_qa_log, including Ariel Pods = "best value/wash" recorded 2026-07-21 --
+// which was re-asked on 2026-08-03 and then GUESSED at, while the recorded
+// answer sat in the database.
+//
+// rule_qa_log has NO match_term column: it is free-text question + answer. A
+// line is therefore linked to a prior answer by asking whether the QUESTION
+// TEXT names it -- every word of the line present in the question, via the
+// same conservative matcher. Only CONFIDENT tiers count, and only rows marked
+// `applies_going_forward`; a one-off answer from a past week is not a standing
+// decision.
+//
+// A PRIOR ANSWER NEVER NAMES A PRODUCT. Live rule rows carry
+// matched_product NULL and an answer like "best value/wash" is a selection
+// HEURISTIC, not an identity -- and evaluating it needs a price the schema
+// does not have. So a prior answer may attach itself to a line and stop that
+// line being an unexplained question; it may never set matched_product, and it
+// never overrides standing rule 6.
+// ---------------------------------------------------------------------
+function eligiblePriorAnswers(priorAnswers, household) {
+  const list = Array.isArray(priorAnswers) ? priorAnswers : [];
+  return list.filter(function (qa) {
+    if (!qa) return false;
+    if (qa.applies_going_forward !== true) return false;
+    if (qa.household_id !== null && qa.household_id !== undefined) {
+      if (!sameHousehold(qa.household_id, household)) return false;
+    }
+    return !(qa.answer === null || qa.answer === undefined || String(qa.answer).trim() === '');
+  });
+}
+
+// Rows that STATE a decision (everything except a pointer row), linked to this
+// line by either route:
+//
+//   1. The QUESTION names the line - every word of "Ariel Pods" appears in
+//      "...7 ambiguities: Ariel Pods size, Sure variant, ...".
+//   2. OR a compound answer's own FRAGMENT KEY names the line, uniquely.
+//
+// Route 2 was added after the live rows were read (2026-08-04). The batch
+// question names its topics loosely - it says "Sure variant" where the list
+// says "Sure male" - so linking on the question alone silently missed a row
+// whose answer keys the line perfectly. The answer's own key is the better
+// index, and it is safe because a key that matches more than one fragment
+// still resolves to "could not be split" rather than to a guess.
+// Is this recorded answer a GLOBAL POLICY statement rather than a decision
+// about a product?
+//
+// Live row 1 (verbatim, 2026-08-04):
+//   Q: "How should items with no quantity, and duplicate list entries, be
+//       handled?"
+//   A: "Items with no quantity default to 1; duplicate list entries are
+//       deduped to a single line."   promoted_rule_id: 2
+//
+// It carries TWO policies, has no `Key=` fragments to split on, and names no
+// product at all. Attaching it to a line about cheese would put list mechanics
+// on a product card - noise on the wrong thing, reading as malfunction in
+// exactly the way a pointer answer does.
+//
+// DECIDED BY WHAT THE ROW IS, not by a keyword list: the row was PROMOTED to a
+// rule, and that rule carries NO TARGET. A target-less rule is by construction
+// about every line, therefore about no particular product - the same
+// hasTarget() boundary the rulebook already uses. A decision recorded as a
+// global policy is not a decision about the dreamies.
+//
+// UNKNOWN DEFAULTS TO LINKING. A promoted_rule_id that resolves to nothing
+// (an inactive or unloaded rule) is NOT treated as policy: for a row that
+// genuinely STATES a decision, silently dropping it loses recorded knowledge,
+// which is the failure this whole Work Order exists to end. It fails towards
+// surfacing.
+//
+// KNOWN LIMIT, stated rather than papered over: a policy row carrying NO
+// promoted_rule_id is not detected by this. Deciding "does this sentence name
+// a product" from the prose alone is the language-parsing this planner refuses
+// to do.
+function isPolicyAnswer(qa, rules) {
+  if (qa.promoted_rule_id === null || qa.promoted_rule_id === undefined) return false;
+  const promoted = (Array.isArray(rules) ? rules : []).filter(function (r) {
+    return r && r.id !== null && r.id !== undefined && String(r.id) === String(qa.promoted_rule_id);
+  });
+  if (promoted.length === 0) return false;          // unknown -> not policy -> still links
+  return promoted.every(function (r) { return !hasTarget(r); });
+}
+
+function priorAnswersForLine(priorAnswers, item, household, rules) {
+  return eligiblePriorAnswers(priorAnswers, household).filter(function (qa) {
+    if (referencedRuleIds(qa.answer).length > 0) return false;   // pointer: handled separately
+    if (isPolicyAnswer(qa, rules)) return false;                 // global policy: not about a product
+    if (termMatch.matchTerms(qa.question, item.item_name).confident === true) return true;
+    const fragments = splitCompoundAnswer(String(qa.answer).trim());
+    if (fragments.length === 0) return false;
+    return fragments.filter(function (f) {
+      return fragmentKeyMatchesLine(f.key, item.item_name);
+    }).length === 1;
+  });
+}
+
+// POINTER rows link by what they POINT AT, not by their own prose.
+//
+// A pointer's question is about bookkeeping ("How were the decisions
+// captured?") and names no product, so it would never link by question text at
+// all - which would make "follow the pointer" a promise the code never keeps.
+// It links when a rule it names is already speaking to this line.
+function pointerAnswersForLine(priorAnswers, household, speakingRuleIds) {
+  return eligiblePriorAnswers(priorAnswers, household).filter(function (qa) {
+    const pointed = referencedRuleIds(qa.answer);
+    if (pointed.length === 0) return false;
+    const ids = pointed.slice();
+    if (qa.promoted_rule_id !== null && qa.promoted_rule_id !== undefined) pushId(ids, qa.promoted_rule_id);
+    return ids.some(function (id) {
+      return speakingRuleIds.some(function (s) { return String(s) === String(id); });
+    });
+  });
+}
+
+function priorAnswerDate(qa) {
+  return (qa.asked_on === null || qa.asked_on === undefined) ? '' : String(qa.asked_on).slice(0, 10);
+}
+
+// ---------------------------------------------------------------------
+// SHAPING A PRIOR ANSWER (WO-Y, second pass - 2026-08-04).
+//
+// The first implementation emitted the whole `answer` string. Warwick then
+// queried the live table, and the rows are not the single-topic answers the
+// fixtures assumed. Two shapes break the naive version:
+//
+//   BATCH (live row 5). One question covering seven ambiguities, answered as
+//   seven "Key=value" fragments in one string. Linking "Ariel Pods" to it is
+//   CORRECT; emitting all seven households' answers onto that card is not.
+//
+//   POINTER (live row 2). "Established the product-specific matching rules now
+//   recorded in asdair.rules with scope=product (rules 10-16, 18-22)." That
+//   states no decision at all - it names where the decisions went. Surfacing
+//   it as a prior decision tells Warwick nothing and reads like a malfunction.
+//
+// So an answer is shaped into one of three outcomes, and BOTH failure
+// directions are visible rather than guessed:
+//
+//   fragment - the one piece keyed to this line, isolated with confidence.
+//   unsplit  - it demonstrably covers this line but could not be split. SAY SO
+//              on the card, and show the raw text. Never dump seven answers,
+//              and never silently drop the link.
+//   pointer  - refuse to present it as a decision. Follow it to the rules it
+//              names instead; if none of them speak to this line, say nothing.
+// ---------------------------------------------------------------------
+
+// Rule ids an answer POINTS AT: "rule 12", "rules 10-16, 18-22".
+// Requires the literal word rule/rules, so a quantity like "4-pack" or a size
+// like "8x35ml" can never be mistaken for a reference.
+function referencedRuleIds(text) {
+  const ids = [];
+  if (text === null || text === undefined) return ids;
+  const re = /\brules?\s+([0-9]+(?:\s*[-,]\s*[0-9]+)*)/gi;
+  let hit;
+  while ((hit = re.exec(String(text))) !== null) {
+    hit[1].split(',').forEach(function (part) {
+      const range = part.split('-').map(function (n) { return parseInt(n.trim(), 10); });
+      if (range.length === 2 && Number.isFinite(range[0]) && Number.isFinite(range[1]) && range[1] >= range[0]) {
+        for (let i = range[0]; i <= range[1]; i++) pushId(ids, i);
+      } else if (Number.isFinite(range[0])) {
+        pushId(ids, range[0]);
+      }
+    });
+  }
+  return ids;
+}
+
+// "Ariel=best value/wash; Sure=rotate variant weekly; ..." -> the segments.
+// Requires at least TWO keyed segments, so a single answer that merely happens
+// to contain an equals sign is never carved up.
+function splitCompoundAnswer(answer) {
+  const segments = String(answer).split(';');
+  if (segments.length < 2) return [];
+  const keyed = [];
+  segments.forEach(function (seg) {
+    const at = seg.indexOf('=');
+    if (at <= 0) return;
+    const key = seg.slice(0, at).trim();
+    const value = seg.slice(at + 1).trim().replace(/[.\s]+$/, '');
+    if (key !== '' && value !== '') keyed.push({ key: key, text: value });
+  });
+  return keyed.length >= 2 ? keyed : [];
+}
+
+// Does a compound answer's fragment KEY name this line?
+//
+// EVERY word of the key must appear as a whole word in the line, or the key
+// must match it confidently. A 3-letter token is admitted on the whole-word
+// path (keys are shorthand: "Sure", "Ariel") where termMatch.js would refuse
+// it, because requiring ALL of them is itself a strong constraint.
+//
+// The ADVISORY tier is deliberately NOT accepted. It was, briefly, and it let
+// the key "Fruit Splits" claim a line reading "fruit juice" off the single
+// shared word "fruit" - which would have put an ice-lolly decision on a carton
+// of juice. This function now decides LINKING as well as isolation, so a loose
+// answer here manufactures exactly the noise this Work Order is removing.
+function fragmentKeyMatchesLine(key, itemName) {
+  const keyTokens = termMatch.tokensOf(key).filter(function (t) { return t.length >= 3; });
+  if (keyTokens.length === 0) return false;
+  const lineTokens = termMatch.tokensOf(itemName);
+  const allPresent = keyTokens.every(function (t) { return lineTokens.indexOf(t) !== -1; });
+  if (allPresent) return true;
+  return termMatch.matchTerms(itemName, key).confident === true;
+}
+
+function shapePriorAnswer(qa, item) {
+  const answer = String(qa.answer).trim();
+  const when = priorAnswerDate(qa);
+
+  // POINTER first: an answer that names rules instead of stating one.
+  const pointedAt = referencedRuleIds(answer);
+  if (pointedAt.length > 0) {
+    const ids = [];
+    if (qa.promoted_rule_id !== null && qa.promoted_rule_id !== undefined) pushId(ids, qa.promoted_rule_id);
+    pointedAt.forEach(function (id) { pushId(ids, id); });
+    return { kind: 'pointer', text: '', ruleIds: ids };
+  }
+
+  const fragments = splitCompoundAnswer(answer);
+  if (fragments.length === 0) {
+    // Single-topic: the whole answer is the decision.
+    return {
+      kind: 'fragment',
+      text: 'prior decision' + (when ? ' (' + when + ')' : '') + ': ' + answer,
+      ruleIds: []
+    };
+  }
+
+  const hits = fragments.filter(function (f) { return fragmentKeyMatchesLine(f.key, item.item_name); });
+  if (hits.length === 1) {
+    return {
+      kind: 'fragment',
+      text: 'prior decision' + (when ? ' (' + when + ')' : '') + ': ' + hits[0].text,
+      ruleIds: []
+    };
+  }
+
+  // Zero matches, or several. Both are "we cannot isolate it" - and the honest
+  // move is to say that in the open rather than dump the batch or drop it.
+  return {
+    kind: 'unsplit',
+    text: 'a prior batch answer' + (when ? ' from ' + when : '')
+      + ' covers this; it could not be split automatically: ' + answer,
+    ruleIds: []
+  };
+}
+
+// An EXPLICITLY WRITTEN quantity, or null when the line did not state one.
+//
+// Distinct from normaliseQty(), which answers "how many shall we plan for" and
+// defaults everything unusable to 1. This answers "what did the list actually
+// SAY", which is a different question and the one a conflict is about. Junk
+// (blank, non-numeric, zero, negative) is NOT an explicit statement, so it can
+// never manufacture a conflict against a real number.
+function explicitQty(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const n = Number(value);
+  if (!Number.isFinite(n)) return null;
+  const i = Math.trunc(n);
+  return i >= 1 ? i : null;
+}
+
+// ---------------------------------------------------------------------
+// Rule 3: dedupe duplicate lines for the same item.
 // Boolean signals are OR-ed; the most restrictive explicit status wins.
+//
+// QUANTITIES ARE NOT SUMMED (corrected 2026-08-04, WO-Y, on Warwick's ruling
+// after the integration builder found it by execution).
+//
+// This function used to do `acc.requested_qty += normaliseQty(...)`, so a list
+// reading "2 milk" and "3 milk" silently became FIVE. Rule 3 says duplicate
+// entries are deduped to a single line; it says nothing about arithmetic.
+// Summing is an INFERENCE, and it was being made in one direction with no
+// signal to anyone - the precise thing this planner is not allowed to do.
+//
+//   * SAME explicit quantity, or none written - dedupe to one line at that
+//     quantity (or 1). Two bare "milk" entries are a REPETITION, not an
+//     addition, so the line is qty 1.
+//   * DIFFERENT explicit quantities - do not sum, do not pick, do not drop.
+//     `qty_conflict` carries every written quantity and planBasket turns the
+//     line into a question showing both. Warwick reads it in two seconds; a
+//     wrong quantity arrives in a delivery.
+//
+// THE LIST-ITEM `id` IS DELIBERATELY NOT CARRIED, and this is not an
+// oversight (noted 2026-08-04): a merged line descends from SEVERAL
+// shopping_list_items rows, so there is no single id that is true of it, and
+// emitting one would be a silent lie about which row the plan line came from.
+// `matched_product_ids` exists precisely because the honest answer to "which
+// ids?" is plural. A caller needing the carrier row must recover it from its
+// own `listItems`, not from `plan.items`.
 // ---------------------------------------------------------------------
 function dedupeList(listItems) {
   const order = [];
@@ -854,6 +1362,7 @@ function dedupeList(listItems) {
   (Array.isArray(listItems) ? listItems : []).forEach(function (raw) {
     const key = normaliseTerm(raw.item_name);
     if (key === '') return; // rule 5: a blank line is not an item
+    const written = explicitQty(raw.requested_qty);
     if (!byKey[key]) {
       const firstId = (raw.matched_product_id !== undefined ? raw.matched_product_id : null);
       const ids = [];
@@ -861,6 +1370,9 @@ function dedupeList(listItems) {
       byKey[key] = {
         item_name: raw.item_name,
         requested_qty: normaliseQty(raw.requested_qty),
+        // EVERY DISTINCT quantity the list actually wrote for this item.
+        written_qtys: written === null ? [] : [written],
+        qty_conflict: null,
         matched_product_id: firstId,
         // Every DISTINCT explicit id seen for this merged line. matched_product_id
         // stays first-wins for backward compatibility, but matchProduct scope-
@@ -879,7 +1391,9 @@ function dedupeList(listItems) {
       order.push(key);
     } else {
       const acc = byKey[key];
-      acc.requested_qty += normaliseQty(raw.requested_qty);
+      // NOT `+=`. See the header: a repeated line is a repetition, and two
+      // different written quantities are a question, never a sum.
+      if (written !== null && acc.written_qtys.indexOf(written) === -1) acc.written_qtys.push(written);
       if (acc.matched_product_id === null && raw.matched_product_id !== undefined && raw.matched_product_id !== null) {
         acc.matched_product_id = raw.matched_product_id;
       }
@@ -897,7 +1411,23 @@ function dedupeList(listItems) {
     }
   });
 
-  return order.map(function (k) { return byKey[k]; });
+  return order.map(function (k) {
+    const acc = byKey[k];
+    if (acc.written_qtys.length > 1) {
+      // The list says two different things about one product. Nothing is
+      // chosen here: requested_qty keeps the FIRST written value only so the
+      // output shape stays a number, planned_qty becomes 0 because the line is
+      // a question, and every written quantity travels in qty_conflict so the
+      // card can show what was actually on the page.
+      acc.qty_conflict = acc.written_qtys.slice();
+      acc.requested_qty = acc.written_qtys[0];
+    } else if (acc.written_qtys.length === 1) {
+      acc.requested_qty = acc.written_qtys[0];
+    } else {
+      acc.requested_qty = 1;   // rule 2: nothing written anywhere -> 1
+    }
+    return acc;
+  });
 }
 
 // ---------------------------------------------------------------------
@@ -919,7 +1449,17 @@ function planBasket(input) {
   // With both absent -- the default -- nothing below changes and planBasket
   // behaves exactly as it did before.
   const lastOrder = args.lastOrder || null;
-  const rotations = Array.isArray(args.rotation) ? args.rotation : [];
+
+  // Rotation instructions: the caller's explicit list FIRST (it wins, so an
+  // override is always possible), then every `rotate` directive in the
+  // rulebook. The second source is what finally makes rotation reachable from
+  // live data -- see rotationInstructionsFromRules().
+  const rotations = (Array.isArray(args.rotation) ? args.rotation : [])
+    .concat(rotationInstructionsFromRules(rules));
+
+  // asdair.rule_qa_log rows (WO-Y). OPTIONAL and ADDITIVE: with none supplied
+  // nothing below changes. data.js loadRuleQaLog() supplies them.
+  const priorAnswers = Array.isArray(args.priorAnswers) ? args.priorAnswers : [];
 
   // Active household: explicit override, else derived from the budget row.
   const household = (args.household !== undefined && args.household !== null)
@@ -927,7 +1467,19 @@ function planBasket(input) {
     : (budget && budget.household_id !== undefined ? budget.household_id : null);
 
   const directives = actionableRules(rules);
+  const advisories = advisoryRules(rules);
   const merged = dedupeList(listItems);
+
+  // GLOBAL `info` rules (live rules 36 and 38: match_term AND match_category
+  // both null) belong to the whole basket. They are surfaced once, in the
+  // summary, for basket review -- not attached to every line.
+  const basketAdvisories = advisories.global.map(function (r) {
+    return {
+      rule_id: (r.id === undefined ? null : r.id),
+      category: (r.category === undefined ? null : r.category),
+      text: ruleReasonText(r)
+    };
+  }).filter(function (a) { return a.text !== ''; });
 
   const items = merged.map(function (line) {
     const flags = [];
@@ -940,9 +1492,12 @@ function planBasket(input) {
     const ambiguous = match.ambiguous;
     const scopeMismatch = match.scopeMismatch === true;
 
-    // Applicable structured directives for this line.
+    // Applicable structured directives for this line. CONFIDENT grade only,
+    // and matched against the line text / category exactly as before -- so
+    // `map` and `exclude` semantics are unchanged by WO-Y. A merely-similar
+    // line must never be silently remapped or silently dropped from the basket.
     const applicable = directives.filter(function (r) {
-      return ruleAppliesToItem(r, line, match.product, household);
+      return ruleMatchGrade(r, line, match.product, household, null) === 'confident';
     });
 
     // Standing 'exclude' directives for this line. Read here (rather than at the
@@ -952,14 +1507,51 @@ function planBasket(input) {
 
     // 'map' directive can set / override the matched product (rule 9).
     let mappedByRule = false;
+    let mappedFamily = null;
     applicable.forEach(function (r) {
       if (r.directive === 'map' && r.matched_product) {
         matchedProduct = r.matched_product;
+        mappedFamily = r.matched_product;
         mappedByRule = true;
         pushFlag(flags, 'product mapped by rule');
         if (r.note) note = note ? (note + '; ' + r.note) : r.note;
       }
     });
+
+    // Do the applicable `map` rules AGREE about what this line is?
+    //
+    // WO-Y CORRECTION (2026-08-04, on Warwick's live reading of the rows). A
+    // `map` plus a `rotate` on the same term was previously treated as a
+    // CONFLICT, on the strength of a note in db/007 recording rules 23/24 as
+    // clashing with the rotate instruction. THAT PREMISE WAS WRONG, and the
+    // live rows say so:
+    //
+    //   rule 23  map    "Sure male" -> "Sure Men Anti-Perspirant (blue variant)"
+    //   rule 32  rotate "Sure male": men's BLUE - rotate the scent each week
+    //   rule 37  info   "Sure male": round the quantity up to complete a pair
+    //
+    // Rule 32 OPENS BY AGREEING with rule 23 and then refines it: 23 picks the
+    // family, 32 picks which one this week, 37 handles the quantity. Three
+    // rules at three levels, composing. Treating that as a contradiction would
+    // make Sure a needs_decision EVERY SINGLE WEEK - the exact failure this
+    // Work Order exists to end, reintroduced by its own fix.
+    //
+    // A GENUINE clash is still detected and still asks: two `map` directives
+    // naming DIFFERENT products for the same line. That is mechanically
+    // decidable and is checked here.
+    //
+    // NOT DETECTED, and deliberately not attempted: a `rotate` whose PROSE
+    // contradicts rather than refines its `map`. Deciding that needs the rules
+    // read as language, and this planner does not parse prose - which is the
+    // property that keeps it deterministic and auditable. Reported as a real
+    // limit rather than faked with a keyword sniffer.
+    const mappedProducts = [];
+    applicable.forEach(function (r) {
+      if (r.directive !== 'map' || !r.matched_product) return;
+      const key = normaliseTerm(r.matched_product);
+      if (mappedProducts.indexOf(key) === -1) mappedProducts.push(key);
+    });
+    const mapsDisagree = mappedProducts.length > 1;
 
     // Regulars: the LOWEST-priority resolution source. Consulted ONLY when
     // everything above produced no product, so existing precedence is
@@ -1021,22 +1613,106 @@ function planBasket(input) {
           candidates: candidates,
           lastOrder: lastOrder,
           itemName: line.item_name,
-          // A `map` rule fixing this line's product while an instruction says
-          // rotate it is a REAL conflict in the rulebook and Warwick's to
-          // settle. Passing it here makes the planner ask instead of resolve.
-          fixedProduct: mappedByRule ? matchedProduct : null
+          // ONLY a genuine clash is handed to chooseRotatedVariant as a fixed
+          // variant. A single `map` plus a `rotate` is a REFINEMENT (the map
+          // names the family, the rotation picks this week's member), not a
+          // contradiction - see mapsDisagree above.
+          fixedProduct: mapsDisagree ? matchedProduct : null
         });
         outcome.flags.forEach(function (f) { pushFlag(flags, f); });
         if (outcome.status === 'rotated') {
           matchedProduct = outcome.chosen.name;
           regularAmbiguous = false;   // rotation is what the household uses to resolve this
           if (outcome.note) note = note ? (note + '; ' + outcome.note) : outcome.note;
+          if (mappedByRule && mappedFamily) {
+            // Traceability: the map still decided the FAMILY, and the plan
+            // should say which rule put the line in it.
+            pushFlag(flags, 'rotation refines mapped family');
+            const refineText = 'rotation refined the mapped family "' + mappedFamily + '"';
+            if (note.indexOf(refineText) === -1) {
+              note = note ? (note + '; ' + refineText) : refineText;
+            }
+          }
         } else {
           rotationNeedsDecision = true;
           if (outcome.question) note = note ? (note + '; ' + outcome.question) : outcome.question;
         }
       }
     }
+
+    // ---- late rule pass: rules that name the RESOLVED product, or that only
+    // match at ADVISORY grade (WO-Y) -------------------------------------
+    //
+    // This is the fix for the live Azera case. Rule 12 targets
+    // match_term "Nescafe Azera"; the photographed line was
+    // "bottle Azera coffee". Nothing matched, so the line reached Warwick as an
+    // unidentified item with no reason -- and he re-answered a decision he had
+    // recorded on 2026-07-06.
+    //
+    // DELIBERATELY NARROWER THAN THE EARLY PASS. These rules may ONLY hold a
+    // line (needs_decision) and attach their reason. They may NOT `map` (the
+    // product is already resolved; remapping it here on a weaker match is
+    // precisely the silent-wrong-product failure) and may NOT `exclude`
+    // (quietly dropping an item from the basket on a weaker match is the worst
+    // available direction). Holding is the safe direction: the cost of a wrong
+    // hold is one question.
+    const lateHolds = directives.filter(function (r) {
+      if (r.directive !== 'needs_decision') return false;
+      if (applicable.indexOf(r) !== -1) return false;                   // already counted
+      return ruleMatchGrade(r, line, match.product, household, matchedProduct) !== null;
+    });
+
+    // Every rule that is holding this line, with its reason, so the question
+    // carries the household's own words instead of arriving bare.
+    const holdingRules = applicable
+      .filter(function (r) { return r.directive === 'needs_decision'; })
+      .concat(lateHolds);
+
+    // TARGETED `info` advisories (live rules 32 and 37 target "sure male").
+    // Advisory grade is accepted here: the whole point is to CARRY knowledge to
+    // a human, and an advisory can neither buy nor drop anything.
+    const lineAdvisories = advisories.targeted.filter(function (r) {
+      return advisoryMatchesLine(r, line, match.product, household, matchedProduct);
+    });
+    lineAdvisories.forEach(function (r) {
+      const text = ruleReasonText(r);
+      if (text === '') return;
+      pushFlag(flags, 'rule advisory');
+      const advisoryText = 'rule advisory: ' + text;
+      if (note.indexOf(advisoryText) === -1) {
+        note = note ? (note + '; ' + advisoryText) : advisoryText;
+      }
+    });
+
+    // PRIOR ANSWERS (asdair.rule_qa_log). Consulted BEFORE the status chain
+    // below decides anything, which is what section D of the canonical process
+    // actually requires. It attaches the recorded answer; it never picks a
+    // product.
+    //
+    // Every rule id that has already SPOKEN about this line, so a pointer
+    // answer can be followed to its targets instead of being read aloud.
+    const speakingRuleIds = [];
+    applicable.concat(lateHolds).concat(lineAdvisories).forEach(function (r) {
+      if (r && r.id !== null && r.id !== undefined) pushId(speakingRuleIds, r.id);
+    });
+
+    // Live row 2's shape states no decision - it says where the decisions went.
+    // It is NEVER presented as one. Following it lands on a rule that is
+    // already speaking here, whose own words are already on the card, so all
+    // that is added is the provenance. Where it lands nowhere, nothing at all
+    // is surfaced.
+    if (pointerAnswersForLine(priorAnswers, household, speakingRuleIds).length > 0) {
+      pushFlag(flags, 'prior decision recorded as rules');
+    }
+
+    priorAnswersForLine(priorAnswers, line, household, rules).forEach(function (qa) {
+      const shaped = shapePriorAnswer(qa, line);
+      pushFlag(flags, 'prior decision on record');
+      if (shaped.kind === 'unsplit') pushFlag(flags, 'prior batch answer not split');
+      if (note.indexOf(shaped.text) === -1) {
+        note = note ? (note + '; ' + shaped.text) : shaped.text;
+      }
+    });
 
     // ---- status resolution -----------------------------------------------
     // Precedence: standing exclude > one-week exclude > needs_decision > add.
@@ -1078,6 +1754,12 @@ function planBasket(input) {
       // matched_product (matchProduct returns product null on a scope leak).
       status = 'needs_decision';
       // Flags for this cause are pushed in the unconditional block below.
+    } else if (line.qty_conflict) {
+      // The list wrote two different quantities for one item. Raised HERE,
+      // above out_of_stock and the rule causes, because none of those tell
+      // Warwick how many to buy - and the old behaviour silently summed them.
+      // Flags and the question text are attached unconditionally below.
+      status = 'needs_decision';
     } else if (line.out_of_stock) {
       // Rule 6: out of stock -> human decision, NEVER auto-substitute.
       status = 'needs_decision';
@@ -1087,7 +1769,7 @@ function planBasket(input) {
       status = 'needs_decision';
       pushFlag(flags, 'flagged on list');
       pushFlag(flags, 'never auto-substitute');
-    } else if (applicable.some(function (r) { return r.directive === 'needs_decision'; })) {
+    } else if (holdingRules.length > 0) {
       status = 'needs_decision';
       pushFlag(flags, 'flagged by rule');
       pushFlag(flags, 'never auto-substitute');
@@ -1146,6 +1828,39 @@ function planBasket(input) {
       pushFlag(flags, 'product id household scope mismatch');
       pushFlag(flags, 'never auto-substitute');
     }
+
+    // A quantity conflict is surfaced no matter which status won above, for the
+    // same reason the scope mismatch is: it must never be masked by another
+    // cause and lose its signal. It is suppressed only where the line is not
+    // being bought at all, because how many of a thing we are not buying is
+    // not a question worth Warwick's attention.
+    if (line.qty_conflict && status !== 'excluded' && status !== 'excluded_this_week') {
+      pushFlag(flags, 'quantity conflict');
+      pushFlag(flags, 'never auto-substitute');
+      const written = line.qty_conflict.join(' and ');
+      const conflictText = 'the list gives two different quantities for this item (' + written
+        + '). They have NOT been added together and none has been chosen - which is right?';
+      if (note.indexOf(conflictText) === -1) {
+        note = note ? (note + '; ' + conflictText) : conflictText;
+      }
+    }
+
+    // WO-Y / the accepted acceptance property: where a rule DELIBERATELY holds
+    // a line, the question must carry that rule's reason. A `needs_decision`
+    // rule doing its job is CORRECT behaviour -- rules 12 and 25 exist
+    // precisely to put the coffee in front of a human, because "only if on
+    // offer" cannot be evaluated without a price the schema does not have. The
+    // 2026-08-03 defect was never that Azera was asked about; it was that it
+    // was asked about as an unidentified line with no reason attached, so
+    // Warwick had to re-derive an answer he had already given.
+    holdingRules.forEach(function (r) {
+      const text = ruleReasonText(r);
+      if (text === '') return;
+      const reasonText = 'held by rule: ' + text;
+      if (note.indexOf(reasonText) === -1) {
+        note = note ? (note + '; ' + reasonText) : reasonText;
+      }
+    });
 
     // Rule 10 book-keeping flag (informational; never becomes a rule).
     if (line.one_week_only) pushFlag(flags, 'one week only');
@@ -1256,7 +1971,16 @@ function planBasket(input) {
     excluded_this_week: excludedThisWeek,            // additive: transient one-week exclusion
     estimated_total: estimatedTotal,
     currency: budget && budget.currency ? String(budget.currency) : 'GBP',
-    budget_flag: budgetFlag
+    budget_flag: budgetFlag,
+    // ADDITIVE (WO-Y). Global `info` rules -- the ones with no target at all,
+    // live rules 36 (the multibuy offer rule) and 38 (out-of-stock is the real
+    // cause of an add-to-trolley failure). They cannot be evaluated by this
+    // planner and no evaluator is faked for them: rule 36 needs a shelf price
+    // and an offer, and there is NO price column on `products` or `regulars`
+    // anywhere in the schema. They surface HERE, once, so a human sees them at
+    // basket review instead of them being discarded as they have been every
+    // week since they were written.
+    advisories: basketAdvisories
   };
 
   return { items: publicItems, summary: summary };
@@ -1266,9 +1990,25 @@ module.exports = {
   planBasket: planBasket,
   rankAlternatives: rankAlternatives,   // suggestion-only alternative ranker (rule 6)
   chooseRotatedVariant: chooseRotatedVariant,   // pure rotation decision (SOP-021 step 2)
+  termMatch: termMatch,                 // the ONE tolerant matcher (WO-Y)
   // exported for unit tests of the pure helpers
   _internal: {
     normaliseTerm: normaliseTerm,
+    ruleMatchGrade: ruleMatchGrade,
+    ruleAppliesToItem: ruleAppliesToItem,
+    ruleReasonText: ruleReasonText,
+    actionableRules: actionableRules,
+    advisoryRules: advisoryRules,
+    advisoryMatchesLine: advisoryMatchesLine,
+    rotationInstructionsFromRules: rotationInstructionsFromRules,
+    priorAnswersForLine: priorAnswersForLine,
+    pointerAnswersForLine: pointerAnswersForLine,
+    isPolicyAnswer: isPolicyAnswer,
+    shapePriorAnswer: shapePriorAnswer,
+    referencedRuleIds: referencedRuleIds,
+    splitCompoundAnswer: splitCompoundAnswer,
+    fragmentKeyMatchesLine: fragmentKeyMatchesLine,
+    hasTarget: hasTarget,
     normaliseQty: normaliseQty,
     matchProduct: matchProduct,
     matchRegular: matchRegular,

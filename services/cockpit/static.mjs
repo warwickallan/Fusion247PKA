@@ -13,6 +13,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { resolveStaticTarget, servePrivateApps } from './private-apps.mjs';
+import { renderServiceWorker } from './sw-version.mjs';
 
 export const MIME = Object.freeze({
   '.html': 'text/html; charset=utf-8',
@@ -83,6 +84,26 @@ export function serveStatic(req, res, ctx) {
   // The overlay path is OWNED by private-apps.mjs: a file of that name in public/ is never served.
   // The one place an overlay could be committed by accident is the one place it cannot come from.
   if (t.isOverlay) return servePrivateApps(res, env, repoRoot);
+  // /sw.js is the ONE transformed response: its cache name is derived from the shell's content so
+  // that invalidation is mechanical rather than a habit. See sw-version.mjs for the whole argument.
+  // Fails LOUD (500) rather than serving an un-substituted worker — a worker whose cache name is
+  // literally '__SHELL_HASH__' would pin every device to one permanent cache, silently and forever.
+  if (path.basename(t.fp) === 'sw.js' && path.dirname(t.fp) === pub) {
+    try {
+      const { body, version } = renderServiceWorker(pub);
+      res.writeHead(200, {
+        'content-type': MIME['.js'],
+        // The worker script itself must never be cached by the HTTP layer, or the update check that
+        // drives this whole mechanism cannot see the new bytes.
+        'cache-control': 'no-store',
+        'x-shell-version': version,
+      });
+      return res.end(body);
+    } catch (e) {
+      res.writeHead(500, { 'content-type': 'text/plain' });
+      return res.end('service worker version could not be derived: ' + e.message);
+    }
+  }
   return readFile(t.fp, (err, buf) => {
     if (err) { res.writeHead(404); return res.end('not found'); }
     res.writeHead(200, { 'content-type': MIME[path.extname(t.fp)] || 'application/octet-stream', 'cache-control': 'no-cache' });

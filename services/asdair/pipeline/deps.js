@@ -226,17 +226,35 @@ function skillData() {
   return skillDataModule;
 }
 
-/** Everything planBasket needs, all of it read-only. */
+/**
+ * Everything planBasket needs, all of it read-only.
+ *
+ * ── priorAnswers: asdair.rule_qa_log, which the planner never used to read ──
+ * loadRuleQaLog is SELECT-only inside a read-only transaction, scoped to the
+ * named household PLUS global (household_id IS NULL) rows. planBasket takes it
+ * as OPTIONAL and ADDITIVE: with none supplied, planning is byte-for-byte what
+ * it was.
+ *
+ * NOTE WHAT IS DELIBERATELY *NOT* HERE: a `.catch(() => [])`. budget and
+ * lastOrder swallow their errors because a shop can genuinely plan without
+ * them. Prior answers are different in kind - they are the entire mechanism by
+ * which an answer Warwick gave on 6 July stops the same question being asked on
+ * 3 August. A swallowed failure here would leave the loop LOOKING wired while
+ * silently planning as though nothing had ever been answered, which is
+ * indistinguishable from the defect this wiring exists to close. It fails loudly
+ * instead.
+ */
 async function realLoadPlanningInputs(householdId) {
   const skill = skillData();
-  const [rules, products, regulars, budget, lastOrder] = await Promise.all([
+  const [rules, products, regulars, budget, lastOrder, priorAnswers] = await Promise.all([
     skill.loadRules(),
     skill.loadProducts(),
     skill.loadRegulars(householdId),
     skill.loadBudget(householdId).catch(() => null),
     skill.loadLastOrder(householdId).catch(() => null),
+    skill.loadRuleQaLog(householdId),
   ]);
-  return { rules, products, regulars, budget, lastOrder };
+  return { rules, products, regulars, budget, lastOrder, priorAnswers };
 }
 
 /**
@@ -283,6 +301,46 @@ async function realRecordLearning({ shop, deps }) {
     }
   }
   return { attempted, applied, errors };
+}
+
+/**
+ * THE ANSWER-LEARNING WRITER. The join that was missing on 2026-08-03.
+ *
+ * outcome/buildAnswerLearning.js turns one settled answer into a write plan and
+ * outcome/recordAnswerLearning.js performs it - decision event, rule_qa_log row,
+ * aliases (including the photographed wording), new-product identity, and the
+ * Regulars/Favourites pending action. Both were complete, both were tested, and
+ * until now NOTHING CALLED EITHER OF THEM.
+ *
+ * ── THIS DEPENDENCY WIDENS A SHAPE, AND THAT IS STATED RATHER THAN HIDDEN ───
+ * Every other write in this container goes through `writeQuery` (one statement,
+ * its own transaction) or through a component that owns its own pool.
+ * recordAnswerLearning needs an actual CONNECTED pg CLIENT: asdair.pending_action
+ * has no writer of its own, so the module has no pool to take one from and says
+ * so by failing loudly. So this function takes one from the write pool that
+ * already exists here, hands it over, and releases it in a `finally`.
+ *
+ * It does NOT open a transaction. Each underlying writer (promoteDecision,
+ * updateRegulars) still owns its own BEGIN/COMMIT exactly as it does today, so
+ * no existing atomicity guarantee is changed and none is nested. The client is
+ * shared so that a multi-step answer is written through one connection, which is
+ * the convention recordAnswerLearning documents.
+ *
+ * FAILURES PROPAGATE. realRecordLearning() below swallows errors on purpose -
+ * enriching an alias must never fail a shop that otherwise reconciled. This is
+ * the opposite case and recordAnswerLearning.js argues it at length: a swallowed
+ * failure on the path whose entire purpose is that an answer survives the week
+ * is indistinguishable from the bug, and would be discovered next Sunday when
+ * Warwick is asked the same question again.
+ */
+async function realRecordAnswerLearning(answer) {
+  const { recordAnswerLearning } = require('../outcome/recordAnswerLearning.js');
+  const client = await getWritePool().connect();
+  try {
+    return await recordAnswerLearning(answer, { client });
+  } finally {
+    client.release();
+  }
 }
 
 /** The hard allowlist, imported from the route that owns it so the two cannot
@@ -334,6 +392,7 @@ export function createDeps(overrides = {}) {
     buildConfirmationPayload: buildPayload,
     recordConfirmation: (confirmation) => recordConfirmation(confirmation),
     recordLearning: realRecordLearning,
+    recordAnswerLearning: realRecordAnswerLearning,
 
     // the pure stage table, injected so getStatus can report the next step
     decideNextStep,

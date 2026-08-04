@@ -13,6 +13,7 @@ import { privateAppsResponse, privateAppsStartupLine } from './private-apps.mjs'
 // Static serving — including the overlay route — lives in static.mjs so a gate can EXECUTE it.
 // It cannot be executed from here: this file imports db.mjs, which opens a live write pool on load.
 import { serveStatic, staticCtx } from './static.mjs';
+import { whyDown } from './down-reason.mjs';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
 // The serving context — which directory is served, and which tree the overlay must stay out of —
@@ -166,14 +167,9 @@ async function apiSourceBrief(video) {
 const APP_SERVICES = {
   asdair: { url: 'http://127.0.0.1:8710/asdair/health', label: 'AsdAIr’s read service' },
 };
-// node's fetch buries the real reason under a generic TypeError, and "TypeError" tells Warwick
-// nothing. Dig out the cause and say what actually happened, in words.
-function whyDown(e) {
-  const code = String((e && ((e.cause && e.cause.code) || e.code || e.name)) || 'unreachable');
-  return { ECONNREFUSED: 'nothing is listening there', ENOTFOUND: 'that address does not resolve',
-    EHOSTUNREACH: 'that host is unreachable', ECONNRESET: 'the connection was reset',
-    TimeoutError: 'it did not answer in time', AbortError: 'it did not answer in time' }[code] || code;
-}
+// whyDown lives in its own module so a gate can EXECUTE it: importing server.mjs opens a live DB
+// pool via db.mjs, which is exactly why the old in-file version was never tested and shipped two
+// unreachable branches. See down-reason.mjs for the DOMException-legacy-code defect it fixes.
 // Answers up / down / none. Never throws, never 500s, never guesses: a service that does not answer
 // is reported as not answering, with the reason, and the UI shows unknown rather than a fake figure.
 async function apiAppStatus(key) {
@@ -186,10 +182,62 @@ async function apiAppStatus(key) {
   if (!svc) return { ok: true, app: null, state: 'none', detail: 'No backing service is registered for this app.' };
   const host = (() => { try { return new URL(svc.url).host; } catch { return 'its configured address'; } })();
   try {
-    const r = await fetch(svc.url, { signal: AbortSignal.timeout(1500), headers: { accept: 'application/json' } });
-    if (!r.ok) return { ok: true, app: key, state: 'down', detail: `${svc.label} answered HTTP ${r.status} on ${host}.` };
+    // BUDGET, and why it moved from 1500ms. Health used to be a literal that touched nothing; it
+    // now does real dependency work (connect + SELECT 1), itself capped at 2000ms upstream. A
+    // 1500ms budget sitting BELOW that cap means our own timeout fires before the service can
+    // report its own reason — turning a lying green into a lying red, which is not progress.
+    // 3500ms sits above the upstream cap so a slow dependency arrives as a REPORTED reason.
+    //
+    // Measured on this machine 2026-08-04, single process, first run discarded:
+    //   * health as a literal .......... median 6ms
+    //   * full workspace read .......... median 1472ms (range 692-1763)
+    // and — the reason headroom is not theoretical — the 1500ms budget was observed TIMING OUT
+    // against the 6ms literal endpoint in live use, which is what produced the bogus "— 23."
+    //
+    // NOT measured: the dependency-aware health endpoint itself, because it cannot run until the
+    // reader is restarted, and that restart is Larry's. Stated rather than estimated.
+    const r = await fetch(svc.url, { signal: AbortSignal.timeout(3500), headers: { accept: 'application/json' } });
     const body = await r.json().catch(() => null);
-    return { ok: true, app: key, state: 'up', detail: `${svc.label} is answering on ${host}.`, service: body && body.service ? String(body.service) : null };
+    // AN APP IS NOT "UP" BECAUSE A PORT ANSWERED.
+    //
+    // This is the second half of the 2026-08-03 false green, and it has to be here as well as in the
+    // reader: /asdair/health returned HTTP 200 with `ok: true` while /asdair/workspace was 500-ing
+    // on a missing `pg` module. A probe that stops at `r.ok` would report "up" for any process that
+    // can still form an HTTP response — including one that can do nothing else.
+    //
+    // So the BODY decides when the body says anything. `ok: false` is degraded, whatever the status
+    // line says. An unparseable or non-object body from a service we expect JSON from is NOT quietly
+    // treated as healthy — unknown reads as unknown.
+    if (!r.ok) {
+      const why = body && body.message ? String(body.message) : `${svc.label} answered HTTP ${r.status} on ${host}.`;
+      return { ok: true, app: key, state: 'down', detail: why, http_status: r.status };
+    }
+    if (body && typeof body === 'object' && body.ok === false) {
+      return {
+        ok: true, app: key, state: 'down', http_status: r.status,
+        detail: body.message ? String(body.message)
+          : `${svc.label} is answering on ${host} but reports it cannot do its job.`,
+        service: body.service ? String(body.service) : null,
+      };
+    }
+    if (!body || typeof body !== 'object') {
+      return {
+        ok: true, app: key, state: 'unknown', http_status: r.status,
+        detail: `${svc.label} answered on ${host} but not with the health report we expect, so its state is unknown.`,
+      };
+    }
+    // Healthy, and able to say what it checked. Surfacing the dependency list means the cockpit can
+    // show WHAT was verified rather than an unexplained green.
+    const deps = Array.isArray(body.dependencies) ? body.dependencies : null;
+    const checked = deps ? deps.filter((x) => x && x.checked).map((x) => String(x.dependency)) : [];
+    return {
+      ok: true, app: key, state: 'up',
+      detail: checked.length
+        ? `${svc.label} is answering on ${host}, and reports its ${checked.join(' and ')} reachable.`
+        : `${svc.label} is answering on ${host}.`,
+      service: body.service ? String(body.service) : null,
+      dependencies_checked: checked,
+    };
   } catch (e) {
     return { ok: true, app: key, state: 'down', detail: `${svc.label} is not answering on ${host} — ${whyDown(e)}.` };
   }
@@ -208,6 +256,44 @@ async function apiAsdairWorkspace() {
     const body = await r.json().catch(() => null);
     if (!body || typeof body !== 'object') return { ok: false, error: 'AsdAIr’s read service returned something that was not JSON.' };
     return body; // upstream already carries its own ok:true/shop/etc — forwarded verbatim, nothing added
+  } catch (e) {
+    return { ok: false, error: `AsdAIr’s read service is not answering — ${whyDown(e)}.` };
+  }
+}
+// The durable RULEBOOK, as opposed to one shop's workspace above. Same shape, same rules: a
+// read-only forward, a short timeout, fail-soft to an error the UI shows as "offline" rather than
+// a crash or an invented rulebook. Kept as its own proxy — NOT folded into apiAsdairWorkspace —
+// because the two answer different questions and are read on different screens, so a shop poll
+// must not drag the whole catalogue with it.
+async function apiAsdairRules() {
+  try {
+    const r = await fetch(`${ASDAIR_ORIGIN}/asdair/rules?household=1`, { signal: AbortSignal.timeout(4000), headers: { accept: 'application/json' } });
+    if (!r.ok) return { ok: false, error: `AsdAIr’s read service answered HTTP ${r.status} for the rulebook.` };
+    const body = await r.json().catch(() => null);
+    if (!body || typeof body !== 'object') return { ok: false, error: 'AsdAIr’s read service returned something that was not JSON.' };
+    return body; // forwarded verbatim — the display strings are already decided server-side
+  } catch (e) {
+    return { ok: false, error: `AsdAIr’s read service is not answering — ${whyDown(e)}.` };
+  }
+}
+// The Sonnet execution packet + basket reconciliation for one shop. Same construction as the two
+// proxies above: a read-only forward, a short timeout, fail-soft to an error the UI shows as
+// "offline" rather than a crash or an invented packet.
+//
+// Its own proxy rather than folded into the workspace, because the two are read on different screens
+// and answer different questions — and because the packet's producers (WO-P/WO-S) do not exist yet,
+// so this route legitimately answers "not produced" for a shop whose workspace is fully populated.
+// Contract: Builds/BUILD-015-.../COCKPIT-PACKET-AND-RECONCILIATION-INTERFACE.md
+async function apiAsdairPacket(shop) {
+  // The browser names a shop id and nothing else; this server owns the host:port, as everywhere.
+  const s = String(shop || '').trim();
+  if (!s || !/^[A-Za-z0-9-]{1,32}$/.test(s)) return { ok: false, error: 'A shop must be named to read its packet.' };
+  try {
+    const r = await fetch(`${ASDAIR_ORIGIN}/asdair/packet?shop=${encodeURIComponent(s)}`, { signal: AbortSignal.timeout(4000), headers: { accept: 'application/json' } });
+    if (!r.ok) return { ok: false, error: `AsdAIr’s read service answered HTTP ${r.status} for the packet.` };
+    const body = await r.json().catch(() => null);
+    if (!body || typeof body !== 'object') return { ok: false, error: 'AsdAIr’s read service returned something that was not JSON.' };
+    return body; // forwarded verbatim — the display strings are already decided server-side
   } catch (e) {
     return { ok: false, error: `AsdAIr’s read service is not answering — ${whyDown(e)}.` };
   }
@@ -262,6 +348,8 @@ const server = http.createServer(async (req, res) => {
     if (req.url.startsWith('/api/deliverable')) { const f = new URL(req.url, 'http://x').searchParams.get('file'); return j(res, 200, await apiDeliverable(f)); }
     if (req.url.startsWith('/api/app-status')) { const a = new URL(req.url, 'http://x').searchParams.get('app'); return j(res, 200, await apiAppStatus(a)); }
     if (req.url.startsWith('/api/asdair/workspace')) return j(res, 200, await apiAsdairWorkspace());
+    if (req.url.startsWith('/api/asdair/rules')) return j(res, 200, await apiAsdairRules());
+    if (req.url.startsWith('/api/asdair/packet')) { const s = new URL(req.url, 'http://x').searchParams.get('shop'); return j(res, 200, await apiAsdairPacket(s)); }
     if (req.url.startsWith('/api/asdair/media')) return proxyAsdairMedia(req, res);
     if (req.url.startsWith('/api/mine') && req.method === 'POST') {
       let raw = ''; req.on('data', (d) => { raw += d; if (raw.length > 1e4) req.destroy(); });

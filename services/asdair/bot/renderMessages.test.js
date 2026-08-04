@@ -34,7 +34,21 @@ const SAMPLES = {
   plan_ready: { shopRef: REF, listLines: 41, resolved: 36, needDecision: 3, excludedByRule: 2, substitutions: 'never auto-substitute' },
   question: { shopRef: REF, questionKey: 'q7', item: 'yoghurt', candidates: ['Yeo Valley Natural 500g', 'Arla Skyr 450g'] },
   progress: { shopRef: REF, stage: 'search items', regularsAdded: 30, searchItemsAdded: 5, held: 2, substitutions: 0, basketLines: 35 },
-  basket_ready: { shopRef: REF, lines: ['Milk 4pt', { label: 'Bananas', qty: 2 }], estimatedTotal: '£84.20', substitutions: 0, newRegulars: 1, aliasesLearned: 2, productIdsCaptured: 4, exceptions: 1 },
+  // The basket handback is DERIVED FROM THE VERIFICATION. `verification` is not
+  // optional garnish: absent or null renders the loud NOT-VERIFIED card, by
+  // design, so a producer that forgets it can never emit a reassuring one.
+  basket_ready: {
+    shopRef: REF,
+    verification: {
+      verified: true, blocking: [], countsMatch: true,
+      expectedDistinctProducts: 4, actualDistinctProducts: 4,
+      expectedTotalUnits: 7, actualTotalUnits: 7,
+      unavailable: [], missing: [], quantityMismatches: [], unexpected: [],
+      nameOnlyMatches: [], packetSelfConsistent: null,
+    },
+    lines: ['Milk 4pt', { label: 'Bananas', qty: 2 }],
+    estimatedTotal: '£84.20', newRegulars: 1, aliasesLearned: 2, productIdsCaptured: 4, exceptions: 1,
+  },
   status: { shopRef: REF, state: 'building', listLines: 41, resolved: 36, needDecision: 3, held: 2, basketLines: 35, substitutions: 0, exceptions: 1, estimatedTotal: null, lastEvent: 'basket line added', updatedAt: '2026-07-28T12:00:00Z' },
   failure: { shopRef: REF, stage: 'search items', detail: 'ASDA search returned no results for "yoghurt"' },
   confirmation_received: { shopRef: REF, source: 'forwarded email' },
@@ -229,14 +243,123 @@ test('basket ready lists the products, the learning counts, and states that noth
   assert.match(out.text, /^Aliases learned: 2$/m);
   assert.match(out.text, /^Product IDs captured: 4$/m);
   assert.match(out.text, /^Exceptions: 1$/m);
-  assert.match(out.text, /Nothing has been ordered\./);
+  assert.match(out.text, /Nothing has been ordered/);
   assert.deepEqual(everyButton(out).map((b) => b.text), ['Send order confirmation', 'View exceptions', 'Close shop']);
+  // NEW CONTRACT: the verdict is the headline, and the two count facts are
+  // reported separately from it.
+  assert.match(out.text, /^🧺 Basket ready — VERIFIED against the plan$/m);
+  assert.match(out.text, /^Distinct products: expected 4, basket 4$/m);
+  assert.match(out.text, /^Total units: expected 7, basket 7$/m);
+  assert.match(out.text, /^Counts match: yes — headline only, NOT the verdict$/m);
 });
 
 test('basket ready with no price source says "unknown", not a made-up total', () => {
-  const out = renderBasketReady({ shopRef: REF, lines: [], estimatedTotal: null });
+  const out = renderBasketReady({ ...SAMPLES.basket_ready, lines: [], estimatedTotal: null });
   assert.match(out.text, /^Estimated total: unknown$/m);
-  assert.match(out.text, /\(none\)/);
+  // A basket with no product lines prints NO product-lines section at all rather
+  // than a "(0)" heading, because a count we did not take is not a zero.
+  assert.ok(!/^Product lines/m.test(out.text));
+});
+
+// ── the basket handback is a claim that reconciliation PASSED ────────────────
+
+test('FAIL SAFE: no verification renders NOT VERIFIED — never a reassuring card of zeros', () => {
+  for (const spec of [
+    { shopRef: REF },
+    { shopRef: REF, verification: null, notVerifiedReason: 'no basket capture has been recorded' },
+    { shopRef: REF, verification: null, lines: ['Milk 4pt'], estimatedTotal: '£84.20' },
+  ]) {
+    const out = renderBasketReady(spec);
+    assert.match(out.text, /^⚠️ Basket NOT VERIFIED$/m);
+    assert.match(out.text, /has NOT been checked against the plan/);
+    assert.match(out.text, /Do not treat this as ready/);
+    // THE CRUCIAL NEGATIVES: no measurement we never took.
+    assert.ok(!/: 0$/m.test(out.text), 'a card with no verification fabricated a zero');
+    assert.ok(!/Counts match/.test(out.text), 'a card with no verification reported a count comparison');
+    assert.ok(!/Distinct products/.test(out.text));
+    assert.ok(!/Product lines/.test(out.text), 'an unverified card listed basket contents');
+    assert.ok(!/£84\.20/.test(out.text), 'an unverified card reported a total');
+    assert.match(out.text, /no checkout, no payment, no delivery slot/);
+  }
+});
+
+test('a FAILED verification says so FIRST, and a matching headline cannot make it read as ready', () => {
+  const out = renderBasketReady({
+    shopRef: REF,
+    verification: {
+      verified: false,
+      blocking: ['1 expected product(s) missing from the basket', '1 basket line(s) on no packet line'],
+      // The exact trap the reconciler mutation-tests: the headline agrees while
+      // the contents are wrong.
+      countsMatch: true,
+      expectedDistinctProducts: 4, actualDistinctProducts: 4,
+      expectedTotalUnits: 7, actualTotalUnits: 7,
+      missing: [{ name: 'Rice Pot', quantity: 3 }],
+      unexpected: [{ name: 'Cola 2L', quantity: 1 }],
+    },
+  });
+  const firstLine = out.text.split('\n')[0];
+  assert.equal(firstLine, '⚠️ Basket NOT VERIFIED — do not check out yet',
+    'a failed verification did not lead the card');
+  assert.ok(out.text.indexOf('Not verified because:') < out.text.indexOf('Counts match'),
+    'the reassuring headline appeared before the reason it is not ready');
+  assert.match(out.text, /^Counts match: yes — headline only, NOT the verdict$/m);
+  assert.match(out.text, /• 1 expected product\(s\) missing from the basket/);
+  assert.match(out.text, /MISSING from the basket:/);
+  assert.match(out.text, /• Rice Pot x3/);
+  assert.match(out.text, /IN THE BASKET but on no planned line:/);
+  assert.match(out.text, /• Cola 2L x1/);
+});
+
+test('an unavailable line is NAMED, and the word "substitut" appears nowhere on this card', () => {
+  const out = renderBasketReady({
+    shopRef: REF,
+    verification: {
+      verified: false,
+      blocking: ['1 product(s) unavailable and awaiting Warwick'],
+      countsMatch: false,
+      expectedDistinctProducts: 2, actualDistinctProducts: 2,
+      expectedTotalUnits: 4, actualTotalUnits: 4,
+      unavailable: [{ name: 'Rice Pot', quantity: 3 }],
+      quantityMismatches: [{ name: 'Oat Crunch', expected: 2, actual: 1 }],
+      nameOnlyMatches: ['Cocoa Drops'],
+      packetSelfConsistent: false,
+    },
+  });
+  assert.match(out.text, /UNAVAILABLE at ASDA — nothing was put in its place, you decide:/);
+  assert.match(out.text, /• Rice Pot x3/);
+  assert.match(out.text, /^WRONG QUANTITY:$/m);
+  assert.match(out.text, /• Oat Crunch: expected 2, basket 1/);
+  assert.match(out.text, /Matched on NAME ONLY/);
+  assert.match(out.text, /• Cocoa Drops/);
+  // A producer defect is named as one and never blamed on the basket.
+  assert.match(out.text, /defect in the plan, not in the basket/);
+  // THE PRODUCT RULE: substitution is not a permitted outcome anywhere, so the
+  // word must not appear on the card that hands the basket over.
+  assert.ok(!/substitut/i.test(out.text), 'the basket handback used the word "substitut*"');
+});
+
+test('a section with no members is omitted entirely rather than rendered empty', () => {
+  const out = renderBasketReady(SAMPLES.basket_ready);
+  for (const heading of ['UNAVAILABLE at ASDA', 'MISSING from the basket', 'WRONG QUANTITY',
+    'IN THE BASKET but on no planned line', 'Matched on NAME ONLY', 'Not verified because']) {
+    assert.ok(!out.text.includes(heading), `${heading} was rendered on a clean basket`);
+  }
+});
+
+test('a quantity that is not a whole number is never invented on the card', () => {
+  const out = renderBasketReady({
+    shopRef: REF,
+    verification: {
+      verified: false, blocking: ['1 expected product(s) missing from the basket'],
+      countsMatch: null,
+      missing: [{ name: 'Rice Pot' }],
+    },
+  });
+  assert.match(out.text, /• Rice Pot$/m, 'a missing quantity was rendered as a made-up number');
+  assert.ok(!/Rice Pot x/.test(out.text));
+  assert.match(out.text, /^Counts match: unknown$/m);
+  assert.match(out.text, /^Distinct products: expected unknown, basket unknown$/m);
 });
 
 test('failure is visible and offers retry', () => {

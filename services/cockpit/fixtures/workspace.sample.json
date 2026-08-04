@@ -1,0 +1,172 @@
+{
+  "_fixture": "SYNTHETIC. Structurally faithful to GET /asdair/workspace, but every value is invented. This repository is PUBLIC and the real payload is a real household's shopping list. Never replace this with a live capture. See render-vm-check.mjs.",
+  "ok": true,
+  "generated_from": "durable state only",
+  "shop": {
+    "shop_id": "1",
+    "shop_id_display": "1",
+    "shop_ref_display": "SHOP-2026-01-01",
+    "household_id_display": "1",
+    "stage": "PROCESSING",
+    "stage_display": "PROCESSING",
+    "stage_label_display": "Working through the list",
+    "all_stages": ["INTAKE", "INTERPRETING", "PROCESSING", "AWAITING_ANSWERS", "PLANNED", "BASKET_REQUESTED", "BASKET_BUILT", "AWAITING_REVIEW", "ORDERED", "RECONCILED", "COMPLETE", "CANCELLED"],
+    "is_terminal": false,
+    "created_at_display": "1 Jan 2026, 09:00",
+    "updated_at_display": "1 Jan 2026, 09:42",
+    "needs_review_display": "no",
+    "last_event_display": "interpretation completed",
+    "failure": null,
+    "lines_summary": { "total_display": "5", "resolved_display": "2", "open_display": "3" },
+    "substitution_policy_display": "never substitute"
+  },
+  "timeline": [
+    { "event_type_display": "shop opened", "from_display": "unknown", "to_display": "INTAKE", "description_display": "List photographed and retained", "occurred_at_display": "1 Jan 2026, 09:00", "is_failure": false },
+    { "event_type_display": "stage change", "from_display": "INTAKE", "to_display": "INTERPRETING", "description_display": "Reading the list against the household catalogue", "occurred_at_display": "1 Jan 2026, 09:05", "is_failure": false },
+    { "event_type_display": "stage change", "from_display": "INTERPRETING", "to_display": "PROCESSING", "description_display": "Interpretation complete", "occurred_at_display": "1 Jan 2026, 09:42", "is_failure": false }
+  ],
+  "evidence": {
+    "source_kind_display": "photograph",
+    "raw_text_display": "unknown",
+    "raw_media_path_display": "sample/list.jpg",
+    "has_media": true,
+    "media_url": "/api/asdair/media?shop=1",
+    "transcript_display": "unknown",
+    "transcript_provider_display": "unknown",
+    "transcript_model_display": "unknown",
+    "transcript_confidence_display": "unknown",
+    "needs_review_display": "no"
+  },
+  "interpretation": {
+    "list_id": "1",
+    "list_id_display": "1",
+    "catalogue_size": 42,
+    "catalogue_size_display": "42",
+    "total_lines_display": "5",
+    "tally": { "matched": 2, "needs_confirmation": 1, "unmatched_new_item": 1, "unreadable": 1, "possible_duplicate": 0 },
+    "lines": [
+      {
+        "line_no": 1, "list_item_id": "101",
+        "raw_reading": "example oat drink", "raw_reading_display": "example oat drink",
+        "matched_regular_id": 11, "matched_regular_id_display": "11",
+        "canonical_product_name": "Example Brand Oat Drink 1L", "canonical_product_name_display": "Example Brand Oat Drink 1L",
+        "asda_product_id": "1000001", "asda_product_id_display": "1000001",
+        "quantity": 2, "quantity_display": "2", "added_quantity_display": "2",
+        "confidence_display": "high", "match_basis": "exact_alias", "match_basis_display": "exact alias match",
+        "alternatives": [], "status": "matched", "status_label": "matched",
+        "plan_status": "resolved", "plan_status_display": "resolved",
+        "note_display": "unknown", "integrity_warnings": []
+      },
+      {
+        "line_no": 2, "list_item_id": "102",
+        "raw_reading": "sample cheese 200g", "raw_reading_display": "sample cheese 200g",
+        "matched_regular_id": 12, "matched_regular_id_display": "12",
+        "canonical_product_name": "Sample Mature Cheese 200g", "canonical_product_name_display": "Sample Mature Cheese 200g",
+        "asda_product_id": "1000002", "asda_product_id_display": "1000002",
+        "quantity": 1, "quantity_display": "1", "added_quantity_display": "1",
+        "confidence_display": "high", "match_basis": "catalogue_id", "match_basis_display": "catalogue id",
+        "alternatives": [], "status": "matched", "status_label": "matched",
+        "plan_status": "resolved", "plan_status_display": "resolved",
+        "note_display": "unknown", "integrity_warnings": []
+      },
+      {
+        "line_no": 3, "list_item_id": "103",
+        "raw_reading": "placeholder juice", "raw_reading_display": "placeholder juice",
+        "matched_regular_id": null, "matched_regular_id_display": "unknown",
+        "canonical_product_name": null, "canonical_product_name_display": "unknown",
+        "asda_product_id": null, "asda_product_id_display": "unknown",
+        "quantity": 1, "quantity_display": "1", "added_quantity_display": "unknown",
+        "confidence_display": "low", "match_basis": "approximate_alias", "match_basis_display": "approximate alias",
+        "alternatives": [
+          { "regular_id_display": "13", "name_display": "Placeholder Orange Juice 1L", "score_display": "0.71" },
+          { "regular_id_display": "14", "name_display": "Placeholder Apple Juice 1L", "score_display": "0.64" }
+        ],
+        "status": "needs_confirmation", "status_label": "needs confirming",
+        "plan_status": "held", "plan_status_display": "held",
+        "note_display": "matched by approximate alias, no catalogue id",
+        "integrity_warnings": ["claimed match carries no catalogue id"]
+      },
+      {
+        "line_no": 4, "list_item_id": "104",
+        "raw_reading": "brand new thing", "raw_reading_display": "brand new thing",
+        "matched_regular_id": null, "matched_regular_id_display": "unknown",
+        "canonical_product_name": null, "canonical_product_name_display": "unknown",
+        "asda_product_id": null, "asda_product_id_display": "unknown",
+        "quantity": 1, "quantity_display": "1", "added_quantity_display": "unknown",
+        "confidence_display": "unknown", "match_basis": "none", "match_basis_display": "no match",
+        "alternatives": [], "status": "unmatched_new_item", "status_label": "new item",
+        "plan_status": "held", "plan_status_display": "held",
+        "note_display": "not in the household catalogue", "integrity_warnings": []
+      },
+      {
+        "line_no": 5, "list_item_id": "105",
+        "raw_reading": null, "raw_reading_display": "unknown",
+        "matched_regular_id": null, "matched_regular_id_display": "unknown",
+        "canonical_product_name": null, "canonical_product_name_display": "unknown",
+        "asda_product_id": null, "asda_product_id_display": "unknown",
+        "quantity": null, "quantity_display": "unknown", "added_quantity_display": "unknown",
+        "confidence_display": "unknown", "match_basis": "none", "match_basis_display": "no match",
+        "alternatives": [], "status": "unreadable", "status_label": "unreadable",
+        "plan_status": "unclassified", "plan_status_display": "unclassified",
+        "note_display": "handwriting could not be read", "integrity_warnings": []
+      }
+    ],
+    "grounded": true
+  },
+  "plan": {
+    "resolved": [
+      { "line_no": 1, "list_item_id": "101", "raw_reading_display": "example oat drink", "canonical_product_name_display": "Example Brand Oat Drink 1L", "matched_regular_id_display": "11", "requested_qty_display": "2", "added_qty_display": "2", "plan_status_display": "resolved", "applied_rule_id_display": "unknown", "applied_rule_display": "unknown", "prior_order_context": "unknown", "in_prior_order": false },
+      { "line_no": 2, "list_item_id": "102", "raw_reading_display": "sample cheese 200g", "canonical_product_name_display": "Sample Mature Cheese 200g", "matched_regular_id_display": "12", "requested_qty_display": "1", "added_qty_display": "1", "plan_status_display": "resolved", "applied_rule_id_display": "unknown", "applied_rule_display": "unknown", "prior_order_context": "unknown", "in_prior_order": true }
+    ],
+    "held": [
+      { "line_no": 3, "list_item_id": "103", "raw_reading_display": "placeholder juice", "canonical_product_name_display": "unknown", "matched_regular_id_display": "unknown", "requested_qty_display": "1", "added_qty_display": "unknown", "plan_status_display": "held", "applied_rule_id_display": "unknown", "applied_rule_display": "unknown", "prior_order_context": "unknown", "in_prior_order": false },
+      { "line_no": 4, "list_item_id": "104", "raw_reading_display": "brand new thing", "canonical_product_name_display": "unknown", "matched_regular_id_display": "unknown", "requested_qty_display": "1", "added_qty_display": "unknown", "plan_status_display": "held", "applied_rule_id_display": "unknown", "applied_rule_display": "unknown", "prior_order_context": "unknown", "in_prior_order": false }
+    ],
+    "excluded": [],
+    "unclassified": [
+      { "line_no": 5, "list_item_id": "105", "raw_reading_display": "unknown", "canonical_product_name_display": "unknown", "matched_regular_id_display": "unknown", "requested_qty_display": "unknown", "added_qty_display": "unknown", "plan_status_display": "unclassified", "applied_rule_id_display": "unknown", "applied_rule_display": "unknown", "prior_order_context": "unknown", "in_prior_order": false }
+    ],
+    "counts": { "resolved_display": "2", "held_display": "2", "excluded_display": "0", "unclassified_display": "1", "total_display": "5" },
+    "prior_order_known": true,
+    "prior_order_ref_display": "SHOP-2025-12-25"
+  },
+  "questions": {
+    "open_count_display": "1",
+    "items": [
+      { "id_display": "1", "line_no_display": "3", "question_display": "Is \"placeholder juice\" the Placeholder Orange Juice 1L you usually get?", "asked_at_display": "1 Jan 2026, 09:40", "answered_display": "no", "answer_display": "unknown", "status_display": "open" }
+    ]
+  },
+  "browser": {
+    "requested": false,
+    "request_id_display": "unknown", "status_display": "unknown", "is_paused": false,
+    "claimed_by_display": "unknown", "requested_at_display": "unknown", "claimed_at_display": "unknown",
+    "finished_at_display": "unknown", "last_error_display": "unknown",
+    "regulars_added_display": "unknown", "searched_items_added_display": "unknown",
+    "basket_lines_display": "unknown", "basket_lines_source_display": "unknown",
+    "estimated_total": null, "held_display": "unknown"
+  },
+  "order": {
+    "received": false,
+    "confirmation_id_display": "unknown", "source_kind_display": "unknown",
+    "received_at_display": "unknown", "reconciled_at_display": "unknown",
+    "raw_text_display": "unknown", "raw_media_path_display": "unknown",
+    "parse_provider_display": "unknown", "stated_total": null, "reported_total": null,
+    "lines": [], "lines_count_display": "unknown",
+    "derived_price_count_display": "unknown", "unknown_basis_count_display": "unknown",
+    "price_basis_display": "unknown"
+  },
+  "history": {
+    "previous_order": { "shop_ref_display": "SHOP-2025-12-25", "ordered_at_display": "25 Dec 2025", "lines_count_display": "4" },
+    "rotation": [],
+    "aliases_learned": [],
+    "aliases_learned_basis": "unknown",
+    "new_regulars": [],
+    "product_ids_captured": [],
+    "catalogue_size_display": "42"
+  },
+  "shops": [
+    { "shop_id_display": "1", "shop_ref_display": "SHOP-2026-01-01", "stage_display": "PROCESSING", "created_at_display": "1 Jan 2026" }
+  ],
+  "packet": null,
+  "reconciliation": null
+}

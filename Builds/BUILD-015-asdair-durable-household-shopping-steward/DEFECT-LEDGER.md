@@ -928,9 +928,14 @@ section C.
 ### Defects surfaced by this backfill that are still OPEN and were not tracked as such
 
 D-2026-07-27-10 · D-2026-07-27-11 · D-2026-07-27-12 · D-2026-07-27-13 · D-2026-07-28-08 ·
-**D-2026-07-28-20** (browser-runner and pipeline-runtime are still absent from CI —
-**VERIFIED by Larry 2026-08-03**: neither working-directory appears in any step of
-`.github/workflows/asdair-tests.yml`) · D-2026-07-28-29 · D-2026-07-28-32 ·
+**D-2026-07-28-20** (browser-runner and pipeline-runtime absent from CI —
+**VERIFIED by Larry 2026-08-03**: neither working-directory appeared in any step of
+`.github/workflows/asdair-tests.yml`. **FIX COMMITTED 2026-08-04** — four steps added
+to the `unit` job, `npm ci` + `node --test` for each; `browser-runner` verified locally
+at **65/65 pass** before the step was trusted. **NOT YET CLOSED**: a workflow edit is
+not a workflow run, and this file is path-filtered, so the fix is proven only when CI
+executes it at a real head — see [[unrun-ci-looks-like-green-ci]]. Re-raised as
+**D-2026-08-04-07** if the first run does not go green) · D-2026-07-28-29 · D-2026-07-28-32 ·
 D-2026-07-28-33 · D-2026-07-28-34 · D-2026-07-28-40 · D-2026-08-03-23.
 
 > **RETRACTED from this list, 2026-08-03: D-2026-07-28-21.** The backfill listed the
@@ -938,14 +943,21 @@ D-2026-07-28-33 · D-2026-07-28-34 · D-2026-07-28-40 · D-2026-08-03-23.
 > 2026-07-28** and the proof assertion was inverted from asserting loss to asserting
 > survival at that time. See the correction block on that entry. The false alarm came from
 > reading section 5b's stale heading and present-tense comment instead of the assertion
-> beneath them; the stale text is now tracked separately as D-2026-08-03-21.
+> beneath them; the stale text is now tracked separately as D-2026-08-03-25 (renumbered
+> from D-2026-08-03-21 on 2026-08-04 — the id was in use twice).
 >
 > Recorded rather than quietly deleted because it is the exact failure mode this ledger
 > exists to catch: **a confident status derived from prose that the code had already
 > contradicted.** Two of the three highest-severity claims in the backfill were checked
 > against source at correction time; this one did not survive the check, the CI one did.
 
-### D-2026-08-03-21 — a proof section's heading and comment contradict its own assertion
+### D-2026-08-03-25 — a proof section's heading and comment contradict its own assertion
+
+> **RENUMBERED 2026-08-04, from D-2026-08-03-21.** The id was in use **twice** — this entry
+> and the CDP-websocket entry in section C — so a work order citing "D-2026-08-03-21"
+> resolved to whichever one the reader happened to find first. Caught at read-back by the
+> WO-ZA builder, not by any control: **nothing in this ledger enforces id uniqueness.** The
+> section-C entry keeps the original id; this one moves.
 
 - **Found:** 2026-08-03, while verifying the WO-E backfill's most severe claim.
 - **Component:** `services/asdair/pipeline-runtime/proof/run-proofs.mjs`, section 5b.
@@ -1025,3 +1037,109 @@ Every wrong call I made tonight has the same shape: **query one instrument, beli
 - **Root cause:** UNKNOWN — not yet traced. Candidates: `match_term` matching is exact-string and the photographed wording differed; or `rules` are loaded but not consulted before question generation; or the `info` directive (rules 32/36/37/38 are all `info`) is never actioned by the planner at all. **The last of those would mean every multibuy and rotation rule in the system is inert.**
 - **Why controls missed it:** no test asserts "a line covered by an active rule does not become a question."
 - **Status:** OPEN. Trace before building anything new — this may be the single highest-value fix in the build, and it is cheap if the cause is the `info` directive being unhandled.
+
+## D-2026-08-04-05 — the proof harness reads and prints real household state, while asserting it does not
+
+- **Found:** 2026-08-04, at WO-ZA read-back, by the builder — **during its own preflight, before it had established the fault**. Disclosed voluntarily, with nothing quoted.
+- **Severity:** MEDIUM-HIGH. No leak off the machine; but a committed control's stated boundary is **false**, and has been on every run since it was written.
+- **Component:** `services/asdair/pipeline-runtime/proof/run-proofs.mjs`, PROOF 9.
+- **Symptom:** the proof overrides `ASDAIR_RUNTIME_STATE_DIR` to a scratch directory, so it *looks* fully sandboxed. It does **not** override `SHOPPER_INTAKE_STATE_FILE`. `collect()` → `readOffset()` → `intakeStateFile()` (`runtime-paths.mjs:41-48`) therefore falls through to the **real household intake state file** under `C:/.fusion247/asdair/` — and prints its contents.
+- **The false claim, verbatim from the file's own header:** *"NOTHING IN THIS FILE TOUCHES … ANY CREDENTIALS FILE."*
+- **Root cause:** a partial sandbox. One of several path helpers was overridden and the siblings sharing the same fall-through were not. **Overriding one env var made the harness look sandboxed, which is worse than looking unsandboxed** — the visible override is what stops anyone checking the rest.
+- **Why controls missed it:** no control exists. Nothing asserts that a proof run resolves no path under `C:/.fusion247/`, and the header comment was taken as the boundary. **A declared private surface with no test is a comment**, and `private_surface: none` on the work order was true of the *code* and false of its *harness* — a distinction no field on the order can express.
+- **Related standing lesson:** [[a-control-is-not-evidence-until-made-to-fail]]. This is a new variant of it — not a control that never fired, but a control whose *scope statement* had never been tested.
+- **Durable fix:** WO-ZA item 5A — override the variable, **enumerate every other helper with the same fall-through rather than spot-checking**, correct the header to say what it actually touches, and add a check that fails if any proof resolves a path under `C:/.fusion247/`.
+- **Status:** OPEN — fix authorised and in progress under WO-ZA. **The harness may not be run again until 5A lands**, since running it is the act that performs the read.
+
+## D-2026-08-04-06 — the same defect id was used twice in this ledger
+
+- **Found:** 2026-08-04, at WO-ZA read-back.
+- **Symptom:** `D-2026-08-03-21` identified **two different defects** — the CDP websocket closing at the end of every runner batch (section C), and a proof section's heading contradicting its own assertion. A work order citing the id resolved to whichever the reader found first.
+- **Why controls missed it:** nothing enforces id uniqueness in this file. Ids are hand-assigned.
+- **Fix applied 2026-08-04:** the second entry renumbered to **D-2026-08-03-25**; the back-reference in the D-2026-07-28-21 retraction block updated. The section-C entry keeps the original id.
+- **Residual risk, stated rather than closed:** the renumber fixes *this* collision. **It does not prevent the next one**, and any external document citing `D-2026-08-03-21` for the proof-narrative defect is now silently wrong. Fixing the class needs a uniqueness check in CI; that is not built, and this entry should not be read as though it were.
+- **Status:** instance FIXED; **class OPEN**.
+
+## D-2026-08-04-07 — ACCEPTED EXCEPTION: the token-leak proof needs a token-shaped fixture
+
+- **Raised:** 2026-08-04, by the WO-Z1 builder, as the sole reason its verdict was PARTIAL.
+- **Symptom:** `secret-scan.sh --surface` over `services/asdair/bot/**` **exits 1**, class `telegram-token-bare`, at `resolveTap.test.js:474` — `const TOKEN = '1234567890:TESTFIXTURE-not-a-real-telegram-token'`.
+- **Pre-existing, proven:** the identical hit fires at **line 470 of untouched `HEAD`**; it moved four lines only because an import was added above it. Not introduced by that work order.
+- **Why it exists:** the fixture lives inside the test *"NO token can leak into a result, a refusal, an error or the console"*. **Being token-shaped is the point of it.** It deliberately omits the real `AA` prefix to sit outside canonical class 1; the newer content class catches the looser shape.
+- **Ruling (Larry, 2026-08-04): NO CHANGE to either the fixture or the scanner.**
+  - The scanner **already anticipated this**: the comment above the class states tower-baton's form *"produces 3, all of them deliberate secret-shaped test fixtures"*, and content classes are excluded from default mode precisely because *"a control that red-lights the repo on day one gets switched off — which is a worse outcome than the gap it closes."*
+  - An allowlist would weaken the class **repo-wide** to resolve a collision the design already priced in, and any marker it keyed on (`TESTFIXTURE`, `not-a-real`) becomes a **universal bypass string**.
+  - De-shaping the fixture would gut a real proof. Editing a test to make a scanner green is the failure this ledger exists to catch.
+- **Evidence of record for any surface scan touching `bot/**`:** the file-list form **excluding `resolveTap.test.js`** (exit 0), with the excluded file's hit named, shown identical at untouched `HEAD`, and explained. Coverage stated, never implied by the exit code.
+- **This is a HABIT, not a mechanism — recorded as such.** Nothing prevents the next reader from re-litigating it, or from quietly de-shaping the fixture to go green. Making it mechanical would need a per-path fixture baseline, which is new machinery this build has not earned. See [[compensating-habits-decay-silently]] — dated liability, not architecture.
+- **Status:** ACCEPTED EXCEPTION. Not a defect to fix; a decision to remember.
+
+## D-2026-08-04-08 — `"shortbread".includes("bread")` — a live wrong-product path in the resolver
+
+- **Found:** 2026-08-04, by the WO-Y/Z2 builder, as an **out-of-scope** finding it fixed anyway rather than leave.
+- **Severity: HIGH.** Not a hypothetical: `interpret/resolveByCatalogue.js` pass 3 used **raw substring containment**, so a list line saying *bread* could resolve to a packet of *shortbread* — a confident, silent, wrong product with no flag raised.
+- **Household impact:** **real baskets may have been wrong in ways nobody attributed to matching.** The wrongness is invisible at every downstream stage — the line resolves, the packet is valid, reconciliation passes, because every layer agrees on the wrong product.
+- **Root cause:** containment used as a proxy for similarity. Every compound word in English defeats it.
+- **Why controls missed it:** the alias fixtures happened to carry exact matches that short-circuited earlier passes. **The builder's own first test for this passed under mutation** — it was passing for the wrong reason, because the fixture carried an exact alias `"bread"` that never reached pass 3. It changed the fixture to `"white bread"`, and only then did the test fail without the fix. **A test that cannot fail is not a proof**, and this one could not.
+- **Durable fix:** token-wise matching. Refusals now pinned as tests: `bread`/`shortbread`, `cream`/`ice cream`, `milk`/`silk`, `beans`/`beers`, `butter`/`batter`, `lemon`/`melon`, `Sure male`/`Sure female`.
+- **Status:** FIXED in the working tree, unproven in the live path until integration.
+
+## D-2026-08-04-09 — provenance written into a uniqueness key: date-stamped `regulars.source`
+
+- **Found:** 2026-08-04, when the WO-Z4 builder flagged its own unverifiable assumption about `regulars.source` and asked for a live check. **The assumption was wrong, and the live data was worse than the assumption.**
+- **My defect.** On 2026-08-03 I created six regulars (ids 108-113) by hand with `source = 'learned-2026-08-03'`.
+- **Why it matters:** `asdair.regulars.source` means **which ASDA view the product is found in** (Regulars vs Favourites). It is part of `UNIQUE (household_id, source, name)` and it drives the execution packet's `source_view`. A date is **provenance**, not a view.
+- **The real exposure — CORRECTED 2026-08-04, and the correction matters more than the original claim.**
+
+  > **What I first wrote, and it was WRONG:** *"learned rows would get `learned-2026-08-04`; because the date is part of the unique key, the same product re-inserts as a SECOND active row."* The WO-Z4 builder pushed back with the code, and the code wins.
+  >
+  > **`updateRegulars` would NOT have duplicated.** Its dedupe guard — `FIND_REGULAR_BY_NORMALISED_NAME_SQL`, `updateRegulars.js:94-105`, **verified by reading it** — is scoped to `(household_id, NORMALISED name)` and **deliberately not to `source`**, with the reason written on it: *"the same item arriving from a different source is still the same item, and a second row for it would make the planner report the term as AMBIGUOUS every week."* A re-learn under a new stamp would have **adopted** ids 108-113 and changed nothing.
+  >
+  > **Why this correction is load-bearing:** if the record said "the writer would have duplicated", the next reader would either harden a guard that already handles this, or relax it believing `UNIQUE` alone suffices. **The second re-opens the hole for real.**
+
+  **Where the exposure genuinely was:** the **hand-written INSERT** path, which has only `UNIQUE (household_id, source, name)` behind it — and a varying `source` defeats that constraint completely. **Those six rows were written by hand, so the pattern that created them is exactly the pattern with no guard.** The same hole is open for any writer that is not `updateRegulars`, and for a name variation (`100g` vs `100 g`) that slips normalisation.
+
+- **So migration 014 is still correct, for a better reason than the one first given:** a date in `source` makes the Regulars/Favourites distinction **unrepresentable** (D-2026-08-04-10), which is the real defect. Not because the writer would have duplicated — it would not.
+- **Why controls missed it:** no CHECK constraint on `source`, and no test asserts the column is a closed vocabulary. It was free text and was used as such. **The guard that does exist lives in one writer, not in the schema** — which is why a hand-written row bypassed it entirely.
+- **Fix applied 2026-08-04** — migration `014`, after verifying **no name collides** with an existing row. `'regular'` chosen over `'favourite'` deliberately: **there is no evidence the ASDA Favourite control was ever clicked for those six**, and claiming otherwise would assert an unverified fact. Reversible; the six ids are named.
+- **Verified after:** `select source, count(*) from asdair.regulars group by source` → `regular 103`, single value.
+- **Status:** instance FIXED. **Class OPEN** — nothing stops the next free-text value.
+
+## D-2026-08-04-10 — Favourites are not a distinct source view. They are absent entirely.
+
+- **Found:** 2026-08-04, in the same query as D-2026-08-04-09.
+- **Evidence:** after migration 014, `asdair.regulars` holds **one** distinct `source` value: `regular` (103 rows). **There is no `'favourite'` row anywhere in the table.**
+- **What this closes:** `CANONICAL-WEEKLY-SHOP-PROCESS.md` has carried *"Favourites represented as a distinct source view — **NOT VERIFIED**"* since the realignment. It is now verified, and the answer is **no**. Not unconstrained — absent.
+- **Consequence:** `source_view: "favourites"` in the execution packet is a **forward contract with no live data behind it**, not a description of anything that exists. Both the packet producer and the handoff correctly infer nothing from `regulars.source`, so no module is wrong — but any document implying Favourites work today is.
+- **Status:** OPEN. Needs a product answer on whether Favourites are a real second view for this household, or whether the distinction should be dropped.
+
+## D-2026-08-04-11 — `rule_qa_log` batch rows cannot be surfaced per-product
+
+- **Found:** 2026-08-04. The WO-Y builder named this as *"the single assumption most likely to be wrong in the live path"* and asked for one query. It was right to.
+- **The mechanism works; the data defeats it.** Linking a list line to a prior answer keys on the question text naming the product — and it does. **The problem is the answers.**
+- **Row 5 is a BATCH row.** Question names seven products; the answer is a compound: *"Ariel=best value/wash; Sure=rotate variant weekly; Sausage Baps=Rustlers Sausage Muffin; Wall's=4-pack; perfume=So...? Honey Oud; Custard&Jelly=DISCONTINUED/ignore; Fruit Splits=ice lollies…"*. Linking `"Ariel Pods"` correctly, then surfaces **all seven households' answers on one card.**
+- **Row 2 is worse — it is a pointer, not an answer:** *"Established the product-specific matching rules now recorded in asdair.rules with scope=product (rules 10-16, 18-22)."* Surfaced as a prior decision, that tells Warwick nothing and reads like a malfunction.
+- **Rows 1, 3, 4 are single-topic and behave as designed.**
+- **Why controls missed it:** the tests used **constructed** fixtures — realistic in shape, single-topic in content. They proved the mechanism and could not have caught the data. See [[a-green-suite-on-your-machine-is-not-green]]: the fixture, not the machine, was the wrong environment here.
+- **Required:** extract the fragment keyed to the matched product; **when it cannot be isolated with confidence, say so on the card** with the raw text rather than dumping seven answers or silently dropping the link — both failure directions visible, neither a guess; and refuse to surface a pointer-answer as a decision.
+- **Status:** OPEN, in progress. The five real rows are now the fixtures.
+
+## D-2026-08-04-12 — RETRACTION: the "three-way Sure conflict" does not exist
+
+- **Adjudicated 2026-08-04 from the live rows**, not from summaries.
+- **The claim, carried since `db/007` and repeated through D-2026-08-04-01:** rules 23/24 map Sure to a **fixed** variant while rule 32 says **rotate** — a contradiction requiring Warwick's ruling.
+- **The rows say otherwise.** Rule 23 maps `"Sure male"` → *"Sure Men Anti-Perspirant Deodorant **(blue variant)**"*. Rule 32 reads *"Sure male (men's **\"blue\"**): ROTATE the variant each week — pick DIFFERENT from the previous order (Sport Cool / Quantum Dry / Invisible etc.)"*. **Rule 32 opens by agreeing with rule 23.** 23 picks the family; 32 picks which scent this week; 37 rounds the quantity and completes the pair. Three rules, three levels, complementary. `rule_qa_log` #5 independently states *"Sure=rotate variant weekly (different each time)"*.
+- **What it would have cost:** the WO-Y builder correctly honoured the committed `db/007` record and built a `fixed_variant_conflict` detector → `needs_decision`. Shipped as-is, **Sure would have become a question every single week** — the exact failure the work order existed to end, reintroduced by its own fix.
+- **Root cause of the false conflict:** reading `note` stubs, migration prose and a Drive document instead of `rule_text`. Same mechanism as D-2026-08-04-03.
+- **Action taken:** migration `013` applied — rule 32 `info` → `rotate`. Verified live: `23 map / 32 rotate / 37 info`. **The rotation code has been built, tested and unreachable for weeks** because the directive filter discarded every `info` row before matching.
+- **Status:** RETRACTED. No Warwick ruling was ever required. The detector is being narrowed to a genuine clash only.
+
+## D-2026-08-04-13 — MY defect: two Work Orders were given the same file
+
+- **Found:** 2026-08-04, by the WO-Y builder, which raised it rather than absorbing it.
+- **What I did:** `WO-ZA` grants the runtime workstream `services/asdair/interpret/interpret-list.js` (fail-close only). I separately told the rule-consumption workstream that `interpret/**` was **exclusively** theirs. **Both statements are mine**, issued hours apart, and neither was checked against the other.
+- **Severity: MEDIUM, and only because it did not fire.** No byte collided — one agent touched `resolveByCatalogue.js`, the other only `interpret-list.js`. **It cost nothing by luck, not by design**, and disjoint ownership exists precisely so that luck is not load-bearing. Two agents writing one file concurrently in a shared tree is corruption, and preventing it is the orchestrator's job.
+- **Why controls missed it:** nothing reconciles a new Work Order's `file_surface` against the surfaces already in flight. Every order was preflighted by its *builder* against reality; **no order was preflighted against its siblings.** See [[preflight-your-own-work-order]] — the order needs more scrutiny than the work, and this is the sibling-collision case that memory does not yet cover.
+- **What made it visible:** the builder's scope discipline. It reconciled its written paths directly against its declared surface (`git diff --stat` being unusable with seven concurrent agents), noticed a modified file it had not written, and reported it. **A builder that had absorbed the diff would have hidden it.**
+- **Also surfaced by the same report:** non-ASCII box-drawing characters (`─`) introduced into a previously pure-ASCII directory by the other agent. Reported, not fixed by the finder — correctly.
+- **Status:** instance closed (no collision occurred). **Class OPEN** — with seven parallel surfaces there is still no cross-order check, and this will recur the moment two orders touch one file for real.

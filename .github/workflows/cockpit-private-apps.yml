@@ -40,3 +40,32 @@ jobs:
       # rather than only the one it happens to run under.
       - name: Private-app overlay mechanism and controls
         run: node services/cockpit/private-apps-check.mjs
+
+      # ── The compensating render controls (WO-ZG) ────────────────────────────────────────────
+      # render-check.mjs and nav-check.mjs need Edge and are BROKEN on the build machine
+      # (D-2026-08-03-11), so these are the only render verification that exists. They are pure
+      # Node, so unlike the browser gates they can run here.
+      #
+      # --self-test FIRST, deliberately: it mutation-tests each instrument and asserts a clean
+      # control. A check that has silently stopped detecting looks exactly like a clean run, so
+      # proving the gate can still FAIL is a precondition of trusting that it PASSED.
+      - name: Template compiles and is structurally balanced (self-test first)
+        run: |
+          node services/cockpit/template-check.mjs --self-test
+          node services/cockpit/template-check.mjs
+
+      - name: Template survives real payload shapes (self-test first)
+        run: |
+          node services/cockpit/render-vm-check.mjs --self-test
+          node services/cockpit/render-vm-check.mjs
+
+      # Cache invalidation must stay DERIVED FROM CONTENT. If someone types a version literal back
+      # into sw.js, the manual habit — and its silent failure, where the device keeps serving the
+      # old bundle — comes back with it. This is the belt to that mechanism's braces.
+      - name: Service-worker cache version is derived, not hand-typed
+        run: node services/cockpit/sw-version-check.mjs
+
+      # whyDown() shipped two UNREACHABLE branches and told Warwick a running service was
+      # "down — 23". This executes the real function against a real DOMException.
+      - name: A down service is explained in words, never a bare error number
+        run: node services/cockpit/down-reason-check.mjs

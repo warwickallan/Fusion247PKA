@@ -1,0 +1,15 @@
+{
+  "name": "asdair-packet",
+  "version": "0.1.0",
+  "private": true,
+  "description": "BUILD-015 AsdAIr - the Sonnet Browser Execution Packet producer (WO-P). Pure: resolved shop state -> a packet valid against SONNET-BROWSER-EXECUTION-PACKET.schema.json, pre-sorted normalized-brand A-Z then canonical product name A-Z, plus a phone-scannable checklist rendering of the same packet in the same order. No Claude session constructs this packet by hand.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "main": "buildExecutionPacket.js",
+  "scripts": {
+    "test": "node --test schemaAssert.test.js buildExecutionPacket.test.js renderChecklist.test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

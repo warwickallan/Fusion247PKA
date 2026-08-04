@@ -15,26 +15,15 @@
 // PURE. No DB, no network, no clock, no randomness - the catalogue is passed in.
 'use strict';
 
-// Match the planner's normalisation so the read path and the plan path agree
-// about what two strings being "the same" means.
-function normaliseTerm(s) {
-  return String(s == null ? '' : s)
-    .toLowerCase()
-    .replace(/[^a-z0-9&\s]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
+// WO-Y: normalisation and tolerant matching now come from ONE module, shared
+// with skill/planner.js. They used to be written twice with DIFFERENT rules -
+// the read path and the plan path disagreed about what "the same product"
+// means, which is how a stored alias could satisfy one and not the other. The
+// module is pure and zero-dependency, so requiring it keeps this file pure.
+const termMatch = require('../skill/termMatch.js');
 
-// Mum writes a leading count ("3 gourmet cat food", "1 4pk orange lucozade").
-// The quantity is captured separately; it must not pollute the match term.
-function stripLeadingQuantity(reading) {
-  const n = normaliseTerm(reading);
-  return n
-    .replace(/^\d+\s*x\s*/, '')
-    .replace(/^\d+\s*pk\s*/, '')
-    .replace(/^\d+\s+/, '')
-    .trim();
-}
+const normaliseTerm = termMatch.normaliseMatchText;
+const stripLeadingQuantity = termMatch.stripLeadingQuantity;
 
 const BASIS = Object.freeze({
   EXACT_ALIAS: 'exact alias',
@@ -46,6 +35,15 @@ const BASIS = Object.freeze({
 
 function aliasesOf(reg) {
   return Array.isArray(reg.aka) ? reg.aka.filter(Boolean) : [];
+}
+
+// Does `haystack` contain every WHOLE WORD of `needle`? Word-boundary aware,
+// unlike the raw substring test this replaces - see pass 3 below for why.
+function tokensContain(haystack, needle) {
+  const hay = termMatch.tokensOf(haystack);
+  const need = termMatch.tokensOf(needle);
+  if (need.length === 0) return false;
+  return need.every((t) => hay.indexOf(t) !== -1);
 }
 
 /**
@@ -93,12 +91,34 @@ function resolveReading(rawReading, regulars, opts = {}) {
   out = hit(regulars.filter((r) => normaliseTerm(r.name) === term), BASIS.REGULAR);
   if (out) return out;
 
+  // 2b. TOLERANT alias match (WO-Y). Word order and one-letter spelling only,
+  //     via the shared matcher, and CONFIDENT tiers only. This is what makes
+  //     "2 yazoo choc" reach the stored alias "choc yazoo", and
+  //     "Double Glouester cheese" reach "double gloucester" - both real
+  //     2026-08-03 failures against real stored aliases.
+  out = hit(
+    regulars.filter((r) => termMatch.bestMatch(rawReading, [r.name].concat(aliasesOf(r))).confident),
+    BASIS.APPROX_ALIAS,
+  );
+  if (out) return out;
+
   // 3. Alias contained in the line, or the line inside an alias
   //    ("1 dreamies cheese large" vs alias "dreamies cheese").
+  //
+  //    WO-Y CORRECTION - REPORTED, and fixed because it is the same defect
+  //    class this Work Order exists to close. This pass used raw SUBSTRING
+  //    containment (`term.includes(na) || na.includes(term)`), which matches
+  //    ACROSS WORD BOUNDARIES: a line reading "bread" resolved against an
+  //    alias "shortbread", and "cream" against "ice cream". That is the
+  //    silently-buys-the-wrong-product failure, and adding tolerance elsewhere
+  //    while leaving it would have been indefensible. Containment is now
+  //    TOKEN-WISE: every word of one side must appear as a whole word in the
+  //    other. "dreamies cheese" still matches "1 dreamies cheese large";
+  //    "bread" no longer matches "shortbread".
   out = hit(
     regulars.filter((r) => aliasesOf(r).some((a) => {
       const na = normaliseTerm(a);
-      return na.length >= 4 && (term.includes(na) || na.includes(term));
+      return na.length >= 4 && (tokensContain(term, na) || tokensContain(na, term));
     })),
     BASIS.APPROX_ALIAS,
   );

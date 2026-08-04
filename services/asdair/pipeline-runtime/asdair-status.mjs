@@ -58,6 +58,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { holderStatus } from './runtime-lock.mjs';
 import { STATE_DIR, RUNTIME_ENTRY, LOG, intakeStateFile } from './runtime-paths.mjs';
+import { assessLiveness, probePgConsumers, PG_CONSUMERS } from './runtime-deps.mjs';
 
 const require = createRequire(import.meta.url);
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -212,27 +213,88 @@ export async function readPendingWork({ connectionString = process.env.ASDAIR_DB
 }
 
 // ---------------------------------------------------------------------
+// Dependencies - health that reflects what the service NEEDS, not that it exists
+// ---------------------------------------------------------------------
+
+/**
+ * Resolve `pg` from the perspective of each folder that calls it, for real.
+ *
+ * Node resolves from the CALLER, so `pg` being installed for pipeline-runtime
+ * says nothing about `shop/`, `pipeline/` or `browser-runner/`. On 2026-08-03
+ * three separate folders were broken at once while the service reported healthy.
+ *
+ * The resolver is injected in tests, so an unresolvable dependency can be proven
+ * to turn health red without uninstalling anything.
+ */
+export function readDependencies({ resolveFrom = defaultPgResolver(), consumers = PG_CONSUMERS } = {}) {
+  const pg = probePgConsumers({ resolveFrom, consumers });
+  return {
+    ok: pg.available === true && pg.ok === true,
+    pg,
+    note: 'a dependency the service needs but cannot load is a RED health state, even when the process is alive',
+  };
+}
+
+function defaultPgResolver() {
+  const servicesRoot = path.resolve(HERE, '..', '..');
+  return (rel) => {
+    const from = path.join(servicesRoot, 'asdair', rel);
+    createRequire(from).resolve('pg');
+  };
+}
+
+// ---------------------------------------------------------------------
 // The document
 // ---------------------------------------------------------------------
 
-export async function collect({ stateDir = STATE_DIR, logPath = LOG, stateFile = intakeStateFile(), db = true } = {}) {
-  const holder = holderStatus(stateDir);
+export async function collect({
+  stateDir = STATE_DIR, logPath = LOG, stateFile = intakeStateFile(), db = true,
+  // Injected so liveness and dependency health are provable offline. Neither
+  // default reaches anything a test cannot control.
+  nowMs = Date.now(), env = process.env, dependencies: injectedDependencies = null,
+  holder: injectedHolder = null,
+} = {}) {
+  const holder = injectedHolder || holderStatus(stateDir);
   const running = holder.state === 'held';
   const log = readEventLog(logPath);
   const offset = readOffset(stateFile);
   const pending = db ? await readPendingWork() : { available: false, source: 'postgres', reason: 'skipped (--no-db)' };
+  const mode = (holder.record && holder.record.mode) || 'live';
+
+  // LIVENESS OF WORK, not of the process. Twice on 2026-08-03 this surface said
+  // running: true while the log had not moved for an hour. The process table
+  // cannot answer "is it doing anything" and was never asked to.
+  const liveness = assessLiveness({
+    running, lastWriteAt: log.exists ? log.last_write_at : null, nowMs, mode, env,
+  });
+
+  const dependencies = injectedDependencies || readDependencies();
 
   const problems = [];
   if (!running && holder.state === 'unverifiable') problems.push(`lock holder could not be verified: ${holder.reason}`);
   if (holder.state === 'stale') problems.push(`a stale lock is present and will be reclaimed on next start: ${holder.reason}`);
   if (!running && holder.state === 'free') problems.push('no poller is running - messages sent to ShopperBot WAIT in Telegram (they are not lost) until one starts');
+  // STALLED: alive and silent. Recovery is `--restart`, which is named here so
+  // the status document carries its own remedy rather than requiring the source.
+  if (liveness.stalled === true) {
+    problems.push(`the runtime is STALLED - ${liveness.reason}. It holds the lock, so nothing else will start; recover with: node ensure-asdair-runtime.mjs --restart`);
+  }
+  if (liveness.stalled === null && running && liveness.silent_for_seconds !== null) {
+    problems.push(`runtime liveness could not be judged: ${liveness.reason}`);
+  }
+  // DEPENDENCY-AWARE HEALTH. `healthy` must not be able to be true while
+  // something the live path requires cannot even be loaded.
+  if (!dependencies.ok) {
+    const callers = dependencies.pg.unresolvable.map((u) => u.caller).join(', ');
+    problems.push(`a required dependency is UNRESOLVABLE from ${dependencies.pg.unresolvable.length} of ${dependencies.pg.checked} calling folders: ${callers} - node resolves from the CALLER, so installing it for pipeline-runtime does not help them`);
+  }
   if (log.offset_held) problems.push('the intake offset is HELD on a failed update - it is being redelivered, and nothing after it is being processed');
   if (log.last_error) problems.push(`last recorded runtime error: ${log.last_error.event}`);
   if (!pending.available && db) problems.push(`pending work could not be read: ${pending.reason}`);
   if (!armed(stateDir).armed) problems.push(`the live runtime is DISARMED - ${armed(stateDir).reason}`);
 
   return {
-    generated_at: new Date().toISOString(),
+    generated_at: new Date(nowMs).toISOString(),
     host: os.hostname(),
     runtime: {
       running,
@@ -240,13 +302,18 @@ export async function collect({ stateDir = STATE_DIR, logPath = LOG, stateFile =
       pid: holder.record && !holder.record.malformed ? (holder.record.pid ?? null) : null,
       mode: holder.record ? holder.record.mode || null : null,
       started_at: holder.record ? holder.record.started_at || null : null,
-      uptime_seconds: uptimeSeconds(holder),
+      uptime_seconds: uptimeSeconds(holder, nowMs),
       entry: holder.record ? holder.record.entry || RUNTIME_ENTRY : RUNTIME_ENTRY,
       identity_verified: holder.state === 'held',
       reason: holder.reason,
       source: 'operating system process table, cross-checked against the runtime lock',
+      // Alive is not the same as working. Both are reported, side by side, so a
+      // consumer cannot read one and believe it has the other.
+      stalled: liveness.stalled,
+      liveness,
     },
     armed: armed(stateDir),
+    dependencies,
     telegram_offset: offset,
     activity: log,
     pending_work: pending,
@@ -256,10 +323,10 @@ export async function collect({ stateDir = STATE_DIR, logPath = LOG, stateFile =
   };
 }
 
-function uptimeSeconds(holder) {
+function uptimeSeconds(holder, nowMs = Date.now()) {
   if (holder.state !== 'held') return null;
   const started = holder.process && holder.process.createdAt ? Date.parse(holder.process.createdAt) : null;
-  return started ? Math.round((Date.now() - started) / 1000) : null;
+  return started ? Math.round((nowMs - started) / 1000) : null;
 }
 
 /**

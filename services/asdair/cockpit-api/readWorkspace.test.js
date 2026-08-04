@@ -148,3 +148,101 @@ test('no shop at all is reported honestly, and nothing else is read', async () =
   assert.equal(payload.reason, 'no_shop');
   assert.equal(statements(client).length, 1);
 });
+
+// =====================================================================
+// checkDependencies - what makes /asdair/health honest.
+//
+// These MUTATE the dependency for real (a pool that refuses, a pool that
+// hangs, a pool whose query fails) and assert the check goes red, then a
+// working pool and assert it goes green. A health check that has never been
+// made to fail is not evidence - and the one this replaces literally could
+// not fail, which is how it reported ok:true through an outage.
+// =====================================================================
+
+function fakePool(behaviour) {
+  return {
+    connect: async function () {
+      if (behaviour.connectError) throw behaviour.connectError;
+      // A SLOW pool, not a black hole. An never-settling promise models nothing real (pg always
+      // settles eventually) and leaves the test runner with a permanently pending promise, which
+      // it reports as three cancelled tests - a test artefact masquerading as a product defect.
+      if (behaviour.slowConnectMs) {
+        await new Promise(function (r) { setTimeout(r, behaviour.slowConnectMs); });
+      }
+      return {
+        query: async function () {
+          if (behaviour.queryError) throw behaviour.queryError;
+          return { rows: [{ '?column?': 1 }] };
+        },
+        release: function () { behaviour.released = true; }
+      };
+    }
+  };
+}
+
+test('checkDependencies is GREEN when the database answers', async () => {
+  const b = {};
+  const r = await RW.checkDependencies({ pool: fakePool(b) });
+  assert.equal(r.ok, true);
+  assert.equal(r.dependency, 'database');
+  assert.equal(r.checked, true);
+  assert.equal(typeof r.latency_ms, 'number');
+  assert.equal(b.released, true, 'the connection must be returned to the pool');
+});
+
+test('checkDependencies goes RED when the driver is missing (the 2026-08-03 failure)', async () => {
+  const err = new Error("Cannot find module 'pg'");
+  err.code = 'MODULE_NOT_FOUND';
+  const r = await RW.checkDependencies({ pool: fakePool({ connectError: err }) });
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, 'driver_not_installed');
+  assert.equal(r.detail, RW.DEPENDENCY_REASONS.driver_not_installed);
+});
+
+test('checkDependencies goes RED when nothing is listening', async () => {
+  const err = new Error('connect ECONNREFUSED 127.0.0.1:5432');
+  err.code = 'ECONNREFUSED';
+  const r = await RW.checkDependencies({ pool: fakePool({ connectError: err }) });
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, 'database_not_listening');
+});
+
+test('checkDependencies goes RED when credentials are rejected', async () => {
+  const err = new Error('password authentication failed');
+  err.code = '28P01';
+  const r = await RW.checkDependencies({ pool: fakePool({ connectError: err }) });
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, 'database_auth_rejected');
+});
+
+test('checkDependencies goes RED when the connection opens but the query fails', async () => {
+  const r = await RW.checkDependencies({ pool: fakePool({ queryError: new Error('read-only transaction aborted') }) });
+  assert.equal(r.ok, false, 'connecting is not the same as being able to read');
+});
+
+test('checkDependencies goes RED - not hung - when the database is too slow to answer', async () => {
+  const started = Date.now();
+  const r = await RW.checkDependencies({ pool: fakePool({ slowConnectMs: 250 }), timeoutMs: 40 });
+  const elapsed = Date.now() - started;
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, 'database_timeout');
+  assert.ok(elapsed < 200, 'the check must bound its own wait, not inherit the database\'s: ' + elapsed + 'ms');
+  // Let the slow connect settle before the test ends, so the late resolution cannot be reported
+  // against an unrelated test.
+  await new Promise(function (r2) { setTimeout(r2, 300); });
+});
+
+test('checkDependencies NEVER throws, whatever the pool does', async () => {
+  const exploding = { connect: function () { throw new Error('synchronous explosion'); } };
+  const r = await RW.checkDependencies({ pool: exploding });
+  assert.equal(r.ok, false, 'a health check that throws cannot report ill health');
+});
+
+test('checkDependencies never returns a connection string', async () => {
+  const err = new Error('connect ECONNREFUSED postgres://user:pw@host:5432/db');
+  err.code = 'ECONNREFUSED';
+  const r = await RW.checkDependencies({ pool: fakePool({ connectError: err }) });
+  const blob = JSON.stringify(r);
+  assert.ok(!blob.includes('user:pw'), 'credentials leaked out of the dependency check');
+  assert.ok(blob.includes('[redacted-connection-string]'));
+});

@@ -266,21 +266,161 @@ export function renderProgress({
  *          estimatedTotal?:number|string, substitutions?:number, newRegulars?:number,
  *          aliasesLearned?:number, productIdsCaptured?:number, exceptions?:number}} spec
  */
+/** The boundary this product never crosses, stated on every basket handback. */
+const NO_ORDER_LINE =
+  'Nothing has been ordered: no checkout, no payment, no delivery slot. Those stay with you.';
+
+/** PURE. One itemised section, omitted entirely when it has no members. */
+function section(out, heading, items) {
+  if (!Array.isArray(items) || items.length === 0) return;
+  out.push('');
+  out.push(heading);
+  for (const item of items) out.push(`  • ${item}`);
+}
+
+/**
+ * PURE. Name a product line for display. Never invents a quantity: a line whose
+ * quantity is unknown prints its name alone rather than "x unknown", because a
+ * fabricated 1 is exactly what verifyBasket refuses to default.
+ */
+function namedQty(name, qty) {
+  return Number.isInteger(qty) ? `${value(name)} x${qty}` : value(name);
+}
+
+/**
+ * PURE. THE BASKET HANDBACK, DERIVED FROM THE VERIFICATION — NEVER FROM RAW
+ * CAPTURED LINES.
+ *
+ * ── WHY THE VERIFICATION IS THE SUBJECT AND THE CONTENTS ARE NOT ────────────
+ * "Basket ready" is a CLAIM THAT RECONCILIATION PASSED. A card that reports what
+ * is in the basket without reporting whether it reconciles is the same lie in a
+ * friendlier font: it reads as ready, and the wrong product is bought and paid
+ * for before anybody finds out. So `verification` is the first thing rendered
+ * and the thing the headline is derived from.
+ *
+ * ── FAIL SAFE: ABSENT VERIFICATION IS LOUD, NOT REASSURING ──────────────────
+ * `verification` absent or null renders **NOT VERIFIED**, with no counts, no
+ * product lines and no totals. It deliberately does NOT fall back to a
+ * well-shaped card full of zeros — a zero is a measurement, and rendering one we
+ * never took is the `ok: true` failure this build keeps re-committing. A producer
+ * that forgets the field therefore gets the alarming card, never the calm one.
+ *
+ * ── counts_match IS NOT THE VERDICT, AND IS LABELLED SO ─────────────────────
+ * reconcile/verifyBasket.js computes `verified` from the LINES and reports
+ * `counts_match` separately, precisely because two wrong products swapped for
+ * each other match perfectly. The card keeps them apart and says which one is
+ * the verdict, so a matching headline can never read as ready.
+ *
+ * ── THE WORD "SUBSTITUTED" DOES NOT APPEAR, AND CANNOT ──────────────────────
+ * Substitution is not a permitted outcome anywhere in this product; the report
+ * status enum deliberately has no such value. An unobtainable line is named as
+ * UNAVAILABLE and handed to Warwick to decide. The old `Substitutions: <count>`
+ * field is gone from this card: a field that can only ever be 0 still implies
+ * the thing could happen.
+ *
+ * @param {{shopRef:string,
+ *          verification?: null | {
+ *            verified:boolean, blocking?:string[], countsMatch?:boolean|null,
+ *            expectedDistinctProducts?:number, actualDistinctProducts?:number,
+ *            expectedTotalUnits?:number, actualTotalUnits?:number,
+ *            unavailable?:Array<{name:string, quantity?:number}>,
+ *            missing?:Array<{name:string, quantity?:number}>,
+ *            quantityMismatches?:Array<{name:string, expected:number, actual:number}>,
+ *            unexpected?:Array<{name:string, quantity?:number}>,
+ *            nameOnlyMatches?:string[],
+ *            packetSelfConsistent?:boolean|null },
+ *          notVerifiedReason?:string,
+ *          boundaryConfirmationsComplete?:boolean,
+ *          boundaryConfirmationsMissing?:string[],
+ *          lines?:Array, estimatedTotal?:*, newRegulars?:*, aliasesLearned?:*,
+ *          productIdsCaptured?:*, exceptions?:*}} spec
+ */
 export function renderBasketReady({
-  shopRef, lines = [], estimatedTotal, substitutions, newRegulars,
-  aliasesLearned, productIdsCaptured, exceptions,
+  shopRef, verification, notVerifiedReason,
+  boundaryConfirmationsComplete, boundaryConfirmationsMissing,
+  lines = [], estimatedTotal, newRegulars, aliasesLearned, productIdsCaptured, exceptions,
 } = {}) {
   assertShopRef(shopRef);
-  const products = Array.isArray(lines) ? lines : [];
+
+  const buttons = keyboard([
+    [button('Send order confirmation', ACTIONS.CONFIRM, shopRef)],
+    [button('View exceptions', ACTIONS.EXCEPTIONS, shopRef), button('Close shop', ACTIONS.CLOSE, shopRef)],
+  ]);
+
+  // ── NOT VERIFIED. No counts, no lines, no totals, no zeros. ───────────────
+  if (verification === null || verification === undefined) {
+    return {
+      text: block([
+        '⚠️ Basket NOT VERIFIED',
+        `Ref: ${value(shopRef)}`,
+        '',
+        'The basket has NOT been checked against the plan, so nothing below can be',
+        'reported about its contents.',
+        `Reason: ${value(notVerifiedReason)}`,
+        '',
+        'Do not treat this as ready. Check the basket yourself before you check out.',
+        '',
+        NO_ORDER_LINE,
+      ]),
+      reply_markup: buttons,
+    };
+  }
+
+  const v = verification;
+  const ok = v.verified === true;
+
+  // THE HEADLINE IS THE VERDICT. Not the counts, and when it is false it is the
+  // first thing on the card, before anything that could read as reassurance.
   const out = [
-    '🧺 Basket ready',
+    ok ? '🧺 Basket ready — VERIFIED against the plan' : '⚠️ Basket NOT VERIFIED — do not check out yet',
     `Ref: ${value(shopRef)}`,
-    '',
-    `Product lines (${count(products.length)}):`,
   ];
-  if (products.length === 0) {
-    out.push('  (none)');
-  } else {
+
+  if (!ok) {
+    section(out, 'Not verified because:',
+      Array.isArray(v.blocking) && v.blocking.length > 0
+        ? v.blocking
+        : ['the verification did not pass, and reported no reason']);
+  }
+
+  // Two separate facts, never merged into one "count".
+  out.push('');
+  out.push(`Distinct products: expected ${count(v.expectedDistinctProducts)}, basket ${count(v.actualDistinctProducts)}`);
+  out.push(`Total units: expected ${count(v.expectedTotalUnits)}, basket ${count(v.actualTotalUnits)}`);
+  out.push(
+    v.countsMatch === true || v.countsMatch === false
+      ? `Counts match: ${v.countsMatch ? 'yes' : 'no'} — headline only, NOT the verdict`
+      : 'Counts match: unknown',
+  );
+
+  section(out, 'UNAVAILABLE at ASDA — nothing was put in its place, you decide:',
+    (v.unavailable || []).map((u) => namedQty(u && u.name, u && u.quantity)));
+  section(out, 'MISSING from the basket:',
+    (v.missing || []).map((m) => namedQty(m && m.name, m && m.quantity)));
+  section(out, 'WRONG QUANTITY:',
+    (v.quantityMismatches || []).map((q) => `${value(q && q.name)}: expected ${count(q && q.expected)}, basket ${count(q && q.actual)}`));
+  section(out, 'IN THE BASKET but on no planned line:',
+    (v.unexpected || []).map((u) => namedQty(u && u.name, u && u.quantity)));
+  section(out, 'Matched on NAME ONLY (the weakest identity — worth an eye):',
+    (v.nameOnlyMatches || []).map((n) => value(n)));
+
+  // A producer defect, and named as one so it is never blamed on the basket.
+  if (v.packetSelfConsistent === false) {
+    out.push('');
+    out.push('NOTE: the plan\'s own declared counts disagree with its own lines.');
+    out.push('That is a defect in the plan, not in the basket.');
+  }
+
+  if (boundaryConfirmationsComplete === false) {
+    section(out, 'NOT CONFIRMED by the shopper:',
+      (boundaryConfirmationsMissing || []).map((b) => value(b)));
+  }
+
+  // The learning counts stay, unchanged, below the verification.
+  const products = Array.isArray(lines) ? lines : [];
+  if (products.length > 0) {
+    out.push('');
+    out.push(`Product lines (${count(products.length)}):`);
     for (const line of products) {
       if (typeof line === 'string') { out.push(`  • ${value(line)}`); continue; }
       const qty = line && line.qty !== undefined ? ` x${value(line.qty)}` : '';
@@ -289,21 +429,14 @@ export function renderBasketReady({
   }
   out.push('');
   out.push(`Estimated total: ${value(estimatedTotal)}`);
-  out.push(`Substitutions: ${count(substitutions)}`);
   out.push(`New regulars: ${count(newRegulars)}`);
   out.push(`Aliases learned: ${count(aliasesLearned)}`);
   out.push(`Product IDs captured: ${count(productIdsCaptured)}`);
   out.push(`Exceptions: ${count(exceptions)}`);
   out.push('');
-  out.push('Nothing has been ordered. Checkout and payment stay with you.');
+  out.push(NO_ORDER_LINE);
 
-  return {
-    text: block(out),
-    reply_markup: keyboard([
-      [button('Send order confirmation', ACTIONS.CONFIRM, shopRef)],
-      [button('View exceptions', ACTIONS.EXCEPTIONS, shopRef), button('Close shop', ACTIONS.CLOSE, shopRef)],
-    ]),
-  };
+  return { text: block(out), reply_markup: buttons };
 }
 
 // ── 6. Status ────────────────────────────────────────────────────────────────

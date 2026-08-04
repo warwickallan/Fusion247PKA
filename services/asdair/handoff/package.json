@@ -1,0 +1,16 @@
+{
+  "name": "asdair-handoff",
+  "version": "0.1.0",
+  "private": true,
+  "description": "BUILD-015 AsdAIr Stage 1 - the Sonnet browser handoff. Turns a Sonnet Browser Execution Packet into one durable artefact that is both phone-readable and machine-parseable, wraps the supervised step in a single-writer claim/progress/completion lifecycle over the EXISTING asdair.browser_build_request, and ingests what Sonnet reports back into the reconciler's input. It contains NO Sonnet trigger: Claude for Chrome has no programmatic invocation surface and none is invented here. Never checks out, never pays, never books a slot, never enters a credential, never substitutes.",
+  "license": "UNLICENSED",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "node --test",
+    "mutation": "node mutation-proof.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
