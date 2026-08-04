@@ -112,11 +112,31 @@ create table if not exists asdair.rules (
     -- INFORMATIONAL: the pure planner ignores its free-text rule_text and it
     -- never changes a basket. match_term / match_category say what the rule
     -- targets; matched_product is the replacement for a 'map' directive; reason
-    -- and note are surfaced to a human. IMPORTANT: the actual directive VALUES
-    -- (which rule maps or excludes what) are household PREFERENCE DATA that live
-    -- ONLY in the private Supabase asdair schema and are NEVER committed to git
-    -- -- the same boundary as the gitignored seed (002_asdair_seed.sql). This
-    -- migration ships the columns (structure), never the rows (data).
+    -- and note are surfaced to a human.
+    --
+    -- DATA CLASSIFICATION -- CORRECTED 2026-08-04. This comment previously read:
+    -- "the actual directive VALUES (which rule maps or excludes what) are
+    -- household PREFERENCE DATA that live ONLY in the private Supabase asdair
+    -- schema and are NEVER committed to git". That was WRONG and it was acted
+    -- on: an agent refused to commit an authorised one-row corrective migration
+    -- on privacy grounds, leaving the live database ahead of git.
+    --
+    -- Warwick's ruling BUILD-015-SHOPPING-DATA-CLASSIFICATION (2026-08-04):
+    -- ordinary household shopping content -- product names, brands, quantities,
+    -- aliases, preferences, Regulars/Favourites classification, rotation rules,
+    -- offer rules, exclusions, mappings and the directive values that encode
+    -- them -- MAY be committed to this public repository, INCLUDING deterministic
+    -- seed and corrective migrations containing those rules. What must never be
+    -- committed is credentials, tokens, payment information, account-session
+    -- material, delivery addresses and unrelated medical records.
+    --
+    -- The SSOT for that boundary is Team Knowledge/Guidelines/
+    -- GL-009-public-private-knowledge-boundary.md. Read it there; this comment
+    -- is a pointer and must never become a second definition of it.
+    --
+    -- This migration still ships the columns (structure) and no rows, because a
+    -- schema migration is not the place for data -- not because the data is
+    -- secret.
     directive          text not null default 'info'
                          check (directive in ('info','exclude','needs_decision','map')),
     match_term         text,

@@ -15,11 +15,21 @@
 --
 -- Rules of the road (same as 001_asdair_schema.sql):
 --   * PURE ASCII only. No currency symbols, no smart quotes.
---   * NO secrets, and NO ROWS. The household's actual regulars are personal
---     preference data that live ONLY in the private Supabase asdair schema
---     and are NEVER committed to git -- the same boundary as the gitignored
---     seed (002_asdair_seed.sql). This migration ships COLUMNS (structure),
---     never rows (data).
+--   * NO secrets. This migration ships COLUMNS (structure) and no rows,
+--     because a schema migration is not the place for data.
+--     DATA CLASSIFICATION -- CORRECTED 2026-08-04. This bullet previously said
+--     the household's actual regulars "are personal preference data that live
+--     ONLY in the private Supabase asdair schema and are NEVER committed to
+--     git". That is WRONG. Per Warwick's ruling
+--     BUILD-015-SHOPPING-DATA-CLASSIFICATION, ordinary household shopping
+--     content -- product names, brands, quantities, aliases, preferences,
+--     Regulars/Favourites classification and the rules over them -- MAY be
+--     committed to this public repository, including deterministic seed and
+--     corrective migrations. Credentials, tokens, payment information,
+--     account-session material, delivery addresses and unrelated medical
+--     records may not. SSOT: Team Knowledge/Guidelines/
+--     GL-009-public-private-knowledge-boundary.md -- a pointer, never a
+--     second definition.
 --   * Idempotent: create table / index IF NOT EXISTS, so re-running it
 --     against a database that already has the live table is a no-op and
 --     never rewrites or drops anything.
