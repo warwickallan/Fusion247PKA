@@ -50,6 +50,8 @@ Parked, not chased. Reporting them is Larry's; deciding their fate is Warwick's.
 | **P-9** | **First live start of Proofline** — G-11 is established only by Warwick starting it himself and it outliving the session. Keel has `live_authority: none` and correctly did not claim it | Held for Phase 4 (H-2). Not a defect |
 | **P-10** | **MEDIUM, estate-wide — `git checkout`/`git restore` is not a safe byte-restore in this repository.** `core.autocrlf=true` with **no root `.gitattributes`** (both verified). The working tree holds LF, git's checkout representation is CRLF. Restoring a file via `git checkout` produced byte-different content from the original while git reported the tree clean; restoring the true original bytes made git report it *modified* with an empty `git diff`. **This is the same root cause as the Veritas receipt's own digest caveat.** A root `.gitattributes` would close it | Outside the Proofline surface and affects every worktree in the estate. Reported once for Warwick's decision. **Not a Work Order** |
 | **P-11** | LOW — the brittle-pattern class, not just the two fixed lines: any future `deepEqual` over a shared trace bus is exposed to the same race. `assertQuiesced` guards the three tests in this file; nothing generalises it, and nothing was built to | Deliberately not generalised. Regrowth cap |
+| **P-12** | **Contract deviation, found in the live journey 2026-08-04.** §5.4 specifies `decision` as an object `{verdict, note, at}`. The service returns the bare string `"approved"`. **The approval note IS durably stored** — the `job.decided` journal record carries it — **but it is not readable back through the API**, so a note Warwick writes when approving can never be seen again. Verified live: journal record 4 holds the note; `GET /api/jobs/:key` does not. Also minor: `error` is absent from the response rather than `null` as specified | **Reported once for Warwick's decision.** Not blocking the launch journey, and **not** a Work Order — a finding is an observation. Either the contract is wrong or the code is; that is his call |
+| **P-13** | **The rendered browser page is still unproven.** Chrome could not load `http://127.0.0.1:7317/` under automation — the extension requires a site-level permission for this origin that only Warwick can grant in the extension UI. The page *serves* correctly (a full browser-shaped request returns all 3,791 bytes with `content-type: text/html`), but **serving is not rendering** | G-1 and G-5's UI halves remain **H-2 — Warwick's own walkthrough**, exactly as the map has said throughout |
 
 ---
 
@@ -333,7 +335,17 @@ Discharged **inside `WO-2026-08-04-01`**. A finding is an observation, not an in
 
 **Frontier:** Phase 3, on a Veritas `HOLD`. **WP-1 is built and integrated at `39a553cb` — do NOT re-implement it.** Work Order `Deliverables/proofline/WO-2026-08-04-01-proofline-service-core.md` remains open for the HOLD disposition above; it is not reissued.
 
-**Exact next action:** **All four HOLD findings are discharged** — D-2 and D-3 by Larry, D-1 and D-4 by Keel at `78c14c8`. Veritas is re-dispatched against the new integrated head, scoped to the discharge. **No implementation remains.**
+**Exact next action:** **Warwick re-attempts the walkthrough** using the one command below. That is the only outstanding step, and it is his.
+
+```
+C:\Fusion247PKA-build-020-trial\services\proofline\start-proofline.cmd
+```
+
+Then `http://127.0.0.1:7317/`. Works from cmd.exe and PowerShell, pasted identically, from any directory.
+
+**Launcher defect discharged at `8d130eb`** — a `.cmd` that invokes `node` directly (no PowerShell, no execution policy, no file association, no encoding hazard), both original failures reproduced as controls first, and both launcher files asserted pure ASCII by byte scan rather than by eye. **Functional journey proven live at that head by Larry through the one-liner:** submit → `queued` with `result: null` → `awaiting_approval` with a result digest → duplicate key with different text returns `200 duplicate:true textMatches:false` with the stored text unchanged → approve → `approved`, all four durable transitions recorded, 5 journal records on disk.
+
+**Still unproven and still his: the rendered page** (P-13). Earlier HOLD findings D-1..D-4 were discharged at `78c14c8` and re-reviewed; the second Veritas pass returned HOLD only on documentation truth, and those three cells were corrected at `b4cba53`.
 
 **Then, and only after a `VERITAS_PASS`:** Warwick's browser walkthrough and first live start (Phase 4, H-2 — the only route by which G-11 is ever claimed), then the merge decision (Phase 5).
 
