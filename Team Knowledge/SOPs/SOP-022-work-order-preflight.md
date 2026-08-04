@@ -271,9 +271,80 @@ The pattern across both rounds is one thing: **the order is the weak link, and t
 that catches it.** A control that fires at completion still finds the defect — it just charges a full
 dispatch for the privilege.
 
+## The pre-dispatch compatibility check — the issuer's, and it runs BEFORE anyone is spawned
+
+**Canonical here. Larry's contract carries the obligation and points at this section; no specialist
+contract restates the mechanism.**
+
+Phase 2 below verifies the order against **reality**. This check verifies it against the **worker's
+permission to perform it** — a different question, and the one that was missing. On 2026-08-04 six Work
+Orders were dispatched and returned four REFUSE and two CLARIFY. **Every challenge was correct**, and
+several found defects in the *order* rather than the work — most starkly a documentation reconciliation
+whose surface included `Builds/**` and `Team Knowledge/**`, which the assigned specialist's contract flatly
+prohibits. **A Work Order cannot override a permanent contract.** Discovering that costs a full dispatch;
+checking it costs a minute.
+
+Before dispatch, Larry answers five questions and **records the answers in the order's frontmatter**, in
+`worker_contract`, `contract_basis`, `contract_conflicts` and `capability_evidence`:
+
+1. **May this specialist write every declared path?** Every `file_surface` entry needs a `contract_basis`
+   entry citing the exact contract heading or clause that permits it.
+2. **May it perform every required non-file action?** Push, PR, migration authorship, script execution —
+   each needs its own `contract_basis` entry.
+3. **Does the acceptance evidence require a prohibited capability?** An acceptance criterion the worker
+   cannot satisfy without breaking its contract is a defect in the order.
+4. **Is the order relying on an obsolete assumption about its tools?** `capability_evidence` records what
+   was actually observed, and from where.
+5. **Does delivery need another owner for part of the outcome?** If so, split or reroute **now**.
+
+**Rules that make this a check rather than a ritual:**
+
+- **The contract version is anchored to an exact commit.** `worker_contract.governance_sha` records the SHA
+  whose contract was read. A contract citation with no SHA is a citation of whatever the file says today.
+- **The worker validates the block at read-back and never trusts it because it is populated.** A populated
+  field is a claim by the issuer, and this SOP exists because the issuer's claims are the measured failure
+  mode. Any mismatch between the order, the cited contract, or observable reality is **CLARIFY or REFUSE
+  before implementation**.
+- **`contract_conflicts: none` is an earned result, not a default placeholder.**
+- **`capability_evidence.source: unknown` is honest but is not permission.** Any capability the
+  implementation genuinely requires must be resolved before issue. **A static contract claim never
+  substitutes for a live capability fact** — a contract describes what a worker *may* do, never what the
+  running host *grants*.
+- **`file_surface` stays pure path data.** Git, the scope check and the secret scanner read those entries;
+  justification lives in `contract_basis`, which quotes a surface entry verbatim rather than annotating it.
+- **If this block becomes reflexively populated ceremony, report the evidence and simplify it
+  deliberately.** Do not quietly stop filling it in, and do not skip it because the issuer believes he
+  remembers the contract.
+
+**This check reduces invalid dispatches. It is not a control.** Nothing mechanically confines a worker to
+its `file_surface`, and a shim's `tools:` list may over-claim — six shims requested `MultiEdit` and never
+received it. Say so wherever this is relied upon, or it becomes the next false assurance.
+
+## Healthy refusal versus wasteful dispatch — they are not the same event
+
+**A correct worker refusal is successful protection of the build.** It is the gate working. Repeated correct
+refusals are evidence that **routing or Work Order construction is defective**, never that the worker is
+resisting too much.
+
+**The target is fewer preventably invalid dispatches — never fewer refusals.** A reduction achieved by
+letting prohibited or under-specified work through is not an improvement, it is the failure this SOP exists
+to prevent. **Never weaken a refusal condition** to reduce token cost, improve an acceptance rate, make the
+issuer's instructions proceed more smoothly, or avoid an inconvenient second routing step.
+
+Two classes, and only one of them is preventable:
+
+| Class | Nature | Owner |
+|---|---|---|
+| **A — preventable before dispatch** | specialist contract conflicts · prohibited file surfaces · missing permissions · missing required capabilities · stale capability assumptions · absent schema decisions · impossible acceptance evidence · actions the specialist may not perform | **Larry**, via the compatibility check above |
+| **B — genuine discovery** | code or runtime behaviour contradicting the order · hidden missing callers · false inherited baselines · deeper defects visible only after inspecting the implementation · interactions no contract or routing check could establish | **the worker**, via the read-back — this is what the gate is *for* |
+
+A class-A refusal is a defect in the dispatch. A class-B refusal is the system working as designed. **Both
+are correct refusals**, and neither is ever a reason to loosen the worker's conditions.
+
 ## For Larry
 
-The mirror of this SOP: **preflight your own Work Order before issuing it, and answer every read-back.**
+The mirror of this SOP: **run the pre-dispatch compatibility check above, preflight your own Work Order
+before issuing it, and answer every read-back.**
 Every defect above was avoidable by running the command, reading the variable's contract, confirming the
 datastore, or asking what the change actually needs to touch. On current evidence the Work Order deserves
 more scrutiny than the returned work does — which is what the research predicted, pointing at the

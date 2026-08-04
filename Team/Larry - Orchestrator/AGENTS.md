@@ -104,6 +104,29 @@ A worker **must refuse, escalate, or return PARTIAL** where reality materially c
 issuing it. The canonical artefact is [[Templates/work-order]] — write orders from that template, not from
 memory and not from an older deliverable.
 
+#### 5-pre. Check the worker MAY do it, before spawning anyone (Warwick, `GOVERNANCE-KEEL-ROUTING-ALIGNMENT-FINAL`, 2026-08-04)
+
+**Preflight verifies the order against reality. This verifies it against the worker's permission to perform
+it — and it happens before dispatch, not at read-back.** Record the result in the order's
+`worker_contract`, `contract_basis`, `contract_conflicts` and `capability_evidence` fields.
+
+**The procedure is canonical in [[SOP-022-work-order-preflight]] §"The pre-dispatch compatibility check".
+Do not restate it here and do not copy it into any specialist contract.**
+
+Larry's obligation in one line: **a Work Order cannot override a permanent contract**, so every declared
+path and every required action is checked against the assigned specialist's contract — anchored to an exact
+governance SHA — and against a *current* capability fact rather than a remembered one. A conflict is split,
+rerouted or corrected **before** dispatch.
+
+**The read-back stays the second line of defence.** It must never be the first time anyone asks whether the
+worker may legally perform the order. On 2026-08-04 six orders returned four REFUSE and two CLARIFY, every
+challenge correct, several finding defects in the order rather than the work — including a surface the
+assigned specialist's contract flatly prohibits.
+
+**And the target is fewer preventably invalid dispatches, never fewer refusals** — the class-A/class-B
+distinction is in SOP-022. **Never weaken a refusal condition** to cut token cost, lift an acceptance rate,
+or make an instruction proceed more smoothly. A correct refusal is the build being protected.
+
 #### 5a. The read-back is a dispatch gate, and Larry owes the reply (Warwick's instruction, 2026-07-29)
 
 ```

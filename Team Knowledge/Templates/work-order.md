@@ -81,16 +81,46 @@ acceptance_property: <the ONE property whose truth decides this WP, stated so it
 integration_owner: larry          # who integrates the returned work and submits the exact head
 veritas_gate: 1                   # 1 = integrated WP · 2 = phase/vertical slice · 3 = documentation
                                   # and Git truth · `none` ONLY where Warwick has said so explicitly
-document_impact: <NONE — verified> # or the exact list of ACTIVE documents requiring amendment.
-                                  # MANDATORY on every order, including when the answer is none.
-                                  # Larry supplies this list; VERITAS VERIFIES IT INDEPENDENTLY
-                                  # at the gate, after integration — never at issue-time.
+document_impact:                  # IDENTIFIES affected active documents. It does NOT authorise.
+                                  # MANDATORY on every order, including when the answer is none
+                                  # (`document_impact: []` with the check actually run).
+                                  # Larry supplies it; VERITAS VERIFIES IT INDEPENDENTLY at the
+                                  # gate, after integration — never at issue-time.
+  - path: <exact active document path>
+    owner: <larry | keel | silas | another contractually permitted owner>
+
 file_surface:                     # the COMPLETE writable set. Nothing else.
+                                  # PURE PATH DATA — git, scope checks and the secret scanner consume
+                                  # these entries. Never annotate an entry, never add a parenthetical
+                                  # or a citation here. Justification lives in `contract_basis` below.
   - services/<svc>/src/**
   - services/<svc>/test/**
   - services/<svc>/migrations/00NN_*.sql
   - .github/workflows/<svc>-tests.yml
 out_of_scope_policy: report-only
+
+# --- contract and capability compatibility (checked BEFORE dispatch, validated at read-back) ---
+# Procedure canonical in [[SOP-022-work-order-preflight]] §"The pre-dispatch compatibility check".
+worker_contract:
+  path: Team/<specialist folder>/AGENTS.md
+  governance_sha: <exact commit containing the contract version actually checked>
+
+contract_basis:                   # one entry per file_surface entry AND per required non-file action
+  - surface: <exact file_surface entry, copied verbatim>
+    permitted_by: <exact contract heading or clause>
+  - action: <required non-file action, e.g. "push the assigned branch">
+    permitted_by: <exact contract heading or clause>
+
+contract_conflicts: none          # an EARNED result, never a default placeholder. A conflict is
+                                  # split, rerouted or corrected BEFORE dispatch — not dispatched
+                                  # and discovered.
+
+capability_evidence:
+  source: <authoritative live inventory | executed probe | unknown>
+  result: <the capabilities actually observed>
+                                  # `unknown` is honest but is NOT permission. Any capability the
+                                  # implementation requires must be resolved before issue.
+                                  # A static contract claim NEVER substitutes for a live capability fact.
 
 # --- authority (these are the standing defaults; any other value needs Warwick) ---
 credential_scope: none
@@ -110,7 +140,30 @@ branch: wo/<nn>-<slug>              # or `n/a — not a git repo`
 schema_decision: <link to Silas's decision, or `n/a`>
 security_inputs: <link to Vex's findings, or `n/a`>
 operational_handoff: none           # mack | none — the worker checks this field, never infers it
-runbook_path: <path, required when operational_handoff: mack>
+runbook_path: services/<service>/RUNBOOK.md   # required when operational_handoff: mack.
+                                    # Must be a SERVICE-LOCAL path the implementer may actually write.
+                                    # A runbook under `Builds/**` is a build/assessment record and is
+                                    # NOT writable by the implementer → REFUSE.
+
+# --- corrective orders arising from a Veritas receipt (omit entirely when not applicable) ---
+veritas_source:
+  receipt: Builds/BUILD-nnn/Assurance/<receipt>.md
+  reviewed_sha: <full 40-char SHA>
+
+veritas_findings:                   # EVERY finding ID from that receipt. No finding may be omitted.
+  - id: D1
+    disposition: assigned-here
+  - id: D2
+    disposition: assigned-to
+    work_order: WO-YYYY-MM-DD-nn
+  - id: D3
+    disposition: already-resolved
+    evidence: <exact SHA and path>
+  - id: D4
+    disposition: returned-for-Warwick-decision
+  - id: D5
+    disposition: disputed-and-returned-to-Veritas
+    reason: <why>
 ---
 ```
 
@@ -132,9 +185,53 @@ that leaves it blank has not said who owns the seam between this WP and everythi
 permitted **only** where Warwick has explicitly said so, and the order must record where he said it. A
 missing value is under-specification like any other; it is not an implied `none`.
 
-**On `document_impact` — the contradiction-prevention control, mandatory on every order.** Value it
-`NONE — verified` or list the exact **active** documents requiring amendment. `NONE — verified` is a claim
-that the author went and looked, not a default to leave in place.
+**On `document_impact` — it IDENTIFIES; it does not AUTHORISE.** This is the field's whole grammar, and
+getting it wrong is how a compatibility conflict gets manufactured at dispatch time:
+
+- **It never adds a path to `file_surface`**, never overrides a permanent contract, and never implies the
+  implementer owns every document listed. A document can be named here and be one the implementer is
+  categorically forbidden to write — that is normal, and it is why every entry carries an `owner`.
+- **Default owners:** implementation-local documents → the implementer, where its contract permits ·
+  schema truth and canonical schema decisions → **Silas**, where his contract permits · integrated build
+  records and cross-document reconciliation → **Larry** · assurance receipts → **Veritas authors, Larry
+  commits verbatim** · verification of documentation truth → **Veritas at Gate 3** · external PR and
+  release review → **Codex**.
+- **Larry is the default owner of cross-document reconciliation because no current contract owns the
+  complete surface**, and no documentation specialist is justified. **That ownership grants him no
+  completion authority whatsoever.**
+- **The load-bearing carve-out.** Documents that define the acceptance of Larry's own integrated work —
+  Wayfinder maps, Build Contracts, Goal Contracts, acceptance criteria — stay Gate 3 material: **Larry
+  writes or reconciles them; Veritas determines whether they are true; Veritas never repairs.** The
+  arrangement is safe because Larry gains nothing from an unreconciled document, and where he *would* gain
+  something the acceptance gate is Warwick's. **Remove that carve-out and this default becomes unsafe the
+  same day** — it is load-bearing, not incidental.
+
+An empty list is `document_impact: []`, and it is a claim that the author went and looked, not a default to
+leave in place.
+
+**On the compatibility block — `worker_contract`, `contract_basis`, `contract_conflicts`,
+`capability_evidence`.** These bind the pre-dispatch check to the artefact rather than to anyone's memory
+of having done it. The procedure, and the worker's duty to validate the block rather than trust it, is
+canonical in [[SOP-022-work-order-preflight]] §"The pre-dispatch compatibility check" and is not restated
+here.
+
+Two rules belong beside the fields because they are about the *shape*:
+
+- **`file_surface` stays pure path data.** Git, the scope check and the secret scanner consume those
+  entries directly. Justification goes in `contract_basis`, which references a surface entry verbatim
+  rather than decorating it.
+- **A populated field is not a performed check.** `contract_conflicts: none` is an earned result;
+  `capability_evidence.source: unknown` is honest but is **not permission**. **If this block ever becomes
+  reflexively populated ceremony, report the evidence and simplify it deliberately** — do not quietly stop
+  filling it in, and do not omit it now because the issuer believes he remembers the contract.
+
+**On `veritas_source` / `veritas_findings` — no finding disappears through summarisation.** A corrective
+order arising from a receipt cites the exact receipt path, its `reviewed_sha`, **every** finding ID, and
+**one explicit disposition per finding**. Splitting findings across several orders is fine; every finding
+stays visible in every accounting pass. **The receipt is authority; Larry's summary is context only** — and
+the executing worker reads the original receipt during preflight rather than the order's account of it. The
+receipt's own IDs are the register: **there is no findings ledger, registry or database, and none is to be
+built.**
 
 It is mandatory for the same reason `private_surface` is: a control that only fires when someone remembers
 it does not fire. The estate's measured failure is not that documents disagree — it is that **a document
@@ -255,6 +352,7 @@ so.
 INTEGRATION READ-BACK
 
 Work Order:
+Veritas findings disposed:        <every ID from the cited receipt, or `n/a — not a corrective order`>
 Exact integrated head:            <full 40-char SHA — resolved, not assumed>
 Branch:
 Acceptance property, restated:
