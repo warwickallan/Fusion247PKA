@@ -5,7 +5,7 @@
 | Field | Value |
 |---|---|
 | `work_order_id` | `WO-2026-08-04-01` |
-| `status` | ISSUED |
+| `status` | **DELIVERED — corrective pass complete; awaiting final assurance.** Implementation at `3a32525`; Veritas HOLD findings D-1 and D-4 discharged at `78c14c8`. Not closed: closure requires a `VERITAS_PASS`, which is not Larry's to declare *(corrected 2026-08-04, Veritas `D-7` — this field read `ISSUED` after the work was delivered)* |
 | `owner` | Keel — Implementation Engineer |
 | `return_to` | Larry |
 | `authorised_by` | Warwick, 2026-08-04 (plan acceptance + "begin implementation") |
