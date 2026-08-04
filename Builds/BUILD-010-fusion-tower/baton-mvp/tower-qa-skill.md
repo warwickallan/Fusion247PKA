@@ -118,6 +118,48 @@ Work these in order; explore beyond the list wherever risk or a dependency sugge
    present and consistent.
 8. **Best-practice / improvement suggestions** — kept **SEPARATE** from
    non-conformances (an Improvement is never a blocker).
+9. **Closure and assurance-receipt enumeration** — the control immediately below.
+
+### Closure and assurance-receipt enumeration
+
+At every PR-head or release review, independently enumerate every claim in the
+actual diff and repository state that a Work Package, phase, build, service or
+user journey is:
+
+- complete;
+- closed;
+- operational;
+- durable;
+- ready;
+- accepted;
+- production-safe;
+- or described with equivalent closure wording.
+
+Do not trust Larry's supplied list as the enumeration. His list may be context,
+but the actual diff and repository state are the authority.
+
+For every closure claim:
+
+1. Locate the applicable committed Veritas receipt.
+2. Read the receipt from the repository.
+3. Confirm its verdict is PASS.
+4. Confirm its assured scope covers the thing being closed.
+5. Confirm its reviewed_sha identifies the integrated head that was assured.
+6. Confirm no later in-scope implementation or documentation change invalidated
+   that assurance without a newer applicable PASS receipt.
+
+A missing, non-PASS, scope-mismatched, superseded or otherwise inapplicable
+receipt is an ACTIVE, IN-SCOPE finding with:
+
+required_disposition: BLOCKS_CURRENT_MERGE
+
+A PR containing no closure claim has no additional receipt requirement.
+
+A receipt digest may detect alteration. It does not prove that an omitted receipt
+exists and therefore does not replace this enumeration.
+
+This is an external absence check. It does not make Codex the author of a
+receipt, the internal assurance authority, or the owner of Work Package closure.
 
 ## Finding classes → verdict
 
