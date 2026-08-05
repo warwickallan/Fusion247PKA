@@ -100,6 +100,37 @@ Restate: the outcome, your plan, what this order failed to settle, and what look
 
 > **`export MSYS_NO_PATHCONV=1`, AND use Windows-form paths (`C:/...`) for every native-binary invocation — `git`, `tasklist`, `cmd.exe`.** The flag is required or `tasklist /FI` is mangled into `C:/Program Files/Git/FI`; Windows-form paths are required or `git -C /c/...` fails with `fatal: cannot change to`. **Both failure modes are real and both were proven by execution during the read-back. A worker who does only one half will produce a confident wrong negative.**
 
+---
+
+# AMENDMENT 2 — 2026-08-05, Larry. **Network allowance, narrowly opened**
+
+**`network: none` → `network: BOUNDED`, for exactly the two measurements below and nothing else.** Larry's authorisation, not Warwick's: these are **read-only queries against Warwick's own service, using the credential the tool already loads for itself**. No data is published, nothing is written to Honcho, and no outcome is irreversible. Escalating this would be an acceptance failure, not diligence.
+
+| | Measurement | What it DECIDES |
+|---|---|---|
+| **M-1** ⭐ | **Do the stored packets carry `map_path`?** | Whether the `744a67a` stripping defect is **LIVE in the data** — meaning N-2/N-3 are broken *independently of the timeout* and a fresh Larry is being misdirected right now — or **LATENT**, a hardening item. **Highest-value question remaining in the investigation** |
+| **M-2** | **Real page-1 latency at the current store size — REPEATED, not sampled** | Whether the 9 s budget is **marginal** (recurs and worsens every session, so the growth reading is right) or **clear** (the abort was a one-off and the growth reading is wrong). **A single sample decides nothing — that is the exact instrument error the Phase 2 gate made** |
+
+## Hard limits on this allowance
+
+- **READ ONLY. Never a write, a delete, a workspace change or a packet mutation against Honcho.**
+- **`credential_scope` stays `none`.** You do **not** open, read, echo, copy or print `C:\.fusion247\honcho.env` — the store **root**, which GL-012 makes ungrantable to anyone. **Invoke the governor's own code path so the tool loads its own credential.** If the only route you can find requires you to read that file yourself, **STOP and return `BLOCKED`** — do not reach for it.
+- **`private_surface` remains `none`. `live_authority` remains `none`.** No repair, no reinstall, no `continuity.mjs write`, no watcher restart. **A read is not a licence to fix what it reveals.**
+- **Do not send Warwick anything.** No Telegram, no ding, no Codex.
+- **Report the raw numbers.** For M-2, report every repetition — not a mean, not a best-of. A distribution is the finding; an average would hide exactly the marginality being tested.
+- **`file_surface` unchanged** — append to `Deliverables/proofline/EVIDENCE-2026-08-05-honcho-regression.md`. One file still.
+
+## Two corrections to your file, from Pax's adjudication — carry them, do not re-argue them
+
+1. **Your file contradicts itself** and Pax resolved it on evidence: §1 and §12-3 say B follows mechanically from A, while §12's hypothesis says two independent faults. **Pax's resolution: two mechanisms genuinely exist — you are right — but only A fired on the night**, because the rendered string discriminates (`:900`/`:914` for stripping vs the `:931` catch string Warwick actually saw). **Your standing-defect claim survives; your "both fired" framing does not.**
+2. **Your objection to the growth reading does not survive.** You argued the failure was on page 1, which existed before the growth. **Page 1 existed; its COST did not stay constant** — it returned 86 packets then and 100 now, each embedding a 3,449-byte state, roughly **340 KB in one response**. It is the most-growing request in the system, on two axes.
+
+**Also adopted from Pax, and it is the best thing either of you found:** the two defects **partially mask each other** — when the `readLatest` inside `writeContinuity` times out, the guard fails open and `map_path` is **kept**, so a slow Honcho actively *suppresses* the stripping defect. **That is why M-1 must be measured and not reasoned about, and it is why neither fault was visible until now.**
+
+**One further fresh read-back is permitted if this amendment is defective. Otherwise proceed and return the numbers.**
+
+---
+
 ## One more finding your read-back produced, which Larry is adopting
 
 **Reads into `~/.mypka/governor/` are NOT refused by the host classifier when the actor is a subagent** — you established this by doing it. WO-07 Amendment 3's `BLOCKED` was about **writes**. That narrows a recorded estate constraint from "machine paths" to "machine writes", which is worth more than this order. **Record it in the evidence file as a standalone observation.** Do not test a write to establish the other half — nothing here needs one.
