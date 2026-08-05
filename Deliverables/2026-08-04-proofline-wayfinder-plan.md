@@ -940,7 +940,15 @@ His bar: *"a fresh Larry receives the genuinely newest packet, containing the cu
 | **C-2** | *"preserve `tower-baton.env`"* | Already hard prohibition #2. It is consumed by the **current** Codex-QA route (`mergeCheck.mjs:142-143`) and deleting it breaks TowerBot verdict delivery **silently** |
 | **C-3** | *"route the live machine-level removal through Mack where that is the correct contract boundary"* | **Confirms Keel's A4 refusal was right.** The work splits per §14.14 |
 
-⚠️ **`run-tower-watcher.ps1` still has unexplained provenance** — created 2026-08-02, the same date as the disabled task's daily trigger boundary. Warwick has authorised its removal, so it proceeds; **the unexplained origin is recorded rather than treated as resolved**, and C-1's live check is the safeguard.
+✅ **`run-tower-watcher.ps1`'s provenance is EXPLAINED — closed 2026-08-05 by Mack.** The scheduled task's own `Comment` field says it:
+
+> *"Fusion Tower baton watcher. **Repaired 2026-08-02**: was logon-only and pinned to the **DELETED worktree `C:\Fusion247PKA-b010`**, so it **sat dead for 12 days in silence**. Now repeats every 10 min, is idempotent, and dings TowerBot on every failure path."*
+
+**Nothing mysterious set it up. A prior session repaired a watchdog that had died silently.** The script's own header names the same three faults. **This was escalated to Warwick as unexplained; it is now explained, and the escalation was resolved by looking rather than by asking.**
+
+**It is not in use:** `LastRunTime 2026-08-03 02:05:02`, `LastResult 0` — it ran successfully ~47 h ago and was disabled immediately after; `NumberOfMissedRuns 283` (≈47.2 h at `PT10M`); **zero `tower-watch` processes exist.** No STOP condition. Removal proceeds.
+
+⚠️ **But the trigger is worse than recorded:** it is a daily trigger **with `Repetition = PT10M`** — a **ten-minute resurrection loop requiring no logon** — not "one run tomorrow". **`Unregister` matters more than the map implied.**
 
 ## 14.14 WP-2A split along the contract seams
 
@@ -949,7 +957,13 @@ Keel's four class-A refusals were all correct. The work divides:
 | Owner | Scope | Why |
 |---|---|---|
 | **Keel** | The **refuse guard** at `bin/tower-watch.js` + `scripts/start-fusion-tower.ps1` · `git worktree remove C:\Fusion247PKA-tower` (verified to lose nothing — clean, pushed, no process holding it) · the **`Deliverables/**` documents** | Code and repo git are squarely inside its contract. `live_authority: none` restored |
-| **Mack** | The **five machine-level removals**: the Startup VBS · the two root `.ps1` files under D-B · `Unregister-ScheduledTask FusionTowerBatonWatcher` | Mack's contract owns supervisor registration; **deregistration is the same seam.** Warwick's C-3 confirms it |
+| **Mack** | The **four** machine-level removals *(corrected from "five" — the list always had four; Mack, 2026-08-05)*: the Startup VBS · the two root `.ps1` files under D-B · `Unregister-ScheduledTask FusionTowerBatonWatcher`. **These land BEFORE Keel's worktree removal — see the sequencing note below** | Mack's contract owns supervisor registration; **deregistration is the same seam.** Warwick's C-3 confirms it |
+
+**🚨 Sequencing, safety-critical (Mack, 2026-08-05).** In `run-tower-cp-watcher.ps1`, **line 23 (the `Stop-Process` kill) executes BEFORE line 24 (the start)**, so the kill is unconditional. Line 7's start target is `C:\Fusion247PKA-tower` — **the very worktree Keel is authorised to remove.** If the worktree goes first, an accidental invocation stops being a *takeover* and becomes a **silent Tower death**: it kills the live watcher and then has nothing to start. **Mack's deletions land first; Keel's `git worktree remove` is HELD until Larry releases it.**
+
+**Also established:** Mack read `run-tower-cp-watcher.ps1` under the exception and **independently confirmed prohibition #1's premise** — `-like '*tower-loop*watcher.mjs*'` does match the live watcher's command line. Previously that premise rested on one uncorroborated reading.
+
+**The machine layer is enumerated and closed — with one honest boundary.** Mack checked **all 216 scheduled tasks**, every `Run`/`RunOnce`/`RunOnceEx`/`RunServices`/Policies hive, WMI permanent subscriptions, Winlogon, `cmd.exe` AutoRun, Group Policy scripts, four PowerShell profiles and the Git Bash profiles: **no eighth registered machine route exists.** **But `C:\.fusion247` itself is un-enumerable under any grant** — prohibition #3 forbids listing it, and `run-tower-watcher.ps1:27` references a `C:\.fusion247\tower-ding.mjs` that appears in **no** investigation to date. **The honest claim is: every automatic/registered route is closed; unregistered scripts at the secrets root are the paste-to-resurrect class and cannot be enumerated under the current grant.** Not *"complete"*.
 | **Larry** | **`Builds/BUILD-010-fusion-tower/**`** — `Runtime/recovery.md:58,81,90,91` and `Architecture/tower-host-runbook.md` §3–§4 | **Keel's critical rule 5 permanently bars `Builds/`, and a Work Order cannot override a contract.** These are build-fact corrections to documented resurrection procedures; Larry takes them as a bounded, reviewed, reversible exception under Rule 4 |
 
 **The acceptance property is amended** (it was falsified — §14.9a B1): *every enumerated start path, **now eight**, fails or refuses when attempted, while PID 31268 remains alive and its log advancing.* **Assert on absolute script path and `WATCHER_ID`, never a process-name match** (B3 — the tower-loop suite spawns children indistinguishable by name).

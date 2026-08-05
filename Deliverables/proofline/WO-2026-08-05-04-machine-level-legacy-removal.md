@@ -1,5 +1,40 @@
 # WO-2026-08-05-04 — WP-2A (machine half): remove the legacy Tower start paths
 
+> ## AMENDMENT 1 — 2026-08-05. Mack returned `REFUSE` on two grounds. **Both upheld. Both are defects in my order, both are wording, and neither needs Warwick or a wider grant.**
+>
+> ### D-1 upheld — **C-1 as written required a check my own prohibition #3 forbids**
+>
+> v1 said to re-execute the check that the PS1's log target *"has not been written since 2026-07-24"*. **Those logs live at `C:\.fusion247\logs\...` — under the secrets root and OUTSIDE the two-path exception.** I instructed a check that the same order forbids.
+>
+> **Mack's substitution is ADOPTED, and it is stronger evidence than what it replaces.** C-1 is discharged by three falsifiers observable entirely outside the secrets root:
+> 1. **Path** — live PID 31268 runs `C:\Fusion247PKA\...\watcher.mjs`; the PS1 launches `C:\Fusion247PKA-tower\...`. Different absolute path.
+> 2. **Identity** — live `WATCHER_ID` is `WARWICK_YOGA#cp#1785800856828` (13-digit ms); the PS1 stamps `YOGA_CP#<10-digit seconds>`. Different prefix **and** different precision.
+> 3. **Cadence** — the PS1 hardcodes `WATCHER_POLL_MS=3000`; the live log polls at **61 seconds**. A process it launched would poll every 3s.
+>
+> For `run-tower-watcher.ps1`: it launches `bin/tower-watch.js` with cwd `services\tower-baton`, and **zero `tower-watch` processes exist**. **Warwick's condition C-1 is satisfied in substance and better than by the method I specified.**
+>
+> ### D-2 upheld — **my `acceptance_property` was the exact defect that got WO-03 refused**
+>
+> v1 said *"every remaining start path fails when attempted"* — but §14.14 amended the property to **eight** paths, and paths 7 and 8 are **Keel's and Larry's, not in Mack's `machine_surface`**. An evidence file asserting the eight-path claim from a four-path proof **reads as complete and is not.** I reproduced the failure I had just finished writing up.
+>
+> **AMENDED `acceptance_property`:** *All four **machine-level** targets are gone, and every **machine-level** route fails when attempted, while PID 31268 is alive with its log advancing at both start and end.*
+>
+> **The evidence file MUST carry a prominent boundary statement** naming paths 7 (`bin/tower-watch.js` + `start-fusion-tower.ps1`) and 8 (the `tower-host-runbook.md` §3–§4 registration procedure) as **out of scope for this file and evidenced elsewhere.** **S-2 composes from three files; it does not rest on this one.**
+>
+> ### Also amended
+>
+> - **🚨 SEQUENCING, and it is safety-critical.** Mack established that **line 23 (kill) executes BEFORE line 24 (start)** in `run-tower-cp-watcher.ps1`, and line 7's start target is the very worktree Keel may remove. **So if the worktree goes first, an accidental invocation stops being a takeover and becomes a SILENT TOWER DEATH.** **Mack's deletions land FIRST. Keel's `git worktree remove` is HELD until Larry releases it** — instruction already sent.
+> - **Target 4's trigger is worse than v1 said.** It is a daily trigger **with `Repetition = PT10M`** — a **ten-minute resurrection loop needing no logon**, not "one run tomorrow". `NumberOfMissedRuns = 283`. **Raises the value of unregistering it; the method is unchanged.**
+> - **The "closed list" claim is narrowed to what can honestly be claimed.** Mack enumerated **all 216 scheduled tasks**, every Run/RunOnce/RunOnceEx/RunServices/Policies hive, WMI permanent subscriptions, Winlogon, `cmd.exe` AutoRun, Group Policy scripts, four PowerShell profiles and the Git Bash profiles: **no eighth registered machine route exists.** **But `C:\.fusion247` itself cannot be enumerated under any grant** — prohibition #3 forbids listing it, and `run-tower-watcher.ps1:27` references a `C:\.fusion247\tower-ding.mjs` that appears in **no** investigation to date. **The evidence file must say: every automatic/registered route is enumerated and closed; unregistered scripts at the secrets root are the paste-to-resurrect class and are un-enumerable under the current grant.** Not *"closed list, complete"*.
+> - **Read-to-verify is INSIDE the exception.** Mack named the tension rather than burying it. Confirmed: *"the exact named exception needed to remove"* includes reading those two files to confirm the kill premise — **because the deletion cannot be safely performed at all if the premise is unconfirmable.**
+> - **Clerical:** map §14.14 says *"five machine-level removals"* and lists four. **Four is correct.** Map corrected.
+> - **Instrument disagreement, recorded:** `Get-ScheduledTaskInfo` reported a `NextRunTime` while `schtasks /Query /V` reported `N/A / Disabled` **for the same task at the same minute**. **Treat `schtasks` as authoritative for A3 and record both.**
+> - **Keel is not writing under `Deliverables/proofline/`** — confirmed; no collision.
+>
+> **Proceed on a fresh read-back.**
+
+---
+
 | Field | Value |
 |---|---|
 | **status** | ISSUED |
