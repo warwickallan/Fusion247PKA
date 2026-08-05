@@ -151,12 +151,13 @@ async function notesFor(pool, turnId) {
 const CP_FNS = ['spawnSync', 'spawn', 'execFileSync', 'execFile', 'execSync', 'exec', 'fork'];
 const CP_CALL_RE = new RegExp(`(?<![\\w$.])(${CP_FNS.join('|')})\\(`, 'g');
 
-// Pinned literal, held HERE rather than derived from the sources it checks — 17 launch sites
-// under tower-loop as of the #92/#93 reconciliation merge (15 from WO-2026-08-03-02, plus 2
-// legitimate additions from PR #93's fetchOpenPrs/detectCheckoutRepo work — both already
-// windowsHide:true — reviewed and acknowledged here per this test's own design). A count that
-// recomputed itself would agree with anything and prove nothing.
-const TOWER_LOOP_CP_SITES = 17;
+// Pinned literal, held HERE rather than derived from the sources it checks — 20 launch sites
+// under tower-loop as of the #92/#93/#94 reconciliation rebase (15 from WO-2026-08-03-02, plus 2
+// from PR #93's fetchOpenPrs/detectCheckoutRepo work, plus 3 from PR #94's WP-2E/WP-2G/M6 spawned
+// node:test subprocesses — the last 3 were bare and have had windowsHide:true added here as part
+// of the reconciliation, per this project's own established convention). A count that recomputed
+// itself would agree with anything and prove nothing.
+const TOWER_LOOP_CP_SITES = 20;
 
 function jsFilesUnder(dir, out = []) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -270,7 +271,7 @@ async function main() {
     const reachFile = path.join(__dirname, 'codexContractReach.test.mjs');
     assert.ok(fs.existsSync(reachFile), 'the reach proof file exists');
     const child = spawn(process.execPath, ['--test', reachFile], {
-      cwd: LOOP_DIR, env: { ...process.env }, stdio: ['ignore', 'pipe', 'pipe'],
+      cwd: LOOP_DIR, env: { ...process.env }, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true,
     });
     let out = ''; let err = '';
     child.stdout.on('data', (d) => { out += d; });
@@ -296,7 +297,7 @@ async function main() {
     const qaFile = path.join(__dirname, 'qaExchange.test.mjs');
     assert.ok(fs.existsSync(qaFile), 'the QA-exchange test file exists');
     const child = spawn(process.execPath, ['--test', qaFile], {
-      cwd: LOOP_DIR, env: { ...process.env }, stdio: ['ignore', 'pipe', 'pipe'],
+      cwd: LOOP_DIR, env: { ...process.env }, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true,
     });
     let out = ''; let err = '';
     child.stdout.on('data', (d) => { out += d; });
@@ -1962,7 +1963,7 @@ async function main() {
     const runProbe = (mode) => new Promise((resolve) => {
       const c = spawn(process.execPath, [probe, mode], {
         cwd: LOOP_DIR, env: { ...process.env, PG_OUT: mode === 'merge-check' ? graphOut : '' },
-        stdio: ['ignore', 'pipe', 'pipe'],
+        stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true,
       });
       let out = ''; let err = '';
       c.stdout.on('data', (d) => { out += d; });
