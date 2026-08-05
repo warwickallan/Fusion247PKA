@@ -1083,6 +1083,99 @@ A real interactive logon remains the only complete proof and is **not required**
 
 ---
 
+## 14.17 WP-2G — what actually reaches Codex. **Traced 2026-08-05.**
+
+### The deciding question, answered plainly: **NO. Root `CLAUDE.md` never reaches the Codex process.**
+
+Established by exhaustive grep, not inference. No `readFileSync` of `CLAUDE.md` exists anywhere in the review path. `"Finding disposition and queue effect"` returns exactly **one** file in the whole repo — `CLAUDE.md` itself.
+
+**And the `required_disposition` vocabulary does NOT come from it.** Three independent sources, none constitutional: the **`--output-schema` tmpfile** (`codexAdapter.mjs:102`) — a second, out-of-band law channel; a **hardcoded trailer** in `.mjs` source (`:245`); and **prose in the skill file**. *Codex could produce the vocabulary from the schema alone.* The appearance of compliance was never evidence of reach.
+
+### 🚨 The skill file is a hand-copied paraphrase, and it has ALREADY DRIFTED
+
+It says *"Only a qualifying finding may block OR trigger another round (Warwick, 2026-08-02)"*. **CLAUDE.md's canonical section additionally requires a blocking finding to NAME THE EXACT NEXT ACTION it would make unsafe, and carries the "Documentation blocks according to effect" clause and the adverse-verdict/queue-ownership clause. None of those three reach Codex.** Kept roughly in step by hand, with no mechanism to stay so. **This is the SSOT Golden Rule being broken in the one place it decides what a reviewer may block.**
+
+### Byte-order of what Codex actually receives (live route)
+
+1. **The entire bytes of `Builds/BUILD-010-fusion-tower/baton-mvp/tower-qa-skill.md`**, `.trim()`ed — **YAML frontmatter included; nothing strips it** · 2. the bounded packet (pointers, `head_sha`, `brief_excerpt`) · 3. the staged diff · 4. a **10-line hardcoded trailer** ending on the disposition rule. Out of band: `CODEX_RESULT_SCHEMA` via `--output-schema`.
+
+### Four further findings, each worse than the one it follows
+
+| # | Finding |
+|---|---|
+| **G-1** | **The route carrying almost all the law is TEST-ONLY.** `towerReview.mjs` composes three law files plus a *"THE BAR FOR BLOCKS_CURRENT_MERGE (Warwick, 2026-08-02)"* block — and `loadProductQaPrompt` has **exactly two call sites, both tests**. It also needs a Postgres `ops` schema that WP-2F just moved off. **The live routes carry the LEAST law.** This is the exact defect `productQaPrompt.mjs:3` was written to close — *"written but never WIRED into the runtime"* — **recurring one layer up** |
+| **G-2** | **No CI job runs any assertion about the QA skill when the QA skill changes.** `tower-baton-tests.yml` filters on `services/tower-baton/**`, so `qaSkill.test.js` — **the one test asserting the shipped skill is ratified** — does not fire on a skill edit. `fusion-tower-tests.yml` fires but asserts nothing about it. **Set the skill to `status: draft` and every gate stays green** |
+| **G-3** | **The live readers do a bare `readFileSync` with ZERO frontmatter validation.** The ratification check (`standing_use_ratified \|\| status === 'approved'`) exists only in **retired** code (`tower-baton/src/qaSkill.js`) and **test-only** code (`productQaPrompt.mjs`). **The degradation risk is not an absent file — it is unratified content running as law** |
+| **G-4** | **The SHA-256 fingerprint is provenance, not a control.** Compared in exactly two places, neither checking currency — an idempotency skip and an immutability trigger. Asserted only as *shape* (`length === 64`), never against a known value. **And it is not computed at all on `reviewDiff.mjs`/`mergeCheck.mjs` — the preferred route.** Forensically useful, preventatively worthless |
+
+**A stale pin already exists**, proving the hazard is live: `tower-runtime.test.js:368` asserts `tower-qa-skill@1(approved` while the shipped file's frontmatter is `version: 2`.
+
+### Decision — durable home: **`services/control-plane/review/prompts/tower-qa-skill.md`**
+
+Beside `reviewer-classification-amendment.md` and `product-qa-runtime-orientation.md` — **already Warwick-approved governing texts with `status`/`governs_live` frontmatter, already loaded fail-closed. The estate already built the home for this artefact class; the file simply is not in it.** Three properties fall out free: it leaves `Builds/**` (**X-1**, and Keel's path ban); it lands inside `control-plane-tests.yml`'s existing `services/control-plane/**` filter so **CI fires on a law edit with no workflow change** (**G-2**); and the loader default stops naming a build, so later builds inherit it (**X-5**).
+
+### Alternatives rejected — including the obvious one, which is a defect
+
+- **🔴 Injecting `CLAUDE.md` into the Codex prompt.** This is the intuitive answer and it is **wrong**: CLAUDE.md says *"You are Larry"*, and `--ignore-user-config`, the skill's own role boundaries and **both** codex adapters exist specifically to neutralise that persona. **`fableAdapter.mjs:33` records a real past persona leak through exactly that channel.**
+- **Letting Codex read the law off disk itself** — `--sandbox read-only` blocks its file reads on Windows. Reach would be unprovable and machine-dependent.
+- **Hiring Codex into `Team/<Name>/AGENTS.md`** — it is external, has no subagent shim, and `agent-index.md:39` deliberately lists it outside the specialist table. Warwick's *"I consider Codex part of Tower"* points at Tower's prompt directory, not the roster.
+- **`Team Knowledge/Guidelines/GL-013`** — defensible on precedence, but needs a **new CI path filter** to make reach provable and separates the file from its two ratified siblings. Strictly more change for the same result.
+- **A reviewer-governance layer / law registry / precedence engine / shared loader module** — the named wrong answer. **Even a shared constants module is regrowth: a seventh file to avoid six one-line edits.**
+
+### How reach is proven with **ZERO Codex spend**
+
+The seam already exists — `buildCodexPrompt` is a pure export, and `runMergeReview` already accepts an injected `spawn`. The test: **resolve the path by importing each loader's own exported constant, never by re-deriving it** *(a test that computes the path itself passes over a loader pointing elsewhere)* → assert the file exists, parses, and is ratified → drive `runMergeReview` with a **fake `spawn` capturing the exact bytes written to `child.stdin`** → assert a **sentinel sentence held as a literal in the test file** appears there. **Mutation half, without which it is not evidence: the same assertions must FAIL for `skillText: ''` and for an unratified fixture.**
+
+**Stated honestly: this proves reach up to and including the bytes handed to the child process. Only the UAT proves the live external process consumed them.**
+
+### ⚖️ The one part that is Warwick's — a `product-decision`
+
+**The duplication cannot be resolved without editing root `CLAUDE.md`, which the hard rule on *"no silent constitutional self-modification"* reserves to Warwick with an exact redline and independent review. Larry may not self-waive that, even under "own the route".** Redline presented separately; the rest of WP-2G proceeds meanwhile.
+
+## 14.18 🔴 WP-2G CLARIFIED — Warwick, 2026-08-05. **REWRITE the law, do not merely rehome it**
+
+> *"**Do not merely rehome Codex's existing contract unchanged.** We already know that several parts of the live wording are stale, contradictory or capable of causing exactly the churn this phase is intended to remove."*
+
+**This supersedes the "move the file" framing of §14.17.** The home decision stands; the *content* is now in scope, and §14.17's G-1..G-4 are evidence for why.
+
+### PRESERVE — the valid core, named by Warwick
+
+Genuine **external independence** · **read-only** operation · **exact-head and diff** evidence · **fail-closed** behaviour · **Veritas-receipt verification** · **bounded findings** · the **three-call ceiling**.
+
+### RESOLVE — the seven required operating outcomes, binding
+
+| # | Outcome |
+|---|---|
+| **O-1** | **Codex reviews the complete proposed PR or release head BY DEFAULT — not every implementation checkpoint.** Earlier review requires **explicit commissioning** |
+| **O-2** | Its **durable control set** is: the exact **Git and PR state** · the **accepted Wayfinder outcome** · relevant **Work Orders** · **tests and CI** · applicable **Veritas receipts**. **ClickUp is NOT the source of authority** |
+| **O-3** | **Codex is the external PR/release reviewer. It verifies that Veritas's internal assurance honestly applies; it does NOT routinely rerun the entire phase gate** |
+| **O-4** | Findings block or trigger another round **only through active, reachable, in-scope MATERIAL EFFECT.** Minor, clerical, theoretical and optional findings are **reported once and parked** |
+| **O-5** | **Codex returns a TECHNICAL VERDICT. Warwick retains merge and final acceptance.** **The existence of an upcoming merge must NOT itself force `DECISION_REQUIRED`** |
+| **O-6** | **GitHub is the durable review and disposition surface. TowerBot is the outbound live viewing surface** for the actual Codex/Larry exchange. **ClickUp is not the control thread. Telegram has no inbound authority** |
+| **O-7** | The real external invocation **reliably receives this law across later builds and PRs.** **Any fingerprint or provenance claim must prove WHICH CONTRACT WAS ACTUALLY DELIVERED — not merely compute an unused hash** |
+
+**O-7 is a direct ruling on G-4.** Today's fingerprint is asserted only as *shape* (`length === 64`), never against a known value, and **is not computed at all on the preferred route.** A hash nobody compares is decoration, and Warwick has now said so in requirement form.
+
+**O-1 and O-3 together explain the observed churn.** The watcher's per-checkpoint polling plus a reviewer with no stated deference to Veritas produces re-review of ground already assured — which is the *"disproportionate assurance work"* and *"repeated investigations"* the Phase 3 report is meant to detect. **The fix is in the law's wording, not in a new control.**
+
+### Scope discipline, restated by him
+
+> *"I am defining the outcome, not the implementation route, destination, file layout or team allocation. Own those. **Do not call Codex until the permanent contract and its real delivery path are integrated and proved offline.**"*
+
+**The hard gate now has two halves: the contract AND its delivery path, both integrated, both proved offline.** The zero-spend reach test (§14.17) is the offline proof.
+
+### The UAT certifies wording, not behaviour-on-the-night
+
+> *"The upcoming live UAT must certify that permanent structure **and wording**, not a temporary dispatch instruction and not the known-stale BUILD-010 behaviour."*
+
+---
+
+### Unestablished — named
+
+`tower-loop/prompts/supervisor-prompt.md` **reaches Codex on EVERY watcher turn**, is labelled `approved_by='ai-authored-unapproved'`, and carries **no** reviewer or disposition law — a second governing text with its own home and its own unapproved status, and **§14.15 does not obviously reach it** · whether the `@1` pin currently fails (DB-gated, not executed) · Fable's own prompt additions unexamined, though `buildFablePrompt` wraps `buildCodexPrompt` so a move affects it identically.
+
+---
+
 ## 14.11 Evidence status — §14.6 discharged
 
 All three investigations have landed and their findings are recorded above. **WP-2A, WP-2E and WP-2F may now be issued as Work Orders.** WP-2B(1) is issued and amended (`WO-2026-08-05-01`, Amendment 1) after a correct class-A `REFUSE`.
