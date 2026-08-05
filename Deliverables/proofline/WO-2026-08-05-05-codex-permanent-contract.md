@@ -1,5 +1,51 @@
 # WO-2026-08-05-05 — WP-2G: Codex's permanent operating law, in its durable home, provably delivered
 
+> ## AMENDMENT 1 — 2026-08-05. Keel returned `REFUSE`. **Upheld in full.** Seven rulings below; the proposed contract design is **accepted as outlined**.
+>
+> ### R-1 · The `Builds/**` delete exception is WITHDRAWN — Keel was right to refuse it
+> Three independent grounds, any one sufficient: **path** (critical rule 5 lists `Builds/` flatly; *a delete is the most complete edit available*), **function** (*"any document whose function is to define, govern or assess the work Keel is implementing"* — this is the contract by which a reviewer decides whether Keel's diffs may merge), and **precedent** (SOP-022 cites this exact shape as its founding example). **I made the same mistake this order was written to document.** **Larry deletes the old file** after Keel returns. Two-commit move; the SSOT duplication exists only across my integration seam.
+>
+> ### R-2 · 🔴 `supervisorCodex.mjs` ADDED to `file_surface` — this was a false green waiting to ship
+> `invokeCodexJson` calls `detectCodexAuth({})` and `resolveCodexBin({})` with **no injection seam**, returning `blocked` **before any spawn** when either fails. On CI there is no `~/.codex/auth.json` — so **the injected `spawn` is never called, no bytes reach `stdin`, and the reach test captures nothing. It would pass here and fail in CI, or, written loosely, pass BY BLOCKING** — the precise false green this WP exists to kill. **Adopt Keel's fix:** optional `authProbe`/`resolveBin` params mirroring `createCodexAdapter({ resolveBin, authProbe })` at `codexAdapter.mjs:280`. **House pattern, ~4 lines, no mechanism.** **The `HOME`-rewriting alternative is REJECTED** — Keel's reasoning accepted: it manufactures a file named `auth.json`, leans on undocumented `os.homedir()` behaviour, and mutates process-wide state in a shared runner.
+>
+> ### R-3 · ⚖️ RATIFICATION — ship **DRAFT**. The flip is a human act, and it is Warwick's
+> Keel is right that this is not a worker's call and right that it is not mine either. **Ratifying wording Keel authored would breach the estate's rule that AI-authored governing prompts need Warwick's approval before use** — with the worked precedent sitting in the same directory, where exactly that was flagged DRAFT and consequently does not govern.
+> **Ruling:** the new file ships **`status: draft`, `governs_live: false`, `standing_use_ratified: false`.** **Warwick reads the finished wording and approves it; the frontmatter flip is then a one-line commit, and that flip is what makes it govern.** He authorised the *outcomes* (O-1..O-7) and said the **UAT certifies the wording** — so the wording must reach him before the UAT, not be self-certified into place.
+> **Consequence for the acceptance property, stated so it is not discovered:** with the real file DRAFT, **the reach test proves the gate works BOTH WAYS** — a ratified fixture reaches `stdin`; the unratified real file is refused. **That is stronger evidence than a passing file would have been**, and it is not a workaround.
+>
+> ### R-4 · G-1 — **Keel's inversion is ACCEPTED, and it is the better answer**
+> Do not wire the dead route to reach the law. **Move the law onto the route that is already live.** Fold the clauses that today exist only in `productQaPrompt.mjs`'s hardcoded trailer and the classification amendment into the permanent contract that `reviewDiff`/`mergeCheck`/`watcher` actually read. **Smaller, and it removes the incentive to keep a second law channel alive.** **Do put the header line recording that `towerReview.mjs` and `productQaPrompt.mjs` remain test-only** — Keel established there is **no production caller at all**, which goes further than §14.17.
+>
+> ### R-5 · G-2 — Keel's correction ADOPTED; my map was half wrong
+> `control-plane-tests.yml` does fire on `services/control-plane/**` ✅ — **but `test:runtime` is not in CI at all, and `reviewTooling.test.mjs`/`classifyBuild.test.mjs` are executed by no npm script and no CI job.** **A reach test dropped beside them would be a green that proves nothing.** **Wire it into `run-tower-loop-tests.mjs`**, which CI does run, reports `executed=`/`failures=`, and exits 1 on zero executed. No workflow change — **for a different reason than the order gave.**
+>
+> ### R-6 · O-7 pin — **sentinel, as Keel recommends. Not a hash literal**
+> The file↔bytes hash equality carries the *"which contract"* half by construction; the sentinel survives the *"evidence-led wording refinements"* Warwick reserved. **A pinned hash makes every wording edit a two-file edit, which is how pins go stale** — and this estate has a worked example in `tower-runtime.test.js:368`. **Also adopt the runtime half:** `reviewDiff.mjs`/`mergeCheck.mjs` compute the fingerprint from the bytes they loaded and fail closed on mismatch. **Two lines each. That is O-7 discharged — a hash compared against something.**
+>
+> ### R-7 · G-3 — **CLOSE it, and the validator must be reached by the LIVE loaders**
+> One exported loader-and-validator, in an existing module Keel judges right. **Not a new file, so not regrowth.** **The test is not enough:** the live readers must validate frontmatter, because *unratified content running as law* is the real risk. **If the natural home is a module the live route does not import, say so — do not create a live dependency on a test-only module by stealth.**
+>
+> ### Also ruled
+> - **`review/prompts/product-qa-runtime-orientation.md` ADDED to `file_surface` — pointer/`base_prompt` updates ONLY, no content change.** It is a live governing text that would otherwise point at a deleted file: the "worse than no move" case.
+> - **Contradiction 2 upheld — my map §14.17 was factually wrong.** The two siblings do **not** match: the classification amendment is `approved`/`governs_live: true`; the orientation file is **DRAFT, not Warwick-approved**. **Match the KEY SHAPE, not the values.** Map corrected.
+> - **`file_surface` purity:** evidence file is exactly `Deliverables/proofline/EVIDENCE-2026-08-05-wo-05-codex-contract-reach.md`. `worktree`: `C:\Fusion247PKA-build-020-trial`.
+> - **Acceptance commands, named:** `npm run test:tower-loop` (`executed=`/`failures=`) · `node --test` in `services/tower-baton` (`# tests`/`# fail`) · `npm run test:tower-loop-unit`. **`test:runtime` is NOT required** — it needs `initdb`/`pg_ctl` absent from CI and is not run there.
+>
+> ### `contract_basis` — the field whose absence caused this round trip
+> | Path / action | Permitting clause |
+> |---|---|
+> | `services/control-plane/**` | Implementation code and runtime assets — core Keel surface |
+> | **Authoring `review/prompts/tower-qa-skill.md`** | **RULED IN, narrowly, on Larry's authority — not left to inference.** A runtime asset under `services/**`; Warwick owns it and specified its binding content himself; **its two siblings in that directory were specialist-authored under a Work Order**; and it ships **DRAFT** (R-3), so Keel authors but does not ratify. Independently assessed before it governs |
+> | `services/tower-baton/test/qaSkill.test.js` | Test repointing inside `services/**` |
+> | `Deliverables/proofline/EVIDENCE-…md` | *"`Deliverables/**` is NOT prohibited wholesale"* |
+> | **NOT `Builds/**`** | **No carve-out exists. Larry's.** |
+>
+> **`contract_conflicts`:** one, now resolved — the `Builds/**` delete, withdrawn at R-1. **`capability_evidence`:** Keel exercised branch/worktree git and a fake-`spawn` capture pattern successfully on `WO-...-01` and `WO-...-02` this session.
+>
+> **Proceed on one fresh read-back.**
+
+---
+
 | Field | Value |
 |---|---|
 | **status** | ISSUED |

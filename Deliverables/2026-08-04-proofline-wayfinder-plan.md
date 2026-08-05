@@ -1112,7 +1112,9 @@ It says *"Only a qualifying finding may block OR trigger another round (Warwick,
 
 ### Decision — durable home: **`services/control-plane/review/prompts/tower-qa-skill.md`**
 
-Beside `reviewer-classification-amendment.md` and `product-qa-runtime-orientation.md` — **already Warwick-approved governing texts with `status`/`governs_live` frontmatter, already loaded fail-closed. The estate already built the home for this artefact class; the file simply is not in it.** Three properties fall out free: it leaves `Builds/**` (**X-1**, and Keel's path ban); it lands inside `control-plane-tests.yml`'s existing `services/control-plane/**` filter so **CI fires on a law edit with no workflow change** (**G-2**); and the loader default stops naming a build, so later builds inherit it (**X-5**).
+Beside `reviewer-classification-amendment.md` and `product-qa-runtime-orientation.md` — governing texts with `status`/`governs_live` frontmatter, loaded fail-closed. **The estate already built the home for this artefact class; the file simply is not in it.**
+
+> **⚠️ CORRECTION, 2026-08-05 (Keel).** This paragraph originally said *"already Warwick-approved governing texts"*. **That is FALSE for the second file.** `reviewer-classification-amendment.md` is `status: approved` / `governs_live: true`; **`product-qa-runtime-orientation.md` is `status: DRAFT — NOT YET WARWICK-APPROVED` / `governs_live: false`, and consequently does not govern.** The home decision stands — but it rests on the *directory* being the right class of home, not on both occupants being ratified. **And that DRAFT file is the worked precedent for R-3: AI-authored governing wording sits unratified until Warwick approves it.** Three properties fall out free: it leaves `Builds/**` (**X-1**, and Keel's path ban); it lands inside `control-plane-tests.yml`'s existing `services/control-plane/**` filter so **CI fires on a law edit with no workflow change** (**G-2**); and the loader default stops naming a build, so later builds inherit it (**X-5**).
 
 ### Alternatives rejected — including the obvious one, which is a defect
 
