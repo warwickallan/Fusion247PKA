@@ -1,28 +1,31 @@
 ---
 artifact: tower-qa-skill
 version: 3
-status: draft
-governs_live: false
-standing_use_ratified: false
-proof_run_authorised: false
+status: approved
+governs_live: true
+standing_use_ratified: true
+proof_run_authorised: true
 owner: Warwick
 author: Keel (BUILD-020 WP-2G, WO-2026-08-05-05), 2026-08-05
-approved_by: none — awaiting Warwick
-approved_at: none
+approved_by: Warwick
+approved_at: 2026-08-05
+ratified_wording_at_head: 17738bfa46d92b2c835f57f55c2ca4a10e09765e — Warwick ratified this exact prose (sections 1-9 below) as it stood at this head, for standing live use and this proof run. This commit changes only the frontmatter above; the governing text is byte-identical to 17738bf
 scope: the EXTERNAL Codex reviewer at PR and release level — the live merge-class route (tower-loop/reviewDiff.mjs, tower-loop/mergeCheck.mjs, tower-loop/watcher.mjs, tower-loop/demo-merge-review.mjs)
 companion: services/control-plane/review/prompts/reviewer-classification-amendment.md — APPROVED and governs_live, loaded and delivered WITH this file on the live route; it is not restated here
 supersedes: Builds/BUILD-010-fusion-tower/baton-mvp/tower-qa-skill.md (version 2, status approved) — a build record, not a runtime home
-needs: Warwick's explicit approval before it may govern a LIVE review. Until then every live loader REFUSES it, fail-closed, and no Codex call is made
+needs: nothing further — ratified. The live loader's own hash check binds this to the exact head this commit produces, per §8
 change_history: recorded in Git. This file is loaded FRESH per review turn; the SHA-256 of the exact bytes loaded is recomputed over the bytes actually delivered and fails closed on mismatch
 ---
 
-> **HUMAN-OWNED GOVERNING CONTRACT — currently a DRAFT that does not govern.**
+> **HUMAN-OWNED GOVERNING CONTRACT — RATIFIED, 2026-08-05.**
 > Warwick owns this text. It was drafted by Keel under `WO-2026-08-05-05` against outcomes
-> Warwick specified, and **it is deliberately unratified**: `status: draft`,
-> `governs_live: false`, `standing_use_ratified: false`. Every live loader refuses to run a
-> review under an unratified contract, so this file governs nothing until Warwick reads the
-> wording and flips those three fields. That flip is a human act and the only thing that makes
-> this contract binding.
+> Warwick specified, and Warwick has now explicitly ratified the exact wording below as it stood
+> at head `17738bf`, for standing live use and this proof run: `status: approved`,
+> `governs_live: true`, `standing_use_ratified: true`, `proof_run_authorised: true`. This
+> contract governs from the exact head this ratifying commit produces onward, per the live
+> loader's own hash-binding in §8. **This ratification does NOT extend to
+> `product-qa-runtime-orientation.md`, which remains an unratified draft, is not loaded by the
+> live Codex route, and is not a WP-2D blocker** (Warwick, 2026-08-05).
 >
 > **Runtime-home note, recorded so the next reader does not repeat the search.** This is the
 > durable home of Codex's operating law. `services/control-plane/review/towerReview.mjs` and
