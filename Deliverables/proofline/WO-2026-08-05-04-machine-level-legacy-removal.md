@@ -59,6 +59,33 @@
 | **blocking_dependencies** | none. **`WO-...-03` (Keel) runs concurrently on `services/tower-baton/**` and `Deliverables/**`; `WO-...-02` owns `services/control-plane/**`. Do not cross into either** |
 | **return_to** | Larry |
 
+> ## AMENDMENT 2 — 2026-08-05. **ONE ADDITIONAL STEP: clear the `C:\Fusion247PKA-tower` residue.**
+>
+> Your four targets are **COMPLETE and integrated**. This adds one bounded step, assigned to you because it is the machine-level seam and you already hold live authority on this route. **Larry's decision, not an escalation.**
+>
+> ### 🚨 What Keel found — read this before touching anything
+>
+> `git worktree remove C:\Fusion247PKA-tower` **half-succeeded.** Git's bookkeeping completed cleanly — deregistered, admin dir gone, `prune` silent, branch alive at `3c08e45` locally and on origin, three stashes unchanged. **The filesystem delete failed with `Invalid argument`, and that failure is a safety feature:**
+>
+> ```
+> FullName : C:\Fusion247PKA-tower\services\control-plane\node_modules
+> LinkType : Junction
+> Target   : C:\Fusion247PKA\services\control-plane\node_modules
+> ```
+>
+> **That junction points into the LIVE tree** — the `node_modules` PID 31268 is running on, holding `better-sqlite3` and `pg`, **native modules a running process cannot survive losing.** Any recursive delete that follows reparse points would have destroyed the live watcher's dependencies and killed the runtime this entire phase exists to protect.
+>
+> ### The step — TWO parts, IN THIS ORDER. Do not reverse them.
+>
+> 1. **`cmd /c rmdir "C:\Fusion247PKA-tower\services\control-plane\node_modules"`** — `rmdir` on a junction removes **the link only, never the target**. **Then confirm the live `C:\Fusion247PKA\services\control-plane\node_modules` still holds its 16 entries**, and that PID 31268 is alive.
+> 2. **Only then** clear the remainder of `C:\Fusion247PKA-tower` (462 files, 109 directories).
+>
+> **🔴 NEVER use a recursive delete for step 1.** **🔴 Before step 2, re-scan the tree for ANY other reparse point** — one junction was found; a second would be just as lethal, and "we checked the one we knew about" is not an enumeration. **If you find another, STOP and report.**
+>
+> **Nothing is lost either way** — the content is `3c08e45`, pushed to `origin/build-014/tower-recovery`. **If any check fails, STOP.** Leaving the residue is an acceptable outcome; killing the watcher is not. *(Larry considered leaving it: rejected because a directory that looks like a usable worktree and is not is exactly the confusing legacy state this phase exists to remove.)*
+>
+> **Extend `machine_surface`** by these two paths, for this step only. `live_authority` extends to them and nothing else. **Append to your existing evidence file.**
+
 ## 🔴 FOUR HARD PROHIBITIONS
 
 1. **NEVER EXECUTE `C:\.fusion247\run-tower-cp-watcher.ps1`.** Not to test it, not to see what it does, not "safely". Its line 23 is a `Stop-Process -Force` over every node process matching `*tower-loop*watcher.mjs*` — **which matches the LIVE watcher, PID 31268.** Running it kills the current runtime and starts a 22-July stale copy against the live database. **Read it if you must; never run it.** *(No one has independently re-read it — Keel declined because the grant was invalid. **You now have a valid grant for that exact file, so confirm this premise yourself before deleting.**)*
