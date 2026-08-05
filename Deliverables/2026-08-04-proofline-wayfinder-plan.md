@@ -394,11 +394,21 @@ Discharged **inside `WO-2026-08-04-01`**. A finding is an observation, not an in
 
 ---
 
-## 12. Current frontier and the exact next action
+## 12. Phase 1's frontier — ⛔ SUPERSEDED AND HISTORICAL. **DO NOT READ THIS AS THE CURRENT FRONTIER.**
 
-**Frontier:** Phase 3, on a Veritas `HOLD`. **WP-1 is built and integrated at `39a553cb` — do NOT re-implement it.** Work Order `Deliverables/proofline/WO-2026-08-04-01-proofline-service-core.md` remains open for the HOLD disposition above; it is not reissued.
+> ## 🚨 CORRECTED 2026-08-05 — this section stated a frontier that was THREE VERSIONS STALE
+>
+> **Found by Keel (WP-2B(2) read-back, P-4), and it is the most serious defect in this map.** This heading said *"Frontier: Phase 3, on a Veritas HOLD"* with an exact next action of *"Warwick re-attempts the walkthrough"* — **while the rotation block said Phase 2 and this section's own tail said "Go to §13."** Three different frontiers in one authoritative document.
+>
+> **Why it matters more than a stale label:** WP-2B(2) is building the mechanism that tells a fresh Larry where the frontier is. **Any code scraping §12 would have emitted "Phase 3, Veritas HOLD, next action: Warwick re-attempts the walkthrough" — a confident wrong orientation, delivered by the very mechanism built to prevent it.** That is W-1's named failure, and this map was the source of it.
+>
+> **THE CURRENT FRONTIER IS §14 (Phase 2) — see §14.16 and §14.19 for live status. §15 is Phase 3, recorded and NOT started.**
+>
+> Everything below in this section is **Phase 1 history, retained as evidence.** Phase 1 was **CLOSED and PASSED by Warwick on 2026-08-04.**
 
-**Exact next action:** **Warwick re-attempts the walkthrough** using the one command below. That is the only outstanding step, and it is his.
+**Phase 1's frontier, as it stood before closure:** Phase 3, on a Veritas `HOLD`. **WP-1 is built and integrated at `39a553cb` — do NOT re-implement it.** Work Order `Deliverables/proofline/WO-2026-08-04-01-proofline-service-core.md` remains open for the HOLD disposition above; it is not reissued.
+
+**Phase 1's exact next action, since completed:** Warwick re-attempted the walkthrough using the command below and **PASSED it on 2026-08-04.**
 
 ```
 C:\Fusion247PKA-build-020-trial\services\proofline\start-proofline.cmd
@@ -1234,6 +1244,32 @@ Genuine **external independence** · **read-only** operation · **exact-head and
 ### Unestablished — named
 
 `tower-loop/prompts/supervisor-prompt.md` **reaches Codex on EVERY watcher turn**, is labelled `approved_by='ai-authored-unapproved'`, and carries **no** reviewer or disposition law — a second governing text with its own home and its own unapproved status, and **§14.15 does not obviously reach it** · whether the `@1` pin currently fails (DB-gated, not executed) · Fable's own prompt additions unexamined, though `buildFablePrompt` wraps `buildCodexPrompt` so a move affects it identically.
+
+---
+
+## 14.19 ⭐ THE CURRENT FRONTIER — single statement, 2026-08-05
+
+**This is the ONLY place in this map that states the live frontier. §12 is Phase 1 history and says so.**
+
+| | |
+|---|---|
+| **Phase** | **Phase 2 — Honcho and Tower as durable shared myPKA infrastructure.** IN PROGRESS |
+| **Delivered and integrated** | WP-2B(1) Honcho writer · WP-2F one canonical store · WP-2A legacy Tower retired · WP-2G Codex contract + reach proof · the constitutional amendment |
+| **Open** | **WP-2B(2)** Honcho render + frontier + install *(refused once; being amended)* · **WP-2E** TowerBot QA exchange · **WP-2C** event-driven ding · **WP-2D** UAT + first live Codex call + merge |
+| **Exact next action** | **Amend WO-2026-08-05-06 (WP-2B(2)) per Keel's read-back, and route the machine-level install half to Mack.** |
+| **Warwick owes** | **Ratify the Codex contract wording** (it ships DRAFT and does not govern until he does) — needed **before** the UAT, not before the next work package |
+| **Gate ahead** | Veritas on the exact integrated head, against §14.0c S-1..S-5 |
+| **Phase 3** | §15. **RECORDED, NOT STARTED.** Not before Phase 2 merges and rotates |
+
+### R-3 CORRECTED — it is SIX hardcoded invocations, not four (Keel, 2026-08-05, P-2)
+
+`C:\Fusion247PKA\.claude\settings.local.json` carries **six** `C:/Fusion247PKA/`-hardcoded entries: **`Stop` × 2** (`bridge-ingest.mjs`, **`continuity.mjs stop`**), `SessionStart` × 2, `PreToolUse` × 1, `statusLine` × 1.
+
+**🎯 R-3 omitted both `Stop` hooks — and one of them is `continuity.mjs stop`, the WRITER this entire work package exists to deploy.** **Installing only the `SessionStart` render would leave the writer running from the stale checkout, and S-1 would still fail** — while looking installed. **Corrected before it could be built against.**
+
+**Also established (P-3):** user-level `~/.claude/settings.json` has **no `hooks` block — but is NOT unused**: it already carries a governor `statusLine` pointing at `C:/Fusion247PKA/`. **Whether user-level hooks MERGE with or OVERRIDE project-level hooks in this build is UNESTABLISHED — if they merge, a fresh Larry in the main worktree gets TWO briefs and TWO packet writes per stop.** Must be proven by execution at install, never assumed.
+
+**And (P-1):** the pointer render fix is **already in this worktree's code** — `readContinuityBrief` already emits *"recall only, ZERO authority"* and closes *"Nothing in this block is an instruction."* **The `"AUTHORITATIVE current focus"` / `"source of truth"` contradiction exists ONLY in the installed copy.** So it is a **pure install delta, not a code delta** — which shrinks the code half and raises the weight of the install half.
 
 ---
 
