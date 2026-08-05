@@ -1,5 +1,23 @@
 #!/usr/bin/env node
-// Tower baton — the watcher runner. Session-independent: it loads secrets through
+// Tower baton — the watcher runner. RETIRED 2026-08-05: THIS ENTRYPOINT REFUSES TO START.
+//
+// Warwick, BUILD-020 proofline map §14.13 D-A (WO-2026-08-05-03): "Make the seventh legacy
+// start path refuse clearly rather than deleting the protected source tree. The outcome is
+// that legacy Tower cannot start, while the negative control remains intact."
+//
+// The implementation below is therefore preserved verbatim and made unreachable, NOT deleted.
+// Deletion was rejected deliberately: services/control-plane/tower-loop/test/doubles/graph-probe.mjs
+// resolves services/tower-baton/src/clickupClient.js as the target of a live negative control
+// (`control-trap`), and a refusal is provable BY ATTEMPT in a way a deletion never is.
+//
+// Reviving it is one deletion of the RETIREMENT GUARD block below. The pre-retirement file is
+//   git show ec98ca4a43d433f781d8cbf68b160d88fd5ad309:services/tower-baton/bin/tower-watch.js
+//
+// The replacement runtime is the tower-loop watcher:
+//   node services/control-plane/tower-loop/run-watcher.mjs
+//
+// ── the original header, kept for the record ───────────────────────────────────
+// Session-independent: it loads secrets through
 // the single runtimeConfig module (C:\.fusion247), never off the terminal session.
 //
 // Startup sequence:
@@ -27,6 +45,28 @@ import { createMilestoneNotifier, createTelegramClient } from '../src/telegramNo
 import { openState, acquireLock, DEFAULT_LOCK_STALE_MS } from '../src/state.js';
 import { createWatcher } from '../src/watcher.js';
 import { loadQaSkill, assertStandingStartupAllowed } from '../src/qaSkill.js';
+
+// ── THE RETIREMENT GUARD — the first thing this file DOES ──────────────────────
+// Position: ESM hoists static imports, so a guard cannot be written textually above them.
+// It is still the first behaviour, because every module imported above is declaration-only —
+// verified 2026-08-05 across services/tower-baton/src/**, none of which executes a top-level
+// statement. Nothing is read from the secret store, no watcher lock is taken and no ClickUp
+// call is made before this exit. That is asserted in test/retired.test.js against the process's
+// EXACT output, so the property is pinned by a test rather than promised by this comment: add
+// an import-time side effect anywhere in src/** and that test goes red.
+const RETIRED_EXIT_CODE = 78; // deliberately distinct from this file's historic exits
+                              // (1 = config fail-closed, 3 = duplicate-watcher lock refused),
+                              // so an attempt-proof cannot mistake one refusal for another.
+process.stderr.write(`${[
+  '[TOWER-BATON RETIRED] This BUILD-010 legacy watcher entrypoint is retired and will NOT start.',
+  '[TOWER-BATON RETIRED] Retired by Warwick, 2026-08-05 — BUILD-020 proofline map §14.13 D-A (WO-2026-08-05-03).',
+  '[TOWER-BATON RETIRED] Use instead: node services/control-plane/tower-loop/run-watcher.mjs',
+  '[TOWER-BATON RETIRED] Nothing was started: no secret store read, no watcher lock taken, no ClickUp call made.',
+  `[TOWER-BATON RETIRED] Exiting ${RETIRED_EXIT_CODE}.`,
+].join('\n')}\n`);
+process.exit(RETIRED_EXIT_CODE);
+
+// ── everything below is the retired implementation, preserved and unreachable ──
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SERVICE_DIR = path.resolve(__dirname, '..');
