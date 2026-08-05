@@ -67,3 +67,61 @@ Today: **no `SessionStart` hook is registered for any worktree but `C:\Fusion247
 Return a READ-BACK and HOLD. Outcome in your own words · method · what this order fails to settle · what looks wrong in it. **Seven orders in this phase have been refused or held, every one for a defect in MY order rather than the work.** **Refuse this one if it is under-specified — a bad install is harder to see than a bad build, because it looks like nothing happened.**
 
 `export MSYS_NO_PATHCONV=1` before any Windows command. Git for your branch is yours. You do not decide the merge.
+
+---
+
+# AMENDMENT 1 — 2026-08-05. Mack returned `REFUSE` on four grounds. **All four upheld.**
+
+## D1 — UPHELD, and it is the most serious finding of this work package. **Option (a) taken.**
+
+`reorient.mjs:765` derives `ESTATE_ROOT` from **the module's own location**. Installed at `C:\Users\Buggly\.mypka\governor\`, that becomes `C:\Users\Buggly` — no `Deliverables\` there — which hits the branch the code itself calls *"the ONE honest silence"*: ENOENT → `null` → **the section is omitted entirely, with no error text.**
+
+**Proven by execution, same module, two locations:** in-tree → the sweep string; relocated → **`NULL`**.
+
+**Why it blocks:** today a fresh Larry in the main worktree *gets* that sweep. **Step 4 removes the project-level entry, so after this install he stops getting it — everywhere.** That is the exact behaviour whose absence once let a fresh session miss a live plan, and it is **invisible to every acceptance test in this order**, because they only inspect the continuity-pointer string.
+
+**RULING — option (a): Keel fixes it first, in `WO-2026-08-05-08`, before this install proceeds.** `main()` passes an explicit root from the hook payload `cwd` — the value `buildBrief` already computes as `where` — instead of the module-relative default. **That is more correct than today for every non-main worktree, not merely equivalent.** Options (b) *"accept the loss"* and (c) *"skip step 4"* are both rejected: (b) trades a real capability for a letter-of-S-1 pass, and (c) keeps the sweep by keeping the double-fire.
+
+**Mack was right not to patch it.** Governor source is Keel's, and a defect found in operation is escalated, never patched by the operator.
+
+## D2 — UPHELD. The acceptance property measured the wrong thing.
+
+`continuity.mjs:1124-1135` dedupes the Stop path on a state hash. Under a **merged** double registration, invocation 2 matches the key and returns `skipped: "unchanged for this session"` — **no second packet.** **So "exactly one packet write" reads one whether the hook fired once or twice — a false pass on precisely the risk step 4 exists to remove.**
+
+**AMENDED `acceptance_property`:** *…and exactly **ONE INVOCATION** of each hook per event — measured as invocations, not writes.* **Report both numbers**; the `skipped` marker in hook output is itself a tell.
+
+## D3 — UPHELD. Declarations corrected, no grant widened.
+
+The required evidence fires `continuity.mjs stop`, which POSTs to Honcho and reads `C:/.fusion247/honcho.env` **at runtime**. Mack named the contradiction rather than resolving it, which is what GL-012 §4 requires.
+
+- **`network`:** `api.honcho.dev` — outbound, **by the installed hook, not by the worker**
+- **`credential_scope`:** `none — the worker never opens a credential file; the INSTALLED HOOK reads C:\.fusion247\honcho.env at runtime`
+- **`private_surface`:** `none for the worker; runtime-only read by the hook, named above`
+
+**The worker still opens nothing and quotes nothing.**
+
+## D4 — UPHELD. One head: **`1b299e3`**.
+
+Cut from `1b299e317fcab4894504a7483c2b2d4a0cf826cc`. **Record `8d4f32e` in `INSTALLED-FROM.txt` as the code provenance** — Mack's proposed split is exactly right, and it verified the governor files are byte-identical at both.
+
+## Q2 probe method — **APPROVED as proposed.**
+
+**The control run is what makes it evidence** — without it, a silent no-fire reads as OVERRIDE and proves nothing. Keep the byte-copy of `~/.claude/settings.json` first and diff it back afterwards. **And measure the real pair in the main worktree after install too: a generic mechanism proof is not the specific configuration.**
+
+## Corrections to this order's own wording
+
+- **"The installed copy is stale" was WRONG.** `C:\Users\Buggly\.mypka\governor\` contains **no `.mjs` at all**. The stale copy is the **`C:\Fusion247PKA` checkout**. **This is an INSTALL, not an upgrade** — nothing is being replaced.
+- **Import closure is FIVE files, not two:** `reorient.mjs` → `continuity.mjs` → `sampler.mjs` → `health-store.mjs` → `atomic-write.mjs`. **Copying two would have failed at the first Stop, on someone else's fresh session.**
+- **Six is confirmed and there is no seventh** — but it is **seven path OCCURRENCES**, because `worktree-guard.mjs` carries `C:/Fusion247PKA` twice. Recorded so a later grep-based count does not read as a discovery.
+
+## Accepted and recorded, per Mack's recommendation
+
+**User-level registration is MACHINE-WIDE, not estate-wide.** These hooks will fire in `C:\ClaudeJobs` and any other directory. `reorient.mjs` degrades soft; `continuity.mjs stop` will write packets from unrelated sessions with no `map_path`. **Accepted — a scoping guard is exactly the mechanism §13.5 forbids.** **Document it in the evidence file as a recorded decision, and expect Warwick to see it.**
+
+**Also expected, so it is not misread as failure:** the *first* session after install renders the **map-absent** form, because the last stored packet came from the old writer which has no `map_path`. It still carries the discriminator string. **Sequence the evidence to show both forms and label them.**
+
+## Discriminator — Mack's correction adopted
+
+The string proves **which code** ran; it cannot prove **which file** ran. **Assert both together:** the `"recall only, ZERO authority"` string **AND** that this worktree has no hook registered in any project-scope file — so the only possible source was the user-level registration.
+
+**HOLD until `WO-2026-08-05-08` (D1) is integrated. Then proceed on one fresh read-back.**
