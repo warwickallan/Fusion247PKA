@@ -1402,7 +1402,7 @@ Genuine **external independence** · **read-only** operation · **exact-head and
 | **Open** | **WP-2C** — **ding RECOVERED (§14.7a), full durable/event-driven claim still open** · then **WP-2D** UAT + first live Codex call + merge |
 | **Exact next action** | **WP-2D** — PR #94 out of draft, Codex reviews the complete integrated change, `merge-decision` is Warwick's |
 | **Warwick owes** | **1. Ratify the Codex contract wording** — `services/control-plane/review/prompts/tower-qa-skill.md` ships DRAFT and does **not** govern until he does; needed **before the UAT**. · **2. Re-bind the hash approval in `services/control-plane/review/prompts/prompt-approvals.json`** — repairing a pointer changed `product-qa-runtime-orientation.md`'s bytes, so his hash-bound campaign approval (`cd65539a…253135`) lapsed and its stamp correctly reverted to `UNRATIFIED-draft`. **That is the binding working, not a defect**; it was already DRAFT and did not govern. *(Was recorded only in `EVIDENCE-…wo-05-codex-contract-reach.md` F-5 — evidence, never instruction. Surfaced here 2026-08-05 per Veritas F-3.)* · **3. The `merge-decision`.** |
-| **Gate ahead** | Veritas on the exact integrated head, against §14.0c S-1..S-5 |
+| **Gate ahead** | ✅ **PASS at `abb9892c950b0d673691849baed9220cbfe321d2`** — `Deliverables/2026-08-05-veritas-phase2-gate-receipt.md`. S-1..S-5 all proven by independent execution. Only `merge-decision` remains, and it is Warwick's alone. |
 | **Phase 3** | §15. **RECORDED, NOT STARTED.** Not before Phase 2 merges and rotates |
 
 ### R-3 CORRECTED — it is SIX hardcoded invocations, not four (Keel, 2026-08-05, P-2)
