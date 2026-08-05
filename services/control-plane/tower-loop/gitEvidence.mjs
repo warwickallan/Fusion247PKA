@@ -43,6 +43,105 @@ function toBuffer(chunks) {
   return Buffer.concat(chunks.map((c) => (Buffer.isBuffer(c) ? c : Buffer.from(String(c), 'utf8'))));
 }
 
+// WO-2026-08-05-TW3 (Gap 2) — a full 40-hex SHA, the same shape `gh` itself hands back and the
+// same discipline `tower/merge-check.mjs`'s headGuard already applies to a PR's authoritative head.
+const CANONICAL_SHA = /^[0-9a-f]{40}$/;
+const short = (s) => String(s ?? '(none)').slice(0, 12);
+
+/** The MAX_DIFF_BYTES truncation, factored out so BOTH the local-git path and the gh-sourced path
+ *  apply the exact same cap, cut and notice — one rule, not two copies that could drift. */
+function truncateDiff(diffBytes) {
+  if (diffBytes.length > MAX_DIFF_BYTES) {
+    const cut = utf8SafeCut(diffBytes, MAX_DIFF_BYTES);
+    return {
+      diff_bytes: cut, diff_total_bytes: diffBytes.length, diff_truncated: true,
+      diff_text: `${diffBytes.subarray(0, cut).toString('utf8')}\n… [diff truncated at ${cut} bytes (cap ${MAX_DIFF_BYTES}) of ${diffBytes.length} bytes] …`,
+    };
+  }
+  return { diff_bytes: diffBytes.length, diff_total_bytes: diffBytes.length, diff_truncated: false, diff_text: diffBytes.toString('utf8') };
+}
+
+/**
+ * Base/head/diff/changed-files resolved ENTIRELY via `gh` — no local git object lookup at all.
+ *
+ * THIS IS WHAT CLOSES GAP 2. Exact-head review must not depend on `cwd` (in production,
+ * `TOWER_EVIDENCE_REPO_DIR`) already holding the reviewed commits in its local object database.
+ * That happened to be true only because every worktree in this estate shares one `.git` object
+ * store by `git worktree add` convention — a convention, never a guarantee. This function needs
+ * no local object at all: a fresh temp dir with zero relationship to the reviewed repo resolves
+ * evidence identically, because every fact below comes from the GitHub API.
+ *
+ * head_sha: `gh api repos/<repo>/pulls/<N>` is the SAME authoritative source
+ * `tower/merge-check.mjs`'s headGuard already trusts (there, via `gh pr view --json headRefOid`;
+ * here, via the equivalent REST field) — never a local ref. A caller-supplied `headSha` that
+ * disagrees is a real signal (the PR moved) and fails CLOSED, the same spirit as headGuard's
+ * exact-head chain, without re-deriving its full TOCTOU machinery here (a merge DECISION's
+ * provenance chain is Codex's job; this function only gathers evidence for one).
+ *
+ * base_sha: an explicit `baseSha` is trusted exactly as the local-git path trusts one. Absent one,
+ * this resolves the PR's actual base ref via the SAME `gh api` call — a deliberate, disclosed
+ * change from the local-git fallback's `head~1` heuristic, which inherently needs a local object
+ * to walk and is also a less correct reading of "the PR's base" than the PR's real base ref.
+ *
+ * diff_text / changed_files: BOTH via `gh pr diff <N>` — the same tool
+ * `tower/merge-check.mjs`'s `collectEvidence()` already proves in production — so they can never
+ * quietly describe different ranges, same discipline the local-git path already applies.
+ *
+ * Returns `{ ok: false, blocker }` on any unresolved step (fail-closed, never assume-and-pass) or
+ * `{ ok: true, fields }` — `fields` merges directly onto the evidence packet.
+ */
+async function resolveViaGh({ gh, repo, prNumber, baseSha, headSha }) {
+  const prRes = await gh(['api', `repos/${repo}/pulls/${prNumber}`, '--jq', '{"head":.head.sha,"base":.base.sha}']);
+  if (!prRes.ok) {
+    return { ok: false, blocker: `gh api repos/${repo}/pulls/${prNumber} failed: ${String(prRes.stderr).trim().slice(0, 200)}` };
+  }
+  let apiSha;
+  try { apiSha = JSON.parse(String(prRes.stdout).trim()); } catch (e) {
+    return { ok: false, blocker: `gh returned non-JSON for PR #${prNumber} head/base: ${String(e?.message ?? e)}` };
+  }
+  const apiHead = String(apiSha?.head ?? '').trim();
+  if (!CANONICAL_SHA.test(apiHead)) {
+    return { ok: false, blocker: `gh returned a non-canonical head SHA for PR #${prNumber}: ${JSON.stringify(apiHead)}` };
+  }
+  if (headSha && headSha !== apiHead) {
+    return {
+      ok: false,
+      blocker: `head mismatch: caller-supplied headSha ${short(headSha)} disagrees with PR #${prNumber}'s `
+        + `authoritative head ${short(apiHead)} from gh api (the PR may have moved) — fail closed rather than review the wrong tree`,
+    };
+  }
+
+  let resolvedBase = baseSha;
+  if (!resolvedBase) {
+    const apiBase = String(apiSha?.base ?? '').trim();
+    if (!CANONICAL_SHA.test(apiBase)) {
+      return { ok: false, blocker: `gh returned a non-canonical base SHA for PR #${prNumber}: ${JSON.stringify(apiBase)}` };
+    }
+    resolvedBase = apiBase;
+  }
+
+  const namesRes = await gh(['pr', 'diff', String(prNumber), '--repo', repo, '--name-only']);
+  if (!namesRes.ok) {
+    return { ok: false, blocker: `gh pr diff --name-only failed for PR #${prNumber}: ${String(namesRes.stderr).trim().slice(0, 200)}` };
+  }
+  const changed_files = String(namesRes.stdout).split(/\r?\n/).filter(Boolean);
+
+  const diffRes = await gh(['pr', 'diff', String(prNumber), '--repo', repo]);
+  if (!diffRes.ok) {
+    return { ok: false, blocker: `gh pr diff failed for PR #${prNumber}: ${String(diffRes.stderr).trim().slice(0, 200)}` };
+  }
+  const diffBytes = diffRes.stdoutBytes ?? Buffer.from(String(diffRes.stdout), 'utf8');
+
+  return {
+    ok: true,
+    fields: {
+      base_sha: resolvedBase, head_sha: apiHead, diff_range: `${resolvedBase}..${apiHead}`,
+      changed_files, scoped_to: null,
+      ...truncateDiff(diffBytes),
+    },
+  };
+}
+
 function run(cmd, args, { cwd, timeoutMs = DEFAULT_TIMEOUT_MS, spawn = nodeSpawn } = {}) {
   return new Promise((resolve) => {
     // Chunks accumulate as BYTES and are decoded EXACTLY ONCE, at the end.
@@ -87,14 +186,27 @@ function run(cmd, args, { cwd, timeoutMs = DEFAULT_TIMEOUT_MS, spawn = nodeSpawn
 /**
  * Gather read-only Git evidence for a merge-class turn.
  *
+ * TWO MECHANISMS (WO-2026-08-05-TW3, Gap 2). When `prNumber` and `repo` are both given (and no
+ * `paths` pathspec), evidence is resolved ENTIRELY via `gh` — see `resolveViaGh` — needing no
+ * local git object database at all. Otherwise (no `prNumber`, e.g. reviewDiff.mjs's local/dev
+ * use, or a scoped `paths` review) the LOCAL-GIT mechanism below runs exactly as before.
+ *
  * @param {object} args
- * @param {string} args.cwd          repo working dir to run git/gh in (must be a git repo).
- * @param {string} [args.repo]       owner/name (for gh; optional — gh infers from cwd remote).
+ * @param {string} args.cwd          repo working dir to run git/gh in (must be a git repo ON
+ *                                   THE LOCAL-GIT MECHANISM ONLY — the gh-sourced mechanism needs
+ *                                   no relationship between `cwd` and the reviewed repo at all).
+ * @param {string} [args.repo]       owner/name. Optional on the local-git mechanism (gh infers
+ *                                   from cwd's remote there); REQUIRED to activate the gh-sourced
+ *                                   mechanism, since `gh pr diff --repo` needs it explicitly.
  * @param {string} [args.branch]     branch under review (recorded; not required to resolve).
- * @param {string} [args.baseSha]    base ref/sha. Falls back to the merge-base with HEAD~ if absent.
- * @param {string} [args.headSha]    exact head ref/sha under review. Falls back to HEAD.
- * @param {number} [args.prNumber]   PR number (for `gh pr checks`).
- * @param {Function} [args.spawn]    injectable spawn (tests).
+ * @param {string} [args.baseSha]    base ref/sha. Local-git: falls back to merge-base with HEAD~.
+ *                                   Gh-sourced: falls back to the PR's actual base ref via `gh`.
+ * @param {string} [args.headSha]    exact head ref/sha under review. Local-git: falls back to
+ *                                   HEAD. Gh-sourced: cross-checked against the PR's authoritative
+ *                                   head from `gh`, fail-closed on a mismatch (the PR moved).
+ * @param {number} [args.prNumber]   PR number. Present + `repo` present ⇒ activates the
+ *                                   gh-sourced mechanism (and is always used for `gh pr checks`).
+ * @param {Function} [args.spawn]    injectable spawn (tests) — the ONE seam both mechanisms share.
  * @returns {Promise<object>} evidence packet (see fields below). `resolved` false ⇒ caller BLOCKS.
  */
 export async function gatherGitEvidence({ cwd, repo = null, branch = null, baseSha = null, headSha = null, prNumber = null, paths = [], spawn = nodeSpawn } = {}) {
@@ -122,64 +234,77 @@ export async function gatherGitEvidence({ cwd, repo = null, branch = null, baseS
     collected_at: new Date().toISOString(),
   };
   const g = (args) => run('git', args, { cwd, spawn });
+  const gh = (args) => run('gh', args, { cwd, spawn });
 
-  // Resolve HEAD (fail-closed).
-  const headRef = headSha || 'HEAD';
-  const headRes = await g(['rev-parse', '--verify', `${headRef}^{commit}`]);
-  if (!headRes.ok) {
-    ev.blocker = `head unresolvable (${headRef}): ${String(headRes.stderr).trim().slice(0, 200)}`;
-    return ev;
-  }
-  ev.head_sha = headRes.stdout.trim();
-
-  // Resolve base: explicit base if given, else merge-base(head, head~1) as a minimal default.
-  let baseResolved = null;
-  if (baseSha) {
-    const baseRes = await g(['rev-parse', '--verify', `${baseSha}^{commit}`]);
-    if (!baseRes.ok) {
-      ev.blocker = `base unresolvable (${baseSha}): ${String(baseRes.stderr).trim().slice(0, 200)}`;
+  // WO-2026-08-05-TW3 (Gap 2) — PREFER GITHUB, not the local checkout, whenever a PR number is
+  // available together with its repo. This is the case for EVERY real invocation from the
+  // watcher's PR-poll path (see watcher.mjs processTurn) and is what removes this function's
+  // dependence on `cwd`'s local object database happening to already hold the target commits.
+  // Pathspec scoping (`paths`) has no gh equivalent here, and no current prNumber-passing caller
+  // uses it — that one combination still falls through to the local-git mechanism below,
+  // unchanged, rather than silently dropping the scope.
+  if (prNumber != null && repo && pathspec.length === 0) {
+    const resolved = await resolveViaGh({ gh, repo, prNumber, baseSha, headSha });
+    if (!resolved.ok) {
+      ev.blocker = resolved.blocker;
       return ev;
     }
-    baseResolved = baseRes.stdout.trim();
+    Object.assign(ev, resolved.fields);
   } else {
-    const parentRes = await g(['rev-parse', '--verify', `${ev.head_sha}~1^{commit}`]);
-    if (!parentRes.ok) {
-      ev.blocker = `no base_sha given and head has no parent to diff against: ${String(parentRes.stderr).trim().slice(0, 200)}`;
+    // ── THE LOCAL-GIT MECHANISM — UNCHANGED. This is the fallback for the no-PR-number
+    // (local/dev) case, which genuinely has no PR to ask GitHub about — e.g. reviewDiff.mjs —
+    // and for the pathspec-scoped case, which the gh path above does not support.
+
+    // Resolve HEAD (fail-closed).
+    const headRef = headSha || 'HEAD';
+    const headRes = await g(['rev-parse', '--verify', `${headRef}^{commit}`]);
+    if (!headRes.ok) {
+      ev.blocker = `head unresolvable (${headRef}): ${String(headRes.stderr).trim().slice(0, 200)}`;
       return ev;
     }
-    baseResolved = parentRes.stdout.trim();
-  }
-  ev.base_sha = baseResolved;
-  ev.diff_range = `${ev.base_sha}..${ev.head_sha}`;
+    ev.head_sha = headRes.stdout.trim();
 
-  // Changed files (fail-closed).
-  const namesRes = await g(['diff', '--name-only', ev.diff_range, ...pathspec]);
-  if (!namesRes.ok) {
-    ev.blocker = `diff range unresolvable (${ev.diff_range}): ${String(namesRes.stderr).trim().slice(0, 200)}`;
-    return ev;
-  }
-  ev.changed_files = namesRes.stdout.split(/\r?\n/).filter(Boolean);
+    // Resolve base: explicit base if given, else merge-base(head, head~1) as a minimal default.
+    let baseResolved = null;
+    if (baseSha) {
+      const baseRes = await g(['rev-parse', '--verify', `${baseSha}^{commit}`]);
+      if (!baseRes.ok) {
+        ev.blocker = `base unresolvable (${baseSha}): ${String(baseRes.stderr).trim().slice(0, 200)}`;
+        return ev;
+      }
+      baseResolved = baseRes.stdout.trim();
+    } else {
+      const parentRes = await g(['rev-parse', '--verify', `${ev.head_sha}~1^{commit}`]);
+      if (!parentRes.ok) {
+        ev.blocker = `no base_sha given and head has no parent to diff against: ${String(parentRes.stderr).trim().slice(0, 200)}`;
+        return ev;
+      }
+      baseResolved = parentRes.stdout.trim();
+    }
+    ev.base_sha = baseResolved;
+    ev.diff_range = `${ev.base_sha}..${ev.head_sha}`;
 
-  // Unified diff (bounded). No context bloat; bounded bytes; truncation flagged.
-  const diffRes = await g(['diff', '--no-color', ev.diff_range, ...pathspec]);
-  if (!diffRes.ok) {
-    ev.blocker = `unable to collect unified diff for ${ev.diff_range}: ${String(diffRes.stderr).trim().slice(0, 200)}`;
-    return ev;
-  }
-  // The cap is applied to the raw BYTES git produced, at a cut that cannot split a character.
-  const diffBytes = diffRes.stdoutBytes ?? Buffer.from(String(diffRes.stdout), 'utf8');
-  ev.diff_total_bytes = diffBytes.length;
-  if (diffBytes.length > MAX_DIFF_BYTES) {
-    const cut = utf8SafeCut(diffBytes, MAX_DIFF_BYTES);
-    ev.diff_bytes = cut;
-    ev.diff_truncated = true;
-    ev.diff_text = `${diffBytes.subarray(0, cut).toString('utf8')}\n… [diff truncated at ${cut} bytes (cap ${MAX_DIFF_BYTES}) of ${diffBytes.length} bytes] …`;
-  } else {
-    ev.diff_bytes = diffBytes.length;
-    ev.diff_text = diffBytes.toString('utf8');
+    // Changed files (fail-closed).
+    const namesRes = await g(['diff', '--name-only', ev.diff_range, ...pathspec]);
+    if (!namesRes.ok) {
+      ev.blocker = `diff range unresolvable (${ev.diff_range}): ${String(namesRes.stderr).trim().slice(0, 200)}`;
+      return ev;
+    }
+    ev.changed_files = namesRes.stdout.split(/\r?\n/).filter(Boolean);
+
+    // Unified diff (bounded). No context bloat; bounded bytes; truncation flagged.
+    const diffRes = await g(['diff', '--no-color', ev.diff_range, ...pathspec]);
+    if (!diffRes.ok) {
+      ev.blocker = `unable to collect unified diff for ${ev.diff_range}: ${String(diffRes.stderr).trim().slice(0, 200)}`;
+      return ev;
+    }
+    // The cap is applied to the raw BYTES git produced, at a cut that cannot split a character.
+    const diffBytes = diffRes.stdoutBytes ?? Buffer.from(String(diffRes.stdout), 'utf8');
+    Object.assign(ev, truncateDiff(diffBytes));
   }
 
-  // CI conclusions via gh — best-effort (an absent/unauth gh is honestly 'unavailable').
+  // CI conclusions via gh — best-effort (an absent/unauth gh is honestly 'unavailable'). UNCHANGED
+  // and shared by BOTH mechanisms above — this was already the only gh call on the local-git path.
   if (prNumber != null) {
     const args = ['pr', 'checks', String(prNumber)];
     if (repo) args.push('--repo', repo);

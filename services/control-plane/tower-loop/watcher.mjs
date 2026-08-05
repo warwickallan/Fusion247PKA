@@ -88,6 +88,11 @@ const PR_POLL_FAIL_ESCALATE_AFTER = 3;
 // Also a literal. Bounds how many PRs one round can ask GitHub about, so an old store full of
 // stale turns cannot turn a poll into a rate-limit incident.
 const PR_POLL_MAX_TARGETS = 5;
+// WO-2026-08-05-TW3 (Gap 1) — a LITERAL, not config, same discipline as PR_POLL_FAIL_ESCALATE_AFTER:
+// how many of `limit`'s slots ROTATE through the overflow rather than being fixed by rank. One slot
+// is enough to guarantee bounded rotation (see pollTargets below) without meaningfully weakening the
+// fixed ranking's protection for in-flight/newest PRs.
+const PR_POLL_ROTATE_SLOTS = 1;
 // The verdict write-back. Same shape and same literal threshold as the poll: a persistent
 // inability to WRITE to the PR is exactly as serious as a persistent inability to read it,
 // because in both cases the loop looks healthy while the human on the PR sees nothing.
@@ -273,8 +278,15 @@ export function explicitRepos(env = process.env) {
  * and ranked as one combined list (in-flight rounds first, then newest-first), and only then is the
  * list truncated to `limit`. This is what stops a fourth source from silently starving a PR that a
  * different source would have kept visible: there is one ranking and one cap, not four.
+ *
+ * WO-2026-08-05-TW3 (Gap 1) — TRUNCATION ALONE IS NOT ENOUGH. The ranking above is static:
+ * newest-first for anything not already in-flight. With more open PRs than `limit`, whatever
+ * ranks below the cutoff was dropped EVERY round, forever — `pr_poll_targets_truncated` logged
+ * the drop loudly, but nothing ever un-dropped it. A PR sitting behind `limit` higher-ranked ones
+ * was invisible to comment-polling indefinitely, even though discovery itself found it fresh
+ * every round. See the rotation logic below the sort for the fix and the bounded-rounds proof.
  */
-export async function pollTargets(pool, { gh = ghCliReader, limit = PR_POLL_MAX_TARGETS, detectRepo = detectCheckoutRepo } = {}) {
+export async function pollTargets(pool, { gh = ghCliReader, limit = PR_POLL_MAX_TARGETS, detectRepo = detectCheckoutRepo, now = Date.now } = {}) {
   // In-flight rounds, most recently active first. Used ONLY to rank targets under the cap, so a
   // PR with a review round waiting on a disposition comment is never the one dropped.
   const { rows } = await pool.query(
@@ -331,13 +343,53 @@ export async function pollTargets(pool, { gh = ghCliReader, limit = PR_POLL_MAX_
     return b.prNumber - a.prNumber;
   });
 
-  if (open.length > limit) {
+  if (open.length <= limit) return open;
+
+  // ── WO-2026-08-05-TW3 (Gap 1) — ROTATION, so a truncated PR is never PERMANENTLY invisible. ──
+  //
+  // `open` still holds every open PR here — the sort above only ordered it. Reserve most of
+  // `limit` for the fixed ranking (in-flight rounds ALWAYS fully included — a round waiting on a
+  // disposition comment must never starve merely because more PRs are open than `limit`), and let
+  // the remaining PR_POLL_ROTATE_SLOTS slot(s) rotate deterministically through the OVERFLOW —
+  // everything the fixed ranking would otherwise drop every single round.
+  //
+  // Deterministic, not random, and using ONLY already-available inputs: wall-clock time (via the
+  // injectable `now`, real Date.now() in production) and the sorted overflow list itself. NO new
+  // store, registry or table — the rotation index is RECOMPUTED from time on every call, never
+  // remembered between rounds. One tick per PR_POLL_MS of wall-clock time — the SAME cadence the
+  // watcher actually polls at (see runWatcher's `nextPrPollAt` gate) — so consecutive PRODUCTION
+  // rounds land in different ticks without needing to remember which overflow PR went last.
+  const inFlightCount = open.filter((t) => inFlight.has(`${t.repo}#${t.prNumber}`)).length;
+  // Never sacrifice an in-flight round for a rotation slot, and never exceed the cap itself.
+  const rankedSlots = Math.min(limit, Math.max(limit - PR_POLL_ROTATE_SLOTS, inFlightCount));
+  const head = open.slice(0, rankedSlots);
+  const overflow = open.slice(rankedSlots);
+  const rotateBudget = limit - head.length;
+
+  const picked = [];
+  if (rotateBudget > 0 && overflow.length > 0) {
+    const tick = Math.floor(now() / PR_POLL_MS);
+    const start = tick % overflow.length;
+    for (let i = 0; i < Math.min(rotateBudget, overflow.length); i += 1) {
+      picked.push(overflow[(start + i) % overflow.length]);
+    }
+  }
+
+  const kept = [...head, ...picked];
+  const keptKeys = new Set(kept.map((t) => `${t.repo}#${t.prNumber}`));
+  const droppedThisRound = open.filter((t) => !keptKeys.has(`${t.repo}#${t.prNumber}`));
+  if (droppedThisRound.length) {
     // The cap is real rate-limit protection, but a silent cap is the same defect in a new shape:
     // a PR that is never polled and never mentioned is invisible for exactly the same reason a
-    // merged target was.
-    log('pr_poll_targets_truncated', { considered: open.length, limit, dropped: open.slice(limit).map((t) => `${t.repo}#${t.prNumber}`) });
+    // merged target was. `rotating` names which overflow PR got this round's rotating slot(s), so
+    // the rotation itself is visible in the log, not just claimed in a comment.
+    log('pr_poll_targets_truncated', {
+      considered: open.length, limit, kept: kept.length,
+      rotating: picked.map((t) => `${t.repo}#${t.prNumber}`),
+      dropped: droppedThisRound.map((t) => `${t.repo}#${t.prNumber}`),
+    });
   }
-  return open.slice(0, limit);
+  return kept;
 }
 
 /**
