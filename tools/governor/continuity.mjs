@@ -630,7 +630,7 @@ const WITHHELD_AUTHORITY_UNESTABLISHED = 'authority-unestablished';
  * network than the full walk this replaces (E-I: "doubles network work per session end"),
  * and it is one more call site for a function that already exists — not a new mechanism.
  */
-async function mapPointerWithholdReason(sessionStartedAt, readOpts) {
+async function mapPointerWithholdReason(sessionStartedAt, sessionId, readOpts) {
   const sessionStartMs = typeof sessionStartedAt === 'string' ? Date.parse(sessionStartedAt) : NaN;
   if (!Number.isFinite(sessionStartMs)) return WITHHELD_AUTHORITY_UNESTABLISHED;
 
@@ -647,10 +647,50 @@ async function mapPointerWithholdReason(sessionStartedAt, readOpts) {
   if (!current) return null;
   if (!current.latestIsAuthoritative) return WITHHELD_AUTHORITY_UNESTABLISHED;
 
+  // ---- WHO WROTE IT — the question time alone cannot answer (Veritas D-1) ----------------
+  //
+  // EVERY CHECK ABOVE THIS LINE IS AN AUTHORITY CHECK AND STAYS AHEAD OF THIS ONE, DELIBERATELY.
+  // Identity only means something once the newest packet has actually been established: a
+  // `session_id` read off a packet that may not BE the newest proves nothing about the newest.
+  // Putting this test in front of those would re-open the fail-open path in a new costume,
+  // which is the one outcome the corrective dispatch refused. The ordering IS the safety, and
+  // `AMD2 THE FAIL-OPEN PATH STAYS CLOSED` is the test that holds it in place.
+  //
+  // THE DEFECT THIS CLOSES. The comparison below is `sessionStartMs > priorWriteMs`, and
+  // `priorWriteMs` advances on EVERY stored write — including this session's own. So after a
+  // session's first packet its start time was permanently behind the last stored write, and
+  // every later `stop` withheld the pointer for the rest of that session's life. Veritas found
+  // it on the installed path: packet 154 (a `stop`) withheld the map path eight minutes after
+  // manual packet 153 carried it, and latest-wins left a fresh session with no map at all.
+  //
+  // A timestamp says WHEN a packet was written, never WHO wrote it. The identity was already on
+  // the packet — `session_id`, set by `buildPacket` from the Stop hook's own payload — and was
+  // simply not consulted. Consulting it is the whole fix: no new field, no new call, no new
+  // mechanism (§16.4).
+  const priorSession = typeof current.latest.session_id === 'string' && current.latest.session_id
+    ? current.latest.session_id
+    : null;
+
+  // AN UNATTRIBUTABLE PRIOR IS NOT A RIVAL. A manual `write`/`backfill` carries no `session_id`
+  // because it is a person at a keyboard, not a session — so it can never be the "newer
+  // session" this guard protects, and blocking on it is exactly what made the documented manual
+  // escape route unusable: the very next Stop clobbered it. The dedupe cannot rescue that
+  // either, because `map_path_withheld` is part of the content hash by design, so a
+  // pointer-carrying packet and the Stop after it differ in content and the Stop is never
+  // suppressed. Accepted limitation, named rather than hidden: a genuinely stale session
+  // closing after a MANUAL write can now displace that manual pointer. That trade is deliberate
+  // — the alternative is the shipped behaviour, which withholds on every Stop of every ordinary
+  // session, and the read side still refuses a path absent from the reader's own checkout.
+  if (priorSession === null) return null;
+
+  // MY OWN EARLIER WRITE IS NOT A RIVAL EITHER. A session may always update its own pointer.
+  if (sessionId && priorSession === sessionId) return null;
+
+  // ---- A GENUINELY DIFFERENT SESSION WROTE IT — the case the guard exists for -------------
   const priorWriteMs = Date.parse(current.latest.ts);
   if (!Number.isFinite(priorWriteMs)) return WITHHELD_AUTHORITY_UNESTABLISHED;
 
-  // Publish only when THIS session genuinely started after the last write.
+  // Publish only when THIS session genuinely started after that OTHER session's write.
   return sessionStartMs > priorWriteMs ? null : WITHHELD_STALE_SESSION;
 }
 
@@ -666,7 +706,7 @@ export async function writeContinuity(state, opts = {}) {
     // again, which breaks the one command Larry uses by hand. An UNPARSEABLE value is a
     // different thing entirely and does land on the unestablished branch below.
     if (sessionStartedAt !== undefined && sessionStartedAt !== null) {
-      const withheld = await mapPointerWithholdReason(sessionStartedAt, readOpts);
+      const withheld = await mapPointerWithholdReason(sessionStartedAt, sessionId, readOpts);
       if (withheld) {
         delete packet.map_path;
         packet.map_path_withheld = withheld;

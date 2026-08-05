@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| **Work Order** | `Deliverables/proofline/WO-2026-08-05-12-wp3a-honcho.md`, as amended by **Amendment 1** (`899b0a7`) |
+| **Work Order** | `Deliverables/proofline/WO-2026-08-05-12-wp3a-honcho.md`, as amended by **Amendment 1** (`899b0a7`) and **Amendment 2** (`bc1ada3` — Veritas D-1, BLOCKING; see **§8**) |
 | **Governance head** | `7bcfef70a3eea5763951019673120887544554d4` |
 | **Worktree / branch** | `C:\Fusion247PKA-wp3a-honcho` · `build-020/wp-3a-honcho` |
 | **Surface written** | `tools/governor/continuity.mjs` · `tools/governor/continuity.test.mjs` · this file. **Paths outside `file_surface`: 0** |
@@ -71,31 +71,33 @@ All commands run in `C:\Fusion247PKA-wp3a-honcho` on Node **v22.18.0**. **Counts
 
 ```
 node --test tools/governor/continuity.test.mjs
-# tests 107
-# pass 107
+# tests 112
+# pass 112
 # fail 0
 ```
 
-**Baseline before this Work Order: `# tests 92 / # pass 92 / # fail 0`.** 15 tests added; of the 92 inherited, **90 passed unchanged** and 2 were changed — see §5, which discloses exactly what and why.
+**Baseline before this Work Order: `# tests 92 / # pass 92 / # fail 0`.** 20 tests added (15 in the original pass, 5 for Amendment 2); of the 92 inherited, **87 passed unchanged**, 2 were changed in the original pass and 3 had fixtures corrected under Amendment 2 — all five disclosed in §5 and §8.4.
 
 ### 3.2 Neighbours — nothing else in the module family regressed
 
+**The full governor set, every module except the one under change, in one run** (Amendment 2 requirement 4):
+
 ```
 node --test tools/governor/atomic-write.test.mjs tools/governor/continuity-derive.test.mjs \
-  tools/governor/evaluator.test.mjs tools/governor/health-store.test.mjs \
-  tools/governor/reorient.test.mjs tools/governor/sampler.test.mjs \
-  tools/governor/statusline-live.test.mjs tools/governor/worktree-guard.test.mjs
-# tests 253 / # pass 253 / # fail 0
-
-node --test tools/governor/footer.test.mjs
-# tests 65 / # pass 65 / # fail 0        (WP-3B's surface — untouched here, run only to prove it)
+  tools/governor/evaluator.test.mjs tools/governor/footer.test.mjs \
+  tools/governor/health-store.test.mjs tools/governor/reorient.test.mjs \
+  tools/governor/sampler.test.mjs tools/governor/statusline-live.test.mjs \
+  tools/governor/worktree-guard.test.mjs
+# tests 318 / # pass 318 / # fail 0
 ```
 
-### 3.3 Mutation gate — nine controls, each made to fail and restored
+`footer.mjs` is WP-3B's surface and was not touched here; it is run to prove that, not to claim it.
+
+### 3.3 Mutation gate — fourteen controls, each made to fail and restored
 
 *A control is not evidence until it has been made to fail.* Each mutation was applied to `continuity.mjs` alone, the suite run, the file restored, and the restoration verified by **sha256**.
 
-Pristine and final sha256: **`ab904088b0f1b8fe6205121e6ee25e3489a84a22376299f462f048d011e90d4d`** — identical after all nine.
+Pristine and final sha256: **`714cd05b86496d7d96c6b72ffeb2a9b688ba8023c8439772ce3a6af1e8d73e36`** — identical after all fourteen. (M1–M9 were also run against the pre-Amendment-2 source, sha256 `ab904088…e90d4d`, and killed there too.)
 
 | # | Control broken | Suite | Killed by |
 |---|---|---|---|
@@ -108,8 +110,15 @@ Pristine and final sha256: **`ab904088b0f1b8fe6205121e6ee25e3489a84a22376299f462
 | M7 | degraded fallback loses its orientation line | 2 red | both DEGRADED RENDER tests |
 | M8 | withheld pointer stops marking itself (silent `delete`) | 4 red | WRITE-AUTHORITY · NO FAIL-OPEN · COMBINED CASE · MUTATION CONTROL |
 | M9 | escalated `🚨` render collapses into the mild one | 1 red | THE BRIEF |
+| **M10** | same-session bypass removed — **D-1 returns** | 2 red | AMD2 general case · AMD2 DISCRIMINATOR |
+| **M11** | unattributable-prior bypass removed — the manual escape is clobbered again | 1 red | **AMD2 live sequence** |
+| **M12** | **OVER-FIX: publish unconditionally once authority is established** | 5 red | WRITE-AUTHORITY · session-start comparison is REAL · WP-3A(c) MUTATION CONTROL · **AMD2 CROSS-SESSION PROTECTION UNCHANGED** |
+| **M13** | authority gate removed, leaving identity in front — the fail-open path re-opened | 1 red | **AMD2 THE FAIL-OPEN PATH STAYS CLOSED** |
+| **M14** | `sessionId` not wired through to the guard | 2 red | AMD2 general case · AMD2 DISCRIMINATOR |
 
-**All nine killed. Final suite after all restorations: `# tests 107 / # fail 0`.**
+**All fourteen killed. Final suite after all restorations: `# tests 112 / # fail 0`.**
+
+**M12 and M13 are the two that Amendment 2 requirement 3 asked for by name.** M12 proves the cross-session protection is not vacuous after the fix — an over-permissive guard is caught by four separate tests. M13 proves the authority checks still sit *in front of* the identity check, so a session id cannot buy publication when the newest packet was never established.
 
 ### 3.4 The E-F combined case, as demanded
 
@@ -183,5 +192,64 @@ No assertion was deleted to go green, no skip or `only` was introduced, no toler
 | **(b)** correct `map_path` delivery | §2(b) · `WRITE-AUTHORITY`, `DIFFERENTIATING PROOF`, `COMBINED CASE`. Mutation M8 |
 | **(c)** no fail-open write-authority guard | §2(c) · `NO FAIL-OPEN`, `COMBINED CASE (E-F)`, `MUTATION CONTROL`, `COST`. Mutations M5, M6, M8 |
 | **(d)** stale/degraded fallback identifies itself **and** still orients | §2(d) · both `DEGRADED RENDER` tests. Mutation M7 |
+
+---
+
+## 8. AMENDMENT 2 — Veritas D-1, BLOCKING. The guard disabled its own pointer publication
+
+### 8.1 What was wrong, and it was mine
+
+`mapPointerWithholdReason` published `map_path` only when `sessionStartMs > priorWriteMs`. **`priorWriteMs` advances on every stored write, including this session's own.** So after a session's first packet, its start time was permanently behind the last stored write, and **every subsequent `stop` withheld the pointer for the rest of that session's life** — the normal case, not an edge case.
+
+Veritas executed the installed production path and found it: **packet 154 (a `stop`) withheld the map path eight minutes after manual packet 153 carried it.** Latest-wins, so the good pointer became unreachable and the AC-1 journey returned no map and no frontier — only a display-capped list of 98 loose deliverables. **The documented manual escape could not win either:** `map_path_withheld` is part of `packetContentHash` by design, so a pointer-carrying packet and the Stop after it differ in content, the dedupe never suppresses that Stop, and a hand-fix is undone on the next turn.
+
+**The defect in one line: the guard existed to stop a *stale* session clobbering a *newer* one, and it could not tell another session's write from its own.** A timestamp says *when* a packet was written and never *who* wrote it.
+
+**This was live in the pre-existing design and my rewrite carried it forward.** I re-derived the comparison, tested both of its directions, and never asked whether `priorWriteMs` could be raised by the very session the guard was judging. The proof that hid it was `WRITE-AUTHORITY`, whose fixture wrote A's packet with **no session identity at all** — so nothing in the suite ever exercised two writes from one session.
+
+### 8.2 The fix — consult the identity that was already on the packet
+
+`buildPacket` has always stamped `session_id` from the Stop hook's own payload. It was simply never read. The guard now asks **who wrote the prior packet** before asking **when**:
+
+1. **All authority checks stay first, unchanged and unmoved.** Read failure, empty store, non-authoritative walk, unusable timestamp — all resolve exactly as before. **The ordering is the safety**, and M13 holds it in place.
+2. **An unattributable prior is not a rival.** A manual `write`/`backfill` carries no `session_id` because it is a person at a keyboard, not a session, so it can never be the "newer session" this guard protects. This is what makes the documented manual escape route survive the next Stop.
+3. **My own earlier write is not a rival.** A session may always update its own pointer.
+4. **A genuinely different session's write still applies the original time comparison**, unchanged.
+
+**No new field, no new call, no new mechanism** — one previously-unread field on an existing packet, plus wiring `sessionId` into a function that already received the rest of the session's context. §16.4's verbs, honoured.
+
+### 8.3 Red first, as required
+
+Both regression tests were written and executed **against the unfixed code before the fix existed**:
+
+```
+node --test tools/governor/continuity.test.mjs        (pre-fix)
+not ok 108 - AMD2 D-1 REGRESSION (the live sequence): a `stop` after a MANUAL write republishes the pointer
+not ok 109 - AMD2 D-1 REGRESSION (the general case): a session publishes on EVERY stop, not just its first
+not ok 111 - AMD2 THE DISCRIMINATOR IS IDENTITY, NOT TIME: same timings, different session ids, opposite outcomes
+# tests 112 / # pass 109 / # fail 3
+```
+
+**Two of the five new tests were GREEN against the unfixed code and stayed green after** — `AMD2 CROSS-SESSION PROTECTION UNCHANGED` and `AMD2 THE FAIL-OPEN PATH STAYS CLOSED`. That is deliberate and it is the strongest single piece of evidence here: **the protections this fix must not break are proven by tests the fix never had to move.**
+
+`AMD2 D-1 REGRESSION (the live sequence)` asserts the end-to-end outcome Veritas actually measured — after the Stop, `readContinuityBrief` renders `likely active map: …` and **not** `MAP POINTER WITHHELD`.
+
+### 8.4 ⚠️ Three further inherited fixtures were corrected — disclosed, and the reasoning is checkable
+
+`WRITE-AUTHORITY`, `MUTATION: the session-start comparison is REAL`, and `WP-3A(c) MUTATION CONTROL` each modelled a **cross-session** scenario using a prior packet with **no `session_id`**. After the fix that shape reads as a manual write, which is deliberately not a rival, so all three began publishing.
+
+**No assertion was changed, removed, relaxed or inverted in any of the three. One fixture field was added to each.** The justification is checkable rather than asserted: in production **every `stop` packet carries a session id**, because `cli()` sets `sessionId = sessionIdFrom(rawStdin)` on the `stop` path (`continuity.mjs`). A prior packet with no `session_id` can *only* be a manual `write`/`backfill`. So the fixtures were describing a situation that cannot arise in the form they assumed — their scenario names said "session A", "older session", "the pointer that should stand", and the fixture never told the code so.
+
+**And the protection does not rest on a fixture I edited:** `AMD2 CROSS-SESSION PROTECTION UNCHANGED` proves the same property with a fully production-shaped fixture, and it was written and passing **before** the fix.
+
+### 8.5 Accepted limitation, named rather than hidden
+
+**A genuinely stale session closing after a MANUAL write can now displace that manual pointer.** A manual write has no session identity, so there is no fact on the packet that distinguishes "Warwick typed this during the current session" from "Warwick typed this during someone else's". Treating it as unattributable is the deliberate trade, and the alternative is the shipped behaviour, which withholds on every Stop of every ordinary session. The read side still refuses a recorded path that is absent from the reader's own checkout (`mapPathPresentHere`), so the worst case remains an honest absence rather than a confident wrong orientation.
+
+### 8.6 Scope
+
+**`live_authority: none` — nothing installed. `~/.mypka/**` untouched; Mack re-installs after merge.** `file_surface` unchanged. **D-2 (stale `accepted_decisions`/`completed`/`blockers` in packet 154) is Larry's, not mine** — it is stored state on the live machine, not code, and it is outside this surface. Veritas's note stands: it becomes visible the moment D-1 is fixed, so it needs Larry's attention before rotation.
+
+---
 
 **Builder self-test evidence — NOT independent review.** Assurance for this phase is Veritas's, on the exact integrated head, and Warwick's `merge-decision` is his alone.
