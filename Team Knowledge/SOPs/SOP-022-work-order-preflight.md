@@ -284,6 +284,10 @@ whose surface included `Builds/**` and `Team Knowledge/**`, which the assigned s
 prohibits. **A Work Order cannot override a permanent contract.** Discovering that costs a full dispatch;
 checking it costs a minute.
 
+**Envelope first.** Before drafting the route or acceptance, fix the envelope from two inputs only: the chosen worker's envelope invariants (its agent-index line; the contract governs) and the named needs of the outcome. Every authority field starts at its standing default; a non-default value must cite the outcome need that requires it, and a need the defaults cannot satisfy is a routing or design question — split the order, choose another owner, or ask Warwick. Never widen a field to fit an evidence idea.
+
+**Route and acceptance are written inside the fixed envelope.** An evidence item the envelope cannot execute is a defect in the evidence idea, never a licence for the envelope.
+
 Before dispatch, Larry answers five questions and **records the answers in the order's frontmatter**, in
 `worker_contract`, `contract_basis`, `contract_conflicts` and `capability_evidence`:
 
@@ -315,6 +319,8 @@ Before dispatch, Larry answers five questions and **records the answers in the o
 - **If this block becomes reflexively populated ceremony, report the evidence and simplify it
   deliberately.** Do not quietly stop filling it in, and do not skip it because the issuer believes he
   remembers the contract.
+
+**The final-text pass — a contradiction reconciliation, not a preflight.** Read the completed order once, as its worker will: (a) no field wider than its cited need; (b) every evidence item executable under this order's own surface, authorities and prohibitions — no spend and no outward action unless separately authorised in the order; (c) every "every / all / no / closed-list" claim names its inventory and stays inside this owner's surface, with the remainder named as evidenced-elsewhere. This pass rereads no contract and duplicates no worker preflight; the read-back remains the reality gate. A contradiction found here is corrected before issue, not discovered by a dispatch.
 
 **This check reduces invalid dispatches. It is not a control.** Nothing mechanically confines a worker to
 its `file_surface`, and a shim's `tools:` list may over-claim — six shims requested `MultiEdit` and never

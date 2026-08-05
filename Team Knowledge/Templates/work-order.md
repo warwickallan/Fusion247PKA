@@ -24,6 +24,8 @@ DRAFT  →  WORKER READ-BACK  →  LARRY ACCEPTS OR AMENDS  →  ISSUED  →  RU
 **The worker must not begin implementation until Larry explicitly accepts the read-back, or issues an
 amended Work Order.** This is a gate, not a courtesy.
 
+**An amendment replaces the envelope table in place, so the order carries exactly one operative envelope.** Struck history moves below the operative envelope under a heading marked non-operative — never left inline where a live order could read as authorising it.
+
 **The Work Package cannot be recorded as complete without a `VERITAS_PASS` receipt against the exact
 integrated head** (Warwick, `GOVERNANCE-VERITAS-HIRE`, 2026-08-04). The second half of the lifecycle is
 therefore not bookkeeping: `VERITAS_PENDING` is the real state of every returned-and-integrated Work
