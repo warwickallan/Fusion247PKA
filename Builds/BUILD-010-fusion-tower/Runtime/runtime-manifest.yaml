@@ -71,7 +71,7 @@ runtime_paths:
   durable_state: 'C:\.fusion247\tower-baton-state.json'   # dedup + per-chain rounds + notify dedup (cache; ClickUp thread is source of truth)
   lockfile: 'C:\.fusion247\tower-baton.lock'              # single-watcher guard
   logs: 'C:\.fusion247\logs\tower-baton\'                 # bounded rotating logs, OUTSIDE the repo
-  qa_skill: 'Builds/BUILD-010-fusion-tower/baton-mvp/tower-qa-skill.md'  # loaded fresh + SHA-256 fingerprinted per turn
+  qa_skill: 'services/control-plane/review/prompts/tower-qa-skill.md'   # MOVED 2026-08-05 (WP-2G). Was Builds/BUILD-010-fusion-tower/baton-mvp/ — operating law may not live under Builds/, which CLAUDE.md #4 makes the authority for build FACTS, never a route  # loaded fresh + SHA-256 fingerprinted per turn
 
 startup:
   status: RETIRED                       # 2026-08-05, Warwick-authorised. tower-baton no longer starts.
