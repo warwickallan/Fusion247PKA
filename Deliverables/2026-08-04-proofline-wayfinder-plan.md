@@ -16,18 +16,18 @@
 | **Head when written** | `ca4580298e1c3aad4f922637c3d836854b4af539`, **advanced by the commit that added this block.** `git rev-parse HEAD` is the authority — this map has recorded a stale head three times (C-3, and twice in the Work Order envelope). **Do not trust a SHA in this file over the repository.** |
 | **Upstream** | ~~**NONE CONFIGURED.** 51 commits ahead of `origin/main`.~~ **CORRECTED 2026-08-04 by execution (R-2): upstream IS `origin/build-020/live-trial`, 54 commits ahead, and PR #94 is already open as a DRAFT.** Remote is `https://github.com/warwickallan/Fusion247PKA.git`. |
 | **Phase complete** | **Phase 1 — Proofline. PASSED by Warwick, 2026-08-04**, on his own completed walkthrough. |
-| **Frontier** | **Phase 2 — Honcho and Tower as durable shared myPKA infrastructure.** Not started. The fresh session owns implementation. |
-| **First safe action** | §13 below. Verify reality, then route. **Do not implement before the route exists.** |
+| **Frontier** | ⛔ **DO NOT READ A FRONTIER FROM THIS BLOCK. → §14.19 is the SINGLE statement of the live frontier.** *(This row said "Phase 2 … Not started" and was a THIRD competing frontier statement — the same defect §12 was corrected for, in the block §12's own diagnosis named. Corrected 2026-08-05, Veritas rotation-readiness HOLD.)* |
+| **First safe action** | **→ §14.19.** *(This row pointed at §13, which lands on "awaiting Warwick's acceptance … nothing has been implemented" — false since 2026-08-05.)* |
 
-### ⚠️ RESUMPTION PRECEDENCE — and the active misdirection risk
+### ✅ RESUMPTION — CORRECTED 2026-08-05. **Automatic reorientation NOW HAPPENS.**
 
-**Automatic reorientation to this map WILL NOT HAPPEN.** Stated plainly because assuming otherwise is the failure:
+**All three warnings below were true when written and are FALSE NOW. Retained struck-through, because the reasoning is the durable part and the correction is the evidence that Phase 2 delivered.**
 
-1. **No SessionStart hook is registered for this worktree** — the only one is hardcoded to `C:/Fusion247PKA/tools/governor/reorient.mjs`. A fresh Larry opened here receives **no continuity brief at all**.
-2. **If one is opened in the main worktree instead, it receives a brief naming BUILD-015 AsdAIr** — `~/.mypka/governor/continuity.json` was last written `2026-08-04T06:42Z` and contains no occurrence of "proofline" or "BUILD-020".
-3. **`Deliverables/2026-08-04-build-015-asdair-wayfinder-plan.md` declares itself the sole route** and carries its own precedence block. A fresh session that opens it will be told, correctly for BUILD-015, that it is the authority. **It is not the authority for BUILD-020.**
+1. ~~**No SessionStart hook is registered for this worktree**~~ — **FIXED at `eff3033`.** A **user-level** `SessionStart` hook is registered at `~/.claude/settings.json` running `C:/Users/Buggly/.mypka/governor/reorient.mjs`. **It fires in EVERY directory, verified by real sessions.**
+2. ~~**a brief naming BUILD-015 AsdAIr**~~ — **FIXED at `eff3033`.** The stored focus now reads *"BUILD-020 Phase 2 — Honcho and Tower…"* and the brief names **this map**. Verified in a live session, not asserted.
+3. **`Deliverables/2026-08-04-build-015-asdair-wayfinder-plan.md` still declares itself the sole route** — **UNCHANGED and still true.** It is authoritative for **BUILD-015 only** and **NON-DIRECTIVE here.**
 
-**So the risk is not a blank orientation — it is a confident wrong one.** Fixing that is Phase 2's N-2.
+**The residual risk is now #3 alone: a confident wrong orientation from the BUILD-015 map, not a blank one.** The brief itself is correct and carries zero authority by design.
 
 **Precedence for BUILD-020, until N-2 lands:**
 
@@ -39,8 +39,7 @@
 | 4 | `Builds/` | **No `BUILD-020-*` record exists** (P-5). Its absence is a recorded fact, not a missing file to go and find. |
 | 5 | The Honcho continuity brief | **Pointer with zero authority** (root `CLAUDE.md` #9) — and currently **stale and wrong for BUILD-020**. Verify against this file; never the reverse. |
 
-**Until Phase 2 fixes it, a fresh session is reached by naming this path:**
-`Deliverables/2026-08-04-proofline-wayfinder-plan.md`
+~~**Until Phase 2 fixes it, a fresh session is reached by naming this path**~~ — **NO LONGER REQUIRED (2026-08-05, `eff3033`).** A fresh Larry in any worktree is reached **automatically**. Naming the path still works and is harmless: `Deliverables/2026-08-04-proofline-wayfinder-plan.md`
 
 ### 🚨 The instrument warning — read before ANY live-state check
 
@@ -1373,11 +1372,11 @@ Genuine **external independence** · **read-only** operation · **exact-head and
 | | |
 |---|---|
 | **Phase** | **Phase 2 — Honcho and Tower as durable shared myPKA infrastructure.** IN PROGRESS |
-| **Delivered and integrated** | WP-2B(1) Honcho writer · WP-2F one canonical store · WP-2A legacy Tower retired · WP-2G Codex contract + reach proof · the constitutional amendment · **WP-2B(2) render + install — COMPLETE at `eff3033`** |
+| **Delivered and integrated** | WP-2B(1) Honcho writer · WP-2F one canonical store · WP-2A legacy Tower retired · WP-2G Codex contract + reach proof · the constitutional amendment · **WP-2B(2) render + install — integrated at `eff3033` and submitted for assurance** *(corrected 2026-08-05: "COMPLETE" was a completion claim Larry may not make without a receipt)* |
 | **✅ S-1 MET** | **A fresh session in a NON-main worktree, with no project-scope hook of its own, receives a brief naming THIS map — automatically, no path typed.** Both discriminator halves hold; main worktree shows exactly **one** block (no double-fire). Hooks **MERGE** (proven), so removing the project-level duplicates was a correctness requirement. Evidence: `Deliverables/proofline/EVIDENCE-2026-08-05-wo-07-honcho-install.md` |
 | **Open** | **WP-2E** TowerBot QA exchange — **the next frontier** · then **WP-2C** event-driven ding · then **WP-2D** UAT + first live Codex call + merge |
 | **Exact next action** | ⛔ **STOP — Warwick ordered rotation preparation, 2026-08-05. Do NOT start WP-2E or WP-2C in this session.** After rotation the fresh Larry's next action is **WP-2E**, whose design is settled in **§14.7** (four wires, no new store), followed by **WP-2C** (§14.1, config-only, boundary in §13.3) |
-| **Warwick owes** | **Ratify the Codex contract wording** (it ships DRAFT and does not govern until he does) — needed **before** the UAT, not before the next work package |
+| **Warwick owes** | **1. Ratify the Codex contract wording** — `services/control-plane/review/prompts/tower-qa-skill.md` ships DRAFT and does **not** govern until he does; needed **before the UAT**. · **2. Re-bind the hash approval in `services/control-plane/review/prompts/prompt-approvals.json`** — repairing a pointer changed `product-qa-runtime-orientation.md`'s bytes, so his hash-bound campaign approval (`cd65539a…253135`) lapsed and its stamp correctly reverted to `UNRATIFIED-draft`. **That is the binding working, not a defect**; it was already DRAFT and did not govern. *(Was recorded only in `EVIDENCE-…wo-05-codex-contract-reach.md` F-5 — evidence, never instruction. Surfaced here 2026-08-05 per Veritas F-3.)* · **3. The `merge-decision`.** |
 | **Gate ahead** | Veritas on the exact integrated head, against §14.0c S-1..S-5 |
 | **Phase 3** | §15. **RECORDED, NOT STARTED.** Not before Phase 2 merges and rotates |
 
@@ -1451,7 +1450,9 @@ Larry's assessment of what currently exists **only** in this session:
 
 ## 14.21 The refusal ledger — durable, because it is the Phase 3 input most likely to be lost
 
-**Six Work Order refusals in Phase 2. EVERY ONE was class-A: a defect in Larry's ORDER, not in the proposed work. None was a worker declining work it should have done.**
+> **⚠️ CORRECTED 2026-08-05 — this ledger UNDER-COUNTED, and Veritas caught it.** It said "six" and claimed *"EVERY ONE"*, while `WO-07` line 67 — written by Larry — says *"seven orders have been refused or held."* **The seventh, Mack's `REFUSE` on WO-07, was absent entirely, as were its Amendments 2 and 3.** Grounds were understated throughout (WO-02: 3 of 5 · WO-03: 5 of 7 · WO-05: 3 of 7), and the derived statistic *"five of six involved a surface field"* was void at seven. **Nothing was softened or misattributed — every entry named Larry as the author of the defect. The failure was completeness, and a false "EVERY ONE" is what would stop a fresh Larry looking for the seventh.** *This is the Phase 3 input most likely to be self-serving, which is exactly why it was sent to be challenged.*
+
+**SEVEN Work Order refusals/holds in Phase 2. Every one was class-A: a defect in Larry's ORDER, not in the proposed work. None was a worker declining work it should have done.**
 
 | # | WO | Refused by | The defect — Larry's |
 |---|---|---|---|
@@ -1460,15 +1461,17 @@ Larry's assessment of what currently exists **only** in this session:
 | 3 | WO-03 legacy removal | Keel | **`Builds/**` in a surface the contract permanently bars** · `live_authority: BOUNDED`, not a permitted value · **scheduled-task work belonging to Mack** · `private_surface` = the secrets root **AGAIN** · **and a SEVENTH start path that falsified the acceptance property** |
 | 4 | WO-04 machine removal | Mack | A condition requiring a check **the same order's own prohibition forbade** · an acceptance property claiming **eight paths from a four-path proof** — *the exact defect that had just refused WO-03, repeated one order later* |
 | 5 | WO-05 Codex contract | Keel | **`Builds/**` again** · **a reach test that would have passed BY BLOCKING in CI** — the false green the WP existed to kill · ratification left to a worker who may not ratify |
-| 6 | WO-06 Honcho render | Keel | **`live_authority` not `none`** · acceptance property unreachable in surface · **and `CLARIFY`: an instruction that reversed an approved governance redline by writing code** |
+| 6 | WO-06 Honcho render | Keel | **`live_authority` not `none`** · acceptance property unreachable in surface · **the first dispatch was IN-PROMPT ONLY, with no Work Order on disk — an order that lives only in Larry's context dies with the session, the exact failure S-5 exists to rule out** · **and `CLARIFY`: an instruction that reversed an approved governance redline by writing code** |
+| **7** | **WO-07 Honcho install** | **Mack** | **`REFUSE` on FOUR grounds, then `BLOCKED`.** **D1: relocating `reorient.mjs` would have SILENTLY killed the Deliverables sweep machine-wide** — invisible to every acceptance test in the order · **D2: the acceptance property measured packet writes, which the Stop-path dedupe makes blind to a double-fire — a false pass on the exact risk it existed to test** · D3: `network`/`credential_scope` declared `none` while the required evidence fires a hook that POSTs and reads a credential at runtime · D4: two conflicting governance heads. **Then Amendment 2: the SHAs Larry named would have DEPLOYED THE DEFECT the amendment existed to prevent.** **Then `BLOCKED — required-but-unavailable`: every machine path is refused by the host classifier when the actor is a subagent, so the contract assigns work the harness forbids** |
 
 ### The patterns, stated plainly for the Phase 3 report
 
-1. **Surface declaration is Larry's weakest discipline.** `private_surface` at the secrets root **twice**; `Builds/**` in a barred surface **twice**; a missing `file_surface` once. **Five of six refusals involved a surface field.**
+1. **Surface declaration is Larry's weakest discipline.** `private_surface` at the secrets root **twice**; `Builds/**` in a barred surface **twice**; a missing `file_surface` once; `live_authority` set to a value the contract forbids **twice**. **Five of SEVEN refusals involved a surface or authority field** *(statistic recomputed 2026-08-05 — the original said five of six and was void).*
 2. **Larry writes acceptance properties that outrun the surface** — eight paths from four, an end-to-end run that needed spend, a live-store write forbidden by the same order.
 3. **Repeating a defect he had just documented.** WO-04 reproduced WO-03's over-claim; WO-05 and WO-03 both put `Builds/**` in a Keel surface.
 4. **Treating a specialist recommendation as authority** (WO-06) — *"a previous instance's standing buys this one nothing"* was the worker's correction, and it was right.
-5. **The refusals were cheap and the defects were not.** Each cost one round trip; three would have shipped a false green, a governance reversal, or an incomplete removal that read as complete.
+5. **Larry's own instruments were wrong twice, and workers caught both** — a mutation harness that reported four mutations applied when they had not (CRLF anchors), and a second whose predicate mis-scored an insert-shaped mutation. **A false green inside the instrument used to detect false greens.**
+6. **The refusals were cheap and the defects were not.** Each cost one round trip; three would have shipped a false green, a governance reversal, or an incomplete removal that read as complete.
 
 **No mechanism is proposed here. Phase 3 decides whether this is a Larry defect, a template defect, or a missing pre-dispatch check — and *"build a checker"* is the diagnosis Warwick has already rejected once.**
 
