@@ -36,7 +36,41 @@
 
 **A** — `live_authority` is `none`. **B** — the acceptance property is split at the code/install seam; yours is above. **C** — the frontier is defined below. **D** — the existence semantics are settled below. **E** — the envelope is filled, and `contract_conflicts` is an earned answer, not a placeholder.
 
-## C — what "the frontier" IS. **Your recommendation adopted.**
+> ## AMENDMENT 2 — 2026-08-05. **INSTRUCTION C IS WITHDRAWN.** Keel returned `CLARIFY` and was right.
+>
+> ### C reversed an approved governance redline — by writing code
+>
+> `continuity.mjs:404-413` and `:751-754` carry the **Section-5 pointer render contract**, landed by **`4a3b873`** — *"BUILD-020 external source repair: apply approved doc-017 redlines"* — **an ancestor of this order's own governance head.** Its message states the rule with no room in it:
+>
+> > *"pointer-only render — permitted fields only; stored `next_action`, `accepted_decisions`, `completed`, `blockers` and `notes` **never rendered on any branch**."*
+>
+> **`next_action` is named PROHIBITED. `immediate_objective` is in neither list.** That same commit also amended `CLAUDE.md`, root `AGENTS.md`, the shims and the Veritas contract — **so it is an approved governance change, not an implementation preference.** My order cited §14.0 W-1 and gate S-1, which authorise the **existence check**, not a reopening of the field allowlist. **I attempted to amend a governance boundary by instructing code that contradicts it.**
+>
+> ### And an executed fact that settles it independently
+>
+> The live store's fields **today**: `immediate_objective` = *"Obtain a Veritas Gate 3 verdict on head 94f135f…"*; `next_action` = a full imperative procedure ending *"…on HOLD or FAIL discharge every finding and resubmit a NEW exact head."*
+>
+> **Built as I ordered, the brief a fresh BUILD-020 Larry reads today would render a complete step-by-step BUILD-015 procedure under a "recall-only" label.** That is **P-4's failure reproduced through the field render instead of map scraping** — *a confident wrong orientation, produced by the mechanism built to prevent one.* **And unlike P-4 it is not hypothetical: it is what the store contains right now.** **The redline removed those fields precisely because labelling was judged insufficient.**
+>
+> ### How I got here — recorded, because it is the interesting part
+>
+> I adopted C as *"your recommendation"* from the previous Keel instance and **presented that provenance as authority**. This instance holds no state from that one, and correctly said so: *"a previous instance's standing buys this one nothing."* **The earlier instance could not have weighed either fact** — the redline sits in the same file it was editing, and the store contents needed executing. **A recommendation is evidence, never instruction (`CLAUDE.md` precedence #8), and I treated one as settled because it came back with a specialist's name on it.**
+>
+> ### RULING — Option 1, as recommended
+>
+> **Drop C. Deliver D + P-6, and let the frontier stay where the redline and `CLAUDE.md` put it: in the map.** The brief's contribution to S-1 is the **existence-verified map path** — the part that was actually broken — plus the existing content-age line that already exposes staleness. **No governance reversal, no round trip, and honest: a pointer points.**
+>
+> **Option 2 (reopening the allowlist) is NOT taken.** It is a `product-decision` for Warwick, and on today's data it would ship a BUILD-015 instruction to a fresh BUILD-020 Larry the moment it landed.
+>
+> ### P-6 corrected — my description was wrong, and it is THREE sites
+>
+> `:22` and `:756` are **not** in contradiction with each other — `:22` calls the *brief* authoritative, `:756` calls the *Deliverables sweep* a fallback. **The real defect is that three sites assert Honcho authority against `CLAUDE.md` #9:** `:22-23` *"the AUTHORITATIVE source of current focus"* · `:757` *"Honcho holds the explicit focus"* · **`:1039-1040` *"it is the authoritative focus"* — which my order missed AND the doc-017 sweep missed.** Doc-017 fixed only the rendered label at `:1004`; the comments were left. **Fix all three.**
+>
+> ### 🚨 Carried out of this order — S-1 fails TODAY on DATA, not code
+>
+> **`focus` is a permitted, already-rendered field, and it currently reads *"BUILD-015 AsdAIr live-acceptance recovery…"*, 30+ hours stale.** **So a fresh Larry gets a wrong orientation from the brief as it stands, before a line of this work exists.** The remedy is a `continuity.mjs write` with the current focus — **an operational act, Larry's, not a code change.** **Option 1 does not fix this and does not claim to.** Tracked separately; **S-1 cannot pass while the store says BUILD-015.**
+
+## ~~C — what "the frontier" IS~~ — **WITHDRAWN, see Amendment 2**
 
 **Render the packet's existing `next_action` and `immediate_objective` beside `focus`, every one labelled recall-only.** **No scraping, no marker convention, no map edit, no extraction mechanism.**
 
