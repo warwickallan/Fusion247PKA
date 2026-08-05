@@ -53,7 +53,11 @@ import { runSupervisor, runMergeReview } from './supervisorCodex.mjs';
 import { CODEX_CONTRACT_PATH, loadCodexContract, assertDeliveredContract } from '../review/codexAdapter.mjs';
 import { gatherGitEvidence } from './gitEvidence.mjs';
 import { detectMergeClass } from './mergeClass.mjs';
-import { notify, composeMessage, composeLarryMessage } from './notify.mjs';
+import {
+  notify, composeMessage, composeLarryMessage,
+  // W3/W4 (WO-2026-08-05-09, WP-2E) — the QA-exchange composers.
+  composeFindingsMessage, composeDispositionMessage,
+} from './notify.mjs';
 // WO-TW-02 — the automatic trigger. The poller was already real and already proven; the only
 // thing missing was something that ran it without a human. That something is the loop below.
 import { pollPrComments, fetchOpenPrs, ghCliReader } from './pollPrComments.mjs';
@@ -320,6 +324,14 @@ export async function pollRound(pool, deps) {
         candidates: res.candidates, checkpointsCreated: res.checkpointsCreated,
         outcomes: res.results.map((r) => r.outcome),
       });
+      // W4 (WO-2026-08-05-09) — echo every FRESHLY-applied disposition to Telegram. Only
+      // outcome==='applied' carries disposedFindingIds; a deduped re-poll of the same comment
+      // never reaches this branch, so a re-poll can never re-echo.
+      for (const r of res.results) {
+        if (r.outcome === 'applied' && Array.isArray(r.disposedFindingIds) && r.disposedFindingIds.length > 0) {
+          await sendDispositionNotifications(pool, deps, { turnId: r.turnId, disposedFindingIds: r.disposedFindingIds });
+        }
+      }
     } catch (e) {
       const msg = String(e?.message ?? e);
       errors.push({ repo, pr: prNumber, error: msg });
@@ -359,6 +371,151 @@ export async function openFinding(pool, { buildRef = 'BUILD-014', openedTurnId =
     [buildRef, openedTurnId, description],
   );
   return rows[0];
+}
+
+// ── W1 (WO-2026-08-05-09, WP-2E) — the wire that turns openFinding() from a dead function into
+// the live disposition machinery's front door ──────────────────────────────────────────────────
+//
+// openFinding() has existed since BUILD-014 and was called only by the acceptance harness and
+// tests — never by this live review path. Four real Codex findings (TQA-001, TQA-002, TQA-003,
+// TOWER-QA-001) sat inside tower.supervisor_review.merge_review as structured JSON while
+// tower.finding held zero rows, because nothing looped merge_review.qa.findings[] and called it.
+// This is that loop, and it is the ONLY new mechanism this Work Order adds — everything it calls
+// (openFinding, the disposition columns, the ingest grammar, the gate) already existed and was
+// already tested.
+
+/** [TQA-001] BLOCKER/ACTIVE/BLOCKS_CURRENT_MERGE — <evidence> — Required correction: <correction>
+ *  Codex's own short ref (f.id, e.g. "TQA-001") is embedded as a prefix in the free-text
+ *  `description` column so every surface that already renders it (the staged reviewer input,
+ *  the PR verdict comment, Telegram) shows BOTH ids — the tower.finding UUID the reply grammar
+ *  requires, and the ref Warwick and Codex actually talk about — with NO new column and NO
+ *  schema growth (regrowth cap; §14.7 "Named as unestablished" leaves this mapping to W1,
+ *  approved by Larry 2026-08-05 as stated). */
+export function formatMergeFindingDescription(f) {
+  const head = `[${f.id}] ${f.technical_impact ?? '?'}/${f.reachability ?? '?'}/${f.required_disposition ?? '?'}`;
+  const evidence = String(f.evidence ?? '').trim();
+  const correction = String(f.required_correction ?? '').trim();
+  const tail = [evidence, correction ? `Required correction: ${correction}` : null].filter(Boolean).join(' — ');
+  return tail ? `${head} — ${tail}` : head;
+}
+
+/**
+ * Turn a round's NEW Codex findings (merge_review.qa.findings[], per CODEX_RESULT_SCHEMA) into
+ * durable tower.finding rows via the existing openFinding(). Called ONCE, from processTurn, at
+ * the exact point a review is first persisted — never on an idempotent replay, so a restart or a
+ * lost insert race can never double-open a finding.
+ *
+ * FAIL-CLOSED ON THE ARRAY, per the Work Order. Three distinct "no findings" shapes are told
+ * apart rather than collapsed into one guess:
+ *   - not merge-class at all              → nothing to open, expected, not reported.
+ *   - merge-class but qa.findings absent  → a BLOCKED merge review (evidence unresolved, Codex
+ *                                           unreachable) never reaches CODEX_RESULT_SCHEMA at all,
+ *                                           so mergeReviewRecord.qa is a hand-built
+ *                                           { status:'blocked', ... } object with no `findings`
+ *                                           key. That is the CORRECT, expected shape for a
+ *                                           blocked round, not a defect to report.
+ *   - qa.findings present but NOT an array → genuinely malformed; logged, nothing opened, and the
+ *                                           round is NOT failed for it (a findings-loop failure
+ *                                           must never take a review round down with it).
+ * A malformed INDIVIDUAL entry (no usable `id`) is skipped and logged rather than crashing the
+ * whole loop or silently dropping the rest.
+ *
+ * NEVER THROWS.
+ *
+ * @returns {{opened: Array<{id:string, codexId:string, technical_impact:?string,
+ *            reachability:?string, required_disposition:?string, evidence:?string,
+ *            required_correction:?string}>, skipped: number, reason: string|null}}
+ */
+export async function openFindingsFromMergeReview(pool, { buildRef, turnId, mergeReviewRecord }) {
+  if (!mergeReviewRecord || mergeReviewRecord.isMergeClass !== true) {
+    return { opened: [], skipped: 0, reason: 'not-merge-class' };
+  }
+  const raw = mergeReviewRecord.qa?.findings;
+  if (raw === undefined) {
+    return { opened: [], skipped: 0, reason: mergeReviewRecord.blocked === true ? 'blocked-no-findings' : 'absent' };
+  }
+  if (!Array.isArray(raw)) {
+    log('findings_array_malformed', { turnId, buildRef, type: typeof raw });
+    return { opened: [], skipped: 0, reason: 'malformed-array' };
+  }
+  const opened = [];
+  let skipped = 0;
+  for (const f of raw) {
+    if (!f || typeof f !== 'object' || typeof f.id !== 'string' || !f.id.trim()) {
+      log('finding_entry_malformed', { turnId, buildRef, entry: JSON.stringify(f ?? null).slice(0, 200) });
+      skipped += 1;
+      continue;
+    }
+    try {
+      const description = formatMergeFindingDescription(f);
+      const row = await openFinding(pool, { buildRef, openedTurnId: turnId, description });
+      opened.push({
+        id: row.id, codexId: f.id,
+        technical_impact: f.technical_impact ?? null, reachability: f.reachability ?? null,
+        required_disposition: f.required_disposition ?? null, evidence: f.evidence ?? null,
+        required_correction: f.required_correction ?? null,
+      });
+    } catch (e) {
+      log('open_finding_failed', { turnId, buildRef, codexId: f.id, error: String(e?.message ?? e) });
+      skipped += 1;
+    }
+  }
+  return { opened, skipped, reason: null };
+}
+
+// ── W4 (WO-2026-08-05-09, WP-2E) — the disposition ECHO's read-back-after-write ────────────────
+//
+// This is the spine of the design: what Telegram renders must be provably what tower.finding
+// holds AFTER a disposing PR comment's UPDATE committed — never the text the comment PARSED in
+// memory. readDisposedFindings performs the ONLY read; sendDispositionNotifications performs the
+// ONLY compose+send. Keeping the read in its own function (rather than inlining a SELECT beside
+// the send) is what makes "renders from the store, not from what was claimed" a property a
+// mutation test can pin to a single seam.
+
+/** Re-SELECT tower.finding for exactly the ids a disposing comment just wrote. Order is
+ *  preserved to match the caller's disposedFindingIds order; ids with no matching row (should
+ *  not happen — ingestComment.mjs only reports an id here when its own UPDATE returned exactly
+ *  one row) are silently dropped rather than throwing, so one bad id cannot block the rest. */
+export async function readDisposedFindings(pool, findingIds) {
+  if (!Array.isArray(findingIds) || findingIds.length === 0) return [];
+  const placeholders = findingIds.map(() => '?').join(',');
+  const { rows } = await pool.query(
+    `select id, description, disposition, disposition_rationale, disposition_source,
+            disposition_comment_id, disposition_head_sha, disposition_at
+       from tower.finding where id in (${placeholders})`,
+    findingIds,
+  );
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  return findingIds.map((id) => byId.get(id)).filter(Boolean);
+}
+
+/**
+ * Echo every FRESHLY-applied disposition to Telegram, one message per finding, read back from
+ * the store via readDisposedFindings — never from the comment's parsed dispositions.
+ *
+ * turnId is deliberately NOT passed to notify() as the dedup key (see NOTIFY_REASONS'
+ * 'finding_disposed' comment in notify.mjs): a null turn_id is treated as distinct by the unique
+ * (turn_id, reason) index, so every disposition event gets its own message even when several
+ * land against the same round — the "ongoing thread, not a single digest" requirement.
+ *
+ * NEVER THROWS: a notify failure for one finding must not stop the others or the poll loop.
+ */
+export async function sendDispositionNotifications(pool, deps, { turnId, disposedFindingIds }) {
+  if (!Array.isArray(disposedFindingIds) || disposedFindingIds.length === 0) return [];
+  const t = await pool.query(`select build_ref, seq from tower.turn where id = ?`, [turnId]);
+  const { build_ref: buildRef, seq: turnSeq } = t.rows[0] ?? {};
+  const findings = await readDisposedFindings(pool, disposedFindingIds);
+  const doNotify = deps?.notify ?? notify;
+  const sent = [];
+  for (const finding of findings) {
+    const message = composeDispositionMessage({ buildRef, turnSeq, turnId, finding });
+    try {
+      sent.push(await doNotify(pool, { turnId: null, reason: 'finding_disposed', state: 'disposed', message }));
+    } catch (e) {
+      log('disposition_notify_failed', { turnId, findingId: finding.id, error: String(e?.message ?? e) });
+    }
+  }
+  return sent;
 }
 
 // loadOpenFindings moved to findings.mjs (WO-OR-22) — it is now imported above, alongside the
@@ -422,7 +579,7 @@ async function claimOne(pool) {
 // A merge-class turn ONLY reaches goal_complete when its Tower-QA review APPROVED against
 // real Git evidence; a blocked/unresolved QA fires tower_failure, a non-approve fires
 // codex_block_or_redirect — a prose "done" can never silently ship.
-async function fireTriggers(pool, { turnId, buildRef, turnSeq, nextState, r, blocked, goalComplete, notifyFn = notify, merge = null, larryResponse = null }) {
+async function fireTriggers(pool, { turnId, buildRef, turnSeq, nextState, r, blocked, goalComplete, notifyFn = notify, merge = null, larryResponse = null, findingsOpened = [] }) {
   const base = {
     buildRef, turnSeq, turnId, state: nextState, verdict: r.verdict,
     summary: r.summary, nextAction: r.next_action, warwickNeeded: r.warwick_needed,
@@ -457,13 +614,23 @@ async function fireTriggers(pool, { turnId, buildRef, turnSeq, nextState, r, blo
     reason = 'goal_complete'; state = 'complete'; summary = `Goal complete — ${r.summary}`;
   }
 
-  if (!reason) return []; // continue / aligned -> SILENT (no Telegram)
-  // Two SEPARATE Telegram messages (one dedup row): Larry's side of the dialogue first, THEN Codex's
-  // verdict — an actual back-and-forth on TowerBot, never one combined message. Larry's is omitted
-  // when there is no larry_response, so a pure-Codex turn still sends exactly one message.
+  const hasNewFindings = Array.isArray(findingsOpened) && findingsOpened.length > 0;
+  if (!reason) {
+    // W3 (WO-2026-08-05-09) — an otherwise-SILENT round (continue/aligned, merge QA approved or
+    // not merge-class) must still surface any findings it opened. Findings must never be
+    // silently dropped just because the overall verdict was fine.
+    if (!hasNewFindings) return []; // continue / aligned, nothing raised -> SILENT (no Telegram)
+    reason = 'findings_raised'; summary = `${r.summary}${mergeLine}`;
+  }
+  // THREE SEPARATE Telegram messages (one dedup row): Larry's side of the dialogue first, THEN
+  // Codex's verdict, THEN (W3) any NEW findings this round raised — an actual back-and-forth on
+  // TowerBot, never one combined message. Each is omitted when it has nothing to say, so an
+  // ordinary delivery round with no findings is unchanged (exactly the pre-existing two-message
+  // shape).
   const messages = [
     composeLarryMessage({ buildRef, turnSeq, turnId, larryResponse }),
     composeMessage({ ...base, state, warwickNeeded, summary }),
+    composeFindingsMessage({ buildRef, turnSeq, turnId, findings: findingsOpened }),
   ].filter(Boolean);
   return [await notifyFn(pool, { turnId, reason, state, message: messages })];
 }
@@ -680,20 +847,28 @@ export async function processTurn(pool, turnId, deps = REAL_DEPS) {
     return { turnId, reused: true, verdict: rWin.verdict, state: stateWin, notifications };
   }
 
+  // (g cont.) W1 (WO-2026-08-05-09) — the ONLY point findings are opened for this round: this
+  // insert just won, so this is the FIRST and ONLY time this review is persisted. Never on the
+  // idempotent-reuse branch above, so a restart or a lost insert race can never double-open a
+  // finding.
+  const findingsOpened = await openFindingsFromMergeReview(pool, { buildRef, turnId, mergeReviewRecord });
+
   // (h) set turn.state from the verdict.
   const nextState = VERDICT_TO_STATE[r.verdict] ?? 'reviewed';
   await pool.query(`update tower.turn set state = ?, lease_owner = null, updated_at = now() where id = ?`, [nextState, turnId]);
 
-  // (h cont.) auto-Telegram on the trigger conditions (idempotent), incl. the merge-class gate.
-  const notifications = await fireTriggers(pool, { turnId, buildRef, turnSeq, nextState, r, blocked: sup.blocked, goalComplete, notifyFn: doNotify, merge: mergeFlags, larryResponse: turnRow.larry_response });
+  // (h cont.) auto-Telegram on the trigger conditions (idempotent), incl. the merge-class gate
+  // and (W3) any findings this round opened.
+  const notifications = await fireTriggers(pool, { turnId, buildRef, turnSeq, nextState, r, blocked: sup.blocked, goalComplete, notifyFn: doNotify, merge: mergeFlags, larryResponse: turnRow.larry_response, findingsOpened: findingsOpened.opened });
 
   log('processed', {
     turnId, verdict: r.verdict, blocked: sup.blocked, state: nextState,
     injectedFindings: openFindings.length,
+    findingsOpened: findingsOpened.opened.length, findingsSkipped: findingsOpened.skipped, findingsReason: findingsOpened.reason,
     mergeClass: detection.isMergeClass, mergeBlocked: mergeFlags?.blocked ?? null, mergeVerdict: mergeFlags?.verdict ?? null,
     promptsApplied: promptsApplied.map((p) => p.name),
   });
-  return { turnId, reused: false, verdict: r.verdict, blocked: sup.blocked, state: nextState, packetHash, mergeReview: mergeReviewRecord, notifications };
+  return { turnId, reused: false, verdict: r.verdict, blocked: sup.blocked, state: nextState, packetHash, mergeReview: mergeReviewRecord, notifications, findingsOpened: findingsOpened.opened };
 }
 
 /** Compact, DB-safe summary of the Git evidence (no full diff text stored in the DB). */

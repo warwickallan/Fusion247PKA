@@ -197,6 +197,13 @@ export async function ingestPrComment(pool, payload, { turnId: explicitTurnId = 
 
   const skipped = [];
   let appliedCount = 0;
+  // W4 (WO-2026-08-05-09) — the ids this call actually wrote a disposition onto, so the caller
+  // (pollPrComments.mjs → watcher.mjs's pollRound) can trigger the Telegram echo without
+  // re-parsing the comment body. Deliberately IDS ONLY, never the rationale text: the echo must
+  // be read back from the store after the write, not carried through from what was parsed here —
+  // see watcher.mjs readDisposedFindings / sendDispositionNotifications for why that distinction
+  // is load-bearing.
+  const disposedFindingIds = [];
   for (const d of parsed.dispositions) {
     const upd = await pool.query(
       `update tower.finding
@@ -207,13 +214,13 @@ export async function ingestPrComment(pool, payload, { turnId: explicitTurnId = 
         returning id`,
       [d.status, d.rationale, row.id, parsed.headSha, d.findingId],
     );
-    if (upd.rowCount === 1) appliedCount += 1;
+    if (upd.rowCount === 1) { appliedCount += 1; disposedFindingIds.push(d.findingId); }
     else skipped.push(`${d.findingId} (no open tower.finding with that id)`);
   }
 
   return {
     applied: true, commentRowId: row.id, turnId: turn.id, headSha: parsed.headSha,
-    applied_count: appliedCount, skipped, dispositions: parsed.dispositions.length,
+    applied_count: appliedCount, skipped, dispositions: parsed.dispositions.length, disposedFindingIds,
   };
 }
 

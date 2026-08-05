@@ -63,6 +63,64 @@ export async function runMergeReview({ packet } = {}) {
       },
     };
   }
+  // WO-2026-08-05-09 (WP-2E) — an APPROVED merge-class review that STILL raises a non-blocking
+  // finding (e.g. a NOTE_ONLY / TRACKED_FOLLOWUP finding attached to an otherwise-clean approve).
+  // Proves fireTriggers' 'findings_raised' fallback: without it, an approve + aligned delivery
+  // verdict is entirely SILENT and this finding would never reach Telegram. Checked BEFORE the
+  // plainer 'with_findings' marker below, because that marker is a substring of this one.
+  if (claim.includes('with_findings_approved')) {
+    return {
+      ok: true, blocked: false, modelId: 'fake-reviewer',
+      result: {
+        status: 'ok', verdict: 'approve',
+        summary: 'Fake QA: approved, with one non-blocking note.',
+        claims_verified: [{ claim: 'change present', status: 'confirmed', evidence: `${changed} changed files` }],
+        acceptance_results: [{ acceptance_row_id: 'AC-01', result: 'pass', rationale: 'implemented', evidence: 'diff' }],
+        prior_finding_results: [],
+        findings: [
+          {
+            id: 'TQA-003', technical_impact: 'NOTE', reachability: 'HYPOTHETICAL',
+            required_disposition: 'NOTE_ONLY',
+            assumed_deployment_baseline: 'live watcher',
+            evidence: 'naming could be clearer in one helper',
+            required_correction: 'optional rename, not required',
+          },
+        ],
+      },
+    };
+  }
+  // WO-2026-08-05-09 (WP-2E) — deterministic NEW findings, shaped exactly like
+  // CODEX_RESULT_SCHEMA's findings[] (codexAdapter.mjs), for the QA-exchange test suite. Only
+  // fires when the staged claim carries this marker, so every PRE-EXISTING test — none of which
+  // uses it — is byte-for-byte unaffected.
+  if (claim.includes('with_findings')) {
+    return {
+      ok: true, blocked: false, modelId: 'fake-reviewer',
+      result: {
+        status: 'ok', verdict: 'request_changes',
+        summary: 'Fake QA: two findings raised for the QA-exchange proof.',
+        claims_verified: [{ claim: 'change present', status: 'confirmed', evidence: `${changed} changed files` }],
+        acceptance_results: [{ acceptance_row_id: 'AC-01', result: 'partial', rationale: 'findings raised', evidence: 'diff' }],
+        prior_finding_results: [],
+        findings: [
+          {
+            id: 'TQA-001', technical_impact: 'HIGH', reachability: 'ACTIVE',
+            required_disposition: 'BLOCKS_CURRENT_MERGE',
+            assumed_deployment_baseline: 'live watcher, real Telegram',
+            evidence: 'pool.end() is not in a finally block — connection leak on throw',
+            required_correction: 'wrap the close in a finally block',
+          },
+          {
+            id: 'TQA-002', technical_impact: 'MEDIUM', reachability: 'LATENT',
+            required_disposition: 'TRACKED_FOLLOWUP',
+            assumed_deployment_baseline: 'live watcher',
+            evidence: 'retry budget is unbounded',
+            required_correction: 'cap the retry count',
+          },
+        ],
+      },
+    };
+  }
   return {
     ok: true, blocked: false, modelId: 'fake-reviewer',
     result: {

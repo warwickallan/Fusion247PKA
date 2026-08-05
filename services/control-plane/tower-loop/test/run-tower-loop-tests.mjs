@@ -288,6 +288,32 @@ async function main() {
     console.log(`[wp2g-reach] # tests ${total} # pass ${pass} # fail ${fail}`);
   });
 
+  // WP-2E (WO-2026-08-05-09) — THE QA-EXCHANGE PROOF, spawned + counted the SAME way as WP-2G
+  // just above. The reason is identical: a test file merely sitting beside this runner, executed
+  // by NO npm script and NO CI job, is a green that proves nothing — this wires it into the exact
+  // command this Work Order names as the acceptance harness.
+  await test('WP-2E — the QA-exchange proof (W1-W4) executes and passes (spawned node:test)', async () => {
+    const qaFile = path.join(__dirname, 'qaExchange.test.mjs');
+    assert.ok(fs.existsSync(qaFile), 'the QA-exchange test file exists');
+    const child = spawn(process.execPath, ['--test', qaFile], {
+      cwd: LOOP_DIR, env: { ...process.env }, stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let out = ''; let err = '';
+    child.stdout.on('data', (d) => { out += d; });
+    child.stderr.on('data', (d) => { err += d; });
+    const code = await waitExit(child);
+    const num = (label) => {
+      const m = out.match(new RegExp(`^# ${label} (\\d+)$`, 'm'));
+      return m ? Number(m[1]) : null;
+    };
+    const pass = num('pass'); const fail = num('fail'); const total = num('tests');
+    assert.notEqual(total, null, `the child reported a test count (stderr: ${err.slice(0, 400)})`);
+    assert.ok(pass > 0, `the QA-exchange proof executed something (# pass = ${pass}) — zero executed is never a pass`);
+    assert.equal(fail, 0, `the QA-exchange proof had failures (# fail = ${fail}):\n${out.slice(-4000)}`);
+    assert.equal(code, 0, `the QA-exchange proof exited 0 (got ${code})`);
+    console.log(`[wp2e-qa-exchange] # tests ${total} # pass ${pass} # fail ${fail}`);
+  });
+
   // ══════════════════════════════════════════════════════════════════════════════
   // WO-OR-22 — the PR-comment ⇄ Tower seam (W1–W8).
   //
