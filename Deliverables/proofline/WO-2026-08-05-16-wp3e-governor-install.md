@@ -1,11 +1,19 @@
 # WO-2026-08-05-16 — WP-3E: install the fixed governor to the machine
 
-> **⚠️ This order is submitted to NOLAN for a bounded class-A pre-dispatch check before it reaches Mack.** First real exercise of the route approved by Warwick on 2026-08-05. **It is NOT yet dispatched.**
+> ## ✅ CLASS-A PRE-DISPATCH CHECK — **PASS** (Nolan, 2026-08-05, Sonnet 5)
+>
+> **The first real exercise of the route Warwick approved on 2026-08-05.** Checked against the closed list only — the final envelope, Mack's contract and shim, and SOP-022's class-A taxonomy. **GL-012 was not opened**, because `private_surface: none` is consistent with a `machine_surface` outside `C:\.fusion247\**` and therefore needed no testing. **Corrections: none.**
+>
+> **One item flagged, explicitly NOT blocking.** `contract_basis` cites Warwick's verbatim *"Mack should own the live-machine side: installation…"* — **and that grant does not appear in Mack's `AGENTS.md` as written today.** The contract's Keel-boundary section assigns *"deployment or launcher hooks"* to Keel and scopes Mack's operational ownership to **released services**; the governor lives under `tools/governor/`, not `services/**`, so the Keel boundary does not technically reach it — **but the affirmative installation grant for a non-service tool copy is an unratified seam, not yet in the contract text.** Checked on approval-of-substance rather than ratified wording, so not a defect. **Recorded here so it reaches Warwick's ratification and is not lost.**
+>
+> **Cost, for AC-5:** Sonnet 5 · 7 tool calls · read-only · no repo audit, no implementation review, no writes.
+>
+> **Status: ISSUED. Dispatch decision was Larry's and is taken.**
 
 | Field | Value |
 |---|---|
 | **work_order_id** | WO-2026-08-05-16 |
-| **status** | DRAFT — awaiting class-A check |
+| **status** | ISSUED — class-A check PASSED (Nolan, Sonnet 5) |
 | **issued / issued_by** | 2026-08-05 / Larry |
 | **owner** | **Mack** |
 | **governance_head** | `696d44985b6e5b943df93daaccd52d133b7e8663` |
