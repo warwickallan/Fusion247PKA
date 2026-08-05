@@ -64,6 +64,7 @@ This matters more than it looks: **the entire next phase is about proving what i
 - Update this map only at meaningful phase boundaries: PASS, PARTIAL or FAILED, with an evidence pointer.
 - Continue autonomously until completion or a genuine Warwick-only blocker.
 - Before any clear, restart or handoff, ensure Honcho contains this exact path, current phase/gate and next action.
+- **Before `/clear`, run `/rotate`. Clearing is unsafe until `/rotate` reports `SAFE TO CLEAR` after the installed Honcho readback matches this Wayfinder's current phase, frontier and exact next action.**
 - **Tangents go in "SHIT TO DO" below. Do not chase them.** See the rule there — it binds even when the tangent comes from Warwick.
 
 ---
