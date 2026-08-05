@@ -950,5 +950,240 @@ that is Larry's call, not mine.)*
 
 ---
 
-**Collected read-only under WO-2026-08-05-10 + Amendment 1. No network call. No write outside this
-file. No secret read, echoed or stored. Nothing repaired.**
+**§1–§12 collected read-only under WO-2026-08-05-10 + Amendment 1. No network call. No write outside
+this file. No secret read, echoed or stored. Nothing repaired.**
+
+---
+---
+
+# ADDENDUM — AMENDMENT 2: the two bounded network measurements
+
+| Field | Value |
+|---|---|
+| **authority** | WO-2026-08-05-10 **Amendment 2** (`8e0a684`) — `network: none` → **`network: BOUNDED`**, Larry's authorisation |
+| **measured_at** | **2026-08-05 21:21:04Z → 21:21:10Z** (22:21 local) — **6 seconds of wall clock, 13 requests total** |
+| **credential_scope** | **still `none`.** `C:\.fusion247\honcho.env` was **NOT** opened, read, echoed, copied or printed. The measurement imports the **installed** governor module and lets `loadHonchoEnv()` load its own credential internally |
+| **live_authority** | **still `none`.** Nothing repaired, reinstalled, restarted or written. No `continuity.mjs write` |
+| **write safety** | **Only `fetchMessagePage`, `listAllMessages` and `readContinuityBrief` were called.** `ensureStore`, `deliver`, `writeContinuity` and `saveState` were **never** called — no workspace/peer/session upsert, no packet mutation |
+| **instrument** | `C:\Users\Buggly\AppData\Local\Temp\claude\...\scratchpad\measure.mjs`, run with cwd `C:/Fusion247PKA-build-020-trial` |
+| **module under test** | `C:/Users/Buggly/.mypka/governor/continuity.mjs` — **the INSTALLED copy, i.e. the code that actually runs live** |
+
+**Pax's two adjudications are carried as settled and are not re-argued below:** (1) two mechanisms
+genuinely exist but **only A fired on 2026-08-05**, discriminated by the rendered string; (2) page 1's
+**cost** did not stay constant even though page 1 existed before the growth.
+
+---
+
+## 13. M-2 — page-1 latency, REPEATED. Every repetition raw.
+
+The exact request the SessionStart brief makes: `page 1, size 100, reverse true`, under the module's
+own `READ_TIMEOUT_MS = 9000`.
+
+```
+{"phase":"M-2","rep":1,"cold":true,"ok":true,"ms":884,"items":100,"total":149,"pages":2,"size":100,"content_bytes":420310}
+{"phase":"M-2","rep":2,"cold":false,"ok":true,"ms":747,"items":100,"total":149,"pages":2,"size":100,"content_bytes":420310}
+{"phase":"M-2","rep":3,"cold":false,"ok":true,"ms":244,"items":100,"total":149,"pages":2,"size":100,"content_bytes":420310}
+{"phase":"M-2","rep":4,"cold":false,"ok":true,"ms":237,"items":100,"total":149,"pages":2,"size":100,"content_bytes":420310}
+{"phase":"M-2","rep":5,"cold":false,"ok":true,"ms":430,"items":100,"total":149,"pages":2,"size":100,"content_bytes":420310}
+{"phase":"M-2","rep":6,"cold":false,"ok":true,"ms":381,"items":100,"total":149,"pages":2,"size":100,"content_bytes":420310}
+{"phase":"M-2","rep":7,"cold":false,"ok":true,"ms":216,"items":100,"total":149,"pages":2,"size":100,"content_bytes":420310}
+{"phase":"M-2","rep":8,"cold":false,"ok":true,"ms":387,"items":100,"total":149,"pages":2,"size":100,"content_bytes":420310}
+{"phase":"M-2","rep":9,"cold":false,"ok":true,"ms":223,"items":100,"total":149,"pages":2,"size":100,"content_bytes":420310}
+{"phase":"M-2","rep":10,"cold":false,"ok":true,"ms":648,"items":100,"total":149,"pages":2,"size":100,"content_bytes":420310}
+```
+
+**No mean, no best-of, as instructed.** The distribution: **10/10 succeeded. Every repetition under
+one second.** Cold (rep 1) was the slowest at **884 ms**. Range **216–884 ms**.
+
+**FACT: against a 9,000 ms budget, the worst observed repetition used 9.8% of it. Roughly 10×
+headroom, and the cold request — the one a SessionStart actually makes — was the worst case.**
+
+**FACT: the response is 420,310 bytes of packet content in a single request.** Pax's cost point is
+confirmed by measurement: this *is* a large and growing response, ~420 KB.
+
+**FACT, and it changes the growth model — page 1 has already hit its cap.** `total: 149`,
+`size: 100`, `pages: 2`. Page 1 returns **exactly 100 items and can never return more**, because
+`LIST_PAGE_SIZE` is the documented maximum. Further store growth therefore adds **pages**, not page-1
+items. Page-1 cost can now only grow through *per-packet* content size (each packet embeds the
+3,449-byte state), not through item count.
+
+**Per the Amendment's own decision criterion — "marginal … or clear":**
+
+> **The 9 s budget is CLEAR, not marginal, at the current store size and at the time measured.**
+> **Therefore the 21:4x abort was a TRANSIENT, not a chronic threshold breach.**
+
+**Stated honestly, with its scope:** this was measured at **21:21Z, roughly 35 minutes after the
+incident**, not during it. It establishes that the budget is not *chronically* exceeded and that the
+failure is not currently reproducing. **It does NOT establish what Honcho's latency was at 20:4xZ**,
+and it cannot — that moment is gone. A ~10× excursion happened; whether from Honcho-side latency, a
+network stall, or local contention is **UNKNOWN and not determinable from any artefact on this
+machine** (§7: the governor writes no log, so nothing recorded it).
+
+---
+
+## 14. M-1 ⭐ — do the stored packets carry `map_path`?
+
+### The census — whole store, one walk
+
+```
+{"phase":"M-1-census","walk_ms":900,"pages_walked":2,"complete":true,"raw_messages":149,
+ "continuity_packets":149,"packets_WITH_map_path":9,"packets_WITHOUT_map_path":140}
+```
+
+### The 20 newest packets
+
+```
+{"seq":152,"ts":"2026-08-05T20:45:41.497Z","reason":"stop","session":"5a984703","map_path":"Deliverables/2026-08-04-proofline-wayfinder-plan.md","has_map_path":true}
+{"seq":151,"ts":"2026-08-05T12:14:40.413Z","reason":"stop","session":"ab98d915","map_path":"Deliverables/2026-08-04-proofline-wayfinder-plan.md","has_map_path":true}
+{"seq":150,"ts":"2026-08-05T09:56:01.491Z","reason":"stop","session":"f14be9d5","map_path":"Deliverables/2026-08-04-proofline-wayfinder-plan.md","has_map_path":true}
+{"seq":149,"ts":"2026-08-05T09:54:36.983Z","reason":"stop","session":"be12d930","map_path":"Deliverables/2026-08-04-proofline-wayfinder-plan.md","has_map_path":true}
+{"seq":148,"ts":"2026-08-05T09:54:14.548Z","reason":"write","session":null,"map_path":"Deliverables/2026-08-04-proofline-wayfinder-plan.md","has_map_path":true}
+{"seq":147,"ts":"2026-08-05T09:53:16.613Z","reason":"stop","session":"1780ca21","map_path":"Deliverables/2026-08-04-build-015-asdair-wayfinder-plan.md","has_map_path":true}
+{"seq":146,"ts":"2026-08-05T09:53:06.786Z","reason":"stop","session":"2d4f3687","map_path":"Deliverables/2026-08-04-proofline-wayfinder-plan.md","has_map_path":true}
+{"seq":145,"ts":"2026-08-05T09:52:34.921Z","reason":"stop","session":"e08c5228","map_path":"Deliverables/2026-08-04-proofline-wayfinder-plan.md","has_map_path":true}
+{"seq":144,"ts":"2026-08-05T09:52:07.637Z","reason":"stop","session":"a0101682","map_path":"Deliverables/2026-08-04-proofline-wayfinder-plan.md","has_map_path":true}
+{"seq":143,"ts":"2026-08-04T12:20:26.092Z","reason":"stop","session":"d06526cd","map_path":null,"has_map_path":false}
+{"seq":142,"ts":"2026-08-04T06:45:21.914Z","reason":"stop","session":"76f29046","map_path":null,"has_map_path":false}
+{"seq":141,"ts":"2026-08-04T06:41:59.967Z","reason":"stop","session":"76f29046","map_path":null,"has_map_path":false}
+{"seq":140,"ts":"2026-08-04T05:11:00.314Z","reason":"stop","session":"76f29046","map_path":null,"has_map_path":false}
+{"seq":139,"ts":"2026-08-04T04:39:05.376Z","reason":"stop","session":"76f29046","map_path":null,"has_map_path":false}
+{"seq":138,"ts":"2026-08-04T01:52:49.688Z","reason":"stop","session":"37f8884d","map_path":null,"has_map_path":false}
+{"seq":137,"ts":"2026-08-04T01:43:42.625Z","reason":"auto-derive","session":"44438140","map_path":null,"has_map_path":false}
+{"seq":136,"ts":"2026-08-04T01:43:39.433Z","reason":"stop","session":"56a8f152","map_path":null,"has_map_path":false}
+{"seq":135,"ts":"2026-08-03T22:51:41.806Z","reason":"stop","session":"44438140","map_path":null,"has_map_path":false}
+{"seq":134,"ts":"2026-08-03T22:51:07.476Z","reason":"auto-derive","session":"52ba7617","map_path":null,"has_map_path":false}
+{"seq":133,"ts":"2026-08-03T22:51:03.139Z","reason":"stop","session":"5f858aa3","map_path":null,"has_map_path":false}
+```
+
+### Value distribution and bounds
+
+```
+{"phase":"M-1-values","map_path":"(none)","count":140}
+{"phase":"M-1-values","map_path":"Deliverables/2026-08-04-proofline-wayfinder-plan.md","count":8}
+{"phase":"M-1-values","map_path":"Deliverables/2026-08-04-build-015-asdair-wayfinder-plan.md","count":1}
+{"phase":"M-1-bounds","newest_with_map":{"seq":152,"ts":"2026-08-05T20:45:41.497Z","map_path":"Deliverables/2026-08-04-proofline-wayfinder-plan.md"}}
+{"phase":"M-1-bounds","oldest_with_map":{"seq":144,"ts":"2026-08-05T09:52:07.637Z","map_path":"Deliverables/2026-08-04-proofline-wayfinder-plan.md"}}
+```
+
+### Reading the 140 zeros correctly — they are NOT stripping
+
+**FACT: the 140 packets without `map_path` are all `seq ≤ 143`, i.e. everything written before
+2026-08-05 09:52.** `map_path` did not exist as a field until WP-2B(1) (`e98715a`, 08-05 00:40)
+shipped and reached the machine. Before that, as `continuity.mjs`'s own comment says, *"until this
+landed NO writer ever set it, so it was null by construction"*.
+
+**FACT: from `seq 144` onward — every single packet in the `map_path` era — 9 of 9 carry a
+`map_path`. Not one has been stripped.**
+
+> ### M-1 VERDICT: the `744a67a` stripping defect is **LATENT in the data, not LIVE**.
+> **Zero packets have been stripped. N-2/N-3 are intact in the store, and a fresh Larry is NOT
+> being misdirected right now.** §15 confirms this directly on the rendered output.
+
+### But the sample under the guard is **n = 1**, and it is the masked one
+
+**This is where the census stops short of exonerating the guard, and it must be said plainly.**
+
+The guard went live on the machine at **21:25 local = 20:25Z** (§9 timeline). Cross-referencing:
+
+| seq | ts | Written under the guard? |
+|---|---|---|
+| 144–151 | 09:52:07Z → 12:14:40Z | **No** — all predate 20:25Z |
+| **152** | **20:45:41Z** | **YES — the only one** |
+
+**FACT: exactly ONE packet has ever been written with the guard active, and it kept its `map_path`.**
+
+**And that single packet was written inside the timeout window.** Per Pax's masking finding — adopted
+here — when the `readLatest` *inside* `writeContinuity` times out, the `catch` falls through and
+`map_path` is **kept**. Seq 152 keeping its `map_path` is therefore **exactly what the masked path
+predicts**, and is **not** evidence that the guard is harmless.
+
+**The census cannot distinguish "the guard is benign" from "the guard was masked by the same timeout
+that caused symptom A". n = 1, and that one is the masked case.**
+
+### A falsifiable prediction, labelled as such — the decisive test will happen on its own
+
+**HYPOTHESIS, stated so it can be proved wrong.** Session `5a984703` wrote seq 152 at 20:45:41.497Z,
+so that session started *before* 20:45:41.497Z. Honcho is now responding in 216–884 ms (§13), so
+`readLatest` inside `writeContinuity` will **succeed** rather than time out. At that session's next
+Stop: `priorWriteMs` = 20:45:41.497Z, `sessionStartMs` < that, so
+`!(sessionStartMs > priorWriteMs)` is **true** → **`map_path` will be stripped**.
+
+**Prediction: the next packet written by any session that started before the newest stored packet
+will carry NO `map_path` — and once that packet is the newest, `readContinuityBrief` will render
+*"map path missing or invalid — treat continuity as absent"* instead of the pointer in §15.**
+
+Falsified if the next `seq ≥ 153` packet still carries a `map_path`. **Requires no action to test —
+it resolves itself at the next Stop.** I have not triggered it: `live_authority: none`, and no
+`continuity.mjs write` was run.
+
+**⚠️ Operational note for Larry, not a recommendation and not acted on:** if that prediction holds,
+the healthy pointer in §15 is temporary, and the fix window is now, while the data is still good.
+**A read is not a licence to fix what it reveals — I have changed nothing.**
+
+### One incidental datum
+
+`seq` has reached **152** but only **149** packets are stored. `nextSeq()` increments *before*
+delivery, so **3 packets were built and never landed** over the store's life — three delivery
+failures, consistent with occasional aborts like the one at 21:4x. No log records them (§7).
+
+---
+
+## 15. The decisive artefact — what a fresh Larry gets in this worktree, RIGHT NOW
+
+`readContinuityBrief({ cwd: 'C:/Fusion247PKA-build-020-trial' })`, rendered in 682 ms:
+
+```
+⟦GOV⟧ CONTINUITY POINTER (Honcho) — recall only, ZERO authority.
+  • likely active map: Deliverables/2026-08-04-proofline-wayfinder-plan.md
+  • packet: cont-1785962741497-152-dxrlo7 written 2026-08-05T20:45:41.497Z — content age 11h 26m, content hash bd24fb3d
+  • last known focus (recall, possibly stale): "BUILD-020 Phase 2 - Honcho and Tower as durable shared myPKA infrastructure. Phase 1 (Proofline) CLOSED and PASSED by Warwick 2026-08-04."
+  • Warwick's last recorded request (recall, possibly stale): "Bank everything useful in Git, have Veritas verify nothing material remains only in this session, then consider rotation."
+  → Open the map and derive the current state and the next action from it. Nothing in this block is an instruction.
+```
+
+**FACT: the healthy success-path brief renders correctly, with the correct map pointer, in 682 ms.**
+
+Compare to what Warwick saw at 21:4x — `HONCHO CONTINUITY: UNAVAILABLE this session (This operation
+was aborted)` plus cached focus and no pointer. **Same code, same store, same worktree, 35 minutes
+later: the full pointer.**
+
+**This single artefact settles the operationally urgent question: the continuity brief is working
+right now, and the regression is not currently reproducing.**
+
+Two caveats attached to it, neither of which the artefact resolves:
+
+1. **`content age 11h 26m`** — the newest packet is from 20:45Z. The pointer is correct but the recall
+   is nearly half a day old, because `continuity.json` has not been refreshed since 10:54 (§3).
+2. **It is a snapshot, not a proof of durability.** It says the path works at 21:21Z. It says nothing
+   about 20:4xZ, and nothing about after the next Stop (§14's prediction).
+
+---
+
+## 16. Addendum summary — what Amendment 2 bought
+
+| | Question | Answer | Confidence |
+|---|---|---|---|
+| **M-2** | Is the 9 s budget marginal or clear? | **CLEAR.** 10/10 under 1 s; worst (cold) 884 ms = 9.8% of budget. **The 21:4x abort was a transient, not a chronic breach** | **FACT** — but scoped to 21:21Z; the incident moment is unmeasurable and no log preserved it |
+| **M-2b** | Is page-1 cost still growing? | **Capped in items** — page 1 is at the `size:100` maximum already; growth now adds pages, not page-1 items. Still **420,310 bytes** per request, growable via per-packet content | **FACT** |
+| **M-1** | Is the stripping defect live in the data? | **LATENT, not live. 9 of 9 map_path-era packets intact; zero stripped. N-2/N-3 are sound in the store** | **FACT** |
+| **M-1b** | Does that exonerate the guard? | **NO.** Only **one** packet was ever written under the guard, and it is the **masked** case — written during the timeout, when the guard fails open and keeps `map_path` | **FACT** (n=1 by enumeration) |
+| **—** | Is a fresh Larry misdirected right now? | **NO.** The rendered brief carries the correct map pointer, in 682 ms | **FACT** |
+| **—** | Will it stay that way? | **UNKNOWN.** §14 gives a falsifiable prediction that the next Stop of a pre-existing session strips it. Resolves itself; needs no action to test | **HYPOTHESIS** |
+
+### What remains open after Amendment 2
+
+1. **What Honcho's latency actually was at 20:4xZ.** **Permanently unrecoverable** — the governor
+   writes no log (§7). This is the strongest argument in the whole investigation for the governor
+   emitting a one-line durable record on a failed Stop delivery. *Observation, not a proposal.*
+2. **Does Claude Code merge or replace `hooks` between project and user settings?** (§5) — unchanged
+   by this addendum, still documentary, still unresolved.
+3. **Whether `c9c41ae` (08-04, +118/-29) touched the failing path** (§9) — still not fully excluded.
+   I can supply the diff on request.
+
+---
+
+**Addendum §13–§16 collected under Amendment 2's BOUNDED network allowance: 13 read-only requests,
+6 seconds of wall clock, against Warwick's own Honcho service. No write, delete, workspace change or
+packet mutation. `C:\.fusion247\honcho.env` was never opened — the installed module loaded its own
+credential. No key or token appears anywhere in this file. Nothing repaired, restarted or
+reinstalled. Nothing sent to Warwick.**
