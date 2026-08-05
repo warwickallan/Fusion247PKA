@@ -59,16 +59,18 @@
 // out of a transcript — reused rather than re-implemented, because a second copy of that
 // logic here is exactly the drift this module exists to refuse.
 
-import { readdirSync, existsSync, statSync } from 'node:fs';
+import { readdirSync, existsSync, statSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { evaluate, STATE } from './evaluator.mjs';
 import { readHealthSample, healthStoreDir } from './health-store.mjs';
+import { readFileSync } from 'node:fs';
 import {
   readTranscriptTail,
   newestAssistantUsage,
   sumUsedTokens,
   SOURCE_TRANSCRIPT,
+  SOURCE_STATUSLINE,
 } from './sampler.mjs';
 
 // ---------------------------------------------------------------------------
@@ -228,8 +230,17 @@ export const HEALTH_SCHEMA_VERSION = 1;
 export const BLIND_REASON = Object.freeze({
   SAMPLE_UNREADABLE: 'sample-missing-or-unreadable',
   SCHEMA_UNRECOGNISED: 'sample-schema-unrecognised',
-  // WIDENED (WO-OR-05): a sample is now usable if it carries EITHER a percentage or a
-  // raw token count, so this rung only fires when it carries neither.
+  // WIDENED (WO-OR-05): a sample was usable if it carried EITHER a percentage or a raw
+  // token count.
+  //
+  // NARROWED AGAIN (WP-3B, Larry's Amendment 1 A-3) — and the direction matters, so read
+  // why before "restoring" it. The widening let a sample carrying ONLY `used_percentage`
+  // render `ctx 42%`, which is a reported percentage standing in for a measurement nobody
+  // took. This rung now fires when the sample carries no COUNT FOR ITS OWN SOURCE, and a
+  // percentage alone no longer rescues it. Nothing real is lost: both live producers write
+  // a count (`statusLine` -> `total_input_tokens`, `transcript` -> `used_tokens`), so the
+  // only samples this newly blinds are ones no producer emits. The percentage is still
+  // rendered — beside the count it belongs to, never instead of it.
   PERCENTAGE_ABSENT: 'context-usage-absent-or-non-finite',
   PERCENTAGE_OUT_OF_RANGE: 'context-percentage-out-of-grammar-range',
   SAMPLED_AT_UNPARSEABLE: 'sampled-at-absent-or-unparseable',
@@ -241,6 +252,56 @@ export const BLIND_REASON = Object.freeze({
   // BLIND rather than being graded into GREEN/AMBER/RED off a guessed denominator.
   WINDOW_SIZE_UNKNOWN: 'context-window-size-not-authoritatively-known',
 });
+
+// ---------------------------------------------------------------------------
+// WHICH MEASUREMENT THE NUMBER IS — WP-3B(a), and the rule is Larry's not this module's
+// ---------------------------------------------------------------------------
+// Two producers write context counts and THEY ARE NOT THE SAME MEASUREMENT:
+//
+//   * `sampler.mjs`'s statusLine writer emits `context_window.total_input_tokens` — the
+//     host's own report of the input tokens presented to the model — and NEVER writes
+//     `used_tokens`.
+//   * `sampler.mjs`'s transcript writer emits `context_window.used_tokens`, derived by
+//     summing usage out of the transcript file, and explicitly writes
+//     `total_input_tokens: null`.
+//
+// The defect this closes (WP-3B finding (a)): the consumer read only `used_tokens`, which
+// a statusLine sample never carries, so the module fell back to the reported percentage
+// and rendered `ctx 42%` while `418,491` sat unread on disk.
+//
+// THE FIX IS NOT A RENAME, and reading both fields with a `??` would be worse than the
+// defect. Unioning two different measurements behind one number is exactly the
+// "one number treated as cost without proving what it means" hazard: the reader could no
+// longer tell which quantity they were being shown. So the source SELECTS the field, one
+// branch reads exactly one field, and the selection is reported alongside the number.
+//
+// A sample with no recognised `source` is a real count that cannot be attributed. It is
+// still shown — refusing to show a measured number is the WO-OR-05 defect all over again
+// — but it is labelled `unattributed` rather than claimed as either producer's.
+export const CONTEXT_MEASUREMENT = Object.freeze({
+  STATUSLINE_TOTAL_INPUT: 'statusLine.total_input_tokens',
+  TRANSCRIPT_USED: 'transcript.used_tokens',
+  UNATTRIBUTED_USED: 'unattributed.used_tokens',
+});
+
+/**
+ * selectContextCount(data) -> { raw, measurement }
+ *
+ * Pure, never throws. `raw` is whatever the field held (including `undefined`); the
+ * caller applies `isFiniteNumber`, so this function decides PROVENANCE only and never
+ * decides validity. `measurement` is a `CONTEXT_MEASUREMENT` member and is never null,
+ * so every count this module renders can name the quantity it is.
+ */
+export function selectContextCount(data) {
+  const cw = data?.context_window;
+  if (data?.source === SOURCE_STATUSLINE) {
+    return { raw: cw?.total_input_tokens, measurement: CONTEXT_MEASUREMENT.STATUSLINE_TOTAL_INPUT };
+  }
+  if (data?.source === SOURCE_TRANSCRIPT) {
+    return { raw: cw?.used_tokens, measurement: CONTEXT_MEASUREMENT.TRANSCRIPT_USED };
+  }
+  return { raw: cw?.used_tokens, measurement: CONTEXT_MEASUREMENT.UNATTRIBUTED_USED };
+}
 
 // `UNSET_REASON` was DELETED here by WO-OR-05, together with `nextModelFor`, its sole
 // producer. Every one of its nine members named a property of banked BUILD-* programme
@@ -894,6 +955,13 @@ export function deriveFooterFields({
       },
       blind: true,
       blindReason,
+      // Read from the parameter rather than closed over a later `const`, so the rungs
+      // that fire BEFORE the sample has been unpacked can still answer it. A blind rung
+      // that carries a number (STALE, WINDOW_SIZE_UNKNOWN) must be able to say which
+      // measurement that number is, for the same reason the success path must.
+      measurement: sample?.data && typeof sample.data === 'object'
+        ? selectContextCount(sample.data).measurement
+        : null,
     };
   };
 
@@ -910,14 +978,19 @@ export function deriveFooterFields({
   // D-M1's fourth mutation and the one a looser `!= null` check would have let through
   // as GREEN. Applied to every one of the three numbers below, not just the percentage.
   const reportedPct = data.context_window?.used_percentage;
-  const usedTokensRaw = data.context_window?.used_tokens;
+  // SOURCE-SELECTED, never unioned — see `selectContextCount`. `measurement` travels with
+  // the number all the way out of this function so no caller has to re-derive which
+  // quantity it is holding.
+  const { raw: usedTokensRaw, measurement } = selectContextCount(data);
   const windowRaw = data.context_window?.context_window_size;
 
   const usedTokens = isFiniteNumber(usedTokensRaw) ? toRenderableTokens(usedTokensRaw) : null;
   const windowTokens =
     isFiniteNumber(windowRaw) && windowRaw > 0 ? toRenderableTokens(windowRaw) : null;
 
-  if (!isFiniteNumber(reportedPct) && usedTokens === null) {
+  // A-3: no count for this sample's own source is BLIND. A reported percentage does NOT
+  // rescue it — see the note on `BLIND_REASON.PERCENTAGE_ABSENT`.
+  if (usedTokens === null) {
     return blind(BLIND_REASON.PERCENTAGE_ABSENT);
   }
 
@@ -1088,6 +1161,10 @@ export function deriveFooterFields({
     },
     blind: state === STATE.BLIND,
     blindReason: null,
+    // NOT inside `fields`. `fields` is exactly the grammar's field set and D-M10 asserts
+    // `parseFooter(renderFooter(x)).fields` round-trips it; an extra key there would be a
+    // key the rendered line cannot carry back. The label rides beside the fields instead.
+    measurement,
   };
 }
 
@@ -1106,6 +1183,317 @@ export function deriveFooterFields({
 // the grounding check has moved to the only place that can still perform it. What D-4
 // forbade — a banked literal presented as live advice — remains impossible, because
 // there is no longer any banked literal to present.
+
+// ---------------------------------------------------------------------------
+// WP-3B(b) — `next:` GROUNDED IN THE ACTIVE MAP, on the ON-DEMAND PATH ONLY
+// ---------------------------------------------------------------------------
+// `next:` stays an INPUT everywhere it was one. What is added here is a way for the
+// on-demand CLI to COMPUTE it when no caller supplied one, instead of rendering UNSET at
+// the exact moment Warwick asked. `--next` still wins outright when given, so no existing
+// caller changes behaviour.
+//
+// WHERE THE POLICY COMES FROM, AND WHERE IT DOES NOT. The five rows below are LARRY'S
+// operating parameter (Amendment 1, A-5) — an advisory recommendation Warwick may
+// overrule, not governing law, and NOT this module's to invent. What lives here is the
+// deterministic MECHANICS of applying them: how the frontier text is located, how it is
+// classified, and what happens when it cannot be. The one place judgement genuinely
+// enters is the vocabulary literal, which is why it is a frozen, readable export rather
+// than a regex buried in a function — a reviewer must be able to disagree with a word.
+//
+// A-4 IS WHAT KEEPS THIS OFF THE HOT PATH, and it is structural rather than argued.
+// `resolveActiveMapPath` (continuity.mjs) shells out to `git grep` and `git log`.
+// `footer.mjs` is imported by `statusline-live.mjs`, which runs on EVERY statusline
+// refresh, and `footer.mjs:49`'s A-7 invariant forbids a `git` invocation on that path.
+// So nothing here is imported at module scope and nothing here is reachable from
+// `deriveFooterFields`: the resolver arrives as an INJECTED dependency that only the
+// direct-execution entrypoint supplies. An importer of this module therefore cannot
+// reach a `git` call even by accident, and the statusline keeps rendering `next: UNSET`.
+// That limitation is real and is recorded rather than hidden.
+
+// Capability order, highest first. "The HIGHER of the candidates" needs a total order,
+// and fail-safe means MORE capability, never less.
+export const NEXT_RANK = Object.freeze(['Opus/high', 'Sonnet/medium', 'Sonnet/low']);
+
+// The vocabulary. Lower-cased substring membership — deterministic, no stemming, no
+// scoring, no "looks like". Terms are drawn from Larry's own row wording plus the
+// estate's proper nouns for the same activities.
+//
+// `merge decision` and `record update` are MULTI-WORD deliberately: bare "decision" and
+// bare "record" appear in almost every map and would make row 4 fire constantly.
+export const FRONTIER_VOCABULARY = Object.freeze({
+  'Opus/high': Object.freeze([
+    'assurance', 'veritas', 'codex', 'review', 'adjudicat', 'design',
+    'uncertain', 'investigat', 'unresolved', 'unestablished', 'fog',
+  ]),
+  'Sonnet/medium': Object.freeze([
+    'implement', 'mechanical', 'bounded', 'record-keeping', 'migration',
+    'test suite', 'wire ', 'install', 'rename', 'single known edit',
+  ]),
+  'Sonnet/low': Object.freeze([
+    'merge decision', 'merge-decision', 'record update',
+  ]),
+});
+
+/**
+ * frontierTextFromMap(mapText) -> { text, headings } — pure, never throws.
+ *
+ * "The remaining work in the active phase", located mechanically. Two section kinds are
+ * collected and concatenated: the last section whose heading names a FRONTIER, and the
+ * last section whose heading names a PHASE. Either alone is demonstrably insufficient on
+ * the real map — the frontier section can be three lines that point elsewhere, and the
+ * phase section can be long enough to have a stale opening — so both are read and the
+ * classifier sees their union.
+ *
+ * A heading marked superseded, historical or closed is EXCLUDED. That is not a nicety:
+ * this estate's maps keep superseded frontiers in place on purpose, with `⛔ SUPERSEDED
+ * AND HISTORICAL. DO NOT READ THIS AS THE CURRENT FRONTIER` written across them, and a
+ * reader that ignored those words would confidently recommend for a phase that closed.
+ *
+ * `headings` is returned so a caller can say WHICH sections it read. A recommendation
+ * whose provenance cannot be stated is the banked-literal defect wearing a new hat.
+ */
+export function frontierTextFromMap(mapText) {
+  if (typeof mapText !== 'string' || mapText.length === 0) return null;
+  const lines = mapText.split(/\r?\n/);
+
+  const sections = [];
+  for (let i = 0; i < lines.length; i += 1) {
+    const m = /^(#{1,6})\s+(.*)$/.exec(lines[i]);
+    if (!m) continue;
+    sections.push({ level: m[1].length, title: m[2], start: i });
+  }
+  if (sections.length === 0) return null;
+
+  const EXCLUDED = /superseded|historical|closed|do not read/i;
+  const bodyOf = (idx) => {
+    const s = sections[idx];
+    let end = lines.length;
+    for (let j = idx + 1; j < sections.length; j += 1) {
+      if (sections[j].level <= s.level) { end = sections[j].start; break; }
+    }
+    return lines.slice(s.start, end).join('\n');
+  };
+
+  const pick = (re) => {
+    for (let i = sections.length - 1; i >= 0; i -= 1) {
+      if (re.test(sections[i].title) && !EXCLUDED.test(sections[i].title)) return i;
+    }
+    return -1;
+  };
+
+  const frontierIdx = pick(/frontier/i);
+  const phaseIdx = pick(/phase\s*\d/i);
+  if (frontierIdx === -1 && phaseIdx === -1) return null;
+
+  const chosen = [...new Set([frontierIdx, phaseIdx].filter((i) => i !== -1))];
+  return {
+    text: chosen.map(bodyOf).join('\n'),
+    headings: chosen.map((i) => sections[i].title),
+  };
+}
+
+/**
+ * classifyFrontier(text) -> { next, matched } — pure, never throws.
+ *
+ * Membership, then Larry's precedence: no category matched is UNSET (never a guess), one
+ * category is that category, more than one is the HIGHEST-RANKED of them.
+ */
+export function classifyFrontier(text) {
+  if (typeof text !== 'string' || text.length === 0) return { next: NEXT_UNSET, matched: [] };
+  const hay = text.toLowerCase();
+  const matched = NEXT_RANK.filter((row) =>
+    FRONTIER_VOCABULARY[row].some((term) => hay.includes(term))
+  );
+  if (matched.length === 0) return { next: NEXT_UNSET, matched };
+  // NEXT_RANK is highest-first and `matched` preserves its order, so [0] IS the higher.
+  return { next: matched[0], matched };
+}
+
+/**
+ * recommendNext({ mapPathFn, readFileFn, cwd }) -> { next, reason, mapPath, headings }
+ *
+ * The one impure step, and it never throws: every failure is a reason string and an
+ * UNSET. `mapPathFn` is injected — see the A-4 note above for why this module must not
+ * import the resolver itself.
+ */
+export function recommendNext({ mapPathFn = null, readFileFn = readFileSync, cwd = process.cwd() } = {}) {
+  const unset = (reason) => ({ next: NEXT_UNSET, reason, mapPath: null, headings: [] });
+  if (typeof mapPathFn !== 'function') return unset('no-map-resolver-supplied');
+
+  let mapPath;
+  try {
+    mapPath = mapPathFn({ cwd });
+  } catch {
+    return unset('map-resolver-threw');
+  }
+  if (typeof mapPath !== 'string' || mapPath.length === 0) return unset('no-active-map-found');
+
+  let text;
+  try {
+    text = readFileFn(mapPath, 'utf8');
+  } catch {
+    return unset('map-unreadable');
+  }
+
+  const frontier = frontierTextFromMap(text);
+  if (frontier === null) return { ...unset('no-frontier-section'), mapPath };
+
+  const { next, matched } = classifyFrontier(frontier.text);
+  return {
+    next,
+    reason: matched.length === 0 ? 'frontier-unclassifiable' : `matched:${matched.join('+')}`,
+    mapPath,
+    headings: frontier.headings,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// THE RECOMMENDATION IS CACHED — Warwick's Amendment 3, C-2
+// ---------------------------------------------------------------------------
+// "Then the renderer merely displays the cached recommendation. It does not reassess the
+// entire phase every time Larry speaks."
+//
+// A-4 confined map discovery to the on-demand path. C-2 tightens that: THE RENDER MUST
+// NOT RESOLVE OR READ THE MAP AT ALL. `resolveActiveMapPath` and `classifyFrontier` move
+// from the render path to a REFRESH path that runs rarely — on Warwick's five events:
+// the active frontier changes, the next Work Order changes, a phase boundary changes,
+// context crosses a threshold, or handback state changes.
+//
+// The render therefore reads one small JSON file and nothing else. No git. No 1,600-line
+// markdown parse. No model.
+//
+// ---------------------------------------------------------------------------
+// THE ONE PLACE THIS READS THE MAP, AND WHY I DID IT RATHER THAN SHIP THE DEFECT
+// ---------------------------------------------------------------------------
+// A cache refreshed "only when an event changes the answer" is only as good as the thing
+// that notices the event. If nothing notices, the cache keeps answering with yesterday's
+// frontier — which is EXACTLY "a banked literal presented as live advice", the defect
+// root CLAUDE.md names and the reason `nextModelFor` was deleted in the first place.
+//
+// So the render performs ONE `statSync` on the map path the cache itself recorded, and
+// renders UNSET if the map has changed since the refresh. That is metadata, not content:
+// no git, no resolution, no parse, O(1), and it cannot invent a recommendation — it can
+// only withdraw one. Reported rather than assumed: if Larry reads C-2 as forbidding even
+// this, `statFn: () => null` disables it and the cache becomes trust-only. I would rather
+// be told to remove this than ship a footer that confidently recommends for a phase that
+// closed an hour ago.
+export const RECOMMENDATION_SCHEMA_VERSION = 1;
+export const RECOMMENDATION_FILE = 'recommendation.json';
+
+/** The cache lives beside the health samples — the same store, not a second one. */
+export function recommendationPath({ cwd = process.cwd(), homeDir, envOverride, dirFor = healthStoreDir } = {}) {
+  const opts = { cwd };
+  if (homeDir !== undefined) opts.homeDir = homeDir;
+  if (envOverride !== undefined) opts.envOverride = envOverride;
+  return join(dirFor(opts), RECOMMENDATION_FILE);
+}
+
+/**
+ * refreshRecommendation({ mapPathFn, ... }) -> { ok, next, reason, path }
+ *
+ * The REFRESH path. Resolves the map, classifies the frontier, and writes the cache.
+ * Runs on an event, never on a render. Never throws.
+ */
+export function refreshRecommendation({
+  cwd = process.cwd(),
+  homeDir,
+  envOverride,
+  dirFor = healthStoreDir,
+  mapPathFn = null,
+  readFileFn = readFileSync,
+  statFn = statSync,
+  writeFn = writeFileSync,
+  mkdirFn = mkdirSync,
+  now = () => new Date().toISOString(),
+} = {}) {
+  const result = recommendNext({ mapPathFn, readFileFn, cwd });
+
+  // The map's identity AT REFRESH TIME, so a later render can tell whether the answer it
+  // is holding is still about the same document.
+  let mapMtimeMs = null;
+  let mapSize = null;
+  if (result.mapPath) {
+    try {
+      const st = statFn(result.mapPath);
+      mapMtimeMs = typeof st?.mtimeMs === 'number' ? st.mtimeMs : null;
+      mapSize = typeof st?.size === 'number' ? st.size : null;
+    } catch { /* recorded as null — the render then declines to trust the cache */ }
+  }
+
+  const record = {
+    schema_version: RECOMMENDATION_SCHEMA_VERSION,
+    refreshed_at: now(),
+    next: result.next,
+    reason: result.reason,
+    map_path: result.mapPath,
+    map_mtime_ms: mapMtimeMs,
+    map_size: mapSize,
+    headings: result.headings,
+  };
+
+  const path = recommendationPath({ cwd, homeDir, envOverride, dirFor });
+  try {
+    mkdirFn(join(path, '..'), { recursive: true });
+    writeFn(path, `${JSON.stringify(record, null, 2)}\n`, 'utf8');
+  } catch {
+    return { ok: false, next: result.next, reason: 'cache-unwritable', path };
+  }
+  return { ok: true, next: result.next, reason: result.reason, path };
+}
+
+/**
+ * readCachedRecommendation(...) -> { next, reason }
+ *
+ * The RENDER path. Reads one small JSON and, at most, stats one path. Never throws, and
+ * every failure is UNSET — the recommendation can be withdrawn here but never invented.
+ */
+export function readCachedRecommendation({
+  cwd = process.cwd(),
+  homeDir,
+  envOverride,
+  dirFor = healthStoreDir,
+  readFileFn = readFileSync,
+  statFn = statSync,
+} = {}) {
+  const unset = (reason) => ({ next: NEXT_UNSET, reason });
+
+  let raw;
+  try {
+    raw = readFileFn(recommendationPath({ cwd, homeDir, envOverride, dirFor }), 'utf8');
+  } catch {
+    return unset('no-cached-recommendation');
+  }
+
+  let record;
+  try {
+    record = JSON.parse(raw);
+  } catch {
+    return unset('cache-unparseable');
+  }
+  if (!record || record.schema_version !== RECOMMENDATION_SCHEMA_VERSION) {
+    return unset('cache-schema-unrecognised');
+  }
+  if (!NEXT_VALUES.includes(record.next)) return unset('cache-value-outside-grammar');
+  if (record.next === NEXT_UNSET) return unset(typeof record.reason === 'string' ? record.reason : 'cached-unset');
+
+  // Has the document the answer is ABOUT moved since the answer was computed? Metadata
+  // only — see the note above this block.
+  if (typeof statFn === 'function' && typeof record.map_path === 'string' && record.map_path.length > 0) {
+    let st = null;
+    try {
+      st = statFn(record.map_path);
+    } catch {
+      return unset('cache-map-unstattable');
+    }
+    if (st) {
+      if (record.map_mtime_ms !== null && st.mtimeMs !== record.map_mtime_ms) return unset('cache-stale-map-changed');
+      if (record.map_size !== null && st.size !== record.map_size) return unset('cache-stale-map-changed');
+    }
+  }
+
+  return { next: record.next, reason: 'cached' };
+}
+
 // ---------------------------------------------------------------------------
 // Impure: resolve which health sample to read (D-3's resolution order)
 // ---------------------------------------------------------------------------
@@ -1417,11 +1805,59 @@ export function computeFooterLine({
 // stay separate, and they stay separate now that `next:` comes from a flag rather than
 // from a file.
 
-export const CLI_EXIT = Object.freeze({ OK: 0, USAGE: 2 });
+// `UNCHANGED` is additive and opt-in (`--if-changed` only). Nothing that ran before this
+// Work Order can observe it: without the flag the entrypoint still only ever returns OK
+// or USAGE.
+export const CLI_EXIT = Object.freeze({ OK: 0, USAGE: 2, UNCHANGED: 3 });
 
 export const CLI_USAGE =
   'usage: node tools/governor/footer.mjs [--session <id>] [--next <Model>/<effort>|UNSET] ' +
-  '[--control CONTINUE|HANDBACK:<code>]';
+  '[--control CONTINUE|HANDBACK:<code>] [--help]';
+
+// ---------------------------------------------------------------------------
+// WP-3B(c) — WHY THIS TEXT EXISTS, AND WHY IT IS THE WHOLE OF (c)
+// ---------------------------------------------------------------------------
+// The measured cost of one rendered footer was ~79k tokens because obtaining it meant
+// dispatching a specialist that READ this 82 KB module to learn how to call it. The
+// cheap route already existed — one `node` invocation, exit 0, one line of stdout — and
+// nothing was wrong with it except that you could not find out about it without reading
+// the module. `--help` previously exited 2 as an unrecognised argument.
+//
+// So the remaining build for (c) is this string and the flag that prints it. Not a new
+// wrapper, not a new script, not a launcher: §16.4's verbs are remove, shorten, combine,
+// change. What is documented here is chosen by one test — could a reader who has never
+// opened this file call it correctly and know what the answer means?
+export const CLI_HELP = [
+  CLI_USAGE,
+  '',
+  'Prints ONE ⟦GOV⟧ line to stdout and exits 0. Environment failures still print a valid',
+  'BLIND line and still exit 0; only a malformed invocation exits 2.',
+  '',
+  'ctx — the context field. Two producers write context counts and they are DIFFERENT',
+  'measurements, so the number is selected by the sample\'s own source and never merged:',
+  `  ${CONTEXT_MEASUREMENT.STATUSLINE_TOTAL_INPUT}  — the host\'s own report of input tokens presented`,
+  `  ${CONTEXT_MEASUREMENT.TRANSCRIPT_USED}        — summed from the transcript file`,
+  `  ${CONTEXT_MEASUREMENT.UNATTRIBUTED_USED}     — a real count from a sample with no recognised source`,
+  'A sample carrying no count for its own source renders BLIND. A reported percentage is',
+  'never shown in place of a count. `ctx ~` means the sample could not be confirmed as',
+  'this session\'s. `ctx 33% (327.4k/1000k)` is percentage, count and window together.',
+  '',
+  'next: — the model/effort recommendation. Supply --next to state it yourself; that',
+  'always wins. With no --next, the direct-execution entrypoint resolves the active',
+  'Wayfinder map and classifies the current frontier under Larry\'s policy. If no frontier',
+  'can be established it renders UNSET — never a guess. Imported callers (the statusline)',
+  'get UNSET: resolving the map shells out to git, which is forbidden on that path.',
+  '',
+  `  next values: ${NEXT_RANK.join(', ')}, or ${NEXT_UNSET}`,
+  `  --next also accepts any of: ${NEXT_MODELS.join('|')}/${NEXT_EFFORTS.join('|')}`,
+  `  --control: ${CONTROL_CONTINUE}, or ${HANDBACK_PREFIX}<code> where <code> is one of:`,
+  `    ${HANDBACK_CODES.join(', ')}`,
+  '',
+  'examples:',
+  '  node tools/governor/footer.mjs',
+  '  node tools/governor/footer.mjs --session <session-id>',
+  '  node tools/governor/footer.mjs --control HANDBACK:merge-decision',
+].join('\n');
 
 function usageFailure(message) {
   return { exitCode: CLI_EXIT.USAGE, stdout: '', stderr: `footer: ${message}\n${CLI_USAGE}\n` };
@@ -1449,11 +1885,25 @@ export function parseCliArgs(argv = []) {
   let sessionId = null;
   let next = NEXT_UNSET;
   let control = CONTROL_CONTINUE;
+  // WP-3B(b): whether the CALLER stated `next`, which is not the same question as whether
+  // `next` is UNSET — `--next UNSET` is a caller stating it, and must not be overridden by
+  // a computed recommendation.
+  let nextSupplied = false;
+  // C-2 / N-4. Both are VALUELESS flags, so they are handled beside `--help` rather than
+  // in the value-taking grammar below.
+  let refresh = false;
+  let ifChanged = false;
 
   const FLAGS = ['--session', '--next', '--control'];
 
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
+    // `--help` takes no value and short-circuits everything. Checked inside the loop so
+    // it works in any position, and BEFORE the unrecognised-argument refusal so that the
+    // one flag a lost reader will try is the one flag that answers them.
+    if (arg === '--help' || arg === '-h') return { ok: true, help: true };
+    if (arg === '--refresh') { refresh = true; continue; }
+    if (arg === '--if-changed') { ifChanged = true; continue; }
     if (!FLAGS.includes(arg)) {
       return { ok: false, error: `unrecognised argument ${JSON.stringify(arg)}` };
     }
@@ -1466,7 +1916,7 @@ export function parseCliArgs(argv = []) {
     }
     i += 1;
     if (arg === '--session') sessionId = value;
-    else if (arg === '--next') next = value;
+    else if (arg === '--next') { next = value; nextSupplied = true; }
     else control = value;
   }
 
@@ -1489,7 +1939,7 @@ export function parseCliArgs(argv = []) {
     };
   }
 
-  return { ok: true, sessionId, next, control };
+  return { ok: true, help: false, sessionId, next, control, nextSupplied, refresh, ifChanged };
 }
 
 /**
@@ -1504,7 +1954,10 @@ export function parseCliArgs(argv = []) {
  *   * the health sample, from the store: the exact one when `--session <id>` is given,
  *     otherwise the NEWEST for this project (which sets the `~` approximate flag);
  *   * `state` / `advice`, via the degradation ladder;
- *   * `next:`, straight from `--next`, defaulting to UNSET.
+ *   * `next:`, straight from `--next` when the caller supplied it; otherwise COMPUTED
+ *     from the active map's frontier, but ONLY when a `mapPathFn` was injected. No
+ *     resolver, no computation, and the value stays UNSET — which is what every
+ *     programmatic caller of this function gets, by design (A-4).
  *
  * A-7 IS NOW SATISFIED OUTRIGHT RATHER THAN BY ARGUMENT (WO-OR-05). This file used to
  * call `liveLocation` here — a real `git` invocation, reachable from a module that sits
@@ -1527,9 +1980,44 @@ export function runCli(argv = [], {
   existsFn,
   statFn,
   evaluateFn,
+  // WP-3B(b). Absent by default and absent for every importer — only the direct-execution
+  // entrypoint supplies it. See the A-4 note above `recommendNext`.
+  mapPathFn = null,
+  readFileFn,
 } = {}) {
   const args = parseCliArgs(argv);
   if (!args.ok) return usageFailure(args.error);
+  if (args.help) return { exitCode: CLI_EXIT.OK, stdout: `${CLI_HELP}\n`, stderr: '' };
+
+  const storeOpts = { cwd, homeDir, envOverride, dirFor: dirFor ?? healthStoreDir };
+
+  // THE REFRESH PATH (C-2). Runs on one of Warwick's five events, never on a render.
+  // Prints a plain summary rather than a footer: this is a maintenance operation and
+  // emitting a `⟦GOV⟧` line here would put a footer into the transcript that nothing
+  // asked for — the exact staple N-4 exists to prevent.
+  if (args.refresh) {
+    const r = refreshRecommendation({ ...storeOpts, mapPathFn, readFileFn, statFn });
+    const summary = `footer: recommendation ${r.ok ? 'refreshed' : 'NOT WRITTEN'} — next: ${r.next} (${r.reason})\n`;
+    return { exitCode: CLI_EXIT.OK, stdout: summary, stderr: '' };
+  }
+
+  // `--next` WINS OUTRIGHT when the caller stated one, including `--next UNSET`. The
+  // cached value only ever fills a silence, so no existing caller's behaviour moves.
+  //
+  // THE RENDER NEVER RESOLVES THE MAP (C-2). It reads the cache the refresh path wrote,
+  // and at most stats the one path that cache recorded. Zero model invocations, no git,
+  // no markdown parse.
+  let nextValue = args.next;
+  if (!args.nextSupplied) {
+    try {
+      nextValue = readCachedRecommendation({ ...storeOpts, readFileFn, statFn }).next;
+    } catch {
+      // The reader promises not to throw; this entrypoint owes a line on its own account
+      // rather than borrowing that promise from a callee.
+      nextValue = NEXT_UNSET;
+    }
+    if (!NEXT_VALUES.includes(nextValue)) nextValue = NEXT_UNSET;
+  }
 
   let line;
   try {
@@ -1539,7 +2027,7 @@ export function runCli(argv = [], {
       homeDir,
       envOverride,
       now,
-      next: args.next,
+      next: nextValue,
       control: args.control,
       readSample,
       dirFor,
@@ -1569,7 +2057,49 @@ export function runCli(argv = [], {
     });
   }
 
+  // ---------------------------------------------------------------------------
+  // N-4 — "no footer when nothing meaningful changed". OPT-IN, and that matters.
+  // ---------------------------------------------------------------------------
+  // The default contract is unchanged: this entrypoint ALWAYS prints exactly one
+  // parseable line and exits 0. That is load-bearing and must not become conditional —
+  // B6 treats "no valid footer" as ALLOW, so a renderer that silently printed nothing
+  // would look identical to a governor that had stopped governing.
+  //
+  // `--if-changed` therefore does not go silent AMBIGUOUSLY. It prints nothing and exits
+  // with a DISTINCT code, so "nothing to say" can never be mistaken for "no footer was
+  // produced". Warwick's trailing clause — "unless he explicitly wants the deterministic
+  // status line on every reply" — is his open choice, and this makes both available
+  // without a further code change rather than deciding it for him.
+  if (args.ifChanged) {
+    const prev = readLastLine({ ...storeOpts, readFileFn });
+    if (prev === line) return { exitCode: CLI_EXIT.UNCHANGED, stdout: '', stderr: '' };
+    writeLastLine(line, { ...storeOpts, readFileFn });
+  }
+
   return { exitCode: CLI_EXIT.OK, stdout: `${line}\n`, stderr: '' };
+}
+
+// The `--if-changed` memory rides in the SAME cache file rather than a second store —
+// one file in the governor's existing directory, not a new store to reason about.
+function readLastLine({ readFileFn = readFileSync, ...opts } = {}) {
+  try {
+    const rec = JSON.parse(readFileFn(recommendationPath(opts), 'utf8'));
+    return typeof rec?.last_line === 'string' ? rec.last_line : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeLastLine(line, { readFileFn = readFileSync, ...opts } = {}) {
+  const path = recommendationPath(opts);
+  let rec = {};
+  try {
+    rec = JSON.parse(readFileFn(path, 'utf8')) ?? {};
+  } catch { /* a cache that does not exist yet is created holding only this */ }
+  try {
+    mkdirSync(join(path, '..'), { recursive: true });
+    writeFileSync(path, `${JSON.stringify({ schema_version: RECOMMENDATION_SCHEMA_VERSION, ...rec, last_line: line }, null, 2)}\n`, 'utf8');
+  } catch { /* never fatal: the line has already been produced */ }
 }
 
 // Run ONLY when executed directly — the entrypoint guard every other module in
@@ -1581,8 +2111,39 @@ export function runCli(argv = [], {
 // stdout write on a Windows pipe, and a truncated footer is precisely the four-field line
 // this whole Work Package exists to make impossible. Setting the code lets Node drain and
 // leave on its own.
+//
+// WP-3B(b) / A-4 — THE MAP RESOLVER IS IMPORTED **HERE** AND NOWHERE ELSE.
+// `continuity.mjs`'s `resolveActiveMapPath` shells out to `git grep` and `git log`.
+// `footer.mjs` is imported by `statusline-live.mjs`, which runs on every statusline
+// refresh, and A-7 forbids a `git` invocation on that path. A module-scope import would
+// put a shelling-out module into that import graph even if nothing called it, so the
+// import lives inside the direct-execution guard: an importer of this module cannot reach
+// it at all, and the property stays STRUCTURAL rather than argued — the same standard
+// WO-OR-05 set when it removed the `worktree-guard.mjs` import.
+//
+// The failure posture is the module's usual one: if the resolver cannot be loaded, the
+// recommendation is simply not computed and `next:` renders UNSET. A footer is still
+// printed and the exit code is still 0.
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const { exitCode, stdout, stderr } = runCli(process.argv.slice(2));
+  const argv = process.argv.slice(2);
+
+  // C-2 TIGHTENED THE A-4 RULE, AND THIS LINE IS WHERE IT BITES. The resolver is loaded
+  // ONLY for `--refresh`. A render — the common case, the one that must cost nothing —
+  // never imports `continuity.mjs`, never reaches a `git` invocation, and never opens the
+  // map. Guarding the import by ARGUMENT rather than only by entrypoint is what makes
+  // "the render must not resolve or read the map at all" true of the process and not
+  // merely of a code path nobody happened to call.
+  let mapPathFn = null;
+  if (argv.includes('--refresh')) {
+    try {
+      const { resolveActiveMapPath } = await import('./continuity.mjs');
+      if (typeof resolveActiveMapPath === 'function') {
+        mapPathFn = ({ cwd }) => resolveActiveMapPath({ cwd });
+      }
+    } catch { /* no resolver -> the refresh writes UNSET, which is the honest answer */ }
+  }
+
+  const { exitCode, stdout, stderr } = runCli(argv, { mapPathFn });
   if (stderr) process.stderr.write(stderr);
   if (stdout) process.stdout.write(stdout);
   process.exitCode = exitCode;
