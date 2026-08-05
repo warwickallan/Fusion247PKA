@@ -23,7 +23,7 @@
 // scanned; anything matching the restricted pattern is withheld and the packet is
 // marked restricted rather than sent verbatim.
 
-import { readFileSync, writeFileSync, mkdirSync, renameSync, statSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, renameSync, statSync, openSync, fstatSync, readSync, closeSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { homedir } from 'node:os';
 import { pathToFileURL, fileURLToPath } from 'node:url';
@@ -127,10 +127,10 @@ async function hf(path, { method = 'GET', body, timeoutMs = READ_TIMEOUT_MS } = 
   }
 }
 
-async function ensureStore() {
-  await hf('/workspaces', { method: 'POST', body: { id: honchoCtx().ws } });
-  await hf('/workspaces/{ws}/peers', { method: 'POST', body: { id: PEER } });
-  await hf('/workspaces/{ws}/sessions', { method: 'POST', body: { id: SESSION, peers: { [PEER]: {} } } });
+async function ensureStore(request = hf) {
+  await request('/workspaces', { method: 'POST', body: { id: honchoCtx().ws } });
+  await request('/workspaces/{ws}/peers', { method: 'POST', body: { id: PEER } });
+  await request('/workspaces/{ws}/sessions', { method: 'POST', body: { id: SESSION, peers: { [PEER]: {} } } });
 }
 
 // ---- packet construction + privacy ----------------------------------------
@@ -525,9 +525,14 @@ function renderContent(p) {
   return `${head}${obj}${bf}\n\`\`\`json\n${JSON.stringify(p)}\n\`\`\``;
 }
 
-async function deliver(packet) {
-  await ensureStore();
-  const res = await hf(`/workspaces/{ws}/sessions/${SESSION}/messages`, {
+// `request` is injectable (defaulting to `hf`) — the SAME idiom `fetchMessagePage` already
+// uses for the read path in this file, applied here so the write path can be proven with no
+// network. Required by the write-side pointer protection below, whose tests need a
+// `readLatest` and a `deliver` that agree on where "the store" is — not a second seam, the
+// same one at one more call site.
+async function deliver(packet, { request = hf } = {}) {
+  await ensureStore(request);
+  const res = await request(`/workspaces/{ws}/sessions/${SESSION}/messages`, {
     method: 'POST',
     timeoutMs: WRITE_TIMEOUT_MS,
     body: { messages: [{ content: renderContent(packet), peer_id: PEER, metadata: { kind: 'continuity', id: packet.id, ts: packet.ts, seq: packet.seq, backfill: packet.backfill, session_id: packet.session_id } }] },
@@ -538,13 +543,76 @@ async function deliver(packet) {
 
 // ---- public: write ---------------------------------------------------------
 
-// Deliver a continuity packet DIRECT to Honcho. On failure returns an honest
-// {ok:false, error} — never silent. No spool: a bounded local retry is added
-// only if delivery is found to genuinely fail in use (Warwick's scope ruling).
+// ---- WRITE-SIDE POINTER PROTECTION (closes the race the read-side check cannot) ----------
+//
+// THE RACE. `continuity.json`/the Honcho session is ONE shared store written by every
+// session's Stop hook across every worktree and build on this machine. Without this check,
+// an honestly-resolved but STALE `map_path` — from a session left open in an old worktree,
+// closed AFTER a more current session already posted the pointer that should stand — would
+// silently become "the current map" on nothing more than post-time ordering. That is W-1
+// (confident wrong orientation), moved from the read side (already closed above, by
+// `mapPathPresentHere`) to the write side, which was never checked until now.
+//
+// THE SIGNAL IS SESSION START TIME, NOT MAP COMMIT-RECENCY (Warwick's ruling, superseding an
+// earlier commit-recency design that was WRONG). A session that starts AFTER the stored
+// pointer's last write represents genuinely current intent — including a DELIBERATE switch to
+// an older, dormant build whose own map was committed long ago. Commit-recency would have
+// rejected that deliberate switch outright, which is exactly backwards: it would have blocked
+// the one case Warwick's own working pattern actually needs. Session-start-vs-last-write is
+// the one signal that tells "an old session finally closing" apart from "a fresh session
+// deliberately pointing somewhere old", because it is the one fact a stale session cannot
+// fake — it started when it started, regardless of what it later points at.
+//
+// THE COMPARISON. `opts.sessionStartedAt` (an ISO string the CLI's `stop` handler resolves
+// from the Stop hook's own `transcript_path` payload field — see `sessionStartFromTranscript`
+// below) is compared against the `ts` of the packet `readLatest` currently reports as newest.
+// `ts` is not a new field; it is the write-timestamp every packet has always carried. If this
+// session started strictly AFTER that write, the candidate `map_path` is genuinely current and
+// is written normally. Otherwise it is omitted — every OTHER field (focus, next_action, etc.)
+// still writes normally, so only the pointer itself is protected. The honest-absent render
+// logic already handles a packet with no `map_path` correctly (see `readContinuityBrief`
+// above); this triggers that existing degradation, it does not build a new one.
+//
+// NOT A NEW MECHANISM. One more call site for `readLatest`, which already exists and is
+// already used by the read path.
+//
+// ACCEPTED LIMITATIONS, NAMED RATHER THAN HIDDEN.
+//   - No prior stored packet, an unparseable/absent `sessionStartedAt` (manual `write` and
+//     `backfill` never supply one — they have no session to time), or a `readLatest` failure
+//     (Honcho unreachable, a network blip) all fall back to the CURRENT unconditional-write
+//     behaviour rather than blocking. A Stop hook that throws ends Warwick's turn with an
+//     error (see the guard around `resolveActiveMapPath` above); a stricter guard here would
+//     trade a rare race for a routine failure.
+//   - The comparison is against the SINGLE newest stored packet, matching the reader's own
+//     latest-wins semantics exactly (`readLatest` has never walked packet history, and this
+//     does not start it walking now). It answers "is THIS write current relative to the last
+//     one", not "what is the best map ever recorded across this session's whole history".
+// Deliver a continuity packet DIRECT to Honcho. On failure returns an honest {ok:false,
+// error} — never silent. No spool: a bounded local retry is added only if delivery is found
+// to genuinely fail in use (Warwick's scope ruling, unchanged by the protection above).
 export async function writeContinuity(state, opts = {}) {
   const packet = buildPacket(state, opts);
+
+  if (packet.map_path) {
+    try {
+      const { cwd, git, request, reason, sessionId, backfill, sessionStartedAt, ...readOpts } = opts;
+      const current = await readLatest(readOpts);
+      const priorWriteMs = current && current.latest ? Date.parse(current.latest.ts) : NaN;
+      const sessionStartMs = typeof sessionStartedAt === 'string' ? Date.parse(sessionStartedAt) : NaN;
+      // Reject unless THIS session genuinely started after the last write. Anything
+      // uncomparable (NaN on either side) leaves the packet untouched — see "accepted
+      // limitations" above.
+      if (Number.isFinite(priorWriteMs) && Number.isFinite(sessionStartMs) && !(sessionStartMs > priorWriteMs)) {
+        delete packet.map_path;
+      }
+    } catch {
+      // Honcho unreachable / readLatest failed — fall back to the unconditional write. Named
+      // explicitly, per the block above: a Stop hook must not throw over this.
+    }
+  }
+
   try {
-    const ref = await deliver(packet);
+    const ref = await deliver(packet, { request: opts.request });
     return { ok: true, id: packet.id, ref, packet };
   } catch (e) {
     return { ok: false, id: packet.id, error: e.message, packet };
@@ -1076,6 +1144,12 @@ async function cli() {
     // consumers. `undefined` falls back to `process.cwd()` inside buildPacket.
     const sessionCwd = cwdFrom(rawStdin);
 
+    // WRITE-SIDE POINTER PROTECTION (see the comment above `writeContinuity`). Resolved only
+    // for `stop` — a manual `write`/`backfill` carries no Stop hook payload and so has no
+    // session to time; `sessionStartFromTranscript` degrades to null on any failure, which
+    // `writeContinuity` already treats as "cannot compare, write unconditionally".
+    const sessionStartedAt = cmd === 'stop' ? sessionStartFromTranscript(transcriptPathFrom(rawStdin)) : null;
+
     // WO-OR-05 — the context-health sample, written from the transcript.
     //
     // THIS RUNS BEFORE THE DEDUPE BELOW, DELIBERATELY. The continuity dedupe returns
@@ -1131,7 +1205,7 @@ async function cli() {
         process.stdout.write(JSON.stringify({ command: 'stop', skipped: 'unchanged for this session' }) + '\n');
         return 0;
       }
-      const r = await writeContinuity(state, { reason: 'stop', sessionId, cwd: sessionCwd || process.cwd() });
+      const r = await writeContinuity(state, { reason: 'stop', sessionId, cwd: sessionCwd || process.cwd(), sessionStartedAt });
       if (r.ok) atomicWriteJson(LAST_FILE, { key, id: r.id, at: new Date().toISOString() });
       process.stdout.write(JSON.stringify({ command: 'stop', ...summ(r) }) + '\n');
       return 0; // a boundary hook never signals failure via exit code
@@ -1202,6 +1276,70 @@ function cwdFrom(raw) {
     const cwd = JSON.parse(raw)?.cwd;
     return (typeof cwd === 'string' && cwd.length) ? cwd : null;
   } catch { return null; }
+}
+
+// The transcript path the hook payload carries, when it carries one. Feeds
+// `sessionStartFromTranscript` below — the write-side pointer protection's ONLY source for
+// "when did THIS session genuinely begin".
+function transcriptPathFrom(raw) {
+  try {
+    const p = JSON.parse(raw)?.transcript_path;
+    return (typeof p === 'string' && p.length) ? p : null;
+  } catch { return null; }
+}
+
+// ---- session start time, from the transcript the Stop hook already tells us about --------
+//
+// Read at most this much from the START of the transcript. Mirrors `sampler.mjs`'s
+// `readTranscriptTail` — same shared transcript file, the OTHER end (newest-assistant-usage
+// is found there scanning BACKWARD from the tail; a session's start is found here scanning
+// FORWARD from the head). `sampler.mjs` sits outside this Work Order's `file_surface`, so
+// this is a small sibling function rather than an import — but the fd/fstat/read/close shape
+// is the identical established idiom in this codebase, not a new technique.
+const TRANSCRIPT_HEAD_BYTES = 1024 * 1024; // generous for a session's first few JSONL lines
+
+function readTranscriptHead(path, maxBytes = TRANSCRIPT_HEAD_BYTES) {
+  if (typeof path !== 'string' || path.length === 0) return '';
+  let fd;
+  try {
+    fd = openSync(path, 'r');
+    const size = fstatSync(fd).size;
+    const length = Math.min(size, maxBytes);
+    const buf = Buffer.allocUnsafe(length);
+    readSync(fd, buf, 0, length, 0);
+    return buf.toString('utf8');
+  } catch {
+    return '';
+  } finally {
+    if (fd !== undefined) {
+      try { closeSync(fd); } catch { /* nothing left to do about it */ }
+    }
+  }
+}
+
+/**
+ * sessionStartFromTranscript(path) -> ISO string | null
+ *
+ * The session's genuine start time: the `timestamp` on the FIRST line of its transcript that
+ * carries one, scanned forward from the head. Verified against real transcripts on this
+ * machine (JSONL; the first one or two lines — `mode`, `file-history-snapshot` — often carry
+ * no top-level `timestamp`, and the first line that does is a few lines in). A line this
+ * function cannot parse — including one truncated at the bounded read's edge — is skipped,
+ * never guessed at. Never throws; returns null on any failure, which every caller reads as
+ * "the write-side protection cannot apply this turn", not as an error.
+ */
+export function sessionStartFromTranscript(path) {
+  const text = readTranscriptHead(path);
+  if (!text) return null;
+  for (const line of text.split('\n')) {
+    if (!line || line.charCodeAt(0) !== 123 /* '{' */) continue;
+    let obj;
+    try { obj = JSON.parse(line); } catch { continue; }
+    if (obj && typeof obj.timestamp === 'string' && Number.isFinite(Date.parse(obj.timestamp))) {
+      return obj.timestamp;
+    }
+  }
+  return null;
 }
 
 const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
