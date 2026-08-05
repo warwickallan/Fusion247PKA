@@ -67,12 +67,37 @@ function tmp(prefix = 'governor-statusline-') {
 // The REAL statusLine payload shape, verified against a live sample under
 // ~/.mypka/governor/health/. Note what is NOT here: `cwd`, and
 // `workspace.current_dir`. Neither exists. See AC4 below.
+//
+// ---------------------------------------------------------------------------
+// CORRECTED 2026-08-05 (WP-3B, Larry's Amendment 2 B-2) — THIS FIXTURE WAS A FALSE
+// WITNESS, and the correction is to the FIXTURE, not to any assertion.
+// ---------------------------------------------------------------------------
+// It carried `used_percentage` and NO token count, and it is named "real-shaped". A
+// census of the whole live store settles that that shape is not real:
+//
+//     68 samples on disk · statusLine 14, transcript 54
+//     14 of 14 statusLine samples carry `context_window.total_input_tokens`
+//     54 of 54 transcript samples carry `context_window.used_tokens`
+//      0 of 68 carry a percentage with NO count — the shape this fixture asserted
+//
+// So the fixture encoded a payload the host does not emit, and it would have gone on
+// passing while asserting something untrue about the world. `total_input_tokens` is
+// added here, consistent with the percentage it already claimed (50% of a 1,000,000
+// window is 500,000), and `version` is moved to the version actually observed on this
+// host. Nothing else changed: no assertion weakened, no tolerance widened, no
+// special-casing. The 50% assertion below still has to be earned.
 function realShapedPayload(overrides = {}) {
   return {
     session_id: 'f944fae7-0000-0000-0000-000000000000',
-    version: '2.1.220',
+    version: '2.1.221',
     model: { id: 'claude-opus-5', display_name: 'Opus 5' },
-    context_window: { used_percentage: 50, remaining_percentage: 50 },
+    context_window: {
+      used_percentage: 50,
+      remaining_percentage: 50,
+      context_window_size: 1_000_000,
+      total_input_tokens: 500_000,
+      total_output_tokens: 1_618,
+    },
     rate_limits: { five_hour: { used_percentage: 7 }, seven_day: { used_percentage: 85 } },
     workspace: { git_worktree: 'Fusion247PKA-governor' },
     worktree: { name: 'x', path: 'C:/Fusion247PKA-governor', branch: 'build-018/session-governor' },

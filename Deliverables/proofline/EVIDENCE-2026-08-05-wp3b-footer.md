@@ -1,8 +1,10 @@
 # EVIDENCE — WO-2026-08-05-13 · WP-3B: fix the governor footer properly
 
-**Author:** Keel (Implementation Engineer) · **Branch:** `build-020/wp-3b-footer` · **Worktree:** `C:\Fusion247PKA-wp3b-footer` · **Governance head:** `7bcfef70a3eea5763951019673120887544554d4` · **Amendment 1:** `899b0a7`
+**Author:** Keel (Implementation Engineer) · **Branch:** `build-020/wp-3b-footer` · **Worktree:** `C:\Fusion247PKA-wp3b-footer` · **Governance head:** `7bcfef70a3eea5763951019673120887544554d4` · **Amendment 1:** `899b0a7` · **Amendments 2 + 3:** `71cb19e`
 
 **Builder self-test evidence — NOT independent review.**
+
+> **§§1–5 below record the work as it stood under Amendment 1. Amendment 3 then superseded the ≥10× target and moved the recommendation off the render path entirely — see §8, which supersedes §3's placement of the classifier and §4's acceptance target. Nothing in §§1–5 is withdrawn as evidence; the measurements and the census still hold.**
 
 ---
 
@@ -187,3 +189,151 @@ The frozen literal is asserted one-for-one against a seven-name literal **typed 
 5. **No install, and the change is inert until there is one.** `~/.mypka/governor/` still carries the old copy; WP-3E (Mack) installs. I read that path read-only for measurement and wrote nothing to it.
 6. **`sampler.mjs` and `sampler.test.mjs` were in surface and were NOT written.** The fix is entirely consumer-side. Reported so the unchanged surface is not mistaken for an oversight.
 7. **Builder evidence only.** These are my own tests on my own change. Nothing here is independent review, acceptance, or merge-readiness.
+
+---
+
+# 8. AMENDMENTS 2 AND 3 — the subagent comes out of the footer path
+
+Recorded separately because Amendment 3 is a **design ruling**, not feedback. Where it conflicts with sections 3–4 above, it wins.
+
+## 8.1 Amendment 2 — the false-witness fixture (B-2)
+
+`realShapedPayload()` in `tools/governor/statusline-live.test.mjs` carried `used_percentage: 50` and **no token count**, under a name asserting it was the real shape. The census settles that it was not:
+
+| Measure | Value |
+|---|---|
+| Live samples on disk | **68** (`statusLine` 14 · `transcript` 54) |
+| statusLine samples carrying `total_input_tokens` | **14 of 14** |
+| transcript samples carrying `used_tokens` | **54 of 54** |
+| Samples carrying a percentage and **no** count | **0 of 68** |
+
+Corrected to a payload the host actually emits: `total_input_tokens: 500_000` against a `1_000_000` window (consistent with the 50% it already claimed) and `version` moved to `2.1.221`, the version observed on disk. **No assertion weakened, no tolerance widened, nothing special-cased** — the 50% assertion still has to be earned. `statusline-live.test.mjs`: **34 tests, 34 pass, 0 fail**.
+
+### B-3 — why BLIND on a percentage-only sample is kept, recorded so it can be challenged
+
+A reported percentage is not a **measured** context number, and WP-3B(a) asked for a measured one. Root `CLAUDE.md`: *"If it cannot be read, the footer says `BLIND` and reports no numbers. It never renders a healthy state it did not measure."*
+
+**The trade, stated with its numbers so a later reader can argue with it rather than rediscover it:** this behaviour blinds a shape that **0 of 68** live samples have, on a host (**2.1.222** installed; samples written by **2.1.221**) where **14 of 14** statusLine samples carry the count. **The residual risk is a future or older host that emits a percentage without a count** — that terminal status line would go BLIND where it previously showed a percentage. It fails **safe**: BLIND is loud and self-describing, so the degradation is visible rather than a confident wrong number. I could not test another host version.
+
+## 8.2 Amendment 3 (C-2) — the recommendation is now CACHED, and the render resolves nothing
+
+The classifier and `FRONTIER_VOCABULARY` **moved from the render path to a refresh path**. Same code, run rarely.
+
+| Path | What it does | Cost |
+|---|---|---|
+| `--refresh` | resolves the active map (git), classifies the frontier, writes the cache | ~0.30 s wall, run on one of Warwick's five events |
+| render (default) | reads one small JSON; at most stats one path | **~0.08 s wall, 0 model contexts, 0 git** |
+
+**Executed end to end, with the store redirected** (`live_authority: none` forbids writing under `~/.mypka/**`, so `MYPKA_GOVERNOR_HEALTH_DIR` pointed at a temp dir):
+
+```
+1. render before any refresh   ⟦GOV⟧ ctx 38% (376k/1000k) · GREEN · TASK UNKNOWN · next: UNSET · CONTINUE
+2. --refresh                   footer: recommendation refreshed — next: Opus/high (matched:Opus/high+Sonnet/medium+Sonnet/low)
+3. render after refresh        ⟦GOV⟧ ctx 38% (376k/1000k) · GREEN · KEEP GOING · next: Opus/high · CONTINUE
+```
+
+The refresh prints a plain summary, **not** a footer — a maintenance command that emitted a governor line would put a footer into the transcript nobody asked for, which is the staple N-4 exists to prevent. A test asserts `parseFooter(refresh.stdout).ok === false`.
+
+### The decisive proof that the render invokes no git — run with git unreachable
+
+```
+$ git --version                                   # control: git is reachable normally
+git version 2.51.0.windows.2
+
+$ env -i MYPKA_GOVERNOR_HEALTH_DIR=... PATH=/nonexistent node tools/governor/footer.mjs --session <id>
+⟦GOV⟧ ctx 38% (376k/1000k) · GREEN · KEEP GOING · next: Opus/high · CONTINUE
+render exit=0
+
+$ env -i ... PATH=/nonexistent node tools/governor/footer.mjs --refresh
+footer: recommendation refreshed — next: UNSET (no-active-map-found)
+refresh exit=0
+```
+
+**The render produced the full line — number and recommendation — with git absent from PATH.** The refresh, which genuinely needs git, **degraded to UNSET rather than lying**. The entrypoint now guards the `continuity.mjs` import by **argument** (`--refresh`), not merely by the direct-execution guard, so a render never loads a module that can shell out.
+
+### The one place the render still touches the map, declared rather than buried
+
+The render performs **one `statSync`** on the map path the cache itself recorded, and renders UNSET (`reason: cache-stale-map-changed`) if the map has moved. **Metadata, not content: no git, no resolution, no parse, O(1).** It can only **withdraw** a recommendation, never invent one.
+
+**Why I added it rather than shipping without it:** a cache refreshed "only when an event changes the answer" is only as good as whatever notices the event. If nothing notices, the footer keeps recommending for a phase that closed — **exactly the banked-literal-as-live-advice defect** the constitution names, and the reason `nextModelFor` was deleted. **If Larry reads C-2 as forbidding even a stat, `statFn: () => null` disables it and the cache becomes trust-only.** I would rather be told to remove this than ship that defect silently.
+
+### N-4 — implemented OPT-IN, and the default contract is untouched
+
+`--if-changed` prints nothing when the line is identical to the last one, and exits with a **distinct code (3)**. It does **not** go silent ambiguously: B6 treats "no valid footer" as ALLOW, so a renderer that silently printed nothing would be indistinguishable from a governor that had stopped governing. Without the flag, every invocation still prints exactly one parseable line and exits 0. Warwick's trailing clause — *"unless he explicitly wants the deterministic status line on every reply"* — is **his open choice**, and this makes both available without a further code change rather than deciding it for him.
+
+## 8.3 C-3 — the negative claim, TESTED. Neither branch is asserted, and here is why
+
+Root `CLAUDE.md` states: *"No hook can render this footer, and none ever will… `MessageDisplay` is display-only and CLI-only, so it reaches nothing on web or Android."*
+
+### What execution ESTABLISHED — the mechanism exists, so the claim is too strong as written
+
+Read-only inspection of the installed host binary (`C:\Users\Buggly\.local\bin\claude.exe`, version **2.1.222**, 279 MB):
+
+| Hook event string | Occurrences |
+|---|---|
+| `additionalContext` | 186 |
+| `PostToolUse` / `PreToolUse` | 185 / 133 |
+| `hookSpecificOutput` | 124 |
+| `SubagentStop` / `UserPromptSubmit` | 73 / 71 |
+| `systemMessage` | 63 |
+| `SessionEnd` / `PreCompact` | 45 / 45 |
+| **`MessageDisplay`** | **38** |
+
+Strings recovered from the same binary, verbatim:
+
+- `Text displayed in place of the delta. Omit (or return the delta unchanged) to display the original.`
+- `MessageDisplay hook failed for completed message; emitting original text:`
+- `MessageDisplay hook flush … failed; displaying original delta:`
+- `UUID of the assistant message being displayed. Stable across every flush of the same message. Not the API msg_ id.`
+- a dispatch branch: `case "MessageDisplay": u.displayContent = e.hookSpecificOutput.displayContent; break`
+- a handler shape: `wth({getAppState, onStreamingDisplay, onMessageDisplay})`, and a call path tagged `"sdk"`
+
+**So a hook CAN replace the displayed text of an assistant message, including a COMPLETED one.** The `CLAUDE.md` sentence *"No hook can render this footer, and none ever will"* is **falsified as to mechanism**. That much is established by execution, not inherited.
+
+### What execution did NOT establish, and could not under this order's authorities
+
+**Whether that display transformation reaches Warwick's web/Android client.** Deciding it requires **both**:
+
+1. **Installing a hook** in `C:\Users\Buggly\.claude\settings.json` — machine-level configuration. That is `live_authority` I do not have (`none`), it is **Mack's declared seam (WP-3E)**, and `.claude/**` is categorically prohibited to me by critical rule 5.
+2. **Observing Warwick's own web/Android client** while it runs — his device, not mine.
+
+**I therefore assert neither branch, as instructed.** What is relevant and established: this machine currently runs `SessionStart -> reorient.mjs` and `Stop -> continuity.mjs stop`, the statusline is `node C:/Users/Buggly/.mypka/governor/statusline-live.mjs`, and **`remoteControlAtStartup: true`** — which is precisely why Warwick sees this machine's sessions on web/Android, and precisely why the question cannot be answered from this side alone.
+
+**The experiment that would settle it, in one run:** register a `MessageDisplay` hook whose command appends a fixed marker to `displayContent`, send one message, and look at the web/Android client. If the marker appears, **N-1 and N-2 are met absolutely and the pasted footer disappears**. If it does not, the floor below stands. **Owner: Mack, under WP-3E, with Warwick observing the client.** It costs one message and no model tokens beyond that message.
+
+### The floor, measured — per C-3's second branch, which is owed either way
+
+```
+wall clock, one render      : 76 ms
+invocation bytes            : 77
+stdout bytes                : 85
+total bytes in Larry context: 162
+new model contexts started  : 0
+```
+
+**Why it is not zero, stated exactly.** The render itself costs **zero LLM tokens** — it is a node process; no model is invoked, and the recommendation comes from a cache, so N-1 and N-3 are met on this route. The residual is **not** the footer: it is the **tool call**, which occupies ~162 bytes of Larry's *already-running* context. **No new model context is started, no contract is loaded, nothing is interpreted.** That residual cannot reach zero while a model is the thing deciding to ask — which is exactly why the hook question above is worth settling: only the hook route removes the **asking**, not merely the answering.
+
+**Comparator, cited and not re-measured:** 79k, 79k, 39k tokens for three dispatched renders this session (Larry's record, Amendment 3 C-5). Critical rule 12 forbids me a subagent, so I did not and could not reproduce them.
+
+## 8.4 Acceptance under the replaced criteria
+
+| # | Criterion | Status |
+|---|---|---|
+| **N-1** | context number: zero LLM tokens | **met** — deterministic node render, proven working with git unreachable |
+| **N-2** | normal render: zero LLM tokens | **met on the render itself.** The residual is the tool call in Larry's existing context (162 bytes), not a new model context |
+| **N-3** | recommendation: no additional model invocation | **met** — cached; the render reads JSON and stats one path. Refresh runs on an event |
+| **N-4** | no footer when nothing meaningful changed | **mechanism delivered opt-in** (`--if-changed`, exit 3). Whether it is used on every reply is Warwick's open choice |
+
+**What no longer belongs to this Work Order:** the `CLAUDE.md` redline (Larry carries it; Warwick ratifies), the machine install (Mack, WP-3E), and the hook experiment above.
+
+## 8.5 Proofs at this head
+
+```
+$ node --test tools/governor/footer.test.mjs
+# tests 77 · # pass 77 · # fail 0
+
+$ node --test tools/governor/statusline-live.test.mjs
+# tests 34 · # pass 34 · # fail 0
+```
+
+Baseline was 65/65 on the footer suite and 34/34 on statusline-live. **12 tests added, none removed, none weakened.** Neighbouring suites re-run and unchanged: `sampler` 43/43, `health-store` 14/14, `evaluator` 34/34, `continuity-derive` 23/23.

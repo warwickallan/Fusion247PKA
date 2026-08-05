@@ -59,7 +59,7 @@
 // out of a transcript — reused rather than re-implemented, because a second copy of that
 // logic here is exactly the drift this module exists to refuse.
 
-import { readdirSync, existsSync, statSync } from 'node:fs';
+import { readdirSync, existsSync, statSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { evaluate, STATE } from './evaluator.mjs';
@@ -1348,6 +1348,153 @@ export function recommendNext({ mapPathFn = null, readFileFn = readFileSync, cwd
 }
 
 // ---------------------------------------------------------------------------
+// THE RECOMMENDATION IS CACHED — Warwick's Amendment 3, C-2
+// ---------------------------------------------------------------------------
+// "Then the renderer merely displays the cached recommendation. It does not reassess the
+// entire phase every time Larry speaks."
+//
+// A-4 confined map discovery to the on-demand path. C-2 tightens that: THE RENDER MUST
+// NOT RESOLVE OR READ THE MAP AT ALL. `resolveActiveMapPath` and `classifyFrontier` move
+// from the render path to a REFRESH path that runs rarely — on Warwick's five events:
+// the active frontier changes, the next Work Order changes, a phase boundary changes,
+// context crosses a threshold, or handback state changes.
+//
+// The render therefore reads one small JSON file and nothing else. No git. No 1,600-line
+// markdown parse. No model.
+//
+// ---------------------------------------------------------------------------
+// THE ONE PLACE THIS READS THE MAP, AND WHY I DID IT RATHER THAN SHIP THE DEFECT
+// ---------------------------------------------------------------------------
+// A cache refreshed "only when an event changes the answer" is only as good as the thing
+// that notices the event. If nothing notices, the cache keeps answering with yesterday's
+// frontier — which is EXACTLY "a banked literal presented as live advice", the defect
+// root CLAUDE.md names and the reason `nextModelFor` was deleted in the first place.
+//
+// So the render performs ONE `statSync` on the map path the cache itself recorded, and
+// renders UNSET if the map has changed since the refresh. That is metadata, not content:
+// no git, no resolution, no parse, O(1), and it cannot invent a recommendation — it can
+// only withdraw one. Reported rather than assumed: if Larry reads C-2 as forbidding even
+// this, `statFn: () => null` disables it and the cache becomes trust-only. I would rather
+// be told to remove this than ship a footer that confidently recommends for a phase that
+// closed an hour ago.
+export const RECOMMENDATION_SCHEMA_VERSION = 1;
+export const RECOMMENDATION_FILE = 'recommendation.json';
+
+/** The cache lives beside the health samples — the same store, not a second one. */
+export function recommendationPath({ cwd = process.cwd(), homeDir, envOverride, dirFor = healthStoreDir } = {}) {
+  const opts = { cwd };
+  if (homeDir !== undefined) opts.homeDir = homeDir;
+  if (envOverride !== undefined) opts.envOverride = envOverride;
+  return join(dirFor(opts), RECOMMENDATION_FILE);
+}
+
+/**
+ * refreshRecommendation({ mapPathFn, ... }) -> { ok, next, reason, path }
+ *
+ * The REFRESH path. Resolves the map, classifies the frontier, and writes the cache.
+ * Runs on an event, never on a render. Never throws.
+ */
+export function refreshRecommendation({
+  cwd = process.cwd(),
+  homeDir,
+  envOverride,
+  dirFor = healthStoreDir,
+  mapPathFn = null,
+  readFileFn = readFileSync,
+  statFn = statSync,
+  writeFn = writeFileSync,
+  mkdirFn = mkdirSync,
+  now = () => new Date().toISOString(),
+} = {}) {
+  const result = recommendNext({ mapPathFn, readFileFn, cwd });
+
+  // The map's identity AT REFRESH TIME, so a later render can tell whether the answer it
+  // is holding is still about the same document.
+  let mapMtimeMs = null;
+  let mapSize = null;
+  if (result.mapPath) {
+    try {
+      const st = statFn(result.mapPath);
+      mapMtimeMs = typeof st?.mtimeMs === 'number' ? st.mtimeMs : null;
+      mapSize = typeof st?.size === 'number' ? st.size : null;
+    } catch { /* recorded as null — the render then declines to trust the cache */ }
+  }
+
+  const record = {
+    schema_version: RECOMMENDATION_SCHEMA_VERSION,
+    refreshed_at: now(),
+    next: result.next,
+    reason: result.reason,
+    map_path: result.mapPath,
+    map_mtime_ms: mapMtimeMs,
+    map_size: mapSize,
+    headings: result.headings,
+  };
+
+  const path = recommendationPath({ cwd, homeDir, envOverride, dirFor });
+  try {
+    mkdirFn(join(path, '..'), { recursive: true });
+    writeFn(path, `${JSON.stringify(record, null, 2)}\n`, 'utf8');
+  } catch {
+    return { ok: false, next: result.next, reason: 'cache-unwritable', path };
+  }
+  return { ok: true, next: result.next, reason: result.reason, path };
+}
+
+/**
+ * readCachedRecommendation(...) -> { next, reason }
+ *
+ * The RENDER path. Reads one small JSON and, at most, stats one path. Never throws, and
+ * every failure is UNSET — the recommendation can be withdrawn here but never invented.
+ */
+export function readCachedRecommendation({
+  cwd = process.cwd(),
+  homeDir,
+  envOverride,
+  dirFor = healthStoreDir,
+  readFileFn = readFileSync,
+  statFn = statSync,
+} = {}) {
+  const unset = (reason) => ({ next: NEXT_UNSET, reason });
+
+  let raw;
+  try {
+    raw = readFileFn(recommendationPath({ cwd, homeDir, envOverride, dirFor }), 'utf8');
+  } catch {
+    return unset('no-cached-recommendation');
+  }
+
+  let record;
+  try {
+    record = JSON.parse(raw);
+  } catch {
+    return unset('cache-unparseable');
+  }
+  if (!record || record.schema_version !== RECOMMENDATION_SCHEMA_VERSION) {
+    return unset('cache-schema-unrecognised');
+  }
+  if (!NEXT_VALUES.includes(record.next)) return unset('cache-value-outside-grammar');
+  if (record.next === NEXT_UNSET) return unset(typeof record.reason === 'string' ? record.reason : 'cached-unset');
+
+  // Has the document the answer is ABOUT moved since the answer was computed? Metadata
+  // only — see the note above this block.
+  if (typeof statFn === 'function' && typeof record.map_path === 'string' && record.map_path.length > 0) {
+    let st = null;
+    try {
+      st = statFn(record.map_path);
+    } catch {
+      return unset('cache-map-unstattable');
+    }
+    if (st) {
+      if (record.map_mtime_ms !== null && st.mtimeMs !== record.map_mtime_ms) return unset('cache-stale-map-changed');
+      if (record.map_size !== null && st.size !== record.map_size) return unset('cache-stale-map-changed');
+    }
+  }
+
+  return { next: record.next, reason: 'cached' };
+}
+
+// ---------------------------------------------------------------------------
 // Impure: resolve which health sample to read (D-3's resolution order)
 // ---------------------------------------------------------------------------
 
@@ -1658,7 +1805,10 @@ export function computeFooterLine({
 // stay separate, and they stay separate now that `next:` comes from a flag rather than
 // from a file.
 
-export const CLI_EXIT = Object.freeze({ OK: 0, USAGE: 2 });
+// `UNCHANGED` is additive and opt-in (`--if-changed` only). Nothing that ran before this
+// Work Order can observe it: without the flag the entrypoint still only ever returns OK
+// or USAGE.
+export const CLI_EXIT = Object.freeze({ OK: 0, USAGE: 2, UNCHANGED: 3 });
 
 export const CLI_USAGE =
   'usage: node tools/governor/footer.mjs [--session <id>] [--next <Model>/<effort>|UNSET] ' +
@@ -1739,6 +1889,10 @@ export function parseCliArgs(argv = []) {
   // `next` is UNSET — `--next UNSET` is a caller stating it, and must not be overridden by
   // a computed recommendation.
   let nextSupplied = false;
+  // C-2 / N-4. Both are VALUELESS flags, so they are handled beside `--help` rather than
+  // in the value-taking grammar below.
+  let refresh = false;
+  let ifChanged = false;
 
   const FLAGS = ['--session', '--next', '--control'];
 
@@ -1748,6 +1902,8 @@ export function parseCliArgs(argv = []) {
     // it works in any position, and BEFORE the unrecognised-argument refusal so that the
     // one flag a lost reader will try is the one flag that answers them.
     if (arg === '--help' || arg === '-h') return { ok: true, help: true };
+    if (arg === '--refresh') { refresh = true; continue; }
+    if (arg === '--if-changed') { ifChanged = true; continue; }
     if (!FLAGS.includes(arg)) {
       return { ok: false, error: `unrecognised argument ${JSON.stringify(arg)}` };
     }
@@ -1783,7 +1939,7 @@ export function parseCliArgs(argv = []) {
     };
   }
 
-  return { ok: true, help: false, sessionId, next, control, nextSupplied };
+  return { ok: true, help: false, sessionId, next, control, nextSupplied, refresh, ifChanged };
 }
 
 /**
@@ -1833,15 +1989,31 @@ export function runCli(argv = [], {
   if (!args.ok) return usageFailure(args.error);
   if (args.help) return { exitCode: CLI_EXIT.OK, stdout: `${CLI_HELP}\n`, stderr: '' };
 
+  const storeOpts = { cwd, homeDir, envOverride, dirFor: dirFor ?? healthStoreDir };
+
+  // THE REFRESH PATH (C-2). Runs on one of Warwick's five events, never on a render.
+  // Prints a plain summary rather than a footer: this is a maintenance operation and
+  // emitting a `⟦GOV⟧` line here would put a footer into the transcript that nothing
+  // asked for — the exact staple N-4 exists to prevent.
+  if (args.refresh) {
+    const r = refreshRecommendation({ ...storeOpts, mapPathFn, readFileFn, statFn });
+    const summary = `footer: recommendation ${r.ok ? 'refreshed' : 'NOT WRITTEN'} — next: ${r.next} (${r.reason})\n`;
+    return { exitCode: CLI_EXIT.OK, stdout: summary, stderr: '' };
+  }
+
   // `--next` WINS OUTRIGHT when the caller stated one, including `--next UNSET`. The
-  // computed value only ever fills a silence, so no existing caller's behaviour moves.
+  // cached value only ever fills a silence, so no existing caller's behaviour moves.
+  //
+  // THE RENDER NEVER RESOLVES THE MAP (C-2). It reads the cache the refresh path wrote,
+  // and at most stats the one path that cache recorded. Zero model invocations, no git,
+  // no markdown parse.
   let nextValue = args.next;
-  if (!args.nextSupplied && mapPathFn) {
+  if (!args.nextSupplied) {
     try {
-      nextValue = recommendNext({ mapPathFn, readFileFn, cwd }).next;
+      nextValue = readCachedRecommendation({ ...storeOpts, readFileFn, statFn }).next;
     } catch {
-      // `recommendNext` promises not to throw; this entrypoint owes a line on its own
-      // account rather than borrowing that promise from a callee.
+      // The reader promises not to throw; this entrypoint owes a line on its own account
+      // rather than borrowing that promise from a callee.
       nextValue = NEXT_UNSET;
     }
     if (!NEXT_VALUES.includes(nextValue)) nextValue = NEXT_UNSET;
@@ -1885,7 +2057,49 @@ export function runCli(argv = [], {
     });
   }
 
+  // ---------------------------------------------------------------------------
+  // N-4 — "no footer when nothing meaningful changed". OPT-IN, and that matters.
+  // ---------------------------------------------------------------------------
+  // The default contract is unchanged: this entrypoint ALWAYS prints exactly one
+  // parseable line and exits 0. That is load-bearing and must not become conditional —
+  // B6 treats "no valid footer" as ALLOW, so a renderer that silently printed nothing
+  // would look identical to a governor that had stopped governing.
+  //
+  // `--if-changed` therefore does not go silent AMBIGUOUSLY. It prints nothing and exits
+  // with a DISTINCT code, so "nothing to say" can never be mistaken for "no footer was
+  // produced". Warwick's trailing clause — "unless he explicitly wants the deterministic
+  // status line on every reply" — is his open choice, and this makes both available
+  // without a further code change rather than deciding it for him.
+  if (args.ifChanged) {
+    const prev = readLastLine({ ...storeOpts, readFileFn });
+    if (prev === line) return { exitCode: CLI_EXIT.UNCHANGED, stdout: '', stderr: '' };
+    writeLastLine(line, { ...storeOpts, readFileFn });
+  }
+
   return { exitCode: CLI_EXIT.OK, stdout: `${line}\n`, stderr: '' };
+}
+
+// The `--if-changed` memory rides in the SAME cache file rather than a second store —
+// one file in the governor's existing directory, not a new store to reason about.
+function readLastLine({ readFileFn = readFileSync, ...opts } = {}) {
+  try {
+    const rec = JSON.parse(readFileFn(recommendationPath(opts), 'utf8'));
+    return typeof rec?.last_line === 'string' ? rec.last_line : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeLastLine(line, { readFileFn = readFileSync, ...opts } = {}) {
+  const path = recommendationPath(opts);
+  let rec = {};
+  try {
+    rec = JSON.parse(readFileFn(path, 'utf8')) ?? {};
+  } catch { /* a cache that does not exist yet is created holding only this */ }
+  try {
+    mkdirSync(join(path, '..'), { recursive: true });
+    writeFileSync(path, `${JSON.stringify({ schema_version: RECOMMENDATION_SCHEMA_VERSION, ...rec, last_line: line }, null, 2)}\n`, 'utf8');
+  } catch { /* never fatal: the line has already been produced */ }
 }
 
 // Run ONLY when executed directly — the entrypoint guard every other module in
@@ -1911,15 +2125,25 @@ export function runCli(argv = [], {
 // recommendation is simply not computed and `next:` renders UNSET. A footer is still
 // printed and the exit code is still 0.
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  let mapPathFn = null;
-  try {
-    const { resolveActiveMapPath } = await import('./continuity.mjs');
-    if (typeof resolveActiveMapPath === 'function') {
-      mapPathFn = ({ cwd }) => resolveActiveMapPath({ cwd });
-    }
-  } catch { /* no resolver -> next: UNSET, which is the honest answer */ }
+  const argv = process.argv.slice(2);
 
-  const { exitCode, stdout, stderr } = runCli(process.argv.slice(2), { mapPathFn });
+  // C-2 TIGHTENED THE A-4 RULE, AND THIS LINE IS WHERE IT BITES. The resolver is loaded
+  // ONLY for `--refresh`. A render — the common case, the one that must cost nothing —
+  // never imports `continuity.mjs`, never reaches a `git` invocation, and never opens the
+  // map. Guarding the import by ARGUMENT rather than only by entrypoint is what makes
+  // "the render must not resolve or read the map at all" true of the process and not
+  // merely of a code path nobody happened to call.
+  let mapPathFn = null;
+  if (argv.includes('--refresh')) {
+    try {
+      const { resolveActiveMapPath } = await import('./continuity.mjs');
+      if (typeof resolveActiveMapPath === 'function') {
+        mapPathFn = ({ cwd }) => resolveActiveMapPath({ cwd });
+      }
+    } catch { /* no resolver -> the refresh writes UNSET, which is the honest answer */ }
+  }
+
+  const { exitCode, stdout, stderr } = runCli(argv, { mapPathFn });
   if (stderr) process.stderr.write(stderr);
   if (stdout) process.stdout.write(stdout);
   process.exitCode = exitCode;

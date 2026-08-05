@@ -14,7 +14,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 // `readdirSync` / `copyFileSync` / `createHash` serve the WP-3B mutation harness at the
 // foot of this file, which copies the module set OUT of the repository before breaking it.
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync, readdirSync, copyFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync, readdirSync, copyFileSync, statSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
@@ -65,6 +65,9 @@ import {
   classifyFrontier,
   recommendNext,
   CLI_HELP,
+  readCachedRecommendation,
+  refreshRecommendation,
+  RECOMMENDATION_FILE,
 } from './footer.mjs';
 // WO-OR-08: the seam block at the foot of this file drives a REAL sampler output into
 // the ladder. Every other test here builds its inputs by hand, which is exactly how a
@@ -1420,11 +1423,17 @@ test('WP-7 AC2: the REAL entrypoint, spawned as a process, prints one line and e
 // ---------------------------------------------------------------------------
 
 test('WP-7 AC3: CONTINUE is the default, and every one of the seven codes is accepted', () => {
-  // WP-3B added `help` and `nextSupplied`. The assertion stays a deepEqual — an exact
-  // shape pin is what makes an accidentally-added field visible — so the two new members
-  // are stated here rather than the check being loosened to a subset comparison.
-  assert.deepEqual(parseCliArgs([]), { ok: true, help: false, sessionId: null, next: NEXT_UNSET, control: CONTROL_CONTINUE, nextSupplied: false });
-  assert.deepEqual(parseCliArgs(['--control', 'CONTINUE']), { ok: true, help: false, sessionId: null, next: NEXT_UNSET, control: 'CONTINUE', nextSupplied: false });
+  // WP-3B added `help`, `nextSupplied`, `refresh` and `ifChanged`. The assertion stays a
+  // deepEqual — an exact shape pin is what makes an accidentally-added field visible — so
+  // the new members are stated here rather than the check being loosened to a subset.
+  const BASE = {
+    ok: true, help: false, sessionId: null, next: NEXT_UNSET,
+    control: CONTROL_CONTINUE, nextSupplied: false, refresh: false, ifChanged: false,
+  };
+  assert.deepEqual(parseCliArgs([]), BASE);
+  assert.deepEqual(parseCliArgs(['--control', 'CONTINUE']), { ...BASE, control: 'CONTINUE' });
+  assert.deepEqual(parseCliArgs(['--refresh']), { ...BASE, refresh: true });
+  assert.deepEqual(parseCliArgs(['--if-changed']), { ...BASE, ifChanged: true });
 
   // `nextSupplied` is about the CALLER, not about the VALUE: `--next UNSET` is a caller
   // stating UNSET and must not be overwritten by a computed recommendation.
@@ -2882,38 +2891,134 @@ test('WP-3B(b): every way the recommendation can fail lands on UNSET — never a
   assert.ok(ok.headings.length > 0, 'the recommendation must be able to state its provenance');
 });
 
-test('WP-3B(b) / A-4: --next WINS, an importer gets UNSET, and only an injected resolver computes', () => {
+test('WP-3B(b) / C-2: the RENDER never resolves the map — it reads a cache, and --next still wins', () => {
   const store = storeWith('sess-b');
   try {
     const deps = { locationFn: stubLocation('C:/repo', 'main'), envOverride: store };
-    const mapPathFn = () => 'map.md';
-    const readFileFn = () => '# 3. PHASE 3\n## Frontier\nsubmit to Veritas for assurance';
+    const mapFile = join(store, 'map.md');
+    writeFileSync(mapFile, '# 3. PHASE 3\n## Frontier\nsubmit to Veritas for assurance');
+    const mapPathFn = () => mapFile;
 
-    // A-4: the statusline path — no resolver — keeps UNSET. This is the recorded
-    // limitation, asserted rather than merely described.
+    // 1. Before any refresh there is no cache, so the render is UNSET. Never a guess.
     assert.equal(parseFooter(runCli(['--session', 'sess-b'], deps).stdout).fields.next, NEXT_UNSET);
 
-    // With a resolver, the same invocation computes.
-    assert.equal(
-      parseFooter(runCli(['--session', 'sess-b'], { ...deps, mapPathFn, readFileFn }).stdout).fields.next,
-      'Opus/high'
-    );
+    // 2. The REFRESH path is the only thing that touches the map. It emits a plain
+    //    summary, NOT a footer: a maintenance command that printed a ⟦GOV⟧ line would put
+    //    a footer in the transcript that nobody asked for.
+    const refreshed = runCli(['--refresh'], { ...deps, mapPathFn });
+    assert.equal(refreshed.exitCode, CLI_EXIT.OK);
+    assert.ok(refreshed.stdout.includes('Opus/high'), `refresh must report what it cached — got ${refreshed.stdout}`);
+    assert.equal(parseFooter(refreshed.stdout).ok, false, 'the refresh output must NOT be a footer');
 
-    // An explicit --next always wins, including when it disagrees with the map...
+    // 3. Now the render answers from the cache — WITH NO RESOLVER INJECTED AT ALL. This
+    //    is the C-2 property: the render cannot resolve the map because it is never given
+    //    the means to, and it still produces the recommendation.
+    assert.equal(parseFooter(runCli(['--session', 'sess-b'], deps).stdout).fields.next, 'Opus/high');
+
+    // 4. A render must never open the map. Proven by making any read of it throw: the
+    //    cache read uses its own injected reader, so a poisoned map reader changes
+    //    nothing. (`readFileFn` is what the render would have to use to read the map.)
+    const poisoned = runCli(['--session', 'sess-b'], {
+      ...deps,
+      readFileFn: (p, enc) => {
+        if (String(p).endsWith('map.md')) throw new Error('the render opened the MAP');
+        return readFileSync(p, enc);
+      },
+    });
+    assert.equal(parseFooter(poisoned.stdout).fields.next, 'Opus/high', 'the render must answer without opening the map');
+
+    // 5. A stale cache WITHDRAWS the recommendation rather than presenting a banked
+    //    literal as live advice. The map changes; the cached answer is about a document
+    //    that no longer exists in that form.
+    writeFileSync(mapFile, '# 3. PHASE 3\n## Frontier\nall that remains is the merge decision');
     assert.equal(
-      parseFooter(runCli(['--session', 'sess-b', '--next', 'Haiku/low'], { ...deps, mapPathFn, readFileFn }).stdout).fields.next,
+      parseFooter(runCli(['--session', 'sess-b'], deps).stdout).fields.next,
+      NEXT_UNSET,
+      'a cache whose map has moved must render UNSET, never the old answer'
+    );
+    assert.equal(readCachedRecommendation({ cwd: process.cwd(), envOverride: store }).reason, 'cache-stale-map-changed');
+
+    // ...and refreshing re-grounds it on the new frontier.
+    runCli(['--refresh'], { ...deps, mapPathFn });
+    assert.equal(parseFooter(runCli(['--session', 'sess-b'], deps).stdout).fields.next, 'Sonnet/low');
+
+    // 6. An explicit --next always wins, including when it disagrees with the cache...
+    assert.equal(
+      parseFooter(runCli(['--session', 'sess-b', '--next', 'Haiku/low'], deps).stdout).fields.next,
       'Haiku/low'
     );
     // ...and including an explicit UNSET, which is a caller stating it, not a silence.
     assert.equal(
-      parseFooter(runCli(['--session', 'sess-b', '--next', 'UNSET'], { ...deps, mapPathFn, readFileFn }).stdout).fields.next,
+      parseFooter(runCli(['--session', 'sess-b', '--next', 'UNSET'], deps).stdout).fields.next,
       NEXT_UNSET
     );
+  } finally {
+    rmSync(store, { recursive: true, force: true });
+  }
+});
 
-    // A resolver whose answer is outside the grammar can never reach the renderer.
-    const rogue = runCli(['--session', 'sess-b'], { ...deps, mapPathFn, readFileFn: () => '# Frontier\nzzz' });
-    assert.equal(parseFooter(rogue.stdout).ok, true);
-    assert.equal(parseFooter(rogue.stdout).fields.next, NEXT_UNSET);
+test('WP-3B: every way the CACHE can be wrong renders UNSET — it can withdraw, never invent', () => {
+  const dir = tmp();
+  try {
+    const write = (o) => writeFileSync(join(dir, 'recommendation.json'), typeof o === 'string' ? o : JSON.stringify(o));
+    const read = () => readCachedRecommendation({ cwd: process.cwd(), envOverride: dir });
+
+    assert.equal(read().reason, 'no-cached-recommendation', 'no cache at all');
+    write('{ not json');
+    assert.equal(read().reason, 'cache-unparseable');
+    write({ schema_version: 99, next: 'Opus/high' });
+    assert.equal(read().reason, 'cache-schema-unrecognised');
+    write({ schema_version: 1, next: 'Gemini/ultra' });
+    assert.equal(read().reason, 'cache-value-outside-grammar', 'a value outside the grammar must never reach the renderer');
+    write({ schema_version: 1, next: 'UNSET', reason: 'frontier-unclassifiable' });
+    assert.equal(read().reason, 'frontier-unclassifiable', 'a cached UNSET keeps its own reason');
+    write({ schema_version: 1, next: 'Opus/high', map_path: join(dir, 'gone.md'), map_mtime_ms: 1 });
+    assert.equal(read().reason, 'cache-map-unstattable');
+
+    // The only shape that yields an answer.
+    const m = join(dir, 'present.md');
+    writeFileSync(m, 'x');
+    const st = statSync(m);
+    write({ schema_version: 1, next: 'Opus/high', map_path: m, map_mtime_ms: st.mtimeMs, map_size: st.size });
+    assert.deepEqual(read(), { next: 'Opus/high', reason: 'cached' });
+
+    for (const r of ['no-cached-recommendation', 'cache-unparseable', 'cache-schema-unrecognised', 'cache-value-outside-grammar', 'cache-map-unstattable']) {
+      assert.ok(typeof r === 'string' && r.length > 0);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('WP-3B / N-4: --if-changed is silent ONLY with a distinct exit code, and the default is untouched', () => {
+  const store = storeWith('sess-n4');
+  try {
+    const deps = { locationFn: stubLocation('C:/repo', 'main'), envOverride: store };
+
+    // The DEFAULT contract is unchanged and this is the load-bearing half: without the
+    // flag, every invocation still prints exactly one parseable line and exits 0.
+    for (let i = 0; i < 3; i += 1) {
+      const r = runCli(['--session', 'sess-n4'], deps);
+      assert.equal(r.exitCode, CLI_EXIT.OK);
+      assert.equal(parseFooter(r.stdout).ok, true, 'the default must never go silent');
+    }
+
+    // First --if-changed render says something.
+    const first = runCli(['--session', 'sess-n4', '--if-changed'], deps);
+    assert.equal(first.exitCode, CLI_EXIT.OK);
+    assert.equal(parseFooter(first.stdout).ok, true);
+
+    // Second, with nothing changed, is silent — but NOT ambiguously silent.
+    const second = runCli(['--session', 'sess-n4', '--if-changed'], deps);
+    assert.equal(second.stdout, '', 'nothing meaningful changed, so nothing is emitted');
+    assert.equal(second.exitCode, CLI_EXIT.UNCHANGED, 'silence must be DISTINGUISHABLE from "no footer produced"');
+    assert.notEqual(CLI_EXIT.UNCHANGED, CLI_EXIT.OK);
+    assert.notEqual(CLI_EXIT.UNCHANGED, CLI_EXIT.USAGE);
+
+    // A meaningful change speaks again.
+    const changed = runCli(['--session', 'sess-n4', '--if-changed', '--control', 'HANDBACK:merge-decision'], deps);
+    assert.equal(changed.exitCode, CLI_EXIT.OK);
+    assert.equal(parseFooter(changed.stdout).fields.control, 'HANDBACK:merge-decision');
   } finally {
     rmSync(store, { recursive: true, force: true });
   }
