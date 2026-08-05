@@ -37,8 +37,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 // reach child_process, so they cannot evidence how the child is launched).
 import { runMergeReview as realRunMergeReview } from '../supervisorCodex.mjs';
 import { gatherGitEvidence } from '../gitEvidence.mjs';
-import { openDb } from '../db.mjs';
-import { applySchema, applyWatcherSchema, applyCommentSchema, applyPostSchema } from '../apply.mjs';
+import { openDb, defaultDbPath } from '../db.mjs';
+import { applySchema, applyWatcherSchema, applyCommentSchema, applyPostSchema, applyMergeCheckSchema } from '../apply.mjs';
 import { seedPrompt } from '../seed.mjs';
 import { ingestTurn } from '../loop.mjs';
 import { detectMergeClass } from '../mergeClass.mjs';
@@ -59,6 +59,11 @@ import { checkFindingDispositions } from '../findings.mjs';
 import { openFinding, processTurn } from '../watcher.mjs';
 import { runSupervisor as fakeRunSupervisor, runMergeReview as fakeRunMergeReview } from './doubles/fakeReviewer.mjs';
 import { notify } from '../notify.mjs';
+// WP-2F — the merge-check path, now on the ONE canonical SQLite store. Both entrypoints: the
+// tower-loop one (runMergeCheck) and the tower/ one, whose store functions are exported so they
+// can be proven against a real store rather than only read.
+import { runMergeCheck } from '../mergeCheck.mjs';
+import { nextSeq as mcNextSeq, record as mcRecord, auditContext as mcAuditContext } from '../../tower/merge-check.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const LOOP_DIR = path.resolve(__dirname, '..');
@@ -225,6 +230,7 @@ async function main() {
   await applyWatcherSchema(pool);
   await applyCommentSchema(pool);   // WO-OR-22 comment seam
   await applyPostSchema(pool);      // WO-TW-02 verdict write-back
+  await applyMergeCheckSchema(pool); // WP-2F merge-check run/message
   await seedPrompt(pool);
 
   // Assert the truthful approval label came through (FIX 1a).
@@ -1650,6 +1656,272 @@ async function main() {
       fs.rmSync(probe, { recursive: true, force: true });
     }
   });
+
+  // ══════════════════════════════════════════════════════════════════════════════
+  // WP-2F — ONE CANONICAL STORE: the merge-check path on SQLite.
+  //
+  // WHAT IS AND IS NOT PROVEN END-TO-END, said plainly up front because the distinction is the
+  // point. runMergeCheck has EIGHT SQL statements. SEVEN are reachable with no Codex and no
+  // Telegram, through the fail-closed and evidence-unresolved branches, and M1–M3 drive them
+  // through the REAL function. The EIGHTH — `update ... set status=?, rounds=?, head_sha=?` —
+  // is only reached after a completed Codex round, which costs money and dings Warwick's phone.
+  // M4 executes that literal DIRECTLY against the store. M4 IS A DIRECT-STATEMENT TEST, NOT AN
+  // END-TO-END PROOF, and must never be cited as one.
+  // ══════════════════════════════════════════════════════════════════════════════
+
+  const MC_HEAD = 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678';   // full 40-char, as classifyMergeRun demands
+  const MC_HEAD2 = 'b1b2c3d4e5f60718293a4b5c6d7e8f9012345678';
+  // A directory that is NOT a git repository, so gatherGitEvidence fails CLOSED — the real
+  // offline route into the evidence-unresolved branch. No network, no `gh` auth, no Codex.
+  const NO_REPO_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'tower-not-a-repo-'));
+
+  await test('M1 — END TO END, fail-closed: an invalid build_ref writes a `blocked` run and its message to the SQLite store, and spends no Codex', async () => {
+    const out = await runMergeCheck({
+      pool, repo: 'warwickallan/Fusion247PKA', prNumber: 7001, headSha: MC_HEAD,
+      buildRef: 'nonsense', wpRef: 'WP-2F', larryClaim: 'should never be recorded',
+      telegramToken: null, telegramChat: null,
+    });
+    assert.equal(out.blocked, true);
+    assert.equal(out.status, 'blocked');
+
+    // The run is REAL and readable back out of the store — statements 1 and 2.
+    const run = (await pool.query(`select * from tower.merge_check_run where id = ?`, [out.runId])).rows[0];
+    assert.ok(run, 'the fail-closed run was persisted');
+    assert.equal(run.pr_number, 7001);
+    // The REJECTED ref is stored verbatim — that is the audit value of a fail-closed row: it says
+    // what was actually asked for. `UNCLASSIFIED` is the fallback only when no ref was supplied
+    // at all, asserted below so both halves of that `??` are covered.
+    assert.equal(run.build_ref, 'nonsense');
+    assert.equal(run.head_sha, MC_HEAD);
+    assert.equal(run.rounds, 0, 'no round was spent');
+    // created_at is a TIMESTAMP_COLUMN, so db.mjs must hand it back as a real Date, not a string.
+    assert.ok(run.created_at instanceof Date, 'created_at rehydrates to a Date');
+
+    const msgs = (await pool.query(`select * from tower.merge_check_message where run_id = ? order by seq`, [out.runId])).rows;
+    assert.equal(msgs.length, 1, 'exactly the rejection message — no larry claim was recorded');
+    assert.equal(msgs[0].sender, 'gpt_codex');
+    assert.equal(msgs[0].status, 'blocked');
+    assert.match(msgs[0].text, /REJECTED \(fail-closed\)/);
+
+    // The other half of `buildRef ?? 'UNCLASSIFIED'`: no ref supplied at all. It must never
+    // default to BUILD-014, which is the failure this fallback was added to prevent.
+    const noRef = await runMergeCheck({
+      pool, repo: 'warwickallan/Fusion247PKA', prNumber: 7001, headSha: MC_HEAD,
+      buildRef: null, wpRef: 'WP-2F', larryClaim: 'no build ref',
+      telegramToken: null, telegramChat: null,
+    });
+    assert.equal(noRef.blocked, true);
+    assert.equal((await pool.query(`select build_ref from tower.merge_check_run where id = ?`, [noRef.runId])).rows[0].build_ref,
+      'UNCLASSIFIED');
+  });
+
+  await test('M2 — END TO END, evidence unresolved: the run OPENS, records Larry, then closes `blocked` with rounds=1 — six of the eight statements on the real path', async () => {
+    const out = await runMergeCheck({
+      pool, repo: 'warwickallan/Fusion247PKA', prNumber: 7002, headSha: MC_HEAD,
+      buildRef: 'BUILD-020', wpRef: 'WP-2F', larryClaim: 'WP-2F is ready',
+      cwd: NO_REPO_DIR,                       // git evidence cannot resolve here → fail closed
+      telegramToken: null, telegramChat: null,
+    });
+    assert.equal(out.blocked, true);
+    assert.equal(out.rounds, 1);
+
+    const run = (await pool.query(`select * from tower.merge_check_run where id = ?`, [out.runId])).rows[0];
+    assert.equal(run.status, 'blocked', 'the UPDATE ran — and with `?` being positional, this is also the proof its params were reordered correctly');
+    assert.equal(run.rounds, 1, 'rounds landed in `rounds`, not in `id`');
+    assert.equal(run.build_ref, 'BUILD-020', 'the classified ref was stored');
+    assert.ok(run.updated_at instanceof Date);
+
+    const msgs = (await pool.query(`select * from tower.merge_check_message where run_id = ? order by seq`, [out.runId])).rows;
+    assert.equal(msgs.length, 2, 'Larry, then Codex');
+    assert.deepEqual(msgs.map((m) => m.sender), ['larry', 'gpt_codex']);
+    assert.deepEqual(msgs.map((m) => m.seq), [1, 2]);
+    assert.equal(msgs[0].text, 'WP-2F is ready');
+    assert.match(msgs[1].text, /git evidence unresolved/);
+  });
+
+  await test('M3 — RESUME: a run interrupted after Larry\'s message is resumed on the next attempt — one run, no duplicate claim — and a CLOSED run is never resumed', async () => {
+    // A crash between the larry message and the closing update is exactly what the resume SELECT
+    // exists for, so that is what is simulated: the real store, the real function, one statement
+    // made to fail. Everything else is untouched.
+    const crashingPool = {
+      ...pool,
+      async query(sql, params) {
+        if (/update tower\.merge_check_run set status='blocked'/.test(sql)) {
+          throw new Error('SIMULATED CRASH — the process died before the run was closed');
+        }
+        return pool.query(sql, params);
+      },
+    };
+    const args = {
+      repo: 'warwickallan/Fusion247PKA', prNumber: 7003, headSha: MC_HEAD2,
+      buildRef: 'BUILD-020', wpRef: 'WP-2F', larryClaim: 'resume me',
+      cwd: NO_REPO_DIR, telegramToken: null, telegramChat: null,
+    };
+    await assert.rejects(() => runMergeCheck({ pool: crashingPool, ...args }), /SIMULATED CRASH/);
+
+    const openRuns = (await pool.query(
+      `select * from tower.merge_check_run where pr_number = ? and head_sha = ? and status = 'open'`, [7003, MC_HEAD2])).rows;
+    assert.equal(openRuns.length, 1, 'the interrupted run is still open — which is what makes resume necessary');
+    const firstRunId = openRuns[0].id;
+
+    // Second attempt, real pool: it must RESUME that run, not open a rival one.
+    const out = await runMergeCheck({ pool, ...args });
+    assert.equal(out.runId, firstRunId, 'the open run was resumed');
+    const allRuns = (await pool.query(`select id from tower.merge_check_run where pr_number = ?`, [7003])).rows;
+    assert.equal(allRuns.length, 1, 'and no second run was created');
+    const msgs = (await pool.query(`select sender, seq from tower.merge_check_message where run_id = ? order by seq`, [firstRunId])).rows;
+    // The crash landed AFTER both of the first attempt's messages (larry seq 1, the blocked
+    // gpt_codex verdict seq 2) and before the closing UPDATE. So the resumed attempt continues at
+    // seq 3 and does NOT re-record Larry — which is the whole point of the `haveLarry` check.
+    assert.equal(msgs.filter((m) => m.sender === 'larry').length, 1, 'Larry\'s claim is recorded ONCE across both attempts');
+    assert.deepEqual(msgs.map((m) => m.seq), [1, 2, 3], 'seq continued from the prior message rather than restarting at 1');
+    assert.deepEqual(msgs.map((m) => m.sender), ['larry', 'gpt_codex', 'gpt_codex']);
+
+    // THE OTHER SIDE, so this is not a one-sided assertion: the run is now `blocked`, and a third
+    // attempt must NOT resume it. A resume SELECT that ignored `status` would pass the check
+    // above and fail here.
+    const out3 = await runMergeCheck({ pool, ...args });
+    assert.notEqual(out3.runId, firstRunId, 'a CLOSED run is never resumed');
+    assert.equal((await pool.query(`select id from tower.merge_check_run where pr_number = ?`, [7003])).rows.length, 2);
+  });
+
+  await test('M4 — DIRECT-STATEMENT TEST (not an end-to-end proof): the post-Codex UPDATE literal, with a CONTROL proving the old param order fails', async () => {
+    // This statement is only reached after a COMPLETED Codex round — real spend and a real
+    // Telegram message to Warwick, neither of which is authorised here. So the literal is executed
+    // directly against the throwaway store. It proves the STATEMENT is correct SQLite and that its
+    // parameters are in the right positions. It does NOT prove the end-to-end merge-check.
+    const runId = (await pool.query(
+      `insert into tower.merge_check_run (pr_number, build_ref, wp_ref, head_sha, status, rounds)
+       values (?,?,?,?,'open',0) returning id`, [7004, 'BUILD-020', 'WP-2F', MC_HEAD])).rows[0].id;
+
+    const upd = await pool.query(
+      `update tower.merge_check_run set status=?, rounds=?, head_sha=?, updated_at=now() where id=?`,
+      ['ready', 2, MC_HEAD2, runId]);
+    assert.equal(upd.rowCount, 1, 'exactly one row matched');
+
+    const row = (await pool.query(`select * from tower.merge_check_run where id = ?`, [runId])).rows[0];
+    assert.equal(row.status, 'ready');
+    assert.equal(row.rounds, 2);
+    assert.equal(row.head_sha, MC_HEAD2);
+    assert.equal(row.pr_number, 7004, 'nothing else moved');
+    assert.ok(row.updated_at instanceof Date, 'now() produced a value db.mjs rehydrates as a Date');
+
+    // THE CONTROL — the pre-WP-2F param array against the `?` form. `$1` was LAST in the SQL and
+    // FIRST in the array, so a blind `$N`→`?` replace would have bound the RUN ID into `status`
+    // and the STATUS STRING into `id`: zero rows matched, silently, and the run would sit `open`
+    // for ever. If this control ever stops failing, the assertion above proves nothing.
+    const wrong = await pool.query(
+      `update tower.merge_check_run set status=?, rounds=?, head_sha=?, updated_at=now() where id=?`,
+      [runId, 'ready', 3, MC_HEAD]);
+    assert.equal(wrong.rowCount, 0, 'the old parameter order matches NOTHING — the test can see the defect it exists to catch');
+    assert.equal((await pool.query(`select status from tower.merge_check_run where id = ?`, [runId])).rows[0].status, 'ready',
+      'and it changed nothing');
+  });
+
+  await test('M5 — the canonical store path: defaultDbPath() resolves to ~/.mypka/tower/tower.db with TOWER_SQLITE_PATH unset, and nothing writes there', async () => {
+    const saved = process.env.TOWER_SQLITE_PATH;
+    const canonical = path.join(os.homedir(), '.mypka', 'tower', 'tower.db');
+    const existedBefore = fs.existsSync(canonical);
+    try {
+      delete process.env.TOWER_SQLITE_PATH;
+      assert.equal(defaultDbPath(), canonical,
+        'the merge-check path, unconfigured, reaches the SAME file the live watcher uses');
+      // Two-sided: an explicit override is honoured, which is what keeps every test off that file.
+      process.env.TOWER_SQLITE_PATH = path.join(TMP_DIR, 'override.db');
+      assert.equal(defaultDbPath(), path.join(TMP_DIR, 'override.db'));
+    } finally {
+      if (saved === undefined) delete process.env.TOWER_SQLITE_PATH; else process.env.TOWER_SQLITE_PATH = saved;
+    }
+    // Resolving the path must never CREATE it. This suite has live_authority: none over that file.
+    assert.equal(fs.existsSync(canonical), existedBefore,
+      'asserting the canonical path neither created nor removed the live store');
+  });
+
+  await test('M6 — ZERO POSTGRES on the merge-check path, INSTRUMENTED: the real module graph is enumerated and a pg trap is proven to bite', async () => {
+    // A source grep answers "is the string in this file". This answers "what did the process
+    // actually load", which is the only form that survives a transitive import appearing later.
+    // SCOPE: the two merge-check entrypoints. tower-loop/accept.mjs is EXCLUDED — it is
+    // Postgres-only, has zero code callers, and WP-2F deliberately leaves it untouched.
+    const probe = path.join(__dirname, 'doubles', 'pg-probe.mjs');
+    const graphOut = path.join(TMP_DIR, 'pg-graph.txt');
+    const runProbe = (mode) => new Promise((resolve) => {
+      const c = spawn(process.execPath, [probe, mode], {
+        cwd: LOOP_DIR, env: { ...process.env, PG_OUT: mode === 'merge-check' ? graphOut : '' },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      let out = ''; let err = '';
+      c.stdout.on('data', (d) => { out += d; });
+      c.stderr.on('data', (d) => { err += d; });
+      c.on('exit', (code) => resolve({ code, out, err }));
+    });
+
+    // 1. THE CONTROL FIRST. If the trap does not bite, the clean result below means nothing.
+    const control = await runProbe('control-trap');
+    assert.equal(control.code, 0, `the pg trap must fire on a deliberate import (got: ${control.out}${control.err.slice(0, 200)})`);
+    assert.match(control.out, /TRAP_FIRED: ZERO-POSTGRES TRAP/);
+
+    // 2. The real path, under the same instrument.
+    const real = await runProbe('merge-check');
+    assert.equal(real.code, 0, `the merge-check probe must complete (stderr: ${real.err.slice(0, 400)})`);
+    const res = JSON.parse(real.out.trim().split(/\r?\n/).pop());
+    assert.equal(res.blocked, true, 'it really executed the fail-closed path against a real store');
+    assert.equal(res.runs, 1);
+    assert.equal(res.msgs, 1);
+
+    // 3. The recording must be non-empty AND contain modules we KNOW were loaded, so an empty
+    //    file can never pass as a clean one.
+    const graph = fs.readFileSync(graphOut, 'utf8').split(/\r?\n/).filter(Boolean);
+    assert.ok(graph.length > 10, `the module graph recorded something (got ${graph.length} entries)`);
+    for (const known of ['tower-loop/mergeCheck.mjs', 'tower/merge-check.mjs', 'tower-loop/db.mjs']) {
+      assert.ok(graph.some((u) => u.replace(/\\/g, '/').endsWith(known)),
+        `the recorder saw ${known} — so it was actually watching`);
+    }
+
+    // 4. And no pg. This is the acceptance property's negative half.
+    const pgLoads = graph.filter((u) => /[/\\]node_modules[/\\]pg[/\\]/.test(u));
+    assert.deepEqual(pgLoads, [], `the merge-check path loaded the pg driver: ${pgLoads.join(', ')}`);
+
+    // 5. The absolute-path import is gone. This one IS a source assertion and is stated as such:
+    //    it is a check on the TEXT of one file, not on runtime behaviour.
+    const towerSrc = fs.readFileSync(path.resolve(LOOP_DIR, '..', 'tower', 'merge-check.mjs'), 'utf8');
+    const body = towerSrc.split(/\r?\n/).filter((l) => !l.trim().startsWith('//')).join('\n');
+    assert.ok(!/file:\/\/\/C:\/Fusion247PKA\/services/.test(body),
+      'no absolute path into one worktree survives in executable code');
+    assert.ok(!/create schema/i.test(body), 'the Postgres-only `create schema` is gone');
+    assert.ok(!/\bleft\s*\(/.test(body), 'the Postgres-only left() is gone');
+  });
+
+  await test('M7 — tower/merge-check.mjs speaks SQLite: record/nextSeq write the exchange, and substr() replaced left() — with a CONTROL proving left() still fails', async () => {
+    const runId = (await pool.query(
+      `insert into tower.merge_check_run (pr_number, build_ref, wp_ref, head_sha, status, rounds)
+       values (?,?,?,?,'open',0) returning id`, [7005, 'BUILD-020', 'WP-2F', MC_HEAD])).rows[0].id;
+
+    // The real exported functions, against the real store.
+    assert.equal(await mcNextSeq(pool, runId), 1, 'an empty run starts at seq 1');
+    assert.equal(await mcRecord(pool, runId, 'larry', 1, null, 'ready to merge', MC_HEAD), 1);
+    assert.equal(await mcRecord(pool, runId, 'gpt_codex', 1, 'FIX_REQUIRED', 'not yet', MC_HEAD), 2);
+    assert.equal(await mcNextSeq(pool, runId), 3, 'coalesce(max(seq),0)+1 advanced');
+
+    const msgs = (await pool.query(`select sender, seq, status, text from tower.merge_check_message where run_id = ? order by seq`, [runId])).rows;
+    assert.deepEqual(msgs.map((m) => `${m.seq}:${m.sender}:${m.status ?? '-'}`), ['1:larry:-', '2:gpt_codex:FIX_REQUIRED']);
+    assert.equal(msgs[1].text, 'not yet', 'the column literally named `text` round-trips');
+
+    // auditContext swallows its own errors by design, so a broken statement would return '' —
+    // silently. Assert it returned CONTENT, which only a working statement can produce. By this
+    // point in the suite tower.turn has real rows.
+    const audit = await mcAuditContext(pool);
+    assert.ok(audit.length > 0, 'substr() executed and the audit context came back non-empty');
+    assert.match(audit, /^#\d+: /, 'and it is the expected shape');
+
+    // THE CONTROL: the Postgres-only spelling must still fail here, or the assertion above would
+    // have passed no matter which function the code used.
+    await assert.rejects(
+      () => pool.query(`select seq, left(instruction,140) instr from tower.turn order by seq desc limit 5`),
+      /no such function: left/i,
+      'left() is genuinely unavailable — so substr() working is a real difference');
+  });
+
+  try { fs.rmSync(NO_REPO_DIR, { recursive: true, force: true }); } catch { /* best effort */ }
 
   await pool.end();
   // The throwaway store has served its purpose; leave nothing behind.

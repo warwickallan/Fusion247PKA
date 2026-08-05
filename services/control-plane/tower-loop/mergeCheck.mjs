@@ -14,13 +14,21 @@
 //   node mergeCheck.mjs --pr 58 --repo warwickallan/Fusion247PKA \
 //     --head <sha> --base <sha> --build BUILD-014 --wp tower-recovery
 //
+// WP-2F — THE STORE IS THE ONE CANONICAL SQLite FILE, not Postgres. `pool` is still the name of
+// the handle parameter and still takes `await pool.query(sql, params) -> { rows, rowCount }`, but
+// it is now db.mjs's façade over ~/.mypka/tower/tower.db (TOWER_SQLITE_PATH). Every SQL literal
+// below was rewritten by hand from `$N` to `?`, which is a POSITIONAL change, not a textual one:
+// `$1` may legally appear after `$2` and did (the two `update ... where id=$1` statements), so
+// the params array had to be reordered to match. A blind `$N`→`?` replace would have silently
+// written the round number into the id column.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import pg from 'pg';
 import { classifyMergeRun } from './classifyBuild.mjs';
 import { gatherGitEvidence } from './gitEvidence.mjs';
 import { runMergeReview } from './supervisorCodex.mjs';
+import { openDb } from './db.mjs';
+import { applyMergeCheckSchema } from './apply.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_REPO_ROOT = process.env.TOWER_EVIDENCE_REPO_DIR || path.resolve(__dirname, '../../..');
@@ -59,11 +67,11 @@ export async function runMergeCheck({
     // Record the rejection durably so the fail-closed decision is auditable; spend no Codex.
     const run = (await pool.query(
       `insert into tower.merge_check_run (pr_number, build_ref, wp_ref, head_sha, status, rounds)
-       values ($1,$2,$3,$4,'blocked',0) returning id`,
+       values (?,?,?,?,'blocked',0) returning id`,
       [prNumber ?? null, (buildRef ?? 'UNCLASSIFIED'), wpRef, (headSha ?? null)])).rows[0];
     await pool.query(
       `insert into tower.merge_check_message (run_id, seq, sender, round, status, text, head_sha)
-       values ($1,1,'gpt_codex',0,'blocked',$2,$3)`,
+       values (?,1,'gpt_codex',0,'blocked',?,?)`,
       [run.id, `merge-check REJECTED (fail-closed) — ${e.message}`, headSha ?? null]);
     const s = await sendTowerBot(telegramToken, telegramChat,
       `🗼 Merge-check REJECTED (fail-closed): ${e.message}`);
@@ -72,20 +80,20 @@ export async function runMergeCheck({
 
   // ── durable run at the exact head (RESUME an open run for this exact (pr, head), else create). ──
   const existing = (await pool.query(
-    `select id from tower.merge_check_run where pr_number=$1 and head_sha=$2 and status='open' order by created_at limit 1`,
+    `select id from tower.merge_check_run where pr_number=? and head_sha=? and status='open' order by created_at limit 1`,
     [prNumber, headSha])).rows[0];
   let runId;
   if (existing) runId = existing.id;
   else runId = (await pool.query(
     `insert into tower.merge_check_run (pr_number, build_ref, wp_ref, head_sha, status, rounds)
-     values ($1,$2,$3,$4,'open',0) returning id`,
+     values (?,?,?,?,'open',0) returning id`,
     [prNumber, classified.build_ref, wpRef, headSha])).rows[0].id;
 
-  const prior = (await pool.query(`select seq, sender from tower.merge_check_message where run_id=$1 order by seq`, [runId])).rows;
+  const prior = (await pool.query(`select seq, sender from tower.merge_check_message where run_id=? order by seq`, [runId])).rows;
   let seq = prior.length ? Math.max(...prior.map((m) => m.seq)) : 0;
   const haveLarry = prior.some((m) => m.sender === 'larry');
   const addMsg = (sender, round, status, text) => pool.query(
-    `insert into tower.merge_check_message (run_id, seq, sender, round, status, text, head_sha) values ($1,$2,$3,$4,$5,$6,$7)`,
+    `insert into tower.merge_check_message (run_id, seq, sender, round, status, text, head_sha) values (?,?,?,?,?,?,?)`,
     [runId, ++seq, sender, round, status, text, headSha]);
 
   const round = 1; // bounded; a single genuine Larry→Codex exchange (<= maxRounds).
@@ -96,7 +104,9 @@ export async function runMergeCheck({
   const ev = await gatherGitEvidence({ cwd, repo, baseSha, headSha, prNumber });
   if (!ev.resolved) {
     await addMsg('gpt_codex', round, 'blocked', `git evidence unresolved — ${ev.blocker}`);
-    await pool.query(`update tower.merge_check_run set status='blocked', rounds=$2, updated_at=now() where id=$1`, [runId, round]);
+    // `?` is POSITIONAL — the Postgres original wrote `rounds=$2 ... where id=$1`, i.e. the
+    // params were NOT in placeholder order. Both the SQL and the array are reordered together.
+    await pool.query(`update tower.merge_check_run set status='blocked', rounds=?, updated_at=now() where id=?`, [round, runId]);
     const s = await sendTowerBot(telegramToken, telegramChat, `🗼 Merge-check PR #${prNumber} @ ${String(headSha).slice(0, 10)} — BLOCKED (evidence: ${ev.blocker})`);
     return { runId, status: 'blocked', verdict: 'blocked', rounds: round, blocked: true, telegram: s };
   }
@@ -123,7 +133,9 @@ export async function runMergeCheck({
     : verdict === 'approve' ? 'ready'
     : verdict === 'request_changes' ? 'changes_requested'
     : verdict === 'comment' ? 'commented' : verdict;
-  await pool.query(`update tower.merge_check_run set status=$2, rounds=$3, head_sha=$4, updated_at=now() where id=$1`, [runId, status, round, headSha]);
+  // Same positional reordering as the blocked branch above: `$1` was LAST in the SQL and FIRST
+  // in the array.
+  await pool.query(`update tower.merge_check_run set status=?, rounds=?, head_sha=?, updated_at=now() where id=?`, [status, round, headSha, runId]);
 
   // ── REAL TowerBot delivery (Larry's side, then Codex's verdict — ordered). ──
   const s1 = await sendTowerBot(telegramToken, telegramChat, `🗼 Merge-check PR #${prNumber} @ ${String(headSha).slice(0, 10)} (round ${round}/${maxRounds})\nLARRY: ${String(larryClaim).slice(0, 600)}`);
@@ -137,12 +149,15 @@ function getEnvVal(file, key) { try { const l = fs.readFileSync(file, 'utf8').sp
 
 if (import.meta.url === `file://${process.argv[1]}` || process.argv[1] === fileURLToPath(import.meta.url)) {
   (async () => {
-    const dbUrl = process.env.CONTROL_PLANE_DEV_DATABASE_URL
-      || getEnvVal('C:/.fusion247/control-plane-dev.env', 'CONTROL_PLANE_DEV_DATABASE_URL');
+    // WP-2F — the store is the one canonical SQLite file. There is no connection string to
+    // supply and no CONTROL_PLANE_DEV_DATABASE_URL to read: the Supabase `tower` schema is
+    // read-only history from here on. The TowerBot credentials are still read at CLI runtime
+    // (they are Telegram config, not a store), unchanged.
     const token = process.env.TELEGRAM_BOT_TOKEN || getEnvVal('C:/.fusion247/tower-baton.env', 'TELEGRAM_BOT_TOKEN');
     const chat = process.env.AUTHORISED_TELEGRAM_USER_ID || getEnvVal('C:/.fusion247/tower-baton.env', 'AUTHORISED_TELEGRAM_USER_ID');
-    if (!dbUrl) throw new Error('CONTROL_PLANE_DEV_DATABASE_URL not set');
-    const pool = new pg.Pool({ connectionString: dbUrl, ssl: { rejectUnauthorized: false } });
+    const pool = openDb();
+    await applyMergeCheckSchema(pool);
+    console.error(`[mergeCheck] store: ${pool.path}`);
     try {
       const out = await runMergeCheck({
         pool,

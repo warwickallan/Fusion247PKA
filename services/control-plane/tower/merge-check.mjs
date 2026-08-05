@@ -1,23 +1,42 @@
 // BUILD-014 — Tower "Codex QA" merge gate (the ONE bounded tool).
 //
 // Larry runs this when he believes something is ready to merge. It assembles a bounded merge
-// packet, has Codex (read-only) review it, records the Larry<->Codex exchange to Supabase in real
-// time, mirrors both messages to TowerBot, and RETURNS Codex's natural-language reply as this
-// command's stdout — so it lands in Larry's current Claude turn (a pull, not an injection).
+// packet, has Codex (read-only) review it, records the Larry<->Codex exchange to the canonical
+// Tower store in real time, mirrors both messages to TowerBot, and RETURNS Codex's
+// natural-language reply as this command's stdout — so it lands in Larry's current Claude turn
+// (a pull, not an injection).
 //
-//   node --env-file=C:/.fusion247/control-plane-dev.env --env-file=C:/.fusion247/tower-baton.env \
+//   node --env-file=C:/.fusion247/tower-baton.env \
 //        services/control-plane/tower/merge-check.mjs --pr <N> --claim "<Larry's completion claim>" \
 //        [--build BUILD-014] [--wp WP-D] [--acceptance "<criteria or path>"]
 //
+// The store needs no --env-file (WP-2F). Only the TowerBot mirror still reads one.
+//
 // Rules: max 3 rounds per PR then escalate (NEEDS_WARWICK); Codex never merges (read-only sandbox);
-// a non-READY status means DO NOT MERGE. Each message is its own Supabase row (own seq, shared run).
+// a non-READY status means DO NOT MERGE. Each message is its own row (own seq, shared run).
+//
+// WP-2F — THE STORE IS THE ONE CANONICAL SQLite FILE (~/.mypka/tower/tower.db, TOWER_SQLITE_PATH),
+// the same store the supervisor loop uses. Three things changed here and each was a real defect:
+//   1. `import pg from 'file:///C:/Fusion247PKA/services/control-plane/node_modules/pg/lib/index.js'`
+//      — an ABSOLUTE PATH INTO ONE WORKTREE. This file could only ever run from that checkout.
+//      Gone; the store handle comes from tower-loop/db.mjs by relative import.
+//   2. `ensureSchema()` held the ONLY definition of merge_check_run/merge_check_message, inline
+//      and in Postgres dialect, `create schema` and all. It now lives in
+//      tower-loop/db/merge_check_schema.sql behind applyMergeCheckSchema() — one definition, the
+//      same applier pattern as every other table in the subsystem.
+//   3. Every SQL literal was rewritten `$N` → `?`, which is POSITIONAL: two `update ... where
+//      id=$1` statements had `$1` LAST in the text and FIRST in the array, so their params were
+//      reordered with them. A blind textual replace would have written the round number into
+//      the id column and updated nothing, silently.
+// `left(x, n)` is Postgres-only and became `substr(x, 1, n)`, which both dialects have.
 import { spawn as nodeSpawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import pg from 'file:///C:/Fusion247PKA/services/control-plane/node_modules/pg/lib/index.js';
 import { resolveCodexBin, sanitizeCodexEnv } from '../review/codexAdapter.mjs';
+import { openDb } from '../tower-loop/db.mjs';
+import { applyMergeCheckSchema } from '../tower-loop/apply.mjs';
 
 const REPO = 'C:/Fusion247PKA';
 const MAX_ROUNDS = 3;
@@ -53,29 +72,16 @@ async function mirror(sender, text) {
   } catch { /* visibility only — never block the gate */ }
 }
 
-// ---------- Supabase (control-plane DEV) ----------
-async function ensureSchema(c) {
-  await c.query(`create schema if not exists tower`);
-  await c.query(`create table if not exists tower.merge_check_run (
-    id uuid primary key default gen_random_uuid(),
-    pr_number int, build_ref text, wp_ref text, head_sha text,
-    status text not null default 'open',
-    rounds int not null default 0,
-    created_at timestamptz not null default now(), updated_at timestamptz not null default now())`);
-  await c.query(`create table if not exists tower.merge_check_message (
-    id uuid primary key default gen_random_uuid(),
-    run_id uuid not null references tower.merge_check_run(id) on delete cascade,
-    seq int not null, sender text not null check (sender in ('larry','gpt_codex')),
-    round int not null, status text, text text not null, head_sha text,
-    created_at timestamptz not null default now(), unique (run_id, seq))`);
-}
-async function nextSeq(c, runId) {
-  const r = await c.query(`select coalesce(max(seq),0)+1 as n from tower.merge_check_message where run_id=$1`, [runId]);
+// ---------- the canonical Tower store (SQLite) ----------
+// Exported so they can be proven against a real temp store rather than only by reading them —
+// same reason headGuard below is exported. Importing this module remains side-effect-free.
+export async function nextSeq(c, runId) {
+  const r = await c.query(`select coalesce(max(seq),0)+1 as n from tower.merge_check_message where run_id=?`, [runId]);
   return r.rows[0].n;
 }
-async function record(c, runId, sender, round, status, text, head) {
+export async function record(c, runId, sender, round, status, text, head) {
   const seq = await nextSeq(c, runId);
-  await c.query(`insert into tower.merge_check_message (run_id, seq, sender, round, status, text, head_sha) values ($1,$2,$3,$4,$5,$6,$7)`,
+  await c.query(`insert into tower.merge_check_message (run_id, seq, sender, round, status, text, head_sha) values (?,?,?,?,?,?,?)`,
     [runId, seq, sender, round, status, text, head]);
   return seq;
 }
@@ -188,9 +194,11 @@ function collectEvidence() {
   if (diff.length > 60000) diff = diff.slice(0, 60000) + '\n... [diff truncated at 60k]';
   return { head: guard.head ?? localHead, diff, prState, ci, guard };
 }
-async function auditContext(c) {
+// `left(x, n)` does not exist in SQLite. `substr(x, 1, n)` is the portable spelling and means
+// exactly the same thing here. Exported for the same reason as `record`.
+export async function auditContext(c) {
   try {
-    const r = await c.query(`select seq, left(instruction,140) instr, left(larry_response,180) resp from tower.turn order by seq desc limit 5`);
+    const r = await c.query(`select seq, substr(instruction,1,140) instr, substr(larry_response,1,180) resp from tower.turn order by seq desc limit 5`);
     return r.rows.map((x) => `#${x.seq}: ${x.instr} -> ${x.resp}`).join('\n');
   } catch { return ''; }
 }
@@ -198,11 +206,12 @@ async function auditContext(c) {
 // ---------- main ----------
 async function main() {
   if (!CLAIM) { console.error('merge-check: --claim "<your completion claim>" is required'); process.exit(2); }
-  const url = process.env.CONTROL_PLANE_DEV_DATABASE_URL;
-  if (!url) { console.error('merge-check: CONTROL_PLANE_DEV_DATABASE_URL not set (run with --env-file=control-plane-dev.env)'); process.exit(2); }
-  const c = new pg.Client({ connectionString: url, ssl: { rejectUnauthorized: false } });
-  await c.connect();
-  await ensureSchema(c);
+  // WP-2F — no connection string, no server, no --env-file for the store. The canonical SQLite
+  // file is opened and the merge-check delta applied (idempotent), exactly as the watcher does
+  // with its own five on boot.
+  const c = openDb();
+  await applyMergeCheckSchema(c);
+  console.error(`[merge-check] store: ${c.path}`);
 
   const ev = collectEvidence();
   // FAIL CLOSED on a head-provenance failure — do NOT run Codex or record a review bound to the
@@ -221,15 +230,16 @@ async function main() {
   if (PR) key = { col: 'pr_number', val: Number(PR) };
   else if (WP) key = { col: 'wp_ref', val: WP };
   else { console.error('merge-check: local mode needs a stable --wp (or use --pr) so the round count survives corrective commits'); process.exit(2); }
-  let run = (await c.query(`select * from tower.merge_check_run where ${key.col}=$1 and status='open' order by created_at desc limit 1`, [key.val])).rows[0];
-  if (!run) run = (await c.query(`insert into tower.merge_check_run (pr_number, build_ref, wp_ref, head_sha, status) values ($1,$2,$3,$4,'open') returning *`, [PR ? Number(PR) : null, BUILD, WP, ev.head])).rows[0];
+  let run = (await c.query(`select * from tower.merge_check_run where ${key.col}=? and status='open' order by created_at desc limit 1`, [key.val])).rows[0];
+  if (!run) run = (await c.query(`insert into tower.merge_check_run (pr_number, build_ref, wp_ref, head_sha, status) values (?,?,?,?,'open') returning *`, [PR ? Number(PR) : null, BUILD, WP, ev.head])).rows[0];
   const round = run.rounds + 1;
 
   // round limit -> escalate to Warwick
   if (round > MAX_ROUNDS) {
     const msg = `Round limit reached (${MAX_ROUNDS} rounds) without READY_TO_MERGE. Escalating to Warwick — he decides how to proceed.`;
     await record(c, run.id, 'gpt_codex', round, 'NEEDS_WARWICK', msg, ev.head);
-    await c.query(`update tower.merge_check_run set status='needs_warwick', rounds=$2, updated_at=now() where id=$1`, [run.id, round - 1]);
+    // `?` is positional; the Postgres original had `$1` last in the text and first in the array.
+    await c.query(`update tower.merge_check_run set status='needs_warwick', rounds=?, updated_at=now() where id=?`, [round - 1, run.id]);
     await mirror('gpt_codex', msg);
     console.log(`\n=== Codex QA — round ${round} — NEEDS_WARWICK ===\n${msg}\n`);
     await c.end(); process.exit(0);
@@ -249,7 +259,8 @@ async function main() {
   const runStatus = verdict.status === 'READY_TO_MERGE' ? 'ready_to_merge'
     : verdict.status === 'FIX_REQUIRED' ? 'open'
     : verdict.status === 'NEEDS_WARWICK' ? 'needs_warwick' : 'blocked';
-  await c.query(`update tower.merge_check_run set status=$2, rounds=$3, head_sha=$4, updated_at=now() where id=$1`, [run.id, runStatus, round, ev.head]);
+  // Same positional reorder as the round-limit branch above.
+  await c.query(`update tower.merge_check_run set status=?, rounds=?, head_sha=?, updated_at=now() where id=?`, [runStatus, round, ev.head, run.id]);
   await c.end();
 
   // 4) return Codex's reply to Larry as this command's output

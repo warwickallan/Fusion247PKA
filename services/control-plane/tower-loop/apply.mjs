@@ -3,9 +3,14 @@
 //
 // Each function takes an OPEN store handle from db.mjs and applies one schema file to it. The
 // files are `create ... if not exists` throughout, so re-running is safe — watcher.mjs re-applies
-// all five on every boot.
+// its five on every boot.
 //
-//   node apply.mjs            (applies all five to TOWER_SQLITE_PATH / ~/.mypka/tower/tower.db)
+// WP-2F added a SIXTH, applyMergeCheckSchema. The watcher deliberately does NOT apply it: the
+// watcher never reads or writes the merge_check_* tables, and the two merge-check entrypoints
+// apply it themselves on startup (idempotent) exactly as the watcher does with its own five.
+// applyAll applies all six.
+//
+//   node apply.mjs            (applies all six to TOWER_SQLITE_PATH / ~/.mypka/tower/tower.db)
 //
 // THE SIGNATURE CHANGED AND IT FAILS LOUDLY. These functions used to take a `postgres://` URL.
 // They now take a handle, and a string argument is REFUSED with a message that says so rather
@@ -65,16 +70,30 @@ export async function applyPostSchema(db) {
   return applyFile(db, 'applyPostSchema', 'post_schema.sql');
 }
 
-/** Apply all five, in dependency order. The order matters: tower.finding (watcher) declares a
+/** Apply the merge-check delta (db/merge_check_schema.sql). Idempotent; adds
+ *  tower.merge_check_run and tower.merge_check_message — the Larry↔Codex merge-gate exchange.
+ *
+ *  WP-2F: this DDL used to live INLINE and in Postgres dialect inside
+ *  tower/merge-check.mjs::ensureSchema(), which meant the merge-check tables were the one part
+ *  of this subsystem that was provisioned somewhere else, against a different store. Both
+ *  merge-check entrypoints now call this. It declares NO foreign key outside its own two tables,
+ *  so it has no ordering constraint against the other five. */
+export async function applyMergeCheckSchema(db) {
+  return applyFile(db, 'applyMergeCheckSchema', 'merge_check_schema.sql');
+}
+
+/** Apply all six, in dependency order. The order matters: tower.finding (watcher) declares a
  *  foreign key onto tower.pr_comment (comment), the hold index needs tower.turn (base), and
- *  tower.pr_verdict_post references tower.supervisor_review (base). */
+ *  tower.pr_verdict_post references tower.supervisor_review (base). The merge-check delta is
+ *  self-contained and goes last. */
 export async function applyAll(db) {
   const base = await applySchema(db);
   const watcher = await applyWatcherSchema(db);
   const hold = await applyHoldSchema(db);
   const comment = await applyCommentSchema(db);
   const post = await applyPostSchema(db);
-  return { base, watcher, hold, comment, post };
+  const mergeCheck = await applyMergeCheckSchema(db);
+  return { base, watcher, hold, comment, post, mergeCheck };
 }
 
 if (import.meta.url === `file://${process.argv[1]}` || process.argv[1] === fileURLToPath(import.meta.url)) {
@@ -88,6 +107,7 @@ if (import.meta.url === `file://${process.argv[1]}` || process.argv[1] === fileU
       console.log(`[apply] hold delta applied (idempotent) from ${r.hold.sqlPath}`);
       console.log(`[apply] comment seam delta applied (idempotent) from ${r.comment.sqlPath}`);
       console.log(`[apply] verdict write-back delta applied (idempotent) from ${r.post.sqlPath}`);
+      console.log(`[apply] merge-check delta applied (idempotent) from ${r.mergeCheck.sqlPath}`);
     } finally { await db.end(); }
   })()
     .then(() => process.exit(0))
