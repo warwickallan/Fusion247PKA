@@ -18,8 +18,9 @@
 | **veritas_gate** | none — this is an investigation brief, not a phase boundary. **It asserts no capability and closes no gate** |
 | **integration_owner** | Larry · **document_impact:** the map (Larry records it, not you) · **out_of_scope_policy:** report-only |
 | **operational_handoff** | none |
-| **blocking_dependencies** | **`WO-2026-08-05-10` (Mack) supplies the executable evidence you cannot gather.** Begin the documentary half immediately; the live half arrives from Larry |
-| **worker_contract** | `Team/Pax - Senior Researcher/AGENTS.md` @ the governance head |
+| **blocking_dependencies** | ~~blocking~~ → **PARTIAL dependency, corrected by Amendment 1 (A-3).** `WO-2026-08-05-10` (Mack) supplies executable evidence you cannot gather. **It blocks Q-2 and the install-delta half of Q-3 ONLY. Everything else is unblocked now** |
+| **worker_contract** | ~~`Team/Pax - Senior Researcher/AGENTS.md`~~ → **`Team/Pax - Researcher/AGENTS.md`** @ the governance head (Amendment 1, A-5) |
+| **machine_surface** *(added by Amendment 1, A-2 — READ-ONLY)* | **`C:\Users\Buggly\.mypka\**`** — the installed governor copy and its siblings. **Read-only. You hold no `Bash`; `Read`/`Grep`/`Glob` is the whole grant here** |
 | **contract_basis** | Warwick named you by name. Cross-source verification before action is your seam |
 | **contract_conflicts** | **⚠️ DECLARED: you hold `Read, Write, WebFetch, WebSearch, Grep, Glob` and NO `Bash`.** You cannot run a command, list a process, or read `git log`. **This is why Mack is paired with you.** If you find you need executable evidence Mack did not supply, **name it precisely and return — do not approximate it** |
 | **return_to** | Larry |
@@ -78,3 +79,33 @@ The nuance that makes it worth investigating rather than just fixing: **it did n
 ## Read-back required before you act
 
 Restate: the outcome, your plan, what this order failed to settle, and what looks wrong with it. **Then hold.** Five of seven Work Order refusals in Phase 2 were surface or authority defects in Larry's orders — challenge this envelope properly, including the tool-grant conflict declared above.
+
+---
+
+# AMENDMENT 1 — 2026-08-05, Larry. Issued in response to Pax's `CLARIFY`
+
+**All four clarifications are answered. The read-back was correct on every point and produced a hypothesis better than either the order named. One further fresh read-back is permitted (root `CLAUDE.md`); after that, proceed unless an ACTIVE in-scope blocker remains.**
+
+| # | Pax asked | Settled |
+|---|---|---|
+| **A-1** | Confirm the Q-4 reading — scope statement, not gate re-litigation | ✅ **Your reading is exactly right and is now the order.** Q-4 asks **what question the Phase 2 gate covered**, and therefore what its PASS did and did not establish. **You do NOT re-read the receipt for correctness, do NOT judge the verdict, and do NOT assess whether Veritas performed properly.** If answering Q-4 requires any of those, the answer is *"that would reopen Phase 2, which Warwick forbade"* — write that and move on |
+| **A-2** | Grant or refuse read-only `machine_surface` | ✅ **GRANTED, read-only: `C:\Users\Buggly\.mypka\**`** — widened past `governor/` deliberately, because a log or artefact one directory over would otherwise produce a true-but-misleading "not found". Added to the envelope above. **`C:\.fusion247\**` remains barred; `private_surface` stays `none`** |
+| **A-3** | Documentary-first, or hold for Mack | ✅ **Documentary-first. Start now.** Deliver the brief with Q-2 and the install-delta half of Q-3 **labelled UNESTABLISHED by name and reason** — never approximated. **You will then be resumed once with Mack's evidence to complete them.** Warwick said *immediately*; a partial honest answer now beats a complete one later |
+| **A-4** | Are Honcho status/incident pages admissible | ✅ **YES.** Public status, incident and changelog pages are documentation of the service. **Still barred: any call to Warwick's own instance, any authenticated request, any reproduction attempt** |
+| **A-5** | `worker_contract` cites a path that does not exist | ✅ **Class-A, upheld.** Verified: `Team/Pax - Researcher` exists, `Team/Pax - Senior Researcher` does not. Corrected in the envelope |
+| **A-6** | `blocking_dependencies` says both "blocking" and "begin immediately" | ✅ **Upheld — the field misdescribed itself.** Corrected to a PARTIAL dependency naming exactly which questions it gates |
+| **A-7** | `capability_evidence` absent | Noted, **non-blocking** as you assessed. `contract_conflicts` discharges it substantively |
+
+## 🎯 A-8 — Your third hypothesis is ADOPTED into the order, and it outranks both of mine
+
+**Q-3 now names THREE candidates, not two.** Yours is listed first because it is the only one that explains the exact observed string:
+
+| | Candidate | Status |
+|---|---|---|
+| **Q-3a** ⭐ | **A fixed 9 s read timeout meeting a dataset that Phase 2's own pagination repair (§14.12) grew.** `READ_TIMEOUT_MS = 9000` at `continuity.mjs:45`; the sole `ctrl.abort()` at `:111`; `"This operation was aborted"` is Node/undici's `AbortError` text | **Larry independently verified lines 45 and 111 by execution.** Test this FIRST |
+| Q-3b | The write-authority race guard (session-start-time comparison, `d49b1dd`) suppressing the write | Larry's original candidate |
+| Q-3c | The machine-level install executing stale code | Larry's original candidate |
+
+**Why A-8 changes the shape of the answer, and you should follow it wherever it leads:** if Q-3a holds, **this is not a correctness regression at all** — it is a fixed constant meeting a grown dataset, with no code defect anywhere. **The smallest change then concerns how loudly the fallback fails, not the read.** That is a materially different recommendation from "fix the bug", and it is allowed to be the answer. **Do not privilege a tidier story.**
+
+Also carry forward, since you established it and it stands: **the degraded-fallback-masking-a-failure behaviour is by design in shipped code** (`continuity.mjs:931-933`), and **the missing-credential hypothesis is excluded by message discrimination** (`:109` throws a distinct string Warwick did not see). Both are load-bearing and both were produced under the un-amended order.
