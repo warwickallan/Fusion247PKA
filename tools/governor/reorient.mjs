@@ -44,8 +44,8 @@
 
 import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync, statSync, lstatSync, realpathSync } from 'node:fs';
-import { join, dirname } from 'node:path';
-import { pathToFileURL, fileURLToPath } from 'node:url';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 import { readContinuityBrief } from './continuity.mjs';
 
@@ -762,7 +762,29 @@ export function renderLocationSection(facts, { cwdClaimedByHost = true } = {}) {
 // list on its own line, because a reader who takes it as the focus will work on the wrong
 // thing.
 
-const ESTATE_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+// WO-2026-08-05-08. THE SWEEP ROOT IS THE SESSION'S, AND IT IS NOW REQUIRED.
+//
+// This was `const ESTATE_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')`,
+// used as the default first argument, and `buildBrief` called `sweepFn()` with none. So the
+// sweep root came from WHERE THIS FILE HAPPENS TO SIT, which is only the session's root by
+// coincidence of the module never having been moved.
+//
+// Found by Mack in operation, not by a test: WP-2B(2) installs this module to
+// `~/.mypka/governor/`, where the module-relative root resolves to `C:\Users\Buggly`. There
+// is no `Deliverables/` there, so the sweep hit the ENOENT branch below — "the ONE honest
+// silence" — and the section was omitted with NO error text. Same module, two locations:
+// in-tree yielded the sweep, relocated yielded null. A fresh Larry would have stopped
+// getting the sweep everywhere, silently, and no install acceptance test would have seen it.
+//
+// The root is now passed explicitly from `buildBrief`'s `where` — the session location the
+// hook payload claims, the same value the location probes above are reported against. That
+// is MORE correct than the old default for every non-main worktree, which until now swept
+// the main checkout's `Deliverables/` regardless of where the session actually was.
+//
+// THERE IS DELIBERATELY NO FALLBACK. `root` has no default: an unusable one throws out of
+// `join` below and `buildBrief` renders its existing "sweep failed" tell. That is the point
+// — a fallback to this module's own location is exactly how a WRONG sweep would look right,
+// and this module's whole subject is claims that are true about the wrong thing.
 const DELIVERABLE_WINDOW_DAYS = 21;
 const DECISION_MARKER =
   /nothing (will|would) be built|awaiting (your|a) |until you accept|your call|needs? (a )?(decision|your )|accept (this|a) plan|what i need:|waiting on you|before any building/i;
@@ -779,7 +801,7 @@ const DECISION_MARKER =
 // measured. `lstat` sees the link itself; `realpath` says where it actually goes.
 const DEFAULT_SWEEP_IO = { readdirSync, statSync, readFileSync, lstatSync, realpathSync };
 
-export function sweepOpenDeliverables(root = ESTATE_ROOT, now = Date.now(), io = DEFAULT_SWEEP_IO) {
+export function sweepOpenDeliverables(root, now = Date.now(), io = DEFAULT_SWEEP_IO) {
   const dir = join(root, 'Deliverables');
   let names;
   try {
@@ -1005,7 +1027,12 @@ export function buildBrief(raw, {
   }
 
   try {
-    const sweep = sweepFn();
+    // WO-2026-08-05-08. `where`, not nothing. The sweep is about THIS SESSION's estate, so
+    // it is rooted at the location the host claimed for this session — the same value the
+    // probes above were measured against. Calling it with no argument rooted it at this
+    // module's own directory, which stops being the session's estate the moment the module
+    // is installed anywhere else. See the note on `sweepOpenDeliverables`.
+    const sweep = sweepFn(where);
     if (sweep) sections.push('(fallback — non-directive list)\n' + sweep);
   } catch (err) {
     sections.push(`⟦GOV⟧ OPEN DELIVERABLES: sweep failed (${err.message}).`);
