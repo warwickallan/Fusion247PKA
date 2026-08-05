@@ -1107,6 +1107,79 @@ Keel's four class-A refusals were all correct. The work divides:
 
 **Do not fix E-1 by adding a check that Larry dispatched. Establish why the turn ended first.**
 
+## 15.3d ⭐ NAMED INVESTIGATION — **DELIVERY TAX AND END-OF-PHASE COLLAPSE**
+
+**Set by Warwick, 2026-08-05. RECORDED ONLY: *"Investigate after Phase 2 merges and the fresh Larry takes over."*** **This is the parent investigation; §15.3c's evidence (E-1..E-6) is its input, not a separate enquiry.**
+
+### The North Star for the whole of Phase 3 — his words
+
+> **"The process exists to ship trustworthy products quickly, not to produce immaculate paperwork about why they have not shipped."**
+
+### His observation
+
+> *"This phase has taken more than 12 hours and became dominated by Work Orders, amendments, refusals, provenance corrections, role-boundary disputes, evidence machinery, idle gaps and half-million-context chasers — with final Veritas, Codex and UAT still outstanding."*
+
+### 📊 Hard baseline, measured 2026-08-05 — so the investigation starts from data, not recollection
+
+| Measure | Value |
+|---|---|
+| **Elapsed, Phase 1 close → now** | **11 h 51 m** (`2026-08-04 22:07:06` → `2026-08-05 09:58:16`) |
+| Commits in Phase 2 | **56** |
+| **Documentation churn** | **`Deliverables/`: 18 files, +3,735 lines** |
+| **Product code churn** | **`services/` + `tools/`: 26 files, +2,869 / −150** |
+| **⚠️ RATIO** | **Paperwork lines EXCEED product lines — 3,735 vs 2,869.** *That single number is the delivery tax made visible* |
+| Work Orders issued | **8** (WO-01 … WO-08) |
+| **Amendments to those orders** | **~11** — more amendments than orders |
+| **Refusals / holds** | **8** — 7 Work Order refusals (all class-A, all Larry's defects) + 1 Veritas HOLD |
+| Files in `Deliverables/proofline/` | **14** |
+| Last measured context | **418,491 input tokens / 1,000,000 (42%)**, still rising |
+| **Delivered** | WP-2B(1) · WP-2F · WP-2A (both halves) · WP-2G · WP-2B(2) code · WO-08 |
+| **Still outstanding** | WP-2B(2) install · WP-2E · WP-2C · **final Veritas · Codex · UAT · merge** |
+
+### What to investigate — seven questions, his
+
+1. **Where elapsed time and tokens actually went** — product implementation **versus** dispatch / admin / evidence / rework / waiting.
+2. **Which controls prevented REAL defects, and which merely moved paperwork around.**
+3. **Why reliability deteriorated near closure.**
+4. **Why actions were narrated but not executed, and inactivity was invisible.**
+5. **Why preventably invalid Work Orders repeatedly reached specialists.**
+6. **Why contracts assign privileged machine work that subagents cannot perform.**
+7. **How late-context degradation amplified every mistake.**
+
+*(Q6 has a worked instance already: WO-07 Amendment 3 — registration is Mack's declared seam under its own contract and Warwick's C-3, and the runtime forbids a subagent from doing it.)*
+
+### What to design — the smallest prevention, seven targets, his
+
+1. **Worker boundaries available at the REASONING stage** — not discovered at read-back.
+2. **Envelope first; route and evidence INSIDE it.**
+3. **One durable dispatch BEFORE work is described as running.**
+4. **Accurate visible in-flight state, and automatic surfacing of a silent stop.**
+5. **Privileged parent-only actions recognised BEFORE dispatch.**
+6. **Implementation banked and rotated BEFORE assurance at punitive context sizes.**
+7. **Veritas and Codex retained for genuine assurance, not document churn.**
+
+### 🔒 PRESERVE — not a target for reduction
+
+> *"Preserve the specialist refusal system: it caught real defects."*
+
+**The refusals are the most valuable thing this phase produced.** They caught: an acceptance test that would have **passed by blocking**; a relocation that would have **silently killed the Deliverables sweep everywhere**; an instruction **reversing an approved governance redline**; a **seventh start path** that falsified a removal proof; a measurement that would have **false-passed the exact risk it existed to test**; and **two GL-012 breaches**.
+
+> *"The target is **fewer preventably invalid dispatches, less admin, less elapsed time and lower token burn** — not fewer challenges or weaker evidence."*
+
+### 🔴 PROHIBITED — the answer may not be any of these
+
+> *"Do not create another checker, validator, control plane, role, registry or document family."*
+
+**Six named prohibitions. BUILD-018 grew a validator → store → parser → registry around rules it never enforced, and this build has already needed the regrowth cap four times.** **The answer must be to REMOVE, SHORTEN, COMBINE or CHANGE what exists** — Warwick's exact verbs.
+
+### Required output
+
+**Recommend exactly what to remove, shorten, combine or change in the existing process — with MEASURABLE TARGETS for the next build.** The baseline table above is what those targets must beat.
+
+### One uncomfortable candidate the investigation should test, recorded now while it is inconvenient
+
+**The Work Order envelope may be causing the defects it exists to prevent.** Every refusal was an *envelope* defect — surface, authority, acceptance property — **not a defect in the described work.** The work was understood every time. **So the question is not "how do we validate envelopes better" (prohibited, and it is the BUILD-018 shape) but "is the envelope carrying fields that Larry cannot reliably author, and should those fields be derived, defaulted, or removed?"** **Target 1 — boundaries at the reasoning stage — points directly at this.**
+
 ## 15.4 Route — the fresh Larry's to own, not this session's
 
 **Not designed here.** Two things worth noting so the next session does not rediscover them: token attribution must be honest about what the evidence **cannot** show, and the Google Drive write is an **outward action** needing its own consideration. **Warwick has not authorised a specific Drive location, and no mechanism for this exists — the regrowth cap applies to it exactly as to everything else.**
