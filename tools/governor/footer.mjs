@@ -1380,12 +1380,44 @@ export function recommendNext({ mapPathFn = null, readFileFn = readFileSync, cwd
 export const RECOMMENDATION_SCHEMA_VERSION = 1;
 export const RECOMMENDATION_FILE = 'recommendation.json';
 
-/** The cache lives beside the health samples — the same store, not a second one. */
+// ---------------------------------------------------------------------------
+// AMENDMENT 4 — THE CACHE MUST NOT LIVE IN THE SCANNED DIRECTORY
+// ---------------------------------------------------------------------------
+// This file used to be written as a direct child of the health store directory, and that
+// was a defect Larry found in live use rather than in this suite.
+//
+// `resolveHealthSample`'s no-session branch lists the store directory, keeps every
+// `*.json`, sorts by mtime, and TREATS THE NEWEST BASENAME AS A SESSION ID. So a freshly
+// written `recommendation.json` was picked up as a health sample, carried no context
+// fields, and the footer rendered BLIND — losing the measured number in the window after
+// every refresh, which is to say at the five events Warwick is most likely to look.
+//
+// THE FIX IS STRUCTURAL, NOT A FILTER. The cache moves into a SUBDIRECTORY of the store.
+// The resolver's scan is one level deep and extension-filtered, so nothing inside
+// `state/` can ever be enumerated as a sample — the cache is invisible to it because of
+// WHERE IT IS, not because of a name the resolver has been taught to skip. A name-based
+// exclusion would put the two files back in one directory and rely on a rule staying in
+// step with them; this cannot decay, because there is nothing to keep in step.
+//
+// WHY A SUBDIRECTORY RATHER THAN A SIBLING OF THE STORE, which the amendment preferred:
+// `healthStoreDir` returns `MYPKA_GOVERNOR_HEALTH_DIR` VERBATIM when it is set. Writing
+// to `<store>/..` would therefore write OUTSIDE the directory an operator explicitly
+// pointed the governor at — into the parent of a temp directory under test, and into
+// whatever happens to sit above the store in a redirected deployment. Staying inside the
+// nominated root is the safer half of "not in the scanned path", and it achieves the same
+// separation. Reported rather than assumed: if Larry wants a true sibling, it is one line.
+export const RECOMMENDATION_SUBDIR = 'state';
+
+/**
+ * The cache lives in a SUBDIRECTORY of the store — same root, structurally outside the
+ * one-level `*.json` scan that resolves health samples. See the note above; this
+ * placement is load-bearing, not cosmetic.
+ */
 export function recommendationPath({ cwd = process.cwd(), homeDir, envOverride, dirFor = healthStoreDir } = {}) {
   const opts = { cwd };
   if (homeDir !== undefined) opts.homeDir = homeDir;
   if (envOverride !== undefined) opts.envOverride = envOverride;
-  return join(dirFor(opts), RECOMMENDATION_FILE);
+  return join(dirFor(opts), RECOMMENDATION_SUBDIR, RECOMMENDATION_FILE);
 }
 
 /**

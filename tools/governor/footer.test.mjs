@@ -14,11 +14,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 // `readdirSync` / `copyFileSync` / `createHash` serve the WP-3B mutation harness at the
 // foot of this file, which copies the module set OUT of the repository before breaking it.
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync, readdirSync, copyFileSync, statSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync, readdirSync, copyFileSync, statSync, utimesSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import {
@@ -68,6 +68,7 @@ import {
   readCachedRecommendation,
   refreshRecommendation,
   RECOMMENDATION_FILE,
+  recommendationPath,
 } from './footer.mjs';
 // WO-OR-08: the seam block at the foot of this file drives a REAL sampler output into
 // the ladder. Every other test here builds its inputs by hand, which is exactly how a
@@ -2960,7 +2961,11 @@ test('WP-3B(b) / C-2: the RENDER never resolves the map — it reads a cache, an
 test('WP-3B: every way the CACHE can be wrong renders UNSET — it can withdraw, never invent', () => {
   const dir = tmp();
   try {
-    const write = (o) => writeFileSync(join(dir, 'recommendation.json'), typeof o === 'string' ? o : JSON.stringify(o));
+    // Derived from the function, never hardcoded. Amendment 4 MOVED this file, and a test
+    // holding its own copy of the layout would have gone green against the wrong path.
+    const cachePath = recommendationPath({ cwd: process.cwd(), envOverride: dir });
+    mkdirSync(dirname(cachePath), { recursive: true });
+    const write = (o) => writeFileSync(cachePath, typeof o === 'string' ? o : JSON.stringify(o));
     const read = () => readCachedRecommendation({ cwd: process.cwd(), envOverride: dir });
 
     assert.equal(read().reason, 'no-cached-recommendation', 'no cache at all');
@@ -3188,13 +3193,134 @@ test('WP-3B: MUTATION — every control this Work Order added can be made to FAI
       assert.ok(importAt > guardAt, 'A-7: the resolver import must live INSIDE the direct-execution guard');
       proven += 1;
     }
+
+    // M6 — AMENDMENT 4. Put the cache back in the scanned directory and the live defect
+    // returns: the newest `*.json` there is read AS a health sample and the measured
+    // number vanishes. This is the mutation that matters most, because the original was
+    // found by a human using the tool rather than by this suite.
+    {
+      const m = mutantModule(
+        'return join(dirFor(opts), RECOMMENDATION_SUBDIR, RECOMMENDATION_FILE);',
+        'return join(dirFor(opts), RECOMMENDATION_FILE);'
+      );
+      mutants.push(m.dir);
+      const mod = await import(m.url);
+
+      const store = tmp();
+      try {
+        const mapFile = join(store, 'map.md');
+        writeFileSync(mapFile, '# 3. PHASE 3\n## Frontier\nsubmit to Veritas for assurance');
+        const sampleFile = join(store, 'sess-live.json');
+        writeFileSync(sampleFile, JSON.stringify({
+          ...LIVE_STATUSLINE_SAMPLE,
+          session_id: 'sess-live',
+          sampled_at: new Date().toISOString(),
+        }));
+
+        mod.refreshRecommendation({ cwd: process.cwd(), envOverride: store, mapPathFn: () => mapFile });
+        const old = Date.now() / 1000 - 600;
+        utimesSync(sampleFile, old, old);
+
+        const r = mod.runCli([], { locationFn: stubLocation('C:/repo', 'main'), envOverride: store });
+        const parsed = parseFooter(r.stdout);
+        assert.equal(parsed.fields.state, 'BLIND', 'M6 must reproduce the live defect — the cache read as a sample');
+        assert.equal(parsed.fields.percent, null, 'M6: the measured number must be gone');
+        proven += 1;
+      } finally {
+        rmSync(store, { recursive: true, force: true });
+      }
+    }
   } finally {
     for (const d of mutants) rmSync(d, { recursive: true, force: true });
   }
 
-  assert.equal(proven, 5, 'every control must have been made to fail');
+  assert.equal(proven, 6, 'every control must have been made to fail');
 
   // Byte-identical restoration: the harness never wrote to the real module at all, and
   // this is the assertion that proves it rather than asserting it in prose.
   assert.equal(sha256File(join(GOVERNOR_DIR, 'footer.mjs')), before, 'the module under test must be byte-identical');
+});
+
+// ===========================================================================
+// AMENDMENT 4 — the cache/sample COLLISION, found by Larry in live use
+// ===========================================================================
+//
+// `--refresh` wrote `recommendation.json` into the very directory
+// `resolveHealthSample` scans. That resolver takes every `*.json` child of the store
+// directory, sorts by mtime, and treats the newest basename AS A SESSION ID. So the
+// freshly-written cache was selected as a health sample, carried no context fields, and
+// the footer went BLIND — losing the measured number in exactly the window after a
+// refresh, which is to say at the five moments Warwick is most likely to look.
+//
+// WHY THE SUITE MISSED IT, RECORDED HERE BECAUSE IT IS THE LESSON. Every test redirects
+// the store with `MYPKA_GOVERNOR_HEALTH_DIR`, and every cache test passed `--session`,
+// which reads an EXACT file and never scans. So the two artefacts were only ever
+// exercised apart. This is E-F's lesson in a second costume: a fault that exists solely
+// in the interaction between two things is invisible to every test that separates them.
+//
+// The mtimes below are SET EXPLICITLY rather than left to write order. A regression test
+// for a newest-file race that depends on filesystem timestamp granularity is a flaky
+// test, and a flaky test for this defect is worse than none.
+test('WP-3B / AMENDMENT 4: the recommendation cache is NEVER selected as a health sample', () => {
+  const dir = tmp();
+  const mapFile = join(dir, 'map.md');
+  try {
+    writeFileSync(mapFile, '# 3. PHASE 3\n## Frontier\nsubmit to Veritas for assurance');
+
+    // A real, healthy sample — the thing the render must still find.
+    const sampleFile = join(dir, 'sess-live.json');
+    writeFileSync(sampleFile, JSON.stringify({
+      ...LIVE_STATUSLINE_SAMPLE,
+      session_id: 'sess-live',
+      sampled_at: new Date().toISOString(),
+    }));
+
+    // The cache, written by the refresh path exactly as production writes it.
+    const refreshed = refreshRecommendation({
+      cwd: process.cwd(),
+      envOverride: dir,
+      mapPathFn: () => mapFile,
+    });
+    assert.equal(refreshed.ok, true, 'the refresh must have written a cache for this test to mean anything');
+    assert.equal(refreshed.next, 'Opus/high');
+
+    // Force the collision deterministically: the cache is NEWER than the sample.
+    const old = Date.now() / 1000 - 600;
+    utimesSync(sampleFile, old, old);
+
+    // THE STRUCTURAL INVARIANT. The resolver trusts every `*.json` child of the store
+    // directory to be a session sample, so the cache must not be one. Asserted on the
+    // PATH rather than on the rendered output, because this is the property that makes
+    // the defect impossible rather than merely absent today.
+    const cachePath = recommendationPath({ cwd: process.cwd(), envOverride: dir });
+    assert.notEqual(
+      dirname(cachePath),
+      dir,
+      `the cache must not be a direct child of the scanned store directory — got ${cachePath}`
+    );
+    assert.ok(
+      !readdirSync(dir).includes(RECOMMENDATION_FILE),
+      'the scanned directory must not contain the cache file at all'
+    );
+
+    // ...and the behaviour that invariant buys. No `--session`, so this is the
+    // newest-file scan — the exact path the defect lived on.
+    const r = runCli([], { locationFn: stubLocation('C:/repo', 'main'), envOverride: dir });
+    const parsed = parseFooter(r.stdout);
+    assert.equal(parsed.ok, true, `unparseable line: ${JSON.stringify(r.stdout)}`);
+    assert.notEqual(parsed.fields.state, 'BLIND', 'the cache must not blind a render that has a real sample');
+    assert.equal(parsed.fields.percent, 25, 'the REAL sample must still be selected');
+    assert.equal(parsed.fields.usedTokens, 248_000, 'and its measured count must survive');
+    assert.equal(parsed.fields.next, 'Opus/high', 'while the cached recommendation is still read');
+
+    // The sample store must still resolve to the sample even when the cache is the most
+    // recently touched thing on disk anywhere under the store root.
+    assert.equal(
+      resolveHealthSample({ cwd: process.cwd(), envOverride: dir }).data?.session_id,
+      'sess-live',
+      'the newest-file scan must land on the sample, not on anything the cache wrote'
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
