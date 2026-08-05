@@ -761,6 +761,28 @@ It is rejected because it means **undoing WO-TW-01** — discarding a migration 
 
 ---
 
+## 14.7a WP-2C reconnaissance, 2026-08-05 (post-WP-2E integration session) — **NOT SETTLED. STOPPED per Warwick's own boundary.**
+
+**§13.3's "one line" claim (R-6) is re-verified true as far as it goes, and materially incomplete.** Executed by Larry directly (GL-012 loaded first; `C:\.fusion247\**` reads below are narrow, targeted, and quote no credential value).
+
+| # | Finding | Evidence |
+|---|---|---|
+| **C-1** | **The live watcher (PID 31268) bypasses the launcher's own credential gate.** `run-watcher.mjs` was hardened under a prior `WO-TW-02` — it now refuses to start unless `TELEGRAM_BOT_TOKEN`/`AUTHORISED_TELEGRAM_USER_ID` are present in its own environment, or `TOWER_NOTIFY_TRANSPORT=none` is explicit (`run-watcher.mjs:64-80`, `validateEnv()`). **But PID 31268's actual command line is `node.exe … tower-loop\watcher.mjs` — `watcher.mjs` directly, not `run-watcher.mjs`.** The hardened gate was never in this process's path. Whether it holds real credentials is genuinely unknown, not "probably fine" | `wmic process where "ProcessId=31268" get CommandLine` executed this session |
+| **C-2** | **Untested, not proven broken.** `notification` table holds exactly 3 rows, all `2026-08-02`, all `telegram_ok=1` — all from a *previous* watcher instance, before PID 31268 existed. `watcher_heartbeat` confirms PID 31268 (`WARWICK_YOGA#cp#1785800856828`) is alive and beating as of `2026-08-05T13:08:33Z` today, `last_turn_id: null`. **Zero notification attempts of any kind since this watcher started** — no real PR turn has reached it, so it has never once tried to send Telegram and neither succeeded nor failed | `select … from notification/watcher_heartbeat` against `C:\Users\Buggly\.mypka\tower\tower.db`, read-only |
+| **C-3** | **`TOWER_NOTIFY_TRANSPORT=none` is still literally at `tower-baton.env:8`, unchanged since R-6** — but whether that file is even loaded into PID 31268's environment is unestablished; nothing in its live command line references it, and per WO-TW-02's own commit note the launcher path that used to auto-load it was deliberately removed | Direct grep, line 8 only, no other content read |
+| **C-4** | **A second, possibly-separate credential path exists and was never reconciled with the first.** `C:\.fusion247\larry-ding.mjs` ("FusionDevBot") draws `TELEGRAM_BOT_TOKEN`/`AUTHORISED_TELEGRAM_USER_ID` from `fusion-capture-gateway.env`, a **different file** from `tower-baton.env`. Whether "DevBot" (Warwick's own naming, §14.0) and "TowerBot" (tower-loop's own naming) are the same bot/chat, or two separate ones, is **not established** | §13.3 line 499 vs `tower-loop/mergeCheck.mjs:180-181` |
+| **C-5** | **A safe, values-never-exposed equality check between the two files was attempted and BLOCKED outright by the harness's own auto-mode classifier before it ran** — not a judgement call declined, a hard block. No content of either file was read or exposed by the attempt | Executed this session; classifier denial, zero output |
+
+### Why this stops here rather than proceeding to a fix
+
+Warwick's own boundary on WP-2C: *"restore the ding where that is genuinely a small configuration issue… if it stops being a config change, STOP and report."* A one-line env edit is still config. But **closing this correctly requires knowing which credential file is authoritative for the bot Warwick actually watches, and that question hit a hard tooling block, not an open one I can reason past.** Guessing wrong here doesn't fail loud — `notify.mjs` records the row and moves on regardless of send success — so a wrong guess would look like it worked. Restarting PID 31268 without that answer risks silently misconfiguring, not fixing, his live notification path.
+
+**Not done, and deliberately not attempted:** editing `tower-baton.env`, killing or restarting PID 31268, or touching `fusion-capture-gateway.env`/`larry-ding.mjs` in any way.
+
+**Frontier note:** WP-2C is **open, investigated, not implemented.** §14.19 to be corrected accordingly.
+
+---
+
 ## 14.9 WP-2A — legacy obsolescence **ESTABLISHED**. Removal is authorised, and it is six targets, not one
 
 ### Obsolescence, proven per implementation
@@ -1375,8 +1397,8 @@ Genuine **external independence** · **read-only** operation · **exact-head and
 | **Delivered and integrated** | WP-2B(1) Honcho writer · WP-2F one canonical store · WP-2A legacy Tower retired · WP-2G Codex contract + reach proof · the constitutional amendment · WP-2B(2) render + install — integrated at `eff3033` · **WP-2E TowerBot QA exchange (W1-W4) — integrated at `81b5823` and submitted for assurance**, built by Keel under `WO-2026-08-05-09` + Amendment 1 (evidence: `Deliverables/proofline/EVIDENCE-2026-08-05-wp-2e-qa-exchange.md`; `node run-tower-loop-tests.mjs` 50 executed, 1 pre-existing unrelated failure — `T5`, unratified `tower-qa-skill.md` — held constant across the merge, 0 regressions) |
 | **✅ S-1 MET** | **A fresh session in a NON-main worktree, with no project-scope hook of its own, receives a brief naming THIS map — automatically, no path typed.** Both discriminator halves hold; main worktree shows exactly **one** block (no double-fire). Hooks **MERGE** (proven), so removing the project-level duplicates was a correctness requirement. Evidence: `Deliverables/proofline/EVIDENCE-2026-08-05-wo-07-honcho-install.md` |
 | **S-4 contributed, not yet gated** | WP-2E's build and integration evidence is above. **S-4 itself is Veritas's to assess at the exact integrated head (§14.0c), not claimed here.** |
-| **Open** | **WP-2C** event-driven ding — **the next frontier** · then **WP-2D** UAT + first live Codex call + merge |
-| **Exact next action** | **WP-2C** — the DevBot ding made genuinely event-driven, config-only per the boundary in §13.3 and §14.1. If it stops being a config change, STOP and report, per Warwick's own binding boundary (§14.0) |
+| **Open** | **WP-2C** event-driven ding — **investigated, NOT implemented, see §14.7a** · then **WP-2D** UAT + first live Codex call + merge |
+| **Exact next action** | ⛔ **STOPPED on WP-2C, per Warwick's own boundary — reported, not guessed past.** §14.7a's reconnaissance found the live watcher (PID 31268) bypasses the launcher's own credential gate, and whether "TowerBot" and "DevBot" (Warwick's own naming) share one credential file or two could not be safely resolved — an equality-only check with zero value exposure was blocked outright by the harness's own classifier before it ran. Guessing wrong here would silently misconfigure his live Telegram delivery rather than fail loud. **Awaiting Warwick's word on which credential file is authoritative before any config edit or watcher restart.** |
 | **Warwick owes** | **1. Ratify the Codex contract wording** — `services/control-plane/review/prompts/tower-qa-skill.md` ships DRAFT and does **not** govern until he does; needed **before the UAT**. · **2. Re-bind the hash approval in `services/control-plane/review/prompts/prompt-approvals.json`** — repairing a pointer changed `product-qa-runtime-orientation.md`'s bytes, so his hash-bound campaign approval (`cd65539a…253135`) lapsed and its stamp correctly reverted to `UNRATIFIED-draft`. **That is the binding working, not a defect**; it was already DRAFT and did not govern. *(Was recorded only in `EVIDENCE-…wo-05-codex-contract-reach.md` F-5 — evidence, never instruction. Surfaced here 2026-08-05 per Veritas F-3.)* · **3. The `merge-decision`.** |
 | **Gate ahead** | Veritas on the exact integrated head, against §14.0c S-1..S-5 |
 | **Phase 3** | §15. **RECORDED, NOT STARTED.** Not before Phase 2 merges and rotates |
