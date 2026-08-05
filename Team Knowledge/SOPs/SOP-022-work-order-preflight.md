@@ -6,7 +6,7 @@
 - **Applies to:** **every** worker or specialist instance executing a bounded Work Order in this estate.
   No exceptions, no "obvious" orders.
 - **Owner:** the executing worker. **Larry owns the quality of the order itself, and owes a timely reply
-  to every read-back. Nolan owns the class-A pre-dispatch check on the order** (Warwick, 2026-08-05).
+  to every read-back.**
 - **Canonical shape of a Work Order:** [[Templates/work-order]]. This SOP is the procedure; that file is
   the artefact. Neither restates the other.
 - **This is not a review ceremony. It is the first phase of execution.** It should take minutes, not a
@@ -341,7 +341,7 @@ Two classes, and only one of them is preventable:
 
 | Class | Nature | Owner |
 |---|---|---|
-| **A — preventable before dispatch** | specialist contract conflicts · prohibited file surfaces · missing permissions · missing required capabilities · stale capability assumptions · absent schema decisions · impossible acceptance evidence · actions the specialist may not perform | **Nolan**, via the compatibility check above. Larry owns the outcome, the routing and the decision to dispatch |
+| **A — preventable before dispatch** | specialist contract conflicts · prohibited file surfaces · missing permissions · missing required capabilities · stale capability assumptions · absent schema decisions · impossible acceptance evidence · actions the specialist may not perform | **Larry**, via the compatibility check above |
 | **B — genuine discovery** | code or runtime behaviour contradicting the order · hidden missing callers · false inherited baselines · deeper defects visible only after inspecting the implementation · interactions no contract or routing check could establish | **the worker**, via the read-back — this is what the gate is *for* |
 
 A class-A refusal is a defect in the dispatch. A class-B refusal is the system working as designed. **Both
@@ -349,10 +349,8 @@ are correct refusals**, and neither is ever a reason to loosen the worker's cond
 
 ## For Larry
 
-The mirror of this SOP: **send the drafted order to Nolan for the class-A check before issuing it — you no
-longer preflight your own — and answer every read-back.**
-
-**Nolan returns a verdict, not a veto. Larry may dispatch over an objection, and records it in the order.**
+The mirror of this SOP: **run the pre-dispatch compatibility check above, preflight your own Work Order
+before issuing it, and answer every read-back.**
 Every defect above was avoidable by running the command, reading the variable's contract, confirming the
 datastore, or asking what the change actually needs to touch. On current evidence the Work Order deserves
 more scrutiny than the returned work does — which is what the research predicted, pointing at the

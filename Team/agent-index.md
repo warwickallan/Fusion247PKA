@@ -5,7 +5,7 @@ Routing table for the team. Twelve specialists ship in the **v3.0.0 all-in-one**
 | Specialist | Role | Folder | Routes to them when |
 |---|---|---|---|
 | Larry | Orchestrator, Librarian, Session-Log Author | [[Team/Larry - Orchestrator/AGENTS]] | Every request lands here first. **Delegation-first, not delegation-only** (reconciled 2026-07-27): Larry is the orchestration and integration authority and delegates bounded specialist execution to stay available — but retains authority to do work personally where architecture, integration, safety or judgement requires it, stating the reason. See his §"Operating doctrine". |
-| Nolan | HR | [[Team/Nolan - HR/AGENTS]] | User wants to hire a new specialist, retire one, or audit team hygiene. Default owner of [[SOP-001-how-to-add-a-new-specialist]]. **Also holds the class-A pre-dispatch check on every Work Order Larry issues to a specialist** (Warwick, 2026-08-05): reads the final envelope, the target specialist's contract/shim and only the directly applicable rules, then returns PASS or concise exact corrections. **Never rewrites the order, never investigates the implementation, never audits the repo, and never withholds or delays a dispatch — a verdict, not a veto.** Class B stays with the worker at read-back. He does not check an order addressed to himself; those keep the previous route and declare on their face that they were not independently checked. Procedure canonical in [[SOP-022-work-order-preflight]], not restated in any contract. |
+| Nolan | HR | [[Team/Nolan - HR/AGENTS]] | User wants to hire a new specialist, retire one, or audit team hygiene. Default owner of [[SOP-001-how-to-add-a-new-specialist]]. |
 | Pax | Researcher | [[Team/Pax - Researcher/AGENTS]] | User asks a question that needs cross-source verification, fact-checking, or structured intelligence. |
 | Penn | Journal Writer | [[Team/Penn - Journal Writer/AGENTS]] | User shares thoughts, screenshots, voice notes, photos, or anything that needs to land in the Journal or PKM. See [[WS-001-daily-journaling]]. |
 | Mack | Automation Specialist | [[Team/Mack - Automation Specialist/AGENTS]] | API integrations, MCP servers, webhooks, OAuth flows, automation scripts. Connection layer for external imports — fetches the bytes, hands off to Silas. Wires up external image generators when local image-gen isn't available. **Operates released backend services** — process supervision, monitoring, routine startup/restart, recovery *execution*, runtime status, incident handling — and escalates defects to Keel rather than editing service code (Warwick's boundary ruling, 2026-07-28). **Envelope invariants (summary — the contract and GL-012 govern):** operates *released* services only — never edits service code under `services/**`; defects escalate to Keel · the machine seam is Mack's: supervisor registration (scheduled task / systemd / pm2 or equivalent), supervision, routine restart and recovery *execution* — and deregistration, the same seam (Warwick, 2026-08-05) · `C:\.fusion247\**` denied by default; the store root is never declarable; access only via a named GL-012 `private/<project>/**` subtree or a named Warwick exception · credentials never in code, never logged, never hardcoded · the template's standing authority defaults (`credential_scope` / `live_authority` / `network`: `none`) bind Mack's orders as they bind all orders. |
@@ -32,7 +32,7 @@ Standing policy. On any active build these roles are assigned by default, and st
 |---|---|
 | Orchestrates and integrates | **Larry** |
 | **Assures internal quality and truth — the gate on WP, phase and documentation truth** | **Veritas** |
-| Audits team hygiene and hiring, **and holds the class-A pre-dispatch check on Work Orders** | **Nolan** |
+| Audits team hygiene and hiring | **Nolan** |
 | Owns architecture, durable state and integrity decisions | **Silas** |
 | Implements, through the Work Order process | **Keel** |
 | Researches | **Pax** |
@@ -43,14 +43,6 @@ Standing policy. On any active build these roles are assigned by default, and st
 Build assurance is now Veritas's standing gate; Nolan's audit remit is team hygiene and hiring, which is what
 his contract actually covers. Codex is named here because the row was missing entirely and a roles table that
 omits the external gate reads as though internal assurance were the last word — it is not.*
-
-*Amended again 2026-08-05 (Warwick, Option A). **The 2026-08-04 note above stands and is not withdrawn** — it
-correctly removed a responsibility Nolan's contract did not carry. **His contract now carries it**, so one
-bounded piece is restored: the **class-A pre-dispatch check on the Work Order envelope**, and nothing else.
-Build assurance remains entirely Veritas's. **Veritas's post-integration gate and its bar on pre-inspection of
-a Work Order are untouched** (see `:85` below) — that bar is precisely why the pre-implementation half went
-unowned between 2026-08-04 and 2026-08-05, and it stays. **Larry's route and dispatch authority are
-unchanged: Nolan returns a verdict, not a veto.** Evidence: `Deliverables/2026-08-05-pax-nolan-gap-brief.md`.*
 
 Decidable test: for any piece of work on an active build, this table names an owner. Engaging someone other than the default, or retaining the work, is a **stated** choice with a reason — never a silent one.
 
