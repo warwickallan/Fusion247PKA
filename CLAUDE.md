@@ -97,33 +97,34 @@ Applied to every outgoing reply: *does it ask Warwick to run a git command, choo
 
 **This section is the only authoritative statement of this rule.** A copy hard-coded into a script's output is a defect in that script.
 
-## The ⟦GOV⟧ footer
+## The governor status line
 
-**The `⟦GOV⟧` footer is EVENT-DRIVEN. It appears when Warwick has something to act on — never as a per-reply staple.** Warwick works on the claude.ai web and Android clients, where a terminal status line is invisible; a footer inside the message stream is the only governor output that reaches him. That is why it exists, and it is also why it must stay rare.
+> **RETIRED 2026-08-05 — Warwick, verbatim: *"Descope and retire the mobile/chat governor footer. Remove the specialist-rendered footer route and any instruction requiring it. Keep the existing terminal status display only. Spend no further tokens investigating automatic mobile rendering."***
 
-Emit it when, and only when, one of these is true:
+**There is no `⟦GOV⟧` footer in the message stream. Larry does not compose one, does not paste one, and does not dispatch anyone to render one.**
 
-- **a handback is owed** — one of the seven codes above; or
-- **rotation is advised** — context is near the threshold, which is his to act on and is never withheld; or
-- **he asked for it.**
+**What remains is the terminal status display only** — `tools/governor/footer.mjs`, read by `statusline-live.mjs` on the host's own statusline refresh. It costs no model invocation and requires no dispatch. Larry may run it directly when he wants the number; he must never quote a figure he has not read from it.
 
-**When work is still in flight and nothing is required of him, emit nothing.** A footer on a reply that is merely a progress note reads as *"I am waiting for you"* and manufactures the exact interruption the footer exists to prevent. Warwick, 2026-08-02: it was useful precisely because it only appeared when he had an action. A staple is noise, and noise is what makes a real signal easy to miss.
+### Why it was retired — recorded so it is not rebuilt
 
-It carries context health, state, continue-or-rotate advice, a **model *and* effort** recommendation for the phase ahead, and the continue-or-handback token. Four rules bind it:
+The footer existed because a terminal status line is invisible on the claude.ai web and Android clients, so a footer inside the message stream was the only governor output that reached Warwick there. **The cost of delivering it was the defect.** Rendering one line required dispatching a specialist that booted a full model context: **measured at 79k, 79k and 39k tokens for three status lines.** Naming the exact command removed some file reading and changed nothing structural.
 
-- **Context health comes from live telemetry.** If it cannot be read, the footer says `BLIND` and reports no numbers. It never renders a healthy state it did not measure.
-- **The recommendation renders a real value only when grounded in a real, current next action**; otherwise `UNSET`. A banked literal presented as live advice is a defect, not a degraded state.
-- **Advice comes after the next requirement is understood, never before it.** With no established next action there is nothing for the context to be fit *for*. **The one thing never withheld this way is the advice to rotate** — running out of context is a fact about the session, not the task, and a quiet footer must never cost Warwick his session.
-- **The handback token, when present, is one of the seven code names above.**
+**Warwick's diagnosis, and it is the durable part:** *"The 'subagent floor' is not a natural cost of the footer. It is proof that a model should never have been in this path."*
 
-> The exact byte grammar — field order, separators, permitted values — lives in `tools/governor/footer.mjs`, the single module that renders and parses it. A hand-composed footer is a defect.
+**What was established by execution before the decision, so nobody re-runs it:**
 
-**No hook can render this footer, and none ever will.** `Stop`/`SubagentStop` `additionalContext` lands in the transcript and cannot modify a reply already streamed; `MessageDisplay` is display-only and CLI-only, so it reaches nothing on web or Android — which is the entire reason the footer exists. It is rendered by a **dispatched specialist running `footer.mjs`** — the standing route, independent of whatever tools Larry holds — and Larry pastes those exact bytes. That is still not hand-composing one.
+- **`MessageDisplay` exists** in host 2.1.222 — 38 occurrences, `hookSpecificOutput.displayContent` documented as *"Text displayed in place of the delta"*, with an explicit completed-message path. **The former claim that "no hook can render this footer, and none ever will" was false as to mechanism.**
+- **Whether that display reaches the web/Android client was never established**, and **Warwick has ruled that no further tokens be spent finding out.** It is not an open question; it is a closed one.
 
-**The handback ding stays a dispatch, and the pre-turn-end reflex that decides to send it stays Larry's judgement, unmechanised.** A Stop-hook detector would have to key off something Larry emits, and the only sanctioned marker is the footer's control token. **Whether an event-driven trigger is achievable here is open and unproven, and is claimed in neither direction.**
+**The three rules that outlive the footer**, because they were always about honesty rather than about that artefact:
+
+- **Context health comes from live telemetry.** A number that was not measured is never rendered. `BLIND` is the honest output when telemetry cannot be read, and it is loud by design.
+- **A recommendation renders a real value only when grounded in a real, current next action**; otherwise `UNSET`. **A banked literal presented as live advice is a defect, not a degraded state.**
+- **The one thing never withheld is the advice to rotate.** Running out of context is a fact about the session, not the task.
+
+**The seven handback code names remain load-bearing** and are unaffected by this retirement: `tools/governor/footer.mjs` holds a frozen `HANDBACK_CODES` literal mirroring them one-for-one. **Renaming a member is a code change, not an edit.**
 
 **Hooks enforce this constitution. They never carry it.** Every clause here binds on its own, on any machine, with no hook installed. And **written is not loaded**: a hook present in a settings file has no effect until the host restarts. No reply may assert a control is active without evidence that it fired.
-
 ## Wayfinder
 
 > **EVERY FUSION247 BUILD REQUIRES A DURABLE WAYFINDER IMPLEMENTATION PLAN BEFORE IMPLEMENTATION BEGINS.** (Warwick, 2026-08-02 — a product and governance decision, binding.)
