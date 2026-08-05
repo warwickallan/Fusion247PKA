@@ -249,27 +249,68 @@ Shipped WP-3. Tests green, CI clean.
 
 ### Which PRs get polled
 
-Derived from the store, so there is no list to maintain and nothing to go stale: the distinct
-`(repo, pr_number)` of turns that are **not `complete`**, most recent first, capped at 5 per round.
-A turn that is `reviewed`/`blocked`/`awaiting_warwick` is *precisely* the one waiting for a
-disposition comment, so polling deliberately continues there.
-
-**The bootstrap, and it is a genuine limitation of a store-derived rule:** with an empty store there
-are no targets, so the very first checkpoint on a PR Tower has never seen is not discoverable. One
-variable fixes that and is the only configuration this feature has:
+**Every OPEN pull request, asked of GitHub every round.** Not derived from Tower's own work state,
+and not configured anywhere.
 
 ```
-TOWER_PR_SEED=warwickallan/Fusion247PKA#90       # comma-separate for more than one
+repos/<owner>/<name>/pulls?state=open&per_page=100   --paginate --jq .[].number
 ```
 
-Once a turn exists for that PR the store-derived rule takes over and the seed is redundant.
+#### What this replaced, and why it kept dying (WO-2026-08-03-05)
+
+Targets used to be the distinct `(repo, pr_number)` of turns `where state <> 'complete'`. Read that
+back slowly: **a round that finished removed its own PR from the poll list.** Success and blindness
+were the same event — the better the loop worked, the more certainly it went quiet — and a PR nobody
+had opened a turn against was invisible from the start. The only thing that ever *added* a PR was a
+human supplying `TOWER_PR_SEED` at launch: a value living solely in `process.env`, refreshed by
+nothing, lost the moment the process was replaced.
+
+Measured on 2026-08-03: a healthy watcher with an advancing heartbeat had polled **PR #90 — merged
+at 2026-08-02T23:30:33Z — 140 rounds in a row**, returning `checkpointsCreated: 0` every time, while
+#91, #81 and #80 sat open and unpolled.
+
+The cut now is:
+
+| Question | Whose fact it is | Where it comes from |
+|---|---|---|
+| Is this PR open? | GitHub's | asked every round |
+| Does this PR have a live round? | ours | `state <> 'complete'`, used **only to rank** under the cap |
+
+#### Where the repository comes from — three sources, all durable
+
+1. **this checkout's `origin` remote** — on disk, re-read every round, unaffected by restart;
+2. **every repo any turn in the store names** — no state filter, deliberately: filtering here would
+   reintroduce the self-extinguishing bug one level up;
+3. `TOWER_PR_SEED` — retained as an escape hatch for a repository that is neither of the above.
+
+**`TOWER_PR_SEED` is no longer load-bearing and its PR number no longer has any power.** A seed entry
+contributes only its `owner/name`; the PR it names is polled if and only if GitHub says it is open.
+A stale seed can no longer pin the watcher to a merged PR. The grammar is unchanged, so nothing an
+operator has already set needs editing.
+
+If **no** repository can be determined from any source, the round logs `pr_poll_no_repos` — a
+deliberately distinct event from `pr_poll_no_targets`, because "there is nothing open to watch" and
+"I do not know where to look" must not share a line.
+
+#### The cap, and why truncation is loud
+
+At most **5** PRs per round (`PR_POLL_MAX_TARGETS`, a literal, not config). PRs with a live round
+rank first, then the rest newest-first, so a round waiting on a disposition comment is never the one
+dropped. Truncation logs `pr_poll_targets_truncated` naming what it dropped — a PR that is silently
+never polled is invisible for exactly the same reason a merged target was. Cost at the cap: one
+discovery call plus two per PR per round, ≈660 requests/hour against GitHub's 5,000.
 
 ### When it fails
 
 A poll failure never takes the turn loop down — GitHub being briefly unreachable is not a reason to
 stop supervising turns already in the store. It is logged as `pr_poll_failed`, and after **3
 consecutive rounds in which every target failed** a `tower_failure` TowerBot message fires naming
-the cause. It fires **once per failure streak**: not every round (spam gets ignored) and not never
+the cause.
+
+**A DISCOVERY failure throws rather than returning an empty list, and that is load-bearing.** An
+empty target list is exactly what a healthy idle watcher produces, so discovery that failed quietly
+would be indistinguishable from a repository with nothing open. The throw is converted by
+`runWatcher` into a failed round, which feeds the same 3-strike alarm. It fires **once per failure streak**: not every round (spam gets ignored) and not never
 (silence from this watcher is indistinguishable from "nothing to review").
 
 ### The build ref is validated, and a bad one is visible
@@ -477,12 +518,17 @@ double rather than about the code.
   the watcher now invokes it, unprompted, forever. It did **not** make delivery a push. There is no
   live listener and no inbound ingress; **GitHub cannot reach this code**, and detection is bounded
   by `TOWER_PR_POLL_MS`. Cite it as "polled automatically", never as "webhook".
-- **THE RESPONSE DOES NOT GO BACK ONTO THE PR.** The review reaches TowerBot and the store. Nothing
-  in this subsystem writes to GitHub — `assertReadOnlyArgs` structurally forbids the poller from
-  doing so, deliberately. A verdict appearing as a PR comment would need a write path that does not
-  exist here.
-- **The store-derived poll cannot bootstrap itself.** No turn for a PR means no target means no
-  poll. The first checkpoint on an unknown PR needs `TOWER_PR_SEED`; after that the store takes over.
+- ~~**THE RESPONSE DOES NOT GO BACK ONTO THE PR.**~~ **SUPERSEDED and it was stale in place** —
+  corrected 2026-08-03. `postVerdict.mjs` writes the verdict onto the PR and has since WO-TW-02; the
+  entry above it described the state before that landed and was never updated. What remains true is
+  narrower and is the part worth keeping: **the POLLER still never writes** (`assertReadOnlyArgs`
+  forbids it structurally), and the write lives in a separate module behind a separate allowlist
+  seam. See "The verdict goes back ONTO the PR".
+- ~~**The store-derived poll cannot bootstrap itself.**~~ **SUPERSEDED** by WO-2026-08-03-05:
+  targets are now every OPEN PR asked of GitHub, so there is no bootstrap hole and no first-
+  checkpoint blind spot. The residual limit is different and smaller: **if no repository can be
+  determined from the checkout's `origin`, the store, or `TOWER_PR_SEED`, nothing is polled.** That
+  round logs `pr_poll_no_repos` rather than looking idle, but it raises no alarm.
 - **A checkpoint marker on a PR whose head has moved is refused, not queued.** Layer 1 compares the
   body head to the API head; if the PR advanced between writing and polling, the comment is
   `refused_head_mismatch` and **no round opens**. Re-post at the current head.

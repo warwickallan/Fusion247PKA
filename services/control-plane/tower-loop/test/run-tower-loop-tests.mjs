@@ -30,7 +30,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { spawn, execFile } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 // WO-2026-08-03-02 — the REAL supervisor invocation (the doubles below deliberately never
@@ -45,10 +45,11 @@ import { detectMergeClass } from '../mergeClass.mjs';
 // WO-OR-22 — the PR-comment ⇄ Tower seam.
 import { ingestPrComment, parseCommentBody } from '../ingestComment.mjs';
 // WO-OR-24 — the GitHub → Tower first hop, driven through an injected `gh` seam (no network).
-import { pollPrComments, assertReadOnlyArgs, ensureCheckpointTurn, checkpointTurnKey } from '../pollPrComments.mjs';
+import { pollPrComments, assertReadOnlyArgs, ensureCheckpointTurn, checkpointTurnKey, fetchOpenPrs } from '../pollPrComments.mjs';
 import { makeFakeGh, ghComment } from './doubles/fakeGh.mjs';
 // WO-TW-02 — the automatic trigger's own seams, and the verdict write-back.
-import { pollTargets } from '../watcher.mjs';
+// WO-2026-08-03-05 — open-PR discovery and the repository sources it draws on.
+import { pollTargets, detectCheckoutRepo, seedRepos } from '../watcher.mjs';
 import {
   assertCommentPostArgs, verdictPostKey, verdictMarker, composeVerdictComment,
   queueVerdictForTurn, postPendingVerdicts,
@@ -145,10 +146,12 @@ async function notesFor(pool, turnId) {
 const CP_FNS = ['spawnSync', 'spawn', 'execFileSync', 'execFile', 'execSync', 'exec', 'fork'];
 const CP_CALL_RE = new RegExp(`(?<![\\w$.])(${CP_FNS.join('|')})\\(`, 'g');
 
-// Pinned literal, held HERE rather than derived from the sources it checks — 15 launch sites
-// under tower-loop as of WO-2026-08-03-02. A count that recomputed itself would agree with
-// anything and prove nothing.
-const TOWER_LOOP_CP_SITES = 15;
+// Pinned literal, held HERE rather than derived from the sources it checks — 17 launch sites
+// under tower-loop as of the #92/#93 reconciliation merge (15 from WO-2026-08-03-02, plus 2
+// legitimate additions from PR #93's fetchOpenPrs/detectCheckoutRepo work — both already
+// windowsHide:true — reviewed and acknowledged here per this test's own design). A count that
+// recomputed itself would agree with anything and prove nothing.
+const TOWER_LOOP_CP_SITES = 17;
 
 function jsFilesUnder(dir, out = []) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -822,26 +825,181 @@ async function main() {
       'a checkpoint marker cannot bypass layer 1 — a typed SHA is never authority');
   });
 
-  await test('A-unit — pollTargets derives PRs from the store, skips complete turns, and honours the bootstrap seed', async () => {
-    const before = await pollTargets(pool);
-    assert.ok(before.some((t) => t.prNumber === 9001), 'a non-complete checkpoint turn is a target');
+  // ══════════════════════════════════════════════════════════════════════════
+  // WO-2026-08-03-05 — THE WATCHER POLLS EVERY OPEN PR (D1–D9)
+  //
+  // The defect these close, stated exactly, because the previous framing was wrong and cost a
+  // round: nothing was hardcoded to a PR. `pollTargets` selected PRs from `tower.turn`
+  // `where state <> 'complete'`, so A ROUND THAT FINISHED REMOVED ITS OWN PR FROM THE POLL LIST.
+  // Success and blindness were the same event. The only thing that ever added a PR back was a
+  // human supplying `TOWER_PR_SEED` at launch — a value living solely in `process.env`, refreshed
+  // by nothing, lost the moment the process was replaced.
+  //
+  // AND THE REASON FIVE ROUNDS OF VALIDATION MISSED IT: every acceptance test supplied, at test
+  // time, the exact binding production supplies once at launch and then never refreshes. The suite
+  // proved the seed was OBEYED. It could not prove the seed was still CORRECT, because the suite
+  // was what supplied it. The tested surface and the failing surface were disjoint.
+  //
+  // SO THE RULE FOR EVERYTHING BELOW: **a test must not supply the binding it is testing.** Where
+  // the claim is discovery, `TOWER_PR_SEED` is UNSET and no turn is prepared, and the watcher has
+  // to find the PR with nothing having told it to.
+  // ══════════════════════════════════════════════════════════════════════════
 
+  await test('D1 — TARGETS ARE OPEN PRs, NOT WORK STATE: a completed round no longer hides its own still-open PR, and PRs with no turn at all are polled', async () => {
+    // THIS ASSERTION IS THE INVERSE OF THE ONE IT REPLACES, and deliberately so. The old A-unit
+    // asserted "a completed PR stops being polled" — which was the DEFECT stated as a
+    // requirement. Openness now governs: a completed turn is not a reason to stop watching a pull
+    // request that is still open, because a new checkpoint can appear on it at any moment.
     await pool.query(`update tower.turn set state = 'complete' where pr_number = 9001`);
-    const after = await pollTargets(pool);
-    assert.ok(!after.some((t) => t.prNumber === 9001), 'a completed PR stops being polled');
+    const completeCount = Number((await pool.query(
+      `select count(*) n from tower.turn where pr_number = 9001 and state <> 'complete'`)).rows[0].n);
+    assert.equal(completeCount, 0, 'precondition: PR 9001 has NO non-complete turn — the old rule yielded nothing here');
 
-    process.env.TOWER_PR_SEED = 'someone/elsewhere#4242';
+    // GitHub says three PRs are open. 9001 has only completed turns; 9002 has a live one; 9999 has
+    // never been seen by Tower at all.
+    const gh = makeFakeGh({ headSha: HEAD_CP, comments: [], openPrs: { [CP_REPO]: [9001, 9002, 9999] } });
+    const targets = await pollTargets(pool, { gh, detectRepo: async () => CP_REPO });
+    const keys = targets.map((t) => `${t.repo}#${t.prNumber}`);
+
+    assert.ok(keys.includes(`${CP_REPO}#9001`), 'a still-open PR whose round COMPLETED is still polled');
+    assert.ok(keys.includes(`${CP_REPO}#9002`), 'a PR with a live round is polled');
+    assert.ok(keys.includes(`${CP_REPO}#9999`), 'a PR with NO turn in the store at all is polled — nothing had to tell us about it');
+  });
+
+  await test('D2 — A MERGED PR DROPS OUT even though its turn is live AND it is explicitly seeded (the live defect, both halves)', async () => {
+    // Measured live on 2026-08-03: watcher PID 9616 healthy, heartbeat advancing, polling PR #90 —
+    // merged at 2026-08-02T23:30:33Z — while PR #91 sat open and unpolled. Both possible bindings
+    // for #90 are reproduced here at once, and NEITHER may survive GitHub saying "closed".
+    const pr = 9021;
+    await inertTurn({ buildRef: 'BUILD-D02', headSha: HEAD_A, instruction: 'live round', larryResponse: 'x' });
+    await pool.query(`update tower.turn set pr_number = ? where instruction = 'live round'`, [pr]);
+    assert.ok(Number((await pool.query(
+      `select count(*) n from tower.turn where pr_number = ? and state <> 'complete'`, [pr])).rows[0].n) > 0,
+    'precondition: the merged PR still has a NON-complete turn — the old rule would poll it forever');
+
+    process.env.TOWER_PR_SEED = `${CP_REPO}#${pr}`;   // and a stale launch-time seed names it too
     try {
-      const seeded = await pollTargets(pool);
-      assert.ok(seeded.some((t) => t.repo === 'someone/elsewhere' && t.prNumber === 4242),
-        'the seed makes a never-before-seen PR reachable — without it the store-derived rule cannot bootstrap');
+      const gh = makeFakeGh({ headSha: HEAD_CP, comments: [], openPrs: { [CP_REPO]: [9022] } });
+      const targets = await pollTargets(pool, { gh, detectRepo: async () => CP_REPO });
+      const keys = targets.map((t) => `${t.repo}#${t.prNumber}`);
+      assert.ok(!keys.includes(`${CP_REPO}#${pr}`),
+        `a merged PR must not be polled, whatever the store or the seed says (got ${JSON.stringify(keys)})`);
+      assert.ok(keys.includes(`${CP_REPO}#9022`), 'and the PR that IS open is polled instead');
+
+      // THE SEED HAS NO POWER OF ITS OWN ANY MORE — only its repository survives.
+      assert.deepEqual(seedRepos({ TOWER_PR_SEED: `${CP_REPO}#${pr}` }), [CP_REPO],
+        'a seed entry contributes its REPOSITORY and nothing else');
     } finally { delete process.env.TOWER_PR_SEED; }
+  });
+
+  await test('D3 — a NEWLY OPENED PR is picked up mid-run with no restart, no seed and no store row', async () => {
+    const gh1 = makeFakeGh({ headSha: HEAD_CP, comments: [], openPrs: { [CP_REPO]: [9031] } });
+    const before = (await pollTargets(pool, { gh: gh1, detectRepo: async () => CP_REPO })).map((t) => t.prNumber);
+    assert.ok(!before.includes(9032), 'precondition: 9032 is not open yet and is not a target');
+
+    // GitHub state changes. Nothing else does — no restart, no configuration, no insert.
+    const gh2 = makeFakeGh({ headSha: HEAD_CP, comments: [], openPrs: { [CP_REPO]: [9031, 9032] } });
+    const after = (await pollTargets(pool, { gh: gh2, detectRepo: async () => CP_REPO })).map((t) => t.prNumber);
+    assert.ok(after.includes(9032), 'the newly opened PR became a target on the very next round');
+    assert.ok(after.includes(9031), 'and the existing one did not fall out');
+  });
+
+  await test('D4 — the REPOSITORY comes from durable sources, NOT from a launch-time env binding', async () => {
+    // The durability half. `detectCheckoutRepo` reads the checkout's own origin remote — on disk,
+    // re-read every round, unaffected by process replacement. The store is the second durable
+    // source. TOWER_PR_SEED is neither required nor sufficient.
+    delete process.env.TOWER_PR_SEED;
+
+    // 1. A FRESH store — nothing Tower has ever seen — with NO seed. If the repo were only
+    //    discoverable from the store or the environment, this yields nothing.
+    const freshPath = path.join(TMP_DIR, 'fresh-discovery.db');
+    const fresh = openDb(freshPath);
+    try {
+      await applySchema(fresh); await applyWatcherSchema(fresh); await applyCommentSchema(fresh); await applyPostSchema(fresh);
+      assert.equal(Number((await fresh.query(`select count(*) n from tower.turn`)).rows[0].n), 0, 'precondition: empty store');
+
+      const asked = [];
+      const gh = makeFakeGh({ headSha: HEAD_CP, comments: [], openPrs: { [CP_REPO]: [4242] } });
+      const spy = { async api(args) { asked.push(args[0]); return gh.api(args); } };
+      const targets = await pollTargets(fresh, { gh: spy, detectRepo: async () => CP_REPO });
+      assert.deepEqual(targets, [{ repo: CP_REPO, prNumber: 4242 }],
+        'with an empty store and NO seed, the checkout itself is enough to find an open PR');
+      assert.ok(asked.some((e) => e.startsWith(`repos/${CP_REPO}/pulls?state=open`)), 'GitHub was asked which PRs are open');
+
+      // 2. NO repository from ANY source ⇒ empty, and that state is DISTINCT in the log from
+      //    "nothing is open". It must never look like a healthy idle round.
+      const none = await pollTargets(fresh, { gh: spy, detectRepo: async () => null });
+      assert.deepEqual(none, [], 'no repository anywhere ⇒ no targets');
+    } finally { await fresh.end(); }
+
+    // 3. And the real derivation is not a stub: run it against THIS checkout and compare with a
+    //    SECOND, independent instrument (git invoked directly by the test).
+    const detected = await detectCheckoutRepo({ cwd: LOOP_DIR });
+    const viaGit = await new Promise((resolve) => {
+      execFile('git', ['remote', 'get-url', 'origin'], { cwd: LOOP_DIR, windowsHide: true }, (err, out) => {
+        if (err) return resolve(null);
+        const m = /[/:]([A-Za-z0-9._-]+\/[A-Za-z0-9._-]+?)(?:\.git)?$/.exec(String(out).trim());
+        resolve(m ? m[1] : null);
+      });
+    });
+    assert.equal(detected, viaGit, 'the product derives the same repository a plain git call does');
+    assert.ok(detected && /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/.test(detected), `and it is a real owner/name (got ${detected})`);
+
+    // 4. A checkout with no usable remote yields null rather than throwing or guessing.
+    assert.equal(await detectCheckoutRepo({ exec: (_c, _a, _o, cb) => cb(new Error('not a git repository')) }), null);
+    assert.equal(await detectCheckoutRepo({ exec: (_c, _a, _o, cb) => cb(null, 'not-a-url\n') }), null);
+  });
+
+  await test('D5 — DISCOVERY FAILURE IS LOUD: it throws rather than returning an empty set that looks like a healthy idle watcher', async () => {
+    const failing = { async api() { throw new Error('gh api rate limit exceeded'); } };
+    await assert.rejects(() => pollTargets(pool, { gh: failing, detectRepo: async () => CP_REPO }),
+      /rate limit exceeded/, 'a discovery failure must propagate — silence is the defect');
+
+    // TWO-SIDED. A genuinely empty repository returns [] WITHOUT throwing, so the assertion above
+    // is not simply "pollTargets always throws".
+    const empty = makeFakeGh({ headSha: HEAD_CP, comments: [], openPrs: { [CP_REPO]: [] } });
+    assert.deepEqual(await pollTargets(pool, { gh: empty, detectRepo: async () => CP_REPO }), [],
+      'no open PRs is a legitimate, non-throwing, empty result');
+
+    // And the throw reaches the alarm path: runWatcher converts it into a FAILED round, which is
+    // what feeds the 3-strike tower_failure. A7 exercises that end to end with a failing fixture.
+  });
+
+  await test('D6 — the discovery call is READ-ONLY and asks for exactly the open PRs', async () => {
+    const gh = makeFakeGh({ headSha: HEAD_CP, comments: [], openPrs: { [CP_REPO]: [9061] } });
+    await pollTargets(pool, { gh, detectRepo: async () => CP_REPO });
+    const call = gh.calls.find((c) => c.includes('pulls?state=open'));
+    assert.ok(call, `discovery was actually invoked (calls: ${JSON.stringify(gh.calls)})`);
+    assert.doesNotThrow(() => assertReadOnlyArgs(call.split(' ')), `discovery argv must be read-only: ${call}`);
+    assert.match(call, /--paginate/, 'paginated, so a repo with many open PRs is not silently truncated by GitHub');
+
+    // The parser refuses junk rather than degrading to an empty list.
+    await assert.rejects(() => fetchOpenPrs({ async api() { return 'nine\n'; } }, { repo: CP_REPO }), /non-numeric/);
+    await assert.rejects(() => fetchOpenPrs({ async api() { return '0\n'; } }, { repo: CP_REPO }), /non-positive/);
+    assert.deepEqual(await fetchOpenPrs({ async api() { return '7\n8\n'; } }, { repo: CP_REPO }), [7, 8]);
+    assert.deepEqual(await fetchOpenPrs({ async api() { return ''; } }, { repo: CP_REPO }), [], 'an empty page is an empty list, not an error');
+  });
+
+  await test('D7 — the cap bounds a round, prefers PRs with live rounds, and says so rather than dropping silently', async () => {
+    const many = Array.from({ length: 12 }, (_, i) => 9500 + i);
+    const gh = makeFakeGh({ headSha: HEAD_CP, comments: [], openPrs: { [CP_REPO]: [...many, 9002] } });
+    const targets = await pollTargets(pool, { gh, limit: 5, detectRepo: async () => CP_REPO });
+    assert.equal(targets.length, 5, 'the round is bounded — a repo full of open PRs is not a rate-limit incident');
+    assert.equal(targets[0].prNumber, 9002, 'a PR with a LIVE round is ranked first and is never the one dropped');
+    // The remainder is newest-first, which is deterministic rather than incidental.
+    assert.deepEqual(targets.slice(1).map((t) => t.prNumber), [9511, 9510, 9509, 9508]);
   });
 
   // ── A5/A6: the SPAWNED watcher. No poller, no CLI, no insert — a comment appears, and that
   // is the only thing that happens externally.
   const GH_FIXTURE = path.join(TMP_DIR, 'gh-fixture.json');
+  // WO-2026-08-03-05 — every spawned-watcher fixture must now state WHICH PRs GitHub considers
+  // open, because that is what the watcher discovers. `openPrs` defaults to nothing (the double
+  // refuses an unmodelled endpoint), so a fixture that forgets it fails loudly instead of
+  // silently polling whatever the old work-state rule happened to yield.
   const writeFixture = (o) => fs.writeFileSync(GH_FIXTURE, JSON.stringify(o), 'utf8');
+  /** Fixture helper: one PR, open, with its comments. */
+  const openFixture = (pr, o) => writeFixture({ openPrs: { [CP_REPO]: [pr] }, ...o });
   const POLL_ENV = {
     TOWER_PR_POLL: 'on',
     TOWER_PR_POLL_MS: '400',
@@ -854,12 +1012,15 @@ async function main() {
   const turnForPr = async (pr) => (await pool.query(
     `select id, state, head_sha, build_ref from tower.turn where repo = ? and pr_number = ? order by seq desc`, [CP_REPO, pr])).rows;
 
-  await test('A5 — END TO END: no turn is prepared, one checkpoint comment appears, and the RUNNING watcher detects it, opens the turn, reviews it and notifies', async () => {
+  await test('A5 — END TO END: no turn is prepared, NOTHING NAMES THE PR, and the RUNNING watcher discovers it, opens the turn, reviews it and notifies', async () => {
     const pr = 9005;
-    writeFixture({ headSha: HEAD_CP, comments: [ghComment({ id: 75001, body: checkpointBody(HEAD_CP) })] });
+    openFixture(pr, { headSha: HEAD_CP, comments: [ghComment({ id: 75001, body: checkpointBody(HEAD_CP) })] });
     assert.equal((await turnForPr(pr)).length, 0, 'acceptance step 1: nothing prepared by hand');
 
-    const w = spawnWatcher('ci-trigger-a5', { ...POLL_ENV, TOWER_PR_SEED: `${CP_REPO}#${pr}` });
+    // WO-2026-08-03-05 — NO TOWER_PR_SEED. This test used to hand the watcher the exact PR number
+    // it was then asked to prove it polled, which proved only that the seed was obeyed. The number
+    // is now GitHub's to tell it.
+    const w = spawnWatcher('ci-trigger-a5', POLL_ENV);
     try {
       // Nothing is run against the watcher from here on. It has to find this itself.
       const deadline = Date.now() + 40000;
@@ -888,7 +1049,7 @@ async function main() {
     assert.equal(beforeRestart.length, 1, 'precondition: exactly one turn from A5');
 
     // Acceptance step 7 — restart, same fixture, same comment still on the PR.
-    const w2 = spawnWatcher('ci-trigger-a6', { ...POLL_ENV, TOWER_PR_SEED: `${CP_REPO}#${pr}` });
+    const w2 = spawnWatcher('ci-trigger-a6', POLL_ENV);
     try {
       await sleep(2500); // several poll rounds at 400ms — it re-sees the checkpoint every time
       const afterRestart = await turnForPr(pr);
@@ -897,6 +1058,7 @@ async function main() {
 
       // Acceptance step 8 — a SECOND checkpoint appears while the watcher is already running.
       writeFixture({
+        openPrs: { [CP_REPO]: [pr] },
         headSha: HEAD_CP2,
         comments: [
           ghComment({ id: 75001, body: checkpointBody(HEAD_CP) }),      // the old one, now stale
@@ -919,10 +1081,10 @@ async function main() {
     } finally { await killWatcher(w2); }
   });
 
-  await test('A7 — a PERSISTENTLY failing poll fires a LOUD tower_failure alarm', async () => {
-    writeFixture({ headSha: HEAD_CP, comments: [], fail: 'simulated GitHub outage' });
+  await test('A7 — a PERSISTENTLY failing poll fires a LOUD tower_failure alarm (now covering DISCOVERY failure, which is the first call to break)', async () => {
+    writeFixture({ openPrs: { [CP_REPO]: [9007] }, headSha: HEAD_CP, comments: [], fail: 'simulated GitHub outage' });
     const before = Number((await pool.query(`select count(*) n from tower.notification where reason = 'tower_failure' and turn_id is null`)).rows[0].n);
-    const w = spawnWatcher('ci-trigger-a7', { ...POLL_ENV, TOWER_PR_SEED: `${CP_REPO}#9007` });
+    const w = spawnWatcher('ci-trigger-a7', POLL_ENV);
     try {
       const deadline = Date.now() + 30000;
       let row = null;
@@ -941,9 +1103,9 @@ async function main() {
   });
 
   await test('A8 — CONTROL: a HEALTHY poll fires no alarm (the A7 assertion is two-sided, not always-true)', async () => {
-    writeFixture({ headSha: HEAD_CP, comments: [ghComment({ id: 78001, body: checkpointBody(HEAD_CP) })] });
+    openFixture(9008, { headSha: HEAD_CP, comments: [ghComment({ id: 78001, body: checkpointBody(HEAD_CP) })] });
     const before = Number((await pool.query(`select count(*) n from tower.notification where reason = 'tower_failure' and turn_id is null`)).rows[0].n);
-    const w = spawnWatcher('ci-trigger-a8', { ...POLL_ENV, TOWER_PR_SEED: `${CP_REPO}#9008` });
+    const w = spawnWatcher('ci-trigger-a8', POLL_ENV);
     try {
       await sleep(4000); // ≥ 3 × PR_POLL_FAIL_ESCALATE_AFTER poll intervals — long enough to alarm if it were going to
       const after = Number((await pool.query(`select count(*) n from tower.notification where reason = 'tower_failure' and turn_id is null`)).rows[0].n);
@@ -954,13 +1116,13 @@ async function main() {
   await test('A9 — ZERO CLICKUP, instrumented: the trigger path\'s module graph is enumerated and a ClickUp trap is proven to bite', async () => {
     const graphOut = path.join(TMP_DIR, 'module-graph.txt');
     fs.writeFileSync(graphOut, '', 'utf8');
-    writeFixture({ headSha: HEAD_CP, comments: [ghComment({ id: 79001, body: checkpointBody(HEAD_CP) })] });
+    openFixture(9009, { headSha: HEAD_CP, comments: [ghComment({ id: 79001, body: checkpointBody(HEAD_CP) })] });
 
     const probe = path.join(__dirname, 'doubles', 'graph-probe.mjs');
     const run = (mode) => new Promise((res) => {
       const c = spawn(process.execPath, [probe, mode], {
         cwd: LOOP_DIR,
-        env: { ...process.env, GRAPH_OUT: graphOut, TOWER_FAKE_GH_FIXTURE: GH_FIXTURE, TOWER_PR_SEED: `${CP_REPO}#9009` },
+        env: { ...process.env, GRAPH_OUT: graphOut, TOWER_FAKE_GH_FIXTURE: GH_FIXTURE, TOWER_PR_SEED: '' },
         stdio: ['ignore', 'pipe', 'pipe'],
         windowsHide: true,
       });
@@ -1026,11 +1188,11 @@ async function main() {
 
   await test('A12 — after an auto-created round completes, the verdict is POSTED to the PR carrying verdict, head and the checkpoint it answers', async () => {
     const pr = 9012;
-    writeFixture({ headSha: HEAD_CP, comments: [ghComment({ id: 91201, body: checkpointBody(HEAD_CP) })] });
+    openFixture(pr, { headSha: HEAD_CP, comments: [ghComment({ id: 91201, body: checkpointBody(HEAD_CP) })] });
     assert.equal((await turnForPr(pr)).length, 0);
     const postsBefore = readPosts().length;
 
-    const w = spawnWatcher('ci-writeback-a12', { ...WRITEBACK_ENV, TOWER_PR_SEED: `${CP_REPO}#${pr}` });
+    const w = spawnWatcher('ci-writeback-a12', WRITEBACK_ENV);
     try {
       const deadline = Date.now() + 40000;
       let posted = null;
@@ -1068,7 +1230,7 @@ async function main() {
       await postPendingVerdicts(pool, { writer: fakeGhWriter, reader: null });
     }
     // And a real restart, which re-queues on boot the same way.
-    const w = spawnWatcher('ci-writeback-a13', { ...WRITEBACK_ENV, TOWER_PR_SEED: `${CP_REPO}#${pr}` });
+    const w = spawnWatcher('ci-writeback-a13', WRITEBACK_ENV);
     try { await sleep(2500); } finally { await killWatcher(w); }
 
     const after = readPosts().filter((x) => x.prNumber === pr).length;
@@ -1091,7 +1253,7 @@ async function main() {
 
   await test('A14 — a FAILING post is fail-closed and LOUD: nothing claims the round was answered, and the alarm fires', async () => {
     const pr = 9014;
-    writeFixture({
+    openFixture(pr, {
       headSha: HEAD_CP, comments: [ghComment({ id: 91401, body: checkpointBody(HEAD_CP) })],
       postFail: 'simulated GitHub write outage',
     });
@@ -1099,7 +1261,7 @@ async function main() {
       `select count(*) n from tower.notification where reason = 'tower_failure' and turn_id is null and state = 'post_failing'`)).rows[0].n);
     assert.equal(before, 0, 'precondition: no write-back alarm has fired yet');
 
-    const w = spawnWatcher('ci-writeback-a14', { ...WRITEBACK_ENV, TOWER_PR_SEED: `${CP_REPO}#${pr}` });
+    const w = spawnWatcher('ci-writeback-a14', WRITEBACK_ENV);
     try {
       const deadline = Date.now() + 40000;
       let alarm = null;
@@ -1144,8 +1306,8 @@ async function main() {
     const cp = (head, id) => ghComment({ id, body: `Shipped. All good — checkpoint for review.\n\n@tower checkpoint: ${BUILD}\n@tower head: ${head}` });
 
     // ROUND 1 — a checkpoint appears; the running watcher opens and reviews it.
-    writeFixture({ headSha: HEAD_CP, comments: [cp(HEAD_CP, 91501)] });
-    const w = spawnWatcher('ci-chain-a15', { ...WRITEBACK_ENV, TOWER_PR_SEED: `${CP_REPO}#${pr}` });
+    openFixture(pr, { headSha: HEAD_CP, comments: [cp(HEAD_CP, 91501)] });
+    const w = spawnWatcher('ci-chain-a15', WRITEBACK_ENV);
     try {
       const waitForTurnAt = async (head, timeoutMs = 40000) => {
         const deadline = Date.now() + timeoutMs;
@@ -1170,7 +1332,7 @@ async function main() {
 
       // ROUND 2 — a NEW checkpoint at a NEW head. The finding is prior and UNDISPOSED, so the
       // gate must reject this round before any reviewer is invoked.
-      writeFixture({ headSha: HEAD_CP2, comments: [cp(HEAD_CP, 91501), cp(HEAD_CP2, 91502)] });
+      openFixture(pr, { headSha: HEAD_CP2, comments: [cp(HEAD_CP, 91501), cp(HEAD_CP2, 91502)] });
       const t2 = (await waitForTurnAt(HEAD_CP2))[0];
       await waitForProcessed(pool, t2.id, 40000);
       const r2 = await reviewsFor(pool, t2.id);
@@ -1185,7 +1347,7 @@ async function main() {
         body: `Fixed that.\n\n@tower head: ${HEAD_CP2}\n@tower finding ${finding.id}: addressed — pool.end() is now in a finally block.`,
       });
       // ROUND 3 — a further checkpoint at the SAME head, so the disposition is not stale for it.
-      writeFixture({ headSha: HEAD_CP2, comments: [cp(HEAD_CP, 91501), cp(HEAD_CP2, 91502), disposition, cp(HEAD_CP2, 91504)] });
+      openFixture(pr, { headSha: HEAD_CP2, comments: [cp(HEAD_CP, 91501), cp(HEAD_CP2, 91502), disposition, cp(HEAD_CP2, 91504)] });
 
       const deadline = Date.now() + 40000;
       let t3 = null;
@@ -1252,6 +1414,80 @@ async function main() {
     const ok = (await pollPrComments(pool, { repo: CP_REPO, prNumber: 9017, gh: gh2 })).results[0].checkpoint;
     assert.equal(ok.buildRef, 'BUILD-019');
     assert.equal(ok.buildRefHonoured, true);
+  });
+
+  // ── D8/D9: the claim Warwick actually cares about, through a SPAWNED watcher, with the suite
+  // supplying nothing but the state of "GitHub". No seed, no prepared turn, no restart.
+  const HEAD_D1 = 'e'.repeat(39) + '1';
+  const HEAD_D2 = 'e'.repeat(39) + '2';
+  const HEAD_D3 = 'e'.repeat(39) + '3';
+  const cpBody = (head, id) => ghComment({ id, body: `Shipped. All good — checkpoint for review.\n\n@tower checkpoint: BUILD-908\n@tower head: ${head}` });
+
+  await test('D8 — TWO open PRs are BOTH polled by one running watcher, each opening its own round, with nothing naming either of them', async () => {
+    const prA = 9081; const prB = 9082;
+    writeFixture({
+      openPrs: { [CP_REPO]: [prA, prB] },
+      byPr: {
+        [prA]: { headSha: HEAD_D1, comments: [cpBody(HEAD_D1, 90810)] },
+        [prB]: { headSha: HEAD_D2, comments: [cpBody(HEAD_D2, 90820)] },
+      },
+    });
+    assert.equal((await turnForPr(prA)).length + (await turnForPr(prB)).length, 0, 'precondition: neither PR has a turn');
+
+    const w = spawnWatcher('ci-discovery-d8', POLL_ENV);   // NO TOWER_PR_SEED
+    try {
+      const deadline = Date.now() + 40000;
+      let a = null; let b = null;
+      while (Date.now() < deadline && !(a && b)) {
+        a = a ?? (await turnForPr(prA))[0] ?? null;
+        b = b ?? (await turnForPr(prB))[0] ?? null;
+        if (!(a && b)) await sleep(250);
+      }
+      assert.ok(a, 'PR A opened a round');
+      assert.ok(b, `PR B opened a round TOO — merging or reviewing one PR must not leave the other unwatched (A=${!!a})`);
+      assert.equal(a.head_sha, HEAD_D1, 'each round is bound to its OWN PR head');
+      assert.equal(b.head_sha, HEAD_D2, 'and not to the other PR\'s');
+      assert.notEqual(a.id, b.id, 'two distinct rounds');
+      await waitForProcessed(pool, a.id, 40000);
+      await waitForProcessed(pool, b.id, 40000);
+      assert.equal((await reviewsFor(pool, a.id)).length, 1);
+      assert.equal((await reviewsFor(pool, b.id)).length, 1);
+    } finally { await killWatcher(w); }
+  });
+
+  await test('D9 — LIVE TRANSITION: one PR merges and a new one opens while the watcher runs — it stops polling the corpse and starts polling the newcomer, with no restart', async () => {
+    // This is the exact event that has broken this loop five times: a merge. The watcher is
+    // already running and is never told anything; only GitHub's answer changes.
+    const merged = 9081; const stillOpen = 9082; const newcomer = 9083;
+    writeFixture({
+      openPrs: { [CP_REPO]: [stillOpen, newcomer] },        // 9081 has MERGED
+      byPr: {
+        // A brand-new checkpoint appears on the merged PR. It must NOT open a round.
+        [merged]: { headSha: HEAD_D1, comments: [cpBody(HEAD_D1, 90810), cpBody(HEAD_D1, 90811)] },
+        [stillOpen]: { headSha: HEAD_D2, comments: [cpBody(HEAD_D2, 90820)] },
+        [newcomer]: { headSha: HEAD_D3, comments: [cpBody(HEAD_D3, 90830)] },
+      },
+    });
+    const mergedTurnsBefore = (await turnForPr(merged)).length;
+    assert.equal(mergedTurnsBefore, 1, 'precondition: the merged PR has exactly the one round D8 opened');
+
+    const w = spawnWatcher('ci-discovery-d9', POLL_ENV);   // NO TOWER_PR_SEED
+    try {
+      const deadline = Date.now() + 40000;
+      let fresh = null;
+      while (Date.now() < deadline && !fresh) {
+        fresh = (await turnForPr(newcomer))[0] ?? null;
+        if (!fresh) await sleep(250);
+      }
+      assert.ok(fresh, 'the PR opened AFTER the watcher started is discovered and polled');
+      assert.equal(fresh.head_sha, HEAD_D3);
+      await waitForProcessed(pool, fresh.id, 40000);
+
+      // Several more poll rounds, so "it just had not got there yet" is not an explanation.
+      await sleep(2000);
+      assert.equal((await turnForPr(merged)).length, mergedTurnsBefore,
+        'the MERGED PR opened no further round despite a new checkpoint comment sitting on it');
+    } finally { await killWatcher(w); }
   });
 
   await test('A10 — run-watcher.mjs is INERT on import: no directory created, no process stopped, nothing spawned', async () => {

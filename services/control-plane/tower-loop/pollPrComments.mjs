@@ -112,6 +112,39 @@ export async function fetchPrHeadSha(gh, { repo, prNumber }) {
   return sha;
 }
 
+/**
+ * Every OPEN pull request on the repository, right now, as GitHub has them.
+ *
+ * WHY THIS EXISTS, and it is the whole point of WO-2026-08-03-05. Which PRs are open is a fact
+ * about GitHub. It was previously inferred from `tower.turn` — work-in-progress state — which made
+ * the watcher's success condition and its blindness condition the same event: a round that
+ * finished set `state='complete'` and thereby removed its own PR from the poll list. The healthier
+ * the loop was, the more certainly it went quiet, and the only thing that ever added a PR back was
+ * a human supplying `TOWER_PR_SEED` at launch. Both of those are bindings that go stale; this
+ * question does not, because it is re-asked every round.
+ *
+ * FAILS LOUD, NEVER EMPTY. A discovery error THROWS. It must never degrade to "no open PRs",
+ * because an empty target set is indistinguishable from a healthy idle watcher — which is exactly
+ * the failure this module is being changed to end.
+ */
+export async function fetchOpenPrs(gh, { repo }) {
+  assertRepo(repo);
+  // `--jq .[].number` with `--paginate` emits one number per line per page, so a repo with more
+  // open PRs than one page still yields a complete list without stitching JSON arrays together.
+  const out = await gh.api([`repos/${repo}/pulls?state=open&per_page=100`, '--paginate', '--jq', '.[].number']);
+  const lines = String(out ?? '').split('\n').map((s) => s.trim()).filter(Boolean);
+  const numbers = [];
+  for (const line of lines) {
+    if (!/^\d+$/.test(line)) {
+      throw new Error(`gh returned a non-numeric open-PR entry for ${repo}: ${JSON.stringify(line)}`);
+    }
+    const n = Number(line);
+    if (!Number.isInteger(n) || n <= 0) throw new Error(`gh returned a non-positive PR number for ${repo}: ${line}`);
+    numbers.push(n);
+  }
+  return numbers;
+}
+
 /** Every comment on the PR, as GitHub returns them. No filtering here — filtering is a decision
  *  and belongs where it can be seen. */
 export async function fetchPrComments(gh, { repo, prNumber }) {
