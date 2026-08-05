@@ -22,7 +22,7 @@
 
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, readdirSync, readFileSync, writeFileSync, statSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -1502,4 +1502,356 @@ test('D: `cwd` and `git` never leak into the message walk', async () => {
     assert.deepEqual(Object.keys(a).sort(), ['cursor', 'page', 'reverse', 'size'],
       'the fetcher sees its own four arguments and nothing this change added');
   }
+});
+
+// ---------------------------------------------------------------------------
+// WRITE-SIDE POINTER PROTECTION — session-start-time vs. stored-packet write-time
+// ---------------------------------------------------------------------------
+//
+// THE RACE THIS CLOSES. `continuity.json`/the Honcho session is ONE shared store written by
+// every session's Stop hook across every worktree and build on this machine. Without this
+// check, an honestly-resolved but STALE `map_path` — from a session left open in an old
+// worktree, closed AFTER a more current session already posted the pointer that should stand
+// — silently becomes "the current map" on nothing more than post-time ordering (W-1, the
+// exact failure WP-2B(1)/(2) above closed on the READ side; this closes it on the WRITE side).
+//
+// THE SIGNAL, AND WHY IT IS NOT MAP COMMIT-RECENCY. An earlier design compared the candidate
+// map's own git-commit timestamp against whatever was already stored. Warwick caught the
+// flaw before it shipped: commit-recency answers "when did this FILE last change", not "when
+// did this SESSION decide to point at it" — so it would have WRONGLY rejected a deliberate
+// switch to an older, dormant build, which is exactly the case this mechanism must allow. The
+// corrected signal is SESSION START TIME vs. the stored pointer's last WRITE time (`ts` — an
+// existing field, nothing new): the one fact a stale session cannot fake. The
+// 'DIFFERENTIATING PROOF' test below is built specifically to demonstrate this: it uses a
+// candidate whose map has an OLD commit timestamp and proves it is STILL accepted, because
+// commit age is no longer part of the comparison at all.
+//
+// THE SEAM. `deliver()` (and therefore `writeContinuity()`) now accepts an injectable
+// `request` — the SAME `request = hf` idiom `fetchMessagePage` already uses for reads in this
+// file, extended to the one write call site that lacked it (see the comment above `deliver`
+// in the source). Combined with the EXISTING `fetchPage` injection on `readLatest`
+// (`writeContinuity` forwards it internally for its own pre-write comparison read), both
+// halves of "the store" a test needs to control are covered by seams this file already had,
+// or by the identical shape of one it already had — nothing new is invented.
+
+// A minimal in-memory fake Honcho session, shared between the WRITE path (`request`, used by
+// `deliver`/`ensureStore`) and the READ path (`fetchPage`, used by `readLatest` — including
+// the comparison `writeContinuity` performs internally before allowing a candidate
+// `map_path` out). Built from `pagingServer` and the fenced-JSON content shape `msg()`
+// mirrors, both already defined above, rather than a new fixture shape: a write appends a raw
+// packet to `store`; a read re-wraps whatever is CURRENTLY in `store` through the SAME
+// `pagingServer` the read-path tests already use. That is what makes "a subsequent
+// `readLatest` observes what a prior write delivered" a genuine round trip rather than an
+// assumption about two independently-programmed stubs agreeing by construction.
+function fakeHoncho(initialPackets = []) {
+  const store = [...initialPackets];
+  const request = async (path, opts) => {
+    const body = opts && opts.body;
+    if (body && Array.isArray(body.messages)) {
+      const m = String(body.messages[0].content).match(/```json\s*([\s\S]*?)```/);
+      if (m) store.push(JSON.parse(m[1].trim()));
+      return [{ id: `m-${store.length}` }];
+    }
+    return { id: 'ok' }; // ensureStore's three /workspaces,/peers,/sessions calls
+  };
+  const fetchPage = (args) => pagingServer(store).fetchPage(args);
+  return { store, request, fetchPage };
+}
+
+test('WRITE-AUTHORITY CONTROL: no prior stored packet — the candidate is written unconditionally', async () => {
+  // "A first-ever write is definitionally not a regression" — the design's own stated
+  // baseline case. Uses a session start time that is, on its face, ancient, to prove
+  // acceptance here is not an accident of a generous sessionStartedAt.
+  const fake = fakeHoncho([]);
+  const { io } = gitStub(
+    { 'rev-parse': 'C:/repo\n', grep: 'Deliverables/map-A.md\n', 'merge-base': 'base1\n', log: gitLogOutput([[1754000000, ['Deliverables/map-A.md']]]) },
+    { files: ['Deliverables/map-A.md'] }
+  );
+  const r = await continuity.writeContinuity(
+    { focus: 'session A' },
+    { cwd: 'C:/repo', git: io, fetchPage: fake.fetchPage, request: fake.request, sessionStartedAt: '2020-01-01T00:00:00.000Z' }
+  );
+  assert.equal(r.ok, true);
+  assert.equal(r.packet.map_path, 'Deliverables/map-A.md');
+});
+
+test("WRITE-AUTHORITY: a session that STARTED BEFORE the stored pointer's last write does NOT replace it", async () => {
+  // Warwick's own acceptance script, steps 1-3: session A posts a current map; session B — an
+  // old/unrelated worktree session whose OWN start time predates A's write — has its Stop
+  // fire AFTER A (a later wall-clock close, but a genuinely older start). B's write must not
+  // move the pointer A just set.
+  const fake = fakeHoncho([]);
+  const gitA = gitStub(
+    { 'rev-parse': 'C:/repo-A\n', grep: 'Deliverables/map-A.md\n', 'merge-base': 'base1\n', log: gitLogOutput([[5000, ['Deliverables/map-A.md']]]) },
+    { files: ['Deliverables/map-A.md'] }
+  ).io;
+  const gitB = gitStub(
+    { 'rev-parse': 'C:/repo-B\n', grep: 'Deliverables/map-B-stale.md\n', 'merge-base': 'base2\n', log: gitLogOutput([[5000, ['Deliverables/map-B-stale.md']]]) },
+    { files: ['Deliverables/map-B-stale.md'] }
+  ).io;
+
+  const a = await continuity.writeContinuity(
+    // sessionStartedAt is irrelevant here — A is the first write, nothing to compare against
+    // yet — so A's own start time is left unset, deliberately, to avoid implying otherwise.
+    { focus: 'session A, current build' },
+    { cwd: 'C:/repo-A', git: gitA, fetchPage: fake.fetchPage, request: fake.request }
+  );
+  assert.equal(a.ok, true);
+  assert.equal(a.packet.map_path, 'Deliverables/map-A.md', 'CONTROL: A really did post a map pointer, or B has nothing to fail to displace');
+
+  // BEFORE A's REAL write ts — computed relative to what `buildPacket` actually stamped
+  // (`a.packet.ts`, the real wall clock at the moment A ran), never a fixed literal date.
+  // A fixed literal would make this test's pass/fail depend on WHEN it happens to run.
+  const beforeA = new Date(Date.parse(a.packet.ts) - 60 * 60 * 1000).toISOString();
+
+  const b = await continuity.writeContinuity(
+    { focus: 'session B, an old worktree finally closing' },
+    // B genuinely started earlier, even though its Stop fires after A's in this call sequence.
+    { cwd: 'C:/repo-B', git: gitB, fetchPage: fake.fetchPage, request: fake.request, sessionStartedAt: beforeA }
+  );
+  assert.equal(b.ok, true);
+  assert.equal(Object.prototype.hasOwnProperty.call(b.packet, 'map_path'), false, "B's stale write must not carry the pointer");
+  assert.equal(b.packet.focus, 'session B, an old worktree finally closing', 'every OTHER field still writes normally — only the pointer is protected');
+
+  // THE OBSERVABLE OUTCOME (step 3 of the acceptance script) — not B's return value alone,
+  // but what a SUBSEQUENT `readLatest` genuinely sees. B is the chronologically newest
+  // packet (posted after A in this store), so under this store's own latest-wins rule it IS
+  // what a fresh read reports as newest — and it must not carry B's stale path.
+  const after = await continuity.readLatest({ fetchPage: fake.fetchPage });
+  assert.equal(after.latest.focus, 'session B, an old worktree finally closing', 'CONTROL: B really is the newest packet by post time, so this is a real test of the render');
+  assert.equal(Object.prototype.hasOwnProperty.call(after.latest, 'map_path'), false, 'the stale path never became the visible pointer');
+
+  // And the RENDER — the surface Warwick actually reads — must not claim a "likely active
+  // map" pointing at B's stale path, or at all: the honest-absent branch already handles a
+  // packet with no `map_path` (see `readContinuityBrief` in the source), and this proves that
+  // EXISTING degradation is what fires, not a silent resurrection of B's path or of A's.
+  const brief = await continuity.readContinuityBrief({ fetchPage: fake.fetchPage });
+  assert.doesNotMatch(brief, /map-B-stale\.md/, "B's stale path must never render as active");
+  assert.match(brief, /map path missing or invalid/, 'the render degrades honestly rather than showing any stale pointer');
+});
+
+test('DIFFERENTIATING PROOF: a session that STARTED AFTER the stored write DOES replace it — even though its own map is OLDER by commit-recency', async () => {
+  // THE CASE THE SUPERSEDED DESIGN GOT WRONG. An earlier design compared the candidate map's
+  // OWN commit timestamp against what was stored, and would have REJECTED this exact write:
+  // the map this session resolves to was committed long before the currently-stored
+  // pointer's map. Under session-start-time comparison it is ACCEPTED, because a deliberate
+  // switch to an older, dormant build is exactly the case the corrected design exists to
+  // allow. This is Warwick's acceptance script step 3, and the reason the design changed.
+  const fake = fakeHoncho([]);
+  const gitCurrent = gitStub(
+    { 'rev-parse': 'C:/repo-current\n', grep: 'Deliverables/map-current.md\n', 'merge-base': 'base1\n', log: gitLogOutput([[1754000000, ['Deliverables/map-current.md']]]) }, // a RECENT commit
+    { files: ['Deliverables/map-current.md'] }
+  ).io;
+  const gitDormant = gitStub(
+    { 'rev-parse': 'C:/repo-dormant\n', grep: 'Deliverables/map-dormant-build.md\n', 'merge-base': 'base2\n', log: gitLogOutput([[1000, ['Deliverables/map-dormant-build.md']]]) }, // an ANCIENT commit
+    { files: ['Deliverables/map-dormant-build.md'] }
+  ).io;
+
+  const current = await continuity.writeContinuity(
+    // First write — nothing to compare against, sessionStartedAt is irrelevant to it.
+    { focus: 'currently active build' },
+    { cwd: 'C:/repo-current', git: gitCurrent, fetchPage: fake.fetchPage, request: fake.request }
+  );
+  assert.equal(current.packet.map_path, 'Deliverables/map-current.md', 'CONTROL: the currently-stored pointer really is set');
+
+  // CONTROL: prove the dormant build's map really IS older by commit, so this test could not
+  // pass by accident under a commit-recency rule — a commit ts of 1000 versus 1754000000 is
+  // about as far apart as two real timestamps get.
+  const dormantAlone = continuity.buildPacket({ focus: 'x' }, { cwd: 'C:/repo-dormant', git: gitDormant });
+  assert.equal(dormantAlone.map_path, 'Deliverables/map-dormant-build.md');
+
+  // AFTER the current pointer's REAL write ts — computed relative to what `buildPacket`
+  // actually stamped (`current.packet.ts`), never a fixed literal date that could drift
+  // against whenever this suite happens to run.
+  const afterCurrent = new Date(Date.parse(current.packet.ts) + 60 * 60 * 1000).toISOString();
+
+  const switchToDormant = await continuity.writeContinuity(
+    { focus: 'deliberately switching to the dormant build' },
+    // A genuinely fresh session, choosing on purpose to point somewhere old.
+    { cwd: 'C:/repo-dormant', git: gitDormant, fetchPage: fake.fetchPage, request: fake.request, sessionStartedAt: afterCurrent }
+  );
+  assert.equal(switchToDormant.ok, true);
+  assert.equal(switchToDormant.packet.map_path, 'Deliverables/map-dormant-build.md', 'a genuinely fresh session switching to an older build DOES replace the pointer');
+
+  const after = await continuity.readLatest({ fetchPage: fake.fetchPage });
+  assert.equal(after.latest.map_path, 'Deliverables/map-dormant-build.md', 'the observable outcome: the dormant map IS now the active pointer, commit age notwithstanding');
+});
+
+test('MUTATION: the session-start comparison is REAL — force OLDER (reject) and NEWER (accept) against the SAME seeded prior', async () => {
+  // The control that makes the two tests above fail-able: a guard that always writes, or
+  // always blocks, would pass a test that only exercises one direction. Both directions are
+  // proven here against an IDENTICAL candidate and an IDENTICAL prior — only the session
+  // start time changes between the two runs.
+  const priorPacket = {
+    schema: 1, kind: 'continuity', id: 'cont-prior', ts: '2026-08-05T09:00:00.000Z', seq: 1,
+    backfill: false, focus: 'prior', map_path: 'Deliverables/map-prior.md', next_action: 'n',
+  };
+  const gitCandidate = gitStub(
+    { 'rev-parse': 'C:/repo\n', grep: 'Deliverables/map-candidate.md\n', 'merge-base': 'base1\n', log: gitLogOutput([[4242, ['Deliverables/map-candidate.md']]]) },
+    { files: ['Deliverables/map-candidate.md'] }
+  ).io;
+
+  const older = fakeHoncho([priorPacket]);
+  const rejected = await continuity.writeContinuity(
+    { focus: 'older session' },
+    { cwd: 'C:/repo', git: gitCandidate, fetchPage: older.fetchPage, request: older.request, sessionStartedAt: '2026-08-05T08:59:59.000Z' } // BEFORE
+  );
+  assert.equal(Object.prototype.hasOwnProperty.call(rejected.packet, 'map_path'), false, 'OLDER must be REJECTED — the pointer must not move');
+
+  const newer = fakeHoncho([priorPacket]);
+  const accepted = await continuity.writeContinuity(
+    { focus: 'newer session' },
+    { cwd: 'C:/repo', git: gitCandidate, fetchPage: newer.fetchPage, request: newer.request, sessionStartedAt: '2026-08-05T09:00:01.000Z' } // AFTER
+  );
+  assert.equal(accepted.packet.map_path, 'Deliverables/map-candidate.md', 'NEWER must be ACCEPTED — proves the guard is not vacuously always-reject');
+});
+
+test('FALLBACK: a readLatest failure degrades to the unconditional write, not a block', async () => {
+  // "A Stop hook that throws ends Warwick's turn with an error" — the same standing rule that
+  // already guards `resolveActiveMapPath` above governs this comparison too. A network blip
+  // must never turn into a broken turn.
+  const throwingFetchPage = async () => { throw new Error('Honcho unreachable'); };
+  const fake = fakeHoncho([]);
+  const gitOk = gitStub(
+    { 'rev-parse': 'C:/repo\n', grep: 'Deliverables/map.md\n', 'merge-base': 'base1\n', log: gitLogOutput([[100, ['Deliverables/map.md']]]) },
+    { files: ['Deliverables/map.md'] }
+  ).io;
+  const r = await continuity.writeContinuity(
+    { focus: 'f' },
+    { cwd: 'C:/repo', git: gitOk, fetchPage: throwingFetchPage, request: fake.request, sessionStartedAt: '2020-01-01T00:00:00.000Z' }
+  );
+  assert.equal(r.ok, true);
+  assert.equal(r.packet.map_path, 'Deliverables/map.md', 'an unreachable comparison read must not block the write');
+});
+
+test("FALLBACK: no sessionStartedAt (a manual `write`/`backfill` has no session to time) — nothing to compare, writes unconditionally", async () => {
+  const priorPacket = {
+    schema: 1, kind: 'continuity', id: 'cont-prior', ts: '2026-08-05T09:00:00.000Z', seq: 1,
+    backfill: false, focus: 'prior', map_path: 'Deliverables/map-prior.md',
+  };
+  const fake = fakeHoncho([priorPacket]);
+  const gitCandidate = gitStub(
+    { 'rev-parse': 'C:/repo\n', grep: 'Deliverables/map-candidate.md\n', 'merge-base': 'base1\n', log: gitLogOutput([[100, ['Deliverables/map-candidate.md']]]) },
+    { files: ['Deliverables/map-candidate.md'] }
+  ).io;
+  const r = await continuity.writeContinuity(
+    { focus: 'manual write, no session' },
+    { cwd: 'C:/repo', git: gitCandidate, fetchPage: fake.fetchPage, request: fake.request } // sessionStartedAt omitted
+  );
+  assert.equal(r.packet.map_path, 'Deliverables/map-candidate.md', 'with nothing to compare, the write proceeds — an accepted limitation, named in the evidence file');
+});
+
+test('SEAM CONTROL: `deliver` routes EVERY Honcho call through the injected `request`, including `ensureStore`', async () => {
+  // Justifies the seam added to `deliver`/`ensureStore`: without this, the claim "the write
+  // path can be proven with no network" would rest on an untested assumption about
+  // `ensureStore`'s three calls specifically.
+  const seen = [];
+  const request = async (path) => {
+    seen.push(path);
+    return path.includes('/messages') && !path.includes('/list') ? [{ id: 'm-1' }] : { id: 'ok' };
+  };
+  // No map candidate here (git throws) — isolates this test to the deliver/ensureStore path,
+  // with no dependency on the comparison read this test is not about.
+  const r = await continuity.writeContinuity(
+    { focus: 'f' },
+    { request, cwd: 'C:/not-a-repo', git: { run: () => { throw new Error('no git'); } } }
+  );
+  assert.equal(r.ok, true);
+  assert.ok(seen.includes('/workspaces'), 'ensureStore/workspaces routed through the injected request');
+  assert.ok(seen.includes('/workspaces/{ws}/peers'), 'ensureStore/peers routed through the injected request');
+  assert.ok(seen.includes('/workspaces/{ws}/sessions'), 'ensureStore/sessions routed through the injected request');
+  assert.ok(
+    seen.some((p) => p.includes(`/sessions/${continuity.CONTINUITY_SESSION}/messages`) && !p.includes('/list')),
+    'the final deliver POST routed through the injected request too'
+  );
+});
+
+// ---------------------------------------------------------------------------
+// sessionStartFromTranscript — the write-side protection's ONLY signal source
+// ---------------------------------------------------------------------------
+//
+// Real transcripts on this machine are JSONL where the first one or two lines (`mode`,
+// `file-history-snapshot`) commonly carry NO top-level `timestamp`, and the first line that
+// does is a few lines in — this suite's fixtures mirror that shape rather than a simplified
+// one, per a direct read of a real transcript file during this Work Order's reconnaissance.
+
+function transcriptFixture(home, lines) {
+  const path = join(home, `fixture-transcript-${Math.random().toString(36).slice(2)}.jsonl`);
+  writeFileSync(path, lines.map((l) => JSON.stringify(l)).join('\n') + '\n', 'utf8');
+  return path;
+}
+
+test('TRANSCRIPT: the FIRST line carrying a top-level timestamp is the session start', () => {
+  const home = cliHome();
+  const path = transcriptFixture(home, [
+    { type: 'mode', mode: 'normal' }, // real transcripts start this way — no timestamp
+    { type: 'file-history-snapshot', snapshot: { timestamp: '2099-01-01T00:00:00.000Z' } }, // NESTED — must be ignored
+    { type: 'attachment', timestamp: '2026-08-05T12:11:08.798Z' }, // the real session start
+    { type: 'user', timestamp: '2026-08-05T12:11:08.900Z' },
+  ]);
+  assert.equal(continuity.sessionStartFromTranscript(path), '2026-08-05T12:11:08.798Z');
+});
+
+test('TRANSCRIPT: an unparseable, missing or timestamp-less transcript resolves to null, never a guess', () => {
+  const home = cliHome();
+  assert.equal(continuity.sessionStartFromTranscript(join(home, 'does-not-exist.jsonl')), null, 'missing file');
+  assert.equal(continuity.sessionStartFromTranscript(transcriptFixture(home, [])), null, 'empty file');
+  assert.equal(continuity.sessionStartFromTranscript(transcriptFixture(home, [{ type: 'mode' }])), null, 'no line carries a timestamp');
+  const gibberish = join(home, 'gibberish.jsonl');
+  writeFileSync(gibberish, 'not json at all\n{"broken\n', 'utf8');
+  assert.equal(continuity.sessionStartFromTranscript(gibberish), null, 'unparseable lines are skipped, not guessed at');
+  assert.equal(continuity.sessionStartFromTranscript(null), null, 'a non-string path never reaches the filesystem');
+  assert.equal(continuity.sessionStartFromTranscript(42), null);
+});
+
+test('TRANSCRIPT: an invalid timestamp value is skipped in favour of the next valid line', () => {
+  const home = cliHome();
+  const path = transcriptFixture(home, [
+    { type: 'a', timestamp: 'not-a-real-date' },
+    { type: 'b', timestamp: '2026-08-05T12:00:00.000Z' },
+  ]);
+  assert.equal(continuity.sessionStartFromTranscript(path), '2026-08-05T12:00:00.000Z');
+});
+
+test('TRANSCRIPT MUTATION: the bounded head-read is REAL — a valid line beyond it is never found', () => {
+  // Proves the bound documented in the source is enforced, not merely a comment. Padding well
+  // past the bound, followed by the ONLY valid timestamped line, must not be found.
+  const home = cliHome();
+  const path = join(home, 'huge-transcript.jsonl');
+  const padding = JSON.stringify({ type: 'padding', big: 'x'.repeat(2 * 1024 * 1024) }); // > the head-read bound alone
+  writeFileSync(path, padding + '\n' + JSON.stringify({ type: 'real', timestamp: '2026-08-05T12:00:00.000Z' }) + '\n', 'utf8');
+  assert.equal(continuity.sessionStartFromTranscript(path), null, 'the only valid line lives past the bounded read');
+});
+
+test('TRANSCRIPT MUTATION CONTROL: the SAME valid line, with no oversized padding ahead of it, IS found', () => {
+  // Makes the test above fail-able: without this, "returns null" could mean the function is
+  // simply broken, not that the bound genuinely excluded the line.
+  const home = cliHome();
+  const path = join(home, 'small-transcript.jsonl');
+  writeFileSync(path, JSON.stringify({ type: 'real', timestamp: '2026-08-05T12:00:00.000Z' }) + '\n', 'utf8');
+  assert.equal(continuity.sessionStartFromTranscript(path), '2026-08-05T12:00:00.000Z');
+});
+
+test('PRODUCT PATH: `stop` derives sessionStartedAt from the REAL transcript_path in its stdin payload, without breaking the existing map pointer', async () => {
+  // This fixture's FETCH_STUB (see FETCH_STUB above) answers every call generically and
+  // carries no real prior packet for `writeContinuity`'s comparison to find, so the write
+  // falls back to unconditional (proven directly, with the store under full test control, in
+  // the WRITE-AUTHORITY suite above). What THIS test proves is narrower and just as real: the
+  // stdin -> transcript_path -> sessionStartFromTranscript -> writeContinuity wiring runs
+  // end-to-end through the ACTUAL CLI without crashing or silently dropping the pointer.
+  const home = cliHome();
+  seedState(home);
+  const transcriptPath = join(home, 'real-transcript.jsonl');
+  writeFileSync(transcriptPath, [
+    JSON.stringify({ type: 'mode', mode: 'normal' }),
+    JSON.stringify({ type: 'user', timestamp: '2020-01-01T00:00:00.000Z' }),
+  ].join('\n') + '\n', 'utf8');
+
+  const r = runCli(home, ['stop'], {
+    stdin: JSON.stringify({ session_id: 'sess-transcript', cwd: REPO_ROOT, transcript_path: transcriptPath }),
+  });
+
+  assert.equal(r.status, 0, `stop must succeed: ${r.stderr}`);
+  assert.equal(r.delivered.length, 1, 'CONTROL: a packet actually reached the transport');
+  assert.match(r.packet.map_path, /^Deliverables\/.+\.md$/, 'the transcript_path plumbing did not break the existing map pointer path');
 });
