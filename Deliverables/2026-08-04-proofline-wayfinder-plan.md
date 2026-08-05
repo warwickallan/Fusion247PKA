@@ -1035,6 +1035,22 @@ Keel's four class-A refusals were all correct. The work divides:
 
 **Why did no footer appear during the expensive stretch?** The footer is deliberately event-driven — handback, rotation-advice, or on request (root `CLAUDE.md`). **At 42% GREEN, no rotation advice was owed, so the design behaved as specified and Warwick still could not see the state.** **So the honest question is not "did the mechanism fail" but "is the trigger set on the right thing" — and whether "rotation advice" firing only near a threshold is too late when the cost is incurred *per turn on the way there*.** **Answering that with a new mechanism is the rejected diagnosis.**
 
+## 15.3b NAMED INVESTIGATION — Nolan's governance/contract role, and the ownership gap that let Keel draft reviewer law
+
+**Set by Warwick, 2026-08-05. RECORDED, NOT STARTED — explicitly: *"Do not investigate now."*** Same gate as the rest of Phase 3.
+
+**The question:** Nolan historically owns hiring, contracts and `agent-index.md` (SOP-001). **So who owns REVIEWER law?** In WP-2G, **Keel — an implementation engineer — authored the operating contract governing the external reviewer that decides whether Keel's own diffs may merge.** Larry ruled that in, narrowly and on his own authority, and recorded the ruling in `contract_basis`. **It shipped DRAFT precisely because nobody could ratify it — which is the gap showing itself.**
+
+**Facts already on the record, so the investigation starts from evidence rather than recollection:**
+
+- **Keel's contract bars it by function**, not just by path: *"any other document whose function is to define, govern or assess the work Keel is implementing."* Keel cited this when refusing the `Builds/**` delete — **and then authored the reviewer contract anyway, under Larry's ruling.** The tension is real and Keel named it: *"I want Larry's ruling recorded there, not my inference."*
+- **The estate has a rule that AI-authored governing prompts need Warwick's approval before use**, and a **worked precedent in the same directory** — `product-qa-runtime-orientation.md`, DRAFT, never approved, and consequently **does not govern**.
+- **Only Nolan may amend a specialist contract** (SOP-001). Nobody was asked whether authoring reviewer law belongs to any existing specialist.
+- **`agent-index.md:39` deliberately lists Codex OUTSIDE the specialist table** — so the reviewer has no contract owner in the roster at all.
+- **A second, unowned governing text exists:** `tower-loop/prompts/supervisor-prompt.md` reaches Codex on **every** watcher turn, is labelled `approved_by='ai-authored-unapproved'`, and carries no reviewer or disposition law (WP-2G finding F-7).
+
+**What the investigation must NOT conclude by reflex:** that the answer is a new specialist, a governance role or a contracts registry. **Warwick's regrowth cap and the recorded lesson that a role IS subject to it both apply** — the real test is whether an existing owner or procedure already supplies standing separation. **It may be that the correct answer is "Warwick ratifies, Nolan owns the contract text, and nothing new is hired."**
+
 ## 15.4 Route — the fresh Larry's to own, not this session's
 
 **Not designed here.** Two things worth noting so the next session does not rediscover them: token attribution must be honest about what the evidence **cannot** show, and the Google Drive write is an **outward action** needing its own consideration. **Warwick has not authorised a specific Drive location, and no mechanism for this exists — the regrowth cap applies to it exactly as to everything else.**
