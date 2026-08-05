@@ -1,6 +1,6 @@
 # EVIDENCE — WO-2026-08-05-13 · WP-3B: fix the governor footer properly
 
-**Author:** Keel (Implementation Engineer) · **Branch:** `build-020/wp-3b-footer` · **Worktree:** `C:\Fusion247PKA-wp3b-footer` · **Governance head:** `7bcfef70a3eea5763951019673120887544554d4` · **Amendment 1:** `899b0a7` · **Amendments 2 + 3:** `71cb19e`
+**Author:** Keel (Implementation Engineer) · **Branch:** `build-020/wp-3b-footer` · **Worktree:** `C:\Fusion247PKA-wp3b-footer` · **Governance head:** `7bcfef70a3eea5763951019673120887544554d4` · **Amendment 1:** `899b0a7` · **Amendments 2 + 3:** `71cb19e` · **Amendment 4:** `60f0e18`
 
 **Builder self-test evidence — NOT independent review.**
 
@@ -337,3 +337,92 @@ $ node --test tools/governor/statusline-live.test.mjs
 ```
 
 Baseline was 65/65 on the footer suite and 34/34 on statusline-live. **12 tests added, none removed, none weakened.** Neighbouring suites re-run and unchanged: `sampler` 43/43, `health-store` 14/14, `evaluator` 34/34, `continuity-derive` 23/23.
+
+---
+
+# 9. AMENDMENT 4 — the cache/sample collision. Found in live use, not by this suite
+
+## 9.1 The defect, reproduced before it was fixed
+
+`--refresh` wrote `recommendation.json` as a **direct child of the health store directory**. `resolveHealthSample`'s no-session branch lists that directory, keeps every `*.json`, sorts by mtime, and **treats the newest basename as a session id** (`footer.mjs`, `candidates[0].name.replace(/\.json$/, '')`). So the freshly written cache was selected *as a health sample*, carried no context fields, and the footer rendered BLIND.
+
+Reproduced by me against the pre-fix code, with the store redirected to a temp directory holding one real live sample:
+
+```
+1. render, no --session, BEFORE refresh:
+   ⟦GOV⟧ ctx ~40% (395.6k/1000k) · GREEN · TASK UNKNOWN · next: UNSET · CONTINUE
+2. --refresh
+   footer: recommendation refreshed — next: Opus/high (matched:...)
+3. render, no --session, AFTER refresh:
+   ⟦GOV⟧ ctx -- · BLIND · NO ADVICE · next: Opus/high · CONTINUE      ← the number is gone
+4. ls -t <store>:  recommendation.json   5a984703-….json
+```
+
+**Severity is not "transient".** Every render between a refresh and the next statusLine sample loses the measured number, and a refresh fires on exactly the five events Warwick named — so the number disappears at the five moments he is most likely to look, then returns on its own. It defeats WP-3B(a) precisely when the recommendation becomes useful, and it reads as a glitch rather than a defect.
+
+## 9.2 Why the suite did not catch it — the lesson, recorded because it will recur
+
+**Every test redirects the store with `MYPKA_GOVERNOR_HEALTH_DIR`, and every cache test passed `--session`** — which reads an *exact* file and never scans. So the cache and the samples were only ever exercised **apart**. They share a directory only in real use.
+
+**This is E-F's lesson in a second costume: a fault that exists solely in the interaction between two things is invisible to every test that separates them.** E-F was two defects that partially masked each other; this is two artefacts that never met. The general form: *a green suite plus a redirected store is not a proven product.*
+
+The honest scoreboard for this Work Order: **the suite proved every property I thought to state, and a human using the tool for ninety seconds found the one I did not.**
+
+## 9.3 The fix — structural, not a filter
+
+`recommendationPath` now returns `<store>/state/recommendation.json`. The resolver's scan is **one level deep and extension-filtered**, so nothing inside `state/` can ever be enumerated as a sample. **The cache is invisible to the resolver because of where it is, not because of a name the resolver has been taught to skip** — there is no rule left to keep in step with the file, so there is nothing that can silently decay.
+
+**Why a subdirectory rather than a true sibling of the store, which the amendment preferred.** `healthStoreDir` returns `MYPKA_GOVERNOR_HEALTH_DIR` **verbatim** when set. Writing to `<store>/..` would write *outside the directory an operator explicitly pointed the governor at* — into the parent of a temp directory under test, and into whatever sits above the store in a redirected deployment. Staying inside the nominated root is the safer half of "not in the scanned path" and achieves the same separation. **If Larry wants a true sibling, it is one line** (`RECOMMENDATION_SUBDIR` and the `join`).
+
+Verified live after the fix, same procedure:
+
+```
+1. render BEFORE refresh:  ⟦GOV⟧ ctx ~40% (395.6k/1000k) · GREEN · TASK UNKNOWN · next: UNSET · CONTINUE
+2. --refresh:              footer: recommendation refreshed — next: Opus/high
+3. render AFTER refresh:   ⟦GOV⟧ ctx ~40% (395.6k/1000k) · GREEN · KEEP GOING · next: Opus/high · CONTINUE
+4. render again:           ⟦GOV⟧ ctx ~40% (395.6k/1000k) · GREEN · KEEP GOING · next: Opus/high · CONTINUE
+5. scanned dir:            state/   5a984703-….json
+6. cache:                  <store>/state/recommendation.json
+```
+
+## 9.4 The regression test — shown RED before green
+
+Added to `footer.test.mjs`. Against the unfixed module:
+
+```
+not ok 78 - WP-3B / AMENDMENT 4: the recommendation cache is NEVER selected as a health sample
+error: 'the cache must not be a direct child of the scanned store directory —
+        got …\gov-footer-ZMOm7A\recommendation.json'
+# tests 78 · # pass 77 · # fail 1
+```
+
+After the fix: **78 / 78 / 0.**
+
+Two things it asserts, deliberately in this order:
+
+1. **The structural invariant, on the path** — the cache is not a direct child of the scanned directory, and `readdirSync(store)` does not contain it. This is the property that makes the defect *impossible*, not merely absent today.
+2. **The behaviour that invariant buys** — with **no `--session`** (the newest-file scan, the exact path the defect lived on), a real sample is still selected, `percent` is 25, the measured count 248,000 survives, and the cached `Opus/high` is still read.
+
+**The mtimes are set explicitly** with `utimesSync` rather than left to write order: a regression test for a newest-file race that depends on filesystem timestamp granularity is flaky, and a flaky test for this defect is worse than none.
+
+**Mutation M6** puts the cache back in the scanned directory and asserts the live defect returns — `state: BLIND`, `percent: null`. Six mutations now, all proven red, with the module's SHA-256 asserted byte-identical afterwards.
+
+## 9.5 Reported, not fixed — the broader assumption behind this defect
+
+**`resolveHealthSample` trusts every `*.json` child of the store directory to be a health sample.** My cache was the first artefact to violate that, but nothing prevents the next one. The class-closing fix is to validate a candidate's *shape* before accepting it — a sample without a `session_id` matching its filename, or without a `context_window`, is not a sample — which is a change *inside* `footer.mjs` and therefore inside my surface.
+
+**I have not made it.** Amendment 4 asked for one fix, at source, and a second behavioural change to the resolver in the same commit would be scope I was not given and would blunt the regression test's meaning. **Severity: low while nothing else writes there; the moment something does, the symptom is a silent BLIND rather than an error.** Raising it or not is Larry's call.
+
+**One operational note for WP-3E (Mack):** a `recommendation.json` written by the *previous* commit on this branch may still exist as a direct child of a real store directory. It is inert to the fixed code but will still poison the scan while it sits there. Larry has already removed the one he created; the install should confirm none remains. **It is under `~/.mypka/**`, which `live_authority: none` puts outside my reach.**
+
+## 9.6 Counts at this head
+
+```
+footer            78 / 78 / 0        continuity          92 / 92 / 0
+statusline-live   34 / 34 / 0        reorient            58 / 58 / 0
+sampler           43 / 43 / 0        worktree-guard      28 / 28 / 0
+health-store      14 / 14 / 0        atomic-write        19 / 19 / 0
+evaluator         34 / 34 / 0        continuity-derive   23 / 23 / 0
+```
+
+**Full governor set: 10 suites, 423 tests, 423 pass, 0 fail.** Thirteen tests added by this Work Order since the 65-test baseline; none removed, none weakened.
