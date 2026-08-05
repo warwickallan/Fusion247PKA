@@ -1621,13 +1621,21 @@ test("WRITE-AUTHORITY: a session that STARTED BEFORE the stored pointer's last w
   assert.equal(after.latest.focus, 'session B, an old worktree finally closing', 'CONTROL: B really is the newest packet by post time, so this is a real test of the render');
   assert.equal(Object.prototype.hasOwnProperty.call(after.latest, 'map_path'), false, 'the stale path never became the visible pointer');
 
-  // And the RENDER — the surface Warwick actually reads — must not claim a "likely active
-  // map" pointing at B's stale path, or at all: the honest-absent branch already handles a
-  // packet with no `map_path` (see `readContinuityBrief` in the source), and this proves that
-  // EXISTING degradation is what fires, not a silent resurrection of B's path or of A's.
+  // WP-3A(b) STRENGTHENED, AND THE ASSERTION CHANGED WITH THE REQUIREMENT — read this before
+  // treating it as a relaxed test. It previously asserted `/map path missing or invalid/`,
+  // i.e. that a WITHHELD pointer rendered identically to a packet that never had one. That
+  // indistinguishability is precisely the silence WP-3A(c) was commissioned to remove, so the
+  // old assertion now encodes the defect rather than the requirement. What must hold is
+  // STRICTLY MORE than before: the stale path still never renders, AND the reader is told the
+  // pointer was withheld rather than absent, AND is still sent to the map.
+  assert.equal(b.packet.map_path_withheld, 'stale-session', 'the withholding is RECORDED on the packet, not left as a silent absence');
+
   const brief = await continuity.readContinuityBrief({ fetchPage: fake.fetchPage });
   assert.doesNotMatch(brief, /map-B-stale\.md/, "B's stale path must never render as active");
-  assert.match(brief, /map path missing or invalid/, 'the render degrades honestly rather than showing any stale pointer');
+  assert.match(brief, /MAP POINTER WITHHELD BY THE WRITER/, 'a withheld pointer must not masquerade as a missing one');
+  assert.doesNotMatch(brief, /map path missing or invalid/, 'and must not take the never-had-one branch');
+  assert.match(brief, /started BEFORE the last stored write/, 'the reader is told WHY, not merely that');
+  assert.match(brief, /Deliverables\/` per `CLAUDE\.md` Step 2/, 'and is still oriented to the map — half an honest answer is a failure');
 });
 
 test('DIFFERENTIATING PROOF: a session that STARTED AFTER the stored write DOES replace it — even though its own map is OLDER by commit-recency', async () => {
@@ -1706,10 +1714,21 @@ test('MUTATION: the session-start comparison is REAL — force OLDER (reject) an
   assert.equal(accepted.packet.map_path, 'Deliverables/map-candidate.md', 'NEWER must be ACCEPTED — proves the guard is not vacuously always-reject');
 });
 
-test('FALLBACK: a readLatest failure degrades to the unconditional write, not a block', async () => {
-  // "A Stop hook that throws ends Warwick's turn with an error" — the same standing rule that
-  // already guards `resolveActiveMapPath` above governs this comparison too. A network blip
-  // must never turn into a broken turn.
+test('WP-3A(c) NO FAIL-OPEN: a readLatest failure WITHHOLDS the pointer and still delivers the packet', async () => {
+  // THIS TEST REPLACES ONE THAT ASSERTED THE DEFECT, and the substitution is the whole point
+  // of WP-3A(c) — flagged here rather than buried, because "a test changed" and "a test was
+  // weakened" look identical in a diff.
+  //
+  // It previously read: 'FALLBACK: a readLatest failure degrades to the unconditional write,
+  // not a block', and asserted `r.packet.map_path === 'Deliverables/map.md'`. That is the
+  // fail-open guard stated as a requirement. E-I is the mechanism (`readLatest` inside the
+  // write path, in a `catch` that writes unconditionally) and E-F is the cost: when Honcho is
+  // slow the read times out, the guard falls open, and the stale pointer is KEPT — so the
+  // slow read SUPPRESSES the stripping defect and each fault hides the other.
+  //
+  // The half of the old test that was always right is KEPT and still asserted: the Stop hook
+  // must not throw and the packet must not be lost. What changed is that an unreachable
+  // comparison read is no longer treated as permission to publish an unchecked pointer.
   const throwingFetchPage = async () => { throw new Error('Honcho unreachable'); };
   const fake = fakeHoncho([]);
   const gitOk = gitStub(
@@ -1720,8 +1739,126 @@ test('FALLBACK: a readLatest failure degrades to the unconditional write, not a 
     { focus: 'f' },
     { cwd: 'C:/repo', git: gitOk, fetchPage: throwingFetchPage, request: fake.request, sessionStartedAt: '2020-01-01T00:00:00.000Z' }
   );
-  assert.equal(r.ok, true);
-  assert.equal(r.packet.map_path, 'Deliverables/map.md', 'an unreachable comparison read must not block the write');
+
+  // CONSTRAINT 1 — the packet is NOT lost, and the hook does not throw.
+  assert.equal(r.ok, true, 'an unreachable comparison read must never cost the packet');
+  assert.equal(r.packet.focus, 'f', 'every other field still writes normally — only the pointer is affected');
+  assert.equal(r.packet.id, fake.store[fake.store.length - 1].id, 'and it genuinely reached the store, not merely the return value');
+
+  // CONSTRAINT 2 — the guard does NOT fall open.
+  assert.equal(Object.prototype.hasOwnProperty.call(r.packet, 'map_path'), false, 'THE DEFECT: an unestablished authority must not publish the pointer anyway');
+  assert.equal(r.packet.map_path_withheld, 'authority-unestablished', 'and the reason is recorded rather than left as a silent absence');
+});
+
+test('WP-3A(c) COMBINED CASE (E-F): a SLOW read and a stale pointer, exercised TOGETHER', async () => {
+  // E-F is the phase's central test-design lesson: "the two defects PARTIALLY MASK EACH
+  // OTHER... a test that exercises them one at a time will pass while both are broken." Every
+  // other guard test above holds one variable still. This one does not.
+  //
+  // THE SCENARIO, WHICH IS THE REAL ONE: an old worktree's session is finally closing (its
+  // start time predates the stored write, so its pointer IS stale and MUST be withheld), and
+  // Honcho is slow enough that the comparison read aborts — which under the old code was
+  // exactly the condition that made the guard fall open and KEEP that stale pointer. Both
+  // faults are live in the same call; the pointer must still not be published.
+  const priorPacket = {
+    schema: 1, kind: 'continuity', id: 'cont-prior', ts: '2026-08-05T09:00:00.000Z', seq: 1,
+    backfill: false, focus: 'the pointer that should stand', map_path: 'Deliverables/map-current.md',
+  };
+  const fake = fakeHoncho([priorPacket]);
+  // The read path aborts the way the real one does — an AbortController timeout surfaces as a
+  // thrown error out of `fetchPage`, which is the same shape `hf()` produces on abort.
+  const slowThenAbort = async () => { throw Object.assign(new Error('The operation was aborted'), { name: 'AbortError' }); };
+  const gitStale = gitStub(
+    { 'rev-parse': 'C:/old-worktree\n', grep: 'Deliverables/map-stale.md\n', 'merge-base': 'base9\n', log: gitLogOutput([[100, ['Deliverables/map-stale.md']]]) },
+    { files: ['Deliverables/map-stale.md'] }
+  ).io;
+
+  const r = await continuity.writeContinuity(
+    { focus: 'an old worktree finally closing' },
+    {
+      cwd: 'C:/old-worktree', git: gitStale,
+      fetchPage: slowThenAbort,          // FAULT 1: the comparison read cannot complete
+      request: fake.request,
+      sessionStartedAt: '2026-08-05T08:00:00.000Z', // FAULT 2: an hour BEFORE the stored write
+    }
+  );
+
+  assert.equal(r.ok, true, 'the packet survives both faults');
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(r.packet, 'map_path'), false,
+    'THE MASKED DEFECT: under the old code the timeout made the guard fall open and this stale path was KEPT'
+  );
+  assert.equal(r.packet.map_path_withheld, 'authority-unestablished');
+
+  // AND THE OBSERVABLE OUTCOME — what a fresh session actually reads afterwards. The store now
+  // holds the stale session's packet as the newest, so this is the render that would have
+  // misdirected the next Larry.
+  const brief = await continuity.readContinuityBrief({ fetchPage: fake.fetchPage });
+  assert.doesNotMatch(brief, /map-stale\.md/, 'the stale path never becomes the visible pointer');
+  assert.match(brief, /MAP POINTER WITHHELD BY THE WRITER/);
+  assert.match(brief, /Deliverables\/` per `CLAUDE\.md` Step 2/, 'and the reader is still oriented');
+});
+
+test('WP-3A(c) MUTATION CONTROL: the combined case is not vacuously always-withhold', async () => {
+  // Makes the test above fail-able. Same stale-session timing, same store — but a comparison
+  // read that WORKS. The guard must then withhold for the OTHER reason, and the two codes must
+  // be distinguishable, or "it withheld" proves nothing about which fault was detected.
+  const priorPacket = {
+    schema: 1, kind: 'continuity', id: 'cont-prior', ts: '2026-08-05T09:00:00.000Z', seq: 1,
+    backfill: false, focus: 'the pointer that should stand', map_path: 'Deliverables/map-current.md',
+  };
+  const fake = fakeHoncho([priorPacket]);
+  const gitStale = gitStub(
+    { 'rev-parse': 'C:/old-worktree\n', grep: 'Deliverables/map-stale.md\n', 'merge-base': 'base9\n', log: gitLogOutput([[100, ['Deliverables/map-stale.md']]]) },
+    { files: ['Deliverables/map-stale.md'] }
+  ).io;
+
+  const stale = await continuity.writeContinuity(
+    { focus: 'old worktree, healthy read' },
+    { cwd: 'C:/old-worktree', git: gitStale, fetchPage: fake.fetchPage, request: fake.request, sessionStartedAt: '2026-08-05T08:00:00.000Z' }
+  );
+  assert.equal(stale.packet.map_path_withheld, 'stale-session', 'a WORKING read attributes the withholding to the timing, not to the transport');
+
+  // And the third direction: a healthy read AND a genuinely fresh session publishes normally.
+  const fresh = fakeHoncho([priorPacket]);
+  const published = await continuity.writeContinuity(
+    { focus: 'a genuinely fresh session' },
+    { cwd: 'C:/old-worktree', git: gitStale, fetchPage: fresh.fetchPage, request: fresh.request, sessionStartedAt: '2026-08-05T09:00:01.000Z' }
+  );
+  assert.equal(published.packet.map_path, 'Deliverables/map-stale.md', 'NOT always-withhold — the guard still publishes when authority IS established');
+  assert.equal(Object.prototype.hasOwnProperty.call(published.packet, 'map_path_withheld'), false, 'and a published pointer carries no withhold marker');
+});
+
+test('WP-3A(c) COST: the guard reads ONE page, not a whole walk (E-I)', async () => {
+  // E-I: the old guard ran a FULL `readLatest` inside the write path, "doubling network work
+  // per session end". The guard only ever needed the newest packet's `ts`. Asserted as a call
+  // count against a store big enough that a full walk would be visibly more than one request.
+  const packets = [];
+  for (let seq = 1; seq <= 250; seq++) {
+    packets.push({
+      schema: 1, kind: 'continuity', id: `cont-${seq}`, seq, backfill: false, focus: `f${seq}`,
+      ts: new Date(Date.UTC(2026, 7, 5, 0, 0, 0, seq)).toISOString(),
+    });
+  }
+  const fake = fakeHoncho(packets);
+  let pageCalls = 0;
+  const counting = (args) => { pageCalls++; return fake.fetchPage(args); };
+  const gitOk = gitStub(
+    { 'rev-parse': 'C:/repo\n', grep: 'Deliverables/map.md\n', 'merge-base': 'base1\n', log: gitLogOutput([[100, ['Deliverables/map.md']]]) },
+    { files: ['Deliverables/map.md'] }
+  ).io;
+
+  await continuity.writeContinuity(
+    { focus: 'f' },
+    { cwd: 'C:/repo', git: gitOk, fetchPage: counting, request: fake.request, sessionStartedAt: '2026-08-06T00:00:00.000Z' }
+  );
+  assert.equal(pageCalls, 1, 'one page — a 250-message store would be three requests under a full walk');
+
+  // CONTROL: prove the fixture really would take three pages if walked, so the assertion above
+  // is measuring restraint rather than a small store.
+  let walkCalls = 0;
+  await continuity.readLatest({ fetchPage: (args) => { walkCalls++; return fake.fetchPage(args); } });
+  assert.equal(walkCalls, 3, 'CONTROL: the same store costs three requests when genuinely walked');
 });
 
 test("FALLBACK: no sessionStartedAt (a manual `write`/`backfill` has no session to time) — nothing to compare, writes unconditionally", async () => {
@@ -1854,4 +1991,250 @@ test('PRODUCT PATH: `stop` derives sessionStartedAt from the REAL transcript_pat
   assert.equal(r.status, 0, `stop must succeed: ${r.stderr}`);
   assert.equal(r.delivered.length, 1, 'CONTROL: a packet actually reached the transport');
   assert.match(r.packet.map_path, /^Deliverables\/.+\.md$/, 'the transcript_path plumbing did not break the existing map pointer path');
+});
+
+// ---------------------------------------------------------------------------
+// WP-3A(a) — THE FRONTIER READ AT PRESENT AND EXPECTED STORE SIZE
+// ---------------------------------------------------------------------------
+//
+// WHAT THE MEASUREMENT SAYS, AND WHAT IT RULES OUT. E-B: ten of ten page-1 reads succeeded,
+// worst case 9.8% of the 9,000 ms budget — so the 2026-08-05 abort was a TRANSIENT and "the
+// store grew past the timeout" is NOT established and is NOT what these tests are built
+// against. E-C: page 1 is ALREADY at the size:100 cap (items:100, total:149, pages:2), so
+// growth adds PAGES, and a later-page failure was swallowed rather than raised.
+//
+// THE HAZARD THESE TESTS ACTUALLY PIN. `reverse=true` is documented; whether the DEPLOYED
+// server honours it is unestablished, and this suite cannot establish it — no test here may
+// reach the network. If it does not honour it, page 1 is the OLDEST hundred of 149, and
+// `readLatest` returns a packet ~50 writes behind the frontier while `pages`, `total`, the
+// repeat guard and the short-page rule all look healthy, because every one of those is a
+// statement about the WALK and none is a statement about the ORDER. So the proofs below are
+// about the CODE's behaviour under a server that ignores `reverse`, and they claim nothing
+// whatever about what the real server does.
+
+function ascendingPackets(n, base = Date.UTC(2026, 7, 5, 0, 0, 0, 0)) {
+  const out = [];
+  for (let seq = 1; seq <= n; seq++) out.push(packet({ seq, ts: new Date(base + seq).toISOString() }));
+  return out;
+}
+
+test('WP-3A(a) THE HAZARD: a truncated read from a server that IGNORES `reverse` is NOT authoritative', async () => {
+  // The measured store size, exactly: 149 messages, 100 to a page, two pages.
+  const packets = ascendingPackets(149);
+  const oldestFirstAlways = async ({ page, size }) => ({
+    items: packets.slice((page - 1) * size, page * size).map((p) => msg(p)),
+    total: packets.length, page, size, pages: Math.ceil(packets.length / size),
+  });
+
+  const truncated = await continuity.readLatest({ fetchPage: oldestFirstAlways, maxPages: 1 });
+  assert.equal(truncated.latest.seq, 100, 'CONTROL: page 1 really is the OLDEST hundred, so this IS the stale answer');
+  assert.equal(truncated.complete, false);
+  assert.equal(truncated.incompleteReason, 'page-cap', 'and it says WHY, not merely that');
+  assert.equal(truncated.newestFirstConfirmed, false, 'the server never demonstrated newest-first ordering');
+  assert.equal(truncated.latestIsAuthoritative, false, 'so seq 100 must NOT be handed over as the frontier');
+
+  // THE OTHER HALF, and the reason this is a pair: a walk that reaches the end is
+  // authoritative whatever order the server used, because the module then holds everything
+  // and its own sort settles it.
+  const full = await continuity.readLatest({ fetchPage: oldestFirstAlways });
+  assert.equal(full.latest.seq, 149, 'the full walk plus the defensive sort recover the genuinely newest');
+  assert.equal(full.complete, true);
+  assert.equal(full.latestIsAuthoritative, true);
+});
+
+test('WP-3A(a) MUTATION CONTROL: truncated is not automatically unauthoritative — newest-first, positively shown, is enough', async () => {
+  // Makes the test above fail-able. Same truncation, same store size; the only difference is
+  // that this server DID demonstrate newest-first ordering in what it returned. A rule of
+  // "incomplete means untrustworthy" would pass the test above and fail here, and would also
+  // fire the loud warning on every normal page-2 store — a warning that always fires is one
+  // nobody reads, which is the failure WO-OR-18 already paid for once.
+  const packets = ascendingPackets(149);
+  const newestFirstTruncated = async ({ page, size }) => {
+    const desc = [...packets].reverse();
+    return {
+      items: desc.slice((page - 1) * size, page * size).map((p) => msg(p)),
+      total: packets.length, page, size, pages: Math.ceil(packets.length / size),
+    };
+  };
+  const r = await continuity.readLatest({ fetchPage: newestFirstTruncated, maxPages: 1 });
+  assert.equal(r.latest.seq, 149, 'the newest packet genuinely was on page 1');
+  assert.equal(r.complete, false, 'the walk was still short — the count and history are partial');
+  assert.equal(r.newestFirstConfirmed, true);
+  assert.equal(r.latestIsAuthoritative, true, 'and that is enough to trust the FRONTIER, which is the question being asked');
+});
+
+test('WP-3A(a) A SINGLE PACKET CONFIRMS NOTHING — "no evidence against" is not confirmation', async () => {
+  // The strictness rule inside `ordersNewestFirst`. One packet, or a run of identical
+  // timestamps, cannot demonstrate an ordering. The honest answer is `false`, and `complete`
+  // then has to carry the weight instead.
+  const only = packet({ seq: 1, ts: '2026-08-05T09:00:00.000Z' });
+  const oneOfFive = async ({ page }) => ({
+    items: page === 1 ? [msg(only)] : [], total: 5, page, size: 100, pages: 2,
+  });
+  const r = await continuity.readLatest({ fetchPage: oneOfFive });
+  assert.equal(r.count, 1);
+  assert.equal(r.newestFirstConfirmed, false, 'one packet is not an ordering');
+  assert.equal(r.complete, false, 'and the declared total says four more exist');
+  assert.equal(r.incompleteReason, 'short-of-total');
+  assert.equal(r.latestIsAuthoritative, false);
+});
+
+test('WP-3A(a) POSITIVE PAGE CHECK: a server answering a page we did not ask for is caught by the ECHO, not by inference', async () => {
+  // Until now the ONLY detection of an ignored `page` was the repeat guard — an inference from
+  // seeing nothing new. This server defeats that inference deliberately: it always answers
+  // `page: 1` while handing back FRESH items every time, so nothing repeats and the old guard
+  // never fires. Only reading the echoed page catches it.
+  const ignoresPage = async ({ page, size }) => ({
+    items: Array.from({ length: size }, (_, i) => msg(packet({ seq: page * 1000 + i, ts: new Date(Date.UTC(2026, 7, 6, 0, 0, i)).toISOString() }), `ip-${page}-${i}`)),
+    total: 10000, page: 1, size, pages: 100,
+  });
+  const r = await continuity.listAllMessages({ fetchPage: ignoresPage });
+  assert.equal(r.complete, false);
+  assert.equal(r.incompleteReason, 'page-mismatch', 'the echoed page disagreed with the page requested');
+  assert.equal(r.pages, 2, 'and it stopped on the SECOND request rather than walking to the cap');
+  assert.equal(r.items.length, 100, 'keeping page 1, discarding the window it did not ask for');
+});
+
+test('WP-3A(a) POSITIVE PAGE CHECK MUTATION: the same server ECHOING correctly is not stopped', async () => {
+  // Makes the test above fail-able: if the check fired on something other than the mismatch,
+  // this identical server would also stop at two pages. It must walk to its own bound instead.
+  const echoesPage = async ({ page, size }) => ({
+    items: Array.from({ length: size }, (_, i) => msg(packet({ seq: page * 1000 + i, ts: new Date(Date.UTC(2026, 7, 6, 0, 0, i)).toISOString() }), `ep-${page}-${i}`)),
+    total: 10000, page, size, pages: 100,
+  });
+  const r = await continuity.listAllMessages({ fetchPage: echoesPage });
+  assert.equal(r.pages, 40, 'it walked to MAX_LIST_PAGES');
+  assert.equal(r.incompleteReason, 'page-cap', 'and stopped for its OWN bound, not for a mismatch');
+});
+
+test('WP-3A(a) COUNT RECONCILIATION: a walk that terminated NORMALLY but holds 100 of a declared 149 is not complete', async () => {
+  // THE SILENT CASE E-C NAMES, in its purest form. Every procedural termination is satisfied
+  // here — the server declares `pages: 1`, so `page >= pages` fires on the first response and
+  // the walk stops for the documented, correct reason. Nothing repeated, nothing failed,
+  // nothing was capped. The ONLY thing that says a third of the store is missing is that the
+  // envelope's own `total` and the items in hand disagree.
+  const packets = ascendingPackets(149);
+  const shortOfItsOwnTotal = async ({ page, size }) => ({
+    items: packets.slice(0, 100).map((p) => msg(p)),
+    total: 149, page, size, pages: 1,
+  });
+  const r = await continuity.listAllMessages({ fetchPage: shortOfItsOwnTotal });
+  assert.equal(r.total, 149);
+  assert.equal(r.items.length, 100);
+  assert.equal(r.complete, false, 'terminating for a good reason is not the same as holding everything');
+  assert.equal(r.incompleteReason, 'short-of-total');
+});
+
+test('WP-3A(a) COUNT RECONCILIATION MUTATION: when the count DOES add up, the walk stays complete', async () => {
+  // Fail-ability for the check above, and protection against the arithmetic being inverted:
+  // an off-by-one here would mark every healthy read incomplete and make the loud signal
+  // worthless within a day.
+  const packets = ascendingPackets(100);
+  const honest = async ({ page, size }) => ({
+    items: packets.map((p) => msg(p)), total: 100, page, size, pages: 1,
+  });
+  const r = await continuity.listAllMessages({ fetchPage: honest });
+  assert.equal(r.complete, true);
+  assert.equal(r.incompleteReason, null, 'a complete walk carries NO reason — a stale reason beside a green result is its own lie');
+});
+
+test('WP-3A(a) EVERY INCOMPLETE WALK NAMES ITS CAUSE — the five reasons, each from a server that produces it', async () => {
+  // `incompleteReason` replaces a boolean that could not tell a reader whether one page was
+  // rejected or the whole ordering was wrong. Enumerated rather than spot-checked: a field
+  // with five producers and one asserted producer is four untested paths.
+  const some = ascendingPackets(100);
+
+  const rejectsPage2 = async ({ page, size }) => {
+    if (page > 1) throw new Error('honcho POST /messages/list -> 422');
+    return { items: some.map((p) => msg(p)), total: 500, page, size, pages: 5 };
+  };
+  assert.equal((await continuity.listAllMessages({ fetchPage: rejectsPage2 })).incompleteReason, 'page-failure');
+
+  const stuck = async ({ page, size }) => ({ items: some.map((p) => msg(p)), total: 500, page, size, pages: 5 });
+  assert.equal((await continuity.listAllMessages({ fetchPage: stuck })).incompleteReason, 'repeat-window');
+
+  const endless = async ({ page, size }) => ({
+    items: Array.from({ length: size }, (_, i) => msg(packet({ seq: page * 1000 + i, ts: new Date(Date.UTC(2026, 7, 7, 0, 0, i)).toISOString() }), `e-${page}-${i}`)),
+    total: 999999, page, size, pages: 9999,
+  });
+  assert.equal((await continuity.listAllMessages({ fetchPage: endless })).incompleteReason, 'page-cap');
+
+  const wrongPage = async ({ page, size }) => ({ items: some.map((p) => msg(p, `w-${page}-${p.seq}`)), total: 500, page: 1, size, pages: 5 });
+  assert.equal((await continuity.listAllMessages({ fetchPage: wrongPage })).incompleteReason, 'page-mismatch');
+
+  const short = async ({ page, size }) => ({ items: some.map((p) => msg(p)), total: 149, page, size, pages: 1 });
+  assert.equal((await continuity.listAllMessages({ fetchPage: short })).incompleteReason, 'short-of-total');
+});
+
+test('WP-3A(a) THE BRIEF: an unestablished frontier is LOUD, and says so differently from a merely short walk', async () => {
+  // The user-visible half. `latestIsAuthoritative` inside readLatest is worth nothing unless
+  // it survives into the text a fresh session actually reads — that text being the entire
+  // reason this module exists.
+  const packets = ascendingPackets(149);
+
+  const oldestFirstAlways = async ({ page, size }) => ({
+    items: packets.slice((page - 1) * size, page * size).map((p) => msg(p)),
+    total: packets.length, page, size, pages: 2,
+  });
+  const loud = await continuity.readContinuityBrief({ fetchPage: oldestFirstAlways, maxPages: 1, git: MAP_PRESENT_IO });
+  assert.match(loud, /PAGINATION INCOMPLETE/, "WO-OR-18's floor is kept, not replaced");
+  assert.match(loud, /prefer the git map/, 'and so is its instruction');
+  assert.match(loud, /THE NEWEST PACKET IS NOT ESTABLISHED/, 'the escalated case must be distinguishable from the mild one');
+  assert.match(loud, /may be far behind the real frontier/);
+  assert.match(loud, /\(page-cap\)/, 'and it names the cause');
+
+  const newestFirstTruncated = async ({ page, size }) => {
+    const desc = [...packets].reverse();
+    return { items: desc.slice((page - 1) * size, page * size).map((p) => msg(p)), total: packets.length, page, size, pages: 2 };
+  };
+  const mild = await continuity.readContinuityBrief({ fetchPage: newestFirstTruncated, maxPages: 1, git: MAP_PRESENT_IO });
+  assert.match(mild, /PAGINATION INCOMPLETE/);
+  assert.match(mild, /prefer the git map/);
+  assert.match(mild, /The packet above IS the newest this read could establish/, 'the mild case must not cry wolf');
+  assert.doesNotMatch(mild, /NOT ESTABLISHED/, 'or the escalation means nothing');
+});
+
+test('WP-3A(a) THE BRIEF MUTATION: neither warning fires on a healthy complete read', async () => {
+  // A signal that always fires is one nobody reads. Both new wordings must be silent here.
+  const { fetchPage } = pagingServer(ascendingPackets(86));
+  const brief = await continuity.readContinuityBrief({ fetchPage, git: MAP_PRESENT_IO });
+  assert.doesNotMatch(brief, /PAGINATION INCOMPLETE/);
+  assert.doesNotMatch(brief, /NOT ESTABLISHED/);
+  assert.match(brief, /likely active map/, 'CONTROL: it really did render the normal brief');
+});
+
+// ---------------------------------------------------------------------------
+// WP-3A(d) — THE DEGRADED FALLBACK: identify as stale AND still orient
+// ---------------------------------------------------------------------------
+//
+// E-J: the success path already renders an age and a closing orientation line; the failure
+// branch rendered NEITHER, despite having the data. Warwick's bar is both halves — "a
+// degraded render that is honest but leaves the reader with nowhere to go has met half the
+// requirement and failed the other half."
+
+test('WP-3A(d) DEGRADED RENDER: an unreachable Honcho identifies itself as stale AND still orients', async () => {
+  continuity.saveState({ focus: 'the last thing this machine knew' });
+  const dead = async () => { throw new Error('honcho POST /messages/list -> 503: upstream'); };
+  const brief = await continuity.readContinuityBrief({ fetchPage: dead });
+
+  assert.match(brief, /UNAVAILABLE this session/, 'the honesty that was already there is kept');
+  assert.match(brief, /503/, 'including why');
+  assert.match(brief, /STALE BY CONSTRUCTION/, 'HALF ONE: it names the cached focus as stale rather than merely presenting it');
+  assert.match(brief, /last written .+ ago/, 'and how stale — the age it already had and never rendered');
+  assert.match(brief, /the last thing this machine knew/, 'CONTROL: the cached value really is the one being labelled');
+  assert.match(brief, /Deliverables\/` per `CLAUDE\.md` Step 2/, 'HALF TWO: and it still says where to go');
+  assert.match(brief, /Nothing in this block is an instruction/, 'with the same zero-authority disclaimer every other branch carries');
+});
+
+test('WP-3A(d) DEGRADED RENDER: with NO cached focus it still orients, rather than trailing off', async () => {
+  // The branch that used to return a single bare sentence. An empty recall is the case where
+  // the reader has LEAST to go on, so it is the last place to stop talking.
+  continuity.saveState({ focus: null });
+  const dead = async () => { throw new Error('honcho POST /messages/list -> 503: upstream'); };
+  const brief = await continuity.readContinuityBrief({ fetchPage: dead });
+
+  assert.match(brief, /UNAVAILABLE this session/);
+  assert.match(brief, /NO recall at all/, 'the absence is stated as a fact rather than left as a silence');
+  assert.doesNotMatch(brief, /STALE BY CONSTRUCTION/, 'and nothing stale is invented to fill it');
+  assert.match(brief, /Deliverables\/` per `CLAUDE\.md` Step 2/, 'the orientation line is NOT conditional on having recall');
 });

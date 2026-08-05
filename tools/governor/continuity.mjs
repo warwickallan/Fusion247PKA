@@ -590,24 +590,87 @@ async function deliver(packet, { request = hf } = {}) {
 // Deliver a continuity packet DIRECT to Honcho. On failure returns an honest {ok:false,
 // error} — never silent. No spool: a bounded local retry is added only if delivery is found
 // to genuinely fail in use (Warwick's scope ruling, unchanged by the protection above).
+// The two stored withhold codes. STABLE LITERALS, and that is load-bearing rather than
+// stylistic: `map_path_withheld` is part of the packet's CONTENT, so it enters
+// `packetContentHash`, so it steers the Stop-hook dedupe. A reason string carrying a network
+// error message would change on every blip, defeat the dedupe, and write a packet per Stop.
+// Diagnosis belongs in the render, which is why the explanatory prose lives beside the
+// renderer and only the code is persisted.
+const WITHHELD_STALE_SESSION = 'stale-session';
+const WITHHELD_AUTHORITY_UNESTABLISHED = 'authority-unestablished';
+
+/**
+ * Should this packet's candidate `map_path` be withheld — and under which code?
+ * Returns null to publish it.
+ *
+ * WP-3A(c). THE DEFECT THIS REPLACES, IN ONE LINE: the previous version ran a full
+ * `readLatest` inside the write path and wrapped it in a `catch` that fell through to an
+ * UNCONDITIONAL write. So the guard failed OPEN exactly when it could not do its job, and
+ * E-F is the consequence — a slow Honcho made the read time out, the guard fell open, and the
+ * stale pointer was KEPT. The two faults masked each other, and a test exercising either one
+ * alone passed while both were broken.
+ *
+ * THE TWO CONSTRAINTS PULL AGAINST EACH OTHER AND BOTH ARE HONOURED HERE, rather than one
+ * being traded for the other:
+ *   - the guard must not silently do the wrong thing when it cannot establish authority — so
+ *     an unestablished authority now WITHHOLDS the pointer instead of publishing it; and
+ *   - a packet must not be silently lost — so the packet is still built, still delivered, and
+ *     every other field still writes normally. Only the pointer is affected, and the fact
+ *     that it was withheld is RECORDED ON THE PACKET rather than left as an absence.
+ *
+ * THAT LAST PART IS THE POINT. A silent `delete` made a withheld pointer byte-identical to a
+ * packet that never had one, so the reader could not tell "this session declined to vouch for
+ * its pointer" from "no map could be resolved at all" — two different situations with two
+ * different next actions for whoever reads the brief.
+ *
+ * COST. One page, not a walk: `maxPages: 1`. The guard only needs the newest packet's `ts`,
+ * and under a server that honours `reverse` the newest packet is on page 1 by construction —
+ * while a server that does NOT honour it can no longer fool this guard, because
+ * `latestIsAuthoritative` refuses to confirm an order it never saw. That is strictly LESS
+ * network than the full walk this replaces (E-I: "doubles network work per session end"),
+ * and it is one more call site for a function that already exists — not a new mechanism.
+ */
+async function mapPointerWithholdReason(sessionStartedAt, readOpts) {
+  const sessionStartMs = typeof sessionStartedAt === 'string' ? Date.parse(sessionStartedAt) : NaN;
+  if (!Number.isFinite(sessionStartMs)) return WITHHELD_AUTHORITY_UNESTABLISHED;
+
+  let current;
+  try {
+    current = await readLatest({ ...readOpts, maxPages: 1 });
+  } catch {
+    // Honcho unreachable, or a page-1 failure. THE READ FAILING IS NOT PERMISSION TO WRITE
+    // THE POINTER — that inversion was the defect. The Stop hook still does not throw.
+    return WITHHELD_AUTHORITY_UNESTABLISHED;
+  }
+  // A genuinely empty store: there is no prior pointer to displace, so a first-ever write
+  // cannot be a regression. This is establishment, not a failure to establish.
+  if (!current) return null;
+  if (!current.latestIsAuthoritative) return WITHHELD_AUTHORITY_UNESTABLISHED;
+
+  const priorWriteMs = Date.parse(current.latest.ts);
+  if (!Number.isFinite(priorWriteMs)) return WITHHELD_AUTHORITY_UNESTABLISHED;
+
+  // Publish only when THIS session genuinely started after the last write.
+  return sessionStartMs > priorWriteMs ? null : WITHHELD_STALE_SESSION;
+}
+
 export async function writeContinuity(state, opts = {}) {
   const packet = buildPacket(state, opts);
 
   if (packet.map_path) {
-    try {
-      const { cwd, git, request, reason, sessionId, backfill, sessionStartedAt, ...readOpts } = opts;
-      const current = await readLatest(readOpts);
-      const priorWriteMs = current && current.latest ? Date.parse(current.latest.ts) : NaN;
-      const sessionStartMs = typeof sessionStartedAt === 'string' ? Date.parse(sessionStartedAt) : NaN;
-      // Reject unless THIS session genuinely started after the last write. Anything
-      // uncomparable (NaN on either side) leaves the packet untouched — see "accepted
-      // limitations" above.
-      if (Number.isFinite(priorWriteMs) && Number.isFinite(sessionStartMs) && !(sessionStartMs > priorWriteMs)) {
+    const { cwd, git, request, reason, sessionId, backfill, sessionStartedAt, ...readOpts } = opts;
+    // NO SESSION TO TIME IS NOT A FAILURE TO ESTABLISH AUTHORITY, AND THE DIFFERENCE MATTERS.
+    // A manual `write` or a `backfill` has no session start because it has no session — it is
+    // a deliberate human act at a keyboard, not a hook firing at a turn end. Folding it into
+    // the unestablished case would mean `continuity.mjs write` could never set a map pointer
+    // again, which breaks the one command Larry uses by hand. An UNPARSEABLE value is a
+    // different thing entirely and does land on the unestablished branch below.
+    if (sessionStartedAt !== undefined && sessionStartedAt !== null) {
+      const withheld = await mapPointerWithholdReason(sessionStartedAt, readOpts);
+      if (withheld) {
         delete packet.map_path;
+        packet.map_path_withheld = withheld;
       }
-    } catch {
-      // Honcho unreachable / readLatest failed — fall back to the unconditional write. Named
-      // explicitly, per the block above: a Stop hook must not throw over this.
     }
   }
 
@@ -740,7 +803,7 @@ function itemKey(it, index) {
 }
 
 /**
- * listAllMessages(opts) -> { items, pages, complete }
+ * listAllMessages(opts) -> { items, pages, total, complete, incompleteReason }
  *
  * `complete: false` means the walk stopped for a reason OTHER than the server indicating
  * there was nothing left — a repeated window, a rejected follow-up request, or the page
@@ -752,6 +815,29 @@ function itemKey(it, index) {
  * messages, and it stays correct as the session grows past that. The walk still runs to the
  * end rather than stopping at the newest packet, because `complete` is only an honest signal
  * if the walk was actually attempted, and `count` is only accurate if every page was read.
+ *
+ * WP-3A(a): TWO ADDITIONS, AND BOTH TURN AN INFERENCE INTO A POSITIVE CHECK.
+ *
+ *   1. `incompleteReason` REPLACES the bare boolean as the thing a caller can act on. A
+ *      truncated walk is not one condition, it is five, and they do not mean the same thing
+ *      to a reader: `page-failure` (a later page was rejected), `page-mismatch` (the server
+ *      answered a page we did not ask for), `repeat-window` (it re-served the same window),
+ *      `page-cap` (our own bound), `short-of-total` (the count does not add up). `complete`
+ *      is kept — every existing caller and test reads it — and the reason travels beside it.
+ *
+ *   2. `page-mismatch` and `short-of-total` are the POSITIVE checks. Until now the only
+ *      detection of a server ignoring `page` was the repeat guard, which is an INFERENCE from
+ *      seeing nothing new; and nothing at all reconciled what was collected against the
+ *      `total` the envelope declares. Both are one comparison against data already in hand,
+ *      on a path that normally terminates on the first response. No extra request, no new
+ *      mechanism, no new module — see §16.4.
+ *
+ * A NOTE ON `short-of-total`, so a false alarm is not later read as a bug: a packet written
+ * BETWEEN our page 1 and our page 2 raises `total` under us, and the walk then reports
+ * `short-of-total` for a store it read correctly. That is the safe direction and it is the
+ * one being chosen deliberately — over-reporting incompleteness costs a reader one look at
+ * the git map, while under-reporting it is the silent partial read this Work Package exists
+ * to make impossible.
  */
 export async function listAllMessages({
   fetchPage = fetchMessagePage,
@@ -763,7 +849,12 @@ export async function listAllMessages({
   const seen = new Set();
   let cursor = null;
   let pages = 0;
+  let total = null;
   let complete = false;
+  // The reason that stands if the loop simply runs out of iterations. Every early exit below
+  // overwrites it, and reaching `complete` clears it — so there is no path on which an
+  // incomplete walk carries no reason, which is the failure mode of a nullable field.
+  let incompleteReason = 'page-cap';
 
   for (let page = 1; page <= maxPages; page++) {
     let res;
@@ -774,9 +865,23 @@ export async function listAllMessages({
       // A LATER-page failure means this server does not accept the follow-up shape; we
       // already hold everything the old single-request path would have returned.
       if (page === 1) throw e;
+      incompleteReason = 'page-failure';
       break;
     }
     pages = page;
+    if (Number.isInteger(res?.total)) total = res.total;
+
+    // POSITIVE PAGE VERIFICATION. The envelope echoes the page it actually served. A server
+    // that ignores `page` answers `page: 1` forever, and that is a fact we can READ rather
+    // than deduce from the absence of new items. Checked BEFORE the batch is merged, because
+    // a window we did not ask for is not evidence about the window we did. The repeat guard
+    // below is KEPT for servers that omit the field — this is the stronger signal, not a
+    // replacement for the weaker one.
+    const answeredPage = Number.isInteger(res?.page) ? res.page : null;
+    if (answeredPage !== null && answeredPage !== page) {
+      incompleteReason = 'page-mismatch';
+      break;
+    }
 
     const batch = Array.isArray(res?.items) ? res.items : (Array.isArray(res) ? res : []);
     if (!batch.length) { complete = true; break; }
@@ -794,7 +899,7 @@ export async function listAllMessages({
     // pagination field re-serves the identical window indefinitely; without this the loop
     // would run to the cap on every single call, turning one request into forty. Nothing
     // new on a page means there is nothing more to get.
-    if (added === 0) break;
+    if (added === 0) { incompleteReason = 'repeat-window'; break; }
 
     // THE DOCUMENTED TERMINATION, and the one that fires on the normal path. `pages` is
     // authoritative and is present on the very first response, so the loop bound is known
@@ -816,11 +921,16 @@ export async function listAllMessages({
     if (batch.length < size && cursor == null) { complete = true; break; }
   }
 
-  return { items, pages, complete };
-}
+  // COUNT RECONCILIATION — the check that makes "complete" mean something arithmetic rather
+  // than merely procedural. Every termination above answers "did the walk stop for a good
+  // reason?"; none of them answers "do we actually hold everything?". A server that declares
+  // `total: 149` and hands back 100 items has told us both facts and they disagree.
+  if (complete && total !== null && items.length < total) {
+    complete = false;
+    incompleteReason = 'short-of-total';
+  }
 
-async function listMessages(opts) {
-  return (await listAllMessages(opts)).items;
+  return { items, pages, total, complete, incompleteReason: complete ? null : incompleteReason };
 }
 
 function parsePacketFromContent(content) {
@@ -844,27 +954,85 @@ function parsePacketFromContent(content) {
 // size, and `reverse=true` and a defensive sort cannot disagree about which packet is newest.
 // The sort is also what settles the two ties the server knows nothing about (equal
 // timestamps -> higher seq; equal seq -> live beats backfill).
+function newestFirstCompare(a, b) {
+  const ta = Date.parse(a.ts) || 0, tb = Date.parse(b.ts) || 0;
+  if (tb !== ta) return tb - ta;
+  if ((b.seq || 0) !== (a.seq || 0)) return (b.seq || 0) - (a.seq || 0);
+  return (a.backfill === b.backfill) ? 0 : (a.backfill ? 1 : -1); // live before backfill on a tie
+}
+
+/**
+ * Did the SERVER hand these back newest-first? Established from the packets AS RECEIVED,
+ * before this module's own sort destroys the evidence — which is why the check lives here and
+ * not anywhere downstream.
+ *
+ * WHY THIS EXISTS AT ALL (WP-3A(a), and it is the hazard the Work Order was reframed around).
+ * `reverse=true` is DOCUMENTED, and whether the DEPLOYED server honours it is NOT ESTABLISHED
+ * — the module has said so in the block above `fetchMessagePage` since WO-OR-21. If it does
+ * not, page 1 is the OLDEST hundred. At the store's measured size that is 100 of 149, so
+ * `readLatest` would return a packet roughly fifty writes behind the frontier — while `pages`,
+ * `total`, the repeat guard and the short-page rule all looked perfectly healthy, because
+ * every one of them is a statement about the WALK and none is a statement about the ORDER.
+ *
+ * A strict decrease is REQUIRED, not merely an absence of increases: one packet, or a run of
+ * identical timestamps, confirms nothing, and "no evidence against" is not confirmation. The
+ * honest answer there is `false`, and `complete` then has to carry the weight instead.
+ */
+function ordersNewestFirst(received) {
+  let sawStrictDecrease = false;
+  for (let i = 1; i < received.length; i++) {
+    const c = newestFirstCompare(received[i - 1], received[i]);
+    if (c > 0) return false; // an OLDER packet arrived before a NEWER one — not newest-first
+    if (c < 0) sawStrictDecrease = true;
+  }
+  return sawStrictDecrease;
+}
+
 export async function readLatest(opts = {}) {
-  const { items, pages, complete } = await listAllMessages(opts);
+  const { items, pages, total, complete, incompleteReason } = await listAllMessages(opts);
   const packets = items.map((it) => parsePacketFromContent(it.content)).filter((p) => p && p.kind === 'continuity');
   if (!packets.length) return null;
-  packets.sort((a, b) => {
-    const ta = Date.parse(a.ts) || 0, tb = Date.parse(b.ts) || 0;
-    if (tb !== ta) return tb - ta;
-    if ((b.seq || 0) !== (a.seq || 0)) return (b.seq || 0) - (a.seq || 0);
-    return (a.backfill === b.backfill) ? 0 : (a.backfill ? 1 : -1); // live before backfill on a tie
-  });
+  const newestFirstConfirmed = ordersNewestFirst(packets);
+  packets.sort(newestFirstCompare);
   return {
     latest: packets[0],
     count: packets.length,
     pages,
+    total,
     complete,
+    incompleteReason,
+    newestFirstConfirmed,
+    // THE FIELD EVERY CALLER MUST CONSULT BEFORE TREATING `latest` AS THE FRONTIER.
+    //
+    // `latest` is still returned when this is false — deliberately. Throwing would take the
+    // brief's honest-degradation path away and would turn a slow page 2 into a broken Stop
+    // hook, which is the fail-closed error this module has always refused. Warwick's bar for
+    // (a) is "impossible or LOUD", and this is the loud half: the value is handed over with
+    // the truth about it attached, and `readContinuityBrief` and `writeContinuity` below both
+    // read it. A caller that ignores it is the defect; a reader that cannot tell is worse.
+    //
+    // TWO independent ways to establish it, and only one has to hold:
+    //   - the walk reached the end (`complete`), so we hold every message whatever order they
+    //     came in, and the sort above settles it; or
+    //   - the server positively demonstrated newest-first ordering in what it did return, so
+    //     page 1 holds the newest even though later pages were not read.
+    latestIsAuthoritative: complete === true || newestFirstConfirmed === true,
     // Section-5 recall identity: hash of the newest content, and the write-timestamp
     // of the packet where that content last changed (not of the newest re-persist).
     contentHash: packetContentHash(packets[0]),
     contentTs: contentTimestampFrom(packets),
   };
 }
+
+// The render-side half of the withhold codes above. Prose lives HERE and not on the packet
+// so that what is stored stays a stable literal (see the comment on the codes themselves) —
+// the packet carries the fact, the renderer carries the explanation. An unrecognised code
+// still renders, quoted verbatim, rather than being dropped: a packet written by a newer
+// version of this module must never render as if it said nothing.
+const WITHHELD_EXPLANATION = {
+  [WITHHELD_STALE_SESSION]: 'that session started BEFORE the last stored write, so its pointer may have been a stale carry-forward from an older worktree',
+  [WITHHELD_AUTHORITY_UNESTABLISHED]: 'the newest stored packet could not be established at write time, so there was nothing trustworthy to check the pointer against',
+};
 
 // Rendered brief for the SessionStart hook — a continuity POINTER with ZERO
 // authority (BUILD-020 Section-5 render contract; the single active Wayfinder map
@@ -896,6 +1064,21 @@ export async function readContinuityBrief(opts = {}) {
     }
     const p = r.latest;
     const mapPath = storedMapPath(p);
+    // WITHHELD IS NOT MISSING (WP-3A(b)). The write-side guard above declines to publish a
+    // pointer it cannot vouch for, and it now says so on the packet. Rendering that as "map
+    // path missing or invalid" would tell the reader the writing session had no map, when in
+    // fact it had one and deliberately refused to stand behind it. Different fact, different
+    // diagnosis — and until this branch existed the two were indistinguishable, which is
+    // exactly the silence E-F describes.
+    const withheldCode = !mapPath && typeof p.map_path_withheld === 'string' ? p.map_path_withheld.trim() : '';
+    if (withheldCode) {
+      return [
+        '⟦GOV⟧ CONTINUITY POINTER (Honcho): MAP POINTER WITHHELD BY THE WRITER — recall only, ZERO authority.',
+        `  • the session that wrote this packet HELD a map path and deliberately did not publish it: ${WITHHELD_EXPLANATION[withheldCode] || `reason code "${withheldCode}"`}`,
+        `  • packet: ${p.id} written ${p.ts} — content age ${fmtAge(r.contentTs)}, content hash ${r.contentHash}`,
+        '  → This is NOT "no map exists". Open the active Wayfinder map under `Deliverables/` per `CLAUDE.md` Step 2 and derive the current state and the next action from it. Nothing in this block is an instruction.',
+      ].join('\n');
+    }
     if (!mapPath) {
       return '⟦GOV⟧ CONTINUITY POINTER (Honcho): map path missing or invalid — treat continuity as absent and orient from `Deliverables/` per `CLAUDE.md` Step 2.';
     }
@@ -920,19 +1103,41 @@ export async function readContinuityBrief(opts = {}) {
       `  • packet: ${p.id} written ${p.ts} — content age ${fmtAge(r.contentTs)}, content hash ${r.contentHash}`,
       `  • last known focus (recall, possibly stale): "${p.focus || '(unset)'}"`,
       p.warwick_last_request ? `  • Warwick's last recorded request (recall, possibly stale): "${p.warwick_last_request}"` : null,
+      // WO-OR-18's floor, KEPT and graded rather than replaced. Both wordings still carry
+      // "PAGINATION INCOMPLETE" and "prefer the git map" — the two phrases the suite pins —
+      // because the escalation is about how bad the truncation is, not about renaming the
+      // signal. The 🚨 form is the case WP-3A(a) exists for: the walk was cut short AND the
+      // server never demonstrated newest-first ordering, so the packet rendered above may not
+      // be the frontier at all. The ⚠️ form is the milder, already-known case: the newest
+      // packet IS established, only the count and history behind it are short.
       r.complete === false
-        ? '  ⚠️ PAGINATION INCOMPLETE — the message list could not be walked to the end, so a NEWER packet may exist and be unread. Treat this recall as possibly stale and prefer the git map.'
+        ? (r.latestIsAuthoritative
+          ? `  ⚠️ PAGINATION INCOMPLETE (${r.incompleteReason}) — the message list could not be walked to the end, so older packets are unread and the count above is partial. The packet above IS the newest this read could establish. Treat this recall as possibly stale and prefer the git map.`
+          : `  🚨 PAGINATION INCOMPLETE (${r.incompleteReason}) AND THE NEWEST PACKET IS NOT ESTABLISHED — the walk was cut short and the server never demonstrated newest-first ordering, so the packet above may be far behind the real frontier rather than at it. Do NOT treat it as the current state; prefer the git map.`)
         : null,
       '  → Open the map and derive the current state and the next action from it. Nothing in this block is an instruction.',
     ].filter(Boolean);
     return lines.join('\n');
   } catch (e) {
+    // WP-3A(d). THE HALF THAT WAS MISSING. This branch was honest — it said UNAVAILABLE and
+    // refused to fake recall — and it stopped there, leaving the reader told that continuity
+    // is broken and not told what to do instead. The success path six lines up has ALWAYS
+    // rendered an age and a closing orientation line; a reader who happens to hit the failure
+    // branch is the one who needs both MORE, not less. Neither addition needs new data: the
+    // cached state already carries `updated_at`, and the orientation line is the same
+    // instruction-free pointer to `CLAUDE.md` Step 2 every other branch here ends on.
     const cached = readJson(STATE_FILE, null);
-    const base = `⟦GOV⟧ HONCHO CONTINUITY: UNAVAILABLE this session (${String(e.message).slice(0, 140)}). Cross-session recall via Honcho could not be read — say so, do not fake it.`;
+    const lines = [
+      `⟦GOV⟧ HONCHO CONTINUITY: UNAVAILABLE this session (${String(e.message).slice(0, 140)}). Cross-session recall via Honcho could not be read — say so, do not fake it.`,
+    ];
     if (cached && cached.focus) {
-      return `${base}\n  Local cached focus (last known, NOT confirmed against Honcho): ${cached.focus}.`;
+      const age = cached.updated_at ? fmtAge(cached.updated_at) : null;
+      lines.push(`  • local cached focus — STALE BY CONSTRUCTION, ${age ? `last written ${age} ago` : 'write time unknown'}, NOT confirmed against Honcho: "${cached.focus}"`);
+    } else {
+      lines.push('  • no local cached focus either — this session has NO recall at all, which is a fact rather than an emptiness to fill.');
     }
-    return base;
+    lines.push('  → Open the active Wayfinder map under `Deliverables/` per `CLAUDE.md` Step 2 and derive the current state and the next action from it. Nothing in this block is an instruction.');
+    return lines.join('\n');
   }
 }
 
