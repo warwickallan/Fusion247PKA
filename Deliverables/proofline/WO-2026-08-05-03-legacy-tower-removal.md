@@ -1,4 +1,77 @@
-# WO-2026-08-05-03 — WP-2A: remove the legacy Tower so it cannot return
+# WO-2026-08-05-03 — WP-2A: make the legacy Tower unable to start
+
+> ## AMENDMENT 1 — 2026-08-05. Keel returned `REFUSE` on seven grounds. All seven upheld. **This order is now KEEL'S HALF ONLY.**
+>
+> **B1 was a discovery that falsified the order, and it is the most valuable thing this build has produced today.** A **seventh** start path — `services/tower-baton/scripts/start-fusion-tower.ps1`, documented as *"the canonical launcher — the only method"* — **survives all six removal targets.** The acceptance property would have been false at the moment it was asserted.
+>
+> **Four class-A defects were mine and were checkable before dispatch:** `live_authority: BOUNDED` (Keel may act only under `none`) · `Builds/**` in the file surface (its contract permanently bars it; **a Work Order cannot override a contract**) · `private_surface` at the secrets root **for the second time in one session** · and scheduled-task/startup-registration work that is **Mack's** seam.
+>
+> **Warwick's decisions, 2026-08-05 — map §14.13:** make the seventh path **REFUSE, do not delete**; and a **named GL-012 exception** for the two root `.ps1` files, with three binding conditions. **The machine-level half is now `WO-2026-08-05-04` (Mack). `Builds/**` is Larry's.**
+
+## Amendment 1 — envelope, REPLACING v1's
+
+| Field | Value |
+|---|---|
+| **status** | ISSUED — AMENDED 1 |
+| **governance_head** | `ff43b67dc3770ef0a0fef88cb0fe87964db7ece1` |
+| **authorised_by / date** | Warwick, 2026-08-05 — map §14.13 **D-A** |
+| **branch** | `build-020/legacy-tower-refuse`, cut from `ff43b67` or later |
+| **file_surface** | `services/tower-baton/bin/tower-watch.js` · `services/tower-baton/scripts/start-fusion-tower.ps1` · `services/tower-baton/test/**` (new, if you add coverage) · `Deliverables/2026-07-28-overnight-estate-closure-report.md` · `Deliverables/2026-08-01-pax-reset-challenge.md` · `Deliverables/2026-07-23-pr58-closure-evidence.md` · a new evidence file under `Deliverables/proofline/` |
+| **NOT in surface** | ❌ **`Builds/**` — Larry's, per your critical rule 5.** ❌ **`C:\.fusion247\**` — Mack's, under Warwick's named exception.** ❌ the Startup VBS and the scheduled task — **Mack's.** ❌ `services/tower-baton/src/**` — **the negative control's target. Do not touch** |
+| **private_surface** | **`none`.** GL-012 **not** engaged for this order |
+| **credential_scope** | none |
+| **live_authority** | **`none`** — restored to the only value your contract permits |
+| **network** | none |
+| **acceptance_property** | **`node bin/tower-watch.js` and `start-fusion-tower.ps1` REFUSE to start a watcher, exiting clearly and non-zero, while `services/tower-baton/src/clickupClient.js` remains present and the `control-trap` negative control still passes** |
+| **veritas_gate** | Phase 2 gate (§14.0c) — contributes to **S-2** |
+| **integration_owner** | Larry |
+| **document_impact** | the three `Deliverables/**` paths — **owner: keel** · `Builds/**` — **owner: larry** · the map — **owner: larry** |
+| **out_of_scope_policy** | report-only |
+| **operational_handoff** | none |
+| **dependency_policy** | no new runtime dependencies |
+| **blocking_dependencies** | none. **`WO-...-04` (Mack) runs concurrently on machine-level targets. Do not cross.** **`WO-...-02` owns `services/control-plane/**`. Do not cross** |
+| **worker_contract** | `Team/Keel - Implementation Engineer/AGENTS.md` @ `ff43b67` |
+| **contract_basis** | `services/tower-baton/**` — implementation code, core Keel surface · `Deliverables/**` — *"NOT prohibited wholesale"* · branch git — *"branch and worktree operations; commits and pushes"* |
+| **contract_conflicts** | **none — v1's three are removed by re-scoping, not by waiver** |
+| **capability_evidence** | `git worktree` authority exercised successfully on `WO-...-01` this session |
+| **return_to** | Larry |
+| **schema_decision / security_inputs** | n/a |
+
+## Amendment 1 — the outcome, restated
+
+**Not removal. A refusal.** Warwick: *"Make the seventh legacy start path refuse clearly rather than deleting the protected source tree. The outcome is that legacy Tower cannot start, while the negative control remains intact."*
+
+**The guard belongs in `bin/tower-watch.js`, not only the `.ps1`.** The launcher's own header states that invoking `node bin/tower-watch.js` is *"equivalently"* the same route through the same `runtimeConfig` module — so a guard only in the `.ps1` leaves the path open. **Guard both; the `.js` is the load-bearing one.**
+
+**Refuse clearly** — a message naming what is retired and what to use instead (`run-watcher.mjs`), and a non-zero exit. Not a silent no-op: a human who runs it must understand what happened.
+
+## Amendment 1 — `git worktree remove C:\Fusion247PKA-tower` is IN, and verified safe
+
+Your preflight established it loses nothing: clean tree, zero untracked, its one commit ahead of `main` is pushed and contained in `origin/build-014/tower-recovery`, no process holds the directory, admin dir unlocked. **The three stashes live in the shared `.git` and are unaffected — you were right to name them so nobody reads them as collateral.** Proceed, and **re-verify at execution time rather than trusting this paragraph.**
+
+## Amendment 1 — your three questions, answered
+
+**Q1** — you found the seventh path and an eighth (`tower-host-runbook.md` §3–§4). **Both are in the acceptance property now.** The eighth's document lives under `Builds/**` and is **Larry's** to correct.
+**Q2** — answered above. Nothing lost.
+**Q3** — **you were right on all three counts.** The order said *"delete or neutralise"* while A2 assumed deletion; the `wscript` attempt is evidentially vacuous because `Run(..., 0, False)` returns immediately and surfaces nothing; and once a file is deleted, an "attempt" is ceremony over a predicate. **Adopted:** `Test-Path`-false is a **hard mechanical gate** before any attempt command; delete rather than neutralise; **the `wscript` attempt is struck**; A3 (`schtasks /Run`, which distinguishes *unregistered* from *disabled*) is the load-bearing attempt. **That whole sequence is Mack's order now** — recorded here so the reasoning is not lost.
+
+## Amendment 1 — B2 and B3 resolved
+
+**B2 — the tower-loop suite is STRUCK from your acceptance evidence.** You were right: your surface is markdown plus one `services/tower-baton/` guard, and a change there cannot regress `tower-loop`. Requiring it was a control reporting on ground your change never touches, and it coupled your verdict to WO-02's in-flight state. **Prove the `control-trap` negative control still passes instead** — that is the one that is genuinely on your ground, and it is the whole reason the source tree survives.
+
+**B3 — adopted as a standing rule for this phase.** Assert on **absolute script path and `WATCHER_ID`**, never a process-name match. The `tower-loop` suite spawns children whose command line is bare `node watcher.mjs`, indistinguishable by name from a resurrection.
+
+## Amendment 1 — acceptance evidence
+
+- **The refusal proven BY ATTEMPT:** run both entrypoints, paste the real refusal output and non-zero exit.
+- **`src/clickupClient.js` still present**, and the `control-trap` negative control still passing — with its **executed** output.
+- `git worktree remove` before/after, plus `git worktree list`.
+- `bash scripts/secret-scan.sh --surface <each declared path>` — **`--surface` mode only.**
+- **PID 31268 alive and its log still advancing, at start AND end.**
+
+**Proceed if sound — one further read-back only if a material defect remains.**
+
+---
 
 | Field | Value |
 |---|---|
