@@ -101,9 +101,11 @@ const CP_FNS = ['spawnSync', 'spawn', 'execFileSync', 'execFile', 'execSync', 'e
 const CP_CALL_RE = new RegExp(`(?<![\\w$.])(${CP_FNS.join('|')})\\(`, 'g');
 
 // Pinned literals, held HERE rather than derived from the sources they check — a count that
-// recomputed itself would agree with anything. 3 in src/, 8 in test/, as of WO-2026-08-03-02.
+// recomputed itself would agree with anything. 3 in src/, 8 in test/, as of WO-2026-08-03-02;
+// test/ moved to 10 during the #92/#93/#94 reconciliation rebase — retired.test.js (added on the
+// #94 branch, predating this convention) had 2 bare spawnSync launches, now windowsHide:true.
 const SRC_CP_SITES = 3;
-const TEST_CP_SITES = 8;
+const TEST_CP_SITES = 10;
 
 function jsFilesUnder(dir, out = []) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {

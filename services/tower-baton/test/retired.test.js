@@ -46,6 +46,7 @@ function runEntrypoint(env = {}) {
   return spawnSync(process.execPath, [ENTRYPOINT], {
     encoding: 'utf8',
     env: { ...process.env, FUSION247_HOME: absentHome(), ...env },
+    windowsHide: true,
   });
 }
 
@@ -68,6 +69,7 @@ test('the guard acts BEFORE anything is loaded, read or logged — exact output,
   const r = spawnSync(process.execPath, [ENTRYPOINT], {
     encoding: 'utf8',
     env: { ...process.env, FUSION247_HOME: home },
+    windowsHide: true,
   });
 
   assert.equal(r.stdout, '', 'the retired entrypoint writes nothing to stdout');
