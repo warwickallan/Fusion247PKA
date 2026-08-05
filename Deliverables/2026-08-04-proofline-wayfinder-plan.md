@@ -1678,3 +1678,45 @@ All three investigations have landed and their findings are recorded above. **WP
 | 5b | **Warwick RATIFIES the governing contract changes** — his reservation, not Larry's to assume | **Warwick** |
 
 **The redline reaches `main` only through Warwick's ratification plus the independent review already on this phase's route — Veritas on the exact integrated head, and Codex at PR level.** Larry does not apply it on his own authority.
+
+---
+
+## 16.10 Continuity published live — 2026-08-05, and the design defect it exposes
+
+**Warwick, 2026-08-05:** *"Do not defer the continuity refresh until merge. Publish the truthful current Phase-3 state now through the installed production write path… Also record the remaining design defect for this phase: material frontier changes must trigger continuity."*
+
+### Packet 1 of 2 — published and read back
+
+**Written through the INSTALLED production path** (`~/.mypka/governor/continuity.mjs write`), not a repo copy: `state_persisted: true`, `withheld: []`, `truncated: []`.
+
+**Read back immediately through the INSTALLED renderer:**
+
+| | |
+|---|---|
+| Packet | `cont-1785971013511-153-6svm8`, **content age 0h 0m** |
+| Focus | **BUILD-020 Phase 3** — no longer Phase 2. **The stale orientation is gone** |
+| Map pointer | **present** — `Deliverables/2026-08-04-proofline-wayfinder-plan.md`. The write-authority path resolved rather than failing open, and did not strip it |
+| Seq | 152 → **153** |
+
+**A second packet is owed after merge**, carrying the merged SHA and the fresh-session next action, read back before `/clear`.
+
+### ⚠️ Observation, recorded not assumed
+
+**`continuity-last.json` still names packet 152 after 153 was written and read back.** Packet 153 is retrievable from Honcho, so it landed. **Whether the last-delivered marker is `stop`-path-only by design, or whether this is a gap, is UNESTABLISHED.** Not chased — recorded.
+
+### 🔴 THE DESIGN DEFECT — Warwick's, and it is the one that matters
+
+> **Material frontier changes must trigger continuity.**
+
+**Today the continuity write is a Larry habit, not an event.** Nothing fires it. The packet sat **13 hours stale** through an entire phase of work — correct map pointer, wrong phase — and only moved because Warwick instructed it explicitly. **That is the same shape as every other compensating habit this estate has recorded: bound to a person remembering, not to an event, and therefore a dated liability.**
+
+**The five events are already named** (§16.3 WP-3B / Warwick, 2026-08-05, for the recommendation cache): active frontier changes · next Work Order changes · phase boundary changes · context crosses a threshold · handback state changes. **The same trigger set applies here, and the cache half of it was already built in WP-3B.**
+
+**Recorded as a defect, NOT dispatched.** It is out of this closure's scope, and **the regrowth cap applies at full force** — the answer is a trigger on an existing write path, never a new mechanism, daemon or watcher.
+
+### Durable estate facts banked from this closure
+
+- **Subagent writes to `~/.mypka/**` now SUCCEED** (Mack, probed and cleaned up, WO-16). **WO-07 Amendment 3's `BLOCKED — required-but-unavailable` is SUPERSEDED.**
+- **The governor runtime carries governance head `696d4498`**, 8/8 byte-identical to the git blob, rollback executed and proven on a file with a real delta.
+- **WP-3B's fix is observable in the product, not only in a hash:** the pre-fix copy renders `ctx 44% · GREEN` with **no figures**; the fixed copy renders `ctx 44% (440.1k/1000k)`.
+- **`MessageDisplay` exists in host 2.1.222** with a completed-message path — the claim that no hook could ever render the footer was false as to mechanism. **Whether it reaches web/Android was never established and Warwick has closed the question.**
