@@ -99,6 +99,15 @@ The first run was **`# pass 25 / # fail 5`**. Three of those failures were the *
 
 Recorded because it is the point: **the trap that has bitten this build three times bit the work that exists to reduce such defects, and only an executed test found it.**
 
+**And it was then proven closed rather than assumed closed.** `git add` warned that all three files will be CRLF on the next checkout, so the working tree was converted to CRLF — simulating a fresh clone — and the suite re-run:
+
+| Working tree | Exit | Counts |
+|---|---|---|
+| LF (as authored) | 0 | `# tests 30 / # pass 30 / # fail 0` |
+| **CRLF (as a fresh checkout delivers it)** | 0 | **`# tests 30 / # pass 30 / # fail 0`** |
+
+This matters beyond tidiness: the mutation harness matches multi-line targets against the source text, so without normalisation **every mutation proof in §2b would fail to find its target on any fresh clone** — the suite would go red for a reason having nothing to do with the code, and the controls would look broken rather than absent. Files restored from the index afterwards; working tree clean.
+
 ---
 
 ## 3. THE REPLAY — the real verification
