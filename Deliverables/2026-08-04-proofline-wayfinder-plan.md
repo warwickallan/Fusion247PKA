@@ -1273,6 +1273,81 @@ Genuine **external independence** · **read-only** operation · **exact-head and
 
 ---
 
+## 14.20 🔄 IMPLEMENTATION CLOSE → ROTATION → FRESH LARRY. **Sequence set by Warwick, 2026-08-05**
+
+> *"At implementation close: bank everything useful in Git, have Veritas verify nothing material remains only in this session, then consider rotation. Fresh Larry handles final Veritas, Codex/UAT and wrap."*
+
+**His condition, and it is the operative one:** record this *"so long as this will not be detrimental to this phase, with everything that needs to be durable from your context on Git and verified as such by Veritas."* **Larry's honest assessment is below, including the one thing that currently makes rotation UNSAFE.**
+
+### The sequence
+
+| # | Step | Owner |
+|---|---|---|
+| **1** | **Finish implementation** — WP-2B(2) code, Mack's install half, WP-2E, WP-2C. **No Codex, no UAT** | this Larry |
+| **2** | **Bank everything useful in Git** — see the durability checklist below | this Larry |
+| **3** | **🚨 Correct the continuity store** — see the rotation blocker | this Larry. **HARD PRECONDITION** |
+| **4** | **Veritas: rotation-readiness assurance.** One question — *"does anything material exist ONLY in this session?"* **This is NOT the Phase 2 gate** | Veritas |
+| **5** | **Rotate** | Warwick |
+| **6** | **Final Veritas Phase 2 gate (§14.0c S-1..S-5) · Codex UAT · merge · wrap** | **fresh Larry** |
+
+**Two distinct Veritas engagements. Do not conflate them.** Step 4 asks *"is the record complete enough to survive a `/clear`?"*. Step 6 asks the mandatory question — *"can Warwick now do the thing this phase promised, in the real intended context?"* — **against the exact integrated head.** Step 4 discharges no gate.
+
+### 🚨 THE ROTATION BLOCKER — rotating today would be actively harmful
+
+**`~/.mypka/governor/continuity.json` still says `focus: "BUILD-015 AsdAIr live-acceptance recovery…"`, 30+ hours stale, with `next_action` a full imperative BUILD-015 Gate 3 procedure.**
+
+**So a `/clear` performed right now hands the fresh Larry a confident, wrong orientation to the wrong build** — the exact failure the rotation block at the top of this map warns about, and the exact failure W-1 names. **`focus` is a PERMITTED, ALREADY-RENDERED field: no code change suppresses it. Only correct data fixes it.**
+
+**Therefore step 3 is a hard precondition of step 5, and it is an operational act, not a code change.** WP-2B(2) and Mack's install make the pointer *robust*; **they do not make the stored content *true*.**
+
+### Durability checklist — what must be in Git before step 4
+
+Larry's assessment of what currently exists **only** in this session:
+
+| Item | State | Action |
+|---|---|---|
+| Decision reasoning (why SQLite, why refuse-not-delete, why DRAFT, why Option 1) | **In commit messages and the map.** Durable | none |
+| Work Orders and every amendment | **On disk, committed.** WO-01..WO-06 | none |
+| Executed evidence per work package | **Committed** under `Deliverables/proofline/` | none |
+| **The refusal ledger** — six Work Order refusals, every one class-A, every one a defect in Larry's order | **⚠️ PARTIAL.** Scattered across amendments and commit messages | **§14.21 — write it out once** |
+| Warwick's decisions and their exact wording | **In the map** (§14.0, §14.13, §14.15, §14.18, §15.3a/b) | none |
+| **Outstanding work and its exact shape** | **§14.19** | keep current |
+| The Codex contract awaiting ratification | **Committed, DRAFT** | Warwick reads it |
+| **Open items needing Warwick** | ratify contract · re-bind `prompt-approvals.json` hash · `merge-decision` | **listed in §14.19** |
+
+### Is rotation detrimental to this phase? — Larry's honest answer
+
+**No, PROVIDED steps 2–4 complete first — and it is positively beneficial for step 6.** The Codex UAT and the final Veritas gate are the most context-expensive work remaining, and they are exactly the work that benefits from a clean context reading a complete record rather than a long transcript.
+
+**The genuine risk is not lost facts — it is lost *judgement about what was nearly wrong*.** Six refusals corrected six defects in Larry's orders; a fresh Larry who does not know that pattern may reissue one. **§14.21 exists to make that pattern durable rather than remembered.**
+
+---
+
+## 14.21 The refusal ledger — durable, because it is the Phase 3 input most likely to be lost
+
+**Six Work Order refusals in Phase 2. EVERY ONE was class-A: a defect in Larry's ORDER, not in the proposed work. None was a worker declining work it should have done.**
+
+| # | WO | Refused by | The defect — Larry's |
+|---|---|---|---|
+| 1 | WO-01 Honcho writer | Keel | **No `file_surface` declared** — the worker's one absolute rule had nothing to bind to; 7 further envelope fields missing |
+| 2 | WO-02 canonical store | Keel | **`private_surface` = the SECRETS-STORE ROOT** (GL-012 breach) · an acceptance criterion that would have **spawned a real Codex run and sent two Telegram messages to Warwick** · `node_modules` absent so no evidence command could run |
+| 3 | WO-03 legacy removal | Keel | **`Builds/**` in a surface the contract permanently bars** · `live_authority: BOUNDED`, not a permitted value · **scheduled-task work belonging to Mack** · `private_surface` = the secrets root **AGAIN** · **and a SEVENTH start path that falsified the acceptance property** |
+| 4 | WO-04 machine removal | Mack | A condition requiring a check **the same order's own prohibition forbade** · an acceptance property claiming **eight paths from a four-path proof** — *the exact defect that had just refused WO-03, repeated one order later* |
+| 5 | WO-05 Codex contract | Keel | **`Builds/**` again** · **a reach test that would have passed BY BLOCKING in CI** — the false green the WP existed to kill · ratification left to a worker who may not ratify |
+| 6 | WO-06 Honcho render | Keel | **`live_authority` not `none`** · acceptance property unreachable in surface · **and `CLARIFY`: an instruction that reversed an approved governance redline by writing code** |
+
+### The patterns, stated plainly for the Phase 3 report
+
+1. **Surface declaration is Larry's weakest discipline.** `private_surface` at the secrets root **twice**; `Builds/**` in a barred surface **twice**; a missing `file_surface` once. **Five of six refusals involved a surface field.**
+2. **Larry writes acceptance properties that outrun the surface** — eight paths from four, an end-to-end run that needed spend, a live-store write forbidden by the same order.
+3. **Repeating a defect he had just documented.** WO-04 reproduced WO-03's over-claim; WO-05 and WO-03 both put `Builds/**` in a Keel surface.
+4. **Treating a specialist recommendation as authority** (WO-06) — *"a previous instance's standing buys this one nothing"* was the worker's correction, and it was right.
+5. **The refusals were cheap and the defects were not.** Each cost one round trip; three would have shipped a false green, a governance reversal, or an incomplete removal that read as complete.
+
+**No mechanism is proposed here. Phase 3 decides whether this is a Larry defect, a template defect, or a missing pre-dispatch check — and *"build a checker"* is the diagnosis Warwick has already rejected once.**
+
+---
+
 ## 14.11 Evidence status — §14.6 discharged
 
 All three investigations have landed and their findings are recorded above. **WP-2A, WP-2E and WP-2F may now be issued as Work Orders.** WP-2B(1) is issued and amended (`WO-2026-08-05-01`, Amendment 1) after a correct class-A `REFUSE`.
