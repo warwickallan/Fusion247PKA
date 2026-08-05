@@ -1003,11 +1003,13 @@ Keel's four class-A refusals were all correct. The work divides:
 
 ---
 
-# 15. PHASE 3 — token and process forensics. **TEED UP, NOT STARTED**
+# 15. PHASE 3 — token and process forensics. **GATE OPEN — NOT STARTED IN THIS CONTEXT**
 
 **Set by Warwick, 2026-08-05. Explicitly NOT to be built now:** *"do not start building it until Phase 2 is complete, merged and we have rotated successfully. The fresh Larry owns the route."*
 
-**Recorded here so it survives rotation. Any session that starts building this before Phase 2 has merged and rotated is disobeying the instruction that created it.**
+**Phase 2 is complete and merged** — PR #94 → `main` at `c21c3f3cfa5cdf8499d3972152bad6dc82986df3`, Veritas PASS at `abb9892c950b0d673691849baed9220cbfe321d2` (`Deliverables/2026-08-05-veritas-phase2-gate-receipt.md`). **The gate is open on Phase 2 completion; the remaining condition — "we have rotated successfully" — is for the FRESH Larry after `/clear` to establish, not this context.** This context does not start Phase 3, per explicit instruction (2026-08-05).
+
+**Recorded here so it survives rotation. Any session that starts building this before rotation has happened is disobeying the instruction that created it.**
 
 ## 15.1 North Star — his words
 
@@ -1395,15 +1397,12 @@ Genuine **external independence** · **read-only** operation · **exact-head and
 
 | | |
 |---|---|
-| **Phase** | **Phase 2 — Honcho and Tower as durable shared myPKA infrastructure.** IN PROGRESS |
-| **Delivered and integrated** | WP-2B(1) Honcho writer · WP-2F one canonical store · WP-2A legacy Tower retired · WP-2G Codex contract + reach proof · the constitutional amendment · WP-2B(2) render + install — integrated at `eff3033` · **WP-2E TowerBot QA exchange (W1-W4) — integrated at `81b5823` and submitted for assurance**, built by Keel under `WO-2026-08-05-09` + Amendment 1 (evidence: `Deliverables/proofline/EVIDENCE-2026-08-05-wp-2e-qa-exchange.md`; `node run-tower-loop-tests.mjs` 50 executed, 1 pre-existing unrelated failure — `T5`, unratified `tower-qa-skill.md` — held constant across the merge, 0 regressions) |
-| **✅ S-1 MET** | **A fresh session in a NON-main worktree, with no project-scope hook of its own, receives a brief naming THIS map — automatically, no path typed.** Both discriminator halves hold; main worktree shows exactly **one** block (no double-fire). Hooks **MERGE** (proven), so removing the project-level duplicates was a correctness requirement. Evidence: `Deliverables/proofline/EVIDENCE-2026-08-05-wo-07-honcho-install.md` |
-| **S-4 contributed, not yet gated** | WP-2E's build and integration evidence is above. **S-4 itself is Veritas's to assess at the exact integrated head (§14.0c), not claimed here.** |
-| **Open** | **WP-2C** — **ding RECOVERED (§14.7a), full durable/event-driven claim still open** · then **WP-2D** UAT + first live Codex call + merge |
-| **Exact next action** | **WP-2D** — PR #94 out of draft, Codex reviews the complete integrated change, `merge-decision` is Warwick's |
-| **Warwick owes** | **1. Ratify the Codex contract wording** — `services/control-plane/review/prompts/tower-qa-skill.md` ships DRAFT and does **not** govern until he does; needed **before the UAT**. · **2. Re-bind the hash approval in `services/control-plane/review/prompts/prompt-approvals.json`** — repairing a pointer changed `product-qa-runtime-orientation.md`'s bytes, so his hash-bound campaign approval (`cd65539a…253135`) lapsed and its stamp correctly reverted to `UNRATIFIED-draft`. **That is the binding working, not a defect**; it was already DRAFT and did not govern. *(Was recorded only in `EVIDENCE-…wo-05-codex-contract-reach.md` F-5 — evidence, never instruction. Surfaced here 2026-08-05 per Veritas F-3.)* · **3. The `merge-decision`.** |
-| **Gate ahead** | ✅ **PASS at `abb9892c950b0d673691849baed9220cbfe321d2`** — `Deliverables/2026-08-05-veritas-phase2-gate-receipt.md`. S-1..S-5 all proven by independent execution. Only `merge-decision` remains, and it is Warwick's alone. |
-| **Phase 3** | §15. **RECORDED, NOT STARTED.** Not before Phase 2 merges and rotates |
+| **Phase** | **Phase 2 — Honcho and Tower as durable shared myPKA infrastructure.** ✅ **PASS. CLOSED.** |
+| **Merge** | **PR #94 merged to `main` at `c21c3f3cfa5cdf8499d3972152bad6dc82986df3`**, guarded to the exact approved head `fec1c89ec1953c9ccad12d079d63f98929d248d6`, `merge-decision` by Warwick, 2026-08-05. PRs #91/#92/#93/#94 all confirmed present on `main` by content and ancestry, not by title. PR #80 (unrelated audit-only draft) closed without merging, history preserved. |
+| **Veritas gate** | ✅ **PASS at `abb9892c950b0d673691849baed9220cbfe321d2`** — `Deliverables/2026-08-05-veritas-phase2-gate-receipt.md`. S-1..S-5 all proven by independent execution, not builder self-report. |
+| **Delivered, integrated, live** | Honcho: dynamic map-pointer discovery (marker + git-recency, not hardcoded) · write-authority race closed (session-start-time comparison, not commit-recency — a first design using commit-recency was wrong and was corrected before shipping) · machine-level install at `~/.mypka/governor/`, hooks and statusline machine-wide, no per-worktree dependency. Tower: machine-level install at `~/.mypka/tower-runtime/` · autostart via `HKCU\...\Run` → hidden VBS → `start-tower.mjs` (the ONLOGON scheduled-task route was tried and is genuinely blocked by OS elevation — recorded, not worked around) · exactly one watcher enforced · legacy resurrection proven closed by attempt · PR discovery genuinely dynamic (GitHub-queried every round, no seed/pre-config, proven on a completely untouched PR) · polling rotation closes starvation past the poll cap · git-evidence resolution via `gh` removes the dependency on any specific mutable worktree · the real Codex/Larry exchange, under the ratified `tower-qa-skill.md` contract, proven live on TowerBot with real finding content and disposition rationale. |
+| **Deferred, not fixed here** | Two pre-existing AsdAIr (BUILD-015) CI failures, root-caused to 2026-08-04 commits, explicitly out of Phase 2 scope per Warwick — `Deliverables/BACKLOG.md` row 11. |
+| **Not this context's to start** | Phase 3 (§15) — gated on rotation, which only the fresh Larry after `/clear` can establish. |
 
 ### R-3 CORRECTED — it is SIX hardcoded invocations, not four (Keel, 2026-08-05, P-2)
 
