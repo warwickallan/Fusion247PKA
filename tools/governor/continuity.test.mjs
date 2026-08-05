@@ -1593,8 +1593,14 @@ test("WRITE-AUTHORITY: a session that STARTED BEFORE the stored pointer's last w
   const a = await continuity.writeContinuity(
     // sessionStartedAt is irrelevant here — A is the first write, nothing to compare against
     // yet — so A's own start time is left unset, deliberately, to avoid implying otherwise.
+    //
+    // AMENDMENT 2 FIXTURE CORRECTION — `sessionId` added, no assertion changed. A models a
+    // Stop-hook session, and in production EVERY stop packet carries a session id because the
+    // hook supplies it. Without one, A's packet looked like a MANUAL write, which the D-1 fix
+    // deliberately treats as unattributable and therefore not a rival. This test's own name
+    // says "session A"; the fixture simply never said so to the code.
     { focus: 'session A, current build' },
-    { cwd: 'C:/repo-A', git: gitA, fetchPage: fake.fetchPage, request: fake.request }
+    { cwd: 'C:/repo-A', git: gitA, fetchPage: fake.fetchPage, request: fake.request, sessionId: 'sess-A' }
   );
   assert.equal(a.ok, true);
   assert.equal(a.packet.map_path, 'Deliverables/map-A.md', 'CONTROL: A really did post a map pointer, or B has nothing to fail to displace');
@@ -1607,7 +1613,7 @@ test("WRITE-AUTHORITY: a session that STARTED BEFORE the stored pointer's last w
   const b = await continuity.writeContinuity(
     { focus: 'session B, an old worktree finally closing' },
     // B genuinely started earlier, even though its Stop fires after A's in this call sequence.
-    { cwd: 'C:/repo-B', git: gitB, fetchPage: fake.fetchPage, request: fake.request, sessionStartedAt: beforeA }
+    { cwd: 'C:/repo-B', git: gitB, fetchPage: fake.fetchPage, request: fake.request, sessionId: 'sess-B', sessionStartedAt: beforeA }
   );
   assert.equal(b.ok, true);
   assert.equal(Object.prototype.hasOwnProperty.call(b.packet, 'map_path'), false, "B's stale write must not carry the pointer");
@@ -1690,9 +1696,16 @@ test('MUTATION: the session-start comparison is REAL — force OLDER (reject) an
   // always blocks, would pass a test that only exercises one direction. Both directions are
   // proven here against an IDENTICAL candidate and an IDENTICAL prior — only the session
   // start time changes between the two runs.
+  //
+  // AMENDMENT 2 FIXTURE CORRECTION — `session_id` added to the prior and `sessionId` to both
+  // writers; no assertion changed and neither direction relaxed. The time comparison this test
+  // exists to prove only APPLIES between two different sessions, so the prior has to belong to
+  // one. Previously it belonged to nobody, which after the D-1 fix reads as a manual write and
+  // is deliberately not a rival. Both writers share one id so that the ONLY difference between
+  // the two runs remains the session start time — which is exactly what this test claims.
   const priorPacket = {
     schema: 1, kind: 'continuity', id: 'cont-prior', ts: '2026-08-05T09:00:00.000Z', seq: 1,
-    backfill: false, focus: 'prior', map_path: 'Deliverables/map-prior.md', next_action: 'n',
+    backfill: false, session_id: 'sess-other', focus: 'prior', map_path: 'Deliverables/map-prior.md', next_action: 'n',
   };
   const gitCandidate = gitStub(
     { 'rev-parse': 'C:/repo\n', grep: 'Deliverables/map-candidate.md\n', 'merge-base': 'base1\n', log: gitLogOutput([[4242, ['Deliverables/map-candidate.md']]]) },
@@ -1702,14 +1715,14 @@ test('MUTATION: the session-start comparison is REAL — force OLDER (reject) an
   const older = fakeHoncho([priorPacket]);
   const rejected = await continuity.writeContinuity(
     { focus: 'older session' },
-    { cwd: 'C:/repo', git: gitCandidate, fetchPage: older.fetchPage, request: older.request, sessionStartedAt: '2026-08-05T08:59:59.000Z' } // BEFORE
+    { cwd: 'C:/repo', git: gitCandidate, fetchPage: older.fetchPage, request: older.request, sessionId: 'sess-mine', sessionStartedAt: '2026-08-05T08:59:59.000Z' } // BEFORE
   );
   assert.equal(Object.prototype.hasOwnProperty.call(rejected.packet, 'map_path'), false, 'OLDER must be REJECTED — the pointer must not move');
 
   const newer = fakeHoncho([priorPacket]);
   const accepted = await continuity.writeContinuity(
     { focus: 'newer session' },
-    { cwd: 'C:/repo', git: gitCandidate, fetchPage: newer.fetchPage, request: newer.request, sessionStartedAt: '2026-08-05T09:00:01.000Z' } // AFTER
+    { cwd: 'C:/repo', git: gitCandidate, fetchPage: newer.fetchPage, request: newer.request, sessionId: 'sess-mine', sessionStartedAt: '2026-08-05T09:00:01.000Z' } // AFTER
   );
   assert.equal(accepted.packet.map_path, 'Deliverables/map-candidate.md', 'NEWER must be ACCEPTED — proves the guard is not vacuously always-reject');
 });
@@ -1803,9 +1816,14 @@ test('WP-3A(c) MUTATION CONTROL: the combined case is not vacuously always-withh
   // Makes the test above fail-able. Same stale-session timing, same store — but a comparison
   // read that WORKS. The guard must then withhold for the OTHER reason, and the two codes must
   // be distinguishable, or "it withheld" proves nothing about which fault was detected.
+  //
+  // AMENDMENT 2 FIXTURE CORRECTION — `session_id` on the prior, `sessionId` on the writers; no
+  // assertion changed. The stale-session case is by definition a case about ANOTHER session's
+  // packet, and the fixture had left the prior unattributed. Same correction, same reason, as
+  // the two above.
   const priorPacket = {
     schema: 1, kind: 'continuity', id: 'cont-prior', ts: '2026-08-05T09:00:00.000Z', seq: 1,
-    backfill: false, focus: 'the pointer that should stand', map_path: 'Deliverables/map-current.md',
+    backfill: false, session_id: 'sess-current', focus: 'the pointer that should stand', map_path: 'Deliverables/map-current.md',
   };
   const fake = fakeHoncho([priorPacket]);
   const gitStale = gitStub(
@@ -1815,7 +1833,7 @@ test('WP-3A(c) MUTATION CONTROL: the combined case is not vacuously always-withh
 
   const stale = await continuity.writeContinuity(
     { focus: 'old worktree, healthy read' },
-    { cwd: 'C:/old-worktree', git: gitStale, fetchPage: fake.fetchPage, request: fake.request, sessionStartedAt: '2026-08-05T08:00:00.000Z' }
+    { cwd: 'C:/old-worktree', git: gitStale, fetchPage: fake.fetchPage, request: fake.request, sessionId: 'sess-old', sessionStartedAt: '2026-08-05T08:00:00.000Z' }
   );
   assert.equal(stale.packet.map_path_withheld, 'stale-session', 'a WORKING read attributes the withholding to the timing, not to the transport');
 
@@ -1823,7 +1841,7 @@ test('WP-3A(c) MUTATION CONTROL: the combined case is not vacuously always-withh
   const fresh = fakeHoncho([priorPacket]);
   const published = await continuity.writeContinuity(
     { focus: 'a genuinely fresh session' },
-    { cwd: 'C:/old-worktree', git: gitStale, fetchPage: fresh.fetchPage, request: fresh.request, sessionStartedAt: '2026-08-05T09:00:01.000Z' }
+    { cwd: 'C:/old-worktree', git: gitStale, fetchPage: fresh.fetchPage, request: fresh.request, sessionId: 'sess-fresh', sessionStartedAt: '2026-08-05T09:00:01.000Z' }
   );
   assert.equal(published.packet.map_path, 'Deliverables/map-stale.md', 'NOT always-withhold — the guard still publishes when authority IS established');
   assert.equal(Object.prototype.hasOwnProperty.call(published.packet, 'map_path_withheld'), false, 'and a published pointer carries no withhold marker');
@@ -2237,4 +2255,204 @@ test('WP-3A(d) DEGRADED RENDER: with NO cached focus it still orients, rather th
   assert.match(brief, /NO recall at all/, 'the absence is stated as a fact rather than left as a silence');
   assert.doesNotMatch(brief, /STALE BY CONSTRUCTION/, 'and nothing stale is invented to fill it');
   assert.match(brief, /Deliverables\/` per `CLAUDE\.md` Step 2/, 'the orientation line is NOT conditional on having recall');
+});
+
+// ---------------------------------------------------------------------------
+// AMENDMENT 2 / VERITAS D-1 — a session must be able to update its OWN pointer
+// ---------------------------------------------------------------------------
+//
+// THE DEFECT, FOUND BY VERITAS AGAINST THE INSTALLED PRODUCTION PATH. The guard published
+// `map_path` only when `sessionStartMs > priorWriteMs` — and `priorWriteMs` advances on every
+// stored write, INCLUDING writes made during this session's own life. So after the first
+// packet of a session, that session's start time is permanently behind the last stored write,
+// and every subsequent `stop` withheld the pointer for the rest of the session. Packet 154, a
+// `stop`, withheld the path eight minutes after manual packet 153 carried it; latest-wins, so
+// a fresh session got no map and no frontier at all.
+//
+// THE GUARD WAS BUILT TO STOP A STALE SESSION CLOBBERING A NEWER ONE, AND IT COULD NOT TELL
+// ANOTHER SESSION'S WRITE FROM ITS OWN. Time alone cannot make that distinction — a timestamp
+// says WHEN a packet was written, never WHO wrote it. The identity was on the packet the whole
+// time (`session_id`, set by `buildPacket` and supplied by the Stop hook), and was not consulted.
+//
+// The two tests below reproduce the live sequence and the general case. Both were run RED
+// against the pre-fix code before the fix was written.
+
+test('AMD2 D-1 REGRESSION (the live sequence): a `stop` after a MANUAL write republishes the pointer', async () => {
+  // Exactly what Veritas executed: packet 153 was a manual `write` that carried the map path
+  // (guard bypassed — a manual write has no session to time), and packet 154 was a `stop`
+  // eight minutes later from a session that had ALREADY been running. Under the old rule the
+  // stop's session start was behind 153's write time, so 154 withheld and the good pointer
+  // became unreachable.
+  //
+  // A manual write is a person at a keyboard, not a session. It carries no `session_id`, so it
+  // can never be the "newer rival session" this guard exists to protect — and treating it as
+  // one is what made AC-1 unreachable by the default route.
+  const manualPacket = {
+    schema: 1, kind: 'continuity', id: 'cont-153', ts: '2026-08-05T22:57:00.000Z', seq: 153,
+    backfill: false, session_id: null, reason: 'manual',
+    focus: 'Phase 3', map_path: 'Deliverables/2026-08-04-proofline-wayfinder-plan.md',
+  };
+  const fake = fakeHoncho([manualPacket]);
+  const gitOk = gitStub(
+    { 'rev-parse': 'C:/repo\n', grep: 'Deliverables/2026-08-04-proofline-wayfinder-plan.md\n', 'merge-base': 'base1\n', log: gitLogOutput([[1754000000, ['Deliverables/2026-08-04-proofline-wayfinder-plan.md']]]) },
+    { files: ['Deliverables/2026-08-04-proofline-wayfinder-plan.md'] }
+  ).io;
+
+  const stop = await continuity.writeContinuity(
+    { focus: 'Phase 3, later in the same working session' },
+    {
+      cwd: 'C:/repo', git: gitOk, fetchPage: fake.fetchPage, request: fake.request,
+      reason: 'stop', sessionId: 'sess-live',
+      // The session was already running when the manual write landed — the whole point.
+      sessionStartedAt: '2026-08-05T21:30:00.000Z',
+    }
+  );
+
+  assert.equal(stop.ok, true);
+  assert.equal(
+    stop.packet.map_path, 'Deliverables/2026-08-04-proofline-wayfinder-plan.md',
+    'THE DEFECT: the Stop after a manual write withheld the pointer and left the store with none'
+  );
+  assert.equal(Object.prototype.hasOwnProperty.call(stop.packet, 'map_path_withheld'), false);
+
+  // THE OBSERVABLE OUTCOME — what a fresh session actually reads. This is the assertion that
+  // matches what Veritas ran: the primary AC-1 journey, end to end.
+  const brief = await continuity.readContinuityBrief({ fetchPage: fake.fetchPage, git: MAP_PRESENT_IO });
+  assert.match(brief, /likely active map: Deliverables\/2026-08-04-proofline-wayfinder-plan\.md/, 'a fresh session must get the map');
+  assert.doesNotMatch(brief, /MAP POINTER WITHHELD/, 'which is precisely what it did NOT get at the reviewed head');
+});
+
+test('AMD2 D-1 REGRESSION (the general case): a session publishes on EVERY stop, not just its first', async () => {
+  // "After a session's first packet, its own start time is permanently behind the last stored
+  // write, and every subsequent stop withholds for the rest of its life." Three turns of one
+  // ordinary session — the normal case, and the one that was broken.
+  const fake = fakeHoncho([]);
+  const gitOk = gitStub(
+    { 'rev-parse': 'C:/repo\n', grep: 'Deliverables/map-A.md\n', 'merge-base': 'base1\n', log: gitLogOutput([[1754000000, ['Deliverables/map-A.md']]]) },
+    { files: ['Deliverables/map-A.md'] }
+  ).io;
+  const session = {
+    cwd: 'C:/repo', git: gitOk, fetchPage: fake.fetchPage, request: fake.request,
+    reason: 'stop', sessionId: 'sess-long', sessionStartedAt: '2026-08-05T20:00:00.000Z',
+  };
+
+  const first = await continuity.writeContinuity({ focus: 'turn 1' }, session);
+  assert.equal(first.packet.map_path, 'Deliverables/map-A.md', 'CONTROL: the first write always published, even before the fix');
+
+  const second = await continuity.writeContinuity({ focus: 'turn 2' }, session);
+  assert.equal(second.packet.map_path, 'Deliverables/map-A.md', 'THE DEFECT: the second turn onward withheld — a session treated its own earlier packet as a rival');
+
+  const third = await continuity.writeContinuity({ focus: 'turn 3' }, session);
+  assert.equal(third.packet.map_path, 'Deliverables/map-A.md', 'and it never recovered for the life of the session');
+
+  const brief = await continuity.readContinuityBrief({ fetchPage: fake.fetchPage, git: MAP_PRESENT_IO });
+  assert.match(brief, /likely active map: Deliverables\/map-A\.md/);
+  assert.match(brief, /turn 3/, 'CONTROL: the newest packet really is the third one');
+});
+
+test('AMD2 CROSS-SESSION PROTECTION UNCHANGED: an older session still cannot clobber a newer one', async () => {
+  // Requirement 3. The fix must not reopen what this guard exists for. Two REAL sessions, each
+  // with its own identity, exactly as the Stop hook supplies them in production: A is current,
+  // B is an old worktree whose Stop fires later but which genuinely started earlier.
+  const fake = fakeHoncho([]);
+  const gitA = gitStub(
+    { 'rev-parse': 'C:/repo-A\n', grep: 'Deliverables/map-A.md\n', 'merge-base': 'base1\n', log: gitLogOutput([[5000, ['Deliverables/map-A.md']]]) },
+    { files: ['Deliverables/map-A.md'] }
+  ).io;
+  const gitB = gitStub(
+    { 'rev-parse': 'C:/repo-B\n', grep: 'Deliverables/map-B-stale.md\n', 'merge-base': 'base2\n', log: gitLogOutput([[5000, ['Deliverables/map-B-stale.md']]]) },
+    { files: ['Deliverables/map-B-stale.md'] }
+  ).io;
+
+  const a = await continuity.writeContinuity(
+    { focus: 'session A, current build' },
+    { cwd: 'C:/repo-A', git: gitA, fetchPage: fake.fetchPage, request: fake.request, reason: 'stop', sessionId: 'sess-A', sessionStartedAt: '2026-08-05T10:00:00.000Z' }
+  );
+  assert.equal(a.packet.map_path, 'Deliverables/map-A.md', 'CONTROL: A really did post a pointer, or B has nothing to fail to displace');
+
+  const beforeA = new Date(Date.parse(a.packet.ts) - 60 * 60 * 1000).toISOString();
+  const b = await continuity.writeContinuity(
+    { focus: 'session B, an old worktree finally closing' },
+    { cwd: 'C:/repo-B', git: gitB, fetchPage: fake.fetchPage, request: fake.request, reason: 'stop', sessionId: 'sess-B', sessionStartedAt: beforeA }
+  );
+  assert.equal(Object.prototype.hasOwnProperty.call(b.packet, 'map_path'), false, "B's stale write must STILL not carry the pointer");
+  assert.equal(b.packet.map_path_withheld, 'stale-session');
+  assert.equal(b.packet.focus, 'session B, an old worktree finally closing', 'and every other field still writes normally');
+
+  const after = await continuity.readLatest({ fetchPage: fake.fetchPage });
+  assert.equal(Object.prototype.hasOwnProperty.call(after.latest, 'map_path'), false, 'the stale path never became the visible pointer');
+});
+
+test('AMD2 THE DISCRIMINATOR IS IDENTITY, NOT TIME: same timings, different session ids, opposite outcomes', async () => {
+  // The control that makes the two above fail-able in BOTH directions at once. An identical
+  // prior packet and an identical session start time; the ONLY thing that changes between the
+  // two runs is whether the stored packet came from this session or another one. A fix that
+  // always publishes would fail the second half; the shipped defect fails the first.
+  const priorFrom = (sessionId) => ({
+    schema: 1, kind: 'continuity', id: 'cont-prior', ts: '2026-08-05T09:00:00.000Z', seq: 1,
+    backfill: false, session_id: sessionId, focus: 'prior', map_path: 'Deliverables/map-prior.md',
+  });
+  const gitCandidate = gitStub(
+    { 'rev-parse': 'C:/repo\n', grep: 'Deliverables/map-candidate.md\n', 'merge-base': 'base1\n', log: gitLogOutput([[4242, ['Deliverables/map-candidate.md']]]) },
+    { files: ['Deliverables/map-candidate.md'] }
+  ).io;
+  const startedBeforeThePrior = '2026-08-05T08:00:00.000Z';
+
+  const mine = fakeHoncho([priorFrom('sess-me')]);
+  const own = await continuity.writeContinuity(
+    { focus: 'my own later turn' },
+    { cwd: 'C:/repo', git: gitCandidate, fetchPage: mine.fetchPage, request: mine.request, reason: 'stop', sessionId: 'sess-me', sessionStartedAt: startedBeforeThePrior }
+  );
+  assert.equal(own.packet.map_path, 'Deliverables/map-candidate.md', 'MY OWN earlier write must never block me');
+
+  const theirs = fakeHoncho([priorFrom('sess-someone-else')]);
+  const rival = await continuity.writeContinuity(
+    { focus: 'an older session closing late' },
+    { cwd: 'C:/repo', git: gitCandidate, fetchPage: theirs.fetchPage, request: theirs.request, reason: 'stop', sessionId: 'sess-me', sessionStartedAt: startedBeforeThePrior }
+  );
+  assert.equal(Object.prototype.hasOwnProperty.call(rival.packet, 'map_path'), false, 'ANOTHER session\'s newer write still blocks me');
+  assert.equal(rival.packet.map_path_withheld, 'stale-session');
+});
+
+test('AMD2 THE FAIL-OPEN PATH STAYS CLOSED: identity does not rescue an unestablished authority', async () => {
+  // Requirement 3, the half that matters most: "a fix that opens the fail-open path this WP
+  // closed is worse than the defect". The same-session rule must sit BEHIND the authority
+  // check, never in front of it — if the comparison read cannot be made at all, there is no
+  // stored packet, no `session_id`, and therefore nothing that could establish sameness.
+  const throwingFetchPage = async () => { throw new Error('Honcho unreachable'); };
+  const fake = fakeHoncho([]);
+  const gitOk = gitStub(
+    { 'rev-parse': 'C:/repo\n', grep: 'Deliverables/map.md\n', 'merge-base': 'base1\n', log: gitLogOutput([[100, ['Deliverables/map.md']]]) },
+    { files: ['Deliverables/map.md'] }
+  ).io;
+  const r = await continuity.writeContinuity(
+    { focus: 'f' },
+    { cwd: 'C:/repo', git: gitOk, fetchPage: throwingFetchPage, request: fake.request, reason: 'stop', sessionId: 'sess-me', sessionStartedAt: '2026-08-05T20:00:00.000Z' }
+  );
+  assert.equal(r.ok, true, 'the packet is still delivered');
+  assert.equal(Object.prototype.hasOwnProperty.call(r.packet, 'map_path'), false, 'and an unreachable read still WITHHOLDS — a session id is not a substitute for authority');
+  assert.equal(r.packet.map_path_withheld, 'authority-unestablished');
+
+  // And the same for a read that succeeds but cannot establish the newest packet: a truncated
+  // walk from a server that never demonstrated newest-first. The `session_id` visible on such
+  // a read may not be the newest session's at all, so it must not unlock publication.
+  const packets = [];
+  for (let seq = 1; seq <= 149; seq++) {
+    packets.push({
+      schema: 1, kind: 'continuity', id: `cont-${seq}`, seq, backfill: false, session_id: 'sess-me',
+      ts: new Date(Date.UTC(2026, 7, 5, 0, 0, 0, seq)).toISOString(), focus: `f${seq}`,
+    });
+  }
+  const oldestFirstAlways = async ({ page, size }) => ({
+    items: packets.slice((page - 1) * size, page * size).map((p) => msg(p)),
+    total: packets.length, page, size, pages: 2,
+  });
+  const unestablished = await continuity.writeContinuity(
+    { focus: 'f' },
+    { cwd: 'C:/repo', git: gitOk, fetchPage: oldestFirstAlways, request: fake.request, reason: 'stop', sessionId: 'sess-me', sessionStartedAt: '2026-08-05T20:00:00.000Z' }
+  );
+  assert.equal(
+    unestablished.packet.map_path_withheld, 'authority-unestablished',
+    'a non-authoritative read withholds even when the packets it DID see carry my own session id'
+  );
 });
