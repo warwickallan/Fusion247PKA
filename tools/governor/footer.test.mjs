@@ -12,7 +12,10 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync } from 'node:fs';
+// `readdirSync` / `copyFileSync` / `createHash` serve the WP-3B mutation harness at the
+// foot of this file, which copies the module set OUT of the repository before breaking it.
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync, readdirSync, copyFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -53,11 +56,20 @@ import {
   parseCliArgs,
   runCli,
   CLI_EXIT,
+  // --- WP-3B ---
+  CONTEXT_MEASUREMENT,
+  selectContextCount,
+  NEXT_RANK,
+  FRONTIER_VOCABULARY,
+  frontierTextFromMap,
+  classifyFrontier,
+  recommendNext,
+  CLI_HELP,
 } from './footer.mjs';
 // WO-OR-08: the seam block at the foot of this file drives a REAL sampler output into
 // the ladder. Every other test here builds its inputs by hand, which is exactly how a
 // denominator from the wrong namespace crossed this boundary through a green suite.
-import { extractTranscriptSample, SOURCE_STATUSLINE } from './sampler.mjs';
+import { extractTranscriptSample, SOURCE_STATUSLINE, SOURCE_TRANSCRIPT } from './sampler.mjs';
 
 // The drift guard below used to import `ESCAPE_HATCH_REASONS` from
 // `escalation-gate.mjs`. That module was RETIRED on 2026-08-01, so the pin was
@@ -84,6 +96,16 @@ function tmp() {
 
 // A health sample good enough to render GREEN. Built explicitly rather than copied from
 // disk so that every degradation test below mutates ONE named thing.
+//
+// WP-3B: `used_tokens` was ADDED here and nothing else about this fixture changed. Since
+// A-3 a sample must carry a count for its own source to get past the ladder's third rung,
+// and this fixture existed to get PAST that rung so the rungs BELOW it could be tested —
+// without a count it now blinds at rung 3 and every test of a lower rung would be
+// testing the wrong thing. No `context_window_size` and no `source`, deliberately: the
+// pair `(count, no window)` renders the bare `ctx 18%` this fixture has always rendered,
+// so every byte assertion below is untouched, and the absent source exercises the
+// `unattributed` branch. Realistic per-producer samples are built explicitly in the
+// WP-3B tests rather than by widening this shared one.
 function goodSample(overrides = {}) {
   return {
     ok: true,
@@ -92,7 +114,7 @@ function goodSample(overrides = {}) {
       schema_version: 1,
       sampled_at: new Date().toISOString(),
       session_id: 'session-a',
-      context_window: { used_percentage: 18 },
+      context_window: { used_percentage: 18, used_tokens: 180_000 },
       rate_limits: { five_hour: { used_percentage: 10 } },
       worktree: { path: 'C:/repo', branch: 'main' },
       ...overrides,
@@ -892,7 +914,7 @@ test('the ladder also refuses an unrecognised schema_version, a NaN percentage a
   assert.equal(deriveFooterFields({ sample: goodSample({ schema_version: undefined }) }).blindReason, BLIND_REASON.SCHEMA_UNRECOGNISED);
   assert.equal(deriveFooterFields({ sample: goodSample({ context_window: {} }) }).blindReason, BLIND_REASON.PERCENTAGE_ABSENT);
   assert.equal(deriveFooterFields({ sample: goodSample({ context_window: { used_percentage: NaN } }) }).blindReason, BLIND_REASON.PERCENTAGE_ABSENT);
-  assert.equal(deriveFooterFields({ sample: goodSample({ context_window: { used_percentage: 140 } }) }).blindReason, BLIND_REASON.PERCENTAGE_OUT_OF_RANGE);
+  assert.equal(deriveFooterFields({ sample: goodSample({ context_window: { used_tokens: 180_000, used_percentage: 140 } }) }).blindReason, BLIND_REASON.PERCENTAGE_OUT_OF_RANGE);
   assert.equal(
     deriveFooterFields({ sample: goodSample(), evaluateFn: () => { throw new Error('boom'); } }).blindReason,
     BLIND_REASON.EVALUATOR_THREW
@@ -1183,7 +1205,7 @@ test('computeFooterLine always returns a GRAMMATICAL line, even with everything 
       schema_version: 1,
       sampled_at: new Date().toISOString(),
       session_id: 's1',
-      context_window: { used_percentage: 18 },
+      context_window: { used_tokens: 180_000, used_percentage: 18 },
     }));
 
     const good = computeFooterLine({ sessionId: 's1', envOverride: dir, next: 'Sonnet/medium' });
@@ -1242,7 +1264,7 @@ function storeWith(sessionId, overrides = {}) {
     schema_version: 1,
     sampled_at: new Date().toISOString(),
     session_id: sessionId,
-    context_window: { used_percentage: 18 },
+    context_window: { used_tokens: 180_000, used_percentage: 18 },
     ...overrides,
   }));
   return dir;
@@ -1353,11 +1375,11 @@ test('WP-7 AC2: --session reads the EXACT sample, and drops the ~ approximate fl
   try {
     writeFileSync(join(store, 'mine.json'), JSON.stringify({
       schema_version: 1, sampled_at: new Date().toISOString(), session_id: 'mine',
-      context_window: { used_percentage: 71 },
+      context_window: { used_tokens: 180_000, used_percentage: 71 },
     }));
     writeFileSync(join(store, 'theirs.json'), JSON.stringify({
       schema_version: 1, sampled_at: new Date().toISOString(), session_id: 'theirs',
-      context_window: { used_percentage: 4 },
+      context_window: { used_tokens: 180_000, used_percentage: 4 },
     }));
 
     const r = runCli(['--session', 'mine'], {
@@ -1374,7 +1396,7 @@ test('WP-7 AC2: --session reads the EXACT sample, and drops the ~ approximate fl
 });
 
 test('WP-7 AC2: the REAL entrypoint, spawned as a process, prints one line and exits 0', () => {
-  const store = storeWith('spawned', { context_window: { used_percentage: 33 } });
+  const store = storeWith('spawned', { context_window: { used_tokens: 180_000, used_percentage: 33 } });
   try {
     // The actual command Larry runs. `runCli` is unit-tested above; this proves the
     // guard, the stream writes and the exit code are wired to it.
@@ -1398,8 +1420,16 @@ test('WP-7 AC2: the REAL entrypoint, spawned as a process, prints one line and e
 // ---------------------------------------------------------------------------
 
 test('WP-7 AC3: CONTINUE is the default, and every one of the seven codes is accepted', () => {
-  assert.deepEqual(parseCliArgs([]), { ok: true, sessionId: null, next: NEXT_UNSET, control: CONTROL_CONTINUE });
-  assert.deepEqual(parseCliArgs(['--control', 'CONTINUE']), { ok: true, sessionId: null, next: NEXT_UNSET, control: 'CONTINUE' });
+  // WP-3B added `help` and `nextSupplied`. The assertion stays a deepEqual — an exact
+  // shape pin is what makes an accidentally-added field visible — so the two new members
+  // are stated here rather than the check being loosened to a subset comparison.
+  assert.deepEqual(parseCliArgs([]), { ok: true, help: false, sessionId: null, next: NEXT_UNSET, control: CONTROL_CONTINUE, nextSupplied: false });
+  assert.deepEqual(parseCliArgs(['--control', 'CONTINUE']), { ok: true, help: false, sessionId: null, next: NEXT_UNSET, control: 'CONTINUE', nextSupplied: false });
+
+  // `nextSupplied` is about the CALLER, not about the VALUE: `--next UNSET` is a caller
+  // stating UNSET and must not be overwritten by a computed recommendation.
+  assert.equal(parseCliArgs(['--next', 'UNSET']).nextSupplied, true, 'an explicit --next UNSET is still supplied');
+  assert.equal(parseCliArgs(['--next', 'Opus/high']).nextSupplied, true);
 
   // Driven off the imported const, never a list typed here — the same discipline the
   // module itself follows, and the reason a vocabulary change cannot pass silently.
@@ -1471,13 +1501,13 @@ test('WP-7 AC4: every hostile input yields a valid BLIND line and exit 0', () =>
       ['store present but empty', [], { envOverride: store('unused') }],
       ['corrupt JSON', ['--session', 'bad'], { envOverride: store('bad', '{ this is not json') }],
       ['truncated JSON', ['--session', 'bad'], { envOverride: store('bad', '{"schema_version":') }],
-      ['unrecognised schema', ['--session', 'bad'], { envOverride: store('bad', JSON.stringify({ schema_version: 99, sampled_at: sampledAt, session_id: 'bad', context_window: { used_percentage: 18 } })) }],
+      ['unrecognised schema', ['--session', 'bad'], { envOverride: store('bad', JSON.stringify({ schema_version: 99, sampled_at: sampledAt, session_id: 'bad', context_window: { used_tokens: 180_000, used_percentage: 18 } })) }],
       ['absent context_window', ['--session', 'bad'], { envOverride: store('bad', JSON.stringify({ schema_version: 1, sampled_at: sampledAt, session_id: 'bad' })) }],
       ['percentage as a STRING', ['--session', 'bad'], { envOverride: store('bad', JSON.stringify({ schema_version: 1, sampled_at: sampledAt, session_id: 'bad', context_window: { used_percentage: '42' } })) }],
-      ['unparseable sampled_at', ['--session', 'bad'], { envOverride: store('bad', JSON.stringify({ schema_version: 1, sampled_at: 'whenever', session_id: 'bad', context_window: { used_percentage: 18 } })) }],
-      ['percentage out of grammar range', ['--session', 'bad'], { envOverride: store('bad', JSON.stringify({ schema_version: 1, sampled_at: sampledAt, session_id: 'bad', context_window: { used_percentage: 4000 } })) }],
-      ['sample belongs to another session', ['--session', 'mine'], { envOverride: store('mine', JSON.stringify({ schema_version: 1, sampled_at: sampledAt, session_id: 'someone-else', context_window: { used_percentage: 18 } })) }],
-      ['the evaluator throws', ['--session', 'ok'], { envOverride: store('ok', JSON.stringify({ schema_version: 1, sampled_at: sampledAt, session_id: 'ok', context_window: { used_percentage: 18 } })), evaluateFn: () => { throw new Error('boom'); } }],
+      ['unparseable sampled_at', ['--session', 'bad'], { envOverride: store('bad', JSON.stringify({ schema_version: 1, sampled_at: 'whenever', session_id: 'bad', context_window: { used_tokens: 180_000, used_percentage: 18 } })) }],
+      ['percentage out of grammar range', ['--session', 'bad'], { envOverride: store('bad', JSON.stringify({ schema_version: 1, sampled_at: sampledAt, session_id: 'bad', context_window: { used_tokens: 180_000, used_percentage: 4000 } })) }],
+      ['sample belongs to another session', ['--session', 'mine'], { envOverride: store('mine', JSON.stringify({ schema_version: 1, sampled_at: sampledAt, session_id: 'someone-else', context_window: { used_tokens: 180_000, used_percentage: 18 } })) }],
+      ['the evaluator throws', ['--session', 'ok'], { envOverride: store('ok', JSON.stringify({ schema_version: 1, sampled_at: sampledAt, session_id: 'ok', context_window: { used_tokens: 180_000, used_percentage: 18 } })), evaluateFn: () => { throw new Error('boom'); } }],
       ['the location resolver throws', [], { envOverride: join(tmpdir(), 'gov-cli-absent-xyz'), locationFn: () => { throw new Error('git exploded'); } }],
       ['the location resolver returns nothing', [], { envOverride: join(tmpdir(), 'gov-cli-absent-xyz'), locationFn: () => undefined }],
       ['the store read throws', [], { envOverride: join(tmpdir(), 'gov-cli-absent-xyz'), listDir: () => { throw new Error('EPERM'); } }],
@@ -1592,7 +1622,7 @@ test('WP-7 AC5: parseFooter accepts EVERY line the CLI can emit — all states x
       try {
         writeFileSync(join(boundary, 'b.json'), JSON.stringify({
           schema_version: 1, sampled_at: new Date().toISOString(), session_id: 'b',
-          context_window: { used_percentage: used },
+          context_window: { used_tokens: 180_000, used_percentage: used },
         }));
         for (const argv of [['--session', 'b'], []]) {
           const r = runCli(argv, { locationFn: stubLocation('C:/repo', 'main'), envOverride: boundary });
@@ -1874,7 +1904,7 @@ test('WO-OR-13 INV-1: an out-of-grammar percentage is BLIND, never graded — in
   const bands = new Set();
   for (const c of cases) {
     const r = deriveFooterFields({
-      sample: goodSample({ context_window: { used_percentage: c.pct } }),
+      sample: goodSample({ context_window: { used_tokens: 180_000, used_percentage: c.pct } }),
       knownSessionId: 'session-a',
     });
     assert.equal(r.blind, true, `${c.what}: must be BLIND`);
@@ -1926,7 +1956,7 @@ test('WO-OR-13: the BLIND ladder still distinguishes its rungs — nine reasons,
     ['foreign session', { sample: goodSample({ session_id: 'someone-else' }) }, BLIND_REASON.SESSION_MISMATCH],
     ['stale', { sample: goodSample({ sampled_at: at(STALE_AFTER_MS + 1000) }) }, BLIND_REASON.STALE],
     ['evaluator threw', { sample: goodSample(), evaluateFn: () => { throw new Error('boom'); } }, BLIND_REASON.EVALUATOR_THREW],
-    ['out of range', { sample: goodSample({ context_window: { used_percentage: -0.4 } }) }, OOR],
+    ['out of range', { sample: goodSample({ context_window: { used_tokens: 180_000, used_percentage: -0.4 } }) }, OOR],
     [
       'window size unknown',
       { sample: goodSample({ context_window: { used_tokens: 72_600 } }) },
@@ -1957,7 +1987,7 @@ test('WO-OR-13: `percent` is never NEGATIVE ZERO — asserted with Object.is, be
   // closed. Normalised in the producer; asserted here at both ends.
   const routes = [
     ['reported directly', deriveFooterFields({
-      sample: goodSample({ context_window: { used_percentage: -0 } }),
+      sample: goodSample({ context_window: { used_tokens: 180_000, used_percentage: -0 } }),
       knownSessionId: 'session-a',
     })],
     ['divided from a -0 numerator', f3Derive({ used: -0, window: 200_000 })],
@@ -2001,7 +2031,7 @@ test('WO-OR-13: in-range telemetry does not move — same percent, same state, s
   let checked = 0;
   for (const c of cases) {
     const r = deriveFooterFields({
-      sample: goodSample({ context_window: { used_percentage: c.pct } }),
+      sample: goodSample({ context_window: { used_tokens: 180_000, used_percentage: c.pct } }),
       knownSessionId: 'session-a',
     });
     assert.equal(r.blind, false, `${c.pct}%: must NOT be BLIND`);
@@ -2015,7 +2045,7 @@ test('WO-OR-13: in-range telemetry does not move — same percent, same state, s
   // Byte pins at both ends of the domain, so a change to the CTX field or the separators
   // cannot hide behind the field-level assertions above.
   const line = (pct) => renderFooter(deriveFooterFields({
-    sample: goodSample({ context_window: { used_percentage: pct } }),
+    sample: goodSample({ context_window: { used_tokens: 180_000, used_percentage: pct } }),
     knownSessionId: 'session-a',
   }).fields);
   assert.equal(line(0), '⟦GOV⟧ ctx 0% · GREEN · TASK UNKNOWN · next: UNSET · CONTINUE');
@@ -2204,7 +2234,7 @@ test('WO-OR-16: the PRODUCER normalises -0 rather than degrading it — on the t
   //    BLIND line for a perfectly healthy 0% reading. WO-OR-13's own test is untouched;
   //    this states the coupling that repair now carries.
   const pct = deriveFooterFields({
-    sample: goodSample({ context_window: { used_percentage: -0 } }),
+    sample: goodSample({ context_window: { used_tokens: 180_000, used_percentage: -0 } }),
     knownSessionId: 'session-a',
   });
   assert.ok(Object.is(pct.fields.percent, 0), 'the producer must still normalise the percent');
@@ -2554,7 +2584,7 @@ test('WARWICK: every BLIND rung renders NO ADVICE — never KEEP GOING, CLEAR NO
   const at = (ms) => new Date(GF_NOW - ms).toISOString();
   const pct = (over) => ({
     ok: true, approximate: false,
-    data: { schema_version: 1, sampled_at: at(1000), session_id: 'w-session', context_window: { used_percentage: 18 }, ...over },
+    data: { schema_version: 1, sampled_at: at(1000), session_id: 'w-session', context_window: { used_tokens: 180_000, used_percentage: 18 }, ...over },
   });
 
   // Every rung of D-3's ladder, by its BLIND_REASON, and whether it carries a count.
@@ -2564,7 +2594,7 @@ test('WARWICK: every BLIND rung renders NO ADVICE — never KEEP GOING, CLEAR NO
     ['no usage at all', { sample: pct({ context_window: {} }) }, BLIND_REASON.PERCENTAGE_ABSENT, null],
     ['sampled_at unparseable', { sample: pct({ sampled_at: 'not a date' }) }, BLIND_REASON.SAMPLED_AT_UNPARSEABLE, null],
     ['session mismatch', { sample: pct({ session_id: 'someone-else' }) }, BLIND_REASON.SESSION_MISMATCH, null],
-    ['percentage out of range', { sample: pct({ context_window: { used_percentage: 140 } }) }, BLIND_REASON.PERCENTAGE_OUT_OF_RANGE, null],
+    ['percentage out of range', { sample: pct({ context_window: { used_tokens: 180_000, used_percentage: 140 } }) }, BLIND_REASON.PERCENTAGE_OUT_OF_RANGE, null],
     ['evaluator threw', { sample: pct(), evaluateFn: () => { throw new Error('boom'); } }, BLIND_REASON.EVALUATOR_THREW, null],
     // The two that carry a real measurement — the half of the ruling that says the count
     // must SURVIVE the advice being withheld.
@@ -2641,4 +2671,425 @@ test('WARWICK: `KEEP GOING?` is RETIRED, not deleted — the parser still reads 
   }
   assert.equal(checked, FOOTER_STATES.length * 2);
   assert.equal(checked, 10, 'five states, both task-knowledge directions');
+});
+
+// ===========================================================================
+// WP-3B — the measured number, the grounded recommendation, and the cheap route
+// ===========================================================================
+//
+// Three findings drive this block, and each expected value below is a LITERAL held here
+// rather than re-derived from the module under test:
+//
+//   (a) the consumer read `used_tokens`, which the statusLine producer never writes, so
+//       418,491 sat unread on disk while the line said `ctx 42%`;
+//   (b) `next:` was caller-supplied, so the module never recommended anything;
+//   (c) the render route was already cheap and undiscoverable, so it was reached by
+//       dispatching a specialist to read 82 KB.
+//
+// The sample field-set below was OBSERVED on disk on 2026-08-05 and is copied verbatim.
+// It is the fixture that matters: every synthetic sample elsewhere in this file agreed
+// with the code, and the defect lived exactly in the gap between them.
+const LIVE_STATUSLINE_SAMPLE = Object.freeze({
+  schema_version: 1,
+  source: 'statusLine',
+  version: '2.1.221',
+  session_id: 'live-session',
+  model: { id: 'claude-opus-5', display_name: 'Opus 5' },
+  effort: { level: 'high' },
+  context_window: {
+    used_percentage: 25,
+    remaining_percentage: 75,
+    context_window_size: 1_000_000,
+    total_input_tokens: 248_010,
+    total_output_tokens: 1_618,
+    exceeds_200k_tokens: true,
+  },
+  rate_limits: { five_hour: { used_percentage: 31 }, seven_day: { used_percentage: 42 } },
+});
+
+const liveSample = (over = {}) => ({
+  ok: true,
+  approximate: false,
+  data: { ...LIVE_STATUSLINE_SAMPLE, sampled_at: new Date().toISOString(), ...over },
+});
+
+test('WP-3B(a): the LIVE statusLine field-set renders its absolute count — the defect, pinned to the real shape', () => {
+  const r = deriveFooterFields({ sample: liveSample(), knownSessionId: 'live-session' });
+
+  // The regression itself. Before the fix this rendered `ctx 25%` and dropped 248,010.
+  assert.equal(r.fields.usedTokens, 248_000, 'the absolute count must reach the fields');
+  assert.equal(r.fields.windowTokens, 1_000_000);
+  assert.equal(r.fields.percent, 25);
+  assert.equal(r.measurement, CONTEXT_MEASUREMENT.STATUSLINE_TOTAL_INPUT, 'and it must say WHICH measurement');
+  assert.equal(r.fields.state, 'GREEN');
+
+  // Byte-level, because "the number reached the fields" and "Warwick can see it" are not
+  // the same claim.
+  assert.equal(
+    renderFooter(r.fields),
+    '\u27E6GOV\u27E7 ctx 25% (248k/1000k) \u00B7 GREEN \u00B7 TASK UNKNOWN \u00B7 next: UNSET \u00B7 CONTINUE'
+  );
+});
+
+test('WP-3B(a): the source SELECTS the field — the two measurements are never unioned', () => {
+  // The no-union proof. This sample carries BOTH fields with DIFFERENT values, which no
+  // real producer emits — precisely so that reading the wrong one is visible. A `??`
+  // fallback in either direction fails one of these two assertions.
+  const both = {
+    used_percentage: null,
+    context_window_size: 1_000_000,
+    total_input_tokens: 248_000,
+    used_tokens: 700_000,
+  };
+
+  const asStatusLine = deriveFooterFields({
+    sample: liveSample({ source: SOURCE_STATUSLINE, context_window: both }),
+    knownSessionId: 'live-session',
+  });
+  assert.equal(asStatusLine.fields.usedTokens, 248_000, 'a statusLine sample reads total_input_tokens');
+  assert.notEqual(asStatusLine.fields.usedTokens, 700_000, 'and must NOT read used_tokens');
+  assert.equal(asStatusLine.measurement, CONTEXT_MEASUREMENT.STATUSLINE_TOTAL_INPUT);
+
+  const asTranscript = deriveFooterFields({
+    sample: liveSample({ source: SOURCE_TRANSCRIPT, context_window: both }),
+    knownSessionId: 'live-session',
+  });
+  assert.equal(asTranscript.fields.usedTokens, 700_000, 'a transcript sample reads used_tokens');
+  assert.notEqual(asTranscript.fields.usedTokens, 248_000, 'and must NOT read total_input_tokens');
+  assert.equal(asTranscript.measurement, CONTEXT_MEASUREMENT.TRANSCRIPT_USED);
+
+  // No recognised source: a real count that cannot be attributed. Still shown — refusing
+  // to show a measured number is the defect WO-OR-05 closed — but labelled honestly.
+  const unattributed = selectContextCount({ context_window: { used_tokens: 5_000 } });
+  assert.deepEqual(unattributed, { raw: 5_000, measurement: CONTEXT_MEASUREMENT.UNATTRIBUTED_USED });
+
+  // Every branch reads exactly ONE field, which is the property "never union" names.
+  assert.equal(selectContextCount({ source: SOURCE_STATUSLINE, context_window: { used_tokens: 9 } }).raw, undefined);
+  assert.equal(selectContextCount({ source: SOURCE_TRANSCRIPT, context_window: { total_input_tokens: 9 } }).raw, undefined);
+});
+
+test('WP-3B(a): a percentage with NO count for its own source is BLIND — never a percentage dressed as a measurement', () => {
+  const noCount = liveSample({
+    context_window: { used_percentage: 25, context_window_size: 1_000_000 },
+  });
+  const r = deriveFooterFields({ sample: noCount, knownSessionId: 'live-session' });
+
+  assert.equal(r.fields.state, 'BLIND', 'INV-1: it must not grade a number it did not measure');
+  assert.equal(r.blindReason, BLIND_REASON.PERCENTAGE_ABSENT);
+  assert.equal(r.fields.percent, null, 'BLIND reports no number');
+  assert.equal(r.fields.usedTokens, null);
+  assert.equal(r.fields.advice, ADVICE.NO_ADVICE);
+  assert.ok(renderFooter(r.fields).startsWith('\u27E6GOV\u27E7 ctx -- \u00B7 BLIND'));
+
+  // A statusLine sample whose only count is the OTHER producer's field is the same case:
+  // that count is not one this source took, so it is not this source's measurement.
+  const wrongField = liveSample({
+    context_window: { used_percentage: 25, context_window_size: 1_000_000, used_tokens: 248_000 },
+  });
+  assert.equal(
+    deriveFooterFields({ sample: wrongField, knownSessionId: 'live-session' }).blindReason,
+    BLIND_REASON.PERCENTAGE_ABSENT
+  );
+});
+
+test('WP-3B(b): the frontier is located mechanically, and a SUPERSEDED one is refused', () => {
+  const map = [
+    '# 12. Phase 1 frontier — SUPERSEDED AND HISTORICAL',
+    'assurance and veritas review of phase 1',
+    '',
+    '## 16. PHASE 3 — the route',
+    'bounded mechanical implementation of the module',
+    '',
+    '## 16.8 Frontier',
+    'merge decision only',
+  ].join('\n');
+
+  const f = frontierTextFromMap(map);
+  assert.ok(f, 'a frontier must be found');
+  assert.deepEqual(f.headings, ['16.8 Frontier', '16. PHASE 3 — the route']);
+  assert.ok(!f.text.includes('phase 1'), 'the SUPERSEDED section must not be read');
+  assert.ok(f.text.includes('merge decision only'));
+
+  // Nothing to go on at all.
+  assert.equal(frontierTextFromMap('# Notes\njust prose'), null);
+  assert.equal(frontierTextFromMap(''), null);
+  assert.equal(frontierTextFromMap(null), null);
+
+  // Every frontier marked superseded is the same as having none.
+  assert.equal(frontierTextFromMap('# The frontier — SUPERSEDED\nassurance'), null);
+});
+
+test("WP-3B(b): Larry's five policy rows, each pinned to a literal, and ambiguity fails SAFE", () => {
+  // The expected values are typed HERE, not read out of FRONTIER_VOCABULARY. A test that
+  // derives its expectation from the table under test drifts in lockstep with it.
+  const rows = [
+    ['no frontier text at all', '', 'UNSET'],
+    ['nothing the vocabulary recognises', 'tidy the whitespace in a readme', 'UNSET'],
+    ['assurance / review / design under uncertainty', 'submit the head to Veritas for assurance', 'Opus/high'],
+    ['bounded mechanical implementation', 'implement the numbered migration', 'Sonnet/medium'],
+    ['nothing but a merge decision', 'all that remains is the merge decision', 'Sonnet/low'],
+  ];
+  let checked = 0;
+  for (const [what, text, expected] of rows) {
+    assert.equal(classifyFrontier(text).next, expected, what);
+    checked += 1;
+  }
+  assert.equal(checked, 5, 'all five rows exercised');
+
+  // Row 5 — ambiguous classification takes the HIGHER of the candidates. Fail safe toward
+  // more capability, never less.
+  const ambiguous = classifyFrontier('implement the migration, then Veritas assurance, then the merge decision');
+  assert.equal(ambiguous.next, 'Opus/high', 'ambiguity must resolve UPWARD');
+  assert.deepEqual(ambiguous.matched, ['Opus/high', 'Sonnet/medium', 'Sonnet/low']);
+
+  // The rank order itself, pinned to a literal — "the higher of the candidates" is
+  // meaningless without a total order, and a reordering would silently invert it.
+  assert.deepEqual([...NEXT_RANK], ['Opus/high', 'Sonnet/medium', 'Sonnet/low']);
+  for (const row of NEXT_RANK) {
+    assert.ok(NEXT_VALUES.includes(row), `${row} must be renderable by the grammar`);
+    assert.ok(FRONTIER_VOCABULARY[row].length > 0, `${row} must have a vocabulary`);
+  }
+
+  // Multi-word by design: bare "decision" and bare "record" appear in every map.
+  assert.ok(!classifyFrontier('a product decision is pending').matched.includes('Sonnet/low'));
+});
+
+test('WP-3B(b): every way the recommendation can fail lands on UNSET — never a guess', () => {
+  const cases = [
+    ['no resolver injected (this is what an IMPORTER gets)', { mapPathFn: null }, 'no-map-resolver-supplied'],
+    ['the resolver throws', { mapPathFn: () => { throw new Error('git exploded'); } }, 'map-resolver-threw'],
+    ['no active map found', { mapPathFn: () => null }, 'no-active-map-found'],
+    ['the map cannot be read', { mapPathFn: () => 'x.md', readFileFn: () => { throw new Error('EPERM'); } }, 'map-unreadable'],
+    ['the map has no frontier', { mapPathFn: () => 'x.md', readFileFn: () => '# nothing here' }, 'no-frontier-section'],
+    ['the frontier says nothing recognisable', { mapPathFn: () => 'x.md', readFileFn: () => '# Frontier\nzzz' }, 'frontier-unclassifiable'],
+  ];
+  let checked = 0;
+  for (const [what, deps, reason] of cases) {
+    const r = recommendNext(deps);
+    assert.equal(r.next, NEXT_UNSET, what);
+    assert.equal(r.reason, reason, `${what}: the reason must say WHICH failure`);
+    checked += 1;
+  }
+  assert.equal(checked, 6);
+
+  // And the success path, so the failure cases are not passing vacuously.
+  const ok = recommendNext({
+    mapPathFn: () => 'map.md',
+    readFileFn: () => '# 3. PHASE 3\n## Frontier\nsubmit to Veritas for assurance',
+  });
+  assert.equal(ok.next, 'Opus/high');
+  assert.equal(ok.mapPath, 'map.md');
+  assert.ok(ok.headings.length > 0, 'the recommendation must be able to state its provenance');
+});
+
+test('WP-3B(b) / A-4: --next WINS, an importer gets UNSET, and only an injected resolver computes', () => {
+  const store = storeWith('sess-b');
+  try {
+    const deps = { locationFn: stubLocation('C:/repo', 'main'), envOverride: store };
+    const mapPathFn = () => 'map.md';
+    const readFileFn = () => '# 3. PHASE 3\n## Frontier\nsubmit to Veritas for assurance';
+
+    // A-4: the statusline path — no resolver — keeps UNSET. This is the recorded
+    // limitation, asserted rather than merely described.
+    assert.equal(parseFooter(runCli(['--session', 'sess-b'], deps).stdout).fields.next, NEXT_UNSET);
+
+    // With a resolver, the same invocation computes.
+    assert.equal(
+      parseFooter(runCli(['--session', 'sess-b'], { ...deps, mapPathFn, readFileFn }).stdout).fields.next,
+      'Opus/high'
+    );
+
+    // An explicit --next always wins, including when it disagrees with the map...
+    assert.equal(
+      parseFooter(runCli(['--session', 'sess-b', '--next', 'Haiku/low'], { ...deps, mapPathFn, readFileFn }).stdout).fields.next,
+      'Haiku/low'
+    );
+    // ...and including an explicit UNSET, which is a caller stating it, not a silence.
+    assert.equal(
+      parseFooter(runCli(['--session', 'sess-b', '--next', 'UNSET'], { ...deps, mapPathFn, readFileFn }).stdout).fields.next,
+      NEXT_UNSET
+    );
+
+    // A resolver whose answer is outside the grammar can never reach the renderer.
+    const rogue = runCli(['--session', 'sess-b'], { ...deps, mapPathFn, readFileFn: () => '# Frontier\nzzz' });
+    assert.equal(parseFooter(rogue.stdout).ok, true);
+    assert.equal(parseFooter(rogue.stdout).fields.next, NEXT_UNSET);
+  } finally {
+    rmSync(store, { recursive: true, force: true });
+  }
+});
+
+test('WP-3B(c): --help exits 0 and answers the question that cost ~79k tokens to answer', () => {
+  const r = runCli(['--help']);
+  assert.equal(r.exitCode, CLI_EXIT.OK, '--help must EXIT 0 — it exited 2 as an unrecognised argument before');
+  assert.equal(r.stderr, '', 'help is not an error');
+  assert.ok(r.stdout.length > 0);
+  assert.equal(runCli(['-h']).exitCode, CLI_EXIT.OK);
+  // Position-independent: a lost reader does not know the flag order either.
+  assert.equal(runCli(['--session', 'x', '--help']).exitCode, CLI_EXIT.OK);
+
+  // What the text must actually carry, so it stays an answer rather than a stub. Each
+  // item is something a reader previously had to open the module to learn.
+  for (const required of [
+    'usage:',
+    'exits 0',
+    CONTEXT_MEASUREMENT.STATUSLINE_TOTAL_INPUT,
+    CONTEXT_MEASUREMENT.TRANSCRIPT_USED,
+    'UNSET',
+    '--control',
+    'examples:',
+  ]) {
+    assert.ok(CLI_HELP.includes(required), `--help must document ${required}`);
+  }
+  // Every handback code reachable from the CLI must be listed, derived from the const so
+  // a new code cannot be added without appearing in the help.
+  for (const code of HANDBACK_CODES) assert.ok(CLI_HELP.includes(code), `--help must list ${code}`);
+
+  // And the real process, because "runCli returned 0" is not "the binary exits 0".
+  const spawned = spawnSync(
+    process.execPath,
+    [fileURLToPath(new URL('./footer.mjs', import.meta.url)), '--help'],
+    { encoding: 'utf8' }
+  );
+  assert.equal(spawned.status, 0, `the spawned entrypoint must exit 0 — got ${spawned.status}`);
+  assert.ok(spawned.stdout.includes('usage:'));
+});
+
+test('WP-3B: HANDBACK_CODES is one-for-one with the constitution AND with a literal typed here', () => {
+  // Two independent pins. The constitution is the authority; the literal additionally
+  // catches an edit that changes both the module and the constitution in one pass.
+  const SEVEN = [
+    'product-decision',
+    'permission',
+    'spend',
+    'irreversible-live-action',
+    'unsafe-repository-state',
+    'rotation-required',
+    'merge-decision',
+  ];
+  assert.deepEqual([...HANDBACK_CODES], SEVEN, 'the frozen literal must not drift from the seven names');
+  assert.equal(HANDBACK_CODES.length, 7);
+
+  const constitution = readFileSync(CONSTITUTION_PATH, 'utf8');
+  for (const code of SEVEN) {
+    assert.ok(constitution.includes(code), `root CLAUDE.md must still name ${code}`);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// MUTATION HARNESS — break each control, prove RED, and prove the real file was never
+// touched. The module set is copied OUT of the repository first: a mutant written beside
+// the original is a write outside this Work Order's file surface, and a harness that has
+// to break that rule is the wrong harness.
+// ---------------------------------------------------------------------------
+const GOVERNOR_DIR = fileURLToPath(new URL('.', import.meta.url));
+
+const sha256File = (p) => createHash('sha256').update(readFileSync(p)).digest('hex');
+
+function mutantModule(find, replace) {
+  const dir = mkdtempSync(join(tmpdir(), 'gov-mutant-'));
+  for (const f of readdirSync(GOVERNOR_DIR)) {
+    if (!f.endsWith('.mjs') || f.endsWith('.test.mjs')) continue;
+    copyFileSync(join(GOVERNOR_DIR, f), join(dir, f));
+  }
+  const target = join(dir, 'footer.mjs');
+  const src = readFileSync(target, 'utf8');
+  assert.ok(src.includes(find), `MUTATION TARGET NOT FOUND — the harness is stale: ${find.slice(0, 60)}`);
+  writeFileSync(target, src.replace(find, replace));
+  return { dir, url: `${pathToFileURL(target).href}?m=${Math.random()}` };
+}
+
+test('WP-3B: MUTATION — every control this Work Order added can be made to FAIL', async () => {
+  const before = sha256File(join(GOVERNOR_DIR, 'footer.mjs'));
+  const mutants = [];
+  let proven = 0;
+
+  try {
+    // M1 — the source-aware selector reverts to reading `used_tokens` for a statusLine
+    // sample. This IS the original defect, reintroduced.
+    {
+      const m = mutantModule(
+        'return { raw: cw?.total_input_tokens, measurement: CONTEXT_MEASUREMENT.STATUSLINE_TOTAL_INPUT };',
+        'return { raw: cw?.used_tokens, measurement: CONTEXT_MEASUREMENT.STATUSLINE_TOTAL_INPUT };'
+      );
+      mutants.push(m.dir);
+      const mod = await import(m.url);
+      const r = mod.deriveFooterFields({ sample: liveSample(), knownSessionId: 'live-session' });
+      assert.notEqual(r.fields.usedTokens, 248_000, 'M1 must break the measured count');
+      assert.equal(r.fields.state, 'BLIND', 'M1: the defect now surfaces as BLIND rather than a silent percentage');
+      proven += 1;
+    }
+
+    // M2 — rung 3 restores the percentage fallback A-3 removed.
+    {
+      // Single-line targets throughout this harness: the module is stored with CRLF
+      // terminators, so a multi-line literal typed here would never match and the
+      // harness would report itself stale for a reason that has nothing to do with the
+      // control. (It DID, on first run — which is the guard behaving correctly.)
+      const m = mutantModule(
+        'if (usedTokens === null) {',
+        'if (!isFiniteNumber(reportedPct) && usedTokens === null) {'
+      );
+      mutants.push(m.dir);
+      const mod = await import(m.url);
+      const noCount = liveSample({ context_window: { used_percentage: 25, context_window_size: 1_000_000 } });
+      const r = mod.deriveFooterFields({ sample: noCount, knownSessionId: 'live-session' });
+      assert.notEqual(r.fields.state, 'BLIND', 'M2 must reintroduce the percentage-dressed-as-measurement path');
+      assert.equal(r.fields.percent, 25);
+      proven += 1;
+    }
+
+    // M3 — ambiguity fails DOWNWARD instead of upward.
+    {
+      const m = mutantModule(
+        'return { next: matched[0], matched };',
+        'return { next: matched[matched.length - 1], matched };'
+      );
+      mutants.push(m.dir);
+      const mod = await import(m.url);
+      assert.equal(
+        mod.classifyFrontier('implement the migration, then Veritas assurance, then the merge decision').next,
+        'Sonnet/low',
+        'M3 must invert the fail-safe direction'
+      );
+      proven += 1;
+    }
+
+    // M4 — `--help` stops short-circuiting and becomes an unrecognised argument again.
+    {
+      const m = mutantModule(
+        "if (arg === '--help' || arg === '-h') return { ok: true, help: true };",
+        '/* help removed by mutation */',
+      );
+      mutants.push(m.dir);
+      const mod = await import(m.url);
+      assert.equal(mod.runCli(['--help']).exitCode, 2, 'M4 must restore the exit-2 behaviour (c) exists to remove');
+      proven += 1;
+    }
+
+    // M5 — A-4/A-7, proven STRUCTURALLY because that is the form the property takes:
+    // no static import of continuity.mjs may exist, and the dynamic one must sit after
+    // the direct-execution guard. A statusline importer must not be able to reach a
+    // `git` invocation even by accident.
+    {
+      const src = readFileSync(join(GOVERNOR_DIR, 'footer.mjs'), 'utf8');
+      assert.ok(
+        !/^import[^\n]*continuity\.mjs/m.test(src),
+        'A-7: footer.mjs must never statically import continuity.mjs — it shells out to git'
+      );
+      const guardAt = src.indexOf('if (process.argv[1] && import.meta.url ===');
+      const importAt = src.indexOf("await import('./continuity.mjs')");
+      assert.ok(guardAt > 0, 'the direct-execution guard must still exist');
+      assert.ok(importAt > guardAt, 'A-7: the resolver import must live INSIDE the direct-execution guard');
+      proven += 1;
+    }
+  } finally {
+    for (const d of mutants) rmSync(d, { recursive: true, force: true });
+  }
+
+  assert.equal(proven, 5, 'every control must have been made to fail');
+
+  // Byte-identical restoration: the harness never wrote to the real module at all, and
+  // this is the assertion that proves it rather than asserting it in prose.
+  assert.equal(sha256File(join(GOVERNOR_DIR, 'footer.mjs')), before, 'the module under test must be byte-identical');
 });
