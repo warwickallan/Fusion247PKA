@@ -15,7 +15,7 @@ import { writeTmp } from '../test-helpers/fakes.js';
 const SCRIPT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'scripts', 'secret-scan.sh');
 
 function bashAvailable() {
-  const probe = spawnSync('bash', ['--version'], { encoding: 'utf8' });
+  const probe = spawnSync('bash', ['--version'], { encoding: 'utf8', windowsHide: true });
   return !probe.error;
 }
 
@@ -27,8 +27,8 @@ test('local secret-scan flags a token-shaped literal and passes clean text', (t)
   const dirty = writeTmp(`const anything = '${tokenLike}';\n`, '.js');
   const clean = writeTmp('const anything = "just a normal string with plain words";\n', '.js');
 
-  const rDirty = spawnSync('bash', [SCRIPT, dirty], { encoding: 'utf8' });
-  const rClean = spawnSync('bash', [SCRIPT, clean], { encoding: 'utf8' });
+  const rDirty = spawnSync('bash', [SCRIPT, dirty], { encoding: 'utf8', windowsHide: true });
+  const rClean = spawnSync('bash', [SCRIPT, clean], { encoding: 'utf8', windowsHide: true });
 
   assert.equal(rDirty.status, 1, `token-shaped literal must fail: ${rDirty.stdout}${rDirty.stderr}`);
   assert.match(rDirty.stdout, /token-shaped/i);
@@ -40,6 +40,6 @@ test('local secret-scan flags a Telegram bot-token shape', (t) => {
   // <8+ digits>:<30+ base64ish> assembled at runtime.
   const tokenLike = '12345678' + ':' + 'A'.repeat(35);
   const dirty = writeTmp(`const t = '${tokenLike}';\n`, '.js');
-  const r = spawnSync('bash', [SCRIPT, dirty], { encoding: 'utf8' });
+  const r = spawnSync('bash', [SCRIPT, dirty], { encoding: 'utf8', windowsHide: true });
   assert.equal(r.status, 1, `${r.stdout}${r.stderr}`);
 });

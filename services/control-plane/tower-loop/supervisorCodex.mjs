@@ -120,14 +120,14 @@ function runCodexChild({ codexBin, argv, cwd, spawn, timeoutMs, apiKey, prompt, 
     let child;
     const childEnv = apiKey ? { ...env, CODEX_API_KEY: apiKey, OPENAI_API_KEY: apiKey } : env;
     try {
-      child = spawn(codexBin, argv, { cwd, shell: false, env: childEnv });
+      child = spawn(codexBin, argv, { cwd, shell: false, env: childEnv, windowsHide: true });
     } catch (e) {
       return finish({ ok: false, code: -1, stderr: String(e?.message ?? e), stdout: '' });
     }
     const timer = setTimeout(() => {
       // Best-effort tree reap on Windows so codex.exe children cannot orphan.
       if (process.platform === 'win32' && child?.pid != null) {
-        try { spawn('taskkill', ['/PID', String(child.pid), '/T', '/F'], { shell: false, stdio: 'ignore' }); } catch { /* ignore */ }
+        try { spawn('taskkill', ['/PID', String(child.pid), '/T', '/F'], { shell: false, stdio: 'ignore', windowsHide: true }); } catch { /* ignore */ }
       }
       try { child?.kill?.('SIGKILL'); } catch { /* ignore */ }
       finish({ ok: false, code: -2, stderr: `supervisor turn timed out after ${timeoutMs}ms`, stdout });

@@ -223,7 +223,7 @@ async function main() {
   if (!branch) {
     try {
       const { execFileSync } = await import('node:child_process');
-      branch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: repoDir, encoding: 'utf8' }).trim() || null;
+      branch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: repoDir, encoding: 'utf8', windowsHide: true }).trim() || null;
     } catch { branch = null; }
   }
   const evidence = await gatherGitEvidence({

@@ -33,7 +33,7 @@ test('runtimeConfig loads with NO inherited terminal env (child sees only the st
   fs.writeFileSync(script, `import { loadRuntimeConfig } from ${JSON.stringify(RUNTIME_CFG_URL)};\n`
     + `const r = loadRuntimeConfig({ required: ['CLICKUP_TOKEN','TELEGRAM_BOT_TOKEN','AUTHORISED_TELEGRAM_USER_ID'] });\n`
     + `process.stdout.write(JSON.stringify({ ok: r.ok, describe: r.config ? r.config.describe() : null }));\n`);
-  const out = execFileSync(process.execPath, [script], { env: cleanEnv(home), encoding: 'utf8' });
+  const out = execFileSync(process.execPath, [script], { env: cleanEnv(home), encoding: 'utf8', windowsHide: true });
   const parsed = JSON.parse(out);
   assert.equal(parsed.ok, true, 'loads config from the store with no inherited env');
   assert.equal(out.includes(CANARY), false, 'no secret VALUE in the child output (masked)');
@@ -42,7 +42,7 @@ test('runtimeConfig loads with NO inherited terminal env (child sees only the st
 
 test('preflight exits 0 when the store is complete (masked)', () => {
   const home = seedHome();
-  const out = execFileSync(process.execPath, [PREFLIGHT], { env: cleanEnv(home), encoding: 'utf8' });
+  const out = execFileSync(process.execPath, [PREFLIGHT], { env: cleanEnv(home), encoding: 'utf8', windowsHide: true });
   assert.match(out, /READY/);
   assert.equal(out.includes(CANARY), false);
 });
@@ -52,7 +52,7 @@ test('preflight fail-closed (exit 1) when CLICKUP_TOKEN missing', () => {
   fs.mkdirSync(home, { recursive: true });
   fs.writeFileSync(path.join(home, 'fusion-capture-gateway.env'), 'TELEGRAM_BOT_TOKEN=123:BOTV\nAUTHORISED_TELEGRAM_USER_ID=42\n');
   let code = 0; let stdout = '';
-  try { stdout = execFileSync(process.execPath, [PREFLIGHT], { env: cleanEnv(home), encoding: 'utf8' }); }
+  try { stdout = execFileSync(process.execPath, [PREFLIGHT], { env: cleanEnv(home), encoding: 'utf8', windowsHide: true }); }
   catch (e) { code = e.status; stdout = String(e.stdout ?? '') + String(e.stderr ?? ''); }
   assert.equal(code, 1);
   assert.match(stdout, /CLICKUP_TOKEN: MISSING|FAIL-CLOSED/);

@@ -66,7 +66,7 @@ export function defaultRunCmd(bin, args, { cwd, timeoutMs = 20_000, spawn = node
     const finish = (r) => { if (!done) { done = true; resolve(r); } };
     let child;
     try {
-      child = spawn(bin, args, { cwd, shell: false });
+      child = spawn(bin, args, { cwd, shell: false, windowsHide: true });
     } catch (e) {
       return finish({ code: -1, stdout: '', stderr: String(e?.message ?? e) });
     }

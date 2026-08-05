@@ -353,7 +353,7 @@ function writeFetchStub(home, probePath) {
 // mutation M4 (a debug line echoing the resolved token survived an execFileSync-based
 // version of this helper).
 function runCli(args, env) {
-  const r = spawnSync(process.execPath, [CLI, ...args], { env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  const r = spawnSync(process.execPath, [CLI, ...args], { env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
   if (r.error) throw r.error;
   return { code: r.status, stdout: String(r.stdout ?? ''), stderr: String(r.stderr ?? '') };
 }

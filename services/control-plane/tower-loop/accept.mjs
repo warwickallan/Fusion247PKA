@@ -48,6 +48,7 @@ function spawnWatcher(watcherId, extraEnv = {}) {
       ...extraEnv,
     },
     stdio: ['ignore', 'pipe', 'pipe'],
+    windowsHide: true,
   });
   const tag = `[${watcherId}]`;
   child.stdout.on('data', (d) => process.stdout.write(String(d).split('\n').filter(Boolean).map((l) => `${tag} ${l}\n`).join('')));
