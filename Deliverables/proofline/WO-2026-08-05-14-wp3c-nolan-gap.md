@@ -133,3 +133,59 @@ Queries #4–#7 are in the file; read them there rather than from this table.
 **Both WP-3A and WP-3B read-backs have now landed, and both supplied substantive Work Order content that Larry is adopting** — a corrected `file_surface`, a rejected `network` grant on GL-012 grounds, an acceptance restatement, and in WP-3B's case the finding that one acceptance criterion was already ~90% delivered. **That is directly probative for Q-2 PRIMARY and it is on disk in this directory.** Weigh it yourself; do not take Larry's characterisation of it.
 
 **This amendment is the one permitted correction. Proceed on it — no further read-back unless the amendment is itself defective.**
+
+---
+
+# AMENDMENT 2 — 2026-08-05. **WARWICK HAS ANSWERED Q-1, Q-2 AND Q-3 HIMSELF**
+
+**His words are precedence #1 and outrank any research finding, including Pax's and Larry's. Recorded verbatim, not paraphrased.**
+
+## The three-way boundary, as he states it
+
+> **Keel** should implement approved technical work: services, migrations, runtime mechanics, launchers, recovery design and the code/config needed to make a service operable.
+>
+> **Mack** should own the live-machine side: installation, deployment/process configuration, supervision, restart/recovery execution, monitoring and runtime evidence.
+>
+> **Nolan** was being used as the independent organisational/governance mind: define role boundaries, challenge conflicts and translate Warwick's settled decisions into contracts and governing instructions.
+
+## The gap — his words
+
+> **The gap was that the Nolan part was never actually formalised.**
+>
+> Nolan's canonical contract remained essentially HR/recruitment-focused and had never been amended. So nobody formally owned:
+>
+> > **translating Warwick's decisions into governing contracts and Work Orders, while independently checking that the implementer was not defining the law governing its own work.**
+>
+> That matters because Keel's own contract explicitly bars Keel from writing documents that define, govern or assess the work Keel is implementing. Mack is the operator, not the policy author. **With no properly routed contract/governance owner, one of two bad things happened:**
+>
+> 1. **Keel wrote or amended contracts/Work Orders governing Keel's own implementation, crossing the independence boundary; or**
+> 2. **Larry wrote the envelopes himself, often badly, because there was nobody else formally accountable for converting the decision into a sound executable contract.**
+>
+> So **Pax is right that "Nolan lapsed" is inaccurate. Nothing lapsed; that responsibility was never canonically assigned.** Nolan happened to fill it informally in earlier work, **which made the system appear to have an owner when it did not.**
+
+## The missing boundary — his words
+
+> The original Keel–Mack boundary was:
+> > **Keel delivers a service that Mack can operate without Keel present.**
+>
+> The missing third boundary was:
+> > **Someone independent of Keel and Mack owns the governing contract and role/interface definition before Keel implements and Mack operates.**
+>
+> **That was the actual gap you were pointing at — not simply "Larry writes poor Work Orders."**
+
+## What this does to the order
+
+| Question | Status |
+|---|---|
+| **Q-1** what Nolan performed | **ANSWERED by Warwick.** The independent organisational/governance mind — informally. **Your finding that it was never canonically assigned is CONFIRMED by him**, and your git evidence (one commit, never amended) is the proof |
+| **Q-2** why Keel wrote contracts or Work Orders | **ANSWERED by Warwick, and it settles the one-gap/two-gap question: ONE gap with TWO symptoms.** Both his numbered outcomes flow from the same missing owner |
+| **Q-3** the exact ownership/routing gap | **ANSWERED by Warwick**, and named precisely: the third boundary above |
+| **Q-4** the smallest correction | **STILL OPEN. This is now the whole of your remaining work** |
+
+## 🔴 Three things you must NOT do with this
+
+1. **Do not treat his ruling as clearing Larry.** He says the ownership gap is the actual gap and that bad envelopes are a *consequence* — **he does not say Larry's execution quality is fine.** Your option 3 is narrowed, not eliminated. **If the evidence still supports a separable execution-quality defect, say so.** Larry has produced three further defects since your read-back, all caught by workers.
+2. **Do not conclude "hire someone" by reflex.** The regrowth cap is at full force, and **a role IS subject to it.** The test remains whether an *existing* owner and an *existing* procedure together supply standing separation. **His framing points at Nolan's contract being FORMALISED rather than at a new specialist — but that is for your evidence to establish, not for you to assume from his wording.**
+3. **Any correction touching `AGENTS.md`, SOP-001 or `CLAUDE.md` is barred to Larry and to you.** Root hard rule: never modify any `AGENTS.md` without explicit approval; no silent constitutional self-modification. **Q-4 produces an exact proposed redline for Warwick's approval and independent review — a permission boundary, which is the one category he left open.**
+
+**Confirm Q-1..Q-3 against the evidence rather than restating him** — if anything on disk contradicts his account, that is a finding and he would want it. **Then spend the brief on Q-4.** It just got much shorter and much sharper, so make it so.
