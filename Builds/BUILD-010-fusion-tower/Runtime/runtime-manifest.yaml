@@ -74,9 +74,11 @@ runtime_paths:
   qa_skill: 'Builds/BUILD-010-fusion-tower/baton-mvp/tower-qa-skill.md'  # loaded fresh + SHA-256 fingerprinted per turn
 
 startup:
-  canonical_launcher: services/tower-baton/scripts/start-fusion-tower.ps1
-  command_line: 'powershell -ExecutionPolicy Bypass -File services\tower-baton\scripts\start-fusion-tower.ps1 -TaskId <clickupTaskId> [-Telegram]'
-  equivalent: 'node services/tower-baton/bin/tower-watch.js  (uses the same runtimeConfig)'
+  status: RETIRED                       # 2026-08-05, Warwick-authorised. tower-baton no longer starts.
+  retired_note: 'Both entrypoints below REFUSE and exit 78. The current Tower is services/control-plane/tower-loop/, launched via run-watcher.mjs. Source tree preserved deliberately: src/clickupClient.js is the target of a live negative control (graph-probe.mjs control-trap) in the tower-loop suite.'
+  canonical_launcher: services/tower-baton/scripts/start-fusion-tower.ps1   # RETIRED — refuses, exit 78
+  command_line: 'RETIRED — refuses with exit 78. Was: powershell -ExecutionPolicy Bypass -File services\tower-baton\scripts\start-fusion-tower.ps1 -TaskId <clickupTaskId> [-Telegram]'
+  equivalent: 'node services/tower-baton/bin/tower-watch.js — RETIRED, refuses, exit 78. This was the REAL entrypoint; the launcher only wrapped it.'
   secrets_on_command_line: false        # the node process loads secrets itself from the store
   startup_milestone_fresh: '[TOWER] ClickUp baton watcher online'
   startup_milestone_recovered: '[TOWER] Watcher recovered and resumed from durable checkpoint state'

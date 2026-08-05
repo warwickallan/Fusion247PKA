@@ -73,7 +73,25 @@ NAMES only. `--ignore-user-config` disables the host `config.toml` (which sets
 `sandbox = "elevated"`) but does **not** disable the auth store, so OAuth still
 applies under the correct user.
 
-## 2. Install NSSM (primary path)
+> ## ⛔ SECTIONS 2–4 ARE RETIRED — DO NOT REGISTER ANYTHING BELOW (2026-08-05)
+>
+> **These sections are a documented resurrection procedure**: they instruct a human to
+> register an NSSM service `FusionTower` and a scheduled task `FusionTowerWatchdog`.
+> **A documented resurrection procedure is a start path with a human in the loop**, and
+> it survives every file deletion, because the person reading it is the mechanism.
+>
+> **Neither was ever registered** — established by enumeration, not by reading the
+> commented-out block: absent from all 216 scheduled tasks and from all 333 Windows
+> services. **Keep it that way.**
+>
+> **The current Tower is `services/control-plane/tower-loop/`, launched via
+> `run-watcher.mjs`.** `tower-baton` is retired and both of its entrypoints refuse with
+> exit 78.
+>
+> Retained rather than deleted so a reader who arrives here from a link lands on the
+> truth. Authorised by Warwick, 2026-08-05.
+
+## 2. Install NSSM (primary path) — ⛔ RETIRED, do not run
 
 ```powershell
 scoop install nssm    # or download from nssm.cc
