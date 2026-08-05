@@ -60,6 +60,8 @@ import {
 } from './notify.mjs';
 // WO-TW-02 — the automatic trigger. The poller was already real and already proven; the only
 // thing missing was something that ran it without a human. That something is the loop below.
+// WO-2026-08-03-05 — `fetchOpenPrs` is the paginated, fail-loud open-PR discovery call, imported
+// from pollPrComments.mjs rather than re-derived here: one seam, one implementation.
 import { pollPrComments, fetchOpenPrs, ghCliReader } from './pollPrComments.mjs';
 // WO-TW-02 — the other half of Warwick's condition: the verdict goes back ONTO the PR. A
 // SEPARATE module with a SEPARATE seam; the poller stays structurally read-only.
@@ -168,8 +170,9 @@ const REPO_SLUG_RE = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/;
  * therefore re-derives it rather than inheriting it.
  *
  * Returns `null` — never throws — when there is no usable remote. Not knowing which repository we
- * are in is a legitimate state (a detached copy, a tarball); the LOUD handling of "no repositories
- * at all" belongs one level up, where it can be seen against the other sources.
+ * are in is a legitimate state (a detached copy, a tarball — see TOWER_PR_REPOS below for exactly
+ * this case in production); the LOUD handling of "no repositories at all" belongs one level up,
+ * where it can be seen against the other sources.
  *
  * @param {object}   [opts]
  * @param {string}   [opts.cwd]   directory to interrogate; defaults to this checkout's root.
@@ -206,6 +209,33 @@ export function seedRepos(env = process.env) {
 }
 
 /**
+ * Repositories named by TOWER_PR_REPOS — the STABLE MACHINE-RUNTIME repository source, retained
+ * as a FOURTH source alongside `detectCheckoutRepo` / the store / `seedRepos` (Warwick's own
+ * instruction, WO 2026-08-05: "retain TOWER_PR_REPOS as the stable machine-runtime repository
+ * source, because the installed runtime is not a Git checkout").
+ *
+ * WHY THIS IS NOT REDUNDANT WITH `detectCheckoutRepo`, and it is worth spelling out because it
+ * looks like a duplicate source at a glance. `detectCheckoutRepo` reads `git remote get-url
+ * origin` from `cwd` — it needs an actual `.git` directory to interrogate. Tower's real machine
+ * deployment (`~/.mypka/tower-runtime/`) is a PLAIN FILE COPY, not a git checkout: there is no
+ * `origin` remote to read, so `detectCheckoutRepo` resolves `null` there every time, by design and
+ * correctly (it never throws or guesses). Without this function, that deployment would have NO
+ * durable repository source at all beyond whatever is already in the store or a seed — exactly the
+ * bootstrap gap this whole change exists to close, reopened for the one environment where it
+ * actually runs live. DO NOT "clean this up" as a duplicate of `detectCheckoutRepo` or of
+ * `seedRepos` — it is neither: it is the only source that survives a non-git deployment.
+ *
+ * Comma-separated `owner/name`, no PR number (a repo, not a PR — the shape TOWER_PR_SEED uses for
+ * its optional `#pr` suffix does not apply here, because this variable was never about one PR).
+ * Read from `process.env` fresh on every call — no caching, same discipline as `seedRepos`.
+ */
+export function explicitRepos(env = process.env) {
+  return String(env.TOWER_PR_REPOS ?? '')
+    .split(',').map((s) => s.trim()).filter(Boolean)
+    .filter((s) => REPO_SLUG_RE.test(s));
+}
+
+/**
  * Which PRs this watcher should ask GitHub about, right now.
  *
  * THE CHANGE, AND WHY THE OLD RULE WAS SELF-EXTINGUISHING. Targets used to be the distinct
@@ -221,11 +251,14 @@ export function seedRepos(env = process.env) {
  * So the cut is: **every open PR on every repository we know about is a target.** A merged or
  * closed PR is not, whatever the store or the environment says about it.
  *
- * WHERE THE REPOSITORIES COME FROM — three sources, and every one of them is durable:
+ * WHERE THE REPOSITORIES COME FROM — FOUR sources, and every one of them is durable:
  *   1. this checkout's `origin` remote        — on disk, re-read every round
  *   2. every repo named by any turn in the store — in the database, survives restart
  *   3. `TOWER_PR_SEED`                        — retained as an operator escape hatch for a repo
  *                                               that is neither of the above
+ *   4. `TOWER_PR_REPOS`                       — the stable machine-runtime source, for a
+ *                                               deployment (a plain file copy, not a git checkout)
+ *                                               where source 1 structurally cannot resolve anything
  * Source 2 deliberately reads ALL turns and NOT `state <> 'complete'`: filtering there would
  * reintroduce the self-extinguishing bug one level up, since a repo whose every turn had completed
  * would stop being asked about.
@@ -234,6 +267,12 @@ export function seedRepos(env = process.env) {
  * and, after three consecutive rounds, into a `tower_failure` alarm. It must never return an empty
  * list on error: an empty list is what a healthy idle watcher returns, and silence that looks like
  * health is the failure mode this whole change exists to remove.
+ *
+ * The cap (`limit`, default `PR_POLL_MAX_TARGETS`) bounds RANKING, never DISCOVERY: every open PR
+ * across every known repository — sources 1-4 above, with no separate cap per source — is fetched
+ * and ranked as one combined list (in-flight rounds first, then newest-first), and only then is the
+ * list truncated to `limit`. This is what stops a fourth source from silently starving a PR that a
+ * different source would have kept visible: there is one ranking and one cap, not four.
  */
 export async function pollTargets(pool, { gh = ghCliReader, limit = PR_POLL_MAX_TARGETS, detectRepo = detectCheckoutRepo } = {}) {
   // In-flight rounds, most recently active first. Used ONLY to rank targets under the cap, so a
@@ -258,6 +297,7 @@ export async function pollTargets(pool, { gh = ghCliReader, limit = PR_POLL_MAX_
   addRepo(await detectRepo());
   for (const r of repoRows) addRepo(String(r.repo));
   for (const r of seedRepos()) addRepo(r);
+  for (const r of explicitRepos()) addRepo(r);
 
   if (repos.length === 0) {
     // Distinct from `pr_poll_no_targets`, and the distinction is the point: "there is nothing open
@@ -310,6 +350,9 @@ export async function pollTargets(pool, { gh = ghCliReader, limit = PR_POLL_MAX_
  * see runWatcher.
  */
 export async function pollRound(pool, deps) {
+  // WO-2026-08-03-05 — pass the injected `gh` seam through so open-PR DISCOVERY runs on every real
+  // poll round. deps.gh is the same seam pollPrComments below is about to use for each target, so
+  // this is the one existing gh invocation point, not a second one.
   const targets = await pollTargets(pool, { gh: deps.gh });
   if (targets.length === 0) { log('pr_poll_no_targets'); return { targets: 0, ok: 0, failed: 0, errors: [] }; }
 

@@ -49,7 +49,7 @@ import { pollPrComments, assertReadOnlyArgs, ensureCheckpointTurn, checkpointTur
 import { makeFakeGh, ghComment } from './doubles/fakeGh.mjs';
 // WO-TW-02 — the automatic trigger's own seams, and the verdict write-back.
 // WO-2026-08-03-05 — open-PR discovery and the repository sources it draws on.
-import { pollTargets, detectCheckoutRepo, seedRepos } from '../watcher.mjs';
+import { pollTargets, detectCheckoutRepo, seedRepos, explicitRepos } from '../watcher.mjs';
 import {
   assertCommentPostArgs, verdictPostKey, verdictMarker, composeVerdictComment,
   queueVerdictForTurn, postPendingVerdicts,
@@ -1060,6 +1060,57 @@ async function main() {
     assert.deepEqual(targets.slice(1).map((t) => t.prNumber), [9511, 9510, 9509, 9508]);
   });
 
+  // ── TOWER_PR_REPOS — the FOURTH source, added on top of PR #93's three (Warwick's instruction:
+  // "retain TOWER_PR_REPOS as the stable machine-runtime repository source, because the installed
+  // runtime is not a Git checkout"). Two properties: it works standing alone, and it shares the
+  // SAME rank+cap as everything else rather than getting a parallel one.
+
+  await test('D-TR1 — TOWER_PR_REPOS ALONE finds an open PR: no seed, no prior turn, and no git checkout to detect from (the real machine-runtime deployment)', async () => {
+    // ~/.mypka/tower-runtime/ is a PLAIN FILE COPY, not a git checkout — detectCheckoutRepo()
+    // resolves null there, proven here by injecting `detectRepo: async () => null` rather than
+    // stubbing something that could quietly still succeed.
+    delete process.env.TOWER_PR_SEED;
+    const freshPath = path.join(TMP_DIR, 'tr1-discovery.db');
+    const fresh = openDb(freshPath);
+    try {
+      await applySchema(fresh); await applyWatcherSchema(fresh); await applyCommentSchema(fresh); await applyPostSchema(fresh);
+      assert.equal(Number((await fresh.query(`select count(*) n from tower.turn`)).rows[0].n), 0, 'precondition: empty store');
+
+      const OTHER_REPO = 'warwickallan/tower-runtime-example';
+      process.env.TOWER_PR_REPOS = OTHER_REPO;
+      try {
+        assert.deepEqual(explicitRepos(), [OTHER_REPO], 'TOWER_PR_REPOS parses to exactly its repository, no PR number attached');
+
+        const gh = makeFakeGh({ headSha: HEAD_CP, comments: [], openPrs: { [OTHER_REPO]: [601] } });
+        const targets = await pollTargets(fresh, { gh, detectRepo: async () => null });
+        assert.deepEqual(targets, [{ repo: OTHER_REPO, prNumber: 601 }],
+          'TOWER_PR_REPOS is sufficient ON ITS OWN — no checkout, no seed, no prior turn required');
+      } finally { delete process.env.TOWER_PR_REPOS; }
+    } finally { await fresh.end(); }
+  });
+
+  await test('D-TR2 — a TOWER_PR_REPOS-sourced repo composes into the SAME rank+cap as every other source, not a parallel cap', async () => {
+    // An open PR must never be permanently invisible just because more than 5 PRs are open across
+    // the COMBINED repo set — including the fourth source. One list, one cap; not one cap per repo.
+    const other = 'warwickallan/tower-runtime-example';
+    process.env.TOWER_PR_REPOS = other;
+    try {
+      const manyHere = Array.from({ length: 4 }, (_, i) => 9600 + i);   // from the detected checkout repo
+      const manyThere = Array.from({ length: 4 }, (_, i) => 700 + i);   // from TOWER_PR_REPOS
+      const gh = makeFakeGh({
+        headSha: HEAD_CP, comments: [],
+        openPrs: { [CP_REPO]: [...manyHere, 9002], [other]: manyThere },
+      });
+      const targets = await pollTargets(pool, { gh, limit: 5, detectRepo: async () => CP_REPO });
+      assert.equal(targets.length, 5, 'still ONE cap of 5 across BOTH repos combined — not 5 per repo');
+      assert.equal(targets[0].repo, CP_REPO);
+      assert.equal(targets[0].prNumber, 9002, 'the live-round PR still ranks first regardless of which source added the rest');
+      const rest = targets.slice(1).map((t) => `${t.repo}#${t.prNumber}`);
+      assert.deepEqual(rest, [`${CP_REPO}#9603`, `${CP_REPO}#9602`, `${CP_REPO}#9601`, `${CP_REPO}#9600`],
+        `expected one shared ranking across sources (got ${JSON.stringify(rest)})`);
+    } finally { delete process.env.TOWER_PR_REPOS; }
+  });
+
   // ── A5/A6: the SPAWNED watcher. No poller, no CLI, no insert — a comment appears, and that
   // is the only thing that happens externally.
   const GH_FIXTURE = path.join(TMP_DIR, 'gh-fixture.json');
@@ -1088,8 +1139,8 @@ async function main() {
     assert.equal((await turnForPr(pr)).length, 0, 'acceptance step 1: nothing prepared by hand');
 
     // WO-2026-08-03-05 — NO TOWER_PR_SEED. This test used to hand the watcher the exact PR number
-    // it was then asked to prove it polled, which proved only that the seed was obeyed. The number
-    // is now GitHub's to tell it.
+    // it was then asked to prove it polled, which proved only that the seed was obeyed. The
+    // number is now GitHub's to tell it.
     const w = spawnWatcher('ci-trigger-a5', POLL_ENV);
     try {
       // Nothing is run against the watcher from here on. It has to find this itself.
