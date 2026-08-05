@@ -861,6 +861,61 @@ Three `MyPKA-*` scheduled tasks the earlier investigation never examined — `My
 
 ---
 
+## 14.12 The Honcho pagination defect — **REPAIRED. Verified 2026-08-05, not assumed**
+
+**Warwick asked for confirmation, 2026-08-05:** *"newer continuity packets can exist beyond the first 50 while `readLatest` returns an older reachable packet. The warning mitigation is not the repair."*
+
+**Verdict: REPAIRED — and proven not to be a coincidental match.**
+
+### The repair, and what it replaced
+
+The defect was commit `7cb1560`: `page`/`size` were sent in the **request body**, which the server's one-property (`filters`) model **discards in silence**, defaulting to `page=1, size=50, reverse=false` — oldest-first. **Warwick is right that the warning was never the repair.** The repair is `7e3847c` (WO-OR-21), which moved them to the **query string**:
+
+```js
+const qs = new URLSearchParams({ reverse: String(!!reverse), size: String(size), page: String(page) });
+```
+
+`LIST_PAGE_SIZE = 100`, `LIST_REVERSE = true`, walk while `page < pages`, then sort **ts desc → seq desc → live-before-backfill** — so selection is by content, never by arrival order or array position. The `⚠️ PAGINATION INCOMPLETE` warning survives as a residual honesty signal for the 40-page cap, **no longer as a substitute for the fix.**
+
+### Proven three ways against the live store
+
+| Test | Result |
+|---|---|
+| Ground truth | **140 packets, 2 pages.** Genuine newest by seq **and** by ts: `cont-1785846026092-143-rqjtww`, seq 143 |
+| **The deciding test** | `readLatest` returns **exactly that packet**. `complete: true` |
+| **Not coincidence — 1** | The newest sits at **position 139 of 140** oldest-first. `reachable_in_first_50_oldest_first: **false**` |
+| **Not coincidence — 2** | The old broken window reproduced live (size 50, oldest-first) returns seq 51 — **2 days 10 hours stale.** The defect is still reproducible against today's store; it is simply no longer on the code path |
+| **Not coincidence — 3** | Forced `size:10, reverse:false` through the real walker still finds seq 143 across **14 pages**. Correctness comes from the walk plus the sort, not from `reverse=true` happening to put the answer on page 1 |
+| Locking test already exists | `continuity.test.mjs:319` — *"MUTATION: a single-page read of the same store returns the STALE packet — the defect, reproduced"*, plus assertions that page/size/reverse are in the query string and nothing pagination-shaped is in the body. **71 pass, 0 fail. No new test is owed** |
+| Contract | `Deliverables/2026-08-02-pax-honcho-messages-list-contract.md` — `page`/`size`/`reverse` are **query** params, size max 100, envelope `{items,total,page,size,pages}`, no cursor. **The live envelope matches it exactly** |
+
+**Nothing is folded into WP-2B for this defect. There is nothing to repair.**
+
+### ⚠️ But Warwick's acceptance bar has TWO halves, and only one is met
+
+His bar: *"a fresh Larry receives the genuinely newest packet, containing the current Wayfinder path and frontier."*
+
+| Half | Status |
+|---|---|
+| **Receives the genuinely newest packet** | ✅ **MET** — proven above |
+| **Containing the current Wayfinder path and frontier** | ❌ **NOT MET.** The live brief renders **right now**: *"map path missing or invalid — treat continuity as absent"* |
+
+**Cause — a deployment gap, not a code defect.** The Stop hook runs `C:/Fusion247PKA/tools/governor/continuity.mjs` — the **main** checkout at `c1ed028` on `build-015/...`, which has **zero** occurrences of `resolveActiveMapPath`/`map_path` and does **not** contain WP-2B(1) (`git merge-base --is-ancestor d3c08a7 HEAD` → **NO**). **So every packet the live hook writes carries no map pointer, and the render correctly shows its honest-absent form.** The read is right; the writer is behind.
+
+**This is exactly WP-2B(2)'s install step, and it is now the thing standing between Phase 2 and S-1.** Recorded, not re-scoped.
+
+### Correction to Larry's own reasoning
+
+**I inferred from "seq 143 > 50" that the defect was live by arithmetic. That inference was WRONG** — the read path already paginates at size 100 with `reverse=true` and walks every page. It was flagged as an inference rather than a finding, and execution overturned it. **A plausible arithmetic argument is not evidence.**
+
+### Named as unestablished
+
+- Whether the server returns 422 on `size=101` — taken from the contract document, **not executed**.
+- Honcho rate limits — recorded as NOT FOUND in any official source. **Unknown, not unlimited.**
+- **`seq 143` against `count 140`: three sequence numbers are consumed but absent from the store.** Consistent with `nextSeq()` incrementing before a delivery that returned `ok:false`. **An observation, not a claim** — not investigated.
+
+---
+
 ## 14.11 Evidence status — §14.6 discharged
 
 All three investigations have landed and their findings are recorded above. **WP-2A, WP-2E and WP-2F may now be issued as Work Orders.** WP-2B(1) is issued and amended (`WO-2026-08-05-01`, Amendment 1) after a correct class-A `REFUSE`.
