@@ -998,6 +998,64 @@ Keel's four class-A refusals were all correct. The work divides:
 
 ---
 
+## 14.15 🚨 AMENDMENT 2 to Phase 2 — Codex is part of Tower, and its operating law is in the wrong home
+
+**Warwick, 2026-08-05, after Fable established it. A scope amendment, not a Phase 3 tangent — his explicit ruling.**
+
+> *"Fable has established that Codex's live operating law currently sits in a BUILD-010 Tower artefact, while the current estate-wide reviewer and finding-disposition law does not necessarily reach the external Codex instance that Tower actually invokes. **I consider Codex part of Tower.** … I do not want Tower-related structural debt dragged beyond the upcoming UAT."*
+
+### Why this is structural, not cosmetic — it contradicts this estate's own precedence
+
+`runtime-manifest.yaml` records `qa_skill: 'Builds/BUILD-010-fusion-tower/baton-mvp/tower-qa-skill.md'`, *"loaded fresh + SHA-256 fingerprinted per turn"*. **But root `CLAUDE.md` precedence #4 states `Builds/` is *"the authority for build FACTS, never a route."*** Operating law — what a reviewer may do, how findings are dispositioned — is a route. **It is currently living in a home the constitution says cannot hold it, inside a build that Phase 2 has just retired.**
+
+Compounding it: **`Builds/**` is on Keel's permanent NEVER-edit list**, so the estate's own implementer cannot maintain the file that governs its reviewer.
+
+### The amended Phase 2 outcome — his words, binding
+
+**Tower, INCLUDING Codex, must be permanently durable across builds and PRs.** Codex's authoritative operating law must:
+
+| # | Requirement |
+|---|---|
+| **X-1** | Live in **the correct durable home** — not a retired build's artefact directory |
+| **X-2** | Have **clear precedence** — a reader must know what governs when sources disagree |
+| **X-3** | **Reliably reach the real external Codex invocation.** Not "exists in the repo" — *reaches the process* |
+| **X-4** | Depend on **none of**: BUILD-010 archaeology · this Larry's context · a temporary instruction added only to make tonight's test pass |
+| **X-5** | **Remain true for later builds without manual repair** |
+
+### 🔴 Hard gate — binding on WP-2D
+
+> *"Resolve that properly **before making the first live Codex call**."*
+
+**NO live Codex execution until X-1..X-5 are integrated.** WP-2D is blocked. This also protects the three-per-gate Codex budget: a call made against the wrong law would burn one and prove nothing.
+
+### The UAT becomes the permanent acceptance certificate
+
+Not a smoke test. **Five properties, all in one run:**
+
+1. Tower invokes Codex **against a real PR**.
+2. Codex **receives the current authoritative law**.
+3. It reviews **the exact Git and PR state** with the **relevant Veritas evidence**.
+4. It **behaves within its proper boundary**.
+5. **The real Codex/Larry exchange and disposition travel through the intended durable GitHub and TowerBot surfaces.**
+
+**And: *"The same structure must remain true for later builds without manual repair."*** — so the UAT certifies the *structure*, not one lucky run.
+
+### Scope discipline he attached, and I will hold to it
+
+> *"I am not prescribing the implementation route, file layout or team allocation. Own that. **I also do not want a wider redesign for its own sake.** Nail the structural problem as part of Phase 2, integrate it, and only call Codex once the system being tested is the permanent one."*
+
+**The regrowth cap applies with full force.** The temptation here is a reviewer-governance layer. **The answer is almost certainly to move law into a home the constitution already recognises and make the loader read it — not to build a new one.** Beyond the UAT he will accept *"evidence-led wording refinements"* — **wording, not a second restructuring.**
+
+### New work package
+
+| WP | Outcome | Blocks |
+|---|---|---|
+| **WP-2G** | Codex's authoritative operating law is in its correct durable home with clear precedence, and **provably reaches the real external Codex invocation** | **WP-2D. No live Codex call before this lands** |
+
+**Design deliberately NOT settled here** — an investigation is establishing what actually reaches the external invocation today. **Deciding the home before knowing what is in the prompt would be exactly the archaeology-dependent guess this amendment exists to end.**
+
+---
+
 ## 14.11 Evidence status — §14.6 discharged
 
 All three investigations have landed and their findings are recorded above. **WP-2A, WP-2E and WP-2F may now be issued as Work Orders.** WP-2B(1) is issued and amended (`WO-2026-08-05-01`, Amendment 1) after a correct class-A `REFUSE`.
