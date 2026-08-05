@@ -1721,3 +1721,24 @@ All three investigations have landed and their findings are recorded above. **WP
 - **The governor runtime carries governance head `696d4498`**, 8/8 byte-identical to the git blob, rollback executed and proven on a file with a real delta.
 - **WP-3B's fix is observable in the product, not only in a hash:** the pre-fix copy renders `ctx 44% · GREEN` with **no figures**; the fixed copy renders `ctx 44% (440.1k/1000k)`.
 - **`MessageDisplay` exists in host 2.1.222** with a completed-message path — the claim that no hook could ever render the footer was false as to mechanism. **Whether it reaches web/Android was never established and Warwick has closed the question.**
+
+---
+
+## 16.11 ⭐ PHASE 3 MERGED — and the exact fresh-start contract
+
+| | |
+|---|---|
+| **MERGED SHA on `main`** | **`f242f3c8d1df6017dbe11b751cee12564b467517`** — PR #96, Codex waived on explicit Warwick authority, this occasion only |
+| **Gate** | **HOLD, and NOT a Phase 3 PASS.** Veritas HOLD at `6858327`; its one blocking finding **D-1 DISCHARGED** at `f542de0` by narrow replay. **D-2..D-6 parked.** Larry records no PASS |
+| **Runtime** | `~/.mypka/governor/` reinstalled from the merged head, 8/8 byte-identical to blob, rollback executed on the only file with a real delta |
+| **Delivered** | Honcho write-authority repair (guard now asks WHO, not only WHEN) · governor footer RETIRED from the message stream · Work Order envelope generator (`tools/wo/`) · cleaned candidate queue · `/rotate` restored |
+
+### THE NEXT ACTION for the fresh session — do these in order
+
+1. **Fix the DevBot ding credentials.** `C:\.fusion247\larry-ding.mjs` returns `{"ok":false,"why":"missing token/chat (names only)"}` — the script is fine, the credentials are not loaded. **Warwick cannot be reached at all until this works**, and he asked for it directly. **Declare the private surface properly; it is the secrets-store root and GL-012 binds.**
+2. **Ding rule, his words:** ding for a decision or action needed, **and** for a substantive update **even when no action is required**. **Never** for routine commentary.
+3. **Then issue the next real Work Order through `tools/wo/envelope.mjs`** — the first live acceptance test of the generation repair. **Report whether it reached the specialist without a preventable class-A refusal.**
+
+### Parked, deliberately, so it is a decision and not an omission
+
+**D-2..D-6** (Veritas) · **the Nolan actor-change proposal**, unratified at `c2ebda4`, **do not merge or amend** · **C-1..C-15** in `Deliverables/BACKLOG.md` · **the eighth generator field** that would close the order-not-at-its-own-head defect · **frontier-change-triggers-continuity**, §16.10 · the 318-vs-331 neighbour count.
