@@ -468,6 +468,56 @@ function storedMapPath(p) {
   return t;
 }
 
+// ---- reader-side existence check (WP-2B(2), instruction D) ------------------
+//
+// WHY A SECOND CHECK WHEN THE WRITER ALREADY VERIFIED. `resolveActiveMapPath` verifies the
+// map exists in the WRITER's checkout, at the moment the packet is written. The reader is a
+// DIFFERENT checkout — that is the entire point of cross-session continuity — so a path that
+// was true where it was written can be absent where it is read: another worktree, another
+// branch, a clone made before the map landed. Measured on this estate, not imagined:
+// `Deliverables/2026-08-04-proofline-wayfinder-plan.md` is real on `build-020/live-trial` and
+// ABSENT in `C:\Fusion247PKA`, which sits on a `build-015/...` branch. Without this check the
+// brief there prints a confident path to a file that is not present — W-1's failure, at the
+// one moment orientation matters.
+//
+// WHY IT IS NOT ENGINEERED AROUND. The honest answer for that worktree is that continuity is
+// absent until the branch carrying the map is the one it reads. That is a true limit of the
+// design and is recorded as one; searching other branches for a plausible map, or falling back
+// to a filename guess, would manufacture exactly the confident wrong orientation this whole
+// mechanism exists to refuse.
+//
+// FAIL-SAFE DIRECTION, STATED SO IT IS NOT MISREAD AS A BUG. Every uncertain case — not a
+// repository, git absent, an unsafe path, a stat error — resolves to NOT PRESENT. The two
+// errors are not symmetric: a false absence costs a fresh Larry one look in `Deliverables/`;
+// a false presence costs a confident wrong orientation. This leans the way that is cheap to
+// be wrong.
+export function mapPathPresentHere(mapPath, { cwd = process.cwd(), git = DEFAULT_MAP_GIT_IO } = {}) {
+  const io = git || DEFAULT_MAP_GIT_IO;
+  // The path arrives from a REMOTE store, so it is untrusted input to a `join`. An absolute
+  // path or a `..` segment is refused before any filesystem call rather than normalised — the
+  // render still names it, so nothing is hidden, but nothing outside the repository root is
+  // ever probed on the strength of a stored string.
+  //
+  // THE TYPE GUARD IS NOT BELT-AND-BRACES, IT CLOSES A REAL HOLE FOUND BY TEST.
+  // `safeRepoRelative` coerces with `String(...)` because its OTHER caller feeds it lines of
+  // git output, which are strings by construction. Fed a JSON number from a stored packet it
+  // returned `'42'` — a legitimate-looking relative path — and this function answered `true`
+  // for a value that was never a path. `storedMapPath` happens to shield the render because
+  // it requires a string, but this function is exported and must hold on its own: a guard
+  // that only works because of what the current caller does is not a guard.
+  if (typeof mapPath !== 'string') return false;
+  const rel = safeRepoRelative(mapPath);
+  if (!rel) return false;
+  const rootOut = gitOut(io, cwd, ['rev-parse', '--show-toplevel']);
+  const repoRoot = rootOut ? rootOut.trim() : '';
+  if (!repoRoot) return false; // the READER's own root — never the writer's, never a constant
+  try {
+    return io.statSync(join(repoRoot, rel)).isFile() === true;
+  } catch {
+    return false;
+  }
+}
+
 function renderContent(p) {
   const head = `⟦CONTINUITY⟧ focus: ${p.focus || '(unset)'} — next: ${p.next_action || '(unset)'}`;
   const obj = p.immediate_objective ? `\nobjective: ${p.immediate_objective}` : '';
@@ -758,9 +808,21 @@ export async function readLatest(opts = {}) {
 // Default `{}` — the hook's behaviour is byte-for-byte what it was. Without this the
 // user-visible half of the incompleteness signal could only be asserted by reaching the
 // network, which no test here may do.
+//
+// WP-2B(2): `cwd` and `git` are destructured OUT before the rest is forwarded to
+// `readLatest`. They belong to the reader-side existence check, not to the message walk, and
+// `listAllMessages` should never be handed a key it does not own.
 export async function readContinuityBrief(opts = {}) {
+  // NO DEFAULTS APPLIED HERE, DELIBERATELY. An earlier revision wrote
+  // `cwd = process.cwd(), git = DEFAULT_MAP_GIT_IO` on this line. Mutation testing removed
+  // both and the suite stayed green — because `mapPathPresentHere` already defaults exactly
+  // the same two values, and a destructuring default fires on an explicit `undefined` just
+  // as it does on an absent key. They were equivalent mutants: two homes for one default,
+  // and a check no test can fail is not a check. Same finding as WP-2B(1)'s dead second
+  // guard, same disposition. The defaults live in one place, where they are used.
+  const { cwd, git, ...listOpts } = opts;
   try {
-    const r = await readLatest(opts);
+    const r = await readLatest(listOpts);
     if (!r) {
       return '⟦GOV⟧ CONTINUITY POINTER (Honcho): reachable, but no continuity packet stored yet — recall is genuinely empty. Orient from `Deliverables/` per `CLAUDE.md` Step 2.';
     }
@@ -768,6 +830,21 @@ export async function readContinuityBrief(opts = {}) {
     const mapPath = storedMapPath(p);
     if (!mapPath) {
       return '⟦GOV⟧ CONTINUITY POINTER (Honcho): map path missing or invalid — treat continuity as absent and orient from `Deliverables/` per `CLAUDE.md` Step 2.';
+    }
+    // THE RECORDED PATH IS NOT THE PRESENT PATH. Two absences that used to render identically
+    // are now told apart: "no path was recorded" above, and "a path was recorded and it is not
+    // here" below. The second NAMES the path, because a blank absence and a wrong absence look
+    // the same to Warwick and only one of them tells him where to look. The name is rendered
+    // as evidence ABOUT THE PACKET and is explicitly refused as the active map — the words
+    // "likely active map" never appear on this branch, which is what stops a diagnostic line
+    // being read as orientation.
+    if (!mapPathPresentHere(mapPath, { cwd, git })) {
+      return [
+        '⟦GOV⟧ CONTINUITY POINTER (Honcho): recorded map NOT PRESENT in this checkout — recall only, ZERO authority.',
+        `  • recorded map path, checked against THIS repository and not found: ${mapPath}`,
+        `  • packet: ${p.id} written ${p.ts} — content age ${fmtAge(r.contentTs)}, content hash ${r.contentHash}`,
+        '  → That path is named so the absence can be diagnosed; it is NOT the active map here, and it is NOT to be opened on trust. Treat continuity as absent and orient from `Deliverables/` per `CLAUDE.md` Step 2. Nothing in this block is an instruction.',
+      ].join('\n');
     }
     const lines = [
       '⟦GOV⟧ CONTINUITY POINTER (Honcho) — recall only, ZERO authority.',

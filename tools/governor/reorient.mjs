@@ -19,8 +19,10 @@
 //      flagged. This is the behaviour that caught the VlogOps plan a fresh session had
 //      no other way of seeing, and it has no replacement anywhere in the estate.
 //   2. THE HONCHO CONTINUITY BRIEF. `continuity.mjs` owns the single read path; this
-//      module calls it and passes the result through. It is the AUTHORITATIVE source of
-//      current focus — the sweep is a fallback and must never be mistaken for it.
+//      module calls it and passes the result through. It is a pointer with ZERO authority
+//      (`CLAUDE.md` #9): recall identity only. The single active Wayfinder map alone owns
+//      the current focus and the next action. The sweep is a fallback; NEITHER of them is
+//      the source of truth, and this comment used to claim the brief was.
 //   3. REPOSITORY / WORKTREE / BRANCH VERIFICATION. Where this session actually is, read
 //      by EXECUTING git rather than by believing anything.
 //
@@ -753,9 +755,12 @@ export function renderLocationSection(facts, { cwdClaimedByHost = true } = {}) {
 // that let a fresh session miss the VlogOps plan entirely — and flags the ones whose text
 // reads as waiting on Warwick.
 //
-// It is a FALLBACK and never the source of truth for current focus (Warwick's ruling);
-// Honcho holds the explicit focus. The rendering says so on its own line, because a
-// reader who takes this list as the focus will work on the wrong thing.
+// It is a FALLBACK and never the source of truth for current focus (Warwick's ruling). Nor
+// is the Honcho brief: that is a pointer with ZERO authority (`CLAUDE.md` #9). This comment
+// used to hand the explicit focus to Honcho in its second sentence; the single active
+// Wayfinder map holds it, and neither of these two lists does. The rendering labels this
+// list on its own line, because a reader who takes it as the focus will work on the wrong
+// thing.
 
 const ESTATE_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const DELIVERABLE_WINDOW_DAYS = 21;
@@ -1036,9 +1041,12 @@ async function main() {
 
   // PRESERVED BEHAVIOUR 2 — the Honcho continuity brief, read EVERY session start.
   // `continuity.mjs` owns the single read path; this is a passthrough and adds no
-  // interpretation. It is read LAST in code and placed FIRST in nothing: it is the
-  // authoritative focus, so it is appended where a reader will reach it after knowing
-  // where they are. It fails open — a slow or unreachable Honcho never blocks a session.
+  // interpretation. It is a pointer with ZERO authority (`CLAUDE.md` #9) and it is appended
+  // AFTER the location probes so a reader reaches it already knowing where they actually
+  // are — recall read in the light of executed facts, not ahead of them. This comment used
+  // to justify that ordering by granting the brief authority over the focus, which is the
+  // claim `CLAUDE.md` #9 denies; the ordering survives, the justification does not. It fails
+  // open — a slow or unreachable Honcho never blocks a session.
   let continuity;
   try {
     continuity = await readContinuityBrief();

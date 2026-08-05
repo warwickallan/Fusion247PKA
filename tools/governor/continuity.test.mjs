@@ -68,6 +68,23 @@ function packet({ seq, ts, backfill = false, focus = `focus-${seq}`, id = `cont-
   return { schema: 1, kind: 'continuity', id, ts, seq, backfill, focus, map_path, next_action: `next-${seq}` };
 }
 
+// WP-2B(2). `readContinuityBrief` now checks the recorded map path against the READER's own
+// repository before rendering it as the active map, so every brief test is implicitly a
+// presence test unless it says otherwise. This seam reports the recorded path PRESENT.
+//
+// The tests that use it are about pagination and focus recency, and they asserted those
+// properties before this check existed; injecting presence keeps them asserting exactly what
+// they always asserted instead of silently becoming presence tests too. They would in fact
+// pass against the real seam today — the fixture's default `map_path` is a map that really
+// is on disk here — and that is precisely the reason NOT to leave it implicit: the day that
+// map is renamed, two pagination tests would fail for a reason that has nothing to do with
+// pagination. Presence itself is proven separately below, negative case and real-seam
+// control included.
+const MAP_PRESENT_IO = {
+  run: (args) => (args[0] === 'rev-parse' ? '/fake/reader/root\n' : ''),
+  statSync: () => ({ isFile: () => true }),
+};
+
 // A server that behaves like the DOCUMENTED one (WO-OR-21): it honours the `size` it is
 // asked for, honours `page`, honours `reverse`, and returns the real five-field envelope
 // {items, total, page, size, pages}.
@@ -471,7 +488,7 @@ test('THE BRIEF: the ⚠️ PAGINATION INCOMPLETE warning reaches the session th
     items: page === 1 ? packets.slice(0, 50).map((p) => msg(p)) : [],
     total: 86, page, size: 50, pages: 2,
   });
-  const brief = await continuity.readContinuityBrief({ fetchPage: truncated, maxPages: 1 });
+  const brief = await continuity.readContinuityBrief({ fetchPage: truncated, maxPages: 1, git: MAP_PRESENT_IO });
   assert.match(brief, /PAGINATION INCOMPLETE/, 'a truncated read must announce itself in the brief');
   assert.match(brief, /prefer the git map/);
 });
@@ -482,7 +499,7 @@ test('THE BRIEF MUTATION: on a complete read the warning is ABSENT and the newes
   const packets = [];
   for (let seq = 1; seq <= 86; seq++) packets.push(packet({ seq, ts: new Date(Date.UTC(2026, 7, 5, 1, 0, seq)).toISOString() }));
   const { fetchPage } = pagingServer(packets);
-  const brief = await continuity.readContinuityBrief({ fetchPage });
+  const brief = await continuity.readContinuityBrief({ fetchPage, git: MAP_PRESENT_IO });
   assert.doesNotMatch(brief, /PAGINATION INCOMPLETE/, 'the ordinary case must be clean');
   assert.match(brief, /focus-86/, 'and it must carry the NEWEST focus, not an earlier one');
   assert.doesNotMatch(brief, /focus-51\b/, 'seq 51 was the stale answer the old path returned');
@@ -1327,4 +1344,162 @@ test('PRODUCT PATH MUTATION: the SESSION cwd steers it — a stop from outside t
     Object.prototype.hasOwnProperty.call(r.packet, 'map_path'), false,
     'outside a repository there is no honest pointer, so the field must be absent'
   );
+});
+
+// ---------------------------------------------------------------------------
+// WP-2B(2) — the READER-SIDE existence check (instruction D)
+// ---------------------------------------------------------------------------
+//
+// THE DEFECT THIS CLOSES. WP-2B(1) made the WRITER verify the map exists before emitting a
+// pointer. The reader was never asked. Writer and reader are different checkouts by design —
+// that is what cross-session continuity IS — so a path that was true where it was written can
+// be absent where it is read. Executed on this estate: the BUILD-020 map is real on
+// `build-020/live-trial` and absent in `C:\Fusion247PKA`, which sits on a `build-015/...`
+// branch. A fresh Larry there was shown a confident path to a file that is not present.
+//
+// WHY THE NEGATIVE CASES CARRY THE WEIGHT, AGAIN. Same reason as WP-2B(1): an absent path
+// renders identically to a present one unless something checks. The load-bearing behaviour is
+// the honest-absent branch, and specifically that it NAMES the path it could not find — a
+// blank absence and a wrong absence look the same to Warwick, and only one of them tells him
+// where to look. Every test below is an acceptance test, not a robustness nicety.
+//
+// THE ONE THING THE ABSENT BRANCH MUST NEVER DO is present the named path as the active map.
+// The diagnostic value of naming it and the danger of naming it are the same property, so
+// "the words `likely active map` do not appear" is asserted explicitly rather than inferred
+// from the branch being a different one.
+
+test('D: a map path recorded but NOT PRESENT here renders honest-absent and NAMES the path', async () => {
+  const missing = 'Deliverables/2026-08-04-proofline-wayfinder-plan.md';
+  const { fetchPage } = pagingServer([packet({ seq: 1, ts: '2026-08-05T00:00:00.000Z', map_path: missing })]);
+  const { io } = gitStub({ 'rev-parse': '/reader/root\n' }, { files: [] }); // repo present, file is not
+
+  const brief = await continuity.readContinuityBrief({ fetchPage, git: io });
+
+  assert.match(brief, /recorded map NOT PRESENT in this checkout/, 'the absence must be stated, not implied');
+  assert.ok(brief.includes(missing), 'and the recorded path must be NAMED so the absence can be diagnosed');
+  assert.doesNotMatch(brief, /likely active map/, 'it must NEVER be offered as the active map');
+  assert.match(brief, /Nothing in this block is an instruction/, 'the pointer discipline still binds this branch');
+});
+
+test('D CONTROL: the SAME packet, with the file present, renders as the active map', async () => {
+  // Makes the test above fail-able. Without this, a render that ALWAYS said "not present"
+  // would satisfy every negative assertion above while destroying the working case.
+  const present = 'Deliverables/2026-08-04-proofline-wayfinder-plan.md';
+  const { fetchPage } = pagingServer([packet({ seq: 1, ts: '2026-08-05T00:00:00.000Z', map_path: present })]);
+  const { io } = gitStub({ 'rev-parse': '/reader/root\n' }, { files: [present] });
+
+  const brief = await continuity.readContinuityBrief({ fetchPage, git: io });
+
+  assert.match(brief, /likely active map: Deliverables\/2026-08-04-proofline-wayfinder-plan\.md/);
+  assert.doesNotMatch(brief, /NOT PRESENT/, 'a present map must not be reported absent');
+});
+
+test('D: the check runs against the READER own repo root — not a constant, not the writer root', () => {
+  // The property that makes this worth having at all. The stat must be rooted at whatever
+  // `git rev-parse --show-toplevel` answers HERE, so the same packet can resolve differently
+  // in two checkouts — which is exactly the real situation it exists for.
+  const rel = 'Deliverables/map.md';
+  const statted = [];
+  const io = {
+    run: (args, cwd) => (args[0] === 'rev-parse' ? `/root-for${cwd}\n` : ''),
+    statSync: (p) => { statted.push(String(p).replace(/\\/g, '/')); return { isFile: () => true }; },
+  };
+
+  assert.equal(continuity.mapPathPresentHere(rel, { cwd: '/checkout-a', git: io }), true);
+  assert.equal(continuity.mapPathPresentHere(rel, { cwd: '/checkout-b', git: io }), true);
+  assert.deepEqual(
+    statted,
+    ['/root-for/checkout-a/Deliverables/map.md', '/root-for/checkout-b/Deliverables/map.md'],
+    'the reader root steers the probe; a hardcoded or writer-side root would give one answer twice'
+  );
+});
+
+test('D: every uncertain case resolves to NOT PRESENT — the fail-safe direction is asserted, not assumed', () => {
+  const rel = 'Deliverables/map.md';
+  const ok = { run: () => '/reader/root\n', statSync: () => ({ isFile: () => true }) };
+
+  // not a repository / git absent — `rev-parse` throws
+  assert.equal(continuity.mapPathPresentHere(rel, { cwd: '/x', git: { ...ok, run: () => { throw new Error('no git'); } } }), false);
+  // a repository probe that answers empty
+  assert.equal(continuity.mapPathPresentHere(rel, { cwd: '/x', git: { ...ok, run: () => '   \n' } }), false);
+  // the path exists but is a DIRECTORY, not a file
+  assert.equal(continuity.mapPathPresentHere(rel, { cwd: '/x', git: { ...ok, statSync: () => ({ isFile: () => false }) } }), false);
+  // stat throws — ENOENT, permissions, a broken junction
+  assert.equal(continuity.mapPathPresentHere(rel, { cwd: '/x', git: { ...ok, statSync: () => { throw new Error('ENOENT'); } } }), false);
+  // CONTROL: with everything working it says true, so the four above are not passing vacuously
+  assert.equal(continuity.mapPathPresentHere(rel, { cwd: '/x', git: ok }), true);
+});
+
+test('D: an untrusted stored path is REFUSED before any filesystem call, never normalised', () => {
+  // The path arrives from a REMOTE store and is about to be joined onto a real root. An
+  // absolute path or a `..` segment would probe outside the repository on the strength of a
+  // string nobody in this process wrote. Refused ahead of the stat — and the stat is asserted
+  // never to have run, because "it returned false" would not distinguish a refusal from a
+  // probe that happened and failed.
+  const probed = [];
+  const io = {
+    run: () => '/reader/root\n',
+    statSync: (p) => { probed.push(String(p)); return { isFile: () => true }; },
+  };
+  const hostile = ['/etc/passwd', 'C:/Windows/system32/x.md', '../../outside.md', 'Deliverables/../../up.md', '', '   ', null, undefined, 42];
+  for (const h of hostile) {
+    assert.equal(continuity.mapPathPresentHere(h, { cwd: '/x', git: io }), false, JSON.stringify(h));
+  }
+  assert.deepEqual(probed, [], 'no hostile path may reach the filesystem at all');
+  // CONTROL: an ordinary repo-relative path DOES reach it, so the emptiness above is a refusal
+  assert.equal(continuity.mapPathPresentHere('Deliverables/map.md', { cwd: '/x', git: io }), true);
+  assert.equal(probed.length, 1, 'and exactly one probe was made for the legitimate path');
+});
+
+test('D CONTROL: the DEFAULT seam reads REAL git and the REAL filesystem', () => {
+  // Pairs with every injected test above. Without it the whole D suite could be testing a
+  // fiction: a `mapPathPresentHere` that ignored its io and returned a constant would satisfy
+  // the stubs. Run against this repository, with no injection at all.
+  const realMap = 'Deliverables/2026-08-02-wayfinder-operating-reset-plan.md';
+  assert.equal(existsSync(join(REPO_ROOT, realMap)), true, 'CONTROL PRECONDITION: the fixture map is really on disk');
+
+  assert.equal(continuity.mapPathPresentHere(realMap, { cwd: REPO_ROOT }), true,
+    'the default seam must find a file that genuinely exists');
+  assert.equal(continuity.mapPathPresentHere('Deliverables/no-such-map-2026-08-05.md', { cwd: REPO_ROOT }), false,
+    'and must not find one that does not');
+  assert.equal(continuity.mapPathPresentHere(realMap, { cwd: SANDBOX_HOME }), false,
+    'outside any repository there is no root to check against, so the answer is NOT PRESENT');
+});
+
+test('D: the DEFAULTS are real — a bare call and an explicitly null seam both fall back to the real one', () => {
+  // These two guards were SURVIVING mutants: dropping `cwd = process.cwd()` and dropping the
+  // `git || DEFAULT_MAP_GIT_IO` fallback both left the suite green, which meant neither was
+  // proven. They are not dead code — both are reachable from a legitimate call — so the
+  // answer is to prove them rather than to delete them. (The third survivor, a duplicate pair
+  // of defaults on `readContinuityBrief`, WAS equivalent and was removed instead.)
+  const realMap = 'Deliverables/2026-08-02-wayfinder-operating-reset-plan.md';
+  const cwdBefore = process.cwd();
+  process.chdir(REPO_ROOT);
+  try {
+    assert.equal(continuity.mapPathPresentHere(realMap), true,
+      'called bare, it must default cwd to the process cwd and find the map');
+    assert.equal(continuity.mapPathPresentHere(realMap, { cwd: REPO_ROOT, git: null }), true,
+      'an explicitly null seam must fall back to the real one, not throw and not report absent');
+    assert.equal(continuity.mapPathPresentHere('Deliverables/no-such-map-2026-08-05.md'), false,
+      'CONTROL: the bare call is not simply returning true for everything');
+  } finally {
+    process.chdir(cwdBefore);
+  }
+});
+
+test('D: `cwd` and `git` never leak into the message walk', async () => {
+  // `readContinuityBrief` forwards its options to `readLatest`. The two new keys belong to
+  // the existence check, and handing `listAllMessages` a key it does not own is how an option
+  // bag quietly becomes an interface. Asserted on what the page fetcher actually received.
+  const seen = [];
+  const fetchPage = async (args) => {
+    seen.push(args);
+    return { items: [msg(packet({ seq: 1, ts: '2026-08-05T00:00:00.000Z' }))], total: 1, page: 1, size: 100, pages: 1 };
+  };
+  await continuity.readContinuityBrief({ fetchPage, git: MAP_PRESENT_IO, cwd: '/somewhere' });
+  assert.ok(seen.length > 0, 'CONTROL: the walk actually ran');
+  for (const a of seen) {
+    assert.deepEqual(Object.keys(a).sort(), ['cursor', 'page', 'reverse', 'size'],
+      'the fetcher sees its own four arguments and nothing this change added');
+  }
 });

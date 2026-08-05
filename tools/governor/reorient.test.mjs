@@ -1554,12 +1554,17 @@ test('WO-OR-17 / INV-2: the reshaped helper and the new seam still cannot break 
 // asserted by controlling the failure.
 
 test('CONTINUITY: the brief is passed through VERBATIM — this module adds no interpretation', async () => {
-  const brief = '⟦GOV⟧ HONCHO CONTINUITY — AUTHORITATIVE current focus:\n  focus: something specific';
+  // P-6, fourth site. The fixture used to read "AUTHORITATIVE current focus" and the
+  // assertion message used to say "then the authoritative focus" — the same claim
+  // `CLAUDE.md` #9 denies, asserted here as if it were the contract. The fixture content is
+  // arbitrary to this test (it proves byte-for-byte passthrough and ORDER, nothing about the
+  // words), so the property under test is untouched and no assertion is weakened.
+  const brief = '⟦GOV⟧ CONTINUITY POINTER (Honcho) — recall only, ZERO authority.\n  • last known focus (recall, possibly stale): "something specific"';
   const composed = `${buildBrief('{}')}\n\n${await Promise.resolve(brief)}`;
   assert.ok(composed.includes(brief), 'the brief must survive composition byte-for-byte');
   assert.ok(
-    composed.indexOf('SESSION LOCATION PROBES') < composed.indexOf('HONCHO CONTINUITY'),
-    'location first, then the authoritative focus'
+    composed.indexOf('SESSION LOCATION PROBES') < composed.indexOf('CONTINUITY POINTER'),
+    'executed location facts first, then the zero-authority recall pointer'
   );
 });
 
@@ -1643,6 +1648,61 @@ test('briefModeFor: an UNRECOGNISED source gets the FULL brief, never silence', 
     assert.equal(p.mode, BRIEF_MODE.FULL, 'unknown is never absent (INV-1)');
     assert.match(p.headline, /UNRECOGNISED SessionStart source/);
   }
+});
+
+// ===========================================================================
+// P-6 — the residual authority scan over this module's own prose
+// ===========================================================================
+// WHY A SOURCE SCAN IS A REAL PROOF HERE AND NOT CEREMONY. The defect this closes is
+// entirely in comments: three separate places told the next reader that the Honcho brief is
+// "the authoritative source of current focus", which is the claim `CLAUDE.md` #9 denies. A
+// comment defect has no runtime symptom, so no behavioural test can catch it and nothing but
+// a reader's memory stops it growing back. `4a3b873` — the approved doc-017 redline — swept
+// this file for exactly this language, fixed the RENDERED label at the sweep section, and
+// left all three comments standing. That is the regrowth this pins.
+//
+// THE LITERALS ARE HELD HERE, IN THE TEST, NOT IMPORTED FROM THE FILE THEY CHECK. A constant
+// compared against itself proves nothing.
+//
+// THE BAN IS NARROW ON PURPOSE. `reorient.mjs` uses the word "authority" legitimately twice
+// ("the only authority on that said nothing", about the deleted alignment verdict). A scan
+// broad enough to catch those would be reworded out of existence the first time it fired,
+// which is how a scan dies. These are the exact claims, not the vocabulary.
+const BANNED_AUTHORITY_CLAIMS = [
+  'AUTHORITATIVE source of current focus',
+  'authoritative focus',
+  'Honcho holds the explicit focus',
+];
+
+// The replacement each site must actually carry. Absence-only would pass if someone simply
+// DELETED the three comments, leaving the next reader with no statement of the boundary at
+// all — a silent file is not a corrected one.
+const REQUIRED_POINTER_CLAIM = 'pointer with ZERO authority';
+
+test('P-6: no comment in this module claims the Honcho brief is authoritative', () => {
+  const src = readFileSync(join(import.meta.dirname, 'reorient.mjs'), 'utf8');
+  for (const claim of BANNED_AUTHORITY_CLAIMS) {
+    assert.ok(
+      !src.includes(claim),
+      `reorient.mjs still asserts "${claim}" — CLAUDE.md #9 makes the brief a pointer with zero authority`
+    );
+  }
+});
+
+test('P-6 MUTATION: the scan is fail-able, and deletion is not a fix', () => {
+  // Makes the test above provable rather than vacuously green. If the banned literals could
+  // never match anything, the assertion would pass over any file at all.
+  const src = readFileSync(join(import.meta.dirname, 'reorient.mjs'), 'utf8');
+  for (const claim of BANNED_AUTHORITY_CLAIMS) {
+    const regrown = `${src}\n// ${claim}\n`;
+    assert.ok(regrown.includes(claim), `the scan cannot detect a regrowth of "${claim}"`);
+  }
+  // And the positive half: all three sites state the boundary rather than saying nothing.
+  const occurrences = src.split(REQUIRED_POINTER_CLAIM).length - 1;
+  assert.ok(
+    occurrences >= 3,
+    `expected all 3 corrected sites to state "${REQUIRED_POINTER_CLAIM}", found ${occurrences}`
+  );
 });
 
 test('normaliseSeparators: the INLINED helper behaves exactly as its deleted original did', () => {
