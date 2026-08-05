@@ -148,12 +148,22 @@ function runCodexChild({ codexBin, argv, cwd, spawn, timeoutMs, apiKey, prompt, 
  * Both runSupervisor (delivery review, SUPERVISOR_SCHEMA) and runMergeReview (merge-class QA,
  * CODEX_RESULT_SCHEMA) compose this — the invocation is reused, not re-implemented.
  */
-async function invokeCodexJson({ prompt, schema, cwd, spawn, fs, timeoutMs }) {
-  const auth = detectCodexAuth({});
+async function invokeCodexJson({ prompt, schema, cwd, spawn, fs, timeoutMs, authProbe, resolveBin }) {
+  // WP-2G — the injection seam. `detectCodexAuth`/`resolveCodexBin` were called with no seam, so
+  // both gates were unconditionally the HOST's: on CI there is no ~/.codex/auth.json and no
+  // %LOCALAPPDATA%\OpenAI\Codex\bin, so this function returned `blocked` BEFORE any spawn — the
+  // injected `spawn` never ran and nothing was ever written to stdin. A reach test built on the
+  // injected spawn would therefore pass on a developer machine and fail in CI, or, written
+  // loosely, pass BY BLOCKING: a false green inside the test meant to prove reach. These two
+  // optional params mirror `createCodexAdapter({ resolveBin, authProbe })` in codexAdapter.mjs
+  // (the house pattern) and default to the real probes, so live behaviour is unchanged.
+  const doAuthProbe = typeof authProbe === 'function' ? authProbe : () => detectCodexAuth({});
+  const doResolveBin = typeof resolveBin === 'function' ? resolveBin : () => resolveCodexBin({});
+  const auth = doAuthProbe();
   if (!auth.authenticated) {
     return { blocked: true, kind: 'no_credential', blocker: 'no codex credential — neither CODEX_API_KEY/OPENAI_API_KEY nor ChatGPT-OAuth auth.json present (do NOT auto-provision)' };
   }
-  const bin = resolveCodexBin({});
+  const bin = doResolveBin();
   if (!bin.path) {
     return { blocked: true, kind: 'no_binary', blocker: `no codex binary — ${bin.error ?? 'not resolvable'} (do NOT auto-install)` };
   }
@@ -196,9 +206,11 @@ export async function runSupervisor({
   spawn = nodeSpawn,
   fs = fsDefault,
   timeoutMs = 8 * 60 * 1000,
+  authProbe,
+  resolveBin,
 } = {}) {
   const prompt = buildSupervisorPrompt({ supervisorPromptText, reconstructedTurnText });
-  const inv = await invokeCodexJson({ prompt, schema: SUPERVISOR_SCHEMA, cwd, spawn, fs, timeoutMs });
+  const inv = await invokeCodexJson({ prompt, schema: SUPERVISOR_SCHEMA, cwd, spawn, fs, timeoutMs, authProbe, resolveBin });
   if (inv.blocked) return blocked(inv.kind, inv.blocker);
 
   const validation = validateSupervisorResult(inv.parsed.result);
@@ -244,9 +256,11 @@ export async function runMergeReview({
   spawn = nodeSpawn,
   fs = fsDefault,
   timeoutMs = 8 * 60 * 1000,
+  authProbe,
+  resolveBin,
 } = {}) {
   const prompt = buildCodexPrompt({ skillText: qaSkillText, packet });
-  const inv = await invokeCodexJson({ prompt, schema: CODEX_RESULT_SCHEMA, cwd, spawn, fs, timeoutMs });
+  const inv = await invokeCodexJson({ prompt, schema: CODEX_RESULT_SCHEMA, cwd, spawn, fs, timeoutMs, authProbe, resolveBin });
   if (inv.blocked) {
     return {
       ok: false, blocked: true, modelId: null,

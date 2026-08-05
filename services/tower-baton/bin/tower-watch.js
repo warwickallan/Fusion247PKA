@@ -71,7 +71,10 @@ process.exit(RETIRED_EXIT_CODE);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SERVICE_DIR = path.resolve(__dirname, '..');
 const REPO_ROOT = path.resolve(SERVICE_DIR, '..', '..');
-const DEFAULT_QA_SKILL = path.join(REPO_ROOT, 'Builds', 'BUILD-010-fusion-tower', 'baton-mvp', 'tower-qa-skill.md');
+// WP-2G — repointed to the contract's durable home. This entrypoint is RETIRED and exits above
+// before reaching here, so this constant is unreachable; it is corrected anyway because a stale
+// pointer left in preserved code is exactly what the next reader copies.
+const DEFAULT_QA_SKILL = path.join(REPO_ROOT, 'services', 'control-plane', 'review', 'prompts', 'tower-qa-skill.md');
 const LOG_DIR = path.join(SECRET_HOME, 'logs', 'tower-baton');
 const LOG_MAX_BYTES = 2 * 1024 * 1024; // 2 MB, then rotate to .1
 

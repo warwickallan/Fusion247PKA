@@ -29,11 +29,14 @@ import { gatherGitEvidence } from './gitEvidence.mjs';
 import { runMergeReview } from './supervisorCodex.mjs';
 import { openDb } from './db.mjs';
 import { applyMergeCheckSchema } from './apply.mjs';
+import { CODEX_CONTRACT_PATH, loadCodexContract, assertDeliveredContract } from '../review/codexAdapter.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_REPO_ROOT = process.env.TOWER_EVIDENCE_REPO_DIR || path.resolve(__dirname, '../../..');
-const DEFAULT_QA_SKILL = process.env.TOWER_QA_SKILL_PATH
-  || path.join(DEFAULT_REPO_ROOT, 'Builds', 'BUILD-010-fusion-tower', 'baton-mvp', 'tower-qa-skill.md');
+// WP-2G — resolved from codexAdapter.mjs's single exported constant, never re-derived. The old
+// default pointed into `Builds/BUILD-010-fusion-tower/**`, which also meant the runtime default
+// named a build: later builds inherited a BUILD-010 path for their reviewer's law.
+export const DEFAULT_QA_SKILL = process.env.TOWER_QA_SKILL_PATH || CODEX_CONTRACT_PATH;
 
 /** Send one TowerBot (Telegram) message. Never throws; never echoes the token. */
 async function sendTowerBot(token, chat, text) {
@@ -112,7 +115,28 @@ export async function runMergeCheck({
   }
 
   // ── REAL Codex merge review under the APPROVED Tower QA skill over the staged diff. ──
-  const qaSkillText = fs.readFileSync(qaSkillPath, 'utf8');
+  // WP-2G: LOADED AND VALIDATED, not bare-read. Absent / empty / no frontmatter / missing sentinel
+  // / NOT RATIFIED each fail closed HERE, before any Codex spend, and the rejection is recorded
+  // durably for the same reason the evidence branch above records its own — a review that did not
+  // happen must not look like one that never arrived.
+  const contract = loadCodexContract({ contractPath: qaSkillPath });
+  if (!contract.ok) {
+    await addMsg('gpt_codex', round, 'blocked', `codex operating contract refused — ${contract.error}`);
+    await pool.query(`update tower.merge_check_run set status='blocked', rounds=?, updated_at=now() where id=?`, [round, runId]);
+    const s = await sendTowerBot(telegramToken, telegramChat, `🗼 Merge-check PR #${prNumber} @ ${String(headSha).slice(0, 10)} — BLOCKED (contract: ${contract.error})`);
+    return { runId, status: 'blocked', verdict: 'blocked', rounds: round, blocked: true, telegram: s };
+  }
+  // O-7's runtime half — the fingerprint is computed over the bytes about to be delivered and
+  // compared against the loaded+validated bytes. Mismatch is fail-closed, not a warning.
+  const provenanceError = assertDeliveredContract(contract.text, contract);
+  if (provenanceError) {
+    await addMsg('gpt_codex', round, 'blocked', `codex operating contract provenance failed — ${provenanceError}`);
+    await pool.query(`update tower.merge_check_run set status='blocked', rounds=?, updated_at=now() where id=?`, [round, runId]);
+    const s = await sendTowerBot(telegramToken, telegramChat, `🗼 Merge-check PR #${prNumber} @ ${String(headSha).slice(0, 10)} — BLOCKED (contract provenance)`);
+    return { runId, status: 'blocked', verdict: 'blocked', rounds: round, blocked: true, telegram: s };
+  }
+  const qaSkillText = contract.text;
+  console.error(`[mergeCheck] contract: ${contract.provenance} sha256=${contract.fingerprint}`);
   const packet = {
     checkpoint_id: `pr${prNumber}-${String(headSha).slice(0, 10)}`, build_id: classified.build_ref,
     repo: ev.repo ?? repo, branch: null,

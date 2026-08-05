@@ -16,13 +16,14 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { gatherGitEvidence } from './gitEvidence.mjs';
 import { runMergeReview } from './supervisorCodex.mjs';
+import { CODEX_CONTRACT_PATH, loadCodexContract, assertDeliveredContract } from '../review/codexAdapter.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const QA_SKILL = process.env.TOWER_QA_SKILL_PATH
-  || path.join(__dirname, '..', '..', '..', 'Builds', 'BUILD-010-fusion-tower', 'baton-mvp', 'tower-qa-skill.md');
+// WP-2G — resolved from codexAdapter.mjs's single exported constant, never re-derived here.
+export const QA_SKILL = process.env.TOWER_QA_SKILL_PATH || CODEX_CONTRACT_PATH;
 
 function git(cwd, args) { return execFileSync('git', args, { cwd, encoding: 'utf8', windowsHide: true }); }
 
@@ -63,7 +64,14 @@ async function main() {
   console.log(`diff bytes=${evidence.diff_text?.length ?? 0} truncated=${evidence.diff_truncated}`);
   if (!evidence.resolved) { console.error(`\nBLOCKED — evidence unresolved: ${evidence.blocker}`); process.exit(2); }
 
-  const qaSkillText = fs.readFileSync(QA_SKILL, 'utf8');
+  // WP-2G — loaded and validated fail-closed, like the two production entrypoints. A demo that
+  // loads the law more loosely than the real route is a demo that proves the wrong thing.
+  const contract = loadCodexContract({ contractPath: QA_SKILL });
+  if (!contract.ok) { console.error(`\nBLOCKED — codex operating contract refused: ${contract.error}`); process.exit(2); }
+  const provenanceError = assertDeliveredContract(contract.text, contract);
+  if (provenanceError) { console.error(`\nBLOCKED — codex operating contract provenance failed: ${provenanceError}`); process.exit(2); }
+  const qaSkillText = contract.text;
+  console.log(`contract: ${contract.provenance} sha256=${contract.fingerprint}`);
   const packet = {
     checkpoint_id: 'demo-checkpoint', build_id: 'BUILD-014-demo',
     repo: evidence.repo, branch: evidence.branch,
@@ -79,4 +87,12 @@ async function main() {
   console.log(JSON.stringify(mr.result, null, 2));
 }
 
-main().catch((e) => { console.error(`[demo] FAILED: ${e.stack ?? e.message}`); process.exit(1); });
+// Run main() only when this file is the ENTRY POINT. Importing it — as the WP-2G reach proof does,
+// to read this loader's own exported contract path rather than re-deriving it — must NOT fire a
+// review: unguarded, the import built a throwaway git repo, gathered evidence and exited 2 inside
+// the importing process. The guard is copied from the sibling `reviewDiff.mjs`, which already had
+// it for exactly this reason.
+const invokedDirectly = process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url;
+if (invokedDirectly) {
+  main().catch((e) => { console.error(`[demo] FAILED: ${e.stack ?? e.message}`); process.exit(1); });
+}

@@ -28,12 +28,194 @@ import { spawn as nodeSpawn } from 'node:child_process';
 import fsDefault from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 import { makeSignedVerdict } from './envelope.mjs';
 
 export const CODEX_EXEC_FLAGS = Object.freeze([
   'exec', '--sandbox', 'read-only', '--skip-git-repo-check', '--ignore-user-config', '--json',
 ]);
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// CODEX'S PERMANENT OPERATING CONTRACT — the ONE loader-and-validator the LIVE route uses.
+//
+// WP-2G. Before this existed, the four live loaders (tower-loop/reviewDiff.mjs, mergeCheck.mjs,
+// watcher.mjs, demo-merge-review.mjs) each held their own `path.join(... 'Builds',
+// 'BUILD-010-fusion-tower', ...)` expression and did a BARE readFileSync with ZERO frontmatter
+// validation. Two consequences, both real:
+//   · six independent path expressions to keep in step by hand — and one of them going stale is
+//     silent, because a review still runs, just under different bytes; and
+//   · UNRATIFIED content could run as law, which is the actual degradation risk. The ratification
+//     check existed only in RETIRED (tower-baton/src/qaSkill.js) and TEST-ONLY
+//     (review/productQaPrompt.mjs) code — i.e. nowhere that runs.
+//
+// This is deliberately NOT a new module, a registry, a precedence engine or a loader framework.
+// It is one exported function in the module every live route already imports (each of them
+// reaches this file through tower-loop/supervisorCodex.mjs), so the law arrives on the route
+// that is already live rather than a new route being built to reach the law.
+//
+// THE SENTINEL, not a hash literal. A pinned hash makes every wording edit a two-file edit, which
+// is exactly how pins go stale — review/test/tower-runtime.test.js carried a `tower-qa-skill@1`
+// pin against a shipped `version: 2` for weeks. The sentinel survives wording refinement while
+// still proving identity, and it is held HERE, outside the file it checks.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+const __adapterDir = path.dirname(fileURLToPath(import.meta.url));
+
+/** The durable home of Codex's operating law. Every live loader resolves it from HERE. */
+export const CODEX_CONTRACT_PATH = path.resolve(__adapterDir, 'prompts', 'tower-qa-skill.md');
+
+/**
+ * The APPROVED + `governs_live` reviewer-classification amendment. It is delivered WITH the
+ * contract on every live turn rather than copied into it: the amendment is Warwick-ratified and
+ * stays the single source of its own clauses. Until WP-2G it reached Codex only through
+ * productQaPrompt.mjs, which has no production caller.
+ */
+export const CODEX_CLASSIFICATION_PATH = path.resolve(__adapterDir, 'prompts', 'reviewer-classification-amendment.md');
+
+/** Held here, OUTSIDE the file it verifies. Its absence from the delivered bytes is fail-closed. */
+export const CODEX_CONTRACT_SENTINEL = 'F247-CODEX-CONTRACT-SENTINEL-1';
+
+const sha256 = (text) => createHash('sha256').update(String(text), 'utf8').digest('hex');
+
+/** Minimal leading-YAML frontmatter parse (key: value). Same shape as the two sibling loaders. */
+export function parseContractFrontmatter(text) {
+  const m = String(text ?? '').match(/^﻿?---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
+  if (!m) return { ok: false, fields: {} };
+  const fields = {};
+  for (const line of m[1].split(/\r?\n/)) {
+    const kv = line.match(/^\s*([A-Za-z_][A-Za-z0-9_-]*)\s*:\s*(.*)$/);
+    if (kv) fields[kv[1].toLowerCase()] = kv[2].trim().replace(/^["']|["']$/g, '');
+  }
+  return { ok: true, fields };
+}
+
+const isTrue = (v) => /^true$/i.test(String(v ?? '').trim());
+
+/**
+ * Is this governing text ratified? The rule is deliberately IDENTICAL to the two loaders that
+ * already existed (tower-baton/src/qaSkill.js and review/productQaPrompt.mjs) rather than a new,
+ * stricter one — one semantics for "ratified" across the estate, and the flip Warwick makes is
+ * the same flip everywhere.
+ */
+export function isContractRatified(fields = {}) {
+  return isTrue(fields.governs_live) || isTrue(fields.standing_use_ratified) || fields.status === 'approved';
+}
+
+/**
+ * Load + validate + fingerprint the governing text(s) the external reviewer will receive.
+ *
+ * Returns `{ ok, error, text, fingerprint, version, status, ratified, contractPath,
+ *            classificationVersion, classificationFingerprint }`.
+ *
+ * FAIL-CLOSED on every one of: absent file · unreadable · empty · no frontmatter block ·
+ * MISSING SENTINEL · NOT RATIFIED. `requireRatified` exists only so a test can exercise the
+ * unratified branch explicitly; the live callers never pass it.
+ *
+ * `text` is the composed delivery: the contract, then the ratified classification amendment.
+ * `fingerprint` is the sha256 of THAT composed string — i.e. of the bytes a caller is about to
+ * hand to the reviewer, not of some file it read earlier and might no longer be sending.
+ */
+export function loadCodexContract({
+  contractPath = CODEX_CONTRACT_PATH,
+  classificationPath = CODEX_CLASSIFICATION_PATH,
+  fs = fsDefault,
+  requireRatified = true,
+  requireClassification = true,
+} = {}) {
+  const fail = (error) => ({ ok: false, error, text: null, fingerprint: null, contractPath });
+
+  let raw;
+  try {
+    if (!fs.existsSync(contractPath)) return fail(`fail-closed: Codex operating contract not found at ${contractPath}`);
+    raw = fs.readFileSync(contractPath, 'utf8');
+  } catch (e) {
+    return fail(`fail-closed: Codex operating contract unreadable (${String(e?.message ?? e)})`);
+  }
+  if (!raw || !raw.trim()) return fail(`fail-closed: Codex operating contract is empty at ${contractPath}`);
+
+  const fm = parseContractFrontmatter(raw);
+  if (!fm.ok) return fail(`fail-closed: Codex operating contract has no frontmatter block at ${contractPath}`);
+  if (!raw.includes(CODEX_CONTRACT_SENTINEL)) {
+    return fail(`fail-closed: Codex operating contract at ${contractPath} does not carry the delivery sentinel `
+      + `"${CODEX_CONTRACT_SENTINEL}" — the loaded file is not this contract`);
+  }
+  const version = fm.fields.version ?? null;
+  const status = fm.fields.status ?? null;
+  const ratified = isContractRatified(fm.fields);
+  if (requireRatified && !ratified) {
+    return {
+      ...fail(`fail-closed: Codex operating contract is NOT RATIFIED (status="${status ?? '(none)'}", `
+        + `governs_live=${isTrue(fm.fields.governs_live)}, standing_use_ratified=${isTrue(fm.fields.standing_use_ratified)}) `
+        + '— an unauthorised governing prompt must never drive a review. Warwick ratifies it; nothing else does.'),
+      version, status, ratified: false,
+    };
+  }
+
+  // The APPROVED classification amendment travels with the contract. It carries the three-judgement
+  // classifier, the merge rule, R1, R2 and round economy — Warwick-approved, governs_live, and until
+  // now delivered only by a route with no production caller.
+  let classificationText = '';
+  let classificationVersion = null;
+  let classificationFingerprint = null;
+  if (requireClassification) {
+    let cRaw;
+    try {
+      if (!fs.existsSync(classificationPath)) return fail(`fail-closed: reviewer-classification-amendment not found at ${classificationPath}`);
+      cRaw = fs.readFileSync(classificationPath, 'utf8');
+    } catch (e) {
+      return fail(`fail-closed: reviewer-classification-amendment unreadable (${String(e?.message ?? e)})`);
+    }
+    if (!cRaw || !cRaw.trim()) return fail('fail-closed: reviewer-classification-amendment is empty');
+    const cfm = parseContractFrontmatter(cRaw);
+    if (!cfm.ok) return fail('fail-closed: reviewer-classification-amendment has no frontmatter block');
+    if (!isContractRatified(cfm.fields)) {
+      return fail(`fail-closed: reviewer-classification-amendment is NOT RATIFIED (status="${cfm.fields.status ?? '(none)'}", `
+        + `governs_live=${isTrue(cfm.fields.governs_live)}) — it is LIVE governance and must be ratified to drive a review`);
+    }
+    classificationText = cRaw;
+    classificationVersion = cfm.fields.version ?? null;
+    classificationFingerprint = sha256(cRaw);
+  }
+
+  const text = classificationText ? `${raw}\n\n${classificationText}` : raw;
+  return {
+    ok: true,
+    error: null,
+    text,
+    fingerprint: sha256(text),
+    contractFingerprint: sha256(raw),
+    version,
+    status,
+    ratified,
+    contractPath,
+    classificationPath: requireClassification ? classificationPath : null,
+    classificationVersion,
+    classificationFingerprint,
+    provenance: `tower-qa-skill@${version ?? '?'}(${status ?? '?'};ratified=${ratified})`
+      + (requireClassification ? `+classification-amendment@${classificationVersion ?? '?'}(APPROVED_LIVE)` : ''),
+  };
+}
+
+/**
+ * O-7's runtime half. Recompute the fingerprint over the bytes ABOUT TO BE DELIVERED and require
+ * them to be the bytes that were loaded and validated. This is what turns the fingerprint from
+ * decoration into a control: a hash compared against something.
+ *
+ * Returns null when they agree; a blocker string when they do not.
+ */
+export function assertDeliveredContract(deliveredText, contract) {
+  if (!contract?.ok) return `contract did not load: ${contract?.error ?? 'unknown'}`;
+  const delivered = sha256(deliveredText);
+  if (delivered !== contract.fingerprint) {
+    return `delivered contract bytes do not match the loaded+validated contract `
+      + `(delivered sha256=${delivered.slice(0, 12)}…, loaded sha256=${String(contract.fingerprint).slice(0, 12)}…)`;
+  }
+  if (!String(deliveredText ?? '').includes(CODEX_CONTRACT_SENTINEL)) {
+    return `delivered contract bytes do not carry the sentinel "${CODEX_CONTRACT_SENTINEL}"`;
+  }
+  return null;
+}
 
 // The SHARED reviewer result schema handed to `codex --output-schema` (STRICT mode: every object
 // closed, every property required) AND embedded in the Fable prompt in-band. PR-2b completion extends

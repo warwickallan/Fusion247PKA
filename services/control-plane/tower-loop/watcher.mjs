@@ -50,6 +50,7 @@ import {
 // is the code the REAL review round runs, not a parallel module nothing calls.
 import { loadOpenFindings, checkFindingDispositions, buildStagedInput } from './findings.mjs';
 import { runSupervisor, runMergeReview } from './supervisorCodex.mjs';
+import { CODEX_CONTRACT_PATH, loadCodexContract, assertDeliveredContract } from '../review/codexAdapter.mjs';
 import { gatherGitEvidence } from './gitEvidence.mjs';
 import { detectMergeClass } from './mergeClass.mjs';
 import { notify, composeMessage, composeLarryMessage } from './notify.mjs';
@@ -90,8 +91,8 @@ const PR_POST_FAIL_ESCALATE_AFTER = 3;
 // Repo root (…/services/control-plane/tower-loop → up 3) + the APPROVED Tower QA skill used
 // on merge-class turns. Both overridable via env for tests / relocated checkouts.
 const REPO_ROOT = process.env.TOWER_EVIDENCE_REPO_DIR || path.resolve(__dirname, '../../..');
-const QA_SKILL_PATH = process.env.TOWER_QA_SKILL_PATH
-  || path.join(REPO_ROOT, 'Builds', 'BUILD-010-fusion-tower', 'baton-mvp', 'tower-qa-skill.md');
+// WP-2G — resolved from codexAdapter.mjs's single exported constant, never re-derived here.
+export const QA_SKILL_PATH = process.env.TOWER_QA_SKILL_PATH || CODEX_CONTRACT_PATH;
 
 // Injectable dependencies (FIX 3 — deterministic CI doubles via env module paths). The
 // watcher resolves reviewer + git-evidence functions once at boot; a fake reviewer / fake
@@ -328,15 +329,17 @@ export async function pollRound(pool, deps) {
   return { targets: targets.length, ok, failed: errors.length, errors };
 }
 
-/** Load the APPROVED Tower QA skill (governing prompt) + its sha256 fingerprint. Fail-closed:
- *  if the skill file is missing, merge-class review is BLOCKED (never assume-and-pass). */
+/** Load + VALIDATE Codex's operating contract (governing prompt) and fingerprint the exact bytes
+ *  that will be delivered. Fail-closed: missing, empty, frontmatter-less, sentinel-less, NOT
+ *  RATIFIED, or a delivered/loaded hash mismatch all BLOCK merge-class review (never
+ *  assume-and-pass). Until WP-2G this was a bare readFileSync with no validation of any kind, so
+ *  unratified content could have run as law — the real degradation risk, not an absent file. */
 function loadQaSkill() {
-  try {
-    const text = fs.readFileSync(QA_SKILL_PATH, 'utf8');
-    return { text, fingerprint: sha256(text), path: QA_SKILL_PATH, ok: true };
-  } catch (e) {
-    return { text: null, fingerprint: null, path: QA_SKILL_PATH, ok: false, error: String(e?.message ?? e) };
-  }
+  const contract = loadCodexContract({ contractPath: QA_SKILL_PATH });
+  if (!contract.ok) return { text: null, fingerprint: null, path: QA_SKILL_PATH, ok: false, error: contract.error };
+  const provenanceError = assertDeliveredContract(contract.text, contract);
+  if (provenanceError) return { text: null, fingerprint: null, path: QA_SKILL_PATH, ok: false, error: provenanceError };
+  return { text: contract.text, fingerprint: contract.fingerprint, path: contract.contractPath, ok: true, provenance: contract.provenance };
 }
 
 function sha256(text) {

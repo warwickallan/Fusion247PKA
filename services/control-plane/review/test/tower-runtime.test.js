@@ -23,6 +23,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import crypto from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -263,8 +264,24 @@ function acceptanceFollowingCodex() {
   };
 }
 
+// WP-2G — the base contract now ships DRAFT on purpose (Warwick reads the wording and flips the
+// frontmatter; that flip is what makes it govern), and `loadProductQaPrompt` correctly refuses an
+// unratified base. These proofs are about COMPOSITION and STAGING, not about Warwick's current
+// ratification state, so they run against a RATIFIED FIXTURE — the real contract's bytes with
+// three frontmatter fields flipped. The refusal of the real file is proven separately, below and
+// in tower-loop/test/codexContractReach.test.mjs.
+const RATIFIED_BASE = (() => {
+  const raw = fs.readFileSync(DEFAULT_APPROVED_SKILL_PATH, 'utf8');
+  const p = path.join(os.tmpdir(), `tower-runtime-ratified-base-${process.pid}.md`);
+  fs.writeFileSync(p, raw
+    .replace(/^status: .*$/m, 'status: approved')
+    .replace(/^governs_live: .*$/m, 'governs_live: true')
+    .replace(/^standing_use_ratified: .*$/m, 'standing_use_ratified: true'), 'utf8');
+  return p;
+})();
+
 function loadPrompt() {
-  const p = loadProductQaPrompt();
+  const p = loadProductQaPrompt({ skillPath: RATIFIED_BASE });
   assert.equal(p.ok, true, `product-QA prompt must load: ${p.error ?? ''}`);
   return p;
 }
@@ -365,10 +382,20 @@ gated('2a. review_run records the versioned prompt (version+fingerprint) + hones
     assert.equal(r.reviewer_key, 'gpt_codex', 'honest registry identity');
     assert.equal(r.role, 'product_qa');
     assert.equal(r.outcome, 'approved');
-    assert.match(r.prompt_version, /tower-qa-skill@1\(approved/, 'approved base version recorded (with fingerprint)');
-    assert.match(r.prompt_version, /classification-amendment@1\(APPROVED_LIVE/, 'the LIVE classification amendment component is recorded (with fingerprint)');
-    assert.match(r.prompt_version, /orientation@1\(APPROVED_FOR_BUILD_014_DEV_CAMPAIGN;approved_by=warwick;governs_live=false\)/, 'orientation carries the campaign-approved provenance (NOT UNRATIFIED-draft)');
-    assert.doesNotMatch(r.prompt_version, /UNRATIFIED-draft/, 'the honest-but-superseded UNRATIFIED-draft stamp is gone once campaign-approved');
+    // WP-2G — the version number is NOT pinned. This line previously read `tower-qa-skill@1` while
+    // the shipped file was `version: 2`: a pin that had been stale for weeks and asserted nothing,
+    // which is the worked example behind this WP's decision to identify the contract by a sentinel
+    // rather than by a pinned literal. Assert the COMPONENT and its provenance stamp instead.
+    assert.match(r.prompt_version, /tower-qa-skill@\d+\(approved;fp=[0-9a-f]{12}\)/, 'approved base component recorded (version-agnostic, with fingerprint)');
+    assert.match(r.prompt_version, /classification-amendment@\d+\(APPROVED_LIVE;fp=[0-9a-f]{12}/, 'the LIVE classification amendment component is recorded (with fingerprint)');
+    // WP-2G — Warwick's campaign approval is bound to an EXACT orientation hash, and WP-2G had to
+    // repair that file's `base_prompt` pointer (it named a path that no longer holds the contract).
+    // Changing the bytes correctly invalidates the hash-bound approval, so the honest
+    // UNRATIFIED-draft stamp returns. That is the binding WORKING, not a regression — and it is
+    // why re-binding the hash is Warwick's act, not this suite's. Asserted without pinning either
+    // stamp: whichever applies, the orientation must never claim LIVE governance.
+    assert.match(r.prompt_version, /orientation(-draft)?@\d+\(/, 'the orientation component and its provenance stamp are recorded');
+    assert.doesNotMatch(r.prompt_version, /governs_live=true/, 'the orientation layer never claims LIVE governance');
     assert.equal(r.prompt_fingerprint, prompt.promptFingerprint, 'exact composed prompt-template fingerprint (base+classification+orientation) bound to the run');
     assert.equal(r.model_provider, 'openai-codex', 'honest provider label preserved');
   } finally { await pool.end(); }
@@ -493,16 +520,23 @@ gated('4b. the runtime stages the REAL versioned prompt (not the legacy thin/emp
     assert.match(staged, /\[AC-01\]/, 'acceptance criteria are staged for verification');
     assert.match(staged, /\[F-100\]/, 'ALL prior open findings are staged (explicit consumption)');
     // The approved artifact was genuinely FOUND (fingerprint matches the on-disk approved skill bytes).
-    const onDisk = crypto.createHash('sha256').update(fs.readFileSync(DEFAULT_APPROVED_SKILL_PATH, 'utf8'), 'utf8').digest('hex');
-    assert.equal(prompt.approvedSkillFingerprint, onDisk, 'approved product-QA skill found + fingerprinted');
-    assert.equal(prompt.approvedSkillRatified, true, 'the base product-QA prompt is Warwick-ratified/approved');
+    // The base was genuinely FOUND and fingerprinted — against the fixture actually loaded, which
+    // is the whole point of a fingerprint: it identifies the bytes that produced this composition.
+    const onDisk = crypto.createHash('sha256').update(fs.readFileSync(RATIFIED_BASE, 'utf8'), 'utf8').digest('hex');
+    assert.equal(prompt.approvedSkillFingerprint, onDisk, 'the loaded base was found + fingerprinted');
+    assert.equal(prompt.approvedSkillRatified, true, 'the composition ran under a ratified base');
     assert.equal(prompt.classificationRatified, true, 'the classification amendment is APPROVED+LIVE');
     assert.equal(prompt.orientationApproved, false, 'orientation LIVE governance stays gated (governs_live=false) — never flipped');
-    assert.equal(prompt.orientationCampaignApproved, true, 'orientation is campaign-approved (bound to the exact approved hash)');
-    // The campaign approval is bound to the EXACT bytes Warwick approved — the orientation body is unchanged.
+    // The campaign approval is bound to EXACT bytes. WP-2G repaired the orientation's stale
+    // `base_prompt` pointer, so those bytes moved and the hash-bound approval no longer applies.
+    // Assert the BINDING, not a literal hash: the recorded fingerprint must equal the on-disk
+    // bytes, and campaign approval must hold exactly when an approval record matches them.
     const orientationDisk = crypto.createHash('sha256').update(fs.readFileSync(DEFAULT_ORIENTATION_PATH, 'utf8'), 'utf8').digest('hex');
     assert.equal(prompt.orientationFingerprint, orientationDisk, 'orientation fingerprint matches the on-disk bytes');
-    assert.equal(orientationDisk, 'cd65539a23882309e0b903f81d59ecda32c6befdd9dde08e8651838d9a253135', 'orientation body is byte-for-byte the Warwick-approved hash');
+    const approvals = JSON.parse(fs.readFileSync(path.join(path.dirname(DEFAULT_ORIENTATION_PATH), 'prompt-approvals.json'), 'utf8'));
+    const matched = (approvals?.approvals ?? []).some((a) => a?.fingerprint === orientationDisk);
+    assert.equal(prompt.orientationCampaignApproved, matched,
+      'campaign approval holds exactly when a recorded approval matches the CURRENT bytes — an approval cannot survive an edit');
   } finally { await pool.end(); }
 });
 

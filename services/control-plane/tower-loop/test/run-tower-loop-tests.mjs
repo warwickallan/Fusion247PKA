@@ -250,6 +250,44 @@ async function main() {
     assert.equal(detectMergeClass({ kind: 'ordinary', larry_response: 'Done and merged.' }, { heuristic: false }).isMergeClass, false, 'heuristic off ⇒ ordinary');
   });
 
+  // WP-2G — THE CODEX CONTRACT REACH PROOF, run inside the suite CI actually executes.
+  //
+  // Why it is spawned rather than inlined: the assertions live in ONE file
+  // (test/codexContractReach.test.mjs) so they can also be run directly, on a machine with no
+  // native SQLite build, which is where the evidence for this WP was produced. Inlining them here
+  // would have made the only copy unrunnable outside a full store build.
+  //
+  // Why it is here rather than beside its own siblings: `reviewTooling.test.mjs` and
+  // `classifyBuild.test.mjs` in this very directory are executed by NO npm script and NO CI job.
+  // A reach test dropped beside them would be a green that proves nothing — the exact defect class
+  // this WP exists to kill. THIS runner is in control-plane-tests.yml, under the existing
+  // `services/control-plane/**` filter, so a change to the contract file fires it with no
+  // workflow change.
+  //
+  // The child's OWN counts are asserted, never its exit code: `# pass` must be non-zero and
+  // `# fail` must be zero, so a run that executed nothing cannot be read as a pass.
+  await test('WP-2G — the Codex contract reach proof executes and passes (spawned node:test)', async () => {
+    const reachFile = path.join(__dirname, 'codexContractReach.test.mjs');
+    assert.ok(fs.existsSync(reachFile), 'the reach proof file exists');
+    const child = spawn(process.execPath, ['--test', reachFile], {
+      cwd: LOOP_DIR, env: { ...process.env }, stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let out = ''; let err = '';
+    child.stdout.on('data', (d) => { out += d; });
+    child.stderr.on('data', (d) => { err += d; });
+    const code = await waitExit(child);
+    const num = (label) => {
+      const m = out.match(new RegExp(`^# ${label} (\\d+)$`, 'm'));
+      return m ? Number(m[1]) : null;
+    };
+    const pass = num('pass'); const fail = num('fail'); const total = num('tests');
+    assert.notEqual(total, null, `the child reported a test count (stderr: ${err.slice(0, 400)})`);
+    assert.ok(pass > 0, `the reach proof executed something (# pass = ${pass}) — zero executed is never a pass`);
+    assert.equal(fail, 0, `the reach proof had failures (# fail = ${fail}):\n${out.slice(-2000)}`);
+    assert.equal(code, 0, `the reach proof exited 0 (got ${code})`);
+    console.log(`[wp2g-reach] # tests ${total} # pass ${pass} # fail ${fail}`);
+  });
+
   // ══════════════════════════════════════════════════════════════════════════════
   // WO-OR-22 — the PR-comment ⇄ Tower seam (W1–W8).
   //

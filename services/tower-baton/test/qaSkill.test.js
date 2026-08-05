@@ -4,12 +4,17 @@ import crypto from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { loadQaSkill, assertStandingStartupAllowed } from '../src/qaSkill.js';
+import fs from 'node:fs';
+
+import { loadQaSkill, assertStandingStartupAllowed, parseFrontmatter } from '../src/qaSkill.js';
 import { writeTmp, approvedSkill } from '../test-helpers/fakes.js';
 
 const SERVICE_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const REPO_ROOT = path.resolve(SERVICE_DIR, '..', '..');
-const SHIPPED_SKILL = path.join(REPO_ROOT, 'Builds', 'BUILD-010-fusion-tower', 'baton-mvp', 'tower-qa-skill.md');
+// WP-2G — the governing contract left `Builds/**` (a build record) for its durable runtime home
+// beside the two other governing texts. This test is the one place in the estate that asserts the
+// SHIPPED file, so a stale constant here would silently assert nothing.
+const SHIPPED_SKILL = path.join(REPO_ROOT, 'services', 'control-plane', 'review', 'prompts', 'tower-qa-skill.md');
 
 test('loadQaSkill — loads approved skill + records SHA-256 fingerprint', () => {
   const text = approvedSkill(2);
@@ -61,13 +66,41 @@ test('loadQaSkill — provisional WITH proof_run_authorised loads (proof gate)',
   assert.equal(r.version, '3');
 });
 
-test('loadQaSkill — the real shipped skill is ratified for standing use', () => {
+// The shipped governing contract, asserted WITHOUT pinning a ratification state.
+//
+// The previous version of this test asserted `status === 'approved'` and
+// `standingUseRatified === true` against the shipped file. That was true of the BUILD-010 file and
+// is NOT true of the WP-2G rewrite, which ships DRAFT on purpose: Warwick reads the wording and
+// flips the frontmatter, and that flip is what makes it govern. Re-pinning either state here just
+// moves the booby trap — the test would go red the day he ratifies it, which is precisely the
+// stale-pin failure this WP was raised over (review/test/tower-runtime.test.js carried a
+// `tower-qa-skill@1` pin against a shipped `version: 2`).
+//
+// So assert the INVARIANT instead: the shipped file exists, parses, carries a version, and the
+// loader's runnable verdict AGREES with the file's own frontmatter. That holds before and after
+// ratification, and it still fails on the things that actually matter — a moved file, a deleted
+// frontmatter block, or a loader that stops honouring the declared state.
+test('loadQaSkill — the real shipped contract loads, and the verdict matches its own frontmatter', () => {
+  assert.ok(fs.existsSync(SHIPPED_SKILL), `the shipped governing contract must exist at ${SHIPPED_SKILL}`);
+  const raw = fs.readFileSync(SHIPPED_SKILL, 'utf8');
+  const fm = parseFrontmatter(raw);
+  assert.equal(fm.ok, true, 'the shipped contract has a frontmatter block');
+  assert.ok(fm.fields.version, 'the shipped contract declares a version');
+
+  const declaredStanding = /^true$/i.test(String(fm.fields.standing_use_ratified ?? ''));
+  const declaredProof = /^true$/i.test(String(fm.fields.proof_run_authorised ?? ''));
+  const declaredRunnable = declaredStanding || declaredProof || fm.fields.status === 'approved';
+
   const r = loadQaSkill({ path: SHIPPED_SKILL });
-  assert.equal(r.ok, true, r.error ?? '');
-  assert.equal(r.status, 'approved', 'shipped skill is approved');
-  assert.equal(r.standingUseRatified, true, 'standing use IS ratified');
-  assert.equal(r.proofRunAuthorised, false, 'separately-authorised bounded proof run no longer required');
-  assert.ok(r.version);
+  assert.equal(r.version, fm.fields.version, 'the loader reads the declared version');
+  assert.equal(r.standingUseRatified, declaredStanding, 'the loader reads the declared standing-use flag');
+  assert.equal(r.ok, declaredRunnable,
+    `the loader's runnable verdict must follow the frontmatter (declared runnable=${declaredRunnable}, got ok=${r.ok}: ${r.error ?? 'ok'})`);
+  assert.equal(assertStandingStartupAllowed(r, { proofMode: false }).ok, declaredStanding,
+    'standing startup is allowed exactly when standing use is ratified — never on a draft');
+  // Visible in the run output, so a reader of CI can see WHICH state was in force that day.
+  console.log(`[qaSkill] shipped contract: version=${fm.fields.version} status=${fm.fields.status} `
+    + `standing_use_ratified=${declaredStanding} → loadable=${r.ok}`);
 });
 
 // ── STANDING-STARTUP GATE (pure) — assertStandingStartupAllowed ────────────────

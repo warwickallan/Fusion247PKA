@@ -48,10 +48,16 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { gatherGitEvidence } from './gitEvidence.mjs';
 import { runMergeReview } from './supervisorCodex.mjs';
+import { CODEX_CONTRACT_PATH, loadCodexContract, assertDeliveredContract } from '../review/codexAdapter.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const QA_SKILL = process.env.TOWER_QA_SKILL_PATH
-  || path.join(__dirname, '..', '..', '..', 'Builds', 'BUILD-010-fusion-tower', 'baton-mvp', 'tower-qa-skill.md');
+// WP-2G — the contract's durable home is resolved from the ONE exported constant in
+// codexAdapter.mjs, not re-derived here. A private path expression per loader is how six of them
+// drifted apart; and it left the old home under `Builds/**`, which is a build record rather than a
+// runtime asset. Exported so a test can prove THIS loader points at the contract rather than
+// computing the path itself — a test that re-derives the path passes over a loader pointing
+// elsewhere, which is the exact failure this constant exists to make visible.
+export const QA_SKILL = process.env.TOWER_QA_SKILL_PATH || CODEX_CONTRACT_PATH;
 
 function arg(name, def = undefined) {
   const i = process.argv.indexOf(`--${name}`);
@@ -248,7 +254,19 @@ async function main() {
   console.log(`packet scoped_to=${JSON.stringify(packet.scoped_to)} wp_id=${JSON.stringify(packet.wp_id)}`);
 
   console.log(`\n── REAL CODEX MERGE REVIEW (Tower QA skill over the staged diff + the REAL claim) ──`);
-  const mr = await runMergeReview({ qaSkillText: fs.readFileSync(QA_SKILL, 'utf8'), packet, cwd: repoDir });
+  // The law is LOADED AND VALIDATED, not merely read. Absent, empty, frontmatter-less, missing the
+  // sentinel, or NOT RATIFIED all fail closed here — unratified content running as law is the real
+  // degradation risk, and until WP-2G this was a bare readFileSync with no check at all.
+  const contract = loadCodexContract({ contractPath: QA_SKILL });
+  if (!contract.ok) die(`codex operating contract refused: ${contract.error}`);
+  // O-7's runtime half: the fingerprint recorded is computed over the bytes ACTUALLY handed to the
+  // child, and compared against the bytes that were loaded and validated. A hash nobody compares
+  // is decoration; this one decides whether the call happens.
+  const mismatch = assertDeliveredContract(contract.text, contract);
+  if (mismatch) die(`codex operating contract provenance failed: ${mismatch}`);
+  console.log(`contract: ${contract.contractPath}`);
+  console.log(`contract provenance: ${contract.provenance} sha256=${contract.fingerprint}`);
+  const mr = await runMergeReview({ qaSkillText: contract.text, packet, cwd: repoDir });
   console.log(`ok=${mr.ok} blocked=${mr.blocked} model=${mr.modelId}`);
   if (mr.blocked) die(`codex review blocked: ${mr.blocker ?? 'unknown'}`, 3);
   console.log(JSON.stringify(mr.result, null, 2));
