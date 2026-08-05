@@ -146,10 +146,12 @@ async function notesFor(pool, turnId) {
 const CP_FNS = ['spawnSync', 'spawn', 'execFileSync', 'execFile', 'execSync', 'exec', 'fork'];
 const CP_CALL_RE = new RegExp(`(?<![\\w$.])(${CP_FNS.join('|')})\\(`, 'g');
 
-// Pinned literal, held HERE rather than derived from the sources it checks — 15 launch sites
-// under tower-loop as of WO-2026-08-03-02. A count that recomputed itself would agree with
-// anything and prove nothing.
-const TOWER_LOOP_CP_SITES = 15;
+// Pinned literal, held HERE rather than derived from the sources it checks — 17 launch sites
+// under tower-loop as of the #92/#93 reconciliation merge (15 from WO-2026-08-03-02, plus 2
+// legitimate additions from PR #93's fetchOpenPrs/detectCheckoutRepo work — both already
+// windowsHide:true — reviewed and acknowledged here per this test's own design). A count that
+// recomputed itself would agree with anything and prove nothing.
+const TOWER_LOOP_CP_SITES = 17;
 
 function jsFilesUnder(dir, out = []) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
