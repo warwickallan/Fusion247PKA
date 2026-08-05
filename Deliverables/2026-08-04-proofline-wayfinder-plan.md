@@ -916,6 +916,74 @@ His bar: *"a fresh Larry receives the genuinely newest packet, containing the cu
 
 ---
 
+## 14.13 Warwick's decisions, 2026-08-05 — the two handbacks DISCHARGED
+
+### D-A · The seventh start path: **make it REFUSE, do not delete**
+
+> *"Make the seventh legacy start path refuse clearly rather than deleting the protected source tree. The outcome is that legacy Tower cannot start, while the negative control remains intact."*
+
+**Accepted as recommended.** A guard at the legacy entrypoint that exits clearly. **`bin/tower-watch.js` is the real entrypoint** — the launcher's own header says invoking it is *"equivalently"* the same route — so **the guard belongs there**, not only in the `.ps1`. `services/tower-baton/src/clickupClient.js` — the negative control's target — is untouched. **Provable by attempt, which deletion never was.**
+
+### D-B · 🔐 GL-012 NAMED EXCEPTION — granted by Warwick, 2026-08-05
+
+> *"I also authorise the exact named exception needed to remove: `C:\.fusion247\run-tower-cp-watcher.ps1`, `C:\.fusion247\run-tower-watcher.ps1`."*
+
+**This is the only authority under which anything at the `C:\.fusion247` ROOT may be touched in this build.** Recorded here as the durable trail, because GL-012 §1 otherwise permits only `private/<project>/**` and no specialist has a legal route to these paths.
+
+**Scope of the exception — exactly two paths, delete only. It extends to nothing else:** not the root, not siblings, not parents, not any `.env`, not `.env keys\`, not `private/`.
+
+**Three conditions Warwick attached, all binding:**
+
+| # | Condition | How it is discharged |
+|---|---|---|
+| **C-1** | *"Confirm immediately before deletion that neither is used by the current Tower runtime"* | A live check **at deletion time**, not from this map. The live watcher (PID 31268) was started by `run-watcher.mjs` and its `WATCHER_ID` format proves neither `.ps1` launched it — **but that is evidence from 2026-08-05 and must be re-executed immediately before the delete** |
+| **C-2** | *"preserve `tower-baton.env`"* | Already hard prohibition #2. It is consumed by the **current** Codex-QA route (`mergeCheck.mjs:142-143`) and deleting it breaks TowerBot verdict delivery **silently** |
+| **C-3** | *"route the live machine-level removal through Mack where that is the correct contract boundary"* | **Confirms Keel's A4 refusal was right.** The work splits per §14.14 |
+
+⚠️ **`run-tower-watcher.ps1` still has unexplained provenance** — created 2026-08-02, the same date as the disabled task's daily trigger boundary. Warwick has authorised its removal, so it proceeds; **the unexplained origin is recorded rather than treated as resolved**, and C-1's live check is the safeguard.
+
+## 14.14 WP-2A split along the contract seams
+
+Keel's four class-A refusals were all correct. The work divides:
+
+| Owner | Scope | Why |
+|---|---|---|
+| **Keel** | The **refuse guard** at `bin/tower-watch.js` + `scripts/start-fusion-tower.ps1` · `git worktree remove C:\Fusion247PKA-tower` (verified to lose nothing — clean, pushed, no process holding it) · the **`Deliverables/**` documents** | Code and repo git are squarely inside its contract. `live_authority: none` restored |
+| **Mack** | The **five machine-level removals**: the Startup VBS · the two root `.ps1` files under D-B · `Unregister-ScheduledTask FusionTowerBatonWatcher` | Mack's contract owns supervisor registration; **deregistration is the same seam.** Warwick's C-3 confirms it |
+| **Larry** | **`Builds/BUILD-010-fusion-tower/**`** — `Runtime/recovery.md:58,81,90,91` and `Architecture/tower-host-runbook.md` §3–§4 | **Keel's critical rule 5 permanently bars `Builds/`, and a Work Order cannot override a contract.** These are build-fact corrections to documented resurrection procedures; Larry takes them as a bounded, reviewed, reversible exception under Rule 4 |
+
+**The acceptance property is amended** (it was falsified — §14.9a B1): *every enumerated start path, **now eight**, fails or refuses when attempted, while PID 31268 remains alive and its log advancing.* **Assert on absolute script path and `WATCHER_ID`, never a process-name match** (B3 — the tower-loop suite spawns children indistinguishable by name).
+
+---
+
+# 15. PHASE 3 — token and process forensics. **TEED UP, NOT STARTED**
+
+**Set by Warwick, 2026-08-05. Explicitly NOT to be built now:** *"do not start building it until Phase 2 is complete, merged and we have rotated successfully. The fresh Larry owns the route."*
+
+**Recorded here so it survives rotation. Any session that starts building this before Phase 2 has merged and rotated is disobeying the instruction that created it.**
+
+## 15.1 North Star — his words
+
+> *"After a phase closes, I can quickly understand where the time and tokens went, what caused avoidable rework, and what should change before the next phase."*
+
+## 15.2 The deliverable
+
+**A durable phase-close report in Google Drive**, produced as **the final job before Larry says it is safe to `/clear`.** It shows **how many tokens the completed phase used** and, **as far as the available evidence allows, where they went.**
+
+**Purpose, in his words:** *"not accounting for its own sake"* — it is to let him **spot obvious token-burning doom loops, disproportionate assurance work, repeated investigations, rework, unnecessary testing or other process smells without having to watch the build live.**
+
+## 15.3 Mandatory content for THIS phase's report
+
+**Every Work Order refusal**, and for each: **what was refused · why · whether the defect was in the ORDER or in the proposed WORK · how many amendments or reissues followed · and whether a repeatable pattern is emerging in Larry's dispatch quality or in the contracts themselves.**
+
+**Phase 2 has already produced material for this, and it is not flattering — which is the point.** Raw data at close: **three refusals across three Work Orders, every one class-A, every one a defect in MY order, not in the proposed work.** A candidate pattern is already visible — **`private_surface` mis-declared as the secrets root TWICE in one session** — and the honest report must say whether that is a Larry defect, a template defect, or a missing pre-dispatch check. **The report is not to be written to make the phase look tidy.**
+
+## 15.4 Route — the fresh Larry's to own, not this session's
+
+**Not designed here.** Two things worth noting so the next session does not rediscover them: token attribution must be honest about what the evidence **cannot** show, and the Google Drive write is an **outward action** needing its own consideration. **Warwick has not authorised a specific Drive location, and no mechanism for this exists — the regrowth cap applies to it exactly as to everything else.**
+
+---
+
 ## 14.11 Evidence status — §14.6 discharged
 
 All three investigations have landed and their findings are recorded above. **WP-2A, WP-2E and WP-2F may now be issued as Work Orders.** WP-2B(1) is issued and amended (`WO-2026-08-05-01`, Amendment 1) after a correct class-A `REFUSE`.
