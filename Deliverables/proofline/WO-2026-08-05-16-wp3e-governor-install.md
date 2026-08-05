@@ -72,3 +72,57 @@
 ## Read-back required before you act
 
 Restate: the outcome, your plan, what this order failed to settle, and what looks wrong with it. **Then hold.** **14 class-A defects across 16 orders in this build, every one a defect in Larry's envelope.** This order has been through Nolan's class-A check — **that is not a reason to challenge it less.**
+
+---
+
+# AMENDMENT 1 — 2026-08-05, Larry. Four defects upheld. All four questions answered
+
+## E-1 🔴 DEFECT 1 UPHELD — **Larry stated the CRLF trap BACKWARDS, and the direction is load-bearing**
+
+**The order said the working tree holds LF and the blob holds CRLF. It is the reverse.** Mack measured it decisively on `atomic-write.mjs`: the **blob holds LF**, the **working tree holds CRLF**, `core.autocrlf=true`, no root `.gitattributes`. Byte counts agree — blob 9652, worktree 9844, delta 192 = exactly the line count.
+
+**Why it matters and is not cosmetic:** as written, the rationale implies the worktree is the LF-clean source. **A `cp` from the worktree would install CRLF and fail byte-identity eight for eight** — the third time this trap would have bitten this build.
+
+**The instruction was right for the wrong reason.** Install by writing **blob bytes** — `git cat-file blob <head>:tools/governor/<f>.mjs` — exactly as Mack planned. **Corrected here rather than silently, because the reasoning is what a later reader inherits.**
+
+## E-2 DEFECT 2 UPHELD — the rollback file must have a REAL delta
+
+**Six of eight files have baseline == installed == head, so restoring one of those and proving it byte-exact is true whether or not the restore did anything.** A tautology dressed as a procedure — precisely the *"claim, not a procedure"* failure step 5 exists to prevent.
+
+**Step 5 is amended: the rollback MUST be executed on a file with a genuine delta. `footer.mjs` confirmed** — largest delta, and it carries the property under test.
+
+## E-3 DEFECT 3 — ruled, and it is a non-issue for correctness
+
+**The head carries ten governor modules; the install carries eight.** Larry has verified by execution: **no module among the installed eight imports either `continuity-derive.mjs` or `worktree-guard.mjs`.** The eight-file install is self-consistent.
+
+**Do not add them.** `footer.mjs:50` records that WO-OR-05 **deliberately** removed the `worktree-guard.mjs` import to keep a shelling-out module off the statusline path, so that absence is intentional. **Install the eight; report the two; decide nothing.**
+
+## E-4 DEFECT 4 — confirms candidate C-15, handled exactly as you propose
+
+**Report and leave.** Your reasoning is right: the stale line describes a file that **overrides the statusline** — the exact surface step 4 depends on — so it is not clerical. It is already C-15 in `Deliverables/BACKLOG.md`.
+
+## E-5 The write probe — ACKNOWLEDGED, and it was the right call
+
+**Returning `BLOCKED` on hearsay would have been a defect in its own right.** A 38-byte reversible write inside a surface explicitly granted, disclosed in full and cleaned up, is proportionate. **It also produced a durable estate fact: subagent writes to `~/.mypka/**` now succeed, so WO-07 Amendment 3's constraint is superseded.**
+
+**`INSTALLED-FROM.txt` handling approved as you propose** — correct the `RESYNCED`/`checkout:`/`code:` lines, and mark the write-refusal provenance line **superseded with the probe as evidence rather than deleting it.** History survives beside the correction.
+
+## E-6 Step 4 render route — **(a) then (b). Approved, with the surface widened for it**
+
+**You are right that step 4 as written cannot distinguish an honest `BLIND` (no telemetry for a worktree that never had a statusline refresh) from the `3b10c42` defect returning. That is a real defect in the order.**
+
+**`machine_surface` is widened, READ-ONLY, by one path: `C:\Users\Buggly\.mypka\governor\health\C--Fusion247PKA-build-020-trial\**`.** Render with that cwd. **Read only — write nothing there.**
+
+**(c) is correctly rejected and your reason is the right one:** manufacturing a sample to satisfy the test is fabricating the conditions of the measurement.
+
+**(b) is Warwick's and is NOT a precondition of your return.** Close the order on (a); his own session is the confirmation, and it is the surface where the defect actually surfaced last time.
+
+## E-7 Evidence file — **commit AND push `-u`**
+
+Recorded is not visible. Push your branch; Larry integrates. Lifecycle stays Larry's.
+
+## E-8 For the record — the pre-dispatch check MISSED all of this
+
+**This envelope passed a bounded class-A check before it reached you, and you then found four defects in it.** That is the miss rate, on the first and only use, and it is being reported to Warwick as evidence rather than buried. **It independently supports the ruling he had already made: moving detection does not repair generation.**
+
+**Proceed. No further read-back unless this amendment is itself defective.**
