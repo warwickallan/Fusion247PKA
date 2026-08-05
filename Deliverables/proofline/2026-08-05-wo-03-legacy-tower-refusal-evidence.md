@@ -12,14 +12,62 @@ This file exists because evidence that lives only in a session report dies with 
 
 ---
 
-## 0. What was NOT done, and why
+## 0. The worktree removal — done on the git side, and a near-miss worth reading
 
-**`git worktree remove C:\Fusion247PKA-tower` was NOT performed.** It is in the Work Order's scope and
-its preconditions were re-verified as safe (§5 below), but Larry placed a **sequencing hold** on that
-one step mid-execution: `C:\.fusion247\run-tower-cp-watcher.ps1` kills every matching watcher **before**
-it starts anything, so removing its start target ahead of WO-2026-08-05-04 would upgrade an accidental
-invocation from a *takeover* into a *silent Tower death*. The worktree still exists. Nothing was
-recreated or covered up.
+Larry held this step mid-execution (`C:\.fusion247\run-tower-cp-watcher.ps1` kills every matching
+watcher **before** it starts anything, so removing its start target first would have upgraded an
+accidental invocation from a *takeover* into a *silent Tower death*). The hold was released once
+WO-2026-08-05-04 deleted that script. Preconditions were then **re-verified at that moment**, not
+reused — all six unchanged.
+
+**`git worktree remove C:\Fusion247PKA-tower` executed and PARTIALLY SUCCEEDED.**
+
+```
+$ git -C C:/Fusion247PKA-wo-03 worktree remove C:/Fusion247PKA-tower
+error: failed to delete 'C:/Fusion247PKA-tower': Invalid argument
+rc=255
+```
+
+**Git's own bookkeeping completed.** The worktree is deregistered, the admin directory
+`C:/Fusion247PKA/.git/worktrees/Fusion247PKA-tower` is gone, `git worktree prune --dry-run` reports
+nothing dangling, the branch survives at `3c08e45` locally and on `origin`, and the three shared-`.git`
+stashes are still three. That is the outcome the Work Order asked for, and the dangling-admin-entry
+failure mode it warned about did **not** occur.
+
+**The filesystem delete stopped part-way**, leaving 462 files / 109 directories. Cause, found:
+
+```
+FullName : C:\Fusion247PKA-tower\services\control-plane\node_modules
+LinkType : Junction
+Target   : {C:\Fusion247PKA\services\control-plane\node_modules}
+```
+
+**That junction points into the LIVE tree** — the `node_modules` PID 31268 is running on right now
+(`better-sqlite3`, `pg`, and 14 more). The recursive delete reached the reparse point, returned
+`Invalid argument`, and stopped.
+
+**Checked immediately, and the news is good:** the live target is intact (16 entries, `better-sqlite3`
+and `pg` present) and the watcher is alive and polling. Nothing followed the junction.
+
+**This is the sharp reason not to "just delete the directory".** The Work Order said `git worktree
+remove` is *"NOT a directory delete"* and gave the dangling-admin-entry reason. The real hazard is
+worse: `rm -rf C:\Fusion247PKA-tower`, or any recursive delete that follows reparse points, would have
+deleted the **live watcher's** `node_modules` — native modules a running process cannot survive
+losing. The error that looks like a failure is what prevented that.
+
+**The residue was left in place deliberately; it is not mine to delete.** A recursive delete over a
+junction into the live runtime is the class of action `live_authority: none` and critical rule 3
+exclude, and this order authorised `git worktree remove`, not a directory delete. The files are inert
+and lose nothing — the content is `3c08e45`, contained in `origin/build-014/tower-recovery`.
+
+Recommended safe finish, for Larry's decision:
+
+1. `cmd /c rmdir "C:\Fusion247PKA-tower\services\control-plane\node_modules"` — `rmdir` on a junction
+   removes **the link only** and never touches its target. Confirm the live `node_modules` still has
+   its 16 entries *after* this.
+2. Only then remove what is left of `C:\Fusion247PKA-tower`.
+
+Do not reverse that order, and do not use a recursive delete for step 1.
 
 ## 1. Live runtime undisturbed — asserted at START and END
 
@@ -181,13 +229,39 @@ Re-verified at execution time rather than trusting the Work Order's paragraph:
 | Stashes (shared `.git`) | 3, unaffected — they live in the shared `.git`, not in this worktree |
 | Stale vs current | has `mergeCheck.mjs` + `run-watcher.mjs`, **no `reviewDiff.mjs`**; the current tree has all three |
 
-**Removal not performed — see §0.**
+Every one of these was re-run immediately before the removal and every one was unchanged.
+
+### After
+
+```
+$ git -C C:/Fusion247PKA-wo-03 worktree list | grep -i "PKA-tower"
+(no match — deregistered)
+
+$ ls -d C:/Fusion247PKA/.git/worktrees/Fusion247PKA-tower
+ls: cannot access ... : No such file or directory
+
+$ git worktree prune --dry-run --verbose
+(no output — nothing dangling)
+
+$ git rev-parse build-014/tower-recovery ; git rev-parse origin/build-014/tower-recovery
+3c08e450d3617da1de43f11f0c33f3c2a483036b
+3c08e450d3617da1de43f11f0c33f3c2a483036b
+
+$ git stash list   → 3 entries, identical before and after
+```
+
+**Filesystem residue: 462 files, 109 directories, 1 reparse point. Not deleted — see §0.**
 
 ## 7. Honest limits of this evidence
 
 - **Builder self-test evidence, not independent review.**
-- **The worktree removal is not done.** Re-verify §6 again at the moment it is released; the checks
-  above were true at 2026-08-05 ~00:20–00:30 UTC and a worktree is a mutable thing.
+- **The worktree removal is complete on the git side and incomplete on disk.** 462 files and one
+  junction remain at `C:\Fusion247PKA-tower`. Nothing is lost, but the directory is still there and
+  anyone re-reading it will find a tree that looks usable and is not.
+- **Mack's deletion of `C:\.fusion247\run-tower-cp-watcher.ps1` was NOT verified by me.** That path is
+  under `C:\.fusion247\`, this order's `private_surface` is `none`, and GL-012 denies it by default —
+  so the hold-release condition rests on Larry's statement and WO-2026-08-05-04's own evidence, not on
+  anything I observed. Stated because a reader could otherwise assume I checked.
 - **A real logon is the only complete proof that no start path survives.** Nothing here tests the
   Startup folder or the scheduled task — those are WO-2026-08-05-04's ground, and restart testing is
   explicitly not required (map §14.0b). Recorded as the residual unproven step, not skipped.
