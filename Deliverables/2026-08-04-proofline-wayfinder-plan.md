@@ -1056,6 +1056,33 @@ Not a smoke test. **Five properties, all in one run:**
 
 ---
 
+## 14.16 WP-2A — DELIVERED and integrated. Status by gate, no completion claim
+
+**Larry may not declare this complete.** Veritas rules on the exact integrated head. What follows is what was delivered and evidenced.
+
+| Piece | Owner | State | Head |
+|---|---|---|---|
+| Refuse guard, both entrypoints, exit 78 | Keel | delivered, `158` tower-baton tests, 0 fail | `5bf0c42` |
+| Four machine-level removals | Mack | delivered; `schtasks /Run` → *"cannot find the file specified"*, **not** *"disabled"* | `7682114` |
+| `Builds/**` resurrection procedures closed | **Larry** | delivered | `9e721e3` |
+| Worktree deregistration + residue | Keel / Mack | delivered | `65bbf2b`, `cf40bd9` |
+
+**S-2 composes from THREE evidence files and none may be read as the whole claim** — each carries a boundary statement naming what it does not cover.
+
+### Two findings from this WP that outlive it
+
+**The junction.** `C:\Fusion247PKA-tower\services\control-plane\node_modules` was a **junction into the LIVE tree** — the `node_modules` PID 31268 runs on, holding `better-sqlite3` and `pg`. **Any recursive delete following reparse points would have killed the runtime this phase exists to protect.** `git worktree remove`'s `Invalid argument` failure is what prevented it. **The map's "not a directory delete" instruction was right for a far weaker reason (a dangling admin entry) than the one that mattered.**
+
+**And the enumeration hazard is the sharper lesson: `Get-ChildItem -Recurse` can follow junctions** — so a scan can enumerate the *live* tree while believing it is enumerating the stale one, and report *"safe to delete"* **from inside the thing it is protecting.** Mack replaced it with a stack walk that refuses to descend into a reparse point, and **mutation-tested that containment on a decoy** rather than trusting the documentation.
+
+**Proof by arithmetic, not exit code.** After `rmdir`: directories **109 → 108**, files **462 → 462**. Exactly one thing went and nothing went through the link — had `rmdir` followed the junction, the file count could not have held. **A zero exit code would have proven none of that.**
+
+### Residual, named not skipped
+
+A real interactive logon remains the only complete proof and is **not required** under §14.0b · `C:\.fusion247` stays **un-enumerable** under any grant · the `tower-ding.mjs` referenced there is **still uncovered by any investigation** · the `schtasks` / `Get-ScheduledTaskInfo` disagreement **reproduced live and is unexplained** — deletions were ordered so it could not affect the outcome · a **38-character literal** in a `$key` variable inside the deleted launcher was **never read and is now unrecoverable**; the live Codex route's credentials are in `tower-baton.env`, intact.
+
+---
+
 ## 14.11 Evidence status — §14.6 discharged
 
 All three investigations have landed and their findings are recorded above. **WP-2A, WP-2E and WP-2F may now be issued as Work Orders.** WP-2B(1) is issued and amended (`WO-2026-08-05-01`, Amendment 1) after a correct class-A `REFUSE`.
