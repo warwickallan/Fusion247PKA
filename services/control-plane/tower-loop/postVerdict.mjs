@@ -84,7 +84,7 @@ export const ghCliWriter = {
       '--method', 'POST', `repos/${repo}/issues/${prNumber}/comments`, '-f', `body=${body}`,
     ]);
     return new Promise((resolve, reject) => {
-      execFile('gh', ['api', ...args], { maxBuffer: 8 * 1024 * 1024 }, (err, stdout, stderr) => {
+      execFile('gh', ['api', ...args], { maxBuffer: 8 * 1024 * 1024, windowsHide: true }, (err, stdout, stderr) => {
         if (err) return reject(new Error(`gh api POST comment failed: ${String(stderr || err.message).trim()}`));
         try {
           const j = JSON.parse(String(stdout ?? '').trim() || '{}');

@@ -193,7 +193,7 @@ export async function verifyCodexInvocable({ codexBin, spawn = nodeSpawn, timeou
     let out = ''; let err = ''; let done = false;
     const finish = (r) => { if (!done) { done = true; resolveP({ ...r, binPath }); } };
     let child;
-    try { child = spawn(binPath, ['--version'], { shell: false }); } catch (e) { return finish({ invocable: false, version: null, error: String(e?.message ?? e) }); }
+    try { child = spawn(binPath, ['--version'], { shell: false, windowsHide: true }); } catch (e) { return finish({ invocable: false, version: null, error: String(e?.message ?? e) }); }
     const timer = setTimeout(() => { try { child.kill(); } catch { /* ignore */ } finish({ invocable: false, version: null, error: 'version probe timed out' }); }, timeoutMs);
     child.stdout?.on('data', (d) => { out += d.toString(); });
     child.stderr?.on('data', (d) => { err += d.toString(); });
@@ -292,7 +292,7 @@ function runCodex({ codexBin, argv, cwd, spawn, timeoutMs, apiKey, prompt }) {
     // SANITISED child env — Telegram/ClickUp/DB secrets are stripped so the reviewer
     // process can never read them. The api key (if any) rides via env, never argv.
     const env = sanitizeCodexEnv(process.env, apiKey);
-    try { child = spawn(codexBin, argv, { cwd, shell: false, env }); }
+    try { child = spawn(codexBin, argv, { cwd, shell: false, env, windowsHide: true }); }
     catch (e) { return finish({ ok: false, code: -1, stderr: String(e?.message ?? e), stdout: '' }); }
     const timer = setTimeout(() => { try { child.kill(); } catch { /* ignore */ } finish({ ok: false, code: -2, stderr: `turn timed out after ${timeoutMs}ms`, stdout }); }, timeoutMs);
     child.stdout?.on('data', (d) => { stdout += d.toString(); });

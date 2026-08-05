@@ -93,7 +93,7 @@ export const ghCliReader = {
   async api(args) {
     assertReadOnlyArgs(args);
     return new Promise((resolve, reject) => {
-      execFile('gh', ['api', ...args], { maxBuffer: 32 * 1024 * 1024 }, (err, stdout, stderr) => {
+      execFile('gh', ['api', ...args], { maxBuffer: 32 * 1024 * 1024, windowsHide: true }, (err, stdout, stderr) => {
         if (err) return reject(new Error(`gh api ${args.join(' ')} failed: ${String(stderr || err.message).trim()}`));
         resolve(stdout);
       });

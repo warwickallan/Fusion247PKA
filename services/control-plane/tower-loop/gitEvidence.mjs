@@ -72,7 +72,7 @@ function run(cmd, args, { cwd, timeoutMs = DEFAULT_TIMEOUT_MS, spawn = nodeSpawn
     };
     let child;
     try {
-      child = spawn(cmd, args, { cwd, shell: false });
+      child = spawn(cmd, args, { cwd, shell: false, windowsHide: true });
     } catch (e) {
       return settle({ ok: false, code: -1, stderrOverride: String(e?.message ?? e) });
     }

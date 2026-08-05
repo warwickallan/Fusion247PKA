@@ -24,7 +24,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const QA_SKILL = process.env.TOWER_QA_SKILL_PATH
   || path.join(__dirname, '..', '..', '..', 'Builds', 'BUILD-010-fusion-tower', 'baton-mvp', 'tower-qa-skill.md');
 
-function git(cwd, args) { return execFileSync('git', args, { cwd, encoding: 'utf8' }); }
+function git(cwd, args) { return execFileSync('git', args, { cwd, encoding: 'utf8', windowsHide: true }); }
 
 function makeThrowawayRepo() {
   const dir = path.join(os.tmpdir(), `tower-demo-${randomUUID()}`);

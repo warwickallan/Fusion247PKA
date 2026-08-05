@@ -31,7 +31,12 @@ import os from 'node:os';
 import path from 'node:path';
 import assert from 'node:assert/strict';
 import { spawn, execFile } from 'node:child_process';
+import { EventEmitter } from 'node:events';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+// WO-2026-08-03-02 — the REAL supervisor invocation (the doubles below deliberately never
+// reach child_process, so they cannot evidence how the child is launched).
+import { runMergeReview as realRunMergeReview } from '../supervisorCodex.mjs';
+import { gatherGitEvidence } from '../gitEvidence.mjs';
 import { openDb } from '../db.mjs';
 import { applySchema, applyWatcherSchema, applyCommentSchema, applyPostSchema } from '../apply.mjs';
 import { seedPrompt } from '../seed.mjs';
@@ -96,6 +101,7 @@ function spawnWatcher(watcherId, extraEnv = {}) {
     // and silently operate on the real durable one.
     env: { ...process.env, ...DOUBLES_ENV, TOWER_SQLITE_PATH: DB_PATH, WATCHER_ID: watcherId, WATCHER_POLL_MS: '400', WATCHER_LEASE_SECONDS: '20', ...extraEnv },
     stdio: ['ignore', 'pipe', 'pipe'],
+    windowsHide: true,
   });
   const tag = `[${watcherId}]`;
   child.stdout.on('data', (d) => process.stdout.write(String(d).split('\n').filter(Boolean).map((l) => `${tag} ${l}\n`).join('')));
@@ -125,6 +131,79 @@ async function reviewsFor(pool, turnId) {
 }
 async function notesFor(pool, turnId) {
   return (await pool.query(`select reason, state from tower.notification where turn_id = ? order by created_at asc, rowid asc`, [turnId])).rows;
+}
+
+// ── WO-2026-08-03-02 — child_process launch-site scanner (test-only) ──────────
+//
+// Ships nothing: it runs only in this suite, adds no dependency and touches no runtime path.
+// It exists because "I fixed the ones I found" has no completion condition — the bare-spawn
+// list this Work Order arrived with was itself wrong, in both directions. Enumeration is what
+// closes a class.
+//
+// `exec` is matched only as a BARE identifier: `RegExp#exec` and `db.raw.exec` are property
+// calls, and the lookbehind drops them. A `(` must follow the name IMMEDIATELY, which is what
+// keeps JSDoc prose ("injectable spawn (tests)") out of the count.
+const CP_FNS = ['spawnSync', 'spawn', 'execFileSync', 'execFile', 'execSync', 'exec', 'fork'];
+const CP_CALL_RE = new RegExp(`(?<![\\w$.])(${CP_FNS.join('|')})\\(`, 'g');
+
+// Pinned literal, held HERE rather than derived from the sources it checks — 15 launch sites
+// under tower-loop as of WO-2026-08-03-02. A count that recomputed itself would agree with
+// anything and prove nothing.
+const TOWER_LOOP_CP_SITES = 15;
+
+function jsFilesUnder(dir, out = []) {
+  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    const p = path.join(dir, e.name);
+    if (e.isDirectory()) { if (e.name !== 'node_modules') jsFilesUnder(p, out); }
+    else if (/\.(mjs|js)$/.test(e.name)) out.push(p);
+  }
+  return out.sort();
+}
+
+/** Source text between a call's `(` and its matching `)`, or null if it cannot be read.
+ *  Strings AND comments are skipped: an apostrophe inside a comment ("the launcher's own")
+ *  otherwise reads as a string opener and swallows the rest of the file. That bug was real —
+ *  it hid a genuine site behind a silent "unparsed" on the first run of this scanner. */
+function cpArgSource(src, openIdx) {
+  let depth = 0, q = null, esc = false, cmt = null;
+  for (let i = openIdx; i < src.length; i += 1) {
+    const c = src[i];
+    if (cmt === 'line') { if (c === '\n') cmt = null; continue; }
+    if (cmt === 'block') { if (c === '*' && src[i + 1] === '/') { cmt = null; i += 1; } continue; }
+    if (q) {
+      if (esc) { esc = false; continue; }
+      if (c === '\\') { esc = true; continue; }
+      if (c === q) q = null;
+      continue;
+    }
+    if (c === '/' && src[i + 1] === '/') { cmt = 'line'; i += 1; continue; }
+    if (c === '/' && src[i + 1] === '*') { cmt = 'block'; i += 1; continue; }
+    if (c === "'" || c === '"' || c === '`') { q = c; continue; }
+    if (c === '(') depth += 1;
+    else if (c === ')') { depth -= 1; if (depth === 0) return src.slice(openIdx + 1, i); }
+  }
+  return null;
+}
+
+function scanChildProcessSites(files) {
+  const sites = [];
+  for (const file of files) {
+    const src = fs.readFileSync(file, 'utf8');
+    const starts = [0];
+    for (let i = 0; i < src.length; i += 1) if (src[i] === '\n') starts.push(i + 1);
+    const lineOf = (idx) => { let lo = 0, hi = starts.length - 1; while (lo < hi) { const m = (lo + hi + 1) >> 1; if (starts[m] <= idx) lo = m; else hi = m - 1; } return lo + 1; };
+    CP_CALL_RE.lastIndex = 0;
+    let m;
+    while ((m = CP_CALL_RE.exec(src)) !== null) {
+      const args = cpArgSource(src, m.index + m[1].length);
+      sites.push({
+        file, rel: path.relative(LOOP_DIR, file).replace(/\\/g, '/'), line: lineOf(m.index), fn: m[1],
+        parsed: args != null,
+        hidden: args != null && /windowsHide:\s*true/.test(args),
+      });
+    }
+  }
+  return sites;
 }
 
 // ── tiny harness (fail-on-0-subtests) ─────────────────────────────────────────
@@ -1043,6 +1122,7 @@ async function main() {
         cwd: LOOP_DIR,
         env: { ...process.env, GRAPH_OUT: graphOut, TOWER_FAKE_GH_FIXTURE: GH_FIXTURE, TOWER_PR_SEED: '' },
         stdio: ['ignore', 'pipe', 'pipe'],
+        windowsHide: true,
       });
       let out = ''; let err = '';
       c.stdout.on('data', (d) => { out += d; });
@@ -1425,6 +1505,7 @@ async function main() {
         // so if anything ran at import we would see its refusal or its side effects.
         env: { PATH: process.env.PATH, SystemRoot: process.env.SystemRoot, HOME: fakeHome, USERPROFILE: fakeHome },
         stdio: ['ignore', 'pipe', 'pipe'],
+        windowsHide: true,
       });
       let out = ''; let err = '';
       c.stdout.on('data', (d) => { out += d; });
@@ -1439,6 +1520,133 @@ async function main() {
     assert.ok(!fs.existsSync(path.join(fakeHome, '.mypka')),
       'and no log directory was created — the import had no filesystem side effect');
     fs.rmSync(fakeHome, { recursive: true, force: true });
+  });
+
+  // ── WO-2026-08-03-02 — no child process may pop a console window on Windows ──
+  //
+  // `child_process` defaults `windowsHide` to FALSE, so every bare launch flashes a console
+  // window. The watcher polls on a 1.5s turn loop and a 60s PR poll, launching git/gh/codex
+  // each time — which made Warwick's laptop unusable. These subtests prove the option is
+  // actually there, and W3/W4 close the CLASS rather than the instances: inspection has no
+  // completion condition, and this defect survived precisely because "the ones I found" was
+  // never the same set as "the ones there are".
+
+  await test('WH1 — gitEvidence launches EVERY git/gh child with windowsHide:true (injected spawn)', async () => {
+    const calls = [];
+    const fakeSpawn = (cmd, args, opts) => {
+      calls.push({ cmd, args, opts });
+      const c = new EventEmitter();
+      c.stdout = new EventEmitter();
+      c.stderr = new EventEmitter();
+      c.kill = () => {};
+      // rev-parse/merge-base must look like real SHAs or the gatherer fails closed early and
+      // the later call sites are never reached — a green over ground never walked.
+      const out = args.includes('rev-parse') ? `${'a'.repeat(40)}\n` : 'diff --git a/x b/x\n';
+      setImmediate(() => { c.stdout.emit('data', Buffer.from(out)); c.emit('close', 0); });
+      return c;
+    };
+    const ev = await gatherGitEvidence({ cwd: LOOP_DIR, repo: 'o/r', prNumber: 1, spawn: fakeSpawn });
+    assert.equal(ev.resolved, true, 'the gatherer must have walked its whole path, not bailed early');
+    assert.ok(calls.length >= 5, `expected every stage to launch a child, got ${calls.length}`);
+    assert.ok(calls.some((c) => c.cmd === 'git'), 'the git seam was exercised');
+    assert.ok(calls.some((c) => c.cmd === 'gh'), 'the gh seam was exercised');
+    const bare = calls.filter((c) => c.opts?.windowsHide !== true);
+    assert.equal(bare.length, 0, `these launches would pop a console window: ${bare.map((c) => c.cmd).join(', ')}`);
+  });
+
+  await test('WH2 — the Codex child (and its win32 taskkill reap) are launched windowsHide:true (injected spawn)', async () => {
+    // Reaching the spawn needs auth+binary to resolve. Both are pointed at THROWAWAY artefacts:
+    // an empty {} in a temp HOME and `node` itself as the "binary". No real credential is read —
+    // a test whose pass depended on ~/.codex/auth.json would be both machine-dependent and a
+    // credential dependency this role may not take.
+    const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'tower-codexspawn-'));
+    fs.mkdirSync(path.join(fakeHome, '.codex'), { recursive: true });
+    fs.writeFileSync(path.join(fakeHome, '.codex', 'auth.json'), '{}', 'utf8');
+    const saved = { UP: process.env.USERPROFILE, HOME: process.env.HOME, BIN: process.env.CODEX_BIN };
+    try {
+      process.env.USERPROFILE = fakeHome; process.env.HOME = fakeHome;
+      process.env.CODEX_BIN = process.execPath;
+
+      const mkChild = (settle) => {
+        const c = new EventEmitter();
+        c.stdout = new EventEmitter();
+        c.stderr = new EventEmitter();
+        c.stdin = { write() {}, end() {} };
+        c.pid = 424242;
+        c.kill = () => {};
+        if (settle) setImmediate(() => { c.stdout.emit('data', Buffer.from('{"ok":1}\n')); c.emit('close', 0); });
+        return c;
+      };
+
+      const calls = [];
+      await realRunMergeReview({
+        qaSkillText: 'skill', packet: {}, cwd: LOOP_DIR, timeoutMs: 5000,
+        spawn: (cmd, args, opts) => { calls.push({ cmd, opts }); return mkChild(true); },
+      });
+      assert.equal(calls.length, 1, `expected exactly one codex launch, got ${calls.length}`);
+      assert.equal(calls[0].opts?.windowsHide, true, 'the codex child would pop a console window');
+
+      // The taskkill reap only exists on the win32 timeout path. Drive a child that never
+      // closes so the timeout fires for real, rather than asserting the branch from its source.
+      const killCalls = [];
+      await realRunMergeReview({
+        qaSkillText: 'skill', packet: {}, cwd: LOOP_DIR, timeoutMs: 30,
+        spawn: (cmd, args, opts) => { killCalls.push({ cmd, opts }); return mkChild(false); },
+      });
+      if (process.platform === 'win32') {
+        const tk = killCalls.filter((c) => c.cmd === 'taskkill');
+        assert.equal(tk.length, 1, `the win32 timeout reap must have run, saw ${killCalls.map((c) => c.cmd).join(',')}`);
+        assert.equal(tk[0].opts?.windowsHide, true, 'the taskkill reap would pop a console window');
+      }
+      const bare = killCalls.filter((c) => c.opts?.windowsHide !== true);
+      assert.equal(bare.length, 0, `bare launches on the timeout path: ${bare.map((c) => c.cmd).join(', ')}`);
+    } finally {
+      if (saved.UP === undefined) delete process.env.USERPROFILE; else process.env.USERPROFILE = saved.UP;
+      if (saved.HOME === undefined) delete process.env.HOME; else process.env.HOME = saved.HOME;
+      if (saved.BIN === undefined) delete process.env.CODEX_BIN; else process.env.CODEX_BIN = saved.BIN;
+      fs.rmSync(fakeHome, { recursive: true, force: true });
+    }
+  });
+
+  await test(`WH3 — ENUMERATION: all ${TOWER_LOOP_CP_SITES} child_process call sites under tower-loop carry windowsHide:true`, () => {
+    const sites = scanChildProcessSites(jsFilesUnder(LOOP_DIR));
+    const unparsed = sites.filter((s) => !s.parsed);
+    assert.equal(unparsed.length, 0,
+      `the scanner could not read the arguments of: ${unparsed.map((s) => `${s.rel}:${s.line}`).join(', ')} — an unread site is NOT a covered site`);
+    const bare = sites.filter((s) => !s.hidden);
+    assert.equal(bare.length, 0, `bare child_process launches: ${bare.map((s) => `${s.rel}:${s.line} ${s.fn}`).join(', ')}`);
+    // Pinned to a literal held HERE, not derived from the sources it checks: a new launch site
+    // — even a correct one — must be a deliberate decision, not a silent addition.
+    assert.equal(sites.length, TOWER_LOOP_CP_SITES,
+      `child_process call-site count moved (found ${sites.length}, pinned ${TOWER_LOOP_CP_SITES}). Review the new/removed site, then update the literal:\n${sites.map((s) => `  ${s.rel}:${s.line} ${s.fn}`).join('\n')}`);
+  });
+
+  await test('WH4 — CONTROL: the enumeration scanner can actually SEE a bare site (it is not always-green)', () => {
+    const probe = fs.mkdtempSync(path.join(os.tmpdir(), 'tower-scanprobe-'));
+    try {
+      // Three shapes at once: a bare launch, a covered launch, and the two things that have
+      // already fooled a grep here — a JSDoc mention, and `.exec(` on a RegExp.
+      const f = path.join(probe, 'probe.mjs');
+      // The call text is ASSEMBLED so this file never contains a literal `<fn>(` adjacency —
+      // otherwise W3, which scans this very directory, would count these fixtures as real
+      // launch sites and the pinned total would be a fiction.
+      const call = (fn, rest) => `const x${fn} = ${fn}${'('}${rest}`;
+      fs.writeFileSync(f, [
+        '/** @param {Function} [args.spawn]  injectable spawn (tests). */',
+        call('spawn', "'git', ['x'], { cwd, shell: false });"),
+        call('spawnSync', "'gh', ['y'], { cwd, windowsHide: true });"),
+        'const m = SOME_RE.exec(text);',
+        "// the launcher's own apostrophe, which once broke argument reading",
+        call('execFile', "'gh', ['z'], { maxBuffer: 1 }, (e) => {});"),
+      ].join('\n'), 'utf8');
+      const sites = scanChildProcessSites([f]);
+      assert.equal(sites.length, 3, `expected exactly 3 real call sites, got ${sites.map((s) => `${s.line}:${s.fn}`).join(',')}`);
+      assert.ok(sites.every((s) => s.parsed), 'every site must be readable, apostrophe-in-comment included');
+      assert.deepEqual(sites.map((s) => s.hidden), [false, true, false],
+        'the scanner must call the bare ones bare and the covered one covered');
+    } finally {
+      fs.rmSync(probe, { recursive: true, force: true });
+    }
   });
 
   await pool.end();
