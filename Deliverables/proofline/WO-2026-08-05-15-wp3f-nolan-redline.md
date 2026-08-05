@@ -82,3 +82,70 @@
 ## Read-back required before you act
 
 Restate: the outcome, your plan, what this order failed to settle, and what looks wrong with it. **Then hold.** **13 of 15 orders in this build have been refused or held, every one class-A, every one a defect in Larry's envelope.** Challenge this one hardest of all — **including whether Larry has drafted the boundaries of his own oversight too loosely.**
+
+---
+
+# AMENDMENT 1 — 2026-08-05, Larry. All five defects upheld. All six questions answered
+
+**You found five class-A defects in the envelope that creates the class-A check. That is the single best piece of evidence produced in this phase, and it is going to Warwick as such.** Order 16, defect 14.
+
+## D-1 — A1 upheld. `contract_basis` per entry, and the real authority named
+
+**You are right that I stretched SOP-001 §7 across five surface entries, and right that it does not cover an SOP amendment.** Per-entry basis, corrected:
+
+| Surface entry | `contract_basis` |
+|---|---|
+| `Team/Nolan - HR/AGENTS.md` | **Warwick, 2026-08-05, verbatim: *"Update the four coherent routing points Pax identified: Nolan's contract, SOP-022, agent-index and Nolan's shim… I ratify governing contract changes."*** Direct personal authorisation of this exact file, with ratification reserved |
+| `Team Knowledge/SOPs/SOP-022-…md` | **Same clause — he names SOP-022 explicitly.** No inference from SOP-001 §7 is used or needed |
+| `Team/agent-index.md` | **Same clause — he names agent-index explicitly** |
+| `.claude/agents/nolan.md` | **Same clause — he names the shim explicitly** |
+| `Team/Larry - Orchestrator/AGENTS.md` **(R-5, new)** | **Larry's authorisation to DRAFT ONLY, as a proposal for Warwick's ratification.** See D-3 |
+| `Deliverables/proofline/EVIDENCE-…md` | Root `AGENTS.md` — `Deliverables/**` is not prohibited wholesale; an evidence file defines no governance and no acceptance |
+
+**SOP-001 §7 is struck as the basis entirely.** Your correction stands: it is an analogy, not coverage, and proceeding on it as coverage would be the exact stretch this check exists to catch.
+
+## D-2 — A2 upheld. The push instruction is REMOVED
+
+**Your contract is silent on git. An order cannot supply an authority a contract does not carry** (SOP-022:284), and amending your contract to add git would be scope creep dressed as convenience — the same defect that had to be fixed properly for Keel.
+
+**You write files in your worktree and commit nothing. Larry commits and pushes from your worktree.** The `§Git` section of this order is void.
+
+## D-3 — A3 upheld, and it is the material one. **R-5 is ADDED as a drafted proposal**
+
+**You are right that the four points are not coherent without `Team/Larry - Orchestrator/AGENTS.md`.** Changing SOP-022:352 while leaving `:103` — *"Larry preflights his own order before issuing it"* — puts two equal-authority specialist contracts in flat contradiction on who performs the class-A check. And **your point about `:610` is sharper than Pax's about the shim**: the routing cheatsheet routes you on *"hire / I need someone for / audit the team"* only, so the same decay argument applies with more force. **That SOP-001 §7 — the clause I wrongly cited as authority — is itself the document recording the 2026-07-31 incident where six specialists were correct in the index and invisible to routing, is not a coincidence you should have had to point out.**
+
+**R-5 is authorised as DRAFTED TEXT ONLY, inside the proposal, clearly marked as the one addition beyond Warwick's stated four, with your reasoning attached so he can strike it in one line.** Warwick approved *"the four coherent routing points"* — **coherence is the operative word, and you have established the four are not coherent alone.** He ratifies or strikes it; neither you nor I apply it.
+
+## D-4 — A4 upheld. The order is now a declared read-only input
+
+**`WO-2026-08-05-15` was committed to `build-020/phase3` at `afa1c7e`, after your worktree was cut. My error.** The envelope is amended: **`C:\Fusion247PKA-build-020-trial\Deliverables\proofline\WO-2026-08-05-15-wp3f-nolan-redline.md` is a DECLARED READ-ONLY INPUT.** Read this amended file from there. The instruction not to use the shared tree governs **writes**, and always did — the order failed to say so.
+
+## D-5 — A5 upheld. Read-only inventory named
+
+For quoting the three preserved boundaries: **root `CLAUDE.md` · `Team/Veritas - Internal Quality and Truth Assurance/AGENTS.md` · `Team/agent-index.md:85` · `services/control-plane/review/prompts/tower-qa-skill.md`.** **Read-only, quote-only, no writes.**
+
+## D-6 — the "verdict, not a veto" sentence: **AUTHORISED as the single permitted addition to R-2**
+
+**You were right not to slip it in.** It is required by Warwick's own "must NOT change" list — *"Preserve Larry's route and dispatch authority"* — so it is not an expansion of your remit but a **limit** on it. **It is the only addition permitted inside R-2. Everything else there is actor-only.**
+
+## D-7 — the recursion: **who class-A checks an order addressed to Nolan?**
+
+**Your sharpest question, and it has no clean answer. Here is the honest one, and it is deliberately not a mechanism.**
+
+**Orders addressed to Nolan keep the current route: Larry preflights, and the class-A risk is ACCEPTED and made VISIBLE rather than closed.** The order must say so on its face — a one-line declaration that it was not independently checked and why.
+
+**Why not close it properly:** a second checker is a new role, and a role is subject to the regrowth cap. Veritas is contractually barred from pre-inspection — that bar is *why* this gap existed and it stays. **So the choice is between an honest visible gap and a new mechanism, and Warwick has rejected the mechanism four times in this build.**
+
+**Nolan orders are rare. A rare, loud, declared gap is a better answer than a permanent apparatus to close it.** Record this reasoning in R-1 so a future reader does not "fix" it by reflex.
+
+## D-8 — the remaining three
+
+- **Scope of the check: every Work Order Larry issues to a specialist.** Not orders to Warwick, not read-back amendments that change no envelope field. **Amendments that change a surface, authority or acceptance field DO get a check** — that is where three of this build's defects lived.
+- **Model tier: your reasoning is accepted in full, including that it is inference rather than measurement — say so in the contract text.** Mid-tier, with your named escalation trigger. **And you are right that a shim cannot pin a model: Larry binds the tier at dispatch.** Record that division so it is not mistaken for enforcement.
+- **Measurement: your three observables, adopted exactly — verdict and correction count, the miss rate (whether the dispatched worker subsequently returned a class-A refusal), and elapsed time and tier.** **No new frontmatter field and no new document**, as you recommend. The miss rate is the only real efficacy measure and it is already observable in the next orders' read-backs.
+
+## D-9 — your self-binding is accepted and is now part of the acceptance
+
+**"I will add no remit beyond Warwick's verbatim shape, and I will flag every line where the text could be read as going beyond it."** **Adopted as a required output.** Give the reviewers a named list to attack rather than a document to re-derive.
+
+**Proceed. One further read-back only if this amendment is itself defective.**
