@@ -60,6 +60,13 @@ export async function runMergeCheck({
   larryClaim, cwd = DEFAULT_REPO_ROOT, qaSkillPath = DEFAULT_QA_SKILL,
   telegramToken = process.env.TELEGRAM_BOT_TOKEN, telegramChat = process.env.AUTHORISED_TELEGRAM_USER_ID,
   maxRounds = 3,
+  // WO-2026-08-05-TW3 — the SAME injectable `spawn` gatherGitEvidence itself already accepts,
+  // passed straight through. Narrow, symmetric plumbing: once Gap 2 made gatherGitEvidence
+  // prefer `gh` whenever `prNumber`+`repo` are given (which every real call here supplies), a
+  // test exercising the fail-closed evidence-unresolved branch needs a way to make that gh call
+  // fail deterministically, with no network, rather than reaching the real `gh` binary. Defaults
+  // to the real spawn exactly as before — production behaviour is unchanged.
+  spawn = undefined,
 } = {}) {
   // ── FIX F1 — ENFORCE explicit merge-run metadata at runtime (fail CLOSED). ──
   // classifyMergeRun throws unless build_ref + repo + PR + full head SHA are all present & valid.
@@ -104,7 +111,10 @@ export async function runMergeCheck({
   if (!haveLarry) await addMsg('larry', round, 'proposed', larryClaim);
 
   // ── REAL git evidence over base..head. ──
-  const ev = await gatherGitEvidence({ cwd, repo, baseSha, headSha, prNumber });
+  // `spawn: undefined` here falls through to gatherGitEvidence's own default (the real
+  // nodeSpawn) — passing it through unconditionally rather than only-when-set keeps this call
+  // symmetric with every other gatherGitEvidence call site in this estate.
+  const ev = await gatherGitEvidence({ cwd, repo, baseSha, headSha, prNumber, spawn });
   if (!ev.resolved) {
     await addMsg('gpt_codex', round, 'blocked', `git evidence unresolved — ${ev.blocker}`);
     // `?` is POSITIONAL — the Postgres original wrote `rounds=$2 ... where id=$1`, i.e. the

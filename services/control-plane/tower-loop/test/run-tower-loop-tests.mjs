@@ -151,13 +151,14 @@ async function notesFor(pool, turnId) {
 const CP_FNS = ['spawnSync', 'spawn', 'execFileSync', 'execFile', 'execSync', 'exec', 'fork'];
 const CP_CALL_RE = new RegExp(`(?<![\\w$.])(${CP_FNS.join('|')})\\(`, 'g');
 
-// Pinned literal, held HERE rather than derived from the sources it checks — 20 launch sites
-// under tower-loop as of the #92/#93/#94 reconciliation rebase (15 from WO-2026-08-03-02, plus 2
-// from PR #93's fetchOpenPrs/detectCheckoutRepo work, plus 3 from PR #94's WP-2E/WP-2G/M6 spawned
-// node:test subprocesses — the last 3 were bare and have had windowsHide:true added here as part
-// of the reconciliation, per this project's own established convention). A count that recomputed
-// itself would agree with anything and prove nothing.
-const TOWER_LOOP_CP_SITES = 20;
+// Pinned literal, held HERE rather than derived from the sources it checks — 25 launch sites
+// under tower-loop as of WO-2026-08-05-TW3 (20 from the #92/#93/#94 reconciliation rebase, plus 5
+// git-fixture-setup child launches in the new test/gitEvidenceGh.test.mjs, each windowsHide:true
+// from the moment it was written). A count that recomputed itself would agree with anything and
+// prove nothing. (Deliberately not naming the launcher function verbatim in this comment — this
+// scanner's own CALL-SITE regex matches inside prose too, and a literal mention here would count
+// itself as a 26th site.)
+const TOWER_LOOP_CP_SITES = 25;
 
 function jsFilesUnder(dir, out = []) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -1054,11 +1055,63 @@ async function main() {
   await test('D7 — the cap bounds a round, prefers PRs with live rounds, and says so rather than dropping silently', async () => {
     const many = Array.from({ length: 12 }, (_, i) => 9500 + i);
     const gh = makeFakeGh({ headSha: HEAD_CP, comments: [], openPrs: { [CP_REPO]: [...many, 9002] } });
-    const targets = await pollTargets(pool, { gh, limit: 5, detectRepo: async () => CP_REPO });
+    // WO-2026-08-05-TW3 (Gap 1) — `now: () => 0` pins the ONE rotating slot deterministically
+    // (tick 0 -> overflow[0]) so this test's fixed expectation still holds exactly. Real
+    // rotation across successive ticks is proven separately below (D-ROT1/D-ROT2).
+    const targets = await pollTargets(pool, { gh, limit: 5, detectRepo: async () => CP_REPO, now: () => 0 });
     assert.equal(targets.length, 5, 'the round is bounded — a repo full of open PRs is not a rate-limit incident');
     assert.equal(targets[0].prNumber, 9002, 'a PR with a LIVE round is ranked first and is never the one dropped');
-    // The remainder is newest-first, which is deterministic rather than incidental.
+    // 4 fixed-ranked (newest-first) + 1 rotating slot, deterministic at tick 0.
     assert.deepEqual(targets.slice(1).map((t) => t.prNumber), [9511, 9510, 9509, 9508]);
+  });
+
+  // ── WO-2026-08-05-TW3 (Gap 1) — ROTATION: no open PR is starved FOREVER just because more than
+  // `limit` are open. D7 above already proves the fixed-ranking + ONE rotating slot shape at a
+  // single tick; these two prove the property the fix actually exists for: bounded coverage
+  // across SUCCESSIVE rounds, and that in-flight rounds are never sacrificed to make room for it.
+
+  await test('D-ROT1 — 9 open PRs (more than `limit`=5): the TAIL PR is starved no longer — every overflow PR is polled within a BOUNDED, STATED number of rounds', async () => {
+    const nine = Array.from({ length: 9 }, (_, i) => 9700 + i);   // 9700..9708, newest-first = 9708..9700
+    const gh = makeFakeGh({ headSha: HEAD_CP, comments: [], openPrs: { [CP_REPO]: nine } });
+
+    // No in-flight round here, so rankedSlots = limit - PR_POLL_ROTATE_SLOTS = 4 (newest-first:
+    // 9708,9707,9706,9705) and the overflow is the remaining 5, oldest last: 9704,9703,9702,9701,
+    // 9700 — the TAIL PR, 9700, is the one the OLD static ranking would have dropped every round,
+    // forever, with no way back in.
+    const OVERFLOW_SIZE = 5;   // 9 total - 4 fixed-ranked
+    const ROTATE_SLOTS = 1;
+    const BOUND = Math.ceil(OVERFLOW_SIZE / ROTATE_SLOTS);   // = 5 rounds — the STATED bound
+
+    const seenTail = [];
+    const unionSeen = new Set();
+    for (let round = 0; round < BOUND; round += 1) {
+      // `now` steps by exactly PR_POLL_MS per round — the SAME cadence runWatcher's own
+      // `nextPrPollAt` gate advances by in production, so this is genuinely "successive rounds",
+      // not an arbitrary sequence of `now` values chosen to make the test pass.
+      const targets = await pollTargets(pool, { gh, limit: 5, detectRepo: async () => CP_REPO, now: () => round * 60000 });
+      assert.equal(targets.length, 5, `round ${round}: the cap is still real rate-limit protection`);
+      for (const t of targets) unionSeen.add(t.prNumber);
+      if (targets.some((t) => t.prNumber === 9700)) seenTail.push(round);
+    }
+
+    assert.ok(seenTail.length > 0,
+      `the tail PR (9700, the one furthest below the old fixed cutoff) was polled at least once within ${BOUND} rounds — rounds it appeared in: ${JSON.stringify(seenTail)}`);
+    // The stronger property the WO actually asks for: not just the single tail PR, but EVERY
+    // open PR — the whole overflow set, not merely its oldest member — reachable within the bound.
+    for (const pr of nine) {
+      assert.ok(unionSeen.has(pr), `PR #${pr} was never polled across ${BOUND} successive rounds (union: ${JSON.stringify([...unionSeen])})`);
+    }
+  });
+
+  await test('D-ROT2 — CONTROL: an in-flight round is NEVER sacrificed for a rotating slot, across every rotating round', async () => {
+    // Same 9-PR overflow shape as D-ROT1, but one of them (9002) has a LIVE round. It must be
+    // fixed-ranked (never the one that rotates in and out) in EVERY round, not just the first.
+    const eight = Array.from({ length: 8 }, (_, i) => 9750 + i);
+    const gh = makeFakeGh({ headSha: HEAD_CP, comments: [], openPrs: { [CP_REPO]: [...eight, 9002] } });
+    for (let round = 0; round < 6; round += 1) {
+      const targets = await pollTargets(pool, { gh, limit: 5, detectRepo: async () => CP_REPO, now: () => round * 60000 });
+      assert.equal(targets[0].prNumber, 9002, `round ${round}: the in-flight PR must still be ranked first, never rotated out`);
+    }
   });
 
   // ── TOWER_PR_REPOS — the FOURTH source, added on top of PR #93's three (Warwick's instruction:
@@ -1102,7 +1155,8 @@ async function main() {
         headSha: HEAD_CP, comments: [],
         openPrs: { [CP_REPO]: [...manyHere, 9002], [other]: manyThere },
       });
-      const targets = await pollTargets(pool, { gh, limit: 5, detectRepo: async () => CP_REPO });
+      // `now: () => 0` — same determinism pin as D7, so the rotating slot's pick is fixed.
+      const targets = await pollTargets(pool, { gh, limit: 5, detectRepo: async () => CP_REPO, now: () => 0 });
       assert.equal(targets.length, 5, 'still ONE cap of 5 across BOTH repos combined — not 5 per repo');
       assert.equal(targets[0].repo, CP_REPO);
       assert.equal(targets[0].prNumber, 9002, 'the live-round PR still ranks first regardless of which source added the rest');
@@ -1655,27 +1709,59 @@ async function main() {
   // completion condition, and this defect survived precisely because "the ones I found" was
   // never the same set as "the ones there are".
 
-  await test('WH1 — gitEvidence launches EVERY git/gh child with windowsHide:true (injected spawn)', async () => {
-    const calls = [];
-    const fakeSpawn = (cmd, args, opts) => {
-      calls.push({ cmd, args, opts });
-      const c = new EventEmitter();
-      c.stdout = new EventEmitter();
-      c.stderr = new EventEmitter();
-      c.kill = () => {};
-      // rev-parse/merge-base must look like real SHAs or the gatherer fails closed early and
-      // the later call sites are never reached — a green over ground never walked.
-      const out = args.includes('rev-parse') ? `${'a'.repeat(40)}\n` : 'diff --git a/x b/x\n';
-      setImmediate(() => { c.stdout.emit('data', Buffer.from(out)); c.emit('close', 0); });
-      return c;
-    };
-    const ev = await gatherGitEvidence({ cwd: LOOP_DIR, repo: 'o/r', prNumber: 1, spawn: fakeSpawn });
-    assert.equal(ev.resolved, true, 'the gatherer must have walked its whole path, not bailed early');
-    assert.ok(calls.length >= 5, `expected every stage to launch a child, got ${calls.length}`);
-    assert.ok(calls.some((c) => c.cmd === 'git'), 'the git seam was exercised');
-    assert.ok(calls.some((c) => c.cmd === 'gh'), 'the gh seam was exercised');
-    const bare = calls.filter((c) => c.opts?.windowsHide !== true);
-    assert.equal(bare.length, 0, `these launches would pop a console window: ${bare.map((c) => c.cmd).join(', ')}`);
+  await test('WH1 — gitEvidence launches EVERY git/gh child with windowsHide:true (injected spawn), on BOTH the gh-sourced and the local-git mechanism', async () => {
+    // WO-2026-08-05-TW3 (Gap 2) rewrote this: `prNumber`+`repo` present now PREFERS the
+    // gh-sourced mechanism, which never touches local git at all — so a single call exercising
+    // "both seams" is no longer the right shape. Two calls, one per mechanism, each checked
+    // against what it actually launches.
+    function makeFakeSpawn() {
+      const calls = [];
+      const fn = (cmd, args, opts) => {
+        calls.push({ cmd, args: [...args], opts });
+        const c = new EventEmitter();
+        c.stdout = new EventEmitter();
+        c.stderr = new EventEmitter();
+        c.kill = () => {};
+        setImmediate(() => {
+          if (cmd === 'git' && args.includes('rev-parse')) { c.stdout.emit('data', Buffer.from(`${'a'.repeat(40)}\n`)); return c.emit('close', 0); }
+          if (cmd === 'git') { c.stdout.emit('data', Buffer.from('diff --git a/x b/x\n')); return c.emit('close', 0); }
+          if (cmd === 'gh' && args[0] === 'api') {
+            c.stdout.emit('data', Buffer.from(`${JSON.stringify({ head: 'a'.repeat(40), base: 'b'.repeat(40) })}\n`));
+            return c.emit('close', 0);
+          }
+          if (cmd === 'gh' && args[0] === 'pr' && args[1] === 'diff') {
+            c.stdout.emit('data', Buffer.from(args.includes('--name-only') ? 'x.mjs\n' : 'diff --git a/x b/x\n'));
+            return c.emit('close', 0);
+          }
+          if (cmd === 'gh' && args[0] === 'pr' && args[1] === 'checks') {
+            c.stdout.emit('data', Buffer.from('some-check pass\n'));
+            return c.emit('close', 0);
+          }
+          c.emit('close', 0);
+        });
+        return c;
+      };
+      fn.calls = calls;
+      return fn;
+    }
+
+    // Mechanism 1: gh-sourced (prNumber + repo — the production PR-poll shape).
+    const ghSpawn = makeFakeSpawn();
+    const ghEv = await gatherGitEvidence({ cwd: LOOP_DIR, repo: 'o/r', prNumber: 1, spawn: ghSpawn });
+    assert.equal(ghEv.resolved, true, 'the gh-sourced mechanism must have walked its whole route, not bailed early');
+    assert.ok(ghSpawn.calls.length >= 4, `expected the gh seam exercised at least 4 times (pulls, diff --name-only, diff, checks), got ${ghSpawn.calls.length}`);
+    assert.ok(ghSpawn.calls.every((c) => c.cmd === 'gh'), `the gh-sourced mechanism must never fall back to local git: ${ghSpawn.calls.map((c) => c.cmd).join(', ')}`);
+    const ghBare = ghSpawn.calls.filter((c) => c.opts?.windowsHide !== true);
+    assert.equal(ghBare.length, 0, `these gh-sourced launches would pop a console window: ${ghBare.map((c) => c.cmd).join(', ')}`);
+
+    // Mechanism 2: local-git (no prNumber — the local/dev fallback, e.g. reviewDiff.mjs).
+    const localSpawn = makeFakeSpawn();
+    const localEv = await gatherGitEvidence({ cwd: LOOP_DIR, spawn: localSpawn });
+    assert.equal(localEv.resolved, true, 'the local-git mechanism must have walked its whole route');
+    assert.ok(localSpawn.calls.some((c) => c.cmd === 'git'), 'the local git seam was exercised');
+    assert.ok(!localSpawn.calls.some((c) => c.cmd === 'gh'), 'no prNumber ⇒ no CI-checks gh call either, unchanged from before this WO');
+    const localBare = localSpawn.calls.filter((c) => c.opts?.windowsHide !== true);
+    assert.equal(localBare.length, 0, `these local-git launches would pop a console window: ${localBare.map((c) => c.cmd).join(', ')}`);
   });
 
   await test('WH2 — the Codex child (and its win32 taskkill reap) are launched windowsHide:true (injected spawn)', async () => {
@@ -1790,6 +1876,24 @@ async function main() {
   // A directory that is NOT a git repository, so gatherGitEvidence fails CLOSED — the real
   // offline route into the evidence-unresolved branch. No network, no `gh` auth, no Codex.
   const NO_REPO_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'tower-not-a-repo-'));
+  // WO-2026-08-05-TW3 (Gap 2) — `NO_REPO_DIR` alone no longer forces the evidence-unresolved
+  // branch below: gatherGitEvidence now PREFERS the gh-sourced mechanism whenever `prNumber`+
+  // `repo` are given (which every M2/M3 call does), and that mechanism never touches `cwd` at
+  // all. Restoring this section's own "No network, no gh auth" guarantee needs the gh call
+  // itself to fail deterministically, injected through mergeCheck.mjs's new `spawn` passthrough
+  // (the same seam gatherGitEvidence itself already accepted) rather than left to whatever this
+  // machine's real `gh` happens to do.
+  const failClosedGhSpawn = (cmd, args) => {
+    const c = new EventEmitter();
+    c.stdout = new EventEmitter();
+    c.stderr = new EventEmitter();
+    c.kill = () => {};
+    setImmediate(() => {
+      c.stderr.emit('data', Buffer.from(`SIMULATED — no network in this suite: ${cmd} ${args.join(' ')}\n`));
+      c.emit('close', 1);
+    });
+    return c;
+  };
 
   await test('M1 — END TO END, fail-closed: an invalid build_ref writes a `blocked` run and its message to the SQLite store, and spends no Codex', async () => {
     const out = await runMergeCheck({
@@ -1835,7 +1939,8 @@ async function main() {
     const out = await runMergeCheck({
       pool, repo: 'warwickallan/Fusion247PKA', prNumber: 7002, headSha: MC_HEAD,
       buildRef: 'BUILD-020', wpRef: 'WP-2F', larryClaim: 'WP-2F is ready',
-      cwd: NO_REPO_DIR,                       // git evidence cannot resolve here → fail closed
+      cwd: NO_REPO_DIR,                       // irrelevant to the gh-sourced mechanism now (see above) — kept for readability
+      spawn: failClosedGhSpawn,               // deterministic, no-network fail-closed on the gh call itself
       telegramToken: null, telegramChat: null,
     });
     assert.equal(out.blocked, true);
@@ -1871,7 +1976,7 @@ async function main() {
     const args = {
       repo: 'warwickallan/Fusion247PKA', prNumber: 7003, headSha: MC_HEAD2,
       buildRef: 'BUILD-020', wpRef: 'WP-2F', larryClaim: 'resume me',
-      cwd: NO_REPO_DIR, telegramToken: null, telegramChat: null,
+      cwd: NO_REPO_DIR, spawn: failClosedGhSpawn, telegramToken: null, telegramChat: null,
     };
     await assert.rejects(() => runMergeCheck({ pool: crashingPool, ...args }), /SIMULATED CRASH/);
 
