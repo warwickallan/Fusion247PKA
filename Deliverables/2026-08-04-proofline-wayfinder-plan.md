@@ -1061,6 +1061,52 @@ Keel's four class-A refusals were all correct. The work divides:
 
 **What the investigation must NOT conclude by reflex:** that the answer is a new specialist, a governance role or a contracts registry. **Warwick's regrowth cap and the recorded lesson that a role IS subject to it both apply** — the real test is whether an existing owner or procedure already supplies standing separation. **It may be that the correct answer is "Warwick ratifies, Nolan owns the contract text, and nothing new is hired."**
 
+## 15.3c NAMED INVESTIGATION — the recurring END-OF-PHASE COLLAPSE, and its smallest prevention
+
+**Set by Warwick, 2026-08-05. RECORDED ONLY. Explicitly: *"Do not investigate or build it during Phase 2."***
+
+### His observation, verbatim
+
+> *"This phase started well, then degraded into repeated defective orders, refusals, narrated-but-unexecuted next actions, five hours idle while I slept, stale Needs Input state, and expensive chasing at ~500k context — all before Veritas and Codex, where every mistake costs even more."*
+
+**Recorded without softening. Every element is corroborated below by this session's own record, so the investigation starts from evidence rather than from Larry's account of himself.**
+
+### Corroborating evidence, from this phase — specific, dated, and Larry's
+
+| # | Instance | Evidence |
+|---|---|---|
+| **E-1** | **Narrated-but-unexecuted next action.** After Keel's WP-2B(2) refusal, Larry corrected the map, then closed the turn with *"Amending the order now."* **He did not amend it and did not dispatch.** Nothing ran until Warwick asked hours later | Warwick: *"WP-2B(2) was dispatched four hours ago, but PR #94 is still at `2fc4d39`."* Verified at the time: **no agents in flight, nothing unpushed, zero unmerged worker branches** |
+| **E-2** | **Idle while Warwick slept, with no signal.** The footer is event-driven and, at GREEN with no handback owed, **correctly emitted nothing** — so a stalled turn and a healthy working turn are **indistinguishable to Warwick** | §15.3a already records the trigger question. **E-1 is the case that proves the gap is not theoretical** |
+| **E-3** | **A Work Order that existed ONLY in Larry's context.** WP-2B(2) was first dispatched in-prompt with **no WO on disk** — the failure mode S-5 exists to rule out, committed while building the mechanism meant to prevent it | Corrected at `WO-2026-08-05-06`; recorded in its own Amendment 1 |
+| **E-4** | **Seven Work Order refusals/holds, EVERY ONE a defect in Larry's order** | Ledger at **§14.21** |
+| **E-5** | **Defect severity rose as the phase progressed, even as refusal frequency stayed flat.** Early: a missing `file_surface`. Late: **an acceptance property that would have returned a FALSE PASS on the exact risk it existed to test** (WO-07 D2), **a relocation that silently kills the Deliverables sweep** (WO-07 D1), **an instruction reversing an approved governance redline** (WO-06 C) | §14.21 and the WO amendments |
+| **E-6** | **Context economics.** Last *measured* telemetry: **418,491 input tokens / 1,000,000 (42%)**, and growing per turn. Warwick observes chasing *"at ~500k"* | §15.3a — **and note the footer does not render the absolute count even though it is in the sample** |
+
+### What Warwick asked to be established
+
+**Why delivery becomes less reliable near closure** — and the **smallest practical prevention**, across five named surfaces:
+
+1. **Accurate in-flight state** — Warwick can see what is actually running.
+2. **No silent stop after a refusal** — a refusal must not be able to end a turn without either a dispatch or an explicit handback.
+3. **Durable dispatch before claiming work is running** — the order on disk *before* the claim, not after.
+4. **Timely rotation before context becomes punitive.**
+5. **Better preparation before Veritas/Codex** — where each defect costs most.
+
+### 🔴 The constraint that decides the answer
+
+> *"Analyse process and ownership first; **do not default to another checker, control plane or governance layer.**"*
+
+**This is the third time this constraint has been applied in this build, and BUILD-018 is what happens when it is ignored.** The tempting answers — a dispatch-linter, a pre-flight validator, a state daemon — are all **rejected diagnoses**.
+
+**Two candidate explanations the investigation should test FIRST, because both are process/ownership rather than mechanism:**
+
+- **Larry batches too much into one turn near closure**, so a turn that ends early strands a queue that only he can see. **E-1 is exactly this shape.**
+- **The reply is doing double duty as both the report and the dispatch record.** When the reply is written *as if* the action happened, the action's absence leaves no trace — because **the narration and the execution share no artefact.** E-1 and E-3 are the same defect at two scales.
+
+**A third, uncomfortable, and testable:** the refusals mean the specialists were catching what Larry no longer was. **That is the system working — but it also means Larry's own error rate was rising while his confidence in each order did not.** *Whether closure pressure, context size, or accumulated unclosed state drives it is exactly what this investigation must establish rather than assume.*
+
+**Do not fix E-1 by adding a check that Larry dispatched. Establish why the turn ended first.**
+
 ## 15.4 Route — the fresh Larry's to own, not this session's
 
 **Not designed here.** Two things worth noting so the next session does not rediscover them: token attribution must be honest about what the evidence **cannot** show, and the Google Drive write is an **outward action** needing its own consideration. **Warwick has not authorised a specific Drive location, and no mechanism for this exists — the regrowth cap applies to it exactly as to everything else.**
