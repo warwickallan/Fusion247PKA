@@ -1627,3 +1627,54 @@ All three investigations have landed and their findings are recorded above. **WP
 **Phase 3, step 1. Branch `build-020/phase3`, cut from `83cd6ae`. Worktree `C:\Fusion247PKA-build-020-trial`.**
 
 **Verify HEAD by execution before trusting any SHA in this file — it has been wrong three times.**
+
+---
+
+## 16.9 ⭐ WP-3F — Nolan restored to the Work Order loop. **APPROVED by Warwick, 2026-08-05**
+
+**This was not in the original Phase 3 scope. It arrived because WP-3C's research produced an answer Warwick then ruled on, and it is recorded here so the route is not reconstructed later from memory.**
+
+### What he approved — Option A, his words
+
+> **"Approved: restore Nolan to the Work Order loop using Pax's Option A.**
+>
+> **Larry drafts. Nolan performs one bounded Class-A pre-dispatch check. Nolan does not rewrite the order, investigate implementation or run a broad repo audit. He reads the final envelope, target specialist contract/shim and only the directly applicable rules, then returns PASS or concise exact corrections.**
+>
+> **Update the four coherent routing points Pax identified: Nolan's contract, SOP-022, agent-index and Nolan's shim. Preserve Larry's route and dispatch authority, Veritas post-integration QA and Codex PR/release QA. I ratify governing contract changes.**
+>
+> **Use a cost-appropriate model and measure the check. Acceptance is three consecutive real orders reaching specialists without a Class-A refusal, at materially lower cost than the refusal/rework pattern."**
+
+### Why it survives the regrowth cap — and this is the whole reason it is permitted
+
+**Option A hires nobody and builds nothing.** Pax established that **the procedure already exists and is already mandatory**: SOP-022 carries the pre-dispatch compatibility check, the envelope-first rule, the five questions and the class-A taxonomy. **It assigns class A to Larry** (`:344`) and tells him to *"preflight your own Work Order before issuing it"* (`:352`). **All thirteen BUILD-020 class-A refusals happened under that assignment.**
+
+**The correction is a CHANGE OF ACTOR — one of Warwick's four permitted verbs.** No new role, registry, document family, validator or checker.
+
+### The finding that made it necessary
+
+**The responsibility was not merely unformalised — it was formally DE-ASSIGNED.** `Team/agent-index.md:42-45` records the build-team table *"previously read 'Independently audits — **Nolan**'"*, changed by **`f78d121` (`GOVERNANCE-VERITAS-HIRE`)**, 2026-08-04, on the explicit grounds that his contract did not cover it. **The replacement is contractually barred from the half that was lost** — *"no pre-inspection of a Work Order before implementation"* — and the Veritas gate fires **after integration**. **BUILD-020's Work Orders begin the same day.** Correlation with a named mechanism; **causation not proven, and Pax says so.**
+
+**The anti-pattern in one line (Pax):** the estate had the independence boundary missing at **both** ends — Keel barred from authoring the law governing its own work, while **the issuer was the sole author *and* the sole checker of the envelope.**
+
+### AC-5 — the new acceptance property, and it is FORWARD-LOOKING
+
+| # | Acceptance property |
+|---|---|
+| **AC-5** | **Three consecutive real orders reach specialists without a Class-A refusal, at materially lower cost than the refusal/rework pattern** |
+
+**AC-5 CANNOT be met inside this phase's implementation, and no receipt may claim it is.** It needs three real orders. **WP-3F delivers the route and the measurement; the acceptance accrues from the next dispatch onward.**
+
+**Baseline to beat, measured 2026-08-05: 13 class-A refusals across 15 orders**, each costing a full round trip and several costing two.
+
+### Provenance recorded honestly
+
+**`WO-2026-08-05-15` is the last Work Order issued under the old route, by necessity — the check it creates does not yet exist.** **The first real class-A check is on the WP-3E install order for Mack.**
+
+### Route addition
+
+| # | Step | Owner |
+|---|---|---|
+| 1b | **WP-3F — Nolan drafts the four-point redline** as a ready-to-apply proposal (SOP-001 §7) | **Nolan** |
+| 5b | **Warwick RATIFIES the governing contract changes** — his reservation, not Larry's to assume | **Warwick** |
+
+**The redline reaches `main` only through Warwick's ratification plus the independent review already on this phase's route — Veritas on the exact integrated head, and Codex at PR level.** Larry does not apply it on his own authority.
