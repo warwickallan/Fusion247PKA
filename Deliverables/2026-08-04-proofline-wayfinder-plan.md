@@ -992,6 +992,49 @@ Keel's four class-A refusals were all correct. The work divides:
 
 **Phase 2 has already produced material for this, and it is not flattering — which is the point.** Raw data at close: **three refusals across three Work Orders, every one class-A, every one a defect in MY order, not in the proposed work.** A candidate pattern is already visible — **`private_surface` mis-declared as the secrets root TWICE in one session** — and the honest report must say whether that is a Larry defect, a template defect, or a missing pre-dispatch check. **The report is not to be written to make the phase look tidy.**
 
+## 15.3a NAMED INVESTIGATION — Governor visibility and context economics
+
+**Set by Warwick, 2026-08-05. RECORDED, NOT STARTED. Same gate as the rest of Phase 3: not before Phase 2 merges and rotates.**
+
+### The issue, his terms
+
+- this session previously **appeared** to consume roughly **58k tokens per turn**;
+- he currently has **no visible sense of how large the session is**;
+- **the footer has not appeared when it would have helped him decide whether to rotate**;
+- **distinguish actual fresh input, cached input/read-write activity, total context presented, output, and any other relevant measure — rather than treating one number as "cost" without proving what it means**;
+- establish **whether the current footer measures the right thing**, and **why its event-driven behaviour did not surface the state before repeated expensive turns**;
+- evaluate **whether the intended solution actually works**: proactive rotation *before* a swollen transcript is repeatedly resent, with Honcho and the Wayfinder making `/clear` + `continue` a cheap, reliable recovery.
+
+### Desired outcome — his words, and they bound the answer
+
+> *"**Not** a footer stapled to every response and **not another governance mechanism.** It is that I can see the state when I ask, receive a timely warning when rotation genuinely becomes appropriate, and rotate without losing the route."*
+
+**The regrowth cap applies at full force.** Two of the three desired properties may already exist and merely be mis-wired — see below.
+
+### Live evidence captured 2026-08-05, before the investigation starts
+
+**A footer rendered on request, from live session-bound telemetry 81 s old:**
+
+```
+⟦GOV⟧ ctx 42% · GREEN · KEEP GOING · next: Opus/high · CONTINUE
+```
+
+**Raw sample** (`~/.mypka/governor/health/C--Fusion247PKA-build-020-trial/<session>.json`): `used_percentage: 42` · `context_window_size: 1000000` · **`total_input_tokens: 418491`** · `total_output_tokens: 1637` · `exceeds_200k_tokens: true` · `model.id: claude-opus-5[1m]` · `effort.level: high` · `source: statusLine` · rate limits five-hour **31%**, seven-day **42%**.
+
+**🎯 FINDING ALREADY IN HAND — the absolute count EXISTS and the footer does not read it.** `footer.mjs` takes its numerator from `context_window.used_tokens`. **That field is not in the sample** — the producer writes **`total_input_tokens`**. So `usedTokens` is `null`, the module falls back to the reported percentage, and renders `ctx 42%` **while `418,491` sits unread on disk.** **A producer/consumer naming mismatch, not missing data.** This is exactly *"I have no visible sense of how large the session is"*, and **the fix may be one field name — which is the first thing to test before anything is designed.**
+
+**🎯 SECOND FINDING — the footer never grounds its own recommendation.** With no `--next`, the same telemetry renders `ctx 42% · GREEN · TASK UNKNOWN · next: UNSET · CONTINUE`. **The model/effort advice is CALLER-SUPPLIED.** It is not invented — telemetry independently records Opus/high — **but the module did not compute it**, and any claim that the footer "recommends" a model is false as built.
+
+**❓ OPEN QUESTION, recorded as a question not a finding — `total_output_tokens: 1637` is implausibly low** for a session of this length, suggesting it is **per-turn or per-sample rather than cumulative.** **This is precisely the "one number treated as cost without proving what it means" hazard Warwick named.** *Establish what each field actually counts before any of them is used as cost.*
+
+### Where the "58k per turn" figure must be tested, not assumed
+
+**418,491 input tokens across this session is consistent with a growing transcript being resent each turn** — but *consistent with* is not *established*. **Do not reason from the number; find the producer and establish what it measures.** `source: statusLine`, `version: 2.1.221` names the producer.
+
+### The uncomfortable question this investigation must actually answer
+
+**Why did no footer appear during the expensive stretch?** The footer is deliberately event-driven — handback, rotation-advice, or on request (root `CLAUDE.md`). **At 42% GREEN, no rotation advice was owed, so the design behaved as specified and Warwick still could not see the state.** **So the honest question is not "did the mechanism fail" but "is the trigger set on the right thing" — and whether "rotation advice" firing only near a threshold is too late when the cost is incurred *per turn on the way there*.** **Answering that with a new mechanism is the rejected diagnosis.**
+
 ## 15.4 Route — the fresh Larry's to own, not this session's
 
 **Not designed here.** Two things worth noting so the next session does not rediscover them: token attribution must be honest about what the evidence **cannot** show, and the Google Drive write is an **outward action** needing its own consideration. **Warwick has not authorised a specific Drive location, and no mechanism for this exists — the regrowth cap applies to it exactly as to everything else.**
