@@ -69,16 +69,26 @@ const tmpFile = (text, name = `${randomUUID()}.md`) => {
   return p;
 };
 
-/** A ratified copy of the REAL shipped contract — same bytes, three frontmatter fields flipped.
+/** A ratified copy of the REAL shipped contract — same bytes, three frontmatter fields FORCED to
+ *  ratified values outright, independent of what the shipped file currently ships as (it may
+ *  already be ratified, or not — this fixture must be genuinely ratified by construction either
+ *  way, never by lucky agreement with the live file's current state).
  *  Warwick's ratification is a human act this test must never simulate on the real file, so the
  *  ratified path is exercised on a fixture and the real file is exercised on the refusal path. */
 function ratifiedFixture() {
   const raw = fs.readFileSync(CODEX_CONTRACT_PATH, 'utf8');
   const ratified = raw
-    .replace(/^status: .*$/m, 'status: approved')
-    .replace(/^governs_live: .*$/m, 'governs_live: true')
-    .replace(/^standing_use_ratified: .*$/m, 'standing_use_ratified: true');
-  assert.notEqual(ratified, raw, 'the fixture must actually differ from the shipped file');
+    .replace(/^status:.*$/m, 'status: approved')
+    .replace(/^governs_live:.*$/m, 'governs_live: true')
+    .replace(/^standing_use_ratified:.*$/m, 'standing_use_ratified: true');
+  // Positive assertion, not a diff against `raw`: the shipped file may itself already be
+  // ratified, in which case `ratified === raw` is the CORRECT outcome, not a defect. What must
+  // be proven is that the fixture carries the ratified values, by construction — not that it
+  // differs from whatever the shipped file happens to ship today.
+  assert.match(ratified, /^status: approved$/m, 'the fixture must declare status: approved');
+  assert.match(ratified, /^governs_live: true$/m, 'the fixture must declare governs_live: true');
+  assert.match(ratified, /^standing_use_ratified: true$/m,
+    'the fixture must declare standing_use_ratified: true');
   return tmpFile(ratified, 'ratified-contract.md');
 }
 
@@ -243,8 +253,20 @@ test('R4 — MUTATION: empty law, an unratified fixture, and a stale loader path
   await mustFail('substituted law (plausible text, no sentinel)',
     () => assertLawReachesStdin({ contractPath: ratified, forceSkillText: '# Some other reviewer prompt\nBe thorough.\n' }));
 
-  // (b) UNRATIFIED FIXTURE — the degradation risk that is not an absent file.
-  const unratified = tmpFile(fs.readFileSync(CODEX_CONTRACT_PATH, 'utf8'), 'unratified-contract.md');
+  // (b) UNRATIFIED FIXTURE — the degradation risk that is not an absent file. Built the same way
+  // as ratifiedFixture(), in reverse: the three frontmatter fields are FORCED to unratified
+  // values outright on a copy of the shipped file, independent of what the shipped file
+  // currently ships as (it may itself already be ratified — this fixture must be genuinely
+  // unratified by construction either way, never by assuming production still ships unratified).
+  const unratifiedRaw = fs.readFileSync(CODEX_CONTRACT_PATH, 'utf8')
+    .replace(/^status:.*$/m, 'status: draft')
+    .replace(/^governs_live:.*$/m, 'governs_live: false')
+    .replace(/^standing_use_ratified:.*$/m, 'standing_use_ratified: false');
+  assert.match(unratifiedRaw, /^status: draft$/m, 'the fixture must declare status: draft');
+  assert.match(unratifiedRaw, /^governs_live: false$/m, 'the fixture must declare governs_live: false');
+  assert.match(unratifiedRaw, /^standing_use_ratified: false$/m,
+    'the fixture must declare standing_use_ratified: false');
+  const unratified = tmpFile(unratifiedRaw, 'unratified-contract.md');
   await mustFail('unratified frontmatter (status: draft, governs_live: false)',
     () => assertLawReachesStdin({ contractPath: unratified }));
 
