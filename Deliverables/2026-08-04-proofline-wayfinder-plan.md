@@ -64,6 +64,7 @@ This matters more than it looks: **the entire next phase is about proving what i
 - Update this map only at meaningful phase boundaries: PASS, PARTIAL or FAILED, with an evidence pointer.
 - Continue autonomously until completion or a genuine Warwick-only blocker.
 - Before any clear, restart or handoff, ensure Honcho contains this exact path, current phase/gate and next action.
+- **Before `/clear`, run `/rotate`. Clearing is unsafe until `/rotate` reports `SAFE TO CLEAR` after the installed Honcho readback matches this Wayfinder's current phase, frontier and exact next action.**
 - **Tangents go in "SHIT TO DO" below. Do not chase them.** See the rule there — it binds even when the tangent comes from Warwick.
 
 ---
@@ -1538,3 +1539,185 @@ All three investigations have landed and their findings are recorded above. **WP
 **✅ STEPS 1–4 DONE, 2026-08-04 (fresh session).** Reconnaissance re-executed and its nine contradictions recorded in **§13.3a**; the Phase 2 route is written in **§14** and is **awaiting Warwick's acceptance**. **The frontier is now §14, not §13.6.** Nothing has been implemented.
 
 **Human dependencies for Phase 2:** Warwick's acceptance of the Phase 2 route · his merge decision · **his fresh-Larry orientation test after merge, which is the real acceptance and cannot be self-certified.**
+
+---
+
+# 16. PHASE 3 — THE ROUTE. **Scope FIXED by Warwick, 2026-08-05. Build to the Star.**
+
+> **⭐ THIS SECTION IS NOW THE LIVE FRONTIER. §14.19 is Phase 2, CLOSED and MERGED.**
+
+**Warwick fixed this scope himself and closed the scope conversation:** *"Do not bring me another scope decision unless a genuine product decision or unavoidable permission boundary remains."* **The map records the route; it does not re-ask for acceptance of a scope he has just written.**
+
+## 16.1 North Star — unchanged, his
+
+> **"The process exists to ship trustworthy products quickly, not to produce immaculate paperwork about why they have not shipped."**
+
+**Phase 3 is no longer a forensics-report phase.** The token/process report (§15.2) is **superseded as the deliverable** by his fixed scope below. §15.3a–d remain valid *evidence and investigation inputs*, and §15.3b is now WP-3C.
+
+## 16.2 Acceptance — his four. Nothing here is Larry's to soften
+
+| # | Acceptance property |
+|---|---|
+| **AC-1** | **Honcho independently supplies the correct active map and current frontier** |
+| **AC-2** | **Larry states and begins the correct next action without Warwick reconstructing or selecting the route** |
+| **AC-3** | **The governor returns an accurate measured context and a sensible model recommendation at substantially reduced measured cost** |
+| **AC-4** | **The fresh session returns a cleaned list containing only proper candidate jobs** |
+
+**AC-1, AC-2 and AC-4 are proven only by the real fresh session after rotation, started with the single word `Continue`.** That is the acceptance test and it is Warwick's, not a builder's self-report.
+
+## 16.3 Work packages
+
+| WP | Outcome | Owner | Surface |
+|---|---|---|---|
+| **WP-3A** | **Fix Honcho properly** — (a) reliable current-frontier read at present **and expected** store size · (b) correct `map_path` delivery · (c) **no fail-open write-authority guard** · (d) a stale or degraded fallback **identifies itself as stale AND still orients to the map** | **Keel** | `tools/governor/continuity.mjs` + its test |
+| **WP-3B** | **Fix the governor footer properly** — (a) return a **measured** context number · (b) **inspect the remaining work in the active phase** and recommend the appropriate model · (c) **no specialist reading an 82 KB module for one status line** · (d) **benchmark before and after, proving a reduction of at least an order of magnitude** from the observed ~79k tokens/render | **Keel** | `tools/governor/footer.mjs` + its test |
+| **WP-3C** | **The Nolan gap — RESEARCH AND EVIDENCE ONLY.** What responsibility Nolan previously performed · why its absence resulted in Keel writing contracts or Work Orders · which exact ownership/routing gap existed · the smallest correction restoring the intended separation **without creating another governance layer**. **Do not implement from inference** | **Pax** | one brief |
+| **WP-3D** | **Clean the candidate queue** — remove resolved, superseded, duplicated and non-actionable entries · **remove AsdAIr work, explicitly deferred** · remove parked maintenance not advancing the active Star · retain **only genuine, evidenced candidates** | **Larry** | this map's SHIT TO DO · `Deliverables/BACKLOG.md` |
+| **WP-3E** | **Machine-level install of WP-3A/WP-3B** — the fixes are inert until the installed copy at `~/.mypka/governor/` carries them | **Mack** | `~/.mypka/**`, hook registration |
+
+## 16.4 🔴 PROHIBITED — his words, and they bind every work package
+
+> *"Do not attempt another generic Work Order template, validator or checker repair in this phase."*
+
+**And the standing six from §15.3d:** no new checker, validator, control plane, role, registry or document family. **The verbs are REMOVE, SHORTEN, COMBINE, CHANGE.**
+
+**The two first-pass refusals of this phase (WO-10 and WO-11, both `CLARIFY`, both class-A defects in Larry's orders) are RECORDED AS UNRESOLVED EVIDENCE — not as a problem to fix now.** Warwick: *"use Pax's Nolan research to determine the actual missing ownership before proposing anything."* **Any attempt to fix Larry's dispatch quality with a mechanism before WP-3C reports is the rejected diagnosis.**
+
+## 16.5 Evidence already in hand — WP-3A and WP-3B start from measurement, not theory
+
+**All executed evidence from the 2026-08-05 investigation, committed under `Deliverables/proofline/EVIDENCE-2026-08-05-honcho-regression.md` and `Deliverables/2026-08-05-pax-honcho-regression-brief.md`.**
+
+| # | Established | Consequence for the build |
+|---|---|---|
+| **E-A** | **No code regression.** Timeout, `AbortController` and the `UNAVAILABLE` string unchanged since `421053b` (2026-08-01) | **Do not go looking for a broken commit. There isn't one** |
+| **E-B** | **Page-1 latency: 884 / 747 / 244 / 237 / 430 / 381 / 216 / 387 / 223 / 648 ms — 10 of 10 succeeded, worst case 9.8% of the 9,000 ms budget** | **The 20:4x abort was a TRANSIENT. "Growth met the constant" is NOT established** and must not be built against as if it were |
+| **E-C** | **Page 1 is already at the `size:100` cap** (`items:100, total:149, pages:2`, `content_bytes:420310`). Further growth adds **pages**, not page-1 items — **and later-page failures are swallowed, not raised** | **This is the real "expected store size" risk in WP-3A(a)**, and it is a *silent* one |
+| **E-D** | **`map_path` stripping is LATENT, not LIVE.** From seq 144 on, 9 of 9 carry it | Nobody is misdirected today |
+| **E-E** | **n = 1 under the guard, and that one is the masked case.** Only seq 152 was written with the guard active, inside the timeout window where it falls open | **The census cannot distinguish benign from masked. WP-3A(c) must not rest on it** |
+| **E-F** | **The two defects PARTIALLY MASK EACH OTHER** — when `readLatest` inside `writeContinuity` times out, the guard fails open and `map_path` is **kept**. A slow Honcho *suppresses* the stripping defect | **Two faults that hide each other are invisible to component testing AND to a single end-to-end sample.** The phase's central test-design lesson |
+| **E-G** | **Seq is 152; only 149 packets are stored.** `nextSeq()` increments before delivery → **three packets were built and never landed, and nothing logged any of them** | **This is why 20:4xZ is permanently unrecoverable.** Recorded as an observation |
+| **E-H** | **The dedupe suppresses a Stop write when semantic state is unchanged**, so nothing has been written since seq 152 despite ~40 min and many Stops | **⚠️ The stripping defect can only fire when a packet IS written — and the next write is AT ROTATION.** Latent because nothing is happening; live at the worst possible moment |
+| **E-I** | **`writeContinuity:596-612` runs a full `readLatest` inside the write path**, in a `catch` that falls back to an unconditional write | Doubles network work per session end, and **disables the guard exactly when the read is slow** |
+| **E-J** | **The success render already carries age and an orientation line; the `:932-933` failure branch carries neither**, despite having parsed `updated_at` | **WP-3A(d) is a small change on a branch that already holds the data** |
+| **E-K** | **No governor log exists anywhere under `~/.mypka/**`** (verified negative; only Tower's `watcher.log`, a different subsystem) | Nothing can be reconstructed after the fact |
+| **E-L** | **The ~79k/render footer cost is Larry dispatching a specialist that READS an 82 KB module.** A subagent's floor is well above the target | **WP-3B(c) cannot be met by a cheaper subagent prompt. The render must not require a subagent at all** — see §16.6 |
+
+## 16.6 ⚖️ The one CONSTITUTIONAL boundary in this phase — flagged, not decided by Larry
+
+**Root `CLAUDE.md` states the footer "is rendered by a dispatched specialist running `footer.mjs` … and Larry pastes those exact bytes."** Warwick's WP-3B(c) — *"do not dispatch a specialist to read an 82 KB module for one status line"* — **cannot be satisfied while that clause stands**, because a subagent's floor cost is far above the order-of-magnitude target.
+
+**Larry may NOT silently amend root `CLAUDE.md`** (*"No silent constitutional self-modification"*). So WP-3B delivers the cheap route **and an exact proposed redline**, which requires Warwick's explicit approval and independent review of the resulting patch. **This is a permission boundary, not a scope question** — the one category he left open.
+
+## 16.7 Route and gates
+
+| # | Step | Owner |
+|---|---|---|
+| 1 | WP-3A · WP-3B (isolated worktrees) · WP-3C in parallel | Keel ×2, Pax |
+| 2 | WP-3D | Larry |
+| 3 | Integration at a single head | Larry decides · Keel executes |
+| 4 | **WP-3E machine install** | Mack |
+| 5 | **Veritas on the EXACT integrated head.** *"Phase 3 does not pass on builder evidence"* | **Veritas** |
+| 6 | Merge through the normal guarded PR route | **Warwick** (`merge-decision`) |
+| 7 | **Rotate immediately** | Warwick |
+| 8 | **Fresh session started with only `Continue`** — AC-1, AC-2 and AC-4 are proven here or not at all | **Warwick** |
+
+**Before Veritas passes the integrated head, the maximum permitted statement is:** «Integrated at "&lt;SHA&gt;" and submitted to Veritas for assurance.»
+
+## 16.8 Frontier
+
+**Phase 3, step 1. Branch `build-020/phase3`, cut from `83cd6ae`. Worktree `C:\Fusion247PKA-build-020-trial`.**
+
+**Verify HEAD by execution before trusting any SHA in this file — it has been wrong three times.**
+
+---
+
+## 16.9 ⭐ WP-3F — Nolan restored to the Work Order loop. **APPROVED by Warwick, 2026-08-05**
+
+**This was not in the original Phase 3 scope. It arrived because WP-3C's research produced an answer Warwick then ruled on, and it is recorded here so the route is not reconstructed later from memory.**
+
+### What he approved — Option A, his words
+
+> **"Approved: restore Nolan to the Work Order loop using Pax's Option A.**
+>
+> **Larry drafts. Nolan performs one bounded Class-A pre-dispatch check. Nolan does not rewrite the order, investigate implementation or run a broad repo audit. He reads the final envelope, target specialist contract/shim and only the directly applicable rules, then returns PASS or concise exact corrections.**
+>
+> **Update the four coherent routing points Pax identified: Nolan's contract, SOP-022, agent-index and Nolan's shim. Preserve Larry's route and dispatch authority, Veritas post-integration QA and Codex PR/release QA. I ratify governing contract changes.**
+>
+> **Use a cost-appropriate model and measure the check. Acceptance is three consecutive real orders reaching specialists without a Class-A refusal, at materially lower cost than the refusal/rework pattern."**
+
+### Why it survives the regrowth cap — and this is the whole reason it is permitted
+
+**Option A hires nobody and builds nothing.** Pax established that **the procedure already exists and is already mandatory**: SOP-022 carries the pre-dispatch compatibility check, the envelope-first rule, the five questions and the class-A taxonomy. **It assigns class A to Larry** (`:344`) and tells him to *"preflight your own Work Order before issuing it"* (`:352`). **All thirteen BUILD-020 class-A refusals happened under that assignment.**
+
+**The correction is a CHANGE OF ACTOR — one of Warwick's four permitted verbs.** No new role, registry, document family, validator or checker.
+
+### The finding that made it necessary
+
+**The responsibility was not merely unformalised — it was formally DE-ASSIGNED.** `Team/agent-index.md:42-45` records the build-team table *"previously read 'Independently audits — **Nolan**'"*, changed by **`f78d121` (`GOVERNANCE-VERITAS-HIRE`)**, 2026-08-04, on the explicit grounds that his contract did not cover it. **The replacement is contractually barred from the half that was lost** — *"no pre-inspection of a Work Order before implementation"* — and the Veritas gate fires **after integration**. **BUILD-020's Work Orders begin the same day.** Correlation with a named mechanism; **causation not proven, and Pax says so.**
+
+**The anti-pattern in one line (Pax):** the estate had the independence boundary missing at **both** ends — Keel barred from authoring the law governing its own work, while **the issuer was the sole author *and* the sole checker of the envelope.**
+
+### AC-5 — the new acceptance property, and it is FORWARD-LOOKING
+
+| # | Acceptance property |
+|---|---|
+| **AC-5** | **Three consecutive real orders reach specialists without a Class-A refusal, at materially lower cost than the refusal/rework pattern** |
+
+**AC-5 CANNOT be met inside this phase's implementation, and no receipt may claim it is.** It needs three real orders. **WP-3F delivers the route and the measurement; the acceptance accrues from the next dispatch onward.**
+
+**Baseline to beat, measured 2026-08-05: 13 class-A refusals across 15 orders**, each costing a full round trip and several costing two.
+
+### Provenance recorded honestly
+
+**`WO-2026-08-05-15` is the last Work Order issued under the old route, by necessity — the check it creates does not yet exist.** **The first real class-A check is on the WP-3E install order for Mack.**
+
+### Route addition
+
+| # | Step | Owner |
+|---|---|---|
+| 1b | **WP-3F — Nolan drafts the four-point redline** as a ready-to-apply proposal (SOP-001 §7) | **Nolan** |
+| 5b | **Warwick RATIFIES the governing contract changes** — his reservation, not Larry's to assume | **Warwick** |
+
+**The redline reaches `main` only through Warwick's ratification plus the independent review already on this phase's route — Veritas on the exact integrated head, and Codex at PR level.** Larry does not apply it on his own authority.
+
+---
+
+## 16.10 Continuity published live — 2026-08-05, and the design defect it exposes
+
+**Warwick, 2026-08-05:** *"Do not defer the continuity refresh until merge. Publish the truthful current Phase-3 state now through the installed production write path… Also record the remaining design defect for this phase: material frontier changes must trigger continuity."*
+
+### Packet 1 of 2 — published and read back
+
+**Written through the INSTALLED production path** (`~/.mypka/governor/continuity.mjs write`), not a repo copy: `state_persisted: true`, `withheld: []`, `truncated: []`.
+
+**Read back immediately through the INSTALLED renderer:**
+
+| | |
+|---|---|
+| Packet | `cont-1785971013511-153-6svm8`, **content age 0h 0m** |
+| Focus | **BUILD-020 Phase 3** — no longer Phase 2. **The stale orientation is gone** |
+| Map pointer | **present** — `Deliverables/2026-08-04-proofline-wayfinder-plan.md`. The write-authority path resolved rather than failing open, and did not strip it |
+| Seq | 152 → **153** |
+
+**A second packet is owed after merge**, carrying the merged SHA and the fresh-session next action, read back before `/clear`.
+
+### ⚠️ Observation, recorded not assumed
+
+**`continuity-last.json` still names packet 152 after 153 was written and read back.** Packet 153 is retrievable from Honcho, so it landed. **Whether the last-delivered marker is `stop`-path-only by design, or whether this is a gap, is UNESTABLISHED.** Not chased — recorded.
+
+### 🔴 THE DESIGN DEFECT — Warwick's, and it is the one that matters
+
+> **Material frontier changes must trigger continuity.**
+
+**Today the continuity write is a Larry habit, not an event.** Nothing fires it. The packet sat **13 hours stale** through an entire phase of work — correct map pointer, wrong phase — and only moved because Warwick instructed it explicitly. **That is the same shape as every other compensating habit this estate has recorded: bound to a person remembering, not to an event, and therefore a dated liability.**
+
+**The five events are already named** (§16.3 WP-3B / Warwick, 2026-08-05, for the recommendation cache): active frontier changes · next Work Order changes · phase boundary changes · context crosses a threshold · handback state changes. **The same trigger set applies here, and the cache half of it was already built in WP-3B.**
+
+**Recorded as a defect, NOT dispatched.** It is out of this closure's scope, and **the regrowth cap applies at full force** — the answer is a trigger on an existing write path, never a new mechanism, daemon or watcher.
+
+### Durable estate facts banked from this closure
+
+- **Subagent writes to `~/.mypka/**` now SUCCEED** (Mack, probed and cleaned up, WO-16). **WO-07 Amendment 3's `BLOCKED — required-but-unavailable` is SUPERSEDED.**
+- **The governor runtime carries governance head `696d4498`**, 8/8 byte-identical to the git blob, rollback executed and proven on a file with a real delta.
+- **WP-3B's fix is observable in the product, not only in a hash:** the pre-fix copy renders `ctx 44% · GREEN` with **no figures**; the fixed copy renders `ctx 44% (440.1k/1000k)`.
+- **`MessageDisplay` exists in host 2.1.222** with a completed-message path — the claim that no hook could ever render the footer was false as to mechanism. **Whether it reaches web/Android was never established and Warwick has closed the question.**
