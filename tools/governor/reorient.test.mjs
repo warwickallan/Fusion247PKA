@@ -203,6 +203,113 @@ test('SWEEP: the list is capped at 8 so a large estate cannot flood the session 
 });
 
 // ===========================================================================
+// WO-2026-08-05-08 — THE SWEEP ROOT IS THE SESSION'S, NOT THE MODULE'S
+// ===========================================================================
+// Mack found this in operation, running the same module from two locations: in-tree it
+// produced the sweep, installed at `~/.mypka/governor/` it produced null. The root came
+// from the module's own directory, so relocating the file silently deleted the section —
+// through the ENOENT branch the module itself calls "the ONE honest silence", with no error
+// text anywhere. Nothing in this suite could have failed over it, because every test above
+// passes a root explicitly and so never exercised the default at all. A default that no
+// test can reach is a default nothing defends.
+
+test('SWEEP ROOT: buildBrief sweeps the SESSION root from the hook payload, not the module directory', () => {
+  // The decisive test, and it uses the DEFAULT sweepFn on purpose. An injected sweep would
+  // prove only that buildBrief calls what it was handed; the property is which ROOT the real
+  // sweep reads. The estate below is in a temp directory that this module is not inside, so
+  // a module-relative root cannot produce these rows.
+  const e = makeEstate([{ name: 'only-in-the-session-root.md', body: '# Session-root marker\n', ageDays: 0 }]);
+  try {
+    const body = buildBrief(JSON.stringify({ source: 'startup', cwd: e.root }));
+    assert.match(body, /Session-root marker/, 'the payload cwd is where the sweep must have looked');
+    const rows = body.split('\n').filter((l) => l.startsWith('  • '));
+    assert.equal(rows.length, 1, 'exactly the session root — no rows from anywhere else');
+    assert.match(rows[0], /only-in-the-session-root\.md/);
+  } finally {
+    e.cleanup();
+  }
+});
+
+test('SWEEP ROOT: no module-relative fallback survives — an unusable root is LOUD, never silent', () => {
+  // CONTROL FIRST. The deleted default resolved to this repository, which really does hold a
+  // populated `Deliverables/`. That is what made the defect invisible: the wrong root
+  // returned a plausible, correct-looking answer everywhere the module had not been moved.
+  const whereTheDefaultUsedToPoint = join(import.meta.dirname, '..', '..');
+  assert.notEqual(
+    sweepOpenDeliverables(whereTheDefaultUsedToPoint, Date.now()),
+    null,
+    'CONTROL — the removed default pointed somewhere that yields a sweep, so its absence is what is being proven'
+  );
+
+  // No root: the argument is required and nothing substitutes for it.
+  assert.throws(() => sweepOpenDeliverables(undefined, Date.now()), /path/i,
+    'a missing root must fail, not quietly fall back to this module\'s own location');
+
+  // And through the production path that failure is a stated line, not an omitted section —
+  // the whole defect was a silence that read as "nothing is open".
+  const body = buildBrief(JSON.stringify({ source: 'startup', cwd: false }));
+  assert.match(body, /OPEN DELIVERABLES: sweep failed/,
+    'a session root the host claimed and could not supply must SAY so');
+  assert.doesNotMatch(body, /OPEN DELIVERABLES \(loose/, 'and must not render a sweep of anywhere else');
+});
+
+test('SWEEP ROOT: the RELOCATED module still sweeps the session — proven by running it from outside the repo', () => {
+  // The real relocation, not a fixture. `reorient.mjs` is copied byte-for-byte to a
+  // directory whose module-relative root has no `Deliverables/` at all — the shape of
+  // WP-2B(2)'s install to `~/.mypka/governor/` — and run as the CLI hook it actually is,
+  // reading a real payload from stdin and emitting real hook JSON.
+  //
+  // `continuity.mjs` is stubbed beside it, and only that. It is the Honcho passthrough, it
+  // is orthogonal to the sweep root, and stubbing it keeps this test off the network and
+  // away from a credential file. Everything the property depends on is the real module.
+  const box = tmp('governor-relocated-');
+  const e = makeEstate([{ name: 'seen-from-outside-the-repo.md', body: '# Relocation marker\n', ageDays: 0 }]);
+  try {
+    const relocated = join(box, 'home', '.mypka', 'governor');
+    mkdirSync(relocated, { recursive: true });
+    writeFileSync(join(relocated, 'reorient.mjs'), readFileSync(join(import.meta.dirname, 'reorient.mjs')));
+    writeFileSync(
+      join(relocated, 'continuity.mjs'),
+      'export async function readContinuityBrief() { return "STUBBED — not the subject of this test"; }\n'
+    );
+
+    // The module-relative root the deleted default would have used, asserted absent rather
+    // than assumed: without this the test could pass because the copy simply worked anyway.
+    assert.throws(
+      () => readdirSync(join(relocated, '..', '..', 'Deliverables')),
+      /ENOENT/,
+      'CONTROL — a module-relative root must genuinely yield nothing from here'
+    );
+
+    const run = spawnSync(process.execPath, [join(relocated, 'reorient.mjs')], {
+      input: JSON.stringify({ source: 'startup', cwd: e.root }),
+      encoding: 'utf8',
+      cwd: box, // and not the repository — nothing about the process is inside the estate
+    });
+    assert.equal(run.status, 0, `the hook must always exit 0 (INV-2): ${run.stderr}`);
+    const ctx = JSON.parse(run.stdout).hookSpecificOutput.additionalContext;
+    assert.match(ctx, /OPEN DELIVERABLES/, 'the relocated module must still produce the sweep section');
+    assert.match(ctx, /Relocation marker/, 'and it must be the SESSION root that was swept');
+
+    // The host that says NOTHING about cwd. The session root is then the hook process's own
+    // directory — which is still the SESSION's, and still not the module's. Asserted from
+    // the relocated copy because only there do those two answers differ.
+    const silentHost = spawnSync(process.execPath, [join(relocated, 'reorient.mjs')], {
+      input: JSON.stringify({ source: 'startup' }),
+      encoding: 'utf8',
+      cwd: e.root,
+    });
+    assert.equal(silentHost.status, 0, `the hook must always exit 0 (INV-2): ${silentHost.stderr}`);
+    const silentCtx = JSON.parse(silentHost.stdout).hookSpecificOutput.additionalContext;
+    assert.match(silentCtx, /Relocation marker/,
+      'with no claimed cwd the sweep follows the hook process, never the module directory');
+  } finally {
+    e.cleanup();
+    rmSync(box, { recursive: true, force: true });
+  }
+});
+
+// ===========================================================================
 // PRESERVED BEHAVIOUR 3 — repository / worktree / branch verification
 // ===========================================================================
 
@@ -1554,12 +1661,17 @@ test('WO-OR-17 / INV-2: the reshaped helper and the new seam still cannot break 
 // asserted by controlling the failure.
 
 test('CONTINUITY: the brief is passed through VERBATIM — this module adds no interpretation', async () => {
-  const brief = '⟦GOV⟧ HONCHO CONTINUITY — AUTHORITATIVE current focus:\n  focus: something specific';
+  // P-6, fourth site. The fixture used to read "AUTHORITATIVE current focus" and the
+  // assertion message used to say "then the authoritative focus" — the same claim
+  // `CLAUDE.md` #9 denies, asserted here as if it were the contract. The fixture content is
+  // arbitrary to this test (it proves byte-for-byte passthrough and ORDER, nothing about the
+  // words), so the property under test is untouched and no assertion is weakened.
+  const brief = '⟦GOV⟧ CONTINUITY POINTER (Honcho) — recall only, ZERO authority.\n  • last known focus (recall, possibly stale): "something specific"';
   const composed = `${buildBrief('{}')}\n\n${await Promise.resolve(brief)}`;
   assert.ok(composed.includes(brief), 'the brief must survive composition byte-for-byte');
   assert.ok(
-    composed.indexOf('SESSION LOCATION PROBES') < composed.indexOf('HONCHO CONTINUITY'),
-    'location first, then the authoritative focus'
+    composed.indexOf('SESSION LOCATION PROBES') < composed.indexOf('CONTINUITY POINTER'),
+    'executed location facts first, then the zero-authority recall pointer'
   );
 });
 
@@ -1591,7 +1703,7 @@ test('BRIEF: all three sections compose into one SessionStart payload', () => {
     assert.match(body, /SESSION START — This is a FRESH session/);
     assert.match(body, /SESSION LOCATION PROBES/);
     assert.match(body, /A live deliverable/);
-    assert.match(body, /fallback, not the source of truth for focus/,
+    assert.match(body, /fallback — non-directive list/,
       'the sweep must never be presented as the current focus');
 
     const out = toHookOutput(body);
@@ -1643,6 +1755,61 @@ test('briefModeFor: an UNRECOGNISED source gets the FULL brief, never silence', 
     assert.equal(p.mode, BRIEF_MODE.FULL, 'unknown is never absent (INV-1)');
     assert.match(p.headline, /UNRECOGNISED SessionStart source/);
   }
+});
+
+// ===========================================================================
+// P-6 — the residual authority scan over this module's own prose
+// ===========================================================================
+// WHY A SOURCE SCAN IS A REAL PROOF HERE AND NOT CEREMONY. The defect this closes is
+// entirely in comments: three separate places told the next reader that the Honcho brief is
+// "the authoritative source of current focus", which is the claim `CLAUDE.md` #9 denies. A
+// comment defect has no runtime symptom, so no behavioural test can catch it and nothing but
+// a reader's memory stops it growing back. `4a3b873` — the approved doc-017 redline — swept
+// this file for exactly this language, fixed the RENDERED label at the sweep section, and
+// left all three comments standing. That is the regrowth this pins.
+//
+// THE LITERALS ARE HELD HERE, IN THE TEST, NOT IMPORTED FROM THE FILE THEY CHECK. A constant
+// compared against itself proves nothing.
+//
+// THE BAN IS NARROW ON PURPOSE. `reorient.mjs` uses the word "authority" legitimately twice
+// ("the only authority on that said nothing", about the deleted alignment verdict). A scan
+// broad enough to catch those would be reworded out of existence the first time it fired,
+// which is how a scan dies. These are the exact claims, not the vocabulary.
+const BANNED_AUTHORITY_CLAIMS = [
+  'AUTHORITATIVE source of current focus',
+  'authoritative focus',
+  'Honcho holds the explicit focus',
+];
+
+// The replacement each site must actually carry. Absence-only would pass if someone simply
+// DELETED the three comments, leaving the next reader with no statement of the boundary at
+// all — a silent file is not a corrected one.
+const REQUIRED_POINTER_CLAIM = 'pointer with ZERO authority';
+
+test('P-6: no comment in this module claims the Honcho brief is authoritative', () => {
+  const src = readFileSync(join(import.meta.dirname, 'reorient.mjs'), 'utf8');
+  for (const claim of BANNED_AUTHORITY_CLAIMS) {
+    assert.ok(
+      !src.includes(claim),
+      `reorient.mjs still asserts "${claim}" — CLAUDE.md #9 makes the brief a pointer with zero authority`
+    );
+  }
+});
+
+test('P-6 MUTATION: the scan is fail-able, and deletion is not a fix', () => {
+  // Makes the test above provable rather than vacuously green. If the banned literals could
+  // never match anything, the assertion would pass over any file at all.
+  const src = readFileSync(join(import.meta.dirname, 'reorient.mjs'), 'utf8');
+  for (const claim of BANNED_AUTHORITY_CLAIMS) {
+    const regrown = `${src}\n// ${claim}\n`;
+    assert.ok(regrown.includes(claim), `the scan cannot detect a regrowth of "${claim}"`);
+  }
+  // And the positive half: all three sites state the boundary rather than saying nothing.
+  const occurrences = src.split(REQUIRED_POINTER_CLAIM).length - 1;
+  assert.ok(
+    occurrences >= 3,
+    `expected all 3 corrected sites to state "${REQUIRED_POINTER_CLAIM}", found ${occurrences}`
+  );
 });
 
 test('normaliseSeparators: the INLINED helper behaves exactly as its deleted original did', () => {

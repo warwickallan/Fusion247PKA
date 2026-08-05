@@ -23,10 +23,12 @@
 // scanned; anything matching the restricted pattern is withheld and the packet is
 // marked restricted rather than sent verbatim.
 
-import { readFileSync, writeFileSync, mkdirSync, renameSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, renameSync, statSync, openSync, fstatSync, readSync, closeSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { homedir } from 'node:os';
 import { pathToFileURL, fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 // WO-OR-05. This module's `stop` command is ALREADY registered as a Stop hook, and Stop
 // is the one event that fires on every client Warwick uses. Rather than register a second
 // hook — which would mean editing settings this Work Order does not own — the health
@@ -125,10 +127,10 @@ async function hf(path, { method = 'GET', body, timeoutMs = READ_TIMEOUT_MS } = 
   }
 }
 
-async function ensureStore() {
-  await hf('/workspaces', { method: 'POST', body: { id: honchoCtx().ws } });
-  await hf('/workspaces/{ws}/peers', { method: 'POST', body: { id: PEER } });
-  await hf('/workspaces/{ws}/sessions', { method: 'POST', body: { id: SESSION, peers: { [PEER]: {} } } });
+async function ensureStore(request = hf) {
+  await request('/workspaces', { method: 'POST', body: { id: honchoCtx().ws } });
+  await request('/workspaces/{ws}/peers', { method: 'POST', body: { id: PEER } });
+  await request('/workspaces/{ws}/sessions', { method: 'POST', body: { id: SESSION, peers: { [PEER]: {} } } });
 }
 
 // ---- packet construction + privacy ----------------------------------------
@@ -158,7 +160,180 @@ function scrub(value) {
   return { clean: s, hit: false };
 }
 
-export function buildPacket(state, { reason = 'manual', sessionId = null, backfill = false } = {}) {
+// ---- the active Wayfinder map pointer (WP-2B(1)) ---------------------------
+//
+// WHAT THIS IS FOR. A fresh Larry, started ANYWHERE, must be able to open the correct
+// current Wayfinder map without Warwick typing a path. `storedMapPath()` below already reads
+// `p.map_path` for the rendered brief; until this landed NO writer ever set it, so it was
+// null by construction and the pointer pointed at nothing.
+//
+// THE ONE RULE THAT SHAPES EVERY LINE BELOW — HONEST ABSENCE. `readContinuityBrief` prints
+// whatever string it is handed as "likely active map" and does not check it. So this
+// function is the ONLY place a confident wrong orientation can be prevented, and a confident
+// wrong orientation is worse than a blank one (W-1, named by Warwick). Therefore: emit a
+// path only when it is marker-identified, unambiguously selected, and VERIFIED TO EXIST.
+// Anything less returns null and the field is omitted entirely. Never a guess, never a
+// stale carry-forward — note in particular that `state.map_path` is never consulted, so a
+// stale value in the local store cannot become tomorrow's orientation.
+//
+// WHY NOT A HARDCODED PATH. Warwick's Phase 2 scope is "shared, dependable myPKA services
+// rather than things tied to a build, worktree or Larry remembering how to start them." A
+// literal map filename in source is build-tied and is wrong the day the map changes.
+//
+// WHY NOT A REGISTRY, MANIFEST OR INDEX FILE (regrowth cap, binding). Nothing new is
+// created to carry this. The map's own orientation block — which `CLAUDE.md` already
+// mandates be copied VERBATIM into every Wayfinder map — is the marker, and git's own
+// history is the recency signal. Both already exist for other reasons.
+//
+// WHY THE MARKER AND NOT THE FILENAME. Measured on this estate: the marker finds all six
+// real maps including `2026-08-04-proofline-wayfinder-plan.md`, and correctly EXCLUDES
+// `2026-08-01-vlogops-wayfinder-plan.md`, which a `*wayfinder-plan.md` filename filter would
+// have swept in. Identity by content beats identity by naming convention.
+//
+// WHY GIT RECENCY AND NEVER FILESYSTEM mtime. A fresh clone or a new worktree stamps every
+// file at checkout time — which is precisely the "started anywhere" case this exists for, so
+// mtime is noise exactly when it is needed most. Commit recency is a property of the work.
+//
+// WHY BRANCH-SCOPED FIRST. Several maps are active in this estate at once. The map this
+// branch is WORKING ON is the one it has touched since it diverged from `origin/main`;
+// repo-wide recency is the weaker fallback for a branch that has touched none.
+const WAYFINDER_MAP_MARKER = 'On a fresh resume, BEFORE using any tool or doing any work, visibly state';
+const WAYFINDER_MAP_DIR = 'Deliverables';
+
+// The default git seam, injectable — this module's neighbour `reorient.mjs` uses the same
+// `DEFAULT_GIT_IO` idiom, so this is the existing pattern rather than new machinery. Every
+// injected test below is PAIRED with a control asserting these defaults read REAL git and
+// the REAL filesystem, so the seam can never end up testing a fiction.
+export const DEFAULT_MAP_GIT_IO = {
+  run: (args, cwd) =>
+    execFileSync('git', ['-C', cwd, ...args], {
+      encoding: 'utf8',
+      // stderr is DISCARDED, not inherited. This runs on the Stop hook path; a `fatal:` line
+      // from a probe that is already represented honestly as "absent" is noise on a surface
+      // Warwick reads. stdin is ignored so no probe can block waiting for input.
+      stdio: ['ignore', 'pipe', 'ignore'],
+      maxBuffer: 8 * 1024 * 1024,
+    }).toString(),
+  statSync,
+};
+
+// A failed git probe and a git probe that answered "nothing" both mean the same thing HERE —
+// no pointer can be established — so both collapse to null deliberately. That is the opposite
+// of `reorient.mjs`'s classified failures, and for a reason: this function has exactly one
+// safe output for every uncertain case, and there is no rendered field for it to qualify.
+function gitOut(io, cwd, args) {
+  try {
+    const out = io.run(args, cwd);
+    return typeof out === 'string' ? out : null;
+  } catch {
+    return null; // `git grep -l` exits 1 on no match; git may be absent entirely
+  }
+}
+
+// A candidate path must be repo-root-relative POSIX and inert. An absolute path would
+// re-import the exact hardcoding defect this change exists to remove, and a control
+// character would corrupt the rendered brief.
+function safeRepoRelative(p) {
+  const t = String(p == null ? '' : p).replace(/\\/g, '/').trim();
+  if (!t) return null;
+  for (let i = 0; i < t.length; i++) if (t.charCodeAt(i) < 0x20) return null; // control chars corrupt the brief
+  if (t.startsWith('/') || /^[A-Za-z]:/.test(t)) return null; // absolute — never emitted
+  if (t.split('/').includes('..')) return null;               // no escaping the repo root
+  return t;
+}
+
+/**
+ * Most recently COMMITTED candidate, in one git call.
+ *
+ * `git log --format=@%ct --name-only [range] -- <candidates>` walks newest-first, so the
+ * FIRST time a path appears is its most recent touch. Returns
+ * `{ path, ambiguous }`.
+ *
+ * `ambiguous: true` means two candidates are equally recent — the same commit, or the same
+ * commit timestamp. There is no honest way to choose between them, so the caller emits
+ * nothing rather than picking one. Guessing here is precisely the failure mode this whole
+ * function exists to prevent.
+ */
+function mostRecentlyCommitted(io, cwd, candidates, range) {
+  const args = ['log', '--format=@%ct', '--name-only'];
+  if (range) args.push(range);
+  args.push('--', ...candidates);
+  const out = gitOut(io, cwd, args);
+  if (!out) return { path: null, ambiguous: false };
+
+  const wanted = new Set(candidates);
+  const seen = new Map(); // path -> commit timestamp of its most recent touch
+  let ts = null;
+  for (const raw of out.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (line.startsWith('@')) {
+      const n = Number(line.slice(1));
+      ts = Number.isFinite(n) ? n : null;
+      continue;
+    }
+    if (ts === null) continue;
+    const rel = safeRepoRelative(line);
+    if (rel && wanted.has(rel) && !seen.has(rel)) seen.set(rel, ts);
+  }
+
+  let path = null;
+  let best = -Infinity;
+  let ambiguous = false;
+  for (const [rel, when] of seen) {
+    if (when > best) { best = when; path = rel; ambiguous = false; }
+    else if (when === best) { ambiguous = true; }
+  }
+  return { path, ambiguous };
+}
+
+/**
+ * The repo-root-relative POSIX path of the Wayfinder map this checkout is working on, or
+ * null when that cannot be ESTABLISHED. Null is a legitimate, expected answer.
+ */
+export function resolveActiveMapPath({ cwd = process.cwd(), git = DEFAULT_MAP_GIT_IO } = {}) {
+  const io = git || DEFAULT_MAP_GIT_IO;
+  const rootOut = gitOut(io, cwd, ['rev-parse', '--show-toplevel']);
+  const repoRoot = rootOut ? rootOut.trim() : '';
+  if (!repoRoot) return null; // not a git repository — nothing to point at
+
+  // EVERY REMAINING PROBE RUNS FROM THE REPOSITORY ROOT, not from `cwd`. `git grep` and
+  // `git log` resolve their pathspecs relative to the CURRENT DIRECTORY, so a session started
+  // in a subdirectory — `tools/governor`, say — asked git about a `Deliverables` that does not
+  // exist there and went silently blind. "Started anywhere" is the whole point of this
+  // function, so anywhere includes a subdirectory.
+  //
+  // IDENTIFY. Tracked files only, which is not a limitation: selection is by commit history,
+  // so a file with no commits could never be chosen anyway.
+  const grep = gitOut(io, repoRoot, ['grep', '-l', '--full-name', '-F', WAYFINDER_MAP_MARKER, '--', WAYFINDER_MAP_DIR]);
+  if (!grep) return null;
+  const candidates = [...new Set(grep.split(/\r?\n/).map(safeRepoRelative).filter(Boolean))];
+  if (!candidates.length) return null;
+
+  // SELECT. Branch-scoped first; repo-wide only when this branch has touched no map at all.
+  const mergeBase = gitOut(io, repoRoot, ['merge-base', 'origin/main', 'HEAD']);
+  const base = mergeBase ? mergeBase.trim() : '';
+  let picked = base ? mostRecentlyCommitted(io, repoRoot, candidates, `${base}..HEAD`) : { path: null, ambiguous: false };
+  // The fallback fires ONLY on an empty branch scope. An ambiguous result always carries a
+  // path, so it can never fall through to the repo-wide query and be quietly resolved by the
+  // weaker rule — which is why one guard below is enough. An earlier revision had a second
+  // guard here; mutation testing showed nothing could make it fail, and a check no test can
+  // fail is not a check, it is dead code wearing a safety badge.
+  if (!picked.path) picked = mostRecentlyCommitted(io, repoRoot, candidates, null);
+  // Ambiguity is never resolved by guessing: two equally-recent maps means silence.
+  if (picked.ambiguous || !picked.path) return null;
+
+  // VERIFY IT EXISTS. The acceptance property says "verified to exist" for a reason: a path
+  // that resolves to nothing renders identically to one that resolves to the right map.
+  try {
+    if (!io.statSync(join(repoRoot, picked.path)).isFile()) return null;
+  } catch {
+    return null;
+  }
+  return picked.path;
+}
+
+export function buildPacket(state, { reason = 'manual', sessionId = null, backfill = false, cwd = process.cwd(), git = DEFAULT_MAP_GIT_IO } = {}) {
   const ts = new Date().toISOString();
   const seq = nextSeq();
   const id = `cont-${Date.parse(ts)}-${seq}-${Math.abs(hashStr(ts + seq + reason)).toString(36).slice(0, 6)}`;
@@ -179,6 +354,30 @@ export function buildPacket(state, { reason = 'manual', sessionId = null, backfi
     clean[k] = r.clean;
     restricted = restricted || r.hit;
   }
+
+  // The pointer is RESOLVED here from the repository, and is deliberately NOT read from
+  // `state`. That is the whole difference between a pointer and a stale carry-forward: a
+  // wrong path that was once right renders exactly like a right one, so there is no route
+  // by which yesterday's value can become today's orientation.
+  //
+  // Guarded, because this runs on the Stop hook path and a hook that throws ends Warwick's
+  // turn with an error. Every failure lands on the honest-absent branch.
+  let mapPath = null;
+  try {
+    mapPath = resolveActiveMapPath({ cwd, git });
+  } catch {
+    mapPath = null;
+  }
+  if (mapPath != null) {
+    // Same privacy discipline as every other field — NOT a bypass. But a withheld value is
+    // not a path: emitting WITHHELD_MARK here would have the render print the withholding
+    // notice as the "likely active map", which is the confident-wrong-orientation failure
+    // wearing a compliance badge. So a hit marks the packet restricted and drops the field.
+    const r = scrub(mapPath);
+    restricted = restricted || r.hit;
+    mapPath = r.hit ? null : r.clean;
+  }
+
   return {
     schema: SCHEMA,
     kind: 'continuity',
@@ -189,6 +388,9 @@ export function buildPacket(state, { reason = 'manual', sessionId = null, backfi
     session_id: sessionId,
     backfill: !!backfill,
     sensitivity: restricted ? 'restricted' : 'ordinary',
+    // OMITTED ENTIRELY when it could not be established — never null, never a guess. The
+    // render's absent-form branch is the correct output when there is nothing true to say.
+    ...(mapPath ? { map_path: mapPath } : {}),
     ...clean,
   };
 }
@@ -199,10 +401,121 @@ function hashStr(s) {
   return h;
 }
 
-function fmtList(label, arr) {
-  if (!Array.isArray(arr) || !arr.length) return null;
-  if (arr.length === 1) return `  • ${label}: ${arr[0]}`;
-  return `  • ${label}:\n` + arr.map((x) => `      - ${x}`).join('\n');
+// ---- Section-5 pointer render (BUILD-020 external source repair) -----------
+//
+// The startup brief is a continuity POINTER with ZERO authority. It renders recall
+// identity only — likely active map path, packet id, written timestamp, content age,
+// content hash, last known focus, Warwick's last recorded request — plus the honest
+// missing/unavailable/pagination states and a fixed open-the-map instruction. The
+// stored `next_action`, `accepted_decisions`, `completed`, `blockers` and `notes`
+// remain in the store for backward compatibility and are NEVER rendered here, on
+// any branch. The single active Wayfinder map owns the next step; nothing this
+// module prints is an instruction.
+
+// Volatile per-delivery fields, excluded from the content hash so a re-persist of
+// unchanged content renders the SAME hash (and a growing age) across sessions.
+const VOLATILE_PACKET_FIELDS = ['id', 'ts', 'seq', 'reason', 'session_id', 'backfill', 'schema', 'kind'];
+
+// Key-sorted canonical JSON — excludes the stored fields' ordering noise from the hash.
+function canonicalJson(v) {
+  if (Array.isArray(v)) return '[' + v.map(canonicalJson).join(',') + ']';
+  if (v && typeof v === 'object') {
+    return '{' + Object.keys(v).sort().map((k) => JSON.stringify(k) + ':' + canonicalJson(v[k])).join(',') + '}';
+  }
+  return JSON.stringify(v) ?? 'null';
+}
+
+// sha256, first 8 hex, over the canonical packet body with volatile fields excluded.
+export function packetContentHash(packet) {
+  const body = {};
+  for (const [k, v] of Object.entries(packet || {})) {
+    if (VOLATILE_PACKET_FIELDS.includes(k)) continue;
+    body[k] = v;
+  }
+  return createHash('sha256').update(canonicalJson(body), 'utf8').digest('hex').slice(0, 8);
+}
+
+// Content timestamp = the write-timestamp of the last packet whose content hash
+// differed from its predecessor. Packets arrive newest-first; walk back through the
+// newest run of identical content and take the oldest write-timestamp in that run,
+// so a re-persist of unchanged content does not reset the age.
+function contentTimestampFrom(sortedPackets) {
+  if (!sortedPackets.length) return null;
+  const newestHash = packetContentHash(sortedPackets[0]);
+  let ts = sortedPackets[0].ts;
+  for (const p of sortedPackets) {
+    if (packetContentHash(p) !== newestHash) break;
+    ts = p.ts;
+  }
+  return ts;
+}
+
+function fmtAge(iso, now = Date.now()) {
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return '(unknown)';
+  const mins = Math.max(0, Math.floor((now - t) / 60000));
+  return `${Math.floor(mins / 60)}h ${mins % 60}m`;
+}
+
+// The stored map path, rendered verbatim when present and plausible. A packet with
+// no usable `map_path` renders the absent-form instead — continuity is then treated
+// as absent; a guessed path is never substituted.
+function storedMapPath(p) {
+  const v = p ? p.map_path : null;
+  if (typeof v !== 'string') return null;
+  const t = v.trim();
+  if (!t || /[\r\n\u0000-\u001f]/.test(t)) return null;
+  return t;
+}
+
+// ---- reader-side existence check (WP-2B(2), instruction D) ------------------
+//
+// WHY A SECOND CHECK WHEN THE WRITER ALREADY VERIFIED. `resolveActiveMapPath` verifies the
+// map exists in the WRITER's checkout, at the moment the packet is written. The reader is a
+// DIFFERENT checkout — that is the entire point of cross-session continuity — so a path that
+// was true where it was written can be absent where it is read: another worktree, another
+// branch, a clone made before the map landed. Measured on this estate, not imagined:
+// `Deliverables/2026-08-04-proofline-wayfinder-plan.md` is real on `build-020/live-trial` and
+// ABSENT in `C:\Fusion247PKA`, which sits on a `build-015/...` branch. Without this check the
+// brief there prints a confident path to a file that is not present — W-1's failure, at the
+// one moment orientation matters.
+//
+// WHY IT IS NOT ENGINEERED AROUND. The honest answer for that worktree is that continuity is
+// absent until the branch carrying the map is the one it reads. That is a true limit of the
+// design and is recorded as one; searching other branches for a plausible map, or falling back
+// to a filename guess, would manufacture exactly the confident wrong orientation this whole
+// mechanism exists to refuse.
+//
+// FAIL-SAFE DIRECTION, STATED SO IT IS NOT MISREAD AS A BUG. Every uncertain case — not a
+// repository, git absent, an unsafe path, a stat error — resolves to NOT PRESENT. The two
+// errors are not symmetric: a false absence costs a fresh Larry one look in `Deliverables/`;
+// a false presence costs a confident wrong orientation. This leans the way that is cheap to
+// be wrong.
+export function mapPathPresentHere(mapPath, { cwd = process.cwd(), git = DEFAULT_MAP_GIT_IO } = {}) {
+  const io = git || DEFAULT_MAP_GIT_IO;
+  // The path arrives from a REMOTE store, so it is untrusted input to a `join`. An absolute
+  // path or a `..` segment is refused before any filesystem call rather than normalised — the
+  // render still names it, so nothing is hidden, but nothing outside the repository root is
+  // ever probed on the strength of a stored string.
+  //
+  // THE TYPE GUARD IS NOT BELT-AND-BRACES, IT CLOSES A REAL HOLE FOUND BY TEST.
+  // `safeRepoRelative` coerces with `String(...)` because its OTHER caller feeds it lines of
+  // git output, which are strings by construction. Fed a JSON number from a stored packet it
+  // returned `'42'` — a legitimate-looking relative path — and this function answered `true`
+  // for a value that was never a path. `storedMapPath` happens to shield the render because
+  // it requires a string, but this function is exported and must hold on its own: a guard
+  // that only works because of what the current caller does is not a guard.
+  if (typeof mapPath !== 'string') return false;
+  const rel = safeRepoRelative(mapPath);
+  if (!rel) return false;
+  const rootOut = gitOut(io, cwd, ['rev-parse', '--show-toplevel']);
+  const repoRoot = rootOut ? rootOut.trim() : '';
+  if (!repoRoot) return false; // the READER's own root — never the writer's, never a constant
+  try {
+    return io.statSync(join(repoRoot, rel)).isFile() === true;
+  } catch {
+    return false;
+  }
 }
 
 function renderContent(p) {
@@ -212,9 +525,14 @@ function renderContent(p) {
   return `${head}${obj}${bf}\n\`\`\`json\n${JSON.stringify(p)}\n\`\`\``;
 }
 
-async function deliver(packet) {
-  await ensureStore();
-  const res = await hf(`/workspaces/{ws}/sessions/${SESSION}/messages`, {
+// `request` is injectable (defaulting to `hf`) — the SAME idiom `fetchMessagePage` already
+// uses for the read path in this file, applied here so the write path can be proven with no
+// network. Required by the write-side pointer protection below, whose tests need a
+// `readLatest` and a `deliver` that agree on where "the store" is — not a second seam, the
+// same one at one more call site.
+async function deliver(packet, { request = hf } = {}) {
+  await ensureStore(request);
+  const res = await request(`/workspaces/{ws}/sessions/${SESSION}/messages`, {
     method: 'POST',
     timeoutMs: WRITE_TIMEOUT_MS,
     body: { messages: [{ content: renderContent(packet), peer_id: PEER, metadata: { kind: 'continuity', id: packet.id, ts: packet.ts, seq: packet.seq, backfill: packet.backfill, session_id: packet.session_id } }] },
@@ -225,13 +543,76 @@ async function deliver(packet) {
 
 // ---- public: write ---------------------------------------------------------
 
-// Deliver a continuity packet DIRECT to Honcho. On failure returns an honest
-// {ok:false, error} — never silent. No spool: a bounded local retry is added
-// only if delivery is found to genuinely fail in use (Warwick's scope ruling).
+// ---- WRITE-SIDE POINTER PROTECTION (closes the race the read-side check cannot) ----------
+//
+// THE RACE. `continuity.json`/the Honcho session is ONE shared store written by every
+// session's Stop hook across every worktree and build on this machine. Without this check,
+// an honestly-resolved but STALE `map_path` — from a session left open in an old worktree,
+// closed AFTER a more current session already posted the pointer that should stand — would
+// silently become "the current map" on nothing more than post-time ordering. That is W-1
+// (confident wrong orientation), moved from the read side (already closed above, by
+// `mapPathPresentHere`) to the write side, which was never checked until now.
+//
+// THE SIGNAL IS SESSION START TIME, NOT MAP COMMIT-RECENCY (Warwick's ruling, superseding an
+// earlier commit-recency design that was WRONG). A session that starts AFTER the stored
+// pointer's last write represents genuinely current intent — including a DELIBERATE switch to
+// an older, dormant build whose own map was committed long ago. Commit-recency would have
+// rejected that deliberate switch outright, which is exactly backwards: it would have blocked
+// the one case Warwick's own working pattern actually needs. Session-start-vs-last-write is
+// the one signal that tells "an old session finally closing" apart from "a fresh session
+// deliberately pointing somewhere old", because it is the one fact a stale session cannot
+// fake — it started when it started, regardless of what it later points at.
+//
+// THE COMPARISON. `opts.sessionStartedAt` (an ISO string the CLI's `stop` handler resolves
+// from the Stop hook's own `transcript_path` payload field — see `sessionStartFromTranscript`
+// below) is compared against the `ts` of the packet `readLatest` currently reports as newest.
+// `ts` is not a new field; it is the write-timestamp every packet has always carried. If this
+// session started strictly AFTER that write, the candidate `map_path` is genuinely current and
+// is written normally. Otherwise it is omitted — every OTHER field (focus, next_action, etc.)
+// still writes normally, so only the pointer itself is protected. The honest-absent render
+// logic already handles a packet with no `map_path` correctly (see `readContinuityBrief`
+// above); this triggers that existing degradation, it does not build a new one.
+//
+// NOT A NEW MECHANISM. One more call site for `readLatest`, which already exists and is
+// already used by the read path.
+//
+// ACCEPTED LIMITATIONS, NAMED RATHER THAN HIDDEN.
+//   - No prior stored packet, an unparseable/absent `sessionStartedAt` (manual `write` and
+//     `backfill` never supply one — they have no session to time), or a `readLatest` failure
+//     (Honcho unreachable, a network blip) all fall back to the CURRENT unconditional-write
+//     behaviour rather than blocking. A Stop hook that throws ends Warwick's turn with an
+//     error (see the guard around `resolveActiveMapPath` above); a stricter guard here would
+//     trade a rare race for a routine failure.
+//   - The comparison is against the SINGLE newest stored packet, matching the reader's own
+//     latest-wins semantics exactly (`readLatest` has never walked packet history, and this
+//     does not start it walking now). It answers "is THIS write current relative to the last
+//     one", not "what is the best map ever recorded across this session's whole history".
+// Deliver a continuity packet DIRECT to Honcho. On failure returns an honest {ok:false,
+// error} — never silent. No spool: a bounded local retry is added only if delivery is found
+// to genuinely fail in use (Warwick's scope ruling, unchanged by the protection above).
 export async function writeContinuity(state, opts = {}) {
   const packet = buildPacket(state, opts);
+
+  if (packet.map_path) {
+    try {
+      const { cwd, git, request, reason, sessionId, backfill, sessionStartedAt, ...readOpts } = opts;
+      const current = await readLatest(readOpts);
+      const priorWriteMs = current && current.latest ? Date.parse(current.latest.ts) : NaN;
+      const sessionStartMs = typeof sessionStartedAt === 'string' ? Date.parse(sessionStartedAt) : NaN;
+      // Reject unless THIS session genuinely started after the last write. Anything
+      // uncomparable (NaN on either side) leaves the packet untouched — see "accepted
+      // limitations" above.
+      if (Number.isFinite(priorWriteMs) && Number.isFinite(sessionStartMs) && !(sessionStartMs > priorWriteMs)) {
+        delete packet.map_path;
+      }
+    } catch {
+      // Honcho unreachable / readLatest failed — fall back to the unconditional write. Named
+      // explicitly, per the block above: a Stop hook must not throw over this.
+    }
+  }
+
   try {
-    const ref = await deliver(packet);
+    const ref = await deliver(packet, { request: opts.request });
     return { ok: true, id: packet.id, ref, packet };
   } catch (e) {
     return { ok: false, id: packet.id, error: e.message, packet };
@@ -473,50 +854,83 @@ export async function readLatest(opts = {}) {
     if ((b.seq || 0) !== (a.seq || 0)) return (b.seq || 0) - (a.seq || 0);
     return (a.backfill === b.backfill) ? 0 : (a.backfill ? 1 : -1); // live before backfill on a tie
   });
-  return { latest: packets[0], count: packets.length, pages, complete };
+  return {
+    latest: packets[0],
+    count: packets.length,
+    pages,
+    complete,
+    // Section-5 recall identity: hash of the newest content, and the write-timestamp
+    // of the packet where that content last changed (not of the newest re-persist).
+    contentHash: packetContentHash(packets[0]),
+    contentTs: contentTimestampFrom(packets),
+  };
 }
 
-// Rendered brief for the SessionStart hook. Never throws: an unreachable Honcho
-// yields an HONEST unavailable note plus the local cached state if present.
+// Rendered brief for the SessionStart hook — a continuity POINTER with ZERO
+// authority (BUILD-020 Section-5 render contract; the single active Wayfinder map
+// alone owns the next step). Never throws: an unreachable Honcho yields an honest
+// unavailable note plus the local cached focus if present.
 //
 // WO-OR-21: `opts` is forwarded to readLatest so the suite can prove the ⚠️ INCOMPLETE line
 // both FIRES when the walk is genuinely truncated and STAYS SILENT on the normal path.
 // Default `{}` — the hook's behaviour is byte-for-byte what it was. Without this the
 // user-visible half of the incompleteness signal could only be asserted by reaching the
 // network, which no test here may do.
+//
+// WP-2B(2): `cwd` and `git` are destructured OUT before the rest is forwarded to
+// `readLatest`. They belong to the reader-side existence check, not to the message walk, and
+// `listAllMessages` should never be handed a key it does not own.
 export async function readContinuityBrief(opts = {}) {
+  // NO DEFAULTS APPLIED HERE, DELIBERATELY. An earlier revision wrote
+  // `cwd = process.cwd(), git = DEFAULT_MAP_GIT_IO` on this line. Mutation testing removed
+  // both and the suite stayed green — because `mapPathPresentHere` already defaults exactly
+  // the same two values, and a destructuring default fires on an explicit `undefined` just
+  // as it does on an absent key. They were equivalent mutants: two homes for one default,
+  // and a check no test can fail is not a check. Same finding as WP-2B(1)'s dead second
+  // guard, same disposition. The defaults live in one place, where they are used.
+  const { cwd, git, ...listOpts } = opts;
   try {
-    const r = await readLatest(opts);
+    const r = await readLatest(listOpts);
     if (!r) {
-      return '⟦GOV⟧ HONCHO CONTINUITY: reachable, but NO continuity packet stored yet. This is the authoritative source of current focus; until one is written, focus is genuinely unknown.';
+      return '⟦GOV⟧ CONTINUITY POINTER (Honcho): reachable, but no continuity packet stored yet — recall is genuinely empty. Orient from `Deliverables/` per `CLAUDE.md` Step 2.';
     }
     const p = r.latest;
+    const mapPath = storedMapPath(p);
+    if (!mapPath) {
+      return '⟦GOV⟧ CONTINUITY POINTER (Honcho): map path missing or invalid — treat continuity as absent and orient from `Deliverables/` per `CLAUDE.md` Step 2.';
+    }
+    // THE RECORDED PATH IS NOT THE PRESENT PATH. Two absences that used to render identically
+    // are now told apart: "no path was recorded" above, and "a path was recorded and it is not
+    // here" below. The second NAMES the path, because a blank absence and a wrong absence look
+    // the same to Warwick and only one of them tells him where to look. The name is rendered
+    // as evidence ABOUT THE PACKET and is explicitly refused as the active map — the words
+    // "likely active map" never appear on this branch, which is what stops a diagnostic line
+    // being read as orientation.
+    if (!mapPathPresentHere(mapPath, { cwd, git })) {
+      return [
+        '⟦GOV⟧ CONTINUITY POINTER (Honcho): recorded map NOT PRESENT in this checkout — recall only, ZERO authority.',
+        `  • recorded map path, checked against THIS repository and not found: ${mapPath}`,
+        `  • packet: ${p.id} written ${p.ts} — content age ${fmtAge(r.contentTs)}, content hash ${r.contentHash}`,
+        '  → That path is named so the absence can be diagnosed; it is NOT the active map here, and it is NOT to be opened on trust. Treat continuity as absent and orient from `Deliverables/` per `CLAUDE.md` Step 2. Nothing in this block is an instruction.',
+      ].join('\n');
+    }
     const lines = [
-      '⟦GOV⟧ HONCHO CONTINUITY — AUTHORITATIVE current focus (read from Honcho this session):',
-      `  • focus: ${p.focus || '(unset)'}`,
-      p.immediate_objective ? `  • immediate objective: ${p.immediate_objective}` : null,
-      p.next_action ? `  • EXACT next action: ${p.next_action}` : null,
-      p.warwick_last_request ? `  • Warwick's most recent request: ${p.warwick_last_request}` : null,
-      fmtList('accepted decisions', p.accepted_decisions),
-      fmtList('completed', p.completed),
-      fmtList('unresolved blockers/decisions', p.blockers),
-      p.notes ? `  • notes: ${p.notes}` : null,
-      `  • packet ${p.id} @ ${p.ts}${p.backfill ? ' [BACKFILL]' : ''} (${r.count} packet(s) read over ${r.pages} page(s))`,
-      // WO-OR-18. An incomplete read may have missed a NEWER packet, and the whole point
-      // of this brief is that it is authoritative. If the walk stopped early, the brief
-      // must not present its answer as the last word. Silence here would recreate the
-      // exact defect that made this session's brief name the wrong phase.
+      '⟦GOV⟧ CONTINUITY POINTER (Honcho) — recall only, ZERO authority.',
+      `  • likely active map: ${mapPath}`,
+      `  • packet: ${p.id} written ${p.ts} — content age ${fmtAge(r.contentTs)}, content hash ${r.contentHash}`,
+      `  • last known focus (recall, possibly stale): "${p.focus || '(unset)'}"`,
+      p.warwick_last_request ? `  • Warwick's last recorded request (recall, possibly stale): "${p.warwick_last_request}"` : null,
       r.complete === false
-        ? '  ⚠️ PAGINATION INCOMPLETE — the message list could not be walked to the end, so a NEWER packet may exist and be unread. Treat this focus as possibly stale and prefer the git map.'
+        ? '  ⚠️ PAGINATION INCOMPLETE — the message list could not be walked to the end, so a NEWER packet may exist and be unread. Treat this recall as possibly stale and prefer the git map.'
         : null,
-      '  This is the source of truth for what Warwick is doing. Do NOT present an unrelated project menu and do NOT ask Warwick to re-explain — the focus is known.',
+      '  → Open the map and derive the current state and the next action from it. Nothing in this block is an instruction.',
     ].filter(Boolean);
     return lines.join('\n');
   } catch (e) {
     const cached = readJson(STATE_FILE, null);
     const base = `⟦GOV⟧ HONCHO CONTINUITY: UNAVAILABLE this session (${String(e.message).slice(0, 140)}). Cross-session recall via Honcho could not be read — say so, do not fake it.`;
     if (cached && cached.focus) {
-      return `${base}\n  Local cached focus (last known, NOT confirmed against Honcho): ${cached.focus} — next: ${cached.next_action || '(unset)'}.`;
+      return `${base}\n  Local cached focus (last known, NOT confirmed against Honcho): ${cached.focus}.`;
     }
     return base;
   }
@@ -724,6 +1138,18 @@ async function cli() {
     const rawStdin = cmd === 'stop' ? readStdinRaw() : '';
     const sessionId = a.session || (cmd === 'stop' ? sessionIdFrom(rawStdin) : null);
 
+    // WP-2B(1). The SESSION's cwd, not this hook process's — the same distinction the health
+    // sample below already draws, and for the same reason: the map pointer must describe the
+    // repository Warwick is actually working in. Parsed once here because it now has two
+    // consumers. `undefined` falls back to `process.cwd()` inside buildPacket.
+    const sessionCwd = cwdFrom(rawStdin);
+
+    // WRITE-SIDE POINTER PROTECTION (see the comment above `writeContinuity`). Resolved only
+    // for `stop` — a manual `write`/`backfill` carries no Stop hook payload and so has no
+    // session to time; `sessionStartFromTranscript` degrades to null on any failure, which
+    // `writeContinuity` already treats as "cannot compare, write unconditionally".
+    const sessionStartedAt = cmd === 'stop' ? sessionStartFromTranscript(transcriptPathFrom(rawStdin)) : null;
+
     // WO-OR-05 — the context-health sample, written from the transcript.
     //
     // THIS RUNS BEFORE THE DEDUPE BELOW, DELIBERATELY. The continuity dedupe returns
@@ -738,13 +1164,9 @@ async function cli() {
     // error, and telemetry is never worth that.
     if (cmd === 'stop') {
       try {
-        let storeOpts = {};
-        try {
-          const cwd = JSON.parse(rawStdin)?.cwd;
-          // Key the store on the SESSION's cwd, not this hook process's, so the sample
-          // lands under the same project key the footer will look under.
-          if (typeof cwd === 'string' && cwd.length) storeOpts = { cwd };
-        } catch { /* fall back to the default cwd */ }
+        // Key the store on the SESSION's cwd, not this hook process's, so the sample
+        // lands under the same project key the footer will look under.
+        const storeOpts = sessionCwd ? { cwd: sessionCwd } : {};
         sampleFromTranscript(rawStdin, { sampledAt: new Date().toISOString(), storeOpts });
       } catch { /* never break the boundary hook */ }
     }
@@ -783,7 +1205,7 @@ async function cli() {
         process.stdout.write(JSON.stringify({ command: 'stop', skipped: 'unchanged for this session' }) + '\n');
         return 0;
       }
-      const r = await writeContinuity(state, { reason: 'stop', sessionId });
+      const r = await writeContinuity(state, { reason: 'stop', sessionId, cwd: sessionCwd || process.cwd(), sessionStartedAt });
       if (r.ok) atomicWriteJson(LAST_FILE, { key, id: r.id, at: new Date().toISOString() });
       process.stdout.write(JSON.stringify({ command: 'stop', ...summ(r) }) + '\n');
       return 0; // a boundary hook never signals failure via exit code
@@ -845,6 +1267,79 @@ function sessionIdFrom(raw) {
     const j = JSON.parse(raw);
     return j.session_id || j.sessionId || null;
   } catch { return null; }
+}
+
+// The session's working directory, when the hook payload carries one. Null otherwise, which
+// every caller reads as "use this process's cwd" rather than as an error.
+function cwdFrom(raw) {
+  try {
+    const cwd = JSON.parse(raw)?.cwd;
+    return (typeof cwd === 'string' && cwd.length) ? cwd : null;
+  } catch { return null; }
+}
+
+// The transcript path the hook payload carries, when it carries one. Feeds
+// `sessionStartFromTranscript` below — the write-side pointer protection's ONLY source for
+// "when did THIS session genuinely begin".
+function transcriptPathFrom(raw) {
+  try {
+    const p = JSON.parse(raw)?.transcript_path;
+    return (typeof p === 'string' && p.length) ? p : null;
+  } catch { return null; }
+}
+
+// ---- session start time, from the transcript the Stop hook already tells us about --------
+//
+// Read at most this much from the START of the transcript. Mirrors `sampler.mjs`'s
+// `readTranscriptTail` — same shared transcript file, the OTHER end (newest-assistant-usage
+// is found there scanning BACKWARD from the tail; a session's start is found here scanning
+// FORWARD from the head). `sampler.mjs` sits outside this Work Order's `file_surface`, so
+// this is a small sibling function rather than an import — but the fd/fstat/read/close shape
+// is the identical established idiom in this codebase, not a new technique.
+const TRANSCRIPT_HEAD_BYTES = 1024 * 1024; // generous for a session's first few JSONL lines
+
+function readTranscriptHead(path, maxBytes = TRANSCRIPT_HEAD_BYTES) {
+  if (typeof path !== 'string' || path.length === 0) return '';
+  let fd;
+  try {
+    fd = openSync(path, 'r');
+    const size = fstatSync(fd).size;
+    const length = Math.min(size, maxBytes);
+    const buf = Buffer.allocUnsafe(length);
+    readSync(fd, buf, 0, length, 0);
+    return buf.toString('utf8');
+  } catch {
+    return '';
+  } finally {
+    if (fd !== undefined) {
+      try { closeSync(fd); } catch { /* nothing left to do about it */ }
+    }
+  }
+}
+
+/**
+ * sessionStartFromTranscript(path) -> ISO string | null
+ *
+ * The session's genuine start time: the `timestamp` on the FIRST line of its transcript that
+ * carries one, scanned forward from the head. Verified against real transcripts on this
+ * machine (JSONL; the first one or two lines — `mode`, `file-history-snapshot` — often carry
+ * no top-level `timestamp`, and the first line that does is a few lines in). A line this
+ * function cannot parse — including one truncated at the bounded read's edge — is skipped,
+ * never guessed at. Never throws; returns null on any failure, which every caller reads as
+ * "the write-side protection cannot apply this turn", not as an error.
+ */
+export function sessionStartFromTranscript(path) {
+  const text = readTranscriptHead(path);
+  if (!text) return null;
+  for (const line of text.split('\n')) {
+    if (!line || line.charCodeAt(0) !== 123 /* '{' */) continue;
+    let obj;
+    try { obj = JSON.parse(line); } catch { continue; }
+    if (obj && typeof obj.timestamp === 'string' && Number.isFinite(Date.parse(obj.timestamp))) {
+      return obj.timestamp;
+    }
+  }
+  return null;
 }
 
 const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;

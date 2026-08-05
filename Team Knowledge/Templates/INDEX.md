@@ -46,9 +46,19 @@ contract is that a template owned by one reader drifts from every other reader.
 | Template | Artefact | Goes under |
 |---|---|---|
 | [[Templates/work-order]] | Work Order (bounded dispatch to a specialist) | `Builds/<BUILD-ID>/Work Packages/<wp-slug>.md`, or `Deliverables/YYYY-MM-DD-<slug>-work-order.md` when standalone |
+| [[Templates/veritas-receipt]] | Veritas assurance receipt (one per review, against one exact head) | `Builds/<BUILD-ID>/Assurance/veritas-<wp-or-phase>-<sha7>.md`, or `Deliverables/YYYY-MM-DD-veritas-<scope>-receipt.md` when standalone |
 
-The lifecycle it enforces — `DRAFT → WORKER READ-BACK → LARRY ACCEPTS OR AMENDS → ISSUED → RUNNING` — is
-mandatory, and the procedure that runs against it is [[SOP-022-work-order-preflight]].
+The lifecycle it enforces is mandatory, and the procedure that runs against it is
+[[SOP-022-work-order-preflight]]:
+
+```
+DRAFT → WORKER READ-BACK → LARRY ACCEPTS OR AMENDS → ISSUED → RUNNING
+      → RETURNED → INTEGRATED → VERITAS_PENDING → VERITAS_PASS → closed
+```
+
+**`closed` is reachable only from `VERITAS_PASS`.** The two templates are halves of one gate — the Work
+Order opens it, the receipt closes it — which is why both live here rather than inside the contract of
+whoever happens to read them most (Warwick, `GOVERNANCE-VERITAS-HIRE`, 2026-08-04).
 
 ## Rules these templates follow
 

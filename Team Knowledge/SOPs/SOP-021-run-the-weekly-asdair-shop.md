@@ -1,13 +1,36 @@
 # SOP-021: Run the weekly AsdAIr shop
 
 - **Status:** Active (created 2026-07-27, per Warwick's durability-repair directive).
-- **Default owner:** AsdAIr (Household Shopping Steward). Larry orchestrates and holds the browser drive until
-  the tool-binding question below is settled.
+- **Default owner:** AsdAIr (Household Shopping Steward).
 - **Triggered by:** a weekly shopping request arriving by any channel (Telegram photo/text, cockpit picker), or
   Warwick asking to "do the shop".
+
+> **⚠️ WHO WRITES THE LIVE BASKET — RULED 2026-08-04, `BUILD-015-CANONICAL-RUNTIME-REALIGNMENT`.**
+> **The Stage 1 live basket writer is Sonnet in Claude for Chrome.** It is **not** Larry, **not** a Claude Code
+> subagent, and **not** the custom Node/CDP runner at `services/asdair/browser-runner/` — that runner is now
+> **experimental, deferred, not the live default, and prohibited from further live-account testing without fresh
+> authority from Warwick.** Canonical: `Builds/BUILD-015-asdair-durable-household-shopping-steward/RUNTIME-DECISION.md`,
+> with the end-to-end process in the same folder's `CANONICAL-WEEKLY-SHOP-PROCESS.md`. **Read those before acting
+> on any statement in this file about who drives the browser.** The earlier line here — *"Larry orchestrates and
+> holds the browser drive until the tool-binding question below is settled"* — is **superseded and removed**; that
+> question is settled and the answer is neither Larry nor the runner.
+>
+> **Everything else in this SOP still stands.** Only the who-drives-the-browser question changed. The
+> catalogue-grounding invariant, the single-poller hazard, the out-of-stock cause of a failed batch add, the
+> typed-quantity trap, the never-auto-substitute rule and the learning arcs are all unchanged and still binding.
 - **Why this file exists:** this method previously lived ONLY in machine-local Claude memory and a per-session
   scratchpad. It was rebuilt from scratch at least twice, was unversioned and unreviewable, and could not be
   handed to a fresh instance. That is the durability defect this SOP closes.
+- **Companion file (added 2026-08-03):** [[SOP-021a-asdair-live-execution-method]] holds the **mechanical
+  execution reality** — every env var and how to verify it, the DB grant preflight, the four processes, the
+  browser runner's 16-command allowlist and plan contract, the durable-state diagnostics, and every known
+  failure mode from the live run of 2026-08-03. **This file owns the intent and policy; SOP-021a owns the
+  mechanics.** Where the two appear to disagree, SOP-021a §8 records the resolution — the code was read, and
+  the code won.
+  *(**Reframed 2026-08-04**, ruling `BUILD-015-CANONICAL-RUNTIME-REALIGNMENT`: SOP-021a is now the reference for
+  the **DEFERRED experimental CDP adapter**, not for the live path. Its preflight, grant, diagnostic and
+  failure-mode knowledge remains accurate and valuable; its runner-driven execution route is **not** how the
+  live basket gets built. See `RUNTIME-DECISION.md`.)*
 
 ## Scope boundary — read before adding anything here
 
@@ -150,28 +173,48 @@ twice**. An answer that only lives in the conversation will be asked again next 
 
 ## 4. Shop
 
-Warwick logs into ASDA. He is already authenticated; **Larry never enters the account password** (hard rule), and
-cannot open the extension sidebar.
+Warwick logs into ASDA. He is already authenticated; **nothing and nobody but Warwick ever enters the account
+password** (hard rule).
 
-**The proven add method — follow it, this was expensive to learn:**
+> **⚠️ WHO SHOPS, RULED 2026-08-04 (`BUILD-015-CANONICAL-RUNTIME-REALIGNMENT`) — Sonnet in Claude for Chrome.**
+> Not Larry, not a Claude Code subagent, not `services/asdair/browser-runner/`. Canonical:
+> `Builds/BUILD-015-asdair-durable-household-shopping-steward/RUNTIME-DECISION.md`.
 
-- The **Regulars tab is the only tab with bulk checkboxes and "Add selected to trolley."** Favourites offers
-  individual adds only. Use Regulars.
-- **Sort A–Z** and do a **full single pass**: tick every match, then one bulk add. Do not scroll-hunt and do not
-  switch views mid-pass — the grid reshuffles and resets sort. Two-at-a-time is a fallback only.
-  (**Open question:** the superseded database copy of this method specified sort by **BRAND** A–Z, both for the
-  grid and for the order of the resolved basket. See "Open questions" below — unresolved, do not silently pick one.)
-- The grid **will not scroll by wheel or keyboard.** `scroll_to` on an element ref is the scroll lever. The DOM
-  **accumulates** loaded items, so: scroll until everything is loaded, `read_page` the accessibility tree **once**
-  (persist to a file if large and parse it for checkbox refs), then batch-click every target ref and add in one go.
-- **Screenshots come out blank on the heavy grid.** The trolley page renders fine — do verification there.
-- Search-adds: navigate to the search URL for the term, then use the `find` tool to locate the exact product's add
-  button and click its ref.
+**The proven add method — Brand A–Z ordered sequential traversal. Follow it, this was expensive to learn:**
 
-> **The real cause of a failed bulk add is a single OUT-OF-STOCK item silently rejecting the WHOLE batch.** It is
+1. Open the appropriate ASDA **Regulars / Favourites** view.
+2. **Change the ASDA ordering to Brand A–Z.**
+3. Follow the prepared execution packet **in that same order**. The ordering *is* the speed.
+4. Add known products **through Regulars or Favourites**, working through them **rapidly and sequentially**.
+5. **Never free-search a known item.**
+6. Free-search **only** a genuinely new item Warwick has approved — then add it, click ASDA's **Favourite**
+   control for it, and capture its real ASDA product identity.
+7. Stop at a **checkout-ready basket**.
+
+Do not switch views mid-pass — the grid reshuffles and resets the sort.
+
+> **⚠️ SUPERSEDED 2026-08-04 — the "bulk checkbox / Add selected to trolley" description.** An earlier version of
+> this section described the proven method as *"the Regulars tab is the only tab with bulk checkboxes and 'Add
+> selected to trolley'; sort A–Z, tick every match, then one bulk add"*, with `scroll_to` / `read_page` / `find`
+> as the levers. **Warwick's ruling is that the proven process was fast ordered traversal, not an assumed
+> one-click bulk operation.** Do not document or attempt it as mass checkbox selection unless evidence proves
+> that was the action; the speed came from *ordering and sequence*, not from a single bulk control. Recorded
+> honestly: `EXPERIMENT-RESULT.md` records only that ASDA's bulk control *exists* — never that it was driven
+> successfully at scale. A work order (WO-D) to build "bulk add" as a performance feature rested on that
+> description and is **CANCELLED as live-runtime work**.
+>
+> Two facts from the superseded block survive and are still worth knowing, because they cost real time to learn:
+> the heavy Regulars grid **will not scroll by wheel or keyboard** and needs an element-targeted scroll, and
+> **screenshots come out blank on that grid** — verify on the trolley page, which renders fine. The tool names in
+> the old block (`scroll_to`, `read_page`, `find`) were always **Claude-in-Chrome tools**, never
+> `browser-runner` commands; that was already noted on 2026-08-03 and is the clue that this SOP had been
+> documenting the browser-driven process all along. Full evidence:
+> [[SOP-021a-asdair-live-execution-method]] §8.1.
+
+> **The real cause of a failed batch add is a single OUT-OF-STOCK item silently rejecting the WHOLE batch.** It is
 > not batch size, and it is not an expired delivery slot (that theory was tested and is wrong). Out-of-stock items
-> still appear in Regulars/Favourites. If a bulk add fails, split the batch only to isolate and drop the
-> out-of-stock item, then resume the full pass. **Dropping is the action — never auto-substitute the missing
+> still appear in Regulars/Favourites. If a batch add fails, split it only to isolate and drop the
+> out-of-stock item, then resume the pass. **Dropping is the action — never auto-substitute the missing
 > item.** Use an already-approved fallback if one exists; otherwise flag the alternatives for a human (step 3).
 
 **Never book a delivery slot. Never check out.** The goal is a checkout-ready basket and nothing further
@@ -201,6 +244,22 @@ substitutions and out-of-stock drops flagged. Check the total against the GBP 12
 
 - **untick "Allow substitutions for all"**, and
 - set the **per-item** substitution flag from each product's `substitutes_allowed`.
+
+> **⚠️ WHO DOES THIS, 2026-08-03 — a HUMAN, always.** `browser-runner` **cannot** set either toggle, by design
+> and in three layers: no allowlisted command exists, `guards.DENY_TARGET` refuses any click matching
+> `substitut`, and `forbidden.test.cjs` fails the build if the token appears in executable source at all.
+> "Enabling substitutions" sits on the same forbidden list as checkout and payment. On 2026-08-03 the finished
+> basket was left with **"Allow substitutions for all" ON**, violating standing rule 6, because nothing and
+> nobody closed this gap. **Make it the last action before hand-back, every week.** Detail:
+> [[SOP-021a-asdair-live-execution-method]] §4.
+>
+> **AMENDED 2026-08-04 (`BUILD-015-CANONICAL-RUNTIME-REALIGNMENT`) — still a human, and now with LESS mechanical
+> protection, not more.** Substitutions cannot be automated at all, under either adapter. The deferred CDP runner
+> enforces the ban in the three code layers above. **Sonnet in Claude for Chrome has no such mechanical
+> enforcement — there the boundary is instruction and supervision, not code.** That is a real, honest reduction
+> in guarantee, accepted deliberately in exchange for a process that works at human speed, and recorded as an
+> open consideration in `RUNTIME-DECISION.md`. It makes this step **more** important, never less: a human sets
+> the substitution toggles, always, as the last action before hand-back.
 
 Unticking the global toggle alone is not the whole job — it makes the default safe, but items that are genuinely
 fine to substitute stay durable state in the database, and the per-item settings are how that state reaches the
@@ -243,9 +302,11 @@ It **cannot** delete, retire, rename or re-home a regular — not by flag, not b
 enforces that independently of the code (`db/005_asdair_rw_grants.sql`).
 
 > **Harvest product IDs while you shop — they are only obtainable there.** Every ASDA product URL carries its id
-> (`/groceries/product/<category>/<slug>/<ID>`), and the accessibility tree you already read for the bulk tick
-> pass is full of them. Capturing them as you go took coverage from 21/91 to 41/97 in one shop. An item with an
-> id resolves by id next week instead of by name.
+> (`/groceries/product/<category>/<slug>/<ID>`), and the Regulars/Favourites page you are already traversing is
+> full of them. Capturing them as you go took coverage from 21/91 to 41/97 in one shop. An item with an
+> id resolves by id next week instead of by name. *(2026-08-04: wording only — this previously referred to "the
+> accessibility tree you already read for the bulk tick pass", which described the superseded bulk-add method.
+> The harvesting instruction itself is unchanged and still binding.)*
 
 ## 7. Confirm
 
@@ -276,10 +337,17 @@ the `asdair` schema, this file wins; report the table rather than following it.
 Both come from the rescued database copy. They are recorded as questions on purpose: neither is a call for a worker
 or for Larry to make.
 
-**1. Sort order — BRAND A–Z or plain A–Z?** §4 above says sort A–Z. The database copy said sort **BRAND** A–Z, and
-also that the resolved basket should be output sorted by brand. These may be the same intent loosely worded, or the
-brand sort may be a deliberate refinement that made the single-pass tick reliable. Unknown which. Whoever knows the
-answer should settle it in §4 and delete this entry.
+**1. Sort order — BRAND A–Z or plain A–Z? RESOLVED 2026-08-04: BRAND A–Z.** ~~§4 above says sort A–Z. The database
+copy said sort **BRAND** A–Z, and also that the resolved basket should be output sorted by brand. These may be the
+same intent loosely worded, or the brand sort may be a deliberate refinement that made the single-pass tick
+reliable. Unknown which.~~ *(2026-08-03: moot for `browser-runner`, which sorts nothing.)*
+
+> **RESOLVED by Warwick's ruling `BUILD-015-CANONICAL-RUNTIME-REALIGNMENT`, 2026-08-04.** The answer is
+> **Brand A–Z**, and it applies to both halves the old question asked about: the ASDA grid ordering **and** the
+> order of the prepared execution packet, which must sort deterministically by **(1) normalized brand A–Z, then
+> (2) canonical product name A–Z**. The database copy was right. §4 above now says Brand A–Z. Kept rather than
+> deleted so the sequence stays legible. Canonical:
+> `Builds/BUILD-015-asdair-durable-household-shopping-steward/CANONICAL-WEEKLY-SHOP-PROCESS.md` §E.
 
 **2. SAFETY CONFLICT — "substitute Banana -> Strawberry".** ⚠️ The database copy's resolution step instructed
 *"substitute Banana -> Strawberry"*. This cannot be taken at face value:
@@ -308,9 +376,22 @@ If that fails, the loop is open again regardless of what files exist.
 
 ## Known limitations (honest, as at 2026-07-27)
 
-- **The browser drive is not yet proven from a subagent.** The Claude-for-Chrome connector is not project-scoped
-  in `.mcp.json`, and every existing shim uses a `tools:` allowlist that would exclude it. Until that is settled
-  on its own, the browser step stays with Larry in main context. This is a mechanical unknown, not a preference.
+- ~~The browser drive is not yet proven from a subagent...~~ **SUPERSEDED 2026-07-28, commit `ab3f231`.**
+  This line described one mechanism's limit (a Claude Code subagent does not inherit host MCP tools) and was
+  wrongly generalised into "the browser step needs Larry." **PROVEN otherwise**: `services/asdair/browser-runner/`
+  is a plain, zero-dependency Node/CDP process (`runner.js`) — an independently deployed program, not something
+  any Claude Code agent, subagent, or MCP tool drives or needs to drive. It is started the same way any other
+  service on this machine is started (`node runner.js --request <id>`, same pattern as `pipeline-runtime` and
+  `cockpit-api`) — by a specialist's Bash tool, a scheduled task, or a human, all equally valid. "Asdair directs,
+  Larry clicks" was never a valid permanent operating mode. See the commit message and `RUNNER-PROOF.md` for the
+  decisive experiment. **Do not re-test this** — it is settled.
+  > **SUPERSEDED IN CONSEQUENCE, 2026-08-04 (`BUILD-015-CANONICAL-RUNTIME-REALIGNMENT`).** The technical finding
+  > above stands — `runner.js` genuinely does not need Larry, and that is still not to be re-tested. What
+  > changed is what follows from it: **`runner.js` is no longer the live basket writer.** Warwick ruled the live
+  > Stage 1 writer is **Sonnet in Claude for Chrome**; the CDP runner is experimental, deferred, not the live
+  > default, and **prohibited from further live-account testing without fresh authority from Warwick**. So the
+  > correct reading of this bullet is narrow: it retired "the browser step needs Larry", and it did **not**
+  > establish the runner as the operating route. `RUNTIME-DECISION.md`.
 - **The ASDA session is a singleton** — one profile, one login, one live trolley holding real money. It cannot be
   worktree-isolated or run concurrently.
 - **Fully hands-off is descoped** (Warwick, 2026-07-21): a human logs in. One shop per week.
@@ -329,9 +410,31 @@ If that fails, the loop is open again regardless of what files exist.
 - **`map` directives can resolve to prose.** Rule 23 maps `sure male` to *"Sure Men Anti-Perspirant Deodorant
   (blue variant)"* — an instruction, not a product — and the planner treats it as confidently matched. Watch for
   it when driving.
+- **No plan builder exists** *(added 2026-08-03)*. `stepQueueBrowserBuild` creates the
+  `asdair.browser_build_request` row but does **not** populate `progress.plan`; nothing in the repo converts
+  resolved `shop_line` rows into a browser-runner plan. On 2026-08-03 it was assembled by hand. Verified by
+  enumeration — `step_id` appears only inside `services/asdair/browser-runner/`. ~~This is the largest remaining
+  gap, and building it is a `product-decision`~~:
+  [[SOP-021a-asdair-live-execution-method]] §7.6.
+  > **AMENDED 2026-08-04 (`BUILD-015-CANONICAL-RUNTIME-REALIGNMENT`).** The gap is real and the enumeration
+  > stands, but it is **no longer on the live critical path**, because the CDP runner is no longer the live
+  > writer. WO-C (the runner plan builder) is **superseded in purpose**; what replaces it is the **Sonnet
+  > Browser Execution Packet** (WO-P) — a durable, deterministic, Brand A–Z artefact produced by the product
+  > itself and stored in Postgres, with a different consumer. **No Claude session constructs it by hand.**
+  > `CANONICAL-WEEKLY-SHOP-PROCESS.md` §E.
+- **The live basket writer has no mechanical substitution/checkout enforcement** *(added 2026-08-04)*. Sonnet in
+  Claude for Chrome is bound by instruction and supervision, not by a closed command allowlist. The boundaries
+  (never book a slot, check out, pay, enter a password, or auto-substitute) are unchanged and absolute, but under
+  this adapter they are **not** enforced in code. Recorded as an open consideration in `RUNTIME-DECISION.md`.
 
 ## References
 
+- **WHO WRITES THE LIVE BASKET (canonical, 2026-08-04):**
+  `Builds/BUILD-015-asdair-durable-household-shopping-steward/RUNTIME-DECISION.md`
+- **The end-to-end canonical process (2026-08-04):**
+  `Builds/BUILD-015-asdair-durable-household-shopping-steward/CANONICAL-WEEKLY-SHOP-PROCESS.md`
+- **Mechanical execution method of the DEFERRED experimental CDP adapter — preflight, diagnostics and failure
+  modes: [[SOP-021a-asdair-live-execution-method]]**
 - Standing rules + rule model: `services/asdair/skill/README.md`
 - Schema and the loop's tables: `services/asdair/db/001_asdair_schema.sql`
 - Outcome + learning writers: `services/asdair/outcome/`

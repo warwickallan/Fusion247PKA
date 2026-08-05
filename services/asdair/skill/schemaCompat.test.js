@@ -41,9 +41,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const data = require('./data');
-const { RULES_SELECT_COLUMNS, REGULARS_SELECT_COLUMNS } = data;
+const { RULES_SELECT_COLUMNS, REGULARS_SELECT_COLUMNS, RULE_QA_LOG_SELECT_COLUMNS } = data;
 
 const SCHEMA_PATH = path.join(__dirname, '..', 'db', '001_asdair_schema.sql');
+const ROTATE_MIGRATION_PATH = path.join(__dirname, '..', 'db', '007_rules_rotate_directive.sql');
 
 // ---------------------------------------------------------------------
 // Parse the column names defined on a given table's `create table` block.
@@ -149,15 +150,65 @@ test('every column loadRules() SELECTs is defined on asdair.rules in the migrati
   });
 });
 
-test('the directive CHECK lists exactly the planner vocabulary: info, exclude, needs_decision, map', function () {
+test('001_asdair_schema.sql defines the ORIGINAL directive vocabulary: info, exclude, needs_decision, map', function () {
   const sql = fs.readFileSync(SCHEMA_PATH, 'utf8');
   const values = parseDirectiveCheckValues(sql);
-  // "Exactly" = these four, no more, no fewer. Order in a CHECK is not
-  // semantically meaningful, so compare as sorted sets. planner.js branches on
-  // precisely this vocabulary (actionableRules ignores 'info'; the map /
-  // needs_decision / exclude directives drive the plan).
+  // "Exactly" = these four, no more, no fewer, IN THIS FILE. Order in a CHECK
+  // is not semantically meaningful, so compare as sorted sets.
+  //
+  // WO-Y NOTE: this test's title used to claim these four were "the planner
+  // vocabulary". They are 001's vocabulary. db/007 widened the live constraint
+  // to include 'rotate', and planner.js now branches on that value too - see
+  // the next test. The assertion below is unchanged; only the claim it makes
+  // about itself is corrected, because a test that overstates its own scope is
+  // how skill/README.md came to say a rotate directive could not be stored
+  // seven weeks after the migration that stores it had landed.
   const expected = ['exclude', 'info', 'map', 'needs_decision'];
   assert.deepEqual(values.slice().sort(), expected);
+});
+
+test('db/007 widens the directive CHECK to include `rotate`, which planner.js now consumes', function () {
+  // planner.js rotationInstructionsFromRules() derives rotation instructions
+  // from rules carrying directive 'rotate'. If that value could not be stored,
+  // the whole path would be unreachable from live data - which is exactly the
+  // state rotation was in for seven weeks. This asserts the migration that
+  // makes it storable is still present and still permits the value.
+  assert.ok(fs.existsSync(ROTATE_MIGRATION_PATH), 'expected db/007_rules_rotate_directive.sql to exist');
+  const sql = fs.readFileSync(ROTATE_MIGRATION_PATH, 'utf8');
+  const m = sql.match(/check\s*\(directive\s+in\s*\(([^)]*)\)/i);
+  assert.ok(m, 'expected 007 to rewrite the directive CHECK');
+  const values = [];
+  const re = /''([^']*)''/g;
+  let hit;
+  while ((hit = re.exec(m[1])) !== null) values.push(hit[1]);
+  assert.deepEqual(values.slice().sort(), ['exclude', 'info', 'map', 'needs_decision', 'rotate']);
+});
+
+// ---------------------------------------------------------------------
+// loadRuleQaLog() drift guard (WO-Y).
+//
+// asdair.rule_qa_log became a PLANNING input: it holds the household's already
+// answered questions, and nothing in the planning path had ever read it. A
+// column selected here but absent from the committed schema would throw at
+// runtime on a clean git-built database, so it is caught statically instead.
+// ---------------------------------------------------------------------
+test('every column loadRuleQaLog() SELECTs is defined on asdair.rule_qa_log in the migration', function () {
+  const sql = fs.readFileSync(SCHEMA_PATH, 'utf8');
+  const schemaColumns = parseTableColumns(sql, 'asdair.rule_qa_log');
+  assert.ok(schemaColumns.length > 0, 'no columns parsed from asdair.rule_qa_log');
+
+  RULE_QA_LOG_SELECT_COLUMNS.forEach(function (col) {
+    assert.ok(
+      schemaColumns.indexOf(col.toLowerCase()) !== -1,
+      'loadRuleQaLog() selects "' + col + '" but asdair.rule_qa_log has no such column in 001_asdair_schema.sql'
+    );
+  });
+
+  // The two the planner's behaviour actually depends on, named explicitly.
+  ['applies_going_forward', 'household_id'].forEach(function (col) {
+    assert.ok(schemaColumns.includes(col),
+      'the planner filters prior answers on ' + col + '; it must exist');
+  });
 });
 
 // ---------------------------------------------------------------------

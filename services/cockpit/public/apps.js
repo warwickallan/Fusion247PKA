@@ -111,6 +111,8 @@ const APPS = [
     views: [
       { key: 'overview', label: 'Overview', blurb: 'Where this week’s shop has got to, and anything waiting on you.' },
       { key: 'details', label: 'Details', blurb: 'Every line on the list — what it was read as, what it matched in the household catalogue, and the evidence behind the match.' },
+      { key: 'basket', label: 'Basket', blurb: 'The execution packet in Brand A–Z order — every product, its quantity, and WHY that quantity — and, once the basket has been built, how it reconciled against what was expected.' },
+      { key: 'rules', label: 'Rules', blurb: 'The durable rulebook: the standing rules AsdAIr plans against, the decisions it has been given, and the household catalogue with its aliases. Read-only — this is what the system believes.' },
       { key: 'about', label: 'About', blurb: 'What this app does, what it will never do, and where its data lives.' },
     ],
     about: [
@@ -119,6 +121,7 @@ const APPS = [
       'The cockpit is a second view of ONE shop, not a second brain: it reads durable state and forwards the same named commands the Telegram bot uses, so an answer given on the phone clears the same question here.',
       'Its reader is SELECT-only, inside a read-only transaction, over a read-only connection.',
       'Identity comes from the household catalogue, never from prose — a line only reads as matched when it carries a real catalogue id, with the raw reading preserved beside it as evidence.',
+      'The Rules view is the durable rulebook, read-only: standing rules grouped by what they DO, the decision history behind them, and every regular with its aliases. Nothing is edited from the cockpit — rules change through the same command surface the Telegram bot uses.',
       'Unknown reads as "unknown", never as 0. A measured zero still prints as 0.',
       'The service binds to localhost by default; a tailnet address has to be set deliberately.',
     ],

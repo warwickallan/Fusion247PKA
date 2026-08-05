@@ -5,7 +5,7 @@ status: DRAFT — NOT YET WARWICK-APPROVED
 governs_live: false
 owner: Warwick
 author: Mack (BUILD-014 PR-2b), 2026-07-20
-base_prompt: Builds/BUILD-010-fusion-tower/baton-mvp/tower-qa-skill.md (APPROVED — standing_use_ratified:true)
+base_prompt: services/control-plane/review/prompts/tower-qa-skill.md (rehomed + rewritten by BUILD-020 WP-2G; ships DRAFT — standing_use_ratified:false, pending Warwick)
 needs: Warwick's explicit approval before it may govern a LIVE review
 ---
 

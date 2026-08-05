@@ -501,7 +501,19 @@ test('planBasket with a rotation instruction plans a DIFFERENT variant from last
   assert.equal(/\bpay\b/.test(blob), false);
 });
 
-test('planBasket: rotation instruction + a map rule fixing the variant -> needs_decision, nothing planned', function () {
+// SUPERSEDED AND REPLACED, 2026-08-04 (WO-Y), on Warwick's live reading of the
+// rulebook - NOT on the implementation's own say-so.
+//
+// This test used to assert that ONE `map` rule plus a rotation instruction was
+// a conflict and produced a needs_decision. That encoded db/007's note about
+// rules 23/24 clashing with the rotate instruction. The live rows show the
+// premise was wrong: rule 32 OPENS by agreeing with rule 23 ("Sure male
+// (men's blue)") and then refines it. Under the old assertion Sure became a
+// question every single week, which is the failure WO-Y exists to end.
+//
+// The assertion is REPLACED, not deleted, and the conflict detector keeps an
+// executing proof in the test immediately below - a genuine clash still asks.
+test('planBasket: a map rule + a rotation instruction REFINES, it does not conflict', function () {
   const plan = planSure({
     lastOrder: LAST_ORDER_SURE,
     rotation: ROTATE_MALE_DEO,
@@ -512,11 +524,36 @@ test('planBasket: rotation instruction + a map rule fixing the variant -> needs_
   });
   const line = plan.items[0];
 
+  assert.equal(line.status, 'add', 'the map picks the family, the rotation picks this week - no question');
+  assert.equal(line.planned_qty, 1);
+  assert.equal(line.flags.indexOf('rotation conflict'), -1, 'this is not a conflict');
+  assert.notEqual(line.matched_product, QUANTUM, 'it must still rotate AWAY from what the last order held');
+  assert.ok(line.flags.indexOf('rotation refines mapped family') !== -1);
+  assert.ok(line.note.indexOf(QUANTUM) !== -1, 'the family the map chose stays traceable on the line');
+});
+
+test('planBasket: TWO map rules naming DIFFERENT products IS a genuine clash -> needs_decision', function () {
+  // The detector must still fire. This is mechanically decidable - two `map`
+  // directives claiming the same line for different products - unlike a prose
+  // contradiction, which this planner deliberately does not try to detect.
+  const plan = planSure({
+    lastOrder: LAST_ORDER_SURE,
+    rotation: ROTATE_MALE_DEO,
+    rules: [
+      { id: 23, directive: 'map', scope: 'product', active: true,
+        match_term: 'male deodorant', matched_product: QUANTUM, household_id: HH },
+      { id: 24, directive: 'map', scope: 'product', active: true,
+        match_term: 'male deodorant', matched_product: 'Sure Men Invisible Ice Anti-Perspirant',
+        household_id: HH }
+    ]
+  });
+  const line = plan.items[0];
+
   assert.equal(line.status, 'needs_decision');
   assert.equal(line.planned_qty, 0);
   assert.ok(line.flags.indexOf('rotation conflict') !== -1);
   assert.ok(line.flags.indexOf('never auto-substitute') !== -1);
-  assert.ok(line.note.indexOf('rotation conflict') !== -1, 'the conflict is put to the human as a question');
+  assert.ok(line.note.indexOf('rotation conflict') !== -1, 'the clash is put to the human as a question');
 });
 
 test('planBasket: rotation asked for on a line with no known variants -> needs_decision', function () {

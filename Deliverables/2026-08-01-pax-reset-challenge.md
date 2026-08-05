@@ -58,7 +58,17 @@ The harness **does** have a real external mechanism: `PreToolUse` hooks (`GUARD_
 Warwick asks whether Codex QA "can reliably be evoked as it was a week ago." **I will not assert it. Here is what must be PROVEN before Codex can be the standing verification gate for Rule 3:**
 
 1. **A live evocation, reproduced NOW.** Run `mergeCheck.mjs` end-to-end on a real diff today and get a Codex verdict back. **"It worked a week ago" is a memory, not evidence** — that run must be reproduced at the current head. This is Rule 3 applied to Rule 3's own gate.
-2. **Tower is a hard dependency, and it is PARKED.** Codex QA runs *through* Tower's `mergeCheck.mjs` (from `C:\Fusion247PKA-tower`), and memory records Tower as **MERGED + PARKED — "don't resume without a fresh decision."** So standing-Codex-gate **requires un-parking Tower**, which is itself a decision (it was parked for a reason). No un-park, no standing gate.
+2. **Tower is a hard dependency, and it is PARKED.** Codex QA runs *through* Tower's `mergeCheck.mjs` (from `C:\Fusion247PKA-tower`), and memory records Tower as **MERGED + PARKED — "don't resume without a fresh decision."** So standing-Codex-gate **requires un-parking Tower**, which is itself a decision (it was parked for a reason). No un-park, no standing gate. — **PATH SUPERSEDED 2026-08-05: see the correction below. The dependency argument stands; the location does not.**
+
+> **Correction, 2026-08-05 (WO-2026-08-05-03, BUILD-020 proofline).** `C:\Fusion247PKA-tower` is **not**
+> where Codex QA runs from. Point 2's *reasoning* is untouched — Tower remains the route and its parked
+> status remains a decision — but the path would send a fresh reader to a stale tree.
+>
+> The current Tower runtime is `C:\Fusion247PKA\services\control-plane\tower-loop\` (live watcher
+> verified by execution 2026-08-05, PID 31268). The preferred Codex review route is `reviewDiff.mjs`,
+> which **does not exist at all** in the `-tower` worktree; that worktree is pinned at `3c08e45` on
+> `build-014/tower-recovery` and its `mergeCheck.mjs` is superseded. The `-tower` worktree is authorised
+> for removal under WO-2026-08-05-03, sequenced behind WO-2026-08-05-04.
 3. **The diff-staging path must be confirmed working.** Codex's read-only sandbox on Windows **cannot self-read files**, so the actual diff must be **staged into the prompt.** A gate that reviews an *empty* diff is worse than none — it manufactures false assurance. Prove Codex reasons over the staged diff, not an empty context.
 4. **Fable is NOT the standing gate.** Confirm-first **hardlock** means every Fable evocation needs Warwick's explicit per-use yes — so it is an on-demand, human-gated escalation, **never** the automatic verifier. The standing gate is Codex-via-Tower **or nothing.**
 

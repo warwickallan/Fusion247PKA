@@ -305,7 +305,11 @@ export async function pollPrComments(pool, { repo, prNumber, gh = ghCliReader, m
       const res = await ingestPrComment(pool, payload);
       if (res.deduped) results.push({ ...base, checkpoint, outcome: 'deduped', commentRowId: res.commentRowId, headSha: res.headSha });
       else if (res.applied) results.push({ ...base, checkpoint, outcome: 'applied', commentRowId: res.commentRowId,
-        turnId: res.turnId, headSha: res.headSha, applied_count: res.applied_count, skipped: res.skipped });
+        turnId: res.turnId, headSha: res.headSha, applied_count: res.applied_count, skipped: res.skipped,
+        // W4 — carried through so watcher.mjs's pollRound can echo each FRESH disposition to
+        // Telegram without re-parsing the comment; a deduped re-poll never reaches this branch,
+        // so a re-poll can never re-echo.
+        disposedFindingIds: res.disposedFindingIds ?? [] });
       else results.push({ ...base, checkpoint, outcome: 'rejected_stale', commentRowId: res.commentRowId,
         turnId: res.turnId, headSha: res.headSha, reason: res.reason });
     } catch (e) {

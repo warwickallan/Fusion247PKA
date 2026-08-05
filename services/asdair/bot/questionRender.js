@@ -150,6 +150,75 @@ export function candidateIds(list) {
 }
 
 /**
+ * The id namespace for a candidate whose identity is an `asdair.regulars` row.
+ *
+ * WHY A PREFIX AND NOT A BARE NUMBER. `planCandidates()` in the pipeline is
+ * explicit that there are three populations of "alternative" and that only the
+ * catalogue resolver's `regular_id` is a trustworthy asdair.regulars id — a
+ * product_alternatives primary key is NOT one, and reading it as one puts a
+ * different product on screen. A bare `"41"` in rendered_candidates would lose
+ * that distinction the moment a second population ever gained an id. The prefix
+ * keeps "which table is this id from" readable off the stored contract itself.
+ */
+export const REGULAR_ID_PREFIX = 'regular:';
+
+/**
+ * PURE. Adapt the candidate list as the PLANNER stores it onto the shape this
+ * module's render contract requires — and separate out the ones that cannot
+ * safely become buttons.
+ *
+ * THE MISMATCH THIS EXISTS TO BRIDGE, STATED PLAINLY. `runPipeline.planCandidates()`
+ * writes `asdair.shop_question.candidates` rows as `{ label, regular_id, source }`
+ * (the catalogue resolver's alternatives) or `{ label, source }` with NO id at all
+ * (the planner's ranked name suggestions — it does not return an id and inventing
+ * one would be a lie). `candidateIdOf()` above accepts `id` / `productId` /
+ * `product_id` and REFUSES anything else. So without this adapter every card
+ * would throw and the product would stay silent, which is the defect, not the fix.
+ *
+ * The id-less ones are NOT quietly dropped and NOT quietly promoted. They are
+ * returned separately so the caller can still show them as text a human can reply
+ * to. Giving them a button would mean an index resolving to a label, which is the
+ * exact ambiguity this module exists to remove.
+ *
+ * @param {Array<string|object>} candidates the stored `candidates` jsonb array
+ * @returns {{candidates:Array<{id:string,label:string|null}>, unidentified:string[]}}
+ */
+export function normaliseStoredCandidates(candidates = []) {
+  const identified = [];
+  const unidentified = [];
+  const list = Array.isArray(candidates) ? candidates : [];
+
+  for (const raw of list) {
+    // A bare string is a LABEL. It has never been an identity here and is not
+    // being promoted to one now.
+    if (typeof raw === 'string') {
+      const label = raw.trim();
+      if (label) unidentified.push(label);
+      continue;
+    }
+    if (!raw || typeof raw !== 'object') continue;
+
+    const label = typeof raw.label === 'string' && raw.label.trim().length > 0
+      ? raw.label.trim()
+      : null;
+
+    const direct = raw.id ?? raw.productId ?? raw.product_id;
+    if (direct !== undefined && direct !== null && String(direct).trim().length > 0) {
+      identified.push({ id: String(direct).trim(), label });
+      continue;
+    }
+    const regular = raw.regular_id ?? raw.regularId;
+    if (regular !== undefined && regular !== null && String(regular).trim().length > 0) {
+      identified.push({ id: `${REGULAR_ID_PREFIX}${String(regular).trim()}`, label });
+      continue;
+    }
+    if (label) unidentified.push(label);
+  }
+
+  return { candidates: identified, unidentified };
+}
+
+/**
  * PURE. Normalise one displayed candidate into the row stored in
  * asdair.shop_question.rendered_candidates. Deliberately small: the id (the only
  * load-bearing field), the label that was actually shown, and the index the

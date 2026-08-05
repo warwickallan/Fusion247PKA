@@ -203,8 +203,22 @@ retro, from 2026-07-10).
 | Worktree | Branch | Why |
 |---|---|---|
 | `C:\Fusion247PKA` | `hygiene/2026-07-28-doctrine-and-capture-persistence` | Primary. Live processes run from here (`liveRunner`, `apply-contract-command --watch`). |
-| `C:\Fusion247PKA-tower` | `build-014/tower-recovery` | Tower merge-check runtime home. |
+| `C:\Fusion247PKA-tower` | `build-014/tower-recovery` | Tower merge-check runtime home. **SUPERSEDED 2026-08-05 — see the correction below.** |
 | `C:\Fusion247PKA-w01` | `idea-017/w01-note-structure-validator` | Open **PR #72**; head matches the PR exactly. |
+
+> **Correction, 2026-08-05 (WO-2026-08-05-03, BUILD-020 proofline).** `C:\Fusion247PKA-tower` is **no
+> longer the Tower merge-check runtime home** and must not be treated as one. The row above is
+> accurate as of 2026-07-28 and is kept as the record of that date.
+>
+> The live Tower runtime is `C:\Fusion247PKA\services\control-plane\tower-loop\watcher.mjs` — verified
+> by execution on 2026-08-05 (`Win32_Process`, PID 31268). The `-tower` worktree is pinned at
+> `3c08e45` on `build-014/tower-recovery` and is **stale**: it carries a superseded `mergeCheck.mjs`
+> and has **no `reviewDiff.mjs` at all**, which is the current Codex review route. Anyone sent there
+> for merge-check evidence is reading a tree three weeks behind the estate.
+>
+> The worktree is authorised for `git worktree remove` under WO-2026-08-05-03 and that step is
+> **sequenced behind WO-2026-08-05-04** (the machine-level launcher deletion), so at the time of
+> writing the directory may still exist. Its existence is not a reason to use it.
 
 ### Unmerged remote branches preserved (15)
 

@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Proofline</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="mark" aria-hidden="true"></span>
+    <h1>Proofline</h1>
+  </div>
+  <dl class="health" id="health" aria-label="Service health">
+    <div><dt>Epoch</dt><dd id="health-epoch">—</dd></div>
+    <div><dt>Awaiting you</dt><dd id="health-awaiting">—</dd></div>
+    <div><dt>Total jobs</dt><dd id="health-total">—</dd></div>
+  </dl>
+</header>
+
+<main class="layout">
+
+  <section class="panel" aria-labelledby="submit-heading">
+    <h2 id="submit-heading">Submit</h2>
+    <form id="submit-form" novalidate>
+      <div class="field">
+        <label for="key">Key</label>
+        <input id="key" name="key" type="text" autocomplete="off" spellcheck="false"
+               placeholder="notes-2026-08-04" required>
+        <p class="hint">Letters, digits, and <code>. _ : -</code> — up to 128 characters. Re-using a key never creates a second job.</p>
+      </div>
+      <div class="field">
+        <label for="text">Text</label>
+        <textarea id="text" name="text" rows="12" spellcheck="false"
+                  placeholder="Paste anything. It is hashed exactly as it arrives — no trimming, no newline rewriting, no Unicode normalisation."></textarea>
+        <p class="hint"><span id="text-size">0</span> bytes of a 1 MiB limit.</p>
+      </div>
+      <div class="actions">
+        <button type="submit" class="primary" id="submit-btn">Submit</button>
+      </div>
+      <p class="notice" id="submit-notice" role="status" aria-live="polite"></p>
+    </form>
+  </section>
+
+  <section class="panel" aria-labelledby="jobs-heading">
+    <h2 id="jobs-heading">Jobs</h2>
+    <p class="empty" id="jobs-empty">Nothing submitted yet.</p>
+    <ul class="joblist" id="joblist"></ul>
+  </section>
+
+  <section class="panel detail" aria-labelledby="detail-heading">
+    <h2 id="detail-heading">Detail</h2>
+    <p class="empty" id="detail-empty">Select a job to see its durable record.</p>
+    <div id="detail" hidden>
+
+      <div class="detail-head">
+        <h3 id="detail-key"></h3>
+        <span class="state" id="detail-state"></span>
+      </div>
+
+      <div class="decision" id="decision" hidden>
+        <label for="decision-note">Note (optional)</label>
+        <input id="decision-note" type="text" autocomplete="off" placeholder="why you decided this">
+        <div class="actions">
+          <button type="button" class="primary" id="approve-btn">Approve</button>
+          <button type="button" class="danger" id="reject-btn">Reject</button>
+        </div>
+        <p class="notice" id="decision-notice" role="status" aria-live="polite"></p>
+      </div>
+
+      <h4>Durable state timeline</h4>
+      <p class="hint">Read back from the journal on disk — not from anything the page remembers. This is how a state that lasted a few milliseconds is still visible.</p>
+      <ol class="timeline" id="timeline"></ol>
+
+      <h4>Result</h4>
+      <p class="empty" id="result-empty">No result yet.</p>
+      <div id="result" hidden>
+        <p class="digest">
+          <span class="digest-label">resultSha256</span>
+          <code id="result-sha"></code>
+        </p>
+        <dl class="counts" id="result-counts"></dl>
+        <h5>Top terms</h5>
+        <ol class="terms" id="result-terms"></ol>
+      </div>
+
+      <h4>Submitted text</h4>
+      <p class="digest">
+        <span class="digest-label">textSha256</span>
+        <code id="detail-textsha"></code>
+      </p>
+      <pre class="text" id="detail-text"></pre>
+
+    </div>
+  </section>
+
+</main>
+
+<script src="/app.js" type="module"></script>
+</body>
+</html>

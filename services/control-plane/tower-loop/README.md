@@ -267,7 +267,11 @@ nothing, lost the moment the process was replaced.
 
 Measured on 2026-08-03: a healthy watcher with an advancing heartbeat had polled **PR #90 — merged
 at 2026-08-02T23:30:33Z — 140 rounds in a row**, returning `checkpointsCreated: 0` every time, while
-#91, #81 and #80 sat open and unpolled.
+#91, #81 and #80 sat open and unpolled. A follow-up attempt the same day (2026-08-05) reintroduced
+the identical failure shape in new clothes: the live-discovery call it added SWALLOWED a `gh`
+failure into a log line and let `pollTargets` fall through to zero targets — indistinguishable from
+a healthy idle watcher to the existing alarm. That version is what the fix below replaces; **a
+discovery failure now throws** — see "When it fails".
 
 The cut now is:
 
@@ -276,17 +280,27 @@ The cut now is:
 | Is this PR open? | GitHub's | asked every round |
 | Does this PR have a live round? | ours | `state <> 'complete'`, used **only to rank** under the cap |
 
-#### Where the repository comes from — three sources, all durable
+#### Where the repository comes from — four sources, all durable
 
 1. **this checkout's `origin` remote** — on disk, re-read every round, unaffected by restart;
 2. **every repo any turn in the store names** — no state filter, deliberately: filtering here would
    reintroduce the self-extinguishing bug one level up;
-3. `TOWER_PR_SEED` — retained as an escape hatch for a repository that is neither of the above.
+3. `TOWER_PR_SEED` — retained as an escape hatch for a repository that is neither of the above;
+4. `TOWER_PR_REPOS` (comma-separated `owner/name`) — the **stable machine-runtime source**. Source 1
+   needs an actual `.git` checkout to read `origin` from; Tower's real machine deployment
+   (`~/.mypka/tower-runtime/`) is a **plain file copy**, not a git checkout, so source 1 resolves
+   nothing there. `TOWER_PR_REPOS` is what makes discovery work at all in that deployment — set once
+   for the life of the deployment, unlike `TOWER_PR_SEED` which names a PR rather than a repo.
 
 **`TOWER_PR_SEED` is no longer load-bearing and its PR number no longer has any power.** A seed entry
 contributes only its `owner/name`; the PR it names is polled if and only if GitHub says it is open.
 A stale seed can no longer pin the watcher to a merged PR. The grammar is unchanged, so nothing an
 operator has already set needs editing.
+
+```
+TOWER_PR_SEED=warwickallan/Fusion247PKA#90       # comma-separate for more than one; #pr is vestigial
+TOWER_PR_REPOS=warwickallan/Fusion247PKA          # comma-separate for more than one; no #pr — repos only
+```
 
 If **no** repository can be determined from any source, the round logs `pr_poll_no_repos` — a
 deliberately distinct event from `pr_poll_no_targets`, because "there is nothing open to watch" and
@@ -294,11 +308,14 @@ deliberately distinct event from `pr_poll_no_targets`, because "there is nothing
 
 #### The cap, and why truncation is loud
 
-At most **5** PRs per round (`PR_POLL_MAX_TARGETS`, a literal, not config). PRs with a live round
-rank first, then the rest newest-first, so a round waiting on a disposition comment is never the one
-dropped. Truncation logs `pr_poll_targets_truncated` naming what it dropped — a PR that is silently
-never polled is invisible for exactly the same reason a merged target was. Cost at the cap: one
-discovery call plus two per PR per round, ≈660 requests/hour against GitHub's 5,000.
+At most **5** PRs per round (`PR_POLL_MAX_TARGETS`, a literal, not config), across the **combined**
+set of every source above — one ranking and one cap, not one per source, so a repository declared
+only via `TOWER_PR_REPOS` cannot silently reserve or lose slots relative to the others. PRs with a
+live round rank first, then the rest newest-first, so a round waiting on a disposition comment is
+never the one dropped. Truncation logs `pr_poll_targets_truncated` naming what it dropped — a PR
+that is silently never polled is invisible for exactly the same reason a merged target was. Cost at
+the cap: one discovery call per known repository plus two per PR per round, ≈660 requests/hour
+against GitHub's 5,000 for a single-repo deployment.
 
 ### When it fails
 
@@ -498,10 +515,13 @@ node test/run-tower-loop-tests.mjs      # no database server, no network, no gh 
 
 Fails loudly on **zero executed subtests** — a run that skips everything is never a pass.
 `W1`–`W8` cover the comment seam; `P1`–`P6` cover the GitHub → Tower first hop; `T0`–`T7` are the
-pre-existing watcher acceptance tests; `A1`–`A16` plus `A-unit` cover the WO-TW-02 automatic
-trigger, the verdict write-back and the chained disposition journey. **41 subtests.**
+pre-existing watcher acceptance tests; `A1`–`A16` cover the WO-TW-02 automatic trigger, the verdict
+write-back and the chained disposition journey; `D1`–`D9` plus `D-TR1`/`D-TR2` (WO-2026-08-03-05)
+cover open-PR discovery — replacing the old `A-unit`, which tested the store-derived rule this
+change removed. **The runner prints its own `executed=N failures=0` — read that, not a number
+copied here, which is exactly the kind of claim that goes stale first.**
 
-`P1`–`P6` and `A1`–`A9` drive the `gh` boundary through an **injected seam**
+`P1`–`P6`, `A1`–`A9` and `D1`–`D9`/`D-TR1`/`D-TR2` drive the `gh` boundary through an **injected seam**
 (`test/doubles/fakeGh.mjs`, and `test/doubles/fakeGhModule.mjs` for a spawned watcher), so the suite
 needs no network and no `gh` binary. The double refuses any endpoint it does not model — a permissive
 double would answer an argv the real seam rejects, and then the suite proves something about the
@@ -525,10 +545,11 @@ double rather than about the code.
   forbids it structurally), and the write lives in a separate module behind a separate allowlist
   seam. See "The verdict goes back ONTO the PR".
 - ~~**The store-derived poll cannot bootstrap itself.**~~ **SUPERSEDED** by WO-2026-08-03-05:
-  targets are now every OPEN PR asked of GitHub, so there is no bootstrap hole and no first-
-  checkpoint blind spot. The residual limit is different and smaller: **if no repository can be
-  determined from the checkout's `origin`, the store, or `TOWER_PR_SEED`, nothing is polled.** That
-  round logs `pr_poll_no_repos` rather than looking idle, but it raises no alarm.
+  targets are now every OPEN PR asked of GitHub (plus `TOWER_PR_REPOS` for a non-checkout
+  deployment), so there is no bootstrap hole and no first-checkpoint blind spot. The residual limit
+  is different and smaller: **if no repository can be determined from the checkout's `origin`, the
+  store, `TOWER_PR_SEED` or `TOWER_PR_REPOS`, nothing is polled.** That round logs `pr_poll_no_repos`
+  rather than looking idle, but it raises no alarm.
 - **A checkpoint marker on a PR whose head has moved is refused, not queued.** Layer 1 compares the
   body head to the API head; if the PR advanced between writing and polling, the comment is
   `refused_head_mismatch` and **no round opens**. Re-post at the current head.

@@ -134,6 +134,40 @@ jobs:
         working-directory: services/asdair/pipeline
         run: node --test
 
+      # ADDED 2026-08-04, closing D-2026-07-28-20 — open since 2026-07-28.
+      #
+      # These two suites existed, passed, and gated NOTHING. Neither working
+      # directory appeared in any step of this file, so every test in them was
+      # builder-run only: a wall of green here said nothing about either one.
+      # That is the same shape as the defect this workflow's own comments warn
+      # about at the Stage 1 modules above — and it survived a further week
+      # precisely because those comments made the file LOOK like it had learned
+      # the lesson. It was caught at a work-order read-back, not by a control.
+      #
+      # Both declare pg and ship a lockfile, so `npm ci` is required; both are
+      # offline at test time (pg is lazily required, every test injects a fake
+      # client or a fake transport). Separate steps so a failure names the module.
+      - name: Install dependencies for the supervised runtime (pg)
+        working-directory: services/asdair/pipeline-runtime
+        run: npm ci
+
+      - name: Run the supervised runtime suite (offline)
+        working-directory: services/asdair/pipeline-runtime
+        run: node --test
+
+      # The browser-runner is the DEFERRED experimental CDP adapter — it is
+      # PROHIBITED from the live route (see its README banner and SOP-021a).
+      # Its suite still runs here: deferred is not the same as unguarded, and
+      # its lease / fencing / idempotent-replay / forbidden-operation proofs are
+      # the reason the prohibition is enforceable rather than merely stated.
+      - name: Install dependencies for the deferred CDP adapter
+        working-directory: services/asdair/browser-runner
+        run: npm ci
+
+      - name: Run the deferred CDP adapter suite (offline, no browser)
+        working-directory: services/asdair/browser-runner
+        run: node --test
+
   integration:
     runs-on: ubuntu-latest
     defaults:

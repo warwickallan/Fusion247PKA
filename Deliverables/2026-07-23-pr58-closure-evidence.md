@@ -107,3 +107,22 @@ updated to run `C:\Fusion247PKA-tower\services\control-plane\tower-loop\watcher.
 `TOWER_EVIDENCE_REPO_DIR=C:\Fusion247PKA-tower` so `REPO_ROOT` is fixed regardless of what the main
 checkout is doing. Secrets remain in `C:\.fusion247\*.env` (never in Git). After PR #58 merges,
 the worktree is re-pointed at `main`.
+
+> **Correction, 2026-08-05 (WO-2026-08-05-03, BUILD-020 proofline). F3 above is HISTORY, not
+> instructions. Do not follow it.** It is accurate for 2026-07-23 and is kept as the PR #58 record.
+>
+> Three of its statements are no longer true, and each of them is a live start path for a retired
+> runtime if a fresh reader pastes it:
+>
+> - **`C:\.fusion247\run-tower-cp-watcher.ps1` is not "the launcher".** It is a **legacy** script
+>   scheduled for deletion under WO-2026-08-05-04. **Do not run it.** It stops every node process
+>   matching `*tower-loop*watcher.mjs*` **before** it starts anything — a match that includes the
+>   *live* watcher — and the copy it then starts is from 2026-07-22.
+> - **`C:\Fusion247PKA-tower` is not the runtime home.** The live watcher runs from
+>   `C:\Fusion247PKA\services\control-plane\tower-loop\watcher.mjs` (verified by execution 2026-08-05,
+>   PID 31268). The `-tower` worktree is pinned at `3c08e45`, its `mergeCheck.mjs` is superseded, and
+>   it has no `reviewDiff.mjs`. It is authorised for `git worktree remove` under WO-2026-08-05-03,
+>   sequenced behind WO-2026-08-05-04.
+> - **The re-point to `main` never happened.** The worktree is still on `build-014/tower-recovery`.
+>
+> The current launcher is `node services/control-plane/tower-loop/run-watcher.mjs`.

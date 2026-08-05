@@ -36,7 +36,11 @@ This is not Larry being unhelpful. An interrupted build is how BUILD-018 happene
 
 ---
 
-## 🔻 STATUS — Phase 0 COMPLETE (promotion + map). Phase 1 is the frontier.
+## 🔻 STATUS — Phases 0, 1, 2 and 3 ✅ PASS. **BUILD-019 IS PAUSED. The active build is BUILD-006 — do not work here.**
+
+> **If you have arrived at this map looking for the next action, it is not in this file.**
+> **Open `Deliverables/2026-08-03-build-006-vlogops-publishing-engine-wayfinder-plan.md` — BUILD-006 VlogOps Publishing Engine, Phase 1.**
+> BUILD-019 resumes at **Phase 4**, and only after BUILD-006 produces a real Publication Package.
 
 | | |
 |---|---|
@@ -44,14 +48,20 @@ This is not Larry being unhelpful. An interrupted build is how BUILD-018 happene
 | **Promoted from** | IDEA-019 (Foundry), on Warwick's explicit instruction 2026-08-02 |
 | **Promoted at** | Fusion247PKA `7163a32` (`origin/main`) |
 | **Branch** | `build-019-public-platform-wayfinder` |
-| **Current phase** | Phase 0 — promotion and mapping: **COMPLETE**. Plan **ACCEPTED IN SUBSTANCE by Warwick, 2026-08-02**, with five bounded corrections since applied. |
-| **⏸️ BUILD STATUS** | **PAUSED by Warwick, 2026-08-02.** BUILD-019 feature implementation is stopped until the Tower watcher migration passes both acceptance journeys. **This is not a BUILD-019 blocker** — it is a deliberate ordering decision: the review loop gets fixed before the website is built through it. See `Deliverables/2026-08-02-tower-watcher-github-sqlite-migration-plan.md`. |
-| **Current gate** | Tower watcher migration acceptance. Phase 1 is authorised but **not to start** until that passes. |
-| **Exact next action** | **Not BUILD-019.** Complete the Tower watcher migration first. When it passes: **Phase 1 — website skeleton in the EXISTING `warwickallan/fusion247-web` repo and EXISTING `fusion247-web` Vercel project.** Initialise Next.js + TypeScript + Tailwind, add CI, turn the canonical-domain 404 into a real page. Nothing external, nothing paid, no account touched. |
+| **Current phase** | **Phases 0, 1, 2 and 3 are all ✅ PASS.** The plan was accepted in substance by Warwick 2026-08-02, with corrections since applied. **Phase 4 is next and is DEFERRED — see below.** |
+| **⏸️ BUILD STATUS** | **PAUSED AFTER PHASE 3 — deliberately, by Warwick, 2026-08-03.** Phases 1–2 are built; Phase 3 is in progress. **The programme order is now fixed: BUILD-019 Phases 1–3 → BUILD-006 VlogOps in full → BUILD-019 Phase 4 → the real end-to-end acceptance journey.** Phase 4 was specified against a **synthetic fixture**; it resumes instead with a **real producer and a real Publication Package** behind it. That is the whole reason for the reordering. |
+| **Next active phase** | **Phase 4 — publication contract + website adapter. DEFERRED, not abandoned.** It does not begin until BUILD-006 produces a real Publication Package and production flow for it to consume. |
+| **Model for Phase 4 when it resumes** | **Opus-high, with mandatory independent review (Codex).** It is the interface VlogOps inherits and the expensive thing to get wrong. |
+| **The other build** | `Deliverables/2026-08-03-build-006-vlogops-publishing-engine-wayfinder-plan.md` — BUILD-006 VlogOps Publishing Engine. It develops against the §4 contract in this map and does **not** wait for BUILD-019 Phases 4–7. |
+| **Current gate** | **NONE — this build is paused and has no open gate of its own.** Phase 3 closed PASS as production-READY, not production-published: the protected Vercel preview is Warwick's review surface, promotion and rollback routes are documented and ready, and `main` and the public domain are untouched. The next gate belongs to BUILD-006. |
+| **⛔ THE LAUNCH GATE** | **Warwick has NOT approved the website copy, the three articles, the rendered visual result, or public launch.** PRs #1 and #2 stay unmerged. **Public production is not the review environment.** Promotion to `www.fusion247.co.uk` is a separate Warwick decision *after* copy and visual approval — a `product-decision` followed by a `merge-decision`, never a technical step. Phase 3's "preview→production" wording **does not override this map's own explicit Warwick launch authority** (§11). |
+| **📐 THE REVIEW LADDER** | **Source → rendered non-production → public promotion only after approval.** *"Authentication failure by an agent is not evidence that the review environment does not exist"* (Warwick, 2026-08-03). The rule and the incident that produced it are recorded ONCE, in **§9.1 of `Deliverables/2026-08-03-build-006-vlogops-publishing-engine-wayfinder-plan.md`** — that is the SSOT and this row is a pointer. It binds this build identically: **the protected preview is the review surface, and an agent's 302 says nothing about whether Warwick can see the site.** |
 | **Model for Phase 1** | **Routine implementation / lower-cost model** — bounded Work Order to Keel. Not Opus-high; the stack and the target are both settled. |
 | **Review route** | **Manual: `reviewDiff.mjs --claim`, claim derived from the Phase 1 gate, inside the three-execution Codex budget.** The watcher cannot be reached from a PR — SHIT TO DO #4. |
 
-**No implementation has begun.** This map and the promotion record are the only artefacts produced so far.
+**Implementation IS under way and is banked.** A working Next.js + TypeScript + Tailwind site exists in `warwickallan/fusion247-web` across three open, unmerged, stacked PRs — **#1** (skeleton, `167d6c2`) → **#2** (16 routes + 3 MDX articles, `9178bd7`) → **#3** (runbook + deployment behaviour, `73f36a8`). CI green on every head SHA. **Nothing is merged and `www.fusion247.co.uk` is still a 404 — deliberately**, pending Warwick's approval of copy, articles and visual result.
+
+> **Two things a fresh session must not undo:** the site is NOT unbuilt, and the 404 is NOT a failure. It is the launch gate holding.
 
 ---
 
@@ -244,9 +254,21 @@ Repository, Vercel project and all domains are **ready and verified** (§5). Bui
 
 **Standing instruction: do not retry, do not duplicate the channel, do not create another Google account.**
 
-**Still genuinely unknown:** the review outcome, the granted handle, and phone-verification state (which gates long uploads, custom thumbnails and live).
+**Still genuinely unknown:** the review outcome and the granted handle.
 
-**Resolution:** recheck **only** when Phase 5 genuinely needs it, or when Warwick reports the review has cleared. Not before — a speculative recheck is how a duplicate channel gets created.
+> #### 🔬 NARROWED BY RESEARCH — Pax, official Google documentation, 2026-08-03
+>
+> **My earlier wording here was wrong in a way that mattered.** It said phone verification "gates long uploads, custom thumbnails and live", implying the pending review blocked the video itself. It does not.
+>
+> - **The unverified-channel duration cap is 15 minutes.** A 9–12 minute Human in the Poop episode is **under it**. Phone verification is **NOT** required for the target format.
+> - **Phone verification IS required for custom thumbnails** — which the Master Story Package explicitly produces. *That* is what the pending review gates, plus publication itself. **Not the upload.**
+> - **Quota is a non-issue and the well-known numbers are stale.** `videos.insert` is **1 unit in a dedicated Video Uploads bucket, ~100 calls/day** (cost changed 2025-12-04; buckets separated 2026-06-01). Uploads no longer compete with reads.
+> - 🔴 **THE REAL PUBLIC-LAUNCH GATE IS AN AUDIT, NOT CODE.** *"All videos uploaded via the `videos.insert` endpoint from unverified API projects created after 28 July 2020 will be restricted to private viewing mode."* Lifting it needs a **YouTube API Services compliance audit** — separate from and additional to the channel's identity review. **An unaudited project can upload, and the video is permanently locked private — it cannot be made public by API or in Studio.** So this map's "default Private while proving" posture is **free**; going public has **lead time**. Starting that audit early is a Warwick decision.
+> - **`status.containsSyntheticMedia`** (boolean) exists on `videos.insert`/`update`, added 2024-10-30. A realistic HeyGen avatar of Warwick is squarely in scope — §7's disclosure requirement has a concrete field.
+> - **`privacyStatus: private` is NOT link-shareable.** For Warwick to view a proof render on his phone, **`unlisted`** is the correct value.
+> - **`youtube.upload`** is least-privilege for upload alone; `videos.update` and thumbnails will likely need broader — confirm per method before fixing the scope set.
+
+**Resolution:** recheck the review **only** when Phase 5 genuinely needs it, or when Warwick reports it has cleared. Not before — a speculative recheck is how a duplicate channel gets created.
 **While open:** Phases 1–4 proceed in full.
 
 ### 🟠 F2 — X: account and app CONFIRMED; the runtime path is what remains
@@ -262,11 +284,30 @@ Repository, Vercel project and all domains are **ready and verified** (§5). Bui
 **No credential value is to be exposed, echoed, logged or reproduced — here or anywhere.**
 **While open:** Phases 1–4 proceed.
 
-### 🟢 F3 — HeyGen: a later human dependency, deliberately not now
+### 🟠 F3 — HeyGen: cost RESOLVED by research; the account binding and one hard limit remain
 
-**Position (Warwick, 2026-08-02):** Warwick will investigate the account, plan, API entitlement, avatar/voice and cost **later tonight**.
+**Position (Warwick, 2026-08-02):** Warwick will investigate the account, plan, API entitlement, avatar/voice and cost.
 
-**It does not block Phases 1–6.** Keep it as a later human dependency and do not preflight it speculatively. It carries spend, so it stays a gate whenever it does arrive.
+**It does not block Phases 1–6.** It carries spend, so it stays a gate whenever it arrives.
+
+> #### 🔬 RESOLVED BY RESEARCH — Pax, official HeyGen documentation, 2026-08-03
+>
+> **No subscription tier is required.** The API is a standalone **pay-as-you-go** purchase from **$5**, prepaid USD wallet, balance readable at `GET /v3/users/me`. Billed **per second of output, identical for 720p and 1080p**. Max **30 minutes and 50 scenes per video** — a 9–12 minute episode needs no duration segmenting. **PAYG cap: 10 concurrent jobs**; `429` carries `Retry-After`. Async via persistent webhooks or per-request `callback_url` + `callback_id`, with **`Heygen-Event-Id` as the documented replay-defence header**.
+>
+> **Cost of one 9–12 minute render — the 4× spread IS the gate:**
+>
+> | Engine / avatar type | $/min | 9–12 min |
+> |---|---|---|
+> | **Avatar III — Digital Twin / Studio** | $1.00 | **$9.02 – $12.02** |
+> | Avatar IV / V — Digital Twin | $4.00 | **$36.02 – $48.02** |
+>
+> **Which applies depends entirely on which engine Warwick's authorised avatar is bound to — still unknown, and it is the substance of this fog item now.** Do not put a single number in a Work Order.
+>
+> 🔴 **`Script text: Maximum 5,000 characters.`** A 9–12 minute script is **~7,200–9,600 characters**. **It does not fit.** Unresolved whether the limit is per video or per scene — the difference between splitting across scenes in one render and not being able to render it in one call. **Resolved by** reading the current `POST /v3/videos` schema or **one ~$1 Avatar III test render**. Do not guess it.
+>
+> **Assume a retried render is charged again** — nothing indicates vendor-side deduplication. **Idempotency must live on our side of the seam.**
+>
+> *Full detail and sourcing: §6 F1 of `Deliverables/2026-08-03-build-006-vlogops-publishing-engine-wayfinder-plan.md` — that is the SSOT; this is the destination-side summary.*
 
 ### ✅ F4 — Secrets location: RESOLVED AND EXECUTED
 
@@ -497,10 +538,12 @@ It is a **hypothesis about route, not law**. It gets corrected at phase boundari
 | Phase | Status | Model for this phase | Evidence |
 |---|---|---|---|
 | 0 — Promotion + Wayfinder map | ✅ **PASS** | Opus-high + Warwick | This map @ `build-019-public-platform-wayfinder`; `Builds/BUILD-019-fusion247-public-platform/`; live recon §5; Warwick accepted in substance 2026-08-02 |
-| 1 — Website skeleton live | ⬜ **NOT STARTED — the frontier** | **Routine / lower-cost** | — |
-| 2 — Information architecture + content model | ⬜ NOT STARTED | Mixed (senior for the content model) | — |
-| 3 — Deployment behaviour + runbook | ⬜ NOT STARTED | Routine | — |
-| 4 — Publication contract + website adapter | ⬜ NOT STARTED | **Opus-high + independent review** | — |
+| 1 — Website skeleton | ✅ **PASS (to the PR boundary)** | Routine | `warwickallan/fusion247-web` PR **#1**, head `167d6c2`. CI green, **7 executed subtests**, mutation-tested twice. WO-2026-08-03-01. **Not merged — by design.** |
+| 2 — Information architecture + content model | ✅ **PASS (to the PR boundary)** | Mixed | PR **#2**, head `9178bd7`. **16 site routes + 3 MDX articles**, all 200 locally with own-copy grep; CI green, **29 executed subtests**; 3 mutation tests (copy softened / link to nonexistent route / YouTube link added) each RED then GREEN. Both secret-scan scopes exit 0. WO-2026-08-03-04. |
+| 3 — Deployment readiness + runbook | ✅ **PASS** | Routine | WO-2026-08-03-07, PR **#3**, head `73f36a8`. **Production-READY, not production-published** (Warwick's correction, 2026-08-03). `docs/runbook.md` (6 operations, launch gate at the top) + `docs/deployment-behaviour.md`. CI green on all three commits, **29 executed subtests** each. Production verified untouched at start and after every push: `www.fusion247.co.uk` **404**, `main` **`9414db1`**. **Review surface: `https://fusion247-web-git-build-019-phase-3-deployment-03c54c-fusion247.vercel.app`** — 302 → `vercel.com/sso-api`, which is Vercel Authentication working (§9.1 of the BUILD-006 map). |
+
+**Scope of the Phase 3 PASS, stated deliberately.** Promotion and rollback are **documented and unexecuted**, and that is correct — executing them would publish unapproved copy. Every step in the runbook is labelled PROVEN or DOCUMENTED–NOT–EXECUTED. **Nothing has been observed rendering, on preview or production** — the 302 is where an unauthenticated tool stops. **Warwick's own click-through is not proven until he makes it**; if he cannot reach the preview, this row reopens. Two things could not be established from this workstation and are recorded rather than assumed: the Vercel CLI here is signed in to a **different project** (`fusion247-platform` under `warwick-25s-projects`), so no CLI route to `fusion247-web` exists locally; and **that `www.fusion247.co.uk` is attached to this Vercel project is NOT VERIFIED** — inferred from the apex 308 only. If a successful production build ever leaves the domain at 404, that is the first place to look.
+| 4 — Publication contract + website adapter | ⏸️ **DEFERRED — the resumption point** | **Opus-high + mandatory independent review** | Resumes **after BUILD-006 produces a real Publication Package**. Was specified against a synthetic fixture; that is what the reordering fixes. |
 | 5 — YouTube adapter | ⬜ BLOCKED (F1) | Routine + senior for ownership/recovery | — |
 | 6 — X adapter | ⬜ BLOCKED (F2) | **Opus-high + mandatory independent review** | — |
 | 7 — Media proof + launch | ⬜ BLOCKED (F3, launch approval) | Warwick decision throughout | — |

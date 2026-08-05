@@ -47,6 +47,31 @@ const RULES_SELECT_COLUMNS = [
   'note'
 ];
 
+// The EXACT column list loadRuleQaLog() SELECTs from asdair.rule_qa_log, kept
+// as one exported constant for the same single-source-of-truth reason as
+// RULES_SELECT_COLUMNS. schemaCompat.test.js asserts every entry is defined on
+// asdair.rule_qa_log in db/001_asdair_schema.sql.
+//
+// WHY THIS TABLE IS SUDDENLY A PLANNING INPUT (WO-Y): it holds the household's
+// ANSWERED questions -- five of them, including Ariel Pods = "best value/wash"
+// recorded 2026-07-21 -- and NOTHING in the planning path has ever read it. The
+// only non-test readers in the whole service were outcome/promoteDecision.js
+// (a writer) and cockpit-api/readRules.js (a display reader). So on 2026-08-03
+// the shop asked Warwick a question whose answer was already in the database.
+//
+// NOTE there is no match_term column here: it is free text. planner.js links a
+// row to a line by matching the LINE against the QUESTION text with the
+// conservative matcher in termMatch.js.
+const RULE_QA_LOG_SELECT_COLUMNS = [
+  'id',
+  'asked_on',
+  'question',
+  'answer',
+  'applies_going_forward',
+  'promoted_rule_id',
+  'household_id'
+];
+
 // The EXACT column list loadRegulars() SELECTs from asdair.regulars, kept as
 // one exported constant for the same single-source-of-truth reason as
 // RULES_SELECT_COLUMNS above. These are fixed identifiers (no external input),
@@ -249,6 +274,28 @@ async function loadRules() {
   const rows = await readQuery(
     'SELECT ' + RULES_SELECT_COLUMNS.join(', ') + ' FROM asdair.rules WHERE active = true ORDER BY id',
     []
+  );
+  return rows;
+}
+
+// Load the household's ANSWERED questions -- asdair.rule_qa_log (WO-Y).
+// SELECT only.
+//
+// SCOPE: the named household's rows PLUS the global ones (household_id null),
+// mirroring loadRules() rather than loadRegulars(). A global recorded decision
+// is exactly as binding as a global rule. Passing no household loads the global
+// rows only, so a caller can never accidentally widen the scope by omission.
+//
+// The planner filters further (it honours `applies_going_forward` and re-checks
+// household scope), so this is the read, not the policy. Ordered oldest-first
+// by asked_on so a later answer on the same subject is appended after an
+// earlier one and reads in the order the household decided things.
+async function loadRuleQaLog(household) {
+  const householdId = await resolveHouseholdId(household);
+  const rows = await readQuery(
+    'SELECT ' + RULE_QA_LOG_SELECT_COLUMNS.join(', ') + ' FROM asdair.rule_qa_log '
+      + 'WHERE household_id IS NULL OR household_id = $1 ORDER BY asked_on, id',
+    [householdId]
   );
   return rows;
 }
@@ -504,6 +551,7 @@ module.exports = {
   loadRegulars: loadRegulars,
   loadBudget: loadBudget,
   loadLastOrder: loadLastOrder,
+  loadRuleQaLog: loadRuleQaLog,
   close: close,
   // Exported for schemaCompat.test.js (schema/code drift guard). Not used by
   // the CLI runtime path.
@@ -511,6 +559,7 @@ module.exports = {
   REGULARS_SELECT_COLUMNS: REGULARS_SELECT_COLUMNS,
   ORDERS_SELECT_COLUMNS: ORDERS_SELECT_COLUMNS,
   ORDER_LINE_SELECT_COLUMNS: ORDER_LINE_SELECT_COLUMNS,
+  RULE_QA_LOG_SELECT_COLUMNS: RULE_QA_LOG_SELECT_COLUMNS,
   // PURE helpers, exported so the shaping and the regulars resolution can be
   // tested offline against fixtures with no database. Not used by the CLI.
   _internal: {

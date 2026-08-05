@@ -59,6 +59,11 @@ button { font-family:inherit; }
   text-transform:uppercase; padding:3px 9px; border-radius:20px; background:var(--panel2); color:var(--ink2); }
 .app-pill.up { background:var(--ok-w); }
 .app-pill.down { background:var(--warn-w); }
+/* .app-pill.unknown / .app-status.unknown are DELIBERATELY not styled. The unmodified rules above
+   already resolve to --panel2 / --park, which is GL-003's "neutral status rail — no status colour
+   applies", and that is exactly what "the service answered but we could not read its health report"
+   means. Do not give unknown an amber treatment: amber says "something is wrong", and colouring
+   uncertainty as a fault is an invented fact in the pessimistic direction. No new token needed. */
 
 .crumbs { display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin-bottom:10px; font-size:12.5px; }
 .crumb { background:none; border:none; padding:4px 2px; min-height:26px; font-size:12.5px; font-weight:700; color:var(--accent-ink); cursor:pointer; border-radius:6px; }
@@ -86,6 +91,66 @@ button { font-family:inherit; }
    global token is unsafe and forks it again. */
 .app-view { padding-top:2px; }
 .app-view .read li { margin:6px 0; }
+/* AsdAIr Overview/Details — no new colour tokens, reuses --hair/--panel2 and the existing 13px radius
+   used by .item/.status-line (GL-003 §4 observed progression). */
+.asdair-view { margin-top:2px; }
+.asdair-photo { display:block; max-width:100%; border-radius:13px; border:1px solid var(--hair); background:var(--panel2); margin-bottom:8px; }
+
+/* ── AsdAIr readable Details + Rules ─────────────────────────────────────────────────────────────
+   LAYOUT ONLY. Not one new colour token, and every text-on-surface pairing below is one GL-003 §2b
+   already measured and PASSES in both schemes:
+     --ink2 on --panel   7.47 / 7.37    (.as-sub, .as-kv dt, .as-note)
+     --ink2 on --panel2  7.08 / 6.78    (.as-tag, .chip.neutral)
+     --ink2 on --warn-w  6.40 / 6.16    (.chip.warn — the D-13 pairing, as .app-pill.down uses)
+     --warn on --warn-w  3.63 / 6.25    (.chip.warn .d — NON-TEXT dot, over the 3:1 floor)
+   Nothing here reaches for --ink3, and nothing fades text with `opacity` (see GL-003 §2b-bis /
+   D-17 / D-18 — opacity is a contrast operation, not a flourish). */
+
+/* A tall row: .item centres its children, which is wrong once a row has four stacked lines. */
+.item.as-stack { align-items:flex-start; }
+
+/* The verbatim evidence line — WHAT MUM WROTE. Never truncated: this is the thing being verified,
+   and an ellipsis in the middle of it defeats the entire purpose of the screen. */
+.as-raw { font-size:15px; font-weight:650; letter-spacing:-.01em; overflow-wrap:anywhere; }
+/* Like .i-why, but WRAPPING. .i-why is nowrap+ellipsis, which silently hides the matched product
+   name — the other half of every comparison Warwick is making here. */
+.as-sub { font-size:12.5px; color:var(--ink2); margin-top:3px; overflow-wrap:anywhere; }
+.as-sub.strong { color:var(--ink); font-weight:650; }
+/* An honest absence. Italic + the muted token, so "nothing was recorded" never reads as content. */
+.as-note { font-size:12.5px; color:var(--ink2); margin-top:3px; font-style:italic; }
+
+/* Key/value facts as a real <dl>, so a screen reader announces the pairing rather than two loose
+   strings. Single column on a phone, two from 560px. */
+.as-kv { display:grid; grid-template-columns:1fr; gap:2px 12px; margin:2px 0 0; }
+.as-kv > div { display:flex; gap:8px; align-items:baseline; padding:2px 0; min-width:0; }
+.as-kv dt { flex:0 0 auto; font-family:var(--mono); font-size:10px; letter-spacing:.06em;
+  text-transform:uppercase; font-weight:700; color:var(--ink2); }
+.as-kv dd { margin:0; flex:1; min-width:0; font-size:13px; color:var(--ink); overflow-wrap:anywhere; }
+@media (min-width:560px) { .as-kv { grid-template-columns:1fr 1fr; } }
+
+/* A wrapping row of chips. .i-act already does flex-wrap for buttons; this is the read-only twin. */
+.as-chips { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-top:7px; }
+
+/* Aliases. Each one is its own tag because "choc yazoo" and "chocolate yazoo" are two separate
+   facts to verify, and a comma-joined string hides where one ends and the next begins. */
+.as-tags { display:flex; flex-wrap:wrap; gap:5px; margin-top:6px; }
+.as-tag { font-family:var(--mono); font-size:11px; font-weight:600; color:var(--ink2);
+  background:var(--panel2); border:1px solid var(--hair); padding:2px 8px; border-radius:20px;
+  overflow-wrap:anywhere; }
+
+/* A section heading INSIDE a group — h3 under the group's h2, so the heading ladder stays legal. */
+.as-sec { font-size:12.5px; font-weight:800; color:var(--ink); margin:14px 0 8px; letter-spacing:-.01em; }
+.as-sec:first-child { margin-top:0; }
+/* The consequence line under a directive heading: what this KIND of rule actually does. */
+.as-meaning { font-size:12.5px; color:var(--ink2); margin:-4px 0 9px; }
+
+/* Two chip tones the palette supported but no selector had yet. Both are existing §2b pairings. */
+.chip.neutral { background:var(--panel2); color:var(--ink2); } .chip.neutral .d { background:var(--park); }
+.chip.warn { background:var(--warn-w); color:var(--ink2); } .chip.warn .d { background:var(--warn); }
+
+/* The raw-JSON drawer is now a LAST RESORT, not the content. Capped and scrollable so it can never
+   again be the tallest thing on the screen. */
+.tech-body .mono.raw { max-height:340px; overflow:auto; }
 
 /* The back chevron: .back is padding:0 0 12px and the glyph is narrow, so it rendered 5x19 CSS px —
    under WCAG 2.2 SC 2.5.8 (24x24) on both axes. Specificity beats .back, which is defined later. */

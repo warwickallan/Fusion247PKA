@@ -37,8 +37,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 // reach child_process, so they cannot evidence how the child is launched).
 import { runMergeReview as realRunMergeReview } from '../supervisorCodex.mjs';
 import { gatherGitEvidence } from '../gitEvidence.mjs';
-import { openDb } from '../db.mjs';
-import { applySchema, applyWatcherSchema, applyCommentSchema, applyPostSchema } from '../apply.mjs';
+import { openDb, defaultDbPath } from '../db.mjs';
+import { applySchema, applyWatcherSchema, applyCommentSchema, applyPostSchema, applyMergeCheckSchema } from '../apply.mjs';
 import { seedPrompt } from '../seed.mjs';
 import { ingestTurn } from '../loop.mjs';
 import { detectMergeClass } from '../mergeClass.mjs';
@@ -49,7 +49,7 @@ import { pollPrComments, assertReadOnlyArgs, ensureCheckpointTurn, checkpointTur
 import { makeFakeGh, ghComment } from './doubles/fakeGh.mjs';
 // WO-TW-02 — the automatic trigger's own seams, and the verdict write-back.
 // WO-2026-08-03-05 — open-PR discovery and the repository sources it draws on.
-import { pollTargets, detectCheckoutRepo, seedRepos } from '../watcher.mjs';
+import { pollTargets, detectCheckoutRepo, seedRepos, explicitRepos } from '../watcher.mjs';
 import {
   assertCommentPostArgs, verdictPostKey, verdictMarker, composeVerdictComment,
   queueVerdictForTurn, postPendingVerdicts,
@@ -59,6 +59,11 @@ import { checkFindingDispositions } from '../findings.mjs';
 import { openFinding, processTurn } from '../watcher.mjs';
 import { runSupervisor as fakeRunSupervisor, runMergeReview as fakeRunMergeReview } from './doubles/fakeReviewer.mjs';
 import { notify } from '../notify.mjs';
+// WP-2F — the merge-check path, now on the ONE canonical SQLite store. Both entrypoints: the
+// tower-loop one (runMergeCheck) and the tower/ one, whose store functions are exported so they
+// can be proven against a real store rather than only read.
+import { runMergeCheck } from '../mergeCheck.mjs';
+import { nextSeq as mcNextSeq, record as mcRecord, auditContext as mcAuditContext } from '../../tower/merge-check.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const LOOP_DIR = path.resolve(__dirname, '..');
@@ -146,12 +151,14 @@ async function notesFor(pool, turnId) {
 const CP_FNS = ['spawnSync', 'spawn', 'execFileSync', 'execFile', 'execSync', 'exec', 'fork'];
 const CP_CALL_RE = new RegExp(`(?<![\\w$.])(${CP_FNS.join('|')})\\(`, 'g');
 
-// Pinned literal, held HERE rather than derived from the sources it checks — 17 launch sites
-// under tower-loop as of the #92/#93 reconciliation merge (15 from WO-2026-08-03-02, plus 2
-// legitimate additions from PR #93's fetchOpenPrs/detectCheckoutRepo work — both already
-// windowsHide:true — reviewed and acknowledged here per this test's own design). A count that
-// recomputed itself would agree with anything and prove nothing.
-const TOWER_LOOP_CP_SITES = 17;
+// Pinned literal, held HERE rather than derived from the sources it checks — 25 launch sites
+// under tower-loop as of WO-2026-08-05-TW3 (20 from the #92/#93/#94 reconciliation rebase, plus 5
+// git-fixture-setup child launches in the new test/gitEvidenceGh.test.mjs, each windowsHide:true
+// from the moment it was written). A count that recomputed itself would agree with anything and
+// prove nothing. (Deliberately not naming the launcher function verbatim in this comment — this
+// scanner's own CALL-SITE regex matches inside prose too, and a literal mention here would count
+// itself as a 26th site.)
+const TOWER_LOOP_CP_SITES = 25;
 
 function jsFilesUnder(dir, out = []) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -225,6 +232,7 @@ async function main() {
   await applyWatcherSchema(pool);
   await applyCommentSchema(pool);   // WO-OR-22 comment seam
   await applyPostSchema(pool);      // WO-TW-02 verdict write-back
+  await applyMergeCheckSchema(pool); // WP-2F merge-check run/message
   await seedPrompt(pool);
 
   // Assert the truthful approval label came through (FIX 1a).
@@ -242,6 +250,70 @@ async function main() {
     assert.equal(h.source, 'heuristic');
     assert.equal(detectMergeClass({ kind: 'ordinary', larry_response: 'Working on the parser now.' }).isMergeClass, false, 'plain progress is ordinary');
     assert.equal(detectMergeClass({ kind: 'ordinary', larry_response: 'Done and merged.' }, { heuristic: false }).isMergeClass, false, 'heuristic off ⇒ ordinary');
+  });
+
+  // WP-2G — THE CODEX CONTRACT REACH PROOF, run inside the suite CI actually executes.
+  //
+  // Why it is spawned rather than inlined: the assertions live in ONE file
+  // (test/codexContractReach.test.mjs) so they can also be run directly, on a machine with no
+  // native SQLite build, which is where the evidence for this WP was produced. Inlining them here
+  // would have made the only copy unrunnable outside a full store build.
+  //
+  // Why it is here rather than beside its own siblings: `reviewTooling.test.mjs` and
+  // `classifyBuild.test.mjs` in this very directory are executed by NO npm script and NO CI job.
+  // A reach test dropped beside them would be a green that proves nothing — the exact defect class
+  // this WP exists to kill. THIS runner is in control-plane-tests.yml, under the existing
+  // `services/control-plane/**` filter, so a change to the contract file fires it with no
+  // workflow change.
+  //
+  // The child's OWN counts are asserted, never its exit code: `# pass` must be non-zero and
+  // `# fail` must be zero, so a run that executed nothing cannot be read as a pass.
+  await test('WP-2G — the Codex contract reach proof executes and passes (spawned node:test)', async () => {
+    const reachFile = path.join(__dirname, 'codexContractReach.test.mjs');
+    assert.ok(fs.existsSync(reachFile), 'the reach proof file exists');
+    const child = spawn(process.execPath, ['--test', reachFile], {
+      cwd: LOOP_DIR, env: { ...process.env }, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true,
+    });
+    let out = ''; let err = '';
+    child.stdout.on('data', (d) => { out += d; });
+    child.stderr.on('data', (d) => { err += d; });
+    const code = await waitExit(child);
+    const num = (label) => {
+      const m = out.match(new RegExp(`^# ${label} (\\d+)$`, 'm'));
+      return m ? Number(m[1]) : null;
+    };
+    const pass = num('pass'); const fail = num('fail'); const total = num('tests');
+    assert.notEqual(total, null, `the child reported a test count (stderr: ${err.slice(0, 400)})`);
+    assert.ok(pass > 0, `the reach proof executed something (# pass = ${pass}) — zero executed is never a pass`);
+    assert.equal(fail, 0, `the reach proof had failures (# fail = ${fail}):\n${out.slice(-2000)}`);
+    assert.equal(code, 0, `the reach proof exited 0 (got ${code})`);
+    console.log(`[wp2g-reach] # tests ${total} # pass ${pass} # fail ${fail}`);
+  });
+
+  // WP-2E (WO-2026-08-05-09) — THE QA-EXCHANGE PROOF, spawned + counted the SAME way as WP-2G
+  // just above. The reason is identical: a test file merely sitting beside this runner, executed
+  // by NO npm script and NO CI job, is a green that proves nothing — this wires it into the exact
+  // command this Work Order names as the acceptance harness.
+  await test('WP-2E — the QA-exchange proof (W1-W4) executes and passes (spawned node:test)', async () => {
+    const qaFile = path.join(__dirname, 'qaExchange.test.mjs');
+    assert.ok(fs.existsSync(qaFile), 'the QA-exchange test file exists');
+    const child = spawn(process.execPath, ['--test', qaFile], {
+      cwd: LOOP_DIR, env: { ...process.env }, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true,
+    });
+    let out = ''; let err = '';
+    child.stdout.on('data', (d) => { out += d; });
+    child.stderr.on('data', (d) => { err += d; });
+    const code = await waitExit(child);
+    const num = (label) => {
+      const m = out.match(new RegExp(`^# ${label} (\\d+)$`, 'm'));
+      return m ? Number(m[1]) : null;
+    };
+    const pass = num('pass'); const fail = num('fail'); const total = num('tests');
+    assert.notEqual(total, null, `the child reported a test count (stderr: ${err.slice(0, 400)})`);
+    assert.ok(pass > 0, `the QA-exchange proof executed something (# pass = ${pass}) — zero executed is never a pass`);
+    assert.equal(fail, 0, `the QA-exchange proof had failures (# fail = ${fail}):\n${out.slice(-4000)}`);
+    assert.equal(code, 0, `the QA-exchange proof exited 0 (got ${code})`);
+    console.log(`[wp2e-qa-exchange] # tests ${total} # pass ${pass} # fail ${fail}`);
   });
 
   // ══════════════════════════════════════════════════════════════════════════════
@@ -983,11 +1055,115 @@ async function main() {
   await test('D7 — the cap bounds a round, prefers PRs with live rounds, and says so rather than dropping silently', async () => {
     const many = Array.from({ length: 12 }, (_, i) => 9500 + i);
     const gh = makeFakeGh({ headSha: HEAD_CP, comments: [], openPrs: { [CP_REPO]: [...many, 9002] } });
-    const targets = await pollTargets(pool, { gh, limit: 5, detectRepo: async () => CP_REPO });
+    // WO-2026-08-05-TW3 (Gap 1) — `now: () => 0` pins the ONE rotating slot deterministically
+    // (tick 0 -> overflow[0]) so this test's fixed expectation still holds exactly. Real
+    // rotation across successive ticks is proven separately below (D-ROT1/D-ROT2).
+    const targets = await pollTargets(pool, { gh, limit: 5, detectRepo: async () => CP_REPO, now: () => 0 });
     assert.equal(targets.length, 5, 'the round is bounded — a repo full of open PRs is not a rate-limit incident');
     assert.equal(targets[0].prNumber, 9002, 'a PR with a LIVE round is ranked first and is never the one dropped');
-    // The remainder is newest-first, which is deterministic rather than incidental.
+    // 4 fixed-ranked (newest-first) + 1 rotating slot, deterministic at tick 0.
     assert.deepEqual(targets.slice(1).map((t) => t.prNumber), [9511, 9510, 9509, 9508]);
+  });
+
+  // ── WO-2026-08-05-TW3 (Gap 1) — ROTATION: no open PR is starved FOREVER just because more than
+  // `limit` are open. D7 above already proves the fixed-ranking + ONE rotating slot shape at a
+  // single tick; these two prove the property the fix actually exists for: bounded coverage
+  // across SUCCESSIVE rounds, and that in-flight rounds are never sacrificed to make room for it.
+
+  await test('D-ROT1 — 9 open PRs (more than `limit`=5): the TAIL PR is starved no longer — every overflow PR is polled within a BOUNDED, STATED number of rounds', async () => {
+    const nine = Array.from({ length: 9 }, (_, i) => 9700 + i);   // 9700..9708, newest-first = 9708..9700
+    const gh = makeFakeGh({ headSha: HEAD_CP, comments: [], openPrs: { [CP_REPO]: nine } });
+
+    // No in-flight round here, so rankedSlots = limit - PR_POLL_ROTATE_SLOTS = 4 (newest-first:
+    // 9708,9707,9706,9705) and the overflow is the remaining 5, oldest last: 9704,9703,9702,9701,
+    // 9700 — the TAIL PR, 9700, is the one the OLD static ranking would have dropped every round,
+    // forever, with no way back in.
+    const OVERFLOW_SIZE = 5;   // 9 total - 4 fixed-ranked
+    const ROTATE_SLOTS = 1;
+    const BOUND = Math.ceil(OVERFLOW_SIZE / ROTATE_SLOTS);   // = 5 rounds — the STATED bound
+
+    const seenTail = [];
+    const unionSeen = new Set();
+    for (let round = 0; round < BOUND; round += 1) {
+      // `now` steps by exactly PR_POLL_MS per round — the SAME cadence runWatcher's own
+      // `nextPrPollAt` gate advances by in production, so this is genuinely "successive rounds",
+      // not an arbitrary sequence of `now` values chosen to make the test pass.
+      const targets = await pollTargets(pool, { gh, limit: 5, detectRepo: async () => CP_REPO, now: () => round * 60000 });
+      assert.equal(targets.length, 5, `round ${round}: the cap is still real rate-limit protection`);
+      for (const t of targets) unionSeen.add(t.prNumber);
+      if (targets.some((t) => t.prNumber === 9700)) seenTail.push(round);
+    }
+
+    assert.ok(seenTail.length > 0,
+      `the tail PR (9700, the one furthest below the old fixed cutoff) was polled at least once within ${BOUND} rounds — rounds it appeared in: ${JSON.stringify(seenTail)}`);
+    // The stronger property the WO actually asks for: not just the single tail PR, but EVERY
+    // open PR — the whole overflow set, not merely its oldest member — reachable within the bound.
+    for (const pr of nine) {
+      assert.ok(unionSeen.has(pr), `PR #${pr} was never polled across ${BOUND} successive rounds (union: ${JSON.stringify([...unionSeen])})`);
+    }
+  });
+
+  await test('D-ROT2 — CONTROL: an in-flight round is NEVER sacrificed for a rotating slot, across every rotating round', async () => {
+    // Same 9-PR overflow shape as D-ROT1, but one of them (9002) has a LIVE round. It must be
+    // fixed-ranked (never the one that rotates in and out) in EVERY round, not just the first.
+    const eight = Array.from({ length: 8 }, (_, i) => 9750 + i);
+    const gh = makeFakeGh({ headSha: HEAD_CP, comments: [], openPrs: { [CP_REPO]: [...eight, 9002] } });
+    for (let round = 0; round < 6; round += 1) {
+      const targets = await pollTargets(pool, { gh, limit: 5, detectRepo: async () => CP_REPO, now: () => round * 60000 });
+      assert.equal(targets[0].prNumber, 9002, `round ${round}: the in-flight PR must still be ranked first, never rotated out`);
+    }
+  });
+
+  // ── TOWER_PR_REPOS — the FOURTH source, added on top of PR #93's three (Warwick's instruction:
+  // "retain TOWER_PR_REPOS as the stable machine-runtime repository source, because the installed
+  // runtime is not a Git checkout"). Two properties: it works standing alone, and it shares the
+  // SAME rank+cap as everything else rather than getting a parallel one.
+
+  await test('D-TR1 — TOWER_PR_REPOS ALONE finds an open PR: no seed, no prior turn, and no git checkout to detect from (the real machine-runtime deployment)', async () => {
+    // ~/.mypka/tower-runtime/ is a PLAIN FILE COPY, not a git checkout — detectCheckoutRepo()
+    // resolves null there, proven here by injecting `detectRepo: async () => null` rather than
+    // stubbing something that could quietly still succeed.
+    delete process.env.TOWER_PR_SEED;
+    const freshPath = path.join(TMP_DIR, 'tr1-discovery.db');
+    const fresh = openDb(freshPath);
+    try {
+      await applySchema(fresh); await applyWatcherSchema(fresh); await applyCommentSchema(fresh); await applyPostSchema(fresh);
+      assert.equal(Number((await fresh.query(`select count(*) n from tower.turn`)).rows[0].n), 0, 'precondition: empty store');
+
+      const OTHER_REPO = 'warwickallan/tower-runtime-example';
+      process.env.TOWER_PR_REPOS = OTHER_REPO;
+      try {
+        assert.deepEqual(explicitRepos(), [OTHER_REPO], 'TOWER_PR_REPOS parses to exactly its repository, no PR number attached');
+
+        const gh = makeFakeGh({ headSha: HEAD_CP, comments: [], openPrs: { [OTHER_REPO]: [601] } });
+        const targets = await pollTargets(fresh, { gh, detectRepo: async () => null });
+        assert.deepEqual(targets, [{ repo: OTHER_REPO, prNumber: 601 }],
+          'TOWER_PR_REPOS is sufficient ON ITS OWN — no checkout, no seed, no prior turn required');
+      } finally { delete process.env.TOWER_PR_REPOS; }
+    } finally { await fresh.end(); }
+  });
+
+  await test('D-TR2 — a TOWER_PR_REPOS-sourced repo composes into the SAME rank+cap as every other source, not a parallel cap', async () => {
+    // An open PR must never be permanently invisible just because more than 5 PRs are open across
+    // the COMBINED repo set — including the fourth source. One list, one cap; not one cap per repo.
+    const other = 'warwickallan/tower-runtime-example';
+    process.env.TOWER_PR_REPOS = other;
+    try {
+      const manyHere = Array.from({ length: 4 }, (_, i) => 9600 + i);   // from the detected checkout repo
+      const manyThere = Array.from({ length: 4 }, (_, i) => 700 + i);   // from TOWER_PR_REPOS
+      const gh = makeFakeGh({
+        headSha: HEAD_CP, comments: [],
+        openPrs: { [CP_REPO]: [...manyHere, 9002], [other]: manyThere },
+      });
+      // `now: () => 0` — same determinism pin as D7, so the rotating slot's pick is fixed.
+      const targets = await pollTargets(pool, { gh, limit: 5, detectRepo: async () => CP_REPO, now: () => 0 });
+      assert.equal(targets.length, 5, 'still ONE cap of 5 across BOTH repos combined — not 5 per repo');
+      assert.equal(targets[0].repo, CP_REPO);
+      assert.equal(targets[0].prNumber, 9002, 'the live-round PR still ranks first regardless of which source added the rest');
+      const rest = targets.slice(1).map((t) => `${t.repo}#${t.prNumber}`);
+      assert.deepEqual(rest, [`${CP_REPO}#9603`, `${CP_REPO}#9602`, `${CP_REPO}#9601`, `${CP_REPO}#9600`],
+        `expected one shared ranking across sources (got ${JSON.stringify(rest)})`);
+    } finally { delete process.env.TOWER_PR_REPOS; }
   });
 
   // ── A5/A6: the SPAWNED watcher. No poller, no CLI, no insert — a comment appears, and that
@@ -1018,8 +1194,8 @@ async function main() {
     assert.equal((await turnForPr(pr)).length, 0, 'acceptance step 1: nothing prepared by hand');
 
     // WO-2026-08-03-05 — NO TOWER_PR_SEED. This test used to hand the watcher the exact PR number
-    // it was then asked to prove it polled, which proved only that the seed was obeyed. The number
-    // is now GitHub's to tell it.
+    // it was then asked to prove it polled, which proved only that the seed was obeyed. The
+    // number is now GitHub's to tell it.
     const w = spawnWatcher('ci-trigger-a5', POLL_ENV);
     try {
       // Nothing is run against the watcher from here on. It has to find this itself.
@@ -1533,27 +1709,59 @@ async function main() {
   // completion condition, and this defect survived precisely because "the ones I found" was
   // never the same set as "the ones there are".
 
-  await test('WH1 — gitEvidence launches EVERY git/gh child with windowsHide:true (injected spawn)', async () => {
-    const calls = [];
-    const fakeSpawn = (cmd, args, opts) => {
-      calls.push({ cmd, args, opts });
-      const c = new EventEmitter();
-      c.stdout = new EventEmitter();
-      c.stderr = new EventEmitter();
-      c.kill = () => {};
-      // rev-parse/merge-base must look like real SHAs or the gatherer fails closed early and
-      // the later call sites are never reached — a green over ground never walked.
-      const out = args.includes('rev-parse') ? `${'a'.repeat(40)}\n` : 'diff --git a/x b/x\n';
-      setImmediate(() => { c.stdout.emit('data', Buffer.from(out)); c.emit('close', 0); });
-      return c;
-    };
-    const ev = await gatherGitEvidence({ cwd: LOOP_DIR, repo: 'o/r', prNumber: 1, spawn: fakeSpawn });
-    assert.equal(ev.resolved, true, 'the gatherer must have walked its whole path, not bailed early');
-    assert.ok(calls.length >= 5, `expected every stage to launch a child, got ${calls.length}`);
-    assert.ok(calls.some((c) => c.cmd === 'git'), 'the git seam was exercised');
-    assert.ok(calls.some((c) => c.cmd === 'gh'), 'the gh seam was exercised');
-    const bare = calls.filter((c) => c.opts?.windowsHide !== true);
-    assert.equal(bare.length, 0, `these launches would pop a console window: ${bare.map((c) => c.cmd).join(', ')}`);
+  await test('WH1 — gitEvidence launches EVERY git/gh child with windowsHide:true (injected spawn), on BOTH the gh-sourced and the local-git mechanism', async () => {
+    // WO-2026-08-05-TW3 (Gap 2) rewrote this: `prNumber`+`repo` present now PREFERS the
+    // gh-sourced mechanism, which never touches local git at all — so a single call exercising
+    // "both seams" is no longer the right shape. Two calls, one per mechanism, each checked
+    // against what it actually launches.
+    function makeFakeSpawn() {
+      const calls = [];
+      const fn = (cmd, args, opts) => {
+        calls.push({ cmd, args: [...args], opts });
+        const c = new EventEmitter();
+        c.stdout = new EventEmitter();
+        c.stderr = new EventEmitter();
+        c.kill = () => {};
+        setImmediate(() => {
+          if (cmd === 'git' && args.includes('rev-parse')) { c.stdout.emit('data', Buffer.from(`${'a'.repeat(40)}\n`)); return c.emit('close', 0); }
+          if (cmd === 'git') { c.stdout.emit('data', Buffer.from('diff --git a/x b/x\n')); return c.emit('close', 0); }
+          if (cmd === 'gh' && args[0] === 'api') {
+            c.stdout.emit('data', Buffer.from(`${JSON.stringify({ head: 'a'.repeat(40), base: 'b'.repeat(40) })}\n`));
+            return c.emit('close', 0);
+          }
+          if (cmd === 'gh' && args[0] === 'pr' && args[1] === 'diff') {
+            c.stdout.emit('data', Buffer.from(args.includes('--name-only') ? 'x.mjs\n' : 'diff --git a/x b/x\n'));
+            return c.emit('close', 0);
+          }
+          if (cmd === 'gh' && args[0] === 'pr' && args[1] === 'checks') {
+            c.stdout.emit('data', Buffer.from('some-check pass\n'));
+            return c.emit('close', 0);
+          }
+          c.emit('close', 0);
+        });
+        return c;
+      };
+      fn.calls = calls;
+      return fn;
+    }
+
+    // Mechanism 1: gh-sourced (prNumber + repo — the production PR-poll shape).
+    const ghSpawn = makeFakeSpawn();
+    const ghEv = await gatherGitEvidence({ cwd: LOOP_DIR, repo: 'o/r', prNumber: 1, spawn: ghSpawn });
+    assert.equal(ghEv.resolved, true, 'the gh-sourced mechanism must have walked its whole route, not bailed early');
+    assert.ok(ghSpawn.calls.length >= 4, `expected the gh seam exercised at least 4 times (pulls, diff --name-only, diff, checks), got ${ghSpawn.calls.length}`);
+    assert.ok(ghSpawn.calls.every((c) => c.cmd === 'gh'), `the gh-sourced mechanism must never fall back to local git: ${ghSpawn.calls.map((c) => c.cmd).join(', ')}`);
+    const ghBare = ghSpawn.calls.filter((c) => c.opts?.windowsHide !== true);
+    assert.equal(ghBare.length, 0, `these gh-sourced launches would pop a console window: ${ghBare.map((c) => c.cmd).join(', ')}`);
+
+    // Mechanism 2: local-git (no prNumber — the local/dev fallback, e.g. reviewDiff.mjs).
+    const localSpawn = makeFakeSpawn();
+    const localEv = await gatherGitEvidence({ cwd: LOOP_DIR, spawn: localSpawn });
+    assert.equal(localEv.resolved, true, 'the local-git mechanism must have walked its whole route');
+    assert.ok(localSpawn.calls.some((c) => c.cmd === 'git'), 'the local git seam was exercised');
+    assert.ok(!localSpawn.calls.some((c) => c.cmd === 'gh'), 'no prNumber ⇒ no CI-checks gh call either, unchanged from before this WO');
+    const localBare = localSpawn.calls.filter((c) => c.opts?.windowsHide !== true);
+    assert.equal(localBare.length, 0, `these local-git launches would pop a console window: ${localBare.map((c) => c.cmd).join(', ')}`);
   });
 
   await test('WH2 — the Codex child (and its win32 taskkill reap) are launched windowsHide:true (injected spawn)', async () => {
@@ -1650,6 +1858,291 @@ async function main() {
       fs.rmSync(probe, { recursive: true, force: true });
     }
   });
+
+  // ══════════════════════════════════════════════════════════════════════════════
+  // WP-2F — ONE CANONICAL STORE: the merge-check path on SQLite.
+  //
+  // WHAT IS AND IS NOT PROVEN END-TO-END, said plainly up front because the distinction is the
+  // point. runMergeCheck has EIGHT SQL statements. SEVEN are reachable with no Codex and no
+  // Telegram, through the fail-closed and evidence-unresolved branches, and M1–M3 drive them
+  // through the REAL function. The EIGHTH — `update ... set status=?, rounds=?, head_sha=?` —
+  // is only reached after a completed Codex round, which costs money and dings Warwick's phone.
+  // M4 executes that literal DIRECTLY against the store. M4 IS A DIRECT-STATEMENT TEST, NOT AN
+  // END-TO-END PROOF, and must never be cited as one.
+  // ══════════════════════════════════════════════════════════════════════════════
+
+  const MC_HEAD = 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678';   // full 40-char, as classifyMergeRun demands
+  const MC_HEAD2 = 'b1b2c3d4e5f60718293a4b5c6d7e8f9012345678';
+  // A directory that is NOT a git repository, so gatherGitEvidence fails CLOSED — the real
+  // offline route into the evidence-unresolved branch. No network, no `gh` auth, no Codex.
+  const NO_REPO_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'tower-not-a-repo-'));
+  // WO-2026-08-05-TW3 (Gap 2) — `NO_REPO_DIR` alone no longer forces the evidence-unresolved
+  // branch below: gatherGitEvidence now PREFERS the gh-sourced mechanism whenever `prNumber`+
+  // `repo` are given (which every M2/M3 call does), and that mechanism never touches `cwd` at
+  // all. Restoring this section's own "No network, no gh auth" guarantee needs the gh call
+  // itself to fail deterministically, injected through mergeCheck.mjs's new `spawn` passthrough
+  // (the same seam gatherGitEvidence itself already accepted) rather than left to whatever this
+  // machine's real `gh` happens to do.
+  const failClosedGhSpawn = (cmd, args) => {
+    const c = new EventEmitter();
+    c.stdout = new EventEmitter();
+    c.stderr = new EventEmitter();
+    c.kill = () => {};
+    setImmediate(() => {
+      c.stderr.emit('data', Buffer.from(`SIMULATED — no network in this suite: ${cmd} ${args.join(' ')}\n`));
+      c.emit('close', 1);
+    });
+    return c;
+  };
+
+  await test('M1 — END TO END, fail-closed: an invalid build_ref writes a `blocked` run and its message to the SQLite store, and spends no Codex', async () => {
+    const out = await runMergeCheck({
+      pool, repo: 'warwickallan/Fusion247PKA', prNumber: 7001, headSha: MC_HEAD,
+      buildRef: 'nonsense', wpRef: 'WP-2F', larryClaim: 'should never be recorded',
+      telegramToken: null, telegramChat: null,
+    });
+    assert.equal(out.blocked, true);
+    assert.equal(out.status, 'blocked');
+
+    // The run is REAL and readable back out of the store — statements 1 and 2.
+    const run = (await pool.query(`select * from tower.merge_check_run where id = ?`, [out.runId])).rows[0];
+    assert.ok(run, 'the fail-closed run was persisted');
+    assert.equal(run.pr_number, 7001);
+    // The REJECTED ref is stored verbatim — that is the audit value of a fail-closed row: it says
+    // what was actually asked for. `UNCLASSIFIED` is the fallback only when no ref was supplied
+    // at all, asserted below so both halves of that `??` are covered.
+    assert.equal(run.build_ref, 'nonsense');
+    assert.equal(run.head_sha, MC_HEAD);
+    assert.equal(run.rounds, 0, 'no round was spent');
+    // created_at is a TIMESTAMP_COLUMN, so db.mjs must hand it back as a real Date, not a string.
+    assert.ok(run.created_at instanceof Date, 'created_at rehydrates to a Date');
+
+    const msgs = (await pool.query(`select * from tower.merge_check_message where run_id = ? order by seq`, [out.runId])).rows;
+    assert.equal(msgs.length, 1, 'exactly the rejection message — no larry claim was recorded');
+    assert.equal(msgs[0].sender, 'gpt_codex');
+    assert.equal(msgs[0].status, 'blocked');
+    assert.match(msgs[0].text, /REJECTED \(fail-closed\)/);
+
+    // The other half of `buildRef ?? 'UNCLASSIFIED'`: no ref supplied at all. It must never
+    // default to BUILD-014, which is the failure this fallback was added to prevent.
+    const noRef = await runMergeCheck({
+      pool, repo: 'warwickallan/Fusion247PKA', prNumber: 7001, headSha: MC_HEAD,
+      buildRef: null, wpRef: 'WP-2F', larryClaim: 'no build ref',
+      telegramToken: null, telegramChat: null,
+    });
+    assert.equal(noRef.blocked, true);
+    assert.equal((await pool.query(`select build_ref from tower.merge_check_run where id = ?`, [noRef.runId])).rows[0].build_ref,
+      'UNCLASSIFIED');
+  });
+
+  await test('M2 — END TO END, evidence unresolved: the run OPENS, records Larry, then closes `blocked` with rounds=1 — six of the eight statements on the real path', async () => {
+    const out = await runMergeCheck({
+      pool, repo: 'warwickallan/Fusion247PKA', prNumber: 7002, headSha: MC_HEAD,
+      buildRef: 'BUILD-020', wpRef: 'WP-2F', larryClaim: 'WP-2F is ready',
+      cwd: NO_REPO_DIR,                       // irrelevant to the gh-sourced mechanism now (see above) — kept for readability
+      spawn: failClosedGhSpawn,               // deterministic, no-network fail-closed on the gh call itself
+      telegramToken: null, telegramChat: null,
+    });
+    assert.equal(out.blocked, true);
+    assert.equal(out.rounds, 1);
+
+    const run = (await pool.query(`select * from tower.merge_check_run where id = ?`, [out.runId])).rows[0];
+    assert.equal(run.status, 'blocked', 'the UPDATE ran — and with `?` being positional, this is also the proof its params were reordered correctly');
+    assert.equal(run.rounds, 1, 'rounds landed in `rounds`, not in `id`');
+    assert.equal(run.build_ref, 'BUILD-020', 'the classified ref was stored');
+    assert.ok(run.updated_at instanceof Date);
+
+    const msgs = (await pool.query(`select * from tower.merge_check_message where run_id = ? order by seq`, [out.runId])).rows;
+    assert.equal(msgs.length, 2, 'Larry, then Codex');
+    assert.deepEqual(msgs.map((m) => m.sender), ['larry', 'gpt_codex']);
+    assert.deepEqual(msgs.map((m) => m.seq), [1, 2]);
+    assert.equal(msgs[0].text, 'WP-2F is ready');
+    assert.match(msgs[1].text, /git evidence unresolved/);
+  });
+
+  await test('M3 — RESUME: a run interrupted after Larry\'s message is resumed on the next attempt — one run, no duplicate claim — and a CLOSED run is never resumed', async () => {
+    // A crash between the larry message and the closing update is exactly what the resume SELECT
+    // exists for, so that is what is simulated: the real store, the real function, one statement
+    // made to fail. Everything else is untouched.
+    const crashingPool = {
+      ...pool,
+      async query(sql, params) {
+        if (/update tower\.merge_check_run set status='blocked'/.test(sql)) {
+          throw new Error('SIMULATED CRASH — the process died before the run was closed');
+        }
+        return pool.query(sql, params);
+      },
+    };
+    const args = {
+      repo: 'warwickallan/Fusion247PKA', prNumber: 7003, headSha: MC_HEAD2,
+      buildRef: 'BUILD-020', wpRef: 'WP-2F', larryClaim: 'resume me',
+      cwd: NO_REPO_DIR, spawn: failClosedGhSpawn, telegramToken: null, telegramChat: null,
+    };
+    await assert.rejects(() => runMergeCheck({ pool: crashingPool, ...args }), /SIMULATED CRASH/);
+
+    const openRuns = (await pool.query(
+      `select * from tower.merge_check_run where pr_number = ? and head_sha = ? and status = 'open'`, [7003, MC_HEAD2])).rows;
+    assert.equal(openRuns.length, 1, 'the interrupted run is still open — which is what makes resume necessary');
+    const firstRunId = openRuns[0].id;
+
+    // Second attempt, real pool: it must RESUME that run, not open a rival one.
+    const out = await runMergeCheck({ pool, ...args });
+    assert.equal(out.runId, firstRunId, 'the open run was resumed');
+    const allRuns = (await pool.query(`select id from tower.merge_check_run where pr_number = ?`, [7003])).rows;
+    assert.equal(allRuns.length, 1, 'and no second run was created');
+    const msgs = (await pool.query(`select sender, seq from tower.merge_check_message where run_id = ? order by seq`, [firstRunId])).rows;
+    // The crash landed AFTER both of the first attempt's messages (larry seq 1, the blocked
+    // gpt_codex verdict seq 2) and before the closing UPDATE. So the resumed attempt continues at
+    // seq 3 and does NOT re-record Larry — which is the whole point of the `haveLarry` check.
+    assert.equal(msgs.filter((m) => m.sender === 'larry').length, 1, 'Larry\'s claim is recorded ONCE across both attempts');
+    assert.deepEqual(msgs.map((m) => m.seq), [1, 2, 3], 'seq continued from the prior message rather than restarting at 1');
+    assert.deepEqual(msgs.map((m) => m.sender), ['larry', 'gpt_codex', 'gpt_codex']);
+
+    // THE OTHER SIDE, so this is not a one-sided assertion: the run is now `blocked`, and a third
+    // attempt must NOT resume it. A resume SELECT that ignored `status` would pass the check
+    // above and fail here.
+    const out3 = await runMergeCheck({ pool, ...args });
+    assert.notEqual(out3.runId, firstRunId, 'a CLOSED run is never resumed');
+    assert.equal((await pool.query(`select id from tower.merge_check_run where pr_number = ?`, [7003])).rows.length, 2);
+  });
+
+  await test('M4 — DIRECT-STATEMENT TEST (not an end-to-end proof): the post-Codex UPDATE literal, with a CONTROL proving the old param order fails', async () => {
+    // This statement is only reached after a COMPLETED Codex round — real spend and a real
+    // Telegram message to Warwick, neither of which is authorised here. So the literal is executed
+    // directly against the throwaway store. It proves the STATEMENT is correct SQLite and that its
+    // parameters are in the right positions. It does NOT prove the end-to-end merge-check.
+    const runId = (await pool.query(
+      `insert into tower.merge_check_run (pr_number, build_ref, wp_ref, head_sha, status, rounds)
+       values (?,?,?,?,'open',0) returning id`, [7004, 'BUILD-020', 'WP-2F', MC_HEAD])).rows[0].id;
+
+    const upd = await pool.query(
+      `update tower.merge_check_run set status=?, rounds=?, head_sha=?, updated_at=now() where id=?`,
+      ['ready', 2, MC_HEAD2, runId]);
+    assert.equal(upd.rowCount, 1, 'exactly one row matched');
+
+    const row = (await pool.query(`select * from tower.merge_check_run where id = ?`, [runId])).rows[0];
+    assert.equal(row.status, 'ready');
+    assert.equal(row.rounds, 2);
+    assert.equal(row.head_sha, MC_HEAD2);
+    assert.equal(row.pr_number, 7004, 'nothing else moved');
+    assert.ok(row.updated_at instanceof Date, 'now() produced a value db.mjs rehydrates as a Date');
+
+    // THE CONTROL — the pre-WP-2F param array against the `?` form. `$1` was LAST in the SQL and
+    // FIRST in the array, so a blind `$N`→`?` replace would have bound the RUN ID into `status`
+    // and the STATUS STRING into `id`: zero rows matched, silently, and the run would sit `open`
+    // for ever. If this control ever stops failing, the assertion above proves nothing.
+    const wrong = await pool.query(
+      `update tower.merge_check_run set status=?, rounds=?, head_sha=?, updated_at=now() where id=?`,
+      [runId, 'ready', 3, MC_HEAD]);
+    assert.equal(wrong.rowCount, 0, 'the old parameter order matches NOTHING — the test can see the defect it exists to catch');
+    assert.equal((await pool.query(`select status from tower.merge_check_run where id = ?`, [runId])).rows[0].status, 'ready',
+      'and it changed nothing');
+  });
+
+  await test('M5 — the canonical store path: defaultDbPath() resolves to ~/.mypka/tower/tower.db with TOWER_SQLITE_PATH unset, and nothing writes there', async () => {
+    const saved = process.env.TOWER_SQLITE_PATH;
+    const canonical = path.join(os.homedir(), '.mypka', 'tower', 'tower.db');
+    const existedBefore = fs.existsSync(canonical);
+    try {
+      delete process.env.TOWER_SQLITE_PATH;
+      assert.equal(defaultDbPath(), canonical,
+        'the merge-check path, unconfigured, reaches the SAME file the live watcher uses');
+      // Two-sided: an explicit override is honoured, which is what keeps every test off that file.
+      process.env.TOWER_SQLITE_PATH = path.join(TMP_DIR, 'override.db');
+      assert.equal(defaultDbPath(), path.join(TMP_DIR, 'override.db'));
+    } finally {
+      if (saved === undefined) delete process.env.TOWER_SQLITE_PATH; else process.env.TOWER_SQLITE_PATH = saved;
+    }
+    // Resolving the path must never CREATE it. This suite has live_authority: none over that file.
+    assert.equal(fs.existsSync(canonical), existedBefore,
+      'asserting the canonical path neither created nor removed the live store');
+  });
+
+  await test('M6 — ZERO POSTGRES on the merge-check path, INSTRUMENTED: the real module graph is enumerated and a pg trap is proven to bite', async () => {
+    // A source grep answers "is the string in this file". This answers "what did the process
+    // actually load", which is the only form that survives a transitive import appearing later.
+    // SCOPE: the two merge-check entrypoints. tower-loop/accept.mjs is EXCLUDED — it is
+    // Postgres-only, has zero code callers, and WP-2F deliberately leaves it untouched.
+    const probe = path.join(__dirname, 'doubles', 'pg-probe.mjs');
+    const graphOut = path.join(TMP_DIR, 'pg-graph.txt');
+    const runProbe = (mode) => new Promise((resolve) => {
+      const c = spawn(process.execPath, [probe, mode], {
+        cwd: LOOP_DIR, env: { ...process.env, PG_OUT: mode === 'merge-check' ? graphOut : '' },
+        stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true,
+      });
+      let out = ''; let err = '';
+      c.stdout.on('data', (d) => { out += d; });
+      c.stderr.on('data', (d) => { err += d; });
+      c.on('exit', (code) => resolve({ code, out, err }));
+    });
+
+    // 1. THE CONTROL FIRST. If the trap does not bite, the clean result below means nothing.
+    const control = await runProbe('control-trap');
+    assert.equal(control.code, 0, `the pg trap must fire on a deliberate import (got: ${control.out}${control.err.slice(0, 200)})`);
+    assert.match(control.out, /TRAP_FIRED: ZERO-POSTGRES TRAP/);
+
+    // 2. The real path, under the same instrument.
+    const real = await runProbe('merge-check');
+    assert.equal(real.code, 0, `the merge-check probe must complete (stderr: ${real.err.slice(0, 400)})`);
+    const res = JSON.parse(real.out.trim().split(/\r?\n/).pop());
+    assert.equal(res.blocked, true, 'it really executed the fail-closed path against a real store');
+    assert.equal(res.runs, 1);
+    assert.equal(res.msgs, 1);
+
+    // 3. The recording must be non-empty AND contain modules we KNOW were loaded, so an empty
+    //    file can never pass as a clean one.
+    const graph = fs.readFileSync(graphOut, 'utf8').split(/\r?\n/).filter(Boolean);
+    assert.ok(graph.length > 10, `the module graph recorded something (got ${graph.length} entries)`);
+    for (const known of ['tower-loop/mergeCheck.mjs', 'tower/merge-check.mjs', 'tower-loop/db.mjs']) {
+      assert.ok(graph.some((u) => u.replace(/\\/g, '/').endsWith(known)),
+        `the recorder saw ${known} — so it was actually watching`);
+    }
+
+    // 4. And no pg. This is the acceptance property's negative half.
+    const pgLoads = graph.filter((u) => /[/\\]node_modules[/\\]pg[/\\]/.test(u));
+    assert.deepEqual(pgLoads, [], `the merge-check path loaded the pg driver: ${pgLoads.join(', ')}`);
+
+    // 5. The absolute-path import is gone. This one IS a source assertion and is stated as such:
+    //    it is a check on the TEXT of one file, not on runtime behaviour.
+    const towerSrc = fs.readFileSync(path.resolve(LOOP_DIR, '..', 'tower', 'merge-check.mjs'), 'utf8');
+    const body = towerSrc.split(/\r?\n/).filter((l) => !l.trim().startsWith('//')).join('\n');
+    assert.ok(!/file:\/\/\/C:\/Fusion247PKA\/services/.test(body),
+      'no absolute path into one worktree survives in executable code');
+    assert.ok(!/create schema/i.test(body), 'the Postgres-only `create schema` is gone');
+    assert.ok(!/\bleft\s*\(/.test(body), 'the Postgres-only left() is gone');
+  });
+
+  await test('M7 — tower/merge-check.mjs speaks SQLite: record/nextSeq write the exchange, and substr() replaced left() — with a CONTROL proving left() still fails', async () => {
+    const runId = (await pool.query(
+      `insert into tower.merge_check_run (pr_number, build_ref, wp_ref, head_sha, status, rounds)
+       values (?,?,?,?,'open',0) returning id`, [7005, 'BUILD-020', 'WP-2F', MC_HEAD])).rows[0].id;
+
+    // The real exported functions, against the real store.
+    assert.equal(await mcNextSeq(pool, runId), 1, 'an empty run starts at seq 1');
+    assert.equal(await mcRecord(pool, runId, 'larry', 1, null, 'ready to merge', MC_HEAD), 1);
+    assert.equal(await mcRecord(pool, runId, 'gpt_codex', 1, 'FIX_REQUIRED', 'not yet', MC_HEAD), 2);
+    assert.equal(await mcNextSeq(pool, runId), 3, 'coalesce(max(seq),0)+1 advanced');
+
+    const msgs = (await pool.query(`select sender, seq, status, text from tower.merge_check_message where run_id = ? order by seq`, [runId])).rows;
+    assert.deepEqual(msgs.map((m) => `${m.seq}:${m.sender}:${m.status ?? '-'}`), ['1:larry:-', '2:gpt_codex:FIX_REQUIRED']);
+    assert.equal(msgs[1].text, 'not yet', 'the column literally named `text` round-trips');
+
+    // auditContext swallows its own errors by design, so a broken statement would return '' —
+    // silently. Assert it returned CONTENT, which only a working statement can produce. By this
+    // point in the suite tower.turn has real rows.
+    const audit = await mcAuditContext(pool);
+    assert.ok(audit.length > 0, 'substr() executed and the audit context came back non-empty');
+    assert.match(audit, /^#\d+: /, 'and it is the expected shape');
+
+    // THE CONTROL: the Postgres-only spelling must still fail here, or the assertion above would
+    // have passed no matter which function the code used.
+    await assert.rejects(
+      () => pool.query(`select seq, left(instruction,140) instr from tower.turn order by seq desc limit 5`),
+      /no such function: left/i,
+      'left() is genuinely unavailable — so substr() working is a real difference');
+  });
+
+  try { fs.rmSync(NO_REPO_DIR, { recursive: true, force: true }); } catch { /* best effort */ }
 
   await pool.end();
   // The throwaway store has served its purpose; leave nothing behind.

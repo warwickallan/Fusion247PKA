@@ -136,6 +136,108 @@ function getPool() {
   return pool;
 }
 
+// ---------------------------------------------------------------------------
+// DEPENDENCY CHECK - what makes /asdair/health honest.
+//
+// THE INCIDENT THIS EXISTS FOR (2026-08-03): GET /asdair/health returned
+// `ok: true` WHILE GET /asdair/workspace was returning 500 on a missing `pg`
+// module. Health was a literal - it reported on nothing and could not fail.
+// A green that cannot go red is worse than no indicator, because it is trusted.
+//
+// WHY IT LIVES HERE, NEXT TO getPool(), AND NOT IN ITS OWN MODULE. The check
+// must exercise the EXACT path that broke: this lazy `require('pg')`, this
+// env var, this pool. A health check that opens its own connection its own way
+// is testing something adjacent to the thing that failed, and would have
+// reported green through the entire incident. Same code path, or it is theatre.
+//
+// PURE ASCII. Never returns a connection string: the message is scrubbed, and
+// the reason codes below are fixed strings chosen so the cockpit can say what
+// is wrong in words without ever echoing configuration back to a browser.
+function scrubbed(err) {
+  var msg = (err && err.message) ? String(err.message) : 'unexpected error';
+  return msg.replace(/postgres(ql)?:\/\/\S+/gi, '[redacted-connection-string]');
+}
+
+function classifyDependencyError(err) {
+  var code = (err && (err.code || (err.cause && err.cause.code))) || '';
+  var msg = (err && err.message) ? String(err.message) : '';
+  // The 2026-08-03 failure exactly: the driver itself is not installed.
+  if (code === 'MODULE_NOT_FOUND' || /Cannot find module/i.test(msg)) return 'driver_not_installed';
+  if (/ASDAIR_DB_URL is not set/.test(msg)) return 'not_configured';
+  if (code === 'ECONNREFUSED') return 'database_not_listening';
+  if (code === 'ENOTFOUND') return 'database_host_unresolved';
+  if (code === 'ETIMEDOUT' || code === 'ASDAIR_HEALTH_TIMEOUT') return 'database_timeout';
+  if (code === '28P01' || code === '28000') return 'database_auth_rejected';
+  if (code === '3D000') return 'database_missing';
+  return 'database_unreachable';
+}
+
+var DEPENDENCY_REASONS = Object.freeze({
+  driver_not_installed: 'the PostgreSQL driver is not installed for this service',
+  not_configured: 'ASDAIR_DB_URL is not set, so the reader has no database to read',
+  database_not_listening: 'nothing is listening on the configured database address',
+  database_host_unresolved: 'the configured database host does not resolve',
+  database_timeout: 'the database did not answer in time',
+  database_auth_rejected: 'the database rejected this service credentials',
+  database_missing: 'the configured database does not exist',
+  database_unreachable: 'the database could not be reached'
+});
+
+/**
+ * Can this service actually do its job right now?
+ *
+ * connect + SELECT 1 + release, against the same pool readWorkspace uses. Kept
+ * deliberately trivial: /asdair/health is polled by the cockpit, so the check
+ * must be cheap enough to run on every poll. It is a liveness probe, not a
+ * self-test - it answers "could I serve a workspace read", nothing more.
+ *
+ * NEVER THROWS. A health check that throws cannot report ill health.
+ *
+ * @param {{timeoutMs?: number, pool?: object}} [options]
+ */
+async function checkDependencies(options) {
+  var opts = options || {};
+  var timeoutMs = typeof opts.timeoutMs === 'number' ? opts.timeoutMs : 2000;
+  var started = Date.now();
+  var timer = null;
+  try {
+    // getPool() is where the lazy require('pg') and the env-var check live -
+    // both failure modes surface here rather than later.
+    var p = opts.pool || getPool();
+    var timeout = new Promise(function (_, reject) {
+      timer = setTimeout(function () {
+        var e = new Error('dependency check exceeded ' + timeoutMs + 'ms');
+        e.code = 'ASDAIR_HEALTH_TIMEOUT';
+        reject(e);
+      }, timeoutMs);
+      // Do not hold the process open just for the health timer.
+      if (timer.unref) timer.unref();
+    });
+    var probe = (async function () {
+      var client = await p.connect();
+      try { await client.query('select 1'); } finally { client.release(); }
+    }());
+    await Promise.race([probe, timeout]);
+    // A rejection AFTER the race is lost would otherwise be an unhandled
+    // rejection that takes the service down - the opposite of a health check.
+    probe.catch(function () {});
+    return { ok: true, dependency: 'database', checked: true, latency_ms: Date.now() - started };
+  } catch (err) {
+    var reason = classifyDependencyError(err);
+    return {
+      ok: false,
+      dependency: 'database',
+      checked: true,
+      latency_ms: Date.now() - started,
+      reason: reason,
+      detail: DEPENDENCY_REASONS[reason] || DEPENDENCY_REASONS.database_unreachable,
+      message: scrubbed(err)
+    };
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 function rows(res) {
   return (res && res.rows) || [];
 }
@@ -288,11 +390,18 @@ async function close() {
 
 module.exports = {
   readWorkspace: readWorkspace,
+  checkDependencies: checkDependencies,
+  DEPENDENCY_REASONS: DEPENDENCY_REASONS,
   close: close,
   ALL_SQL: ALL_SQL,
   ITEM_BASE_COLUMNS: ITEM_BASE_COLUMNS,
   ITEM_OPTIONAL_COLUMNS: ITEM_OPTIONAL_COLUMNS,
   _internal: {
+    // Exported so readPacket.js shares the SAME lazy pool, the same lazy
+    // require('pg') and the same env var. A sibling reader that opened its own
+    // connection its own way would be a second configuration path to keep in
+    // sync, and the health check would no longer speak for both.
+    getPool: getPool,
     gather: gather,
     buildItemSelect: buildItemSelect,
     probeItemColumns: probeItemColumns,

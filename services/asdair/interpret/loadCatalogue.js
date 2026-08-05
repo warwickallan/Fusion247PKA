@@ -104,7 +104,22 @@ async function loadCatalogue(client, householdId) {
     candidates: regulars.rows.map(compactRegular),
     // Full rows kept separately: the resolver needs product ids/urls that the
     // prompt does not need to see.
-    regularsById: new Map(regulars.rows.map((r) => [r.id, r])),
+    //
+    // KEYED BY Number(r.id), NOT r.id VERBATIM. asdair.regulars.id is `bigint`
+    // (001_asdair_schema.sql), and node-postgres returns a bigint column as a
+    // STRING by default (no pg.types.setTypeParser override exists anywhere in
+    // this codebase). Every known consumer of this Map - shopLines.withCanonicalNames
+    // (pipeline/shopLines.js), interpret-list.js's own resolve() - looks a row up
+    // by Number(matched_regular_id). A Map keyed by the raw string id therefore
+    // silently missed EVERY lookup in the real deployment: canonical_name came
+    // back null for every matched line, and runPipeline's buildGroundedIntents
+    // threw its "neither a catalogue match nor a readable raw_reading" error for
+    // a line that WAS matched. This is what actually failed SHOP-2026-08-03, and
+    // it was invisible to the offline suite because the pipeline test harness
+    // stubs this whole module out with a hand-built (already-numeric) catalogue -
+    // see loadCatalogue.test.js, which exercises this module for real with
+    // STRING ids, the way Postgres actually returns them.
+    regularsById: new Map(regulars.rows.map((r) => [Number(r.id), r])),
     rules: rules.rows.map(compactRule),
     last_order: lastOrderId ? { order_id: lastOrderId, lines: lastOrderLines } : null,
   };

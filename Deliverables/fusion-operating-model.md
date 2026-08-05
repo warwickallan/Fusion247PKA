@@ -67,7 +67,25 @@ governance boundaries. Distinct from Mason (Mason is product/synthesis, Silas is
 **Larry — Orchestrator / Quarterback.** Routes work to specialists, keeps operational truth, reconciles, and holds
 integration + merge authority. **NOT default implementation labour** — bounded builds increasingly go to delegated
 builder agents (see the next commissioned design). Larry stays available to Warwick for orchestration rather than
-disappearing into implementation.
+disappearing into implementation. **Larry does NOT hold completion authority** (Warwick, 2026-08-04) — see Veritas
+below.
+
+**Veritas — Internal Quality and Truth Assurance.** *(Added 2026-08-04 by Warwick's order `GOVERNANCE-VERITAS-HIRE`.
+This model is LOCKED against rewriting, not against Warwick changing it; a roles model that omits a mandatory role
+sends every specialist who reads it down a superseded route.)* **Structurally separate INTERNAL assurance —
+separate context, no authorship or integration authority, direct repository inspection, an uneditable verdict,
+but the SAME runtime and model. It is not external verification; Codex remains the different-model external
+gate.** Determines, independently of Larry's judgement, whether integrated work
+meets the stated outcome and accepted design, **works through the production path**, is genuinely integrated rather
+than merely implemented in isolation, is durable across restart and recovery, and is accurately represented in Git
+and in every active document. Reviews the **exact integrated head** in a separate context — never a worker branch, a
+read-back, or Larry's summary. Three gates only (integrated WP · phase or vertical slice · documentation and Git
+truth) and **no pre-inspection of a Work Order before implementation**, so a specialist's start is never delayed.
+Three verdicts only — PASS / HOLD / FAIL — and an unknown on a mandatory acceptance property is a HOLD.
+**A Work Package cannot be recorded complete without VERITAS_PASS.** Veritas reports and never repairs; Larry
+dispatches the corrections. Veritas does NOT replace Codex, does not research (Pax), does not do visual/UI QA
+(Vera), does not implement (Keel), and does not audit team hygiene (Nolan). Canonical contract:
+`Team/Veritas - Internal Quality and Truth Assurance/AGENTS.md`.
 
 **Warwick — Strategic authority.** Sets priorities; expresses opportunity interest and commissions; holds BUILD
 authorisation, merge-to-main, live-apply, Fable use, and all exceptions. Commissions **outcomes, not implementation
@@ -87,7 +105,12 @@ administration.**
 ## The idea lifecycle (canonical)
 
 `source → atoms (Arc) → Mason synthesis → opportunity → Warwick interest → Pax research where warranted →
-brief / PRD → Larry implementation plan → Warwick GO → delegated build → QA → merge`
+brief / PRD → Larry implementation plan → Warwick GO → delegated build → Larry integrates →
+VERITAS internal assurance of the exact integrated head → CODEX external QA at the PR head → merge`
+
+*Amended 2026-08-04 (`GOVERNANCE-VERITAS-HIRE`). The single undifferentiated `QA` step in the previous version is
+what let internal assurance and external review be treated as one thing that either had happened or had not. They
+are two gates with different scopes and different owners, and the build is not complete until both have passed.*
 
 **Self-improvement path:** the Brain can accumulate + synthesise self-improvement opportunities without Warwick or
 Larry manually driving every atom; mature ones flow through the same lifecycle, with Warwick's GO as the gate

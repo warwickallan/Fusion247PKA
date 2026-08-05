@@ -24,9 +24,10 @@ It is also **not a receiver**. It never polls Telegram — see [Why there is no 
 | `renderMessages.js` | The message catalogue. Nine pure renderers, each returning `{ text, reply_markup }`. |
 | `inboundRouter.js` | Maps one inbound Telegram update onto one intent `{ action, shopRef, arg, responder, raw }`. |
 | `questionRender.js` | Builds a question card **and its render contract** from one list, and persists what was displayed. |
+| `questionStore.js` | The durable Store behind that contract, over `asdair.shop_question`. Two factories — a pg client, or a read/write query pair. |
 | `resolveTap.js` | Resolves a tapped index back through the stored contract to a product — or refuses it, visibly. |
 | `sendShopperMessage.js` | The outbound sender: `sendMessage` · `editMessageText` · `answerCallbackQuery`. Injectable HTTP client. |
-| `*.test.js` | `node --test`, fully offline. 126 tests, no network, no database, no credentials file. |
+| `*.test.js` | `node --test`, fully offline. No network, no database, no credentials file. |
 
 Zero runtime dependencies. ESM. Node ≥ 18.
 
@@ -176,6 +177,44 @@ A test asserts no `keep` / `raw` / `discard` / `delete` button ever appears on t
 ---
 
 ## The render contract
+
+### Who calls this in production, and where
+
+**`sendQuestionCard()` has a production caller.** It is
+`services/asdair/pipeline/runtime.js`, and the route is worth knowing before you wire anything new,
+because it is not obvious by grep:
+
+```
+runPipeline.stepPlan()          opens an asdair.shop_question row (status 'open')
+   -> runtime.queueShopCards()  enqueues an outbox row of kind `question`, ONE per question
+   -> runtime.drainOutbox()     intercepts kind `question` and calls bot.sendQuestionCard()
+   -> questionRender            sends the card, THEN seals the render contract against the
+                                message id Telegram allocated
+```
+
+Three things a future caller will get wrong, so they are stated here rather than rediscovered:
+
+1. **A question card must never go through the generic renderer.** `MESSAGES.question` is
+   `renderQuestionCard`, which will happily render and send a perfectly good card — with **no render
+   contract recorded**. Every button on it then refuses forever, because an index is meaningless
+   without the stored list it indexes into. `drainOutbox` therefore intercepts kind `question`
+   *before* the `MESSAGES` lookup. Sending a question any other way is the defect, not a shortcut.
+
+2. **The planner's candidate shape is not this module's candidate shape.**
+   `runPipeline.planCandidates()` writes `{ label, regular_id, source }` for the catalogue
+   resolver's alternatives and `{ label, source }` — **no id at all** — for the planner's ranked
+   name suggestions. `candidateIdOf()` accepts `id` / `productId` / `product_id` and *throws* on
+   anything else, so the raw planner shape cannot be rendered. `normaliseStoredCandidates()` bridges
+   it: `regular_id` becomes the id **`regular:<n>`**, and the prefix is load-bearing — a bare number
+   would lose which table the id came from, and a `product_alternatives` primary key is **not** an
+   `asdair.regulars` id. Candidates with no trustworthy id are returned separately and shown as card
+   *text* the human can reply to; they never become buttons, because a button resolving an index to
+   a label reintroduces the exact ambiguity this contract exists to remove.
+
+3. **Idempotency for a question card is NOT `outboxEverQueued`.** That reads per *kind* per shop, and
+   one shop holds many questions — using it would card the first question and silently swallow every
+   other one, forever. The real guard is `shop_question.card_message_id`, set only after a card is
+   genuinely on the wire, plus ledger adoption of a still-pending row for the window in between.
 
 **A question button carries a candidate *index*. That is what forces everything below.**
 
@@ -357,6 +396,42 @@ store = {
 
 Rows come back in the **database's own shape** — the snake_case columns of `asdair.shop_question`,
 plus a joined `shop_ref` (`asdair.shop`), because reading them leniently is how a misread starts.
+
+`questionStore.js` is the real implementation, and it has **two factories**:
+
+```js
+createQuestionStore(client)                         // a connected pg client
+createQuestionStoreFromQueries({ read, write })     // a read/write query PAIR
+```
+
+The pair exists because the pipeline runtime holds no client — it holds `deps.readQuery` and
+`deps.writeQuery`, two pools against two roles, and the read role is SELECT-only *deliberately*, so
+a bug cannot write through it. Handing the store one `client.query` would collapse that separation
+for every caller. The two reads go to `read`; `saveRender` and `recordAnswer` go to `write`. The SQL
+still has exactly one owner.
+
+### The refusal contract — the two "no"s are different facts
+
+`resolveTap.js` also exports **`resolveCandidateAnswer()`**, the READ half on its own: every
+staleness check `resolveTap` makes, in the same order, with the same vocabulary — and **no write and
+no acknowledgement.** That is what the pipeline runtime uses, because a tap there becomes a member
+of the *command* surface (`answerQuestion`), so a tap on the phone and a click in the Cockpit are
+one durable write. Calling `resolveTap()` as well would write the same answer twice, by two paths,
+and the ledger would stop being the record of what happened.
+
+A tap falls into exactly one of three buckets, and **the last two must never be collapsed into one
+message**:
+
+| The tapped `(chat, message)` | Verdict | What Warwick is told |
+|---|---|---|
+| **is** the recorded card | the live render — resolve the index | the answer |
+| is **not**, but the question exists | `STALE_CARD`, `refresh: true` | the card is out of date, ask again |
+| neither | `UNKNOWN_CARD` | this card is not on record |
+
+"Superseded" and "never heard of it" are different facts, and the first is the one he needs. Every
+refusal carries a `notice` from `TAP_NOTICES` (exported, so a caller answering the tap itself does
+not grow a second copy of the strings), and **no refusal ever carries a candidate label, a product
+id or an answer** — a refusal that leaks a plausible-looking answer is worse than one that does not.
 
 ### Resolving a tap
 

@@ -10,7 +10,9 @@
 //
 // Exercises every branch of planner.js:
 //   * no-qty -> 1
-//   * dedupe / sum
+//   * dedupe: same-or-absent written quantity collapses to one line; DIFFERENT
+//     written quantities are a QUESTION carrying both numbers, never a sum
+//     (corrected 2026-08-04 - this header used to say "dedupe / sum")
 //   * product match (household-scoped preferred over global)
 //   * unmatched-but-listed -> needs_decision + "no explicit product mapping"
 //   * needs_decision: out of stock, flagged-on-list, ambiguous, rule
@@ -72,19 +74,100 @@ test('helper normaliseQty coerces bad values to 1 and keeps positive ints', func
   assert.equal(_internal.normaliseQty(2.9), 2);
 });
 
-test('rule 3: duplicate lines are deduped and their counts summed', function () {
+// SUPERSEDED AND REPLACED, 2026-08-04 (WO-Y), on Warwick's ruling after the
+// integration builder found the defect by execution.
+//
+// This test used to assert that duplicate lines had their counts SUMMED:
+// "2 Widget A" + "3 widget a" + "Widget A" == 6. Rule 3 says duplicate entries
+// are deduped to a single line; it says nothing about arithmetic. Summing is an
+// inference, and it was being made silently in one direction - so a list
+// reading "2 milk" and "3 milk" quietly ordered five.
+//
+// The assertion is REPLACED, not deleted, and the three cases below carry more
+// proof than the one line they replace.
+test('rule 3: duplicate lines with the SAME written quantity collapse to one line at that quantity', function () {
   const plan = planBasket({
     listItems: [
       { item_name: 'Widget A', requested_qty: 2 },
-      { item_name: 'widget a', requested_qty: 3 },  // different case, same item
-      { item_name: 'Widget A' }                     // no qty -> +1
+      { item_name: 'widget a', requested_qty: 2 }   // different case, same item
     ],
     products: products, rules: [], budget: budget, household: HH
   });
   const rows = plan.items.filter(function (it) { return it.item_name.toLowerCase() === 'widget a'; });
   assert.equal(rows.length, 1, 'duplicates collapse to one line');
-  assert.equal(rows[0].requested_qty, 6);
-  assert.equal(rows[0].planned_qty, 6);
+  assert.equal(rows[0].requested_qty, 2, 'a repetition is not an addition');
+  assert.equal(rows[0].planned_qty, 2);
+  assert.equal(rows[0].status, 'add');
+});
+
+test('rule 3 + rule 2: duplicate lines with NO written quantity collapse to one line at 1', function () {
+  const plan = planBasket({
+    listItems: [
+      { item_name: 'Widget A' },
+      { item_name: 'widget a' },
+      { item_name: 'WIDGET A' }
+    ],
+    products: products, rules: [], budget: budget, household: HH
+  });
+  const rows = plan.items.filter(function (it) { return it.item_name.toLowerCase() === 'widget a'; });
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].requested_qty, 1, 'three bare repetitions of one item are one item');
+  assert.equal(rows[0].status, 'add');
+});
+
+test('rule 3: DIFFERENT written quantities are a QUESTION, never a sum', function () {
+  // The real defect: "2 milk" and "3 milk" silently became five.
+  const plan = planBasket({
+    listItems: [
+      { item_name: 'Widget A', requested_qty: 2 },
+      { item_name: 'widget a', requested_qty: 3 }
+    ],
+    products: products, rules: [], budget: budget, household: HH
+  });
+  const rows = plan.items.filter(function (it) { return it.item_name.toLowerCase() === 'widget a'; });
+  assert.equal(rows.length, 1, 'it is still one line');
+  const w = rows[0];
+
+  assert.notEqual(w.requested_qty, 5, 'the quantities must NOT be added together');
+  assert.equal(w.status, 'needs_decision', 'the list says two different things; that is a question');
+  assert.equal(w.planned_qty, 0, 'nothing is planned until Warwick says which');
+  assert.ok(w.flags.includes('quantity conflict'));
+  assert.ok(w.flags.includes('never auto-substitute'));
+  assert.match(w.note, /two different quantities for this item \(2 and 3\)/,
+    'BOTH written quantities must be on the card, so Warwick sees what was on the page');
+  assert.equal(plan.summary.needs_decision, 1);
+});
+
+test('rule 3: an absent quantity alongside an explicit one is NOT a conflict', function () {
+  // "milk" plus "2 milk" is one item written twice, once with a count. Only
+  // two DIFFERENT written numbers are a genuine disagreement.
+  const plan = planBasket({
+    listItems: [
+      { item_name: 'Widget A' },
+      { item_name: 'widget a', requested_qty: 2 }
+    ],
+    products: products, rules: [], budget: budget, household: HH
+  });
+  const w = plan.items.filter(function (it) { return it.item_name.toLowerCase() === 'widget a'; })[0];
+  assert.equal(w.requested_qty, 2);
+  assert.equal(w.status, 'add');
+  assert.equal(w.flags.includes('quantity conflict'), false);
+});
+
+test('rule 3: junk in a quantity field never manufactures a conflict', function () {
+  const plan = planBasket({
+    listItems: [
+      { item_name: 'Widget A', requested_qty: 2 },
+      { item_name: 'widget a', requested_qty: 'lots' },
+      { item_name: 'widget a', requested_qty: 0 },
+      { item_name: 'widget a', requested_qty: -4 }
+    ],
+    products: products, rules: [], budget: budget, household: HH
+  });
+  const w = plan.items.filter(function (it) { return it.item_name.toLowerCase() === 'widget a'; })[0];
+  assert.equal(w.requested_qty, 2, 'only a real written number counts as a statement of quantity');
+  assert.equal(w.status, 'add');
+  assert.equal(w.flags.includes('quantity conflict'), false);
 });
 
 test('rule 9: household-scoped product beats a global mapping', function () {
@@ -678,7 +761,10 @@ test('Finding 2: duplicate lines whose SECOND carries a foreign id -> merged lin
   const rows = plan.items.filter(function (it) { return it.item_name.toLowerCase() === 'generic milk 2l'; });
   assert.equal(rows.length, 1, 'duplicates still collapse to one line');
   const m = rows[0];
-  assert.equal(m.requested_qty, 2, 'counts are still summed');
+  // Both lines wrote qty 1, so there is no quantity disagreement here - the
+  // subject of this test is the FOREIGN ID, and that is unchanged.
+  // (Was `2` while dedupe summed counts; corrected 2026-08-04 with the rule.)
+  assert.equal(m.requested_qty, 1);
   assert.equal(m.status, 'needs_decision', 'a hidden foreign id is not silently accepted as add');
   assert.equal(m.planned_qty, 0);
   assert.equal(m.matched_product, null, 'neither the active nor the foreign product is auto-applied on conflict');
@@ -688,7 +774,19 @@ test('Finding 2: duplicate lines whose SECOND carries a foreign id -> merged lin
   assert.ok(m.flags.includes('never auto-substitute'));
 });
 
-test('Finding 2 control: duplicate lines repeating the SAME id behave exactly as before (add, no conflict)', function () {
+// RETITLED AND STRENGTHENED, 2026-08-04 (WO-ZJ), finishing the WO-Y transaction.
+//
+// The title used to read "behave exactly as before (add, no conflict)" and the
+// body asserted requested_qty 5 -- i.e. that 2 + 3 were SUMMED. That is the
+// exact outcome Warwick banned ("2 milk" and "3 milk" must never silently
+// become five), so the assertion was asserting the defect.
+//
+// The INPUT is deliberately unchanged. This test's real subject is the ID axis
+// (Finding 2: a same-id repeat must not raise a household-scope mismatch), and
+// that assertion is kept verbatim. What the correction adds is the proof that
+// the two axes are INDEPENDENT: the same line raises a quantity question while
+// raising no scope conflict. No assertion was removed; there are now seven.
+test('Finding 2 control: duplicate lines repeating the SAME id raise no SCOPE conflict (the differing quantities are their own question)', function () {
   const plan = planBasket({
     listItems: [
       { item_name: 'Widget A', requested_qty: 2, matched_product_id: 12 },  // global id
@@ -699,11 +797,16 @@ test('Finding 2 control: duplicate lines repeating the SAME id behave exactly as
   const rows = plan.items.filter(function (it) { return it.item_name.toLowerCase() === 'widget a'; });
   assert.equal(rows.length, 1);
   const w = rows[0];
-  assert.equal(w.requested_qty, 5, 'counts summed as before');
-  assert.equal(w.planned_qty, 5);
-  assert.equal(w.status, 'add');
-  assert.equal(w.matched_product, 'Widget A Deluxe');
-  assert.ok(!w.flags.includes('product id household scope mismatch'), 'same-id repeat is not a conflict');
+  assert.equal(w.requested_qty, 2, 'the FIRST written quantity only - nothing is summed, nothing is chosen');
+  assert.notEqual(w.requested_qty, 5, 'the quantities must NOT be added together');
+  assert.equal(w.planned_qty, 0, 'nothing is planned until Warwick says which');
+  assert.equal(w.status, 'needs_decision', 'two different written quantities are a question');
+  assert.equal(w.matched_product, 'Widget A Deluxe', 'the same-id repeat still resolves the product');
+  assert.match(w.note, /two different quantities for this item \(2 and 3\)/,
+    'BOTH written quantities reach the card');
+  // The ORIGINAL subject of this control, unchanged: a repeated id is not a
+  // scope conflict, and the quantity question above must not manufacture one.
+  assert.ok(!w.flags.includes('product id household scope mismatch'), 'same-id repeat is not a SCOPE conflict');
 });
 
 test('Finding 2 control: an id-bearing line plus a no-id duplicate still first-wins the single id (no regression)', function () {
@@ -717,7 +820,11 @@ test('Finding 2 control: an id-bearing line plus a no-id duplicate still first-w
   const rows = plan.items.filter(function (it) { return it.item_name.toLowerCase() === 'generic milk 2l'; });
   assert.equal(rows.length, 1);
   const m = rows[0];
-  assert.equal(m.requested_qty, 2);
+  // Both lines wrote qty 1 - the SAME number twice, which is a repetition and
+  // not an addition. (Was `2` while dedupe summed counts; corrected 2026-08-04
+  // with the rule, exactly as the Finding 2 test above it already was.)
+  assert.equal(m.requested_qty, 1, 'one quantity written twice is a repetition, not an addition');
+  assert.ok(!m.flags.includes('quantity conflict'), 'one repeated quantity is not a disagreement');
   assert.equal(m.status, 'add');
   assert.equal(m.matched_product, 'Store Brand Milk 2L', 'active-household id resolves as before');
   assert.ok(!m.flags.includes('product id household scope mismatch'));

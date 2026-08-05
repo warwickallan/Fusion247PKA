@@ -52,16 +52,33 @@ Exit 0 = ready; exit 1 = fail-closed (the masked output names the missing var). 
 the same loader (`runtimeConfig`) the watcher uses — if pre-flight is green, the watcher
 will load identically.
 
-## 4. Start (canonical launcher — the only method)
+## 4. Start — ⛔ RETIRED 2026-08-05. THIS NO LONGER STARTS ANYTHING.
 
-```
-powershell -ExecutionPolicy Bypass -File services\tower-baton\scripts\start-fusion-tower.ps1 -TaskId <clickupTaskId> -Telegram
-```
+> **`tower-baton` is retired.** Both entrypoints below now **refuse and exit 78**. This
+> section is kept because it was the documented start path and a reader who finds it
+> elsewhere must land on the truth, not on a dead command.
+>
+> **The current Tower is `services/control-plane/tower-loop/`, launched via
+> `run-watcher.mjs`.** That is the only Tower runtime.
+>
+> Authorised by Warwick, 2026-08-05: *"Verify the legacy Tower is genuinely obsolete,
+> then remove it so it cannot restart or confuse the current runtime."* The decision was
+> to make it **refuse** rather than delete the source tree, because
+> `src/clickupClient.js` is the target of a live negative control in the `tower-loop`
+> test suite (`graph-probe.mjs` `control-trap`).
 
-On a fresh start the watcher emits `[TOWER] ClickUp baton watcher online` via its own
-notifier; after a restart with existing state it emits
-`[TOWER] Watcher recovered and resumed from durable checkpoint state`. Secrets are NEVER
-on the command line — the node process loads them from the store.
+~~`powershell -ExecutionPolicy Bypass -File services\tower-baton\scripts\start-fusion-tower.ps1 -TaskId <clickupTaskId> -Telegram`~~ — **refuses, exit 78.**
+
+~~`node services\tower-baton\bin\tower-watch.js`~~ — **refuses, exit 78.** This was the
+real entrypoint: the launcher above only wrapped it, so guarding the `.ps1` alone would
+have left the path open.
+
+**A defect found while retiring it, worth keeping:** this launcher had **never been
+runnable under the host this very line named.** `powershell -File` is Windows PowerShell
+5.1, which reads a UTF-8-no-BOM file as ANSI; the committed em-dashes killed it at
+*parse* time. It ran under `pwsh` 7 and was dead under 5.1. The file is now pure ASCII
+and a test pins that. **The same root cause broke the Proofline launcher on 2026-08-04
+(`8d130eb`) — twice in one build.**
 
 ## 5. Safe backup + restore onto the Yoga
 
@@ -72,17 +89,21 @@ on the command line — the node process loads them from the store.
   (§2), confirm `gh auth status` is signed in and `%USERPROFILE%\.codex\auth.json`
   exists, then run the masked health check (§3).
 
-## 6. Scheduled Task (session-independent, after proofs)
+## 6. Scheduled Task — ⛔ RETIRED 2026-08-05. **DO NOT REGISTER THIS.**
 
-Register a user-level task that runs the launcher as Buggly at logon. Secrets are NOT
-on the task command line — the launcher/watcher load them from the store:
+> **This section was a documented resurrection procedure — a start path with a human in
+> the loop.** Following it would have re-created the exact legacy watcher that Phase 2
+> retired, and it would have survived every file deletion, because a person reading these
+> lines is the mechanism.
+>
+> **The registration it created (`FusionTowerBatonWatcher`) has been unregistered.** Do
+> not re-create it. The launcher it points at refuses with exit 78 in any case, so
+> following this now yields a task that fires every ten minutes and does nothing.
 
-```
-schtasks /Create /TN "FusionTowerBaton" /SC ONLOGON /RL LIMITED ^
-  /TR "powershell -ExecutionPolicy Bypass -File C:\Fusion247PKA\services\tower-baton\scripts\start-fusion-tower.ps1 -TaskId <clickupTaskId> -Telegram"
-```
+~~`schtasks /Create /TN "FusionTowerBaton" /SC ONLOGON /RL LIMITED /TR "powershell … start-fusion-tower.ps1 …"`~~ — **do not run.**
 
-The single-watcher lock prevents a duplicate if both a manual run and the task fire.
+**If you need Tower running, the answer is `services/control-plane/tower-loop/` via
+`run-watcher.mjs` — not this.**
 
 ## 7. Disable / uninstall
 

@@ -69,6 +69,130 @@ function insertColumns(sql, table) {
   return m[1].split(',').map((c) => c.trim());
 }
 
+/**
+ * Read the projected column names out of a SELECT's own statement text.
+ *
+ * WHY THIS EXISTS - defect D1, veritas-wp-red-suite-recovery-0f8a1bc. The
+ * listQuestions handler below used to hold a hard-coded list of the columns it
+ * returned. That list was derived from nothing, so the statement could change
+ * underneath it unnoticed: dropping `q.answer_text` from the real SELECT left
+ * the suite green at 185/0, and so did dropping `sl.raw_reading` and leaving a
+ * trailing comma before FROM - which is not even valid SQL. The fake answered
+ * from its own literal and never read what it was asked for.
+ *
+ * The statement is the input now. This is insertColumns() above pointed at a
+ * select list instead of an insert list, and it is the ONLY new mechanism here:
+ * no SQL parser, no schema registry, no column-contract store.
+ *
+ * WHAT IT DETECTS, exactly:
+ *   * a column DROPPED from the select list       - it stops being returned
+ *   * a column ADDED that the fake cannot source  - the handler throws
+ *   * a column RENAMED, or its alias changed      - same; the new name is unknown
+ *   * an EMPTY item in the list                   - throws (the trailing comma)
+ *   * no top-level FROM                           - throws
+ *   * unbalanced parentheses in the select list   - throws
+ *
+ * WHAT IT DOES NOT DO, and must not be read as doing:
+ *   * it does NOT validate SQL. Only the three malformations named above are
+ *     caught. Any other syntax error passes straight through this function.
+ *   * it does NOT check types, nullability, join semantics, ordering or
+ *     cardinality.
+ *   * it proves NOTHING about Postgres. It reads a string.
+ *   * it does not understand string literals, subqueries or a bare `*`. It
+ *     THROWS on anything it cannot read a plain column name out of, which is
+ *     loud rather than lenient on purpose.
+ */
+export function selectProjection(sql) {
+  const text = String(sql).replace(/\s+/g, ' ').trim();
+  if (!/^SELECT /i.test(text)) throw new Error(`fakePg: not a SELECT statement: ${text}`);
+  const body = text.replace(/^SELECT /i, '');
+  const items = [];
+  let depth = 0;
+  let start = 0;
+  let end = -1;
+  for (let i = 0; i < body.length; i += 1) {
+    const c = body[i];
+    if (c === '(') { depth += 1; continue; }
+    if (c === ')') {
+      depth -= 1;
+      if (depth < 0) throw new Error(`fakePg: unbalanced ")" in the select list of: ${text}`);
+      continue;
+    }
+    if (depth !== 0) continue;
+    if (c === ',') { items.push(body.slice(start, i)); start = i + 1; continue; }
+    if ((i === 0 || body[i - 1] === ' ') && /^FROM /i.test(body.slice(i, i + 5))) { end = i; break; }
+  }
+  if (end === -1) {
+    throw new Error(depth === 0
+      ? `fakePg: no top-level FROM in: ${text}`
+      : `fakePg: unbalanced "(" in the select list of: ${text}`);
+  }
+  items.push(body.slice(start, end));
+  return items.map((raw) => {
+    const item = raw.trim();
+    if (item === '') throw new Error(`fakePg: empty item in the select list of: ${text}`);
+    const aliased = / AS ([A-Za-z_][A-Za-z0-9_]*)$/i.exec(item);
+    const name = aliased ? aliased[1] : item.split('.').pop();
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
+      throw new Error(`fakePg: could not read a column name from the select item "${item}" in: ${text}`);
+    }
+    return name;
+  });
+}
+
+/**
+ * The asdair.shop_question columns this fake knows how to SOURCE.
+ *
+ * Read the role of this list carefully, because it looks like the literal that
+ * caused D1 and it is not doing that job. The old literal decided WHAT WAS
+ * RETURNED, which is why the statement could drift away from it in silence.
+ * This one decides only WHETHER THE FAKE ADMITS IT CAN SERVE A NAME the
+ * statement asked for; what is returned is whatever the statement selects.
+ *
+ * A name outside this list, and outside the two join-sourced names handled in
+ * projectQuestionRow, is a THROW - never a silent null.
+ *
+ * The exact expected set is pinned in a literal held OUTSIDE this file, in
+ * listQuestionsProjection.test.js, precisely so that editing the statement and
+ * this list together still reddens the suite.
+ */
+const QUESTION_ROW_COLUMNS = new Set([
+  'id', 'list_item_id', 'question_key', 'question_text', 'candidates', 'status',
+  'answer_text', 'answer_source', 'card_chat_id', 'card_message_id',
+  'rendered_candidates', 'render_fingerprint', 'render_version', 'callback_index',
+]);
+
+/**
+ * Build ONE result row for the listQuestions projection.
+ *
+ * `item_name` and `photographed_wording` go through here with everything else.
+ * They used to be attached by the handler unconditionally, outside the column
+ * list altogether - which is why dropping `sl.raw_reading AS photographed_wording`
+ * stayed green even though runPipeline.test.js genuinely asserts on that field.
+ * A consumer assertion existed and still could not fire.
+ */
+function projectQuestionRow(projection, question, listItem, shopLine) {
+  const row = {};
+  for (const name of projection) {
+    if (QUESTION_ROW_COLUMNS.has(name)) {
+      row[name] = question[name] === undefined ? null : question[name];
+      continue;
+    }
+    if (name === 'item_name') {
+      row[name] = listItem ? listItem.item_name : null;
+      continue;
+    }
+    if (name === 'photographed_wording') {
+      row[name] = shopLine && shopLine.raw_reading !== undefined ? shopLine.raw_reading : null;
+      continue;
+    }
+    throw new Error(`fakePg: the select list asks for "${name}", which this fake does not model. `
+      + 'Teach it where that column comes from, or the statement is asking asdair.shop_question '
+      + 'and its two LEFT JOINs for something they cannot give.');
+  }
+  return row;
+}
+
 /** Map positional params onto the insert's columns, honouring ::jsonb casts. */
 function insertRow(sql, table, params) {
   const cols = insertColumns(sql, table);
@@ -99,6 +223,12 @@ export function createFakeDatabase(seed = {}) {
     shopping_list_items: [],
     order_confirmation: [],
     order_confirmation_line: [],
+    // asdair.rule_qa_log - the decision log promoteDecision always writes, and
+    // the table skill/data.js loadRuleQaLog() reads back as `priorAnswers`. It
+    // is the whole mechanism by which an answer given this week stops the same
+    // question being asked next week, so the pipeline suite has to be able to
+    // see a row land in it.
+    rule_qa_log: [],
     ...seed,
   };
   const nextId = {};
@@ -276,8 +406,79 @@ export function createFakeClient(store, options = {}) {
       rows(db.shop_question.filter((q) => String(q.id) === String(p[0])))],
     [/count\(\*\)::int AS n FROM asdair\.shop_question WHERE shop_id = \$1 AND status = 'open'/i, (sql, p) =>
       rows([{ n: db.shop_question.filter((q) => String(q.shop_id) === String(p[0]) && q.status === 'open').length }])],
-    [/FROM asdair\.shop_question WHERE shop_id = \$1 ORDER BY id ASC/i, (sql, p) =>
-      rows(db.shop_question.filter((q) => String(q.shop_id) === String(p[0])).sort((a, b) => a.id - b.id))],
+    // store.listQuestions - shop_question LEFT JOINed to the item name carrier.
+    //
+    // The previous handler here answered the FLAT statement listQuestions used to
+    // emit. When that query grew the two LEFT JOINs and the four render-contract
+    // columns, this file was not updated, so the statement fell through to "no
+    // handler" - and queueShopCards catches per shop, so the throw surfaced as
+    // "no question card was queued" rather than as an error. Nothing about the
+    // real query was wrong; its offline counterpart simply did not exist.
+    //
+    // MODELLED AS A REAL LEFT JOIN, not as a convenience lookup:
+    //   * no match on either side yields ONE row with those fields null - which
+    //     is the whole reason both joins are LEFT, so a question whose list item
+    //     has gone still reaches the card;
+    //   * N matches on shop_line yield N rows, exactly as Postgres would. A fake
+    //     that silently collapsed a fan-out would hide a real duplicate.
+    //
+    // THE PROJECTION IS DERIVED FROM THE STATEMENT, by selectProjection() above.
+    // It is not a list held here. That is the correction of defect D1: the list
+    // that used to live at this spot decided the output on its own, so the real
+    // SELECT could lose a column - or be left syntactically invalid - and this
+    // handler would keep answering exactly as before, green.
+    //
+    // What this now guarantees, and nothing beyond it: a column dropped from the
+    // statement stops being returned; a column added that cannot be sourced
+    // throws; a renamed column or alias throws; an empty item in the select list
+    // (a trailing comma before FROM), a missing FROM, or unbalanced parentheses
+    // in the select list all throw. It does NOT validate SQL in general, does not
+    // check types or join semantics, and proves nothing whatever about Postgres.
+    // The exact expected column set is pinned in listQuestionsProjection.test.js,
+    // outside this file, so that changing the statement and this file together
+    // still reddens the suite.
+    [/FROM asdair\.shop_question q\s+LEFT JOIN asdair\.shopping_list_items li[\s\S]*WHERE q\.shop_id = \$1 ORDER BY q\.id ASC/i, (sql, p) => {
+      const projection = selectProjection(sql);
+      const out = [];
+      db.shop_question
+        .filter((q) => String(q.shop_id) === String(p[0]))
+        .sort((a, b) => a.id - b.id)
+        .forEach((q) => {
+          // li: shopping_list_items.id is the primary key, so at most one.
+          const li = q.list_item_id === null || q.list_item_id === undefined
+            ? null
+            : db.shopping_list_items.find((i) => String(i.id) === String(q.list_item_id)) || null;
+
+          // sl: joined on (list_item_id, shop_id) - no unique index covers that
+          // pair, so it can legitimately fan out.
+          const lines = q.list_item_id === null || q.list_item_id === undefined
+            ? []
+            : db.shop_line.filter((l) => String(l.list_item_id) === String(q.list_item_id)
+              && String(l.shop_id) === String(q.shop_id));
+
+          if (lines.length === 0) {
+            out.push(projectQuestionRow(projection, q, li, null));
+            return;
+          }
+          for (const l of lines) out.push(projectQuestionRow(projection, q, li, l));
+        });
+      return rows(out);
+    }],
+
+    // ── asdair.rule_qa_log ─────────────────────────────────────────────────
+    // outcome/promoteDecision.js builds this INSERT from a fixed column list and
+    // writes it for EVERY decision - the `asdair.rules` insert beside it is the
+    // conditional one, gated on applies_going_forward AND on the database's own
+    // provenance verdict. Modelling the log insert (and only it) is therefore
+    // enough to run the real promoteDecision on the answer-learning path the
+    // pipeline takes, where applies_going_forward is an explicit false and no
+    // rule is ever promoted.
+    [/^INSERT INTO asdair\.rule_qa_log \(/i, (sql, params) => {
+      const row = insertRow(sql, 'asdair.rule_qa_log', params);
+      const created = { id: id('rule_qa_log'), promoted_rule_id: null, ...row };
+      db.rule_qa_log.push(created);
+      return rows([{ id: created.id }]);
+    }],
 
     // ── asdair.browser_build_request ───────────────────────────────────────
     [/^INSERT INTO asdair\.browser_build_request \(/i, (sql, p) => {
@@ -395,6 +596,13 @@ export function createFakeClient(store, options = {}) {
     [/FROM asdair\.pipeline_command\s+WHERE status = 'pending' AND kind = 'outbox'/i, () =>
       rows(db.pipeline_command.filter((c) => c.status === 'pending' && c.kind === 'outbox')
         .sort((a, b) => a.id - b.id))],
+
+    // store.outboxEverQueued - the receipt self-heal's "ever, not merely pending" check.
+    [/^SELECT 1 FROM asdair\.pipeline_command\s+WHERE shop_id = \$1 AND kind = 'outbox' AND command = \$2/i, (sql, p) => {
+      const hit = db.pipeline_command.some((c) => String(c.shop_id) === String(p[0])
+        && c.kind === 'outbox' && c.command === p[1]);
+      return hit ? rows([{ exists: 1 }]) : none();
+    }],
 
     // The backfill's preflight: "is migration 009 actually applied here?"
     [/^SELECT to_regclass\('asdair\.pipeline_command'\)/i, () =>

@@ -61,6 +61,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Full history required: resolveActiveMapPath() (WP-2B(1)) finds the active Wayfinder
+          # map via `git log`/`git grep` over real commit history, branch-scoped first. A shallow
+          # (depth-1, the actions/checkout default) clone has none to walk, so the MAP POINTER
+          # CONTROL tests correctly fail here — the mechanism works, the checkout does not carry
+          # what it needs. Same fix already used by release-scaffold.yml in this repo.
+          fetch-depth: 0
 
       - name: Set up Node
         uses: actions/setup-node@v4

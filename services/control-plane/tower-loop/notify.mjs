@@ -18,6 +18,21 @@ export const NOTIFY_REASONS = Object.freeze([
   'codex_block_or_redirect',
   'goal_complete',
   'tower_failure',
+  // W4 (WO-2026-08-05-09, WP-2E) — the disposition ECHO: Telegram reads back what the store
+  // actually accepted after a PR-comment disposition writes it. ALWAYS sent with turnId=null,
+  // deliberately, never the disposing round's real turn id: the dedup index is (turn_id, reason),
+  // and SQLite treats NULL as distinct from every other NULL in a unique index (the same property
+  // 'tower_failure' alarms already rely on for turnId=null crash notifications). Using the real
+  // turn id here would silently swallow every disposition after the first one landed against the
+  // same round — exactly the "single digest instead of an ongoing thread" the design forbids.
+  'finding_disposed',
+  // W3 (WO-2026-08-05-09) — a round whose delivery verdict is 'continue'/aligned and whose
+  // merge-class QA APPROVED would otherwise be entirely SILENT (fireTriggers' existing "continue
+  // -> no Telegram" rule) even when that same QA raised NEW, non-blocking findings alongside its
+  // approval (e.g. a TRACKED_FOLLOWUP or NOTE_ONLY finding attached to an approve). Findings must
+  // never be silently dropped, so this is the fallback reason ONLY when no other trigger fired
+  // but this round opened at least one finding.
+  'findings_raised',
 ]);
 
 const TELEGRAM_TIMEOUT_MS = 15000;
@@ -168,5 +183,72 @@ export function composeMessage({ buildRef, turnSeq, turnId, state, verdict, summ
     warwickNeeded ? '⚠️ Warwick needs to act.' : null,
     `turn: ${turnId}`,
   ].filter(Boolean);
+  return lines.join('\n');
+}
+
+// ── W3/W4 (WO-2026-08-05-09, WP-2E) — the QA-exchange composers ─────────────────────────────
+//
+// Two DELIBERATELY SEPARATE safety caps, and they must never be confused with each other or with
+// summariseLarry's 280-char default above:
+//
+//   - summariseLarry's 280 is a SUMMARY — it exists to keep Larry's excerpt short on purpose.
+//   - the two caps below are a Telegram PAYLOAD BACKSTOP only (Telegram's hard limit is 4096
+//     chars per message). They are set far above any realistic finding/rationale text so they
+//     never clip real content — the WO's own acceptance evidence requires a test proving
+//     disposition_rationale specifically survives intact past "today's cap" (280), and reusing
+//     summariseLarry here would fail that on the first non-trivial rationale.
+const EVIDENCE_SAFETY_CAP = 1200;
+const RATIONALE_SAFETY_CAP = 3000;
+
+function truncateSafety(text, max) {
+  const s = String(text ?? '').trim();
+  if (!s) return '';
+  return s.length > max ? `${s.slice(0, max - 1).trimEnd()}…` : s;
+}
+
+/** One line per NEW finding this round's merge-class QA raised. Codex's own short ref (e.g.
+ *  "TQA-001") is shown alongside the tower.finding UUID so Warwick can always tell which id
+ *  answers which Codex reference — the same pairing W1 embeds into `description` at write time. */
+function formatFindingForTelegram(f) {
+  const ref = f?.codexId ? `${f.codexId} ` : '';
+  const head = `${ref}(${f?.id}) — ${f?.technical_impact ?? '?'}/${f?.reachability ?? '?'}/${f?.required_disposition ?? '?'}`;
+  const evidence = truncateSafety(f?.evidence, EVIDENCE_SAFETY_CAP);
+  return evidence ? `${head}\n  ${evidence}` : head;
+}
+
+/**
+ * W3 — compose the THIRD message part: the real content of any findings THIS round's merge-class
+ * QA raised — id, impact, reachability, required disposition, and the evidence text. Not a count,
+ * not a verdict word (§14.7's requirement 1). Returns '' when the round opened no findings, so an
+ * ordinary delivery round is byte-for-byte unchanged and `.filter(Boolean)` drops it from the
+ * outgoing message array.
+ */
+export function composeFindingsMessage({ buildRef, turnSeq, turnId, findings = [] }) {
+  if (!Array.isArray(findings) || findings.length === 0) return '';
+  const lines = [
+    `🔎 Codex findings — Tower ${buildRef ?? 'BUILD-014'} · turn #${turnSeq ?? '?'}`,
+    ...findings.map((f) => formatFindingForTelegram(f)),
+    `turn: ${turnId}`,
+  ];
+  return lines.join('\n');
+}
+
+/**
+ * W4 — compose the disposition ECHO message. Every field here MUST come from the `finding` object
+ * the caller passes in, and that object must itself have been re-read from tower.finding AFTER the
+ * disposing write committed (see watcher.mjs readDisposedFindings) — this function performs no
+ * read of its own, on purpose, so the read-back boundary stays in exactly one place a mutation can
+ * be pinned to. Renders `disposition_rationale` PROSE, never the bare `disposition` enum
+ * (§14.7's requirement 2) — "addressed" alone tells Warwick nothing about how.
+ */
+export function composeDispositionMessage({ buildRef, turnSeq, turnId, finding }) {
+  const rationale = truncateSafety(finding?.disposition_rationale, RATIONALE_SAFETY_CAP);
+  const lines = [
+    `↩️ Disposition — Tower ${buildRef ?? 'BUILD-014'} · turn #${turnSeq ?? '?'}`,
+    `finding: ${finding?.id}${finding?.description ? ` — ${truncateSafety(finding.description, 200)}` : ''}`,
+    `disposition: ${finding?.disposition ?? '(none)'}`,
+    rationale || '(no rationale recorded)',
+    `turn: ${turnId}`,
+  ];
   return lines.join('\n');
 }

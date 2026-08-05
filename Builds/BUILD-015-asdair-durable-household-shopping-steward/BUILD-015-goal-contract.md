@@ -9,6 +9,18 @@ tags: [build, asdair, idea-012]
 
 # BUILD-015 — AsdAIr Durable Household Shopping Steward
 
+> **⚠️ AMENDED 2026-08-04 — Warwick's ruling `BUILD-015-CANONICAL-RUNTIME-REALIGNMENT`.**
+> **Who writes the live ASDA basket is settled, and it is neither Larry nor the CDP runner.**
+> The Stage 1 live basket writer is **Sonnet in Claude for Chrome**, using the proven **Brand A–Z ordered
+> sequential traversal**. Not Larry, not a Claude Code subagent, and not `services/asdair/browser-runner/` —
+> which is now experimental, deferred, not the live default, not a blocker to Stage 1, and **prohibited from
+> further live-account testing without fresh authority from Warwick**.
+> **Canonical:** [`RUNTIME-DECISION.md`](./RUNTIME-DECISION.md) ·
+> [`CANONICAL-WEEKLY-SHOP-PROCESS.md`](./CANONICAL-WEEKLY-SHOP-PROCESS.md) ·
+> work-order consequences in [`WORK-ORDERS-REALIGNMENT-ADDENDUM.md`](./WORK-ORDERS-REALIGNMENT-ADDENDUM.md).
+> **The North star, success criteria, non-goals, invariants and authority below are unchanged.** Only the
+> who-drives-the-browser statements are superseded, and each is marked in place.
+
 A **Goal Contract**, not a scaffold. Promotion of an existing, already-running capability into a truthful
 governance home — not a new design exercise.
 
@@ -44,8 +56,13 @@ the repo, including tests**. Each week started no better informed than the last.
 product scope for BUILD-015 is the **supervised** workflow:
 
 > Warwick/list -> AsdAIr resolves against Mum's durable Regulars/rules -> genuine unknowns are held and asked ->
-> **Larry drives the ASDA browser using SOP-021** -> never auto-substitute -> never checkout or pay -> record the
-> actual outcome -> persist learning for the next shop.
+> ~~**Larry drives the ASDA browser using SOP-021**~~ **Sonnet in Claude for Chrome builds the basket using
+> SOP-021's Brand A–Z traversal** *(SUPERSEDED 2026-08-04 — see the banner above and `RUNTIME-DECISION.md`)* ->
+> never auto-substitute -> never checkout or pay -> record the actual outcome -> persist learning for the next
+> shop.
+
+**The supervised bar itself is unchanged** — a human logs in, and Warwick remains the checkout and payment gate.
+What changed on 2026-08-04 is only *which* supervised writer builds the trolley.
 
 **Alias/Regular coverage improving through real shops is operational learning, NOT a merge blocker.** A recorded
 verdict of "not ready for AUTONOMOUS lane" is therefore not a statement that this build failed its bar - it is a
@@ -115,7 +132,9 @@ engineer.
 1. **"substitute Banana → Strawberry"** (from the superseded method). A legitimate `map` directive, or a safety
    bug against standing rule 6 and the live hard-excludes? Both readings recorded in `SOP-021`, neither encoded.
    Interim safe default: treat any banana/strawberry line as `needs_decision`.
-2. **Sort order** — `SOP-021` says A–Z; the superseded copy said BRAND A–Z.
+2. ~~**Sort order** — `SOP-021` says A–Z; the superseded copy said BRAND A–Z.~~ **CLOSED 2026-08-04: BRAND A–Z**,
+   for both the ASDA grid ordering and the execution packet (normalized brand A–Z, then canonical product name
+   A–Z). The superseded copy was right. `CANONICAL-WEEKLY-SHOP-PROCESS.md` §E.
 3. **Data decisions** — Arla BOB is active in `regulars` while rule 10 says never buy BOB; `rules` 23/24 fix the
    Sure variant while `rule_qa_log` #5 says rotate it; a test row remains in a `next_week_draft` list.
 
@@ -126,8 +145,9 @@ engineer.
 implemented and dead. Do not claim budget flagging works until a price source exists.
 
 Also deferred: 70 of 91 regulars carry no `asda_product_id` (name-matching only, lower confidence) · schema drift
-on `previously_ordered` and `command_request` · the browser drive stays with Larry until the Chrome-connector
-tool-binding question is settled on its own.
+on `previously_ordered` and `command_request` · ~~the browser drive stays with Larry until the Chrome-connector
+tool-binding question is settled on its own~~ **SUPERSEDED 2026-08-04: that question is settled and the answer is
+Sonnet in Claude for Chrome — not Larry, and not the CDP runner. `RUNTIME-DECISION.md`.**
 
 ---
 
@@ -184,6 +204,17 @@ reconciliation and learning. **The one genuinely supervised step is building the
 session** — a singleton holding real money, with no public API — plus checkout and payment, which stay Warwick's
 permanently.
 
-**The honest gap to close for the north star** is therefore narrow and nameable: an unattended basket-build
+~~**The honest gap to close for the north star** is therefore narrow and nameable: an unattended basket-build
 runner that claims `asdair.browser_build_request` and drives ASDA, still stopping at checkout-ready. That is
-Stage 2c and it stays deferred until Stage 1 is proven live — but nothing in Stage 1 needs undoing to get there.
+Stage 2c and it stays deferred until Stage 1 is proven live — but nothing in Stage 1 needs undoing to get there.~~
+
+> **RESTATED 2026-08-04 (`BUILD-015-CANONICAL-RUNTIME-REALIGNMENT`).** The shape of the gap holds — everything
+> except building the trolley already runs unattended, and nothing in Stage 1 needs undoing. What is superseded is
+> naming the CDP runner as the thing that closes it. **Stage 1's basket writer is Sonnet in Claude for Chrome**, a
+> supervised browser session; the unattended runner is Stage 2c and stays deferred, now additionally **prohibited
+> from live-account testing without fresh authority from Warwick**.
+>
+> Recorded honestly rather than resolved: Sonnet in Claude for Chrome is **not** a headless, unattended runtime.
+> It satisfies "independent of any Claude Code session" in the sense that it no longer needs *Larry* — but it does
+> need *a Sonnet browser session*. **Whether that meets the intent of "fully automated" is Warwick's call, not a
+> builder's**, and it is not asserted here either way. `RUNTIME-DECISION.md` §"Open considerations".

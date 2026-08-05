@@ -47,4 +47,41 @@ export function intakeStateFile(env = process.env) {
   return path.join(home, 'shopper-intake-state.json');
 }
 
+/** The dedicated Chrome profile the browser runner drives. Under the household
+ *  root by default, so it belongs in this module with the other two rather than
+ *  as a bare literal in the launcher.
+ *
+ *  MOVED here 2026-08-04 (WO-ZA follow-up). It was the THIRD helper with a
+ *  fall-through to C:/.fusion247, found while enumerating the first two, and it
+ *  was the one left documented rather than guarded - which is the state 5A
+ *  existed to end. ensure-asdair-runtime.mjs re-exports the default constant so
+ *  its own test suite is unaffected. */
+export const CHROME_DEFAULT_PROFILE_DIR = process.platform === 'win32'
+  ? 'C:/.fusion247/asdair/chrome-profile'
+  : path.join(os.homedir(), '.fusion247', 'asdair', 'chrome-profile');
+
+export function chromeProfileDir(env = process.env) {
+  const override = env.ASDAIR_CHROME_PROFILE_DIR;
+  if (typeof override === 'string' && override.length > 0) return override;
+  return CHROME_DEFAULT_PROFILE_DIR;
+}
+
+/**
+ * EVERY path helper in this module whose value can land under the household
+ * root, named once so a control can enumerate them instead of a human
+ * remembering to.
+ *
+ * THE POINT: the 2026-08-04 sweep found three fall-throughs, guarded two, and
+ * left the third with a note on it. A note is not a control. PROOF 10 resolves
+ * this whole list and fails on any that escapes, AND fails if this list stops
+ * matching the `.fusion247` literals actually present in this file - so a
+ * FOURTH helper added later cannot be silently unguarded.
+ */
+export const HOUSEHOLD_PATH_HELPERS = Object.freeze([
+  { name: 'STATE_DIR', env: 'ASDAIR_RUNTIME_STATE_DIR', resolve: () => STATE_DIR },
+  { name: 'LOG', env: 'ASDAIR_RUNTIME_STATE_DIR', resolve: () => LOG },
+  { name: 'intakeStateFile', env: 'SHOPPER_INTAKE_STATE_FILE', resolve: (env) => intakeStateFile(env) },
+  { name: 'chromeProfileDir', env: 'ASDAIR_CHROME_PROFILE_DIR', resolve: (env) => chromeProfileDir(env) },
+]);
+
 export { HERE };

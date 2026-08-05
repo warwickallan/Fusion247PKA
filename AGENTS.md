@@ -74,6 +74,7 @@ The only acceptable "no" is when the user explicitly says they do not want to gr
 | Arc | [[Team/Arc - Transfer Intelligence Specialist/AGENTS]] | Mining a source into durable, atomic, transferable ideas with provenance - the divergent generation half of the idea engine. Does NOT synthesise opportunities. |
 | Mason | [[Team/Mason - Opportunity Synthesis Specialist/AGENTS]] | Converging the atom estate into a few coherent, evidence-backed OPPORTUNITIES - the convergent half. Decides what deserves the scarce attention of the user. |
 | Asdair | [[Team/Asdair - Household Shopping Steward/AGENTS]] | The weekly household shop as a standing job: intake, planning against the durable rulebook, the needs-decision queue, reconcile, and the learning write-back. Owns [[SOP-021-run-the-weekly-asdair-shop]]. Never books a slot, checks out or pays. *(hired 2026-07-27)* |
+| Veritas | [[Team/Veritas - Internal Quality and Truth Assurance/AGENTS]] | Internal quality and truth assurance — reviews the **exact integrated head** and determines whether work meets the stated outcome, works through the production path, is genuinely integrated, is durable, and is accurately described by every active document. Three gates (integrated WP · phase/vertical slice · documentation and Git truth); three verdicts (PASS / HOLD / FAIL). **Larry may not declare work complete; `closed` is reachable only from VERITAS_PASS.** Does not replace Codex, who remains the external PR/release gate. *(hired 2026-08-04, `GOVERNANCE-VERITAS-HIRE`)* |
 
 **SOPs are skills, not 1:1 ownership.** Each SOP names a default owner (the specialist who runs it most often), but any agent can invoke an SOP when they need its procedure. Think of SOPs the way Claude skills work — discrete, named, callable. Workstreams are multi-agent compositions; Guidelines are general rules every agent reads. See [[Team Knowledge/INDEX]].
 
@@ -108,19 +109,9 @@ Larry enforces this rule at session close as Librarian.
 
 Local file beats global memory. If `AGENTS.md` in this folder says X and your global memory says Y, follow X.
 
-### 3. Iron rule for Larry — delegation-first, not delegation-only
+### 3. Iron rule for Larry — canonical in root `CLAUDE.md` Rule 4
 
-**Larry is primarily the orchestration and integration authority.** He delegates bounded specialist execution wherever that improves delivery and keeps him available to the user — journal capture goes to Penn, research to Pax, hiring to Nolan, and so on — then synthesizes the result.
-
-**The reason for this rule is to stop Larry becoming the universal bottleneck.** That reason is permanent. The earlier absolute phrasing ("never executes domain work") was reconciled by Warwick on 2026-07-27 after delegation was tested for real, because an absolute now conflicts with proven good judgement.
-
-**Larry retains authority to do the work personally when his judgement says that is the best route** — and must say so, with the reason and the availability cost. Legitimate cases: architecture and interface decisions; anything whose only input is Larry's own context; integration, merges and git surgery; anything crossing a trust boundary or touching credentials; and the genuinely tiny change where writing the Work Order costs more than making it.
-
-**Delegation must be proportionate (Warwick, 2026-08-01).** Mandatory team use does NOT mean every trivial edit requires a Work Order, specialist dispatch, read-back ceremony and separate investigation. Larry may directly perform a small, bounded, low-risk correction when ALL of these hold: (a) the required change is already understood; (b) no specialist design decision is involved; (c) the work is easily reviewed and reversible; and (d) delegation overhead would materially exceed the implementation effort. Named specialists remain **required** for substantive domain work, ambiguity, architecture, integrity decisions, and genuinely independent review. When a named agent is unavailable, use the documented fallback **immediately** — do not spend significant time or tokens investigating the roster unless the missing agent genuinely blocks substantive work.
-
-**What is NOT legitimate** is drifting back into being the default builder because delegating felt like effort. If Larry finds himself routinely executing a category of work, that is a missing specialist — brief Nolan (see the hire-don't-decline rule).
-
-The full operating method — retain-vs-delegate, Work Order discipline, escalate-vs-decide, and Larry's own failure signature — is distilled in `Team/Larry - Orchestrator/AGENTS.md` §"Operating doctrine".
+The delegation rule, the bounded direct-execution exception and Larry's availability obligation are canonical in root `CLAUDE.md` Rule 4 and are not restated here (reconciled by Warwick 2026-07-27; superseding history in git). What belongs here is routing: if Larry finds himself routinely executing a category of work, that is a missing specialist — brief Nolan per the hire-don't-decline rule. The full operating method — retain-vs-delegate, Work Order discipline, escalate-vs-decide — is distilled in `Team/Larry - Orchestrator/AGENTS.md` §"Operating doctrine".
 
 ### 4. Wiki convention
 
@@ -267,6 +258,8 @@ Trigger phrases → action:
 | "check this PR before merge" | Run SOP-018 |
 | "independently verify what changed" | Run SOP-018 |
 | "compare what was requested with what was actually built" | Run SOP-018 |
+
+**Routing changed 2026-08-04 (`GOVERNANCE-VERITAS-HIRE`) — read this before routing any row above.** These triggers previously routed to **Pax**. Where the subject is **integrated build work**, they now route to **[[Team/Veritas - Internal Quality and Truth Assurance/AGENTS]]**, whose gate is a standing requirement rather than an on-request review (routing pointer only: verdict definitions are canonical in Veritas's contract; their effect on the work queue is canonical in root `CLAUDE.md` §Finding disposition). **SOP-018 remains a callable skill any agent may invoke**, and it is the procedure Veritas's method draws on; what changed is who holds the gate. **Pax runs SOP-018 only for a commissioned or exploratory audit — he is not the routine internal QA department.** *(Historical/current only while BUILD-015 remains open:) (Carve-out: for BUILD-015 only, Pax remains the already-authorised sole final acceptance gate.)* "Check this PR before merge" at PR and release level stays **Codex's** external gate, which additionally checks whether Veritas performed the internal role properly.
 
 Rules:
 

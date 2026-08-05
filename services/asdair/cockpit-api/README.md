@@ -20,9 +20,10 @@ command against the same row** — not because two implementations were kept in 
 |---|---|
 | `present.js` | PURE. The two presentation rules, in tested code: unknown reads as `"unknown"` (never `0`), and money always carries its basis so a **derived** price can never be shown as an ASDA-quoted figure. |
 | `assembleWorkspace.js` | PURE. Durable rows → the workspace payload. Enforces the catalogue-grounding invariant at the boundary. |
-| `readWorkspace.js` | The reader. ONE `BEGIN TRANSACTION READ ONLY`; reuses `getShopStatus()` on the same client rather than reimplementing the projection. |
+| `readWorkspace.js` | The reader for ONE SHOP. ONE `BEGIN TRANSACTION READ ONLY`; reuses `getShopStatus()` on the same client rather than reimplementing the projection. |
+| `readRules.js` | The reader for the **durable rulebook** — `asdair.rules`, `asdair.rule_qa_log`, `asdair.regulars` (with their `aka` aliases). Same construction as `readWorkspace.js`: SELECT-only, one read-only snapshot, presentation via `present.js`. Shop-independent, so it is a separate route rather than another key on the workspace. |
 | `commandSurface.js` | Names the 10 shared commands, binds to `../pipeline/commands.js`, and refuses anything on the deny list. **No local fallback, deliberately.** |
-| `httpApi.js` | PURE-ish router: `GET /asdair/health`, `GET /asdair/workspace`, `POST /asdair/command`, `GET /asdair/media`. |
+| `httpApi.js` | PURE-ish router: `GET /asdair/health`, `GET /asdair/workspace`, `GET /asdair/rules`, `POST /asdair/command`, `GET /asdair/media`. Five routes; `httpApi.test.js` pins the count to a literal so the surface cannot grow by accident. |
 | `server.js` | The node:http binder. Started by `node server.js` and nothing else. |
 
 ## The rules this module exists to keep
@@ -44,6 +45,13 @@ The raw reading is preserved verbatim beside it as evidence. A stored line claim
 **4. A build request is a request.** `requestBasketBuild` writes a durable `browser_build_request` row. The
 existence of that row is never reported as evidence that a basket exists. Nothing here drives a browser,
 books a slot, checks out or pays.
+
+**5. A rule that cannot explain itself is SHOWN, not hidden.** Many `asdair.rules` rows carry
+`note = null` (defect D-2026-08-03-16). `readRules.js` reports `has_note: false` and counts them in
+`rules.without_note_display`; it never drops the row and never invents prose for it. The same applies
+to a `rule_qa_log` answer marked *applies going forward* with no `promoted_rule_id` — the planner acts
+on rules, not on the log, so that pairing is counted as `decisions.unpromoted_standing_display` and
+surfaced as the gap it is.
 
 ## The command surface
 

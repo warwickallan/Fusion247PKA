@@ -98,8 +98,11 @@ export const TAP_OUTCOMES = Object.freeze({
   ALREADY_ANSWERED: 'already_answered',
 });
 
-/** What Warwick sees in the Telegram toast/alert. Short — Telegram caps at 200. */
-const NOTICES = Object.freeze({
+/** What Warwick sees in the Telegram toast/alert. Short — Telegram caps at 200.
+ *  Exported because the pipeline runtime answers some taps itself (it routes a
+ *  tap onto the COMMAND surface rather than writing the answer here), and a
+ *  second copy of these strings would be a second thing to keep in step. */
+export const TAP_NOTICES = Object.freeze({
   [TAP_REFUSALS.STALE_CARD]: 'This card is out of date — the options were re-listed since it was sent. Nothing was changed. Ask for the question again to get a fresh card.',
   [TAP_REFUSALS.INDEX_OUT_OF_RANGE]: 'That option is no longer on the current list. Nothing was changed. Ask for the question again to get a fresh card.',
   [TAP_REFUSALS.QUESTION_MISMATCH]: 'This button does not match the card it is on. Nothing was changed. Ask for the question again.',
@@ -113,6 +116,9 @@ const NOTICES = Object.freeze({
   [TAP_REFUSALS.NOT_AN_ANSWER]: 'That button is not a candidate choice.',
   [TAP_REFUSALS.NO_CARD_IDENTITY]: 'This tap carried no card to correlate it to. Nothing was changed.',
 });
+
+/** Backwards-compatible internal alias. The exported name is TAP_NOTICES. */
+const NOTICES = TAP_NOTICES;
 
 /** Refusals that mean "the card is out of date" — the caller should offer a fresh one. */
 const REFRESHABLE = new Set([
@@ -163,6 +169,157 @@ function durableAnswer(row) {
     candidateLabel: chosen && chosen.label !== undefined ? String(chosen.label) : null,
     answerText: typeof row.answer_text === 'string' ? row.answer_text : null,
     answerSource: typeof row.answer_source === 'string' ? row.answer_source : null,
+  };
+}
+
+/**
+ * READ-ONLY. Resolve a tapped candidate INDEX back to the product text that was
+ * actually displayed — and refuse, with a reason, when it cannot be done safely.
+ *
+ * ── WHY THIS EXISTS ALONGSIDE resolveTap() ───────────────────────────────────
+ * resolveTap() is the whole round trip: it resolves AND writes the answer AND
+ * acknowledges the tap. The pipeline runtime does not want that: a tap there
+ * becomes a member of the COMMAND surface (`answerQuestion`), so that a tap on
+ * the phone and a click in the Cockpit are the same durable write. If the runtime
+ * called resolveTap() as well, one tap would be written twice, through two
+ * different paths, and the ledger would stop being the record of what happened.
+ *
+ * So this function is the READ half on its own — every staleness check resolveTap
+ * makes, in the same order, using the same refusal vocabulary and the same
+ * contract verification, and NOTHING ELSE. No write, no acknowledgement. The
+ * caller writes through its own command surface and answers the tap itself.
+ *
+ * It is deliberately here rather than in a new module: this file's header says it
+ * is the only thing that reads the render contract back, and that is a property
+ * worth keeping true.
+ *
+ * THE THREE BUCKETS ARE IDENTICAL to resolveTap's, because the defect is:
+ *   (chat, message) IS the recorded card  -> live render, resolve the index
+ *   not it, but the question exists       -> STALE_CARD. Refuse, visibly.
+ *   neither                               -> UNKNOWN_CARD. Refuse.
+ * There is NO path here that recomputes candidates. There must never be one.
+ *
+ * @param {{store:object, shopRef?:string|null, questionKey:string, candidateIndex:number,
+ *          chatId:*, messageId:*, expectedRenderVersion?:number,
+ *          expectedRenderFingerprint?:string}} args
+ * @returns {Promise<{ok:true, questionKey:string, candidateIndex:number, label:string,
+ *                    candidateId:string, renderVersion:*, renderFingerprint:*,
+ *                    alreadyAnswered:boolean}
+ *                 | {ok:false, code:string, reason:string, notice:string, refresh:boolean}>}
+ */
+export async function resolveCandidateAnswer({
+  store, shopRef = null, questionKey, candidateIndex, chatId, messageId,
+  expectedRenderVersion, expectedRenderFingerprint,
+} = {}) {
+  if (!store || typeof store !== 'object') throw new Error('resolveCandidateAnswer: a store must be injected');
+  for (const m of ['getQuestionByCard', 'getQuestionByKey']) {
+    if (typeof store[m] !== 'function') throw new Error(`resolveCandidateAnswer: store.${m}() is required`);
+  }
+
+  const refuse = (code, extra = {}) => ({
+    ok: false,
+    code,
+    reason: code,
+    notice: NOTICES[code] || code,
+    refresh: REFRESHABLE.has(code),
+    questionKey: typeof questionKey === 'string' ? questionKey : null,
+    candidateIndex: Number.isInteger(candidateIndex) ? candidateIndex : null,
+    ...extra,
+  });
+
+  if (typeof questionKey !== 'string' || questionKey.length === 0) return refuse(TAP_REFUSALS.BAD_ANSWER_ARG);
+  if (!Number.isInteger(candidateIndex) || candidateIndex < 0) return refuse(TAP_REFUSALS.BAD_ANSWER_ARG);
+  if (chatId === null || chatId === undefined || messageId === null || messageId === undefined) {
+    return refuse(TAP_REFUSALS.NO_CARD_IDENTITY);
+  }
+
+  // ── 1. The card, BY IDENTITY. Never by question key — the key alone finds
+  //       whatever render happens to be current, which is the guess this refuses.
+  let row;
+  try {
+    row = await store.getQuestionByCard({ chatId, messageId });
+  } catch {
+    return refuse(TAP_REFUSALS.STORE_FAILED);
+  }
+
+  if (!row) {
+    let byKey = null;
+    try {
+      byKey = await store.getQuestionByKey({ shopRef, questionKey });
+    } catch {
+      return refuse(TAP_REFUSALS.STORE_FAILED);
+    }
+    if (byKey) {
+      // The question is alive but this is not its card. A SUPERSEDED render —
+      // and that is a far more useful fact than "never heard of it".
+      return refuse(TAP_REFUSALS.STALE_CARD, {
+        tappedCard: { chatId: String(chatId), messageId: String(messageId) },
+        currentCard: {
+          chatId: byKey.card_chat_id !== undefined && byKey.card_chat_id !== null ? String(byKey.card_chat_id) : null,
+          messageId: byKey.card_message_id !== undefined && byKey.card_message_id !== null ? String(byKey.card_message_id) : null,
+        },
+        currentRenderVersion: byKey.render_version ?? null,
+      });
+    }
+    return refuse(TAP_REFUSALS.UNKNOWN_CARD);
+  }
+
+  // ── 2. The card must be the card the button claims to be on.
+  if (row.question_key !== questionKey) {
+    return refuse(TAP_REFUSALS.QUESTION_MISMATCH, { cardQuestionKey: row.question_key ?? null });
+  }
+  if (shopRef && row.shop_ref !== undefined && row.shop_ref !== null && !sameId(row.shop_ref, shopRef)) {
+    return refuse(TAP_REFUSALS.SHOP_MISMATCH);
+  }
+  // Belt and braces: the row came back FROM (chat, message), but a store that
+  // looked it up loosely would defeat the whole scheme, so re-check the binding.
+  if (!sameId(row.card_chat_id, chatId) || !sameId(row.card_message_id, messageId)) {
+    return refuse(TAP_REFUSALS.STALE_CARD);
+  }
+
+  // ── 3. The stored contract must still describe what it says it describes.
+  const integrity = verifyStoredContract(row);
+  if (!integrity.ok) return refuse(TAP_REFUSALS.CONTRACT_CORRUPT, { detail: integrity.reason });
+
+  // ── 4. A caller that knows which render it expects may pin it.
+  if (expectedRenderVersion !== undefined && expectedRenderVersion !== null
+      && row.render_version !== expectedRenderVersion) {
+    return refuse(TAP_REFUSALS.STALE_CARD, {
+      expectedRenderVersion, actualRenderVersion: row.render_version ?? null,
+    });
+  }
+  if (expectedRenderFingerprint !== undefined && expectedRenderFingerprint !== null
+      && row.render_fingerprint !== expectedRenderFingerprint) {
+    return refuse(TAP_REFUSALS.STALE_CARD);
+  }
+
+  if (row.status === 'skipped') return refuse(TAP_REFUSALS.QUESTION_SKIPPED);
+
+  // ── 5. Index -> candidate, THROUGH THE STORED LIST. The only mapping there is.
+  const rendered = Array.isArray(row.rendered_candidates) ? row.rendered_candidates : [];
+  if (candidateIndex >= rendered.length) {
+    // Past the end of the stored list = the list shrank under this card. That is
+    // staleness, and it gets the staleness treatment, not a shrug.
+    return refuse(TAP_REFUSALS.INDEX_OUT_OF_RANGE, { renderedCount: rendered.length });
+  }
+  const chosen = rendered[candidateIndex];
+  const candidateId = chosen && chosen.id !== undefined && chosen.id !== null ? String(chosen.id) : '';
+  if (candidateId.length === 0) return refuse(TAP_REFUSALS.CANDIDATE_UNIDENTIFIED);
+  const candidateLabel = chosen && chosen.label !== undefined && chosen.label !== null && String(chosen.label).length > 0
+    ? String(chosen.label)
+    : null;
+
+  return {
+    ok: true,
+    questionKey,
+    candidateIndex,
+    // The pipeline's answerQuestion command stores answer_text, which is what a
+    // human reads back. The id stays alongside it for the audit trail.
+    label: candidateLabel || candidateId,
+    candidateId,
+    renderVersion: row.render_version ?? null,
+    renderFingerprint: row.render_fingerprint ?? null,
+    alreadyAnswered: row.status === 'answered',
   };
 }
 

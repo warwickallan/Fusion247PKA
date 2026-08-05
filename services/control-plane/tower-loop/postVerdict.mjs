@@ -31,6 +31,9 @@
 //   marker exists at all — it is not decoration.
 
 import { execFile } from 'node:child_process';
+// W2 (WO-2026-08-05-09, WP-2E) — the open findings a verdict comment must actually list, so its
+// own "Reply with `@tower finding <id>: ..." instruction is followable rather than unfollowable.
+import { loadOpenFindings } from './findings.mjs';
 
 const REPO_RE = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/;
 // Exactly one endpoint shape may be written to, and only with POST.
@@ -106,7 +109,7 @@ export const ghCliWriter = {
  */
 export function composeVerdictComment({
   postKey, verdict, summary, nextAction, headSha, buildRef, turnSeq, turnId,
-  checkpointCommentId = null, warwickNeeded = false, reviewer = 'gpt_codex',
+  checkpointCommentId = null, warwickNeeded = false, reviewer = 'gpt_codex', openFindings = [],
 }) {
   const lines = [
     `**Tower review — ${String(verdict ?? 'unknown').toUpperCase()}**`,
@@ -121,6 +124,15 @@ export function composeVerdictComment({
   if (warwickNeeded) lines.push('- ⚠️ **Warwick input required.**');
   lines.push('', summary ? String(summary) : '_(no summary recorded)_');
   if (nextAction) lines.push('', `**Next:** ${nextAction}`);
+  // W2 (WO-2026-08-05-09) — the instruction below used to publish an unfollowable directive: it
+  // told the reader to reply `@tower finding <id>: ...` while listing no findings and no ids.
+  // List them here, so the grammar ingestComment.mjs already parses is actually usable.
+  if (Array.isArray(openFindings) && openFindings.length > 0) {
+    lines.push('', '**Open findings to answer:**');
+    for (const f of openFindings) {
+      lines.push(`- \`${f.id}\` — ${String(f.description ?? '').slice(0, 200)}`);
+    }
+  }
   lines.push('', '<sub>Posted automatically by the Tower watcher. Reply with `@tower head:` and',
     '`@tower finding <id>: <disposition> — <why>` to answer findings in the next round.</sub>',
     '', verdictMarker(postKey));
@@ -172,11 +184,16 @@ export async function queueVerdictForTurn(pool, turnId) {
   const m = /^pr-checkpoint:.+@(\d+)$/.exec(String(row.session_turn_key ?? ''));
   if (m) checkpointCommentId = Number(m[1]);
 
+  // W2 — the SAME open findings the disposition gate (findings.mjs) reads: whatever the reader
+  // must answer before the next round can proceed is exactly what this comment must list.
+  const openFindings = await loadOpenFindings(pool, row.build_ref);
+
   const postKey = verdictPostKey({ reviewId: row.review_id });
   const body = composeVerdictComment({
     postKey, verdict: row.verdict, summary: row.summary, nextAction: row.next_action,
     headSha: row.head_sha, buildRef: row.build_ref, turnSeq: row.seq, turnId: row.turn_id,
     checkpointCommentId, warwickNeeded: row.warwick_needed === true, reviewer: row.reviewer,
+    openFindings,
   });
   return queueVerdictPost(pool, {
     reviewId: row.review_id, turnId: row.turn_id, repo: row.repo,

@@ -1,5 +1,15 @@
 # VlogOps — the plan, before any building
 
+> # ⛔ SUPERSEDED AS EXECUTION GUIDANCE — 2026-08-03
+>
+> **Do not follow this document. It is history.**
+>
+> This is the 2026-08-01 *"draft one script and see what happens"* planning trial. It **predates** the Foundry boundary decision of 2026-08-02 and the accepted IDEA-006 Goal Contract, and it plans a **manual scripting exercise** rather than the durable publishing engine BUILD-006 actually is.
+>
+> **The live route is `Deliverables/2026-08-03-build-006-vlogops-publishing-engine-wayfinder-plan.md`.**
+>
+> **Retained, not deleted.** It holds real thinking and the record of how the approach changed — including a correction where I asserted something did not exist without having looked hard enough. Deleting that would remove the evidence of the lesson. **A fresh Larry finding this file must treat it as history and open the BUILD-006 map instead.**
+
 _Wayfinder planning trial, 2026-08-01. **Planning only. Nothing has been built and nothing will be until you accept this.**_
 
 > **Revised the same day.** The first version of this document claimed the method was

@@ -15,6 +15,31 @@
 // a stand-in entry; the pipeline proofs run against a file-durable stand-in for
 // Postgres and a file-backed stand-in for Telegram. The real 2026-07-27 list is
 // never fetched, never acknowledged, and never consumed.
+//
+// ── THE HOUSEHOLD-STATE BOUNDARY (corrected 2026-08-04, WO-ZA item 5A) ──────
+// The paragraph above USED TO BE FALSE, and the correction is recorded here
+// rather than quietly applied, because the false version is exactly the kind of
+// comfortable assertion this harness exists to replace with evidence.
+//
+// runtime-paths.mjs has TWO helpers that fall through to C:/.fusion247/asdair
+// when their environment override is unset:
+//
+//   STATE_DIR          <- ASDAIR_RUNTIME_STATE_DIR      (this file always set it)
+//   intakeStateFile()  <- SHOPPER_INTAKE_STATE_FILE     (this file NEVER set it)
+//
+// So PROOF 9 called `--status`, which called readOffset(), which resolved to the
+// REAL household Telegram offset file under C:/.fusion247/asdair/ - opened it,
+// parsed it, and PRINTED its contents into the proof transcript. Every run of
+// this harness did that, while the header above swore it did not.
+//
+// Both overrides are now set, for the parent process and for every child, and
+// the boundary is no longer a promise in a comment: PROOF 10 fails the run if
+// ANY path a proof resolves, or any byte of the evidence file, lands under a
+// household store root. See guardHouseholdPath() and HOUSEHOLD_ROOTS below.
+//
+// Governing boundary: Team Knowledge/Guidelines/GL-012-secrets-store-access-boundary.md
+// (C:\.fusion247\** is denied by default). This harness runs under
+// private_surface: none and must therefore resolve nothing there at all.
 // =====================================================================
 
 import fs from 'node:fs';
@@ -48,13 +73,17 @@ function sleep(ms) { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0
 function launcher(args, env = {}) {
   const r = spawnSync(process.execPath, [LAUNCHER, ...args], {
     encoding: 'utf8', windowsHide: true,
-    env: { ...process.env, ASDAIR_RUNTIME_STATE_DIR: STATE, ...env },
+    // PROOF_ENV carries BOTH overrides. Passing only the state dir is what let
+    // the intake offset fall through to the household file - see the header.
+    env: { ...process.env, ...PROOF_ENV, ...env },
   });
   return { status: r.status, out: `${r.stdout || ''}${r.stderr || ''}`.trim() };
 }
 
 function child(args) {
-  const r = spawnSync(process.execPath, [CHILD, ...args], { encoding: 'utf8', windowsHide: true });
+  const r = spawnSync(process.execPath, [CHILD, ...args], {
+    encoding: 'utf8', windowsHide: true, env: { ...process.env, ...PROOF_ENV },
+  });
   const out = `${r.stdout || ''}${r.stderr || ''}`.trim();
   // 137 is a DELIBERATE crash injection. Anything else non-zero is the proof
   // harness itself being broken, and must be visible rather than swallowed.
@@ -73,8 +102,69 @@ fs.mkdirSync(RUN, { recursive: true });
 const STATE = path.join(RUN, 'state');
 fs.mkdirSync(STATE, { recursive: true });
 
+// ---------------------------------------------------------------------
+// The household-state boundary. Established BEFORE the first proof runs and
+// before anything imports runtime-paths.mjs, because STATE_DIR is evaluated at
+// module load and a late override would be a no-op that still looked applied.
+// ---------------------------------------------------------------------
+
+/** Every root that holds real household state or secret material. A path that
+ *  normalises inside one of these is a boundary breach regardless of how it was
+ *  constructed. Kept as a list, not a single prefix, so the Unix default is
+ *  covered too rather than only the Windows one this machine happens to use. */
+const HOUSEHOLD_ROOTS = Object.freeze([
+  'C:/.fusion247',
+  path.join(os.homedir(), '.fusion247'),
+]);
+
+/** Normalise the way GL-012 section 3 requires - resolve, unify slash direction,
+ *  case-fold - THEN compare. A prefix test on raw strings is defeated by
+ *  `C:\.fusion247` vs `C:/.fusion247/` vs a relative `..` walk. */
+function normaliseForCompare(p) {
+  return path.resolve(String(p)).replace(/\\/g, '/').toLowerCase();
+}
+
+/** True when `p` resolves inside a household store root. */
+export function isHouseholdPath(p) {
+  if (p === null || p === undefined || p === '') return false;
+  const n = normaliseForCompare(p);
+  return HOUSEHOLD_ROOTS.some((root) => {
+    const r = normaliseForCompare(root);
+    return n === r || n.startsWith(`${r}/`);
+  });
+}
+
+/** The scratch intake offset file these proofs use INSTEAD of the household's.
+ *  A synthetic value, so PROOF 9 proves the reader works rather than merely
+ *  proving the field exists. */
+const INTAKE_STATE = path.join(STATE, 'proof-intake-state.json');
+const SYNTHETIC_OFFSET = 424242;
+fs.writeFileSync(INTAKE_STATE, `${JSON.stringify({
+  last_update_id: SYNTHETIC_OFFSET,
+  updated_at: '2026-08-04T00:00:00.000Z',
+  _synthetic: 'a PROOF fixture. Not the household offset, which this harness must never open.',
+}, null, 1)}\n`);
+
+/** The overrides every process in this run inherits. Set on the parent too:
+ *  anything this file imports in-process resolves through the same env. */
+const PROOF_ENV = Object.freeze({
+  ASDAIR_RUNTIME_STATE_DIR: STATE,
+  SHOPPER_INTAKE_STATE_FILE: INTAKE_STATE,
+  // The third fall-through, found by the 5A sweep and left documented rather
+  // than guarded until 2026-08-04. `--preflight` stats this directory, so a
+  // proof that ever runs preflight would otherwise touch the household root.
+  ASDAIR_CHROME_PROFILE_DIR: path.join(STATE, 'proof-chrome-profile'),
+});
+Object.assign(process.env, PROOF_ENV);
+
+/** Every path the live status document resolved, captured by PROOF 9 and
+ *  re-checked by PROOF 10. Declared here so PROOF 10 fails loudly if PROOF 9
+ *  never ran, rather than passing over an empty list. */
+let STATUS_PATHS = null;
+
 console.log(`AsdAIr runtime proofs - ${new Date().toISOString()}`);
 console.log(`host ${os.hostname()}   node ${process.version}   scratch ${RUN}`);
+console.log('household-state boundary: ARMED (PROOF 10 fails the run if any path resolves under a household root)');
 
 // =====================================================================
 heading(1, 'A SECOND POLLER REFUSES TO START');
@@ -105,7 +195,7 @@ heading(1, 'A SECOND POLLER REFUSES TO START');
   launcher(['--stop']);
   const racers = [0, 1, 2].map(() => spawn(process.execPath, [LAUNCHER, '--selftest'], {
     encoding: 'utf8', windowsHide: true,
-    env: { ...process.env, ASDAIR_RUNTIME_STATE_DIR: STATE },
+    env: { ...process.env, ...PROOF_ENV },
     stdio: ['ignore', 'pipe', 'pipe'],
   }));
   const outs = await Promise.all(racers.map((p) => new Promise((res) => {
@@ -280,18 +370,33 @@ const C5 = {
 }
 
 // =====================================================================
-heading('5b', 'FINDING: A CRASH *AFTER* THE ACK LOSES THE LIST SILENTLY');
-// This one is expected to demonstrate a DEFECT, not a guarantee.
+heading('5b', 'A CRASH *AFTER* THE ACK STILL KEEPS THE LIST (the ack boundary holds)');
+// WHAT THIS PROVES, IN THE PRESENT TENSE: the shop is persisted BEFORE the
+// Telegram offset is acknowledged, so a process that dies in the window between
+// "I have this message" and its next durable write has already written the shop.
+// Nothing is lost.
 //
-// runIntake advances and PERSISTS the offset inside its own loop (shopperIntake
-// .js:662), but the shop row is only written afterwards, by pollIntake calling
-// commands.receiveList (runtime.js:125). Between those two points the receiver
-// has told Telegram "I have this message" and has written nothing durable. If
-// the process dies there - a reboot, a power cut, a kill - Telegram deletes the
-// update and there is no shop, no error and no trace.
+// ── HISTORY, and why the wording of this block matters ──────────────────────
+// This section WAS a demonstration of a real defect. runIntake used to advance
+// and persist the offset inside its own loop while the shop row was written
+// only afterwards, by pollIntake calling commands.receiveList - so a reboot,
+// power cut or kill between those two points left no shop, no error and no
+// trace. Codex flagged it merge-blocking on 2026-07-28 and was right.
 //
-// It is proven here rather than argued, because it is exactly the failure the
-// single-poller lock exists to prevent, arriving by a different door.
+// THE ORDERING WAS FIXED THAT DAY: the shop is now persisted inside onRecord,
+// before the offset moves, and the check below was inverted from asserting the
+// LOSS to asserting SURVIVAL.
+//
+// The heading and this comment were NOT updated with it, and the cost was real
+// and measured: on 2026-08-03 a reader took the stale present-tense prose as
+// current and filed a false "unrecoverable list loss is still open" entry in
+// BUILD-015's own defect ledger, which then had to be retracted. That is
+// D-2026-08-03-21 - a proof whose narrative outlived the code it described.
+// Corrected 2026-08-04 under WO-ZA item 6.
+//
+// If this ordering is ever changed back, the check below fails. It is the
+// assertion, not this prose, that is load-bearing - but prose that contradicts
+// the assertion has now cost this build once, so keep the two in step.
 // =====================================================================
 const C5b = {
   db: path.join(RUN, 't5b-db.json'), tg: path.join(RUN, 't5b-telegram.json'), offset: path.join(RUN, 't5b-offset.json'),
@@ -446,11 +551,33 @@ heading(9, 'RUNTIME HEALTH IS VISIBLE');
 {
   launcher(['--selftest']);
   const s = JSON.parse(launcher(['--status', '--no-db']).out);
+
+  // FIRST, before anything from this document is printed: every path it
+  // resolved must be scratch. If the boundary leaked, the leak must not be
+  // echoed into the transcript on its way to being reported.
+  STATUS_PATHS = [
+    s.telegram_offset.source, s.activity.path, s.armed.file,
+    s.paths.state_dir, s.paths.lock, s.paths.log, s.paths.cache,
+  ];
+  const escaped = STATUS_PATHS.filter((p) => isHouseholdPath(p));
+  check('BOUNDARY: every path --status resolved is scratch, none is household state',
+    escaped.length === 0,
+    escaped.length === 0
+      ? `${STATUS_PATHS.length} paths checked, all under ${RUN}`
+      : `${escaped.length} path(s) resolved under a household root - values withheld`);
+
   check('status answers: is it running, and which process',
     s.runtime.running === true && Number.isInteger(s.runtime.pid) && s.runtime.identity_verified === true,
     { running: s.runtime.running, pid: s.runtime.pid, uptime_seconds: s.runtime.uptime_seconds, source: s.runtime.source });
+  // Strengthened 2026-08-04: this used to assert only that the FIELD existed,
+  // which a null would satisfy - and it was reading the household's real offset
+  // to do it. It now reads a synthetic scratch fixture and asserts the VALUE,
+  // so it proves the reader works rather than proving the key is present.
   check('status answers: where the Telegram offset has got to',
-    Object.prototype.hasOwnProperty.call(s.telegram_offset, 'last_update_id'), s.telegram_offset);
+    s.telegram_offset.exists === true
+      && s.telegram_offset.last_update_id === SYNTHETIC_OFFSET
+      && s.telegram_offset.consumed === true,
+    { exists: s.telegram_offset.exists, last_update_id: s.telegram_offset.last_update_id, consumed: s.telegram_offset.consumed });
   check('status answers: when it last did anything, and the last error',
     s.activity.exists === true && s.activity.events_parsed > 0
       && Object.prototype.hasOwnProperty.call(s.activity, 'last_error'),
@@ -462,6 +589,83 @@ heading(9, 'RUNTIME HEALTH IS VISIBLE');
       && String(readJson(path.join(STATE, 'status.json'))._cache).includes('not a source of truth'),
     path.join(STATE, 'status.json'));
   launcher(['--stop']);
+}
+
+// =====================================================================
+heading(10, 'THE PROOFS TOUCH NO HOUSEHOLD STATE (the boundary, as a control)');
+// The header of this file used to ASSERT this. An assertion in a comment is not
+// a control, and this one was false for as long as it existed - PROOF 9 read and
+// printed the household's real Telegram offset every single run.
+//
+// So the claim is now executed. Three checks, in the order that matters:
+//   a) the two overridable path helpers resolve INSIDE scratch under proof env;
+//   b) the detector can FAIL - proven by evaluating the same helper with the
+//      override removed and requiring it to be flagged. A guard that has never
+//      been made to fire is not evidence that it would;
+//   c) nothing under a household root reached the transcript or the evidence
+//      file, checked against the bytes rather than against intent.
+// =====================================================================
+{
+  const rp = await import('../runtime-paths.mjs');
+
+  // (a) resolution under the proof environment - the WHOLE enumerated list, so
+  // this is one control over all three fall-throughs rather than two guarded
+  // and one documented.
+  const helpers = rp.HOUSEHOLD_PATH_HELPERS;
+  const leaked = helpers.filter((h) => isHouseholdPath(h.resolve(process.env))).map((h) => h.name);
+  check('every household-capable path helper resolves inside the scratch run, not under a household root',
+    helpers.length === 4 && leaked.length === 0,
+    leaked.length === 0
+      ? `checked ${helpers.length}: ${helpers.map((h) => h.name).join(', ')} - all under ${RUN}`
+      : `LEAKED: ${leaked.join(', ')} (values withheld)`);
+
+  // (a2) THE DRIFT GUARD. A fourth helper added later must not be able to slip
+  // in unguarded. The list above is compared against the household-root literals
+  // actually present in runtime-paths.mjs; add one without listing it and this
+  // fails, which is the whole point of enumerating rather than remembering.
+  // Comments are stripped first: prose describing the boundary must not be able
+  // to move the count that enforces it.
+  const rpSrc = fs.readFileSync(path.join(HERE, '..', 'runtime-paths.mjs'), 'utf8');
+  const rpCode = rpSrc.split(/\r?\n/)
+    .filter((l) => { const t = l.trim(); return !(t.startsWith('//') || t.startsWith('*') || t.startsWith('/*')); })
+    .join('\n');
+  const literals = (rpCode.match(/\.fusion247/g) || []).length;
+  const EXPECTED_LITERALS = 6; // 3 definitions (STATE_DIR, intakeStateFile, chromeProfileDir) x win32 + posix
+  check('DRIFT GUARD: no household path helper exists in runtime-paths.mjs that this control does not resolve',
+    literals === EXPECTED_LITERALS,
+    literals === EXPECTED_LITERALS
+      ? `${literals} household-root literals in code back ${helpers.length} enumerated helpers (3 definitions x win32/posix; LOG derives from STATE_DIR)`
+      : `runtime-paths.mjs now has ${literals} household-root literals in code, not ${EXPECTED_LITERALS} - a helper was added or removed. Add it to HOUSEHOLD_PATH_HELPERS and update this count, or it is UNGUARDED.`);
+
+  // (b) MUTATION. Remove each override and require the guard to catch it. This
+  // computes STRINGS; no file is opened, so proving the detector fires costs
+  // no access to the thing it protects.
+  const unguarded = helpers
+    .map((h) => ({ name: h.name, falls: isHouseholdPath(h.resolve({})) }))
+    .filter((r) => !r.falls);
+  check('MUTATION: with every override unset the helpers DO fall through, and the guard catches all of them',
+    unguarded.length === 0,
+    unguarded.length === 0
+      ? `all ${helpers.length} unset cases resolve under a household root and are flagged - so the passing case above is a real result, not a vacuous one`
+      : `NOT DETECTED for: ${unguarded.map((r) => r.name).join(', ')} - the guard would not have caught these`);
+
+  // ...and the guard must not simply say yes to everything.
+  check('MUTATION: the guard does NOT flag an ordinary scratch path (it discriminates)',
+    isHouseholdPath(INTAKE_STATE) === false && isHouseholdPath(RUN) === false,
+    'scratch paths are not flagged');
+
+  // (c) PROOF 9 must actually have run its capture, and the transcript must be
+  // clean. An empty STATUS_PATHS would make check (a) of PROOF 9 vacuous.
+  check('PROOF 9 captured the live status paths (this control is not passing over an empty list)',
+    Array.isArray(STATUS_PATHS) && STATUS_PATHS.length === 7,
+    `${STATUS_PATHS === null ? 'null - PROOF 9 did not run' : `${STATUS_PATHS.length} paths captured`}`);
+
+  const transcript = JSON.stringify(results);
+  const marks = HOUSEHOLD_ROOTS.map((r) => normaliseForCompare(r));
+  const dirty = marks.filter((m) => transcript.replace(/\\\\/g, '/').toLowerCase().includes(m));
+  check('no household root appears anywhere in the evidence this run will write',
+    dirty.length === 0,
+    dirty.length === 0 ? `${results.length} recorded checks scanned, ${marks.length} root patterns` : 'a household root reached the transcript');
 }
 
 // ---------------------------------------------------------------------

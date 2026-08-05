@@ -1,0 +1,152 @@
+{
+  "_fixture": "SYNTHETIC. Structurally faithful to GET /asdair/packet as published in Builds/BUILD-015-.../COCKPIT-PACKET-AND-RECONCILIATION-INTERFACE.md, every value invented. This repository is PUBLIC. Never replace with a live capture.",
+  "ok": true,
+  "generated_from": "durable state only",
+  "unknown_means_unknown": true,
+  "shop_id_display": "1",
+  "packet_state": "produced",
+  "reconciliation_state": "produced",
+  "packet": {
+    "packet_version_display": "1",
+    "shop_ref_display": "SHOP-2026-01-01",
+    "generated_at_display": "1 Jan 2026, 10:00",
+    "household_id_display": "1",
+    "sort_contract_display": "brand_az_then_product_az",
+    "sort_verified": true,
+    "sort_first_break_display": "unknown",
+    "expected_distinct_products_display": "3",
+    "expected_total_units_display": "5",
+    "lines_count_display": "3",
+    "new_items_count_display": "1",
+    "known_items_count_display": "2",
+    "identity_incomplete_count_display": "0",
+    "held_count_display": "1",
+    "lines": [
+      {
+        "seq_display": "1", "shop_line_no_display": "1",
+        "original_list_line_display": "example oat drink",
+        "canonical_product_id_display": "11",
+        "canonical_product_name_display": "Example Brand Oat Drink 1L",
+        "brand_display": "Example Brand", "has_brand": true,
+        "source_view_display": "regulars", "source_view_meaning": "from your Regulars list",
+        "asda_product_ref_display": "1000001", "asda_url_display": "unknown",
+        "required_quantity_display": "3",
+        "origin_display": "known", "is_new": false, "is_known": true,
+        "approved_search_term_display": "unknown",
+        "substitutes_allowed_display": "no",
+        "applied_rules": ["1"], "applied_rules_count_display": "1", "has_applied_rules": true,
+        "quantity_rationale_display": "list said 2; rule 1 rounds up to 3 for the any-2-for-X offer, and the third keeps the fortnight cycle aligned",
+        "has_quantity_rationale": true,
+        "identity_incomplete": false
+      },
+      {
+        "seq_display": "2", "shop_line_no_display": "2",
+        "original_list_line_display": "sample cheese 200g",
+        "canonical_product_id_display": "12",
+        "canonical_product_name_display": "Sample Mature Cheese 200g",
+        "brand_display": "Sample", "has_brand": true,
+        "source_view_display": "favourites", "source_view_meaning": "from your Favourites",
+        "asda_product_ref_display": "1000002", "asda_url_display": "unknown",
+        "required_quantity_display": "1",
+        "origin_display": "known", "is_new": false, "is_known": true,
+        "approved_search_term_display": "unknown",
+        "substitutes_allowed_display": "no",
+        "applied_rules": [], "applied_rules_count_display": "0", "has_applied_rules": false,
+        "quantity_rationale_display": "unknown", "has_quantity_rationale": false,
+        "identity_incomplete": false
+      },
+      {
+        "seq_display": "3", "shop_line_no_display": "4",
+        "original_list_line_display": "brand new thing",
+        "canonical_product_id_display": "unknown",
+        "canonical_product_name_display": "Zebra Sample Thing 500ml",
+        "brand_display": "Zebra", "has_brand": true,
+        "source_view_display": "search", "source_view_meaning": "searched for - this item is new",
+        "asda_product_ref_display": "unknown", "asda_url_display": "unknown",
+        "required_quantity_display": "1",
+        "origin_display": "new_approved", "is_new": true, "is_known": false,
+        "approved_search_term_display": "zebra sample thing 500ml",
+        "substitutes_allowed_display": "no",
+        "applied_rules": [], "applied_rules_count_display": "0", "has_applied_rules": false,
+        "quantity_rationale_display": "unknown", "has_quantity_rationale": false,
+        "identity_incomplete": false
+      }
+    ],
+    "held": [
+      {
+        "shop_line_no_display": "3",
+        "original_list_line_display": "placeholder juice",
+        "reason_display": "awaiting_decision",
+        "reason_meaning": "waiting on an answer from you",
+        "detail_display": "which of the two juices did you mean?",
+        "rule_id_display": "unknown"
+      }
+    ]
+  },
+  "reconciliation": {
+    "reconciliation_version_display": "1",
+    "shop_ref_display": "SHOP-2026-01-01",
+    "reconciled_at_display": "1 Jan 2026, 18:12",
+    "expected_distinct_products_display": "3",
+    "actual_distinct_products_display": "3",
+    "expected_total_units_display": "5",
+    "actual_total_units_display": "5",
+    "distinct_products_match": true,
+    "total_units_match": true,
+    "lines_count_display": "3",
+    "mismatched_lines_count_display": "1",
+    "fully_reconciled": false,
+    "counts_agree_but_lines_do_not": true,
+    "lines": [
+      {
+        "seq_display": "1", "canonical_product_id_display": "11",
+        "canonical_product_name_display": "Example Brand Oat Drink 1L", "brand_display": "Example Brand",
+        "expected_quantity_display": "3", "actual_quantity_display": "3",
+        "identity_match_display": "exact", "identity_meaning": "the right product",
+        "quantity_match_display": "exact", "quantity_meaning": "the right quantity",
+        "expected_product_ref_display": "1000001", "actual_product_ref_display": "1000001",
+        "detail_display": "unknown", "is_match": true
+      },
+      {
+        "seq_display": "2", "canonical_product_id_display": "12",
+        "canonical_product_name_display": "Sample Mature Cheese 200g", "brand_display": "Sample",
+        "expected_quantity_display": "1", "actual_quantity_display": "1",
+        "identity_match_display": "different_product", "identity_meaning": "a DIFFERENT product",
+        "quantity_match_display": "exact", "quantity_meaning": "the right quantity",
+        "expected_product_ref_display": "1000002", "actual_product_ref_display": "1000009",
+        "detail_display": "a 400g pack was picked up instead of the 200g", "is_match": false
+      },
+      {
+        "seq_display": "3", "canonical_product_id_display": "unknown",
+        "canonical_product_name_display": "Zebra Sample Thing 500ml", "brand_display": "Zebra",
+        "expected_quantity_display": "1", "actual_quantity_display": "1",
+        "identity_match_display": "exact", "identity_meaning": "the right product",
+        "quantity_match_display": "exact", "quantity_meaning": "the right quantity",
+        "expected_product_ref_display": "unknown", "actual_product_ref_display": "1000123",
+        "detail_display": "unknown", "is_match": true
+      }
+    ],
+    "unavailable": [
+      {
+        "original_list_line_display": "placeholder juice",
+        "canonical_product_name_display": "Placeholder Orange Juice 1L",
+        "reason_display": "out_of_stock", "reason_meaning": "out of stock",
+        "detail_display": "unknown"
+      }
+    ],
+    "unavailable_count_display": "1",
+    "unexpected": [
+      {
+        "canonical_product_name_display": "Something Nobody Asked For",
+        "actual_product_ref_display": "1009999",
+        "actual_quantity_display": "1",
+        "detail_display": "unknown"
+      }
+    ],
+    "unexpected_count_display": "1",
+    "checkout_performed": { "value": false, "display": "no" },
+    "payment_performed": { "value": false, "display": "no" },
+    "slot_booked": { "value": null, "display": "not confirmed" },
+    "no_purchase_action_confirmed": false
+  }
+}

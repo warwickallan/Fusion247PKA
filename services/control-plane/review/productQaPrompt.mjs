@@ -1,14 +1,28 @@
 // BUILD-014 PR-2b — the VERSIONED product-QA prompt (the load-bearing fix).
 //
+// 🔴 TEST-ONLY AS OF 2026-08-05 (BUILD-020 WP-2G, traced by execution — do not infer otherwise).
+// `loadProductQaPrompt` has exactly two call sites and BOTH are tests; `review/towerReview.mjs`,
+// its only consumer, likewise has NO PRODUCTION CALLER anywhere in the estate and additionally
+// needs a Postgres `ops` schema that WP-2F moved off. So this file is a dead law channel: the
+// richest reviewer prompt in the repo reached no reviewer. That is the very defect the header
+// below was written about — "written but never WIRED into the runtime" — recurring one layer up.
+// WP-2G's answer is NOT to wire this route. It is to move the law onto the route that is already
+// live: `tower-loop/reviewDiff.mjs`, `mergeCheck.mjs`, `watcher.mjs` and `demo-merge-review.mjs`
+// now load and validate Codex's permanent contract through `loadCodexContract()` in
+// `review/codexAdapter.mjs`, which every one of them already imports. Keep this module honest and
+// pointing at the same file — do not build a second law channel back up around it.
+//
 // THE MISS THIS CLOSES: the richer GPT-style product-QA reviewer prompt was written but never
 // WIRED into the runtime — the loop ran an empty/thin skillText. This module wires the REAL,
 // versioned product-QA prompt and binds its version + fingerprint onto every review_run.
 //
 // GOVERNANCE (honest provenance — never present an AI-authored prompt as approved):
-//   · BASE = Builds/BUILD-010-fusion-tower/baton-mvp/tower-qa-skill.md — Warwick-authored and
-//     RATIFIED (status: approved, standing_use_ratified: true). THIS is the governing text. Its
-//     ordered checklist already puts acceptance alignment before "explore beyond", and its
-//     product-QA (not pentest) orientation is exactly what we want wired.
+//   · BASE = review/prompts/tower-qa-skill.md — THIS is the governing text. (WP-2G rehomed and
+//     rewrote it; its previous home under the BUILD-010 build record is recorded in the file's own
+//     `supersedes:` field.) Its ordered checklist puts acceptance alignment before "explore
+//     beyond", and its product-QA (not pentest) orientation is exactly what we want wired. It
+//     currently ships DRAFT pending Warwick's ratification, so this loader correctly REFUSES it —
+//     an unratified governing prompt must never drive a review.
 //   · ORIENTATION = review/prompts/product-qa-runtime-orientation.md — a DRAFT layer authored by
 //     Mack (PR-2b) that makes two behaviours EXPLICIT + TESTABLE: acceptance-FIRST ordering, and
 //     explicit consumption of EVERY prior open finding. It is clearly flagged NOT-YET-APPROVED and
@@ -32,12 +46,15 @@ import crypto from 'node:crypto';
 import fsDefault from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { CODEX_CONTRACT_PATH } from './codexAdapter.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Repo-root-relative default paths. review/ -> control-plane/ -> services/ -> repo root.
-export const DEFAULT_APPROVED_SKILL_PATH = path.resolve(
-  __dirname, '..', '..', '..', 'Builds', 'BUILD-010-fusion-tower', 'baton-mvp', 'tower-qa-skill.md');
+// WP-2G — the base skill's durable home is `review/prompts/`, beside the two governing texts this
+// module already loads from there. Resolved from codexAdapter.mjs's single exported constant so
+// this (test-only) route can never drift from the live one. Its old default pointed into
+// `Builds/BUILD-010-fusion-tower/**` — a build record, and a runtime default that named a build.
+export const DEFAULT_APPROVED_SKILL_PATH = CODEX_CONTRACT_PATH;
 export const DEFAULT_CLASSIFICATION_PATH = path.resolve(
   __dirname, 'prompts', 'reviewer-classification-amendment.md');
 export const DEFAULT_ORIENTATION_PATH = path.resolve(

@@ -33,10 +33,37 @@ const SELECT_COLS = `
 
 const asText = (v) => (v === null || v === undefined ? null : String(v));
 
+/**
+ * The store over a READ/WRITE query PAIR rather than a single client.
+ *
+ * WHY THE SPLIT EXISTS. The pipeline runtime holds no pg client - it holds
+ * `deps.readQuery` and `deps.writeQuery`, which are two pools against two roles,
+ * deliberately: the read role is SELECT-only so a bug cannot write through it.
+ * Handing this store one `client.query` would collapse that separation for every
+ * caller, so the seam is here instead and the SQL below has exactly one owner.
+ *
+ * The two READS go to `read`; the two WRITES go to `write`. Nothing else changes.
+ *
+ * @param {{read:Function, write:Function}} queries `(sql, params) => {rows, rowCount}`
+ */
+export function createQuestionStoreFromQueries({ read, write } = {}) {
+  if (typeof read !== 'function' || typeof write !== 'function') {
+    throw new Error('questionStore: read and write query functions are required');
+  }
+  return buildQuestionStore({ read, write });
+}
+
 export function createQuestionStore(client) {
   if (!client || typeof client.query !== 'function') {
     throw new Error('questionStore: a connected pg client is required');
   }
+  const query = (sql, params) => client.query(sql, params);
+  return buildQuestionStore({ read: query, write: query });
+}
+
+function buildQuestionStore({ read, write }) {
+  const client = { query: read };
+  const writer = { query: write };
 
   return {
     async getQuestionByCard({ chatId, messageId }) {
@@ -68,7 +95,7 @@ export function createQuestionStore(client) {
     // index means a re-render UPDATES the contract rather than creating a
     // second question - re-asking is impossible by construction.
     async saveRender({ shopRef, questionKey, chatId, messageId, renderedCandidates, renderFingerprint, renderVersion }) {
-      const r = await client.query(
+      const r = await writer.query(
         `update asdair.shop_question q
             set card_chat_id        = $3,
                 card_message_id     = $4,
@@ -91,7 +118,7 @@ export function createQuestionStore(client) {
 
     // THE COMPARE-AND-SET. `and status = 'open'` is what makes a double tap safe.
     async recordAnswer({ questionId, answerText, answerSource, callbackIndex, answeredAt }) {
-      const upd = await client.query(
+      const upd = await writer.query(
         `update asdair.shop_question
             set status         = 'answered',
                 answer_text    = $2,

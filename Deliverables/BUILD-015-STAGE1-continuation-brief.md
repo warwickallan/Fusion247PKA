@@ -1,5 +1,35 @@
 # BUILD-015 AsdAIr Stage 1 — continuation brief
 
+## RESUMPTION PRECEDENCE — recorded 2026-08-04, discharging Veritas `D-G3-07`
+
+**Recorded by `WO-2026-08-04-03`, re-seated by `WO-2026-08-04-04` when this map was added. Exactly
+one document may direct the next session. This is the order, and every resumption-shaped document
+in `Deliverables/` carries this identical block.**
+
+1. **`Builds/BUILD-015-asdair-durable-household-shopping-steward/`** — the build record is the
+   **authority for every BUILD-015 fact, and it is not a route.** A document that disagrees with it
+   is wrong.
+2. **`Deliverables/2026-08-04-build-015-asdair-wayfinder-plan.md`** — **THE Wayfinder map. The sole
+   route, and the only document that may state the exact next action.**
+3. **`Deliverables/NEXT-ASDAIR-SESSION-brief.md`** — **NON-DIRECTIVE.** Operational hazards and
+   code-level do-not-rebuild warnings the map points at. It states no next action.
+4. **`Deliverables/2026-08-04-rotation-brief.md`** — **NON-DIRECTIVE.** A dated snapshot of the
+   2026-08-04 rotation, kept for its record of what changed and the traps it names. It states no
+   next action.
+5. **`Deliverables/BUILD-015-STAGE1-continuation-brief.md`** — **NON-DIRECTIVE. Superseded
+   2026-07-28 snapshot**, kept as a historical record only.
+6. **`Deliverables/NEXT-SESSION-MISSION-repo-worktree-hygiene.md`** — **NOT a BUILD-015 resumption
+   document.** A standing repository-hygiene mission; it never directs BUILD-015 work.
+
+**This block is deliberately duplicated byte-identically across all five documents, as a recorded
+exception to the SSOT Golden Rule** (root `AGENTS.md` §1), because a fresh instance may open any one
+of them first and must learn from that one which document it is allowed to act on.
+
+**The Honcho continuity brief is a POINTER, never the authority** (root `CLAUDE.md` Step 2).
+**Verify by execution, not belief.**
+
+> **SUPERSEDED 2026-07-28 SNAPSHOT — NON-DIRECTIVE, retained as a historical record. Everything below describes the estate as it stood on 2026-07-28 and is not to be acted on or corrected; the current state and the single exact next action are in `Deliverables/2026-08-04-build-015-asdair-wayfinder-plan.md`.**
+
 **Written 2026-07-28 by Larry, mid-build.** Everything below is verifiable from git, `gh pr view 82`, and the
 `asdair` database. Reconstruct from those, not from this file.
 

@@ -198,7 +198,27 @@ export function makeHarness(script = {}) {
         rules: [], products: [],
         regulars: [...catalogue.regularsById.values()],
         budget: null, lastOrder: catalogue.last_order,
+        // asdair.rule_qa_log, as data.js loadRuleQaLog() returns it. Defaulted
+        // to empty rather than omitted: planBasket treats priorAnswers as
+        // optional, so a harness that left the key off entirely could not tell
+        // "the pipeline passed no prior answers" apart from "there were none".
+        priorAnswers: [],
       };
+    },
+
+    /**
+     * THE REAL recordAnswerLearning, on the fake client.
+     *
+     * Same seam and same reason as recordConfirmation above: the module takes an
+     * already-connected client, so the offline suite runs the genuine
+     * buildAnswerLearning -> promoteDecision path rather than a re-implementation
+     * of it. A stub here would assert only that runPipeline called something,
+     * which is the shape of proof this build already has too much of.
+     */
+    async recordAnswerLearning(answer) {
+      calls.push({ dep: 'recordAnswerLearning', questionKey: answer.question_key });
+      const { recordAnswerLearning } = require('../../outcome/recordAnswerLearning.js');
+      return recordAnswerLearning(answer, { client });
     },
 
     buildConfirmationPayload(payload) {

@@ -120,6 +120,122 @@ changes a plan when it carries **structured directive fields**:
 Free-text-only rows have no planning effect. This keeps the planner deterministic
 and auditable rather than guessing intent from prose.
 
+### `info` rules are CARRIED, not actioned (WO-Y, 2026-08-04)
+
+Until 2026-08-04 `actionableRules()` **discarded every `info` row before
+matching**. On the live rulebook that is rules 32, 36, 37 and 38 -- *every
+rotation rule and every multibuy rule in the system*. They were correct,
+complete, written weeks earlier, and had **never once fired**. That is the
+defect WO-Y exists to close, and it cost Warwick an evening on 2026-08-03
+answering questions he had already answered.
+
+The fix is **not** to make `info` actionable. For most of these rules `info` is
+the *correct* directive and the content simply cannot be executed here:
+
+| Live rule | Verdict | What now happens |
+|---|---|---|
+| 32 -- rotate the Sure variant weekly | `info` is the **wrong** directive; it should be `rotate` | Handed back as a migration for Warwick to apply. Not applied here. |
+| 36 -- multibuy: buy up to the offer quantity when the extra items are >=50% off | `info` is **correct** and must stay | **Cannot be evaluated. There is no price column on `products` or `regulars` anywhere in the schema** -- the same reason standing rule 7 above is inoperative. No evaluator is faked. It surfaces at basket review. |
+| 37 -- round a "any 2 for X" quantity up to an even number | `info` is **correct** | Same: conditional on an offer this planner cannot see. Carried to the line. |
+| 38 -- an add-to-trolley failure means OUT OF STOCK, not an expired slot | not a planner rule at all | Guidance for whatever drives the browser. Carried, never implemented here. |
+
+So:
+
+- **Targeted `info` rules** (rules 32, 37 -- both target `sure male`) attach to
+  the line they name: flag `rule advisory`, and the rule's own words in the
+  note.
+- **Global `info` rules** (rules 36, 38 -- `match_term` *and* `match_category`
+  both NULL) belong to the basket rather than to any one line, and surface once
+  in **`summary.advisories`**, an additive key. Pasting a global rule onto all
+  forty lines would be noise, and noise is how a real signal gets missed.
+- An advisory **never** changes status, quantity or matched product.
+
+**Do not read `summary.advisories` as "the multibuy rule works".** It does not.
+It means the rule finally reaches a human instead of being thrown away.
+
+### Prior answers: `asdair.rule_qa_log` is a planning input (WO-Y)
+
+`CANONICAL-WEEKLY-SHOP-PROCESS.md` section D requires that *"previous decisions must be
+consulted before any question is generated"*. Nothing in the planning path had
+**ever** read `rule_qa_log`: its only non-test readers in the whole service were
+`outcome/promoteDecision.js` (a writer) and `cockpit-api/readRules.js` (a
+display reader). So on 2026-08-03 the shop asked about Ariel Pods while the
+recorded answer -- *"best value/wash"*, 2026-07-21 -- sat in the database.
+
+- `data.js` **`loadRuleQaLog(household)`** (SELECT only) reads the household's
+  rows plus the global ones.
+- `planBasket({ ..., priorAnswers })` consults them **before** the status chain
+  runs. A matching row adds the flag `prior decision on record` and the answer
+  itself to the note.
+- Only `applies_going_forward` rows count, and household scope is honoured.
+- **A prior answer never names a product.** "Best value/wash" is a selection
+  heuristic, not an identity, and evaluating it needs a price that does not
+  exist. It can stop a line being an *unexplained* question; it can never pick
+  the item. Standing rule 6 is untouched.
+
+#### The live rows are not single-topic, and the shaping that follows from that
+
+The first implementation emitted the whole `answer` string, on fixtures that
+assumed one question meant one decision. **The live rows say otherwise**
+(queried 2026-08-04), and two shapes break that assumption:
+
+- **BATCH (live row 5).** One question covering seven ambiguities, answered as
+  seven `Key=value` fragments in a single string. Linking `"Ariel Pods"` to it
+  is correct; emitting all seven households' decisions onto that card is not.
+- **POINTER (live row 2).** *"Established the product-specific matching rules
+  now recorded in `asdair.rules` with scope=product (rules 10-16, 18-22)."*
+  That states no decision at all -- it records where the decisions went.
+  Surfacing it as a prior decision tells Warwick nothing and reads like a
+  malfunction.
+
+So an answer is shaped into exactly one of three outcomes, and **both failure
+directions are made visible rather than guessed at**:
+
+| Outcome | When | What the card gets |
+|---|---|---|
+| `fragment` | single-topic, or exactly one `Key=` fragment names the line | flag `prior decision on record` + that fragment only |
+| `unsplit` | it demonstrably covers the line but zero or several fragments match | flag `prior batch answer not split` + *"a prior batch answer from <date> covers this; it could not be split automatically"* + the raw text |
+| `pointer` | the answer names rules (`rule N`, `rules N-M`) instead of stating one | **never presented as a decision.** Followed to the rules it names: if one of them already speaks to this line, flag `prior decision recorded as rules` and nothing more, since that rule's own words are already on the card. If none do, nothing at all is surfaced. |
+
+**Linking runs by two routes**, because the batch question names its topics
+loosely -- it says *"Sure variant"* where the list says *"Sure male"*:
+
+1. the **question** names the line (every word of the line appears in it); or
+2. a compound answer's own **fragment key** names the line, uniquely.
+
+A key that matches more than one fragment resolves to `unsplit`, never to a
+guess. A rule reference is parsed only after the literal word `rule`/`rules`,
+so a pack size (`Wall's=4-pack`, `8x35ml`) can never be read as one.
+
+### Tolerant matching (WO-Y) -- and why it is deliberately grudging
+
+Alias and rule matching were **exact string equality**, so `"2 yazoo choc"`
+missed the stored alias `"choc yazoo"` (word order) and
+`"Double Glouester cheese"` missed `"double gloucester"` (one letter). Both are
+real 2026-08-03 failures against real stored aliases.
+
+`termMatch.js` is now the **single** matcher, shared by `planner.js` and
+`interpret/resolveByCatalogue.js` -- they previously had two different
+implementations, which is how the read path and the plan path came to disagree
+about what "the same product" means.
+
+It grades every match, and the grades have different powers:
+
+- **CONFIDENT** (`exact`, `token_set`, `typo`, `key_subset`) may establish
+  identity -- resolve a regular, apply a `map`, seed a rotation ring.
+- **ADVISORY** (`shared_distinctive`) may **only** attach a reason and **hold**
+  a line for a human. It can never name a product.
+
+That asymmetry is the whole design: a matcher that is too loose silently buys
+the wrong product, while one that is too tight asks a question. Every threshold
+in `termMatch.js` fails towards asking, and every one has a real counter-example
+pinned in `termMatch.test.js` (`beans`/`beers`, `butter`/`batter`,
+`milk`/`silk`, `Sure male`/`Sure female`, `bread`/`shortbread`). **Loosening a
+threshold without adding its counter-example re-opens this defect.**
+
+Exact matching still runs first and still wins, so no line that resolved before
+can change its answer.
+
 ### How Regulars drive resolution
 
 `asdair.regulars` is the household's standing "this is what we actually buy"
@@ -185,17 +301,55 @@ standing rule 7. Two additive pieces close that:
 
   **It never guesses.** The line becomes `needs_decision`, carrying a question,
   when there are no candidates, when every candidate was in the last order (the
-  ring is exhausted - it will not silently repeat), or when a `map` rule FIXES
-  the variant while an instruction says vary it. **That last conflict is live and
-  real** (rules fix the men's deodorant variant while the decision log says
-  rotate it) and it is Warwick's to settle, not the planner's.
+  ring is exhausted - it will not silently repeat), or on a genuine variant
+  clash.
 
-  **What is NOT here:** a database carrier for the rotation instruction.
-  `asdair.rules.directive` is CHECK-constrained to `info | exclude |
-  needs_decision | map`, so a `rotate` directive cannot be stored without a
-  migration, which is outside this layer. Until that lands the instruction must
-  be passed in by the caller. The mechanism is live and tested; the row that
-  would trigger it from live data is the remaining half.
+  **CORRECTED 2026-08-04 (WO-Y), on Warwick's reading of the live rows.** This
+  paragraph used to say a `map` rule plus a rotate instruction was itself the
+  conflict, citing rules 23/24 against the decision log. **That premise was
+  wrong.** The live rows compose rather than clash:
+
+  - **23** `map "Sure male"` -> *"Sure Men Anti-Perspirant Deodorant (blue
+    variant)"*
+  - **32** `rotate "Sure male (men's blue)"` -- rotate the scent weekly
+  - **37** `info "Sure male"` -- round the quantity up to complete a pair
+
+  Rule 32 **opens by agreeing with rule 23** and then refines it: 23 picks the
+  family, 32 picks this week's member, 37 handles the quantity. Three rules at
+  three levels. Had the old reading shipped, Sure would have become a
+  `needs_decision` **every single week** -- the exact failure WO-Y exists to
+  end, reintroduced by its own fix.
+
+  **A genuine clash still asks:** two `map` directives naming DIFFERENT
+  products for the same line. That is mechanically decidable and is detected.
+
+  **NOT detected, and deliberately not attempted:** a `rotate` whose *prose*
+  contradicts rather than refines its `map`. Deciding that means reading the
+  rules as language, and this planner does not parse prose -- the property that
+  keeps it deterministic and auditable. Stated as a real limit rather than
+  faked with a keyword sniffer.
+
+  **CORRECTED 2026-08-04 (WO-Y).** This paragraph used to say there was no
+  database carrier for the rotation instruction, because
+  `asdair.rules.directive` was CHECK-constrained to
+  `info | exclude | needs_decision | map`. **That has not been true since
+  `db/007_rules_rotate_directive.sql` landed**, which widened the constraint to
+  include `rotate`. The stale claim survived here for weeks and was still being
+  quoted as a reason rotation could not work -- while the actual reason was
+  simply that nothing derived instructions from those rows.
+
+  **`planBasket` now derives rotation instructions from the rulebook itself:**
+  every active rule carrying `directive = 'rotate'` and a target becomes a
+  rotation instruction, using the same `match_term` / `match_category` /
+  `household_id` targeting a directive rule uses. `stepPlan()` already passes
+  `rules` and `lastOrder`, so **rotation needs no new pipeline wiring at all**.
+  An explicitly-passed `rotation` argument is still honoured and still wins,
+  so a caller can always override the rulebook.
+
+  **What this does NOT do:** change any rule's directive. Live rule 32 ("Sure
+  male: ROTATE the variant each week") still carries `info`, so it still does
+  not rotate. Making it rotate is a **data** change to the household's rulebook
+  and is Warwick's to apply, not this layer's to assume.
 
 ## Run the CLI (live acceptance)
 

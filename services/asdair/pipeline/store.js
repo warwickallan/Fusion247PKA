@@ -176,14 +176,58 @@ export async function countOpenQuestions(deps, shopId) {
   return Number(rowsOf(res)[0]?.n) || 0;
 }
 
-/** Every question on a shop, in the order it was asked. */
+/**
+ * Every question on a shop, in the order it was asked.
+ *
+ * ── WHY THE FOUR RENDER-CONTRACT COLUMNS ARE SELECTED ───────────────────────
+ * Migration 009 added rendered_candidates / render_fingerprint / render_version
+ * / callback_index to asdair.shop_question. This function did not select them,
+ * so every pipeline-side consumer of the render contract silently received
+ * `undefined` - not an error, not an empty value, just a shape that quietly
+ * disagreed with the table. A Telegram button carries a candidate INDEX, and an
+ * index is only meaningful against the exact list that was DISPLAYED; reading
+ * that list as `undefined` is how a stale tap stops being detectable. Selecting
+ * them is not an enhancement, it is the column list catching up with the table.
+ *
+ * ── WHY THE TWO JOINS ───────────────────────────────────────────────────────
+ * `asdair.shop_question` has no column for the item a question is ABOUT, and
+ * `question_text` is a whole sentence ("Which product is \"dreamies cheese\"?").
+ * Consumers were rendering that sentence into the card's `Item:` field, which is
+ * why the card read `Item: Which product is "dreamies cheese"?`. Parsing the
+ * name back out of the sentence is brittle and would break the moment the
+ * wording changed, so the name TRAVELS instead:
+ *
+ *   shop_question.list_item_id -> shopping_list_items.item_name   `item_name`
+ *                              -> shop_line.raw_reading           `photographed_wording`
+ *
+ * Both are LEFT joins: a question opened before this carrier existed, or one
+ * whose list item has since gone, still returns its row with these two fields
+ * null rather than vanishing from the list. A missing name must degrade the
+ * card, never lose the question.
+ *
+ * `photographed_wording` is what was actually written on the page. It is the
+ * highest-value single field in the learning loop - it becomes the alias that
+ * stops next week's question - and it is a fact of the interpretation, so it is
+ * read from asdair.shop_line rather than reconstructed by anybody downstream.
+ */
 export async function listQuestions(deps, shopId) {
   const res = await deps.readQuery(
-    `SELECT id, question_key, question_text, candidates, status, answer_text, answer_source,
-            card_chat_id, card_message_id
-       FROM asdair.shop_question WHERE shop_id = $1 ORDER BY id ASC`, [shopId],
+    `SELECT q.id, q.list_item_id, q.question_key, q.question_text, q.candidates, q.status,
+            q.answer_text, q.answer_source, q.card_chat_id, q.card_message_id,
+            q.rendered_candidates, q.render_fingerprint, q.render_version, q.callback_index,
+            li.item_name AS item_name,
+            sl.raw_reading AS photographed_wording
+       FROM asdair.shop_question q
+       LEFT JOIN asdair.shopping_list_items li ON li.id = q.list_item_id
+       LEFT JOIN asdair.shop_line sl ON sl.list_item_id = q.list_item_id AND sl.shop_id = q.shop_id
+      WHERE q.shop_id = $1 ORDER BY q.id ASC`, [shopId],
   );
-  return rowsOf(res).map((q) => ({ ...q, candidates: Array.isArray(q.candidates) ? q.candidates : asArray(q.candidates) }));
+  return rowsOf(res).map((q) => ({
+    ...q,
+    candidates: Array.isArray(q.candidates) ? q.candidates : asArray(q.candidates),
+    rendered_candidates: Array.isArray(q.rendered_candidates)
+      ? q.rendered_candidates : asArray(q.rendered_candidates),
+  }));
 }
 
 function asArray(value) {
@@ -492,6 +536,115 @@ export async function resolveCommand(deps, ledgerId, status = 'done', note = nul
 }
 
 // ---------------------------------------------------------------------
+// ONE-SHOT DURABLE MARKERS
+//
+// Both functions below want the SAME guarantee, and it is the opposite of the
+// one recordLedgerEntry gives. recordLedgerEntry deliberately mints a NEW
+// generation once the previous one is spent, because "ask for the basket again"
+// must be a genuinely new unit of work. These two must fire ONCE, EVER:
+//
+//   * an interpretation happened at a moment - a second record of the same
+//     model call would be a second claim that the model was asked, and this
+//     evidence exists precisely so such a claim cannot be made falsely;
+//   * promoteDecision writes a rule_qa_log row with NO idempotency key of its
+//     own (recordAnswerLearning.js says so in terms), so learning the same
+//     answer twice appends a duplicate decision to the audit log.
+//
+// So they insert against the TOTAL unique index directly, with a deterministic
+// key and no generation. The DATABASE decides the duplicate - this code does not
+// read first and write second. `created:false` means somebody already did it.
+// ---------------------------------------------------------------------
+
+/** A one-shot ledger row. Returns the row plus who won the race. */
+async function insertOneShot(deps, { shopId, name, idempotencyKey, payload }) {
+  const args = { ...(payload || {}), ledger_action_key: idempotencyKey };
+  const inserted = rowsOf(await deps.writeQuery(INSERT_LEDGER_SQL, [
+    shopId ?? null, LEDGER_KINDS.COMMAND, name, JSON.stringify(args), idempotencyKey,
+  ]))[0];
+  if (inserted) {
+    const row = toLedgerRow(inserted);
+    return { id: row.id, created: true, row, already: false };
+  }
+  const existing = rowsOf(await deps.readQuery(SELECT_LEDGER_BY_IDEMPOTENCY_KEY_SQL, [idempotencyKey]))[0];
+  if (!existing) {
+    throw new Error(`store: the one-shot insert for "${idempotencyKey}" wrote nothing and no row carries that key. Nothing was written.`);
+  }
+  const row = toLedgerRow(existing);
+  return { id: row.id, created: false, row, already: LEDGER_TERMINAL_STATUSES.includes(existing.status) };
+}
+
+/** The command name every grounding-evidence row carries. */
+export const GROUNDING_EVIDENCE = 'groundingEvidence';
+
+/**
+ * Record, per interpretation, WHAT GROUNDING WAS ACTUALLY SUPPLIED to the model.
+ *
+ * ── WHY THIS EXISTS (D-2026-08-03-04, and it cost a live shop) ──────────────
+ * On 2026-08-03 a `--dry-run` that skipped the model call ENTIRELY was mistaken
+ * for proof that the model path worked. The reason it could be mistaken is that
+ * nothing downstream could tell the difference: a run that interpreted nothing
+ * and a run that interpreted ten lines left the same trace.
+ *
+ * So the record is written FROM THE MODEL CALL'S OWN RETURN, after it returns.
+ * Asserting that `loadCatalogue()` was called proves only that we prepared to
+ * ask; `readings_returned` is a number that only exists if something answered.
+ * A skipped call cannot produce this row, which is the whole point.
+ *
+ * ── SANITIZED: COUNTS AND IDS ONLY ─────────────────────────────────────────
+ * NEVER a product name, never list content, never a raw reading, never the
+ * photograph, never the prompt text. The prompt is measured in CHARACTERS, not
+ * quoted. What is stored is the SHAPE of the grounding, which is what makes the
+ * claim checkable, and none of the household's data, which is what keeps an
+ * audit record from becoming a second copy of the shopping list.
+ */
+export async function recordGroundingEvidence(deps, {
+  shopId, householdId, sourceKind, catalogueCandidates, promptChars, readingsReturned,
+  lineNos = [], matchedRegularIds = [],
+}) {
+  const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : null);
+  return insertOneShot(deps, {
+    shopId,
+    name: GROUNDING_EVIDENCE,
+    idempotencyKey: `grounding:${shopId}`,
+    payload: {
+      household_id: num(householdId),
+      source_kind: String(sourceKind),
+      // The grounding that was SUPPLIED.
+      catalogue_candidates: num(catalogueCandidates),
+      prompt_chars: num(promptChars),
+      // What came BACK. A skipped call cannot produce these.
+      readings_returned: num(readingsReturned),
+      line_nos: lineNos.map(num).filter((n) => n !== null),
+      matched_regular_ids: matchedRegularIds.map(num).filter((n) => n !== null),
+    },
+  });
+}
+
+/** The command name every answer-learning marker carries. */
+export const ANSWER_LEARNING = 'answerLearning';
+
+/**
+ * Claim the right to persist the learning for ONE answered question.
+ *
+ * `{ created: true }` - this caller owns it; do the learning, then resolve the
+ * row. `{ already: true }` - a previous pass finished it; skip, and skip
+ * silently, because a re-run of a resumable pipeline is normal and not an error.
+ * `{ created: false, already: false }` - a previous pass claimed it and DIED
+ * before resolving it. That is a resumable row, so this caller re-runs the
+ * learning: recordAnswerLearning's own steps are re-runnable and its receipt
+ * names which one failed, whereas leaving it unclaimed forever would silently
+ * lose the answer - which is the defect this whole path exists to end.
+ */
+export async function claimAnswerLearning(deps, { shopId, householdId, questionKey }) {
+  return insertOneShot(deps, {
+    shopId,
+    name: ANSWER_LEARNING,
+    idempotencyKey: `learn:${shopId}:${questionKey}`,
+    payload: { household_id: householdId ?? null, question_key: String(questionKey) },
+  });
+}
+
+// ---------------------------------------------------------------------
 // The outbox
 // ---------------------------------------------------------------------
 
@@ -511,6 +664,27 @@ export async function enqueueMessage(deps, { householdId, shopId, kind, key, pay
   return recordLedgerEntry(deps, {
     kind: LEDGER_KINDS.OUTBOX, householdId, shopId, name: kind, key, payload,
   });
+}
+
+/**
+ * True when a message of this KIND has EVER been queued for a shop - pending
+ * or already resolved, from this pass, a pass before it, or a pass that ran
+ * before this very check existed.
+ *
+ * This is deliberately NOT "is one currently pending": a once-per-shop card
+ * (the receipt) must never be asked twice, whether the earlier queue was sent
+ * minutes ago, days ago, or predates the code that queues it - so the read
+ * covers the FULL history of the outbox family, exactly the way
+ * listIssuedCommandNames does for a LATCH command's "ever issued" gate above.
+ */
+export async function outboxEverQueued(deps, shopId, kind) {
+  const res = await deps.readQuery(
+    `SELECT 1 FROM asdair.pipeline_command
+      WHERE shop_id = $1 AND kind = 'outbox' AND command = $2
+      LIMIT 1`,
+    [shopId, kind],
+  );
+  return rowsOf(res).length > 0;
 }
 
 /** Every unsent message, oldest first. */

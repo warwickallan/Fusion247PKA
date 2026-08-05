@@ -3,8 +3,12 @@
 // The HTTP client is injected; every Telegram call lands on a fake.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { TAP_OUTCOMES, TAP_REFUSALS, handleAsdairTap, resolveTap } from './resolveTap.js';
-import { persistQuestionRender, prepareQuestionCard, sendQuestionCard } from './questionRender.js';
+import {
+  TAP_NOTICES, TAP_OUTCOMES, TAP_REFUSALS, handleAsdairTap, resolveCandidateAnswer, resolveTap,
+} from './resolveTap.js';
+import {
+  normaliseStoredCandidates, persistQuestionRender, prepareQuestionCard, sendQuestionCard,
+} from './questionRender.js';
 import { ACTIONS, buildAnswerArg, buildCallbackData } from './callbackProtocol.js';
 import { routeAsdairUpdate } from './inboundRouter.js';
 import { createShopperSender } from './sendShopperMessage.js';
@@ -516,4 +520,183 @@ test('no rendered candidate label or product id is ever fabricated on a refusal'
   assert.equal(out.candidateId, undefined);
   assert.equal(out.candidateLabel, undefined);
   assert.equal(out.answerText, undefined);
+});
+
+// =====================================================================
+// THE READ HALF ON ITS OWN - resolveCandidateAnswer()
+//
+// The pipeline runtime cannot call resolveTap(): a tap there becomes a member of
+// the COMMAND surface, so resolving AND writing here would write one answer twice
+// through two paths. These prove the READ half makes every staleness check
+// resolveTap makes, and that a stale tap NEVER silently maps to a new ordering.
+// =====================================================================
+
+test('READ HALF: a live tap resolves its index through the STORED list', async () => {
+  const { store } = await seed({ candidates: [C, A, B] });
+  const out = await resolveCandidateAnswer({
+    store, shopRef: REF, questionKey: KEY, candidateIndex: 0, chatId: CHAT, messageId: 100,
+  });
+  assert.equal(out.ok, true);
+  assert.equal(out.candidateId, C.id, 'index 0 must be whatever was DISPLAYED, not a recomputed first');
+  assert.equal(out.label, C.label);
+  assert.equal(out.renderVersion, 1);
+  assert.equal(out.alreadyAnswered, false);
+  // READ ONLY. Nothing was written and nothing was acknowledged.
+  assert.equal(store.calls.includes('recordAnswer'), false);
+  assert.equal(store.rows[0].status, 'open');
+});
+
+test('READ HALF / THE DEFECT: a tap on a SUPERSEDED card is refused, never mapped to the new ordering', async () => {
+  // v1 on message 100 displayed [A, B, C].
+  const { store } = await seed({ candidates: [A, B, C] });
+  // The question is re-rendered as a NEW card, with the order REVERSED.
+  const { contract: v2 } = prepareQuestionCard({
+    shopRef: REF, questionKey: KEY, item: 'yogurt', candidates: [C, B, A], renderVersion: 2,
+  });
+  await persistQuestionRender({ store, contract: v2, chatId: CHAT, messageId: 200 });
+
+  // Warwick taps index 0 on the OLD card still in his scrollback. On the old list
+  // that is A; on the current list it is C. A silent remap would return C.
+  const stale = await resolveCandidateAnswer({
+    store, shopRef: REF, questionKey: KEY, candidateIndex: 0, chatId: CHAT, messageId: 100,
+  });
+  assert.equal(stale.ok, false, 'a tap on a superseded card was resolved');
+  assert.equal(stale.code, TAP_REFUSALS.STALE_CARD);
+  assert.equal(stale.refresh, true, 'the human must be offered a fresh card');
+  assert.equal(stale.currentCard.messageId, '200');
+  assert.equal(stale.currentRenderVersion, 2);
+  // And nothing that looks like an answer leaked out of the refusal.
+  assert.equal(stale.label, undefined);
+  assert.equal(stale.candidateId, undefined);
+
+  // The LIVE card still resolves, and index 0 there is C - which is exactly the
+  // value a silent remap of the stale tap would have produced.
+  const live = await resolveCandidateAnswer({
+    store, shopRef: REF, questionKey: KEY, candidateIndex: 0, chatId: CHAT, messageId: 200,
+  });
+  assert.equal(live.ok, true);
+  assert.equal(live.candidateId, C.id);
+});
+
+test('READ HALF: a card nobody has a contract for is UNKNOWN, not stale - the two are different facts', async () => {
+  const { store } = await seed();
+  const out = await resolveCandidateAnswer({
+    store, shopRef: REF, questionKey: 'q404', candidateIndex: 0, chatId: CHAT, messageId: 999,
+  });
+  assert.equal(out.ok, false);
+  assert.equal(out.code, TAP_REFUSALS.UNKNOWN_CARD);
+});
+
+test('READ HALF: a contract whose fingerprint no longer matches its list is refused', async () => {
+  const { store } = await seed();
+  // Somebody edited rendered_candidates without re-sealing the fingerprint.
+  store.rows[0].rendered_candidates = [{ index: 0, id: 'P-9999', label: 'something else' }];
+  const out = await resolveCandidateAnswer({
+    store, shopRef: REF, questionKey: KEY, candidateIndex: 0, chatId: CHAT, messageId: 100,
+  });
+  assert.equal(out.ok, false);
+  assert.equal(out.code, TAP_REFUSALS.CONTRACT_CORRUPT);
+});
+
+test('READ HALF: an index past the end of the stored list is staleness, not a shrug', async () => {
+  const { store } = await seed({ candidates: [A, B] });
+  const out = await resolveCandidateAnswer({
+    store, shopRef: REF, questionKey: KEY, candidateIndex: 2, chatId: CHAT, messageId: 100,
+  });
+  assert.equal(out.ok, false);
+  assert.equal(out.code, TAP_REFUSALS.INDEX_OUT_OF_RANGE);
+  assert.equal(out.renderedCount, 2);
+  assert.equal(out.refresh, true);
+});
+
+test('READ HALF: a button claiming a different question than the card it sits on is refused', async () => {
+  const { store } = await seed();
+  const out = await resolveCandidateAnswer({
+    store, shopRef: REF, questionKey: 'q8', candidateIndex: 0, chatId: CHAT, messageId: 100,
+  });
+  assert.equal(out.ok, false);
+  assert.equal(out.code, TAP_REFUSALS.QUESTION_MISMATCH);
+});
+
+test('READ HALF: a card belonging to another shop is refused', async () => {
+  const { store } = await seed();
+  const out = await resolveCandidateAnswer({
+    store, shopRef: 'shop-2026-08-04', questionKey: KEY, candidateIndex: 0, chatId: CHAT, messageId: 100,
+  });
+  assert.equal(out.ok, false);
+  assert.equal(out.code, TAP_REFUSALS.SHOP_MISMATCH);
+});
+
+test('READ HALF: a skipped question is refused; a store that throws is refused, never guessed at', async () => {
+  const { store } = await seed();
+  store.rows[0].status = 'skipped';
+  const skipped = await resolveCandidateAnswer({
+    store, shopRef: REF, questionKey: KEY, candidateIndex: 0, chatId: CHAT, messageId: 100,
+  });
+  assert.equal(skipped.code, TAP_REFUSALS.QUESTION_SKIPPED);
+
+  const broken = {
+    async getQuestionByCard() { throw new Error('the database is down'); },
+    async getQuestionByKey() { return null; },
+  };
+  const failed = await resolveCandidateAnswer({
+    store: broken, shopRef: REF, questionKey: KEY, candidateIndex: 0, chatId: CHAT, messageId: 100,
+  });
+  assert.equal(failed.code, TAP_REFUSALS.STORE_FAILED);
+  assert.ok(!/database is down/.test(JSON.stringify(failed)), 'a store diagnostic leaked into the refusal');
+});
+
+test('READ HALF: every refusal carries a human notice, and every code is a member of TAP_REFUSALS', async () => {
+  const { store } = await seed();
+  const cases = [
+    { questionKey: KEY, candidateIndex: 0, chatId: CHAT, messageId: 999 },
+    { questionKey: 'q8', candidateIndex: 0, chatId: CHAT, messageId: 100 },
+    { questionKey: KEY, candidateIndex: 9, chatId: CHAT, messageId: 100 },
+    { questionKey: KEY, candidateIndex: 0, chatId: null, messageId: 100 },
+  ];
+  const known = new Set(Object.values(TAP_REFUSALS));
+  let checked = 0;
+  for (const c of cases) {
+    const out = await resolveCandidateAnswer({ store, shopRef: REF, ...c });
+    assert.equal(out.ok, false);
+    assert.ok(known.has(out.code), `unknown refusal code ${out.code}`);
+    assert.equal(out.notice, TAP_NOTICES[out.code], 'a refusal reached the human without its notice');
+    assert.ok(out.notice.length > 10);
+    checked += 1;
+  }
+  assert.equal(checked, 4, 'the loop executed no cases');
+});
+
+// =====================================================================
+// THE CANDIDATE ADAPTER - what the planner stores vs what may be a button
+// =====================================================================
+
+test('a planner candidate carrying a regulars id becomes a button; a bare label never does', () => {
+  const out = normaliseStoredCandidates([
+    { label: 'Yeo Valley Natural 500g', regular_id: 41, source: 'asdair.regulars (resolveByCatalogue)' },
+    { label: 'Arla Skyr 450g', source: 'planner suggestion (no product id)' },
+    'ASDA Greek Style 500g',
+    { id: 'P-777', label: 'Explicit id wins' },
+  ]);
+  assert.deepEqual(out.candidates, [
+    { id: 'regular:41', label: 'Yeo Valley Natural 500g' },
+    { id: 'P-777', label: 'Explicit id wins' },
+  ]);
+  assert.deepEqual(out.unidentified, ['Arla Skyr 450g', 'ASDA Greek Style 500g']);
+  // And what comes out is renderable: this is the whole point of the adapter.
+  const { contract } = prepareQuestionCard({
+    shopRef: REF, questionKey: KEY, item: 'yogurt', candidates: out.candidates,
+  });
+  assert.deepEqual(contract.candidateIds, ['regular:41', 'P-777']);
+});
+
+test('the adapter never invents an identity out of a label', () => {
+  const out = normaliseStoredCandidates([{ label: 'no id at all' }, { regular_id: '' }, {}, null]);
+  assert.deepEqual(out.candidates, []);
+  assert.deepEqual(out.unidentified, ['no id at all']);
+  // prepareQuestionCard still fails closed on the raw planner shape, unchanged.
+  assert.throws(
+    () => prepareQuestionCard({ shopRef: REF, questionKey: KEY, candidates: [{ label: 'no id at all' }] }),
+    /has no id/,
+  );
 });

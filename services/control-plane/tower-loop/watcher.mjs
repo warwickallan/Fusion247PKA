@@ -50,11 +50,18 @@ import {
 // is the code the REAL review round runs, not a parallel module nothing calls.
 import { loadOpenFindings, checkFindingDispositions, buildStagedInput } from './findings.mjs';
 import { runSupervisor, runMergeReview } from './supervisorCodex.mjs';
+import { CODEX_CONTRACT_PATH, loadCodexContract, assertDeliveredContract } from '../review/codexAdapter.mjs';
 import { gatherGitEvidence } from './gitEvidence.mjs';
 import { detectMergeClass } from './mergeClass.mjs';
-import { notify, composeMessage, composeLarryMessage } from './notify.mjs';
+import {
+  notify, composeMessage, composeLarryMessage,
+  // W3/W4 (WO-2026-08-05-09, WP-2E) — the QA-exchange composers.
+  composeFindingsMessage, composeDispositionMessage,
+} from './notify.mjs';
 // WO-TW-02 — the automatic trigger. The poller was already real and already proven; the only
 // thing missing was something that ran it without a human. That something is the loop below.
+// WO-2026-08-03-05 — `fetchOpenPrs` is the paginated, fail-loud open-PR discovery call, imported
+// from pollPrComments.mjs rather than re-derived here: one seam, one implementation.
 import { pollPrComments, fetchOpenPrs, ghCliReader } from './pollPrComments.mjs';
 // WO-TW-02 — the other half of Warwick's condition: the verdict goes back ONTO the PR. A
 // SEPARATE module with a SEPARATE seam; the poller stays structurally read-only.
@@ -81,6 +88,11 @@ const PR_POLL_FAIL_ESCALATE_AFTER = 3;
 // Also a literal. Bounds how many PRs one round can ask GitHub about, so an old store full of
 // stale turns cannot turn a poll into a rate-limit incident.
 const PR_POLL_MAX_TARGETS = 5;
+// WO-2026-08-05-TW3 (Gap 1) — a LITERAL, not config, same discipline as PR_POLL_FAIL_ESCALATE_AFTER:
+// how many of `limit`'s slots ROTATE through the overflow rather than being fixed by rank. One slot
+// is enough to guarantee bounded rotation (see pollTargets below) without meaningfully weakening the
+// fixed ranking's protection for in-flight/newest PRs.
+const PR_POLL_ROTATE_SLOTS = 1;
 // The verdict write-back. Same shape and same literal threshold as the poll: a persistent
 // inability to WRITE to the PR is exactly as serious as a persistent inability to read it,
 // because in both cases the loop looks healthy while the human on the PR sees nothing.
@@ -90,8 +102,8 @@ const PR_POST_FAIL_ESCALATE_AFTER = 3;
 // Repo root (…/services/control-plane/tower-loop → up 3) + the APPROVED Tower QA skill used
 // on merge-class turns. Both overridable via env for tests / relocated checkouts.
 const REPO_ROOT = process.env.TOWER_EVIDENCE_REPO_DIR || path.resolve(__dirname, '../../..');
-const QA_SKILL_PATH = process.env.TOWER_QA_SKILL_PATH
-  || path.join(REPO_ROOT, 'Builds', 'BUILD-010-fusion-tower', 'baton-mvp', 'tower-qa-skill.md');
+// WP-2G — resolved from codexAdapter.mjs's single exported constant, never re-derived here.
+export const QA_SKILL_PATH = process.env.TOWER_QA_SKILL_PATH || CODEX_CONTRACT_PATH;
 
 // Injectable dependencies (FIX 3 — deterministic CI doubles via env module paths). The
 // watcher resolves reviewer + git-evidence functions once at boot; a fake reviewer / fake
@@ -163,8 +175,9 @@ const REPO_SLUG_RE = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/;
  * therefore re-derives it rather than inheriting it.
  *
  * Returns `null` — never throws — when there is no usable remote. Not knowing which repository we
- * are in is a legitimate state (a detached copy, a tarball); the LOUD handling of "no repositories
- * at all" belongs one level up, where it can be seen against the other sources.
+ * are in is a legitimate state (a detached copy, a tarball — see TOWER_PR_REPOS below for exactly
+ * this case in production); the LOUD handling of "no repositories at all" belongs one level up,
+ * where it can be seen against the other sources.
  *
  * @param {object}   [opts]
  * @param {string}   [opts.cwd]   directory to interrogate; defaults to this checkout's root.
@@ -201,6 +214,33 @@ export function seedRepos(env = process.env) {
 }
 
 /**
+ * Repositories named by TOWER_PR_REPOS — the STABLE MACHINE-RUNTIME repository source, retained
+ * as a FOURTH source alongside `detectCheckoutRepo` / the store / `seedRepos` (Warwick's own
+ * instruction, WO 2026-08-05: "retain TOWER_PR_REPOS as the stable machine-runtime repository
+ * source, because the installed runtime is not a Git checkout").
+ *
+ * WHY THIS IS NOT REDUNDANT WITH `detectCheckoutRepo`, and it is worth spelling out because it
+ * looks like a duplicate source at a glance. `detectCheckoutRepo` reads `git remote get-url
+ * origin` from `cwd` — it needs an actual `.git` directory to interrogate. Tower's real machine
+ * deployment (`~/.mypka/tower-runtime/`) is a PLAIN FILE COPY, not a git checkout: there is no
+ * `origin` remote to read, so `detectCheckoutRepo` resolves `null` there every time, by design and
+ * correctly (it never throws or guesses). Without this function, that deployment would have NO
+ * durable repository source at all beyond whatever is already in the store or a seed — exactly the
+ * bootstrap gap this whole change exists to close, reopened for the one environment where it
+ * actually runs live. DO NOT "clean this up" as a duplicate of `detectCheckoutRepo` or of
+ * `seedRepos` — it is neither: it is the only source that survives a non-git deployment.
+ *
+ * Comma-separated `owner/name`, no PR number (a repo, not a PR — the shape TOWER_PR_SEED uses for
+ * its optional `#pr` suffix does not apply here, because this variable was never about one PR).
+ * Read from `process.env` fresh on every call — no caching, same discipline as `seedRepos`.
+ */
+export function explicitRepos(env = process.env) {
+  return String(env.TOWER_PR_REPOS ?? '')
+    .split(',').map((s) => s.trim()).filter(Boolean)
+    .filter((s) => REPO_SLUG_RE.test(s));
+}
+
+/**
  * Which PRs this watcher should ask GitHub about, right now.
  *
  * THE CHANGE, AND WHY THE OLD RULE WAS SELF-EXTINGUISHING. Targets used to be the distinct
@@ -216,11 +256,14 @@ export function seedRepos(env = process.env) {
  * So the cut is: **every open PR on every repository we know about is a target.** A merged or
  * closed PR is not, whatever the store or the environment says about it.
  *
- * WHERE THE REPOSITORIES COME FROM — three sources, and every one of them is durable:
+ * WHERE THE REPOSITORIES COME FROM — FOUR sources, and every one of them is durable:
  *   1. this checkout's `origin` remote        — on disk, re-read every round
  *   2. every repo named by any turn in the store — in the database, survives restart
  *   3. `TOWER_PR_SEED`                        — retained as an operator escape hatch for a repo
  *                                               that is neither of the above
+ *   4. `TOWER_PR_REPOS`                       — the stable machine-runtime source, for a
+ *                                               deployment (a plain file copy, not a git checkout)
+ *                                               where source 1 structurally cannot resolve anything
  * Source 2 deliberately reads ALL turns and NOT `state <> 'complete'`: filtering there would
  * reintroduce the self-extinguishing bug one level up, since a repo whose every turn had completed
  * would stop being asked about.
@@ -229,8 +272,21 @@ export function seedRepos(env = process.env) {
  * and, after three consecutive rounds, into a `tower_failure` alarm. It must never return an empty
  * list on error: an empty list is what a healthy idle watcher returns, and silence that looks like
  * health is the failure mode this whole change exists to remove.
+ *
+ * The cap (`limit`, default `PR_POLL_MAX_TARGETS`) bounds RANKING, never DISCOVERY: every open PR
+ * across every known repository — sources 1-4 above, with no separate cap per source — is fetched
+ * and ranked as one combined list (in-flight rounds first, then newest-first), and only then is the
+ * list truncated to `limit`. This is what stops a fourth source from silently starving a PR that a
+ * different source would have kept visible: there is one ranking and one cap, not four.
+ *
+ * WO-2026-08-05-TW3 (Gap 1) — TRUNCATION ALONE IS NOT ENOUGH. The ranking above is static:
+ * newest-first for anything not already in-flight. With more open PRs than `limit`, whatever
+ * ranks below the cutoff was dropped EVERY round, forever — `pr_poll_targets_truncated` logged
+ * the drop loudly, but nothing ever un-dropped it. A PR sitting behind `limit` higher-ranked ones
+ * was invisible to comment-polling indefinitely, even though discovery itself found it fresh
+ * every round. See the rotation logic below the sort for the fix and the bounded-rounds proof.
  */
-export async function pollTargets(pool, { gh = ghCliReader, limit = PR_POLL_MAX_TARGETS, detectRepo = detectCheckoutRepo } = {}) {
+export async function pollTargets(pool, { gh = ghCliReader, limit = PR_POLL_MAX_TARGETS, detectRepo = detectCheckoutRepo, now = Date.now } = {}) {
   // In-flight rounds, most recently active first. Used ONLY to rank targets under the cap, so a
   // PR with a review round waiting on a disposition comment is never the one dropped.
   const { rows } = await pool.query(
@@ -253,6 +309,7 @@ export async function pollTargets(pool, { gh = ghCliReader, limit = PR_POLL_MAX_
   addRepo(await detectRepo());
   for (const r of repoRows) addRepo(String(r.repo));
   for (const r of seedRepos()) addRepo(r);
+  for (const r of explicitRepos()) addRepo(r);
 
   if (repos.length === 0) {
     // Distinct from `pr_poll_no_targets`, and the distinction is the point: "there is nothing open
@@ -286,13 +343,53 @@ export async function pollTargets(pool, { gh = ghCliReader, limit = PR_POLL_MAX_
     return b.prNumber - a.prNumber;
   });
 
-  if (open.length > limit) {
+  if (open.length <= limit) return open;
+
+  // ── WO-2026-08-05-TW3 (Gap 1) — ROTATION, so a truncated PR is never PERMANENTLY invisible. ──
+  //
+  // `open` still holds every open PR here — the sort above only ordered it. Reserve most of
+  // `limit` for the fixed ranking (in-flight rounds ALWAYS fully included — a round waiting on a
+  // disposition comment must never starve merely because more PRs are open than `limit`), and let
+  // the remaining PR_POLL_ROTATE_SLOTS slot(s) rotate deterministically through the OVERFLOW —
+  // everything the fixed ranking would otherwise drop every single round.
+  //
+  // Deterministic, not random, and using ONLY already-available inputs: wall-clock time (via the
+  // injectable `now`, real Date.now() in production) and the sorted overflow list itself. NO new
+  // store, registry or table — the rotation index is RECOMPUTED from time on every call, never
+  // remembered between rounds. One tick per PR_POLL_MS of wall-clock time — the SAME cadence the
+  // watcher actually polls at (see runWatcher's `nextPrPollAt` gate) — so consecutive PRODUCTION
+  // rounds land in different ticks without needing to remember which overflow PR went last.
+  const inFlightCount = open.filter((t) => inFlight.has(`${t.repo}#${t.prNumber}`)).length;
+  // Never sacrifice an in-flight round for a rotation slot, and never exceed the cap itself.
+  const rankedSlots = Math.min(limit, Math.max(limit - PR_POLL_ROTATE_SLOTS, inFlightCount));
+  const head = open.slice(0, rankedSlots);
+  const overflow = open.slice(rankedSlots);
+  const rotateBudget = limit - head.length;
+
+  const picked = [];
+  if (rotateBudget > 0 && overflow.length > 0) {
+    const tick = Math.floor(now() / PR_POLL_MS);
+    const start = tick % overflow.length;
+    for (let i = 0; i < Math.min(rotateBudget, overflow.length); i += 1) {
+      picked.push(overflow[(start + i) % overflow.length]);
+    }
+  }
+
+  const kept = [...head, ...picked];
+  const keptKeys = new Set(kept.map((t) => `${t.repo}#${t.prNumber}`));
+  const droppedThisRound = open.filter((t) => !keptKeys.has(`${t.repo}#${t.prNumber}`));
+  if (droppedThisRound.length) {
     // The cap is real rate-limit protection, but a silent cap is the same defect in a new shape:
     // a PR that is never polled and never mentioned is invisible for exactly the same reason a
-    // merged target was.
-    log('pr_poll_targets_truncated', { considered: open.length, limit, dropped: open.slice(limit).map((t) => `${t.repo}#${t.prNumber}`) });
+    // merged target was. `rotating` names which overflow PR got this round's rotating slot(s), so
+    // the rotation itself is visible in the log, not just claimed in a comment.
+    log('pr_poll_targets_truncated', {
+      considered: open.length, limit, kept: kept.length,
+      rotating: picked.map((t) => `${t.repo}#${t.prNumber}`),
+      dropped: droppedThisRound.map((t) => `${t.repo}#${t.prNumber}`),
+    });
   }
-  return open.slice(0, limit);
+  return kept;
 }
 
 /**
@@ -305,6 +402,9 @@ export async function pollTargets(pool, { gh = ghCliReader, limit = PR_POLL_MAX_
  * see runWatcher.
  */
 export async function pollRound(pool, deps) {
+  // WO-2026-08-03-05 — pass the injected `gh` seam through so open-PR DISCOVERY runs on every real
+  // poll round. deps.gh is the same seam pollPrComments below is about to use for each target, so
+  // this is the one existing gh invocation point, not a second one.
   const targets = await pollTargets(pool, { gh: deps.gh });
   if (targets.length === 0) { log('pr_poll_no_targets'); return { targets: 0, ok: 0, failed: 0, errors: [] }; }
 
@@ -319,6 +419,14 @@ export async function pollRound(pool, deps) {
         candidates: res.candidates, checkpointsCreated: res.checkpointsCreated,
         outcomes: res.results.map((r) => r.outcome),
       });
+      // W4 (WO-2026-08-05-09) — echo every FRESHLY-applied disposition to Telegram. Only
+      // outcome==='applied' carries disposedFindingIds; a deduped re-poll of the same comment
+      // never reaches this branch, so a re-poll can never re-echo.
+      for (const r of res.results) {
+        if (r.outcome === 'applied' && Array.isArray(r.disposedFindingIds) && r.disposedFindingIds.length > 0) {
+          await sendDispositionNotifications(pool, deps, { turnId: r.turnId, disposedFindingIds: r.disposedFindingIds });
+        }
+      }
     } catch (e) {
       const msg = String(e?.message ?? e);
       errors.push({ repo, pr: prNumber, error: msg });
@@ -328,15 +436,17 @@ export async function pollRound(pool, deps) {
   return { targets: targets.length, ok, failed: errors.length, errors };
 }
 
-/** Load the APPROVED Tower QA skill (governing prompt) + its sha256 fingerprint. Fail-closed:
- *  if the skill file is missing, merge-class review is BLOCKED (never assume-and-pass). */
+/** Load + VALIDATE Codex's operating contract (governing prompt) and fingerprint the exact bytes
+ *  that will be delivered. Fail-closed: missing, empty, frontmatter-less, sentinel-less, NOT
+ *  RATIFIED, or a delivered/loaded hash mismatch all BLOCK merge-class review (never
+ *  assume-and-pass). Until WP-2G this was a bare readFileSync with no validation of any kind, so
+ *  unratified content could have run as law — the real degradation risk, not an absent file. */
 function loadQaSkill() {
-  try {
-    const text = fs.readFileSync(QA_SKILL_PATH, 'utf8');
-    return { text, fingerprint: sha256(text), path: QA_SKILL_PATH, ok: true };
-  } catch (e) {
-    return { text: null, fingerprint: null, path: QA_SKILL_PATH, ok: false, error: String(e?.message ?? e) };
-  }
+  const contract = loadCodexContract({ contractPath: QA_SKILL_PATH });
+  if (!contract.ok) return { text: null, fingerprint: null, path: QA_SKILL_PATH, ok: false, error: contract.error };
+  const provenanceError = assertDeliveredContract(contract.text, contract);
+  if (provenanceError) return { text: null, fingerprint: null, path: QA_SKILL_PATH, ok: false, error: provenanceError };
+  return { text: contract.text, fingerprint: contract.fingerprint, path: contract.contractPath, ok: true, provenance: contract.provenance };
 }
 
 function sha256(text) {
@@ -356,6 +466,151 @@ export async function openFinding(pool, { buildRef = 'BUILD-014', openedTurnId =
     [buildRef, openedTurnId, description],
   );
   return rows[0];
+}
+
+// ── W1 (WO-2026-08-05-09, WP-2E) — the wire that turns openFinding() from a dead function into
+// the live disposition machinery's front door ──────────────────────────────────────────────────
+//
+// openFinding() has existed since BUILD-014 and was called only by the acceptance harness and
+// tests — never by this live review path. Four real Codex findings (TQA-001, TQA-002, TQA-003,
+// TOWER-QA-001) sat inside tower.supervisor_review.merge_review as structured JSON while
+// tower.finding held zero rows, because nothing looped merge_review.qa.findings[] and called it.
+// This is that loop, and it is the ONLY new mechanism this Work Order adds — everything it calls
+// (openFinding, the disposition columns, the ingest grammar, the gate) already existed and was
+// already tested.
+
+/** [TQA-001] BLOCKER/ACTIVE/BLOCKS_CURRENT_MERGE — <evidence> — Required correction: <correction>
+ *  Codex's own short ref (f.id, e.g. "TQA-001") is embedded as a prefix in the free-text
+ *  `description` column so every surface that already renders it (the staged reviewer input,
+ *  the PR verdict comment, Telegram) shows BOTH ids — the tower.finding UUID the reply grammar
+ *  requires, and the ref Warwick and Codex actually talk about — with NO new column and NO
+ *  schema growth (regrowth cap; §14.7 "Named as unestablished" leaves this mapping to W1,
+ *  approved by Larry 2026-08-05 as stated). */
+export function formatMergeFindingDescription(f) {
+  const head = `[${f.id}] ${f.technical_impact ?? '?'}/${f.reachability ?? '?'}/${f.required_disposition ?? '?'}`;
+  const evidence = String(f.evidence ?? '').trim();
+  const correction = String(f.required_correction ?? '').trim();
+  const tail = [evidence, correction ? `Required correction: ${correction}` : null].filter(Boolean).join(' — ');
+  return tail ? `${head} — ${tail}` : head;
+}
+
+/**
+ * Turn a round's NEW Codex findings (merge_review.qa.findings[], per CODEX_RESULT_SCHEMA) into
+ * durable tower.finding rows via the existing openFinding(). Called ONCE, from processTurn, at
+ * the exact point a review is first persisted — never on an idempotent replay, so a restart or a
+ * lost insert race can never double-open a finding.
+ *
+ * FAIL-CLOSED ON THE ARRAY, per the Work Order. Three distinct "no findings" shapes are told
+ * apart rather than collapsed into one guess:
+ *   - not merge-class at all              → nothing to open, expected, not reported.
+ *   - merge-class but qa.findings absent  → a BLOCKED merge review (evidence unresolved, Codex
+ *                                           unreachable) never reaches CODEX_RESULT_SCHEMA at all,
+ *                                           so mergeReviewRecord.qa is a hand-built
+ *                                           { status:'blocked', ... } object with no `findings`
+ *                                           key. That is the CORRECT, expected shape for a
+ *                                           blocked round, not a defect to report.
+ *   - qa.findings present but NOT an array → genuinely malformed; logged, nothing opened, and the
+ *                                           round is NOT failed for it (a findings-loop failure
+ *                                           must never take a review round down with it).
+ * A malformed INDIVIDUAL entry (no usable `id`) is skipped and logged rather than crashing the
+ * whole loop or silently dropping the rest.
+ *
+ * NEVER THROWS.
+ *
+ * @returns {{opened: Array<{id:string, codexId:string, technical_impact:?string,
+ *            reachability:?string, required_disposition:?string, evidence:?string,
+ *            required_correction:?string}>, skipped: number, reason: string|null}}
+ */
+export async function openFindingsFromMergeReview(pool, { buildRef, turnId, mergeReviewRecord }) {
+  if (!mergeReviewRecord || mergeReviewRecord.isMergeClass !== true) {
+    return { opened: [], skipped: 0, reason: 'not-merge-class' };
+  }
+  const raw = mergeReviewRecord.qa?.findings;
+  if (raw === undefined) {
+    return { opened: [], skipped: 0, reason: mergeReviewRecord.blocked === true ? 'blocked-no-findings' : 'absent' };
+  }
+  if (!Array.isArray(raw)) {
+    log('findings_array_malformed', { turnId, buildRef, type: typeof raw });
+    return { opened: [], skipped: 0, reason: 'malformed-array' };
+  }
+  const opened = [];
+  let skipped = 0;
+  for (const f of raw) {
+    if (!f || typeof f !== 'object' || typeof f.id !== 'string' || !f.id.trim()) {
+      log('finding_entry_malformed', { turnId, buildRef, entry: JSON.stringify(f ?? null).slice(0, 200) });
+      skipped += 1;
+      continue;
+    }
+    try {
+      const description = formatMergeFindingDescription(f);
+      const row = await openFinding(pool, { buildRef, openedTurnId: turnId, description });
+      opened.push({
+        id: row.id, codexId: f.id,
+        technical_impact: f.technical_impact ?? null, reachability: f.reachability ?? null,
+        required_disposition: f.required_disposition ?? null, evidence: f.evidence ?? null,
+        required_correction: f.required_correction ?? null,
+      });
+    } catch (e) {
+      log('open_finding_failed', { turnId, buildRef, codexId: f.id, error: String(e?.message ?? e) });
+      skipped += 1;
+    }
+  }
+  return { opened, skipped, reason: null };
+}
+
+// ── W4 (WO-2026-08-05-09, WP-2E) — the disposition ECHO's read-back-after-write ────────────────
+//
+// This is the spine of the design: what Telegram renders must be provably what tower.finding
+// holds AFTER a disposing PR comment's UPDATE committed — never the text the comment PARSED in
+// memory. readDisposedFindings performs the ONLY read; sendDispositionNotifications performs the
+// ONLY compose+send. Keeping the read in its own function (rather than inlining a SELECT beside
+// the send) is what makes "renders from the store, not from what was claimed" a property a
+// mutation test can pin to a single seam.
+
+/** Re-SELECT tower.finding for exactly the ids a disposing comment just wrote. Order is
+ *  preserved to match the caller's disposedFindingIds order; ids with no matching row (should
+ *  not happen — ingestComment.mjs only reports an id here when its own UPDATE returned exactly
+ *  one row) are silently dropped rather than throwing, so one bad id cannot block the rest. */
+export async function readDisposedFindings(pool, findingIds) {
+  if (!Array.isArray(findingIds) || findingIds.length === 0) return [];
+  const placeholders = findingIds.map(() => '?').join(',');
+  const { rows } = await pool.query(
+    `select id, description, disposition, disposition_rationale, disposition_source,
+            disposition_comment_id, disposition_head_sha, disposition_at
+       from tower.finding where id in (${placeholders})`,
+    findingIds,
+  );
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  return findingIds.map((id) => byId.get(id)).filter(Boolean);
+}
+
+/**
+ * Echo every FRESHLY-applied disposition to Telegram, one message per finding, read back from
+ * the store via readDisposedFindings — never from the comment's parsed dispositions.
+ *
+ * turnId is deliberately NOT passed to notify() as the dedup key (see NOTIFY_REASONS'
+ * 'finding_disposed' comment in notify.mjs): a null turn_id is treated as distinct by the unique
+ * (turn_id, reason) index, so every disposition event gets its own message even when several
+ * land against the same round — the "ongoing thread, not a single digest" requirement.
+ *
+ * NEVER THROWS: a notify failure for one finding must not stop the others or the poll loop.
+ */
+export async function sendDispositionNotifications(pool, deps, { turnId, disposedFindingIds }) {
+  if (!Array.isArray(disposedFindingIds) || disposedFindingIds.length === 0) return [];
+  const t = await pool.query(`select build_ref, seq from tower.turn where id = ?`, [turnId]);
+  const { build_ref: buildRef, seq: turnSeq } = t.rows[0] ?? {};
+  const findings = await readDisposedFindings(pool, disposedFindingIds);
+  const doNotify = deps?.notify ?? notify;
+  const sent = [];
+  for (const finding of findings) {
+    const message = composeDispositionMessage({ buildRef, turnSeq, turnId, finding });
+    try {
+      sent.push(await doNotify(pool, { turnId: null, reason: 'finding_disposed', state: 'disposed', message }));
+    } catch (e) {
+      log('disposition_notify_failed', { turnId, findingId: finding.id, error: String(e?.message ?? e) });
+    }
+  }
+  return sent;
 }
 
 // loadOpenFindings moved to findings.mjs (WO-OR-22) — it is now imported above, alongside the
@@ -419,7 +674,7 @@ async function claimOne(pool) {
 // A merge-class turn ONLY reaches goal_complete when its Tower-QA review APPROVED against
 // real Git evidence; a blocked/unresolved QA fires tower_failure, a non-approve fires
 // codex_block_or_redirect — a prose "done" can never silently ship.
-async function fireTriggers(pool, { turnId, buildRef, turnSeq, nextState, r, blocked, goalComplete, notifyFn = notify, merge = null, larryResponse = null }) {
+async function fireTriggers(pool, { turnId, buildRef, turnSeq, nextState, r, blocked, goalComplete, notifyFn = notify, merge = null, larryResponse = null, findingsOpened = [] }) {
   const base = {
     buildRef, turnSeq, turnId, state: nextState, verdict: r.verdict,
     summary: r.summary, nextAction: r.next_action, warwickNeeded: r.warwick_needed,
@@ -454,13 +709,23 @@ async function fireTriggers(pool, { turnId, buildRef, turnSeq, nextState, r, blo
     reason = 'goal_complete'; state = 'complete'; summary = `Goal complete — ${r.summary}`;
   }
 
-  if (!reason) return []; // continue / aligned -> SILENT (no Telegram)
-  // Two SEPARATE Telegram messages (one dedup row): Larry's side of the dialogue first, THEN Codex's
-  // verdict — an actual back-and-forth on TowerBot, never one combined message. Larry's is omitted
-  // when there is no larry_response, so a pure-Codex turn still sends exactly one message.
+  const hasNewFindings = Array.isArray(findingsOpened) && findingsOpened.length > 0;
+  if (!reason) {
+    // W3 (WO-2026-08-05-09) — an otherwise-SILENT round (continue/aligned, merge QA approved or
+    // not merge-class) must still surface any findings it opened. Findings must never be
+    // silently dropped just because the overall verdict was fine.
+    if (!hasNewFindings) return []; // continue / aligned, nothing raised -> SILENT (no Telegram)
+    reason = 'findings_raised'; summary = `${r.summary}${mergeLine}`;
+  }
+  // THREE SEPARATE Telegram messages (one dedup row): Larry's side of the dialogue first, THEN
+  // Codex's verdict, THEN (W3) any NEW findings this round raised — an actual back-and-forth on
+  // TowerBot, never one combined message. Each is omitted when it has nothing to say, so an
+  // ordinary delivery round with no findings is unchanged (exactly the pre-existing two-message
+  // shape).
   const messages = [
     composeLarryMessage({ buildRef, turnSeq, turnId, larryResponse }),
     composeMessage({ ...base, state, warwickNeeded, summary }),
+    composeFindingsMessage({ buildRef, turnSeq, turnId, findings: findingsOpened }),
   ].filter(Boolean);
   return [await notifyFn(pool, { turnId, reason, state, message: messages })];
 }
@@ -677,20 +942,28 @@ export async function processTurn(pool, turnId, deps = REAL_DEPS) {
     return { turnId, reused: true, verdict: rWin.verdict, state: stateWin, notifications };
   }
 
+  // (g cont.) W1 (WO-2026-08-05-09) — the ONLY point findings are opened for this round: this
+  // insert just won, so this is the FIRST and ONLY time this review is persisted. Never on the
+  // idempotent-reuse branch above, so a restart or a lost insert race can never double-open a
+  // finding.
+  const findingsOpened = await openFindingsFromMergeReview(pool, { buildRef, turnId, mergeReviewRecord });
+
   // (h) set turn.state from the verdict.
   const nextState = VERDICT_TO_STATE[r.verdict] ?? 'reviewed';
   await pool.query(`update tower.turn set state = ?, lease_owner = null, updated_at = now() where id = ?`, [nextState, turnId]);
 
-  // (h cont.) auto-Telegram on the trigger conditions (idempotent), incl. the merge-class gate.
-  const notifications = await fireTriggers(pool, { turnId, buildRef, turnSeq, nextState, r, blocked: sup.blocked, goalComplete, notifyFn: doNotify, merge: mergeFlags, larryResponse: turnRow.larry_response });
+  // (h cont.) auto-Telegram on the trigger conditions (idempotent), incl. the merge-class gate
+  // and (W3) any findings this round opened.
+  const notifications = await fireTriggers(pool, { turnId, buildRef, turnSeq, nextState, r, blocked: sup.blocked, goalComplete, notifyFn: doNotify, merge: mergeFlags, larryResponse: turnRow.larry_response, findingsOpened: findingsOpened.opened });
 
   log('processed', {
     turnId, verdict: r.verdict, blocked: sup.blocked, state: nextState,
     injectedFindings: openFindings.length,
+    findingsOpened: findingsOpened.opened.length, findingsSkipped: findingsOpened.skipped, findingsReason: findingsOpened.reason,
     mergeClass: detection.isMergeClass, mergeBlocked: mergeFlags?.blocked ?? null, mergeVerdict: mergeFlags?.verdict ?? null,
     promptsApplied: promptsApplied.map((p) => p.name),
   });
-  return { turnId, reused: false, verdict: r.verdict, blocked: sup.blocked, state: nextState, packetHash, mergeReview: mergeReviewRecord, notifications };
+  return { turnId, reused: false, verdict: r.verdict, blocked: sup.blocked, state: nextState, packetHash, mergeReview: mergeReviewRecord, notifications, findingsOpened: findingsOpened.opened };
 }
 
 /** Compact, DB-safe summary of the Git evidence (no full diff text stored in the DB). */
