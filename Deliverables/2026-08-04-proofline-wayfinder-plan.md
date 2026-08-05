@@ -1373,9 +1373,10 @@ Genuine **external independence** · **read-only** operation · **exact-head and
 | | |
 |---|---|
 | **Phase** | **Phase 2 — Honcho and Tower as durable shared myPKA infrastructure.** IN PROGRESS |
-| **Delivered and integrated** | WP-2B(1) Honcho writer · WP-2F one canonical store · WP-2A legacy Tower retired · WP-2G Codex contract + reach proof · the constitutional amendment |
-| **Open** | **WP-2B(2)** Honcho render + frontier + install *(refused once; being amended)* · **WP-2E** TowerBot QA exchange · **WP-2C** event-driven ding · **WP-2D** UAT + first live Codex call + merge |
-| **Exact next action** | **Amend WO-2026-08-05-06 (WP-2B(2)) per Keel's read-back, and route the machine-level install half to Mack.** |
+| **Delivered and integrated** | WP-2B(1) Honcho writer · WP-2F one canonical store · WP-2A legacy Tower retired · WP-2G Codex contract + reach proof · the constitutional amendment · **WP-2B(2) render + install — COMPLETE at `eff3033`** |
+| **✅ S-1 MET** | **A fresh session in a NON-main worktree, with no project-scope hook of its own, receives a brief naming THIS map — automatically, no path typed.** Both discriminator halves hold; main worktree shows exactly **one** block (no double-fire). Hooks **MERGE** (proven), so removing the project-level duplicates was a correctness requirement. Evidence: `Deliverables/proofline/EVIDENCE-2026-08-05-wo-07-honcho-install.md` |
+| **Open** | **WP-2E** TowerBot QA exchange — **the next frontier** · then **WP-2C** event-driven ding · then **WP-2D** UAT + first live Codex call + merge |
+| **Exact next action** | ⛔ **STOP — Warwick ordered rotation preparation, 2026-08-05. Do NOT start WP-2E or WP-2C in this session.** After rotation the fresh Larry's next action is **WP-2E**, whose design is settled in **§14.7** (four wires, no new store), followed by **WP-2C** (§14.1, config-only, boundary in §13.3) |
 | **Warwick owes** | **Ratify the Codex contract wording** (it ships DRAFT and does not govern until he does) — needed **before** the UAT, not before the next work package |
 | **Gate ahead** | Veritas on the exact integrated head, against §14.0c S-1..S-5 |
 | **Phase 3** | §15. **RECORDED, NOT STARTED.** Not before Phase 2 merges and rotates |
@@ -1411,7 +1412,13 @@ Genuine **external independence** · **read-only** operation · **exact-head and
 
 **Two distinct Veritas engagements. Do not conflate them.** Step 4 asks *"is the record complete enough to survive a `/clear`?"*. Step 6 asks the mandatory question — *"can Warwick now do the thing this phase promised, in the real intended context?"* — **against the exact integrated head.** Step 4 discharges no gate.
 
-### 🚨 THE ROTATION BLOCKER — rotating today would be actively harmful
+### ✅ ROTATION BLOCKER — **DISCHARGED 2026-08-05 at `eff3033`**
+
+**The store's `focus` now reads *"BUILD-020 Phase 2 — Honcho and Tower as durable shared myPKA infrastructure. Phase 1 (Proofline) CLOSED and PASSED by Warwick 2026-08-04."*** Written via `continuity.mjs write` (`ok:true`, `state_persisted:true`, `withheld:[]`, `truncated:[]`) and **confirmed rendered in a real fresh session**. **A `/clear` no longer hands a fresh Larry a BUILD-015 orientation.** Step 3 of §14.20 is complete.
+
+**The original blocker, retained because the reasoning is the durable part:**
+
+### ~~🚨 THE ROTATION BLOCKER — rotating today would be actively harmful~~
 
 **`~/.mypka/governor/continuity.json` still says `focus: "BUILD-015 AsdAIr live-acceptance recovery…"`, 30+ hours stale, with `next_action` a full imperative BUILD-015 Gate 3 procedure.**
 
