@@ -234,14 +234,16 @@ Specialists are bound as subagents at `.claude/agents/<slug>.md` — thin shims 
 **When Warwick has authorised a session Work Package (ACTIVE SESSION WORK PACKAGE on the active Wayfinder), every Veritas phase or Work Package dispatch MUST include:**
 
 1. the active Wayfinder path;
-2. the exact **ACTIVE SESSION WORK PACKAGE** section (or a verbatim extract of its numbered requirements);
+2. the exact **ACTIVE SESSION WORK PACKAGE** section (or a verbatim extract of its **functional** numbered requirements);
 3. the exact stable integrated head under review;
-4. **every** numbered acceptance requirement from that section;
+4. **every** numbered **functional** acceptance requirement (rows 1–5 unless Warwick changed the table);
 5. **every** known residual recorded against those requirements;
-6. the instruction that Veritas returns a **separate PASS / HOLD / FAIL for each numbered requirement**;
-7. a **prohibition on narrowing** the audit to a Gate 1 slice, a product subset, or any other smaller claim **unless Warwick explicitly authorised that narrower release decision**.
+6. the instruction that Veritas returns a **separate PASS / HOLD / FAIL for each numbered functional requirement** (template: [[Templates/veritas-receipt]] § Accepted requirements);
+7. a **prohibition on narrowing** the audit to an older product slice **unless Warwick explicitly authorised that narrower release decision**.
 
-**Before Codex may be invoked**, Veritas must have confirmed at the exact current head: the complete authorised Work Package was in scope; every acceptance item was examined; no required item is partial, unestablished, deferred or only capability-proven; **CI is green**; the head did not move during review.
+**Gate 1** grades functional requirements only. **Gate 2** grades the phase North Star journey. Separate receipts. Gate 1 PASS + Gate 2 HOLD is valid.
+
+**Before Codex may be invoked**, Veritas Gate 1 must have PASS at the exact current head (or ancestor with no later in-scope product change); scope match; **CI green**; head stable. Missing/held/mismatched coverage → Codex prohibited. **Warwick’s explicit authority is still required before any Codex run.** Phase-complete merge additionally needs Gate 2 PASS.
 
 A prior Gate 1 PASS on an older head is evidence for that slice only. It is **not** merge readiness for a later complete package. **Codex is never summoned to paper over a narrow Veritas scope.**
 

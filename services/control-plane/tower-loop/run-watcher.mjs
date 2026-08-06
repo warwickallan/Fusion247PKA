@@ -41,7 +41,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { defaultDbPath } from './db.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -87,7 +87,7 @@ function stopExistingWatcher() {
     { windowsHide: true });
 }
 
-export function main() {
+export function main() { // exported for start-watcher.mjs Windows entry
   const check = validateEnv();
   if (!check.ok) {
     console.error(`[tower-cp] REFUSING TO START — missing required environment variable(s): ${check.missing.join(', ')}`);
@@ -132,6 +132,21 @@ export function main() {
 
 // THE MAIN GUARD. Everything above is inert on import; nothing below runs unless this file is the
 // process entrypoint. See note 3 in the header — this guard is the fix, not the note about it.
-if (import.meta.url === `file://${process.argv[1]}` || process.argv[1] === fileURLToPath(import.meta.url)) {
+//
+// Windows: `import.meta.url` is `file:///C:/...` while `process.argv[1]` is often a bare path
+// (`C:\...`). Comparing string forms without normalisation silently skips main() — measured
+// 2026-08-06. Resolve both to absolute filesystem paths and compare those.
+function isMainModule() {
+  if (!process.argv[1]) return false;
+  try {
+    const self = path.normalize(path.resolve(fileURLToPath(import.meta.url)));
+    const entry = path.normalize(path.resolve(process.argv[1]));
+    // Case-insensitive on Windows (drive letter / path casing can differ).
+    return self.toLowerCase() === entry.toLowerCase();
+  } catch {
+    return false;
+  }
+}
+if (isMainModule()) {
   main();
 }
