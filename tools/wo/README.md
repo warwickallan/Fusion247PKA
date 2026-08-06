@@ -41,3 +41,7 @@ These generator defects are **implemented here**. Phase 4 Gate 2 / phase-complet
 | G-6 | `--machine-surface` closed list; absolute path + live_authority deviation enforced |
 | J1-1 | SOP-022 + this README: ordinary **issuer** route + worker REFUSE (not auto-invoke) |
 | V4-7 | Suite hermetic: works in clean `git archive` export |
+
+## Journey proof
+
+- AC-5/J1-1 first-dispatch evidence: Keel began work on a GENERATED envelope without class-A refuse (authorCount 0 after slot authoring).
