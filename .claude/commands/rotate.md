@@ -32,7 +32,7 @@ You are Larry.
 
 > **His reason, and it is the whole point: deferring the report to the fresh session LOSES session-specific evidence that has not yet become a durable artefact.** A rotation is the last moment that evidence exists. **After `/clear` it is gone, and no fresh Larry can reconstruct it.**
 
-**5. Commission Pax to produce the performance/process report for the session being closed.** **Pax writes it, not Larry** — the session cannot be its own sole witness. Commission it through the normal Work Order route. **What the report must cover, at minimum:**
+**5. Commission Pax to produce the performance/process report for the session being closed.** **Pax writes it, not Larry** — the session cannot be its own sole witness. Commission it through the normal Work Order route. **What the report must cover, at minimum** (keep every existing requirement below **and** every mandatory output in the following list — they are additive, not alternatives):
 
    - **Work Order evidence** — every order issued, its verdict, and whether the worker began substantive work on first dispatch;
    - **rework and refusals** — every `REFUSE`, `CLARIFY` and amendment round trip, with the class of each and whether it was preventable;
@@ -40,6 +40,20 @@ You are Larry.
    - **parent-channel availability and queued messages** — whether the channel was reachable, and anything that queued rather than delivering;
    - **token and context economics** — measured figures read from the instrument, **never estimated**;
    - **any other recorded delivery-tax findings** from the session.
+
+   **Mandatory outputs (Warwick, 2026-08-06 — additive; every row required; no estimates):**
+
+   - **opening and closing context/token readings** (instrument values only);
+   - **total measured context/token movement** between those readings;
+   - **elapsed session time**;
+   - **per-specialist dispatch count and token usage** where the host records it;
+   - **evidenced allocation** across: product implementation · Work Order/admin · assurance/evidence · rework · waiting;
+   - **parent-channel availability, response latency and queued Warwick messages** where measurable;
+   - **Work Order first-dispatch success, amendments, refusals and preventable-failure analysis**;
+   - **documentation-versus-product change volume** across the complete session range;
+   - **explicit `UNESTABLISHED`** for every metric the host does not expose.
+
+   **Same session identity for both artefacts.** The Git Markdown report and the Supabase payload (step 7 / 7b) **must describe the same session, branch and exact closing head** — no mismatched SHAs, no partial ranges, no second invented window.
 
 **6. WAIT for Pax's return.** **Do not proceed to the continuity publish without it.** A commissioned worker whose return you never read is unbanked work — step 1's rule applies to this dispatch as much as any other.
 
