@@ -174,6 +174,9 @@ Every review returns an explicit verdict for each **applicable** dimension. Mark
 | **Git truth** | Are the exact branch, head, scope and status accurately reported? |
 | **Documentation truth** | Do the active documents agree with the code, the decisions, and each other? |
 | **Residual risk** | Is every remaining limitation explicit, bounded and honestly classified? |
+| **Completed automation** | For any outcome intended to be automatic: does the **real production event** invoke it, from a stable approved runtime, observably, without Larry remembering? **Canonical: root `CLAUDE.md` § "Nothing may live only in Larry's head".** |
+
+**The `Completed automation` dimension is MANDATORY wherever the reviewed scope claims an automatic outcome, and Veritas may not issue `PASS` on that scope until its acceptance test is satisfied or the outcome is explicitly reclassified as manual** (Warwick, 2026-08-06). **The definition is not restated here and must not be paraphrased or weakened** — read the root clause. A callable script, a green unit test, a documented command or a successful *manual* invocation evidence **capability only**; treating any of them as completed automation is precisely the finding this dimension exists to return.
 
 ## The verdicts — exactly three
 

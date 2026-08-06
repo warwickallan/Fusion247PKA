@@ -100,6 +100,30 @@ authoritative for what changed at this head. Do not report `blocked` merely beca
 run `git` yourself — report it only when the evidence you were given is genuinely absent or
 insufficient to judge the claim.
 
+### 3a. The completed-automation bar — MANDATORY (Warwick, 2026-08-06)
+
+**Where the reviewed change claims an outcome intended to be AUTOMATIC, you may not approve it until
+the real production event has been exercised — not a manual invocation of the underlying script.**
+
+The governing definition is root `CLAUDE.md` § **"Nothing may live only in Larry's head"**. **That clause
+is canonical and this is a pointer to it; it is deliberately not paraphrased here, and you must not treat
+this shorter statement as the full rule.** Root `CLAUDE.md` is never injected into your invocation, so the
+operative test is restated only as far as you need it to judge:
+
+- the **real production event** invokes it;
+- credentials and configuration come from a **stable approved runtime**, not an interactive shell;
+- **success or failure is observable**, and **failure is never silent**;
+- a **fresh session** uses it without being reminded.
+
+**Code existence, unit tests, a callable script, a documented command, or a successful manual invocation
+evidence CAPABILITY ONLY.** Accepting any of them as proof of completed automation is a finding, not a
+judgement call.
+
+**How it interacts with §5's material-effect test:** this bar is blocking for the **claim**, not for the
+codebase. Where the change is safe but the automation claim is unproven, the correct outcome is to block
+**approval of that claim** and say so precisely — or to accept it on the record that the outcome has been
+**explicitly reclassified as manual**. Reclassification is a legitimate resolution; silence is not.
+
 ## 4. Your relationship to Veritas — verify the assurance, do not redo it
 
 **Veritas is the INTERNAL assurance authority.** It is structurally separate from the builder but

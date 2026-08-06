@@ -1742,3 +1742,106 @@ All three investigations have landed and their findings are recorded above. **WP
 ### Parked, deliberately, so it is a decision and not an omission
 
 **D-2..D-6** (Veritas) · **the Nolan actor-change proposal**, unratified at `c2ebda4`, **do not merge or amend** · **C-1..C-15** in `Deliverables/BACKLOG.md` · **the eighth generator field** that would close the order-not-at-its-own-head defect · **frontier-change-triggers-continuity**, §16.10 · the 318-vs-331 neighbour count.
+
+---
+
+# 17. ⭐ PHASE-COMPLETION CONTRACT — set by Warwick, 2026-08-06. **THIS IS NOW THE LIVE FRONTIER.**
+
+> **His instruction, verbatim in effect:** *"record that before this phase finishes, the following must all be complete and verified true."* **Some of it may already be done. Nothing here is complete on assertion — each line is complete only when verified true.**
+>
+> **Also his, and it binds the route:** *"Do not offer an option menu and do not reopen completed Honcho work unless the fresh-session journey itself fails."* **The 2026-08-06 fresh-session journey did NOT fail** — orientation recovered this map and the frontier from the Honcho pointer with `Continue` as the only input. **Honcho is therefore CLOSED and is not to be reopened.**
+
+## 17.0 What this session had in flight when the contract arrived — stood down, recorded not buried
+
+| | |
+|---|---|
+| **In flight** | A Work Order for **C-11** (`notify-snapshot-consumers.yml` permanently red by design) was drafted for Keel and **not dispatched** |
+| **Stood down because** | JOB 1 requires the authoring route to be repaired **before** the first real order, which is the acceptance test. Dispatching C-11 on the unrepaired route would have **spent the acceptance test** on it |
+| **Genuine preflight catch, retained as evidence** | Keel's contract permits `.github/workflows/<service>-tests.yml` — **`notify-snapshot-consumers.yml` is not that shape.** A class-A contract conflict caught **before** dispatch, not discovered after. **This is the preflight working, and it is exactly the defect class JOB 1 §2 must generate rather than leave to prose** |
+
+## 17.1 JOB 1 — finish the Work Order authoring repair
+
+### The ratification boundary — restated because it is the thing most likely to be quietly re-crossed
+
+**The Nolan-per-order checker proposal remains PARKED and unratified at `c2ebda4`. Do NOT merge, recreate or apply it.** No Nolan contract, SOP-022 actor, `agent-index` or shim change is authorised. **The Phase-3 branch independently verified zero governing Nolan changes.** **Nolan remains an occasional structural/audit role, never a routine checker on every Work Order.**
+
+**This supersedes §16.9's approved-Option-A route as a thing to implement.** §16.9 records what was approved on 2026-08-05; **2026-08-06 parks it unratified.** The later instruction governs.
+
+### What exists today — established, not assumed
+
+| # | Fact |
+|---|---|
+| **J1-a** | `tools/wo/envelope.mjs` **deterministically copies** canonical tools, surfaces, standing authority defaults, git authority, worktree state and producible-evidence constraints |
+| **J1-b** | It correctly fails unknown fields as `UNRESOLVED` |
+| **J1-c** | It prevents **11 of 41 scored historical defects — 27% BY DEFECT**, while touching **8 of 13 affected orders — 62% BY ORDER**. ⚠️ **Warwick: *"Never quote either rate without its unit."*** The two numbers measure different things and a bare "27%" or "62%" is a misreport |
+| **J1-d** | It does **NOT** reach acceptance-property or reasoning defects |
+| **J1-e** | It has **no automatic production caller** and currently depends on **Larry remembering** to invoke and use it |
+| **J1-f** | **The first genuine Work Order after this respawn is the initial live acceptance test** |
+
+### The eight requirements — all must be complete and verified true
+
+| # | Requirement |
+|---|---|
+| **J1-1** | Canonical envelope generation is an **unavoidable part of Larry's ordinary dispatch route** — not a remembered optional command |
+| **J1-2** | **`contract_basis` is GENERATED** from canonical contract/surface extraction, not authored prose |
+| **J1-3** | **Standing defaults are not retyped.** Orders carry **only authorised deviations**, each explicitly escalated |
+| **J1-4** | **The Work Order exists at the governance head it declares BEFORE the worker is dispatched** |
+| **J1-5** | Larry authors **only** the variable outcome, scope, acceptance, evidence and sequencing |
+| **J1-6** | A **same-context final reread of the complete issued text** is retained before dispatch |
+| **J1-7** | **Reduce or remove fields that add ceremony without changing execution**, using the existing replay evidence. **Do not add another checker, actor, service or governance layer** |
+| **J1-8** | **Prove the route with the first real Work Order: the worker begins substantive work on FIRST dispatch without a preventable Class-A refusal** |
+
+**Warwick on what J1-8 does and does not establish:** *"A single successful order is initial acceptance, not proof of a permanent trend. Record subsequent real orders as accumulating evidence."* **And the failure route is named in advance: if preventable Class-A defects persist, REDUCE THE FORMAT FURTHER — do not resurrect Nolan-per-order.**
+
+## 17.2 JOB 2 — make the Larry ding genuinely event-driven
+
+**His diagnosis:** *"The current `larry-ding.mjs` is only a script Larry remembers to call, and its credentials depend on the invoking shell. That is not durable automation."*
+
+**Confirmed by execution this session, and the cause was NOT what §16.11 recorded.** §16.11 step 1 said *"the credentials are not loaded."* **They were present on disk the entire time.** The failing invocation simply never handed them to node — `--env-file` was omitted, so the script fell through its own gate. Control: same script, same machine, **without** the flag → `{"ok":false,"why":"missing token/chat (names only)"}` exit 2; **with** it → credentials resolve, exit 0. **A real send then delivered: `{"ok":true,"message_id":320}`.** No credential value was read, echoed or logged.
+
+**That repair is capability, NOT completed automation** — precisely the distinction §17.3 now makes canonical. The channel still works only when a caller remembers a flag.
+
+### Required outcome — every line must be verified true
+
+| # | Requirement |
+|---|---|
+| **J2-1** | **Defined events invoke the ding automatically** |
+| **J2-2** | Events include **Warwick action/decision required** and **substantive milestone, gate result or breakage** |
+| **J2-3** | **Routine progress narration does NOT ding** |
+| **J2-4** | **Credentials/configuration come from the approved stable runtime, not an interactive shell** |
+| **J2-5** | **Delivery success AND delivery failure are durably observable** |
+| **J2-6** | **Failure is never silent** |
+| **J2-7** | **No daemon or new service** unless the existing event/milestone route genuinely cannot provide the trigger |
+| **J2-8** | **Prove a real phone delivery from a fresh session caused by the REAL EVENT** — without Larry being reminded and without manually running the underlying script |
+
+### 🚨 Known blocker on the J2 surface — a `permission`, and it is Warwick's
+
+**The Claude Code auto-mode classifier DENIES writes into `C:\.fusion247\**`**, hit this session attempting to make `larry-ding.mjs` self-sufficient. **And GL-012 §4 independently bars dispatching any specialist there** — the script sits at the **secrets-store root**, which is never a valid `private_surface` grant. **So the surface is closed to Larry by the classifier and closed to every worker by GL-012.** J2-4's "approved stable runtime" must therefore resolve this, not route around it. **Dinged to Warwick 2026-08-06 as an A/B decision; unanswered at the time of writing.**
+
+**Related and already recorded: C-9** — the governor writes **no log** when a continuity packet fails to deliver. **J2-5 and J2-6 are the same requirement arriving from a second direction**, and a fix that satisfies one should be checked against the other rather than built twice.
+
+## 17.3 ⚖️ STANDING CANONICAL LAW — *"Nothing may live only in Larry's head"*
+
+**Warwick supplied the exact block and instructed that it be added to root `CLAUDE.md` as the SOLE canonical definition.** That is his explicit approval and his exact text, which is what root `CLAUDE.md`'s *"no silent constitutional self-modification"* clause requires. **The independent review of the resulting patch is still owed** and is discharged by this phase's existing route — Veritas on the exact integrated head, Codex at PR level. **Larry does not self-certify it.**
+
+**Where it lives:** root `CLAUDE.md`, canonical, once.
+
+**Five projections, each POINTING to the root clause — *"must not paraphrase or weaken it"*:**
+
+| # | Surface | What it binds |
+|---|---|---|
+| **L-1** | **Larry contract** | completion and dispatch bar |
+| **L-2** | **Veritas contract** | **mandatory PASS dimension** |
+| **L-3** | **Codex contract** (`services/control-plane/review/prompts/`) | **mandatory PR-review bar** |
+| **L-4** | **Work Order template / SOP-022** | mandatory acceptance clause for intended automation |
+| **L-5** | **Wayfinder template / start contract** | **automated outcomes remain FRONTIER until the canonical test passes** |
+
+**The prohibitions, his words:** *"No new control plane. No Nolan routine checker. No manual steps disguised as automation. Build to the Star."*
+
+## 17.4 Frontier
+
+**§17 is the live frontier. JOB 1 then JOB 2, in that order, plus the §17.3 law and its five projections.**
+
+**Ordering constraint that is easy to get wrong:** J1-8 consumes the **first genuine Work Order** as its acceptance test. **Do not spend it on unrelated queue work** — C-11 was stood down for exactly this reason (§17.0).
+
+**Nothing in §17 is complete on Larry's assertion.** §17.3 is the law that says so, and it applies to §17 itself.

@@ -356,6 +356,13 @@ datastore, or asking what the change actually needs to touch. On current evidenc
 more scrutiny than the returned work does — which is what the research predicted, pointing at the
 commissioner rather than the worker.
 
+**Add one question to the issuer's check, for any order whose outcome is intended to be automatic:
+*would a manual invocation of the thing being built satisfy these acceptance criteria?* If yes, the order
+is under-specified — rewrite the acceptance around the real production event, or state explicitly that the
+outcome is manual.** Canonical definition: root `CLAUDE.md` § **"Nothing may live only in Larry's head"**;
+the mandatory acceptance clause is in [[Templates/work-order]]. **This is a question Larry asks himself
+inside the existing preflight — it creates no new checker, actor or gate** (Warwick, 2026-08-06).
+
 ## References
 
 - [[Templates/work-order]] — the canonical Work Order shape and the read-back block. Canonical there.

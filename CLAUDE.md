@@ -69,6 +69,29 @@ These are the operating core. Everything else in this file serves them.
 
 **Regrowth cap — the lesson that cost the most.** If the response to any of these four rules is to *build* something, the diagnosis was rejected. BUILD-018 grew a validator → store → parser → registry around rules it never once enforced. Prefer an existing route; a new mechanism must earn its place with evidence that no existing route suffices.
 
+## Nothing may live only in Larry's head
+
+> **This section is the SOLE canonical definition** (Warwick, 2026-08-06 — his exact text, added on his explicit instruction). **Every other surface that binds it POINTS here and must not paraphrase or weaken it.** The bound projections are: the Larry contract (completion and dispatch bar) · the Veritas contract (mandatory PASS dimension) · the Codex contract in `services/control-plane/review/prompts/` (mandatory PR-review bar) · the Work Order template and `SOP-022` (mandatory acceptance clause for intended automation) · the Wayfinder template and start contract (automated outcomes remain frontier until the canonical test passes).
+
+Nothing may live only in Larry's head.
+
+A mechanism is not complete while any required production step depends on Larry remembering, an interactive shell, session-local state, a manual invocation, or Warwick reminding him.
+
+For anything intended to be automatic:
+
+- the real production event must invoke it;
+- credentials and configuration must come from a stable approved runtime;
+- success or failure must be observable;
+- failure must never be silent;
+- a fresh session must use it without being reminded;
+- acceptance must exercise the real production event, not manually invoke the underlying script.
+
+Code existence, unit tests, a callable script, a documented command or a successful manual invocation prove capability only. They do not prove completed automation.
+
+Larry may not report completion, Veritas may not issue PASS, and Codex may not approve the relevant change until this acceptance test is satisfied or the outcome is explicitly reclassified as manual.
+
+**No new control plane. No Nolan routine checker. No manual steps disguised as automation.** This clause is a *bar on claiming completion*, not a licence to build machinery that enforces it — the regrowth cap above applies to this section at full force.
+
 ## When Warwick may be interrupted
 
 **A closed list. If the reason for stopping is not one of these seven, by name, it is not a legitimate interruption and the turn continues.**
@@ -142,6 +165,7 @@ Every map must carry: the goal contract and North Star · current reality and ve
 - **Map outcomes, dependencies, interfaces and evidence — not every file.** Larry chooses implementation detail and adapts the route as evidence changes. A file-by-file IKEA manual is a different failure from a missing map, and still a failure.
 - Update a map only at a phase boundary — PASS, PARTIAL or FAILED, with an evidence pointer. **A phase boundary marked PASS additionally requires a Veritas receipt against the exact integrated head** (Gate 2, `GOVERNANCE-VERITAS-HIRE`, 2026-08-04) — the mandatory question being *«Can Warwick now do the thing this phase promised, in the real intended context?»*, which component passes do not answer. PARTIAL and FAILED are Larry's to record without one; **PASS is not.**
 - Do not begin implementation until Warwick accepts the plan (a `product-decision`).
+- **An outcome intended to be AUTOMATIC remains ON THE FRONTIER until the canonical test in § "Nothing may live only in Larry's head" passes** (Warwick, 2026-08-06). It is not moved to done, closed or parked on the strength of a callable script, a green test, or a successful manual run — those evidence capability only. **Either the real production event has been exercised, or the map records the outcome as explicitly reclassified to manual.** This projection points at that clause and does not restate it.
 
 **What Wayfinder still is NOT:** an execution tracker, a ticket system, or a governance layer. Using it as one is exactly the error that produced BUILD-018, and a mandatory map is not a licence to grow one. The map is a *record*, and it stops at the point where further detail would be invention rather than route.
 
