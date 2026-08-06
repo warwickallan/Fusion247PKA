@@ -905,6 +905,36 @@ export function issuabilitySnapshotFooter(authorCount, unresolvedCount) {
  * G-6 — machine-install orders. Closed list of absolute machine paths; never matched against
  * repo contract patterns (that would fabricate a grant — MUT-10 class defect).
  */
+export function isAbsoluteMachinePath(p) {
+  if (typeof p !== 'string') return false;
+  const s = p.trim();
+  if (!s) return false;
+  // Windows drive, UNC, or POSIX absolute. Reject relative and bare names.
+  if (/^[A-Za-z]:[\\/]/.test(s)) return true;
+  if (s.startsWith('\\\\') || s.startsWith('//')) return true;
+  if (s.startsWith('/')) return true;
+  return false;
+}
+
+export function validateMachineSurfaces(machineSurfaces, deviations = []) {
+  const errors = [];
+  if (!Array.isArray(machineSurfaces) || machineSurfaces.length === 0) {
+    return { ok: true, errors };
+  }
+  for (const s of machineSurfaces) {
+    if (!isAbsoluteMachinePath(s)) {
+      errors.push(`machine_surface not absolute: ${JSON.stringify(s)}`);
+    }
+  }
+  const liveDev = deviations.find((d) => d.field === 'live_authority');
+  if (!liveDev || !liveDev.value || liveDev.value === 'none') {
+    errors.push('machine_surface requires --deviate live_authority=<bounded value> (not none)');
+  } else if (!liveDev.authority) {
+    errors.push('machine_surface live_authority deviation requires --deviation-authority');
+  }
+  return { ok: errors.length === 0, errors };
+}
+
 export function machineSurfaceBasis(machineSurfaces) {
   return machineSurfaces.map((surface) => ({
     surface,
@@ -932,6 +962,15 @@ export function generateOrder({
       ok: false,
       fatal: `governance head ${headCheck.reason}. NO ORDER EMITTED.`,
       reason: headCheck.reason,
+    };
+  }
+
+  const machineCheck = validateMachineSurfaces(machineSurfaces, deviations);
+  if (!machineCheck.ok) {
+    return {
+      ok: false,
+      fatal: `machine_surface validation failed: ${machineCheck.errors.join('; ')}. NO ORDER EMITTED.`,
+      reason: machineCheck.errors.join('; '),
     };
   }
 
@@ -1188,9 +1227,9 @@ export function parseDeviations(raw, authority) {
 const USAGE = `usage: node tools/wo/envelope.mjs --owner <slug> --governance-head <sha> [options]
        node tools/wo/envelope.mjs --count-markers <file>
 
-ORDINARY DISPATCH ROUTE (J1-1): every Work Order issued to a specialist MUST be produced by
-this generator (or regenerated after material amendment). Workers REFUSE orders that lack the
-ORDER_MARKER provenance header (SOP-022). This is not optional tooling — it is the dispatch path.
+ORDINARY DISPATCH ROUTE (J1-1): the ordinary issuer path is this generator (then bare-slot
+authoring + --count-markers). Workers REFUSE orders that lack the ORDER_MARKER (SOP-022).
+This is discipline + refuse-gate, not an auto-invoking service.
 
   --owner <slug>              the specialist the order is for
   --governance-head <sha>     the commit whose contracts govern. VERIFIED TO EXIST; no bypass

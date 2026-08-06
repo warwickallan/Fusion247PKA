@@ -1,6 +1,6 @@
 # Work Order envelope generator — ordinary dispatch route
 
-**J1-1:** generation is part of ordinary dispatch, not an optional remembered command.
+**J1-1 (honest form):** the **ordinary** way to issue a Work Order is to run this generator, author bare slots, recompute markers, then dispatch. That is **issuer discipline + worker REFUSE of unmarked orders** (SOP-022) — **not** an auto-invoking daemon, SessionStart hook, or control plane. Capability is this CLI; the route is complete when Larry uses it every time and workers refuse anything else.
 
 ```bash
 # Produce a complete order (repo surfaces)
@@ -12,7 +12,7 @@ node tools/wo/envelope.mjs \
   --surface 'tools/wo/**' \
   --out Deliverables/proofline/WO-….md
 
-# Machine-install order (G-6)
+# Machine-install order (G-6) — absolute paths only; live_authority deviation required
 node tools/wo/envelope.mjs \
   --owner mack \
   --governance-head "$(git rev-parse HEAD)" \

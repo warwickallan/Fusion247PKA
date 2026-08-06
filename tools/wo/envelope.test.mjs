@@ -281,6 +281,25 @@ test('G-6 — machine_surface emits closed list and does not require repo file_s
   assert.match(r.text, /^live_authority: BOUNDED/m);
 });
 
+test('G-6 — relative machine_surface or missing live_authority deviation is fatal', () => {
+  const rel = E.generateOrder({
+    ...orderSpec(),
+    surfaces: [],
+    machineSurfaces: ['relative/path.mjs'],
+    deviations: [{ field: 'live_authority', value: 'BOUNDED', authority: 'test' }],
+  });
+  assert.equal(rel.ok, false);
+  assert.match(rel.fatal, /not absolute/);
+  const noDev = E.generateOrder({
+    ...orderSpec(),
+    surfaces: [],
+    machineSurfaces: ['C:/Users/Buggly/.mypka/governor/ding.mjs'],
+    deviations: [],
+  });
+  assert.equal(noDev.ok, false);
+  assert.match(noDev.fatal, /live_authority/);
+});
+
 // ---------------------------------------------------------------------------
 // FIELD 7 — producible evidence. The check that would have caught WO-11.
 // ---------------------------------------------------------------------------

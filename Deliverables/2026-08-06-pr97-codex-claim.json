@@ -1,0 +1,20 @@
+{
+  "checkpoint_id": "build-020-phase4-pr97",
+  "build_id": "BUILD-020",
+  "wp_id": "phase4-closure-gate1",
+  "brief_ref": "Deliverables/2026-08-06-phase4-closure-wp-evidence.md",
+  "summary": "BUILD-020 Phase 4 closure Work Package is integrated on build-020/phase4-automation-law: Work Order envelope generator repairs G-1 through G-6, J1-1 ordinary dispatch route (SOP-022), hermetic suite 64/64 under git-archive isolation, AC-5 counting definition; dual-harness specialist-return cue scripts and registrations for Claude and Grok; FusionDevBot installed-path durable send re-proven; session-report schema and populate mechanism for /rotate; Tower watcher observed live. Veritas Gate 1 PASS at a1e124a. Phase Gate 2 / phase-complete is NOT claimed — residuals (hooks-trust, Supabase green populate, cold-start, AC-5 streak accrual) remain open and must not be treated as delivered automation.",
+  "brief_excerpt": "Acceptance for Codex PR review (Gate 1 product only):\n1. tools/wo/envelope.mjs implements G-1..G-6 and J1-1 route documentation without inventing a new control plane; tests 64/64 hermetic.\n2. Return-cue scripts dual-normalise Claude/Grok payloads; never auto-send Telegram; zero model classify.\n3. FusionDevBot path is installed ding.mjs with credentials self-loaded; failure not silent.\n4. No false claim that Phase 4 is complete or that live Grok hooks-fire / Supabase green populate / watcher cold-start are proven.\n5. Secrets not committed; private_surface none on this surface.\n6. Blocking findings only where they name an unsafe current next action.",
+  "scoped_to": [
+    "tools/wo/**",
+    ".claude/hooks/**",
+    ".claude/settings.json",
+    ".claude/commands/rotate.md",
+    ".grok/hooks/**",
+    "tools/session-report/**",
+    "Team Knowledge/SOPs/SOP-022-work-order-preflight.md",
+    "Deliverables/2026-08-06-phase4-closure-wp-evidence.md",
+    "Deliverables/2026-08-06-veritas-build020-gate1-pass-a1e124a-receipt.md",
+    "Deliverables/2026-08-04-proofline-wayfinder-plan.md"
+  ]
+}
