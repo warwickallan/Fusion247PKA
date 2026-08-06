@@ -63,6 +63,22 @@ describe('return-cue Option A', () => {
     assert.equal(isParentPayload({ agent_id: null }), true);
     assert.equal(isParentPayload({ agent_id: '' }), true);
     assert.equal(isParentPayload({ agent_id: 'a515f57fcfad85cbd' }), false);
+    // Grok camelCase
+    assert.equal(isParentPayload({ agentId: 'x', toolName: 'run_terminal_command' }), false);
+    assert.equal(isParentPayload({ toolName: 'run_terminal_command' }), true);
+  });
+
+  it('buildMarker accepts Grok camelCase SubagentStop payloads', async () => {
+    const { buildMarker } = await import('./return-cue-write.mjs');
+    const m = buildMarker({
+      hookEventName: 'subagent_stop',
+      sessionId: 'grok-sess',
+      agentId: 'g1',
+      agentType: 'keel',
+    });
+    assert.equal(m.session_id, 'grok-sess');
+    assert.equal(m.agent_id, 'g1');
+    assert.equal(m.agent_type, 'keel');
   });
 
   it('formatCue uses specialist text and falls back without inventing', () => {

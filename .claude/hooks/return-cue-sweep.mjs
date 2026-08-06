@@ -63,7 +63,9 @@ async function main() {
     } catch {
       process.exit(0);
     }
-    const sessionId = payload.session_id ? String(payload.session_id) : null;
+    const sessionId = payload.session_id || payload.sessionId
+      ? String(payload.session_id || payload.sessionId)
+      : null;
     sweepStateDir(stateDirFromEnv(), sessionId);
   } catch {
     // never break SessionStart

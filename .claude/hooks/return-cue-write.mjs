@@ -17,15 +17,29 @@ export function stateDirFromEnv(env = process.env) {
   return join(root, '.claude', 'state', 'return-cues');
 }
 
+/** Normalise Claude snake_case and Grok camelCase hook payloads to one shape. */
+export function normalizeHookPayload(raw) {
+  if (!raw || typeof raw !== 'object') return {};
+  return {
+    ...raw,
+    hook_event_name: raw.hook_event_name || raw.hookEventName || null,
+    session_id: raw.session_id || raw.sessionId || null,
+    agent_id: raw.agent_id || raw.agentId || null,
+    agent_type: raw.agent_type || raw.agentType || null,
+    tool_name: raw.tool_name || raw.toolName || null,
+  };
+}
+
 export function buildMarker(payload, now = new Date()) {
-  if (!payload || typeof payload !== 'object') return null;
-  const agentId = payload.agent_id;
+  const p = normalizeHookPayload(payload);
+  if (!p || typeof p !== 'object') return null;
+  const agentId = p.agent_id;
   if (agentId == null || agentId === '') return null;
-  const sessionId = payload.session_id;
+  const sessionId = p.session_id;
   if (sessionId == null || sessionId === '') return null;
-  const agentType = payload.agent_type == null || payload.agent_type === ''
+  const agentType = p.agent_type == null || p.agent_type === ''
     ? 'unknown'
-    : String(payload.agent_type);
+    : String(p.agent_type);
   return {
     session_id: String(sessionId),
     agent_id: String(agentId),

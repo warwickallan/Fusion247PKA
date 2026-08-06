@@ -32,9 +32,23 @@ export function textPathFromEnv(env = process.env) {
   return join(here, 'return-cue-text.json');
 }
 
+/** Claude snake_case + Grok camelCase → one shape. */
+export function normalizeHookPayload(raw) {
+  if (!raw || typeof raw !== 'object') return {};
+  return {
+    ...raw,
+    hook_event_name: raw.hook_event_name || raw.hookEventName || null,
+    session_id: raw.session_id || raw.sessionId || null,
+    agent_id: raw.agent_id || raw.agentId || null,
+    agent_type: raw.agent_type || raw.agentType || null,
+    tool_name: raw.tool_name || raw.toolName || null,
+  };
+}
+
 export function isParentPayload(payload) {
-  if (!payload || typeof payload !== 'object') return false;
-  const id = payload.agent_id;
+  const p = normalizeHookPayload(payload);
+  if (!p || typeof p !== 'object') return false;
+  const id = p.agent_id;
   return id == null || id === '';
 }
 
@@ -126,7 +140,8 @@ export function buildAdditionalContext(claimed, cueTable) {
 }
 
 export function hookEventName(payload) {
-  return payload?.hook_event_name || 'PreToolUse';
+  const p = normalizeHookPayload(payload);
+  return p.hook_event_name || 'PreToolUse';
 }
 
 export function emitContext(eventName, text) {
@@ -153,8 +168,9 @@ async function main() {
     } catch {
       process.exit(0);
     }
-    if (!isParentPayload(payload)) process.exit(0);
-    const sessionId = payload.session_id;
+    const p = normalizeHookPayload(payload);
+    if (!isParentPayload(p)) process.exit(0);
+    const sessionId = p.session_id;
     if (!sessionId) process.exit(0);
 
     const stateDir = stateDirFromEnv();
@@ -170,7 +186,8 @@ async function main() {
 
     const text = buildAdditionalContext(claimed, table);
     if (text) {
-      emitContext(hookEventName(payload), text);
+      // Grok accepts the same hookSpecificOutput.additionalContext vocabulary as Claude.
+      emitContext(hookEventName(p), text);
     }
     releaseClaims(claimed);
   } catch {

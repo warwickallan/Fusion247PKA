@@ -43,23 +43,26 @@ You are Larry.
 
 **6. WAIT for Pax's return.** **Do not proceed to the continuity publish without it.** A commissioned worker whose return you never read is unbanked work — step 1's rule applies to this dispatch as much as any other.
 
-**7. Write and commit the report as a Git artefact under `Deliverables/`.** ⛔ **NOT Google Drive. NOT Google Sheets. NOT a Supabase row.** The repository is the durable store, and a report that lives anywhere else is not recoverable from Git and the map alone — which is step 9's first bar.
+**7. Write and commit the report as a Git artefact under `Deliverables/`.** ⛔ **NOT Google Drive. NOT Google Sheets as the only store.** The repository Markdown Deliverable is the human-readable durable report. **Also build a machine payload** (`Deliverables/YYYY-MM-DD-session-report-payload.json`) with the same session, branch and closing head fields for Supabase population (step 7b).
 
-**8. Add the report POINTER to the active Wayfinder**, and commit it. The map must name the report by path, so the fresh session finds it without being told.
+**7b. Populate Supabase from the same evidence** — `node tools/session-report/populate.mjs --file <payload.json>`. Schema: `tools/session-report/schema.sql`. Credentials self-load from the approved runtime. **Success and failure must both be visible** (stdout/stderr JSON + `~/.mypka/governor/session-report-populate.jsonl`). A credentials-absent or post failure is a **recorded FAIL**, never silent success. Do not invent a green outcome.
+
+**8. Add the report POINTER to the active Wayfinder**, and commit it. The map must name the report by path **and the closing head**, so the fresh session finds it without being told.
 
 ---
 
-**9. Publish continuity through the INSTALLED production Honcho write path** — `~/.mypka/governor/continuity.mjs write`, never a repo copy. **Derive every field from the updated Wayfinder, not from narrative memory.** Step 2 happens before this for exactly that reason: the map is the source, the packet is a pointer to it. **The packet must carry the report pointer too.**
+**9. Publish continuity through the INSTALLED production Honcho write path** — `~/.mypka/governor/continuity.mjs write`, never a repo copy. **Derive every field from the updated Wayfinder, not from narrative memory.** Step 2 happens before this for exactly that reason: the map is the source, the packet is a pointer to it. **The packet must carry the report pointer and exact closing head.**
 
 **10. Read it back through the INSTALLED production Honcho reader** — `~/.mypka/governor/continuity.mjs read`. **A write that reports success is not a delivery. Only the read-back is evidence.**
 
-**11. Verify the read-back MATCHES the Wayfinder** on four things: **map path · phase/frontier · exact next action · the report pointer.** Compare them; do not eyeball one and assume the rest.
+**11. Verify the read-back MATCHES the Wayfinder** on: **map path · phase/frontier · exact next action · the report pointer · closing head.** Compare them; do not eyeball one and assume the rest.
 
-**12. Return `SAFE TO CLEAR`** only when **all six** hold:
+**12. Return `SAFE TO CLEAR`** only when **all seven** hold:
    - the work is recoverable from Git and the map alone;
    - **no required worker result is outstanding**;
    - Git state is durable — pushed, or deliberately not and classified as such;
    - **the report Deliverable EXISTS on disk and is committed**;
+   - **Supabase population succeeded OR failed visibly with a durable log line** (never silent);
    - **the report pointer is in the Wayfinder and in the packet**;
    - **the Honcho read-back matches.**
 
@@ -76,8 +79,8 @@ You are Larry.
 ## Bars
 
 - **No new mechanism.** This wraps what exists.
-- **The session report is a GIT ARTEFACT under `Deliverables/`.** ⛔ **Never Google Drive, never Google Sheets, never a Supabase row** (Warwick, 2026-08-06). Anything outside the repository fails the first `SAFE TO CLEAR` bar — *recoverable from Git and the map alone.*
-- **Do NOT build Supabase reporting inside `/rotate`.** Populating or querying these reports in Supabase is **a separate job for a fresh session**, explicitly deferred by Warwick. Adding it here is the regrowth cap firing.
+- **The session report is a GIT ARTEFACT under `Deliverables/`.** That remains the human-readable SSOT. Supabase is a **mirror populated from the same payload** (Warwick WP, 2026-08-06) — never the only store, never a second inventing source of truth.
+- **Supabase population runs at `/rotate` step 7b** via `tools/session-report/populate.mjs`. Visible success or visible failure only.
 - **Pax writes the report; Larry does not.** A session grading its own performance is the thing this step exists to avoid. **Larry commissions, waits, commits and points at it.**
 - **Never report `SAFE TO CLEAR` with the report missing.** It is a hard bar, not a nice-to-have — **the evidence it captures ceases to exist at `/clear`**, which is the entire reason the step is inside the transaction rather than after it.
 - **Never report `SAFE TO CLEAR` on a write result alone.** The read-back is the evidence, and this is the whole reason the command exists.

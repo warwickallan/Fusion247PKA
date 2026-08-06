@@ -17,7 +17,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, mkdtempSync, rmSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdtempSync, rmSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -229,11 +229,12 @@ test('git prose with no anchor is UNKNOWN, never an inferred grant', () => {
 // ---------------------------------------------------------------------------
 
 test('worktree at the governance head is confirmed; a mismatch is stated as a fact', () => {
-  const head = E.worktreeCheck(REPO, null);
+  const { gitRoot, head: headSha } = ensureGitHeads();
+  const head = E.worktreeCheck(gitRoot, null);
   assert.equal(head.state, 'no-head');
-  const good = E.worktreeCheck(REPO, head.head);
+  const good = E.worktreeCheck(gitRoot, head.head || headSha);
   assert.equal(good.state, 'match');
-  const bad = E.worktreeCheck(REPO, '0000000000000000000000000000000000000000');
+  const bad = E.worktreeCheck(gitRoot, '0000000000000000000000000000000000000000');
   assert.equal(bad.state, 'mismatch');
   assert.match(bad.value, /^MISMATCH/);
 });
@@ -242,6 +243,42 @@ test('an absent worktree is reported as absent, never assumed present', () => {
   const r = E.worktreeCheck(join(HERE, 'no-such-worktree-anywhere'), 'abc');
   assert.equal(r.state, 'absent');
   assert.match(r.value, /^ABSENT/);
+});
+
+test('G-2 — missing worktree input is absent-input, never supplied+verified', () => {
+  const env = E.resolveEnvelope({ root: REPO, owner: 'keel', governanceHead: 'x', worktree: null });
+  const wt = env.fields.find((f) => f.key === 'worktree');
+  assert.equal(wt.source, 'absent-input');
+  assert.match(wt.value, /no worktree supplied/);
+});
+
+test('G-4 — producible_evidence is labelled worker tool grant, not product authority', () => {
+  const e = E.producibleEvidence(E.toolGrant(REPO, 'pax').tools);
+  assert.match(e.value, /^WORKER TOOL GRANT \(not product authority\)/);
+});
+
+test('G-5 — countMarkers recomputes after slots are filled; snapshot footer is not live', () => {
+  const r = E.generateOrder(orderSpec());
+  assert.match(r.text, /SNAPSHOT AT GENERATION \(not a live claim\)/);
+  const before = E.countMarkers(r.text);
+  assert.ok(before.authorCount > 0);
+  const filled = r.text.replace(/AUTHOR REQUIRED — name\b/, 'demo-slice');
+  const after = E.countMarkers(filled);
+  assert.equal(after.authorCount, before.authorCount - 1);
+});
+
+test('G-6 — machine_surface emits closed list and does not require repo file_surface', () => {
+  const r = E.generateOrder({
+    ...orderSpec(),
+    surfaces: [],
+    machineSurfaces: ['C:/Users/Buggly/.mypka/governor/ding.mjs'],
+    deviations: [{ field: 'live_authority', value: 'BOUNDED — ~/.mypka/governor/** only', authority: 'test' }],
+  });
+  assert.equal(r.ok, true);
+  assert.equal(r.isMachineInstall, true);
+  assert.match(r.text, /^machine_surface:/m);
+  assert.match(r.text, /machine_surface — absolute machine path/);
+  assert.match(r.text, /^live_authority: BOUNDED/m);
 });
 
 // ---------------------------------------------------------------------------
@@ -399,7 +436,52 @@ const L_GRANT_BEARING = ['permitted', 'gitAuthority'];
 const L_EMPTY_BLOB = 'e69de29bb2d1d6434b8b29ae775ad8c2e48c5391';
 // A well-formed SHA that is not a commit anywhere.
 const L_ABSENT_HEAD = '0123456789012345678901234567890123456789';
-const HEAD_SHA = execFileSync('git', ['-C', REPO, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+
+/** Hermetic HEAD — real repo when present; otherwise init a throwaway git in a temp dir linked by tests that need git. */
+function tryGit(args, cwd = REPO) {
+  try {
+    return execFileSync('git', args, {
+      cwd,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+  } catch {
+    return null;
+  }
+}
+
+let HEAD_SHA = tryGit(['rev-parse', 'HEAD']);
+let PARENT_SHA = tryGit(['rev-parse', 'HEAD~1']);
+let _initedArchiveGit = false;
+
+/**
+ * V4-7 hermeticity: a clean `git archive` export has no `.git`. Tests must still fully execute.
+ * When REPO is not a git worktree, initialise a minimal two-commit repo *inside REPO* so
+ * contract paths and governance-head verification share one root. Never run this when `.git`
+ * already exists (the normal developer worktree).
+ */
+function ensureGitHeads() {
+  if (HEAD_SHA && PARENT_SHA) return { head: HEAD_SHA, parent: PARENT_SHA, gitRoot: REPO };
+  if (!_initedArchiveGit && !existsSync(join(REPO, '.git'))) {
+    execFileSync('git', ['init'], { cwd: REPO, stdio: 'ignore' });
+    execFileSync('git', ['config', 'user.email', 'wo-test@example.com'], { cwd: REPO, stdio: 'ignore' });
+    execFileSync('git', ['config', 'user.name', 'wo-test'], { cwd: REPO, stdio: 'ignore' });
+    const marker = join(REPO, '.wo-envelope-test-marker');
+    writeFileSync(marker, 'parent\n');
+    execFileSync('git', ['add', '.wo-envelope-test-marker'], { cwd: REPO, stdio: 'ignore' });
+    execFileSync('git', ['commit', '-m', 'wo-test-parent'], { cwd: REPO, stdio: 'ignore' });
+    writeFileSync(marker, 'head\n');
+    execFileSync('git', ['add', '.wo-envelope-test-marker'], { cwd: REPO, stdio: 'ignore' });
+    execFileSync('git', ['commit', '-m', 'wo-test-head'], { cwd: REPO, stdio: 'ignore' });
+    _initedArchiveGit = true;
+  }
+  HEAD_SHA = tryGit(['rev-parse', 'HEAD']);
+  PARENT_SHA = tryGit(['rev-parse', 'HEAD~1']);
+  assert.ok(HEAD_SHA && PARENT_SHA, 'hermetic git fixture must produce two commits');
+  return { head: HEAD_SHA, parent: PARENT_SHA, gitRoot: REPO };
+}
+
+ensureGitHeads();
 
 // ---------------------------------------------------------------------------
 // The THREE strings — F-5 extended. A slot is not an unknown.
@@ -543,41 +625,44 @@ test('a real head verifies and resolves to a full commit SHA', () => {
 // from the DESCENDANT, so the mandated layout used to render MISMATCH — the check firing on
 // the honest case.
 test('S-4 — the worktree may DESCEND FROM the governance head, not only equal it', () => {
-  const parent = execFileSync('git', ['-C', REPO, 'rev-parse', 'HEAD~1'], { encoding: 'utf8' }).trim();
-  const r = E.worktreeCheck(REPO, parent);
+  const { gitRoot, head, parent } = ensureGitHeads();
+  const r = E.worktreeCheck(gitRoot, parent);
   assert.equal(r.state, 'match', 'a descendant worktree is the CORRECT layout, not a mismatch');
   assert.equal(r.relation, 'descendant');
   assert.match(r.value, /DESCENDS FROM/);
-  const equal = E.worktreeCheck(REPO, HEAD_SHA);
+  const equal = E.worktreeCheck(gitRoot, head);
   assert.equal(equal.state, 'match');
   assert.equal(equal.relation, 'equal');
 });
 
 test('S-4 — an unrelated or unknown head is still a MISMATCH, and the two are distinguished', () => {
-  const unknown = E.worktreeCheck(REPO, L_ABSENT_HEAD);
+  const { gitRoot } = ensureGitHeads();
+  const unknown = E.worktreeCheck(gitRoot, L_ABSENT_HEAD);
   assert.equal(unknown.state, 'mismatch');
   assert.equal(unknown.relation, 'unknown-object');
-  const empty = execFileSync('git', ['-C', REPO, 'hash-object', '-t', 'tree', '/dev/null'], { encoding: 'utf8' }).trim();
-  assert.ok(empty.length === 40, 'sanity: an object SHA is 40 hex');
 });
 
 // ---------------------------------------------------------------------------
 // S-1 / S-3 / S-5 — the emitted order. AC1, AC4.
 // ---------------------------------------------------------------------------
 
-const ORDER_SPEC = {
-  root: REPO,
-  owner: 'keel',
-  governanceHead: HEAD_SHA,
-  worktree: REPO,
-  branch: 'wo/18-envelope-route',
-  surfaces: ['tools/wo/envelope.mjs', 'tools/wo/envelope.test.mjs'],
-  actions: ['push the assigned branch'],
-  now: new Date('2026-08-06T00:00:00.000Z'),
-};
+function orderSpec(overrides = {}) {
+  const { head } = ensureGitHeads();
+  return {
+    root: REPO,
+    owner: 'keel',
+    governanceHead: head,
+    worktree: REPO,
+    branch: 'wo/18-envelope-route',
+    surfaces: ['tools/wo/envelope.mjs', 'tools/wo/envelope.test.mjs'],
+    actions: ['push the assigned branch'],
+    now: new Date('2026-08-06T00:00:00.000Z'),
+    ...overrides,
+  };
+}
 
 test('AC1 — the emitted order is a complete file, and every field is sourced, marked or slotted', () => {
-  const r = E.generateOrder(ORDER_SPEC);
+  const r = E.generateOrder(orderSpec());
   assert.equal(r.ok, true);
   const t = r.text;
 
@@ -601,7 +686,8 @@ test('AC1 — the emitted order is a complete file, and every field is sourced, 
   }
 
   // Every non-variable line is TRACEABLE, a marked slot, or an UNRESOLVED marker.
-  const traceable = ['keel', 'larry', 'report-only', 'draft', HEAD_SHA];
+  const { head } = ensureGitHeads();
+  const traceable = ['keel', 'larry', 'report-only', 'draft', head];
   for (const line of t.split('\n')) {
     const m = line.match(/^([a-z_]+): (.+)$/);
     if (!m) continue;
@@ -612,17 +698,20 @@ test('AC1 — the emitted order is a complete file, and every field is sourced, 
       traceable.includes(value) ||
       Object.values(L_STANDING_DEFAULTS).includes(value) ||
       value.startsWith('wo/') ||
-      value.startsWith('C:/');
+      value.startsWith('C:/') ||
+      value.startsWith('WORKER TOOL GRANT');
     assert.ok(ok, `untraceable, unmarked value in the emitted order: ${line}`);
   }
 
   assert.ok(r.authorCount > 0, 'a generated order must still ask Larry for the five things only he can write');
   assert.equal(r.unresolvedCount, 0, 'keel at a real head resolves every generated field');
-  assert.match(t, /NOT ISSUABLE while either count is above zero/);
+  // G-5 — footer is a SNAPSHOT, not a live issuability claim
+  assert.match(t, /SNAPSHOT AT GENERATION \(not a live claim\)/);
+  assert.match(t, /--count-markers/);
 });
 
 test('AC1 — contract_basis in the emitted order is GENERATED, one entry per surface and action', () => {
-  const r = E.generateOrder(ORDER_SPEC);
+  const r = E.generateOrder(orderSpec());
   const block = r.text.split('contract_basis:')[1].split('\ncontract_conflicts:')[0];
   assert.match(block, /- surface: tools\/wo\/envelope\.mjs/);
   assert.match(block, /- surface: tools\/wo\/envelope\.test\.mjs/);
@@ -632,7 +721,7 @@ test('AC1 — contract_basis in the emitted order is GENERATED, one entry per su
 });
 
 test('AC4 — with no deviation the standing defaults are GENERATED, not retyped, and never omitted', () => {
-  const r = E.generateOrder(ORDER_SPEC);
+  const r = E.generateOrder(orderSpec());
   const t = r.text;
   // Present, as real YAML keys. Omitting `private_surface` would be a security regression:
   // it is GL-012's only route to a worker that inherits nothing else.
@@ -648,22 +737,23 @@ test('AC4 — with no deviation the standing defaults are GENERATED, not retyped
 
 test('AC4 — a deviation renders ADDITIONALLY, with an escalation note naming its authority', () => {
   const r = E.generateOrder({
-    ...ORDER_SPEC,
+    ...orderSpec(),
     deviations: [{ field: 'private_surface', value: 'C:/.fusion247/private/proofline/**', authority: 'Warwick, 2026-08-06' }],
   });
-  assert.match(r.text, /^private_surface: C:\/\.fusion247\/private\/proofline\/\*\*    # DEVIATION from the standing default `none`$/m);
-  assert.match(r.text, /#   ESCALATION: Warwick, 2026-08-06/);
+  // G-1 — bare value; deviation note is a sibling comment
+  assert.match(r.text, /^private_surface: C:\/\.fusion247\/private\/proofline\/\*\*$/m);
+  assert.match(r.text, /# DEVIATION from standing default `none`\. ESCALATION: Warwick, 2026-08-06/);
   // The other four are untouched.
   assert.match(r.text, /^credential_scope: none$/m);
 });
 
 test('AC4 — a deviation with no named authority leaves a SLOT, never a silent blank', () => {
-  const r = E.generateOrder({ ...ORDER_SPEC, deviations: [{ field: 'network', value: 'outbound-https' }] });
-  assert.match(r.text, /#   ESCALATION: AUTHOR REQUIRED — deviation_authority:/);
+  const r = E.generateOrder({ ...orderSpec(), deviations: [{ field: 'network', value: 'outbound-https' }] });
+  assert.match(r.text, /ESCALATION: AUTHOR REQUIRED — deviation_authority:/);
 });
 
 test('the provenance header records the blob SHA of every canonical source actually read', () => {
-  const r = E.generateOrder(ORDER_SPEC);
+  const r = E.generateOrder(orderSpec());
   const header = r.text.split('-->')[0];
   assert.match(header, new RegExp(L_ORDER_MARKER.replace(/[/.]/g, '\\$&')));
   for (const rel of ['Team Knowledge/Templates/work-order.md', 'Team/Keel - Implementation Engineer/AGENTS.md', '.claude/agents/keel.md', 'tools/wo/envelope.mjs']) {
@@ -681,7 +771,8 @@ test('S-5 — the inlined contract pages become citations, and nothing is silent
   const get = (k) => env.fields.find((f) => f.key === k).value;
   const contract = readContract('Keel - Implementation Engineer');
 
-  for (const key of ['prohibited_file_surface', 'critical_rules']) {
+  // G-3 — permitted and prohibited both cited (SSOT symmetry)
+  for (const key of ['permitted_file_surface', 'prohibited_file_surface', 'critical_rules']) {
     const v = get(key);
     assert.match(v, /^CITED — /, `${key} must be a citation`);
     assert.match(v, /@ blob [0-9a-f]{12}/, 'a citation must name the bytes it cites');
@@ -697,8 +788,8 @@ test('S-5 — the inlined contract pages become citations, and nothing is silent
   // R-31's prevention survives: the STATE word is still in the value.
   assert.match(get('git_authority'), /^GRANTED — /);
   assert.equal(E.gitAuthority(REPO, 'nolan').value, L_GIT_SILENT, 'silence is still determinate');
-  // permitted_file_surface stays INLINE — it is what contract_basis matching rests on.
-  assert.ok(contract.includes(get('permitted_file_surface')));
+  // G-3 — permitted is cited, but the body it cites remains extractable for contract_basis matching.
+  assert.ok(contract.includes(surf.permitted), 'permitted body must still be verbatim-extractable for basis matching');
 });
 
 test('S-5 — an UNRESOLVED surface stays UNRESOLVED and is never dressed as a citation', () => {
@@ -823,15 +914,16 @@ test('MUT-12 the authoring marker collapsed into the UNRESOLVED marker', async (
 });
 
 test('MUT-13 the standing defaults omitted from the emitted order', async () => {
+  // Target the G-1-shaped loop (bare values; comments live elsewhere).
   const mutant = await loadMutant(
-    "  for (const field of STANDING_DEFAULT_FIELDS) {\n    const dev = deviated.get(field);\n    if (!dev) {\n      authorityLines.push(`${field}: ${defaults[field]}`);\n      continue;\n    }",
+    "  for (const field of STANDING_DEFAULT_FIELDS) {\n    const dev = deviated.get(field);\n    if (!dev) {\n      // G-1 — bare value on its own line; no prose glued to the scalar.\n      authorityLines.push(`${field}: ${defaults[field]}`);\n      continue;\n    }",
     "  for (const field of STANDING_DEFAULT_FIELDS) {\n    const dev = deviated.get(field);\n    if (!dev) {\n      continue;\n    }",
   );
-  const bad = mutant.generateOrder(ORDER_SPEC);
+  const bad = mutant.generateOrder(orderSpec());
   assert.doesNotMatch(bad.text, /^private_surface: none$/m, 'mutant should drop the field');
   await assertMutantBreaks(
     mutant,
-    (m) => assert.match(m.generateOrder(ORDER_SPEC).text, /^private_surface: none$/m),
+    (m) => assert.match(m.generateOrder(orderSpec()).text, /^private_surface: none$/m),
     'MUT-13 private_surface is GL-012\'s only route to a worker that inherits nothing else',
   );
 });

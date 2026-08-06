@@ -2325,35 +2325,48 @@ node "C:/Users/Buggly/.mypka/governor/ding.mjs" <message-file>
 
 ## 17.4 Frontier
 
-## ⭐ THE LIVE FRONTIER — 2026-08-06 post-rotation. **This is the single statement. Read this, not §17.5's table.**
+## ⭐ THE LIVE FRONTIER — 2026-08-06 Phase 4 closure WP. **This is the single statement.**
 
 | | |
 |---|---|
 | **Map** | `Deliverables/2026-08-04-proofline-wayfinder-plan.md` — this file |
-| **Branch / worktree** | `build-020/phase4-automation-law` · `C:\Fusion247PKA-build-020-trial` — **PUSHED.** ⚠️ **Verify HEAD by execution; this map has recorded a stale SHA four times** |
-| **Phase** | **BUILD-020 Phase 4 — INTEGRATED, NOT PASSED.** **Veritas `HOLD`** on the phase question, twice, at `89602f3` and `b267d55` |
-| **§9 probe** | ✅ **EXECUTED** on host `2.1.222` → **`BUILD`**. Evidence: `Deliverables/2026-08-06-s9-agent-id-probe-evidence.md` |
-| **Session report** | 📄 **`Deliverables/2026-08-06-session-performance-report.md`** (Pax) |
-| **Receipts** | `Deliverables/2026-08-06-veritas-build020-phase4-receipt.md` · `Deliverables/2026-08-06-veritas-build020-phase4-rereview-b267d55-receipt.md` |
-| **Merged to `main`?** | **NO. Nothing merged. No PR. `main` untouched.** |
+| **Branch / worktree** | `build-020/phase4-automation-law` · `C:\Fusion247PKA-build-020-trial` — **PUSHED.** ⚠️ **Verify HEAD by execution** |
+| **Phase** | **BUILD-020 Phase 4 — INTEGRATED, NOT PASSED.** Closure WP in flight; **do not claim phase complete** while residual items below are open |
+| **Closure evidence** | 📄 **`Deliverables/2026-08-06-phase4-closure-wp-evidence.md`** |
+| **§9 / WO-22** | ✅ §9 **BUILD** on `2.1.222` · ✅ Option A scripts shipped · dual-harness registration present |
+| **WO generator** | ✅ **G-1..G-6, J1-1, V4-7 hermetic (64/64), AC-5 definition** — see closure evidence |
+| **FusionDevBot** | ✅ installed path proven (`message_id` 333, blob match, ding-log) |
+| **Session report** | 📄 prior: `Deliverables/2026-08-06-session-performance-report.md` · Supabase schema+populate **mechanism** landed |
+| **Receipts** | prior Veritas HOLD receipts still on branch; **new Veritas owed on the closure head** |
+| **Merged to `main`?** | **NO. No PR yet.** |
 
 ### 🎯 THE EXACT NEXT ACTION
 
-**Integrate WO-22 at the current tip and decide the Phase 4 closure path** against still-open items (J1-1, AC-5 counting rule, reminder-hook A/B/C, Veritas re-review of the new exact head). **Do not re-run the §9 probe unless the host version changes.**
+1. **Veritas** on the exact integrated closure head (this tip after push).  
+2. Open **PR** and run **Codex** at PR level (≤3 budget).  
+3. Bring **merge-decision** to Warwick.  
+4. Residual activation (do not block Veritas, do block "phase complete"): `/hooks-trust` on this worktree · apply `tools/session-report/schema.sql` + runtime Supabase credentials · cold-start proof of Tower watcher if demanded.
 
-**Just completed:** §9 → **BUILD** · WO-22 Option A reduced **implemented** (Larry Rule 4 exception after Keel `REFUSE` on `.claude/**`) · evidence `Deliverables/proofline/EVIDENCE-2026-08-06-wo-22-return-cue.md` · unit **10/10** · host `2.1.222`.
+### ✅ Closed this WP (banked)
 
-### ⏸️ Awaiting Warwick — do NOT decide these
+- Work Order generator repairs **G-1..G-6**, **J1-1**, hermetic suite, **AC-5 definition**  
+- Return-cue shared scripts + Claude settings + Grok `.grok/hooks/return-cue.json`  
+- FusionDevBot durable send path re-proven  
+- `/rotate` steps for Supabase mirror population  
+- Watcher observed live (PID + log cadence)
 
-1. **The AC-5 counting rule** — does a clean order the generator has no shape for (`WO-20`) break the streak, sit outside it, or count? **AC-5 may already be met; Larry may not pick the favourable reading.**
-2. **The reminder-hook option** — A (accept dispatch-time), B (`Stop` hook, risks noise), or **C (Larry's recommendation: the hook is a partial aid, Rule 4a is the control)**.
-3. **`G-1`..`G-6`** — the generator's remaining defects, chiefly *bare values with prose in a sibling comment*.
-4. **Supabase performance-reporting** — explicitly deferred by Warwick to a session after this `/clear`. **Not built.**
+### ⏸️ Residual (honest — phase NOT complete)
 
-### 📌 Parked, deliberately — each a decision, not an omission
+| Item | State |
+|---|---|
+| Grok **live** host hook fire | needs `/hooks-trust` on `C:\Fusion247PKA-build-020-trial` + session reload |
+| Supabase **successful** populate | credentials + schema apply |
+| Tower **cold-start** without Warwick | not exercised (live process proven only) |
+| Reminder-hook option A/B/C | still Warwick's product call if he wants to retire dispatch-time aid |
+| Veritas + Codex + merge | **next** |
 
-**J1-1 is OPEN** (nothing makes generation unavoidable) · **`V4-7`** `envelope.test.mjs` is not hermetic — **fix inside the next WO-tooling work, not as its own order** (Veritas's own advice) · **`V4-9`** `tower-qa-skill.md` §3a paraphrases — **Warwick's, as external reviewer law** · **C-1..C-15** in `Deliverables/BACKLOG.md`, untouched all session · **C-11** stood down at §17.0 and still stood down · **Veritas D-2..D-6** from Phase 3 · **the legacy `C:/.fusion247/larry-ding.mjs`** — two paths to one channel, unfixable from either side.
+### 📌 Still parked (not this WP)
 
-**Ordering constraint that still holds:** the candidate queue does **not** get picked up mid-closure.
+**V4-9** tower-qa-skill paraphrase · **C-1..C-15** backlog · legacy `C:/.fusion247/larry-ding.mjs` dual path · Veritas D-2..D-6 from Phase 3 where still open.
 
-**Nothing in §17 is complete on Larry's assertion.** §17.3 is the law that says so, and it applies to §17 itself.
+**Nothing in §17 is complete on Larry's assertion.** §17.3 still binds.
