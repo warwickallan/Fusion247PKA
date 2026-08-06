@@ -1224,7 +1224,9 @@ Keel's four class-A refusals were all correct. The work divides:
 
 ## 15.4 Route — the fresh Larry's to own, not this session's
 
-**Not designed here.** Two things worth noting so the next session does not rediscover them: token attribution must be honest about what the evidence **cannot** show, and the Google Drive write is an **outward action** needing its own consideration. **Warwick has not authorised a specific Drive location, and no mechanism for this exists — the regrowth cap applies to it exactly as to everything else.**
+**Not designed here.** One thing worth noting so the next session does not rediscover it: token attribution must be honest about what the evidence **cannot** show.
+
+⛔ **CORRECTED 2026-08-06 (Veritas `V5-1`) — the THIRD live Google Drive instance.** This paragraph also read *"the Google Drive write is an outward action needing its own consideration."* **There is no Google Drive write on this route.** The report is a **GIT artefact under `Deliverables/`**, produced inside `/rotate` — `.claude/commands/rotate.md` is the operative procedure and §17.5a is canonical. ⚠️ **Larry claimed this contradiction was "corrected in both places". That was a COMPLETENESS CLAIM and it was WRONG** — a third instance survived, in the very section describing the route for the artefact `/rotate` is about to produce.
 
 ---
 
@@ -2055,7 +2057,9 @@ All three investigations have landed and their findings are recorded above. **WP
 
 ### ✅ ESTABLISHED BY EXECUTION — Larry's probe, 2026-08-06
 
-**Method:** `SubagentStop` hook registered in the **UNTRACKED** `.claude/settings.local.json`, three trivial background agents dispatched (one alone, then two concurrently), full stdin payload captured each time, probe then removed. **The tracked `.claude/settings.json` was never modified; `git status .claude/` clean afterwards.**
+**Method:** `SubagentStop` hook registered in the **UNTRACKED** `.claude/settings.local.json`, three trivial background agents dispatched (one alone, then two concurrently), full stdin payload captured each time, probe then removed.
+
+⚠️ **How far that claim is corroborated, stated exactly (Veritas `V5-5`, accepted):** git confirms `settings.json`'s last change is the `$CLAUDE_PROJECT_DIR` path fix at `755536e`, that no probe commit touches it, and that `settings.local.json` is untracked and gitignored. **But a transient uncommitted edit-and-revert is NOT DISPROVABLE BY GIT.** So the honest form is *"not contradicted by git"*, **not** *"proven"* — and `S-1`..`S-4` are **builder evidence Veritas could not reproduce** (`V5-4`: it holds no hook registration and no `Task`). **The raw payload file is untracked and ephemeral: the findings survive in this map, the payloads do not.**
 
 | # | Finding |
 |---|---|
@@ -2138,7 +2142,16 @@ node "C:/Users/Buggly/.mypka/governor/ding.mjs" <message-file>
 | **E-8** | **Overstated the projection count** — "five projections" is four surfaces plus a self-reference | **Veritas V4-5** | §17.3 above |
 | **E-9** | **Described the attention correction as delivered** when its hook was never observed to fire at the reviewed head and was not reclassified as manual | **Veritas V4-4** | §17.8, reclassified |
 
-**The pattern worth Pax's attention, stated without excuse: SEVEN of the nine were caught by someone else — a specialist read-back or the assurance gate — and only E-5 was caught by Larry.** **The two that no reviewer could have caught (E-4) were caught by Warwick.** **A worker read-back and an independent gate are, on this session's evidence, the load-bearing controls; Larry's self-review caught almost nothing.**
+| **E-10** | **Committed `34d0cd0` while the branch was under assurance**, moving the head mid-review so the receipt no longer covered the branch tip | **Veritas V4-10** | ⚠️ **ADDED 2026-08-06 on Veritas `V5-2`** — it had appeared only as the *rationale* for a later sequencing decision, framed as Veritas's finding rather than as Larry's error |
+| **E-11** | **Claimed the Google Drive contradiction was "corrected in both places."** A **third** live instance survived at §15.4 — in the very section describing the route for the artefact `/rotate` produces | **Veritas V5-1** | Corrected 2026-08-06 |
+
+**The pattern worth Pax's attention, stated without excuse: NINE of the eleven were caught by someone else** — a specialist read-back or the assurance gate — **and only E-5 was caught by Larry.** **The two no reviewer could have caught (E-4) were caught by Warwick.** **A worker read-back and an independent gate are, on this session's evidence, the load-bearing controls; Larry's self-review caught almost nothing.**
+
+> ### 🚨 The shape Veritas named, and it is worth more than either defect
+>
+> **`E-10` and `E-11` are both SWEEPS REPORTED AS EXHAUSTIVE.** *"Corrected in both places"* and *"EVERY Larry error this session"* are **completeness claims**, and **both were false when written.** ⚠️ **The defect is not the missed instance — it is the word "every".** A partial sweep honestly labelled partial costs a reader nothing; **a partial sweep labelled complete stops them looking.**
+>
+> **This belongs in the rotation report** (Veritas's own instruction) **and it generalises well past this session:** the same failure produced the three competing frontiers §12 records, and it is the reason a completeness claim should either be mechanically enumerated or stated as *"the instances I found"*.
 
 **⛔ PAX IS UNTOUCHED UNTIL `/rotate` RUNS. No commission, no reconnaissance, no evidence gathering, no drafting before then.** Warwick's constraint still binds: *"Do not launch a separate report investigation before the Work Order route is ready — the Pax commission is also the first live acceptance test of that repaired route."* **The commission IS the investigation.**
 
