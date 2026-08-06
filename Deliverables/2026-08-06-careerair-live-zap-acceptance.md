@@ -37,10 +37,12 @@ private_surface: C:\.fusion247\private\careerair\**
 `src/email/auth.mjs` now accepts both `x-careerair-token` and `Authorization: Bearer`.  
 Auth rejections record **header names only** (never values) for next diagnosis.
 
-## Residual (account / Zapier config)
+## Correction (Warwick, 2026-08-06)
 
-Warwick to confirm both Zaps send header **X-CareerAIR-Token** (or Bearer) and re-Test.  
-Ding #344 describes the fix. No paid plan change.
+**There are no Zaps.** Microsoft Outlook app connection on Zapier MCP ≠ a workflow. Dashboard has no published Zaps.  
+Automatic Outlook → CareerAIR is **NOT live**.  
+`missing_token` rows **must not** be attributed to a CareerAIR Zap; source **unidentified**.  
+No further email fixtures / Zapier task burn until a published Opportunities Zap exists and is tested.
 
 ## Not blocked for interim product claims
 

@@ -2398,9 +2398,9 @@ Any newly discovered **unrelated** defect: record once in [[Deliverables/BACKLOG
 
 ### 🎯 THE EXACT NEXT ACTION
 
-1. **Unblock Gate 1 row 2:** fix Zapier Webhooks headers so POSTs include `X-CareerAIR-Token` (or `Authorization: Bearer`); ledger currently shows `missing_token` for inbound Zap-window POSTs. Re-Test until one `accepted` delivery. Ding **#344**.  
-2. **CI green** at exact tip (runners were queued/NOT RUN at Gate 1).  
-3. **Re-run Veritas Gate 1** at new tip if product advanced → then **Codex** → merge decision pack. Gate 2 already **HOLD** (valid with WP progress). Do not merge without Warwick.
+1. **Create first Zap (Opportunities only)** — none exist yet. MCP Outlook connection is not a Zap. Wait for Warwick to publish + Test until one `accepted` delivery. Application Updates Zap only after Opportunities passes.  
+2. **CI green** at exact tip.  
+3. **Re-run Veritas Gate 1** after live Zap acceptance → **Codex** → merge decision pack. Gate 2 already **HOLD**. Do not merge without Warwick.
 
 ### 📌 NEXT WORK PACKAGE (record only — do not execute in this Grok session)
 
