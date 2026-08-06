@@ -446,6 +446,132 @@ test('AC1 — an inherited environment alone is NOT enough: with no file, it sti
   }
 });
 
+// ---- J2-c: the file is the ONLY source of credentials, at EVERY exit -------
+//
+// WHY THIS TABLE EXISTS. A mutation that made `loadCredentials` fall back to the inherited
+// environment when the file was present-but-incomplete SURVIVED the original suite. So did
+// the same fallback on the unreadable-file branch. Two of the four exits were pinned and
+// two were not, and the unpinned pair defeats J2-c itself — a path that silently prefers
+// shell-supplied credentials when its own file is incomplete is precisely the shell
+// dependence this job exists to remove.
+//
+// The fix is enumeration, not two more spot tests: EVERY exit that can fail to produce
+// credentials is exercised with both names ALSO present in process.env, and the branch
+// inventory is pinned below so a new branch added later cannot be silently unpinned.
+
+// Written in the scanner's designated placeholder shape — A-Z and underscores only, which
+// `secret-assigned-to-sensitive-name` explicitly allowlists. The first draft used hyphens
+// and the scanner correctly flagged it (exit 1) as a secret-shaped value assigned to a
+// TOKEN-named key. This is the control's intended exemption, not a way around it.
+const INHERITED_DECOY = {
+  TELEGRAM_BOT_TOKEN: 'DECOY_INHERITED_TOKEN_MUST_NEVER_BE_USED',
+  AUTHORISED_TELEGRAM_USER_ID: 'DECOY_INHERITED_CHAT_ID_NEVER_USED',
+};
+
+const CREDENTIAL_FAILURE_BRANCHES = [
+  {
+    branch: 'file-absent',
+    outcome: 'credentials-file-absent',
+    envPath: (t) => t.path('absent.env'),
+  },
+  {
+    branch: 'file-unreadable',
+    outcome: 'credentials-file-unreadable',
+    envPath: (t) => {
+      mkdirSync(t.path('a-directory-not-a-file'));
+      return t.path('a-directory-not-a-file');
+    },
+  },
+  {
+    branch: 'token-name-missing',
+    outcome: 'credentials-missing-names',
+    envPath: (t) => credsFile(t, { omit: ['TELEGRAM_BOT_TOKEN'] }),
+  },
+  {
+    branch: 'chat-id-name-missing',
+    outcome: 'credentials-missing-names',
+    envPath: (t) => credsFile(t, { omit: ['AUTHORISED_TELEGRAM_USER_ID'] }),
+  },
+  {
+    branch: 'both-names-missing',
+    outcome: 'credentials-missing-names',
+    envPath: (t) => credsFile(t, { omit: CREDENTIAL_NAMES }),
+  },
+  {
+    branch: 'name-present-but-blank',
+    outcome: 'credentials-missing-names',
+    envPath: (t) => {
+      const p = t.path('blank.env');
+      writeFileSync(p, `TELEGRAM_BOT_TOKEN=\nAUTHORISED_TELEGRAM_USER_ID=${FAKE_CHAT_ID}\n`, 'utf8');
+      return p;
+    },
+  },
+];
+
+for (const scenario of CREDENTIAL_FAILURE_BRANCHES) {
+  test(`J2-c — ${scenario.branch}: an inherited environment must NOT rescue it`, async () => {
+    const t = tmp();
+    try {
+      // The production hazard being pinned: someone exports TELEGRAM_BOT_TOKEN for a
+      // different tool, and this path quietly starts using it.
+      process.env.TELEGRAM_BOT_TOKEN = INHERITED_DECOY.TELEGRAM_BOT_TOKEN;
+      process.env.AUTHORISED_TELEGRAM_USER_ID = INHERITED_DECOY.AUTHORISED_TELEGRAM_USER_ID;
+
+      const logPath = t.path('ding-log.jsonl');
+      const fetchImpl = stubFetch(okReply());
+      const { code, stdout, stderr } = await invoke({
+        argv: [msgFile(t)],
+        envPath: scenario.envPath(t),
+        logPath,
+        fetchImpl,
+      });
+
+      assert.equal(code, EXIT.CREDENTIALS_UNUSABLE, 'an incomplete file must not become a send');
+      assert.equal(fetchImpl.calls.length, 0, 'nothing may be sent on inherited credentials');
+
+      const lines = recordLines(logPath);
+      assert.equal(lines.length, 1);
+      assert.equal(lines[0].outcome, scenario.outcome);
+
+      const all = readFileSync(logPath, 'utf8') + stdout + stderr;
+      for (const decoy of Object.values(INHERITED_DECOY)) {
+        assert.ok(!all.includes(decoy), 'an inherited credential value surfaced');
+      }
+    } finally {
+      delete process.env.TELEGRAM_BOT_TOKEN;
+      delete process.env.AUTHORISED_TELEGRAM_USER_ID;
+      t.cleanup();
+    }
+  });
+}
+
+test('J2-c — every credentials-failure branch is pinned against an inherited rescue', () => {
+  // Pinned to a literal held HERE. Adding an exit to loadCredentials without adding a row
+  // above fails this test rather than shipping an unpinned branch.
+  assert.deepEqual(CREDENTIAL_FAILURE_BRANCHES.map((b) => b.branch).sort(), [
+    'both-names-missing',
+    'chat-id-name-missing',
+    'file-absent',
+    'file-unreadable',
+    'name-present-but-blank',
+    'token-name-missing',
+  ]);
+});
+
+test('J2-c — the send path never reads a credential name from process.env at all', () => {
+  // The broad structural pin behind the behavioural table. Every mutation in this family
+  // has to introduce one of these reads, so this catches the class rather than the case.
+  const code = SOURCE.split('\n')
+    .filter((l) => !l.trim().startsWith('//'))
+    .join('\n');
+  for (const name of CREDENTIAL_NAMES) {
+    assert.ok(
+      !new RegExp(`process\\.env\\.${name}|process\\.env\\[['"\`]${name}`).test(code),
+      `${name} must come from the approved file, never from the environment`,
+    );
+  }
+});
+
 // ---- AC2: a success is durably recorded, with the message_id ---------------
 
 test('AC2 — a successful send records timestamp, outcome and the Telegram message_id', async () => {
