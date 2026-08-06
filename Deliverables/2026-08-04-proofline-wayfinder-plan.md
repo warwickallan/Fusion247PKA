@@ -2398,9 +2398,9 @@ Any newly discovered **unrelated** defect: record once in [[Deliverables/BACKLOG
 
 ### 🎯 THE EXACT NEXT ACTION
 
-1. **If Zaps not yet in Zapier UI:** create two event-triggered Zaps per private `ZAPIER-ACTIVATION.md` (Funnel URL live; 1 task/email; no Schedule/search). Ding #343 carries the URL.  
-2. **Otherwise:** treat Funnel authenticated path + fail-loud + durable install as interim product evidence; proceed assurance.  
-3. **Integrate** public tip `33e11a3` (or later) + private digest → **Veritas Gate 1** → **Gate 2** → freeze → **Codex** → merge decision pack. Do not merge.
+1. **Unblock Gate 1 row 2:** fix Zapier Webhooks headers so POSTs include `X-CareerAIR-Token` (or `Authorization: Bearer`); ledger currently shows `missing_token` for inbound Zap-window POSTs. Re-Test until one `accepted` delivery. Ding **#344**.  
+2. **CI green** at exact tip (runners were queued/NOT RUN at Gate 1).  
+3. **Re-run Veritas Gate 1** at new tip if product advanced → then **Codex** → merge decision pack. Gate 2 already **HOLD** (valid with WP progress). Do not merge without Warwick.
 
 ### 📌 NEXT WORK PACKAGE (record only — do not execute in this Grok session)
 
