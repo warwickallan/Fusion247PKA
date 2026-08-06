@@ -2350,11 +2350,11 @@ node "C:/Users/Buggly/.mypka/governor/ding.mjs" <message-file>
 
 | # | Requirement | Status | Evidence / residual |
 |---|---|---|---|
-| **1** | Work Order route complete: G-1..G-6; hermetic 65/65 worktree+archive; J1-1 ordinary generated-envelope route (marker + refuse + real first-dispatch); AC-5 three clean GENERATED first-dispatch accepts | **READY FOR GATE 1** | G-1..G-6 + validation; hermetic fixed at tip; AC-5 Keel/Pax/Nolan; J1-1: ordinary route executed — **manual field authoring is judgement, not failure**. Evidence: `tools/wo/**`, AC-5 notes, journey proof README |
-| **2** | Return-cue: **Claude** automatic parent cue live; **Grok** honest host outcome (no false equivalence) | **IN PROGRESS** | Claude: hooks tracked; live journey to complete. Grok: Pax **DO NOT BUILD** Option A (`Deliverables/2026-08-06-pax-grok-return-cue-equivalence.md`) → **Option C MANUAL CONTEXTUAL DISCIPLINE** — remove false inject registration |
-| **3** | FusionDevBot durable path + qualifying combined journey (host-appropriate) | **PARTIAL** | Transport PASS (msg 333, blob). Claude: complete with return-cue. Grok: Rule 4a discipline path only |
-| **4** | Watcher/Tower durable across restart, session, PR | **PARTIAL** | Cold-start evidence banked. Fix `run-watcher.mjs` Windows main-guard; prove fresh-session discovery + TowerBot credential path |
-| **5** | `/rotate` Pax report + **successful** matching Supabase populate | **PARTIAL** | Mechanism ready; **green populate** still required (credentials/schema via approved runtime) |
+| **1** | Work Order route complete: G-1..G-6; hermetic 65/65 worktree+archive; J1-1 ordinary generated-envelope route (manual field authoring OK); AC-5 three clean GENERATED first-dispatch accepts | **PASS** (Gate 1 @ `95f8826`) | `Deliverables/2026-08-06-veritas-gate1-active-wp-receipt.md` |
+| **2** | Return-cue: **Claude** automatic parent cue live; **Grok** Option C honest | **PASS** (Gate 1) | Claude live proof + `.grok/ORIENTATION.md` / empty inject hooks |
+| **3** | FusionDevBot durable path + host-appropriate combined journey | **PASS** (Gate 1) | Transport + host-appropriate grading PASS |
+| **4** | Watcher/Tower durable across restart, session, PR | **PASS** (Gate 1) | `start-watcher.mjs` + durable SQLite |
+| **5** | `/rotate` Pax report + **successful** matching Supabase populate | **HOLD** | **Only functional HOLD** — need `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` in approved runtime + schema apply |
 
 ### ASSURANCE AND RELEASE SEQUENCE (not product requirements)
 
