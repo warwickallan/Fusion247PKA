@@ -510,8 +510,9 @@ function ensureGitHeads() {
     writeFileSync(join(FIXTURE_GIT_ROOT, 'b.txt'), 'head\n');
     execFileSync('git', ['add', 'b.txt'], { cwd: FIXTURE_GIT_ROOT, stdio: 'ignore' });
     execFileSync('git', ['commit', '-m', 'wo-test-head'], { cwd: FIXTURE_GIT_ROOT, stdio: 'ignore' });
-    // Point git at fixture for any subsequent tryGit on REPO via env used by child tests only
+    // Redirect git for archive extracts only (see envelope.mjs gitCwd). Never init inside REPO.
     process.env.WO_TEST_GIT_CWD = FIXTURE_GIT_ROOT;
+    process.env.WO_TEST_GIT_ALLOW_REDIRECT = '1';
   }
   HEAD_SHA = tryGit(['rev-parse', 'HEAD'], FIXTURE_GIT_ROOT);
   PARENT_SHA = tryGit(['rev-parse', 'HEAD~1'], FIXTURE_GIT_ROOT);
@@ -644,11 +645,15 @@ test('AC3 — a missing governance head argument is equally fatal, not a blank f
 
 test('AC3 — an unverifiable root is fatal too: cannot-check is never treated as passed', () => {
   const dir = mkdtempSync(join(tmpdir(), 'wo18-norepo-'));
+  // Disable archive redirect so this temp dir is not silently verified via the fixture.
+  const prev = process.env.WO_TEST_GIT_ALLOW_REDIRECT;
+  delete process.env.WO_TEST_GIT_ALLOW_REDIRECT;
   try {
     const r = E.verifyGovernanceHead(dir, HEAD_SHA);
     assert.equal(r.ok, false, 'a directory outside any repository cannot verify a head');
     assert.equal(r.reason, E.HEAD_FAILURE.NO_GIT);
   } finally {
+    if (prev !== undefined) process.env.WO_TEST_GIT_ALLOW_REDIRECT = prev;
     rmSync(dir, { recursive: true, force: true });
   }
 });
@@ -972,11 +977,12 @@ test('MUT-14 the worktree ancestry check reverted to equality', async () => {
     "      stdio: ['ignore', 'ignore', 'ignore'],\n    });\n    descends = true;",
     "      stdio: ['ignore', 'ignore', 'ignore'],\n    });\n    descends = false;",
   );
-  const parent = execFileSync('git', ['-C', REPO, 'rev-parse', 'HEAD~1'], { encoding: 'utf8' }).trim();
-  assert.equal(mutant.worktreeCheck(REPO, parent).state, 'mismatch', 'mutant should reject a descendant');
+  const { gitRoot, parent } = ensureGitHeads();
+  // Use gitRoot (fixture in archive extracts) — never assume REPO has .git
+  assert.equal(mutant.worktreeCheck(gitRoot, parent).state, 'mismatch', 'mutant should reject a descendant');
   await assertMutantBreaks(
     mutant,
-    (m) => assert.equal(m.worktreeCheck(REPO, parent).state, 'match'),
+    (m) => assert.equal(m.worktreeCheck(gitRoot, parent).state, 'match'),
     'MUT-14 the two-commit layout J1-4 mandates must not read as a mismatch',
   );
 });

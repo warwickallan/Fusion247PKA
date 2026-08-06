@@ -376,9 +376,12 @@ export function gitAuthority(root, slug) {
 export function worktreeCheck(worktree, governanceHead) {
   if (!worktree) return { value: 'n/a — no worktree supplied', state: 'absent-input' };
   if (!existsSync(worktree)) return { value: `ABSENT — ${worktree} does not exist`, state: 'absent' };
+  // Tests may set WO_TEST_GIT_CWD to a temp fixture so git archive exports never need a .git
+  // inside the extracted tree. Production leaves WO_TEST_GIT_CWD unset → use the worktree.
+  const cwd = gitCwd(worktree);
   let head;
   try {
-    head = execFileSync('git', ['-C', worktree, 'rev-parse', 'HEAD'], {
+    head = execFileSync('git', ['-C', cwd, 'rev-parse', 'HEAD'], {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
     }).trim();
@@ -398,7 +401,7 @@ export function worktreeCheck(worktree, governanceHead) {
   // rendered `MISMATCH`, i.e. the check fired on the honest case, which is how checks die.
   let descends = false;
   try {
-    execFileSync('git', ['-C', worktree, 'merge-base', '--is-ancestor', governanceHead, 'HEAD'], {
+    execFileSync('git', ['-C', cwd, 'merge-base', '--is-ancestor', governanceHead, 'HEAD'], {
       encoding: 'utf8',
       stdio: ['ignore', 'ignore', 'ignore'],
     });
@@ -419,7 +422,7 @@ export function worktreeCheck(worktree, governanceHead) {
   // worktree was cut from the wrong place.
   let known = false;
   try {
-    execFileSync('git', ['-C', worktree, 'rev-parse', '--verify', `${governanceHead}^{commit}`], {
+    execFileSync('git', ['-C', cwd, 'rev-parse', '--verify', `${governanceHead}^{commit}`], {
       encoding: 'utf8',
       stdio: ['ignore', 'ignore', 'ignore'],
     });
@@ -454,9 +457,25 @@ export const HEAD_FAILURE = {
   UNKNOWN: 'is not a commit in this repository',
 };
 
-/** Git cwd for verification. Tests may set WO_TEST_GIT_CWD to a temp fixture so archive exports never get `git init` inside the source tree. */
+/**
+ * Git cwd for verification.
+ * Tests may set WO_TEST_GIT_CWD + WO_TEST_GIT_ALLOW_REDIRECT=1 so a git-archive extract
+ * (no .git) can still verify heads without `git init` inside the tree. Production leaves
+ * both unset. When root already has .git, never redirect.
+ */
 function gitCwd(root) {
-  return process.env.WO_TEST_GIT_CWD || root;
+  if (process.env.WO_TEST_GIT_ALLOW_REDIRECT === '1' && process.env.WO_TEST_GIT_CWD) {
+    try {
+      execFileSync('git', ['-C', root, 'rev-parse', '--git-dir'], {
+        encoding: 'utf8',
+        stdio: ['ignore', 'ignore', 'ignore'],
+      });
+      return root;
+    } catch {
+      return process.env.WO_TEST_GIT_CWD;
+    }
+  }
+  return root;
 }
 
 export function verifyGovernanceHead(root, governanceHead) {
