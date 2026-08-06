@@ -2048,6 +2048,29 @@ All three investigations have landed and their findings are recorded above. **WP
 
 **Disposition: reported once, NOT dispatched.** The fix is a candidate for the same iteration as G-1..G-5, and **it is Warwick's call**, not a Work Order Larry raises off his own finding.
 
+#### ✅ Correction accepted from Mack's read-back — **"contract gap" was Larry's error, not a finding**
+
+**Larry wrote WO-20's `contract_conflicts` as: the surface rests on his authorisation plus WP-3E precedent, *"NOT on a contract clause"*, and called it a KNOWN CONTRACT GAP. Mack showed that is wrong, and the correction is accepted and applied.**
+
+> **Mack: *"My contract has no file-pattern grammar at all."*** The absence of a `~/.mypka/**` pattern is therefore **not a denial** — it is the absence of an enumeration **that was never written for any path.** ⚠️ **Reading it as a denial would equally forbid every `.env`, every `.mcp.json` and every supervisor registration the same contract explicitly ORDERS Mack to perform.**
+
+**The basis is THREE-LEGGED, not one-legged:** Mack's affirmative grants (*"Mack owns operation of released services"*; *"Keel writes the hook … Mack registers it"*; MCP registrations written **outside** the repo) · Larry's bounded authorisation · WP-3E precedent, which **Mack verified by execution rather than trusting the document's description of itself.** **The residue is DOCUMENTARY, not authorising.**
+
+**The durable lesson, and it generalises beyond Mack:** *absence of an enumeration in a prose contract is not a prohibition.* **Treating it as one manufactures a blocker and then requires an authorisation to clear a door that was never locked** — the mirror of the fabricated-grant defect Keel fixed at `MUT-10`. Both are the same error: **inferring a contract's answer from its silence.**
+
+#### 🔬 The CRLF trap, MEASURED on this exact file — the first time both hashes have been produced
+
+**Mack, before writing anything:**
+
+| Source | Bytes | SHA-256 |
+|---|---|---|
+| **git blob** (`git cat-file -p`) | **17,454** | `0f26ef1624dcb85e031a30a74e6421f5de12e9a7266fb452b727e9e7e17b5d4b` |
+| **working tree** `tools/governor/ding.mjs` | **17,863** | `c318bf0476ee700833e8281708d51d2befeb93b18305db267d03eeb889490ed7` |
+
+**409 bytes divergent — and `git status --porcelain` on that path returns EMPTY. Git reports the tree clean.**
+
+**This is the FOURTH time this trap has surfaced in BUILD-020 and the first time anyone produced both figures for the file in question.** **Installing from the working tree would have failed AC1 while every casual check looked fine.** Install method is `git cat-file blob`, which is also what `INSTALLED-FROM.txt` records for WP-3E — **and Mack confirmed the live `footer.mjs` already hashes identical to its blob**, so the runtime demonstrably holds blob bytes. **This is direct, current corroboration for C-2 and P-10** and it belongs in the phase report.
+
 > **Keel's verdict on the generated envelope, quoted because it is the sharpest summary of what was actually bought:**
 >
 > **"The generated half is more trustworthy than prose about *provenance*, and less usable than prose about *values*."**
