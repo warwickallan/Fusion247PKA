@@ -1996,6 +1996,35 @@ All three investigations have landed and their findings are recorded above. **WP
 
 **Warwick set the live test himself: *"The Veritas return is the live test: the reminder must reach Larry, and if the return is substantive the ding must arrive before the chat update."*** **If the reminder does not appear on the Veritas return, that is a LOADING result, not a design failure** — and it must be reported as exactly that, not quietly absorbed and not dressed up as success.
 
+### ✅ IT FIRED — and ⛔ at the WRONG MOMENT. Observed 2026-08-06
+
+**The hook loaded WITHOUT a host restart and fired. Observed, not asserted** — the reminder text appeared in Larry's context immediately after the Veritas dispatch. **"Written is not loaded" is discharged for this hook: it is loaded and firing.**
+
+**But it fired at DISPATCH, not at RETURN.**
+
+**The mechanism, and it is not a bug in the hook:** `PostToolUse` fires when a **tool call completes**. For a **background** agent the tool call completes at **LAUNCH** — the specialist's return arrives later as a **task notification, which is not a tool result and therefore cannot trigger `PostToolUse` at all.**
+
+**So on the default path the reminder lands at the one moment it is not needed, and is silent at the moment it is — which is exactly the moment that failed twice today.**
+
+### ⚖️ The tension is between two of Warwick's OWN instructions, and Larry is not resolving it silently
+
+| Instruction | What it requires |
+|---|---|
+| **Part 3** | the reminder fires on specialist **RETURNS** |
+| **Part 4** | eligible specialists run in the **BACKGROUND by default**, so Larry stays available |
+
+**Background dispatch is precisely what makes the reminder unable to fire on return.** They cannot both hold as written with this hook event.
+
+**Options, reported for Warwick's decision — not chosen by Larry:**
+
+| | Option | Cost |
+|---|---|---|
+| **A** | Accept it — a standing nudge once per dispatch, just early | Cheap, no change, **weaker than intended** |
+| **B** | Move the reminder to the **`Stop` hook**, which fires at every turn end including the turn that processes a return | Still zero-model, still no classification — **but it fires on EVERY turn, so it becomes noise, and noise gets ignored.** That is how gates die |
+| **C** | **Keep the hook as a partial aid and treat the CANONICAL RULE as the actual control** | Honest about what a reminder can and cannot fix |
+
+**Larry's recommendation is C, and the reasoning is the part that matters:** **the hook is not what will fix the attention failure — Rule 4a is.** Calling the hook "the fix" would be the *mechanism-instead-of-discipline* pattern Warwick has rejected repeatedly, and the regrowth cap applies. **Recorded as a recommendation. The decision is his.**
+
 ## 17.7 ✅ J2-e — PASSED BY EXECUTION, 2026-08-06
 
 **Command, stated exactly, because the absence of flags IS the proof:**
