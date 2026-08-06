@@ -1946,6 +1946,60 @@ All three investigations have landed and their findings are recorded above. **WP
 
 **If Warwick meant ratify instead, that reverses his own explicit prohibition and is one word from him.** Recorded as an interpretation precisely so it costs nothing to correct.
 
+## 17.6 ✅ STEP 2 — the Work Order / Nolan resolution, COMPLETED 2026-08-06
+
+**Ratifies nothing. Creates no actor. `c2ebda4` stays unmerged.**
+
+### The question that was open
+
+**Who checks a Work Order envelope before dispatch?** Pax established (WP-3C) that the responsibility was not merely unformalised but **formally DE-ASSIGNED**: `Team/agent-index.md:42-45` records the build-team table *"previously read 'Independently audits — **Nolan**'"*, changed by **`f78d121`** on 2026-08-04. The replacement is contractually barred from the half that was lost — *"no pre-inspection of a Work Order before implementation"* — and the Veritas gate fires **after** integration. **Pax's one-line diagnosis: the issuer was the sole author *and* the sole checker of the envelope.** Baseline: **13 class-A refusals across 15 orders.**
+
+### The resolution
+
+**The per-order checker question is answered by the GENERATION repair, not by a change of actor.** The defect was never that nobody *re-read* the envelope — it was that the envelope was **hand-typed from memory by the one person who could not see their own blind spot.** A second reader inspects a fallible artefact after the fact; **generation removes the fallible step.** Warwick's four permitted verbs are REMOVE, SHORTEN, COMBINE, CHANGE — **this REMOVES the authoring step rather than ADDING a reader.**
+
+**Standing position, unchanged and now closed:** Nolan remains an **occasional structural / audit role**, never a routine checker on every Work Order. **No Nolan contract, SOP-022 actor, `agent-index` or shim change is authorised or made.** §16.9 records what was approved on 2026-08-05 and is **superseded as a thing to implement** by the 2026-08-06 parking.
+
+### The evidence, measured across the two orders that bracket the repair
+
+| | **WO-18** — envelope **hand-authored** | **WO-19** — envelope **GENERATED** |
+|---|---|---|
+| Verdict | **`CLARIFY`** | **`ACCEPT`** |
+| Preventable class-A in the order | **2 of material weight**, + 4 minor | **0** |
+| Amendment required before build? | **YES** — `AMENDMENT 1`, a full round trip | **NO** |
+| Defects found | 9 | 4 contradictions, **all in the envelope/authoring, none blocking** |
+
+**The honest reading, and it is narrower than it looks: n = 2, and the two orders differ in more than one variable** — different scope, and the second was written by a Larry who had just read nine findings about the first. **Confounded, and stated so.** What is *not* confounded: the class-A defects in WO-18 were **envelope-shaped** (a `contract_basis` citing a generator field instead of a contract heading, a stale SHA typed from memory), and **both are structurally impossible in a generated envelope.**
+
+### ⚠️ AC-5 accounting — stated exactly, because it is the property most likely to be over-read
+
+**AC-5 requires THREE CONSECUTIVE real orders reaching specialists without a preventable class-A refusal.**
+
+| Order | Counts toward the streak? |
+|---|---|
+| **WO-18** | **NO.** It did not refuse, but it carried 2 preventable class-A defects and **held for a full amendment before substantive work began** |
+| **WO-19** | **YES** — clean, no amendment, worker proceeded on acceptance |
+
+**Consecutive clean orders: ONE. AC-5 needs three. The Pax commission (§17.5 step 3) would be the second.** **AC-5 IS NOT MET and no receipt may say otherwise.** Warwick: *"A single successful order is initial acceptance, not proof of a permanent trend."*
+
+### What the generated envelope did NOT fix — Keel's findings, accepted in full
+
+**Reported once, not dispatched.** ⚠️ **Most of these are Larry's authoring, not the tool's:**
+
+| # | Finding | Whose |
+|---|---|---|
+| **G-1** | **Value-plus-prose in one scalar makes no envelope field machine-readable.** `contract_conflicts: none — earned: …`, `operational_handoff: none — Mack installs …`. A worker told to *read* a field and **never infer** it had to parse English off the front to obey. One prose comma from costing something | **Larry's authoring** |
+| **G-2** | **`worktree` contradicted itself inside one order** — frontmatter named it, the generated row said `n/a — no worktree supplied` under a **`supplied + verified`** provenance tag. **Lending an authority marker to an absence is the worst available shape** | Larry omitted the flag; **the provenance tag is the tool's** |
+| **G-3** | **SSOT applied inconsistently in one table** — `permitted_file_surface` fully inlined while `prohibited_file_surface` is a pointer. **The asymmetry least likely to protect anyone** | Tool |
+| **G-4** | **`producible_evidence` reads as constraining the deliverable.** *"network fetch: NOT available"* is true of the worker's tool grant and irrelevant to a deliverable whose job is an outbound POST | Tool |
+| **G-5** | **The issuability footer is computed at generation and never recomputed** — stale the instant a slot is authored. Failed safe here; **fails dangerous in the other direction** | Tool |
+
+**The accepted fix for the next iteration, Keel's recommendation:** **every field a bare value, prose in a sibling comment.** **Not dispatched — it is a candidate, and its disposition is Warwick's.**
+
+> **Keel's verdict on the generated envelope, quoted because it is the sharpest summary of what was actually bought:**
+>
+> **"The generated half is more trustworthy than prose about *provenance*, and less usable than prose about *values*."**
+
 ## 17.4 Frontier
 
 **⛔ SUPERSEDED 2026-08-06 — → §17.5 is the SINGLE statement of the live frontier.** The ordered closure Warwick set replaces "JOB 1 then JOB 2" as the sequence.
