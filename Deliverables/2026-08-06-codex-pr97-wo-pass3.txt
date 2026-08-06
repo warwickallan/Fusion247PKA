@@ -1,0 +1,136 @@
+repo:  .
+range: 4eb5368e23ada5a8b516860a57c11dbe6b046f31..1b6c346d2548d13014fc36d63492d51f965c1637
+claim: Deliverables/2026-08-06-pr97-codex-claim-wo-pass3.json
+scope  : tools/wo/**
+branch : build-020/phase4-automation-law
+
+ÔöÇÔöÇ GIT EVIDENCE (real, read-only) ÔöÇÔöÇ
+resolved=true diff_range=4eb5368e23ada5a8b516860a57c11dbe6b046f31..1b6c346d2548d13014fc36d63492d51f965c1637
+changed_files=["tools/wo/README.md","tools/wo/envelope.mjs","tools/wo/envelope.test.mjs"]
+diff bytes=60000 of 81937 (real UTF-8 bytes) truncated=true
+WARNING: diff was TRUNCATED ÔÇö the verdict does not cover the whole change.
+packet diff_range=4eb5368e23ada5a8b516860a57c11dbe6b046f31..1b6c346d2548d13014fc36d63492d51f965c1637 -- tools/wo/**
+packet scoped_to=["tools/wo/**"] wp_id="phase4-wo-generator"
+
+ÔöÇÔöÇ REAL CODEX MERGE REVIEW (Tower QA skill over the staged diff + the REAL claim) ÔöÇÔöÇ
+contract: C:\Fusion247PKA-build-020-trial\services\control-plane\review\prompts\tower-qa-skill.md
+contract provenance: tower-qa-skill@3(approved;ratified=true)+classification-amendment@1(APPROVED_LIVE) sha256=ad00bb7ac6678b0a92b3d329561d09b326c6eea5b77b9b0df181ea7d540f3172
+ok=true blocked=false model=openai-codex-exec
+{
+  "status": "ok",
+  "verdict": "request_changes",
+  "summary": "CORRECTIONS_REQUIRED: the generator changes largely implement G-1..G-6 and remove the phase-complete claim, but the archive-mode test fixture mutates the repository under test by creating `.git` and `.wo-envelope-test-marker` without cleanup. That breaches the staged hermetic-test criterion and contaminates the evidence used to establish clean-export behaviour.",
+  "claims_verified": [
+    {
+      "claim": "G-1..G-6 are implemented, including absolute machine_surface validation and required live_authority deviation.",
+      "status": "confirmed",
+      "evidence": "tools/wo/envelope.mjs adds bare authoring slots, provenance states, symmetric surface citations, worker-tool-grant labelling, live marker recomputation, and fatal machine_surface validation."
+    },
+    {
+      "claim": "J1-1 is issuer discipline plus worker REFUSE, not automatic invocation.",
+      "status": "confirmed",
+      "evidence": "tools/wo/README.md and CLI usage explicitly describe the route as discipline plus REFUSE and disclaim a daemon, hook, or control plane."
+    },
+    {
+      "claim": "The tests are hermetic in a clean git archive.",
+      "status": "refuted",
+      "evidence": "tools/wo/envelope.test.mjs: ensureGitHeads() runs `git init` in REPO and writes `.wo-envelope-test-marker`, with no teardown."
+    },
+    {
+      "claim": "README makes no Phase 4 completion claim.",
+      "status": "confirmed",
+      "evidence": "tools/wo/README.md explicitly says Phase 4 Gate 2 / phase-complete remains separate and is not asserted."
+    },
+    {
+      "claim": "The change adds no secrets or control-plane mechanism.",
+      "status": "confirmed",
+      "evidence": "The staged source contains only local CLI generation, validation, tests, and documentation; README explicitly disclaims a daemon, hook, or control plane."
+    }
+  ],
+  "acceptance_results": [
+    {
+      "acceptance_row_id": "G-1",
+      "result": "pass",
+      "rationale": "Generated scalar values and author slots are bare; guidance and deviation explanations are sibling comments.",
+      "evidence": "tools/wo/envelope.mjs generateOrder(): authorityLines and AUTHOR_REQUIRED fields."
+    },
+    {
+      "acceptance_row_id": "G-2",
+      "result": "pass",
+      "rationale": "Missing, failed, absent, matching, and mismatching worktree states receive distinct provenance.",
+      "evidence": "tools/wo/envelope.mjs resolveEnvelope(): worktreeSource mapping."
+    },
+    {
+      "acceptance_row_id": "G-3",
+      "result": "pass",
+      "rationale": "Permitted and prohibited file surfaces are both emitted as citations to canonical contract sections.",
+      "evidence": "tools/wo/envelope.mjs resolveEnvelope(): permitted_file_surface and prohibited_file_surface use cite()."
+    },
+    {
+      "acceptance_row_id": "G-4",
+      "result": "pass",
+      "rationale": "Producible evidence is explicitly scoped to the worker tool grant, not deliverable authority.",
+      "evidence": "tools/wo/envelope.mjs producibleEvidence()."
+    },
+    {
+      "acceptance_row_id": "G-5",
+      "result": "pass",
+      "rationale": "The footer is labelled a generation snapshot and --count-markers recomputes current marker counts.",
+      "evidence": "tools/wo/envelope.mjs countMarkers(), issuabilitySnapshotFooter(), and CLI count-markers branch."
+    },
+    {
+      "acceptance_row_id": "G-6",
+      "result": "pass",
+      "rationale": "Machine surfaces are a closed, absolute-path list and require an authorised, non-none live_authority deviation.",
+      "evidence": "tools/wo/envelope.mjs isAbsoluteMachinePath(), validateMachineSurfaces(), and machineSurfaceBasis()."
+    },
+    {
+      "acceptance_row_id": "absolute-machine-surface-live-authority",
+      "result": "pass",
+      "rationale": "Relative paths, absent deviations, none-valued deviations, and missing deviation authority fail before order emission.",
+      "evidence": "tools/wo/envelope.mjs validateMachineSurfaces(); corresponding G-6 tests in tools/wo/envelope.test.mjs."
+    },
+    {
+      "acceptance_row_id": "hermetic-tests",
+      "result": "fail",
+      "rationale": "Archive-mode setup modifies the repository being tested and leaves persistent Git metadata and a marker file, so the test is not isolated or cleanup-safe.",
+      "evidence": "tools/wo/envelope.test.mjs ensureGitHeads(): `git init` in REPO and writeFileSync(join(REPO, '.wo-envelope-test-marker')); no teardown is shown."
+    },
+    {
+      "acceptance_row_id": "no-secrets",
+      "result": "pass",
+      "rationale": "No credential material or secret-bearing configuration is introduced in the staged change.",
+      "evidence": "Staged diff for tools/wo/**."
+    },
+    {
+      "acceptance_row_id": "no-control-plane",
+      "result": "pass",
+      "rationale": "The implementation is an explicitly invoked CLI and marker counter; it adds no automatic dispatcher, daemon, or hook.",
+      "evidence": "tools/wo/README.md J1-1 statement and tools/wo/envelope.mjs CLI main()."
+    },
+    {
+      "acceptance_row_id": "no-phase-complete-claim",
+      "result": "pass",
+      "rationale": "README limits its claim to defects implemented in this module and expressly denies Phase 4 completion.",
+      "evidence": "tools/wo/README.md, ÔÇ£Defects addressed in this module (not a phase-complete claim)ÔÇØ."
+    }
+  ],
+  "prior_finding_results": [
+    {
+      "finding_id": "F-1",
+      "status": "addressed",
+      "rationale": "README no longer claims Phase 4 defects or the phase itself are closed; it explicitly reserves phase completion for Gate 2."
+    }
+  ],
+  "findings": [
+    {
+      "id": "F-2",
+      "technical_impact": "MEDIUM",
+      "reachability": "ACTIVE",
+      "required_disposition": "BLOCKS_CURRENT_MERGE",
+      "assumed_deployment_baseline": "The current authorised route includes running the committed Node test suite both in normal worktrees and clean `git archive` exports, as claimed by V4-7.",
+      "evidence": "tools/wo/envelope.test.mjs ensureGitHeads() creates `.git` and `.wo-envelope-test-marker` directly under REPO when testing an archive export and provides no teardown. This makes the hermetic-test acceptance action invalid and can contaminate subsequent test evidence.",
+      "required_correction": "Create the fallback two-commit Git fixture in an isolated temporary directory, point Git-dependent tests at that fixture, and remove it in teardown. Do not initialise or write fixture files into REPO."
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "checkpoint_id": "build-020-phase4-pr97-wo-pass2",
+  "build_id": "BUILD-020",
+  "wp_id": "phase4-wo-generator",
+  "brief_ref": "Deliverables/2026-08-06-phase4-closure-wp-evidence.md",
+  "summary": "Work Order envelope generator implements G-1..G-6 with validated machine_surface (absolute paths + required live_authority deviation). J1-1 is issuer discipline + worker REFUSE (SOP-022), not auto-invocation. Hermetic tests in tools/wo. Phase complete is not claimed.",
+  "brief_excerpt": "Prior BLOCKS corrections: (1) machine_surface rejects non-absolute paths and requires live_authority deviation+authority; (2) README/USAGE do not claim auto-invoking automation. Acceptance: G-1..G-6 present; validation enforced; hermetic tests; no secrets; no new control plane.",
+  "scoped_to": ["tools/wo/**"]
+}
