@@ -1,0 +1,279 @@
+{
+  "session_date": "2026-08-06",
+  "branch": "build-020/phase4-automation-law",
+  "closing_head": "6b485079ca618c46e68fe1755eb99065ea85bb44",
+  "closing_head_short": "6b48507",
+  "map_path": "Deliverables/2026-08-04-proofline-wayfinder-plan.md",
+  "report_path": "Deliverables/2026-08-06-session-performance-report-rotate-careerair-mcp.md",
+  "deliverable_path": "Deliverables/2026-08-06-session-performance-report-rotate-careerair-mcp.md",
+  "payload_path": "Deliverables/2026-08-06-session-report-payload-rotate-careerair-mcp.json",
+  "host": "grok-build",
+  "host_version": null,
+  "pr": "#97",
+  "pr_status": "open_unmerged",
+  "prior_freeze_head": "3cf31c24badac7fa910b6003cd8bbc0471fa9111",
+  "git_range_this_slice": "3cf31c24..6b48507",
+  "git_stat_larry_measured": {
+    "files": 13,
+    "insertions": 1417,
+    "deletions": 62,
+    "characterisation": "docs-heavy banking; services/cockpit private-api earlier in broader day range",
+    "label": "E"
+  },
+  "metrics": {
+    "opening_context_tokens": { "value": null, "label": "U" },
+    "closing_context_tokens": { "value": null, "label": "U" },
+    "total_context_token_movement": { "value": null, "label": "U" },
+    "elapsed_session_minutes": { "value": null, "label": "U" },
+    "ding_log_span_this_slice": {
+      "value": {
+        "message_ids": "341-347",
+        "start_ts": "2026-08-06T15:07:07.271Z",
+        "end_ts": "2026-08-06T19:38:33.939Z",
+        "note": "log activity span only — not session elapsed"
+      },
+      "label": "E"
+    },
+    "per_specialist_dispatch_counts": {
+      "value": {
+        "veritas_new_this_slice": 0,
+        "veritas_prior_same_day_amended_wp_hold": 2,
+        "pax_this_slice": 1,
+        "keel_this_slice": 0,
+        "mack_this_slice": 0,
+        "nolan_this_slice": 0,
+        "larry_direct_dominant": true
+      },
+      "label": "E"
+    },
+    "per_specialist_token_usage": { "value": null, "label": "U" },
+    "allocation_product_pct": { "value": null, "label": "U" },
+    "allocation_wo_admin_pct": { "value": null, "label": "U" },
+    "allocation_assurance_pct": { "value": null, "label": "U" },
+    "allocation_rework_pct": { "value": null, "label": "U" },
+    "allocation_waiting_pct": { "value": null, "label": "U" },
+    "parent_channel_available": { "value": true, "label": "E" },
+    "parent_channel_response_latency": { "value": null, "label": "U" },
+    "queued_messages": { "value": 0, "label": "E" },
+    "wo_first_dispatch_success_day_rollup": { "value": 5, "label": "E" },
+    "wo_amendments_day_rollup": { "value": 2, "label": "E" },
+    "wo_refusals_day_rollup": { "value": 1, "label": "E" },
+    "wo_this_slice_mode": {
+      "value": "larry_direct_dominant_rule4_private_careerair_and_docs; specialist_implementation_sparse_none; rotate_pax_report_only_new_issued_order",
+      "label": "E"
+    },
+    "documentation_vs_product_change_volume": {
+      "value": {
+        "files": 13,
+        "insertions": 1417,
+        "deletions": 62,
+        "doc_lines_changed": null,
+        "product_lines_changed": null,
+        "note": "Larry-measured total only; path-class split UNESTABLISHED for this range"
+      },
+      "label": "E"
+    }
+  },
+  "elapsed_minutes": null,
+  "total_context_tokens_in": null,
+  "total_context_tokens_out": null,
+  "parent_channel_available": true,
+  "queued_messages": 0,
+  "wo_first_dispatch_success": 5,
+  "wo_amendments": 2,
+  "wo_refusals": 1,
+  "doc_lines_changed": null,
+  "product_lines_changed": null,
+  "allocation_product_pct": null,
+  "allocation_admin_pct": null,
+  "allocation_evidence_pct": null,
+  "allocation_rework_pct": null,
+  "allocation_waiting_pct": null,
+  "work_orders": [
+    {
+      "id": "day-rollup-prior-freeze",
+      "source": "Deliverables/2026-08-06-session-performance-report-rotate.md",
+      "first_dispatch_success": ["WO-19", "WO-21", "ac5-1", "ac5-2", "ac5-3"],
+      "amendments": ["WO-18", "WO-20"],
+      "refusals": ["WO-22"],
+      "label": "E"
+    },
+    {
+      "id": "WO-2026-08-06-rotate-careerair-mcp",
+      "worker": "pax",
+      "mode": "commissioned_rotate_report",
+      "first_dispatch_substantive": true,
+      "outcome": "md_and_json_payload_this_return",
+      "label": "E"
+    },
+    {
+      "id": "careerair-path-slice-larry-direct",
+      "worker": "larry-direct",
+      "mode": "rule4_private_careerair_plus_docs",
+      "notes": "Funnel/local adapter banking; paid Zap cancel; path corrections; Zapier MCP inventory; ding 341-347; map banking. No new proofline specialist implementation WO accept artefacts this slice.",
+      "label": "E"
+    }
+  ],
+  "findings": [
+    {
+      "id": "F1",
+      "text": "Automatic Outlook collection is NOT LIVE; Funnel/local pipeline is dormant adapter capability only.",
+      "label": "E"
+    },
+    {
+      "id": "F2",
+      "text": "Authorised path is Zapier MCP + warwickallan@outlook.com only; Claude Outlook connector (work bellrock mailbox) is FORBIDDEN for CareerAIR.",
+      "label": "E"
+    },
+    {
+      "id": "F3",
+      "text": "Entra/Graph consent is NOT the next Warwick action (corrected off after interim framing).",
+      "label": "E"
+    },
+    {
+      "id": "F4",
+      "text": "Zapier MCP on this host exposes ClickUp+GitHub tools only; zero Microsoft Outlook MCP actions; config URL banked.",
+      "label": "E"
+    },
+    {
+      "id": "F5",
+      "text": "Veritas Gate1 HOLD and Gate2 HOLD remain banked at f0d2614 for amended WP — no new Veritas results invented at tip 6b48507.",
+      "label": "E"
+    },
+    {
+      "id": "F6",
+      "text": "PR #97 open unmerged; Codex and merge blocked until Gate1 PASS + Warwick authority.",
+      "label": "E"
+    },
+    {
+      "id": "F7",
+      "text": "Ding ids 341-347: 341 sent; one usage-message-file-unreadable exit 4; 342-347 sent including 346 Entra-era and 347 Zapier MCP blocker correction; queued 0.",
+      "label": "E"
+    }
+  ],
+  "blockers": [
+    {
+      "id": "B1",
+      "text": "Zapier MCP missing Microsoft Outlook Find/Get Email actions for warwickallan@outlook.com on host config https://mcp.zapier.com/mcp/servers/ccffef98-9615-4a5d-967a-83b4ab3acd0e/config",
+      "blocks": "CareerAIR automatic Outlook intake (map row 3)",
+      "label": "E"
+    },
+    {
+      "id": "B2",
+      "text": "Veritas Gate 1 HOLD at f0d2614 (CareerAIR auto intake residual) — no Codex until Gate 1 PASS at frozen head",
+      "blocks": "Codex + merge decision pack (map rows 5-7)",
+      "label": "E"
+    },
+    {
+      "id": "B3",
+      "text": "PR #97 unmerged; no merge without Warwick explicit final authority",
+      "blocks": "estate-default Phase 4 assets on main",
+      "label": "E"
+    }
+  ],
+  "next_action": {
+    "text": "Warwick adds free Zapier MCP Microsoft Outlook Find/Get Email for warwickallan@outlook.com; Larry then collects via Zapier MCP only into local CareerAIR queue; no auto-collection claim until live accept; no Veritas/Codex while falsely claimed; no merge without Warwick.",
+    "map_steps": [
+      "Warwick (free, not paid Webhooks): add Microsoft Outlook Find Email (+ Get Email) for warwickallan@outlook.com on https://mcp.zapier.com/mcp/servers/ccffef98-9615-4a5d-967a-83b4ab3acd0e/config",
+      "Larry (after actions appear): collect CareerAIR folders via Zapier MCP only → local queue/processor → Cockpit truth; no Claude Outlook connector; no paid Custom Request Zap",
+      "Do not claim automatic Outlook collection live until real personal-mailbox message accepted and processed; no Veritas/Codex while auto collection falsely claimed; no merge without Warwick"
+    ],
+    "source": "Deliverables/2026-08-04-proofline-wayfinder-plan.md § THE EXACT NEXT ACTION",
+    "label": "E"
+  },
+  "veritas": {
+    "gate1_amended_wp": {
+      "verdict": "HOLD",
+      "reviewed_sha": "f0d2614da5b71186f6e335552ed6b166d1327127",
+      "receipt": "Deliverables/2026-08-06-veritas-gate1-amended-wp-f0d2614-receipt.md",
+      "note": "prior same-day artefact — not a new review of tip 6b48507",
+      "label": "E"
+    },
+    "gate2_phase4": {
+      "verdict": "HOLD",
+      "reviewed_sha": "f0d2614da5b71186f6e335552ed6b166d1327127",
+      "receipt": "Deliverables/2026-08-06-veritas-gate2-phase4-f0d2614-receipt.md",
+      "note": "prior same-day artefact — not a new review of tip 6b48507",
+      "label": "E"
+    }
+  },
+  "ding_this_slice": {
+    "ids": [341, 342, 343, 344, 345, 346, 347],
+    "sent_count": 7,
+    "usage_errors": [
+      {
+        "ts": "2026-08-06T15:33:58.021Z",
+        "outcome": "usage-message-file-unreadable",
+        "exit": 4,
+        "detail": "ENOENT"
+      }
+    ],
+    "notes": "341 sent; usage fail; 342-347 sent; 346 Entra-era; 347 Zapier MCP blocker correction",
+    "label": "E"
+  },
+  "unestablished": [
+    "opening_context_tokens",
+    "closing_context_tokens",
+    "total_context_token_movement",
+    "elapsed_session_minutes",
+    "host_version",
+    "per_specialist_tokens_in",
+    "per_specialist_tokens_out",
+    "allocation_product_pct",
+    "allocation_wo_admin_pct",
+    "allocation_assurance_pct",
+    "allocation_rework_pct",
+    "allocation_waiting_pct",
+    "parent_channel_response_latency",
+    "rule_4a_notification_miss_count_after_morning",
+    "doc_product_line_split_3cf31c24_to_6b48507",
+    "veritas_verdict_at_tip_6b48507",
+    "dings_after_347"
+  ],
+  "specialists": [
+    {
+      "specialist": "veritas",
+      "dispatches_this_slice": 0,
+      "dispatches_prior_same_day_amended_wp": 2,
+      "tokens_in": null,
+      "tokens_out": null,
+      "notes": "Gate1 HOLD + Gate2 HOLD receipts at f0d2614 only; no new tip review. Tokens UNESTABLISHED on Grok."
+    },
+    {
+      "specialist": "pax",
+      "dispatches_this_slice": 1,
+      "tokens_in": null,
+      "tokens_out": null,
+      "notes": "This rotate CareerAIR-MCP session report. Tokens UNESTABLISHED."
+    },
+    {
+      "specialist": "keel",
+      "dispatches_this_slice": 0,
+      "tokens_in": null,
+      "tokens_out": null,
+      "notes": "No new implementation dispatch established this slice."
+    },
+    {
+      "specialist": "mack",
+      "dispatches_this_slice": 0,
+      "tokens_in": null,
+      "tokens_out": null,
+      "notes": "No new implementation dispatch established this slice."
+    },
+    {
+      "specialist": "nolan",
+      "dispatches_this_slice": 0,
+      "tokens_in": null,
+      "tokens_out": null,
+      "notes": "No new implementation dispatch established this slice."
+    },
+    {
+      "specialist": "larry-direct",
+      "dispatches_this_slice": null,
+      "tokens_in": null,
+      "tokens_out": null,
+      "notes": "Dominant execution mode this slice (Rule 4 private CareerAIR + docs + path corrections + dings). Not a specialist dispatch count."
+    }
+  ],
+  "notes": "Fourth /rotate slice 2026-08-06 on grok-build after freeze 3cf31c24. Closing head commission 6b485079ca618c46e68fe1755eb99065ea85bb44 (short 6b48507). Window: amended WP A-D; CareerAIR Funnel+local adapter; paid Zap cancelled; Entra path corrected OFF; work Outlook connector FORBIDDEN; authorised Zapier MCP personal mailbox; proven MCP tools ClickUp+GitHub only; auto Outlook NOT LIVE; Veritas G1/G2 HOLD prior at f0d2614 only; PR#97 open. Larry-measured git 3cf31c24..6b48507: 13 files +1417/-62 docs-heavy. Ding 341-347 with one usage ENOENT. Day WO roll-up carried 5/2/1. This slice Larry-direct dominant; Pax rotate report only new specialist order. Grok: all ctx/token fields null/UNESTABLISHED. next_action matches map: Warwick free Zapier MCP Outlook Find/Get Email then Larry collect via Zapier MCP only."
+}

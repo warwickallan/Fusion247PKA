@@ -2344,8 +2344,8 @@ node "C:/Users/Buggly/.mypka/governor/ding.mjs" <message-file>
 | **Map** | `Deliverables/2026-08-04-proofline-wayfinder-plan.md` — this file |
 | **Branch / worktree** | `build-020/phase4-automation-law` · `C:\Fusion247PKA-build-020-trial` |
 | **PR** | **#97** open — **merge only after Codex + Warwick final decision** |
-| **HEAD** | verify `git rev-parse HEAD` (package amendment `636e650` · private-api proxy `dfa36fb` · tip advances with banking) |
-| **Phase** | BUILD-020 Phase 4 — amended WP in flight · Gate 2 re-verdict required at final head |
+| **HEAD** | verify `git rev-parse HEAD` (tip advances with banking; rotate banked through `6b48507` then tip) |
+| **Phase** | BUILD-020 Phase 4 — amended WP in flight · row 3 automatic Outlook **NOT LIVE** · Gate 1/2 HOLD at older head · Gate 2 re-verdict required at final head after row 3 honest acceptance |
 | **Evidence pack** | `Deliverables/2026-08-06-amended-wp-recon-evidence.md` |
 | **Private surface (CareerAIR only)** | **`C:\.fusion247\private\careerair\**`** — never `C:\.fusion247\**` root/parent |
 | **Authorised product decision (C-10)** | **Supersedes** prior “visibility first, automation decision separate.” Warwick **authorises restoration/completion of the already-intended automatic CareerAIR Outlook collection route** for this package. Linked: [[Deliverables/BACKLOG]] C-10 **moved out of candidate** into this authorised WP. |
@@ -2366,7 +2366,7 @@ node "C:/Users/Buggly/.mypka/governor/ding.mjs" <message-file>
 |---|---|---|---|
 | **1** | **BUILD-020 durability / promotion readiness.** Accepted operating mechanisms correctly classified (session-independent · machine-global install · generic repo assets in PR #97 · BUILD-020-specific). Survives: dead Larry session · worktree delete/recreate · fresh branch from current main · branch from main after #97 merges · installed-runtime restart. Replacement-machine DR **not** claimed unless executed. Exact merge unit + post-merge install alignment listed. | **MOSTLY DONE** | Recon banked in evidence pack. Merge unit = PR #97 generic assets. Live install alignment listed. Replacement-machine DR out of scope. |
 | **2** | **Gate 2 Phase 4 residuals dispositioned against current evidence.** Every old Gate 2 residual at `95f8826` returns exactly one of: DISCHARGED · STILL OPEN · RECLASSIFIED · NOT PART OF THE PHASE. Do not copy old HOLD language forward. Valid: WP Gate 1 PASS + Phase Gate 2 HOLD pending post-merge. Do not manufacture Phase PASS to merge. | **DONE (disposition table banked)** | See evidence pack row 2. Phase close still needs fresh Gate 2 at final head. |
-| **3** | **CareerAIR automatic Outlook intake.** Eligible mail from CareerAIR inbox/folder in `warwickallan@outlook.com` is retrieved **durably and automatically**, persisted safely, and processed through the **existing** CareerAIR product — without Warwick starting a session or reminding Larry. Wiring/ops repair only — no redesign of CV/fit/QA/rewrite/approval/submit/LinkedIn/browser. Acceptance journey: discover → self-load creds → persist before ack → no-dupe on restart → intake path → correct next governed state → no external consequential action → observable success/failure → resume from durable state → fresh session can read health/last success/pending depth/oldest age. | **NOT LIVE** | **Zapier paid Webhooks cancelled.** Funnel+webhook+queue+processor+fail-loud preserved as **dormant adapter**. Graph poller built (`graph-collect` / bootstrap); scheduled. **Blocker:** free Entra public client id + one device-code sign-in as warwickallan@outlook.com (Mail.Read). Evidence: `Deliverables/2026-08-06-careerair-zapier-cancelled-graph-route.md` |
+| **3** | **CareerAIR automatic Outlook intake.** Eligible mail from CareerAIR inbox/folder in `warwickallan@outlook.com` is retrieved **durably and automatically**, persisted safely, and processed through the **existing** CareerAIR product — without Warwick starting a session or reminding Larry. Wiring/ops repair only — no redesign of CV/fit/QA/rewrite/approval/submit/LinkedIn/browser. Acceptance journey: discover → self-load creds → persist before ack → no-dupe on restart → intake path → correct next governed state → no external consequential action → observable success/failure → resume from durable state → fresh session can read health/last success/pending depth/oldest age. | **NOT LIVE** | **Authorised mailbox path = Zapier MCP → `warwickallan@outlook.com` only.** **Do not** use Claude Outlook connector (work `warwick.allan@bellrock.co.uk`). **Do not** require Entra/Graph consent as the path. **Zapier paid Webhooks cancelled.** Funnel+webhook+queue+processor+Cockpit+fail-loud = **dormant adapter**. **Proven blocker (Grok host, 2026-08-06):** Zapier MCP tools are **ClickUp + GitHub only** — zero Microsoft Outlook actions; `zapier__microsoft_outlook_find_email` → tool not found. **One free unblock:** add Outlook Find/Get Email for personal mailbox on https://mcp.zapier.com/mcp/servers/ccffef98-9615-4a5d-967a-83b4ab3acd0e/config — not paid Webhooks. Evidence: `Deliverables/2026-08-06-careerair-zapier-mcp-outlook-blocker.md` @ `6b48507`. Graph poller code may exist privately but is **not** the authorised route and **not** claimed live. |
 | **4** | **Live Cockpit production surface + truthful CareerAIR operational view.** Normal Cockpit route loads; core nav not regressed; Apps → CareerAIR opens; shows collector state, last success, pending count, oldest pending age, processing state, latest safe item summary/status, exact failure when unhealthy; “no messages” ≠ “collector unhealthy” ≠ “consumer not running”; same durable state as processor; survives service restart + cache refresh; health unhealthy when CareerAIR dependency missing. Executable browser journey required. | **MOSTLY DONE** | Overlay + private-api + email-ops + browser shoot. Re-verify strip after Funnel install. |
 
 ### ASSURANCE AND RELEASE SEQUENCE (not product requirements) — rows 5–7
@@ -2398,9 +2398,19 @@ Any newly discovered **unrelated** defect: record once in [[Deliverables/BACKLOG
 
 ### 🎯 THE EXACT NEXT ACTION
 
-1. **Warwick one-time Graph consent** (after free Entra public client id): run private `careerair-graph-bootstrap.mjs` device code as warwickallan@outlook.com.  
-2. **Larry:** graph-collect live acceptance → processor → Cockpit; then Veritas Gate 1 (honest) → Codex → merge pack.  
-3. Do **not** claim auto Outlook collection live until Graph collect accepts a folder message. Do not merge without Warwick.
+1. **Warwick (free, not paid Webhooks):** on Zapier MCP config, add **Microsoft Outlook Find Email (+ Get Email)** for **`warwickallan@outlook.com`** — https://mcp.zapier.com/mcp/servers/ccffef98-9615-4a5d-967a-83b4ab3acd0e/config  
+2. **Larry (after actions appear):** collect CareerAIR folders via **Zapier MCP only** → local queue/processor → Cockpit truth; **no** Claude Outlook connector; **no** paid Custom Request Zap.  
+3. Do **not** claim automatic Outlook collection live until a real personal-mailbox message is accepted and processed. **No Veritas/Codex** while auto collection is falsely claimed. No merge without Warwick.
+
+### 📌 ROTATION (this `/rotate`)
+
+| | |
+|---|---|
+| **Rotate at** | 2026-08-06 (Grok Build host) |
+| **Session freeze / product tip for report** | `6b485079ca618c46e68fe1755eb99065ea85bb44` — CareerAIR Zapier MCP Outlook blocker banked; auto collection NOT LIVE |
+| **Session report (Pax)** | `Deliverables/2026-08-06-session-performance-report-rotate-careerair-mcp.md` |
+| **Payload** | `Deliverables/2026-08-06-session-report-payload-rotate-careerair-mcp.json` |
+| **Rotate banking commits** | this map update + report artefacts (see `git log` after push) |
 
 ### 📌 NEXT WORK PACKAGE (record only — do not execute in this Grok session)
 
