@@ -116,6 +116,34 @@ Row 4's required separation now genuinely holds: `no_messages: false` · `collec
 reason) · `consumer: ok`. The surface now **agrees** with `runtime/ops/state.json` instead of
 contradicting it.
 
+## 4a. 🔴 D-4 — the same defect class, one layer further out (Veritas Gate 1 @ `0cf70c9`)
+
+Veritas found that the repaired surface **still misdirected the operator**. The response contradicted itself:
+
+```
+"failure":  "collector unhealthy: graph_auth_required: CAREERAIR_GRAPH_CLIENT_ID not set…"
+"collector": { … "provider_active": "zapier_webhook" }
+```
+
+It sent the operator to configure **Microsoft Graph** — a route the Work Package rules
+**unauthorised** — when the true reason is that **no automatic trigger exists on the authorised
+route**. An "exact failure" that names a forbidden remedy is worse than a vague one. Root cause is
+the provider contradiction already recorded as residual 5, leaking onto the user-visible surface.
+
+**Repaired and verified live:**
+
+```
+failure           : collector unhealthy: no automatic collection trigger exists on the
+                    authorised route — collection is currently manual. (A stale incident from a
+                    non-authorised route is also recorded; see recorded_incident. Do NOT act on
+                    it without Warwick changing the route.)
+authorised_route  : zapier_webhook
+recorded_incident : {kind: graph_auth_required, since: 2026-08-06T20:50:06.100Z}
+```
+
+The raw incident is **preserved, not hidden** — it remains a true fact about the machine; it is
+simply not the operator's next action.
+
 ## 5. Honest limitations and residuals — none of these are claimed as done
 
 - **Row 3 is NOT LIVE.** No automatic trigger exists. `config/outlook-scout.json`

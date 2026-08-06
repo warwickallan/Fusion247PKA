@@ -51,6 +51,26 @@ Prior Gate 2 receipt: `Deliverables/2026-08-06-veritas-gate2-phase4-receipt.md` 
 | Green populate unestablished (old text) | **DISCHARGED** | Superseded by later Gate 1 isolation green |
 | Combined cue→ding one journey | **NOT PART OF THIS AMENDED WP product rows** / may remain Gate 2 | Next Claude WP |
 
+### 🔴 D-2 CORRECTION (Veritas Gate 1 @ `0cf70c9`) — dispositioned **by the source receipt's own labels**
+
+**The defect, accepted in full:** the table above uses `P-JOB1`/`P-CUE`-style labels that **appear
+nowhere in the source Gate 2 receipt**, whose residuals are numbered **V9-1 … V9-4**. Coverage
+therefore could not be audited by name — and **V9-3 and V9-4 received no disposition at all**, though
+row 2 requires exactly one for *every* residual. Larry's omission, found by Veritas, not by me.
+
+Source of truth for the labels: `Deliverables/2026-08-06-veritas-gate2-phase4-receipt.md` lines 147–150.
+
+| Source residual (verbatim label) | Severity | Disposition | Basis |
+|---|---|---|---|
+| **V9-1** — Phase 4 promise unmet for Gate 2; green Supabase populate unestablished; combined return-cue → Rule 4a → ding not one proven production journey; ACTIVE WP rows 2–5 PARTIAL; §17.5 closure incomplete | high, **blocking** | **STILL OPEN** — *partially discharged, and the remainder is honestly still open* | Green Supabase populate **DISCHARGED** (later Gate 1 isolation green). The **combined** cue → Rule 4a → ding production journey remains **NOT** proven as one journey: the return-cue half is now live-proven at `0cf70c9`, but the ding remains a **Larry judgement call**, deliberately un-mechanised (root `CLAUDE.md` § Rule 4a). **It continues to block any Phase 4 PASS / complete / closed / accepted claim.** |
+| **V9-2** — Watcher/Tower: TowerBot-credentialed restart and fresh-session discovery residual; live log not re-proven at this exact tip | medium | **STILL OPEN** | Not addressed by this package and **not claimed**. No TowerBot-credentialed restart was executed at `0cf70c9`. Non-blocking for unrelated work; **gates row-4 strict PASS**. Owner: Mack / Larry — park or re-prove. |
+| **V9-3** — AC-5 accept notes remain thin (1–2 lines); "materially lower cost" not freshly instrumented for the three-order streak | low | **STILL OPEN — parked** | Untouched by this package. No fresh cost instrumentation was performed, and I do not claim any. Explicitly **non-blocking**; parked to the one scheduled documentation reconciliation per the finding-disposition rule. |
+| **V9-4** — No full-package Gate 1 PASS receipt at tip `95f8826` for ACTIVE rows 1–5; map still lists Gate 1 pending | process | **DISCHARGED — as to the process gap only** | A **full-package** Gate 1 receipt now exists at the exact head `0cf70c9`, graded **per-row across the complete amended functional set (rows 1–4)**, with scope **explicitly not narrowed**: `Deliverables/2026-08-06-veritas-gate1-amended-wp-0cf70c9-receipt.md`. **⚠️ Read this precisely:** V9-4 recorded the *absence of a full-package receipt*, and that absence is closed. **The receipt's verdict is FAIL, so nothing here supports treating Gate 1 as a package PASS** — the very thing V9-4 warned against. The process gap is discharged; the package is not. |
+
+**Coverage check, auditable by name:** V9-1 ✅ · V9-2 ✅ · V9-3 ✅ · V9-4 ✅ — **4 of 4**, each with exactly
+one disposition. The `P-*` table above is retained as the working narrative that produced these, not
+as the coverage claim.
+
 ---
 
 ## Row 3 — CareerAIR Outlook intake
