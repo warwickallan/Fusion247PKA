@@ -2337,68 +2337,85 @@ node "C:/Users/Buggly/.mypka/governor/ding.mjs" <message-file>
 
 ## ⭐ ACTIVE SESSION WORK PACKAGE — single durable authority for this session
 
-> **Warwick 2026-08-06 (amended):** this section is the session’s durable accepted scope. **Functional acceptance = rows 1–5 only.** Assurance and release sequencing are **separate** (below) and are **not** product requirements for Veritas to “PASS about itself.” Every Work Order, Veritas dispatch, `/rotate` report and merge-readiness statement **derives from here**. Gate 1 PASS at `a1e124a` is **narrow slice evidence only** — not merge readiness. **PR #97 remains HOLD / unmerged. No Codex without Warwick’s explicit authority after applicable Veritas PASS.**
+> **Warwick 2026-08-06 (amended — scope change, confirmed):** this section is the session’s durable accepted scope. **Functional acceptance = rows 1–4 only.** Assurance and release sequencing are **rows 5–7** and are **not** product requirements for Veritas to “PASS about itself.” Every Work Order, Veritas dispatch, `/rotate` report and merge-readiness statement **derives from here**. Prior Gate 1 PASS on rows 1–5 (WO/DevBot/cue/Watcher/Supabase) is **banked evidence of those mechanisms** — it is **not** this package’s acceptance and is **not** to be reopened unless current evidence proves a regression. **PR #97 remains unmerged until Warwick’s final merge authority.** Codex is **authorised by Warwick for this package only after Veritas Gate 1 PASS** at the frozen exact head.
 
 | | |
 |---|---|
 | **Map** | `Deliverables/2026-08-04-proofline-wayfinder-plan.md` — this file |
 | **Branch / worktree** | `build-020/phase4-automation-law` · `C:\Fusion247PKA-build-020-trial` |
-| **PR** | **#97** open — **merge HOLD** (Warwick) |
-| **HEAD** | Session **closing head (report + Supabase):** `3cf31c24badac7fa910b6003cd8bbc0471fa9111` · tip after banking: verify `git rev-parse HEAD` |
-| **Phase** | BUILD-020 Phase 4 — **Gate 1 PASS** · **Gate 2 HOLD** · phase PASS only after Gate 2 Veritas PASS |
-| **Session report** | `Deliverables/2026-08-06-session-performance-report-rotate.md` · payload `Deliverables/2026-08-06-session-report-payload.json` · same `closing_head` `3cf31c24…` · WO `Deliverables/proofline/WO-2026-08-06-rotate-pax-session-report.md` |
+| **PR** | **#97** open — **merge only after Codex + Warwick final decision** |
+| **HEAD** | verify `git rev-parse HEAD` (base at package amendment: `f178fa0860ec051c9357c325ca53000ca8e643c9`) |
+| **Phase** | BUILD-020 Phase 4 — amended WP in flight · Gate 2 re-verdict required at final head |
+| **Private surface (CareerAIR only)** | **`C:\.fusion247\private\careerair\**`** — never `C:\.fusion247\**` root/parent |
+| **Authorised product decision (C-10)** | **Supersedes** prior “visibility first, automation decision separate.” Warwick **authorises restoration/completion of the already-intended automatic CareerAIR Outlook collection route** for this package. Linked: [[Deliverables/BACKLOG]] C-10 **moved out of candidate** into this authorised WP. |
+| **Interrupt Warwick only for** | irreducible account-authority action · Veritas verdict · final merge readiness. No routine progress dings. |
 
-### Functional acceptance requirements (1–5) — Veritas Gate 1 grades these
+### Package composition (Warwick)
+
+| Block | Content |
+|---|---|
+| **A** | BUILD-020 durability, Phase 4 residual assessment, estate promotion readiness |
+| **B** | CareerAIR Outlook intake repair + directly necessary Cockpit repair |
+| **C** | Veritas assurance of the **complete amended** Work Package (Gate 1) |
+| **D** | Final Codex review + merge decision pack for Warwick |
+
+### Functional acceptance requirements (1–4) — Veritas Gate 1 grades these
 
 | # | Requirement | Status | Evidence / residual |
 |---|---|---|---|
-| **1** | Work Order route complete: G-1..G-6; hermetic 65/65 worktree+archive; J1-1 ordinary generated-envelope route (manual field authoring OK); AC-5 three clean GENERATED first-dispatch accepts | **PASS** (Gate 1 @ `95f8826`) | `Deliverables/2026-08-06-veritas-gate1-active-wp-receipt.md` |
-| **2** | Return-cue: **Claude** automatic parent cue live; **Grok** Option C honest | **PASS** (Gate 1) | Claude live proof + `.grok/ORIENTATION.md` / empty inject hooks |
-| **3** | FusionDevBot durable path + host-appropriate combined journey | **PASS** (Gate 1) | Transport + host-appropriate grading PASS |
-| **4** | Watcher/Tower durable across restart, session, PR | **PASS** (Gate 1) | `start-watcher.mjs` + durable SQLite |
-| **5** | `/rotate` Pax report + **successful** matching Supabase populate | **PASS** (Gate 1) | Durable self-load `C:/.fusion247/fusion-capture-gateway.env` (`DATABASE_URL`; project `kerdinlgcfxnjrztwqde`). Schema via `apply-schema.mjs`. Isolation re-populate ok:true verified:true. Receipts: `…gate1-active-wp-0855e4e-receipt.md` + `…-isolation-receipt.md` |
+| **1** | **BUILD-020 durability / promotion readiness.** Accepted operating mechanisms correctly classified (session-independent · machine-global install · generic repo assets in PR #97 · BUILD-020-specific). Survives: dead Larry session · worktree delete/recreate · fresh branch from current main · branch from main after #97 merges · installed-runtime restart. Replacement-machine DR **not** claimed unless executed. Exact merge unit + post-merge install alignment listed. | **IN PROGRESS** | Prior mechanism evidence banked; fresh boundary assessment this package |
+| **2** | **Gate 2 Phase 4 residuals dispositioned against current evidence.** Every old Gate 2 residual at `95f8826` returns exactly one of: DISCHARGED · STILL OPEN · RECLASSIFIED · NOT PART OF THE PHASE. Do not copy old HOLD language forward. Valid: WP Gate 1 PASS + Phase Gate 2 HOLD pending post-merge. Do not manufacture Phase PASS to merge. | **IN PROGRESS** | Old receipt: `…veritas-gate2-phase4-receipt.md` predates green Supabase, real `/rotate`, Gate1 rows1–5 PASS, Honcho recovery, latest Watcher/DevBot |
+| **3** | **CareerAIR automatic Outlook intake.** Eligible mail from CareerAIR inbox/folder in `warwickallan@outlook.com` is retrieved **durably and automatically**, persisted safely, and processed through the **existing** CareerAIR product — without Warwick starting a session or reminding Larry. Wiring/ops repair only — no redesign of CV/fit/QA/rewrite/approval/submit/LinkedIn/browser. Acceptance journey: discover → self-load creds → persist before ack → no-dupe on restart → intake path → correct next governed state → no external consequential action → observable success/failure → resume from durable state → fresh session can read health/last success/pending depth/oldest age. | **NOT STARTED** | Private surface only. One collector · one checkpoint · one processing route. |
+| **4** | **Live Cockpit production surface + truthful CareerAIR operational view.** Normal Cockpit route loads; core nav not regressed; Apps → CareerAIR opens; shows collector state, last success, pending count, oldest pending age, processing state, latest safe item summary/status, exact failure when unhealthy; “no messages” ≠ “collector unhealthy” ≠ “consumer not running”; same durable state as processor; survives service restart + cache refresh; health unhealthy when CareerAIR dependency missing. Executable browser journey required. | **NOT STARTED** | Minimal root-cause repair only — not full IDEA-016 programme |
 
-### ASSURANCE AND RELEASE SEQUENCE (not product requirements)
+### ASSURANCE AND RELEASE SEQUENCE (not product requirements) — rows 5–7
 
 | # | Step | Status |
 |---|---|---|
-| **6** | Stable exact head + green required CI for that head | Product `0855e4e` on remote; re-check CI for tip as needed before any merge unit |
-| **7** | **Veritas Gate 1** functional WP | **PASS** @ product `0855e4e7…` — `Deliverables/2026-08-06-veritas-gate1-active-wp-0855e4e-isolation-receipt.md` (rows 1–5 PASS; isolation + remote proven) |
-| **8** | **Veritas Gate 2** Phase 4 | **HOLD** — phase not PASS — `Deliverables/2026-08-06-veritas-gate2-phase4-receipt.md` |
-| **9** | Warwick: Codex eligibility for merge unit | Warwick — Gate 1 PASS + Gate 2 HOLD → **WP-only Codex only if Warwick authorises**; **not invoked** |
-| **10** | Codex only after Warwick authorises | **HOLD — no Codex** (this session) |
-| **11** | Warwick final merge decision | Warwick |
-| **12** | No merge without Warwick | absolute |
+| **5** | **Veritas Gate 1** — complete amended WP at stable exact head. Grade separately: (1) durability/promotion · (2) CareerAIR auto Outlook + pipeline · (3) Cockpit + CareerAIR visibility · (4) Documentation/Git/private-boundary truth. Dispatch with: this WP · public head · private CareerAIR snapshot/digest · private surface · residuals · live Outlook + processing + browser evidence · CI · proposed merge unit. | **NOT STARTED** — no Codex while any mandatory Gate 1 row HOLD/FAIL |
+| **6** | **Veritas Gate 2** — separate Phase 4 verdict at same head: «Can Warwick now do the thing Phase 4 promised in the real intended context?» WP PASS / Phase HOLD remains valid and intelligible. CareerAIR must not disguise Phase 4 gaps; open post-merge Phase 4 must not erase completed CareerAIR repair. | **NOT STARTED** |
+| **7** | **Codex + merge decision pack.** Warwick **authorises** final Codex after Gate 1 PASS. Freeze head · CI green at exact head · PR #97 title/body reconciled to truth · Gate 1/2 stated separately · privacy-bounded private review if private delta · then one decision pack (public head, #97 scope, both Veritas, both Codex if any, live journeys, merge recommendation, next Claude WP residuals). **No merge without Warwick’s explicit final authority.** | **NOT STARTED** |
 
-**Gate 1 PASS + Gate 2 HOLD is a valid outcome** (WP complete; phase still open). Do not call Gate 1 = Phase PASS.
+**Gate 1 PASS + Gate 2 HOLD is a valid outcome.** Do not call Gate 1 = Phase PASS.
 
-### Supporting banked evidence
+### Explicitly OUT OF SCOPE (unless proven to block an acceptance journey above)
 
-- WO: `tools/wo/**` · AC-5 notes · `tools/wo/README.md` Journey proof  
-- Grok research: `Deliverables/2026-08-06-pax-grok-return-cue-equivalence.md`  
-- Watcher: `Deliverables/2026-08-06-watcher-cold-start-evidence.md`  
-- Narrow Gate 1: `Deliverables/2026-08-06-veritas-build020-gate1-pass-a1e124a-receipt.md`  
-- Prior full-WP HOLD (old shape): `Deliverables/2026-08-06-veritas-active-session-wp-receipt.md`  
-- Ding: `~/.mypka/governor/ding.mjs` · Supabase: `tools/session-report/*`  
-- **Supabase green proof:** `Deliverables/2026-08-06-session-report-supabase-green-proof.md` (schema apply + populate + verify; durable path; no Warwick credential paste)
-- **Session performance report (accepted `/rotate` 2026-08-06):** `Deliverables/2026-08-06-session-performance-report-rotate.md` · payload `Deliverables/2026-08-06-session-report-payload.json` · **closing_head** `3cf31c24badac7fa910b6003cd8bbc0471fa9111` · Pax WO `Deliverables/proofline/WO-2026-08-06-rotate-pax-session-report.md`
+**C-1..C-9, C-11..C-15** · shopping projectors · general Builds/System projections · generic Telegram attention loop · withheld-capability demo · attention history · documentation privacy scanning · YouTube capture · unrelated Cockpit visual polish · replacement-machine disaster recovery · full IDEA-016 Cockpit programme · installing/chasing the next-WP Claude host hook (unless strictly required to preserve an already-proven file during merge prep).
 
-### Veritas / Codex dispatch law (durable)
+Any newly discovered **unrelated** defect: record once in [[Deliverables/BACKLOG]] with evidence; continue this route.
 
-**Gate 1 dispatch** must include: this map path · functional rows **1–5** · residuals · exact head · **separate PASS/HOLD/FAIL per row** · prohibition on narrowing to older slices · CI green + head frozen.  
-**Gate 2 dispatch** must include: BUILD-020 North Star · phase journey · how Gate 1 serves it · remaining phase gaps.  
-**Codex eligibility:** Gate 1 HOLD/FAIL → Codex prohibited. Gate 1 PASS + Gate 2 HOLD → Codex only if Warwick authorises **WP-only** merge with matching PR claims. Phase-complete merge needs Gate 2 PASS + Warwick. **Never invoke Codex this turn.**
+### Prior mechanism evidence (banked — do not reopen without regression)
+
+- WO route · DevBot · return-cue (Claude live / Grok Option C) · Watcher/Tower · `/rotate` + Supabase green — Gate 1 @ `0855e4e` isolation receipt and supporting Deliverables under `2026-08-06-*`
+- Session report freeze: `Deliverables/2026-08-06-session-performance-report-rotate.md` · closing_head `3cf31c24…`
+
+### Veritas / Codex dispatch law (this package)
+
+**Gate 1:** map path · functional rows **1–4** · residuals · exact public head · private digest/surface · **separate PASS/HOLD/FAIL per Gate 1 dimension** · no narrowing · CI green + head frozen.  
+**Gate 2:** BUILD-020 North Star · phase journey · estate vs branch · merge/install boundary · post-merge acceptance if any.  
+**Codex:** only after Gate 1 PASS; Warwick has pre-authorised the final review for this package; still no merge without Warwick.
 
 ### 🎯 THE EXACT NEXT ACTION
 
-**Fresh session after this `/rotate` (sole next action):**
+1. **Bank this amended WP** (map + BACKLOG C-10 authorisation) and remove unexplained dirt (`.grok/hooks/probe-dump.json` — diagnostic residue).  
+2. **Parallel recon:** (A) BUILD-020 durability boundaries + old Gate 2 residual disposition against current evidence; (B) CareerAIR private-route recon (Pax/Keel) under declared private surface; (C) live Cockpit production diagnosis.  
+3. **Repair only** load-bearing CareerAIR Outlook collector + minimal Cockpit root causes; prove acceptance journeys.  
+4. **Integrate → Veritas Gate 1 → Gate 2 → freeze → Codex → decision pack.** Do not merge.
 
-1. **Review** `Deliverables/2026-08-06-session-performance-report-rotate.md` (Pax).  
-2. **Assess the exact remaining Gate 2 Phase 4 residuals** (map + Gate 2 receipt + phase North Star — not Gate 1 re-litigation).  
-3. **Bring Warwick the phase-closure or bounded WP-only Codex decision** (Gate 1 PASS + Gate 2 HOLD → WP-only Codex only with Warwick authority; phase-complete needs Gate 2 PASS + Warwick).  
+### 📌 NEXT WORK PACKAGE (record only — do not execute in this Grok session)
 
-**State:** Gate 1 **PASS** · Gate 2 **HOLD** · PR **#97 HOLD** · no merge without Warwick · Gate 1 ≠ Phase PASS.
+Warwick launches a **fresh Claude Code session** after the present merge decision. That package will:
+
+- start from updated main or explicitly approved post-merge state;
+- align/install the identified Claude hook in the canonical Claude host/worktree;
+- prove the live Claude return-cue journey from the merged source;
+- run fresh-main orientation acceptance;
+- verify installed-runtime/source alignment;
+- complete any genuine residual **explicitly carried by Veritas Gate 2**;
+- seek final Phase 4 closure where warranted.
+
+**Name exact residuals, evidence and next actions into this section when Gate 2 returns — no vague dump.**
 
 ### 📌 Parked (not this WP)
 
-**V4-9** · **C-1..C-15** · legacy `C:/.fusion247/larry-ding.mjs` · reminder-hook A/B/C product choice.
+**V4-9** · **C-1..C-9, C-11..C-15** · legacy `C:/.fusion247/larry-ding.mjs` · reminder-hook A/B/C product choice · next-WP Claude host hook install.
