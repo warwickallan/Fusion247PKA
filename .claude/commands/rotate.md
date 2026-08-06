@@ -82,4 +82,4 @@ You are Larry.
 - **Never report `SAFE TO CLEAR` with the report missing.** It is a hard bar, not a nice-to-have — **the evidence it captures ceases to exist at `/clear`**, which is the entire reason the step is inside the transaction rather than after it.
 - **Never report `SAFE TO CLEAR` on a write result alone.** The read-back is the evidence, and this is the whole reason the command exists.
 - **Never derive the packet from memory.** The Wayfinder is the source. If the map and your recollection disagree, **the map wins and your recollection is the defect.**
-- **Do not fabricate a next action.** If the map does not ground one, that is a step 9 correction — fix the map first.
+- **Do not fabricate a next action.** If the map does not ground one, that is a **step 13** correction — fix the map first. *(Was "step 9" before the report steps were inserted; corrected 2026-08-06, Veritas V4-8.)*

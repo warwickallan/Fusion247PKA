@@ -1032,7 +1032,9 @@ Keel's four class-A refusals were all correct. The work divides:
 
 ## 15.2 The deliverable
 
-**A durable phase-close report in Google Drive**, produced as **the final job before Larry says it is safe to `/clear`.** It shows **how many tokens the completed phase used** and, **as far as the available evidence allows, where they went.**
+> ⛔ **CORRECTED 2026-08-06 (Veritas V4-2). The DESTINATION below is SUPERSEDED — §17.5a is canonical.** Warwick reactivated §15.2 on 2026-08-06, and **reactivating a section reactivates its body**, so this line's "Google Drive" came back to life as an active instruction. **It is not one.** **The report is a GIT artefact under `Deliverables/`. NOT Google Drive, NOT Google Sheets, NOT Supabase.** The *substance* below — a phase-close report produced as the final job before `SAFE TO CLEAR`, showing token usage and, as far as evidence allows, where it went — **is reactivated and stands. Only the destination changed.**
+
+~~**A durable phase-close report in Google Drive**~~ **→ a durable phase-close report committed under `Deliverables/`**, produced as **the final job before Larry says it is safe to `/clear`.** It shows **how many tokens the completed phase used** and, **as far as the available evidence allows, where they went.**
 
 **Purpose, in his words:** *"not accounting for its own sake"* — it is to let him **spot obvious token-burning doom loops, disproportionate assurance work, repeated investigations, rework, unnecessary testing or other process smells without having to watch the build live.**
 
@@ -1930,6 +1932,8 @@ All three investigations have landed and their findings are recorded above. **WP
 
 **Five projections, each POINTING to the root clause — *"must not paraphrase or weaken it"*:**
 
+> ⚠️ **CORRECTED 2026-08-06 (Veritas V4-5, non-blocking, accepted).** **"Five projections" is really FOUR DISTINCT SURFACES plus a SELF-REFERENCE.** **L-5** landed in root `CLAUDE.md` § Wayfinder — **the canonical file pointing at itself** — because **no Wayfinder template file exists** and inventing one would be regrowth. **The START / RESUME block does not carry the automation-frontier clause.** The binding is real and the decision to avoid a new file was deliberate; **the count was overstated and is corrected here rather than defended.**
+
 | # | Surface | What it binds |
 |---|---|---|
 | **L-1** | **Larry contract** | completion and dispatch bar |
@@ -2025,6 +2029,18 @@ All three investigations have landed and their findings are recorded above. **WP
 
 **Larry's recommendation is C, and the reasoning is the part that matters:** **the hook is not what will fix the attention failure — Rule 4a is.** Calling the hook "the fix" would be the *mechanism-instead-of-discipline* pattern Warwick has rejected repeatedly, and the regrowth cap applies. **Recorded as a recommendation. The decision is his.**
 
+### ⚖️ EXPLICIT RECLASSIFICATION — the attention correction is **MANUAL** (Veritas V4-4, accepted)
+
+**Veritas: *"The reminder hook is intended-automatic, was never observed to fire at this head, and is not reclassified as manual. Capability, not completed automation."*** **Accepted in full. This is root `CLAUDE.md` § "Nothing may live only in Larry's head" caught against Larry a SECOND time in one session — by the law he wrote that morning.**
+
+**The reclassification, using the root clause's own permitted resolution:**
+
+> **The attention correction is a MANUAL control. Rule 4a is the mechanism, and Rule 4a is a JUDGEMENT Larry performs — not an automation.** **The `PostToolUse` reminder is a PARTIAL AID that does NOT fire at the moment it was intended to fire** (a background specialist's return is a task notification, not a tool result). **It is not, and must never be recorded as, completed automation.**
+
+⚠️ **A subsequent firing does not undo this.** The hook **was** later observed firing — at **dispatch**, at head `34d0cd0`, after the reviewed head. **That proves loading, not delivery of the intended behaviour**, and it is measured for the wrong event. **Larry's original claim (e) — that Rule 4a "plus a zero-model reminder hook address notification attention" — overstated it, and Veritas was right to block it.**
+
+**What is honestly true at this head:** Rule 4a exists and is canonical · the hook exists, loads and executes · **the attention failure has no automated guard, by design and by Warwick's ruling, and its two recorded failures today remain unguarded by anything except Larry's judgement.**
+
 ## 17.7 ✅ J2-e — PASSED BY EXECUTION, 2026-08-06
 
 **Command, stated exactly, because the absence of flags IS the proof:**
@@ -2059,9 +2075,29 @@ node "C:/Users/Buggly/.mypka/governor/ding.mjs" <message-file>
 
 **Two failures of the same rule, in one session, by the author of the rule, roughly an hour apart, with the instrument reading GREEN and nothing else going wrong.** **This is the single strongest delivery-tax datum the session produced and it is Pax's to analyse, not Larry's to explain away.** **It does not reopen Warwick's ruling** — he owns the trade; Larry owes him the number, and the number is now two.
 
-**⛔ PAX IS UNTOUCHED UNTIL AFTER ROTATION. No commission, no reconnaissance, no evidence gathering, no drafting.** Warwick's earlier constraint still binds and is now doubled: *"Do not launch a separate report investigation before the Work Order route is ready — the Pax commission is also the first live acceptance test of that repaired route."* **The commission IS the investigation, and it belongs to the session after this one.**
+### 📋 EVERY Larry error this session — the consolidated record. **Input for the rotation report.**
 
-**The Google Drive report** (originally step 4) **follows the Pax commission and is therefore also post-rotation.** It is not this session's work and no part of it is drafted here.
+**Written here because Veritas (V4-11) found one that had been owned in conversation and never entered the record. A correction that exists only in chat does not exist.**
+
+| # | Error | Caught by | Recorded |
+|---|---|---|---|
+| **E-1** | **Stale SHA in a dispatch** — named `c9390de` as the branch tip from memory when two of Larry's own later commits had moved it to `4214a66` | **Keel's read-back** | §17.6, WO-18 `AMENDMENT 1` |
+| **E-2** | **Eyeballed a token figure and was ~2× wrong.** Claimed the envelope was *"roughly ten thousand tokens"*; **measured: 20,056 chars ≈ 5,014 tokens.** Also misattributed the bulk — missed `git_authority` at 14%, overstated `prohibited_file_surface`, which is 7% | **Keel's read-back** | ⚠️ **WAS ONLY IN THE WO FILE AND A COMMIT MESSAGE — added to the map here, 2026-08-06, on Veritas V4-11** |
+| **E-3** | **Called Mack's contract a "GAP"** when it has no file-pattern grammar at all, so absence is not denial | **Mack's read-back** | §17.6 + `08344dd` |
+| **E-4** | **Missed notification ×2** — step 2's completion, and Mack's WP-4C return | **Warwick, twice** | §17.7 above |
+| **E-5** | **Asserted context was "very long" twice and recommended rotating — without reading the instrument.** It measured **~32% GREEN, CONTINUE** | **Larry, on finally measuring** | `c9803dc` |
+| **E-6** | **Left a live Google Drive contradiction and a live Pax-timing contradiction** in the map after re-scoping, including in **§15.2 — the section Warwick reactivated, whose body Larry did not re-read** | **Veritas V4-2, V4-3** | Corrected 2026-08-06 |
+| **E-7** | **Never pushed the branch.** 24 commits existed only on this machine; the reviewed head was on no remote | **Veritas V4-1** | Pushed 2026-08-06 |
+| **E-8** | **Overstated the projection count** — "five projections" is four surfaces plus a self-reference | **Veritas V4-5** | §17.3 above |
+| **E-9** | **Described the attention correction as delivered** when its hook was never observed to fire at the reviewed head and was not reclassified as manual | **Veritas V4-4** | §17.8, reclassified |
+
+**The pattern worth Pax's attention, stated without excuse: SEVEN of the nine were caught by someone else — a specialist read-back or the assurance gate — and only E-5 was caught by Larry.** **The two that no reviewer could have caught (E-4) were caught by Warwick.** **A worker read-back and an independent gate are, on this session's evidence, the load-bearing controls; Larry's self-review caught almost nothing.**
+
+**⛔ PAX IS UNTOUCHED UNTIL `/rotate` RUNS. No commission, no reconnaissance, no evidence gathering, no drafting before then.** Warwick's constraint still binds: *"Do not launch a separate report investigation before the Work Order route is ready — the Pax commission is also the first live acceptance test of that repaired route."* **The commission IS the investigation.**
+
+⛔ **CORRECTED 2026-08-06 (Veritas V4-3).** This paragraph previously ended *"…and it belongs to the session after this one."* **That is FALSE and directly contradicted §17.5a.** **Pax is commissioned INSIDE `/rotate`, before `SAFE TO CLEAR`, by THIS session — not after respawn.** Warwick reversed the timing on 2026-08-06 because **deferring the report past `/clear` destroys the session-specific evidence it exists to capture.** ⚠️ **A fresh Larry reading the old wording at step 5 would have received two opposite instructions — which is exactly the defect this map has carried before.**
+
+⛔ **CORRECTED 2026-08-06 (Veritas V4-2 and V4-3).** This paragraph previously read *"The Google Drive report (originally step 4) follows the Pax commission and is therefore also post-rotation"* and, above it, that the commission *"belongs to the session after this one"*. **BOTH statements are now FALSE and were live contradictions of §17.5a.** **The report is a GIT artefact under `Deliverables/`, and Pax is commissioned INSIDE `/rotate` before `SAFE TO CLEAR` — not after respawn.** ⚠️ **There is no Google Drive step anywhere on this route.**
 
 <details><summary>Superseded — the original six-step ordering, retained as the record</summary>
 
