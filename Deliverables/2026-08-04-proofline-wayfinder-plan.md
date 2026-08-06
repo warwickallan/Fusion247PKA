@@ -1820,6 +1820,25 @@ All three investigations have landed and their findings are recorded above. **WP
 
 **Related and already recorded: C-9** — the governor writes **no log** when a continuity packet fails to deliver. **J2-5 and J2-6 are the same requirement arriving from a second direction**, and a fix that satisfies one should be checked against the other rather than built twice.
 
+### ✅ The J2 route — ESTABLISHED BY RECONNAISSANCE 2026-08-06. **No daemon and no new service are needed**
+
+**J2-7 permits a daemon only if the existing event/milestone route genuinely cannot provide the trigger. It can.** Both halves already exist and neither was built for this:
+
+| Need | What already carries it | Evidence |
+|---|---|---|
+| **J2-1 — a real production event** | **A `Stop` hook is ALREADY REGISTERED at USER level**: `node C:/Users/Buggly/.mypka/governor/continuity.mjs stop`. It fires at **every turn end, in every directory**, spawned **by the host** | `~/.claude/settings.json`, read 2026-08-06. Same registration route as the `SessionStart` reorient hook proven at `eff3033` |
+| **J2-3 — routine narration must NOT ding** | Continuity's **existing semantic-change dedupe** already suppresses a Stop write when state is unchanged (**E-H**). **That is precisely the substantive-vs-routine discriminator J2-3 needs** — it exists, it is proven, and it does not have to be invented | E-H, §16.5 |
+| **J2-5 / J2-6 — success AND failure durably observable, never silent** | **Tower's `notify.mjs` already does all of it**: a durable `tower.notification` row, a dedup claim, `telegram_ok` and `telegram_message_id` written back after the POST, and an **honest** `"not sent — missing TELEGRAM_BOT_TOKEN…"` detail recorded when credentials are absent rather than a silent no-op | `services/control-plane/tower-loop/notify.mjs:58-121`, read 2026-08-06 |
+| **J2-2 — which events** | The **five already named** in §16.10: active frontier changes · next Work Order changes · phase boundary changes · context crosses a threshold · handback state changes | Warwick, 2026-08-05 |
+
+### 🔓 This dissolves the §17.2 classifier blocker rather than routing around it
+
+**The blocker was that writes to `C:\.fusion247\**` are denied to Larry by the classifier and to every worker by GL-012.** On this route **no write to that path is ever required.** The change lives in `tools/governor/continuity.mjs` (repo, Keel) and its installed copy under `~/.mypka/governor/` (Mack — **and §16.10 records that subagent writes to `~/.mypka/**` now SUCCEED**). Credentials are **read at runtime by the hook-spawned process** from the stable path — never written, never echoed, and never sourced from an interactive shell, which is exactly **J2-4**.
+
+**The one thing reconnaissance did NOT establish, and it must not be assumed:** that the hook-spawned process actually resolves `TELEGRAM_BOT_TOKEN` / `AUTHORISED_TELEGRAM_USER_ID` in its own environment. **`notify.mjs` reads them from `process.env` exactly as `larry-ding.mjs` does**, so the *same* defect this session diagnosed can recur one layer up. **Establish it by execution before designing on it.**
+
+**Convergence worth noting:** §16.10's parked *"frontier-change-triggers-continuity"* defect and J2-1 are **the same mechanism**. Building the ding trigger discharges the parked defect; they must not be built twice.
+
 ## 17.3 ⚖️ STANDING CANONICAL LAW — *"Nothing may live only in Larry's head"*
 
 **Warwick supplied the exact block and instructed that it be added to root `CLAUDE.md` as the SOLE canonical definition.** That is his explicit approval and his exact text, which is what root `CLAUDE.md`'s *"no silent constitutional self-modification"* clause requires. **The independent review of the resulting patch is still owed** and is discharged by this phase's existing route — Veritas on the exact integrated head, Codex at PR level. **Larry does not self-certify it.**
