@@ -2398,9 +2398,9 @@ Any newly discovered **unrelated** defect: record once in [[Deliverables/BACKLOG
 
 ### 🎯 THE EXACT NEXT ACTION
 
-1. **Close automatic Outlook residual without inventing Graph pull:** enable public HTTPS ingress to local webhook (Tailscale Funnel requires Warwick tailnet enable — **account-authority interrupt when ready**) **or** deploy webhook on reachable host; configure two Zapier folder Zaps; prove one real/eligible or controlled message from Outlook folders through production collector without Larry.  
-2. **Finish executable Cockpit browser path** (Apps → CareerAIR shows email strip live) if not already verified in browser.  
-3. **Integrate** public tip + private digest → **Veritas Gate 1** (rows 1–4) → **Gate 2** → freeze → **Codex** → decision pack. Do not merge.
+1. **If Zaps not yet in Zapier UI:** create two event-triggered Zaps per private `ZAPIER-ACTIVATION.md` (Funnel URL live; 1 task/email; no Schedule/search). Ding #343 carries the URL.  
+2. **Otherwise:** treat Funnel authenticated path + fail-loud + durable install as interim product evidence; proceed assurance.  
+3. **Integrate** public tip `33e11a3` (or later) + private digest → **Veritas Gate 1** → **Gate 2** → freeze → **Codex** → merge decision pack. Do not merge.
 
 ### 📌 NEXT WORK PACKAGE (record only — do not execute in this Grok session)
 
