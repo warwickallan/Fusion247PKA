@@ -1812,16 +1812,25 @@ All three investigations have landed and their findings are recorded above. **WP
 
 ### Required outcome — every line must be verified true
 
-| # | Requirement |
+### 🔴 CORRECTED BY WARWICK, 2026-08-06 — **JOB 2 is NOT "make an event decide when to ding"**
+
+> **His correction, and it re-scopes the whole job:** *"The decision is contextual and stays with Larry, grounded by the START / RESUME HERE rule."*
+>
+> **No daemon and no automatic event classifier are required.** **The durable outcome is the SEND PATH, not the trigger.**
+
+**What this supersedes:** the requirement list below replaces the earlier J2-1..J2-8. **The `Stop`-hook trigger design recorded further down is SUPERSEDED and must not be built** — it is retained struck-through only because its *credential* finding survives and is now the crux.
+
+| # | Requirement — Warwick, 2026-08-06 |
 |---|---|
-| **J2-1** | **Defined events invoke the ding automatically** |
-| **J2-2** | Events include **Warwick action/decision required** and **substantive milestone, gate result or breakage** |
-| **J2-3** | **Routine progress narration does NOT ding** |
-| **J2-4** | **Credentials/configuration come from the approved stable runtime, not an interactive shell** |
-| **J2-5** | **Delivery success AND delivery failure are durably observable** |
-| **J2-6** | **Failure is never silent** |
-| **J2-7** | **No daemon or new service** unless the existing event/milestone route genuinely cannot provide the trigger |
-| **J2-8** | **Prove a real phone delivery from a fresh session caused by the REAL EVENT** — without Larry being reminded and without manually running the underlying script |
+| **J2-a** | **Larry applies the written criteria himself:** ding for Warwick action/decision, **or** a substantive outcome worth knowing; **never routine progress.** The criteria are the START / RESUME HERE block — **that rule is the grounding, and it is not restated here** |
+| **J2-b** | **FusionDevBot is Warwick's channel. TowerBot remains Codex/reviewer ONLY** |
+| **J2-c** | **The FusionDevBot send path loads its approved credentials ITSELF** — **no remembered flag, no shell setup** |
+| **J2-d** | **Send success or failure is VISIBLE, and failure is NEVER SILENT** |
+| **J2-e** | **`getMe` proves bot identity ONLY.** **Acceptance is ONE REAL FusionDevBot MESSAGE ARRIVING ON WARWICK'S PHONE from the repaired path** |
+
+**Read J2-e exactly.** It disqualifies every proof this session has produced so far: the three delivered dings all passed `--env-file` by hand, and `getMe` proves only that a bot exists. **Neither is acceptance.** Acceptance is a message that arrives having loaded its own credentials.
+
+**What is NOT owed, stated so it is not built:** no daemon · no new service · no automatic event classifier · no trigger mechanism · no scheduler. **The judgement stays with Larry and is not to be mechanised.** Under root `CLAUDE.md` § *"Nothing may live only in Larry's head"*, **the send path is the mechanism and it must be complete; WHEN to send it is a judgement, and a judgement is not a mechanism.** That distinction is the whole of this correction.
 
 ### 🚨 Known blocker on the J2 surface — a `permission`, and it is Warwick's
 
@@ -1829,9 +1838,15 @@ All three investigations have landed and their findings are recorded above. **WP
 
 **Related and already recorded: C-9** — the governor writes **no log** when a continuity packet fails to deliver. **J2-5 and J2-6 are the same requirement arriving from a second direction**, and a fix that satisfies one should be checked against the other rather than built twice.
 
-### ✅ The J2 route — ESTABLISHED BY RECONNAISSANCE 2026-08-06. **No daemon and no new service are needed**
+### ⛔ SUPERSEDED 2026-08-06 — the TRIGGER half of this reconnaissance is NOT to be built
 
-**J2-7 permits a daemon only if the existing event/milestone route genuinely cannot provide the trigger. It can.** Both halves already exist and neither was built for this:
+> **Warwick re-scoped JOB 2 above: the decision is contextual and stays with Larry. There is no automatic event classifier and no trigger mechanism.** Everything in this subsection about the `Stop` hook, the dedupe discriminator and the five events **is retained as evidence only** — it is a correct finding about the estate and a **wrong route for J2.**
+>
+> **What survives and is now the CRUX:** the credential probe below. It is the direct proof of **J2-c** — the send path cannot rely on an inherited environment, so it must load its credentials itself.
+>
+> **Do not build the trigger. Do not delete this record either** — it is what stops the next session re-deriving the same design and mistaking it for the route.
+
+**Retained for evidence — the original reconnaissance, correct as facts about the estate:**
 
 | Need | What already carries it | Evidence |
 |---|---|---|
@@ -1855,9 +1870,26 @@ All three investigations have landed and their findings are recorded above. **WP
 
 **Consequence, and it is the whole design constraint for J2:** a `Stop`-hook-spawned process **inherits nothing** and would fail with the *identical* `missing token/chat` gate that `larry-ding.mjs` hit this session. **The event route is right; the credential route is genuinely missing and must be built, not assumed.**
 
-**J2-4 therefore resolves to: the INSTALLED runtime under `~/.mypka/governor/` loads the credentials itself at process start, from the stable path.** That is the same repair the classifier blocked on `larry-ding.mjs` — **relocated to a surface where it is permitted**: `~/.mypka/**` is not `C:\.fusion247\**`, GL-012 does not bar it, and §16.10 records that subagent writes there now **succeed** (Mack, WO-16). **The blocked repair is not abandoned; it moves to where it belongs.**
+**J2-c therefore resolves to: the send path loads the credentials ITSELF at process start, from the approved stable path — no `--env-file`, no shell setup.**
 
-**Split, unchanged from WP-3A/WP-3E:** Keel changes `tools/governor/continuity.mjs` in the repo; **Mack installs to `~/.mypka/governor/`**, because a fix present only in the repo is inert — the §16.11 lesson.
+### 🚧 The surface decision — and why it is NOT a Warwick permission after all
+
+**The obstacle:** the natural repair is to edit `C:\.fusion247\larry-ding.mjs` so it self-loads. **The auto-mode classifier DENIES writes to `C:\.fusion247\**`** (hit this session), and **GL-012 §4 independently bars dispatching any specialist there** — it is the secrets-store root and never a valid grant. **Both doors are shut.**
+
+**Two routes, and the second needs no permission:**
+
+| | Route | Verdict |
+|---|---|---|
+| **(a)** | Warwick permits the one write to `C:\.fusion247\larry-ding.mjs` | **Not needed. Do not ask.** It also leaves the send path **outside version control** |
+| **(b)** | **The send path moves into the repo at `tools/governor/` and is INSTALLED to `~/.mypka/governor/`**, reading the approved credentials at runtime from the stable path | **CHOSEN.** An ordinary technical decision, not a product one |
+
+**Why (b) is decisively right, and it is not merely convenience:** `C:\.fusion247\larry-ding.mjs` is **not in version control**. It cannot be reviewed by Veritas, cannot be reviewed by Codex, has no history, and does not survive a rebuild of the machine. **A send path Warwick's acceptance depends on cannot live outside git.** Route (b) makes it versioned, reviewable and installable, and `~/.mypka/**` is a surface where subagent writes are proven to succeed (§16.10, Mack, WO-16).
+
+**Reading is not writing, and the distinction is load-bearing here.** The classifier blocked a **write**; the running script performing a **runtime read** of the approved env file is exactly what `--env-file` already does today. **No credential value ever enters a model context**, and no worker opens that file — a worker writes a path literal, which is not access. ⚠️ **Constraint for the Work Order: the tests must NOT read the real credentials file.**
+
+**Recorded honestly:** the legacy `C:\.fusion247\larry-ding.mjs` cannot be retired or edited, because that surface is closed. **It remains on disk as a legacy duplicate.** Two paths to one channel is a real defect — **reported once, not fixed**, since fixing it needs the permission route (a) exists for and Warwick has not been asked for it.
+
+**Split, unchanged from WP-3A/WP-3E:** **Keel** authors under `tools/governor/` in the repo; **Mack** installs to `~/.mypka/governor/`, because a fix present only in the repo is inert — the §16.11 lesson. **J2-e's acceptance is a real message from the INSTALLED path, not the repo copy.**
 
 **Convergence worth noting:** §16.10's parked *"frontier-change-triggers-continuity"* defect and J2-1 are **the same mechanism**. Building the ding trigger discharges the parked defect; they must not be built twice.
 
