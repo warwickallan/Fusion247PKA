@@ -67,14 +67,19 @@ This matters more than it looks: **the entire next phase is about proving what i
 - **Before `/clear`, run `/rotate`. Clearing is unsafe until `/rotate` reports `SAFE TO CLEAR` after the installed Honcho readback matches this Wayfinder's current phase, frontier and exact next action.**
 - **Tangents go in "SHIT TO DO" below. Do not chase them.** See the rule there — it binds even when the tangent comes from Warwick.
 
-> **Set by Warwick, 2026-08-06 — VERBATIM. Do not reword, summarise or "harmonise" this block.**
+> ### 📣 The Warwick notification rule — **NOT COPIED HERE BY DESIGN**
 >
-> Warwick notification rule: use FusionDevBot when Warwick must make a decision or take an action, and for a substantive outcome he would reasonably want to know immediately even when no action is required—for example a gate verdict, merge, significant failure, recovery or SAFE TO CLEAR. Do not ding for routine progress narration.
-> At orientation, confirm the FusionDevBot notification path is available. If it is unavailable, say so immediately; never let Warwick believe he can put the phone down and wait for a notification that cannot arrive.
+> **Canonical: root `CLAUDE.md` § "Rule 4a — the Warwick notification rule". Read it there.**
+>
+> **The verbatim copy that stood here was REPLACED by this reference on Warwick's instruction, 2026-08-06.** A rule living in two places drifts, and the SSOT Golden Rule says every fact lives in exactly one file. **Do not restore a copy — restore a pointer if this one is ever lost.**
+>
+> **The one-line shape, so a reader knows what they are being sent to** (this is a signpost, not the rule): **decide before posting any substantive outcome and immediately after any specialist return · send BEFORE the chat update · then yield.** ⚠️ **Do not act on this summary — the criteria, the channel, the ordering and the availability clause are all in the canonical section.**
 
-**The only edit to the above is Warwick's own correction, 2026-08-06: he wrote "TowerBot", then corrected it to FusionDevBot. Everything else is his text unaltered.** ⚠️ **Do not "fix" it back.** The two bots are a real, documented split and they are not interchangeable: **DevBot is Warwick's channel; TowerBot is Codex's channel** (`Deliverables/2026-07-21-tubeair-telegram-combined-gateway-handoff.md:28`). Notifying Warwick through TowerBot would send it to the reviewer channel.
+**Two facts that belong here rather than in the constitution, because they are this build's evidence:**
 
-**Orientation duty discharged, 2026-08-06, by execution:** `getMe` returned `{"ok":true,"username":"Fusion247devbot","first_name":"Fusion 247 Larry Dev"}` — read-only, no message sent, token never printed. **Path AVAILABLE.** ⚠️ **But read §17.2 before relying on it unattended: the credentials resolve only when the caller supplies them. A hook-spawned process inherits NEITHER name, established by execution.** So the path is available *to a session that loads them* and **not yet** to an automatic event — which is exactly what J2 exists to fix, and exactly the gap this rule says must never be papered over.
+⚠️ **FusionDevBot and TowerBot are a real documented split and are not interchangeable — DevBot is Warwick's channel, TowerBot is Codex's** (`Deliverables/2026-07-21-tubeair-telegram-combined-gateway-handoff.md:28`). **Warwick himself wrote "TowerBot" on 2026-08-06 and corrected it to FusionDevBot.** Notifying him through TowerBot would deliver to the reviewer channel. **Do not "fix" it back.**
+
+✅ **Orientation duty discharged 2026-08-06 by execution**, and the limitation that stood beside it is now **CLOSED**: `getMe` returned `{"ok":true,"username":"Fusion247devbot"}`, and **J2-e then proved a real send from the installed path with the credentials self-loaded** (§17.7, `message_id 326`). **The earlier caveat — that the path was available only to a caller that supplied credentials — no longer applies to the installed path.**
 
 ---
 
@@ -1962,6 +1967,34 @@ All three investigations have landed and their findings are recorded above. **WP
 ⛔ **The report is a GIT artefact. NOT Google Drive, NOT Google Sheets, NOT Supabase** — this supersedes the earlier "publish to Google Drive" step entirely. **Supabase reporting is explicitly DEFERRED to a fresh session after the next `/clear` and must not be built now.**
 
 **For THIS rotation the report must carry:** Work Order evidence · rework and refusals · **the notification misses** · parent-channel availability and queued messages · token/context evidence **read from the instrument, never estimated** · and any other recorded delivery-tax findings.
+
+## 17.8 📣 The attention correction — Warwick, 2026-08-06. **Integrated BEFORE Veritas, as ordered**
+
+> **His diagnosis, and it reframes the whole problem: *"The DevBot transport is now proven. The repeated failure is attention at the point of judgement."*** **Correct it "without reopening automatic notification classification."**
+
+**Four parts, all landed:**
+
+| # | Change | Where |
+|---|---|---|
+| **1** | **One concise canonical notification rule beside Rule 4** — decide before posting any substantive outcome and immediately after any specialist return · **send BEFORE the chat update** · then yield. *"The judgement remains Larry's; delivery is mechanical."* | root `CLAUDE.md` § **Rule 4a** |
+| **2** | **The Wayfinder copy REPLACED by an exact reference.** A rule in two places drifts; SSOT says one home | this map's START / RESUME block |
+| **3** | **A zero-model `PostToolUse` reminder on Agent returns**, injecting the rule into the parent at the moment of decision | `.claude/hooks/notify-reminder.mjs` + `.claude/settings.json` |
+| **4** | **Availability preserved** — eligible specialists run in the **background by default** and Larry **yields immediately after dispatch**. Foreground needs a genuine interactive-permission reason | root `CLAUDE.md` § Rule 4a |
+
+**What the hook is NOT, asserted by source and not by promise** — `grep -cE "fetch\|https?:\|telegram\|Agent(\|spawn\|exec"` over it returns **0**:
+
+- **does NOT classify significance** — the judgement is Larry's and stays Larry's;
+- **does NOT send** — no network call of any kind;
+- **does NOT launch an agent** — no model is invoked, so it costs **zero tokens**;
+- **does NOT create a daemon** — it runs, prints, exits `0`.
+
+**Executed proof it works as a program:** emits valid JSON with `hookEventName: PostToolUse` and a populated `additionalContext`; `settings.json` parses with matcher `Agent|Task`. **Exit 0 always — a reminder that can break the parent turn is worse than no reminder.**
+
+### ⚠️ WRITTEN IS NOT LOADED — and this is the honest status
+
+**Root `CLAUDE.md`: *"a hook present in a settings file has no effect until the host restarts… No reply may assert a control is active without evidence that it fired."*** **This hook has NOT yet been observed to fire.** It is **written and executable**, which is a different claim from **installed and firing**.
+
+**Warwick set the live test himself: *"The Veritas return is the live test: the reminder must reach Larry, and if the return is substantive the ding must arrive before the chat update."*** **If the reminder does not appear on the Veritas return, that is a LOADING result, not a design failure** — and it must be reported as exactly that, not quietly absorbed and not dressed up as success.
 
 ## 17.7 ✅ J2-e — PASSED BY EXECUTION, 2026-08-06
 
