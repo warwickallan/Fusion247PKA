@@ -1,9 +1,9 @@
 {
   "session_date": "2026-08-06",
   "branch": "build-020/phase4-automation-law",
-  "closing_head": "b936ce0e334bb7fb42b0bccfe16da674968d06bc",
+  "closing_head": "3cf31c24badac7fa910b6003cd8bbc0471fa9111",
   "map_path": "Deliverables/2026-08-04-proofline-wayfinder-plan.md",
-  "deliverable_path": "Deliverables/2026-08-06-session-performance-report-gate1-pass.md",
+  "deliverable_path": "Deliverables/2026-08-06-session-performance-report-rotate.md",
   "host": "grok-build",
   "host_version": null,
   "elapsed_minutes": null,
@@ -11,8 +11,8 @@
   "total_context_tokens_out": null,
   "parent_channel_available": true,
   "queued_messages": 0,
-  "wo_first_dispatch_success": 3,
-  "wo_amendments": 0,
+  "wo_first_dispatch_success": 5,
+  "wo_amendments": 2,
   "wo_refusals": 1,
   "doc_lines_changed": 3520,
   "product_lines_changed": 2063,
@@ -35,34 +35,43 @@
     "allocation_rework_pct",
     "allocation_waiting_pct",
     "parent_channel_response_latency",
-    "rule_4a_notification_miss_count_this_window",
-    "exact_veritas_dispatch_count_full_day_split",
-    "exact_keel_dispatch_count",
-    "exact_mack_dispatch_count",
-    "independent_git_diff_stat_reexecution"
+    "rule_4a_notification_miss_count_after_morning",
+    "exact_full_day_veritas_dispatch_count",
+    "exact_full_day_keel_dispatch_count",
+    "exact_full_day_mack_dispatch_count",
+    "git_diff_stat_b936ce0_to_3cf31c24",
+    "git_diff_stat_complete_session_to_freeze_head",
+    "doc_product_volume_complete_freeze_range"
   ],
-  "notes": "Second /rotate of 2026-08-06 after prior report at ~e615cd0. Gate 1 PASS @ product 0855e4e7 (isolation); Gate 2 HOLD; PR #97 HOLD; no Codex. WO issued this window: ac5-1/2/3 first-dispatch success; WO-22 Keel REFUSE (preventable surface/contract mismatch) then Larry Rule 4 implement. Git e615cd0..b936ce0 Larry-measured 57 files +5431/-152; product-ish +1946/-117 (touch 2063); docs +3485/-35 (touch 3520). Grok host: no context instrument — all ctx/token fields null. Ding ids 330-339: 9 sent, 1 usage-no-message-file exit 4, queued 0. Supabase populate residual closed (self-load DATABASE_URL; green banked).",
+  "notes": "Third /rotate 2026-08-06 re-issue at freeze head 3cf31c24badac7fa910b6003cd8bbc0471fa9111 (after rotate.md mandatory metrics + Honcho map marker banking). Gate 1 PASS @ product 0855e4e7 isolation; Gate 2 HOLD; PR #97 HOLD; no Codex. Complete-day WO roll-up: first-dispatch success 5 (WO-19,21,ac5-1,ac5-2,ac5-3), amendments 2 (WO-18,20), refusals 1 (WO-22 preventable). This WO-rotate-pax GENERATED first dispatch is this report — not counted in success until Larry accepts. doc/product line fields are Larry-measured e615cd0..b936ce0 touches (3520/2063) only; complete freeze range UNESTABLISHED (no Bash). Grok host: all ctx/token fields null. Ding ids 326-340: 15 sent, 1 usage-no-message-file exit 4, queued 0. Two Warwick-confirmed Rule 4a misses morning only. Supabase green banked through b936ce0; 3cf31c24 populate is Larry step 7b after this return.",
   "specialists": [
     {
       "specialist": "veritas",
-      "dispatches": 4,
+      "dispatches": 6,
       "tokens_in": null,
       "tokens_out": null,
-      "notes": "Minimum established on ACTIVE WP arc: Gate1@95f8826 HOLD, Gate1@0855e4e HOLD, Gate1 isolation PASS, Gate2 HOLD. More same-day receipts may exist; full-day split UNESTABLISHED."
+      "notes": "Minimum same-day Gate receipts established from artefacts; more may exist — exact full-day count UNESTABLISHED. Tokens UNESTABLISHED on Grok."
     },
     {
       "specialist": "pax",
-      "dispatches": 3,
+      "dispatches": 6,
       "tokens_in": null,
       "tokens_out": null,
-      "notes": "ac5-1 note; Grok return-cue Option C brief; this performance report. Tokens UNESTABLISHED on Grok."
+      "notes": "Morning performance report; WO-21 brief; ac5-1; Grok return-cue Option C; gate1-pass report; this rotate report. Tokens UNESTABLISHED."
     },
     {
       "specialist": "keel",
-      "dispatches": 2,
+      "dispatches": 4,
       "tokens_in": null,
       "tokens_out": null,
-      "notes": "ac5-2 journey proof first-dispatch success; WO-22 REFUSE at read-back. Additional hermetic/product dispatches possible — count is minimum."
+      "notes": "Minimum: WO-18, WO-19, ac5-2, WO-22 REFUSE. Hermetic/product dispatches may add more — UNESTABLISHED."
+    },
+    {
+      "specialist": "mack",
+      "dispatches": 1,
+      "tokens_in": null,
+      "tokens_out": null,
+      "notes": "WO-20 ding machine install established. Later exclusive dispatches UNESTABLISHED — recorded minimum 1."
     },
     {
       "specialist": "nolan",
@@ -72,18 +81,11 @@
       "notes": "ac5-3 GENERATED first-dispatch accept note."
     },
     {
-      "specialist": "mack",
-      "dispatches": 0,
-      "tokens_in": null,
-      "tokens_out": null,
-      "notes": "No new exclusive WO outcome file this window; watcher/install references only. Count UNESTABLISHED as positive dispatches — recorded 0 rather than invent."
-    },
-    {
       "specialist": "larry-direct",
       "dispatches": 1,
       "tokens_in": null,
       "tokens_out": null,
-      "notes": "Not a specialist dispatch. WO-22 implemented under Rule 4 exception after Keel REFUSE. Orchestration/dings not counted as dispatches."
+      "notes": "Not a specialist dispatch. WO-22 Rule 4 exception implementation after Keel REFUSE. Orchestration/dings not counted as dispatches."
     }
   ]
 }

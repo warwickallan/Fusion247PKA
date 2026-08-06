@@ -2344,9 +2344,9 @@ node "C:/Users/Buggly/.mypka/governor/ding.mjs" <message-file>
 | **Map** | `Deliverables/2026-08-04-proofline-wayfinder-plan.md` — this file |
 | **Branch / worktree** | `build-020/phase4-automation-law` · `C:\Fusion247PKA-build-020-trial` |
 | **PR** | **#97** open — **merge HOLD** (Warwick) |
-| **HEAD** | Session **closing head (report):** `b936ce0e334bb7fb42b0bccfe16da674968d06bc` · tip after banking: verify `git rev-parse HEAD` |
-| **Phase** | BUILD-020 Phase 4 — phase PASS only after Gate 2 Veritas PASS |
-| **Session report** | `Deliverables/2026-08-06-session-performance-report-gate1-pass.md` · payload `Deliverables/2026-08-06-session-report-payload.json` · same `closing_head` `b936ce0e…` |
+| **HEAD** | Session **closing head (report + Supabase):** `3cf31c24badac7fa910b6003cd8bbc0471fa9111` · tip after banking: verify `git rev-parse HEAD` |
+| **Phase** | BUILD-020 Phase 4 — **Gate 1 PASS** · **Gate 2 HOLD** · phase PASS only after Gate 2 Veritas PASS |
+| **Session report** | `Deliverables/2026-08-06-session-performance-report-rotate.md` · payload `Deliverables/2026-08-06-session-report-payload.json` · same `closing_head` `3cf31c24…` · WO `Deliverables/proofline/WO-2026-08-06-rotate-pax-session-report.md` |
 
 ### Functional acceptance requirements (1–5) — Veritas Gate 1 grades these
 
@@ -2381,7 +2381,7 @@ node "C:/Users/Buggly/.mypka/governor/ding.mjs" <message-file>
 - Prior full-WP HOLD (old shape): `Deliverables/2026-08-06-veritas-active-session-wp-receipt.md`  
 - Ding: `~/.mypka/governor/ding.mjs` · Supabase: `tools/session-report/*`  
 - **Supabase green proof:** `Deliverables/2026-08-06-session-report-supabase-green-proof.md` (schema apply + populate + verify; durable path; no Warwick credential paste)
-- **Session performance report (second rotate 2026-08-06):** `Deliverables/2026-08-06-session-performance-report-gate1-pass.md` · payload `Deliverables/2026-08-06-session-report-payload.json` · **closing_head** `b936ce0e334bb7fb42b0bccfe16da674968d06bc`
+- **Session performance report (accepted `/rotate` 2026-08-06):** `Deliverables/2026-08-06-session-performance-report-rotate.md` · payload `Deliverables/2026-08-06-session-report-payload.json` · **closing_head** `3cf31c24badac7fa910b6003cd8bbc0471fa9111` · Pax WO `Deliverables/proofline/WO-2026-08-06-rotate-pax-session-report.md`
 
 ### Veritas / Codex dispatch law (durable)
 
@@ -2393,11 +2393,11 @@ node "C:/Users/Buggly/.mypka/governor/ding.mjs" <message-file>
 
 **Fresh session after this `/rotate` (sole next action):**
 
-1. **Review** `Deliverables/2026-08-06-session-performance-report-gate1-pass.md` (Pax).  
+1. **Review** `Deliverables/2026-08-06-session-performance-report-rotate.md` (Pax).  
 2. **Assess the exact remaining Gate 2 Phase 4 residuals** (map + Gate 2 receipt + phase North Star — not Gate 1 re-litigation).  
 3. **Bring Warwick the phase-closure or bounded WP-only Codex decision** (Gate 1 PASS + Gate 2 HOLD → WP-only Codex only with Warwick authority; phase-complete needs Gate 2 PASS + Warwick).  
 
-**Still absolute:** no merge without Warwick · PR **#97 HOLD** · do not treat Gate 1 as Phase PASS.
+**State:** Gate 1 **PASS** · Gate 2 **HOLD** · PR **#97 HOLD** · no merge without Warwick · Gate 1 ≠ Phase PASS.
 
 ### 📌 Parked (not this WP)
 
