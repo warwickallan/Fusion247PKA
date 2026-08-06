@@ -1,0 +1,17 @@
+{
+  "_comment": "Canonical specialist-return cue text. Hooks look up by agent_type only — never invent. Unknown types use \"_default\". Do not collapse all entries to one generic string (Pax: that kills the gate by habituation).",
+  "_default": "A background specialist (type: {agent_type}) has returned. Before summarising or starting further parent work, apply the Warwick notification rule (root CLAUDE.md Rule 4a) now. If it qualifies, send through FusionDevBot first; then report and yield.",
+  "general-purpose": "A background general-purpose agent has returned. Before summarising or starting further parent work, apply the Warwick notification rule (root CLAUDE.md Rule 4a) now. If it qualifies, send through FusionDevBot first; then report and yield.",
+  "Explore": "Explore has returned. Before summarising or starting further parent work, apply the Warwick notification rule (root CLAUDE.md Rule 4a) now. If it qualifies, send through FusionDevBot first; then report and yield.",
+  "explore": "Explore has returned. Before summarising or starting further parent work, apply the Warwick notification rule (root CLAUDE.md Rule 4a) now. If it qualifies, send through FusionDevBot first; then report and yield.",
+  "keel": "Keel has returned. Before summarising or starting further parent work, apply the Warwick notification rule (root CLAUDE.md Rule 4a) now. If it qualifies, send through FusionDevBot first; then report and yield.",
+  "mack": "Mack has returned. Before summarising or starting further parent work, apply the Warwick notification rule (root CLAUDE.md Rule 4a) now. If it qualifies, send through FusionDevBot first; then report and yield.",
+  "pax": "Pax has returned. Before summarising or starting further parent work, apply the Warwick notification rule (root CLAUDE.md Rule 4a) now. If it qualifies, send through FusionDevBot first; then report and yield.",
+  "veritas": "Veritas has returned. Before summarising or starting further parent work, apply the Warwick notification rule (root CLAUDE.md Rule 4a) now. If it qualifies, send through FusionDevBot first; then report and yield.",
+  "nolan": "Nolan has returned. Before summarising or starting further parent work, apply the Warwick notification rule (root CLAUDE.md Rule 4a) now. If it qualifies, send through FusionDevBot first; then report and yield.",
+  "penn": "Penn has returned. Before summarising or starting further parent work, apply the Warwick notification rule (root CLAUDE.md Rule 4a) now. If it qualifies, send through FusionDevBot first; then report and yield.",
+  "silas": "Silas has returned. Before summarising or starting further parent work, apply the Warwick notification rule (root CLAUDE.md Rule 4a) now. If it qualifies, send through FusionDevBot first; then report and yield.",
+  "felix": "Felix has returned. Before summarising or starting further parent work, apply the Warwick notification rule (root CLAUDE.md Rule 4a) now. If it qualifies, send through FusionDevBot first; then report and yield.",
+  "vex": "Vex has returned. Before summarising or starting further parent work, apply the Warwick notification rule (root CLAUDE.md Rule 4a) now. If it qualifies, send through FusionDevBot first; then report and yield.",
+  "vera": "Vera has returned. Before summarising or starting further parent work, apply the Warwick notification rule (root CLAUDE.md Rule 4a) now. If it qualifies, send through FusionDevBot first; then report and yield."
+}

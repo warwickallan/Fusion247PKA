@@ -2339,9 +2339,9 @@ node "C:/Users/Buggly/.mypka/governor/ding.mjs" <message-file>
 
 ### 🎯 THE EXACT NEXT ACTION
 
-**Dispatch a bounded Work Order to implement Option A reduced** (subagent-return retrieval cue) per `Deliverables/2026-08-06-pax-subagent-return-cue-brief.md` §§7–8 and §17.9 above. Kill condition cleared by execution: parent `PreToolUse` lacks `agent_id`; subagent `PreToolUse` carries `agent_id` + `agent_type` on host `2.1.222`.
+**Integrate WO-22 at the current tip and decide the Phase 4 closure path** against still-open items (J1-1, AC-5 counting rule, reminder-hook A/B/C, Veritas re-review of the new exact head). **Do not re-run the §9 probe unless the host version changes.**
 
-**Why this and not something else:** the post-rotation probe was the only gated item; it returned `BUILD`. Implementation is the named next step. **Do not re-run the probe unless the host version changes.**
+**Just completed:** §9 → **BUILD** · WO-22 Option A reduced **implemented** (Larry Rule 4 exception after Keel `REFUSE` on `.claude/**`) · evidence `Deliverables/proofline/EVIDENCE-2026-08-06-wo-22-return-cue.md` · unit **10/10** · host `2.1.222`.
 
 ### ⏸️ Awaiting Warwick — do NOT decide these
 
