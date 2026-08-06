@@ -2354,17 +2354,17 @@ node "C:/Users/Buggly/.mypka/governor/ding.mjs" <message-file>
 | **2** | Return-cue: **Claude** automatic parent cue live; **Grok** Option C honest | **PASS** (Gate 1) | Claude live proof + `.grok/ORIENTATION.md` / empty inject hooks |
 | **3** | FusionDevBot durable path + host-appropriate combined journey | **PASS** (Gate 1) | Transport + host-appropriate grading PASS |
 | **4** | Watcher/Tower durable across restart, session, PR | **PASS** (Gate 1) | `start-watcher.mjs` + durable SQLite |
-| **5** | `/rotate` Pax report + **successful** matching Supabase populate | **PRODUCT GREEN — awaiting Veritas** | Durable self-load from `C:/.fusion247/fusion-capture-gateway.env` (`DATABASE_URL`; project `kerdinlgcfxnjrztwqde`). No shell `SUPABASE_*`. Schema applied via `tools/session-report/apply-schema.mjs`. Fresh-shell populate **ok:true verified:true** at tip — evidence `Deliverables/2026-08-06-session-report-supabase-green-proof.md`. **Not Gate 1 PASS until Veritas re-grades the exact head.** |
+| **5** | `/rotate` Pax report + **successful** matching Supabase populate | **PASS** (Gate 1) | Durable self-load `C:/.fusion247/fusion-capture-gateway.env` (`DATABASE_URL`; project `kerdinlgcfxnjrztwqde`). Schema via `apply-schema.mjs`. Isolation re-populate ok:true verified:true. Receipts: `…gate1-active-wp-0855e4e-receipt.md` + `…-isolation-receipt.md` |
 
 ### ASSURANCE AND RELEASE SEQUENCE (not product requirements)
 
 | # | Step | Status |
 |---|---|---|
-| **6** | Stable exact head + green required CI for that head | Prior PASS at `95f8826`; **re-check after tip with session-report fix** |
-| **7** | **Veritas Gate 1** functional WP | **Resubmit at tip** (prior overall HOLD: rows 1–4 PASS, row 5 HOLD @ `95f8826`) — new product head includes durable populate |
+| **6** | Stable exact head + green required CI for that head | Product `0855e4e` on remote; re-check CI for tip as needed before any merge unit |
+| **7** | **Veritas Gate 1** functional WP | **PASS** @ product `0855e4e7…` — `Deliverables/2026-08-06-veritas-gate1-active-wp-0855e4e-isolation-receipt.md` (rows 1–5 PASS; isolation + remote proven) |
 | **8** | **Veritas Gate 2** Phase 4 | **HOLD** — phase not PASS — `Deliverables/2026-08-06-veritas-gate2-phase4-receipt.md` |
-| **9** | Warwick: Codex eligibility for merge unit | Warwick — **not yet** (Gate 1 not overall PASS) |
-| **10** | Codex only after Warwick authorises | **HOLD — no Codex** |
+| **9** | Warwick: Codex eligibility for merge unit | Warwick — Gate 1 PASS + Gate 2 HOLD → **WP-only Codex only if Warwick authorises**; **not invoked** |
+| **10** | Codex only after Warwick authorises | **HOLD — no Codex** (this session) |
 | **11** | Warwick final merge decision | Warwick |
 | **12** | No merge without Warwick | absolute |
 
@@ -2388,9 +2388,9 @@ node "C:/Users/Buggly/.mypka/governor/ding.mjs" <message-file>
 
 ### 🎯 THE EXACT NEXT ACTION
 
-1. **Resubmit Veritas Gate 1** on the exact integrated tip that carries durable session-report self-load + green populate evidence (row 5 residual).  
-2. On Gate 1 overall PASS: still **no Codex / no merge** until Warwick authorises (PR #97 HOLD).  
-3. Gate 2 stays HOLD until phase North Star residuals closed.  
+1. **Gate 1 functional WP is PASS** at product `0855e4e7…` (isolation receipt). Commit/bank latest Veritas receipt if not already on branch.  
+2. **Still no Codex / no merge** until Warwick authorises (PR #97 HOLD). Gate 1 PASS + Gate 2 HOLD ≠ phase complete.  
+3. Gate 2 stays HOLD until phase North Star residuals closed — do not treat Gate 1 as Phase PASS.  
 4. **No Codex. No merge** without Warwick.
 
 ### 📌 Parked (not this WP)
