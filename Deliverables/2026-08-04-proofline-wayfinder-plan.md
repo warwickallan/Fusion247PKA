@@ -2354,14 +2354,14 @@ node "C:/Users/Buggly/.mypka/governor/ding.mjs" <message-file>
 | **2** | Return-cue: **Claude** automatic parent cue live; **Grok** Option C honest | **PASS** (Gate 1) | Claude live proof + `.grok/ORIENTATION.md` / empty inject hooks |
 | **3** | FusionDevBot durable path + host-appropriate combined journey | **PASS** (Gate 1) | Transport + host-appropriate grading PASS |
 | **4** | Watcher/Tower durable across restart, session, PR | **PASS** (Gate 1) | `start-watcher.mjs` + durable SQLite |
-| **5** | `/rotate` Pax report + **successful** matching Supabase populate | **HOLD** | **Only functional HOLD** — need `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` in approved runtime + schema apply |
+| **5** | `/rotate` Pax report + **successful** matching Supabase populate | **PRODUCT GREEN — awaiting Veritas** | Durable self-load from `C:/.fusion247/fusion-capture-gateway.env` (`DATABASE_URL`; project `kerdinlgcfxnjrztwqde`). No shell `SUPABASE_*`. Schema applied via `tools/session-report/apply-schema.mjs`. Fresh-shell populate **ok:true verified:true** at tip — evidence `Deliverables/2026-08-06-session-report-supabase-green-proof.md`. **Not Gate 1 PASS until Veritas re-grades the exact head.** |
 
 ### ASSURANCE AND RELEASE SEQUENCE (not product requirements)
 
 | # | Step | Status |
 |---|---|---|
-| **6** | Stable exact head + green required CI for that head | **PASS at `95f8826`** (governor/control-plane/secret-scan/private-apps success); re-check after later tips |
-| **7** | **Veritas Gate 1** functional WP | **HOLD overall** (rows 1–4 PASS, **row 5 HOLD**) — `Deliverables/2026-08-06-veritas-gate1-active-wp-receipt.md` |
+| **6** | Stable exact head + green required CI for that head | Prior PASS at `95f8826`; **re-check after tip with session-report fix** |
+| **7** | **Veritas Gate 1** functional WP | **Resubmit at tip** (prior overall HOLD: rows 1–4 PASS, row 5 HOLD @ `95f8826`) — new product head includes durable populate |
 | **8** | **Veritas Gate 2** Phase 4 | **HOLD** — phase not PASS — `Deliverables/2026-08-06-veritas-gate2-phase4-receipt.md` |
 | **9** | Warwick: Codex eligibility for merge unit | Warwick — **not yet** (Gate 1 not overall PASS) |
 | **10** | Codex only after Warwick authorises | **HOLD — no Codex** |
@@ -2378,6 +2378,7 @@ node "C:/Users/Buggly/.mypka/governor/ding.mjs" <message-file>
 - Narrow Gate 1: `Deliverables/2026-08-06-veritas-build020-gate1-pass-a1e124a-receipt.md`  
 - Prior full-WP HOLD (old shape): `Deliverables/2026-08-06-veritas-active-session-wp-receipt.md`  
 - Ding: `~/.mypka/governor/ding.mjs` · Supabase: `tools/session-report/*`  
+- **Supabase green proof:** `Deliverables/2026-08-06-session-report-supabase-green-proof.md` (schema apply + populate + verify; durable path; no Warwick credential paste)
 
 ### Veritas / Codex dispatch law (durable)
 
@@ -2387,8 +2388,8 @@ node "C:/Users/Buggly/.mypka/governor/ding.mjs" <message-file>
 
 ### 🎯 THE EXACT NEXT ACTION
 
-1. **Warwick (only if needed):** place `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` in approved off-repo runtime; allow schema apply.  
-2. Successful populate → resubmit **Gate 1** at new tip (row 5 clears → overall Gate 1 PASS possible).  
+1. **Resubmit Veritas Gate 1** on the exact integrated tip that carries durable session-report self-load + green populate evidence (row 5 residual).  
+2. On Gate 1 overall PASS: still **no Codex / no merge** until Warwick authorises (PR #97 HOLD).  
 3. Gate 2 stays HOLD until phase North Star residuals closed.  
 4. **No Codex. No merge** without Warwick.
 
