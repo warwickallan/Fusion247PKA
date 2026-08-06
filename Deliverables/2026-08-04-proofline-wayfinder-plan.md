@@ -2360,12 +2360,12 @@ node "C:/Users/Buggly/.mypka/governor/ding.mjs" <message-file>
 
 | # | Step | Status |
 |---|---|---|
-| **6** | Stable exact head + green required CI for that head | open at tip |
-| **7** | **Veritas Gate 1** — full functional Work Package (rows 1–5 only); separate verdict per row | pending after 1–5 closed |
-| **8** | **Veritas Gate 2** — BUILD-020 Phase 4 + North Star journey | pending after Gate 1 |
-| **9** | Warwick decides whether assured merge unit may proceed to Codex | Warwick |
-| **10** | Codex only after Warwick explicitly authorises | **HOLD — no Codex this stage** |
-| **11** | Warwick receives final merge decision | Warwick |
+| **6** | Stable exact head + green required CI for that head | **PASS at `95f8826`** (governor/control-plane/secret-scan/private-apps success); re-check after later tips |
+| **7** | **Veritas Gate 1** functional WP | **HOLD overall** (rows 1–4 PASS, **row 5 HOLD**) — `Deliverables/2026-08-06-veritas-gate1-active-wp-receipt.md` |
+| **8** | **Veritas Gate 2** Phase 4 | **HOLD** — phase not PASS — `Deliverables/2026-08-06-veritas-gate2-phase4-receipt.md` |
+| **9** | Warwick: Codex eligibility for merge unit | Warwick — **not yet** (Gate 1 not overall PASS) |
+| **10** | Codex only after Warwick authorises | **HOLD — no Codex** |
+| **11** | Warwick final merge decision | Warwick |
 | **12** | No merge without Warwick | absolute |
 
 **Gate 1 PASS + Gate 2 HOLD is a valid outcome** (WP complete; phase still open). Do not call Gate 1 = Phase PASS.
