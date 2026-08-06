@@ -2337,6 +2337,20 @@ node "C:/Users/Buggly/.mypka/governor/ding.mjs" <message-file>
 
 ## ⭐ ACTIVE SESSION WORK PACKAGE — single durable authority for this session
 
+> **🔄 AMENDMENT 5 — Warwick, 2026-08-07. SPECIALIST-RETURN REMINDER HOOKS DESCOPED AND DISABLED.**
+>
+> **Recorded outcome, his exact wording:** «**Specialist-return reminder injection: DESCOPED — demonstrated regression and no demonstrated net benefit.**»
+>
+> **Disabled from the active runtime** (project `.claude/settings.json` `hooks` emptied): `notify-reminder` · `return-cue-write` · `return-cue-consume` · `return-cue-sweep`. Runtime state `.claude/state/return-cues/` removed so no stale marker can fire.
+>
+> **NOT touched, and explicitly preserved:** the machine-level `SessionStart → reorient.mjs` orientation hook and `Stop → continuity.mjs stop` banking/rotation hook, both in `~/.claude/settings.json`. That file was not opened for writing. *(Note: the `SessionStart` binding removed from the PROJECT settings was `return-cue-sweep`, part of the descoped system — not the orientation hook, which is a different file at a different scope.)*
+>
+> **Implementations and evidence PRESERVED in git** as a failed/unproven experiment — all six files remain tracked under `.claude/hooks/`. **No further repair, extension or proving inside this Build.** Reconsider only if real delivery evidence shows Larry repeatedly missing meaningful specialist returns without them.
+>
+> **The evidence base** (Larry's executed count, this session): **8** false *"a specialist has returned"* fired at **dispatch** — `PostToolUse` completes at launch for a background agent, so it is structurally incapable of detecting a return; **3** false *"(type: unknown)"* with nothing running, cause **never established**; ~1 duplicate; against ~6 true, correctly-timed injections. **Majority false.** Larry disproved the instrument in-line six times. **No notification was shown to have been caused by a hook** — every ding sent (349–353) was driven by the substance of the event. Three prior rotations, and Grok with no equivalent hooks, worked well without it. Larry's candid judgement, on the record: the hooks did not improve his behaviour, and repeated false prompts bias toward over-notification.
+>
+> **⚠️ WRITTEN IS NOT LOADED, in both directions.** Root `CLAUDE.md`: *"a hook present in a settings file has no effect until the host restarts."* The same applies to removal — **the already-loaded hooks may keep firing in this session**. Any further injection observed before a restart is expected, is not a failure of this change, and must not be reported as one. **Confirmation that they no longer fire is owed at the next fresh session, either way.**
+
 > **🔄 AMENDMENT 4 — Warwick, 2026-08-06 (after Veritas Gate 1 FAIL). ROW 3 DESCOPED.**
 >
 > His words: *"Row 3 you may descope and move with details back to the backlog, we will come back to CareerAIR."*
