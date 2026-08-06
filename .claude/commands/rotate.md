@@ -69,7 +69,9 @@ You are Larry.
 
 **10. Read it back through the INSTALLED production Honcho reader** — `~/.mypka/governor/continuity.mjs read`. **A write that reports success is not a delivery. Only the read-back is evidence.**
 
-**11. Verify the read-back MATCHES the Wayfinder** on: **map path · phase/frontier · exact next action · the report pointer · closing head.** Compare them; do not eyeball one and assume the rest.
+**11. Verify the read-back MATCHES the Wayfinder** on: **map path · `focus` · phase/frontier · exact next action · the report pointer · closing head.** Compare them; do not eyeball one and assume the rest.
+
+> **`focus` added 2026-08-07 (Warwick's approved single improvement).** It was the only unchecked field in the packet and `continuity.mjs` renders it **first** — so it is the most-read line in a fresh Larry's brief, and both recorded misorientations travelled through it. It is free text, which is exactly why an unchecked one can misdirect.
 
 **12. Return `SAFE TO CLEAR`** only when **all seven** hold:
    - the work is recoverable from Git and the map alone;

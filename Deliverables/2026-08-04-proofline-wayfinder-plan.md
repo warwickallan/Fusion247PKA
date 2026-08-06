@@ -16,8 +16,8 @@
 | **Head when written** | `ca4580298e1c3aad4f922637c3d836854b4af539`, **advanced by the commit that added this block.** `git rev-parse HEAD` is the authority — this map has recorded a stale head three times (C-3, and twice in the Work Order envelope). **Do not trust a SHA in this file over the repository.** |
 | **Upstream** | ~~**NONE CONFIGURED.** 51 commits ahead of `origin/main`.~~ **CORRECTED 2026-08-04 by execution (R-2): upstream IS `origin/build-020/live-trial`, 54 commits ahead, and PR #94 is already open as a DRAFT.** Remote is `https://github.com/warwickallan/Fusion247PKA.git`. |
 | **Phase complete** | **Phase 1 — Proofline. PASSED by Warwick, 2026-08-04**, on his own completed walkthrough. |
-| **Frontier** | ⛔ **DO NOT READ A FRONTIER FROM THIS BLOCK. → §14.19 is the SINGLE statement of the live frontier.** *(This row said "Phase 2 … Not started" and was a THIRD competing frontier statement — the same defect §12 was corrected for, in the block §12's own diagnosis named. Corrected 2026-08-05, Veritas rotation-readiness HOLD.)* |
-| **First safe action** | **→ §14.19.** *(This row pointed at §13, which lands on "awaiting Warwick's acceptance … nothing has been implemented" — false since 2026-08-05.)* |
+| **Frontier** | ⛔ **DO NOT READ A FRONTIER FROM THIS BLOCK. → the ONE current navigational target is § ACTIVE SESSION WORK PACKAGE (end of this file), and its `🎯 THE EXACT NEXT ACTION`.** *(**CORRECTED 2026-08-07:** this row previously pointed at **§14.19**, which records **Phase 2 — PASS. CLOSED**. The 2026-08-05 repair became the defect when §17 later declared itself live. Target is now named by SECTION IDENTIFIER, not by section number — identifiers survive succession, uniqueness claims decay.)* *(This row said "Phase 2 … Not started" and was a THIRD competing frontier statement — the same defect §12 was corrected for, in the block §12's own diagnosis named. Corrected 2026-08-05, Veritas rotation-readiness HOLD.)* |
+| **First safe action** | **→ § ACTIVE SESSION WORK PACKAGE → `🎯 THE EXACT NEXT ACTION`.** *(**CORRECTED 2026-08-07:** previously **→ §14.19** (Phase 2, CLOSED); before that **→ §13** ("nothing has been implemented" — false since 2026-08-05). Two successive corrections both went stale because both named a section NUMBER.)* |
 
 ### ✅ RESUMPTION — CORRECTED 2026-08-05. **Automatic reorientation NOW HAPPENS.**
 
@@ -1420,9 +1420,10 @@ Genuine **external independence** · **read-only** operation · **exact-head and
 
 ---
 
-## 14.19 ⭐ THE CURRENT FRONTIER — single statement, 2026-08-05
+## 14.19 ⛔ HISTORICAL — Phase 2's frontier. **NOT THE CURRENT FRONTIER.**
 
-**This is the ONLY place in this map that states the live frontier. §12 is Phase 1 history and says so.**
+> **⛔ RETIRED 2026-08-07. → the current target is § ACTIVE SESSION WORK PACKAGE.**
+> ~~*"This is the ONLY place in this map that states the live frontier."*~~ **That claim was FALSE from 2026-08-05 onward** — §16.8 appeared the same day it was written, and §17 later declared itself live. This section records **Phase 2 — PASS. CLOSED**, and two directive rows at the top of this file pointed here until today. **Retained as evidence of Phase 2; it directs nothing.**
 
 | | |
 |---|---|
@@ -1657,7 +1658,7 @@ All three investigations have landed and their findings are recorded above. **WP
 
 **Before Veritas passes the integrated head, the maximum permitted statement is:** «Integrated at "&lt;SHA&gt;" and submitted to Veritas for assurance.»
 
-## 16.8 Frontier
+## 16.8 ⛔ HISTORICAL — Phase 3's frontier. **NOT THE CURRENT FRONTIER.** → § ACTIVE SESSION WORK PACKAGE
 
 **Phase 3, step 1. Branch `build-020/phase3`, cut from `83cd6ae`. Worktree `C:\Fusion247PKA-build-020-trial`.**
 
@@ -1767,7 +1768,7 @@ All three investigations have landed and their findings are recorded above. **WP
 | **Runtime** | `~/.mypka/governor/` reinstalled from the merged head, 8/8 byte-identical to blob, rollback executed on the only file with a real delta |
 | **Delivered** | Honcho write-authority repair (guard now asks WHO, not only WHEN) · governor footer RETIRED from the message stream · Work Order envelope generator (`tools/wo/`) · cleaned candidate queue · `/rotate` restored |
 
-### THE NEXT ACTION for the fresh session — do these in order
+### ⛔ HISTORICAL — Phase 3's next action. **SUPERSEDED, directs nothing.** → § ACTIVE SESSION WORK PACKAGE
 
 1. **Fix the DevBot ding credentials.** `C:\.fusion247\larry-ding.mjs` returns `{"ok":false,"why":"missing token/chat (names only)"}` — the script is fine, the credentials are not loaded. **Warwick cannot be reached at all until this works**, and he asked for it directly. **Declare the private surface properly; it is the secrets-store root and GL-012 binds.**
 2. **Ding rule, his words:** ding for a decision or action needed, **and** for a substantive update **even when no action is required**. **Never** for routine commentary.
@@ -1779,7 +1780,9 @@ All three investigations have landed and their findings are recorded above. **WP
 
 ---
 
-# 17. ⭐ PHASE-COMPLETION CONTRACT — set by Warwick, 2026-08-06. **THIS IS NOW THE LIVE FRONTIER.**
+# 17. ⭐ PHASE-COMPLETION CONTRACT — set by Warwick, 2026-08-06. **Standing Phase 4 requirements — NOT the frontier statement.** → § ACTIVE SESSION WORK PACKAGE
+
+> **⚠️ CORRECTED 2026-08-07.** This heading previously read *"THIS IS NOW THE LIVE FRONTIER"*, which made it the third competing frontier claim. Its **content remains live and binding** as the Phase 4 completion contract; it simply does **not** state the current navigational target. **The one current target is § ACTIVE SESSION WORK PACKAGE.**
 
 > **His instruction, verbatim in effect:** *"record that before this phase finishes, the following must all be complete and verified true."* **Some of it may already be done. Nothing here is complete on assertion — each line is complete only when verified true.**
 >
@@ -2117,7 +2120,7 @@ All three investigations have landed and their findings are recorded above. **WP
 
 **What remains unestablished:** return-time efficacy vs noise · exactly-once consume under concurrent parent batches · Notification in interactive sessions.
 
-**📌 EXACT NEXT ACTION (supersedes the post-rotation probe action):** **Issue and dispatch a bounded Work Order to implement Option A reduced** per `Deliverables/2026-08-06-pax-subagent-return-cue-brief.md` §§7–8 — `SubagentStop` marker writer · parent-only `PreToolUse`/`UserPromptSubmit` consumer gated on absent `agent_id` · specialist-specific cue text · zero model calls · no daemon · no auto-send. **Do not build a workaround for a failed probe — the probe passed.**
+**⛔ HISTORICAL — SUPERSEDED 2026-08-07. This work was delivered, then DESCOPED by Amendment 5. Directs nothing. → § ACTIVE SESSION WORK PACKAGE.** ~~📌 EXACT NEXT ACTION (supersedes the post-rotation probe action):~~ **Issue and dispatch a bounded Work Order to implement Option A reduced** per `Deliverables/2026-08-06-pax-subagent-return-cue-brief.md` §§7–8 — `SubagentStop` marker writer · parent-only `PreToolUse`/`UserPromptSubmit` consumer gated on absent `agent_id` · specialist-specific cue text · zero model calls · no daemon · no auto-send. **Do not build a workaround for a failed probe — the probe passed.**
 
 ## 17.7 ✅ J2-e — PASSED BY EXECUTION, 2026-08-06
 
@@ -2333,9 +2336,30 @@ node "C:/Users/Buggly/.mypka/governor/ding.mjs" <message-file>
 >
 > **"The generated half is more trustworthy than prose about *provenance*, and less usable than prose about *values*."**
 
-## 17.4 Frontier
+## 17.4 Frontier → **§ ACTIVE SESSION WORK PACKAGE is the one current target.** *(This heading is a signpost, not a second frontier statement.)*
 
 ## ⭐ ACTIVE SESSION WORK PACKAGE — single durable authority for this session
+
+> **🔄 AMENDMENT 6 — Warwick, 2026-08-07. SUB-PHASE 4A DECLARED AND CLOSED FOR ASSURANCE. WAYFINDER STRATEGY DECIDED.**
+>
+> **Route:** Sub-phase 4A → Veritas → rotate; **Sub-phase 4B** (one fresh session) → remaining delivery and cleanup → Veritas → Codex → Warwick merge decision → authorised merge → installed/runtime alignment → **Proofline closure**; **only then** Asdair. **Proofline is NOT closed merely because PR #97 merges.**
+>
+> **Sub-phase 4A receives NO Codex review and NO merge.** Closure record and full 4B handover: [[Deliverables/2026-08-07-subphase-4A-closure-and-4B-handover]].
+>
+> **① WAYFINDER STRATEGY — DECIDED. The reduced, enforceable form.** Pax's 40-line constitutional proposal and the broad Project/Build/Wayfinder hierarchy are **NOT adopted**. The map contradictions are **NOT left unresolved**. Binding:
+> 1. The active BUILD-020 Wayfinder must have **one unambiguous current navigational target**.
+> 2. Historical Phase and frontier material may remain as evidence, but must be **clearly non-directive**.
+> 3. **Veritas must explicitly enumerate every statement in the active map capable of directing a fresh Larry's next action and verify all resolve to the same current target.**
+> 4. `focus` added to the existing `/rotate` read-back check. **Done this session.**
+> 5. **Veritas does not inherit ownership of the route or work queue** — preserved.
+>
+> **The enumeration check belongs in the existing Veritas Gate 3 surface. It must NOT be duplicated across `CLAUDE.md`, the map and another artefact.** No further Pax/Nolan research before rotation; their reports are banked at `research/wayfinder-transferability` @ `619c548`.
+>
+> **② VERITAS VERDICT TREATMENT FOR A BROKEN LIVE MAP — new, binding.** Where an active Wayfinder statement points a fresh Larry toward **closed or superseded** work · **competes** with the real current target · **misstates** the live Phase or next action · or makes rotation or continuation **unsafe** — Veritas returns **FAIL** on the affected Documentation/Git-truth or continuation-readiness dimension, **not merely HOLD**. The artefact is *demonstrably wrong*, not *pending*. **HOLD remains correct for genuinely pending evidence or an external action where the active artefact is not itself false.** This does **not** require failing unrelated functional outcomes — but **no Sub-phase or Phase may receive an overall closing PASS while its active Wayfinder can misdirect a fresh session.** **Larry owns the repair; Veritas identifies the unsafe effect and re-verifies the corrected exact SHA.**
+>
+> **③ NAVIGATION REPAIRED THIS SESSION.** Six stale directive statements retired or redirected; all now resolve to **§ ACTIVE SESSION WORK PACKAGE**. Executed enumeration in the closure record. **The lesson: both previous repairs named a section NUMBER and both went stale. The target is now named by section IDENTIFIER.**
+>
+> **④ TERMINOLOGY.** `Sub-phase` is **Warwick's boundary vocabulary** only. **`ACTIVE SESSION WORK PACKAGE` is retained as the proven durable map identifier — no repository-wide rename is authorised.** Larry retains full freedom over internal Work Packages and Work Orders.
 
 > **🔄 AMENDMENT 5 — Warwick, 2026-08-07. SPECIALIST-RETURN REMINDER HOOKS DESCOPED AND DISABLED.**
 >
