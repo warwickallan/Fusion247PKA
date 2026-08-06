@@ -136,7 +136,17 @@ Private contracts: `contracts/EMAIL-INTAKE-CONTRACT.md`, `config/outlook-scout.j
 | `GET /private-api/careerair/api/overview` | PASS (counts only) |
 | `GET /private-api/careerair/api/email-ops` | PASS when webhook up; correctly **unhealthy** when webhook down |
 
-Full CDP screenshot campaign: optional; API + shell routes executed against live ports Warwick uses (`8090` / tailnet `:8443`).
+**Browser shoot executed** (`cockpit/shoot.mjs` → `runtime/proof/cockpit-home`, private):
+
+| Shot | Result |
+|---|---|
+| Home | rendered |
+| Apps grid — CareerAIR tile | rendered |
+| Overview — overlay rendered 65716 chars | **PASS** (email strip + KPIs path live) |
+| Opportunities / Fit / Applications / Documents / About / Add-a-job | rendered |
+| Desktop Fit 1280 | rendered |
+
+API + shell routes also executed against live ports Warwick uses (`8090` / tailnet `:8443`).
 
 ---
 
