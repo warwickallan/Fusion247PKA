@@ -67,6 +67,15 @@ This matters more than it looks: **the entire next phase is about proving what i
 - **Before `/clear`, run `/rotate`. Clearing is unsafe until `/rotate` reports `SAFE TO CLEAR` after the installed Honcho readback matches this Wayfinder's current phase, frontier and exact next action.**
 - **Tangents go in "SHIT TO DO" below. Do not chase them.** See the rule there — it binds even when the tangent comes from Warwick.
 
+> **Set by Warwick, 2026-08-06 — VERBATIM. Do not reword, summarise or "harmonise" this block.**
+>
+> Warwick notification rule: use FusionDevBot when Warwick must make a decision or take an action, and for a substantive outcome he would reasonably want to know immediately even when no action is required—for example a gate verdict, merge, significant failure, recovery or SAFE TO CLEAR. Do not ding for routine progress narration.
+> At orientation, confirm the FusionDevBot notification path is available. If it is unavailable, say so immediately; never let Warwick believe he can put the phone down and wait for a notification that cannot arrive.
+
+**The only edit to the above is Warwick's own correction, 2026-08-06: he wrote "TowerBot", then corrected it to FusionDevBot. Everything else is his text unaltered.** ⚠️ **Do not "fix" it back.** The two bots are a real, documented split and they are not interchangeable: **DevBot is Warwick's channel; TowerBot is Codex's channel** (`Deliverables/2026-07-21-tubeair-telegram-combined-gateway-handoff.md:28`). Notifying Warwick through TowerBot would send it to the reviewer channel.
+
+**Orientation duty discharged, 2026-08-06, by execution:** `getMe` returned `{"ok":true,"username":"Fusion247devbot","first_name":"Fusion 247 Larry Dev"}` — read-only, no message sent, token never printed. **Path AVAILABLE.** ⚠️ **But read §17.2 before relying on it unattended: the credentials resolve only when the caller supplies them. A hook-spawned process inherits NEITHER name, established by execution.** So the path is available *to a session that loads them* and **not yet** to an automatic event — which is exactly what J2 exists to fix, and exactly the gap this rule says must never be papered over.
+
 ---
 
 ## 0. AMENDMENT 1 — the corrections forced by Keel's executed read-back (2026-08-04)
