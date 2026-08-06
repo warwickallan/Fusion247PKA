@@ -1838,6 +1838,24 @@ All three investigations have landed and their findings are recorded above. **WP
 
 **What is NOT owed, stated so it is not built:** no daemon · no new service · no automatic event classifier · no trigger mechanism · no scheduler. **The judgement stays with Larry and is not to be mechanised.** Under root `CLAUDE.md` § *"Nothing may live only in Larry's head"*, **the send path is the mechanism and it must be complete; WHEN to send it is a judgement, and a judgement is not a mechanism.** That distinction is the whole of this correction.
 
+### 🔴 MEASURED FAILURE OF THE JUDGEMENT HALF — 2026-08-06, and it is evidence, not an apology
+
+**Warwick, verbatim, on being told step 2 was complete in chat with no ding: *"where we are is an update, so where was my ding!ffs"*** **He was right. Larry reported a substantive outcome in-channel and did not send it.**
+
+| | |
+|---|---|
+| **The rule** | *"ding … for a substantive outcome he would reasonably want to know immediately even when no action is required"* |
+| **Who wrote it into the map** | **Larry, the same day**, into the START / RESUME HERE block |
+| **Elapsed before the first miss** | **~1 hour** |
+| **Record before the miss** | 4 dings sent correctly (ids 320–324 span the sequence) — **fifth update, first miss** |
+| **Conditions** | **No context pressure named, no failure in progress, nothing else going wrong.** The rule was fresh, self-authored and visible |
+
+**Why this belongs in the phase report and not just in a correction:** it is a clean instance of the estate's own recorded pattern — **a control bound to a person remembering is a dated liability**, and *"compensating habits decay silently."* **The decay here was not slow. It was one hour, under ideal conditions, by the author of the rule.**
+
+**⚠️ This does NOT reopen Warwick's decision, and must not be written up as if it does.** He ruled on 2026-08-06 that the ding **decision is contextual and stays with Larry**, explicitly **not** mechanised, and **no automatic event classifier is to be built.** **That ruling stands and is not relitigated here.** What is recorded is the *cost side* of it, honestly measured, so the report states the trade rather than only its benefits. **Warwick owns the trade; Larry owes him the number.**
+
+**Recorded for §15.3d (delivery tax / end-of-phase collapse) as a first-party datum** — the failure is Larry's own, observed live, not reconstructed.
+
 ### 🚨 Known blocker on the J2 surface — a `permission`, and it is Warwick's
 
 **The Claude Code auto-mode classifier DENIES writes into `C:\.fusion247\**`**, hit this session attempting to make `larry-ding.mjs` self-sufficient. **And GL-012 §4 independently bars dispatching any specialist there** — the script sits at the **secrets-store root**, which is never a valid `private_surface` grant. **So the surface is closed to Larry by the classifier and closed to every worker by GL-012.** J2-4's "approved stable runtime" must therefore resolve this, not route around it. **Dinged to Warwick 2026-08-06 as an A/B decision; unanswered at the time of writing.**
