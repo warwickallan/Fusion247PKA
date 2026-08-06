@@ -1837,6 +1837,19 @@ All three investigations have landed and their findings are recorded above. **WP
 
 **The one thing reconnaissance did NOT establish, and it must not be assumed:** that the hook-spawned process actually resolves `TELEGRAM_BOT_TOKEN` / `AUTHORISED_TELEGRAM_USER_ID` in its own environment. **`notify.mjs` reads them from `process.env` exactly as `larry-ding.mjs` does**, so the *same* defect this session diagnosed can recur one layer up. **Establish it by execution before designing on it.**
 
+#### ⛔ NOW ESTABLISHED BY EXECUTION, 2026-08-06 — **the risk was real, and it is the crux of J2-4**
+
+| Probe | Result |
+|---|---|
+| Both credential names in an **inherited** (no `--env-file`) environment | **`TELEGRAM_BOT_TOKEN: ABSENT` · `AUTHORISED_TELEGRAM_USER_ID: ABSENT`** — presence tested, **no value read or printed** |
+| Installed `~/.mypka/governor/continuity.mjs` — any `loadEnvFile`, env-file, credential or notify/ding reference | **NONE.** The file has no credential path whatsoever |
+
+**Consequence, and it is the whole design constraint for J2:** a `Stop`-hook-spawned process **inherits nothing** and would fail with the *identical* `missing token/chat` gate that `larry-ding.mjs` hit this session. **The event route is right; the credential route is genuinely missing and must be built, not assumed.**
+
+**J2-4 therefore resolves to: the INSTALLED runtime under `~/.mypka/governor/` loads the credentials itself at process start, from the stable path.** That is the same repair the classifier blocked on `larry-ding.mjs` — **relocated to a surface where it is permitted**: `~/.mypka/**` is not `C:\.fusion247\**`, GL-012 does not bar it, and §16.10 records that subagent writes there now **succeed** (Mack, WO-16). **The blocked repair is not abandoned; it moves to where it belongs.**
+
+**Split, unchanged from WP-3A/WP-3E:** Keel changes `tools/governor/continuity.mjs` in the repo; **Mack installs to `~/.mypka/governor/`**, because a fix present only in the repo is inert — the §16.11 lesson.
+
 **Convergence worth noting:** §16.10's parked *"frontier-change-triggers-continuity"* defect and J2-1 are **the same mechanism**. Building the ding trigger discharges the parked defect; they must not be built twice.
 
 ## 17.3 ⚖️ STANDING CANONICAL LAW — *"Nothing may live only in Larry's head"*
