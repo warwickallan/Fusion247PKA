@@ -57,15 +57,24 @@ This matters more than it looks: **the entire next phase is about proving what i
 ## START / RESUME HERE — ordered by Warwick
 
 - This Git Wayfinder is the sole route and source of truth.
-- **On a fresh resume, BEFORE using any tool or doing any work, visibly state: (1) this recovered map path, (2) the goal, (3) the current phase and gate, (4) the next action. THEN open this map and continue.**
-- Read the current phase, gate and evidence before acting.
+- **Bare `Continue.` after a fresh session / `/clear` / resume is a one-time orientation handshake, not a blank cheque to execute.** Ordered steps (canonical also in root `CLAUDE.md` Step 2):
+  1. Recover Honcho and **this** active Wayfinder (verify by execution: branch, HEAD, worktree).
+  2. Establish exact branch, head, phase, **ACTIVE SESSION WORK PACKAGE** (§ below), acceptance criteria, completed items, open residuals and recorded next action.
+  3. Produce **one concise orientation summary** to Warwick.
+  4. **Explicitly ask Warwick to confirm whether anything has changed since rotation.**
+  5. **Do not begin substantive execution** until that one confirmation is received.
+  6. If Warwick supplies a change, **update the ACTIVE SESSION WORK PACKAGE first**, then proceed.
+  7. After confirmation, execute autonomously without repeatedly asking route questions.
+- **On a confirmed resume (not bare Continue. alone),** before any tool call, visibly state: (1) this recovered map path, (2) the goal, (3) the current phase and gate, (4) the next action — then open this map and continue.
+- Read the current phase, gate, **ACTIVE SESSION WORK PACKAGE** and evidence before acting.
 - Honcho points here; it does not replace this map.
 - Do not create a todo list, parallel tracker or replacement plan.
-- Update this map only at meaningful phase boundaries: PASS, PARTIAL or FAILED, with an evidence pointer.
-- Continue autonomously until completion or a genuine Warwick-only blocker.
-- Before any clear, restart or handoff, ensure Honcho contains this exact path, current phase/gate and next action.
+- Update this map only at meaningful phase boundaries: PASS, PARTIAL or FAILED, with an evidence pointer — **except** the ACTIVE SESSION WORK PACKAGE, which Larry updates whenever Warwick amends the session requirements.
+- Continue autonomously until completion or a genuine Warwick-only blocker **after** the orientation handshake.
+- Before any clear, restart or handoff, ensure Honcho contains this exact path, current phase/gate, ACTIVE SESSION WORK PACKAGE pointer and next action.
 - **Before `/clear`, run `/rotate`. Clearing is unsafe until `/rotate` reports `SAFE TO CLEAR` after the installed Honcho readback matches this Wayfinder's current phase, frontier and exact next action.**
 - **Tangents go in "SHIT TO DO" below. Do not chase them.** See the rule there — it binds even when the tangent comes from Warwick.
+- **All Work Orders, Veritas dispatches, `/rotate` reporting and merge-readiness statements derive from the ACTIVE SESSION WORK PACKAGE.** No requirement may live only in chat, Larry's context or a stale rotation packet.
 
 > ### 📣 The Warwick notification rule — **NOT COPIED HERE BY DESIGN**
 >
@@ -2325,48 +2334,54 @@ node "C:/Users/Buggly/.mypka/governor/ding.mjs" <message-file>
 
 ## 17.4 Frontier
 
-## ⭐ THE LIVE FRONTIER — 2026-08-06 Phase 4 closure WP. **This is the single statement.**
+## ⭐ ACTIVE SESSION WORK PACKAGE — single durable authority for this session
+
+> **Warwick 2026-08-06: this section is the complete authorised Work Package.** Every Work Order, Veritas dispatch, `/rotate` report and merge-readiness statement **must derive from here**. Gate 1 PASS at `a1e124a` is **narrow evidence only** — it does **not** satisfy this package and must **not** be represented as merge readiness. **No Codex** until Warwick explicitly authorises final review after full Veritas on this package. **PR #97 remains HOLD / unmerged.**
 
 | | |
 |---|---|
 | **Map** | `Deliverables/2026-08-04-proofline-wayfinder-plan.md` — this file |
-| **Branch / worktree** | `build-020/phase4-automation-law` · `C:\Fusion247PKA-build-020-trial` — **PUSHED.** ⚠️ **Verify HEAD by execution** |
-| **Phase** | **BUILD-020 Phase 4 — INTEGRATED, NOT PASSED.** Closure WP in flight; **do not claim phase complete** while residual items below are open |
-| **Closure evidence** | 📄 **`Deliverables/2026-08-06-phase4-closure-wp-evidence.md`** |
-| **§9 / WO-22** | ✅ §9 **BUILD** on `2.1.222` · ✅ Option A scripts shipped · dual-harness registration present |
-| **WO generator** | ✅ **G-1..G-6, J1-1, V4-7 hermetic (64/64), AC-5 definition** — see closure evidence |
-| **FusionDevBot** | ✅ installed path proven (`message_id` 333, blob match, ding-log) |
-| **Session report** | 📄 prior: `Deliverables/2026-08-06-session-performance-report.md` · Supabase schema+populate **mechanism** landed |
-| **Receipts** | prior Veritas HOLD receipts still on branch; **new Veritas owed on the closure head** |
-| **Merged to `main`?** | **NO. No PR yet.** |
+| **Branch / worktree** | `build-020/phase4-automation-law` · `C:\Fusion247PKA-build-020-trial` |
+| **PR** | **#97** open — **merge HOLD** (Warwick) |
+| **HEAD** | ⚠️ **Verify by `git rev-parse HEAD`** — never trust a SHA written here over the repository |
+| **Phase** | BUILD-020 Phase 4 — **NOT COMPLETE** until every acceptance row below is PASS live |
+
+### Numbered acceptance requirements (each needs Veritas PASS separately)
+
+| # | Requirement | Status | Residual / evidence |
+|---|---|---|---|
+| **1** | Every Work Order alteration complete: **G-1..G-6**, true **J1-1** (ordinary dispatch journey, not docs alone), **hermetic tests**, **AC-5** (three clean generated-route orders) | **PARTIAL** | G-1..G-6 + hermetic suite **implemented**; J1-1 still needs **executed ordinary-dispatch journey** (fresh session, no Warwick reminder, generated envelope, first-dispatch start). AC-5 has **definition** only — **0/3** streak accrued under the fixed rule |
+| **2** | Claude **and** Grok return-cue (or host-equivalent) **installed and proven live**: real background specialist → marker → parent consume exactly once → cue in parent context; stale/dupe cleanup | **PARTIAL** | Tracked scripts + dual-harness registration + unit/CLI dual-payload. **Grok live host unproven** (`/hooks-trust` missing on this worktree). **Claude full return-and-parent-consume re-proof** owed on real Claude host before phase complete |
+| **3** | FusionDevBot durable installed path + **combined journey**: specialist return → parent cue → Rule 4a judgement → qualifying ding **before** substantive chat update | **PARTIAL** | Transport proven (`message_id` 333, blob match, ding-log). **Combined journey not proven** end-to-end with live parent cue |
+| **4** | Watcher and Tower **online, observable, durable** across fresh sessions, PRs, restarts via **installed startup route** (not "PID exists") | **PARTIAL** | Live poll proven. **Controlled stop → durable restart → fresh session sees online without Warwick reconstructing command** — **UNESTABLISHED** |
+| **5** | `/rotate` commissions Pax; Git Deliverable; **successful** Supabase populate from same evidence; Honcho pointer + head; SAFE TO CLEAR only when all true | **PARTIAL** | Schema + populate mechanism + rotate steps. **Schema not applied; credentials-absent fail only** — not acceptance |
+| **6** | Final stable head checked by Veritas against **this complete Work Package** (each row separate PASS/HOLD) | **OPEN** | Prior Gate 1 PASS at `a1e124a` is **narrow only**. Product changed after that head — **full-package Veritas required at final tip** |
+| **7** | Codex only after (6) and only when Warwick authorises final review | **HOLD** | **No Codex authorised this stage.** Third-pass BLOCK residual fixed in product; unreviewed under Codex budget — **do not run a fourth** |
+
+### Supporting banked evidence (not acceptance by themselves)
+
+- WO tooling + tests: `tools/wo/**`, isolation 65/65 (post-fixture fix)  
+- Return-cue: `.claude/hooks/return-cue-*`, `.grok/hooks/return-cue.json`, §9 BUILD on Claude `2.1.222`  
+- Closure notes: `Deliverables/2026-08-06-phase4-closure-wp-evidence.md`  
+- Veritas Gate 1 PASS (narrow): `Deliverables/2026-08-06-veritas-build020-gate1-pass-a1e124a-receipt.md`  
+- Ding: `~/.mypka/governor/ding.mjs` + `ding-log.jsonl`  
+- Session report (prior): `Deliverables/2026-08-06-session-performance-report.md`  
+- Supabase: `tools/session-report/schema.sql`, `populate.mjs`  
+
+### Veritas dispatch law for this package (durable)
+
+Every Veritas dispatch for this WP **must** include: this map path · this ACTIVE SESSION WORK PACKAGE section · exact stable head · all seven numbered requirements · all residuals · instruction to return **separate PASS/HOLD per requirement** · **prohibition on narrowing to Gate 1** unless Warwick explicitly authorised a narrower release. Before Codex may ever be invoked: Veritas confirms complete package in scope, every item examined, none partial/unestablished/deferred, **CI green**, head stable during review.
 
 ### 🎯 THE EXACT NEXT ACTION
 
-1. **Veritas** on the exact integrated closure head (this tip after push).  
-2. Open **PR** and run **Codex** at PR level (≤3 budget).  
-3. Bring **merge-decision** to Warwick.  
-4. Residual activation (do not block Veritas, do block "phase complete"): `/hooks-trust` on this worktree · apply `tools/session-report/schema.sql` + runtime Supabase credentials · cold-start proof of Tower watcher if demanded.
+1. Land CI green on PR #97 (governor suite count **11**).  
+2. Execute remaining acceptance rows **1–5** by production journeys (J1-1 journey, AC-5 three orders, live Grok+Claude return-cue, combined ding journey, watcher cold-start, Supabase green populate).  
+3. **Full-package Veritas** at the final stable head (not Gate 1 slice).  
+4. Present Warwick **merge-readiness** only after Veritas; **wait** for explicit authority before any Codex.  
+5. **Do not merge** without Warwick.
 
-### ✅ Closed this WP (banked)
+### 📌 Parked (not this WP)
 
-- Work Order generator repairs **G-1..G-6**, **J1-1**, hermetic suite, **AC-5 definition**  
-- Return-cue shared scripts + Claude settings + Grok `.grok/hooks/return-cue.json`  
-- FusionDevBot durable send path re-proven  
-- `/rotate` steps for Supabase mirror population  
-- Watcher observed live (PID + log cadence)
+**V4-9** · **C-1..C-15** · legacy `C:/.fusion247/larry-ding.mjs` · Veritas D-2..D-6 where still open · reminder-hook A/B/C product choice.
 
-### ⏸️ Residual (honest — phase NOT complete)
-
-| Item | State |
-|---|---|
-| Grok **live** host hook fire | needs `/hooks-trust` on `C:\Fusion247PKA-build-020-trial` + session reload |
-| Supabase **successful** populate | credentials + schema apply |
-| Tower **cold-start** without Warwick | not exercised (live process proven only) |
-| Reminder-hook option A/B/C | still Warwick's product call if he wants to retire dispatch-time aid |
-| Veritas + Codex + merge | **next** |
-
-### 📌 Still parked (not this WP)
-
-**V4-9** tower-qa-skill paraphrase · **C-1..C-15** backlog · legacy `C:/.fusion247/larry-ding.mjs` dual path · Veritas D-2..D-6 from Phase 3 where still open.
-
-**Nothing in §17 is complete on Larry's assertion.** §17.3 still binds.
+**Nothing in this package is complete on Larry's assertion.** §17.3 and root CLAUDE.md § "Nothing may live only in Larry's head" bind.

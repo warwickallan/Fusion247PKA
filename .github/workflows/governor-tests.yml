@@ -159,7 +159,8 @@ jobs:
           #
           # 7 -> 10 at WO-OR-18: reorient.test.mjs is no longer excluded (+1), and
           # continuity.test.mjs / continuity-derive.test.mjs are new (+2).
-          expected=10
+          # 10 -> 11 at BUILD-020 Phase 4: ding.test.mjs added with the FusionDevBot send path.
+          expected=11
           actual=$(echo "$FILES" | grep -c 'test.mjs')
           if [ "$actual" -ne "$expected" ]; then
             echo "::error::SUITE SET CHANGED — expected ${expected} test files, found ${actual}. If a suite was legitimately added or deleted, update this literal in the same commit."
