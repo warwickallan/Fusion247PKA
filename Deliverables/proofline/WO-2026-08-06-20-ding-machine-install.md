@@ -39,6 +39,11 @@ document_impact:
 file_surface: []
 machine_surface:                  # CLOSED LIST. Write permitted here and ONLY here.
   - C:/Users/Buggly/.mypka/governor/ding.mjs
+  # AMENDMENT 1, 2026-08-06 (F1 ruling). APPEND-ONLY — add the WP-4C provenance entry; never
+  # rewrite or remove an existing one. Added because Mack was right: a one-file closed list is
+  # correct for code but silently drops the provenance record, and an installed file whose origin
+  # is undocumented ON THE MACHINE is precisely the defect §16.11 was paid for.
+  - C:/Users/Buggly/.mypka/governor/INSTALLED-FROM.txt
 out_of_scope_policy: report-only
 
 worker_contract:
@@ -52,10 +57,15 @@ contract_basis:
     permitted_by: "Larry's explicit authorisation; mandatory precondition below"
 
 contract_conflicts: >-
-  ONE, disclosed rather than earned-away. Mack's contract declares no `~/.mypka/**` write pattern,
-  so this surface rests on Larry's explicit authorisation plus the WP-3E precedent, NOT on a
-  contract clause. It is bounded to a single named file. If you judge that insufficient, REFUSE and
-  say so — that is the correct outcome and it will not be held against the order.
+  CORRECTED BY MACK'S READ-BACK, AMENDMENT 1, 2026-08-06. Larry originally recorded this as a
+  contract GAP with the surface resting only on his authorisation plus WP-3E precedent. Mack showed
+  that UNDERSELLS it and the correction is accepted: Mack's contract has NO file-pattern grammar at
+  all, so the absence of a `~/.mypka/**` pattern is NOT a denial — reading it as one would also
+  forbid every `.env`, `.mcp.json` and supervisor registration the same contract explicitly orders.
+  The basis is THREE-LEGGED — the contract's affirmative grants ("Mack owns operation of released
+  services"; "Keel writes the hook, Mack registers it"; MCP registrations written outside the repo),
+  Larry's bounded authorisation, and WP-3E precedent VERIFIED BY EXECUTION rather than trusted.
+  The residue is DOCUMENTARY, not authorising. Reported, not fixed — contracts are not Mack's surface.
 
 capability_evidence:
   source: executed probe
