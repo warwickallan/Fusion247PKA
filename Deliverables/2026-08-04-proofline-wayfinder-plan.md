@@ -1939,16 +1939,30 @@ All three investigations have landed and their findings are recorded above. **WP
 
 **The §15.2–§15.3d phase-close report is REACTIVATED and is part of this work package** (§16.1's supersession is reversed above). **The steps are ORDERED, not a menu.**
 
+### 🔄 SEQUENCE REVISED by Warwick, 2026-08-06 — **rotation now comes BEFORE Pax**
+
+> **His correction, verbatim in effect: *"Do not rotate before Mack."*** and **"Pax remains untouched until after rotation."** **The table below is the operative sequence. The original six-step list is retained beneath it as the record of what it replaced.**
+
 | # | Step | Owner | State |
 |---|---|---|---|
-| **1** | **FusionDevBot durable send path** | Keel → Mack → Warwick | **IN FLIGHT.** `WO-2026-08-06-19` dispatched at `394ce68`. Install (WP-4C) and J2-e acceptance follow |
-| **2** | **Complete the Work Order / Nolan resolution** | Larry | Not started. See the reading below |
-| **3** | **Commission Pax** to assemble the phase-report evidence — folding in the existing Nolan brief, **all Work Order refusals and rework**, **token/context economics**, and **delivery-tax evidence** | Pax | Not started. **Gated behind 1 and 2** |
-| **4** | **Larry publishes the final durable report to Google Drive** | Larry | **Only after 1–3 are FACTUALLY complete** — his words |
-| **5** | **Veritas reviews the exact integrated head AND report truth** | Veritas | Report truth is explicitly in scope, not only code |
-| **6** | **`/rotate`** | Larry | — |
+| **1** | **Keel returns and JOB 2 is integrated** | Keel → Larry | ✅ **DONE.** Integrated at **`8b0528b`**, independently verified — 56/56, `ding.mjs` byte-identical across the addendum, Larry's own surviving mutation now caught (5 red) |
+| **2** | **Mack installs the versioned FusionDevBot sender** | **Mack** | **IN FLIGHT.** `WO-2026-08-06-20` (WP-4C) dispatched at `0cc2ffe`. Hand-authored on the WP-3E `machine_surface` shape — see G-6 |
+| **3** | **Prove J2-e — ONE REAL MESSAGE arriving from the INSTALLED path**, credentials self-loaded, **no `--env-file` and no shell preparation** | **Larry**, then Warwick's eyes | Not started. **Gated behind 2** |
+| **4** | **Veritas reviews the exact integrated head** | **Veritas** | Not started |
+| **5** | **`/rotate` and reach `SAFE TO CLEAR`** | Larry | Not started |
+| **6** | **A FRESH Larry picks up the Pax report commission on the other side** | Pax, commissioned by the fresh Larry | **Not started, and NOT this session's** |
 
-**His binding constraint on ordering:** *"Do not launch a separate report investigation before the Work Order route is ready: the Pax commission is also the first live acceptance test of that repaired route."* **No report reconnaissance, no evidence gathering and no drafting happens ahead of step 3.** The commission IS the investigation.
+**⛔ PAX IS UNTOUCHED UNTIL AFTER ROTATION. No commission, no reconnaissance, no evidence gathering, no drafting.** Warwick's earlier constraint still binds and is now doubled: *"Do not launch a separate report investigation before the Work Order route is ready — the Pax commission is also the first live acceptance test of that repaired route."* **The commission IS the investigation, and it belongs to the session after this one.**
+
+**The Google Drive report** (originally step 4) **follows the Pax commission and is therefore also post-rotation.** It is not this session's work and no part of it is drafted here.
+
+<details><summary>Superseded — the original six-step ordering, retained as the record</summary>
+
+**1** FusionDevBot durable send path · **2** Complete the Work Order / Nolan resolution · **3** Commission Pax for the phase-report evidence · **4** Larry publishes the durable Google Drive report once 1–3 are factually complete · **5** Veritas on the exact integrated head and report truth · **6** `/rotate`.
+
+**What changed:** rotation moved from last to **before** Pax, and the Pax commission moved to a fresh session. **Step 2 (Nolan resolution) was completed under the original numbering and is recorded in §17.6** — it is not lost by the renumbering.
+
+</details>
 
 ### ⚠️ One factual correction to step 3, recorded rather than silently absorbed
 
