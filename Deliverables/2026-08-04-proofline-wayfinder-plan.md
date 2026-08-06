@@ -2152,6 +2152,14 @@ node "C:/Users/Buggly/.mypka/governor/ding.mjs" <message-file>
 > **`E-10` and `E-11` are both SWEEPS REPORTED AS EXHAUSTIVE.** *"Corrected in both places"* and *"EVERY Larry error this session"* are **completeness claims**, and **both were false when written.** ⚠️ **The defect is not the missed instance — it is the word "every".** A partial sweep honestly labelled partial costs a reader nothing; **a partial sweep labelled complete stops them looking.**
 >
 > **This belongs in the rotation report** (Veritas's own instruction) **and it generalises well past this session:** the same failure produced the three competing frontiers §12 records, and it is the reason a completeness claim should either be mechanically enumerated or stated as *"the instances I found"*.
+>
+> ### 🚨🚨 IT HAPPENED A THIRD TIME — **inside the very table written to fix it** (Pax, 2026-08-06)
+>
+> **`V5-2` was raised so this E-table would be COMPLETE before Pax wrote the report from it. `E-10` was added. §17.6's own *"Larry's input was wrong"* (`G-6`) WAS NOT.** **Added below as `E-12`.**
+>
+> **Pax's conclusion, and it is the durable finding of this session: *"Three failed completeness claims in one session, two of them AFTER the pattern was explicitly named, is not inattention — it is the shape of the claim."*** **A completeness claim made by re-reading is a claim about what the author noticed. It cannot be made reliable by trying harder; it can only be made mechanically or hedged honestly.**
+
+| **E-12** | **§17.6 records `G-6` as *"Larry's input was wrong"* — a genuine error, omitted from this table even when the table was rewritten specifically to be complete** | **Pax** | Added 2026-08-06 — **the third failed completeness claim** |
 
 **⛔ PAX IS UNTOUCHED UNTIL `/rotate` RUNS. No commission, no reconnaissance, no evidence gathering, no drafting before then.** Warwick's constraint still binds: *"Do not launch a separate report investigation before the Work Order route is ready — the Pax commission is also the first live acceptance test of that repaired route."* **The commission IS the investigation.**
 
@@ -2215,7 +2223,27 @@ node "C:/Users/Buggly/.mypka/governor/ding.mjs" <message-file>
 | **WO-18** | **NO.** It did not refuse, but it carried 2 preventable class-A defects and **held for a full amendment before substantive work began** |
 | **WO-19** | **YES** — clean, no amendment, worker proceeded on acceptance |
 
-**Consecutive clean orders: ONE. AC-5 needs three. The Pax commission (§17.5 step 3) would be the second.** **AC-5 IS NOT MET and no receipt may say otherwise.** Warwick: *"A single successful order is initial acceptance, not proof of a permanent trend."*
+> ### ⚖️ CORRECTED 2026-08-06 by Pax — **and the correction runs AGAINST Larry, not in his favour**
+>
+> **Larry recorded the count as ONE. Pax's honest count at rotation is TWO — `WO-19` and `WO-21`** — **and `WO-22` would make three under one reading.** ⚠️ **Larry under-counted his own acceptance property**, which is the opposite of the error this record was watching for.
+>
+> **But the real defect is definitional, and it is Warwick's to settle in one word: "consecutive" has never been defined against an order the GENERATOR HAS NO SHAPE FOR.** `WO-20` (Mack, machine-install) was **hand-authored because the generator correctly refused** (`G-6`). **Does a clean order the route cannot produce break the streak, sit outside it, or count?** **Larry does not decide this** — a `product-decision`, recorded, not resolved.
+>
+> **Consequence, stated plainly: AC-5 MAY ALREADY BE MET. It is NOT recorded as met**, because the counting rule is undecided and **Larry may not choose the reading that favours him.**
+
+**Warwick: *"A single successful order is initial acceptance, not proof of a permanent trend."*** **Whatever the count, no receipt may record AC-5 as met until the definitional question above is answered.**
+
+### 📊 Pax's measured comparison against the ONLY baseline — §15.3d, Phase 2
+
+| Metric | Phase 2 baseline | This session |
+|---|---|---|
+| Orders issued | 8 | **4** |
+| Amendment round trips | ~11 | **2** |
+| **Class-A refusals** | **7** | **0** |
+
+**No worker refused an order this session.** **Both round trips were on HAND-AUTHORED envelopes; both GENERATED envelopes ran clean on first dispatch** — **unconfounded on the one variable that matters.**
+
+⚠️ **Pax's caution, and it belongs beside the numbers: do NOT read the 33 clean notification minutes as the problem being fixed.** Both confirmed misses **predate** the installed send path's first row at `01:30`, and **the send path was never the failing half.** The likelier explanation for the clean window is **that Warwick had just corrected Larry twice — the loudest and shortest-lived correction available.**
 
 ### What the generated envelope did NOT fix — Keel's findings, accepted in full
 
@@ -2280,10 +2308,34 @@ node "C:/Users/Buggly/.mypka/governor/ding.mjs" <message-file>
 
 ## 17.4 Frontier
 
-**⛔ SUPERSEDED 2026-08-06 — → §17.5 is the SINGLE statement of the live frontier.** The ordered closure Warwick set replaces "JOB 1 then JOB 2" as the sequence.
+## ⭐ THE LIVE FRONTIER AT ROTATION — 2026-08-06. **This is the single statement. Read this, not §17.5's table.**
 
-**Where things actually stand:** the §17.3 law and its five projections are committed at `9fa3169`. **JOB 1 is BUILT and INTEGRATED at `b30bf55`** — independently verified by Larry, **not** Veritas-passed, **and J1-1 remains OPEN.** JOB 2 is `WO-2026-08-06-19`, in flight. **Everything else follows §17.5's numbered steps.**
+| | |
+|---|---|
+| **Map** | `Deliverables/2026-08-04-proofline-wayfinder-plan.md` — this file |
+| **Branch / worktree** | `build-020/phase4-automation-law` · `C:\Fusion247PKA-build-020-trial` — **PUSHED.** ⚠️ **Verify HEAD by execution; this map has recorded a stale SHA four times** |
+| **Phase** | **BUILD-020 Phase 4 — INTEGRATED, NOT PASSED.** **Veritas `HOLD`** on the phase question, twice, at `89602f3` and `b267d55` |
+| **Session report** | 📄 **`Deliverables/2026-08-06-session-performance-report.md`** (Pax) |
+| **Receipts** | `Deliverables/2026-08-06-veritas-build020-phase4-receipt.md` · `Deliverables/2026-08-06-veritas-build020-phase4-rereview-b267d55-receipt.md` |
+| **Merged to `main`?** | **NO. Nothing merged. No PR. `main` untouched.** |
 
-**Ordering constraint that is easy to get wrong:** C-11 was stood down (§17.0) so the acceptance test was not spent on unrelated queue work, and **that still holds — the candidate queue does not get picked up mid-closure.**
+### 🎯 THE EXACT NEXT ACTION
+
+**Run Pax's §9 probe from `Deliverables/2026-08-06-pax-subagent-return-cue-brief.md`: establish whether `PreToolUse` firing INSIDE a subagent carries `agent_id`. Capture the exact host version with the result.**
+
+**Why this and not something else:** it is the **only** named post-rotation item with a defined method and a **pre-stated kill condition** — *if `agent_id` is absent, the cue can land in the wrong context and the verdict flips from `BUILD` to `DO NOT BUILD`, falling back to Option C.* **Do not build the relay before running it.** §17.9 is the full context.
+
+### ⏸️ Awaiting Warwick — do NOT decide these
+
+1. **The AC-5 counting rule** — does a clean order the generator has no shape for (`WO-20`) break the streak, sit outside it, or count? **AC-5 may already be met; Larry may not pick the favourable reading.**
+2. **The reminder-hook option** — A (accept dispatch-time), B (`Stop` hook, risks noise), or **C (Larry's recommendation: the hook is a partial aid, Rule 4a is the control)**.
+3. **`G-1`..`G-6`** — the generator's remaining defects, chiefly *bare values with prose in a sibling comment*.
+4. **Supabase performance-reporting** — explicitly deferred by Warwick to a session after this `/clear`. **Not built.**
+
+### 📌 Parked, deliberately — each a decision, not an omission
+
+**J1-1 is OPEN** (nothing makes generation unavoidable) · **`V4-7`** `envelope.test.mjs` is not hermetic — **fix inside the next WO-tooling work, not as its own order** (Veritas's own advice) · **`V4-9`** `tower-qa-skill.md` §3a paraphrases — **Warwick's, as external reviewer law** · **C-1..C-15** in `Deliverables/BACKLOG.md`, untouched all session · **C-11** stood down at §17.0 and still stood down · **Veritas D-2..D-6** from Phase 3 · **the legacy `C:/.fusion247/larry-ding.mjs`** — two paths to one channel, unfixable from either side.
+
+**Ordering constraint that still holds:** the candidate queue does **not** get picked up mid-closure.
 
 **Nothing in §17 is complete on Larry's assertion.** §17.3 is the law that says so, and it applies to §17 itself.

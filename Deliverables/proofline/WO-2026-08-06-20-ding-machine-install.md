@@ -52,7 +52,7 @@ worker_contract:
 
 contract_basis:
   - surface: C:/Users/Buggly/.mypka/governor/ding.mjs
-    permitted_by: "Larry's explicit authorisation on the WP-3E precedent (WO-2026-08-05-16, `machine_surface`). Mack's contract does not declare a `~/.mypka/**` file pattern — that is a KNOWN CONTRACT GAP, recorded, and NOT closed by this order."
+    permitted_by: "Larry's explicit authorisation on the WP-3E precedent (WO-2026-08-05-16, `machine_surface`), PLUS Mack's affirmative contract grants — see `contract_conflicts` below, which is the operative statement. ~~Mack's contract does not declare a `~/.mypka/**` file pattern — that is a KNOWN CONTRACT GAP~~ WITHDRAWN 2026-08-06 (Pax): Mack's contract has no file-pattern grammar at all, so absence is not denial. The residue is DOCUMENTARY, not authorising. Struck here rather than deleted because the withdrawn claim sat unstruck beside its own retraction."
   - action: capture a rollback baseline before writing
     permitted_by: "Larry's explicit authorisation; mandatory precondition below"
 
