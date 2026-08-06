@@ -454,13 +454,19 @@ export const HEAD_FAILURE = {
   UNKNOWN: 'is not a commit in this repository',
 };
 
+/** Git cwd for verification. Tests may set WO_TEST_GIT_CWD to a temp fixture so archive exports never get `git init` inside the source tree. */
+function gitCwd(root) {
+  return process.env.WO_TEST_GIT_CWD || root;
+}
+
 export function verifyGovernanceHead(root, governanceHead) {
   if (typeof governanceHead !== 'string' || governanceHead.trim() === '') {
     return { ok: false, reason: HEAD_FAILURE.MISSING };
   }
   const sha = governanceHead.trim();
+  const cwd = gitCwd(root);
   try {
-    execFileSync('git', ['-C', root, 'rev-parse', '--git-dir'], {
+    execFileSync('git', ['-C', cwd, 'rev-parse', '--git-dir'], {
       encoding: 'utf8',
       stdio: ['ignore', 'ignore', 'ignore'],
     });
@@ -468,7 +474,7 @@ export function verifyGovernanceHead(root, governanceHead) {
     return { ok: false, reason: HEAD_FAILURE.NO_GIT, head: sha };
   }
   try {
-    const resolved = execFileSync('git', ['-C', root, 'rev-parse', '--verify', `${sha}^{commit}`], {
+    const resolved = execFileSync('git', ['-C', cwd, 'rev-parse', '--verify', `${sha}^{commit}`], {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
     }).trim();

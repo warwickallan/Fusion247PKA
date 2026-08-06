@@ -471,33 +471,52 @@ function tryGit(args, cwd = REPO) {
 
 let HEAD_SHA = tryGit(['rev-parse', 'HEAD']);
 let PARENT_SHA = tryGit(['rev-parse', 'HEAD~1']);
-let _initedArchiveGit = false;
+let FIXTURE_GIT_ROOT = null;
 
 /**
  * V4-7 hermeticity: a clean `git archive` export has no `.git`. Tests must still fully execute.
- * When REPO is not a git worktree, initialise a minimal two-commit repo *inside REPO* so
- * contract paths and governance-head verification share one root. Never run this when `.git`
- * already exists (the normal developer worktree).
+ * When REPO is not a git worktree, use a **separate temp git root** for head verification —
+ * never `git init` inside the export/source tree (that contaminates the fixture).
+ * Contract/shim reads still use REPO. generateOrder needs governance head in root's git —
+ * when REPO has no git, generateOrder tests use FIXTURE_GIT_ROOT as root only for verify,
+ * by copying minimal Team/shim files is too heavy; instead: init fixture and set
+ * GIT_DIR/GIT_WORK_TREE is fragile. Simpler: for archive, `git init` in temp and
+ * `generateOrder({ root: REPO, governanceHead })` uses verifyGovernanceHead(REPO) which
+ * fails NO_GIT — so archive generateOrder tests need REPO to appear as git.
+ *
+ * Solution: create temp dir with its own .git and a bare file; for generateOrder, pass
+ * root=REPO but governanceHead from fixture only works if verify uses REPO. Therefore
+ * verifyGovernanceHead must accept optional gitCwd — too invasive for this pass.
+ *
+ * Practical hermetic approach used here: temp fixture is the git root AND we symlink/copy
+ * is expensive. Instead mirror: when no .git in REPO, set process.env.GIT_DIR to fixture's
+ * .git and GIT_WORK_TREE to REPO for the duration of git calls inside worktreeCheck only —
+ * still invasive.
+ *
+ * Final approach: temp fixture with two commits; HEAD_SHA from fixture; tests that need
+ * generateOrder at REPO skip verify by using fixture ONLY when we `git -C REPO` fails —
+ * change verify to look for env WO_TEST_GIT_CWD.
  */
 function ensureGitHeads() {
   if (HEAD_SHA && PARENT_SHA) return { head: HEAD_SHA, parent: PARENT_SHA, gitRoot: REPO };
-  if (!_initedArchiveGit && !existsSync(join(REPO, '.git'))) {
-    execFileSync('git', ['init'], { cwd: REPO, stdio: 'ignore' });
-    execFileSync('git', ['config', 'user.email', 'wo-test@example.com'], { cwd: REPO, stdio: 'ignore' });
-    execFileSync('git', ['config', 'user.name', 'wo-test'], { cwd: REPO, stdio: 'ignore' });
-    const marker = join(REPO, '.wo-envelope-test-marker');
-    writeFileSync(marker, 'parent\n');
-    execFileSync('git', ['add', '.wo-envelope-test-marker'], { cwd: REPO, stdio: 'ignore' });
-    execFileSync('git', ['commit', '-m', 'wo-test-parent'], { cwd: REPO, stdio: 'ignore' });
-    writeFileSync(marker, 'head\n');
-    execFileSync('git', ['add', '.wo-envelope-test-marker'], { cwd: REPO, stdio: 'ignore' });
-    execFileSync('git', ['commit', '-m', 'wo-test-head'], { cwd: REPO, stdio: 'ignore' });
-    _initedArchiveGit = true;
+  if (!FIXTURE_GIT_ROOT) {
+    FIXTURE_GIT_ROOT = mkdtempSync(join(tmpdir(), 'wo-env-git-'));
+    execFileSync('git', ['init'], { cwd: FIXTURE_GIT_ROOT, stdio: 'ignore' });
+    execFileSync('git', ['config', 'user.email', 'wo-test@example.com'], { cwd: FIXTURE_GIT_ROOT, stdio: 'ignore' });
+    execFileSync('git', ['config', 'user.name', 'wo-test'], { cwd: FIXTURE_GIT_ROOT, stdio: 'ignore' });
+    writeFileSync(join(FIXTURE_GIT_ROOT, 'a.txt'), 'parent\n');
+    execFileSync('git', ['add', 'a.txt'], { cwd: FIXTURE_GIT_ROOT, stdio: 'ignore' });
+    execFileSync('git', ['commit', '-m', 'wo-test-parent'], { cwd: FIXTURE_GIT_ROOT, stdio: 'ignore' });
+    writeFileSync(join(FIXTURE_GIT_ROOT, 'b.txt'), 'head\n');
+    execFileSync('git', ['add', 'b.txt'], { cwd: FIXTURE_GIT_ROOT, stdio: 'ignore' });
+    execFileSync('git', ['commit', '-m', 'wo-test-head'], { cwd: FIXTURE_GIT_ROOT, stdio: 'ignore' });
+    // Point git at fixture for any subsequent tryGit on REPO via env used by child tests only
+    process.env.WO_TEST_GIT_CWD = FIXTURE_GIT_ROOT;
   }
-  HEAD_SHA = tryGit(['rev-parse', 'HEAD']);
-  PARENT_SHA = tryGit(['rev-parse', 'HEAD~1']);
+  HEAD_SHA = tryGit(['rev-parse', 'HEAD'], FIXTURE_GIT_ROOT);
+  PARENT_SHA = tryGit(['rev-parse', 'HEAD~1'], FIXTURE_GIT_ROOT);
   assert.ok(HEAD_SHA && PARENT_SHA, 'hermetic git fixture must produce two commits');
-  return { head: HEAD_SHA, parent: PARENT_SHA, gitRoot: REPO };
+  return { head: HEAD_SHA, parent: PARENT_SHA, gitRoot: FIXTURE_GIT_ROOT };
 }
 
 ensureGitHeads();
@@ -666,12 +685,13 @@ test('S-4 — an unrelated or unknown head is still a MISMATCH, and the two are 
 // ---------------------------------------------------------------------------
 
 function orderSpec(overrides = {}) {
-  const { head } = ensureGitHeads();
+  const { head, gitRoot } = ensureGitHeads();
+  // Contracts from REPO; git verification from gitRoot (REPO when real clone; temp fixture in archive).
   return {
     root: REPO,
     owner: 'keel',
     governanceHead: head,
-    worktree: REPO,
+    worktree: tryGit(['rev-parse', 'HEAD']) ? REPO : gitRoot,
     branch: 'wo/18-envelope-route',
     surfaces: ['tools/wo/envelope.mjs', 'tools/wo/envelope.test.mjs'],
     actions: ['push the assigned branch'],
