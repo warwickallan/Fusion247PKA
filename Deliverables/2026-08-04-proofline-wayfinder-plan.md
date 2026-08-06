@@ -2373,9 +2373,9 @@ node "C:/Users/Buggly/.mypka/governor/ding.mjs" <message-file>
 
 | # | Step | Status |
 |---|---|---|
-| **5** | **Veritas Gate 1** — complete amended WP at stable exact head. Grade separately: (1) durability/promotion · (2) CareerAIR auto Outlook + pipeline · (3) Cockpit + CareerAIR visibility · (4) Documentation/Git/private-boundary truth. Dispatch with: this WP · public head · private CareerAIR snapshot/digest · private surface · residuals · live Outlook + processing + browser evidence · CI · proposed merge unit. | **NOT STARTED** — no Codex while any mandatory Gate 1 row HOLD/FAIL |
-| **6** | **Veritas Gate 2** — separate Phase 4 verdict at same head: «Can Warwick now do the thing Phase 4 promised in the real intended context?» WP PASS / Phase HOLD remains valid and intelligible. CareerAIR must not disguise Phase 4 gaps; open post-merge Phase 4 must not erase completed CareerAIR repair. | **NOT STARTED** |
-| **7** | **Codex + merge decision pack.** Warwick **authorises** final Codex after Gate 1 PASS. Freeze head · CI green at exact head · PR #97 title/body reconciled to truth · Gate 1/2 stated separately · privacy-bounded private review if private delta · then one decision pack (public head, #97 scope, both Veritas, both Codex if any, live journeys, merge recommendation, next Claude WP residuals). **No merge without Warwick’s explicit final authority.** | **NOT STARTED** |
+| **5** | **Veritas Gate 1** — complete amended WP at stable exact head. | **HOLD** @ `f0d2614` — `Deliverables/2026-08-06-veritas-gate1-amended-wp-f0d2614-receipt.md` (rows 1/3/4 PASS; row 2 Zap residual; CI NOT RUN). **No Codex until Gate 1 PASS** |
+| **6** | **Veritas Gate 2** — separate Phase 4 verdict at same head. | **HOLD** @ `f0d2614` — `Deliverables/2026-08-06-veritas-gate2-phase4-f0d2614-receipt.md` (mechanisms usable; PR#97 unmerged; not phase-complete) |
+| **7** | **Codex + merge decision pack.** Warwick **authorises** final Codex after Gate 1 PASS. **No merge without Warwick’s explicit final authority.** | **BLOCKED** — Gate 1 PASS + CI green required first |
 
 **Gate 1 PASS + Gate 2 HOLD is a valid outcome.** Do not call Gate 1 = Phase PASS.
 
