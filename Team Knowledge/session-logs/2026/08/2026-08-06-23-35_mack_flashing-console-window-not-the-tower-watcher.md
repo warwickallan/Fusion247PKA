@@ -63,6 +63,47 @@ from `HKCU\...\Run` — is intact and demonstrably silent.
    after the fact. Causation here has to be observed live. Worth knowing before the next person
    tries to diagnose a scheduled-task problem from history.
 
+## The authorised fix — BUILT AND SELF-TESTED, BLOCKED AT APPLY
+
+Warwick authorised the generic hidden-launcher fix late on 2026-08-06. The runner was written and
+proved; **applying it to the four tasks was denied twice by the Claude Code auto-mode classifier**,
+so the tasks are unchanged and the flashing continues.
+
+**Runner:** `C:\Users\Buggly\.mypka\run-hidden.vbs`. Self-test through the real runner:
+
+```
+exit for probe-exit2.cmd : 2   (MUST be 2)   <- non-zero exit code SURVIVES
+exit for probe-exit0.cmd : 0   (MUST be 0)
+probe.log written twice                      <- side effects / logging SURVIVE
+```
+
+`waitOnReturn = True` plus `WScript.Quit rc` is what preserves the exit code. Anyone tempted to
+"simplify" it to `False` would silently green every task it touches.
+
+### ROLLBACK ROUTE — capture first, always
+
+Full original definitions of all four tasks exported **before** any change was attempted, to
+`C:\Users\Buggly\.mypka\task-rollback-2026-08-06\` (one `.xml` per task, `Export-ScheduledTask`
+format). Restore any single task with:
+
+```powershell
+$n = 'CareerAIR-Email-Ensure'   # or Graph-Collect / Ops-Liveness / MyPKA-Local-Services-Live
+Register-ScheduledTask -TaskName $n -Xml (Get-Content "C:\Users\Buggly\.mypka\task-rollback-2026-08-06\$n.xml" -Raw) -Force
+```
+
+Originals, for the record (`Execute` | `Argument` | `WorkingDirectory`):
+
+| Task | Execute | Argument | WorkDir |
+|---|---|---|---|
+| `CareerAIR-Email-Ensure` | `…\scripts\ensure-email-only.cmd` | *(none)* | *(none)* |
+| `CareerAIR-Graph-Collect` | `…\scripts\careerair-graph-collect.cmd` | *(none)* | *(none)* |
+| `CareerAIR-Ops-Liveness` | `…\scripts\careerair-ops-liveness.cmd` | *(none)* | *(none)* |
+| `MyPKA-Local-Services-Live` | `C:\Program Files\nodejs\node.exe` | `scripts\ensure-local-services.mjs` | `C:\.fusion247\private\careerair` |
+
+All four: `LogonType=Interactive`, user `Buggly`, `RunLevel=Limited`, single action.
+The apply script gates on the rollback XML existing and skips any task whose original was not
+captured — no task is modified without a restore path.
+
 ## Left undone, deliberately
 
 The fix was withheld from execution by Larry: the flashing tasks are CareerAIR's, inside
