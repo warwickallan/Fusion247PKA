@@ -2350,13 +2350,13 @@ node "C:/Users/Buggly/.mypka/governor/ding.mjs" <message-file>
 
 | # | Requirement | Status | Residual / evidence |
 |---|---|---|---|
-| **1** | Every Work Order alteration complete: **G-1..G-6**, true **J1-1** (ordinary dispatch journey, not docs alone), **hermetic tests**, **AC-5** (three clean generated-route orders) | **PARTIAL** | G-1..G-6 + hermetic suite **implemented**; J1-1 still needs **executed ordinary-dispatch journey** (fresh session, no Warwick reminder, generated envelope, first-dispatch start). AC-5 has **definition** only — **0/3** streak accrued under the fixed rule |
-| **2** | Claude **and** Grok return-cue (or host-equivalent) **installed and proven live**: real background specialist → marker → parent consume exactly once → cue in parent context; stale/dupe cleanup | **PARTIAL** | Tracked scripts + dual-harness registration + unit/CLI dual-payload. **Grok live host unproven** (`/hooks-trust` missing on this worktree). **Claude full return-and-parent-consume re-proof** owed on real Claude host before phase complete |
-| **3** | FusionDevBot durable installed path + **combined journey**: specialist return → parent cue → Rule 4a judgement → qualifying ding **before** substantive chat update | **PARTIAL** | Transport proven (`message_id` 333, blob match, ding-log). **Combined journey not proven** end-to-end with live parent cue |
-| **4** | Watcher and Tower **online, observable, durable** across fresh sessions, PRs, restarts via **installed startup route** (not "PID exists") | **PARTIAL** | Live poll proven. **Controlled stop → durable restart → fresh session sees online without Warwick reconstructing command** — **UNESTABLISHED** |
-| **5** | `/rotate` commissions Pax; Git Deliverable; **successful** Supabase populate from same evidence; Honcho pointer + head; SAFE TO CLEAR only when all true | **PARTIAL** | Schema + populate mechanism + rotate steps. **Schema not applied; credentials-absent fail only** — not acceptance |
-| **6** | Final stable head checked by Veritas against **this complete Work Package** (each row separate PASS/HOLD) | **OPEN** | Prior Gate 1 PASS at `a1e124a` is **narrow only**. Product changed after that head — **full-package Veritas required at final tip** |
-| **7** | Codex only after (6) and only when Warwick authorises final review | **HOLD** | **No Codex authorised this stage.** Third-pass BLOCK residual fixed in product; unreviewed under Codex budget — **do not run a fourth** |
+| **1** | Every Work Order alteration complete: **G-1..G-6**, true **J1-1** (ordinary dispatch journey, not docs alone), **hermetic tests**, **AC-5** (three clean generated-route orders) | **PARTIAL → nearly closed** | **G-1..G-6** implemented + machine_surface validation; hermetic **65/65**. **AC-5: 3/3** consecutive GENERATED-route first-dispatch accepts without class-A refuse (Keel `590e99d`, Pax note, Nolan `0acf177`). **J1-1 remaining limitation (honest):** generation is the ordinary envelope route and workers refuse unmarked orders; **slot authoring is still Larry manual** before ready:true — not full auto-generation without human authoring. Ordinary journey **executed** for three orders (no Warwick mid-flight reminder). |
+| **2** | Claude **and** Grok return-cue (or host-equivalent) **installed and proven live** | **PARTIAL (Grok: DO NOT BUILD)** | **Claude:** tracked hooks + unit/CLI; live `-p` session left empty marker dir (write+consume consistent); CLI parent inject proven. **Grok:** Pax brief `Deliverables/2026-08-06-pax-grok-return-cue-equivalence.md` — **no parent `additionalContext` inject** (passive hooks ignore stdout; SubagentStop is in-specialist). **Fallback: Option C discipline** on Grok. Folder trust added for this worktree; live SubagentStop dump still empty without host reload. |
+| **3** | FusionDevBot durable path + **combined journey** with parent cue | **PARTIAL** | Transport **PASS** (333, blob match). Combined journey **blocked on Grok** (no parent cue inject). On Claude, cue+Rule 4a+ding not yet exercised as one live session journey. |
+| **4** | Watcher/Tower durable cold-start via installed route | **PARTIAL → stronger** | Controlled **stop → restart** of installed `tower-loop/watcher.mjs` with durable `TOWER_SQLITE_PATH`; PID 21104; `watcher_up` + `pr_poll` on PR **#97**. Evidence: `Deliverables/2026-08-06-watcher-cold-start-evidence.md`. Residual: `run-watcher.mjs` Windows main-guard; TowerBot-credentialed restart not in shell. |
+| **5** | `/rotate` + successful Supabase populate | **PARTIAL** | Mechanism ready. **Schema not applied; no SUPABASE_* in runtime shell** — green populate **blocked on credentials** (Warwick/permission). Fail-loud proven. |
+| **6** | Full-package Veritas at final stable head | **OPEN** | Gate 1 PASS `a1e124a` **narrow only**. **Full WP Veritas next** after this bank. |
+| **7** | Codex only after (6) + Warwick authority | **HOLD** | **No Codex this stage.** |
 
 ### Supporting banked evidence (not acceptance by themselves)
 
@@ -2374,10 +2374,10 @@ Every Veritas dispatch for this WP **must** include: this map path · this ACTIV
 
 ### 🎯 THE EXACT NEXT ACTION
 
-1. Land CI green on PR #97 (governor suite count **11**).  
-2. Execute remaining acceptance rows **1–5** by production journeys (J1-1 journey, AC-5 three orders, live Grok+Claude return-cue, combined ding journey, watcher cold-start, Supabase green populate).  
-3. **Full-package Veritas** at the final stable head (not Gate 1 slice).  
-4. Present Warwick **merge-readiness** only after Veritas; **wait** for explicit authority before any Codex.  
+1. ~~CI green~~ **governor-tests green** at `72866f4+` (expected=11). Confirm tip green after latest commits.  
+2. **Full-package Veritas** at exact tip against this ACTIVE SESSION WORK PACKAGE (rows 1–7 each).  
+3. Close residual **#5** only when Supabase credentials are in approved runtime (Warwick).  
+4. Present **merge-readiness** after Veritas; **no Codex** until Warwick authorises.  
 5. **Do not merge** without Warwick.
 
 ### 📌 Parked (not this WP)
