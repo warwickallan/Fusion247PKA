@@ -1,0 +1,182 @@
+---
+build: BUILD-020
+scope: phase-4-closure-wp (Gate 1 WO tooling + return-cue slice) AND phase-4 Gate 2 (phase NOT claimed complete)
+gate: 1+2
+
+reviewed_sha: fa2018f8e97b19ee062cae119b8e1fa69f6696bd
+governance_sha: fa2018f8e97b19ee062cae119b8e1fa69f6696bd
+branch: build-020/phase4-automation-law
+remote_reachable: true                 # local origin ref equals reviewed_sha (see Evidence)
+governance_contract_blob: 6f3c111447b307c26e5ad06d39be5fe123acd4b3
+# blob continuity from prior receipt at b267d55; re-hash via git rev-parse unavailable this host (no Bash)
+
+evidence_workspace: NOT-CREATED — host grant lacks Bash; git archive isolation could not run
+worktree_head_at_start: fa2018f8e97b19ee062cae119b8e1fa69f6696bd
+worktree_head_at_end: fa2018f8e97b19ee062cae119b8e1fa69f6696bd
+worktree_head_matched: true            # worktree gitdir HEAD ref + branch ref + origin ref
+worktree_status_clean: UNVERIFIED      # git status --porcelain unavailable without Bash
+
+review_ceiling: 45 minutes elapsed / proportionate tokens
+prior_receipt: Deliverables/2026-08-06-veritas-build020-phase4-rereview-b267d55-receipt.md
+verdict: HOLD
+receipt_sha256: UNVERIFIED-HOST-NO-CRYPTO
+# Host tool grant for this Veritas runtime: Read/Grep/Glob-class + Write only — no Bash.
+# Body is complete below; recompute sha256 of body (everything after closing ---) to make tamper-evident.
+reviewed_by: veritas
+reviewed_date: 2026-08-06
+next_review_trigger: >-
+  exact integrated head after (1) suite evidence for tools/wo/envelope.test.mjs and
+  .claude/hooks/return-cue.test.mjs is executed under a clean git-archive export of that head
+  (or bound green run at that exact SHA), AND if seeking Phase 4 PASS: AC-5 met or Warwick
+  re-scopes it, residual activation dispositioned, §17.0 J1-1 OPEN row and §17.5 step-5 status
+  reconciled with the frontier, and no false phase-complete claim.
+---
+
+## Scope reviewed
+
+**Dispatch claim:** BUILD-020 Phase 4 **closure Work Package** banked at `fa2018f` — WO generator G-1..G-6, J1-1, hermetic suite, AC-5 **definition**, return-cue dual-harness, FusionDevBot re-proof, session-report mechanism, watcher observed; **phase NOT claimed complete**; residuals listed.
+
+**Scope Veritas determined (widened to accepted phase question for Gate 2, per contract):**
+
+| Gate | Question | In this head |
+|---|---|---|
+| **1** | Integrated WP for WO tooling + return-cue slice | In scope — artefacts at this tip |
+| **2** | «Can Warwick now do the thing this phase promised, in the real intended context?» | In scope — **answer is no**, and Larry does not claim otherwise |
+
+**Deliberately NOT in scope:** release/CI/security confidence (Codex); Warwick phone receipt of Telegram; inventing PASS on residual live-host activation; re-litigating parked `V4-9` / `V5-*` non-blocking items without Warwick authority for a second doc-only cycle.
+
+## Evidence provenance
+
+- **Isolation: NOT PROVEN.** This Veritas runtime has **no Bash**. Contract-mandated `git archive <reviewed_sha> | tar -x -C <ephemeral workspace outside the repository>` **could not run**. Evidence is therefore from the worktree and durable runtime logs — **not** from an isolated export. Per §Evidence isolation that is a **HOLD**, not a caveat.
+- **Head bind (file-system git, not shell):**
+  - Worktree `.git` → `gitdir: C:/Fusion247PKA/.git/worktrees/Fusion247PKA-build-020-trial`
+  - `…/HEAD` → `ref: refs/heads/build-020/phase4-automation-law`
+  - `refs/heads/build-020/phase4-automation-law` → `fa2018f8e97b19ee062cae119b8e1fa69f6696bd`
+  - `refs/remotes/origin/build-020/phase4-automation-law` → **same SHA**
+  - `logs/HEAD` tip commit message: *Phase 4 closure WP: WO G-1..G-6, J1-1, hermetic suite, dual-harness return-cue*
+- **Porcelain clean:** **UNVERIFIED** (no `git status`).
+- **Live `git ls-remote`:** **UNVERIFIED**; remote-tracking ref match is local evidence of push, not a fresh network check.
+- **Working tree not modified by this review** except this receipt write (sole authorised write surface).
+- **Governance contract** loaded from `Team/Veritas - Internal Quality and Truth Assurance/AGENTS.md` at this checkout; blob re-hash unavailable — continuity ID from prior receipt retained with that limit named.
+
+## Evidence executed or inspected
+
+| Command or artefact | Exit | Executed subtests | Result |
+|---|---|---|---|
+| Read worktree git refs / logs (HEAD, branch, origin) | n/a | n/a | **reviewed_sha = branch tip = origin tracking ref** |
+| `git archive` isolation | — | — | **UNAVAILABLE** — no Bash |
+| `node --test tools/wo/envelope.test.mjs` | — | — | **UNEXECUTED**. Source has **exactly 64** `test(` declarations; hermetic `ensureGitHeads()` present for archive-without-`.git` |
+| `node --test .claude/hooks/return-cue.test.mjs` | — | — | **UNEXECUTED**. Source has **11** `it(` cases incl. Grok camelCase + CLI write/consume |
+| Read `tools/wo/envelope.mjs` G-1..G-6 / ORDER_MARKER | n/a | n/a | **Source-level support** for all six defect fixes + `GENERATED by tools/wo/envelope.mjs` marker |
+| Read SOP-022 §Ordinary dispatch route (J1-1) | n/a | n/a | **Route + worker REFUSE without marker + issuer rule + `--count-markers`** — the outside-`tools/wo/**` close Keel required |
+| Read `.claude/settings.json` + `.grok/hooks/return-cue.json` | n/a | n/a | Dual harness registers SubagentStop / PreToolUse / UserPromptSubmit / SessionStart → shared scripts |
+| Read return-cue-write/consume + text table | n/a | n/a | Four-field markers; dual snake/camel normalize; Rule 4a cue text |
+| Read `~/.mypka/governor/ding-log.jsonl` | n/a | n/a | Line with `"message_id":333` at `2026-08-06T09:36:13.831Z`, outcome `sent` |
+| Compare installed vs repo `ding.mjs` (read/grep) | n/a | n/a | Same structure/CREDENTIALS_PATH/emit paths; **byte-identity / SHA-256 NOT re-run this host** (prior receipts established `0f26ef16…`) |
+| Read `tools/session-report/schema.sql` + `populate.mjs` | n/a | n/a | Schema + credentials-absent → exit 2 + durable jsonl path; **green populate UNVERIFIED** (no credentials; residual honest) |
+| Read `~/.mypka/tower/logs/watcher.log` (tail) | n/a | n/a | Continuous `pr_poll_discovery` ~60s on `warwickallan/Fusion247PKA`, open:0, drops #94/#80/#90 — **live process evidence** |
+| Watcher cold-start / PID | — | — | **UNVERIFIED this review** (log proves ongoing poll; cold-start residual stands) |
+| Live Grok host SubagentStop fire | — | — | **UNVERIFIED** — builder residual (hooks-trust on this worktree) stands; not claimed |
+| Map frontier + §17.0 + §17.5 + closure evidence + prior receipts | n/a | n/a | Claim honesty on phase-not-complete **holds**; doc drift on J1-1 OPEN vs frontier DONE (finding) |
+
+## Assurance dimensions
+
+| Dimension | Verdict | Basis |
+|---|---|---|
+| Goal fidelity | **HOLD** | Closure WP goals are largely present in source and honest residuals. **Phase promise is not met** (AC-5 not met; residuals; Gate 2 answer no). Larry does not claim phase complete — that honesty is correct and is not a PASS |
+| Design fidelity | **PASS** | G-1..G-6 and J1-1 use existing surfaces (generator + SOP-022 refuse teeth + README). No new control plane. Return-cue is Option A reduced scripts + host registration. Session-report is mirror, Markdown SSOT retained |
+| Functional proof | **HOLD** | Suites **not executed** under this review. FusionDevBot send line 333 and watcher log **are** real runtime artefacts. Grok live hook fire residual. Primary journey for return-cue on **this** host is the residual, not proven here |
+| Integration | **HOLD** | WO marker wired into SOP-022 read-back; dual-harness files present and point at shared scripts. Live host load of Grok hooks residual. Claude settings present in git |
+| Durability | **PASS (git)** / **HOLD (ops residuals)** | Head on local `origin/*` ref. Watcher log durable; cold-start residual. Session-report green path residual |
+| Test quality | **HOLD** | 64 + 11 tests **authored** with mutation tests and hermetic git fixture for V4-7 — **execution count this review = 0**. Claimed 64/64 and 11/11 are **builder assertions**, not Veritas-executed |
+| Git truth | **PASS (with limit)** | Branch tip, commit message and origin tracking ref match `fa2018f`. Porcelain and live ls-remote UNVERIFIED |
+| Documentation truth | **HOLD** | Phase-not-complete is honest. **§17.0 J1-1 still 🔴 OPEN** while frontier and SOP-022 claim closed — live contradiction. **§17.5 step 5 still "Not started"** while a session-performance report claims written inside `/rotate`. AC-5 definition in closure evidence improves the map's undecided streak rule |
+| Residual risk | **PASS** | Residuals named: Grok hooks-trust, Supabase credentials+schema, watcher cold-start, reminder option A/B/C, Veritas+Codex+merge. Phase not dressed as complete |
+| **Completed automation** | **HOLD (slice)** / **PASS (reclassed pieces)** | Rule 4a / ding **manual judgement** (prior §17.8 reclass) stands. Return-cue **intends** host-automatic fire — **live Grok residual** means production event not proven on this worktree. WO generation is **procedure + refuse teeth**, not auto-invoke (explicit; no new checker). Session-report populate automatic-at-`/rotate` only when credentials exist — residual honest |
+
+## Production caller and journey
+
+**Gate 1 — WO ordinary dispatch (claimed closed via J1-1):**
+
+1. Larry runs `node tools/wo/envelope.mjs …` → emits order with `<!-- GENERATED by tools/wo/envelope.mjs`
+2. Authors bare `AUTHOR REQUIRED` slots; recomputes via `--count-markers`
+3. Dispatches specialist
+4. Worker read-back (SOP-022): **REFUSE** if marker absent
+
+Hop 1 still requires Larry to run the generator — **teeth are at hop 4**, not a forced pre-dispatch mechanism. That matches the standing ban on new checkers and is the design Keel forced. **Not the same as completed automation of generation.**
+
+**Return-cue (Option A):**
+
+1. Host `SubagentStop` → `return-cue-write.mjs` → four-field marker under `.claude/state/return-cues/`
+2. Parent `PreToolUse` / `UserPromptSubmit` → `return-cue-consume.mjs` → `additionalContext` with Rule 4a text
+3. Larry judges; may send via installed `ding.mjs`
+
+**Hop 1 on Grok at this worktree: residual (hooks-trust).** Scripts and registration are on the journey; live host fire is not established here.
+
+**FusionDevBot:** real production path is installed `~/.mypka/governor/ding.mjs` with self-loaded credentials — **message_id 333** in durable log. Judgement to call it remains Larry's (manual).
+
+**Watcher:** live log shows continuous poll — production process observed; cold-start journey residual.
+
+## Restart and durability
+
+- **Git head durability:** local origin ref = `fa2018f` — treated as remote-reachable for this receipt with the live-ls-remote limit named.
+- **Watcher:** log continuity across minutes; kill/restart cold-start **not** exercised (residual).
+- **Session-report schema:** not applied in this review; populate failure path coded for credentials-absent.
+- **Return-cue markers:** ephemeral state dir by design; sweep on SessionStart.
+
+## Documentation contradiction scan
+
+- **Larry's declared impact (from closure evidence + map frontier):** WO repairs, J1-1, hermetic suite, AC-5 def, dual-harness return-cue, FusionDevBot, session-report mechanism, watcher observed; phase not complete; residuals listed.
+- **Verified independently:**
+  - SOP-022 + `tools/wo/README.md` carry J1-1 route — **holds**.
+  - Frontier residual table matches claim honesty on phase — **holds**.
+  - **Missed by completeness claims of "J1-1 DONE" without map reconciliation:** `Deliverables/2026-08-04-proofline-wayfinder-plan.md` **§17.0 J1-1 row still 🔴 OPEN** (historical requirement table not banner-corrected). A fresh reader landing on §17.0, not only the live frontier, is told J1-1 is still open.
+  - **§17.5 ordered-closure step 5 still "Not started"** while `Deliverables/2026-08-06-session-performance-report.md` claims written inside `/rotate` before `SAFE TO CLEAR` — status table vs artefact drift.
+  - AC-5 counting rule in closure evidence **does** answer the machine-install / hand-authored exception question the map left to Warwick — good; **AC-5 still not recorded met** — correct.
+- **Active documents that would misdirect on the live frontier route:** frontier itself is clear (INTEGRATED, NOT PASSED). **§17.0 OPEN row is the misdirection risk** for anyone reading requirements rather than frontier.
+- **Closure claims since last receipt (`b267d55` HOLD):**
+  - Phase 4 complete / PASS → **none claimed** ✓
+  - Closure WP banked with residual honesty → this review
+  - J1-1 closed → **artefact support yes; map §17.0 not updated**
+  - No WP/phase marked `closed` without a receipt → **no false closed found**
+
+## Defects
+
+| # | Severity | Finding | Owner |
+|---|---|---|---|
+| **V6-0** | **blocking** | **Mandatory evidence method not satisfied:** no isolated `git archive` export; no executed suite counts; porcelain UNVERIFIED. Host Veritas grant lacked Bash. **Blocks:** any `PASS` on Gate 1 or Gate 2 at this head until suite evidence is executed under isolation (or a bound green run at this exact SHA is produced by an authorised executor and cited). **Does not block** residual activation work or continuing the map route. | Larry (re-dispatch Veritas on a host with Bash, or supply bound execution evidence) |
+| **V6-1** | **blocking (Gate 2 only)** | **Phase 4 acceptance still unmet:** AC-5 not met (definition improved; streak not closed); honest residuals (Grok live hooks, Supabase green populate, watcher cold-start); Gate 2 answer remains no. **Blocks:** Phase 4 PASS / complete / closed / accepted; any statement that the phase promise is delivered. **Does not block** Gate-1-scoped corrective evidence runs or residual work. | Larry / Warwick (AC-5 product call if needed) |
+| **V6-2** | non-blocking | Map **§17.0 J1-1 still 🔴 OPEN** while SOP-022, README, frontier and closure evidence claim closed. Completeness claim on the map's requirement table is incomplete. Fix inside current doc reconciliation — not a new assurance cycle by itself. | Larry |
+| **V6-3** | non-blocking | Map **§17.5 step 5 "Not started"** vs session-performance report claiming `/rotate` authorship. Reconcile status table with artefacts. | Larry |
+| **V6-4** | non-blocking | Ding blob byte-identity and live `ls-remote` not re-executed this host; rely on prior receipts + origin ref + ding-log 333. Re-prove cheaply on next Bash-capable review if merge-critical. | Larry |
+| **V6-5** | non-blocking | Live Grok SubagentStop residual and Claude live re-proof residual — correctly not claimed complete; remain activation items. | Warwick / Larry |
+| **V5-0 remnants** | context | Prior HOLD at `b267d55`: J1-1 route **now present in SOP-022** (source); AC-5 and phase PASS still open as V6-1. | — |
+
+**Nothing in this receipt is a Work Order.** Findings are observations. Queue effect: root `CLAUDE.md` §Finding disposition.
+
+## Verdict
+
+**HOLD**
+
+**One sentence:** Closure WP material is substantially present and residuals are honestly named, but this review cannot PASS — isolation and suites were not executed, and Phase 4's own acceptance properties remain unmet.
+
+**What this HOLD gates:**
+- Any Phase 4 `PASS` / complete / closed / accepted / production-safe claim
+- Gate 1 `PASS` on WO tooling + return-cue until **executed** suite evidence is bound to the exact head under isolation (or equivalent)
+- Treating claimed 64/64 or 11/11 as Veritas-verified
+
+**What it does NOT gate:**
+- Continuing residual activation (`/hooks-trust`, Supabase schema+credentials, cold-start proof)
+- Map route items after Veritas (PR / Codex / merge-decision) **for product review** — phase completion remains gated; an adverse assurance verdict does not transfer the queue to Veritas
+- Safe implementation on the active residual list
+
+**On the submitted claim:** *"Phase is NOT claimed complete — residual items listed"* — **verified true and the strongest property of the head.** WO generator source and J1-1 SOP route support the "banked" narrative; **execution proof is missing from this review.** FusionDevBot `message_id` 333 and watcher poll cadence are **executed reads of durable logs**, not Larry's summary alone.
+
+## Next review trigger
+
+Exact integrated head at which **either**:
+
+1. **Gate 1 only:** suite runs for `tools/wo/envelope.test.mjs` and `.claude/hooks/return-cue.test.mjs` are executed under a clean archive export of that head (or a bound green run at that SHA), isolation proven, and J1-1 map §17.0 row reconciled — **or**
+2. **Gate 2 phase PASS:** all of (1), plus AC-5 met or Warwick-explicit re-scope, residuals dispositioned or explicitly accepted as non-blocking for phase close, and §17.5 step-5 status true against artefacts.
+
+`V6-2`..`V6-5` are non-blocking and park to scheduled reconciliation unless they start misdirecting the live frontier.
