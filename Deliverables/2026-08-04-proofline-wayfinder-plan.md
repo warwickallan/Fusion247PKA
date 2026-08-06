@@ -2041,6 +2041,33 @@ All three investigations have landed and their findings are recorded above. **WP
 
 **What is honestly true at this head:** Rule 4a exists and is canonical · the hook exists, loads and executes · **the attention failure has no automated guard, by design and by Warwick's ruling, and its two recorded failures today remain unguarded by anything except Larry's judgement.**
 
+## 17.9 🔬 The subagent-return cue — RESEARCH COMMISSIONED. **📌 FOLLOW UP AFTER `/rotate`**
+
+> **📌 WARWICK'S EXPLICIT FOLLOW-UP NOTE, 2026-08-06: *"make a note to follow up after `/rotate`."*** **The implementation decision comes AFTER `/clear`, alongside the separate Supabase performance-reporting job. Pax researches; Pax does NOT implement.** **This note must survive rotation — it belongs in the continuity packet.**
+
+**Why it exists:** the dispatch-time hook fires at **LAUNCH**, not return (§17.8). Warwick's North Star: *"When a background specialist actually finishes, Larry's parent session receives one fresh, specialist-specific retrieval cue at the next safe parent turn."* **Commissioned to Pax as `WO-2026-08-06-21` → `Deliverables/2026-08-06-pax-subagent-return-cue-brief.md`.**
+
+### ⚠️ A class-A defect in the commission, caught at PREFLIGHT by the generator
+
+**Warwick's brief requires answers *"by execution, not inference"*. PAX HAS NO `Bash`** — Read, Write, WebFetch, WebSearch, Grep, Glob only. **As literally worded the order was impossible and would have earned an immediate `REFUSE`.**
+
+**The generator caught it, not Larry.** It derives `producible_evidence` from the tool grant and emitted: *"acceptance evidence must NOT require an executed command · command execution: NOT available (tools: has no Bash)."* **This is WP-4A's repair preventing a real class-A defect on live work, at issue time.** Resolved by the established pattern: **Larry executes and stages; the worker analyses.**
+
+### ✅ ESTABLISHED BY EXECUTION — Larry's probe, 2026-08-06
+
+**Method:** `SubagentStop` hook registered in the **UNTRACKED** `.claude/settings.local.json`, three trivial background agents dispatched (one alone, then two concurrently), full stdin payload captured each time, probe then removed. **The tracked `.claude/settings.json` was never modified; `git status .claude/` clean afterwards.**
+
+| # | Finding |
+|---|---|
+| **S-1** | **`SubagentStop` DOES fire at the real completion moment for a BACKGROUND agent** — and fired **BEFORE** the task-notification reached Larry's context |
+| **S-2** | Payload carries **`session_id` (the PARENT session)** · `agent_id` · **`agent_type`** · `agent_transcript_path` · `transcript_path` · `cwd` · `prompt_id` · `permission_mode` · `stop_hook_active` · `last_assistant_message` · `background_tasks` |
+| **S-3** | **`agent_type` correctly distinguished `general-purpose` from `Explore`** — **specialist-specific cues are feasible on real data, not on assumption** |
+| **S-4** | **Two CONCURRENT returns each fired their own `SubagentStop`** with distinct `agent_id`s; an append-only file queued them naturally |
+
+**Warwick's steps 1 and 2 are PROVEN VIABLE. S-4 answers only the WRITE half of his queueing question** — ⚠️ **the CONSUME half (a later parent hook reading each marker exactly once) is UNTESTED and is Pax's to establish.**
+
+**Larry's sequencing decision, recorded:** **the Veritas resubmission is HELD until Pax's brief is committed.** Veritas's own `V4-10` found the repo head moved *during* its last review, so a receipt no longer covered the branch tip. **Running both concurrently would repeat that exact defect.**
+
 ## 17.7 ✅ J2-e — PASSED BY EXECUTION, 2026-08-06
 
 **Command, stated exactly, because the absence of flags IS the proof:**
