@@ -2068,6 +2068,26 @@ All three investigations have landed and their findings are recorded above. **WP
 
 **Larry's sequencing decision, recorded:** **the Veritas resubmission is HELD until Pax's brief is committed.** Veritas's own `V4-10` found the repo head moved *during* its last review, so a receipt no longer covered the branch tip. **Running both concurrently would repeat that exact defect.**
 
+### 📋 PAX RETURNED — `BUILD`, reduced, **GATED ON ONE PROBE**. Brief: `Deliverables/2026-08-06-pax-subagent-return-cue-brief.md`
+
+| | |
+|---|---|
+| **Verdict** | **`BUILD` — Option A, reduced — CONDITIONAL.** ⚠️ **Kill condition stated IN ADVANCE:** if `PreToolUse` firing *inside* a subagent does **not** carry `agent_id`, a parent tool call cannot be told from a specialist's, the cue can land in the **wrong context**, and the verdict **flips to `DO NOT BUILD` → fall back to Option C.** **Pax would not authorise the build without that probe** |
+| **Option B — DEAD**, established from the docs | **No native event both fires on a background return AND reaches the parent's context.** `Notification`'s `agent_completed` matcher is the right moment but its only output is `systemMessage` — *"Warning message shown to the user"* — which **never reaches Claude**. `SubagentStop.additionalContext` lands *"at the end of the turn"* with exit-2 semantics *"prevents the subagent from stopping"*, i.e. it **injects back into the SPECIALIST** — the exact thing Warwick forbade |
+| **The honest answer to the central question** | **NO hook is documented to fire after a background completion notification is processed.** The sub-agents page, verbatim: *"A background subagent's results reach Claude as a completion notification in a later turn."* **The relay is necessarily OPPORTUNISTIC** — next `PreToolUse` or `UserPromptSubmit`, whichever comes first. **That is not the clean answer the design assumed** |
+
+**🚨 The finding worth the whole commission: TWO OFFICIAL ANTHROPIC PAGES CONTRADICT EACH OTHER on the field the design rests on.** The **Agent SDK hooks** page says *"`agent_id` and `agent_type` are populated when the hook fires inside a subagent… available to all hook types"*; the **CLI hooks reference** lists `PreToolUse`'s inputs with **no `agent_id`**. **Pax did not pick a side — the contradiction IS the probe.** ✅ Correct handling, and the opposite of inferring a capability from a plausible field name.
+
+**The unexpected failure mode: the relay can fire EARLY.** A parent tool call one second after `SubagentStop` consumes the marker **before the completion notification has landed** — so Larry is told to act on a return he cannot yet see, **and the marker is gone.** Cheap mitigation, free from the executed evidence: **put `agent_type` in the cue** so Larry at least knows *who* returned. **Residual risk stands.**
+
+> **Pax's anti-pattern, and it is the durable part: *"the failure mode is the text, not the build."*** A generic *"a specialist returned"* on every return **becomes a banner ad within a day — a gate that gets skimmed has died while still looking green.** **Warwick's specialist-specific canonical text is the only thing making this survivable. If it ever collapses back to one generic string, RETIRE the hook.**
+
+**And the strongest argument for `BUILD`, worth defending if challenged:** the existing hook fires at dispatch, so it is **stale by the time the decision is due**. **Return-time firing is a CHANGE OF KIND, not a change of dose.**
+
+**Unresolved, and labelled as such by Pax:** `agent_id` presence in parent vs subagent `PreToolUse` (**UNESTABLISHED, and it decides the verdict**) · whether the relay materially improves retrieval **or just adds noise** (**UNESTABLISHED and unprovable in advance** — one data point in favour, zero about return-time efficacy) · **the host version was never captured in Larry's evidence file**, and the sub-agents page pins background behaviour to specific versions, so **record the exact version with any probe result or the evidence has no shelf life**.
+
+**📌 EXACT NEXT ACTION FOR THE POST-ROTATION SESSION: run Pax's §9 probe, capturing the host version, and let its result decide `BUILD` vs `DO NOT BUILD`.** ⛔ **Larry did NOT run it during this session.** Warwick deferred the implementation decision to after `/clear` and set the closing sequence himself; **running an unrequested probe while he slept is a request amplified into maintenance, which is Rule 1's named failure.**
+
 ## 17.7 ✅ J2-e — PASSED BY EXECUTION, 2026-08-06
 
 **Command, stated exactly, because the absence of flags IS the proof:**
