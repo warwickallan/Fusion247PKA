@@ -79,8 +79,9 @@ Private contracts: `contracts/EMAIL-INTAKE-CONTRACT.md`, `config/outlook-scout.j
 | Pre-session queue | 0 messages, 0 runs |
 | Webhook secret | Generated into `C:\.fusion247\careerair.env` as `CAREERAIR_EMAIL_WEBHOOK_SECRET` (value never logged) |
 | Webhook server | Listens `127.0.0.1:8787`; supervised via `ensure-local-services` service key `email` |
-| Controlled fixture | POST → `emailMessageId=73`, `duplicate:false`; second POST `duplicate:true` deliveryCount=2 |
-| Processor | recovery run claimed 1, processed 1 → 1 new opportunity; state `done` |
+| Controlled fixture (synthetic POST) | POST → `emailMessageId=73`, `duplicate:false`; second POST `duplicate:true` deliveryCount=2 |
+| Controlled fixture **from Outlook folder** | Draft created → moved to CareerAIR/Opportunities → normalised POST → `emailMessageId=75` duplicate-safe → processor claimed 1, processed 1 → new opportunity; **no application submitted** |
+| Processor | recovery runs claimed/processed fixtures → states `done` (2 messages) |
 | Scheduled processor tasks | `CareerAIR-Email-0800/1200/1700` created |
 | Public Zapier reachability | **NOT DONE** — Tailscale Funnel **not enabled** on tailnet (requires Warwick account action at Tailscale admin URL); no Hetzner deploy this pass |
 | Outlook rules → folders | **UNPROVEN** — folders empty of real mail; rules recommendations exist private-only |
