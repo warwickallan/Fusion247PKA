@@ -2014,6 +2014,26 @@ All three investigations have landed and their findings are recorded above. **WP
 
 **The accepted fix for the next iteration, Keel's recommendation:** **every field a bare value, prose in a sibling comment.** **Not dispatched — it is a candidate, and its disposition is Warwick's.**
 
+### G-6 — the generator has NO shape for a MACHINE-INSTALL order. Found 2026-08-06 attempting WP-4C
+
+**Larry generated WO-20 for Mack (install `ding.mjs` to `~/.mypka/governor/`) and the tool returned 3 `UNRESOLVED` and declared the order NOT ISSUABLE.** ✅ **The refusal was CORRECT, and Larry's input was wrong** — which is the tool behaving exactly as designed and is recorded as a success, not a defect.
+
+**The real shape, established from the WP-3E precedent (`WO-2026-08-05-16`) rather than invented:** a machine-install order does **not** use `file_surface` at all. It uses:
+
+| Field | WP-3E's value |
+|---|---|
+| **`machine_surface`** *(closed list)* | `C:\Users\Buggly\.mypka\governor\**` — **write permitted here and ONLY here** |
+| **`live_authority`** | **BOUNDED — `~/.mypka/governor/**` only** (a deviation from the standing `none`) |
+
+**Two distinct facts, and they must not be conflated:**
+
+1. **`file_surface` is for REPO paths.** Passing a machine path to `--surface` asks the tool to match `~/.mypka/...` against a contract's repo patterns; **finding nothing and refusing is right.** A tool that "helpfully" resolved it would be fabricating a grant — the exact defect Keel fixed at `MUT-10`.
+2. **The generator has no `machine_surface` concept and no way to express a bounded `live_authority`** beyond the generic `--deviate`. **So the estate's real machine-install shape cannot currently be generated** — it must be hand-authored, which reintroduces **G-1** on the two most safety-critical fields in the order.
+
+**Consequence for AC-5's accounting, stated so it is not quietly skipped:** WO-20 **was not issued** on the generated route. **It does not count as a clean order and does not advance the streak.** Consecutive clean orders remains **ONE**.
+
+**Disposition: reported once, NOT dispatched.** The fix is a candidate for the same iteration as G-1..G-5, and **it is Warwick's call**, not a Work Order Larry raises off his own finding.
+
 > **Keel's verdict on the generated envelope, quoted because it is the sharpest summary of what was actually bought:**
 >
 > **"The generated half is more trustworthy than prose about *provenance*, and less usable than prose about *values*."**
