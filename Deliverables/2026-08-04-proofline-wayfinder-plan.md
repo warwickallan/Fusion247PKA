@@ -56,7 +56,8 @@ This matters more than it looks: **the entire next phase is about proving what i
 
 ## START / RESUME HERE — ordered by Warwick
 
-- This Git Wayfinder is the sole route and source of truth.
+- **On a fresh resume, BEFORE using any tool or doing any work, visibly state: (1) this recovered map path, (2) the goal, (3) the current phase and gate, (4) the next action. THEN open this map and continue.**
+- This Git Wayfinder is the sole route and source of truth for BUILD-020.
 - **Bare `Continue.` after a fresh session / `/clear` / resume is a one-time orientation handshake, not a blank cheque to execute.** Ordered steps (canonical also in root `CLAUDE.md` Step 2):
   1. Recover Honcho and **this** active Wayfinder (verify by execution: branch, HEAD, worktree).
   2. Establish exact branch, head, phase, **ACTIVE SESSION WORK PACKAGE** (§ below), acceptance criteria, completed items, open residuals and recorded next action.
