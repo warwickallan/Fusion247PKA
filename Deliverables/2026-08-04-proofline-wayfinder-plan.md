@@ -2387,10 +2387,10 @@ node "C:/Users/Buggly/.mypka/governor/ding.mjs" <message-file>
 
 ### 🎯 THE EXACT NEXT ACTION
 
-1. Close functional rows 2–5 (Grok Option C durable; Claude live cue; combined ding; watcher main-guard; Supabase green).  
-2. Green CI on **exact tip**.  
-3. Veritas **Gate 1** then **Gate 2** (separate receipts).  
-4. Report merge-readiness to Warwick. **No Codex. No merge.**
+1. **Warwick (only if needed):** place `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` in approved off-repo runtime; allow schema apply.  
+2. Successful populate → resubmit **Gate 1** at new tip (row 5 clears → overall Gate 1 PASS possible).  
+3. Gate 2 stays HOLD until phase North Star residuals closed.  
+4. **No Codex. No merge** without Warwick.
 
 ### 📌 Parked (not this WP)
 
