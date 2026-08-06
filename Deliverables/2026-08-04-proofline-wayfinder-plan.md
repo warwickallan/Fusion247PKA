@@ -1947,10 +1947,55 @@ All three investigations have landed and their findings are recorded above. **WP
 |---|---|---|---|
 | **1** | **Keel returns and JOB 2 is integrated** | Keel → Larry | ✅ **DONE.** Integrated at **`8b0528b`**, independently verified — 56/56, `ding.mjs` byte-identical across the addendum, Larry's own surviving mutation now caught (5 red) |
 | **2** | **Mack installs the versioned FusionDevBot sender** | **Mack** | **IN FLIGHT.** `WO-2026-08-06-20` (WP-4C) dispatched at `0cc2ffe`. Hand-authored on the WP-3E `machine_surface` shape — see G-6 |
-| **3** | **Prove J2-e — ONE REAL MESSAGE arriving from the INSTALLED path**, credentials self-loaded, **no `--env-file` and no shell preparation** | **Larry**, then Warwick's eyes | Not started. **Gated behind 2** |
-| **4** | **Veritas reviews the exact integrated head** | **Veritas** | Not started |
-| **5** | **`/rotate` and reach `SAFE TO CLEAR`** | Larry | Not started |
-| **6** | **A FRESH Larry picks up the Pax report commission on the other side** | Pax, commissioned by the fresh Larry | **Not started, and NOT this session's** |
+| **2b** | **WP-4C install** | Mack | ✅ **DONE.** Installed sha `0f26ef16…` **equals the git blob**, verified independently by Larry; 0 CR bytes; rollback **executed** (absent→install→delete→verify→reinstall→equal); `INSTALLED-FROM.txt` appended with **append-only PROVEN** (first 8,310 bytes hash to the pre-write baseline) |
+| **3** | **Prove J2-e — ONE REAL MESSAGE arriving from the INSTALLED path**, credentials self-loaded, **no `--env-file` and no shell preparation** | **Larry**, then Warwick's eyes | ✅ **FIRED AND DELIVERED — see §17.7** |
+| **4** | **Veritas reviews the exact integrated head** | **Veritas** | **NEXT** |
+| **5** | **`/rotate` and reach `SAFE TO CLEAR`** — **now including the Pax report INSIDE the transaction** | Larry + Pax | Not started. **`/rotate` updated 2026-08-06 — see below** |
+| ~~**6**~~ | ~~A fresh Larry picks up the Pax commission on the other side~~ | — | ⛔ **REVERSED 2026-08-06 — see §17.5a** |
+
+### 🔄 §17.5a — Pax moves INSIDE `/rotate`. Warwick, 2026-08-06
+
+> **His reason, and it is the load-bearing part: *"Do not defer the Pax report until after respawn. That would lose session-specific evidence that has not yet been turned into a durable artefact."*** **A rotation is the last moment that evidence exists. After `/clear` it is gone and no fresh Larry can reconstruct it.**
+
+**`/rotate` is updated — `.claude/commands/rotate.md`, not a new mechanism.** Every rotation now: completes existing assurance and banking · **commissions Pax** for the closing session's performance/process report · **waits for the return** · **writes and commits it under `Deliverables/`** · **puts the pointer in the Wayfinder AND the Honcho packet** · and **withholds `SAFE TO CLEAR` until the Deliverable exists and the read-back matches.**
+
+⛔ **The report is a GIT artefact. NOT Google Drive, NOT Google Sheets, NOT Supabase** — this supersedes the earlier "publish to Google Drive" step entirely. **Supabase reporting is explicitly DEFERRED to a fresh session after the next `/clear` and must not be built now.**
+
+**For THIS rotation the report must carry:** Work Order evidence · rework and refusals · **the notification misses** · parent-channel availability and queued messages · token/context evidence **read from the instrument, never estimated** · and any other recorded delivery-tax findings.
+
+## 17.7 ✅ J2-e — PASSED BY EXECUTION, 2026-08-06
+
+**Command, stated exactly, because the absence of flags IS the proof:**
+
+```
+node "C:/Users/Buggly/.mypka/governor/ding.mjs" <message-file>
+```
+
+**No `--env-file`. No exported variable. No shell preparation.** Verified immediately before firing, in the same shell: **`TELEGRAM_BOT_TOKEN: ABSENT · AUTHORISED_TELEGRAM_USER_ID: ABSENT`.**
+
+| Evidence | Value |
+|---|---|
+| Return | `{"ok":true,"why":"sent","message_id":326}` — **exit 0** |
+| Durable record, written on first invocation | `{"ts":"2026-08-06T01:30:20.851Z","outcome":"sent","exit":0,"message_id":326,"bytes":2310}` |
+| Installed file | `0f26ef16…` = git blob at `8b0528ba`, **0 CR bytes** |
+
+**What this PROVES:** the send path loads its own approved credentials from a stable runtime, delivers, and **durably records the delivery** — **J2-c, J2-d and J2-e's send half.**
+
+⚠️ **What it does NOT prove, and no receipt may claim otherwise:**
+
+- **Arrival on Warwick's phone is HIS confirmation, not Larry's.** Telegram returning `ok:true` with a `message_id` evidences that the message left and was accepted. **It is not the same claim as "he saw it."**
+- **Nothing triggers this automatically, and nothing is supposed to.** Warwick ruled the ding **judgement** stays with Larry and is explicitly not mechanised. **Under root `CLAUDE.md` § "Nothing may live only in Larry's head", the MECHANISM (the send path) is now complete; the JUDGEMENT is not a mechanism** — which is exactly the boundary §17.2 records.
+
+### 🔴 And the judgement half failed TWICE today — both misses, recorded
+
+**Warwick, twice: *"where was my ding!ffs"*, then *"you absolutely should have dinged for the update on mack, that is substantial and a miss."*** **Both correct.**
+
+| # | Occasion | Larry's error |
+|---|---|---|
+| **1** | Step 2 (Nolan resolution) completed | Reported in chat, no ding |
+| **2** | **Mack's WP-4C return** — install verified, CRLF trap measured, contract correction accepted | Reported in chat, no ding |
+
+**Two failures of the same rule, in one session, by the author of the rule, roughly an hour apart, with the instrument reading GREEN and nothing else going wrong.** **This is the single strongest delivery-tax datum the session produced and it is Pax's to analyse, not Larry's to explain away.** **It does not reopen Warwick's ruling** — he owns the trade; Larry owes him the number, and the number is now two.
 
 **⛔ PAX IS UNTOUCHED UNTIL AFTER ROTATION. No commission, no reconnaissance, no evidence gathering, no drafting.** Warwick's earlier constraint still binds and is now doubled: *"Do not launch a separate report investigation before the Work Order route is ready — the Pax commission is also the first live acceptance test of that repaired route."* **The commission IS the investigation, and it belongs to the session after this one.**
 

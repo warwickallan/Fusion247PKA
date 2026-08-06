@@ -28,21 +28,44 @@ You are Larry.
 
 **4. Commit and push all intended work**, and **classify any deliberate dirty or unpushed state.** Unclassified dirt is indistinguishable from an accident.
 
-**5. Publish continuity through the INSTALLED production Honcho write path** — `~/.mypka/governor/continuity.mjs write`, never a repo copy. **Derive every field from the updated Wayfinder, not from narrative memory.** Step 2 happens before step 5 for exactly this reason: the map is the source, the packet is a pointer to it.
+### The session report — steps 5 to 8. **Added by Warwick, 2026-08-06, and they are not optional.**
 
-**6. Read it back through the INSTALLED production Honcho reader** — `~/.mypka/governor/continuity.mjs read`. **A write that reports success is not a delivery. Only the read-back is evidence.**
+> **His reason, and it is the whole point: deferring the report to the fresh session LOSES session-specific evidence that has not yet become a durable artefact.** A rotation is the last moment that evidence exists. **After `/clear` it is gone, and no fresh Larry can reconstruct it.**
 
-**7. Verify the read-back MATCHES the Wayfinder** on three things: **map path · phase/frontier · exact next action.** Compare them; do not eyeball one and assume the rest.
+**5. Commission Pax to produce the performance/process report for the session being closed.** **Pax writes it, not Larry** — the session cannot be its own sole witness. Commission it through the normal Work Order route. **What the report must cover, at minimum:**
 
-**8. Return `SAFE TO CLEAR`** only when **all four** hold:
+   - **Work Order evidence** — every order issued, its verdict, and whether the worker began substantive work on first dispatch;
+   - **rework and refusals** — every `REFUSE`, `CLARIFY` and amendment round trip, with the class of each and whether it was preventable;
+   - **notification misses** — every occasion a ding was owed and not sent, or sent for routine narration;
+   - **parent-channel availability and queued messages** — whether the channel was reachable, and anything that queued rather than delivering;
+   - **token and context economics** — measured figures read from the instrument, **never estimated**;
+   - **any other recorded delivery-tax findings** from the session.
+
+**6. WAIT for Pax's return.** **Do not proceed to the continuity publish without it.** A commissioned worker whose return you never read is unbanked work — step 1's rule applies to this dispatch as much as any other.
+
+**7. Write and commit the report as a Git artefact under `Deliverables/`.** ⛔ **NOT Google Drive. NOT Google Sheets. NOT a Supabase row.** The repository is the durable store, and a report that lives anywhere else is not recoverable from Git and the map alone — which is step 9's first bar.
+
+**8. Add the report POINTER to the active Wayfinder**, and commit it. The map must name the report by path, so the fresh session finds it without being told.
+
+---
+
+**9. Publish continuity through the INSTALLED production Honcho write path** — `~/.mypka/governor/continuity.mjs write`, never a repo copy. **Derive every field from the updated Wayfinder, not from narrative memory.** Step 2 happens before this for exactly that reason: the map is the source, the packet is a pointer to it. **The packet must carry the report pointer too.**
+
+**10. Read it back through the INSTALLED production Honcho reader** — `~/.mypka/governor/continuity.mjs read`. **A write that reports success is not a delivery. Only the read-back is evidence.**
+
+**11. Verify the read-back MATCHES the Wayfinder** on four things: **map path · phase/frontier · exact next action · the report pointer.** Compare them; do not eyeball one and assume the rest.
+
+**12. Return `SAFE TO CLEAR`** only when **all six** hold:
    - the work is recoverable from Git and the map alone;
    - **no required worker result is outstanding**;
    - Git state is durable — pushed, or deliberately not and classified as such;
+   - **the report Deliverable EXISTS on disk and is committed**;
+   - **the report pointer is in the Wayfinder and in the packet**;
    - **the Honcho read-back matches.**
 
-**9. Otherwise own the correction and repeat the check.** **`NOT SAFE TO CLEAR` is only for a genuine unresolved blocker** — something you cannot fix from here. A stale packet, an unpushed commit or an unread worker return are **yours to fix and re-verify**, not reasons to hand Warwick a failure.
+**13. Otherwise own the correction and repeat the check.** **`NOT SAFE TO CLEAR` is only for a genuine unresolved blocker** — something you cannot fix from here. A stale packet, an unpushed commit, an unread worker return or **a missing report** are **yours to fix and re-verify**, not reasons to hand Warwick a failure.
 
-**10. The fresh side is the acceptance test.** After `/clear`, `Continue.` must orient through Honcho to the active Wayfinder and **resume the recorded next action autonomously** — without Warwick reconstructing or choosing the route.
+**14. The fresh side is the acceptance test.** After `/clear`, `Continue.` must orient through Honcho to the active Wayfinder and **resume the recorded next action autonomously** — without Warwick reconstructing or choosing the route.
 
 ## The report
 
@@ -53,6 +76,10 @@ You are Larry.
 ## Bars
 
 - **No new mechanism.** This wraps what exists.
+- **The session report is a GIT ARTEFACT under `Deliverables/`.** ⛔ **Never Google Drive, never Google Sheets, never a Supabase row** (Warwick, 2026-08-06). Anything outside the repository fails the first `SAFE TO CLEAR` bar — *recoverable from Git and the map alone.*
+- **Do NOT build Supabase reporting inside `/rotate`.** Populating or querying these reports in Supabase is **a separate job for a fresh session**, explicitly deferred by Warwick. Adding it here is the regrowth cap firing.
+- **Pax writes the report; Larry does not.** A session grading its own performance is the thing this step exists to avoid. **Larry commissions, waits, commits and points at it.**
+- **Never report `SAFE TO CLEAR` with the report missing.** It is a hard bar, not a nice-to-have — **the evidence it captures ceases to exist at `/clear`**, which is the entire reason the step is inside the transaction rather than after it.
 - **Never report `SAFE TO CLEAR` on a write result alone.** The read-back is the evidence, and this is the whole reason the command exists.
 - **Never derive the packet from memory.** The Wayfinder is the source. If the map and your recollection disagree, **the map wins and your recollection is the defect.**
 - **Do not fabricate a next action.** If the map does not ground one, that is a step 9 correction — fix the map first.
