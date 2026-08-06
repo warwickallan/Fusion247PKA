@@ -25,7 +25,7 @@ import {
   buildAdditionalContext,
   DEFAULT_TTL_MS,
 } from './return-cue-consume.mjs';
-import { shouldDelete, sweepStateDir } from './return-cue-sweep.mjs';
+import { isMarkerFileName, sweepStateDir } from './return-cue-sweep.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const textTable = JSON.parse(readFileSync(join(here, 'return-cue-text.json'), 'utf8'));
@@ -148,9 +148,16 @@ describe('return-cue Option A', () => {
     assert.equal(second.length, 0);
   });
 
-  it('sweep removes foreign session and TTL-stale; keeps current fresh', () => {
+  // ── WO-23 F1 ────────────────────────────────────────────────────────────────
+  // This test previously asserted `kept: 1` — it asserted the DEFECT. A marker
+  // whose session_id matched the current session and whose age was inside the TTL
+  // was kept across SessionStart, and was then consumed by a fresh context as if a
+  // specialist had just returned. Session id survives `/clear`; TTL is only 30 min;
+  // neither can see a context boundary. SessionStart firing IS the boundary.
+  it('sweep removes EVERY marker at SessionStart, including same-session and fresh', () => {
     const state = join(dir, 'cues4');
     mkdirSync(state, { recursive: true });
+    // (a) the F1 case: same session id, written moments ago. MUST still be deleted.
     writeFileSync(join(state, 'a.json'), JSON.stringify({
       session_id: 'keep-me',
       agent_id: 'a',
@@ -169,11 +176,37 @@ describe('return-cue Option A', () => {
       agent_type: 'keel',
       ts: new Date(Date.now() - DEFAULT_TTL_MS - 1).toISOString(),
     }));
-    const r = sweepStateDir(state, 'keep-me');
-    assert.equal(r.kept, 1);
-    assert.equal(r.deleted, 2);
-    assert.equal(existsSync(join(state, 'a.json')), true);
-    assert.equal(shouldDelete({ session_id: 'x', ts: new Date().toISOString() }, 'y', Date.now()), true);
+    // a claimed leftover must go too
+    writeFileSync(join(state, 'd.json.claimed'), JSON.stringify({
+      session_id: 'keep-me', agent_id: 'd', agent_type: 'keel', ts: new Date().toISOString(),
+    }));
+    // an unrelated file must be left alone
+    writeFileSync(join(state, 'README.txt'), 'not a marker');
+
+    const r = sweepStateDir(state);
+    assert.equal(r.deleted, 4);
+    assert.equal(r.kept, 0, 'kept must be 0 — any non-zero means conditional sweeping regressed');
+    assert.equal(existsSync(join(state, 'a.json')), false, 'F1: same-session fresh marker must NOT survive');
+    assert.equal(existsSync(join(state, 'b.json')), false);
+    assert.equal(existsSync(join(state, 'c.json')), false);
+    assert.equal(existsSync(join(state, 'd.json.claimed')), false);
+    assert.equal(existsSync(join(state, 'README.txt')), true, 'non-marker files are not the sweep\'s business');
+  });
+
+  it('sweep takes no session id and cannot be made conditional by a payload', () => {
+    // The old signature accepted (stateDir, currentSessionId). Passing extra args
+    // must not resurrect conditional behaviour.
+    const state = join(dir, 'cues4b');
+    mkdirSync(state, { recursive: true });
+    writeFileSync(join(state, 'a.json'), JSON.stringify({
+      session_id: 'keep-me', agent_id: 'a', agent_type: 'keel', ts: new Date().toISOString(),
+    }));
+    const r = sweepStateDir(state, 'keep-me', Date.now(), DEFAULT_TTL_MS);
+    assert.equal(r.deleted, 1);
+    assert.equal(existsSync(join(state, 'a.json')), false);
+    assert.equal(isMarkerFileName('x.json'), true);
+    assert.equal(isMarkerFileName('x.json.claimed'), true);
+    assert.equal(isMarkerFileName('README.txt'), false);
   });
 
   it('CLI write script produces a four-field marker from SubagentStop-shaped stdin', () => {

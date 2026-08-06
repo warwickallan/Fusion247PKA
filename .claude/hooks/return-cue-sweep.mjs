@@ -1,9 +1,33 @@
 #!/usr/bin/env node
 /**
- * SessionStart → drop markers for other sessions and past TTL.
- * Always exit 0.
+ * SessionStart → drop EVERY marker. Unconditionally.
+ *
+ * A return-cue exists to be consumed inside the SAME live context that dispatched
+ * the specialist. Any SessionStart — startup, clear, resume or compact — means that
+ * context is gone, so every marker predating it is stale BY CONSTRUCTION.
+ *
+ * ── Why this is unconditional (WO-23 F1 repair, 2026-08-06) ───────────────────
+ * The previous version kept a marker whose session_id matched the current session
+ * and whose age was inside the TTL. A false cue was then observed firing on a fresh
+ * context's very first UserPromptSubmit with zero specialists dispatched.
+ *
+ * The cause was NOT a cross-session marker. `return-cue-consume.mjs` refuses any
+ * marker whose session_id differs from the consuming session, so a foreign marker
+ * can never be consumed at all — the fact that this one WAS consumed proves its
+ * session_id matched. It crossed a `/clear`, which PRESERVES the session id.
+ *
+ * Session id and TTL cannot detect a context boundary. SessionStart firing IS the
+ * boundary, so the boundary itself is the only sound signal, and it needs no
+ * payload field to be trusted.
+ *
+ * ── Fail-safe direction ───────────────────────────────────────────────────────
+ * A missed nudge is recoverable — root CLAUDE.md Rule 4a is the actual control and
+ * the hook was never more than a partial aid. A FALSE cue actively misleads the
+ * parent into believing a specialist returned. So this sweep drops, never keeps.
+ *
+ * Always exit 0. A hook that can break SessionStart is worse than no hook.
  */
-import { existsSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 
 export const DEFAULT_TTL_MS = 30 * 60 * 1000;
@@ -13,39 +37,27 @@ export function stateDirFromEnv(env = process.env) {
   return join(root, '.claude', 'state', 'return-cues');
 }
 
-export function shouldDelete(marker, currentSessionId, nowMs, ttlMs = DEFAULT_TTL_MS) {
-  if (!marker) return true;
-  if (currentSessionId && marker.session_id !== currentSessionId) return true;
-  const t = Date.parse(marker.ts);
-  if (Number.isNaN(t)) return true;
-  if ((nowMs - t) > ttlMs) return true;
-  return false;
+/** Marker files and claimed leftovers. Anything else in the dir is left alone. */
+export function isMarkerFileName(name) {
+  return name.endsWith('.json') || name.endsWith('.claimed');
 }
 
-export function sweepStateDir(stateDir, currentSessionId, nowMs = Date.now(), ttlMs = DEFAULT_TTL_MS) {
+/**
+ * Delete every marker in the directory. `kept` is always 0 — it is retained in the
+ * return shape so a caller asserting on it fails loudly if this ever regresses to
+ * conditional sweeping.
+ */
+export function sweepStateDir(stateDir) {
   if (!existsSync(stateDir)) return { deleted: 0, kept: 0 };
   let deleted = 0;
-  let kept = 0;
   for (const name of readdirSync(stateDir)) {
-    const path = join(stateDir, name);
-    // claimed leftovers and markers
-    if (!name.endsWith('.json') && !name.endsWith('.json.claimed') && !name.endsWith('.claimed')) {
-      continue;
-    }
-    let marker = null;
+    if (!isMarkerFileName(name)) continue;
     try {
-      marker = JSON.parse(readFileSync(path, 'utf8'));
-    } catch {
-      try { rmSync(path, { force: true }); deleted += 1; } catch { /* */ }
-      continue;
-    }
-    if (shouldDelete(marker, currentSessionId, nowMs, ttlMs)) {
-      try { rmSync(path, { force: true }); deleted += 1; } catch { /* */ }
-    } else {
-      kept += 1;
-    }
+      rmSync(join(stateDir, name), { force: true });
+      deleted += 1;
+    } catch { /* a marker we cannot remove must not break SessionStart */ }
   }
-  return { deleted, kept };
+  return { deleted, kept: 0 };
 }
 
 async function readStdin() {
@@ -63,10 +75,10 @@ async function main() {
     } catch {
       process.exit(0);
     }
-    const sessionId = payload.session_id || payload.sessionId
-      ? String(payload.session_id || payload.sessionId)
-      : null;
-    sweepStateDir(stateDirFromEnv(), sessionId);
+    // payload is read only to confirm well-formed stdin; the sweep is unconditional
+    // and deliberately does NOT depend on session_id being present or matching.
+    void payload;
+    sweepStateDir(stateDirFromEnv());
   } catch {
     // never break SessionStart
   }

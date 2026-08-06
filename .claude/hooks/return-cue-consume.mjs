@@ -3,7 +3,13 @@
  * Parent PreToolUse / UserPromptSubmit → claim return-cue markers and inject additionalContext.
  *
  * Parent-only: exit immediately if payload carries agent_id (subagent PreToolUse).
- * Atomic claim via rename to .claimed (Windows: rename fails if target exists → mutex).
+ *
+ * Exactly-once claim via rename to .claimed. CORRECTED 2026-08-06 (WO-23 F2): the
+ * previous comment claimed "Windows: rename fails if target exists → mutex". That
+ * reason is FALSE — Node's fs.renameSync REPLACES an existing destination on Windows.
+ * The mutex holds for a different reason: the winner's rename makes the SOURCE path
+ * vanish, so every loser's renameSync throws ENOENT and skips. Safe behaviour, wrong
+ * stated cause — and a wrong cause in a comment is what a later reader reasons from.
  *
  * Always exit 0.
  */
@@ -89,13 +95,20 @@ export function isFresh(marker, nowMs, ttlMs = DEFAULT_TTL_MS) {
 
 /**
  * Claim matching markers. Returns claimed markers (may be multiple).
- * Atomic rename: path.json → path.json.claimed ; fails if claimed exists.
+ *
+ * Exactly-once: rename path.json → path.json.claimed. The loser of a race throws
+ * ENOENT because the source is gone (see the file header — the rename does NOT
+ * fail on an existing destination).
  */
 export function claimMatchingMarkers(stateDir, sessionId, nowMs = Date.now(), ttlMs = DEFAULT_TTL_MS) {
   if (!existsSync(stateDir)) return [];
   mkdirSync(stateDir, { recursive: true });
   const claimed = [];
-  const names = readdirSync(stateDir).filter((n) => n.endsWith('.json') && !n.endsWith('.claimed.json'));
+  // Claimed files are named "<id>.json.claimed", so .endsWith('.json') already excludes
+  // them. A previous "!n.endsWith('.claimed.json')" clause here was dead code that read
+  // like the duplicate guard while doing nothing (WO-23 F3). The real guard is the
+  // rename below.
+  const names = readdirSync(stateDir).filter((n) => n.endsWith('.json'));
   for (const name of names) {
     const path = join(stateDir, name);
     let raw;
