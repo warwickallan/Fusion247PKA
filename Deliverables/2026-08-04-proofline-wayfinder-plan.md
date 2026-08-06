@@ -2088,9 +2088,26 @@ All three investigations have landed and their findings are recorded above. **WP
 
 **And the strongest argument for `BUILD`, worth defending if challenged:** the existing hook fires at dispatch, so it is **stale by the time the decision is due**. **Return-time firing is a CHANGE OF KIND, not a change of dose.**
 
-**Unresolved, and labelled as such by Pax:** `agent_id` presence in parent vs subagent `PreToolUse` (**UNESTABLISHED, and it decides the verdict**) · whether the relay materially improves retrieval **or just adds noise** (**UNESTABLISHED and unprovable in advance** — one data point in favour, zero about return-time efficacy) · **the host version was never captured in Larry's evidence file**, and the sub-agents page pins background behaviour to specific versions, so **record the exact version with any probe result or the evidence has no shelf life**.
+**Unresolved, and labelled as such by Pax (pre-probe):** `agent_id` presence in parent vs subagent `PreToolUse` (**was UNESTABLISHED — now SETTLED**) · whether the relay materially improves retrieval **or just adds noise** (**still UNESTABLISHED and unprovable in advance**) · **host version pin** (**now captured**).
 
-**📌 EXACT NEXT ACTION FOR THE POST-ROTATION SESSION: run Pax's §9 probe, capturing the host version, and let its result decide `BUILD` vs `DO NOT BUILD`.** ⛔ **Larry did NOT run it during this session.** Warwick deferred the implementation decision to after `/clear` and set the closing sequence himself; **running an unrequested probe while he slept is a request amplified into maintenance, which is Rule 1's named failure.**
+### ✅ §9 PROBE EXECUTED — 2026-08-06 post-rotation session
+
+**Evidence:** `Deliverables/2026-08-06-s9-agent-id-probe-evidence.md`  
+**Host version:** `2.1.222 (Claude Code)`  
+**Method:** temporary untracked hooks in `.claude/settings.local.json` only (restored after; tracked `settings.json` untouched) · one `claude -p` parent with one background general-purpose Agent · 6 payloads · exit 0 · 44.9 s
+
+| Observation | Result |
+|---|---|
+| Parent `PreToolUse` (Bash, Agent dispatch, Bash after) | **no** `agent_id`, **no** `agent_type` |
+| Subagent `PreToolUse` (Bash, Read) | **`agent_id` + `agent_type` present** (`a515f57fcfad85cbd` / `general-purpose`) |
+| `SubagentStop` | fired once with same `agent_id` + `agent_type` |
+| `Notification` | **0 firings** under this non-interactive run (fold-in only) |
+| **Kill condition** | **NOT triggered** |
+| **Verdict** | **`BUILD` — Option A reduced may proceed** |
+
+**What remains unestablished:** return-time efficacy vs noise · exactly-once consume under concurrent parent batches · Notification in interactive sessions.
+
+**📌 EXACT NEXT ACTION (supersedes the post-rotation probe action):** **Issue and dispatch a bounded Work Order to implement Option A reduced** per `Deliverables/2026-08-06-pax-subagent-return-cue-brief.md` §§7–8 — `SubagentStop` marker writer · parent-only `PreToolUse`/`UserPromptSubmit` consumer gated on absent `agent_id` · specialist-specific cue text · zero model calls · no daemon · no auto-send. **Do not build a workaround for a failed probe — the probe passed.**
 
 ## 17.7 ✅ J2-e — PASSED BY EXECUTION, 2026-08-06
 
@@ -2308,22 +2325,23 @@ node "C:/Users/Buggly/.mypka/governor/ding.mjs" <message-file>
 
 ## 17.4 Frontier
 
-## ⭐ THE LIVE FRONTIER AT ROTATION — 2026-08-06. **This is the single statement. Read this, not §17.5's table.**
+## ⭐ THE LIVE FRONTIER — 2026-08-06 post-rotation. **This is the single statement. Read this, not §17.5's table.**
 
 | | |
 |---|---|
 | **Map** | `Deliverables/2026-08-04-proofline-wayfinder-plan.md` — this file |
 | **Branch / worktree** | `build-020/phase4-automation-law` · `C:\Fusion247PKA-build-020-trial` — **PUSHED.** ⚠️ **Verify HEAD by execution; this map has recorded a stale SHA four times** |
 | **Phase** | **BUILD-020 Phase 4 — INTEGRATED, NOT PASSED.** **Veritas `HOLD`** on the phase question, twice, at `89602f3` and `b267d55` |
+| **§9 probe** | ✅ **EXECUTED** on host `2.1.222` → **`BUILD`**. Evidence: `Deliverables/2026-08-06-s9-agent-id-probe-evidence.md` |
 | **Session report** | 📄 **`Deliverables/2026-08-06-session-performance-report.md`** (Pax) |
 | **Receipts** | `Deliverables/2026-08-06-veritas-build020-phase4-receipt.md` · `Deliverables/2026-08-06-veritas-build020-phase4-rereview-b267d55-receipt.md` |
 | **Merged to `main`?** | **NO. Nothing merged. No PR. `main` untouched.** |
 
 ### 🎯 THE EXACT NEXT ACTION
 
-**Run Pax's §9 probe from `Deliverables/2026-08-06-pax-subagent-return-cue-brief.md`: establish whether `PreToolUse` firing INSIDE a subagent carries `agent_id`. Capture the exact host version with the result.**
+**Dispatch a bounded Work Order to implement Option A reduced** (subagent-return retrieval cue) per `Deliverables/2026-08-06-pax-subagent-return-cue-brief.md` §§7–8 and §17.9 above. Kill condition cleared by execution: parent `PreToolUse` lacks `agent_id`; subagent `PreToolUse` carries `agent_id` + `agent_type` on host `2.1.222`.
 
-**Why this and not something else:** it is the **only** named post-rotation item with a defined method and a **pre-stated kill condition** — *if `agent_id` is absent, the cue can land in the wrong context and the verdict flips from `BUILD` to `DO NOT BUILD`, falling back to Option C.* **Do not build the relay before running it.** §17.9 is the full context.
+**Why this and not something else:** the post-rotation probe was the only gated item; it returned `BUILD`. Implementation is the named next step. **Do not re-run the probe unless the host version changes.**
 
 ### ⏸️ Awaiting Warwick — do NOT decide these
 
