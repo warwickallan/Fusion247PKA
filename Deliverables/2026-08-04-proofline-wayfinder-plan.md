@@ -1782,7 +1782,7 @@ All three investigations have landed and their findings are recorded above. **WP
 
 | # | Requirement |
 |---|---|
-| **J1-1** | Canonical envelope generation is an **unavoidable part of Larry's ordinary dispatch route** — not a remembered optional command |
+| **J1-1** | Canonical envelope generation is an **unavoidable part of Larry's ordinary dispatch route** — not a remembered optional command. **🔴 OPEN, and explicitly NOT closed by WO-18.** Keel's read-back established that `tools/wo/**` cannot close it: **every acceptance criterion there is satisfiable by manually invoking the tool**, which the acceptance clause committed at `9fa3169` calls under-specification. WO-18's `outcome` is therefore amended to declare a **manual** deliverable, per the clause's own named alternative. **The law caught its own first order — that is the law working, not a failure.** What WO-18 *does* contribute is a **provenance header** on every emitted order (tool, governance head, source paths + blob SHAs, generation time) so a hand-authored order is **detectably** not generated — output text, not a checker. **Closing J1-1 needs a route change outside `tools/wo/**`, and the standing prohibition on new checkers, actors, services and governance layers constrains what is permissible. Larry does not invent one; it is reported here** |
 | **J1-2** | **`contract_basis` is GENERATED** from canonical contract/surface extraction, not authored prose |
 | **J1-3** | **Standing defaults are not retyped.** Orders carry **only authorised deviations**, each explicitly escalated |
 | **J1-4** | **The Work Order exists at the governance head it declares BEFORE the worker is dispatched** |

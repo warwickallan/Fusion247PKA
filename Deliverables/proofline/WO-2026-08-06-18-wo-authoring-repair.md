@@ -4,7 +4,7 @@ name: Work Order authoring repair — generate the order, do not type it
 work_order_id: WO-2026-08-06-18
 build: BUILD-020
 wp_number: WP-4A
-status: draft
+status: issued          # AMENDMENT 1, 2026-08-06 — read-back accepted with rulings (was: draft)
 authorised_by: Warwick
 authorised_date: 2026-08-06
 owner: keel
@@ -14,10 +14,15 @@ tags: [build-020, wp-4a, phase-4]
 
 # --- scope ---
 outcome: >
-  `tools/wo/envelope.mjs` emits a COMPLETE, ready-to-issue Work Order file — not envelope rows to
-  stdout — with `contract_basis` extracted from canonical contracts, standing defaults omitted rather
-  than retyped, the declared governance head verified to exist, and ceremony fields removed on the
-  evidence that they never changed execution.
+  MANUAL DELIVERABLE, stated explicitly per Templates/work-order.md "Mandatory acceptance clause for an
+  INTENDED-AUTOMATIC outcome". This Work Order delivers a MANUALLY-INVOKED AUTHORING TOOL. It does not
+  claim, and its acceptance criteria do not evidence, completed automation under root CLAUDE.md
+  "Nothing may live only in Larry's head". J1-1 REMAINS OPEN and is recorded as open in map §17.1 —
+  it is not closed by this order and no part of this order may be read as closing it.
+  The deliverable: `tools/wo/envelope.mjs` emits a COMPLETE, ready-to-issue Work Order file — not
+  envelope rows to stdout — with `contract_basis` extracted from canonical contracts, standing defaults
+  GENERATED rather than retyped by Larry (see S-3 as amended), the declared governance head verified to
+  exist and to be an ancestor-or-equal of the worktree head, and ceremony fields removed on evidence.
 acceptance_property: >
   A Work Order produced by the tool at a named governance head is issuable with Larry having authored
   ONLY outcome, scope, acceptance, evidence and sequencing — and every other field is traceable to a
@@ -42,15 +47,20 @@ worker_contract:
   path: Team/Keel - Implementation Engineer/AGENTS.md
   governance_sha: 9fa3169e3cc59867d3ab617a2d56d07910de65d6
 
+# AMENDMENT 1 (C-5): these cited a GENERATOR FIELD NAME, not a contract heading, which the template
+# requires. Corrected to exact headings — the same defect class S-2 exists to remove, in the order
+# commissioning S-2. Found by Keel's read-back.
 contract_basis:
   - surface: tools/wo/envelope.mjs
-    permitted_by: "permitted_file_surface — `tools/**`"
+    permitted_by: "Team/Keel - Implementation Engineer/AGENTS.md § Where Keel writes — `tools/**`"
   - surface: tools/wo/envelope.test.mjs
-    permitted_by: "permitted_file_surface — `tools/**`; 'a test suite' is named work in scope"
+    permitted_by: "Team/Keel - Implementation Engineer/AGENTS.md § Where Keel writes — `tools/**`"
   - action: cut and operate branch `wo/18-envelope-route` in worktree `C:/Fusion247PKA-wo-18`
-    permitted_by: "The integration role — branch and worktree operations, commits, pushes"
+    permitted_by: "Team/Keel - Implementation Engineer/AGENTS.md § The integration role — branch and worktree operations, commits and pushes"
   - action: run `node --test` and `bash scripts/secret-scan.sh --surface tools/wo`
-    permitted_by: "The integration role — test and script execution"
+    permitted_by: "Team/Keel - Implementation Engineer/AGENTS.md § The integration role — test and script execution"
+  - action: "write ephemeral test fixtures to os.tmpdir() and one demonstration artefact to the session scratchpad (AMENDMENT 1, M-1 ruling — both OUTSIDE the repository; no repo path is written)"
+    permitted_by: "Larry's explicit authorisation, AMENDMENT 1, 2026-08-06. Both paths are outside `file_surface` by design and neither is a repository path."
 
 contract_conflicts: none
 
@@ -111,8 +121,8 @@ SOP-022 actor, agent-index or shim change is authorised by this order or any par
 |---|---|---|
 | **S-1** | **Emit a complete order FILE, not stdout rows.** The tool writes a ready-to-issue Work Order at a caller-given path, with the variable sections present as clearly-marked authoring slots. Larry fills only outcome, scope, acceptance, evidence, sequencing | J1-1, J1-5 |
 | **S-2** | **Generate `contract_basis` by extraction.** For each declared `file_surface` entry and each declared non-file action, resolve the permitting clause **from the canonical contract file** and cite its exact heading. Where no clause permits it, emit `UNRESOLVED` — the J1-b behaviour, extended to this field | J1-2 |
-| **S-3** | **Stop retyping standing defaults.** Emit the standing authority block **only** where the caller passes an explicit deviation; a deviation renders with a required escalation note naming who authorised it. Absent a deviation the order carries a single line stating defaults apply | J1-3 |
-| **S-4** | **Verify the declared governance head EXISTS** in the repository before emitting, and fail loudly if it does not | J1-4 |
+| **S-3** | **AMENDED — see C-1 ruling below. Larry stops TYPING the standing defaults; the tool still EMITS them.** Emit all five as **real YAML keys generated by extraction** from `Templates/work-order.md`, under a one-line provenance note stating defaults apply and where they came from. A deviation renders **additionally**, with the escalation note naming who authorised it. **Literal omission is REJECTED** — it would make every emitted order refusable on sight | J1-3 |
+| **S-4** | **Verify the declared governance head EXISTS** in the repository before emitting, and fail loudly if it does not. **AMENDED (C-2): also correct `worktreeCheck` from `HEAD === governance head` to ANCESTOR-OR-EQUAL** (`git merge-base --is-ancestor`). **Authorised into S-4** | J1-4 |
 | **S-5** | **Remove ceremony fields**, on evidence — see below | J1-7 |
 
 ### S-5 is evidence-led, not taste-led
@@ -175,6 +185,41 @@ is a hypothesis for you to test against the replay evidence, not an instruction 
    justification depends on the emitted shape.
 4. Commit by explicit pathspec. Push the branch. **Open no PR and merge nothing** — integration is
    Larry's decision and merge is Warwick's.
+
+## Inputs supplied — AMENDMENT 1 (M-6). *"Amend the order, do not patch it in chat."*
+
+These were named only in the dispatch message. **The next reader of this file would not have found them.**
+
+| Input | Path | Why it is load-bearing |
+|---|---|---|
+| **Replay corpus** | `Deliverables/proofline/EVIDENCE-2026-08-05-wp3g-envelope.md` | **AC5 stands on it.** §3 R-01–R-42 are the scored defects; §4.2/4.3/4.4 are the field-level findings |
+| **Phase-completion contract** | `Deliverables/2026-08-04-proofline-wayfinder-plan.md` §17 | Warwick's JOB 1, its eight requirements and the J1-a..J1-e facts |
+| **The canonical law** | root `CLAUDE.md` § "Nothing may live only in Larry's head" | Why "the tool exists and is callable" is not a complete outcome |
+| **Worker contract** | `Team/Keel - Implementation Engineer/AGENTS.md` @ `9fa3169` | Surface, git authority, critical rules |
+
+---
+
+## AMENDMENT 1 — 2026-08-06. Read-back accepted with rulings
+
+**Keel returned `CLARIFY` with 2 preventable class-A of material weight, 4 minor class-A, 1 class-B, 2 clerical. Every one is accepted as correct.** Per SOP-022, the order is amended and **one** additional fresh read-back is permitted. Rulings:
+
+| Ref | Ruling |
+|---|---|
+| **C-1** | **Keel is right and I do not amend the template.** `Templates/work-order.md`, root `CLAUDE.md` § Private surfaces item 2 and SOP-022 §9 all outrank this order, and `private_surface` is **GL-012's only route to an ephemeral worker that inherits nothing else.** Omitting it would be a security regression dressed as concision. **J1-3's named harm is Larry RETYPING them — that is what stops. The tool emits them.** AC4 says no *retyped* block; a generated block is not a retyped one, so this satisfies AC4 literally |
+| **C-2** | **Authorised into S-4.** The mismatch is real, Keel executed it, and **my own two-commit design is what exposed it.** Ancestor-or-equal is the correct semantics |
+| **C-3** | **My defect, accepted.** I named `c9390de` from memory; the tip was `4214a66`. Cutting from the true tip was correct. **This is precisely the class the gate exists to catch, and it was mine** |
+| **C-4** | Fixed above — `status: issued` |
+| **C-5** | Fixed above — exact headings |
+| **M-1** | **Option (a) AUTHORISED.** Ephemeral `os.tmpdir()` for the write-path test, one demonstration artefact to the session scratchpad. **Both outside the repository, both named in the return, no repo path written.** Recorded in `contract_basis` |
+| **M-2** | **Confirmed as proposed.** Keyword-match against anchored contract sections; exactly one match → cite the heading; zero or many → `UNRESOLVED`. **No action→clause table** — that is a registry and it is not to be grown |
+| **M-3** | **Confirmed.** No git or no repository = the loud failure. **No bypass flag** — a skippable check is not a check |
+| **M-4** | **Confirmed.** A third marker, distinct from `UNRESOLVED`. Wording is yours; `AUTHOR REQUIRED — <field>: <what to write>` is fine |
+| **M-5** | **Confirmed — bring the exact cut list with per-field justification. Do not apply silently.** Your S-5 analysis is accepted, including that **my test was the wrong test as worded**: cutting on absence-of-evidence is the weak form. **Use the SSOT rule as the stated justification and say plainly that it is not a replay row.** `git_authority` — keep the three-state value plus citation, drop the page; that preserves R-31 |
+| **Q2 / J1-1** | **Keel is right: J1-1 is genuinely unmet, not merely split, and my own acceptance clause caught my own order.** `outcome` is amended to state this is a **manual** deliverable. **J1-1 is recorded OPEN in map §17.1.** The **provenance header is APPROVED** — tool, governance head, source paths with blob SHAs, generation time. It is output text, not a checker |
+
+**Correction to my own S-5 figure, recorded because the order carried it as evidence:** I wrote "roughly ten thousand tokens" from an eyeball. Keel **measured 20,056 chars ≈ 5,014 tokens** — I was ~2× high, missed `git_authority` at 14%, and overstated `prohibited_file_surface`, which is 7%. **The surviving claim is the one that mattered: inlined contract text is 85% of the envelope.**
+
+---
 
 ## Note — how J1-4 resolves, and why it looked circular
 
