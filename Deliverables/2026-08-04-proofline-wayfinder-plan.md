@@ -2823,6 +2823,36 @@ Any newly discovered **unrelated** defect: record once in [[Deliverables/BACKLOG
 >
 > **This is an EXECUTION phase, not another QA programme.** No Veritas loop. No Codex loop. No new governance programme. The governance changes are **surgical corrections to prevent recurrence of a demonstrated failure** — not a build.
 
+### ⭐ 4C NORTH STAR — **ONE REAL SYSTEM.** Warwick, 2026-08-07. **This governs 4C. Everything below serves it.**
+
+> **The objective of 4C is not to make Git tidy for its own sake.**
+>
+> It is to make Fusion247PKA behave as **one coherent, durable system in which completed work cannot disappear, become stranded, fork into competing versions, or require Larry to remember where the "real" version lives.**
+>
+> **There is one canonical MAIN and one active piece of work.** While work is underway, useful new state may legitimately exist in that active working state. **When that work is MERGED, the distinction disappears.**
+>
+> **MAIN + ACTIVE WORK → MERGE → MAIN.**
+>
+> **The test, and it is the whole thing:** a fresh Larry should never have to ask *"Didn't we already build this somewhere?"* **If the answer is yes, the previous merge failed.**
+
+**MERGE is an outcome, not a Git command.** A PR merge may be one operation used to achieve it; **clicking Merge does not make the work MERGED.** A Warwick MERGE means: everything retained is on canonical `main` or in its deliberately approved canonical non-Git home · anything executable or operational that should consume the retained work **is consuming the canonical version** · anything superseded is **no longer an active competing source** · anything discarded is **dead** · nothing useful belonging to the work is **stranded outside the canonical system**. And it must be **durable** — a new session, restart, fresh checkout or recovery finds the same authoritative implementation **without relying on Larry's memory or archaeological searching**.
+
+**MERGE is NOT** — *"a PR was merged" · "a branch was closed" · "the tests passed" · "Codex approved the diff" · "Veritas issued a receipt" · "the useful bits are preserved in another worktree" · "we kept the old branch just in case" · "the runtime still works from the old checkout" · "we'll reconcile the estate later."* **Those may be evidence or intermediate steps. None satisfies the human outcome.**
+
+**Larry owns achieving the North Star.** Warwick decides what outcome is wanted and whether the final merge is authorised; **Larry owns how Git, branches, worktrees, runtimes, specialists and sequencing get there. Warwick should never need to understand Git terminology to obtain a clean merged system.**
+
+> **⛔ THE STANDING CORRECTION, and it is why this section exists** (Warwick, 2026-08-07): *"I just want the human outcome to be the focus, not the machine electronic admin… the system has worked quite well recently. Just the focus has been wrong cos it had focused on admin, not product, outcomes and goals."*
+>
+> **Do not throw the baby out with the bathwater.** **Veritas stays difficult, sceptical and independent of Larry's judgement — that is the baby we keep.** What disappears is **the recursive assurance machinery that let her spend hours reviewing administrative changes created by the preceding review.**
+>
+> **Evidence exists to answer the human questions. The evidence does not become the purpose of the review.** A SHA records what was inspected; **it does not define the human scope.** A receipt is the **output** of a review, **not a new product requiring another review.**
+>
+> **⚠️ Responding to this section by adding further clauses and specifics IS the failure it describes.** The regrowth cap applies at full force.
+
+**Codex's value is the fresh external pair of eyes immediately before Warwick collapses the active work back into MAIN** — challenging (1) whether what is being kept is technically sound enough for the agreed outcome, including what Larry and Veritas may collectively have missed, and (2) whether the proposed merge **actually produces the North Star**. **It reports what is wrong; Larry fixes it. It does not become an iterative development partner.**
+
+**4C is finished only when Fusion247PKA demonstrates the model it is establishing for every future Build:** **ONE MAIN. ONE WORKING FOLDER. ONE AUTHORITATIVE SYSTEM.** And from then onward — *the active piece of work may temporarily exist beside MAIN; MERGE consumes it; nothing useful gets left behind.*
+
 ### 🎯 THE ONE CURRENT NEXT ACTION — **Sub-phase 4C: CANONICAL ESTATE RESET.**
 
 **Working branch `build-020/4c-estate-convergence`, cut from `70dba16`.** Every 4C acceptance row below is Warwick's, restated in the order he set them.
