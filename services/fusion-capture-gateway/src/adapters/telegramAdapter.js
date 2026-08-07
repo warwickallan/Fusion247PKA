@@ -50,8 +50,12 @@ let nextMessageId = 1000;
  * @param {object} opts
  * @param {string|number} opts.authorisedUserId  the single allowlisted numeric id.
  * @param {string} [opts.defaultAction]           default capture action (SaveToBrain).
+ * @param {boolean} [opts.acceptMultimodal]       OPT-IN (default false). Forwarded to
+ *                  mapTelegramUpdate: when true an authorised private photo/voice
+ *                  update is accepted (technical_source_type 'image'|'voice')
+ *                  instead of rejected 'unsupported_content_type'. DEV-only.
  */
-export function createMockTelegramAdapter({ authorisedUserId, defaultAction = 'SaveToBrain' } = {}) {
+export function createMockTelegramAdapter({ authorisedUserId, defaultAction = 'SaveToBrain', acceptMultimodal = false } = {}) {
   if (authorisedUserId === undefined || authorisedUserId === null || authorisedUserId === '') {
     throw new Error('createMockTelegramAdapter: authorisedUserId required (allowlist of one)');
   }
@@ -89,6 +93,7 @@ export function createMockTelegramAdapter({ authorisedUserId, defaultAction = 'S
         authorisedUserId: authorised,
         action,
         defaultAction,
+        acceptMultimodal,
       });
       if (!mapped.ok) {
         if (mapped.reason === 'unauthorised_sender') {
