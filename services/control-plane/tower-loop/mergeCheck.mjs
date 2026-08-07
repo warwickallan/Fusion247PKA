@@ -85,6 +85,30 @@ export const MAX_CONVERGENCE_BYTES = 24_000;
  *  tips, so deduplicating by object id collapses ~66 non-contained refs to far fewer probes. */
 export const MAX_REFS_PROBED = 80;
 const CONVERGENCE_PROBE_TIMEOUT_MS = 20_000;
+/** Recovery pins are NOT ordinary working branches — see the [R] section for the reasoning. */
+export const RECOVERY_REF_PREFIX = 'refs/recovery';
+/** Divergence analysis costs 4 probes per tip; bound how many run at once. */
+const PROBE_CONCURRENCY = 8;
+/** Most-divergent modified paths sampled per tip. Names and line counts only — never contents. */
+const SAMPLE_PATHS_PER_TIP = 3;
+/** Tips that get a rendered sample block, highest divergence first. Bounds the block. */
+const SAMPLED_TIPS = 8;
+/** Recovery-pin groups itemised. The total count is always complete; only itemisation is capped. */
+const RECOVERY_GROUPS_SHOWN = 20;
+
+/** Bounded-concurrency map. 4 probes x ~45 tips would otherwise spawn ~180 children at once. */
+async function mapLimit(items, limit, fn) {
+  const out = new Array(items.length);
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {
+    for (;;) {
+      const i = next; next += 1;
+      if (i >= items.length) return;
+      out[i] = await fn(items[i], i);
+    }
+  }));
+  return out;
+}
 
 /**
  * Run one read-only probe. Never throws and never rejects: a failure is DATA, because the whole
@@ -101,16 +125,20 @@ function runProbe(cmd, args, { cwd, spawn = nodeSpawn, timeoutMs = CONVERGENCE_P
     try {
       child = spawn(cmd, args, { cwd, shell: false, windowsHide: true });
     } catch (e) {
-      return settle({ ok: false, stdout: '', stderr: String(e?.message ?? e) });
+      return settle({ ok: false, code: -1, stdout: '', stderr: String(e?.message ?? e) });
     }
     const timer = setTimeout(() => {
       try { child.kill?.('SIGKILL'); } catch { /* ignore */ }
-      settle({ ok: false, stdout: '', stderr: `timed out after ${timeoutMs}ms` });
+      settle({ ok: false, code: -2, stdout: '', stderr: `timed out after ${timeoutMs}ms` });
     }, timeoutMs);
     child.stdout?.on('data', (d) => outChunks.push(d));
     child.stderr?.on('data', (d) => errChunks.push(d));
-    child.on('error', (e) => { clearTimeout(timer); settle({ ok: false, stdout: '', stderr: String(e?.message ?? e) }); });
-    child.on('close', (code) => { clearTimeout(timer); settle({ ok: code === 0, stdout: text(outChunks), stderr: text(errChunks) }); });
+    child.on('error', (e) => { clearTimeout(timer); settle({ ok: false, code: -1, stdout: '', stderr: String(e?.message ?? e) }); });
+    // `code` is carried because two probes here signal a RESULT through a non-zero exit rather
+    // than a failure: `merge-base --is-ancestor` returns 1 for "not an ancestor", and
+    // `merge-tree` returns 1 for "merged, with conflicts" while still printing a valid tree OID.
+    // Collapsing those to `ok:false` would have turned the most divergent branches into UNRESOLVED.
+    child.on('close', (code) => { clearTimeout(timer); settle({ ok: code === 0, code, stdout: text(outChunks), stderr: text(errChunks) }); });
   });
 }
 
@@ -144,9 +172,12 @@ export async function gatherConvergenceEvidence({
   let probesRun = 0;
   const record = (r) => { probesRun += 1; if (!r.ok) failures.push(r); return r; };
 
-  const REF_FMT = '%(refname:short)%09%(objectname)';
+  // Full refname AND short name: `%(refname:short)` renders `refs/remotes/origin/HEAD` as bare
+  // `origin`, which slipped past a `/HEAD$` filter on the short name and rendered the remote's
+  // symbolic HEAD as if it were a branch. Filtering is done on the FULL refname for that reason.
+  const REF_FMT = '%(refname)%09%(objectname)%09%(refname:short)';
   const [mainRes, localRes, remoteRes, localMergedRes, remoteMergedRes,
-    worktreeRes, stashRes, statusRes, prRes, mainTreeRes] = await Promise.all([
+    worktreeRes, stashRes, statusRes, prRes, mainTreeRes, recoveryRes] = await Promise.all([
     git('rev-parse', '--verify', `${mainRef}^{commit}`),
     git('for-each-ref', `--format=${REF_FMT}`, 'refs/heads'),
     git('for-each-ref', `--format=${REF_FMT}`, 'refs/remotes'),
@@ -156,64 +187,146 @@ export async function gatherConvergenceEvidence({
     git('stash', 'list', '--format=%gd %H %gs'),
     git('status', '--porcelain=v1', '--untracked-files=all'),
     runProbe('gh', ['pr', 'list', '--state', 'open', '--json', 'number,headRefName,headRefOid,title', '--limit', '100'], opts),
-    git('ls-tree', '-r', '--name-only', mainRef),
+    git('rev-parse', `${mainRef}^{tree}`),
+    git('for-each-ref', `--format=${REF_FMT}`, RECOVERY_REF_PREFIX),
   ].map((p) => p.then(record)));
 
   // ── ref inventory ──────────────────────────────────────────────────────────
   const parseRefs = (res) => lines(res.stdout).map((l) => {
-    const [name, sha] = l.split('\t');
-    return { name: (name ?? '').trim(), sha: (sha ?? '').trim() };
+    const [full, sha, short] = l.split('\t');
+    return { full: (full ?? '').trim(), sha: (sha ?? '').trim(), name: (short ?? '').trim() };
   }).filter((r) => r.name);
   const localRefs = localRes.ok ? parseRefs(localRes) : null;
-  const remoteRefs = remoteRes.ok ? parseRefs(remoteRes).filter((r) => !/\/HEAD$/.test(r.name)) : null;
+  const remoteRefs = remoteRes.ok ? parseRefs(remoteRes).filter((r) => !/\/HEAD$/.test(r.full)) : null;
   const mergedLocal = localMergedRes.ok ? new Set(lines(localMergedRes.stdout).map((l) => l.replace(/^\*?\s*/, '').trim())) : null;
   const mergedRemote = remoteMergedRes.ok ? new Set(lines(remoteMergedRes.stdout).map((l) => l.trim())) : null;
 
-  // ── stranded-file measure, by CONTENT (§3b) ────────────────────────────────
-  // main's own path set, once. If it could not be read there is no baseline to subtract from, and
-  // that is stated rather than silently producing a count of "every file on the ref".
-  const mainPaths = mainTreeRes.ok ? new Set(lines(mainTreeRes.stdout)) : null;
+  // ══════════════════════════════════════════════════════════════════════════
+  // DIVERGENCE ANALYSIS — WO-2026-08-07-4C-06, correcting a defect in the SPEC of 4C-03.
+  //
+  // THE DEFECT. The original measure was `git ls-tree -r --name-only <ref>` minus main's path set:
+  // it counts PATHNAMES that exist on the ref and not on main. A ref that MODIFIES a file main also
+  // has contributes ZERO to that count, however much unique implementation it holds. Measured on
+  // this estate at the time of the correction: `idea-017/w01-note-structure-validator` scored 4
+  // absent paths against 101 same-path modifications — a 25x under-report; and a branch that only
+  // ever edits existing files scores 0 and reads as CONVERGED.
+  //
+  // That is an instrument that fails in the SAFE-LOOKING direction, which is the single class §3b
+  // exists to prevent. `files_absent_from_main` is retained because it is still a real signal, but
+  // it is no longer presented as sufficient.
+  //
+  // THE DECISIVE MEASURE is `git merge-tree --write-tree <canonical> <tip>`: merge the tip into the
+  // canonical ref and compare the resulting tree OID with the canonical tree OID. Equal ⇒ the tip
+  // contributes NOTHING. Both OIDs are staged so a reviewer can re-derive the judgement.
+  //
+  // TWO THINGS ESTABLISHED BY EXECUTION HERE, because guessing either would have been a defect:
+  //   · `merge-tree` exits 1 on CONFLICTS and still prints a valid tree OID. Exit 1 is a RESULT,
+  //     not a failure. Only 128/other is unresolved. Treating 1 as failure would have turned every
+  //     conflicting branch — the most divergent ones — into "UNRESOLVED".
+  //   · `merge-tree --write-tree` WRITES the merged tree into the object database. It is the one
+  //     probe here that is not purely read-only. It touches NO ref, NO index and NO working tree;
+  //     the objects are unreferenced and are reclaimed by `gc`. Recorded because a reader is
+  //     entitled to know which probe writes.
+  //
+  // LINE COUNTS COME FROM `git diff --numstat`, NEVER FROM merge-tree OUTPUT. merge-tree renders
+  // conflicted regions as additions carrying `<<<<<<<` / `=======` markers, so counting insertions
+  // from it over-reports badly. Sourcing them from `git diff` sidesteps that entirely rather than
+  // shipping a conflict-inclusive number and captioning it.
+  // ══════════════════════════════════════════════════════════════════════════
+
   const notContained = [];
   if (localRefs && mergedLocal) for (const r of localRefs) if (!mergedLocal.has(r.name)) notContained.push({ ...r, scope: 'local' });
   if (remoteRefs && mergedRemote) for (const r of remoteRefs) if (!mergedRemote.has(r.name)) notContained.push({ ...r, scope: 'remote' });
 
-  const uniqueTips = [...new Set(notContained.map((r) => r.sha).filter(Boolean))];
+  // Grouped by TIP, not by ref name: local and remote refs overwhelmingly share tips in this
+  // estate, so a per-ref rendering duplicated every analysis and roughly doubled the block for no
+  // added fact. One tip, one analysis, all the names that point at it.
+  const tipGroups = new Map();
+  for (const r of notContained) {
+    if (!r.sha) continue;
+    if (!tipGroups.has(r.sha)) tipGroups.set(r.sha, []);
+    tipGroups.get(r.sha).push(r.name);
+  }
+  const uniqueTips = [...tipGroups.keys()];
   const probedTips = uniqueTips.slice(0, maxRefsProbed);
   const unprobedTips = uniqueTips.length - probedTips.length;
-  /** sha → { files_absent_from_main } | { error } | { gone: true } */
-  const strandedBySha = new Map();
-  if (mainPaths) {
-    // Deliberately NOT run through `record()`. These probes are classified individually below —
-    // a vanished ref is a fact about a moving estate rather than a probe failure — and an earlier
-    // draft that recorded them and then popped the failure back off was a real race: under
-    // `Promise.all` the completions interleave, so the pop could remove a DIFFERENT probe's
-    // failure and silently erase a genuine one from the report.
-    const results = await Promise.all(probedTips.map(async (sha) => {
-      probesRun += 1;
-      return [sha, await git('ls-tree', '-r', '--name-only', sha)];
-    }));
-    for (const [sha, r] of results) {
-      if (r.ok) {
-        let absent = 0;
-        for (const f of lines(r.stdout)) if (!mainPaths.has(f)) absent += 1;
-        strandedBySha.set(sha, { count: absent });
-      } else if (/not a (?:tree|valid) object|unknown revision|bad object|does not exist/i.test(r.stderr)) {
-        // Property 5: Larry is converging concurrently. A tip that has gone is not an error and is
-        // certainly not "clean" — it is a fact about a moving estate, recorded as one.
-        strandedBySha.set(sha, { gone: true });
-      } else {
-        strandedBySha.set(sha, { error: String(r.stderr || 'unknown').trim().slice(0, 160) });
-        failures.push(r);
-      }
+  const canonicalTree = mainTreeRes.ok ? mainTreeRes.stdout.trim() : null;
+
+  /** sha → divergence record. EVERY field defaults to an explicit UNRESOLVED, never to a clean value. */
+  const divergence = new Map();
+  const GONE_RE = /not a (?:tree|valid) object|unknown revision|bad object|does not exist|ambiguous argument/i;
+
+  const tipResults = await mapLimit(probedTips, PROBE_CONCURRENCY, async (sha) => {
+    const [anc, added, modified, mt] = await Promise.all([
+      git('merge-base', '--is-ancestor', sha, mainRef),
+      git('diff', '--numstat', '--diff-filter=A', mainRef, sha),
+      git('diff', '--numstat', '--diff-filter=M', mainRef, sha),
+      canonicalTree ? git('merge-tree', '--write-tree', mainRef, sha) : Promise.resolve(null),
+    ]);
+    probesRun += canonicalTree ? 4 : 3;
+    return { sha, anc, added, modified, mt };
+  });
+
+  for (const { sha, anc, added, modified, mt } of tipResults) {
+    const d = {
+      contained: 'UNRESOLVED', absent: 'UNRESOLVED', modified: 'UNRESOLVED',
+      contribution: 'UNRESOLVED', tree: null, conflicts: null, gone: false, sample: [],
+    };
+    // A tip that has gone is a fact about a moving estate — never clean, never an error.
+    if (GONE_RE.test(added.stderr) || GONE_RE.test(modified.stderr)) {
+      d.gone = true;
+      divergence.set(sha, d);
+      continue;
     }
+    // `--is-ancestor` signals by exit code: 0 contained, 1 not contained, anything else unresolved.
+    if (anc.ok) d.contained = 'true';
+    else if (anc.code === 1) d.contained = 'false';
+    else failures.push(anc);
+
+    if (added.ok) d.absent = lines(added.stdout).length; else failures.push(added);
+    if (modified.ok) {
+      const rows = lines(modified.stdout).map((l) => {
+        const [a, dl, ...rest] = l.split('\t');
+        return { add: Number(a) || 0, del: Number(dl) || 0, path: rest.join('\t') };
+      }).filter((r) => r.path);
+      d.modified = rows.length;
+      d.sample = rows.sort((x, y) => (y.add + y.del) - (x.add + x.del)).slice(0, SAMPLE_PATHS_PER_TIP);
+    } else failures.push(modified);
+
+    // THE FAIL-SAFE FLIP. Absent or unreadable merge-tree evidence is UNRESOLVED — never `false`,
+    // which would read as "this ref contributes nothing" and is exactly backwards.
+    if (!canonicalTree) {
+      d.contribution = 'UNRESOLVED';
+    } else if (mt && (mt.ok || mt.code === 1)) {
+      const first = String(mt.stdout).split(/\r?\n/)[0]?.trim() ?? '';
+      if (/^[0-9a-f]{40}$/.test(first)) {
+        d.tree = first;
+        d.conflicts = mt.code === 1;
+        d.contribution = first === canonicalTree ? 'NOTHING' : 'CONTRIBUTES';
+      } else {
+        d.contribution = 'UNRESOLVED';
+        failures.push({ ...mt, stderr: `merge-tree produced no tree OID: ${String(mt.stdout).slice(0, 120)}` });
+      }
+    } else if (mt) {
+      d.contribution = 'UNRESOLVED';
+      failures.push(mt);
+    }
+    divergence.set(sha, d);
   }
-  const strandedNote = (sha) => {
-    if (!mainPaths) return 'files_absent_from_main=UNMEASURED (main tree unreadable)';
-    const s = strandedBySha.get(sha);
-    if (!s) return 'files_absent_from_main=NOT PROBED (tip cap reached)';
-    if (s.gone) return 'files_absent_from_main=UNMEASURABLE — ref disappeared during enumeration';
-    if (s.error) return `files_absent_from_main=UNMEASURED — ${s.error}`;
-    return `files_absent_from_main=${s.count}`;
+
+  /** Render one tip's fields. Every unknown is stated as a GAP, never as a clean value. */
+  const divergenceNote = (sha) => {
+    const d = divergence.get(sha);
+    if (!d) return 'DIVERGENCE NOT PROBED (tip cap reached) — UNASSESSED, not clean';
+    if (d.gone) return 'ref disappeared during enumeration — UNMEASURABLE, not clean';
+    const contribution = d.contribution === 'UNRESOLVED'
+      ? 'merge_contribution=UNRESOLVED — GAP IN THE EVIDENCE'
+      : `merge_contribution=${d.contribution}`;
+    const trees = d.tree
+      ? ` (merged tree ${d.tree.slice(0, 12)} ${d.tree === canonicalTree ? '==' : '!='} canonical ${String(canonicalTree).slice(0, 12)}${d.conflicts ? ', merge CONFLICTS' : ''})`
+      : '';
+    return `contained_in_main=${d.contained}  files_absent_from_main=${d.absent}  `
+      + `files_modified_vs_main=${d.modified}  ${contribution}${trees}`;
   };
 
   // ── render ─────────────────────────────────────────────────────────────────
@@ -239,10 +352,10 @@ export async function gatherConvergenceEvidence({
         const contained = refs.filter((r) => mergedSet.has(r.name));
         body.push(`contained in ${mainRef} (${contained.length}): ${contained.map((r) => r.name).join(', ') || '(none)'}`);
       }
-      body.push(mergedSet ? `NOT contained in ${mainRef}:` : `UNASSESSED (containment probe failed):`);
+      body.push(mergedSet ? `NOT contained in ${mainRef} (analysed by tip in [7]):` : `UNASSESSED (containment probe failed):`);
       const rest = mergedSet ? refs.filter((r) => !mergedSet.has(r.name)) : refs;
       if (!rest.length) body.push('  (none)');
-      for (const r of rest) body.push(`  ${r.name}  ${r.sha.slice(0, 12)}  ${strandedNote(r.sha)}`);
+      for (const r of rest) body.push(`  ${r.name}  ${r.sha.slice(0, 12)}`);
       return body;
     });
   };
@@ -254,7 +367,11 @@ export async function gatherConvergenceEvidence({
   // The summary sits at the TOP so that if the byte cap ever bites, the reader still learns that
   // probes failed. A truncation that removes the failure report would be the worst possible cut.
   out.push(`probes: ${probesRun} run, ${failures.length} FAILED${failures.length ? ' — sections below name each one' : ''}`);
-  out.push('method: containment via `git branch --merged`; stranded files via `git ls-tree -r --name-only <tip>` minus the same for the canonical ref. Ref NAMES are never used to classify.');
+  out.push(`canonical_tree: ${canonicalTree ?? 'UNRESOLVED — merge_contribution cannot be computed for any ref'}`);
+  out.push('method: containment via `git merge-base --is-ancestor`; same-path divergence via `git diff --numstat` against the canonical ref; merge contribution via `git merge-tree --write-tree`. Ref NAMES are never used to classify.');
+  // The reviewer-facing framing the correction requires. Short by design: Codex answers the human
+  // question in §3b; this block only supplies evidence for it.
+  out.push('⚠️ A PATH-ONLY MEASURE DOES NOT PROVE CONVERGENCE. `files_absent_from_main=0` means only that this ref adds no NEW pathnames — a ref that MODIFIES files the canonical ref already has can hold unique work and still score 0. Judge `files_modified_vs_main` and `merge_contribution` together; `merge_contribution=NOTHING` is the only field that says a ref contributes nothing.');
   out.push('This block states facts only. It contains no convergence verdict, score or boolean.');
 
   if (!mainRes.ok) out.push('', `[0] CANONICAL REF`, `  ${failLine(mainRes)}`);
@@ -293,19 +410,77 @@ export async function gatherConvergenceEvidence({
     return [`count: ${parsed.length}`, ...parsed.map((pr) => `#${pr.number}  ${pr.headRefName}  ${String(pr.headRefOid ?? '').slice(0, 12)}  ${String(pr.title ?? '').slice(0, 100)}`)];
   });
 
-  out.push('', '[7] STRANDED-STATE MEASUREMENT COVERAGE');
-  if (!mainPaths) {
+  // ── [7] the decisive section ───────────────────────────────────────────────
+  out.push('', `[7] NON-CONTAINED TIPS — SAME-PATH DIVERGENCE ANALYSIS (${uniqueTips.length} distinct tip(s))`);
+  if (!canonicalTree) {
     out.push(`  ${failLine(mainTreeRes)}`);
-    out.push(`  NO stranded-file counts could be computed — there is no baseline to subtract from. The absence of counts above is a GAP IN THE EVIDENCE, not an absence of stranded work.`);
-  } else {
-    out.push(`  canonical ref path count: ${mainPaths.size}`);
-    out.push(`  distinct non-contained tips: ${uniqueTips.length}; probed: ${probedTips.length} (cap ${maxRefsProbed})`);
-    if (unprobedTips > 0) out.push(`  ${unprobedTips} tip(s) were NOT probed because the cap was reached — those refs carry NO stranded-file count and are UNASSESSED, not clean.`);
-    const gone = [...strandedBySha.values()].filter((s) => s.gone).length;
-    const errored = [...strandedBySha.values()].filter((s) => s.error).length;
-    if (gone) out.push(`  ${gone} tip(s) disappeared during enumeration (concurrent convergence) — recorded as unmeasurable, not as zero.`);
-    if (errored) out.push(`  ${errored} tip(s) could not be read — see the UNMEASURED notes above.`);
+    out.push('  merge_contribution is UNRESOLVED for EVERY ref — there is no canonical tree to compare against. This is a GAP IN THE EVIDENCE, not an absence of stranded work.');
   }
+  if (!uniqueTips.length) {
+    out.push('  (no non-contained tips enumerated — if either containment probe failed above, this is UNASSESSED rather than clean)');
+  }
+  out.push(`  probed: ${probedTips.length} of ${uniqueTips.length} (cap ${maxRefsProbed}); line counts come from \`git diff --numstat\`, NOT from merge-tree output, so no conflict-marker regions are counted.`);
+  if (unprobedTips > 0) {
+    out.push(`  ⚠️ ${unprobedTips} tip(s) were NOT probed because the cap was reached — they carry NO divergence evidence and are UNASSESSED, not clean.`);
+  }
+  // Most-divergent first, so a byte cut removes the least informative rows rather than the worst.
+  const rank = (sha) => {
+    const d = divergence.get(sha);
+    if (!d || d.gone) return -1;
+    return (Number(d.modified) || 0) + (Number(d.absent) || 0);
+  };
+  const ordered = [...probedTips].sort((a, b) => rank(b) - rank(a));
+  let sampledSoFar = 0;
+  for (const sha of ordered) {
+    const names = tipGroups.get(sha) ?? [];
+    out.push(`  tip ${sha.slice(0, 12)}  refs: ${names.join(', ')}`);
+    out.push(`    ${divergenceNote(sha)}`);
+    const d = divergence.get(sha);
+    if (d && d.sample?.length && sampledSoFar < SAMPLED_TIPS) {
+      sampledSoFar += 1;
+      out.push('    most-divergent modified paths (changed lines, names only — no file contents):');
+      for (const s of d.sample) out.push(`      +${s.add}/-${s.del}  ${s.path}`);
+    }
+  }
+  if (probedTips.length > SAMPLED_TIPS) {
+    out.push(`  (path samples rendered for the ${SAMPLED_TIPS} most-divergent tips only, to respect the block's byte cap; the per-tip COUNTS above are complete for every probed tip.)`);
+  }
+  const gone = [...divergence.values()].filter((d) => d.gone).length;
+  const unresolved = [...divergence.values()].filter((d) => d.contribution === 'UNRESOLVED' && !d.gone).length;
+  if (gone) out.push(`  ${gone} tip(s) disappeared during enumeration (concurrent convergence) — recorded as unmeasurable, not as zero.`);
+  if (unresolved) out.push(`  ⚠️ ${unresolved} tip(s) have merge_contribution=UNRESOLVED — that is missing evidence, NOT a finding of "contributes nothing".`);
+
+  // ── [R] recovery pins ──────────────────────────────────────────────────────
+  // DELIBERATE CHOICE, stated rather than silent: refs under `refs/recovery/**` are EXCLUDED from
+  // the working-branch enumeration and the divergence analysis above, by refname prefix. They are
+  // not working branches — they are pins deliberately created to preserve state during a halted
+  // convergence, so analysing them as branch drift would swamp the block with ~100 rows of
+  // intentional preservation and bury the real signal. They ARE enumerated and counted here,
+  // because "no useful state remains" cannot be judged by a reviewer who was never told they exist.
+  section(`[R] RECOVERY PINS under ${RECOVERY_REF_PREFIX}/** — preserved state, NOT working branches`, recoveryRes, () => {
+    const refs = parseRefs(recoveryRes);
+    const byPrefix = new Map();
+    for (const r of refs) {
+      const seg = r.name.split('/');
+      // Group at three segments, EXCEPT where the third is a bare object id — those families are
+      // flat and sha-named (one pin per commit), so grouping at three would emit one row per pin
+      // and bury the block in ~75 lines of noise. Collapse those to the two-segment parent.
+      const depth = /^[0-9a-f]{7,40}$/.test(seg[2] ?? '') ? 2 : 3;
+      const p = seg.slice(0, depth).join('/');
+      byPrefix.set(p, (byPrefix.get(p) ?? 0) + 1);
+    }
+    const groups = [...byPrefix.entries()].sort((a, b) => b[1] - a[1]);
+    const shown = groups.slice(0, RECOVERY_GROUPS_SHOWN);
+    const body = [
+      `count: ${refs.length} (EXCLUDED from [1], [2] and [7] by refname prefix — deliberate, see note)`,
+      ...shown.map(([p, n]) => `${p}/** — ${n} pin(s)`),
+    ];
+    if (groups.length > shown.length) {
+      body.push(`(${groups.length - shown.length} further pin group(s) not itemised, to respect the block's byte cap; the total count above is complete.)`);
+    }
+    body.push('These are deliberate preservation pins. Their existence is evidence that state was rescued; it is NOT evidence that the estate has converged, and their contents are NOT analysed here.');
+    return body;
+  });
 
   if (failures.length) {
     out.push('', '[8] FAILED PROBES — CONSOLIDATED');

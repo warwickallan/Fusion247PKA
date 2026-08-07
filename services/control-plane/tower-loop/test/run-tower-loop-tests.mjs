@@ -163,7 +163,9 @@ const CP_CALL_RE = new RegExp(`(?<![\\w$.])(${CP_FNS.join('|')})\\(`, 'g');
 // written: the convergence inventory's read-only probe runner in mergeCheck.mjs, and the two
 // pass-through spawn doubles in C2/C5 below (which delegate to the real binary for the commands
 // they are not mutating, and so genuinely launch children).
-const TOWER_LOOP_CP_SITES = 28;
+// WO-2026-08-07-4C-06 moved it again, 28 -> 29: one launch site in C7/C8's scratch-repo git helper,
+// windowsHide:true from the moment it was written.
+const TOWER_LOOP_CP_SITES = 29;
 
 function jsFilesUnder(dir, out = []) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -2302,18 +2304,33 @@ async function main() {
     // because it was ENUMERATED — not because a heading was hardcoded with nothing under it.
     for (const heading of ['[1] LOCAL BRANCHES', '[2] REMOTE BRANCHES', '[3] REGISTERED WORKTREES',
       '[4] STASHES', '[5] DIRTY AND UNTRACKED PATHS', '[6] OPEN PULL REQUESTS',
-      '[7] STRANDED-STATE MEASUREMENT COVERAGE']) {
+      '[7] NON-CONTAINED TIPS — SAME-PATH DIVERGENCE ANALYSIS', '[R] RECOVERY PINS']) {
       assert.ok(inv.text.includes(heading), `the inventory carries ${heading}`);
     }
     // Real content, not just scaffolding: this very worktree and this very branch must appear.
     assert.match(inv.text, /canonical_ref: main @ [0-9a-f]{40}/, 'the canonical ref is resolved to a real SHA');
+    assert.match(inv.text, /canonical_tree: [0-9a-f]{40}/, 'and the canonical TREE, which merge_contribution compares against');
     assert.ok(/\[3\] REGISTERED WORKTREES[\s\S]*?count: [1-9]/.test(inv.text), 'at least one worktree was really enumerated');
-    assert.match(inv.text, /files_absent_from_main=\d+/, 'the by-CONTENT stranded measure produced real counts');
+
+    // WO-4C-06 — all four per-tip fields, populated from real probes.
+    assert.match(inv.text, /files_absent_from_main=\d+/, 'the path-only measure is retained');
+    assert.match(inv.text, /files_modified_vs_main=\d+/, 'the SAME-PATH divergence measure is present');
+    assert.match(inv.text, /contained_in_main=(true|false)/, 'per-ref ancestry is stated');
+    assert.match(inv.text, /merge_contribution=(NOTHING|CONTRIBUTES)/, 'the decisive measure is computed');
+    assert.match(inv.text, /merged tree [0-9a-f]{12} (==|!=) canonical [0-9a-f]{12}/,
+      'and BOTH tree OIDs are staged so a reviewer can re-derive it');
+    // The reviewer-facing framing that stops a path-only zero being read as convergence.
+    assert.ok(inv.text.includes('A PATH-ONLY MEASURE DOES NOT PROVE CONVERGENCE'),
+      'the block warns that files_absent_from_main=0 is not convergence');
+    assert.ok(inv.text.includes('NOT from merge-tree output'),
+      'and states that line counts avoid merge-tree conflict-marker over-reporting');
 
     // THE MEASURE IS BY CONTENT, AND THE PACKET SAYS SO — §3b: "Accounted for means classified by
     // CONTENT, not by name."
     assert.ok(inv.text.includes('Ref NAMES are never used to classify'), 'the method is stated to the reviewer');
-    assert.ok(inv.text.includes('git ls-tree -r --name-only'), 'and names the exact measure, so it can be reproduced');
+    for (const cmd of ['git merge-base --is-ancestor', 'git diff --numstat', 'git merge-tree --write-tree']) {
+      assert.ok(inv.text.includes(cmd), `the method names the exact command \`${cmd}\`, so a reviewer can reproduce it`);
+    }
 
     // IT IS EVIDENCE, NOT A VERDICT. No convergence conclusion may be computed in code.
     assert.ok(inv.text.includes('no convergence verdict, score or boolean'), 'the block declares itself evidence');
@@ -2459,7 +2476,8 @@ async function main() {
     assert.ok(seen, 'the merge-class review ran and its packet was observed');
     assert.ok(typeof seen.convergence === 'string' && seen.convergence.includes('ESTATE CONVERGENCE INVENTORY'),
       'the AUTOMATIC route stages the inventory too — same gatherer, no copy');
-    assert.ok(seen.convergence.includes('[7] STRANDED-STATE MEASUREMENT COVERAGE'));
+    assert.ok(seen.convergence.includes('[7] NON-CONTAINED TIPS — SAME-PATH DIVERGENCE ANALYSIS'),
+      'and it is the CORRECTED inventory, carrying the same-path divergence analysis');
 
     // And the ORDINARY (non-merge-class) route stages nothing — the block is merge-class gated,
     // which is what Warwick specified. Proven by observation, not by reading the branch.
@@ -2473,6 +2491,149 @@ async function main() {
     });
     assert.equal(ordinarySeen, 'untouched', 'an ordinary delivery round runs NO merge review and stages no inventory');
     console.log(`[4c-C6] automatic route carries ${Buffer.byteLength(seen.convergence, 'utf8')}B; ordinary route stages none`);
+  });
+
+  // ══════════════════════════════════════════════════════════════════════════════
+  // WO-2026-08-07-4C-06 — THE CORRECTED STRANDED-WORK MEASURE.
+  //
+  // C7 is the load-bearing one. The ORIGINAL measure was `git ls-tree -r --name-only <ref>` minus
+  // main's path set — it counts PATHNAMES. A branch that only ever MODIFIES files main already has
+  // scores ZERO on it and reads as converged, however much unique implementation it holds. That is
+  // an instrument that fails in the safe-looking direction.
+  //
+  // C7 builds that exact branch in a throwaway repository and proves the corrected inventory sees
+  // it. It is synthetic ON PURPOSE: the live estate happens not to contain a pure-modification
+  // branch today, so a test written against the live estate would prove nothing about the case the
+  // correction exists for, and would silently stop proving it as the estate changes.
+  // ══════════════════════════════════════════════════════════════════════════════
+
+  /** One git command in a scratch repo. Deterministic identity so commits never depend on host config. */
+  function gitIn(cwd, args) {
+    return new Promise((resolve, reject) => {
+      const c = spawn('git', ['-c', 'user.name=Keel', '-c', 'user.email=keel@example.invalid',
+        '-c', 'commit.gpgsign=false', ...args], { cwd, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+      let out = ''; let err = '';
+      c.stdout.on('data', (d) => { out += d; });
+      c.stderr.on('data', (d) => { err += d; });
+      c.on('close', (code) => (code === 0 ? resolve(out) : reject(new Error(`git ${args.join(' ')} -> ${code}: ${err}`))));
+    });
+  }
+
+  await test('C7 — THE CORRECTION: a ref that ONLY MODIFIES files scores 0 on the path measure and is still caught', async () => {
+    const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'conv-samepath-'));
+    try {
+      await gitIn(repo, ['init', '--initial-branch=main', '-q']);
+      fs.writeFileSync(path.join(repo, 'shared.txt'), 'original\n');
+      fs.writeFileSync(path.join(repo, 'other.txt'), 'untouched\n');
+      await gitIn(repo, ['add', 'shared.txt', 'other.txt']);
+      await gitIn(repo, ['commit', '-q', '-m', 'base']);
+
+      // The branch under test: it adds NO new pathname. It only rewrites a file main already has.
+      await gitIn(repo, ['checkout', '-q', '-b', 'only-modifies']);
+      fs.writeFileSync(path.join(repo, 'shared.txt'), `${'unique implementation line\n'.repeat(40)}`);
+      await gitIn(repo, ['commit', '-q', '-am', 'unique work, no new files']);
+      await gitIn(repo, ['checkout', '-q', 'main']);
+
+      const inv = await gatherConvergenceEvidence({ cwd: repo, mainRef: 'main' });
+      // The `gh pr list` probe legitimately fails in a scratch repo with no GitHub remote — and it
+      // is REPORTED as a failure, which is the correct behaviour, not something to assert away.
+      // What must hold is that every GIT probe resolved.
+      assert.ok(!/PROBE FAILED: git /.test(inv.text),
+        `every git probe resolved in the scratch repo:\n${inv.text.slice(0, 700)}`);
+
+      // THE OLD MEASURE'S ANSWER, computed by running the ORIGINAL algorithm verbatim against real
+      // git output — so the defect is DEMONSTRATED here, not merely asserted in a comment.
+      const treePaths = async (ref) => (await gitIn(repo, ['ls-tree', '-r', '--name-only', ref]))
+        .split(/\r?\n/).filter(Boolean);
+      const mainPathSet = new Set(await treePaths('main'));
+      const oldMeasure = (await treePaths('only-modifies')).filter((f) => !mainPathSet.has(f)).length;
+      assert.equal(oldMeasure, 0,
+        'CONTROL: the ORIGINAL pathname measure scores this branch 0 — it genuinely could not see this work');
+
+      // THE CORRECTED MEASURE'S ANSWER.
+      assert.match(inv.text, /files_absent_from_main=0\b/, 'the path measure is retained and honestly reports 0');
+      assert.match(inv.text, /files_modified_vs_main=1\b/, 'the SAME-PATH measure sees the modification the old one missed');
+      assert.ok(inv.text.includes('merge_contribution=CONTRIBUTES'),
+        'and the decisive measure says the ref CONTRIBUTES — "zero paths absent" can no longer read as convergence');
+      assert.ok(inv.text.includes('+40/-1  shared.txt') || /\+40\/-1\s+shared\.txt/.test(inv.text),
+        'the divergent path is sampled with line counts and no file contents');
+      // Not a single byte of file content may appear in the block.
+      assert.ok(!inv.text.includes('unique implementation line'),
+        'FILE CONTENTS are never staged — names and counts only');
+      console.log('[4c-C7] pure-modification branch: old measure=0, files_modified_vs_main=1, merge_contribution=CONTRIBUTES');
+    } finally {
+      try { fs.rmSync(repo, { recursive: true, force: true }); } catch { /* best effort */ }
+    }
+  });
+
+  await test('C8 — a ref contributing NOTHING is reported as NOTHING, so the field is two-sided', async () => {
+    // Without this, "CONTRIBUTES" could be a constant. An ancestor of main must come back NOTHING.
+    const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'conv-nothing-'));
+    try {
+      await gitIn(repo, ['init', '--initial-branch=main', '-q']);
+      fs.writeFileSync(path.join(repo, 'a.txt'), 'one\n');
+      await gitIn(repo, ['add', 'a.txt']);
+      await gitIn(repo, ['commit', '-q', '-m', 'base']);
+      // A branch BEHIND main: fully contained, contributes nothing.
+      await gitIn(repo, ['branch', 'behind']);
+      fs.writeFileSync(path.join(repo, 'b.txt'), 'two\n');
+      await gitIn(repo, ['add', 'b.txt']);
+      await gitIn(repo, ['commit', '-q', '-m', 'main moves on']);
+
+      const inv = await gatherConvergenceEvidence({ cwd: repo, mainRef: 'main' });
+      // `behind` is an ancestor, so it is CONTAINED and never reaches the divergence section.
+      assert.ok(/\[1\] LOCAL BRANCHES[\s\S]*?contained in main \(2\)/.test(inv.text),
+        'an ancestor branch is reported as contained, not as stranded');
+      assert.ok(inv.text.includes('(no non-contained tips enumerated'),
+        'and with nothing non-contained, [7] says so explicitly rather than rendering an empty list');
+      console.log('[4c-C8] ancestor branch classified contained; empty [7] states itself');
+    } finally {
+      try { fs.rmSync(repo, { recursive: true, force: true }); } catch { /* best effort */ }
+    }
+  });
+
+  await test('C9 — MUTATION: an unrunnable merge-tree probe yields UNRESOLVED, never "contributes nothing"', async () => {
+    // THE FAIL-SAFE FLIP, and the reason this Work Order exists. Absent evidence used to render as
+    // clean. If merge-tree cannot run, the ref must read as a GAP — never as `false`/NOTHING, which
+    // a reviewer would take as "this branch holds nothing", the most dangerous possible default.
+    const inv = await gatherConvergenceEvidence({
+      cwd: REPO_UNDER_TEST,
+      spawn: partiallyFailingSpawn((cmd, args) => cmd === 'git' && args[0] === 'merge-tree'),
+    });
+    assert.ok(inv.text.includes('merge_contribution=UNRESOLVED — GAP IN THE EVIDENCE'),
+      'an unrunnable merge-tree renders as an explicit gap');
+    // Scoped to the PER-TIP rows. A bare `includes` over the whole block matches the reviewer
+    // framing line, which legitimately quotes `merge_contribution=NOTHING` while explaining it —
+    // an imprecise assertion that failed for the wrong reason and was corrected, not deleted.
+    const tipRows = inv.text.split(/\r?\n/).filter((l) => /contained_in_main=/.test(l));
+    assert.ok(tipRows.length > 0, 'there were per-tip rows to examine');
+    assert.deepEqual(tipRows.filter((l) => /merge_contribution=NOTHING/.test(l)), [],
+      'NO per-tip row says "contributes nothing" — that is the safe-looking failure this corrects');
+    assert.equal(tipRows.filter((l) => /merge_contribution=UNRESOLVED/.test(l)).length, tipRows.length,
+      'every per-tip row reports the gap instead');
+    assert.match(inv.text, /⚠️ \d+ tip\(s\) have merge_contribution=UNRESOLVED — that is missing evidence, NOT a finding of "contributes nothing"\./,
+      'the block says plainly what the gap does and does not mean');
+
+    // CONTROL: unmutated, the same refs resolve — so the assertions above detect the injected
+    // failure rather than a field that never populates.
+    const healthy = await gatherConvergenceEvidence({ cwd: REPO_UNDER_TEST });
+    assert.ok(!healthy.text.includes('merge_contribution=UNRESOLVED'), 'CONTROL: unmutated, nothing is UNRESOLVED');
+    assert.ok(healthy.text.includes('merge_contribution=CONTRIBUTES'), 'CONTROL: and the field really does populate');
+    console.log('[4c-C9] merge-tree outage -> UNRESOLVED (never NOTHING); control confirms it populates');
+  });
+
+  await test('C10 — recovery pins are enumerated and counted, but EXCLUDED from the working-branch analysis', async () => {
+    const inv = await gatherConvergenceEvidence({ cwd: REPO_UNDER_TEST });
+    const rSection = inv.text.slice(inv.text.indexOf('[R] RECOVERY PINS'));
+    assert.match(rSection, /count: \d+/, 'recovery pins are counted — a reviewer is told they exist');
+    assert.ok(rSection.includes('EXCLUDED from [1], [2] and [7] by refname prefix'),
+      'and the exclusion is stated, not silent');
+    assert.ok(rSection.includes('NOT evidence that the estate has converged'),
+      'their existence is explicitly not read as convergence');
+    // They must NOT appear as ordinary branches in the divergence analysis.
+    const divSection = inv.text.slice(inv.text.indexOf('[7] NON-CONTAINED'), inv.text.indexOf('[R] RECOVERY PINS'));
+    assert.ok(!divSection.includes('recovery/4c'), 'no recovery pin is analysed as a working branch');
+    console.log('[4c-C10] recovery pins counted and excluded, with the choice stated in the block');
   });
 
   try { fs.rmSync(NO_REPO_DIR, { recursive: true, force: true }); } catch { /* best effort */ }
