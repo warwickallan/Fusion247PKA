@@ -41,9 +41,31 @@ loader resolves the old path.
 `…-004-private-capability-migration-direction-decision.md` by the privacy remediation
 (*"Withdraw private-capability specifics from the public repository"*).
 
-> ⚠️ **`Fusion247PKA` is a PUBLIC repository, and ~30 old branches still carry the unredacted file.**
-> Deleting those refs does not lose anything — it **completes a privacy remediation that is currently
-> incomplete on the public remote.**
+> ⚠️ **`Fusion247PKA` is a PUBLIC repository, and ~30 old branches still carried the unredacted file.**
+> Deleting those refs removes them from the **active estate**.
+
+> ### 🔴 CORRECTION — my earlier claim was WRONG, and Warwick was right to challenge it
+>
+> I first wrote that deleting these branches *"completes a privacy remediation that is currently incomplete."*
+> **That is false.** Warwick's correction — *"do not claim that alone completes historical privacy removal"* —
+> is right, and the reason is stronger than he put it.
+>
+> **The pre-redaction content is reachable from `main`'s own history.** Commit `7d16e66` added the file and
+> is an **ancestor of `main`**; `6bf7092` merely deleted it going forward. Established by execution:
+> `git merge-base --is-ancestor 7d16e66 main` → true, and the blob still reads.
+>
+> **So the content was never only on those branches, and deleting them changes nothing about historical
+> exposure.** Branch deletion achieves the 4C goal — removing **active competing sources** — and nothing more.
+>
+> **Classification, per Warwick's test:** the withdrawn material is a **private capability name and its
+> purpose** (that "CareerAIR" drafted CVs, cover letters and career narrative for Warwick personally), plus
+> a minor anecdote. **No credentials, no secrets, no third-party personal data.** That is
+> **obsolete / private-by-policy**, not information requiring historical purge. **Therefore branch removal
+> is sufficient for this 4C convergence goal**, and the residual is **reported, not purged.**
+>
+> **RESIDUAL, stated rather than hidden:** the pre-redaction wording remains readable in `main`'s history and
+> may persist in GitHub caches and PR references. **No history rewrite has been performed and none is
+> proposed** — Warwick forbade launching one without explicit authority, and this material does not warrant it.
 
 **32 refs not contained in `main` hold these two files and nothing else.** Their unique-useful-file
 count is **zero**.
@@ -131,5 +153,46 @@ unapproved, and the repo is public. It needs a disposition consistent with its a
 
 ---
 
-**Nothing in the DISCARD or YOUR CALL columns has been deleted.** On your word I execute the DISCARD
-column and whatever you decide in YOUR CALL, then prove the fourteen end-state checks by execution.
+---
+
+# ⚡ EXECUTION RECORD — Warwick authorised the full disposition, 2026-08-07
+
+**His ruling, and the constraint on every KEEP:** *"KEEP means extract/canonicalise the useful value onto
+main and then remove the old branch/worktree. It does not authorise another permanent side state."*
+
+## Measured before → after
+
+| Surface | Before | After | Notes |
+|---|---|---|---|
+| **Worktrees** | 19 | **2** | canonical `main` + the ONE active piece of work |
+| **Local branches** | 67 | **6** | `main`, 4C, its ancestor, and 4 held while Keel ports from them |
+| **Remote branches** | 68 | **6** | same set |
+| **Stashes** | 3 | **0** | each verified preserved or superseded *before* dropping |
+| **Orphaned repo copy** | 1 | **0** | `.claude/worktrees/agent-a039623889ea601df` — no `.git`, invisible to `git worktree list` |
+| **Empty C-root leftovers** | 3 | **0** | `Fusion247PKA-governor`, `Fusion247PKA-wt`, `audit-worktrees` |
+
+## KEEP — canonicalised onto the 4C branch, then the source deleted
+
+| Value | Evidence | Source branch |
+|---|---|---|
+| de-mypka extraction audit, 11 docs | byte-identical to `c5160a9`, verified per file | deleted |
+| Wayfinder-transferability research, 8 docs | byte-identical to `619c548`, verified per file | deleted |
+| 2026-07-31 governor-abort handoff record | byte-identical to `cded1d6` | deleted — **its `private-api-proxy.mjs` discarded as superseded, per Warwick** |
+| 2026-07-15 memory-checkpoints session log | restored from `84f22d8` | deleted |
+| **AsdAIr `samePath` CI fix + 2 regression tests** | `a8c2a33`; `main` still carried the bug; 69/69 pass | worktree removed |
+| **Codex F-001…F-004 + Warwick's deferred-hardening ruling** | `d7967c6`; existed only in `stash@{2}` | stash dropped |
+| **Warwick's 2026-07-21 canonical-brain position** | preserved **local-only per his decision**; patch byte-identical to the live stash before dropping | stash dropped |
+
+## Still held — deliberately, and why
+
+**Four branches survive only because Keel is porting from them** (`build-010/wp1-…`, `build-002/wp2-…`,
+`build-002/multimodal-intake`, `idea-017/w01-…`). Warwick ruled KEEP-the-value on all four; they are deleted
+the moment the port lands. **`build-020/phase4-automation-law`** is an ancestor of the 4C branch and goes
+when 4C merges.
+
+**Not yet executed:** `C:\tb` · `C:\Fable-External-Repair` · the three preservation copies · the untracked
+VlogOps draft (durable copy taken at `~/.mypka/unpublished-drafts/`; disposition still Warwick's) · the
+final 4C merge · the fourteen end-state checks.
+
+**One residual requiring a permission grant:** nothing outstanding — the earlier `git worktree remove` and
+`git branch -D` denials were subsequently approved and all queued deletions completed.
