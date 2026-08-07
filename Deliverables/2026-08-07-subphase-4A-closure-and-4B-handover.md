@@ -20,7 +20,7 @@
 | 9 | **CareerAIR alert muted**, both halves | DONE | proven through a real scheduled-task fire |
 | 10 | **Flashing root cause proven** | DIAGNOSED, **not applied** | `cf94a54`, `aed2fdc` |
 | 11 | **Wayfinder navigation repaired** | DONE | this session — enumeration below |
-| 12 | **Four research reports** | BANKED | branch `research/wayfinder-transferability` |
+| 12 | **Eight research artefacts** *(corrected from "four" — Veritas)* | BANKED | branch `research/wayfinder-transferability` @ `619c548` |
 
 ## The active-map enumeration (Warwick's §3A requirement)
 
@@ -38,9 +38,33 @@ Every statement in the active map capable of directing a fresh Larry's next acti
 | 2339 | §17.4 Frontier | signpost → § ACTIVE SESSION WORK PACKAGE |
 | 2440 | 🎯 THE EXACT NEXT ACTION | **the one current target** |
 
-**Control executed:** grep for surviving unstruck claims of *"ONLY place in this map"* or *"THIS IS NOW THE LIVE FRONTIER"* → **zero**.
+> ## ⛔ THE TABLE ABOVE IS THE FIRST, REFUTED ENUMERATION. Retained so the method failure is visible.
+>
+> **Veritas FAIL @ `2cf3673` refuted it on two grounds, both correct:**
+>
+> **① It verified where the arrows POINT, not whether the DESTINATION is true.** Every pointer was corrected to aim at § ACTIVE SESSION WORK PACKAGE — and that section's own `🎯 THE EXACT NEXT ACTION` was **itself stale**, still listing the Zapier demonstration (descoped by Amendment 4) and the hook install (descoped by Amendment 5), and still saying "rows 1–4" against its own heading's "rows 1, 2 and 4". **Fixing where an arrow points does not make the target true.**
+>
+> **② The control was bad method.** ~~*grep for "ONLY place in this map" or "THIS IS NOW THE LIVE FRONTIER" → zero*~~ — the live claim read *"THIS **SECTION** IS NOW THE LIVE FRONTIER"*, which that literal cannot match. **A string literal was used to discharge a semantic completeness claim.** Nine rows were enumerated where Veritas counted twenty-four.
 
-**The lesson, recorded because it cost two repairs:** both previous corrections named a section **NUMBER** and both went stale when a later phase added a section. The target is now named by **section IDENTIFIER**. Identifiers survive succession; uniqueness claims decay.
+### ✅ CORRECTED ENUMERATION — semantic, 2026-08-07
+
+**Method changed.** Candidates are matched by **semantic class**, case-insensitively — *live/current frontier · first safe action · first safe continuation · next action · follow up after · must survive rotation · gate open · not started · read this first · do these in order* — and each is then checked for a **retirement marker**, rather than tested against one literal string.
+
+**Result: 47 candidates · 13 already retirement-marked · 34 unmarked.** Of the 34, most are descriptive prose, acceptance criteria or method rules that direct nothing. **Nine were genuinely directive and false, and all nine are now retired:**
+
+| Line | Statement | Repair |
+|---|---|---|
+| 19 / 20 | `⟦ROTATION BLOCK⟧` **Frontier** and **First safe action** — pointed at §14.19 (Phase 2 CLOSED) | → § ACTIVE SESSION WORK PACKAGE |
+| 429 | *"THE CURRENT FRONTIER IS §14… §15 is Phase 3, recorded and NOT started"* — **both clauses false** | retired |
+| 447 | *"The frontier has moved. **Go to §13.**"* | retired |
+| 1569 | *"The frontier is now §14, not §13.6. Nothing has been implemented."* — inside §13.6 *"for the fresh session"* | retired |
+| 1556 | §13.6 heading *"First safe continuation — for the fresh session"* | marked historical |
+| 1576 | *"THIS **SECTION** IS NOW THE LIVE FRONTIER"* (§16 = Phase 3, **merged**) — the instance the bad grep missed | retired |
+| 1031 / 1235 | §15 *"GATE OPEN — NOT STARTED"* — Phase 3 delivered and merged | banner added |
+| 2059 / 2063 | §17.9 *"FOLLOW UP AFTER `/rotate`"* + *"must survive rotation"* — descoped by Amendment 5 | discharged |
+| 2463+ | **The destination itself** — the spent seven-step route | replaced with the one current next action |
+
+**Two lessons, not one.** ① Both earlier repairs named a section **NUMBER** and went stale when a later phase added a section — the target is now named by **section IDENTIFIER**. ② **An identifier does not make the section it names TRUE.** The pointer must be stable *and* the destination must be re-asserted current. Veritas's words: *"The identifier is not this repair's weakness; it is a real improvement. The weakness moved."*
 
 ---
 
@@ -126,7 +150,7 @@ Runs on **port 8090** from `C:\Fusion247PKA`, branch `build-015/...`, HEAD `c1ed
 ## 2.6 PR #97 — corrected, and a structural defect
 
 Title corrected from a false *"(Gate 1 PASS)"* to *"(Veritas Gate 1 FAIL @0cf70c9 — NOT merge-ready)"*.
-**🔴 Structural:** the PR's `statusCheckRollup` contains **only Vercel previews** — none of `control-plane-tests`, `secret-scan`, `governor-tests`, `cockpit-private-apps`. GitHub therefore reports `MERGEABLE` / `CLEAN` from preview builds while **every deciding gate is invisible to it**. **Do not read PR mergeability as assurance.**
+**⚠️ CORRECTED 2026-08-07 (Veritas @ `2cf3673`) — the text below was TRUE WHEN WRITTEN AND FALSE WITHIN MINUTES.** As committed it would have misdirected 4B step 13 and taught distrust of a genuine green. **Verified at the frozen head: all four workflows are `completed success`, and the rollup now carries the real checks — `private-apps`, `db-proofs`, `unit`, `secret-scan`, all SUCCESS. The Actions outage drained. CI IS GREEN at `2cf3673`. Do not go hunting an outage in 4B.** What survives: read CI from **run evidence at the exact frozen head**, never from PR colour. ~~**🔴 Structural:** the PR's `statusCheckRollup` contains **only Vercel previews** — none of `control-plane-tests`, `secret-scan`, `governor-tests`, `cockpit-private-apps`.~~ GitHub therefore reports `MERGEABLE` / `CLEAN` from preview builds while **every deciding gate is invisible to it**. **Do not read PR mergeability as assurance.**
 
 ## 2.7 Research — banked, no further rounds authorised
 
@@ -166,3 +190,109 @@ BUILD-020 merged, installed, durable, clean · its old map cannot emit a competi
 ## Standing constraints for 4B
 
 Larry owns internal Work Packages and Work Orders; **Warwick calls Sub-phase boundaries**. `ACTIVE SESSION WORK PACKAGE` is retained as the durable map identifier — **no repository-wide rename is authorised.** SHIT TO DO stays non-directive. **No further Pax/Nolan research rounds.** Veritas returns **FAIL**, not HOLD, where an active map statement is demonstrably false or can misdirect a fresh session.
+> Veritas verdict and before `/rotate`**, and mirror the one-line summary into the `/rotate` focus.
+
+**Sub-phase 4B is NOT complete merely when the remaining Cockpit, scheduled-task, CI, assurance,
+Codex and merge work is finished.** Its final Phase-level acceptance must answer, in Warwick's words:
+
+> «**Is everything delivered across BUILD-020's previous Phases durable, correctly captured and
+> independent of the old branch, worktree, installed accident and Larry's context — and is everything
+> required to create a completely new Build Wayfinder now understood, durable and reproducible by a
+> genuinely fresh Larry?**»
+
+**Both parts must be answered by Larry AND by Veritas at final Phase close.** Neither part alone
+closes the Phase.
+
+---
+
+## PART A — Durability
+
+Prove that **every load-bearing BUILD-020 outcome**:
+
+- exists in **canonical Git**;
+- is included in the **correct merge unit**;
+- is **installed from canonical merged source** where required;
+- **survives `/clear`, restart, fresh session and worktree recreation**;
+- depends on **no unmerged branch, dirty clone, temporary transcript or previous Larry context**;
+- has **truthful evidence and provenance**;
+- leaves **no valuable work stranded**.
+
+### Known live threats to Part A — carried forward from 4A, each must be closed or honestly recorded
+
+| Threat | Established | Closes when |
+|---|---|---|
+| Live Cockpit runs **uncommitted bytes** on a BUILD-015 branch, 183 commits behind main | 2026-08-06 | changes banked, Cockpit moved to canonical merged state, provenance truthful |
+| `/api/health` reports the **commit, never the loaded bytes** | `server.mjs:32` | `provenance.mjs` ships with `sha` · `dirty` · `provenance` · `sourceHash` |
+| **CareerAIR private surface is not under version control** — today's changes there have no history and no rollback | 2026-08-06 | recorded honestly, or brought under control by Warwick's decision |
+| Scheduled-task fix **built but not applied**; runner and rollback live only under `~/.mypka/` | 2026-08-07 | applied and proven through natural fires, or explicitly reclassified |
+| **Hooks disabled but not proven non-firing** after a genuinely fresh session | 2026-08-07 | confirmed either way at the next fresh session |
+| PR #97 `statusCheckRollup` shows **only Vercel previews** — the deciding gates are invisible to it | 2026-08-07 | CI green demonstrated at the frozen exact head **by run evidence, not by PR colour** |
+
+**The Part A test is adversarial, not declarative.** Pick the things a fresh Larry would actually need
+and prove they are in Git — do not assert coverage.
+
+---
+
+## PART B — New-Build Wayfinder reproducibility
+
+Prove that a genuinely fresh Larry, starting **only** with:
+
+- an accepted **PRD or Goal Contract**;
+- a **truthful starting position**;
+- **scope and non-goals**;
+- an accepted **North Star**;
+
+can **reproducibly establish**:
+
+- **one authoritative Wayfinder**;
+- **logical, dependency-sensitive Phases**;
+- **Phase outcomes and gate questions**;
+- the **START / RESUME interface**;
+- the **`ACTIVE SESSION WORK PACKAGE` anchor**;
+- **`SHIT TO DO`** as durable but **non-directive**;
+- **safe rotation and continuation**;
+- **Warwick's Sub-phase boundary vocabulary**;
+- **Larry's autonomous Work Package and Work Order decomposition**;
+- correct **Veritas, Codex and merge boundaries**.
+
+### 🔴 The acceptance bar that decides the shape of the proof
+
+> **The proof must NOT require copying the full Proofline map, and must NOT require Warwick to
+> reconstruct the method from chat.**
+
+So the artefact cannot be the 2,400-line map, and it cannot be a transcript. It must be small enough
+that a fresh Larry can act on it without inheriting Proofline's bulk — which is the same distinction
+the banked research drew between **load-bearing behaviour** and **Proofline-specific history**.
+
+### 🔴 A known trap Part B must clear — already proven, do not rediscover
+
+`LARRY-01-fallback-misfire-EXECUTED.md` (branch `research/wayfinder-transferability`) established
+**by execution**: `resolveActiveMapPath()` falls back to **repo-wide recency** whenever a branch has
+touched no map, and today that returns the **Proofline** map.
+
+**A brand-new Build's branch has zero map commits until its map is first committed.** In that window a
+fresh Larry is confidently oriented to the **wrong build** — and the function satisfies all three of
+its own stated safety conditions while doing it.
+
+**Part B is not proven until a new Wayfinder can be created without falling into this.** Whether the
+constitution's own read-the-map discipline catches it is **unestablished** and must not be assumed in
+either direction.
+
+### Why this ordering, in Warwick's words
+
+> *"Asdair will subsequently test recovery of an existing stale Wayfinder. BUILD-020 must first prove
+> that creating a brand-new one is reproducible."*
+
+**Creating** is the simpler case and must be proven first. **Recovering a stale map** — Asdair — is the
+harder one, and is explicitly **not** in scope for 4B.
+
+---
+
+## `/rotate` focus line — to carry into the packet
+
+> **BUILD-020 Sub-phase 4B — final closeout. Phase closes only on BOTH: (A) every load-bearing
+> BUILD-020 outcome durable in canonical Git, installed from merged source, surviving `/clear`,
+> restart and worktree recreation, free of any unmerged-branch / dirty-clone / transcript / old-Larry
+> dependency; and (B) a genuinely fresh Larry can reproducibly create a NEW Build Wayfinder from a
+> Goal Contract alone — without copying the Proofline map or rebuilding the method from chat. Asdair
+> follows and tests stale-map recovery, not this.**

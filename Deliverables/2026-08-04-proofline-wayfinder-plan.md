@@ -426,7 +426,7 @@ Discharged **inside `WO-2026-08-04-01`**. A finding is an observation, not an in
 >
 > **Why it matters more than a stale label:** WP-2B(2) is building the mechanism that tells a fresh Larry where the frontier is. **Any code scraping §12 would have emitted "Phase 3, Veritas HOLD, next action: Warwick re-attempts the walkthrough" — a confident wrong orientation, delivered by the very mechanism built to prevent it.** That is W-1's named failure, and this map was the source of it.
 >
-> **THE CURRENT FRONTIER IS §14 (Phase 2) — see §14.16 and §14.19 for live status. §15 is Phase 3, recorded and NOT started.**
+> ~~**THE CURRENT FRONTIER IS §14 (Phase 2) — see §14.16 and §14.19 for live status. §15 is Phase 3, recorded and NOT started.**~~ ⛔ **RETIRED 2026-08-07 — both clauses false.** §14 is Phase 2 **CLOSED and MERGED**; §15/Phase 3 is **DELIVERED and MERGED**. **→ § ACTIVE SESSION WORK PACKAGE is the one current target.**
 >
 > Everything below in this section is **Phase 1 history, retained as evidence.** Phase 1 was **CLOSED and PASSED by Warwick on 2026-08-04.**
 
@@ -444,7 +444,7 @@ Then `http://127.0.0.1:7317/`. Works from cmd.exe and PowerShell, pasted identic
 
 **Still unproven and still his: the rendered page** (P-13). Earlier HOLD findings D-1..D-4 were discharged at `78c14c8` and re-reviewed; the second Veritas pass returned HOLD only on documentation truth, and those three cells were corrected at `b4cba53`.
 
-**Phase 1 is CLOSED — Warwick passed it 2026-08-04.** The frontier has moved. **Go to §13.**
+**Phase 1 is CLOSED — Warwick passed it 2026-08-04.** ~~The frontier has moved. **Go to §13.**~~ ⛔ **"Go to §13" RETIRED 2026-08-07** — §13 is Phase 2, closed and merged. **→ § ACTIVE SESSION WORK PACKAGE.**
 
 **Resumable state:** branch `build-020/live-trial`, worktree `C:\Fusion247PKA-build-020-trial`. Verify HEAD by execution before trusting any SHA here — this map got that wrong three times.
 
@@ -1028,7 +1028,8 @@ Keel's four class-A refusals were all correct. The work divides:
 
 ---
 
-# 15. PHASE 3 — token and process forensics. **GATE OPEN — NOT STARTED IN THIS CONTEXT**
+# 15. PHASE 3 — token and process forensics. ⛔ **HISTORICAL — PHASE 3 IS DELIVERED AND MERGED (see §16.11). Directs nothing.** → § ACTIVE SESSION WORK PACKAGE
+> ~~*"GATE OPEN — NOT STARTED IN THIS CONTEXT"*~~ — **false since Phase 3 merged; banner added 2026-08-07.**
 
 **Set by Warwick, 2026-08-05. Explicitly NOT to be built now:** *"do not start building it until Phase 2 is complete, merged and we have rotated successfully. The fresh Larry owns the route."*
 
@@ -1232,7 +1233,7 @@ Keel's four class-A refusals were all correct. The work divides:
 
 **The Work Order envelope may be causing the defects it exists to prevent.** Every refusal was an *envelope* defect — surface, authority, acceptance property — **not a defect in the described work.** The work was understood every time. **So the question is not "how do we validate envelopes better" (prohibited, and it is the BUILD-018 shape) but "is the envelope carrying fields that Larry cannot reliably author, and should those fields be derived, defaulted, or removed?"** **Target 1 — boundaries at the reasoning stage — points directly at this.**
 
-## 15.4 Route — the fresh Larry's to own, not this session's
+## 15.4 ⛔ HISTORICAL — Phase 3's route. **Delivered and merged. Directs nothing.** → § ACTIVE SESSION WORK PACKAGE
 
 **Not designed here.** One thing worth noting so the next session does not rediscover it: token attribution must be honest about what the evidence **cannot** show.
 
@@ -1552,7 +1553,7 @@ All three investigations have landed and their findings are recorded above. **WP
 - **Retiring `tower-baton` is not the goal** — it is parked out of scope in the migration plan. Touch it only if it is the minimal way to satisfy N-1.
 - **DevBot is configuration only.** See the boundary above.
 
-## 13.6 First safe continuation — for the fresh session
+## 13.6 ⛔ HISTORICAL — Phase 2's "first safe continuation". **NOT a continuation instruction. Directs nothing.** → § ACTIVE SESSION WORK PACKAGE
 
 **Do not implement. Route first.** The Wayfinder mandate applies to this phase as it did to Proofline: no map, no build.
 
@@ -1565,7 +1566,7 @@ All three investigations have landed and their findings are recorded above. **WP
 3. **Record contradictions in this file** rather than overwriting one source.
 4. **Then extend this map** with the Phase 2 route, and get Warwick's acceptance before implementing (`product-decision`).
 
-**✅ STEPS 1–4 DONE, 2026-08-04 (fresh session).** Reconnaissance re-executed and its nine contradictions recorded in **§13.3a**; the Phase 2 route is written in **§14** and is **awaiting Warwick's acceptance**. **The frontier is now §14, not §13.6.** Nothing has been implemented.
+**✅ STEPS 1–4 DONE, 2026-08-04 (fresh session).** Reconnaissance re-executed and its nine contradictions recorded in **§13.3a**; the Phase 2 route is written in **§14** and is **awaiting Warwick's acceptance**. ~~**The frontier is now §14, not §13.6.** Nothing has been implemented.~~ ⛔ **BOTH CLAUSES RETIRED 2026-08-07.** §14 is **Phase 2, CLOSED and MERGED**, and *"nothing has been implemented"* has been false since 2026-08-05. This sits inside §13.6 *"First safe continuation — **for the fresh session**"*, so it was directive. **→ § ACTIVE SESSION WORK PACKAGE is the one current target.**
 
 **Human dependencies for Phase 2:** Warwick's acceptance of the Phase 2 route · his merge decision · **his fresh-Larry orientation test after merge, which is the real acceptance and cannot be self-certified.**
 
@@ -1573,7 +1574,7 @@ All three investigations have landed and their findings are recorded above. **WP
 
 # 16. PHASE 3 — THE ROUTE. **Scope FIXED by Warwick, 2026-08-05. Build to the Star.**
 
-> **⭐ THIS SECTION IS NOW THE LIVE FRONTIER. §14.19 is Phase 2, CLOSED and MERGED.**
+> **⛔ HISTORICAL — retired 2026-08-07. §16 is Phase 3, DELIVERED AND MERGED. → § ACTIVE SESSION WORK PACKAGE is the one current target.** ~~*"THIS SECTION IS NOW THE LIVE FRONTIER. §14.19 is Phase 2, CLOSED and MERGED."*~~ *(Fourth instance of the §12 defect: a correction that named a section and then outlived its own truth.)*
 
 **Warwick fixed this scope himself and closed the scope conversation:** *"Do not bring me another scope decision unless a genuine product decision or unavoidable permission boundary remains."* **The map records the route; it does not re-ask for acceptance of a scope he has just written.**
 
@@ -2056,9 +2057,10 @@ All three investigations have landed and their findings are recorded above. **WP
 
 **What is honestly true at this head:** Rule 4a exists and is canonical · the hook exists, loads and executes · **the attention failure has no automated guard, by design and by Warwick's ruling, and its two recorded failures today remain unguarded by anything except Larry's judgement.**
 
-## 17.9 🔬 The subagent-return cue — RESEARCH COMMISSIONED. **📌 FOLLOW UP AFTER `/rotate`**
+## 17.9 🔬 The subagent-return cue — ⛔ **CLOSED. DESCOPED AND DISABLED by Amendment 5. NO follow-up is owed after `/rotate`.** → § ACTIVE SESSION WORK PACKAGE
+> ~~*"📌 FOLLOW UP AFTER `/rotate`" · "This note must survive rotation"*~~ — **retired 2026-08-07.** The work was delivered, then descoped: *«Specialist-return reminder injection: DESCOPED — demonstrated regression and no demonstrated net benefit.»* **A fresh Larry must NOT pick this up.**
 
-> **📌 WARWICK'S EXPLICIT FOLLOW-UP NOTE, 2026-08-06: *"make a note to follow up after `/rotate`."*** **The implementation decision comes AFTER `/clear`, alongside the separate Supabase performance-reporting job. Pax researches; Pax does NOT implement.** **This note must survive rotation — it belongs in the continuity packet.**
+> ⛔ **DISCHARGED 2026-08-07 — NO follow-up is owed.** The implementation decision was taken: the reminder system is **DESCOPED AND DISABLED** (Amendment 5). **A fresh Larry must not pick this up after `/rotate`.** ~~**📌 WARWICK'S EXPLICIT FOLLOW-UP NOTE, 2026-08-06: *"make a note to follow up after `/rotate`."***~~ **The implementation decision comes AFTER `/clear`, alongside the separate Supabase performance-reporting job. Pax researches; Pax does NOT implement.** **This note must survive rotation — it belongs in the continuity packet.**
 
 **Why it exists:** the dispatch-time hook fires at **LAUNCH**, not return (§17.8). Warwick's North Star: *"When a background specialist actually finishes, Larry's parent session receives one fresh, specialist-specific retrieval cue at the next safe parent turn."* **Commissioned to Pax as `WO-2026-08-06-21` → `Deliverables/2026-08-06-pax-subagent-return-cue-brief.md`.**
 
@@ -2464,17 +2466,21 @@ Any newly discovered **unrelated** defect: record once in [[Deliverables/BACKLOG
 >
 > ~~1. **Warwick (free, not paid Webhooks):** on Zapier MCP config, add **Microsoft Outlook Find Email (+ Get Email)** for `warwickallan@outlook.com`.~~ ~~2. Larry collects after actions appear.~~ ~~3. Do not claim live.~~
 
-**Warwick's authorised route, 2026-08-06 — run autonomously; stop only for a genuine Warwick-only blocker.**
+> **⛔ THE 2026-08-06 SEVEN-STEP ROUTE IS SPENT. Retained struck, for provenance only.**
+> ~~1. Zapier-MCP Outlook demonstration~~ **DONE — and row 3 then DESCOPED (Amendment 4).**
+> ~~2. Claude hook install and live proof~~ **DONE — and then DESCOPED AND DISABLED (Amendment 5).**
+> ~~3. Remaining row 1 and row 4 acceptance~~ **DONE.** ~~4. CI green~~ **OBTAINED at `2cf3673`.**
+> ~~5. Fresh Veritas Gate 1, rows 1–4~~ **Superseded: rows are now 1, 2 and 4.** ~~6. Codex~~ ~~7. Merge pack~~ **→ Sub-phase 4B.**
+>
+> *(Veritas FAIL @ `2cf3673`: this destination stayed stale while every pointer to it was corrected. **Fixing where an arrow points does not make the target true.**)*
 
-1. **Zapier-MCP Outlook demonstration** — default `warwickallan@outlook.com` connection **only**; **do not touch or investigate the second Outlook connection**; collect from the CareerAIR folders; feed the real message through the **existing** durable queue, processor and Cockpit journey; prove persistence, dedupe and truthful operational state end to end. **Row 3 stays NOT LIVE.**
-2. **Claude hook install and live proof** — the seven outcomes folded into row 1 above. Repair permitted only where execution proves a real defect (one already is: the cross-session stale cue).
-3. **Remaining row 1 and row 4 acceptance.**
-4. **CI green at the frozen exact head.**
-5. **Fresh Veritas Gate 1** — complete amended WP, rows 1–4, separate verdict per row, no narrowing.
-6. **Codex only after Gate 1 PASS** — pre-authorised by Warwick for this package; max three executions.
-7. **Final merge decision pack for Warwick.**
+**🎯 THE ONE CURRENT NEXT ACTION — Sub-phase 4A → rotation.**
 
-**Gate 2 may remain HOLD if the genuinely automatic Outlook trigger is still absent. Do not manufacture a Phase PASS. No merge without Warwick's explicit final authority.**
+1. **Repair the four unretired directive statements** Veritas found at `2cf3673` (§16 L1576, §13.6 L1568, §17.9 L2059, §15 L1031/1235) **and this destination**. ✅ **DONE — this edit.**
+2. **Re-verify the corrected head with Veritas.** A Sub-phase 4A closing PASS is unavailable while the active map can misdirect a fresh session (Amendment 6 ②).
+3. **On PASS:** load Sub-phase 4B into this section, run `/rotate`, verify **map path · `focus` · phase · package · exact head · exact next action**, and **`/clear` ONLY on `SAFE TO CLEAR`**.
+
+**Sub-phase 4A takes NO Codex and NO merge.** **Everything else — Cockpit banking, scheduled-task apply, Codex, merge, install alignment, Proofline closure — belongs to Sub-phase 4B**, whose full 18-step route and **final two-part Phase acceptance** are in [[Deliverables/2026-08-07-subphase-4A-closure-and-4B-handover]]. **Do not start 4B work in 4A.**
 
 ### 📌 ROTATION (this `/rotate`)
 
