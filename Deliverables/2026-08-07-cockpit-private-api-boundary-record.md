@@ -163,7 +163,7 @@ received traffic.**
 trust.** It executes **97 assertions** *(51 at WO-31; raised to 97 by WO-32, which added the no-`Origin` method rule)*, **asserts its own executed count is non-zero** (a gate that
 asserts nothing also exits 0), and **mutation-tests itself**: **five** in-memory permissive policy fixtures
 — including *the handler as it stood before this repair* — each of which must turn assertions red, and
-an inert fixture is treated as a failure. **All four were caught.** This is a control that has been made
+an inert fixture is treated as a failure. **All five were caught.** *(Corrected 2026-08-07 — the sentence above was updated to five while this one still said four. Warwick caught it; documentation correction only, no Work Order and no assurance cycle.)* This is a control that has been made
 to fail, which is the only kind that is evidence.
 
 **Stated beside the result, per the rule that a control must declare its ground:** the gate does **not**
