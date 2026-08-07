@@ -220,6 +220,55 @@ function sqlLiteral(value) {
   return `'${String(value).replace(/'/g, "''")}'`;
 }
 
+/** An id that names a NUMBERED Work Order, as opposed to any other kind of dispatch. */
+export const NUMBERED_WORK_ORDER_ID = /^WO-\d+$/;
+
+/**
+ * The STORED Work Order denominator for a rotation — `wo_total`.
+ *
+ * WHAT IT COUNTS: numbered Work Orders. NOT dispatch instances. The distinction is not pedantic —
+ * the 4A payload's `work_orders` array holds NINE entries, of which only two (`WO-23`, `WO-24`) are
+ * numbered orders; the other seven are Veritas gate rounds, Mack dispatches and research rounds. A
+ * denominator of 9 would make "0 of 9 survived first read-back", which is false, and false in the
+ * flattering direction.
+ *
+ * PRECEDENCE:
+ *   1. an explicit `payload.wo_total`, when a future payload carries one — the producer's own count
+ *      always wins over anything worked out here;
+ *   2. otherwise the number of `work_orders` entries whose `id` matches /^WO-\d+$/;
+ *   3. otherwise SQL NULL.
+ *
+ * WHY THIS IS NOT THE INFERENCE schema.sql FORBIDS. Deriving the total from
+ * success + amendments + refusals is circular: those three are outcomes OF these orders, so their sum
+ * can never contradict them and can never see an order that produced none of the three. Counting the
+ * orders themselves reads a different fact out of the same source evidence.
+ *
+ * THE NULL RULE, at the one place it is easy to get wrong: an ABSENT or EMPTY `work_orders` array
+ * returns null, not 0 — nothing was enumerated, so nothing is known. A NON-EMPTY array that happens to
+ * contain no numbered order returns 0, which is a real zero: the dispatches were enumerated and none
+ * of them was a Work Order.
+ */
+export function woTotal(payload) {
+  const explicit = payload ? payload.wo_total : undefined;
+  if (explicit !== undefined && explicit !== null && explicit !== '') {
+    const n = Number(explicit);
+    return Number.isFinite(n) ? n : null;
+  }
+  const entries = payload && Array.isArray(payload.work_orders) ? payload.work_orders : null;
+  if (!entries || entries.length === 0) return null;
+  return entries.filter((e) => e && NUMBERED_WORK_ORDER_ID.test(String(e.id ?? ''))).length;
+}
+
+/**
+ * The git stat block. The payload names it `git_stat_larry_measured` (the measurer is part of the
+ * claim); the column is `git_stat`. The plain name is accepted as a fallback so a future producer
+ * that drops the suffix keeps working. Absent → NULL, meaning never measured — not an empty object.
+ */
+export function gitStat(payload) {
+  if (!payload) return null;
+  return payload.git_stat_larry_measured ?? payload.git_stat ?? null;
+}
+
 function applySchema(creds) {
   if (!existsSync(SCHEMA_SQL)) {
     return { ok: false, why: 'schema-file-absent', path: SCHEMA_SQL };
@@ -272,6 +321,13 @@ async function populatePostgrest(creds, payload) {
     allocation_waiting_pct: payload.allocation_waiting_pct ?? null,
     unestablished: payload.unestablished ?? [],
     notes: payload.notes ?? null,
+    // WO-25: fields the payload has always carried and this writer used to discard. `?? null` is
+    // load-bearing — an absent key becomes SQL NULL ("not established"), never 0 and never ''.
+    total_subagent_tokens: payload.total_subagent_tokens ?? null,
+    wo_total: woTotal(payload),
+    git_stat: gitStat(payload),
+    work_orders: payload.work_orders ?? [],
+    findings: payload.findings ?? [],
   };
 
   const res = await fetch(`${base}/rest/v1/session_report.rotation`, {
@@ -333,7 +389,8 @@ INSERT INTO session_report.rotation (
   doc_lines_changed, product_lines_changed,
   allocation_product_pct, allocation_admin_pct, allocation_evidence_pct,
   allocation_rework_pct, allocation_waiting_pct,
-  unestablished, notes
+  unestablished, notes,
+  total_subagent_tokens, wo_total, git_stat, work_orders, findings
 ) VALUES (
   ${sqlLiteral(payload.session_date)}::date,
   ${sqlLiteral(payload.branch)},
@@ -358,7 +415,12 @@ INSERT INTO session_report.rotation (
   ${sqlLiteral(payload.allocation_rework_pct ?? null)},
   ${sqlLiteral(payload.allocation_waiting_pct ?? null)},
   ${sqlLiteral(payload.unestablished ?? [])}::jsonb,
-  ${sqlLiteral(payload.notes ?? null)}
+  ${sqlLiteral(payload.notes ?? null)},
+  ${sqlLiteral(payload.total_subagent_tokens ?? null)},
+  ${sqlLiteral(woTotal(payload))},
+  ${sqlLiteral(gitStat(payload))}::jsonb,
+  ${sqlLiteral(payload.work_orders ?? [])}::jsonb,
+  ${sqlLiteral(payload.findings ?? [])}::jsonb
 )
 ON CONFLICT (closing_head, deliverable_path) DO UPDATE SET
   session_date = EXCLUDED.session_date,
@@ -382,7 +444,12 @@ ON CONFLICT (closing_head, deliverable_path) DO UPDATE SET
   allocation_rework_pct = EXCLUDED.allocation_rework_pct,
   allocation_waiting_pct = EXCLUDED.allocation_waiting_pct,
   unestablished = EXCLUDED.unestablished,
-  notes = EXCLUDED.notes
+  notes = EXCLUDED.notes,
+  total_subagent_tokens = EXCLUDED.total_subagent_tokens,
+  wo_total = EXCLUDED.wo_total,
+  git_stat = EXCLUDED.git_stat,
+  work_orders = EXCLUDED.work_orders,
+  findings = EXCLUDED.findings
 RETURNING id;
 COMMIT;
 `;

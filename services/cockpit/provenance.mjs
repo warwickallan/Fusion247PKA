@@ -49,6 +49,7 @@ export const SOURCE_MODULES = [
   'down-reason.mjs',
   'private-apps.mjs',
   'provenance.mjs',
+  'rotation-report.mjs',
   'server.mjs',
   'static.mjs',
   'sw-version.mjs',
@@ -137,6 +138,22 @@ export function moduleClosure(entry = 'server.mjs', { dir = DIR } = {}) {
  *
  * Raw bytes are hashed, so a checkout whose line endings differ produces a different hash. That is
  * correct: it describes the files THIS process loaded, which is the question being asked.
+ *
+ * ── THE MISREADING THIS DIGEST WILL INVITE, so nobody "fixes" it ─────────────────────────────────
+ * sourceHash is NOT comparable across checkouts or machines, and a difference between two of them is
+ * NOT evidence that the code differs. Established by execution, not argued: two worktrees holding
+ * byte-identical TRACKED content produced 916d0c67479c7edf and b21e69c0df49c916. Six of the modules
+ * hashed identically; provenance.mjs was git blob ea800833 in both, but 7517 bytes with 164 CRLF in
+ * one working copy against 7353 bytes with bare LF in the other — exactly 164 CR characters, from
+ * git's autocrlf normalising on checkout. The digest was right; the comparison was meaningless.
+ *
+ * On Windows this will happen by default, and the live Cockpit runs from its own checkout, so it WILL
+ * be seen. What the digest is good for is the question it was built for: has THIS RUNNING PROCESS
+ * drifted from the files sitting beside it on THIS machine.
+ *
+ * DO NOT normalise line endings inside the digest to make the numbers match. That would make
+ * sourceHash describe git's content rather than the loaded bytes, which is precisely the failure
+ * /api/health had in the first place. An honest limitation beats a hash that lies more smoothly.
  */
 export function sourceHash({ dir = DIR, modules = SOURCE_MODULES } = {}) {
   const h = crypto.createHash('sha256');
