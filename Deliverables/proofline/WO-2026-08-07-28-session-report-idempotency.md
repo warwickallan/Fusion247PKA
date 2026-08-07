@@ -48,6 +48,10 @@ document_impact: []
 file_surface:
   - tools/session-report/schema.sql
   - tools/session-report/populate.mjs
+  - tools/session-report/idempotency-check.mjs
+# idempotency-check.mjs ADDED BY AMENDMENT 1 (A1). My defect: AC4 and AC5 demanded a check and a
+# mutation test, and the surface contained no file to write them in. Same basis as the other two:
+# § Where Keel writes — `tools/**`.
 out_of_scope_policy: report-only
 
 # --- contract and capability compatibility ---
@@ -63,6 +67,8 @@ contract_basis:
     permitted_by: "Team/Keel - Implementation Engineer/AGENTS.md § Where Keel writes — `tools/**`"
   - surface: tools/session-report/populate.mjs
     permitted_by: "Team/Keel - Implementation Engineer/AGENTS.md § Where Keel writes — `tools/**`"
+  - surface: tools/session-report/idempotency-check.mjs
+    permitted_by: "Team/Keel - Implementation Engineer/AGENTS.md § Where Keel writes — `tools/**` (added by Amendment 1 A1)"
 
 contract_conflicts: none
 # EARNED. Both surfaces are under `tools/**`, named in § Where Keel writes. No `.claude/**`, no
@@ -99,6 +105,27 @@ operational_handoff: none
 ---
 
 # WO-2026-08-07-28 — A mirror that cannot duplicate on re-run
+
+## AMENDMENT 1 — Larry, 2026-08-07, after Keel's read-back (verdict CLARIFY). Binding; supersedes the original where they differ. ONE fresh read-back, then build.
+
+**Three of his four findings are defects in my order. One changes what Warwick can see.**
+
+**(A1) SURFACE WIDENED — my defect.** AC4 and AC5 demanded a check script and a mutation test, and `file_surface` contained **no file to write them in**. `tools/session-report/idempotency-check.mjs` is added. He was right to refuse to write it on his own authority; critical rule 1 is exactly for the "one line would fix it" case.
+
+**(A2) C1 — UNIQUE INDEX, not a table constraint. His correction prevents a worse bug than the one we are fixing.** Postgres has no `ALTER TABLE ... ADD CONSTRAINT IF NOT EXISTS`, and `populate.mjs` applies the whole of `schema.sql` on **every** run under `ON_ERROR_STOP=1`. A bare `ADD CONSTRAINT` would therefore **abort every subsequent `/rotate`** with *"constraint already exists"* — converting today's silent duplication into a hard failure of the rotation transaction. **Use `CREATE UNIQUE INDEX IF NOT EXISTS`**: a valid `ON CONFLICT (rotation_id, specialist)` inference target and already this file's house style.
+
+**(A3) C2 — APPROVED, and the order was wrong to foreclose it. Use the disposable local cluster.** AC4's *"with no database"* and the out-of-scope *"executing any SQL"* are **AMENDED** to read: **no LIVE database and no Supabase; a disposable local Postgres cluster IS permitted.** His reasoning is correct and it is our own standing rule: *"one row per key"* and *"no duplicate-key error is raised"* are **properties of Postgres, not of a string** — proving them against a hand-written model of `ON CONFLICT` is a fixture proof, and a fixture proof **moves the verdict rather than being caveated at the bottom**. His own contract already permits it: *"Migrations run only against a disposable local/CI Postgres."* `initdb`/`pg_ctl`/`psql` are on PATH and nothing is listening on 5432. **Cluster in the scratchpad, private port, deleted afterwards. Never Supabase, no credentials, no network.**
+
+**(A4) TRANSACTION RESTRUCTURING — APPROVED, and you are right that it is not optional.** Today each specialist row is a **separate `psql` invocation outside any transaction** (`populate.mjs:469-492`). Adding a delete makes that gap load-bearing: **a crash between delete and re-insert loses rows that exist nowhere else.** Fold the upserts **and** the delete into **one transaction in a single invocation, upsert-first then delete-not-in-set, never delete-first.** That is the minimum safe form of what AC3 asks, not scope growth.
+
+**(AC3) YOUR ANSWER IS ACCEPTED, AND YOUR GUARD IS THE PART THAT MATTERS.** Remove stale rows — a table holding rows the payload no longer contains is the union of every payload ever written, which is the same class of lie as the duplicate. **And the guard is load-bearing, not defensive dressing: delete only when `Array.isArray(payload.specialists)` is true.** An absent array is *no claim*; an empty array is a positive claim of "none". Without that distinction one truncated payload silently wipes a rotation's specialist rows and this repair becomes a **data-loss route — a worse defect than the one it fixes**. **That is the WO-25 null-is-not-zero rule applied to a collection, and you generalised it correctly without being asked.**
+
+**(A5) PostgREST — YES to the idempotency parameters, NO to the schema-qualification defect.** Add `on_conflict=rotation_id,specialist` + `resolution=merge-duplicates` so the same property holds on both write paths; it is a few lines inside your surface and consistency is worth more than reasoning about reachability. **Do NOT fix the dotted schema-path defect** — that is a different defect, separately reported, and out of scope. **⚠️ In your return, state plainly that this branch is UNPROVEN and may be non-functional for the schema-qualification reason, so the fix is never read as evidence that the path works.**
+
+**⊕ NEW — AC8. A representation gap I confirmed by execution, and it defeats a requirement Warwick already set.** Your INFO note said the payload carries `tokens`, not `tokens_in`/`tokens_out`. I checked: **every specialist entry carries a real measured `tokens` total** — `veritas 663631`, `pax 502531`, `mack 481422`, and so on — **and the schema has nowhere to put it, so all of it is discarded and written as NULL.** Amendment 7 requires the expanded view to show **"specialist token usage where established"**. It *is* established; the mirror drops it. **Add a nullable `tokens bigint` column to `session_report.specialist_dispatch`, mirror it from the payload, and comment it as the measured total.** **Leave `tokens_in`/`tokens_out` writing NULL** — they are genuinely absent from the payload, and absent is not zero. **Do not map a total into `tokens_in`; that would be a fabricated split.** *(`outcomes` is also dropped. Not named in Warwick's requirement — reported once, deliberately not added.)*
+
+**Not amended:** AC1's forward-only idempotence, AC2's null-is-not-zero rule, AC5's mutation test, AC6's quoted DDL, the "Larry applies it and proves the re-run" boundary, and every authority field.
+
 
 **The defect is proven, and it bit today.** `schema.sql:4` states the design intent: *"Supabase is a queryable mirror, not a second SSOT."* `session_report.rotation` honours it — it has a unique `(closing_head, deliverable_path)` and upserts. **`session_report.specialist_dispatch` has no uniqueness at all**, so the writer inserts unconditionally. Re-running `populate.mjs` against the same payload duplicated all five specialist rows and the live surface reported **30 dispatches where the truth is 15**.
 
