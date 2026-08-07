@@ -22,16 +22,19 @@ DRAFT  →  WORKER READ-BACK  →  LARRY ACCEPTS OR AMENDS  →  ISSUED  →  RU
          VERITAS_FAIL  →  the Work Package stays open, Larry re-plans
 ```
 
-**A head that differs only by receipts, documentation or clerical repair is the SAME scope and does not
-re-open a gate.** Canonical: root `CLAUDE.md` §"Veritas dispatch" — not restated here.
+**A Veritas gate is bound to the WORK BOUNDARY and the outcome it promised, never to a SHA.** A head that
+differs only by receipts, documentation or clerical repair does not re-open a gate; a later review is
+justified only where the promised outcome materially changed. Canonical: root `CLAUDE.md` §"Veritas
+dispatch" — not restated here.
 
 **The worker must not begin implementation until Larry explicitly accepts the read-back, or issues an
 amended Work Order.** This is a gate, not a courtesy.
 
 **An amendment replaces the envelope table in place, so the order carries exactly one operative envelope.** Struck history moves below the operative envelope under a heading marked non-operative — never left inline where a live order could read as authorising it.
 
-**The Work Package cannot be recorded as complete without a `VERITAS_PASS` receipt against the exact
-integrated head** (Warwick, `GOVERNANCE-VERITAS-HIRE`, 2026-08-04). The second half of the lifecycle is
+**The Work Package cannot be recorded as complete without a `VERITAS_PASS` receipt against that Work
+Package and the outcome it promised** (Warwick, `GOVERNANCE-VERITAS-HIRE`, 2026-08-04; bound to the
+boundary rather than to a SHA, 2026-08-07). The second half of the lifecycle is
 therefore not bookkeeping: `VERITAS_PENDING` is the real state of every returned-and-integrated Work
 Package until [[Team/Veritas - Internal Quality and Truth Assurance/AGENTS]] reviews it, and **Larry may
 not write `closed` from his own assessment.** Before that receipt exists, the maximum permitted statement
@@ -84,7 +87,7 @@ tags: [build-nnn, wp-n]
 outcome: <one sentence — what is true when this is done>
 acceptance_property: <the ONE property whose truth decides this WP, stated so it can be checked
                       against the repository by someone who was not told the answer>
-integration_owner: larry          # who integrates the returned work and submits the exact head
+integration_owner: larry          # who integrates the returned work and submits the completed boundary
 veritas_gate: 1                   # 1 = integrated WP · 2 = phase/vertical slice · 3 = documentation
                                   # and Git truth · `none` ONLY where Warwick has said so explicitly
 document_impact:                  # IDENTIFIES affected active documents. It does NOT authorise.
@@ -184,7 +187,7 @@ planner consumes rule X on the live path"* is an acceptance property. *"Tests pa
 green over a capability nothing calls.
 
 **On `integration_owner`** — the returned work is not the delivered work. This field names who integrates
-and who submits the exact integrated head to Veritas. It is `larry` by default and by design; a Work Order
+and who submits the completed boundary and its promised outcome to Veritas. It is `larry` by default and by design; a Work Order
 that leaves it blank has not said who owns the seam between this WP and everything around it.
 
 **On `veritas_gate`** — which of the three gates fires when this order's work is integrated. `none` is
@@ -377,7 +380,9 @@ INTEGRATION READ-BACK
 
 Work Order:
 Veritas findings disposed:        <every ID from the cited receipt, or `n/a — not a corrective order`>
-Exact integrated head:            <full 40-char SHA — resolved, not assumed>
+Boundary and promised outcome:    <THE GATE'S IDENTITY — the WP/phase and what it promised>
+Where the work lives:             <branch, worktree and/or runtime Veritas should go and look at>
+Integrated head (provenance):     <full 40-char SHA — resolved, not assumed>
 Branch:
 Acceptance property, restated:
 What was integrated, in my words:
