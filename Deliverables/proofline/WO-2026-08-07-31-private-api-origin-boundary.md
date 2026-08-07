@@ -200,3 +200,50 @@ operational_handoff: none
      Before issue, RECOMPUTE: node tools/wo/envelope.mjs --count-markers <file>
      An order is unready while either recomputed count is above zero AFTER Larry authors slots.
      Do not treat this footer as current once the file has been edited. -->
+
+---
+
+## AMENDMENT 1 — Larry, 2026-08-07, answering Keel's read-back verdict `CLARIFY`
+
+**All four findings confirmed. Both blocking ones are granted. The order was wrong in three checkable places and one of them was a hazard I introduced.**
+
+### ① Finding 1 — GRANTED. `services/cockpit/private-api.mjs` is ADDED to `file_surface`. **Extract the handler.**
+
+**Keel established the declared surface could not deliver AC1/AC3 at all**, and — the part that matters — **rejected the very route this order offered him.** The order suggested the synthetic-credentials pattern. He showed it is *worse here*: `db.mjs`'s `COCKPIT_CREDS` default resolves to the **live runtime credentials file**, so **a gate whose failure mode on one unset or mistyped env var is "load production credentials" is precisely the hazard `clone-portability-check.mjs` exists to close.** Its header makes *"never import `db.mjs`"* a permanent constraint, not a preference. It also still needs `pg`, which the runner does not have — `.github/workflows/cockpit-private-apps.yml` has **no install step**, so an importing gate is `MODULE_NOT_FOUND` in CI: permanently red, i.e. **not a gate at all.**
+
+**Extraction is F6's lesson APPLIED rather than worked around**, and it is what `static.mjs`, `provenance.mjs`, `rotation-report.mjs` and `down-reason.mjs` already are. **This is not scope expansion — it is the smallest implementation that can actually be proven**, which is what Warwick's ruling 3 asked for.
+
+### ② Finding 2 — GRANTED, NARROWLY. `services/cockpit/provenance.mjs` is added **for a ONE-LINE `SOURCE_MODULES` addition and nothing else.**
+
+> **🔴 THIS IS THE THIRD CONSECUTIVE ORDER IN WHICH A LARRY-PRESCRIBED CHANGE WOULD HAVE HOLED `provenance.mjs`** — WO-25, WO-30, now WO-31. **Three for three, all caught by Keel, none by Larry.** The map already records the corrective and it was not applied here: *a prescribed method that touches a control must be run against that control before it is prescribed.* **Recorded again, because writing the lesson down twice has not yet changed the behaviour.**
+
+**Touch nothing else in `provenance.mjs`.** If the one-line addition does not make `provenance-check.mjs` green, **stop and report** rather than widening.
+
+### ③ Finding 3 — the AC4 narrowing is CONFIRMED, and the gap is LARRY'S to close.
+
+**There is no caller of `/private-api` anywhere in this repository** — Keel's grep returns only `server.mjs`'s own three lines, because the CareerAIR overlay is served from the private apps directory **outside** the repo.
+
+- **Prove:** same-origin and no-`Origin` requests still forward.
+- **Do NOT claim** *"the CareerAIR overlay still works"* — and he was right to refuse to.
+- **The live-path confirmation is recorded as OWED and is LARRY'S**, at route step 18 against the canonical merged runtime, alongside the other post-merge acceptance items.
+
+### ④ Finding 4 — origin rule APPROVED, **with the optional allowlist, because the residual is real.**
+
+**Approved:** absent `Origin` → **allow** (same-origin GETs and non-browser callers send none); `Origin` present → its **host:port must equal the request's own `Host`**, else **403 before the body is read and before any forward**. **Self-configuring — no hostname literal baked in**, which is right, and is the standing lesson that static config is not dynamic discovery.
+
+**And YES to the optional additive `COCKPIT_ALLOWED_ORIGINS`, empty by default.** **Reason: his residual is genuine and unresolvable from inside his scope.** `tailscale serve --https=8443 → http://127.0.0.1:8090` fronts the Cockpit, and **if it does not preserve `Host`, strict equality would 403 the legitimate overlay — exactly the AC4 breakage Warwick ruled against.** An empty default keeps the safe behaviour safe; the escape hatch exists if the live path needs it. **Keel owns the shape; the value is not set by this order.**
+
+**DNS rebinding: accepted as a reported residual at this risk level. Do not build for it** — Warwick's ruling 4 and the regrowth cap both apply.
+
+### ⑤ AC5 versus the publication constraint — RULED, as asked, in one line.
+
+**Use the in-memory permissive *policy fixture*, named for the property, in the `clone-portability-check.mjs` "MUTATION FIXTURES" shape.** **No attacker page, no narrative, no upstream detail, and nothing permissive ever written into server code.** That satisfies AC5 and the public-repo constraint together — the mutation proves the gate bites, without the artefact teaching anyone how to exploit it.
+
+### ⑥ Non-blocking, accepted as reported
+
+- The `outcome` field prescribing *"a positive Origin check"* while the body leaves the method to him — **his choice and the property coincide**, so it is immaterial. **Noted as a drafting defect on Larry's side: the order should not have half-prescribed.**
+- Envelope `governance_sha` `147cc87f` versus dispatch head `2e9a3047` — **verified immaterial** by him: ancestor, contract blob byte-identical (`500c6c517107`), template blob as cited. **Governing head remains `2e9a3047` and the amended surface is authorised at it.**
+
+### Standing instructions unchanged
+
+**No second read-back required** — every ruling above answers a question he raised and proved. **Proceed.** Do not import or execute `db.mjs`. Do not touch the live clone, port 8090 or any scheduled task. **No new authentication system** (Warwick's ruling 4). **No attack detail in any committed artefact** — commit message, comments and test names describe the property, never a runnable exploit. Stage by explicit pathspec, `pull --rebase`, push. No PR, no merge.
