@@ -88,3 +88,13 @@ jobs:
       # server.mjs imports db.mjs, which opens two live pools at module load.
       - name: Build provenance is read from loaded bytes, never from git
         run: node services/cockpit/provenance-check.mjs
+
+      # Warwick's rule for the rotation-report surface: "Unknown, not established and zero are
+      # materially different." A rotation row legitimately carries a real 0 (wo_first_dispatch_success)
+      # beside real nulls (elapsed_minutes, host_version), so the read layer must carry both through
+      # to the wire without either becoming the other. This gate asserts that field-by-field and is
+      # mutation-tested: introducing `?? 0` turns 29 of its assertions red.
+      # It runs with no database — the mapping is exercised through an injected query function, and
+      # the run asserts db.mjs was never loaded (server.mjs imports it, and it opens two live pools).
+      - name: Rotation reports map NULL and zero as different values
+        run: node services/cockpit/rotation-report-check.mjs
