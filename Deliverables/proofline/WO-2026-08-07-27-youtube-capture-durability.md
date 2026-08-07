@@ -17,7 +17,6 @@
      This header is EVIDENCE OF ORIGIN, not a control. Nothing verifies it automatically.
 -->
 ---
----
 # --- identity and authority ---
 name: Durable YouTube capture — watcher recovery, honest success briefing, lock reconciliation
 work_order_id: WO-2026-08-07-27
@@ -112,6 +111,31 @@ operational_handoff: none
 ---
 
 # WO-2026-08-07-27 — Durable YouTube capture
+
+## AMENDMENT 1 — Larry, 2026-08-07, after Keel's read-back (verdict CLARIFY). Binding; supersedes the original text where they differ. ONE fresh read-back, then build.
+
+**FIRST — the order's own defect, which Keel found and I have fixed.** C7 was right: lines 19-20 were `---` followed immediately by `---`, so the **YAML frontmatter block was EMPTY** and every envelope field was body text. `--count-markers` returned `ready true` regardless, so readiness did not catch it. **Cause: I assembled this order by concatenating the generator's head fragment (which ends with the frontmatter opener) with a body that opened with its own `---`.** Repaired in place — the block now parses at 6,285 chars with `owner: keel` present. **WO-25 and WO-26 are unaffected** (built differently); **WO-28 was assembled the same way and has been corrected before issue.**
+
+**(1) C1 — APPROVED exactly as you proposed. Your reading is right and the order was wrong.** AC1's evidence as written would have required writing under `C:/.fusion247` (`ensure-youtube-watcher.mjs:19-20`), force-killing and spawning the **live** watcher, and letting the child reach production Postgres — breaking `private_surface: none`, `live_authority: none`, `credential_scope: none` and `network: none` **all at once**. **Export `ensureWatcher({ listWatchers, killWatcher, startWatcher, logDir })`, prove both branches through injected probes, AND run the real module end-to-end once against a temp log dir with a distinct sentinel command line and a harmless sleeper.** Both branches genuinely executed; the real watcher, the real log dir and the real database never touched. *(This is the `defaultRunGit` seam pattern again, and it keeps being the answer.)*
+
+**(2) C2 — NEITHER of your options. Use the EXISTING `~/.mypka/` estate directory, and here is why your recommendation (a) is the one I am rejecting.** A counter in `os.tmpdir()` has a failure mode that defeats the requirement: **if temp is cleared between attempts the counter never accumulates, the threshold is never reached, and the watcher stays SILENTLY DEAD — which is the precise outcome Warwick's escalation exists to prevent.** Over-notifying is a nuisance; never notifying is the bug. Option (b) is right in shape but you called it "a new estate location" — **it is not.** `C:/Users/Buggly/.mypka/` **already exists and is already load-bearing**: `~/.mypka/governor/ding.mjs`, `~/.mypka/tower/tower.db`, `~/.mypka/run-hidden.vbs`. Putting one small state file there **invents no location and adds no mechanism**, and it survives reboot and temp cleanup, which the requirement needs. **Option (c) is refused** — a migration and a schema decision for a recovery counter is exactly the regrowth Warwick named.
+
+> **Make the path INJECTABLE with that as the default.** You author code that writes there; **you do not write there yourself**, and your tests must inject a temp path. That is what keeps this inside `private_surface: none` and inside your declared surface.
+
+**(3) C2a — YES to the heartbeat, and thank you for finding the hole.** You are right that with true ensure semantics **"healthy" needs a definition, and a HUNG watcher — alive but no longer polling — would be left alone forever and look identical to a healthy one.** "Process alive" alone would let this order ship a mechanism that cannot detect the failure it was written for. **`watch-captures.mjs` touches the state file once per pass; `ensure` treats alive AND fresh heartbeat as healthy; a stale heartbeat is what makes repeated-recovery-failure detectable at all.** One file, two uses, no daemon, no supervisor. **Choose and state the freshness threshold yourself** against the 30s poll interval, and justify it in one line.
+
+**(4) C4 — CONFIRMED, and your instinct is the whole point of AC4.** Do **not** classify off `persistCapture`'s returned `persisted` boolean. **A claimed commit is not a durable commit**, and trusting the claim is the defect this order exists to prevent. **Add the injected `durabilityProbe` that re-checks real tracked state** (`git ls-files --error-unmatch` on the vault-relative note and raw paths), **and that is what the AC5 mutation test forces to succeed.** Good catch that `generate-source-note.mjs:147` is the call site and outside your surface, and that `watch-captures.mjs:118-120` already receives and discards the fields — so AC4 is reachable without touching it.
+
+**(5) C5 — CORRECT, and do not reconcile `SXg08HPpKr8`.** Construct a stranded capture in a throwaway repo. **Your evidence must not claim the real one was rescued.** It gets picked up when the mechanism next runs in the live clone, which is a production event neither of us can manufacture.
+
+**(6) C6 — SERIOUS, and it changes what Warwick is asked to approve.** `services/hub/router/liveDeps.mjs:10` records that enabling `HUB_YOUTUBE_ROUTE=1` requires **stopping** `ensure-youtube-watcher` so a capture is processed once — and a task that re-ensures every few minutes **makes that human instruction unenforceable**. **Carry this warning in the AC2 command text, prominently.** Larry puts it in front of Warwick **before** he elevates, because it is a live-behaviour consequence of installing the task, not a footnote. **Also correct the now-false single-instance comment at `watch-captures.mjs:71-72`** — it is in your surface and AC1 falsifies it.
+
+**(7) C3 — acknowledged and correct.** The escalation is authored against the existing `watch-captures.mjs:148` transport and proven **only** through an injected sender. **No real message is sent by this dispatch, and "escalation proven" must never be read as "escalation delivered."** Say exactly that in your return.
+
+**(8) AC2 rollback — your correction is right.** A **new** task rolls back by `Unregister-ScheduledTask`, not by restoring an `Export-ScheduledTask` XML; that banked set covers the four **pre-existing** tasks only. Use `wscript.exe //B //Nologo` via `run-hidden.vbs` as you propose, so the new task does not reintroduce the console flash section 2.2 exists to remove.
+
+**Not amended:** AC4's deciding property, AC5's bounded retry-and-reconcile, AC6's conciseness and single transport, AC7's no-database proof, the acceptance-is-the-next-real-capture clause, and every authority field.
+
 
 **Warwick's problem, in one line:** he sent a link, nothing happened, and nothing told him — for four days.
 
