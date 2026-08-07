@@ -2395,6 +2395,26 @@ node "C:/Users/Buggly/.mypka/governor/ding.mjs" <message-file>
 > 6. **contradictory wording caused false handbacks and repeated stopping;**
 > 7. **the system consumed extraordinary context and specialist effort while repeatedly finding documentation defects rather than product defects.**
 >
+
+> #### 🔴 CAPAE EFFECTIVENESS EVIDENCE — 2026-08-07, recorded on Warwick's instruction. **The correction was CORRECT, PRESENT and CANONICAL, and the behaviour regressed anyway.**
+>
+> **The sequence, verified by Warwick independently — not asserted by Larry:**
+>
+> - The authorised Rule 4a correction is **on canonical `main`** — `30666f1` is an **ancestor of current `main`**.
+> - Current `CLAUDE.md` reads **SEND → post → CONTINUE**, stopping only for one of the **seven** named interruption conditions.
+> - Larry's own `AGENTS.md` §9e **explicitly** states that ending a turn at a worker return, review, tests, commit, push, PR or other ordinary execution boundary **is a defect**.
+> - **Larry then ended a turn at exactly such a boundary — having just written *"Rotating now"* — without rotating.**
+>
+> **The conclusion, and it is the whole value of this entry:**
+>
+> > **The remaining problem is EXECUTION / ADHERENCE, not a missing sentence.**
+>
+> **Why that matters more than any of the seven points above it:** every prior remedy in this Sub-phase was **textual** — an amendment, a re-cut, a pointer, a clarified sentence. **This occurrence proves the textual remedy class is exhausted.** The wording was already correct, already canonical, already on `main`, and already duplicated into Larry's own contract — **and the behaviour still regressed within the same session, minutes later.**
+>
+> **⛔ Therefore 4C must NOT respond to this with another sentence, amendment or governance artefact.** Writing a further clause would be the eighth instance of the very pattern this evidence documents. **What 4C examines is why correct, present, canonical wording failed to change behaviour** — not what wording to add.
+>
+> *(Recorded as evidence only. No fix is proposed here, deliberately: Warwick has forbidden designing or solving 4C before it is entered.)*
+
 > **Corroborating facts from this Sub-phase, recorded because they are the measurements behind the seven points and will not survive a `/clear` otherwise:**
 >
 > - **Nine Gate 1 verdicts** were issued in Sub-phase 4B. **Every FAIL was documentation. Not one was the engineering.**
