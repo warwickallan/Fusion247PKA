@@ -2356,6 +2356,26 @@ node "C:/Users/Buggly/.mypka/governor/ding.mjs" <message-file>
 
 ## ⭐ ACTIVE SESSION WORK PACKAGE — single durable authority for this session
 
+> **🔄 AMENDMENT 11 — Warwick, 2026-08-07. FUTURE-ROUTE ONLY: ASDAIR IS NO LONGER THE NEXT HOP. A NEW SUB-PHASE 4C COMES FIRST.**
+>
+> **⛔ THIS AMENDMENT CHANGES NOTHING ABOUT SUB-PHASE 4B.** Warwick, explicit: *"make only the minimum routing amendment needed so 4B finishes exactly as currently planned."* **4B's Work Package, its acceptance rows, its 18-step route, Amendment 10's decisions, the Gate 1 FAIL and every open repair are untouched and remain exactly as written.**
+>
+> ### The new next Sub-phase
+>
+> **`4C — CAPAE + Asdair Hop Preparation`**, covering two things and no others:
+> 1. **the lightweight CAPAE learning / effectiveness loop** just defined;
+> 2. **final preparation and proof for the hop into Asdair.**
+>
+> ### What this amendment deliberately does NOT do — his instructions, and they are constraints on Larry
+>
+> - **4C is NOT designed, scoped, planned or started.** *"Detailed 4C instructions will follow only after we enter 4C with a fresh `Continue`."* **Anything beyond the two bullets above is invention, and writing it here would be exactly the failure this map keeps recording.**
+> - **NOTHING in any Asdair branch, worktree, Wayfinder or artefact may be touched, updated or begun.** `Deliverables/2026-08-04-build-015-asdair-wayfinder-plan.md` remains authoritative for **BUILD-015 only** and **NON-DIRECTIVE here** — unchanged, and not to be opened for this.
+> - **No new deliverable, tracker, plan file or Work Order is created for 4C.** The regrowth cap applies at full force: a route amendment is a sentence, not a programme.
+>
+> ### Effect on the frontier — none
+>
+> **The one current next action is unchanged and still lives in § ACTIVE SESSION WORK PACKAGE → `🎯 THE ONE CURRENT NEXT ACTION`.** This amendment is a **future**-route change only. **A fresh Larry reading this block must not treat 4C as actionable** — it is the recorded answer to *"what comes after 4B"*, nothing more.
+
 > **🔄 AMENDMENT 10 — Warwick, 2026-08-07. TWO DECISIONS, in answer to the pre-merge / post-merge adjudication below.**
 >
 > ### ① Amendment 9 — **Option A APPROVED, NARROWLY SCOPED.** His scope words, and they are the whole point of the decision:
@@ -2489,7 +2509,7 @@ node "C:/Users/Buggly/.mypka/governor/ding.mjs" <message-file>
 
 > **🔄 AMENDMENT 6 — Warwick, 2026-08-07. SUB-PHASE 4A DECLARED AND CLOSED FOR ASSURANCE. WAYFINDER STRATEGY DECIDED.**
 >
-> **Route:** Sub-phase 4A → Veritas → rotate; **Sub-phase 4B** (one fresh session) → remaining delivery and cleanup → Veritas → Codex → Warwick merge decision → authorised merge → installed/runtime alignment → **Proofline closure**; **only then** Asdair. **Proofline is NOT closed merely because PR #97 merges.**
+> **Route:** Sub-phase 4A → Veritas → rotate; **Sub-phase 4B** (one fresh session) → remaining delivery and cleanup → Veritas → Codex → Warwick merge decision → authorised merge → installed/runtime alignment → **Proofline closure**; ~~**only then** Asdair~~ → **then SUB-PHASE 4C (see AMENDMENT 11) — and only after 4C, Asdair.** **Proofline is NOT closed merely because PR #97 merges.**
 >
 > **Sub-phase 4A receives NO Codex review and NO merge.** Closure record and full 4B handover: [[Deliverables/2026-08-07-subphase-4A-closure-and-4B-handover]].
 >
@@ -2721,7 +2741,7 @@ Any newly discovered **unrelated** defect: record once in [[Deliverables/BACKLOG
 > **The earlier PASS must never be described as having reviewed later commits. Its reviewed head is `c50d8cb` and that is recorded truthfully wherever it is cited.**
 
 1. **Pax delivers the session performance report** (`/rotate` step 5) → commit report + payload.
-2. **Load** the Sub-phase 4B Work Package, the final two-part Phase acceptance, and the **Asdair jumping-over point**.
+2. **Load** the Sub-phase 4B Work Package, the final two-part Phase acceptance, and the ~~**Asdair jumping-over point**~~ ⛔ **— the Asdair hop is NO LONGER the next hop. Superseded by AMENDMENT 11: SUB-PHASE 4C comes first.** *(This block is discharged and directs nothing; the strike is here so the phrase cannot be read as a live route even in a record.)*
 3. **Complete the remaining `/rotate` transaction** — report pointer in the map · Supabase population **recorded truthfully, success or visible failure** · Honcho publish through the **installed** write path · read-back through the **installed** reader.
 4. **Record the final head truthfully**, without stretching the `c50d8cb` PASS over it.
 5. **Verify the read-back matches on all six:** **map · Phase · `focus` · active package · exact head · exact next action.**
