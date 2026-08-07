@@ -69,8 +69,10 @@ preconditions below are satisfied** — a `git stash` here would destroy the run
    SHA. **Record the before and after SHA.**
 5. **Restore the preserved artefacts** into the moved tree. The two session logs need no restore —
    they are tracked at `b0c3b2b` and arrive with the merge.
-6. **Reinstall dependencies if the lockfile moved.** `services/control-plane` holds the `pg` install
-   that `services/cockpit/db.mjs` imports **by absolute path** — see §6.
+6. **Reinstall dependencies if the lockfile moved. STILL MANDATORY.** `services/control-plane` holds the `pg` install
+   that `services/cockpit/db.mjs` imports — **now clone-relative rather than by absolute path (WO-30), which
+   changes nothing about this step**: an emptied `node_modules` still breaks the Cockpit, and after the repair
+   it breaks **loudly at import** instead of silently borrowing another clone's tree. See §6(a).
 7. **Start the Cockpit. Verify §7 before enabling anything scheduled.**
 
 ## 5. Rollback
@@ -82,11 +84,17 @@ load-bearing.**
 
 ## 6. 🔴 Known hazards, each proven rather than anticipated
 
-**(a) `db.mjs` imports `pg` by ABSOLUTE PATH into this clone.** `services/cockpit/db.mjs:7` reads
+**(a) ✅ REPAIRED 2026-08-07 (WO-30) — re-cut, because this section described the OLD behaviour as a live hazard.**
+
+~~`db.mjs` imports `pg` by ABSOLUTE PATH into this clone. `services/cockpit/db.mjs:7` reads
 `file:///C:/Fusion247PKA/services/control-plane/node_modules/pg/lib/index.js`, and `:10` defaults
-the credentials path into the same tree. **The Cockpit cannot run from any other checkout**, and a
-move that empties `node_modules` breaks it. This is also `BACKLOG` C-6: *worktree isolation does not
-isolate the database.*
+the credentials path into the same tree. **The Cockpit cannot run from any other checkout**.~~
+
+**What was actually wrong, and it was worse than "cannot run elsewhere":** a Cockpit started from **any other checkout silently borrowed this clone's dependency tree AND its LIVE PRODUCTION CREDENTIALS**, because the absolute `COCKPIT_CREDS` default pointed every checkout at `C:/Fusion247PKA/.../.runtime-live/directus-live.env.json`. **It did not fail — it connected, with credentials it had never declared.** Row 1's *"survives worktree delete/recreate"* was passing only because a stray checkout quietly reached into the live clone.
+
+**Now:** both the `pg` specifier and the credentials default resolve **relative to the module's own location** (`createRequire(import.meta.url)` and `new URL(..., import.meta.url)`). A checkout without its own dependencies **fails loudly at import**. **The loud failure is the repair, not a regression.**
+
+**⚠️ Unchanged for THIS migration, and the reason step 4.6 still stands:** from `C:\Fusion247PKA` the new clone-relative forms resolve to **character-for-character the same two paths** as the old absolute ones, and `COCKPIT_CREDS` is set **nowhere in the repository**, so the live service runs on the default and its value is unchanged there. **A move that empties `node_modules` still breaks it — reinstall at step 4.6 remains mandatory.** Gated by `services/cockpit/clone-portability-check.mjs`, registered in CI. `BACKLOG` C-6 (*worktree isolation does not isolate the database*) is **narrowed, not closed** — the credentials-borrowing half is fixed; the module still opens two production pools at import, which is why nothing may import it to test it.
 
 **(b) A task enabled against a stale clone runs stale code — this HAPPENED, 2026-08-07.** The
 `MyPKA-YouTube-Watcher-Ensure` task was installed pointing at this clone while the fix that gives

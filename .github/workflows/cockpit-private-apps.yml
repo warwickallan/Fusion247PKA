@@ -89,6 +89,15 @@ jobs:
       - name: Build provenance is read from loaded bytes, never from git
         run: node services/cockpit/provenance-check.mjs
 
+      # db.mjs once named ONE checkout for both its pg import and its credentials default, so a
+      # Cockpit started from any other checkout silently borrowed the live clone's dependencies AND
+      # its live credentials. Veritas Defect 6; BUILD-020 row 1 "survives worktree delete/recreate".
+      # Reads db.mjs as TEXT and never imports it — it opens two production pools at module scope.
+      # On this runner node_modules is absent, so the existence assertion skips LOUDLY and says why:
+      # a green here is 22 assertions plus 5 caught mutations, never a silent zero.
+      - name: Cockpit DB module resolves inside its own clone (no absolute clone root)
+        run: node services/cockpit/clone-portability-check.mjs
+
       # Warwick's rule for the rotation-report surface: "Unknown, not established and zero are
       # materially different." A rotation row legitimately carries a real 0 (wo_first_dispatch_success)
       # beside real nulls (elapsed_minutes, host_version), so the read layer must carry both through
