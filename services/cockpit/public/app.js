@@ -453,7 +453,15 @@ createApp({
 
     // Leaving an area always drops you back to the Apps GRID — tapping "Apps" while already inside
     // an app must go somewhere, not silently do nothing. The breadcrumb is the way back in.
-    const go = (k) => { detail.value = null; closeApp(); area.value = k; if (k === 'apps') probeAll(); };
+    // Rotation reports are read ONCE, lazily, when System is first opened — the same lazy pattern as
+    // goView's Rules/Basket reads. Not on mount (a round trip on every load for a tab most visits
+    // never open) and not on every entry (a service that is down must not be hammered by navigation;
+    // the group offers an explicit retry instead).
+    const go = (k) => {
+      detail.value = null; closeApp(); area.value = k;
+      if (k === 'apps') probeAll();
+      if (k === 'system' && !rrRequested.value) loadRotationReports();
+    };
     const open = (item, as) => { detail.value = { ...item, _as: as }; };
     const closeDetail = () => { detail.value = null; };
 
@@ -544,6 +552,135 @@ createApp({
       return 'note generating…';
     };
 
+    // ---- System > Session / Rotation Reports ---------------------------------------------------
+    // Warwick reads each /rotate report here. The whole surface turns on ONE rule, in his words:
+    // "Do not convert missing values into zero. 'Unknown,' 'not established' and zero are materially
+    // different." The cheapest way to lie about a session is to print 0 where nothing was measured.
+    //
+    // HOW THE DISTINCTION IS CARRIED — four axes, NOT ONE OF WHICH IS COLOUR:
+    //   a measured number -> .rr-num : MONO, --ink, full weight, a DIGIT.
+    //   an unknown        -> .rr-unk : the body face, ITALIC, --ink2, a WORD ("not established").
+    // Typeface, slant, ink-weight and digit-vs-word. It therefore survives greyscale, a colour-blind
+    // reader and a screen reader, none of which can see a hue. Mono is not decoration here: GL-003 §3
+    // fixes it as "this is a measurement or a machine string", so the TYPEFACE ITSELF is the claim,
+    // and setting an unmeasured value in the body face withdraws that claim.
+    //
+    // Grey, never amber (app.js:229-237): amber says "something is wrong", and a value nobody
+    // measured is not a fault. Colouring uncertainty as a fault is inventing a fact, just quieter.
+    //
+    // THE SAME RULE AT THE AGGREGATE LEVEL, which is where it is easiest to miss: a bar's TRACK is
+    // drawn only when the value is known. A real 0 renders a VISIBLE EMPTY TRACK; an unknown renders
+    // NO TRACK AT ALL. A zero-width fill inside no track is exactly the collapse this file exists to
+    // prevent, so the two cases are distinguishable by presence, not only by the words beside them.
+    const rrReports = ref(null);    // null = never read, or the read FAILED. Never an empty list.
+    const rrLoading = ref(false);
+    const rrErr = ref(null);
+    const rrRequested = ref(false); // false = we have not asked yet, which is not "there are none".
+
+    // Failure is HTTP 200 with {ok:false}, so this branches on `ok` and never on r.status (the house
+    // pattern, as loadAsdairPacket does). A non-JSON body throws in r.json() and lands in the same
+    // catch — the read failed either way, and the UI says the read failed rather than inventing an
+    // empty list.
+    async function loadRotationReports() {
+      rrRequested.value = true; rrLoading.value = true; rrErr.value = null;
+      try {
+        const r = await fetch('/api/rotation-reports', { cache: 'no-store' });
+        const d = await r.json();
+        if (!d || d.ok === false) throw new Error((d && d.error) || 'the cockpit could not read the rotation reports');
+        rrReports.value = Array.isArray(d.reports) ? d.reports : [];
+      } catch (e) {
+        // Keep reports null, NOT []. "We could not read them" and "there are none" are two facts.
+        rrErr.value = e.message || 'the read failed'; rrReports.value = null;
+      } finally { rrLoading.value = false; }
+    }
+
+    const rrList = computed(() => (Array.isArray(rrReports.value) ? rrReports.value : []));
+
+    // "Any field may be null" (the frozen contract). These two make a null CONTAINER degrade into a
+    // field-by-field "not established" instead of throwing — so a report with `workOrders: null`
+    // renders four honest unknowns rather than blanking the card.
+    const rrArr = (v) => (Array.isArray(v) ? v : []);
+    const rrObj = (v) => ((v && typeof v === 'object') ? v : {});
+    const rrHas = (v) => v !== null && v !== undefined && v !== '';
+    const rrText = (v) => (rrHas(v) ? String(v).trim() : '');
+
+    // ORDERING IS THE PRODUCER'S GUARANTEE, NOT OURS. The cockpit never re-sorts (app.js:735). If the
+    // supplied order is not most-recent-first we SURFACE it as a producer defect, exactly as the
+    // packet view does for a declared sort that is not the actual sort (app.js:737-745) — quietly
+    // fixing it here would hide a bug in the endpoint and cost nothing to the person who could fix
+    // it. Rows with an unestablished createdAt are skipped: they cannot PROVE a break either way.
+    const rrOrderBreak = computed(() => {
+      const l = rrList.value;
+      for (let i = 1; i < l.length; i++) {
+        const a = l[i - 1] && l[i - 1].createdAt, b = l[i] && l[i].createdAt;
+        if (!rrHas(a) || !rrHas(b)) continue;
+        if (new Date(b).getTime() > new Date(a).getTime()) return i + 1;
+      }
+      return 0;
+    });
+
+    // ---- formatters. Every one FORMATS a supplied value; not one produces a figure. ----
+    const rrInt = (n) => Number(n).toLocaleString('en-GB');
+    // Big counts are abbreviated to a few significant figures on a phone rather than printed as a
+    // full grouped integer. That is a ROUNDING, so the template prints "≈" wherever rrIsCompact is
+    // true, and the drawer always carries the exact grouped integer alongside. An abbreviation
+    // presented as exact is a small lie with no upside.
+    // (No worked example is written here on purpose: AC6 forbids the report's own figures appearing
+    //  as literals anywhere in this diff, and a comment is in the diff.)
+    const rrIsCompact = (n) => rrHas(n) && Math.abs(Number(n)) >= 1e4;
+    function rrCompact(n) {
+      const v = Number(n);
+      if (!isFinite(v)) return String(n);
+      if (Math.abs(v) >= 1e6) return (v / 1e6).toFixed(2).replace(/\.?0+$/, '') + 'M';
+      if (Math.abs(v) >= 1e4) return (v / 1e3).toFixed(1).replace(/\.0$/, '') + 'k';
+      return rrInt(v);
+    }
+    const rrPct = (n) => (Math.round(Number(n) * 10) / 10) + '%';
+    function rrMins(n) {
+      const v = Math.round(Number(n));
+      if (!isFinite(v)) return String(n);
+      if (v < 60) return v + 'm';
+      const h = Math.floor(v / 60), m = v % 60;
+      return m ? h + 'h ' + m + 'm' : h + 'h';
+    }
+    // Bar width as a percentage of a scale. Clamped, because a producer figure over its own maximum
+    // must not paint outside the track — and the printed number beside it stays the real one.
+    function rrBar(v, max) {
+      const m = Number(max);
+      if (!isFinite(m) || m <= 0) return '0%';
+      return Math.max(0, Math.min(100, (Number(v) / m) * 100)).toFixed(1) + '%';
+    }
+
+    // The allocation slices, in a fixed reading order. This hard-codes KEYS AND LABELS — schema, not
+    // data — and no figure. Every number still comes from r.allocation at render time.
+    const RR_ALLOC = [['productPct', 'Product'], ['adminPct', 'Admin'], ['evidencePct', 'Evidence'],
+      ['reworkPct', 'Rework'], ['waitingPct', 'Waiting']];
+    const rrAlloc = (r) => RR_ALLOC.map(([k, label]) => ({ label, v: rrObj(r.allocation)[k] }));
+    // What the MEASURED slices account for, and whether any slice is missing. Printing a sum that
+    // silently omits an unmeasured slice would imply the rest was idle time; it was not measured.
+    const rrAllocSum = (r) => rrAlloc(r).reduce((n, a) => (rrHas(a.v) ? n + Number(a.v) : n), 0);
+    const rrAllocGap = (r) => rrAlloc(r).some((a) => !rrHas(a.v));
+    // ⚠️ THE SUM ITSELF CAN LIE, AND IT DID. When NOTHING was measured, rrAllocSum is 0 and the note
+    // read "the measured slices account for 0% of the session" — a computed zero presented as a
+    // measurement. That is the exact failure this surface exists to prevent, reintroduced at the
+    // aggregate level, where it is easiest to miss: a total over no measurements is not 0, it is
+    // not established. Found by READING the rendered degenerate row, not by a gate — every check
+    // was green while that sentence was on screen.
+    const rrAllocAnyKnown = (r) => rrAlloc(r).some((a) => rrHas(a.v));
+
+    const rrCtx = (r) => [
+      { label: 'Context in', v: r.contextTokensIn },
+      { label: 'Context out', v: r.contextTokensOut },
+      { label: 'Subagent tokens', v: r.subagentTokens },
+    ];
+    // Bars scale against the largest ESTABLISHED value on the same card, so the comparison is real.
+    const rrMax = (rows) => rows.reduce((m, x) => (rrHas(x.v) && Number(x.v) > m ? Number(x.v) : m), 0);
+    const rrCtxMax = (r) => rrMax(rrCtx(r));
+    const rrSpecMax = (r) => rrMax(rrArr(r.specialists).map((s) => ({ v: s.dispatches })));
+    // Product and documentation lines share one scale so the two bars are comparable to each other,
+    // which is the entire question that pair of numbers is asked.
+    const rrLinesMax = (r) => rrMax([{ v: rrObj(r.lines).productChanged }, { v: rrObj(r.lines).docChanged }]);
+
     return {
       AREAS, APPS, appKey, appViewKey, currentApp, currentView, statusOf, appTone, appStatusLine, probeApp, openApp, closeApp, goView,
       asdairWs, asdairWsErr, asdairWsLoading, asdairMediaErr, loadAsdairWorkspace, asdairShop, asdairOtherShops, asdairWaitingOn, asdairPrevOrderTotal,
@@ -558,6 +695,9 @@ createApp({
       tiBrain, tiCash, tiSpin, tiStars, mine, ideaDecide, opps, opportunityDecide, synthesise, synthing, synthMsg,
       outputs, newOutputs, itemsAdded, wins, builds,
       statusTone, statusLine, tiles, go, open, closeDetail, decide, copyTranscript, primaryAction, sourceStatus, load, REPORT, GRAPH,
+      rrReports, rrLoading, rrErr, rrRequested, loadRotationReports, rrList, rrOrderBreak,
+      rrArr, rrObj, rrHas, rrText, rrInt, rrCompact, rrIsCompact, rrPct, rrMins, rrBar,
+      rrAlloc, rrAllocSum, rrAllocGap, rrAllocAnyKnown, rrCtx, rrCtxMax, rrSpecMax, rrLinesMax,
     };
   },
   template: `
@@ -1446,6 +1586,267 @@ createApp({
             <span class="chip" :class="b.status_tone==='block' ? 'block' : (b.status_tone==='ok' ? 'ok':'prog')"><span class="d"></span>{{ b.status }}</span>
           </div>
         </div>
+        <!-- ── SESSION / ROTATION REPORTS ─────────────────────────────────────────────────────
+             Warwick's /rotate reports, most recent first. THE HONESTY CHAIN IS THE POINT, so read
+             the v-if order — each rung is a DIFFERENT fact and none may be collapsed into another:
+               1. not asked yet   -> we have not read them. Not "there are none".
+               2. reading         -> in flight.
+               3. read FAILED     -> say the read failed and show NOTHING else. Not an empty list.
+               4. read, empty     -> a measured zero: they were read and there are none.
+               5. read, present   -> render them, in the producer's order, unsorted by us.
+             A failure at rung 3 is CONTAINED to this group: "Happening now" above and "Recent
+             history" below keep rendering, because a report read that fell over must not take the
+             System tab with it. -->
+        <div class="grp">
+          <h2>Session / Rotation Reports<span class="g-count" v-if="rrReports">{{ rrList.length }}</span></h2>
+
+          <div v-if="!rrRequested && !rrLoading" class="empty">
+            The rotation reports have not been read yet.
+            <button class="act" @click="loadRotationReports()">Read them</button>
+          </div>
+
+          <div v-else-if="rrLoading && !rrReports" class="empty">Reading the rotation reports…</div>
+
+          <div v-else-if="rrErr" class="item red as-stack">
+            <div class="i-main">
+              <div class="i-eyebrow blocked">COULD NOT BE READ</div>
+              <div class="i-title">The rotation reports could not be read, so none are shown — that is not the same as there being none.</div>
+              <div class="as-sub">Nothing else on this tab is affected.</div>
+              <div class="err">{{ rrErr }}</div>
+              <button class="act" :disabled="rrLoading" @click="loadRotationReports()">{{ rrLoading ? '…' : 'Try again' }}</button>
+            </div>
+          </div>
+
+          <div v-else-if="!rrList.length" class="empty">The reports were read and there are none recorded yet. Nothing is being guessed at in the meantime.</div>
+
+          <template v-else>
+            <!-- A declared order that is not the actual order is a PRODUCER defect. Surfaced, not
+                 silently re-sorted (app.js:735 / :737-745) — the endpoint is where it gets fixed. -->
+            <div v-if="rrOrderBreak" class="item red as-stack">
+              <div class="i-main">
+                <div class="i-eyebrow blocked">ORDER WRONG</div>
+                <div class="i-title">These are supposed to arrive most-recent-first, and they do not.</div>
+                <div class="as-sub">The order first breaks at report {{ rrOrderBreak }}. They are shown exactly as supplied rather than quietly reordered — the ordering is the endpoint's to guarantee, so this is worth fixing upstream.</div>
+              </div>
+            </div>
+
+            <div v-for="(r, ri) in rrList" :key="ri" class="item grey as-stack">
+              <div class="i-main">
+                <div class="i-eyebrow">
+                  ROTATION · <template v-if="rrHas(r.host)">{{ r.host }}</template><span v-else class="rr-unk">host not established</span>
+                </div>
+                <div class="i-title">
+                  <template v-if="rrHas(r.createdAt)">{{ when(r.createdAt) }}</template>
+                  <template v-else-if="rrHas(r.sessionDate)">{{ r.sessionDate }}</template>
+                  <span v-else class="rr-unk">session date not established</span>
+                </div>
+
+                <dl class="as-kv">
+                  <div><dt>Session date</dt><dd><span v-if="rrHas(r.sessionDate)" class="rr-num">{{ r.sessionDate }}</span><span v-else class="rr-unk">not established</span></dd></div>
+                  <div><dt>Host</dt><dd><span v-if="rrHas(r.host)" class="rr-num">{{ r.host }}</span><span v-else class="rr-unk">not established</span></dd></div>
+                  <div><dt>Host version</dt><dd><span v-if="rrHas(r.hostVersion)" class="rr-num">{{ r.hostVersion }}</span><span v-else class="rr-unk">not established</span></dd></div>
+                  <div><dt>Branch</dt><dd><span v-if="rrHas(r.branch)" class="rr-num">{{ r.branch }}</span><span v-else class="rr-unk">not established</span></dd></div>
+                  <!-- Short head, with the full one on hover/focus AND in the drawer below, so the
+                       exact SHA is available without expanding and exact when expanded. -->
+                  <div><dt>Closing head</dt><dd><span v-if="rrHas(r.closingHeadShort)" class="rr-num" :title="rrText(r.closingHead)">{{ r.closingHeadShort }}</span><span v-else-if="rrHas(r.closingHead)" class="rr-num">{{ r.closingHead }}</span><span v-else class="rr-unk">not established</span></dd></div>
+                  <div><dt>Elapsed</dt><dd><span v-if="rrHas(r.elapsedMinutes)" class="rr-num">{{ rrMins(r.elapsedMinutes) }}</span><span v-else class="rr-unk">not established</span></dd></div>
+                  <div><dt>Specialist dispatches</dt><dd><span v-if="rrHas(r.specialistDispatches)" class="rr-num">{{ rrInt(r.specialistDispatches) }}</span><span v-else class="rr-unk">not established</span></dd></div>
+                  <div><dt>Rotation id</dt><dd><span v-if="rrHas(r.id)" class="rr-num">{{ r.id }}</span><span v-else class="rr-unk">not established</span></dd></div>
+                </dl>
+
+                <!-- FINDINGS FIRST, because "the surface should make the important findings obvious
+                     rather than presenting a database grid". The text is rendered VERBATIM: a
+                     finding is prose, and a count parsed out of prose would be our figure, not the
+                     producer's. A null (never established) and an empty list (recorded, none)
+                     are different screens. -->
+                <div class="rr-block">
+                  <div class="rr-h">Findings</div>
+                  <div v-if="!r.findings" class="as-note">Findings were not established for this rotation.</div>
+                  <div v-else-if="!rrArr(r.findings).length" class="as-note">This rotation was reviewed and recorded no findings.</div>
+                  <template v-else>
+                    <div v-for="(f, fi) in rrArr(r.findings)" :key="fi" class="rr-find">
+                      <span class="chip neutral"><span class="d"></span><template v-if="rrHas(f.confidence)">{{ f.confidence }}</template><template v-else>confidence unknown</template></span>
+                      <span class="rr-find-t"><template v-if="rrHas(f.text)">{{ f.text }}</template><span v-else class="rr-unk">text not established</span></span>
+                    </div>
+                  </template>
+                </div>
+
+                <!-- CONTEXT CONSUMED. Note what a bar means here: the TRACK is drawn only when the
+                     value is known, so a real 0 is a visible empty track and an unknown is no track
+                     at all. The bar is aria-hidden; the number beside it is the accessible fact. -->
+                <div class="rr-block">
+                  <div class="rr-h">Context consumed</div>
+                  <dl class="rr-rows">
+                    <div v-for="c in rrCtx(r)" :key="c.label" class="rr-row">
+                      <dt class="rr-row-l">{{ c.label }}</dt>
+                      <dd class="rr-row-v"><template v-if="rrHas(c.v)">
+                        <span class="rr-track" aria-hidden="true"><span class="rr-fill" :style="{width: rrBar(c.v, rrCtxMax(r))}"></span></span>
+                        <span class="rr-num"><template v-if="rrIsCompact(c.v)">≈</template>{{ rrCompact(c.v) }}</span>
+                      </template>
+                      <span v-else class="rr-unk">not established</span></dd>
+                    </div>
+                  </dl>
+                </div>
+
+                <!-- WHERE THE EFFORT WENT. Every slice uses the SAME neutral fill: the producer sends
+                     five numbers and no assessment, so tinting "rework" amber would be our judgement
+                     dressed as its data. The labels carry the meaning. -->
+                <div class="rr-block">
+                  <div class="rr-h">Where the effort went</div>
+                  <dl class="rr-rows">
+                    <div v-for="a in rrAlloc(r)" :key="a.label" class="rr-row">
+                      <dt class="rr-row-l">{{ a.label }}</dt>
+                      <dd class="rr-row-v"><template v-if="rrHas(a.v)">
+                        <span class="rr-track" aria-hidden="true"><span class="rr-fill" :style="{width: rrBar(a.v, 100)}"></span></span>
+                        <span class="rr-num">{{ rrPct(a.v) }}</span>
+                      </template>
+                      <span v-else class="rr-unk">not established</span></dd>
+                    </div>
+                  </dl>
+                  <!-- A total over NO measurements is not 0% — it is not established. Two different
+                       sentences, because they are two different facts. -->
+                  <div v-if="rrAllocGap(r) && rrAllocAnyKnown(r)" class="as-note">The measured slices account for {{ rrPct(rrAllocSum(r)) }} of the session. The remainder is not idle time — one or more slices were never measured, and they are named above.</div>
+                  <div v-else-if="rrAllocGap(r)" class="as-note">None of the effort allocation was measured for this rotation, so there is no total to show — that is not the same as a session with no effort in it.</div>
+                </div>
+
+                <!-- WORK ORDERS. This block carries the criterion: firstDispatchSuccess is very often
+                     a REAL ZERO, and it must read as a measurement (empty track + mono digits) on the
+                     same card where an unmeasured elapsed time reads as an italic word. -->
+                <div class="rr-block">
+                  <div class="rr-h">Work Orders</div>
+                  <dl class="rr-rows">
+                    <div class="rr-row">
+                      <dt class="rr-row-l">Survived first read-back</dt>
+                      <dd class="rr-row-v"><template v-if="rrHas(rrObj(r.workOrders).firstDispatchSuccess) && rrHas(rrObj(r.workOrders).total)">
+                        <span class="rr-track" aria-hidden="true"><span class="rr-fill" :style="{width: rrBar(rrObj(r.workOrders).firstDispatchSuccess, rrObj(r.workOrders).total)}"></span></span>
+                        <span class="rr-num">{{ rrInt(rrObj(r.workOrders).firstDispatchSuccess) }} of {{ rrInt(rrObj(r.workOrders).total) }}</span>
+                      </template>
+                      <span v-else class="rr-unk">not established</span></dd>
+                    </div>
+                    <div class="rr-row">
+                      <dt class="rr-row-l">Amended</dt>
+                      <dd class="rr-row-v"><template v-if="rrHas(rrObj(r.workOrders).amendments) && rrHas(rrObj(r.workOrders).total)">
+                        <span class="rr-track" aria-hidden="true"><span class="rr-fill" :style="{width: rrBar(rrObj(r.workOrders).amendments, rrObj(r.workOrders).total)}"></span></span>
+                        <span class="rr-num">{{ rrInt(rrObj(r.workOrders).amendments) }} of {{ rrInt(rrObj(r.workOrders).total) }}</span>
+                      </template>
+                      <span v-else class="rr-unk">not established</span></dd>
+                    </div>
+                    <div class="rr-row">
+                      <dt class="rr-row-l">Refused</dt>
+                      <dd class="rr-row-v"><template v-if="rrHas(rrObj(r.workOrders).refusals) && rrHas(rrObj(r.workOrders).total)">
+                        <span class="rr-track" aria-hidden="true"><span class="rr-fill" :style="{width: rrBar(rrObj(r.workOrders).refusals, rrObj(r.workOrders).total)}"></span></span>
+                        <span class="rr-num">{{ rrInt(rrObj(r.workOrders).refusals) }} of {{ rrInt(rrObj(r.workOrders).total) }}</span>
+                      </template>
+                      <span v-else class="rr-unk">not established</span></dd>
+                    </div>
+                  </dl>
+                </div>
+
+                <!-- WHAT CHANGED — product versus documentation. -->
+                <div class="rr-block">
+                  <div class="rr-h">What changed</div>
+                  <dl class="rr-rows">
+                    <div class="rr-row">
+                      <dt class="rr-row-l">Product lines</dt>
+                      <dd class="rr-row-v"><template v-if="rrHas(rrObj(r.lines).productChanged)">
+                        <span class="rr-track" aria-hidden="true"><span class="rr-fill" :style="{width: rrBar(rrObj(r.lines).productChanged, rrLinesMax(r))}"></span></span>
+                        <span class="rr-num">{{ rrInt(rrObj(r.lines).productChanged) }}</span>
+                      </template>
+                      <span v-else class="rr-unk">not established</span></dd>
+                    </div>
+                    <div class="rr-row">
+                      <dt class="rr-row-l">Documentation lines</dt>
+                      <dd class="rr-row-v"><template v-if="rrHas(rrObj(r.lines).docChanged)">
+                        <span class="rr-track" aria-hidden="true"><span class="rr-fill" :style="{width: rrBar(rrObj(r.lines).docChanged, rrLinesMax(r))}"></span></span>
+                        <span class="rr-num">{{ rrInt(rrObj(r.lines).docChanged) }}</span>
+                      </template>
+                      <span v-else class="rr-unk">not established</span></dd>
+                    </div>
+                    <div class="rr-row">
+                      <dt class="rr-row-l">Documentation share of insertions</dt>
+                      <dd class="rr-row-v"><template v-if="rrHas(rrObj(r.gitStat).doc_share_of_insertions_pct)">
+                        <span class="rr-track" aria-hidden="true"><span class="rr-fill" :style="{width: rrBar(rrObj(r.gitStat).doc_share_of_insertions_pct, 100)}"></span></span>
+                        <span class="rr-num">{{ rrPct(rrObj(r.gitStat).doc_share_of_insertions_pct) }}</span>
+                      </template>
+                      <span v-else class="rr-unk">not established</span></dd>
+                    </div>
+                  </dl>
+                </div>
+
+                <!-- UNRESOLVED / UNESTABLISHED MEASUREMENTS. Three screens, deliberately: the list
+                     was never established · it was established and is empty · it has entries. These
+                     names are NOT correlated with the per-field nulls above — the two vocabularies
+                     do not join, and inventing a mapping would be a naming contract the endpoint
+                     never agreed to. Both are shown; neither is resolved here. -->
+                <div class="rr-block">
+                  <div class="rr-h">Unresolved or unestablished measurements<span class="g-count" v-if="r.unestablished">{{ rrArr(r.unestablished).length }}</span></div>
+                  <div v-if="!r.unestablished" class="as-note">The list of unestablished measurements was itself not established.</div>
+                  <div v-else-if="!rrArr(r.unestablished).length" class="as-note">Nothing was left unestablished in this rotation.</div>
+                  <div v-else class="as-tags"><span v-for="(u, ui) in rrArr(r.unestablished)" :key="ui" class="as-tag">{{ u }}</span></div>
+                </div>
+
+                <div class="rr-block">
+                  <div class="rr-h">Notes</div>
+                  <div v-if="rrText(r.notes)" class="as-sub">{{ rrText(r.notes) }}</div>
+                  <div v-else class="as-note">No notes were recorded for this rotation.</div>
+                </div>
+
+                <div class="rr-block">
+                  <div class="rr-h">Durable report</div>
+                  <div v-if="rrHas(r.deliverablePath)" class="mono">{{ r.deliverablePath }}</div>
+                  <div v-else class="as-note">No durable report path was recorded.</div>
+                </div>
+
+                <!-- THE DRAWER — exact identifiers and the per-specialist breakdown. Unknowns stay
+                     labelled unknown in here too; a technical drawer is not a licence to print 0. -->
+                <details class="tech">
+                  <summary>Full metric set · specialists · exact identifiers</summary>
+                  <div class="tech-body">
+                    <dl class="as-kv">
+                      <div><dt>Rotation id</dt><dd><span v-if="rrHas(r.id)" class="rr-num">{{ r.id }}</span><span v-else class="rr-unk">not established</span></dd></div>
+                      <div><dt>Closing head (exact)</dt><dd><span v-if="rrHas(r.closingHead)" class="rr-num">{{ r.closingHead }}</span><span v-else class="rr-unk">not established</span></dd></div>
+                      <div><dt>Created at</dt><dd><span v-if="rrHas(r.createdAt)" class="rr-num">{{ r.createdAt }}</span><span v-else class="rr-unk">not established</span></dd></div>
+                      <div><dt>Map path</dt><dd><span v-if="rrHas(r.mapPath)" class="rr-num">{{ r.mapPath }}</span><span v-else class="rr-unk">not established</span></dd></div>
+                      <div><dt>Deliverable path</dt><dd><span v-if="rrHas(r.deliverablePath)" class="rr-num">{{ r.deliverablePath }}</span><span v-else class="rr-unk">not established</span></dd></div>
+                      <div><dt>Context in (exact)</dt><dd><span v-if="rrHas(r.contextTokensIn)" class="rr-num">{{ rrInt(r.contextTokensIn) }}</span><span v-else class="rr-unk">not established</span></dd></div>
+                      <div><dt>Context out (exact)</dt><dd><span v-if="rrHas(r.contextTokensOut)" class="rr-num">{{ rrInt(r.contextTokensOut) }}</span><span v-else class="rr-unk">not established</span></dd></div>
+                      <div><dt>Subagent tokens (exact)</dt><dd><span v-if="rrHas(r.subagentTokens)" class="rr-num">{{ rrInt(r.subagentTokens) }}</span><span v-else class="rr-unk">not established</span></dd></div>
+                      <div><dt>Elapsed (minutes)</dt><dd><span v-if="rrHas(r.elapsedMinutes)" class="rr-num">{{ rrInt(r.elapsedMinutes) }}</span><span v-else class="rr-unk">not established</span></dd></div>
+                      <div><dt>Insertions</dt><dd><span v-if="rrHas(rrObj(r.gitStat).insertions)" class="rr-num">{{ rrInt(rrObj(r.gitStat).insertions) }}</span><span v-else class="rr-unk">not established</span></dd></div>
+                      <div><dt>Deletions</dt><dd><span v-if="rrHas(rrObj(r.gitStat).deletions)" class="rr-num">{{ rrInt(rrObj(r.gitStat).deletions) }}</span><span v-else class="rr-unk">not established</span></dd></div>
+                      <div><dt>Work Orders total</dt><dd><span v-if="rrHas(rrObj(r.workOrders).total)" class="rr-num">{{ rrInt(rrObj(r.workOrders).total) }}</span><span v-else class="rr-unk">not established</span></dd></div>
+                    </dl>
+
+                    <div class="rr-h">Specialists<span class="g-count" v-if="r.specialists">{{ rrArr(r.specialists).length }}</span></div>
+                    <div v-if="!r.specialists" class="as-note">The specialist breakdown was not established for this rotation.</div>
+                    <div v-else-if="!rrArr(r.specialists).length" class="as-note">This rotation recorded no specialist dispatches.</div>
+                    <div v-else class="rr-specs">
+                      <div v-for="(s, si) in rrArr(r.specialists)" :key="si" class="rr-spec">
+                        <dl class="rr-rows"><div class="rr-row">
+                          <dt class="rr-row-l"><template v-if="rrHas(s.specialist)">{{ s.specialist }}</template><span v-else class="rr-unk">unnamed</span></dt>
+                          <dd class="rr-row-v">
+                            <template v-if="rrHas(s.dispatches)">
+                              <span class="rr-track" aria-hidden="true"><span class="rr-fill" :style="{width: rrBar(s.dispatches, rrSpecMax(r))}"></span></span>
+                              <span class="rr-num">{{ rrInt(s.dispatches) }}</span>
+                            </template>
+                            <span v-else class="rr-unk">not established</span>
+                          </dd>
+                        </div></dl>
+                        <dl class="as-kv">
+                          <div><dt>Tokens in</dt><dd><span v-if="rrHas(s.tokensIn)" class="rr-num">{{ rrInt(s.tokensIn) }}</span><span v-else class="rr-unk">not established</span></dd></div>
+                          <div><dt>Tokens out</dt><dd><span v-if="rrHas(s.tokensOut)" class="rr-num">{{ rrInt(s.tokensOut) }}</span><span v-else class="rr-unk">not established</span></dd></div>
+                        </dl>
+                        <div v-if="rrText(s.notes)" class="as-sub">{{ rrText(s.notes) }}</div>
+                        <div v-else class="as-note">No note was recorded for this specialist.</div>
+                      </div>
+                    </div>
+                  </div>
+                </details>
+              </div>
+            </div>
+          </template>
+        </div>
+
         <details class="tech" v-if="wins.length"><summary>Recent history · {{ wins.length }}</summary>
           <div class="tech-body">
             <div v-for="wn in wins" :key="wn.id" class="item green" style="margin-top:8px"><div class="i-main"><div class="i-title">{{ wn.text }}</div><div class="i-why">{{ ago(wn.happened_at) }} ago</div></div></div>
