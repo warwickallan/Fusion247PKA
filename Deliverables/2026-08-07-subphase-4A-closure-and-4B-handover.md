@@ -89,6 +89,28 @@ Implemented: every `~~…~~` span is stripped first, so only **unstruck residue*
 
 **This classification is offered for refutation, not asserted.** Twice now a self-graded "benign" has been wrong.
 
+### ✅ VERITAS PASS @ `c50d8cb` — and the method's honest limit, written beside the result
+
+Veritas ran its **own** independent sentence-level sweep — twelve classes, each survivor resolved to its enclosing heading: **80 matches · 16 in retired sections · 64 residual, all read. Not one points a fresh Larry at closed or superseded work.** All five of my classifications held — *"the first time your self-grading has survived my check."*
+
+On **L1597**, which I asked it to attack hardest: **AC-1 is an acceptance property, not a navigation statement.** It names no section, phase, task or destination, and states something that must **still** hold — Amendment 6 ①.3 restates substantially the same requirement. **A property that must hold cannot misdirect; only an instruction can.**
+
+> ### 🔴 THE LIMIT — stated, not left to be inferred
+>
+> **"Zero unstruck survivors" is a claim relative to the implemented class list, not an absolute one.**
+>
+> **Veritas proved it with D-11**: §16.10's *"A second packet is owed after merge… read back before `/clear`"* was a live directive my sweep **could not see**, because my list had no **`owed`** family. It was found by a wider net, not by mine. **`owed` has since been added as a twelfth class and D-11 is retired** — but the lesson is that the next gap will be a family nobody has thought of yet. **Whoever runs this check must state which classes they used.**
+
+**Three further non-blocking findings, all repaired at this head rather than parked:**
+
+- **D-11** §16.10 L1738 — the `owed` directive above. **Retired**; Phase 2 merged at PR #94 and its packet was delivered. Post-merge packet duties for BUILD-020 live in **4B step 18**.
+- **D-12** §16's retirement banner sat in a **blockquote beneath** the heading while §15's sat **in** it — so a tool resolving by heading read §16 as **unmarked**, the exact scraper failure §12 documents. **Banner moved into the `# 16.` heading line.** Latent, not active — fixed because latent navigation defects are what this whole exercise is about.
+- **D-10** the Grok-era `📌 NEXT WORK PACKAGE (… do not execute in this Grok session)` block — graded *"the weakest remaining point in the map"*. **Replaced by § 📌 SUB-PHASE 4B**, not merely annotated.
+
+**D-13** (§15.3a/b *"RECORDED, NOT STARTED / Do not investigate now"*) is left as Veritas graded it — false but contained, and **a stale prohibition is materially different from a stale instruction: at worst it stops work nobody is asking for.**
+
+Veritas also filed an **erratum against its own `52427cd` receipt** (it wrote "Residual risk — PASS (carried)"; it was HOLD at `2cf3673` and was *repaired*, not carried). Verdict unaffected. A committed receipt is never edited — corrected in the successor.
+
 **Also repaired at Veritas F6:** `📌 ROTATION (this /rotate)` still described the **previous Grok rotation** (`6b48507`, Grok Pax report). `rotate.md` step 11 verifies the Honcho read-back against **that block's** pointer and closing head — so a stale block would have been checked against and **passed**. This rotation's rows now sit above the struck ones.
 **And a parked contradiction fixed because it would have shaped 4B:** the Gate 1 dispatch law said **rows 1–4** while its own section heading said **rows 1, 2 and 4**.
 

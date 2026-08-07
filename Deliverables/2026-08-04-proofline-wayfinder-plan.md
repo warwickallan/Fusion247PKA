@@ -1572,7 +1572,7 @@ All three investigations have landed and their findings are recorded above. **WP
 
 ---
 
-# 16. PHASE 3 — THE ROUTE. **Scope FIXED by Warwick, 2026-08-05. Build to the Star.**
+# 16. ⛔ HISTORICAL — PHASE 3, DELIVERED AND MERGED. **Directs nothing.** → § ACTIVE SESSION WORK PACKAGE — *(banner moved INTO the heading 2026-08-07, Veritas D-12: it previously sat in a blockquote beneath, so a tool resolving by heading read §16 as unmarked — the exact scraper failure §12 documents)*. ~~PHASE 3 — THE ROUTE. Scope FIXED by Warwick, 2026-08-05. Build to the Star.~~
 
 > **⛔ HISTORICAL — retired 2026-08-07. §16 is Phase 3, DELIVERED AND MERGED. → § ACTIVE SESSION WORK PACKAGE is the one current target.** ~~*"THIS SECTION IS NOW THE LIVE FRONTIER. §14.19 is Phase 2, CLOSED and MERGED."*~~ *(Fourth instance of the §12 defect: a correction that named a section and then outlived its own truth.)*
 
@@ -1735,7 +1735,7 @@ All three investigations have landed and their findings are recorded above. **WP
 | Map pointer | **present** — `Deliverables/2026-08-04-proofline-wayfinder-plan.md`. The write-authority path resolved rather than failing open, and did not strip it |
 | Seq | 152 → **153** |
 
-**A second packet is owed after merge**, carrying the merged SHA and the fresh-session next action, read back before `/clear`.
+~~**A second packet is owed after merge**, carrying the merged SHA and the fresh-session next action, read back before `/clear`.~~ ⛔ **RETIRED 2026-08-07 (Veritas D-11).** This was Phase 2's post-merge packet; **Phase 2 merged at PR #94 and its packet was delivered.** Nothing is owed here. *Post-merge packet duties for BUILD-020 live in Sub-phase 4B step 18, not in this closed section.*
 
 ### ⚠️ Observation, recorded not assumed
 
@@ -2505,19 +2505,32 @@ Any newly discovered **unrelated** defect: record once in [[Deliverables/BACKLOG
 | ~~**Payload**~~ | ~~`Deliverables/2026-08-06-session-report-payload-rotate-careerair-mcp.json`~~ |
 | ~~**Rotate banking commits**~~ | ~~this map update + report artefacts~~ |
 
-### 📌 NEXT WORK PACKAGE (record only — do not execute in this Grok session)
+### 📌 SUB-PHASE 4B — the next package. **This is what the fresh Larry owns.**
 
-Warwick launches a **fresh Claude Code session** after the present merge decision. That package will:
+> ⛔ **The Grok-era "NEXT WORK PACKAGE" block is struck below** (Veritas D-10 — it was the weakest remaining point in the map, still saying *"do not execute in this Grok session"*). **Replaced, not merely annotated.**
 
-- start from updated main or explicitly approved post-merge state;
-- align/install the identified Claude hook in the canonical Claude host/worktree;
-- prove the live Claude return-cue journey from the merged source;
-- run fresh-main orientation acceptance;
-- verify installed-runtime/source alignment;
-- complete any genuine residual **explicitly carried by Veritas Gate 2**;
-- seek final Phase 4 closure where warranted.
+**Sub-phase 4B is the FINAL BUILD-020 closeout.** Full 18-step route and both parts of the final Phase-level acceptance: [[Deliverables/2026-08-07-subphase-4A-closure-and-4B-handover]] Part 3. In short:
 
-**Name exact residuals, evidence and next actions into this section when Gate 2 returns — no vague dump.**
+1. Prove the descoped reminder hooks **no longer load or fire** after a genuinely fresh session.
+2. Apply the four scheduled-task hidden-launcher changes **through Warwick's bounded action** (`Set-ScheduledTask` is blocked by the host classifier for Larry and specialists alike).
+3. Prove **natural** fires preserve exit codes, logs, failure visibility and rollback — **`CareerAIR-Graph-Collect` must still report `LastTaskResult = 2`**.
+4. Regenerate WO-24 **through `tools/wo/envelope.mjs`** and issue it.
+5. Rescue and bank the Cockpit changes **without mutating the live dirty clone**.
+6. Truthful `/api/health` provenance **without importing the DB-opening server module in tests**.
+7. Disposition `pg` and the untracked files. 8. Prepare Cockpit migration + rollback — **do not restart or move it** before merge authority.
+9. Implement the reduced **Veritas Gate 3 enumeration check**. 10. Confirm `focus` in `/rotate` read-back.
+11. Reconcile all active map navigation after the final work. 12. Freeze one final candidate head. 13. Complete CI at it.
+14. Fresh Veritas over the **complete remaining functional scope** (rows 1, 2, 4). 15. **Separate Phase / North-Star closure verdict.**
+16. Codex **only when eligible**. 17. Full merge decision pack to Warwick. 18. After authorised merge: verify remote+local merged state · align installed/runtime from canonical merged Git · move the live Cockpit safely · prove truthful provenance · prove no feature-branch/worktree/old-session dependency · clean the estate.
+
+**🔴 The Phase does not close on step 18 alone.** Final acceptance must ALSO answer both parts of Warwick's question — **(A) durability** of every load-bearing BUILD-020 outcome, and **(B) reproducible creation of a NEW Build Wayfinder** by a genuinely fresh Larry, without copying the Proofline map or rebuilding the method from chat. **Both, by Larry and by Veritas.** See the closure record.
+
+**Standing:** Sub-phase 4A's PASS is **4A's only**. It is **not** a Phase verdict, does **not** grade rows 1/2/4, and **4B inherits no standing from it** — 4B is assured on its own evidence at its own head, or not at all. **Gate 1 remains HOLD at `f0d2614`; Gate 2 remains HOLD.**
+
+> ~~### 📌 NEXT WORK PACKAGE (record only — do not execute in this Grok session)~~
+> ~~Warwick launches a fresh Claude Code session after the present merge decision. That package will: start from updated main or explicitly approved post-merge state; align/install the identified Claude hook in the canonical Claude host/worktree; prove the live Claude return-cue journey from the merged source; run fresh-main orientation acceptance; verify installed-runtime/source alignment; complete any genuine residual explicitly carried by Veritas Gate 2; seek final Phase 4 closure where warranted.~~
+> ~~Name exact residuals, evidence and next actions into this section when Gate 2 returns.~~
+> ⛔ **Struck 2026-08-07.** The hook line is void — the reminder system is **descoped and disabled** (Amendment 5).
 
 ### 📌 Parked (not this WP)
 
