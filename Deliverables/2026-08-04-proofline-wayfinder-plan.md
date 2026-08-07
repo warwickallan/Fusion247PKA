@@ -2815,13 +2815,45 @@ Any newly discovered **unrelated** defect: record once in [[Deliverables/BACKLOG
 | **Live estate** | Cockpit **PID 30000** and Tower **PID 26728** both running from **canonical merged `main`**; exactly one watcher; **no component depends on any BUILD-020 branch or worktree** |
 | **Estate cleanup** | worktrees **38 → 19**; **15 BUILD-020 branches deleted**, every one proven superseded **by content diff, never by name** |
 
-### 🎯 THE ONE CURRENT NEXT ACTION — **enter Sub-phase 4C: CAPAE + Asdair Hop Preparation.**
+### 🔄 AMENDMENT 13 — Warwick, 2026-08-07. **4C IS RESCOPED. CAPAE AND ASDAIR MOVE TO 4D.**
 
-**Do NOT reopen BUILD-020 assurance. Do NOT design or solve 4C before Warwick briefs it** — he was explicit: *"Do NOT design or solve 4C before rotation. Preserve that evidence and arrive there cleanly."*
+> **His decision, and it replaces Amendment 11's contents for 4C.** ⛔ **CAPAE and Asdair are DESCOPED from 4C.** No CAPAE implementation, no Supabase CAPAE population, no CAPAE design change, no Asdair functional delivery, no Asdair hop preparation happens in 4C. They become **Sub-phase 4D**, entered only once 4C's end state is actually true.
+>
+> **4C has ONE purpose, his words:** *"Fix the meaning of MERGE permanently, correct Veritas/Codex responsibilities accordingly, and converge the ENTIRE Fusion247PKA repository/working estate so that when 4C itself finishes there is ONE canonical main and ONE canonical working folder on main, with no useful state left anywhere else."*
+>
+> **This is an EXECUTION phase, not another QA programme.** No Veritas loop. No Codex loop. No new governance programme. The governance changes are **surgical corrections to prevent recurrence of a demonstrated failure** — not a build.
 
-**Read first, in this order:** ① the **4C CAPAE EVIDENCE** block beside Amendment 11 in this map — Warwick's seven points plus the measurements behind them; ② `Deliverables/2026-08-07-build-020-post-merge-closeout.md`; ③ Pax's session report.
+### 🎯 THE ONE CURRENT NEXT ACTION — **Sub-phase 4C: CANONICAL ESTATE RESET.**
 
-### ⛔ CARRIED INTO 4C — owed, and none of it discharged
+**Working branch `build-020/4c-estate-convergence`, cut from `70dba16`.** Every 4C acceptance row below is Warwick's, restated in the order he set them.
+
+| # | Requirement | State |
+|---|---|---|
+| **1** | **MERGE = ESTATE CONVERGENCE canonicalised ONCE** in root operating law, plus the DURABLE definition. Other surfaces POINT to it; no scattered copies. Larry's sole ownership of the Git lifecycle preserved. | ⬜ |
+| **2** | **Veritas contract corrected** — current Wayfinder/Build truth, NOT estate-wide Git archaeology. Gate 1 functional-only; Gate 2 the one journey question; Gate 3 current-project doc truth. **A receipt-bearing head does not create a new review cycle.** One substantive pass per boundary + one focused delta on a genuine functional blocker. | ⬜ |
+| **3** | **Codex contract corrected** at `services/control-plane/review/prompts/tower-qa-skill.md` — merge-class review gains responsibility **B: will this merge actually converge the estate?** Stranded useful state is a **merge blocker**. Codex reports, never repairs. **The live loader must consume the amended contract** — an amended contract the runtime does not read is not done. | ⬜ |
+| **4** | **The WHOLE estate converged** — every branch, worktree, stash, dirty file, untracked file, patch, rescue folder, installed runtime and scheduled task classified **by CONTENT, never by name**, to exactly one of **KEEP → canonical** or **DISCARD → dead**. | ⬜ |
+| **5** | **The named survivors dispositioned** — Pax's CAPAE report banked as a 4D input (no CAPAE analysis) · the asdair 34-line WIP resolved for estate purposes only · the unapproved VlogOps draft given a safe disposition consistent with its privacy status · old-location `tower-qa-skill.md` copies proven dead. | ⬜ |
+| **6** | **End state proven MECHANICALLY**, not asserted — the fourteen checks in § 4C TARGET END STATE. | ⬜ |
+
+**⛔ Larry may not report *"Fusion247PKA is converged"* until every row is true by execution.** Warwick: *"Do not report that sentence until it is actually true."*
+
+### 📋 4C INVENTORY — executed 2026-08-07, `main` = `bc99606`
+
+| Surface | Measured |
+|---|---|
+| **Local branches** | **65** — **36 ancestry-proven contained in `main`** (dead by content) · **29 hold commits not in `main`** |
+| **Remote branches** | **75** — **33 contained in `main`** · **34 hold commits not in `main`** |
+| **Worktrees** | **19** registered |
+| **Stashes** | **3** — `stash@{0}` on `main` @ `ae32ac9` · `stash@{1}` on `build-014/directus-live-cockpit` · `stash@{2}` on `build-014/wp-d-cockpit-v2` |
+| **Open PRs** | **0** |
+| **Closed-unmerged PRs whose branch survives** | **2** — **#80** `audit/de-mypka-extraction-20260728` · **#72** `idea-017/w01-note-structure-validator` |
+| **Dirty/untracked** | **2 locations only** — `C:\Fusion247PKA` (VlogOps draft, untracked) · `C:\Fusion247PKA-wo-asdair-ci` (2 modified + 1 untracked evidence doc) |
+| **`tower-qa-skill.md` copies** | **1 live** (`services/control-plane/review/prompts/`). Old `Builds/BUILD-010-fusion-tower/baton-mvp/` path exists **only in history and dead branches** — no live loader resolves it |
+
+**⚠️ "Not merged" is an ancestry fact, not a usefulness verdict.** Each of the 34 unique branches still needs a CONTENT decision; ancestry only proves the 36+33 are safe.
+
+### ⛔ CARRIED — re-cut against Amendment 13. **Items 1, 2, 3 and 6 are 4D's; items 4, 5 and 7 are 4C's.**
 
 1. **`MyPKA-YouTube-Watcher-Ensure` is DISABLED and blocked on ELEVATION.** Ensure semantics are proven (two ticks, ProcessId unchanged, kill-loop gone) but **that is CAPABILITY, not automation.** **Amendment 9 REMAINS AUTOMATIC and is NOT accepted.**
 2. **R1 — the non-mutating-GET assumption is UNVERIFIED**, blocked by the GL-012 private-surface boundary. **No side effect observed is not proof none exists.**
@@ -2829,7 +2861,30 @@ Any newly discovered **unrelated** defect: record once in [[Deliverables/BACKLOG
 4. **🔴 THE ESTATE-CONVERGENCE DEFECT — Warwick's own framing, and it is 4C's.** **20 non-BUILD-020 worktrees hold genuinely unique state** (`build-015/*`, `idea-012/*`, `idea-017/*`, `audit/*`, `research/*`). **Untouched, not absorbed, not deleted.** His operating model: **useful work lives on MAIN or in the ONE active piece of work — never indefinitely in a third place.** These are that third place.
 5. **`~/.mypka/preserved-2026-08-07/asdair-ci-runtime-uncommitted.patch`** — 34 lines of untested WIP against a service whose CI is **red on `main`**. **Carried into 4C, which is Asdair preparation.** Its worktree `C:\Fusion247PKA-wo-asdair-ci` is **deliberately retained**.
 6. **`CareerAIR-Ops-Liveness` deliberately DISABLED** — it alerted every 30 minutes about the Zapier path Amendment 4 descoped.
-7. **Rollbacks retained:** `C:\Fusion247PKA-premigration-20260807` (whole live clone) · `~/.mypka/tower-backups/2026-08-07-pre-postmerge-realign/` · `C:\Fusion247PKA-unique-artefacts-20260807`.
+7. **Rollbacks retained:** `C:\Fusion247PKA-premigration-20260807` (whole live clone) · `~/.mypka/tower-backups/2026-08-07-pre-postmerge-realign/` · `C:\Fusion247PKA-unique-artefacts-20260807`. **4C's:** temporary preservation is a safety mechanism, **never a final disposition** — before 4C closes each must contain **zero unique useful state**.
+
+### ✅ 4C TARGET END STATE — **fourteen checks, every one proven by execution.** Warwick's list, unabridged
+
+| # | Check |
+|---|---|
+| 1 | Local checkout is on `main` |
+| 2 | Local `main` equals `origin/main` |
+| 3 | Working tree clean |
+| 4 | No useful untracked files |
+| 5 | No useful stash |
+| 6 | **ONE** registered working folder/worktree for this repository |
+| 7 | No surviving **local** working branch carrying useful state |
+| 8 | No surviving **remote** working branch carrying useful state |
+| 9 | No open PR carrying unique work |
+| 10 | No installed runtime/service/task depends on a non-`main` branch or worktree |
+| 11 | Fresh recovery from canonical state does not require hunting another branch |
+| 12 | Every item in the estate audit has a **KEEP→canonical** or **DISCARD→dead** disposition |
+| 13 | Every temporary preservation copy contains **zero** unique useful state |
+| 14 | Canonical MERGE / Veritas / Codex contracts are on `main`, **and the live Codex loader consumes the amended contract** |
+
+**The human-visible answer 4C is allowed to produce, and only when all fourteen are true:**
+
+> *«Fusion247PKA is converged. There is one canonical main and one canonical working folder. No useful work is stranded outside it. Everything retained is durable; everything else is dead.»*
 
 
 ### 📊 ASSURANCE STANDING — **THE SINGLE SOURCE. Every other statement of gate standing in this map POINTS HERE and must not restate it.**
