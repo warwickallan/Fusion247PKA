@@ -2380,6 +2380,32 @@ node "C:/Users/Buggly/.mypka/governor/ding.mjs" <message-file>
 >
 > **Repair: WO-31.** *"No security programme, no credential-rotation exercise, no unrelated hardening."* **After the repair is independently verified, continue the Proofline route autonomously through Gate 1 / Gate 2 / Vex / Codex as applicable.**
 
+
+> ### 📌 4C CAPAE EVIDENCE — Warwick, 2026-08-07, at the PR #97 merge. **PRESERVED, NOT SOLVED.**
+>
+> **His instruction: *"Do NOT design or solve 4C before rotation. Preserve that evidence and arrive there cleanly."*** **This block is the evidence. It is not a diagnosis, not a plan, and nothing may be built from it before 4C is entered with a fresh `Continue.`**
+>
+> **The principal CAPAE evidence, in his words:**
+>
+> 1. **assurance became admin about admin;**
+> 2. **Gate 1 repeatedly absorbed Gate 3 / document-currency work despite functional rows passing;**
+> 3. **non-blocking documentation defects repeatedly prevented progression;**
+> 4. **final-production acceptance properties were used as prerequisites for reaching the production event that could prove them;**
+> 5. **the active Wayfinder became nearly 3,000 lines and its historical state became an endless assurance surface;**
+> 6. **contradictory wording caused false handbacks and repeated stopping;**
+> 7. **the system consumed extraordinary context and specialist effort while repeatedly finding documentation defects rather than product defects.**
+>
+> **Corroborating facts from this Sub-phase, recorded because they are the measurements behind the seven points and will not survive a `/clear` otherwise:**
+>
+> - **Nine Gate 1 verdicts** were issued in Sub-phase 4B. **Every FAIL was documentation. Not one was the engineering.**
+> - Veritas' own words at `b62a9fc`: *"The engineering is the strongest it has been at any head in this Sub-phase. **One sentence in the map is the whole distance.**"*
+> - Veritas' own words at `3a1e670`: *"**each repair has been exactly as wide as the last finding, and the next finding has been just outside it.**"*
+> - **Three separate circularities** were found and had to be ruled on individually — row 4's live surface, `installed-runtime restart`, and `codex_qa_started` — all the same shape: **an acceptance property whose only proof lies beyond the gate that requires it.**
+> - **A constitutional sentence** (*"then yield"*) that Larry had over-translated **caused repeated false handbacks** until Warwick corrected it.
+> - **The final merge was taken as an explicit Warwick exception** because the loop had become self-sustaining.
+>
+> **⛔ Nothing here is a finding against any specialist.** Veritas repeatedly corrected its own prior verdicts, caught defects Larry had reported as fixed, and refused to assert properties it could not execute. **The pattern is structural, and 4C is where it gets examined — not here.**
+
 > **🔄 AMENDMENT 11 — Warwick, 2026-08-07. FUTURE-ROUTE ONLY: ASDAIR IS NO LONGER THE NEXT HOP. A NEW SUB-PHASE 4C COMES FIRST.**
 >
 > **⛔ THIS AMENDMENT CHANGES NOTHING ABOUT SUB-PHASE 4B.** Warwick, explicit: *"make only the minimum routing amendment needed so 4B finishes exactly as currently planned."* **4B's Work Package, its acceptance rows, its 18-step route, Amendment 10's decisions, the Gate 1 FAIL and every open repair are untouched and remain exactly as written.**
