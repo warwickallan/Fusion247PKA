@@ -55,6 +55,10 @@ file_surface:
   - services/cockpit/rotation-report-check.mjs
   - services/cockpit/server.mjs
   - services/cockpit/README.md
+  - services/cockpit/provenance.mjs
+# services/cockpit/provenance.mjs ADDED BY AMENDMENT 1 (M1) — permitted by § Where Keel writes (services/**).
+# Without it AC8 is undeliverable: importing rotation-report.mjs into server.mjs changes the module
+# closure, and SOURCE_MODULES is a hand-declared literal that provenance-check.mjs re-derives and fails on.
 out_of_scope_policy: report-only
 
 # --- contract and capability compatibility ---
@@ -80,6 +84,8 @@ contract_basis:
     permitted_by: "Team/Keel - Implementation Engineer/AGENTS.md § Where Keel writes — `services/**`"
   - surface: services/cockpit/README.md
     permitted_by: "Team/Keel - Implementation Engineer/AGENTS.md § Where Keel writes — `services/**`"
+  - surface: services/cockpit/provenance.mjs
+    permitted_by: "Team/Keel - Implementation Engineer/AGENTS.md § Where Keel writes — `services/**` (added by Amendment 1 M1)"
 
 contract_conflicts: none
 # EARNED. Checked against the classes that caused the WO-22/23/24 refusals:
@@ -124,6 +130,40 @@ operational_handoff: none
 ---
 
 # WO-2026-08-07-25 — Rotation reports: schema mirror, least-privilege grant, and the read endpoint
+
+## 🔄 AMENDMENT 1 — Larry, 2026-08-07, after Keel's read-back (verdict CLARIFY). Binding; supersedes the original text wherever they differ. ONE additional fresh read-back, then proceed.
+
+**① M1 — `services/cockpit/provenance.mjs` ADDED to `file_surface`. This is the most valuable finding of the session and it is a defect in my order.** Keel proved by execution — not inference — that importing `rotation-report.mjs` into `server.mjs` makes the recomputed module closure diverge from the hand-declared `SOURCE_MODULES` literal, so `provenance-check.mjs` would go red. **The second consequence is worse than the red gate: `sourceHash` would stop covering a module the running Cockpit actually loads — exactly the defect `provenance.mjs` was built to make impossible.** My own WO-24 control, holed by my own next order, one week old. **Add `'rotation-report.mjs'` to `SOURCE_MODULES` as part of this work.** ⊕ **`node services/cockpit/provenance-check.mjs` is ADDED to the required regression evidence** — it is the gate this change most directly disturbs and the order failed to name it. *(You need only RUN `provenance-check.mjs`; it is deliberately NOT in your surface because you do not edit it.)*
+
+**② C1 / M2 — `wo_total` is DERIVED FROM THE PAYLOAD, not left NULL. Settled by execution, and your reading of the array was right.**
+The payload has **no** `wo_total` key (`hasOwnProperty` → false), and its `work_orders` array holds **9** entries which are **dispatch instances, not numbered orders** — exactly as you found. Larry executed the enumeration:
+
+```
+ids: WO-23 | WO-24 | veritas-gate1-amended-wp-0cf70c9 | veritas-subphase-4a-2cf3673
+   | veritas-subphase-4a-52427cd | veritas-subphase-4a-c50d8cb | mack-careerair-alert-mute
+   | mack-flashing-console-fix | pax-nolan-research-rounds
+entries matching /^WO-\d+$/  → 2  (WO-23, WO-24)
+```
+
+**RULING — `populate.mjs` sets `wo_total` in this precedence order:** ① an explicit `payload.wo_total` when a future payload carries one; ② otherwise **the count of `work_orders` entries whose `id` matches `/^WO-\d+$/`**; ③ otherwise **SQL NULL**. **Comment the selector in code and state that it counts NUMBERED Work Orders, not dispatch instances.** For the 4A payload this yields **2**, which is the true denominator and makes Warwick's *"0 of 2 Work Orders surviving first read-back"* real rather than unknown. **This is NOT the inference AC1 forbids** — AC1 bans deriving the total from `success + amendments + refusals`, which would be circular. Counting the actual orders from the same source evidence is what Amendment 7 authorises. **The `9` you correctly refused to use stays unused.**
+
+**③ M4 — `cp_directus` is CONFIRMED and is not a guess.** You were right that you cannot verify it; Larry can and did. A live `pg_roles` query at 1b201f3 returned rows for `cp_directus` and `cp_worker` by exactly those names, alongside the proof that `cp_directus` holds neither `USAGE` nor `SELECT` on `session_report`. **Write the literal `cp_directus`.** If execution still fails on a project-qualified form, that is Larry's to see and fix at apply time, not yours.
+
+**④ A1–A5 — all APPROVED as you proposed.** A2 `git_stat` ← `git_stat_larry_measured` with a `git_stat` fallback · A3 `work_orders`/`findings` as `not null default '[]'::jsonb` matching the existing `unestablished` convention, `git_stat` plain nullable · A4 read pool `q`, never `w` · **A5 confirmed: the `work_orders` ARRAY is mirrored to the database but deliberately NOT surfaced in the API. Mirror ⊇ API is correct and intended.**
+
+**⑤ A6 — PUSH IS AUTHORISED.** Your reading is exactly right: `network: none` bounds the **implementation** (no Supabase, no API calls), and the push is separately granted by § The integration role plus this order's git endpoint. **Push `feat/cockpit-rotation-reports` with `-u`.** No PR, no merge.
+
+**⑥ M3 — APPROVED, and thank you for not broadening silently.** `bigint`/int8 arrives from `pg` as a string just as `numeric` does, and the order named only `numeric`. **Convert both families to JSON numbers and keep `null` as `null` through the conversion.** That is covered by decision, not by your discretion.
+
+**⑦ C2 — citation corrected, non-blocking.** The `{ ok:false, error }` house pattern is at `server.mjs:261/263/266/277/279/282`, not the lines the order cited. The pattern itself is unambiguous. **Follow the real lines.**
+
+**⑧ Your secret-scan exit 2 at preflight is CORRECTLY handled.** Three of the surfaces are files this order creates, so `NOT SCANNED — target does not exist` is the honest greenfield case and not a refusal reason at read-back. **It becomes blocking evidence at handback**, where all surfaces exist and the scanner must return coverage. Noted too that it fails fast on the first missing target, so that preflight run says nothing about the other six paths.
+
+**⑨ O2 — you are right, and Larry is already on it.** `provenance-check.mjs` is ALSO unregistered in CI. Both registrations are Larry's; neither is yours. Nothing owed from you beyond the note you already gave.
+
+**⑩ FOR FELIX, carried by Larry — you flagged this and it matters.** With ② applied, `workOrders.total` returns **2**, not null, so the frozen contract's example stands and Felix needs no warning about that member. **The contract is unchanged. Do not vary it.**
+
+**Not amended:** AC2's least-privilege ruling, AC4's module split, AC5's null-vs-zero property, AC6, AC7, the frozen API contract, and every authority field.
 
 **Why this exists, in Warwick's words:** *"Pax produces valuable performance reports; the durable Markdown sits on an unmerged branch; Warwick cannot conveniently see it; the live structured data already exists in Supabase."* Git stays the durable SSOT. Supabase stays a **queryable mirror**. **You are not building a third store, and you are not duplicating the report.**
 
@@ -202,6 +242,7 @@ Any deviation breaks a worker you cannot see. If you believe a field is wrong, *
 ## Required evidence
 
 - `node services/cockpit/rotation-report-check.mjs` → paste real output. **Assert the executed count is non-zero.**
+- **`node services/cockpit/provenance-check.mjs`** → exit 0 with its executed count. *(Added by Amendment 1 ① — this is the gate your `server.mjs` import most directly disturbs.)*
 - The **AC5 mutation test**: paste the red output with the `?? 0` coalesce present, and the green after removing it.
 - The **`db.mjs` never loaded** assertion, with its non-vacuity proof (as you did on WO-24).
 - `node --check` on every changed `.mjs`; `grants.sql` and `schema.sql` shown in full in the return (they are short, and Larry executes them).
