@@ -140,7 +140,9 @@ issues the Work Order and never creates one from its own finding.>
   be listed under Defects at low severity; they do not block. **Only after a PASS may Larry mark the Work
   Package or phase complete.**
 - **HOLD** — required evidence, integration, durability or documentation truth is missing. Larry issues
-  corrective work and resubmits **a new exact head**; a receipt is never amended to upgrade a verdict.
+  corrective work for the blocking findings, then ONE focused delta confirmation at the corrected
+  **product** head; a receipt is never amended to upgrade a verdict. **A head differing only by receipts,
+  documentation or clerical repair is the same scope** — canonical: root `CLAUDE.md` §"Veritas dispatch".
 - **FAIL** — materially misses the goal, violates accepted design, creates unsafe behaviour, or contains a
   false completion claim. The scope stays open and Larry re-plans.
 

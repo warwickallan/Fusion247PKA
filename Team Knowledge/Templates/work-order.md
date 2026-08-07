@@ -17,9 +17,13 @@
 DRAFT  →  WORKER READ-BACK  →  LARRY ACCEPTS OR AMENDS  →  ISSUED  →  RUNNING
       →  RETURNED  →  INTEGRATED  →  VERITAS_PENDING
       →  VERITAS_PASS  →  closed
-         VERITAS_HOLD  →  corrective work, resubmit a NEW exact head
+         VERITAS_HOLD  →  corrective work for the BLOCKING findings, then ONE focused delta
+                          confirmation at the corrected PRODUCT head
          VERITAS_FAIL  →  the Work Package stays open, Larry re-plans
 ```
+
+**A head that differs only by receipts, documentation or clerical repair is the SAME scope and does not
+re-open a gate.** Canonical: root `CLAUDE.md` §"Veritas dispatch" — not restated here.
 
 **The worker must not begin implementation until Larry explicitly accepts the read-back, or issues an
 amended Work Order.** This is a gate, not a courtesy.
