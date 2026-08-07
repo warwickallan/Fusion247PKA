@@ -69,3 +69,13 @@ jobs:
       # "down — 23". This executes the real function against a real DOMException.
       - name: A down service is explained in words, never a bare error number
         run: node services/cockpit/down-reason-check.mjs
+
+      # /api/health reported the COMMIT and called it the running code, so a dirty working tree
+      # was described by whatever git last recorded. provenance.mjs answers from the loaded bytes
+      # instead, and sourceHash is structurally unable to repeat that failure because it never
+      # consults git. This gate also re-derives SOURCE_MODULES from server.mjs's own imports and
+      # fails on drift — so adding an import without declaring it goes red here rather than
+      # silently shrinking what sourceHash covers. It cannot be run by starting the server:
+      # server.mjs imports db.mjs, which opens two live pools at module load.
+      - name: Build provenance is read from loaded bytes, never from git
+        run: node services/cockpit/provenance-check.mjs
