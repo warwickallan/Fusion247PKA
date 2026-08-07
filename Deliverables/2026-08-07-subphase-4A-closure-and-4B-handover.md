@@ -66,6 +66,32 @@ Every statement in the active map capable of directing a fresh Larry's next acti
 
 **Two lessons, not one.** ① Both earlier repairs named a section **NUMBER** and went stale when a later phase added a section — the target is now named by **section IDENTIFIER**. ② **An identifier does not make the section it names TRUE.** The pointer must be stable *and* the destination must be re-asserted current. Veritas's words: *"The identifier is not this repair's weakness; it is a real improvement. The weakness moved."*
 
+### 🔴 THIRD LESSON — the second FAIL, and it is a method lesson (Veritas F5 @ `52427cd`)
+
+**A tenth directive survived inside its own retirement banner.** §17.9's heading *quoted* `"This note must survive rotation"` as retired while **the sentence itself was never struck** — the contract's named Gate 3 failure verbatim: *"A supersession banner does not pass while the body still instructs the opposite."* It was blocking because the next action is **run `/rotate`**, and that sentence instructed descoped work **into the continuity packet — the first artefact a fresh Larry reads**.
+
+**Why the sweep missed it, and this is the durable part.** The weakness was **granularity, not coverage** — Veritas added ten phrase families beyond mine and surfaced only two benign extras. The sweep matches **lines**; the repair retires the **matched phrase**; sibling sentences in the same block survive saying the same thing. **And a line-level post-check cannot catch it either**, because the survivor shares a line with struck text, so any *"ignore lines containing `~~`"* filter reads it as retired. Veritas's own first filter did exactly that and missed it; it found it by reading the block.
+
+**The missing step — cheap, no new mechanism, the same grep once more:**
+
+> **After repairing, re-run the sweep on the REPAIRED file and require ZERO unstruck survivors — matching by SENTENCE, not by line.**
+
+Implemented: every `~~…~~` span is stripped first, so only **unstruck residue** is tested, and each survivor is then resolved to its **enclosing section** to see whether that section itself carries a retirement banner.
+
+**Result on the repaired file: 5 residual matches, ZERO of them directive.**
+
+| Line | Enclosing section | Why it is not a directive |
+|---|---|---|
+| 20 | `⟦ROTATION BLOCK⟧` (live) | **This is the correct current target itself** — the answer, not a defect |
+| 425 · 427 | §12 — `⛔ SUPERSEDED AND HISTORICAL` | narrative *about* a past defect, inside a retired section |
+| 1597 | §16.2 Acceptance | **AC-1** — states a property that must hold; names no destination |
+| 1786 | §17 (live) | Larry's own correction note, quoting what the heading *used* to say |
+
+**This classification is offered for refutation, not asserted.** Twice now a self-graded "benign" has been wrong.
+
+**Also repaired at Veritas F6:** `📌 ROTATION (this /rotate)` still described the **previous Grok rotation** (`6b48507`, Grok Pax report). `rotate.md` step 11 verifies the Honcho read-back against **that block's** pointer and closing head — so a stale block would have been checked against and **passed**. This rotation's rows now sit above the struck ones.
+**And a parked contradiction fixed because it would have shaped 4B:** the Gate 1 dispatch law said **rows 1–4** while its own section heading said **rows 1, 2 and 4**.
+
 ---
 
 # PART 2 — Context-sensitive evidence that would otherwise be lost

@@ -2060,7 +2060,7 @@ All three investigations have landed and their findings are recorded above. **WP
 ## 17.9 🔬 The subagent-return cue — ⛔ **CLOSED. DESCOPED AND DISABLED by Amendment 5. NO follow-up is owed after `/rotate`.** → § ACTIVE SESSION WORK PACKAGE
 > ~~*"📌 FOLLOW UP AFTER `/rotate`" · "This note must survive rotation"*~~ — **retired 2026-08-07.** The work was delivered, then descoped: *«Specialist-return reminder injection: DESCOPED — demonstrated regression and no demonstrated net benefit.»* **A fresh Larry must NOT pick this up.**
 
-> ⛔ **DISCHARGED 2026-08-07 — NO follow-up is owed.** The implementation decision was taken: the reminder system is **DESCOPED AND DISABLED** (Amendment 5). **A fresh Larry must not pick this up after `/rotate`.** ~~**📌 WARWICK'S EXPLICIT FOLLOW-UP NOTE, 2026-08-06: *"make a note to follow up after `/rotate`."***~~ **The implementation decision comes AFTER `/clear`, alongside the separate Supabase performance-reporting job. Pax researches; Pax does NOT implement.** **This note must survive rotation — it belongs in the continuity packet.**
+> ⛔ **DISCHARGED 2026-08-07 — NO follow-up is owed.** The implementation decision was taken: the reminder system is **DESCOPED AND DISABLED** (Amendment 5). **A fresh Larry must not pick this up after `/rotate`.** ~~**📌 WARWICK'S EXPLICIT FOLLOW-UP NOTE, 2026-08-06: *"make a note to follow up after `/rotate`."***~~ ~~**The implementation decision comes AFTER `/clear`, alongside the separate Supabase performance-reporting job. Pax researches; Pax does NOT implement.**~~ ~~**This note must survive rotation — it belongs in the continuity packet.**~~ ⛔ **BOTH SENTENCES STRUCK 2026-08-07 (Veritas F5, blocking).** They survived inside their own retirement banner and instructed descoped work into the continuity packet — the first artefact a fresh Larry reads. **NOTHING from §17.9 belongs in the packet.** *Checked before striking: the "separate Supabase performance-reporting job" is **not** a pending item — it is `/rotate` **step 7b**, already law and already inside the rotation transaction. Nothing is lost.*
 
 **Why it exists:** the dispatch-time hook fires at **LAUNCH**, not return (§17.8). Warwick's North Star: *"When a background specialist actually finishes, Larry's parent session receives one fresh, specialist-specific retrieval cue at the next safe parent turn."* **Commissioned to Pax as `WO-2026-08-06-21` → `Deliverables/2026-08-06-pax-subagent-return-cue-brief.md`.**
 
@@ -2456,7 +2456,7 @@ Any newly discovered **unrelated** defect: record once in [[Deliverables/BACKLOG
 
 ### Veritas / Codex dispatch law (this package)
 
-**Gate 1:** map path · functional rows **1–4** · residuals · exact public head · private digest/surface · **separate PASS/HOLD/FAIL per Gate 1 dimension** · no narrowing · CI green + head frozen.  
+**Gate 1:** map path · functional rows **1, 2 and 4** *(corrected 2026-08-07 — row 3 was descoped by Amendment 4; this said "1–4" and contradicted its own section heading on the fact most likely to shape 4B's Gate 1 dispatch)* · residuals · exact public head · private digest/surface · **separate PASS/HOLD/FAIL per dimension** · no narrowing · CI green + head frozen.  
 **Gate 2:** BUILD-020 North Star · phase journey · estate vs branch · merge/install boundary · post-merge acceptance if any.  
 **Codex:** only after Gate 1 PASS; Warwick has pre-authorised the final review for this package; still no merge without Warwick.
 
@@ -2486,11 +2486,24 @@ Any newly discovered **unrelated** defect: record once in [[Deliverables/BACKLOG
 
 | | |
 |---|---|
-| **Rotate at** | 2026-08-06 (Grok Build host) |
-| **Session freeze / product tip for report** | `6b485079ca618c46e68fe1755eb99065ea85bb44` — CareerAIR Zapier MCP Outlook blocker banked; auto collection NOT LIVE |
-| **Session report (Pax)** | `Deliverables/2026-08-06-session-performance-report-rotate-careerair-mcp.md` |
-| **Payload** | `Deliverables/2026-08-06-session-report-payload-rotate-careerair-mcp.json` |
-| **Rotate banking commits** | this map update + report artefacts (see `git log` after push) |
+> ⛔ **THE ROWS BELOW DESCRIBE THE PREVIOUS (GROK) ROTATION AND ARE STRUCK — Veritas F6, blocking.** `rotate.md` step 11 verifies the Honcho read-back against **this block's** report pointer and closing head, so a stale block would have been checked against and passed. **This rotation's rows are above them.**
+
+| **THIS rotation — Sub-phase 4A close** | |
+|---|---|
+| **Rotate at** | **2026-08-07 (Claude host)** |
+| **Sub-phase** | **4A — closed for assurance. NO Codex, NO merge.** |
+| **Session freeze / product tip** | **the exact head carrying the Veritas 4A PASS** — set at rotation, never earlier |
+| **Session report** | written into this `/rotate` transaction (step 7), with its Supabase payload (step 7b) |
+| **Closure record** | [[Deliverables/2026-08-07-subphase-4A-closure-and-4B-handover]] |
+| **Next package** | **Sub-phase 4B** — see § ACTIVE SESSION WORK PACKAGE and the closure record's Part 3 |
+
+| ~~Previous rotation (Grok) — struck~~ | |
+|---|---|
+| ~~**Rotate at**~~ | ~~2026-08-06 (Grok Build host)~~ |
+| ~~**Session freeze / product tip for report**~~ | ~~`6b485079ca618c46e68fe1755eb99065ea85bb44` — CareerAIR Zapier MCP Outlook blocker banked; auto collection NOT LIVE~~ |
+| ~~**Session report (Pax)**~~ | ~~`Deliverables/2026-08-06-session-performance-report-rotate-careerair-mcp.md`~~ |
+| ~~**Payload**~~ | ~~`Deliverables/2026-08-06-session-report-payload-rotate-careerair-mcp.json`~~ |
+| ~~**Rotate banking commits**~~ | ~~this map update + report artefacts~~ |
 
 ### 📌 NEXT WORK PACKAGE (record only — do not execute in this Grok session)
 
