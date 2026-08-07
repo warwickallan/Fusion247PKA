@@ -38,7 +38,7 @@ const {
   grantExpectations, evaluateGrants, evaluateColumnDenials,
   extractModelIds, evaluateVisionModel, VISION_MODEL_DEFAULT,
   launcherPathFromTaskArguments, evaluateScheduledTask, SCHEDULED_TASK_NAME,
-  looksLikeTelegramToken, PG_CONSUMERS, CHROME_DEFAULT_PROFILE_DIR,
+  looksLikeTelegramToken, PG_CONSUMERS, CHROME_DEFAULT_PROFILE_DIR, samePath,
 } = await import('./ensure-asdair-runtime.mjs');
 
 // ---------------------------------------------------------------------
@@ -749,6 +749,26 @@ test('AC11 passes when the registration matches this checkout, slashes and case 
     readScheduledTask: () => ({ found: true, arguments: `--env-file="x" "${LAUNCHER.replace(/\//g, '\\').toUpperCase()}"` }),
   });
   assert.deepEqual(warnedOn(r, 'AC11'), []);
+});
+
+// samePath() is the exact comparison AC11 relies on. Tested directly, not only
+// through evaluateScheduledTask/run(), so the underlying normalisation is
+// proven rather than one caller's assertion merely going green. This is the
+// regression case: on a POSIX host, path.resolve() does not treat a backslash
+// as a separator, so a Windows-style registered path was previously being
+// joined onto process.cwd() as a literal filename instead of recognised as
+// the same absolute path - two forms of the SAME checkout compared unequal.
+test('samePath: a backslash, all-caps Windows-style path still matches a forward-slash, mixed-case POSIX path for the same checkout', () => {
+  const posix = '/tmp/asdair-wo-b-MEAxSm/checkout-a/ensure-asdair-runtime.mjs';
+  const windowsStyle = posix.replace(/\//g, '\\').toUpperCase();
+  assert.equal(samePath(posix, windowsStyle), true,
+    'same checkout, differing only by slash direction and case, must compare equal');
+});
+
+test('samePath: a genuinely different checkout still compares unequal after normalisation', () => {
+  const a = '/tmp/asdair-wo-b-MEAxSm/checkout-a/ensure-asdair-runtime.mjs';
+  const b = '\\TMP\\ASDAIR-WO-B-MEAXSM\\CHECKOUT-B\\ENSURE-ASDAIR-RUNTIME.MJS';
+  assert.equal(samePath(a, b), false, 'normalisation must not make two different checkouts equal');
 });
 
 test('the launcher path is extracted from the task arguments WITHOUT the credentials paths', () => {
