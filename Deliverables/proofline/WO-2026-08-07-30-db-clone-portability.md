@@ -199,3 +199,51 @@ operational_handoff: none
      Before issue, RECOMPUTE: node tools/wo/envelope.mjs --count-markers <file>
      An order is unready while either recomputed count is above zero AFTER Larry authors slots.
      Do not treat this footer as current once the file has been edited. -->
+
+---
+
+## AMENDMENT 1 — Larry, 2026-08-07, in answer to Keel's read-back verdict `CLARIFY`
+
+**Both contradictions are confirmed, both were established by execution rather than argued, and the second one changes the method.**
+
+### ① AC2 — "resolves" means THE SPECIFIER COMPUTES INSIDE THE CONTAINING CLONE. Confirmed; my criterion was unsatisfiable as written.
+
+**Keel proved both targets are gitignored**, so a fresh `git worktree` contains neither: `node_modules/` at `.gitignore:59` with `git ls-files` returning **0**, and `.runtime-live/` at `services/control-plane/wp-d-proof/.gitignore:4` — a directory that **does not exist even in this worktree**. He also established the Node semantics by execution: `import.meta.resolve()` returns a URL **without any filesystem check**, while `require.resolve` throws.
+
+**So "resolves both targets from a different path" could only ever have meant existence, and existence is impossible there.** The reading is corrected to Keel's, which is the strongest honest pair available:
+
+1. **From the temp worktree** — the resolved URL is **character-for-character** `<tempWorktree>/services/control-plane/node_modules/pg/lib/index.js` (and the equivalent for the creds default), **containing no `C:/Fusion247PKA`**;
+2. **From here** — a real **existence** assertion, where `node_modules/pg` genuinely does exist.
+
+*He said "I will not silently redefine your criterion" and instead made me do it. That is the correct behaviour and it is why the read-back gate exists.*
+
+### ② The two-line fix would have broken a currently-green CI gate. Method confirmed: `createRequire` + `new URL`.
+
+**Executed probe, his:**
+
+    relativeImports(current db.mjs)                                            = []
+    relativeImports("...from '../control-plane/node_modules/pg/lib/index.js'") = ["../control-plane/node_modules/pg/lib/index.js"]
+
+A relative **static import specifier** adds a `node_modules` path to the closure `provenance.mjs` recomputes, the declared `SOURCE_MODULES` stops matching, and **`provenance-check.mjs` goes RED** — a step in `cockpit-private-apps.yml`, and a file outside Keel's surface. `provenance.mjs` already documents the current behaviour deliberately: *"Absolute and bare specifiers … are not cockpit source"*.
+
+**CONFIRMED — use `createRequire(import.meta.url)` (a `node:module` builtin, no new dependency) with a clone-relative specifier, and `new URL(..., import.meta.url)` for the creds default.** Neither form is matched by the `relativeImports` regex, so the closure is unchanged and `pg` correctly stays outside the cockpit source hash.
+
+**The ~4-line diff is APPROVED and supersedes the "two lines expected" instruction.** Keel was told to stop and say why before exceeding it; he did exactly that, with a probe rather than an opinion.
+
+> **🔴 THE LESSON, AND IT HAS NOW HAPPENED TWICE IN TWO CONSECUTIVE ORDERS.** At WO-25 the map records: *"A control I holed, caught by Keel and not by me … my own control, holed by my own next order, one day later."* **This is the same shape again** — `provenance.mjs` is a control built to make undeclared module drift impossible, and my prescribed fix would have tripped it. **Both times the worker proved it by running the real function rather than reasoning about it; both times I reasoned.** Recorded in the map, not just here.
+
+### ③ Accepted without change
+
+- **AC3's enforcement is Larry's commit, not Keel's.** The check enforces nothing until the workflow step exists, and `.github/workflows/**` is outside his contract. **Registration line to hand over, placed after the provenance step:**
+
+      - name: Cockpit DB module resolves inside its own clone (no absolute clone root)
+        run: node services/cockpit/clone-portability-check.mjs
+
+- **AC1 is scoped to `db.mjs` ALONE and must stay so.** `rotation-report-check.mjs:353` deliberately holds the same absolute creds string as a **synthetic leak-detection fixture**. A directory-wide scan would go red on a file Keel may not touch. **AC1 is not estate-wide and must not later be read that way.**
+- **AC6 answered in the read-back and accepted.** From `C:\Fusion247PKA` the clone-relative forms **reproduce today's two absolute paths exactly**, and `COCKPIT_CREDS` is set **nowhere in the repository**, so the live service runs on the default and that default's value is unchanged there.
+
+> **⚠️ THE BEHAVIOUR CHANGE, stated plainly because it is the point of the repair and not a side effect:** a Cockpit started from **any other checkout** will now **fail loudly at import** instead of **silently borrowing the live clone's `pg` and the live clone's credentials**. **That silent borrowing is the actual defect** — it is not merely a portability wart, and row 1's *"survives worktree delete/recreate"* was passing only because a stray checkout would quietly reach into the live clone. Migration plan §4.6 step 6 already anticipates the reinstall.
+
+### Standing instructions unchanged
+
+**No second read-back required** — every clarification confirms a proposal Keel made himself and proved. **Proceed to implementation.** Do not import or execute `db.mjs`. Do not touch the live clone, port 8090, or any scheduled task. Lazy pools remain out of scope — **report the smallest such change, do not make it.** Stage by explicit pathspec, `pull --rebase`, push. No PR, no merge.
