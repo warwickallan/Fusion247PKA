@@ -155,6 +155,83 @@ unapproved, and the repo is public. It needs a disposition consistent with its a
 
 ---
 
+# 🔴 THE DELETION PROOF WAS WRONG — recorded before anything else, because it invalidates part of this document
+
+**An external review of the 4C work found a substantive defect in the measure this document is built on. It is correct.**
+
+**The flawed measure:** *files present on `<ref>` and absent from `main`* (`git ls-tree` minus `main`'s path set).
+**What it actually proves:** which **pathnames** are absent. **What it does NOT prove:** that a branch which
+**modifies** a file `main` also has holds no unique useful implementation. Such a branch scores **zero** on
+this measure while carrying real work.
+
+**Worse, and it is the honest part:** the same-path signal *was* computed earlier in the session — 138
+differing shared files on `build-015/runtime-recovery`, 131 on `idea-012/asdair-stage1-durability` — and was
+**dismissed as "main has moved on" without being tested.** The right number was in hand and was reasoned away.
+
+**What this invalidates:** ancestry-proven deletions (36 local + 32 remote, every commit already in `main`)
+remain sound — containment is a complete proof. **Every NON-CONTAINED ref whose discard rested materially on
+`files_absent_from_main = 0` is NOT yet proven safe.**
+
+## Recoverability secured before any analysis
+
+| Control | State |
+|---|---|
+| `gc.auto`, `gc.pruneExpire`, `gc.reflogExpire`, `gc.reflogExpireUnreachable` | **disabled** in the repo |
+| Deleted branch tips re-pinned | **40** under `refs/recovery/4c/**` |
+| Previously-unreachable commits re-pinned | **75** under `refs/recovery/4c-unreachable/**` |
+| `git fsck --unreachable` | **zero** unreachable commits |
+
+**Destructive deletion is STOPPED** and does not resume until every recovered tip is accounted for.
+
+## The corrected method, and two traps found while establishing it
+
+The question is Warwick's: **"Does this old state contain any useful behaviour, implementation, decision or
+evidence that is not represented by the canonical system?"** Evidence is three-way merge, diff and code
+reading — **never pathname subtraction**.
+
+- `git merge-tree --write-tree <canonical> <ref>`; a resulting tree equal to the canonical tree proves the ref
+  contributes **nothing**. **8 refs already prove this.**
+- ⚠️ **Trap 1:** `git diff main..<ref>` `+lines` mostly measures **main moving on**, not unique branch work.
+- ⚠️ **Trap 2:** `merge-tree` renders **conflicted regions as additions** with `<<<<<<<` markers, so raw
+  insertion counts **over-report**. A file showing "190 insertions" turned out to be one where `main` is
+  simply the larger evolved version.
+
+**First properly-proven result:** `build-015/pipeline-orchestrator` is **superseded** — `main`'s `store.js` is
+818 lines to the branch's 427, and `routeTaps()` exists on `main` at `services/asdair/pipeline/runtime.js:204`
+with an evolved signature the branch lacks. Its "absent" lines are the branch's **older variants**.
+
+**Ownership** (Warwick, 2026-08-07): this forensic re-audit is **Larry's estate-convergence responsibility**
+with an implementation specialist doing the mechanical and semantic comparison. **Veritas does NOT perform
+repository archaeology** — that scope was removed from her contract earlier the same day, and dispatching her
+to it was Larry's error, corrected. Her 4C assurance remains the **human boundary outcome**. **Codex** performs
+the final independent merge-class challenge once the candidate is stable.
+
+## 📌 F-001 — a genuine finding, deliberately NOT expanded into 4C
+
+**The defect:** `services/control-plane/tower-loop/notify.mjs` claims the `(turn_id, reason)` dedup row at
+**lines 86–98**, and the Telegram POST does not happen until **line 121**. A crash in that gap leaves
+`telegram_ok=0`, and the next pass returns *"deduped — Telegram not re-sent"*. **No resend path exists
+anywhere in the subsystem** — established by reading the code, not inferred.
+
+**The estate finding underneath it, and it is the North Star failure inside `main` itself:** the durable outbox
+that fixes this **was already built** — `services/control-plane/notifier/notifier.mjs`, watchdog-backed,
+with bounded retry and dead-lettering — and it is **imported by nothing except its own test.** The estate holds
+**three** notification-outbox designs (`ops.*` on main, `ftw.*` on a dead branch, `tower.*` on the live path),
+and the one path that actually sends Warwick's Telegram is **the only one without retry**.
+
+**Safety determination for 4C, which is the only question 4C must answer:** F-001 is **pre-existing on `main`**
+and 4C changes nothing on that code path. **It does NOT make the current 4C merge or convergence unsafe.**
+
+**Disposition (Warwick, 2026-08-07):** *"do NOT allow it to expand 4C automatically… route it to the appropriate
+subsequent work rather than turning estate convergence into a programme to repair every historical defect on
+main."* **Recorded here, routed onward, NOT fixed in 4C.** Fixing it needs a schema decision and a production
+caller — neither is 4C's.
+
+**Protected, per his instruction:** `notifier.mjs` is **on `main`**, so no branch deletion can lose it. It is
+recorded here so convergence does not leave it invisible, and so it is not mistaken for dead code later.
+
+---
+
 # ⚡ EXECUTION RECORD — Warwick authorised the full disposition, 2026-08-07
 
 **His ruling, and the constraint on every KEEP:** *"KEEP means extract/canonicalise the useful value onto
