@@ -105,3 +105,17 @@ jobs:
       - name: Windows SAPI voice transcription proof (real audio -> transcript)
         working-directory: services/hub
         run: node --test voice/voiceTranscribe.test.mjs
+
+      # Runs on WINDOWS deliberately, not in the `hub` ubuntu job. ensure-youtube-watcher.mjs
+      # inspects the process table through `powershell Get-CimInstance Win32_Process`, and the
+      # check has no platform guard, so on ubuntu it would fail for the wrong reason and teach
+      # everyone to ignore a red. (This workflow already learned that lesson once: a gate was
+      # registered against a runner whose Node lacked `registerHooks` and died at import.)
+      #
+      # What it protects: a briefing must never tell Warwick COMPLETE while the git commit has
+      # not landed. Mutation-tested - forcing the durability probe to report success turns 15 of
+      # its 98 assertions red, including "the briefing Warwick receives does NOT say COMPLETE".
+      # It touches no database, no credentials and no live watcher: every target is a throwaway
+      # git repo, a temp state path or a sentinel process.
+      - name: A capture briefing never claims COMPLETE before the commit lands
+        run: node services/hub/youtube/capture-durability-check.mjs
