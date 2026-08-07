@@ -452,6 +452,8 @@ Then `http://127.0.0.1:7317/`. Works from cmd.exe and PowerShell, pasted identic
 
 # 13. PHASE 2 — Honcho and Tower as durable shared myPKA infrastructure
 
+> ⛔ **HISTORICAL — Phase 2, CLOSED and MERGED. Directs nothing.** → **§ ACTIVE SESSION WORK PACKAGE**. *(Banner added 2026-08-07, route step 11: this top-level heading was the only superseded section in the map carrying no banner, so a reader skimming headings could have read it as live.)*
+
 **Set by Warwick, 2026-08-04, at the rotation boundary. The fresh session owns implementation. Nothing here has been started.**
 
 ## 13.1 North Star — his words
@@ -553,6 +555,8 @@ The stale copy's `spawn` calls carry no `windowsHide`, and `git`/`gh` are consol
 ---
 
 # 14. PHASE 2 ROUTE — **ACCEPTED AND AMENDED by Warwick, 2026-08-05**
+
+> ⛔ **HISTORICAL — Phase 2, CLOSED and MERGED. Directs nothing.** → **§ ACTIVE SESSION WORK PACKAGE**. *(Banner added 2026-08-07, route step 11 — same reason as §13.)*
 
 **Status: the `product-decision` handback is DISCHARGED.** Warwick accepted the route and amended it materially. §14.0 records what he decided; the work packages below are revised against it. Written from R-1..R-9, not from §13.3.
 
@@ -1985,7 +1989,7 @@ All three investigations have landed and their findings are recorded above. **WP
 | **2b** | **WP-4C install** | Mack | ✅ **DONE.** Installed sha `0f26ef16…` **equals the git blob**, verified independently by Larry; 0 CR bytes; rollback **executed** (absent→install→delete→verify→reinstall→equal); `INSTALLED-FROM.txt` appended with **append-only PROVEN** (first 8,310 bytes hash to the pre-write baseline) |
 | **3** | **Prove J2-e — ONE REAL MESSAGE arriving from the INSTALLED path**, credentials self-loaded, **no `--env-file` and no shell preparation** | **Larry**, then Warwick's eyes | ✅ **FIRED AND DELIVERED — see §17.7** |
 | **4** | **Veritas reviews the exact integrated head** | **Veritas** | **NEXT** |
-| **5** | **`/rotate` and reach `SAFE TO CLEAR`** — **now including the Pax report INSIDE the transaction** | Larry + Pax | Not started. **`/rotate` updated 2026-08-06 — see below** |
+| ~~**5**~~ | ~~**`/rotate` and reach `SAFE TO CLEAR`** — now including the Pax report INSIDE the transaction~~ | Larry + Pax | ⛔ **SUPERSEDED 2026-08-07 — this row's "Not started" is FALSE. `/rotate` has since completed TWICE** (Sub-phase 4A close, and the in-flight 4B rotation). → **§ ROTATION** below. |
 | ~~**6**~~ | ~~A fresh Larry picks up the Pax commission on the other side~~ | — | ⛔ **REVERSED 2026-08-06 — see §17.5a** |
 
 ### 🔄 §17.5a — Pax moves INSIDE `/rotate`. Warwick, 2026-08-06
@@ -2585,7 +2589,9 @@ Any newly discovered **unrelated** defect: record once in [[Deliverables/BACKLOG
 >
 > *(Veritas FAIL @ `2cf3673`: this destination stayed stale while every pointer to it was corrected. **Fixing where an arrow points does not make the target true.**)*
 
-**🎯 THE ONE CURRENT NEXT ACTION — reach ONE reviewed rotation head, then rotate.**
+**✅ PRIOR NEXT ACTION — DISCHARGED. Reach ONE reviewed rotation head, then rotate.**
+
+> ⛔ **This heading is DELIBERATELY no longer phrased as the current next action** (repaired 2026-08-07, route step 11). It previously carried the phrase *"THE ONE CURRENT NEXT ACTION"* **verbatim**, which meant that exact label matched **twice** in this map — here, describing a rotation the very next lines confirm is **complete**, and again below at the genuine live action. **A fresh Larry grepping for the unique-sounding label got two hits 36 lines apart.** That is the "competing frontiers" failure Amendment 6 ② makes a **FAIL**, reintroduced by the same wording that was supposed to prevent it. **The phrase is now unique to the live action below.**
 
 > **State of this block, so it describes itself** *(Veritas D-15: it previously said "✅ DONE — this edit" several commits after that edit, recorded neither of the later steps, and named no receipt or passed head — so its own "On PASS" condition could not be evaluated from the destination alone)*.
 
@@ -2636,7 +2642,9 @@ Any newly discovered **unrelated** defect: record once in [[Deliverables/BACKLOG
 7. **After authorised merge:** execute [[Deliverables/2026-08-07-cockpit-live-migration-and-rollback-plan]]. **🔴 Its §3 preconditions are binding, especially precondition 5 — no scheduled task may be enabled against the live clone until that clone carries the code the task assumes.**
 8. **The Phase does not close on the merge alone** — both parts of the final acceptance still stand: **(A) durability** of every load-bearing BUILD-020 outcome, and **(B) reproducible creation of a NEW Build Wayfinder** by a genuinely fresh Larry. Both by Larry and by Veritas.
 
-**⚠️ ALSO OWED, and not yet done:** the reduced **Veritas Gate 3 enumeration check** (4B step 9, Amendment 6 ③) and the **final map navigation reconciliation** (step 11). **This map now carries NINE amendments and an execution log — reconcile it before the final freeze, not after.**
+**✅ STEP 11 — MAP NAVIGATION RECONCILIATION: DONE, 2026-08-07.** Executed as a read-only enumeration of every statement in this map capable of directing a fresh Larry's next action, then repaired by Larry (Amendment 6 ② assigns the repair to Larry by name). **Two Category-C unsafe statements found and fixed:** ① this section's own sibling heading carried the phrase *"THE ONE CURRENT NEXT ACTION"* **verbatim twice**, the second describing an already-complete rotation; ② the 18-step 4B route was a flat unannotated checklist under *"This is what the fresh Larry owns"*, which invited re-execution of finished work. **Two Category-D ambiguous statements also marked:** the stale *"Not started"* `/rotate` row in §17.5, and the two unbannered Phase 2 top-level headings (§13, §14). **The lesson repeats itself: the previous repair's own wording reintroduced the defect it was written to prevent.**
+
+**🔶 STEP 9 — the reduced Veritas Gate 3 enumeration check: PARTIAL, and stated honestly.** The enumeration requirement is **carried explicitly in this session's Gate 1 dispatch**, so this gate performs it. **The durable half is NOT done:** Amendment 6 ① says the check *"belongs in the existing Veritas Gate 3 surface"*, which means an edit to `Team/Veritas - Internal Quality and Truth Assurance/AGENTS.md` — a **canonical specialist contract**, which root `CLAUDE.md` gates behind **Warwick's explicit approval of the patch itself**, an exact redline, and independent review. **Larry has NOT applied it and will not apply it unilaterally.** Gate 3 today carries only the weaker bar at line 109 (*"No PASS while an active document would send a fresh Larry … down a superseded route"*) — a prohibition, not an enumeration deliverable. **The exact redline is owed to Warwick in the merge decision pack.** ⚠️ **Until then this check lives in a dispatch Larry writes — which is precisely the condition root `CLAUDE.md` § *"Nothing may live only in Larry's head"* exists to name. Recorded as a known limit, not papered over.**
 
 <details><summary>DISCHARGED — the 2026-08-07 Sub-phase 4A rotation steps (record only, directs nothing)</summary>
 
@@ -2710,6 +2718,24 @@ Any newly discovered **unrelated** defect: record once in [[Deliverables/BACKLOG
 > ⛔ **The Grok-era "NEXT WORK PACKAGE" block is struck below** (Veritas D-10 — it was the weakest remaining point in the map, still saying *"do not execute in this Grok session"*). **Replaced, not merely annotated.**
 
 **Sub-phase 4B is the FINAL BUILD-020 closeout.** Full 18-step route and both parts of the final Phase-level acceptance: [[Deliverables/2026-08-07-subphase-4A-closure-and-4B-handover]] Part 3. In short:
+
+> 🔴 **DO NOT START THIS LIST AT STEP 1.** Per-step state, evidenced in the § SUB-PHASE 4B EXECUTION LOG above — **claimed only where the log actually evidences it:**
+>
+> | Steps | State |
+> |---|---|
+> | **1** | ✅ DONE — descoped hooks proven not to fire, four dispatches, zero false injections |
+> | **2, 3** | ✅ DONE — Warwick executed the elevation bundle; `CareerAIR-Graph-Collect` still reports `LastTaskResult = 2`. ⚠️ **`MyPKA-YouTube-Watcher-Ensure` remains `Disabled` ON PURPOSE** |
+> | **4, 5 (both halves)** | ✅ DONE — WO-24 · WO-25 · WO-26 integrated |
+> | **6, 7** | ⚠️ **NOT ESTABLISHED IN THIS SESSION.** Not claimed. Gate 1 grades them on evidence, not on this row |
+> | **8** | ✅ DONE — plan committed at `7ba504a`, **PLAN ONLY, not executed** |
+> | **9** | 🔶 **PARTIAL** — the enumeration is carried explicitly in the Gate 1 dispatch. **The durable Gate 3 contract redline is NOT applied** — editing a canonical specialist `AGENTS.md` needs Warwick's approval of the patch. **Owed to him in the merge decision pack** |
+> | **10** | ✅ DONE — Amendment 6 ④ |
+> | **11** | ✅ DONE — this repair, 2026-08-07 |
+> | **12, 13** | ✅ DONE at the head this repair produces — CI must be complete **at that exact head** |
+> | **14** | 🎯 **THE CURRENT NEXT ACTION** — stated once, above, under `🎯 THE ONE CURRENT NEXT ACTION` |
+> | **15, 15a, 16, 17, 18** | ⬜ OWED, in that order |
+>
+> *(Repaired 2026-08-07, route step 11: this list was previously flat and unannotated under a heading reading "This is what the fresh Larry owns", which invited a fresh session to re-execute finished work.)*
 
 1. Prove the descoped reminder hooks **no longer load or fire** after a genuinely fresh session.
 2. Apply the four scheduled-task hidden-launcher changes **through Warwick's bounded action** (`Set-ScheduledTask` is blocked by the host classifier for Larry and specialists alike).
