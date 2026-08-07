@@ -2396,6 +2396,14 @@ node "C:/Users/Buggly/.mypka/governor/ding.mjs" <message-file>
 > 7. **the system consumed extraordinary context and specialist effort while repeatedly finding documentation defects rather than product defects.**
 >
 
+> #### ✅ SEMANTIC CORRECTION — **WHAT `SAFE TO CLEAR` ACTUALLY MEANS.** Warwick, 2026-08-07.
+>
+> > **`SAFE TO CLEAR` = sufficient truthful continuity exists for a fresh session to resume safely.**
+>
+> **Pax report ingestion, CAPAE enrichment, Supabase population and report pointers may still be OWED, but they are NOT prerequisites of `SAFE TO CLEAR`** — **unless their absence would make resumption unsafe.**
+>
+> *(This corrects the reading that produced the coupling defect below: the transaction was being treated as a checklist to complete rather than a question to answer truthfully. The question is whether a fresh Larry can resume safely — not whether every enrichment artefact has landed.)*
+
 > #### 🔴 CAPAE DEFECT — **CONTINUITY IS COUPLED TO CAPAE REPORTING.** Recorded 2026-08-07 on Warwick’s instruction.
 >
 > **The `/rotate` contract makes the Pax session report a HARD PREREQUISITE of safe resumption** — step 6 *"WAIT for Pax… do not proceed to the continuity publish without it"*, and step 12 *"Never report `SAFE TO CLEAR` with the report missing."*
