@@ -128,7 +128,25 @@ with **nobody reminding Larry how Tower works.** The trigger obligation now live
 
 ---
 
-## 5. OUTSTANDING — the exact state, so attempt 10 does not rediscover it
+## 5. OUTSTANDING
+
+> ⛔ **THE NUMBERED LIST BELOW WAS TRUE WHEN WRITTEN AND IS NOW SUPERSEDED — RE-CUT 2026-08-07 (Veritas Gate 1 @ `07aa166`, D-1 blocking).** It contradicted **§3b of this same file**. **§3b and the current state below are authoritative; the numbered items are retained struck, as the record of what was outstanding at the time.**
+>
+> **CURRENT STATE, verified by execution:**
+>
+> | Item | State |
+> |---|---|
+> | **WO-31** `/private-api` origin boundary | ✅ **INTEGRATED** @ `02c4520`; Vex re-verified **GREEN** @ `3254c69` |
+> | **WO-32** R2 unsafe-method guard | ✅ **INTEGRATED** @ `4c55781` — 97 assertions, 5 fixtures |
+> | **WO-33** `codex_qa_started` + `@tower` strip | ✅ **INTEGRATED** @ `b03119c`/`f102dca` — **CAPABILITY ONLY** |
+> | **Runtime alignment** | ✅ **EXECUTED** — Warwick authorised it; **PID 22708**; §3b. **NOT an open decision.** |
+> | **`TOWER_EVIDENCE_REPO_DIR`** | ✅ **SET and correct** — real git repo sharing an object DB with this worktree |
+> | **Gate 1** | **FAIL** @ `07aa166` — rows 2 and 4 **PASS**, row 1 HOLD |
+> | **Gate 2** | **FAIL** @ `07aa166` — phase question answered **NO**; none of 4B reachable on `:8090` |
+> | **THE ONE THING STILL GENUINELY OUTSTANDING** | ⛔ **The real Codex QA on PR #97 has NOT run. `codex_qa_started` has ZERO rows in the Tower store and no turn has ever existed for #97.** That is the acceptance test. |
+
+### ⛔ SUPERSEDED — the original outstanding list, retained as record
+ — the exact state, so attempt 10 does not rediscover it
 
 1. **WO-33 IN FLIGHT** (Keel) — `Deliverables/proofline/WO-2026-08-07-33-codex-qa-started-card.md`,
    Amendments 1 and 2 applied. AC1–AC6 = the new `Codex QA started` card (**verified by `git log --all -S`

@@ -79,6 +79,13 @@ preconditions below are satisfied** — a `git stash` here would destroy the run
    2. **🔴 ESTABLISH WHETHER `tailscale serve` PRESERVES `Host`.** `--https=8443 → http://127.0.0.1:8090` fronts the Cockpit. **If the terminator rewrites `Host`, strict equality will 403 the legitimate overlay** — the exact breakage Warwick ruled against. **Unresolved pre-merge by construction; it needs the live path.**
    3. **`COCKPIT_ALLOWED_ORIGINS` is the escape hatch for 8.2** — optional, additive, **empty by default**, so the safe behaviour is the default. **Its value is set by nobody yet; setting it is Mack's, on evidence from 8.2, and it must not be set speculatively.**
    4. **R1 (Warwick, accepted):** cross-site **no-`Origin` GET remains permitted**, and **the security GREEN ASSUMES GET on the private upstream is NON-MUTATING.** **Verify that assumption against the real CareerAIR/live journey here. If a side-effecting GET exists, close it at this step** — that is where Warwick placed it.
+   6. 🔴 **ADDED 2026-08-07 (Veritas Gate 1 @ 07aa166, D-3) — WO-32 CHANGED WHAT A DROPPED `Origin` MEANS, AND THIS IS A FUNCTIONAL RISK, NOT A SECURITY ONE.**
+      **Before WO-32**, a fronting terminator that did not preserve `Origin` was **harmless** — the request arrived with none and was allowed.
+      **After WO-32**, the same drop makes **every browser WRITE through the tunnel return 403.** A write outage on the real journey.
+      ⛔ **`COCKPIT_ALLOWED_ORIGINS` CANNOT RESCUE THIS CASE** — a request carrying **no** `Origin` matches **no** allowlist entry. **Step 8.3 above names that variable as the hatch for the `Host` question; it is NOT a hatch for this one.** Do not reach for it here and find out the hard way.
+      **CONFIRM AT THIS STEP:** that a browser-issued **unsafe** method (POST/PUT/PATCH/DELETE) through `tailscale serve` **still carries `Origin` on arrival at `:8090`**. *("A browser sends `Origin` unconditionally" describes what the browser EMITS, not what ARRIVES after a proxy hop — and only the second is readable at the guard. That claim is **recalled from the fetch standard, not verified against a primary source, and no browser was exercised**.)*
+      **If it does not arrive:** the repair is Warwick’s decision — the guard is bounded reliability, not a security requirement, and reverting it restores the previous behaviour without reopening the WO-31 boundary.
+
    5. **Re-run `origin-boundary-check.mjs` against the moved tree** — it needs no database and no credentials, so it costs nothing to prove the boundary survived the move.
 
 ## 5. Rollback
