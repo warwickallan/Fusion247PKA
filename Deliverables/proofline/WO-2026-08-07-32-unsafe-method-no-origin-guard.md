@@ -191,3 +191,54 @@ operational_handoff: none
      Before issue, RECOMPUTE: node tools/wo/envelope.mjs --count-markers <file>
      An order is unready while either recomputed count is above zero AFTER Larry authors slots.
      Do not treat this footer as current once the file has been edited. -->
+
+---
+
+## AMENDMENT 1 — Larry, 2026-08-07, answering Keel's `CLARIFY`
+
+**Both questions settled. ② changes the implementation, and the change makes the order FAITHFUL to Warwick's ruling rather than wider than it.**
+
+### ② ALLOWLIST — and it is **GET, HEAD, OPTIONS**. Not a denylist, and not a widening.
+
+**Keel measured the gap rather than theorising it: `PROPFIND` with no `Origin` FORWARDS A BODY TO THE UPSTREAM TODAY.** A denylist of the four named verbs would *"close the case Vex named and leave the same structural hole one verb to the left."*
+
+**The decisive point, and it is why this is not scope growth:** **Warwick's R2 says *"unsafe methods"* — it does not say *"these four verbs."*** A four-verb denylist implements a list; **an allowlist implements the ruling.** `PROPFIND` **is** an unsafe method. Leaving it forwarding would be an incomplete implementation of R2, not a conservative one.
+
+**THE SAFE SET IS `GET`, `HEAD`, `OPTIONS`** — the HTTP-safe methods (RFC 9110), **not** Keel's proposed `GET`/`HEAD` alone.
+
+- **Why OPTIONS is included:** it is **safe by definition**, Keel measured it forwarding **no body**, and including it means **this guard changes the behaviour of ZERO currently-working requests.** His `GET`/`HEAD`-only proposal would newly 403 an `OPTIONS` that returns 200 today — a real behaviour change, and an avoidable one.
+- **Everything else with no `Origin` is refused**, before the body is read and before any forward. **Fail closed on the unknown verb.**
+- **AC2 is therefore widened to the safe set**, and its protection of Warwick's **R1** is unchanged: **cross-site no-`Origin` GET remains permitted, deliberately.**
+
+*(Recorded because it is the shape of this whole session: Keel proposed the narrower-sounding option and flagged that he would not widen scope unilaterally. He was right to ask. The wider option is correct here **because it is what the ruling says**, and it costs no behaviour change.)*
+
+### ① AC5's browser claim — **AMENDED. Larry asked for something the envelope makes impossible.**
+
+AC5 said *"State how you established this rather than asserting it"* — under **`network: none`**, with **no `WebFetch` and no `WebSearch`** in the grant (the envelope's own `producible_evidence` row records exactly this), and no browser to exercise. **The order demanded establishment while withholding every means of establishing it. That is my defect, not a gap in his diligence.**
+
+**Return it in Vex's own terms and no stronger:** *"unconditional in the fetch standard; **recalled, not verified against a primary source**; no browser exercised."* **A declared limit is the correct output here. Do not dress recall as establishment — that is precisely what Vex refused to do, and refusing it again is right.**
+
+### ③ Accepted as reported
+
+- **Head mismatch (`6354d8a` vs `2d80b52`)** — verified immaterial by Keel: contract blob `500c6c5171…` identical at both. **Governing head is `6354d8a`.**
+- **Composed-decision refactor APPROVED.** Keep `originDecision()` unchanged and compose it with the new rule in **one exported pure function** that both `servePrivateApi` and the mutation fixture call. **This preserves all 51 existing assertions, keeps the policy in one place, and avoids a fail-open default inside a security control** — the defect class this order exists to remove. **AC4's fixture must remove the NEW rule specifically, not the whole decision.**
+- **AC1 evidence scope — his wording adopted:** the recording upstream proves **non-forward** (0 requests, 0 bytes); that the body was never **read off the socket** rests on the refusal's position ahead of the buffering loop at `private-api.mjs:145`. **State it that way. Do not let the upstream's silence stand in for both claims.**
+- Duplicate secret-scan line and `status: draft` — cosmetic, noted.
+
+### 🔴 ④ KEEL'S LARGEST FINDING — promoted to a BINDING step-18 item
+
+**The order framed the legitimate-caller risk as non-browser callers. The bigger risk is the fronting terminator, and this guard INVERTS its consequence.**
+
+The Cockpit is fronted by `tailscale serve --https=8443` → `http://127.0.0.1:8090`, and the boundary record already carries an **unresolved** residual about whether that terminator preserves `Host`. **The identical question applies to `Origin`:**
+
+- **Today**, a terminator that dropped `Origin` is **benign** — the request arrives with no `Origin` and is allowed.
+- **After this guard**, the same drop means **every browser write through the tunnel returns 403.** **Not a security failure — a functional write outage on the real journey.**
+- **`COCKPIT_ALLOWED_ORIGINS` CANNOT rescue it** — a request with no `Origin` matches no allowlist entry. **The recorded hatch for the `Host` uncertainty does not cover this one.**
+- *"A browser sends `Origin` unconditionally"* is a claim about **what the browser emits**, not **what arrives after a proxy hop**. **Only the second is what this guard reads.**
+
+**STEP 18 MUST NOW CONFIRM BOTH:** the R1 safe-GET item, **and that an unsafe method issued from a browser through `tailscale serve` still carries `Origin` on arrival at `:8090`.** **Otherwise this bounded reliability improvement lands as a write outage.** *(Settleable only on the real live path. Reported by Keel, not resolved by him — correctly.)*
+
+### Unchanged
+No further hardening · no new authentication system · `db.mjs` untouched · R1 stays accepted and open · nothing under `~/.mypka/**` (a Tower alignment is running concurrently) · **no attack detail in any committed artefact — this repository is PUBLIC.**
+
+**No second read-back required. Proceed.**
