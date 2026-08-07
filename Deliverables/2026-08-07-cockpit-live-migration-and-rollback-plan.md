@@ -32,7 +32,7 @@ preconditions below are satisfied** — a `git stash` here would destroy the run
 
 | Entry | Disposition |
 |---|---|
-| `services/cockpit/server.mjs` | **Superseded.** The governance head already contains its 86-line private-API bridge in a *superset* form (blob `95bb814c` ⊃ `16a6a851`, +90 lines). Porting it would regress. Proven at WO-24. |
+| `services/cockpit/server.mjs` | ⛔ **BLOB CONTAINMENT CLAIM NO LONGER HOLDS — RE-CUT 2026-08-07 (Veritas D-2).** ~~The governance head already contains its 86-line private-API bridge in a *superset* form (blob `95bb814c` ⊃ `16a6a851`, +90 lines).~~ **WO-31 EXTRACTED the bridge out of `server.mjs` into `services/cockpit/private-api.mjs`**, so the branch no longer contains the live clone's handler as a textual superset — it contains a **repaired replacement in a different file**. **The disposition is UNCHANGED and stronger: still Superseded, still do not port.** The live clone's copy carries the **defective** origin behaviour that WO-31 exists to remove; porting it would reintroduce the exposure. *(The old wording would have had someone verify containment, find it false, and hesitate at exactly the wrong moment.)* |
 | `services/control-plane/package.json` · `package-lock.json` | **Ported and merged** (WO-24, byte-identical). |
 | `services/hub/youtube/persistCapture.mjs` · `watch-captures.mjs` | **Ported and merged** (WO-24), then substantially rewritten by WO-27. **The merged version wins.** |
 | `services/asdair/skill/planner.js` · `Team Knowledge/.obsidian/community-plugins.json` | **Line-ending noise.** ` M` with no diff hunk. Nothing to port. |
@@ -74,6 +74,12 @@ preconditions below are satisfied** — a `git stash` here would destroy the run
    changes nothing about this step**: an emptied `node_modules` still breaks the Cockpit, and after the repair
    it breaks **loudly at import** instead of silently borrowing another clone's tree. See §6(a).
 7. **Start the Cockpit. Verify §7 before enabling anything scheduled.**
+8. ⊕ **ADDED 2026-08-07 (Veritas D-2) — WO-31 consequences. These are BINDING post-merge acceptance items, not notes.**
+   1. **🔴 CONFIRM THE CAREERAIR OVERLAY STILL REACHES `/private-api`.** WO-31 refuses a request whose `Origin` does not match the Cockpit's own `Host`. **There is NO caller of `/private-api` anywhere in the repository** — the overlay is served from outside it — so **this could not be proven pre-merge, and Keel correctly refused to claim it.** **This is the first thing to check after the Cockpit restarts.**
+   2. **🔴 ESTABLISH WHETHER `tailscale serve` PRESERVES `Host`.** `--https=8443 → http://127.0.0.1:8090` fronts the Cockpit. **If the terminator rewrites `Host`, strict equality will 403 the legitimate overlay** — the exact breakage Warwick ruled against. **Unresolved pre-merge by construction; it needs the live path.**
+   3. **`COCKPIT_ALLOWED_ORIGINS` is the escape hatch for 8.2** — optional, additive, **empty by default**, so the safe behaviour is the default. **Its value is set by nobody yet; setting it is Mack's, on evidence from 8.2, and it must not be set speculatively.**
+   4. **R1 (Warwick, accepted):** cross-site **no-`Origin` GET remains permitted**, and **the security GREEN ASSUMES GET on the private upstream is NON-MUTATING.** **Verify that assumption against the real CareerAIR/live journey here. If a side-effecting GET exists, close it at this step** — that is where Warwick placed it.
+   5. **Re-run `origin-boundary-check.mjs` against the moved tree** — it needs no database and no credentials, so it costs nothing to prove the boundary survived the move.
 
 ## 5. Rollback
 
