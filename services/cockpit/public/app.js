@@ -596,6 +596,19 @@ createApp({
 
     const rrList = computed(() => (Array.isArray(rrReports.value) ? rrReports.value : []));
 
+    // ONE trigger for the whole surface, so it is the SAME DOM element in every state and keyboard
+    // focus survives a load. It used to be re-created inside two v-if branches ("Read them" and
+    // "Try again"), each of which destroyed itself on click: focus fell to <body> and a keyboard
+    // user had to Tab from the top of the document (WCAG 2.2 SC 2.4.3 Focus Order). The label is
+    // therefore state-derived rather than branch-derived. It never disappears after a successful
+    // read either — that success path destroyed focus in exactly the same way.
+    const rrActionLabel = computed(() => {
+      if (rrLoading.value) return 'Reading…';
+      if (rrErr.value) return 'Try again';
+      if (!rrRequested.value) return 'Read them';
+      return 'Read them again';
+    });
+
     // "Any field may be null" (the frozen contract). These two make a null CONTAINER degrade into a
     // field-by-field "not established" instead of throwing — so a report with `workOrders: null`
     // renders four honest unknowns rather than blanking the card.
@@ -620,7 +633,14 @@ createApp({
     });
 
     // ---- formatters. Every one FORMATS a supplied value; not one produces a figure. ----
-    const rrInt = (n) => Number(n).toLocaleString('en-GB');
+    // Every formatter guards isFinite, and they all fail the same way: print the SUPPLIED value
+    // verbatim rather than "NaN". "NaN" in .rr-num is mono, --ink, upright — the house signal for
+    // "this is a measurement" (GL-003 §3) — applied to something that is not one, which is the same
+    // collapse this surface exists to prevent, just at the formatter level. rrCompact and rrMins
+    // already did this; rrInt and rrPct did not, so a non-numeric field printed NaN / NaN%.
+    // Residual, stated rather than implied: a non-numeric still renders INSIDE .rr-num. Routing it
+    // to .rr-unk instead is a change at ~15 template call sites and is not taken here.
+    const rrInt = (n) => { const v = Number(n); return isFinite(v) ? v.toLocaleString('en-GB') : String(n); };
     // Big counts are abbreviated to a few significant figures on a phone rather than printed as a
     // full grouped integer. That is a ROUNDING, so the template prints "≈" wherever rrIsCompact is
     // true, and the drawer always carries the exact grouped integer alongside. An abbreviation
@@ -635,7 +655,7 @@ createApp({
       if (Math.abs(v) >= 1e4) return (v / 1e3).toFixed(1).replace(/\.0$/, '') + 'k';
       return rrInt(v);
     }
-    const rrPct = (n) => (Math.round(Number(n) * 10) / 10) + '%';
+    const rrPct = (n) => { const v = Number(n); return isFinite(v) ? (Math.round(v * 10) / 10) + '%' : String(n); };
     function rrMins(n) {
       const v = Math.round(Number(n));
       if (!isFinite(v)) return String(n);
@@ -695,7 +715,7 @@ createApp({
       tiBrain, tiCash, tiSpin, tiStars, mine, ideaDecide, opps, opportunityDecide, synthesise, synthing, synthMsg,
       outputs, newOutputs, itemsAdded, wins, builds,
       statusTone, statusLine, tiles, go, open, closeDetail, decide, copyTranscript, primaryAction, sourceStatus, load, REPORT, GRAPH,
-      rrReports, rrLoading, rrErr, rrRequested, loadRotationReports, rrList, rrOrderBreak,
+      rrReports, rrLoading, rrErr, rrRequested, loadRotationReports, rrList, rrOrderBreak, rrActionLabel,
       rrArr, rrObj, rrHas, rrText, rrInt, rrCompact, rrIsCompact, rrPct, rrMins, rrBar,
       rrAlloc, rrAllocSum, rrAllocGap, rrAllocAnyKnown, rrCtx, rrCtxMax, rrSpecMax, rrLinesMax,
     };
@@ -1589,37 +1609,76 @@ createApp({
         <!-- ── SESSION / ROTATION REPORTS ─────────────────────────────────────────────────────
              Warwick's /rotate reports, most recent first. THE HONESTY CHAIN IS THE POINT, so read
              the v-if order — each rung is a DIFFERENT fact and none may be collapsed into another:
-               1. not asked yet   -> we have not read them. Not "there are none".
-               2. reading         -> in flight.
+               1. reading         -> in flight (leads the chain: see the note on re-reads below).
+               2. not asked yet   -> we have not read them. Not "there are none".
                3. read FAILED     -> say the read failed and show NOTHING else. Not an empty list.
                4. read, empty     -> a measured zero: they were read and there are none.
-               5. read, present   -> render them, in the producer's order, unsorted by us.
+               5. read, present   -> N were read; the cards render below, in the producer's order,
+                                     unsorted by us.
              A failure at rung 3 is CONTAINED to this group: "Happening now" above and "Recent
              history" below keep rendering, because a report read that fell over must not take the
-             System tab with it. -->
+             System tab with it.
+
+             WHAT CHANGED AND WHY (Vera HIGH-1, WCAG 2.2 SC 4.1.3 Status Messages / SC 2.4.3 Focus
+             Order). The five rungs were previously five sibling v-if branches with the trigger
+             button living inside two of them, and nothing carried role="status". A screen-reader
+             user pressed "Read them" and heard NOTHING — not "reading", not "the read failed", not
+             "there are none", not the arrival of N reports — and a keyboard user lost focus to
+             <body> because the button destroyed itself on click.
+             Three structural consequences, each deliberate:
+               a) the state region is STABLE and in the DOM from first paint, before any swap. A
+                  role="status" region created at the same moment its text arrives is announced
+                  unreliably — the AT has to have been observing it already. House pattern:
+                  app.js:807, 867, 967, 1074, 1184.
+               b) rung 1 leads on rrLoading alone, so a RE-read announces too. The CARDS are still
+                  governed by rrList exactly as before, so an in-flight re-read keeps the
+                  already-read cards on screen under a "Reading…" status — which is what is
+                  actually true — instead of blanking them.
+               c) rung 5 announces a SENTENCE, not the cards. The cards sit outside the live region
+                  on purpose: a polite region wrapping ~40 dt/dd pairs per card would read the whole
+                  set aloud on arrival. They are reached by their headings instead (see .rr-h). -->
         <div class="grp">
           <h2>Session / Rotation Reports<span class="g-count" v-if="rrReports">{{ rrList.length }}</span></h2>
 
-          <div v-if="!rrRequested && !rrLoading" class="empty">
-            The rotation reports have not been read yet.
-            <button class="act" @click="loadRotationReports()">Read them</button>
-          </div>
+          <div class="rr-state">
+            <div class="rr-state-msg" role="status" aria-live="polite">
+              <div v-if="rrLoading" class="empty">Reading the rotation reports…</div>
 
-          <div v-else-if="rrLoading && !rrReports" class="empty">Reading the rotation reports…</div>
+              <div v-else-if="!rrRequested" class="empty">The rotation reports have not been read yet.</div>
 
-          <div v-else-if="rrErr" class="item red as-stack">
-            <div class="i-main">
-              <div class="i-eyebrow blocked">COULD NOT BE READ</div>
-              <div class="i-title">The rotation reports could not be read, so none are shown — that is not the same as there being none.</div>
-              <div class="as-sub">Nothing else on this tab is affected.</div>
-              <div class="err">{{ rrErr }}</div>
-              <button class="act" :disabled="rrLoading" @click="loadRotationReports()">{{ rrLoading ? '…' : 'Try again' }}</button>
+              <div v-else-if="rrErr" class="item red as-stack">
+                <div class="i-main">
+                  <div class="i-eyebrow blocked">COULD NOT BE READ</div>
+                  <div class="i-title">The rotation reports could not be read, so none are shown — that is not the same as there being none.</div>
+                  <div class="as-sub">Nothing else on this tab is affected.</div>
+                  <div class="err">{{ rrErr }}</div>
+                </div>
+              </div>
+
+              <div v-else-if="!rrList.length" class="empty">The reports were read and there are none recorded yet. Nothing is being guessed at in the meantime.</div>
+
+              <!-- .as-sub, not .empty: this is the one rung that is NOT an empty state, and reusing
+                   the empty-state class for it would be a naming lie in the markup for the sake of
+                   2px of type. Same token, same surface: --ink2 on --bg, 6.59 / 8.34 (GL-003 §2b). -->
+              <div v-else class="as-sub">{{ rrList.length }} <template v-if="rrList.length === 1">rotation report was</template><template v-else>rotation reports were</template> read, and {{ rrList.length === 1 ? 'it is' : 'they are' }} shown below in the order supplied.</div>
+            </div>
+
+            <!-- The single stable trigger (see rrActionLabel). Disabled during the read, NEVER
+                 removed, so focus survives. It sits OUTSIDE the live region deliberately: its label
+                 changes with the state and would otherwise be spoken as part of the status message.
+                 Its own change is still announced when it holds focus, because a focused control's
+                 accessible name changing is announced by the AT already. -->
+            <div class="rr-state-act">
+              <button class="act" :disabled="rrLoading" @click="loadRotationReports()">{{ rrActionLabel }}</button>
             </div>
           </div>
 
-          <div v-else-if="!rrList.length" class="empty">The reports were read and there are none recorded yet. Nothing is being guessed at in the meantime.</div>
-
-          <template v-else>
+          <!-- aria-busy belongs HERE, on the container whose content is being replaced — not on the
+               status region, where aria-busy="true" would SUPPRESS the very "Reading…" announcement
+               it was asked for. This container renders nothing in the four non-list states: rrList
+               is empty in all of them, the failed read included (rrReports goes back to null, never
+               to [], so rung 3 still shows nothing rather than an empty list). -->
+          <div class="rr-list" :aria-busy="rrLoading ? 'true' : 'false'">
             <!-- A declared order that is not the actual order is a PRODUCER defect. Surfaced, not
                  silently re-sorted (app.js:735 / :737-745) — the endpoint is where it gets fixed. -->
             <div v-if="rrOrderBreak" class="item red as-stack">
@@ -1660,12 +1719,20 @@ createApp({
                      producer's. A null (never established) and an empty list (recorded, none)
                      are different screens. -->
                 <div class="rr-block">
-                  <div class="rr-h">Findings</div>
+                  <h3 class="as-sec rr-h">Findings</h3>
                   <div v-if="!r.findings" class="as-note">Findings were not established for this rotation.</div>
                   <div v-else-if="!rrArr(r.findings).length" class="as-note">This rotation was reviewed and recorded no findings.</div>
                   <template v-else>
                     <div v-for="(f, fi) in rrArr(r.findings)" :key="fi" class="rr-find">
-                      <span class="chip neutral"><span class="d"></span><template v-if="rrHas(f.confidence)">{{ f.confidence }}</template><template v-else>confidence unknown</template></span>
+                      <!-- An unmeasured confidence gets NO CHIP, exactly as an unmeasured figure
+                           gets no track. It previously rendered inside the same .chip.neutral as a
+                           measured one — mono, --ink2, same pill, same dot — which is this surface's
+                           own criterion broken on the field sitting highest on the card. The absent
+                           chip is the tell; .rr-unk carries the words. Contrast is unchanged: the
+                           chip was --ink2 on --panel2 (7.08 / 6.78) and .rr-unk here is --ink2 on
+                           --panel (7.47 / 7.37). Both PASS (GL-003 §2b). -->
+                      <span v-if="rrHas(f.confidence)" class="chip neutral"><span class="d"></span>{{ f.confidence }}</span>
+                      <span v-else class="rr-unk">confidence not established</span>
                       <span class="rr-find-t"><template v-if="rrHas(f.text)">{{ f.text }}</template><span v-else class="rr-unk">text not established</span></span>
                     </div>
                   </template>
@@ -1675,7 +1742,7 @@ createApp({
                      value is known, so a real 0 is a visible empty track and an unknown is no track
                      at all. The bar is aria-hidden; the number beside it is the accessible fact. -->
                 <div class="rr-block">
-                  <div class="rr-h">Context consumed</div>
+                  <h3 class="as-sec rr-h">Context consumed</h3>
                   <dl class="rr-rows">
                     <div v-for="c in rrCtx(r)" :key="c.label" class="rr-row">
                       <dt class="rr-row-l">{{ c.label }}</dt>
@@ -1692,7 +1759,7 @@ createApp({
                      five numbers and no assessment, so tinting "rework" amber would be our judgement
                      dressed as its data. The labels carry the meaning. -->
                 <div class="rr-block">
-                  <div class="rr-h">Where the effort went</div>
+                  <h3 class="as-sec rr-h">Where the effort went</h3>
                   <dl class="rr-rows">
                     <div v-for="a in rrAlloc(r)" :key="a.label" class="rr-row">
                       <dt class="rr-row-l">{{ a.label }}</dt>
@@ -1713,7 +1780,7 @@ createApp({
                      a REAL ZERO, and it must read as a measurement (empty track + mono digits) on the
                      same card where an unmeasured elapsed time reads as an italic word. -->
                 <div class="rr-block">
-                  <div class="rr-h">Work Orders</div>
+                  <h3 class="as-sec rr-h">Work Orders</h3>
                   <dl class="rr-rows">
                     <div class="rr-row">
                       <dt class="rr-row-l">Survived first read-back</dt>
@@ -1744,7 +1811,7 @@ createApp({
 
                 <!-- WHAT CHANGED — product versus documentation. -->
                 <div class="rr-block">
-                  <div class="rr-h">What changed</div>
+                  <h3 class="as-sec rr-h">What changed</h3>
                   <dl class="rr-rows">
                     <div class="rr-row">
                       <dt class="rr-row-l">Product lines</dt>
@@ -1779,20 +1846,20 @@ createApp({
                      do not join, and inventing a mapping would be a naming contract the endpoint
                      never agreed to. Both are shown; neither is resolved here. -->
                 <div class="rr-block">
-                  <div class="rr-h">Unresolved or unestablished measurements<span class="g-count" v-if="r.unestablished">{{ rrArr(r.unestablished).length }}</span></div>
+                  <h3 class="as-sec rr-h">Unresolved or unestablished measurements<span class="g-count" v-if="r.unestablished">{{ rrArr(r.unestablished).length }}</span></h3>
                   <div v-if="!r.unestablished" class="as-note">The list of unestablished measurements was itself not established.</div>
                   <div v-else-if="!rrArr(r.unestablished).length" class="as-note">Nothing was left unestablished in this rotation.</div>
                   <div v-else class="as-tags"><span v-for="(u, ui) in rrArr(r.unestablished)" :key="ui" class="as-tag">{{ u }}</span></div>
                 </div>
 
                 <div class="rr-block">
-                  <div class="rr-h">Notes</div>
+                  <h3 class="as-sec rr-h">Notes</h3>
                   <div v-if="rrText(r.notes)" class="as-sub">{{ rrText(r.notes) }}</div>
                   <div v-else class="as-note">No notes were recorded for this rotation.</div>
                 </div>
 
                 <div class="rr-block">
-                  <div class="rr-h">Durable report</div>
+                  <h3 class="as-sec rr-h">Durable report</h3>
                   <div v-if="rrHas(r.deliverablePath)" class="mono">{{ r.deliverablePath }}</div>
                   <div v-else class="as-note">No durable report path was recorded.</div>
                 </div>
@@ -1817,7 +1884,7 @@ createApp({
                       <div><dt>Work Orders total</dt><dd><span v-if="rrHas(rrObj(r.workOrders).total)" class="rr-num">{{ rrInt(rrObj(r.workOrders).total) }}</span><span v-else class="rr-unk">not established</span></dd></div>
                     </dl>
 
-                    <div class="rr-h">Specialists<span class="g-count" v-if="r.specialists">{{ rrArr(r.specialists).length }}</span></div>
+                    <h3 class="as-sec rr-h">Specialists<span class="g-count" v-if="r.specialists">{{ rrArr(r.specialists).length }}</span></h3>
                     <div v-if="!r.specialists" class="as-note">The specialist breakdown was not established for this rotation.</div>
                     <div v-else-if="!rrArr(r.specialists).length" class="as-note">This rotation recorded no specialist dispatches.</div>
                     <div v-else class="rr-specs">
@@ -1844,7 +1911,7 @@ createApp({
                 </details>
               </div>
             </div>
-          </template>
+          </div>
         </div>
 
         <details class="tech" v-if="wins.length"><summary>Recent history · {{ wins.length }}</summary>
