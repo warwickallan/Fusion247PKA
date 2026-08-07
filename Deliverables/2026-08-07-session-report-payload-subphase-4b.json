@@ -1,0 +1,542 @@
+{
+  "session_date": "2026-08-07",
+  "branch": "build-020/phase4-automation-law",
+  "closing_head": "7ba504aaec6ea61f06f8b2dea241db1fc3bf2d96",
+  "closing_head_short": "7ba504a",
+  "session_start_head": "b0a1c99",
+  "session_range": "b0a1c99..7ba504aaec6ea61f06f8b2dea241db1fc3bf2d96",
+  "map_path": "Deliverables/2026-08-04-proofline-wayfinder-plan.md",
+  "report_path": "Deliverables/2026-08-07-session-performance-report-subphase-4b.md",
+  "deliverable_path": "Deliverables/2026-08-07-session-performance-report-subphase-4b.md",
+  "payload_path": "Deliverables/2026-08-07-session-report-payload-subphase-4b.json",
+  "host": "claude",
+  "host_version": null,
+  "pr": "#97",
+  "pr_status": null,
+  "prior_freeze_head": "b0a1c99",
+  "git_range_this_slice": "b0a1c99..7ba504a",
+  "git_stat_larry_measured": {
+    "commits": 34,
+    "files": 30,
+    "insertions": 5354,
+    "deletions": 109,
+    "doc_files": null,
+    "doc_insertions": 1741,
+    "doc_deletions": 2,
+    "product_files": null,
+    "product_insertions": 3613,
+    "product_deletions": 107,
+    "doc_share_of_insertions_pct": 32.5,
+    "files_by_area": { "Deliverables": 8, "services": 14, ".github": 2, "tools": 4, "other": 2 },
+    "characterisation": "product-dominant, and the inversion from 4A's 88.3% doc share is real: product insertions rose 214 -> 3613 (17x absolute) while documentation stayed roughly flat (1620 -> 1741). BUT 'product' is not all function: at least 1,488 insertions (>=27.8% of all insertions) are verification harness -- capture-durability-check.mjs 462, idempotency-check.mjs 431, rotation-report-check.mjs 400, provenance-check.mjs 195. Honest split: ~32.5% doc, >=27.8% proof-of-function, <=39.7% function.",
+    "reconciliation": "CLEAN. 1741+3613=5354; 2+107=109; 8+14+2+4+2=30. The 4A payload's F12 defect (staged product-file list not reconciling with its own totals) did NOT recur.",
+    "discrepancy": "none in the supplied figures. The doc-vs-product FILE split was not supplied (only the line split), and which of the two 'other' files is doc vs product is UNESTABLISHED.",
+    "label": "E1S"
+  },
+  "metrics": {
+    "opening_context_tokens": { "value": null, "label": "U" },
+    "closing_context_tokens": { "value": null, "label": "U", "note": "parent context at rotation reported by Warwick as ~543k; single unverified source, not treated as a measurement" },
+    "total_context_token_movement": { "value": null, "label": "U" },
+    "elapsed_session_minutes": { "value": null, "label": "U", "note": "session ran roughly 00:40 to 11:10 local by Larry's own approximate statement (~630 min); explicitly NOT a measurement and used nowhere as one" },
+    "committed_activity_span": { "value": null, "label": "U", "note": "no commit timestamps supplied; Pax has no git access" },
+    "ding_log_span_this_session": {
+      "value": {
+        "message_ids": "355-357, 360-363",
+        "start_ts": "2026-08-07T00:41:53.433Z",
+        "end_ts": "2026-08-07T09:39:24.497Z",
+        "span_minutes": 537,
+        "note": "UTC; log activity span only, not session elapsed. Read at source from C:/Users/Buggly/.mypka/governor/ding-log.jsonl."
+      },
+      "label": "E"
+    },
+    "per_specialist_dispatch_counts": {
+      "value": { "keel": 4, "felix": 2, "vera": 1, "explore": 1, "total_numbered_orders": 5, "total_agent_spawns": 8, "total_return_events": 13 },
+      "label": "E1S"
+    },
+    "per_specialist_token_usage": {
+      "value": { "keel": 1485881, "felix": 521146, "vera": 131654, "explore": 154587, "total": 2093268 },
+      "basis": "derived by summing the 13 supplied return-event figures per agent; reconciles exactly to the supplied total of 2,093,268",
+      "label": "E1S"
+    },
+    "per_return_event_tokens": {
+      "value": {
+        "explore_cockpit_recon": 154587,
+        "keel_wo24_readback": 113215,
+        "keel_wo24_build": 180523,
+        "keel_wo25_readback": 137468,
+        "keel_wo25_build": 212631,
+        "felix_wo26_readback": 126019,
+        "felix_wo26_build": 219916,
+        "vera_visual_gate": 131654,
+        "felix_a11y_fix_pass": 175211,
+        "keel_wo27_readback": 126809,
+        "keel_wo27_build": 216652,
+        "keel_wo28_readback": 116126,
+        "keel_wo28_build": 182457
+      },
+      "label": "E1S"
+    },
+    "allocation_product_pct": { "value": 48.4, "label": "E1S", "basis": "build-pass token share (1,012,179); NOT time" },
+    "allocation_wo_admin_pct": { "value": 29.6, "label": "E1S", "basis": "read-back gate token share (619,637); NOT time" },
+    "allocation_assurance_pct": { "value": 6.3, "label": "E1S", "basis": "Vera visual gate token share (131,654); NOT time" },
+    "allocation_research_advisory_pct": { "value": 7.4, "label": "E1S", "basis": "Explore reconnaissance token share (154,587); NOT time" },
+    "allocation_rework_pct": { "value": 8.4, "label": "E1S", "basis": "Felix a11y repair pass after Vera NOT PASS (175,211). UNLIKE 4A's 26.2%, this is NOT attributable to a preventable Larry defect with confidence -- it is a quality gate firing and being satisfied. Zero tokens were spent on refused orders this session (4A: 197,193)." },
+    "allocation_waiting_pct": { "value": null, "label": "U" },
+    "allocation_time_based_any": { "value": null, "label": "U" },
+    "allocation_note": "the five allocation categories are disjoint and sum to 100.1% on rounding; they reconcile exactly to 2,093,268 tokens before rounding",
+    "tokens_per_product_insertion": {
+      "value": 579,
+      "prior_session_value": 10381,
+      "improvement_factor": 17.9,
+      "caveat": "NOT like-for-like. 4A was an assurance and closure session; 4B was a build session. This measures what each session was FOR, not relative productivity.",
+      "label": "E1S"
+    },
+    "parent_channel_available": { "value": true, "label": "E", "basis": "7 of 7 ding sends exit 0, zero queued" },
+    "parent_channel_response_latency": { "value": null, "label": "U" },
+    "queued_messages": { "value": 0, "label": "E" },
+    "wo_first_dispatch_success_numbered_orders": { "value": 0, "denominator": 5, "label": "E", "definition": "numbered Work Orders that survived read-back with NO binding amendment required. All five received Amendment 1." },
+    "wo_accepted_rather_than_refused": { "value": 5, "denominator": 5, "label": "E", "definition": "numbered Work Orders accepted at read-back rather than REFUSED. Both this metric and the one above are true and they measure different things." },
+    "wo_serious_defect_found_by_worker": { "value": 5, "denominator": 5, "label": "E" },
+    "wo_clarify_verdicts": { "value": 4, "denominator": 5, "label": "E" },
+    "wo_amendments": { "value": 5, "label": "E" },
+    "wo_refusals": { "value": 0, "label": "E", "note": "the three immediately preceding Keel orders -- WO-22, WO-23, WO-24-v1 -- were ALL refused at read-back on preventable order defects" },
+    "read_back_gate_cost": {
+      "value": { "total_tokens": 619637, "pct_of_subagent_spend": 29.6, "mean_per_order": 123927, "orders": 5, "serious_defects_caught": 5 },
+      "verdict": "earning its cost decisively; the DEPENDENCE on it is the finding, not the cost",
+      "label": "E1S"
+    },
+    "documentation_vs_product_change_volume": {
+      "value": {
+        "files": 30,
+        "insertions": 5354,
+        "deletions": 109,
+        "doc_lines_changed": 1743,
+        "product_lines_changed": 3720,
+        "doc_insertions": 1741,
+        "product_insertions": 3613,
+        "doc_share_of_insertions_pct": 32.5,
+        "verification_harness_insertions_lower_bound": 1488,
+        "verification_harness_share_of_insertions_pct_lower_bound": 27.8,
+        "function_code_share_of_insertions_pct_upper_bound": 39.7
+      },
+      "label": "E1S"
+    }
+  },
+  "elapsed_minutes": null,
+  "total_context_tokens_in": null,
+  "total_context_tokens_out": null,
+  "total_subagent_tokens": 2093268,
+  "parent_channel_available": true,
+  "queued_messages": 0,
+  "wo_first_dispatch_success": 0,
+  "wo_amendments": 5,
+  "wo_refusals": 0,
+  "doc_lines_changed": 1743,
+  "product_lines_changed": 3720,
+  "allocation_product_pct": 48.4,
+  "allocation_admin_pct": 29.6,
+  "allocation_evidence_pct": 6.3,
+  "allocation_rework_pct": 8.4,
+  "allocation_waiting_pct": null,
+  "work_orders": [
+    {
+      "id": "WO-24",
+      "worker": "keel",
+      "scope": "Cockpit /api/health provenance and windowsHide",
+      "first_dispatch_substantive": false,
+      "outcome": "CLARIFY -> ACCEPT after Amendment 1; delivered",
+      "tokens": 293738,
+      "tokens_readback": 113215,
+      "tokens_build": 180523,
+      "amendments": 1,
+      "integrated_sha": "2829d43",
+      "order_defects_found_by_worker": [
+        "AC7 built on a FALSE PREMISE -- the order told Keel to port server.mjs from the live clone; the governance head already held a superset, so porting would have REGRESSED the branch",
+        "document_impact was [] and wrong"
+      ],
+      "preventable_by_larry": true,
+      "value_returned": "prevented a branch regression; established that /api/health cannot be exercised over HTTP without loading db.mjs and its two production pools",
+      "residual": "the /api/health wiring line rests on inspection, never called over HTTP -- Larry recorded this himself as where a reviewer looks first",
+      "label": "E"
+    },
+    {
+      "id": "WO-25",
+      "worker": "keel",
+      "scope": "rotation-report schema mirror, least-privilege grant, /api/rotation-reports",
+      "first_dispatch_substantive": false,
+      "outcome": "CLARIFY -> ACCEPT after Amendment 1; delivered",
+      "tokens": 350099,
+      "tokens_readback": 137468,
+      "tokens_build": 212631,
+      "amendments": 1,
+      "integrated_sha": "77dbca2",
+      "order_defects_found_by_worker": [
+        "THE MOST VALUABLE FINDING OF THE SESSION: importing rotation-report.mjs into server.mjs makes the recomputed module closure diverge from provenance.mjs's hand-declared SOURCE_MODULES, so sourceHash would silently stop covering a module the running Cockpit loads -- the exact defect provenance.mjs was built to make impossible, one day old",
+        "provenance-check.mjs was not named in the order's required regression evidence"
+      ],
+      "preventable_by_larry": true,
+      "value_returned": "Larry's own control, holed by Larry's own next order, caught by the worker and not by Larry. Proven by copying the modules and running the real moduleClosure(), not by inference.",
+      "evidence": "117 assertions; Larry independently mutation-tested null->0 (29 go red); endpoint proved against real Postgres",
+      "label": "E"
+    },
+    {
+      "id": "WO-26",
+      "worker": "felix",
+      "scope": "Cockpit System tab -- session/rotation reports UI",
+      "first_dispatch_substantive": true,
+      "outcome": "ACCEPT with 6 unsettled items returned; Amendment 1 issued; delivered; then FAILED Vera's visual gate on 2 HIGH; repaired",
+      "tokens": 345935,
+      "tokens_readback": 126019,
+      "tokens_build": 219916,
+      "amendments": 1,
+      "integrated_sha": "67b0af8",
+      "repair_sha": "63380d1",
+      "order_defects_found_by_worker": [
+        "the gate the order cited (render-vm-check.mjs) CANNOT SEE the System area -- every existing scenario pins area:'apps'. AC8 would have gone green proving nothing, AND that green would have reached Veritas as render proof",
+        "contrast-check.mjs never reads class names; its green means 'the tokens did not move', not 'the new pairings pass'"
+      ],
+      "preventable_by_larry": true,
+      "value_returned": "prevented a vacuous green from entering the assurance chain as evidence",
+      "label": "E"
+    },
+    {
+      "id": "WO-27",
+      "worker": "keel",
+      "scope": "durable YouTube capture -- true ensure semantics, heartbeat, durability probe, escalation",
+      "first_dispatch_substantive": false,
+      "outcome": "CLARIFY -> ACCEPT after Amendment 1; delivered",
+      "tokens": 343461,
+      "tokens_readback": 126809,
+      "tokens_build": 216652,
+      "amendments": 1,
+      "integrated_sha": "5203cee",
+      "order_defects_found_by_worker": [
+        "the order's YAML FRONTMATTER WAS EMPTY (--- immediately followed by ---), so every envelope field was body text. Cause: Larry concatenated the generator's head fragment onto a body carrying its own ---. `--count-markers` still returned ready:true -- a readiness control giving a FALSE GREEN on a structurally void order",
+        "AC1's evidence as written would have broken private_surface, live_authority, credential_scope AND network simultaneously",
+        "a tmpdir counter would leave the watcher SILENTLY DEAD if temp were cleared -- the precise outcome the escalation exists to prevent",
+        "'process alive' as the health definition would leave a HUNG watcher untouched forever"
+      ],
+      "preventable_by_larry": true,
+      "acceptance_status": "CAPABILITY ONLY -- NOT durable, NOT automatic. 98 assertions; Larry mutation-tested the deciding control (forcing the durability probe to succeed turns 15 of 98 red). Acceptance is the next real unattended capture. REMAINS ON THE FRONTIER per 'Nothing may live only in Larry's head'.",
+      "label": "E"
+    },
+    {
+      "id": "WO-28",
+      "worker": "keel",
+      "scope": "session-report writer idempotency -- uniqueness, transaction, stale-row removal",
+      "first_dispatch_substantive": false,
+      "outcome": "CLARIFY -> ACCEPT after Amendment 1; delivered; PROVEN ON LIVE",
+      "tokens": 298583,
+      "tokens_readback": 116126,
+      "tokens_build": 182457,
+      "amendments": 1,
+      "integrated_sha": "0af12e2",
+      "order_defects_found_by_worker": [
+        "the order's 'ADD CONSTRAINT' wording would have ABORTED EVERY SUBSEQUENT /rotate -- Postgres has no ADD CONSTRAINT IF NOT EXISTS and populate.mjs applies schema.sql on every run under ON_ERROR_STOP=1. It would have converted silent duplication into a hard failure of the rotation transaction.",
+        "the order's file_surface gave him no file to write the required check script in; he refused to write it on his own authority (critical rule 1)",
+        "the order FORBADE the only real proof ('with no database') -- the properties under test are properties of Postgres, not of a string",
+        "removing stale rows without an absent-vs-empty guard is a DATA-LOSS ROUTE, a worse defect than the one being fixed"
+      ],
+      "preventable_by_larry": true,
+      "value_returned": "two catastrophic classes prevented in one order",
+      "evidence": "Warwick's own acceptance test executed: writer re-run twice against live Supabase left dispatch rows 27->27, 4A rows 5->5, sum 15->15; per-specialist tokens now mirror and reconcile exactly to the 2,221,596 headline",
+      "label": "E"
+    },
+    {
+      "id": "vera-visual-gate-wo26",
+      "worker": "vera",
+      "first_dispatch_substantive": true,
+      "outcome": "NOT PASS -- 2 HIGH findings",
+      "tokens": 131654,
+      "note": "repaired by Felix at 63380d1. Engagement authority UNESTABLISHED: the map records at lines 109 and 360 that 'Felix, Vex and Vera are NOT engaged unless a specific acceptance failure demonstrates one is necessary' (Warwick, 2026-08-04). Felix is covered by Warwick's Amendment 7; whether Vera's gate was separately authorised is not traceable in the committed record. The gate earned its cost; the authority trail is what is missing.",
+      "label": "E1S"
+    },
+    {
+      "id": "explore-cockpit-recon",
+      "worker": "explore",
+      "first_dispatch_substantive": true,
+      "outcome": "delivered",
+      "tokens": 154587,
+      "note": "live reconnaissance before planning, per the Wayfinder rule. Produced the RLS grant table, the schema-gap analysis, the private-api-bridge architecture finding and the Vue/no-build-step UI constraints -- all recorded in the map before implementation began.",
+      "label": "E1S"
+    }
+  ],
+  "findings": [
+    {
+      "id": "F1",
+      "text": "The '5 of 5 accepted' headline and the '0 of 5 clean' reality are both true and measure different things. Every one of the five orders received a binding Amendment 1, and a worker found a serious defect in every single one. Reporting only the first would be the mediocre version of this report.",
+      "confidence": "high",
+      "label": "E"
+    },
+    {
+      "id": "F2",
+      "text": "The improvement over the three-refusal streak is REAL and is exactly one layer deep. REFUSE was caused by STRUCTURAL defects (no file_surface, forbidden surfaces, hand-authored without the envelope.mjs marker, unexecutable acceptance tests) which were closed by a route change -- WO-24 regenerated through tools/wo/envelope.mjs. CLARIFY is caused by SUBSTANTIVE defects -- does the order's premise hold in the real target context -- and that rate did not improve at all. Larry fixed the layer that had a tool; the layer with no tool is unchanged and is being caught entirely by worker judgement.",
+      "confidence": "high",
+      "label": "E"
+    },
+    {
+      "id": "F3",
+      "text": "There is NO evidence the worker bar softened. Keel still refused to write a one-line check script on his own authority (WO-28 A1), still proved defects by execution rather than inference (running the real moduleClosure() rather than reading imports), and still returned CLARIFY four times in five. The change was in the orders, which is also what Larry's own execution log says: 'the difference was the order, not the worker'.",
+      "confidence": "high",
+      "label": "E"
+    },
+    {
+      "id": "F4",
+      "text": "Even the class that was closed was closed against the TOOL'S failure mode, not against the class. WO-27's frontmatter block was empty (--- immediately followed by ---) and `node tools/wo/envelope.mjs --count-markers` still returned ready:true. A readiness control returned a green on a structurally void order -- the exact false-green class this estate keeps writing rules about, occurring inside the tool built to prevent it.",
+      "confidence": "high",
+      "label": "E"
+    },
+    {
+      "id": "F5",
+      "text": "The 88.3% -> 32.5% documentation inversion is REAL, not a counting artefact: product insertions rose 214 -> 3,613, a 17x absolute increase, while documentation stayed roughly flat. But 'product' is not what the word implies. At least 1,488 insertions (>=27.8% of all insertions) are verification harness -- four check scripts created this session totalling 462+431+400+195 lines. The honest sentence is not 'we shifted from documentation to product' but 'we shifted from documentation to a roughly even split of function and the proof of function'. The 27.8% is a LOWER BOUND from current file sizes; Pax could not diff.",
+      "confidence": "medium-high",
+      "label": "E1S"
+    },
+    {
+      "id": "F6",
+      "text": "The 'does work at import' pattern is NOT an estate property and NOT a coincidence -- it is a small, identifiable, UNCLOSED residual class whose highest-consequence member is still open. Established by execution: import.meta.url / require.main entry guards appear 192 times across 170 files under services/, so the guard IS the estate idiom. watch-captures.mjs was FIXED this session and its own comment records the history ('Before WO-27 main() ran at the top level, so a mere import opened production Postgres and ran a full pass'). services/cockpit/db.mjs is STILL unguarded -- lines 16 and 18 construct two pg.Pools against production Postgres at module scope. Two of the three incidents trace to that one 22-line file, which has now shaped design decisions in two consecutive Work Orders and forced the WO-25 architecture by Larry's own written admission.",
+      "confidence": "high",
+      "label": "E"
+    },
+    {
+      "id": "F7",
+      "text": "Larry's self-diagnosed defect signature is substantially CORRECT but too narrow at the top. 5 of 9 recorded errors fit -- CI Node 20 vs registerHooks 22.15, the ubuntu/PowerShell near-miss, the Postgres-toolchain near-miss, WO-24's false premise about the live clone, and the Scheduled Task on a stale clone. But items 4 and 5 are assertions about a CHECKOUT, not a runner. The accurate class is 'asserting a property of a TARGET CONTEXT that was never executed against' -- runner, checkout, cluster, database, all the same defect in different clothes. Larry's own migration plan states it better than his hypothesis: 'The Work Order reasoned about the code; the task points at a checkout.'",
+      "confidence": "high",
+      "label": "E"
+    },
+    {
+      "id": "F8",
+      "text": "The signature did NOT change between sessions -- only the surface did. 4A's finding F6 named the root defect as 'a claim verified against a convenient proxy rather than against the destination'. This session's target-context class is the execution-context special case of exactly that. Two consecutive sessions, one root defect, different clothes. That continuity is more diagnostic than either instance.",
+      "confidence": "high",
+      "label": "E"
+    },
+    {
+      "id": "F9",
+      "text": "Larry's hypothesis MISSES a genuinely distinct second signature: hand-assembly of dispatch artefacts by concatenation, producing a silently malformed artefact. Two instances -- WO-27's empty frontmatter (generator head fragment concatenated onto a body carrying its own ---) and a dispatch prompt shipped containing a literal $(cat) placeholder instead of the order body. Both are in dispatch artefacts, both are mechanical, and one of them defeated its own readiness check.",
+      "confidence": "high",
+      "label": "E"
+    },
+    {
+      "id": "F10",
+      "text": "The read-back gate is earning its cost decisively, and it is not close. 619,637 tokens (29.6%, ~123,927 per order) bought, per order, at least one defect that would have caused material harm -- an aborted /rotate transaction, a data-loss route, a holed control, a vacuous green reaching Veritas, a branch regression. The settling comparison: in 4A, 581,403 tokens (26.2%) were spent DOWNSTREAM of preventable Larry defects, repairing. This session spent a comparable sum UPSTREAM, preventing, and delivered five integrated orders instead of zero. Same order of cost, opposite direction of travel. THE FINDING IS THE DEPENDENCE, NOT THE COST: a last line of defence that fires 5 of 5 is functioning as the first line, and its yield is not falling.",
+      "confidence": "high",
+      "label": "E1S"
+    },
+    {
+      "id": "F11",
+      "text": "The brief lists 6 notifications; the log shows 7. Message 355 at 2026-08-07T00:41:53Z falls inside the stated session window (~00:40 local start) and the 4A report's window closed at 354. Excluding it would leave 355 covered by no report -- the EXACT audit gap 4A recorded as F13 for message 348. This is the second consecutive boundary orphan, and the report-window convention itself produces one at every rotation. This report claims 355 and closes the gap.",
+      "confidence": "high",
+      "label": "E"
+    },
+    {
+      "id": "F12",
+      "text": "Notification payload DEFLATED 26.5% -- mean 1,847.9 bytes across ids 355-363 versus 4A's 2,513.8 across 349-354. 4A finding F8 flagged a 3.07x inflation; the direction has corrected. Whether any send was routine narration remains UNESTABLISHED: the log records bytes and timestamps, never content.",
+      "confidence": "high",
+      "label": "E"
+    },
+    {
+      "id": "F13",
+      "text": "There is a ~7-hour notification silence between 357 (01:21:35Z) and 360 (08:19:58Z) containing the WO-25 and WO-26 integrations, Vera's NOT PASS on 2 HIGH, the a11y repair and the CI going red. Judged against Rule 4a's written criteria, none of those required a Warwick decision and all were self-corrected in the same stretch; the closest call is the CI red, which the phrase 'a significant failure' arguably names. Against that, the window is overnight and a buzz Warwick cannot act on is what 'never for routine progress narration' protects. VERDICT: no send in that window was CLEARLY owed. 4A's F7 -- three gate verdicts returned after the log terminated -- did NOT recur in that form. Every unambiguously owed event (the DELETE permission, the elevation bundle, the watcher incident) falls inside the 08:19-09:39 cluster of four sends.",
+      "confidence": "medium",
+      "label": "E for the log; I for owedness"
+    },
+    {
+      "id": "F14",
+      "text": "Message ids 358 and 359 do not appear in the transport log. Telegram assigns message_id chat-wide, so the most likely explanation is two messages from another sender in that chat. There is NO evidence of a failed send -- every logged send has exit 0 and zero queued. Cause UNESTABLISHED; stated rather than guessed.",
+      "confidence": "high for the gap; unestablished for the cause",
+      "label": "E"
+    },
+    {
+      "id": "F15",
+      "text": "TWO WORKER BOUNDARY BREACHES ARE RECORDED NOWHERE IN GIT. Felix ran git stash/pop under a no-git order (popped a pre-existing repo stash, left conflict markers in two control-plane files; verified nil-impact -- 3 stashes intact, files byte-identical to committed blobs). Keel imported watch-captures.mjs during preflight, whose top-level main() read the gateway env, connected to production Postgres and ran a scan pass -- breaching private_surface, network and live_authority simultaneously (verified nil-impact -- 0 rows, 0 notifications, no secret content). Both were correctly self-reported and correctly VERIFIED rather than trusted. Neither appears in the active Wayfinder, in any Deliverables document dated 2026-08-04 to 2026-08-07, or in any session log -- there are no session logs at all for 2026-08-07 despite eight spawns. Under 'Nothing may live only in Larry's head', two live-surface breaches existing only in a session about to be cleared are exactly the class the clause exists for. SCOPE OF THE NEGATIVE: Deliverables and Team Knowledge/session-logs/2026/08 searched; specialist journals and Builds/ not searched.",
+      "confidence": "high",
+      "label": "E"
+    },
+    {
+      "id": "F16",
+      "text": "THE MOST EXPENSIVE ERROR, verified verbatim in two independent committed documents (migration plan section 6(b) and the Wayfinder execution log): an elevation step was sequenced AHEAD of the migration that makes it safe. MyPKA-YouTube-Watcher-Ensure was installed pointing at C:/Fusion247PKA, a clone 183 commits behind still holding the old 23-line unconditional-kill ensure-youtube-watcher.mjs. The task killed and restarted the watcher every five minutes -- proven empirically, PID 33024 -> 28240 inside one cycle, no state file written. A TubeAIR extraction is capped at 180s and note generation can exceed the 5-minute cycle, so a long transcript could have been killed mid-flight indefinitely. LARRY HAD PERSONALLY WRITTEN THE WARNING ABOUT THIS EXACT TRAP INTO KEEL'S WO-27 ORDER HOURS EARLIER. Detection was Warwick's: his instruction 'the ProcessId must be unchanged across two ticks' caught it inside one cycle. The check design was sound; the sequencing was not. Now binding as section 3 precondition 5 of the migration plan.",
+      "confidence": "high",
+      "label": "E"
+    },
+    {
+      "id": "F17",
+      "text": "BEST PROCESS ARTEFACT OF THE SESSION -- a defect converted into a durable in-place constraint within hours, at the exact site where it would recur. .github/workflows/build-002-tests.yml deliberately leaves idempotency-check.mjs UNREGISTERED and cites the Node-20 failure from earlier the same day as its precedent: 'Registering it on an unverified runner is how a gate dies at import and teaches everyone to ignore a red -- which already happened once in this estate today.' It then forbids the tempting repair: 'DO NOT FIX IT BY SKIPPING WHEN initdb IS ABSENT. A check that quietly executes zero cases and exits 0...' Within-session learning, written where it binds.",
+      "confidence": "high",
+      "label": "E"
+    },
+    {
+      "id": "F18",
+      "text": "The git stat reconciles exactly this session (1741+3613=5354; 2+107=109; area counts sum to 30). 4A finding F12 -- a staged product-file list that did not reconcile with its own totals -- did NOT recur. A small, real improvement in measurement discipline.",
+      "confidence": "high",
+      "label": "E"
+    },
+    {
+      "id": "F19",
+      "text": "The unapproved vlog draft is a product-decision now open across at least THREE sessions -- carried in Deliverables/2026-08-04-rotation-brief.md:145, Deliverables/2026-08-07-subphase-4A-closure-and-4B-handover.md:133, and Deliverables/2026-08-07-cockpit-live-migration-and-rollback-plan.md:41. Recorded three times, decided zero. Deciding is Warwick's; carrying it silently for a third rotation is a route defect worth naming.",
+      "confidence": "high",
+      "label": "E"
+    },
+    {
+      "id": "F20",
+      "text": "Token efficiency rose ~18x -- 579 tokens per product insertion versus 4A's 10,381 -- and zero tokens were spent on refused orders (4A: 197,193). NOT like-for-like: 4A was an assurance and closure session, 4B a build session. This measures what each session was FOR, not relative productivity, and must not be quoted without that caveat.",
+      "confidence": "medium",
+      "label": "E1S"
+    },
+    {
+      "id": "F21",
+      "text": "Larry over-reported an RLS security risk to Warwick, relaying a Supabase advisory before measuring it; an executed grant query disproved it (anon holds no schema USAGE at all, and tools/session-report/schema.sql contains no GRANT statements). The correction is well written and self-authored in the map: 'a scanner advisory is a claim about a default configuration, not a measurement of this database. I passed it on before measuring it.' Recorded once for Warwick, no Work Order raised, no remediation applied -- the correct disposition.",
+      "confidence": "high",
+      "label": "E"
+    }
+  ],
+  "blockers": [
+    {
+      "id": "B1",
+      "text": "NO Veritas receipt covers the closing head 7ba504a. Gate 1 and Gate 2 both remain HOLD at f0d2614. The Sub-phase 4A PASS is bound to c50d8cb and confers nothing here. No Codex eligibility, no merge readiness.",
+      "blocks": "Codex invocation and the merge decision",
+      "label": "E"
+    },
+    {
+      "id": "B2",
+      "text": "CI status at 7ba504a is UNESTABLISHED -- no evidence supplied and Pax has no runner access. 4A blocker B3 warned precisely against carrying a CI-green impression into the next session. Do not carry one out of this one. Read CI from run evidence at a frozen exact head, per workflow, never from PR colour.",
+      "blocks": "any CI-green claim at the closing head; the final freeze",
+      "label": "U"
+    },
+    {
+      "id": "B3",
+      "text": "services/cockpit/db.mjs still opens two production pg.Pools at module load, unguarded (lines 16, 18). It has now shaped design decisions in two consecutive Work Orders and both new CI gates carry comments explaining they exist partly to prove it was never loaded.",
+      "blocks": "nothing immediately; it constrains every future test that would import server.mjs",
+      "label": "E"
+    },
+    {
+      "id": "B4",
+      "text": "WO-27 durable YouTube capture is CAPABILITY ONLY -- not durable, not automatic. 98 assertions and a mutation test prove capability. Acceptance is the next real unattended capture. It REMAINS ON THE FRONTIER per 'Nothing may live only in Larry's head' and must not be moved to done.",
+      "blocks": "any completion claim for the durable-capture outcome",
+      "label": "E"
+    },
+    {
+      "id": "B5",
+      "text": "MyPKA-YouTube-Watcher-Ensure is Disabled on purpose, deliberately not unregistered. Re-enabling is a post-migration step gated by migration-plan section 3 precondition 5: no scheduled task may be enabled against the live clone until that clone carries the code the task assumes.",
+      "blocks": "re-enabling the ensure task",
+      "label": "E"
+    },
+    {
+      "id": "B6",
+      "text": "Nothing built this session reaches Warwick's phone. The live Cockpit serves public/** straight from C:/Fusion247PKA -- 183 commits behind, on a BUILD-015 branch, 10 dirty entries. Warwick's acceptance criterion 9 (the surface survives the move to canonical merged runtime) is untested by construction.",
+      "blocks": "acceptance of the Amendment 7 rotation-report surface",
+      "label": "E"
+    }
+  ],
+  "next_action": {
+    "text": "Dispatch VERITAS GATE 1 over the complete remaining functional scope (rows 1, 2 and 4) at a frozen head, per the Veritas dispatch law -- separate PASS/HOLD/FAIL per numbered functional requirement, no narrowing. Precondition: freeze one final candidate head and COMPLETE CI at it (4B steps 12-13); an in_progress workflow is NOT RUN and NOT RUN is never PASS. Then Gate 2, then the bounded VEX review (Amendment 8, route step 15a), then Codex only with Warwick's explicit authority, then the merge decision pack.",
+    "source": "Deliverables/2026-08-04-proofline-wayfinder-plan.md -- 'THE ONE CURRENT NEXT ACTION' and 'The remaining route, in order, and NONE of it may be skipped'",
+    "label": "E"
+  },
+  "veritas": {
+    "gate1_status_carried": { "verdict": "HOLD", "reviewed_sha": "f0d2614da5b71186f6e335552ed6b166d1327127", "label": "E" },
+    "gate2_status_carried": { "verdict": "HOLD", "reviewed_sha": "f0d2614da5b71186f6e335552ed6b166d1327127", "label": "E" },
+    "subphase_4a_pass_carried": {
+      "verdict": "PASS",
+      "reviewed_sha": "c50d8cb48d4c536952e07ccf32f94bbc4061e615",
+      "receipt": "Deliverables/2026-08-07-veritas-subphase-4a-c50d8cb-receipt.md",
+      "verdict_scope": "SUB-PHASE 4A CLOSURE ONLY -- not Phase 4, not Gate 1, not Gate 2, not Codex eligibility, not merge readiness. 4B inherits NO standing from it.",
+      "label": "E"
+    },
+    "dispatches_this_session": 0,
+    "receipt_covering_closing_head": null
+  },
+  "ci_at_closing_head": {
+    "head": "7ba504aaec6ea61f06f8b2dea241db1fc3bf2d96",
+    "governor-tests": null,
+    "control-plane-tests": null,
+    "secret-scan": null,
+    "cockpit-private-apps": null,
+    "build-002-tests": null,
+    "complete": null,
+    "note": "UNESTABLISHED. No CI evidence was supplied for 7ba504a and Pax has no runner access. Do NOT infer green. Verified by file read: provenance-check.mjs and rotation-report-check.mjs are registered in cockpit-private-apps.yml (Node bumped 20 -> 22 with a written reason); capture-durability-check.mjs is registered in build-002-tests.yml on the Windows job; idempotency-check.mjs is DELIBERATELY unregistered with the reason recorded in-file. Registration is not a run.",
+    "label": "U"
+  },
+  "ding_this_session": {
+    "ids": [355, 356, 357, 360, 361, 362, 363],
+    "sent_count": 7,
+    "exit_zero_count": 7,
+    "failure_count": 0,
+    "usage_errors": [],
+    "queued": 0,
+    "bytes": [2446, 1499, 1172, 2279, 1910, 2212, 1417],
+    "mean_bytes": 1847.9,
+    "prior_session_mean_bytes": 2513.8,
+    "inflation_factor": 0.735,
+    "first_ts": "2026-08-07T00:41:53.433Z",
+    "last_ts": "2026-08-07T09:39:24.497Z",
+    "brief_stated_count": 6,
+    "brief_correction": "the brief omitted message 355 at 00:41:53Z, which falls inside the stated session window and is covered by no other report -- the same boundary-orphan gap 4A recorded as F13 for message 348",
+    "missing_ids_in_log": [358, 359],
+    "missing_ids_cause": null,
+    "owed_and_not_sent": {
+      "count_min": 0,
+      "count_max": 1,
+      "events": ["CI going red on the Node-20 provenance-check registration -- 'a significant failure' by the words of Rule 4a, inside the overnight silence window"],
+      "basis": "a ~7-hour silence between 357 (01:21:35Z) and 360 (08:19:58Z) covering the WO-25/WO-26 integrations, Vera's NOT PASS on 2 HIGH, the a11y repair and the CI red. None required a Warwick decision; all were self-corrected in the same stretch; the window is overnight. Every unambiguously owed event falls inside the 08:19-09:39 cluster.",
+      "verdict": "no send was CLEARLY owed; Warwick's to rule",
+      "label": "E for absence, I for owedness"
+    },
+    "routine_narration_sends": { "value": null, "label": "U", "note": "the transport log records bytes and timestamps, never content; only Warwick reading messages 355-363 can rule on this" },
+    "verification": "read at source from C:/Users/Buggly/.mypka/governor/ding-log.jsonl by Pax; lines 32-38 of the file",
+    "label": "E"
+  },
+  "descopes": [],
+  "larry_self_corrections": [
+    { "claim": "registered provenance-check.mjs in CI on a runner pinned to Node 20", "correction": "CI went red -- registerHooks from node:module requires 22.15+; fixed by bumping to Node 22, with the reason and a prohibition on skip-when-missing written into the workflow", "label": "E" },
+    { "claim": "capture-durability-check could be registered on ubuntu", "correction": "caught before registering -- PowerShell/Win32_Process constraint; registered on the Windows job instead", "label": "E" },
+    { "claim": "a Postgres toolchain is known present on the runner", "correction": "self-caught as never established; idempotency-check left unregistered with the reason recorded in-file", "label": "E" },
+    { "claim": "RLS disabled means anyone with the anon key can read or modify every row (relayed from a Supabase advisory)", "correction": "disproved by an executed grant query -- anon holds no schema USAGE at all; schema.sql contains no GRANT statements, and that absence is what makes the tables unreachable rather than exposed", "label": "E" },
+    { "claim": "re-running populate.mjs is safe", "correction": "false -- duplicated all 5 specialist rows in live Supabase, 30 dispatches where 15 is true; specialist_dispatch had no uniqueness. Required Warwick's authorisation for a DELETE to repair, and produced WO-28.", "label": "E" },
+    { "claim": "the Scheduled Task elevation was safe to hand to Warwick", "correction": "false -- it pointed at a clone 183 commits behind holding the old unconditional-kill script; killed and restarted the watcher every 5 minutes, PID 33024 -> 28240 inside one cycle. Now binding as migration-plan precondition 5.", "label": "E" },
+    { "claim": "WO-24 AC7 -- port server.mjs from the live clone", "correction": "false premise; the governance head already held a superset and porting would have REGRESSED the branch. Caught by Keel at read-back.", "label": "E" },
+    { "claim": "a dispatch prompt was ready to send", "correction": "shipped containing a literal $(cat) placeholder instead of the order body", "label": "E" },
+    { "claim": "WO-27 was ready (--count-markers returned ready:true)", "correction": "the YAML frontmatter block was EMPTY; every envelope field was body text. Caught by Keel, not by the readiness check.", "label": "E" }
+  ],
+  "unestablished": [
+    "opening_context_tokens",
+    "closing_context_tokens",
+    "total_context_token_movement",
+    "elapsed_session_minutes",
+    "host_version",
+    "session_start_head_full_40char_sha",
+    "pr_status_at_closing_head",
+    "ci_status_at_closing_head_all_workflows",
+    "git_log_timezone_offset",
+    "doc_vs_product_FILE_split",
+    "classification_of_the_two_other_area_files",
+    "allocation_time_based_all_categories",
+    "allocation_waiting_pct",
+    "parent_channel_response_latency",
+    "warwick_presence_at_keyboard",
+    "notification_content_routine_narration",
+    "cause_of_missing_ding_ids_358_359",
+    "vera_engagement_authority_trail",
+    "exact_diff_attribution_of_verification_harness_insertions",
+    "independent_verification_of_subagent_token_ledger",
+    "whether_any_specialist_journal_or_Builds_record_carries_the_two_boundary_breaches"
+  ],
+  "specialists": [
+    { "specialist": "keel", "dispatches": 4, "spawn_events": 8, "tokens": 1485881, "outcomes": ["CLARIFY->ACCEPT", "CLARIFY->ACCEPT", "CLARIFY->ACCEPT", "CLARIFY->ACCEPT"], "notes": "Four numbered orders, four accepted, four delivered and integrated, after three consecutive refusals. Found a serious defect in every order including one that would have aborted every subsequent /rotate and one that would have holed Larry's own one-day-old control. One self-reported boundary breach (imported watch-captures.mjs at preflight; verified nil-impact)." },
+    { "specialist": "felix", "dispatches": 2, "spawn_events": 3, "tokens": 521146, "outcomes": ["ACCEPT with 6 unsettled", "repair delivered"], "notes": "System tab UI. Proved the cited render gate cannot see the System area -- all existing scenarios pin area:'apps' -- preventing a vacuous green from reaching Veritas as render proof. Failed Vera's visual gate on 2 HIGH and repaired at 63380d1. One self-reported boundary breach (git stash/pop under a no-git order; verified nil-impact)." },
+    { "specialist": "vera", "dispatches": 1, "spawn_events": 1, "tokens": 131654, "outcomes": ["NOT PASS -- 2 HIGH"], "notes": "The gate worked and the repair followed. Engagement authority against the map's 'Felix, Vex and Vera are NOT engaged unless...' clause is UNESTABLISHED." },
+    { "specialist": "explore", "dispatches": 1, "spawn_events": 1, "tokens": 154587, "outcomes": ["delivered"], "notes": "Live reconnaissance before planning, per the Wayfinder rule. Produced the RLS grant table, the schema-gap analysis, the private-api-bridge architecture finding and the Vue/no-build-step UI constraints -- all recorded in the map BEFORE implementation began. Cheapest high-yield dispatch of the session." }
+  ],
+  "recommendations_for_warwick": [
+    "Rule on services/cockpit/db.mjs. One file, 22 lines, two production pools at module scope, has dictated architecture across two consecutive Work Orders and caused a live incident through a sibling module. A lazy accessor is small. This is a change to ONE FILE, never a new mechanism -- the regrowth cap applies at full force.",
+    "Do not read '5 of 5 accepted' as order quality. The truthful pair is '0 of 5 clean, 5 of 5 delivered'. The read-back gate is carrying Larry's authoring at ~124k tokens per order and its yield is not falling.",
+    "Smallest fix in the report: `--count-markers` returned ready:true on an order whose YAML frontmatter block was empty. Either that check validates the PARSED envelope or it should stop reporting readiness. It closes a false-green class inside the tool built to prevent false greens.",
+    "Read Telegram messages 355-363 and rule on whether any was routine narration, and on the ~7-hour overnight silence. No instrument can answer it; the byte trend is down 26.5% and points the right way.",
+    "Decide the unapproved vlog draft, or explicitly park it with a date. It has been carried across three rotations and recorded three times without a decision.",
+    "The report-window convention orphans one notification per rotation -- message 348 last time, message 355 this time. Define the window by ding-id continuity rather than by session boundary.",
+    "Two worker boundary breaches (Felix git stash/pop; Keel importing watch-captures.mjs into production Postgres) were correctly self-reported and verified nil-impact, but exist in NO committed artefact other than this report. Decide whether they belong in the map."
+  ],
+  "notes": "Sub-phase 4B build session on the Claude host. Range b0a1c99..7ba504a, 34 commits, 30 files, +5354/-109, 32.5% of insertions documentation -- inverted from 4A's 88.3%, and the inversion is real, though at least 27.8% of all insertions is verification harness rather than function. Five Work Orders issued, FIVE accepted and integrated (WO-24 2829d43, WO-25 77dbca2, WO-26 67b0af8 + 63380d1, WO-27 5203cee, WO-28 0af12e2), breaking a three-order refusal streak -- but ZERO survived read-back without a binding amendment and a worker found a serious defect in every one. 2,093,268 measured subagent tokens across 8 spawns and 13 return events; 29.6% spent on the read-back gate, which caught 5 of 5 and is judged to be earning its cost decisively. Zero tokens on refused orders (4A: 197,193). The most expensive error: an elevation step sequenced ahead of the migration that makes it safe, handing Warwick a Scheduled Task pointing at a clone 183 commits behind, which killed and restarted the YouTube watcher every 5 minutes (PID 33024 -> 28240 in one cycle) -- with Larry having personally written the warning about that exact trap into Keel's order hours earlier. Notification transport 7/7 exit 0, payload down 26.5%, one boundary-orphan message (355) reclaimed. NO Veritas receipt covers this head; Gate 1 and Gate 2 both HOLD; CI at 7ba504a UNESTABLISHED and must not be assumed green. Report written by Pax; the session is not its own sole witness. No figure in this payload is an estimate; every unsupplied quantity is null and listed under unestablished.",
+  "author": "pax",
+  "report_written_by": "pax",
+  "self_witness_disclaimer": "Same-estate review -- not independently verified. Pax is a specialist of the team whose session is reported, dispatched by its subject, running in the same model and runtime. This is structurally weaker than external review. Pax had NO Bash: no git, no CI, no process table, no gh, no ability to diff. Every quantity is Larry-measured. The mitigation applied: each load-bearing claim was verified against a committed artefact by Read/Grep (the five Work Order files, the Wayfinder execution log, the workflow YAML, db.mjs and watch-captures.mjs source, the migration plan, and the ding transport log read at source), and four findings run AGAINST the brief supplied -- the notification count (7 not 6), the scope of Larry's self-diagnosed defect signature (target context, not runner), the composition of the 'product' insertions (>=27.8% verification harness), and the framing of the acceptance streak (0 of 5 clean, not 5 of 5 clean)."
+}
