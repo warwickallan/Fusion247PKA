@@ -47,6 +47,7 @@ import {
   loadCodexContract,
   assertDeliveredContract,
   parseContractFrontmatter,
+  buildCodexPrompt,
 } from '../../review/codexAdapter.mjs';
 import { runMergeReview } from '../supervisorCodex.mjs';
 import { QA_SKILL as REVIEW_DIFF_QA_SKILL } from '../reviewDiff.mjs';
@@ -155,14 +156,14 @@ const PACKET = {
  * and assert the captured `stdin` bytes carry the law. Reused verbatim by the mutation half so a
  * mutation is proven to break THIS assertion, not a weakened restatement of it.
  */
-async function assertLawReachesStdin({ contractPath, forceSkillText = null }) {
+async function assertLawReachesStdin({ contractPath, forceSkillText = null, packet = PACKET }) {
   const spawn = makeCapturingSpawn();
   const contract = loadCodexContract({ contractPath });
   assert.equal(contract.ok, true, `contract must load: ${contract.error ?? ''}`);
 
   const delivered = forceSkillText === null ? contract.text : forceSkillText;
   const res = await runMergeReview({
-    qaSkillText: delivered, packet: PACKET, cwd: TMP,
+    qaSkillText: delivered, packet, cwd: TMP,
     spawn, authProbe: AUTH_OK, resolveBin: BIN_OK, timeoutMs: 10000,
   });
 
@@ -330,6 +331,95 @@ test('R4 — MUTATION: empty law, an unratified fixture, and a stale loader path
   assert.equal(spawn.captured.length, 0,
     'and NOTHING was written to stdin — so a passing reach assertion above genuinely required the spawn');
   console.log('[mutation] auth probe denied → 0 bytes captured (the reach assertion cannot pass by blocking)');
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// 3b. THE ESTATE-CONVERGENCE INVENTORY REACHES STDIN (WO-2026-08-07-4C-03)
+//
+// WO-4C-01 proved §3b's LAW reaches the child. That left the obligation live and the evidence for
+// it absent — Codex was told to establish nine convergence properties from staged evidence that
+// was never staged. These three tests are the other half: the EVIDENCE reaches the same bytes.
+//
+// They exercise the real `runMergeReview` → `buildCodexPrompt` path with the same injected spawn,
+// so what is asserted is the bytes written to the child's stdin, not a property of a packet object
+// sitting in memory. A packet field that never renders is exactly the defect reviewDiff.mjs:144
+// already documents: buildCodexPrompt "renders a FIXED WHITELIST of packet keys and silently drops
+// anything it does not know", so a `convergence` key that looked right would have reached the
+// reviewer NOT AT ALL.
+// ──────────────────────────────────────────────────────────────────────────────
+
+// A literal held HERE, outside the renderer it checks — same rule as SENTINEL and O5_LITERAL.
+const CONVERGENCE_BLOCK_HEADING = '── STAGED ESTATE-CONVERGENCE EVIDENCE (merge-class)';
+const INVENTORY_FIXTURE = [
+  'ESTATE CONVERGENCE INVENTORY — gathered by execution at packet-build time.',
+  '[1] LOCAL BRANCHES (2 total, 1 NOT contained in main)',
+  '  build-020/4c-estate-convergence  6ae592cda638  files_absent_from_main=12',
+].join('\n');
+
+test('R7 — a staged convergence inventory reaches the exact bytes written to the child\'s stdin', async () => {
+  const { bytes } = await assertLawReachesStdin({
+    contractPath: ratifiedFixture(),
+    packet: { ...PACKET, convergence: INVENTORY_FIXTURE },
+  });
+  assert.ok(bytes.includes(CONVERGENCE_BLOCK_HEADING),
+    'the delivered bytes carry the labelled convergence section header');
+  assert.ok(bytes.includes('files_absent_from_main=12'),
+    'and the inventory CONTENT itself — the by-content stranded measure — not merely a header');
+  // §3b tells the reviewer it must judge on staged evidence. The evidence must therefore arrive
+  // AFTER the law that instructs it, exactly as the diff does.
+  assert.ok(bytes.indexOf(SENTINEL) < bytes.indexOf(CONVERGENCE_BLOCK_HEADING),
+    'the contract precedes the convergence evidence in the delivered bytes');
+  // And it is labelled as evidence rather than as a verdict, so a reviewer cannot read a staged
+  // fact as a staged conclusion.
+  assert.ok(bytes.includes('not a convergence verdict'),
+    'the block states plainly that it is evidence, not a verdict');
+  console.log(`[reach-4c] convergence block delivered; ${bytes.length} total bytes to stdin`);
+});
+
+test('R8 — ABSENT-KEY EQUIVALENCE: a packet without `convergence` renders BYTE-IDENTICALLY to before', () => {
+  // The whole justification for putting this in the shared renderer is that every other caller —
+  // the delivery-review path, reviewDiff.mjs, fableAdapter.mjs — is untouched. That is asserted
+  // here rather than claimed in a comment, because a rendering only BELIEVED to be inert is how an
+  // unrelated review turn quietly acquires a new section.
+  const skill = '# law\nbody\n';
+  const withoutKey = buildCodexPrompt({ skillText: skill, packet: PACKET });
+  const withNull = buildCodexPrompt({ skillText: skill, packet: { ...PACKET, convergence: null } });
+  const withEmpty = buildCodexPrompt({ skillText: skill, packet: { ...PACKET, convergence: '' } });
+  assert.equal(withNull, withoutKey, 'convergence: null renders identically to the key being absent');
+  assert.equal(withEmpty, withoutKey, 'convergence: \'\' renders identically too — an empty inventory is never staged as one');
+  assert.ok(!withoutKey.includes(CONVERGENCE_BLOCK_HEADING), 'and no convergence section appears at all');
+
+  // THE CONTROL. Byte-equality above proves nothing unless the comparison can also detect a
+  // difference — otherwise it would pass over a renderer that ignored the field entirely.
+  const withKey = buildCodexPrompt({ skillText: skill, packet: { ...PACKET, convergence: INVENTORY_FIXTURE } });
+  assert.notEqual(withKey, withoutKey, 'CONTROL: a populated inventory DOES change the bytes');
+  assert.ok(withKey.includes(CONVERGENCE_BLOCK_HEADING) && withKey.includes('files_absent_from_main=12'));
+  console.log(`[reach-4c] absent-key equivalence holds; populated block adds ${withKey.length - withoutKey.length} bytes`);
+});
+
+test('R9 — a FAILED PROBE is visible in the delivered bytes and never renders as a clean estate', async () => {
+  // The property the Work Order calls load-bearing, asserted at the delivery boundary rather than
+  // at the gatherer's return value. A probe failure that got lost between the inventory and the
+  // child's stdin would leave a reviewer judging a non-converged estate as converged.
+  const failedInventory = [
+    'ESTATE CONVERGENCE INVENTORY — gathered by execution at packet-build time.',
+    'probes: 10 run, 3 FAILED — sections below name each one',
+    '[1] LOCAL BRANCHES',
+    '  PROBE FAILED: git for-each-ref --format=... refs/heads — fatal: not a git repository',
+  ].join('\n');
+  const { bytes } = await assertLawReachesStdin({
+    contractPath: ratifiedFixture(),
+    packet: { ...PACKET, convergence: failedInventory },
+  });
+  assert.ok(bytes.includes('PROBE FAILED: git for-each-ref'), 'the probe failure itself reaches stdin');
+  assert.ok(bytes.includes('3 FAILED'), 'and the top-of-block failure count reaches stdin');
+  // The renderer must also TELL the reviewer how to read that line, or a failed probe is just an
+  // odd string in a wall of text.
+  assert.ok(bytes.includes('"PROBE FAILED:" means that fact could NOT be established'),
+    'the delivered bytes instruct the reviewer to treat a failed probe as missing evidence');
+  assert.ok(bytes.includes('never as a clean result'),
+    'and explicitly forbid reading it as a clean result');
+  console.log('[reach-4c] probe failure is visible in the delivered bytes');
 });
 
 // ──────────────────────────────────────────────────────────────────────────────

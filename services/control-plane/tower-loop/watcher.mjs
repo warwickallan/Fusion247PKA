@@ -52,6 +52,13 @@ import { loadOpenFindings, checkFindingDispositions, buildStagedInput } from './
 import { runSupervisor, runMergeReview } from './supervisorCodex.mjs';
 import { CODEX_CONTRACT_PATH, loadCodexContract, assertDeliveredContract } from '../review/codexAdapter.mjs';
 import { gatherGitEvidence } from './gitEvidence.mjs';
+// WO-2026-08-07-4C-03 — ONE implementation of the §3b estate-convergence inventory, two callers.
+// Copying the gatherer into this file would have produced two enumerations that drift apart, and
+// the whole defect being closed here is one merge-class route carrying evidence the other does
+// not. (Its natural home is gitEvidence.mjs, which is the estate's read-only git-shelling module;
+// it lives in mergeCheck.mjs because that was the shared surface this Work Order authorised.
+// Reported, not repaired — see the return.)
+import { safeGatherConvergenceEvidence } from './mergeCheck.mjs';
 import { detectMergeClass } from './mergeClass.mjs';
 import {
   notify, composeMessage, composeLarryMessage,
@@ -111,7 +118,7 @@ export const QA_SKILL_PATH = process.env.TOWER_QA_SKILL_PATH || CODEX_CONTRACT_P
 // watcher resolves reviewer + git-evidence functions once at boot; a fake reviewer / fake
 // git-evidence module (canned, no network) is loaded when the env var points at it. The
 // Telegram transport double is env-controlled INSIDE notify (TOWER_NOTIFY_TRANSPORT=none).
-const REAL_DEPS = { runSupervisor, runMergeReview, gatherGitEvidence, notify };
+const REAL_DEPS = { runSupervisor, runMergeReview, gatherGitEvidence, notify, gatherConvergence: safeGatherConvergenceEvidence };
 
 async function resolveDeps() {
   let reviewerMod = {};
@@ -784,6 +791,7 @@ export async function processTurn(pool, turnId, deps = REAL_DEPS) {
   const doReview = deps.runSupervisor ?? runSupervisor;
   const doMergeReview = deps.runMergeReview ?? runMergeReview;
   const doGatherEvidence = deps.gatherGitEvidence ?? gatherGitEvidence;
+  const doGatherConvergence = deps.gatherConvergence ?? safeGatherConvergenceEvidence;
   const doNotify = deps.notify ?? notify;
 
   // (a) load the ACTIVE supervisor prompt FIRST, and bind it onto the turn if unbound.
@@ -939,7 +947,12 @@ export async function processTurn(pool, turnId, deps = REAL_DEPS) {
           model_id: null,
         };
       } else {
-        const packet = buildMergePacket({ turnRow, evidence, buildRef, larryClaim: turnRow.larry_response, openFindings });
+        // WO-2026-08-07-4C-03 — §3b responsibility B's evidence, on the AUTOMATIC route. This is
+        // the route that actually fires: staging the inventory only into mergeCheck.mjs's CLI
+        // entrypoint would have worked when the command was run by hand and silently not worked
+        // here, which is the "works if you invoke the right thing" failure, not durability.
+        const convergence = await doGatherConvergence({ cwd: REPO_ROOT });
+        const packet = buildMergePacket({ turnRow, evidence, buildRef, larryClaim: turnRow.larry_response, openFindings, convergence });
         const mr = await doMergeReview({ qaSkillText: qa.text, packet, cwd: REPO_ROOT });
         mergeReviewRecord = {
           isMergeClass: true, blocked: mr.blocked === true,
@@ -1022,8 +1035,10 @@ function summariseEvidence(ev) {
   };
 }
 
-/** Build the buildCodexPrompt packet for the merge-class QA review from the Git evidence. */
-function buildMergePacket({ turnRow, evidence, buildRef, larryClaim, openFindings }) {
+/** Build the buildCodexPrompt packet for the merge-class QA review from the Git evidence.
+ *  Exported so the packet's CONTENTS can be asserted directly — a packet built inside a private
+ *  function can only ever be evidenced by spending a real review. */
+export function buildMergePacket({ turnRow, evidence, buildRef, larryClaim, openFindings, convergence = null }) {
   return {
     checkpoint_id: `turn:${turnRow.seq ?? '?'}`,
     build_id: buildRef,
@@ -1034,6 +1049,10 @@ function buildMergePacket({ turnRow, evidence, buildRef, larryClaim, openFinding
     ci_checks: evidence.ci_checks,
     // Carry open findings forward into the QA packet so a merge review must dispose of each.
     evidence_refs: (openFindings ?? []).map((f) => `finding:${f.id} ${String(f.description).slice(0, 120)}`),
+    // WO-2026-08-07-4C-03 — §3b responsibility B. `null` when no inventory was gathered, which
+    // buildCodexPrompt renders as NOTHING rather than as an empty inventory: a section reading
+    // "no branches, no worktrees" would be a converged-looking estate produced by an absent probe.
+    convergence: convergence?.text ?? null,
   };
 }
 

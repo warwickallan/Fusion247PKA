@@ -62,7 +62,7 @@ import { notify } from '../notify.mjs';
 // WP-2F — the merge-check path, now on the ONE canonical SQLite store. Both entrypoints: the
 // tower-loop one (runMergeCheck) and the tower/ one, whose store functions are exported so they
 // can be proven against a real store rather than only read.
-import { runMergeCheck } from '../mergeCheck.mjs';
+import { runMergeCheck, gatherConvergenceEvidence, safeGatherConvergenceEvidence } from '../mergeCheck.mjs';
 import { nextSeq as mcNextSeq, record as mcRecord, auditContext as mcAuditContext } from '../../tower/merge-check.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -158,7 +158,12 @@ const CP_CALL_RE = new RegExp(`(?<![\\w$.])(${CP_FNS.join('|')})\\(`, 'g');
 // prove nothing. (Deliberately not naming the launcher function verbatim in this comment — this
 // scanner's own CALL-SITE regex matches inside prose too, and a literal mention here would count
 // itself as a 26th site.)
-const TOWER_LOOP_CP_SITES = 25;
+// WO-2026-08-07-4C-03 moved this from 25 to 28 — DELIBERATELY, which is the only way this literal
+// is ever allowed to move. Three new launch sites, each windowsHide:true from the moment it was
+// written: the convergence inventory's read-only probe runner in mergeCheck.mjs, and the two
+// pass-through spawn doubles in C2/C5 below (which delegate to the real binary for the commands
+// they are not mutating, and so genuinely launch children).
+const TOWER_LOOP_CP_SITES = 28;
 
 function jsFilesUnder(dir, out = []) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -2250,6 +2255,224 @@ async function main() {
       () => pool.query(`select seq, left(instruction,140) instr from tower.turn order by seq desc limit 5`),
       /no such function: left/i,
       'left() is genuinely unavailable — so substr() working is a real difference');
+  });
+
+  // ══════════════════════════════════════════════════════════════════════════════
+  // WO-2026-08-07-4C-03 — THE ESTATE-CONVERGENCE INVENTORY (reviewer contract §3b).
+  //
+  // WO-4C-01 proved §3b's LAW reaches the Codex child. It left the obligation live and the
+  // evidence for it absent: Codex was told to establish nine convergence properties, and handed
+  // repo/branch/head/base/diff only. C1–C6 prove the inventory is gathered by execution, that a
+  // probe which could NOT run is visible rather than silent, and that it reaches the packet on
+  // BOTH merge-class routes — the CLI entrypoint and the automatic PR-poll route.
+  //
+  // The reach-to-stdin half lives in test/codexContractReach.test.mjs (R7–R9), spawned and counted
+  // by WP-2G above, because it must stay runnable with no native SQLite build.
+  //
+  // NO COUNT IS PINNED. Larry executes estate convergence in this same repository while these run,
+  // so branches and worktrees genuinely disappear mid-enumeration; a test asserting "68 branches"
+  // would fail for the healthiest possible reason.
+  // ══════════════════════════════════════════════════════════════════════════════
+
+  /** A spawn double that fails EXACTLY the git subcommands named, and runs the real thing for the
+   *  rest. Partial failure is the case that matters: a total outage is obvious, whereas one dead
+   *  probe among nine healthy ones is precisely the shape that could render as a clean estate. */
+  function partiallyFailingSpawn(failWhen) {
+    return (cmd, args, opts) => {
+      if (!failWhen(cmd, args)) return spawn(cmd, args, { ...opts, windowsHide: true });
+      const c = new EventEmitter();
+      c.stdout = new EventEmitter();
+      c.stderr = new EventEmitter();
+      c.kill = () => {};
+      setImmediate(() => {
+        c.stderr.emit('data', Buffer.from(`SIMULATED PROBE FAILURE: ${cmd} ${args.join(' ')}\n`));
+        c.emit('close', 128);
+      });
+      return c;
+    };
+  }
+  const REPO_UNDER_TEST = path.resolve(LOOP_DIR, '..', '..', '..');
+
+  await test('C1 — the inventory is gathered BY EXECUTION against the real repository, and states facts only', async () => {
+    const inv = await gatherConvergenceEvidence({ cwd: REPO_UNDER_TEST });
+    assert.ok(inv.probes_run > 5, `real probes ran (got ${inv.probes_run}) — a zero-probe inventory is never evidence`);
+    assert.equal(inv.probes_failed, 0, `no probe failed on a healthy checkout: ${inv.text.slice(0, 600)}`);
+
+    // Every §3b evidence class the Work Order named has a section, and each section is present
+    // because it was ENUMERATED — not because a heading was hardcoded with nothing under it.
+    for (const heading of ['[1] LOCAL BRANCHES', '[2] REMOTE BRANCHES', '[3] REGISTERED WORKTREES',
+      '[4] STASHES', '[5] DIRTY AND UNTRACKED PATHS', '[6] OPEN PULL REQUESTS',
+      '[7] STRANDED-STATE MEASUREMENT COVERAGE']) {
+      assert.ok(inv.text.includes(heading), `the inventory carries ${heading}`);
+    }
+    // Real content, not just scaffolding: this very worktree and this very branch must appear.
+    assert.match(inv.text, /canonical_ref: main @ [0-9a-f]{40}/, 'the canonical ref is resolved to a real SHA');
+    assert.ok(/\[3\] REGISTERED WORKTREES[\s\S]*?count: [1-9]/.test(inv.text), 'at least one worktree was really enumerated');
+    assert.match(inv.text, /files_absent_from_main=\d+/, 'the by-CONTENT stranded measure produced real counts');
+
+    // THE MEASURE IS BY CONTENT, AND THE PACKET SAYS SO — §3b: "Accounted for means classified by
+    // CONTENT, not by name."
+    assert.ok(inv.text.includes('Ref NAMES are never used to classify'), 'the method is stated to the reviewer');
+    assert.ok(inv.text.includes('git ls-tree -r --name-only'), 'and names the exact measure, so it can be reproduced');
+
+    // IT IS EVIDENCE, NOT A VERDICT. No convergence conclusion may be computed in code.
+    assert.ok(inv.text.includes('no convergence verdict, score or boolean'), 'the block declares itself evidence');
+    for (const forbidden of [/converged\s*[:=]/i, /convergence_ok/i, /"?verdict"?\s*[:=]/i, /\bPASS\b/, /\bFAIL\b(?!ED)/]) {
+      assert.ok(!forbidden.test(inv.text), `the inventory must compute no verdict (matched ${forbidden})`);
+    }
+    console.log(`[4c-C1] ${Buffer.byteLength(inv.text, 'utf8')} bytes, ${inv.probes_run} probes, ${inv.probes_failed} failed`);
+  });
+
+  await test('C2 — MUTATION: a FAILED probe is reported explicitly and its section NEVER renders as clean', async () => {
+    // The control made to fail. Kill the branch enumeration and the containment probe: without
+    // this behaviour the section would render "0 branches", which reads as a converged estate and
+    // is the exact failure §3b exists to catch.
+    const inv = await gatherConvergenceEvidence({
+      cwd: REPO_UNDER_TEST,
+      spawn: partiallyFailingSpawn((cmd, args) => cmd === 'git' && (args[0] === 'for-each-ref' || (args[0] === 'branch' && args.includes('--merged')))),
+    });
+    assert.ok(inv.probes_failed >= 2, `the forced failures were counted (got ${inv.probes_failed})`);
+    assert.match(inv.text, /probes: \d+ run, [1-9]\d* FAILED/, 'the failure count is stated at the TOP of the block');
+    assert.ok(inv.text.includes('PROBE FAILED: git for-each-ref'), 'the failing command is named verbatim');
+    assert.ok(inv.text.includes('[8] FAILED PROBES — CONSOLIDATED'), 'and consolidated so it cannot be missed');
+
+    // THE ASSERTION THAT MATTERS: the branch sections must NOT read as an empty, clean estate.
+    const localSection = inv.text.split('[1] LOCAL BRANCHES')[1].split('[2] REMOTE BRANCHES')[0];
+    assert.ok(localSection.includes('PROBE FAILED'), 'the local-branch section itself carries the failure');
+    assert.ok(!/count: 0/.test(localSection), 'it does NOT render a zero count');
+    assert.ok(!/\(none\)/.test(localSection), 'and does NOT render an empty list — silence would read as converged');
+
+    // CONTROL ON THE CONTROL: the same call WITHOUT the mutation is clean, so the assertions above
+    // are detecting the injected failure rather than always-true text.
+    const healthy = await gatherConvergenceEvidence({ cwd: REPO_UNDER_TEST });
+    assert.equal(healthy.probes_failed, 0, 'CONTROL: the unmutated inventory has no failures');
+    assert.ok(!healthy.text.includes('PROBE FAILED'), 'CONTROL: and says so — the mutation is what produced the failure text');
+    console.log(`[4c-C2] forced ${inv.probes_failed} probe failures; all visible in the block`);
+  });
+
+  await test('C3 — TOTAL outage: every probe fails, and the block still says so rather than looking empty', async () => {
+    const inv = await gatherConvergenceEvidence({
+      cwd: REPO_UNDER_TEST, spawn: partiallyFailingSpawn(() => true),
+    });
+    assert.ok(inv.probes_failed >= 8, `every probe failed (got ${inv.probes_failed} of ${inv.probes_run})`);
+    assert.ok(inv.text.includes('[8] FAILED PROBES — CONSOLIDATED'));
+    assert.ok(inv.text.includes('Every fact they would have established is MISSING from this inventory.'),
+      'the block states the consequence, not merely the failures');
+    assert.ok(inv.text.includes('canonical_ref: main (UNRESOLVED'), 'an unresolved canonical ref is stated, not defaulted');
+    // The stranded measure has no baseline, and must say the absence of counts is a GAP.
+    assert.ok(inv.text.includes('GAP IN THE EVIDENCE') && inv.text.includes('not an absence of stranded work'),
+      'the missing stranded baseline is named as a gap in the evidence, never as a clean result');
+    // And still no verdict — a total outage must not resolve to "nothing stranded".
+    assert.ok(!/converged/i.test(inv.text), 'a total outage never renders as convergence');
+    console.log(`[4c-C3] total outage: ${inv.probes_failed}/${inv.probes_run} probes failed, block still speaks`);
+  });
+
+  await test('C4 — the byte cap TRUNCATES LOUDLY, and a thrown gatherer still produces a speaking block', async () => {
+    const tiny = await gatherConvergenceEvidence({ cwd: REPO_UNDER_TEST, maxBytes: 900 });
+    assert.equal(tiny.truncated, true, 'the cap bit');
+    assert.ok(Buffer.byteLength(tiny.text, 'utf8') < 900 + 400, 'and bounded the block (notice aside)');
+    assert.ok(tiny.text.includes('ESTATE CONVERGENCE INVENTORY TRUNCATED at'), 'truncation is announced, never silent');
+    assert.ok(tiny.text.includes('UNSEEN EVIDENCE, not an empty estate'), 'and its meaning is spelled out');
+    // The failure summary must survive a cut, because it sits at the top by construction.
+    assert.match(tiny.text, /probes: \d+ run, \d+ FAILED?/, 'the probe summary survives truncation');
+
+    // The wrapper: a gatherer that throws must still yield a block that says nothing was established.
+    const thrown = await safeGatherConvergenceEvidence({
+      cwd: REPO_UNDER_TEST,
+      spawn: () => { throw new Error('SIMULATED catastrophic spawn failure'); },
+      maxBytes: -1,   // force the render path itself to misbehave alongside the spawn failure
+    });
+    assert.ok(thrown.text.includes('PROBE FAILED') || thrown.text.includes('NOT GATHERED'),
+      'a catastrophic failure still produces an explicit block');
+    assert.ok(!/count: 0/.test(thrown.text), 'and never a zero count');
+    console.log(`[4c-C4] cap announced at 900B; catastrophic path speaks`);
+  });
+
+  await test('C5 — END TO END on the CLI route: runMergeCheck stages the inventory AND ci_checks into the real packet', async () => {
+    // The acceptance property, on the route the Work Order named. `spawn` is injected so the gh
+    // evidence resolves with no network, and `runMergeReview` is injected so the packet handed to
+    // the reviewer can be OBSERVED without spending a live Codex review.
+    const HEAD = 'c1c2c3d4e5f60718293a4b5c6d7e8f9012345678';
+    const BASE = 'd1d2c3d4e5f60718293a4b5c6d7e8f9012345678';
+    const ghSpawn = (cmd, args, opts) => {
+      if (cmd === 'git') return spawn(cmd, args, { ...opts, windowsHide: true });   // convergence probes stay REAL
+      const c = new EventEmitter();
+      c.stdout = new EventEmitter(); c.stderr = new EventEmitter(); c.kill = () => {};
+      const a = args.join(' ');
+      let out = '';
+      if (a.includes('api repos/')) out = JSON.stringify({ head: HEAD, base: BASE });
+      else if (a.includes('--name-only')) out = 'services/control-plane/tower-loop/mergeCheck.mjs\n';
+      else if (a.startsWith('pr diff')) out = '--- a/x\n+++ b/x\n+one line\n';
+      else if (a.startsWith('pr checks')) out = 'control-plane-tests\tpass\t1m\n';
+      setImmediate(() => { if (out) c.stdout.emit('data', Buffer.from(out)); c.emit('close', 0); });
+      return c;
+    };
+    let seen = null;
+    const spyReview = async ({ packet }) => {
+      seen = packet;
+      return { ok: true, blocked: false, modelId: 'spy', result: { status: 'ok', verdict: 'approve', summary: 'spy', findings: [] } };
+    };
+    const out = await runMergeCheck({
+      pool, repo: 'warwickallan/Fusion247PKA', prNumber: 7100, headSha: HEAD, baseSha: BASE,
+      buildRef: 'BUILD-020', wpRef: 'WO-4C-03', larryClaim: 'convergence evidence staging',
+      cwd: REPO_UNDER_TEST, spawn: ghSpawn, runMergeReview: spyReview,
+      telegramToken: null, telegramChat: null,
+    });
+    assert.equal(out.blocked, false, `the run reached the review (status=${out.status})`);
+    assert.ok(seen, 'the packet handed to the reviewer was observed');
+    assert.ok(typeof seen.convergence === 'string' && seen.convergence.length > 200,
+      'the CLI route stages a real convergence inventory');
+    assert.ok(seen.convergence.includes('ESTATE CONVERGENCE INVENTORY'));
+    assert.ok(seen.convergence.includes('[3] REGISTERED WORKTREES'), 'gathered by execution, not a placeholder');
+    // The ci_checks omission fixed alongside it — gathered, rendered, and previously dropped here
+    // while the sibling route staged it.
+    assert.ok(String(seen.ci_checks).includes('control-plane-tests'), 'ci_checks now reaches the packet on this route too');
+    console.log(`[4c-C5] CLI packet carries ${Buffer.byteLength(seen.convergence, 'utf8')}B of convergence evidence + ci_checks`);
+  });
+
+  await test('C6 — END TO END on the AUTOMATIC route: processTurn stages the inventory into the merge-class packet', async () => {
+    // The route that actually fires. Staging only into the CLI entrypoint would have worked when
+    // the command was run by hand and silently not worked here.
+    const t = await inertTurn({ buildRef: 'BUILD-4C03', headSha: HEAD_A,
+      instruction: 'Warwick: merge-class review.', larryResponse: 'Larry: ready to merge.' });
+    let seen = null;
+    const deps = {
+      ...IN_PROC_DEPS,
+      gatherGitEvidence: async () => ({
+        resolved: true, repo: REPO, branch: 'build-020/4c-estate-convergence',
+        head_sha: HEAD_A, base_sha: HEAD_B, diff_range: `${HEAD_B}..${HEAD_A}`,
+        changed_files: ['services/control-plane/tower-loop/watcher.mjs'],
+        diff_text: '--- a\n+++ b\n+x\n', diff_truncated: false, ci_checks: 'ok', ci_source: 'gh pr checks',
+      }),
+      runMergeReview: async ({ packet }) => {
+        seen = packet;
+        return { ok: true, blocked: false, modelId: 'spy', result: { status: 'ok', verdict: 'approve', summary: 'spy', findings: [] } };
+      },
+    };
+    const prev = process.env.TOWER_MERGE_CLASS_HEURISTIC;
+    process.env.TOWER_MERGE_CLASS_HEURISTIC = 'on';   // 'ready to merge' ⇒ merge-class
+    try {
+      await processTurn(pool, t.id, deps);
+    } finally {
+      if (prev === undefined) delete process.env.TOWER_MERGE_CLASS_HEURISTIC; else process.env.TOWER_MERGE_CLASS_HEURISTIC = prev;
+    }
+    assert.ok(seen, 'the merge-class review ran and its packet was observed');
+    assert.ok(typeof seen.convergence === 'string' && seen.convergence.includes('ESTATE CONVERGENCE INVENTORY'),
+      'the AUTOMATIC route stages the inventory too — same gatherer, no copy');
+    assert.ok(seen.convergence.includes('[7] STRANDED-STATE MEASUREMENT COVERAGE'));
+
+    // And the ORDINARY (non-merge-class) route stages nothing — the block is merge-class gated,
+    // which is what Warwick specified. Proven by observation, not by reading the branch.
+    let ordinarySeen = 'untouched';
+    const ordinary = await inertTurn({ buildRef: 'BUILD-4C03-ORD', headSha: HEAD_A,
+      instruction: 'Warwick: progress?', larryResponse: 'Larry: still working on the parser.' });
+    process.env.TOWER_MERGE_CLASS_HEURISTIC = 'off';
+    await processTurn(pool, ordinary.id, {
+      ...IN_PROC_DEPS,
+      runMergeReview: async ({ packet }) => { ordinarySeen = packet; return { ok: true, blocked: false, result: {} }; },
+    });
+    assert.equal(ordinarySeen, 'untouched', 'an ordinary delivery round runs NO merge review and stages no inventory');
+    console.log(`[4c-C6] automatic route carries ${Buffer.byteLength(seen.convergence, 'utf8')}B; ordinary route stages none`);
   });
 
   try { fs.rmSync(NO_REPO_DIR, { recursive: true, force: true }); } catch { /* best effort */ }
