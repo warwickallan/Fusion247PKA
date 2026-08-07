@@ -47,6 +47,7 @@ export const PROVENANCE_STATES = ['clean', 'dirty', 'git-unavailable', 'not-a-re
 export const SOURCE_MODULES = [
   'db.mjs',
   'down-reason.mjs',
+  'private-api.mjs',
   'private-apps.mjs',
   'provenance.mjs',
   'rotation-report.mjs',

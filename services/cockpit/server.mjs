@@ -22,6 +22,11 @@ import { provenancePayload } from './provenance.mjs';
 // rotation-report-check.mjs can execute the whole mapping — including the null-is-not-zero property —
 // without a Postgres anywhere near it.
 import { rotationReportsResponse } from './rotation-report.mjs';
+// The private-app API bridge and its ORIGIN BOUNDARY. Extracted for the same reason as static.mjs
+// above, and it was the last live-facing handler still trapped in this file: while it lived here no
+// gate could execute it, because importing this file opens two live pools via db.mjs. It is now
+// executed end to end, against a recording fake upstream, by origin-boundary-check.mjs.
+import { PRIVATE_API_PREFIX, privateApiCtx, servePrivateApi } from './private-api.mjs';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
 // The serving context — which directory is served, and which tree the overlay must stay out of —
@@ -325,93 +330,11 @@ async function proxyAsdairMedia(req, res) {
   }
 }
 
-// Generic same-origin bridge for private app APIs that bind loopback only.
-// OPT-IN: absent COCKPIT_PRIVATE_API, /private-api/* is not a route (falls through to static 404).
-// Strips the /private-api prefix and forwards method/body/selected headers to the configured origin.
-// No app name lives here — private apps own their upstream paths. Used by private overlays that
-// cannot call 127.0.0.1 from a phone/tunnel (that would be the device's loopback, not this host).
-const PRIVATE_API_ORIGIN = String(process.env.COCKPIT_PRIVATE_API || '').replace(/\/$/, '');
-const PRIVATE_API_PREFIX = '/private-api';
-async function proxyPrivateApi(req, res) {
-  if (!PRIVATE_API_ORIGIN) {
-    res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' });
-    res.end('private API bridge is not configured');
-    return;
-  }
-  const incoming = new URL(req.url || '/', 'http://x');
-  if (!incoming.pathname.startsWith(PRIVATE_API_PREFIX)) {
-    res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
-    res.end('not found');
-    return;
-  }
-  const rest = incoming.pathname.slice(PRIVATE_API_PREFIX.length) || '/';
-  // Containment: only absolute path on the configured origin; reject protocol-relative or host injection.
-  if (!rest.startsWith('/') || rest.startsWith('//')) {
-    res.writeHead(400, { 'content-type': 'text/plain; charset=utf-8' });
-    res.end('bad private API path');
-    return;
-  }
-  const target = PRIVATE_API_ORIGIN + rest + incoming.search;
-  try {
-    const headers = { accept: req.headers.accept || '*/*' };
-    if (req.headers['content-type']) headers['content-type'] = req.headers['content-type'];
-    // Buffer body for non-GET/HEAD (private APIs are small JSON / form posts, not multi-GB streams).
-    let body;
-    if (req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'OPTIONS') {
-      const chunks = [];
-      let n = 0;
-      for await (const c of req) {
-        n += c.length;
-        if (n > 40 * 1024 * 1024) {
-          res.writeHead(413, { 'content-type': 'text/plain; charset=utf-8' });
-          res.end('payload too large');
-          return;
-        }
-        chunks.push(c);
-      }
-      body = Buffer.concat(chunks);
-    }
-    if (req.method === 'OPTIONS') {
-      res.writeHead(204, {
-        'access-control-allow-origin': req.headers.origin || '*',
-        'access-control-allow-methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
-        'access-control-allow-headers': req.headers['access-control-request-headers'] || 'content-type',
-        'cache-control': 'no-store',
-      });
-      res.end();
-      return;
-    }
-    const upstream = await fetch(target, {
-      method: req.method,
-      headers,
-      body,
-      signal: AbortSignal.timeout(30_000),
-      redirect: 'manual',
-    });
-    const outHeaders = {
-      'cache-control': upstream.headers.get('cache-control') || 'no-store',
-    };
-    const ct = upstream.headers.get('content-type');
-    if (ct) outHeaders['content-type'] = ct;
-    const cd = upstream.headers.get('content-disposition');
-    if (cd) outHeaders['content-disposition'] = cd;
-    // Reflect browser origin for same-host SPA; never cache private payloads.
-    if (req.headers.origin) {
-      outHeaders['access-control-allow-origin'] = req.headers.origin;
-      outHeaders.vary = 'Origin';
-    }
-    if (!upstream.body) {
-      res.writeHead(upstream.status, outHeaders);
-      res.end();
-      return;
-    }
-    res.writeHead(upstream.status, outHeaders);
-    Readable.fromWeb(upstream.body).pipe(res);
-  } catch (e) {
-    res.writeHead(502, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
-    res.end(JSON.stringify({ ok: false, error: `private API bridge failed — ${whyDown(e)}` }));
-  }
-}
+// The private-app API bridge is built by ONE constructor from the environment, in private-api.mjs,
+// which also owns the origin boundary that decides which requests may use it. Used by private
+// overlays that cannot call 127.0.0.1 from a phone/tunnel (that would be the device's loopback, not
+// this host).
+const PRIVATE_API = privateApiCtx(process.env);
 
 // Deliverables = produced docs (Pax reports etc.) living in the repo's Deliverables/ folder — the synced
 // "things for Warwick to read". Listed newest-first with a human title from the first H1.
@@ -451,7 +374,7 @@ const server = http.createServer(async (req, res) => {
     if (req.url.startsWith('/api/asdair/packet')) { const s = new URL(req.url, 'http://x').searchParams.get('shop'); return j(res, 200, await apiAsdairPacket(s)); }
     if (req.url.startsWith('/api/asdair/media')) return proxyAsdairMedia(req, res);
     // Private-app same-origin bridge (opt-in via COCKPIT_PRIVATE_API). Must run before static.
-    if (req.url.startsWith(PRIVATE_API_PREFIX)) return proxyPrivateApi(req, res);
+    if (req.url.startsWith(PRIVATE_API_PREFIX)) return servePrivateApi(req, res, PRIVATE_API);
     if (req.url.startsWith('/api/mine') && req.method === 'POST') {
       let raw = ''; req.on('data', (d) => { raw += d; if (raw.length > 1e4) req.destroy(); });
       req.on('end', () => {
@@ -529,4 +452,7 @@ server.listen(PORT, BIND, () => {
   // never is, because where an overlay lives can itself say what it is for.
   const line = privateAppsStartupLine(privateAppsResponse(process.env, REPO));
   console[line.level](line.message);
+  // A boundary whose configuration was silently discarded is a boundary nobody can tell is set
+  // wrongly. Said once, out loud, at startup — never silently dropped.
+  for (const warning of PRIVATE_API.configWarnings) console.warn(warning);
 });
