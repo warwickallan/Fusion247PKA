@@ -2356,6 +2356,27 @@ node "C:/Users/Buggly/.mypka/governor/ding.mjs" <message-file>
 
 ## ⭐ ACTIVE SESSION WORK PACKAGE — single durable authority for this session
 
+> **🔄 AMENDMENT 12 — Warwick, 2026-08-07. E-1 RULING + THE VEX RED RULINGS.**
+>
+> ### ① `installed-runtime restart` (service half) — **POST-MERGE ACCEPTANCE PROPERTY.** His words:
+>
+> **It is a post-merge acceptance property. It is NOT required for pre-merge Gate 1 PASS**, because executing it would require touching the live Cockpit/runtime **in direct conflict with the standing pre-merge boundary.**
+>
+> **Keep it explicitly OWED.** After authorised merge it **must be executed against the canonical merged runtime and must pass before BUILD-020 / Phase 4 can close.**
+>
+> > **⛔ «This ruling does not discharge the property; it places it in the correct half of the route.»** **It is the THIRD member of the same circularity Amendment 10 resolved twice** — Gate 1 PASS required it, it required the live runtime restarted, that happens post-merge, and merge requires Gate 1 PASS. **It was simply missing from Amendment 10 ②'s table. It is now in the post-merge half, alongside Amendment 7 ⑥/⑨, the live `:8090` journey, Amendment 9's capture and "branch from main after #97 merges".**
+>
+> **Effect:** Veritas Gate 1's sole remaining blocker at `19fc792` (finding E-1) is resolved as a **routing** matter, not by discharging anything. *(Larry did NOT self-assign it — Veritas was explicit that the gated party assigning its own acceptance property earns no PASS on inference.)*
+>
+> ### ② The Vex RED rulings — **recorded in full at [[Deliverables/2026-08-07-cockpit-private-api-boundary-record]]**, which is the **sanitised** record ruling ① requires. **The detailed review is deliberately OFF this public repository.**
+>
+> 1. **Publication** — detailed review and attack journey **off the public repo**, preserved privately; git carries the minimum sanitised finding/repair/verification record only.
+> 2. **Live exposure** — **repair promptly and proportionately.** *"A private hobby system, not an enterprise incident-response exercise"*, **no evidence of exploitation.** Smallest reversible live containment **authorised to Larry**; **do not prematurely migrate the Cockpit or expand scope.**
+> 3. **Required outcome** — the governing question's accepted answer **must become NO**. **⛔ Removal of reflected CORS headers alone is explicitly NOT sufficient** — a browser write capable of avoiding preflight must also be prevented. **The team chooses the smallest correct implementation and proves the actual browser-origin property.**
+> 4. **Authentication** — **no new authentication system.** The private local/Tailscale boundary is **proportionate at MyPKA's current risk level.** Revisit only if the exposure model materially changes.
+>
+> **Repair: WO-31.** *"No security programme, no credential-rotation exercise, no unrelated hardening."* **After the repair is independently verified, continue the Proofline route autonomously through Gate 1 / Gate 2 / Vex / Codex as applicable.**
+
 > **🔄 AMENDMENT 11 — Warwick, 2026-08-07. FUTURE-ROUTE ONLY: ASDAIR IS NO LONGER THE NEXT HOP. A NEW SUB-PHASE 4C COMES FIRST.**
 >
 > **⛔ THIS AMENDMENT CHANGES NOTHING ABOUT SUB-PHASE 4B.** Warwick, explicit: *"make only the minimum routing amendment needed so 4B finishes exactly as currently planned."* **4B's Work Package, its acceptance rows, its 18-step route, Amendment 10's decisions, the Gate 1 FAIL and every open repair are untouched and remain exactly as written.**
