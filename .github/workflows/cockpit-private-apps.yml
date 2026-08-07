@@ -32,7 +32,16 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          # 22, not 20 — REQUIRED, not a routine bump. provenance-check.mjs proves AC3 (that the
+          # run never loads db.mjs, which opens two live production pools at module load) using
+          # `registerHooks` from `node:module`, which does not exist before v22.15.0. On Node 20 the
+          # gate does not fail an assertion — it dies at import with
+          # "does not provide an export named 'registerHooks'".
+          # Do NOT "fix" a future recurrence by making that assertion skip when the API is missing:
+          # a check that silently executes zero cases and exits 0 is the exact failure this whole
+          # workflow exists to prevent. Either the runner supports the technique or the gate is red.
+          # All six gates verified green on v22.18.0 before this bump.
+          node-version: '22'
 
       # Exits non-zero on a failure AND on a vacuous run (zero assertions executed). The Windows
       # case-folding rules are asserted here too — the platform is a parameter rather than a
@@ -69,3 +78,44 @@ jobs:
       # "down — 23". This executes the real function against a real DOMException.
       - name: A down service is explained in words, never a bare error number
         run: node services/cockpit/down-reason-check.mjs
+
+      # /api/health reported the COMMIT and called it the running code, so a dirty working tree
+      # was described by whatever git last recorded. provenance.mjs answers from the loaded bytes
+      # instead, and sourceHash is structurally unable to repeat that failure because it never
+      # consults git. This gate also re-derives SOURCE_MODULES from server.mjs's own imports and
+      # fails on drift — so adding an import without declaring it goes red here rather than
+      # silently shrinking what sourceHash covers. It cannot be run by starting the server:
+      # server.mjs imports db.mjs, which opens two live pools at module load.
+      - name: Build provenance is read from loaded bytes, never from git
+        run: node services/cockpit/provenance-check.mjs
+
+      # db.mjs once named ONE checkout for both its pg import and its credentials default, so a
+      # Cockpit started from any other checkout silently borrowed the live clone's dependencies AND
+      # its live credentials. Veritas Defect 6; BUILD-020 row 1 "survives worktree delete/recreate".
+      # Reads db.mjs as TEXT and never imports it — it opens two production pools at module scope.
+      # On this runner node_modules is absent, so the existence assertion skips LOUDLY and says why:
+      # a green here is 22 assertions plus 5 caught mutations, never a silent zero.
+      - name: Cockpit DB module resolves inside its own clone (no absolute clone root)
+        run: node services/cockpit/clone-portability-check.mjs
+
+      # /private-api was the last live-facing handler inside server.mjs, and server.mjs imports
+      # db.mjs, which opens two live pools at module scope — so no gate could execute it. That is
+      # why the defect survived: it was unreachable by any test, not subtle. It now lives in
+      # private-api.mjs and this boots the real handler against a recording fake upstream: a foreign
+      # origin is refused before its body is read and before anything goes upstream, and the check
+      # asserts what the upstream actually received. Green is 97 assertions plus 5 caught fixtures.
+      # (was 51/4 before WO-32 added the no-Origin method rule. If you change the gate, change this
+      #  line too - a stale count here is a comment, not a control, but it misleads the next reader.)
+      # No install step needed — that is the point of the extraction.
+      - name: The private API bridge refuses a foreign origin before anything reaches the upstream
+        run: node services/cockpit/origin-boundary-check.mjs
+
+      # Warwick's rule for the rotation-report surface: "Unknown, not established and zero are
+      # materially different." A rotation row legitimately carries a real 0 (wo_first_dispatch_success)
+      # beside real nulls (elapsed_minutes, host_version), so the read layer must carry both through
+      # to the wire without either becoming the other. This gate asserts that field-by-field and is
+      # mutation-tested: introducing `?? 0` turns 29 of its assertions red.
+      # It runs with no database — the mapping is exercised through an injected query function, and
+      # the run asserts db.mjs was never loaded (server.mjs imports it, and it opens two live pools).
+      - name: Rotation reports map NULL and zero as different values
+        run: node services/cockpit/rotation-report-check.mjs

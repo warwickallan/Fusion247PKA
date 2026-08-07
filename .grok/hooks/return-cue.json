@@ -1,0 +1,4 @@
+{
+  "_comment": "GROK: Option C only. Pax 2026-08-06 established Grok passive hooks do NOT inject stdout into the parent (official 10-hooks.md). SubagentStop runs in the specialist. There is no Claude-equivalent parent additionalContext path. Do NOT register write/consume inject hooks here — that layout would falsely imply symmetry. MANUAL CONTEXTUAL DISCIPLINE: on specialist return, apply root CLAUDE.md Rule 4a before substantive chat. See ACTIVE SESSION WORK PACKAGE §2 and Deliverables/2026-08-06-pax-grok-return-cue-equivalence.md.",
+  "hooks": {}
+}

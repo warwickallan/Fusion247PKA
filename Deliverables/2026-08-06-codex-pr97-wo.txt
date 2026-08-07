@@ -1,0 +1,133 @@
+repo:  .
+range: 4eb5368e23ada5a8b516860a57c11dbe6b046f31..26468b4985572050428a467fcb9e760cce06cad4
+claim: Deliverables/2026-08-06-pr97-codex-claim-wo.json
+scope  : tools/wo/**
+branch : build-020/phase4-automation-law
+
+ÔöÇÔöÇ GIT EVIDENCE (real, read-only) ÔöÇÔöÇ
+resolved=true diff_range=4eb5368e23ada5a8b516860a57c11dbe6b046f31..26468b4985572050428a467fcb9e760cce06cad4
+changed_files=["tools/wo/README.md","tools/wo/envelope.mjs","tools/wo/envelope.test.mjs"]
+diff bytes=60000 of 79077 (real UTF-8 bytes) truncated=true
+WARNING: diff was TRUNCATED ÔÇö the verdict does not cover the whole change.
+packet diff_range=4eb5368e23ada5a8b516860a57c11dbe6b046f31..26468b4985572050428a467fcb9e760cce06cad4 -- tools/wo/**
+packet scoped_to=["tools/wo/**"] wp_id="phase4-wo-generator"
+
+ÔöÇÔöÇ REAL CODEX MERGE REVIEW (Tower QA skill over the staged diff + the REAL claim) ÔöÇÔöÇ
+contract: C:\Fusion247PKA-build-020-trial\services\control-plane\review\prompts\tower-qa-skill.md
+contract provenance: tower-qa-skill@3(approved;ratified=true)+classification-amendment@1(APPROVED_LIVE) sha256=ad00bb7ac6678b0a92b3d329561d09b326c6eea5b77b9b0df181ea7d540f3172
+ok=true blocked=false model=openai-codex-exec
+{
+  "status": "ok",
+  "verdict": "request_changes",
+  "summary": "CORRECTIONS_REQUIRED. The staged implementation substantially supports G-1 through G-5, but G-6 is not enforced: `--machine-surface` accepts arbitrary values despite the claimed absolute-path closed-list contract, and generation does not require the stated live-authority deviation. The supplied packet also lacks executed test/CI results at head 26468b4985572050428a467fcb9e760cce06cad4, so the hermetic-test claim is not verified. The README additionally claims ordinary-dispatch automation, but no real production dispatch event evidence is staged; that claim cannot be approved under ┬º3a.",
+  "claims_verified": [
+    {
+      "claim": "The generator implements G-1 through G-5.",
+      "status": "confirmed",
+      "evidence": "The staged code separates bare values from guidance, records worktree input provenance, cites both surface classes, labels worker-tool capability, and provides live marker recomputation."
+    },
+    {
+      "claim": "The generator implements G-6 as an absolute machine-path closed list.",
+      "status": "refuted",
+      "evidence": "`asList(args['machine-surface'])` flows into `machineSurfaceBasis()` and emitted `machine_surface` rows without absolute-path validation; `generateOrder()` also succeeds without a `live_authority` deviation."
+    },
+    {
+      "claim": "Hermetic tests pass.",
+      "status": "unverifiable",
+      "evidence": "Test source is staged but truncated, and no executed test or CI receipt tied to exact head 26468b4985572050428a467fcb9e760cce06cad4 is included."
+    },
+    {
+      "claim": "Generation is part of the automatic ordinary dispatch route.",
+      "status": "unverifiable",
+      "evidence": "README prose and an order marker show capability/documentation only. No real production dispatch event, stable runtime invocation, observable failure proof, or fresh-session exercise is staged."
+    },
+    {
+      "claim": "Phase complete is not claimed.",
+      "status": "confirmed",
+      "evidence": "The checkpoint summary explicitly disclaims phase completion; no applicable Veritas closure receipt is therefore required by that summary."
+    }
+  ],
+  "acceptance_results": [
+    {
+      "acceptance_row_id": "G-1",
+      "result": "pass",
+      "rationale": "Generated scalar values are separated from explanatory guidance.",
+      "evidence": "`authorityLines` emits bare values followed by sibling comments; author-required fields similarly place guidance on separate comment lines."
+    },
+    {
+      "acceptance_row_id": "G-2",
+      "result": "pass",
+      "rationale": "Absent and verified worktree inputs are distinguished.",
+      "evidence": "`worktreeSource` maps `absent-input`, verification failure, path absence, match, and mismatch separately."
+    },
+    {
+      "acceptance_row_id": "G-3",
+      "result": "pass",
+      "rationale": "Permitted and prohibited surfaces use the same citation mechanism.",
+      "evidence": "`resolveEnvelope()` wraps both fields with `cite(...)`, including source, heading, and blob identity."
+    },
+    {
+      "acceptance_row_id": "G-4",
+      "result": "pass",
+      "rationale": "Evidence capability is explicitly scoped to the worker tool grant.",
+      "evidence": "`producibleEvidence()` prefixes `WORKER TOOL GRANT (not product authority)` and the field source repeats that boundary."
+    },
+    {
+      "acceptance_row_id": "G-5",
+      "result": "pass",
+      "rationale": "Marker status can be recomputed after editing and the generation footer disclaims live status.",
+      "evidence": "`countMarkers()`, `--count-markers`, and `issuabilitySnapshotFooter()` implement recomputation and snapshot wording."
+    },
+    {
+      "acceptance_row_id": "G-6",
+      "result": "fail",
+      "rationale": "The claimed absolute machine-path closed list is descriptive rather than enforced.",
+      "evidence": "`machineSurfaceBasis(machineSurfaces)` maps every supplied string; neither it nor `generateOrder()` rejects relative paths, empty-like entries, or omission of the stated live-authority deviation."
+    },
+    {
+      "acceptance_row_id": "2-hermetic-tests-pass",
+      "result": "blocked",
+      "rationale": "The packet provides test code but no execution evidence at the reviewed SHA.",
+      "evidence": "No test command result or CI run tied to 26468b4985572050428a467fcb9e760cce06cad4 is staged."
+    },
+    {
+      "acceptance_row_id": "3-no-secrets",
+      "result": "pass",
+      "rationale": "No credential or secret material is visible in the staged implementation.",
+      "evidence": "The shown changes contain code, documentation, fixtures, paths, and placeholder identities only."
+    },
+    {
+      "acceptance_row_id": "4-no-new-control-plane",
+      "result": "pass",
+      "rationale": "The change is a local generator, CLI, documentation, and tests; it does not add a service or control plane.",
+      "evidence": "Changed surface is limited to `tools/wo/README.md`, `envelope.mjs`, and `envelope.test.mjs`."
+    },
+    {
+      "acceptance_row_id": "5-block-only-unsafe-current-action",
+      "result": "fail",
+      "rationale": "Issuing a machine-install order through the claimed ordinary route is currently unsafe because its absolute-path and authority conditions are not enforced.",
+      "evidence": "The CLI accepts `--machine-surface` directly and `generateOrder()` returns success without validating path absoluteness or requiring the documented deviation."
+    }
+  ],
+  "prior_finding_results": [],
+  "findings": [
+    {
+      "id": "F-1-machine-surface-not-validated",
+      "technical_impact": "HIGH",
+      "reachability": "ACTIVE",
+      "required_disposition": "BLOCKS_CURRENT_MERGE",
+      "assumed_deployment_baseline": "The generator is intended for current ordinary Work Order dispatch, including machine-install orders, as claimed by `tools/wo/README.md` and CLI usage.",
+      "evidence": "`asList(args['machine-surface'])` is passed unchanged to `generateOrder()`; `machineSurfaceBasis()` accepts every entry, and `isMachineInstall` merely checks `length > 0`. No absolute-path check exists and no `live_authority` deviation is required before `ok: true`.",
+      "required_correction": "Fail order generation unless every machine surface is an absolute machine path in the supported path form and the required bounded `live_authority` deviation plus authority are present; add negative tests for relative paths and missing authority."
+    },
+    {
+      "id": "F-2-ordinary-dispatch-automation-unproven",
+      "technical_impact": "MEDIUM",
+      "reachability": "ACTIVE",
+      "required_disposition": "BLOCKS_CURRENT_MERGE",
+      "assumed_deployment_baseline": "The README is active operator guidance and claims this generator is the ordinary dispatch route now, while the checkpoint says ordinary dispatch is supported.",
+      "evidence": "The staged README and usage text assert that every issued Work Order must use the generator, but the packet contains no evidence that the real production dispatch event invokes it from a stable runtime with observable failure and fresh-session use.",
+      "required_correction": "Either stage evidence exercising the real ordinary-dispatch production event at this exact head, satisfying ┬º3a, or reclassify the delivered outcome and README wording as a manual generator capability without claiming completed ordinary-route automation."
+    }
+  ]
+}

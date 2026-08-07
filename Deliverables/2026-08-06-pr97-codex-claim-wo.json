@@ -1,0 +1,9 @@
+{
+  "checkpoint_id": "build-020-phase4-pr97-wo",
+  "build_id": "BUILD-020",
+  "wp_id": "phase4-wo-generator",
+  "brief_ref": "Deliverables/2026-08-06-phase4-closure-wp-evidence.md",
+  "summary": "Work Order envelope generator implements G-1..G-6 and supports ordinary dispatch (J1-1 documentation lives in SOP-022 outside this scope). Hermetic tests are part of tools/wo. Phase complete is not claimed.",
+  "brief_excerpt": "1. G-1 bare values; G-2 worktree provenance; G-3 dual cite; G-4 worker-tool label; G-5 count-markers; G-6 machine_surface.\n2. Hermetic tests pass.\n3. No secrets.\n4. No new control plane.\n5. Block only unsafe current action.",
+  "scoped_to": ["tools/wo/**"]
+}

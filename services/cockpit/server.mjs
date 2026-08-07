@@ -7,13 +7,26 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
-import { execSync, spawn } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { q, w } from './db.mjs';
 import { privateAppsResponse, privateAppsStartupLine } from './private-apps.mjs';
 // Static serving — including the overlay route — lives in static.mjs so a gate can EXECUTE it.
 // It cannot be executed from here: this file imports db.mjs, which opens a live write pool on load.
 import { serveStatic, staticCtx } from './static.mjs';
 import { whyDown } from './down-reason.mjs';
+// Build provenance lives in provenance.mjs for the same reason as static.mjs above — so a gate can
+// EXECUTE it — and it answers a harder question than the git one-liner it replaces. See its header.
+import { provenancePayload } from './provenance.mjs';
+// Rotation performance reports, read out of the session_report mirror. Same reason again: the read
+// logic takes its query function as an ARGUMENT and imports nothing that touches a database, so
+// rotation-report-check.mjs can execute the whole mapping — including the null-is-not-zero property —
+// without a Postgres anywhere near it.
+import { rotationReportsResponse } from './rotation-report.mjs';
+// The private-app API bridge and its ORIGIN BOUNDARY. Extracted for the same reason as static.mjs
+// above, and it was the last live-facing handler still trapped in this file: while it lived here no
+// gate could execute it, because importing this file opens two live pools via db.mjs. It is now
+// executed end to end, against a recording fake upstream, by origin-boundary-check.mjs.
+import { PRIVATE_API_PREFIX, privateApiCtx, servePrivateApi } from './private-api.mjs';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
 // The serving context — which directory is served, and which tree the overlay must stay out of —
@@ -29,9 +42,12 @@ const BIND = process.env.COCKPIT_BIND || '127.0.0.1'; // localhost; Tailscale se
 // MIME moved to static.mjs with the serving code that uses it — it had no other reader here.
 
 // Build identity so the app can show "you're on the latest" and tell itself apart from Directus/old URLs.
-let SHA = 'dev'; try { SHA = execSync('git rev-parse --short HEAD', { cwd: DIR }).toString().trim(); } catch { /* not a repo */ }
+// Taken ONCE at startup, deliberately: the question /api/health answers is "what is this process
+// running", and this process loaded those bytes here. A per-request answer would describe the working
+// tree as it is now, which is the very confusion the old git-only line caused.
+const PROVENANCE = provenancePayload();
 let VERSION = '0.0.0'; try { VERSION = JSON.parse(fs.readFileSync(path.join(DIR, 'package.json'), 'utf8')).version; } catch { /* no pkg */ }
-const BUILD = { version: VERSION, sha: SHA, startedAt: new Date().toISOString() };
+const BUILD = { version: VERSION, sha: PROVENANCE.sha, startedAt: new Date().toISOString() };
 
 // Governed intent queues the surface may file into, with their allowlisted payload columns.
 const INTENTS = {
@@ -314,6 +330,12 @@ async function proxyAsdairMedia(req, res) {
   }
 }
 
+// The private-app API bridge is built by ONE constructor from the environment, in private-api.mjs,
+// which also owns the origin boundary that decides which requests may use it. Used by private
+// overlays that cannot call 127.0.0.1 from a phone/tunnel (that would be the device's loopback, not
+// this host).
+const PRIVATE_API = privateApiCtx(process.env);
+
 // Deliverables = produced docs (Pax reports etc.) living in the repo's Deliverables/ folder — the synced
 // "things for Warwick to read". Listed newest-first with a human title from the first H1.
 function listDeliverables() {
@@ -351,6 +373,8 @@ const server = http.createServer(async (req, res) => {
     if (req.url.startsWith('/api/asdair/rules')) return j(res, 200, await apiAsdairRules());
     if (req.url.startsWith('/api/asdair/packet')) { const s = new URL(req.url, 'http://x').searchParams.get('shop'); return j(res, 200, await apiAsdairPacket(s)); }
     if (req.url.startsWith('/api/asdair/media')) return proxyAsdairMedia(req, res);
+    // Private-app same-origin bridge (opt-in via COCKPIT_PRIVATE_API). Must run before static.
+    if (req.url.startsWith(PRIVATE_API_PREFIX)) return servePrivateApi(req, res, PRIVATE_API);
     if (req.url.startsWith('/api/mine') && req.method === 'POST') {
       let raw = ''; req.on('data', (d) => { raw += d; if (raw.length > 1e4) req.destroy(); });
       req.on('end', () => {
@@ -361,7 +385,7 @@ const server = http.createServer(async (req, res) => {
           // favours recall, persists the converged atoms. Rich sources take longer (T2, several min); atoms appear
           // in /api/state when done. neo4j.env is OPTIONAL (only the non-model graph enrichment uses it, which
           // degrades gracefully): --env-file-if-exists so a MISSING neo4j.env can never stop Arc from launching (TQA-001).
-          const p = spawn('node', ['--env-file=C:/.fusion247/fusion-capture-gateway.env', '--env-file-if-exists=C:/.fusion247/neo4j.env', `${REPO}/services/control-plane/cockpit/arc.mjs`, v], { detached: true, stdio: 'ignore', cwd: REPO });
+          const p = spawn('node', ['--env-file=C:/.fusion247/fusion-capture-gateway.env', '--env-file-if-exists=C:/.fusion247/neo4j.env', `${REPO}/services/control-plane/cockpit/arc.mjs`, v], { detached: true, stdio: 'ignore', cwd: REPO, windowsHide: true });
           p.unref();
           j(res, 200, { ok: true, mining: v });
         } catch (e) { j(res, 500, { ok: false, error: e.message }); }
@@ -387,7 +411,7 @@ const server = http.createServer(async (req, res) => {
       // Fire Mason's synthesis over the whole atom estate, detached (one Sonnet pass, ~5 min) — surfaced
       // opportunities appear in /api/state when done. This is the cockpit trigger for lifecycle Step 4.
       try {
-        const p = spawn('node', ['--env-file=C:/.fusion247/fusion-capture-gateway.env', `${REPO}/services/control-plane/cockpit/mason-synthesise.mjs`], { detached: true, stdio: 'ignore', cwd: REPO });
+        const p = spawn('node', ['--env-file=C:/.fusion247/fusion-capture-gateway.env', `${REPO}/services/control-plane/cockpit/mason-synthesise.mjs`], { detached: true, stdio: 'ignore', cwd: REPO, windowsHide: true });
         p.unref();
         return j(res, 200, { ok: true, synthesising: true });
       } catch (e) { return j(res, 500, { ok: false, error: e.message }); }
@@ -408,7 +432,14 @@ const server = http.createServer(async (req, res) => {
       });
       return;
     }
-    if (req.url.startsWith('/api/health')) return j(res, 200, { status: 'ok', build: BUILD });
+    // The rotation reports. `q` is the cp_directus READ pool — never `w`; this route reads evidence
+    // and must remain structurally unable to alter it. The object returned is the one the gate
+    // executes, so what is proved and what Warwick sees are one construction. It never throws: a
+    // database failure comes back as HTTP 200 { ok:false, error } and takes no other route down.
+    if (req.url.startsWith('/api/rotation-reports')) return j(res, 200, await rotationReportsResponse(q));
+    // The four provenance fields are the object provenance.mjs builds and the gate executes — the
+    // endpoint does not assemble its own version of the answer.
+    if (req.url.startsWith('/api/health')) return j(res, 200, { status: 'ok', build: BUILD, ...PROVENANCE });
     return serveStatic(req, res, STATIC);
   } catch (e) { j(res, 500, { ok: false, error: e.message }); }
 });
@@ -421,4 +452,7 @@ server.listen(PORT, BIND, () => {
   // never is, because where an overlay lives can itself say what it is for.
   const line = privateAppsStartupLine(privateAppsResponse(process.env, REPO));
   console[line.level](line.message);
+  // A boundary whose configuration was silently discarded is a boundary nobody can tell is set
+  // wrongly. Said once, out loud, at startup — never silently dropped.
+  for (const warning of PRIVATE_API.configWarnings) console.warn(warning);
 });

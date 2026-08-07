@@ -152,6 +152,130 @@ button { font-family:inherit; }
    again be the tallest thing on the screen. */
 .tech-body .mono.raw { max-height:340px; overflow:auto; }
 
+/* ── Session / Rotation Reports (System tab) ─────────────────────────────────────────────────────
+   LAYOUT ONLY. Not one new colour token. Every pairing below is an EXISTING GL-003 §2b pairing,
+   and the figures are reproduced from the §2d formula (the same arithmetic contrast-check.mjs
+   runs), light / dark:
+
+     --ink2 on --panel    7.47 / 7.37    (.rr-unk, .rr-row-l)          PASS  4.5:1 text floor
+     --ink2 on --panel2   7.08 / 6.78    (.rr-unk inside .tech)        PASS  4.5:1 text floor
+     --ink  on --panel   16.40 / 13.76   (.rr-num, .rr-h, .rr-find-t)  PASS  4.5:1 text floor
+     --ink  on --panel2  15.55 / 12.65   (.rr-num inside .tech)        PASS  4.5:1 text floor
+     --park border on --panel  4.74 / 3.42  (.rr-track outline)        PASS  3:1 non-text floor
+     --accent on --panel2      4.69 / 6.96  (.rr-fill on the track)    PASS  3:1 non-text floor
+
+   ⚠️ A MEASURED DEVIATION, RECORDED RATHER THAN MADE QUIETLY. The obvious bar tokens do not work:
+   measured against a --panel2 track, --accent-w is 1.10, --ok-w is 1.08 and --warn-w is 1.11, and
+   --hair on --panel is 1.24. A bar at 1.1:1 is not a subtle bar, it is an invisible one. So the
+   track's outline is --park and the fill is --accent, both of which clear the 3:1 non-text floor in
+   BOTH schemes. Still no new token — these are existing tokens, measured before use rather than
+   assumed from the tint family's name.
+
+   Nothing here reaches for --ink3 and nothing fades text with `opacity` (GL-003 §2b-bis, D-17/D-18).
+
+   NOTE ON WHAT contrast-check.mjs PROVES ABOUT THIS BLOCK: nothing directly. That script
+   self-validates eight pinned figures and prints a hard-coded pairing report; it never reads these
+   class names. Its green means "the tokens did not move", which is why every pairing above is one
+   §2b already measured rather than a new one asserted here. */
+
+/* THE STATE REGION. .rr-state-msg is the role="status" aria-live="polite" region and .rr-state-act
+   holds the one trigger; both are in the DOM from first paint and neither is destroyed by a state
+   swap. The reasoning is in the template (app.js, "WHAT CHANGED AND WHY") and is not restated here.
+   Only the separation is a style question: the trigger used to sit inline inside two of the state
+   messages, and hoisting it out of the v-if chain puts it on its own line. Nothing else is declared
+   — the messages keep .empty / .item / .as-sub, so no colour, size or token changes. */
+.rr-state-act { margin-top:8px; }
+
+/* THE UNKNOWN-VALUE CLASS — the whole point of this surface.
+   A value that was never measured must not look like a measured zero. Against .rr-num (mono,
+   --ink, a digit) this differs on FOUR axes and NOT ONE OF THEM IS COLOUR: the body face instead
+   of mono, italic instead of upright, --ink2 instead of --ink, and a word instead of a digit. It
+   therefore still reads correctly in greyscale, to a colour-blind reader, and to a screen reader.
+   Mono is load-bearing, not decorative: GL-003 §3 fixes it as "this is a measurement or a machine
+   string", so setting an unmeasured value in the body face WITHDRAWS that claim.
+   Grey (--ink2), never amber: amber means "something is wrong", and unmeasured is not a fault.
+   Follows the .as-note precedent above (italic + the muted token = an honest absence). LOCAL to
+   this surface by decision — it is not a GL-003 primitive, though the estate now wants one:
+   .app-pill.unknown, .app-status.unknown and every nullable field here are three sites. */
+.rr-unk { font-family:var(--font); font-style:italic; font-weight:500; font-size:12.5px;
+  color:var(--ink2); overflow-wrap:anywhere; }
+/* .i-eyebrow is 9.5px mono caps, so the flat 12.5px above rendered the ABSENT fact 32% LARGER than
+   the present label beside it, with a face and a slant change mid-line — the hierarchy inverted on
+   the one line that is supposed to be the quietest.
+   SCOPED, not global. `font-size:inherit` on .rr-unk itself was measured and rejected: .rr-row-v is
+   a <dd> and neither it, .rr-rows, .rr-block, .i-main nor .item declares a font-size, so .rr-unk
+   would inherit the 16px document default and render "not established" LARGER than the 12.5px
+   .rr-num it exists to contrast with — the same inversion, in the other direction, in more places.
+   .i-title (15px) is deliberately left alone: 12.5px inside it is smaller than its host, so the
+   hierarchy there is not inverted and there is nothing to fix. */
+.i-eyebrow .rr-unk { font-size:inherit; }
+/* A MEASURED value. Mono says "this is a measurement" — see above. */
+.rr-num { font-family:var(--mono); font-size:12.5px; font-weight:700; color:var(--ink);
+  overflow-wrap:anywhere; }
+
+.rr-block { margin-top:12px; }
+/* .rr-h IS .as-sec, plus the flex layout its trailing count badge needs — nothing more.
+   It was a standalone rule declaring font-size:12.5px / font-weight:800 / color:var(--ink) /
+   letter-spacing:-.01em, which is .as-sec (L142) character for character. The stylesheet was
+   therefore declaring this treatment to be a heading while the markup rendered it as a <div>: a
+   screen-reader user got ~40 dt/dd pairs per card with no heading landmarks and no way to skip a
+   card or jump to Findings (WCAG SC 1.3.1 Info and Relationships, failure technique F2).
+   The markup is now <h3 class="as-sec rr-h">, which is legal under the group's <h2> and the pane's
+   <h1> with no skipped level, and the typography is declared ONCE, in .as-sec. Two consequences
+   worth knowing: .as-sec:first-child (0,2,0) still wins over this rule and zeroes the top margin
+   for the eight headings that open a .rr-block, exactly as before; the ninth ("Specialists", inside
+   the drawer, preceded by a <dl>) now takes .as-sec's 14px top margin where it previously had none,
+   which is separation it wanted.
+   It also un-deads .rr-find:first-of-type below — that rule never matched while .rr-h was the first
+   <div> in the block. */
+.rr-h { display:flex; align-items:baseline; gap:8px; margin-bottom:6px; }
+/* A real <dl>, for the same reason .as-kv is one: a screen reader announces the label and its
+   figure as a PAIR rather than as two loose strings. The bar rows are label/value pairs, so they
+   get the same treatment — a grid of divs would have looked identical and read worse.
+   (No worked example is written here: AC6 forbids the report's figures as literals in this diff.) */
+.rr-rows { display:flex; flex-direction:column; gap:5px; margin:0; }
+/* label · value, where the value is [bar + number] or the unknown word. The number is never inside
+   the bar and is never replaced by it. */
+.rr-row { display:grid; grid-template-columns:minmax(0,1fr); align-items:center; gap:2px 10px; min-width:0; }
+.rr-row-l { font-size:12.5px; color:var(--ink2); min-width:0; overflow-wrap:anywhere; }
+.rr-row-v { margin:0; min-width:0; display:flex; align-items:center; gap:9px; }
+/* The track takes the slack; the number keeps its natural width so it is never squeezed or clipped.
+   CAPPED, because "takes the slack" had no ceiling: on a 1920px screen the 8px-tall track computed
+   to roughly 1100-1150px wide, and an 8x1130 hairline cannot be read as a proportion — which is the
+   only job a bar has here. 320px is a width a proportion is still legible at; no token, no
+   breakpoint, and min-width:40px below still protects the small end. */
+.rr-row-v .rr-track { flex:1 1 auto; max-width:320px; }
+.rr-row-v .rr-num, .rr-row-v .rr-unk { flex:0 0 auto; }
+/* 560px, matching .as-kv (L129). These two grids sit on the SAME card, and at 520 there was a 40px
+   band in which they disagreed about how many columns the card had. 520 was also a fifth ad-hoc
+   breakpoint in a 560/780/1180/1560 ladder. Nothing is lost at the low end: at 519px this grid was
+   already single-column and comfortable. */
+@media (min-width:560px) { .rr-row { grid-template-columns:minmax(0,12em) minmax(0,1fr); } }
+.rr-specs { display:flex; flex-direction:column; }
+
+/* THE TRACK IS THE ZERO-VERSUS-UNKNOWN TELL, and it is why it has a visible outline rather than
+   only a fill. A real 0 renders a VISIBLE EMPTY TRACK; an unmeasured value renders NO TRACK AT ALL
+   (the template does not emit one). Had the track been drawn in both cases, a zero-width fill and
+   an unmeasured value would be the same picture — which is precisely the collapse this whole
+   surface exists to prevent. --park is GL-003's "neutral status rail: no status colour applies",
+   which is exactly the right thing to say about a measurement that carries no verdict. */
+.rr-track { display:block; height:8px; border-radius:20px; background:var(--panel2);
+  border:1px solid var(--park); overflow:hidden; min-width:40px; }
+.rr-fill { display:block; height:100%; background:var(--accent); border-radius:20px; }
+/* The bar is aria-hidden in the markup: its length duplicates the number printed beside it, and a
+   screen reader should hear the figure once, as a figure. */
+
+.rr-find { display:flex; flex-wrap:wrap; align-items:baseline; gap:8px; padding:6px 0;
+  border-top:1px solid var(--hair); }
+.rr-find:first-of-type { border-top:none; padding-top:2px; }
+/* A finding is PROSE and is rendered verbatim, so it must wrap — .i-why is nowrap+ellipsis and
+   would eat the half of the sentence that carries the finding. */
+.rr-find-t { flex:1 1 14em; min-width:0; font-size:13px; color:var(--ink); line-height:1.5;
+  overflow-wrap:anywhere; }
+
+.rr-spec { padding:7px 0; border-top:1px solid var(--hair); }
+.rr-spec:first-of-type { border-top:none; }
+
 /* The back chevron: .back is padding:0 0 12px and the glyph is narrow, so it rendered 5x19 CSS px —
    under WCAG 2.2 SC 2.5.8 (24x24) on both axes. Specificity beats .back, which is defined later. */
 .apps-pane .app-back { display:inline-flex; align-items:center; justify-content:center;

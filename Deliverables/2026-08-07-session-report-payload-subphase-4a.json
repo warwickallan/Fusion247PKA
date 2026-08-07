@@ -1,0 +1,460 @@
+{
+  "session_date": "2026-08-07",
+  "branch": "build-020/phase4-automation-law",
+  "closing_head": "ccb4132e6d13a8f2e34f80019b8fefa79cdb1a6f",
+  "closing_head_short": "ccb4132",
+  "session_start_head": "f6ce6a12d0d864b50e8cf4e224d305187fd4525e",
+  "session_range": "f6ce6a12d0d864b50e8cf4e224d305187fd4525e..ccb4132e6d13a8f2e34f80019b8fefa79cdb1a6f",
+  "map_path": "Deliverables/2026-08-04-proofline-wayfinder-plan.md",
+  "report_path": "Deliverables/2026-08-07-session-performance-report-subphase-4a.md",
+  "deliverable_path": "Deliverables/2026-08-07-session-performance-report-subphase-4a.md",
+  "payload_path": "Deliverables/2026-08-07-session-report-payload-subphase-4a.json",
+  "host": "claude",
+  "host_version": null,
+  "pr": "#97",
+  "pr_status": "open_unmerged",
+  "prior_freeze_head": "6b485079ca618c46e68fe1755eb99065ea85bb44",
+  "git_range_this_slice": "f6ce6a1..ccb4132",
+  "git_stat_larry_measured": {
+    "commits": 14,
+    "files": 18,
+    "insertions": 1834,
+    "deletions": 146,
+    "doc_files": 13,
+    "doc_insertions": 1620,
+    "doc_deletions": 47,
+    "product_files": 5,
+    "product_insertions": 214,
+    "product_deletions": 99,
+    "doc_share_of_insertions_pct": 88.3,
+    "characterisation": "documentation-dominant; the single largest product-line action was a deletion (.claude/settings.json +1/-56, the hooks descope)",
+    "discrepancy": "staged per-file product list names 4 files summing to +102/-99; staged product total is 5 files +214/-99. Deletions reconcile; 1 file and +112 insertions are unaccounted for. Not guessed.",
+    "label": "E1S"
+  },
+  "metrics": {
+    "opening_context_tokens": { "value": null, "label": "U" },
+    "closing_context_tokens": { "value": null, "label": "U" },
+    "total_context_token_movement": { "value": null, "label": "U" },
+    "elapsed_session_minutes": { "value": null, "label": "U" },
+    "committed_activity_span": {
+      "value": {
+        "first_commit": "9171248",
+        "first_commit_ts_local": "2026-08-06 21:02",
+        "last_commit": "ccb4132",
+        "last_commit_ts_local": "2026-08-07 01:26",
+        "span_minutes": 264,
+        "note": "local clock, offset UNESTABLISHED; not session elapsed and not combined with the ding span"
+      },
+      "label": "E1S"
+    },
+    "ding_log_span_this_session": {
+      "value": {
+        "message_ids": "349-354",
+        "start_ts": "2026-08-06T20:40:13.936Z",
+        "end_ts": "2026-08-06T23:21:48.898Z",
+        "span_minutes": 161,
+        "note": "UTC; log activity span only, not session elapsed"
+      },
+      "label": "E"
+    },
+    "per_specialist_dispatch_counts": {
+      "value": {
+        "veritas": 4,
+        "pax": 3,
+        "nolan": 3,
+        "mack": 3,
+        "keel": 2,
+        "total_instances": 15
+      },
+      "label": "E1S"
+    },
+    "per_specialist_token_usage": {
+      "value": {
+        "veritas": 663631,
+        "pax": 502531,
+        "mack": 481422,
+        "nolan": 376819,
+        "keel": 197193,
+        "total": 2221596
+      },
+      "label": "E1S"
+    },
+    "allocation_product_pct": { "value": 21.7, "label": "E1S", "basis": "share of measured subagent tokens, NOT time" },
+    "allocation_wo_admin_pct": { "value": 8.9, "label": "E1S", "basis": "Keel refused-order token share; NOT time" },
+    "allocation_assurance_pct": { "value": 29.9, "label": "E1S", "basis": "Veritas token share; NOT time" },
+    "allocation_research_advisory_pct": { "value": 39.6, "label": "E1S", "basis": "Pax+Nolan token share; NOT time" },
+    "allocation_rework_pct": { "value": 26.2, "label": "E1S", "basis": "tokens downstream of a preventable Larry defect (Veritas re-rounds 384210 + Keel refusals 197193 = 581403); overlaps the categories above by design" },
+    "allocation_waiting_pct": { "value": null, "label": "U" },
+    "allocation_time_based_any": { "value": null, "label": "U" },
+    "parent_channel_available": { "value": true, "label": "E" },
+    "parent_channel_response_latency": { "value": null, "label": "U" },
+    "queued_messages": { "value": 0, "label": "E" },
+    "wo_first_dispatch_success_numbered_orders": { "value": 0, "denominator": 2, "label": "E" },
+    "wo_first_dispatch_substantive_all_instances": { "value": 13, "denominator": 15, "pct": 86.7, "label": "E1S" },
+    "wo_amendments": { "value": 0, "label": "E" },
+    "wo_refusals": { "value": 2, "label": "E" },
+    "documentation_vs_product_change_volume": {
+      "value": {
+        "files": 18,
+        "insertions": 1834,
+        "deletions": 146,
+        "doc_lines_changed": 1667,
+        "product_lines_changed": 313,
+        "doc_insertions": 1620,
+        "product_insertions": 214,
+        "doc_share_of_insertions_pct": 88.3
+      },
+      "label": "E1S"
+    }
+  },
+  "elapsed_minutes": null,
+  "total_context_tokens_in": null,
+  "total_context_tokens_out": null,
+  "total_subagent_tokens": 2221596,
+  "parent_channel_available": true,
+  "queued_messages": 0,
+  "wo_first_dispatch_success": 0,
+  "wo_amendments": 0,
+  "wo_refusals": 2,
+  "doc_lines_changed": 1667,
+  "product_lines_changed": 313,
+  "allocation_product_pct": 21.7,
+  "allocation_admin_pct": 8.9,
+  "allocation_evidence_pct": 29.9,
+  "allocation_rework_pct": 26.2,
+  "allocation_waiting_pct": null,
+  "work_orders": [
+    {
+      "id": "WO-23",
+      "worker": "keel",
+      "scope": "return-cue hooks",
+      "first_dispatch_substantive": false,
+      "outcome": "REFUSE",
+      "tokens": 95281,
+      "refusal_conditions": [
+        "R1 surface .claude/** forbidden by Keel critical rule 5",
+        "R2 hand-authored, no GENERATED by tools/wo/envelope.mjs marker (SOP-022 J1-1), no hand_authored_exception",
+        "R3 missing mandatory file_surface plus ~17 envelope fields",
+        "R4 two acceptance criteria only the parent or Warwick could fire"
+      ],
+      "preventable": true,
+      "disposition": "no amendment; Larry took the work directly under the Rule 4 four-condition exception, stated before acting",
+      "value_returned": "F1 refuted Larry's stated root cause and prevented a green test that would have left the defect live",
+      "label": "E"
+    },
+    {
+      "id": "WO-24",
+      "worker": "keel",
+      "scope": "Cockpit /api/health provenance",
+      "first_dispatch_substantive": false,
+      "outcome": "REFUSE",
+      "tokens": 101912,
+      "refusal_conditions": [
+        "no file_surface declared",
+        "no GENERATED by tools/wo/envelope.mjs marker (SOP-022 J1-1) — repeat of an acknowledged WO-23 failure with a written remedy",
+        "acceptance tests unexecutable",
+        "order invited writes under Team Knowledge/, forbidden by Keel critical rule 5"
+      ],
+      "preventable": true,
+      "repeat_of": "WO-23 — four of four refusal classes recurred, not two",
+      "disposition": "no amendment; deferred whole to Sub-phase 4B step 4 with regeneration requirements banked",
+      "value_returned": "/api/health cannot be tested by starting the server (db.mjs opens two live pg.Pools at module load); pg is a floor-raise not an upgrade; server.mjs:32 is a fourth console flash",
+      "label": "E"
+    },
+    {
+      "id": "veritas-gate1-amended-wp-0cf70c9",
+      "worker": "veritas",
+      "first_dispatch_substantive": true,
+      "outcome": "FAIL",
+      "tokens": 136306,
+      "label": "E1S"
+    },
+    {
+      "id": "veritas-subphase-4a-2cf3673",
+      "worker": "veritas",
+      "first_dispatch_substantive": true,
+      "outcome": "FAIL",
+      "tokens": 143115,
+      "blocking_findings": ["F1 next action directs descoped work", "F2 merged Phase 3 declared THE LIVE FRONTIER", "F3", "F4", "D-7 false completion claim", "D-9 residuals 4 and 5 false at head"],
+      "preventable_by_larry": true,
+      "root_cause": "verified where pointers aim, not whether the destination is true; a string literal used to discharge a semantic completeness claim",
+      "label": "E"
+    },
+    {
+      "id": "veritas-subphase-4a-52427cd",
+      "worker": "veritas",
+      "first_dispatch_substantive": true,
+      "outcome": "FAIL",
+      "tokens": 177124,
+      "blocking_findings": ["F5 a tenth directive survives unstruck inside its own retirement banner", "F6 ROTATION block records another host's rotation"],
+      "preventable_by_larry": true,
+      "root_cause": "sweep matches lines, repair retires the matched phrase, sibling sentences survive; a line-level post-check cannot catch it",
+      "label": "E"
+    },
+    {
+      "id": "veritas-subphase-4a-c50d8cb",
+      "worker": "veritas",
+      "first_dispatch_substantive": true,
+      "outcome": "PASS",
+      "tokens": 207086,
+      "verdict_scope": "SUB-PHASE 4A CLOSURE ONLY. Not Phase 4. Not Gate 1. Not Gate 2. Not Codex eligibility. Not merge readiness.",
+      "label": "E"
+    },
+    {
+      "id": "mack-careerair-alert-mute",
+      "worker": "mack",
+      "first_dispatch_substantive": true,
+      "outcome": "delivered",
+      "tokens": 113412,
+      "note": "the session's only surviving specialist-delivered product change; read-back then executed; proven through a real scheduled-task fire; mutation-tested",
+      "label": "E1S"
+    },
+    {
+      "id": "mack-flashing-console-fix",
+      "worker": "mack",
+      "instances": 2,
+      "first_dispatch_substantive": true,
+      "outcome": "handback_permission",
+      "tokens": 368010,
+      "note": "root cause proven, runner built and self-proved, rollback captured BEFORE any attempt; Set-ScheduledTask denied by the Claude Code auto-mode classifier for Mack twice and Larry once; it is the command not the agent; all four tasks verified UNCHANGED, no partial application; no workaround attempted",
+      "label": "E"
+    },
+    {
+      "id": "pax-nolan-research-rounds",
+      "worker": "pax+nolan",
+      "instances": 6,
+      "first_dispatch_substantive": true,
+      "outcome": "delivered",
+      "tokens": 879350,
+      "note": "transferability, operating-model reconciliation, Sub-phase model — each Pax round independently reviewed by Nolan; banked on branch research/wayfinder-transferability @ 619c548 (8 artefacts, 2236 lines, pushed). No further rounds authorised in 4B.",
+      "label": "E1S"
+    }
+  ],
+  "findings": [
+    {
+      "id": "F1",
+      "text": "Three consecutive Keel Work Orders — WO-22, WO-23, WO-24 — were refused, all on preventable order defects, with the contract-surface violation class present in all three. WO-22's class is corroborated by two independent prior session reports. The brief presented WO-23 as the first offence.",
+      "confidence": "high",
+      "label": "E"
+    },
+    {
+      "id": "F2",
+      "text": "Four of WO-23's four refusal classes recurred in WO-24, not two as stated in the brief. Established by comparing the WO-23 refusal record with closure record section 2.1.",
+      "confidence": "high",
+      "label": "E"
+    },
+    {
+      "id": "F3",
+      "text": "The remedy was written, committed and then not executed on the very next order: WO-23's disposition states 'Future Work Orders in this package go through node tools/wo/envelope.mjs'. The next order was hand-authored. The gap is binding, not knowledge.",
+      "confidence": "high",
+      "label": "E"
+    },
+    {
+      "id": "F4",
+      "text": "581,403 tokens (26.2% of all measured subagent tokens) were spent downstream of a preventable Larry defect: Veritas re-review rounds 2 and 3 (384,210) plus two refused Keel orders (197,193). The Keel figure has a partial offset — a valid order would have surfaced the same preflight findings.",
+      "confidence": "high",
+      "label": "E1S"
+    },
+    {
+      "id": "F5",
+      "text": "5.1% of measured subagent spend (113,412 tokens) produced the session's only surviving specialist-delivered product change. Independently corroborated by an unrelated instrument: 88.3% of committed insertions were documentation.",
+      "confidence": "high",
+      "label": "E1S"
+    },
+    {
+      "id": "F6",
+      "text": "A single root defect appears five times this session: a claim verified against a convenient proxy rather than against the destination — pointer direction vs target truth; a string literal vs a semantic class; head -8 vs the full list; an outage report and PR rollup colour vs run evidence at the exact head. The estate had already written and committed the corrective rule for every instance.",
+      "confidence": "high",
+      "label": "E"
+    },
+    {
+      "id": "F7",
+      "text": "At least one and up to three owed notifications were not sent. The transport log terminates at message 354 (23:21:48Z); three Veritas gate verdicts — two FAILs and the PASS closing Sub-phase 4A — were returned after it. Robust to the unestablished timezone offset for any value between UTC-1 and UTC+1. Rule 4a names 'a gate verdict' explicitly.",
+      "confidence": "high for the absence, medium for owedness",
+      "label": "E"
+    },
+    {
+      "id": "F8",
+      "text": "Notification payload inflated 3.07x versus the prior session — mean 2,513.8 bytes across ids 349-354 versus 817.9 bytes across ids 341-347 — with three of six sends inside 26 minutes at session start. Whether any was routine narration is UNESTABLISHED: the log records bytes, not content.",
+      "confidence": "medium",
+      "label": "E"
+    },
+    {
+      "id": "F9",
+      "text": "The only Larry-authored product implementation of the session was descoped roughly three hours later. e1b0121 (21:13) repaired the return-cue F1 defect with 12/12 tests and a real mutation test; 664ea4c (00:17) descoped and disabled the system. The descope is correct and evidence-backed (8 false returns, 3 false 'unknown', ~1 duplicate vs ~6 true), but that tally was available before the repair.",
+      "confidence": "medium",
+      "label": "E"
+    },
+    {
+      "id": "F10",
+      "text": "Transport was flawless: 6 sends, 6 'sent', 6 exit 0, zero queued, zero usage errors — better than the prior slice which logged a usage-message-file-unreadable exit 4. Independently re-read at source; Larry's excerpt matched the file exactly across ids 343-354.",
+      "confidence": "high",
+      "label": "E"
+    },
+    {
+      "id": "F11",
+      "text": ".claude/** still has no contracted owner. Correctly raised once for Warwick and correctly not converted into a Work Order. This is now the second session in which Larry personally executed work on that surface.",
+      "confidence": "high",
+      "label": "E"
+    },
+    {
+      "id": "F12",
+      "text": "The staged product-file list does not reconcile with its own totals: four files summing to +102/-99 against a stated total of 5 files +214/-99. One file and +112 insertions unaccounted for. Not guessed.",
+      "confidence": "high",
+      "label": "E"
+    },
+    {
+      "id": "F13",
+      "text": "Notification message 348 (2026-08-06T19:49:48Z) is covered by no session report — the prior report's window closed at 347 and this one opens at 349. An audit gap between two consecutive reports.",
+      "confidence": "high",
+      "label": "E"
+    }
+  ],
+  "blockers": [
+    {
+      "id": "B1",
+      "text": "Scheduled-task flashing fix built and self-proved but NOT APPLIED — Set-ScheduledTask denied by the Claude Code auto-mode classifier for Mack (twice) and Larry (once). It is the command, not the agent; re-dispatch cannot help. Requires Warwick's bounded action.",
+      "blocks": "4B steps 2 and 3",
+      "label": "E"
+    },
+    {
+      "id": "B2",
+      "text": "Veritas Gate 1 remains HOLD at f0d2614 and Gate 2 remains HOLD. The Sub-phase 4A PASS confers no Codex eligibility and no merge readiness. Residuals 1, 2, 3, 6, 7, 8 are open and owed in 4B.",
+      "blocks": "Codex invocation and merge decision",
+      "label": "E"
+    },
+    {
+      "id": "B3",
+      "text": "CI at the closing head ccb4132 is INCOMPLETE — governor-tests and control-plane-tests in_progress at measurement; secret-scan and cockpit-private-apps success. Under estate doctrine in_progress is NOT RUN and NOT RUN is never PASS. No Veritas receipt covers ccb4132; the PASS is bound to c50d8cb.",
+      "blocks": "any CI-green claim at the closing head; 4B step 13 needs complete CI at a frozen exact head",
+      "label": "E"
+    },
+    {
+      "id": "B4",
+      "text": "Hooks disabled but not proven non-firing after a genuinely fresh session. 'Written is not loaded' cuts both ways — already-loaded hooks may keep firing until restart.",
+      "blocks": "4B step 1",
+      "label": "E"
+    }
+  ],
+  "next_action": {
+    "text": "Sub-phase 4B — final BUILD-020 closeout, per the 18 steps in the closure record Part 3. Phase closes only on BOTH: (A) every load-bearing BUILD-020 outcome durable in canonical Git, installed from merged source, surviving /clear, restart and worktree recreation, free of any unmerged-branch / dirty-clone / transcript / old-Larry dependency; and (B) a genuinely fresh Larry can reproducibly create a NEW Build Wayfinder from a Goal Contract alone, without copying the Proofline map or rebuilding the method from chat.",
+    "source": "Deliverables/2026-08-07-subphase-4A-closure-and-4B-handover.md Part 3; Deliverables/2026-08-04-proofline-wayfinder-plan.md section ACTIVE SESSION WORK PACKAGE",
+    "label": "E"
+  },
+  "veritas": {
+    "subphase_4a_round1": {
+      "verdict": "FAIL",
+      "reviewed_sha": "2cf367395b5b175dfc551f72591dd1a4ee470922",
+      "receipt": "Deliverables/2026-08-07-veritas-subphase-4a-2cf3673-receipt.md",
+      "label": "E"
+    },
+    "subphase_4a_round2": {
+      "verdict": "FAIL",
+      "reviewed_sha": "52427cde99e1445d4c2448403f5dc4069ff1522b",
+      "receipt": "Deliverables/2026-08-07-veritas-subphase-4a-52427cd-receipt.md",
+      "label": "E"
+    },
+    "subphase_4a_round3": {
+      "verdict": "PASS",
+      "reviewed_sha": "c50d8cb48d4c536952e07ccf32f94bbc4061e615",
+      "receipt": "Deliverables/2026-08-07-veritas-subphase-4a-c50d8cb-receipt.md",
+      "verdict_scope": "SUB-PHASE 4A CLOSURE ONLY — not Phase 4, not Gate 1, not Gate 2, not Codex eligibility, not merge readiness; no later sub-phase inherits standing",
+      "authorises": "recording Sub-phase 4A closed, and rotating on this head",
+      "label": "E"
+    },
+    "gate1_amended_wp": {
+      "verdict": "FAIL",
+      "reviewed_sha": "0cf70c9",
+      "receipt": "Deliverables/2026-08-06-veritas-gate1-amended-wp-0cf70c9-receipt.md",
+      "label": "E"
+    },
+    "gate1_status_carried": { "verdict": "HOLD", "reviewed_sha": "f0d2614da5b71186f6e335552ed6b166d1327127", "label": "E" },
+    "gate2_status_carried": { "verdict": "HOLD", "reviewed_sha": "f0d2614da5b71186f6e335552ed6b166d1327127", "label": "E" },
+    "receipt_covering_closing_head": null
+  },
+  "ci_at_closing_head": {
+    "head": "ccb4132e6d13a8f2e34f80019b8fefa79cdb1a6f",
+    "governor-tests": "in_progress",
+    "control-plane-tests": "in_progress",
+    "secret-scan": "success",
+    "cockpit-private-apps": "success",
+    "complete": false,
+    "note": "in_progress is NOT RUN; NOT RUN is never PASS. Do not carry a CI-green impression of ccb4132 into 4B.",
+    "label": "E"
+  },
+  "ding_this_session": {
+    "ids": [349, 350, 351, 352, 353, 354],
+    "sent_count": 6,
+    "exit_zero_count": 6,
+    "failure_count": 0,
+    "usage_errors": [],
+    "queued": 0,
+    "bytes": [2062, 2713, 3054, 2274, 2964, 2016],
+    "mean_bytes": 2513.8,
+    "prior_session_mean_bytes": 817.9,
+    "inflation_factor": 3.07,
+    "first_ts": "2026-08-06T20:40:13.936Z",
+    "last_ts": "2026-08-06T23:21:48.898Z",
+    "owed_and_not_sent": {
+      "count_min": 1,
+      "count_max": 3,
+      "events": [
+        "Veritas FAIL @2cf3673 — Sub-phase 4A closure claim failed",
+        "Veritas FAIL @52427cd — second failure on the same closure claim",
+        "Veritas PASS @c50d8cb — the gate verdict closing Sub-phase 4A"
+      ],
+      "basis": "transport log terminates at message 354 (23:21:48Z); all three verdicts were returned after commit 2cf3673 (00:56 local), which falls after 23:21:48Z for any offset between UTC-1 and UTC+1. Rule 4a names 'a gate verdict' explicitly.",
+      "caveat": "the rotation notification for this /rotate may follow this report; it cannot retro-cover the two FAILs, which were discrete past moments",
+      "label": "E for absence, I for owedness"
+    },
+    "routine_narration_sends": { "value": null, "label": "U", "note": "the transport log records bytes and timestamps, never content; only Warwick reading messages 349-354 can rule on this" },
+    "verification": "read at source from C:/Users/Buggly/.mypka/governor/ding-log.jsonl; Larry's staged excerpt matched the file exactly across ids 343-354 and the file terminates at 354",
+    "label": "E"
+  },
+  "descopes": [
+    { "item": "CareerAIR row 3 — automatic Outlook collection", "disposition": "descoped to BACKLOG C-10, parked intact, still recorded NOT LIVE", "evidence": "Amendment 4, fb3a61c; Veritas verified 'intact, not softened'", "label": "E" },
+    { "item": "specialist-return reminder hook system", "disposition": "descoped and disabled — demonstrated regression and no demonstrated net benefit; all six implementations preserved and tracked", "evidence": "Amendment 5, 664ea4c; .claude/settings.json -> {\"hooks\": {}}", "false_positive_tally": "8 false 'specialist has returned' at dispatch, 3 false '(type: unknown)', ~1 duplicate, versus ~6 true", "label": "E" }
+  ],
+  "larry_self_corrections": [
+    { "claim": "eight Veritas gates ignored the frontier contradiction", "correction": "false — drawn from a head -8; a 2026-08-05 receipt had blocked on exactly it", "label": "E1S" },
+    { "claim": "CI is blocked by an Actions outage", "correction": "false by the time it was said; closure record 2.6 now reads TRUE WHEN WRITTEN AND FALSE WITHIN MINUTES — CI IS GREEN at 2cf3673", "label": "E" },
+    { "claim": "stacked PRs would force Codex to review fragments", "correction": "backwards — it truncates at 60k either way", "label": "E1S" },
+    { "claim": "Wayfinder navigation repaired — DONE", "correction": "false completion claim at head — Veritas D-7 @2cf3673", "label": "E" },
+    { "claim": "closure-record residuals 4 and 5 (CI not obtained; PR rollup only Vercel previews)", "correction": "false at head — Veritas D-9 @2cf3673; all four workflows completed success and the rollup carried the real checks", "label": "E" }
+  ],
+  "unestablished": [
+    "opening_context_tokens",
+    "closing_context_tokens",
+    "total_context_token_movement",
+    "elapsed_session_minutes",
+    "host_version",
+    "git_log_timezone_offset",
+    "allocation_time_based_all_categories",
+    "allocation_waiting_pct",
+    "parent_channel_response_latency",
+    "warwick_presence_at_keyboard",
+    "notification_content_routine_narration",
+    "identity_of_fifth_product_file_and_its_112_insertions",
+    "dings_after_message_354",
+    "independent_verification_of_subagent_token_ledger",
+    "compilation_date_of_hook_false_positive_tally"
+  ],
+  "specialists": [
+    { "specialist": "veritas", "dispatches": 4, "tokens": 663631, "outcomes": ["FAIL", "FAIL", "FAIL", "PASS"], "notes": "Gate 1 FAIL @0cf70c9 plus three Sub-phase 4A rounds. Rounds 2 and 3 (384,210 tokens) exist only because rounds 1 and 2 failed on preventable defects." },
+    { "specialist": "pax", "dispatches": 3, "tokens": 502531, "outcomes": ["delivered", "delivered", "delivered"], "notes": "transferability, operating-model reconciliation, Sub-phase model. Quality not graded here — conflict of interest declared in the report." },
+    { "specialist": "mack", "dispatches": 3, "tokens": 481422, "outcomes": ["delivered", "handback_permission", "handback_permission"], "notes": "CareerAIR alert mute delivered (113,412) — the session's only surviving specialist product change. Flashing fix (368,010) built and self-proved but blocked by the auto-mode classifier; no workaround attempted." },
+    { "specialist": "nolan", "dispatches": 3, "tokens": 376819, "outcomes": ["delivered", "delivered", "delivered"], "notes": "independent review of each Pax research round." },
+    { "specialist": "keel", "dispatches": 2, "tokens": 197193, "outcomes": ["REFUSE", "REFUSE"], "notes": "Both refused at read-back before any work began. Both orders defective and preventable, both Larry's. Third and fourth consecutive Keel refusals counting WO-22 from the prior session." }
+  ],
+  "recommendations_for_warwick": [
+    "Rule once on the Work Order authoring route — three consecutive refusals on the same class is a route defect, not three lapses. Cheapest binding uses the existing tools/wo/envelope.mjs route; no new mechanism (regrowth cap applies at full force).",
+    "Settle whether .claude/** gets a contracted owner or a standing named exception. Larry has now taken it directly twice.",
+    "Read Telegram messages 349-354 and rule on whether any was routine narration. No instrument can answer this; the 3.07x byte inflation is the detectable signature.",
+    "Adopt the sentence-level re-sweep as the standing enumeration check (already 4B step 9), and require the class list to be stated beside the result — Veritas's own 'owed' gap proves the coverage claim is only ever relative to the classes used.",
+    "Do not carry a CI-green impression of ccb4132 into 4B; read CI from run evidence at a frozen exact head, never from PR colour."
+  ],
+  "notes": "Sub-phase 4A closure /rotate on the Claude host. Range f6ce6a1..ccb4132, 14 commits, 18 files, +1834/-146, 88.3% of insertions documentation. Sub-phase 4A closed on a genuine Veritas PASS at c50d8cb after three assurance rounds, the first two failing on preventable defects. Every numbered Work Order issued this session was refused at read-back (0/2) — the third consecutive Keel order refused on the contract-surface class, and four of four WO-23 refusal classes recurred in WO-24. 2,221,596 measured subagent tokens across 15 dispatch instances; 26.2% spent downstream of a preventable Larry defect; 5.1% produced the only surviving specialist product change. Transport flawless (6/6, exit 0, zero queued) but the log terminates before three gate verdicts. Report written by Pax; the session is not its own sole witness. All context/token movement for the parent is UNESTABLISHED — not handed over and no sampler held. No figure in this payload is an estimate.",
+  "author": "pax",
+  "report_written_by": "pax",
+  "self_witness_disclaimer": "Same-estate review. Pax is a specialist of the team whose session is reported, dispatched by its subject. Structurally weaker than external review. Every unflattering claim is tied to a committed artefact rather than to reviewer judgement; two of the three sharpest findings run against the brief supplied."
+}

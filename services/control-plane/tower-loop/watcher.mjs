@@ -57,6 +57,8 @@ import {
   notify, composeMessage, composeLarryMessage,
   // W3/W4 (WO-2026-08-05-09, WP-2E) — the QA-exchange composers.
   composeFindingsMessage, composeDispositionMessage,
+  // WO-2026-08-07-33 — the QA-STARTED composer: the one card that fires BEFORE Codex returns.
+  composeQaStartedMessage,
 } from './notify.mjs';
 // WO-TW-02 — the automatic trigger. The poller was already real and already proven; the only
 // thing missing was something that ran it without a human. That something is the loop below.
@@ -856,6 +858,49 @@ export async function processTurn(pool, turnId, deps = REAL_DEPS) {
   // Dispositions reach the packet straight from the DB — nothing is hand-carried in.
   const stagedInput = buildStagedInput(baseText, buildRef, openFindings);
   const packetHash = sha256(stagedInput);
+
+  // (f-pre) WO-2026-08-07-33 — THE FIRST CARD OF THE QA SEQUENCE: "it is running".
+  //
+  // THE POSITION IS THE FEATURE. Every other notification in this file is emitted from
+  // fireTriggers, i.e. AFTER a verdict exists — so TowerBot (which is DISPLAY ONLY; Warwick never
+  // types into it) showed him each outcome and never the beat that says a review is under way.
+  // This is the last line at which "a real Codex QA execution has begun" becomes true, and it is
+  // reached only after everything that could stop one has already returned:
+  //
+  //   - the IDEMPOTENT-REPLAY branch returned above, so re-processing an already-reviewed turn
+  //     never re-announces a Codex run that is not happening;
+  //   - the FAIL-CLOSED findings-disposition gate returned above, and it rejects the round
+  //     "BEFORE any reviewer is invoked" — a card emitted at poll time would have announced QA
+  //     for rounds that never reach Codex at all (that gate, an unreadable QA skill, unresolved
+  //     Git evidence, detectMergeClass not firing, or a claim that never happens);
+  //   - `doReview` on the very next line IS the real Codex invocation.
+  //
+  // TWO CONSTRAINTS, both load-bearing. Neither is an implementation preference:
+  //
+  //   1. THE REAL TURN ID, NEVER null. notify() dedups on (turn_id, reason), and SQLite treats
+  //      every NULL as distinct in a unique index — the property 'tower_failure' and
+  //      'finding_disposed' deliberately exploit so they CAN repeat. This card must send exactly
+  //      once per turn, so it depends on that index actually biting. A null here would re-announce
+  //      on every pass, forever.
+  //   2. UNCONDITIONAL — never gated on a "did we just create it?" flag. The idempotence is the
+  //      database's, exactly as notify()'s own header requires. Gating on a freshly-created flag
+  //      would lose the card permanently if the process died between the turn write and this one.
+  //
+  // A failed send must not take the review round down with it, and must not be silent either.
+  // Logged and continue — the same shape as the poll/post alarms further down this file.
+  try {
+    await doNotify(pool, {
+      turnId,
+      reason: 'codex_qa_started',
+      state: 'qa_started',
+      message: composeQaStartedMessage({
+        buildRef, turnSeq, turnId,
+        prNumber: turnRow.pr_number, headSha: turnRow.head_sha,
+      }),
+    });
+  } catch (e) {
+    log('qa_started_notify_failed', { turnId, error: String(e?.message ?? e) });
+  }
 
   // (f) DELIVERY review: REAL Codex reviews the staged (reconstructed + findings) turn under
   //     the lean delivery-supervisor prompt (ordinary path, unchanged).

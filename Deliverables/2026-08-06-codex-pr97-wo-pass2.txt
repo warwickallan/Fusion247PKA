@@ -1,0 +1,125 @@
+repo:  .
+range: 4eb5368e23ada5a8b516860a57c11dbe6b046f31..5135a2495448461c1859cbebd22476e46c4dcddb
+claim: Deliverables/2026-08-06-pr97-codex-claim-wo-pass2.json
+scope  : tools/wo/**
+branch : build-020/phase4-automation-law
+
+ÔöÇÔöÇ GIT EVIDENCE (real, read-only) ÔöÇÔöÇ
+resolved=true diff_range=4eb5368e23ada5a8b516860a57c11dbe6b046f31..5135a2495448461c1859cbebd22476e46c4dcddb
+changed_files=["tools/wo/README.md","tools/wo/envelope.mjs","tools/wo/envelope.test.mjs"]
+diff bytes=60000 of 81539 (real UTF-8 bytes) truncated=true
+WARNING: diff was TRUNCATED ÔÇö the verdict does not cover the whole change.
+packet diff_range=4eb5368e23ada5a8b516860a57c11dbe6b046f31..5135a2495448461c1859cbebd22476e46c4dcddb -- tools/wo/**
+packet scoped_to=["tools/wo/**"] wp_id="phase4-wo-generator"
+
+ÔöÇÔöÇ REAL CODEX MERGE REVIEW (Tower QA skill over the staged diff + the REAL claim) ÔöÇÔöÇ
+contract: C:\Fusion247PKA-build-020-trial\services\control-plane\review\prompts\tower-qa-skill.md
+contract provenance: tower-qa-skill@3(approved;ratified=true)+classification-amendment@1(APPROVED_LIVE) sha256=ad00bb7ac6678b0a92b3d329561d09b326c6eea5b77b9b0df181ea7d540f3172
+ok=true blocked=false model=openai-codex-exec
+{
+  "status": "ok",
+  "verdict": "request_changes",
+  "summary": "CORRECTIONS_REQUIRED ÔÇö the generator changes satisfy the staged G-1..G-6 claims, including the two prior corrections. However, tools/wo/README.md explicitly claims the listed Phase 4 defects are closed, and the packet contains no applicable committed Veritas PASS receipt covering that closure claim at reviewed SHA 5135a2495448461c1859cbebd22476e46c4dcddb.",
+  "claims_verified": [
+    {
+      "claim": "The generator implements G-1..G-6.",
+      "status": "confirmed",
+      "evidence": "tools/wo/envelope.mjs visibly separates bare values from guidance, records honest worktree provenance, cites both surface classes, labels worker-tool evidence, recomputes markers, and validates absolute machine surfaces plus live_authority deviation and authority."
+    },
+    {
+      "claim": "J1-1 is issuer discipline plus worker refusal, not auto-invoking automation.",
+      "status": "confirmed",
+      "evidence": "tools/wo/README.md:3 and the CLI usage explicitly describe a manual generator/refusal route and disclaim a daemon, hook, or control plane."
+    },
+    {
+      "claim": "Phase completion is not claimed.",
+      "status": "refuted",
+      "evidence": "tools/wo/README.md:29-40 is headed ÔÇ£Defects closed (Phase 4)ÔÇØ and enumerates G-1 through G-6, J1-1, and V4-7 as closed."
+    }
+  ],
+  "acceptance_results": [
+    {
+      "acceptance_row_id": "G-1",
+      "result": "pass",
+      "rationale": "Generated scalar values and authoring markers are bare; explanatory text is emitted as sibling comments.",
+      "evidence": "tools/wo/envelope.mjs generateOrder(): authority lines and authored fields emit values separately from # guidance comments."
+    },
+    {
+      "acceptance_row_id": "G-2",
+      "result": "pass",
+      "rationale": "Absent worktree input is no longer labelled supplied and verified.",
+      "evidence": "tools/wo/envelope.mjs resolveEnvelope() maps absent-input to source 'absent-input'; a dedicated G-2 test asserts this."
+    },
+    {
+      "acceptance_row_id": "G-3",
+      "result": "pass",
+      "rationale": "Permitted and prohibited surfaces are both represented by source citations.",
+      "evidence": "tools/wo/envelope.mjs resolveEnvelope() applies cite() to permitted_file_surface and prohibited_file_surface."
+    },
+    {
+      "acceptance_row_id": "G-4",
+      "result": "pass",
+      "rationale": "Producible evidence is explicitly scoped to the worker tool grant rather than product authority.",
+      "evidence": "tools/wo/envelope.mjs producibleEvidence() prefixes the value with 'WORKER TOOL GRANT (not product authority)'."
+    },
+    {
+      "acceptance_row_id": "G-5",
+      "result": "pass",
+      "rationale": "Generation-time readiness is labelled a snapshot and a separate CLI path recomputes live marker counts.",
+      "evidence": "tools/wo/envelope.mjs countMarkers(), issuabilitySnapshotFooter(), and --count-markers handling."
+    },
+    {
+      "acceptance_row_id": "G-6",
+      "result": "pass",
+      "rationale": "Machine surfaces use a dedicated closed list, reject non-absolute paths, and require a non-none live_authority deviation with authority.",
+      "evidence": "tools/wo/envelope.mjs isAbsoluteMachinePath(), validateMachineSurfaces(), and machineSurfaceBasis(); corresponding G-6 tests are staged."
+    },
+    {
+      "acceptance_row_id": "validation-enforced",
+      "result": "pass",
+      "rationale": "Invalid governance heads and invalid machine-surface configurations fail before an order is emitted.",
+      "evidence": "tools/wo/envelope.mjs verifyGovernanceHead() and generateOrder() return ok:false with 'NO ORDER EMITTED' on validation failure."
+    },
+    {
+      "acceptance_row_id": "hermetic-tests",
+      "result": "pass",
+      "rationale": "The staged tests provide a fallback two-commit Git fixture when run from an archive without .git.",
+      "evidence": "tools/wo/envelope.test.mjs ensureGitHeads() initializes a local fixture when repository metadata is absent."
+    },
+    {
+      "acceptance_row_id": "no-secrets",
+      "result": "pass",
+      "rationale": "No credentials or secret values appear in the staged changes.",
+      "evidence": "The staged README, implementation, and tests contain only example paths, test identities, and placeholder authority text."
+    },
+    {
+      "acceptance_row_id": "no-new-control-plane",
+      "result": "pass",
+      "rationale": "The change adds a synchronous CLI and tests, while explicitly disclaiming an auto-invoking service.",
+      "evidence": "tools/wo/README.md:3 and tools/wo/envelope.mjs main() show an invoked CLI with no daemon, hook, watcher, or service registration."
+    }
+  ],
+  "prior_finding_results": [
+    {
+      "finding_id": "machine_surface-absolute-and-authorised",
+      "status": "addressed",
+      "rationale": "validateMachineSurfaces() rejects relative paths and requires a non-none live_authority deviation plus deviation authority."
+    },
+    {
+      "finding_id": "automation-claim-overstatement",
+      "status": "addressed",
+      "rationale": "README and USAGE explicitly classify J1-1 as issuer discipline plus worker refusal and disclaim auto-invocation."
+    }
+  ],
+  "findings": [
+    {
+      "id": "F-1-missing-veritas-receipt-for-closure-claim",
+      "technical_impact": "HIGH",
+      "reachability": "ACTIVE",
+      "required_disposition": "BLOCKS_CURRENT_MERGE",
+      "assumed_deployment_baseline": "The proposed tools/wo changes and README at exact head 5135a2495448461c1859cbebd22476e46c4dcddb are the current merge candidate; repository documentation is treated as an active claim about delivered Phase 4 scope.",
+      "evidence": "tools/wo/README.md:29-40 states ÔÇ£Defects closed (Phase 4)ÔÇØ and lists G-1..G-6, J1-1, and V4-7. The bounded packet supplies no committed Veritas receipt with PASS, matching scope, and reviewed_sha for this closure claim.",
+      "required_correction": "Either stage an applicable committed Veritas PASS receipt covering these closure claims at the assured integrated head, or remove/rephrase the closure language so the README describes implemented behaviour without claiming Phase 4 defects are closed."
+    }
+  ]
+}

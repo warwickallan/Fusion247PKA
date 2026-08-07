@@ -33,6 +33,20 @@ export const NOTIFY_REASONS = Object.freeze([
   // never be silently dropped, so this is the fallback reason ONLY when no other trigger fired
   // but this round opened at least one finding.
   'findings_raised',
+  // WO-2026-08-07-33 — the FIRST card of the QA sequence, and the only one that fires BEFORE
+  // Codex has returned. Every reason above is emitted from fireTriggers, i.e. after a verdict
+  // exists, so TowerBot showed the outcome and never the "it is running" beat. Emitted from
+  // watcher.mjs's processTurn at the last line before the real Codex invocation — NOT at poll
+  // time, because a round can be created and then never reach Codex at all (the fail-closed
+  // findings-disposition gate, an unreadable QA skill, unresolved Git evidence, a claim that
+  // never happens). A card announcing a run that never starts is worse than no card.
+  //
+  // ALWAYS sent with the REAL turn id, never null — the exact opposite of 'finding_disposed' and
+  // 'tower_failure' above. Those exploit SQLite treating every NULL as distinct in the
+  // (turn_id, reason) unique index so they can send repeatedly; this card must send exactly once
+  // per turn, so it depends on that same index actually biting. A null turn id here would
+  // re-announce the card on every pass, forever.
+  'codex_qa_started',
 ]);
 
 const TELEGRAM_TIMEOUT_MS = 15000;
@@ -143,16 +157,57 @@ async function sendOneTelegram(token, chatId, text) {
   }
 }
 
+// AC7 (WO-2026-08-07-33) — a CONTROL-DIRECTIVE line, for the purpose of excerpting only.
+//
+// This is a LINE-PREFIX TEST and deliberately not a grammar. `ingestComment.mjs` owns the
+// directive vocabulary in HEAD_RE / FINDING_RE / CHECKPOINT_RE, and re-implementing any of them
+// here would create a second definition that drifts from the first the day either changes. The
+// shape below mirrors the ONE test in that module which already decides directive-ness without
+// reference to the individual patterns — its catch-all `/^\s*@tower\b/` (ingestComment.mjs:108),
+// the line that makes any unrecognised `@tower` line malformed.
+//
+// ONE DELIBERATE WIDENING, stated rather than slipped in: this test is case-INSENSITIVE where
+// that catch-all is not. CHECKPOINT_RE and FINDING_RE both carry the `i` flag, so `@Tower
+// checkpoint:` is a directive the parser ACCEPTS; matching case-sensitively here would let that
+// form leak into the card as if it were prose. Over-stripping is not a risk in the other
+// direction — a line that begins `@tower` is never Larry's plain English.
+const TOWER_DIRECTIVE_LINE = /^\s*@tower\b/i;
+
 // Bounded, human-readable excerpt of Larry's turn so the Telegram message shows LARRY'S SIDE of
 // the Larry<->Codex dialogue, not just Codex's verdict (Warwick's ask: "I have no idea what you
 // are doing in response to Codex"). Strips code fences + collapses whitespace and caps the length
 // so a long turn can never blow up the message.
+//
+// AC7 — AND STRIPS `@tower …` CONTROL-DIRECTIVE LINES FIRST. `pollPrComments.ensureCheckpointTurn`
+// stores the PR comment VERBATIM as larry_response (correctly — that field is the durable record
+// of what was actually written, and must never be edited). But a checkpoint comment leads with
+// `@tower head:` / `@tower checkpoint:` / `@tower finding …`, so the card was rendering raw
+// control syntax instead of Larry's reaction. The defect is in what the card is FED, not the card.
+//
+// TWO ORDERING FACTS, and both are why this belongs HERE rather than in composeLarryMessage or at
+// the data layer:
+//
+//   1. THE STRIP MUST PRECEDE THE TRUNCATION. Directives are long; leaving them in until after the
+//      280-char cut lets them consume the whole budget and truncate the prose away entirely.
+//      Stripping downstream of summariseLarry cannot fix that — the information is already gone.
+//   2. THE STRIP MUST PRECEDE THE WHITESPACE COLLAPSE. `\s+ -> ' '` destroys line structure, and a
+//      line-prefix test needs lines. Running it after would silently match nothing.
+//
+// Doing it at the data layer instead would corrupt the verbatim record, which is why that is not
+// an option. This is an EXCERPTING concern, so it lives in the excerpter.
 export function summariseLarry(text, max = 280) {
   if (text === null || text === undefined) return '';
-  const clean = String(text)
+  const prose = String(text)
+    .split(/\r?\n/)
+    .filter((line) => !TOWER_DIRECTIVE_LINE.test(line))
+    .join('\n');
+  const clean = prose
     .replace(/```[\s\S]*?```/g, ' [code] ')  // closed fenced blocks -> placeholder
     .replace(/`+/g, ' ')                       // F-002: any leftover/unmatched backticks -> space
     .replace(/\s+/g, ' ').trim();
+  // Empty after stripping is the EXPECTED case for a directives-only comment, and '' is the right
+  // answer: composeLarryMessage already returns '' for it, so only the Codex card is sent. A card
+  // reading "Larry: (nothing)" would be worse than no card.
   if (clean === '') return '';
   return clean.length > max ? (clean.slice(0, max - 1).trimEnd() + '…') : clean;
 }
@@ -251,4 +306,50 @@ export function composeDispositionMessage({ buildRef, turnSeq, turnId, finding }
     `turn: ${turnId}`,
   ];
   return lines.join('\n');
+}
+
+// ── WO-2026-08-07-33 — the QA-STARTED composer ──────────────────────────────────────────────
+//
+// PROVENANCE IS THE POINT OF THIS CARD, not decoration. "Codex QA started" on its own tells
+// Warwick that something is happening to something; the PR number and the head are what make it
+// a statement he can act on. So this composer states both, and it NEVER abbreviates the head —
+// deliberately unlike the 12-char slices used in pollPrComments' refusal messages, which are
+// diagnostics for a human reading a log rather than the identity of the thing under review.
+//
+// NOTHING IS EVER INVENTED HERE. A turn that carries no PR number or no canonical head says so
+// in words. The alternative — defaulting to a plausible value, or silently omitting the line —
+// would produce a card that reads as full provenance while carrying none, which is precisely the
+// failure this card exists to avoid.
+
+const CANONICAL_HEAD = /^[0-9a-f]{40}$/;
+
+/** `#87`, or an explicit statement that this turn is not bound to a pull request. */
+function formatPrRef(prNumber) {
+  const n = Number(prNumber);
+  return Number.isInteger(n) && n > 0 ? `#${n}` : '(not a pull-request turn)';
+}
+
+/** The FULL 40-hex head, or an explicit statement that the turn carries no canonical one. */
+function formatHeadRef(headSha) {
+  const s = String(headSha ?? '').trim().toLowerCase();
+  return CANONICAL_HEAD.test(s) ? s : '(no canonical head recorded on this turn)';
+}
+
+/**
+ * Compose the QA-STARTED message — the opening beat of the TowerBot QA sequence, sent BEFORE the
+ * Codex verdict/findings cards rather than after them. One message, one dedup row keyed on the
+ * real turn id.
+ *
+ * Its caller (watcher.mjs processTurn) owns the WHEN and it is load-bearing; this function owns
+ * only the WHAT. Keep them separate: a composer that could be called from a second place would
+ * make the timing guarantee unverifiable by reading either file alone.
+ */
+export function composeQaStartedMessage({ buildRef, turnSeq, turnId, prNumber, headSha }) {
+  return [
+    `🤖 Codex QA started — Tower ${buildRef ?? 'BUILD-014'} · turn #${turnSeq ?? '?'}`,
+    `PR: ${formatPrRef(prNumber)}`,
+    `head: ${formatHeadRef(headSha)}`,
+    'Codex is reviewing this head now — the verdict follows.',
+    `turn: ${turnId}`,
+  ].join('\n');
 }

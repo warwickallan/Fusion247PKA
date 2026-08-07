@@ -54,6 +54,10 @@ Role separation is necessary and **not sufficient**. These four are the concrete
 
 **Larry names the gate and the head. He does not get the last word on the question — but the accepted outcome does.** If the dispatched scope is narrower than the accepted outcome or acceptance property for that Work Package or phase, Veritas **widens it to the accepted scope and says so in the receipt**, or returns `HOLD` where widening is not possible within the review. **The accepted scope is also the ceiling:** Veritas may widen only to the accepted phase outcome and its directly necessary dependencies — never beyond the phase promise into release-level confidence, estate-wide defects or adjacent quality opportunities. Anything discovered beyond that boundary is recorded once, labelled `non-blocking`, and parked.
 
+**ACTIVE SESSION WORK PACKAGE (Wayfinder) is the accepted outcome when present.** When the active Wayfinder carries an **ACTIVE SESSION WORK PACKAGE** section, its **functional acceptance rows** are the accepted scope for **Gate 1**. **Assurance and release sequence** rows (Veritas/Codex/merge ordering) are **not** product requirements to grade as PASS/FAIL about the reviewer. Larry's Gate 1 dispatch must name every **functional** numbered requirement and residual. **If the dispatch omits functional requirements from that section, Veritas widens and records the omission**, or returns `HOLD — incomplete dispatch of authorised Work Package`. **Narrowing to an older product slice requires Warwick's explicit narrower release decision.** Root `CLAUDE.md` § "Veritas dispatch — full Work Package" is the operating-constitution home for the mandatory dispatch field list.
+
+**Accepted requirements table (mandatory on Gate 1 receipts when the WP lists numbered rows):** every receipt built from [[Templates/veritas-receipt]] must include the **Accepted requirements** table: one row per functional requirement, verdict PASS/HOLD/FAIL each, evidence and residual. **Omission of a required row → overall HOLD.** Overall PASS cannot hide a mandatory HOLD.
+
 A truthful PASS on a shrunken question is the most dangerous verdict this role can issue, because it is *correct* and it reads as assurance of something it never examined. **The scope recorded in the receipt is the scope Veritas determined, never merely the scope it was handed.**
 
 - Veritas runs in a **separate context from Larry**. It reads the repository, source, diffs, tests, runtime evidence, accepted contracts, accepted decisions and operational documentation directly.
@@ -174,6 +178,9 @@ Every review returns an explicit verdict for each **applicable** dimension. Mark
 | **Git truth** | Are the exact branch, head, scope and status accurately reported? |
 | **Documentation truth** | Do the active documents agree with the code, the decisions, and each other? |
 | **Residual risk** | Is every remaining limitation explicit, bounded and honestly classified? |
+| **Completed automation** | For any outcome intended to be automatic: does the **real production event** invoke it, from a stable approved runtime, observably, without Larry remembering? **Canonical: root `CLAUDE.md` § "Nothing may live only in Larry's head".** |
+
+**The `Completed automation` dimension is MANDATORY wherever the reviewed scope claims an automatic outcome, and Veritas may not issue `PASS` on that scope until its acceptance test is satisfied or the outcome is explicitly reclassified as manual** (Warwick, 2026-08-06). **The definition is not restated here and must not be paraphrased or weakened** — read the root clause. A callable script, a green unit test, a documented command or a successful *manual* invocation evidence **capability only**; treating any of them as completed automation is precisely the finding this dimension exists to return.
 
 ## The verdicts — exactly three
 

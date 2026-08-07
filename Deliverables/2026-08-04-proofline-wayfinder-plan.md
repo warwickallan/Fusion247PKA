@@ -8,6 +8,7 @@
 
 **Written 2026-08-04 at the rotation boundary. Everything below was true when written and is a claim about the past, not the present.**
 
+
 | | |
 |---|---|
 | **Map path** | `Deliverables/2026-08-04-proofline-wayfinder-plan.md` — this file. The only BUILD-020 map. |
@@ -16,8 +17,8 @@
 | **Head when written** | `ca4580298e1c3aad4f922637c3d836854b4af539`, **advanced by the commit that added this block.** `git rev-parse HEAD` is the authority — this map has recorded a stale head three times (C-3, and twice in the Work Order envelope). **Do not trust a SHA in this file over the repository.** |
 | **Upstream** | ~~**NONE CONFIGURED.** 51 commits ahead of `origin/main`.~~ **CORRECTED 2026-08-04 by execution (R-2): upstream IS `origin/build-020/live-trial`, 54 commits ahead, and PR #94 is already open as a DRAFT.** Remote is `https://github.com/warwickallan/Fusion247PKA.git`. |
 | **Phase complete** | **Phase 1 — Proofline. PASSED by Warwick, 2026-08-04**, on his own completed walkthrough. |
-| **Frontier** | ⛔ **DO NOT READ A FRONTIER FROM THIS BLOCK. → §14.19 is the SINGLE statement of the live frontier.** *(This row said "Phase 2 … Not started" and was a THIRD competing frontier statement — the same defect §12 was corrected for, in the block §12's own diagnosis named. Corrected 2026-08-05, Veritas rotation-readiness HOLD.)* |
-| **First safe action** | **→ §14.19.** *(This row pointed at §13, which lands on "awaiting Warwick's acceptance … nothing has been implemented" — false since 2026-08-05.)* |
+| **Frontier** | ⛔ **DO NOT READ A FRONTIER FROM THIS BLOCK. → the ONE current navigational target is § ACTIVE SESSION WORK PACKAGE (end of this file), and its `🎯 THE ONE CURRENT NEXT ACTION`.** *(**CORRECTED AGAIN 2026-08-07 — Veritas Gate 1 Defect 1:** this row named `THE EXACT NEXT ACTION`, a label that resolved to a heading whose body reads "SUPERSEDED" and "SPENT". **The third successive correction of this row, and the second to go stale by naming a label rather than checking where the label lands.** Verify the target reads `🎯 THE ONE CURRENT NEXT ACTION` before trusting this row.)* *(**CORRECTED 2026-08-07:** this row previously pointed at **§14.19**, which records **Phase 2 — PASS. CLOSED**. The 2026-08-05 repair became the defect when §17 later declared itself live. Target is now named by SECTION IDENTIFIER, not by section number — identifiers survive succession, uniqueness claims decay.)* *(This row said "Phase 2 … Not started" and was a THIRD competing frontier statement — the same defect §12 was corrected for, in the block §12's own diagnosis named. Corrected 2026-08-05, Veritas rotation-readiness HOLD.)* |
+| **First safe action** | **→ § ACTIVE SESSION WORK PACKAGE → `🎯 THE ONE CURRENT NEXT ACTION`.** *(**CORRECTED 2026-08-07 — Veritas Gate 1 Defect 1**, same cause as the row above: the old label landed on a SUPERSEDED/SPENT heading.)* *(**CORRECTED 2026-08-07:** previously **→ §14.19** (Phase 2, CLOSED); before that **→ §13** ("nothing has been implemented" — false since 2026-08-05). Two successive corrections both went stale because both named a section NUMBER.)* |
 
 ### ✅ RESUMPTION — CORRECTED 2026-08-05. **Automatic reorientation NOW HAPPENS.**
 
@@ -56,16 +57,40 @@ This matters more than it looks: **the entire next phase is about proving what i
 
 ## START / RESUME HERE — ordered by Warwick
 
-- This Git Wayfinder is the sole route and source of truth.
 - **On a fresh resume, BEFORE using any tool or doing any work, visibly state: (1) this recovered map path, (2) the goal, (3) the current phase and gate, (4) the next action. THEN open this map and continue.**
-- Read the current phase, gate and evidence before acting.
+- This Git Wayfinder is the sole route and source of truth for BUILD-020.
+- **Bare `Continue.` after a fresh session / `/clear` / resume is a one-time orientation handshake, not a blank cheque to execute.** Ordered steps (canonical also in root `CLAUDE.md` Step 2):
+  1. Recover Honcho and **this** active Wayfinder (verify by execution: branch, HEAD, worktree).
+  2. Establish exact branch, head, phase, **ACTIVE SESSION WORK PACKAGE** (§ below), acceptance criteria, completed items, open residuals and recorded next action.
+  3. Produce **one concise orientation summary** to Warwick.
+  4. **Explicitly ask Warwick to confirm whether anything has changed since rotation.**
+  5. **Do not begin substantive execution** until that one confirmation is received.
+  6. If Warwick supplies a change, **update the ACTIVE SESSION WORK PACKAGE first**, then proceed.
+  7. After confirmation, execute autonomously without repeatedly asking route questions.
+- **On a confirmed resume (not bare Continue. alone),** before any tool call, visibly state: (1) this recovered map path, (2) the goal, (3) the current phase and gate, (4) the next action — then open this map and continue.
+- Read the current phase, gate, **ACTIVE SESSION WORK PACKAGE** and evidence before acting.
 - Honcho points here; it does not replace this map.
 - Do not create a todo list, parallel tracker or replacement plan.
-- Update this map only at meaningful phase boundaries: PASS, PARTIAL or FAILED, with an evidence pointer.
-- Continue autonomously until completion or a genuine Warwick-only blocker.
-- Before any clear, restart or handoff, ensure Honcho contains this exact path, current phase/gate and next action.
+- Update this map only at meaningful phase boundaries: PASS, PARTIAL or FAILED, with an evidence pointer — **except** the ACTIVE SESSION WORK PACKAGE, which Larry updates whenever Warwick amends the session requirements.
+- Continue autonomously until completion or a genuine Warwick-only blocker **after** the orientation handshake.
+- Before any clear, restart or handoff, ensure Honcho contains this exact path, current phase/gate, ACTIVE SESSION WORK PACKAGE pointer and next action.
 - **Before `/clear`, run `/rotate`. Clearing is unsafe until `/rotate` reports `SAFE TO CLEAR` after the installed Honcho readback matches this Wayfinder's current phase, frontier and exact next action.**
 - **Tangents go in "SHIT TO DO" below. Do not chase them.** See the rule there — it binds even when the tangent comes from Warwick.
+- **All Work Orders, Veritas dispatches, `/rotate` reporting and merge-readiness statements derive from the ACTIVE SESSION WORK PACKAGE.** No requirement may live only in chat, Larry's context or a stale rotation packet.
+
+> ### 📣 The Warwick notification rule — **NOT COPIED HERE BY DESIGN**
+>
+> **Canonical: root `CLAUDE.md` § "Rule 4a — the Warwick notification rule". Read it there.**
+>
+> **The verbatim copy that stood here was REPLACED by this reference on Warwick's instruction, 2026-08-06.** A rule living in two places drifts, and the SSOT Golden Rule says every fact lives in exactly one file. **Do not restore a copy — restore a pointer if this one is ever lost.**
+>
+> **The one-line shape, so a reader knows what they are being sent to** (this is a signpost, not the rule): **decide before posting any substantive outcome and immediately after any specialist return · send BEFORE the chat update · then CONTINUE — stopping only for one of the seven named interruption reasons.** ⚠️ **Do not act on this summary — the criteria, the channel, the ordering and the availability clause are all in the canonical section.**
+
+**Two facts that belong here rather than in the constitution, because they are this build's evidence:**
+
+⚠️ **FusionDevBot and TowerBot are a real documented split and are not interchangeable — DevBot is Warwick's channel, TowerBot is Codex's** (`Deliverables/2026-07-21-tubeair-telegram-combined-gateway-handoff.md:28`). **Warwick himself wrote "TowerBot" on 2026-08-06 and corrected it to FusionDevBot.** Notifying him through TowerBot would deliver to the reviewer channel. **Do not "fix" it back.**
+
+✅ **Orientation duty discharged 2026-08-06 by execution**, and the limitation that stood beside it is now **CLOSED**: `getMe` returned `{"ok":true,"username":"Fusion247devbot"}`, and **J2-e then proved a real send from the installed path with the credentials self-loaded** (§17.7, `message_id 326`). **The earlier caveat — that the path was available only to a caller that supplied credentials — no longer applies to the installed path.**
 
 ---
 
@@ -402,7 +427,7 @@ Discharged **inside `WO-2026-08-04-01`**. A finding is an observation, not an in
 >
 > **Why it matters more than a stale label:** WP-2B(2) is building the mechanism that tells a fresh Larry where the frontier is. **Any code scraping §12 would have emitted "Phase 3, Veritas HOLD, next action: Warwick re-attempts the walkthrough" — a confident wrong orientation, delivered by the very mechanism built to prevent it.** That is W-1's named failure, and this map was the source of it.
 >
-> **THE CURRENT FRONTIER IS §14 (Phase 2) — see §14.16 and §14.19 for live status. §15 is Phase 3, recorded and NOT started.**
+> ~~**THE CURRENT FRONTIER IS §14 (Phase 2) — see §14.16 and §14.19 for live status. §15 is Phase 3, recorded and NOT started.**~~ ⛔ **RETIRED 2026-08-07 — both clauses false.** §14 is Phase 2 **CLOSED and MERGED**; §15/Phase 3 is **DELIVERED and MERGED**. **→ § ACTIVE SESSION WORK PACKAGE is the one current target.**
 >
 > Everything below in this section is **Phase 1 history, retained as evidence.** Phase 1 was **CLOSED and PASSED by Warwick on 2026-08-04.**
 
@@ -420,7 +445,7 @@ Then `http://127.0.0.1:7317/`. Works from cmd.exe and PowerShell, pasted identic
 
 **Still unproven and still his: the rendered page** (P-13). Earlier HOLD findings D-1..D-4 were discharged at `78c14c8` and re-reviewed; the second Veritas pass returned HOLD only on documentation truth, and those three cells were corrected at `b4cba53`.
 
-**Phase 1 is CLOSED — Warwick passed it 2026-08-04.** The frontier has moved. **Go to §13.**
+**Phase 1 is CLOSED — Warwick passed it 2026-08-04.** ~~The frontier has moved. **Go to §13.**~~ ⛔ **"Go to §13" RETIRED 2026-08-07** — §13 is Phase 2, closed and merged. **→ § ACTIVE SESSION WORK PACKAGE.**
 
 **Resumable state:** branch `build-020/live-trial`, worktree `C:\Fusion247PKA-build-020-trial`. Verify HEAD by execution before trusting any SHA here — this map got that wrong three times.
 
@@ -428,7 +453,9 @@ Then `http://127.0.0.1:7317/`. Works from cmd.exe and PowerShell, pasted identic
 
 # 13. PHASE 2 — Honcho and Tower as durable shared myPKA infrastructure
 
-**Set by Warwick, 2026-08-04, at the rotation boundary. The fresh session owns implementation. Nothing here has been started.**
+> ⛔ **HISTORICAL — Phase 2, CLOSED and MERGED. Directs nothing.** → **§ ACTIVE SESSION WORK PACKAGE**. *(Banner added 2026-08-07, route step 11: this top-level heading was the only superseded section in the map carrying no banner, so a reader skimming headings could have read it as live.)*
+
+~~**Set by Warwick, 2026-08-04, at the rotation boundary. The fresh session owns implementation. Nothing here has been started.**~~ ⛔ **FALSE AND SUPERSEDED — re-cut 2026-08-07 (Veritas N-1).** This sits two lines under §13's own **CLOSED and MERGED** banner. Phase 2 shipped. **Directs nothing.**
 
 ## 13.1 North Star — his words
 
@@ -529,6 +556,8 @@ The stale copy's `spawn` calls carry no `windowsHide`, and `git`/`gh` are consol
 ---
 
 # 14. PHASE 2 ROUTE — **ACCEPTED AND AMENDED by Warwick, 2026-08-05**
+
+> ⛔ **HISTORICAL — Phase 2, CLOSED and MERGED. Directs nothing.** → **§ ACTIVE SESSION WORK PACKAGE**. *(Banner added 2026-08-07, route step 11 — same reason as §13.)*
 
 **Status: the `product-decision` handback is DISCHARGED.** Warwick accepted the route and amended it materially. §14.0 records what he decided; the work packages below are revised against it. Written from R-1..R-9, not from §13.3.
 
@@ -1004,7 +1033,8 @@ Keel's four class-A refusals were all correct. The work divides:
 
 ---
 
-# 15. PHASE 3 — token and process forensics. **GATE OPEN — NOT STARTED IN THIS CONTEXT**
+# 15. PHASE 3 — token and process forensics. ⛔ **HISTORICAL — PHASE 3 IS DELIVERED AND MERGED (see §16.11). Directs nothing.** → § ACTIVE SESSION WORK PACKAGE
+> ~~*"GATE OPEN — NOT STARTED IN THIS CONTEXT"*~~ — **false since Phase 3 merged; banner added 2026-08-07.**
 
 **Set by Warwick, 2026-08-05. Explicitly NOT to be built now:** *"do not start building it until Phase 2 is complete, merged and we have rotated successfully. The fresh Larry owns the route."*
 
@@ -1018,7 +1048,9 @@ Keel's four class-A refusals were all correct. The work divides:
 
 ## 15.2 The deliverable
 
-**A durable phase-close report in Google Drive**, produced as **the final job before Larry says it is safe to `/clear`.** It shows **how many tokens the completed phase used** and, **as far as the available evidence allows, where they went.**
+> ⛔ **CORRECTED 2026-08-06 (Veritas V4-2). The DESTINATION below is SUPERSEDED — §17.5a is canonical.** Warwick reactivated §15.2 on 2026-08-06, and **reactivating a section reactivates its body**, so this line's "Google Drive" came back to life as an active instruction. **It is not one.** **The report is a GIT artefact under `Deliverables/`. NOT Google Drive, NOT Google Sheets, NOT Supabase.** The *substance* below — a phase-close report produced as the final job before `SAFE TO CLEAR`, showing token usage and, as far as evidence allows, where it went — **is reactivated and stands. Only the destination changed.**
+
+~~**A durable phase-close report in Google Drive**~~ **→ a durable phase-close report committed under `Deliverables/`**, produced as **the final job before Larry says it is safe to `/clear`.** It shows **how many tokens the completed phase used** and, **as far as the available evidence allows, where they went.**
 
 **Purpose, in his words:** *"not accounting for its own sake"* — it is to let him **spot obvious token-burning doom loops, disproportionate assurance work, repeated investigations, rework, unnecessary testing or other process smells without having to watch the build live.**
 
@@ -1206,9 +1238,11 @@ Keel's four class-A refusals were all correct. The work divides:
 
 **The Work Order envelope may be causing the defects it exists to prevent.** Every refusal was an *envelope* defect — surface, authority, acceptance property — **not a defect in the described work.** The work was understood every time. **So the question is not "how do we validate envelopes better" (prohibited, and it is the BUILD-018 shape) but "is the envelope carrying fields that Larry cannot reliably author, and should those fields be derived, defaulted, or removed?"** **Target 1 — boundaries at the reasoning stage — points directly at this.**
 
-## 15.4 Route — the fresh Larry's to own, not this session's
+## 15.4 ⛔ HISTORICAL — Phase 3's route. **Delivered and merged. Directs nothing.** → § ACTIVE SESSION WORK PACKAGE
 
-**Not designed here.** Two things worth noting so the next session does not rediscover them: token attribution must be honest about what the evidence **cannot** show, and the Google Drive write is an **outward action** needing its own consideration. **Warwick has not authorised a specific Drive location, and no mechanism for this exists — the regrowth cap applies to it exactly as to everything else.**
+**Not designed here.** One thing worth noting so the next session does not rediscover it: token attribution must be honest about what the evidence **cannot** show.
+
+⛔ **CORRECTED 2026-08-06 (Veritas `V5-1`) — the THIRD live Google Drive instance.** This paragraph also read *"the Google Drive write is an outward action needing its own consideration."* **There is no Google Drive write on this route.** The report is a **GIT artefact under `Deliverables/`**, produced inside `/rotate` — `.claude/commands/rotate.md` is the operative procedure and §17.5a is canonical. ⚠️ **Larry claimed this contradiction was "corrected in both places". That was a COMPLETENESS CLAIM and it was WRONG** — a third instance survived, in the very section describing the route for the artefact `/rotate` is about to produce.
 
 ---
 
@@ -1392,9 +1426,10 @@ Genuine **external independence** · **read-only** operation · **exact-head and
 
 ---
 
-## 14.19 ⭐ THE CURRENT FRONTIER — single statement, 2026-08-05
+## 14.19 ⛔ HISTORICAL — Phase 2's frontier. **NOT THE CURRENT FRONTIER.**
 
-**This is the ONLY place in this map that states the live frontier. §12 is Phase 1 history and says so.**
+> **⛔ RETIRED 2026-08-07. → the current target is § ACTIVE SESSION WORK PACKAGE.**
+> ~~*"This is the ONLY place in this map that states the live frontier."*~~ **That claim was FALSE from 2026-08-05 onward** — §16.8 appeared the same day it was written, and §17 later declared itself live. This section records **Phase 2 — PASS. CLOSED**, and two directive rows at the top of this file pointed here until today. **Retained as evidence of Phase 2; it directs nothing.**
 
 | | |
 |---|---|
@@ -1523,7 +1558,7 @@ All three investigations have landed and their findings are recorded above. **WP
 - **Retiring `tower-baton` is not the goal** — it is parked out of scope in the migration plan. Touch it only if it is the minimal way to satisfy N-1.
 - **DevBot is configuration only.** See the boundary above.
 
-## 13.6 First safe continuation — for the fresh session
+## 13.6 ⛔ HISTORICAL — Phase 2's "first safe continuation". **NOT a continuation instruction. Directs nothing.** → § ACTIVE SESSION WORK PACKAGE
 
 **Do not implement. Route first.** The Wayfinder mandate applies to this phase as it did to Proofline: no map, no build.
 
@@ -1536,15 +1571,15 @@ All three investigations have landed and their findings are recorded above. **WP
 3. **Record contradictions in this file** rather than overwriting one source.
 4. **Then extend this map** with the Phase 2 route, and get Warwick's acceptance before implementing (`product-decision`).
 
-**✅ STEPS 1–4 DONE, 2026-08-04 (fresh session).** Reconnaissance re-executed and its nine contradictions recorded in **§13.3a**; the Phase 2 route is written in **§14** and is **awaiting Warwick's acceptance**. **The frontier is now §14, not §13.6.** Nothing has been implemented.
+**✅ STEPS 1–4 DONE, 2026-08-04 (fresh session).** Reconnaissance re-executed and its nine contradictions recorded in **§13.3a**; the Phase 2 route is written in **§14** and is **awaiting Warwick's acceptance**. ~~**The frontier is now §14, not §13.6.** Nothing has been implemented.~~ ⛔ **BOTH CLAUSES RETIRED 2026-08-07.** §14 is **Phase 2, CLOSED and MERGED**, and *"nothing has been implemented"* has been false since 2026-08-05. This sits inside §13.6 *"First safe continuation — **for the fresh session**"*, so it was directive. **→ § ACTIVE SESSION WORK PACKAGE is the one current target.**
 
 **Human dependencies for Phase 2:** Warwick's acceptance of the Phase 2 route · his merge decision · **his fresh-Larry orientation test after merge, which is the real acceptance and cannot be self-certified.**
 
 ---
 
-# 16. PHASE 3 — THE ROUTE. **Scope FIXED by Warwick, 2026-08-05. Build to the Star.**
+# 16. ⛔ HISTORICAL — PHASE 3, DELIVERED AND MERGED. **Directs nothing.** → § ACTIVE SESSION WORK PACKAGE — *(banner moved INTO the heading 2026-08-07, Veritas D-12: it previously sat in a blockquote beneath, so a tool resolving by heading read §16 as unmarked — the exact scraper failure §12 documents)*. ~~PHASE 3 — THE ROUTE. Scope FIXED by Warwick, 2026-08-05. Build to the Star.~~
 
-> **⭐ THIS SECTION IS NOW THE LIVE FRONTIER. §14.19 is Phase 2, CLOSED and MERGED.**
+> **⛔ HISTORICAL — retired 2026-08-07. §16 is Phase 3, DELIVERED AND MERGED. → § ACTIVE SESSION WORK PACKAGE is the one current target.** ~~*"THIS SECTION IS NOW THE LIVE FRONTIER. §14.19 is Phase 2, CLOSED and MERGED."*~~ *(Fourth instance of the §12 defect: a correction that named a section and then outlived its own truth.)*
 
 **Warwick fixed this scope himself and closed the scope conversation:** *"Do not bring me another scope decision unless a genuine product decision or unavoidable permission boundary remains."* **The map records the route; it does not re-ask for acceptance of a scope he has just written.**
 
@@ -1553,6 +1588,12 @@ All three investigations have landed and their findings are recorded above. **WP
 > **"The process exists to ship trustworthy products quickly, not to produce immaculate paperwork about why they have not shipped."**
 
 **Phase 3 is no longer a forensics-report phase.** The token/process report (§15.2) is **superseded as the deliverable** by his fixed scope below. §15.3a–d remain valid *evidence and investigation inputs*, and §15.3b is now WP-3C.
+
+> ## 🔄 REACTIVATED 2026-08-06 — **the supersession above is REVERSED by Warwick**
+>
+> **His instruction: *"Reactivate the §15.2–§15.3d phase-close report as part of this work package."*** **§15.2's report is a DELIVERABLE again**, folded into the Phase 4 work package and sequenced in **§17.5**.
+>
+> **The paragraph above is retained, not deleted, because it is the true record of what was decided on 2026-08-05.** It is no longer operative. **§17.5 governs.** ⚠️ **Do not read the supersession as live** — this is the exact three-competing-frontiers defect §12 was corrected for, and the reason the reversal is recorded here rather than by quietly editing the sentence away.
 
 ## 16.2 Acceptance — his four. Nothing here is Larry's to soften
 
@@ -1623,7 +1664,7 @@ All three investigations have landed and their findings are recorded above. **WP
 
 **Before Veritas passes the integrated head, the maximum permitted statement is:** «Integrated at "&lt;SHA&gt;" and submitted to Veritas for assurance.»
 
-## 16.8 Frontier
+## 16.8 ⛔ HISTORICAL — Phase 3's frontier. **NOT THE CURRENT FRONTIER.** → § ACTIVE SESSION WORK PACKAGE
 
 **Phase 3, step 1. Branch `build-020/phase3`, cut from `83cd6ae`. Worktree `C:\Fusion247PKA-build-020-trial`.**
 
@@ -1692,6 +1733,7 @@ All three investigations have landed and their findings are recorded above. **WP
 
 **Read back immediately through the INSTALLED renderer:**
 
+
 | | |
 |---|---|
 | Packet | `cont-1785971013511-153-6svm8`, **content age 0h 0m** |
@@ -1699,7 +1741,17 @@ All three investigations have landed and their findings are recorded above. **WP
 | Map pointer | **present** — `Deliverables/2026-08-04-proofline-wayfinder-plan.md`. The write-authority path resolved rather than failing open, and did not strip it |
 | Seq | 152 → **153** |
 
-**A second packet is owed after merge**, carrying the merged SHA and the fresh-session next action, read back before `/clear`.
+~~**A second packet is owed after merge**, carrying the merged SHA and the fresh-session next action, read back before `/clear`.~~ ⛔ **RETIRED 2026-08-07 (Veritas D-11), with its reason CORRECTED 2026-08-07 (Veritas D-14).**
+
+> **My first retirement reason was false on both clauses and I had asserted it without checking.** It said *"This was **Phase 2's** post-merge packet; **Phase 2 merged at PR #94** and its packet was delivered."*
+>
+> **Verified:** §16.10's own packet table reads *"Focus: **BUILD-020 Phase 3** — no longer Phase 2"*, so the obligation was **Phase 3's**. And §16.11 records the merge as **PR #96 → `f242f3c8d1df6017dbe11b751cee12564b467517`**, not PR #94.
+>
+> **And "its packet was delivered" was not shown either.** Only **"Packet 1 of 2"** appears anywhere in this map; **no second packet is recorded**, and the two packet ids present are `cont-1785846026092-143-rqjtww` and `cont-1785971013511-153-6svm8`. **Whether Phase 3's post-merge packet was ever published is UNESTABLISHED.**
+>
+> **Why it is nevertheless retired, stated correctly this time:** the obligation is **not dropped — it is superseded and carried forward.** BUILD-020's post-merge packet duty now lives in **Sub-phase 4B step 18**, which requires post-merge verification at the final merge. This section directs nothing because 4B owns the duty, **not** because the duty was discharged.
+>
+> *Recorded per the contract's revert-proofing rule: an editor who checks a false reason may restore the obligation. The reason is now true, so checking it confirms rather than reverses.*
 
 ### ⚠️ Observation, recorded not assumed
 
@@ -1733,7 +1785,7 @@ All three investigations have landed and their findings are recorded above. **WP
 | **Runtime** | `~/.mypka/governor/` reinstalled from the merged head, 8/8 byte-identical to blob, rollback executed on the only file with a real delta |
 | **Delivered** | Honcho write-authority repair (guard now asks WHO, not only WHEN) · governor footer RETIRED from the message stream · Work Order envelope generator (`tools/wo/`) · cleaned candidate queue · `/rotate` restored |
 
-### THE NEXT ACTION for the fresh session — do these in order
+### ⛔ HISTORICAL — Phase 3's next action. **SUPERSEDED, directs nothing.** → § ACTIVE SESSION WORK PACKAGE
 
 1. **Fix the DevBot ding credentials.** `C:\.fusion247\larry-ding.mjs` returns `{"ok":false,"why":"missing token/chat (names only)"}` — the script is fine, the credentials are not loaded. **Warwick cannot be reached at all until this works**, and he asked for it directly. **Declare the private surface properly; it is the secrets-store root and GL-012 binds.**
 2. **Ding rule, his words:** ding for a decision or action needed, **and** for a substantive update **even when no action is required**. **Never** for routine commentary.
@@ -1742,3 +1794,1196 @@ All three investigations have landed and their findings are recorded above. **WP
 ### Parked, deliberately, so it is a decision and not an omission
 
 **D-2..D-6** (Veritas) · **the Nolan actor-change proposal**, unratified at `c2ebda4`, **do not merge or amend** · **C-1..C-15** in `Deliverables/BACKLOG.md` · **the eighth generator field** that would close the order-not-at-its-own-head defect · **frontier-change-triggers-continuity**, §16.10 · the 318-vs-331 neighbour count.
+
+---
+
+# 17. ⭐ PHASE-COMPLETION CONTRACT — set by Warwick, 2026-08-06. **Standing Phase 4 requirements — NOT the frontier statement.** → § ACTIVE SESSION WORK PACKAGE
+
+> **⚠️ CORRECTED 2026-08-07.** This heading previously read *"THIS IS NOW THE LIVE FRONTIER"*, which made it the third competing frontier claim. Its **content remains live and binding** as the Phase 4 completion contract; it simply does **not** state the current navigational target. **The one current target is § ACTIVE SESSION WORK PACKAGE.**
+
+> **His instruction, verbatim in effect:** *"record that before this phase finishes, the following must all be complete and verified true."* **Some of it may already be done. Nothing here is complete on assertion — each line is complete only when verified true.**
+>
+> **Also his, and it binds the route:** *"Do not offer an option menu and do not reopen completed Honcho work unless the fresh-session journey itself fails."* **The 2026-08-06 fresh-session journey did NOT fail** — orientation recovered this map and the frontier from the Honcho pointer with `Continue` as the only input. **Honcho is therefore CLOSED and is not to be reopened.**
+
+## 17.0 What this session had in flight when the contract arrived — stood down, recorded not buried
+
+| | |
+|---|---|
+| **In flight** | A Work Order for **C-11** (`notify-snapshot-consumers.yml` permanently red by design) was drafted for Keel and **not dispatched** |
+| **Stood down because** | JOB 1 requires the authoring route to be repaired **before** the first real order, which is the acceptance test. Dispatching C-11 on the unrepaired route would have **spent the acceptance test** on it |
+| **Genuine preflight catch, retained as evidence** | Keel's contract permits `.github/workflows/<service>-tests.yml` — **`notify-snapshot-consumers.yml` is not that shape.** A class-A contract conflict caught **before** dispatch, not discovered after. **This is the preflight working, and it is exactly the defect class JOB 1 §2 must generate rather than leave to prose** |
+
+## 17.1 JOB 1 — finish the Work Order authoring repair
+
+### The ratification boundary — restated because it is the thing most likely to be quietly re-crossed
+
+**The Nolan-per-order checker proposal remains PARKED and unratified at `c2ebda4`. Do NOT merge, recreate or apply it.** No Nolan contract, SOP-022 actor, `agent-index` or shim change is authorised. **The Phase-3 branch independently verified zero governing Nolan changes.** **Nolan remains an occasional structural/audit role, never a routine checker on every Work Order.**
+
+**This supersedes §16.9's approved-Option-A route as a thing to implement.** §16.9 records what was approved on 2026-08-05; **2026-08-06 parks it unratified.** The later instruction governs.
+
+### What exists today — established, not assumed
+
+| # | Fact |
+|---|---|
+| **J1-a** | `tools/wo/envelope.mjs` **deterministically copies** canonical tools, surfaces, standing authority defaults, git authority, worktree state and producible-evidence constraints |
+| **J1-b** | It correctly fails unknown fields as `UNRESOLVED` |
+| **J1-c** | It prevents **11 of 41 scored historical defects — 27% BY DEFECT**, while touching **8 of 13 affected orders — 62% BY ORDER**. ⚠️ **Warwick: *"Never quote either rate without its unit."*** The two numbers measure different things and a bare "27%" or "62%" is a misreport |
+| **J1-d** | It does **NOT** reach acceptance-property or reasoning defects |
+| **J1-e** | It has **no automatic production caller** and currently depends on **Larry remembering** to invoke and use it |
+| **J1-f** | **The first genuine Work Order after this respawn is the initial live acceptance test** |
+
+### The eight requirements — all must be complete and verified true
+
+| # | Requirement |
+|---|---|
+| **J1-1** | Canonical envelope generation is an **unavoidable part of Larry's ordinary dispatch route** — not a remembered optional command. ✅ **CLOSED 2026-08-06** outside `tools/wo/**`: SOP-022 § Ordinary dispatch route requires the ORDER_MARKER; workers REFUSE unmarked orders; issuer must run `tools/wo/envelope.mjs` then `--count-markers`. WO-18's provenance header remains the detectable origin evidence. **Not** closed by WO-18 alone (that history stands). **Closing was the route change outside tools/wo.** Prior text: OPEN, and explicitly NOT closed by WO-18. Keel's read-back established that `tools/wo/**` cannot close it: every acceptance criterion there is satisfiable by manually invoking the tool. WO-18's `outcome` amended to declare a **manual** deliverable. What WO-18 *does* contribute is a **provenance header** on every emitted order so a hand-authored order is **detectably** not generated. Historical note (superseded for status only): Closing J1-1 needed a route change outside `tools/wo/**`, and the standing prohibition on new checkers, actors, services and governance layers constrains what is permissible. Larry does not invent one; it is reported here** |
+| **J1-2** | **`contract_basis` is GENERATED** from canonical contract/surface extraction, not authored prose |
+| **J1-3** | **Standing defaults are not retyped.** Orders carry **only authorised deviations**, each explicitly escalated |
+| **J1-4** | **The Work Order exists at the governance head it declares BEFORE the worker is dispatched** |
+| **J1-5** | Larry authors **only** the variable outcome, scope, acceptance, evidence and sequencing |
+| **J1-6** | A **same-context final reread of the complete issued text** is retained before dispatch |
+| **J1-7** | **Reduce or remove fields that add ceremony without changing execution**, using the existing replay evidence. **Do not add another checker, actor, service or governance layer** |
+| **J1-8** | **Prove the route with the first real Work Order: the worker begins substantive work on FIRST dispatch without a preventable Class-A refusal** |
+
+**Warwick on what J1-8 does and does not establish:** *"A single successful order is initial acceptance, not proof of a permanent trend. Record subsequent real orders as accumulating evidence."* **And the failure route is named in advance: if preventable Class-A defects persist, REDUCE THE FORMAT FURTHER — do not resurrect Nolan-per-order.**
+
+## 17.2 JOB 2 — make the Larry ding genuinely event-driven
+
+**His diagnosis:** *"The current `larry-ding.mjs` is only a script Larry remembers to call, and its credentials depend on the invoking shell. That is not durable automation."*
+
+**Confirmed by execution this session, and the cause was NOT what §16.11 recorded.** §16.11 step 1 said *"the credentials are not loaded."* **They were present on disk the entire time.** The failing invocation simply never handed them to node — `--env-file` was omitted, so the script fell through its own gate. Control: same script, same machine, **without** the flag → `{"ok":false,"why":"missing token/chat (names only)"}` exit 2; **with** it → credentials resolve, exit 0. **A real send then delivered: `{"ok":true,"message_id":320}`.** No credential value was read, echoed or logged.
+
+**That repair is capability, NOT completed automation** — precisely the distinction §17.3 now makes canonical. The channel still works only when a caller remembers a flag.
+
+### Required outcome — every line must be verified true
+
+### 🔴 CORRECTED BY WARWICK, 2026-08-06 — **JOB 2 is NOT "make an event decide when to ding"**
+
+> **His correction, and it re-scopes the whole job:** *"The decision is contextual and stays with Larry, grounded by the START / RESUME HERE rule."*
+>
+> **No daemon and no automatic event classifier are required.** **The durable outcome is the SEND PATH, not the trigger.**
+
+**What this supersedes:** the requirement list below replaces the earlier J2-1..J2-8. **The `Stop`-hook trigger design recorded further down is SUPERSEDED and must not be built** — it is retained struck-through only because its *credential* finding survives and is now the crux.
+
+| # | Requirement — Warwick, 2026-08-06 |
+|---|---|
+| **J2-a** | **Larry applies the written criteria himself:** ding for Warwick action/decision, **or** a substantive outcome worth knowing; **never routine progress.** The criteria are the START / RESUME HERE block — **that rule is the grounding, and it is not restated here** |
+| **J2-b** | **FusionDevBot is Warwick's channel. TowerBot remains Codex/reviewer ONLY** |
+| **J2-c** | **The FusionDevBot send path loads its approved credentials ITSELF** — **no remembered flag, no shell setup** |
+| **J2-d** | **Send success or failure is VISIBLE, and failure is NEVER SILENT** |
+| **J2-e** | **`getMe` proves bot identity ONLY.** **Acceptance is ONE REAL FusionDevBot MESSAGE ARRIVING ON WARWICK'S PHONE from the repaired path** |
+
+**Read J2-e exactly.** It disqualifies every proof this session has produced so far: the three delivered dings all passed `--env-file` by hand, and `getMe` proves only that a bot exists. **Neither is acceptance.** Acceptance is a message that arrives having loaded its own credentials.
+
+**What is NOT owed, stated so it is not built:** no daemon · no new service · no automatic event classifier · no trigger mechanism · no scheduler. **The judgement stays with Larry and is not to be mechanised.** Under root `CLAUDE.md` § *"Nothing may live only in Larry's head"*, **the send path is the mechanism and it must be complete; WHEN to send it is a judgement, and a judgement is not a mechanism.** That distinction is the whole of this correction.
+
+### 🔴 MEASURED FAILURE OF THE JUDGEMENT HALF — 2026-08-06, and it is evidence, not an apology
+
+**Warwick, verbatim, on being told step 2 was complete in chat with no ding: *"where we are is an update, so where was my ding!ffs"*** **He was right. Larry reported a substantive outcome in-channel and did not send it.**
+
+
+| | |
+|---|---|
+| **The rule** | *"ding … for a substantive outcome he would reasonably want to know immediately even when no action is required"* |
+| **Who wrote it into the map** | **Larry, the same day**, into the START / RESUME HERE block |
+| **Elapsed before the first miss** | **~1 hour** |
+| **Record before the miss** | 4 dings sent correctly (ids 320–324 span the sequence) — **fifth update, first miss** |
+| **Conditions** | **No context pressure named, no failure in progress, nothing else going wrong.** The rule was fresh, self-authored and visible |
+
+**Why this belongs in the phase report and not just in a correction:** it is a clean instance of the estate's own recorded pattern — **a control bound to a person remembering is a dated liability**, and *"compensating habits decay silently."* **The decay here was not slow. It was one hour, under ideal conditions, by the author of the rule.**
+
+**⚠️ This does NOT reopen Warwick's decision, and must not be written up as if it does.** He ruled on 2026-08-06 that the ding **decision is contextual and stays with Larry**, explicitly **not** mechanised, and **no automatic event classifier is to be built.** **That ruling stands and is not relitigated here.** What is recorded is the *cost side* of it, honestly measured, so the report states the trade rather than only its benefits. **Warwick owns the trade; Larry owes him the number.**
+
+**Recorded for §15.3d (delivery tax / end-of-phase collapse) as a first-party datum** — the failure is Larry's own, observed live, not reconstructed.
+
+### 🚨 Known blocker on the J2 surface — a `permission`, and it is Warwick's
+
+**The Claude Code auto-mode classifier DENIES writes into `C:\.fusion247\**`**, hit this session attempting to make `larry-ding.mjs` self-sufficient. **And GL-012 §4 independently bars dispatching any specialist there** — the script sits at the **secrets-store root**, which is never a valid `private_surface` grant. **So the surface is closed to Larry by the classifier and closed to every worker by GL-012.** J2-4's "approved stable runtime" must therefore resolve this, not route around it. **Dinged to Warwick 2026-08-06 as an A/B decision; unanswered at the time of writing.**
+
+**Related and already recorded: C-9** — the governor writes **no log** when a continuity packet fails to deliver. **J2-5 and J2-6 are the same requirement arriving from a second direction**, and a fix that satisfies one should be checked against the other rather than built twice.
+
+### ⛔ SUPERSEDED 2026-08-06 — the TRIGGER half of this reconnaissance is NOT to be built
+
+> **Warwick re-scoped JOB 2 above: the decision is contextual and stays with Larry. There is no automatic event classifier and no trigger mechanism.** Everything in this subsection about the `Stop` hook, the dedupe discriminator and the five events **is retained as evidence only** — it is a correct finding about the estate and a **wrong route for J2.**
+>
+> **What survives and is now the CRUX:** the credential probe below. It is the direct proof of **J2-c** — the send path cannot rely on an inherited environment, so it must load its credentials itself.
+>
+> **Do not build the trigger. Do not delete this record either** — it is what stops the next session re-deriving the same design and mistaking it for the route.
+
+**Retained for evidence — the original reconnaissance, correct as facts about the estate:**
+
+| Need | What already carries it | Evidence |
+|---|---|---|
+| **J2-1 — a real production event** | **A `Stop` hook is ALREADY REGISTERED at USER level**: `node C:/Users/Buggly/.mypka/governor/continuity.mjs stop`. It fires at **every turn end, in every directory**, spawned **by the host** | `~/.claude/settings.json`, read 2026-08-06. Same registration route as the `SessionStart` reorient hook proven at `eff3033` |
+| **J2-3 — routine narration must NOT ding** | Continuity's **existing semantic-change dedupe** already suppresses a Stop write when state is unchanged (**E-H**). **That is precisely the substantive-vs-routine discriminator J2-3 needs** — it exists, it is proven, and it does not have to be invented | E-H, §16.5 |
+| **J2-5 / J2-6 — success AND failure durably observable, never silent** | **Tower's `notify.mjs` already does all of it**: a durable `tower.notification` row, a dedup claim, `telegram_ok` and `telegram_message_id` written back after the POST, and an **honest** `"not sent — missing TELEGRAM_BOT_TOKEN…"` detail recorded when credentials are absent rather than a silent no-op | `services/control-plane/tower-loop/notify.mjs:58-121`, read 2026-08-06 |
+| **J2-2 — which events** | The **five already named** in §16.10: active frontier changes · next Work Order changes · phase boundary changes · context crosses a threshold · handback state changes | Warwick, 2026-08-05 |
+
+### 🔓 This dissolves the §17.2 classifier blocker rather than routing around it
+
+**The blocker was that writes to `C:\.fusion247\**` are denied to Larry by the classifier and to every worker by GL-012.** On this route **no write to that path is ever required.** The change lives in `tools/governor/continuity.mjs` (repo, Keel) and its installed copy under `~/.mypka/governor/` (Mack — **and §16.10 records that subagent writes to `~/.mypka/**` now SUCCEED**). Credentials are **read at runtime by the hook-spawned process** from the stable path — never written, never echoed, and never sourced from an interactive shell, which is exactly **J2-4**.
+
+**The one thing reconnaissance did NOT establish, and it must not be assumed:** that the hook-spawned process actually resolves `TELEGRAM_BOT_TOKEN` / `AUTHORISED_TELEGRAM_USER_ID` in its own environment. **`notify.mjs` reads them from `process.env` exactly as `larry-ding.mjs` does**, so the *same* defect this session diagnosed can recur one layer up. **Establish it by execution before designing on it.**
+
+#### ⛔ NOW ESTABLISHED BY EXECUTION, 2026-08-06 — **the risk was real, and it is the crux of J2-4**
+
+| Probe | Result |
+|---|---|
+| Both credential names in an **inherited** (no `--env-file`) environment | **`TELEGRAM_BOT_TOKEN: ABSENT` · `AUTHORISED_TELEGRAM_USER_ID: ABSENT`** — presence tested, **no value read or printed** |
+| Installed `~/.mypka/governor/continuity.mjs` — any `loadEnvFile`, env-file, credential or notify/ding reference | **NONE.** The file has no credential path whatsoever |
+
+**Consequence, and it is the whole design constraint for J2:** a `Stop`-hook-spawned process **inherits nothing** and would fail with the *identical* `missing token/chat` gate that `larry-ding.mjs` hit this session. **The event route is right; the credential route is genuinely missing and must be built, not assumed.**
+
+**J2-c therefore resolves to: the send path loads the credentials ITSELF at process start, from the approved stable path — no `--env-file`, no shell setup.**
+
+### 🚧 The surface decision — and why it is NOT a Warwick permission after all
+
+**The obstacle:** the natural repair is to edit `C:\.fusion247\larry-ding.mjs` so it self-loads. **The auto-mode classifier DENIES writes to `C:\.fusion247\**`** (hit this session), and **GL-012 §4 independently bars dispatching any specialist there** — it is the secrets-store root and never a valid grant. **Both doors are shut.**
+
+**Two routes, and the second needs no permission:**
+
+| | Route | Verdict |
+|---|---|---|
+| **(a)** | Warwick permits the one write to `C:\.fusion247\larry-ding.mjs` | **Not needed. Do not ask.** It also leaves the send path **outside version control** |
+| **(b)** | **The send path moves into the repo at `tools/governor/` and is INSTALLED to `~/.mypka/governor/`**, reading the approved credentials at runtime from the stable path | **CHOSEN.** An ordinary technical decision, not a product one |
+
+**Why (b) is decisively right, and it is not merely convenience:** `C:\.fusion247\larry-ding.mjs` is **not in version control**. It cannot be reviewed by Veritas, cannot be reviewed by Codex, has no history, and does not survive a rebuild of the machine. **A send path Warwick's acceptance depends on cannot live outside git.** Route (b) makes it versioned, reviewable and installable, and `~/.mypka/**` is a surface where subagent writes are proven to succeed (§16.10, Mack, WO-16).
+
+**Reading is not writing, and the distinction is load-bearing here.** The classifier blocked a **write**; the running script performing a **runtime read** of the approved env file is exactly what `--env-file` already does today. **No credential value ever enters a model context**, and no worker opens that file — a worker writes a path literal, which is not access. ⚠️ **Constraint for the Work Order: the tests must NOT read the real credentials file.**
+
+**Recorded honestly:** the legacy `C:\.fusion247\larry-ding.mjs` cannot be retired or edited, because that surface is closed. **It remains on disk as a legacy duplicate.** Two paths to one channel is a real defect — **reported once, not fixed**, since fixing it needs the permission route (a) exists for and Warwick has not been asked for it.
+
+**Split, unchanged from WP-3A/WP-3E:** **Keel** authors under `tools/governor/` in the repo; **Mack** installs to `~/.mypka/governor/`, because a fix present only in the repo is inert — the §16.11 lesson. **J2-e's acceptance is a real message from the INSTALLED path, not the repo copy.**
+
+**Convergence worth noting:** §16.10's parked *"frontier-change-triggers-continuity"* defect and J2-1 are **the same mechanism**. Building the ding trigger discharges the parked defect; they must not be built twice.
+
+## 17.3 ⚖️ STANDING CANONICAL LAW — *"Nothing may live only in Larry's head"*
+
+**Warwick supplied the exact block and instructed that it be added to root `CLAUDE.md` as the SOLE canonical definition.** That is his explicit approval and his exact text, which is what root `CLAUDE.md`'s *"no silent constitutional self-modification"* clause requires. **The independent review of the resulting patch is still owed** and is discharged by this phase's existing route — Veritas on the exact integrated head, Codex at PR level. **Larry does not self-certify it.**
+
+**Where it lives:** root `CLAUDE.md`, canonical, once.
+
+**Five projections, each POINTING to the root clause — *"must not paraphrase or weaken it"*:**
+
+> ⚠️ **CORRECTED 2026-08-06 (Veritas V4-5, non-blocking, accepted).** **"Five projections" is really FOUR DISTINCT SURFACES plus a SELF-REFERENCE.** **L-5** landed in root `CLAUDE.md` § Wayfinder — **the canonical file pointing at itself** — because **no Wayfinder template file exists** and inventing one would be regrowth. **The START / RESUME block does not carry the automation-frontier clause.** The binding is real and the decision to avoid a new file was deliberate; **the count was overstated and is corrected here rather than defended.**
+
+| # | Surface | What it binds |
+|---|---|---|
+| **L-1** | **Larry contract** | completion and dispatch bar |
+| **L-2** | **Veritas contract** | **mandatory PASS dimension** |
+| **L-3** | **Codex contract** (`services/control-plane/review/prompts/`) | **mandatory PR-review bar** |
+| **L-4** | **Work Order template / SOP-022** | mandatory acceptance clause for intended automation |
+| **L-5** | **Wayfinder template / start contract** | **automated outcomes remain FRONTIER until the canonical test passes** |
+
+**The prohibitions, his words:** *"No new control plane. No Nolan routine checker. No manual steps disguised as automation. Build to the Star."*
+
+## 17.5 ⭐ ORDERED CLOSURE — set by Warwick, 2026-08-06. **This is the phase-close sequence.**
+
+**The §15.2–§15.3d phase-close report is REACTIVATED and is part of this work package** (§16.1's supersession is reversed above). **The steps are ORDERED, not a menu.**
+
+### 🔄 SEQUENCE REVISED by Warwick, 2026-08-06 — **rotation now comes BEFORE Pax**
+
+> **His correction, verbatim in effect: *"Do not rotate before Mack."*** and **"Pax remains untouched until after rotation."** **The table below is the operative sequence. The original six-step list is retained beneath it as the record of what it replaced.**
+
+| # | Step | Owner | State |
+|---|---|---|---|
+| **1** | **Keel returns and JOB 2 is integrated** | Keel → Larry | ✅ **DONE.** Integrated at **`8b0528b`**, independently verified — 56/56, `ding.mjs` byte-identical across the addendum, Larry's own surviving mutation now caught (5 red) |
+| **2** | **Mack installs the versioned FusionDevBot sender** | **Mack** | ⛔ **SUPERSEDED — the row DIRECTLY BELOW records this same install as ✅ DONE.** *(Re-cut 2026-08-07, Veritas D-4: the exact shape repaired at `:2685`, surviving at a second location.)* ~~IN FLIGHT.~~ `WO-2026-08-06-20` (WP-4C) dispatched at `0cc2ffe`. Hand-authored on the WP-3E `machine_surface` shape — see G-6 |
+| **2b** | **WP-4C install** | Mack | ✅ **DONE.** Installed sha `0f26ef16…` **equals the git blob**, verified independently by Larry; 0 CR bytes; rollback **executed** (absent→install→delete→verify→reinstall→equal); `INSTALLED-FROM.txt` appended with **append-only PROVEN** (first 8,310 bytes hash to the pre-write baseline) |
+| **3** | **Prove J2-e — ONE REAL MESSAGE arriving from the INSTALLED path**, credentials self-loaded, **no `--env-file` and no shell preparation** | **Larry**, then Warwick's eyes | ✅ **FIRED AND DELIVERED — see §17.7** |
+| **4** | **Veritas reviews the exact integrated head** | **Veritas** | ⛔ **STALE — THIRTEEN reviews later.** ➡️ **SEE § ASSURANCE STANDING.** *(Re-cut 2026-08-07, Veritas D-5.)* ~~NEXT~~ |
+| ~~**5**~~ | ~~**`/rotate` and reach `SAFE TO CLEAR`** — now including the Pax report INSIDE the transaction~~ | Larry + Pax | ⛔ **SUPERSEDED 2026-08-07 — this row's "Not started" is FALSE. `/rotate` has since completed TWICE** (Sub-phase 4A close, and the in-flight 4B rotation). → **§ ROTATION** below. |
+| ~~**6**~~ | ~~A fresh Larry picks up the Pax commission on the other side~~ | — | ⛔ **REVERSED 2026-08-06 — see §17.5a** |
+
+### 🔄 §17.5a — Pax moves INSIDE `/rotate`. Warwick, 2026-08-06
+
+> **His reason, and it is the load-bearing part: *"Do not defer the Pax report until after respawn. That would lose session-specific evidence that has not yet been turned into a durable artefact."*** **A rotation is the last moment that evidence exists. After `/clear` it is gone and no fresh Larry can reconstruct it.**
+
+**`/rotate` is updated — `.claude/commands/rotate.md`, not a new mechanism.** Every rotation now: completes existing assurance and banking · **commissions Pax** for the closing session's performance/process report · **waits for the return** · **writes and commits it under `Deliverables/`** · **puts the pointer in the Wayfinder AND the Honcho packet** · and **withholds `SAFE TO CLEAR` until the Deliverable exists and the read-back matches.**
+
+⛔ **The report is a GIT artefact. NOT Google Drive, NOT Google Sheets, NOT Supabase** — this supersedes the earlier "publish to Google Drive" step entirely. **Supabase reporting is explicitly DEFERRED to a fresh session after the next `/clear` and must not be built now.**
+
+**For THIS rotation the report must carry:** Work Order evidence · rework and refusals · **the notification misses** · parent-channel availability and queued messages · token/context evidence **read from the instrument, never estimated** · and any other recorded delivery-tax findings.
+
+## 17.8 📣 The attention correction — Warwick, 2026-08-06. **Integrated BEFORE Veritas, as ordered**
+
+> **His diagnosis, and it reframes the whole problem: *"The DevBot transport is now proven. The repeated failure is attention at the point of judgement."*** **Correct it "without reopening automatic notification classification."**
+
+**Four parts, all landed:**
+
+| # | Change | Where |
+|---|---|---|
+| **1** | **One concise canonical notification rule beside Rule 4** — decide before posting any substantive outcome and immediately after any specialist return · **send BEFORE the chat update** · then CONTINUE — stopping only for one of the seven named interruption reasons. *"The judgement remains Larry's; delivery is mechanical."* | root `CLAUDE.md` § **Rule 4a** |
+| **2** | **The Wayfinder copy REPLACED by an exact reference.** A rule in two places drifts; SSOT says one home | this map's START / RESUME block |
+| **3** | **A zero-model `PostToolUse` reminder on Agent returns**, injecting the rule into the parent at the moment of decision | `.claude/hooks/notify-reminder.mjs` + `.claude/settings.json` |
+| **4** | **Availability preserved** — eligible specialists run in the **background by default** and Larry **yields immediately after dispatch**. Foreground needs a genuine interactive-permission reason | root `CLAUDE.md` § Rule 4a |
+
+**What the hook is NOT, asserted by source and not by promise** — `grep -cE "fetch\|https?:\|telegram\|Agent(\|spawn\|exec"` over it returns **0**:
+
+- **does NOT classify significance** — the judgement is Larry's and stays Larry's;
+- **does NOT send** — no network call of any kind;
+- **does NOT launch an agent** — no model is invoked, so it costs **zero tokens**;
+- **does NOT create a daemon** — it runs, prints, exits `0`.
+
+**Executed proof it works as a program:** emits valid JSON with `hookEventName: PostToolUse` and a populated `additionalContext`; `settings.json` parses with matcher `Agent|Task`. **Exit 0 always — a reminder that can break the parent turn is worse than no reminder.**
+
+### ⚠️ WRITTEN IS NOT LOADED — and this is the honest status
+
+**Root `CLAUDE.md`: *"a hook present in a settings file has no effect until the host restarts… No reply may assert a control is active without evidence that it fired."*** **This hook has NOT yet been observed to fire.** It is **written and executable**, which is a different claim from **installed and firing**.
+
+**Warwick set the live test himself: *"The Veritas return is the live test: the reminder must reach Larry, and if the return is substantive the ding must arrive before the chat update."*** **If the reminder does not appear on the Veritas return, that is a LOADING result, not a design failure** — and it must be reported as exactly that, not quietly absorbed and not dressed up as success.
+
+### ✅ IT FIRED — and ⛔ at the WRONG MOMENT. Observed 2026-08-06
+
+**The hook loaded WITHOUT a host restart and fired. Observed, not asserted** — the reminder text appeared in Larry's context immediately after the Veritas dispatch. **"Written is not loaded" is discharged for this hook: it is loaded and firing.**
+
+**But it fired at DISPATCH, not at RETURN.**
+
+**The mechanism, and it is not a bug in the hook:** `PostToolUse` fires when a **tool call completes**. For a **background** agent the tool call completes at **LAUNCH** — the specialist's return arrives later as a **task notification, which is not a tool result and therefore cannot trigger `PostToolUse` at all.**
+
+**So on the default path the reminder lands at the one moment it is not needed, and is silent at the moment it is — which is exactly the moment that failed twice today.**
+
+### ⚖️ The tension is between two of Warwick's OWN instructions, and Larry is not resolving it silently
+
+| Instruction | What it requires |
+|---|---|
+| **Part 3** | the reminder fires on specialist **RETURNS** |
+| **Part 4** | eligible specialists run in the **BACKGROUND by default**, so Larry stays available |
+
+**Background dispatch is precisely what makes the reminder unable to fire on return.** They cannot both hold as written with this hook event.
+
+**Options, reported for Warwick's decision — not chosen by Larry:**
+
+| | Option | Cost |
+|---|---|---|
+| **A** | Accept it — a standing nudge once per dispatch, just early | Cheap, no change, **weaker than intended** |
+| **B** | Move the reminder to the **`Stop` hook**, which fires at every turn end including the turn that processes a return | Still zero-model, still no classification — **but it fires on EVERY turn, so it becomes noise, and noise gets ignored.** That is how gates die |
+| **C** | **Keep the hook as a partial aid and treat the CANONICAL RULE as the actual control** | Honest about what a reminder can and cannot fix |
+
+**Larry's recommendation is C, and the reasoning is the part that matters:** **the hook is not what will fix the attention failure — Rule 4a is.** Calling the hook "the fix" would be the *mechanism-instead-of-discipline* pattern Warwick has rejected repeatedly, and the regrowth cap applies. **Recorded as a recommendation. The decision is his.**
+
+### ⚖️ EXPLICIT RECLASSIFICATION — the attention correction is **MANUAL** (Veritas V4-4, accepted)
+
+**Veritas: *"The reminder hook is intended-automatic, was never observed to fire at this head, and is not reclassified as manual. Capability, not completed automation."*** **Accepted in full. This is root `CLAUDE.md` § "Nothing may live only in Larry's head" caught against Larry a SECOND time in one session — by the law he wrote that morning.**
+
+**The reclassification, using the root clause's own permitted resolution:**
+
+> **The attention correction is a MANUAL control. Rule 4a is the mechanism, and Rule 4a is a JUDGEMENT Larry performs — not an automation.** **The `PostToolUse` reminder is a PARTIAL AID that does NOT fire at the moment it was intended to fire** (a background specialist's return is a task notification, not a tool result). **It is not, and must never be recorded as, completed automation.**
+
+⚠️ **A subsequent firing does not undo this.** The hook **was** later observed firing — at **dispatch**, at head `34d0cd0`, after the reviewed head. **That proves loading, not delivery of the intended behaviour**, and it is measured for the wrong event. **Larry's original claim (e) — that Rule 4a "plus a zero-model reminder hook address notification attention" — overstated it, and Veritas was right to block it.**
+
+**What is honestly true at this head:** Rule 4a exists and is canonical · the hook exists, loads and executes · **the attention failure has no automated guard, by design and by Warwick's ruling, and its two recorded failures today remain unguarded by anything except Larry's judgement.**
+
+## 17.9 🔬 The subagent-return cue — ⛔ **CLOSED. DESCOPED AND DISABLED by Amendment 5. NO follow-up is owed after `/rotate`.** → § ACTIVE SESSION WORK PACKAGE
+> ~~*"📌 FOLLOW UP AFTER `/rotate`" · "This note must survive rotation"*~~ — **retired 2026-08-07.** The work was delivered, then descoped: *«Specialist-return reminder injection: DESCOPED — demonstrated regression and no demonstrated net benefit.»* **A fresh Larry must NOT pick this up.**
+
+> ⛔ **DISCHARGED 2026-08-07 — NO follow-up is owed.** The implementation decision was taken: the reminder system is **DESCOPED AND DISABLED** (Amendment 5). **A fresh Larry must not pick this up after `/rotate`.** ~~**📌 WARWICK'S EXPLICIT FOLLOW-UP NOTE, 2026-08-06: *"make a note to follow up after `/rotate`."***~~ ~~**The implementation decision comes AFTER `/clear`, alongside the separate Supabase performance-reporting job. Pax researches; Pax does NOT implement.**~~ ~~**This note must survive rotation — it belongs in the continuity packet.**~~ ⛔ **BOTH SENTENCES STRUCK 2026-08-07 (Veritas F5, blocking).** They survived inside their own retirement banner and instructed descoped work into the continuity packet — the first artefact a fresh Larry reads. **NOTHING from §17.9 belongs in the packet.** *Checked before striking: the "separate Supabase performance-reporting job" is **not** a pending item — it is `/rotate` **step 7b**, already law and already inside the rotation transaction. Nothing is lost.*
+
+**Why it exists:** the dispatch-time hook fires at **LAUNCH**, not return (§17.8). Warwick's North Star: *"When a background specialist actually finishes, Larry's parent session receives one fresh, specialist-specific retrieval cue at the next safe parent turn."* **Commissioned to Pax as `WO-2026-08-06-21` → `Deliverables/2026-08-06-pax-subagent-return-cue-brief.md`.**
+
+### ⚠️ A class-A defect in the commission, caught at PREFLIGHT by the generator
+
+**Warwick's brief requires answers *"by execution, not inference"*. PAX HAS NO `Bash`** — Read, Write, WebFetch, WebSearch, Grep, Glob only. **As literally worded the order was impossible and would have earned an immediate `REFUSE`.**
+
+**The generator caught it, not Larry.** It derives `producible_evidence` from the tool grant and emitted: *"acceptance evidence must NOT require an executed command · command execution: NOT available (tools: has no Bash)."* **This is WP-4A's repair preventing a real class-A defect on live work, at issue time.** Resolved by the established pattern: **Larry executes and stages; the worker analyses.**
+
+### ✅ ESTABLISHED BY EXECUTION — Larry's probe, 2026-08-06
+
+**Method:** `SubagentStop` hook registered in the **UNTRACKED** `.claude/settings.local.json`, three trivial background agents dispatched (one alone, then two concurrently), full stdin payload captured each time, probe then removed.
+
+⚠️ **How far that claim is corroborated, stated exactly (Veritas `V5-5`, accepted):** git confirms `settings.json`'s last change is the `$CLAUDE_PROJECT_DIR` path fix at `755536e`, that no probe commit touches it, and that `settings.local.json` is untracked and gitignored. **But a transient uncommitted edit-and-revert is NOT DISPROVABLE BY GIT.** So the honest form is *"not contradicted by git"*, **not** *"proven"* — and `S-1`..`S-4` are **builder evidence Veritas could not reproduce** (`V5-4`: it holds no hook registration and no `Task`). **The raw payload file is untracked and ephemeral: the findings survive in this map, the payloads do not.**
+
+| # | Finding |
+|---|---|
+| **S-1** | **`SubagentStop` DOES fire at the real completion moment for a BACKGROUND agent** — and fired **BEFORE** the task-notification reached Larry's context |
+| **S-2** | Payload carries **`session_id` (the PARENT session)** · `agent_id` · **`agent_type`** · `agent_transcript_path` · `transcript_path` · `cwd` · `prompt_id` · `permission_mode` · `stop_hook_active` · `last_assistant_message` · `background_tasks` |
+| **S-3** | **`agent_type` correctly distinguished `general-purpose` from `Explore`** — **specialist-specific cues are feasible on real data, not on assumption** |
+| **S-4** | **Two CONCURRENT returns each fired their own `SubagentStop`** with distinct `agent_id`s; an append-only file queued them naturally |
+
+**Warwick's steps 1 and 2 are PROVEN VIABLE. S-4 answers only the WRITE half of his queueing question** — ⚠️ **the CONSUME half (a later parent hook reading each marker exactly once) is UNTESTED and is Pax's to establish.**
+
+**Larry's sequencing decision, recorded:** **the Veritas resubmission is HELD until Pax's brief is committed.** Veritas's own `V4-10` found the repo head moved *during* its last review, so a receipt no longer covered the branch tip. **Running both concurrently would repeat that exact defect.**
+
+### 📋 PAX RETURNED — `BUILD`, reduced, **GATED ON ONE PROBE**. Brief: `Deliverables/2026-08-06-pax-subagent-return-cue-brief.md`
+
+| | |
+|---|---|
+| **Verdict** | **`BUILD` — Option A, reduced — CONDITIONAL.** ⚠️ **Kill condition stated IN ADVANCE:** if `PreToolUse` firing *inside* a subagent does **not** carry `agent_id`, a parent tool call cannot be told from a specialist's, the cue can land in the **wrong context**, and the verdict **flips to `DO NOT BUILD` → fall back to Option C.** **Pax would not authorise the build without that probe** |
+| **Option B — DEAD**, established from the docs | **No native event both fires on a background return AND reaches the parent's context.** `Notification`'s `agent_completed` matcher is the right moment but its only output is `systemMessage` — *"Warning message shown to the user"* — which **never reaches Claude**. `SubagentStop.additionalContext` lands *"at the end of the turn"* with exit-2 semantics *"prevents the subagent from stopping"*, i.e. it **injects back into the SPECIALIST** — the exact thing Warwick forbade |
+| **The honest answer to the central question** | **NO hook is documented to fire after a background completion notification is processed.** The sub-agents page, verbatim: *"A background subagent's results reach Claude as a completion notification in a later turn."* **The relay is necessarily OPPORTUNISTIC** — next `PreToolUse` or `UserPromptSubmit`, whichever comes first. **That is not the clean answer the design assumed** |
+
+**🚨 The finding worth the whole commission: TWO OFFICIAL ANTHROPIC PAGES CONTRADICT EACH OTHER on the field the design rests on.** The **Agent SDK hooks** page says *"`agent_id` and `agent_type` are populated when the hook fires inside a subagent… available to all hook types"*; the **CLI hooks reference** lists `PreToolUse`'s inputs with **no `agent_id`**. **Pax did not pick a side — the contradiction IS the probe.** ✅ Correct handling, and the opposite of inferring a capability from a plausible field name.
+
+**The unexpected failure mode: the relay can fire EARLY.** A parent tool call one second after `SubagentStop` consumes the marker **before the completion notification has landed** — so Larry is told to act on a return he cannot yet see, **and the marker is gone.** Cheap mitigation, free from the executed evidence: **put `agent_type` in the cue** so Larry at least knows *who* returned. **Residual risk stands.**
+
+> **Pax's anti-pattern, and it is the durable part: *"the failure mode is the text, not the build."*** A generic *"a specialist returned"* on every return **becomes a banner ad within a day — a gate that gets skimmed has died while still looking green.** **Warwick's specialist-specific canonical text is the only thing making this survivable. If it ever collapses back to one generic string, RETIRE the hook.**
+
+**And the strongest argument for `BUILD`, worth defending if challenged:** the existing hook fires at dispatch, so it is **stale by the time the decision is due**. **Return-time firing is a CHANGE OF KIND, not a change of dose.**
+
+**Unresolved, and labelled as such by Pax (pre-probe):** `agent_id` presence in parent vs subagent `PreToolUse` (**was UNESTABLISHED — now SETTLED**) · whether the relay materially improves retrieval **or just adds noise** (**still UNESTABLISHED and unprovable in advance**) · **host version pin** (**now captured**).
+
+### ✅ §9 PROBE EXECUTED — 2026-08-06 post-rotation session
+
+**Evidence:** `Deliverables/2026-08-06-s9-agent-id-probe-evidence.md`  
+**Host version:** `2.1.222 (Claude Code)`  
+**Method:** temporary untracked hooks in `.claude/settings.local.json` only (restored after; tracked `settings.json` untouched) · one `claude -p` parent with one background general-purpose Agent · 6 payloads · exit 0 · 44.9 s
+
+| Observation | Result |
+|---|---|
+| Parent `PreToolUse` (Bash, Agent dispatch, Bash after) | **no** `agent_id`, **no** `agent_type` |
+| Subagent `PreToolUse` (Bash, Read) | **`agent_id` + `agent_type` present** (`a515f57fcfad85cbd` / `general-purpose`) |
+| `SubagentStop` | fired once with same `agent_id` + `agent_type` |
+| `Notification` | **0 firings** under this non-interactive run (fold-in only) |
+| **Kill condition** | **NOT triggered** |
+| **Verdict** | **`BUILD` — Option A reduced may proceed** |
+
+**What remains unestablished:** return-time efficacy vs noise · exactly-once consume under concurrent parent batches · Notification in interactive sessions.
+
+**⛔ HISTORICAL — SUPERSEDED 2026-08-07. This work was delivered, then DESCOPED by Amendment 5. Directs nothing. → § ACTIVE SESSION WORK PACKAGE.** ~~📌 EXACT NEXT ACTION (supersedes the post-rotation probe action):~~ **Issue and dispatch a bounded Work Order to implement Option A reduced** per `Deliverables/2026-08-06-pax-subagent-return-cue-brief.md` §§7–8 — `SubagentStop` marker writer · parent-only `PreToolUse`/`UserPromptSubmit` consumer gated on absent `agent_id` · specialist-specific cue text · zero model calls · no daemon · no auto-send. **Do not build a workaround for a failed probe — the probe passed.**
+
+## 17.7 ✅ J2-e — PASSED BY EXECUTION, 2026-08-06
+
+**Command, stated exactly, because the absence of flags IS the proof:**
+
+```
+node "C:/Users/Buggly/.mypka/governor/ding.mjs" <message-file>
+```
+
+**No `--env-file`. No exported variable. No shell preparation.** Verified immediately before firing, in the same shell: **`TELEGRAM_BOT_TOKEN: ABSENT · AUTHORISED_TELEGRAM_USER_ID: ABSENT`.**
+
+| Evidence | Value |
+|---|---|
+| Return | `{"ok":true,"why":"sent","message_id":326}` — **exit 0** |
+| Durable record, written on first invocation | `{"ts":"2026-08-06T01:30:20.851Z","outcome":"sent","exit":0,"message_id":326,"bytes":2310}` |
+| Installed file | `0f26ef16…` = git blob at `8b0528ba`, **0 CR bytes** |
+
+**What this PROVES:** the send path loads its own approved credentials from a stable runtime, delivers, and **durably records the delivery** — **J2-c, J2-d and J2-e's send half.**
+
+⚠️ **What it does NOT prove, and no receipt may claim otherwise:**
+
+- **Arrival on Warwick's phone is HIS confirmation, not Larry's.** Telegram returning `ok:true` with a `message_id` evidences that the message left and was accepted. **It is not the same claim as "he saw it."**
+- **Nothing triggers this automatically, and nothing is supposed to.** Warwick ruled the ding **judgement** stays with Larry and is explicitly not mechanised. **Under root `CLAUDE.md` § "Nothing may live only in Larry's head", the MECHANISM (the send path) is now complete; the JUDGEMENT is not a mechanism** — which is exactly the boundary §17.2 records.
+
+### 🔴 And the judgement half failed TWICE today — both misses, recorded
+
+**Warwick, twice: *"where was my ding!ffs"*, then *"you absolutely should have dinged for the update on mack, that is substantial and a miss."*** **Both correct.**
+
+| # | Occasion | Larry's error |
+|---|---|---|
+| **1** | Step 2 (Nolan resolution) completed | Reported in chat, no ding |
+| **2** | **Mack's WP-4C return** — install verified, CRLF trap measured, contract correction accepted | Reported in chat, no ding |
+
+**Two failures of the same rule, in one session, by the author of the rule, roughly an hour apart, with the instrument reading GREEN and nothing else going wrong.** **This is the single strongest delivery-tax datum the session produced and it is Pax's to analyse, not Larry's to explain away.** **It does not reopen Warwick's ruling** — he owns the trade; Larry owes him the number, and the number is now two.
+
+### 📋 EVERY Larry error this session — the consolidated record. **Input for the rotation report.**
+
+**Written here because Veritas (V4-11) found one that had been owned in conversation and never entered the record. A correction that exists only in chat does not exist.**
+
+| # | Error | Caught by | Recorded |
+|---|---|---|---|
+| **E-1** | **Stale SHA in a dispatch** — named `c9390de` as the branch tip from memory when two of Larry's own later commits had moved it to `4214a66` | **Keel's read-back** | §17.6, WO-18 `AMENDMENT 1` |
+| **E-2** | **Eyeballed a token figure and was ~2× wrong.** Claimed the envelope was *"roughly ten thousand tokens"*; **measured: 20,056 chars ≈ 5,014 tokens.** Also misattributed the bulk — missed `git_authority` at 14%, overstated `prohibited_file_surface`, which is 7% | **Keel's read-back** | ⚠️ **WAS ONLY IN THE WO FILE AND A COMMIT MESSAGE — added to the map here, 2026-08-06, on Veritas V4-11** |
+| **E-3** | **Called Mack's contract a "GAP"** when it has no file-pattern grammar at all, so absence is not denial | **Mack's read-back** | §17.6 + `08344dd` |
+| **E-4** | **Missed notification ×2** — step 2's completion, and Mack's WP-4C return | **Warwick, twice** | §17.7 above |
+| **E-5** | **Asserted context was "very long" twice and recommended rotating — without reading the instrument.** It measured **~32% GREEN, CONTINUE** | **Larry, on finally measuring** | `c9803dc` |
+| **E-6** | **Left a live Google Drive contradiction and a live Pax-timing contradiction** in the map after re-scoping, including in **§15.2 — the section Warwick reactivated, whose body Larry did not re-read** | **Veritas V4-2, V4-3** | Corrected 2026-08-06 |
+| **E-7** | **Never pushed the branch.** 24 commits existed only on this machine; the reviewed head was on no remote | **Veritas V4-1** | Pushed 2026-08-06 |
+| **E-8** | **Overstated the projection count** — "five projections" is four surfaces plus a self-reference | **Veritas V4-5** | §17.3 above |
+| **E-9** | **Described the attention correction as delivered** when its hook was never observed to fire at the reviewed head and was not reclassified as manual | **Veritas V4-4** | §17.8, reclassified |
+
+| **E-10** | **Committed `34d0cd0` while the branch was under assurance**, moving the head mid-review so the receipt no longer covered the branch tip | **Veritas V4-10** | ⚠️ **ADDED 2026-08-06 on Veritas `V5-2`** — it had appeared only as the *rationale* for a later sequencing decision, framed as Veritas's finding rather than as Larry's error |
+| **E-11** | **Claimed the Google Drive contradiction was "corrected in both places."** A **third** live instance survived at §15.4 — in the very section describing the route for the artefact `/rotate` produces | **Veritas V5-1** | Corrected 2026-08-06 |
+
+**The pattern worth Pax's attention, stated without excuse: NINE of the eleven were caught by someone else** — a specialist read-back or the assurance gate — **and only E-5 was caught by Larry.** **The two no reviewer could have caught (E-4) were caught by Warwick.** **A worker read-back and an independent gate are, on this session's evidence, the load-bearing controls; Larry's self-review caught almost nothing.**
+
+> ### 🚨 The shape Veritas named, and it is worth more than either defect
+>
+> **`E-10` and `E-11` are both SWEEPS REPORTED AS EXHAUSTIVE.** *"Corrected in both places"* and *"EVERY Larry error this session"* are **completeness claims**, and **both were false when written.** ⚠️ **The defect is not the missed instance — it is the word "every".** A partial sweep honestly labelled partial costs a reader nothing; **a partial sweep labelled complete stops them looking.**
+>
+> **This belongs in the rotation report** (Veritas's own instruction) **and it generalises well past this session:** the same failure produced the three competing frontiers §12 records, and it is the reason a completeness claim should either be mechanically enumerated or stated as *"the instances I found"*.
+>
+> ### 🚨🚨 IT HAPPENED A THIRD TIME — **inside the very table written to fix it** (Pax, 2026-08-06)
+>
+> **`V5-2` was raised so this E-table would be COMPLETE before Pax wrote the report from it. `E-10` was added. §17.6's own *"Larry's input was wrong"* (`G-6`) WAS NOT.** **Added below as `E-12`.**
+>
+> **Pax's conclusion, and it is the durable finding of this session: *"Three failed completeness claims in one session, two of them AFTER the pattern was explicitly named, is not inattention — it is the shape of the claim."*** **A completeness claim made by re-reading is a claim about what the author noticed. It cannot be made reliable by trying harder; it can only be made mechanically or hedged honestly.**
+
+| **E-12** | **§17.6 records `G-6` as *"Larry's input was wrong"* — a genuine error, omitted from this table even when the table was rewritten specifically to be complete** | **Pax** | Added 2026-08-06 — **the third failed completeness claim** |
+
+**⛔ PAX IS UNTOUCHED UNTIL `/rotate` RUNS. No commission, no reconnaissance, no evidence gathering, no drafting before then.** Warwick's constraint still binds: *"Do not launch a separate report investigation before the Work Order route is ready — the Pax commission is also the first live acceptance test of that repaired route."* **The commission IS the investigation.**
+
+⛔ **CORRECTED 2026-08-06 (Veritas V4-3).** This paragraph previously ended *"…and it belongs to the session after this one."* **That is FALSE and directly contradicted §17.5a.** **Pax is commissioned INSIDE `/rotate`, before `SAFE TO CLEAR`, by THIS session — not after respawn.** Warwick reversed the timing on 2026-08-06 because **deferring the report past `/clear` destroys the session-specific evidence it exists to capture.** ⚠️ **A fresh Larry reading the old wording at step 5 would have received two opposite instructions — which is exactly the defect this map has carried before.**
+
+⛔ **CORRECTED 2026-08-06 (Veritas V4-2 and V4-3).** This paragraph previously read *"The Google Drive report (originally step 4) follows the Pax commission and is therefore also post-rotation"* and, above it, that the commission *"belongs to the session after this one"*. **BOTH statements are now FALSE and were live contradictions of §17.5a.** **The report is a GIT artefact under `Deliverables/`, and Pax is commissioned INSIDE `/rotate` before `SAFE TO CLEAR` — not after respawn.** ⚠️ **There is no Google Drive step anywhere on this route.**
+
+<details><summary>Superseded — the original six-step ordering, retained as the record</summary>
+
+**1** FusionDevBot durable send path · **2** Complete the Work Order / Nolan resolution · **3** Commission Pax for the phase-report evidence · **4** Larry publishes the durable Google Drive report once 1–3 are factually complete · **5** Veritas on the exact integrated head and report truth · **6** `/rotate`.
+
+**What changed:** rotation moved from last to **before** Pax, and the Pax commission moved to a fresh session. **Step 2 (Nolan resolution) was completed under the original numbering and is recorded in §17.6** — it is not lost by the renumbering.
+
+</details>
+
+### ⚠️ One factual correction to step 3, recorded rather than silently absorbed
+
+**Step 3 calls the Pax commission *"the first genuine Work Order through the repaired route"*. It is not — it will be the SECOND.** `WO-2026-08-06-19` (step 1, Keel) was **already generated by the repaired tool** at governance head `b30bf55` and dispatched at `394ce68`, before this instruction arrived. **The route was ready, so no instruction was breached** — the ordering constraint is satisfied either way.
+
+**Why this is better for Warwick, not worse:** he asked for accumulating evidence rather than a single data point, and *"a single successful order is initial acceptance, not proof of a permanent trend."* **Two orders through the route give two observations. The Pax commission additionally tests the route against a DIFFERENT specialist and a research-shaped order** — WO-19 tested it against Keel and an implementation-shaped one. **That is a stronger test than repeating the same shape.**
+
+### 📌 Step 2 — the reading Larry is acting on, stated so it can be overruled cheaply
+
+**"Complete the Work Order / Nolan resolution" is read as CLOSE IT, not ratify it.** The basis is Warwick's own standing instruction, unreversed: the Nolan-per-order proposal is **parked and unratified at `c2ebda4`**, *"do not merge, recreate or apply it"*, no Nolan contract / SOP-022 actor / agent-index / shim change is authorised, and **Nolan remains an occasional structural/audit role, not a routine checker.**
+
+**So the resolution to be COMPLETED is: the per-order checker is answered by the GENERATION repair, not by a change of actor.** Step 2 records that conclusion durably, retires the parked item, and leaves `c2ebda4` unmerged. **It ratifies nothing and creates no actor.**
+
+**If Warwick meant ratify instead, that reverses his own explicit prohibition and is one word from him.** Recorded as an interpretation precisely so it costs nothing to correct.
+
+## 17.6 ✅ STEP 2 — the Work Order / Nolan resolution, COMPLETED 2026-08-06
+
+**Ratifies nothing. Creates no actor. `c2ebda4` stays unmerged.**
+
+### The question that was open
+
+**Who checks a Work Order envelope before dispatch?** Pax established (WP-3C) that the responsibility was not merely unformalised but **formally DE-ASSIGNED**: `Team/agent-index.md:42-45` records the build-team table *"previously read 'Independently audits — **Nolan**'"*, changed by **`f78d121`** on 2026-08-04. The replacement is contractually barred from the half that was lost — *"no pre-inspection of a Work Order before implementation"* — and the Veritas gate fires **after** integration. **Pax's one-line diagnosis: the issuer was the sole author *and* the sole checker of the envelope.** Baseline: **13 class-A refusals across 15 orders.**
+
+### The resolution
+
+**The per-order checker question is answered by the GENERATION repair, not by a change of actor.** The defect was never that nobody *re-read* the envelope — it was that the envelope was **hand-typed from memory by the one person who could not see their own blind spot.** A second reader inspects a fallible artefact after the fact; **generation removes the fallible step.** Warwick's four permitted verbs are REMOVE, SHORTEN, COMBINE, CHANGE — **this REMOVES the authoring step rather than ADDING a reader.**
+
+**Standing position, unchanged and now closed:** Nolan remains an **occasional structural / audit role**, never a routine checker on every Work Order. **No Nolan contract, SOP-022 actor, `agent-index` or shim change is authorised or made.** §16.9 records what was approved on 2026-08-05 and is **superseded as a thing to implement** by the 2026-08-06 parking.
+
+### The evidence, measured across the two orders that bracket the repair
+
+| | **WO-18** — envelope **hand-authored** | **WO-19** — envelope **GENERATED** |
+|---|---|---|
+| Verdict | **`CLARIFY`** | **`ACCEPT`** |
+| Preventable class-A in the order | **2 of material weight**, + 4 minor | **0** |
+| Amendment required before build? | **YES** — `AMENDMENT 1`, a full round trip | **NO** |
+| Defects found | 9 | 4 contradictions, **all in the envelope/authoring, none blocking** |
+
+**The honest reading, and it is narrower than it looks: n = 2, and the two orders differ in more than one variable** — different scope, and the second was written by a Larry who had just read nine findings about the first. **Confounded, and stated so.** What is *not* confounded: the class-A defects in WO-18 were **envelope-shaped** (a `contract_basis` citing a generator field instead of a contract heading, a stale SHA typed from memory), and **both are structurally impossible in a generated envelope.**
+
+### ⚠️ AC-5 accounting — stated exactly, because it is the property most likely to be over-read
+
+**AC-5 requires THREE CONSECUTIVE real orders reaching specialists without a preventable class-A refusal.**
+
+| Order | Counts toward the streak? |
+|---|---|
+| **WO-18** | **NO.** It did not refuse, but it carried 2 preventable class-A defects and **held for a full amendment before substantive work began** |
+| **WO-19** | **YES** — clean, no amendment, worker proceeded on acceptance |
+
+> ### ⚖️ CORRECTED 2026-08-06 by Pax — **and the correction runs AGAINST Larry, not in his favour**
+>
+> **Larry recorded the count as ONE. Pax's honest count at rotation is TWO — `WO-19` and `WO-21`** — **and `WO-22` would make three under one reading.** ⚠️ **Larry under-counted his own acceptance property**, which is the opposite of the error this record was watching for.
+>
+> **But the real defect is definitional, and it is Warwick's to settle in one word: "consecutive" has never been defined against an order the GENERATOR HAS NO SHAPE FOR.** `WO-20` (Mack, machine-install) was **hand-authored because the generator correctly refused** (`G-6`). **Does a clean order the route cannot produce break the streak, sit outside it, or count?** **Larry does not decide this** — a `product-decision`, recorded, not resolved.
+>
+> **Consequence, stated plainly: AC-5 MAY ALREADY BE MET. It is NOT recorded as met**, because the counting rule is undecided and **Larry may not choose the reading that favours him.**
+
+**Warwick: *"A single successful order is initial acceptance, not proof of a permanent trend."*** **Whatever the count, no receipt may record AC-5 as met until the definitional question above is answered.**
+
+### 📊 Pax's measured comparison against the ONLY baseline — §15.3d, Phase 2
+
+| Metric | Phase 2 baseline | This session |
+|---|---|---|
+| Orders issued | 8 | **4** |
+| Amendment round trips | ~11 | **2** |
+| **Class-A refusals** | **7** | **0** |
+
+**No worker refused an order this session.** **Both round trips were on HAND-AUTHORED envelopes; both GENERATED envelopes ran clean on first dispatch** — **unconfounded on the one variable that matters.**
+
+⚠️ **Pax's caution, and it belongs beside the numbers: do NOT read the 33 clean notification minutes as the problem being fixed.** Both confirmed misses **predate** the installed send path's first row at `01:30`, and **the send path was never the failing half.** The likelier explanation for the clean window is **that Warwick had just corrected Larry twice — the loudest and shortest-lived correction available.**
+
+### What the generated envelope did NOT fix — Keel's findings, accepted in full
+
+**Reported once, not dispatched.** ⚠️ **Most of these are Larry's authoring, not the tool's:**
+
+| # | Finding | Whose |
+|---|---|---|
+| **G-1** | **Value-plus-prose in one scalar makes no envelope field machine-readable.** `contract_conflicts: none — earned: …`, `operational_handoff: none — Mack installs …`. A worker told to *read* a field and **never infer** it had to parse English off the front to obey. One prose comma from costing something | **Larry's authoring** |
+| **G-2** | **`worktree` contradicted itself inside one order** — frontmatter named it, the generated row said `n/a — no worktree supplied` under a **`supplied + verified`** provenance tag. **Lending an authority marker to an absence is the worst available shape** | Larry omitted the flag; **the provenance tag is the tool's** |
+| **G-3** | **SSOT applied inconsistently in one table** — `permitted_file_surface` fully inlined while `prohibited_file_surface` is a pointer. **The asymmetry least likely to protect anyone** | Tool |
+| **G-4** | **`producible_evidence` reads as constraining the deliverable.** *"network fetch: NOT available"* is true of the worker's tool grant and irrelevant to a deliverable whose job is an outbound POST | Tool |
+| **G-5** | **The issuability footer is computed at generation and never recomputed** — stale the instant a slot is authored. Failed safe here; **fails dangerous in the other direction** | Tool |
+
+**The accepted fix for the next iteration, Keel's recommendation:** **every field a bare value, prose in a sibling comment.** **Not dispatched — it is a candidate, and its disposition is Warwick's.**
+
+### G-6 — the generator has NO shape for a MACHINE-INSTALL order. Found 2026-08-06 attempting WP-4C
+
+**Larry generated WO-20 for Mack (install `ding.mjs` to `~/.mypka/governor/`) and the tool returned 3 `UNRESOLVED` and declared the order NOT ISSUABLE.** ✅ **The refusal was CORRECT, and Larry's input was wrong** — which is the tool behaving exactly as designed and is recorded as a success, not a defect.
+
+**The real shape, established from the WP-3E precedent (`WO-2026-08-05-16`) rather than invented:** a machine-install order does **not** use `file_surface` at all. It uses:
+
+| Field | WP-3E's value |
+|---|---|
+| **`machine_surface`** *(closed list)* | `C:\Users\Buggly\.mypka\governor\**` — **write permitted here and ONLY here** |
+| **`live_authority`** | **BOUNDED — `~/.mypka/governor/**` only** (a deviation from the standing `none`) |
+
+**Two distinct facts, and they must not be conflated:**
+
+1. **`file_surface` is for REPO paths.** Passing a machine path to `--surface` asks the tool to match `~/.mypka/...` against a contract's repo patterns; **finding nothing and refusing is right.** A tool that "helpfully" resolved it would be fabricating a grant — the exact defect Keel fixed at `MUT-10`.
+2. **The generator has no `machine_surface` concept and no way to express a bounded `live_authority`** beyond the generic `--deviate`. **So the estate's real machine-install shape cannot currently be generated** — it must be hand-authored, which reintroduces **G-1** on the two most safety-critical fields in the order.
+
+**Consequence for AC-5's accounting, stated so it is not quietly skipped:** WO-20 **was not issued** on the generated route. **It does not count as a clean order and does not advance the streak.** Consecutive clean orders remains **ONE**.
+
+**Disposition: reported once, NOT dispatched.** The fix is a candidate for the same iteration as G-1..G-5, and **it is Warwick's call**, not a Work Order Larry raises off his own finding.
+
+#### ✅ Correction accepted from Mack's read-back — **"contract gap" was Larry's error, not a finding**
+
+**Larry wrote WO-20's `contract_conflicts` as: the surface rests on his authorisation plus WP-3E precedent, *"NOT on a contract clause"*, and called it a KNOWN CONTRACT GAP. Mack showed that is wrong, and the correction is accepted and applied.**
+
+> **Mack: *"My contract has no file-pattern grammar at all."*** The absence of a `~/.mypka/**` pattern is therefore **not a denial** — it is the absence of an enumeration **that was never written for any path.** ⚠️ **Reading it as a denial would equally forbid every `.env`, every `.mcp.json` and every supervisor registration the same contract explicitly ORDERS Mack to perform.**
+
+**The basis is THREE-LEGGED, not one-legged:** Mack's affirmative grants (*"Mack owns operation of released services"*; *"Keel writes the hook … Mack registers it"*; MCP registrations written **outside** the repo) · Larry's bounded authorisation · WP-3E precedent, which **Mack verified by execution rather than trusting the document's description of itself.** **The residue is DOCUMENTARY, not authorising.**
+
+**The durable lesson, and it generalises beyond Mack:** *absence of an enumeration in a prose contract is not a prohibition.* **Treating it as one manufactures a blocker and then requires an authorisation to clear a door that was never locked** — the mirror of the fabricated-grant defect Keel fixed at `MUT-10`. Both are the same error: **inferring a contract's answer from its silence.**
+
+#### 🔬 The CRLF trap, MEASURED on this exact file — the first time both hashes have been produced
+
+**Mack, before writing anything:**
+
+| Source | Bytes | SHA-256 |
+|---|---|---|
+| **git blob** (`git cat-file -p`) | **17,454** | `0f26ef1624dcb85e031a30a74e6421f5de12e9a7266fb452b727e9e7e17b5d4b` |
+| **working tree** `tools/governor/ding.mjs` | **17,863** | `c318bf0476ee700833e8281708d51d2befeb93b18305db267d03eeb889490ed7` |
+
+**409 bytes divergent — and `git status --porcelain` on that path returns EMPTY. Git reports the tree clean.**
+
+**This is the FOURTH time this trap has surfaced in BUILD-020 and the first time anyone produced both figures for the file in question.** **Installing from the working tree would have failed AC1 while every casual check looked fine.** Install method is `git cat-file blob`, which is also what `INSTALLED-FROM.txt` records for WP-3E — **and Mack confirmed the live `footer.mjs` already hashes identical to its blob**, so the runtime demonstrably holds blob bytes. **This is direct, current corroboration for C-2 and P-10** and it belongs in the phase report.
+
+> **Keel's verdict on the generated envelope, quoted because it is the sharpest summary of what was actually bought:**
+>
+> **"The generated half is more trustworthy than prose about *provenance*, and less usable than prose about *values*."**
+
+## 17.4 Frontier → **§ ACTIVE SESSION WORK PACKAGE is the one current target.** *(This heading is a signpost, not a second frontier statement.)*
+
+## ⭐ ACTIVE SESSION WORK PACKAGE — single durable authority for this session
+
+> **🔄 AMENDMENT 12 — Warwick, 2026-08-07. E-1 RULING + THE VEX RED RULINGS.**
+>
+> ### ① `installed-runtime restart` (service half) — **POST-MERGE ACCEPTANCE PROPERTY.** His words:
+>
+> **It is a post-merge acceptance property. It is NOT required for pre-merge Gate 1 PASS**, because executing it would require touching the live Cockpit/runtime **in direct conflict with the standing pre-merge boundary.**
+>
+> **Keep it explicitly OWED.** After authorised merge it **must be executed against the canonical merged runtime and must pass before BUILD-020 / Phase 4 can close.**
+>
+> > **⛔ «This ruling does not discharge the property; it places it in the correct half of the route.»** **It is the THIRD member of the same circularity Amendment 10 resolved twice** — Gate 1 PASS required it, it required the live runtime restarted, that happens post-merge, and merge requires Gate 1 PASS. **It was simply missing from Amendment 10 ②'s table. It is now in the post-merge half, alongside Amendment 7 ⑥/⑨, the live `:8090` journey, Amendment 9's capture and "branch from main after #97 merges".**
+>
+> **Effect:** Veritas Gate 1's sole remaining blocker at `19fc792` (finding E-1) is resolved as a **routing** matter, not by discharging anything. *(Larry did NOT self-assign it — Veritas was explicit that the gated party assigning its own acceptance property earns no PASS on inference.)*
+>
+> ### ② The Vex RED rulings — **recorded in full at [[Deliverables/2026-08-07-cockpit-private-api-boundary-record]]**, which is the **sanitised** record ruling ① requires. **The detailed review is deliberately OFF this public repository.**
+>
+> 1. **Publication** — detailed review and attack journey **off the public repo**, preserved privately; git carries the minimum sanitised finding/repair/verification record only.
+> 2. **Live exposure** — **repair promptly and proportionately.** *"A private hobby system, not an enterprise incident-response exercise"*, **no evidence of exploitation.** Smallest reversible live containment **authorised to Larry**; **do not prematurely migrate the Cockpit or expand scope.**
+> 3. **Required outcome** — the governing question's accepted answer **must become NO**. **⛔ Removal of reflected CORS headers alone is explicitly NOT sufficient** — a browser write capable of avoiding preflight must also be prevented. **The team chooses the smallest correct implementation and proves the actual browser-origin property.**
+> 4. **Authentication** — **no new authentication system.** The private local/Tailscale boundary is **proportionate at MyPKA's current risk level.** Revisit only if the exposure model materially changes.
+>
+> **Repair: WO-31.** *"No security programme, no credential-rotation exercise, no unrelated hardening."* **After the repair is independently verified, continue the Proofline route autonomously through Gate 1 / Gate 2 / Vex / Codex as applicable.**
+
+> **🔄 AMENDMENT 11 — Warwick, 2026-08-07. FUTURE-ROUTE ONLY: ASDAIR IS NO LONGER THE NEXT HOP. A NEW SUB-PHASE 4C COMES FIRST.**
+>
+> **⛔ THIS AMENDMENT CHANGES NOTHING ABOUT SUB-PHASE 4B.** Warwick, explicit: *"make only the minimum routing amendment needed so 4B finishes exactly as currently planned."* **4B's Work Package, its acceptance rows, its 18-step route, Amendment 10's decisions, the Gate 1 FAIL and every open repair are untouched and remain exactly as written.**
+>
+> ### The new next Sub-phase
+>
+> **`4C — CAPAE + Asdair Hop Preparation`**, covering two things and no others:
+> 1. **the lightweight CAPAE learning / effectiveness loop** just defined;
+> 2. **final preparation and proof for the hop into Asdair.**
+>
+> ### What this amendment deliberately does NOT do — his instructions, and they are constraints on Larry
+>
+> - **4C is NOT designed, scoped, planned or started.** *"Detailed 4C instructions will follow only after we enter 4C with a fresh `Continue`."* **Anything beyond the two bullets above is invention, and writing it here would be exactly the failure this map keeps recording.**
+> - **NOTHING in any Asdair branch, worktree, Wayfinder or artefact may be touched, updated or begun.** `Deliverables/2026-08-04-build-015-asdair-wayfinder-plan.md` remains authoritative for **BUILD-015 only** and **NON-DIRECTIVE here** — unchanged, and not to be opened for this.
+> - **No new deliverable, tracker, plan file or Work Order is created for 4C.** The regrowth cap applies at full force: a route amendment is a sentence, not a programme.
+>
+> ### Effect on the frontier — none
+>
+> **The one current next action is unchanged and still lives in § ACTIVE SESSION WORK PACKAGE → `🎯 THE ONE CURRENT NEXT ACTION`.** This amendment is a **future**-route change only. **A fresh Larry reading this block must not treat 4C as actionable** — it is the recorded answer to *"what comes after 4B"*, nothing more.
+
+> **🔄 AMENDMENT 10 — Warwick, 2026-08-07. TWO DECISIONS, in answer to the pre-merge / post-merge adjudication below.**
+>
+> ### ① Amendment 9 — **Option A APPROVED, NARROWLY SCOPED.** His scope words, and they are the whole point of the decision:
+>
+> **Reclassify Amendment 9 as MANUAL for Gate 1 ACCEPTANCE AND EVIDENCE PURPOSES ONLY**, because its automatic acceptance test is **structurally impossible** before the authorised post-merge migration.
+>
+> > **🔴 «This does not change the product requirement.»**
+>
+> **The durable YouTube capture outcome REMAINS AUTOMATIC** and must be **re-tested post-merge at route step 18 as a BINDING acceptance obligation.** All seven conditions, as Warwick wrote them:
+>
+> 1. canonical live runtime carries the merged code;
+> 2. **`MyPKA-YouTube-Watcher-Ensure` can then be enabled without violating migration precondition 5**;
+> 3. watcher remains stable;
+> 4. the **next genuine unattended YouTube capture** is processed **automatically**;
+> 5. required persistence completes;
+> 6. Warwick receives the **automatic** completion briefing;
+> 7. **no manual invocation substitutes for that proof.**
+>
+> > **⛔ BINDING PROHIBITION — Warwick, verbatim: «Do not describe Amendment 9 as permanently manual, accepted, or complete before that post-merge test passes.»**
+> >
+> > **This binds every surface**: Larry's replies, the execution log, any Veritas dispatch or receipt, the merge decision pack, the Codex claim, and any session or closure record. **"Reclassified MANUAL for Gate 1 evidence" is the ONLY permitted phrasing pre-merge.** *"Manual"* alone is a false statement of the product requirement. **A Gate 1 PASS carrying this reclassification is NOT acceptance of durable capture.**
+>
+> ### ② Row 4 runtime split — **ACCEPTED.** *"Pre-merge render/evidence requirements remain Gate 1 material; live-runtime acceptance remains binding post-merge at step 18. Preserve both rather than weakening either side."*
+>
+> ### ③ `db.mjs` absolute-path defect — **DO NOT PARK IT.** Warwick overrode Larry's recommendation, and he was right to.
+>
+> **Larry reported Veritas Defect 6 as non-blocking and for Warwick's decision. Warwick's decision is that it is IN SCOPE and repairable now:** the hardcoded `C:\Fusion247PKA` dependency **directly bears on row 1's worktree delete/recreate durability requirement** and is **genuinely repairable pre-merge**. **Route the smallest appropriate repair through the existing operating model and include it in the next frozen Gate 1 candidate.**
+>
+> *Recorded as a correction, not absorbed silently: Larry recommended parking a defect that sits directly on a row-1 acceptance property he was simultaneously asking Veritas to grade. **Recommending a disposition is Larry's; deciding it is Warwick's — and the recommendation was wrong here.*** **The regrowth cap still applies at full force: smallest appropriate repair, existing operating model, no new mechanism.**
+
+> **🔄 AMENDMENT 9 — Warwick, 2026-08-07. DURABLE YOUTUBE CAPTURE: WATCHER RECOVERY + AN HONEST SUCCESS BRIEFING. Folded into 4B durability. NOT a new programme.**
+>
+> **What prompted it, established by execution — two INDEPENDENT causes, and the second could hide the first indefinitely:**
+> 1. **The YouTube watcher had been dead ~4 days.** Last processed `1wBQ6bH95F4` at 2026-08-03 22:46; Warwick's 2026-08-07 08:05 link sat unprocessed until Larry ran a pass by hand. `ensure-youtube-watcher.mjs` states its own limit in its header: *"NOT self-healing on its own: crash/reboot recovery = a logon Scheduled Task (needs elevation = Warwick)."* **Nothing alerted anyone.**
+> 2. **There is NO success notification anywhere in the pipeline.** Enumerated: the only `larry-ding` call is `watch-captures.mjs:148`, the **STUCK** nudge. On success a note lands silently in the vault. **So a dead watcher and a healthy one look identical to Warwick.**
+>
+> **⊕ A third fault, found in the same hour and NOT a one-off:** the manual pass generated the note and the DB row correctly but **could not commit it** — `.git/index.lock` was held by Larry's own concurrent orchestration. `persistCapture` failed soft (correct — the capture continues) and the note is **on disk, in the database, and untracked**. **Warwick's ruling: treat this as an OPERATIONAL DURABILITY CASE, not a Larry accident. Parallel workers and orchestration are normal. A transient shared-Git lock must never leave a successfully generated capture permanently uncommitted.**
+>
+> **AUTHORISED — his words, condensed only where he repeats himself:**
+> 1. **Make the watcher durable.** It must recover automatically from **reboot, logon and unexpected process death** without Warwick tending it. **If repeated recovery fails, tell Warwick rather than remaining silently dead.**
+> 2. **One concise success briefing to DevBot per successfully processed capture** — but **"success" means the durable pipeline destination has been reached, not merely that the note was generated.** The notification must distinguish at least:
+>    - **`COMPLETE`** — note generated · DB state correct · **required Git persistence completed**;
+>    - **`DEGRADED` / `PENDING`** — note generated but a required durability step **such as the Git commit has not completed**.
+>    - **🔴 "Do not send a false green while durable persistence is outstanding."**
+> 3. **Smallest bounded recovery for the lock case — "retry/reconcile later rather than creating another monitoring platform."**
+>
+> **🎯 ACCEPTANCE IS THE NEXT REAL CAPTURE — Warwick's own test, and it is the § "Nothing may live only in Larry's head" clause applied exactly:** the watcher is **already running without Warwick starting it** · the capture **processes unattended** · note and DB row correct · **required Git persistence completes despite ordinary concurrent work** · Warwick **receives the concise success briefing automatically**. **A callable script, a green test or a successful manual run prove capability ONLY. This outcome stays on the frontier until a real production capture satisfies the above, or it is explicitly reclassified as manual.**
+>
+> **🔴 HUMAN DEPENDENCY — and it CONVERGES with one already waiting.** Durable reboot/logon recovery needs a **Scheduled Task, which needs elevation**. Four `Set-ScheduledTask` commands are **already** pending Warwick's bounded action (the flashing-console fix, closure record §2.2, blocked by the host classifier for Larry and specialists alike). **These go to Warwick TOGETHER, as ONE elevation step, not two.**
+>
+> **Scope discipline, at Warwick's explicit instruction: "Fold this into the existing 4B durability work. Do not create a new programme around it."** The regrowth cap applies at full force — no new monitoring platform, no daemon supervisor, no control plane.
+
+> **🔄 AMENDMENT 8 — Warwick, 2026-08-07. ONE BOUNDED VEX SECURITY REVIEW AUTHORISED, BEFORE CODEX AND THE MERGE DECISION.**
+>
+> ✅ **THIS GATE HAS FIRED AND RETURNED — 2026-08-07. Verdict RED, repaired by WO-31, re-verified GREEN.** See [[Deliverables/2026-08-07-cockpit-private-api-boundary-record]]. *(Repaired 2026-08-07, Veritas D-1: the trigger text below still read as pending.)*
+>
+> ~~**⏱️ TRIGGER — this gate does NOT fire yet.**~~ Vex runs **once BOTH are integrated**: ① the **WO-24** Cockpit provenance work; ② the new **`/api/rotation-reports`** route and System-tab reporting surface. **Do not dispatch Vex before both are integrated. Warwick's explicit instruction at authorisation: do not interrupt Keel and do not widen WO-24.** *(Banked here because this gate fires several steps and probably one rotation away from the session that received it.)*
+>
+> **📍 ROUTE POSITION:** inserted into the Sub-phase 4B route **after integration of both surfaces and BEFORE step 16 (Codex) and step 17 (merge decision pack)**. It does **not** displace Veritas Gate 1 / Gate 2, and it is **not** a substitute for either.
+>
+> **🎯 THE GOVERNING QUESTION — Warwick's exact words, and the whole review answers this one thing:**
+>
+> > **«Can an untrusted webpage running in Warwick's browser read from or perform actions against the Cockpit's private upstream services through the proxy without authority Warwick deliberately granted?»**
+>
+> **SCOPE — the final live-facing Cockpit boundary ONLY. This list is closed:**
+> 1. `/private-api/*` · 2. `/api/rotation-reports` · 3. Cockpit/Tailscale exposure and authentication assumptions · 4. reflected CORS behaviour · 5. forwarded methods, paths, bodies and headers · 6. whether an untrusted webpage in Warwick's browser could use the proxy to **read from** or perform **state-changing actions against** a private upstream · 7. request-size, timeout and redirect controls · 8. whether Postgres/Supabase credentials remain **entirely server-side** · 9. whether the rotation-report data requires any **stronger access restriction**.
+>
+> **REQUIRED OUTPUT:** **GREEN, YELLOW or RED** · a **concrete attack journey** wherever a risk is claimed · **exact file and line references** · the **smallest necessary correction** · **no implementation, no broad security audit, no unrelated estate expansion.**
+>
+> **🔴 DO NOT PRE-JUDGE THE VERDICT.** Warwick, verbatim: **«"Reflected CORS" is a reason to inspect, not an assumed vulnerability.»** The dispatch must carry this sentence and must not brief Vex toward a finding. **A GREEN reached honestly is a real outcome, not a failed review.**
+>
+> **QUEUE EFFECT — stated so it is not misread later.** **A Vex finding does NOT automatically become a Work Order** (root `CLAUDE.md` § finding disposition, and Warwick restated it at authorisation). **Bring the verdict and any proposed bounded repair back to Warwick before expanding scope.** Larry recommends a disposition; Warwick decides it.
+>
+> **REVIEW CEILING — owed at dispatch and recorded now so it is not omitted.** Per root `CLAUDE.md` § Specialist dispatch, an assurance dispatch names a proportionate ceiling that **the reviewer may not extend**. For this bounded boundary review: **one pass, ≤ ~120k tokens, no second round without Warwick.** A dispatch without a stated ceiling earns only the small bind-and-primary-journey allowance in Vex's own contract.
+>
+> **PROVENANCE OF THE FINDING THAT PROMPTED IT:** raised by **Keel** during the WO-24 read-back — the already-committed bridge is a same-origin HTTP proxy with reflected CORS (`services/cockpit/server.mjs:317-403`, dispatch at `:443`). **Received as a report, parked, and put to Warwick once** — it was never actioned inside WO-24, and Keel was told not to widen toward it.
+
+> **🔄 AMENDMENT 7 — Warwick, 2026-08-07. SCOPE ADDED TO SUB-PHASE 4B: ROTATION REPORTS ON THE COCKPIT SYSTEM TAB.**
+>
+> **⛔ This amendment adds scope to Sub-phase 4B ONLY. It does NOT amend, reinterpret or reopen the completed Sub-phase 4A rotation** (Warwick, explicit). The 4A Veritas PASS at `c50d8cb`, its reviewed scope, the rotation head `b0a1c99` and the § ROTATION block below are untouched and remain true as written.
+>
+> **The outcome, his framing:** Pax produces valuable performance reports; the durable Markdown sits on an unmerged branch; Warwick cannot conveniently see it; the live structured data already exists in Supabase. **The Cockpit must display the Supabase report directly, and must NOT depend on the corresponding Git deliverable being merged before the report becomes visible.** This is **part of BUILD-020 durability** — operational evidence is not genuinely useful when Warwick cannot see it without searching an unmerged branch.
+>
+> **Source — no third store.** `session_report.rotation` and `session_report.specialist_dispatch`. **Supabase remains a queryable mirror generated from the same rotation evidence; Git remains the durable SSOT.** **Do not create a third reporting store and do not manually duplicate the report.**
+>
+> **Collapsed summary must carry:** session date/time · host + host version · branch · short closing SHA with full SHA available · elapsed time · context tokens in and out · specialist dispatch count · WO first-dispatch successes · WO amendments · WO refusals · product vs documentation line changes · product/admin/evidence/rework/waiting allocation percentages · unresolved or unestablished measurements · report notes · durable deliverable path. **Most recent first.**
+>
+> **Expanded view must carry:** the full metric set · specialist-by-specialist dispatch counts · specialist token usage where established · specialist notes · unknown/unestablished values **clearly labelled as such** · the exact Supabase rotation ID · the exact closing head · the associated durable Git report path.
+>
+> **🔴 `Unknown`, `not established` and `0` are materially different and must never be collapsed into one another.** Missing values are **not** converted to zero.
+>
+> **Human-readable emphasis, not a database grid.** Concise visual summaries for: total context consumption · allocation of effort · WO success/refusal/rework · specialist usage · unresolved measurements. **For the current report Warwick must plainly see** ≈2.22M subagent tokens · 15 specialist dispatches · 26.2% downstream of preventable defects · 0 of 2 Work Orders surviving first read-back · three consecutive Keel orders refused on the same contract-surface class · 88.3% of insertions documentation · five proxy-versus-destination verification failures. **🔴 These figures are NOT to be hard-coded — they render from stored report data.**
+>
+> **Schema/payload extension is AUTHORISED where a material finding cannot be represented** — **the smallest existing payload/schema surface**, mirrored and displayed from the same source evidence. **Not a new store, not a new mechanism** (the regrowth cap applies at full force).
+>
+> **Operational requirements:** read through the **existing** Cockpit private API bridge · **no service credentials to the browser** · preserve the existing authentication boundary · truthful empty/loading/database-failure wording · **failure to load historical reports must not break the rest of the System tab** · prove a newly populated Supabase rotation appears **without a Git merge or a Cockpit code change** · **include this surface in the Cockpit rescue, provenance and post-merge live-migration plan already owned by 4B**.
+>
+> **Acceptance — PASS requires EXECUTION proving all nine:** ① current rotation row read from **live** Supabase · ② specialist rows joined correctly · ③ renders readably in the System tab · ④ unknown fields remain visibly unknown · ⑤ a second fixture/report ordered correctly · ⑥ refresh obtains a newly populated report **without a deployment** · ⑦ browser receives **no** database secret or service-role credential · ⑧ displayed closing SHA, rotation ID and deliverable path **match Supabase exactly** · ⑨ the surface **survives the final Cockpit move to canonical merged runtime**.
+>
+> **📋 EXECUTED RECONNAISSANCE, 2026-08-07 — two findings recorded before implementation, per "begin with live reconnaissance".**
+>
+> **(a) ⚠️ SECURITY — RLS is disabled, but the exposure I first reported was OVERSTATED, and the correction is the finding.** Executed: `session_report.rotation` (7 rows) and `session_report.specialist_dispatch` (27 rows) both report `rls_enabled: false`, and Supabase's generic advisory states that **"anyone with the anon key can read or modify every row."** **I relayed that verbatim. A second executed query DISPROVED it for these tables:**
+>
+> ```
+> grantee        schema_usage  can_select_rotation  can_select_dispatch
+> anon           false         false                false
+> authenticated  false         false                false
+> service_role   false         false                false
+> cp_directus    false         false                false
+> cp_worker      false         false                false
+> postgres       true          true                 true
+> ```
+>
+> **`anon` holds no `USAGE` on the `session_report` schema at all**, so the advisory's premise — default grants — does not hold here. **`tools/session-report/schema.sql` contains no `GRANT` statements, and that absence is what makes the tables unreachable rather than exposed.** The honest statement: **RLS is off, and it is currently carrying no load, because schema-level grants already deny every non-superuser role.** RLS should still be enabled before any role is granted access, or the grant silently becomes total. **Recorded once for Warwick's decision. No Work Order raised, no remediation applied** — enabling RLS without policies would block all access.
+>
+> *(Lesson, recorded because it is the recurring one: a scanner advisory is a claim about a default configuration, not a measurement of this database. I passed it on before measuring it.)*
+>
+> **(a-2) 🔴 THE REAL BLOCKER — the Cockpit CANNOT read these tables today.** The same query proves `cp_directus` — the Cockpit's SELECT-only read role (`services/cockpit/db.mjs:16`) — has **neither schema `USAGE` nor `SELECT`** on either table. **A least-privilege forward-only migration granting `USAGE` on `session_report` plus `SELECT` on the two tables to `cp_directus` only is REQUIRED before acceptance criteria ① and ② can pass.** Larry's decision, as the ordinary technical means to scope Warwick already authorised: **grant to the read role only, never to `cp_worker`, `anon` or `authenticated`; forward-only migration; no `service_role` key anywhere near the Cockpit.** **Still unproven and owed by execution:** that `directus-live.env.json` and the session-report `DATABASE_URL` address the **same Postgres instance** — if they do not, the whole route changes and must be re-planned rather than patched.
+>
+> **(b) ⚠️ SCHEMA GAP — four of Warwick's seven required figures are NOT representable today.** Established by executed query, not inspection:
+> - **✅ representable now:** 15 dispatches (sum of `specialist_dispatch.dispatches` = 4+3+3+3+2) · 26.2% (`allocation_rework_pct`, though the column is named *rework* and Warwick's phrasing is *downstream of preventable defects* — a labelling decision, not a gap).
+> - **❌ NOT representable:** **≈2.22M subagent tokens** — every `specialist_dispatch.tokens_in/out` is **NULL**; the figure exists only as prose in `rotation.notes`. **88.3% of insertions documentation** — `doc_lines_changed` (1667) and `product_lines_changed` (313) sum to 1980 = insertions+deletions (`+1834/-146`), so they are *lines changed*, not *insertions*; 1667/1980 = 84.2% ≠ 88.3%, and the insertion-only split **cannot be derived** from what is stored. **Three consecutive Keel refusals on one contract-surface class** — a cross-session streak, prose only. **Five proxy-versus-destination verification failures** — no column anywhere.
+> - **⚠️ derivable only by inference:** **0 of 2 Work Orders** — the denominator is not stored; `0+0+2` happens to equal 2 this session, but that identity is an assumption, not a guarantee. **A stored total is required rather than an inferred one.**
+> - **Consequence:** the authorised smallest-surface extension is **needed, not optional**, and its exact shape is a Keel design decision taken against this evidence.
+>
+> **(c) 🏗️ ARCHITECTURE — "read through the existing private API bridge" cannot be taken literally, and the intent is met a different way.** Executed reconnaissance establishes that **`/private-api/*` is a generic reverse proxy with NO endpoints in this repo** (`services/cockpit/server.mjs:317-403`): it strips the prefix and forwards to an **off-repo** private service named by `COCKPIT_PRIVATE_API`, forwarding only `accept` and `content-type` — no cookies, no auth headers. **There is no in-repo file where a new private-api read endpoint can be added.** The house pattern for data the Cockpit itself owns is a **first-party `/api/…` route in `server.mjs`** reading through `db.mjs`'s bounded `q()` pool (`apiState`, `apiAsdairPacket` are the precedents).
+>
+> **Larry's decision — an ordinary technical choice, not a Warwick decision:** implement a **first-party `/api/rotation-reports` route**, with the read logic in its **own module** (`services/cockpit/rotation-report.mjs`) imported by `server.mjs` in one line, proven by `services/cockpit/rotation-report-check.mjs` against an **injected query function**. **This is forced, not preferred:** `server.mjs` imports `db.mjs`, which opens **two production `pg` pools at module load**, so any test that imports the server touches live Postgres — the identical hazard that shaped WO-24. **Warwick's actual constraints are fully satisfied and are the part that matters:** the read is server-side, the browser is issued no key of any kind, and the existing network boundary (`127.0.0.1` bind + Tailscale-serve) is untouched. **⚠️ This is a deviation from the literal wording of the instruction and is flagged as such rather than quietly reinterpreted.**
+>
+> **(d) UI constraints established, so they are not rediscovered:** the Cockpit is **Vue 3.5.24, vendored, with NO build step** (`services/cockpit/README.md:9`) — *not* the React/Tailwind `Expansions/mypka-cockpit`, which is a different product with no System tab. The System section is `app.js:1439`, and it is the **`v-else` CATCH-ALL** — **any new `v-else-if` must be inserted BEFORE it or it will never render** (`nav-check.mjs:82-84`). Every new binding **must** be added to the `setup()` return block (`app.js:548-561`) or `render-vm-check.mjs` fails it via a Proxy `has` trap — which is the gate working. **No charting library exists and none is to be added:** house style is `.tile` numerics, `.chip` state pills, `.as-kv` fact grids, and the printed number as the primary artefact (`app.js:1445`). `render-vm-check.mjs` currently has **no System-area scenario**; one must be added for coverage.
+>
+> **Route position:** this is **additional 4B scope**, folded into the existing Cockpit rescue (step 5) and the post-merge live-migration step (18). **It does not displace steps 1–4**, and it does not alter the final two-part Phase acceptance. **⚠️ Warwick's acceptance criterion ⑨ has real teeth:** the live Cockpit serves `public/**` straight from its own working tree at `C:\Fusion247PKA` — **183 commits behind main, on a BUILD-015 branch, 10 dirty entries** — so nothing built here reaches Warwick's phone until that clone is moved to canonical merged state.
+
+> **🔄 AMENDMENT 6 — Warwick, 2026-08-07. SUB-PHASE 4A DECLARED AND CLOSED FOR ASSURANCE. WAYFINDER STRATEGY DECIDED.**
+>
+> **Route:** Sub-phase 4A → Veritas → rotate; **Sub-phase 4B** (one fresh session) → remaining delivery and cleanup → Veritas → Codex → Warwick merge decision → authorised merge → installed/runtime alignment → **Proofline closure**; ~~**only then** Asdair~~ → **then SUB-PHASE 4C (see AMENDMENT 11) — and only after 4C, Asdair.** **Proofline is NOT closed merely because PR #97 merges.**
+>
+> **Sub-phase 4A receives NO Codex review and NO merge.** Closure record and full 4B handover: [[Deliverables/2026-08-07-subphase-4A-closure-and-4B-handover]].
+>
+> **① WAYFINDER STRATEGY — DECIDED. The reduced, enforceable form.** Pax's 40-line constitutional proposal and the broad Project/Build/Wayfinder hierarchy are **NOT adopted**. The map contradictions are **NOT left unresolved**. Binding:
+> 1. The active BUILD-020 Wayfinder must have **one unambiguous current navigational target**.
+> 2. Historical Phase and frontier material may remain as evidence, but must be **clearly non-directive**.
+> 3. **Veritas must explicitly enumerate every statement in the active map capable of directing a fresh Larry's next action and verify all resolve to the same current target.**
+> 4. `focus` added to the existing `/rotate` read-back check. **Done this session.**
+> 5. **Veritas does not inherit ownership of the route or work queue** — preserved.
+>
+> **The enumeration check belongs in the existing Veritas Gate 3 surface. It must NOT be duplicated across `CLAUDE.md`, the map and another artefact.** No further Pax/Nolan research before rotation; their reports are banked at `research/wayfinder-transferability` @ `619c548`.
+>
+> **② VERITAS VERDICT TREATMENT FOR A BROKEN LIVE MAP — new, binding.** Where an active Wayfinder statement points a fresh Larry toward **closed or superseded** work · **competes** with the real current target · **misstates** the live Phase or next action · or makes rotation or continuation **unsafe** — Veritas returns **FAIL** on the affected Documentation/Git-truth or continuation-readiness dimension, **not merely HOLD**. The artefact is *demonstrably wrong*, not *pending*. **HOLD remains correct for genuinely pending evidence or an external action where the active artefact is not itself false.** This does **not** require failing unrelated functional outcomes — but **no Sub-phase or Phase may receive an overall closing PASS while its active Wayfinder can misdirect a fresh session.** **Larry owns the repair; Veritas identifies the unsafe effect and re-verifies the corrected exact SHA.**
+>
+> **③ NAVIGATION REPAIRED THIS SESSION.** Six stale directive statements retired or redirected; all now resolve to **§ ACTIVE SESSION WORK PACKAGE**. Executed enumeration in the closure record. **The lesson: both previous repairs named a section NUMBER and both went stale. The target is now named by section IDENTIFIER.**
+>
+> **④ TERMINOLOGY.** `Sub-phase` is **Warwick's boundary vocabulary** only. **`ACTIVE SESSION WORK PACKAGE` is retained as the proven durable map identifier — no repository-wide rename is authorised.** Larry retains full freedom over internal Work Packages and Work Orders.
+
+> **🔄 AMENDMENT 5 — Warwick, 2026-08-07. SPECIALIST-RETURN REMINDER HOOKS DESCOPED AND DISABLED.**
+>
+> **Recorded outcome, his exact wording:** «**Specialist-return reminder injection: DESCOPED — demonstrated regression and no demonstrated net benefit.**»
+>
+> **Disabled from the active runtime** (project `.claude/settings.json` `hooks` emptied): `notify-reminder` · `return-cue-write` · `return-cue-consume` · `return-cue-sweep`. Runtime state `.claude/state/return-cues/` removed so no stale marker can fire.
+>
+> **NOT touched, and explicitly preserved:** the machine-level `SessionStart → reorient.mjs` orientation hook and `Stop → continuity.mjs stop` banking/rotation hook, both in `~/.claude/settings.json`. That file was not opened for writing. *(Note: the `SessionStart` binding removed from the PROJECT settings was `return-cue-sweep`, part of the descoped system — not the orientation hook, which is a different file at a different scope.)*
+>
+> **Implementations and evidence PRESERVED in git** as a failed/unproven experiment — all six files remain tracked under `.claude/hooks/`. **No further repair, extension or proving inside this Build.** Reconsider only if real delivery evidence shows Larry repeatedly missing meaningful specialist returns without them.
+>
+> **The evidence base** (Larry's executed count, this session): **8** false *"a specialist has returned"* fired at **dispatch** — `PostToolUse` completes at launch for a background agent, so it is structurally incapable of detecting a return; **3** false *"(type: unknown)"* with nothing running, cause **never established**; ~1 duplicate; against ~6 true, correctly-timed injections. **Majority false.** Larry disproved the instrument in-line six times. **No notification was shown to have been caused by a hook** — every ding sent (349–353) was driven by the substance of the event. Three prior rotations, and Grok with no equivalent hooks, worked well without it. Larry's candid judgement, on the record: the hooks did not improve his behaviour, and repeated false prompts bias toward over-notification.
+>
+> **⚠️ WRITTEN IS NOT LOADED, in both directions.** Root `CLAUDE.md`: *"a hook present in a settings file has no effect until the host restarts."* The same applies to removal — **the already-loaded hooks may keep firing in this session**. Any further injection observed before a restart is expected, is not a failure of this change, and must not be reported as one. **Confirmation that they no longer fire is owed at the next fresh session, either way.**
+
+> **🔄 AMENDMENT 4 — Warwick, 2026-08-06 (after Veritas Gate 1 FAIL). ROW 3 DESCOPED.**
+>
+> His words: *"Row 3 you may descope and move with details back to the backlog, we will come back to CareerAIR."*
+>
+> **The functional acceptance set for this Work Package is now rows 1, 2 and 4.** Row 3 is **removed from acceptance and parked intact** in [[Deliverables/BACKLOG]] **C-10**, with its banked evidence, its proven findings and the undecided route question recorded there so none of it is re-derived on return.
+>
+> **Row 3 is NOT withdrawn, softened or reinterpreted.** CareerAIR automatic Outlook intake remains **NOT LIVE**, and the Gate 1 FAIL against it stands on the record as a true verdict about the scope it reviewed. Descoping changes **what this package promises**, which is Warwick's to decide — it does not change what was found.
+>
+> **Consequence for assurance:** the Gate 1 FAIL at `0cf70c9` was carried by row 3 **alone**. A future Gate 1 over rows 1, 2 and 4 is therefore a **different scope** and must be dispatched as such — it may **not** cite the `0cf70c9` receipt as covering it. **Warwick has instructed that Veritas is NOT to be commissioned yet ("more to follow"), so no gate is open.**
+>
+> **Also parked with C-10:** the `graph_auth_required` alert to CareerAIRbot is being deliberately muted while collection is knowingly down. Un-muting is part of resuming C-10.
+
+> **🔄 AMENDMENT 3 — Warwick, 2026-08-06 (Claude host, post-rotation). Scope change, confirmed and authorised.**
+>
+> **1. The Zapier MCP Outlook blocker was HOST-SPECIFIC to Grok, and is withdrawn as a general blocker.** Warwick, verbatim: *"The Outlook-action blocker was specific to the Grok host. My mistake. On Claude, the Zapier MCP already has the correct Microsoft Outlook actions and the default connection is the authorised personal mailbox `warwickallan@outlook.com`."* Verified by execution on this host (2026-08-06): Microsoft Outlook enabled with **35 actions**, default connection **`warwickallan@outlook.com`**, including `find_emails` and `find_emails_in_specific_folder`. The banked blocker at `6b48507` remains true **of the Grok host only** and must not be re-cited as a Claude-host blocker.
+>
+> **2. Zapier-MCP demonstration collection is AUTHORISED** under the constraints in row 3. **Row 3 remains NOT LIVE and is NOT to be softened or redefined** — Warwick, verbatim: *"keep Row 3 explicitly NOT LIVE because an MCP call inside a Larry session is demonstration evidence, not session-independent automatic collection… A genuinely automatic trigger remains required before automatic Outlook intake can PASS."*
+>
+> **3. The previously deferred Claude hook installation and live proof is FOLDED INTO ROW 1** — not a new work package, and the hook design is **not** reopened. Requirements are in row 1 below. Unparked from § Parked and from § Explicitly OUT OF SCOPE by this amendment.
+>
+> **4. Gate 2 may remain HOLD** if the genuinely automatic Outlook trigger is still absent. **Do not manufacture a Phase PASS.** No merge without Warwick's explicit final authority.
+
+> **Warwick 2026-08-06 (amended — scope change, confirmed):** this section is the session’s durable accepted scope. **Functional acceptance = rows 1–4 only.** Assurance and release sequencing are **rows 5–7** and are **not** product requirements for Veritas to “PASS about itself.” Every Work Order, Veritas dispatch, `/rotate` report and merge-readiness statement **derives from here**. Prior Gate 1 PASS on rows 1–5 (WO/DevBot/cue/Watcher/Supabase) is **banked evidence of those mechanisms** — it is **not** this package’s acceptance and is **not** to be reopened unless current evidence proves a regression. **PR #97 remains unmerged until Warwick’s final merge authority.** Codex is **authorised by Warwick for this package only after Veritas Gate 1 PASS** at the frozen exact head.
+
+| | |
+|---|---|
+| **Map** | `Deliverables/2026-08-04-proofline-wayfinder-plan.md` — this file |
+| **Branch / worktree** | `build-020/phase4-automation-law` · `C:\Fusion247PKA-build-020-trial` |
+| **PR** | **#97** open — **merge only after Codex + Warwick final decision** |
+| **HEAD** | **Always verify by execution: `git rev-parse HEAD`.** *(Re-cut 2026-08-07: this row named a long-superseded rotation banking point. The live head is never recorded here — it is read from git, and the frozen head under assurance is named in § ASSURANCE STANDING.)* |
+| **Phase** | **BUILD-020 Phase 4 — Sub-phase 4B in flight.** ➡️ **Gate standing: SEE § ASSURANCE STANDING — the single source. Do not restate it here.** *(Re-cut 2026-08-07, Veritas Gate 1 @ `30666f1`, blocking. This row was authored at `f6ce6a1` — BEFORE Amendments 4 and 6 — and was never re-cut. It said `Gate 1/2 HOLD at older head`, false in both halves, and conditioned Gate 2 on `row 3 honest acceptance` when **Amendment 4 DESCOPED row 3** fifteen lines above the map own instruction not to cite it as owed.)*<br>**🔴 THE FIFTH RESTATEMENT, and how it survived: Larry verified the SSOT fix by grepping for the sentences he had just rewritten. This row matched none of them because he had never read it.** **Verify by READING THE WHOLE TABLE, never by searching strings you already know.** |
+| **Evidence pack** | `Deliverables/2026-08-06-amended-wp-recon-evidence.md` |
+| **Private surface (CareerAIR only)** | **`C:\.fusion247\private\careerair\**`** — never `C:\.fusion247\**` root/parent |
+| **Authorised product decision (C-10)** | ⛔ **SUPERSEDED BY AMENDMENT 4 — re-cut 2026-08-07 (Veritas N-6).** This row read as a LIVE authorisation of **row 3**, which **Amendment 4 DESCOPED and parked in [[Deliverables/BACKLOG]] C-10**. **Row 3 is not graded, not owed, and its FAIL is not blocking.** *(The live CareerAIR intake alerter that was firing every 30 minutes about this very descoped path was disabled 2026-08-07 — it was monitoring work deliberately stopped.)* |
+| **Interrupt Warwick only for** | ➡️ **THE SEVEN NAMED REASONS in root `CLAUDE.md` § "When Warwick may be interrupted". That closed list governs; this row does not restate it.**<br>🔴 **RE-CUT 2026-08-07 — this row listed `Veritas verdict` as an interrupt reason, which is NOW FALSE and was causing exactly the false handbacks Warwick corrected Rule 4a to stop.** **A gate verdict is a NOTIFICATION, not a handback:** send the ding when the written criteria apply, post, **then CONTINUE** — stop only for one of the seven. **Found by READING this table row by row, which is the method the fifth restatement proved necessary.** |
+
+### Package composition (Warwick)
+
+| Block | Content |
+|---|---|
+| **A** | BUILD-020 durability, Phase 4 residual assessment, estate promotion readiness |
+| **B** | CareerAIR Outlook intake repair + directly necessary Cockpit repair |
+| **C** | Veritas assurance of the **complete amended** Work Package (Gate 1) |
+| **D** | Final Codex review + merge decision pack for Warwick |
+
+### Functional acceptance requirements — **rows 1, 2 and 4** (row 3 DESCOPED by Amendment 4)
+
+> **⚠️ Row 3 remains printed below for provenance and is struck. It is NOT part of acceptance.** It is parked in [[Deliverables/BACKLOG]] **C-10**. Do not grade it, do not cite it as owed, and do not treat its FAIL as blocking this package.
+
+| # | Requirement | Status | Evidence / residual |
+|---|---|---|---|
+| **1** | **BUILD-020 durability / promotion readiness.** Accepted operating mechanisms correctly classified (session-independent · machine-global install · generic repo assets in PR #97 · BUILD-020-specific). Survives: dead Larry session · worktree delete/recreate · fresh branch from current main · branch from main after #97 merges · installed-runtime restart. Replacement-machine DR **not** claimed unless executed. Exact merge unit + post-merge install alignment listed. ~~**⊕ FOLDED IN BY AMENDMENT 3 — Claude hook installation and live proof (7 outcomes, Warwick's words):** (a) install the already identified canonical Claude hooks on the actual Claude host; (b) preserve source-to-installed byte/provenance alignment; (c) prove the real Claude background-specialist return-cue journey LIVE; (d) prove parent-only consumption and no duplicate cue; (e) verify the installed runtime survives restart / session rotation as already designed; (f) record any genuine limitation honestly; (g) do not redesign the hooks, add a daemon, add a model call, or reopen settled Option A decisions unless execution proves a real defect.~~<br>⛔ **THE AMENDMENT 3 HOOK OUTCOMES (a)–(g) ARE STRUCK AND ARE NOT PART OF ROW 1 ACCEPTANCE. RE-CUT 2026-08-07 — Veritas Gate 1 @ `443d0fa`, blocking.** **Amendment 5 DESCOPED AND DISABLED the entire specialist-return reminder system** — *"No further repair, extension or proving inside this Build."* **Amendment 3 had folded these seven outcomes INTO row 1, and row 1 was never re-cut against Amendment 5**, so they sat here as live acceptance criteria for a mechanism Warwick had killed. **Do not grade them, do not cite them as owed, do not reproduce or repair against them.** *(This is Amendment 4's treatment of row 3 — struck, restatused, annotated — applied to the thing that needed it and did not get it. Veritas records that it missed this at BOTH `3e4c9d9` and `275ec07`; Larry missed it at three.)* **What REPLACED them is the Amendment 5 descope proof: a fresh session, project `hooks: {}`, `.claude/state/return-cues/` absent, four specialist dispatches and four returns producing ZERO false injections — execution-log step 1, PROVEN.** | **DONE for the non-hook scope.** Hook half **STRUCK, not outstanding** | Recon banked in evidence pack. Merge unit = PR #97 generic assets. Live install alignment listed. Replacement-machine DR out of scope.<br>⛔ **STRUCK AND HISTORICAL — RE-CUT 2026-08-07 (Veritas Gate 1 @ `443d0fa`). This block instructed a fresh Larry to REPRODUCE AND REPAIR a defect in a mechanism Warwick has since DESCOPED AND DISABLED (Amendment 5). It directs nothing. Do not act on "reproduce rather than assume", and do not treat outcomes (d) or (e) as falsified acceptance criteria — they are not acceptance criteria at all any more.** The defect below is **true history** and is retained only as the reason Amendment 5 exists. ~~**🔴 REAL DEFECT PROVEN BY EXECUTION, 2026-08-06 (permits repair under (g)):** a **stale return-cue survived the session boundary**.~~ On this session's very first `UserPromptSubmit` — with **zero specialists dispatched in this session** — `return-cue-consume.mjs` injected *"A background specialist (type: unknown) has returned"*. `SessionStart`'s `return-cue-sweep.mjs` did not drop it. Suspected cause: `shouldDelete()` skips the cross-session test when the `SessionStart` payload carries **no `session_id`**, leaving only the 30-minute TTL — and the prior session rotated inside that window. Effect: a **false cue crossing sessions**, which directly falsifies outcome (d) and (e). Marker was consumed and deleted before it could be captured; reproduce rather than assume. |
+| **2** | **Gate 2 Phase 4 residuals dispositioned against current evidence.** Every old Gate 2 residual at `95f8826` returns exactly one of: DISCHARGED · STILL OPEN · RECLASSIFIED · NOT PART OF THE PHASE. Do not copy old HOLD language forward. Valid: WP Gate 1 PASS + Phase Gate 2 HOLD pending post-merge. Do not manufacture Phase PASS to merge. | **DONE (disposition table banked)** | See evidence pack row 2. Phase close still needs fresh Gate 2 at final head. |
+| ~~**3**~~ 🔄 **DESCOPED** | ~~**CareerAIR automatic Outlook intake.**~~ **PARKED → [[Deliverables/BACKLOG]] C-10 by Amendment 4. Not graded. Not owed. Retained here for provenance only.** ~~ Eligible mail from CareerAIR inbox/folder in `warwickallan@outlook.com` is retrieved **durably and automatically**, persisted safely, and processed through the **existing** CareerAIR product — without Warwick starting a session or reminding Larry. Wiring/ops repair only — no redesign of CV/fit/QA/rewrite/approval/submit/LinkedIn/browser. Acceptance journey: discover → self-load creds → persist before ack → no-dupe on restart → intake path → correct next governed state → no external consequential action → observable success/failure → resume from durable state → fresh session can read health/last success/pending depth/oldest age. | **NOT LIVE** | **Authorised mailbox path = Zapier MCP → `warwickallan@outlook.com` only.** **Do not** use Claude Outlook connector (work `warwick.allan@bellrock.co.uk`). **Do not** require Entra/Graph consent as the path. **Zapier paid Webhooks cancelled.** Funnel+webhook+queue+processor+Cockpit+fail-loud = **dormant adapter**. ~~**Proven blocker (Grok host, 2026-08-06):** Zapier MCP tools are **ClickUp + GitHub only**~~ — ⛔ **WITHDRAWN AS A GENERAL BLOCKER by Amendment 3.** That finding was **true of the Grok host only**. Evidence retained for that host: `Deliverables/2026-08-06-careerair-zapier-mcp-outlook-blocker.md` @ `6b48507`. **On the Claude host, verified by execution 2026-08-06:** Microsoft Outlook enabled, **35 actions**, default connection **`warwickallan@outlook.com`**, `microsoft_outlook_find_emails` + `microsoft_outlook_find_emails_in_specific_folder` present. **Second Outlook connection exists and is NOT to be touched or investigated** (Warwick, explicit). **Demonstration collection AUTHORISED:** default personal connection only → CareerAIR folders → **existing** durable queue/processor/Cockpit journey → prove persistence, dedupe and truthful operational state end to end. **⚠️ THIS DOES NOT DISCHARGE ROW 3.** An MCP call inside a Larry session is **demonstration evidence, not session-independent automatic collection**, and fails the standing test in root `CLAUDE.md` § *"Nothing may live only in Larry's head"* (a fresh session must use it without being reminded; the real production event must invoke it). **Row 3 stays NOT LIVE until a genuinely automatic trigger exists.** Graph poller code may exist privately but is **not** the authorised route and **not** claimed live.<br>**✅ DEMONSTRATION EXECUTED 2026-08-06 — row 3 STILL NOT LIVE.** 4 real messages collected via Zapier MCP from the two configured CareerAIR folders and fed through the existing contract → store → processor. Proven: channel derived not trusted · persist-before-ack · dedupe (`deliveries=2`, queue unchanged) · **no-dupe on restart** (re-collect after processing → `state=done deliveries=3`, queue stays 0) · run idempotency · no external consequential action · **deny-by-default** (real Inbox id → `REFUSED unknown_folder`, nothing written). **🔍 Silent-zero finding:** Zapier's folder picker shows **top-level folders only**, so `CareerAIR` read as empty (`totalItemCount: 0`) while its **2 child folders** hold **160 messages** — a collector built on the picker alone would have reported success and collected nothing forever. Evidence: [[Deliverables/2026-08-06-careerair-mcp-demonstration-evidence]]. **Still NOT LIVE: every call was Larry-in-session; no automatic trigger exists.** |
+| **4** | **Live Cockpit production surface + truthful CareerAIR operational view.** Normal Cockpit route loads; core nav not regressed; Apps → CareerAIR opens; shows collector state, last success, pending count, oldest pending age, processing state, latest safe item summary/status, exact failure when unhealthy; “no messages” ≠ “collector unhealthy” ≠ “consumer not running”; same durable state as processor; survives service restart + cache refresh; health unhealthy when CareerAIR dependency missing. Executable browser journey required. | **MOSTLY DONE** | Overlay + private-api + email-ops + browser shoot. Re-verify strip after Funnel install.<br>**🔴 MATERIAL DEFECT FOUND AND REPAIRED 2026-08-06** — `/careerair/api/email-ops` published a **false operational picture**: `collector.state` came **only** from a webhook health probe ("is the door open", not "is mail arriving") while the Funnel feeding it is the **dormant** adapter with no Zaps; and `collector.last_success_at` was sourced from **`careerair.email_run`**, so a **processing** success was published as a **collection** success. Observed: `collector: up`, `healthy: true`, `last_successful_collection` = a run that collected nothing — and it **contradicted** `runtime/ops/state.json`. Repaired: ingress separated from collector; collector sourced from the durable ops record; `last_successful_collection` is a real collection event or `null`; processing run separately labelled. Now: `healthy: false` · `collector: down` naming `graph_auth_required` · `last_successful_collection: null`. Evidence: [[Deliverables/2026-08-06-careerair-mcp-demonstration-evidence]] §4. **Residual: executable browser journey still owed at the final head.** |
+
+### ASSURANCE AND RELEASE SEQUENCE (not product requirements) — rows 5–7
+
+| # | Step | Status |
+|---|---|---|
+| **5** | **Veritas Gate 1** — complete amended WP at stable exact head. | ➡️ **SEE § ASSURANCE STANDING — the single source.** *(This cell said `HOLD @ f0d2614` and was stale by SIX receipts. Veritas @ `b62a9fc` D-1. Do not restate standing here.)* |
+| **6** | **Veritas Gate 2** — separate Phase 4 verdict at same head. | ➡️ **SEE § ASSURANCE STANDING.** *(Said `HOLD @ f0d2614`; Gate 2 has since been DISPATCHED and answered the phase question NO.)* |
+| **7** | **Codex + merge decision pack.** Warwick **authorises** final Codex after Gate 1 PASS. **No merge without Warwick’s explicit final authority.** | **BLOCKED** — Gate 1 PASS + CI green required first |
+
+**Gate 1 PASS + Gate 2 HOLD is a valid outcome.** Do not call Gate 1 = Phase PASS.
+
+### Explicitly OUT OF SCOPE (unless proven to block an acceptance journey above)
+
+**C-1..C-9, C-11..C-15** · shopping projectors · general Builds/System projections · generic Telegram attention loop · withheld-capability demo · attention history · documentation privacy scanning · YouTube capture · unrelated Cockpit visual polish · replacement-machine disaster recovery · full IDEA-016 Cockpit programme · **installing/chasing the Claude host hook** — ✅ **BACK OUT OF SCOPE, and permanently.** *(⊖ Amendment 3 had moved it IN SCOPE inside row 1; **Amendment 5 then descoped and DISABLED the whole reminder system**, so it is out of scope again — not as a deferral, but because **the outcome no longer exists**. Re-cut 2026-08-07, Veritas Gate 1 @ `443d0fa`, blocking: this line still recorded it as in-scope.)*
+
+Any newly discovered **unrelated** defect: record once in [[Deliverables/BACKLOG]] with evidence; continue this route.
+
+### Prior mechanism evidence (banked — do not reopen without regression)
+
+- WO route · DevBot · return-cue (Claude live / Grok Option C) · Watcher/Tower · `/rotate` + Supabase green — Gate 1 @ `0855e4e` isolation receipt and supporting Deliverables under `2026-08-06-*`
+- Session report freeze: `Deliverables/2026-08-06-session-performance-report-rotate.md` · closing_head `3cf31c24…`
+
+### Veritas / Codex dispatch law (this package)
+
+**Gate 1:** map path · functional rows **1, 2 and 4** *(corrected 2026-08-07 — row 3 was descoped by Amendment 4; this said "1–4" and contradicted its own section heading on the fact most likely to shape 4B's Gate 1 dispatch)* · residuals · exact public head · private digest/surface · **separate PASS/HOLD/FAIL per dimension** · no narrowing · CI green + head frozen.  
+**Gate 2:** BUILD-020 North Star · phase journey · estate vs branch · merge/install boundary · post-merge acceptance if any.  
+**Codex:** only after Gate 1 PASS; Warwick has pre-authorised the final review for this package; still no merge without Warwick.
+
+### ⛔ HISTORICAL — SPENT ROUTES. DIRECTS NOTHING. *(formerly "🎯 THE EXACT NEXT ACTION")*
+
+> ⛔ **BANNER MOVED INTO THE HEADING ITSELF, 2026-08-07 — Veritas Gate 1 Defect 1, blocking.** This heading previously read **`🎯 THE EXACT NEXT ACTION`** while its entire body said *"SUPERSEDED BY AMENDMENT 3"* and *"THE SEVEN-STEP ROUTE IS SPENT"*. **The START/RESUME block's "First safe action" row pointed a fresh Larry at that exact label** — so the map's own read-this-first instruction resolved to dead work, 52 lines above the live action. **Larry's step-11 enumeration missed it: he grepped for the label he had just repaired (`THE ONE CURRENT NEXT ACTION`) and not for the label the entry block points WITH.** → **The live action is § ACTIVE SESSION WORK PACKAGE → `🎯 THE ONE CURRENT NEXT ACTION`.**
+
+> **⛔ SUPERSEDED BY AMENDMENT 3.** Step 1 below is **DISCHARGED** — the Outlook actions are present on the Claude host. Retained for provenance, struck so it is not re-executed.
+>
+> ~~1. **Warwick (free, not paid Webhooks):** on Zapier MCP config, add **Microsoft Outlook Find Email (+ Get Email)** for `warwickallan@outlook.com`.~~ ~~2. Larry collects after actions appear.~~ ~~3. Do not claim live.~~
+
+> **⛔ THE 2026-08-06 SEVEN-STEP ROUTE IS SPENT. Retained struck, for provenance only.**
+> ~~1. Zapier-MCP Outlook demonstration~~ **DONE — and row 3 then DESCOPED (Amendment 4).**
+> ~~2. Claude hook install and live proof~~ **DONE — and then DESCOPED AND DISABLED (Amendment 5).**
+> ~~3. Remaining row 1 and row 4 acceptance~~ **DONE.** ~~4. CI green~~ **OBTAINED at `2cf3673`.**
+> ~~5. Fresh Veritas Gate 1, rows 1–4~~ **Superseded: rows are now 1, 2 and 4.** ~~6. Codex~~ ~~7. Merge pack~~ **→ Sub-phase 4B.**
+>
+> *(Veritas FAIL @ `2cf3673`: this destination stayed stale while every pointer to it was corrected. **Fixing where an arrow points does not make the target true.**)*
+
+**✅ PRIOR NEXT ACTION — DISCHARGED. Reach ONE reviewed rotation head, then rotate.**
+
+> ⛔ **This heading is DELIBERATELY no longer phrased as the current next action** (repaired 2026-08-07, route step 11). It previously carried the phrase *"THE ONE CURRENT NEXT ACTION"* **verbatim**, which meant that exact label matched **twice** in this map — here, describing a rotation the very next lines confirm is **complete**, and again below at the genuine live action. **A fresh Larry grepping for the unique-sounding label got two hits 36 lines apart.** That is the "competing frontiers" failure Amendment 6 ② makes a **FAIL**, reintroduced by the same wording that was supposed to prevent it. **The phrase is now unique to the live action below.**
+
+> **State of this block, so it describes itself** *(Veritas D-15: it previously said "✅ DONE — this edit" several commits after that edit, recorded neither of the later steps, and named no receipt or passed head — so its own "On PASS" condition could not be evaluated from the destination alone)*.
+
+**✅ ALREADY ACHIEVED — Sub-phase 4A is assured.**
+**Veritas PASS — Sub-phase 4A closure only — at `c50d8cb48d4c536952e07ccf32f94bbc4061e615`**, receipt `Deliverables/2026-08-07-veritas-subphase-4a-c50d8cb-receipt.md` (`sha256 10b929a3…`), reached after **two FAILs** at `2cf3673` and `52427cd`, both of which stand as true verdicts about those heads. **Scope of that PASS: 4A closure ONLY — not a Phase verdict, does not grade functional rows 1/2/4, no Codex eligibility, no merge readiness, and 4B inherits no standing from it.**
+
+**✅ THE `/rotate` TRANSACTION IS COMPLETE — closed 2026-08-07 at `b0a1c99`.** Verified by execution in the following (fresh) session: report + payload committed · 4B loaded · Honcho packet published and readable with `focus` = *"ACTIVE PACKAGE = Sub-phase 4B"* · worktree clean · 0 ahead of `origin`. **The seven steps below are DISCHARGED and are retained as the record of that rotation, not as instructions.** *(Repaired 2026-08-07 in the 4B session: this block still read "THE REMAINING ACTION — complete `/rotate`" after the rotation had closed, which would have directed a fresh Larry to redo a finished transaction — the Amendment 6 ② failure condition. Repairing a stale directive is NOT an amendment to the 4A rotation record, which is untouched.)*
+
+### 📊 SUB-PHASE 4B — EXECUTION LOG (Larry, 2026-08-07). Progress only; **no completion claim and no PASS from this log.** *(Corrected 2026-08-07, Veritas N-7: this said “no Veritas receipt exists for any head below”, which is FALSE — receipts exist for `443d0fa` and `3254c69`, both cited below it. ➡️ Gate standing: SEE § ASSURANCE STANDING.)*
+
+| Step | State | Evidence |
+|---|---|---|
+| **1** — descoped hooks no longer fire | **PROVEN** | Fresh session, project `hooks: {}`, `.claude/state/return-cues/` absent. **Four specialist dispatches and four returns produced ZERO false "specialist has returned" injections** (previously 8 false fires at dispatch alone). Amendment 5's owed confirmation is discharged. |
+| **4** — WO-24 (**subject: the Cockpit provenance / `windowsHide` work**) regenerated **through** `envelope.mjs` | **DONE** | `Deliverables/proofline/WO-2026-08-07-24-…` · Keel verdict **CLARIFY→ACCEPT** after Amendment 1 · **the first Keel order in four to survive read-back**, and the difference was the order, not the worker.<br>📌 **Clerical correction, Warwick, 2026-08-07:** WO-24 **was generated through the Work Order envelope route; it is not itself "the Work Order envelope"**. Its subject is Cockpit provenance and `windowsHide`. Recorded because this row previously named only the route, and a fresh reader — Larry did, at orientation — can mistake the route for the deliverable. |
+| **5** — Cockpit rescue (provenance half) | **INTEGRATED @ `2829d43`** | Larry re-verified independently, not from the worker's report: 8 files, **zero** outside surface · `provenance-check.mjs` **29 assertions, 0 failed** · all **6** child-process sites carry `windowsHide` · **live clone still exactly 10 entries, `c1ed028`, untouched.** ⚠️ **NOT verified: `/api/health` was never called over HTTP** — doing so loads `db.mjs` and opens production pools. One wiring line rests on inspection. **That residue is where a reviewer looks first.** |
+| ~~**5 (Amendment 7)** — rotation-report surface~~ | ⛔ **SUPERSEDED — see the INTEGRATED row below.** *(Veritas E-2: this row still read IN FLIGHT beside its own completed successor.)* | **WO-25** (Keel, server half: schema mirror · least-privilege grant · `/api/rotation-reports`) and **WO-26** (Felix, System-tab UI) running **in parallel on disjoint file surfaces against a FROZEN API contract carried in both orders**, so neither can silently drift from the other. |
+| **CI** | **`provenance-check.mjs` REGISTERED @ `b632170`** | It existed and passed but **CI never ran it** — capability, not automation. `rotation-report-check.mjs` is deliberately NOT registered until WO-25 integrates. |
+| **15a** — bounded Vex review | ✅ **FIRED, RETURNED RED, REPAIRED, RE-VERIFIED GREEN** | Amendment 8. Verdict **RED** at `443d0fa` — the bridge echoed an arbitrary origin and answered preflights on the upstream's behalf; **confirmed ARMED on the live Cockpit**, so the exposure predated this branch. Repaired by **WO-31 @ `02c4520`** (handler extracted to `private-api.mjs`; origin decision moved onto the **request**; 403 before body read and before forward, every method equally). **Vex re-verified GREEN at `3254c69`** — 124 independent assertions, 24 bypass shapes hunted, write half proven from the **upstream's** record (0 requests, 0 bytes). Sanitised record: [[Deliverables/2026-08-07-cockpit-private-api-boundary-record]]. **Detailed review and probe harness are deliberately OFF this public repo** (Warwick's publication ruling). |
+| **WO-31** — `/private-api` origin boundary | **INTEGRATED @ `02c4520`**, CI gate registered @ `3254c69` | New module `services/cockpit/private-api.mjs` (Vex F6 applied — it was the last live-facing handler inside `server.mjs`, so **no gate could execute it**, which is why the defect survived). New gate `services/cockpit/origin-boundary-check.mjs` — **51 assertions, 4 permissive fixtures caught**, registered in `cockpit-private-apps.yml` and **proven to execute on the runner**. `provenance.mjs` gained one `SOURCE_MODULES` line. Optional additive `COCKPIT_ALLOWED_ORIGINS`, **empty default**. |
+| **5 (Amdt 7)** — rotation-report surface | **INTEGRATED** | **WO-25** server half @ `77dbca2` (117 assertions; Larry mutation-tested null→0 himself: 29 go red) · **WO-26** System tab @ `67b0af8`, accessibility repairs @ `63380d1` after Vera returned **NOT PASS** on two HIGH findings. Schema widened and least-privilege grant applied live — `cp_directus` SELECT only, **no INSERT, no UPDATE**; `anon`/`authenticated`/`service_role` nothing. **Endpoint proved against REAL Postgres**: 7 reports, correct ordering, 2,221,596 subagent tokens, 0 of 2 Work Orders, 88.3%, 26.2%, and `elapsedMinutes: null` beside `firstDispatchSuccess: 0` in the same row. |
+| **Amdt 9** — durable YouTube capture | **INTEGRATED, NOT ACCEPTED** | **WO-27** @ `5203cee`. 98 assertions; Larry independently mutation-tested the deciding control — forcing the durability probe to succeed turns **15 of 98** red. **⛔ CAPABILITY ONLY. Not durable, not automatic.** Acceptance is the next real capture, unattended. |
+| **Writer idempotency** | **PROVEN ON LIVE** | **WO-28** @ `0af12e2`. Warwick's own acceptance test executed: the writer re-run **twice** against live Supabase left dispatch rows **27→27**, 4A rows **5→5**, sum **15→15**. The previously-discarded per-specialist `tokens` now mirror and **reconcile exactly to the 2,221,596 headline**. |
+| **Live machine** | **STABLE, one control deliberately off** | Warwick executed the 5-command elevation bundle. Four task changes correct; `CareerAIR-Graph-Collect` **still reports `LastTaskResult = 2`**, so errors still propagate. **`MyPKA-YouTube-Watcher-Ensure` is `Disabled` on purpose** — see the incident below. Watcher process alive (PID 28240). |
+| **CI** | `cockpit-private-apps` **green** | Both new cockpit gates registered and running for real. `capture-durability-check` registered on the **Windows** job. `idempotency-check` **deliberately NOT registered** — runner Postgres availability is UNESTABLISHED and a skip-on-missing would be a vacuous green. |
+| **WO-29** — System-tab render coverage *(Veritas Defect 5)* | **INTEGRATED @ `a00e3a3`** | Larry re-verified independently, not from the return: **16 → 24 scenarios · 0 → 54 assertions · 4/4 → 7/7 mutations caught · 1 file changed · `app.js` never written.** **The decisive line:** under the null-collapse mutation, **`3 of 54 RED \| pre-existing detectors fired in 0 scenario(s)`** — drop the `rrHas` guard and `rrInt(null)` renders `"0"` because `Number(null) === 0`; template compiles, nothing throws, **and the old check passed.** Warwick's *Unknown / not established / 0* distinction was collapsing **inside the gate meant to catch it.** Mutation cases are **permanent in `--self-test`**, so CI regenerates the count every run. |
+| **WO-30** — `db.mjs` clone portability *(Veritas Defect 6, unparked by Warwick)* | **INTEGRATED @ `5b1409f`**, CI line registered @ `1c633a5` | Larry re-verified: **23 assertions, 0 failed, 5 mutations caught**; `provenance-check` **still green at 29**; temp worktree **absent from disk and registry**. **🔴 The defect was worse than "unportable":** a Cockpit started from any other checkout **silently borrowed the live clone's dependency tree AND its live production credentials** — it did not fail, it **connected**, with credentials it had never declared. **Row 1's "survives worktree delete/recreate" was passing only because a stray checkout quietly reached into the live clone.** Now fails loudly at import. **`BACKLOG` C-6 narrowed, NOT closed** — the pools still open at module scope. |
+| **WO-31** — `/private-api` origin boundary *(Vex RED)* | **INTEGRATED @ `02c4520`** | Handler extracted to `private-api.mjs` — **Vex F6 applied**: it was the last live-facing handler inside `server.mjs`, so **no gate could execute it**, which is why the defect survived. Origin decision moved onto the **request**: 403 before the body is read and before any forward, every method equally. **Vex re-verified GREEN at `3254c69`** — 124 assertions, 24 bypass shapes hunted, write half proven from the **upstream's own record** (0 requests, 0 bytes). |
+| **WO-32** — R2 unsafe-method no-`Origin` guard | **INTEGRATED @ `4c55781`** | **Allowlist of the HTTP-safe set** (`GET`/`HEAD`/`OPTIONS`), not a four-verb denylist — Keel **measured** `PROPFIND` with no `Origin` forwarding a body upstream. `originDecision()` byte-for-byte unchanged; the new rule composed in one exported function, so there is **no fail-open default inside a security control**. Gate **51 → 97 assertions, 4 → 5 fixtures, all caught** (the new rule alone accounts for **17/64**). **Zero currently-working requests changed behaviour.** |
+| **WO-33** — TowerBot `codex_qa_started` + `@tower` strip | **INTEGRATED @ `b03119c` / `f102dca`** | Card emitted in `processTurn` **immediately before the real Codex call** — Keel proved **five** ways QA never runs after checkpoint creation, so emitting there would have announced runs that never start. `summariseLarry` strips `@tower` directive lines so Larry's prose surfaces **regardless of comment ordering**. `notify.test.mjs` 7 → 20 tests; `run-tower-loop-tests.mjs` **69 executed, 0 failures**. **⛔ CAPABILITY ONLY — the card has NEVER been observed on the real TowerBot.** |
+| **Tower runtime ALIGNED** | **LIVE — and running UNMERGED branch bytes** | ⚠️ **Recorded because Veritas Gate 2 D-2 found this was true IN SILENCE.** `notify.mjs` and `watcher.mjs` copied into `~/.mypka/tower-runtime`; watcher restarted — **PID 22708**, outside every checkout, dynamic PR discovery, `TOWER_PR_SEED` unset, polling #97. **Warwick explicitly authorised this bounded reversible alignment** (durability record §1b item 4), **so the action stands; the defect was the silence.**<br>**🔴 CONSEQUENCE, stated plainly: the machine-installed Tower runtime is NO LONGER running canonical merged `main`.** `INSTALLED-FROM.txt` still claims `c21c3f3` and is **STALE**. **Part A's *"installed from canonical merged source · no dependency on an unmerged branch"* is FALSE of the live estate until the merge lands**, and must not be claimed until then. **Rollback: `~/.mypka/tower-backups/2026-08-07-pre-wo33-alignment/ROLLBACK.txt` — three commands, no git, no session.** |
+| **`TOWER_EVIDENCE_REPO_DIR`** *(Veritas Gate 2 D-3)* | **ESTABLISHED SET AND CORRECT — by Mack, properties only** | Veritas recorded it as unconfirmed because the supplying file is **outside its declared surface** and it correctly did not look. **Mack established it by execution without exposing any value:** `UNSET` at all three OS scopes, so `tower-baton.env` is the only supplier; **`SET`** there; resolved directory exists; **`IS_GIT_REPO = true`**; it is `C:\Fusion247PKA`, which **shares one object database** with this worktree — so every commit made here is in the evidence store the instant it is written, **structurally rather than by fetch luck**. It holds `2d80b52`, `6354d8a` and `origin/main`. **`INSTALLED-FROM.txt`'s "KNOWN GAP" on this variable is therefore STALE.** *(Both reviewers were right: Veritas about what it could see, Mack about what is true.)* |
+| **Route step 11** — map navigation | **DONE, then FAILED, then repaired** | Larry's enumeration missed the blocking defect; Veritas found it. See § ADJUDICATION and Defect 1. |
+
+### ✅ ROW 1 ② — SURVIVAL SCENARIOS **EXECUTED**, 2026-08-07. *(Veritas Gate 1: "classified, not executed — no worktree delete/recreate or fresh-branch-from-main exercise is recorded at this head.")*
+
+**Executed by Larry at `1c633a5`. Worktrees created, exercised, removed, and absence verified on disk and in `git worktree list`.**
+
+| Scenario | Executed | Result |
+|---|---|---|
+| **worktree DELETE and RECREATE** | `git worktree add` → `remove --force` → `prune` → **verified deleted** → `add` again | **All three repo-local mechanisms ran in the recreated worktree:** `clone-portability-check` **22 assertions, 5 mutations caught** · `provenance-check` **29 assertions** · `render-vm-check` **24 scenarios, 54 assertions**. |
+| **fresh branch from CURRENT main** | worktree at `origin/main` = `4eb5368` | **BUILD-020 cockpit assets correctly ABSENT** (`clone-portability-check`, `provenance-check`, `rotation-report` — all unmerged, which is the truthful state, not a failure). **`tools/wo/envelope.mjs` IS present on main** — the Work Order route is already merged and survives independently of this branch. |
+| **machine-global install, worktree-independent** | probed **from the main worktree**, which carries none of this branch's assets | `~/.mypka/governor/ding.mjs` **resolvable and self-loading its own credentials** — no `--env-file`, no shell preparation, no dependency on this branch or this worktree. |
+| **branch from main AFTER #97 merges** | ⬜ **NOT EXECUTED — post-merge by construction.** Recorded as owed at route step 18, not claimed. |
+| **installed-runtime restart** | ⬜ **NOT EXECUTED at this head.** Not claimed. |
+
+> **🔎 The delete/recreate run produced better evidence than a bare pass.** In the recreated worktree `clone-portability-check` reported **22** assertions rather than 23, and said exactly why: *"Existence: SKIPPED — dependencies are not installed in this clone"*, **naming the exact missing path**. **That is the loud-skip design working in the real scenario rather than only on the CI runner** — the check degrades to a smaller number and announces the reason, instead of quietly passing 23 and implying it proved something it did not. **A silent 23 there would have been the vacuous green this whole Sub-phase keeps hunting.**
+
+**🔴 A THIRD FINDING, and it is the most expensive lesson of the session — Larry's, recorded so the ordering becomes a precondition rather than a memory.**
+
+**An elevation step was sequenced AHEAD of the migration that makes it safe.** The `MyPKA-YouTube-Watcher-Ensure` task was handed to Warwick pointing at `C:\Fusion247PKA` — a clone **183 commits behind** that still holds the **old 23-line unconditional-kill** `ensure-youtube-watcher.mjs`. The fix giving it true ensure semantics was integrated on `build-020` and **unmerged**. Result: the task **killed and restarted the watcher every five minutes**, proven empirically by the PID moving **33024 → 28240** inside one cycle with no state file written. A note generation can exceed the five-minute cycle, so **a long transcript could have been killed mid-flight indefinitely**.
+
+**Larry had personally written the warning about this exact trap into Keel's WO-27 order hours earlier.** The Work Order reasoned about *the code*; the task points at *a checkout*. **Now binding as §3 precondition 5 of the migration plan.** *(Warwick's verification instruction — "the ProcessId must be unchanged across two ticks" — caught it inside one cycle. The check design was sound; the sequencing was not.)*
+
+**🔎 Two findings recorded here rather than left in a session that will be cleared:**
+
+0. **🔴🔴 THE SAME THING HAPPENED AGAIN AT WO-30 — TWICE IN TWO CONSECUTIVE ORDERS, AND THAT MAKES IT A PATTERN IN LARRY, NOT LUCK IN KEEL.** Larry prescribed a two-line fix for `db.mjs`: a relative static `import` of `pg`. **Keel ran `relativeImports()` on both forms** and proved the relative specifier would pull a `node_modules` path into the closure `provenance.mjs` recomputes, break the declared `SOURCE_MODULES` and **turn `provenance-check.mjs` RED — a green CI gate, in a file outside his surface.** Resolved with `createRequire(import.meta.url)` + `new URL(...)`, neither matched by the regex. **`provenance.mjs` is a control built to make undeclared module drift impossible, and Larry's own next order would have tripped it — exactly as at WO-25, one order later.** **Both times the worker EXECUTED the real function; both times Larry REASONED about it.** *The corrective is not "be more careful" — it is that a prescribed method touching a control must be run against that control before it is prescribed.*
+1. **🔴 A control I holed, caught by Keel and not by me.** Importing `rotation-report.mjs` into `server.mjs` makes the recomputed module closure diverge from `provenance.mjs`'s hand-declared `SOURCE_MODULES`, so `provenance-check.mjs` goes red — **and `sourceHash` would silently stop covering a module the running Cockpit loads. That is exactly the defect `provenance.mjs` was built to make impossible.** My own control, holed by my own next order, one day later. He proved it by copying the modules and running the real `moduleClosure()` rather than reasoning about it. Fixed by amendment.
+2. **⚠️ `sourceHash` is NOT comparable across checkouts, and that will generate false alarms.** Executed: the same tracked content produced `916d0c67…` in one worktree and `b21e69c0…` in another. Cause established, not assumed — identical git blob `ea800833…`, but 164 CRLF here versus 164 bare LF there (autocrlf on checkout); the digest itself is deterministic within a tree. **It is CORRECT for its stated purpose** (which bytes this process loaded) **but anyone comparing the live Cockpit's hash to CI's will wrongly conclude the code differs.** Documented in the README inside WO-25. **It must NOT be "fixed" by normalising line endings in the digest — that would make it describe git content instead of loaded bytes, which is the original `/api/health` lie.**
+
+### 📊 ASSURANCE STANDING — **THE SINGLE SOURCE. Every other statement of gate standing in this map POINTS HERE and must not restate it.**
+
+> **🔴 WHY THIS BLOCK EXISTS.** Gate standing was restated in **four** places, and **six consecutive Gate 1 verdicts** were carried by one of them going stale. Veritas @ `b62a9fc`: *"The record is current with respect to the last review's finding list and stale with respect to its outcome. That is a placement and sequencing property, not a diligence one."* **Restatement was the defect. This block is the fix — SSOT, not a new mechanism.**
+>
+> **⛔ WHEN A GATE RETURNS, UPDATE THIS BLOCK IN THE SAME COMMIT THAT BANKS THE RECEIPT.** Not at the next gate. Not as gate preparation. *(Warwick's process correction, 2026-08-07: re-cut the affected state record **as part of integrating** the work, never later as housekeeping.)*
+
+| | |
+|---|---|
+| **Gate 1 — current** | **HOLD @ `3a1e670`** — rows 1, 2 and 4 **PASS**; enumeration dimension **HOLD**; all remaining findings **non-blocking**. *(Prior: FAIL @ `b62a9fc`, FAIL @ `30666f1`.)* Receipt: `…-3a1e670-receipt.md` (`sha256 3b290818…`). **⚠️ THIS CELL MUST LEAD WITH THE CURRENT HEAD.** *(D-2 @ `3a1e670`: it was reported repaired at `30666f1` and was NOT — it still led with an older head and reached the current one in a later sentence. Identical shape, one head on, same cell.)* |
+| **Gate 1 — history** | **FAIL @ `0cf70c9`** · HOLD @ `f0d2614` · FAIL @ `3e4c9d9` · FAIL @ `275ec07` · FAIL @ `443d0fa` · HOLD @ `19fc792` · FAIL @ `3254c69` · FAIL @ `07aa166` · FAIL @ `b62a9fc` · FAIL @ `30666f1`. **Every FAIL was documentation, never the engineering.** *(E-2 @ `30666f1`: `0cf70c9` was omitted while the equally pre-4B `f0d2614` was included — an inconsistent cut, now corrected.)* |
+| **Gate 2 — current** | **FAIL @ `07aa166`.** **DISPATCHED AND ANSWERED.** The mandatory question — *"Can Warwick now do the thing this phase promised, in the real intended context?"* — answered **NO**: on `:8090`, `/api/rotation-reports` is **404** and `/api/health` serves the pre-WO-24 payload at `c1ed028`. **None of 4B is reachable on the surface Warwick uses.** Receipt: `Deliverables/2026-08-07-veritas-gate2-phase4-07aa166-receipt.md` (`sha256 5d4d489a…`) |
+| **Codex** | ⛔ **NOT ELIGIBLE.** Requires Gate 1 PASS at the exact head, CI green, head frozen, **and Warwick's explicit authority**. |
+| **Merge** | ⛔ **NOT READY.** Nothing integrated in 4B is accepted, complete or merge-ready, **and none of it may be described that way.** |
+| **Work Orders integrated in 4B** | **TEN** — WO-24 … WO-33. **None of that is assurance.** |
+
+**The engineering position, stated separately from the documentation position because they have diverged all Sub-phase:** Veritas @ `b62a9fc` — *"The engineering is the strongest it has been at any head in this Sub-phase. One sentence in the map is the whole distance."*
+
+> **⚠️ THE THIRD CIRCULARITY, and Warwick has ALREADY ROUTED IT — do not re-raise it as a decision.**
+> `codex_qa_started` is **capability only** (zero rows in the Tower store; no turn has ever existed for PR #97), and **its only acceptance path is a real Codex run — which requires Gate 1 PASS.** Veritas named this as the third instance of the circularity Amendments 10 and 12 resolved twice.
+> **Warwick's instruction of 2026-08-07 already places it, verbatim:** *"When Codex becomes genuinely eligible, trigger the real PR #97 Codex QA. That real Codex execution is also the binding TowerBot production acceptance."*
+> **So: `codex_qa_started` acceptance is routed AFTER Gate 1 PASS, to the real Codex run. It does not gate Gate 1.** **Larry did not reclassify anything — this records Warwick's routing.** **And it is NOT accepted until that real sequence is seen: no fixture, database inspection or Veritas statement substitutes for it.**
+
+### 📋 HISTORICAL — the FIRST Gate 1 return of Sub-phase 4B (head `3e4c9d9`). ➡️ **CURRENT standing: SEE § ASSURANCE STANDING, 22 lines above. DO NOT read gate state from this heading.**
+
+> ⛔ **Re-cut 2026-08-07 (Veritas @ `3a1e670`, D-1). Head-bound and therefore not FALSE — which is why it was never a FAIL — but SIX VERDICTS STALE, the last restatement never converted to a pointer, and the surface a skimmer resolves by. It escaped a prior enumeration because that search matched `FAIL @`/`FAIL at` and this text reads `**FAIL** at` — markdown emphasis between the two words defeated the pattern.**
+
+**Receipt:** `Deliverables/2026-08-07-veritas-gate1-subphase-4b-3e4c9d9-receipt.md` · `receipt_sha256` **`1341ef86…`**, independently recomputed by Larry and matching. **Rows 1, 2 and 4 each HOLD; overall FAIL.** Two dimensions FAIL: **Documentation truth** (Defect 1) and **Completed automation** (Amendment 9). **The FAIL is carried by the map and by one disabled scheduled task — not by the engineering.** Veritas found **no false completion claim** anywhere in the package and rated **Residual risk PASS**, its strongest dimension: every limitation it independently confirmed was already named honestly here.
+
+### ⚖️ ADJUDICATION — the pre-merge / post-merge boundary. **Warwick's question, 2026-08-07, answered against this map and its amendments.**
+
+> **His constraint, and it is preserved exactly:** *"The recorded route deliberately keeps the live Cockpit on the existing runtime until after authorised merge… Do not move, mutate or prematurely migrate the live Cockpit merely to make Gate 1 green."* **Nothing below moves, restarts or mutates the live Cockpit, and nothing weakens the post-merge half.**
+
+**The answer is BOTH — and the split is precise, not a compromise.**
+
+**① Row 4 is CORRECTLY HOLD on the part that is genuinely pre-merge provable.** Amendment 7 criteria **③ renders readably** and **④ unknown fields remain visibly unknown** have **no executed render evidence at all**. `render-vm-check.mjs` carries 16 scenarios, **every one an asdair view**; Amendment 7 (d)'s own accepted reconnaissance said a System-area scenario *"must be added for coverage"* and it was not added. **That gap has nothing to do with the merge boundary and is repairable now.** Veritas is right, and this is a real defect in the delivered work.
+
+**② Row 4 is EXPOSING A REAL CONTRADICTION on the part that requires the live instance.** Veritas graded row 4 from *"the entry point Warwick actually reaches — his browser against the live Cockpit on `:8090`"*. That instance serves from `C:\Fusion247PKA` at `c1ed028`, **183 commits behind, on a different branch**. It cannot carry 4B's code. **The only thing that puts the code there is the migration — and the migration's own §3 precondition 2 is «Veritas Gate 1 PASS».**
+
+> **🔴 THE CIRCULAR DEPENDENCY, stated plainly:**
+> **Gate 1 PASS requires the live surface → the live surface requires the migration → the migration requires Gate 1 PASS.**
+> **Under that reading, pre-merge Gate 1 PASS is UNREACHABLE BY ANY ACTION.** It is not a bar the work can clear; it is a bar nothing can clear. **Amendment 7 ⑨ already says so in its own words — *"survives the final Cockpit move to canonical merged runtime"* is post-move by construction**, and Veritas itself records ⑥ and ⑨ as *"unexecuted by construction"*.
+
+**③ The SAME circularity hits row 1 through Amendment 9, and this one is worse.** The durable-capture acceptance test is *"the next real unattended capture"*, which needs `MyPKA-YouTube-Watcher-Ensure` enabled. **That task is `Disabled` ON PURPOSE**, because migration §3 **precondition 5** forbids enabling any scheduled task against the live clone until that clone carries the code the task assumes — the precondition written *because* enabling it early killed and restarted the watcher every five minutes. **So Amendment 9's acceptance test is ALSO post-merge by construction.** Root `CLAUDE.md` § *"Nothing may live only in Larry's head"* permits exactly **two** exits — satisfy the acceptance test, or **explicitly reclassify as manual**. **The first is unreachable pre-merge. The second is Warwick's alone; Larry may not self-reclassify.** → **`product-decision` raised, and ANSWERED — see AMENDMENT 10 ①.** **Option A approved, narrowly scoped: MANUAL for Gate 1 acceptance and evidence purposes ONLY. The outcome REMAINS AUTOMATIC as a product requirement, with a binding seven-condition post-merge re-test at step 18. It may NOT be described as permanently manual, accepted or complete before that test passes.**
+
+**RESOLUTION — row 4 and row 1 acceptance split by RUNTIME, not weakened:**
+
+| Half | Graded by | Content |
+|---|---|---|
+| **PRE-MERGE — branch runtime** | **Gate 1** | Amendment 7 ①②③④⑤⑦⑧ · row 1 survival scenarios that do not need merged `main` (worktree delete/recreate, fresh branch from current main) · all documentation truth. **③④ MUST be executed, not inspected.** |
+| **POST-MERGE — live runtime** | **Route step 18 + Gate 2, binding** | Amendment 7 **⑥ and ⑨** · the live `:8090` browser journey · Amendment 9's real unattended capture · *"branch from main after #97 merges"*. **Recorded as OWED, not discharged.** |
+
+**🔴 THIS IS NOT A WEAKENING, AND THE TEST OF THAT IS EXPLICIT:** the post-merge half is **not** deleted, deferred indefinitely or downgraded to a caveat. **It becomes a BINDING acceptance obligation at route step 18, and the Phase does not close without it.** A Gate 1 PASS under this split **does not mean row 4 is delivered to Warwick** — it means the branch-runtime half is proven and the live-runtime half is scheduled and owed. **Any document that later describes Gate 1 PASS as "the Cockpit surface works" is making a false completion claim.** Veritas's finding stands on the record exactly as written: **at `3e4c9d9` the rotation-report surface is reachable by no user.**
+
+**What Larry is NOT doing, deliberately:** not starting the branch Cockpit to manufacture a live journey (`db.mjs` opens two production pools at module scope — the hazard Veritas avoided and that forced WO-25's architecture), not touching the live clone, not enabling any scheduled task, and not editing Veritas's receipt.
+
+**🎯 THE ONE CURRENT NEXT ACTION — execute the pre-merge repairs, then re-dispatch Gate 1 at a new frozen head.**
+
+**In order — EVERY item carries its state, because leaving later items unmarked is what made this block misdirect** *(Veritas Gate 1 @ `275ec07`: items ①②③ read `DONE` while ④–⑧ were unmarked though complete, so a fresh Larry would have read ⑦ as live and **raised a duplicate Work Order for an already-merged repair**)*:
+
+| # | Item | State |
+|---|---|---|
+| ① | Defect 1 — entry rows repointed, banner moved into the heading | ✅ **DONE** |
+| ② | Defect 4 "accepted" contradiction | ✅ **DONE** — and its **sibling occurrence repaired 2026-08-07** after Veritas found the first repair had missed it |
+| ③ | Amendment 10 ① recorded | ✅ **DONE** |
+| ④ | Row 2's stale dispositions re-cut against Amendment 5 | ✅ **DONE — all THREE.** Two named by Veritas across two gates, plus **P-TOWER**, found by Larry enumerating **by meaning** rather than by remembered wording |
+| ⑤ | Row 1 ③'s void *"next Claude WP"* alignment row | ✅ **DONE** |
+| ⑥ | Defect 5 — System-area render scenarios (**WO-29**) | ✅ **INTEGRATED @ `a00e3a3`** — 24 scenarios, 54 assertions, 7/7 mutations |
+| ⑦ | Defect 6 — `db.mjs` absolute-path repair (**WO-30**) | ✅ **INTEGRATED @ `5b1409f`**, CI gate registered @ `1c633a5`. **⛔ DO NOT RAISE A WORK ORDER FOR THIS — IT IS MERGED.** |
+| ⑧ | Row 1 ② — survival scenarios **executed**, not classified | ✅ **DONE** — delete/recreate · fresh-from-main · machine-global. **`installed-runtime restart` NOT executed — see ⑨** |
+| ⑨ | **`installed-runtime restart`** *(Veritas @ `275ec07`)* | 🔶 **HALF PROVEN, and the halves are named** — see below |
+| ⑩ | **Branch-runtime HTTP path** *(Amendment 10 ② puts the branch runtime in THIS gate)* | ✅ **EXECUTED** — see below |
+| ⑪ | **Amendment 8 Vex review** — fired, **RED**, and the exposure was **confirmed live on the running Cockpit** | ✅ **DONE** |
+| ⑫ | **WO-31 security repair** — handler extracted, origin decision on the request, 403 before body read and before forward | ✅ **INTEGRATED @ `02c4520`**, CI gate registered @ `3254c69` |
+| ⑬ | **Independent re-verification** — Vex GREEN at `3254c69`, 124 assertions, 24 bypass shapes | ✅ **DONE.** ⛔ **Conditional on R1 — see below** |
+| ⑭ | **R1 accepted by Warwick** — cross-site no-`Origin` GET remains permitted; **the GREEN assumes GET on the private upstream is NON-MUTATING** | ✅ **ACCEPTED**, verification owed at step 18 |
+| ⑮ | **R2 — belt-and-braces guard** for unsafe methods with no `Origin` | ✅ **APPLIED — WO-32 @ `4c55781`.** ⛔ **DO NOT RAISE A WORK ORDER — IT IS MERGED.** *(Repaired 2026-08-07, Veritas Gate 2 D-1 blocking: this row still read OWED after the guard shipped — the identical failure this table was repaired for at `275ec07`.)* |
+| ⑯ | **WO-31 / WO-32 / WO-33 integrated; Tower runtime aligned** | ✅ **DONE** — see the execution-log rows below |
+| ⑰ | Re-freeze, complete CI, re-dispatch Gate 1 | ⬜ **OWED** |
+
+### ✅ ⑩ BRANCH-RUNTIME HTTP PATH — EXECUTED 2026-08-07, with **ZERO production contact**
+
+**The residual Veritas named twice — *"`/api/health` has never been called over HTTP"* — is CLOSED at the branch runtime.**
+
+**How, and why it required no live credentials and no database traffic:** `/api/health` is a **static handler** (`server.mjs:519`) — it returns `BUILD` + `PROVENANCE`, both taken once at startup, and **never queries**. `pg.Pool` construction does not connect. So the branch Cockpit was started on **port 8391** against a **synthetic credentials file** pointing at `127.0.0.1:59999`, **a port nothing listens on**, with a synthetic CA. **No live credentials were read. No production database was contacted. The live Cockpit on 8090 was never touched** — re-confirmed answering `200` immediately afterwards, and the test process was killed and port 8391 verified free.
+
+| Probe | Result |
+|---|---|
+| `GET /api/health` over real HTTP | **`{"status":"ok","sha":"bf56338","dirty":true,"provenance":"dirty","sourceHash":"ef9867db…"}`** — **the WO-24 provenance fields are served over HTTP**, which is exactly what the live clone at `c1ed028` does **not** do. `dirty: true` was **correct and honest** — the worktree genuinely had uncommitted edits at that moment. |
+| `GET /api/rotation-reports` with the database unreachable | **HTTP 200**, body **`{"ok":false,"error":"The rotation reports could not be read — nothing is listening there."}`** |
+| `GET /api/no-such-route` | **HTTP 404** |
+
+**The 404-versus-truthful-failure contrast is the point.** Veritas measured `404` on the live clone and correctly concluded the route does not exist there. At the branch runtime the **same request is wired and fails truthfully**, with `ok:false` and a real reason rather than an empty list. **"No reports" and "the database is unreachable" are not collapsed** — which is Amendment 7's requirement.
+
+> **⚠️ REPORTED ONCE, not fixed, for Warwick's decision:** the truthful failure is returned with **HTTP status 200** and `ok:false` in the body. The Cockpit UI reads the body, so the surface is truthful — but **a monitor checking status codes alone would read a failed read as success.** Non-blocking, not a Work Order.
+>
+> **⛔ WHAT THIS DOES NOT PROVE:** that the endpoint returns **real rotation data over HTTP**. That needs a real database and is **owed post-merge at step 18** with the live journey. **Wiring and truthful failure are proven; correct data over HTTP is not.**
+
+### 🔶 ⑨ `installed-runtime restart` — HALF PROVEN. **The unproven half is named rather than implied.**
+
+- ✅ **PROVEN — the machine-global governor half.** Nine installed modules under `~/.mypka/governor/` (`ding`, `continuity`, `footer`, `statusline-live`, `evaluator`, `health-store`, `reorient`, `sampler`, `atomic-write`). A **brand-new process** read the installed continuity state successfully and recovered the live `focus` — *"BUILD-020 Phase 4 · Sub-phase 4B IN FLIGHT (not closed)…"*. Every invocation of these is already a fresh process, so this is the property itself, not a proxy for it.
+- ⬜ **NOT PROVEN — the installed SERVICE half**, and it is **not executable pre-merge.** Restarting the live Cockpit or the local supervisor `MyPKA-Local-Services-Live` means **touching the live runtime**, which Warwick's standing constraint forbids before an authorised merge, and the supervisor is additionally elevation-gated. **Recorded as OWED at route step 18. Not claimed, and the row-1 property is NOT asserted as met.**
+
+> ⚠️ **CI PRECISION — a correction to LARRY'S OWN REPEATED CLAIM** *(Veritas @ `3254c69`, non-blocking but it matters)*. Larry stated "all five workflows green at this exact head" at several heads this session. **That is literally true of only TWO of the five on `push`.** `governor-tests`, `control-plane-tests` and `build-002-tests` are **path-filtered on `push`** and ran only on `pull_request`, i.e. **against a merge commit, not the literal head tree.** Verified by Larry per workflow per event. **This is the estate's own "unrun CI looks like green CI" doctrine, and Larry walked into it while quoting it.** **The honest form is: two workflows green on `push` at the exact head; three green on `pull_request` against the merge commit.**
+
+> **Everything upstream of the gate is DONE and integrated.** ~~Five~~ ~~Seven~~ ~~Eight~~ **TEN** Work Orders — WO-24, WO-25, WO-26, WO-27, WO-28, WO-29, WO-30, WO-31, **WO-32, WO-33** — **all INTEGRATED and independently re-verified by Larry. NONE of them ASSURED.** *(**CORRECTED 2026-08-07 — Veritas Gate 1 Defect 4, sibling occurrence.** This row said "all **accepted**, all integrated" — the same word, in the same two meanings, that was repaired at the § ROTATION block and **missed here**. "Larry accepted the worker's return" is not "assured", and two rows using one word for both is how a false completion claim gets made without anyone lying.)* **Warwick's four ordered items of 2026-08-07 are all discharged**, including the elevation bundle, which he executed.
+
+**The remaining route, in order, and NONE of it may be skipped:**
+
+1. **Freeze one final candidate head** and **complete CI at it** (4B steps 12–13). ⚠️ An `in_progress` workflow is **NOT RUN**, never PASS — check the last result **per workflow**.
+2. **Veritas Gate 1** over rows **1, 2 and 4** — separate PASS/HOLD/FAIL per numbered requirement, no narrowing.
+3. **Veritas Gate 2** — the separate Phase / North-Star closure verdict. **Gate 1 PASS + Gate 2 HOLD is valid; do not manufacture a Phase PASS to merge.**
+4. ✅ **Bounded VEX review — DONE.** Fired, returned **RED**, repaired by **WO-31**, **re-verified GREEN**. *(Repaired 2026-08-07, Veritas D-1 — this item still described a review that had not yet run.)* ~~Amendment 8, route step **15a**. Fires only now that both Cockpit surfaces are integrated.~~ One pass, ≤~120k, closed scope, and **Warwick's "reflected CORS is a reason to inspect, not an assumed vulnerability" must be carried verbatim.**
+5. **Codex** — only when eligible, and **only with Warwick's explicit authority**.
+   > **🔴 DURABLE TRIGGER OBLIGATION — Warwick, 2026-08-07. THIS EXISTS BECAUSE IT MUST NOT LIVE IN LARRY'S MEMORY.**
+   >
+   > **Codex does NOT run because a PR opens** — that is deliberate; auto-firing on PR-open would spend an execution unbidden against the three-per-gate budget. **The gate is CHECKPOINT-TRIGGERED, and posting that checkpoint is LARRY'S OBLIGATION at this route step.**
+   >
+   > **WHEN the route reaches Codex eligibility, Larry MUST post a single PR comment containing:**
+   > - **`@tower head: <40-hex exact reviewed head>`**
+   > - **`@tower checkpoint: BUILD-020`**
+   > - **`@tower finding <id>: <disposition> — <why>` for EVERY still-open finding.**
+   >
+   > **⚠️ The findings gate is FAIL-CLOSED.** A checkpoint that does not dispose **every** open finding is **rejected**, and TowerBot shows a **BLOCK card instead of a QA round.** *(Observed 2026-08-05 on PR #94 — this is not theoretical.)*
+   >
+   > **Everything downstream is unattended and durable:** the Tower watcher autostarts from HKCU Run, is pinned to `~/.mypka/tower-runtime` (**not a worktree**), **discovers open PRs from GitHub each round with no seed**, ingests the comment on its own ~60s poll, runs real Codex, posts the cards, and **writes the verdict back onto the PR itself**. **Warwick relays nothing.**
+   >
+   > **TowerBot is DISPLAY ONLY. Codex-originated cards come from the Tower/Codex path and Larry NEVER authors, paraphrases, mirrors or reposts Codex content. Larry authors only his own disposition/action cards.**
+   >
+   > **ACCEPTANCE is the visible sequence:** **`Codex QA started` → Codex → Larry → Codex → Larry → … → final Codex verdict**, with exact PR and head provenance.
+   >
+   > **A fresh Larry after `/clear`, and the NEXT PR, must recover this obligation FROM THIS BLOCK — not from anyone's memory and not from Warwick prompting.** *(This paragraph is the durability control. There is no mechanism behind it and none is wanted; it is a written obligation on the route, which is where Warwick placed it.)*
+   >
+   > **⚠️ KNOWN LIMITATION, recorded ONCE by his ruling 3 — DO NOT BUILD FOR IT.** **Watcher death is SILENT.** A `watcher_heartbeat` row is written but is read only by a manual CLI, so if the process dies TowerBot simply goes quiet — **indistinguishable from "no QA running".** **No supervisor and no additional monitoring is to be added in this build unless normal operation demonstrates it is actually required** (Warwick, explicit). **If an expected card does not appear within a few minutes, check the watcher process before assuming Codex is merely slow.**
+6. **Merge decision pack to Warwick** (`merge-decision`).
+7. **After authorised merge:** execute [[Deliverables/2026-08-07-cockpit-live-migration-and-rollback-plan]]. **🔴 Its §3 preconditions are binding, especially precondition 5 — no scheduled task may be enabled against the live clone until that clone carries the code the task assumes.**
+8. **The Phase does not close on the merge alone** — both parts of the final acceptance still stand: **(A) durability** of every load-bearing BUILD-020 outcome, and **(B) reproducible creation of a NEW Build Wayfinder** by a genuinely fresh Larry. Both by Larry and by Veritas.
+
+**✅ STEP 11 — MAP NAVIGATION RECONCILIATION: DONE, 2026-08-07.** Executed as a read-only enumeration of every statement in this map capable of directing a fresh Larry's next action, then repaired by Larry (Amendment 6 ② assigns the repair to Larry by name). **Two Category-C unsafe statements found and fixed:** ① this section's own sibling heading carried the phrase *"THE ONE CURRENT NEXT ACTION"* **verbatim twice**, the second describing an already-complete rotation; ② the 18-step 4B route was a flat unannotated checklist under *"This is what the fresh Larry owns"*, which invited re-execution of finished work. **Two Category-D ambiguous statements also marked:** the stale *"Not started"* `/rotate` row in §17.5, and the two unbannered Phase 2 top-level headings (§13, §14). **The lesson repeats itself: the previous repair's own wording reintroduced the defect it was written to prevent.**
+
+**🔶 STEP 9 — the reduced Veritas Gate 3 enumeration check: PARTIAL, and stated honestly.** The enumeration requirement is **carried explicitly in this session's Gate 1 dispatch**, so this gate performs it. **The durable half is NOT done:** Amendment 6 ① says the check *"belongs in the existing Veritas Gate 3 surface"*, which means an edit to `Team/Veritas - Internal Quality and Truth Assurance/AGENTS.md` — a **canonical specialist contract**, which root `CLAUDE.md` gates behind **Warwick's explicit approval of the patch itself**, an exact redline, and independent review. **Larry has NOT applied it and will not apply it unilaterally.** Gate 3 today carries only the weaker bar at line 109 (*"No PASS while an active document would send a fresh Larry … down a superseded route"*) — a prohibition, not an enumeration deliverable. **The exact redline is owed to Warwick in the merge decision pack.** ⚠️ **Until then this check lives in a dispatch Larry writes — which is precisely the condition root `CLAUDE.md` § *"Nothing may live only in Larry's head"* exists to name. Recorded as a known limit, not papered over.**
+
+<details><summary>DISCHARGED — the 2026-08-07 Sub-phase 4A rotation steps (record only, directs nothing)</summary>
+
+**Warwick, 2026-08-07: *"No more assurance loops tonight."***
+
+> **🔴 THE ASSURANCE BOUNDARY — settled, and it stops a regress.**
+> **The Veritas PASS proves Sub-phase 4A. The established rotation controls prove the handover. They are different responsibilities and do not recursively assure each other.**
+> Commits after `c50d8cb` load the **already-authorised** 4B handover, apply the **non-blocking** corrections Veritas itself identified, and prepare the normal rotation transaction. **They do not require another Veritas review merely because the head advances** — every fix to satisfy a review moves the head, which would demand another review, forever.
+> **The earlier PASS must never be described as having reviewed later commits. Its reviewed head is `c50d8cb` and that is recorded truthfully wherever it is cited.**
+
+1. **Pax delivers the session performance report** (`/rotate` step 5) → commit report + payload.
+2. **Load** the Sub-phase 4B Work Package, the final two-part Phase acceptance, and the ~~**Asdair jumping-over point**~~ ⛔ **— the Asdair hop is NO LONGER the next hop. Superseded by AMENDMENT 11: SUB-PHASE 4C comes first.** *(This block is discharged and directs nothing; the strike is here so the phrase cannot be read as a live route even in a record.)*
+3. **Complete the remaining `/rotate` transaction** — report pointer in the map · Supabase population **recorded truthfully, success or visible failure** · Honcho publish through the **installed** write path · read-back through the **installed** reader.
+4. **Record the final head truthfully**, without stretching the `c50d8cb` PASS over it.
+5. **Verify the read-back matches on all six:** **map · Phase · `focus` · active package · exact head · exact next action.**
+6. **All seven normal rotation safety bars.**
+7. **Return `SAFE TO CLEAR`** — and `/clear` only then.
+
+</details>
+
+**Veritas is dispatched again ONLY if** `/rotate` exposes an actual contradiction · the read-back points at the wrong route · or a new active instruction materially conflicts with Sub-phase 4B.
+
+**Sub-phase 4A takes NO Codex and NO merge.** **Everything else — Cockpit banking, scheduled-task apply, Codex, merge, install alignment, Proofline closure — belongs to Sub-phase 4B**, whose full 18-step route and **final two-part Phase acceptance** are in [[Deliverables/2026-08-07-subphase-4A-closure-and-4B-handover]]. **Do not start 4B work in 4A.**
+
+### 📌 ROTATION (this `/rotate`)
+
+| | |
+|---|---|
+> ⛔ **THE ROWS BELOW DESCRIBE THE PREVIOUS (GROK) ROTATION AND ARE STRUCK — Veritas F6, blocking.** `rotate.md` step 11 verifies the Honcho read-back against **this block's** report pointer and closing head, so a stale block would have been checked against and passed. **This rotation's rows are above them.**
+
+| **THIS rotation — Sub-phase 4B in-flight, 2026-08-07** | |
+|---|---|
+| **Rotate at** | **2026-08-07 (Claude host)** · in-flight rotation, **not** a Sub-phase close |
+| **Closing head** | **`7ba504aaec6ea61f06f8b2dea241db1fc3bf2d96`** |
+| **Session report (Pax)** | **`Deliverables/2026-08-07-session-performance-report-subphase-4b.md`** — written by Pax, not Larry |
+| **Payload** | **`Deliverables/2026-08-07-session-report-payload-subphase-4b.json`** — same session, branch and closing head |
+| **Supabase** | **POPULATED and verified** — rotation id `1342ce9a-c4fa-406f-b2cc-d3f6b61d5e57`, durable log line in `~/.mypka/governor/session-report-populate.jsonl`. Confirmed through the **live read path**: 8 reports, this one newest. |
+| **Delivered this session** | **WO-24, WO-25, WO-26, WO-27, WO-28 — all five INTEGRATED. NONE of them ASSURED.** Cockpit provenance · the rotation-report mirror, grant and endpoint · the System-tab surface and its accessibility repairs · durable YouTube capture · writer idempotency. *(**CORRECTED 2026-08-07 — Veritas Gate 1 Defect 4.** This row read "all five **accepted** and integrated" while the row two below read "Nothing integrated this session is **accepted** … and none of it may be described that way." **"Accepted" here meant "Larry accepted the worker's return", two lines from a row using it to mean "assured".** The same word carrying two meanings in one table is how a false completion claim gets made without anyone lying. The Larry-side meaning is now stated as what it is.)* |
+| **CI position, stated honestly** | **NOT RUN at the rotation head.** All five workflows were `in_progress` at `8444679`. The last complete green was `cockpit-private-apps` at `b0c3b2b`. **Under estate doctrine an `in_progress` workflow is NOT RUN, never PASS** — 4B step 13 still requires complete CI at its own frozen head. |
+| **Assurance position** | ➡️ **SEE § ASSURANCE STANDING — the single source.** *(This row has now gone stale TWICE. It is a pointer from here on; do not restate gate standing in it.)* **What remains true and is NOT a standing claim: nothing integrated in Sub-phase 4B is accepted, complete or merge-ready, and none of it may be described that way.** |
+| **Next package** | **Veritas Gate 1 over rows 1, 2 and 4** — see § ACTIVE SESSION WORK PACKAGE → `🎯 THE ONE CURRENT NEXT ACTION` |
+
+> **⚖️ TWO WORKER BOUNDARY BREACHES, recorded here because Pax established they existed in NO committed artefact.** Both self-reported by the worker, both verified nil-impact by Larry, both closed.
+> 1. **Felix breached the no-git boundary** (his order granted no git endpoint). He ran `git stash`/`pop`, which popped a **pre-existing repo stash** and left conflict markers in two `services/control-plane/` files outside his surface, then repaired with `git restore`. **Verified: all three stashes present and unchanged** (a conflicting `pop` does not drop), **both files byte-identical to their committed blobs**, live clone untouched. **Nothing was lost** — the content still lives in `stash@{0}`.
+> 2. **Keel breached `private_surface: none`, `network: none` and `live_authority: none`** by importing `watch-captures.mjs` during preflight; its **unguarded top-level `main()`** read the gateway env, connected to production Postgres and ran a scan pass. **Verified: 0 rows created, 0 notifications** (last nudge 2026-07-27), live clone unchanged, **no secret content in any artefact**. He fixed the root cause, which was in his surface.
+>
+> **🔴 Pax then disproved Larry's reading of the cause.** Larry called import-side-effects "an estate property". **They are not:** entry guards appear **192 times across 170 files** under `services/` — the guard **is** the idiom. **`services/cockpit/db.mjs` is the outlier and is STILL UNGUARDED** (lines 16 and 18, two production pools at module scope). **Two of the three incidents trace to that one 22-line file**, and it has now forced architecture in two consecutive Work Orders. *That is a specific, fixable defect, not a cultural one.*
+
+| **THIS rotation — Sub-phase 4A close** | |
+|---|---|
+| **Rotate at** | **2026-08-07 (Claude host)** |
+| **Sub-phase** | **4A — closed for assurance. NO Codex, NO merge.** |
+| **Veritas 4A PASS — exact reviewed head** | **`c50d8cb48d4c536952e07ccf32f94bbc4061e615`** · receipt `Deliverables/2026-08-07-veritas-subphase-4a-c50d8cb-receipt.md`. **This PASS reviewed THIS head and no later commit.** Two prior FAILs at `2cf3673` and `52427cd` stand as true verdicts about those heads. |
+| **Rotation head** | recorded at commit — **a descendant of the reviewed head, carrying the 4B load, the non-blocking D-10/11/12/14/15 corrections and the rotation transaction.** **NOT reviewed by the 4A PASS, and not claimed to be.** Assured instead by the rotation controls: Honcho read-back on six fields + the seven safety bars. |
+| **Session report (Pax)** | **`Deliverables/2026-08-07-session-performance-report-subphase-4a.md`** — written by Pax, not Larry |
+| **Payload** | **`Deliverables/2026-08-07-session-report-payload-subphase-4a.json`** — same session, branch and closing head |
+| **Closure record** | [[Deliverables/2026-08-07-subphase-4A-closure-and-4B-handover]] |
+| **CI position, stated honestly** | All four workflows **`completed success` at `ccb4132`**. **That green does NOT travel forward to the rotation head**, which is a later commit. **4B step 13 requires complete CI at its own frozen exact head** — and under estate doctrine an `in_progress` workflow is **NOT RUN**, never PASS. |
+| **Next package** | **Sub-phase 4B** — see § ACTIVE SESSION WORK PACKAGE and the closure record's Part 3 |
+
+| ~~Previous rotation (Grok) — struck~~ | |
+|---|---|
+| ~~**Rotate at**~~ | ~~2026-08-06 (Grok Build host)~~ |
+| ~~**Session freeze / product tip for report**~~ | ~~`6b485079ca618c46e68fe1755eb99065ea85bb44` — CareerAIR Zapier MCP Outlook blocker banked; auto collection NOT LIVE~~ |
+| ~~**Session report (Pax)**~~ | ~~`Deliverables/2026-08-06-session-performance-report-rotate-careerair-mcp.md`~~ |
+| ~~**Payload**~~ | ~~`Deliverables/2026-08-06-session-report-payload-rotate-careerair-mcp.json`~~ |
+| ~~**Rotate banking commits**~~ | ~~this map update + report artefacts~~ |
+
+### 📌 SUB-PHASE 4B — the next package. **This is what the fresh Larry owns.**
+
+> ⛔ **The Grok-era "NEXT WORK PACKAGE" block is struck below** (Veritas D-10 — it was the weakest remaining point in the map, still saying *"do not execute in this Grok session"*). **Replaced, not merely annotated.**
+
+**Sub-phase 4B is the FINAL BUILD-020 closeout.** Full 18-step route and both parts of the final Phase-level acceptance: [[Deliverables/2026-08-07-subphase-4A-closure-and-4B-handover]] Part 3. In short:
+
+> 🔴 **DO NOT START THIS LIST AT STEP 1.** Per-step state, evidenced in the § SUB-PHASE 4B EXECUTION LOG above — **claimed only where the log actually evidences it:**
+>
+> | Steps | State |
+> |---|---|
+> | **1** | ✅ DONE — descoped hooks proven not to fire, four dispatches, zero false injections |
+> | **2, 3** | ✅ DONE — Warwick executed the elevation bundle; `CareerAIR-Graph-Collect` still reports `LastTaskResult = 2`. ⚠️ **`MyPKA-YouTube-Watcher-Ensure` remains `Disabled` ON PURPOSE** |
+> | **4, 5 (both halves)** | ✅ DONE — WO-24 · WO-25 · WO-26 integrated |
+> | **6, 7** | ⚠️ **NOT ESTABLISHED IN THIS SESSION.** Not claimed. Gate 1 grades them on evidence, not on this row |
+> | **8** | ✅ DONE — plan committed at `7ba504a`, **PLAN ONLY, not executed** |
+> | **9** | 🔶 **PARTIAL** — the enumeration is carried explicitly in the Gate 1 dispatch. **The durable Gate 3 contract redline is NOT applied** — editing a canonical specialist `AGENTS.md` needs Warwick's approval of the patch. **Owed to him in the merge decision pack** |
+> | **10** | ✅ DONE — Amendment 6 ④ |
+> | **11** | ✅ DONE — this repair, 2026-08-07 |
+> | **12, 13** | ✅ DONE at the head this repair produces — CI must be complete **at that exact head** |
+> | **14** | 🎯 **THE CURRENT NEXT ACTION** — stated once, above, under `🎯 THE ONE CURRENT NEXT ACTION` |
+> | **15a** | ✅ **DONE** — Vex RED → WO-31 → Vex GREEN |
+> | **15, 16, 17, 18** | ⬜ OWED, in that order |
+>
+> *(Repaired 2026-08-07, route step 11: this list was previously flat and unannotated under a heading reading "This is what the fresh Larry owns", which invited a fresh session to re-execute finished work.)*
+
+1. Prove the descoped reminder hooks **no longer load or fire** after a genuinely fresh session.
+2. Apply the four scheduled-task hidden-launcher changes **through Warwick's bounded action** (`Set-ScheduledTask` is blocked by the host classifier for Larry and specialists alike).
+3. Prove **natural** fires preserve exit codes, logs, failure visibility and rollback — **`CareerAIR-Graph-Collect` must still report `LastTaskResult = 2`**.
+4. Regenerate WO-24 **through `tools/wo/envelope.mjs`** and issue it.
+5. Rescue and bank the Cockpit changes **without mutating the live dirty clone**. **⊕ EXTENDED BY AMENDMENT 7: build the Session / Rotation Reports surface on the existing System tab, fed from `session_report.*` through the existing private API bridge — nine executed acceptance criteria, and it must be carried through the rescue, provenance and post-merge live-migration plan (step 18).**
+6. Truthful `/api/health` provenance **without importing the DB-opening server module in tests**.
+7. Disposition `pg` and the untracked files. 8. Prepare Cockpit migration + rollback — **do not restart or move it** before merge authority.
+9. Implement the reduced **Veritas Gate 3 enumeration check**. 10. Confirm `focus` in `/rotate` read-back.
+11. Reconcile all active map navigation after the final work. 12. Freeze one final candidate head. 13. Complete CI at it.
+14. Fresh Veritas over the **complete remaining functional scope** (rows 1, 2, 4). 15. **Separate Phase / North-Star closure verdict.**
+**15a. ⊕ AMENDMENT 8 — one bounded VEX security review of the final live-facing Cockpit boundary, AFTER both the WO-24 work and the `/api/rotation-reports` + System-tab surface are integrated, and BEFORE Codex. Closed scope, GREEN/YELLOW/RED, one pass. Verdict and any proposed repair go to Warwick before any scope expands.**
+16. Codex **only when eligible**. 17. Full merge decision pack to Warwick. 18. After authorised merge: verify remote+local merged state · align installed/runtime from canonical merged Git · move the live Cockpit safely · prove truthful provenance · prove no feature-branch/worktree/old-session dependency · clean the estate.
+
+**🔴 The Phase does not close on step 18 alone.** Final acceptance must ALSO answer both parts of Warwick's question — **(A) durability** of every load-bearing BUILD-020 outcome, and **(B) reproducible creation of a NEW Build Wayfinder** by a genuinely fresh Larry, without copying the Proofline map or rebuilding the method from chat. **Both, by Larry and by Veritas.** See the closure record.
+
+**Standing:** Sub-phase 4A's PASS is **4A's only**. It is **not** a Phase verdict, does **not** grade rows 1/2/4, and **4B inherits no standing from it** — 4B is assured on its own evidence at its own head, or not at all. ➡️ **Gate standing: SEE § ASSURANCE STANDING — the single source.** *(This sentence claimed HOLD @ 19fc792, an enumeration PASS and an un-dispatched Gate 2 — false in every clause by `b62a9fc`. Veritas D-1. Replaced with a pointer rather than another restatement.)*
+
+> ~~### 📌 NEXT WORK PACKAGE (record only — do not execute in this Grok session)~~
+> ~~Warwick launches a fresh Claude Code session after the present merge decision. That package will: start from updated main or explicitly approved post-merge state; align/install the identified Claude hook in the canonical Claude host/worktree; prove the live Claude return-cue journey from the merged source; run fresh-main orientation acceptance; verify installed-runtime/source alignment; complete any genuine residual explicitly carried by Veritas Gate 2; seek final Phase 4 closure where warranted.~~
+> ~~Name exact residuals, evidence and next actions into this section when Gate 2 returns.~~
+> ⛔ **Struck 2026-08-07.** The hook line is void — the reminder system is **descoped and disabled** (Amendment 5).
+
+### 📌 Parked (not this WP)
+
+**V4-9** · **C-1..C-9, C-11..C-15** · legacy `C:/.fusion247/larry-ding.mjs` · ~~reminder-hook A/B/C product choice~~ **⛔ MOOT — the reminder system is descoped and disabled (Amendment 5); there is no product choice left to make** · **next-WP Claude host hook install — ⛔ NEITHER PARKED NOR IN SCOPE: the outcome was WITHDRAWN by Amendment 5.** *(Re-cut 2026-08-07, Veritas Gate 1 @ `443d0fa`. This line said "⊖ UNPARKED by Amendment 3 — now inside row 1", which was true for one day and then contradicted by Amendment 5. **A withdrawn outcome is not parked work; parking implies it could come back.**)*

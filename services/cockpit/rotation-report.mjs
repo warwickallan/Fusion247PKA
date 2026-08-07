@@ -1,0 +1,278 @@
+// Fusion247 Cockpit — the rotation performance reports, read out of the session_report mirror.
+//
+// Git stays the durable SSOT: the human-readable report is the Markdown Deliverable. Supabase is a
+// QUERYABLE MIRROR of the same evidence, and this module is the only thing that turns that mirror
+// into the shape the System tab renders. It is not a second report and it is not a third store.
+//
+// ── WHY THIS IS ITS OWN MODULE, WITH THE QUERY INJECTED ──────────────────────────────────────────
+// `server.mjs` imports `db.mjs`, which constructs two live Postgres pools AT MODULE LOAD. Anything
+// that imports `server.mjs` therefore opens production connections just by being loaded, which means
+// it cannot be executed inside a gate. So the read logic lives here, takes its `query` function as an
+// argument, and imports nothing that touches a database. `rotation-report-check.mjs` proves that by
+// recording every module the process actually loads and asserting `db.mjs` is not among them — the
+// same construction as `provenance.mjs` / `provenance-check.mjs`, and the same reasoning that pulled
+// `static.mjs` and `down-reason.mjs` out before them.
+//
+// ── THE PROPERTY THIS FILE EXISTS TO HOLD ────────────────────────────────────────────────────────
+// Warwick, verbatim: "Do not convert missing values into zero. 'Unknown,' 'not established' and zero
+// are materially different."
+//
+// A SQL NULL must arrive at the browser as JSON `null`. Never `0`, never `"0"`, never `""`, never
+// `"unknown"`, and never as an absent key. The 4A rotation is the case that makes this concrete: it
+// holds `wo_first_dispatch_success = 0` — a TRUE zero, nought Work Orders survived first read-back —
+// sitting in the same row as `elapsed_minutes = null` and `total_context_tokens_in = null`, which are
+// TRUE unknowns nobody ever measured. Rendering those three identically would be a lie in both
+// directions at once: it would invent a measurement, and it would hide a real failure behind it.
+//
+// Every conversion below is written to fail towards `null`. `Number('')` is 0 in JavaScript and
+// `Number(null)` is 0 as well, so the guards in `num()` are the load-bearing lines of this file.
+
+import { whyDown } from './down-reason.mjs';
+
+/**
+ * ORDERING. `created_at` descending, and the choice is deliberate rather than incidental.
+ *
+ * `session_date` is a DATE. Two rotations closed on the same day tie, and a tie has no defined order
+ * — so "most recent first" would silently become "arbitrary among today's rotations", which is
+ * exactly the kind of nondeterminism that reads as a rendering bug months later. `created_at` is a
+ * timestamptz written by the database at insert time, so it totally orders the rows and cannot be
+ * affected by the producer's clock or timezone.
+ */
+export const ROTATION_ORDER_BY = 'created_at desc';
+
+/**
+ * `select *` rather than an explicit column list, and this is a fail-soft decision.
+ *
+ * The columns this reader wants are added by a forward-only migration that a human applies. Between
+ * deploying this code and applying that migration, an explicit list would raise `42703 undefined
+ * column` and take the whole endpoint down. `select *` instead returns the columns that do exist, the
+ * absent ones map to `null`, and the UI honestly reports "not established" until the migration lands.
+ * Unknown is the correct answer to "what is this column's value" when the column is not there yet.
+ */
+export const ROTATION_SQL = `select * from session_report.rotation order by ${ROTATION_ORDER_BY}`;
+
+/** Specialist rows for a known set of rotations. Ordered so the nested arrays are stable. */
+export const SPECIALIST_SQL =
+  'select * from session_report.specialist_dispatch where rotation_id = any($1::uuid[]) order by specialist asc';
+
+/**
+ * Postgres failures, in words, WITHOUT the driver's message.
+ *
+ * `err.message` is never read here. A pg error message can carry a host, a role name or a connection
+ * detail, and this string is rendered in a browser. SQLSTATE is a fixed five-character code that
+ * carries no deployment detail, so it can be mapped safely; anything unrecognised falls through to
+ * `whyDown()`, which is already the house resolver and also never reads `message`.
+ */
+export const SQLSTATE_REASONS = Object.freeze({
+  '42501': 'the cockpit’s read role has not been granted access to it',
+  '3F000': 'the session_report schema does not exist yet',
+  '42P01': 'the rotation tables have not been created yet',
+  '42703': 'the schema change adding the newer columns has not been applied yet',
+  '28000': 'the cockpit’s database role was rejected',
+  '28P01': 'the cockpit’s database role was rejected',
+  '53300': 'the database refused another connection',
+  '57P03': 'the database is still starting up',
+});
+
+/** @returns {string} A phrase that completes "… — <this>." Never carries a DSN, host, role or path. */
+export function readFailure(e) {
+  if (e && typeof e === 'object' && typeof e.code === 'string' && SQLSTATE_REASONS[e.code]) {
+    return SQLSTATE_REASONS[e.code];
+  }
+  return whyDown(e);
+}
+
+/**
+ * A JSON number, or null. THE central guard of this module.
+ *
+ * `numeric` and `bigint`/int8 both arrive from `pg` as STRINGS — numeric because it is arbitrary
+ * precision, int8 because it can exceed Number.MAX_SAFE_INTEGER. Both must become JSON numbers for
+ * the contract, and null must survive that conversion untouched.
+ *
+ * The two traps, both of which produce a plausible-looking 0:
+ *   - `Number(null)` is 0;
+ *   - `Number('')` is 0.
+ * Hence the explicit null/undefined guard first and the empty-string guard second. `'0'` reaches
+ * `Number` and correctly becomes 0, because that is a real value.
+ */
+export function num(v) {
+  if (v === null || v === undefined) return null;
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+  const s = String(v).trim();
+  if (s === '') return null;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** A string, or null. An absent value stays absent — it never degrades to ''. */
+export function str(v) {
+  if (v === null || v === undefined) return null;
+  return String(v);
+}
+
+/** A jsonb value, or null. NULL here means "never recorded" and is not the same as `[]` or `{}`. */
+export function jsonOrNull(v) {
+  return v === null || v === undefined ? null : v;
+}
+
+/** A jsonb LIST column. Its schema default is `[]`, so an empty list is a real answer: "none". */
+export function jsonList(v) {
+  if (Array.isArray(v)) return v;
+  return v === null || v === undefined ? [] : v;
+}
+
+/**
+ * An ISO instant, or null. `timestamptz` arrives from `pg` as a JS Date; a Date without a driver
+ * (a fixture, or a row read through PostgREST) arrives as a string and is passed through.
+ */
+export function toIso(v) {
+  if (v === null || v === undefined) return null;
+  if (v instanceof Date) return Number.isNaN(v.getTime()) ? null : v.toISOString();
+  return String(v);
+}
+
+/**
+ * A calendar date as `YYYY-MM-DD`, or null.
+ *
+ * NOT `toISOString().slice(0, 10)`. `pg` parses a DATE into a Date at LOCAL midnight, so converting
+ * it through UTC shifts the day backwards for every host east of Greenwich — the row would say
+ * 2026-08-06 for a rotation that closed on the 7th. The local field accessors round-trip exactly
+ * what the driver built, on every offset.
+ */
+export function toDateString(v) {
+  if (v === null || v === undefined) return null;
+  if (v instanceof Date) {
+    if (Number.isNaN(v.getTime())) return null;
+    const p = (n) => String(n).padStart(2, '0');
+    return `${v.getFullYear()}-${p(v.getMonth() + 1)}-${p(v.getDate())}`;
+  }
+  return String(v).slice(0, 10);
+}
+
+/** One specialist_dispatch row → the contract's nested shape. */
+export function mapSpecialist(row) {
+  return {
+    specialist: str(row.specialist),
+    dispatches: num(row.dispatches),
+    tokensIn: num(row.tokens_in),
+    tokensOut: num(row.tokens_out),
+    notes: str(row.notes),
+  };
+}
+
+/**
+ * The rotation's total specialist dispatches — a SUM, and sums are where "unknown" quietly becomes
+ * zero.
+ *
+ * No rows at all → null. Not 0: nothing was recorded, so the total is not established. (The empty
+ * ARRAY still ships as `[]` under `specialists`; that says "no rows", while this says "no total".)
+ *
+ * A row whose `dispatches` is null → the whole sum is null. Adding 0 for the unknown member would
+ * produce a total that looks measured and is not. The column is `not null` today, so this branch
+ * should be unreachable in production — it is here because the property must hold by construction
+ * rather than by a constraint someone could later relax.
+ */
+export function sumDispatches(specialists) {
+  if (!Array.isArray(specialists) || specialists.length === 0) return null;
+  let total = 0;
+  for (const s of specialists) {
+    if (s.dispatches === null || s.dispatches === undefined) return null;
+    total += s.dispatches;
+  }
+  return total;
+}
+
+/** One rotation row plus its specialist rows → one entry of the frozen API contract. */
+export function mapRotation(row, specialistRows = []) {
+  const specialists = (Array.isArray(specialistRows) ? specialistRows : []).map(mapSpecialist);
+  const closingHead = str(row.closing_head);
+  return {
+    id: str(row.id),
+    createdAt: toIso(row.created_at),
+    sessionDate: toDateString(row.session_date),
+    host: str(row.host),
+    hostVersion: str(row.host_version),
+    branch: str(row.branch),
+    closingHead,
+    // Derived, never stored twice. Null head → null short head, rather than a '' that looks like a sha.
+    closingHeadShort: closingHead === null ? null : closingHead.slice(0, 7),
+    mapPath: str(row.map_path),
+    deliverablePath: str(row.deliverable_path),
+    elapsedMinutes: num(row.elapsed_minutes),
+    contextTokensIn: num(row.total_context_tokens_in),
+    contextTokensOut: num(row.total_context_tokens_out),
+    subagentTokens: num(row.total_subagent_tokens),
+    specialistDispatches: sumDispatches(specialists),
+    // Any member may be null, and 0 and null are different answers. `total` is the STORED denominator
+    // written by populate.mjs; it is never re-derived here from the three outcome counts beside it.
+    workOrders: {
+      total: num(row.wo_total),
+      firstDispatchSuccess: num(row.wo_first_dispatch_success),
+      amendments: num(row.wo_amendments),
+      refusals: num(row.wo_refusals),
+    },
+    lines: {
+      docChanged: num(row.doc_lines_changed),
+      productChanged: num(row.product_lines_changed),
+    },
+    gitStat: jsonOrNull(row.git_stat),
+    allocation: {
+      productPct: num(row.allocation_product_pct),
+      adminPct: num(row.allocation_admin_pct),
+      evidencePct: num(row.allocation_evidence_pct),
+      reworkPct: num(row.allocation_rework_pct),
+      waitingPct: num(row.allocation_waiting_pct),
+    },
+    findings: jsonList(row.findings),
+    unestablished: jsonList(row.unestablished),
+    notes: str(row.notes),
+    specialists,
+  };
+}
+
+/**
+ * The reports, most recent first. Throws whatever the query function throws — the caller below turns
+ * that into words.
+ *
+ * @param {(text: string, params?: unknown[]) => Promise<{rows: any[]}>} query
+ */
+export async function rotationReports(query) {
+  const rotations = await query(ROTATION_SQL);
+  const rows = (rotations && rotations.rows) || [];
+  if (rows.length === 0) return [];
+
+  const ids = rows.map((r) => r.id).filter((id) => id !== null && id !== undefined);
+  let specialistRows = [];
+  if (ids.length > 0) {
+    const specialists = await query(SPECIALIST_SQL, [ids]);
+    specialistRows = (specialists && specialists.rows) || [];
+  }
+
+  // Grouped in one pass. A rotation with no specialist rows gets [] — an empty array, never null and
+  // never an error, because "this rotation dispatched nobody" is a normal and reportable outcome.
+  const byRotation = new Map(rows.map((r) => [String(r.id), []]));
+  for (const s of specialistRows) {
+    const bucket = byRotation.get(String(s.rotation_id));
+    if (bucket) bucket.push(s);
+  }
+
+  return rows.map((r) => mapRotation(r, byRotation.get(String(r.id)) || []));
+}
+
+/**
+ * What `GET /api/rotation-reports` returns, verbatim.
+ *
+ * The endpoint returns exactly this object, so what the gate executes and what Warwick sees are one
+ * construction rather than two that have to be kept in step — the `provenancePayload()` precedent.
+ *
+ * A database failure comes back as HTTP 200 with `{ ok: false, error }`, the house pattern
+ * (server.mjs:261/263/266/277/279/282). It never throws, so it can never take another route down with
+ * it, and the sentence is built from SQLSTATE alone so it cannot carry a DSN, host, role or path.
+ */
+export async function rotationReportsResponse(query) {
+  try {
+    return { ok: true, reports: await rotationReports(query) };
+  } catch (e) {
+    return { ok: false, error: `The rotation reports could not be read — ${readFailure(e)}.` };
+  }
+}

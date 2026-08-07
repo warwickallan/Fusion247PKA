@@ -1,0 +1,9 @@
+{
+  "checkpoint_id": "build-020-phase4-pr97-wo-pass3",
+  "build_id": "BUILD-020",
+  "wp_id": "phase4-wo-generator",
+  "brief_ref": "Deliverables/2026-08-06-veritas-build020-gate1-pass-a1e124a-receipt.md",
+  "summary": "tools/wo envelope generator: G-1..G-6 implemented with machine_surface validation; J1-1 is discipline+REFUSE not auto-invoke; hermetic tests; no phase-complete claim in README.",
+  "brief_excerpt": "Prior F-1: README no longer claims Phase 4 defects closed. Acceptance: G-1..G-6; absolute machine_surface + live_authority; hermetic tests; no secrets; no control plane; no phase-complete claim.",
+  "scoped_to": ["tools/wo/**"]
+}

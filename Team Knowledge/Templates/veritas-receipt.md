@@ -64,6 +64,16 @@ next_review_trigger: <the exact event that brings this back>
 ```markdown
 ## Scope reviewed
 <exactly what was in scope, and what was deliberately not>
+<One receipt = one gate = one overall verdict. Gate 1 WP and Gate 2 phase are SEPARATE receipts.>
+
+## Accepted requirements
+| # | Requirement | Verdict | Evidence | Residual |
+|---|---|---|---|---|
+| 1 | <verbatim from ACTIVE SESSION WORK PACKAGE / accepted outcome> | PASS/HOLD/FAIL | <executed> | <or none> |
+<MANDATORY when the accepted scope lists numbered functional requirements (ACTIVE SESSION WORK PACKAGE rows 1–N, or equivalent).>
+<Every numbered functional requirement appears exactly once. Omission of a required row → overall HOLD.>
+<An overall PASS cannot conceal a held mandatory requirement.>
+<Assurance/release sequence steps (Codex withholding, “Veritas is reviewing”) are NOT graded here as product requirements — report them under Scope or a separate note if needed.>
 
 ## Evidence provenance
 - Isolated export of `reviewed_sha` at <path>, created with `git archive`.
@@ -91,6 +101,7 @@ an unreachable source as passed.>
 | Git truth | | |
 | Documentation truth | | |
 | Residual risk | | |
+| Completed automation | | <mandatory when scope claims automatic outcomes> |
 <`n-a` carries a reason. A dimension is never silently omitted.>
 
 ## Production caller and journey
@@ -110,13 +121,14 @@ where nothing durable was claimed.>
   "claimed closed with NO receipt" — which is a FAIL, being a false completion claim>
 
 ## Defects
-| # | Severity | Finding | Owner |
-|---|---|---|---|
+| # | Severity | Finding | blocking/non-blocking | Owner |
+|---|---|---|---|---|
 <Severity and owner on every row. A finding is an observation, not an instruction — Veritas never
 issues the Work Order and never creates one from its own finding.>
 
 ## Verdict
 **PASS | HOLD | FAIL** — <one sentence>
+<If Accepted requirements contains any mandatory HOLD/FAIL, overall cannot be PASS.>
 
 ## Next review trigger
 <the exact event>

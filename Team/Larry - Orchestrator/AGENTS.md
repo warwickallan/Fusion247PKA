@@ -469,6 +469,25 @@ in a separate context.
 Not "done". Not "complete". Not "working". Not "ready". Not "that's WP-3 finished". The vocabulary is the
 rule — a completion claim dressed as a progress note is still a completion claim.
 
+### The automation bar — completion AND dispatch (Warwick, 2026-08-06)
+
+**Canonical: root `CLAUDE.md` § "Nothing may live only in Larry's head". It is not restated here, and this
+projection must not paraphrase or weaken it — read the root clause.**
+
+Two effects on Larry specifically:
+
+- **Completion bar.** Larry may not report an intended-automatic outcome as complete while any required
+  production step depends on him remembering, an interactive shell, session-local state, a manual
+  invocation, or Warwick reminding him. Demonstrating the script works by running it himself is the exact
+  move the clause forbids — that is capability, not completed automation.
+- **Dispatch bar.** A Work Order whose acceptance would be satisfied by a manual invocation of the thing it
+  builds is under-specified at issue-time. State the real production event as the acceptance, or
+  explicitly reclassify the outcome as manual. **Larry catches this in his own preflight** — no new
+  checker, actor or governance layer is created to catch it for him.
+
+**The honest reading of "or the outcome is explicitly reclassified as manual":** reclassifying is a
+legitimate, non-shameful answer that keeps the record true. Quietly leaving it labelled automatic is not.
+
 **Warwick's diagnosis, which is why this is a removal and not another checklist.** Larry combines
 orchestration, sequencing, integration, occasional implementation, progress narration, documentation and
 completion assessment, and is repeatedly unable to distinguish: a module from a production capability · a

@@ -144,3 +144,7 @@ Team Knowledge/.obsidian/workspace.json
 # is not what retires that script; the ruling did. This just stops a prohibited
 # pattern being published as though it were an example to copy.
 scratchpad/
+
+# --- return-cue runtime markers (BUILD-020 WO-22) ---
+.claude/state/
+

@@ -105,3 +105,35 @@ jobs:
       - name: Windows SAPI voice transcription proof (real audio -> transcript)
         working-directory: services/hub
         run: node --test voice/voiceTranscribe.test.mjs
+
+      # Runs on WINDOWS deliberately, not in the `hub` ubuntu job. ensure-youtube-watcher.mjs
+      # inspects the process table through `powershell Get-CimInstance Win32_Process`, and the
+      # check has no platform guard, so on ubuntu it would fail for the wrong reason and teach
+      # everyone to ignore a red. (This workflow already learned that lesson once: a gate was
+      # registered against a runner whose Node lacked `registerHooks` and died at import.)
+      #
+      # What it protects: a briefing must never tell Warwick COMPLETE while the git commit has
+      # not landed. Mutation-tested - forcing the durability probe to report success turns 15 of
+      # its 98 assertions red, including "the briefing Warwick receives does NOT say COMPLETE".
+      # It touches no database, no credentials and no live watcher: every target is a throwaway
+      # git repo, a temp state path or a sentinel process.
+      - name: A capture briefing never claims COMPLETE before the commit lands
+        run: node services/hub/youtube/capture-durability-check.mjs
+
+      # ⚠️ NOT REGISTERED YET, deliberately: tools/session-report/idempotency-check.mjs.
+      # It stands up its own disposable PostgreSQL cluster (initdb, private loopback port,
+      # destroyed on exit) — because the properties under test are properties of Postgres, not of
+      # a string: "one row per (rotation_id, specialist)" and "no duplicate-key error" cannot be
+      # proven against a hand-written model of ON CONFLICT.
+      #
+      # WHY IT IS NOT HERE: whether `initdb`/`pg_ctl` are on PATH on these runners is UNESTABLISHED.
+      # It passes locally (24/24 against PostgreSQL 17.4) only because a Postgres toolchain happens
+      # to be installed on this machine. Registering it on an unverified runner is how a gate dies
+      # at import and teaches everyone to ignore a red — which already happened once in this estate
+      # today (provenance-check against a runner pinned to Node 20, no `registerHooks`).
+      #
+      # AND DO NOT "FIX" IT BY SKIPPING WHEN initdb IS ABSENT. A check that quietly executes zero
+      # cases and exits 0 is a vacuous green, which is the exact failure this whole workflow estate
+      # exists to prevent. Either the runner provisions Postgres (a `services:` container or an
+      # explicit install step) and the gate runs for real, or it stays a human-invoked check and
+      # that limitation is stated rather than papered over.

@@ -1,0 +1,16 @@
+{
+  "checkpoint_id": "build-020-phase4-pr97-product",
+  "build_id": "BUILD-020",
+  "wp_id": "phase4-closure-gate1-product",
+  "brief_ref": "Deliverables/2026-08-06-phase4-closure-wp-evidence.md",
+  "summary": "Product slice only: Work Order envelope generator G-1..G-6 + J1-1 SOP route + hermetic tests; return-cue dual-harness scripts/registrations; session-report schema+populate. Phase complete is NOT claimed.",
+  "brief_excerpt": "1. tools/wo implements G-1..G-6 without a new control plane; tests hermetic.\n2. Return-cue dual-normalize; no auto Telegram; no model classify.\n3. No false phase-complete claim in product code.\n4. No secrets committed.\n5. Blocking only for unsafe current next action.",
+  "scoped_to": [
+    "tools/wo/**",
+    ".claude/hooks/**",
+    ".claude/settings.json",
+    ".grok/hooks/**",
+    "tools/session-report/**",
+    "Team Knowledge/SOPs/SOP-022-work-order-preflight.md"
+  ]
+}

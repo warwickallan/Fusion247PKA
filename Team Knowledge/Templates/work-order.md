@@ -305,6 +305,24 @@ AC2 — ...
 - ...
 ```
 
+### Mandatory acceptance clause for an INTENDED-AUTOMATIC outcome (Warwick, 2026-08-06)
+
+**Canonical: root `CLAUDE.md` § "Nothing may live only in Larry's head". Read it — this projection points
+there and must not paraphrase or weaken it.**
+
+**Where a Work Order's outcome is intended to be automatic, its acceptance criteria MUST be satisfiable
+only by exercising the real production event.** An AC that a manual invocation of the delivered script
+would satisfy is **under-specification** — the same class as a missing mandatory field, and the worker
+returns `REFUSE` at read-back naming it.
+
+Concretely, such an order's acceptance states: which **real event** fires it · that credentials and
+configuration come from the **stable approved runtime** rather than the invoking shell · how **success and
+failure are each durably observable** · and that a **fresh session** exercises it without being reminded.
+
+**The alternative is always available and is not a failure:** state explicitly in `outcome` that the
+deliverable is **manual**, and the clause does not apply. What is forbidden is an order that reads as
+automatic and accepts on evidence that only proves capability.
+
 ## The read-back block — returned verbatim, before any implementation
 
 The assigned worker returns exactly this, and nothing is written until Larry answers it:
