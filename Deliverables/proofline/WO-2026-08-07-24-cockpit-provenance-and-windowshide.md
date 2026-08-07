@@ -54,10 +54,12 @@ file_surface:
   - services/cockpit/provenance.mjs
   - services/cockpit/provenance-check.mjs
   - services/cockpit/server.mjs
+  - services/cockpit/README.md
   - services/hub/youtube/persistCapture.mjs
   - services/hub/youtube/watch-captures.mjs
   - services/control-plane/package.json
   - services/control-plane/package-lock.json
+# services/cockpit/README.md ADDED BY AMENDMENT 1 — permitted by § Where Keel writes (services/**).
 # machine_surface: CLOSED LIST. Write permitted here and ONLY here. Absolute machine paths.
 machine_surface:
   - C:/Fusion247PKA
@@ -126,6 +128,30 @@ operational_handoff: none
 
 # WO-2026-08-07-24 — Cockpit provenance truth, console-flash suppression, and the pg floor-raise
 
+## 🔄 AMENDMENT 1 — Larry, 2026-08-07, after Keel's read-back (verdict CLARIFY)
+
+**Every point below is a defect in my order that Keel's read-back caught. Rulings are binding; the amended order supersedes the original text wherever they differ. ONE additional fresh read-back is allowed, then proceed.**
+
+**① C1 — AC7's `server.mjs` half is STRUCK. Keel's finding is correct and my premise was false.** Evidence he produced: `server.mjs` at `3bab190` is blob `95bb814c`; the live clone is on a **different branch and commit** (`build-015/live-acceptance-recovery-2026-08-03` @ `c1ed028`) where it is blob `16a6a851`; `git diff 16a6a851 95bb814` is **+90 lines**, so **the governance head already contains the entire 86-line insertion**, and the live working copy is a **strict subset** missing only four explanatory comment lines. **Porting it would REGRESS the branch.** This also corroborates the 4B handover's own line — *"Nothing valuable is stranded."* **AC7 now covers only `persistCapture.mjs`, `watch-captures.mjs`, `package.json` and its lock mirror.** Record the enumerated blob evidence in the return.
+
+**② C2 — ruled explicitly rather than left to resolve by luck.** Keel is right that AC7 and § out-of-scope pointed at the same code in opposite directions: those 86 lines **are** the private API bridge, which § out-of-scope reserves to a separate order. **AC7 never covered the bridge. The bridge remains fully out of scope.** With ① applied, the contradiction is removed by design, not by coincidence.
+
+**③ A1 — `sourceHash` is reading (b), with a drift guard. APPROVED and extended.** Reading (a) — every `*.mjs` in `services/cockpit/` — is a **defect**, exactly as Keel argues: that directory holds ~12 probe and check scripts the server never imports, so a change to a *check script* would alter the hash and misdescribe the running code. That is the failure AC4 exists to prevent. **Use an explicit declared list of the modules `server.mjs` actually imports.** **⊕ ADDED REQUIREMENT, because a hand-maintained list drifts silently:** `provenance-check.mjs` must **statically parse `server.mjs`'s relative import statements and assert the declared list matches**. Drift then **fails the gate** instead of quietly producing a wrong hash. Mutation-test that assertion — add an import, prove the check goes red, remove it.
+
+**④ A2 — payload-builder interface APPROVED as proposed.** `provenance.mjs` exports a builder returning `{sha, dirty, provenance, sourceHash}`; `provenance-check.mjs` **executes** it and asserts all four keys plus git-independence of `sourceHash`; `/api/health` returns that object. **Only the single wiring line rests on inspection, which is the correct residue.** This settles AC4's missing evidence route.
+
+**⑤ A3 — injectable command runner APPROVED.** It is design, not test-tampering, and `persistCapture.mjs`'s `defaultRunGit` is the in-house precedent. Critical rule 9 is not engaged: you are injecting a seam, not weakening an assertion.
+
+**⑥ A4 — correct, they are one edit.** Make it once, evidence it against both AC6 and AC7.
+
+**⑦ MISSING REQUIREMENT — Keel found an active document I missed, and my `document_impact: []` was WRONG.** `services/cockpit/README.md:32` documents `GET /api/health` under § Endpoints and will understate the endpoint once it carries four fields. **My enumeration searched `Team Knowledge/**`, `Builds/**` and `Expansions/**` and never searched `services/**` — that is the gap, and it is mine.** **`services/cockpit/README.md` is ADDED to `file_surface`** — it sits under `services/**`, which your contract permits, and splitting an endpoint from its own documentation across two owners is how drift starts. **NEW AC9: update `services/cockpit/README.md` § Endpoints so it states the four `/api/health` fields truthfully.**
+
+**⑧ The `windowsHide` enumeration is accepted as stated** — 6 call sites (`server.mjs:32`, `:454`, `:480`; `persistCapture.mjs:31`; `watch-captures.mjs:43`, `:148`), 3 fixed by the port, 3 remaining. **Report found-vs-fixed counts as executed, not as recalled.**
+
+**⑨ The CORS/proxy observation is RECEIVED AS A REPORT and parked — do not act on it.** Keel notes the already-committed bridge is a same-origin proxy with reflected CORS and asks whether Vex has seen it. **That is an observation, not an instruction, and it is out of this order's scope.** It does not block this work. Larry reports it once to Warwick for his decision; **no Work Order is raised from a reviewer finding without him.**
+
+**Not amended:** AC1, AC2, AC3, AC4 (interface now settled), AC5, AC6, AC8, the git endpoint, and every authority field.
+
 > **⚠️ ONE KNOWN INCONSISTENCY IN THIS ORDER, named so you do not have to discover it.** The generated **Envelope table** at the foot renders `live_authority | none` because it prints the STANDING DEFAULT from the canonical template. The **frontmatter `live_authority` above carries the authorised deviation and its escalation, and the frontmatter GOVERNS.** This is a rendering limitation of `tools/wo/envelope.mjs`, not a contradiction in your authority. Larry has logged it for the scheduled reconciliation. **Do not refuse on this point; do report it if you disagree with the reading.**
 
 ## Acceptance criteria
@@ -142,9 +168,11 @@ operational_handoff: none
 
 **AC6 — the pg change is a floor-raise, not an upgrade.** `services/control-plane/package.json` moves to match what is **already installed and locked**: both lockfiles, including build-020's committed one, already resolve `node_modules/pg` to **`8.22.0`** with identical integrity, and `^8.11.0` already permits it. Expected result: **zero install delta and no lockfile regeneration.** If your execution contradicts that, **stop and report** — do not regenerate the lockfile to make it true.
 
-**AC7 — the stranded work is recovered.** The uncommitted changes to `services/cockpit/server.mjs`, `services/hub/youtube/persistCapture.mjs`, `services/hub/youtube/watch-captures.mjs`, `services/control-plane/package.json` and `services/control-plane/package-lock.json` are read out of the live clone and applied on this branch. **`services/asdair/skill/planner.js` and `Team Knowledge/.obsidian/community-plugins.json` are line-ending noise that produce no diff hunk — there is nothing to port and they are NOT in your surface.** If you find a real hunk in either, that contradicts the banked finding: report it, do not act on it.
+**AC7 — the stranded work is recovered.** ⚠️ **AMENDED BY AMENDMENT 1 ① — `services/cockpit/server.mjs` is STRUCK from this criterion.** Its content is already present at the governance head in a superset form; porting it would regress the branch. **AC7 now covers only** `services/hub/youtube/persistCapture.mjs`, `services/hub/youtube/watch-captures.mjs`, `services/control-plane/package.json` and `services/control-plane/package-lock.json`, read out of the live clone and applied on this branch. ~~The uncommitted changes to `services/cockpit/server.mjs`~~ are **not** ported. **`services/asdair/skill/planner.js` and `Team Knowledge/.obsidian/community-plugins.json` are line-ending noise that produce no diff hunk — there is nothing to port and they are NOT in your surface.** If you find a real hunk in either, that contradicts the banked finding: report it, do not act on it.
 
 **AC8 — the live clone is untouched.** `git -C C:/Fusion247PKA status --porcelain` returns the **same 10 entries** at the end of your work as at the start. Capture both.
+
+**AC9 — the endpoint's own documentation stays true.** *(Added by Amendment 1 ⑦.)* `services/cockpit/README.md` § Endpoints currently documents `GET /api/health` at `:32` against the old two-field shape. Update it to state the four fields — `sha`, `dirty`, `provenance`, `sourceHash` — accurately. **Describe what the code does, not what this order intended.**
 
 ## Required evidence
 
