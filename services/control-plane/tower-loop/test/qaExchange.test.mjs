@@ -247,7 +247,12 @@ test('W3 "findings_raised" fallback: an APPROVED merge review that still raises 
   assert.equal(res.findingsOpened.length, 1);
   assert.equal(res.findingsOpened[0].codexId, 'TQA-003');
 
-  const notes = (await pool.query(`select reason, message from tower.notification where turn_id = ?`, [turn.id])).rows;
+  // SCOPED, not relaxed (WO-33): this turn now also receives the `codex_qa_started` card, which fires
+  // at the real execution point for every QA origin. The assertion below is about the VERDICT-PHASE
+  // cards, and it stays exactly as strong as it was — still `equal(…, 1)`, never `ok(… >= 1)`.
+  // Weakening the count to make a suite green is the fabrication mode this estate forbids; excluding
+  // the one card that legitimately joined the turn is not.
+  const notes = (await pool.query(`select reason, message from tower.notification where turn_id = ? and reason <> 'codex_qa_started'`, [turn.id])).rows;
   assert.equal(notes.length, 1, 'a notification fired even though the round was aligned+approved');
   assert.equal(notes[0].reason, 'findings_raised');
   assert.match(notes[0].message, /TQA-003/);
