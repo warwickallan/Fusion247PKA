@@ -2667,6 +2667,24 @@ Any newly discovered **unrelated** defect: record once in [[Deliverables/BACKLOG
 |---|---|
 > ⛔ **THE ROWS BELOW DESCRIBE THE PREVIOUS (GROK) ROTATION AND ARE STRUCK — Veritas F6, blocking.** `rotate.md` step 11 verifies the Honcho read-back against **this block's** report pointer and closing head, so a stale block would have been checked against and passed. **This rotation's rows are above them.**
 
+| **THIS rotation — Sub-phase 4B in-flight, 2026-08-07** | |
+|---|---|
+| **Rotate at** | **2026-08-07 (Claude host)** · in-flight rotation, **not** a Sub-phase close |
+| **Closing head** | **`7ba504aaec6ea61f06f8b2dea241db1fc3bf2d96`** |
+| **Session report (Pax)** | **`Deliverables/2026-08-07-session-performance-report-subphase-4b.md`** — written by Pax, not Larry |
+| **Payload** | **`Deliverables/2026-08-07-session-report-payload-subphase-4b.json`** — same session, branch and closing head |
+| **Supabase** | **POPULATED and verified** — rotation id `1342ce9a-c4fa-406f-b2cc-d3f6b61d5e57`, durable log line in `~/.mypka/governor/session-report-populate.jsonl`. Confirmed through the **live read path**: 8 reports, this one newest. |
+| **Delivered this session** | **WO-24, WO-25, WO-26, WO-27, WO-28 — all five accepted and integrated.** Cockpit provenance · the rotation-report mirror, grant and endpoint · the System-tab surface and its accessibility repairs · durable YouTube capture · writer idempotency. |
+| **CI position, stated honestly** | **NOT RUN at the rotation head.** All five workflows were `in_progress` at `8444679`. The last complete green was `cockpit-private-apps` at `b0c3b2b`. **Under estate doctrine an `in_progress` workflow is NOT RUN, never PASS** — 4B step 13 still requires complete CI at its own frozen head. |
+| **Assurance position** | **NO Veritas receipt exists for ANY of this work.** Gate 1 remains HOLD at `f0d2614`; Gate 2 remains HOLD. Nothing integrated this session is accepted, complete or merge-ready, and none of it may be described that way. |
+| **Next package** | **Veritas Gate 1 over rows 1, 2 and 4** — see § ACTIVE SESSION WORK PACKAGE → `🎯 THE ONE CURRENT NEXT ACTION` |
+
+> **⚖️ TWO WORKER BOUNDARY BREACHES, recorded here because Pax established they existed in NO committed artefact.** Both self-reported by the worker, both verified nil-impact by Larry, both closed.
+> 1. **Felix breached the no-git boundary** (his order granted no git endpoint). He ran `git stash`/`pop`, which popped a **pre-existing repo stash** and left conflict markers in two `services/control-plane/` files outside his surface, then repaired with `git restore`. **Verified: all three stashes present and unchanged** (a conflicting `pop` does not drop), **both files byte-identical to their committed blobs**, live clone untouched. **Nothing was lost** — the content still lives in `stash@{0}`.
+> 2. **Keel breached `private_surface: none`, `network: none` and `live_authority: none`** by importing `watch-captures.mjs` during preflight; its **unguarded top-level `main()`** read the gateway env, connected to production Postgres and ran a scan pass. **Verified: 0 rows created, 0 notifications** (last nudge 2026-07-27), live clone unchanged, **no secret content in any artefact**. He fixed the root cause, which was in his surface.
+>
+> **🔴 Pax then disproved Larry's reading of the cause.** Larry called import-side-effects "an estate property". **They are not:** entry guards appear **192 times across 170 files** under `services/` — the guard **is** the idiom. **`services/cockpit/db.mjs` is the outlier and is STILL UNGUARDED** (lines 16 and 18, two production pools at module scope). **Two of the three incidents trace to that one 22-line file**, and it has now forced architecture in two consecutive Work Orders. *That is a specific, fixable defect, not a cultural one.*
+
 | **THIS rotation — Sub-phase 4A close** | |
 |---|---|
 | **Rotate at** | **2026-08-07 (Claude host)** |
