@@ -2352,6 +2352,29 @@ node "C:/Users/Buggly/.mypka/governor/ding.mjs" <message-file>
 
 ## ⭐ ACTIVE SESSION WORK PACKAGE — single durable authority for this session
 
+> **🔄 AMENDMENT 8 — Warwick, 2026-08-07. ONE BOUNDED VEX SECURITY REVIEW AUTHORISED, BEFORE CODEX AND THE MERGE DECISION.**
+>
+> **⏱️ TRIGGER — this gate does NOT fire yet.** Vex runs **once BOTH are integrated**: ① the **WO-24** Cockpit provenance work; ② the new **`/api/rotation-reports`** route and System-tab reporting surface. **Do not dispatch Vex before both are integrated. Warwick's explicit instruction at authorisation: do not interrupt Keel and do not widen WO-24.** *(Banked here because this gate fires several steps and probably one rotation away from the session that received it.)*
+>
+> **📍 ROUTE POSITION:** inserted into the Sub-phase 4B route **after integration of both surfaces and BEFORE step 16 (Codex) and step 17 (merge decision pack)**. It does **not** displace Veritas Gate 1 / Gate 2, and it is **not** a substitute for either.
+>
+> **🎯 THE GOVERNING QUESTION — Warwick's exact words, and the whole review answers this one thing:**
+>
+> > **«Can an untrusted webpage running in Warwick's browser read from or perform actions against the Cockpit's private upstream services through the proxy without authority Warwick deliberately granted?»**
+>
+> **SCOPE — the final live-facing Cockpit boundary ONLY. This list is closed:**
+> 1. `/private-api/*` · 2. `/api/rotation-reports` · 3. Cockpit/Tailscale exposure and authentication assumptions · 4. reflected CORS behaviour · 5. forwarded methods, paths, bodies and headers · 6. whether an untrusted webpage in Warwick's browser could use the proxy to **read from** or perform **state-changing actions against** a private upstream · 7. request-size, timeout and redirect controls · 8. whether Postgres/Supabase credentials remain **entirely server-side** · 9. whether the rotation-report data requires any **stronger access restriction**.
+>
+> **REQUIRED OUTPUT:** **GREEN, YELLOW or RED** · a **concrete attack journey** wherever a risk is claimed · **exact file and line references** · the **smallest necessary correction** · **no implementation, no broad security audit, no unrelated estate expansion.**
+>
+> **🔴 DO NOT PRE-JUDGE THE VERDICT.** Warwick, verbatim: **«"Reflected CORS" is a reason to inspect, not an assumed vulnerability.»** The dispatch must carry this sentence and must not brief Vex toward a finding. **A GREEN reached honestly is a real outcome, not a failed review.**
+>
+> **QUEUE EFFECT — stated so it is not misread later.** **A Vex finding does NOT automatically become a Work Order** (root `CLAUDE.md` § finding disposition, and Warwick restated it at authorisation). **Bring the verdict and any proposed bounded repair back to Warwick before expanding scope.** Larry recommends a disposition; Warwick decides it.
+>
+> **REVIEW CEILING — owed at dispatch and recorded now so it is not omitted.** Per root `CLAUDE.md` § Specialist dispatch, an assurance dispatch names a proportionate ceiling that **the reviewer may not extend**. For this bounded boundary review: **one pass, ≤ ~120k tokens, no second round without Warwick.** A dispatch without a stated ceiling earns only the small bind-and-primary-journey allowance in Vex's own contract.
+>
+> **PROVENANCE OF THE FINDING THAT PROMPTED IT:** raised by **Keel** during the WO-24 read-back — the already-committed bridge is a same-origin HTTP proxy with reflected CORS (`services/cockpit/server.mjs:317-403`, dispatch at `:443`). **Received as a report, parked, and put to Warwick once** — it was never actioned inside WO-24, and Keel was told not to widen toward it.
+
 > **🔄 AMENDMENT 7 — Warwick, 2026-08-07. SCOPE ADDED TO SUB-PHASE 4B: ROTATION REPORTS ON THE COCKPIT SYSTEM TAB.**
 >
 > **⛔ This amendment adds scope to Sub-phase 4B ONLY. It does NOT amend, reinterpret or reopen the completed Sub-phase 4A rotation** (Warwick, explicit). The 4A Veritas PASS at `c50d8cb`, its reviewed scope, the rotation head `b0a1c99` and the § ROTATION block below are untouched and remain true as written.
@@ -2616,6 +2639,7 @@ Any newly discovered **unrelated** defect: record once in [[Deliverables/BACKLOG
 9. Implement the reduced **Veritas Gate 3 enumeration check**. 10. Confirm `focus` in `/rotate` read-back.
 11. Reconcile all active map navigation after the final work. 12. Freeze one final candidate head. 13. Complete CI at it.
 14. Fresh Veritas over the **complete remaining functional scope** (rows 1, 2, 4). 15. **Separate Phase / North-Star closure verdict.**
+**15a. ⊕ AMENDMENT 8 — one bounded VEX security review of the final live-facing Cockpit boundary, AFTER both the WO-24 work and the `/api/rotation-reports` + System-tab surface are integrated, and BEFORE Codex. Closed scope, GREEN/YELLOW/RED, one pass. Verdict and any proposed repair go to Warwick before any scope expands.**
 16. Codex **only when eligible**. 17. Full merge decision pack to Warwick. 18. After authorised merge: verify remote+local merged state · align installed/runtime from canonical merged Git · move the live Cockpit safely · prove truthful provenance · prove no feature-branch/worktree/old-session dependency · clean the estate.
 
 **🔴 The Phase does not close on step 18 alone.** Final acceptance must ALSO answer both parts of Warwick's question — **(A) durability** of every load-bearing BUILD-020 outcome, and **(B) reproducible creation of a NEW Build Wayfinder** by a genuinely fresh Larry, without copying the Proofline map or rebuilding the method from chat. **Both, by Larry and by Veritas.** See the closure record.
