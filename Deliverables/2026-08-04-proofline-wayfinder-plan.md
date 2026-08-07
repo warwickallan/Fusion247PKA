@@ -2761,6 +2761,37 @@ Any newly discovered **unrelated** defect: record once in [[Deliverables/BACKLOG
 
 **Merge commit `a2aae94693cff94aaf3fc87ded0948197b5ea0d0`; `origin/main` verified to contain the authorised head.** **No Gate 1 PASS, no Gate 2 PASS, no Codex approval and no completed-automation acceptance exists for this merge, and none may be claimed.**
 
+### 📌 ROTATION — Sub-phase 4B CLOSE, 2026-08-07. **BUILD-020 merged. Next is Sub-phase 4C.**
+
+| | |
+|---|---|
+| **Rotate at** | 2026-08-07 (Claude host) — **Sub-phase 4B close, after the authorised merge** |
+| **Closing head** | recorded at commit — verify `git rev-parse HEAD` |
+| **Canonical `main`** | **`bc99606daad6269554fccf0738a8f489c55be265`** · merge commit `a2aae94` · authorised head `28b06df` |
+| **Session report (Pax)** | `Deliverables/2026-08-07-session-performance-report-subphase-4b-close.md` — **written by Pax, not Larry** |
+| **Payload** | `Deliverables/2026-08-07-session-report-payload-subphase-4b-close.json` |
+| **Closeout** | [[Deliverables/2026-08-07-build-020-post-merge-closeout]] — merged main, live smoke results, Tower alignment, task state, preserved artefacts, estate cleanup, everything still owed |
+| **Assurance position** | ⛔ **NO Gate 1 PASS. NO Gate 2 PASS. NO Codex. NO TowerBot production acceptance.** The merge was **Warwick's explicit exception**, not assurance passing. **Nothing in 4B may be described as assured, complete or accepted.** |
+| **Live estate** | Cockpit **PID 30000** and Tower **PID 26728** both running from **canonical merged `main`**; exactly one watcher; **no component depends on any BUILD-020 branch or worktree** |
+| **Estate cleanup** | worktrees **38 → 19**; **15 BUILD-020 branches deleted**, every one proven superseded **by content diff, never by name** |
+
+### 🎯 THE ONE CURRENT NEXT ACTION — **enter Sub-phase 4C: CAPAE + Asdair Hop Preparation.**
+
+**Do NOT reopen BUILD-020 assurance. Do NOT design or solve 4C before Warwick briefs it** — he was explicit: *"Do NOT design or solve 4C before rotation. Preserve that evidence and arrive there cleanly."*
+
+**Read first, in this order:** ① the **4C CAPAE EVIDENCE** block beside Amendment 11 in this map — Warwick's seven points plus the measurements behind them; ② `Deliverables/2026-08-07-build-020-post-merge-closeout.md`; ③ Pax's session report.
+
+### ⛔ CARRIED INTO 4C — owed, and none of it discharged
+
+1. **`MyPKA-YouTube-Watcher-Ensure` is DISABLED and blocked on ELEVATION.** Ensure semantics are proven (two ticks, ProcessId unchanged, kill-loop gone) but **that is CAPABILITY, not automation.** **Amendment 9 REMAINS AUTOMATIC and is NOT accepted.**
+2. **R1 — the non-mutating-GET assumption is UNVERIFIED**, blocked by the GL-012 private-surface boundary. **No side effect observed is not proof none exists.**
+3. **Sub-phase 4B assurance was never completed** — no Gate 1/Gate 2 PASS, no Codex, no TowerBot acceptance of `codex_qa_started`. **Owed unless Warwick disposes it.**
+4. **🔴 THE ESTATE-CONVERGENCE DEFECT — Warwick's own framing, and it is 4C's.** **20 non-BUILD-020 worktrees hold genuinely unique state** (`build-015/*`, `idea-012/*`, `idea-017/*`, `audit/*`, `research/*`). **Untouched, not absorbed, not deleted.** His operating model: **useful work lives on MAIN or in the ONE active piece of work — never indefinitely in a third place.** These are that third place.
+5. **`~/.mypka/preserved-2026-08-07/asdair-ci-runtime-uncommitted.patch`** — 34 lines of untested WIP against a service whose CI is **red on `main`**. **Carried into 4C, which is Asdair preparation.** Its worktree `C:\Fusion247PKA-wo-asdair-ci` is **deliberately retained**.
+6. **`CareerAIR-Ops-Liveness` deliberately DISABLED** — it alerted every 30 minutes about the Zapier path Amendment 4 descoped.
+7. **Rollbacks retained:** `C:\Fusion247PKA-premigration-20260807` (whole live clone) · `~/.mypka/tower-backups/2026-08-07-pre-postmerge-realign/` · `C:\Fusion247PKA-unique-artefacts-20260807`.
+
+
 ### 📊 ASSURANCE STANDING — **THE SINGLE SOURCE. Every other statement of gate standing in this map POINTS HERE and must not restate it.**
 
 > **🔴 WHY THIS BLOCK EXISTS.** Gate standing was restated in **four** places, and **six consecutive Gate 1 verdicts** were carried by one of them going stale. Veritas @ `b62a9fc`: *"The record is current with respect to the last review's finding list and stale with respect to its outcome. That is a placement and sequencing property, not a diligence one."* **Restatement was the defect. This block is the fix — SSOT, not a new mechanism.**
@@ -2816,7 +2847,7 @@ Any newly discovered **unrelated** defect: record once in [[Deliverables/BACKLOG
 
 **What Larry is NOT doing, deliberately:** not starting the branch Cockpit to manufacture a live journey (`db.mjs` opens two production pools at module scope — the hazard Veritas avoided and that forced WO-25's architecture), not touching the live clone, not enabling any scheduled task, and not editing Veritas's receipt.
 
-**🎯 THE ONE CURRENT NEXT ACTION — execute the pre-merge repairs, then re-dispatch Gate 1 at a new frozen head.**
+**⛔ SPENT — the pre-merge repair/re-gate loop. DIRECTS NOTHING.** *(Retired 2026-08-07 at the Sub-phase 4B close. Warwick authorised the PR #97 merge as an explicit exception, terminating this loop. The label was deliberately removed from this heading so it appears ONCE in the map — at the live 4C action above. Two live targets is the exact defect that carried six Gate 1 verdicts.)* ➡️ **The one current action is § ROTATION → enter Sub-phase 4C.**
 
 **In order — EVERY item carries its state, because leaving later items unmarked is what made this block misdirect** *(Veritas Gate 1 @ `275ec07`: items ①②③ read `DONE` while ④–⑧ were unmarked though complete, so a fresh Larry would have read ⑦ as live and **raised a duplicate Work Order for an already-merged repair**)*:
 
