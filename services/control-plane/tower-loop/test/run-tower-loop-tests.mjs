@@ -522,6 +522,116 @@ async function main() {
   });
 
   // ══════════════════════════════════════════════════════════════════════════════
+  // WO-2026-08-07-33 — THE "CODEX QA STARTED" CARD, against a real store.
+  //
+  // The composer and the frozen-reason gate are unit-proved in test/notify.test.mjs, which has no
+  // store and therefore cannot say anything about DEDUP. Dedup is a property of a UNIQUE INDEX in
+  // the database, so it is proved here or it is not proved at all. Q3 below additionally MAKES THE
+  // CONTROL FAIL, because an index that is merely assumed to bite is not evidence that it does.
+  // ══════════════════════════════════════════════════════════════════════════════
+
+  await test('Q1 — the QA-started card is emitted ONCE per turn, BEFORE the verdict card, with the real turn id', async () => {
+    assert.equal(process.env.TOWER_NOTIFY_TRANSPORT, 'none', 'proof runs with the network transport off');
+
+    // 'shipped. all good' drives the fake reviewer to a 'correct' verdict, so this round produces
+    // a REAL verdict card too. That matters: the ordering assertion below is only meaningful
+    // against a round that has a second card to be ordered against.
+    const t = await inertTurn({ buildRef: 'BUILD-WO33', headSha: HEAD_A,
+      instruction: 'Warwick: review this checkpoint.', larryResponse: 'Larry: shipped. all good' });
+
+    // Spy that DELEGATES to the real notify — so the store's dedup does the real work and the spy
+    // only observes. A spy that replaced notify would prove the test's own arithmetic, not the
+    // product's.
+    const calls = [];
+    const spyDeps = { ...IN_PROC_DEPS, notify: async (p, args) => { calls.push(args); return notify(p, args); } };
+
+    const res = await processTurn(pool, t.id, spyDeps);
+    assert.ok(!res.gateBlocked, `the round was not gate-blocked (got ${JSON.stringify(res.gateErrors ?? null)})`);
+
+    const started = calls.filter((c) => c.reason === 'codex_qa_started');
+    assert.equal(started.length, 1, `exactly one QA-started notify() call (got ${started.length})`);
+    assert.equal(started[0].turnId, t.id, 'it carries the REAL turn id — never null (a null would never dedup)');
+    assert.ok(started[0].message.includes(`PR: #${PR}`), 'the card names the PR');
+    assert.ok(started[0].message.includes(`head: ${HEAD_A}`), 'the card names the exact 40-hex head');
+
+    // Persisted, exactly once, and FIRST — rowid is insertion order, so this is the real ordering
+    // of the cards as TowerBot received them, not an assumption about how the code reads.
+    const notes = await notesFor(pool, t.id);
+    const startedRows = notes.filter((n) => n.reason === 'codex_qa_started');
+    assert.equal(startedRows.length, 1, `exactly one persisted QA-started row (got ${startedRows.length})`);
+    assert.equal(notes[0].reason, 'codex_qa_started', `the QA-started card is the FIRST card of the sequence (got ${JSON.stringify(notes.map((n) => n.reason))})`);
+    assert.ok(notes.some((n) => n.reason !== 'codex_qa_started'),
+      `a verdict card followed it — this is a sequence, not a lone card (got ${JSON.stringify(notes.map((n) => n.reason))})`);
+
+    const stored = (await pool.query(
+      `select turn_id, state, message from tower.notification where turn_id = ? and reason = 'codex_qa_started'`, [t.id])).rows[0];
+    assert.equal(stored.turn_id, t.id, 'the stored row is keyed on the real turn id');
+    assert.equal(stored.state, 'qa_started');
+  });
+
+  await test('Q2 — AC4: a SECOND attempt on the same (turn, reason) does NOT send', async () => {
+    const t = await inertTurn({ buildRef: 'BUILD-WO33-DEDUP', headSha: HEAD_A,
+      instruction: 'Warwick: round.', larryResponse: 'Larry: done.' });
+
+    const first = await notify(pool, { turnId: t.id, reason: 'codex_qa_started', state: 'qa_started', message: 'first' });
+    assert.equal(first.deduped, false, 'the first attempt claimed the slot and sent');
+    assert.ok(first.notificationId, 'a row was written');
+
+    // The second attempt is the assertion. `deduped: true` is notify()'s own statement that it did
+    // NOT post; notificationId null is that no second row was created.
+    const second = await notify(pool, { turnId: t.id, reason: 'codex_qa_started', state: 'qa_started', message: 'second' });
+    assert.equal(second.deduped, true, 'the SECOND attempt did NOT send');
+    assert.equal(second.notificationId, null, 'and wrote no second row');
+    assert.equal(second.telegram_message_id, null, 'nothing reached Telegram');
+
+    const n = Number((await pool.query(
+      `select count(*) c from tower.notification where turn_id = ? and reason = 'codex_qa_started'`, [t.id])).rows[0].c);
+    assert.equal(n, 1, `exactly one row survives two attempts (got ${n})`);
+
+    // And the row is the FIRST one — a re-announce that overwrote the original would also leave
+    // one row, which is a different (and wrong) behaviour that this distinguishes.
+    const msg = (await pool.query(
+      `select message from tower.notification where turn_id = ? and reason = 'codex_qa_started'`, [t.id])).rows[0].message;
+    assert.equal(msg, 'first', 'the original row is untouched — the second attempt was a no-op, not an update');
+
+    // A REPLAY of the whole turn must not re-announce either: processTurn's idempotent branch
+    // returns before the emission point, and the index would refuse it even if it did not. Both
+    // belts are exercised by running it twice.
+    const calls = [];
+    const spyDeps = { ...IN_PROC_DEPS, notify: async (p, args) => { calls.push(args); return notify(p, args); } };
+    await processTurn(pool, t.id, spyDeps);
+    await processTurn(pool, t.id, spyDeps);
+    const after = Number((await pool.query(
+      `select count(*) c from tower.notification where turn_id = ? and reason = 'codex_qa_started'`, [t.id])).rows[0].c);
+    assert.equal(after, 1, `still exactly one after two full re-processes (got ${after})`);
+  });
+
+  await test('Q3 — MUTATION: the dedup depends on the real turn id, and a null one would NOT dedup', async () => {
+    // The control made to fail. If the card were ever sent with turnId=null — the shape
+    // 'tower_failure' and 'finding_disposed' deliberately use — SQLite treats each NULL as
+    // distinct in the (turn_id, reason) unique index and NOTHING would stop it re-announcing on
+    // every pass, forever. This asserts that property is real rather than repeating the claim.
+    const before = Number((await pool.query(
+      `select count(*) c from tower.notification where turn_id is null and reason = 'tower_failure'`)).rows[0].c);
+    await notify(pool, { turnId: null, reason: 'tower_failure', state: 'mutation-probe', message: 'one' });
+    await notify(pool, { turnId: null, reason: 'tower_failure', state: 'mutation-probe', message: 'two' });
+    const after = Number((await pool.query(
+      `select count(*) c from tower.notification where turn_id is null and reason = 'tower_failure'`)).rows[0].c);
+    assert.equal(after - before, 2,
+      'a NULL turn id does NOT dedup — which is exactly why the QA-started card must never use one');
+
+    // …and the same two sends against a REAL turn id collapse to one. Same reason, same store,
+    // the only variable is the turn id.
+    const t = await inertTurn({ buildRef: 'BUILD-WO33-MUT', headSha: HEAD_A,
+      instruction: 'Warwick: probe.', larryResponse: 'Larry: probe.' });
+    await notify(pool, { turnId: t.id, reason: 'tower_failure', state: 'mutation-probe', message: 'one' });
+    await notify(pool, { turnId: t.id, reason: 'tower_failure', state: 'mutation-probe', message: 'two' });
+    const real = Number((await pool.query(
+      `select count(*) c from tower.notification where turn_id = ? and reason = 'tower_failure'`, [t.id])).rows[0].c);
+    assert.equal(real, 1, 'a real turn id DOES dedup — the index bites, proven by making it not bite above');
+  });
+
+  // ══════════════════════════════════════════════════════════════════════════════
   // WO-OR-24 — THE FIRST HOP. A real GitHub comment reaching the ingest path above.
   //
   // Driven through an INJECTED `gh` seam so the suite needs no network and no gh binary. The
