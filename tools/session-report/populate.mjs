@@ -269,6 +269,101 @@ export function gitStat(payload) {
   return payload.git_stat_larry_measured ?? payload.git_stat ?? null;
 }
 
+/**
+ * The specialist rows a payload asserts for one rotation — and, separately, WHETHER IT ASSERTS
+ * ANYTHING AT ALL. That second fact is the whole point of this function and it is why the return is
+ * a pair rather than a bare array.
+ *
+ * `claimed: false` means the payload carried no `specialists` array. The payload made NO CLAIM about
+ * specialists, so the writer upserts nothing AND DELETES NOTHING. `claimed: true` with an empty
+ * `rows` is the opposite: a positive assertion that this rotation had no specialist dispatches, which
+ * legitimately removes every existing row for that rotation.
+ *
+ * WHY THE DISTINCTION IS LOAD-BEARING RATHER THAN PEDANTIC. Once the writer deletes rows the payload
+ * no longer lists, letting "absent" and "empty" collapse into one another turns a single truncated or
+ * malformed payload into a silent wipe of a rotation's specialist rows — rows that exist nowhere else
+ * in the mirror. That would be a DATA-LOSS ROUTE introduced by an idempotency repair: a worse defect
+ * than the duplication it fixes. It is the same null-is-not-zero rule the rest of this file applies to
+ * scalars (`?? null`, never `?? 0`), applied to a collection: absent is not empty.
+ *
+ * NULL HANDLING, per column and deliberately not uniform:
+ *   - tokens, tokens_in, tokens_out, notes are NULLABLE, so an absent key becomes SQL NULL — never 0
+ *     and never ''. `tokens` is the measured TOTAL the payload actually carries; tokens_in/tokens_out
+ *     stay NULL because the payload carries no split, and inventing one would be fabrication.
+ *   - dispatches is `not null default 0` in schema.sql and so cannot hold NULL. `?? 0` there is the
+ *     column's own contract, not an exception to the rule above.
+ */
+export function specialistRows(payload) {
+  const raw = payload && Array.isArray(payload.specialists) ? payload.specialists : null;
+  if (!raw) return { claimed: false, rows: [] };
+  return {
+    claimed: true,
+    rows: raw.map((s) => ({
+      specialist: String(s?.specialist ?? ''),
+      dispatches: s?.dispatches ?? 0,
+      tokens: s?.tokens ?? null,
+      tokens_in: s?.tokens_in ?? null,
+      tokens_out: s?.tokens_out ?? null,
+      notes: s?.notes ?? null,
+    })),
+  };
+}
+
+/**
+ * The COMPLETE specialist write for one rotation as a single transactional SQL script — or `null`
+ * when the payload made no claim and nothing at all should run.
+ *
+ * Three properties are deliberate, and each is asserted by tools/session-report/idempotency-check.mjs:
+ *
+ *   1. ONE TRANSACTION, ONE INVOCATION. Before WO-28 each specialist row was a separate `psql` call
+ *      outside any transaction. That was survivable while the writer only inserted; it stops being
+ *      survivable the moment a DELETE exists, because a crash between the delete and the re-insert
+ *      loses rows that exist nowhere else. BEGIN/COMMIT makes the mirror update atomic.
+ *   2. UPSERT FIRST, DELETE LAST — never the reverse. Delete-then-insert opens a window in which the
+ *      rotation has no specialist rows at all; on failure that window becomes permanent.
+ *   3. ONE STATEMENT PER ROW rather than a single multi-row VALUES. A multi-row upsert raises
+ *      "ON CONFLICT DO UPDATE command cannot affect row a second time" if a payload ever lists the
+ *      same specialist twice. Per-row statements inside the transaction make that case last-one-wins
+ *      instead of a hard failure, which is the right behaviour for a mirror.
+ *
+ * The DELETE is scoped to this rotation_id alone. `specialist` is NOT NULL in the schema, so the
+ * `NOT IN (...)` list can never contain a NULL and can never silently match nothing.
+ */
+export function specialistWriteSql(rotationId, payload) {
+  const { claimed, rows } = specialistRows(payload);
+  if (!claimed) return null;
+
+  const upserts = rows.map(
+    (r) => `INSERT INTO session_report.specialist_dispatch (
+  rotation_id, specialist, dispatches, tokens, tokens_in, tokens_out, notes
+) VALUES (
+  ${sqlLiteral(rotationId)}::uuid,
+  ${sqlLiteral(r.specialist)},
+  ${sqlLiteral(r.dispatches)},
+  ${sqlLiteral(r.tokens)},
+  ${sqlLiteral(r.tokens_in)},
+  ${sqlLiteral(r.tokens_out)},
+  ${sqlLiteral(r.notes)}
+)
+ON CONFLICT (rotation_id, specialist) DO UPDATE SET
+  dispatches = EXCLUDED.dispatches,
+  tokens = EXCLUDED.tokens,
+  tokens_in = EXCLUDED.tokens_in,
+  tokens_out = EXCLUDED.tokens_out,
+  notes = EXCLUDED.notes;`,
+  );
+
+  const keep = rows.map((r) => sqlLiteral(r.specialist)).join(', ');
+  const prune = rows.length
+    ? `DELETE FROM session_report.specialist_dispatch
+WHERE rotation_id = ${sqlLiteral(rotationId)}::uuid
+  AND specialist NOT IN (${keep});`
+    : `DELETE FROM session_report.specialist_dispatch
+WHERE rotation_id = ${sqlLiteral(rotationId)}::uuid;`;
+
+  return ['BEGIN;', ...upserts, prune, 'COMMIT;', ''].join('\n');
+}
+
 function applySchema(creds) {
   if (!existsSync(SCHEMA_SQL)) {
     return { ok: false, why: 'schema-file-absent', path: SCHEMA_SQL };
@@ -347,25 +442,39 @@ async function populatePostgrest(creds, payload) {
   const rows = await res.json();
   const rotationId = Array.isArray(rows) ? rows[0]?.id : rows?.id;
 
-  if (rotationId && Array.isArray(payload.specialists)) {
-    for (const s of payload.specialists) {
-      const r2 = await fetch(`${base}/rest/v1/session_report.specialist_dispatch`, {
-        method: 'POST',
-        headers: { ...headers, Prefer: 'return=representation' },
-        body: JSON.stringify({
-          rotation_id: rotationId,
-          specialist: s.specialist,
-          dispatches: s.dispatches ?? 0,
-          tokens_in: s.tokens_in ?? null,
-          tokens_out: s.tokens_out ?? null,
-          notes: s.notes ?? null,
-        }),
-      });
+  // The same idempotency property as the database-url path: on_conflict names the unique index added
+  // in schema.sql, and resolution=merge-duplicates is what turns PostgREST's POST into an upsert. The
+  // `claimed` guard is shared with that path via specialistRows(), so an absent `specialists` array
+  // means "no claim" here too.
+  //
+  // KNOWN AND DELIBERATE ASYMMETRY, recorded here so it is never mistaken for an oversight: this
+  // branch does NOT prune specialists dropped from a later payload. Only the upsert half of WO-28 was
+  // authorised here. This branch is also UNPROVEN — see the schema-qualification note on the rotation
+  // POST below.
+  const { claimed: specialistsClaimed, rows: specialistRowList } = specialistRows(payload);
+  if (rotationId && specialistsClaimed) {
+    for (const r of specialistRowList) {
+      const r2 = await fetch(
+        `${base}/rest/v1/session_report.specialist_dispatch?on_conflict=rotation_id,specialist`,
+        {
+          method: 'POST',
+          headers: { ...headers, Prefer: 'return=representation,resolution=merge-duplicates' },
+          body: JSON.stringify({
+            rotation_id: rotationId,
+            specialist: r.specialist,
+            dispatches: r.dispatches,
+            tokens: r.tokens,
+            tokens_in: r.tokens_in,
+            tokens_out: r.tokens_out,
+            notes: r.notes,
+          }),
+        },
+      );
       if (!r2.ok) {
         return {
           ok: false,
           why: 'specialist-row-failed',
-          specialist: s.specialist,
+          specialist: r.specialist,
           status: r2.status,
         };
       }
@@ -466,32 +575,29 @@ COMMIT;
       return { ok: false, why: 'no-rotation-id-returned', stdout: r.stdout.slice(0, 200) };
     }
 
-    for (const s of specialists) {
-      const sSql = `
-INSERT INTO session_report.specialist_dispatch (
-  rotation_id, specialist, dispatches, tokens_in, tokens_out, notes
-) VALUES (
-  ${sqlLiteral(rotationId)}::uuid,
-  ${sqlLiteral(s.specialist)},
-  ${sqlLiteral(s.dispatches ?? 0)},
-  ${sqlLiteral(s.tokens_in ?? null)},
-  ${sqlLiteral(s.tokens_out ?? null)},
-  ${sqlLiteral(s.notes ?? null)}
-);
-`;
+    // ONE transactional invocation for every specialist row plus the prune, rather than one psql
+    // call per row outside any transaction. `null` means the payload made no claim about specialists,
+    // in which case nothing is written and nothing is removed — see specialistRows().
+    const specialistSql = specialistWriteSql(rotationId, payload);
+    if (specialistSql !== null) {
       const tmp2 = join(tmpdir(), `session-report-spec-${randomBytes(8).toString('hex')}.sql`);
       try {
-        writeFileSync(tmp2, sSql, 'utf8');
+        writeFileSync(tmp2, specialistSql, 'utf8');
         const r2 = runPsql(creds.databaseUrl, creds.sslCaFile, ['-f', tmp2], secrets);
         if (!r2.ok) {
-          return { ok: false, why: 'specialist-row-failed', specialist: s.specialist, detail: r2 };
+          return { ok: false, why: 'specialist-row-failed', specialists: specialists.length, detail: r2 };
         }
       } finally {
         try { unlinkSync(tmp2); } catch { /* */ }
       }
     }
 
-    return { ok: true, rotation_id: rotationId, mode: 'database-url' };
+    return {
+      ok: true,
+      rotation_id: rotationId,
+      mode: 'database-url',
+      specialists_written: specialistSql === null ? null : specialists.length,
+    };
   } finally {
     try { unlinkSync(tmp); } catch { /* */ }
   }
