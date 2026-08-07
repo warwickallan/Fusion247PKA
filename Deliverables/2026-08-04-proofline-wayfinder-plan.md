@@ -454,7 +454,7 @@ Then `http://127.0.0.1:7317/`. Works from cmd.exe and PowerShell, pasted identic
 
 > ⛔ **HISTORICAL — Phase 2, CLOSED and MERGED. Directs nothing.** → **§ ACTIVE SESSION WORK PACKAGE**. *(Banner added 2026-08-07, route step 11: this top-level heading was the only superseded section in the map carrying no banner, so a reader skimming headings could have read it as live.)*
 
-**Set by Warwick, 2026-08-04, at the rotation boundary. The fresh session owns implementation. Nothing here has been started.**
+~~**Set by Warwick, 2026-08-04, at the rotation boundary. The fresh session owns implementation. Nothing here has been started.**~~ ⛔ **FALSE AND SUPERSEDED — re-cut 2026-08-07 (Veritas N-1).** This sits two lines under §13's own **CLOSED and MERGED** banner. Phase 2 shipped. **Directs nothing.**
 
 ## 13.1 North Star — his words
 
@@ -1985,10 +1985,10 @@ All three investigations have landed and their findings are recorded above. **WP
 | # | Step | Owner | State |
 |---|---|---|---|
 | **1** | **Keel returns and JOB 2 is integrated** | Keel → Larry | ✅ **DONE.** Integrated at **`8b0528b`**, independently verified — 56/56, `ding.mjs` byte-identical across the addendum, Larry's own surviving mutation now caught (5 red) |
-| **2** | **Mack installs the versioned FusionDevBot sender** | **Mack** | **IN FLIGHT.** `WO-2026-08-06-20` (WP-4C) dispatched at `0cc2ffe`. Hand-authored on the WP-3E `machine_surface` shape — see G-6 |
+| **2** | **Mack installs the versioned FusionDevBot sender** | **Mack** | ⛔ **SUPERSEDED — the row DIRECTLY BELOW records this same install as ✅ DONE.** *(Re-cut 2026-08-07, Veritas D-4: the exact shape repaired at `:2685`, surviving at a second location.)* ~~IN FLIGHT.~~ `WO-2026-08-06-20` (WP-4C) dispatched at `0cc2ffe`. Hand-authored on the WP-3E `machine_surface` shape — see G-6 |
 | **2b** | **WP-4C install** | Mack | ✅ **DONE.** Installed sha `0f26ef16…` **equals the git blob**, verified independently by Larry; 0 CR bytes; rollback **executed** (absent→install→delete→verify→reinstall→equal); `INSTALLED-FROM.txt` appended with **append-only PROVEN** (first 8,310 bytes hash to the pre-write baseline) |
 | **3** | **Prove J2-e — ONE REAL MESSAGE arriving from the INSTALLED path**, credentials self-loaded, **no `--env-file` and no shell preparation** | **Larry**, then Warwick's eyes | ✅ **FIRED AND DELIVERED — see §17.7** |
-| **4** | **Veritas reviews the exact integrated head** | **Veritas** | **NEXT** |
+| **4** | **Veritas reviews the exact integrated head** | **Veritas** | ⛔ **STALE — THIRTEEN reviews later.** ➡️ **SEE § ASSURANCE STANDING.** *(Re-cut 2026-08-07, Veritas D-5.)* ~~NEXT~~ |
 | ~~**5**~~ | ~~**`/rotate` and reach `SAFE TO CLEAR`** — now including the Pax report INSIDE the transaction~~ | Larry + Pax | ⛔ **SUPERSEDED 2026-08-07 — this row's "Not started" is FALSE. `/rotate` has since completed TWICE** (Sub-phase 4A close, and the in-flight 4B rotation). → **§ ROTATION** below. |
 | ~~**6**~~ | ~~A fresh Larry picks up the Pax commission on the other side~~ | — | ⛔ **REVERSED 2026-08-06 — see §17.5a** |
 
@@ -2598,7 +2598,7 @@ node "C:/Users/Buggly/.mypka/governor/ding.mjs" <message-file>
 | **Phase** | **BUILD-020 Phase 4 — Sub-phase 4B in flight.** ➡️ **Gate standing: SEE § ASSURANCE STANDING — the single source. Do not restate it here.** *(Re-cut 2026-08-07, Veritas Gate 1 @ `30666f1`, blocking. This row was authored at `f6ce6a1` — BEFORE Amendments 4 and 6 — and was never re-cut. It said `Gate 1/2 HOLD at older head`, false in both halves, and conditioned Gate 2 on `row 3 honest acceptance` when **Amendment 4 DESCOPED row 3** fifteen lines above the map own instruction not to cite it as owed.)*<br>**🔴 THE FIFTH RESTATEMENT, and how it survived: Larry verified the SSOT fix by grepping for the sentences he had just rewritten. This row matched none of them because he had never read it.** **Verify by READING THE WHOLE TABLE, never by searching strings you already know.** |
 | **Evidence pack** | `Deliverables/2026-08-06-amended-wp-recon-evidence.md` |
 | **Private surface (CareerAIR only)** | **`C:\.fusion247\private\careerair\**`** — never `C:\.fusion247\**` root/parent |
-| **Authorised product decision (C-10)** | **Supersedes** prior “visibility first, automation decision separate.” Warwick **authorises restoration/completion of the already-intended automatic CareerAIR Outlook collection route** for this package. Linked: [[Deliverables/BACKLOG]] C-10 **moved out of candidate** into this authorised WP. |
+| **Authorised product decision (C-10)** | ⛔ **SUPERSEDED BY AMENDMENT 4 — re-cut 2026-08-07 (Veritas N-6).** This row read as a LIVE authorisation of **row 3**, which **Amendment 4 DESCOPED and parked in [[Deliverables/BACKLOG]] C-10**. **Row 3 is not graded, not owed, and its FAIL is not blocking.** *(The live CareerAIR intake alerter that was firing every 30 minutes about this very descoped path was disabled 2026-08-07 — it was monitoring work deliberately stopped.)* |
 | **Interrupt Warwick only for** | ➡️ **THE SEVEN NAMED REASONS in root `CLAUDE.md` § "When Warwick may be interrupted". That closed list governs; this row does not restate it.**<br>🔴 **RE-CUT 2026-08-07 — this row listed `Veritas verdict` as an interrupt reason, which is NOW FALSE and was causing exactly the false handbacks Warwick corrected Rule 4a to stop.** **A gate verdict is a NOTIFICATION, not a handback:** send the ding when the written criteria apply, post, **then CONTINUE** — stop only for one of the seven. **Found by READING this table row by row, which is the method the fifth restatement proved necessary.** |
 
 ### Package composition (Warwick)
@@ -2734,7 +2734,7 @@ Any newly discovered **unrelated** defect: record once in [[Deliverables/BACKLOG
 
 | | |
 |---|---|
-| **Gate 1 — current** | **FAIL @ `b62a9fc` → rows 1, 2 and 4 ALL PASS; overall FAIL carried SOLELY by the enumeration / document-currency dimension.** Then **FAIL @ `30666f1`** — same dimension, a fifth restatement (the header `Phase` row). Receipts: `…-b62a9fc-receipt.md` (`sha256 c1161514…`) · `…-30666f1-receipt.md` (`sha256 5a622113…`). *(E-3 @ `30666f1`: this row previously led with an older head and reached the current one mid-sentence — accurate in full, skimmable wrong.)* |
+| **Gate 1 — current** | **HOLD @ `3a1e670`** — rows 1, 2 and 4 **PASS**; enumeration dimension **HOLD**; all remaining findings **non-blocking**. *(Prior: FAIL @ `b62a9fc`, FAIL @ `30666f1`.)* Receipt: `…-3a1e670-receipt.md` (`sha256 3b290818…`). **⚠️ THIS CELL MUST LEAD WITH THE CURRENT HEAD.** *(D-2 @ `3a1e670`: it was reported repaired at `30666f1` and was NOT — it still led with an older head and reached the current one in a later sentence. Identical shape, one head on, same cell.)* |
 | **Gate 1 — history** | **FAIL @ `0cf70c9`** · HOLD @ `f0d2614` · FAIL @ `3e4c9d9` · FAIL @ `275ec07` · FAIL @ `443d0fa` · HOLD @ `19fc792` · FAIL @ `3254c69` · FAIL @ `07aa166` · FAIL @ `b62a9fc` · FAIL @ `30666f1`. **Every FAIL was documentation, never the engineering.** *(E-2 @ `30666f1`: `0cf70c9` was omitted while the equally pre-4B `f0d2614` was included — an inconsistent cut, now corrected.)* |
 | **Gate 2 — current** | **FAIL @ `07aa166`.** **DISPATCHED AND ANSWERED.** The mandatory question — *"Can Warwick now do the thing this phase promised, in the real intended context?"* — answered **NO**: on `:8090`, `/api/rotation-reports` is **404** and `/api/health` serves the pre-WO-24 payload at `c1ed028`. **None of 4B is reachable on the surface Warwick uses.** Receipt: `Deliverables/2026-08-07-veritas-gate2-phase4-07aa166-receipt.md` (`sha256 5d4d489a…`) |
 | **Codex** | ⛔ **NOT ELIGIBLE.** Requires Gate 1 PASS at the exact head, CI green, head frozen, **and Warwick's explicit authority**. |
@@ -2748,7 +2748,9 @@ Any newly discovered **unrelated** defect: record once in [[Deliverables/BACKLOG
 > **Warwick's instruction of 2026-08-07 already places it, verbatim:** *"When Codex becomes genuinely eligible, trigger the real PR #97 Codex QA. That real Codex execution is also the binding TowerBot production acceptance."*
 > **So: `codex_qa_started` acceptance is routed AFTER Gate 1 PASS, to the real Codex run. It does not gate Gate 1.** **Larry did not reclassify anything — this records Warwick's routing.** **And it is NOT accepted until that real sequence is seen: no fixture, database inspection or Veritas statement substitutes for it.**
 
-### 📋 VERITAS GATE 1 RETURNED — **FAIL** at `3e4c9d9`, 2026-08-07
+### 📋 HISTORICAL — the FIRST Gate 1 return of Sub-phase 4B (). ➡️ **CURRENT standing: SEE § ASSURANCE STANDING, 22 lines above. DO NOT read gate state from this heading.**
+
+> ⛔ **Re-cut 2026-08-07 (Veritas @ `3a1e670`, D-1). Head-bound and therefore not FALSE — which is why it was never a FAIL — but SIX VERDICTS STALE, the last restatement never converted to a pointer, and the surface a skimmer resolves by. It escaped a prior enumeration because that search matched `FAIL @`/`FAIL at` and this text reads `**FAIL** at` — markdown emphasis between the two words defeated the pattern.**
 
 **Receipt:** `Deliverables/2026-08-07-veritas-gate1-subphase-4b-3e4c9d9-receipt.md` · `receipt_sha256` **`1341ef86…`**, independently recomputed by Larry and matching. **Rows 1, 2 and 4 each HOLD; overall FAIL.** Two dimensions FAIL: **Documentation truth** (Defect 1) and **Completed automation** (Amendment 9). **The FAIL is carried by the map and by one disabled scheduled task — not by the engineering.** Veritas found **no false completion claim** anywhere in the package and rated **Residual risk PASS**, its strongest dimension: every limitation it independently confirmed was already named honestly here.
 
@@ -2818,6 +2820,8 @@ Any newly discovered **unrelated** defect: record once in [[Deliverables/BACKLOG
 
 - ✅ **PROVEN — the machine-global governor half.** Nine installed modules under `~/.mypka/governor/` (`ding`, `continuity`, `footer`, `statusline-live`, `evaluator`, `health-store`, `reorient`, `sampler`, `atomic-write`). A **brand-new process** read the installed continuity state successfully and recovered the live `focus` — *"BUILD-020 Phase 4 · Sub-phase 4B IN FLIGHT (not closed)…"*. Every invocation of these is already a fresh process, so this is the property itself, not a proxy for it.
 - ⬜ **NOT PROVEN — the installed SERVICE half**, and it is **not executable pre-merge.** Restarting the live Cockpit or the local supervisor `MyPKA-Local-Services-Live` means **touching the live runtime**, which Warwick's standing constraint forbids before an authorised merge, and the supervisor is additionally elevation-gated. **Recorded as OWED at route step 18. Not claimed, and the row-1 property is NOT asserted as met.**
+| # | Item | State |
+|---|---|---|
 | ⑫ | **Amendment 8 Vex review** — fired, **RED**, and the exposure was **confirmed live on the running Cockpit** | ✅ **DONE** |
 | ⑬ | **WO-31 security repair** — handler extracted, origin decision on the request, 403 before body read and before forward | ✅ **INTEGRATED @ `02c4520`**, CI gate registered @ `3254c69` |
 | ⑭ | **Independent re-verification** — Vex GREEN at `3254c69`, 124 assertions, 24 bypass shapes | ✅ **DONE.** ⛔ **Conditional on R1 — see below** |
