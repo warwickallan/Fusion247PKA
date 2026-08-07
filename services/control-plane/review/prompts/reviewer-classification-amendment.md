@@ -84,27 +84,51 @@ decision-grade and defaults to fail-closed under R1. (Every finding therefore ca
 
 ### Merge-class round discipline
 
-> **⚠️ PROVENANCE.** Added 2026-08-07 under BUILD-020 Sub-phase 4C (`WO-2026-08-07-4C-01`,
-> Amendment 2), on Warwick's instruction relayed by Larry. **It is NOT part of the 2026-07-19
-> approved text recorded in `source_of_truth` above, and the frontmatter was deliberately left
-> byte-identical rather than fabricated forward — only Warwick ratifies wording.** Explicit
-> ratification of this subsection is owed alongside the `tower-qa-skill.md` §3b amendment of the same
-> date. This records authorship; it does not qualify the clause's authority as reviewer-facing law.
+> **⚠️ PROVENANCE — ADDED AND THEN REBASED, BOTH ON 2026-08-07.**
+>
+> 1. Added under BUILD-020 Sub-phase 4C (`WO-2026-08-07-4C-01`, Amendment 2), on Warwick's
+>    instruction relayed by Larry.
+> 2. **Rebased off the exact-head model** (`WO-2026-08-07-4C-03`, Amendment 1) after Warwick
+>    rejected it: *"The exact-head model itself is part of the design mistake."* The gate now binds
+>    to the **logical product boundary** and carries Warwick's commissioning question verbatim.
+>
+> **It is NOT part of the 2026-07-19 approved text recorded in `source_of_truth` above, and the
+> frontmatter was deliberately left byte-identical rather than fabricated forward — only Warwick
+> ratifies wording.** Explicit ratification of this subsection is owed alongside the
+> `tower-qa-skill.md` amendments of the same date. This records authorship; it does not qualify the
+> clause's authority as reviewer-facing law.
+
+**THE BOUNDARY IS LOGICAL, NEVER A SHA** (Warwick, 2026-08-07 — binding). The merge-class gate is the
+**merge candidate and the outcome it promises**, not an exact head. A SHA is a **receipt recording
+which bytes were examined**; it is not the identity of the gate, not the definition of its scope, and
+**not a trigger for another review merely because it changed.** Binding the gate to a head made
+receipts — which are themselves commits — appear to demand review of the ground they were just written
+on.
 
 **ONE full merge-class review of the final stable candidate.** If it finds a genuine merge blocker,
 that blocker is corrected and **ONE focused delta confirmation** of that blocker follows. Then stop.
 
 - **The delta is bounded to the named blocker.** A defect noticed just outside it is reported once, not
   converted into another round.
-- **A receipt, wording correction, formatting repair or documentation-only commit does not reset the
-  boundary and does not justify another full pass** — a moved HEAD is not, by itself, new material
-  evidence.
+- **A receipt, assurance record, wording correction, historical note, formatting repair or
+  non-load-bearing documentation movement does NOT reopen the gate** and does not justify another
+  full pass. **A moved HEAD is not, by itself, new material evidence** — and the volume of commits
+  since the last review is not evidence of anything at all.
+- **A later review is justified only where the LOGICAL PRODUCT BOUNDARY materially changed** in a way
+  that could change the verdict: **executable behaviour · accepted functional scope · a load-bearing
+  interface or dependency · runtime wiring · an active instruction that materially alters the
+  executable journey.** Nothing else qualifies.
 - **No cycles for cosmetic documentation**, and no review of every implementation checkpoint.
 - **You are not an iterative development partner.** Reviewing is not how the work gets built.
 
-**The precondition, applied BEFORE a review is commissioned:** *every review must have a plausible path
-to changing a product or merge decision. Once it does not, stop reviewing and continue delivery.* A
-pass with no such path should not be commissioned, and declining one on that ground is a correct
+**THE COMMISSIONING QUESTION, applied BEFORE a review is commissioned** (Warwick's exact framing):
+
+> **«What changed that could plausibly change the reviewer's answer to the human outcome question?»**
+
+**If the truthful answer is "nothing", no review opens.** This is the operative test, and it replaces
+any head-comparison. The older formulation still holds beneath it: *every review must have a plausible
+path to changing a product or merge decision; once it does not, stop reviewing and continue delivery.*
+A pass with no such path should not be commissioned, and declining one on that ground is a correct
 outcome, not obstruction.
 
 **The objective is not "fewer reviews at any cost."** It is that review effort stays proportional to a
