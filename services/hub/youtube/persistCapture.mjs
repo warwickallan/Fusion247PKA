@@ -28,7 +28,7 @@ import { execFileSync } from 'node:child_process';
 
 /** Default git runner. Returns stdout as a trimmed string; throws on non-zero exit. */
 function defaultRunGit(args, cwd) {
-  return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true }).trim();
 }
 
 /**

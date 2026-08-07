@@ -41,7 +41,7 @@ const db = new pg.Client(gatewayDsn());
 function runTubeair(url, videoId) {
   const py = path.join(TUBEAIR, '.venv/Scripts/python.exe');
   const r = spawnSync(py, ['tubeair.py', '--url', url, '--out', OUT, '--languages', 'en,en-US,en-GB', '--note', 'BUILD-002 WP2 auto-detect'],
-    { cwd: TUBEAIR, encoding: 'utf8', timeout: 180000 });
+    { cwd: TUBEAIR, encoding: 'utf8', timeout: 180000, windowsHide: true });
   if (r.status !== 0) return { ok: false, error: (r.stderr || r.stdout || 'tubeair failed').split('\n').slice(-3).join(' ') };
   const outRoot = path.join(TUBEAIR, OUT);
   // NEWEST matching packet dir + manifest.video_id validation (QA2-A: a stale/mismatched older packet
@@ -145,7 +145,7 @@ async function nudgePending() {
   const tmp = path.join(os.tmpdir(), `yt-nudge-${pend.map((p) => p.video_id).join('-').slice(0, 40)}.txt`);
   try {
     fs.writeFileSync(tmp, msg);
-    const r = spawnSync(process.execPath, ['--env-file=C:/.fusion247/fusion-capture-gateway.env', 'C:/.fusion247/larry-ding.mjs', tmp], { encoding: 'utf8' });
+    const r = spawnSync(process.execPath, ['--env-file=C:/.fusion247/fusion-capture-gateway.env', 'C:/.fusion247/larry-ding.mjs', tmp], { encoding: 'utf8', windowsHide: true });
     if (r.status === 0) {
       for (const p of pend) await db.query(`update cockpit.youtube_source set pending_nudged_at=now() where video_id=$1`, [p.video_id]);
       console.log(`[watch]   nudged Warwick about ${pend.length} pending note(s)`);

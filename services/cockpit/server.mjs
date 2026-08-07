@@ -7,13 +7,16 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
-import { execSync, spawn } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { q, w } from './db.mjs';
 import { privateAppsResponse, privateAppsStartupLine } from './private-apps.mjs';
 // Static serving — including the overlay route — lives in static.mjs so a gate can EXECUTE it.
 // It cannot be executed from here: this file imports db.mjs, which opens a live write pool on load.
 import { serveStatic, staticCtx } from './static.mjs';
 import { whyDown } from './down-reason.mjs';
+// Build provenance lives in provenance.mjs for the same reason as static.mjs above — so a gate can
+// EXECUTE it — and it answers a harder question than the git one-liner it replaces. See its header.
+import { provenancePayload } from './provenance.mjs';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
 // The serving context — which directory is served, and which tree the overlay must stay out of —
@@ -29,9 +32,12 @@ const BIND = process.env.COCKPIT_BIND || '127.0.0.1'; // localhost; Tailscale se
 // MIME moved to static.mjs with the serving code that uses it — it had no other reader here.
 
 // Build identity so the app can show "you're on the latest" and tell itself apart from Directus/old URLs.
-let SHA = 'dev'; try { SHA = execSync('git rev-parse --short HEAD', { cwd: DIR }).toString().trim(); } catch { /* not a repo */ }
+// Taken ONCE at startup, deliberately: the question /api/health answers is "what is this process
+// running", and this process loaded those bytes here. A per-request answer would describe the working
+// tree as it is now, which is the very confusion the old git-only line caused.
+const PROVENANCE = provenancePayload();
 let VERSION = '0.0.0'; try { VERSION = JSON.parse(fs.readFileSync(path.join(DIR, 'package.json'), 'utf8')).version; } catch { /* no pkg */ }
-const BUILD = { version: VERSION, sha: SHA, startedAt: new Date().toISOString() };
+const BUILD = { version: VERSION, sha: PROVENANCE.sha, startedAt: new Date().toISOString() };
 
 // Governed intent queues the surface may file into, with their allowlisted payload columns.
 const INTENTS = {
@@ -451,7 +457,7 @@ const server = http.createServer(async (req, res) => {
           // favours recall, persists the converged atoms. Rich sources take longer (T2, several min); atoms appear
           // in /api/state when done. neo4j.env is OPTIONAL (only the non-model graph enrichment uses it, which
           // degrades gracefully): --env-file-if-exists so a MISSING neo4j.env can never stop Arc from launching (TQA-001).
-          const p = spawn('node', ['--env-file=C:/.fusion247/fusion-capture-gateway.env', '--env-file-if-exists=C:/.fusion247/neo4j.env', `${REPO}/services/control-plane/cockpit/arc.mjs`, v], { detached: true, stdio: 'ignore', cwd: REPO });
+          const p = spawn('node', ['--env-file=C:/.fusion247/fusion-capture-gateway.env', '--env-file-if-exists=C:/.fusion247/neo4j.env', `${REPO}/services/control-plane/cockpit/arc.mjs`, v], { detached: true, stdio: 'ignore', cwd: REPO, windowsHide: true });
           p.unref();
           j(res, 200, { ok: true, mining: v });
         } catch (e) { j(res, 500, { ok: false, error: e.message }); }
@@ -477,7 +483,7 @@ const server = http.createServer(async (req, res) => {
       // Fire Mason's synthesis over the whole atom estate, detached (one Sonnet pass, ~5 min) — surfaced
       // opportunities appear in /api/state when done. This is the cockpit trigger for lifecycle Step 4.
       try {
-        const p = spawn('node', ['--env-file=C:/.fusion247/fusion-capture-gateway.env', `${REPO}/services/control-plane/cockpit/mason-synthesise.mjs`], { detached: true, stdio: 'ignore', cwd: REPO });
+        const p = spawn('node', ['--env-file=C:/.fusion247/fusion-capture-gateway.env', `${REPO}/services/control-plane/cockpit/mason-synthesise.mjs`], { detached: true, stdio: 'ignore', cwd: REPO, windowsHide: true });
         p.unref();
         return j(res, 200, { ok: true, synthesising: true });
       } catch (e) { return j(res, 500, { ok: false, error: e.message }); }
@@ -498,7 +504,9 @@ const server = http.createServer(async (req, res) => {
       });
       return;
     }
-    if (req.url.startsWith('/api/health')) return j(res, 200, { status: 'ok', build: BUILD });
+    // The four provenance fields are the object provenance.mjs builds and the gate executes — the
+    // endpoint does not assemble its own version of the answer.
+    if (req.url.startsWith('/api/health')) return j(res, 200, { status: 'ok', build: BUILD, ...PROVENANCE });
     return serveStatic(req, res, STATIC);
   } catch (e) { j(res, 500, { ok: false, error: e.message }); }
 });

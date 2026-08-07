@@ -29,7 +29,16 @@ Install on the phone: open that URL in Chrome → menu → **Add to Home screen*
 ## Endpoints
 - `GET /api/state` — attention (open+deferred), outputs, ingested, wins, builds
 - `POST /api/decide` — `{id, decision: accept|decline|defer|reopen, intent?, args?}`
-- `GET /api/health`
+- `GET /api/health` — `{status, build, sha, dirty, provenance, sourceHash}`, all four provenance
+  fields taken **once at startup** so they describe the process that is running, not the working tree
+  as it is now:
+  - `sha` — short git SHA, or `dev` when git could not answer.
+  - `dirty` — `true`/`false` when git could answer; `null` means **unknown**, never "clean".
+  - `provenance` — `clean` · `dirty` · `not-a-repo` · `git-unavailable`.
+  - `sourceHash` — digest over the bytes of the modules `server.mjs` actually loads. Computed with
+    `fs` only and **never consults git**, so it stays true when the git answer is stale, wrong or
+    absent. Built by `provenance.mjs`; executed by `provenance-check.mjs`, which also fails if the
+    module list drifts from what `server.mjs` imports.
 
 ## Not yet (see Deliverables/BACKLOG.md)
 Autostart-on-boot (held until accepted over Directus); inline TubeAIR-packet render in Outputs;
