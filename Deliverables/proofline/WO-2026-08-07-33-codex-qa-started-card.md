@@ -53,6 +53,9 @@ file_surface:
   - services/control-plane/tower-loop/notify.mjs
   - services/control-plane/tower-loop/pollPrComments.mjs
   - services/control-plane/tower-loop/test/notify.test.mjs
+  # AMENDED IN PLACE 2026-08-07 (Amendment 1) - the operative envelope carries the grant.
+  - services/control-plane/tower-loop/watcher.mjs              # M1 Option 2: ONE notify() call in processTurn
+  - services/control-plane/tower-loop/test/run-tower-loop-tests.mjs   # M2: the DB-backed dedup proof for AC4
 out_of_scope_policy: report-only
 
 # --- contract and capability compatibility ---
@@ -194,3 +197,37 @@ operational_handoff: none
      Before issue, RECOMPUTE: node tools/wo/envelope.mjs --count-markers <file>
      An order is unready while either recomputed count is above zero AFTER Larry authors slots.
      Do not treat this footer as current once the file has been edited. -->
+
+
+---
+
+## AMENDMENT 1 — Larry, 2026-08-07, answering Keel's `CLARIFY`
+
+**The read-back found my emission point was wrong for Warwick's literal requirement. Both decisions go Keel's way.**
+
+### M1 — **OPTION 2. `watcher.mjs` is added to `file_surface` for ONE `notify()` call.**
+
+**Warwick's words are literal: *"emitted when the real Codex QA execution begins."*** Keel established that `ensureCheckpointTurn` is where a round is **requested**, not where Codex **executes**, and named **five** recorded ways the QA never runs after that point — the fail-closed findings gate, an unreadable skill file, **unresolved git evidence**, `detectMergeClass` not firing, and `claimOne` returning null.
+
+**Option 1 would have shipped a card announcing a run that may never start, on the one channel Warwick cannot reply through.** That is the order's own stated failure mode — *"a card saying QA started without saying of what is worse than no card"* — in a worse shape: **a card asserting a state that is false.**
+
+**Emit inside `processTurn`, immediately before `doReview` / `doMergeReview`** — past the disposition gate, with `turnRow.pr_number` and `turnRow.head_sha` in hand, on the **real turn id**, ahead of `fireTriggers` by construction. **This also covers every QA origin, not just checkpoint comments** — `loop.mjs`, `bridge-ingest.mjs` and `seed.mjs` currently produce the four verdict cards with no started card, and Option 2 fixes that too.
+
+**Two constraints Keel proved and which are now binding on the implementation:**
+
+1. **The card MUST carry the real turn id. Never `null`.** SQLite treats each NULL as distinct in the unique index, so a `null` turn id would **re-announce every poll round, forever**. This is the one genuine double-fire vector.
+2. **The call must be UNCONDITIONAL — not gated on `checkpoint.created === true`.** A crash between the turn insert and the notification insert would leave `created === false` on every later round and **the card would be lost permanently**. Let the index be the idempotency, exactly as `notify.mjs`'s own header demands: *"IDEMPOTENCE IS THE DATABASE'S, NOT THIS MODULE'S."*
+
+### M2 — **GRANTED. `test/run-tower-loop-tests.mjs` added** so AC4 is provable by execution.
+
+Keel was right that the declared composer-only test cannot prove DB-backed dedup, and right to refuse to cite an argument-from-index as executed proof.
+
+### Accepted without change
+- **C3** — runtime files are **content-identical, differing only in line endings** (CRLF vs LF, `core.autocrlf=true`). **Recorded so an alignment hash comparison is not misread as drift** — the same trap the map already carries for `sourceHash`.
+- **C4** — dispatch head `58df36d` vs order header `6e7ed6e`: ancestor, all four canonical blobs identical at both. **No governance difference.**
+- **C5** — clerical `document_impact` path. Noted.
+
+### Unchanged
+`round = 1` untouched · no supervisor or deadman · no Telegram input surface · **do not touch anything under `~/.mypka/**`** — alignment and restart are Larry's.
+
+**No second read-back required.** Proceed.
