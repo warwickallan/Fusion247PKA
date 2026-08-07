@@ -191,3 +191,44 @@ operational_handoff: none
      Before issue, RECOMPUTE: node tools/wo/envelope.mjs --count-markers <file>
      An order is unready while either recomputed count is above zero AFTER Larry authors slots.
      Do not treat this footer as current once the file has been edited. -->
+
+---
+
+## AMENDMENT 1 — Larry, 2026-08-07, in answer to Keel's read-back verdict `CLARIFY`
+
+**The read-back found a genuine defect in this order and two genuine gaps. All three clarifications are confirmed, and one acceptance criterion is withdrawn as already satisfied.**
+
+### ① AC3 mutation — IN MEMORY ONLY. Confirmed, and the order was wrong as written.
+
+**AC3 as originally written would have required a write to `services/cockpit/public/app.js`, which is OUTSIDE the declared `file_surface` and is Felix's surface.** A temporary write is a write. **Keel was right to refuse that reading and right that the file's own `--self-test` already mutates templates in memory via `opts.template.replace(anchor, …)` + `Vue.compile`.**
+
+- **Mutate in memory. Never write `app.js`. Evidence the non-write with `git status --porcelain services/cockpit/public/app.js` returning empty.**
+- **CONFIRMED AND ADOPTED — make the rotation-block mutation cases PERMANENT inside `--self-test`**, rather than a one-off run reported in a return. **This is strictly better than what I asked for.** CI already executes `--self-test` before the gate, so **the red count is regenerated on every CI run instead of resting on Keel's say-so in a message that will be cleared.** A control that is re-proven by the machine each run is durable; one proven once in a return is a memory. **Keep the loud abort if the mutation anchor is gone** — a mutation that silently stops mutating is a green that means nothing.
+
+### ② The verdict layer — CONFIRMED, add it.
+
+**Keel established by execution that AC2 was unsatisfiable by the instrument as it stands:** dropping the `v-if="rrHas(r.elapsedMinutes)"` guard makes `rrInt(null)` return `"0"` because `Number(null) === 0`, the template compiles, nothing throws, no binding is missing, no stray blob appears — **and the check passes today.** That is exactly Warwick's "`Unknown`, `not established` and `0` are materially different" collapsing silently.
+
+- **Add the `ok(name, cond, detail)` / `ran` / `failed` verdict layer over the RENDERED VISIBLE TEXT, in the house shape already shipped in `rotation-report-check.mjs`.** Hard-fail on zero executed assertions.
+- **The scenario/render mechanism stays untouched** — this adds a verdict on the text that mechanism produces. That is not the "second mechanism" AC1 prohibits, and the distinction is accepted on the record.
+- **"Assertion count before = 0" is the honest answer.** No assertion concept exists in this file yet. Report it as 0, not as an absence.
+
+### ③ Assumption 1 — CONFIRMED. AC1 item 2 is the OUT-OF-ORDER case.
+
+Item 1 = the correctly-ordered pair, asserting `rrOrderBreak` does **not** fire. Item 2 = the out-of-order case, asserting the **ORDER WRONG** branch renders and names the break index. **Keel's reading is better than my wording and is adopted.** That branch is rendered by no scenario today, which is the Defect 5 class exactly.
+
+### ④ AC5 — WITHDRAWN. Already satisfied; there is no work in it.
+
+**Keel proved it by execution:** `.github/workflows/cockpit-private-apps.yml` lines 67–69 already run `--self-test` then the check, and the workflow **deliberately carries no `paths:` filter** — its own comment records why (a path-filtered workflow vanishes from `gh run list` and an absent run reads as green). New scenarios inherit CI with no registration change; `provenance-check.mjs` is registered too, at line 100.
+
+**AC5 is discharged BY EVIDENCE, not by work.** The `.github/**` carve-out goes unused and **the diff must be one file.** *(I cited the `provenance-check.mjs` precedent as if it repeated here. It does not. Checking whether the precedent applied before invoking it was my job, not Keel's.)*
+
+### ⑤ Accepted without change
+
+- **Assumption 2 — inline synthetic fixtures, structurally faithful to `mapReport`, and NO real figures from Warwick's actual rotation reports as literals.** Correct, and holding the line WO-26's AC6 held. **Reported-not-fixed noted:** `rotation-report-check.mjs:155` appears to assert on real report figures — **outside this surface, recorded once, not a Work Order.**
+- **Assumption 3** — assertions added for the System scenarios only. **Retro-fitting the 16 asdair scenarios would be scope expansion; do not.**
+- **④ envelope drift** — the order's `governance_sha` says `66d0cf1` while HEAD is `3288eeb`, the order's own commit. **Keel verified the contract blob is byte-identical at both heads (`500c6c5171…`), so nothing is affected.** Recorded because a self-verifying line that has quietly gone stale is exactly what nobody looks at twice. **Governing head for this work is `3288eeb`.**
+
+### Standing instructions unchanged
+
+**No second read-back is required** — every clarification above confirms a proposal Keel made himself. **Proceed to implementation.** Everything else in the original order stands: do not start the Cockpit server, do not touch the live clone or port 8090 or any scheduled task, do not repair `db.mjs` *(now separately authorised by Warwick under Amendment 10 ③ and routed to its own Work Order — still not this one)*, commit and push by explicit pathspec, never `git add -A`, no PR, no merge.
