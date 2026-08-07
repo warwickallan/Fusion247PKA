@@ -2396,6 +2396,18 @@ node "C:/Users/Buggly/.mypka/governor/ding.mjs" <message-file>
 > 7. **the system consumed extraordinary context and specialist effort while repeatedly finding documentation defects rather than product defects.**
 >
 
+> #### 🔴 CAPAE DEFECT — **CONTINUITY IS COUPLED TO CAPAE REPORTING.** Recorded 2026-08-07 on Warwick’s instruction.
+>
+> **The `/rotate` contract makes the Pax session report a HARD PREREQUISITE of safe resumption** — step 6 *"WAIT for Pax… do not proceed to the continuity publish without it"*, and step 12 *"Never report `SAFE TO CLEAR` with the report missing."*
+>
+> **So a slow or unavailable Pax blocks Larry from preserving state, rotating, resuming productive work and remaining available.** That happened this session: Larry idled on a running Pax instead of publishing a truthful packet he already had every field for.
+>
+> **Warwick’s correction, and it is the 4C requirement:**
+>
+> > **CONTINUITY = the minimum state required to resume safely. CAPAE = asynchronous analysis and enrichment.** **A slow or unavailable Pax must NEVER prevent Larry from preserving state, rotating, resuming productive work, or remaining available. CAPAE enriches the next session; it does not hold the door shut.**
+>
+> **What was done instead of rebuilding anything:** continuity was **published and read back through the installed path with the minimum truthful state**, so resumption is safe **whether or not the report ever lands**. **No machinery was invented, worked around or rebuilt** — Warwick forbade that, and the coupling is recorded here as 4C’s to resolve.
+
 > #### 🔴 CAPAE EFFECTIVENESS EVIDENCE — 2026-08-07, recorded on Warwick's instruction. **The correction was CORRECT, PRESENT and CANONICAL, and the behaviour regressed anyway.**
 >
 > **The sequence, verified by Warwick independently — not asserted by Larry:**
