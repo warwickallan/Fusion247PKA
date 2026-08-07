@@ -175,6 +175,6 @@ API + shell routes also executed against live ports Warwick uses (`8090` / tailn
 
 - Zapier Zap creation / Funnel enable (account-authority)
 - Full Veritas Gate 1 / Gate 2 / Codex (after more integration)
-- Claude host hook install (next WP)
+- ~~Claude host hook install (next WP)~~ ⛔ **RE-CUT 2026-08-07 (Veritas Gate 1 @ `19fc792`, finding E-2, non-blocking).** *"next WP"* recorded this as **DEFERRED**. **Amendment 5 WITHDREW the outcome** — the reminder system is descoped and disabled. **It is not a next-WP item and there is no WP it is waiting for.** *(Same defect class as the four re-cut in the map, and it survived four map re-cuts because **it lived one document over**. Larry's grep of the map was correct and still missed it — the class is not confined to the artefact you last repaired.)*
 - C-1..C-9, C-11..C-15
 - Replacement-machine DR
