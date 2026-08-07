@@ -8,6 +8,7 @@
 
 **Written 2026-08-04 at the rotation boundary. Everything below was true when written and is a claim about the past, not the present.**
 
+
 | | |
 |---|---|
 | **Map path** | `Deliverables/2026-08-04-proofline-wayfinder-plan.md` — this file. The only BUILD-020 map. |
@@ -1732,6 +1733,7 @@ All three investigations have landed and their findings are recorded above. **WP
 
 **Read back immediately through the INSTALLED renderer:**
 
+
 | | |
 |---|---|
 | Packet | `cont-1785971013511-153-6svm8`, **content age 0h 0m** |
@@ -1878,6 +1880,7 @@ All three investigations have landed and their findings are recorded above. **WP
 ### 🔴 MEASURED FAILURE OF THE JUDGEMENT HALF — 2026-08-06, and it is evidence, not an apology
 
 **Warwick, verbatim, on being told step 2 was complete in chat with no ding: *"where we are is an update, so where was my ding!ffs"*** **He was right. Larry reported a substantive outcome in-channel and did not send it.**
+
 
 | | |
 |---|---|
@@ -2675,7 +2678,7 @@ Any newly discovered **unrelated** defect: record once in [[Deliverables/BACKLOG
 
 **✅ THE `/rotate` TRANSACTION IS COMPLETE — closed 2026-08-07 at `b0a1c99`.** Verified by execution in the following (fresh) session: report + payload committed · 4B loaded · Honcho packet published and readable with `focus` = *"ACTIVE PACKAGE = Sub-phase 4B"* · worktree clean · 0 ahead of `origin`. **The seven steps below are DISCHARGED and are retained as the record of that rotation, not as instructions.** *(Repaired 2026-08-07 in the 4B session: this block still read "THE REMAINING ACTION — complete `/rotate`" after the rotation had closed, which would have directed a fresh Larry to redo a finished transaction — the Amendment 6 ② failure condition. Repairing a stale directive is NOT an amendment to the 4A rotation record, which is untouched.)*
 
-### 📊 SUB-PHASE 4B — EXECUTION LOG (Larry, 2026-08-07). Progress only; **no completion claim, and no PASS — no Veritas receipt exists for any head below.**
+### 📊 SUB-PHASE 4B — EXECUTION LOG (Larry, 2026-08-07). Progress only; **no completion claim and no PASS from this log.** *(Corrected 2026-08-07, Veritas N-7: this said “no Veritas receipt exists for any head below”, which is FALSE — receipts exist for `443d0fa` and `3254c69`, both cited below it. ➡️ Gate standing: SEE § ASSURANCE STANDING.)*
 
 | Step | State | Evidence |
 |---|---|---|
@@ -2748,7 +2751,7 @@ Any newly discovered **unrelated** defect: record once in [[Deliverables/BACKLOG
 > **Warwick's instruction of 2026-08-07 already places it, verbatim:** *"When Codex becomes genuinely eligible, trigger the real PR #97 Codex QA. That real Codex execution is also the binding TowerBot production acceptance."*
 > **So: `codex_qa_started` acceptance is routed AFTER Gate 1 PASS, to the real Codex run. It does not gate Gate 1.** **Larry did not reclassify anything — this records Warwick's routing.** **And it is NOT accepted until that real sequence is seen: no fixture, database inspection or Veritas statement substitutes for it.**
 
-### 📋 HISTORICAL — the FIRST Gate 1 return of Sub-phase 4B (). ➡️ **CURRENT standing: SEE § ASSURANCE STANDING, 22 lines above. DO NOT read gate state from this heading.**
+### 📋 HISTORICAL — the FIRST Gate 1 return of Sub-phase 4B (head `3e4c9d9`). ➡️ **CURRENT standing: SEE § ASSURANCE STANDING, 22 lines above. DO NOT read gate state from this heading.**
 
 > ⛔ **Re-cut 2026-08-07 (Veritas @ `3a1e670`, D-1). Head-bound and therefore not FALSE — which is why it was never a FAIL — but SIX VERDICTS STALE, the last restatement never converted to a pointer, and the surface a skimmer resolves by. It escaped a prior enumeration because that search matched `FAIL @`/`FAIL at` and this text reads `**FAIL** at` — markdown emphasis between the two words defeated the pattern.**
 
@@ -2797,6 +2800,13 @@ Any newly discovered **unrelated** defect: record once in [[Deliverables/BACKLOG
 | ⑧ | Row 1 ② — survival scenarios **executed**, not classified | ✅ **DONE** — delete/recreate · fresh-from-main · machine-global. **`installed-runtime restart` NOT executed — see ⑨** |
 | ⑨ | **`installed-runtime restart`** *(Veritas @ `275ec07`)* | 🔶 **HALF PROVEN, and the halves are named** — see below |
 | ⑩ | **Branch-runtime HTTP path** *(Amendment 10 ② puts the branch runtime in THIS gate)* | ✅ **EXECUTED** — see below |
+| ⑪ | **Amendment 8 Vex review** — fired, **RED**, and the exposure was **confirmed live on the running Cockpit** | ✅ **DONE** |
+| ⑫ | **WO-31 security repair** — handler extracted, origin decision on the request, 403 before body read and before forward | ✅ **INTEGRATED @ `02c4520`**, CI gate registered @ `3254c69` |
+| ⑬ | **Independent re-verification** — Vex GREEN at `3254c69`, 124 assertions, 24 bypass shapes | ✅ **DONE.** ⛔ **Conditional on R1 — see below** |
+| ⑭ | **R1 accepted by Warwick** — cross-site no-`Origin` GET remains permitted; **the GREEN assumes GET on the private upstream is NON-MUTATING** | ✅ **ACCEPTED**, verification owed at step 18 |
+| ⑮ | **R2 — belt-and-braces guard** for unsafe methods with no `Origin` | ✅ **APPLIED — WO-32 @ `4c55781`.** ⛔ **DO NOT RAISE A WORK ORDER — IT IS MERGED.** *(Repaired 2026-08-07, Veritas Gate 2 D-1 blocking: this row still read OWED after the guard shipped — the identical failure this table was repaired for at `275ec07`.)* |
+| ⑯ | **WO-31 / WO-32 / WO-33 integrated; Tower runtime aligned** | ✅ **DONE** — see the execution-log rows below |
+| ⑰ | Re-freeze, complete CI, re-dispatch Gate 1 | ⬜ **OWED** |
 
 ### ✅ ⑩ BRANCH-RUNTIME HTTP PATH — EXECUTED 2026-08-07, with **ZERO production contact**
 
@@ -2820,15 +2830,6 @@ Any newly discovered **unrelated** defect: record once in [[Deliverables/BACKLOG
 
 - ✅ **PROVEN — the machine-global governor half.** Nine installed modules under `~/.mypka/governor/` (`ding`, `continuity`, `footer`, `statusline-live`, `evaluator`, `health-store`, `reorient`, `sampler`, `atomic-write`). A **brand-new process** read the installed continuity state successfully and recovered the live `focus` — *"BUILD-020 Phase 4 · Sub-phase 4B IN FLIGHT (not closed)…"*. Every invocation of these is already a fresh process, so this is the property itself, not a proxy for it.
 - ⬜ **NOT PROVEN — the installed SERVICE half**, and it is **not executable pre-merge.** Restarting the live Cockpit or the local supervisor `MyPKA-Local-Services-Live` means **touching the live runtime**, which Warwick's standing constraint forbids before an authorised merge, and the supervisor is additionally elevation-gated. **Recorded as OWED at route step 18. Not claimed, and the row-1 property is NOT asserted as met.**
-| # | Item | State |
-|---|---|---|
-| ⑫ | **Amendment 8 Vex review** — fired, **RED**, and the exposure was **confirmed live on the running Cockpit** | ✅ **DONE** |
-| ⑬ | **WO-31 security repair** — handler extracted, origin decision on the request, 403 before body read and before forward | ✅ **INTEGRATED @ `02c4520`**, CI gate registered @ `3254c69` |
-| ⑭ | **Independent re-verification** — Vex GREEN at `3254c69`, 124 assertions, 24 bypass shapes | ✅ **DONE.** ⛔ **Conditional on R1 — see below** |
-| ⑮ | **R1 accepted by Warwick** — cross-site no-`Origin` GET remains permitted; **the GREEN assumes GET on the private upstream is NON-MUTATING** | ✅ **ACCEPTED**, verification owed at step 18 |
-| ⑯ | **R2 — belt-and-braces guard** for unsafe methods with no `Origin` | ✅ **APPLIED — WO-32 @ `4c55781`.** ⛔ **DO NOT RAISE A WORK ORDER — IT IS MERGED.** *(Repaired 2026-08-07, Veritas Gate 2 D-1 blocking: this row still read OWED after the guard shipped — the identical failure this table was repaired for at `275ec07`.)* |
-| ⑰ | **WO-31 / WO-32 / WO-33 integrated; Tower runtime aligned** | ✅ **DONE** — see the execution-log rows below |
-| ⑪ | Re-freeze, complete CI, re-dispatch Gate 1 | ⬜ **OWED** |
 
 > ⚠️ **CI PRECISION — a correction to LARRY'S OWN REPEATED CLAIM** *(Veritas @ `3254c69`, non-blocking but it matters)*. Larry stated "all five workflows green at this exact head" at several heads this session. **That is literally true of only TWO of the five on `push`.** `governor-tests`, `control-plane-tests` and `build-002-tests` are **path-filtered on `push`** and ran only on `pull_request`, i.e. **against a merge commit, not the literal head tree.** Verified by Larry per workflow per event. **This is the estate's own "unrun CI looks like green CI" doctrine, and Larry walked into it while quoting it.** **The honest form is: two workflows green on `push` at the exact head; three green on `pull_request` against the merge commit.**
 
