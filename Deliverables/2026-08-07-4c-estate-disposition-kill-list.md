@@ -81,7 +81,7 @@ count is **zero**.
 | Refs whose only unique files are the two dead ones | **32** | Zero unique-useful files, measured by content. Includes the whole `build-015/*` and `idea-012/*` family — their implementation **did land**; `services/asdair/**` on `main` carries it. |
 | `stash@{0}` | 1 | `pg ^8.11.0 → ^8.22.0`. **`main` already has `^8.22.0`.** Superseded. |
 | Orphaned repo copy in `.claude/worktrees/agent-a039623889ea601df` | 1 | **No `.git` file — invisible to `git worktree list`.** 366 files, **2 absent from `main`**: the two dead files above. Zero unique-useful state. |
-| `C:\tb` | 1 | Duplicate YouTube capture. `dhbcVxYhWaQ` is already on `main` under `Team Knowledge/Sources/`. |
+| `C:\tb` | 1 | **Corrected on closer inspection — not a straight duplicate.** It is an **earlier capture of the same video** (`dhbcVxYhWaQ`): Warwick's live DevBot test of **2026-07-20T00:13:27Z**, `user_note: "Warwick live test via DevBot 2026-07-20"`. `main` carries a **later** capture of the same video (2026-07-22T02:35:02Z, `user_note: "BUILD-002 WP2 auto-detect"`). With newlines normalised, the **only** differences are `captured_at`, `user_note` and `output_dir` — the transcript and report body are the same. **The knowledge is canonical on `main`; the delta is capture metadata from a superseded run. Recorded here so the fact of that first live test is not silently lost, then discarded.** |
 | `C:\Fable-External-Repair` | 1 | 9 filesystem backups of files that are **all tracked in git**. Git history already holds every version — a backup of a tracked file is never unique state. |
 
 ---
