@@ -93,6 +93,29 @@ so that path has NEVER run. Warwick's ruling: leave it alone.**
 
 ---
 
+## 3b. SESSION-INDEPENDENCE — established from INSTALLED-RUNTIME FACTS, 2026-08-07. **NOT from a rotation.**
+
+> **Warwick, 2026-08-07 — explicit: *"NO ROTATION. I explicitly vetoed rotation. Do not 'prove survival across a rotation' now and do not make rotation an acceptance prerequisite. For this repair, establish session-independence from the installed-runtime facts already available."*** **The next genuine future rotation provides additional effectiveness evidence; it is NOT authority to rotate now.**
+
+**Each row verified by Larry directly, not taken from a worker report:**
+
+| Property | Evidence at 2026-08-07 |
+|---|---|
+| Machine-installed, **not** session-owned | **exactly one** tower-loop watcher, **PID 22708**, launched by the HKCU autostart chain — **no Claude session involved** |
+| **Outside** the worktree | executing from `~/.mypka/tower-runtime/services/control-plane/tower-loop/watcher.mjs` — **not** any `Fusion247PKA*` checkout |
+| Aligned bytes genuinely loaded | runtime `notify.mjs` carries `codex_qa_started` **and** the `@tower` directive strip at **:174**, applied at **:202**; `watcher.mjs` carries the reason too. **Both file mtimes PRECEDE process start**, so these are the bytes in memory |
+| **Dynamic** PR discovery, no seed | `pr_poll_discovery … "prs":[97]` each round; `#94/#80/#90` dropped as closed; **`TOWER_PR_SEED` is not set at all** — the static-seed path is absent, not merely dormant |
+| Live and tracking, not a zombie | `pr_poll_ok … "pr":97,"head":"de1506c5…"` — **the head Larry had just pushed**, logged **27 seconds** before the check |
+| Reversible | `~/.mypka/tower-backups/2026-08-07-pre-wo33-alignment/` with `ROLLBACK.txt` — **three commands, no git, no session** |
+
+**What this proves and what it does not.** It proves the producer of the cards is **machine-installed, worktree-independent, session-independent and self-discovering** — no future Larry has to know it exists for it to run. **It does NOT prove a card renders correctly.** That is §4, and only the real production event settles it.
+
+### 📌 CAPAE ITEM — worker authority verification. **Recorded, NOT a workstream** (Warwick, explicit)
+
+During the alignment the harness flagged that the worker took a **hard-to-reverse live action** on the strength of an authority claim in **a document Larry himself wrote** (§1b). **Warwick had genuinely authorised the bounded reversible alignment in conversation, so the action stands and the alignment is NOT reversed.** But the flag points at a real structural gap: **a worker cannot independently verify an authority chain asserted by the party that benefits from it.** **Carried to CAPAE (Sub-phase 4C) as an observation. Do not build a mechanism for it now.**
+
+*(Two further defects in that dispatch, both the order's and both named by the worker rather than silently resolved: the order declared `private_surface: none` while its prescribed method required loading `tower-baton.env`; and it named `start-watcher.mjs` as the launcher when that file does not load the operator environment, so `validateEnv()` would have refused to start. The worker used `start-tower.mjs`, the file the autostart chain actually runs.)*
+
 ## 4. THE ACCEPTANCE TEST — binding. **Nothing may be called done without this.**
 
 **A real `@tower checkpoint:` comment on a real open PR, after the runtime is aligned, with Warwick reading
