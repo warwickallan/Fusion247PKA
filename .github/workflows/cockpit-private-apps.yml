@@ -32,7 +32,16 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          # 22, not 20 — REQUIRED, not a routine bump. provenance-check.mjs proves AC3 (that the
+          # run never loads db.mjs, which opens two live production pools at module load) using
+          # `registerHooks` from `node:module`, which does not exist before v22.15.0. On Node 20 the
+          # gate does not fail an assertion — it dies at import with
+          # "does not provide an export named 'registerHooks'".
+          # Do NOT "fix" a future recurrence by making that assertion skip when the API is missing:
+          # a check that silently executes zero cases and exits 0 is the exact failure this whole
+          # workflow exists to prevent. Either the runner supports the technique or the gate is red.
+          # All six gates verified green on v22.18.0 before this bump.
+          node-version: '22'
 
       # Exits non-zero on a failure AND on a vacuous run (zero assertions executed). The Windows
       # case-folding rules are asserted here too — the platform is a parameter rather than a
