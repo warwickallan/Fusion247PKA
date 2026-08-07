@@ -23,9 +23,7 @@
 // before a body is buffered and before `fetch()` is called, and it is made for every method equally.
 //
 // ── HOW AN ORIGIN IS JUDGED, AND WHY IT IS NOT CONFIGURED BY NAME ────────────────────────────────
-//   * No `Origin` header  → ALLOW. Browsers omit it on same-origin GET/HEAD and on ordinary
-//     navigation, and non-browser callers omit it too. A browser POST always carries one, so
-//     allowing the absent case does not open the write path.
+//   * No `Origin` header  → the METHOD decides; see the next section.
 //   * `Origin` present    → its host:port must equal the request's own `Host`. Same host, same
 //     answer, whatever that host is called today. No hostname literal is compiled in, so this
 //     follows the Cockpit to a new address without an edit — naming today's host in config would
@@ -37,6 +35,30 @@
 //
 // A residual is recorded rather than built for: a hostile name that resolves to this host would
 // present a matching `Origin`. Proportionate at this risk level, and out of scope by ruling.
+//
+// ── WHEN NO `Origin` ARRIVES, THE METHOD DECIDES ─────────────────────────────────────────────────
+// Browsers omit `Origin` on same-origin safe requests and on ordinary navigation, and non-browser
+// callers omit it too. This handler used to forward every one of those, on the reasoning that a
+// browser attaches `Origin` to anything unsafe — which is true as far as it goes, and is a property
+// of the CLIENT. A server control that holds only because the caller volunteers a header is not
+// enforcing the property; it is trusting someone else to. So the server decides for itself:
+//
+//   a SAFE method with no `Origin`  → FORWARD, exactly as before.
+//   anything else with no `Origin`  → 403, before the body is read and before any forward.
+//
+// SAFE_METHODS is an ALLOWLIST, not a list of the common write verbs, and that is the whole point:
+// an unknown or extension method carries no promise of being safe, so the unknown FAILS CLOSED. A
+// denylist would have covered the named verbs and left every other unsafe method forwarding a body.
+//
+// The safe half is deliberately unchanged. A cross-site request in a browser's safe shape carries no
+// `Origin` and is still forwarded; that is an accepted, recorded contingency, and this guard is not
+// authority to close it. `COCKPIT_ALLOWED_ORIGINS` cannot widen the unsafe case either — a request
+// with no `Origin` matches no entry in any allowlist, so there is nothing to configure here.
+//
+// One operational consequence, recorded because it inverts: a terminator in front of this server
+// that did not preserve `Origin` used to be harmless — the request simply arrived without one and
+// was forwarded. It now turns a legitimate browser write into a 403. What a browser EMITS and what
+// ARRIVES after a proxy hop are different facts, and only the second is readable here.
 import { Readable } from 'node:stream';
 import { whyDown } from './down-reason.mjs';
 
@@ -87,6 +109,40 @@ export function originDecision({ origin, host, allowed = [] }) {
 }
 
 /**
+ * The HTTP-safe methods (RFC 9110 §9.2.1) — the CLOSED set this bridge forwards when a request never
+ * identified its origin. Membership is the only way past that case; there is no denylist to be
+ * incomplete, and no configuration that can extend this set.
+ */
+export const SAFE_METHODS = ['GET', 'HEAD', 'OPTIONS'];
+
+/** Membership in that closed set. An absent, blank or unrecognised method is not a member. */
+export function isSafeMethod(method) {
+  return SAFE_METHODS.includes(String(method || '').trim().toUpperCase());
+}
+
+/**
+ * The decision the server actually acts on: `originDecision()` composed with the rule that an unsafe
+ * method must identify its origin. ONE implementation, called by the handler below and by the gate's
+ * mutation fixtures, so a second copy of the policy cannot drift away from this one.
+ *
+ * `originDecision()` is deliberately left exactly as it was — a pure function of the origin alone,
+ * with its own proofs — rather than growing a `method` parameter that would need a default. A
+ * default of "safe" inside a security control is a fail-open, and fail-open-by-default is the shape
+ * of defect this function exists to remove. So the composition is explicit, and a call that supplies
+ * no method at all fails CLOSED rather than inheriting a permissive assumption.
+ *
+ * The method is consulted ONLY in the no-origin case. A request that did identify its origin is
+ * judged on that origin for every method equally, exactly as before.
+ */
+export function boundaryDecision({ method, origin, host, allowed = [] }) {
+  const decision = originDecision({ origin, host, allowed });
+  if (!decision.allowed || decision.reason !== 'no-origin') return decision;
+  return isSafeMethod(method)
+    ? { allowed: true, reason: 'no-origin-safe-method' }
+    : { allowed: false, reason: 'no-origin-unsafe-method' };
+}
+
+/**
  * The serving context, built by ONE constructor from the environment — the same shape as
  * `staticCtx` in static.mjs, and for the same reason: the call site where the pieces could be
  * assembled wrongly does not exist.
@@ -127,7 +183,12 @@ export async function servePrivateApi(req, res, ctx) {
   if (!incoming.pathname.startsWith(PRIVATE_API_PREFIX)) { refuse(res, 404, 'not found'); return; }
 
   // ── THE BOUNDARY. Before the body is read. Before anything leaves this process. ────────────────
-  const decision = originDecision({ origin: req.headers.origin, host: req.headers.host, allowed: ctx.allowed });
+  // This line's position is load-bearing: the refusal happens ahead of the buffering loop below, so
+  // a refused request's body is never read off the socket. The recording upstream in the gate can
+  // only prove the non-forward; that the body was never read is this ordering, and nothing else.
+  const decision = boundaryDecision({
+    method: req.method, origin: req.headers.origin, host: req.headers.host, allowed: ctx.allowed,
+  });
   if (!decision.allowed) { refuse(res, 403, 'private API bridge: refused'); return; }
 
   const rest = incoming.pathname.slice(PRIVATE_API_PREFIX.length) || '/';
