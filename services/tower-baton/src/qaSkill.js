@@ -1,8 +1,18 @@
 // Tower baton — the modifiable Tower QA skill loader (Warwick addition #1).
 //
 // The QA operating instructions live as a FIRST-CLASS, versioned, modifiable skill
-// doc at Builds/BUILD-010-fusion-tower/baton-mvp/tower-qa-skill.md. The watcher
+// doc at services/control-plane/review/prompts/tower-qa-skill.md. The watcher
 // loads THIS file FRESH on every turn and records its SHA-256 fingerprint, so:
+//
+// PATH CORRECTED 2026-08-07 (WO-2026-08-07-4C-01). This comment previously named
+// Builds/BUILD-010-fusion-tower/baton-mvp/tower-qa-skill.md — a DEAD location that
+// exists only in git history and superseded branches. No live loader resolves it.
+// Two further facts a reader needs and this comment did not carry:
+//   · the LIVE merge-class route is review/codexAdapter.mjs -> loadCodexContract(),
+//     resolved from CODEX_CONTRACT_PATH by tower-loop/{reviewDiff,mergeCheck,watcher,
+//     demo-merge-review}.mjs. THAT is the loader that delivers law to Codex; and
+//   · this module is the tower-baton watcher's loader, described by codexAdapter.mjs
+//     as retired. Evidence gathered here says nothing about the live Codex route.
 //   · a mid-run edit to the skill takes effect on the very next turn, and
 //   · every verdict is bound to the exact prompt bytes that produced it (audit).
 //

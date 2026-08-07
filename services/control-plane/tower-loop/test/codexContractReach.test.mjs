@@ -62,6 +62,13 @@ const SENTINEL = 'F247-CODEX-CONTRACT-SENTINEL-1';
 // second, independent literal: the sentinel proves WHICH FILE arrived, this proves the LAW did.
 const O5_LITERAL = 'The existence of an upcoming merge must NOT itself force `DECISION_REQUIRED`';
 
+// A third independent literal, added 2026-08-07 (WO-2026-08-07-4C-01): §3b's merge-class
+// estate-convergence responsibility. Same rule as the two above — held HERE, outside the file it
+// checks. It exists because 4C's acceptance turns on the LIVE loader consuming the AMENDED bytes,
+// and a contract that merely contains new law on disk proves nothing about what reached stdin.
+// If §3b is ever reworded, this line is what proves the obligation still arrives.
+const CONVERGENCE_LITERAL = 'Will this merge actually CONVERGE THE ESTATE?';
+
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-contract-reach-'));
 const tmpFile = (text, name = `${randomUUID()}.md`) => {
   const p = path.join(TMP, name);
@@ -166,8 +173,12 @@ async function assertLawReachesStdin({ contractPath, forceSkillText = null }) {
   // THE ACCEPTANCE PROPERTY.
   assert.ok(bytes.includes(SENTINEL), `the delivered stdin bytes must carry the contract sentinel "${SENTINEL}"`);
   assert.ok(bytes.includes(O5_LITERAL), 'the delivered stdin bytes must carry the contract\'s operating law (O-5)');
+  assert.ok(bytes.includes(CONVERGENCE_LITERAL),
+    'the delivered stdin bytes must carry §3b — the merge-class estate-convergence responsibility');
   assert.ok(bytes.includes('three judgements'),
     'the APPROVED classification amendment must be delivered WITH the contract');
+  assert.ok(bytes.includes('ONE full merge-class review of the final stable candidate'),
+    'the amended merge-class round discipline must be delivered WITH the contract (classification amendment)');
 
   // Provenance: the bytes delivered are the bytes loaded and validated.
   assert.equal(assertDeliveredContract(delivered, contract), null, 'delivered bytes match the loaded+validated contract');
@@ -197,6 +208,7 @@ test('R1 — the contract exists at the loader\'s own exported path, parses, and
   }
   assert.ok(raw.includes(SENTINEL), 'the contract carries its delivery sentinel');
   assert.ok(raw.includes(O5_LITERAL), 'the contract carries O-5 verbatim');
+  assert.ok(raw.includes(CONVERGENCE_LITERAL), 'the contract carries §3b (merge-class estate convergence) verbatim');
   // It lives in the runtime prompts directory beside its two siblings — not under Builds/**.
   assert.equal(path.basename(path.dirname(CODEX_CONTRACT_PATH)), 'prompts');
   assert.ok(!CODEX_CONTRACT_PATH.replace(/\\/g, '/').includes('/Builds/'),
@@ -252,6 +264,19 @@ test('R4 — MUTATION: empty law, an unratified fixture, and a stale loader path
   // (a2) And the subtler version: real-looking law that is not THIS contract.
   await mustFail('substituted law (plausible text, no sentinel)',
     () => assertLawReachesStdin({ contractPath: ratified, forceSkillText: '# Some other reviewer prompt\nBe thorough.\n' }));
+
+  // (a3) THE PRE-AMENDMENT CONTRACT — added 2026-08-07 (WO-2026-08-07-4C-01). The nastiest
+  // version of this failure is not an empty or substituted law: it is the REAL, correctly
+  // sentinelled, correctly ratified contract at its PREVIOUS wording, still loading and still
+  // reviewing — with the merge-class convergence obligation silently absent. That delivers a
+  // review that looks entirely healthy and cannot block a merge for stranded work. Strip §3b from
+  // an otherwise-genuine copy and the reach assertion must bite; if it does not, the convergence
+  // literal above is decoration.
+  const preAmendment = fs.readFileSync(ratified, 'utf8').replace(CONVERGENCE_LITERAL, 'Is the diff sound?');
+  assert.ok(!preAmendment.includes(CONVERGENCE_LITERAL), 'the pre-amendment fixture genuinely lacks §3b');
+  assert.ok(preAmendment.includes(SENTINEL), 'and it is otherwise the real contract — sentinel intact');
+  await mustFail('pre-amendment contract (real + ratified, but §3b convergence law absent)',
+    () => assertLawReachesStdin({ contractPath: tmpFile(preAmendment, 'pre-amendment-contract.md') }));
 
   // (b) UNRATIFIED FIXTURE — the degradation risk that is not an absent file. Built the same way
   // as ratifiedFixture(), in reverse: the three frontmatter fields are FORCED to unratified
