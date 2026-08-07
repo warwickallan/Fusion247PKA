@@ -35,7 +35,13 @@ outcome: The Cockpit reports its own provenance truthfully through /api/health (
 acceptance_property: Executing `node services/cockpit/provenance-check.mjs` proves the provenance logic returns the correct answer for clean, dirty, not-a-repo and git-unavailable states, reports a NON-ZERO count of checks actually executed, and completes without any Postgres connection being opened or `db.mjs` being loaded at any point in the run.
 integration_owner: larry
 veritas_gate: 1
-document_impact: []
+document_impact:
+  - path: services/cockpit/README.md
+    owner: keel (in file_surface by Amendment 1 ⑦; AC9 covers it)
+    why: "§ Endpoints documents GET /api/health and understates it once the payload carries four fields."
+# ⚠️ CORRECTED 2026-08-07 after Keel's return. This field read `[]` through implementation. It was WRONG,
+# Amendment 1 ⑦ established it was wrong, and leaving it at `[]` would have put the frontmatter in conflict
+# with the amendment Veritas re-derives this list against. Keel flagged the residue; the fix is Larry's.
 # ENUMERATED BY EXECUTION at 3bab190, and the first attempt was WRONG — recorded rather than hidden.
 #  Attempt 1: `git grep -l "api/health\|provenance" -- "Team Knowledge/**" "Builds/**"` returned a LARGE set and did
 #  NOT support `[]`. Most were the ordinary English word "provenance" in knowledge guidelines (GL-006/008/009/010/011,
@@ -162,7 +168,7 @@ operational_handoff: none
 
 **AC3 — no Postgres anywhere in that run.** The `provenance-check.mjs` process must not load `services/cockpit/db.mjs` and must not open a `pg` connection. `db.mjs` constructs two live pools against production Postgres **at module load**, so this is a hard prohibition, not a preference. Demonstrate it — e.g. by asserting `db.mjs` is absent from the loaded-module set at the end of the run. **Do not "prove" this by reading the source and reasoning about it.**
 
-**AC4 — `/api/health` tells the truth.** It exposes `sha`, `dirty`, `provenance` and **`sourceHash`**, where `sourceHash` is a digest over the **loaded `services/cockpit/*.mjs` bytes** and **never consults git**. That property is the point: it is structurally incapable of repeating the original failure, in which a git-derived answer misdescribed the running code.
+**AC4 — `/api/health` tells the truth.** It exposes `sha`, `dirty`, `provenance` and **`sourceHash`**, where `sourceHash` is a digest over ~~the **loaded `services/cockpit/*.mjs` bytes**~~ ⚠️ **SUPERSEDED BY AMENDMENT 1 ③ — read that instead: an EXPLICIT DECLARED LIST of the modules `server.mjs` actually imports, guarded by a static-parse assertion.** *(The struck wording was a directory glob, which would have made a change to any check script alter the hash — the precise failure this criterion exists to prevent. Struck 2026-08-07 rather than left for the reader to reconcile via the precedence clause.)* It **never consults git**. That property is the point: it is structurally incapable of repeating the original failure, in which a git-derived answer misdescribed the running code.
 
 **AC5 — the fourth console flash is fixed in the same change.** `services/cockpit/server.mjs:32` calls `execSync('git rev-parse …')` through `cmd.exe` with `windowsHide` defaulted false — a genuine fourth flash source, sitting in the very line AC1 rewrites. Every `execSync`/`spawn`/`spawnSync` in the file surface must carry `windowsHide: true`. **Enumerate them and report the count found and the count fixed** — do not assert "all of them" from inspection.
 
