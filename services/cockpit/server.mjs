@@ -17,6 +17,11 @@ import { whyDown } from './down-reason.mjs';
 // Build provenance lives in provenance.mjs for the same reason as static.mjs above — so a gate can
 // EXECUTE it — and it answers a harder question than the git one-liner it replaces. See its header.
 import { provenancePayload } from './provenance.mjs';
+// Rotation performance reports, read out of the session_report mirror. Same reason again: the read
+// logic takes its query function as an ARGUMENT and imports nothing that touches a database, so
+// rotation-report-check.mjs can execute the whole mapping — including the null-is-not-zero property —
+// without a Postgres anywhere near it.
+import { rotationReportsResponse } from './rotation-report.mjs';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
 // The serving context — which directory is served, and which tree the overlay must stay out of —
@@ -504,6 +509,11 @@ const server = http.createServer(async (req, res) => {
       });
       return;
     }
+    // The rotation reports. `q` is the cp_directus READ pool — never `w`; this route reads evidence
+    // and must remain structurally unable to alter it. The object returned is the one the gate
+    // executes, so what is proved and what Warwick sees are one construction. It never throws: a
+    // database failure comes back as HTTP 200 { ok:false, error } and takes no other route down.
+    if (req.url.startsWith('/api/rotation-reports')) return j(res, 200, await rotationReportsResponse(q));
     // The four provenance fields are the object provenance.mjs builds and the gate executes — the
     // endpoint does not assemble its own version of the answer.
     if (req.url.startsWith('/api/health')) return j(res, 200, { status: 'ok', build: BUILD, ...PROVENANCE });
