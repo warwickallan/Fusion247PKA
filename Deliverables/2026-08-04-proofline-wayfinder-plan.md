@@ -2352,6 +2352,28 @@ node "C:/Users/Buggly/.mypka/governor/ding.mjs" <message-file>
 
 ## ⭐ ACTIVE SESSION WORK PACKAGE — single durable authority for this session
 
+> **🔄 AMENDMENT 9 — Warwick, 2026-08-07. DURABLE YOUTUBE CAPTURE: WATCHER RECOVERY + AN HONEST SUCCESS BRIEFING. Folded into 4B durability. NOT a new programme.**
+>
+> **What prompted it, established by execution — two INDEPENDENT causes, and the second could hide the first indefinitely:**
+> 1. **The YouTube watcher had been dead ~4 days.** Last processed `1wBQ6bH95F4` at 2026-08-03 22:46; Warwick's 2026-08-07 08:05 link sat unprocessed until Larry ran a pass by hand. `ensure-youtube-watcher.mjs` states its own limit in its header: *"NOT self-healing on its own: crash/reboot recovery = a logon Scheduled Task (needs elevation = Warwick)."* **Nothing alerted anyone.**
+> 2. **There is NO success notification anywhere in the pipeline.** Enumerated: the only `larry-ding` call is `watch-captures.mjs:148`, the **STUCK** nudge. On success a note lands silently in the vault. **So a dead watcher and a healthy one look identical to Warwick.**
+>
+> **⊕ A third fault, found in the same hour and NOT a one-off:** the manual pass generated the note and the DB row correctly but **could not commit it** — `.git/index.lock` was held by Larry's own concurrent orchestration. `persistCapture` failed soft (correct — the capture continues) and the note is **on disk, in the database, and untracked**. **Warwick's ruling: treat this as an OPERATIONAL DURABILITY CASE, not a Larry accident. Parallel workers and orchestration are normal. A transient shared-Git lock must never leave a successfully generated capture permanently uncommitted.**
+>
+> **AUTHORISED — his words, condensed only where he repeats himself:**
+> 1. **Make the watcher durable.** It must recover automatically from **reboot, logon and unexpected process death** without Warwick tending it. **If repeated recovery fails, tell Warwick rather than remaining silently dead.**
+> 2. **One concise success briefing to DevBot per successfully processed capture** — but **"success" means the durable pipeline destination has been reached, not merely that the note was generated.** The notification must distinguish at least:
+>    - **`COMPLETE`** — note generated · DB state correct · **required Git persistence completed**;
+>    - **`DEGRADED` / `PENDING`** — note generated but a required durability step **such as the Git commit has not completed**.
+>    - **🔴 "Do not send a false green while durable persistence is outstanding."**
+> 3. **Smallest bounded recovery for the lock case — "retry/reconcile later rather than creating another monitoring platform."**
+>
+> **🎯 ACCEPTANCE IS THE NEXT REAL CAPTURE — Warwick's own test, and it is the § "Nothing may live only in Larry's head" clause applied exactly:** the watcher is **already running without Warwick starting it** · the capture **processes unattended** · note and DB row correct · **required Git persistence completes despite ordinary concurrent work** · Warwick **receives the concise success briefing automatically**. **A callable script, a green test or a successful manual run prove capability ONLY. This outcome stays on the frontier until a real production capture satisfies the above, or it is explicitly reclassified as manual.**
+>
+> **🔴 HUMAN DEPENDENCY — and it CONVERGES with one already waiting.** Durable reboot/logon recovery needs a **Scheduled Task, which needs elevation**. Four `Set-ScheduledTask` commands are **already** pending Warwick's bounded action (the flashing-console fix, closure record §2.2, blocked by the host classifier for Larry and specialists alike). **These go to Warwick TOGETHER, as ONE elevation step, not two.**
+>
+> **Scope discipline, at Warwick's explicit instruction: "Fold this into the existing 4B durability work. Do not create a new programme around it."** The regrowth cap applies at full force — no new monitoring platform, no daemon supervisor, no control plane.
+
 > **🔄 AMENDMENT 8 — Warwick, 2026-08-07. ONE BOUNDED VEX SECURITY REVIEW AUTHORISED, BEFORE CODEX AND THE MERGE DECISION.**
 >
 > **⏱️ TRIGGER — this gate does NOT fire yet.** Vex runs **once BOTH are integrated**: ① the **WO-24** Cockpit provenance work; ② the new **`/api/rotation-reports`** route and System-tab reporting surface. **Do not dispatch Vex before both are integrated. Warwick's explicit instruction at authorisation: do not interrupt Keel and do not widen WO-24.** *(Banked here because this gate fires several steps and probably one rotation away from the session that received it.)*
