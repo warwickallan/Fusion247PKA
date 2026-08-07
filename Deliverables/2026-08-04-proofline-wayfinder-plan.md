@@ -2809,6 +2809,26 @@ Any newly discovered **unrelated** defect: record once in [[Deliverables/BACKLOG
 3. **Veritas Gate 2** — the separate Phase / North-Star closure verdict. **Gate 1 PASS + Gate 2 HOLD is valid; do not manufacture a Phase PASS to merge.**
 4. ✅ **Bounded VEX review — DONE.** Fired, returned **RED**, repaired by **WO-31**, **re-verified GREEN**. *(Repaired 2026-08-07, Veritas D-1 — this item still described a review that had not yet run.)* ~~Amendment 8, route step **15a**. Fires only now that both Cockpit surfaces are integrated.~~ One pass, ≤~120k, closed scope, and **Warwick's "reflected CORS is a reason to inspect, not an assumed vulnerability" must be carried verbatim.**
 5. **Codex** — only when eligible, and **only with Warwick's explicit authority**.
+   > **🔴 DURABLE TRIGGER OBLIGATION — Warwick, 2026-08-07. THIS EXISTS BECAUSE IT MUST NOT LIVE IN LARRY'S MEMORY.**
+   >
+   > **Codex does NOT run because a PR opens** — that is deliberate; auto-firing on PR-open would spend an execution unbidden against the three-per-gate budget. **The gate is CHECKPOINT-TRIGGERED, and posting that checkpoint is LARRY'S OBLIGATION at this route step.**
+   >
+   > **WHEN the route reaches Codex eligibility, Larry MUST post a single PR comment containing:**
+   > - **`@tower head: <40-hex exact reviewed head>`**
+   > - **`@tower checkpoint: BUILD-020`**
+   > - **`@tower finding <id>: <disposition> — <why>` for EVERY still-open finding.**
+   >
+   > **⚠️ The findings gate is FAIL-CLOSED.** A checkpoint that does not dispose **every** open finding is **rejected**, and TowerBot shows a **BLOCK card instead of a QA round.** *(Observed 2026-08-05 on PR #94 — this is not theoretical.)*
+   >
+   > **Everything downstream is unattended and durable:** the Tower watcher autostarts from HKCU Run, is pinned to `~/.mypka/tower-runtime` (**not a worktree**), **discovers open PRs from GitHub each round with no seed**, ingests the comment on its own ~60s poll, runs real Codex, posts the cards, and **writes the verdict back onto the PR itself**. **Warwick relays nothing.**
+   >
+   > **TowerBot is DISPLAY ONLY. Codex-originated cards come from the Tower/Codex path and Larry NEVER authors, paraphrases, mirrors or reposts Codex content. Larry authors only his own disposition/action cards.**
+   >
+   > **ACCEPTANCE is the visible sequence:** **`Codex QA started` → Codex → Larry → Codex → Larry → … → final Codex verdict**, with exact PR and head provenance.
+   >
+   > **A fresh Larry after `/clear`, and the NEXT PR, must recover this obligation FROM THIS BLOCK — not from anyone's memory and not from Warwick prompting.** *(This paragraph is the durability control. There is no mechanism behind it and none is wanted; it is a written obligation on the route, which is where Warwick placed it.)*
+   >
+   > **⚠️ KNOWN LIMITATION, recorded ONCE by his ruling 3 — DO NOT BUILD FOR IT.** **Watcher death is SILENT.** A `watcher_heartbeat` row is written but is read only by a manual CLI, so if the process dies TowerBot simply goes quiet — **indistinguishable from "no QA running".** **No supervisor and no additional monitoring is to be added in this build unless normal operation demonstrates it is actually required** (Warwick, explicit). **If an expected card does not appear within a few minutes, check the watcher process before assuming Codex is merely slow.**
 6. **Merge decision pack to Warwick** (`merge-decision`).
 7. **After authorised merge:** execute [[Deliverables/2026-08-07-cockpit-live-migration-and-rollback-plan]]. **🔴 Its §3 preconditions are binding, especially precondition 5 — no scheduled task may be enabled against the live clone until that clone carries the code the task assumes.**
 8. **The Phase does not close on the merge alone** — both parts of the final acceptance still stand: **(A) durability** of every load-bearing BUILD-020 outcome, and **(B) reproducible creation of a NEW Build Wayfinder** by a genuinely fresh Larry. Both by Larry and by Veritas.
