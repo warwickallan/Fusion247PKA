@@ -34,6 +34,36 @@ cap that clips the rationale."***
 
 ---
 
+## 1b. ⭐ WARWICK'S STANDING AUTHORITY — 2026-08-07. **A FRESH LARRY HAS THIS. DO NOT ASK FOR IT AGAIN.**
+
+> *"You have my authority to complete the bounded TowerBot repair and its real acceptance. **Do not stop and ask me to choose between implementation details you can resolve** from the recorded route, existing runtime design, Git evidence, specialist evidence, or safe reversible execution."*
+
+**Explicitly granted, and each of these is therefore NOT a Warwick question:**
+
+1. **Finish and bank WO-33 correctly.**
+2. **Issue/complete WO-32** under his already-given **R2** ruling (§5.4 below).
+3. **Establish `TOWER_EVIDENCE_REPO_DIR` safely** — *"use the appropriate specialist/runtime inspection route rather than asking me to inspect configuration for you."* **Never expose credential values. Report set/unset and whether it points at a real git checkout — never the value.**
+4. **Make whatever bounded, reversible RUNTIME ALIGNMENT is necessary to execute the real acceptance**, using the existing Tower deployment/rollback discipline. ⛔ **Authority is for the Tower acceptance repair ONLY — NOT unrelated live migration and NOT scope growth.** *(This resolves the Option A/B question: A is authorised. Keep byte copies; restart via the INSTALLED launcher `start-watcher.mjs`; never hand-kill the PID; never run two watchers.)*
+5. **Prove the INSTALLED watcher is the thing producing the cards** — not a local invocation.
+6. **Prove the mechanism survives session rotation and is not dependent on this Larry.**
+7. **Then run the actual Codex QA sequence against the real PR and LET THAT INTERACTION BE THE ACCEPTANCE TEST.**
+
+**Rotation instruction, verbatim:** *"If the context genuinely requires rotation, run `/rotate` properly, prove the continuation packet, and rotate. **Rotation is not a reason to stop the work or return the route to me. Fresh Larry resumes from the durable record and continues.**"*
+
+**And the bar for calling it done:** *"do not declare this durable again until that real sequence has happened and the evidence demonstrates that **the next PR/session gets the same behaviour without Larry remembering anything.**"*
+
+**Do NOT spend another assurance cycle proving rationale exists "somewhere in Telegram". The destination is the visible card sequence Warwick actually reads.**
+
+### 🔴 CORRECTION TO §1's FRAMING — Warwick, explicit, and it changes the diagnosis
+
+> *"Treat the Git finding correctly: **Phase 2 S-4 received a FALSE-POSITIVE ACCEPTANCE for the Larry-card portion of the visible journey.** Do not record this as merely 'a later regression' unless evidence proves it actually regressed. The transport, store, watcher and disposition paths may have been durable; **the claimed user-visible Larry response was not correctly proven.**"*
+
+**So: this was NEVER working and then broken. It was ACCEPTED WITHOUT BEING PROVEN.** No evidence of regression exists and none should be claimed. **§1's root-cause analysis stands — fixture prose in `accept.mjs`, real production event never exercised — but its label is FALSE-POSITIVE ACCEPTANCE, not regression.**
+
+**WO-33 is CAPABILITY until the real production event proves it. Fixture green is supporting evidence ONLY.**
+
+---
+
 ## 2. WHAT IS ALREADY DURABLE — established by execution 2026-08-07. **DO NOT REBUILD ANY OF THIS.**
 
 | Property | Evidence |
