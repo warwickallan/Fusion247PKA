@@ -560,6 +560,16 @@ export async function createPostgresOperationalStore({ connectionString, poolCon
       return res.rows.map(mapRow);
     },
 
+    // FTW COMMAND-INTAKE SEAM (BUILD-002 WP2). Expose the SAME service_role pool
+    // as a scoped query passthrough so the ftw.run_event writer
+    // (store/ftwCommandIntake.js) REUSES this connection rather than opening a
+    // second one. The writer only ever runs the single scoped ftw.run_event
+    // insert/select (least privilege) — this is a low-level seam, not a widening
+    // of the durable OperationalStore contract.
+    async query(text, params) {
+      return pool.query(text, params);
+    },
+
     // Not part of the durable API — pool lifecycle for tests / shutdown.
     async end() {
       await pool.end();
