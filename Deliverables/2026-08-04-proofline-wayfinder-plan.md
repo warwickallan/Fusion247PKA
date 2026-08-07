@@ -2730,9 +2730,46 @@ Any newly discovered **unrelated** defect: record once in [[Deliverables/BACKLOG
 
 **🎯 THE ONE CURRENT NEXT ACTION — execute the pre-merge repairs, then re-dispatch Gate 1 at a new frozen head.**
 
-**In order:** ① Defect 1 — **DONE**, both halves (entry rows 19–20 repointed; the banner moved into the 2578 heading itself). ② Defect 4 "accepted" contradiction — **DONE**. ③ Amendment 10 ① recorded — **DONE**. ④ Row 2's two stale dispositions re-cut against Amendment 5. ⑤ Row 1 ③'s void *"next Claude WP"* alignment row re-cut. ⑥ **Defect 5 — System-area render scenarios** so Amendment 7 ③④ have executed render evidence — **WO-29 ISSUED to Keel** *(`Deliverables/proofline/WO-2026-08-07-29-render-vm-system-scenario.md`, generated through `envelope.mjs`, recomputed ready)*. ⑦ **Defect 6 — the `db.mjs` absolute-path repair, now IN SCOPE by Amendment 10 ③** *(Work Order, issued AFTER WO-29 integrates — two workers pushing one branch concurrently is corruption, and serialising it is Larry's job)*. ⑧ Row 1 ② — **execute** the survival scenarios rather than classifying them; Defect 6's repair is what makes the worktree delete/recreate scenario capable of passing. ⑨ Re-freeze, complete CI, re-dispatch Gate 1.
+**In order — EVERY item carries its state, because leaving later items unmarked is what made this block misdirect** *(Veritas Gate 1 @ `275ec07`: items ①②③ read `DONE` while ④–⑧ were unmarked though complete, so a fresh Larry would have read ⑦ as live and **raised a duplicate Work Order for an already-merged repair**)*:
 
-> **Everything upstream of the gate is DONE and integrated.** Five Work Orders — WO-24, WO-25, WO-26, WO-27, WO-28 — all accepted, all integrated, all independently re-verified by Larry. **Warwick's four ordered items of 2026-08-07 are all discharged**, including the elevation bundle, which he executed.
+| # | Item | State |
+|---|---|---|
+| ① | Defect 1 — entry rows repointed, banner moved into the heading | ✅ **DONE** |
+| ② | Defect 4 "accepted" contradiction | ✅ **DONE** — and its **sibling occurrence repaired 2026-08-07** after Veritas found the first repair had missed it |
+| ③ | Amendment 10 ① recorded | ✅ **DONE** |
+| ④ | Row 2's stale dispositions re-cut against Amendment 5 | ✅ **DONE — all THREE.** Two named by Veritas across two gates, plus **P-TOWER**, found by Larry enumerating **by meaning** rather than by remembered wording |
+| ⑤ | Row 1 ③'s void *"next Claude WP"* alignment row | ✅ **DONE** |
+| ⑥ | Defect 5 — System-area render scenarios (**WO-29**) | ✅ **INTEGRATED @ `a00e3a3`** — 24 scenarios, 54 assertions, 7/7 mutations |
+| ⑦ | Defect 6 — `db.mjs` absolute-path repair (**WO-30**) | ✅ **INTEGRATED @ `5b1409f`**, CI gate registered @ `1c633a5`. **⛔ DO NOT RAISE A WORK ORDER FOR THIS — IT IS MERGED.** |
+| ⑧ | Row 1 ② — survival scenarios **executed**, not classified | ✅ **DONE** — delete/recreate · fresh-from-main · machine-global. **`installed-runtime restart` NOT executed — see ⑨** |
+| ⑨ | **`installed-runtime restart`** *(Veritas @ `275ec07`)* | 🔶 **HALF PROVEN, and the halves are named** — see below |
+| ⑩ | **Branch-runtime HTTP path** *(Amendment 10 ② puts the branch runtime in THIS gate)* | ✅ **EXECUTED** — see below |
+
+### ✅ ⑩ BRANCH-RUNTIME HTTP PATH — EXECUTED 2026-08-07, with **ZERO production contact**
+
+**The residual Veritas named twice — *"`/api/health` has never been called over HTTP"* — is CLOSED at the branch runtime.**
+
+**How, and why it required no live credentials and no database traffic:** `/api/health` is a **static handler** (`server.mjs:519`) — it returns `BUILD` + `PROVENANCE`, both taken once at startup, and **never queries**. `pg.Pool` construction does not connect. So the branch Cockpit was started on **port 8391** against a **synthetic credentials file** pointing at `127.0.0.1:59999`, **a port nothing listens on**, with a synthetic CA. **No live credentials were read. No production database was contacted. The live Cockpit on 8090 was never touched** — re-confirmed answering `200` immediately afterwards, and the test process was killed and port 8391 verified free.
+
+| Probe | Result |
+|---|---|
+| `GET /api/health` over real HTTP | **`{"status":"ok","sha":"bf56338","dirty":true,"provenance":"dirty","sourceHash":"ef9867db…"}`** — **the WO-24 provenance fields are served over HTTP**, which is exactly what the live clone at `c1ed028` does **not** do. `dirty: true` was **correct and honest** — the worktree genuinely had uncommitted edits at that moment. |
+| `GET /api/rotation-reports` with the database unreachable | **HTTP 200**, body **`{"ok":false,"error":"The rotation reports could not be read — nothing is listening there."}`** |
+| `GET /api/no-such-route` | **HTTP 404** |
+
+**The 404-versus-truthful-failure contrast is the point.** Veritas measured `404` on the live clone and correctly concluded the route does not exist there. At the branch runtime the **same request is wired and fails truthfully**, with `ok:false` and a real reason rather than an empty list. **"No reports" and "the database is unreachable" are not collapsed** — which is Amendment 7's requirement.
+
+> **⚠️ REPORTED ONCE, not fixed, for Warwick's decision:** the truthful failure is returned with **HTTP status 200** and `ok:false` in the body. The Cockpit UI reads the body, so the surface is truthful — but **a monitor checking status codes alone would read a failed read as success.** Non-blocking, not a Work Order.
+>
+> **⛔ WHAT THIS DOES NOT PROVE:** that the endpoint returns **real rotation data over HTTP**. That needs a real database and is **owed post-merge at step 18** with the live journey. **Wiring and truthful failure are proven; correct data over HTTP is not.**
+
+### 🔶 ⑨ `installed-runtime restart` — HALF PROVEN. **The unproven half is named rather than implied.**
+
+- ✅ **PROVEN — the machine-global governor half.** Nine installed modules under `~/.mypka/governor/` (`ding`, `continuity`, `footer`, `statusline-live`, `evaluator`, `health-store`, `reorient`, `sampler`, `atomic-write`). A **brand-new process** read the installed continuity state successfully and recovered the live `focus` — *"BUILD-020 Phase 4 · Sub-phase 4B IN FLIGHT (not closed)…"*. Every invocation of these is already a fresh process, so this is the property itself, not a proxy for it.
+- ⬜ **NOT PROVEN — the installed SERVICE half**, and it is **not executable pre-merge.** Restarting the live Cockpit or the local supervisor `MyPKA-Local-Services-Live` means **touching the live runtime**, which Warwick's standing constraint forbids before an authorised merge, and the supervisor is additionally elevation-gated. **Recorded as OWED at route step 18. Not claimed, and the row-1 property is NOT asserted as met.**
+| ⑪ | Re-freeze, complete CI, re-dispatch Gate 1 | ⬜ **OWED** |
+
+> **Everything upstream of the gate is DONE and integrated.** ~~Five~~ **Seven** Work Orders — WO-24, WO-25, WO-26, WO-27, WO-28, **WO-29, WO-30** — **all INTEGRATED and independently re-verified by Larry. NONE of them ASSURED.** *(**CORRECTED 2026-08-07 — Veritas Gate 1 Defect 4, sibling occurrence.** This row said "all **accepted**, all integrated" — the same word, in the same two meanings, that was repaired at the § ROTATION block and **missed here**. "Larry accepted the worker's return" is not "assured", and two rows using one word for both is how a false completion claim gets made without anyone lying.)* **Warwick's four ordered items of 2026-08-07 are all discharged**, including the elevation bundle, which he executed.
 
 **The remaining route, in order, and NONE of it may be skipped:**
 
