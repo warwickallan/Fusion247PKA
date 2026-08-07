@@ -231,6 +231,22 @@ Warwick's 18 steps, verbatim in intent. **Do not begin Asdair functional work in
 17. Return the full merge decision pack to Warwick.
 18. After authorised merge: verify remote and local merged state · align installed/runtime from canonical merged Git · move the live Cockpit safely · prove truthful provenance · prove no dependency on the feature branch, worktree or old session · clean and reconcile the estate.
 
+## 🎯 THE ASDAIR JUMPING-OVER POINT — the objective 4B is aiming at
+
+**BUILD-020 is not finished when PR #97 merges. It is finished when the estate can safely jump to Asdair.** That jump is the real goal, and 4B's final Phase acceptance exists to make it possible.
+
+**The jump is safe only when all three hold:**
+
+1. **BUILD-020 is durable and clean** — Part A. Merged, installed from canonical merged source, surviving `/clear`, restart and worktree recreation, with **no dependency on an unmerged branch, a dirty clone, a transcript or an old Larry context**.
+2. **The Proofline map cannot emit a competing next action** — it must be incapable of directing anyone once BUILD-020 closes. Tonight's four FAIL-driven repairs are the start of that, **not the completion of it**: the map still directs today because 4B is live.
+3. **Creating a new Wayfinder is reproducible** — Part B. Provable **without** copying the Proofline map and **without** Warwick reconstructing the method from chat.
+
+**Then, and only then, Asdair** — which tests the *harder* case: **recovering an existing stale Wayfinder.** Warwick's ordering: *"BUILD-020 must first prove that creating a brand-new one is reproducible."* Creating is the simpler case and is proven first.
+
+**🔴 The trap that sits directly on this jump, already proven by execution** — `LARRY-01`: `resolveActiveMapPath()` falls back to **repo-wide recency** whenever a branch has touched no map, and today that returns **Proofline**. A brand-new Build's branch has **zero map commits until its map is first committed**, so the jump passes straight through the window where a fresh Larry is confidently pointed at the wrong build. **Asdair's own recovery will hit this too.** Do not rediscover it.
+
+**Explicitly NOT in 4B:** any Asdair functional work. 4B proves the estate is *ready* to jump. It does not jump.
+
 ## Before Asdair (not in 4B)
 
 BUILD-020 merged, installed, durable, clean · its old map cannot emit a competing next action · Asdair's Wayfinder has a truthful starting point · North Star reaffirmed · stale/superseded/historical Asdair content classified · **a fresh session proves it lands on Asdair correctly** (see LARRY-01 — the repo-wide fallback makes this a real hazard).

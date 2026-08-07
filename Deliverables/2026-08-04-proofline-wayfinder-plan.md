@@ -1735,7 +1735,17 @@ All three investigations have landed and their findings are recorded above. **WP
 | Map pointer | **present** — `Deliverables/2026-08-04-proofline-wayfinder-plan.md`. The write-authority path resolved rather than failing open, and did not strip it |
 | Seq | 152 → **153** |
 
-~~**A second packet is owed after merge**, carrying the merged SHA and the fresh-session next action, read back before `/clear`.~~ ⛔ **RETIRED 2026-08-07 (Veritas D-11).** This was Phase 2's post-merge packet; **Phase 2 merged at PR #94 and its packet was delivered.** Nothing is owed here. *Post-merge packet duties for BUILD-020 live in Sub-phase 4B step 18, not in this closed section.*
+~~**A second packet is owed after merge**, carrying the merged SHA and the fresh-session next action, read back before `/clear`.~~ ⛔ **RETIRED 2026-08-07 (Veritas D-11), with its reason CORRECTED 2026-08-07 (Veritas D-14).**
+
+> **My first retirement reason was false on both clauses and I had asserted it without checking.** It said *"This was **Phase 2's** post-merge packet; **Phase 2 merged at PR #94** and its packet was delivered."*
+>
+> **Verified:** §16.10's own packet table reads *"Focus: **BUILD-020 Phase 3** — no longer Phase 2"*, so the obligation was **Phase 3's**. And §16.11 records the merge as **PR #96 → `f242f3c8d1df6017dbe11b751cee12564b467517`**, not PR #94.
+>
+> **And "its packet was delivered" was not shown either.** Only **"Packet 1 of 2"** appears anywhere in this map; **no second packet is recorded**, and the two packet ids present are `cont-1785846026092-143-rqjtww` and `cont-1785971013511-153-6svm8`. **Whether Phase 3's post-merge packet was ever published is UNESTABLISHED.**
+>
+> **Why it is nevertheless retired, stated correctly this time:** the obligation is **not dropped — it is superseded and carried forward.** BUILD-020's post-merge packet duty now lives in **Sub-phase 4B step 18**, which requires post-merge verification at the final merge. This section directs nothing because 4B owns the duty, **not** because the duty was discharged.
+>
+> *Recorded per the contract's revert-proofing rule: an editor who checks a false reason may restore the obligation. The reason is now true, so checking it confirms rather than reverses.*
 
 ### ⚠️ Observation, recorded not assumed
 
@@ -2474,11 +2484,29 @@ Any newly discovered **unrelated** defect: record once in [[Deliverables/BACKLOG
 >
 > *(Veritas FAIL @ `2cf3673`: this destination stayed stale while every pointer to it was corrected. **Fixing where an arrow points does not make the target true.**)*
 
-**🎯 THE ONE CURRENT NEXT ACTION — Sub-phase 4A → rotation.**
+**🎯 THE ONE CURRENT NEXT ACTION — reach ONE reviewed rotation head, then rotate.**
 
-1. **Repair the four unretired directive statements** Veritas found at `2cf3673` (§16 L1576, §13.6 L1568, §17.9 L2059, §15 L1031/1235) **and this destination**. ✅ **DONE — this edit.**
-2. **Re-verify the corrected head with Veritas.** A Sub-phase 4A closing PASS is unavailable while the active map can misdirect a fresh session (Amendment 6 ②).
-3. **On PASS:** load Sub-phase 4B into this section, run `/rotate`, verify **map path · `focus` · phase · package · exact head · exact next action**, and **`/clear` ONLY on `SAFE TO CLEAR`**.
+> **State of this block, so it describes itself** *(Veritas D-15: it previously said "✅ DONE — this edit" several commits after that edit, recorded neither of the later steps, and named no receipt or passed head — so its own "On PASS" condition could not be evaluated from the destination alone)*.
+
+**✅ ALREADY ACHIEVED — Sub-phase 4A is assured.**
+**Veritas PASS — Sub-phase 4A closure only — at `c50d8cb48d4c536952e07ccf32f94bbc4061e615`**, receipt `Deliverables/2026-08-07-veritas-subphase-4a-c50d8cb-receipt.md` (`sha256 10b929a3…`), reached after **two FAILs** at `2cf3673` and `52427cd`, both of which stand as true verdicts about those heads. **Scope of that PASS: 4A closure ONLY — not a Phase verdict, does not grade functional rows 1/2/4, no Codex eligibility, no merge readiness, and 4B inherits no standing from it.**
+
+**⏳ THE REMAINING ACTION — complete `/rotate`. Warwick, 2026-08-07: *"No more assurance loops tonight."***
+
+> **🔴 THE ASSURANCE BOUNDARY — settled, and it stops a regress.**
+> **The Veritas PASS proves Sub-phase 4A. The established rotation controls prove the handover. They are different responsibilities and do not recursively assure each other.**
+> Commits after `c50d8cb` load the **already-authorised** 4B handover, apply the **non-blocking** corrections Veritas itself identified, and prepare the normal rotation transaction. **They do not require another Veritas review merely because the head advances** — every fix to satisfy a review moves the head, which would demand another review, forever.
+> **The earlier PASS must never be described as having reviewed later commits. Its reviewed head is `c50d8cb` and that is recorded truthfully wherever it is cited.**
+
+1. **Pax delivers the session performance report** (`/rotate` step 5) → commit report + payload.
+2. **Load** the Sub-phase 4B Work Package, the final two-part Phase acceptance, and the **Asdair jumping-over point**.
+3. **Complete the remaining `/rotate` transaction** — report pointer in the map · Supabase population **recorded truthfully, success or visible failure** · Honcho publish through the **installed** write path · read-back through the **installed** reader.
+4. **Record the final head truthfully**, without stretching the `c50d8cb` PASS over it.
+5. **Verify the read-back matches on all six:** **map · Phase · `focus` · active package · exact head · exact next action.**
+6. **All seven normal rotation safety bars.**
+7. **Return `SAFE TO CLEAR`** — and `/clear` only then.
+
+**Veritas is dispatched again ONLY if** `/rotate` exposes an actual contradiction · the read-back points at the wrong route · or a new active instruction materially conflicts with Sub-phase 4B.
 
 **Sub-phase 4A takes NO Codex and NO merge.** **Everything else — Cockpit banking, scheduled-task apply, Codex, merge, install alignment, Proofline closure — belongs to Sub-phase 4B**, whose full 18-step route and **final two-part Phase acceptance** are in [[Deliverables/2026-08-07-subphase-4A-closure-and-4B-handover]]. **Do not start 4B work in 4A.**
 
@@ -2492,9 +2520,12 @@ Any newly discovered **unrelated** defect: record once in [[Deliverables/BACKLOG
 |---|---|
 | **Rotate at** | **2026-08-07 (Claude host)** |
 | **Sub-phase** | **4A — closed for assurance. NO Codex, NO merge.** |
-| **Session freeze / product tip** | **the exact head carrying the Veritas 4A PASS** — set at rotation, never earlier |
-| **Session report** | written into this `/rotate` transaction (step 7), with its Supabase payload (step 7b) |
+| **Veritas 4A PASS — exact reviewed head** | **`c50d8cb48d4c536952e07ccf32f94bbc4061e615`** · receipt `Deliverables/2026-08-07-veritas-subphase-4a-c50d8cb-receipt.md`. **This PASS reviewed THIS head and no later commit.** Two prior FAILs at `2cf3673` and `52427cd` stand as true verdicts about those heads. |
+| **Rotation head** | recorded at commit — **a descendant of the reviewed head, carrying the 4B load, the non-blocking D-10/11/12/14/15 corrections and the rotation transaction.** **NOT reviewed by the 4A PASS, and not claimed to be.** Assured instead by the rotation controls: Honcho read-back on six fields + the seven safety bars. |
+| **Session report (Pax)** | **`Deliverables/2026-08-07-session-performance-report-subphase-4a.md`** — written by Pax, not Larry |
+| **Payload** | **`Deliverables/2026-08-07-session-report-payload-subphase-4a.json`** — same session, branch and closing head |
 | **Closure record** | [[Deliverables/2026-08-07-subphase-4A-closure-and-4B-handover]] |
+| **CI position, stated honestly** | All four workflows **`completed success` at `ccb4132`**. **That green does NOT travel forward to the rotation head**, which is a later commit. **4B step 13 requires complete CI at its own frozen exact head** — and under estate doctrine an `in_progress` workflow is **NOT RUN**, never PASS. |
 | **Next package** | **Sub-phase 4B** — see § ACTIVE SESSION WORK PACKAGE and the closure record's Part 3 |
 
 | ~~Previous rotation (Grok) — struck~~ | |
