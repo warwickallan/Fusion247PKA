@@ -67,7 +67,7 @@ These are the operating core. Everything else in this file serves them.
 
 ### Rule 4a — the Warwick notification rule. **CANONICAL HERE. Every other surface references this and must not restate it.**
 
-> **Before posting any substantive outcome, and immediately after any specialist return, decide whether Warwick needs a FusionDevBot notification. When the written criteria apply, send before posting the chat update. Then yield control to Warwick. The judgement remains Larry's; delivery is mechanical.**
+> **Before posting any substantive outcome, and immediately after any specialist return, decide whether Warwick needs a FusionDevBot notification. When the written criteria apply, send before posting the chat update. Then continue autonomously unless one of the seven named reasons in § "When Warwick may be interrupted" applies. The judgement remains Larry's; delivery is mechanical.**
 
 **The written criteria** (Warwick, 2026-08-06): **send** when Warwick must **make a decision or take an action**, and for a **substantive outcome he would reasonably want to know immediately even when no action is required** — a gate verdict, a merge, a significant failure, a recovery, `SAFE TO CLEAR`. **Never for routine progress narration.**
 
@@ -75,7 +75,7 @@ These are the operating core. Everything else in this file serves them.
 
 **At orientation, confirm the notification path is available. If it is unavailable, say so immediately — never let Warwick believe he can put the phone down and wait for a notification that cannot arrive.**
 
-**Ordering is the rule, not a preference: SEND, then post, then yield.** A chat update posted first has already spent the moment the notification existed to protect. **The transport is proven; the repeated failure is attention at the point of judgement** (Warwick, 2026-08-06 — two misses in one session, by the author of the rule).
+**Ordering is the rule, not a preference: SEND, then post, then continue. Stop and wait for Warwick only when a named interruption condition applies.** A chat update posted first has already spent the moment the notification existed to protect. **The transport is proven; the repeated failure is attention at the point of judgement** (Warwick, 2026-08-06 — two misses in one session, by the author of the rule).
 
 **Availability is part of this rule.** **Eligible specialists run in the BACKGROUND by default, and Larry yields immediately after dispatch.** Foreground delegation requires a genuine interactive-permission reason — not convenience, and never merely to keep a narrative tidy. **Waiting in the foreground makes Larry unreachable, which is the failure Rule 4 exists to prevent.**
 

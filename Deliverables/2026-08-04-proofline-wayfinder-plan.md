@@ -83,7 +83,7 @@ This matters more than it looks: **the entire next phase is about proving what i
 >
 > **The verbatim copy that stood here was REPLACED by this reference on Warwick's instruction, 2026-08-06.** A rule living in two places drifts, and the SSOT Golden Rule says every fact lives in exactly one file. **Do not restore a copy — restore a pointer if this one is ever lost.**
 >
-> **The one-line shape, so a reader knows what they are being sent to** (this is a signpost, not the rule): **decide before posting any substantive outcome and immediately after any specialist return · send BEFORE the chat update · then yield.** ⚠️ **Do not act on this summary — the criteria, the channel, the ordering and the availability clause are all in the canonical section.**
+> **The one-line shape, so a reader knows what they are being sent to** (this is a signpost, not the rule): **decide before posting any substantive outcome and immediately after any specialist return · send BEFORE the chat update · then CONTINUE — stopping only for one of the seven named interruption reasons.** ⚠️ **Do not act on this summary — the criteria, the channel, the ordering and the availability clause are all in the canonical section.**
 
 **Two facts that belong here rather than in the constitution, because they are this build's evidence:**
 
@@ -2010,7 +2010,7 @@ All three investigations have landed and their findings are recorded above. **WP
 
 | # | Change | Where |
 |---|---|---|
-| **1** | **One concise canonical notification rule beside Rule 4** — decide before posting any substantive outcome and immediately after any specialist return · **send BEFORE the chat update** · then yield. *"The judgement remains Larry's; delivery is mechanical."* | root `CLAUDE.md` § **Rule 4a** |
+| **1** | **One concise canonical notification rule beside Rule 4** — decide before posting any substantive outcome and immediately after any specialist return · **send BEFORE the chat update** · then CONTINUE — stopping only for one of the seven named interruption reasons. *"The judgement remains Larry's; delivery is mechanical."* | root `CLAUDE.md` § **Rule 4a** |
 | **2** | **The Wayfinder copy REPLACED by an exact reference.** A rule in two places drifts; SSOT says one home | this map's START / RESUME block |
 | **3** | **A zero-model `PostToolUse` reminder on Agent returns**, injecting the rule into the parent at the moment of decision | `.claude/hooks/notify-reminder.mjs` + `.claude/settings.json` |
 | **4** | **Availability preserved** — eligible specialists run in the **background by default** and Larry **yields immediately after dispatch**. Foreground needs a genuine interactive-permission reason | root `CLAUDE.md` § Rule 4a |
