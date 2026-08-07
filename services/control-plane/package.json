@@ -19,7 +19,7 @@
     "test": "node db/test/run-db-tests.mjs && node db/test/run-contract-tests.mjs && node db/test/run-registry-tests.mjs && node review/test/run-runtime-tests.mjs && node worker/test/run-worker-tests.mjs && node test/run-wpc-tests.mjs && node test/run-wpd0-tests.mjs && node db/test/run-outbox-tests.mjs && node notifier/test/run-notifier-tests.mjs"
   },
   "devDependencies": {
-    "pg": "^8.11.0"
+    "pg": "^8.22.0"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.2"
