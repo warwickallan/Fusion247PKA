@@ -2352,6 +2352,40 @@ node "C:/Users/Buggly/.mypka/governor/ding.mjs" <message-file>
 
 ## ⭐ ACTIVE SESSION WORK PACKAGE — single durable authority for this session
 
+> **🔄 AMENDMENT 7 — Warwick, 2026-08-07. SCOPE ADDED TO SUB-PHASE 4B: ROTATION REPORTS ON THE COCKPIT SYSTEM TAB.**
+>
+> **⛔ This amendment adds scope to Sub-phase 4B ONLY. It does NOT amend, reinterpret or reopen the completed Sub-phase 4A rotation** (Warwick, explicit). The 4A Veritas PASS at `c50d8cb`, its reviewed scope, the rotation head `b0a1c99` and the § ROTATION block below are untouched and remain true as written.
+>
+> **The outcome, his framing:** Pax produces valuable performance reports; the durable Markdown sits on an unmerged branch; Warwick cannot conveniently see it; the live structured data already exists in Supabase. **The Cockpit must display the Supabase report directly, and must NOT depend on the corresponding Git deliverable being merged before the report becomes visible.** This is **part of BUILD-020 durability** — operational evidence is not genuinely useful when Warwick cannot see it without searching an unmerged branch.
+>
+> **Source — no third store.** `session_report.rotation` and `session_report.specialist_dispatch`. **Supabase remains a queryable mirror generated from the same rotation evidence; Git remains the durable SSOT.** **Do not create a third reporting store and do not manually duplicate the report.**
+>
+> **Collapsed summary must carry:** session date/time · host + host version · branch · short closing SHA with full SHA available · elapsed time · context tokens in and out · specialist dispatch count · WO first-dispatch successes · WO amendments · WO refusals · product vs documentation line changes · product/admin/evidence/rework/waiting allocation percentages · unresolved or unestablished measurements · report notes · durable deliverable path. **Most recent first.**
+>
+> **Expanded view must carry:** the full metric set · specialist-by-specialist dispatch counts · specialist token usage where established · specialist notes · unknown/unestablished values **clearly labelled as such** · the exact Supabase rotation ID · the exact closing head · the associated durable Git report path.
+>
+> **🔴 `Unknown`, `not established` and `0` are materially different and must never be collapsed into one another.** Missing values are **not** converted to zero.
+>
+> **Human-readable emphasis, not a database grid.** Concise visual summaries for: total context consumption · allocation of effort · WO success/refusal/rework · specialist usage · unresolved measurements. **For the current report Warwick must plainly see** ≈2.22M subagent tokens · 15 specialist dispatches · 26.2% downstream of preventable defects · 0 of 2 Work Orders surviving first read-back · three consecutive Keel orders refused on the same contract-surface class · 88.3% of insertions documentation · five proxy-versus-destination verification failures. **🔴 These figures are NOT to be hard-coded — they render from stored report data.**
+>
+> **Schema/payload extension is AUTHORISED where a material finding cannot be represented** — **the smallest existing payload/schema surface**, mirrored and displayed from the same source evidence. **Not a new store, not a new mechanism** (the regrowth cap applies at full force).
+>
+> **Operational requirements:** read through the **existing** Cockpit private API bridge · **no service credentials to the browser** · preserve the existing authentication boundary · truthful empty/loading/database-failure wording · **failure to load historical reports must not break the rest of the System tab** · prove a newly populated Supabase rotation appears **without a Git merge or a Cockpit code change** · **include this surface in the Cockpit rescue, provenance and post-merge live-migration plan already owned by 4B**.
+>
+> **Acceptance — PASS requires EXECUTION proving all nine:** ① current rotation row read from **live** Supabase · ② specialist rows joined correctly · ③ renders readably in the System tab · ④ unknown fields remain visibly unknown · ⑤ a second fixture/report ordered correctly · ⑥ refresh obtains a newly populated report **without a deployment** · ⑦ browser receives **no** database secret or service-role credential · ⑧ displayed closing SHA, rotation ID and deliverable path **match Supabase exactly** · ⑨ the surface **survives the final Cockpit move to canonical merged runtime**.
+>
+> **📋 EXECUTED RECONNAISSANCE, 2026-08-07 — two findings recorded before implementation, per "begin with live reconnaissance".**
+>
+> **(a) 🔴 SECURITY — RLS is DISABLED on both source tables.** Executed against live Supabase: `session_report.rotation` (7 rows) and `session_report.specialist_dispatch` (27 rows) both report `rls_enabled: false`, so **anyone holding the anon key can read *and modify* every row**. This is **pre-existing estate state, not introduced by this scope**, and it does **not** block acceptance criterion ⑦ — reading through the server-side private API bridge means the browser is issued no key at all. **Recorded once for Warwick's decision; no Work Order raised and no automatic remediation applied** — enabling RLS without policies would block all access. Proposed SQL is held in the session report, not executed.
+>
+> **(b) ⚠️ SCHEMA GAP — four of Warwick's seven required figures are NOT representable today.** Established by executed query, not inspection:
+> - **✅ representable now:** 15 dispatches (sum of `specialist_dispatch.dispatches` = 4+3+3+3+2) · 26.2% (`allocation_rework_pct`, though the column is named *rework* and Warwick's phrasing is *downstream of preventable defects* — a labelling decision, not a gap).
+> - **❌ NOT representable:** **≈2.22M subagent tokens** — every `specialist_dispatch.tokens_in/out` is **NULL**; the figure exists only as prose in `rotation.notes`. **88.3% of insertions documentation** — `doc_lines_changed` (1667) and `product_lines_changed` (313) sum to 1980 = insertions+deletions (`+1834/-146`), so they are *lines changed*, not *insertions*; 1667/1980 = 84.2% ≠ 88.3%, and the insertion-only split **cannot be derived** from what is stored. **Three consecutive Keel refusals on one contract-surface class** — a cross-session streak, prose only. **Five proxy-versus-destination verification failures** — no column anywhere.
+> - **⚠️ derivable only by inference:** **0 of 2 Work Orders** — the denominator is not stored; `0+0+2` happens to equal 2 this session, but that identity is an assumption, not a guarantee. **A stored total is required rather than an inferred one.**
+> - **Consequence:** the authorised smallest-surface extension is **needed, not optional**, and its exact shape is a Keel design decision taken against this evidence.
+>
+> **Route position:** this is **additional 4B scope**, folded into the existing Cockpit rescue (step 5) and the post-merge live-migration step (18). **It does not displace steps 1–4**, and it does not alter the final two-part Phase acceptance.
+
 > **🔄 AMENDMENT 6 — Warwick, 2026-08-07. SUB-PHASE 4A DECLARED AND CLOSED FOR ASSURANCE. WAYFINDER STRATEGY DECIDED.**
 >
 > **Route:** Sub-phase 4A → Veritas → rotate; **Sub-phase 4B** (one fresh session) → remaining delivery and cleanup → Veritas → Codex → Warwick merge decision → authorised merge → installed/runtime alignment → **Proofline closure**; **only then** Asdair. **Proofline is NOT closed merely because PR #97 merges.**
@@ -2491,7 +2525,13 @@ Any newly discovered **unrelated** defect: record once in [[Deliverables/BACKLOG
 **✅ ALREADY ACHIEVED — Sub-phase 4A is assured.**
 **Veritas PASS — Sub-phase 4A closure only — at `c50d8cb48d4c536952e07ccf32f94bbc4061e615`**, receipt `Deliverables/2026-08-07-veritas-subphase-4a-c50d8cb-receipt.md` (`sha256 10b929a3…`), reached after **two FAILs** at `2cf3673` and `52427cd`, both of which stand as true verdicts about those heads. **Scope of that PASS: 4A closure ONLY — not a Phase verdict, does not grade functional rows 1/2/4, no Codex eligibility, no merge readiness, and 4B inherits no standing from it.**
 
-**⏳ THE REMAINING ACTION — complete `/rotate`. Warwick, 2026-08-07: *"No more assurance loops tonight."***
+**✅ THE `/rotate` TRANSACTION IS COMPLETE — closed 2026-08-07 at `b0a1c99`.** Verified by execution in the following (fresh) session: report + payload committed · 4B loaded · Honcho packet published and readable with `focus` = *"ACTIVE PACKAGE = Sub-phase 4B"* · worktree clean · 0 ahead of `origin`. **The seven steps below are DISCHARGED and are retained as the record of that rotation, not as instructions.** *(Repaired 2026-08-07 in the 4B session: this block still read "THE REMAINING ACTION — complete `/rotate`" after the rotation had closed, which would have directed a fresh Larry to redo a finished transaction — the Amendment 6 ② failure condition. Repairing a stale directive is NOT an amendment to the 4A rotation record, which is untouched.)*
+
+**🎯 THE ONE CURRENT NEXT ACTION — execute Sub-phase 4B on the recorded route, as extended by Amendment 7.** In Warwick's order, 2026-08-07: ① complete the fresh-session hook non-firing proof **through a normal specialist dispatch** · ② regenerate **WO-24 through `tools/wo/envelope.mjs`** and issue it · ③ begin the **Cockpit rescue and the Amendment 7 reporting surface** · ④ bring Warwick the four scheduled-task commands **only when that bounded human step is actually reached** — not before. Everything else in the 18-step route and the final two-part Phase acceptance is unchanged.
+
+<details><summary>DISCHARGED — the 2026-08-07 Sub-phase 4A rotation steps (record only, directs nothing)</summary>
+
+**Warwick, 2026-08-07: *"No more assurance loops tonight."***
 
 > **🔴 THE ASSURANCE BOUNDARY — settled, and it stops a regress.**
 > **The Veritas PASS proves Sub-phase 4A. The established rotation controls prove the handover. They are different responsibilities and do not recursively assure each other.**
@@ -2505,6 +2545,8 @@ Any newly discovered **unrelated** defect: record once in [[Deliverables/BACKLOG
 5. **Verify the read-back matches on all six:** **map · Phase · `focus` · active package · exact head · exact next action.**
 6. **All seven normal rotation safety bars.**
 7. **Return `SAFE TO CLEAR`** — and `/clear` only then.
+
+</details>
 
 **Veritas is dispatched again ONLY if** `/rotate` exposes an actual contradiction · the read-back points at the wrong route · or a new active instruction materially conflicts with Sub-phase 4B.
 
@@ -2546,7 +2588,7 @@ Any newly discovered **unrelated** defect: record once in [[Deliverables/BACKLOG
 2. Apply the four scheduled-task hidden-launcher changes **through Warwick's bounded action** (`Set-ScheduledTask` is blocked by the host classifier for Larry and specialists alike).
 3. Prove **natural** fires preserve exit codes, logs, failure visibility and rollback — **`CareerAIR-Graph-Collect` must still report `LastTaskResult = 2`**.
 4. Regenerate WO-24 **through `tools/wo/envelope.mjs`** and issue it.
-5. Rescue and bank the Cockpit changes **without mutating the live dirty clone**.
+5. Rescue and bank the Cockpit changes **without mutating the live dirty clone**. **⊕ EXTENDED BY AMENDMENT 7: build the Session / Rotation Reports surface on the existing System tab, fed from `session_report.*` through the existing private API bridge — nine executed acceptance criteria, and it must be carried through the rescue, provenance and post-merge live-migration plan (step 18).**
 6. Truthful `/api/health` provenance **without importing the DB-opening server module in tests**.
 7. Disposition `pg` and the untracked files. 8. Prepare Cockpit migration + rollback — **do not restart or move it** before merge authority.
 9. Implement the reduced **Veritas Gate 3 enumeration check**. 10. Confirm `focus` in `/rotate` read-back.
