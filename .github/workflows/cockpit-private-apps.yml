@@ -103,7 +103,9 @@ jobs:
       # why the defect survived: it was unreachable by any test, not subtle. It now lives in
       # private-api.mjs and this boots the real handler against a recording fake upstream: a foreign
       # origin is refused before its body is read and before anything goes upstream, and the check
-      # asserts what the upstream actually received. Green is 51 assertions plus 4 caught fixtures.
+      # asserts what the upstream actually received. Green is 97 assertions plus 5 caught fixtures.
+      # (was 51/4 before WO-32 added the no-Origin method rule. If you change the gate, change this
+      #  line too - a stale count here is a comment, not a control, but it misleads the next reader.)
       # No install step needed — that is the point of the extraction.
       - name: The private API bridge refuses a foreign origin before anything reaches the upstream
         run: node services/cockpit/origin-boundary-check.mjs

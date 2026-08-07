@@ -106,7 +106,19 @@ nothing. **A gate must also be able to execute the handler** — see F6.
 
 > **🔴 THE VEX GREEN IS CONDITIONAL ON THIS ASSUMPTION, AND THE ASSUMPTION IS UNVERIFIED.** Any statement that *"the boundary is closed"* **without** carrying *"assuming GET on the private upstream is non-mutating"* has **overstated an accepted verdict.** **Verification is a named binding item at route step 18** (migration plan §4.8.4) — not a footnote, and **not discharged by this acceptance.**
 
-**R2 — Warwick ruled APPLY**, as *"a bounded reliability improvement, not authority for further hardening"*: a small server-side guard refusing an **unsafe** method carrying **no `Origin`**, so the property stops depending on the browser attaching it — **provided it breaks no known legitimate caller.** Issued as **WO-32**. **Safe methods with no `Origin` remain permitted — that is R1, deliberately unchanged.**
+### R2 — APPLIED, 2026-08-07. **WO-32 @ `4c55781`.**
+
+**The guard is an ALLOWLIST of the HTTP-safe set — `GET`, `HEAD`, `OPTIONS` — not a denylist of named verbs.** Keel established by measurement that `PROPFIND` with no `Origin` **forwarded a body to the upstream**, so a four-verb denylist would have closed the case Vex named and left the same hole one verb to the left. **Warwick's R2 says "unsafe methods", not "these four verbs": a denylist implements a list, an allowlist implements the ruling.**
+
+**`originDecision()` is byte-for-byte unchanged**; the method is consulted **only** where no origin arrived, composed in one exported function that both the handler and the mutation fixture call — so no second copy of the policy exists and there is **no fail-open default inside a security control.**
+
+**Proven, and re-verified independently by Larry:** **97 assertions, 0 failed; 5 permissive fixtures, all caught** (17/64 for the new rule specifically). Unsafe + no `Origin` → **403 with the recording upstream at 0 requests and 0 bytes**, including `PROPFIND`. **Safe + no `Origin` → still 200, upstream reached exactly once — zero currently-working requests changed behaviour.** `provenance-check` green at 29.
+
+> **🔴 STEP-18 ITEM ADDED BY THIS CHANGE, and it is a FUNCTIONAL risk, not a security one.** The Cockpit is fronted by `tailscale serve`. **A terminator that does not preserve `Origin` was harmless before this guard and now converts every browser write through the tunnel into a 403.** **`COCKPIT_ALLOWED_ORIGINS` cannot rescue it — a request with no `Origin` matches no allowlist entry.** *"A browser sends `Origin` unconditionally"* describes what the browser **emits**, not what **arrives after a proxy hop**, and only the second is readable at the guard. **Step 18 must confirm that a browser-issued unsafe method still carries `Origin` on arrival at `:8090`, or this lands as a write outage.**
+>
+> **Declared limit, in Vex's own terms and no stronger:** the browser-always-sends-`Origin` rule is **recalled from the fetch standard, NOT verified against a primary source, and no browser was exercised.** The order originally demanded Keel *establish* it while setting `network: none` and granting no web access — **that was Larry's defect and the demand was withdrawn.**
+
+~~**R2 — Warwick ruled APPLY**~~, as *"a bounded reliability improvement, not authority for further hardening"*: a small server-side guard refusing an **unsafe** method carrying **no `Origin`**, so the property stops depending on the browser attaching it — **provided it breaks no known legitimate caller.** Issued as **WO-32**. **Safe methods with no `Origin` remain permitted — that is R1, deliberately unchanged.**
 
 **Nothing here may be described as fixed, closed or accepted until the repair is independently verified
 and reaches the live runtime.**
@@ -148,8 +160,8 @@ received traffic.**
 ### The CI gate — what it actually examines
 
 `services/cockpit/origin-boundary-check.mjs` was **run independently and inspected, not taken on
-trust.** It executes **51 assertions**, **asserts its own executed count is non-zero** (a gate that
-asserts nothing also exits 0), and **mutation-tests itself**: four in-memory permissive policy fixtures
+trust.** It executes **97 assertions** *(51 at WO-31; raised to 97 by WO-32, which added the no-`Origin` method rule)*, **asserts its own executed count is non-zero** (a gate that
+asserts nothing also exits 0), and **mutation-tests itself**: **five** in-memory permissive policy fixtures
 — including *the handler as it stood before this repair* — each of which must turn assertions red, and
 an inert fixture is treated as a failure. **All four were caught.** This is a control that has been made
 to fail, which is the only kind that is evidence.
