@@ -2356,6 +2356,36 @@ node "C:/Users/Buggly/.mypka/governor/ding.mjs" <message-file>
 
 ## ⭐ ACTIVE SESSION WORK PACKAGE — single durable authority for this session
 
+> **🔄 AMENDMENT 10 — Warwick, 2026-08-07. TWO DECISIONS, in answer to the pre-merge / post-merge adjudication below.**
+>
+> ### ① Amendment 9 — **Option A APPROVED, NARROWLY SCOPED.** His scope words, and they are the whole point of the decision:
+>
+> **Reclassify Amendment 9 as MANUAL for Gate 1 ACCEPTANCE AND EVIDENCE PURPOSES ONLY**, because its automatic acceptance test is **structurally impossible** before the authorised post-merge migration.
+>
+> > **🔴 «This does not change the product requirement.»**
+>
+> **The durable YouTube capture outcome REMAINS AUTOMATIC** and must be **re-tested post-merge at route step 18 as a BINDING acceptance obligation.** All seven conditions, as Warwick wrote them:
+>
+> 1. canonical live runtime carries the merged code;
+> 2. **`MyPKA-YouTube-Watcher-Ensure` can then be enabled without violating migration precondition 5**;
+> 3. watcher remains stable;
+> 4. the **next genuine unattended YouTube capture** is processed **automatically**;
+> 5. required persistence completes;
+> 6. Warwick receives the **automatic** completion briefing;
+> 7. **no manual invocation substitutes for that proof.**
+>
+> > **⛔ BINDING PROHIBITION — Warwick, verbatim: «Do not describe Amendment 9 as permanently manual, accepted, or complete before that post-merge test passes.»**
+> >
+> > **This binds every surface**: Larry's replies, the execution log, any Veritas dispatch or receipt, the merge decision pack, the Codex claim, and any session or closure record. **"Reclassified MANUAL for Gate 1 evidence" is the ONLY permitted phrasing pre-merge.** *"Manual"* alone is a false statement of the product requirement. **A Gate 1 PASS carrying this reclassification is NOT acceptance of durable capture.**
+>
+> ### ② Row 4 runtime split — **ACCEPTED.** *"Pre-merge render/evidence requirements remain Gate 1 material; live-runtime acceptance remains binding post-merge at step 18. Preserve both rather than weakening either side."*
+>
+> ### ③ `db.mjs` absolute-path defect — **DO NOT PARK IT.** Warwick overrode Larry's recommendation, and he was right to.
+>
+> **Larry reported Veritas Defect 6 as non-blocking and for Warwick's decision. Warwick's decision is that it is IN SCOPE and repairable now:** the hardcoded `C:\Fusion247PKA` dependency **directly bears on row 1's worktree delete/recreate durability requirement** and is **genuinely repairable pre-merge**. **Route the smallest appropriate repair through the existing operating model and include it in the next frozen Gate 1 candidate.**
+>
+> *Recorded as a correction, not absorbed silently: Larry recommended parking a defect that sits directly on a row-1 acceptance property he was simultaneously asking Veritas to grade. **Recommending a disposition is Larry's; deciding it is Warwick's — and the recommendation was wrong here.*** **The regrowth cap still applies at full force: smallest appropriate repair, existing operating model, no new mechanism.**
+
 > **🔄 AMENDMENT 9 — Warwick, 2026-08-07. DURABLE YOUTUBE CAPTURE: WATCHER RECOVERY + AN HONEST SUCCESS BRIEFING. Folded into 4B durability. NOT a new programme.**
 >
 > **What prompted it, established by execution — two INDEPENDENT causes, and the second could hide the first indefinitely:**
@@ -2647,7 +2677,7 @@ Any newly discovered **unrelated** defect: record once in [[Deliverables/BACKLOG
 > **Gate 1 PASS requires the live surface → the live surface requires the migration → the migration requires Gate 1 PASS.**
 > **Under that reading, pre-merge Gate 1 PASS is UNREACHABLE BY ANY ACTION.** It is not a bar the work can clear; it is a bar nothing can clear. **Amendment 7 ⑨ already says so in its own words — *"survives the final Cockpit move to canonical merged runtime"* is post-move by construction**, and Veritas itself records ⑥ and ⑨ as *"unexecuted by construction"*.
 
-**③ The SAME circularity hits row 1 through Amendment 9, and this one is worse.** The durable-capture acceptance test is *"the next real unattended capture"*, which needs `MyPKA-YouTube-Watcher-Ensure` enabled. **That task is `Disabled` ON PURPOSE**, because migration §3 **precondition 5** forbids enabling any scheduled task against the live clone until that clone carries the code the task assumes — the precondition written *because* enabling it early killed and restarted the watcher every five minutes. **So Amendment 9's acceptance test is ALSO post-merge by construction.** Root `CLAUDE.md` § *"Nothing may live only in Larry's head"* permits exactly **two** exits — satisfy the acceptance test, or **explicitly reclassify as manual**. **The first is unreachable pre-merge. The second is Warwick's alone; Larry may not self-reclassify.** → **`product-decision` raised. This is the one genuine Warwick decision this adjudication produced.**
+**③ The SAME circularity hits row 1 through Amendment 9, and this one is worse.** The durable-capture acceptance test is *"the next real unattended capture"*, which needs `MyPKA-YouTube-Watcher-Ensure` enabled. **That task is `Disabled` ON PURPOSE**, because migration §3 **precondition 5** forbids enabling any scheduled task against the live clone until that clone carries the code the task assumes — the precondition written *because* enabling it early killed and restarted the watcher every five minutes. **So Amendment 9's acceptance test is ALSO post-merge by construction.** Root `CLAUDE.md` § *"Nothing may live only in Larry's head"* permits exactly **two** exits — satisfy the acceptance test, or **explicitly reclassify as manual**. **The first is unreachable pre-merge. The second is Warwick's alone; Larry may not self-reclassify.** → **`product-decision` raised, and ANSWERED — see AMENDMENT 10 ①.** **Option A approved, narrowly scoped: MANUAL for Gate 1 acceptance and evidence purposes ONLY. The outcome REMAINS AUTOMATIC as a product requirement, with a binding seven-condition post-merge re-test at step 18. It may NOT be described as permanently manual, accepted or complete before that test passes.**
 
 **RESOLUTION — row 4 and row 1 acceptance split by RUNTIME, not weakened:**
 
@@ -2662,7 +2692,7 @@ Any newly discovered **unrelated** defect: record once in [[Deliverables/BACKLOG
 
 **🎯 THE ONE CURRENT NEXT ACTION — execute the pre-merge repairs, then re-dispatch Gate 1 at a new frozen head.**
 
-**In order:** ① Defect 1 — **DONE**, both halves (entry rows 19–20 repointed; the banner moved into the 2578 heading itself). ② Defect 4 "accepted" contradiction — **DONE**. ③ Row 2's two stale dispositions re-cut against Amendment 5. ④ Row 1 ③'s void *"next Claude WP"* alignment row re-cut. ⑤ **Defect 5 — add the System-area scenario to `render-vm-check.mjs`** so Amendment 7 ③④ have executed render evidence *(Work Order — Keel)*. ⑥ Row 1 ② — **execute** the survival scenarios rather than classifying them. ⑦ Re-freeze, complete CI, re-dispatch Gate 1. **Defect 6 (`db.mjs` absolute-path binding to one clone) is reported ONCE for Warwick's decision and is NOT a Work Order.**
+**In order:** ① Defect 1 — **DONE**, both halves (entry rows 19–20 repointed; the banner moved into the 2578 heading itself). ② Defect 4 "accepted" contradiction — **DONE**. ③ Amendment 10 ① recorded — **DONE**. ④ Row 2's two stale dispositions re-cut against Amendment 5. ⑤ Row 1 ③'s void *"next Claude WP"* alignment row re-cut. ⑥ **Defect 5 — System-area render scenarios** so Amendment 7 ③④ have executed render evidence — **WO-29 ISSUED to Keel** *(`Deliverables/proofline/WO-2026-08-07-29-render-vm-system-scenario.md`, generated through `envelope.mjs`, recomputed ready)*. ⑦ **Defect 6 — the `db.mjs` absolute-path repair, now IN SCOPE by Amendment 10 ③** *(Work Order, issued AFTER WO-29 integrates — two workers pushing one branch concurrently is corruption, and serialising it is Larry's job)*. ⑧ Row 1 ② — **execute** the survival scenarios rather than classifying them; Defect 6's repair is what makes the worktree delete/recreate scenario capable of passing. ⑨ Re-freeze, complete CI, re-dispatch Gate 1.
 
 > **Everything upstream of the gate is DONE and integrated.** Five Work Orders — WO-24, WO-25, WO-26, WO-27, WO-28 — all accepted, all integrated, all independently re-verified by Larry. **Warwick's four ordered items of 2026-08-07 are all discharged**, including the elevation bundle, which he executed.
 

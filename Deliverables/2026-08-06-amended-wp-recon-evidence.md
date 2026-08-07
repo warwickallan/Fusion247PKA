@@ -31,7 +31,7 @@ Amended ACTIVE SESSION WORK PACKAGE functional rows 1–4 recon and partial repa
 |---|---|---|
 | `~/.mypka/governor/ding.mjs` | repo blob | Re-align if tip differs |
 | Live cockpit `C:\Fusion247PKA\services\cockpit\server.mjs` | PR + live patch | Propagate private-api proxy (applied live + banked in trial) |
-| Claude host hooks | tracked `.claude/**` | **Next Claude WP** — do not install in this Grok session |
+| Claude host hooks | tracked `.claude/**` | ⛔ **VOID — RE-CUT 2026-08-07 (Veritas Gate 1, row 1 blocker ③).** This row read *"**Next Claude WP** — do not install in this Grok session"*. **Amendment 5 DESCOPED AND DISABLED the specialist-return reminder hooks the following day, so there is no "next Claude WP" to install them in and nothing to align.** **Correct disposition: NOT PART OF THE PHASE — the outcome was withdrawn, not deferred.** Shipped state verified in the Veritas export at `3e4c9d9`: `.claude/settings.json` = `{"hooks": {}}`, `.claude/state/return-cues/` absent, all six implementations still tracked under `.claude/hooks/` as inert source. *(A deferral row and a withdrawal row read almost identically and mean opposite things — this one was pointing a fresh reader at work that no longer exists.)* |
 
 ---
 
@@ -49,7 +49,7 @@ Prior Gate 2 receipt: `Deliverables/2026-08-06-veritas-gate2-phase4-receipt.md` 
 | P-ROTATE + green Supabase | **DISCHARGED** | Real `/rotate` + green populate banked @ freeze head |
 | P-CLOSE ordered phase close | **STILL OPEN** | Phase PASS still requires Gate 2 re-verdict at final head; honest **WP PASS / Phase HOLD** remains valid if post-merge Claude host journey is the remaining North Star acceptance |
 | Green populate unestablished (old text) | **DISCHARGED** | Superseded by later Gate 1 isolation green |
-| Combined cue→ding one journey | **NOT PART OF THIS AMENDED WP product rows** / may remain Gate 2 | Next Claude WP |
+| Combined cue→ding one journey | ⛔ **RE-CUT 2026-08-07 (Veritas Gate 1, row 2).** Was *"may remain Gate 2 / **Next Claude WP**"*. **NOT PART OF THE PHASE.** | **Amendment 5 abolished the cue half the day after this table was cut.** The `cue → ding` journey cannot remain a Gate 2 residual because **the cue no longer exists**: hooks descoped and disabled, proven by execution (fresh session, four specialist dispatches, four returns, **zero** injections, against 8 false fires at dispatch alone previously). **The ding half stands on its own and is unaffected.** *(Row 2's rule is that every residual returns exactly one of DISCHARGED · STILL OPEN · RECLASSIFIED · NOT PART OF THE PHASE — "may remain" is none of the four, which is how this survived a re-cut.)* |
 
 ### 🔴 D-2 CORRECTION (Veritas Gate 1 @ `0cf70c9`) — dispositioned **by the source receipt's own labels**
 
