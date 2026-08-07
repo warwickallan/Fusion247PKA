@@ -52,6 +52,11 @@ document_impact: [{path: Deliverables/2026-08-04-proofline-wayfinder-plan.md, ow
 file_surface:
   - services/cockpit/server.mjs
   - services/cockpit/origin-boundary-check.mjs
+  # AMENDED IN PLACE 2026-08-07 (Amendment 1 ① and ②) — the operative envelope must carry the
+  # grant, not only the appended amendment section. Keel reported this as a document defect at
+  # preflight and built to the explicit grant, which was unambiguous; the envelope was the defect.
+  - services/cockpit/private-api.mjs        # extracted handler — Amendment 1 ①, F6 applied
+  - services/cockpit/provenance.mjs         # ONE LINE only: 'private-api.mjs' in SOURCE_MODULES
 out_of_scope_policy: report-only
 
 # --- contract and capability compatibility ---

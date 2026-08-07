@@ -98,6 +98,16 @@ jobs:
       - name: Cockpit DB module resolves inside its own clone (no absolute clone root)
         run: node services/cockpit/clone-portability-check.mjs
 
+      # /private-api was the last live-facing handler inside server.mjs, and server.mjs imports
+      # db.mjs, which opens two live pools at module scope — so no gate could execute it. That is
+      # why the defect survived: it was unreachable by any test, not subtle. It now lives in
+      # private-api.mjs and this boots the real handler against a recording fake upstream: a foreign
+      # origin is refused before its body is read and before anything goes upstream, and the check
+      # asserts what the upstream actually received. Green is 51 assertions plus 4 caught fixtures.
+      # No install step needed — that is the point of the extraction.
+      - name: The private API bridge refuses a foreign origin before anything reaches the upstream
+        run: node services/cockpit/origin-boundary-check.mjs
+
       # Warwick's rule for the rotation-report surface: "Unknown, not established and zero are
       # materially different." A rotation row legitimately carries a real 0 (wo_first_dispatch_success)
       # beside real nulls (elapsed_minutes, host_version), so the read layer must carry both through
