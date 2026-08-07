@@ -109,6 +109,32 @@ operational_handoff: none
 
 # WO-2026-08-07-26 — Session / Rotation Reports on the System tab
 
+## 🔄 AMENDMENT 1 — Larry, 2026-08-07, after Felix's read-back (verdict ACCEPT, six items unsettled). Binding; supersedes the original text wherever they differ. Proceed — no second read-back required.
+
+**① 5.1 — THE MOST IMPORTANT FINDING IN THIS ORDER, and my Required-evidence text was FALSE.** I wrote that `render-vm-check.mjs` *"is the gate that catches a binding you forgot to export."* **For your markup that is untrue, and you proved it rather than arguing it:** all 16 scenarios pin `area: 'apps'` (`render-vm-check.mjs:134`), the System section is the `v-else` branch, a non-taken branch is never evaluated, and your dump of all 16 rendered outputs contains **zero** occurrences of "Happening now" or "Recent history". **Consequence, now recorded: AC8's green proves NEITHER AC4 NOR AC6.**
+
+> **🔴 EVIDENCE RULING — binding on the return, and on Larry.** Your dev-loop harness and the committed gate are **two different things and must never be merged into one claim**. Report them **separately and in these words or equivalent**: *"the committed `render-vm-check.mjs` exits 0 and DOES NOT COVER the System area; a throwaway harness rendering `area:'system'` covers it in the dev loop and is NOT a committed gate."* **Larry will not forward AC8's green to Veritas as render proof of this work, and says so here so the record cannot be misread later.** Harness in the scratchpad only — not the repo, not your surface. **Approved exactly as you proposed.**
+
+**② 5.1 knock-on — Keel's owed System scenario is PROMOTED from a note to real work.** It is not tidy-up; **it is the only thing that makes this gate durable**, and without it every future change to the System tab ships behind a green that cannot see it. Larry raises it as a separate bounded order after both halves integrate. **Still not yours — a check script is outside your contract's frontend-tree clause. Name it in your return as owed.**
+
+**③ 5.2 — APPROVED, and the over-read is real.** `contrast-check.mjs` self-validates eight pinned figures and prints a hard-coded pairing report; **it never reads your class names.** Its green means *"the tokens did not move"*, not *"the new pairings pass"*. **Use only pairings already measured in GL-003 §2b, and record each new class's pairing and figure in a CSS comment block following the `styles.css:99-107` precedent.** State the limit plainly in your return.
+
+**④ 5.3 — TRANSCRIPTION IS WHAT I MEANT. The frozen contract does NOT change.** You are right that `findings[]` is `{id, text, confidence}` prose and that "three" and "five" cannot be computed from it. **Render the finding text verbatim — that satisfies "from the data, not hard-coded", which is the actual requirement.** Your judgement that prose is the right shape for a finding, and that adding count fields would push producer semantics into the schema, is correct and I am adopting it. **Keel is unaffected; nothing changes on his side.**
+
+**⑤ 5.5 — RENDER AS SUPPLIED. DO NOT RE-SORT.** You surfaced a genuine conflict and returned it instead of picking; that was right. The house rule wins — `app.js:735`: *"Shown in the order it was produced; the cockpit never re-sorts it."* **AC1's ordering is therefore KEEL'S guarantee** (a SQL `ORDER BY created_at DESC`), not yours. ⊕ **Added requirement, from the same house precedent (`app.js:737-745`): if the supplied order is not most-recent-first, SURFACE IT as a producer defect — do not silently fix it.** Say in your return that ordering is Keel's to guarantee.
+
+**⑥ 5.4 — APPROVED. Make no attempt to correlate `unestablished[]` with the per-field nulls.** They are two representations of the same fact with names that do not join, and inventing a mapping would be a naming contract Keel never agreed. Render per-field nulls inline as unknown; render `unestablished[]` as its own labelled verbatim list. **Recorded here so the duplication is never later read as a bug.**
+
+**⑦ 5.6 — APPROVED, and pre-declaring the scoping is exactly right.** `15` cannot be proven absent across `styles.css`, which legitimately contains `15px`. **Scope the proof as: `2.22`, `2221596`, `88.3`, `26.2` absent from the entire diff; `15` absent as a RENDERED TEXT literal in the `app.js` diff, shown with context.** Because you named the scoping in advance, it is evidence and not selection.
+
+**⑧ The Iris question — APPROVED with a boundary, and you were right to ask rather than decide.** **Add the ONE LOCAL LAYOUT CLASS** following the `.as-note` precedent under the LAYOUT-ONLY rule. **No new colour token, and it is a local class — NOT a GL-003 primitive**, so § Design-system extensions is satisfied by you having asked and by the extension not being a design-system one. ⊕ **Your observation that this is the THIRD site needing an "unknown inline value" primitive (`.app-pill.unknown`, `.app-status.unknown`, and now every nullable field here) is a real design-system gap. Larry records it for Iris and Warwick — the promotion decision is theirs, not this order's, and you are not to wait for it.**
+
+**⑨ Your AC4 treatment is ACCEPTED as designed, and it is better than the order asked for.** Four independent axes — typeface, slant, weight/ink, digit-vs-word — none dependent on colour, surviving greyscale and a screen reader. **Mono means "this is a measurement", so a real `0` is mono and a `null` is an italic word.** That is the doctrine at `app.js:229-237` applied properly rather than recited.
+
+**⑩ Critical Rule 10 (distribution path) — NOTED, and thank you for closing it unprompted.** `sw.js:27` already lists `/app.js` and `/styles.css` in `SHELL`, and the cache name is derived from content by `sw-version.mjs`, proven by its own 12 assertions. **No cache bump and no shell edit is owed.** My order did not name the distribution path and should have; you checked it anyway.
+
+**Not amended:** AC1–AC7, the frozen API contract, the five hazards, the git prohibition, and every authority field.
+
 **Warwick's problem, in his words:** *"Pax produces valuable performance reports; the durable Markdown sits on an unmerged branch; Warwick cannot conveniently see it; the live structured data already exists in Supabase."* Your job is the half he actually looks at.
 
 **His standard for it:** *"The surface should make the important findings obvious rather than presenting a database grid."*
