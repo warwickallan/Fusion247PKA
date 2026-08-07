@@ -88,6 +88,15 @@ preconditions below are satisfied** — a `git stash` here would destroy the run
 
    5. **Re-run `origin-boundary-check.mjs` against the moved tree** — it needs no database and no credentials, so it costs nothing to prove the boundary survived the move.
 
+## 4b. ⚠️ THE TOWER RUNTIME IS ALSO DIVERGED — added 2026-08-07 (Veritas Gate 1 @ b62a9fc, E-3)
+
+**This plan had ZERO occurrences of "Tower" while a SECOND machine-installed runtime was knowingly running unmerged branch code.** The Cockpit is not the only live thing this merge reconciles.
+
+- **What diverged:** `~/.mypka/tower-runtime/services/control-plane/tower-loop/{notify.mjs,watcher.mjs}` were replaced 2026-08-07 with bytes from `build-020/phase4-automation-law` to carry WO-33. **Warwick explicitly authorised this bounded reversible alignment.**
+- **Consequence, and it must not be glossed:** the machine-installed Tower runtime is **NOT** running canonical merged `main`. **Any claim of "installed from canonical merged source · no dependency on an unmerged branch" is FALSE of the live estate until this merge lands.**
+- **AT THIS STEP, after the merge:** re-align the Tower runtime from **canonical merged `main`**, restart via the **installed launcher** (`start-tower.mjs` — NOT `start-watcher.mjs`, which does not load the operator environment), confirm **exactly one** watcher, and **append the correction to `INSTALLED-FROM.txt`** so it stops describing a resync that is no longer true.
+- **Rollback for the Tower half is separate from the Cockpit half:** `~/.mypka/tower-backups/2026-08-07-pre-wo33-alignment/ROLLBACK.txt` — three commands, no git, no session.
+
 ## 5. Rollback
 
 **Stop the service, delete the moved tree, rename `C:\Fusion247PKA-premigration-YYYYMMDD` back, restart.**
