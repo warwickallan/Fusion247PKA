@@ -384,8 +384,18 @@ export function reportsOverview(reports) {
     return vals.length ? vals.reduce((a, b) => a + b, 0) : null;
   };
 
-  const woSuccess = sum((r) => r.workOrders && r.workOrders.firstDispatchSuccess);
-  const woTotal = sum((r) => r.workOrders && r.workOrders.total);
+  // ⚠️ SUM THE PAIR, NOT THE COLUMNS. Summing `firstDispatchSuccess` and `total` independently
+  // produced `13 of 7` against live data on 2026-08-08 — rotations that recorded a success count but
+  // no denominator inflated the numerator against a denominator they never contributed to. Only
+  // rotations where BOTH halves are established can contribute to either half.
+  let woSuccess = null, woTotal = null;
+  for (const r of list) {
+    const w = r.workOrders || {};
+    if (w.total === null || w.total === undefined) continue;
+    if (w.firstDispatchSuccess === null || w.firstDispatchSuccess === undefined) continue;
+    woSuccess = (woSuccess ?? 0) + w.firstDispatchSuccess;
+    woTotal = (woTotal ?? 0) + w.total;
+  }
   const allFindings = list.flatMap((r) => (r.findings || []).map(findingHeadline));
 
   // TREND — only when BOTH the latest and the previous value are established.
@@ -414,11 +424,17 @@ export function reportsOverview(reports) {
 
   return {
     sessions: list.length,
-    woFirstPass: woTotal === null ? null : { success: woSuccess ?? 0, total: woTotal },
+    woFirstPass: woTotal === null ? null : { success: woSuccess, total: woTotal },
     amendments: sum((r) => r.workOrders && r.workOrders.amendments),
     refusals: sum((r) => r.workOrders && r.workOrders.refusals),
     subagentTokens: sum((r) => r.subagentTokens),
-    contextTokens: sum((r) => (r.contextTokensIn ?? 0) + (r.contextTokensOut ?? 0)),
+    // `?? 0` inside the sum turned "never established" into a measured zero and reported 0 tokens
+    // against nine real sessions. Only rotations that established a value contribute at all.
+    contextTokens: sum((r) => {
+      const i = r.contextTokensIn, o = r.contextTokensOut;
+      if ((i === null || i === undefined) && (o === null || o === undefined)) return null;
+      return (i ?? 0) + (o ?? 0);
+    }),
     findingsTotal: allFindings.length,
     failuresTotal: allFindings.filter((f) => f.failure).length,
     unestablishedTotal: sum((r) => (r.unestablished || []).length),

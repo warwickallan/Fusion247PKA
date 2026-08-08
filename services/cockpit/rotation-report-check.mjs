@@ -39,6 +39,7 @@ const {
   ROTATION_ORDER_BY, ROTATION_SQL, SPECIALIST_SQL, SQLSTATE_REASONS,
   jsonList, jsonOrNull, mapRotation, mapSpecialist, num, readFailure,
   rotationReports, rotationReportsResponse, str, sumDispatches, toDateString, toIso,
+  reportsOverview, reportSummary, findingHeadline,
 } = mod;
 
 let ran = 0, failed = 0;
@@ -401,6 +402,40 @@ const CONTRACT_KEYS = [
   ok('a failed read does not poison the next read', stillFine.ok === true && stillFine.reports.length === 1,
     JSON.stringify(stillFine.ok));
 }
+
+
+// ── 12. reportsOverview: aggregates that live data proved wrong ──────────────────────────────────
+// Both of these shipped and were caught by LOOKING AT THE LIVE ENDPOINT, not by this file. They are
+// pinned here so the next edit cannot reintroduce them.
+{
+  const R = (over) => ({ workOrders: { total: null, firstDispatchSuccess: null, amendments: null, refusals: null },
+    allocation: { reworkPct: null }, findings: [], unestablished: [], subagentTokens: null,
+    contextTokensIn: null, contextTokensOut: null, sessionDate: '2026-01-01', ...over });
+
+  // ⭐ success must never exceed total: a rotation with a numerator but no denominator contributes
+  // to NEITHER half. Live data reported "13 of 7" before this was fixed.
+  const mixed = reportsOverview([
+    R({ workOrders: { total: 2, firstDispatchSuccess: 1, amendments: null, refusals: null } }),
+    R({ workOrders: { total: null, firstDispatchSuccess: 6, amendments: null, refusals: null } }),
+    R({ workOrders: { total: 5, firstDispatchSuccess: 2, amendments: null, refusals: null } }),
+  ]);
+  ok('⭐ WO first pass sums the PAIR, so success can never exceed total',
+    mixed.woFirstPass.success === 3 && mixed.woFirstPass.total === 7,
+    `${mixed.woFirstPass.success}/${mixed.woFirstPass.total}`);
+
+  // ⭐ absent context tokens stay absent. `?? 0` reported a measured 0 across nine real sessions.
+  const noCtx = reportsOverview([R({}), R({})]);
+  ok('⭐ context tokens nobody established report null, never 0',
+    noCtx.contextTokens === null, JSON.stringify(noCtx.contextTokens));
+
+  const someCtx = reportsOverview([R({ contextTokensIn: 100, contextTokensOut: 20 }), R({})]);
+  ok('⭐ and a single established value still sums, without the absent one contributing a zero',
+    someCtx.contextTokens === 120, JSON.stringify(someCtx.contextTokens));
+
+  ok('a trend is null when the two most recent rework values are not both established',
+    reportsOverview([R({ allocation: { reworkPct: 10 } }), R({})]).trend === null);
+}
+
 
 if (ran === 0) { console.error('ROTATION-REPORT-CHECK FAIL — zero assertions executed.'); process.exit(1); }
 if (failed) { console.error(`ROTATION-REPORT-CHECK FAIL — ${failed} of ${ran} assertions failed.`); process.exit(1); }
