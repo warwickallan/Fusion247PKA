@@ -568,7 +568,35 @@ begins only after the prepared sequence below reaches Warwick's decision at step
 catalogue-grounded interpretation with no Larry in the execution path — and what, from executable
 evidence, is the earliest link in the journey that still cannot happen in production?*
 
-### 🎯 THE EXACT FIRST ACTION — execution-based bootstrap. It deliberately self-invalidates stale preparation assumptions.
+### 🎯 THE ONE CURRENT NEXT ACTION — rotation position, 2026-08-08 ~23:50. **WP-B15-1 live acceptance is PENDING WARWICK'S CHOICE.**
+
+**Where the WP stands (everything below is banked and pushed on this branch):** source complete at
+`7db899b` · Veritas Gate 1 **PASS** (all 8, mutation-tested) · **migration 016 APPLIED to the live
+household DB** under Warwick's §3 authority (pre-notified, ding 424; schema proven read-only
+after: `asdair_ro` SELECT-only, no UPDATE/DELETE for anyone) · both Pax audits banked · runtime
+currently running CANONICAL MAIN bytes (restored; the card code is NOT live yet).
+
+**THE BLOCKER, named honestly (`permission`):** the auto-mode classifier denies Larry starting the
+acceptance runtime (a process start carrying secrets-store env-file arguments — twice denied;
+worked around by NOTHING, per the guard's intent). **Warwick has two options, dinged to him
+(425):**
+- **(a) RECOMMENDED:** he runs, in the session:
+  `! powershell -ExecutionPolicy Bypass -File "Deliverables/2026-08-08-start-acceptance-runtime.ps1"`
+  *(committed copy in this worktree — run from `C:\Fusion247PKA-b15`; it swaps the poller to this
+  branch head, and within ~2 poller ticks shop 6's confirmation card lands on ShopperBot; HIS TAP
+  on "Confirm this reading" is the §11 acceptance event).* Watch item: gate-clear → replan fires
+  the first-ever live `recordAnswerLearning` writes, which park the shop FAILED on any error —
+  that outcome is honest acceptance evidence of the audit-predicted seam, not a card defect.
+- **(b) "merge first":** Codex merge-check on this branch through the Tower-visible
+  `mergeCheck.mjs` route → Warwick's `merge-decision` → the scheduled task then serves the new
+  code from canonical `main` with no special start.
+
+**After the acceptance event (either route): the Asda Build 002 §12 handback** — WP outcome + real
+evidence + both audit headlines + the next-slice recommendation (both audits point at durable
+human learning / intent promotion over invariant-D retention; the going-forward act rides the new
+card). **That handback is the next genuine product decision.**
+
+### The standing fresh-session bootstrap — execution-based; it deliberately self-invalidates stale preparation assumptions.
 
 **Nothing prepared before the merge may be trusted until this runs.** No SHA is written here — the
 post-merge head cannot be known while this is being written, and hardcoding one is the failure this
