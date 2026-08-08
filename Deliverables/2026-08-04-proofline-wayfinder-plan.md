@@ -2853,9 +2853,19 @@ Any newly discovered **unrelated** defect: record once in [[Deliverables/BACKLOG
 
 **4C is finished only when Fusion247PKA demonstrates the model it is establishing for every future Build:** **ONE MAIN. ONE WORKING FOLDER. ONE AUTHORITATIVE SYSTEM.** And from then onward — *the active piece of work may temporarily exist beside MAIN; MERGE consumes it; nothing useful gets left behind.*
 
-### 🎯 THE ONE CURRENT NEXT ACTION — **Sub-phase 4C: CANONICAL ESTATE RESET.**
+### 🎯 THE ONE CURRENT NEXT ACTION — **Sub-phase 4C: ESTATE RECONCILIATION & CONVERGENCE.**
+
+*(Renamed from "Canonical Estate Reset" 2026-08-08 — Warwick's four-term correction. **RECONCILE** decides what belongs; **MERGE** is the Git event; **CONVERGE** is the estate end state; **CLOSE** ends the sub-phase. Canonical in root `CLAUDE.md` § "Git ownership".)*
 
 **Working branch `build-020/4c-estate-convergence`, cut from `70dba16`.** Every 4C acceptance row below is Warwick's, restated in the order he set them.
+
+> **📍 WHERE 4C ACTUALLY IS — 2026-08-08. Read this before acting; the rows below carry the detail.**
+>
+> **Reconciliation and convergence are EXECUTED.** Worktrees **19→2**, local branches **67→3**, remote **68→3**, stashes **3→0**, 0 open PRs, canonical tree clean, runtime alignment re-proven under a corrected check. Three survivors reconciled: **S-1** integrated in minimum current-compatible form, **S-2** preserved as historical evidence only, **S-3** preserved as decommissioned reference-only design capital.
+>
+> **NOT YET DONE, and 4C may not be reported CONVERGED or CLOSED until they are:** Warwick's ratification of the amended Codex prose · the ONE focused Veritas confirmation of its three findings · the ONE merge-class Codex review · the merge itself · the post-merge convergence proof · retiring the candidate worktree and clearing `~/.mypka/tower-backups/`.
+>
+> **The next thing owed to Warwick is the final merge decision** — not another intermediate discussion.
 
 | # | Requirement | State |
 |---|---|---|

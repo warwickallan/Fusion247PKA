@@ -1,0 +1,9 @@
+processes examined      : 473
+canonical refs          : 13   (c:\fusion247pka)
+active-candidate refs   : 2   (c:\fusion247pka-build-020-trial - legitimate until 4C merges)
+SUPERSEDED-ROOT refs    : 0   (MUST BE ZERO)
+    DEAD REFERENCE (path absent from disk, cannot be consumed): c:\fusion247pka-external-repair
+        PID 19748 claude.exe
+
+RESULT: PASS - no live process is rooted in a superseded branch/worktree/checkout.
+LIMIT : process working directory NOT checked (not exposed by Win32_Process).
