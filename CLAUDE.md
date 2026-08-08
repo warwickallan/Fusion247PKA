@@ -146,22 +146,71 @@ Applied to every outgoing reply: *does it ask Warwick to run a git command, choo
 
 **This section is the only authoritative statement of this rule.** A copy hard-coded into a script's output is a defect in that script.
 
-### MERGE = ESTATE CONVERGENCE. **This section is the only home of this definition; every other surface points here.**
+### RECONCILE · MERGE · CONVERGE · CLOSE — the four terms. **This section is the only home of these definitions; every other surface points here.**
 
-**When Warwick says "merge" — "merge the Build", "merge the Wayfinder", "finish and merge", "tidy and merge" — he means ESTATE CONVERGENCE. Executing a GitHub PR merge is ONE operation inside it, never the whole of it.**
+**Corrected by Warwick, 2026-08-08. Every obligation in this section is unchanged — what changed is the naming.** **MERGE** is an established Git word with a narrow, precise meaning; using it for the whole estate-wide outcome made that outcome ambiguous. The estate-wide end state is **CONVERGENCE**. The process that decides what reaches it is **RECONCILIATION**.
+
+**When Warwick says "merge the Build", "merge the Wayfinder", "finish and merge", "tidy and merge", he means through to CONVERGENCE and CLOSE. Executing a GitHub PR merge is ONE operation inside that, never the whole of it.**
+
+The flow, and nothing skips a step:
+
+```
+ACTIVE + HISTORICAL/STRANDED STATE → RECONCILE → VALID CURRENT CANDIDATE → MERGE INTO MAIN → PROVE CONVERGENCE → CLOSE
+```
 
 Warwick's model, and the test everything below serves: **ONE MAIN. ONE CURRENT WORKING FOLDER.** Everything useful is either (A) on canonical main, or (B) actively being worked in the ONE current working state. **Everything else is dead.**
 
-Work is not MERGED until **every useful output belonging to it has a final canonical disposition**: **KEEP** → on canonical main, or in the approved canonical runtime / non-Git data store. **DISCARD** → dead, and removed from the active estate.
+#### RECONCILE — the process
 
-- A merge may **not** leave useful unique work stranded on a branch, worktree, stash, untracked file, recovery folder, patch, worker checkout, machine-installed copy, or any other competing location.
-- A merge may **not** leave a live service, launcher, scheduled task or runtime consuming superseded branch or worktree bytes.
+**RECONCILE is deciding what belongs in the current canonical system.** It governs every candidate: active work, and equally historical, stranded or competing state found on a branch, worktree, stash, untracked file, recovery folder, patch, worker checkout or machine-installed copy.
+
+**The reconciliation test — four questions, asked of every survivor:**
+
+1. **Is it unique?** — or is that value already carried by current canon.
+2. **Is it still wanted?**
+3. **Is it compatible with decisions made since?**
+4. **Is the old implementation or text still the correct CURRENT form?** — value can survive while its old shape does not.
+
+**Then classify it. These four are the whole list:**
+
+- **Integrate** — in current-compatible form.
+- **Preserve but explicitly decommission** — retained, clearly marked reference-only, never an active source.
+- **Recognise as already satisfied differently** — the need is met by current canon; the old artefact adds nothing.
+- **Discard** — superseded or obsolete.
+
+**Recovery discovers candidates. Current canon decides what survives.** Finding something is never by itself a reason to reinstate it.
+
+**Precedence when candidates conflict: later explicit Warwick decisions outrank earlier conflicting ones.** Where precedence settles it from the record, settle it and continue. **A genuine unresolved conflict between two Warwick decisions that precedence cannot settle from the record is a Warwick decision (`product-decision`) — never chosen silently.**
+
+#### MERGE — the Git operation
+
+**MERGE keeps its normal Git and software meaning: integrating the active change or history into main.** **A merged PR is a Git event. It does NOT by itself prove estate convergence**, and may never be reported as though it did. The handback code `merge-decision` names Warwick's decision on this Git operation; it is load-bearing in shipped code and is unchanged by this correction.
+
+#### CONVERGE / CONVERGENCE — the estate-wide end state
+
+The estate is **CONVERGED** only when **all** of these hold:
+
+- current **MAIN** contains everything still useful, wanted and correct;
+- **no useful current work is stranded elsewhere** — not on a branch, worktree, stash, untracked file, recovery folder, patch, worker checkout, machine-installed copy, or any other competing location;
+- **no alternative implementation remains accidentally authoritative**;
+- intentionally retained historical alternatives are **clearly decommissioned and reference-only**;
+- branches, worktrees, stashes and recovery state contain **no unresolved useful value**;
+- **live runtimes, launchers, scheduled tasks and services consume canonical current sources** — never superseded branch or worktree bytes;
+- there is **one canonical current system**, not multiple competing truths.
+
+Which requires that **every useful output belonging to the work has a final canonical disposition**: **KEEP** → on canonical main, or in the approved canonical runtime / non-Git data store. **DISCARD** → dead, and removed from the active estate.
+
 - **Temporary preservation during safe reconciliation is a safety mechanism only. It is NEVER a final disposition.**
-- After the merge is complete, **no useful state from that completed work exists only outside canonical main** or its approved canonical non-Git data/runtime store.
+- Once convergence is complete, **no useful state from that completed work exists only outside canonical main** or its approved canonical non-Git data/runtime store.
 - Historical Git commits may remain as history. **History is not an active alternative source**, and history is **never** rewritten merely to make old bytes disappear.
-- **"Merged" may not be reported until convergence is complete.**
 
 **DURABLE means canonical, remotely recoverable, and actually consumed from the canonical source where applicable.** *"Committed somewhere"*, *"pushed on some branch"*, *"preserved in a worktree"*, *"installed from old bytes"*, or *"works if Larry finds the right old checkout"* is **NOT durable.**
+
+#### CLOSE — the boundary
+
+**A Build or Sub-phase may CLOSE only when its promised human outcome is satisfied AND the reconciliation and convergence required at that boundary are complete.**
+
+**The reporting bar is absolute: nothing may be reported RECONCILED, CONVERGED or CLOSED until it is true.** "Merged" states the Git fact and nothing more.
 
 ## The governor status line
 
