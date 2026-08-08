@@ -1,6 +1,13 @@
-# PROPOSED Active Session Work Package — WP-B15-1: the interpretation-confirmation gate gets its production surface
+# Active Session Work Package — WP-B15-1: the interpretation-confirmation gate gets its production surface
 
-**Status: PROPOSAL. Not active until Warwick's Step-5 decision. Prepared 2026-08-08 from Pax's
+**Status: ✅ APPROVED by Warwick, 2026-08-08 — items 1 + 2 only; item 3 OUT (his ruling, verbatim
+authority: [[Deliverables/2026-08-08-asda-build-002-SOURCE]], which also grants the narrow item-2
+migration authority with conditions and sets the binding acceptance evidence list in its §11).
+The four Step-5 questions are ANSWERED there: retained photograph = shop 6's photo IFF provable
+from the durable production record, else "NO APPROVED RETAINED PHOTOGRAPH ESTABLISHED"; BOB
+ruling closed (§5 — keep rule 10); item 3 OUT, leading candidate for the next slice subject to
+the Supabase audit; migration authority granted narrowly (§3).** ~~Status: PROPOSAL. Not active
+until Warwick's Step-5 decision.~~ Prepared 2026-08-08 from Pax's
 Step-2 investigation ([[Deliverables/2026-08-08-pax-b15-grounded-vision-investigation]]) and
 Larry's live verification. One WP, as commissioned ("Asdair Build 001" §8 Step 3).**
 

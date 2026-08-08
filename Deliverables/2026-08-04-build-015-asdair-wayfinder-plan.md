@@ -301,6 +301,9 @@ Each is settled. **Do not re-open one; point at it.**
 | **Exact-source-photograph provability is a product requirement** (fingerprint, intake ID, line counts, packet fingerprint — the wrong-week incident is the reason) | Warwick, 2026-08-08 — commission mirror §6C |
 | **Grounded candidate evidence is constrained, not discarded**; deterministic matches win, Terra ranks only supplied candidates, close calls become a human question | Warwick, 2026-08-08 — commission mirror §6D |
 | **First post-jump mission and sequence**: grounded-vision / earliest-broken-link investigation → one bounded Pax investigation → ONE proposed Active Session Work Package → one bounded Nolan review → Warwick decision → only then implementation | Warwick, 2026-08-08 — commission mirror §11–§12, §23 |
+| **WP-B15-1 APPROVED — items 1+2 only; item 3 OUT** (leading candidate for the next slice, subject to the household-knowledge audit). Narrow item-2 migration authority granted with conditions. Binding acceptance = the real production event list | Warwick, 2026-08-08 — [[Deliverables/2026-08-08-asda-build-002-SOURCE]] §1–§3, §11 |
+| **BOB ruling — CLOSED, not a contradiction: KEEP rule 10 (never BOB).** BOB's presence in ASDA Regulars/Favourites is **external platform evidence, not household intent** — Mum switched to Cravendale over end-of-date milk. **Principle carried into the knowledge model: external platform list membership never silently outranks an explicit current household rule/decision.** Do not "clean" ASDA's lists | Warwick, 2026-08-08 — [[Deliverables/2026-08-08-asda-build-002-SOURCE]] §5, §7 |
+| **Retained-photograph ruling**: shop 6's exact photo is approved for the "what Terra receives" demonstration IFF its provenance is provable from the durable production record; otherwise the recorded answer is NO APPROVED RETAINED PHOTOGRAPH ESTABLISHED — never substitute another week's | Warwick, 2026-08-08 — [[Deliverables/2026-08-08-asda-build-002-SOURCE]] §4 |
 
 ## 5. UNRESOLVED FOG AND CONTRADICTIONS
 
@@ -321,11 +324,14 @@ source.**
    10 is `info` with no `match_term`, so nothing enforces it. The old reasoning that `milk` resolved
    safely *because regular 69 carries no alias* was written when matching was exact-string. **Matching
    is now tolerant, so the reason that safety held may no longer hold.** More urgent, not less.
-   ~~`UNVERIFIABLE OFFLINE`.~~ **CONFIRMED LIVE 2026-08-08 (read-only): regular 69 `"Arla BOB
-   Semi-Skimmed Milk 2L That Tastes Like Whole"` is ACTIVE while rule 10 remains `info` with no
-   `match_term` — structurally unenforced. The regular's own name suggests the household
-   deliberately buys BOB; the rule says never. A genuine product question for the first WP — not
-   to be silently resolved either way.**
+   ~~`UNVERIFIABLE OFFLINE`.~~ ~~CONFIRMED LIVE 2026-08-08: … a genuine product question.~~
+   **CLOSED BY WARWICK'S RULING, 2026-08-08 (same day):** not a contradiction. **KEEP rule 10**;
+   BOB in ASDA Regulars/Favourites is external platform evidence (ASDA controls those surfaces),
+   not current household intent — Mum switched to Cravendale over end-of-date milk. The structural
+   half survives as engineering fact, not open question: rule 10 is `info` with no `match_term`,
+   so nothing yet ENFORCES the ruling in the planner — that belongs to routed knowledge-model
+   work, guided by the audit. Authority:
+   [[Deliverables/2026-08-08-asda-build-002-SOURCE]] §5, §7.
 3. **Migrations 013 and 014 were applied live and have no committed files.** `services/asdair/db/`
    stops at `012_complete_grant_matrix.sql` — verified by listing. **The live database is ahead of
    the repository, and a fresh clone or bootstrap restore does not reproduce live state.**
@@ -589,7 +595,26 @@ Then verify which 4E preparation assumptions survived: the seven-break classific
 CI-red row in §2, and the live-runtime row in §2 were all established 2026-08-08 and **each names
 its evidence so it can be re-established or falsified in minutes.**
 
-### The prepared sequence — Warwick's commission §12/§23, binding
+### ⭐ ACTIVE SESSION WORK PACKAGE — WP-B15-1, items 1+2 (approved 2026-08-08)
+
+**The prepared sequence below was EXECUTED AND DISCHARGED on 2026-08-08, in order:** step 1 the
+bootstrap ([[Deliverables/2026-08-08-b15-bootstrap-evidence]]); step 2 Pax's bounded investigation
+([[Deliverables/2026-08-08-pax-b15-grounded-vision-investigation]] — found break 8, the
+interpretation-confirmation gate, verified live); step 3 the ONE proposed WP
+([[Deliverables/2026-08-08-b15-proposed-aswp-01]]); step 4 Nolan CLEAR-WITH-OBSERVATIONS
+([[Deliverables/2026-08-08-nolan-wp-b15-1-review]]); step 5 **Warwick's decision — WP-B15-1
+items 1+2 APPROVED** ([[Deliverables/2026-08-08-asda-build-002-SOURCE]]).
+
+**The active work is now WP-B15-1** — production confirmation surface (item 1) + exact-source
+binding / wrong-week protection (item 2). **Binding acceptance is the real production event list
+in Asda Build 002 §11** — live poller card → real Telegram delivery → real tap → gate clears →
+replan → shop 6 recovers; restart-safe; no Larry and no manual DB command anywhere in the journey;
+never reported complete because code exists. **In parallel (not blocking):** the bounded read-only
+Pax Supabase household-knowledge audit (Asda Build 002 §6–§9). **After both: ONE handback to
+Warwick (§12) — the next genuine product decision. Item 3 (candidate-evidence retention) is OUT,
+recorded as leading candidate for the next slice.**
+
+### The prepared sequence — Warwick's commission §12/§23 — ✅ DISCHARGED 2026-08-08 (record retained)
 
 1. **Fresh orientation / canonical bootstrap** — the first action above. Nothing else starts first.
 2. **ONE bounded Pax investigation** — scope FIXED: grounded vision · exact source binding ·
