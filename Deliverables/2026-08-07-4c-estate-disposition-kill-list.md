@@ -319,9 +319,21 @@ main and then remove the old branch/worktree. It does not authorise another perm
 the moment the port lands. **`build-020/phase4-automation-law`** is an ancestor of the 4C branch and goes
 when 4C merges.
 
-**Not yet executed:** `C:\tb` · `C:\Fable-External-Repair` · the three preservation copies · the untracked
-VlogOps draft (durable copy taken at `~/.mypka/unpublished-drafts/`; disposition still Warwick's) · the
-final 4C merge · the fourteen end-state checks.
+## Convergence preparation — completed 2026-08-08
+
+| Item | Disposition | Proof |
+|---|---|---|
+| **Current-main reconciliation** | ✅ `main` merged into the candidate at `280d359` | The candidate was cut from `phase4-automation-law` **before** PR #97 and the `SXg08HPpKr8` capture landed. `git rev-list --count HEAD..main` = **0** after. |
+| **The 4 held source branches** | ✅ pinned, then deleted local + remote | Ported value verified present on the candidate first: gateway `transcription` (1 file), gateway `governance` (2), `noteStructure` (2). `build-010/wp1` correctly contributed **nothing** — porting it would have revived the architecture Warwick ruled dead. |
+| **`C:\Fusion247PKA-premigration-20260807`** (full clone @ `c1ed028`) | ✅ removed — **zero unique useful state** | 6 modified files tested: 3 orphan-free. `persistCapture.mjs` 86→**162** lines and `watch-captures.mjs` 166→**376** are the 4B durable-capture rewrite. `server.mjs` 510→**458** is *smaller* because `/private-api` was **extracted** into 3 cockpit files — its orphans include a permissive `access-control-allow-origin: *` that 4B's origin boundary deliberately replaced. Both untracked Felix session logs are already on the candidate. |
+| **`C:\Fusion247PKA-unique-artefacts-20260807`** | ✅ removed | All 3 Sources artefacts byte-identical to the candidate after the main reconciliation; the VlogOps draft preserved separately; `stale-index.lock` is a lock file. |
+| **`C:\tb`**, **`C:\Fable-External-Repair`** | ✅ removed (contents) | Recorded above. One cosmetic residual: the emptied `Fable-External-Repair` **directory node** is pinned by an OS handle — 0 entries, confirmed via PowerShell. |
+| **The unapproved VlogOps draft** | ✅ **kept, not published, not deleted** | Removed from the canonical working tree **only after** the durable copy at `~/.mypka/unpublished-drafts/` was verified byte-identical to **both** other copies. It is an unreviewed draft from a pipeline whose only prior run scored **2/10 on privacy comprehension**; `Fusion247PKA` is public. Consistent with Warwick's standing rulings — the same shape he chose for the PKM position. |
+| **Runtime / task / service alignment** | ✅ verified | Every scheduled task and every live node process resolves to `C:\Fusion247PKA` (canonical) or `C:\.fusion247` (approved private runtime). **None depends on a branch or worktree.** |
+
+**Estate now:** **2** worktrees · **3** local and **3** remote branches (`main`, the candidate, and its ancestor) · **0** stashes · **0** open PRs · canonical working tree **clean** · C-root holds only `C:\Fusion247PKA` and the active `C:\Fusion247PKA-build-020-trial`.
+
+**Still open, deliberately:** `~/.mypka/tower-backups/2026-08-07-pre-postmerge-realign/` (76 files) is a **live-runtime rollback** and is retained until post-merge alignment proves the new state healthy — that is a rollback being used as a rollback. It is cleared before 4C closes. And the final merge, the end-state proof, and the `phase4-automation-law` ancestor branch, which dies with the merge.
 
 **One residual requiring a permission grant:** nothing outstanding — the earlier `git worktree remove` and
 `git branch -D` denials were subsequently approved and all queued deletions completed.
