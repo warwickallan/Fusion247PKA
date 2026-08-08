@@ -2940,7 +2940,7 @@ Any newly discovered **unrelated** defect: record once in [[Deliverables/BACKLOG
 
 **What 4E is (summary — the mirror is authoritative):** while BUILD-020/Proofline stays the active Build, reconcile the EXISTING BUILD-015 AsdAIr Wayfinder (`Deliverables/2026-08-04-build-015-asdair-wayfinder-plan.md`) against current repository, runtime and evidence truth, in an **isolated preparation branch/worktree** — no AsdAIr implementation, no runtime change, no specialist dispatch during preparation. Then, without stopping: Veritas 4E assurance → Codex on the actual merge unit → Warwick's `merge-decision` (the ONE planned interruption) → merge → prove convergence → explicit Build switch to BUILD-015 (NOT via `/rotate`) → fresh-side orientation acceptance. BUILD-020 parks at a 4F return frontier; the jump does not close it.
 
-**The current exact action: execute the 4E preparation in the isolated unit.** Sequence position and candidate head are recorded here at each boundary per commission §15.8.
+**4E PREPARATION CANDIDATE EXISTS — banked and pushed 2026-08-08.** Head `d122006` on branch `build-020/4e-build-015-prep` (isolated worktree `C:/Fusion247PKA-4e-prep`; draft PR **#99**). One file changed: the BUILD-015 Wayfinder, reconciled. The Proofline working tree was verified uncontaminated (clean at `c97edba`). **4E has NOT been independently accepted.** **The current exact action: Veritas 4E phase assurance against the candidate head, per commission §16.** Then Codex on the merge unit → Warwick's `merge-decision` → merge → convergence → explicit Build switch.
 
 **📄 SESSION REPORT — 4D close rotation, 2026-08-08.** Closing head `9de03b7` (payload), Supabase rotation `6dbc9606-8b2e-4fe9-8e79-5fbbbd118ccf` (populated, `verified:true`).
 
