@@ -596,6 +596,18 @@ evidence + both audit headlines + the next-slice recommendation (both audits poi
 human learning / intent promotion over invariant-D retention; the going-forward act rides the new
 card). **That handback is the next genuine product decision.**
 
+**📄 SESSION REPORT — rotation 2026-08-08/09.** The closing head is the commit AFTER the one
+carrying this block (the payload commit; the payload names both exactly).
+- **Report:** [[Deliverables/2026-08-08-session-performance-report-b15-session]] — ⏳
+  **COMMISSIONED, OUTSTANDING AT ROTATION** (Pax, non-blocking per `/rotate` step 6). **When it
+  lands: commit it, fold its CAPAE grades — including the deliberately Larry-ungraded
+  `record-amended-body-not-recut` — into the record via `capae-sync.mjs`.** It writes to this
+  worktree's `Deliverables/` untracked.
+- **Payload:** [[Deliverables/2026-08-08-session-report-payload-b15-session.json]] · **Ledger:**
+  [[Deliverables/2026-08-08-subagent-token-ledger-b15-session]] (A = 1,250,384 dedup; Larry's
+  closing context level 582.9k/1000k separate) · **Order of record:**
+  [[Deliverables/2026-08-08-wo-b15-01-order]].
+
 ### The standing fresh-session bootstrap — execution-based; it deliberately self-invalidates stale preparation assumptions.
 
 **Nothing prepared before the merge may be trusted until this runs.** No SHA is written here — the
