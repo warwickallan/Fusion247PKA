@@ -1,0 +1,13 @@
+diff --git a/services/control-plane/test/wp-c-e2e.test.js b/services/control-plane/test/wp-c-e2e.test.js
+index 9b824e5..39ca7e6 100644
+--- a/services/control-plane/test/wp-c-e2e.test.js
++++ b/services/control-plane/test/wp-c-e2e.test.js
+@@ -146,7 +146,7 @@ gated('1. HMAC verify: good signature accepted (writes), bad signature rejected
+     assert.equal(ok.accepted, true);
+     assert.ok(ok.checkpointId);
+     assert.equal(ok.headSha, HEAD_A);
+-    const ev = await pool.query(`select count(*)::int c from ops.agent_event where delivery_key = 'd-ok'`);
++    const ev = await pool.query(`select count(*)::int c from ops.agent_event where delivery_key = 'github:d-ok'`);
+     assert.equal(ev.rows[0].c, 1);
+     const job = await pool.query(`select count(*)::int c from ops.job where queue = 'review'`);
+     assert.equal(job.rows[0].c, 1);

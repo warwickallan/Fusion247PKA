@@ -1,0 +1,53 @@
+diff --git a/services/control-plane/worker/events.mjs b/services/control-plane/worker/events.mjs
+index 16a212d..d3e3c17 100644
+--- a/services/control-plane/worker/events.mjs
++++ b/services/control-plane/worker/events.mjs
+@@ -134,11 +134,20 @@ export function assertEventKindAllowed(eventKind) {
+  * start, so multiple events emitted inside one completion txn would tie and lose their
+  * order. clock_timestamp() advances between the sequential INSERTs, giving the ledger a
+  * deterministic emission order that reconstructs the lifecycle faithfully.
++ *
++ * DIVERGENT-BODY GUARD (opt-in via ev.verifyPayloadHashOnConflict — before-live hardening).
++ * The delivery_key is the exactly-once pivot: "same key => same event". A REDELIVERY that
++ * reuses a delivery_key but carries a DIFFERENT body is a violation of that assumption — two
++ * distinct events silently collapsing into one. When ev.verifyPayloadHashOnConflict is set and
++ * the INSERT conflicts, we compare the STORED payload_hash against the incoming one and THROW a
++ * DIVERGENT_REDELIVERY error on mismatch (fail-closed) instead of silently returning "deduped".
++ * Default OFF, so every existing caller (worker effects/lifecycle) keeps its exact behaviour.
+  */
+ export async function appendEvent(client, ev) {
+   if (!ev.deliveryKey) throw new Error('appendEvent: deliveryKey is required (idempotency pivot)');
+   if (!ev.eventKind) throw new Error('appendEvent: eventKind is required');
+   const payload = ev.payload ?? {};
++  const payloadHash = ev.payloadHash ?? hashPayload(payload);
+   const res = await client.query(
+     `insert into ops.agent_event
+        (build_id, delivery_key, event_kind, actor, payload_hash, payload, classification, occurred_at)
+@@ -152,10 +161,25 @@ export async function appendEvent(client, ev) {
+       ev.deliveryKey,
+       ev.eventKind,
+       ev.actor ?? null,
+-      ev.payloadHash ?? hashPayload(payload),
++      payloadHash,
+       JSON.stringify(payload),
+       ev.classification ?? null,
+       ev.occurredAt ?? null,
+     ]);
+-  return res.rowCount === 1;
++  if (res.rowCount === 1) return true;
++  // Conflict = the delivery_key was already ingested (redelivery). Fail-closed on a DIVERGENT body.
++  if (ev.verifyPayloadHashOnConflict) {
++    const existing = await client.query(
++      `select payload_hash from ops.agent_event where delivery_key = $1`, [ev.deliveryKey]);
++    const storedHash = existing.rows[0]?.payload_hash ?? null;
++    if (storedHash !== null && storedHash !== payloadHash) {
++      const err = new Error(
++        `divergent-body redelivery: delivery_key already ingested with a DIFFERENT payload_hash ` +
++        `(stored ${storedHash}, incoming ${payloadHash}) — two different bodies under one delivery ` +
++        `id are NOT the same event; refusing to treat this as an already-delivered success`);
++      err.code = 'DIVERGENT_REDELIVERY';
++      throw err;
++    }
++  }
++  return false;
+ }

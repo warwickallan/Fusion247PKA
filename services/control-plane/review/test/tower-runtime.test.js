@@ -513,7 +513,18 @@ gated('4b. the runtime stages the REAL versioned prompt (not the legacy thin/emp
     await runTowerReview({ pool, checkpointId: cpId, reviewers: [reviewer], packetBuilder: pb, productQaPrompt: prompt, evidenceSources: gitFake(), log: SILENT });
     const staged = reviewer.lastSkillText;
     assert.ok(staged && staged.length > 200, 'skillText is the REAL prompt, not the legacy empty thin skill');
-    assert.match(staged, /Tower QA — independent Codex review/, 'the APPROVED ratified skill body is staged');
+    // STALE PIN REPAIRED 2026-08-07 (WO-2026-08-07-4C-01). This line asserted the heading
+    // /Tower QA — independent Codex review/, which the WP-2G rewrite renamed to
+    // "# Codex — the external review contract". It had been RED since that rewrite: a pin against
+    // text nobody ships, i.e. the third instance of the drift class this file already documents at
+    // line ~385 (`tower-qa-skill@1` vs a shipped `version: 2`).
+    //
+    // Assert the DELIVERY SENTINEL instead. It is the estate's own identity mechanism for exactly
+    // this problem — held as a literal here, OUTSIDE the file it checks, so it still proves which
+    // body was staged, while surviving the wording refinements that broke the heading pin. It goes
+    // red on a substituted, truncated or wrong-file body, which is what this assertion is for.
+    assert.match(staged, /F247-CODEX-CONTRACT-SENTINEL-1/,
+      'the APPROVED ratified skill body is staged (identity proven by its delivery sentinel)');
     assert.match(staged, /three judgements/i, 'the LIVE reviewer-classification amendment is staged (base+classification+orientation)');
     assert.match(staged, /BLOCKS_CURRENT_MERGE/, 'the disposition vocabulary + fail-closed output contract are staged');
     assert.match(staged, /ACCEPTANCE FIRST/, 'the acceptance-first orientation layer is staged');

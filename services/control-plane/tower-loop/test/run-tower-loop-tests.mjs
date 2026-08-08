@@ -62,7 +62,7 @@ import { notify } from '../notify.mjs';
 // WP-2F — the merge-check path, now on the ONE canonical SQLite store. Both entrypoints: the
 // tower-loop one (runMergeCheck) and the tower/ one, whose store functions are exported so they
 // can be proven against a real store rather than only read.
-import { runMergeCheck } from '../mergeCheck.mjs';
+import { runMergeCheck, gatherConvergenceEvidence, safeGatherConvergenceEvidence } from '../mergeCheck.mjs';
 import { nextSeq as mcNextSeq, record as mcRecord, auditContext as mcAuditContext } from '../../tower/merge-check.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -158,7 +158,18 @@ const CP_CALL_RE = new RegExp(`(?<![\\w$.])(${CP_FNS.join('|')})\\(`, 'g');
 // prove nothing. (Deliberately not naming the launcher function verbatim in this comment — this
 // scanner's own CALL-SITE regex matches inside prose too, and a literal mention here would count
 // itself as a 26th site.)
-const TOWER_LOOP_CP_SITES = 25;
+// WO-2026-08-07-4C-03 moved this from 25 to 28 — DELIBERATELY, which is the only way this literal
+// is ever allowed to move. Three new launch sites, each windowsHide:true from the moment it was
+// written: the convergence inventory's read-only probe runner in mergeCheck.mjs, and the two
+// pass-through spawn doubles in C2/C5 below (which delegate to the real binary for the commands
+// they are not mutating, and so genuinely launch children).
+// WO-2026-08-07-4C-06 moved it again, 28 -> 29: one launch site in C7/C8's scratch-repo git helper,
+// windowsHide:true from the moment it was written.
+// WO-2026-08-08-4C-13 moved it 29 -> 30: one launch site in the convergence fixture's spawn double,
+// which passes real git through while answering `gh` from a canned child — windowsHide:true from
+// the moment it was written. The control caught this addition on the first run, which is the only
+// reason this literal is worth having; it was updated deliberately, never to make a suite go green.
+const TOWER_LOOP_CP_SITES = 30;
 
 function jsFilesUnder(dir, out = []) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -2250,6 +2261,660 @@ async function main() {
       () => pool.query(`select seq, left(instruction,140) instr from tower.turn order by seq desc limit 5`),
       /no such function: left/i,
       'left() is genuinely unavailable — so substr() working is a real difference');
+  });
+
+  // ══════════════════════════════════════════════════════════════════════════════
+  // WO-2026-08-07-4C-03 — THE ESTATE-CONVERGENCE INVENTORY (reviewer contract §3b).
+  //
+  // WO-4C-01 proved §3b's LAW reaches the Codex child. It left the obligation live and the
+  // evidence for it absent: Codex was told to establish nine convergence properties, and handed
+  // repo/branch/head/base/diff only. C1–C6 prove the inventory is gathered by execution, that a
+  // probe which could NOT run is visible rather than silent, and that it reaches the packet on
+  // BOTH merge-class routes — the CLI entrypoint and the automatic PR-poll route.
+  //
+  // The reach-to-stdin half lives in test/codexContractReach.test.mjs (R7–R9), spawned and counted
+  // by WP-2G above, because it must stay runnable with no native SQLite build.
+  //
+  // NO COUNT IS PINNED. Larry executes estate convergence in this same repository while these run,
+  // so branches and worktrees genuinely disappear mid-enumeration; a test asserting "68 branches"
+  // would fail for the healthiest possible reason.
+  // ══════════════════════════════════════════════════════════════════════════════
+
+  /** A child-process double that settles immediately with a canned exit code and streams. */
+  function cannedChild(code, stdout, stderr) {
+    const c = new EventEmitter();
+    c.stdout = new EventEmitter();
+    c.stderr = new EventEmitter();
+    c.kill = () => {};
+    setImmediate(() => {
+      if (stdout) c.stdout.emit('data', Buffer.from(stdout));
+      if (stderr) c.stderr.emit('data', Buffer.from(stderr));
+      c.emit('close', code);
+    });
+    return c;
+  }
+
+  /** A spawn double that fails EXACTLY the git subcommands named, and runs the real thing for the
+   *  rest. Partial failure is the case that matters: a total outage is obvious, whereas one dead
+   *  probe among nine healthy ones is precisely the shape that could render as a clean estate. */
+  function partiallyFailingSpawn(failWhen) {
+    return (cmd, args, opts) => {
+      if (!failWhen(cmd, args)) return spawn(cmd, args, { ...opts, windowsHide: true });
+      return cannedChild(128, '', `SIMULATED PROBE FAILURE: ${cmd} ${args.join(' ')}\n`);
+    };
+  }
+  const REPO_UNDER_TEST = path.resolve(LOOP_DIR, '..', '..', '..');
+
+  /** One git command in a scratch repo. Deterministic identity so commits never depend on host config. */
+  function gitIn(cwd, args) {
+    return new Promise((resolve, reject) => {
+      const c = spawn('git', ['-c', 'user.name=Keel', '-c', 'user.email=keel@example.invalid',
+        '-c', 'commit.gpgsign=false', ...args], { cwd, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+      let out = ''; let err = '';
+      c.stdout.on('data', (d) => { out += d; });
+      c.stderr.on('data', (d) => { err += d; });
+      c.on('close', (code) => (code === 0 ? resolve(out) : reject(new Error(`git ${args.join(' ')} -> ${code}: ${err}`))));
+    });
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════════
+  // WO-2026-08-08-4C-13 — THE CONTROLS NO LONGER DEPEND ON THE AMBIENT REPOSITORY.
+  //
+  // THE DEFECT. C1, C2, C9 and C10 were written against the checkout they happen to run in. That
+  // is a test whose answer is a property of the machine, not of the code, and it failed exactly
+  // that way: `executed=79 failures=0` locally and `executed=79 failures=3` in CI at the same SHA
+  // (run 31232959281). The CI block read `canonical_ref: main (UNRESOLVED — see below)` and
+  // `probes: 11 run, 5 FAILED`, because `actions/checkout` leaves no local `main` on a
+  // pull_request build. C10 was worse: it went GREEN in CI over `count: 0`, because
+  // `refs/recovery/**` is never fetched there and `/count: \d+/` matches zero — a control that
+  // passed while examining nothing, which is the precise defect class this whole block exists to
+  // catch, hiding inside the fix for it.
+  //
+  // WHY NOT `fetch-depth: 0`. That was the obvious candidate and it was DISPROVED before it was
+  // tried, by arithmetic on the CI log rather than by another red run. The gatherer fires exactly
+  // 11 top-level probes; CI reported 5 failing; with containment unresolved no tip probes are
+  // added, so the five are forced: rev-parse main^{commit}, branch --merged, branch -r --merged,
+  // rev-parse main^{tree}, and `gh pr list`. The fifth fails on a runner with no GH_TOKEN exported
+  // to the step AT ANY FETCH DEPTH, so `probes_failed === 0` could never hold. Nothing in
+  // `.github/workflows/control-plane-tests.yml` was changed, and that absence is deliberate.
+  //
+  // THE FIX. These controls now build the repository they measure. `gatherConvergenceEvidence` is
+  // still exercised BY EXECUTION against a real git repository with real commits, real branches
+  // and real refs — it is simply a repository the test owns, so every count is pinned to a literal
+  // and a wrong answer is visible anywhere the suite runs. `gh` is the one probe with no local
+  // equivalent, so it is answered through the SAME injected-spawn seam the rest of this block
+  // already uses; no new mechanism, no new dependency, and git stays entirely real.
+  //
+  // NOTHING IS WEAKENED TO GO GREEN. Every assertion these controls made is still made, and the
+  // counts are now pinned HARDER than before rather than relaxed.
+  // ══════════════════════════════════════════════════════════════════════════════
+
+  /** Real git, canned `gh` (no network, no auth), plus optional targeted git failures. */
+  function fixtureSpawn(failWhen = () => false) {
+    return (cmd, args, opts) => {
+      // The one probe a local fixture cannot satisfy: there is no GitHub behind a temp directory.
+      // Answered here rather than left to fail, so `probes_failed: 0` is a real statement about
+      // the git evidence instead of a number that depends on runner credentials.
+      if (cmd === 'gh') return cannedChild(0, '[]', '');
+      if (failWhen(cmd, args)) return cannedChild(128, '', `SIMULATED PROBE FAILURE: ${cmd} ${args.join(' ')}\n`);
+      return spawn(cmd, args, { ...opts, windowsHide: true });
+    };
+  }
+
+  /**
+   * Build the deterministic estate these controls measure. Its shape mirrors the real situation
+   * Codex flagged on PR #98, so the evidence proven here is the evidence that review needed:
+   *
+   *   main              base → tip                    the canonical ref
+   *   behind            at base                       CONTAINED — must never appear in [7]
+   *   prior/work        modifies a.txt off main tip   non-contained, and an ANCESTOR of the candidate
+   *   candidate/head    prior/work + adds c.txt       non-contained — the merge candidate itself
+   *   independent/work  modifies b.txt off main tip   non-contained, and INDEPENDENT of the candidate
+   *
+   *   refs/recovery/4c-unreachable/<sha> × 3          sha-named pin family (grouped at 2 segments)
+   *   refs/recovery/4c/keep-this-branch               pinned AT independent/work's tip, so the
+   *                                                   [1]/[2]/[7] exclusion has something to hide
+   *
+   * `prior/work` is the whole point: a non-contained ref that CONTRIBUTES and is nonetheless
+   * carried by this merge. Before this Work Order the block rendered it identically to
+   * `independent/work`, which is why the reviewer could not tell them apart.
+   */
+  async function makeConvergenceFixture({ withRecoveryPins = true } = {}) {
+    const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'conv-fixture-'));
+    const w = (f, s) => fs.writeFileSync(path.join(repo, f), s);
+    await gitIn(repo, ['init', '--initial-branch=main', '-q']);
+    w('a.txt', 'one\n'); w('b.txt', 'two\n');
+    await gitIn(repo, ['add', 'a.txt', 'b.txt']);
+    await gitIn(repo, ['commit', '-q', '-m', 'base']);
+    await gitIn(repo, ['branch', 'behind']);                       // contained: stays at base
+    w('z.txt', 'main moves on\n');
+    await gitIn(repo, ['add', 'z.txt']);
+    await gitIn(repo, ['commit', '-q', '-m', 'main tip']);
+
+    await gitIn(repo, ['checkout', '-q', '-b', 'prior/work']);
+    w('a.txt', 'prior implementation line\n'.repeat(20));
+    await gitIn(repo, ['commit', '-q', '-am', 'prior work — modifies a.txt only']);
+    await gitIn(repo, ['checkout', '-q', '-b', 'candidate/head']);
+    w('c.txt', 'candidate work\n');
+    await gitIn(repo, ['add', 'c.txt']);
+    await gitIn(repo, ['commit', '-q', '-m', 'candidate builds on prior/work']);
+
+    await gitIn(repo, ['checkout', '-q', '-b', 'independent/work', 'main']);
+    w('b.txt', 'independent implementation line\n'.repeat(10));
+    await gitIn(repo, ['commit', '-q', '-am', 'independent work — modifies b.txt only']);
+    const independentSha = (await gitIn(repo, ['rev-parse', 'HEAD'])).trim();
+    await gitIn(repo, ['checkout', '-q', 'main']);
+
+    if (withRecoveryPins) {
+      for (const m of ['base', 'main tip', 'prior work — modifies a.txt only']) {
+        const sha = (await gitIn(repo, ['rev-list', '-1', `--grep=${m}`, '--all'])).trim();
+        await gitIn(repo, ['update-ref', `refs/recovery/4c-unreachable/${sha}`, sha]);
+      }
+      // Pinned AT a working branch's tip ON PURPOSE: if the refname-prefix exclusion ever breaks,
+      // this name shows up in [7] beside `independent/work`, and C10 sees it.
+      await gitIn(repo, ['update-ref', 'refs/recovery/4c/keep-this-branch', independentSha]);
+    }
+    const candidateSha = (await gitIn(repo, ['rev-parse', 'candidate/head'])).trim();
+    return { repo, candidateSha, independentSha };
+  }
+  const rmrf = (p) => { try { fs.rmSync(p, { recursive: true, force: true }); } catch { /* best effort */ } };
+
+  await test('C1 — the inventory is gathered BY EXECUTION against a real repository, with every count pinned', async () => {
+    const { repo, candidateSha } = await makeConvergenceFixture();
+    try {
+    const inv = await gatherConvergenceEvidence({ cwd: repo, mainRef: 'main', candidateRef: candidateSha, spawn: fixtureSpawn() });
+    // PINNED, not ">5". 11 top-level probes + 1 candidate resolution + 3 non-contained tips x 5
+    // per-tip probes = 27. A change that silently stops probing shows up here as a number.
+    assert.equal(inv.probes_run, 27, `every probe fired (got ${inv.probes_run})`);
+    assert.equal(inv.probes_failed, 0, `no probe failed on this fixture: ${inv.text.slice(0, 600)}`);
+
+    // Every §3b evidence class the Work Order named has a section, and each section is present
+    // because it was ENUMERATED — not because a heading was hardcoded with nothing under it.
+    for (const heading of ['[1] LOCAL BRANCHES', '[2] REMOTE BRANCHES', '[3] REGISTERED WORKTREES',
+      '[4] STASHES', '[5] DIRTY AND UNTRACKED PATHS', '[6] OPEN PULL REQUESTS',
+      '[7] NON-CONTAINED TIPS — SAME-PATH DIVERGENCE ANALYSIS', '[R] RECOVERY PINS']) {
+      assert.ok(inv.text.includes(heading), `the inventory carries ${heading}`);
+    }
+    // Real content, not just scaffolding — and now checkable against known truth rather than
+    // against whatever the surrounding estate happens to contain.
+    assert.match(inv.text, /canonical_ref: main @ [0-9a-f]{40}/, 'the canonical ref is resolved to a real SHA');
+    assert.match(inv.text, /canonical_tree: [0-9a-f]{40}/, 'and the canonical TREE, which merge_contribution compares against');
+    assert.ok(/\[3\] REGISTERED WORKTREES[\s\S]*?count: 1\b/.test(inv.text), 'the fixture\'s one worktree was really enumerated');
+    assert.match(inv.text, /\[1\] LOCAL BRANCHES \(5 total, 3 NOT contained in main\)/,
+      'the branch census is exact: 5 branches, 3 non-contained');
+    assert.match(inv.text, /contained in main \(2\): (behind, main|main, behind)/,
+      '`behind` and `main` are classified CONTAINED — by content, not by name');
+    assert.match(inv.text, /\[7\] NON-CONTAINED TIPS — SAME-PATH DIVERGENCE ANALYSIS \(3 distinct tip\(s\)\)/,
+      'and exactly the three non-contained tips reach the divergence section');
+    // The known divergence, by the numbers. `prior/work` rewrites a.txt (20 lines in, 1 out) and
+    // adds NO pathname — the very shape that scored 0 on the original measure.
+    assert.match(inv.text, /files_absent_from_main=0\s+files_modified_vs_main=1\s+merge_contribution=CONTRIBUTES/,
+      'the pure-modification tip is measured, not missed');
+
+    // WO-4C-06 — all four per-tip fields, populated from real probes.
+    assert.match(inv.text, /files_absent_from_main=\d+/, 'the path-only measure is retained');
+    assert.match(inv.text, /files_modified_vs_main=\d+/, 'the SAME-PATH divergence measure is present');
+    assert.match(inv.text, /contained_in_main=(true|false)/, 'per-ref ancestry is stated');
+    assert.match(inv.text, /merge_contribution=(NOTHING|CONTRIBUTES)/, 'the decisive measure is computed');
+    assert.match(inv.text, /merged tree [0-9a-f]{12} (==|!=) canonical [0-9a-f]{12}/,
+      'and BOTH tree OIDs are staged so a reviewer can re-derive it');
+    // The reviewer-facing framing that stops a path-only zero being read as convergence.
+    assert.ok(inv.text.includes('A PATH-ONLY MEASURE DOES NOT PROVE CONVERGENCE'),
+      'the block warns that files_absent_from_main=0 is not convergence');
+    assert.ok(inv.text.includes('NOT from merge-tree output'),
+      'and states that line counts avoid merge-tree conflict-marker over-reporting');
+
+    // THE MEASURE IS BY CONTENT, AND THE PACKET SAYS SO — §3b: "Accounted for means classified by
+    // CONTENT, not by name."
+    assert.ok(inv.text.includes('Ref NAMES are never used to classify'), 'the method is stated to the reviewer');
+    for (const cmd of ['git merge-base --is-ancestor', 'git diff --numstat', 'git merge-tree --write-tree']) {
+      assert.ok(inv.text.includes(cmd), `the method names the exact command \`${cmd}\`, so a reviewer can reproduce it`);
+    }
+
+    // IT IS EVIDENCE, NOT A VERDICT. No convergence conclusion may be computed in code.
+    assert.ok(inv.text.includes('no convergence verdict, score or boolean'), 'the block declares itself evidence');
+    for (const forbidden of [/converged\s*[:=]/i, /convergence_ok/i, /"?verdict"?\s*[:=]/i, /\bPASS\b/, /\bFAIL\b(?!ED)/]) {
+      assert.ok(!forbidden.test(inv.text), `the inventory must compute no verdict (matched ${forbidden})`);
+    }
+    console.log(`[4c-C1] ${Buffer.byteLength(inv.text, 'utf8')} bytes, ${inv.probes_run} probes, ${inv.probes_failed} failed, 5 branches / 3 non-contained tips — all pinned`);
+    } finally { rmrf(repo); }
+  });
+
+  await test('C2 — MUTATION: a FAILED probe is reported explicitly and its section NEVER renders as clean', async () => {
+    // The control made to fail. Kill the branch enumeration and the containment probe: without
+    // this behaviour the section would render "0 branches", which reads as a converged estate and
+    // is the exact failure §3b exists to catch.
+    const { repo, candidateSha } = await makeConvergenceFixture();
+    try {
+    const inv = await gatherConvergenceEvidence({
+      cwd: repo, mainRef: 'main', candidateRef: candidateSha,
+      spawn: fixtureSpawn((cmd, args) => cmd === 'git' && (args[0] === 'for-each-ref' || (args[0] === 'branch' && args.includes('--merged')))),
+    });
+    assert.ok(inv.probes_failed >= 2, `the forced failures were counted (got ${inv.probes_failed})`);
+    assert.match(inv.text, /probes: \d+ run, [1-9]\d* FAILED/, 'the failure count is stated at the TOP of the block');
+    assert.ok(inv.text.includes('PROBE FAILED: git for-each-ref'), 'the failing command is named verbatim');
+    assert.ok(inv.text.includes('[8] FAILED PROBES — CONSOLIDATED'), 'and consolidated so it cannot be missed');
+
+    // THE ASSERTION THAT MATTERS: the branch sections must NOT read as an empty, clean estate.
+    const localSection = inv.text.split('[1] LOCAL BRANCHES')[1].split('[2] REMOTE BRANCHES')[0];
+    assert.ok(localSection.includes('PROBE FAILED'), 'the local-branch section itself carries the failure');
+    assert.ok(!/count: 0/.test(localSection), 'it does NOT render a zero count');
+    assert.ok(!/\(none\)/.test(localSection), 'and does NOT render an empty list — silence would read as converged');
+
+    // CONTROL ON THE CONTROL: the same call WITHOUT the mutation is clean, so the assertions above
+    // are detecting the injected failure rather than always-true text. THIS is the assertion that
+    // was environment-dependent — it was measuring the runner's checkout, not the code.
+    const healthy = await gatherConvergenceEvidence({ cwd: repo, mainRef: 'main', candidateRef: candidateSha, spawn: fixtureSpawn() });
+    assert.equal(healthy.probes_failed, 0, 'CONTROL: the unmutated inventory has no failures');
+    assert.ok(!healthy.text.includes('PROBE FAILED'), 'CONTROL: and says so — the mutation is what produced the failure text');
+    assert.ok(healthy.text.includes('contained in main (2)'), 'CONTROL: and the branch census really does populate when the probe runs');
+    console.log(`[4c-C2] forced ${inv.probes_failed} probe failures; all visible in the block; control clean at 0`);
+    } finally { rmrf(repo); }
+  });
+
+  await test('C3 — TOTAL outage: every probe fails, and the block still says so rather than looking empty', async () => {
+    const inv = await gatherConvergenceEvidence({
+      cwd: REPO_UNDER_TEST, spawn: partiallyFailingSpawn(() => true),
+    });
+    assert.ok(inv.probes_failed >= 8, `every probe failed (got ${inv.probes_failed} of ${inv.probes_run})`);
+    assert.ok(inv.text.includes('[8] FAILED PROBES — CONSOLIDATED'));
+    assert.ok(inv.text.includes('Every fact they would have established is MISSING from this inventory.'),
+      'the block states the consequence, not merely the failures');
+    assert.ok(inv.text.includes('canonical_ref: main (UNRESOLVED'), 'an unresolved canonical ref is stated, not defaulted');
+    // The stranded measure has no baseline, and must say the absence of counts is a GAP.
+    assert.ok(inv.text.includes('GAP IN THE EVIDENCE') && inv.text.includes('not an absence of stranded work'),
+      'the missing stranded baseline is named as a gap in the evidence, never as a clean result');
+    // And still no verdict — a total outage must not resolve to "nothing stranded".
+    assert.ok(!/converged/i.test(inv.text), 'a total outage never renders as convergence');
+    console.log(`[4c-C3] total outage: ${inv.probes_failed}/${inv.probes_run} probes failed, block still speaks`);
+  });
+
+  await test('C4 — the byte cap TRUNCATES LOUDLY, and a thrown gatherer still produces a speaking block', async () => {
+    const tiny = await gatherConvergenceEvidence({ cwd: REPO_UNDER_TEST, maxBytes: 900 });
+    assert.equal(tiny.truncated, true, 'the cap bit');
+    assert.ok(Buffer.byteLength(tiny.text, 'utf8') < 900 + 400, 'and bounded the block (notice aside)');
+    assert.ok(tiny.text.includes('ESTATE CONVERGENCE INVENTORY TRUNCATED at'), 'truncation is announced, never silent');
+    assert.ok(tiny.text.includes('UNSEEN EVIDENCE, not an empty estate'), 'and its meaning is spelled out');
+    // The failure summary must survive a cut, because it sits at the top by construction.
+    assert.match(tiny.text, /probes: \d+ run, \d+ FAILED?/, 'the probe summary survives truncation');
+
+    // The wrapper: a gatherer that throws must still yield a block that says nothing was established.
+    const thrown = await safeGatherConvergenceEvidence({
+      cwd: REPO_UNDER_TEST,
+      spawn: () => { throw new Error('SIMULATED catastrophic spawn failure'); },
+      maxBytes: -1,   // force the render path itself to misbehave alongside the spawn failure
+    });
+    assert.ok(thrown.text.includes('PROBE FAILED') || thrown.text.includes('NOT GATHERED'),
+      'a catastrophic failure still produces an explicit block');
+    assert.ok(!/count: 0/.test(thrown.text), 'and never a zero count');
+    console.log(`[4c-C4] cap announced at 900B; catastrophic path speaks`);
+  });
+
+  await test('C5 — END TO END on the CLI route: runMergeCheck stages the inventory AND ci_checks into the real packet', async () => {
+    // The acceptance property, on the route the Work Order named. `spawn` is injected so the gh
+    // evidence resolves with no network, and `runMergeReview` is injected so the packet handed to
+    // the reviewer can be OBSERVED without spending a live Codex review.
+    const HEAD = 'c1c2c3d4e5f60718293a4b5c6d7e8f9012345678';
+    const BASE = 'd1d2c3d4e5f60718293a4b5c6d7e8f9012345678';
+    const ghSpawn = (cmd, args, opts) => {
+      if (cmd === 'git') return spawn(cmd, args, { ...opts, windowsHide: true });   // convergence probes stay REAL
+      const c = new EventEmitter();
+      c.stdout = new EventEmitter(); c.stderr = new EventEmitter(); c.kill = () => {};
+      const a = args.join(' ');
+      let out = '';
+      if (a.includes('api repos/')) out = JSON.stringify({ head: HEAD, base: BASE });
+      else if (a.includes('--name-only')) out = 'services/control-plane/tower-loop/mergeCheck.mjs\n';
+      else if (a.startsWith('pr diff')) out = '--- a/x\n+++ b/x\n+one line\n';
+      else if (a.startsWith('pr checks')) out = 'control-plane-tests\tpass\t1m\n';
+      setImmediate(() => { if (out) c.stdout.emit('data', Buffer.from(out)); c.emit('close', 0); });
+      return c;
+    };
+    let seen = null;
+    const spyReview = async ({ packet }) => {
+      seen = packet;
+      return { ok: true, blocked: false, modelId: 'spy', result: { status: 'ok', verdict: 'approve', summary: 'spy', findings: [] } };
+    };
+    const out = await runMergeCheck({
+      pool, repo: 'warwickallan/Fusion247PKA', prNumber: 7100, headSha: HEAD, baseSha: BASE,
+      buildRef: 'BUILD-020', wpRef: 'WO-4C-03', larryClaim: 'convergence evidence staging',
+      cwd: REPO_UNDER_TEST, spawn: ghSpawn, runMergeReview: spyReview,
+      telegramToken: null, telegramChat: null,
+    });
+    assert.equal(out.blocked, false, `the run reached the review (status=${out.status})`);
+    assert.ok(seen, 'the packet handed to the reviewer was observed');
+    assert.ok(typeof seen.convergence === 'string' && seen.convergence.length > 200,
+      'the CLI route stages a real convergence inventory');
+    assert.ok(seen.convergence.includes('ESTATE CONVERGENCE INVENTORY'));
+    assert.ok(seen.convergence.includes('[3] REGISTERED WORKTREES'), 'gathered by execution, not a placeholder');
+    // The ci_checks omission fixed alongside it — gathered, rendered, and previously dropped here
+    // while the sibling route staged it.
+    assert.ok(String(seen.ci_checks).includes('control-plane-tests'), 'ci_checks now reaches the packet on this route too');
+    console.log(`[4c-C5] CLI packet carries ${Buffer.byteLength(seen.convergence, 'utf8')}B of convergence evidence + ci_checks`);
+  });
+
+  await test('C6 — END TO END on the AUTOMATIC route: processTurn stages the inventory into the merge-class packet', async () => {
+    // The route that actually fires. Staging only into the CLI entrypoint would have worked when
+    // the command was run by hand and silently not worked here.
+    const t = await inertTurn({ buildRef: 'BUILD-4C03', headSha: HEAD_A,
+      instruction: 'Warwick: merge-class review.', larryResponse: 'Larry: ready to merge.' });
+    let seen = null;
+    const deps = {
+      ...IN_PROC_DEPS,
+      gatherGitEvidence: async () => ({
+        resolved: true, repo: REPO, branch: 'build-020/4c-estate-convergence',
+        head_sha: HEAD_A, base_sha: HEAD_B, diff_range: `${HEAD_B}..${HEAD_A}`,
+        changed_files: ['services/control-plane/tower-loop/watcher.mjs'],
+        diff_text: '--- a\n+++ b\n+x\n', diff_truncated: false, ci_checks: 'ok', ci_source: 'gh pr checks',
+      }),
+      runMergeReview: async ({ packet }) => {
+        seen = packet;
+        return { ok: true, blocked: false, modelId: 'spy', result: { status: 'ok', verdict: 'approve', summary: 'spy', findings: [] } };
+      },
+    };
+    const prev = process.env.TOWER_MERGE_CLASS_HEURISTIC;
+    process.env.TOWER_MERGE_CLASS_HEURISTIC = 'on';   // 'ready to merge' ⇒ merge-class
+    try {
+      await processTurn(pool, t.id, deps);
+    } finally {
+      if (prev === undefined) delete process.env.TOWER_MERGE_CLASS_HEURISTIC; else process.env.TOWER_MERGE_CLASS_HEURISTIC = prev;
+    }
+    assert.ok(seen, 'the merge-class review ran and its packet was observed');
+    assert.ok(typeof seen.convergence === 'string' && seen.convergence.includes('ESTATE CONVERGENCE INVENTORY'),
+      'the AUTOMATIC route stages the inventory too — same gatherer, no copy');
+    assert.ok(seen.convergence.includes('[7] NON-CONTAINED TIPS — SAME-PATH DIVERGENCE ANALYSIS'),
+      'and it is the CORRECTED inventory, carrying the same-path divergence analysis');
+
+    // And the ORDINARY (non-merge-class) route stages nothing — the block is merge-class gated,
+    // which is what Warwick specified. Proven by observation, not by reading the branch.
+    let ordinarySeen = 'untouched';
+    const ordinary = await inertTurn({ buildRef: 'BUILD-4C03-ORD', headSha: HEAD_A,
+      instruction: 'Warwick: progress?', larryResponse: 'Larry: still working on the parser.' });
+    process.env.TOWER_MERGE_CLASS_HEURISTIC = 'off';
+    await processTurn(pool, ordinary.id, {
+      ...IN_PROC_DEPS,
+      runMergeReview: async ({ packet }) => { ordinarySeen = packet; return { ok: true, blocked: false, result: {} }; },
+    });
+    assert.equal(ordinarySeen, 'untouched', 'an ordinary delivery round runs NO merge review and stages no inventory');
+    console.log(`[4c-C6] automatic route carries ${Buffer.byteLength(seen.convergence, 'utf8')}B; ordinary route stages none`);
+  });
+
+  // ══════════════════════════════════════════════════════════════════════════════
+  // WO-2026-08-07-4C-06 — THE CORRECTED STRANDED-WORK MEASURE.
+  //
+  // C7 is the load-bearing one. The ORIGINAL measure was `git ls-tree -r --name-only <ref>` minus
+  // main's path set — it counts PATHNAMES. A branch that only ever MODIFIES files main already has
+  // scores ZERO on it and reads as converged, however much unique implementation it holds. That is
+  // an instrument that fails in the safe-looking direction.
+  //
+  // C7 builds that exact branch in a throwaway repository and proves the corrected inventory sees
+  // it. It is synthetic ON PURPOSE: the live estate happens not to contain a pure-modification
+  // branch today, so a test written against the live estate would prove nothing about the case the
+  // correction exists for, and would silently stop proving it as the estate changes.
+  // ══════════════════════════════════════════════════════════════════════════════
+
+  // `gitIn` and the fixture builder are declared once, above C1, where the controls that use them
+  // begin — they were previously declared here, between C6 and C7.
+
+  await test('C7 — THE CORRECTION: a ref that ONLY MODIFIES files scores 0 on the path measure and is still caught', async () => {
+    const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'conv-samepath-'));
+    try {
+      await gitIn(repo, ['init', '--initial-branch=main', '-q']);
+      fs.writeFileSync(path.join(repo, 'shared.txt'), 'original\n');
+      fs.writeFileSync(path.join(repo, 'other.txt'), 'untouched\n');
+      await gitIn(repo, ['add', 'shared.txt', 'other.txt']);
+      await gitIn(repo, ['commit', '-q', '-m', 'base']);
+
+      // The branch under test: it adds NO new pathname. It only rewrites a file main already has.
+      await gitIn(repo, ['checkout', '-q', '-b', 'only-modifies']);
+      fs.writeFileSync(path.join(repo, 'shared.txt'), `${'unique implementation line\n'.repeat(40)}`);
+      await gitIn(repo, ['commit', '-q', '-am', 'unique work, no new files']);
+      await gitIn(repo, ['checkout', '-q', 'main']);
+
+      const inv = await gatherConvergenceEvidence({ cwd: repo, mainRef: 'main' });
+      // The `gh pr list` probe legitimately fails in a scratch repo with no GitHub remote — and it
+      // is REPORTED as a failure, which is the correct behaviour, not something to assert away.
+      // What must hold is that every GIT probe resolved.
+      assert.ok(!/PROBE FAILED: git /.test(inv.text),
+        `every git probe resolved in the scratch repo:\n${inv.text.slice(0, 700)}`);
+
+      // THE OLD MEASURE'S ANSWER, computed by running the ORIGINAL algorithm verbatim against real
+      // git output — so the defect is DEMONSTRATED here, not merely asserted in a comment.
+      const treePaths = async (ref) => (await gitIn(repo, ['ls-tree', '-r', '--name-only', ref]))
+        .split(/\r?\n/).filter(Boolean);
+      const mainPathSet = new Set(await treePaths('main'));
+      const oldMeasure = (await treePaths('only-modifies')).filter((f) => !mainPathSet.has(f)).length;
+      assert.equal(oldMeasure, 0,
+        'CONTROL: the ORIGINAL pathname measure scores this branch 0 — it genuinely could not see this work');
+
+      // THE CORRECTED MEASURE'S ANSWER.
+      assert.match(inv.text, /files_absent_from_main=0\b/, 'the path measure is retained and honestly reports 0');
+      assert.match(inv.text, /files_modified_vs_main=1\b/, 'the SAME-PATH measure sees the modification the old one missed');
+      assert.ok(inv.text.includes('merge_contribution=CONTRIBUTES'),
+        'and the decisive measure says the ref CONTRIBUTES — "zero paths absent" can no longer read as convergence');
+      assert.ok(inv.text.includes('+40/-1  shared.txt') || /\+40\/-1\s+shared\.txt/.test(inv.text),
+        'the divergent path is sampled with line counts and no file contents');
+      // Not a single byte of file content may appear in the block.
+      assert.ok(!inv.text.includes('unique implementation line'),
+        'FILE CONTENTS are never staged — names and counts only');
+      console.log('[4c-C7] pure-modification branch: old measure=0, files_modified_vs_main=1, merge_contribution=CONTRIBUTES');
+    } finally {
+      try { fs.rmSync(repo, { recursive: true, force: true }); } catch { /* best effort */ }
+    }
+  });
+
+  await test('C8 — a ref contributing NOTHING is reported as NOTHING, so the field is two-sided', async () => {
+    // Without this, "CONTRIBUTES" could be a constant. An ancestor of main must come back NOTHING.
+    const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'conv-nothing-'));
+    try {
+      await gitIn(repo, ['init', '--initial-branch=main', '-q']);
+      fs.writeFileSync(path.join(repo, 'a.txt'), 'one\n');
+      await gitIn(repo, ['add', 'a.txt']);
+      await gitIn(repo, ['commit', '-q', '-m', 'base']);
+      // A branch BEHIND main: fully contained, contributes nothing.
+      await gitIn(repo, ['branch', 'behind']);
+      fs.writeFileSync(path.join(repo, 'b.txt'), 'two\n');
+      await gitIn(repo, ['add', 'b.txt']);
+      await gitIn(repo, ['commit', '-q', '-m', 'main moves on']);
+
+      const inv = await gatherConvergenceEvidence({ cwd: repo, mainRef: 'main' });
+      // `behind` is an ancestor, so it is CONTAINED and never reaches the divergence section.
+      assert.ok(/\[1\] LOCAL BRANCHES[\s\S]*?contained in main \(2\)/.test(inv.text),
+        'an ancestor branch is reported as contained, not as stranded');
+      assert.ok(inv.text.includes('(no non-contained tips enumerated'),
+        'and with nothing non-contained, [7] says so explicitly rather than rendering an empty list');
+      console.log('[4c-C8] ancestor branch classified contained; empty [7] states itself');
+    } finally {
+      try { fs.rmSync(repo, { recursive: true, force: true }); } catch { /* best effort */ }
+    }
+  });
+
+  await test('C9 — MUTATION: an unrunnable merge-tree probe yields UNRESOLVED, never "contributes nothing"', async () => {
+    // THE FAIL-SAFE FLIP, and the reason this Work Order exists. Absent evidence used to render as
+    // clean. If merge-tree cannot run, the ref must read as a GAP — never as `false`/NOTHING, which
+    // a reviewer would take as "this branch holds nothing", the most dangerous possible default.
+    const { repo, candidateSha } = await makeConvergenceFixture();
+    try {
+    const inv = await gatherConvergenceEvidence({
+      cwd: repo, mainRef: 'main', candidateRef: candidateSha,
+      spawn: fixtureSpawn((cmd, args) => cmd === 'git' && args[0] === 'merge-tree'),
+    });
+    assert.ok(inv.text.includes('merge_contribution=UNRESOLVED — GAP IN THE EVIDENCE'),
+      'an unrunnable merge-tree renders as an explicit gap');
+    // Scoped to the PER-TIP rows. A bare `includes` over the whole block matches the reviewer
+    // framing line, which legitimately quotes `merge_contribution=NOTHING` while explaining it —
+    // an imprecise assertion that failed for the wrong reason and was corrected, not deleted.
+    const tipRows = inv.text.split(/\r?\n/).filter((l) => /contained_in_main=/.test(l));
+    assert.ok(tipRows.length > 0, 'there were per-tip rows to examine');
+    assert.deepEqual(tipRows.filter((l) => /merge_contribution=NOTHING/.test(l)), [],
+      'NO per-tip row says "contributes nothing" — that is the safe-looking failure this corrects');
+    assert.equal(tipRows.filter((l) => /merge_contribution=UNRESOLVED/.test(l)).length, tipRows.length,
+      'every per-tip row reports the gap instead');
+    assert.match(inv.text, /⚠️ \d+ tip\(s\) have merge_contribution=UNRESOLVED — that is missing evidence, NOT a finding of "contributes nothing"\./,
+      'the block says plainly what the gap does and does not mean');
+
+    // CONTROL: unmutated, the same refs resolve — so the assertions above detect the injected
+    // failure rather than a field that never populates. This was the environment-dependent half:
+    // in CI there was no canonical tree at all, so the field was UNRESOLVED with no mutation.
+    const healthy = await gatherConvergenceEvidence({ cwd: repo, mainRef: 'main', candidateRef: candidateSha, spawn: fixtureSpawn() });
+    assert.ok(!healthy.text.includes('merge_contribution=UNRESOLVED'), 'CONTROL: unmutated, nothing is UNRESOLVED');
+    assert.equal(healthy.text.split('merge_contribution=CONTRIBUTES').length - 1, 3,
+      'CONTROL: and the field really does populate — all three non-contained tips resolve');
+    console.log('[4c-C9] merge-tree outage -> UNRESOLVED (never NOTHING) on all 3 tips; control confirms it populates');
+    } finally { rmrf(repo); }
+  });
+
+  await test('C10 — recovery pins are enumerated and counted, but EXCLUDED from the working-branch analysis', async () => {
+    // THE VACUOUS PASS THIS REPLACES. This control used to run against the ambient checkout and
+    // assert `/count: \d+/`. In CI `refs/recovery/**` is never fetched, so the section rendered
+    // `count: 0`, the regex matched it, and "no recovery pin is analysed as a working branch" was
+    // trivially true because there were none. It reported GREEN having examined nothing. The count
+    // is now pinned to a literal over refs the test created, and the exclusion is made to have
+    // something to hide: `recovery/4c/keep-this-branch` points at `independent/work`'s exact tip.
+    const { repo, candidateSha, independentSha } = await makeConvergenceFixture();
+    const empty = await makeConvergenceFixture({ withRecoveryPins: false });
+    try {
+      const inv = await gatherConvergenceEvidence({ cwd: repo, mainRef: 'main', candidateRef: candidateSha, spawn: fixtureSpawn() });
+      const rSection = inv.text.slice(inv.text.indexOf('[R] RECOVERY PINS'));
+      assert.ok(rSection.includes('count: 4 (EXCLUDED from [1], [2] and [7] by refname prefix'),
+        `all four pins are counted — a zero count can no longer satisfy this: ${rSection.slice(0, 300)}`);
+      assert.ok(rSection.includes('recovery/4c-unreachable/** — 3 pin(s)'),
+        'the sha-named family is collapsed to its parent and counted');
+      assert.ok(rSection.includes('recovery/4c/keep-this-branch/** — 1 pin(s)'),
+        'and the named pin is itemised separately');
+      assert.ok(rSection.includes('NOT evidence that the estate has converged'),
+        'their existence is explicitly not read as convergence');
+
+      // THE EXCLUSION, MADE TO BITE. `recovery/4c/keep-this-branch` is pinned at the SAME commit as
+      // `independent/work`, which really is in [7]. If the refname-prefix exclusion ever broke, the
+      // pin's name would be listed beside it on that tip's `refs:` line.
+      const divSection = inv.text.slice(inv.text.indexOf('[7] NON-CONTAINED'), inv.text.indexOf('[R] RECOVERY PINS'));
+      assert.ok(divSection.includes(independentSha.slice(0, 12)),
+        'the pinned commit really is one of the analysed tips — otherwise the next assertion proves nothing');
+      assert.ok(divSection.includes('independent/work'), 'and it is listed under its working-branch name');
+      assert.ok(!/recovery\//.test(divSection), 'but NO recovery ref is analysed as a working branch');
+      assert.ok(!/recovery\//.test(inv.text.slice(inv.text.indexOf('[1] LOCAL BRANCHES'), inv.text.indexOf('[3] REGISTERED'))),
+        'and none appears in the branch census either');
+
+      // CONTROL: an identical estate with NO pins renders count: 0 — so the pinned count above is
+      // detecting real refs rather than matching whatever number happens to be there. This is the
+      // exact difference the old `/count: \d+/` assertion could not see.
+      const none = await gatherConvergenceEvidence({ cwd: empty.repo, mainRef: 'main', candidateRef: empty.candidateSha, spawn: fixtureSpawn() });
+      const noneSection = none.text.slice(none.text.indexOf('[R] RECOVERY PINS'));
+      assert.ok(noneSection.includes('count: 0 (EXCLUDED'), 'CONTROL: with no pins the section says zero');
+      assert.ok(!noneSection.includes('count: 4'), 'CONTROL: and the assertion above would have failed there');
+      assert.match(noneSection, /count: \d+/, 'CONTROL: and the OLD regex still matches that zero — which is why it was replaced');
+      console.log('[4c-C10] 4 pins counted (3 grouped + 1 named), excluded from [1]/[2]/[7] with a pin sharing a live tip; zero-pin control confirms the count bites');
+    } finally { rmrf(repo); rmrf(empty.repo); }
+  });
+
+  // ══════════════════════════════════════════════════════════════════════════════
+  // WO-2026-08-08-4C-13 — BLOCKER B: THE MERGE CANDIDATE.
+  //
+  // Codex's finding on PR #98 was "a contributing non-contained prior branch without visible
+  // content-level reconciliation". The branch in question — `build-020/phase4-automation-law` —
+  // is an ANCESTOR of the merge candidate, so it converges with that merge and stops being
+  // non-contained the moment it lands. The block could not say so: an ancestor of the candidate
+  // and a branch independent of it rendered identically. The finding was legitimate because the
+  // EVIDENCE was insufficient, so what is proven here is the evidence, not the verdict.
+  // ══════════════════════════════════════════════════════════════════════════════
+
+  await test('C11 — a non-contained ref is reported as an ANCESTOR of the merge candidate or INDEPENDENT of it', async () => {
+    const { repo, candidateSha } = await makeConvergenceFixture();
+    try {
+      const inv = await gatherConvergenceEvidence({ cwd: repo, mainRef: 'main', candidateRef: candidateSha, spawn: fixtureSpawn() });
+      assert.ok(inv.text.includes(`merge_candidate: ${candidateSha} @ ${candidateSha}`),
+        'the candidate every ancestry field is measured against is named at the top of the block, resolved to a real SHA');
+
+      /** The `refs:` + fields pair for one tip, located by branch name — never by position. */
+      const rowFor = (branch) => {
+        const l = inv.text.split(/\r?\n/);
+        const i = l.findIndex((x) => /^\s*tip [0-9a-f]{12}\s+refs:/.test(x) && x.includes(branch));
+        assert.ok(i >= 0, `${branch} appears in [7]`);
+        return l[i + 1];
+      };
+      // THE DISTINCTION THAT WAS MISSING. Both CONTRIBUTE; only one converges with this merge.
+      assert.match(rowFor('prior/work'), /merge_contribution=CONTRIBUTES/,
+        'the prior branch genuinely contributes — this is not a case of it being empty');
+      assert.match(rowFor('prior/work'), /ancestor_of_merge_candidate=true/,
+        'and it is an ANCESTOR of the candidate, so this merge carries it');
+      assert.match(rowFor('independent/work'), /merge_contribution=CONTRIBUTES/,
+        'the independent branch also contributes — identical on the old fields');
+      assert.match(rowFor('independent/work'), /ancestor_of_merge_candidate=false/,
+        'but it is INDEPENDENT of the candidate — the two are no longer indistinguishable');
+      assert.match(rowFor('candidate/head'), /ancestor_of_merge_candidate=true/,
+        'the candidate is trivially its own ancestor, and that is left visible rather than special-cased');
+
+      // MUTATION, in the direction that matters: a ref that is NOT an ancestor must never read as
+      // converging. Re-measured against a DIFFERENT candidate, `prior/work` flips to false.
+      const otherCandidate = (await gitIn(repo, ['rev-parse', 'independent/work'])).trim();
+      const flipped = await gatherConvergenceEvidence({ cwd: repo, mainRef: 'main', candidateRef: otherCandidate, spawn: fixtureSpawn() });
+      const flippedRow = flipped.text.split(/\r?\n/)[
+        flipped.text.split(/\r?\n/).findIndex((x) => /^\s*tip [0-9a-f]{12}\s+refs:/.test(x) && x.includes('prior/work')) + 1];
+      assert.match(flippedRow, /ancestor_of_merge_candidate=false/,
+        'MUTATION: measured against a candidate it is NOT an ancestor of, the same ref reports false');
+
+      // The reviewer is told what the field does and does not mean, and no decision is computed.
+      assert.ok(inv.text.includes('READING `ancestor_of_merge_candidate`'), 'the reading is stated to the reviewer');
+      assert.ok(inv.text.includes('it is not a reconciliation decision and no reconciliation decision is computed here'),
+        'and the block still refuses to draw the conclusion — Codex judges, the block evidences');
+      for (const forbidden of [/converged\s*[:=]/i, /convergence_ok/i, /"?verdict"?\s*[:=]/i, /\bPASS\b/, /\bFAIL\b(?!ED)/]) {
+        assert.ok(!forbidden.test(inv.text), `still no verdict is computed (matched ${forbidden})`);
+      }
+      console.log('[4c-C11] prior/work=true, independent/work=false, candidate=true; re-measured against another candidate prior/work flips to false');
+    } finally { rmrf(repo); }
+  });
+
+  await test('C12 — FAIL-SAFE: an undeterminable ancestry is UNRESOLVED, never "independent" and never "converges"', async () => {
+    const { repo, candidateSha } = await makeConvergenceFixture();
+    try {
+      /** Every per-tip row, so an assertion can never be satisfied by a caption that quotes a field. */
+      const tipRows = (t) => t.split(/\r?\n/).filter((l) => /contained_in_main=/.test(l));
+
+      // (a) NO CANDIDATE SUPPLIED. The relation is unknown, and unknown is stated.
+      const noCand = await gatherConvergenceEvidence({ cwd: repo, mainRef: 'main', spawn: fixtureSpawn() });
+      assert.ok(noCand.text.includes('merge_candidate: NONE SUPPLIED'), 'the block says no candidate was given');
+      const rowsA = tipRows(noCand.text);
+      assert.equal(rowsA.length, 3, 'all three tips still rendered');
+      assert.equal(rowsA.filter((l) => /ancestor_of_merge_candidate=UNRESOLVED/.test(l)).length, 3,
+        'every tip reports UNRESOLVED');
+      assert.deepEqual(rowsA.filter((l) => /ancestor_of_merge_candidate=(true|false)\b/.test(l)), [],
+        'and NOT ONE reports true or false — a guess in either direction is the failure this prevents');
+
+      // (b) A CANDIDATE THAT DOES NOT RESOLVE in this checkout — the realistic case, since Tower's
+      // local clone need not hold an arbitrary PR head.
+      const absent = await gatherConvergenceEvidence({
+        cwd: repo, mainRef: 'main', candidateRef: 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef', spawn: fixtureSpawn(),
+      });
+      assert.ok(absent.text.includes('UNRESOLVED — it did not resolve in this checkout'),
+        'an unresolvable candidate is named as unresolved, not silently dropped');
+      assert.equal(tipRows(absent.text).filter((l) => /ancestor_of_merge_candidate=UNRESOLVED/.test(l)).length, 3,
+        'and every tip inherits the gap');
+
+      // (c) THE PROBE ITSELF DIES. merge-base is used for BOTH containment and candidate ancestry,
+      // so only the two-arg candidate form is killed; containment must survive untouched.
+      const broken = await gatherConvergenceEvidence({
+        cwd: repo, mainRef: 'main', candidateRef: candidateSha,
+        spawn: fixtureSpawn((cmd, args) => cmd === 'git' && args[0] === 'merge-base' && args[args.length - 1] === candidateSha),
+      });
+      const rowsC = tipRows(broken.text);
+      assert.equal(rowsC.filter((l) => /ancestor_of_merge_candidate=UNRESOLVED — GAP IN THE EVIDENCE/.test(l)).length, 3,
+        'a dead ancestry probe renders as an explicit gap on every tip');
+      assert.deepEqual(rowsC.filter((l) => /ancestor_of_merge_candidate=(true|false)\b/.test(l)), [],
+        'and never as an answer it does not have');
+      assert.ok(rowsC.every((l) => /contained_in_main=(true|false)/.test(l)),
+        'while containment — the other merge-base user — is unaffected, so the mutation was surgical');
+      assert.match(broken.text, /⚠️ \d+ tip\(s\) have ancestor_of_merge_candidate=UNRESOLVED — that is missing evidence, NOT a finding that the tip is independent of this merge\./,
+        'and the block spells out what the gap does not mean');
+      assert.ok(broken.text.includes('[8] FAILED PROBES — CONSOLIDATED'), 'the dead probe is also consolidated, not merely implied');
+
+      // CONTROL: the same fixture with nothing broken answers true/false, so (a)-(c) detect the
+      // injected condition rather than a field that never populates.
+      const healthy = await gatherConvergenceEvidence({ cwd: repo, mainRef: 'main', candidateRef: candidateSha, spawn: fixtureSpawn() });
+      assert.equal(tipRows(healthy.text).filter((l) => /ancestor_of_merge_candidate=(true|false)\b/.test(l)).length, 3,
+        'CONTROL: unmutated, all three tips resolve to a real answer');
+      assert.equal(healthy.probes_failed, 0, 'CONTROL: and nothing failed');
+      console.log('[4c-C12] no candidate / unresolvable candidate / dead probe -> UNRESOLVED on 3/3 tips; control resolves 3/3');
+    } finally { rmrf(repo); }
   });
 
   try { fs.rmSync(NO_REPO_DIR, { recursive: true, force: true }); } catch { /* best effort */ }

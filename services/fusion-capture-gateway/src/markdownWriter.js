@@ -34,9 +34,14 @@ function gitBlobSha1(content) {
 
 // Deterministic note body derived purely from the record (no wall-clock), so the
 // content hash is stable and re-derivation matches the on-disk note.
+//
+// TEXT PATH (no record.transcription): byte-for-byte identical to WP0 — the
+// header block, then the preview. MULTIMODAL PATH (record.transcription present,
+// set by the worker's opt-in transcription stage): appends a governed
+// transcription block (the OCR/STT text + any structured items / needs_review).
 function renderNote(record) {
   const preview = typeof record.text_preview === 'string' ? record.text_preview : '';
-  return [
+  const header = [
     `# Capture ${record.capture_id}`,
     '',
     `- capture_id: ${record.capture_id}`,
@@ -44,9 +49,40 @@ function renderNote(record) {
     `- recorded_intent: ${record.recorded_intent ?? ''}`,
     `- technical_source_type: ${record.technical_source_type ?? ''}`,
     '',
-    preview,
+  ];
+
+  const t = record.transcription;
+  if (!t || typeof t !== 'object') {
+    // Unchanged WP0 text-note shape.
+    return [...header, preview, ''].join('\n');
+  }
+
+  // Multimodal note. DEV provenance is explicit: the transcript came from an
+  // INJECTED transcriber in this increment, not a live model call.
+  const lines = [
+    ...header,
+    '## Transcription (DEV — injected transcriber, not a live model call)',
     '',
-  ].join('\n');
+  ];
+  if (typeof t.text === 'string' && t.text.length > 0) {
+    lines.push(t.text, '');
+  }
+  if (Array.isArray(t.items) && t.items.length > 0) {
+    lines.push('### Structured items');
+    for (const it of t.items) {
+      const note = it.note ? ` (${it.note})` : '';
+      lines.push(`- ${it.requested_qty} x ${it.item_name}${note}`);
+    }
+    lines.push('');
+  }
+  if (Array.isArray(t.needs_review) && t.needs_review.length > 0) {
+    lines.push('### Needs review');
+    for (const r of t.needs_review) {
+      lines.push(`- ${r.raw} — ${r.reason}`);
+    }
+    lines.push('');
+  }
+  return lines.join('\n');
 }
 
 /**

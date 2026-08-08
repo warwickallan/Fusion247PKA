@@ -2380,6 +2380,72 @@ node "C:/Users/Buggly/.mypka/governor/ding.mjs" <message-file>
 >
 > **Repair: WO-31.** *"No security programme, no credential-rotation exercise, no unrelated hardening."* **After the repair is independently verified, continue the Proofline route autonomously through Gate 1 / Gate 2 / Vex / Codex as applicable.**
 
+
+> ### 📌 4C CAPAE EVIDENCE — Warwick, 2026-08-07, at the PR #97 merge. **PRESERVED, NOT SOLVED.**
+>
+> **His instruction: *"Do NOT design or solve 4C before rotation. Preserve that evidence and arrive there cleanly."*** **This block is the evidence. It is not a diagnosis, not a plan, and nothing may be built from it before 4C is entered with a fresh `Continue.`**
+>
+> **The principal CAPAE evidence, in his words:**
+>
+> 1. **assurance became admin about admin;**
+> 2. **Gate 1 repeatedly absorbed Gate 3 / document-currency work despite functional rows passing;**
+> 3. **non-blocking documentation defects repeatedly prevented progression;**
+> 4. **final-production acceptance properties were used as prerequisites for reaching the production event that could prove them;**
+> 5. **the active Wayfinder became nearly 3,000 lines and its historical state became an endless assurance surface;**
+> 6. **contradictory wording caused false handbacks and repeated stopping;**
+> 7. **the system consumed extraordinary context and specialist effort while repeatedly finding documentation defects rather than product defects.**
+>
+
+> #### ✅ SEMANTIC CORRECTION — **WHAT `SAFE TO CLEAR` ACTUALLY MEANS.** Warwick, 2026-08-07.
+>
+> > **`SAFE TO CLEAR` = sufficient truthful continuity exists for a fresh session to resume safely.**
+>
+> **Pax report ingestion, CAPAE enrichment, Supabase population and report pointers may still be OWED, but they are NOT prerequisites of `SAFE TO CLEAR`** — **unless their absence would make resumption unsafe.**
+>
+> *(This corrects the reading that produced the coupling defect below: the transaction was being treated as a checklist to complete rather than a question to answer truthfully. The question is whether a fresh Larry can resume safely — not whether every enrichment artefact has landed.)*
+
+> #### 🔴 CAPAE DEFECT — **CONTINUITY IS COUPLED TO CAPAE REPORTING.** Recorded 2026-08-07 on Warwick’s instruction.
+>
+> **The `/rotate` contract makes the Pax session report a HARD PREREQUISITE of safe resumption** — step 6 *"WAIT for Pax… do not proceed to the continuity publish without it"*, and step 12 *"Never report `SAFE TO CLEAR` with the report missing."*
+>
+> **So a slow or unavailable Pax blocks Larry from preserving state, rotating, resuming productive work and remaining available.** That happened this session: Larry idled on a running Pax instead of publishing a truthful packet he already had every field for.
+>
+> **Warwick’s correction, and it is the 4C requirement:**
+>
+> > **CONTINUITY = the minimum state required to resume safely. CAPAE = asynchronous analysis and enrichment.** **A slow or unavailable Pax must NEVER prevent Larry from preserving state, rotating, resuming productive work, or remaining available. CAPAE enriches the next session; it does not hold the door shut.**
+>
+> **What was done instead of rebuilding anything:** continuity was **published and read back through the installed path with the minimum truthful state**, so resumption is safe **whether or not the report ever lands**. **No machinery was invented, worked around or rebuilt** — Warwick forbade that, and the coupling is recorded here as 4C’s to resolve.
+
+> #### 🔴 CAPAE EFFECTIVENESS EVIDENCE — 2026-08-07, recorded on Warwick's instruction. **The correction was CORRECT, PRESENT and CANONICAL, and the behaviour regressed anyway.**
+>
+> **The sequence, verified by Warwick independently — not asserted by Larry:**
+>
+> - The authorised Rule 4a correction is **on canonical `main`** — `30666f1` is an **ancestor of current `main`**.
+> - Current `CLAUDE.md` reads **SEND → post → CONTINUE**, stopping only for one of the **seven** named interruption conditions.
+> - Larry's own `AGENTS.md` §9e **explicitly** states that ending a turn at a worker return, review, tests, commit, push, PR or other ordinary execution boundary **is a defect**.
+> - **Larry then ended a turn at exactly such a boundary — having just written *"Rotating now"* — without rotating.**
+>
+> **The conclusion, and it is the whole value of this entry:**
+>
+> > **The remaining problem is EXECUTION / ADHERENCE, not a missing sentence.**
+>
+> **Why that matters more than any of the seven points above it:** every prior remedy in this Sub-phase was **textual** — an amendment, a re-cut, a pointer, a clarified sentence. **This occurrence proves the textual remedy class is exhausted.** The wording was already correct, already canonical, already on `main`, and already duplicated into Larry's own contract — **and the behaviour still regressed within the same session, minutes later.**
+>
+> **⛔ Therefore 4C must NOT respond to this with another sentence, amendment or governance artefact.** Writing a further clause would be the eighth instance of the very pattern this evidence documents. **What 4C examines is why correct, present, canonical wording failed to change behaviour** — not what wording to add.
+>
+> *(Recorded as evidence only. No fix is proposed here, deliberately: Warwick has forbidden designing or solving 4C before it is entered.)*
+
+> **Corroborating facts from this Sub-phase, recorded because they are the measurements behind the seven points and will not survive a `/clear` otherwise:**
+>
+> - **Nine Gate 1 verdicts** were issued in Sub-phase 4B. **Every FAIL was documentation. Not one was the engineering.**
+> - Veritas' own words at `b62a9fc`: *"The engineering is the strongest it has been at any head in this Sub-phase. **One sentence in the map is the whole distance.**"*
+> - Veritas' own words at `3a1e670`: *"**each repair has been exactly as wide as the last finding, and the next finding has been just outside it.**"*
+> - **Three separate circularities** were found and had to be ruled on individually — row 4's live surface, `installed-runtime restart`, and `codex_qa_started` — all the same shape: **an acceptance property whose only proof lies beyond the gate that requires it.**
+> - **A constitutional sentence** (*"then yield"*) that Larry had over-translated **caused repeated false handbacks** until Warwick corrected it.
+> - **The final merge was taken as an explicit Warwick exception** because the loop had become self-sustaining.
+>
+> **⛔ Nothing here is a finding against any specialist.** Veritas repeatedly corrected its own prior verdicts, caught defects Larry had reported as fixed, and refused to assert properties it could not execute. **The pattern is structural, and 4C is where it gets examined — not here.**
+
 > **🔄 AMENDMENT 11 — Warwick, 2026-08-07. FUTURE-ROUTE ONLY: ASDAIR IS NO LONGER THE NEXT HOP. A NEW SUB-PHASE 4C COMES FIRST.**
 >
 > **⛔ THIS AMENDMENT CHANGES NOTHING ABOUT SUB-PHASE 4B.** Warwick, explicit: *"make only the minimum routing amendment needed so 4B finishes exactly as currently planned."* **4B's Work Package, its acceptance rows, its 18-step route, Amendment 10's decisions, the Gate 1 FAIL and every open repair are untouched and remain exactly as written.**
@@ -2729,6 +2795,138 @@ Any newly discovered **unrelated** defect: record once in [[Deliverables/BACKLOG
 1. **🔴 A control I holed, caught by Keel and not by me.** Importing `rotation-report.mjs` into `server.mjs` makes the recomputed module closure diverge from `provenance.mjs`'s hand-declared `SOURCE_MODULES`, so `provenance-check.mjs` goes red — **and `sourceHash` would silently stop covering a module the running Cockpit loads. That is exactly the defect `provenance.mjs` was built to make impossible.** My own control, holed by my own next order, one day later. He proved it by copying the modules and running the real `moduleClosure()` rather than reasoning about it. Fixed by amendment.
 2. **⚠️ `sourceHash` is NOT comparable across checkouts, and that will generate false alarms.** Executed: the same tracked content produced `916d0c67…` in one worktree and `b21e69c0…` in another. Cause established, not assumed — identical git blob `ea800833…`, but 164 CRLF here versus 164 bare LF there (autocrlf on checkout); the digest itself is deterministic within a tree. **It is CORRECT for its stated purpose** (which bytes this process loaded) **but anyone comparing the live Cockpit's hash to CI's will wrongly conclude the code differs.** Documented in the README inside WO-25. **It must NOT be "fixed" by normalising line endings in the digest — that would make it describe git content instead of loaded bytes, which is the original `/api/health` lie.**
 
+### 🔴 PR #97 MERGED ON WARWICK’S EXPLICIT AUTHORITY — 2026-08-07
+
+**Warwick explicitly authorised PR #97 merge at `28b06df04509e1145b6edd18351a109b2da8c22f` before final Gate 1 PASS and without Codex, terminating the recursive assurance loop. This is a user-authorised exception, not evidence that the skipped assurance passed. Any genuinely unresolved operational acceptance remains owed unless Warwick subsequently disposes it.**
+
+**Merge commit `a2aae94693cff94aaf3fc87ded0948197b5ea0d0`; `origin/main` verified to contain the authorised head.** **No Gate 1 PASS, no Gate 2 PASS, no Codex approval and no completed-automation acceptance exists for this merge, and none may be claimed.**
+
+### 📌 ROTATION — Sub-phase 4B CLOSE, 2026-08-07. **BUILD-020 merged. Next is Sub-phase 4C.**
+
+| | |
+|---|---|
+| **Rotate at** | 2026-08-07 (Claude host) — **Sub-phase 4B close, after the authorised merge** |
+| **Closing head** | recorded at commit — verify `git rev-parse HEAD` |
+| **Canonical `main`** | **`bc99606daad6269554fccf0738a8f489c55be265`** · merge commit `a2aae94` · authorised head `28b06df` |
+| **Session report (Pax)** | `Deliverables/2026-08-07-session-performance-report-subphase-4b-close.md` — **written by Pax, not Larry** |
+| **Payload** | `Deliverables/2026-08-07-session-report-payload-subphase-4b-close.json` |
+| **Closeout** | [[Deliverables/2026-08-07-build-020-post-merge-closeout]] — merged main, live smoke results, Tower alignment, task state, preserved artefacts, estate cleanup, everything still owed |
+| **Assurance position** | ⛔ **NO Gate 1 PASS. NO Gate 2 PASS. NO Codex. NO TowerBot production acceptance.** The merge was **Warwick's explicit exception**, not assurance passing. **Nothing in 4B may be described as assured, complete or accepted.** |
+| **Live estate** | Cockpit **PID 30000** and Tower **PID 26728** both running from **canonical merged `main`**; exactly one watcher; **no component depends on any BUILD-020 branch or worktree** |
+| **Estate cleanup** | worktrees **38 → 19**; **15 BUILD-020 branches deleted**, every one proven superseded **by content diff, never by name** |
+
+### 🔄 AMENDMENT 13 — Warwick, 2026-08-07. **4C IS RESCOPED. CAPAE AND ASDAIR MOVE TO 4D.**
+
+> **His decision, and it replaces Amendment 11's contents for 4C.** ⛔ **CAPAE and Asdair are DESCOPED from 4C.** No CAPAE implementation, no Supabase CAPAE population, no CAPAE design change, no Asdair functional delivery, no Asdair hop preparation happens in 4C. They become **Sub-phase 4D**, entered only once 4C's end state is actually true.
+>
+> **4C has ONE purpose, his words:** *"Fix the meaning of MERGE permanently, correct Veritas/Codex responsibilities accordingly, and converge the ENTIRE Fusion247PKA repository/working estate so that when 4C itself finishes there is ONE canonical main and ONE canonical working folder on main, with no useful state left anywhere else."*
+>
+> **This is an EXECUTION phase, not another QA programme.** No Veritas loop. No Codex loop. No new governance programme. The governance changes are **surgical corrections to prevent recurrence of a demonstrated failure** — not a build.
+
+### ⭐ 4C NORTH STAR — **ONE REAL SYSTEM.** Warwick, 2026-08-07. **This governs 4C. Everything below serves it.**
+
+> **The objective of 4C is not to make Git tidy for its own sake.**
+>
+> It is to make Fusion247PKA behave as **one coherent, durable system in which completed work cannot disappear, become stranded, fork into competing versions, or require Larry to remember where the "real" version lives.**
+>
+> **There is one canonical MAIN and one active piece of work.** While work is underway, useful new state may legitimately exist in that active working state. **When that work is MERGED, the distinction disappears.**
+>
+> **MAIN + ACTIVE WORK → MERGE → MAIN.**
+>
+> **The test, and it is the whole thing:** a fresh Larry should never have to ask *"Didn't we already build this somewhere?"* **If the answer is yes, the previous merge failed.**
+
+**MERGE is an outcome, not a Git command.** A PR merge may be one operation used to achieve it; **clicking Merge does not make the work MERGED.** A Warwick MERGE means: everything retained is on canonical `main` or in its deliberately approved canonical non-Git home · anything executable or operational that should consume the retained work **is consuming the canonical version** · anything superseded is **no longer an active competing source** · anything discarded is **dead** · nothing useful belonging to the work is **stranded outside the canonical system**. And it must be **durable** — a new session, restart, fresh checkout or recovery finds the same authoritative implementation **without relying on Larry's memory or archaeological searching**.
+
+**MERGE is NOT** — *"a PR was merged" · "a branch was closed" · "the tests passed" · "Codex approved the diff" · "Veritas issued a receipt" · "the useful bits are preserved in another worktree" · "we kept the old branch just in case" · "the runtime still works from the old checkout" · "we'll reconcile the estate later."* **Those may be evidence or intermediate steps. None satisfies the human outcome.**
+
+**Larry owns achieving the North Star.** Warwick decides what outcome is wanted and whether the final merge is authorised; **Larry owns how Git, branches, worktrees, runtimes, specialists and sequencing get there. Warwick should never need to understand Git terminology to obtain a clean merged system.**
+
+> **⛔ THE STANDING CORRECTION, and it is why this section exists** (Warwick, 2026-08-07): *"I just want the human outcome to be the focus, not the machine electronic admin… the system has worked quite well recently. Just the focus has been wrong cos it had focused on admin, not product, outcomes and goals."*
+>
+> **Do not throw the baby out with the bathwater.** **Veritas stays difficult, sceptical and independent of Larry's judgement — that is the baby we keep.** What disappears is **the recursive assurance machinery that let her spend hours reviewing administrative changes created by the preceding review.**
+>
+> **Evidence exists to answer the human questions. The evidence does not become the purpose of the review.** A SHA records what was inspected; **it does not define the human scope.** A receipt is the **output** of a review, **not a new product requiring another review.**
+>
+> **⚠️ Responding to this section by adding further clauses and specifics IS the failure it describes.** The regrowth cap applies at full force.
+
+**Codex's value is the fresh external pair of eyes immediately before Warwick collapses the active work back into MAIN** — challenging (1) whether what is being kept is technically sound enough for the agreed outcome, including what Larry and Veritas may collectively have missed, and (2) whether the proposed merge **actually produces the North Star**. **It reports what is wrong; Larry fixes it. It does not become an iterative development partner.**
+
+**4C is finished only when Fusion247PKA demonstrates the model it is establishing for every future Build:** **ONE MAIN. ONE WORKING FOLDER. ONE AUTHORITATIVE SYSTEM.** And from then onward — *the active piece of work may temporarily exist beside MAIN; MERGE consumes it; nothing useful gets left behind.*
+
+### 🎯 THE ONE CURRENT NEXT ACTION — **Sub-phase 4C: ESTATE RECONCILIATION & CONVERGENCE.**
+
+*(Renamed from "Canonical Estate Reset" 2026-08-08 — Warwick's four-term correction. **RECONCILE** decides what belongs; **MERGE** is the Git event; **CONVERGE** is the estate end state; **CLOSE** ends the sub-phase. Canonical in root `CLAUDE.md` § "Git ownership".)*
+
+**Working branch `build-020/4c-estate-convergence`, cut from `70dba16`.** Every 4C acceptance row below is Warwick's, restated in the order he set them.
+
+> **📍 WHERE 4C ACTUALLY IS — 2026-08-08. Read this before acting; the rows below carry the detail.**
+>
+> **Reconciliation and convergence are EXECUTED.** Worktrees **19→2**, local branches **67→3**, remote **68→3**, stashes **3→0**, 0 open PRs, canonical tree clean, runtime alignment re-proven under a corrected check. Three survivors reconciled: **S-1** integrated in minimum current-compatible form, **S-2** preserved as historical evidence only, **S-3** preserved as decommissioned reference-only design capital.
+>
+> **NOT YET DONE, and 4C may not be reported CONVERGED or CLOSED until they are:** Warwick's ratification of the amended Codex prose · the ONE focused Veritas confirmation of its three findings · the ONE merge-class Codex review · the merge itself · the post-merge convergence proof · retiring the candidate worktree and clearing `~/.mypka/tower-backups/`.
+>
+> **The next thing owed to Warwick is the final merge decision** — not another intermediate discussion.
+
+| # | Requirement | State |
+|---|---|---|
+| **1** | **MERGE = ESTATE CONVERGENCE canonicalised ONCE** in root operating law, plus the DURABLE definition. Other surfaces POINT to it; no scattered copies. Larry's sole ownership of the Git lifecycle preserved. | ✅ **LANDED** `6257915` — § "Git ownership", placed after the section's existing SSOT sentence so it carries its own. "Larry owns the entire git lifecycle … absolute and unchanged" verified byte-identical. |
+| **2** | **Veritas contract corrected** — current Wayfinder/Build truth, NOT estate-wide Git archaeology. Gate 1 functional-only; Gate 2 the one journey question; Gate 3 current-project doc truth. **A receipt-bearing head does not create a new review cycle.** One substantive pass per boundary + one focused delta on a genuine functional blocker. | ✅ **LANDED** `6257915` + **REBASED** `b856ba3` onto Warwick's Amendment 2 model. **14 SHA-identity carriers enumerated by grep and rebased.** Gate = human outcome at a work boundary; SHA = provenance. The three gates survive, each explicitly bound to the five questions it answers. |
+| **3** | **Codex contract corrected** at `services/control-plane/review/prompts/tower-qa-skill.md` — merge-class review gains responsibility **B: will this merge actually converge the estate?** Stranded useful state is a **merge blocker**. Codex reports, never repairs. **The live loader must consume the amended contract** — an amended contract the runtime does not read is not done. | 🟠 **IMPLEMENTED, AWAITING WARWICK'S RATIFICATION.** ✅ Landed `6ae592c` + evidence route `9c14e5b`; the path-based measure corrected at `ea13bba`; the outcome-bound wording rebase landed `7d739d2` *(this cell read "IN FLIGHT" until 2026-08-08 — Veritas non-blocking finding, corrected once)*. Proven through `loadCodexContract()` — the **LIVE** route, not the retired `qaSkill.js`; estate inventory proven to reach the child's stdin; every new control mutation-tested to fail and restored. ⬜ **Warwick's 2026-08-08 correction is being applied**: Codex reviews the estate that **EXISTS at the merge boundary** — Q1 technical soundness, Q2 no unresolved reconciliation/convergence debt from **previous** completed work and no current pre-merge defect. **It does NOT certify a future post-merge estate.** ⛔ **The prose is UNRATIFIED and `loadCodexContract()` gates on the frontmatter flags, not on `ratified_wording_at_head`. Only Warwick discharges this. No Codex invocation occurs before he signs.** |
+| **4** | **The WHOLE estate RECONCILED and CONVERGED** — every branch, worktree, stash, dirty file, untracked file, patch, rescue folder, installed runtime and scheduled task classified **by CONTENT, never by name**, to exactly one of **KEEP → canonical** or **DISCARD → dead**. | ✅ **EXECUTED.** Warwick authorised the full disposition 2026-08-07. **Worktrees 19→2 · local branches 67→3 · remote 68→3 · stashes 3→0 · 0 open PRs · canonical tree clean.** ⚠️ **Larry's first uniqueness measure was WRONG** (pathnames absent from `main` — blind to a branch that *modifies* a shared file); an external review caught it, deletion stopped, **119 recovery refs** pinned every tip, gc/prune/reflog-expiry disabled, and a forensic re-audit under four orthogonal tests re-decided all 40 tips. All 75 previously-unreachable commits accounted for. Evidence: [[Deliverables/2026-08-07-4c-estate-disposition-kill-list]]. |
+| **5** | **The named survivors dispositioned** — Pax's CAPAE report banked as a 4D input (no CAPAE analysis) · the asdair 34-line WIP resolved for estate purposes only · the unapproved VlogOps draft given a safe disposition consistent with its privacy status · old-location `tower-qa-skill.md` copies proven dead. | ✅ **DONE.** asdair WIP recovered `a8c2a33` (`main` still carried the bug; 69/69 pass) · `stash@{2}` deferred-hardening ruling recovered `d7967c6` · PKM position preserved **local-only per Warwick** · Pax report banked `70dba16` · old-location copies proven dead. **Plus the three re-audit survivors:** **S-1** reconciled *not restored* (unsupported attribution deleted, corroborated 2026-07-28 ruling quoted and fenced from engineering expression, over-broad doctrine removed) · **S-2** preserved as historical evidence only · **S-3** preserved at `Builds/DECOMMISSIONED/` as reference-only Postgres capital, **no caller anywhere**. **VlogOps: kept, not published, not deleted** — durable copy at `~/.mypka/unpublished-drafts/`, byte-verified before the tree copy was removed. |
+| **6** | **End state proven MECHANICALLY**, not asserted — the fourteen checks in § 4C TARGET END STATE. | 🟠 **IN PROGRESS — not yet claimed.** Estate state, runtime alignment and recovery integrity are executed and verified. **Outstanding:** the final merge, the post-merge convergence proof, retiring the candidate worktree, clearing `~/.mypka/tower-backups/`, and Warwick's ratification of the amended Codex prose. **Nothing may be reported CONVERGED or CLOSED until all fourteen are true.** |
+
+**⛔ Larry may not report *"Fusion247PKA is converged"* until every row is true by execution.** Warwick: *"Do not report that sentence until it is actually true."*
+
+### 📋 4C INVENTORY — executed 2026-08-07, `main` = `bc99606`
+
+| Surface | Measured |
+|---|---|
+| **Local branches** | **65** — **36 ancestry-proven contained in `main`** (dead by content) · **29 hold commits not in `main`** |
+| **Remote branches** | **75** — **33 contained in `main`** · **34 hold commits not in `main`** |
+| **Worktrees** | **19** registered |
+| **Stashes** | **3** — `stash@{0}` on `main` @ `ae32ac9` · `stash@{1}` on `build-014/directus-live-cockpit` · `stash@{2}` on `build-014/wp-d-cockpit-v2` |
+| **Open PRs** | **0** |
+| **Closed-unmerged PRs whose branch survives** | **2** — **#80** `audit/de-mypka-extraction-20260728` · **#72** `idea-017/w01-note-structure-validator` |
+| **Dirty/untracked** | **2 locations only** — `C:\Fusion247PKA` (VlogOps draft, untracked) · `C:\Fusion247PKA-wo-asdair-ci` (2 modified + 1 untracked evidence doc) |
+| **`tower-qa-skill.md` copies** | **1 live** (`services/control-plane/review/prompts/`). Old `Builds/BUILD-010-fusion-tower/baton-mvp/` path exists **only in history and dead branches** — no live loader resolves it |
+
+**⚠️ "Not merged" is an ancestry fact, not a usefulness verdict.** Each of the 34 unique branches still needs a CONTENT decision; ancestry only proves the 36+33 are safe.
+
+### ⛔ CARRIED — re-cut against Amendment 13. **Items 1, 2, 3 and 6 are 4D's; items 4, 5 and 7 are 4C's.**
+
+1. **`MyPKA-YouTube-Watcher-Ensure` is DISABLED and blocked on ELEVATION.** Ensure semantics are proven (two ticks, ProcessId unchanged, kill-loop gone) but **that is CAPABILITY, not automation.** **Amendment 9 REMAINS AUTOMATIC and is NOT accepted.**
+2. **R1 — the non-mutating-GET assumption is UNVERIFIED**, blocked by the GL-012 private-surface boundary. **No side effect observed is not proof none exists.**
+3. **Sub-phase 4B assurance was never completed** — no Gate 1/Gate 2 PASS, no Codex, no TowerBot acceptance of `codex_qa_started`. **Owed unless Warwick disposes it.**
+4. ✅ **DISCHARGED — THE ESTATE-CONVERGENCE DEFECT.** ~~20 non-BUILD-020 worktrees hold genuinely unique state~~ — **reconciled and converged 2026-08-07/08.** Every one classified by CONTENT under the corrected method; the `build-015/*` and `idea-012/*` family proved **superseded** (their implementation *did* land — `services/asdair/**` on `main` carries it, and `main`'s `store.js` is 818 lines to the branch's 427). Worktrees **19→2**. Warwick's operating model now holds: useful work lives on `main` or in the ONE active piece of work.
+5. ✅ **DISCHARGED — the asdair WIP.** The 34 lines were **genuinely useful and genuinely stranded**: `main` still carried the bug where `path.resolve()` ran *before* backslash conversion, so on the Linux CI runner a Windows path was silently joined onto `cwd` and two forms of the **same** checkout compared unequal. Recovered with two regression tests at **`a8c2a33`**, 69/69 pass. Worktree `C:\Fusion247PKA-wo-asdair-ci` **removed** after all three files were byte-proven identical to the banked version.
+6. **`CareerAIR-Ops-Liveness` deliberately DISABLED** — it alerted every 30 minutes about the Zapier path Amendment 4 descoped.
+7. 🟠 **MOSTLY DISCHARGED — rollbacks.** ✅ `C:\Fusion247PKA-premigration-20260807` **removed** — zero unique useful state, every orphan proven superseded (`persistCapture` 86→162 and `watch-captures` 166→376 are the 4B durable-capture rewrite; `server.mjs` is *smaller* because `/private-api` was **extracted** into 3 files). ✅ `C:\Fusion247PKA-unique-artefacts-20260807` **removed** — all 5 files represented or preserved. ⬜ `~/.mypka/tower-backups/2026-08-07-pre-postmerge-realign/` (76 files) **deliberately retained** as a **live-runtime rollback** until post-merge alignment proves the new state healthy — a rollback being used as a rollback — then cleared. **Temporary preservation is never a final disposition.**
+
+### ✅ 4C TARGET END STATE — **fourteen checks, every one proven by execution.** Warwick's list, unabridged
+
+| # | Check |
+|---|---|
+| 1 | Local checkout is on `main` |
+| 2 | Local `main` equals `origin/main` |
+| 3 | Working tree clean |
+| 4 | No useful untracked files |
+| 5 | No useful stash |
+| 6 | **ONE** registered working folder/worktree for this repository |
+| 7 | No surviving **local** working branch carrying useful state |
+| 8 | No surviving **remote** working branch carrying useful state |
+| 9 | No open PR carrying unique work |
+| 10 | No installed runtime/service/task depends on a non-`main` branch or worktree |
+| 11 | Fresh recovery from canonical state does not require hunting another branch |
+| 12 | Every item in the estate audit has a **KEEP→canonical** or **DISCARD→dead** disposition |
+| 13 | Every temporary preservation copy contains **zero** unique useful state |
+| 14 | Canonical MERGE / Veritas / Codex contracts are on `main`, **and the live Codex loader consumes the amended contract** |
+
+**The human-visible answer 4C is allowed to produce, and only when all fourteen are true:**
+
+> *«Fusion247PKA is converged. There is one canonical main and one canonical working folder. No useful work is stranded outside it. Everything retained is durable; everything else is dead.»*
+
+
 ### 📊 ASSURANCE STANDING — **THE SINGLE SOURCE. Every other statement of gate standing in this map POINTS HERE and must not restate it.**
 
 > **🔴 WHY THIS BLOCK EXISTS.** Gate standing was restated in **four** places, and **six consecutive Gate 1 verdicts** were carried by one of them going stale. Veritas @ `b62a9fc`: *"The record is current with respect to the last review's finding list and stale with respect to its outcome. That is a placement and sequencing property, not a diligence one."* **Restatement was the defect. This block is the fix — SSOT, not a new mechanism.**
@@ -2784,7 +2982,7 @@ Any newly discovered **unrelated** defect: record once in [[Deliverables/BACKLOG
 
 **What Larry is NOT doing, deliberately:** not starting the branch Cockpit to manufacture a live journey (`db.mjs` opens two production pools at module scope — the hazard Veritas avoided and that forced WO-25's architecture), not touching the live clone, not enabling any scheduled task, and not editing Veritas's receipt.
 
-**🎯 THE ONE CURRENT NEXT ACTION — execute the pre-merge repairs, then re-dispatch Gate 1 at a new frozen head.**
+**⛔ SPENT — the pre-merge repair/re-gate loop. DIRECTS NOTHING.** *(Retired 2026-08-07 at the Sub-phase 4B close. Warwick authorised the PR #97 merge as an explicit exception, terminating this loop. The label was deliberately removed from this heading so it appears ONCE in the map — at the live 4C action above. Two live targets is the exact defect that carried six Gate 1 verdicts.)* ➡️ **The one current action is § ROTATION → enter Sub-phase 4C.**
 
 **In order — EVERY item carries its state, because leaving later items unmarked is what made this block misdirect** *(Veritas Gate 1 @ `275ec07`: items ①②③ read `DONE` while ④–⑧ were unmarked though complete, so a fresh Larry would have read ⑦ as live and **raised a duplicate Work Order for an already-merged repair**)*:
 

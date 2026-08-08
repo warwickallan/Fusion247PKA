@@ -1,0 +1,440 @@
+{
+  "session_date": "2026-08-07",
+  "branch": "build-020/phase4-automation-law",
+  "worktree": "C:\\Fusion247PKA-build-020-trial",
+  "host": "claude",
+  "host_version": "2.1.221",
+  "host_version_note": "read from the governor health sample; root CLAUDE.md reasons about 2.1.222. Clerical discrepancy, recorded once, non-blocking.",
+  "host_session_id": "e1a5349f-4c7d-4ce4-bb91-f2ea51224e07",
+  "host_session_id_basis": "established by execution: the session-id key under which ~/.mypka/governor/health/C--Fusion247PKA-build-020-trial holds this session's statusLine sample, and the evidence-workspace id recorded verbatim in the Veritas ecfd38f receipt frontmatter",
+
+  "opening_head": "c0cf334ae6bbc9e34edd08da1de0f30807938a68",
+  "opening_head_short": "c0cf334",
+  "opening_head_committed_utc": "2026-08-07T10:26:31Z",
+  "closing_head": "4bf04e29febf3c009baa23e73a50f118ecfe1a24",
+  "closing_head_short": "4bf04e2",
+  "closing_head_committed_utc": "2026-08-07T20:32:26Z",
+  "closing_head_basis": "final entry of C:\\Fusion247PKA\\.git\\worktrees\\Fusion247PKA-build-020-trial\\logs\\HEAD; HEAD is ref: refs/heads/build-020/phase4-automation-law",
+  "session_range": "c0cf334ae6bbc9e34edd08da1de0f30807938a68..4bf04e29febf3c009baa23e73a50f118ecfe1a24",
+  "git_range_this_slice": "c0cf334..4bf04e2",
+  "commits_in_range": 51,
+  "commits_in_range_basis": "52 reflog entries in range; one (28b06df -> 28b06df) is a no-op self-checkout, not a commit",
+
+  "map_path": "Deliverables/2026-08-04-proofline-wayfinder-plan.md",
+  "report_path": "Deliverables/2026-08-07-session-performance-report-subphase-4b-close.md",
+  "deliverable_path": "Deliverables/2026-08-07-session-performance-report-subphase-4b-close.md",
+  "payload_path": "Deliverables/2026-08-07-session-report-payload-subphase-4b-close.json",
+  "prior_report_path": "Deliverables/2026-08-07-session-performance-report-subphase-4b.md",
+  "closeout_path": "Deliverables/2026-08-07-build-020-post-merge-closeout.md",
+
+  "pr": "#97",
+  "pr_status": "MERGED",
+  "pr_merge_commit": "a2aae94693cff94aaf3fc87ded0948197b5ea0d0",
+  "pr_authorised_head": "28b06df04509e1145b6edd18351a109b2da8c22f",
+  "canonical_main_after_merge": "bc99606daad6269554fccf0738a8f489c55be265",
+
+  "metrics": {
+    "opening_context_tokens": {
+      "value": null,
+      "label": "U",
+      "note": "STRUCTURALLY UNRECOVERABLE. The governor health store keeps one file per session id and overwrites it on every statusline refresh; it is a latest-sample store, not a series. The opening value was destroyed before this report could be written. Third consecutive report in this series to record it UNESTABLISHED."
+    },
+    "closing_context_tokens": {
+      "value": 833500,
+      "label": "E",
+      "basis": "~/.mypka/governor/health/C--Fusion247PKA-build-020-trial/e1a5349f-4c7d-4ce4-bb91-f2ea51224e07.json, sampled_at 2026-08-07T21:04:24.427Z (32 min after the closing head), source statusLine",
+      "used_percentage": 83,
+      "remaining_percentage": 17,
+      "context_window_size": 1000000
+    },
+    "total_context_token_movement": { "value": null, "label": "U", "note": "not derivable without an opening reading" },
+    "total_output_tokens_field": {
+      "value": 155,
+      "label": "E-but-unusable",
+      "note": "read from the instrument and relied on for nothing. The map already records this field as an open question (implausibly low; probably per-turn or per-sample rather than cumulative)."
+    },
+    "rate_limit_five_hour_pct_at_close": { "value": 6, "label": "E" },
+    "rate_limit_seven_day_pct_at_close": { "value": 68, "label": "E" },
+    "rate_limit_seven_day_pct_prior_session_sample": { "value": 62, "label": "E", "note": "session d049def8, sampled 2026-08-07T10:30:34Z" },
+    "seven_day_allowance_delta_points": {
+      "value": 6,
+      "label": "E",
+      "caveat": "UPPER BOUND on this session's share. The interval between the two samples includes the tail of the previous session."
+    },
+
+    "elapsed_committed_activity_seconds": { "value": 33991, "human": "9h 26m 31s", "label": "E", "basis": "first in-range commit 072979e @ 11:05:55Z -> closing head @ 20:32:26Z" },
+    "elapsed_from_opening_head_seconds": { "value": 36355, "human": "10h 05m 55s", "label": "E" },
+    "elapsed_session_wallclock_minutes": { "value": null, "label": "U", "note": "no instrument records session start" },
+    "allocation_waiting_pct": { "value": null, "label": "U" },
+    "allocation_time_based_any": { "value": null, "label": "U", "note": "no instrument measures time allocation. Commit-count allocation is supplied instead and is labelled as a proxy." },
+
+    "per_specialist_token_usage": {
+      "value": null,
+      "label": "U",
+      "note": "NO figures were supplied in the dispatch and no subagent token ledger exists in any committed artefact for this range. Unlike the prior report there is no measurement to verify. Not estimated."
+    },
+    "per_specialist_dispatch_counts": {
+      "value": { "veritas": 11, "keel": 4, "vex": 2, "mack": 1, "pax": 1, "wo29_worker_unnamed": 1 },
+      "total_floor": 19,
+      "label": "E-floor",
+      "note": "FLOOR, not a total. Counted only where the committed record names the specialist. Exact total UNESTABLISHED. Keel is named for WO-30, WO-31, WO-32, WO-33; WO-29's worker is named nowhere in the commit record or the execution-log row. Read-back and build passes are not separately evidenced, so spawn count differs from order count and is UNESTABLISHED."
+    },
+    "declared_assurance_ceiling_tokens": {
+      "value": 2080000,
+      "label": "E",
+      "definition": "SUM OF AUTHORISED MAXIMA read from the review_ceiling field of the eleven in-range Veritas receipts. THIS IS NOT CONSUMPTION.",
+      "breakdown": { "250k": 5, "200k": 1, "150k": 1, "120k": 4 },
+      "actual_consumption": null,
+      "note": "every receipt records its ceiling as 'not extended'"
+    },
+    "declared_assurance_ceiling_terminal_phase_tokens": {
+      "value": 1830000,
+      "label": "E",
+      "definition": "receipts #2 through #11 — the phase that produced zero Work Orders and zero product defects"
+    },
+
+    "allocation_commit_count_proxy": {
+      "docs": 30,
+      "work_order_envelopes": 11,
+      "governance": 1,
+      "product": 9,
+      "total": 51,
+      "product_pct": 17.6,
+      "docs_and_admin_pct": 82.4,
+      "veritas_receipts_and_their_repairs": 14,
+      "veritas_receipts_and_their_repairs_pct": 27.5,
+      "label": "E",
+      "limit": "counts commits, not lines. A one-line ci( commit and a 400-line check script each count once."
+    },
+
+    "documentation_vs_product_change_volume": {
+      "files_changed": null,
+      "insertions": null,
+      "deletions": null,
+      "doc_insertions": null,
+      "product_insertions": null,
+      "doc_lines_changed": null,
+      "product_lines_changed": null,
+      "label": "U",
+      "note": "LINE-LEVEL VOLUME IS UNESTABLISHED. Pax has no Bash and cannot diff. The measured proxy is the commit-subject split: 42 documentation/order/governance : 9 product = 82.4% / 17.6%. For contrast the prior session in the same Sub-phase measured 32.5% documentation BY LINE across 34 commits; the two measures are not like-for-like and the comparison is directional only.",
+      "commit_subject_split": { "doc_order_governance": 42, "product": 9, "product_pct": 17.6 },
+      "four_hour_tail": {
+        "last_product_code_commit": "4c557818cd53a79b215d399694567b8a8a722fee",
+        "last_product_code_commit_utc": "2026-08-07T16:32:14Z",
+        "duration_to_closing_head": "4h 00m 12s",
+        "commits_in_tail": 14,
+        "product_code_commits_in_tail": 0,
+        "note": "real operational work happened in that window — the live migration, the Tower re-alignment, the estate cleanup — and landed as one record rather than as code. The window is not idle; it is uncommitted-as-product."
+      }
+    },
+
+    "parent_channel_available": { "value": true, "label": "E", "basis": "9 of 9 ding sends exit 0, zero queued, zero usage errors" },
+    "parent_channel_response_latency": { "value": null, "label": "U", "note": "the transport log is outbound-only" },
+    "queued_messages": { "value": 0, "label": "E" },
+
+    "wo_issued_in_range": { "value": 5, "label": "E", "note": "WO-29..WO-33. The brief's 'ten Work Orders WO-24..WO-33' describes Sub-phase 4B as a whole; WO-24..28 belong to the previous session and are scored in the prior report." },
+    "wo_first_dispatch_success": { "value": 0, "denominator": 5, "label": "E", "definition": "numbered Work Orders that survived read-back with NO binding amendment" },
+    "wo_amendments": { "value": 6, "label": "E", "note": "WO-33 took two" },
+    "wo_refusals": { "value": 0, "label": "E" },
+    "wo_worker_found_defect_in_order": { "value": 5, "denominator": 5, "label": "E" },
+    "read_back_gate_cost_tokens": { "value": null, "label": "U" }
+  },
+
+  "elapsed_minutes": 566.5,
+  "total_context_tokens_in": 833500,
+  "total_context_tokens_out": null,
+  "total_subagent_tokens": null,
+  "parent_channel_available": true,
+  "queued_messages": 0,
+  "wo_first_dispatch_success": 0,
+  "wo_amendments": 6,
+  "wo_refusals": 0,
+  "doc_lines_changed": null,
+  "product_lines_changed": null,
+  "allocation_product_pct": null,
+  "allocation_admin_pct": null,
+  "allocation_evidence_pct": null,
+  "allocation_rework_pct": null,
+  "allocation_waiting_pct": null,
+
+  "work_orders": [
+    {
+      "id": "WO-29",
+      "worker": null,
+      "worker_note": "NOT NAMED in the commit record or the execution-log row",
+      "scope": "System-tab render coverage for the rotation-report surface (Veritas Defect 5)",
+      "origin": "Veritas Gate 1 finding at 3e4c9d9",
+      "first_dispatch_substantive": false,
+      "outcome": "order amended at read-back; delivered",
+      "amendments": 1,
+      "integrated_sha": "a00e3a3",
+      "order_defects_found_by_worker": ["three clarifications confirmed and AC5 withdrawn as already satisfied — an acceptance criterion demanding work already done"],
+      "value_returned": "on integration the mutation run showed 3 of 54 RED with pre-existing detectors firing in 0 scenarios: dropping the rrHas guard makes rrInt(null) render \"0\" because Number(null) === 0, the template compiles, nothing throws, and the OLD check passed. Warwick's Unknown / not-established / 0 distinction was collapsing inside the gate built to catch it.",
+      "tokens": null,
+      "label": "E"
+    },
+    {
+      "id": "WO-30",
+      "worker": "keel",
+      "scope": "Cockpit db.mjs clone portability (Veritas Defect 6, unparked by Warwick)",
+      "origin": "Veritas Gate 1 finding at 3e4c9d9",
+      "first_dispatch_substantive": false,
+      "outcome": "order amended at read-back; delivered",
+      "amendments": 1,
+      "integrated_sha": "5b1409f",
+      "ci_sha": "1c633a5",
+      "order_defects_found_by_worker": ["Larry's prescribed two-line fix — a relative static import of pg — would have pulled a node_modules path into the closure provenance.mjs recomputes, broken the declared SOURCE_MODULES and turned provenance-check.mjs RED: a green CI gate, in a file outside the worker's surface. Proved by EXECUTING relativeImports() on both forms."],
+      "value_returned": "the underlying defect was worse than 'unportable': a Cockpit started from any other checkout silently borrowed the live clone's dependency tree AND its live production credentials — it did not fail, it connected, with credentials it had never declared. Row 1's 'survives worktree delete/recreate' had been passing only because a stray checkout quietly reached into the live clone.",
+      "residual": "BACKLOG C-6 narrowed, NOT closed — the pools still open at module scope",
+      "tokens": null,
+      "label": "E"
+    },
+    {
+      "id": "WO-31",
+      "worker": "keel",
+      "scope": "/private-api origin boundary",
+      "origin": "Vex RED at 443d0fa",
+      "first_dispatch_substantive": false,
+      "outcome": "order amended at read-back; delivered",
+      "amendments": 1,
+      "integrated_sha": "02c4520",
+      "ci_sha": "3254c69",
+      "order_defects_found_by_worker": ["the order demanded the worker ESTABLISH a fact while setting network: none and granting no web access — Larry's defect, and the demand was withdrawn", "two surface additions were missing from the envelope"],
+      "value_returned": "handler extracted from server.mjs, where it had been the last live-facing handler and therefore executable by no gate — which is why the defect survived",
+      "tokens": null,
+      "label": "E"
+    },
+    {
+      "id": "WO-32",
+      "worker": "keel",
+      "scope": "unsafe-method no-Origin guard",
+      "origin": "Warwick R2 ruling",
+      "first_dispatch_substantive": false,
+      "outcome": "order amended at read-back; delivered",
+      "amendments": 1,
+      "integrated_sha": "4c55781",
+      "order_defects_found_by_worker": ["AC5's impossible demand withdrawn", "Keel MEASURED that a four-verb denylist would have left the same hole one verb to the left; an allowlist of the HTTP-safe set was adopted instead"],
+      "tokens": null,
+      "label": "E"
+    },
+    {
+      "id": "WO-33",
+      "worker": "keel",
+      "scope": "TowerBot codex_qa_started card + @tower strip",
+      "origin": "Warwick Tower ruling 1",
+      "first_dispatch_substantive": false,
+      "outcome": "order amended TWICE at read-back; delivered",
+      "amendments": 2,
+      "integrated_sha": "b03119c",
+      "test_sha": "f102dca",
+      "order_defects_found_by_worker": ["A1: Keel proved FIVE ways QA never runs after checkpoint creation, so the order's emission point would have announced runs that never start", "A2: the deficiency is what the Larry card is FED, not the card — the order had diagnosed the wrong component"],
+      "acceptance_status": "CAPABILITY ONLY — the card has NEVER been observed on the real TowerBot. Zero rows, no turn for PR #97. Remains OWED under 'Nothing may live only in Larry's head'.",
+      "tokens": null,
+      "label": "E"
+    }
+  ],
+
+  "veritas": {
+    "receipts_committed_in_range": 11,
+    "gate1_receipts_in_range": 10,
+    "gate2_receipts_in_range": 1,
+    "gate1_verdicts": { "FAIL": 7, "HOLD": 3, "PASS": 0 },
+    "gate2_verdicts": { "FAIL": 1, "HOLD": 0, "PASS": 0 },
+    "receipt_covering_closing_head": null,
+    "brief_corrections": [
+      "The brief and the map (:2420) say NINE Gate 1 verdicts. There are TEN, all committed in range. Veritas states it independently at ecfd38f: 'All ten Gate 1 receipts and both Gate 2 receipts are present on disk.' The map's own CAPAE corroborating-facts block undercounts by one. Non-blocking.",
+      "The brief says TWO Gate 2 verdicts. ONE Gate 2 receipt was committed in range (07aa166, FAIL). The second on disk is 2026-08-06-veritas-gate2-phase4-f0d2614-receipt.md, from the previous day."
+    ],
+    "sequence": [
+      { "n": 1, "gate": 1, "reviewed_sha": "3e4c9d9", "verdict": "FAIL", "banked_utc": "2026-08-07T11:31:14Z", "rows_1_2_4": "all HOLD", "carrier": "functional rows not yet passing", "carrier_class": "MIXED — produced Veritas Defects 5 and 6, both real product defects", "ceiling": "250k" },
+      { "n": 2, "gate": 1, "reviewed_sha": "275ec07", "verdict": "FAIL", "banked_utc": "2026-08-07T13:16:14Z", "rows_1_2_4": "all HOLD", "carrier_class": "MIXED", "ceiling": "250k" },
+      { "n": 3, "gate": 1, "reviewed_sha": "443d0fa", "verdict": "FAIL", "banked_utc": "2026-08-07T14:37:39Z", "rows_1_2_4": "2 PASS, 4 PASS, 1 HOLD", "carrier": "D-1 with D-2 — an active-map statement pointing a fresh Larry at descoped work", "carrier_class": "DOCUMENTATION", "ceiling": "250k" },
+      { "n": 4, "gate": 1, "reviewed_sha": "19fc792", "verdict": "HOLD", "banked_utc": "2026-08-07T14:53:41Z", "carrier_class": "DOCUMENTATION", "note": "verdict UPGRADED from FAIL — a Veritas self-correction", "ceiling": "120k" },
+      { "n": 5, "gate": 1, "reviewed_sha": "3254c69", "verdict": "FAIL", "banked_utc": "2026-08-07T15:42:57Z", "carrier": "the engineering is sound and the security repair is real, but the active Wayfinder does not know it happened and would send a fresh session to do it again", "carrier_class": "DOCUMENTATION", "ceiling": "250k" },
+      { "n": 6, "gate": 2, "reviewed_sha": "07aa166", "verdict": "FAIL", "banked_utc": "2026-08-07T17:09:42Z", "carrier_class": "DOCUMENTATION + live-position truthfulness", "ceiling": "200k" },
+      { "n": 7, "gate": 1, "reviewed_sha": "07aa166", "verdict": "FAIL", "banked_utc": "2026-08-07T17:16:43Z", "carrier": "the delivered engineering is sound; the FAIL is carried by the active map and its companion record failing, again, to know what the last two Work Orders and the live-runtime change did", "carrier_class": "DOCUMENTATION", "ceiling": "250k" },
+      { "n": 8, "gate": 1, "reviewed_sha": "b62a9fc", "verdict": "FAIL", "banked_utc": "2026-08-07T17:39:48Z", "rows_1_2_4": "ALL PASS", "carrier": "carried entirely by E-1: the active map's statement of its own assurance standing is false in every clause", "carrier_class": "DOCUMENTATION", "ceiling": "150k" },
+      { "n": 9, "gate": 1, "reviewed_sha": "30666f1", "verdict": "FAIL", "banked_utc": "2026-08-07T18:05:52Z", "rows_1_2_4": "ALL PASS", "carrier": "carried entirely by E-1: one unconverted row, in different words", "carrier_class": "DOCUMENTATION", "ceiling": "120k" },
+      { "n": 10, "gate": 1, "reviewed_sha": "3a1e670", "verdict": "HOLD", "banked_utc": "2026-08-07T18:26:08Z", "rows_1_2_4": "ALL PASS", "carrier": "six document-currency findings", "carrier_class": "DOCUMENTATION", "ceiling": "120k" },
+      { "n": 11, "gate": 1, "reviewed_sha": "ecfd38f", "verdict": "HOLD", "banked_utc": "2026-08-07T18:43:00Z", "rows_1_2_4": "ALL PASS", "carrier": "two findings, D-3 and N-7, BOTH labelled non-blocking, one of them inside the previous repair", "carrier_class": "DOCUMENTATION", "ceiling": "120k" }
+    ],
+    "self_corrections": [
+      { "at": "19fc792", "what": "verdict upgraded from FAIL to HOLD on re-grading the same class" },
+      { "at": "ecfd38f", "what": "explicit self-reversal, verbatim: 'I am correcting my own prior grading, and it matters that a successor can see it. At 3a1e670 I made codex_qa_started the SOLE CARRIER of a Completed automation HOLD on this gate. Under my own contract's scope ceiling that was a widening past the accepted rows that I did not record as a widening.'" }
+    ],
+    "productive_vs_terminal_phase": {
+      "productive": { "verdicts": 1, "work_orders_generated": 2, "orders": ["WO-29", "WO-30"], "product_defects_found": 2 },
+      "terminal": {
+        "verdicts": 10,
+        "span_utc": "13:16:14Z -> 18:43:00Z",
+        "span_human": "5h 26m 46s",
+        "share_of_committed_activity_pct": 57.7,
+        "declared_ceiling_tokens": 1830000,
+        "work_orders_generated": 0,
+        "product_defects_found": 0
+      },
+      "note": "the three later Work Orders trace to Vex's RED (WO-31), Warwick's R2 ruling (WO-32) and Warwick's Tower ruling 1 (WO-33). No Work Order after WO-30 cites a Gate 1 or Gate 2 finding."
+    }
+  },
+
+  "vex": {
+    "dispatches": 2,
+    "first_verdict": "RED",
+    "first_verdict_head": "443d0fa",
+    "first_verdict_scope": "the /private-api/* bridge as written, when armed. The other eight scope items were GREEN and proven.",
+    "material_fact": "the condition was confirmed ARMED on the live Cockpit, so the exposure predated this branch",
+    "repair": "WO-31 @ 02c4520",
+    "reverification_verdict": "GREEN",
+    "reverification_head": "3254c69",
+    "reverification_evidence": "124 independent assertions, 24 bypass shapes hunted, write half proven from the upstream's own record (0 requests, 0 bytes)",
+    "condition_on_green": "R1 — the GREEN is conditional on the UNVERIFIED assumption that GET on the private upstream is non-mutating. Accepted by Warwick with the condition named. Verification is a binding item at route step 18. The closeout records it as HONEST PARTIAL, not discharged: 'No side effect was observed; that is not proof.'",
+    "blocked_by": "GL-012 private-surface boundary — the upstream's source could not be enumerated. Blocked by the boundary, not by effort.",
+    "publication": "SANITISED by Warwick's ruling. No attack detail, probe shape or bypass mechanism appears in this payload or in the report. Record: Deliverables/2026-08-07-cockpit-private-api-boundary-record.md",
+    "label": "E"
+  },
+
+  "merge_exception": {
+    "recorded_as": "USER-AUTHORISED EXCEPTION, NOT ASSURANCE PASSING",
+    "verbatim": "Warwick explicitly authorised PR #97 merge at 28b06df04509e1145b6edd18351a109b2da8c22f before final Gate 1 PASS and without Codex, terminating the recursive assurance loop. This is a user-authorised exception, not evidence that the skipped assurance passed.",
+    "authorised_head": "28b06df04509e1145b6edd18351a109b2da8c22f",
+    "merge_commit": "a2aae94693cff94aaf3fc87ded0948197b5ea0d0",
+    "canonical_main": "bc99606daad6269554fccf0738a8f489c55be265",
+    "assurance_position": "NO Gate 1 PASS. NO Gate 2 PASS. NO Codex. NO TowerBot production acceptance. Nothing in 4B may be described as assured, complete or accepted.",
+    "label": "E"
+  },
+
+  "ding_this_session": {
+    "ids": [364, 365, 366, 367, 368, 369, 370, 371, 372],
+    "sent_count": 9,
+    "exit_zero_count": 9,
+    "failure_count": 0,
+    "usage_errors": [],
+    "queued": 0,
+    "contiguous": true,
+    "bytes": [1623, 1252, 1977, 1780, 3174, 2156, 2472, 2988, 2599],
+    "mean_bytes": 2224.6,
+    "prior_session_mean_bytes": 1847.9,
+    "inflation_factor": 1.204,
+    "first_ts": "2026-08-07T10:30:15.703Z",
+    "last_ts": "2026-08-07T15:55:48.299Z",
+    "silence_to_closing_head": "4h 36m 38s",
+    "boundary_orphan": false,
+    "boundary_orphan_note": "the prior report's defect did not recur — ids 364-372 are contiguous and 363 was claimed by the prior report",
+    "verification": "read at source from C:/Users/Buggly/.mypka/governor/ding-log.jsonl; the log records FAILURES as well as successes (two exit-4 usage errors appear earlier in its history), so absence from the log means ding.mjs was not invoked",
+    "owed_and_not_sent": {
+      "count": 7,
+      "label": "E for absence and for category, I for owedness-in-context",
+      "events": [
+        { "event": "Veritas Gate 2 @ 07aa166 — FAIL", "commit": "f54c4e2", "utc": "2026-08-07T17:09:42Z", "rule_4a_category": "gate verdict" },
+        { "event": "Veritas Gate 1 @ 07aa166 — FAIL", "commit": "b62a9fc", "utc": "2026-08-07T17:16:43Z", "rule_4a_category": "gate verdict" },
+        { "event": "Veritas Gate 1 @ b62a9fc — FAIL", "commit": "9413d89", "utc": "2026-08-07T17:39:48Z", "rule_4a_category": "gate verdict" },
+        { "event": "Veritas Gate 1 @ 30666f1 — FAIL", "commit": "3a1e670", "utc": "2026-08-07T18:05:52Z", "rule_4a_category": "gate verdict" },
+        { "event": "Veritas Gate 1 @ 3a1e670 — HOLD", "commit": "ecfd38f", "utc": "2026-08-07T18:26:08Z", "rule_4a_category": "gate verdict" },
+        { "event": "Veritas Gate 1 @ ecfd38f — HOLD", "commit": "28b06df", "utc": "2026-08-07T18:43:00Z", "rule_4a_category": "gate verdict" },
+        { "event": "PR #97 MERGED", "commit": "b2af412", "utc": "2026-08-07T19:49:12Z", "rule_4a_category": "merge" }
+      ],
+      "sharpest_fact": "commit 30666f1 at 17:53:46Z is the Warwick-authorised redline strengthening Rule 4a to 'SEND, then post, then CONTINUE'. In the 2h 38m 40s between that redline landing and the closing head, THREE gate verdicts and ONE merge occurred and not one notification was sent. The rule was strengthened and the channel got quieter.",
+      "corroborates": "this is a SECOND, INDEPENDENT instance of the CAPAE evidence Warwick recorded ('the correction was CORRECT, PRESENT and CANONICAL, and the behaviour regressed anyway') — his instance came from Larry's turn behaviour, this one from a transport log Larry does not author",
+      "not_claimed": "whether Warwick was at the keyboard is UNESTABLISHED; he plainly authorised the merge so he knew of it. Rule 4a's criteria are not conditioned on his presence and the ordering rule explicitly is not. Whether any of the seven was genuinely owed in context is Warwick's to rule; that seven named-category events passed with zero sends is a measurement."
+    },
+    "sent_for_routine_narration": { "value": null, "label": "U", "note": "the log records bytes and timestamps, never content; only Warwick reading messages 364-372 can rule on it" },
+    "label": "E"
+  },
+
+  "findings": [
+    { "id": "F1", "text": "WARWICK'S HEADLINE CLAIM IS PARTLY DISCONFIRMED. 'Every Gate 1 FAIL was documentation, not engineering' is TRUE of five of the seven FAILs (443d0fa, 3254c69, 07aa166, b62a9fc, 30666f1 — each with Veritas recording the engineering as sound or improving and naming a statement in the map about the map as the carrier) and FALSE of the first two (3e4c9d9, 275ec07), where functional rows 1, 2 and 4 were themselves HOLD and which produced two Work Orders against real product defects.", "confidence": "high", "label": "E" },
+    { "id": "F2", "text": "THE MEASUREMENT THAT REPLACES THE CLAIM: Gate 1 verdict #1 produced two Work Orders; verdicts #2 through #11 produced zero. WO-29 (11:58:11Z) and WO-30 (12:28:57Z) both post-date receipt #1 (11:31:14Z) and both name their Veritas defect in the commit subject. No later Work Order cites a Gate 1 or Gate 2 finding — WO-31 traces to Vex, WO-32 and WO-33 to Warwick's rulings. The assurance loop had a productive phase and a terminal phase, and the boundary is receipt #2. That is more useful for 4C than 'it was all documentation', because it says the mechanism works and then stops working rather than that it never worked.", "confidence": "high", "label": "E" },
+    { "id": "F3", "text": "The terminal phase spans 13:16:14Z to 18:43:00Z — 5h 26m 46s, 57.7% of the session's committed activity — across ten verdicts against a declared ceiling of 1,830,000 tokens, for zero product defects and zero Work Orders.", "confidence": "high", "label": "E" },
+    { "id": "F4", "text": "ELEVEN VERITAS VERDICTS, ZERO PASS. Seven Gate 1 FAIL, three Gate 1 HOLD, one Gate 2 FAIL. Four CONSECUTIVE verdicts (b62a9fc, 30666f1, 3a1e670, ecfd38f) returned with functional rows 1, 2 and 4 ALL PASSING and the gate still not passing. Three receipts carry the identical sentence: 'All three functional rows pass their pre-merge halves. The overall verdict is not PASS, and the reason is again not the engineering.'", "confidence": "high", "label": "E" },
+    { "id": "F5", "text": "HYPOTHESIS 3 IS SUPPORTED IN EFFECT BUT WRONG IN FORM. The FAILs were carried by findings Veritas explicitly labelled BLOCKING under its own Amendment 6 (2), so non-blockers did not cause FAIL. But at ecfd38f the HOLD is carried by two findings, D-3 and N-7, BOTH labelled non-blocking — one a table that may not render, one a heading claiming LESS assurance than exists. HOLD gates PASS, closure and merge. Accurate form: non-blocking documentation findings did not produce FAIL, but they did produce HOLD, and HOLD blocked the route just the same.", "confidence": "high", "label": "E" },
+    { "id": "F6", "text": "THE CIRCULARITY HYPOTHESIS IS SUPPORTED AND VERITAS NAMES IT INDEPENDENTLY. Map :2423 — 'Three separate circularities were found and had to be ruled on individually — row 4's live surface, installed-runtime restart, and codex_qa_started — all the same shape: an acceptance property whose only proof lies beyond the gate that requires it.' At ecfd38f Veritas quotes its own contract verbatim and states that read literally it makes Gate 1 PASS unreachable because the acceptance event requires Gate 1 PASS, then declines that reading on its own scope clause. A reviewer had to argue its way out of its own contract to make a PASS reachable at all.", "confidence": "high", "label": "E" },
+    { "id": "F7", "text": "THE NOTIFICATION SILENCE DEEPENED AFTER THE NOTIFICATION RULE WAS STRENGTHENED. Last send 15:55:48Z. Rule 4a redline landed 17:53:46Z. Three gate verdicts and one merge followed in 2h 38m 40s with zero sends. Seven Rule-4a-NAMED events (six gate verdicts, one merge) occurred after the last send. Measured from a transport log that records failures as well as successes.", "confidence": "high", "label": "E" },
+    { "id": "F8", "text": "THE OPENING CONTEXT READING IS STRUCTURALLY UNRECOVERABLE, not merely missing. The governor health store keeps one file per session id and overwrites it on every statusline refresh — a latest-sample store, not a series. The /rotate contract requires token/context evidence read from the instrument and never estimated, and for the opening figure the instrument cannot satisfy that after the fact. Third consecutive report to record it UNESTABLISHED. Recorded as evidence only; no fix proposed.", "confidence": "high", "label": "E" },
+    { "id": "F9", "text": "CLOSING CONTEXT MEASURED: 833,500 input tokens, 83% of a 1,000,000 window, 17% remaining, sampled 21:04:24Z. Seven-day allowance 62% -> 68% across the interval from the previous session's last sample; +6 points is an UPPER BOUND on this session's share because the interval includes the previous session's tail.", "confidence": "high", "label": "E" },
+    { "id": "F10", "text": "COMMIT ALLOCATION: 51 commits — 30 docs, 11 Work Order envelopes, 1 governance, 9 product. 14 of 51 (27.5%) are Veritas gate receipts or their direct repairs — MORE than the 9 product commits (17.6%). Counts commits, not lines; line-level volume is UNESTABLISHED.", "confidence": "high", "label": "E" },
+    { "id": "F11", "text": "THE LAST 4h 00m 12s OF THE RANGE CONTAINS 14 COMMITS AND NOT ONE PRODUCT-CODE CHANGE — six gate verdicts, the constitutional redline, the merge record, the post-merge closeout, 4C evidence preservation and the asdair evidence canonicalisation. Real operational work happened in that window (live migration, Tower re-alignment, estate cleanup) and landed as one record rather than as code. The window is not idle; it is uncommitted-as-product.", "confidence": "high", "label": "E" },
+    { "id": "F12", "text": "0 OF 5 CLEAN FIRST DISPATCHES, THIRD SESSION RUNNING. Five orders, six amendments, zero refusals, and a worker found a defect in Larry's order in 5 of 5. Across Sub-phase 4B as a whole: ten orders, ten amendments-or-refusals, zero clean first dispatches. The read-back gate is functioning as the FIRST line of order review, not the last, and its yield is not falling.", "confidence": "high", "label": "E" },
+    { "id": "F13", "text": "THREE PREVENTABLE-DEFECT CLASSES IN THE ORDERS. (1) Asserting a property of a target the order was never executed against — WO-30's module-closure regex, WO-33 A1's execution point. This is the IDENTICAL class the prior report named as Larry's signature; third consecutive session, same root defect. (2) Demanding what the order's own envelope forbids — WO-31 and WO-32 A1, two instances in two consecutive orders, both withdrawn once challenged. (3) Requiring work already delivered — WO-29 A1.", "confidence": "high", "label": "E" },
+    { "id": "F14", "text": "THE BRIEF'S 'THREE CONSECUTIVE ORDERS THAT WOULD HAVE HOLED provenance.mjs' IS TWO. The map itself says two — WO-25 (previous session) and WO-30 (this session): 'TWICE IN TWO CONSECUTIVE ORDERS, AND THAT MAKES IT A PATTERN IN LARRY, NOT LUCK IN KEEL.' WO-31 required provenance.mjs to gain one SOURCE_MODULES line, but that is a DECLARED change made correctly, not a control silently holed. Counting it as a third would overstate the record.", "confidence": "high", "label": "E" },
+    { "id": "F15", "text": "VERIFICATION-BY-GREP CONFIRMED AND DIAGNOSED AT LEAST THREE TIMES. Veritas @3a1e670: 'each repair has been exactly as wide as the last finding, and the next finding has been just outside it.' Veritas @ecfd38f: 'the fourth consecutive instance of the pattern.' Map :2702 names the mechanism: 'he grepped for the label he had just repaired and not for the label the entry block points WITH.' And once by markdown emphasis defeating a pattern — ecfd38f's emphasis-tolerant enumeration is described as 'the exact pattern class that defeated the 3a1e670 search'. The method that finally closed the class was STRUCTURAL ENUMERATION INDEPENDENT OF WORDING, not a better search string.", "confidence": "high", "label": "E" },
+    { "id": "F16", "text": "VERITAS CORRECTED ITSELF TWICE, ONE OF THEM A RECORDED BREACH OF ITS OWN SCOPE CEILING. At 19fc792 a verdict was upgraded from FAIL to HOLD. At ecfd38f, verbatim: 'I am correcting my own prior grading... Under my own contract's scope ceiling that was a widening past the accepted rows that I did not record as a widening.' A reviewer catching itself breaching its own ceiling and saying so in the receipt is the strongest evidence in this session that the assurance function is honest, and it should not be lost in a report about assurance being expensive.", "confidence": "high", "label": "E" },
+    { "id": "F17", "text": "THE MAP'S OWN CAPAE COUNT IS ONE OUT. Map :2420 says 'Nine Gate 1 verdicts were issued in Sub-phase 4B'. Ten Gate 1 receipts were committed in this range, and Veritas states it independently at ecfd38f: 'All ten Gate 1 receipts and both Gate 2 receipts are present on disk.' Non-blocking, recorded once.", "confidence": "high", "label": "E" },
+    { "id": "F18", "text": "TWO OF WARWICK'S OWN FACTUAL SUMMARIES ARE ONE OUT, AND BOTH ERR TOWARD A TIDIER STORY — nine Gate 1 verdicts (ten) and three provenance near-holes (two). A report that repeated them would have been the mediocre version of this one.", "confidence": "high", "label": "I" },
+    { "id": "F19", "text": "THE VEX GREEN IS CONDITIONAL AND THE CONDITION IS UNVERIFIED. R1 — GET on the private upstream is assumed non-mutating; the upstream's source lives inside the private surface so every route could not be enumerated. Blocked by the GL-012 boundary, not by effort. Recorded as HONEST PARTIAL, not discharged: 'No side effect was observed; that is not proof.'", "confidence": "high", "label": "E" },
+    { "id": "F20", "text": "THE TOWER RE-ALIGNMENT WAS NOT A NO-OP, AND THE FIND JUSTIFIES THE METHOD: the installed tower-qa-skill.md was missing the mandatory completed-automation bar (+24 lines). Tower loads that contract byte-exact into the external Codex invocation, so the installed Tower would have injected a STALE REVIEWER CONTRACT into Codex.", "confidence": "high", "label": "E" },
+    { "id": "F21", "text": "ESTATE CLEANUP WAS DONE BY CONTENT, NEVER BY NAME, AND TWO CATCHES JUSTIFIED IT: one branch held 34 uncommitted lines plus an unbanked evidence deliverable existing nowhere else; another LOOKED unique but was 1,766 lines behind main. Worktrees 38 -> 19; 15 BUILD-020 branches deleted.", "confidence": "high", "label": "E" }
+  ],
+
+  "larry_failures_verified": [
+    { "item": "constitutional over-translation of 'stay available' as 'yield control'", "status": "CONFIRMED", "evidence": "map :2424 — 'A constitutional sentence (then yield) that Larry had over-translated caused repeated false handbacks until Warwick corrected it.' Corrected by redline 30666f1.", "count_of_false_handbacks": null, "count_label": "U", "aftermath": "it did not hold — three gate verdicts and one merge after the redline with zero notifications" },
+    { "item": "verification-by-grep", "status": "CONFIRMED", "diagnoses": 3, "evidence": "Veritas @3a1e670 and @ecfd38f (fourth consecutive instance); map :2702 names the mechanism; ecfd38f confirms one instance where markdown emphasis defeated the pattern" },
+    { "item": "prescribed method that would have holed provenance.mjs", "status": "TWO ESTABLISHED, NOT THREE", "brief_said": 3, "record_says": 2, "orders": ["WO-25 (previous session)", "WO-30 (this session)"], "note": "WO-31 required a DECLARED SOURCE_MODULES line, made correctly — not a control silently holed" },
+    { "item": "an order demanding a fact while withholding every means of establishing it", "status": "CONFIRMED, verbatim", "evidence": "boundary record — 'The order originally demanded Keel establish it while setting network: none and granting no web access — that was Larry's defect and the demand was withdrawn.' Second instance in class: WO-32 A1, 'AC5's impossible demand withdrawn'." },
+    { "item": "private_surface: none declared beside a method requiring a credential-bearing file", "status": "UNESTABLISHED IN THIS RANGE", "note": "Pax searched the active map, the eleven receipts, the boundary record, the closeout and the in-range commit subjects and could not locate this instance inside c0cf334..4bf04e2. Nearest recorded instance is WO-27 (previous session), whose AC1 evidence 'would have broken private_surface, live_authority, credential_scope AND network simultaneously', and a Phase 3 instance at map :1790. Stated as unestablished rather than assumed true because it was in the brief. Scope of the negative: Work Order envelope bodies under Deliverables/proofline/ were not individually opened." },
+    { "item": "a defect reported as repaired at a head where it was not", "status": "CONFIRMED, at least twice", "evidence": "ecfd38f D-3 — 'The D-3 repair is not established as effective... the property it was meant to restore is UNKNOWN rather than established', while Larry's declared DOCUMENT IMPACT listed D-3 as repaired. Map :2750 — 'Route step 11 — DONE, then FAILED, then repaired. Larry's enumeration missed the blocking defect; Veritas found it.' And 30666f1, where the E-1 repair was a FIFTH restatement rather than a conversion." }
+  ],
+
+  "warwick_hypotheses_tested": [
+    { "n": 1, "hypothesis": "assurance became admin about admin", "verdict": "SUPPORTED", "measurement": "14 of 51 commits (27.5%) are gate receipts or their repairs vs 9 product commits (17.6%); five of seven FAILs carried by a statement in the map about the map" },
+    { "n": 2, "hypothesis": "Gate 1 repeatedly absorbed Gate 3 / document-currency work despite functional rows passing", "verdict": "SUPPORTED, quantified", "measurement": "four consecutive verdicts with rows 1, 2 and 4 ALL PASS and the gate still not passing; three receipts carry the identical 'the reason is again not the engineering' sentence" },
+    { "n": 3, "hypothesis": "non-blocking documentation defects repeatedly prevented progression", "verdict": "SUPPORTED IN EFFECT, CORRECTED IN FORM", "measurement": "FAILs were carried by findings labelled BLOCKING under Amendment 6 (2). But ecfd38f's HOLD is carried by two findings BOTH labelled non-blocking, and HOLD gates PASS, closure and merge." },
+    { "n": 4, "hypothesis": "final-production acceptance properties used as prerequisites for reaching the production event that could prove them", "verdict": "SUPPORTED, named independently by Veritas", "measurement": "three separate circularities ruled on individually; at ecfd38f Veritas quotes its own contract and states the literal reading makes Gate 1 PASS unreachable" },
+    { "n": 5, "hypothesis": "the Wayfinder reached ~3,000 lines and its history became an endless assurance surface", "verdict": "SUPPORTED, measured", "measurement": "2,988 lines enumerated structurally at ecfd38f; 22 separate statements of gate standing in one document; an awk pass over every table in the file needed to adjudicate one repair" },
+    { "n": 6, "hypothesis": "contradictory wording caused false handbacks and repeated stopping", "verdict": "SUPPORTED, independently corroborated", "measurement": "map :2424 plus a SECOND instrument — the transport log shows the notification silence deepened AFTER the correcting redline" },
+    { "n": 7, "hypothesis": "extraordinary context and specialist effort went into finding documentation defects rather than product defects", "verdict": "SUPPORTED, with the F1/F2 correction", "measurement": "2,080,000 tokens of declared assurance ceiling across 11 verdicts, 0 PASS; closing context 83% of a 1M window; ten of eleven verdicts produced no work at all. Correction: the first verdict produced two real product Work Orders, so 'rather than product defects' is true of the terminal phase, not of the whole." }
+  ],
+
+  "blockers": [
+    { "id": "B1", "text": "NO Veritas receipt covers the closing head 4bf04e2. No Gate 1 PASS, no Gate 2 PASS, no Codex, no TowerBot production acceptance exists for anything in Sub-phase 4B. The merge was Warwick's explicit exception. Nothing in 4B may be described as assured, complete or accepted.", "label": "E" },
+    { "id": "B2", "text": "CI status at the closing head is UNESTABLISHED. Pax has no runner access and none was supplied. Do NOT infer green.", "label": "U" },
+    { "id": "B3", "text": "MyPKA-YouTube-Watcher-Ensure is DISABLED and blocked on ELEVATION — Enable-ScheduledTask and schtasks /Change /ENABLE both return Access is denied. Ensure semantics proven by two ticks with ProcessId unchanged, which is CAPABILITY, not automation. Amendment 9 remains AUTOMATIC and is not accepted.", "label": "E" },
+    { "id": "B4", "text": "R1 — the non-mutating-GET assumption is UNVERIFIED, blocked by the GL-012 private-surface boundary. No side effect observed is not proof none exists.", "label": "E" },
+    { "id": "B5", "text": "WO-33's codex_qa_started card is CAPABILITY ONLY — never observed on the real TowerBot, zero rows, no turn for PR #97. Remains OWED under 'Nothing may live only in Larry's head'.", "label": "E" },
+    { "id": "B6", "text": "20 non-BUILD-020 worktrees hold genuinely unique state and were deliberately untouched. Carried to 4C as the estate-convergence defect Warwick named.", "label": "E" }
+  ],
+
+  "next_action": {
+    "text": "Enter Sub-phase 4C — CAPAE + Asdair Hop Preparation. Do NOT reopen BUILD-020 assurance. Do NOT design or solve 4C before Warwick briefs it. Read first, in order: the 4C CAPAE EVIDENCE block beside Amendment 11 in the map; Deliverables/2026-08-07-build-020-post-merge-closeout.md; this report.",
+    "source": "Deliverables/2026-08-04-proofline-wayfinder-plan.md — 'THE ONE CURRENT NEXT ACTION'",
+    "label": "E"
+  },
+
+  "unestablished": [
+    "opening_context_tokens",
+    "total_context_token_movement",
+    "session_wallclock_length",
+    "waiting_or_idle_time",
+    "per_specialist_token_usage_all",
+    "exact_total_dispatch_count",
+    "wo29_worker_identity",
+    "line_level_doc_vs_product_volume",
+    "files_changed",
+    "insertions_and_deletions",
+    "ci_status_at_closing_head",
+    "parent_channel_response_latency",
+    "warwick_presence_at_keyboard_during_the_4h37m_silence",
+    "notification_content_routine_narration",
+    "private_surface_none_instance_in_this_range",
+    "read_back_gate_token_cost",
+    "actual_assurance_token_consumption_as_opposed_to_declared_ceiling",
+    "count_of_false_handbacks_caused_by_the_yield_over_translation"
+  ],
+
+  "descopes": [],
+
+  "recommendations_for_warwick": [
+    "EVIDENCE-ONLY. Warwick has forbidden solving or designing 4C before rotation; nothing below is a proposal, a Work Order or a mechanism.",
+    "The instrument cannot supply an opening context reading after the fact. Three consecutive reports have recorded it UNESTABLISHED. The health store is a latest-sample store, not a series.",
+    "The assurance loop's productive phase ended at receipt #2. Verdict #1 produced two real Work Orders; verdicts #2-#11 produced none, across 5h 27m and a declared ceiling of 1,830,000 tokens. That boundary is measurable and is more informative than 'it was all documentation'.",
+    "The notification silence deepened immediately after the notification rule was strengthened — three gate verdicts and one merge in 2h 39m with zero sends. A second, independent instance of the CAPAE finding, from an instrument Larry does not author.",
+    "0 of 5 clean first dispatches, third session running. The read-back gate is functioning as the first line of order review, not the last.",
+    "Two of Warwick's own factual summaries are one out — nine Gate 1 verdicts (ten) and three provenance near-holes (two). Both err toward a tidier story."
+  ],
+
+  "notes": "Sub-phase 4B CLOSE on the Claude host. Range c0cf334..4bf04e2, 51 commits, 9h 26m 31s of committed activity. Nine product commits (17.6%); 14 commits (27.5%) are Veritas gate receipts or their repairs. ELEVEN Veritas verdicts — ten Gate 1, one Gate 2 — and ZERO PASS, against a declared assurance ceiling of 2,080,000 tokens. Warwick's claim that every Gate 1 FAIL was documentation is TRUE of five of seven and FALSE of the first two, which produced Veritas Defects 5 and 6 and Work Orders WO-29 and WO-30 against real product defects — including a Cockpit that, started from any other checkout, silently borrowed the live clone's dependency tree AND its live production credentials. Gate 1 verdict #1 produced two Work Orders; verdicts #2-#11 produced zero. Five Work Orders issued (WO-29..WO-33), six amendments, zero refusals, 0 of 5 clean first dispatches, a worker defect found in 5 of 5 orders. Vex returned RED on the /private-api bridge (confirmed ARMED on the live Cockpit, so the exposure predated the branch), was repaired by WO-31 and re-verified GREEN at 3254c69 — conditional on an unverified non-mutating-GET assumption blocked by the GL-012 boundary. PR #97 was merged on Warwick's explicit authority at 28b06df BEFORE Gate 1 PASS and WITHOUT Codex: a user-authorised exception, not assurance passing. Post-merge: live Cockpit and Tower moved to canonical main, one watcher, estate cleaned 38 -> 19 worktrees by content diff, and the Tower re-alignment found the installed reviewer contract missing the completed-automation bar. Notification transport 9/9 exit 0 — and then SEVEN Rule-4a-named events (six gate verdicts and the merge) passed with zero sends, in the 4h 37m after the last ding, including three verdicts and the merge AFTER the redline that strengthened the rule. Closing context 833,500 tokens, 83% of a 1M window. Opening context is structurally unrecoverable. Report written by Pax; the session is not its own sole witness.",
+
+  "author": "pax",
+  "report_written_by": "pax",
+  "publication_constraint": "PUBLIC REPOSITORY. No attack detail, probe shape or bypass mechanism from the Vex security review appears in this payload or in the report.",
+  "self_witness_disclaimer": "Same-estate review — not independently verified. Pax is a specialist of the team whose session is reported, dispatched by its subject, running in the same runtime; Veritas's ecfd38f review ran under the SAME host session id as this dispatch. Pax had NO Bash: no git, no gh, no CI API, no process table, no ability to diff. UNLIKE the prior report, NO figures were supplied in the dispatch, so every quantity here was read directly from an instrument on disk — the worktree reflog (heads, subjects, exact epoch timestamps), the governor health store (context telemetry), the transport log (notifications), and the eleven committed Veritas receipts, the Work Order commit record, the sanitised Vex boundary record, the closeout and the active map. Nothing is estimated. Five load-bearing claims run AGAINST the brief supplied: the Gate 1 verdict count (ten, not nine), the Gate 2 count in range (one, not two), the provenance.mjs near-hole count (two, not three), the Work Order count in range (five, not ten), and the headline documentation claim itself (true of five of seven FAILs, false of the first two)."
+}

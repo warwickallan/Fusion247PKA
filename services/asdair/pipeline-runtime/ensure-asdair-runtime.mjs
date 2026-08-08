@@ -374,9 +374,20 @@ export function launcherPathFromTaskArguments(argumentString) {
   return m ? m[1] : null;
 }
 
-function samePath(a, b) {
+// Slashes are normalised to '/' BEFORE path.resolve() runs, not after. On a
+// POSIX host (the Linux CI runner, or any non-Windows dev box) path.resolve()
+// treats a backslash as an ordinary character, not a separator, so a
+// Windows-style registered path such as '\TMP\CHECKOUT-A\ensure...mjs' is NOT
+// recognised as absolute - it gets silently joined onto process.cwd() instead
+// of compared as itself, and two paths that are the SAME checkout, differing
+// only by slash direction and case, come out as different strings. Converting
+// backslashes to forward slashes first makes the path POSIX-absolute (it
+// still starts with '/'), so resolve() leaves it alone on every platform and
+// the only remaining differences are exactly the ones this comparison exists
+// to ignore: slash direction and case.
+export function samePath(a, b) {
   if (typeof a !== 'string' || typeof b !== 'string') return false;
-  const norm = (p) => path.resolve(p).replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+  const norm = (p) => path.resolve(p.replace(/\\/g, '/')).replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
   return norm(a) === norm(b);
 }
 

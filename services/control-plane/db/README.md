@@ -196,3 +196,18 @@ The migration is idempotent (verified by double-apply): re-running it against an
 2. **`ops.git_sha` refuses abbreviated SHAs outright** (full 40 only). If any real inbound source can only supply a 7–12 char short SHA that cannot be expanded at the boundary, that source must resolve to the full SHA before writing. Keeping the strict domain and resolving upstream is the recommendation — accepting short SHAs is exactly the Tower bug.
 3. **Schema name `ops`** (generic dev namespace) rather than a build-specific one like `ftw`. Confirm the final production namespace before any live apply.
 4. **Object-ownership separation for a live apply** (see Threat model): own the objects with a dedicated admin/migration role distinct from the runtime `service_role`.
+
+---
+
+## Decommissioned architectural alternative — Postgres/Supabase structural head authority
+
+**SQLite is the current canonical architecture.** A Postgres/Supabase implementation making three
+head-authority guarantees DB-structural (merge-gate head binding, build-head monotonicity, clock-step
+ordering via a set-once `arrival_seq`) exists as **reference-only design capital** at:
+
+    Builds/DECOMMISSIONED/postgres-head-authority-structural/
+
+It is **not applied to any database, has no caller, and is not on any migration or runtime discovery
+path.** It is recorded here only so a future reader can find it without archaeology.
+**Reactivation requires a new explicit Warwick architecture decision** and reconciliation against the
+then-current system. Preserved during BUILD-020 Sub-phase 4C estate reconciliation, 2026-08-07.

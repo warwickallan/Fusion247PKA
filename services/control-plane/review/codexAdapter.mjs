@@ -406,12 +406,37 @@ export function buildCodexPrompt({ skillText, packet = {} }) {
     ? ['', `── STAGED DIFF (${p.diff_range ?? 'head'}${p.diff_truncated ? ', TRUNCATED' : ''}) — the actual changes, read-only from Tower's git ──`, p.diff_text]
     : ['', '── STAGED DIFF: (none captured — if you cannot read the disk, say so honestly and return verdict "comment" with an "unverifiable" claim; do not fabricate) ──'];
 
+  // WO-2026-08-07-4C-03 — STAGED ESTATE-CONVERGENCE EVIDENCE (the reviewer contract's §3b
+  // responsibility B). §3b obliges a merge-class reviewer to judge nine convergence properties
+  // and states plainly that it "cannot enumerate the estate" itself and must judge on the STAGED
+  // evidence — so before this block existed, the only defensible §3b answer was "insufficient
+  // evidence", every time. The inventory is gathered read-only by Tower at packet-build time.
+  //
+  // THE ABSENT CASE IS BYTE-IDENTICAL, DELIBERATELY. `p.convergence` is set by the two merge-class
+  // packet builders and by nothing else, so every other caller — the delivery-review path,
+  // reviewDiff.mjs, fableAdapter.mjs — spreads an empty array here and produces exactly the bytes
+  // it produced before. That equivalence is asserted in test/codexContractReach.test.mjs rather
+  // than claimed in this comment; a rendering that is only *believed* to be inert is how an
+  // unrelated review turn quietly acquires a new section.
+  //
+  // IT IS EVIDENCE, NOT A VERDICT. Nothing here computes or carries a convergence pass/fail —
+  // that judgement is the reviewer's, and moving it into a script would be the wrong shape.
+  const convergenceBlock = p.convergence
+    ? ['',
+      '── STAGED ESTATE-CONVERGENCE EVIDENCE (merge-class) — read-only inventory gathered by Tower at packet-build time ──',
+      'This is FACTUAL EVIDENCE for your §3b responsibility B, not a convergence verdict. No pass/fail is',
+      'computed anywhere in it. Any line beginning "PROBE FAILED:" means that fact could NOT be established —',
+      'treat it as missing evidence under §3b, never as a clean result.',
+      String(p.convergence)]
+    : [];
+
   return [
     String(skillText ?? '').trim(),
     '',
     '── THIS REVIEW TURN — bounded packet (pointers + staged diff, not the whole corpus) ──',
     ...pointerLines,
     ...diffBlock,
+    ...convergenceBlock,
     '',
     'Review the STAGED DIFF above (the real changes at the exact head) against the approved',
     'brief/acceptance. Your read-only sandbox may block shell/file access — that is expected;',

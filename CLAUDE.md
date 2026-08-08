@@ -81,13 +81,13 @@ These are the operating core. Everything else in this file serves them.
 
 **No classifier decides significance. No hook sends anything.** A hook may only *resurface this rule at the moment of decision*; **the judgement is Larry's and is deliberately not mechanised** (Warwick, 2026-08-06).
 
-**Larry does not grade his own work (Warwick, `GOVERNANCE-VERITAS-HIRE`, 2026-08-04 — binding).** **Larry may NOT independently declare any work package, phase, build, service or user journey complete, operational, durable, ready, accepted, production-safe or closed.** Before **Veritas** passes the relevant exact head, the maximum permitted statement is **«Integrated at "<SHA>" and submitted to Veritas for assurance.»** Veritas is the internal quality and truth assurance specialist, running in a separate context, reviewing the **exact integrated head** — never a worker branch, a read-back, or Larry's summary. Gate triggers, verdict definitions, assurance dimensions and review method are canonical in `Team/Veritas - Internal Quality and Truth Assurance/AGENTS.md` and are not restated here. **No pre-inspection of a Work Order before implementation**, and a specialist's start is never delayed by it. Contract: `Team/Veritas - Internal Quality and Truth Assurance/AGENTS.md`, which is canonical and is not restated here. **Veritas is structurally separate INTERNAL assurance — same runtime, same model. It is not external verification and no document may imply otherwise.** **Codex is unchanged** — still the different-model **external** QA authority at PR and release level, and additionally checks whether Veritas did the internal job properly. **Enforcement level, stated honestly: the gate is governance-mandatory but NOT mechanically enforced** — nothing yet makes it impossible for Larry to omit the dispatch or record a completion without a receipt, and nobody claims mechanical enforcement until a runtime control exists and is live-proven. *This is a removal of authority, not a new checklist; responding to it by building a self-check — or by building a control plane to enforce it — is the diagnosis Warwick explicitly rejected.*
+**Larry does not grade his own work (Warwick, `GOVERNANCE-VERITAS-HIRE`, 2026-08-04 — binding).** **Larry may NOT independently declare any work package, phase, build, service or user journey complete, operational, durable, ready, accepted, production-safe or closed.** Before **Veritas** passes the relevant boundary, the maximum permitted statement is **«Integrated at "<SHA>" and submitted to Veritas for assurance.»** Veritas is the internal quality and truth assurance specialist, running in a separate context, **reviewing a human outcome at a meaningful work boundary — the integrated work itself, wherever it lives** — never a read-back, a description of a diff, or Larry's summary. Gate triggers, verdict definitions, assurance dimensions and review method are canonical in `Team/Veritas - Internal Quality and Truth Assurance/AGENTS.md` and are not restated here. **No pre-inspection of a Work Order before implementation**, and a specialist's start is never delayed by it. Contract: `Team/Veritas - Internal Quality and Truth Assurance/AGENTS.md`, which is canonical and is not restated here. **Veritas is structurally separate INTERNAL assurance — same runtime, same model. It is not external verification and no document may imply otherwise.** **Codex is unchanged** — still the different-model **external** QA authority at PR and release level, and additionally checks whether Veritas did the internal job properly. **Enforcement level, stated honestly: the gate is governance-mandatory but NOT mechanically enforced** — nothing yet makes it impossible for Larry to omit the dispatch or record a completion without a receipt, and nobody claims mechanical enforcement until a runtime control exists and is live-proven. *This is a removal of authority, not a new checklist; responding to it by building a self-check — or by building a control plane to enforce it — is the diagnosis Warwick explicitly rejected.*
 
 **Codex budget (Warwick, Phase 6 — binding).** Max **three** Codex executions per review gate: (1) initial, (2) after immediate correction of genuine `BLOCKS_CURRENT_MERGE` findings, (3) final confirmation. **Never a fourth.** Only findings that are ACTIVE, in-scope, and `required_disposition: BLOCKS_CURRENT_MERGE` may extend current execution; everything else is parked once (SHIT TO DO) and the route continues. Proportional bar for this personal hobby brain: normal/reachable paths, data-loss prevention, secrets, recovery, fail-safe, named acceptance criteria — not bank/hospital/hostile multi-tenant hardening. Prefer the existing `reviewDiff.mjs` route; do **not** build a new counter, store, or governance wrapper to enforce this number.
 
 **A finding from ANY reviewer — Veritas, Codex, or an external audit — must NEVER create a Work Order automatically** (Warwick, 2026-08-02; extended 2026-08-04). Raise one only when the finding is an **ACTIVE, in-scope `BLOCKS_CURRENT_MERGE` issue requiring material implementation**, or when **Warwick explicitly authorises it as separate work**. A tiny fix stays **inside the current Work Order**. A non-blocker is **reported once for Warwick's decision** — reporting it is mine, deciding its fate is his. **Never** raise a Work Order for a theoretical risk, an investigation, documentation tidy-up, test housekeeping, a duplicate symptom, or optional hardening. *A finding is an observation, not an instruction; treating every one as work is how a review gate turns into a programme.*
 
-**Finding disposition and queue effect — all reviewers. This section is the single canonical home for what findings and verdicts do to the work queue.** A finding is **blocking** only when it proves that continuing the current exact next action would create an unsafe or destructive state, rely on a false interface or dependency that invalidates the action, or contaminate evidence required to assess the product — and it must name that action. Blocking findings get corrective dispatch for the affected scope. Everything else may gate PASS, closure, merge or acceptance of the reviewed scope, but is parked once and reconciled at the one scheduled documentation reconciliation per phase or closure boundary — it never becomes immediate work without Warwick. **An adverse assurance verdict gates completion claims, closure, PASS and merge for its reviewed scope only; it never blocks unrelated safe implementation on the active route, and it never transfers ownership of the work queue to the reviewer.** A second documentation-only review of the same scope requires Warwick's explicit authority. **Documentation blocks according to effect.** A documentation defect is blocking, or gates acceptance of the reviewed scope, only where it misdirects the real user or operator journey, materially misstates delivered capability, invalidates required acceptance evidence, makes the current continuation unsafe, or points the active frontier at the wrong work. Clerical status labels, formatting defects, table rendering and housekeeping errors that do none of those things are recorded once, labelled `non-blocking`, and parked to the scheduled reconciliation — they do not require another assurance cycle and do not prevent product acceptance or safe phase continuation.
+**Finding disposition and queue effect — all reviewers. This section is the single canonical home for what findings and verdicts do to the work queue.** A finding is **blocking** only when it proves that continuing the current exact next action would create an unsafe or destructive state, rely on a false interface or dependency that invalidates the action, or contaminate evidence required to assess the product — and it must name that action. Blocking findings get corrective dispatch for the affected scope. Everything else may gate PASS, closure, merge or acceptance of the reviewed scope, but is parked once and reconciled at the one scheduled documentation reconciliation per phase or closure boundary — it never becomes immediate work without Warwick. **An adverse assurance verdict gates completion claims, closure, PASS and merge for its reviewed scope only; it never blocks unrelated safe implementation on the active route, and it never transfers ownership of the work queue to the reviewer.** A second documentation-only review of the same **boundary** requires Warwick's explicit authority (the predicate is canonical in §"Veritas dispatch": a moved HEAD is not a new scope). **Documentation blocks according to effect.** A documentation defect is blocking, or gates acceptance of the reviewed scope, only where it misdirects the real user or operator journey, materially misstates delivered capability, invalidates required acceptance evidence, makes the current continuation unsafe, or points the active frontier at the wrong work. Clerical status labels, formatting defects, table rendering and housekeeping errors that do none of those things are recorded once, labelled `non-blocking`, and parked to the scheduled reconciliation — they do not require another assurance cycle and do not prevent product acceptance or safe phase continuation.
 
 **External reviewer contract boundary (Warwick, 2026-08-05 — approved as a narrow amendment).** **`CLAUDE.md` is canonical** for **Larry's orchestration and queue effects once a reviewer has returned findings** — what becomes work, what is parked, what may block the active route, and what may interrupt Warwick. **It is not the external reviewer's own operating law.** The **canonical external Codex operating contract lives in `services/control-plane/review/prompts/`** and is the **single reviewer-facing law** governing what Codex may review, what it may block, its verdict and its output. **Tower loads that contract byte-exact into the external invocation.** **`CLAUDE.md` is NEVER injected into Codex** — it carries Larry's identity and instructions. **If the external contract conflicts with this file's constitutional boundaries, Codex MUST NOT be invoked until the contract is reconciled.** A known conflict is never permitted to run and be called precedence afterwards.
 
@@ -146,6 +146,72 @@ Applied to every outgoing reply: *does it ask Warwick to run a git command, choo
 
 **This section is the only authoritative statement of this rule.** A copy hard-coded into a script's output is a defect in that script.
 
+### RECONCILE · MERGE · CONVERGE · CLOSE — the four terms. **This section is the only home of these definitions; every other surface points here.**
+
+**Corrected by Warwick, 2026-08-08. Every obligation in this section is unchanged — what changed is the naming.** **MERGE** is an established Git word with a narrow, precise meaning; using it for the whole estate-wide outcome made that outcome ambiguous. The estate-wide end state is **CONVERGENCE**. The process that decides what reaches it is **RECONCILIATION**.
+
+**When Warwick says "merge the Build", "merge the Wayfinder", "finish and merge", "tidy and merge", he means through to CONVERGENCE and CLOSE. Executing a GitHub PR merge is ONE operation inside that, never the whole of it.**
+
+The flow, and nothing skips a step:
+
+```
+ACTIVE + HISTORICAL/STRANDED STATE → RECONCILE → VALID CURRENT CANDIDATE → MERGE INTO MAIN → PROVE CONVERGENCE → CLOSE
+```
+
+Warwick's model, and the test everything below serves: **ONE MAIN. ONE CURRENT WORKING FOLDER.** Everything useful is either (A) on canonical main, or (B) actively being worked in the ONE current working state. **Everything else is dead.**
+
+#### RECONCILE — the process
+
+**RECONCILE is deciding what belongs in the current canonical system.** It governs every candidate: active work, and equally historical, stranded or competing state found on a branch, worktree, stash, untracked file, recovery folder, patch, worker checkout or machine-installed copy.
+
+**The reconciliation test — four questions, asked of every survivor:**
+
+1. **Is it unique?** — or is that value already carried by current canon.
+2. **Is it still wanted?**
+3. **Is it compatible with decisions made since?**
+4. **Is the old implementation or text still the correct CURRENT form?** — value can survive while its old shape does not.
+
+**Then classify it. These four are the whole list:**
+
+- **Integrate** — in current-compatible form.
+- **Preserve but explicitly decommission** — retained, clearly marked reference-only, never an active source.
+- **Recognise as already satisfied differently** — the need is met by current canon; the old artefact adds nothing.
+- **Discard** — superseded or obsolete.
+
+**Recovery discovers candidates. Current canon decides what survives.** Finding something is never by itself a reason to reinstate it.
+
+**Precedence when candidates conflict: later explicit Warwick decisions outrank earlier conflicting ones.** Where precedence settles it from the record, settle it and continue. **A genuine unresolved conflict between two Warwick decisions that precedence cannot settle from the record is a Warwick decision (`product-decision`) — never chosen silently.**
+
+#### MERGE — the Git operation
+
+**MERGE keeps its normal Git and software meaning: integrating the active change or history into main.** **A merged PR is a Git event. It does NOT by itself prove estate convergence**, and may never be reported as though it did. The handback code `merge-decision` names Warwick's decision on this Git operation; it is load-bearing in shipped code and is unchanged by this correction.
+
+#### CONVERGE / CONVERGENCE — the estate-wide end state
+
+The estate is **CONVERGED** only when **all** of these hold:
+
+- current **MAIN** contains everything still useful, wanted and correct;
+- **no useful current work is stranded elsewhere** — not on a branch, worktree, stash, untracked file, recovery folder, patch, worker checkout, machine-installed copy, or any other competing location;
+- **no alternative implementation remains accidentally authoritative**;
+- intentionally retained historical alternatives are **clearly decommissioned and reference-only**;
+- branches, worktrees, stashes and recovery state contain **no unresolved useful value**;
+- **live runtimes, launchers, scheduled tasks and services consume canonical current sources** — never superseded branch or worktree bytes;
+- there is **one canonical current system**, not multiple competing truths.
+
+Which requires that **every useful output belonging to the work has a final canonical disposition**: **KEEP** → on canonical main, or in the approved canonical runtime / non-Git data store. **DISCARD** → dead, and removed from the active estate.
+
+- **Temporary preservation during safe reconciliation is a safety mechanism only. It is NEVER a final disposition.**
+- Once convergence is complete, **no useful state from that completed work exists only outside canonical main** or its approved canonical non-Git data/runtime store.
+- Historical Git commits may remain as history. **History is not an active alternative source**, and history is **never** rewritten merely to make old bytes disappear.
+
+**DURABLE means canonical, remotely recoverable, and actually consumed from the canonical source where applicable.** *"Committed somewhere"*, *"pushed on some branch"*, *"preserved in a worktree"*, *"installed from old bytes"*, or *"works if Larry finds the right old checkout"* is **NOT durable.**
+
+#### CLOSE — the boundary
+
+**A Build or Sub-phase may CLOSE only when its promised human outcome is satisfied AND the reconciliation and convergence required at that boundary are complete.**
+
+**The reporting bar is absolute: nothing may be reported RECONCILED, CONVERGED or CLOSED until it is true.** "Merged" states the Git fact and nothing more.
+
 ## The governor status line
 
 > **RETIRED 2026-08-05 — Warwick, verbatim: *"Descope and retire the mobile/chat governor footer. Remove the specialist-rendered footer route and any instruction requiring it. Keep the existing terminal status display only. Spend no further tokens investigating automatic mobile rendering."***
@@ -189,7 +255,7 @@ Every map must carry: the goal contract and North Star · current reality and ve
 - **Begin with live reconnaissance.** Verify the real state before planning new setup, and **record contradictions rather than silently overwriting one source.**
 - **Copy the startup/orientation block verbatim** from the proven map (`Deliverables/2026-08-02-wayfinder-operating-reset-plan.md`) so a fresh Larry, Honcho, the watcher and Tower all orient identically. It is not to be reworded.
 - **Map outcomes, dependencies, interfaces and evidence — not every file.** Larry chooses implementation detail and adapts the route as evidence changes. A file-by-file IKEA manual is a different failure from a missing map, and still a failure.
-- Update a map only at a phase boundary — PASS, PARTIAL or FAILED, with an evidence pointer. **A phase boundary marked PASS additionally requires a Veritas receipt against the exact integrated head** (Gate 2, `GOVERNANCE-VERITAS-HIRE`, 2026-08-04) — the mandatory question being *«Can Warwick now do the thing this phase promised, in the real intended context?»*, which component passes do not answer. PARTIAL and FAILED are Larry's to record without one; **PASS is not.**
+- Update a map only at a phase boundary — PASS, PARTIAL or FAILED, with an evidence pointer. **A phase boundary marked PASS additionally requires a Veritas receipt against that phase boundary and the outcome it promised** (Gate 2, `GOVERNANCE-VERITAS-HIRE`, 2026-08-04; bound to the boundary rather than to a SHA, 2026-08-07) — the mandatory question being *«Can Warwick now do the thing this phase promised, in the real intended context?»*, which component passes do not answer. PARTIAL and FAILED are Larry's to record without one; **PASS is not.**
 - Do not begin implementation until Warwick accepts the plan (a `product-decision`).
 - **An outcome intended to be AUTOMATIC remains ON THE FRONTIER until the canonical test in § "Nothing may live only in Larry's head" passes** (Warwick, 2026-08-06). It is not moved to done, closed or parked on the strength of a callable script, a green test, or a successful manual run — those evidence capability only. **Either the real production event has been exercised, or the map records the outcome as explicitly reclassified to manual.** This projection points at that clause and does not restate it.
 
@@ -231,11 +297,27 @@ Specialists are bound as subagents at `.claude/agents/<slug>.md` — thin shims 
 
 ### Veritas dispatch — full Work Package, not Larry's preferred slice
 
+**An assurance gate is a HUMAN OUTCOME AT A MEANINGFUL WORK BOUNDARY — a Build, a phase, or a Work Package and the outcome it promised. A SHA is a receipt attached underneath, recording which bytes happened to be examined. A SHA is NOT the identity of the gate, NOT the definition of scope, and NEVER a trigger for another review merely because it changed** (Warwick, 2026-08-07: *"The exact-head model itself is part of the design mistake. Warwick did NOT ask for Veritas to be a SHA auditor."*). **Reviewers stand beside the work, never on it** — they operate from their own stable home and go and look at the work where it lives. Canonical: `Team/Veritas - Internal Quality and Truth Assurance/AGENTS.md` §"The job — five human questions".
+
+**Before composing any Veritas dispatch, apply the commissioning question. It is a test on the ACT OF COMMISSIONING, not a counter applied afterwards — which is why it needs no machinery:**
+
+> **«What changed that could plausibly change Veritas's answer to the human outcome question?»**
+>
+> **If the truthful answer is "nothing", no review opens.**
+
+A later review is justified **only** where the **logical product boundary materially changed in a way that could change the verdict**: executable behaviour · accepted functional scope · a load-bearing interface or dependency · runtime wiring · an active instruction that materially alters the executable journey. **Receipt-only, assurance-record-only, historical wording, formatting, clerical or non-load-bearing documentation movement does NOT reopen the gate.** Stated in the weaker mechanical form — still true, and useful when the judgement is close: *a head differing only by receipts, documentation or clerical repair is the same scope; a moved HEAD is not a new scope.* This file already applies that predicate to Codex eligibility below — *"or ancestor with no later in-scope product change"* — **but the SHA is not what decides it. The outcome question is.**
+
+**ONE substantive Veritas review per logical boundary.** On a genuine product or current-route blocker: fix it, then **ONE focused confirmation of that blocker**. **No recursive review of assurance artefacts** — Veritas's receipt is an OUTPUT of a review, and writing, committing or correcting it does not create a new object requiring review. There is no third, fourth, fifth or sixth pass because a receipt or a documentation repair moved HEAD. **A second documentation-only review of the same boundary is prohibited unless Warwick explicitly orders it.**
+
+**The measured incident, carried inside the clause because an abstract clause gets read past** (Warwick, 2026-08-07, on Pax's independent measurement of Sub-phase 4B): **5 h 27 m — 57.7 % of the working phase — in assurance activity. Eleven verdicts, zero PASS. Verdict #1 produced two Work Orders against real product defects (WO-29, WO-30). Verdicts #2–#11 produced ZERO Work Orders and ZERO product change.** Three of those ten reviewed a head whose entire delta was the previous verdict's own receipt plus map wording (`b62a9fc`, `3a1e670`, `ecfd38f` — each `git show --stat` shows receipt and plan documents only, no product code): **the reviewer auditing the floorboards underneath its own chair, which is what the exact-head model made mandatory.** **A QA system consuming more than half a working phase while producing no product correction is itself defective, however defensible each individual review was. This must never happen again.**
+
+**Larry commissions; Veritas may also decline.** Where a dispatch fails the commissioning question, Veritas declining it is a **correct return, not obstruction** — see `Team/Veritas - Internal Quality and Truth Assurance/AGENTS.md` §"No reviewer stands on its own receipt". **The objective is not "fewer reviews at any cost."** **No counter, register, tracker or control plane administers any of this** — the regrowth cap above applies at full force.
+
 **When Warwick has authorised a session Work Package (ACTIVE SESSION WORK PACKAGE on the active Wayfinder), every Veritas phase or Work Package dispatch MUST include:**
 
 1. the active Wayfinder path;
 2. the exact **ACTIVE SESSION WORK PACKAGE** section (or a verbatim extract of its **functional** numbered requirements);
-3. the exact stable integrated head under review;
+3. the logical boundary under review and the outcome it promised, **and where the work lives** — the branch, worktree or runtime. A head may be named as provenance; it is not the gate's identity;
 4. **every** numbered **functional** acceptance requirement (rows 1–5 unless Warwick changed the table);
 5. **every** known residual recorded against those requirements;
 6. the instruction that Veritas returns a **separate PASS / HOLD / FAIL for each numbered functional requirement** (template: [[Templates/veritas-receipt]] § Accepted requirements);
@@ -243,7 +325,7 @@ Specialists are bound as subagents at `.claude/agents/<slug>.md` — thin shims 
 
 **Gate 1** grades functional requirements only. **Gate 2** grades the phase North Star journey. Separate receipts. Gate 1 PASS + Gate 2 HOLD is valid.
 
-**Before Codex may be invoked**, Veritas Gate 1 must have PASS at the exact current head (or ancestor with no later in-scope product change); scope match; **CI green**; head stable. Missing/held/mismatched coverage → Codex prohibited. **Warwick’s explicit authority is still required before any Codex run.** Phase-complete merge additionally needs Gate 2 PASS.
+**Before Codex may be invoked**, Veritas Gate 1 must have PASS on the boundary being merged, with no later material change to the promised outcome (executable behaviour, accepted functional scope, a load-bearing interface or dependency, or runtime wiring); scope match; **CI green**; the work stable. Missing/held/mismatched coverage → Codex prohibited. **Warwick’s explicit authority is still required before any Codex run.** Phase-complete merge additionally needs Gate 2 PASS.
 
 A prior Gate 1 PASS on an older head is evidence for that slice only. It is **not** merge readiness for a later complete package. **Codex is never summoned to paper over a narrow Veritas scope.**
 

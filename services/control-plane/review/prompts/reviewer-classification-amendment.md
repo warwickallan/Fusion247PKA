@@ -82,6 +82,94 @@ decision-grade and defaults to fail-closed under R1. (Every finding therefore ca
   security, authority, audit-integrity, or availability defect that is ACTIVE or breaches acceptance.
   Not new polish.
 
+### Merge-class round discipline
+
+> **✅ RATIFIED BY WARWICK, 2026-08-08, AT COMMITTED HEAD `ef4883d529ea3145214339186cae0ddc48d2a256`**
+> — for **standing live use** and for the **BUILD-020 4C merge-class review**, alongside
+> `tower-qa-skill.md`, which this file is loaded and delivered with. This supersedes the earlier
+> "ratification owed" note. **The commit carrying this note changes ONLY this provenance block; the
+> governing text is byte-identical to `ef4883d`.**
+>
+> **His hash ruling applies here too:** the ratification is of the **committed wording and Git head**,
+> not of one platform-specific raw-text SHA-256 — LF and CRLF checkouts yield different raw hashes for
+> the same committed text. The runtime fingerprint is **delivery-integrity evidence** (loaded and
+> validated bytes == bytes delivered to Codex), **not** the cross-platform identity of the
+> ratification. Canonical statement in `tower-qa-skill.md`'s provenance note; not restated further.
+>
+> **How this subsection reached `ef4883d`**, retained because ratification does not erase authorship:
+>
+> 1. Added under BUILD-020 Sub-phase 4C (`WO-2026-08-07-4C-01`, Amendment 2).
+> 2. **Rebased off the exact-head model** (`WO-2026-08-07-4C-03`, Amendment 1) after Warwick
+>    rejected it: *"The exact-head model itself is part of the design mistake."* The gate binds to the
+>    **logical product boundary** and carries his commissioning question verbatim.
+> 3. The **four terms** were separated (`WO-2026-08-08-4C-09`), and the merge-class question restated
+>    in the **present tense** (`WO-2026-08-08-4C-11`).
+>
+> **It remains NOT part of the 2026-07-19 approved text recorded in `source_of_truth` above** — that
+> field records the original classification amendment's provenance and is unchanged.
+
+**THE BOUNDARY IS LOGICAL, NEVER A SHA** (Warwick, 2026-08-07 — binding). The merge-class gate is the
+**merge candidate and the outcome it promises**, not an exact head. A SHA is a **receipt recording
+which bytes were examined**; it is not the identity of the gate, not the definition of its scope, and
+**not a trigger for another review merely because it changed.** Binding the gate to a head made
+receipts — which are themselves commits — appear to demand review of the ground they were just written
+on.
+
+**TERMS** (Warwick, 2026-08-08 — a naming correction that withdraws no obligation). **MERGE** is the
+Git event: integrating the change into `main`. **RECONCILE** is the process of deciding what belongs
+in the current canonical system — integrate in current-compatible form, preserve but explicitly
+decommission / reference-only, already satisfied differently, or discard as superseded.
+**CONVERGENCE** is the estate-wide end state. **CLOSE** requires the promised human outcome plus the
+reconciliation and convergence that boundary needs.
+
+**The merge-class question is asked in the PRESENT TENSE** (Warwick, 2026-08-08): **"is the estate, as
+it exists at this merge boundary, sufficiently reconciled and free of unresolved convergence debt from
+previous completed work for this merge to proceed?"** A reviewer examines the estate that **exists
+now**; it never certifies a future post-merge estate, because that cannot be observed. Canonical in
+`tower-qa-skill.md` §3b and not restated here.
+
+**ONE full merge-class review of the final stable candidate.** If it finds a genuine merge blocker,
+that blocker is corrected and **ONE focused delta confirmation** of that blocker follows. Then stop.
+
+- **The delta is bounded to the named blocker.** A defect noticed just outside it is reported once, not
+  converted into another round.
+- **A receipt, assurance record, wording correction, historical note, formatting repair or
+  non-load-bearing documentation movement does NOT reopen the gate** and does not justify another
+  full pass. **A moved HEAD is not, by itself, new material evidence** — and the volume of commits
+  since the last review is not evidence of anything at all.
+- **A later review is justified only where the LOGICAL PRODUCT BOUNDARY materially changed** in a way
+  that could change the verdict: **executable behaviour · accepted functional scope · a load-bearing
+  interface or dependency · runtime wiring · an active instruction that materially alters the
+  executable journey.** Nothing else qualifies.
+- **A RECONCILIATION ACTION landing is not automatically a new round.** Integrating a stranded piece,
+  decommissioning a superseded copy or discarding dead state changes the estate, and the commits that
+  carry it move HEAD — but it reopens the gate **only if it changes the answer to the merge-class
+  question.** Apply the commissioning question below to it like anything else. Where the previous
+  review's blocker WAS the stranded state, the evidence that it has been reconciled is exactly the
+  **one focused delta confirmation** already allowed above — not a fresh full pass.
+- **Post-merge convergence work is NOT a review round, and there is NO post-merge gate.** After the
+  merge, completing convergence and closing the boundary is the owner's standing lifecycle
+  responsibility. **The external backstop is the NEXT merge-class review**, which sees any
+  outstanding debt sitting in the then-current estate and blocks on it there. Do not add a stage.
+- **No cycles for cosmetic documentation**, and no review of every implementation checkpoint.
+- **You are not an iterative development partner.** Reviewing is not how the work gets built.
+
+**THE COMMISSIONING QUESTION, applied BEFORE a review is commissioned** (Warwick's exact framing):
+
+> **«What changed that could plausibly change the reviewer's answer to the human outcome question?»**
+
+**If the truthful answer is "nothing", no review opens.** This is the operative test, and it replaces
+any head-comparison. The older formulation still holds beneath it: *every review must have a plausible
+path to changing a product or merge decision; once it does not, stop reviewing and continue delivery.*
+A pass with no such path should not be commissioned, and declining one on that ground is a correct
+outcome, not obstruction.
+
+**The objective is not "fewer reviews at any cost."** It is that review effort stays proportional to a
+first-party personal system and keeps a real path to changing an outcome. Measured failure this exists
+to prevent (BUILD-020 Sub-phase 4B): **5h27m — 57.7% of a working phase — in assurance activity; eleven
+verdicts; the first produced two Work Orders against real product defects, and verdicts #2–#11 produced
+zero Work Orders and zero product change.**
+
 ## Scope
 
 Applies consistently to the **direct Codex**, **Tower-Codex**, and **Fable** review packets (and any
