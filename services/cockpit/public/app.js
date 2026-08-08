@@ -1823,7 +1823,13 @@ createApp({
           <!-- ══ L1 — THE CAPAE EXECUTIVE VIEW. Warwick's four at-a-glance questions, answered
                without opening anything: does CAPAE need me · what is the most important family ·
                is learning being proven · what most recently went wrong.
-               Derived server-side by capae.mjs capaeOverview(), so capae-check.mjs asserts it. -->
+               Derived server-side by capae.mjs capaeOverview(). capae-check.mjs now asserts that
+               derivation directly — including a guard reproducing the exact mutation that proved it
+               unasserted (needsAttention forced true, six gates green), and the check now runs in CI.
+               ⚠️ THIS COMMENT PREVIOUSLY CLAIMED THAT COVERAGE BEFORE IT EXISTED. capae-check.mjs
+               imported five symbols and never touched res.overview. A false statement about
+               acceptance evidence, sitting in product source where the next reader believes it —
+               which is the same failure as reporting a mechanism active before executing it. -->
           <div v-if="capRequested && !capErr && capOverview" class="cap-exec">
             <div class="cap-alert" :class="capOverview.needsAttention ? 't-urgent' : 't-positive'">
               <span class="rr-mark" aria-hidden="true">{{ capOverview.needsAttention ? '⚠' : '✓' }}</span>

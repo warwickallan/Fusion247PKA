@@ -89,6 +89,19 @@ jobs:
       - name: Build provenance is read from loaded bytes, never from git
         run: node services/cockpit/provenance-check.mjs
 
+      # ⚠️ ADDED 2026-08-08 — capae-check.mjs existed and ran in NO WORKFLOW AT ALL, so the CAPAE
+      # read layer and, with it, the derivation behind Home's attention signal and System's leading
+      # alert, were outside CI entirely. Veritas proved the consequence by mutation: replacing
+      # `needsAttention` with a constant `true` left SIX gates exiting 0. The suite now asserts that
+      # derivation directly and this step is what makes the assertion binding.
+      - name: CAPAE read layer and the attention derivation behind Home and System
+        run: node services/cockpit/capae-check.mjs
+
+      # Same reasoning: the rotation-report read layer holds the "a SQL NULL never becomes zero"
+      # property, and it was likewise only ever run by hand.
+      - name: Rotation reports — NULL never becomes zero
+        run: node services/cockpit/rotation-report-check.mjs
+
       # db.mjs once named ONE checkout for both its pg import and its credentials default, so a
       # Cockpit started from any other checkout silently borrowed the live clone's dependencies AND
       # its live credentials. Veritas Defect 6; BUILD-020 row 1 "survives worktree delete/recreate".

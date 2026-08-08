@@ -6,7 +6,7 @@
 // check, and this estate has paid for that lesson more than once.
 
 import assert from 'node:assert/strict';
-import { capaeResponse, activeBrief, effectivenessLine, mapFamily, num } from './capae.mjs';
+import { capaeResponse, activeBrief, effectivenessLine, mapFamily, num, capaeOverview, familiesByUrgency } from './capae.mjs';
 
 let asserts = 0;
 const ok = (fn, msg) => { fn(); asserts++; void msg; };
@@ -105,5 +105,64 @@ ok(() => assert.doesNotMatch(failed.error, /5432|ECONNREFUSED|cp_directus/), 'ne
 // mapFamily must not invent a state
 ok(() => assert.equal(mapFamily({ slug: 's', title: 't' }).state, 'MONITORING'), 'default state is the unproven one');
 ok(() => assert.equal(mapFamily({ slug: 's', title: 't' }).rca_status, 'UNESTABLISHED'), 'default RCA is the honest one');
+
+
+// ── capaeOverview / familiesByUrgency — THE DERIVATION BEHIND BOTH ATTENTION SIGNALS ─────────────
+//
+// ⚠️ THESE WERE ASSERTED BY NOTHING. Veritas proved it at 83bcdec by replacing
+//     const needsAttention = ineffective.length > 0 || reopened.length > 0;
+// with `= true` and running SIX gates — every one exited 0. `render-vm-check` covers both branches
+// of the Home card, but it STUBS `capOverview` as a fixture, so it proves the template GIVEN an
+// answer and never the answer itself. Home's one signal and System's leading alert both read this
+// function; nothing anywhere read it back.
+const FAM = (over = {}) => ({
+  slug: 'f', title: 'F', state: 'MONITORING', occurrences: 0, is_pilot: false,
+  unmeasurable: false, exposures_clean: 0, exposures_required: 5, history: [], ...over,
+});
+
+// The exact mutation Veritas used. `needsAttention = true` must now fail HERE.
+ok(() => assert.equal(capaeOverview([FAM()]).needsAttention, false),
+  'MUTATION GUARD: a lone MONITORING family does NOT need attention');
+ok(() => assert.equal(capaeOverview([]).needsAttention, false),
+  'MUTATION GUARD: an empty record does NOT need attention');
+ok(() => assert.equal(capaeOverview([FAM({ state: 'EFFECTIVE' }), FAM({ slug: 'g', state: 'UNMEASURABLE' })]).needsAttention, false),
+  'MUTATION GUARD: proven and unmeasurable families do NOT need attention');
+
+// ...and the positive half, so the guard cannot be satisfied by always returning false.
+ok(() => assert.equal(capaeOverview([FAM({ state: 'CHALLENGED' })]).needsAttention, true),
+  'a CHALLENGED family - a prevention that HAD been proven and failed since - needs attention');
+ok(() => assert.equal(capaeOverview([FAM({ state: 'INEFFECTIVE' })]).needsAttention, true),
+  'an INEFFECTIVE family needs attention');
+
+ok(() => assert.deepEqual(capaeOverview([FAM({ state: 'CHALLENGED' }), FAM({ slug: 'g' })]).counts,
+  { MONITORING: 1, CHALLENGED: 1, EFFECTIVE: 0, INEFFECTIVE: 0, UNMEASURABLE: 0 }),
+  'counts carry all five states, present even at zero');
+
+ok(() => assert.equal(capaeOverview([FAM({ state: 'CHALLENGED', title: 'Reopened one' })]).reopened[0].title, 'Reopened one'),
+  'CHALLENGED is what reopened means, and it names the family');
+
+ok(() => assert.equal(capaeOverview([FAM({ is_pilot: true, required_larry_behaviour: 'Do the thing.' })]).pilot.nextQualifiedExposure, 'Do the thing.'),
+  'the pilot next qualified exposure is the record own words, not a paraphrase');
+
+ok(() => assert.equal(capaeOverview([FAM()]).pilot, null), 'no pilot flagged means no pilot claimed');
+
+// latestRecurrence must pick the most recent FAILURE, never a clean or a no-op.
+ok(() => assert.equal(capaeOverview([FAM({ history: [
+  { disposition: 'RECURRENCE', occurred_at: '2026-01-01T00:00:00Z', summary: 'older' },
+  { disposition: 'CLEAN-EXPOSURE', occurred_at: '2026-02-01T00:00:00Z', summary: 'clean' },
+  { disposition: 'NONE-THIS-SESSION', occurred_at: '2026-03-01T00:00:00Z', summary: 'none' },
+] })]).latest.summary, 'older'),
+  'the latest RECURRENCE is a failure - a later clean or no-op must not displace it');
+
+ok(() => assert.equal(capaeOverview([FAM()]).latest, null), 'a family with no failures reports no latest recurrence');
+
+// Ordering drives which family Home names as the most important.
+ok(() => assert.deepEqual(
+  familiesByUrgency([FAM({ slug: 'mon' }), FAM({ slug: 'eff', state: 'EFFECTIVE' }), FAM({ slug: 'inef', state: 'INEFFECTIVE' }), FAM({ slug: 'chal', state: 'CHALLENGED' })]).map((f) => f.slug),
+  ['inef', 'chal', 'mon', 'eff']),
+  'worst first: INEFFECTIVE, CHALLENGED, MONITORING, then EFFECTIVE last');
+
+ok(() => assert.equal(familiesByUrgency([FAM({ slug: 'a' }), FAM({ slug: 'p', is_pilot: true })])[0].slug, 'p'),
+  'the pilot lifts within its band');
 
 console.log(`CAPAE-CHECK PASS — ${asserts} assertions executed, 0 failed.`);

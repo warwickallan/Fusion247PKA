@@ -45,6 +45,14 @@ export const PROVENANCE_STATES = ['clean', 'dirty', 'git-unavailable', 'not-a-re
  * goes red rather than quietly producing a wrong hash.
  */
 export const SOURCE_MODULES = [
+  // ⚠️ THIS LIST IS THE DIGEST'S ENTIRE FIELD OF VIEW, AND IT WENT BLIND TO 4D.
+  // `capae.mjs` and the governor brief it imports were both in `server.mjs`'s real import closure
+  // and both absent here, so `sourceHash()` returned an unchanged digest while the whole CAPAE
+  // surface changed underneath it — a hash whose stated purpose is "what code is ACTUALLY RUNNING",
+  // answering correctly only by coincidence. Veritas proved it by mutation at `83bcdec`: appending
+  // a comment to `capae.mjs` left the digest at `b5a1529657be5225` before, during and after.
+  // Adding a module to `server.mjs` means adding it HERE, in the same commit.
+  'capae.mjs',
   'db.mjs',
   'down-reason.mjs',
   'private-api.mjs',
@@ -54,6 +62,9 @@ export const SOURCE_MODULES = [
   'server.mjs',
   'static.mjs',
   'sw-version.mjs',
+  // Outside `services/cockpit/`, and deliberately so: `capae.mjs` imports `selectActive` from the
+  // governor to hold ONE brief-selection contract. A cross-tree import is still running code.
+  '../../tools/governor/capae-brief.mjs',
 ];
 
 /**

@@ -151,7 +151,16 @@ const seenStates = new Set();
   // And it does not need to be inside a repository at all: the same bytes in a plain directory must
   // produce the same digest.
   const copy = mktmp('prov-copy-');
-  for (const m of SOURCE_MODULES) fs.copyFileSync(path.join(DIR, m), path.join(copy, m));
+  // mkdir the destination PARENT first. `SOURCE_MODULES` is no longer flat: `capae.mjs` imports the
+  // governor's brief across trees to hold one selection contract, so the list now legitimately
+  // contains `../../tools/governor/capae-brief.mjs`. A bare copyFileSync threw ENOENT on it and took
+  // this whole gate down — the module was correctly added to the digest and the HARNESS was what
+  // could not cope. Relative entries are normal now; this loop handles any depth.
+  for (const m of SOURCE_MODULES) {
+    const dest = path.join(copy, m);
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.copyFileSync(path.join(DIR, m), dest);
+  }
   ok('the same bytes OUTSIDE any repository hash identically', sourceHash({ dir: copy }) === baseline,
     sourceHash({ dir: copy }));
 
