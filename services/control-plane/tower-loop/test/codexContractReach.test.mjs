@@ -68,14 +68,19 @@ const O5_LITERAL = 'The existence of an upcoming merge must NOT itself force `DE
 // checks. It exists because 4C's acceptance turns on the LIVE loader consuming the AMENDED bytes,
 // and a contract that merely contains new law on disk proves nothing about what reached stdin.
 // If §3b is ever reworded, this line is what proves the obligation still arrives.
-// MOVED DELIBERATELY 2026-08-08 (WO-2026-08-08-4C-09), which is the event this pin's own note
-// anticipates. It was `Will this merge actually CONVERGE THE ESTATE?`. Warwick's terminology
-// correction separated MERGE (the Git event) from CONVERGENCE (the estate end state), so the old
-// sentence was itself the overloaded usage being corrected — retaining it to keep a test green
-// would have preserved the defect in the delivered law. The new literal pins the SHARPENING, which
-// is the part that would be lost if §3b were ever quietly reverted: the reviewer must weigh the
-// merge TOGETHER WITH the reconciliation actions, not the merge alone.
-const CONVERGENCE_LITERAL = 'TOGETHER WITH THE EVIDENCED RECONCILIATION ACTIONS';
+// MOVED DELIBERATELY TWICE, both on 2026-08-08 — each time because §3b's governing question itself
+// changed, which is precisely the event this pin exists to make visible.
+//
+//   1. `Will this merge actually CONVERGE THE ESTATE?`      (WO-4C-09 replaced it: that sentence WAS
+//      the MERGE/CONVERGENCE overload being corrected)
+//   2. `TOGETHER WITH THE EVIDENCED RECONCILIATION ACTIONS` (WO-4C-11 replaced it: Question 2 was
+//      reframed off a prediction about the post-merge estate and onto the observable present)
+//
+// The literal now pins the PRESENT-TENSE FRAMING, which is the property that would be silently lost
+// if §3b were ever reverted to asking a reviewer to certify a future estate it cannot observe.
+// Retaining a superseded literal merely to keep this test green would preserve the defect in the
+// delivered law — the pin follows the law, never the other way round.
+const CONVERGENCE_LITERAL = 'AS IT EXISTS AT THIS MERGE BOUNDARY';
 
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-contract-reach-'));
 const tmpFile = (text, name = `${randomUUID()}.md`) => {

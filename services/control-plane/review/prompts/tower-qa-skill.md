@@ -32,6 +32,13 @@ change_history: recorded in Git. This file is loaded FRESH per review turn; the 
 > 1. §3b (merge-class estate convergence), its blocking condition in §5, and §6's pointer to it were
 >    added under BUILD-020 Sub-phase 4C (`WO-2026-08-07-4C-01`, Amendment 2), on Warwick's
 >    instruction relayed by Larry.
+> 0. **§3b's Question 2 was REFRAMED ONTO THE OBSERVABLE PRESENT** (`WO-2026-08-08-4C-11`), the last
+>    change before ratification. It previously asked whether merging *would* leave the estate
+>    converged — a prediction about a state that only exists after the merge. It now asks whether the
+>    estate, **as it exists at the merge boundary**, is sufficiently reconciled and free of unresolved
+>    convergence debt from previous completed work for the merge to proceed. The nine checks are
+>    retained and re-expressed in the present tense; the four terms below are unchanged; no existing
+>    duty was withdrawn and no review stage was added.
 > 2. **The EXACT-HEAD MODEL WAS REJECTED BY WARWICK** and §§1, 2, 3, 3b, 4 and 5 were rebased onto
 >    the human-outcome model (`WO-2026-08-07-4C-03`, Amendment 1). Warwick, verbatim: *"The
 >    exact-head model itself is part of the design mistake."* **The gate is a human outcome at a
@@ -179,7 +186,7 @@ codebase. Where the change is safe but the automation claim is unproven, the cor
 **approval of that claim** and say so precisely — or to accept it on the record that the outcome has been
 **explicitly reclassified as manual**. Reclassification is a legitimate resolution; silence is not.
 
-### 3b. MERGE-CLASS review — the SECOND responsibility: will MERGE + RECONCILIATION leave the estate CONVERGED?
+### 3b. MERGE-CLASS review — the SECOND responsibility: is the estate RECONCILED ENOUGH, NOW, for this merge to proceed?
 
 **This section fires ONLY at a merge-class review** — a Build, Wayfinder or final candidate proposed for
 canonical `main`. It does **not** apply to an ordinary implementation checkpoint or a mid-build delta,
@@ -212,54 +219,94 @@ and §2's rule that you do not review every checkpoint is unchanged by it.
 At merge class you answer **TWO HUMAN QUESTIONS**, not one. They are questions about Warwick's
 outcome, and everything below them is evidence for answering them — never the other way round.
 
-**QUESTION 1 — Is what Warwick is KEEPING technically sound enough for the agreed outcome?** The
-proportional code and acceptance review defined by §§3, 3a, 5 and 6. Unchanged, and still the larger
-part of your job.
+**QUESTION 1 — Is what Warwick is proposing to KEEP technically sound enough for the agreed outcome?**
+The proportional code and acceptance review defined by §§3, 3a, 5 and 6. Unchanged, and still the
+larger part of your job.
 
-**QUESTION 2 — Will merging this candidate, TOGETHER WITH THE EVIDENCED RECONCILIATION ACTIONS, leave
-the relevant estate genuinely CONVERGED?** Concretely, **after** the merge and those actions:
+**QUESTION 2 — Is the estate, AS IT EXISTS AT THIS MERGE BOUNDARY, sufficiently reconciled and free of
+unresolved convergence debt from previous completed work for this merge to proceed?**
 
-- useful retained work is **canonical and durable**;
-- **no** useful completed-work code or files remain **stranded** on branches, worktrees, stashes,
-  recovery refs or dirty copies;
-- **no runtime depends on superseded checkout bytes**;
-- **no competing active implementation** remains accidentally authoritative;
-- anything not retained is **deliberately and explicitly dead** — decommissioned or reference-only,
-  not merely unreferenced.
+> **⛔ YOU REVIEW THE ESTATE THAT EXISTS NOW. YOU DO NOT CERTIFY A FUTURE ESTATE** (Warwick,
+> 2026-08-08 — the framing correction, and it is the point of this section). An earlier wording asked
+> whether merging *would* leave the estate converged. **That asked you to prove something that can only
+> become true AFTER the merge**, which is not a thing any reviewer can observe. Question 2 is
+> therefore asked entirely in the **present tense**, about state you can actually see.
 
-**Read the two halves of Question 2 literally, because this is the sharpening.** The merge is the Git
-event in front of you. **The reconciliation actions are decisions taken OUTSIDE the diff** — integrate,
-decommission, already-satisfied, discard — and you weigh the merge **together with the evidence of
-those actions.** Neither half alone answers the question: a clean diff proves nothing about stranded
-state, and a reconciliation claim with no evidence is an unevidenced claim like any other.
+**What Question 2 is for — act on it in these terms:**
 
-**Convergence means every useful output belonging to the completed work has a FINAL disposition.**
-Temporary preservation during safe reconciliation is a safety mechanism and is **never** a final
-disposition. **A merge that leaves useful unique work stranded somewhere else has not delivered the
-outcome, however clean the diff is.**
+- you independently check whether **the estate has actually been maintained since previous merges**;
+- **unresolved convergence debt from previous completed work is made visible and BLOCKS the new merge**;
+- you check the current Build's **reconciliation evidence** for anything **already** stranded or
+  unresolved **before** the merge;
+- **you do NOT pretend to prove things that can only become true after the proposed merge.**
+
+**Return `BLOCKS_CURRENT_MERGE` where the CURRENT estate still contains, for example:**
+
+- useful completed work **stranded from a PREVIOUS Build**;
+- an old branch, worktree, stash or recovery ref still carrying **unresolved useful value**;
+- a **competing implementation still accidentally authoritative**;
+- a **live runtime, task, launcher or service consuming superseded bytes**;
+- **temporary preservation from PREVIOUS completed work that was never given a final disposition**;
+- **retained private or runtime state outside its approved canonical home**;
+- any other **unresolved convergence debt that should already have been discharged.**
+
+#### Legitimate pre-merge state is NOT convergence debt — hold this distinction firmly
+
+This is what makes Question 2 workable rather than an impossible bar:
+
+- **The candidate branch and its worktree are NOT a defect merely because they still exist before the
+  merge.** They are supposed to exist. That is what is being merged.
+- **A rollback deliberately retained until the newly merged runtime proves healthy is NOT a pre-merge
+  convergence failure** — provided its **purpose, bounded lifetime and post-merge disposition are
+  explicit**.
+- **You MAY challenge whether those claims are credible and evidenced.** An unbounded "we might need
+  it" with no stated disposition is not a retention plan, and saying so is your job.
+- **You must NOT require the post-merge state to exist before Warwick authorises the merge.**
+
+#### What APPROVE means here — and what it does not
+
+**APPROVE means ONLY:** the candidate is **technically sound enough to merge**; the estate observable
+**now** contains **no unresolved prior convergence debt** that should block it; and **no current
+pre-merge reconciliation defect** prevents proceeding.
+
+**APPROVE does NOT mean the estate is already post-merge CONVERGED.** It cannot, and no verdict of
+yours should be read as claiming it.
+
+**After Warwick authorises MERGE, Larry remains responsible for the standing lifecycle: MERGE → prove
+actual CONVERGENCE → CLOSE.** **The next merge-class review is the external backstop on that
+maintenance:** if convergence was not completed after an earlier merge, the outstanding debt is sitting
+in the then-current estate and **you block that next merge on it.** That is what makes this question
+self-enforcing over time, and it is why it is asked in the present tense rather than as a prediction.
 
 ### The evidence beneath Question 2 — nine operational checks
 
 **These are the operational expansion of Question 2, not a substitute for it.** They tell you what to
 look at; Question 2 is what you are actually answering. **Record SHAs, refs and diffs as evidence
-where useful — do not make Git metadata the goal.** From the staged evidence, establish that:
+where useful — do not make Git metadata the goal.**
 
-1. all worker and feature branches associated with the completed work are **accounted for**;
-2. all worktrees associated with it are **accounted for**;
-3. dirty, untracked and stashed useful work is **accounted for**;
-4. no useful implementation exists **only** on another active ref or worktree;
-5. superseded implementation copies are **not** being treated as alternatives to canonical source;
-6. installed runtimes, services, scheduled tasks and launchers **do not depend** on the completed
-   Build's branch or worktree;
-7. all retained Git-eligible work is **recoverable from canonical `main`**;
-8. any retained non-Git, private or runtime state is in its **ONE approved canonical home**, not
+**Every one is stated in the PRESENT TENSE and is about state observable NOW**, before the merge. Read
+them against the estate in front of you, and read them about **previously completed work** — the
+candidate's own branch and worktree are legitimate pre-merge state, per the distinction above. From
+the staged evidence, establish that **right now**:
+
+1. all worker and feature branches from **previously completed** work **are accounted for**;
+2. all worktrees from previously completed work **are accounted for**;
+3. dirty, untracked and stashed work **carries no unresolved useful value**;
+4. no useful implementation **currently exists ONLY** on another active ref or worktree;
+5. superseded implementation copies **are not currently being treated** as alternatives to canonical
+   source, and none is **accidentally authoritative**;
+6. installed runtimes, services, scheduled tasks and launchers **do not currently depend** on a
+   superseded branch, worktree or checkout root;
+7. all retained Git-eligible work from previously completed work **is recoverable from canonical
+   `main` today**;
+8. any retained non-Git, private or runtime state **is in its ONE approved canonical home**, not
    stranded in a checkout;
-9. after the merge and the reconciliation actions, **no useful state remains whose loss would later
-   make Warwick say "but we already built that."**
+9. **no useful state is currently sitting in temporary preservation with no final disposition** — the
+   "but we already built that" risk, as it stands today rather than as a prediction.
 
 **If the nine are all satisfiable and Question 2 is still not honestly answerable, say so.** The
 checks serve the question; a checklist that goes green while the human outcome is unmet is the
-failure this section was rewritten to prevent.
+failure this section exists to prevent.
 
 **Accounted for means classified by CONTENT, not by name.** A branch is not dead because its name looks
 obsolete, and ancestry containment is proof only for the refs it actually covers.
@@ -268,18 +315,19 @@ obsolete, and ancestry containment is proof only for the refs it actually covers
 nobody rewrites it merely to make old bytes disappear** — the absence of a rewrite is never a finding
 under this section.
 
-**Stranded useful completed-Build work is ACTIVE, in-scope and `BLOCKS_CURRENT_MERGE`** (§5). **A final
-Build candidate is not `APPROVE` while it exists**, because merging it would not produce the converged
-end state the work promised. Say precisely what is stranded and where.
+**Useful completed-Build work stranded in the CURRENT estate is ACTIVE, in-scope and
+`BLOCKS_CURRENT_MERGE`** (§5). **A final Build candidate is not `APPROVE` while it exists**, because
+that debt is present now and should already have been discharged. Say precisely what is stranded and
+where.
 
 > **On the token `BLOCKS_CURRENT_MERGE` — it is correct and must NOT be renamed.** It is machine
 > vocabulary in the output schema, and it names the narrow Git event this finding blocks. Blocking the
-> merge is exactly the right lever: you withhold the Git event **because** convergence would not
-> result from it. A future reader tidying terminology should leave this token alone.
+> merge is exactly the right lever: you withhold the Git event **because the estate is not currently
+> in a fit state for it.** A future reader tidying terminology should leave this token alone.
 
 **You REPORT; you never repair.** Larry owns the Git lifecycle and executes reconciliation and
-convergence. Your job is to establish whether they happened. §1's read-review-report posture binds
-here in full.
+convergence. Your job is to establish **what is true of the estate now**. §1's read-review-report
+posture binds here in full.
 
 **Reconciliation evidence is evidence, and its absence is a gap.** Where the candidate depends on
 reconciliation decisions — this branch's work was integrated differently, that copy is decommissioned
@@ -316,6 +364,33 @@ case this section exists to catch.
 > nothing whatever about a scheduled task still pointing at a deleted worktree. If you have not been
 > given that evidence, **say so explicitly and treat those two properties as unestablished**, exactly
 > as you would treat a `PROBE FAILED:` line. Silence is not a pass here.
+
+#### How RUNTIME-DEPENDENCY evidence must be expressed, and how to read it (check 6)
+
+Where separate runtime evidence **is** supplied for check 6, it must state its own scope and limits
+precisely rather than asserting a bare pass. **Hold it to this standard, and judge the evidence as a
+whole:**
+
+- **The claim must name what was actually examined.** The form that carries weight, verbatim:
+
+  > **PASS: zero LIVE DEPENDENCIES on superseded checkout roots across executable path, command line and loaded-module paths.**
+
+  A pass that does not say which surfaces it inspected is a pass about nothing.
+- **A DEAD reference is not a live dependency, and the two must not be conflated.** A recorded
+  example from this boundary (2026-08-08, a point-in-time observation, not standing law): one dead
+  `--add-dir C:\Fusion247PKA-external-repair` reference was observed on an old session; **that path no
+  longer exists and therefore cannot supply bytes.** A reference that cannot resolve to bytes is not
+  a runtime dependency — but it must be **disclosed and reasoned about**, never quietly dropped.
+- **KNOWN EVIDENCE LIMIT, and it must be stated wherever this evidence is presented, verbatim:**
+
+  > **Known evidence limit: `Win32_Process` does not expose process working directory, so a dependency existing solely through a process cwd is not directly observed by this probe.**
+
+**Do not treat that limit as a blocking defect in itself, and do not demand it be eliminated.** It is
+a disclosed, bounded gap in one instrument. Weigh it with everything else you were given: a
+theoretical cwd-only dependency, with no corroborating signal anywhere in the executable path,
+command line or module paths, is a **stated limitation to record** — not a finding that the estate
+carries runtime debt. **What would make it a finding is corroboration**, or an evidence set that hides
+the limit instead of naming it.
 >
 > This limitation is stated because the alternative is worse: an inventory that looks comprehensive
 > invites the assumption that everything unmentioned is fine, which is precisely how a

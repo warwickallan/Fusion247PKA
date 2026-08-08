@@ -110,9 +110,13 @@ Git event: integrating the change into `main`. **RECONCILE** is the process of d
 in the current canonical system — integrate in current-compatible form, preserve but explicitly
 decommission / reference-only, already satisfied differently, or discard as superseded.
 **CONVERGENCE** is the estate-wide end state. **CLOSE** requires the promised human outcome plus the
-reconciliation and convergence that boundary needs. The merge-class question is therefore **"will the
-merge, together with the evidenced reconciliation actions, leave the estate converged?"** — canonical
-in `tower-qa-skill.md` §3b and not restated here.
+reconciliation and convergence that boundary needs.
+
+**The merge-class question is asked in the PRESENT TENSE** (Warwick, 2026-08-08): **"is the estate, as
+it exists at this merge boundary, sufficiently reconciled and free of unresolved convergence debt from
+previous completed work for this merge to proceed?"** A reviewer examines the estate that **exists
+now**; it never certifies a future post-merge estate, because that cannot be observed. Canonical in
+`tower-qa-skill.md` §3b and not restated here.
 
 **ONE full merge-class review of the final stable candidate.** If it finds a genuine merge blocker,
 that blocker is corrected and **ONE focused delta confirmation** of that blocker follows. Then stop.
@@ -133,6 +137,10 @@ that blocker is corrected and **ONE focused delta confirmation** of that blocker
   question.** Apply the commissioning question below to it like anything else. Where the previous
   review's blocker WAS the stranded state, the evidence that it has been reconciled is exactly the
   **one focused delta confirmation** already allowed above — not a fresh full pass.
+- **Post-merge convergence work is NOT a review round, and there is NO post-merge gate.** After the
+  merge, completing convergence and closing the boundary is the owner's standing lifecycle
+  responsibility. **The external backstop is the NEXT merge-class review**, which sees any
+  outstanding debt sitting in the then-current estate and blocks on it there. Do not add a stage.
 - **No cycles for cosmetic documentation**, and no review of every implementation checkpoint.
 - **You are not an iterative development partner.** Reviewing is not how the work gets built.
 
