@@ -18,18 +18,45 @@ probes are quoted. Declared limits are at the end — this document says what wa
 **No BUILD-015 branch exists anywhere** — `build-015/live-acceptance-recovery-2026-08-03` was merged
 via the 4C estate reconciliation (PR #98) and deleted; verified by enumeration, not recollection.
 
-## 2. Runtime-dependency evidence (probes: `Get-CimInstance Win32_Process`, `Get-ScheduledTask`, process `StartTime`)
+## 2. Runtime-dependency evidence — examined surfaces, results, dead references, and the mandatory limitation (check-6 form)
 
-- The live AsdAIr runtime (`pipeline/runtime.js --watch`) and ShopperBot server run **from the
-  primary checkout `C:\Fusion247PKA`** — canonical lineage on disk, but the processes started
-  2026-08-03 21:31 and 2026-08-04 02:37 respectively and are therefore **executing pre-2026-08-04
-  bytes from memory**. This is recorded in the reconciled Wayfinder §2 as deployment evidence, with
-  restart explicitly deferred to post-jump BUILD-015 work. **This merge changes documentation only
-  and alters no runtime dependency.**
+**Surfaces examined, by execution 2026-08-08, for the AsdAIr-relevant processes (PID 40920 —
+`runtime.js --watch`; PID 31216 — ShopperBot `server.js`):**
+
+1. **Executable path** (`Win32_Process.ExecutablePath`): both are
+   `C:\Program Files\nodejs\node.exe` — the system Node install, **not any checkout**.
+2. **Command line** (`Win32_Process.CommandLine`): PID 40920 names the absolute script path
+   `C:\Fusion247PKA\services\asdair\pipeline\runtime.js` — the **primary canonical checkout, not a
+   superseded or deleted checkout**. PID 31216's script argument is **relative** (`server.js`) —
+   see the limitation below; its env-file arguments name `C:/.fusion247/asdair.env` and
+   `C:/.fusion247/.env keys/shopper.env.txt` (approved secrets store, GL-012).
+3. **Loaded OS modules** (`Get-Process -Module`, non-`C:\Windows` entries): both processes load
+   only `C:\Program Files\nodejs\node.exe` and `C:\Program Files\Bonjour\mdnsNSP.dll`.
+   **Zero modules load from any repository checkout path, current or superseded.**
+
+**Dead references, reported separately: NONE observed.** Every path named on the examined command
+lines exists (`Test-Path` true for the runtime script and the env files). No process references a
+deleted checkout or missing file.
+
+**⚠️ MANDATORY LIMITATION — `Win32_Process` cannot expose a process's current working directory.**
+Consequences, stated rather than glossed: (a) PID 31216's relative `server.js` cannot be resolved
+to an on-disk file from this surface — its source lineage is asserted from operational knowledge
+(the ShopperBot service folder), not proven by this probe; (b) the Cockpit server (PID 29436,
+identified by its `127.0.0.1:8090` listener) likewise runs a relative `server.mjs` and inherits the
+same limit; (c) for a Node process, the OS-module surface does not enumerate V8-loaded JavaScript —
+which files `require()` resolved is inferable only from the script path, and a long-running process
+may hold **memory-resident bytes older than the files now at those paths.** That last point is a
+measured fact here: PID 40920 started 2026-08-03 21:31 and PID 31216 2026-08-04 02:37, both before
+the 2026-08-04 fix commits, so both execute **pre-fix bytes** regardless of the current on-disk
+source. Recorded in the reconciled Wayfinder §2; restart is explicitly deferred to post-jump
+BUILD-015 work.
+
+**Zero-live-dependency result for THIS merge:** the PR #99 diff is documentation-only
+(`Deliverables/*.md` + one `.json` claim record). **No examined process references any file this
+merge changes**, so merging it alters no runtime dependency.
+
 - Scheduled task `MyPKA-AsdAIr-Runtime`: **Ready** (probed read-only). The stale
   `ACTIVATION-DEFERRED.md` claim ("Disabled, not armed") is corrected in the reconciled map.
-- Live Cockpit serves from the repo (SSOT `services/cockpit/README.md`); this merge touches no
-  Cockpit source.
 
 ## 3. Non-Git / private / runtime state (declared homes, GL-012)
 
