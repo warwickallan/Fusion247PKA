@@ -27,6 +27,7 @@ import {
   LOCATION,
   DECISION,
   GUARDED_TOOLS,
+  SHELL_TOOLS,
   PUSH_ASK_REASON,
 } from './worktree-guard.mjs';
 
@@ -973,4 +974,35 @@ test('MAIN-PUSH GATE (MUTATION): a force-push is denied even from the canonical 
   );
   assert.equal(r.decision, DECISION.DENY);
   assert.match(r.reason, /denied outright/i);
+});
+
+test('MAIN-PUSH GATE (ENUMERATION): EVERY shell tool in the grant is gated, not just Bash', () => {
+  // The 2026-08-08 defect: the gate named `Bash`, and the push that defeated it
+  // went out through `PowerShell` — same command, same effect, no prompt.
+  // This asserts the class, so adding a shell tool without gating it FAILS here.
+  assert.deepEqual(SHELL_TOOLS, ['Bash', 'PowerShell']);
+  for (const tool of SHELL_TOOLS) {
+    assert.ok(GUARDED_TOOLS.includes(tool), `${tool} must be a guarded tool`);
+    const r = guard(
+      { tool_name: tool, tool_input: { command: 'git push origin main' }, cwd: process.cwd() },
+      { estateRoots: [process.cwd()] }
+    );
+    assert.equal(r.decision, DECISION.ASK, `${tool} must ASK for a push to main`);
+    assert.equal(r.reason, PUSH_ASK_REASON);
+
+    const f = guard(
+      { tool_name: tool, tool_input: { command: 'git push --force origin main' }, cwd: process.cwd() },
+      { estateRoots: [process.cwd()] }
+    );
+    assert.equal(f.decision, DECISION.DENY, `${tool} must DENY a force push`);
+  }
+});
+
+test('MAIN-PUSH GATE (MUTATION): a tool NOT in the shell list is not silently gated', () => {
+  // Proves the previous test can fail: an ungated tool name must NOT ask.
+  const r = guard(
+    { tool_name: 'Read', tool_input: { command: 'git push origin main' }, cwd: process.cwd() },
+    { estateRoots: [process.cwd()] }
+  );
+  assert.notEqual(r.decision, DECISION.ASK);
 });

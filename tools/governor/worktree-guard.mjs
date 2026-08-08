@@ -44,7 +44,14 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-export const GUARDED_TOOLS = ['Write', 'Edit', 'MultiEdit', 'NotebookEdit', 'Bash'];
+export const GUARDED_TOOLS = ['Write', 'Edit', 'MultiEdit', 'NotebookEdit', 'Bash', 'PowerShell'];
+
+// Every tool in this grant that can execute a shell command, and therefore a
+// `git push`. Enumerated rather than inspected: on 2026-08-08 the main-push gate
+// covered `Bash` alone, and the push that defeated it went out through
+// `PowerShell` — same command, same effect, no prompt. A gate that names one
+// shell is not a gate.
+export const SHELL_TOOLS = ['Bash', 'PowerShell'];
 
 export const LOCATION = {
   ALIGNED: 'aligned',
@@ -407,7 +414,7 @@ export function decide({ toolName, toolInput, comparison, canonical }) {
     return { decision: DECISION.DEFER, reason: 'Session is in the canonical worktree and branch.' };
   }
 
-  if (toolName === 'Bash') {
+  if (SHELL_TOOLS.includes(toolName)) {
     const cls = classifyBashCommand(toolInput?.command);
     if (cls.kind === 'read-only') {
       return {
@@ -651,7 +658,7 @@ export function guard(payload, opts = {}) {
   // The main-push human gate runs BEFORE any location logic. It must fire in
   // the ordinary aligned case, and it must survive the absence of programme
   // state — both of which the location path exits early on.
-  if (toolName === 'Bash') {
+  if (SHELL_TOOLS.includes(toolName)) {
     const push = classifyPushCommand(toolInput?.command);
     if (push === 'destructive') {
       return {

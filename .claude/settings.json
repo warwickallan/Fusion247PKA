@@ -1,3 +1,15 @@
 {
-  "hooks": {}
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit|Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node C:/Fusion247PKA/tools/governor/worktree-guard.mjs --estate C:/Fusion247PKA"
+          }
+        ]
+      }
+    ]
+  }
 }
