@@ -1047,3 +1047,160 @@ test('a refused tap is still ANSWERED, so the phone does not spin', async () => 
   assert.equal(bot.answered.length, 1);
   assert.match(bot.answered[0].text, /supervised browser step/);
 });
+
+// =====================================================================
+// WP-B15-1: THE CONFIRMATION SURFACE, END TO END THROUGH THE LOOP
+//
+// What only this file can prove: the whole journey rides the ONE poller and the
+// SAME command surface - photo in, fingerprint bound at receive, park carded,
+// card DELIVERED, approve TAP routed, gate cleared, replan proceeds - with no
+// manual command insert anywhere. (The live acceptance event itself - real
+// Telegram, real thumb - is explicitly NOT provable offline and is not claimed
+// here; these are the source-level halves.)
+// =====================================================================
+
+/** A raw Telegram photo update, as the wire delivers it. Obvious fixtures. */
+function photoTgUpdate({ updateId = 1, chatId = 555, messageId = 900 } = {}) {
+  return {
+    update_id: updateId,
+    message: {
+      message_id: messageId,
+      from: { id: chatId },
+      chat: { id: chatId, type: 'private' },
+      photo: [{ file_id: 'BIG', file_unique_id: 'u', width: 100, height: 100, file_size: 5 }],
+    },
+  };
+}
+
+/** What makeIntake's fake telegram serves for every download. */
+const FAKE_PHOTO_BYTES = 'not-a-real-photo';
+
+test('APPROVE maps to confirmInterpretation - and the pre-existing confirm refusal is untouched beside it', () => {
+  const mapped = intentToCommand({
+    ok: true, action: 'approve', shopRef: REF, arg: null,
+    responder: 'telegram:555', raw: { kind: 'callback' },
+  });
+  assert.equal(mapped.ok, true);
+  assert.equal(mapped.command, COMMANDS.CONFIRM_INTERPRETATION);
+  assert.equal(mapped.spec.shopRef, REF);
+  assert.equal(mapped.spec.actor, 'telegram:555');
+
+  // The reconcile-stage prompt keeps its meaning: still refused, still honest.
+  const confirm = intentToCommand({
+    ok: true, action: 'confirm', shopRef: REF, arg: null,
+    responder: 'telegram:555', raw: { kind: 'callback' },
+  });
+  assert.equal(confirm.ok, false);
+  assert.equal(confirm.reason, ADAPTER_REFUSALS.NOT_A_COMMAND);
+});
+
+test('END TO END: photo in -> fingerprint bound at receive -> park carded and DELIVERED -> approve tap clears the gate -> replan proceeds', async () => {
+  const { createHash } = await import('node:crypto');
+  const expectedFp = createHash('sha256').update(Buffer.from(FAKE_PHOTO_BYTES)).digest('hex');
+
+  const h = makeHarness({
+    modelLines: [
+      { line_no: 1, raw_reading: '3 gourmet cat food', quantity: 3 },
+      { line_no: 2, raw_reading: '1 weetabix protein', quantity: 1 },
+    ],
+  });
+  const bot = await makeBot();
+
+  // PASS 1 - the photo arrives through the real poller path. The shop is
+  // durable, flagged for review, and the fingerprint binding was written by
+  // the SAME receive, before the offset moved - not by any later step.
+  await runOnce(h.deps, { householdId: HOUSEHOLD_ID, intake: makeIntake([photoTgUpdate()]), bot });
+  assert.equal(h.db.shop.length, 1);
+  assert.equal(h.db.shop[0].needs_review, true);
+  assert.equal(h.db.shop_source_image.length, 1, 'the binding must be written by the production receive path');
+  assert.equal(h.db.shop_source_image[0].fingerprint, expectedFp,
+    'the stored fingerprint must be the sha256 of the exact downloaded bytes');
+
+  // PASS 2 - Warwick taps "Build this shop" ON THE PHONE. No manual command.
+  await runOnce(h.deps, {
+    householdId: HOUSEHOLD_ID,
+    intake: makeIntake([callbackUpdate({ updateId: 2, data: `asd:build:${REF}` })]),
+    bot,
+  });
+  assert.equal(h.db.shop[0].status, 'TRANSCRIBING');
+
+  // PASS 3 - interpretation (the one model call, faked).
+  await runOnce(h.deps, { householdId: HOUSEHOLD_ID, intake: makeIntake([]), bot });
+  assert.equal(h.db.shop[0].status, 'PROCESSING');
+
+  // PASS 4 - planning parks at the gate, queues the card, AND DELIVERS IT in
+  // the same pass: queueShopCards/drainOutbox run after the advance.
+  await runOnce(h.deps, { householdId: HOUSEHOLD_ID, intake: makeIntake([]), bot });
+  assert.equal(h.db.shop[0].status, 'PROCESSING', 'the park holds until a human confirms');
+  assert.equal(ledger(h, 'outbox', 'confirm_interpretation').length, 1);
+  const delivered = bot.sent.find((s) => s.message.text.includes('Confirm this reading'));
+  assert.ok(delivered, 'the confirmation card must actually reach the send seam');
+  assert.ok(delivered.message.text.includes(`sha256:${expectedFp.slice(0, 12)}`),
+    'the card must show WHICH photograph produced the reading');
+  const approveButton = delivered.message.reply_markup.inline_keyboard.flat()
+    .find((b) => b.callback_data === `asd:approve:${REF}`);
+  assert.ok(approveButton, 'the card must carry the distinct approve tap');
+
+  // PASS 5 - the real deliberate act: Warwick taps the button the card carries.
+  // The tap is routed BEFORE the advance, so the same pass clears the gate and
+  // re-plans through the existing chain. Zero manual inserts anywhere.
+  const approve = await runOnce(h.deps, {
+    householdId: HOUSEHOLD_ID,
+    intake: makeIntake([callbackUpdate({ updateId: 3, data: approveButton.callback_data })]),
+    bot,
+  });
+  assert.equal(approve.taps.routed, 1, 'the approve tap must route as a command');
+  const confirmRows = ledger(h, 'command', COMMANDS.CONFIRM_INTERPRETATION);
+  assert.equal(confirmRows.length, 1, 'exactly one confirmInterpretation latch');
+  assert.equal(confirmRows[0].args.actor, 'telegram:555', 'the latch must record the REAL human actor, never a pipeline identity');
+  assert.equal(h.db.shop[0].status, 'READY_TO_SHOP', 'the gate must clear through the existing command/latch/replan chain');
+
+  // And never a second card, however many more passes run.
+  await runOnce(h.deps, { householdId: HOUSEHOLD_ID, intake: makeIntake([]), bot });
+  assert.equal(ledger(h, 'outbox', 'confirm_interpretation').length, 1);
+});
+
+test('PROCESS DEATH before delivery: the queued card survives the restart and is sent exactly once, never re-queued', async () => {
+  const h = makeHarness({
+    modelLines: [
+      { line_no: 1, raw_reading: '3 gourmet cat food', quantity: 3 },
+      { line_no: 2, raw_reading: '1 weetabix protein', quantity: 1 },
+    ],
+  });
+  // Drive to the park with NO bot wired - the card is queued durably but the
+  // process "dies" before anything can send it.
+  await commands.receiveList({
+    householdId: HOUSEHOLD_ID, listDate: '2026-08-03', sourceKind: 'photo',
+    rawMediaPath: 'C:/.fusion247/asdair/shopper-media/fake.jpg', needsReview: true,
+    actor: 'telegram:555', telegramChatId: '555', telegramMessageId: '900',
+  }, h.deps);
+  await commands.buildShop({ shopRef: REF, actor: 'telegram:555' }, h.deps);
+  await runOnce(h.deps, { householdId: HOUSEHOLD_ID, intake: makeIntake([]) }); // -> TRANSCRIBING
+  await runOnce(h.deps, { householdId: HOUSEHOLD_ID, intake: makeIntake([]) }); // -> PROCESSING
+  await runOnce(h.deps, { householdId: HOUSEHOLD_ID, intake: makeIntake([]) }); // parks + queues card
+  const queuedRows = ledger(h, 'outbox', 'confirm_interpretation');
+  assert.equal(queuedRows.length, 1);
+  assert.equal(queuedRows[0].status, 'pending', 'undelivered, exactly as a crash-before-send leaves it');
+
+  // A brand-new process (the restart), pointed at the SAME durable database.
+  const restarted = makeHarness({
+    modelLines: [
+      { line_no: 1, raw_reading: '3 gourmet cat food', quantity: 3 },
+      { line_no: 2, raw_reading: '1 weetabix protein', quantity: 1 },
+    ],
+    seed: h.db,
+  });
+  const bot = await makeBot();
+  await runOnce(restarted.deps, { householdId: HOUSEHOLD_ID, intake: makeIntake([]), bot });
+
+  const cards = ledger(restarted, 'outbox', 'confirm_interpretation');
+  assert.equal(cards.length, 1, 'the restart must ADOPT the pending card, never queue a second');
+  assert.equal(cards[0].status, 'done', 'the surviving card must actually be delivered after the restart');
+  assert.equal(bot.sent.filter((s) => s.message.text.includes('Confirm this reading')).length, 1,
+    'exactly one confirmation card reaches the phone across the death and revival');
+
+  // Further passes: no resend, no requeue.
+  await runOnce(restarted.deps, { householdId: HOUSEHOLD_ID, intake: makeIntake([]), bot });
+  assert.equal(bot.sent.filter((s) => s.message.text.includes('Confirm this reading')).length, 1);
+  assert.equal(ledger(restarted, 'outbox', 'confirm_interpretation').length, 1);
+});

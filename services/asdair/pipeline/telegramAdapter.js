@@ -87,6 +87,15 @@ export function intentToCommand(intent, deps = {}) {
       // mistaken for an approval.
       return { ok: true, command: COMMANDS.GET_STATUS, spec: { shopRef, actor } };
     }
+    case 'approve': {
+      const bad = needsShop(); if (bad) return bad;
+      // The deliberate act itself: "Confirm this reading" on the confirmation
+      // card. A LATCH command - once issued it stays true for the shop, so the
+      // interpretation gate opens and cannot silently re-close. Distinct from
+      // 'confirm' above by design: that word already means "forward the ASDA
+      // order email", and a tap word must never carry two meanings.
+      return { ok: true, command: COMMANDS.CONFIRM_INTERPRETATION, spec: { shopRef, actor } };
+    }
     case 'status':
     case 'held':
     case 'exceptions': {

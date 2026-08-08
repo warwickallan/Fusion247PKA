@@ -1015,3 +1015,209 @@ test('JOIN 4 - ANSWER LEARNING: a settled answer becomes a durable rule_qa_log r
   await runPipeline(HANDLE, h.deps);
   assert.equal(h.db.rule_qa_log.length, 1, 'a re-run appended a duplicate decision to the audit log');
 });
+
+// =====================================================================
+// WP-B15-1: THE CONFIRMATION CARD - SELF-HEALING (the gate's production surface)
+//
+// Until this card, planOutcome's park at wait:interpretation_confirmation wrote
+// no event and queued nothing - a photo shop could sit there for days with
+// nothing telling anyone it was being waited on (shop 6's live shape). These
+// tests mirror the receipt/progress card proofs exactly: queued at most once
+// ever per shop, durable, race-safe, and self-healing for a shop that was
+// already parked before this code existed.
+// =====================================================================
+
+const CONFIRM_CARDS = (db) => db.pipeline_command.filter(
+  (c) => c.kind === 'outbox' && c.command === 'confirm_interpretation',
+);
+
+/** All-matched model lines: no questions open, so the shop hits the
+ *  interpretation gate directly - the pure park, nothing else in play. */
+const ALL_MATCHED_LINES = [
+  { line_no: 1, raw_reading: '3 gourmet cat food', quantity: 3 },
+  { line_no: 2, raw_reading: '1 weetabix protein', quantity: 1 },
+];
+
+/** Drive a received photo shop to the interpretation park. */
+async function driveToConfirmationPark(h, handle = HANDLE) {
+  await commands.buildShop({ shopRef: handle.shopRef, actor: ACTOR }, h.deps);
+  await runPipeline(handle, h.deps);        // -> TRANSCRIBING
+  await runPipeline(handle, h.deps);        // -> PROCESSING (interpreted)
+  return runPipeline(handle, h.deps);       // plan -> parks at the gate
+}
+
+/** A 64-hex-char fingerprint fixture - an obvious fake, valid under the CHECK. */
+const FP_WEEK_A = 'ab12cd34ef567890'.repeat(4);
+const FP_WEEK_B = '90fe87dc65ba4321'.repeat(4);
+
+async function receivePhotoWithFingerprint(h, {
+  fingerprint, listDate = '2026-08-03', messageId = '900',
+  receivedAt = null,
+} = {}) {
+  return commands.receiveList({
+    householdId: HOUSEHOLD_ID, listDate, sourceKind: 'photo',
+    rawMediaPath: 'C:/.fusion247/asdair/shopper-media/fake.jpg', needsReview: true,
+    actor: ACTOR, telegramChatId: '555', telegramMessageId: messageId,
+    imageFingerprint: fingerprint, imageByteLength: 12345,
+    receivedAt: receivedAt || (listDate + 'T19:05:00.000Z'),
+  }, h.deps);
+}
+
+test('THE CONFIRMATION CARD: parking at the gate queues exactly ONE card, and the park itself is unchanged', async () => {
+  const h = makeHarness({ modelLines: ALL_MATCHED_LINES });
+  await receivePhoto(h);
+  const parked = await driveToConfirmationPark(h);
+
+  assert.equal(parked.step, STEPS.AWAIT_INTERPRETATION_CONFIRMATION);
+  assert.equal(parked.stepped, false, 'the card is bookkeeping alongside the park, never a transition');
+  assert.equal(shopStatus(h), 'PROCESSING');
+
+  const cards = CONFIRM_CARDS(h.db);
+  assert.equal(cards.length, 1);
+  assert.equal(cards[0].args.shopRef, REF);
+  assert.equal(h.db.pending_action.length, 0, 'a queued card is machine bookkeeping, never a household to-do');
+});
+
+test('THE CONFIRMATION CARD: repeated passes over the parked shop never queue a second card', async () => {
+  const h = makeHarness({ modelLines: ALL_MATCHED_LINES });
+  await receivePhoto(h);
+  await driveToConfirmationPark(h);
+  for (let i = 0; i < 4; i += 1) {
+    const r = await runPipeline(HANDLE, h.deps);
+    assert.equal(r.stepped, false);
+  }
+  assert.equal(CONFIRM_CARDS(h.db).length, 1, 'Warwick would be asked to confirm the same reading twice');
+});
+
+test('THE CONFIRMATION CARD: payload is HONEST when no fingerprint was recorded - absence travels as null, counts are real', async () => {
+  const h = makeHarness({ modelLines: ALL_MATCHED_LINES });
+  await receivePhoto(h);   // the pre-fingerprinting receive path: no binding row
+  await driveToConfirmationPark(h);
+
+  const card = CONFIRM_CARDS(h.db)[0];
+  assert.equal(card.args.interpretedLines, 2, 'the interpreted count must come from the durable rows');
+  assert.equal(card.args.fingerprintPrefix, null, 'no stored fingerprint may be fabricated');
+  assert.equal(card.args.priorShopRef, null, 'no prior photo shop exists in this fixture');
+  assert.equal(card.args.samePhotoAsPrior, null, 'an impossible comparison must travel as null, never as false-reassurance');
+  assert.equal(card.args.receivedAt, '2026-08-03T09:00:00.000Z', 'with no binding, the shop row arrival time anchors the card');
+});
+
+test('THE FINGERPRINT BINDING: receiveList persists it once, first-write-wins, inside the receive itself', async () => {
+  const h = makeHarness({ modelLines: ALL_MATCHED_LINES });
+  await receivePhotoWithFingerprint(h, { fingerprint: FP_WEEK_A });
+  assert.equal(h.db.shop_source_image.length, 1);
+  assert.equal(h.db.shop_source_image[0].fingerprint, FP_WEEK_A);
+  assert.equal(h.db.shop_source_image[0].byte_length, 12345);
+  assert.equal(h.db.shop_source_image[0].captured_at, '2026-08-03T19:05:00.000Z');
+
+  // A Telegram redelivery RESUMES the shop - and must adopt the ORIGINAL
+  // binding, not overwrite it, even if the redelivered fingerprint differs.
+  await receivePhotoWithFingerprint(h, { fingerprint: FP_WEEK_B });
+  assert.equal(h.db.shop.length, 1, 'a redelivery must not create a second shop');
+  assert.equal(h.db.shop_source_image.length, 1, 'a redelivery must not create a second binding');
+  assert.equal(h.db.shop_source_image[0].fingerprint, FP_WEEK_A, 'first write wins - the binding is immutable');
+});
+
+test('THE CONFIRMATION CARD: carries the stored fingerprint prefix and the receiver own captured-at time', async () => {
+  const h = makeHarness({ modelLines: ALL_MATCHED_LINES });
+  await receivePhotoWithFingerprint(h, { fingerprint: FP_WEEK_A });
+  await driveToConfirmationPark(h);
+
+  const card = CONFIRM_CARDS(h.db)[0];
+  assert.equal(card.args.fingerprintPrefix, FP_WEEK_A.slice(0, 12));
+  assert.equal(card.args.fingerprintAlgo, 'sha256');
+  assert.equal(card.args.receivedAt, '2026-08-03T19:05:00.000Z', 'the binding captured_at outranks the row timestamp');
+});
+
+test('THE WRONG-WEEK COMPARISON: the card names the previous photo shop, and an identical photograph is flagged', async () => {
+  // Week A: a photo shop, fingerprinted, driven to its park.
+  const h = makeHarness({ modelLines: ALL_MATCHED_LINES });
+  await receivePhotoWithFingerprint(h, { fingerprint: FP_WEEK_A });
+  await driveToConfirmationPark(h);
+
+  // Week B, DIFFERENT photograph: prior shop named, samePhotoAsPrior false.
+  const REF_B = 'SHOP-2026-08-10';
+  await receivePhotoWithFingerprint(h, { fingerprint: FP_WEEK_B, listDate: '2026-08-10', messageId: '901' });
+  await driveToConfirmationPark(h, { shopRef: REF_B });
+  const cardB = CONFIRM_CARDS(h.db).find((c) => c.args.shopRef === REF_B);
+  assert.equal(cardB.args.priorShopRef, REF, 'the previous photo shop must be named');
+  assert.equal(cardB.args.priorReceivedAt, '2026-08-03T19:05:00.000Z');
+  assert.equal(cardB.args.samePhotoAsPrior, false);
+
+  // Week C, the SAME photograph as week B re-sent: flagged true.
+  const REF_C = 'SHOP-2026-08-17';
+  await receivePhotoWithFingerprint(h, { fingerprint: FP_WEEK_B, listDate: '2026-08-17', messageId: '902' });
+  await driveToConfirmationPark(h, { shopRef: REF_C });
+  const cardC = CONFIRM_CARDS(h.db).find((c) => c.args.shopRef === REF_C);
+  assert.equal(cardC.args.priorShopRef, REF_B);
+  assert.equal(cardC.args.samePhotoAsPrior, true, 'an identical re-sent photograph is the wrong-week smoking gun');
+});
+
+test('THE CONFIRMATION CARD: a shop ALREADY parked before this code existed (shop 6 shape) recovers on the next pass', async () => {
+  // Build the pre-fix world: a photo shop with every question ANSWERED, parked
+  // at the gate, with NO confirmation card ever queued - exactly shop 6 live.
+  const h = makeHarness({ modelLines: MODEL_LINES });   // line 3 opens a question
+  await receivePhoto(h);
+  await commands.buildShop({ shopRef: REF, actor: ACTOR }, h.deps);
+  await runPipeline(HANDLE, h.deps);        // -> TRANSCRIBING
+  await runPipeline(HANDLE, h.deps);        // -> PROCESSING
+  await runPipeline(HANDLE, h.deps);        // plan -> NEEDS_DECISION (1 question)
+  const q = h.db.shop_question.find((x) => x.status === 'open');
+  await commands.answerQuestion({ shopRef: REF, actor: ACTOR, questionKey: q.question_key, answerText: 'Rowntrees Fruit Pastille Lolly' }, h.deps);
+  await runPipeline(HANDLE, h.deps);        // replan (answer learning records) -> PROCESSING
+  assert.equal(shopStatus(h), 'PROCESSING', 'the replan itself must succeed - a learning failure here would be a different defect, not a gate defect');
+  await runPipeline(HANDLE, h.deps);        // plan -> parks at the gate (queues the card, post-fix)
+
+  // Model the pre-fix world exactly: parked, no card ever queued.
+  h.db.pipeline_command = h.db.pipeline_command.filter(
+    (c) => !(c.kind === 'outbox' && c.command === 'confirm_interpretation'),
+  );
+  assert.equal(CONFIRM_CARDS(h.db).length, 0);
+
+  // A brand-new process (restart/deploy), pointed at the SAME durable database.
+  const restarted = makeHarness({ modelLines: MODEL_LINES, seed: h.db });
+  const r = await runPipeline(HANDLE, restarted.deps);
+  assert.equal(r.step, STEPS.AWAIT_INTERPRETATION_CONFIRMATION);
+  assert.equal(CONFIRM_CARDS(restarted.db).length, 1, 'a shop parked before this fix was never recovered');
+  const card = CONFIRM_CARDS(restarted.db)[0];
+  assert.equal(card.args.fingerprintPrefix, null, 'a pre-fingerprinting shop must render honest absence, not an invented hash');
+  assert.equal(card.args.interpretedLines, 3);
+});
+
+test('THE CONFIRMATION CARD: two runners racing the same parked shop cannot double-queue it', async () => {
+  const h = makeHarness({ modelLines: ALL_MATCHED_LINES });
+  await receivePhoto(h);
+  await commands.buildShop({ shopRef: REF, actor: ACTOR }, h.deps);
+  await runPipeline(HANDLE, h.deps);        // -> TRANSCRIBING
+  await runPipeline(HANDLE, h.deps);        // -> PROCESSING
+
+  // Both runners plan the parked shop concurrently, both read "never queued".
+  await Promise.all([runPipeline(HANDLE, h.deps), runPipeline(HANDLE, h.deps)]);
+  assert.equal(CONFIRM_CARDS(h.db).length, 1, 'a race between two runners queued the confirmation card twice');
+});
+
+test('THE GATE CLEARS: confirmInterpretation after the card -> replan proceeds -> READY_TO_SHOP, and no second card ever', async () => {
+  const h = makeHarness({ modelLines: ALL_MATCHED_LINES });
+  await receivePhoto(h);
+  await driveToConfirmationPark(h);
+  assert.equal(CONFIRM_CARDS(h.db).length, 1);
+
+  // The deliberate act - the same command the approve tap dispatches.
+  await commands.confirmInterpretation({ shopRef: REF, actor: ACTOR }, h.deps);
+  const passed = await runPipeline(HANDLE, h.deps);
+  assert.equal(passed.to, 'READY_TO_SHOP', 'the latch must open the gate through the existing chain');
+
+  // Further passes: parked for the basket request, and still exactly one card.
+  const after = await runPipeline(HANDLE, h.deps);
+  assert.equal(after.step, STEPS.AWAIT_BASKET_REQUEST);
+  assert.equal(CONFIRM_CARDS(h.db).length, 1);
+});
+
+test('THE CONFIRMATION CARD: a TEXT shop never gets one - it was typed, not read, so there is no gate', async () => {
+  const h = makeHarness();
+  await receiveText(h);
+  await commands.buildShop({ shopRef: REF, actor: ACTOR }, h.deps);
+  await drain(h);
+  assert.equal(shopStatus(h), 'READY_TO_SHOP');
+  assert.equal(CONFIRM_CARDS(h.db).length, 0);
+});

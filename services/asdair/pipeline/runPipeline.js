@@ -438,6 +438,63 @@ async function stepPlan(deps, snapshot) {
 
   if (gate.to === null) {
     // Legally parked: the list needed review and nobody has confirmed it.
+    //
+    // ── THE CONFIRMATION CARD, SELF-HEALING (WP-B15-1 item 1) ───────────────
+    // Until this card, the park above was SILENT: it wrote no event and queued
+    // nothing, so a shop could sit here for days (shop 6's exact live shape:
+    // PROCESSING, needs_review, every question answered, five days, not one
+    // event) with nothing telling anyone it was being waited on. The card is
+    // the missing production surface for the gate.
+    //
+    // Same self-healing shape as the receipt and progress cards in runPipeline
+    // below, and for the same reasons: bookkeeping alongside a pass, never a
+    // transition; guarded by outboxEverQueued over the FULL outbox history, so
+    // it is queued AT MOST ONCE per shop, ever - and a shop ALREADY parked
+    // here before this code shipped gets its card on the very next pass,
+    // because every pass over a parked PROCESSING shop re-runs this step. No
+    // manual insert, no restart of the durable state.
+    //
+    // The payload is built from DURABLE reads only (the stored fingerprint
+    // binding, the stored prior photo shop, the stored interpreted lines), so
+    // the card renders the same facts however many passes later it is sent.
+    // A missing binding travels as null and is rendered as an honest absence -
+    // nothing here fabricates a fingerprint or a count.
+    if (!(await store.outboxEverQueued(deps, shop.id, 'confirm_interpretation'))) {
+      const iso = (v) => {
+        if (v === null || v === undefined) return null;
+        if (v instanceof Date) return v.toISOString();
+        return String(v);
+      };
+      const source = await store.findSourceImage(deps, shop.id);
+      const prior = await store.findPriorPhotoShop(deps, shop.household_id, shop.id);
+      await store.enqueueMessage(deps, {
+        householdId: shop.household_id,
+        shopId: shop.id,
+        kind: 'confirm_interpretation',
+        key: outboxKeyFor(shop.shop_ref, 'confirm_interpretation'),
+        payload: {
+          shopRef: shop.shop_ref,
+          // What was read, counted from the durable interpretation rows. There
+          // is deliberately NO physical-line count: none exists anywhere in
+          // this system, and the renderer says so instead of inventing one.
+          interpretedLines: interpreted.length,
+          // The exact-source binding (invariant C). Null when the shop predates
+          // fingerprinting - the renderer states that plainly.
+          fingerprintPrefix: source && source.fingerprint ? String(source.fingerprint).slice(0, 12) : null,
+          fingerprintAlgo: source ? source.algo : null,
+          receivedAt: iso(source && source.captured_at ? source.captured_at : shop.created_at),
+          // The human-readable prior-photograph comparison (wrong-week
+          // protection): the previous photo shop's identity and received time,
+          // and - when BOTH fingerprints exist - whether this is literally the
+          // same photograph. null means "could not be compared", never "fine".
+          priorShopRef: prior ? prior.shop_ref : null,
+          priorReceivedAt: prior ? iso(prior.captured_at ?? prior.created_at) : null,
+          samePhotoAsPrior: source && source.fingerprint && prior && prior.fingerprint
+            ? source.fingerprint === prior.fingerprint
+            : null,
+        },
+      });
+    }
     return {
       stepped: false, step: gate.step, from: shop.status, to: null,
       reason: gate.reason, plan_summary: plan.summary, questions: opened,
