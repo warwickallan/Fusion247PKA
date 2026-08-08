@@ -149,7 +149,7 @@ unapproved, and the repo is public. It needs a disposition consistent with its a
 | Action | Evidence |
 |---|---|
 | Removed `C:\Fusion247PKA-governor`, `C:\Fusion247PKA-wt`, `C:\audit-worktrees` | All three verified **zero entries** immediately before `rmdir`; removal confirmed by failed `ls`. |
-| Removed worktree `C:\Fusion247PKA-wo-asdair-ci` + branch `build-020/asdair-ci-fix` | **BLOCKED** — denied by the permission layer. Not executed. Its uncommitted fix was banked first at `a8c2a33`, and all three files were byte-compared identical before any removal was attempted. |
+| Removed worktree `C:\Fusion247PKA-wo-asdair-ci` + branch `build-020/asdair-ci-fix` | ✅ **EXECUTED.** *(Corrected 2026-08-08, Veritas 4C finding: this row still read "BLOCKED — denied by the permission layer", which was true only of the FIRST attempt. Permission was subsequently granted and the removal completed with the rest of the worktree teardown.)* Its uncommitted fix was banked first at `a8c2a33`, and all three files were byte-compared identical before removal. |
 
 ---
 
@@ -232,9 +232,9 @@ recorded here so convergence does not leave it invisible, and so it is not mista
 
 ---
 
-# ✅ RECOVERY-PIN ACCOUNTING — all 115 accounted for
+# ✅ RECOVERY-PIN ACCOUNTING — all pins accounted for (**115 at the time of Warwick's gate; 119 now**)
 
-**Warwick's gate: *"Only when all 115 recovery pins are accounted for may destructive cleanup resume."*
+**Warwick's gate: *"Only when all 115 recovery pins are accounted for may destructive cleanup resume."* **The count is now 119** — the four held source branches were pinned before deletion, after the gate was set. The gate is satisfied for all of them.
 And his constraint: *"Do not perform 75 manual archaeological reviews unnecessarily."***
 
 ## The 40 branch tips — re-audited under the stronger method
@@ -329,7 +329,7 @@ when 4C merges.
 | **`C:\Fusion247PKA-unique-artefacts-20260807`** | ✅ removed | All 3 Sources artefacts byte-identical to the candidate after the main reconciliation; the VlogOps draft preserved separately; `stale-index.lock` is a lock file. |
 | **`C:\tb`**, **`C:\Fable-External-Repair`** | ✅ removed (contents) | Recorded above. One cosmetic residual: the emptied `Fable-External-Repair` **directory node** is pinned by an OS handle — 0 entries, confirmed via PowerShell. |
 | **The unapproved VlogOps draft** | ✅ **kept, not published, not deleted** | Removed from the canonical working tree **only after** the durable copy at `~/.mypka/unpublished-drafts/` was verified byte-identical to **both** other copies. It is an unreviewed draft from a pipeline whose only prior run scored **2/10 on privacy comprehension**; `Fusion247PKA` is public. Consistent with Warwick's standing rulings — the same shape he chose for the PKM position. |
-| **Runtime / task / service alignment** | ✅ verified | Every scheduled task and every live node process resolves to `C:\Fusion247PKA` (canonical) or `C:\.fusion247` (approved private runtime). **None depends on a branch or worktree.** |
+| **Runtime / task / service alignment** | ✅ verified — **after a correction** | Every **scheduled task** (10/10) resolves to `C:\Fusion247PKA` (canonical) or `C:\.fusion247` (approved private runtime). ⚠️ **The original wording claimed the same of every live process, and that over-reached.** Veritas found a stranded process tree rooted in the candidate worktree — PID 12536, `services/proofline/test/helpers/harness.mjs`, an abandoned Proofline T-3b crash-test **alive since 2026-08-04 19:37**. My probe read command lines but did not chase the child chain. **Killed 2026-08-08** (`taskkill /T /F` on root PID 30764; 3 processes terminated), and re-probed: **zero node processes now reference `build-020-trial`.** The substantive property holds; the claim now rests on evidence that survives re-execution. It also mattered operationally — a live process rooted in the candidate worktree can obstruct retiring it. |
 
 **Estate now:** **2** worktrees · **3** local and **3** remote branches (`main`, the candidate, and its ancestor) · **0** stashes · **0** open PRs · canonical working tree **clean** · C-root holds only `C:\Fusion247PKA` and the active `C:\Fusion247PKA-build-020-trial`.
 
