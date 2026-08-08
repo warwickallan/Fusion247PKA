@@ -2869,6 +2869,23 @@ Any newly discovered **unrelated** defect: record once in [[Deliverables/BACKLOG
 
 **4C is finished only when Fusion247PKA demonstrates the model it is establishing for every future Build:** **ONE MAIN. ONE WORKING FOLDER. ONE AUTHORITATIVE SYSTEM.** And from then onward — *the active piece of work may temporarily exist beside MAIN; MERGE consumes it; nothing useful gets left behind.*
 
+### ⏳ OUTSTANDING ON ARRIVAL — **the Pax 4C rotation report. READ THIS BEFORE ANYTHING ELSE.**
+
+> **A Pax dispatch was IN FLIGHT when this session rotated, and it may return AFTER the `/clear`.**
+>
+> **Precedent, from this exact setup:** agent `aba3fc4a8b2c0798a` was dispatched in the session before the last `/clear`, **survived the clear**, and delivered its full result into the next session. **So expect this one to arrive, in a session whose Larry did not commission it.**
+>
+> **ON ARRIVAL, and it is not optional:**
+> 1. **Write the report to `Deliverables/`** — filename in the `2026-08-08-session-performance-report-subphase-4c-*.md` shape.
+> 2. **COMMIT it.** A returned worker whose output is never banked is unbanked work.
+> 3. **Incorporate it into the rotation close.**
+>
+> **⛔ THE 4C ROTATION IS NOT COMPLETE UNTIL THAT IS DONE.** 4C's *product* work is closed and converged; its *rotation close* is not. Do not treat the sub-phase as fully rotated, and do not open 4D's work package as though the close were finished, until the report is banked.
+>
+> **Its inputs, already committed:** [[Deliverables/2026-08-08-subagent-token-ledger-4c-session]] · [[Deliverables/2026-08-08-authority-breach-pr98-merged-without-warwick-authority]] · both Veritas receipts. **Pax was told to attack the ledger's accounting basis, not accept it** — if his return disputes it, the record wins and the correction is stated.
+>
+> **If it never arrives**, say so plainly and record it as an unbanked dispatch. **Do not write the report yourself** — the session cannot be its own sole witness, and that is the whole reason the step exists.
+
 ### 🎯 THE ONE CURRENT NEXT ACTION — **Sub-phase 4C: ESTATE RECONCILIATION & CONVERGENCE.**
 
 *(Renamed from "Canonical Estate Reset" 2026-08-08 — Warwick's four-term correction. **RECONCILE** decides what belongs; **MERGE** is the Git event; **CONVERGE** is the estate end state; **CLOSE** ends the sub-phase. Canonical in root `CLAUDE.md` § "Git ownership".)*
