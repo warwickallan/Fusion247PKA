@@ -39,6 +39,20 @@ const DIR = path.dirname(fileURLToPath(import.meta.url));
 // constructor removes the call site where that mistake was possible, and the gate executes it.
 const STATIC = staticCtx(DIR, process.env);
 const REPO = path.resolve(DIR, '..', '..');
+// WHERE THE DELIVERABLES ACTUALLY LIVE, resolved once at startup and announced out loud.
+//
+// THE DEFECT THIS CLOSES (BUILD-020 4D, found by execution). This process runs from the machine
+// install at ~/.mypka/tower-runtime, so `REPO` resolves THERE — and that install carries no
+// `Deliverables/`. Every request to open a session report answered "document missing", which is a
+// sentence about the FILE, and the file was never the problem: the server was looking in a tree that
+// has never contained one. A wrong-place read and a genuinely absent document rendered identically.
+//
+// `COCKPIT_REPO` names the canonical checkout when the server does not run from inside it. It is not
+// a hardcoded path and not a default that silently points somewhere plausible: when it is unset and
+// the local tree has no `Deliverables/`, the route below reports exactly which directory it looked
+// in, so the next reader sees the cause instead of a missing file.
+const DELIVERABLES_DIR = path.join(path.resolve(process.env.COCKPIT_REPO || REPO), 'Deliverables');
+const DELIVERABLES_OK = fs.existsSync(DELIVERABLES_DIR);
 const TK = path.join(REPO, 'Team Knowledge');
 const PORT = Number(process.env.COCKPIT_PORT || 8090);
 const BIND = process.env.COCKPIT_BIND || '127.0.0.1'; // localhost; Tailscale serve exposes it tailnet-only over HTTPS (matches Directus)
@@ -354,10 +368,15 @@ function listDeliverables() {
 async function apiDeliverable(file) {
   const safe = path.basename(String(file || ''));
   if (!safe.toLowerCase().endsWith('.md')) return { ok: false, error: 'not a document' };
-  const dir = path.join(REPO, 'Deliverables');
-  const fp = path.join(dir, safe);
-  if (!fp.startsWith(dir)) return { ok: false, error: 'path' };
-  try { return { ok: true, file: safe, text: fs.readFileSync(fp, 'utf8') }; } catch { return { ok: false, error: 'document missing' }; }
+  // THE DIRECTORY IS WRONG IS A DIFFERENT FACT FROM THE DOCUMENT IS MISSING, and only one of them
+  // tells the reader where to look. Reported before the read is attempted, because after it the two
+  // are indistinguishable.
+  if (!DELIVERABLES_OK) {
+    return { ok: false, error: `no Deliverables directory at ${DELIVERABLES_DIR} — this server is not running inside the canonical checkout. Set COCKPIT_REPO to it. The document itself was never looked for.` };
+  }
+  const fp = path.join(DELIVERABLES_DIR, safe);
+  if (!fp.startsWith(DELIVERABLES_DIR)) return { ok: false, error: 'path' };
+  try { return { ok: true, file: safe, text: fs.readFileSync(fp, 'utf8') }; } catch { return { ok: false, error: `document missing — looked in ${DELIVERABLES_DIR}` }; }
 }
 
 const server = http.createServer(async (req, res) => {
@@ -452,6 +471,12 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, BIND, () => {
   console.log(`Fusion247 Cockpit on http://${BIND}:${PORT} (tailnet-private)`);
+  // Same reasoning as the overlay line below: a Deliverables directory that is not there produces a
+  // surface that looks fine until Warwick clicks Open, and then blames the document. Say which
+  // directory was resolved, and say plainly when it does not exist, ONCE, at startup.
+  console.log(DELIVERABLES_OK
+    ? `Deliverables: ${DELIVERABLES_DIR}`
+    : `Deliverables: NOT FOUND at ${DELIVERABLES_DIR} — session reports cannot be opened or downloaded. Set COCKPIT_REPO to the canonical checkout.`);
   // Say once, out loud, what the overlay actually resolved to. A misconfigured path serves exactly
   // what "no overlay" serves, so without this line a typo is indistinguishable from switching it
   // off — and the surface you were expecting just never appears. The verdict is printed; the path

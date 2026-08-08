@@ -48,6 +48,9 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { readContinuityBrief } from './continuity.mjs';
+// The active CAPAE brief. Read from a PRECOMPUTED local file and never queried here: this hook runs
+// on every session start and must not depend on Supabase being reachable or the Cockpit being up.
+import { readBrief, renderActiveBrief } from './capae-brief.mjs';
 
 // INLINED from the deleted `rotate-session.mjs` (WO-OR-05). Four lines, one caller, and
 // keeping a module alive to export them would have been the tail wagging the dog.
@@ -1081,7 +1084,21 @@ async function main() {
     continuity = `⟦GOV⟧ HONCHO CONTINUITY: brief failed hard (${err.message}).`;
   }
 
-  process.stdout.write(JSON.stringify(toHookOutput(`${body}\n\n${continuity}`)));
+  // The active CAPAE brief, appended LAST — after the executed location probes and after the Honcho
+  // pointer. Ordering is deliberate and matches the reasoning above: these are patterns Larry is
+  // still at material risk of repeating, and they are read in the light of where he actually is
+  // rather than ahead of it.
+  //
+  // FAILS OPEN, LIKE EVERYTHING ELSE ON THIS PATH. An absent, unreadable or malformed brief yields
+  // '' and the session starts exactly as it did before this existed. It is also SILENT when there
+  // is nothing actionable — no families, no block, no line saying there is no block. That is the
+  // brief's own rule ("no actionable CAPAE state means no CAPAE noise") rather than a saving.
+  let capae = '';
+  try {
+    capae = renderActiveBrief(readBrief());
+  } catch { capae = ''; }
+
+  process.stdout.write(JSON.stringify(toHookOutput(`${body}\n\n${continuity}${capae ? `\n\n${capae}` : ''}`)));
   process.exitCode = 0;
 }
 

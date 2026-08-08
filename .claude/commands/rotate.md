@@ -84,6 +84,8 @@ You are Larry.
 
 **7b. Populate Supabase from the same evidence** — `node tools/session-report/populate.mjs --file <payload.json>`. Schema: `tools/session-report/schema.sql`. Credentials self-load from the approved runtime. **Success and failure must both be visible** (stdout/stderr JSON + `~/.mypka/governor/session-report-populate.jsonl`). A credentials-absent or post failure is a **recorded FAIL**, never silent success. Do not invent a green outcome.
 
+**7c. Update the CAPAE record from this rotation's findings.** `node tools/session-report/capae-sync.mjs <payload.json> [rotation_id]` — for every finding that names a `family`, it appends ONE occurrence and updates that family. ⛔ **An UNRECOGNISED slug is REPORTED and skipped, never created** (exit 3): naming a new family is a judgement about cause, and a judgement is not a script — name it deliberately or fix the slug. It also rewrites the tiny precomputed active brief a fresh Larry is handed at session start, so this rotation is reflected there without any query at hook time. **Visible success or visible failure only.**
+
 **8. Add the report POINTER to the active Wayfinder**, and commit it. The map must name the report by path **and the closing head**, so the fresh session finds it without being told.
 
 ---
