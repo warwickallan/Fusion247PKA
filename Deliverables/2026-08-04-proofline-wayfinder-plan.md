@@ -2922,6 +2922,24 @@ Any newly discovered **unrelated** defect: record once in [[Deliverables/BACKLOG
 - **Also required in 4D:** ⭐ **OUTCOME A** — distinct durable semantics for `CONTINUE` / `ROTATE` / `CLOSE-SESSION`, with a **real close-session → fresh-launch acceptance before BUILD-020 finishes.** See Amendment 15.
 - ⚠️ **Amendment 14's seven carried items are INPUTS AND DEBT, not authority to implement them.** Warwick, 2026-08-08.
 
+> ### 📊 4D EXECUTION — Warwick authorised the smallest proportionate implementation, 2026-08-08. **DELIVERED at `4901917`.**
+>
+> **Decision brief and the six seeded families:** [[Deliverables/2026-08-08-4d-capae-decision-brief-and-families]] — synthesis of Pax and Nolan, their three real disagreements settled, and what was deliberately NOT built.
+>
+> **✅ DONE, by execution:**
+> - **Outcome A** in `tools/governor/continuity.mjs` — `session_close` as a **content-bearing** field (`reason` is volatile and would have deduped the packet away) · a close packet carries **no map pointer** · it renders **positively** (*"DELIBERATELY CLOSED — not rotated"*, *"A CLOSED SESSION IS NOT A CLOSED BUILD"*) · third map-absence code `map-unresolvable` closing RCA §1.2. **116/116 green, four new tests, INSTALLED to `~/.mypka/governor/` and byte-verified against source.**
+> - **`/close-session`** steps 8–9 — publishes and reads back the close packet; carries the doctrine *"it may close a session and nothing else."*
+> - **`/rotate`** — Pax **off** the blocking path (step 6), family + exposure convention (6b), map-mismatch as a step-13 correction (11b), `SAFE TO CLEAR` re-cut so an outstanding return is **named** rather than absent (12).
+> - **`CLAUDE.md` § Wayfinder** — quote-vs-inference attribution rule, and *an amendment changing a phase's state is not complete until the rows it contradicts are re-cut in the same commit.*
+> - **Effectiveness** is one `family` slug plus one exposure word inside `session_report.rotation.findings`, which is **already `jsonb`, already written by `populate.mjs:425`, already read by the Cockpit.** No schema change, no migration, no new table, no register.
+>
+> **⛔ OUTSTANDING — 4D may not be reported complete until these are true:**
+> 1. **A REAL `/close-session` → REAL fresh launch, observed.** Warwick's stated bar before BUILD-020 finishes. Implemented and unit-tested; **not yet exercised end-to-end.**
+> 2. **Push.** `e750ddb`, `4f565b7`, `4901917` are banked locally and **unpushed** — `git push origin main` is denied by `C:\ProgramData\ClaudeCode\managed-settings.json`, a machine-level managed policy. Warwick authorised the correction; the harness classifier blocks the write from inside a session. **One elevated command was supplied to him.** Buzz cannot review until this clears.
+> 3. **No family is EFFECTIVE, and none may be claimed.** Zero qualified exposures have occurred under 4D. **The maximum truthful claim is that the loop can now name a family, carry it, and count a recurrence.**
+>
+> **📌 The pilot family is FF-01 `work-order-not-generated`** — Warwick's steer moved it there from both specialists' tonight-centred choices. **Its next qualified exposure is the next real Work Order.** Not manufactured, not scheduled.
+
 > ### ⛔ HISTORICAL FROM HERE DOWN IN THIS SECTION — Sub-phase 4C, **CLOSED by Warwick 2026-08-08 (Amendment 15).**
 >
 > **The 4C rows, inventory, target end state and assurance standing below are retained as EVIDENCE of a closed sub-phase. They direct nothing.** ⚠️ **Rows 3 and 6 below still read `AWAITING WARWICK'S RATIFICATION` and `IN PROGRESS — not yet claimed`. Both were true when written and are SUPERSEDED by the closure** — ratification landed at `d1feb60`, the focused Veritas confirmation at `49f134f`, Codex round 3 approved, the merge at `eb03696`, post-merge convergence at `0b1fd1a`/`0d4f3a4`, and `~/.mypka/tower-backups/` no longer exists. **They are left visible rather than overwritten because the gap between them and Amendment 14 IS tonight's failure 3, and erasing the evidence of a defect while closing it is how the same defect returns.**
