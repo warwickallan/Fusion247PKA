@@ -1,0 +1,17 @@
+{
+  "session_date": "2026-08-08",
+  "branch": "build-015/grounded-recognition",
+  "closing_head": "c4c0a4121169ed6759bf0dde1c3799c671d2abb5",
+  "map_path": "Deliverables/2026-08-04-build-015-asdair-wayfinder-plan.md",
+  "deliverable_path": "Deliverables/2026-08-08-session-performance-report-b15-session.md",
+  "payload_path": "Deliverables/2026-08-08-capae-fold-record-amended-b15.json",
+  "notes": "FOLD payload only: carries the single finding Larry deliberately left ungraded at the primary sync (self-award prohibited). Pax's session report awarded it; this fold records HIS verdict against the same rotation. Primary payload: Deliverables/2026-08-08-session-report-payload-b15-session.json (rotation 17fda1dc-8e78-44ab-b303-437ccd66cd2c).",
+  "findings": [
+    {
+      "family": "record-amended-body-not-recut",
+      "exposure": "clean",
+      "summary": "PAX AWARDED, not Larry: six state-changing record edits this session struck the superseded rows in the same commits (map frontier re-cuts, the bootstrap-evidence attribution correction, the WP status re-cut, the Proofline 4E close, the launch-attempt supersession) — independently verified by Pax in the session performance report. Second consecutive clean exposure.",
+      "evidence_ref": "Deliverables/2026-08-08-session-performance-report-b15-session.md"
+    }
+  ]
+}

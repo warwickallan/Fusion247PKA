@@ -580,29 +580,40 @@ currently running CANONICAL MAIN bytes (restored; the card code is NOT live yet)
 acceptance runtime (a process start carrying secrets-store env-file arguments — twice denied;
 worked around by NOTHING, per the guard's intent). **Warwick has two options, dinged to him
 (425):**
-- **(a) RECOMMENDED:** he runs, in the session:
-  `! powershell -ExecutionPolicy Bypass -File "Deliverables/2026-08-08-start-acceptance-runtime.ps1"`
-  *(committed copy in this worktree — run from `C:\Fusion247PKA-b15`; it swaps the poller to this
-  branch head, and within ~2 poller ticks shop 6's confirmation card lands on ShopperBot; HIS TAP
-  on "Confirm this reading" is the §11 acceptance event).* Watch item: gate-clear → replan fires
+- ~~(a) he runs the committed launcher script~~ **ATTEMPTED BY WARWICK 2026-08-08 ~23:53 — FAILED,
+  mundane cause established:** the script killed the canonical runtime and the launcher then died
+  before its first log line because **a git worktree carries no `node_modules`** — the branch
+  worktree has Keel's source but not the installed dependencies. Nothing was corrupted; the
+  canonical runtime was restored via the scheduled task (PID 10192, 23:55:16). *(The log's
+  `wait:interpretation_confirmation` lines up to 23:50:52 are the OLD code's silent park — the
+  pre-existing gate with no surface, exactly break 8 — not the new card code running.)*
+- **(a′) still-live variant:** `npm install` (or `npm ci`) in the worktree's
+  `services/asdair/{pipeline,pipeline-runtime,bot,intake}` packages, then rerun the committed
+  launcher — same card-within-two-ticks outcome. Watch item unchanged: gate-clear → replan fires
   the first-ever live `recordAnswerLearning` writes, which park the shop FAILED on any error —
-  that outcome is honest acceptance evidence of the audit-predicted seam, not a card defect.
-- **(b) "merge first":** Codex merge-check on this branch through the Tower-visible
-  `mergeCheck.mjs` route → Warwick's `merge-decision` → the scheduled task then serves the new
-  code from canonical `main` with no special start.
+  honest acceptance evidence of the audit-predicted seam, not a card defect.
+- **(b) NOW RECOMMENDED — "merge first":** Codex merge-check on this branch through the
+  Tower-visible `mergeCheck.mjs` route → Warwick's `merge-decision` → merge → the scheduled task
+  serves the new code from canonical `main` with its existing installed dependencies — no special
+  start, no worktree deps, and the Tower conversation Warwick asked for becomes visible on the
+  route that produces it.
 
 **After the acceptance event (either route): the Asda Build 002 §12 handback** — WP outcome + real
 evidence + both audit headlines + the next-slice recommendation (both audits point at durable
 human learning / intent promotion over invariant-D retention; the going-forward act rides the new
 card). **That handback is the next genuine product decision.**
 
-**📄 SESSION REPORT — rotation 2026-08-08/09.** The closing head is the commit AFTER the one
-carrying this block (the payload commit; the payload names both exactly).
-- **Report:** [[Deliverables/2026-08-08-session-performance-report-b15-session]] — ⏳
-  **COMMISSIONED, OUTSTANDING AT ROTATION** (Pax, non-blocking per `/rotate` step 6). **When it
-  lands: commit it, fold its CAPAE grades — including the deliberately Larry-ungraded
-  `record-amended-body-not-recut` — into the record via `capae-sync.mjs`.** It writes to this
-  worktree's `Deliverables/` untracked.
+**📄 SESSION REPORT — rotation 2026-08-08/09.** The payload describes session head `c4c0a41`; the
+rotation-tail commits after it (payload banking, the launch-attempt record, Pax's report fold) are
+part of this same rotation and the continuity packet names the true final tip.
+- **Report:** [[Deliverables/2026-08-08-session-performance-report-b15-session]] — ✅ **LANDED
+  BEFORE THE CLEAR and banked.** Executive CAPAE: **all four preventions held — the first
+  all-clean session since the loop began** (`built-tested-never-activated` improved under its
+  heaviest exercise; `record-amended-body-not-recut` second consecutive clean, PAX-awarded and
+  folded via `capae-sync.mjs`). The one recurrence is outside the tracked families — the Codex
+  route-selection/TowerBot class, already adjudicated by Warwick as 4F evidence. Two NEW family
+  candidates proposed for Warwick's decision (never minted by script): `channel-healthy-route-not-called`
+  and `session-meter-not-read-at-open`.
 - **Payload:** [[Deliverables/2026-08-08-session-report-payload-b15-session.json]] · **Ledger:**
   [[Deliverables/2026-08-08-subagent-token-ledger-b15-session]] (A = 1,250,384 dedup; Larry's
   closing context level 582.9k/1000k separate) · **Order of record:**
