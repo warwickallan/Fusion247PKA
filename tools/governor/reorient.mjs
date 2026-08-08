@@ -1095,6 +1095,14 @@ async function main() {
   // brief's own rule ("no actionable CAPAE state means no CAPAE noise") rather than a saving.
   let capae = '';
   try {
+    // SNAPSHOT FIRST, THEN RENDER. `capae-sync.mjs` rewrites capae-active.json at every rotation, so
+    // this is the only moment the brief Larry is ACTUALLY being handed still exists on disk. /rotate
+    // reads the snapshot to give Pax the exact opening brief rather than the one written after the
+    // session it is judging. Failure is silent by design — the hook must never break a session start.
+    //
+    // ⚠️ THIS LINE WAS MISSING. The import was added and the CALL was not, so the comparison arm was
+    // dead code while being reported as wired — caught by Pax's evaluation, 2026-08-08.
+    snapshotOpeningBrief();
     capae = renderActiveBrief(readBrief());
   } catch { capae = ''; }
 

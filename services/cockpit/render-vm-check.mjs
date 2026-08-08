@@ -408,16 +408,21 @@ const RR_ALL_NULL = {
   findings: null, unestablished: null, notes: null, specialists: null,
 };
 
-// ⚠️ THESE SCENARIOS NOW RUN AGAINST `settings`, NOT `system` — 2026-08-08, Buzz defect 1.
+// ⚠️ THESE SCENARIOS RUN AGAINST `system` — and this constant has now moved TWICE in one day.
 //
-// Warwick specified Session / Rotation Reports and CAPAE as surfaces in SETTINGS. They had been
-// built into the System pane, which is the template's terminal `v-else`. Moving the markup without
-// moving these scenarios would have left 45 assertions passing against a pane that no longer holds
-// the surface — a check measuring the wrong place, which is worse than no check.
+// 2026-08-08 morning: Warwick placed Session/Rotation Reports and CAPAE in SETTINGS, so this read
+// `settings`. 2026-08-08 afternoon: he corrected that placement — they belong in SYSTEM, which owns
+// current operational state, CAPAE, session performance and operational history. Settings returns to
+// configuration and app information.
+//
+// THE REASON THIS COMMENT IS LONGER THAN THE LINE IT EXPLAINS: each time the markup moved, 45 of the
+// 54 assertions below went green against a pane that no longer contained the surface. A check bound
+// to the wrong area does not fail loudly — it passes quietly, which is worse than having no check at
+// all. If the placement moves again, move this constant IN THE SAME COMMIT.
 //
 // `currentView` is left pointing at a real app view so nothing OUTSIDE the area branches degrades:
 // the scenario under test is the reports/CAPAE surface, not a half-initialised shell.
-const SYS = { area: 'settings' };
+const SYS = { area: 'system' };
 // The four rr* refs are set on EVERY System scenario, never partially: they are shared module state,
 // and a scenario that inherits a previous one's rrErr is testing something nobody wrote down.
 // `rrOpenCard: '0'` OPENS THE FIRST CARD, and it is load-bearing rather than convenience.
@@ -571,11 +576,12 @@ const SYSTEM_PLAN = [
       ['no empty-list wording appears on a failed read', (p) => !hasText(p, 'there are none recorded yet')],
       ['CONTAINMENT: the System header still renders', (p) => hasText(p, 'System')],
       ['CONTAINMENT: the status line above still renders', (p) => hasText(p, 'Building — nothing blocking me')],
-      // Re-anchored 2026-08-08 with the surface's move into Settings. The PROPERTY is unchanged and
-      // is Amendment 7's: a failed report read must not take the rest of the pane down with it. The
-      // neighbouring group is now Settings' "This app" rather than System's "Happening now".
-      ['CONTAINMENT: the "This app" group above still renders',
-        (p) => hasText(p, 'This app') && hasText(p, 'Fusion247 Cockpit')],
+      // Re-anchored TWICE on 2026-08-08, following the surface back into System. The PROPERTY never
+      // changed and is Amendment 7's: a failed report read must not take the rest of the pane down
+      // with it. Only the neighbouring group moved — "Happening now" is System's, and it is the
+      // group that must survive a database failure in the reports below it.
+      ['CONTAINMENT: the "Happening now" group above still renders',
+        (p) => hasText(p, 'Happening now') && hasText(p, 'Nothing actively building.')],
       ['the failure offers a retry', (p) => hasText(p, 'Try again')],
     ]],
 ];

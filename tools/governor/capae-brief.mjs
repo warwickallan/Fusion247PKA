@@ -66,7 +66,13 @@ export function buildBrief(families, { at = null } = {}) {
       state: String(f.state || 'MONITORING'),
       cause: f.root_cause ? String(f.root_cause) : null,
       must: f.required_larry_behaviour ? String(f.required_larry_behaviour) : null,
-      effectiveness: f.effectiveness ? String(f.effectiveness) : null,
+      // ⚠️ `f.effectiveness` IS NOT A COLUMN. This read `f.effectiveness` and mapped it straight
+      // through, so every brief carried `effectiveness: null` and the fraction in Warwick's own
+      // example ("2/5") was unrenderable no matter how much evidence accumulated — Larry saw a bare
+      // state forever. The two numbers ARE fetched by the caller's select; they were simply dropped
+      // here. Carried as NUMBERS, formatted at render, so the brief stays a data file.
+      clean: Number(f.exposures_clean) || 0,
+      required: Number(f.exposures_required) > 0 ? Number(f.exposures_required) : null,
     })),
   };
 }
@@ -153,7 +159,14 @@ export function renderActiveBrief(brief, { now = new Date() } = {}) {
     if (f.cause) bits.push(`— cause: ${f.cause}`);
     lines.push(bits.join(' '));
     if (f.must) lines.push(`      MUST: ${f.must}`);
-    lines.push(`      ${f.occurrences} occurrence${f.occurrences === 1 ? '' : 's'} · ${f.effectiveness || f.state}`);
+    // The EVIDENCE, formatted here rather than stored: "2 of 5 clean" is the one line that tells
+    // Larry whether the prevention is actually being proven, and it is what makes the counter worth
+    // carrying at all. Without a threshold there is no denominator, so the state stands alone rather
+    // than implying progress against a bar nobody set.
+    const evidence = f.required
+      ? `${f.clean || 0} of ${f.required} clean exposures · ${f.state}`
+      : String(f.state);
+    lines.push(`      ${f.occurrences} occurrence${f.occurrences === 1 ? '' : 's'} · ${evidence}`);
   }
   lines.push('  → If one of these situations arises this session, it is a QUALIFIED EXPOSURE: record the outcome in the rotation report against its family slug. Do not manufacture work to create one.');
   return lines.join('\n');

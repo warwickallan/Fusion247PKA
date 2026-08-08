@@ -1711,6 +1711,12 @@ createApp({
           <div class="item grey"><div class="i-main"><div class="i-title">You're on the standalone Cockpit ✅</div><div class="i-why">{{ host }} — the https tailnet app (not Directus, not the old IP link)</div></div></div>
           <div class="item grey"><div class="i-main"><div class="i-title">On the latest?</div><div class="i-why">Reload the app — if the build code above changes, you've picked up a newer version.</div></div></div>
         </div>
+      </section>
+
+      <!-- SYSTEM — answers "what's happening now?"; history is deeper down -->
+      <section v-else class="pane">
+        <header class="p-h"><h1>System</h1></header>
+        <div class="status-line" :class="{red: statusTone==='red'}"><span>{{ statusTone==='red' ? '🔴' : '🟢' }}</span>{{ statusLine }}</div>
         <!-- ================= CAPAE =================================================
              A SEPARATE section from Session / Rotation Reports, deliberately. A rotation report is
              what happened in ONE session; a CAPAE family is what keeps happening ACROSS sessions and
@@ -2274,12 +2280,6 @@ createApp({
             <pre class="rr-doc" style="white-space:pre-wrap;overflow-x:auto;max-height:60vh;overflow-y:auto">{{ rrDoc.text }}</pre>
           </div>
         </div>
-      </section>
-
-      <!-- SYSTEM — answers "what's happening now?"; history is deeper down -->
-      <section v-else class="pane">
-        <header class="p-h"><h1>System</h1></header>
-        <div class="status-line" :class="{red: statusTone==='red'}"><span>{{ statusTone==='red' ? '🔴' : '🟢' }}</span>{{ statusLine }}</div>
         <div class="grp"><h2>Happening now<span class="g-count">{{ builds.length }}</span></h2>
           <div v-if="!builds.length" class="empty">Nothing actively building.</div>
           <div v-for="b in builds" :key="b.id" class="item" :class="b.status_tone==='block' ? 'red':'grey'">

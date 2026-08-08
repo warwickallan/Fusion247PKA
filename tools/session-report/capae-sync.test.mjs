@@ -113,7 +113,7 @@ test('CAPAE vocabulary (MUTATION): NOTHING unreadable becomes RECURRENCE', () =>
 test('REAL SYNC: a malformed exposure is REJECTED, writes nothing, and fails visibly', async () => {
   await isolatedHome(async () => {
     const db = fakeDb([FAMILY()]);
-    const r = await syncCapae(payload(finding({ exposure: 'reccurence' })), { rotationId: 'rot-1', transport: db.call });
+    const r = await syncCapae(payload(finding({ exposure: 'reccurence' })), { rotationId: 'rot-1', transport: db.call, briefPath: join(process.env.TEMP || tmpdir(), "capae-test-brief.json") });
     assert.equal(r.ok, false, 'a rejected exposure must make the sync unsuccessful');
     assert.deepEqual(r.rejected, [{ slug: 'ff-01', exposure: 'reccurence' }]);
     assert.equal(db.inserted, 0, 'nothing may be written for a rejected exposure');
@@ -130,13 +130,13 @@ test('REAL SYNC: a CLEAN exposure advances effectiveness evidence, and reaching 
   await isolatedHome(async () => {
     const db = fakeDb([FAMILY({ exposures_required: 2 })]);
 
-    const one = await syncCapae(payload(finding()), { rotationId: 'rot-1', transport: db.call });
+    const one = await syncCapae(payload(finding()), { rotationId: 'rot-1', transport: db.call, briefPath: join(process.env.TEMP || tmpdir(), "capae-test-brief.json") });
     assert.equal(one.ok, true);
     assert.equal(db.families[0].exposures_clean, 1, 'clean must ADVANCE the evidence');
     assert.equal(db.families[0].state, 'MONITORING', 'one of two is not yet proven');
     assert.equal(db.families[0].occurrences, 0, 'a clean exposure is not a failure');
 
-    await syncCapae(payload(finding()), { rotationId: 'rot-2', transport: db.call });
+    await syncCapae(payload(finding()), { rotationId: 'rot-2', transport: db.call, briefPath: join(process.env.TEMP || tmpdir(), "capae-test-brief.json") });
     assert.equal(db.families[0].exposures_clean, 2);
     assert.equal(db.families[0].state, 'EFFECTIVE', 'the threshold is met, so the prevention is proven');
   });
@@ -145,7 +145,7 @@ test('REAL SYNC: a CLEAN exposure advances effectiveness evidence, and reaching 
 test('REAL SYNC: NONE-THIS-SESSION is recorded but is NOT a failure and NOT a clean exposure', async () => {
   await isolatedHome(async () => {
     const db = fakeDb([FAMILY()]);
-    const r = await syncCapae(payload(finding({ exposure: 'none-this-session' })), { rotationId: 'rot-1', transport: db.call });
+    const r = await syncCapae(payload(finding({ exposure: 'none-this-session' })), { rotationId: 'rot-1', transport: db.call, briefPath: join(process.env.TEMP || tmpdir(), "capae-test-brief.json") });
     assert.equal(r.ok, true);
     assert.equal(db.inserted, 1, 'it IS recorded — absence of opportunity is evidence');
     assert.equal(db.families[0].occurrences, 0, 'must not masquerade as an occurrence of the failure');
@@ -157,7 +157,7 @@ test('REAL SYNC: NONE-THIS-SESSION is recorded but is NOT a failure and NOT a cl
 test('REAL SYNC: UNMEASURABLE-AT-THIS-FREQUENCY does not become a recurrence', async () => {
   await isolatedHome(async () => {
     const db = fakeDb([FAMILY()]);
-    const r = await syncCapae(payload(finding({ exposure: 'unmeasurable-at-this-frequency' })), { rotationId: 'rot-1', transport: db.call });
+    const r = await syncCapae(payload(finding({ exposure: 'unmeasurable-at-this-frequency' })), { rotationId: 'rot-1', transport: db.call, briefPath: join(process.env.TEMP || tmpdir(), "capae-test-brief.json") });
     assert.equal(r.ok, true);
     assert.equal(db.occurrences[0].disposition, 'UNMEASURABLE');
     assert.equal(db.families[0].occurrences, 0, 'rarity is not a fault');
@@ -168,11 +168,11 @@ test('REAL SYNC: UNMEASURABLE-AT-THIS-FREQUENCY does not become a recurrence', a
 test('REAL SYNC: a RECURRENCE after EFFECTIVE reopens the family and returns it to Larry\'s attention', async () => {
   await isolatedHome(async () => {
     const db = fakeDb([FAMILY({ exposures_required: 2 })]);
-    await syncCapae(payload(finding()), { rotationId: 'r1', transport: db.call });
-    await syncCapae(payload(finding()), { rotationId: 'r2', transport: db.call });
+    await syncCapae(payload(finding()), { rotationId: 'r1', transport: db.call, briefPath: join(process.env.TEMP || tmpdir(), "capae-test-brief.json") });
+    await syncCapae(payload(finding()), { rotationId: 'r2', transport: db.call, briefPath: join(process.env.TEMP || tmpdir(), "capae-test-brief.json") });
     assert.equal(db.families[0].state, 'EFFECTIVE');
 
-    await syncCapae(payload(finding({ exposure: 'recurrence' })), { rotationId: 'r3', transport: db.call });
+    await syncCapae(payload(finding({ exposure: 'recurrence' })), { rotationId: 'r3', transport: db.call, briefPath: join(process.env.TEMP || tmpdir(), "capae-test-brief.json") });
     assert.equal(db.families[0].state, 'CHALLENGED', 'a proven prevention that fails is CHALLENGED, not quietly still EFFECTIVE');
     assert.equal(db.families[0].occurrences, 1);
     assert.equal(db.families[0].exposures_clean, 0, 'the clean streak is broken, so the evidence resets');
@@ -192,11 +192,11 @@ test('REAL SYNC: replaying the SAME rotation does not double-count anything', as
     const db = fakeDb([FAMILY({ exposures_required: 5 })]);
     const p = payload(finding({ exposure: 'recurrence' }));
 
-    await syncCapae(p, { rotationId: 'rot-1', transport: db.call });
+    await syncCapae(p, { rotationId: 'rot-1', transport: db.call, briefPath: join(process.env.TEMP || tmpdir(), "capae-test-brief.json") });
     const afterFirst = { ...db.families[0] };
     assert.equal(afterFirst.occurrences, 1);
 
-    for (let i = 0; i < 3; i++) await syncCapae(p, { rotationId: 'rot-1', transport: db.call });
+    for (let i = 0; i < 3; i++) await syncCapae(p, { rotationId: 'rot-1', transport: db.call, briefPath: join(process.env.TEMP || tmpdir(), "capae-test-brief.json") });
 
     assert.equal(db.inserted, 1, 'the same (family, rotation) may only ever produce ONE occurrence row');
     assert.equal(db.families[0].occurrences, 1, 'and the count must not move on replay');
@@ -208,8 +208,8 @@ test('REAL SYNC: replaying the SAME rotation does not double-count anything', as
 test('REAL SYNC: a DIFFERENT rotation reporting the same family does count again', async () => {
   await isolatedHome(async () => {
     const db = fakeDb([FAMILY({ exposures_required: 5 })]);
-    await syncCapae(payload(finding({ exposure: 'recurrence' })), { rotationId: 'rot-1', transport: db.call });
-    await syncCapae(payload(finding({ exposure: 'recurrence' })), { rotationId: 'rot-2', transport: db.call });
+    await syncCapae(payload(finding({ exposure: 'recurrence' })), { rotationId: 'rot-1', transport: db.call, briefPath: join(process.env.TEMP || tmpdir(), "capae-test-brief.json") });
+    await syncCapae(payload(finding({ exposure: 'recurrence' })), { rotationId: 'rot-2', transport: db.call, briefPath: join(process.env.TEMP || tmpdir(), "capae-test-brief.json") });
     assert.equal(db.families[0].occurrences, 2, 'replay safety must not become "never counts twice"');
   });
 });
@@ -217,7 +217,7 @@ test('REAL SYNC: a DIFFERENT rotation reporting the same family does count again
 test('REAL SYNC: a null rotation_id cannot be deduplicated, and the result SAYS so', async () => {
   await isolatedHome(async () => {
     const db = fakeDb([FAMILY()]);
-    const r = await syncCapae(payload(finding()), { rotationId: null, transport: db.call });
+    const r = await syncCapae(payload(finding()), { rotationId: null, transport: db.call, briefPath: join(process.env.TEMP || tmpdir(), "capae-test-brief.json") });
     assert.equal(r.unDedupable, 1, 'the caller must be told which writes had no replay protection');
   });
 });
@@ -267,7 +267,7 @@ test('REAL SYNC: two DIFFERENT findings for the same family in ONE rotation both
     await syncCapae(payload(
       finding({ exposure: 'recurrence', summary: 'PR merged without authority' }),
       finding({ exposure: 'recurrence', summary: 'Amendment heading asserted a decision' }),
-    ), { rotationId: 'rot-1', transport: db.call });
+    ), { rotationId: 'rot-1', transport: db.call, briefPath: join(process.env.TEMP || tmpdir(), "capae-test-brief.json") });
 
     assert.equal(db.inserted, 2, 'two distinct findings are two distinct occurrences');
     assert.equal(db.families[0].occurrences, 2);
@@ -276,7 +276,7 @@ test('REAL SYNC: two DIFFERENT findings for the same family in ONE rotation both
     await syncCapae(payload(
       finding({ exposure: 'recurrence', summary: 'PR merged without authority' }),
       finding({ exposure: 'recurrence', summary: 'Amendment heading asserted a decision' }),
-    ), { rotationId: 'rot-1', transport: db.call });
+    ), { rotationId: 'rot-1', transport: db.call, briefPath: join(process.env.TEMP || tmpdir(), "capae-test-brief.json") });
     assert.equal(db.inserted, 2, 'replay of the same findings must remain a no-op');
     assert.equal(db.families[0].occurrences, 2);
   });

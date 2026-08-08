@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { shouldRemind, lastDingMs, run, REMINDER } from './idle-ding-check.mjs';
 
 test('REMINDS when no ding has gone out since the last idle moment — the 2026-08-08 failure', () => {
@@ -69,4 +70,62 @@ test('the reminder points at the rule and does NOT restate its criteria', () => 
   assert.match(REMINDER, /Rule 4a/);
   assert.doesNotMatch(REMINDER, /SAFE TO CLEAR|routine progress narration/,
     'copying the criteria here would create a duplicate that drifts from the canonical rule');
+});
+
+// ---------------------------------------------------------------------------
+// The four properties Warwick required proving against 34d0cd0's objection.
+// 34d0cd0 (2026-08-06) rejected a NAIVE Stop reminder because it would fire every turn, become
+// noise and be ignored. These pin the difference between that design and this one.
+// ---------------------------------------------------------------------------
+import { RECENT_CONTACT_MS } from './idle-ding-check.mjs';
+const MIN = 60_000;
+const BASE = 1_000_000_000;
+
+test('PROPERTY: no ding since the previous idle, and none recent → REMINDS', () => {
+  assert.equal(shouldRemind({ lastDing: BASE, lastStop: BASE + 30 * MIN, now: BASE + 31 * MIN }), true);
+});
+
+test('PROPERTY: a genuine ding since the previous idle → QUIET', () => {
+  assert.equal(shouldRemind({ lastDing: BASE + 40 * MIN, lastStop: BASE + 30 * MIN, now: BASE + 41 * MIN }), false);
+});
+
+test('PROPERTY (the 34d0cd0 objection): ordinary turns do NOT become wallpaper', () => {
+  // Six ordinary turns a minute apart, one real ding during turn 3. Measured BEFORE the recent-
+  // contact window existed: 5 of 6 fired. That is the wallpaper the earlier design was rejected for.
+  let lastStop = 0, lastDing = 0, fired = 0;
+  for (let turn = 1; turn <= 6; turn++) {
+    const now = BASE + turn * MIN;
+    if (turn === 3) lastDing = now - 1;
+    if (shouldRemind({ lastDing, lastStop, now })) fired++;
+    lastStop = now;
+  }
+  assert.ok(fired <= 2, `expected at most 2 reminders across a kept-informed exchange, got ${fired}`);
+});
+
+test('PROPERTY: but the REAL failure still fires every time — six turns, never dinged', () => {
+  let lastStop = 0, fired = 0;
+  for (let turn = 1; turn <= 6; turn++) {
+    const now = BASE + turn * MIN;
+    if (shouldRemind({ lastDing: 0, lastStop, now })) fired++;
+    lastStop = now;
+  }
+  assert.equal(fired, 6, 'muting must never swallow a stretch with no notification at all');
+});
+
+test('MUTATION: the recent-contact window is what does the muting, and it expires', () => {
+  const justInside = { lastDing: BASE, lastStop: BASE + MIN, now: BASE + RECENT_CONTACT_MS - 1 };
+  const justOutside = { lastDing: BASE, lastStop: BASE + MIN, now: BASE + RECENT_CONTACT_MS + 1 };
+  assert.equal(shouldRemind(justInside), false, 'inside the window it must stay quiet');
+  assert.equal(shouldRemind(justOutside), true, 'outside it the reminder must return');
+});
+
+test('CAPABILITY: the hook cannot send, spawn, or invoke a model — asserted on CODE, not comments', () => {
+  const src = readFileSync(new URL('./idle-ding-check.mjs', import.meta.url), 'utf8')
+    .split('\n').filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).join('\n');
+  for (const [name, re] of Object.entries({
+    network: /fetch\(|https?:\/\/|axios/,
+    spawn: /child_process|spawn|exec\(/,
+    model: /Agent|subagent|anthropic/i,
+    send: /sendMessage|telegram|bot\d/i,
+  })) assert.ok(!re.test(src), `hook must not be capable of ${name}`);
 });
