@@ -28,7 +28,7 @@
  */
 import { readFileSync, existsSync, appendFileSync, mkdirSync, writeFileSync, unlinkSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { homedir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
@@ -172,7 +172,7 @@ function appendLog(entry, secrets = []) {
  * Run SQL via psql. Connection string passed as argv only to the child; not exported
  * into this process's process.env. Child env gets PGSSLROOTCERT when CA path exists.
  */
-function runPsql(databaseUrl, sslCaFile, args, secrets) {
+export function runPsql(databaseUrl, sslCaFile, args, secrets) {
   const conn = toPsqlConnectionString(databaseUrl);
   const env = { ...process.env, PGSSLMODE: 'require' };
   // Do not leave DATABASE_URL / SUPABASE_* in child from parent either
@@ -210,7 +210,7 @@ function runPsql(databaseUrl, sslCaFile, args, secrets) {
   };
 }
 
-function sqlLiteral(value) {
+export function sqlLiteral(value) {
   if (value === null || value === undefined) return 'NULL';
   if (typeof value === 'boolean') return value ? 'TRUE' : 'FALSE';
   if (typeof value === 'number' && Number.isFinite(value)) return String(value);
@@ -754,7 +754,19 @@ async function main() {
   process.exit(verification.ok ? 0 : 8);
 }
 
-main().catch((e) => {
-  process.stderr.write(JSON.stringify({ ok: false, why: 'exception', message: String(e?.message || e) }) + '\n');
-  process.exit(1);
-});
+// THE HOUSE MAIN-GUARD (`continuity.mjs` precedent) — and it is a defect repair, not tidying.
+//
+// `main()` was called unconditionally at module load. Any module that imported this one to reuse
+// `loadCredentials` therefore ran the CLI: with no --file and no --apply-schema it printed the usage
+// line and called process.exit BEFORE the importer got its credentials. `capae-sync.mjs` imports
+// exactly that function, so the entire CAPAE sync path terminated on its first real call and had
+// never once completed against the live database. Everything downstream of it — occurrences, family
+// counters, effectiveness, the precomputed brief — was consequently never written by the production
+// route, while the unit tests (which inject a transport) stayed green.
+const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (isMain) {
+  main().catch((e) => {
+    process.stderr.write(JSON.stringify({ ok: false, why: 'exception', message: String(e?.message || e) }) + '\n');
+    process.exit(1);
+  });
+}

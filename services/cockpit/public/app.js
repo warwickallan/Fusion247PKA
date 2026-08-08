@@ -1680,19 +1680,6 @@ createApp({
           <div class="item grey"><div class="i-main"><div class="i-title">You're on the standalone Cockpit ✅</div><div class="i-why">{{ host }} — the https tailnet app (not Directus, not the old IP link)</div></div></div>
           <div class="item grey"><div class="i-main"><div class="i-title">On the latest?</div><div class="i-why">Reload the app — if the build code above changes, you've picked up a newer version.</div></div></div>
         </div>
-      </section>
-
-      <!-- SYSTEM — answers "what's happening now?"; history is deeper down -->
-      <section v-else class="pane">
-        <header class="p-h"><h1>System</h1></header>
-        <div class="status-line" :class="{red: statusTone==='red'}"><span>{{ statusTone==='red' ? '🔴' : '🟢' }}</span>{{ statusLine }}</div>
-        <div class="grp"><h2>Happening now<span class="g-count">{{ builds.length }}</span></h2>
-          <div v-if="!builds.length" class="empty">Nothing actively building.</div>
-          <div v-for="b in builds" :key="b.id" class="item" :class="b.status_tone==='block' ? 'red':'grey'">
-            <div class="i-main"><div class="i-title">{{ b.name }}</div><div class="i-why">{{ b.gives }} · {{ b.progress_pct || 0 }}%</div></div>
-            <span class="chip" :class="b.status_tone==='block' ? 'block' : (b.status_tone==='ok' ? 'ok':'prog')"><span class="d"></span>{{ b.status }}</span>
-          </div>
-        </div>
         <!-- ── SESSION / ROTATION REPORTS ─────────────────────────────────────────────────────
              Warwick's /rotate reports, most recent first. THE HONESTY CHAIN IS THE POINT, so read
              the v-if order — each rung is a DIFFERENT fact and none may be collapsed into another:
@@ -2137,6 +2124,19 @@ createApp({
               <button class="refresh" style="margin-left:6px" @click="rrCloseDoc()">Close</button>
             </div>
             <pre class="rr-doc" style="white-space:pre-wrap;overflow-x:auto;max-height:60vh;overflow-y:auto">{{ rrDoc.text }}</pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- SYSTEM — answers "what's happening now?"; history is deeper down -->
+      <section v-else class="pane">
+        <header class="p-h"><h1>System</h1></header>
+        <div class="status-line" :class="{red: statusTone==='red'}"><span>{{ statusTone==='red' ? '🔴' : '🟢' }}</span>{{ statusLine }}</div>
+        <div class="grp"><h2>Happening now<span class="g-count">{{ builds.length }}</span></h2>
+          <div v-if="!builds.length" class="empty">Nothing actively building.</div>
+          <div v-for="b in builds" :key="b.id" class="item" :class="b.status_tone==='block' ? 'red':'grey'">
+            <div class="i-main"><div class="i-title">{{ b.name }}</div><div class="i-why">{{ b.gives }} · {{ b.progress_pct || 0 }}%</div></div>
+            <span class="chip" :class="b.status_tone==='block' ? 'block' : (b.status_tone==='ok' ? 'ok':'prog')"><span class="d"></span>{{ b.status }}</span>
           </div>
         </div>
 

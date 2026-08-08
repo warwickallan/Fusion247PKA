@@ -404,10 +404,16 @@ const RR_ALL_NULL = {
   findings: null, unestablished: null, notes: null, specialists: null,
 };
 
-// The System pane is reached by `area`, not by a view key: it is the template's terminal `v-else`.
-// `currentView` is left pointing at a real app view so nothing OUTSIDE the area branches degrades —
-// the scenario under test is the System pane, not a half-initialised shell.
-const SYS = { area: 'system' };
+// ⚠️ THESE SCENARIOS NOW RUN AGAINST `settings`, NOT `system` — 2026-08-08, Buzz defect 1.
+//
+// Warwick specified Session / Rotation Reports and CAPAE as surfaces in SETTINGS. They had been
+// built into the System pane, which is the template's terminal `v-else`. Moving the markup without
+// moving these scenarios would have left 45 assertions passing against a pane that no longer holds
+// the surface — a check measuring the wrong place, which is worse than no check.
+//
+// `currentView` is left pointing at a real app view so nothing OUTSIDE the area branches degrades:
+// the scenario under test is the reports/CAPAE surface, not a half-initialised shell.
+const SYS = { area: 'settings' };
 // The four rr* refs are set on EVERY System scenario, never partially: they are shared module state,
 // and a scenario that inherits a previous one's rrErr is testing something nobody wrote down.
 const rrRefs = (reports, { loading = false, err = null, requested = true } = {}) =>
@@ -551,8 +557,11 @@ const SYSTEM_PLAN = [
       ['no empty-list wording appears on a failed read', (p) => !hasText(p, 'there are none recorded yet')],
       ['CONTAINMENT: the System header still renders', (p) => hasText(p, 'System')],
       ['CONTAINMENT: the status line above still renders', (p) => hasText(p, 'Building — nothing blocking me')],
-      ['CONTAINMENT: the "Happening now" group above still renders',
-        (p) => hasText(p, 'Happening now') && hasText(p, 'Nothing actively building.')],
+      // Re-anchored 2026-08-08 with the surface's move into Settings. The PROPERTY is unchanged and
+      // is Amendment 7's: a failed report read must not take the rest of the pane down with it. The
+      // neighbouring group is now Settings' "This app" rather than System's "Happening now".
+      ['CONTAINMENT: the "This app" group above still renders',
+        (p) => hasText(p, 'This app') && hasText(p, 'Fusion247 Cockpit')],
       ['the failure offers a retry', (p) => hasText(p, 'Try again')],
     ]],
 ];

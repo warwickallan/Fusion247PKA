@@ -21,6 +21,11 @@
 //      to be filled with something plausible. A family whose exposures are too rare to accumulate
 //      reports UNMEASURABLE rather than carrying a counter that cannot advance.
 
+// THE ONE SELECTION CONTRACT. Imported from the governor rather than reimplemented here, so the
+// list the Cockpit labels "Larry's Active Brief" is computed by the same function that builds the
+// brief Larry is actually handed at Continue. See `activeBrief` below.
+import { selectActive } from '../../tools/governor/capae-brief.mjs';
+
 /**
  * Families, newest activity first, with the pilot surfaced ahead of the rest.
  *
@@ -176,27 +181,18 @@ export function mapOccurrence(row) {
 /**
  * The ACTIVE brief — what a fresh Larry is handed at Continue, and nothing more.
  *
- * SELECTION IS ONE BINARY TEST, not the four-factor score the brief sketched: include a family iff
- * its prevention is STILL UNPROVEN and a qualified exposure is plausible. That is computable from
- * the record, it naturally bounds the list, and it makes "no actionable CAPAE state means no CAPAE
- * noise" mechanically true instead of aspirational.
+ * ⛔ THE SELECTION IS NOT IMPLEMENTED HERE. It is `selectActive` in
+ * `tools/governor/capae-brief.mjs` — the SAME function that computes the brief Larry actually
+ * receives — and this module only shapes the selected rows for the Cockpit's display.
  *
- * EXCLUDED, DELIBERATELY:
- *   - EFFECTIVE — the prevention is proven, so the family leaves Larry's attention. It returns
- *     automatically if it recurs, because a recurrence moves it off EFFECTIVE.
- *   - UNMEASURABLE — no exposure is plausible, so a line about it is noise Larry cannot act on.
- *
- * RANKING approximates relevance × recurrence × consequence × prevention-still-unproven, with
- * CHALLENGED weighted above MONITORING (a prevention already in doubt is the one most likely to
- * fail again) and the pilot pinned first.
+ * WHY THAT MATTERS MORE THAN THE DUPLICATION IT REMOVES: this file previously carried its own
+ * copy of the eligibility test, the ranking weights AND a limit of 5, while the governor used 4.
+ * The two were never reconciled, so the Cockpit's heading — "Larry's Active Brief" — was a claim
+ * the code could not honour. A surface that says it shows what Larry sees must not compute its
+ * own answer. There is one contract, and it lives with the producer.
  */
-export function activeBrief(families, { limit = 5 } = {}) {
-  const eligible = families.filter((f) => !f.unmeasurable && f.state !== 'EFFECTIVE');
-  const weight = (f) => (f.is_pilot ? 1000 : 0) + (f.state === 'CHALLENGED' ? 100 : 0) + Math.min(f.occurrences || 0, 20);
-  return eligible
-    .slice()
-    .sort((a, b) => weight(b) - weight(a) || String(a.slug).localeCompare(String(b.slug)))
-    .slice(0, limit)
+export function activeBrief(families, opts = {}) {
+  return selectActive(families, opts)
     .map((f) => ({
       slug: f.slug,
       title: f.title,

@@ -272,6 +272,11 @@ test('SWEEP ROOT: the RELOCATED module still sweeps the session — proven by ru
       join(relocated, 'continuity.mjs'),
       'export async function readContinuityBrief() { return "STUBBED — not the subject of this test"; }\n'
     );
+    // `capae-brief.mjs` is copied REAL, not stubbed: it reads one local JSON file, touches no
+    // network and no credential, so it belongs on the "everything the property depends on is the
+    // real module" side of the line drawn above. It was added to reorient.mjs's imports by 4D and
+    // never added here, which has failed this test — and only this test — ever since.
+    writeFileSync(join(relocated, 'capae-brief.mjs'), readFileSync(join(import.meta.dirname, 'capae-brief.mjs')));
 
     // The module-relative root the deleted default would have used, asserted absent rather
     // than assumed: without this the test could pass because the copy simply worked anyway.

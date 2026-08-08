@@ -45,3 +45,15 @@ GRANT USAGE ON SCHEMA session_report TO cp_directus;
 
 GRANT SELECT ON session_report.rotation            TO cp_directus;
 GRANT SELECT ON session_report.specialist_dispatch TO cp_directus;
+
+-- CAPAE (BUILD-020 Sub-phase 4D). Same decision, same role, same shape: the Cockpit's READ pool gets
+-- SELECT and nothing else, so /api/capae can display the learning loop while remaining structurally
+-- unable to alter the evidence it shows. Written as explicit lines per table, per the "new tables here
+-- get an explicit line in this file or they get nothing" rule above.
+--
+-- TO UNDO, exactly:
+--   REVOKE SELECT ON session_report.capae_occurrence FROM cp_directus;
+--   REVOKE SELECT ON session_report.capae_family     FROM cp_directus;
+
+GRANT SELECT ON session_report.capae_family     TO cp_directus;
+GRANT SELECT ON session_report.capae_occurrence TO cp_directus;
