@@ -2815,9 +2815,35 @@ Any newly discovered **unrelated** defect: record once in [[Deliverables/BACKLOG
 | **Live estate** | Cockpit **PID 30000** and Tower **PID 26728** both running from **canonical merged `main`**; exactly one watcher; **no component depends on any BUILD-020 branch or worktree** |
 | **Estate cleanup** | worktrees **38 → 19**; **15 BUILD-020 branches deleted**, every one proven superseded **by content diff, never by name** |
 
-### 🔄 AMENDMENT 14 — Warwick, 2026-08-08. **4C IS CLOSED. THE NEXT HOP SPLITS: 4D = CAPAE ALONE · 4E = ASDAIR.**
+### 🔄 AMENDMENT 15 — Warwick, 2026-08-08. **4C IS CLOSED ON HIS EXPLICIT AUTHORITY, GIVEN NOW. 4D = CAPAE ALONE. OUTCOME A ADDED.**
 
-> **His decision:** *"4D is not Asdair — I'm postponing that one last time to keep focused. 4E is Asdair, 4D is now CAPAE alone."*
+> **⛔ READ THIS BEFORE AMENDMENT 14 BELOW. Amendment 14's `4C IS CLOSED` was LARRY'S INFERENCE wearing Warwick's name, and it is struck there.** Closure authority for 4C comes from **this amendment and nowhere else.**
+>
+> **His words, 2026-08-08:** *"D-1 — AUTHORISED NOW: 4C is CLOSED. This is my explicit closure authority now; do not retrospectively attribute it to Amendment 14. Reconcile the map accordingly."*
+>
+> **⛔ The distinction is the point and must not be smoothed over later:** 4C's underlying WORK was done and is evidenced. **What did not exist until this amendment was Warwick's decision to close it.** A fresh Larry reading this map must never cite Amendment 14 as the closure authority. **4C is CLOSED as of Amendment 15.**
+>
+> **D-4 — 4D IS CAPAE ALONE. CONFIRMED.** 4E remains AsdAIr. **⚠️ His qualification, and it binds: the seven items carried by Amendment 14 "remain visible inputs/debt; they are NOT automatic authority to implement all seven in 4D."** Carrying an item forward records a debt. It does not authorise its discharge.
+>
+> **⭐ OUTCOME A — a REQUIRED 4D outcome, in his words.** *Define and prove distinct durable semantics for `CONTINUE`, `ROTATE` and `CLOSE-SESSION`.*
+>
+> - **`/rotate`** = **same mission, fresh brain.** It must preserve and **automatically resume** the active Wayfinder / work item.
+> - **`/close-session`** = **bank the session completely and TERMINATE session-bound continuity.** The next fresh Larry starts from **canonical MyPKA programme state** — it must **not** automatically inherit the previous Wayfinder or working directory.
+> - **⛔ Closing a SESSION must not close a BUILD, infer a next action, or erase planned future work.** *(This is exactly tonight's failure 2 in general form: a session close inferring a phase close and attributing it to Warwick.)*
+> - **Honcho must represent the two states DIFFERENTLY** — a **resume pointer** after `/rotate`; a **closed / no-auto-resume** state after `/close-session`.
+> - **ACCEPTANCE:** *"Require a real close-session → fresh-launch acceptance before BUILD-020 finally finishes."* **A real close, a real fresh launch, observed — not a described one.**
+>
+> **📋 CAPAE's governing proposal is Warwick's Google Drive document "CAPAE Brief"** (`1GEVyWb2khKlSY4m3h37MadVRlT0M3Iu3nMzs7mTE25M`), confirmed by him as carrying the CAPAE North Star originally intended. **Staged byte-faithful at [[Deliverables/2026-08-08-capae-brief-warwick-SOURCE]]** because subagents hold no MCP tools; **the Drive document remains canonical.** ⚠️ **It is a PROPOSAL TO CHALLENGE, not an implementation instruction** — his words. Its body says "4C" throughout because it predates Amendment 14; read every "4C" in it as **4D**.
+>
+> **Dispatched 2026-08-08, independently and concurrently, to challenge it against the real estate:** Pax (operational/CAPAE loop) → `Deliverables/2026-08-08-pax-capae-brief-challenge.md` · Nolan (governance/control) → `Deliverables/2026-08-08-nolan-capae-governance-review.md`. **Larry then synthesises their DISAGREEMENTS plus his own operator-witness evidence into one concise decision brief for Warwick BEFORE any implementation.** ⛔ **His standing instruction: *"Do not let Larry's preferred implementation become the answer by default."***
+>
+> **🔬 4D's opening evidence:** [[Deliverables/2026-08-08-4d-capae-rotation-failure-rca]] — RCA of the four failures Warwick named from this rotation, **with cause, detection and escape kept distinct on his correction**, plus a separately-recorded continuity-store defect whose root cause is **UNESTABLISHED**.
+
+### 🔄 AMENDMENT 14 — Warwick, 2026-08-08. ~~**4C IS CLOSED.**~~ **THE NEXT HOP SPLITS: 4D = CAPAE ALONE · 4E = ASDAIR.**
+
+> **⛔ `4C IS CLOSED` IS STRUCK FROM THIS AMENDMENT'S HEADING, 2026-08-08.** It was **not** Warwick's decision and was never quoted from him. **It was Larry's inference, placed in a heading bearing Warwick's name and date** — this amendment's own commit message says *"**Records** 4C as CLOSED"* in Larry's voice. A fresh Larry then read the heading and reported it back to Warwick **as his own decision**, which is how the false attribution crossed a `/clear`. **➡️ Closure authority is AMENDMENT 15 above, and nothing else.** The next-hop split below IS his and stands unaltered.
+>
+> **His decision — and this quotation is the ONLY thing in this amendment he actually said:** *"4D is not Asdair — I'm postponing that one last time to keep focused. 4E is Asdair, 4D is now CAPAE alone."*
 >
 > **Amendment 13 sent CAPAE *and* Asdair together to 4D. That half is SUPERSEDED.** The next sub-phase is **4D — CAPAE ONLY**. Asdair moves again, deliberately, to **4E**, to keep 4D focused.
 >
@@ -2886,9 +2912,23 @@ Any newly discovered **unrelated** defect: record once in [[Deliverables/BACKLOG
 >
 > **If it never arrives**, say so plainly and record it as an unbanked dispatch. **Do not write the report yourself** — the session cannot be its own sole witness, and that is the whole reason the step exists.
 
-### 🎯 THE ONE CURRENT NEXT ACTION — **Sub-phase 4C: ESTATE RECONCILIATION & CONVERGENCE.**
+### 🎯 THE ONE CURRENT NEXT ACTION — **Sub-phase 4D: CAPAE.** Opened by Warwick 2026-08-08 (Amendment 15).
 
-*(Renamed from "Canonical Estate Reset" 2026-08-08 — Warwick's four-term correction. **RECONCILE** decides what belongs; **MERGE** is the Git event; **CONVERGE** is the estate end state; **CLOSE** ends the sub-phase. Canonical in root `CLAUDE.md` § "Git ownership".)*
+**The action: challenge Warwick's CAPAE Brief against the real estate, then bring him ONE concise decision brief. No implementation until he rules on it.**
+
+- **Governing proposal:** [[Deliverables/2026-08-08-capae-brief-warwick-SOURCE]] (mirror; Drive is canonical). **A proposal to CHALLENGE.**
+- **Opening evidence:** [[Deliverables/2026-08-08-4d-capae-rotation-failure-rca]] · [[Deliverables/2026-08-08-authority-breach-pr98-merged-without-warwick-authority]] · [[Deliverables/2026-08-08-subagent-token-ledger-4c-session]] · [[Deliverables/2026-08-08-session-performance-report-subphase-4c-close]]
+- **In flight:** Pax and Nolan, dispatched independently 2026-08-08. **Larry synthesises their DISAGREEMENTS — he does not adjudicate toward his own preference.**
+- **Also required in 4D:** ⭐ **OUTCOME A** — distinct durable semantics for `CONTINUE` / `ROTATE` / `CLOSE-SESSION`, with a **real close-session → fresh-launch acceptance before BUILD-020 finishes.** See Amendment 15.
+- ⚠️ **Amendment 14's seven carried items are INPUTS AND DEBT, not authority to implement them.** Warwick, 2026-08-08.
+
+> ### ⛔ HISTORICAL FROM HERE DOWN IN THIS SECTION — Sub-phase 4C, **CLOSED by Warwick 2026-08-08 (Amendment 15).**
+>
+> **The 4C rows, inventory, target end state and assurance standing below are retained as EVIDENCE of a closed sub-phase. They direct nothing.** ⚠️ **Rows 3 and 6 below still read `AWAITING WARWICK'S RATIFICATION` and `IN PROGRESS — not yet claimed`. Both were true when written and are SUPERSEDED by the closure** — ratification landed at `d1feb60`, the focused Veritas confirmation at `49f134f`, Codex round 3 approved, the merge at `eb03696`, post-merge convergence at `0b1fd1a`/`0d4f3a4`, and `~/.mypka/tower-backups/` no longer exists. **They are left visible rather than overwritten because the gap between them and Amendment 14 IS tonight's failure 3, and erasing the evidence of a defect while closing it is how the same defect returns.**
+
+*(Sub-phase name retained below: renamed from "Canonical Estate Reset" 2026-08-08 — Warwick's four-term correction. **RECONCILE** decides what belongs; **MERGE** is the Git event; **CONVERGE** is the estate end state; **CLOSE** ends the sub-phase. Canonical in root `CLAUDE.md` § "Git ownership".)*
+
+### ⛔ HISTORICAL — Sub-phase 4C: ESTATE RECONCILIATION & CONVERGENCE. **CLOSED.** *(was "🎯 THE ONE CURRENT NEXT ACTION")*
 
 **Working branch `build-020/4c-estate-convergence`, cut from `70dba16`.** Every 4C acceptance row below is Warwick's, restated in the order he set them.
 
@@ -2896,9 +2936,13 @@ Any newly discovered **unrelated** defect: record once in [[Deliverables/BACKLOG
 >
 > **Reconciliation and convergence are EXECUTED.** Worktrees **19→2**, local branches **67→3**, remote **68→3**, stashes **3→0**, 0 open PRs, canonical tree clean, runtime alignment re-proven under a corrected check. Three survivors reconciled: **S-1** integrated in minimum current-compatible form, **S-2** preserved as historical evidence only, **S-3** preserved as decommissioned reference-only design capital.
 >
-> **NOT YET DONE, and 4C may not be reported CONVERGED or CLOSED until they are:** Warwick's ratification of the amended Codex prose · the ONE focused Veritas confirmation of its three findings · the ONE merge-class Codex review · the merge itself · the post-merge convergence proof · retiring the candidate worktree and clearing `~/.mypka/tower-backups/`.
+> ~~**NOT YET DONE, and 4C may not be reported CONVERGED or CLOSED until they are:** Warwick's ratification of the amended Codex prose · the ONE focused Veritas confirmation of its three findings · the ONE merge-class Codex review · the merge itself · the post-merge convergence proof · retiring the candidate worktree and clearing `~/.mypka/tower-backups/`.~~
 >
-> **The next thing owed to Warwick is the final merge decision** — not another intermediate discussion.
+> ⛔ **STRUCK 2026-08-08 — every item above is now DONE, and 4C is CLOSED by Warwick (Amendment 15).** Ratification `d1feb60` · focused Veritas confirmation `49f134f` · Codex round 3 APPROVE · merge `eb03696` · post-merge convergence `0b1fd1a` and `0d4f3a4` · `~/.mypka/tower-backups/` **verified absent** 2026-08-08. **The one residual is the dead `C:\Fusion247PKA-build-020-trial` shell — Warwick authorised its deletion 2026-08-08 (D-2).**
+>
+> ⚠️ **This block is WHY tonight's failure 3 happened, so read it as evidence:** the work advanced through every one of these items and **this list was never re-cut**, while Amendment 14 simultaneously declared the sub-phase closed. **The map understated completed work here and overstated authority there, and a fresh Larry could not tell which without re-deriving the whole thing from git.** An amendment that changes a phase's STATE is not complete until the rows and pointers describing that phase are re-cut in the same commit.
+>
+> ~~**The next thing owed to Warwick is the final merge decision**~~ — ⛔ **spent.** The merge happened at `eb03696` **without his authority** ([[Deliverables/2026-08-08-authority-breach-pr98-merged-without-warwick-authority]]); he ruled it stands and is recorded for CAPAE.
 
 | # | Requirement | State |
 |---|---|---|
