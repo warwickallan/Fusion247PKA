@@ -342,8 +342,15 @@ const CONTRACT_KEYS = [
     empty.ok === true && Array.isArray(empty.reports) && empty.reports.length === 0, JSON.stringify(empty));
 
   const good = await rotationReportsResponse(fakeQuery([fullRow], specialistRows4A));
-  ok('the response envelope is exactly { ok, reports }',
-    JSON.stringify(Object.keys(good).sort()) === JSON.stringify(['ok', 'reports']), Object.keys(good).join(','));
+  // Widened 2026-08-08 with the executive view: `overview` is the cross-session summary and each
+  // report carries a derived `summary`. Still a CLOSED assertion — a fifth key is still a failure —
+  // because the point of this check is that nothing sneaks into the envelope unnoticed.
+  ok('the response envelope is exactly { ok, reports, overview }',
+    JSON.stringify(Object.keys(good).sort()) === JSON.stringify(['ok', 'overview', 'reports']), Object.keys(good).join(','));
+  ok('every report carries its derived summary',
+    good.reports.every((r) => r.summary && typeof r.summary.headline === 'string'
+      && Array.isArray(r.summary.measures) && typeof r.summary.unestablishedCount === 'number'),
+    JSON.stringify(good.reports[0] && good.reports[0].summary && good.reports[0].summary.headline));
 }
 
 // ── 10. a query function that throws: words, HTTP-200 shape, and NO LEAK ─────────────────────────

@@ -37,6 +37,10 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { createContext, runInContext } from 'node:vm';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+// The REAL derivation, so these scenarios exercise the executive layer rather than a hand-made
+// stand-in for it. A fixture without `summary` renders no L1 block at all — which is exactly how
+// the re-cut could have shipped with 28 assertions silently passing against absent markup.
+import { reportSummary } from './rotation-report.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PUB = path.join(HERE, 'public');
@@ -416,8 +420,15 @@ const RR_ALL_NULL = {
 const SYS = { area: 'settings' };
 // The four rr* refs are set on EVERY System scenario, never partially: they are shared module state,
 // and a scenario that inherits a previous one's rrErr is testing something nobody wrote down.
-const rrRefs = (reports, { loading = false, err = null, requested = true } = {}) =>
-  ({ rrReports: reports, rrLoading: loading, rrErr: err, rrRequested: requested });
+// `rrOpenCard: '0'` OPENS THE FIRST CARD, and it is load-bearing rather than convenience.
+// The 2026-08-08 executive re-cut put every metric, identifier and "not established" line behind a
+// per-card disclosure. Left closed, 28 of these assertions would have gone green by asserting
+// against markup that no longer rendered at all — the failure mode this whole check exists to catch.
+// Opening the card keeps every L3/L4 assertion testing real rendered output AND proves the
+// disclosure actually reveals it.
+const rrRefs = (reports, { loading = false, err = null, requested = true, open = '0' } = {}) =>
+  ({ rrReports: Array.isArray(reports) ? reports.map((r) => ({ ...r, summary: reportSummary(r) })) : reports,
+    rrLoading: loading, rrErr: err, rrRequested: requested, rrOpenCard: open });
 
 const SYSTEM_PLAN = [
   // AC1 ① — two reports, most recent first. The ordering holds, so the ORDER WRONG branch must NOT
@@ -428,8 +439,11 @@ const SYSTEM_PLAN = [
       ['the plural sentence states they were read and are shown in the supplied order',
         (p) => hasText(p, 'rotation reports were') && hasText(p, 'shown below in the order supplied.')],
       ['no ORDER WRONG banner on a correctly ordered pair', (p) => !hasText(p, 'ORDER WRONG')],
-      ['both reports render, not just the first',
-        (p) => hasText(p, 'aaaaaaa') && hasText(p, 'bbbbbbb')],
+      // Re-cut 2026-08-08: card 0 is OPEN so its short head renders; card 1 is COLLAPSED and is
+      // identified by the session date on its L1 chip. Both cards must still be present — the second
+      // report vanishing behind the first card's disclosure is the defect this guards.
+      ['both reports render — the first expanded, the second as a collapsed card',
+        (p) => hasText(p, 'aaaaaaa') && hasText(p, '2026-01-01') && hasText(p, '2026-01-02')],
       ['a measured elapsed time renders as a formatted duration, not as words',
         (p) => valueAfter(p, 'Elapsed') === '1h 35m'],
       ['a measured Work Order outcome renders as digits over its denominator',
@@ -445,7 +459,7 @@ const SYSTEM_PLAN = [
       ['the banner names the exact position the order first breaks',
         (p) => hasText(p, 'The order first breaks at report 2.')],
       ['the reports are still shown, in the order actually supplied',
-        (p) => hasText(p, 'bbbbbbb') && hasText(p, 'aaaaaaa') && valueAfter(p, 'Closing head') === 'bbbbbbb'],
+        (p) => hasText(p, '2026-01-01') && hasText(p, '2026-01-02') && valueAfter(p, 'Closing head') === 'bbbbbbb'],
     ]],
 
   // AC1 ③ + ④ + AC2 — THE DECIDING SCENARIO. Each assertion binds to ONE field, and the unknown and

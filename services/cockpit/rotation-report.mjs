@@ -271,8 +271,158 @@ export async function rotationReports(query) {
  */
 export async function rotationReportsResponse(query) {
   try {
-    return { ok: true, reports: await rotationReports(query) };
+    const reports = await rotationReports(query);
+    // `overview` and each report's `summary` are DERIVED here, not in the template, so the executive
+    // view is assertable by rotation-report-check.mjs without a browser.
+    return {
+      ok: true,
+      reports: reports.map((r) => ({ ...r, summary: reportSummary(r) })),
+      overview: reportsOverview(reports),
+    };
   } catch (e) {
     return { ok: false, error: `The rotation reports could not be read — ${readFailure(e)}.` };
   }
+}
+
+// ---------------------------------------------------------------------------
+// THE EXECUTIVE LAYER (2026-08-08, Warwick's phone review)
+// ---------------------------------------------------------------------------
+// "Warwick must NOT have to read a report in order to discover what matters." Everything below is
+// DERIVED from fields already mapped above — no new query, no new column, no invented analytic. A
+// measure that is not established stays null and is COUNTED, not printed twenty-one times.
+
+/**
+ * A finding's DISPLAY headline. The original text is never altered or replaced — `lead` is a prefix
+ * of `full`, and `full` is Pax's own summary verbatim. The label is derived from the exposure word,
+ * which is a closed vocabulary, so this cannot drift into paraphrasing evidence.
+ */
+export const EXPOSURE_PRESENTATION = Object.freeze({
+  'recurrence':                     { label: 'PREVENTION FAILED TO STICK', tone: 'urgent',    mark: '🔴', failure: true },
+  'new':                            { label: 'NEW FAILURE FAMILY',         tone: 'urgent',    mark: '🔴', failure: true },
+  'clean':                          { label: 'PREVENTION HELD',            tone: 'positive',  mark: '🟢', failure: false },
+  'none-this-session':              { label: 'NO QUALIFIED EXPOSURE',      tone: 'quiet',     mark: '⚪', failure: false },
+  'unmeasurable-at-this-frequency': { label: 'TOO RARE TO MEASURE',        tone: 'neutral',   mark: '⚪', failure: false },
+});
+
+/** First sentence or clause, for the one-line lead. A PREFIX of the original, never a rewrite. */
+function leadOf(text, max = 110) {
+  const s = String(text || '').trim();
+  if (!s) return null;
+  const stop = s.search(/[.;]\s/);
+  const cut = stop > 20 && stop < max ? stop + 1 : (s.length > max ? s.lastIndexOf(' ', max) : s.length);
+  return s.slice(0, cut > 20 ? cut : s.length).trim() + (cut < s.length ? '…' : '');
+}
+
+export function findingHeadline(finding) {
+  const f = finding && typeof finding === 'object' ? finding : {};
+  const exposure = String(f.exposure || '').trim().toLowerCase();
+  const p = EXPOSURE_PRESENTATION[exposure] || { label: 'FINDING', tone: 'quiet', mark: '⚪', failure: false };
+  const full = str(f.summary) || (typeof finding === 'string' ? finding : null);
+  return {
+    family: str(f.family),
+    exposure: exposure || null,
+    label: p.label, tone: p.tone, mark: p.mark, failure: p.failure,
+    lead: leadOf(full),
+    full,
+  };
+}
+
+/** Only measures that are actually established. Absent stays absent — it is counted, not rendered. */
+export function headlineMeasures(r) {
+  const out = [];
+  const wo = r.workOrders || {};
+  if (wo.total !== null && wo.firstDispatchSuccess !== null) {
+    out.push({ label: 'WO first pass', value: `${wo.firstDispatchSuccess}/${wo.total}`,
+      tone: wo.total > 0 && wo.firstDispatchSuccess === 0 ? 'urgent' : 'quiet' });
+  }
+  if (r.allocation && r.allocation.reworkPct !== null) {
+    out.push({ label: 'Rework', value: `${r.allocation.reworkPct}%`,
+      tone: r.allocation.reworkPct >= 25 ? 'urgent' : 'quiet' });
+  }
+  if (r.subagentTokens !== null) {
+    const m = r.subagentTokens / 1_000_000;
+    out.push({ label: 'Subagent', value: m >= 1 ? `${m.toFixed(2)}M` : `${Math.round(r.subagentTokens / 1000)}k`, tone: 'quiet' });
+  }
+  if (r.specialistDispatches !== null && r.specialistDispatches !== undefined) {
+    out.push({ label: 'Dispatches', value: String(r.specialistDispatches), tone: 'quiet' });
+  }
+  return out.slice(0, 4);
+}
+
+/** One session → one collapsed card's worth of truth. */
+export function reportSummary(r) {
+  const findings = (r.findings || []).map(findingHeadline);
+  const failures = findings.filter((f) => f.failure);
+  const unestablished = (r.unestablished || []).length;
+
+  let headline;
+  if (failures.length) headline = `${failures.length} prevention${failures.length === 1 ? '' : 's'} failed to stick`;
+  else if (findings.length) headline = `${findings.length} finding${findings.length === 1 ? '' : 's'}, none a failure`;
+  else headline = 'No findings recorded';
+
+  return {
+    headline,
+    tone: failures.length ? 'urgent' : (findings.length ? 'quiet' : 'positive'),
+    measures: headlineMeasures(r),
+    findings,
+    findingsCount: findings.length,
+    failuresCount: failures.length,
+    unestablishedCount: unestablished,
+  };
+}
+
+/**
+ * ACROSS recent sessions. Every field is null when the underlying measure is not established —
+ * a trend computed from one established value and one absent one is a fabricated trend.
+ */
+export function reportsOverview(reports) {
+  const list = Array.isArray(reports) ? reports : [];
+  if (list.length === 0) return null;
+
+  const sum = (pick) => {
+    const vals = list.map(pick).filter((v) => v !== null && v !== undefined);
+    return vals.length ? vals.reduce((a, b) => a + b, 0) : null;
+  };
+
+  const woSuccess = sum((r) => r.workOrders && r.workOrders.firstDispatchSuccess);
+  const woTotal = sum((r) => r.workOrders && r.workOrders.total);
+  const allFindings = list.flatMap((r) => (r.findings || []).map(findingHeadline));
+
+  // TREND — only when BOTH the latest and the previous value are established.
+  let trend = null;
+  if (list.length >= 2) {
+    const a = list[0].allocation && list[0].allocation.reworkPct;
+    const b = list[1].allocation && list[1].allocation.reworkPct;
+    if (a !== null && a !== undefined && b !== null && b !== undefined) {
+      const delta = a - b;
+      trend = {
+        measure: 'Rework', latest: a, previous: b, delta,
+        direction: delta < 0 ? 'improving' : delta > 0 ? 'degrading' : 'flat',
+        tone: delta < 0 ? 'positive' : delta > 0 ? 'urgent' : 'quiet',
+      };
+    }
+  }
+
+  // STANDOUT — the session carrying the most failures, named only if there is one.
+  let standout = null;
+  for (const r of list) {
+    const s = reportSummary(r);
+    if (s.failuresCount > 0 && (!standout || s.failuresCount > standout.failuresCount)) {
+      standout = { sessionDate: r.sessionDate, failuresCount: s.failuresCount, headline: s.headline };
+    }
+  }
+
+  return {
+    sessions: list.length,
+    woFirstPass: woTotal === null ? null : { success: woSuccess ?? 0, total: woTotal },
+    amendments: sum((r) => r.workOrders && r.workOrders.amendments),
+    refusals: sum((r) => r.workOrders && r.workOrders.refusals),
+    subagentTokens: sum((r) => r.subagentTokens),
+    contextTokens: sum((r) => (r.contextTokensIn ?? 0) + (r.contextTokensOut ?? 0)),
+    findingsTotal: allFindings.length,
+    failuresTotal: allFindings.filter((f) => f.failure).length,
+    unestablishedTotal: sum((r) => (r.unestablished || []).length),
+    trend,
+    standout,
+  };
 }

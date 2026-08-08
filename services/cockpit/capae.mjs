@@ -232,8 +232,133 @@ export async function capaeFamilies(query) {
 export async function capaeResponse(query) {
   try {
     const families = await capaeFamilies(query);
-    return { ok: true, families, active: activeBrief(families) };
+    // `overview` and `ordered` are DERIVED here rather than in the template, so the executive screen
+    // is assertable by capae-check.mjs without a browser. Same data, decided once.
+    return {
+      ok: true,
+      families,
+      active: activeBrief(families),
+      overview: capaeOverview(families),
+      ordered: familiesByUrgency(families).map((f) => f.slug),
+    };
   } catch (e) {
     return { ok: false, error: `The CAPAE record could not be read — ${readFailure(e)}.` };
   }
+}
+
+// ---------------------------------------------------------------------------
+// THE EXECUTIVE LAYER (2026-08-08, Warwick's phone review)
+// ---------------------------------------------------------------------------
+// "Cockpit must bring the important thing to Warwick visually. Warwick must NOT have to read a
+// report in order to discover what matters."
+//
+// Everything below is DERIVED from data already mapped above. No new query, no new column, no new
+// store. These are display decisions, and they live here rather than in the template so they can be
+// asserted by capae-check.mjs without a browser.
+
+/**
+ * State presentation. NEVER COLOUR ALONE — every state carries a word and a mark, because a red
+ * chip is invisible to a colourblind reader and meaningless in a screenshot pasted into a report.
+ */
+export const STATE_PRESENTATION = Object.freeze({
+  INEFFECTIVE:  { tone: 'urgent',    label: 'INEFFECTIVE',  mark: '⛔', rank: 0 },
+  CHALLENGED:   { tone: 'prominent', label: 'CHALLENGED',   mark: '⚠',  rank: 1 },
+  MONITORING:   { tone: 'quiet',     label: 'MONITORING',   mark: '•',  rank: 2 },
+  UNMEASURABLE: { tone: 'neutral',   label: 'UNMEASURABLE', mark: '–',  rank: 3 },
+  EFFECTIVE:    { tone: 'positive',  label: 'EFFECTIVE',    mark: '✓',  rank: 4 },
+});
+
+export function familyPresentation(family) {
+  const s = (family && family.state) || 'MONITORING';
+  return STATE_PRESENTATION[s] || STATE_PRESENTATION.MONITORING;
+}
+
+/** One line of WHY, taken from the record in priority order. Null when the record has none. */
+export function whyThisMatters(family) {
+  if (!family) return null;
+  return family.root_cause || family.finding || family.required_larry_behaviour || null;
+}
+
+/**
+ * Effectiveness as progress, but ONLY where progress is a meaningful idea.
+ * Without a threshold there is no denominator, and inventing one would imply a bar nobody set.
+ */
+export function effectivenessProgress(family) {
+  if (!family || family.unmeasurable) return null;
+  const req = family.exposures_required;
+  if (req === null || req === undefined || req <= 0) return null;
+  const clean = family.exposures_clean || 0;
+  return { clean, required: req, complete: clean >= req, label: `${clean} of ${req} clean exposures` };
+}
+
+/** The most recent occurrence that was a FAILURE, across every family. Null if there has been none. */
+export function latestRecurrence(families) {
+  let best = null;
+  for (const f of families || []) {
+    for (const o of f.history || []) {
+      if (o.disposition !== 'RECURRENCE' && o.disposition !== 'NEW') continue;
+      if (!best || String(o.occurred_at || '') > String(best.occurred_at || '')) {
+        best = { slug: f.slug, title: f.title, summary: o.summary, occurred_at: o.occurred_at, disposition: o.disposition };
+      }
+    }
+  }
+  return best;
+}
+
+/**
+ * THE FIRST CAPAE SCREEN, in one object. Answers Warwick's four at-a-glance questions without him
+ * opening anything: does CAPAE need me · what is the most important family · is learning being
+ * proven · what most recently went wrong.
+ */
+export function capaeOverview(families) {
+  const list = Array.isArray(families) ? families : [];
+  const counts = { MONITORING: 0, CHALLENGED: 0, EFFECTIVE: 0, INEFFECTIVE: 0, UNMEASURABLE: 0 };
+  for (const f of list) if (counts[f.state] !== undefined) counts[f.state] += 1;
+
+  // CHALLENGED means a prevention that HAD been proven has failed since. That is the reopening
+  // signal, and it is derived from the state machine rather than guessed at from counts.
+  const reopened = list.filter((f) => f.state === 'CHALLENGED')
+    .map((f) => ({ slug: f.slug, title: f.title, occurrences: f.occurrences }));
+  const ineffective = list.filter((f) => f.state === 'INEFFECTIVE')
+    .map((f) => ({ slug: f.slug, title: f.title, occurrences: f.occurrences }));
+  const becameEffective = list.filter((f) => f.state === 'EFFECTIVE')
+    .map((f) => ({ slug: f.slug, title: f.title }));
+
+  const pilotRow = list.find((f) => f.is_pilot) || null;
+  const pilot = pilotRow ? {
+    slug: pilotRow.slug,
+    title: pilotRow.title,
+    state: pilotRow.state,
+    occurrences: pilotRow.occurrences,
+    // What would COUNT as its next qualified exposure — the record's own words, not a paraphrase.
+    nextQualifiedExposure: pilotRow.required_larry_behaviour || null,
+    progress: effectivenessProgress(pilotRow),
+  } : null;
+
+  const needsAttention = ineffective.length > 0 || reopened.length > 0;
+  const attention = needsAttention
+    ? `${ineffective.length + reopened.length} prevention${ineffective.length + reopened.length === 1 ? '' : 's'} in doubt`
+    : (counts.MONITORING > 0 ? 'Nothing in doubt — preventions under observation' : 'Nothing needs attention');
+
+  return {
+    total: list.length,
+    counts,
+    needsAttention,
+    attention,
+    ineffective,
+    reopened,
+    becameEffective,
+    pilot,
+    latest: latestRecurrence(list),
+  };
+}
+
+/** Families ordered for the executive list: worst first, pilot lifted within its band. */
+export function familiesByUrgency(families) {
+  return (Array.isArray(families) ? families : []).slice().sort((a, b) => {
+    const ra = familyPresentation(a).rank, rb = familyPresentation(b).rank;
+    if (ra !== rb) return ra - rb;
+    if (a.is_pilot !== b.is_pilot) return a.is_pilot ? -1 : 1;
+    return (b.occurrences || 0) - (a.occurrences || 0) || String(a.slug).localeCompare(String(b.slug));
+  });
 }

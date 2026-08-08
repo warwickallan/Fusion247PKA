@@ -588,11 +588,21 @@ createApp({
         const d = await r.json();
         if (!d || d.ok === false) throw new Error((d && d.error) || 'the cockpit could not read the rotation reports');
         rrReports.value = Array.isArray(d.reports) ? d.reports : [];
+        rrOverview.value = d.overview || null;
       } catch (e) {
         // Keep reports null, NOT []. "We could not read them" and "there are none" are two facts.
-        rrErr.value = e.message || 'the read failed'; rrReports.value = null;
+        rrErr.value = e.message || 'the read failed'; rrReports.value = null; rrOverview.value = null;
       } finally { rrLoading.value = false; }
     }
+
+    // THE EXECUTIVE VIEW, derived server-side in rotation-report.mjs. Each report also carries its
+    // own `summary`, so a collapsed card needs no computation here.
+    const rrOverview = ref(null);
+    const rrOpenCard = ref('');
+    const rrCardToggle = (id) => { rrOpenCard.value = rrOpenCard.value === id ? '' : id; };
+    /** Raw metrics (L4) are a SECOND disclosure inside an opened card — never on the default view. */
+    const rrRawOpen = ref('');
+    const rrRawToggle = (id) => { rrRawOpen.value = rrRawOpen.value === id ? '' : id; };
 
     const rrList = computed(() => (Array.isArray(rrReports.value) ? rrReports.value : []));
 
@@ -656,12 +666,31 @@ createApp({
         if (!d || d.ok === false) throw new Error((d && d.error) || 'the cockpit could not read the CAPAE record');
         capFamilies.value = Array.isArray(d.families) ? d.families : [];
         capActive.value = Array.isArray(d.active) ? d.active : [];
+        capOverview.value = d.overview || null;
+        capOrder.value = Array.isArray(d.ordered) ? d.ordered : [];
       } catch (e) {
         capErr.value = e.message || 'the read failed'; capFamilies.value = null; capActive.value = [];
+        capOverview.value = null; capOrder.value = [];
       } finally { capLoading.value = false; }
     }
 
+    // THE EXECUTIVE VIEW. Computed on the server (services/cockpit/capae.mjs) and carried here, so
+    // what Warwick sees at a glance is asserted by capae-check.mjs rather than by reading the page.
+    const capOverview = ref(null);
+    const capOrder = ref([]);
+
     const capList = computed(() => (Array.isArray(capFamilies.value) ? capFamilies.value : []));
+    /** Worst first. Falls back to the supplied order if the server sent no ordering. */
+    const capRanked = computed(() => {
+      const by = new Map(capList.value.map((f) => [f.slug, f]));
+      const ranked = capOrder.value.map((s) => by.get(s)).filter(Boolean);
+      return ranked.length ? ranked : capList.value;
+    });
+    const capStateMark = (s) => ({
+      INEFFECTIVE: '⛔', CHALLENGED: '⚠', MONITORING: '•', UNMEASURABLE: '–', EFFECTIVE: '✓',
+    }[s] || '•');
+    /** One line of WHY, so a collapsed card still answers "why does this matter". */
+    const capWhy = (f) => (f && (f.root_cause || f.finding || f.required_larry_behaviour)) || null;
     const capToggle = (slug) => { capOpen.value = capOpen.value === slug ? '' : slug; };
     const capActionLabel = computed(() => (capLoading.value ? 'Reading…' : capRequested.value ? 'Read again' : 'Read the CAPAE record'));
 
@@ -803,6 +832,8 @@ createApp({
       rrDoc, rrDocLoading, rrDocErr, rrDocName, rrOpenDoc, rrCloseDoc, rrDownloadDoc,
       capFamilies, capActive, capLoading, capErr, capRequested, capOpen,
       loadCapae, capList, capToggle, capActionLabel, capTone, capCDE,
+      capOverview, capRanked, capStateMark, capWhy,
+      rrOverview, rrOpenCard, rrCardToggle, rrRawOpen, rrRawToggle,
       rrArr, rrObj, rrHas, rrText, rrInt, rrCompact, rrIsCompact, rrPct, rrMins, rrBar,
       rrAlloc, rrAllocSum, rrAllocGap, rrAllocAnyKnown, rrCtx, rrCtxMax, rrSpecMax, rrLinesMax,
     };
@@ -1680,6 +1711,181 @@ createApp({
           <div class="item grey"><div class="i-main"><div class="i-title">You're on the standalone Cockpit ✅</div><div class="i-why">{{ host }} — the https tailnet app (not Directus, not the old IP link)</div></div></div>
           <div class="item grey"><div class="i-main"><div class="i-title">On the latest?</div><div class="i-why">Reload the app — if the build code above changes, you've picked up a newer version.</div></div></div>
         </div>
+        <!-- ================= CAPAE =================================================
+             A SEPARATE section from Session / Rotation Reports, deliberately. A rotation report is
+             what happened in ONE session; a CAPAE family is what keeps happening ACROSS sessions and
+             what is being done about it. Merging them would hide the only thing CAPAE adds.
+
+             The read is on an explicit trigger, like the reports, so opening Settings never fires a
+             database read Warwick did not ask for. -->
+        <div class="grp">
+          <h2>CAPAE — the learning loop<span class="g-count" v-if="capFamilies">{{ capList.length }}</span></h2>
+
+          <div class="rr-state">
+            <div class="rr-state-msg" role="status" aria-live="polite">
+              <div v-if="capLoading" class="empty">Reading the CAPAE record…</div>
+              <div v-else-if="!capRequested" class="empty">The CAPAE record has not been read yet.</div>
+              <div v-else-if="capErr" class="item red as-stack">
+                <div class="i-main">
+                  <div class="i-eyebrow blocked">COULD NOT BE READ</div>
+                  <div class="i-title">The CAPAE record could not be read, so no families are shown — that is not the same as there being none.</div>
+                  <div class="err">{{ capErr }}</div>
+                </div>
+              </div>
+              <div v-else-if="!capList.length" class="empty">The record was read and no failure families are recorded yet.</div>
+              <div v-else class="as-sub">{{ capList.length }} failure {{ capList.length === 1 ? 'family is' : 'families are' }} recorded. A repeated failure updates its family — it never creates a second one.</div>
+            </div>
+
+            <button class="refresh" @click="loadCapae()" :disabled="capLoading">{{ capActionLabel }}</button>
+
+            <!-- What Larry is handed at Continue. Shown here so Warwick can see the exact bounded
+                 list rather than take its size on trust. -->
+            <div v-if="capRequested && !capErr && capActive.length" class="item as-stack" style="margin-top:10px">
+              <div class="i-main">
+                <div class="i-eyebrow">LARRY'S ACTIVE BRIEF · {{ capActive.length }}</div>
+                <div class="as-sub">Only families whose prevention is still unproven AND where an exposure is plausible. EFFECTIVE and UNMEASURABLE families are excluded, so they leave his attention automatically.</div>
+                <div v-for="a in capActive" :key="a.slug" class="as-note" style="margin-top:6px">
+                  <strong>{{ a.title }}</strong> — MUST: {{ a.must || 'not recorded' }} <span class="rr-unk">· {{ a.effectiveness }}</span>
+                </div>
+              </div>
+            </div>
+
+          <!-- ══ L1 — THE CAPAE EXECUTIVE VIEW. Warwick's four at-a-glance questions, answered
+               without opening anything: does CAPAE need me · what is the most important family ·
+               is learning being proven · what most recently went wrong.
+               Derived server-side by capae.mjs capaeOverview(), so capae-check.mjs asserts it. -->
+          <div v-if="capRequested && !capErr && capOverview" class="cap-exec">
+            <div class="cap-alert" :class="capOverview.needsAttention ? 't-urgent' : 't-positive'">
+              <span class="rr-mark" aria-hidden="true">{{ capOverview.needsAttention ? '⚠' : '✓' }}</span>
+              <span class="rr-exec-text">{{ capOverview.attention }}</span>
+            </div>
+
+            <div class="cap-counts">
+              <span class="rr-chip t-urgent"   v-if="capOverview.counts.INEFFECTIVE">⛔ {{ capOverview.counts.INEFFECTIVE }} ineffective</span>
+              <span class="rr-chip t-prominent" v-if="capOverview.counts.CHALLENGED">⚠ {{ capOverview.counts.CHALLENGED }} challenged</span>
+              <span class="rr-chip t-quiet"    v-if="capOverview.counts.MONITORING">• {{ capOverview.counts.MONITORING }} monitoring</span>
+              <span class="rr-chip t-positive" v-if="capOverview.counts.EFFECTIVE">✓ {{ capOverview.counts.EFFECTIVE }} effective</span>
+              <span class="rr-chip t-neutral"  v-if="capOverview.counts.UNMEASURABLE">– {{ capOverview.counts.UNMEASURABLE }} unmeasurable</span>
+            </div>
+
+            <!-- A family that HAD been proven and has failed since. This is the signal most worth
+                 surfacing, because it is the one that silently disappears from an active list. -->
+            <div v-if="capOverview.reopened.length" class="cap-line t-prominent">
+              <b>Reopened:</b>
+              <span v-for="(x, xi) in capOverview.reopened" :key="x.slug">{{ xi ? ' · ' : ' ' }}{{ x.title }}</span>
+            </div>
+            <div v-if="capOverview.becameEffective.length" class="cap-line t-positive">
+              <b>Proven:</b>
+              <span v-for="(x, xi) in capOverview.becameEffective" :key="x.slug">{{ xi ? ' · ' : ' ' }}{{ x.title }}</span>
+            </div>
+
+            <div v-if="capOverview.pilot" class="cap-line t-quiet">
+              <b>Pilot — {{ capOverview.pilot.title }}</b>
+              <span v-if="capOverview.pilot.progress"> · {{ capOverview.pilot.progress.label }}</span>
+              <div v-if="capOverview.pilot.nextQualifiedExposure" class="cap-sub">Next qualified exposure: {{ capOverview.pilot.nextQualifiedExposure }}</div>
+            </div>
+
+            <div v-if="capOverview.latest" class="cap-line t-urgent">
+              <b>Latest recurrence</b> · {{ String(capOverview.latest.occurred_at || '').slice(0,10) }} · {{ capOverview.latest.title }}
+              <div v-if="capOverview.latest.summary" class="cap-sub">{{ capOverview.latest.summary }}</div>
+            </div>
+          </div>
+            <div v-if="capRequested && !capErr && capList.length" class="rr-cards">
+              <div v-for="f in capRanked" :key="f.slug" class="rr-card" :class="'t-'+capTone(f.state)">
+                <!-- ══ L1 — THE COLLAPSED FAMILY. State (word AND mark, never colour alone), title,
+                     count, one line of WHY, effectiveness progress, latest occurrence, pilot mark.
+                     Everything else is L3/L4 and opens on tap. -->
+                <div class="rr-h">
+                  <h3><span class="cap-mark" aria-hidden="true">{{ capStateMark(f.state) }}</span> {{ f.title }}<span v-if="f.is_pilot" class="chip ok" style="margin-left:6px">PILOT</span></h3>
+                  <div class="as-sub">
+                    <span class="chip" :class="capTone(f.state)">{{ f.state }}</span>
+                    <span class="rr-chip t-neutral" style="margin-left:6px">{{ f.occurrences }} occurrence{{ f.occurrences === 1 ? '' : 's' }}</span>
+                    <span v-if="f.last_occurrence_at" class="rr-chip t-neutral" style="margin-left:6px">last {{ String(f.last_occurrence_at).slice(0,10) }}</span>
+                  </div>
+                </div>
+
+                <div v-if="capWhy(f)" class="cap-why">{{ capWhy(f) }}</div>
+
+                <!-- Effectiveness as PROGRESS where a threshold exists; the sentence itself is L3. -->
+                <div v-if="f.exposures_required" class="cap-prog">
+                  <div class="cap-prog-bar"><i :style="{width: Math.min(100, Math.round(100 * (f.exposures_clean || 0) / f.exposures_required)) + '%'}"></i></div>
+                  <span class="cap-prog-txt">{{ f.exposures_clean || 0 }} of {{ f.exposures_required }} clean exposures</span>
+                </div>
+                <div v-else-if="f.unmeasurable" class="cap-prog-txt">No counter is open — exposures are too rare to prove effectiveness.</div>
+
+                <div class="rr-acts">
+                  <button class="refresh" @click="capToggle(f.slug)">{{ capOpen === f.slug ? 'Hide detail' : 'Open detail' }}</button>
+                </div>
+
+                <div v-if="capOpen === f.slug" class="rr-detail">
+                <dl class="as-kv">
+                  <div><dt>Occurrences</dt><dd><span class="rr-num">{{ f.occurrences }}</span></dd></div>
+                  <div><dt>Latest occurrence</dt><dd><span v-if="f.last_occurrence_at" class="rr-num">{{ String(f.last_occurrence_at).slice(0,10) }}</span><span v-else class="rr-unk">none recorded</span></dd></div>
+                  <div><dt>Cause class</dt><dd><span v-if="f.cause_class">{{ f.cause_class }}</span><span v-else class="rr-unk">not established</span></dd></div>
+                  <div><dt>RCA</dt><dd><span class="chip" :class="f.rca_status === 'ESTABLISHED' ? 'ok' : 'warn'">{{ f.rca_status }}</span><span v-if="f.rca_confidence" class="rr-unk" style="margin-left:6px">confidence {{ f.rca_confidence }}</span></dd></div>
+                </dl>
+
+                <div class="rr-block">
+                  <div class="as-lab">Effectiveness</div>
+                  <div class="i-title">{{ f.effectiveness }}</div>
+                  <div v-if="f.effectiveness_note" class="as-sub">{{ f.effectiveness_note }}</div>
+                </div>
+
+                <div class="rr-block">
+                  <div class="as-lab">Root cause</div>
+                  <div v-if="f.root_cause" class="as-sub">{{ f.root_cause }}</div>
+                  <div v-else class="as-note">ROOT CAUSE: UNESTABLISHED. Evidence does not establish one, and nothing is being guessed in the meantime.</div>
+                </div>
+
+                <div class="rr-block">
+                  <div class="as-lab">Cause · Detection · Escape</div>
+                  <dl class="as-kv">
+                    <div v-for="(c, ci) in capCDE(f)" :key="ci"><dt>{{ c.k }}</dt><dd><span v-if="c.v">{{ c.v }}</span><span v-else class="rr-unk">not established</span></dd></div>
+                  </dl>
+                </div>
+
+                <div class="rr-block">
+                  <div class="as-lab">Finding</div>
+                  <div v-if="f.finding" class="as-sub">{{ f.finding }}</div><div v-else class="as-note">Not recorded.</div>
+                  <div class="as-lab" style="margin-top:8px">Latest correction</div>
+                  <div v-if="f.latest_correction" class="as-sub">{{ f.latest_correction }}</div><div v-else class="as-note">Not recorded.</div>
+                  <div class="as-lab" style="margin-top:8px">Corrective / preventive action</div>
+                  <div v-if="f.preventive_action" class="as-sub">{{ f.preventive_action }}</div>
+                  <div v-else class="as-note">NONE — deliberately. Not every finding justifies a control.</div>
+                  <div class="as-lab" style="margin-top:8px">Required Larry behaviour</div>
+                  <div v-if="f.required_larry_behaviour" class="as-sub">{{ f.required_larry_behaviour }}</div><div v-else class="as-note">Not recorded.</div>
+                </div>
+
+                <!-- History behind a disclosure: Warwick can inspect it, and it never enters
+                     Larry's context, which is the whole point of keeping the active brief tiny. -->
+                <details class="tech" @toggle="capToggle(f.slug)">
+                  <summary>History and evidence · {{ f.history.length }} {{ f.history.length === 1 ? 'occurrence' : 'occurrences' }}</summary>
+                  <div class="tech-body">
+                    <div v-if="!f.history.length" class="as-note">No individual occurrences are recorded against this family yet.</div>
+                    <div v-for="(h, hi) in f.history" :key="hi" class="item as-stack" style="margin-top:8px">
+                      <div class="i-main">
+                        <div class="i-eyebrow">{{ h.disposition }}<span v-if="h.occurred_at"> · {{ String(h.occurred_at).slice(0,10) }}</span></div>
+                        <div class="i-title">{{ h.summary || 'No summary was recorded.' }}</div>
+                        <div v-if="h.evidence_ref" class="mono as-sub">{{ h.evidence_ref }}</div>
+                        <div v-if="h.deliverable_path" class="as-sub">
+                          Session report: <span class="mono">{{ rrDocName(h.deliverable_path) }}</span>
+                          <button class="refresh" style="margin-left:6px" @click="rrOpenDoc(h.deliverable_path)">Open</button>
+                        </div>
+                        <div v-if="h.closing_head" class="as-note mono">head {{ String(h.closing_head).slice(0,12) }}<span v-if="h.branch"> · {{ h.branch }}</span></div>
+                      </div>
+                    </div>
+                    <div v-if="f.evidence_refs.length" style="margin-top:8px">
+                      <div class="as-lab">Evidence references</div>
+                      <div v-for="(e, ei) in f.evidence_refs" :key="ei" class="as-note mono">{{ e }}</div>
+                    </div>
+                  </div>
+                </details>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- ── SESSION / ROTATION REPORTS ─────────────────────────────────────────────────────
              Warwick's /rotate reports, most recent first. THE HONESTY CHAIN IS THE POINT, so read
              the v-if order — each rung is a DIFFERENT fact and none may be collapsed into another:
@@ -1755,6 +1961,28 @@ createApp({
           <div class="rr-list" :aria-busy="rrLoading ? 'true' : 'false'">
             <!-- A declared order that is not the actual order is a PRODUCER defect. Surfaced, not
                  silently re-sorted (app.js:735 / :737-745) — the endpoint is where it gets fixed. -->
+          <!-- ══ L1 — ACROSS RECENT SESSIONS, before any individual report. Derived server-side by
+               rotation-report.mjs reportsOverview(). Every field is null when the measure is not
+               established: a trend computed from one known and one absent value is a fabrication. -->
+          <div v-if="rrRequested && !rrErr && rrOverview" class="cap-exec">
+            <div class="cap-counts">
+              <span class="rr-chip t-neutral">{{ rrOverview.sessions }} session{{ rrOverview.sessions === 1 ? '' : 's' }}</span>
+              <span v-if="rrOverview.woFirstPass" class="rr-chip" :class="rrOverview.woFirstPass.success === 0 && rrOverview.woFirstPass.total > 0 ? 't-urgent' : 't-quiet'">WO first pass {{ rrOverview.woFirstPass.success }}/{{ rrOverview.woFirstPass.total }}</span>
+              <span v-if="rrOverview.amendments !== null" class="rr-chip t-quiet">{{ rrOverview.amendments }} amendment{{ rrOverview.amendments === 1 ? '' : 's' }}</span>
+              <span v-if="rrOverview.refusals !== null" class="rr-chip t-quiet">{{ rrOverview.refusals }} refusal{{ rrOverview.refusals === 1 ? '' : 's' }}</span>
+              <span v-if="rrOverview.failuresTotal" class="rr-chip t-urgent">🔴 {{ rrOverview.failuresTotal }} prevention failure{{ rrOverview.failuresTotal === 1 ? '' : 's' }}</span>
+              <span v-if="rrOverview.unestablishedTotal" class="rr-chip t-neutral">⚠ {{ rrOverview.unestablishedTotal }} measurements unavailable</span>
+            </div>
+
+            <div v-if="rrOverview.trend" class="cap-line" :class="'t-'+rrOverview.trend.tone">
+              <b>{{ rrOverview.trend.measure }} {{ rrOverview.trend.direction }}</b>
+              · {{ rrOverview.trend.previous }}% → {{ rrOverview.trend.latest }}% since the previous session
+            </div>
+
+            <div v-if="rrOverview.standout" class="cap-line t-urgent">
+              <b>Standout session</b> · {{ rrOverview.standout.sessionDate || 'date not established' }} — {{ rrOverview.standout.headline }}
+            </div>
+          </div>
             <div v-if="rrOrderBreak" class="item red as-stack">
               <div class="i-main">
                 <div class="i-eyebrow blocked">ORDER WRONG</div>
@@ -1774,6 +2002,40 @@ createApp({
                   <span v-else class="rr-unk">session date not established</span>
                 </div>
 
+                <!-- ══ L1 — WHAT MATTERS. Derived server-side by rotation-report.mjs reportSummary(),
+                     so this line is asserted by rotation-report-check.mjs and not by reading the page.
+                     Everything below the actions is L3/L4 and is CLOSED by default: on a phone a
+                     normal report used to consume several screens before the next one was reachable. -->
+                <div class="rr-exec" v-if="r.summary">
+                  <div class="rr-exec-head" :class="'t-'+r.summary.tone">
+                    <span class="rr-mark" aria-hidden="true">{{ r.summary.tone==='urgent' ? '🔴' : (r.summary.tone==='positive' ? '🟢' : '⚪') }}</span>
+                    <span class="rr-exec-text">{{ r.summary.headline }}</span>
+                  </div>
+                  <div class="rr-chips">
+                    <!-- Date first: "date/session" is the card's identity, and it must be readable
+                         without opening anything. The rotation UUID and full SHA stay in L4. -->
+                    <span v-if="r.sessionDate" class="rr-chip t-neutral">{{ r.sessionDate }}</span>
+                    <span v-for="m in r.summary.measures" :key="m.label" class="rr-chip" :class="'t-'+m.tone">{{ m.label }} <b>{{ m.value }}</b></span>
+                    <!-- The "not established" collapse. Twenty-one absent measurements are ONE chip,
+                         not twenty-one lines; the exact list stays in the detail below. -->
+                    <span v-if="r.summary.unestablishedCount" class="rr-chip t-neutral">⚠ {{ r.summary.unestablishedCount }} measurements unavailable</span>
+                  </div>
+                  <div class="rr-acts">
+                    <button class="refresh" @click="rrCardToggle(String(ri))">{{ rrOpenCard===String(ri) ? 'Hide detail' : (r.summary.findingsCount ? 'Open findings · ' + r.summary.findingsCount : 'Open detail') }}</button>
+                    <button class="refresh" style="margin-left:6px" @click="rrOpenDoc(r.deliverablePath)">Full report</button>
+                    <button class="refresh" style="margin-left:6px" @click="rrDownloadDoc(r.deliverablePath)">Download</button>
+                  </div>
+                  <!-- THE FINDINGS LAYER. The label is derived from the closed exposure vocabulary and
+                       the lead is a PREFIX of Pax's own summary — never a rewrite. Full prose below. -->
+                  <div v-if="rrOpenCard===String(ri) && r.summary.findingsCount" class="rr-finds">
+                    <div v-for="(fd, fi) in r.summary.findings" :key="fi" class="rr-find" :class="'t-'+fd.tone">
+                      <div class="rr-find-h"><span aria-hidden="true">{{ fd.mark }}</span> <b>{{ fd.label }}</b><span v-if="fd.family" class="rr-find-fam">{{ fd.family }}</span></div>
+                      <div v-if="fd.lead" class="rr-find-lead">{{ fd.lead }}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div v-if="rrOpenCard===String(ri)" class="rr-detail">
                 <dl class="as-kv">
                   <div><dt>Session date</dt><dd><span v-if="rrHas(r.sessionDate)" class="rr-num">{{ r.sessionDate }}</span><span v-else class="rr-unk">not established</span></dd></div>
                   <div><dt>Host</dt><dd><span v-if="rrHas(r.host)" class="rr-num">{{ r.host }}</span><span v-else class="rr-unk">not established</span></dd></div>
@@ -1990,126 +2252,12 @@ createApp({
                     </div>
                   </div>
                 </details>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- ================= CAPAE =================================================
-             A SEPARATE section from Session / Rotation Reports, deliberately. A rotation report is
-             what happened in ONE session; a CAPAE family is what keeps happening ACROSS sessions and
-             what is being done about it. Merging them would hide the only thing CAPAE adds.
-
-             The read is on an explicit trigger, like the reports, so opening Settings never fires a
-             database read Warwick did not ask for. -->
-        <div class="grp">
-          <h2>CAPAE — the learning loop<span class="g-count" v-if="capFamilies">{{ capList.length }}</span></h2>
-
-          <div class="rr-state">
-            <div class="rr-state-msg" role="status" aria-live="polite">
-              <div v-if="capLoading" class="empty">Reading the CAPAE record…</div>
-              <div v-else-if="!capRequested" class="empty">The CAPAE record has not been read yet.</div>
-              <div v-else-if="capErr" class="item red as-stack">
-                <div class="i-main">
-                  <div class="i-eyebrow blocked">COULD NOT BE READ</div>
-                  <div class="i-title">The CAPAE record could not be read, so no families are shown — that is not the same as there being none.</div>
-                  <div class="err">{{ capErr }}</div>
-                </div>
-              </div>
-              <div v-else-if="!capList.length" class="empty">The record was read and no failure families are recorded yet.</div>
-              <div v-else class="as-sub">{{ capList.length }} failure {{ capList.length === 1 ? 'family is' : 'families are' }} recorded. A repeated failure updates its family — it never creates a second one.</div>
-            </div>
-
-            <button class="refresh" @click="loadCapae()" :disabled="capLoading">{{ capActionLabel }}</button>
-
-            <!-- What Larry is handed at Continue. Shown here so Warwick can see the exact bounded
-                 list rather than take its size on trust. -->
-            <div v-if="capRequested && !capErr && capActive.length" class="item as-stack" style="margin-top:10px">
-              <div class="i-main">
-                <div class="i-eyebrow">LARRY'S ACTIVE BRIEF · {{ capActive.length }}</div>
-                <div class="as-sub">Only families whose prevention is still unproven AND where an exposure is plausible. EFFECTIVE and UNMEASURABLE families are excluded, so they leave his attention automatically.</div>
-                <div v-for="a in capActive" :key="a.slug" class="as-note" style="margin-top:6px">
-                  <strong>{{ a.title }}</strong> — MUST: {{ a.must || 'not recorded' }} <span class="rr-unk">· {{ a.effectiveness }}</span>
-                </div>
-              </div>
-            </div>
-
-            <div v-if="capRequested && !capErr && capList.length" class="rr-cards">
-              <div v-for="f in capList" :key="f.slug" class="rr-card">
-                <div class="rr-h">
-                  <h3>{{ f.title }}<span v-if="f.is_pilot" class="chip ok" style="margin-left:6px">PILOT</span></h3>
-                  <div class="as-sub">
-                    <span class="chip" :class="capTone(f.state)">{{ f.state }}</span>
-                    <span class="mono" style="margin-left:6px">{{ f.slug }}</span>
-                  </div>
-                </div>
-
-                <dl class="as-kv">
-                  <div><dt>Occurrences</dt><dd><span class="rr-num">{{ f.occurrences }}</span></dd></div>
-                  <div><dt>Latest occurrence</dt><dd><span v-if="f.last_occurrence_at" class="rr-num">{{ String(f.last_occurrence_at).slice(0,10) }}</span><span v-else class="rr-unk">none recorded</span></dd></div>
-                  <div><dt>Cause class</dt><dd><span v-if="f.cause_class">{{ f.cause_class }}</span><span v-else class="rr-unk">not established</span></dd></div>
-                  <div><dt>RCA</dt><dd><span class="chip" :class="f.rca_status === 'ESTABLISHED' ? 'ok' : 'warn'">{{ f.rca_status }}</span><span v-if="f.rca_confidence" class="rr-unk" style="margin-left:6px">confidence {{ f.rca_confidence }}</span></dd></div>
-                </dl>
-
-                <div class="rr-block">
-                  <div class="as-lab">Effectiveness</div>
-                  <div class="i-title">{{ f.effectiveness }}</div>
-                  <div v-if="f.effectiveness_note" class="as-sub">{{ f.effectiveness_note }}</div>
-                </div>
-
-                <div class="rr-block">
-                  <div class="as-lab">Root cause</div>
-                  <div v-if="f.root_cause" class="as-sub">{{ f.root_cause }}</div>
-                  <div v-else class="as-note">ROOT CAUSE: UNESTABLISHED. Evidence does not establish one, and nothing is being guessed in the meantime.</div>
-                </div>
-
-                <div class="rr-block">
-                  <div class="as-lab">Cause · Detection · Escape</div>
-                  <dl class="as-kv">
-                    <div v-for="(c, ci) in capCDE(f)" :key="ci"><dt>{{ c.k }}</dt><dd><span v-if="c.v">{{ c.v }}</span><span v-else class="rr-unk">not established</span></dd></div>
-                  </dl>
-                </div>
-
-                <div class="rr-block">
-                  <div class="as-lab">Finding</div>
-                  <div v-if="f.finding" class="as-sub">{{ f.finding }}</div><div v-else class="as-note">Not recorded.</div>
-                  <div class="as-lab" style="margin-top:8px">Latest correction</div>
-                  <div v-if="f.latest_correction" class="as-sub">{{ f.latest_correction }}</div><div v-else class="as-note">Not recorded.</div>
-                  <div class="as-lab" style="margin-top:8px">Corrective / preventive action</div>
-                  <div v-if="f.preventive_action" class="as-sub">{{ f.preventive_action }}</div>
-                  <div v-else class="as-note">NONE — deliberately. Not every finding justifies a control.</div>
-                  <div class="as-lab" style="margin-top:8px">Required Larry behaviour</div>
-                  <div v-if="f.required_larry_behaviour" class="as-sub">{{ f.required_larry_behaviour }}</div><div v-else class="as-note">Not recorded.</div>
-                </div>
-
-                <!-- History behind a disclosure: Warwick can inspect it, and it never enters
-                     Larry's context, which is the whole point of keeping the active brief tiny. -->
-                <details class="tech" @toggle="capToggle(f.slug)">
-                  <summary>History and evidence · {{ f.history.length }} {{ f.history.length === 1 ? 'occurrence' : 'occurrences' }}</summary>
-                  <div class="tech-body">
-                    <div v-if="!f.history.length" class="as-note">No individual occurrences are recorded against this family yet.</div>
-                    <div v-for="(h, hi) in f.history" :key="hi" class="item as-stack" style="margin-top:8px">
-                      <div class="i-main">
-                        <div class="i-eyebrow">{{ h.disposition }}<span v-if="h.occurred_at"> · {{ String(h.occurred_at).slice(0,10) }}</span></div>
-                        <div class="i-title">{{ h.summary || 'No summary was recorded.' }}</div>
-                        <div v-if="h.evidence_ref" class="mono as-sub">{{ h.evidence_ref }}</div>
-                        <div v-if="h.deliverable_path" class="as-sub">
-                          Session report: <span class="mono">{{ rrDocName(h.deliverable_path) }}</span>
-                          <button class="refresh" style="margin-left:6px" @click="rrOpenDoc(h.deliverable_path)">Open</button>
-                        </div>
-                        <div v-if="h.closing_head" class="as-note mono">head {{ String(h.closing_head).slice(0,12) }}<span v-if="h.branch"> · {{ h.branch }}</span></div>
-                      </div>
-                    </div>
-                    <div v-if="f.evidence_refs.length" style="margin-top:8px">
-                      <div class="as-lab">Evidence references</div>
-                      <div v-for="(e, ei) in f.evidence_refs" :key="ei" class="as-note mono">{{ e }}</div>
-                    </div>
-                  </div>
-                </details>
-              </div>
-            </div>
-          </div>
-        </div>
 
         <!-- The opened report document. One viewer serving both surfaces: a report opened from the
              reports list and a report opened from a CAPAE occurrence are the same file, so they get
