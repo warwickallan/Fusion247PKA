@@ -137,12 +137,15 @@ EVIDENCE about that boundary.** Whether any of its findings still bind after thi
 reconciliation is listed in § "THE PREPARED POST-JUMP PHASE" → deferred verification — it is not
 silently discharged here.
 
-> **MAP ACCEPTANCE — the 2026-08-08 position.** Warwick has still not accepted the 2026-08-04 map
-> as a document. **The 4E route is designed to close exactly that**: this reconciled map goes to
-> Veritas (4E assurance), then Codex (merge unit), then **Warwick's `merge-decision` — and his
-> authorised merge of the 4E preparation into canonical `main` is the acceptance event for this
-> prepared map as the post-jump authority** (commission §18, §22). Until that merge, this map is a
-> **prepared candidate**, and no statement in it may be read as already merged.
+> **MAP ACCEPTANCE — CLOSED 2026-08-08.** The 4E route completed the same day it was prepared:
+> Veritas **PASS** (all 14 requirements; receipt `Deliverables/2026-08-08-veritas-4e-prep-receipt.md`),
+> Codex three-pass review on PR #99 (content 14/14; TQA-4E-002 adjudicated by Warwick, verbatim:
+> *"I accept TQA-4E-002 as the bounded evidence limitation for this documentation-only merge"*),
+> and **Warwick's `merge-decision`: MERGE — executed at the exact reviewed head `0511c0a`, PR #99.**
+> **That merge is the acceptance event (commission §18, §22): this map is ACCEPTED and is the
+> active post-jump authority.** ~~Until that merge, this map is a prepared candidate~~ —
+> superseded by the merge itself; resolve current canonical `main` by execution, never from a SHA
+> written here.
 
 ---
 
@@ -528,9 +531,11 @@ independent review by the same model, never as external verification. Merge-to-m
 
 ## 10. THE PREPARED POST-JUMP PHASE — the one directive section of this map
 
-**Prepared 2026-08-08 during BUILD-020 Sub-phase 4E. It becomes ACTIVE when the Build switch to
-BUILD-015 completes** (commission mirror §21–§22). Until that switch, BUILD-020/Proofline remains
-the active Build and its Wayfinder directs the estate; nothing here authorises earlier AsdAIr work.
+**Prepared 2026-08-08 during BUILD-020 Sub-phase 4E. ~~It becomes ACTIVE when the Build switch to
+BUILD-015 completes~~ — the switch COMPLETED 2026-08-08: the 4E preparation merged (PR #99, reviewed
+head `0511c0a`), convergence was proven, BUILD-020 parked at its 4F return frontier, and BUILD-015
+is the ACTIVE Build. THIS SECTION IS LIVE.** (Commission mirror §21–§22.) Implementation still
+begins only after the prepared sequence below reaches Warwick's decision at step 5.
 
 ### The phase and its gate question
 
@@ -638,8 +643,9 @@ execution — establishing it is precisely step 2's job.
    2026-08-04 document state; this 4E reconciliation supersedes the map's directive layer and
    applies the receipt's `D-G3-23`/`D-G3-25` map corrections. Whether the residual findings still
    gate anything is for the next assurance boundary to state, not for this map to self-declare.
-6. **Whether Warwick's merge of the 4E preparation has actually happened** — this map may not claim
-   it has; see the MAP ACCEPTANCE block above.
+6. ~~Whether Warwick's merge of the 4E preparation has actually happened~~ **DISCHARGED 2026-08-08:
+   the merge happened — PR #99 at reviewed head `0511c0a`; see the MAP ACCEPTANCE block above.
+   Current canonical HEAD is still resolved by execution, never read from this map.**
 
 ### Parked documentation debt — recorded once, not chased (root `CLAUDE.md` finding-disposition)
 
