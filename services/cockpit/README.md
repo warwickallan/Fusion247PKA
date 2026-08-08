@@ -10,6 +10,28 @@ real actions still flow `governed intent → worker → receipt`. See memory `co
   Creds come from the gitignored live-runtime file (`COCKPIT_CREDS`, defaults to the Directus live env json).
 - **Installable PWA** — manifest + service worker; add to home screen for a fullscreen app icon.
 
+## ⭐ WHERE THE LIVE COCKPIT RUNS FROM — SETTLED 2026-08-08. **This paragraph is the SSOT; nothing else in the estate may answer this question.**
+
+> **The live Cockpit runs from THIS repository — `C:\Fusion247PKA\services\cockpit`. There is no installed copy. Editing a file here changes the live surface.**
+
+Started by the `MyPKA-Local-Services-Live` scheduled task → `ensure-local-services.mjs`. `public/*` is
+served straight off disk with no build step, so a static edit is live on save; `server.mjs`, `db.mjs`,
+`capae.mjs` and `rotation-report.mjs` are loaded once at startup and need a **restart** to take effect.
+
+**Why this is written down at all: the answer kept flipping.** A stale duplicate lived at
+`~/.mypka/tower-runtime/services/cockpit/`, and both "it serves from the worktree" and "it serves from
+tower-runtime" were asserted, corrected, and asserted again across sessions. **The duplicate was
+deleted on 2026-08-08** — with seven sibling dead copies, 670 files, every one verified byte-present in
+this repo and none unique. **`~/.mypka/tower-runtime/` now contains `services/control-plane/` ONLY**,
+which is the Tower watcher's real home and is a genuine install.
+
+**How to settle it again in ten seconds, without trusting this file:**
+```sh
+curl -s http://127.0.0.1:8090/api/state    # build.sha is a commit in THIS repo
+                                           # tower-runtime is not a git repo and cannot report one
+```
+Then compare `curl -s http://127.0.0.1:8090/app.js` against `public/app.js`. Two independent proofs.
+
 ## Run
 ```sh
 node server.mjs                 # binds 127.0.0.1:8090 by default
