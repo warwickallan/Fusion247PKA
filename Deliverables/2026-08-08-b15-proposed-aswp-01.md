@@ -4,6 +4,25 @@
 Step-2 investigation ([[Deliverables/2026-08-08-pax-b15-grounded-vision-investigation]]) and
 Larry's live verification. One WP, as commissioned ("Asdair Build 001" §8 Step 3).**
 
+**Nolan Step-4 review (2026-08-08): CLEAR-WITH-OBSERVATIONS, no blocker —
+[[Deliverables/2026-08-08-nolan-wp-b15-1-review]]. His observations are folded in below (marked
+"Nolan"); the original wording they corrected is struck, not deleted.**
+
+## Implementation hazards named by review — binding on the Work Order
+
+- **⚠️ Action-name collision (Nolan, verified at source):** the Telegram callback vocabulary
+  **already contains `confirm`** (`callbackProtocol.js:86` — the ASDA order-confirmation email
+  prompt, pinned by `runtime.test.js:398`). Pax's sketch line "add one `confirm` action" is stale
+  on this point and must not be followed literally. **Use a distinct ≤10-byte action name** so no
+  collision and no protocol-wide byte-budget rebalance.
+- **Wrong-week evidence (Nolan):** timestamp + hash prefix on the card cannot alone satisfy the
+  wrong-week criterion — the card needs a **human-readable prior-photograph comparison** (e.g.
+  "this photo, received Fri 20:41 — previous shop's photo was Mon 09:12") for the mismatch to be
+  visible to a human.
+- **Honest acceptance limit (Nolan):** "every physical line represented" is **human-verified at
+  the confirmation gate** — no independent line count exists — and the acceptance record must say
+  so rather than implying a mechanical check.
+
 ## The earliest still-broken product link, and its proof
 
 Every photo shop is created `needs_review = true`; `planOutcome` refuses READY_TO_SHOP until a
@@ -39,14 +58,19 @@ because that audit enumerated module-caller wiring, and this gate is correctly w
 2. **Exact-source binding on the card (invariant C, wrong-week protection)** — capture an
    immutable image fingerprint at intake, carry it on the shop row, and render the card so it is
    unambiguous WHICH photograph produced the reading (received timestamp + fingerprint prefix +
-   physical/interpreted line counts). Requires one forward-only migration — **authored in-repo
-   with the migration-debt numbering reconciled against the three live-only tables, and applied
-   to the live database only under Warwick's explicit authority at implementation time.**
-3. **(SEVERABLE) Invariant D retention** — stop discarding Terra's catalogue-constrained
-   candidate evidence: `realInterpretPhoto` (deps.js:178–182) currently strips
+   physical/interpreted line counts, **and — Nolan — a human-readable prior-photograph comparison
+   so a wrong-week mismatch is visible to a human, not only encoded in a hash**). Requires one
+   forward-only migration — **authored in-repo, numbered PAST the live migration debt (the three
+   live-only tables), that debt recorded once and repatriated by NOTHING in this WP (Nolan's pin),
+   and applied to the live database only under Warwick's explicit authority at implementation
+   time.**
+3. **(SEVERABLE — Nolan recommends OUT)** Invariant D retention — stop discarding Terra's
+   catalogue-constrained candidate evidence (`realInterpretPhoto`, deps.js:178–182 strips
    `matched_regular_id` / `confidence` / `alternatives` / `status` before `resolveAll` re-solves
-   from raw text. Carry the validated evidence through (the validation logic already exists in
-   the diagnostic CLI `interpret-list.js`). Severable if Warwick prefers the narrower first slice.
+   from raw text; the validation logic already exists in `interpret-list.js`). **Nolan's grounds:
+   different seam, its own likely schema change, quality-improving rather than unblocking — it
+   deserves its own slice.** Larry concurs; recommended disposition: OUT of this WP, first
+   candidate for the next one.
 
 ## Acceptance — the real production event, not a manual invocation (CAPAE bar applies)
 
