@@ -596,6 +596,90 @@ createApp({
 
     const rrList = computed(() => (Array.isArray(rrReports.value) ? rrReports.value : []));
 
+    // ---- Reading and downloading the report itself ------------------------------------------
+    //
+    // The Deliverable is the SSOT; the mirror row only points at it. `/api/deliverable` already
+    // reads Deliverables/ behind a basename guard, so this reuses that route rather than adding a
+    // second file-serving surface. The download is built from the SAME fetched text, so what
+    // Warwick reads on screen and what he saves cannot diverge.
+    const rrDoc = ref(null);
+    const rrDocLoading = ref(false);
+    const rrDocErr = ref(null);
+    const rrDocName = (p) => String(p || '').split(/[\\/]/).pop();
+
+    async function rrOpenDoc(p) {
+      const file = rrDocName(p);
+      if (!file) { rrDocErr.value = 'This rotation recorded no deliverable path, so there is nothing to open.'; return; }
+      rrDocLoading.value = true; rrDocErr.value = null; rrDoc.value = null;
+      try {
+        const r = await fetch('/api/deliverable?file=' + encodeURIComponent(file), { cache: 'no-store' });
+        const d = await r.json();
+        if (!d || d.ok === false) throw new Error((d && d.error) || 'the document could not be read');
+        rrDoc.value = { file: d.file, text: String(d.text || '') };
+      } catch (e) {
+        rrDocErr.value = (e.message || 'the read failed') + ' — the report row is still correct; only the file read failed.';
+      } finally { rrDocLoading.value = false; }
+    }
+    function rrCloseDoc() { rrDoc.value = null; rrDocErr.value = null; }
+
+    // Downloads the bytes actually fetched. If the document is not open yet it is fetched first, so
+    // the button can never silently save an empty file.
+    async function rrDownloadDoc(p) {
+      const file = rrDocName(p);
+      if (!file) return;
+      if (!rrDoc.value || rrDoc.value.file !== file) await rrOpenDoc(p);
+      if (!rrDoc.value) return;
+      const blob = new Blob([rrDoc.value.text], { type: 'text/markdown;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = rrDoc.value.file;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+    }
+
+    // ---- CAPAE ------------------------------------------------------------------------------
+    //
+    // Same contract as the rotation reports, and the same refusal to invent: `capFamilies` stays
+    // null when the read FAILED, so "could not be read" never renders as "there are none".
+    const capFamilies = ref(null);
+    const capActive = ref([]);
+    const capLoading = ref(false);
+    const capErr = ref(null);
+    const capRequested = ref(false);
+    const capOpen = ref('');
+
+    async function loadCapae() {
+      capRequested.value = true; capLoading.value = true; capErr.value = null;
+      try {
+        const r = await fetch('/api/capae', { cache: 'no-store' });
+        const d = await r.json();
+        if (!d || d.ok === false) throw new Error((d && d.error) || 'the cockpit could not read the CAPAE record');
+        capFamilies.value = Array.isArray(d.families) ? d.families : [];
+        capActive.value = Array.isArray(d.active) ? d.active : [];
+      } catch (e) {
+        capErr.value = e.message || 'the read failed'; capFamilies.value = null; capActive.value = [];
+      } finally { capLoading.value = false; }
+    }
+
+    const capList = computed(() => (Array.isArray(capFamilies.value) ? capFamilies.value : []));
+    const capToggle = (slug) => { capOpen.value = capOpen.value === slug ? '' : slug; };
+    const capActionLabel = computed(() => (capLoading.value ? 'Reading…' : capRequested.value ? 'Read again' : 'Read the CAPAE record'));
+
+    // The state chip's tone. EFFECTIVE is the ONLY green: everything else is either unproven or in
+    // doubt, and colouring MONITORING green would tell Warwick a prevention had been demonstrated
+    // when no qualified exposure has occurred.
+    const capTone = (s) => ({
+      EFFECTIVE: 'ok', INEFFECTIVE: 'red', CHALLENGED: 'warn', UNMEASURABLE: 'mute', MONITORING: 'info',
+    }[s] || 'info');
+    const capCDE = (f) => {
+      const o = (f && f.cause_detection_escape) || {};
+      return [
+        { k: 'Cause', v: o.cause || null },
+        { k: 'Detection', v: o.detection || null },
+        { k: 'Escape', v: o.escape || null },
+      ];
+    };
+
     // ONE trigger for the whole surface, so it is the SAME DOM element in every state and keyboard
     // focus survives a load. It used to be re-created inside two v-if branches ("Read them" and
     // "Try again"), each of which destroyed itself on click: focus fell to <body> and a keyboard
@@ -716,6 +800,9 @@ createApp({
       outputs, newOutputs, itemsAdded, wins, builds,
       statusTone, statusLine, tiles, go, open, closeDetail, decide, copyTranscript, primaryAction, sourceStatus, load, REPORT, GRAPH,
       rrReports, rrLoading, rrErr, rrRequested, loadRotationReports, rrList, rrOrderBreak, rrActionLabel,
+      rrDoc, rrDocLoading, rrDocErr, rrDocName, rrOpenDoc, rrCloseDoc, rrDownloadDoc,
+      capFamilies, capActive, capLoading, capErr, capRequested, capOpen,
+      loadCapae, capList, capToggle, capActionLabel, capTone, capCDE,
       rrArr, rrObj, rrHas, rrText, rrInt, rrCompact, rrIsCompact, rrPct, rrMins, rrBar,
       rrAlloc, rrAllocSum, rrAllocGap, rrAllocAnyKnown, rrCtx, rrCtxMax, rrSpecMax, rrLinesMax,
     };
@@ -1861,6 +1948,13 @@ createApp({
                 <div class="rr-block">
                   <h3 class="as-sec rr-h">Durable report</h3>
                   <div v-if="rrHas(r.deliverablePath)" class="mono">{{ r.deliverablePath }}</div>
+                  <!-- Open and Download read the DELIVERABLE, which is the SSOT. The mirror row is a
+                       pointer to it, so these buttons are how Warwick gets the actual report rather
+                       than the summarised fields above. Absent path = no buttons, never a dead one. -->
+                  <div v-if="rrHas(r.deliverablePath)" class="as-sub">
+                    <button class="refresh" @click="rrOpenDoc(r.deliverablePath)">Open report</button>
+                    <button class="refresh" style="margin-left:6px" @click="rrDownloadDoc(r.deliverablePath)">Download</button>
+                  </div>
                   <div v-else class="as-note">No durable report path was recorded.</div>
                 </div>
 
@@ -1911,6 +2005,138 @@ createApp({
                 </details>
               </div>
             </div>
+          </div>
+        </div>
+
+        <!-- ================= CAPAE =================================================
+             A SEPARATE section from Session / Rotation Reports, deliberately. A rotation report is
+             what happened in ONE session; a CAPAE family is what keeps happening ACROSS sessions and
+             what is being done about it. Merging them would hide the only thing CAPAE adds.
+
+             The read is on an explicit trigger, like the reports, so opening Settings never fires a
+             database read Warwick did not ask for. -->
+        <div class="grp">
+          <h2>CAPAE — the learning loop<span class="g-count" v-if="capFamilies">{{ capList.length }}</span></h2>
+
+          <div class="rr-state">
+            <div class="rr-state-msg" role="status" aria-live="polite">
+              <div v-if="capLoading" class="empty">Reading the CAPAE record…</div>
+              <div v-else-if="!capRequested" class="empty">The CAPAE record has not been read yet.</div>
+              <div v-else-if="capErr" class="item red as-stack">
+                <div class="i-main">
+                  <div class="i-eyebrow blocked">COULD NOT BE READ</div>
+                  <div class="i-title">The CAPAE record could not be read, so no families are shown — that is not the same as there being none.</div>
+                  <div class="err">{{ capErr }}</div>
+                </div>
+              </div>
+              <div v-else-if="!capList.length" class="empty">The record was read and no failure families are recorded yet.</div>
+              <div v-else class="as-sub">{{ capList.length }} failure {{ capList.length === 1 ? 'family is' : 'families are' }} recorded. A repeated failure updates its family — it never creates a second one.</div>
+            </div>
+
+            <button class="refresh" @click="loadCapae()" :disabled="capLoading">{{ capActionLabel }}</button>
+
+            <!-- What Larry is handed at Continue. Shown here so Warwick can see the exact bounded
+                 list rather than take its size on trust. -->
+            <div v-if="capRequested && !capErr && capActive.length" class="item as-stack" style="margin-top:10px">
+              <div class="i-main">
+                <div class="i-eyebrow">LARRY'S ACTIVE BRIEF · {{ capActive.length }}</div>
+                <div class="as-sub">Only families whose prevention is still unproven AND where an exposure is plausible. EFFECTIVE and UNMEASURABLE families are excluded, so they leave his attention automatically.</div>
+                <div v-for="a in capActive" :key="a.slug" class="as-note" style="margin-top:6px">
+                  <strong>{{ a.title }}</strong> — MUST: {{ a.must || 'not recorded' }} <span class="rr-unk">· {{ a.effectiveness }}</span>
+                </div>
+              </div>
+            </div>
+
+            <div v-if="capRequested && !capErr && capList.length" class="rr-cards">
+              <div v-for="f in capList" :key="f.slug" class="rr-card">
+                <div class="rr-h">
+                  <h3>{{ f.title }}<span v-if="f.is_pilot" class="chip ok" style="margin-left:6px">PILOT</span></h3>
+                  <div class="as-sub">
+                    <span class="chip" :class="capTone(f.state)">{{ f.state }}</span>
+                    <span class="mono" style="margin-left:6px">{{ f.slug }}</span>
+                  </div>
+                </div>
+
+                <dl class="as-kv">
+                  <div><dt>Occurrences</dt><dd><span class="rr-num">{{ f.occurrences }}</span></dd></div>
+                  <div><dt>Latest occurrence</dt><dd><span v-if="f.last_occurrence_at" class="rr-num">{{ String(f.last_occurrence_at).slice(0,10) }}</span><span v-else class="rr-unk">none recorded</span></dd></div>
+                  <div><dt>Cause class</dt><dd><span v-if="f.cause_class">{{ f.cause_class }}</span><span v-else class="rr-unk">not established</span></dd></div>
+                  <div><dt>RCA</dt><dd><span class="chip" :class="f.rca_status === 'ESTABLISHED' ? 'ok' : 'warn'">{{ f.rca_status }}</span><span v-if="f.rca_confidence" class="rr-unk" style="margin-left:6px">confidence {{ f.rca_confidence }}</span></dd></div>
+                </dl>
+
+                <div class="rr-block">
+                  <div class="as-lab">Effectiveness</div>
+                  <div class="i-title">{{ f.effectiveness }}</div>
+                  <div v-if="f.effectiveness_note" class="as-sub">{{ f.effectiveness_note }}</div>
+                </div>
+
+                <div class="rr-block">
+                  <div class="as-lab">Root cause</div>
+                  <div v-if="f.root_cause" class="as-sub">{{ f.root_cause }}</div>
+                  <div v-else class="as-note">ROOT CAUSE: UNESTABLISHED. Evidence does not establish one, and nothing is being guessed in the meantime.</div>
+                </div>
+
+                <div class="rr-block">
+                  <div class="as-lab">Cause · Detection · Escape</div>
+                  <dl class="as-kv">
+                    <div v-for="(c, ci) in capCDE(f)" :key="ci"><dt>{{ c.k }}</dt><dd><span v-if="c.v">{{ c.v }}</span><span v-else class="rr-unk">not established</span></dd></div>
+                  </dl>
+                </div>
+
+                <div class="rr-block">
+                  <div class="as-lab">Finding</div>
+                  <div v-if="f.finding" class="as-sub">{{ f.finding }}</div><div v-else class="as-note">Not recorded.</div>
+                  <div class="as-lab" style="margin-top:8px">Latest correction</div>
+                  <div v-if="f.latest_correction" class="as-sub">{{ f.latest_correction }}</div><div v-else class="as-note">Not recorded.</div>
+                  <div class="as-lab" style="margin-top:8px">Corrective / preventive action</div>
+                  <div v-if="f.preventive_action" class="as-sub">{{ f.preventive_action }}</div>
+                  <div v-else class="as-note">NONE — deliberately. Not every finding justifies a control.</div>
+                  <div class="as-lab" style="margin-top:8px">Required Larry behaviour</div>
+                  <div v-if="f.required_larry_behaviour" class="as-sub">{{ f.required_larry_behaviour }}</div><div v-else class="as-note">Not recorded.</div>
+                </div>
+
+                <!-- History behind a disclosure: Warwick can inspect it, and it never enters
+                     Larry's context, which is the whole point of keeping the active brief tiny. -->
+                <details class="tech" @toggle="capToggle(f.slug)">
+                  <summary>History and evidence · {{ f.history.length }} {{ f.history.length === 1 ? 'occurrence' : 'occurrences' }}</summary>
+                  <div class="tech-body">
+                    <div v-if="!f.history.length" class="as-note">No individual occurrences are recorded against this family yet.</div>
+                    <div v-for="(h, hi) in f.history" :key="hi" class="item as-stack" style="margin-top:8px">
+                      <div class="i-main">
+                        <div class="i-eyebrow">{{ h.disposition }}<span v-if="h.occurred_at"> · {{ String(h.occurred_at).slice(0,10) }}</span></div>
+                        <div class="i-title">{{ h.summary || 'No summary was recorded.' }}</div>
+                        <div v-if="h.evidence_ref" class="mono as-sub">{{ h.evidence_ref }}</div>
+                        <div v-if="h.deliverable_path" class="as-sub">
+                          Session report: <span class="mono">{{ rrDocName(h.deliverable_path) }}</span>
+                          <button class="refresh" style="margin-left:6px" @click="rrOpenDoc(h.deliverable_path)">Open</button>
+                        </div>
+                        <div v-if="h.closing_head" class="as-note mono">head {{ String(h.closing_head).slice(0,12) }}<span v-if="h.branch"> · {{ h.branch }}</span></div>
+                      </div>
+                    </div>
+                    <div v-if="f.evidence_refs.length" style="margin-top:8px">
+                      <div class="as-lab">Evidence references</div>
+                      <div v-for="(e, ei) in f.evidence_refs" :key="ei" class="as-note mono">{{ e }}</div>
+                    </div>
+                  </div>
+                </details>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- The opened report document. One viewer serving both surfaces: a report opened from the
+             reports list and a report opened from a CAPAE occurrence are the same file, so they get
+             the same reader rather than two that could drift. -->
+        <div class="grp" v-if="rrDocLoading || rrDocErr || rrDoc">
+          <h2>Report document</h2>
+          <div v-if="rrDocLoading" class="empty">Reading the document…</div>
+          <div v-else-if="rrDocErr" class="item red as-stack"><div class="i-main"><div class="i-eyebrow blocked">COULD NOT BE READ</div><div class="i-title">{{ rrDocErr }}</div></div></div>
+          <div v-else-if="rrDoc">
+            <div class="as-sub"><span class="mono">{{ rrDoc.file }}</span>
+              <button class="refresh" style="margin-left:8px" @click="rrDownloadDoc(rrDoc.file)">Download</button>
+              <button class="refresh" style="margin-left:6px" @click="rrCloseDoc()">Close</button>
+            </div>
+            <pre class="rr-doc" style="white-space:pre-wrap;overflow-x:auto;max-height:60vh;overflow-y:auto">{{ rrDoc.text }}</pre>
           </div>
         </div>
 

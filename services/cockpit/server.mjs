@@ -22,6 +22,9 @@ import { provenancePayload } from './provenance.mjs';
 // rotation-report-check.mjs can execute the whole mapping — including the null-is-not-zero property —
 // without a Postgres anywhere near it.
 import { rotationReportsResponse } from './rotation-report.mjs';
+// CAPAE — the closed learning loop. Same construction as the rotation reports: the endpoint returns
+// the object capae-check.mjs executes, so what is proved and what Warwick sees are one thing.
+import { capaeResponse } from './capae.mjs';
 // The private-app API bridge and its ORIGIN BOUNDARY. Extracted for the same reason as static.mjs
 // above, and it was the last live-facing handler still trapped in this file: while it lived here no
 // gate could execute it, because importing this file opens two live pools via db.mjs. It is now
@@ -437,6 +440,9 @@ const server = http.createServer(async (req, res) => {
     // executes, so what is proved and what Warwick sees are one construction. It never throws: a
     // database failure comes back as HTTP 200 { ok:false, error } and takes no other route down.
     if (req.url.startsWith('/api/rotation-reports')) return j(res, 200, await rotationReportsResponse(q));
+    // CAPAE. Same READ pool `q`, same never-throws contract: a database failure is HTTP 200
+    // { ok:false, error } and takes no other route down with it.
+    if (req.url.startsWith('/api/capae')) return j(res, 200, await capaeResponse(q));
     // The four provenance fields are the object provenance.mjs builds and the gate executes — the
     // endpoint does not assemble its own version of the answer.
     if (req.url.startsWith('/api/health')) return j(res, 200, { status: 'ok', build: BUILD, ...PROVENANCE });
