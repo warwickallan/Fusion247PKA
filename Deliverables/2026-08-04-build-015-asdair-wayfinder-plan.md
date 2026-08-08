@@ -609,10 +609,29 @@ items 1+2 APPROVED** ([[Deliverables/2026-08-08-asda-build-002-SOURCE]]).
 binding / wrong-week protection (item 2). **Binding acceptance is the real production event list
 in Asda Build 002 §11** — live poller card → real Telegram delivery → real tap → gate clears →
 replan → shop 6 recovers; restart-safe; no Larry and no manual DB command anywhere in the journey;
-never reported complete because code exists. **In parallel (not blocking):** the bounded read-only
-Pax Supabase household-knowledge audit (Asda Build 002 §6–§9). **After both: ONE handback to
-Warwick (§12) — the next genuine product decision. Item 3 (candidate-evidence retention) is OUT,
+never reported complete because code exists. **Item 3 (candidate-evidence retention) is OUT,
 recorded as leading candidate for the next slice.**
+
+**IMPLEMENTATION POSITION, 2026-08-08 late:** Keel's Work Order `WO-2026-08-08-B15-01` (envelope
+route, read-back held and accepted with the AC4 route-(a) amendment) returned COMPLETED —
+**integrated at `7db899b` and submitted to Veritas for assurance.** Source-level ACs met with
+builder self-evidence (pipeline 205/205, bot 156/156, intake 28/28 executed; surface secret scan
+clean; migration `db/016_shop_source_image.sql` AUTHORED, NOT applied; `approve` action distinct
+from the pre-existing `confirm`). **The live halves are explicitly NOT claimed** — the §11
+production event (migration application under Warwick's §3 authority with pre-notification,
+runtime restart, real card, real tap, shop 6 recovery) is the outstanding WP acceptance.
+
+**The parallel Pax household-knowledge audit is BANKED:**
+[[Deliverables/2026-08-08-pax-supabase-household-knowledge-audit]]. Headline: static knowledge
+genuinely reaches Terra/recognition/planner (recognition is authentically grounded); **everything
+the system should learn by operating is lost or inert** — shop 6's 11 answers produced zero
+durable rows, the wired learning loop hard-codes itself ineligible (`applies_going_forward:
+false`), the 106-key purchase-frequency view is read by nothing, and rule 10 cannot structurally
+reach a decision point (never-BOB holds only by alias-curation accident on regular 4). **No
+WP-B15-1 invalidation.** One acceptance watch item: gate-clear → replan fires the first-ever live
+`recordAnswerLearning` writes, and that writer parks the shop FAILED on any error — first suspect
+if acceptance stalls after the tap. **After the §11 event and Veritas: ONE handback to Warwick
+(Asda Build 002 §12) — the next genuine product decision.**
 
 ### The prepared sequence — Warwick's commission §12/§23 — ✅ DISCHARGED 2026-08-08 (record retained)
 
