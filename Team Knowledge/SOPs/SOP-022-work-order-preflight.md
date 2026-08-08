@@ -97,6 +97,14 @@ Verdict:
   preflight, an acceptance criterion that cannot be delivered inside the declared surface, or an
   authority value the worker may not act under). **No files written.**
 
+  **Not automatically a refusal ground:** a contract requiring a public session log **where Warwick has
+  classified the capability as having no permitted public-repository trace**. That narrow conflict is
+  already ruled — apply [[GL-009-public-private-knowledge-boundary]] § "No-public-trace classifications"
+  and proceed (step 9c). Where you cannot establish whether such a classification exists, that is a
+  `CLARIFY` to Larry, not a `REFUSE`. This resolves one named, already-ruled conflict **by authority, not
+  for convenience**; it weakens no other refusal condition (see § "Healthy refusal versus wasteful
+  dispatch").
+
 **Restating the order back verbatim is not a read-back.** The value is in the paraphrase — a misreading
 only becomes visible when the words change.
 
@@ -186,6 +194,23 @@ Verify the order against observable reality. Read-only; nothing here writes.
    and must not be refused**: nothing has been written yet, and firing the gate there teaches everyone
    to ignore it. The blocking check lands at handback instead, where exit `2` over a declared private
    surface can no longer be innocent. This asymmetry was ruled, not drifted into; do not harmonise it.
+
+   **9c. Ask once whether a no-public-trace classification applies — here, not at handback.** Whenever
+   `private_surface` is not `none`, establish at preflight whether Warwick **has classified** this
+   capability or workstream as having no permitted public-repository trace. Canonical:
+   [[GL-009-public-private-knowledge-boundary]] § "No-public-trace classifications". Do not re-derive it
+   and do not restate it in the read-back beyond naming the section.
+
+   - **He has** → the full record lives in the approved private surface and the public repository gets at
+     most a generic marker; check the **filename, path and frontmatter** of anything public, not only its
+     body. This is already ruled — not a contradiction to name and not grounds to refuse.
+   - **He has not** → ordinary public-by-default rules apply and nothing in this step restricts you. **A
+     non-`none` `private_surface` does not by itself imply a classification.**
+   - **You cannot tell** → one-line `CLARIFY` to Larry. Do not assume it in either direction.
+
+   The question belongs at preflight rather than handback because **the one thing that cannot be undone
+   here is publishing** — a private path or artefact name committed to the public repo is not fixed by
+   deleting it afterwards.
 
 ## Outcomes
 
@@ -378,8 +403,10 @@ inside the existing preflight — it creates no new checker, actor or gate** (Wa
 ## References
 
 - [[Templates/work-order]] — the canonical Work Order shape and the read-back block. Canonical there.
-- [[GL-012-secrets-store-access-boundary]] — canonical for preflight step 9: `C:\.fusion247\**` deny by
-  default, the declared-project-subtree allowlist, and the preflight/handback scanner asymmetry.
+- [[GL-012-secrets-store-access-boundary]] — canonical for preflight steps 9a/9b: `C:\.fusion247\**` deny
+  by default, the declared-project-subtree allowlist, and the preflight/handback scanner asymmetry.
+- [[GL-009-public-private-knowledge-boundary]] — canonical for preflight step 9c and the REFUSE carve-out
+  above: what may enter the public repository, and the narrow no-public-trace classification rule.
 - [[SOP-018-independent-change-qa]] — the independent QA layer a worker's evidence feeds and never replaces.
 - Ambiguity is the primary driver of fabricated success (measured 20–40× risk multiplier):
   `Deliverables/2026-07-27-pax-delegation-failure-modes.md`

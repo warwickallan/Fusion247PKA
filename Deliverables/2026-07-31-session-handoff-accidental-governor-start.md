@@ -31,8 +31,9 @@ preflight, the work-order template), and a matching cockpit-side private-API pro
 - `Team Knowledge/Guidelines/GL-012-secrets-store-access-boundary.md` — new **§6a**: private-app
   session logs live inside the declared private surface; the public repo gets at most a generic
   marker (worked example of the wording given, plus a worked *failing* case — a "sanitised" public
-  log that still leaks via filename/frontmatter/links). States this is a **settled ruling** (Warwick,
-  2026-07-29) that a worker applies without re-escalating.
+  log that still leaks via filename/frontmatter/links). States this is a **settled ruling** attributed to
+  Warwick on 2026-07-29 — **that attribution is UNSUPPORTED; see the pointer correction below** — which a
+  worker applies without re-escalating.
 - `Team Knowledge/SOPs/SOP-022-work-order-preflight.md` — a contract requiring a public session log
   for private-application work is no longer a REFUSE ground; new **step 9c** makes settling
   "where does the log go" a preflight-time check, not a handback-time discovery.
@@ -53,6 +54,24 @@ so it is not orphaned — it's the import target):**
 text explicitly closes the loop it opens — "do not escalate this conflict again"). Nothing here was
 touched or added by this handoff. Next-session judgement call, not mine to make now: commit message
 and whether to push (main is already 1 ahead of origin, unpushed, from the prior session close).
+
+> **Pointer correction, 2026-08-08 (Nolan, WO-2026-08-08-4C-10). The inventory above is left exactly as
+> written — it is an accurate record of the working tree on 2026-07-31 — but two of its pointers must
+> stop claiming a current canonical location.** That diff was never committed to `main` and never
+> reached canon; it survives only as commit `95c265d` on a recovery ref. **`GL-012 §6a` does not exist
+> and will not be created.** It was **reconciled**, not restored: GL-012 has been byte-identical to the
+> merge base throughout, and the 2026-08-04 ruling `BUILD-015-SHOPPING-DATA-CLASSIFICATION` made
+> [[GL-009-public-private-knowledge-boundary]] the sole home of the public-repository boundary, which is
+> where the surviving ruling now lives as § "No-public-trace classifications". Read any reference to
+> "GL-012 §6a" above — here or in the BUILD-018 records that cite it — as pointing there instead.
+>
+> **Two things the recovered text got wrong, recorded so they are not re-imported.** It attributed the
+> rule to a **ruling of 2026-07-29, which is unsupported** — Warwick corroborated the underlying decision
+> on 2026-08-08 from an independent conversation record of **2026-07-28**, and the recovered date and
+> framing are not his. And it mixed engineering generalisation into the ruling's voice, most sharply a
+> universal claim that no sanitised public log is ever acceptable. **The verified ruling is narrower:** it
+> binds only where Warwick **has classified** a capability as having no permitted public-repository
+> trace. The integrated section quotes the ruling and labels the team's own expression of it separately.
 
 ## Untracked, pre-existing, unrelated to this diff — Cairn intake
 
@@ -94,5 +113,12 @@ None — this is a read-only inventory. No commits, no reverts, no deletions.
    what session/action produced it.
 2. Once cleared, either delete `.claude/governor-probe/` or fold it into a real, reviewed tool if the
    capture capability is wanted on purpose.
-3. Separately — and independently of (1)/(2) — the GL-012 §6a / SOP-022 / work-order / cockpit-proxy
-   diff above looks complete; next session can review and commit it on its own merits.
+3. ~~Separately — and independently of (1)/(2) — the GL-012 §6a / SOP-022 / work-order / cockpit-proxy
+   diff above looks complete; next session can review and commit it on its own merits.~~
+   **CLOSED 2026-08-08 (WO-2026-08-08-4C-10).** The governance three quarters of that diff were
+   reconciled against current canon and integrated in minimum current-compatible form — into
+   [[GL-009-public-private-knowledge-boundary]], [[SOP-022-work-order-preflight]] and
+   [[Templates/work-order]]. It was **not** committed as found; see the pointer correction above. The
+   cockpit private-API proxy half (`services/cockpit/private-api-proxy.mjs`, `server.mjs`) was **outside
+   this reconciliation's file surface and remains unreconciled** — it is still a live candidate on
+   `95c265d` and is Larry's to route.

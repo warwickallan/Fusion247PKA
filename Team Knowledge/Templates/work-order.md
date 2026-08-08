@@ -286,6 +286,11 @@ worker refuses it**:
 - **Required evidence on such an order must include the surface-scoped secret scan**, and exit `2` over
   a declared private surface is **blocking at handback** (GL-012 §5). Do not write an acceptance
   criterion that a worker can only satisfy by treating an unscanned private surface as clean.
+- **Where Warwick has classified the capability as having no permitted public-repository trace**
+  ([[GL-009-public-private-knowledge-boundary]] § "No-public-trace classifications" — a narrow, already-
+  ruled case, not a rule about private-surface work generally), do not write an acceptance criterion or
+  an evidence line that can only be satisfied by naming that capability, its paths or its artefacts in
+  the public repository. A required deliverable at a public path is how an order forces that disclosure.
 
 **On `worktree` / `branch`:** a surface outside any git repository is legitimate. Say so explicitly
 (`n/a — not a git repo`); their absence on such an order is **not** under-specification, and no worker

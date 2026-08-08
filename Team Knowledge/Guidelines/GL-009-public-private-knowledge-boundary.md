@@ -20,7 +20,7 @@ When the classification is genuinely unclear, the escalation is a one-line quest
 
 - Team contracts and adapter shims.
 - SOPs, Workstreams, Guidelines, templates, and architecture tasks.
-- Abstract session-log records that describe decisions without embedding personal evidence.
+- Abstract session-log records that describe decisions without embedding personal evidence. **Narrow exception: a capability or workstream Warwick has classified as having no permitted public-repository trace — see "No-public-trace classifications" below. For those, and only those, sanitising the body of a record does not make the record publishable.**
 - Public-facing examples that do not reveal Warwick's journal content, current state, or private evidence.
 - **Ordinary household operations content** — see the explicit list below.
 
@@ -50,6 +50,30 @@ This list is permissive on purpose and is as binding as the prohibited list belo
 - Any secret that enables account access, fraud or impersonation.
 - Medical records and diagnostic information **unrelated to ordinary shopping instructions**. "Buy the usual paracetamol" is a shopping instruction and is permitted; a diagnosis, prescription record or clinical note is not.
 
+## No-public-trace classifications
+
+**Two kinds of sentence appear below and the difference is load-bearing.** The blockquote marked **VERIFIED RULING** is Warwick's own decision, corroborated on 2026-08-08 against a conversation record of **2026-07-28** that is independent of any Git artefact. Everything after it is the team's engineering expression of that ruling and carries no more authority than any other operating text in this file. **Do not cite the engineering half as a Warwick ruling.**
+
+> **VERIFIED RULING (Warwick, 2026-07-28).** Where Warwick has classified a capability or workstream as having **no permitted public-repository trace**, sanitising body text does not make a public artefact acceptable if the artefact itself — including its filename, frontmatter, metadata, branch/issue/build identity or equivalent surface — still exposes or represents that private capability.
+
+On the occasion that produced it, the classification covered **sanitised machinery, build records, specialist references, and public branch, issue and metadata traces** — not merely secret values — and the capability itself belonged in approved private Supabase/runtime state.
+
+**Scope, stated so it cannot drift.** This section binds **only where Warwick has actually classified a capability or workstream that way.** It is **not** a general rule about `private_surface` work, and it does not disturb the public-by-default list above: abstract records that describe decisions without embedding personal evidence remain **permitted**. It is also not a licence to infer any further prohibition — the reading rule at the top of this file still governs everything this file does not name.
+
+### Engineering expression — what a worker does about a classification
+
+*The team's implementation of the ruling above. Not Warwick's words.*
+
+1. **The whole artefact is the test, not its body text.** Filename, path, frontmatter, `agent_id`, `linked_*` fields and wikilinks are part of the disclosure. A generic marker written into a new `session-logs/…_<specialist-slug>_….md` still discloses the specialist, the date, and — by joining the slug to the public agent index — the capability.
+2. **Prefer adding one line to a public record that already exists** over creating any new public file. A new file must be named, and the name is itself a disclosure decision.
+3. **Where public governance needs evidence that the work occurred, a generic marker is sufficient.** Serviceable wording:
+
+   > Private application work completed under private build governance. Evidence retained in the authorised private surface.
+
+4. **The full record lives in the approved private surface or runtime**, under that capability's own contracts, and is not thinned there.
+5. **A classification is per-capability and per-fact, never per-project-by-association.** A capability whose existence is already named publicly for a legitimate reason does not thereby make its routes, data, paths, artefacts or implementation publishable.
+6. **Where a classification is known to exist, a worker applies it rather than re-litigating it** — that decision is Warwick's and is already made. **Where the worker cannot establish whether one exists, that is the one-line question to Larry** the reading rule prescribes: not a unilateral refusal, and not an assumption in either direction. Withholding pending the answer is always available.
+
 ## Private/local by default
 
 These remain private because they are Warwick's lived context, not because they concern a household:
@@ -75,4 +99,5 @@ When a public architecture change depends on personal context, record the mechan
 
 ## Version history
 
+- **2026-08-08** — added "No-public-trace classifications", plus the matching narrow exception on the public-by-default session-log bullet. **Authority: Warwick's ruling of 2026-07-28**, corroborated by Warwick on 2026-08-08 from a conversation record independent of Git. **RECONCILED, not restored.** A recovered draft of this material (commit `95c265d`, 2026-07-31) reached neither canon nor `main`; it placed the rule inside [[GL-012-secrets-store-access-boundary]], which the 2026-08-04 sole-source rule below does not permit, it carried an **unsupported attribution to a 2026-07-29 ruling**, and it mixed engineering generalisation into the ruling's voice. The verified ruling is quoted; the generalisation is removed or narrowed and labelled as the team's own. Recorded by Nolan.
 - **2026-08-04** — added the household-operations classification (permitted and prohibited lists), the closed-prohibition reading rule, and the `.gitignore` corollary. Removed "preferences" from the private-by-default list. Authority: Warwick, ruling `BUILD-015-SHOPPING-DATA-CLASSIFICATION`, recorded by Silas. Cause: an agent inferred a prohibition from the word "household" and refused an authorised migration. *(Larry, same day: removed a duplicated `## Git rule` section left by the edit — the superseded copy, not the amended one.)*
