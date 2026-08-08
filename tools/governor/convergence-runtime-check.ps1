@@ -25,7 +25,7 @@ $CANON  = 'c:\fusion247pka'
 $ACTIVE = 'c:\fusion247pka-build-020-trial'   # the ONE active working state, retired at 4C close
 
 # Any MyPKA checkout root mentioned in a path, either separator.
-$rx = [regex]'(?i)(c:[\\/]fusion247pka[a-z0-9._-]*)|(\.claude[\\/]worktrees[\\/][a-z0-9-]+)'
+$rx = [regex]'(?i)(c:[\\/]fusion247pka[a-z0-9._-]*)|(c:[\\/]fable-external-repair)|(c:[\\/]audit-worktrees)|(\.claude[\\/]worktrees[\\/][a-z0-9-]+)'
 
 $superseded = @{}   # LIVE superseded root -> processes consuming it
 $deadRefs   = @{}   # superseded root that no longer exists on disk -> processes merely naming it
@@ -77,7 +77,10 @@ foreach ($k in $deadRefs.Keys) {
 }
 Write-Output ""
 if ($supCount -eq 0) {
-    Write-Output "RESULT: PASS - no live process is rooted in a superseded branch/worktree/checkout."
+    Write-Output "RESULT: PASS - zero LIVE DEPENDENCIES on the superseded checkout roots ENUMERATED in this"
+    Write-Output "        script's pattern, across executable path, command line and loaded-module paths."
+    Write-Output "        The claim is bounded to those roots. A superseded root NOT matching the pattern"
+    Write-Output "        would not be seen - widen the pattern before widening this sentence."
 } else {
     Write-Output "RESULT: FAIL - $supCount live reference(s) to superseded roots."
 }

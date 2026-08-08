@@ -1,9 +1,12 @@
-processes examined      : 473
+processes examined      : 474
 canonical refs          : 13   (c:\fusion247pka)
 active-candidate refs   : 2   (c:\fusion247pka-build-020-trial - legitimate until 4C merges)
 SUPERSEDED-ROOT refs    : 0   (MUST BE ZERO)
     DEAD REFERENCE (path absent from disk, cannot be consumed): c:\fusion247pka-external-repair
         PID 19748 claude.exe
 
-RESULT: PASS - no live process is rooted in a superseded branch/worktree/checkout.
+RESULT: PASS - zero LIVE DEPENDENCIES on the superseded checkout roots ENUMERATED in this
+        script's pattern, across executable path, command line and loaded-module paths.
+        The claim is bounded to those roots. A superseded root NOT matching the pattern
+        would not be seen - widen the pattern before widening this sentence.
 LIMIT : process working directory NOT checked (not exposed by Win32_Process).
