@@ -78,6 +78,40 @@ export function writeBrief(families, { path = BRIEF_PATH, at = null } = {}) {
   return brief;
 }
 
+/**
+ * THE OPENING BRIEF — what Larry was handed at THIS session's start, preserved for /rotate.
+ *
+ * WHY THIS EXISTS, and it is the whole of Warwick's comparison loop (2026-08-08): `capae-sync.mjs`
+ * REWRITES `capae-active.json` at every rotation. So by the time Pax is asked "did the preventions
+ * Larry was told about actually hold?", the file no longer contains what Larry was told — it
+ * contains what the NEXT session will be told. Pax would have been comparing behaviour against a
+ * brief that did not exist when the behaviour happened.
+ *
+ * The snapshot is taken at SessionStart, overwritten once per session, and read at /rotate. It is a
+ * copy of a small JSON file — deliberately not a store, not a table and not a session registry.
+ * If it is absent, /rotate says so; it never substitutes the current brief and calls it the opening
+ * one, because that is the exact substitution this function exists to prevent.
+ */
+export const OPENING_BRIEF_PATH = join(homedir(), '.mypka', 'governor', 'capae-opening.json');
+
+export function snapshotOpeningBrief({ from = BRIEF_PATH, to = OPENING_BRIEF_PATH } = {}) {
+  try {
+    const raw = readFileSync(from, 'utf8');
+    const j = JSON.parse(raw);
+    if (!j || !Array.isArray(j.families)) return null;
+    mkdirSync(dirname(to), { recursive: true });
+    writeFileSync(to, JSON.stringify({ ...j, snapshot_of: from, snapshot_at: new Date().toISOString() }, null, 2) + '\n');
+    return j;
+  } catch { return null; }
+}
+
+export function readOpeningBrief({ path = OPENING_BRIEF_PATH, io = { readFileSync } } = {}) {
+  try {
+    const j = JSON.parse(io.readFileSync(path, 'utf8'));
+    return j && Array.isArray(j.families) ? j : null;
+  } catch { return null; }
+}
+
 export function readBrief({ path = BRIEF_PATH, io = { readFileSync } } = {}) {
   try {
     const raw = io.readFileSync(path, 'utf8');

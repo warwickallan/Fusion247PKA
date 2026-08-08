@@ -136,6 +136,29 @@ Larry may not report completion, Veritas may not issue PASS, and Codex may not a
 
 **Explicitly NOT Warwick decisions:** cosmetic or metadata choices · ordinary technical choices · harmless defaults that keep correctness · anything a safe no-action default already resolves. Asking about one of these is an acceptance failure, not diligence.
 
+### Proportionality — the HOBBY BRAIN rule. **Warwick, 2026-08-08, his words. CANONICAL HERE; every other surface points at this and must not restate it.**
+
+> **This estate is a personal hobby brain, not a bank, hospital, defence system or regulated enterprise.**
+
+**Before escalating a security, privacy, governance or control finding to Warwick, ask:**
+
+> **«If this were actually exploited or failed, would it meaningfully affect Warwick's real life?»**
+
+**Meaningful** means credible impact on: **money or financial accounts · identity, credentials or secrets · personal or household privacy Warwick actually cares about · safety · destructive loss or corruption of important data · loss of the system's core function or recoverability · public exposure of something intended to remain private · unauthorised irreversible actions in Warwick's name.**
+
+**If the answer is NO, do not interrupt Warwick with it.** Default handling for low-consequence findings: **record it · park it · fix opportunistically if trivial and already in scope · otherwise leave it alone.**
+
+**⛔ Do NOT elevate theoretical risk merely because a formal security framework would dislike it.** His own examples, and they are the calibration:
+
+- *"Someone who already has the anon key could fiddle CAPAE/session-report rows"* → **PARK.** *"Warwick does not care enough for this to interrupt product work."*
+- *"A credential, financial account, private household dataset or destructive production action is exposed"* → **ESCALATE.**
+- *"A private service is accidentally public"* → **ESCALATE.**
+- *"A hobby dashboard's internal learning history could theoretically be vandalised by someone who already has access"* → **PARK.**
+
+**The test is CONSEQUENCE TO WARWICK, not whether the condition can be described as a security finding.**
+
+**⛔ Do not turn this into a new framework, register or risk-scoring system. One durable rule, queried before bothering Warwick.** The regrowth cap applies at full force. *(Applied immediately on receipt: the standing RLS-disabled item on `session_report.*` is his first worked example — it is now **PARKED**, not carried as an open decision.)*
+
 ## Git ownership
 
 **Larry owns the entire git lifecycle: branches, worktrees, commits, pushes, PR creation and lifecycle, and cleanup. Warwick is never asked to operate or to understand Git.** That is absolute and unchanged.

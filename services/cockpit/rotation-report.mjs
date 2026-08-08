@@ -154,6 +154,12 @@ export function mapSpecialist(row) {
   return {
     specialist: str(row.specialist),
     dispatches: num(row.dispatches),
+    // ⭐ `tokens` IS THE MEASURED TOTAL, and this mapper dropped it on the floor.
+    // populate.mjs has been writing it since the column was added; schema.sql documents it as
+    // "measured TOTAL … NOT a sum of tokens_in/tokens_out — those are separately absent". The
+    // Cockpit mapped only the in/out pair, both of which are always NULL, so every per-specialist
+    // cost in the estate rendered as "not established" while the real number sat in the row.
+    tokens: num(row.tokens),
     tokensIn: num(row.tokens_in),
     tokensOut: num(row.tokens_out),
     notes: str(row.notes),
@@ -355,14 +361,18 @@ export function reportSummary(r) {
   const failures = findings.filter((f) => f.failure);
   const unestablished = (r.unestablished || []).length;
 
+  // ⛔ AN EMPTY ARRAY IS NOT POSITIVE EVIDENCE. This used to render "No findings recorded" in the
+  // POSITIVE tone, which told Warwick a session had been reviewed clean when the truth was that no
+  // structured findings existed — most often because the rotation predates the findings field
+  // entirely. Green is earned by evidence. Absence is neutral, and says so.
   let headline;
   if (failures.length) headline = `${failures.length} prevention${failures.length === 1 ? '' : 's'} failed to stick`;
   else if (findings.length) headline = `${findings.length} finding${findings.length === 1 ? '' : 's'}, none a failure`;
-  else headline = 'No findings recorded';
+  else headline = 'No structured findings recorded';
 
   return {
     headline,
-    tone: failures.length ? 'urgent' : (findings.length ? 'quiet' : 'positive'),
+    tone: failures.length ? 'urgent' : (findings.length ? 'quiet' : 'neutral'),
     measures: headlineMeasures(r),
     findings,
     findingsCount: findings.length,
@@ -441,4 +451,47 @@ export function reportsOverview(reports) {
     trend,
     standout,
   };
+}
+
+/**
+ * SESSION ECONOMICS — Larry and the specialists as PEERS, never as one number.
+ *
+ * ⛔ LARRY'S CONTEXT OCCUPANCY IS NOT SUBAGENT TOKEN TRAFFIC. Adding them produces a figure that
+ * means nothing: one is how full a single context got, the other is how much work was fanned out.
+ * Warwick's instruction is explicit, and this function is the reason the template cannot get it
+ * wrong — the two live in separate objects and are never summed.
+ *
+ * Unmeasured is stated ONCE per side, as a flag, rather than as a column of "not established".
+ */
+export function sessionEconomics(r) {
+  const specialists = Array.isArray(r.specialists) ? r.specialists : [];
+  const tokenVals = specialists.map((s) => s.tokens).filter((v) => v !== null && v !== undefined);
+
+  const larry = {
+    contextIn: r.contextTokensIn,
+    contextOut: r.contextTokensOut,
+    // "Movement" is only truthful when BOTH ends were measured. One end plus an assumed zero is a
+    // fabricated delta, which is the same class of error as `?? 0` in the cross-session totals.
+    movement: (r.contextTokensIn !== null && r.contextTokensIn !== undefined
+      && r.contextTokensOut !== null && r.contextTokensOut !== undefined)
+      ? r.contextTokensOut - r.contextTokensIn : null,
+    elapsedMinutes: r.elapsedMinutes,
+    measured: (r.contextTokensIn !== null && r.contextTokensIn !== undefined)
+      || (r.contextTokensOut !== null && r.contextTokensOut !== undefined),
+  };
+
+  const specialist = {
+    // The rotation-level total is authoritative where present; the per-specialist sum is a fallback
+    // and is labelled as derived so the two are never confused.
+    tokens: r.subagentTokens !== null && r.subagentTokens !== undefined
+      ? r.subagentTokens
+      : (tokenVals.length ? tokenVals.reduce((a, b) => a + b, 0) : null),
+    tokensAreDerived: (r.subagentTokens === null || r.subagentTokens === undefined) && tokenVals.length > 0,
+    dispatches: r.specialistDispatches,
+    count: specialists.length,
+    measuredCount: tokenVals.length,
+    roster: specialists,
+  };
+
+  return { larry, specialist };
 }

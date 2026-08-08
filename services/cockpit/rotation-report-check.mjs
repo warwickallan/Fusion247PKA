@@ -309,9 +309,17 @@ const CONTRACT_KEYS = [
   ok('a null date stays null', toDateString(null) === null);
   ok('toIso(null) is null', toIso(null) === null);
   ok('toIso of a Date is an ISO instant', toIso(new Date('2026-08-07T00:38:45.516Z')) === '2026-08-07T00:38:45.516Z');
-  ok('mapSpecialist maps its five contract fields',
+  // SIX now, not five: `tokens` is the MEASURED per-specialist total that populate.mjs has always
+  // written and this mapper silently dropped, so every specialist cost rendered "not established"
+  // while the number sat in the row. This assertion is what would have caught it — it did not,
+  // because it asserted the shape the mapper HAD rather than the shape the schema supplies.
+  ok('mapSpecialist maps its six contract fields, including the measured `tokens` total',
     JSON.stringify(Object.keys(mapSpecialist({ specialist: 'keel', dispatches: 2 })).sort())
-      === JSON.stringify(['dispatches', 'notes', 'specialist', 'tokensIn', 'tokensOut']));
+      === JSON.stringify(['dispatches', 'notes', 'specialist', 'tokens', 'tokensIn', 'tokensOut']));
+  ok('⭐ a measured token total survives the mapper as a number',
+    mapSpecialist({ specialist: 'keel', dispatches: 2, tokens: '918273' }).tokens === 918273);
+  ok('⭐ and an unmeasured one stays null, never 0',
+    mapSpecialist({ specialist: 'keel', dispatches: 2, tokens: null }).tokens === null);
 }
 
 // ── 9. ordering, joining, and the empty table ────────────────────────────────────────────────────

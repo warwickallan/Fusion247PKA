@@ -50,7 +50,7 @@ import { pathToFileURL } from 'node:url';
 import { readContinuityBrief } from './continuity.mjs';
 // The active CAPAE brief. Read from a PRECOMPUTED local file and never queried here: this hook runs
 // on every session start and must not depend on Supabase being reachable or the Cockpit being up.
-import { readBrief, renderActiveBrief } from './capae-brief.mjs';
+import { readBrief, renderActiveBrief, snapshotOpeningBrief } from './capae-brief.mjs';
 
 // INLINED from the deleted `rotate-session.mjs` (WO-OR-05). Four lines, one caller, and
 // keeping a module alive to export them would have been the tail wagging the dog.
