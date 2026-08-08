@@ -2456,3 +2456,75 @@ test('AMD2 THE FAIL-OPEN PATH STAYS CLOSED: identity does not rescue an unestabl
     'a non-authoritative read withholds even when the packets it DID see carry my own session id'
   );
 });
+
+// ---------------------------------------------------------------------------
+// OUTCOME A — CLOSE-SESSION vs ROTATE, and the third kind of map absence.
+//
+// BUILD-020 Sub-phase 4D, 2026-08-08. Every test below FAILS without the source change it
+// covers; each was run against the unmodified module first. A test that cannot fail is not a
+// check, and this file already says so about its own affordances.
+// ---------------------------------------------------------------------------
+
+const CLOSE_GIT_OK = gitStub(
+  { 'rev-parse': 'C:/repo\n', grep: 'Deliverables/map-A.md\n', 'merge-base': 'base1\n', log: gitLogOutput([[1754000000, ['Deliverables/map-A.md']]]) },
+  { files: ['Deliverables/map-A.md'] }
+).io;
+
+test('OUTCOME A: a CLOSED session renders positively — it never renders as an empty or failed one', async () => {
+  const fake = fakeHoncho([]);
+  const w = await continuity.writeContinuity(
+    { focus: 'work banked' },
+    { cwd: 'C:/repo', git: CLOSE_GIT_OK, fetchPage: fake.fetchPage, request: fake.request, reason: 'close-session', sessionClose: true, sessionId: 'sess-close' }
+  );
+  assert.equal(w.packet.session_close, true, 'the close must be recorded ON the packet — `reason` is volatile and excluded from the content hash');
+
+  const brief = await continuity.readContinuityBrief({ fetchPage: fakeHoncho([w.packet]).fetchPage, git: MAP_PRESENT_IO });
+  assert.match(brief, /DELIBERATELY CLOSED/, 'a closed session must say so');
+  assert.match(brief, /NOT a lost or failed rotation/, 'it must distinguish itself from a broken rotation');
+  assert.match(brief, /CLOSED SESSION IS NOT A CLOSED BUILD/, 'closing a session must never read as closing a Build');
+  assert.match(brief, /BACKLOG\.md/, 'it must say planned work was not erased, and where it still lives');
+  assert.doesNotMatch(brief, /map path missing or invalid/, 'the generic absence branch would report a correct close as a defect');
+});
+
+test('OUTCOME A: a close packet carries NO resume pointer, so the next Larry cannot inherit one', async () => {
+  const fake = fakeHoncho([]);
+  const w = await continuity.writeContinuity(
+    { focus: 'work banked' },
+    { cwd: 'C:/repo', git: CLOSE_GIT_OK, fetchPage: fake.fetchPage, request: fake.request, reason: 'close-session', sessionClose: true, sessionId: 'sess-close' }
+  );
+  assert.equal(w.packet.map_path, undefined, 'a resolvable map must still be OMITTED on a close — what is not written cannot be auto-resumed');
+  assert.equal(
+    w.packet.map_path_withheld, undefined,
+    'a close carries no pointer BY DESIGN; labelling it withheld would re-merge the two states this separates'
+  );
+});
+
+test('OUTCOME A: an ordinary ROTATE packet is unchanged — it still carries its pointer and no close marker', async () => {
+  const fake = fakeHoncho([]);
+  const w = await continuity.writeContinuity(
+    { focus: 'still mid-mission' },
+    { cwd: 'C:/repo', git: CLOSE_GIT_OK, fetchPage: fake.fetchPage, request: fake.request, reason: 'stop', sessionId: 'sess-rotate' }
+  );
+  assert.equal(w.packet.map_path, 'Deliverables/map-A.md', 'rotate must still hand the Wayfinder forward');
+  assert.ok(!('session_close' in w.packet), 'the field must be OMITTED, never written false — no stored packet changes meaning');
+});
+
+test('RCA 1.2: a map that cannot be RESOLVED is diagnosed, not left as a bare absence', async () => {
+  const fake = fakeHoncho([]);
+  // The 2026-08-08 condition exactly: the writer stood outside a git repository, so
+  // `resolveActiveMapPath` returned null and the packet was stored carrying nothing at all.
+  const notARepo = gitStub({ 'rev-parse': '\n' }).io;
+  const w = await continuity.writeContinuity(
+    { focus: 'written from a dead directory' },
+    { cwd: 'C:/not-a-repo', git: notARepo, fetchPage: fake.fetchPage, request: fake.request, reason: 'stop', sessionId: 'sess-x' }
+  );
+  assert.equal(w.packet.map_path, undefined, 'no pointer could be resolved');
+  assert.equal(
+    w.packet.map_path_withheld, 'map-unresolvable',
+    'the REASON must be on the packet — before this, "writer stood in the wrong place" and "estate has no map" were indistinguishable'
+  );
+
+  const brief = await continuity.readContinuityBrief({ fetchPage: fakeHoncho([w.packet]).fetchPage, git: MAP_PRESENT_IO });
+  assert.match(brief, /WORKING DIRECTORY/, 'the render must point at the writer\'s location as the cause');
+  assert.match(brief, /says nothing about whether a map EXISTS/, 'it must refuse to imply the estate is map-less');
+});

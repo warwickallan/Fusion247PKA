@@ -130,8 +130,45 @@ or without this slash command.
 
    **Keep it proportionate — this pass must not become another build.**
 
-8. **Sign off as Larry**, confirming the session log's path (and the ClickUp
+8. **END SESSION-BOUND CONTINUITY — the terminal-close packet.** (Outcome A,
+   BUILD-020 Sub-phase 4D, 2026-08-08.) After everything above is banked,
+   publish ONE closing packet through the INSTALLED path:
+
+   ```
+   node ~/.mypka/governor/continuity.mjs write --close --focus "<what was banked, past tense>"
+   ```
+
+   Then **read it back** — `node ~/.mypka/governor/continuity.mjs read` — and
+   confirm it renders **"PREVIOUS SESSION WAS DELIBERATELY CLOSED"**. A write
+   that reports success is not a delivery; only the read-back is evidence.
+
+   **What this packet does and does not mean.** It carries **no resume pointer
+   and no next action, deliberately** — the next Larry starts from canonical
+   MyPKA programme state and does **not** auto-resume this session's Wayfinder
+   or working directory. **It does not close a Build.**
+
+   > **⛔ `/close-session` may close a session. It may not close anything else.**
+   > It may not close a Build, a Sub-phase, a Work Package or a Wayfinder row;
+   > it may not infer a next action; it may not promote a lesson into operating
+   > law; and **it may not author an amendment heading bearing Warwick's name.**
+   > Everything it learns leaves as a **recommendation carried forward.**
+   >
+   > **`/rotate` preserves. `/close-session` banks and terminates. Neither
+   > creates authority. A state transition of the SESSION is never evidence of a
+   > state transition of the WORK.**
+   >
+   > *(Written after 2026-08-08, when a session close inferred a phase close and
+   > signed it with Warwick's name. The two acts share the word "close" and the
+   > same terminal moment; they share nothing else.)*
+
+   **Planned, unstarted work is NOT erased by this.** It stays where it already
+   lives — `Deliverables/BACKLOG.md` and the active Wayfinder, both on disk and
+   in git, neither touched by closing a session.
+
+9. **Sign off as Larry**, confirming the session log's path (and the ClickUp
    mirror's status) and summarizing what was closed out, in plain language.
+   **State plainly that the SESSION is closed and the BUILD is not**, unless
+   Warwick has separately and explicitly closed it.
 
 Do not invent new behavior here — this command is a convenience trigger for
 the contract already defined in `AGENTS.md`, never a divergent spec.

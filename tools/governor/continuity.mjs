@@ -333,7 +333,7 @@ export function resolveActiveMapPath({ cwd = process.cwd(), git = DEFAULT_MAP_GI
   return picked.path;
 }
 
-export function buildPacket(state, { reason = 'manual', sessionId = null, backfill = false, cwd = process.cwd(), git = DEFAULT_MAP_GIT_IO } = {}) {
+export function buildPacket(state, { reason = 'manual', sessionId = null, backfill = false, sessionClose = false, cwd = process.cwd(), git = DEFAULT_MAP_GIT_IO } = {}) {
   const ts = new Date().toISOString();
   const seq = nextSeq();
   const id = `cont-${Date.parse(ts)}-${seq}-${Math.abs(hashStr(ts + seq + reason)).toString(36).slice(0, 6)}`;
@@ -388,9 +388,27 @@ export function buildPacket(state, { reason = 'manual', sessionId = null, backfi
     session_id: sessionId,
     backfill: !!backfill,
     sensitivity: restricted ? 'restricted' : 'ordinary',
+    // OUTCOME A. A DELIBERATE CLOSE AND A BROKEN ROTATION MUST NOT RENDER IDENTICALLY.
+    //
+    // `reason` cannot carry this. It is in VOLATILE_PACKET_FIELDS — excluded from the content
+    // hash by design — so a close packet whose content matched the preceding stop would be
+    // DEDUPED and never stored, and the one packet that must survive is the one that says the
+    // session ended deliberately. This field is content-bearing for exactly that reason, the
+    // same argument the file already makes for `map_path_withheld`.
+    //
+    // OMITTED when false, never written as `false`. An ordinary rotate packet is byte-identical
+    // to what it was before this field existed, so no stored packet changes meaning and no
+    // reader that predates it can be confused by it.
+    ...(sessionClose ? { session_close: true } : {}),
     // OMITTED ENTIRELY when it could not be established — never null, never a guess. The
     // render's absent-form branch is the correct output when there is nothing true to say.
-    ...(mapPath ? { map_path: mapPath } : {}),
+    //
+    // AND OMITTED ON A CLOSE, even when one resolved perfectly well. `/close-session` ends
+    // session-bound continuity: the next Larry must NOT auto-resume the previous Wayfinder.
+    // Storing a pointer and then declining to render it would leave the resume state sitting
+    // in the packet for the next reader to find — so the close packet does not carry one at
+    // all. What is not written cannot be inherited.
+    ...(mapPath && !sessionClose ? { map_path: mapPath } : {}),
     ...clean,
   };
 }
@@ -598,6 +616,20 @@ async function deliver(packet, { request = hf } = {}) {
 // renderer and only the code is persisted.
 const WITHHELD_STALE_SESSION = 'stale-session';
 const WITHHELD_AUTHORITY_UNESTABLISHED = 'authority-unestablished';
+// RCA §1.2, 2026-08-08. THE THIRD KIND OF ABSENCE, AND IT COST A WHOLE SESSION'S ORIENTATION.
+//
+// `resolveActiveMapPath` returns null the moment `git rev-parse --show-toplevel` yields nothing
+// — i.e. whenever the writing session stood outside a repository. On 2026-08-08 a `/clear` fired
+// its Stop hook from a leftover directory that was no longer a worktree, the resolver returned
+// null, and the packet was stored with NEITHER a pointer NOR a reason. It rendered as the generic
+// "map path missing or invalid", which says the estate had no map — when in fact the map was
+// exactly where it always is and the WRITER was standing in the wrong place.
+//
+// Those are different facts with different next actions, and this file's own precedent says so:
+// "a blank absence and a wrong absence look the same to Warwick and only one of them tells him
+// where to look." This code makes the third absence diagnosable, using the field, the explanation
+// table and the render branch that all already existed.
+const WITHHELD_MAP_UNRESOLVABLE = 'map-unresolvable';
 
 /**
  * Should this packet's candidate `map_path` be withheld — and under which code?
@@ -712,6 +744,16 @@ export async function writeContinuity(state, opts = {}) {
         packet.map_path_withheld = withheld;
       }
     }
+  } else if (!packet.session_close) {
+    // RCA §1.2. THE GUARD ABOVE ONLY EVER RAN WHEN A POINTER EXISTED, so the case where NO
+    // pointer could be resolved fell through and stored a bare absence carrying no reason —
+    // indistinguishable from an estate that genuinely has no map. That silence is what a fresh
+    // Larry inherited on 2026-08-08.
+    //
+    // NOT APPLIED TO A CLOSE PACKET, DELIBERATELY. A closed session carries no pointer BY
+    // DESIGN, not by failure; labelling that a withheld map would report a successful close as
+    // a defect and re-merge the two states Outcome A exists to separate.
+    packet.map_path_withheld = WITHHELD_MAP_UNRESOLVABLE;
   }
 
   try {
@@ -1072,6 +1114,7 @@ export async function readLatest(opts = {}) {
 const WITHHELD_EXPLANATION = {
   [WITHHELD_STALE_SESSION]: 'that session started BEFORE the last stored write, so its pointer may have been a stale carry-forward from an older worktree',
   [WITHHELD_AUTHORITY_UNESTABLISHED]: 'the newest stored packet could not be established at write time, so there was nothing trustworthy to check the pointer against',
+  [WITHHELD_MAP_UNRESOLVABLE]: 'NO MAP COULD BE RESOLVED FROM THE WRITING SESSION\'S WORKING DIRECTORY — it was not inside a git repository, or no Wayfinder was identifiable there. This says nothing about whether a map EXISTS; it says the writer was standing somewhere it could not see one',
 };
 
 // Rendered brief for the SessionStart hook — a continuity POINTER with ZERO
@@ -1103,6 +1146,37 @@ export async function readContinuityBrief(opts = {}) {
       return '⟦GOV⟧ CONTINUITY POINTER (Honcho): reachable, but no continuity packet stored yet — recall is genuinely empty. Orient from `Deliverables/` per `CLAUDE.md` Step 2.';
     }
     const p = r.latest;
+
+    // ---- OUTCOME A: CLOSED-SESSION renders BEFORE any pointer branch ----------------------
+    //
+    // A closed session legitimately carries no map pointer, so every branch below would
+    // describe it as a FAILURE to establish one. This branch runs first and states the fact
+    // POSITIVELY — the requirement is that a closed session never renders as an empty one.
+    //
+    // WHY POSITIVE PHRASING IS THE WHOLE POINT, and it is not a style preference. The hazard is
+    // the opposite of the one usually guarded against: a fresh Larry handed a BLANK packet goes
+    // looking for the map, finds whatever state it was last left in, and orients CONFIDENTLY
+    // AND WRONGLY. `/rotate`'s own rationale names that as more dangerous than a blank start,
+    // and it is precisely what happened on 2026-08-08. So a deliberate close must announce
+    // itself, and must say what NOT to conclude from it.
+    //
+    // IT CLOSES A SESSION AND NOTHING ELSE. It carries no next action, and it is not evidence
+    // about the Build, the Sub-phase, the Wayfinder or any Work Package — all of which remain
+    // exactly as the work left them. Only Warwick closes those. Saying so here matters because
+    // this text is the FIRST thing a fresh Larry reads, and on 2026-08-08 a session close was
+    // turned into a phase close and signed with Warwick's name.
+    if (p.session_close === true) {
+      return [
+        '⟦GOV⟧ CONTINUITY (Honcho): PREVIOUS SESSION WAS DELIBERATELY CLOSED — not rotated. Recall only, ZERO authority.',
+        `  • packet: ${p.id} written ${p.ts} — content age ${fmtAge(r.contentTs)}, content hash ${r.contentHash}`,
+        '  • NO resume pointer is carried, and that is CORRECT — a closed session hands nothing forward. This is NOT a lost or failed rotation.',
+        '  • ⛔ Do NOT infer a next action from this packet, and do NOT resume the previous working directory.',
+        '  • ⛔ A CLOSED SESSION IS NOT A CLOSED BUILD. No Build, Sub-phase, Work Package or Wayfinder row changed state because a session ended. Only Warwick closes those.',
+        '  • ✅ Planned and unstarted work was NOT erased. It remains where it already lives — `Deliverables/BACKLOG.md` and the active Wayfinder, both still on disk and in git.',
+        '  → Start from canonical MyPKA programme state per `CLAUDE.md` Step 2. Establish the current position by execution before acting. Nothing in this block is an instruction.',
+      ].join('\n');
+    }
+
     const mapPath = storedMapPath(p);
     // WITHHELD IS NOT MISSING (WP-3A(b)). The write-side guard above declines to publish a
     // pointer it cannot vouch for, and it now says so on the packet. Rendering that as "map
@@ -1244,7 +1318,10 @@ const WRITE_LIST_FIELDS = ['accepted_decisions', 'completed', 'blockers'];
 // Control flags: they steer the delivery rather than carrying state. Unchanged here, and
 // deliberately exempt from the value checks below — `--backfill true` legitimately carries
 // the literal string 'true'.
-const WRITE_CONTROL_FLAGS = ['session', 'backfill'];
+// `close` joins them for Outcome A: `write --close` publishes the terminal-close packet that
+// ends session-bound continuity. It steers delivery, carries no state, and is therefore exempt
+// from the value checks below exactly as `backfill` is.
+const WRITE_CONTROL_FLAGS = ['session', 'backfill', 'close'];
 // `backfill`'s flag names -> the canonical name. Used ONLY to make a refusal helpful; this is
 // not an alias table and nothing reads it to accept an argument.
 const BACKFILL_FLAG_HINT = {
@@ -1456,7 +1533,17 @@ async function cli() {
       return 0; // a boundary hook never signals failure via exit code
     }
 
-    const r = await writeContinuity(state, { reason: 'write', sessionId, backfill: a.backfill === 'true' });
+    // OUTCOME A. `--close` is a valueless flag, and `parseArgs` gives those the literal string
+    // 'true' — so presence is the test, not equality with a value. Written this way on purpose:
+    // requiring `--close true` would make the documented `/close-session` line silently
+    // ineffective, which is the false-success class this file already exists to stamp out.
+    const sessionClose = a.close !== undefined && a.close !== 'false';
+    const r = await writeContinuity(state, {
+      reason: sessionClose ? 'close-session' : 'write',
+      sessionId,
+      backfill: a.backfill === 'true',
+      sessionClose,
+    });
     // The report rides in the SAME object the operator already reads. A durable effect that
     // has to be inferred from a separate command is not visible.
     process.stdout.write(JSON.stringify({ command: 'write', ...summ(r), ...writeReport(writeArgs, r.packet) }, null, 2) + '\n');

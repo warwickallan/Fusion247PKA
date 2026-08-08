@@ -259,6 +259,18 @@ Every map must carry: the goal contract and North Star · current reality and ve
 - Do not begin implementation until Warwick accepts the plan (a `product-decision`).
 - **An outcome intended to be AUTOMATIC remains ON THE FRONTIER until the canonical test in § "Nothing may live only in Larry's head" passes** (Warwick, 2026-08-06). It is not moved to done, closed or parked on the strength of a callable script, a green test, or a successful manual run — those evidence capability only. **Either the real production event has been exercised, or the map records the outcome as explicitly reclassified to manual.** This projection points at that clause and does not restate it.
 
+### Amendments — attribution and reconciliation. **Canonical here; every other surface points to this.**
+
+> **⛔ WHAT WARWICK SAID IS QUOTED. WHAT LARRY CONCLUDED IS LABELLED AS LARRY'S AND NEVER ENTERS THE HEADING.**
+>
+> **If it is not in the quote, it does not go in the heading with his name on it.** An `AMENDMENT N — Warwick, <date>` heading asserts provenance for everything under it, and these blocks legitimately carry two kinds of content: **his ruling**, and **Larry's consequent record-keeping**. Only the first may be attributed to him.
+>
+> *(Written after 2026-08-08. Amendment 14's heading read "4C IS CLOSED" beside Warwick's name; his quoted words settled only the next-hop split, and the commit message said "**Records** 4C as CLOSED" in Larry's own voice. A fresh Larry then read the heading and reported it back to Warwick **as his own decision**. The map already had the fenced-quote convention — the amendment used it correctly for the split and then put the unquoted inference in the heading above it.)*
+
+> **⛔ AN AMENDMENT THAT CHANGES A PHASE'S STATE IS NOT COMPLETE UNTIL THE ROWS AND POINTERS DESCRIBING THAT PHASE ARE RE-CUT IN THE SAME COMMIT.**
+>
+> This is what *"fix the map first"* already means; it is stated here once because appending an amendment above a body it contradicts has now recurred four times on the active map — **three of them recorded, in prose, at the point of failure.** Counting a recurrence is not preventing it. **Supersede the body, or do not append the amendment.**
+
 **What Wayfinder still is NOT:** an execution tracker, a ticket system, or a governance layer. Using it as one is exactly the error that produced BUILD-018, and a mandatory map is not a licence to grow one. The map is a *record*, and it stops at the point where further detail would be invention rather than route.
 
 ## Source of truth and precedence
