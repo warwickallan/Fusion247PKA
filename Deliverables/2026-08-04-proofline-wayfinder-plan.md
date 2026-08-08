@@ -2815,7 +2815,23 @@ Any newly discovered **unrelated** defect: record once in [[Deliverables/BACKLOG
 | **Live estate** | Cockpit **PID 30000** and Tower **PID 26728** both running from **canonical merged `main`**; exactly one watcher; **no component depends on any BUILD-020 branch or worktree** |
 | **Estate cleanup** | worktrees **38 → 19**; **15 BUILD-020 branches deleted**, every one proven superseded **by content diff, never by name** |
 
-### 🔄 AMENDMENT 13 — Warwick, 2026-08-07. **4C IS RESCOPED. CAPAE AND ASDAIR MOVE TO 4D.**
+### 🔄 AMENDMENT 14 — Warwick, 2026-08-08. **4C IS CLOSED. THE NEXT HOP SPLITS: 4D = CAPAE ALONE · 4E = ASDAIR.**
+
+> **His decision:** *"4D is not Asdair — I'm postponing that one last time to keep focused. 4E is Asdair, 4D is now CAPAE alone."*
+>
+> **Amendment 13 sent CAPAE *and* Asdair together to 4D. That half is SUPERSEDED.** The next sub-phase is **4D — CAPAE ONLY**. Asdair moves again, deliberately, to **4E**, to keep 4D focused.
+>
+> **⛔ A fresh Larry must NOT treat Asdair as the next hop.** It has now been postponed twice — first behind 4C by Amendment 11, now behind CAPAE by this. **The next destination after 4C is CAPAE and nothing else.**
+>
+> **4C IS CLOSED.** `main` carries the PR #98 merge plus post-merge convergence. Estate: **1 branch · 1 remote branch · 1 worktree · 0 stashes · 0 recovery refs · normal GC restored AND exercised** (`git gc --prune=now` took unreachable objects 5,196 → 0, `git fsck` 0 errors). Convergence proven under a **positive runtime-provenance invariant** — every runtime owned by Fusion247PKA is identifiable and proven canonical or proven derived from canonical `main`. Evidence: [[Deliverables/2026-08-07-4c-estate-disposition-kill-list]], the two Veritas receipts, and `tools/governor/convergence-runtime-check.ps1`.
+>
+> **CARRIED INTO 4D — none of it discharged:** the CAPAE evidence block beside Amendment 11 (Warwick's seven points) · **`MyPKA-YouTube-Watcher-Ensure` disabled, blocked on ELEVATION — Amendment 9 REMAINS AUTOMATIC and is NOT accepted** · **R1** non-mutating-GET **unverified** · **4B assurance never completed** (no Gate 1/Gate 2 PASS, no Codex; merged under his explicit exception) · **F-001** — `notify.mjs` claims its `(turn_id, reason)` dedup row at lines 86–98 but does not POST until line 121, and **no resend path exists anywhere in the subsystem** · the **already-built, unwired durable outbox** `services/control-plane/notifier/notifier.mjs`, **imported by nothing but its own test**, while the path that actually sends Warwick's Telegram is the only one of three designs without retry.
+>
+> **Recorded, not absorbed:** [[Deliverables/2026-08-08-authority-breach-pr98-merged-without-warwick-authority]] — PR #98 was merged after Codex approval **without Warwick's explicit merge authority**. His ruling: do not revert; record it for CAPAE. **That record is itself a 4D input.**
+>
+> **Also banked for 4D:** [[Deliverables/2026-08-08-subagent-token-ledger-4c-session]] — the per-specialist token ledger Pax reported UNESTABLISHED in two consecutive reports. ~2,171,361 subagent tokens; Keel 59.8 %, Nolan 17.8 %, Pax 12.4 %, **Veritas 9.9 % across two runs** — against 4B's eleven verdicts at 57.7 % of the session for zero product change.
+
+### 🔄 AMENDMENT 13 — Warwick, 2026-08-07. **4C IS RESCOPED. CAPAE AND ASDAIR MOVE TO 4D.** *(⛔ **its next-hop half is SUPERSEDED by Amendment 14 above** — 4D is CAPAE alone; Asdair is 4E. Its 4C rescope stands and was delivered in full.)*
 
 > **His decision, and it replaces Amendment 11's contents for 4C.** ⛔ **CAPAE and Asdair are DESCOPED from 4C.** No CAPAE implementation, no Supabase CAPAE population, no CAPAE design change, no Asdair functional delivery, no Asdair hop preparation happens in 4C. They become **Sub-phase 4D**, entered only once 4C's end state is actually true.
 >
