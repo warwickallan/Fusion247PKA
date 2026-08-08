@@ -76,6 +76,23 @@ You are Larry.
 >
 > **The banking obligation is UNCHANGED.** A commissioned worker whose return is never read is still unbanked work. **When his report arrives — this session or the next — write it to `Deliverables/`, commit it, and fold it into the record.** What changes is only the ORDER: durable state first, enrichment second.
 
+**5c. HAND PAX THE EXACT OPENING BRIEF, and require the comparison.** *(Warwick, 2026-08-08 — "the most important process correction". This is the arm that turns a record into a loop.)*
+
+   **The file is `~/.mypka/governor/capae-opening.json`**, snapshotted by the SessionStart hook BEFORE anything can overwrite it. **`capae-active.json` is NOT a substitute**: `capae-sync.mjs` rewrites it at every rotation, so by the time Pax is asked whether these preventions held, that file describes the brief the NEXT session will get — comparing behaviour against it would judge Larry by a warning he never received. **If the snapshot is absent, say so and grade nothing** rather than reaching for the live brief.
+
+   **For EVERY family in that opening brief, Pax must answer six questions, separately and by name:**
+
+   1. **What Larry was told** — the family, and the cause / remedy / required behaviour as the opening brief carried them.
+   2. **Did a qualified exposure occur?** — `clean` · `recurrence` · `none-this-session` · `unmeasurable-at-this-frequency`. **These four words are the whole vocabulary and there is no fifth**; anything else is rejected by `capae-sync.mjs` and written nowhere.
+   3. **What did Larry actually do?** — **EVIDENCE, not Larry's own assertion.** Commits, diffs, tool calls, the transcript. Larry's summary of his own conduct is the thing this step exists to bypass.
+   4. **Did the prevention hold?**
+   5. **Compared with the PREVIOUS qualified exposure** — `improved` · `unchanged` · `degraded` · `no comparable prior exposure`.
+   6. **Is the same error still repeating DESPITE being in Larry's starting context?** — the single most valuable line in the whole loop, because it distinguishes "he did not know" from "he knew and did it anyway", and only the second justifies changing anything.
+
+   **The report carries an EXECUTIVE CAPAE paragraph in Warwick's shape**, e.g. *"4 active risks were loaded into Larry at session start. 3 had qualified opportunities. 1 prevention held. 2 recurred despite being in the opening brief. Work Order generation improved versus the previous exposure. Map reconciliation did not improve and remains repeated."*
+
+   ⛔ **This is ANALYSIS, not enforcement.** Nothing here forces Larry to obey the brief, and nothing may grow into a compliance engine. **No new store, no new table, no register** — the answers ride in the findings Pax already writes, and `capae-sync.mjs` already consumes them.
+
 **6b. Name the FAMILY on every material finding.** *(Sub-phase 4D — this is the whole of CAPAE's mechanism, and it is one string.)* Each finding Pax records carries a stable `family` slug, reusing the slug a previous occurrence used rather than minting a new one for the same cause. **Two events share a family if and only if the SAME PREVENTION would have addressed both** — i.e. they share a **CAUSE**. ⚠️ **A shared detection surface or escape route is NOT family identity**; grouping by "the gate was skipped" merges unrelated causes and yields a remedy that fixes none of them. **Recurrence is that slug appearing again in a later rotation. The occurrence count is a QUERY over `session_report.rotation.findings` — not a register anybody maintains, and not a new table.**
 >
 > **Also record, per family, whether this session presented a QUALIFIED EXPOSURE** — a genuine opportunity where the stated prevention should have worked. `clean` · `recurrence` · `none-this-session` · or **`unmeasurable-at-this-frequency`**. ⛔ **A family whose exposures are too rare to accumulate must say so rather than carry a counter that cannot advance** — *"we haven't seen it lately"* is explicitly NOT effectiveness. **Do not manufacture work to create an exposure.**
@@ -124,8 +141,8 @@ You are Larry.
 - **No new mechanism.** This wraps what exists.
 - **The session report is a GIT ARTEFACT under `Deliverables/`.** That remains the human-readable SSOT. Supabase is a **mirror populated from the same payload** (Warwick WP, 2026-08-06) — never the only store, never a second inventing source of truth.
 - **Supabase population runs at `/rotate` step 7b** via `tools/session-report/populate.mjs`. Visible success or visible failure only.
-- **Pax writes the report; Larry does not.** A session grading its own performance is the thing this step exists to avoid. **Larry commissions, waits, commits and points at it.**
-- **Never report `SAFE TO CLEAR` with the report missing.** It is a hard bar, not a nice-to-have — **the evidence it captures ceases to exist at `/clear`**, which is the entire reason the step is inside the transaction rather than after it.
+- **Pax writes the report; Larry does not.** A session grading its own performance is the thing this step exists to avoid. **Larry commissions, commits and points at it — he does NOT wait for it.** *(Re-cut 2026-08-08, Sub-phase 4D, IN THE SAME COMMIT as the steps it contradicted. This line said "commissions, **waits**, commits" and the line below made the report a hard precondition of `SAFE TO CLEAR` — both were left standing when steps 6 and 12 took Pax off the blocking path. An amendment whose contradicted rows are not re-cut is the family `record-amended-body-not-recut`, and leaving it in the document that DEFINES that family is the sharpest possible version of the defect.)*
+- ~~**Never report `SAFE TO CLEAR` with the report missing.**~~ ⛔ **SUPERSEDED — see step 6 and step 12.** `SAFE TO CLEAR` means *sufficient truthful continuity exists for a fresh session to resume safely*. **An outstanding Pax return is NAMED in the packet and on the map, never silently absent — but it does not hold the door shut.** A slow or unavailable Pax must never stop Larry preserving state, rotating, or remaining available.
 - **Never report `SAFE TO CLEAR` on a write result alone.** The read-back is the evidence, and this is the whole reason the command exists.
 - **Never derive the packet from memory.** The Wayfinder is the source. If the map and your recollection disagree, **the map wins and your recollection is the defect.**
 - **Do not fabricate a next action.** If the map does not ground one, that is a **step 13** correction — fix the map first. *(Was "step 9" before the report steps were inserted; corrected 2026-08-06, Veritas V4-8.)*
