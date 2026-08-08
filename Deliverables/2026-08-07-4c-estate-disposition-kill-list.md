@@ -232,6 +232,36 @@ recorded here so convergence does not leave it invisible, and so it is not mista
 
 ---
 
+# 🔴 CODEX MERGE-CLASS REVIEW — PR #98. **Round 1 REQUEST_CHANGES. Round 2 acceptance is BINDING.**
+
+**Round 1 ran for real** under the contract Warwick ratified at `ef4883d` — `tower-qa-skill@3(approved;ratified=true)`, delivered `sha256 5a3bac43…`, convergence inventory 4,645 bytes / 19 probes / 0 failed. **Verdict `request_changes`, 3 findings, 1 round.** Both Telegram messages delivered: **Larry `473`, Codex `474`, both `ok:true`.**
+
+| Finding | Established position |
+|---|---|
+| **F-PR98-001** HIGH — a contributing non-contained prior branch with no visible content-level reconciliation | **Legitimate — the evidence was genuinely insufficient.** The only non-contained refs are the candidate and `build-020/phase4-automation-law`, and `git merge-base --is-ancestor` proves the latter is an **ancestor of the candidate**, so it converges *with* this merge. The inventory gave Codex no way to see that. **Fixing the evidence, not arguing the verdict.** |
+| **F-PR98-002** HIGH — CI not green at the reviewed SHA | **Splits.** `db-proofs` is **4C's own defect** — in CI the canonical ref is UNRESOLVED, so probes fail and controls whose premise is *"the unmutated inventory has no failures"* are false there (`executed=79 failures=3`; **C1, C2 and C9** — three, not the two first reported). `integration` is **pre-existing on `main`**: `asdair-tests.yml` last ran on `main` at `c21c3f3c` on 2026-08-05 and **failed**, and `git diff --name-only main..HEAD` over `services/asdair/skill/**` and its tests returns **empty**. |
+| **F-PR98-003** MEDIUM — truncated packet, insufficient source evidence for some criteria | Marked **partial rather than silently passed** — the reviewer declining to pass what it could not see. |
+
+**A fourth defect found while correcting, not reported by Codex:** **C10 passes VACUOUSLY in CI.** `refs/recovery/**` is never fetched by a default checkout, so the section renders `count: 0`, which still satisfies its `/count: \d+/` regex, and *"no recovery pin is analysed as a working branch"* is trivially true when there are none. **Green over nothing** — the exact defect class this correction exists to close, hiding inside the fix for it.
+
+**`fetch-depth: 0` cannot discharge this**, established by arithmetic on the CI log rather than by attempting it: of the 5 failing probes, one is **`gh pr list`**, which fails on a runner with no `GH_TOKEN` exported to the step **at any checkout depth**; and `actions/checkout` on a `pull_request` leaves no local `main`, so the bare name would not resolve even at full history. **The fixture route is the only one that works.**
+
+## ⛔ ROUND 2 ACCEPTANCE — Warwick, 2026-08-08. BINDING, and mechanically checkable.
+
+> **Round 2 MUST exercise the same live Tower → Telegram path as Round 1.** Expected, in order:
+> 1. **Larry → Codex** message on Telegram stating the focused confirmation scope;
+> 2. **Codex → Larry** response on Telegram with the focused verdict and findings.
+>
+> **Do NOT bypass Tower, do NOT call Codex directly, and do NOT treat a store-only verdict as sufficient.**
+>
+> **If either Telegram message fails to arrive, that is a LIVE-ROUTE DEFECT and must be reported BEFORE the merge decision is presented** — not noted afterwards.
+
+**Scope is bounded to F-PR98-001 / 002 / 003 and the corrections and evidence needed to discharge them. Settled 4C scope is NOT reopened.**
+
+**The check is mechanical:** the run returns `telegram.larry.{ok,id}` and `telegram.codex.{ok,id}`. Round 1 returned `ok:true` for both with ids 473 and 474. **Anything less than two `ok:true` with two new ids is the defect above.**
+
+---
+
 # ✅ RECOVERY-PIN ACCOUNTING — all pins accounted for (**115 at the time of Warwick's gate; 119 now**)
 
 **Warwick's gate: *"Only when all 115 recovery pins are accounted for may destructive cleanup resume."* **The count is now 119** — the four held source branches were pinned before deletion, after the gate was set. The gate is satisfied for all of them.
