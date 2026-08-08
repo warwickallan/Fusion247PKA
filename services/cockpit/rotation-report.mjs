@@ -282,7 +282,7 @@ export async function rotationReportsResponse(query) {
     // view is assertable by rotation-report-check.mjs without a browser.
     return {
       ok: true,
-      reports: reports.map((r) => ({ ...r, summary: reportSummary(r) })),
+      reports: reports.map((r) => ({ ...r, summary: reportSummary(r), econ: sessionEconomics(r) })),
       overview: reportsOverview(reports),
     };
   } catch (e) {

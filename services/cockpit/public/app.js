@@ -1746,15 +1746,6 @@ createApp({
 
             <!-- What Larry is handed at Continue. Shown here so Warwick can see the exact bounded
                  list rather than take its size on trust. -->
-            <div v-if="capRequested && !capErr && capActive.length" class="item as-stack" style="margin-top:10px">
-              <div class="i-main">
-                <div class="i-eyebrow">LARRY'S ACTIVE BRIEF · {{ capActive.length }}</div>
-                <div class="as-sub">Only families whose prevention is still unproven AND where an exposure is plausible. EFFECTIVE and UNMEASURABLE families are excluded, so they leave his attention automatically.</div>
-                <div v-for="a in capActive" :key="a.slug" class="as-note" style="margin-top:6px">
-                  <strong>{{ a.title }}</strong> — MUST: {{ a.must || 'not recorded' }} <span class="rr-unk">· {{ a.effectiveness }}</span>
-                </div>
-              </div>
-            </div>
 
           <!-- ══ L1 — THE CAPAE EXECUTIVE VIEW. Warwick's four at-a-glance questions, answered
                without opening anything: does CAPAE need me · what is the most important family ·
@@ -1890,6 +1881,21 @@ createApp({
               </div>
             </div>
           </div>
+
+          <!-- ══ L3 — "What Larry was told at session start."
+               MOVED HERE AND CLOSED BY DEFAULT, 2026-08-08. It used to sit ABOVE the executive
+               signal, so Warwick read four paragraphs of standing brief before discovering that a
+               prevention is currently failing. It is inspectable, not headline: the brief is an
+               INPUT to the session, and what matters at a glance is the OUTCOME above it. -->
+          <details class="tech" v-if="capRequested && !capErr && capActive.length">
+            <summary>What Larry was told at session start · {{ capActive.length }}</summary>
+            <div class="tech-body">
+              <div class="as-sub">The precomputed active brief handed to Larry at Continue. Only families whose prevention is still unproven AND where an exposure is plausible — EFFECTIVE and UNMEASURABLE families are excluded, so they leave his attention automatically.</div>
+              <div v-for="a in capActive" :key="a.slug" class="as-note" style="margin-top:6px">
+                <strong>{{ a.title }}</strong> — MUST: {{ a.must || 'not recorded' }} <span class="rr-unk">· {{ a.effectiveness }}</span>
+              </div>
+            </div>
+          </details>
         </div>
 
         <!-- ── SESSION / ROTATION REPORTS ─────────────────────────────────────────────────────
@@ -2042,6 +2048,51 @@ createApp({
                 </div>
 
                 <div v-if="rrOpenCard===String(ri)" class="rr-detail">
+                  <!-- ══ L2 — SESSION ECONOMICS. Larry and the specialists as PEERS, side by side.
+                       ⛔ THE TWO ARE NEVER SUMMED. Context occupancy and fanned-out subagent traffic
+                       are different measures; adding them yields a number that means nothing.
+                       Derived by rotation-report.mjs sessionEconomics(), so the template cannot get
+                       the separation wrong even if someone edits it carelessly. -->
+                  <div class="econ" v-if="r.econ">
+                    <div class="econ-side">
+                      <div class="econ-h">LARRY</div>
+                      <template v-if="r.econ.larry.measured">
+                        <div class="econ-row"><span>Context in</span><b>{{ rrHas(r.econ.larry.contextIn) ? rrCompact(r.econ.larry.contextIn) : '—' }}</b></div>
+                        <div class="econ-row"><span>Context out</span><b>{{ rrHas(r.econ.larry.contextOut) ? rrCompact(r.econ.larry.contextOut) : '—' }}</b></div>
+                        <div class="econ-row" v-if="rrHas(r.econ.larry.movement)"><span>Movement</span><b>{{ rrCompact(r.econ.larry.movement) }}</b></div>
+                      </template>
+                      <!-- ONE compact line, not a block of repeated "not established". -->
+                      <div v-else class="econ-unk">⚠ Larry context usage was not measured</div>
+                      <div class="econ-row" v-if="rrHas(r.econ.larry.elapsedMinutes)"><span>Elapsed</span><b>{{ rrMins(r.econ.larry.elapsedMinutes) }}</b></div>
+                    </div>
+
+                    <div class="econ-side">
+                      <div class="econ-h">SPECIALISTS</div>
+                      <div class="econ-row"><span>Traffic</span><b>{{ rrHas(r.econ.specialist.tokens) ? rrCompact(r.econ.specialist.tokens) : '—' }}</b></div>
+                      <div class="econ-row"><span>Dispatches</span><b>{{ rrHas(r.econ.specialist.dispatches) ? rrInt(r.econ.specialist.dispatches) : '—' }}</b></div>
+                      <div class="econ-row"><span>Specialists</span><b>{{ r.econ.specialist.count }}</b></div>
+                      <div v-if="r.econ.specialist.tokensAreDerived" class="econ-unk">summed from the specialist rows, not a stored total</div>
+                      <div v-if="!r.econ.specialist.count" class="econ-unk">no specialists dispatched</div>
+                    </div>
+                  </div>
+
+                  <!-- ══ WHO DID WHAT, AND ROUGHLY WHAT DID IT COST. The tokens field is the MEASURED total
+                       the mapper used to drop on the floor. An unmeasured one stays "not measured",
+                       never 0 — the two are different answers and must not look alike. -->
+                  <details class="tech" v-if="r.econ && r.econ.specialist.count">
+                    <summary>Specialists · {{ r.econ.specialist.count }}<template v-if="r.econ.specialist.measuredCount"> · {{ r.econ.specialist.measuredCount }} measured</template></summary>
+                    <div class="tech-body">
+                      <div v-for="s in r.econ.specialist.roster" :key="s.specialist" class="spec-row">
+                        <div class="spec-top">
+                          <b class="spec-name">{{ s.specialist }}</b>
+                          <span class="rr-chip t-quiet">{{ rrHas(s.dispatches) ? rrInt(s.dispatches) : '—' }} dispatch{{ s.dispatches === 1 ? '' : 'es' }}</span>
+                          <span class="rr-chip" :class="rrHas(s.tokens) ? 't-neutral' : 't-quiet'">{{ rrHas(s.tokens) ? rrCompact(s.tokens) + ' tokens' : 'cost not measured' }}</span>
+                        </div>
+                        <div v-if="s.notes" class="spec-notes">{{ s.notes }}</div>
+                        <div v-else class="econ-unk">what they worked on was not recorded for this rotation</div>
+                      </div>
+                    </div>
+                  </details>
                 <dl class="as-kv">
                   <div><dt>Session date</dt><dd><span v-if="rrHas(r.sessionDate)" class="rr-num">{{ r.sessionDate }}</span><span v-else class="rr-unk">not established</span></dd></div>
                   <div><dt>Host</dt><dd><span v-if="rrHas(r.host)" class="rr-num">{{ r.host }}</span><span v-else class="rr-unk">not established</span></dd></div>

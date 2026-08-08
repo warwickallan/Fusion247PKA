@@ -40,7 +40,7 @@ import { fileURLToPath } from 'node:url';
 // The REAL derivation, so these scenarios exercise the executive layer rather than a hand-made
 // stand-in for it. A fixture without `summary` renders no L1 block at all — which is exactly how
 // the re-cut could have shipped with 28 assertions silently passing against absent markup.
-import { reportSummary } from './rotation-report.mjs';
+import { reportSummary, sessionEconomics } from './rotation-report.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PUB = path.join(HERE, 'public');
@@ -432,7 +432,7 @@ const SYS = { area: 'system' };
 // Opening the card keeps every L3/L4 assertion testing real rendered output AND proves the
 // disclosure actually reveals it.
 const rrRefs = (reports, { loading = false, err = null, requested = true, open = '0' } = {}) =>
-  ({ rrReports: Array.isArray(reports) ? reports.map((r) => ({ ...r, summary: reportSummary(r) })) : reports,
+  ({ rrReports: Array.isArray(reports) ? reports.map((r) => ({ ...r, summary: reportSummary(r), econ: sessionEconomics(r) })) : reports,
     rrLoading: loading, rrErr: err, rrRequested: requested, rrOpenCard: open });
 
 const SYSTEM_PLAN = [
@@ -497,8 +497,13 @@ const SYSTEM_PLAN = [
         (p) => hasText(p, 'A synthetic finding whose confidence was never established.')],
       ['an empty unestablished list is a measured emptiness, not an unknown',
         (p) => hasText(p, 'Nothing was left unestablished in this rotation.')],
+      // Re-anchored 2026-08-08: the specialist drill-down now renders the count as a chip
+      // ("0 dispatches") ahead of the older raw block, so `valueAfter` lands on the chip. THE
+      // PROPERTY IS UNCHANGED and is the one that matters — a MEASURED zero must render as 0 and
+      // must never degrade into "not measured", because those are different answers about a
+      // specialist who was configured but never dispatched.
       ['a specialist with zero dispatches renders a zero, not an unknown',
-        (p) => valueAfter(p, 'keel') === '0'],
+        (p) => hasText(p, '0 dispatches') && !hasText(p, 'keel cost not measured')],
       ['an unestablished token count on that same specialist renders as words',
         (p) => valueAfter(p, 'Tokens out') === 'not established'],
     ]],
