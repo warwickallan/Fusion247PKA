@@ -2936,6 +2936,12 @@ Any newly discovered **unrelated** defect: record once in [[Deliverables/BACKLOG
 
 **4D is CLOSED — Veritas `PASS` on all 22 acceptance items at `7afac1d`, 2026-08-08.** Receipt: [[Deliverables/2026-08-08-veritas-4d-pass-receipt]].
 
+**📄 SESSION REPORT — 4D close rotation, 2026-08-08.** Closing head `9de03b7` (payload), Supabase rotation `6dbc9606-8b2e-4fe9-8e79-5fbbbd118ccf` (populated, `verified:true`).
+
+- **Report:** [[Deliverables/2026-08-08-session-performance-report-subphase-4d-close]] — ⏳ **OUTSTANDING AT ROTATION.** Pax was commissioned and is NOT on the blocking path (`/rotate` step 6). **Named here rather than left silent: when it lands, write it, commit it, fold it into the record.** It carries the step 5c comparison — what Larry was told at session start versus what he actually did, from evidence.
+- **Subagent ledger:** [[Deliverables/2026-08-08-subagent-token-ledger-4d-close]] — A = 541,355 deduplicated; naive summing would have overstated by 71%.
+- **CAPAE synced** against rotation `6dbc9606`: three recurrences recorded; `work-order-not-generated` recorded `none-this-session` honestly, no Work Order having been issued. **`record-amended-body-not-recut` was DELIBERATELY left ungraded by Larry** — awarding one's own clean exposure is exactly what he may not do; Pax decides it.
+
 **⛔ NOTHING ABOUT 4E IS WRITTEN HERE, DELIBERATELY. Warwick gives the fresh Larry the 4E commission directly.** Do not infer it, do not reconstruct it from the § FORWARD ROUTE summary above, and do not begin preparing AsdAIr. The one binding distinction, already recorded: *"Prepare AsdAIr before the jump. Execute AsdAIr only after the jump."* **BUILD-015 already exists and must not be recreated.**
 
 **The first safe action of the next session is to receive Warwick's 4E commission.** If it has not arrived, say so and wait — that is a legitimate, complete answer, not a gap to be filled.
