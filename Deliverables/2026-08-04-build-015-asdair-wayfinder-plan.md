@@ -1,9 +1,36 @@
 # BUILD-015 AsdAIr — Wayfinder plan
 
+> ## ⭐ RECONCILED 2026-08-08 — BUILD-020 Sub-phase 4E (`BUILD-015-PREJUMP-WAYFINDER-HANDOVER`)
+>
+> **This map was reconciled against current repository, runtime and evidence truth on 2026-08-08,
+> under Warwick's 4E commission** — canonical text: Google Doc "Asdair Brief" (Drive root); repo
+> mirror: [[Deliverables/2026-08-08-build-015-prejump-wayfinder-handover-SOURCE]]. What happened
+> between this map's writing (2026-08-04) and the reconciliation, in one paragraph:
+>
+> Branch `build-015/live-acceptance-recovery-2026-08-03` — the branch every head in the original
+> §2 referred to — **was merged into canonical `main` and no longer exists** (its content reached
+> `main` through the BUILD-020 Sub-phase 4C estate reconciliation, PR #98). BUILD-020 / Proofline
+> then ran as the active Build through its Phase 4. On 2026-08-08 Warwick commissioned 4E: prepare
+> THIS existing map for a clean post-Proofline restart, then merge, converge, and switch the active
+> Build to BUILD-015. **Sections below carry explicit truth labels** — `CURRENT`, `STALE`,
+> `SUPERSEDED`, `UNESTABLISHED`, `HISTORICAL EVIDENCE` — applied 2026-08-08; a section without a
+> label was verified still accurate at reconciliation.
+>
+> **The one directive section of this map is § "THE PREPARED POST-JUMP PHASE".** The former §10
+> frontier is superseded and says so. **Warwick's 2026-08-08 commission is later authority than the
+> 2026-08-04 route authorisation; where they conflict, the commission governs** (root `CLAUDE.md`
+> § RECONCILE: later explicit Warwick decisions outrank earlier conflicting ones).
+
 ## START / RESUME HERE — ordered by Warwick
 
 - This Git Wayfinder is the sole route and source of truth.
 - **On a fresh resume, BEFORE using any tool or doing any work, visibly state: (1) this recovered map path, (2) the goal, (3) the current phase and gate, (4) the next action. THEN open this map and continue.**
+- **Canonical-lineage bootstrap — the first move of every fresh BUILD-015 session:** resolve current
+  canonical state **by execution** before trusting anything in this map — `git rev-parse HEAD` on
+  `main`, `git status --porcelain`, `gh pr list --state open`, and the live-runtime probes in
+  § "THE PREPARED POST-JUMP PHASE" → Step 1. **Canonical `main` is the source lineage; a running
+  process or old checkout is deployment evidence, never source authority.** *"Running code tells us
+  what was deployed. Git tells us what source we own"* (Warwick, 2026-08-08).
 - Read the current phase, gate and evidence before acting.
 - Honcho points here; it does not replace this map.
 - Do not create a todo list, parallel tracker or replacement plan.
@@ -89,7 +116,9 @@ documentation-truth review.
 > **No mechanism is to be built to manage this.**
 >
 > **What Warwick has NOT done, and it is not a technicality.** He authorised the route. **He has
-> not read or accepted this 430-line map as a document.** The map carries far more than §9 — the
+> not read or accepted this map as a document.** *(2026-08-08: the phrase "430-line" is removed per
+> `D-G3-25` — the count was falsified by its own commit; the map carries no self-count, for the same
+> reason §12 refuses one.)* The map carries far more than §9 — the
 > current reality table, the fog register, the boundaries, the acceptance evidence and the frontier
 > — and none of that has been in front of him. **Do not read "the route is authorised" as "the map
 > is accepted."** A fresh instance must not begin phase 1 work on the strength of a document
@@ -98,7 +127,22 @@ documentation-truth review.
 
 **Nothing in this map records any work package, phase, build, service or journey as complete,
 operational, durable, ready, accepted, production-safe or closed.** Larry holds no such authority
-(`GOVERNANCE-VERITAS-HIRE`, 2026-08-04). **BUILD-015 currently holds an open Veritas Gate 3 HOLD.**
+(`GOVERNANCE-VERITAS-HIRE`, 2026-08-04). ~~**BUILD-015 currently holds an open Veritas Gate 3
+HOLD.**~~ **RE-CUT 2026-08-08:** the Gate 3 position when this map was written (two receipts, live
+HOLD at `d63668f`) was superseded by a **third** Gate 3 review — **HOLD at `94f135f`**, receipt
+`Builds/BUILD-015-.../Assurance/veritas-gate3-truth-94f135f.md`, with `D-G3-21`–`D-G3-24` never
+subsequently corrected and `D-G3-26` (an `eol=lf` pin for `Assurance/*.md`) an open Warwick
+decision. **That HOLD reviewed the 2026-08-04 document state as its boundary and is HISTORICAL
+EVIDENCE about that boundary.** Whether any of its findings still bind after this 2026-08-08
+reconciliation is listed in § "THE PREPARED POST-JUMP PHASE" → deferred verification — it is not
+silently discharged here.
+
+> **MAP ACCEPTANCE — the 2026-08-08 position.** Warwick has still not accepted the 2026-08-04 map
+> as a document. **The 4E route is designed to close exactly that**: this reconciled map goes to
+> Veritas (4E assurance), then Codex (merge unit), then **Warwick's `merge-decision` — and his
+> authorised merge of the 4E preparation into canonical `main` is the acceptance event for this
+> prepared map as the post-jump authority** (commission §18, §22). Until that merge, this map is a
+> **prepared candidate**, and no statement in it may be read as already merged.
 
 ---
 
@@ -124,19 +168,63 @@ started no better informed than the last.
 **Larry is outside the weekly operating path.** AsdAIr must run with zero Claude Code involvement;
 model calls go through `FUSION_GATEWAY_URL`.
 
+### ⭐ The Star as Warwick restated it, 2026-08-08 — CURRENT, and it extends (does not replace) the goal contract
+
+**Canonical full text: [[Deliverables/2026-08-08-build-015-prejump-wayfinder-handover-SOURCE]] §5–§6.
+Binding. The compact form:**
+
+Warwick sends Mum's real handwritten shopping-list photograph to ShopperBot, and **without Warwick
+opening Claude Code, contacting Larry or ChatGPT, transcribing anything, joining services by hand,
+or deciding which week's photograph was used**, the production system: receives the photo durably →
+binds the shop to the exact source message/image → loads the complete household recognition
+catalogue **before** vision → has **Terra** interpret against Regulars, Favourites, canonical names,
+aliases, brand/category/variant, usual quantities, prior answers and prior orders → resolves known
+items safely → batches genuine ambiguities into ONE Telegram question round → persists answers so
+next week asks less → produces one confirmed **Brand A–Z** plan → hands it to the approved delegated
+basket runtime → builds the trolley → reconciles against the plan → notifies checkout-ready →
+**checkout, payment and slot stay Warwick's alone** → persists outcomes and learning.
+
+**The four non-negotiable product invariants (mirror §6, binding verbatim there):**
+
+- **A — Recognition is catalogue-grounded.** No open-ended OCR or ungrounded transcription may
+  remain available as a silent production fallback. *A function called `loadCatalogue` is not
+  evidence the catalogue reached the model.*
+- **B — ASDA product IDs do not gate handwriting recognition.** Missing IDs/URLs may affect basket
+  execution; they must never stop Terra recognising a known Regular, Favourite, canonical name or
+  alias. Recognition identity and store-navigation identity are separate concerns.
+- **C — The exact source photograph remains provable** end-to-end (intake ID, image reference,
+  immutable fingerprint, timestamp, shop reference, physical/interpreted line counts, packet
+  fingerprint). The wrong-week-list incident is a product requirement, not trivia.
+- **D — Grounded model evidence is constrained, not discarded.** Deterministic exact matches win;
+  Terra ranks only supplied catalogue candidates; close candidates become a human question; nothing
+  outside the catalogue becomes an accepted known item; confirmed outcomes enrich future aliases.
+
+**Production vision ownership (Warwick, 2026-08-08):** Terra through the Fusion gateway is the
+acceptable production vision runtime. Delegated Claude vision may later be *investigated* as
+diagnostic or shadow-review capability; **it is not production architecture unless it demonstrably
+operates independently of Larry and survives cold start.** Larry, ChatGPT and a live Claude Code
+conversation must not remain part of the production shopping journey.
+
 ## 2. CURRENT REALITY AND VERIFIED ASSETS
 
-**Resolved by execution 2026-08-04. Every head named here will have moved — resolve it yourself.**
+### ⛔ The 2026-08-04 state table — HISTORICAL EVIDENCE. Its branch no longer exists.
+
+The original table below described branch `build-015/live-acceptance-recovery-2026-08-03` at
+`cd51ac0`. **That branch was merged into canonical `main` (via the 4C estate reconciliation, PR #98)
+and deleted.** Its rows are retained struck-through as evidence of the 2026-08-04 position only:
+
+~~Branch `build-015/live-acceptance-recovery-2026-08-03` · HEAD `cd51ac066895985463e88d3933de4e0c1db7c0db` · two Gate 3 reviews, live HOLD at `d63668f` · no open PR · 14 suites, 1,609 tests / 1,606 pass / 3 skipped pinned to that head · CI UNVERIFIABLE OFFLINE · live DB UNVERIFIABLE OFFLINE~~
+
+### Current reality — resolved by execution 2026-08-08 (4E reconciliation). Every head will move — resolve it yourself.
 
 | | |
 |---|---|
-| Branch | `build-015/live-acceptance-recovery-2026-08-03` |
-| HEAD when written | `cd51ac066895985463e88d3933de4e0c1db7c0db` (`git rev-parse HEAD`) |
-| Gate 3 reviewed heads | **TWO reviews, both HOLD, both receipts committed.** `ecfb04b8b6d5173ffa68b318baf2c3a97c0dd040` (11 defects, 5 HIGH) and then `d63668f653e233a22b5a28b6eb60f5fb84ecce48` (9 defects, 3 HIGH). **The live HOLD is the second.** Enumerate `Builds/BUILD-015-…/Assurance/` rather than trusting this row |
-| Open PR for this branch | **none.** Five PRs open estate-wide; enumerate live, never carry the list forward |
-| Suites | 14 asdair suites, **1,609 tests · 1,606 pass · 0 fail · 3 skipped**, pinned to the head above. **The per-suite split is deliberately carried forward nowhere — it goes stale within a commit. Re-run it, and read the executed count rather than the exit code** |
-| CI | **UNVERIFIABLE OFFLINE.** No CI result is claimed at any head. An absent run is never a passing run |
-| Live database | **UNVERIFIABLE OFFLINE** — `live_authority: none` throughout this map |
+| Source authority | **Canonical `main`.** All BUILD-015 source, this map, the build record and all four+1 assurance receipts live on `main`. No BUILD-015 branch exists |
+| Gate 3 position | **THREE reviews, all HOLD.** Live receipt: `veritas-gate3-truth-94f135f.md` — `D-G3-21`–`24` never corrected, `D-G3-26` open Warwick decision. Enumerate `Builds/BUILD-015-…/Assurance/` rather than trusting this row |
+| CI | **`asdair-tests.yml` is RED at its most recent run** — 2026-08-08, head `eb03696` (the 4C merge): `unit` job PASSED, `integration` job FAILED at *"clean Postgres → schema → seed → data.js → planner.js"* with an `AssertionError`. **The workflow is path-filtered: later non-asdair commits produce NO run, and an unrun workflow looks exactly like a green one. Check the last run PER WORKFLOW.** Root cause UNESTABLISHED — a live candidate is fog item 3 (migrations 013/014 missing from the repo, so a clean Postgres cannot reproduce live schema) |
+| Live runtime | **RUNNING, and OLDER than current source.** Verified by execution 2026-08-08: `pipeline/runtime.js --watch` (PID at probe: 40920) has run from the primary checkout `C:\Fusion247PKA` **since 2026-08-03 21:31** — it predates every 2026-08-04 seven-workstream fix and is executing pre-fix bytes from memory. The ShopperBot server process started 2026-08-04 02:37, also pre-fix. Scheduled task `MyPKA-AsdAIr-Runtime` is **Ready** — `ACTIVATION-DEFERRED.md`'s "registered Disabled, not armed" is STALE. **Restarting these processes is a runtime action belonging to post-jump BUILD-015 work — 4E changes nothing live** |
+| Live database | **UNVERIFIABLE from this reconciliation** — `live_authority: none` throughout this map. Migrations directory still stops at `012_complete_grant_matrix.sql`; 013/014 remain applied-live-only (fog item 3, still true 2026-08-08) |
+| Suites | Not re-run during 4E (documentation-only phase). The last committed local claim is the 2026-08-04 green at 1,599–1,609; **the CI row above is newer and redder — believe it** |
 
 **Verified assets — real, tested, and reachable from something:** the intake receiver, shop state
 store and status projection, the ShopperBot control surface, vision transcription through the
@@ -145,10 +233,12 @@ term matching (`skill/termMatch.js`), reconciliation (`reconcile/`), the outcome
 writers, and the Cockpit read surface. `sendQuestionCard` **now has a production caller**, bound in
 `pipeline/runtime.js`.
 
-**Verified assets with NO production caller — built, tested, and reached by nothing:** the execution
-packet producer `packet/buildExecutionPacket.js`. Enumerated 2026-08-04: every reference outside
-`packet/` is a comment or a cross-module test pin in `handoff/`. **A tested module with no caller is
-not delivered.**
+**Verified assets with NO production caller — built, tested, and reached by nothing** *(re-enumerated
+2026-08-08)*: the execution-packet → handoff chain. `packet/buildExecutionPacket.js` now HAS a real
+caller — `handoff/buildHandoff.js` — **but `handoff/` itself has zero non-test importers anywhere in
+`services/asdair/`**; `pipeline/runtime.js` mentions `buildHandoff()` only in a comment (line ~401).
+The chain plan → packet → Sonnet handoff artefact exists and is tested, and **nothing in the
+production journey invokes it. A tested module with no caller is not delivered.**
 
 **The standing risk, stated as the risk it is: no row has ever been written to Postgres by this
 journey.** All three skipped tests are the destructive Postgres tests gated on
@@ -161,7 +251,11 @@ anything survives process death.
 **The canonical end-to-end process is
 `Builds/BUILD-015-.../CANONICAL-WEEKLY-SHOP-PROCESS.md` (steps A–H).** Its own status table records,
 per step, what is implemented and what is not. **That table is the authority on implementation
-status; this map does not duplicate it.**
+status; this map does not duplicate it.** *(Timing caveat added 2026-08-08: that status table is
+dated 2026-08-04 01:31 — before the seven-workstream commit `996a838` at 02:39 the same night. Its
+rows C ("exact-string"), D ("demonstrably broken") and E ("does not exist") describe the
+pre-workstream source and are STALE as source claims; §10's seven-break table carries the
+reconciled position with evidence.)*
 
 Shape of the journey: photograph → ShopperBot intake → durable shop row → catalogue loaded **before**
 interpretation → catalogue-constrained vision → identity resolved from our rows → rule and alias
@@ -196,6 +290,11 @@ Each is settled. **Do not re-open one; point at it.**
 | Packet stored as whole schema-valid `jsonb`, cockpit renders `lines` in array order and does not re-sort | `COCKPIT-PACKET-AND-RECONCILIATION-INTERFACE.md` |
 | The accepted provenance residual (TQA-PR73-002) proves provenance of **citation**, never of content | `ACCEPTANCE-AND-EVIDENCE.md` |
 | Veritas gates every integrated head; Larry may not declare his own work complete | `GOVERNANCE-VERITAS-HIRE`, root `CLAUDE.md` |
+| **Terra via the Fusion gateway is the production vision runtime**; delegated Claude vision is investigate-later, diagnostic/shadow only, and never production unless independently cold-start proven | Warwick, 2026-08-08 — commission mirror §5 |
+| **ASDA product IDs never gate handwriting recognition** — recognition identity and store-navigation identity are separate concerns | Warwick, 2026-08-08 — commission mirror §6B |
+| **Exact-source-photograph provability is a product requirement** (fingerprint, intake ID, line counts, packet fingerprint — the wrong-week incident is the reason) | Warwick, 2026-08-08 — commission mirror §6C |
+| **Grounded candidate evidence is constrained, not discarded**; deterministic matches win, Terra ranks only supplied candidates, close calls become a human question | Warwick, 2026-08-08 — commission mirror §6D |
+| **First post-jump mission and sequence**: grounded-vision / earliest-broken-link investigation → one bounded Pax investigation → ONE proposed Active Session Work Package → one bounded Nolan review → Warwick decision → only then implementation | Warwick, 2026-08-08 — commission mirror §11–§12, §23 |
 
 ## 5. UNRESOLVED FOG AND CONTRADICTIONS
 
@@ -241,7 +340,10 @@ source.**
    matched the file at `HEAD`" is falsified by observations 2 and 3. "It matched the previous
    commit" — the replacement offered in the `d63668f` receipt — is falsified by observation 3, where
    the previous commit carried the corrected blob and the injected copy did not. Observation 3
-   matched a blob **four commits back**. **No mechanism is offered here to replace them.** Caching or
+   matched a blob that was ~~four commits back~~ **last current two commits back from the observing
+   session's `HEAD` `c9b04cf`, and first appeared five commits back** *(corrected 2026-08-08 from
+   `D-G3-23` of the `94f135f` receipt: blob `8d865ed1…` was `CLAUDE.md` at `ecfb04b`, `565351d`,
+   `7ca8c3b` and `cd51ac0`; `75a19c4b…` from `d63668f` onward — "four" was neither)*. **No mechanism is offered here to replace them.** Caching or
    snapshotting is a hypothesis, not a finding, and re-narrowing this to a third guess is how the
    first two got written.
 
@@ -265,7 +367,7 @@ This map owns only *which dependency blocks what, and when*.
 
 | # in the brief | Dependency | Becomes blocking at |
 |---|---|---|
-| 1 | **Asdair's contract still says Asdair runs `runner.js` itself**, which `RUNTIME-DECISION.md` supersedes and prohibits | **Before any Asdair dispatch, at any phase.** A dispatched Asdair reads its own contract first and that contract outranks every brief. The prohibited action is a **live ASDA account** action. **DO NOT DISPATCH ASDAIR UNTIL WARWICK HAS RULED.** |
+| 1 | **Asdair's contract still says Asdair runs `runner.js` itself**, which `RUNTIME-DECISION.md` supersedes and prohibits *(re-verified 2026-08-08: `Team/Asdair - Household Shopping Steward/AGENTS.md:97` still carries the superseded claim; only Warwick may authorise the `AGENTS.md` edit)* | **Before any Asdair dispatch, at any phase.** A dispatched Asdair reads its own contract first and that contract outranks every brief. The prohibited action is a **live ASDA account** action. **DO NOT DISPATCH ASDAIR UNTIL WARWICK HAS RULED.** |
 | 2 | Should Favourites be a real second ASDA view? | **Phase 1** — it decides whether the packet's `source_view` contract describes anything |
 | 3 | Should the dedupe guard live in the schema rather than in one writer? | **Phase 1**, with migrations 013/014 |
 | 4 | `D-G3-08` — Keel's contract enumerates three conditions after "when all of these hold" | **Non-blocking.** Fold in at Warwick's next authorised touch of that contract |
@@ -312,15 +414,17 @@ document**, which is not the same decision and has not been made.
 **Canonical record: `Builds/BUILD-015-.../ACCEPTANCE-AND-EVIDENCE.md`. Assurance receipts:
 `Builds/BUILD-015-.../Assurance/`. Neither is restated here.**
 
-Four assurance receipts exist. **Enumerate the directory rather than trusting this table — it goes
-stale the moment a receipt is committed, and it has done so once already:**
+Five assurance receipts exist *(re-enumerated 2026-08-08 — the 2026-08-04 version of this table
+said four and went stale exactly as predicted)*. **Enumerate the directory rather than trusting
+this table:**
 
 | Receipt | Head reviewed | Verdict |
 |---|---|---|
 | `veritas-wp-red-suite-recovery-0f8a1bc.md` | `0f8a1bcd715ac04833534bf014a15563f3df9dff` | **HOLD** |
 | `veritas-wp-red-suite-recovery-0f8a1bc-provenance-addendum.md` | same | isolation PROVEN, **HOLD stands** |
 | `veritas-gate3-governance-ecfb04b.md` | `ecfb04b8b6d5173ffa68b318baf2c3a97c0dd040` | **HOLD** — 11 defects, 5 HIGH |
-| `veritas-gate3-documentation-d63668f.md` | `d63668f653e233a22b5a28b6eb60f5fb84ecce48` | **HOLD** — 9 defects, 3 HIGH. **This is the live one** |
+| `veritas-gate3-documentation-d63668f.md` | `d63668f653e233a22b5a28b6eb60f5fb84ecce48` | **HOLD** — 9 defects, 3 HIGH |
+| `veritas-gate3-truth-94f135f.md` | `94f135f` (the second Gate 3 discharge commit) | **HOLD** — documentation truth rose from FAIL; `D-G3-21`–`24` named, never corrected; `D-G3-26` is an open Warwick decision. **This is the live Gate 3 receipt, and it reviewed the 2026-08-04 document state — HISTORICAL EVIDENCE about that boundary; its standing after the 2026-08-08 reconciliation is a deferred-verification item, not silently discharged** |
 
 **The finding-level accounting — severities, which findings fell outside the dispatched scope, and
 the disposition of each — is in `Deliverables/NEXT-ASDAIR-SESSION-brief.md` §"THE VERITAS POSITION".
@@ -340,7 +444,17 @@ It is not repeated here. The receipt itself is the register.**
 - **Larry may not record a phase PASS.** PARTIAL and FAILED are his; **PASS additionally requires a
   Veritas receipt against the exact integrated head.**
 
-## 9. THE EXECUTION ROUTE — phased against the Veritas gates
+## 9. THE EXECUTION ROUTE — ⛔ SUPERSEDED 2026-08-08 as the directive route. HISTORICAL EVIDENCE + candidate future work.
+
+> **⛔ This six-phase route no longer states what happens next.** Warwick's 2026-08-08 commission
+> (`BUILD-015-PREJUMP-WAYFINDER-HANDOVER`) is later authority and sets a different first sequence —
+> § "THE PREPARED POST-JUMP PHASE" is the one directive section. **What this section retains:** the
+> six phases' *content* (repo/live reconciliation, durability, the injected journey, documentation
+> truth, external acceptance) remains a truthful record of work BUILD-015 still plausibly needs, and
+> the gate questions remain good questions — but **the order, the entry point and WHAT COMES FIRST
+> are now decided by post-jump evidence through the prepared sequence, not by this table.** Phase 0's
+> Gate 3 thread ended in the third HOLD (`94f135f`, see §8) with its corrections never made; that
+> debt is carried in deferred verification, not silently discharged.
 
 **Phased against assurance, not narrative progress.** Gate 1 = integrated Work Package · Gate 2 =
 phase or vertical slice · Gate 3 = documentation and Git truth. **This table is the six-phase route
@@ -350,14 +464,15 @@ It does not extend to the map as a document, which he has not read.**
 
 | Phase | Outcome | Gate | The question the gate answers | Status |
 |---|---|---|---|---|
-| **0** | Gate 3 documentation and Git truth discharged | Veritas Gate 3 | Does every active document agree with the code and with Git? | **IN PROGRESS** |
+| **0** | Gate 3 documentation and Git truth discharged | Veritas Gate 3 | Does every active document agree with the code and with Git? | ~~IN PROGRESS~~ **THREAD ENDED UNRESOLVED — third HOLD at `94f135f`, corrections never made; debt carried in §10 deferred verification** |
 | **1** | Repository and live database reconciled — migrations 013/014 authored as artefacts, the packet table contract settled | Gate 1 per WP | Does a fresh clone reproduce the live state? | Not started |
 | **2** | Execution packet durable — 015 applied, producer wired to a real production caller, persistence and restart proven | **Gate 2** | **Can Warwick's plan survive a process death?** | Not started |
 | **3** | Injected end-to-end journey green with duplicate, stale-answer, mutation and restart controls | **Gate 2** | **Photograph → correctly resolved, Brand A–Z, checkout-ready basket, in the real intended context?** | Not started |
 | **4** | Documentation reconciled against the implemented journey; one clean PR; CI bound to the exact head | Gate 3 | Is what we say we built what we built? | Not started |
 | **5** | Codex external QA within the three-pass maximum, then Pax's final product acceptance | External, then Pax | Would an independent party accept this? | Not started |
 
-**No phase is marked PASS. Phase 0 is IN PROGRESS.**
+**No phase is marked PASS.** ~~Phase 0 is IN PROGRESS.~~ *(Re-cut 2026-08-08: Phase 0's Gate 3
+thread ended in the third HOLD and this route is superseded as directive — see the banner above.)*
 
 > **Phase 2's question is the one every green suite in this build has so far failed to answer.** The
 > `RESUMABILITY` tests prove no state hides in the deps container; they prove nothing about process
@@ -366,7 +481,9 @@ It does not extend to the map as a document, which he has not read.**
 
 ### What sits inside each phase
 
-**Phase 0 — Gate 3, current. Two rounds so far, both HOLD.**
+**Phase 0 — Gate 3.** ~~Current. Two rounds so far, both HOLD.~~ *(Re-cut 2026-08-08: THREE rounds
+happened, all HOLD — the third at `94f135f` postdates this prose; see §8. The thread ended
+unresolved and this section is historical evidence.)*
 
 - **Round 1 — `ecfb04b8b6d5173ffa68b318baf2c3a97c0dd040`, HOLD, 11 defects, 5 HIGH.** `D-G3-01`
   through `D-G3-07` were the correction set; `D-G3-08` through `D-G3-11` were recorded for
@@ -409,13 +526,141 @@ final BUILD-015 acceptance. **Pax is a different hat, not a different model:** r
 independent review by the same model, never as external verification. Merge-to-main is Warwick's
 `merge-decision`.
 
-## 10. CURRENT FRONTIER AND THE EXACT NEXT ACTION
+## 10. THE PREPARED POST-JUMP PHASE — the one directive section of this map
 
-**Phase 0, IN PROGRESS. Gate: Veritas Gate 3. BUILD-015 holds an open Gate 3 HOLD — two rounds so
-far, the live one against `d63668f653e233a22b5a28b6eb60f5fb84ecce48`. Resolve the current position
-with the discharge test below rather than from this sentence.**
+**Prepared 2026-08-08 during BUILD-020 Sub-phase 4E. It becomes ACTIVE when the Build switch to
+BUILD-015 completes** (commission mirror §21–§22). Until that switch, BUILD-020/Proofline remains
+the active Build and its Wayfinder directs the estate; nothing here authorises earlier AsdAIr work.
 
-> ### THE EXACT NEXT ACTION
+### The phase and its gate question
+
+**Phase: GROUNDED RECOGNITION — the first post-jump mission** (Warwick, 2026-08-08):
+
+> **Establish whether Mum's exact photograph can be interpreted safely, catalogue-grounded and
+> without Larry, and identify the earliest still-broken link in the real photo-to-checkout-ready
+> journey.**
+
+**The gate question this phase must answer:** *Can Mum's exact photograph reach a safely resolved,
+catalogue-grounded interpretation with no Larry in the execution path — and what, from executable
+evidence, is the earliest link in the journey that still cannot happen in production?*
+
+### 🎯 THE EXACT FIRST ACTION — execution-based bootstrap. It deliberately self-invalidates stale preparation assumptions.
+
+**Nothing prepared before the merge may be trusted until this runs.** No SHA is written here — the
+post-merge head cannot be known while this is being written, and hardcoding one is the failure this
+map has already paid for three times.
+
+```
+git rev-parse HEAD                          # resolve current canonical main — the source authority
+git status --porcelain                      # anything here is new work, not a BUILD-015 package
+gh pr list --state open                     # never carry a PR list forward
+ls Builds/BUILD-015-asdair-durable-household-shopping-steward/Assurance/
+                                            # enumerate receipts; READ THE NEWEST ONE FIRST —
+                                            # a HOLD names its correction set (D-G3-24's lesson)
+gh run list --workflow=asdair-tests.yml --limit 1
+                                            # CI truth PER WORKFLOW — an unrun workflow is not green
+Get-ScheduledTask -TaskName "MyPKA-AsdAIr-Runtime"   # live activation state, verified, not asserted
+Get-CimInstance Win32_Process -Filter "Name = 'node.exe'"
+                                            # which asdair processes run, from where, since when —
+                                            # compare process START TIME against the newest asdair
+                                            # commit: a process older than the source is executing
+                                            # stale bytes and is DEPLOYMENT evidence, not truth
+```
+
+Then verify which 4E preparation assumptions survived: the seven-break classifications below, the
+CI-red row in §2, and the live-runtime row in §2 were all established 2026-08-08 and **each names
+its evidence so it can be re-established or falsified in minutes.**
+
+### The prepared sequence — Warwick's commission §12/§23, binding
+
+1. **Fresh orientation / canonical bootstrap** — the first action above. Nothing else starts first.
+2. **ONE bounded Pax investigation** — scope FIXED: grounded vision · exact source binding ·
+   catalogue completeness · what Terra actually receives (one explicitly approved retained
+   photograph only — if none exists, say so; never substitute another week's) · candidate-evidence
+   loss · earliest still-broken product link. **Not another general AsdAIr audit.** The prepared
+   question set is in the commission mirror §11 A–F, including the minimum recognition acceptance
+   corpus (Gourmet cat food, Dreamies cheese, Weetabix Protein, Wall's sausage rolls, Arla milk,
+   Mars/Milky Way, wrong-week control, and the structural cases).
+3. **Propose ONE Active Session Work Package** targeting the earliest still-broken product link.
+   **Larry-less catalogue-grounded recognition is the presumptive first gate unless executable
+   evidence already closes it.** Wrong-week/source-image protection is included.
+4. **ONE bounded Nolan review** — scope FIXED: accidental complexity · duplicated authority ·
+   cargo-culted Proofline · framework regrowth · evidence that does not prove the visible outcome ·
+   unnecessary platform/Cockpit work. Nolan does not redesign the product.
+5. **Warwick decision.** Only then does AsdAIr implementation begin.
+
+**Do not carry BUILD-020 specialist choreography into BUILD-015** unless this map actually calls
+for it. Most future implementation lives in `services/asdair/**` behind stable interfaces; Cockpit
+changes only when a real user-facing requirement requires them; no grand `server.mjs` refactor.
+
+### Pax's seven broken links — classified 2026-08-08 from existing evidence, per the commission's four-value scale
+
+**Scale: `OPEN` · `SOURCE FIXED — NOT LIVE` · `LIVE — NOT COLD-START PROVEN` · `FULLY CLOSED BY
+EXECUTABLE PRODUCT EVIDENCE`. Closure is an executable product-evidence claim — never inferred from
+module existence, tests, commit messages or docs.** Audit of record:
+`Builds/BUILD-015-.../END-TO-END-PROCESS-AUDIT.md` (Pax, 2026-08-04). The shared live caveat for
+every `SOURCE FIXED — NOT LIVE` row: **the live runtime process has run since 2026-08-03 21:31 and
+predates every fix; no real shop has exercised any of them; no row of this journey has ever been
+written to Postgres.**
+
+| # | Pax's break (2026-08-04) | Classification 2026-08-08 | Evidence |
+|---|---|---|---|
+| 1 | Nothing sends a question card to Telegram — `sendQuestionCard()` had zero production callers | **SOURCE FIXED — NOT LIVE** | Wired into `pipeline/runtime.js` (commit `996a838`, suites recovered green at `24a731f`); enumerated caller verified 2026-08-08. Never exercised by a live shop |
+| 2 | A button answer cannot be captured — live wiring passed `resolveCandidate: () => null` | **SOURCE FIXED — NOT LIVE** | `runtime.js:211–233` now hands real resolvers via `bot/resolveTap.js` (read 2026-08-08). Same live caveat |
+| 3 | The execution packet does not exist | **OPEN** | The producer now exists (`packet/buildExecutionPacket.js`) and `handoff/buildHandoff.js` calls it — but **`handoff/` has zero non-test importers in all of `services/asdair/`** (enumerated 2026-08-08); `runtime.js` names `buildHandoff()` only in a comment. The production journey still cannot produce a packet. A tested module with no caller is not delivered |
+| 4 | No basket writer | **OPEN** | The ruled writer is supervised Sonnet in Claude for Chrome (`RUNTIME-DECISION.md`); the handoff artefact it would consume is unreachable (row 3); no programmatic invocation surface exists, **deliberately** (`996a838`: "none was invented"). The CDP runner remains experimental and prohibited from live-account testing. No basket has ever been built by the ruled route |
+| 5 | No basket-ready handback — nothing enqueues kind `basket_ready` | **SOURCE FIXED — NOT LIVE** | `basket_ready` is enqueued from `pipeline/runtime.js` at source (enumerated 2026-08-08) — but it sits downstream of rows 3–4, so it has never fired, and the live process predates it |
+| 6 | The rulebook is not consumed — `info` rules discarded, exact-string matching, `rule_qa_log` never read | **SOURCE FIXED — NOT LIVE**, with a red flag | Rule-consumption workstream landed (`996a838`); tolerant matching in `skill/termMatch.js`; skill suite recovered green at `24a731f`. **Caveat that must not be dropped: `asdair-tests.yml`'s `integration` job — clean Postgres → schema → seed → `data.js` → `planner.js` — FAILED (AssertionError) at `eb03696`, 2026-08-08, the newest run on `main`. The full-path proof is red; root cause unestablished** |
+| 7 | Answers do not survive the week — `promoteDecision` deliberately not wired | **SOURCE FIXED — NOT LIVE** | `promoteDecision` is driven from the outcome writers (`buildAnswerLearning.js`, `recordAnswerLearning.js`, `record-shop.js` — enumerated 2026-08-08); the learning-loop tests assert an answer this week prevents the question next week against the real planner. Never exercised by a real shop |
+
+**The honest summary a fresh session should carry: zero of the seven are closed by executable
+product evidence.** Five are fixed at source and have never run live; two (the packet chain and the
+basket writer — the plan→basket half of the journey) remain OPEN in production terms. **The live
+runtime is executing pre-fix bytes.** The earliest still-broken link is therefore not yet settled by
+execution — establishing it is precisely step 2's job.
+
+### Deferred verification — facts unknowable or deliberately not settled until post-merge canonical state
+
+1. **Post-merge canonical `main` HEAD** — resolve by execution; never carry the 4E preparation SHA
+   forward as current truth.
+2. **`asdair-tests.yml` at the merged head** — does the integration red persist? Root-cause it
+   (live candidate: migrations 013/014 absent from the repo — fog item 3 — so a clean Postgres may
+   not reproduce live schema). *4E changed no asdair source, so the red is expected to persist; the
+   workflow is path-filtered and may simply not run again until asdair changes.*
+3. **Live database truth** — `live_authority: none` throughout 4E: the `sure`-variant conflict
+   (fog 1), Arla BOB rule 10 (fog 2), applied-migrations list, `regulars.source` distinct values /
+   Favourites (fog 5), the BUILD-002 test row (fog 6).
+4. **Live runtime restart** — the running `runtime.js --watch` and ShopperBot processes predate
+   current source. Whether and when to restart them onto canonical bytes is a **post-jump runtime
+   decision taken inside BUILD-015 work with Warwick's visibility — 4E deliberately changed nothing
+   live**, and this map does not claim live Cockpit or the live runtime has moved.
+5. **Standing of the `94f135f` Gate 3 HOLD after this reconciliation** — its boundary was the
+   2026-08-04 document state; this 4E reconciliation supersedes the map's directive layer and
+   applies the receipt's `D-G3-23`/`D-G3-25` map corrections. Whether the residual findings still
+   gate anything is for the next assurance boundary to state, not for this map to self-declare.
+6. **Whether Warwick's merge of the 4E preparation has actually happened** — this map may not claim
+   it has; see the MAP ACCEPTANCE block above.
+
+### Parked documentation debt — recorded once, not chased (root `CLAUDE.md` finding-disposition)
+
+- `SHIT-TO-DO.md:51` (row 11) — false consequence sentence about `secret-scan.sh` (`D-G3-21`; the
+  receipt records the error as Veritas's own). Correct at the next authorised touch of that file.
+- `SHIT-TO-DO.md:167` — self-contradicting "neither false sentence is reproduced" (`D-G3-22`);
+  receipt supplies the corrected wording.
+- `SHIT-TO-DO.md:49` — the same "four commits back" frame corrected in this map's §5.7 (`D-G3-23`).
+- `D-G3-26` — receipts' CRLF digest mismatch on clean clone: **an open Warwick decision**
+  (`.gitattributes` `eol=lf` pin for `Assurance/*.md`, or a template statement that digests bind to
+  the blob). Should be taken before any external party verifies a receipt.
+
+### ⛔ HISTORICAL — the 2026-08-04 exact next action (Phase 0 / Gate 3 resubmission). SUPERSEDED 2026-08-08. Directs nothing.
+
+*The block below was the frontier while the Gate 3 thread was live. Its resubmission action was
+overtaken: the third review happened (receipt at `94f135f`, HOLD), its corrections were never made,
+and Warwick's 2026-08-08 commission then reset the route. The block is retained because its
+discharge-test pattern — and `D-G3-24`'s one-clause repair, "if the newest receipt names the
+immediately preceding head, read it first" — is folded into the bootstrap above.*
+
+> ### THE EXACT NEXT ACTION — ⛔ SUPERSEDED
 >
 > **Submit the head that contains this line to Veritas for a Gate 3 re-review, and obtain the
 > receipt that does not exist at it.**
@@ -457,10 +702,10 @@ with the discharge test below rather than from this sentence.**
 > **Until that receipt exists, the maximum permitted statement is «Integrated at "\<SHA>" and
 > submitted to Veritas for assurance.»** Not done, not complete, not ready.
 
-**On `VERITAS_PASS`, phase 0 closes and phase 1 begins.** The six-phase route itself is authorised
+~~**On `VERITAS_PASS`, phase 0 closes and phase 1 begins.** The six-phase route itself is authorised
 (2026-08-04 — see the authorisation block at the top of this map). **The whole route remains
-sequenced behind a Gate 3 PASS the estate does not hold**, and a fresh instance should note
-separately that **Warwick has not read or accepted this map as a document**.
+sequenced behind a Gate 3 PASS the estate does not hold.**~~ ⛔ **SUPERSEDED 2026-08-08 with the
+block above** — the route and frontier are now stated once, at the top of §10.
 
 **This is the only document permitted to state an exact next action.** If another document in
 `Deliverables/` appears to state one, that document is the defect — see the precedence block above.
@@ -499,11 +744,13 @@ exists.**
 1. **Recovered map** — `Deliverables/2026-08-04-build-015-asdair-wayfinder-plan.md` (this file).
 2. **Goal** — `BUILD-015-END-TO-END-RECOVERY`: photograph → ShopperBot → checkout-ready basket, every
    gap closed, integrated, run and proven, with Larry outside the weekly operating path.
-3. **Phase and gate** — **phase 0, IN PROGRESS, Veritas Gate 3**, with an open HOLD. **Two Gate 3
-   receipts exist and the live HOLD is the later one — enumerate `Assurance/` rather than naming a
-   head from here.**
-4. **Exact next action** — §10 above, **including its discharge test, which tells you whether §10
-   is still outstanding.** Run the test before acting on the action.
+3. **Phase and gate** — **GROUNDED RECOGNITION, the prepared post-jump phase (§10), NOT STARTED**,
+   active only once the BUILD-015 Build switch has completed. The historical Gate 3 thread ended in
+   a third HOLD whose receipt is historical evidence — **enumerate `Assurance/` and read the newest
+   receipt rather than naming a head from here.** *(Re-cut 2026-08-08; the previous text said
+   "phase 0, IN PROGRESS, Veritas Gate 3, two receipts" — all three claims had gone stale.)*
+4. **Exact next action** — **§10 → "THE EXACT FIRST ACTION"**: the execution-based bootstrap that
+   re-establishes canonical state before anything prepared pre-merge is trusted.
 
 **Then verify by execution, not belief:**
 
@@ -516,9 +763,15 @@ ls Builds/BUILD-015-asdair-durable-household-shopping-steward/Assurance/   # the
 
 > #### ⚠️ THE DIRTY WORKING TREE IS NOT A BUILD-015 PACKAGE. DO NOT COMMIT IT AS ONE.
 >
-> `git status --porcelain` in this checkout returns **pre-existing, unrelated entries that belong to
-> no BUILD-015 work package** and have been carried, untouched, across every Gate 3 review. As at
-> 2026-08-04 they are:
+> *(Re-framed 2026-08-08: the checkout this block described — the deleted
+> `build-015/live-acceptance-recovery-2026-08-03` working tree — no longer exists. The RULE stands
+> on any checkout: entries `git status` returns are either new work needing their own attention or
+> pre-existing strays; never sweep them into a BUILD-015 commit. The list below is the 2026-08-04
+> inventory, retained as HISTORICAL EVIDENCE of the pattern.)*
+>
+> `git status --porcelain` in ~~this~~ that checkout returned **pre-existing, unrelated entries that
+> belonged to no BUILD-015 work package** and were carried, untouched, across every Gate 3 review.
+> As at 2026-08-04 they were:
 >
 > - `Team Knowledge/.obsidian/community-plugins.json`
 > - `services/asdair/skill/planner.js` — **modified flag only; `git diff --numstat` is empty.** A
