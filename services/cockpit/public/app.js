@@ -143,7 +143,12 @@ createApp({
         loadErr.value = true; loading.value = false; // keep last state; banner offers a manual retry
       }
     }
-    onMounted(() => load());
+    onMounted(() => {
+      load();
+      // One small CAPAE read at start, so Home can answer "what needs my attention?" without
+      // Warwick having to go and ask System first. Reuses capRequested, so System never re-reads.
+      ensureCapaeSignal();
+    });
 
     const attn = computed(() => state.value.attention || []);
     const activeAttn = computed(() => attn.value.filter((i) => i.status !== 'deferred'));
@@ -186,14 +191,70 @@ createApp({
       .reduce((n, o) => { const m = String(o.title || '').match(/^\s*(\d+)/); return n + (m ? Number(m[1]) : 1); }, 0));
     const wins = computed(() => state.value.wins || []);
     const builds = computed(() => state.value.builds || []);
-    // Latest = a merged, time-sorted feed of recent activity (under the Home tiles).
+    // RECENT ACTIVITY — a merged, time-sorted feed across Fusion247, from EXISTING sources only.
+    //
+    // Widened 2026-08-08: this was "Latest" and behaved like "recently ingested". It now also carries
+    // the learning estate's own events, because a family recurring or a prevention becoming proven is
+    // exactly the kind of thing Warwick should see without opening System.
+    //
+    // ⛔ NO EVENT TYPE IS INVENTED. Every row below is derived from a field that already exists and is
+    // already fetched. An event that cannot be dated honestly is OMITTED rather than given a
+    // plausible timestamp — an activity feed whose ordering is partly guessed is worse than a short
+    // one, and building an event store to fix that is the programme this must not become.
     const latest = computed(() => {
       const rows = [];
       for (const o of outputs.value) rows.push({ t: o.produced_at, label: outputTitle(o), kind: 'Output', area: 'outputs' });
-      for (const s of (state.value.ingested || [])) rows.push({ t: s.updated_at, label: s.title || s.video_id, kind: 'Ingested', area: 'brain' });
+      for (const s of (state.value.ingested || [])) rows.push({ t: s.updated_at, label: s.title || s.video_id, kind: 'Captured', area: 'brain' });
       for (const w of wins.value) rows.push({ t: w.happened_at, label: w.text, kind: 'Win', area: 'system' });
+      // CAPAE. `last_occurrence_at` is the only honest timestamp a family carries, so a family that
+      // has never been observed contributes nothing rather than appearing dated "now".
+      for (const f of capList.value) {
+        if (!f.last_occurrence_at) continue;
+        const kind = f.state === 'CHALLENGED' ? 'Prevention challenged'
+          : f.state === 'EFFECTIVE' ? 'Prevention proven'
+          : f.state === 'INEFFECTIVE' ? 'Prevention failed'
+          : f.occurrences > 0 ? 'Recurrence' : null;
+        if (!kind) continue;
+        rows.push({ t: f.last_occurrence_at, label: f.title, kind, area: 'system' });
+      }
       return rows.filter((x) => x.t && x.label).sort((a, b) => new Date(b.t) - new Date(a.t)).slice(0, 8);
     });
+
+    /**
+     * HOME'S ONE ATTENTION SIGNAL. Not a second dashboard — the single most important thing, or
+     * nothing at all.
+     *
+     * Returns null unless a prevention is genuinely in doubt. Routine MONITORING is not an attention
+     * item: every family sits at MONITORING most of the time, so surfacing that would make the card
+     * permanent furniture and therefore invisible — the same wallpaper failure the Stop reminder had
+     * to be redesigned around.
+     */
+    const homeAttention = computed(() => {
+      const o = capOverview.value;
+      if (!o || !o.needsAttention) return null;
+      const worst = (o.ineffective && o.ineffective[0]) || (o.reopened && o.reopened[0]) || null;
+      if (!worst) return null;
+      const n = (o.ineffective || []).length + (o.reopened || []).length;
+      return {
+        headline: `${n} prevention${n === 1 ? '' : 's'} need${n === 1 ? 's' : ''} attention`,
+        title: worst.title,
+        detail: `${worst.occurrences} occurrence${worst.occurrences === 1 ? '' : 's'}`,
+        tone: (o.ineffective || []).length ? 'urgent' : 'prominent',
+      };
+    });
+
+    /**
+     * Load the CAPAE record ONCE so Home can show the signal above and the feed can carry its events.
+     *
+     * ⚠️ A DELIBERATE CHANGE to the "explicit trigger only" rule, and it is Warwick's: he asked for
+     * Home to tell him what needs attention, which IS the request the old rule was protecting him
+     * from making by accident. It is one small read, it reuses `capRequested` so System never
+     * re-reads, and a failure leaves `capOverview` null — Home then simply shows nothing rather than
+     * a broken card.
+     */
+    function ensureCapaeSignal() {
+      if (!capRequested.value && !capLoading.value) loadCapae();
+    }
 
     const blockedN = computed(() => blocked.value.length);
     const statusTone = computed(() => (blockedN.value ? 'red' : 'green'));
@@ -832,7 +893,7 @@ createApp({
       rrDoc, rrDocLoading, rrDocErr, rrDocName, rrOpenDoc, rrCloseDoc, rrDownloadDoc,
       capFamilies, capActive, capLoading, capErr, capRequested, capOpen,
       loadCapae, capList, capToggle, capActionLabel, capTone, capCDE,
-      capOverview, capRanked, capStateMark, capWhy,
+      capOverview, capRanked, capStateMark, capWhy, homeAttention, ensureCapaeSignal,
       rrOverview, rrOpenCard, rrCardToggle, rrRawOpen, rrRawToggle,
       rrArr, rrObj, rrHas, rrText, rrInt, rrCompact, rrIsCompact, rrPct, rrMins, rrBar,
       rrAlloc, rrAllocSum, rrAllocGap, rrAllocAnyKnown, rrCtx, rrCtxMax, rrSpecMax, rrLinesMax,
@@ -861,6 +922,18 @@ createApp({
       <!-- HOME -->
       <section v-if="area==='home'" class="pane">
         <div class="status-line" :class="{red: statusTone==='red'}"><span>{{ statusTone==='red' ? '🔴' : '🟢' }}</span>{{ statusLine }}</div>
+        <!-- ══ HOME'S ONE ATTENTION SIGNAL — NOT a second CAPAE dashboard.
+             It appears only when a prevention is genuinely in doubt (INEFFECTIVE or reopened after
+             having been proven). Routine MONITORING is deliberately excluded: every family sits
+             there most of the time, so showing it would make this card permanent furniture and
+             therefore invisible. Nothing to say → nothing rendered. -->
+        <div class="grp" v-if="homeAttention">
+          <div class="home-attn" :class="'t-'+homeAttention.tone" @click="go('system')" role="button" tabindex="0" @keyup.enter="go('system')">
+            <div class="home-attn-h"><span aria-hidden="true">⚠</span> {{ homeAttention.headline }}</div>
+            <div class="home-attn-b">{{ homeAttention.title }} · {{ homeAttention.detail }}</div>
+            <div class="home-attn-go">System →</div>
+          </div>
+        </div>
 
         <!-- Needs you: genuine blockers + decisions, pinned at the top -->
         <div class="grp" v-if="needsYou.length">
@@ -897,7 +970,7 @@ createApp({
 
         <!-- Latest: recent activity, under the tiles -->
         <div class="grp" style="margin-top:20px" v-if="latest.length">
-          <h2>🕑 Latest</h2>
+          <h2>🕑 Recent activity</h2>
           <div v-for="(l,idx) in latest" :key="idx" class="item grey" @click="go(l.area)">
             <div class="i-main"><div class="i-eyebrow">{{ l.kind }} · {{ ago(l.t) }} ago</div><div class="i-title">{{ terse(l.label) }}</div></div>
             <span class="chev">›</span>

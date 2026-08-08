@@ -514,3 +514,13 @@ button { font-family:inherit; }
 .spec-notes { font-size:12.5px; color:var(--ink2); line-height:1.45; margin-top:3px; overflow-wrap:anywhere; }
 
 @media (max-width:420px) { .econ { grid-template-columns:1fr; } }
+
+/* Home's single attention signal. Tap target, not a dashboard tile. */
+.home-attn { border-radius:12px; padding:11px 13px; border:1px solid var(--hair); cursor:pointer;
+  background:var(--panel2); }
+.home-attn.t-urgent { background:var(--stop-w); border-color:var(--stop); }
+.home-attn.t-prominent { background:var(--warn-w); border-color:var(--warn); }
+.home-attn-h { font-size:14.5px; font-weight:800; color:var(--ink); line-height:1.3; }
+.home-attn-b { font-size:13px; color:var(--ink2); line-height:1.4; margin-top:4px; overflow-wrap:anywhere; }
+.home-attn-go { font-size:12.5px; font-weight:700; color:var(--accent-ink); margin-top:6px; }
+.home-attn:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }

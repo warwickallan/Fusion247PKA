@@ -204,9 +204,13 @@ try {
   assert('the entry rows are keyboard-reachable', (home.match(/role="button" tabindex="0"/g) || []).length >= 2);
   // Order is the design decision: a surface you owe a decision to sits above a passive feed.
   const iLater = home.indexOf('aria-label="Later —');
-  const iLatest = home.indexOf('🕑 Latest');
-  assert('Latest actually rendered (so the ordering check below is not vacuous)', iLatest > -1);
-  assert('the entry rows sit above Latest', iLater > -1 && iLatest > -1 && iLater < iLatest, `later@${iLater} latest@${iLatest}`);
+  // Renamed 2026-08-08: 'Latest' behaved like 'recently ingested'; it is now RECENT ACTIVITY and
+  // also carries CAPAE events. The non-vacuity guard below is the point — an ordering assertion
+  // against an absent element passes by saying nothing, which is how this rename would have gone
+  // unnoticed.
+  const iLatest = home.indexOf('🕑 Recent activity');
+  assert('Recent activity actually rendered (so the ordering check below is not vacuous)', iLatest > -1);
+  assert('the entry rows sit above Recent activity', iLater > -1 && iLatest > -1 && iLater < iLatest, `later@${iLater} latest@${iLatest}`);
 
   // ---- 4. RENDERED: Later ---------------------------------------------------------------------
   const later = await dump(`${base}/__nav-probe.html`);

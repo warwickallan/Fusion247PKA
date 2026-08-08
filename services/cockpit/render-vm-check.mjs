@@ -435,6 +435,55 @@ const rrRefs = (reports, { loading = false, err = null, requested = true, open =
   ({ rrReports: Array.isArray(reports) ? reports.map((r) => ({ ...r, summary: reportSummary(r), econ: sessionEconomics(r) })) : reports,
     rrLoading: loading, rrErr: err, rrRequested: requested, rrOpenCard: open });
 
+// ── HOME: the single attention signal and the widened Recent activity feed ───────────────────────
+// Added 2026-08-08. There was NO Home scenario at all, so the attention card and the CAPAE rows in
+// the feed would have shipped entirely uncovered — the third time in one day that new markup sat
+// outside every check. `capOverview`/`capList` are written as REAL refs so the real computeds
+// (`homeAttention`, `latest`) run rather than being stubbed.
+const CAP_ATTN = {
+  capRequested: true, capLoading: false, capErr: null,
+  capFamilies: [
+    { slug: 'record-amended-body-not-recut', title: 'A record is amended and the rows it contradicts are left standing',
+      state: 'CHALLENGED', occurrences: 5, last_occurrence_at: '2026-08-08T04:03:00.000Z',
+      root_cause: 'Amendment-by-append with no reconciliation step.', is_pilot: false, unmeasurable: false,
+      exposures_clean: 0, exposures_required: 5, history: [] },
+    { slug: 'work-order-not-generated', title: 'Work Order issued outside the generated envelope route',
+      state: 'MONITORING', occurrences: 2, last_occurrence_at: '2026-08-07T09:00:00.000Z',
+      root_cause: 'The generation route is treated as exempt.', is_pilot: true, unmeasurable: false,
+      exposures_clean: 0, exposures_required: 5, history: [] },
+  ],
+  capOverview: { total: 2, counts: { MONITORING: 1, CHALLENGED: 1, EFFECTIVE: 0, INEFFECTIVE: 0, UNMEASURABLE: 0 },
+    needsAttention: true, attention: '1 prevention in doubt', ineffective: [],
+    reopened: [{ slug: 'record-amended-body-not-recut', title: 'A record is amended and the rows it contradicts are left standing', occurrences: 5 }],
+    becameEffective: [], pilot: null, latest: null },
+  capActive: [],
+};
+const CAP_QUIET = {
+  ...CAP_ATTN,
+  capOverview: { ...CAP_ATTN.capOverview, needsAttention: false, attention: 'Nothing in doubt', reopened: [] },
+};
+
+const HOME_PLAN = [
+  ['HOME (a prevention is in doubt)', 'overview', CAP_ATTN, { area: 'home' }, [
+    ['the attention card names the count in plain language',
+      (p) => hasText(p, '1 prevention needs attention')],
+    ['it names the actual family, not a slug',
+      (p) => hasText(p, 'A record is amended and the rows it contradicts are left standing')],
+    ['it carries the occurrence count and a way through to System',
+      (p) => hasText(p, '5 occurrences') && hasText(p, 'System →')],
+    ['⭐ Home does NOT become a second CAPAE dashboard',
+      (p) => !hasText(p, 'CAPAE — the learning loop') && !hasText(p, 'MUST:')],
+    ['Recent activity carries the CAPAE event, not just ingestion',
+      (p) => hasText(p, 'Recent activity') && hasText(p, 'Prevention challenged')],
+  ]],
+  ['HOME (nothing in doubt — the card must stay quiet)', 'overview', CAP_QUIET, { area: 'home' }, [
+    ['⭐ no attention card at all when nothing needs attention',
+      (p) => !hasText(p, 'needs attention') && !hasText(p, 'System →')],
+    ['but the pane still renders',
+      (p) => hasText(p, 'Recent activity')],
+  ]],
+];
+
 const SYSTEM_PLAN = [
   // AC1 ① — two reports, most recent first. The ordering holds, so the ORDER WRONG branch must NOT
   // fire; a banner that appears on correct data is as bad as one that never appears on wrong data.
@@ -603,7 +652,7 @@ function renderPlan(plan, render) {
   });
 }
 function scenarios(render) {
-  return renderPlan(ASDAIR_PLAN, render).concat(renderPlan(SYSTEM_PLAN, render));
+  return renderPlan(ASDAIR_PLAN, render).concat(renderPlan(SYSTEM_PLAN, render)).concat(renderPlan(HOME_PLAN, render));
 }
 
 // ---------------------------------------------------------------------------
