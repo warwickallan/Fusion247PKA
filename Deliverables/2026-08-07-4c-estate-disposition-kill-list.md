@@ -232,6 +232,58 @@ recorded here so convergence does not leave it invisible, and so it is not mista
 
 ---
 
+# ✅ RECOVERY-PIN ACCOUNTING — all 115 accounted for
+
+**Warwick's gate: *"Only when all 115 recovery pins are accounted for may destructive cleanup resume."*
+And his constraint: *"Do not perform 75 manual archaeological reviews unnecessarily."***
+
+## The 40 branch tips — re-audited under the stronger method
+
+Independently re-audited (WO-4C-07) with four orthogonal tests: ancestry · `merge-tree` contribution ·
+**set algebra from the shared merge base** (`diff(B→tip)` minus `diff(B→canon)` — immune to "main moved
+on", because canon's own evolution is subtracted rather than counted) · symbol-absence and prose-orphan
+indexes against the canonical estate. **T3, T4a and T4b converged independently on the same refs.**
+
+| Verdict | Count |
+|---|---|
+| SURVIVOR | **3** — S-1, S-2, S-3 below |
+| SAFE-CONTAINED | 1 |
+| CONTRIBUTES-NOTHING | 7 |
+| SUPERSEDED | 29 |
+
+## The 75 previously-unreachable commits — accounted for, not archaeologically reviewed
+
+**65 of 75 are stash artefacts** (`WIP on…`, `index on…`, `untracked files on…`, `On <branch>…`).
+**Most were already unreachable before 4C began** — historical `git stash drop`/`pop` residue, not work
+this Sub-phase deleted. Three correspond to stashes dropped this session.
+
+| Category | Count | Basis |
+|---|---|---|
+| Contributes nothing to canon (`merge-tree` tree-identical) | **24** | mechanical |
+| Own delta vs parent is empty | **15** | mechanical |
+| Own delta fully represented on canon | **2** | line-level |
+| Own delta has orphan lines, **parent state already dispositioned** | **29** | parent in `main` (22) or under an audited tip (7) |
+| **Genuinely independent states** | **5** | examined individually — below |
+
+**The 5 independent states, each resolved by execution:**
+
+| Commit | Resolution |
+|---|---|
+| `9cdaf417`, `debc5452` — *"Land first WS-004 Team Retro"* | **REPRESENTED.** `Deliverables/2026-07-15-team-retro-proposals.md` is on canon and the orphan count against it is **0**. |
+| `0d19a541`, `e21ad09f` — *"Regen mypka.db after Team Retro"* | **REPRESENTED.** Orphan count **0** on every real path; `mypka.db` is a generated SOP-002 mirror. |
+| `c3a10575` — WIP on `build-020/live-trial` (139 orphan lines, the largest) | **SUPERSEDED.** Its orphans are docstring drafts plus line-break variants of the `TOWER_PR_REPOS` live-discovery feature, which **landed** — `TOWER_PR_REPOS` appears 5× on canon's `watcher.mjs`. Its local `fetchOpenPrNumbers` was replaced by the **paginated, fail-loud `fetchOpenPrs`** extracted to `pollPrComments.mjs`. Canon's is the better implementation. |
+
+**Method validation, unprompted:** `c9597067` (the PKM position deliberately kept off canon per Warwick's
+own decision) correctly reports orphan lines, and `b9a28f6e` (the deferred-hardening stash whose content
+**was** canonicalised at `d7967c6`) correctly reports **contributes-nothing**. The instrument distinguishes
+the two cases it was built to distinguish.
+
+**A known limit, stated rather than hidden:** line-level orphan detection reports **reformatting as
+orphans**. That is exactly what happened on `c3a10575`, and it is why every flagged case was resolved by
+reading the code and checking symbols, never by the count alone.
+
+---
+
 # ⚡ EXECUTION RECORD — Warwick authorised the full disposition, 2026-08-07
 
 **His ruling, and the constraint on every KEEP:** *"KEEP means extract/canonicalise the useful value onto
