@@ -469,9 +469,10 @@ test('handleAsdairTap hands a TYPED reply back unresolved — matching words to 
 // ── secret hygiene ───────────────────────────────────────────────────────────
 
 test('NO token can leak into a result, a refusal, an error or the console', async () => {
-  // Must NOT match the repo secret-scan's Telegram pattern
-  // ([0-9]{6,}:AA[A-Za-z0-9_-]{30,}) - the body must not begin "AA".
-  const TOKEN = '1234567890:TESTFIXTURE-not-a-real-telegram-token';
+  // Must NOT match the repo secret-scan's `telegram-token-bare` pattern
+  // ([0-9]{8,}:[A-Za-z0-9_-]{30,}) - the dots keep every token-charset run in
+  // the body under 30 characters.
+  const TOKEN = '1234567890:TESTFIXTURE.not.a.real.telegram.token';
   const seen = [];
   const write = (chunk) => { seen.push(String(chunk)); return true; };
   const realOut = process.stdout.write;
