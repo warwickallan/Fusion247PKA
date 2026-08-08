@@ -568,7 +568,51 @@ begins only after the prepared sequence below reaches Warwick's decision at step
 catalogue-grounded interpretation with no Larry in the execution path — and what, from executable
 evidence, is the earliest link in the journey that still cannot happen in production?*
 
-### 🎯 THE ONE CURRENT NEXT ACTION — rotation position, 2026-08-08 ~23:50. **WP-B15-1 live acceptance is PENDING WARWICK'S CHOICE.**
+### 🎯 THE ONE CURRENT NEXT ACTION — route DECIDED by Warwick, 2026-08-09. **MERGE-FIRST. WP-B15-1 remains NOT COMPLETE until the real live acceptance event happens.**
+
+> **AMENDMENT — Warwick, 2026-08-09.** Verbatim ruling, mirrored at
+> [[Deliverables/2026-08-09-warwick-route-decision-merge-first-SOURCE]]:
+>
+> > "Do NOT take option (a′). Do NOT install `node_modules` into `C:\Fusion247PKA-b15` merely to
+> > resurrect the special acceptance launcher. Do NOT engineer around the failed worktree runtime
+> > path. Proceed MERGE-FIRST, with one amendment: **The post-merge canonical runtime start is now
+> > an EXPLICIT acceptance step. Do not assume the logon-triggered scheduled task will restart it.**"
+>
+> **The decided route, in order:** `build-015/grounded-recognition` → ONE PR to `main` → establish
+> CI truth on the EXACT PR head → Tower-visible Codex merge-check via the canonical `mergeCheck.mjs`
+> route → Warwick `merge-decision` → merge → **explicitly start/restart the canonical AsdAIr runtime
+> from `C:\Fusion247PKA`** → prove by execution that the running process consumes merged canonical
+> bytes → shop 6 reaches the new confirmation surface → real ShopperBot card → real Warwick tap on
+> "Confirm this reading" → observe `needs_review` clear / replan / resulting shop state → §12 handback.
+>
+> **Warwick's boundaries on this route (his numbering):** (1) Veritas Gate 1 is already PASS on this
+> WP boundary — **do not reopen Veritas** absent a material executable change. (2) There is no open
+> PR; create the ONE BUILD-015 PR. (3) Establish CI on the exact PR head; **the known AsdAIr
+> integration failure is INHERITED BASELINE — no CI-repair side quest** to make this WP look green.
+> (4) If the canonical merge-check route can distinguish the inherited failure and proceed
+> legitimately, use it. (5) **If `mergeCheck.mjs` hard-requires green CI and blocks on the inherited
+> baseline: STOP and hand Warwick that exact gate.** No bypass, no bare `reviewDiff.mjs`, no silent
+> redefinition of the assurance rule. (6) **Codex must be Tower-visible through `mergeCheck.mjs`** —
+> the prior route-selection recurrence is already banked as 4F evidence; do not repeat it. (7) After
+> merge, **do not assume runtime activation**: establish the canonical merged SHA, the runtime
+> process start, the runtime source/cwd/launcher lineage as far as executable evidence permits, and
+> that the new card code is genuinely live. (8) **Next-slice findings are not touched yet** — durable
+> human learning / intent promotion, `substitutes_allowed` continuity loss, invariant-D candidate
+> evidence, BOB, browser-shopping-method recovery. They belong in the §12 handback.
+>
+> **Larry's record, not Warwick's words:** the fresh-session bootstrap of 2026-08-09 established one
+> operational fact the rotation record did not carry — **no AsdAIr pipeline runtime process was
+> running at all** (only ShopperBot, PID 14376). The scheduled task `MyPKA-AsdAIr-Runtime` is
+> **logon-triggered only** (`MSFT_TaskLogonTrigger`, 30 s delay; last run 2026-08-08 23:54:59,
+> result 0). That is precisely why Warwick's amendment makes the runtime start an explicit acceptance
+> step rather than an assumed consequence of merging. CI at the branch head was **failure**
+> (`asdair-tests`, run 31281191826, 2026-08-08T22:13:29Z) — the inherited integration red.
+>
+> **Superseded by this amendment:** the "PENDING WARWICK'S CHOICE" framing below, option (a) and its
+> still-live variant (a′), and the recommendation language. They are retained as the record of how
+> the decision was reached. **Option (a′) is now PROHIBITED, not merely un-chosen.**
+
+### ⛔ HISTORICAL — how the choice was framed at rotation, 2026-08-08 ~23:50. Settled by the amendment above. Directs nothing.
 
 **Where the WP stands (everything below is banked and pushed on this branch):** source complete at
 `7db899b` · Veritas Gate 1 **PASS** (all 8, mutation-tested) · **migration 016 APPLIED to the live
