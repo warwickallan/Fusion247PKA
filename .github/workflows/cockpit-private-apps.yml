@@ -97,10 +97,9 @@ jobs:
       - name: CAPAE read layer and the attention derivation behind Home and System
         run: node services/cockpit/capae-check.mjs
 
-      # Same reasoning: the rotation-report read layer holds the "a SQL NULL never becomes zero"
-      # property, and it was likewise only ever run by hand.
-      - name: Rotation reports — NULL never becomes zero
-        run: node services/cockpit/rotation-report-check.mjs
+      # (`rotation-report-check.mjs` is NOT added here — it already runs below as "Rotation reports
+      #  map NULL and zero as different values". I added a second, identical step; Veritas caught the
+      #  duplication. One command, one step.)
 
       # db.mjs once named ONE checkout for both its pg import and its credentials default, so a
       # Cockpit started from any other checkout silently borrowed the live clone's dependencies AND

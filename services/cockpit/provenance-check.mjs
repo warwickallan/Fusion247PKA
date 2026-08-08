@@ -150,14 +150,35 @@ const seenStates = new Set();
 
   // And it does not need to be inside a repository at all: the same bytes in a plain directory must
   // produce the same digest.
-  const copy = mktmp('prov-copy-');
-  // mkdir the destination PARENT first. `SOURCE_MODULES` is no longer flat: `capae.mjs` imports the
-  // governor's brief across trees to hold one selection contract, so the list now legitimately
-  // contains `../../tools/governor/capae-brief.mjs`. A bare copyFileSync threw ENOENT on it and took
-  // this whole gate down — the module was correctly added to the digest and the HARNESS was what
-  // could not cope. Relative entries are normal now; this loop handles any depth.
+  // THE COPY ROOT IS NESTED TWO LEVELS DEEP, AND THAT IS THE WHOLE FIX.
+  //
+  // `SOURCE_MODULES` is no longer flat: `capae.mjs` imports the governor's brief across trees to
+  // hold one selection contract, so the list legitimately contains
+  // `../../tools/governor/capae-brief.mjs`. Mirroring the real `services/cockpit/` depth means that
+  // entry resolves to `<root>/tools/governor/…` — INSIDE the isolation directory, exactly as it
+  // resolves inside the repository.
+  //
+  // ⚠️ TWO EARLIER ATTEMPTS FAILED, AND THE SECOND FAILED SILENTLY ON THIS HOST.
+  //   1. A bare `copyFileSync` threw ENOENT — visible, harmless.
+  //   2. Adding `mkdirSync(dirname)` against a FLAT copy dir let `../../` escape the temp root by
+  //      two levels. On Linux CI that is `mkdir /tools/governor` → EACCES and a red run. On Windows
+  //      `os.tmpdir()` is deep enough that it SUCCEEDED, writing a real file into
+  //      `%LOCALAPPDATA%\tools\governor\` that cleanup never removed — and hashing that module from
+  //      a path OUTSIDE the isolated copy, quietly narrowing what this assertion exercises while its
+  //      text stayed identical. Veritas caught it; a local exit 0 is what produced it.
+  //
+  // The containment assertion below is the guard that makes a third variant impossible.
+  const copyRoot = mktmp('prov-copy-');
+  const copy = path.join(copyRoot, 'services', 'cockpit');
+  fs.mkdirSync(copy, { recursive: true });
+  const escaped = SOURCE_MODULES.filter((m) => {
+    const dest = path.resolve(copy, m);
+    return !dest.startsWith(path.resolve(copyRoot) + path.sep);
+  });
+  ok('⭐ every copied module lands INSIDE the isolation directory (no `../` escape)',
+    escaped.length === 0, escaped.join(', ') || 'none escape');
   for (const m of SOURCE_MODULES) {
-    const dest = path.join(copy, m);
+    const dest = path.resolve(copy, m);
     fs.mkdirSync(path.dirname(dest), { recursive: true });
     fs.copyFileSync(path.join(DIR, m), dest);
   }
