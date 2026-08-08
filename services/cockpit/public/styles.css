@@ -446,7 +446,10 @@ button { font-family:inherit; }
 .rr-chip.t-prominent, .cap-line.t-prominent { background:var(--warn-w); color:var(--ink2); border-color:var(--warn); }
 .rr-chip.t-positive, .cap-alert.t-positive, .cap-line.t-positive { background:var(--ok-w); color:var(--ink2); border-color:var(--ok); }
 .rr-chip.t-quiet, .cap-line.t-quiet { background:var(--panel2); color:var(--ink2); }
-.rr-chip.t-neutral { background:var(--panel2); color:var(--ink3); }
+/* --ink2, NOT --ink3: measured 3.60 light / 3.42 dark against --panel2, under the 4.5 floor for
+   normal text. This chip carries "⚠ N measurements unavailable" and the session date — content, not
+   decoration — so it takes the same ink as every other chip. */
+.rr-chip.t-neutral { background:var(--panel2); color:var(--ink2); }
 
 .rr-acts { display:flex; flex-wrap:wrap; gap:6px; margin-top:9px; }
 .rr-acts .refresh { margin-left:0 !important; }
@@ -461,7 +464,7 @@ button { font-family:inherit; }
 .rr-find.t-positive { border-left-color:var(--ok); }
 .rr-find.t-quiet, .rr-find.t-neutral { border-left-color:var(--park); }
 .rr-find-h { font-size:12px; font-weight:800; letter-spacing:.02em; color:var(--ink); }
-.rr-find-fam { font-family:var(--mono); font-size:11px; font-weight:600; color:var(--ink3); margin-left:6px; }
+.rr-find-fam { font-family:var(--mono); font-size:11px; font-weight:600; color:var(--ink2); margin-left:6px; }
 .rr-find-lead { font-size:13px; line-height:1.45; color:var(--ink2); margin-top:3px; overflow-wrap:anywhere; }
 
 /* CAPAE executive block. */
@@ -471,7 +474,7 @@ button { font-family:inherit; }
 .cap-line { margin-top:7px; padding:7px 10px; border-radius:9px; font-size:13px; line-height:1.45;
   color:var(--ink2); border:1px solid var(--hair); overflow-wrap:anywhere; }
 .cap-line b { color:var(--ink); }
-.cap-sub { font-size:12.5px; color:var(--ink3); margin-top:3px; line-height:1.4; }
+.cap-sub { font-size:12.5px; color:var(--ink2); margin-top:3px; line-height:1.4; }
 
 .cap-mark { font-size:12px; }
 .cap-why { font-size:13px; line-height:1.45; color:var(--ink2); margin-top:6px; overflow-wrap:anywhere; }
