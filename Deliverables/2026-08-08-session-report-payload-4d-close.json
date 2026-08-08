@@ -1,0 +1,65 @@
+{
+  "session_date": "2026-08-08",
+  "branch": "main",
+  "closing_head": "b52e6da",
+  "map_path": "Deliverables/2026-08-04-proofline-wayfinder-plan.md",
+  "deliverable_path": "Deliverables/2026-08-08-session-performance-report-subphase-4d-close.md",
+  "host": "claude",
+  "host_version": null,
+  "elapsed_minutes": null,
+  "total_context_tokens_in": null,
+  "total_context_tokens_out": null,
+  "total_subagent_tokens": 541355,
+  "wo_total": 0,
+  "wo_first_dispatch_success": null,
+  "wo_amendments": null,
+  "wo_refusals": null,
+  "doc_lines_changed": null,
+  "product_lines_changed": null,
+  "allocation_product_pct": null,
+  "allocation_admin_pct": null,
+  "allocation_evidence_pct": null,
+  "allocation_rework_pct": null,
+  "allocation_waiting_pct": null,
+  "specialists": [
+    { "specialist": "veritas", "dispatches": 3, "tokens": 229037, "notes": "4D phase check across three rounds: HOLD (20/22), D-1 rejected on a temp-dir escape my fix introduced, then PASS on all 22 at 7afac1d. Three genuine product corrections." },
+    { "specialist": "pax", "dispatches": 1, "tokens": 164764, "notes": "Adversarial evaluation of CAPAE as built. Found the live brief was the repo's own test fixture, the opening-brief snapshot never called, and the effectiveness fraction unrenderable." },
+    { "specialist": "nolan", "dispatches": 1, "tokens": 147554, "notes": "Independent architecture challenge. Measured CAPAE's footprint in operating law at ZERO and the brief at ~78 tokens; withdrew half of his own prior recommendation." }
+  ],
+  "findings": [
+    {
+      "family": "built-tested-never-activated",
+      "exposure": "recurrence",
+      "summary": "snapshotOpeningBrief was imported and never called, and was reported to Warwick as wired. capae-check.mjs also existed in no CI workflow at all.",
+      "evidence_ref": "Deliverables/2026-08-08-veritas-4d-phase-check-receipt.md"
+    },
+    {
+      "family": "control-cannot-reach-what-it-checks",
+      "exposure": "recurrence",
+      "summary": "The idle-ding hook tested rec.ok, a field ding.mjs has never written, and passed its own unit test against the assumed shape. capaeOverview was asserted by nothing: forcing needsAttention=true left six gates green.",
+      "evidence_ref": "Deliverables/2026-08-08-veritas-4d-phase-check-receipt.md"
+    },
+    {
+      "family": "acceptance-proves-mechanism-not-outcome",
+      "exposure": "recurrence",
+      "summary": "provenance-check.mjs was exiting 1 in CI unnoticed, and a local exit 0 was then offered as the D-1 fix when CI was the gate — the second attempt succeeded wrongly on Windows while failing on Linux.",
+      "evidence_ref": "Deliverables/2026-08-08-veritas-4d-focused-confirmation-receipt.md"
+    },
+    {
+      "family": "work-order-not-generated",
+      "exposure": "none-this-session",
+      "summary": "No real Work Order was issued this session. The three specialist commissions are reviews, not Work Orders under SOP-022, so the pilot family had no qualified opportunity. Recorded rather than left silent.",
+      "evidence_ref": "Deliverables/2026-08-08-subagent-token-ledger-4d-close.md"
+    }
+  ],
+  "unestablished": [
+    "Larry's own opening and closing context/token readings - no instrument exposed to Larry this session",
+    "elapsed session time",
+    "per-specialist tokens_in / tokens_out - the return exposes a single total only",
+    "model per specialist - not exposed in the Agent return",
+    "documentation-versus-product change volume - left to Pax, who can compute it from the commit range",
+    "evidenced allocation across product/admin/assurance/rework/waiting - left to Pax",
+    "record-amended-body-not-recut exposure disposition - deliberately NOT self-awarded by Larry; Pax grades it"
+  ],
+  "notes": "Sub-phase 4D CLOSED on Veritas PASS: all 22 acceptance items at 7afac1d, CI 31257962740 green with zero skipped steps, after three review rounds and three genuine product corrections. Findings above are the recurrences Larry can evidence against himself; the clean/recurrence judgement on record-amended-body-not-recut is deliberately left to Pax under step 5c, because awarding one's own clean exposure is exactly what Larry may not do. Pax's report is OUTSTANDING at rotation and is named here and on the map rather than left silent."
+}
