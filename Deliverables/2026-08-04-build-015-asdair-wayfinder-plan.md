@@ -614,7 +614,18 @@ recorded as leading candidate for the next slice.**
 
 **IMPLEMENTATION POSITION, 2026-08-08 late:** Keel's Work Order `WO-2026-08-08-B15-01` (envelope
 route, read-back held and accepted with the AC4 route-(a) amendment) returned COMPLETED —
-**integrated at `7db899b` and submitted to Veritas for assurance.** Source-level ACs met with
+integrated at `7db899b`, and **Veritas Gate 1 returned PASS on all eight requirements**
+(independently re-executed 389 subtests; three capability mutations red-then-restored-green;
+receipt: [[Deliverables/2026-08-08-veritas-wp-b15-1-gate1-receipt]]). **Recorded residuals (her
+D1, non-blocking, discharged here):** (a) the card's `humanTime` renders UTC — the household is on
+BST, so card times read an hour off local until a display decision is taken; (b) 7 pre-existing
+env-shaped `skill` local test failures, identical pre/post, `skill/**` untouched. **The
+old-brain→Supabase continuity audit is BANKED:**
+[[Deliverables/2026-08-08-pax-old-brain-continuity-audit]] — stock preserved and enriched, flow
+lost (the "never asked again" promise is structurally unmeetable; Ariel Pods re-asked live
+2026-08-03), plus the F-fact that `substitutes_allowed=false` for ALL 103 regulars flattened the
+old 9-of-36 allow-substitutes knowledge. Its §E recommendation: the next slice is durable human
+learning / intent promotion, not invariant-D retention. Source-level ACs met with
 builder self-evidence (pipeline 205/205, bot 156/156, intake 28/28 executed; surface secret scan
 clean; migration `db/016_shop_source_image.sql` AUTHORED, NOT applied; `approve` action distinct
 from the pre-existing `confirm`). **The live halves are explicitly NOT claimed** — the §11
