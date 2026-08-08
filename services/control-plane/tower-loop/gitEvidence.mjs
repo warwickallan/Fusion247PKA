@@ -21,7 +21,14 @@ const DEFAULT_TIMEOUT_MS = 30_000;
 // truncation notice understated the unseen remainder by 6.2%. A cap that lies about its own
 // unit is bad; a durable RECORD that understates how much the reviewer did not see is worse,
 // because the packet is transient and the record is not. The cap value is unchanged.
-export const MAX_DIFF_BYTES = 60_000;
+// WO-2026-08-08-4C-14 — the cap is now OVERRIDABLE via TOWER_MAX_DIFF_BYTES, default unchanged
+// at 60,000. Reason, recorded because a raised cap must never become the silent default: the
+// BUILD-020 4C merge-class review delivered Codex 60,000 of 1,050,971 bytes — 5.7% of the change —
+// and it correctly refused to clear findings it could not see. A reviewer asked to judge an
+// implementation it was never shown is not an independent check; it is a formality. The default
+// stays low because most reviews do not need more; the override exists so a large, genuinely
+// merge-class change can be delivered in full rather than the reviewer being blamed for the gap.
+export const MAX_DIFF_BYTES = Number(process.env.TOWER_MAX_DIFF_BYTES ?? 60_000);
 
 /**
  * Largest cut index <= max that does NOT land inside a multibyte UTF-8 sequence.
