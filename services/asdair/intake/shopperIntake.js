@@ -53,6 +53,7 @@ import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 
 const DEFAULT_API_BASE = 'https://api.telegram.org';
 
@@ -359,6 +360,26 @@ export function buildTextPayload(verdict) {
  */
 export function buildPhotoPayload(verdict, imageRef) {
   return { kind: 'photo', imageRef };
+}
+
+/**
+ * PURE. The immutable content fingerprint of one downloaded image.
+ *
+ * WP-B15-1 invariant C: a shop must be bound to the exact CONTENT of the
+ * photograph it was read from, not merely to a mutable file path plus Telegram
+ * identifiers. Computed HERE, at intake, from the exact buffer that is written
+ * to the media store - the one moment the bytes are provably in hand - and
+ * carried on the record's meta so the pipeline can persist it beside the shop
+ * before the Telegram offset is acknowledged. Downstream consumers read the
+ * STORED value; nothing recomputes it from a path.
+ *
+ * Lowercase hex SHA-256. Deterministic: same bytes, same fingerprint, forever.
+ */
+export function imageFingerprintOf(bytes) {
+  if (!Buffer.isBuffer(bytes)) {
+    throw new Error('imageFingerprintOf: a Buffer of the downloaded image bytes is required');
+  }
+  return createHash('sha256').update(bytes).digest('hex');
 }
 
 /**
@@ -764,7 +785,11 @@ async function buildRecord(verdict, { telegram, media, dryRun, now }) {
   return {
     sourceId: verdict.sourceId,
     payload: buildPhotoPayload(verdict, imagePath),
-    meta: { ...photoMeta, imagePath, bytes: bytes.length },
+    // `imageSha256` rides META, not the payload: the payload contract is
+    // EXACTLY a resolvePayload shape ({ kind:'photo', imageRef }) and stays so.
+    // Hashed from the same buffer `media.save` just wrote, so the fingerprint
+    // and the stored file cannot disagree at the moment of capture.
+    meta: { ...photoMeta, imagePath, bytes: bytes.length, imageSha256: imageFingerprintOf(bytes) },
   };
 }
 

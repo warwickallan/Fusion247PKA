@@ -151,6 +151,25 @@ export async function receiveList(spec, deps) {
   const shop = created.shop;
   const sourceId = spec.sourceId || sourceIdFor(shop);
 
+  // ── THE EXACT-SOURCE IMAGE BINDING (WP-B15-1 invariant C) ─────────────────
+  // The content hash intake computed from the exact downloaded bytes, persisted
+  // beside the shop INSIDE the same durability-before-ack boundary (receiveList
+  // runs inside intake's onRecord, before the Telegram offset moves). The
+  // PRIMARY KEY makes this first-write-wins: a redelivery RESUMES the shop and
+  // adopts the original binding, never overwrites it. A photo shop with no
+  // fingerprint (pre-fingerprinting intake, or a non-Telegram entry path)
+  // simply gets no row - the confirmation card renders that absence honestly
+  // rather than this code inventing a value.
+  if (sourceKind === 'photo' && typeof spec.imageFingerprint === 'string' && spec.imageFingerprint.length > 0) {
+    await store.recordSourceImage(deps, {
+      shopId: shop.id,
+      fingerprint: spec.imageFingerprint,
+      algo: 'sha256',
+      byteLength: Number.isFinite(Number(spec.imageByteLength)) ? Number(spec.imageByteLength) : null,
+      capturedAt: spec.receivedAt ?? null,
+    });
+  }
+
   // The receive itself is a LATCH: it is a permanent fact about this shop, kept
   // so "where did this week come from, and who sent it?" is answerable later.
   const recorded = await record(deps, {

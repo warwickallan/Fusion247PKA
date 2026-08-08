@@ -215,6 +215,10 @@ export function createFakeDatabase(seed = {}) {
     shop_event: [],
     shop_question: [],
     shop_line: [],
+    // asdair.shop_source_image (migration 016) - the exact-source image
+    // binding. PRIMARY KEY on shop_id IS the first-write-wins idempotency, so
+    // it is modelled as a real unique index below, not as a convenience map.
+    shop_source_image: [],
     browser_build_request: [],
     pending_action: [],
     pipeline_command: [],
@@ -463,6 +467,49 @@ export function createFakeClient(store, options = {}) {
           for (const l of lines) out.push(projectQuestionRow(projection, q, li, l));
         });
       return rows(out);
+    }],
+
+    // ── asdair.shop_source_image (migration 016 - exact-source binding) ────
+    // PRIMARY KEY (shop_id) + the three CHECKs, so a test cannot write a row
+    // Postgres would refuse, and a second insert for the same shop writes
+    // nothing - which is the first-write-wins property the writer relies on.
+    [/^INSERT INTO asdair\.shop_source_image \(shop_id, fingerprint, algo, byte_length, captured_at\) VALUES/i, (sql, p) => {
+      const row = {
+        shop_id: p[0], fingerprint: p[1], algo: p[2] ?? 'sha256',
+        byte_length: p[3] ?? null, captured_at: p[4] ?? nowIso(),
+      };
+      if (typeof row.fingerprint !== 'string' || !/^[0-9a-f]{16,128}$/.test(row.fingerprint)) {
+        throw new Error('fakePg: CHECK shop_source_image_fingerprint_shaped violated');
+      }
+      if (row.algo !== 'sha256') {
+        throw new Error('fakePg: CHECK shop_source_image_algo_known violated');
+      }
+      if (row.byte_length !== null && !(Number.isInteger(Number(row.byte_length)) && Number(row.byte_length) > 0)) {
+        throw new Error('fakePg: CHECK shop_source_image_bytes_sane violated');
+      }
+      if (db.shop_source_image.some((r) => String(r.shop_id) === String(row.shop_id))) return none();
+      db.shop_source_image.push(row);
+      return rows([row]);
+    }],
+    [/FROM asdair\.shop_source_image WHERE shop_id = \$1/i, (sql, p) =>
+      rows(db.shop_source_image.filter((r) => String(r.shop_id) === String(p[0])))],
+    // store.findPriorPhotoShop - the newest earlier photo shop, LEFT JOINed to
+    // its binding. Modelled as a real LEFT JOIN: no binding yields the shop row
+    // with null fingerprint/captured_at, never a dropped row.
+    [/FROM asdair\.shop s\s+LEFT JOIN asdair\.shop_source_image i ON i\.shop_id = s\.id\s+WHERE s\.household_id = \$1 AND s\.source_kind = 'photo' AND s\.id < \$2 ORDER BY s\.id DESC LIMIT 1/i, (sql, p) => {
+      const hits = db.shop
+        .filter((s) => String(s.household_id) === String(p[0]) && s.source_kind === 'photo'
+          && Number(s.id) < Number(p[1]))
+        .sort((a, b) => b.id - a.id)
+        .slice(0, 1)
+        .map((s) => {
+          const i = db.shop_source_image.find((r) => String(r.shop_id) === String(s.id)) || null;
+          return {
+            id: s.id, shop_ref: s.shop_ref, created_at: s.created_at,
+            fingerprint: i ? i.fingerprint : null, captured_at: i ? i.captured_at : null,
+          };
+        });
+      return rows(hits);
     }],
 
     // ── asdair.rule_qa_log ─────────────────────────────────────────────────

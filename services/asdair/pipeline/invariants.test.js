@@ -378,12 +378,17 @@ test('NEVER DELETES: no module here emits a DELETE, TRUNCATE or DROP', () => {
 });
 
 test('this work package owns ONE folder: it emits SQL for shop_line and pipeline_command, and reads everything else', () => {
-  // The only tables this pipeline WRITES directly are the two that arrived for
+  // The only tables this pipeline WRITES directly are the ones that arrived for
   // exactly this stage and have no other owner:
-  //   asdair.shop_line        migration 008 - the durable interpretation
-  //   asdair.pipeline_command migration 009 - the machine ledger
+  //   asdair.shop_line         migration 008 - the durable interpretation
+  //   asdair.pipeline_command  migration 009 - the machine ledger
+  //   asdair.shop_source_image migration 016 - the exact-source image binding
+  //                            (WP-B15-1; owned by pipeline/store.js by ruling
+  //                            on WO-2026-08-08-B15-01 - the shop-row INSERT
+  //                            allowlist is frozen and owned elsewhere, so the
+  //                            binding lives in a side table this stage owns)
   // Everything else is written through the component that owns it.
-  const OWNED = ['asdair.shop_line', 'asdair.pipeline_command'];
+  const OWNED = ['asdair.shop_line', 'asdair.pipeline_command', 'asdair.shop_source_image'];
   const writers = shippingFiles()
     // The backfill is the ONE deliberate exception - retiring the legacy
     // pending_action rows IS its job, and the test below governs it instead.
