@@ -224,9 +224,9 @@ and deleted.** Its rows are retained struck-through as evidence of the 2026-08-0
 |---|---|
 | Source authority | **Canonical `main`.** All BUILD-015 source, this map, the build record and all four+1 assurance receipts live on `main`. No BUILD-015 branch exists |
 | Gate 3 position | **THREE reviews, all HOLD.** Live receipt: `veritas-gate3-truth-94f135f.md` — `D-G3-21`–`24` never corrected, `D-G3-26` open Warwick decision. Enumerate `Builds/BUILD-015-…/Assurance/` rather than trusting this row |
-| CI | **`asdair-tests.yml` is RED at its most recent run** — 2026-08-08, head `eb03696` (the 4C merge): `unit` job PASSED, `integration` job FAILED at *"clean Postgres → schema → seed → data.js → planner.js"* with an `AssertionError`. **The workflow is path-filtered: later non-asdair commits produce NO run, and an unrun workflow looks exactly like a green one. Check the last run PER WORKFLOW.** Root cause UNESTABLISHED — a live candidate is fog item 3 (migrations 013/014 missing from the repo, so a clean Postgres cannot reproduce live schema) |
-| Live runtime | **RUNNING, and OLDER than current source.** Verified by execution 2026-08-08: `pipeline/runtime.js --watch` (PID at probe: 40920) has run from the primary checkout `C:\Fusion247PKA` **since 2026-08-03 21:31** — it predates every 2026-08-04 seven-workstream fix and is executing pre-fix bytes from memory. The ShopperBot server process started 2026-08-04 02:37, also pre-fix. Scheduled task `MyPKA-AsdAIr-Runtime` is **Ready** — `ACTIVATION-DEFERRED.md`'s "registered Disabled, not armed" is STALE. **Restarting these processes is a runtime action belonging to post-jump BUILD-015 work — 4E changes nothing live** |
-| Live database | **UNVERIFIABLE from this reconciliation** — `live_authority: none` throughout this map. Migrations directory still stops at `012_complete_grant_matrix.sql`; 013/014 remain applied-live-only (fog item 3, still true 2026-08-08) |
+| CI | ~~Root cause UNESTABLISHED~~ **RE-CUT at the bootstrap (2026-08-08 late): `asdair-tests.yml`'s `integration` job has NEVER passed in its recorded history (12/12 runs failed, 2026-08-05→08). Exact failure identified: `skill/test/integration.dbtest.js:266` — seeded `widget b` (household-scoped term match) plans `needs_decision` where the test requires `add`; the divergence is in the real `data.js` adapter ↔ planner contract, which unit fixtures never exercise. INHERITED BASELINE BREAKAGE — predates all 4E/bootstrap work. Do not weaken the assertion; the fix is routed work.** The path-filter warning stands: an unrun workflow looks exactly like a green one — check the last run PER WORKFLOW. Detail: [[Deliverables/2026-08-08-b15-bootstrap-evidence]] §3 |
+| Live runtime | ~~RUNNING, and OLDER than current source~~ **RE-CUT — ALIGNED at the bootstrap (2026-08-08 ~21:50–21:55), on Warwick's §4 authority:** `runtime.js --watch` restarted via the canonical scheduled-task launcher (PID 13756, absolute canonical entrypoint) and cockpit-api restarted detached (PID 14376, canonical WorkingDirectory, port 8710 LISTENING). **Both now execute canonical source `959a64b` — the first live processes ever to carry the 2026-08-04 seven-workstream fixes.** No shop_event row appeared after the restarts (verified) — the alignment changed no shopping state. Known liability recorded once: **cockpit-api has no launcher/task; its start is manual.** Scheduled task `Ready`; `ACTIVATION-DEFERRED.md`'s "Disabled, not armed" remains STALE. Detail: [[Deliverables/2026-08-08-b15-bootstrap-evidence]] §2 |
+| Live database | ~~UNVERIFIABLE from this reconciliation~~ **RE-CUT — ESTABLISHED read-only at the bootstrap (2026-08-08, `asdair_ro`, SELECTs only):** 26 live tables vs 23 repo-defined — **live-only: `command_request`, `previously_ordered`, `skill_steps` (the migration debt, now named); no packet table (015 never applied).** Rules: 40 by directive (exclude 3 · info 24 · map 10 · needs_decision 2 · rotate 1) — rule 32 is now a structured `rotate` WITH match_term; rule 10 (never-BOB) is still inert `info` while regular 69 (Arla BOB) is ACTIVE — fog 2 CONFIRMED LIVE. Regulars: 103/103 active, `source`={regular} only — fog 5 RESOLVED (no live Favourites source). **Real journey rows exist: 3 shops; shop 6 (2026-08-03) interpreted 35 lines against a 97-product catalogue, answered all 11 questions, replanned — and has sat at `PROCESSING` ever since: parked on the interpretation-confirmation gate (`needs_review=true`, zero confirm commands ever in `pipeline_command` — break 8 below), NOT the packet seam as first attributed.** Detail: [[Deliverables/2026-08-08-b15-bootstrap-evidence]] §4–§5 |
 | Suites | Not re-run during 4E (documentation-only phase). The last committed local claim is the 2026-08-04 green at 1,599–1,609; **the CI row above is newer and redder — believe it** |
 
 **Verified assets — real, tested, and reachable from something:** the intake receiver, shop state
@@ -243,9 +243,12 @@ caller — `handoff/buildHandoff.js` — **but `handoff/` itself has zero non-te
 The chain plan → packet → Sonnet handoff artefact exists and is tested, and **nothing in the
 production journey invokes it. A tested module with no caller is not delivered.**
 
-**The standing risk, stated as the risk it is: no row has ever been written to Postgres by this
-journey.** All three skipped tests are the destructive Postgres tests gated on
-`ASDAIR_DB_TEST_ALLOW_DESTRUCTIVE`. The `RESUMABILITY` tests build a fresh deps container over the
+**The standing risk, re-stated with its scope (precision added at the 2026-08-08 bootstrap): no row
+has ever been written to Postgres by the TESTED journey** — all three skipped tests are the
+destructive Postgres tests gated on `ASDAIR_DB_TEST_ALLOW_DESTRUCTIVE`, and that remains true.
+**The LIVE journey has real rows** (3 shops; shop 6's full trail through interpretation, questions
+and replan — see [[Deliverables/2026-08-08-b15-bootstrap-evidence]] §5), written during the
+manually-rescued 2026-08-03 run. Both halves are true; the original sentence stated only the first. The `RESUMABILITY` tests build a fresh deps container over the
 **same in-memory JS object graph** — which proves no state hides in the container, **not** that
 anything survives process death.
 
@@ -298,6 +301,9 @@ Each is settled. **Do not re-open one; point at it.**
 | **Exact-source-photograph provability is a product requirement** (fingerprint, intake ID, line counts, packet fingerprint — the wrong-week incident is the reason) | Warwick, 2026-08-08 — commission mirror §6C |
 | **Grounded candidate evidence is constrained, not discarded**; deterministic matches win, Terra ranks only supplied candidates, close calls become a human question | Warwick, 2026-08-08 — commission mirror §6D |
 | **First post-jump mission and sequence**: grounded-vision / earliest-broken-link investigation → one bounded Pax investigation → ONE proposed Active Session Work Package → one bounded Nolan review → Warwick decision → only then implementation | Warwick, 2026-08-08 — commission mirror §11–§12, §23 |
+| **WP-B15-1 APPROVED — items 1+2 only; item 3 OUT** (leading candidate for the next slice, subject to the household-knowledge audit). Narrow item-2 migration authority granted with conditions. Binding acceptance = the real production event list | Warwick, 2026-08-08 — [[Deliverables/2026-08-08-asda-build-002-SOURCE]] §1–§3, §11 |
+| **BOB ruling — CLOSED, not a contradiction: KEEP rule 10 (never BOB).** BOB's presence in ASDA Regulars/Favourites is **external platform evidence, not household intent** — Mum switched to Cravendale over end-of-date milk. **Principle carried into the knowledge model: external platform list membership never silently outranks an explicit current household rule/decision.** Do not "clean" ASDA's lists | Warwick, 2026-08-08 — [[Deliverables/2026-08-08-asda-build-002-SOURCE]] §5, §7 |
+| **Retained-photograph ruling**: shop 6's exact photo is approved for the "what Terra receives" demonstration IFF its provenance is provable from the durable production record; otherwise the recorded answer is NO APPROVED RETAINED PHOTOGRAPH ESTABLISHED — never substitute another week's | Warwick, 2026-08-08 — [[Deliverables/2026-08-08-asda-build-002-SOURCE]] §4 |
 
 ## 5. UNRESOLVED FOG AND CONTRADICTIONS
 
@@ -307,22 +313,35 @@ source.**
 1. **The `sure`-variant conflict — three artefacts disagree.** `skill/planner.js:524` returns
    `fixed_variant_conflict`; `services/asdair/db/007_rules_rotate_directive.sql`'s header states the
    household holds a real conflict and that the migration does not resolve it; `ACTIVATION-DEFERRED.md`
-   calls it *"Real, unresolved."* **Establish which is true against the live rules table.**
-   `UNVERIFIABLE OFFLINE`. **The separate three-way reading Warwick already closed is retracted and
-   settled — this is not that, and it does not re-open it.**
+   calls it *"Real, unresolved."* ~~Establish which is true against the live rules table.
+   `UNVERIFIABLE OFFLINE`.~~ **PARTIALLY RESOLVED BY EXECUTION 2026-08-08 (read-only):** the live
+   rules table now holds Sure as a structured family — rule 13 `info`, rules 23/24 `map` (male→blue,
+   female→white), **rule 32 a structured `rotate` WITH `match_term`** (no longer inert info), rule
+   37 `info` (multibuy rounding). Whether the planner actually actions `rotate` end-to-end is
+   still for the routed investigation. **The separate three-way reading Warwick already closed is
+   retracted and settled — this is not that, and it does not re-open it.**
 2. **`Arla BOB Semi-Skimmed 2L` (regular 69) is ACTIVE while rule 10 says never buy BOB**, and rule
    10 is `info` with no `match_term`, so nothing enforces it. The old reasoning that `milk` resolved
    safely *because regular 69 carries no alias* was written when matching was exact-string. **Matching
    is now tolerant, so the reason that safety held may no longer hold.** More urgent, not less.
-   `UNVERIFIABLE OFFLINE`.
+   ~~`UNVERIFIABLE OFFLINE`.~~ ~~CONFIRMED LIVE 2026-08-08: … a genuine product question.~~
+   **CLOSED BY WARWICK'S RULING, 2026-08-08 (same day):** not a contradiction. **KEEP rule 10**;
+   BOB in ASDA Regulars/Favourites is external platform evidence (ASDA controls those surfaces),
+   not current household intent — Mum switched to Cravendale over end-of-date milk. The structural
+   half survives as engineering fact, not open question: rule 10 is `info` with no `match_term`,
+   so nothing yet ENFORCES the ruling in the planner — that belongs to routed knowledge-model
+   work, guided by the audit. Authority:
+   [[Deliverables/2026-08-08-asda-build-002-SOURCE]] §5, §7.
 3. **Migrations 013 and 014 were applied live and have no committed files.** `services/asdair/db/`
    stops at `012_complete_grant_matrix.sql` — verified by listing. **The live database is ahead of
    the repository, and a fresh clone or bootstrap restore does not reproduce live state.**
 4. **The producer's actual database role is unverified**, and it is the highest-risk unknown before
    any live migration application. `UNVERIFIABLE OFFLINE`.
-5. **Whether Favourites is genuinely a distinct source view.** `asdair.regulars` holds one distinct
-   `source` value; no `'favourite'` row has ever existed, so `source_view: "favourites"` is a forward
-   contract describing nothing live. `UNVERIFIABLE OFFLINE`. Product intent is Warwick's — §7 item 2.
+5. **Whether Favourites is genuinely a distinct source view.** ~~`UNVERIFIABLE OFFLINE`.~~
+   **RESOLVED BY EXECUTION 2026-08-08 (read-only): `asdair.regulars` = 103 rows, all active, and
+   `source` holds exactly `{regular}` — no `'favourite'` row exists. `source_view: "favourites"`
+   remains a forward contract describing nothing live.** Product intent is still Warwick's — §7
+   item 2 (human dependency 2) stands.
 6. **A `BUILD-002 live proof` test row is recorded as still sitting in a `next_week_draft` list.**
    `UNVERIFIABLE OFFLINE`.
 7. **A corrected record may not reach a fresh agent. UNEXPLAINED — three observations across three
@@ -549,7 +568,102 @@ begins only after the prepared sequence below reaches Warwick's decision at step
 catalogue-grounded interpretation with no Larry in the execution path — and what, from executable
 evidence, is the earliest link in the journey that still cannot happen in production?*
 
-### 🎯 THE EXACT FIRST ACTION — execution-based bootstrap. It deliberately self-invalidates stale preparation assumptions.
+### 🎯 THE ONE CURRENT NEXT ACTION — route DECIDED by Warwick, 2026-08-09. **MERGE-FIRST. WP-B15-1 remains NOT COMPLETE until the real live acceptance event happens.**
+
+> **AMENDMENT — Warwick, 2026-08-09.** Verbatim ruling, mirrored at
+> [[Deliverables/2026-08-09-warwick-route-decision-merge-first-SOURCE]]:
+>
+> > "Do NOT take option (a′). Do NOT install `node_modules` into `C:\Fusion247PKA-b15` merely to
+> > resurrect the special acceptance launcher. Do NOT engineer around the failed worktree runtime
+> > path. Proceed MERGE-FIRST, with one amendment: **The post-merge canonical runtime start is now
+> > an EXPLICIT acceptance step. Do not assume the logon-triggered scheduled task will restart it.**"
+>
+> **The decided route, in order:** `build-015/grounded-recognition` → ONE PR to `main` → establish
+> CI truth on the EXACT PR head → Tower-visible Codex merge-check via the canonical `mergeCheck.mjs`
+> route → Warwick `merge-decision` → merge → **explicitly start/restart the canonical AsdAIr runtime
+> from `C:\Fusion247PKA`** → prove by execution that the running process consumes merged canonical
+> bytes → shop 6 reaches the new confirmation surface → real ShopperBot card → real Warwick tap on
+> "Confirm this reading" → observe `needs_review` clear / replan / resulting shop state → §12 handback.
+>
+> **Warwick's boundaries on this route (his numbering):** (1) Veritas Gate 1 is already PASS on this
+> WP boundary — **do not reopen Veritas** absent a material executable change. (2) There is no open
+> PR; create the ONE BUILD-015 PR. (3) Establish CI on the exact PR head; **the known AsdAIr
+> integration failure is INHERITED BASELINE — no CI-repair side quest** to make this WP look green.
+> (4) If the canonical merge-check route can distinguish the inherited failure and proceed
+> legitimately, use it. (5) **If `mergeCheck.mjs` hard-requires green CI and blocks on the inherited
+> baseline: STOP and hand Warwick that exact gate.** No bypass, no bare `reviewDiff.mjs`, no silent
+> redefinition of the assurance rule. (6) **Codex must be Tower-visible through `mergeCheck.mjs`** —
+> the prior route-selection recurrence is already banked as 4F evidence; do not repeat it. (7) After
+> merge, **do not assume runtime activation**: establish the canonical merged SHA, the runtime
+> process start, the runtime source/cwd/launcher lineage as far as executable evidence permits, and
+> that the new card code is genuinely live. (8) **Next-slice findings are not touched yet** — durable
+> human learning / intent promotion, `substitutes_allowed` continuity loss, invariant-D candidate
+> evidence, BOB, browser-shopping-method recovery. They belong in the §12 handback.
+>
+> **Larry's record, not Warwick's words:** the fresh-session bootstrap of 2026-08-09 established one
+> operational fact the rotation record did not carry — **no AsdAIr pipeline runtime process was
+> running at all** (only ShopperBot, PID 14376). The scheduled task `MyPKA-AsdAIr-Runtime` is
+> **logon-triggered only** (`MSFT_TaskLogonTrigger`, 30 s delay; last run 2026-08-08 23:54:59,
+> result 0). That is precisely why Warwick's amendment makes the runtime start an explicit acceptance
+> step rather than an assumed consequence of merging. CI at the branch head was **failure**
+> (`asdair-tests`, run 31281191826, 2026-08-08T22:13:29Z) — the inherited integration red.
+>
+> **Superseded by this amendment:** the "PENDING WARWICK'S CHOICE" framing below, option (a) and its
+> still-live variant (a′), and the recommendation language. They are retained as the record of how
+> the decision was reached. **Option (a′) is now PROHIBITED, not merely un-chosen.**
+
+### ⛔ HISTORICAL — how the choice was framed at rotation, 2026-08-08 ~23:50. Settled by the amendment above. Directs nothing.
+
+**Where the WP stands (everything below is banked and pushed on this branch):** source complete at
+`7db899b` · Veritas Gate 1 **PASS** (all 8, mutation-tested) · **migration 016 APPLIED to the live
+household DB** under Warwick's §3 authority (pre-notified, ding 424; schema proven read-only
+after: `asdair_ro` SELECT-only, no UPDATE/DELETE for anyone) · both Pax audits banked · runtime
+currently running CANONICAL MAIN bytes (restored; the card code is NOT live yet).
+
+**THE BLOCKER, named honestly (`permission`):** the auto-mode classifier denies Larry starting the
+acceptance runtime (a process start carrying secrets-store env-file arguments — twice denied;
+worked around by NOTHING, per the guard's intent). **Warwick has two options, dinged to him
+(425):**
+- ~~(a) he runs the committed launcher script~~ **ATTEMPTED BY WARWICK 2026-08-08 ~23:53 — FAILED,
+  mundane cause established:** the script killed the canonical runtime and the launcher then died
+  before its first log line because **a git worktree carries no `node_modules`** — the branch
+  worktree has Keel's source but not the installed dependencies. Nothing was corrupted; the
+  canonical runtime was restored via the scheduled task (PID 10192, 23:55:16). *(The log's
+  `wait:interpretation_confirmation` lines up to 23:50:52 are the OLD code's silent park — the
+  pre-existing gate with no surface, exactly break 8 — not the new card code running.)*
+- **(a′) still-live variant:** `npm install` (or `npm ci`) in the worktree's
+  `services/asdair/{pipeline,pipeline-runtime,bot,intake}` packages, then rerun the committed
+  launcher — same card-within-two-ticks outcome. Watch item unchanged: gate-clear → replan fires
+  the first-ever live `recordAnswerLearning` writes, which park the shop FAILED on any error —
+  honest acceptance evidence of the audit-predicted seam, not a card defect.
+- **(b) NOW RECOMMENDED — "merge first":** Codex merge-check on this branch through the
+  Tower-visible `mergeCheck.mjs` route → Warwick's `merge-decision` → merge → the scheduled task
+  serves the new code from canonical `main` with its existing installed dependencies — no special
+  start, no worktree deps, and the Tower conversation Warwick asked for becomes visible on the
+  route that produces it.
+
+**After the acceptance event (either route): the Asda Build 002 §12 handback** — WP outcome + real
+evidence + both audit headlines + the next-slice recommendation (both audits point at durable
+human learning / intent promotion over invariant-D retention; the going-forward act rides the new
+card). **That handback is the next genuine product decision.**
+
+**📄 SESSION REPORT — rotation 2026-08-08/09.** The payload describes session head `c4c0a41`; the
+rotation-tail commits after it (payload banking, the launch-attempt record, Pax's report fold) are
+part of this same rotation and the continuity packet names the true final tip.
+- **Report:** [[Deliverables/2026-08-08-session-performance-report-b15-session]] — ✅ **LANDED
+  BEFORE THE CLEAR and banked.** Executive CAPAE: **all four preventions held — the first
+  all-clean session since the loop began** (`built-tested-never-activated` improved under its
+  heaviest exercise; `record-amended-body-not-recut` second consecutive clean, PAX-awarded and
+  folded via `capae-sync.mjs`). The one recurrence is outside the tracked families — the Codex
+  route-selection/TowerBot class, already adjudicated by Warwick as 4F evidence. Two NEW family
+  candidates proposed for Warwick's decision (never minted by script): `channel-healthy-route-not-called`
+  and `session-meter-not-read-at-open`.
+- **Payload:** [[Deliverables/2026-08-08-session-report-payload-b15-session.json]] · **Ledger:**
+  [[Deliverables/2026-08-08-subagent-token-ledger-b15-session]] (A = 1,250,384 dedup; Larry's
+  closing context level 582.9k/1000k separate) · **Order of record:**
+  [[Deliverables/2026-08-08-wo-b15-01-order]].
+
+### The standing fresh-session bootstrap — execution-based; it deliberately self-invalidates stale preparation assumptions.
 
 **Nothing prepared before the merge may be trusted until this runs.** No SHA is written here — the
 post-merge head cannot be known while this is being written, and hardcoding one is the failure this
@@ -576,7 +690,56 @@ Then verify which 4E preparation assumptions survived: the seven-break classific
 CI-red row in §2, and the live-runtime row in §2 were all established 2026-08-08 and **each names
 its evidence so it can be re-established or falsified in minutes.**
 
-### The prepared sequence — Warwick's commission §12/§23, binding
+### ⭐ ACTIVE SESSION WORK PACKAGE — WP-B15-1, items 1+2 (approved 2026-08-08)
+
+**The prepared sequence below was EXECUTED AND DISCHARGED on 2026-08-08, in order:** step 1 the
+bootstrap ([[Deliverables/2026-08-08-b15-bootstrap-evidence]]); step 2 Pax's bounded investigation
+([[Deliverables/2026-08-08-pax-b15-grounded-vision-investigation]] — found break 8, the
+interpretation-confirmation gate, verified live); step 3 the ONE proposed WP
+([[Deliverables/2026-08-08-b15-proposed-aswp-01]]); step 4 Nolan CLEAR-WITH-OBSERVATIONS
+([[Deliverables/2026-08-08-nolan-wp-b15-1-review]]); step 5 **Warwick's decision — WP-B15-1
+items 1+2 APPROVED** ([[Deliverables/2026-08-08-asda-build-002-SOURCE]]).
+
+**The active work is now WP-B15-1** — production confirmation surface (item 1) + exact-source
+binding / wrong-week protection (item 2). **Binding acceptance is the real production event list
+in Asda Build 002 §11** — live poller card → real Telegram delivery → real tap → gate clears →
+replan → shop 6 recovers; restart-safe; no Larry and no manual DB command anywhere in the journey;
+never reported complete because code exists. **Item 3 (candidate-evidence retention) is OUT,
+recorded as leading candidate for the next slice.**
+
+**IMPLEMENTATION POSITION, 2026-08-08 late:** Keel's Work Order `WO-2026-08-08-B15-01` (envelope
+route, read-back held and accepted with the AC4 route-(a) amendment) returned COMPLETED —
+integrated at `7db899b`, and **Veritas Gate 1 returned PASS on all eight requirements**
+(independently re-executed 389 subtests; three capability mutations red-then-restored-green;
+receipt: [[Deliverables/2026-08-08-veritas-wp-b15-1-gate1-receipt]]). **Recorded residuals (her
+D1, non-blocking, discharged here):** (a) the card's `humanTime` renders UTC — the household is on
+BST, so card times read an hour off local until a display decision is taken; (b) 7 pre-existing
+env-shaped `skill` local test failures, identical pre/post, `skill/**` untouched. **The
+old-brain→Supabase continuity audit is BANKED:**
+[[Deliverables/2026-08-08-pax-old-brain-continuity-audit]] — stock preserved and enriched, flow
+lost (the "never asked again" promise is structurally unmeetable; Ariel Pods re-asked live
+2026-08-03), plus the F-fact that `substitutes_allowed=false` for ALL 103 regulars flattened the
+old 9-of-36 allow-substitutes knowledge. Its §E recommendation: the next slice is durable human
+learning / intent promotion, not invariant-D retention. Source-level ACs met with
+builder self-evidence (pipeline 205/205, bot 156/156, intake 28/28 executed; surface secret scan
+clean; migration `db/016_shop_source_image.sql` AUTHORED, NOT applied; `approve` action distinct
+from the pre-existing `confirm`). **The live halves are explicitly NOT claimed** — the §11
+production event (migration application under Warwick's §3 authority with pre-notification,
+runtime restart, real card, real tap, shop 6 recovery) is the outstanding WP acceptance.
+
+**The parallel Pax household-knowledge audit is BANKED:**
+[[Deliverables/2026-08-08-pax-supabase-household-knowledge-audit]]. Headline: static knowledge
+genuinely reaches Terra/recognition/planner (recognition is authentically grounded); **everything
+the system should learn by operating is lost or inert** — shop 6's 11 answers produced zero
+durable rows, the wired learning loop hard-codes itself ineligible (`applies_going_forward:
+false`), the 106-key purchase-frequency view is read by nothing, and rule 10 cannot structurally
+reach a decision point (never-BOB holds only by alias-curation accident on regular 4). **No
+WP-B15-1 invalidation.** One acceptance watch item: gate-clear → replan fires the first-ever live
+`recordAnswerLearning` writes, and that writer parks the shop FAILED on any error — first suspect
+if acceptance stalls after the tap. **After the §11 event and Veritas: ONE handback to Warwick
+(Asda Build 002 §12) — the next genuine product decision.**
+
+### The prepared sequence — Warwick's commission §12/§23 — ✅ DISCHARGED 2026-08-08 (record retained)
 
 1. **Fresh orientation / canonical bootstrap** — the first action above. Nothing else starts first.
 2. **ONE bounded Pax investigation** — scope FIXED: grounded vision · exact source binding ·
@@ -618,11 +781,19 @@ written to Postgres.**
 | 6 | The rulebook is not consumed — `info` rules discarded, exact-string matching, `rule_qa_log` never read | **SOURCE FIXED — NOT LIVE**, with a red flag | Rule-consumption workstream landed (`996a838`); tolerant matching in `skill/termMatch.js`; skill suite recovered green at `24a731f`. **Caveat that must not be dropped: `asdair-tests.yml`'s `integration` job — clean Postgres → schema → seed → `data.js` → `planner.js` — FAILED (AssertionError) at `eb03696`, 2026-08-08, the newest run on `main`. The full-path proof is red; root cause unestablished** |
 | 7 | Answers do not survive the week — `promoteDecision` deliberately not wired | **SOURCE FIXED — NOT LIVE** | `promoteDecision` is driven from the outcome writers (`buildAnswerLearning.js`, `recordAnswerLearning.js`, `record-shop.js` — enumerated 2026-08-08); the learning-loop tests assert an answer this week prevents the question next week against the real planner. Never exercised by a real shop |
 
-**The honest summary a fresh session should carry: zero of the seven are closed by executable
-product evidence.** Five are fixed at source and have never run live; two (the packet chain and the
-basket writer — the plan→basket half of the journey) remain OPEN in production terms. **The live
-runtime is executing pre-fix bytes.** The earliest still-broken link is therefore not yet settled by
-execution — establishing it is precisely step 2's job.
+| **8** | **The interpretation-confirmation gate has no production surface** *(found by the Step-2 investigation, 2026-08-08 — absent from Pax's original seven because the 2026-08-04 audit enumerated module-caller wiring and this gate is correctly wired in code; the missing thing is the HUMAN surface)* | **OPEN** | Every photo shop is created `needs_review=true`; `planOutcome` refuses READY_TO_SHOP without `confirmInterpretation`; the Telegram adapter has no confirm action, live Cockpit proxies are read-only, and the only confirm UI is the non-running Directus `wp-d-proof` extension; the park writes no event and queues no card. **Verified live: shop 6 `needs_review=true`; zero confirm commands in `pipeline_command`'s entire history** |
+
+**The honest summary a fresh session should carry** *(re-cut 2026-08-08 after Step 2)*: **zero of
+the eight are closed by executable product evidence.** Five are fixed at source and (since the
+bootstrap runtime alignment) now run in a live process for the first time — still unexercised by a
+real shop; three (the confirmation gate, the packet chain and the basket writer) remain OPEN in
+production terms. ~~The live runtime is executing pre-fix bytes.~~ *(Cleared at the bootstrap —
+see the Live-runtime row above.)* **The earliest still-broken link IS now settled by execution:
+break 8, the interpretation-confirmation gate** — the journey stalls there before the packet seam
+can even be reached. The proposed WP targeting it:
+[[Deliverables/2026-08-08-b15-proposed-aswp-01]] *(a PROPOSAL — active only on Warwick's Step-5
+decision)*. Pax's full brief:
+[[Deliverables/2026-08-08-pax-b15-grounded-vision-investigation]].
 
 ### Deferred verification — facts unknowable or deliberately not settled until post-merge canonical state
 

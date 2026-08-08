@@ -134,6 +134,13 @@ export async function pollIntake(deps, { intake, householdId, now, log = () => {
       telegramUpdateId: meta.updateId != null ? String(meta.updateId) : null,
       sourceId: record.sourceId,
       actor: `telegram:${meta.senderId ?? 'unknown'}`,
+      // WP-B15-1 invariant C: the immutable content hash intake computed from
+      // the exact downloaded bytes, plus the receiver's own stamp. Carried into
+      // receiveList so the binding is durable BEFORE the offset moves, in the
+      // same boundary as the shop itself. Absent on text shops, honestly.
+      imageFingerprint: record.payload.kind === 'photo' ? (meta.imageSha256 ?? null) : null,
+      imageByteLength: record.payload.kind === 'photo' ? (meta.bytes ?? null) : null,
+      receivedAt: meta.receivedAt ?? null,
     };
     received.push(await commands.receiveList(spec, deps));
   };

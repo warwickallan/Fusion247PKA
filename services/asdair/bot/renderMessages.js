@@ -218,6 +218,163 @@ export function renderQuestionCard({ shopRef, questionKey, item, note, candidate
   return { text: block(lines), reply_markup: keyboard(rows) };
 }
 
+// ── 3b. Interpretation-confirmation card ─────────────────────────────────────
+
+/** Day names for humanTime(). UTC, deterministic, no locale machinery. */
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+/** ISO-8601 timestamp, minute precision or better, optional zone suffix. */
+const ISO_TS_RE = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::\d{2}(?:\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?$/;
+
+/** PURE. Days since 1970-01-01 for a civil date (Howard Hinnant's algorithm). */
+function daysFromCivil(y, m, d) {
+  const yy = y - (m <= 2 ? 1 : 0);
+  const era = Math.floor(yy / 400);
+  const yoe = yy - era * 400;
+  const doy = Math.floor((153 * (m + (m > 2 ? -3 : 9)) + 2) / 5) + d - 1;
+  const doe = yoe * 365 + Math.floor(yoe / 4) - Math.floor(yoe / 100) + doy;
+  return era * 146097 + doe - 719468;
+}
+
+/** PURE. The exact inverse of daysFromCivil. */
+function civilFromDays(z0) {
+  const z = z0 + 719468;
+  const era = Math.floor(z / 146097);
+  const doe = z - era * 146097;
+  const yoe = Math.floor((doe - Math.floor(doe / 1460) + Math.floor(doe / 36524) - Math.floor(doe / 146096)) / 365);
+  const y = yoe + era * 400;
+  const doy = doe - (365 * yoe + Math.floor(yoe / 4) - Math.floor(yoe / 100));
+  const mp = Math.floor((5 * doy + 2) / 153);
+  const d = doy - Math.floor((153 * mp + 2) / 5) + 1;
+  const m = mp < 10 ? mp + 3 : mp - 9;
+  return { y: y + (m <= 2 ? 1 : 0), m, d };
+}
+
+/**
+ * PURE. A human-readable UTC rendering of an ISO timestamp string.
+ *
+ * "Sat 2026-08-08 20:41 UTC" - enough for a human to compare two photographs'
+ * arrival times at a glance, which is the wrong-week criterion's whole point.
+ *
+ * DELIBERATELY WITHOUT the Date constructor: this folder's purity guard
+ * (noPolling.test.js) forbids it in the pure modules, and rightly - it drags
+ * in the host clock and locale machinery. So the string is
+ * parsed and converted by calendar arithmetic instead: a `Z` or offset suffix
+ * is normalised to UTC exactly, and the weekday falls out of days-since-epoch
+ * (1970-01-01 was a Thursday). Anything unparseable - including an impossible
+ * calendar date like Feb 30, caught by the round-trip check - renders as
+ * "unknown", never as a fabricated time.
+ */
+export function humanTime(isoString) {
+  if (typeof isoString !== 'string') return UNKNOWN;
+  const m = ISO_TS_RE.exec(isoString.trim());
+  if (!m) return UNKNOWN;
+  const [, ys, mos, ds, hs, mins, zone] = m;
+  const y = Number(ys); const mo = Number(mos); const d = Number(ds);
+  const h = Number(hs); const min = Number(mins);
+  if (mo < 1 || mo > 12 || d < 1 || d > 31 || h > 23 || min > 59) return UNKNOWN;
+  const days = daysFromCivil(y, mo, d);
+  const back = civilFromDays(days);
+  if (back.y !== y || back.m !== mo || back.d !== d) return UNKNOWN; // Feb 30 etc.
+
+  let offsetMin = 0;
+  if (zone && zone !== 'Z') {
+    const zm = /^([+-])(\d{2}):?(\d{2})$/.exec(zone);
+    if (!zm) return UNKNOWN;
+    offsetMin = (zm[1] === '-' ? -1 : 1) * (Number(zm[2]) * 60 + Number(zm[3]));
+  }
+
+  const totalMin = days * 1440 + h * 60 + min - offsetMin;
+  const utcDays = Math.floor(totalMin / 1440);
+  const rem = totalMin - utcDays * 1440;
+  const civil = civilFromDays(utcDays);
+  const weekday = ((utcDays % 7) + 4 + 7) % 7; // 1970-01-01 (day 0) was Thursday (4)
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${DAY_NAMES[weekday]} ${civil.y}-${pad(civil.m)}-${pad(civil.d)} `
+    + `${pad(Math.floor(rem / 60))}:${pad(rem % 60)} UTC`;
+}
+
+/**
+ * PURE. THE INTERPRETATION-CONFIRMATION CARD (WP-B15-1) - the production
+ * surface of the needs_review gate. A photographed list is not declared ready
+ * to shop on AsdAIr's own say-so: this card shows the human WHAT was read and
+ * exactly WHICH photograph it was read from, and the Confirm tap is the
+ * deliberate act that opens the gate.
+ *
+ * ── EXACT-SOURCE BINDING, RENDERED HONESTLY ─────────────────────────────────
+ * The card names the photograph by its received time and immutable content-
+ * fingerprint prefix. A shop with no stored fingerprint (received before
+ * fingerprinting existed) says so in words - the absence is rendered, never
+ * papered over with a fabricated value.
+ *
+ * ── THE WRONG-WEEK COMPARISON IS HUMAN-READABLE, NOT A BARE HASH ────────────
+ * A hash prefix alone is not evidence a human can act on: a re-sent July
+ * photograph arrives with THIS week's received timestamp, and two hex strings
+ * differ invisibly. So the card carries the PREVIOUS photo shop's identity and
+ * received time beside this one's, and - when both fingerprints exist and are
+ * EQUAL - a loud "same photograph" warning, because identical content is the
+ * one wrong-week condition that can be stated mechanically without lying.
+ *
+ * ── NO PHYSICAL-LINE COUNT IS CLAIMED, BECAUSE NONE EXISTS ──────────────────
+ * Only the model's own line count is recorded anywhere in this system. Line
+ * completeness is verified by the HUMAN at this gate, comparing card against
+ * photograph - the card says exactly that, and never presents the interpreted
+ * count as an independent check.
+ *
+ * @param {{shopRef:string, interpretedLines?:number,
+ *          fingerprintPrefix?:string|null, fingerprintAlgo?:string|null,
+ *          receivedAt?:string|null,
+ *          priorShopRef?:string|null, priorReceivedAt?:string|null,
+ *          samePhotoAsPrior?:boolean|null}} spec
+ */
+export function renderConfirmInterpretation({
+  shopRef, interpretedLines,
+  fingerprintPrefix, fingerprintAlgo,
+  receivedAt,
+  priorShopRef, priorReceivedAt, samePhotoAsPrior,
+} = {}) {
+  assertShopRef(shopRef);
+
+  const lines = [
+    '🔍 Confirm this reading',
+    `Ref: ${value(shopRef)}`,
+    '',
+    `This plan was read from the photograph received ${humanTime(receivedAt)}.`,
+    typeof fingerprintPrefix === 'string' && fingerprintPrefix.length > 0
+      ? `Photo fingerprint: ${value(fingerprintAlgo)}:${fingerprintPrefix}…`
+      : 'Photo fingerprint: none was recorded at intake for this shop.',
+    '',
+    `Lines read from the photograph: ${count(interpretedLines)}`,
+    'Physical lines on the page: not counted by AsdAIr — check the reading',
+    'against the photograph yourself before confirming.',
+    '',
+  ];
+
+  if (priorShopRef) {
+    lines.push(`Previous photo shop: ${value(priorShopRef)}, photograph received ${humanTime(priorReceivedAt)}.`);
+    if (samePhotoAsPrior === true) {
+      lines.push('⚠️ THIS IS THE SAME PHOTOGRAPH as that shop\'s — if you expected a new');
+      lines.push('list this week, do NOT confirm.');
+    } else if (samePhotoAsPrior === null || samePhotoAsPrior === undefined) {
+      lines.push('(The two photographs could not be compared by content — check the times.)');
+    }
+  } else {
+    lines.push('Previous photo shop: none on record — this is the first photographed list.');
+  }
+
+  lines.push('');
+  lines.push('Tap Confirm this reading to approve it. If anything is wrong, do not');
+  lines.push('confirm — review the list first.');
+
+  return {
+    text: block(lines),
+    reply_markup: keyboard([
+      [button('Confirm this reading', ACTIONS.APPROVE, shopRef)],
+      [button('Review list', ACTIONS.REVIEW, shopRef), button('Cancel', ACTIONS.CANCEL, shopRef)],
+    ]),
+  };
+}
+
 // ── 4. Progress ──────────────────────────────────────────────────────────────
 
 /**
@@ -578,6 +735,7 @@ export const MESSAGES = Object.freeze({
   receipt: renderReceipt,
   plan_ready: renderPlanReady,
   question: renderQuestionCard,
+  confirm_interpretation: renderConfirmInterpretation,
   progress: renderProgress,
   basket_ready: renderBasketReady,
   status: renderStatus,

@@ -1,0 +1,68 @@
+{
+  "session_date": "2026-08-08",
+  "branch": "build-015/grounded-recognition",
+  "worktree": "C:\\Fusion247PKA-b15",
+  "host": "claude",
+  "closing_head": "c4c0a4121169ed6759bf0dde1c3799c671d2abb5",
+  "map_path": "Deliverables/2026-08-04-build-015-asdair-wayfinder-plan.md",
+  "deliverable_path": "Deliverables/2026-08-08-session-performance-report-b15-session.md",
+  "payload_path": "Deliverables/2026-08-08-session-report-payload-b15-session.json",
+  "report_status": "COMMISSIONED-OUTSTANDING-AT-ROTATION (Pax, non-blocking per rotate step 6; fresh session banks it on arrival)",
+  "session_range_note": "Dual-build session: BUILD-020 4E on main 3e775d0..959a64b (merged via PR #99 at reviewed head 0511c0a), then BUILD-015 on branch 959a64b..closing_head. 4E portion already reported in the Proofline map's 4E close block.",
+  "elapsed_minutes": null,
+  "elapsed_note": "UNESTABLISHED as wallclock; committed-activity span derivable from commit timestamps (first commit c97edba ~17:5x UTC+1 to closing head ~00:0x). Session start approx 15:35 UK from the continuity packet age at orientation.",
+  "total_context_tokens_in": 582900,
+  "total_context_tokens_in_note": "CLOSING context level, measured via tools/governor/footer.mjs at rotation: 582.9k/1000k (~58%) AMBER. OPENING reading UNESTABLISHED (not sampled at start).",
+  "total_context_tokens_out": null,
+  "total_subagent_tokens": 1250384,
+  "total_subagent_tokens_note": "Total A, deduplicated (Keel's cumulative reading adopted per the 4D-proven interpretation; alternative per-dispatch reading 1,394,553). Ledger: Deliverables/2026-08-08-subagent-token-ledger-b15-session.md. Codex CLI x3 unexposed, UNESTABLISHED not zero. NEVER added to context level.",
+  "wo_total": 1,
+  "wo_first_dispatch_success": 0,
+  "wo_first_dispatch_note": "WO-2026-08-08-B15-01 survived read-back with ONE binding amendment (AC4 route fork, order under-specification, settled to the worker's recommended route (a)); implementation then completed first-pass with zero refusals. Envelope route used end-to-end (recomputed READY 0/0).",
+  "wo_amendments": 1,
+  "wo_refusals": 0,
+  "doc_lines_changed": null,
+  "product_lines_changed": null,
+  "lines_note": "Line-level split UNESTABLISHED at rotation; Pax computes over the full dual range. Product code commits this session: 3 (Keel's 6c15537, c278ceb, 7db899b, +18 files, +25 net tests); everything else documentation/assurance/evidence.",
+  "allocation_product_pct": null,
+  "allocation_admin_pct": null,
+  "allocation_evidence_pct": null,
+  "allocation_rework_pct": null,
+  "allocation_waiting_pct": null,
+  "specialists": {
+    "veritas": { "dispatches": 2, "tokens": 262810, "verdicts": "4E prep PASS 14/14; WP-B15-1 Gate 1 PASS 8/8 (mutation-tested), one non-blocking D1" },
+    "pax": { "dispatches": 4, "tokens": 483524, "note": "three measured returns: grounded-vision 206,601 + supabase knowledge audit 150,959 + old-brain continuity 125,964. The fourth dispatch (session report, commissioned at rotation) is outstanding - its tokens are UNMEASURED until return, not zero, and are NOT in this figure or in total A." },
+    "nolan": { "dispatches": 1, "tokens": 97392 },
+    "keel": { "dispatches": 2, "tokens": 406658, "note": "cumulative per the adopted reading; read-back 144169 within it" },
+    "codex_cli": { "executions": 3, "tokens": null, "note": "reviewDiff.mjs route; usage unexposed, UNESTABLISHED" }
+  },
+  "findings": [
+    {
+      "family": "work-order-not-generated",
+      "exposure": "clean",
+      "summary": "The session's one Work Order went through the generated envelope route end-to-end: generated, one UNRESOLVED surface fixed by regeneration, recomputed READY 0/0, read-back held per SOP-022, amendment ruled explicitly, then issued. Objectively verifiable from the banked order (GENERATED header + marker recount); Pax re-grades in the session report.",
+      "evidence_ref": "Deliverables/2026-08-08-wo-b15-01-order.md"
+    },
+    {
+      "family": "built-tested-never-activated",
+      "exposure": "clean",
+      "summary": "Activation discipline held at every layer under repeated pressure: runtime alignment proven by process start-times and entry paths, migration 016 applied AND schema proven read-only after, live halves of WP-B15-1 explicitly unclaimed in the WO, the map, the commit messages and Veritas's HONESTY dimension (PASS). Self-graded from strong evidence; Pax re-grades.",
+      "evidence_ref": "Deliverables/2026-08-08-veritas-wp-b15-1-gate1-receipt.md"
+    },
+    {
+      "family": "control-cannot-reach-what-it-checks",
+      "exposure": "clean",
+      "summary": "The MUST (make the control fail on purpose) was exercised twice independently: Veritas mutation-tested the enqueue guard and fingerprint writes (red-then-restored-green), and Larry live-verified Pax's break-8 claim against the database before acting on it rather than trusting the staged narrative. Pax re-grades.",
+      "evidence_ref": "Deliverables/2026-08-08-veritas-wp-b15-1-gate1-receipt.md"
+    }
+  ],
+  "unestablished": [
+    "opening context reading",
+    "wallclock elapsed",
+    "Codex CLI token usage (3 executions)",
+    "line-level doc-vs-product split (Pax computes)",
+    "parent-channel response latency (outbound-only transport log)",
+    "record-amended-body-not-recut exposure — DELIBERATELY ungraded by Larry (self-award prohibited); Pax decides in the session report and the fresh session folds his verdict via capae-sync"
+  ],
+  "notes": "Dual-build session: 4E executed to completion (merge 0511c0a, convergence proven, Build switch, BUILD-015 activated) then WP-B15-1 to acceptance-pending. 15 FusionDevBot dings 411-425, all delivered, zero queued. Route-selection/TowerBot recurrence recorded as natural 4F evidence on the Proofline map (family outside the four watched; no new slug minted per the sync contract). Two classifier denials on the acceptance-runtime start ended the session at a genuine permission handback: Warwick's options banked on the map. Pax session report OUTSTANDING at rotation by design (rotate step 6); same session identity required when it lands."
+}

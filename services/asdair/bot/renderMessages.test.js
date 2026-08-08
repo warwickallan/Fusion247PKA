@@ -6,8 +6,10 @@ import {
   MAX_BUTTON_LABEL_CHARS,
   UNKNOWN,
   count,
+  humanTime,
   labelFor,
   renderBasketReady,
+  renderConfirmInterpretation,
   renderConfirmationReceived,
   renderFailure,
   renderPlanReady,
@@ -33,6 +35,13 @@ const SAMPLES = {
   receipt: { shopRef: REF, source: 'telegram photo' },
   plan_ready: { shopRef: REF, listLines: 41, resolved: 36, needDecision: 3, excludedByRule: 2, substitutions: 'never auto-substitute' },
   question: { shopRef: REF, questionKey: 'q7', item: 'yoghurt', candidates: ['Yeo Valley Natural 500g', 'Arla Skyr 450g'] },
+  confirm_interpretation: {
+    shopRef: REF, interpretedLines: 35,
+    fingerprintPrefix: 'ab12cd34ef56', fingerprintAlgo: 'sha256',
+    receivedAt: '2026-08-08T20:41:00.000Z',
+    priorShopRef: 'shop-2026-07-21', priorReceivedAt: '2026-07-21T09:12:00.000Z',
+    samePhotoAsPrior: false,
+  },
   progress: { shopRef: REF, stage: 'search items', regularsAdded: 30, searchItemsAdded: 5, held: 2, substitutions: 0, basketLines: 35 },
   // The basket handback is DERIVED FROM THE VERIFICATION. `verification` is not
   // optional garnish: absent or null renders the loud NOT-VERIFIED card, by
@@ -63,9 +72,12 @@ function everyButton(rendered) {
 // ── catalogue-wide shape ─────────────────────────────────────────────────────
 
 test('the catalogue covers every message the directive specifies', () => {
+  // 'confirm_interpretation' added by WP-B15-1 (the needs_review gate's
+  // production surface). The list grows; nothing was removed or renamed.
   assert.deepEqual(Object.keys(MESSAGES).sort(), [
-    'basket_ready', 'confirmation_received', 'failure', 'plan_ready',
-    'progress', 'question', 'receipt', 'reconciliation_summary', 'status',
+    'basket_ready', 'confirm_interpretation', 'confirmation_received', 'failure',
+    'plan_ready', 'progress', 'question', 'receipt', 'reconciliation_summary',
+    'status',
   ]);
 });
 
@@ -409,9 +421,10 @@ test('labelFor never returns an empty label', () => {
 test('NO SECRET can reach rendered output: a token-shaped value passed into every renderer never appears', () => {
   // A realistic bot-token shape. If a renderer ever reached for the environment,
   // or echoed an unexpected field, this would catch it.
-  // Shaped to NOT match the repo secret-scan's Telegram pattern - see the note
-  // on the same fixture in sendShopperMessage.test.js.
-  const TOKEN = '1234567890:TESTFIXTURE-not-a-real-telegram-token';
+  // Shaped to NOT match the repo secret-scan's `telegram-token-bare` pattern
+  // ([0-9]{8,}:[A-Za-z0-9_-]{30,}) - see the note on the same fixture in
+  // sendShopperMessage.test.js.
+  const TOKEN = '1234567890:TESTFIXTURE.not.a.real.telegram.token';
   const originalEnv = process.env.SHOPPER_BOT_TOKEN;
   process.env.SHOPPER_BOT_TOKEN = TOKEN;
   try {
@@ -426,5 +439,70 @@ test('NO SECRET can reach rendered output: a token-shaped value passed into ever
   } finally {
     if (originalEnv === undefined) delete process.env.SHOPPER_BOT_TOKEN;
     else process.env.SHOPPER_BOT_TOKEN = originalEnv;
+  }
+});
+
+// ── WP-B15-1: the interpretation-confirmation card ───────────────────────────
+// The needs_review gate's production surface. What these prove: the card binds
+// the reading to the EXACT photograph (fingerprint prefix + received time),
+// renders every absence honestly instead of fabricating, carries a
+// HUMAN-READABLE prior-photograph comparison, and its primary tap is the
+// distinct `approve` action - never the reconcile-stage `confirm`.
+
+test('CONFIRMATION CARD: names the exact photograph - fingerprint prefix and received time both rendered', () => {
+  const out = renderConfirmInterpretation(SAMPLES.confirm_interpretation);
+  assert.ok(out.text.includes('sha256:ab12cd34ef56'), 'the fingerprint prefix is missing');
+  assert.ok(out.text.includes('Sat 2026-08-08 20:41 UTC'), 'the received time is missing or not human-readable');
+  assert.ok(out.text.includes('read from the photograph received'), 'the wording does not bind reading to photograph');
+  assert.ok(out.text.includes('Lines read from the photograph: 35'));
+});
+
+test('CONFIRMATION CARD: a shop with NO stored fingerprint says so in words - never a fabricated value', () => {
+  const out = renderConfirmInterpretation({
+    shopRef: REF, interpretedLines: 35,
+    fingerprintPrefix: null, fingerprintAlgo: null,
+    receivedAt: '2026-08-03T19:05:00.000Z',
+    priorShopRef: null, priorReceivedAt: null, samePhotoAsPrior: null,
+  });
+  assert.ok(out.text.includes('none was recorded at intake'), 'a missing fingerprint must be stated, not hidden');
+  assert.ok(!out.text.includes('sha256:'), 'no fingerprint may be rendered when none is stored');
+  assert.ok(out.text.includes('none on record'), 'a missing prior photo shop must be stated');
+});
+
+test('CONFIRMATION CARD: never claims a mechanical physical-line count - the human verifies against the photograph', () => {
+  const out = renderConfirmInterpretation(SAMPLES.confirm_interpretation);
+  assert.ok(out.text.includes('not counted by AsdAIr'), 'the card must say no physical count exists');
+  assert.ok(/check the reading/i.test(out.text), 'the card must direct the human to verify against the photograph');
+});
+
+test('CONFIRMATION CARD: the prior-photograph comparison is human-readable, and identical content warns LOUDLY', () => {
+  const spec = { ...SAMPLES.confirm_interpretation };
+  const normal = renderConfirmInterpretation(spec);
+  assert.ok(normal.text.includes('shop-2026-07-21'), 'the prior shop is not named');
+  assert.ok(normal.text.includes('Tue 2026-07-21 09:12 UTC'), 'the prior received time is not human-readable');
+  assert.ok(!normal.text.includes('SAME PHOTOGRAPH'), 'different photographs must not warn');
+
+  const resent = renderConfirmInterpretation({ ...spec, samePhotoAsPrior: true });
+  assert.ok(resent.text.includes('SAME PHOTOGRAPH'), 'an identical re-sent photograph must warn');
+  assert.ok(resent.text.includes('do NOT confirm'), 'the warning must tell the human not to confirm');
+
+  const uncomparable = renderConfirmInterpretation({ ...spec, samePhotoAsPrior: null });
+  assert.ok(uncomparable.text.includes('could not be compared'), 'null must render as not-compared, never as fine');
+});
+
+test('CONFIRMATION CARD: the primary tap is `approve` - and no button on it is the reconcile-stage `confirm`', () => {
+  const out = renderConfirmInterpretation(SAMPLES.confirm_interpretation);
+  const actions = everyButton(out).map((b) => parseCallbackData(b.callback_data).action);
+  assert.ok(actions.includes('approve'), 'the card must offer the approve tap');
+  assert.ok(!actions.includes('confirm'), 'the order-email `confirm` action must never appear on this card');
+});
+
+test('humanTime: deterministic UTC rendering, and anything unparseable is unknown - never a fabricated time', () => {
+  assert.equal(humanTime('2026-08-08T20:41:00.000Z'), 'Sat 2026-08-08 20:41 UTC');
+  assert.equal(humanTime('2026-08-08T22:41:00+02:00'), 'Sat 2026-08-08 20:41 UTC', 'an offset suffix must normalise to UTC');
+  assert.equal(humanTime('2026-02-30T10:00:00Z'), UNKNOWN, 'an impossible calendar date must not be normalised into a real one');
+  assert.equal(humanTime('2026-07-21T09:12:00.000Z'), 'Tue 2026-07-21 09:12 UTC');
+  for (const bad of [null, undefined, '', '   ', 'not-a-date', 42]) {
+    assert.equal(humanTime(bad), UNKNOWN, `humanTime(${String(bad)})`);
   }
 });

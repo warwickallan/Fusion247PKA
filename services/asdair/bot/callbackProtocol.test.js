@@ -194,3 +194,21 @@ test('malformed answer args are refused', () => {
     assert.equal(parseAnswerArg(bad).ok, false, `should have refused: ${String(bad)}`);
   }
 });
+
+// ── WP-B15-1: the `approve` action (interpretation-confirmation gate) ────────
+
+test('approve exists, is DISTINCT from the order-email confirm, and rides the wire round-trip', () => {
+  assert.ok(isValidAction('approve'), 'missing action: approve');
+  assert.ok(isValidAction('confirm'), 'the pre-existing confirm action must survive untouched');
+  assert.notEqual(ACTIONS.APPROVE, ACTIONS.CONFIRM, 'one tap word must never carry two meanings');
+  const data = buildCallbackData({ action: ACTIONS.APPROVE, shopRef: REF });
+  assert.equal(data, `asd:approve:${REF}`);
+  assert.deepEqual(parseCallbackData(data), { ok: true, action: 'approve', shopRef: REF, arg: null });
+});
+
+test('approve is 7 bytes, so `exceptions` still sizes the budget and no field shrinks protocol-wide', () => {
+  assert.equal(byteLength(ACTIONS.APPROVE), 7);
+  assert.ok(byteLength(ACTIONS.APPROVE) <= MAX_ACTION_BYTES, 'approve must fit the existing action budget');
+  assert.equal(MAX_ACTION_BYTES, 'exceptions'.length, 'adding approve must not change the longest action');
+  assert.equal(WORST_CASE_BYTES, CALLBACK_DATA_MAX_BYTES, 'the 64-byte saturation arithmetic must be unchanged');
+});

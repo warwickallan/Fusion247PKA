@@ -709,6 +709,72 @@ export async function listOutbox(deps, { shopId = null } = {}) {
 }
 
 // ---------------------------------------------------------------------
+// The exact-source image binding - asdair.shop_source_image (migration 016)
+//
+// WP-B15-1 invariant C. One row per shop, binding it to the immutable CONTENT
+// of the photograph it was read from. Written once, at receive time, inside the
+// same durability-before-ack boundary as the shop itself; read by the
+// confirmation card so the human can see WHICH photograph produced the reading.
+// The table grants no UPDATE and no DELETE to any role, so first-write-wins is
+// structural, not a convention this module remembers.
+// ---------------------------------------------------------------------
+
+const SOURCE_IMAGE_COLUMNS = 'shop_id, fingerprint, algo, byte_length, captured_at';
+
+/**
+ * Bind one shop to its source image, once. IDEMPOTENT ON THE SHOP: the PRIMARY
+ * KEY refuses a second row, so a Telegram redelivery (which RESUMES the shop)
+ * adopts the original binding rather than overwriting it. `created:false` means
+ * the binding already existed - normal on a redelivery, never an error.
+ *
+ * `capturedAt` is the receiver's own stamp carried through intake; the database
+ * clock is only the fallback when no stamp travelled.
+ */
+export async function recordSourceImage(deps, { shopId, fingerprint, algo = 'sha256', byteLength = null, capturedAt = null }) {
+  const res = await deps.writeQuery(
+    `INSERT INTO asdair.shop_source_image (shop_id, fingerprint, algo, byte_length, captured_at)
+     VALUES ($1, $2, $3, $4, coalesce($5::timestamptz, now()))
+     ON CONFLICT (shop_id) DO NOTHING
+     RETURNING ${SOURCE_IMAGE_COLUMNS}`,
+    [shopId, fingerprint, algo, byteLength, capturedAt],
+  );
+  const row = rowsOf(res)[0] || null;
+  return { created: !!row, row };
+}
+
+/** The stored image binding for one shop, or null. Null is an HONEST answer -
+ *  a shop received before fingerprinting existed has no row, and the card says
+ *  so rather than fabricating a value. */
+export async function findSourceImage(deps, shopId) {
+  const res = await deps.readQuery(
+    `SELECT ${SOURCE_IMAGE_COLUMNS} FROM asdair.shop_source_image WHERE shop_id = $1`,
+    [shopId],
+  );
+  return rowsOf(res)[0] || null;
+}
+
+/**
+ * The household's most recent EARLIER photo shop, with its image binding where
+ * one exists - what the confirmation card's human-readable prior-photograph
+ * comparison is built from. LEFT JOIN: an old photo shop with no fingerprint
+ * still anchors the comparison by its received time.
+ *
+ * Ordered by shop id, not by date: ids are assigned at receive time, so "the
+ * previous photo shop" is well-defined even when two arrive on one day.
+ */
+export async function findPriorPhotoShop(deps, householdId, shopId) {
+  const res = await deps.readQuery(
+    `SELECT s.id, s.shop_ref, s.created_at, i.fingerprint, i.captured_at
+       FROM asdair.shop s
+       LEFT JOIN asdair.shop_source_image i ON i.shop_id = s.id
+      WHERE s.household_id = $1 AND s.source_kind = 'photo' AND s.id < $2
+      ORDER BY s.id DESC LIMIT 1`,
+    [householdId, shopId],
+  );
+  return rowsOf(res)[0] || null;
+}
+
+// ---------------------------------------------------------------------
 // The human's list - READ ONLY, and the only mention of pending_action left
 // ---------------------------------------------------------------------
 

@@ -84,6 +84,13 @@ export const ACTIONS = Object.freeze({
   CLOSE: 'close',           // Close shop
   RETRY: 'retry',           // Retry the failed step
   CONFIRM: 'confirm',       // Send order confirmation (Warwick forwards the ASDA email)
+  // APPROVE is the interpretation-confirmation gate's deliberate act ("Confirm
+  // this reading" on the confirmation card -> confirmInterpretation). It is
+  // DELIBERATELY NOT `confirm`: that name is already the reconcile-stage
+  // order-email prompt above, and one tap word carrying two meanings is the
+  // exact ambiguity the "a glance is not an approval" design exists to prevent.
+  // 7 bytes, so `exceptions` (10) still sizes the budget and nothing shrinks.
+  APPROVE: 'approve',       // Confirm this reading (interpretation gate)
 });
 
 /** The action names as a lookup set, for O(1) validation. */

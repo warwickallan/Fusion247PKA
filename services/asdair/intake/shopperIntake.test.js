@@ -539,3 +539,65 @@ test('the offset IS acknowledged once persistence succeeds', async () => {
   assert.equal(seen.length, 1, 'the persistence hook ran BEFORE acknowledgement');
   assert.equal((await state.read()).lastUpdateId, 901);
 });
+
+// ── WP-B15-1: the exact-source image fingerprint (invariant C) ───────────────
+
+test('FINGERPRINT: a downloaded photo carries the sha256 of the EXACT saved bytes on its meta', async () => {
+  const bytes = Buffer.from('FAKEJPEGBYTES');
+  const telegram = fakeTelegram({ updates: [photoUpdate({ updateId: 9001, messageId: 200 })], bytes });
+  const media = fakeMedia();
+  const r = await runIntake({ config: testConfig(), telegram, state: createMemoryStateStore(null), media, now: () => 1_700_000_000_000 });
+
+  assert.equal(r.emitted.length, 1);
+  const rec = r.emitted[0];
+  // The independent expectation: computed here, from the same fixture bytes,
+  // with node:crypto directly - not by calling the function under test.
+  const { createHash } = await import('node:crypto');
+  const expected = createHash('sha256').update(bytes).digest('hex');
+  assert.equal(rec.meta.imageSha256, expected, 'the fingerprint is not the sha256 of the downloaded bytes');
+  assert.equal(rec.meta.bytes, bytes.length);
+  // The bytes the media store SAVED are the bytes that were hashed.
+  assert.equal(media.saved[0].bytes.toString(), bytes.toString());
+  // The payload contract is untouched: still exactly the resolvePayload shape.
+  assert.deepEqual(Object.keys(rec.payload).sort(), ['imageRef', 'kind'], 'the fingerprint must ride meta, never the payload');
+});
+
+test('FINGERPRINT: same bytes same fingerprint, different bytes different fingerprint - it is content identity', async () => {
+  const a = await runIntake({
+    config: testConfig(),
+    telegram: fakeTelegram({ updates: [photoUpdate({ updateId: 9101, messageId: 201 })], bytes: Buffer.from('WEEK-A-PHOTO') }),
+    state: createMemoryStateStore(null), media: fakeMedia(), now: () => 1_700_000_000_000,
+  });
+  const aAgain = await runIntake({
+    config: testConfig(),
+    telegram: fakeTelegram({ updates: [photoUpdate({ updateId: 9102, messageId: 202 })], bytes: Buffer.from('WEEK-A-PHOTO') }),
+    state: createMemoryStateStore(null), media: fakeMedia(), now: () => 1_700_000_000_000,
+  });
+  const b = await runIntake({
+    config: testConfig(),
+    telegram: fakeTelegram({ updates: [photoUpdate({ updateId: 9103, messageId: 203 })], bytes: Buffer.from('WEEK-B-PHOTO') }),
+    state: createMemoryStateStore(null), media: fakeMedia(), now: () => 1_700_000_000_000,
+  });
+  assert.equal(a.emitted[0].meta.imageSha256, aAgain.emitted[0].meta.imageSha256,
+    'a re-sent identical photograph must fingerprint identically - that is the wrong-week detector');
+  assert.notEqual(a.emitted[0].meta.imageSha256, b.emitted[0].meta.imageSha256,
+    'two different photographs must never share a fingerprint');
+});
+
+test('FINGERPRINT: a dry run downloads nothing, so it honestly carries no fingerprint', async () => {
+  const telegram = fakeTelegram({ updates: [photoUpdate({ updateId: 9201, messageId: 204 })] });
+  const r = await runIntake({ config: testConfig(), telegram, state: createMemoryStateStore(null), dryRun: true, now: () => 1_700_000_000_000 });
+  assert.equal(r.emitted.length, 1);
+  assert.ok(!('imageSha256' in r.emitted[0].meta), 'a fingerprint of bytes never fetched would be fabricated evidence');
+  assert.equal(telegram.calls.downloadFile.length, 0);
+});
+
+test('FINGERPRINT: a text message carries none - there is no image to bind', async () => {
+  const r = await runIntake({
+    config: testConfig(),
+    telegram: fakeTelegram({ updates: [textUpdate({ updateId: 9301, messageId: 205 })] }),
+    state: createMemoryStateStore(null), media: fakeMedia(), now: () => 1_700_000_000_000,
+  });
+  assert.equal(r.emitted.length, 1);
+  assert.ok(!('imageSha256' in r.emitted[0].meta));
+});
