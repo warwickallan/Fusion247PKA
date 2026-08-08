@@ -70,8 +70,13 @@ question-card code actually loaded.
 shopping_lists) → resumed → **TRANSCRIBING → PROCESSING: "interpreted 35 line(s) against a
 catalogue of 97 known products"** → **NEEDS_DECISION: "11 line(s) need a human decision"** →
 answers → **"every question is answered - re-planning with the answers in place" → PROCESSING at
-20:10:40 — and NOT ONE EVENT SINCE.** Five days stuck at the exact seam where the execution-packet
-chain has no production caller (breaks 3–5).
+20:10:40 — and NOT ONE EVENT SINCE.** ~~Five days stuck at the exact seam where the
+execution-packet chain has no production caller (breaks 3–5).~~ **CORRECTED SAME DAY by Pax's
+Step-2 investigation and re-verified live by Larry: the stall is the interpretation-confirmation
+gate — shop 6 is `needs_review = true` and `pipeline_command` holds ZERO confirm commands ever;
+no production surface can issue `confirmInterpretation`. The packet seam (breaks 3–5) is
+downstream of a state shop 6 never reached.** See
+[[Deliverables/2026-08-08-pax-b15-grounded-vision-investigation]] and the proposed WP.
 
 **Precision on an earlier map claim:** the 2026-08-04 map's "no row has ever been written to
 Postgres by this journey" was about the TEST journey (all destructive Postgres tests skipped); the
