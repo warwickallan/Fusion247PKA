@@ -568,7 +568,73 @@ begins only after the prepared sequence below reaches Warwick's decision at step
 catalogue-grounded interpretation with no Larry in the execution path — and what, from executable
 evidence, is the earliest link in the journey that still cannot happen in production?*
 
-### 🎯 THE ONE CURRENT NEXT ACTION — route DECIDED by Warwick, 2026-08-09. **MERGE-FIRST. WP-B15-1 remains NOT COMPLETE until the real live acceptance event happens.**
+### 🎯 THE ONE CURRENT NEXT ACTION — the merge-first route is EXECUTED. **Shop 6 recovered live, 2026-08-09 00:41:55. Next action: the § 12 handback — Warwick's next product decision.**
+
+> **⚠️ COMPLETION IS NOT CLAIMED HERE.** Larry does not grade his own work. What follows is the
+> acceptance EVIDENCE from the real production event. **The completion claim for WP-B15-1 requires
+> a Veritas gate against this boundary and does not exist yet.** Until then the maximum permitted
+> statement is that the work is integrated at `d907350` and the live acceptance event is evidenced
+> below. **Break 8's classification moves only on that receipt, not on this record.**
+
+#### THE LIVE ACCEPTANCE EVENT — executed evidence, 2026-08-09
+
+**The route Warwick decided on 2026-08-09 ran end to end.** PR #100 → CI on the exact head →
+Tower-visible Codex via `mergeCheck.mjs` (APPROVE, zero findings, three executions of three) →
+Warwick's merge → merge commit **`d907350`** → **explicit** canonical runtime start → real card →
+real tap → recovery.
+
+| Step | Evidence | Time (local) |
+|---|---|---|
+| Merge | `d907350`, expected-head guard matched reviewed head `b4b37d8` | 00:37:41 |
+| Canonical checkout | fast-forwarded, zero untracked paths; all 18 changed source files hash-match merged `main` | 00:38 |
+| **Explicit** runtime start | scheduled task started by hand — **not** assumed from the logon trigger; `launcher_spawn` entry `C:\Fusion247PKA\services\asdair\pipeline\runtime.js`, PID 3704 | 00:38:40 |
+| Lineage | process start **59 s AFTER** the merge commit; entry path in the canonical checkout | 00:38:40 |
+| Card queued | `pipeline_command` id 21, `kind=outbox`, `confirm_interpretation` — **by the runtime, not by Larry** | 00:38:45 |
+| Card delivered | `status=done`, `attempts=1`, `last_error=null`, `result={"note":"sent"}` | 00:38:46 |
+| **Warwick's tap** | `pipeline_command` id 22, `kind=command`, `confirmInterpretation` — **the first confirm command in this system's entire history** | 00:40:51 |
+| Gate cleared + replan | `shop_event` transition `PROCESSING → READY_TO_SHOP`, description *"every line is resolved"* | 00:41:55 |
+| Shop 6 recovered | `plan_ready` card queued and sent (`pipeline_command` id 23, `done`) | 00:41:56 |
+
+**Self-healing proven, not asserted.** Shop 6 had been parked silently at the interpretation gate
+since **2026-08-03** — five days, every question answered, not one event. No row was inserted, no
+manual database command was issued, and the durable state was not restarted. The new code met the
+already-parked shop on its **first pass** and produced the card. That is the `outboxEverQueued`
+self-heal path in `runPipeline.js:462` doing exactly what its comment claims.
+
+**No Larry in the execution path.** Larry started the runtime — an acceptance step Warwick made
+explicit — and touched nothing in the journey afterwards. Every subsequent row was written by the
+runtime.
+
+#### Defects and corrections observed AT the acceptance — recorded, not smoothed
+
+1. **`answerCallbackQuery` rejected: "query is too old and response timeout expired or query ID is
+   invalid".** Emitted as `tap_failed`, which then failed the whole pass (`pass_failed`, passes 2
+   and 4). **Consequence for the human: Warwick's button never confirmed visually, so he tapped
+   roughly four more times.** **CAUSE UNESTABLISHED** — a named candidate, asserted as nothing more,
+   is that two processes poll the same bot token (ShopperBot `server.js` PID 14376 and the pipeline
+   runtime both call `getUpdates`). **The latch held: four tap batches produced exactly ONE
+   `confirmInterpretation` row and zero duplicates**, and the offset advanced each time, so passes
+   resumed cleanly once taps stopped. The durability design absorbed the defect; the UX is still
+   wrong.
+2. **`needs_review` remains `true`, and this is BY DESIGN — not a miss, and the earlier expectation
+   was wrong.** `commands.js:145-148`: the flag is set at the one moment it can be, creation, and
+   *"there is no writer for `needs_review` afterwards — shopStore's UPDATE allowlist is (status,
+   last_error, list_id) precisely so progressing a shop can never rewrite what arrived."* **The gate
+   clearing is evidenced by the status transition, not by that flag.** Warwick's route said "observe
+   `needs_review` clear"; that phrasing originated in Larry's own framing and was wrong about the
+   design. Corrected here rather than left to mislead the next session.
+3. **`pipeline_command` id 22 remains `status=pending`.** Consistent with the documented design —
+   *"A LATCH, not a queue entry: once issued it stays true for this shop, so the runner consuming it
+   cannot re-close the gate"* (`commands.js:213-231`). **Honest limit: no writer that marks it `done`
+   was located.** Non-blocking; recorded once.
+4. **The learning loop wrote nothing, and the feared failure did NOT occur.** The watch item was that
+   gate-clear → replan fires the first-ever live `recordAnswerLearning` writes, whose writer parks the
+   shop FAILED on any error. **The shop did not park FAILED.** It also learned nothing: `rule_qa_log`
+   still holds 5 rows with a newest timestamp of **2026-07-20**. This corroborates Pax's banked
+   household-knowledge audit and the `runPipeline.js:581` `applies_going_forward: false` finding.
+   **Next slice, and explicitly not touched here** (Warwick, 2026-08-09, boundary 8).
+
+
 
 > **AMENDMENT — Warwick, 2026-08-09.** Verbatim ruling, mirrored at
 > [[Deliverables/2026-08-09-warwick-route-decision-merge-first-SOURCE]]:
