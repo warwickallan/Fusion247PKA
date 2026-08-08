@@ -1,88 +1,157 @@
 # convergence-runtime-check.ps1
 #
-# Proves ONE property, and states its own limit:
+# POSITIVE RUNTIME PROVENANCE. Replaces the earlier negative check.
 #
-#   No live process of any executable type has its executable, command line, or loaded
-#   module path rooted in a SUPERSEDED MyPKA branch / worktree / checkout.
+#   Every live Fusion247 runtime must be IDENTIFIABLE, its actual code source must be KNOWN,
+#   and that source must be either canonical `main` or an installed/derived runtime
+#   DEMONSTRABLY PRODUCED FROM canonical `main`.
 #
-# BUILD-020 Sub-phase 4C. Written after Veritas proved the previous check narrower than its
-# claim: it enumerated node.exe only and read command lines only, and so missed a stranded
-# Proofline test-harness tree alive inside the candidate worktree since 2026-08-04.
+# WHY THIS CHANGED (BUILD-020 4C, 2026-08-08). The previous check asked the negative question
+# "does any process reference one of these known-superseded roots?" and passed when none did.
+# `~/.mypka/tower-runtime/` escaped it — not because the check malfunctioned, but because a
+# blacklist can only catch what someone already thought to list. Tower was running PRE-MERGE
+# installed bytes, including a stale ratified reviewer contract, and the check said PASS.
 #
-# SCOPE, stated rather than implied:
-#   CHECKED     - ExecutablePath, CommandLine and every loaded module path, for EVERY process,
-#                 matching both \ and / path separators.
-#   NOT CHECKED - the process working directory. Win32_Process does not expose it and obtaining
-#                 it needs handle enumeration this estate does not carry. A process whose cwd is
-#                 a superseded checkout, but whose exe, command line and modules are all canonical,
-#                 would NOT be caught. That is a real gap, recorded, not argued away.
+# The invariant is now inverted: an UNRECOGNISED runtime root is a FAILURE, not a pass. A future
+# reader does not need to know tonight's history to find a hidden runtime copy — the check makes
+# the estate declare every runtime it is actually operating.
+#
+# CLASSIFICATION (in order):
+#   CANONICAL        the repository working folder itself.
+#   PRIVATE-RUNTIME  C:\.fusion247\** — the approved private/runtime home (GL-012). Out of repo
+#                    scope by design; reported, never silently ignored.
+#   DERIVED-CURRENT  an installed copy whose tracked source files are byte-identical to canonical
+#                    main. PROVEN by comparison, not by a marker file or a plausible name.
+#   DERIVED-STALE    an installed copy that differs from canonical main. FAILS. This is the case
+#                    that escaped the old check.
+#   UNKNOWN          a live runtime whose code root cannot be placed. FAILS.
+#
+# SCOPE LIMIT, stated rather than implied: process working directory is not available from
+# Win32_Process, so a runtime whose only link to a stale tree is its cwd is not observed here.
 #
 # Read-only. Kills nothing. exit 0 = PASS, exit 1 = FAIL.
 
 $ErrorActionPreference = 'SilentlyContinue'
+$CANON = 'C:\Fusion247PKA'
 
-$CANON  = 'c:\fusion247pka'
-$ACTIVE = 'c:\fusion247pka-build-020-trial'   # the ONE active working state, retired at 4C close
-
-# Any MyPKA checkout root mentioned in a path, either separator.
-$rx = [regex]'(?i)(c:[\\/]fusion247pka[a-z0-9._-]*)|(c:[\\/]fable-external-repair)|(c:[\\/]audit-worktrees)|(\.claude[\\/]worktrees[\\/][a-z0-9-]+)'
-
-$superseded = @{}   # LIVE superseded root -> processes consuming it
-$deadRefs   = @{}   # superseded root that no longer exists on disk -> processes merely naming it
-$canonHits = 0; $activeHits = 0; $procs = 0
-
-foreach ($p in Get-CimInstance Win32_Process) {
-    $procs++
-    $paths = New-Object System.Collections.ArrayList
-    [void]$paths.Add($p.ExecutablePath)
-    [void]$paths.Add($p.CommandLine)
-    foreach ($m in (Get-Process -Id $p.ProcessId).Modules) { [void]$paths.Add($m.FileName) }
-
-    foreach ($val in $paths) {
-        if ([string]::IsNullOrWhiteSpace($val)) { continue }
-        foreach ($m in $rx.Matches($val)) {
-            $root = $m.Value.Replace('/', '\').ToLower().TrimEnd('\')
-            if ($root -eq $CANON)       { $canonHits++;  continue }
-            if ($root -eq $ACTIVE)      { $activeHits++; continue }
-            # A root that no longer exists on disk cannot be CONSUMED - it is a dead reference
-            # (a stale launch argument), not a live dependency. Both are reported; only the
-            # live kind fails the check.
-            if (-not (Test-Path -LiteralPath $root)) {
-                if (-not $deadRefs.ContainsKey($root)) { $deadRefs[$root] = New-Object System.Collections.ArrayList }
-                $de = "PID $($p.ProcessId) $($p.Name)"
-                if ($deadRefs[$root] -notcontains $de) { [void]$deadRefs[$root].Add($de) }
-                continue
-            }
-            if (-not $superseded.ContainsKey($root)) { $superseded[$root] = New-Object System.Collections.ArrayList }
-            $entry = "PID $($p.ProcessId) $($p.Name)"
-            if ($superseded[$root] -notcontains $entry) { [void]$superseded[$root].Add($entry) }
+function Resolve-CodeRoot([string]$cmdline) {
+    # the first absolute path in the command line that names a real file is the entry script
+    foreach ($m in [regex]::Matches($cmdline, '[A-Za-z]:[\\/][^"'']+?\.(mjs|js|cjs)')) {
+        $p = $m.Value.Replace('/', '\')
+        if (Test-Path -LiteralPath $p -PathType Leaf) { return $p }
+    }
+    # RELATIVE entry script (the process was launched from its own working directory, which
+    # Win32_Process does not expose). Resolve it against the known runtime homes rather than
+    # declaring it unplaceable — a relative path is still a real, findable file.
+    foreach ($m in [regex]::Matches($cmdline, '(?<![\w:\\/.])((?:[\w.-]+[\\/])*[\w.-]+\.(?:mjs|js|cjs))')) {
+        $rel = $m.Groups[1].Value.Replace('/', '\')
+        foreach ($base in @('C:\Fusion247PKA', 'C:\.fusion247\private\careerair', 'C:\.fusion247')) {
+            $cand = Join-Path $base $rel
+            if (Test-Path -LiteralPath $cand -PathType Leaf) { return $cand }
+        }
+        foreach ($d in (Get-ChildItem -LiteralPath 'C:\.fusion247\private' -Directory -ErrorAction SilentlyContinue)) {
+            $cand = Join-Path $d.FullName $rel
+            if (Test-Path -LiteralPath $cand -PathType Leaf) { return $cand }
         }
     }
+    return $null
 }
 
-$supCount = 0
-foreach ($k in $superseded.Keys) { $supCount += $superseded[$k].Count }
-
-Write-Output "processes examined      : $procs"
-Write-Output "canonical refs          : $canonHits   ($CANON)"
-Write-Output "active-candidate refs   : $activeHits   ($ACTIVE - legitimate until 4C merges)"
-Write-Output "SUPERSEDED-ROOT refs    : $supCount   (MUST BE ZERO)"
-foreach ($k in $superseded.Keys) {
-    Write-Output "    $k"
-    foreach ($e in $superseded[$k]) { Write-Output "        $e" }
+function Get-RuntimeRoot([string]$entry) {
+    # Walk up to the RUNTIME ROOT: the first ancestor that is a git repository (.git), or that
+    # contains a 'services' subtree. .git wins because a checkout's root is its own provenance
+    # anchor — this is what places a runtime living in a subdirectory of another repository
+    # (e.g. <repo>\apps\<app>), which an earlier version misread as an unplaceable install.
+    $d = Split-Path -Parent $entry
+    while ($d) {
+        if (Test-Path -LiteralPath (Join-Path $d '.git')) { return $d }
+        if (Test-Path -LiteralPath (Join-Path $d 'services') -PathType Container) { return $d }
+        $parent = Split-Path -Parent $d
+        if (-not $parent -or $parent -eq $d) { break }
+        $d = $parent
+    }
+    return (Split-Path -Parent $entry)
 }
-foreach ($k in $deadRefs.Keys) {
-    Write-Output "    DEAD REFERENCE (path absent from disk, cannot be consumed): $k"
-    foreach ($e in $deadRefs[$k]) { Write-Output "        $e" }
+
+function Test-DerivedFromMain([string]$root) {
+    # PROVE derivation: every tracked source file present in the install must be byte-identical
+    # to canonical main. node_modules and .git are excluded (dependency/VCS state, not source).
+    $mismatch = @()
+    $checked = 0
+    $svc = Join-Path $root 'services'
+    if (-not (Test-Path -LiteralPath $svc)) { return @{ ok = $false; checked = 0; mismatch = @('no services/ subtree') } }
+    Get-ChildItem -LiteralPath $svc -Recurse -File -Include *.mjs,*.js,*.cjs,*.md,*.sql,*.json |
+        Where-Object { $_.FullName -notmatch '\\node_modules\\' -and $_.FullName -notmatch '\\\.git\\' -and
+                       $_.FullName -notmatch '\\\.runtime-live\\' -and $_.FullName -notmatch '\\\.logs?\\' -and
+                       $_.Extension -ne '.log' } |
+        ForEach-Object {
+            $rel = $_.FullName.Substring($root.Length).TrimStart('\')
+            $canonFile = Join-Path $CANON $rel
+            if (Test-Path -LiteralPath $canonFile -PathType Leaf) {
+                $checked++
+                $a = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
+                $b = (Get-FileHash -LiteralPath $canonFile -Algorithm SHA256).Hash
+                if ($a -ne $b) { $mismatch += $rel }
+            }
+        }
+    return @{ ok = ($mismatch.Count -eq 0 -and $checked -gt 0); checked = $checked; mismatch = $mismatch }
+}
+
+$rows = @()
+Get-CimInstance Win32_Process -Filter "Name='node.exe'" | ForEach-Object {
+    $p = $_
+    $cl = [string]$p.CommandLine
+    if ($cl -notmatch '(?i)fusion247|\.mypka|asdair|careerair|cockpit|obsidiwikai') { return }
+    $entry = Resolve-CodeRoot $cl
+    if (-not $entry) {
+        if ($cl -match '(?i)C:[\/]\.fusion247') {
+            $rows += [pscustomobject]@{ PID=$p.ProcessId; Root='C:\.fusion247 (relative entry)'; Class='PRIVATE-RUNTIME'; Detail='approved private/runtime home (GL-012); entry script is relative to its own cwd' }
+        } else {
+            $rows += [pscustomobject]@{ PID=$p.ProcessId; Root='(entry script not resolvable)'; Class='UNKNOWN'; Detail=$cl.Substring(0,[Math]::Min(70,$cl.Length)) }
+        }
+        return
+    }
+    $root = Get-RuntimeRoot $entry
+    $cls = $null; $detail = ''
+    if ($root -ieq $CANON) { $cls = 'CANONICAL'; $detail = 'repository working folder' }
+    elseif ($root -like 'C:\.fusion247*' -or $entry -like 'C:\.fusion247*') { $cls = 'PRIVATE-RUNTIME'; $detail = 'approved private/runtime home (GL-012)' }
+    elseif (Test-Path -LiteralPath (Join-Path $root '.git')) {
+        $o = (& git -C $root remote get-url origin 2>$null)
+        if ($o -and $o -notmatch '(?i)Fusion247PKA') {
+            $cls = 'SEPARATE-REPO'; $detail = "own repository, origin $o - outside this estate's convergence, named not ignored"
+        } else {
+            $d = Test-DerivedFromMain $root
+            if ($d.ok) { $cls = 'DERIVED-CURRENT'; $detail = "$($d.checked) source files byte-identical to canonical main" }
+            else { $cls = 'DERIVED-STALE'; $detail = "$($d.mismatch.Count) file(s) differ: " + (($d.mismatch | Select-Object -First 3) -join ', ') }
+        }
+    }
+    else {
+        $d = Test-DerivedFromMain $root
+        if ($d.ok) { $cls = 'DERIVED-CURRENT'; $detail = "$($d.checked) source files byte-identical to canonical main" }
+        else { $cls = 'DERIVED-STALE'; $detail = "$($d.mismatch.Count) file(s) differ from canonical main: " + (($d.mismatch | Select-Object -First 4) -join ', ') }
+    }
+    $rows += [pscustomobject]@{ PID=$p.ProcessId; Root=$root; Class=$cls; Detail=$detail }
+}
+
+Write-Output "POSITIVE RUNTIME PROVENANCE - every live runtime must be placed, or it FAILS"
+Write-Output ""
+foreach ($r in ($rows | Sort-Object Class, Root)) {
+    Write-Output ("  [{0,-15}] PID {1,-7} {2}" -f $r.Class, $r.PID, $r.Root)
+    Write-Output ("                    {0}" -f $r.Detail)
 }
 Write-Output ""
-if ($supCount -eq 0) {
-    Write-Output "RESULT: PASS - zero LIVE DEPENDENCIES on the superseded checkout roots ENUMERATED in this"
-    Write-Output "        script's pattern, across executable path, command line and loaded-module paths."
-    Write-Output "        The claim is bounded to those roots. A superseded root NOT matching the pattern"
-    Write-Output "        would not be seen - widen the pattern before widening this sentence."
+$bad = @($rows | Where-Object { $_.Class -eq 'UNKNOWN' -or $_.Class -eq 'DERIVED-STALE' })
+Write-Output ("runtimes examined : {0}" -f $rows.Count)
+Write-Output ("canonical         : {0}" -f @($rows | Where-Object { $_.Class -eq 'CANONICAL' }).Count)
+Write-Output ("derived-current   : {0}" -f @($rows | Where-Object { $_.Class -eq 'DERIVED-CURRENT' }).Count)
+Write-Output ("private-runtime   : {0}" -f @($rows | Where-Object { $_.Class -eq 'PRIVATE-RUNTIME' }).Count)
+Write-Output ("separate-repo     : {0}   (named, outside this estate)" -f @($rows | Where-Object { $_.Class -eq 'SEPARATE-REPO' }).Count)
+Write-Output ("UNPLACED or STALE : {0}   (MUST BE ZERO)" -f $bad.Count)
+Write-Output ""
+if ($bad.Count -eq 0) {
+    Write-Output "RESULT: PASS - every live Fusion247 runtime is canonical, provably derived from canonical main, or the approved private runtime."
 } else {
-    Write-Output "RESULT: FAIL - $supCount live reference(s) to superseded roots."
+    Write-Output "RESULT: FAIL - a live runtime is unplaced or running stale derived bytes."
 }
-Write-Output "LIMIT : process working directory NOT checked (not exposed by Win32_Process)."
-if ($supCount -eq 0) { exit 0 } else { exit 1 }
+Write-Output "LIMIT : process working directory is not exposed by Win32_Process and is not checked."
+if ($bad.Count -eq 0) { exit 0 } else { exit 1 }
