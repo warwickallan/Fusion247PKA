@@ -2,9 +2,12 @@
 #
 # POSITIVE RUNTIME PROVENANCE. Replaces the earlier negative check.
 #
-#   Every live Fusion247 runtime must be IDENTIFIABLE, its actual code source must be KNOWN,
-#   and that source must be either canonical `main` or an installed/derived runtime
-#   DEMONSTRABLY PRODUCED FROM canonical `main`.
+#   Every live runtime CONTROLLED BY, LAUNCHED BY, or whose AUTHORITATIVE SOURCE BELONGS TO
+#   Fusion247PKA must be IDENTIFIABLE, its actual code source KNOWN, and that source must be
+#   canonical `main` or an install DEMONSTRABLY PRODUCED FROM canonical `main`.
+#
+#   SCOPE (Warwick, 2026-08-08): a legitimate separate repo/product estate is NOT in scope and is
+#   NOT audited, reconciled or modified. No cross-repo archaeology.
 #
 # WHY THIS CHANGED (BUILD-020 4C, 2026-08-08). The previous check asked the negative question
 # "does any process reference one of these known-superseded roots?" and passed when none did.
@@ -24,6 +27,9 @@
 #                    main. PROVEN by comparison, not by a marker file or a plausible name.
 #   DERIVED-STALE    an installed copy that differs from canonical main. FAILS. This is the case
 #                    that escaped the old check.
+#   EXTERNAL-ESTATE  a legitimate SEPARATE repo/product estate. NOT Fusion247PKA state, NOT audited.
+#                    Only one question is asked of it: does Fusion247PKA launch from or depend on it?
+#   IMPROPER-DEPENDENCY  Fusion247PKA code references an external estate's path. FAILS.
 #   UNKNOWN          a live runtime whose code root cannot be placed. FAILS.
 #
 # SCOPE LIMIT, stated rather than implied: process working directory is not available from
@@ -118,7 +124,25 @@ Get-CimInstance Win32_Process -Filter "Name='node.exe'" | ForEach-Object {
     elseif (Test-Path -LiteralPath (Join-Path $root '.git')) {
         $o = (& git -C $root remote get-url origin 2>$null)
         if ($o -and $o -notmatch '(?i)Fusion247PKA') {
-            $cls = 'SEPARATE-REPO'; $detail = "own repository, origin $o - outside this estate's convergence, named not ignored"
+            # EXTERNAL / SEPARATE ESTATE. Warwick, 2026-08-08: a legitimate separate repo/product
+            # estate (fusion247-platform, Trainr, PowerLumina, ...) is NOT Fusion247PKA state and is
+            # NOT audited, reconciled or modified by this check. The scope of the 4C invariant is
+            # every runtime CONTROLLED BY, LAUNCHED BY, or whose AUTHORITATIVE SOURCE BELONGS TO
+            # Fusion247PKA. The only question asked of an external estate is the one below: is
+            # Fusion247PKA improperly depending on or launching from it? No cross-repo archaeology.
+            $improper = @()
+            if (Test-Path -LiteralPath (Join-Path $root '.git')) {
+                $launchers = Get-ChildItem -LiteralPath $CANON -Recurse -File -Include *.mjs,*.js,*.ps1,*.cmd,*.vbs -ErrorAction SilentlyContinue |
+                    Where-Object { $_.FullName -notmatch '\\node_modules\\' -and $_.FullName -notmatch '\\Deliverables\\' -and $_.FullName -notmatch '\\Builds\\' }
+                foreach ($f in $launchers) {
+                    if ((Get-Content -LiteralPath $f.FullName -Raw -ErrorAction SilentlyContinue) -match [regex]::Escape($root)) { $improper += $f.FullName }
+                }
+            }
+            if ($improper.Count -eq 0) {
+                $cls = 'EXTERNAL-ESTATE'; $detail = "separate repo, origin $o - NOT Fusion247PKA state, not audited. Fusion247PKA does not launch from or depend on it (0 references in canonical code)."
+            } else {
+                $cls = 'IMPROPER-DEPENDENCY'; $detail = "Fusion247PKA code references this external estate: " + (($improper | Select-Object -First 3) -join ', ')
+            }
         } else {
             $d = Test-DerivedFromMain $root
             if ($d.ok) { $cls = 'DERIVED-CURRENT'; $detail = "$($d.checked) source files byte-identical to canonical main" }
@@ -140,12 +164,12 @@ foreach ($r in ($rows | Sort-Object Class, Root)) {
     Write-Output ("                    {0}" -f $r.Detail)
 }
 Write-Output ""
-$bad = @($rows | Where-Object { $_.Class -eq 'UNKNOWN' -or $_.Class -eq 'DERIVED-STALE' })
+$bad = @($rows | Where-Object { $_.Class -eq 'UNKNOWN' -or $_.Class -eq 'DERIVED-STALE' -or $_.Class -eq 'IMPROPER-DEPENDENCY' })
 Write-Output ("runtimes examined : {0}" -f $rows.Count)
 Write-Output ("canonical         : {0}" -f @($rows | Where-Object { $_.Class -eq 'CANONICAL' }).Count)
 Write-Output ("derived-current   : {0}" -f @($rows | Where-Object { $_.Class -eq 'DERIVED-CURRENT' }).Count)
 Write-Output ("private-runtime   : {0}" -f @($rows | Where-Object { $_.Class -eq 'PRIVATE-RUNTIME' }).Count)
-Write-Output ("separate-repo     : {0}   (named, outside this estate)" -f @($rows | Where-Object { $_.Class -eq 'SEPARATE-REPO' }).Count)
+Write-Output ("external-estate   : {0}   (separate repo, NOT audited - only checked that Fusion247PKA does not launch from it)" -f @($rows | Where-Object { $_.Class -eq 'EXTERNAL-ESTATE' }).Count)
 Write-Output ("UNPLACED or STALE : {0}   (MUST BE ZERO)" -f $bad.Count)
 Write-Output ""
 if ($bad.Count -eq 0) {
